@@ -1,0 +1,15 @@
+*.a
+*.sw*
+
+CMakeCache.txt
+CMakeFiles
+Makefile
+compile_commands.json
+
+libraries/utilities/git_revision.cpp
+
+tests/app_test
+tests/chain_bench
+tests/chain_test
+
+/doxygen

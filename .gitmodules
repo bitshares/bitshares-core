@@ -1,0 +1,6 @@
+[submodule "libraries/fc"]
+	path = libraries/fc
+	url = https://github.com/cryptonomex/fc
+[submodule "libraries/leveldb"]
+	path = libraries/leveldb
+	url = https://github.com/bitcoin/leveldb.git

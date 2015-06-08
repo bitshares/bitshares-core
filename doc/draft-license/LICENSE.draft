@@ -1,0 +1,19 @@
+This is draft license text currently under development.  This license does not apply to anything right now.
+
+Copyright (c) 2015, Cryptonomex, Inc
+All rights reserved.
+
+The graphene source code is proprietary and may not be used for any purpose without written permission from Cryptonomex, Inc.  The source code is
+provided publicly for the sole purpose of allowing users to audit the code and compile their own executables.  Blockchain technology depends upon
+a strong consensus on the rules of an open protocol; this source code is provided to completely document the protocol rules (bugs and all).
+
+Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
+
+1. No distribution of binaries compiled from modified versions of the code
+
+2. Any modifications made to the code become property of Cryptonomex, Inc and must be licensed under these same terms
+
+3. The software may be forked/cloned on github for the purpose of submitting bug fixes and pull requests.  All forked repositories are property of Cryptonomex and by
+forking you authorize Github.com to delete your fork at the request Cryptonomex, Inc.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
