@@ -22,7 +22,7 @@
 
 namespace graphene { namespace chain {
 
-object_id_type account_create_evaluator::do_evaluate( const account_create_operation& op )
+void_result account_create_evaluator::do_evaluate( const account_create_operation& op )
 { try {
    FC_ASSERT( db().find_object(op.voting_account) );
    FC_ASSERT( is_relative(op.memo_key) || db().find_object(op.memo_key) );
@@ -97,7 +97,7 @@ object_id_type account_create_evaluator::do_evaluate( const account_create_opera
       FC_ASSERT( op.owner.auths.find( parent_account_itr->id ) != op.owner.auths.end() );
    }
 
-   return object_id_type();
+   return void_result();
 } FC_CAPTURE_AND_RETHROW( (op) ) }
 
 object_id_type account_create_evaluator::do_apply( const account_create_operation& o )
@@ -136,7 +136,7 @@ object_id_type account_create_evaluator::do_apply( const account_create_operatio
 } FC_CAPTURE_AND_RETHROW((o)) }
 
 
-object_id_type account_update_evaluator::do_evaluate( const account_update_operation& o )
+void_result account_update_evaluator::do_evaluate( const account_update_operation& o )
 {
    database&   d = db();
 
@@ -174,9 +174,9 @@ object_id_type account_update_evaluator::do_evaluate( const account_update_opera
       }
    }
 
-   return object_id_type();
+   return void_result();
 }
-object_id_type account_update_evaluator::do_apply( const account_update_operation& o )
+void_result account_update_evaluator::do_apply( const account_update_operation& o )
 {
    db().modify( *acnt, [&]( account_object& a  ){
           if( o.owner ) a.owner = *o.owner;
@@ -192,10 +192,10 @@ object_id_type account_update_evaluator::do_apply( const account_update_operatio
           a.num_witness = o.num_witness;
           a.num_committee = o.num_committee;
       });
-   return object_id_type();
+   return void_result();
 }
 
-object_id_type account_whitelist_evaluator::do_evaluate(const account_whitelist_operation& o)
+void_result account_whitelist_evaluator::do_evaluate(const account_whitelist_operation& o)
 { try {
    database& d = db();
 
@@ -203,10 +203,10 @@ object_id_type account_whitelist_evaluator::do_evaluate(const account_whitelist_
    if( !d.get_global_properties().parameters.allow_non_prime_whitelists )
       FC_ASSERT(listed_account->is_prime());
 
-   return object_id_type();
+   return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }
 
-object_id_type account_whitelist_evaluator::do_apply(const account_whitelist_operation& o)
+void_result account_whitelist_evaluator::do_apply(const account_whitelist_operation& o)
 {
    database& d = db();
 
@@ -221,7 +221,7 @@ object_id_type account_whitelist_evaluator::do_apply(const account_whitelist_ope
          a.blacklisting_accounts.erase(o.authorizing_account);
    });
 
-   return object_id_type();
+   return void_result();
 }
 
 } } // graphene::chain

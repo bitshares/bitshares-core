@@ -27,8 +27,8 @@ namespace graphene { namespace chain {
       public:
          typedef transfer_operation operation_type;
 
-         object_id_type do_evaluate( const transfer_operation& o );
-         object_id_type do_apply( const transfer_operation& o );
+         void_result do_evaluate( const transfer_operation& o );
+         void_result do_apply( const transfer_operation& o );
    };
 
 } } // graphene::chain

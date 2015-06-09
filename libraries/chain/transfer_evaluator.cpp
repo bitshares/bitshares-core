@@ -19,7 +19,7 @@
 #include <graphene/chain/account_object.hpp>
 
 namespace graphene { namespace chain {
-object_id_type transfer_evaluator::do_evaluate( const transfer_operation& op )
+void_result transfer_evaluator::do_evaluate( const transfer_operation& op )
 { try {
    database& d = db();
 
@@ -43,13 +43,13 @@ object_id_type transfer_evaluator::do_evaluate( const transfer_operation& op )
    FC_ASSERT( d.get_balance( &from_account, &asset_type ).amount >= op.amount.amount,
               "", ("total_transfer",op.amount)("balance",d.get_balance(&from_account, &asset_type).amount) );
 
-   return object_id_type();
+   return void_result();
 } FC_CAPTURE_AND_RETHROW( (op) ) }
 
-object_id_type transfer_evaluator::do_apply( const transfer_operation& o )
+void_result transfer_evaluator::do_apply( const transfer_operation& o )
 { try {
    db().adjust_balance( o.from, -o.amount );
    db().adjust_balance( o.to, o.amount );
-   return object_id_type();
+   return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) )}
 } } // graphene::chain
