@@ -209,6 +209,8 @@ namespace graphene { namespace app {
       const auto& sell_price_idx = short_order_idx.indices().get<by_price>();
       const asset_object& mia = _db.get(a);
 
+      FC_ASSERT( mia.is_market_issued(), "must be a market issued asset" );
+
       price index_price = price::min(mia.get_id(), mia.bitasset_data(_db).options.short_backing_asset);
 
       auto short_itr = sell_price_idx.lower_bound(index_price.max());
