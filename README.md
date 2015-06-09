@@ -21,6 +21,11 @@ Then, in a separate terminal window, start the command-line wallet `cli_wallet`:
 
     ./programs/cli_wallet/cli_wallet
 
+To set your iniital password to 'password' use:
+
+    >>> set_password password
+    >>> unlock password
+
 If you send private keys over this connection, `rpc-endpoint` should be bound to localhost for security.
 
 A list of CLI wallet commands is available [here](https://bitshares.github.io/doxygen/classgraphene_1_1wallet_1_1wallet__api.html).
@@ -36,66 +41,17 @@ Unit testing
 We use the Boost unit test framework for unit testing.  Most unit
 tests reside in the `chain_test` build target.
 
-Core mechanics
---------------
-
-- Witnesses
-- Key members
-- Price feeds
-- Global parameters
-- Voting on witnesses
-- Voting on key members
-- Witness pay
-- Transfers
-- Markets
-- Escrow
-- Recurring payments
-
-Gotchas
--------
-
-- Key objects can actually contain a key or address
-
 Witness node
 ------------
 
 The role of the witness node is to broadcast transactions, download blocks, and optionally sign them.
 
-TODO:  How do you get block signing keys into the witness node?
-
-How to use fc async to do recurring tasks
------------------------------------------
-
-    _my_task = fc::async( callable, "My Task" );
-    _my_task = fc::schedule( callable, "My Task 2", exec_time );
-
-Stuff to know about the code
-----------------------------
-
-`static_variant<t1, t2>` is a *union type* which says "this variable may be either t1 or t2."  It is serializable if t1 and t2 are both serializable.
-
-The file `operations.hpp` documents the available operations, and `database_fixture.hpp` is a good reference for building and submitting transactions for processing.
-
-Tests also show the way to do many things, but are often cluttered with code that generates corner cases to try to break things in every possible way.
-
-Visitors are at the end of `operations.hpp` after the large typedef for `operation` as a `static_variant`.  TODO:  They should be refactored into a separate header.
-
-Downcasting stuff
------------------
-
-- You have an `object_id_type` and want to downcast it to a `key_id_type` : `key_id_type( object_id )`
-- You have an `operation_result` and want to downcast it to an `object_id_type` : `op_result.get<object_id_type>()`
-- Since `operation_result` is a `static_variant`, the above is also how you downcast `static_variant`
+./witness_node --rpc-endpoint "127.0.0.1:8090" --enable-stale-production  -w \""1.7.0"\" \""1.7.1"\" \""1.7.2"\" \""1.7.3"\" \""1.7.4"\" --private-key "[\"1.2.0\",\"aeebad4a796fcc2e15dc4c6061b45ed9b373f26adfc798ca7d2d8cc58182718e\"]"
 
 Running specific tests
 ----------------------
 
 - `tests/chain_tests -t block_tests/name_of_test`
-
-Debugging FC exceptions with GDB
---------------------------------
-
-- `catch throw`
 
 Using the API
 -------------
