@@ -59,7 +59,7 @@ bool is_valid_name( const string& s )
       if( c >= 'a' && c <= 'z' ){}
       else if( c >= '0' && c <= '9' )
       {
-         if( prev == ' ' || prev == '.' || prev == '-' || prev == '/' ) return false;
+         if( prev == ' ' || prev == '.' ||  prev == '/' ) return false;
       }
       else switch( c )
       {
