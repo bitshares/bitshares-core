@@ -137,6 +137,33 @@ If you want information which is not available from an API, it might be availabl
 from the [database](https://bitshares.github.io/doxygen/classgraphene_1_1chain_1_1database.html);
 it is fairly simple to write API methods to expose database methods.
 
+Running private testnet
+-----------------------
+
+Normally `witness_node` assumes it won't be producing blocks from
+genesis, or against very old chain state.  We need to get `witness_node`
+to discard this assumption if we actually want to start a new chain,
+so we will need to specify in `config.ini`:
+
+    enable-stale-production = true
+
+We also need to specify which witnesses will produce blocks locally;
+`witness_node` does not assume that it should produce blocks for a given
+witness just because it has the correct private key to do so.  There are
+ten witnesses at genesis of the testnet, block production can be
+enabled for all of them by specifying multiple times in `config.ini`:
+
+    witness-id = "1.7.0"
+    witness-id = "1.7.1"
+    witness-id = "1.7.2"
+    witness-id = "1.7.3"
+    witness-id = "1.7.4"
+    witness-id = "1.7.5"
+    witness-id = "1.7.6"
+    witness-id = "1.7.7"
+    witness-id = "1.7.8"
+    witness-id = "1.7.9"
+
 Questions
 ---------
 
@@ -159,3 +186,30 @@ Questions
     designed for "server push" notifications, and we would have to figure out a way to queue notifications for a polling client.
 
     Websockets solves all these problems.  If you need to access Graphene's stateful methods, you need to use Websockets.
+
+- What is the meaning of `a.b.c` numbers?
+
+    The first number specifies the *space*.  Space 1 is for protocol objects, 2 is for implementation objects.
+    Protocol space objects can appear on the wire, for example in the binary form of transactions.
+    Implementation space objects cannot appear on the wire and solely exist for implementation
+    purposes, such as optimization or internal bookkeeping.
+
+    The second number specifies the *type*.  The type of the object determines what fields it has.  For a
+    complete list of type ID's, see `enum object_type` and `enum impl_object_type` in
+    [types.hpp](https://github.com/cryptonomex/graphene/blob/master/libraries/chain/include/graphene/chain/types.hpp).
+
+    The third number specifies the *instance*.  The instance of the object is different for each individual
+    object.
+
+- The answer to the previous question was really confusing.  Can you make it clearer?
+
+    All account ID's are of the form `1.3.x`.  If you were the 9735th account to be registered,
+    your account's ID will be `1.3.9735`.  Account `0` is special (it's the "genesis account,"
+    which is controlled by the delegates and has a few abilities and restrictions other accounts
+    do not).
+
+    All asset ID's are of the form `1.4.x`.  If you were the 29th asset to be registered,
+    your asset's ID will be `1.4.29`.  Asset `0` is special (it's BTS, which is considered the "core asset").
+
+    The first and second number together identify the kind of thing you're talking about (`1.3` for accounts,
+    `1.4` for assets).  The third number identifies the particular thing.
