@@ -1,6 +1,8 @@
 [submodule "libraries/fc"]
 	path = libraries/fc
 	url = https://github.com/cryptonomex/fc
+  ignore = dirty
 [submodule "libraries/leveldb"]
 	path = libraries/leveldb
 	url = https://github.com/bitcoin/leveldb.git
+  ignore = dirty
