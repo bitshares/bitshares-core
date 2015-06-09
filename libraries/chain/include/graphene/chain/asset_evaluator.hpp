@@ -35,8 +35,8 @@ namespace graphene { namespace chain {
    {
       public:
          typedef asset_issue_operation operation_type;
-         object_id_type do_evaluate( const asset_issue_operation& o );
-         object_id_type do_apply( const asset_issue_operation& o );
+         void_result do_evaluate( const asset_issue_operation& o );
+         void_result do_apply( const asset_issue_operation& o );
 
          const asset_dynamic_data_object* asset_dyn_data = nullptr;
          const account_object*            to_account = nullptr;
@@ -46,8 +46,8 @@ namespace graphene { namespace chain {
    {
       public:
          typedef asset_burn_operation operation_type;
-         object_id_type do_evaluate( const asset_burn_operation& o );
-         object_id_type do_apply( const asset_burn_operation& o );
+         void_result do_evaluate( const asset_burn_operation& o );
+         void_result do_apply( const asset_burn_operation& o );
 
          const asset_dynamic_data_object* asset_dyn_data = nullptr;
          const account_object*            from_account = nullptr;
@@ -59,8 +59,8 @@ namespace graphene { namespace chain {
       public:
          typedef asset_update_operation operation_type;
 
-         object_id_type do_evaluate( const asset_update_operation& o );
-         object_id_type do_apply( const asset_update_operation& o );
+         void_result do_evaluate( const asset_update_operation& o );
+         void_result do_apply( const asset_update_operation& o );
 
          const asset_object* asset_to_update = nullptr;
    };
@@ -70,8 +70,8 @@ namespace graphene { namespace chain {
       public:
          typedef asset_update_bitasset_operation operation_type;
 
-         object_id_type do_evaluate( const asset_update_bitasset_operation& o );
-         object_id_type do_apply( const asset_update_bitasset_operation& o );
+         void_result do_evaluate( const asset_update_bitasset_operation& o );
+         void_result do_apply( const asset_update_bitasset_operation& o );
 
          const asset_bitasset_data_object* bitasset_to_update = nullptr;
    };
@@ -81,8 +81,8 @@ namespace graphene { namespace chain {
       public:
          typedef asset_update_feed_producers_operation operation_type;
 
-         object_id_type do_evaluate( const operation_type& o );
-         object_id_type do_apply( const operation_type& o );
+         void_result do_evaluate( const operation_type& o );
+         void_result do_apply( const operation_type& o );
 
          const asset_bitasset_data_object* bitasset_to_update = nullptr;
    };
@@ -92,8 +92,8 @@ namespace graphene { namespace chain {
       public:
          typedef asset_fund_fee_pool_operation operation_type;
 
-         object_id_type do_evaluate(const asset_fund_fee_pool_operation& op);
-         object_id_type do_apply(const asset_fund_fee_pool_operation& op);
+         void_result do_evaluate(const asset_fund_fee_pool_operation& op);
+         void_result do_apply(const asset_fund_fee_pool_operation& op);
 
          const asset_dynamic_data_object* asset_dyn_data = nullptr;
    };
@@ -103,8 +103,8 @@ namespace graphene { namespace chain {
       public:
          typedef asset_global_settle_operation operation_type;
 
-         object_id_type do_evaluate(const operation_type& op);
-         object_id_type do_apply(const operation_type& op);
+         void_result do_evaluate(const operation_type& op);
+         void_result do_apply(const operation_type& op);
 
          const asset_object* asset_to_settle = nullptr;
    };
@@ -124,8 +124,8 @@ namespace graphene { namespace chain {
       public:
          typedef asset_publish_feed_operation operation_type;
 
-         object_id_type do_evaluate( const asset_publish_feed_operation& o );
-         object_id_type do_apply( const asset_publish_feed_operation& o );
+         void_result do_evaluate( const asset_publish_feed_operation& o );
+         void_result do_apply( const asset_publish_feed_operation& o );
 
          std::map<std::pair<asset_id_type,asset_id_type>,price_feed> median_feed_values;
    };

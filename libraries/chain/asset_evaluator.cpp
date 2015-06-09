@@ -98,7 +98,7 @@ object_id_type asset_create_evaluator::do_apply( const asset_create_operation& o
    return next_asset_id;
 }
 
-object_id_type asset_issue_evaluator::do_evaluate( const asset_issue_operation& o )
+void_result asset_issue_evaluator::do_evaluate( const asset_issue_operation& o )
 { try {
    database& d   = db();
 
@@ -116,10 +116,10 @@ object_id_type asset_issue_evaluator::do_evaluate( const asset_issue_operation& 
    asset_dyn_data = &a.dynamic_asset_data_id(d);
    FC_ASSERT( (asset_dyn_data->current_supply + o.asset_to_issue.amount) <= a.options.max_supply );
 
-   return object_id_type();
+   return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }
 
-object_id_type asset_issue_evaluator::do_apply( const asset_issue_operation& o )
+void_result asset_issue_evaluator::do_apply( const asset_issue_operation& o )
 {
    db().adjust_balance( o.issue_to_account, o.asset_to_issue );
 
@@ -127,10 +127,10 @@ object_id_type asset_issue_evaluator::do_apply( const asset_issue_operation& o )
         data.current_supply += o.asset_to_issue.amount;
    });
 
-   return object_id_type();
+   return void_result();
 }
 
-object_id_type asset_burn_evaluator::do_evaluate( const asset_burn_operation& o )
+void_result asset_burn_evaluator::do_evaluate( const asset_burn_operation& o )
 { try {
    database& d   = db();
 
@@ -147,10 +147,10 @@ object_id_type asset_burn_evaluator::do_evaluate( const asset_burn_operation& o 
    asset_dyn_data = &a.dynamic_asset_data_id(d);
    FC_ASSERT( (asset_dyn_data->current_supply - o.amount_to_burn.amount) >= 0 );
 
-   return object_id_type();
+   return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }
 
-object_id_type asset_burn_evaluator::do_apply( const asset_burn_operation& o )
+void_result asset_burn_evaluator::do_apply( const asset_burn_operation& o )
 {
    db().adjust_balance( o.payer, -o.amount_to_burn );
 
@@ -158,10 +158,10 @@ object_id_type asset_burn_evaluator::do_apply( const asset_burn_operation& o )
         data.current_supply -= o.amount_to_burn.amount;
    });
 
-   return object_id_type();
+   return void_result();
 }
 
-object_id_type asset_fund_fee_pool_evaluator::do_evaluate(const asset_fund_fee_pool_operation& o)
+void_result asset_fund_fee_pool_evaluator::do_evaluate(const asset_fund_fee_pool_operation& o)
 { try {
    database& d = db();
 
@@ -169,10 +169,10 @@ object_id_type asset_fund_fee_pool_evaluator::do_evaluate(const asset_fund_fee_p
 
    asset_dyn_data = &a.dynamic_asset_data_id(d);
 
-   return object_id_type();
+   return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }
 
-object_id_type asset_fund_fee_pool_evaluator::do_apply(const asset_fund_fee_pool_operation& o)
+void_result asset_fund_fee_pool_evaluator::do_apply(const asset_fund_fee_pool_operation& o)
 {
    db().adjust_balance(o.from_account, -o.amount);
 
@@ -180,10 +180,10 @@ object_id_type asset_fund_fee_pool_evaluator::do_apply(const asset_fund_fee_pool
       data.fee_pool += o.amount;
    });
 
-   return object_id_type();
+   return void_result();
 }
 
-object_id_type asset_update_evaluator::do_evaluate(const asset_update_operation& o)
+void_result asset_update_evaluator::do_evaluate(const asset_update_operation& o)
 { try {
    database& d = db();
 
@@ -210,10 +210,10 @@ object_id_type asset_update_evaluator::do_evaluate(const asset_update_operation&
    for( auto id : o.new_options.blacklist_authorities )
       d.get_object(id);
 
-   return object_id_type();
+   return void_result();
 } FC_CAPTURE_AND_RETHROW((o)) }
 
-object_id_type asset_update_evaluator::do_apply(const asset_update_operation& o)
+void_result asset_update_evaluator::do_apply(const asset_update_operation& o)
 {
    database& d = db();
 
@@ -235,10 +235,10 @@ object_id_type asset_update_evaluator::do_apply(const asset_update_operation& o)
       a.options = o.new_options;
    });
 
-   return object_id_type();
+   return void_result();
 }
 
-object_id_type asset_update_bitasset_evaluator::do_evaluate(const asset_update_bitasset_operation& o)
+void_result asset_update_bitasset_evaluator::do_evaluate(const asset_update_bitasset_operation& o)
 {
    database& d = db();
 
@@ -256,19 +256,19 @@ object_id_type asset_update_bitasset_evaluator::do_evaluate(const asset_update_b
    bitasset_to_update = &b;
    FC_ASSERT( o.issuer == a.issuer, "", ("o.issuer", o.issuer)("a.issuer", a.issuer) );
 
-   return object_id_type();
+   return void_result();
 }
 
-object_id_type asset_update_bitasset_evaluator::do_apply(const asset_update_bitasset_operation& o)
+void_result asset_update_bitasset_evaluator::do_apply(const asset_update_bitasset_operation& o)
 {
    db().modify(*bitasset_to_update, [&o](asset_bitasset_data_object& b) {
       b.options = o.new_options;
    });
 
-   return object_id_type();
+   return void_result();
 }
 
-object_id_type asset_update_feed_producers_evaluator::do_evaluate(const asset_update_feed_producers_evaluator::operation_type& o)
+void_result asset_update_feed_producers_evaluator::do_evaluate(const asset_update_feed_producers_evaluator::operation_type& o)
 {
    database& d = db();
 
@@ -284,10 +284,10 @@ object_id_type asset_update_feed_producers_evaluator::do_evaluate(const asset_up
    const asset_bitasset_data_object& b = a.bitasset_data(d);
    bitasset_to_update = &b;
    FC_ASSERT( a.issuer == o.issuer );
-   return object_id_type();
+   return void_result();
 }
 
-object_id_type asset_update_feed_producers_evaluator::do_apply(const asset_update_feed_producers_evaluator::operation_type& o)
+void_result asset_update_feed_producers_evaluator::do_apply(const asset_update_feed_producers_evaluator::operation_type& o)
 {
    db().modify(*bitasset_to_update, [&](asset_bitasset_data_object& a) {
       //This is tricky because I have a set of publishers coming in, but a map of publisher to feed is stored.
@@ -308,11 +308,11 @@ object_id_type asset_update_feed_producers_evaluator::do_apply(const asset_updat
       a.update_median_feeds(db().head_block_time());
    });
 
-   return object_id_type();
+   return void_result();
 }
 
 
-object_id_type asset_global_settle_evaluator::do_evaluate(const asset_global_settle_evaluator::operation_type& op)
+void_result asset_global_settle_evaluator::do_evaluate(const asset_global_settle_evaluator::operation_type& op)
 {
    const database& d = db();
    asset_to_settle = &op.asset_to_settle(d);
@@ -329,14 +329,14 @@ object_id_type asset_global_settle_evaluator::do_evaluate(const asset_global_set
    FC_ASSERT(least_collateralized_short.get_debt() * op.settle_price <= least_collateralized_short.get_collateral(),
              "Cannot force settle at supplied price: least collateralized short lacks sufficient collateral to settle.");
 
-   return object_id_type();
+   return void_result();
 }
 
-object_id_type asset_global_settle_evaluator::do_apply(const asset_global_settle_evaluator::operation_type& op)
+void_result asset_global_settle_evaluator::do_apply(const asset_global_settle_evaluator::operation_type& op)
 {
    database& d = db();
    d.globally_settle_asset( op.asset_to_settle(db()), op.settle_price );
-   return object_id_type();
+   return void_result();
 }
 
 object_id_type asset_settle_evaluator::do_evaluate(const asset_settle_evaluator::operation_type& op)
@@ -361,7 +361,7 @@ object_id_type asset_settle_evaluator::do_apply(const asset_settle_evaluator::op
    }).id;
 }
 
-object_id_type asset_publish_feeds_evaluator::do_evaluate(const asset_publish_feed_operation& o)
+void_result asset_publish_feeds_evaluator::do_evaluate(const asset_publish_feed_operation& o)
 { try {
    database& d = db();
 
@@ -381,10 +381,10 @@ object_id_type asset_publish_feeds_evaluator::do_evaluate(const asset_publish_fe
       FC_ASSERT(bitasset.feeds.count(o.publisher));
    }
 
-   return object_id_type();
+   return void_result();
 } FC_CAPTURE_AND_RETHROW((o)) }
 
-object_id_type asset_publish_feeds_evaluator::do_apply(const asset_publish_feed_operation& o)
+void_result asset_publish_feeds_evaluator::do_apply(const asset_publish_feed_operation& o)
 { try {
    database& d = db();
 
@@ -395,7 +395,7 @@ object_id_type asset_publish_feeds_evaluator::do_apply(const asset_publish_feed_
       a.update_median_feeds(d.head_block_time());
    });
 
-   return object_id_type();
+   return void_result();
    } FC_CAPTURE_AND_RETHROW((o)) }
 
 } } // graphene::chain
