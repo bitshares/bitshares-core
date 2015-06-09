@@ -388,7 +388,7 @@ BOOST_AUTO_TEST_CASE( mia_feeds )
 BOOST_AUTO_TEST_CASE( witness_create )
 { try {
    ACTOR(nathan);
-   upgrade_to_prime(nathan_id);
+   upgrade_to_lifetime_member(nathan_id);
    trx.clear();
    witness_id_type nathan_witness_id = create_witness(nathan_id, nathan_key_id, nathan_private_key).id;
    // Give nathan some voting stake
@@ -494,7 +494,7 @@ BOOST_AUTO_TEST_CASE( global_settle_test )
 BOOST_AUTO_TEST_CASE( worker_create_test )
 { try {
    ACTOR(nathan);
-   upgrade_to_prime(nathan_id);
+   upgrade_to_lifetime_member(nathan_id);
    generate_block();
 
    {
@@ -615,7 +615,7 @@ BOOST_AUTO_TEST_CASE( worker_pay_test )
 BOOST_AUTO_TEST_CASE( refund_worker_test )
 {try{
    ACTOR(nathan);
-   upgrade_to_prime(nathan_id);
+   upgrade_to_lifetime_member(nathan_id);
    generate_block();
    generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
    trx.set_expiration(db.head_block_id());

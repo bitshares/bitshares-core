@@ -122,7 +122,6 @@ share_type account_create_operation::calculate_fee( const fee_schedule_type& sch
 }
 share_type account_update_operation::calculate_fee( const fee_schedule_type& schedule )const
 {
-   if( upgrade_to_prime ) return schedule.at(prime_upgrade_fee_type);
    return schedule.at(account_create_fee_type);
 }
 void account_update_operation::get_required_auth(flat_set<account_id_type>& active_auth_set,
@@ -138,7 +137,7 @@ void account_update_operation::validate()const
 {
    FC_ASSERT( fee.amount >= 0 );
    FC_ASSERT( account != account_id_type() );
-   FC_ASSERT( owner || active || voting_account || memo_key || vote || upgrade_to_prime );
+   FC_ASSERT( owner || active || voting_account || memo_key || vote );
 }
 
 

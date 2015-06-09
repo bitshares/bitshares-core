@@ -460,23 +460,26 @@ namespace graphene { namespace chain {
       uint16_t                maximum_witness_count               = GRAPHENE_DEFAULT_MAX_WITNESSES; ///< maximum number of active witnesses
       uint16_t                maximum_committee_count             = GRAPHENE_DEFAULT_MAX_COMMITTEE; ///< maximum number of active delegates
       uint16_t                maximum_authority_membership        = GRAPHENE_DEFAULT_MAX_AUTHORITY_MEMBERSHIP; ///< largest number of keys/accounts an authority can have
-      uint16_t                burn_percent_of_fee                 = GRAPHENE_DEFAULT_BURN_PERCENT_OF_FEE; ///< the percentage of every fee that is taken out of circulation
-      uint16_t                witness_percent_of_fee              = GRAPHENE_DEFAULT_WITNESS_PERCENT; ///< percent of revenue paid to witnesses
+      uint16_t                burn_percent_of_fee                 = GRAPHENE_DEFAULT_BURN_PERCENT_OF_FEE; ///< the percentage of the network's allocation of a fee that is taken out of circulation
+      uint16_t                network_percent_of_fee              = GRAPHENE_DEFAULT_NETWORK_PERCENT_OF_FEE; ///< percent of transaction fees paid to network
+      uint16_t                lifetime_referrer_percent_of_fee    = GRAPHENE_DEFAULT_LIFETIME_REFERRER_PERCENT_OF_FEE; ///< percent of transaction fees paid to network
       uint32_t                cashback_vesting_period_seconds     = GRAPHENE_DEFAULT_CASHBACK_VESTING_PERIOD_SEC; ///< time after cashback rewards are accrued before they become liquid
+      share_type              cashback_vesting_threshold          = GRAPHENE_DEFAULT_CASHBACK_VESTING_THRESHOLD; ///< the maximum cashback that can be received without vesting
       uint16_t                max_bulk_discount_percent_of_fee    = GRAPHENE_DEFAULT_MAX_BULK_DISCOUNT_PERCENT; ///< the maximum percentage discount for bulk discounts
       share_type              bulk_discount_threshold_min         = GRAPHENE_DEFAULT_BULK_DISCOUNT_THRESHOLD_MIN; ///< the minimum amount of fees paid to qualify for bulk discounts
       share_type              bulk_discount_threshold_max         = GRAPHENE_DEFAULT_BULK_DISCOUNT_THRESHOLD_MAX; ///< the amount of fees paid to qualify for the max bulk discount percent
-      bool                    count_non_prime_votes               = true; ///< set to false to restrict voting privlegages to prime accounts
-      bool                    allow_non_prime_whitelists          = false; ///< true if non-prime accounts may set whitelists and blacklists; false otherwise
+      bool                    count_non_member_votes              = true; ///< set to false to restrict voting privlegages to member accounts
+      bool                    allow_non_member_whitelists         = false; ///< true if non-member accounts may set whitelists and blacklists; false otherwise
       share_type              witness_pay_per_block               = GRAPHENE_DEFAULT_WITNESS_PAY_PER_BLOCK; ///< CORE to be allocated to witnesses (per block)
       share_type              worker_budget_per_day               = GRAPHENE_DEFAULT_WORKER_BUDGET_PER_DAY; ///< CORE to be allocated to workers (per day)
 
       void validate()const
       {
-         FC_ASSERT( witness_percent_of_fee <= GRAPHENE_100_PERCENT );
          FC_ASSERT( burn_percent_of_fee <= GRAPHENE_100_PERCENT );
+         FC_ASSERT( network_percent_of_fee <= GRAPHENE_100_PERCENT );
          FC_ASSERT( max_bulk_discount_percent_of_fee <= GRAPHENE_100_PERCENT );
-         FC_ASSERT( burn_percent_of_fee + witness_percent_of_fee <= GRAPHENE_100_PERCENT );
+         FC_ASSERT( lifetime_referrer_percent_of_fee <= GRAPHENE_100_PERCENT );
+         FC_ASSERT( network_percent_of_fee + lifetime_referrer_percent_of_fee <= GRAPHENE_100_PERCENT );
          FC_ASSERT( bulk_discount_threshold_min <= bulk_discount_threshold_max );
          FC_ASSERT( bulk_discount_threshold_min > 0 );
 
@@ -656,13 +659,15 @@ FC_REFLECT( graphene::chain::chain_parameters,
             (maximum_asset_feed_publishers)
             (maximum_authority_membership)
             (burn_percent_of_fee)
-            (witness_percent_of_fee)
+            (network_percent_of_fee)
+            (lifetime_referrer_percent_of_fee)
             (max_bulk_discount_percent_of_fee)
             (cashback_vesting_period_seconds)
+            (cashback_vesting_threshold)
             (bulk_discount_threshold_min)
             (bulk_discount_threshold_max)
-            (count_non_prime_votes)
-            (allow_non_prime_whitelists)
+            (count_non_member_votes)
+            (allow_non_member_whitelists)
             (witness_pay_per_block)
             (worker_budget_per_day)
           )

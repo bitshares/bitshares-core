@@ -202,8 +202,8 @@ struct database_fixture {
    void transfer( const account_object& from, const account_object& to, const asset& amount, const asset& fee = asset() );
    void fund_fee_pool( const account_object& from, const asset_object& asset_to_fund, const share_type amount );
    void enable_fees( share_type fee = GRAPHENE_BLOCKCHAIN_PRECISION );
-   void upgrade_to_prime( account_id_type account );
-   void upgrade_to_prime( const account_object& account );
+   void upgrade_to_lifetime_member( account_id_type account );
+   void upgrade_to_lifetime_member( const account_object& account );
    void print_market( const string& syma, const string& symb )const;
    string pretty( const asset& a )const;
    void print_short_order( const short_order_object& cur )const;

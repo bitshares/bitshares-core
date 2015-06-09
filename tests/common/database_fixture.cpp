@@ -676,21 +676,18 @@ void database_fixture::enable_fees(
    } );
 }
 
-void database_fixture::upgrade_to_prime(account_id_type account)
+void database_fixture::upgrade_to_lifetime_member(account_id_type account)
 {
-   upgrade_to_prime(account(db));
+   upgrade_to_lifetime_member(account(db));
 }
 
-void database_fixture::upgrade_to_prime( const account_object& account )
+void database_fixture::upgrade_to_lifetime_member( const account_object& account )
 {
    try
    {
-      account_update_operation op;
-      op.account = account.id;
-      op.upgrade_to_prime = true;
-      trx.operations.emplace_back(operation(op));
+      // TODO
       db.push_transaction( trx, ~0 );
-      FC_ASSERT( account.is_prime() );
+      FC_ASSERT( account.is_lifetime_member() );
       trx.clear();
    }
    FC_CAPTURE_AND_RETHROW((account))

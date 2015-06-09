@@ -186,13 +186,13 @@ BOOST_AUTO_TEST_CASE( update_account )
       transfer(account_id_type()(db), nathan, asset(3000000));
 
       enable_fees();
-      op.upgrade_to_prime   = true;
+      // TODO: op.upgrade_to_prime   = true;
       op.fee     = op.calculate_fee( db.get_global_properties().parameters.current_fees );
       trx.operations.push_back(op);
       db.push_transaction(trx, ~0);
 
       BOOST_CHECK( nathan.referrer == nathan.id );
-      BOOST_CHECK( nathan.referrer_percent == 100 );
+      BOOST_CHECK( nathan.referrer_rewards_percentage == 100 );
    } catch (fc::exception& e) {
       edump((e.to_detail_string()));
       throw;
@@ -1872,7 +1872,7 @@ BOOST_AUTO_TEST_CASE( witness_withdraw_pay_test )
    BOOST_CHECK_EQUAL(core->dynamic_asset_data_id(db).accumulated_fees.value, 0);
    account_update_operation uop;
    uop.account = nathan->get_id();
-   uop.upgrade_to_prime = true;
+   // TODO: uop.upgrade_to_prime = true;
    trx.set_expiration(db.head_block_id());
    trx.operations.push_back(uop);
    trx.visit(operation_set_fee(db.current_fee_schedule()));
@@ -2124,7 +2124,7 @@ BOOST_AUTO_TEST_CASE( unimp_transfer_cashback_test )
 
    const account_object& sam  = create_account( "sam" );
    transfer(account_id_type()(db), sam, asset(30000));
-   upgrade_to_prime(sam);
+   upgrade_to_lifetime_member(sam);
 
    ilog( "Creating alice" );
    const account_object& alice  = create_account( "alice", sam, sam, 0 );

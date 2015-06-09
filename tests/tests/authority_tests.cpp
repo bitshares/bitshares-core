@@ -434,7 +434,7 @@ BOOST_FIXTURE_TEST_CASE( fired_delegates, database_fixture )
    for( int i = 0; i < 15; ++i )
    {
       const auto& account = create_account("delegate" + fc::to_string(i+1), delegate_key_object.id);
-      upgrade_to_prime(account);
+      upgrade_to_lifetime_member(account);
       delegates.insert(create_delegate(account).vote_id);
    }
 
@@ -980,8 +980,8 @@ BOOST_FIXTURE_TEST_CASE( bogus_signature, database_fixture )
 BOOST_FIXTURE_TEST_CASE( voting_account, database_fixture )
 { try {
    ACTORS((nathan)(vikram));
-   upgrade_to_prime(nathan_id);
-   upgrade_to_prime(vikram_id);
+   upgrade_to_lifetime_member(nathan_id);
+   upgrade_to_lifetime_member(vikram_id);
    delegate_id_type nathan_delegate = create_delegate(nathan_id(db)).id;
    delegate_id_type vikram_delegate = create_delegate(vikram_id(db)).id;
 

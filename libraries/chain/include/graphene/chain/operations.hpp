@@ -15,7 +15,7 @@
  * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-/* Copyright (C) Cryptonomex, Inc - All Rights Reserved 
+/* Copyright (C) Cryptonomex, Inc - All Rights Reserved
  *
  *  All modifications become property of Cryptonomex, Inc.
  *
@@ -125,14 +125,13 @@ namespace graphene { namespace chain {
    struct account_create_operation
    {
       asset           fee;
+      /// This account pays the fee. Must be a lifetime member.
       account_id_type registrar;
 
-      /**
-       *  If fee_paying_account->is_prime then referrer can be
-       *  any other account that is also prime.  Otherwise referrer must
-       *  equal fee_paying_account->referrer.
-       */
+      /// This account receives a portion of the fee split between registrar and referrer. Must be a member.
       account_id_type referrer;
+      /// Of the fee split between registrar and referrer, this percentage goes to the referrer. The rest goes to the
+      /// registrar.
       uint8_t         referrer_percent = 0;
 
       string          name;
@@ -213,12 +212,6 @@ namespace graphene { namespace chain {
       optional<flat_set<vote_id_type>>        vote;
       uint16_t                                num_witness = 0;
       uint16_t                                num_committee = 0;
-
-      /**
-       * If set to true, upgrades the account to a prime account by setting the account's referrer to itself. This may
-       * only be set to true when the account being modified is not already a prime account.
-       */
-      bool                                    upgrade_to_prime = false;
 
       account_id_type fee_payer()const { return account; }
       void       get_required_auth(flat_set<account_id_type>& active_auth_set , flat_set<account_id_type>& owner_auth_set)const;
@@ -1089,13 +1082,13 @@ namespace graphene { namespace chain {
     * authorizing account. This operation is primarily useful for scheduling recurring payments.
     *
     * Withdrawal permissions define withdrawal periods, which is a span of time during which the authorized account may
-    * make a withdrawal.  Any number of withdraws may be made so long as the total amount withdrawn is less than the limit
-    * for any given period.
+    * make a withdrawal. Any number of withdrawals may be made so long as the total amount withdrawn per period does
+    * not exceed the limit for any given period.
     *
     * Withdrawal permissions authorize only a specific pairing, i.e. a permission only authorizes one specified
     * authorized account to withdraw from one specified authorizing account. Withdrawals are limited and may not exceet
-    * the withdrawal limit. The withdrawal must be made in the same asset as the limit; attempts with withdraw any other
-    * asset type will be rejected.
+    * the withdrawal limit. The withdrawal must be made in the same asset as the limit; attempts with withdraw any
+    * other asset type will be rejected.
     *
     * The fee for this operation is paid by withdraw_from_account, and this account is required to authorize this
     * operation.
@@ -1748,7 +1741,7 @@ FC_REFLECT( graphene::chain::account_create_operation,
 
 FC_REFLECT_TYPENAME( fc::flat_set<graphene::chain::vote_id_type> )
 FC_REFLECT( graphene::chain::account_update_operation,
-            (fee)(account)(owner)(active)(voting_account)(memo_key)(num_witness)(num_committee)(vote)(upgrade_to_prime)
+            (fee)(account)(owner)(active)(voting_account)(memo_key)(num_witness)(num_committee)(vote)
           )
 
 FC_REFLECT_TYPENAME( graphene::chain::account_whitelist_operation::account_listing)

@@ -24,7 +24,7 @@
 namespace graphene { namespace chain {
 object_id_type delegate_create_evaluator::do_evaluate( const delegate_create_operation& op )
 {
-   FC_ASSERT(db().get(op.delegate_account).is_prime());
+   FC_ASSERT(db().get(op.delegate_account).is_lifetime_member());
    return object_id_type();
 }
 

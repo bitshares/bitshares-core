@@ -25,7 +25,7 @@
 namespace graphene { namespace chain {
 object_id_type witness_create_evaluator::do_evaluate( const witness_create_operation& op )
 {
-   FC_ASSERT(db().get(op.witness_account).is_prime());
+   FC_ASSERT(db().get(op.witness_account).is_lifetime_member());
    return object_id_type();
 }
 
