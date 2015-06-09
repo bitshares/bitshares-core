@@ -153,6 +153,7 @@ void database::init_genesis(const genesis_allocation& initial_allocation)
    });
    const account_object& genesis_account =
       create<account_object>( [&](account_object& n) {
+         n.membership_expiration_date = time_point_sec::maximum();
          n.name = "genesis";
          n.owner.add_authority(genesis_key.get_id(), 1);
          n.owner.weight_threshold = 1;
@@ -174,6 +175,10 @@ void database::init_genesis(const genesis_allocation& initial_allocation)
       const account_object& delegate_account =
          create<account_object>( [&](account_object& a) {
             a.active = a.owner = genesis_account.owner;
+            a.referrer = account_id_type(i);
+            a.registrar = account_id_type(i);
+            a.lifetime_referrer = account_id_type(i);
+            a.membership_expiration_date = fc::time_point_sec::maximum();
             a.name = string("init") + fc::to_string(i);
             a.statistics = stats_obj.id;
          });

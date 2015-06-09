@@ -184,7 +184,7 @@ namespace graphene { namespace chain {
          /// @return true if this is a lifetime member account; false otherwise.
          bool is_lifetime_member()const
          {
-            return get_id() == referrer;
+            return membership_expiration_date == time_point_sec::maximum();
          }
          /// @return true if this is a basic account; false otherwise.
          bool is_basic_account(time_point_sec now)const
