@@ -412,6 +412,7 @@ namespace graphene { namespace chain {
        void for_each(T&& t, const account_object& a, seq<Is...>)
        {
            auto l = { (std::get<Is>(t)(a), 0)... };
+           (void)l;
        }
    }
    template<class... Types>

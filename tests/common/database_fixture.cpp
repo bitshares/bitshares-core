@@ -670,9 +670,9 @@ void database_fixture::enable_fees(
 {
    db.modify(global_property_id_type()(db), [fee](global_property_object& gpo)
    {
-      for( int i=0; i < FEE_TYPE_COUNT; ++i)
-         gpo.parameters.current_fees.set(i, fee);
-      gpo.parameters.current_fees.set( prime_upgrade_fee_type, 10*fee.value );
+      fc::reflector<fee_schedule_type>::visit(fee_schedule_type::fee_set_visitor{gpo.parameters.current_fees,
+                                                                                 uint32_t(fee.value)});
+      gpo.parameters.current_fees.membership_annual_fee = 10*fee.value;
    } );
 }
 

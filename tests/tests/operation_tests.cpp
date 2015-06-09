@@ -1867,7 +1867,7 @@ BOOST_AUTO_TEST_CASE( witness_withdraw_pay_test )
    const asset_object* core = &asset_id_type()(db);
    const account_object* nathan = &get_account("nathan");
    enable_fees(100000000);
-   BOOST_CHECK_GT(db.current_fee_schedule().at(prime_upgrade_fee_type).value, 0);
+   BOOST_CHECK_GT(db.current_fee_schedule().membership_lifetime_fee, 0);
 
    BOOST_CHECK_EQUAL(core->dynamic_asset_data_id(db).accumulated_fees.value, 0);
    account_update_operation uop;

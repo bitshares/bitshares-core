@@ -113,7 +113,7 @@ namespace graphene { namespace chain {
 
       account_id_type fee_payer()const { return fee_paying_account; }
       void            get_required_auth(flat_set<account_id_type>& active_auth_set , flat_set<account_id_type>&)const;
-      share_type      calculate_fee( const fee_schedule_type& k )const{ return k.at( key_create_fee_type ); }
+      share_type      calculate_fee( const fee_schedule_type& k )const{ return k.key_create_fee; }
       void            validate()const;
 
       void get_balance_delta( balance_accumulator& acc, const operation_result& result = asset())const { acc.adjust( fee_payer(), -fee ); }
@@ -193,7 +193,7 @@ namespace graphene { namespace chain {
       account_id_type fee_payer()const { return authorizing_account; }
       void get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>&)const;
       void validate()const { FC_ASSERT( fee.amount >= 0 ); FC_ASSERT(new_listing < 0x4); }
-      share_type calculate_fee(const fee_schedule_type& k)const { return k.at(account_whitelist_fee_type); }
+      share_type calculate_fee(const fee_schedule_type& k)const { return k.account_whitelist_fee; }
 
       void get_balance_delta( balance_accumulator& acc, const operation_result& result = asset())const { acc.adjust( fee_payer(), -fee ); }
    };
@@ -221,6 +221,62 @@ namespace graphene { namespace chain {
    };
 
    /**
+    * @brief Manage an account's membership status
+    * @ingroup operations
+    *
+    * This operation is used to upgrade an account to a member, or renew its subscription. If an account which is an
+    * unexpired annual subscription member publishes this operation with @ref upgrade_to_lifetime_member set to false,
+    * the account's membership expiration date will be pushed backward one year. If a basic account publishes it with
+    * @ref upgrade_to_lifetime_member set to false, the account will be upgraded to a subscription member with an
+    * expiration date one year after the processing time of this operation.
+    *
+    * Any account may use this operation to become a lifetime member by setting @ref upgrade_to_lifetime_member to
+    * true. Once an account has become a lifetime member, it may not use this operation anymore.
+    */
+   struct account_upgrade_operation
+   {
+      asset             fee;
+      /// The account to upgrade; must not already be a lifetime member
+      account_id_type   account_to_upgrade;
+      /// If true, the account will be upgraded to a lifetime member; otherwise, it will add a year to the subscription
+      bool              upgrade_to_lifetime_member = false;
+
+      account_id_type fee_payer()const { return account_to_upgrade; }
+      void       get_required_auth(flat_set<account_id_type>& active_auth_set , flat_set<account_id_type>&)const
+      { active_auth_set.insert(account_to_upgrade); }
+      void       validate()const;
+      share_type calculate_fee( const fee_schedule_type& k )const;
+      void get_balance_delta( balance_accumulator& acc, const operation_result& = asset())const { acc.adjust( fee_payer(), -fee ); }
+   };
+
+   /**
+    * @brief transfers the account to another account while clearing the white list
+    * @ingroup operations
+    *
+    * In theory an account can be transferred by simply updating the authorities, but that kind
+    * of transfer lacks semantic meaning and is more often done to rotate keys without transferring
+    * ownership.   This operation is used to indicate the legal transfer of title to this account and
+    * a break in the operation history.
+    *
+    * The account_id's owner/active/voting/memo authority should be set to new_owner
+    *
+    * This operation will clear the account's whitelist statuses, but not the blacklist statuses.
+    */
+   struct account_transfer_operation
+   {
+      asset           fee;
+      account_id_type account_id;
+      account_id_type new_owner;
+
+      account_id_type fee_payer()const { return account_id; }
+      void        get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>&)const;
+      void        validate()const;
+      share_type  calculate_fee( const fee_schedule_type& k )const;
+
+      void get_balance_delta( balance_accumulator& acc, const operation_result& result = asset())const { acc.adjust( fee_payer(), -fee ); }
+   };
+
+   /**
     * @brief Create a delegate object, as a bid to hold a delegate seat on the network.
     * @ingroup operations
     *
@@ -237,34 +293,6 @@ namespace graphene { namespace chain {
       void get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>&)const;
       void validate()const;
       share_type calculate_fee( const fee_schedule_type& k )const;
-      void get_balance_delta( balance_accumulator& acc, const operation_result& result = asset())const { acc.adjust( fee_payer(), -fee ); }
-   };
-
-
-   /**
-    *  @brief transfers the account to another account while clearing the white list
-    *  @ingroup operations
-    *
-    *  In theory an account can be transferred by simply updating the authorities, but that kind
-    *  of transfer lacks semantic meaning and is more often done to rotate keys without transferring
-    *  ownership.   This operation is used to indicate the legal transfer of title to this account and
-    *  a break in the operation history.
-    *
-    *  The account_id's owner/active/voting/memo authority should be set to new_owner
-    *
-    *  This operation will clear the account's whitelist statuses, but not the blacklist statuses.
-    */
-   struct account_transfer_operation
-   {
-      asset           fee;
-      account_id_type account_id;
-      account_id_type new_owner;
-
-      account_id_type fee_payer()const { return account_id; }
-      void        get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>&)const;
-      void        validate()const;
-      share_type  calculate_fee( const fee_schedule_type& k )const;
-
       void get_balance_delta( balance_accumulator& acc, const operation_result& result = asset())const { acc.adjust( fee_payer(), -fee ); }
    };
 
@@ -640,7 +668,7 @@ namespace graphene { namespace chain {
       { active_auth_set.insert(fee_payer()); }
       void            validate()const;
       share_type      calculate_fee( const fee_schedule_type& k )const
-      { return k.at(asset_update_fee_type); }
+      { return k.asset_update_fee; }
       void            get_balance_delta( balance_accumulator& acc, const operation_result& result = asset())const
       { acc.adjust( fee_payer(), -fee ); }
    };
@@ -1565,6 +1593,7 @@ namespace graphene { namespace chain {
             account_create_operation,
             account_update_operation,
             account_whitelist_operation,
+            account_upgrade_operation,
             account_transfer_operation,
             asset_create_operation,
             asset_update_operation,
@@ -1739,10 +1768,10 @@ FC_REFLECT( graphene::chain::account_create_operation,
             (num_witness)(num_committee)(vote)
           )
 
-FC_REFLECT_TYPENAME( fc::flat_set<graphene::chain::vote_id_type> )
 FC_REFLECT( graphene::chain::account_update_operation,
             (fee)(account)(owner)(active)(voting_account)(memo_key)(num_witness)(num_committee)(vote)
           )
+FC_REFLECT( graphene::chain::account_upgrade_operation, (fee)(account_to_upgrade)(upgrade_to_lifetime_member) )
 
 FC_REFLECT_TYPENAME( graphene::chain::account_whitelist_operation::account_listing)
 FC_REFLECT_ENUM( graphene::chain::account_whitelist_operation::account_listing,
@@ -1840,3 +1869,4 @@ FC_REFLECT( graphene::chain::custom_operation, (fee)(payer)(required_auths)(id)(
 FC_REFLECT( graphene::chain::void_result, )
 
 FC_REFLECT_TYPENAME( graphene::chain::operation )
+FC_REFLECT_TYPENAME( fc::flat_set<graphene::chain::vote_id_type> )
