@@ -182,13 +182,13 @@ namespace graphene { namespace app {
           * @param callback Callback method which is called with the new version of a changed object
           * @param ids The set of object IDs to watch
           */
-         void subscribe_to_objects(const std::function<void(const fc::variant&)>& callback,
+         bool subscribe_to_objects(const std::function<void(const fc::variant&)>& callback,
                                    const vector<object_id_type>& ids);
          /**
           * @brief Stop receiving notifications for some object(s)
           * @param ids The set of object IDs to stop watching
           */
-         void unsubscribe_from_objects(const vector<object_id_type>& ids);
+         bool unsubscribe_from_objects(const vector<object_id_type>& ids);
          /**
           * @brief Request notification when the active orders in the market between two assets changes
           * @param callback Callback method which is called when the market changes

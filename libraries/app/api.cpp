@@ -381,14 +381,16 @@ namespace graphene { namespace app {
        }
     }
 
-    void database_api::subscribe_to_objects( const std::function<void(const fc::variant&)>&  callback, const vector<object_id_type>& ids)
+    bool database_api::subscribe_to_objects( const std::function<void(const fc::variant&)>&  callback, const vector<object_id_type>& ids)
     {
        for(auto id : ids) _subscriptions[id] = callback;
+       return true;
     }
 
-    void database_api::unsubscribe_from_objects(const vector<object_id_type>& ids)
+    bool database_api::unsubscribe_from_objects(const vector<object_id_type>& ids)
     {
        for(auto id : ids) _subscriptions.erase(id);
+       return true;
     }
 
     void database_api::subscribe_to_market(std::function<void(const variant&)> callback, asset_id_type a, asset_id_type b)
