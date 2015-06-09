@@ -905,8 +905,8 @@ string memo_message::serialize() const
 
 memo_message memo_message::deserialize(const string& serial)
 {
-   FC_ASSERT( serial.size() >= sizeof(memo_message::checksum) );
    memo_message result;
+   FC_ASSERT( serial.size() >= sizeof(result.checksum) );
    result.checksum = ntohl((uint32_t&)(*serial.data()));
    result.text = serial.substr(sizeof(result.checksum));
    return result;

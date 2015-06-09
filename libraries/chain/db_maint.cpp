@@ -153,11 +153,7 @@ void database::update_active_delegates()
 
          // total_votes is 64 bits. Subtract the number of leading low bits from 64 to get the number of useful bits,
          // then I want to keep the most significant 16 bits of what's left.
-#ifdef __GNUC__
-         int8_t bits_to_drop = std::max(int(64 - __builtin_clzll(total_votes)) - 16, 0);
-#else
-         int8_t bits_to_drop = std::max(int(boost::multiprecision::detail::find_msb(total_votes.value)) - 15, 0);
-#endif
+         int8_t bits_to_drop = std::max(int(boost::multiprecision::detail::find_msb(total_votes)) - 15, 0);
          for( const auto& weight : weights )
          {
             // Ensure that everyone has at least one vote. Zero weights aren't allowed.
