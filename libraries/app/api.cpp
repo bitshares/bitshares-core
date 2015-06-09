@@ -245,6 +245,10 @@ namespace graphene { namespace app {
        result.reserve(limit);
 
        auto itr = assets_by_symbol.lower_bound(lower_bound_symbol);
+
+       if( lower_bound_symbol == "" ) 
+          itr = assets_by_symbol.begin();
+
        while(limit-- && itr != assets_by_symbol.end())
           result.emplace_back(*itr++);
 
