@@ -357,6 +357,7 @@ namespace graphene { namespace chain {
       uint32_t account_len5_fee;
       uint32_t account_len4_fee;
       uint32_t account_len3_fee;
+      uint32_t account_len2_fee;
       uint32_t account_premium_fee;  ///< accounts with premium names; i.e. @ref is_cheap_name returns false
       uint32_t account_whitelist_fee; ///< the fee to whitelist an account
       uint32_t delegate_create_fee; ///< fixed fee for registering as a delegate; used to discourage frivioulous delegates
@@ -538,6 +539,7 @@ FC_REFLECT( graphene::chain::fee_schedule_type,
                  (account_len5_fee)
                  (account_len4_fee)
                  (account_len3_fee)
+                 (account_len2_fee)
                  (account_premium_fee)
                  (account_whitelist_fee)
                  (delegate_create_fee)

@@ -127,6 +127,8 @@ share_type account_create_operation::calculate_fee( const fee_schedule_type& sch
      core_fee_required = schedule.account_len4_fee;
    else if( s == 3 )
      core_fee_required = schedule.account_len3_fee;
+   else if( s == 2 )
+      core_fee_required = schedule.account_len2_fee;
 
    return core_fee_required;
 }
