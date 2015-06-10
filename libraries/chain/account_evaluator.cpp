@@ -206,4 +206,39 @@ void_result account_whitelist_evaluator::do_apply(const account_whitelist_operat
    return void_result();
 }
 
+void_result account_upgrade_evaluator::do_evaluate(const account_upgrade_evaluator::operation_type& o)
+{
+   database& d = db();
+
+   account = &d.get(o.account_to_upgrade);
+   FC_ASSERT(!account->is_lifetime_member());
+
+   return {};
+}
+
+void_result account_upgrade_evaluator::do_apply(const account_upgrade_evaluator::operation_type& o)
+{
+   database& d = db();
+
+   d.modify(*account, [&](account_object& a) {
+      if( o.upgrade_to_lifetime_member )
+      {
+         // Upgrade to lifetime member. I don't care what the account was before.
+         a.membership_expiration_date = time_point_sec::maximum();
+         a.referrer = a.registrar = a.lifetime_referrer = a.get_id();
+      } else if( a.is_annual_member(d.head_block_time()) ) {
+         // Renew an annual subscription that's still in effect.
+         FC_ASSERT(a.membership_expiration_date - d.head_block_time() < fc::days(3650),
+                   "May not extend annual membership more than a decade into the future.");
+         a.membership_expiration_date += fc::days(365);
+      } else {
+         // Upgrade from basic account.
+         assert(a.is_basic_account(d.head_block_time()));
+         a.membership_expiration_date = d.head_block_time() + fc::days(365);
+      }
+   });
+
+   return {};
+}
+
 } } // graphene::chain
