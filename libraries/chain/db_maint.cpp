@@ -242,10 +242,10 @@ void database::process_budget()
       // blocks_to_maint > 0 because time_to_maint > 0,
       // which means numerator is at least equal to block_interval
 
-      share_type available_funds = get_max_budget( now );
+      share_type available_funds = get_max_budget(now);
 
       share_type witness_budget = gpo.parameters.witness_pay_per_block.value * blocks_to_maint;
-      witness_budget = std::min( witness_budget, available_funds );
+      witness_budget = std::min(witness_budget, available_funds);
       available_funds -= witness_budget;
 
       fc::uint128_t worker_budget_u128 = gpo.parameters.worker_budget_per_day.value;
@@ -260,21 +260,22 @@ void database::process_budget()
       available_funds -= worker_budget;
 
       share_type leftover_worker_funds = worker_budget;
-      pay_workers( leftover_worker_funds );
+      pay_workers(leftover_worker_funds);
       available_funds += leftover_worker_funds;
 
-      modify( core, [&]( asset_dynamic_data_object& _core )
+      modify(core, [&]( asset_dynamic_data_object& _core )
       {
          _core.current_supply = (_core.current_supply + witness_budget +
                                  worker_budget - leftover_worker_funds -
                                  _core.accumulated_fees);
          _core.accumulated_fees = 0;
-      } );
-      modify( dpo, [&]( dynamic_global_property_object& _dpo )
+      });
+      modify(dpo, [&]( dynamic_global_property_object& _dpo )
       {
+         // Should this be +=?
          _dpo.witness_budget = witness_budget;
          _dpo.last_budget_time = now;
-      } );
+      });
 
       // available_funds is money we could spend, but don't want to.
       // we simply let it evaporate back into the reserve.
@@ -361,6 +362,11 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
 
          auto cut_fee = [](share_type a, uint16_t p) -> share_type
          {
+            if( a == 0 || p == 0 )
+               return 0;
+            if( p == GRAPHENE_100_PERCENT )
+               return a;
+
             fc::uint128 r(a.value);
             r *= p;
             r /= GRAPHENE_100_PERCENT;
@@ -400,10 +406,11 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
             share_type burned = cut_fee(network_cut, props.parameters.burn_percent_of_fee);
             share_type accumulated = network_cut - burned;
             assert( accumulated + burned == network_cut );
-            share_type referral = core_fee_total - network_cut;
+            share_type lifetime_cut = cut_fee(core_fee_total, a.lifetime_referrer_fee_percentage);
+            share_type referral = core_fee_total - network_cut - lifetime_cut;
 
-            d.modify(dynamic_asset_data_id_type()(d), [burned,accumulated](asset_dynamic_data_object& d) {
-               d.accumulated_fees += accumulated + burned;
+            d.modify(dynamic_asset_data_id_type()(d), [network_cut](asset_dynamic_data_object& d) {
+               d.accumulated_fees += network_cut;
             });
 
             d.modify(a.statistics(d), [core_fee_total](account_statistics_object& s) {
@@ -413,20 +420,18 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
 
             d.deposit_cashback( a, bulk_cashback );
 
-            assert( referral + bulk_cashback + accumulated + burned == core_fee_subtotal );
-
             // Potential optimization: Skip some of this math and object lookups by special casing on the account type.
             // For example, if the account is a lifetime member, we can skip all this and just deposit the referral to
             // it directly.
-            share_type lifetime_cut = cut_fee(referral, a.lifetime_referrer_fee_percentage);
             share_type referrer_cut = cut_fee(referral, a.referrer_rewards_percentage);
-            share_type registrar_cut = referral - lifetime_cut = referrer_cut;
+            share_type registrar_cut = referral - referrer_cut;
 
             d.deposit_cashback(d.get(a.lifetime_referrer), lifetime_cut);
             d.deposit_cashback(d.get(a.referrer), referrer_cut);
             d.deposit_cashback(d.get(a.registrar), registrar_cut);
 
-            assert( lifetime_cut + referrer_cut + registrar_cut == referral );
+            idump((referrer_cut)(registrar_cut)(bulk_cashback)(accumulated)(burned)(lifetime_cut)(core_fee_subtotal));
+            assert( referrer_cut + registrar_cut + bulk_cashback + accumulated + burned + lifetime_cut == core_fee_subtotal );
          }
       }
    } fees_helper(*this, gpo);

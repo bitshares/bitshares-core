@@ -816,6 +816,7 @@ BOOST_FIXTURE_TEST_CASE( max_authority_membership, database_fixture )
       private_key_type sam_key = generate_private_key("sam");
 
       account_object sam_account_object = create_account( "sam", sam_key );
+      upgrade_to_lifetime_member(sam_account_object);
       account_object genesis_account_object = genesis_account(db);
 
       const asset_object& core = asset_id_type()(db);

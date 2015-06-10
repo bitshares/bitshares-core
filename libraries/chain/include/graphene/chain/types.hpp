@@ -416,8 +416,7 @@ namespace graphene { namespace chain {
 
    struct chain_parameters
    {
-      fee_schedule_type       current_fees; ///< current schedule of fees, indexed by @ref fee_type
-      uint32_t                witness_pay_percent_of_accumulated  = GRAPHENE_DEFAULT_WITNESS_PAY_PERCENT_OF_ACCUMULATED; ///< percentage of accumulated fees in core asset to pay to witnesses for block production
+      fee_schedule_type       current_fees; ///< current schedule of fees
       uint8_t                 block_interval                      = GRAPHENE_DEFAULT_BLOCK_INTERVAL; ///< interval in seconds between blocks
       uint32_t                maintenance_interval                = GRAPHENE_DEFAULT_MAINTENANCE_INTERVAL; ///< interval in sections between blockchain maintenance events
       uint32_t                maximum_transaction_size            = GRAPHENE_DEFAULT_MAX_TRANSACTION_SIZE; ///< maximum allowable size in bytes for a transaction
@@ -454,7 +453,6 @@ namespace graphene { namespace chain {
          FC_ASSERT( bulk_discount_threshold_min <= bulk_discount_threshold_max );
          FC_ASSERT( bulk_discount_threshold_min > 0 );
 
-         FC_ASSERT( witness_pay_percent_of_accumulated < GRAPHENE_WITNESS_PAY_PERCENT_PRECISION );
          FC_ASSERT( block_interval <= GRAPHENE_MAX_BLOCK_INTERVAL );
          FC_ASSERT( block_interval > 0 );
          FC_ASSERT( maintenance_interval > block_interval,
@@ -575,7 +573,6 @@ FC_REFLECT( graphene::chain::fee_schedule_type,
 
 FC_REFLECT( graphene::chain::chain_parameters,
             (current_fees)
-            (witness_pay_percent_of_accumulated)
             (block_interval)
             (maintenance_interval)
             (maximum_transaction_size)

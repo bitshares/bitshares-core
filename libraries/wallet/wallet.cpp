@@ -763,9 +763,11 @@ public:
       account_object account_obj = get_account(name);
       FC_ASSERT( !account_obj.is_lifetime_member() );
 
-      // TODO
-
       signed_transaction tx;
+      account_upgrade_operation op;
+      op.account_to_upgrade = account_obj.get_id();
+      op.upgrade_to_lifetime_member = true;
+      tx.operations = {op};
       tx.visit( operation_set_fee( _remote_db->get_global_properties().parameters.current_fees ) );
       tx.validate();
 

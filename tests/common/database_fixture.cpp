@@ -119,6 +119,7 @@ void database_fixture::verify_asset_supplies( )const
    for( const account_statistics_object& a : statistics_index )
    {
       reported_core_in_orders += a.total_core_in_orders;
+      total_balances[asset_id_type()] += a.pending_fees;
    }
    for( const limit_order_object& o : db.get_index_type<limit_order_index>().indices() )
    {
@@ -672,7 +673,8 @@ void database_fixture::enable_fees(
    {
       fc::reflector<fee_schedule_type>::visit(fee_schedule_type::fee_set_visitor{gpo.parameters.current_fees,
                                                                                  uint32_t(fee.value)});
-      gpo.parameters.current_fees.membership_annual_fee = 10*fee.value;
+      gpo.parameters.current_fees.membership_annual_fee = 3*fee.value;
+      gpo.parameters.current_fees.membership_lifetime_fee = 10*fee.value;
    } );
 }
 
@@ -685,9 +687,12 @@ void database_fixture::upgrade_to_lifetime_member( const account_object& account
 {
    try
    {
-      // TODO
+      account_upgrade_operation op;
+      op.account_to_upgrade = account.get_id();
+      op.upgrade_to_lifetime_member = true;
+      trx.operations = {op};
       db.push_transaction( trx, ~0 );
-      FC_ASSERT( account.is_lifetime_member() );
+      FC_ASSERT( op.account_to_upgrade(db).is_lifetime_member() );
       trx.clear();
    }
    FC_CAPTURE_AND_RETHROW((account))

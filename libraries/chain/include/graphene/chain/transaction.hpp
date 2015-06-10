@@ -19,6 +19,8 @@
 #include <graphene/chain/types.hpp>
 #include <graphene/chain/operations.hpp>
 
+#include <numeric>
+
 // this is for htonl() and ntohl() functions
 // TODO:  write and use FC wrappers for these functions
 #ifndef WIN32
