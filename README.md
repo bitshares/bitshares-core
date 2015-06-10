@@ -6,7 +6,7 @@ This is a quick introduction to get new developers up to speed on Graphene.
 Starting Graphene
 -----------------
 
-    git clone https://gitlab.bitshares.org/dlarimer/graphene
+    git clone https://github.com/cryptonomex/graphene.git
     cd graphene
     git submodule update --init --recursive
     cmake -DCMAKE_BUILD_TYPE=Debug .
