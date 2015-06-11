@@ -219,7 +219,7 @@ void database::init_genesis(const genesis_allocation& initial_allocation)
       _wso.scheduler._min_token_count = init_witnesses.size() / 2;
       _wso.scheduler.update( init_witness_set );
 
-      for( int i=0; i<init_witnesses.size(); i++ )
+      for( size_t i=0; i<init_witnesses.size(); i++ )
          _wso.scheduler.produce_schedule( rng );
 
       _wso.last_scheduling_block = 0;
