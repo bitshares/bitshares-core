@@ -119,7 +119,7 @@ void database_fixture::verify_asset_supplies( )const
    for( const account_statistics_object& a : statistics_index )
    {
       reported_core_in_orders += a.total_core_in_orders;
-      total_balances[asset_id_type()] += a.pending_fees;
+      total_balances[asset_id_type()] += a.pending_fees + a.pending_vested_fees;
    }
    for( const limit_order_object& o : db.get_index_type<limit_order_index>().indices() )
    {

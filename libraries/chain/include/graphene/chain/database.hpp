@@ -254,7 +254,7 @@ namespace graphene { namespace chain {
          void adjust_core_in_orders( const account_object& acnt, asset delta );
 
          // helper to handle cashback rewards
-         void deposit_cashback( const account_object& acct, share_type amount );
+         void deposit_cashback(const account_object& acct, share_type amount, bool require_vesting = true);
 
          //////////////////// db_debug.cpp ////////////////////
 

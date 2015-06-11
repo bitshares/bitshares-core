@@ -67,7 +67,10 @@ namespace graphene { namespace chain {
             d.fee_pool -= core_fee_paid;
          });
       db().modify(*fee_paying_account_statistics, [&](account_statistics_object& s) {
-         s.pending_fees += core_fee_paid;
+         if( core_fee_paid > db().get_global_properties().parameters.cashback_vesting_threshold )
+            s.pending_fees += core_fee_paid;
+         else
+            s.pending_vested_fees += core_fee_paid;
       });
    } FC_CAPTURE_AND_RETHROW() }
 

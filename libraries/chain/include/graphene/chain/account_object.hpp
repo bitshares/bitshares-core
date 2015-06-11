@@ -62,11 +62,20 @@ namespace graphene { namespace chain {
          /**
           * Tracks the fees paid by this account which have not been disseminated to the various parties that receive
           * them yet (registrar, referrer, lifetime referrer, network, etc). This is used as an optimization to avoid
-          * doing massive amounts of uint128 math on each and every operation.
+          * doing massive amounts of uint128 arithmetic on each and every operation.
           *
-          * These fees will be paid out and this counter will reset during the maintenance interval.
+          *These fees will be paid out as vesting cash-back, and this counter will reset during the maintenance
+          *interval.
           */
          share_type pending_fees;
+         /**
+          * Same as @ref pending_fees, except these fees will be paid out as pre-vested cash-back (immediately
+          * available for withdrawal) rather than requiring the normal vesting period.
+          */
+         share_type pending_vested_fees;
+
+         /// @brief Calculate the percentage discount this user receives on his fees
+         uint16_t calculate_bulk_discount_percent(const chain_parameters& params)const;
    };
 
    /**
@@ -290,5 +299,6 @@ FC_REFLECT_DERIVED( graphene::chain::account_statistics_object, (graphene::chain
                     (most_recent_op)
                     (total_core_in_orders)
                     (lifetime_fees_paid)
+                    (pending_fees)(pending_vested_fees)
                   )
 

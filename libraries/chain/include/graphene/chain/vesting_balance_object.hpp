@@ -35,9 +35,9 @@ namespace graphene { namespace chain {
       vesting_policy_context(
          asset _balance,
          fc::time_point_sec _now,
-         asset _amount )
-         : balance( _balance ), now( _now ), amount( _amount ) {}
-   
+         asset _amount)
+         : balance(_balance), now(_now), amount(_amount) {}
+
       asset balance;
       fc::time_point_sec now;
       asset amount;
@@ -53,11 +53,14 @@ namespace graphene { namespace chain {
       share_type                        begin_balance;   // same asset as balance
       share_type                        total_withdrawn; // same asset as balance
 
-      asset get_allowed_withdraw( const vesting_policy_context& ctx )const;
-      bool is_deposit_allowed( const vesting_policy_context& ctx )const;
-      bool is_withdraw_allowed( const vesting_policy_context& ctx )const;
-      void on_deposit( const vesting_policy_context& ctx );
-      void on_withdraw( const vesting_policy_context& ctx );
+      asset get_allowed_withdraw(const vesting_policy_context& ctx)const;
+      bool is_deposit_allowed(const vesting_policy_context& ctx)const;
+      bool is_deposit_vested_allowed(const vesting_policy_context&)const { return false; }
+      bool is_withdraw_allowed(const vesting_policy_context& ctx)const;
+      void on_deposit(const vesting_policy_context& ctx);
+      void on_deposit_vested(const vesting_policy_context&)
+      { FC_THROW( "May not deposit vested into a linear vesting balance." ); }
+      void on_withdraw(const vesting_policy_context& ctx);
    };
 
    struct cdd_vesting_policy
@@ -71,20 +74,22 @@ namespace graphene { namespace chain {
        * non-destructively figure out how many coin seconds
        * are available.
        */
-      fc::uint128_t compute_coin_seconds_earned( const vesting_policy_context& ctx )const;
+      fc::uint128_t compute_coin_seconds_earned(const vesting_policy_context& ctx)const;
 
       /**
        * Update coin_seconds_earned and
        * coin_seconds_earned_last_update fields; called by both
        * on_deposit() and on_withdraw().
        */
-      void update_coin_seconds_earned( const vesting_policy_context& ctx );
+      void update_coin_seconds_earned(const vesting_policy_context& ctx);
 
-      asset get_allowed_withdraw( const vesting_policy_context& ctx )const;
-      bool is_deposit_allowed( const vesting_policy_context& ctx )const;
-      bool is_withdraw_allowed( const vesting_policy_context& ctx )const;
-      void on_deposit( const vesting_policy_context& ctx );
-      void on_withdraw( const vesting_policy_context& ctx );
+      asset get_allowed_withdraw(const vesting_policy_context& ctx)const;
+      bool is_deposit_allowed(const vesting_policy_context& ctx)const;
+      bool is_deposit_vested_allowed(const vesting_policy_context& ctx)const;
+      bool is_withdraw_allowed(const vesting_policy_context& ctx)const;
+      void on_deposit(const vesting_policy_context& ctx);
+      void on_deposit_vested(const vesting_policy_context& ctx);
+      void on_withdraw(const vesting_policy_context& ctx);
    };
 
    typedef fc::static_variant<
@@ -102,17 +107,21 @@ namespace graphene { namespace chain {
          static const uint8_t space_id = protocol_ids;
          static const uint8_t type_id = vesting_balance_object_type;
 
-         account_id_type                owner;
-         asset                          balance;
-         vesting_policy                 policy;
+         account_id_type   owner;
+         asset             balance;
+         vesting_policy    policy;
 
          vesting_balance_object() {}
 
          /**
           * Used to increase existing vesting balances.
           */
-         void deposit( const fc::time_point_sec& now, const asset& amount );
-         bool is_deposit_allowed( const fc::time_point_sec& now, const asset& amount )const;
+         void deposit(const fc::time_point_sec& now, const asset& amount);
+         bool is_deposit_allowed(const fc::time_point_sec& now, const asset& amount)const;
+
+         /// @brief Deposit amount into vesting balance, making the new funds vest immediately
+         void deposit_vested(const fc::time_point_sec& now, const asset& amount);
+         bool is_deposit_vested_allowed(const fc::time_point_sec& now, const asset& amount)const;
 
          /**
           * Used to remove a vesting balance from the VBO.  As well
@@ -122,27 +131,27 @@ namespace graphene { namespace chain {
           * The money doesn't "go" anywhere; the caller is responsible
           * for crediting it to the proper account.
           */
-         void withdraw( const fc::time_point_sec& now, const asset& amount );
-         bool is_withdraw_allowed( const fc::time_point_sec& now, const asset& amount )const;
+         void withdraw(const fc::time_point_sec& now, const asset& amount);
+         bool is_withdraw_allowed(const fc::time_point_sec& now, const asset& amount)const;
    };
 
 } } // graphene::chain
 
-FC_REFLECT( graphene::chain::linear_vesting_policy,
-   (vesting_seconds)
-   (begin_date)
-   (begin_balance)
-   (total_withdrawn)
-)
+FC_REFLECT(graphene::chain::linear_vesting_policy,
+           (vesting_seconds)
+           (begin_date)
+           (begin_balance)
+           (total_withdrawn)
+          )
 
-FC_REFLECT( graphene::chain::cdd_vesting_policy,
-   (vesting_seconds)
-   (coin_seconds_earned)
-   (coin_seconds_earned_last_update)
-)
+FC_REFLECT(graphene::chain::cdd_vesting_policy,
+           (vesting_seconds)
+           (coin_seconds_earned)
+           (coin_seconds_earned_last_update)
+          )
 
-FC_REFLECT_DERIVED( graphene::chain::vesting_balance_object, (graphene::db::object),
-   (owner)
-   (balance)
-   (policy)
-)
+FC_REFLECT_DERIVED(graphene::chain::vesting_balance_object, (graphene::db::object),
+                   (owner)
+                   (balance)
+                   (policy)
+                  )
