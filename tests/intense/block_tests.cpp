@@ -268,6 +268,7 @@ BOOST_FIXTURE_TEST_CASE( delegate_groups_mc_test, database_fixture )
 
       cur_round.reserve( num_witnesses );
       full_schedule.reserve( total_blocks );
+      cur_round.push_back( db.get_dynamic_global_properties().current_witness );
 
       // we assert so the test doesn't continue, which would
       // corrupt memory
