@@ -1,11 +1,11 @@
 [submodule "docs"]
 	path = docs
-	url = git@github.com:cryptonomex/graphene.wiki.git
+	url = https://github.com/cryptonomex/graphene.wiki.git
 [submodule "libraries/fc"]
     path = libraries/fc
-    url = git@github.com:cryptonomex/fc.git
+    url = https://github.com/cryptonomex/fc.git
     ignore = dirty
 [submodule "libraries/leveldb"]
     path = libraries/leveldb
-    url = git@github.com:bitcoin/leveldb.git
+    url = https://github.com/bitcoin/leveldb.git
     ignore = dirty
