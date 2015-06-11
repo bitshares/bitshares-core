@@ -253,7 +253,7 @@ BOOST_FIXTURE_TEST_CASE( update_account_keys, database_fixture )
  *  This test checks the requirement using Monte Carlo approach
  *  (produce lots of blocks and check the invariant holds).
  */
-BOOST_FIXTURE_TEST_CASE( delegate_groups_mc_test, database_fixture )
+BOOST_FIXTURE_TEST_CASE( witness_order_mc_test, database_fixture )
 {
    try {
       size_t num_witnesses = db.get_global_properties().active_witnesses.size();
@@ -276,12 +276,15 @@ BOOST_FIXTURE_TEST_CASE( delegate_groups_mc_test, database_fixture )
 
       while( full_schedule.size() < total_blocks )
       {
+         if( (db.head_block_num() & 0x3FFF) == 0 )
+         {
+             wdump( (db.head_block_num()) );
+         }
          witness_id_type wid = db.get_scheduled_witness( 1 ).first;
          full_schedule.push_back( wid );
          cur_round.push_back( wid );
          if( cur_round.size() == num_witnesses )
          {
-            wdump( (cur_round) );
             // check that the current round contains exactly 1 copy
             // of each witness
             witness_seen.reset();
