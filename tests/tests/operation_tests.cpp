@@ -1970,25 +1970,6 @@ BOOST_AUTO_TEST_CASE( witness_withdraw_pay_test )
 } FC_LOG_AND_RETHROW() }
 
 /**
- *  To have a secure random number we need to ensure that the same
- *  delegate does not get to produce two blocks in a row.  There is
- *  always a chance that the last delegate of one round will be the
- *  first delegate of the next round.
- *
- *  This means that when we shuffle delegates we need to make sure
- *  that there is at least N/2 delegates between consecutive turns
- *  of the same delegate.    This means that durring the random
- *  shuffle we need to restrict the placement of delegates to maintain
- *  this invariant.
- */
-BOOST_AUTO_TEST_CASE_EXPECTED_FAILURES( unimp_delegate_groups_test, 1 )
-BOOST_AUTO_TEST_CASE( unimp_delegate_groups_test )
-{
-   BOOST_FAIL( "not implemented" );
-}
-
-
-/**
  * This test should simulate a prediction market which means the following:
  *
  * 1) Issue a BitAsset without Forced Settling & With Global Settling
