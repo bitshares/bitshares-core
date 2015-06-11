@@ -5,11 +5,21 @@ CMakeCache.txt
 CMakeFiles
 Makefile
 compile_commands.json
+*.cmake
 
 libraries/utilities/git_revision.cpp
+
+programs/cli_wallet/cli_wallet
+programs/js_operation_serializer/js_operation_serializer
+programs/witness_node/witness_node
 
 tests/app_test
 tests/chain_bench
 tests/chain_test
+tests/intense_test
+tests/performance_test
 
 /doxygen
+
+witness_node_data_dir
+wallet.json
