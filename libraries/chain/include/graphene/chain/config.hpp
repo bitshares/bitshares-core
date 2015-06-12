@@ -112,3 +112,13 @@
 #define GRAPHENE_MAX_INTEREST_APR                            uint16_t( 10000 )
 #define GRAPHENE_LEGACY_NAME_IMPORT_PERIOD                   3000000 /** 3 million blocks */
 
+/**
+ *  Reserved Account IDs with special meaning
+ */
+///@{
+#define GRAPHENE_GENESIS_ACCOUNT (graphene::chain::account_id_type(0))
+#define GRAPHENE_WITNESS_ACCOUNT (graphene::chain::account_id_type(1))
+#define GRAPHENE_DELEGATE_ACCOUNT (graphene::chain::account_id_type(2))
+#define GRAPHENE_NULL_ACCOUNT (graphene::chain::account_id_type(3))
+#define GRAPHENE_TEMP_ACCOUNT (graphene::chain::account_id_type(4))
+///@}

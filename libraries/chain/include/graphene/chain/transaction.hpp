@@ -1,19 +1,6 @@
 /*
  * Copyright (c) 2015, Cryptonomex, Inc.
  * All rights reserved.
- *
- * This source code is provided for evaluation in private test networks only, until September 8, 2015. After this date, this license expires and
- * the code may not be used, modified or distributed for any purpose. Redistribution and use in source and binary forms, with or without modification,
- * are permitted until September 8, 2015, provided that the following conditions are met:
- *
- * 1. The code and/or derivative works are used only for private test networks consisting of no more than 10 P2P nodes.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
- * THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR
- * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
- * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
- * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
- * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #pragma once
 #include <graphene/chain/types.hpp>
@@ -140,10 +127,17 @@ namespace graphene { namespace chain {
          : transaction(trx){}
 
       void sign( key_id_type id, const private_key_type& key );
+
       flat_map<key_id_type,signature_type> signatures;
 
+      /** some operations may depend only upon a signature and not
+       * require account approval.  This allows those extra signatures
+       * to be added to the transaction.
+       */
+      flat_map<address,signature_type>     extra_signatures;
+
       /// Removes all operations and signatures
-      void clear() { operations.clear(); signatures.clear(); }
+      void clear() { operations.clear(); signatures.clear(); extra_signatures.clear(); }
    };
 
    /**
@@ -175,6 +169,8 @@ namespace graphene { namespace chain {
 } }
 
 FC_REFLECT( graphene::chain::transaction, (ref_block_num)(ref_block_prefix)(relative_expiration)(operations) )
-FC_REFLECT_DERIVED( graphene::chain::signed_transaction, (graphene::chain::transaction), (signatures) )
+FC_REFLECT_DERIVED( graphene::chain::signed_transaction, 
+                    (graphene::chain::transaction), 
+                    (signatures)(extra_signatures) )
 FC_REFLECT_DERIVED( graphene::chain::processed_transaction, (graphene::chain::signed_transaction), (operation_results) )
 

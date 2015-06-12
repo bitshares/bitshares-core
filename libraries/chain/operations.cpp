@@ -1,19 +1,6 @@
 /*
  * Copyright (c) 2015, Cryptonomex, Inc.
  * All rights reserved.
- *
- * This source code is provided for evaluation in private test networks only, until September 8, 2015. After this date, this license expires and
- * the code may not be used, modified or distributed for any purpose. Redistribution and use in source and binary forms, with or without modification,
- * are permitted until September 8, 2015, provided that the following conditions are met:
- *
- * 1. The code and/or derivative works are used only for private test networks consisting of no more than 10 P2P nodes.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
- * THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR
- * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
- * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
- * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
- * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #include <graphene/chain/database.hpp>
 #include <graphene/chain/operations.hpp>
@@ -910,6 +897,65 @@ memo_message memo_message::deserialize(const string& serial)
    result.checksum = ntohl((uint32_t&)(*serial.data()));
    result.text = serial.substr(sizeof(result.checksum));
    return result;
+}
+
+/**
+ *  If fee_payer = temp_account_id, then the fee is paid by the surplus balance of inputs-outputs and
+ *  100% of the fee goes to the network.
+ */
+account_id_type blind_transfer_operation::fee_payer()const 
+{ 
+   return fee_payer_id;
+}
+
+void            blind_transfer_operation::get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>&)const
+{
+   active_auth_set.insert( fee_payer_id );
+   active_auth_set.insert( from_account );
+   for( auto input : inputs )
+   {
+      if( input.owner.which() == static_variant<address,account_id_type>::tag<account_id_type>::value )
+         active_auth_set.insert( input.owner.get<account_id_type>() );
+   }
+}
+
+/**
+ *  This method can be computationally intensive because it verifies that input commitments - output commitments add up to 0
+ */
+void            blind_transfer_operation::validate()const
+{
+   vector<commitment_type> in(inputs.size());
+   vector<commitment_type> out(outputs.size());
+   int64_t                 net_public = from_amount.value - to_amount.value;
+   for( uint32_t i = 0; i < in.size(); ++i )  in[i] = inputs[i].commitment;
+   for( uint32_t i = 0; i < out.size(); ++i ) out[i] = outputs[i].commitment;
+   FC_ASSERT( in.size() + out.size() || net_public == 0 );
+   if( fee_payer_id == GRAPHENE_TEMP_ACCOUNT ) net_public -= fee.amount.value;
+   FC_ASSERT( fc::ecc::verify_sum( in, out, net_public ) );
+
+   if( outputs.size() > 1 )
+   {
+      for( auto out : outputs )
+      {
+         auto info = fc::ecc::range_get_info( out.range_proof );
+         FC_ASSERT( info.min_value >= 0 );
+         FC_ASSERT( info.max_value <= GRAPHENE_MAX_SHARE_SUPPLY );
+      }
+   }
+}
+
+share_type      blind_transfer_operation::calculate_fee( const fee_schedule_type& k )const
+{
+   auto size = 1024 + fc::raw::pack_size(*this);
+   return (k.blind_transfer_fee * size)/1024;
+}
+
+void            blind_transfer_operation::get_balance_delta( balance_accumulator& acc, 
+                                                             const operation_result& result)const 
+{ 
+   acc.adjust( fee_payer(), -fee ); 
+   acc.adjust( from_account, asset(-from_amount,fee.asset_id) ); 
+   acc.adjust( to_account, asset(to_amount,fee.asset_id) ); 
 }
 
 } } // namespace graphene::chain

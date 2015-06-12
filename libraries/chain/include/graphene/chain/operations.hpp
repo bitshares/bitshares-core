@@ -275,6 +275,7 @@ namespace graphene { namespace chain {
       void get_balance_delta( balance_accumulator& acc, const operation_result& result = asset())const { acc.adjust( fee_payer(), -fee ); }
    };
 
+
   /**
     * @brief Create a witness object, as a bid to hold a witness position on the network.
     * @ingroup operations
@@ -443,6 +444,114 @@ namespace graphene { namespace chain {
          acc.adjust( from, -amount );
          acc.adjust( to, amount );
       }
+   };
+
+   /**
+    *  There are two ways to transfer value while maintaining privacy:
+    *  1. account to account with amount kept secret
+    *  2. stealth transfers with amount sender/receiver kept secret 
+    *
+    *  When doing account to account transfers, everyone with access to the
+    *  memo key can see the amounts, but they will not have access to the funds. 
+    *
+    *  When using stealth transfers the same key is used for control and reading
+    *  the memo.  
+    *
+    *  This operation is more expensive than a normal transfer and has 
+    *  a fee proportional to the size of the operation.
+    *
+    *  All assets in a blind transfer must be of the same type: fee.asset_id
+    *  The fee_payer is the temp account and can be funded from the blinded values.
+    *
+    *  Using this operation you can transfer from an account and/or blinded balances 
+    *  to an account and/or blinded balances.  
+    *
+    *  The sum of the blind_inputs + public inputs - public outputs - blind_outputs - fee must
+    *  be 0.
+    *
+    *  Stealth Transfers:
+    *
+    *  Assuming Receiver has key pair R,r and has shared public key R with Sender 
+    *  Assuming Sender has key pair S,s 
+    *  Generate one time key pair  O,o  as s.child(nonce) where nonce can be inferred from transaction
+    *  Calculate secret V = o*R
+    *  blinding_factor = sha256(V) 
+    *  memo is encrypted via aes of V 
+    *  owner = R.child(sha256(blinding_factor)) 
+    *
+    *  Sender gives Receiver output ID to complete the payment.
+    *
+    *  This process can also be used to send money to a cold wallet without having to
+    *  pre-register any accounts.  
+    *
+    *  Outputs are assigned the same IDs as the inputs until no more input IDs are available, 
+    *  in which case a the return value will be the *first* ID allocated for an output.  Additional
+    *  output IDs are allocated sequentially thereafter.   If there are fewer outputs than inputs
+    *  then the input IDs are freed and never used again.
+    */
+   struct blind_transfer_operation
+   {
+      /**
+       *  This data is encrypted and stored in the
+       *  encrypted memo portion of the blind output.
+       */
+      struct blind_memo
+      {
+         account_id_type     from;
+         share_type          amount;
+         string              message;
+         /** set to the first 4 bytes of the shared secret
+          * used to encrypt the memo.  Used to verify that
+          * decryption was successful.
+          */
+         uint32_t            check= 0;
+      };
+
+      struct blind_input
+      {
+         fc::ecc::commitment_type                commitment;
+         /** provided to maintain the invariant that all authority
+          * required by an operation is explicit in the operation.  Must
+          * match blinded_balance_id->owner 
+          */
+         static_variant<address,account_id_type> owner;
+      };
+
+      /**
+       *  The blinded output that must be proven to be greater than 0
+       */
+      struct blind_output
+      {
+         fc::ecc::commitment_type                commitment;
+         /** only required if there is more than one blind output */
+         range_proof_type                        range_proof;
+         static_variant<address,account_id_type> owner;
+         public_key_type                         one_time_key;
+         /** encrypted via aes with shared secret derived from
+          * one_time_key and (owner or owner.memo_key)
+          */
+         vector<char>                            encrypted_memo;
+      };
+
+      asset                 fee;
+      account_id_type       fee_payer_id;
+      account_id_type       from_account;
+      /** unblinded amount transfered from from account */
+      share_type            from_amount;
+      account_id_type       to_account;
+      /** unblinded amount transfered to to_account */
+      share_type            to_amount;
+      string                to_account_name;
+      optional<address>     to_address;
+      vector<blind_input>   inputs;
+      vector<blind_output>  outputs;
+
+      account_id_type fee_payer()const;
+      void            get_required_auth( flat_set<account_id_type>& active_auth_set, 
+                                         flat_set<account_id_type>& )const;
+      void            validate()const;
+      share_type      calculate_fee( const fee_schedule_type& k )const;
+      void            get_balance_delta( balance_accumulator& acc, const operation_result& result = asset())const;
    };
 
    /**
@@ -1482,6 +1591,7 @@ namespace graphene { namespace chain {
       }
    };
 
+
    /**
     * @defgroup workers The Blockchain Worker System
     * @ingroup operations
@@ -1846,4 +1956,17 @@ FC_REFLECT( graphene::chain::worker_create_operation,
 FC_REFLECT( graphene::chain::custom_operation, (fee)(payer)(required_auths)(id)(data) )
 FC_REFLECT( graphene::chain::void_result, )
 
+FC_REFLECT( graphene::chain::blind_transfer_operation::blind_memo,
+            (from)(amount)(message)(check) )
+FC_REFLECT( graphene::chain::blind_transfer_operation::blind_input,
+            (commitment)(owner) )
+FC_REFLECT( graphene::chain::blind_transfer_operation::blind_output,
+            (commitment)(range_proof)(owner)(one_time_key)(encrypted_memo) )
+FC_REFLECT( graphene::chain::blind_transfer_operation, 
+            (fee)(fee_payer_id)
+            (from_account)(from_amount)
+            (to_account)(to_account_name)(to_address)(to_amount) )
+
 FC_REFLECT_TYPENAME( graphene::chain::operation )
+
+

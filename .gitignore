@@ -1,6 +1,7 @@
 *.a
 *.sw*
 
+*.cmake
 CMakeCache.txt
 CMakeFiles
 Makefile
@@ -12,4 +13,10 @@ tests/app_test
 tests/chain_bench
 tests/chain_test
 
-/doxygen
+doxygen
+
+programs/cli_wallet/cli_wallet
+programs/js_operation_serializer/js_operation_serializer
+programs/witness_node/witness_node
+tests/intense_test
+tests/performance_test

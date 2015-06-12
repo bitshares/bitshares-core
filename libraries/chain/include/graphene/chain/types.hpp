@@ -63,6 +63,9 @@ namespace graphene { namespace chain {
    using                               fc::flat_map;
    using                               fc::flat_set;
    using                               fc::static_variant;
+   using                               fc::ecc::range_proof_type;
+   using                               fc::ecc::range_proof_info;
+   using                               fc::ecc::commitment_type;
 
    typedef fc::ecc::private_key        private_key_type;
 
@@ -131,6 +134,7 @@ namespace graphene { namespace chain {
       global_settle_fee_type,
       worker_create_fee_type, ///< the cost to create a new worker
       worker_delete_fee_type, ///< the cost to delete a worker
+      blind_transfer_fee_type, ///< the cost per killobyte of the blinded transfer size
       FEE_TYPE_COUNT ///< Sentry value which contains the number of different fee types
    };
 
@@ -271,6 +275,8 @@ namespace graphene { namespace chain {
    typedef safe<int64_t>                                share_type;
    typedef fc::sha224                                   secret_hash_type;
    typedef uint16_t                                     weight_type;
+
+
 
    /**
     * @brief An ID for some votable object
@@ -417,6 +423,7 @@ namespace graphene { namespace chain {
        uint32_t global_settle_fee;
        uint32_t worker_create_fee; ///< the cost to create a new worker
        uint32_t worker_delete_fee; ///< the cost to delete a worker
+       uint32_t blind_transfer_fee; ///< cost per kb for blind transfers
    };
 
 
@@ -639,6 +646,7 @@ FC_REFLECT_ENUM( graphene::chain::fee_type,
                  (global_settle_fee_type)
                  (worker_create_fee_type)
                  (worker_delete_fee_type)
+                 (blind_transfer_fee_type)
                  (FEE_TYPE_COUNT)
                )
 
