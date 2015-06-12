@@ -935,4 +935,63 @@ share_type account_upgrade_operation::calculate_fee(const fee_schedule_type& k) 
    return k.membership_annual_fee;
 }
 
+/**
+ *  If fee_payer = temp_account_id, then the fee is paid by the surplus balance of inputs-outputs and
+ *  100% of the fee goes to the network.
+ */
+account_id_type blind_transfer_operation::fee_payer()const
+{
+   return fee_payer_id;
+}
+
+void            blind_transfer_operation::get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>&)const
+{
+   active_auth_set.insert( fee_payer_id );
+   active_auth_set.insert( from_account );
+   for( auto input : inputs )
+   {
+      if( input.owner.which() == static_variant<address,account_id_type>::tag<account_id_type>::value )
+         active_auth_set.insert( input.owner.get<account_id_type>() );
+   }
+}
+
+/**
+ *  This method can be computationally intensive because it verifies that input commitments - output commitments add up to 0
+ */
+void            blind_transfer_operation::validate()const
+{
+   vector<commitment_type> in(inputs.size());
+   vector<commitment_type> out(outputs.size());
+   int64_t                 net_public = from_amount.value - to_amount.value;
+   for( uint32_t i = 0; i < in.size(); ++i )  in[i] = inputs[i].commitment;
+   for( uint32_t i = 0; i < out.size(); ++i ) out[i] = outputs[i].commitment;
+   FC_ASSERT( in.size() + out.size() || net_public == 0 );
+   if( fee_payer_id == GRAPHENE_TEMP_ACCOUNT ) net_public -= fee.amount.value;
+   FC_ASSERT( fc::ecc::verify_sum( in, out, net_public ) );
+
+   if( outputs.size() > 1 )
+   {
+      for( auto out : outputs )
+      {
+         auto info = fc::ecc::range_get_info( out.range_proof );
+         FC_ASSERT( info.min_value >= 0 );
+         FC_ASSERT( info.max_value <= GRAPHENE_MAX_SHARE_SUPPLY );
+      }
+   }
+}
+
+share_type      blind_transfer_operation::calculate_fee( const fee_schedule_type& k )const
+{
+   auto size = 1024 + fc::raw::pack_size(*this);
+   return (k.blind_transfer_fee * size)/1024;
+}
+
+void            blind_transfer_operation::get_balance_delta( balance_accumulator& acc,
+                                                             const operation_result& result)const
+{
+   acc.adjust( fee_payer(), -fee );
+   acc.adjust( from_account, asset(-from_amount,fee.asset_id) );
+   acc.adjust( to_account, asset(to_amount,fee.asset_id) );
+}
+
 } } // namespace graphene::chain

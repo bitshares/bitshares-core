@@ -63,6 +63,9 @@ namespace graphene { namespace chain {
    using                               fc::flat_map;
    using                               fc::flat_set;
    using                               fc::static_variant;
+   using                               fc::ecc::range_proof_type;
+   using                               fc::ecc::range_proof_info;
+   using                               fc::ecc::commitment_type;
 
    typedef fc::ecc::private_key        private_key_type;
 

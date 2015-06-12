@@ -1,11 +1,11 @@
 *.a
 *.sw*
 
+*.cmake
 CMakeCache.txt
 CMakeFiles
 Makefile
 compile_commands.json
-*.cmake
 
 libraries/utilities/git_revision.cpp
 
@@ -19,7 +19,7 @@ tests/chain_test
 tests/intense_test
 tests/performance_test
 
-/doxygen
+doxygen
 
-witness_node_data_dir
 wallet.json
+witness_node_data_dir
