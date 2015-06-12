@@ -695,7 +695,7 @@ public:
 
       account_object registrar_account_object =
             this->get_account( registrar_account );
-      FC_ASSERT( registrar_account_object.is_prime() );
+      FC_ASSERT( registrar_account_object.is_lifetime_member() );
 
       account_id_type registrar_account_id = registrar_account_object.id;
 
@@ -761,17 +761,13 @@ public:
    { try {
       FC_ASSERT( !self.is_locked() );
       account_object account_obj = get_account(name);
-      FC_ASSERT( !account_obj.is_prime() );
-
-      account_update_operation   update_op;
-      update_op.account          = account_obj.id;
-      update_op.num_witness      = account_obj.num_witness;
-      update_op.num_committee    = account_obj.num_committee;
-      update_op.upgrade_to_prime = true;
-
+      FC_ASSERT( !account_obj.is_lifetime_member() );
 
       signed_transaction tx;
-      tx.operations.push_back( update_op );
+      account_upgrade_operation op;
+      op.account_to_upgrade = account_obj.get_id();
+      op.upgrade_to_lifetime_member = true;
+      tx.operations = {op};
       tx.visit( operation_set_fee( _remote_db->get_global_properties().parameters.current_fees ) );
       tx.validate();
 
@@ -802,7 +798,7 @@ public:
          account_object referrer_account_object =
                this->get_account( referrer_account );
          account_create_op.referrer = referrer_account_object.id;
-         account_create_op.referrer_percent = referrer_account_object.referrer_percent;
+         account_create_op.referrer_percent = referrer_account_object.referrer_rewards_percentage;
 
          // get pay_from_account_id
          key_create_operation owner_key_create_op;

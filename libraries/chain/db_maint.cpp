@@ -174,74 +174,6 @@ void database::update_active_delegates()
    });
 } FC_CAPTURE_AND_RETHROW() }
 
-void database::update_vote_totals(const global_property_object& props)
-{ try {
-   _vote_tally_buffer.resize(props.next_available_vote_id);
-   _witness_count_histogram_buffer.resize(props.parameters.maximum_witness_count / 2 + 1);
-   _committee_count_histogram_buffer.resize(props.parameters.maximum_committee_count / 2 + 1);
-
-   const account_index& account_idx = get_index_type<account_index>();
-   _total_voting_stake = 0;
-
-   bool count_non_prime_votes = props.parameters.count_non_prime_votes;
-   auto timestamp = fc::time_point::now();
-   for( const account_object& stake_account : account_idx.indices() )
-   {
-      if( count_non_prime_votes || stake_account.is_prime() )
-      {
-         // There may be a difference between the account whose stake is voting and the one specifying opinions.
-         // Usually they're the same, but if the stake account has specified a voting_account, that account is the one
-         // specifying the opinions.
-         const account_object& opinion_account =
-               (stake_account.voting_account == account_id_type())? stake_account
-                                                                  : get(stake_account.voting_account);
-
-         const auto& stats = stake_account.statistics(*this);
-         uint64_t voting_stake = stats.total_core_in_orders.value
-               + (stake_account.cashback_vb.valid() ? (*stake_account.cashback_vb)(*this).balance.amount.value: 0)
-               + get_balance(stake_account.get_id(), asset_id_type()).amount.value;
-
-         for( vote_id_type id : opinion_account.votes )
-         {
-            uint32_t offset = id.instance();
-            // if they somehow managed to specify an illegal offset, ignore it.
-            if( offset < _vote_tally_buffer.size() )
-               _vote_tally_buffer[ offset ] += voting_stake;
-         }
-
-         if( opinion_account.num_witness <= props.parameters.maximum_witness_count )
-         {
-            uint16_t offset = std::min(size_t(opinion_account.num_witness/2),
-                                       _witness_count_histogram_buffer.size() - 1);
-            //
-            // votes for a number greater than maximum_witness_count
-            // are turned into votes for maximum_witness_count.
-            //
-            // in particular, this takes care of the case where a
-            // member was voting for a high number, then the
-            // parameter was lowered.
-            //
-            _witness_count_histogram_buffer[ offset ] += voting_stake;
-         }
-         if( opinion_account.num_committee <= props.parameters.maximum_committee_count )
-         {
-            uint16_t offset = std::min(size_t(opinion_account.num_committee/2),
-                                       _committee_count_histogram_buffer.size() - 1);
-            //
-            // votes for a number greater than maximum_committee_count
-            // are turned into votes for maximum_committee_count.
-            //
-            // same rationale as for witnesses
-            //
-            _committee_count_histogram_buffer[ offset ] += voting_stake;
-         }
-
-         _total_voting_stake += voting_stake;
-      }
-   }
-   ilog("Tallied votes in ${time} milliseconds.", ("time", (fc::time_point::now() - timestamp).count() / 1000.0));
-} FC_CAPTURE_AND_RETHROW() }
-
 share_type database::get_max_budget( fc::time_point_sec now )const
 {
    const dynamic_global_property_object& dpo = get_dynamic_global_properties();
@@ -310,10 +242,10 @@ void database::process_budget()
       // blocks_to_maint > 0 because time_to_maint > 0,
       // which means numerator is at least equal to block_interval
 
-      share_type available_funds = get_max_budget( now );
+      share_type available_funds = get_max_budget(now);
 
       share_type witness_budget = gpo.parameters.witness_pay_per_block.value * blocks_to_maint;
-      witness_budget = std::min( witness_budget, available_funds );
+      witness_budget = std::min(witness_budget, available_funds);
       available_funds -= witness_budget;
 
       fc::uint128_t worker_budget_u128 = gpo.parameters.worker_budget_per_day.value;
@@ -328,21 +260,22 @@ void database::process_budget()
       available_funds -= worker_budget;
 
       share_type leftover_worker_funds = worker_budget;
-      pay_workers( leftover_worker_funds );
+      pay_workers(leftover_worker_funds);
       available_funds += leftover_worker_funds;
 
-      modify( core, [&]( asset_dynamic_data_object& _core )
+      modify(core, [&]( asset_dynamic_data_object& _core )
       {
          _core.current_supply = (_core.current_supply + witness_budget +
                                  worker_budget - leftover_worker_funds -
                                  _core.accumulated_fees);
          _core.accumulated_fees = 0;
-      } );
-      modify( dpo, [&]( dynamic_global_property_object& _dpo )
+      });
+      modify(dpo, [&]( dynamic_global_property_object& _dpo )
       {
+         // Should this be +=?
          _dpo.witness_budget = witness_budget;
          _dpo.last_budget_time = now;
-      } );
+      });
 
       // available_funds is money we could spend, but don't want to.
       // we simply let it evaporate back into the reserve.
@@ -352,7 +285,153 @@ void database::process_budget()
 
 void database::perform_chain_maintenance(const signed_block& next_block, const global_property_object& global_props)
 {
-   update_vote_totals(global_props);
+   const auto& gpo = get_global_properties();
+
+   struct vote_tally_helper {
+      database& d;
+      const global_property_object& props;
+
+      vote_tally_helper(database& d, const global_property_object& gpo)
+         : d(d), props(gpo)
+      {
+         d._vote_tally_buffer.resize(props.next_available_vote_id);
+         d._witness_count_histogram_buffer.resize(props.parameters.maximum_witness_count / 2 + 1);
+         d._committee_count_histogram_buffer.resize(props.parameters.maximum_committee_count / 2 + 1);
+         d._total_voting_stake = 0;
+      }
+
+      void operator()(const account_object& stake_account) {
+         if( props.parameters.count_non_member_votes || stake_account.is_member(d.head_block_time()) )
+         {
+            // There may be a difference between the account whose stake is voting and the one specifying opinions.
+            // Usually they're the same, but if the stake account has specified a voting_account, that account is the one
+            // specifying the opinions.
+            const account_object& opinion_account =
+                  (stake_account.voting_account == account_id_type())? stake_account
+                                                                     : d.get(stake_account.voting_account);
+
+            const auto& stats = stake_account.statistics(d);
+            uint64_t voting_stake = stats.total_core_in_orders.value
+                  + (stake_account.cashback_vb.valid() ? (*stake_account.cashback_vb)(d).balance.amount.value: 0)
+                  + d.get_balance(stake_account.get_id(), asset_id_type()).amount.value;
+
+            for( vote_id_type id : opinion_account.votes )
+            {
+               uint32_t offset = id.instance();
+               // if they somehow managed to specify an illegal offset, ignore it.
+               if( offset < d._vote_tally_buffer.size() )
+                  d._vote_tally_buffer[ offset ] += voting_stake;
+            }
+
+            if( opinion_account.num_witness <= props.parameters.maximum_witness_count )
+            {
+               uint16_t offset = std::min(size_t(opinion_account.num_witness/2),
+                                          d._witness_count_histogram_buffer.size() - 1);
+               // votes for a number greater than maximum_witness_count
+               // are turned into votes for maximum_witness_count.
+               //
+               // in particular, this takes care of the case where a
+               // member was voting for a high number, then the
+               // parameter was lowered.
+               d._witness_count_histogram_buffer[ offset ] += voting_stake;
+            }
+            if( opinion_account.num_committee <= props.parameters.maximum_committee_count )
+            {
+               uint16_t offset = std::min(size_t(opinion_account.num_committee/2),
+                                          d._committee_count_histogram_buffer.size() - 1);
+               // votes for a number greater than maximum_committee_count
+               // are turned into votes for maximum_committee_count.
+               //
+               // same rationale as for witnesses
+               d._committee_count_histogram_buffer[ offset ] += voting_stake;
+            }
+
+            d._total_voting_stake += voting_stake;
+         }
+      }
+   } tally_helper(*this, gpo);
+   struct process_fees_helper {
+      database& d;
+      const global_property_object& props;
+
+      process_fees_helper(database& d, const global_property_object& gpo)
+         : d(d), props(gpo) {}
+
+      share_type cut_fee(share_type a, uint16_t p)const
+      {
+         if( a == 0 || p == 0 )
+            return 0;
+         if( p == GRAPHENE_100_PERCENT )
+            return a;
+
+         fc::uint128 r(a.value);
+         r *= p;
+         r /= GRAPHENE_100_PERCENT;
+         return r.to_uint64();
+      }
+
+      void pay_out_fees(const account_object& account, share_type core_fee_total, bool require_vesting)
+      {
+         share_type network_cut = cut_fee(core_fee_total, account.network_fee_percentage);
+         assert( network_cut <= core_fee_total );
+         share_type burned = cut_fee(network_cut, props.parameters.burn_percent_of_fee);
+         share_type accumulated = network_cut - burned;
+         assert( accumulated + burned == network_cut );
+         share_type lifetime_cut = cut_fee(core_fee_total, account.lifetime_referrer_fee_percentage);
+         share_type referral = core_fee_total - network_cut - lifetime_cut;
+
+         d.modify(dynamic_asset_data_id_type()(d), [network_cut](asset_dynamic_data_object& d) {
+            d.accumulated_fees += network_cut;
+         });
+
+         // Potential optimization: Skip some of this math and object lookups by special casing on the account type.
+         // For example, if the account is a lifetime member, we can skip all this and just deposit the referral to
+         // it directly.
+         share_type referrer_cut = cut_fee(referral, account.referrer_rewards_percentage);
+         share_type registrar_cut = referral - referrer_cut;
+
+         d.deposit_cashback(d.get(account.lifetime_referrer), lifetime_cut, require_vesting);
+         d.deposit_cashback(d.get(account.referrer), referrer_cut, require_vesting);
+         d.deposit_cashback(d.get(account.registrar), registrar_cut, require_vesting);
+
+         assert( referrer_cut + registrar_cut + accumulated + burned + lifetime_cut == core_fee_total );
+     }
+
+      void operator()(const account_object& a) {
+         const account_statistics_object& stats = a.statistics(d);
+
+         if( stats.pending_fees > 0 )
+         {
+            share_type vesting_fee_subtotal(stats.pending_fees);
+            share_type vested_fee_subtotal(stats.pending_vested_fees);
+            share_type vesting_cashback, vested_cashback;
+
+            if( stats.lifetime_fees_paid > props.parameters.bulk_discount_threshold_min &&
+                a.is_member(d.head_block_time()) )
+            {
+               auto bulk_discount_rate = stats.calculate_bulk_discount_percent(props.parameters);
+               vesting_cashback = cut_fee(vesting_fee_subtotal, bulk_discount_rate);
+               vesting_fee_subtotal -= vesting_cashback;
+
+               vested_cashback = cut_fee(vested_fee_subtotal, bulk_discount_rate);
+               vested_fee_subtotal -= vested_cashback;
+            }
+
+            pay_out_fees(a, vesting_fee_subtotal, true);
+            d.deposit_cashback(a, vesting_cashback, true);
+            pay_out_fees(a, vested_fee_subtotal, false);
+            d.deposit_cashback(a, vested_cashback, false);
+
+            d.modify(stats, [vested_fee_subtotal, vesting_fee_subtotal](account_statistics_object& s) {
+               s.lifetime_fees_paid += vested_fee_subtotal + vesting_fee_subtotal;
+               s.pending_fees = 0;
+               s.pending_vested_fees = 0;
+            });
+        }
+      }
+   } fee_helper(*this, gpo);
+
+   perform_account_maintenance(std::tie(tally_helper, fee_helper));
 
    struct clear_canary {
       clear_canary(vector<uint64_t>& target): target(target){}
@@ -367,9 +446,8 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
    update_active_witnesses();
    update_active_delegates();
 
-   const global_property_object& global_properties = get_global_properties();
-   if( global_properties.pending_parameters )
-      modify(get_global_properties(), [](global_property_object& p) {
+   if( gpo.pending_parameters )
+      modify(gpo, [](global_property_object& p) {
          p.parameters = std::move(*p.pending_parameters);
          p.pending_parameters.reset();
       });
@@ -388,7 +466,7 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
    }
 
    auto next_maintenance_time = get<dynamic_global_property_object>(dynamic_global_property_id_type()).next_maintenance_time;
-   auto maintenance_interval = get_global_properties().parameters.maintenance_interval;
+   auto maintenance_interval = gpo.parameters.maintenance_interval;
 
    if( next_maintenance_time <= next_block.timestamp )
    {

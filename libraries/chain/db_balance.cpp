@@ -89,7 +89,7 @@ void database::adjust_core_in_orders( const account_object& acnt, asset delta )
    }
 }
 
-void database::deposit_cashback( const account_object& acct, share_type amount )
+void database::deposit_cashback(const account_object& acct, share_type amount, bool require_vesting)
 {
    // If we don't have a VBO, or if it has the wrong maturity
    // due to a policy change, cut it loose.
@@ -112,7 +112,10 @@ void database::deposit_cashback( const account_object& acct, share_type amount )
 
       modify( cashback_vb, [&]( vesting_balance_object& obj )
       {
-         obj.deposit( now, amount );
+         if( require_vesting )
+            obj.deposit(now, amount);
+         else
+            obj.deposit_vested(now, amount);
       } );
       return;
    }
@@ -124,7 +127,7 @@ void database::deposit_cashback( const account_object& acct, share_type amount )
 
       cdd_vesting_policy policy;
       policy.vesting_seconds = global_vesting_seconds;
-      policy.coin_seconds_earned = 0;
+      policy.coin_seconds_earned = require_vesting? 0 : amount.value * policy.vesting_seconds;
       policy.coin_seconds_earned_last_update = now;
 
       obj.policy = policy;

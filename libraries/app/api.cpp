@@ -155,10 +155,22 @@ namespace graphene { namespace app {
 
     vector<asset> database_api::get_account_balances(account_id_type acnt, const flat_set<asset_id_type>& assets)const
     {
-       vector<asset> result;  result.reserve(assets.size());
-
-       std::transform(assets.begin(), assets.end(), std::back_inserter(result),
-                      [this, acnt](asset_id_type id) { return _db.get_balance(acnt, id); });
+       vector<asset> result;
+       if (assets.empty())
+       {
+          // if the caller passes in an empty list of assets, return balances for all assets the account owns
+          const account_balance_index& balance_index = _db.get_index_type<account_balance_index>();
+          auto range = balance_index.indices().get<by_account>().equal_range(acnt);
+          for (const account_balance_object& balance : boost::make_iterator_range(range.first, range.second))
+             result.push_back(asset(balance.get_balance()));
+       }
+       else
+       {
+          result.reserve(assets.size());
+           
+          std::transform(assets.begin(), assets.end(), std::back_inserter(result),
+                         [this, acnt](asset_id_type id) { return _db.get_balance(acnt, id); });
+       }
 
        return result;
     }

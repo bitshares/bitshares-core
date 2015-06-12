@@ -140,7 +140,6 @@ void witness_plugin::block_production_loop()
 
       // we must control the witness scheduled to produce the next block.
       if( _witnesses.find( scheduled_witness ) == _witnesses.end() ) {
-         elog("Not producing block because it's not my turn.");
          return false;
       }
 

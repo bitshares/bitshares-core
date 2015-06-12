@@ -64,6 +64,7 @@ void database::initialize_evaluators()
    register_evaluator<key_create_evaluator>();
    register_evaluator<account_create_evaluator>();
    register_evaluator<account_update_evaluator>();
+   register_evaluator<account_upgrade_evaluator>();
    register_evaluator<account_whitelist_evaluator>();
    register_evaluator<delegate_create_evaluator>();
    register_evaluator<custom_evaluator>();
@@ -153,6 +154,9 @@ void database::init_genesis(const genesis_allocation& initial_allocation)
    });
    const account_object& genesis_account =
       create<account_object>( [&](account_object& n) {
+         n.membership_expiration_date = time_point_sec::maximum();
+         n.network_fee_percentage = GRAPHENE_DEFAULT_NETWORK_PERCENT_OF_FEE;
+         n.lifetime_referrer_fee_percentage = GRAPHENE_100_PERCENT - GRAPHENE_DEFAULT_NETWORK_PERCENT_OF_FEE;
          n.name = "genesis";
          n.owner.add_authority(genesis_key.get_id(), 1);
          n.owner.weight_threshold = 1;
@@ -174,6 +178,12 @@ void database::init_genesis(const genesis_allocation& initial_allocation)
       const account_object& delegate_account =
          create<account_object>( [&](account_object& a) {
             a.active = a.owner = genesis_account.owner;
+            a.referrer = account_id_type(i);
+            a.registrar = account_id_type(i);
+            a.lifetime_referrer = account_id_type(i);
+            a.network_fee_percentage = GRAPHENE_DEFAULT_NETWORK_PERCENT_OF_FEE;
+            a.lifetime_referrer_fee_percentage = GRAPHENE_100_PERCENT - GRAPHENE_DEFAULT_NETWORK_PERCENT_OF_FEE;
+            a.membership_expiration_date = fc::time_point_sec::maximum();
             a.name = string("init") + fc::to_string(i);
             a.statistics = stats_obj.id;
          });
@@ -209,7 +219,7 @@ void database::init_genesis(const genesis_allocation& initial_allocation)
       _wso.scheduler._min_token_count = init_witnesses.size() / 2;
       _wso.scheduler.update( init_witness_set );
 
-      for( int i=0; i<init_witnesses.size(); i++ )
+      for( size_t i=0; i<init_witnesses.size(); i++ )
          _wso.scheduler.produce_schedule( rng );
 
       _wso.last_scheduling_block = 0;

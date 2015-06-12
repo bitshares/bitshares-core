@@ -20,6 +20,7 @@
 #include <graphene/chain/block.hpp>
 #include <graphene/chain/asset.hpp>
 #include <graphene/chain/global_property_object.hpp>
+#include <graphene/chain/account_object.hpp>
 #include <graphene/chain/asset_object.hpp>
 #include <graphene/chain/fork_database.hpp>
 
@@ -253,7 +254,7 @@ namespace graphene { namespace chain {
          void adjust_core_in_orders( const account_object& acnt, asset delta );
 
          // helper to handle cashback rewards
-         void deposit_cashback( const account_object& acct, share_type amount );
+         void deposit_cashback(const account_object& acct, share_type amount, bool require_vesting = true);
 
          //////////////////// db_debug.cpp ////////////////////
 
@@ -357,7 +358,9 @@ namespace graphene { namespace chain {
          void perform_chain_maintenance(const signed_block& next_block, const global_property_object& global_props);
          void update_active_witnesses();
          void update_active_delegates();
-         void update_vote_totals(const global_property_object& props);
+
+         template<class... Types>
+         void perform_account_maintenance(std::tuple<Types...> helpers);
          ///@}
          ///@}
 
@@ -393,5 +396,31 @@ namespace graphene { namespace chain {
          vector<uint64_t>                  _committee_count_histogram_buffer;
          uint64_t                          _total_voting_stake;
    };
+
+   namespace detail
+   {
+       template<int... Is>
+       struct seq { };
+
+       template<int N, int... Is>
+       struct gen_seq : gen_seq<N - 1, N - 1, Is...> { };
+
+       template<int... Is>
+       struct gen_seq<0, Is...> : seq<Is...> { };
+
+       template<typename T, int... Is>
+       void for_each(T&& t, const account_object& a, seq<Is...>)
+       {
+           auto l = { (std::get<Is>(t)(a), 0)... };
+           (void)l;
+       }
+   }
+   template<class... Types>
+   void database::perform_account_maintenance(std::tuple<Types...> helpers)
+   {
+      const auto& idx = get_index_type<account_index>().indices();
+      for( const account_object& a : idx )
+         detail::for_each(helpers, a, detail::gen_seq<sizeof...(Types)>());
+   }
 
 } }

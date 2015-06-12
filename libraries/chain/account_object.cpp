@@ -36,4 +36,24 @@ void account_balance_object::adjust_balance(const asset& delta)
    balance += delta.amount;
 }
 
+uint16_t account_statistics_object::calculate_bulk_discount_percent(const chain_parameters& params) const
+{
+   uint64_t bulk_discount_percent = 0;
+   if( lifetime_fees_paid >= params.bulk_discount_threshold_max )
+      bulk_discount_percent = params.max_bulk_discount_percent_of_fee;
+   else if(params.bulk_discount_threshold_max.value !=
+           params.bulk_discount_threshold_min.value)
+   {
+      bulk_discount_percent =
+            (params.max_bulk_discount_percent_of_fee *
+             (lifetime_fees_paid.value -
+              params.bulk_discount_threshold_min.value)) /
+            (params.bulk_discount_threshold_max.value -
+             params.bulk_discount_threshold_min.value);
+   }
+   assert( bulk_discount_percent <= GRAPHENE_100_PERCENT );
+
+   return bulk_discount_percent;
+}
+
 } } // graphene::chain

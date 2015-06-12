@@ -61,55 +61,17 @@ namespace graphene { namespace chain {
 
    void generic_evaluator::pay_fee()
    { try {
-      asset core_fee_subtotal(core_fee_paid);
-      const auto& gp = db().get_global_properties();
-      share_type bulk_cashback  = share_type(0);
-      if( fee_paying_account_statistics->lifetime_fees_paid > gp.parameters.bulk_discount_threshold_min &&
-          fee_paying_account->is_prime() )
-      {
-         uint64_t bulk_discount_percent = 0;
-         if( fee_paying_account_statistics->lifetime_fees_paid > gp.parameters.bulk_discount_threshold_max )
-            bulk_discount_percent = gp.parameters.max_bulk_discount_percent_of_fee;
-         else if(gp.parameters.bulk_discount_threshold_max.value - gp.parameters.bulk_discount_threshold_min.value != 0)
-         {
-            bulk_discount_percent =
-                  (gp.parameters.max_bulk_discount_percent_of_fee *
-                            (fee_paying_account_statistics->lifetime_fees_paid.value -
-                             gp.parameters.bulk_discount_threshold_min.value)) /
-                  (gp.parameters.bulk_discount_threshold_max.value - gp.parameters.bulk_discount_threshold_min.value);
-         }
-         assert( bulk_discount_percent <= GRAPHENE_100_PERCENT );
-         assert( bulk_discount_percent >= 0 );
-
-         bulk_cashback = (core_fee_subtotal.amount.value * bulk_discount_percent) / GRAPHENE_100_PERCENT;
-         assert( bulk_cashback <= core_fee_subtotal.amount );
-      }
-
-      share_type core_fee_total = core_fee_subtotal.amount - bulk_cashback;
-      share_type accumulated = (core_fee_total.value  * gp.parameters.witness_percent_of_fee)/GRAPHENE_100_PERCENT;
-      share_type burned     = (core_fee_total.value  * gp.parameters.burn_percent_of_fee)/GRAPHENE_100_PERCENT;
-      share_type referral   = core_fee_total.value - accumulated - burned;
-      auto& d = db();
-
-      assert( accumulated + burned <= core_fee_total );
-
       if( fee_asset->get_id() != asset_id_type() )
-         d.modify(*fee_asset_dyn_data, [this](asset_dynamic_data_object& d) {
+         db().modify(*fee_asset_dyn_data, [this](asset_dynamic_data_object& d) {
             d.accumulated_fees += fee_from_account.amount;
             d.fee_pool -= core_fee_paid;
          });
-      d.modify(dynamic_asset_data_id_type()(d), [burned,accumulated](asset_dynamic_data_object& d) {
-         d.accumulated_fees += accumulated + burned;
+      db().modify(*fee_paying_account_statistics, [&](account_statistics_object& s) {
+         if( core_fee_paid > db().get_global_properties().parameters.cashback_vesting_threshold )
+            s.pending_fees += core_fee_paid;
+         else
+            s.pending_vested_fees += core_fee_paid;
       });
-
-      d.modify(fee_paying_account->statistics(d), [core_fee_total](account_statistics_object& s) {
-         s.lifetime_fees_paid += core_fee_total;
-      });
-
-      d.deposit_cashback( fee_paying_account->referrer(d), referral );
-      d.deposit_cashback( *fee_paying_account, bulk_cashback );
-
-      assert( referral + bulk_cashback + accumulated + burned == core_fee_subtotal.amount );
    } FC_CAPTURE_AND_RETHROW() }
 
    bool generic_evaluator::verify_authority( const account_object& a, authority::classification c )

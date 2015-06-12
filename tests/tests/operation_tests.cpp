@@ -107,6 +107,7 @@ BOOST_AUTO_TEST_CASE( child_account )
       const auto& nathan_key = register_key(nathan_private_key.get_public_key());
       const account_object& nathan = get_account("nathan");
       const account_object& root = create_account("root");
+      upgrade_to_lifetime_member(root);
 
       skip_key_index_test = true;
       db.modify(nathan, [nathan_key](account_object& a) {
@@ -128,7 +129,7 @@ BOOST_AUTO_TEST_CASE( child_account )
       BOOST_REQUIRE_THROW(db.push_transaction(trx), fc::exception);
       trx.signatures.clear();
       op.owner = authority(1, account_id_type(nathan.id), 1);
-      trx.operations.back() = op;
+      trx.operations = {op};
       sign(trx, key_id_type(), fc::ecc::private_key::regenerate(fc::sha256::hash(string("genesis"))));
       sign(trx, nathan_key.id, nathan_private_key);
       db.push_transaction(trx);
@@ -186,13 +187,16 @@ BOOST_AUTO_TEST_CASE( update_account )
       transfer(account_id_type()(db), nathan, asset(3000000));
 
       enable_fees();
-      op.upgrade_to_prime   = true;
-      op.fee     = op.calculate_fee( db.get_global_properties().parameters.current_fees );
-      trx.operations.push_back(op);
-      db.push_transaction(trx, ~0);
+      {
+         account_upgrade_operation op;
+         op.account_to_upgrade = nathan.id;
+         op.upgrade_to_lifetime_member = true;
+         op.fee = op.calculate_fee(db.get_global_properties().parameters.current_fees);
+         trx.operations = {op};
+         db.push_transaction(trx, ~0);
+      }
 
-      BOOST_CHECK( nathan.referrer == nathan.id );
-      BOOST_CHECK( nathan.referrer_percent == 100 );
+      BOOST_CHECK( nathan.is_lifetime_member() );
    } catch (fc::exception& e) {
       edump((e.to_detail_string()));
       throw;
@@ -1866,13 +1870,13 @@ BOOST_AUTO_TEST_CASE( witness_withdraw_pay_test )
 
    const asset_object* core = &asset_id_type()(db);
    const account_object* nathan = &get_account("nathan");
-   enable_fees(100000000);
-   BOOST_CHECK_GT(db.current_fee_schedule().at(prime_upgrade_fee_type).value, 0);
+   enable_fees(105000000);
+   BOOST_CHECK_GT(db.current_fee_schedule().membership_lifetime_fee, 0);
 
    BOOST_CHECK_EQUAL(core->dynamic_asset_data_id(db).accumulated_fees.value, 0);
-   account_update_operation uop;
-   uop.account = nathan->get_id();
-   uop.upgrade_to_prime = true;
+   account_upgrade_operation uop;
+   uop.account_to_upgrade = nathan->get_id();
+   uop.upgrade_to_lifetime_member = true;
    trx.set_expiration(db.head_block_id());
    trx.operations.push_back(uop);
    trx.visit(operation_set_fee(db.current_fee_schedule()));
@@ -1880,17 +1884,13 @@ BOOST_AUTO_TEST_CASE( witness_withdraw_pay_test )
    trx.sign(key_id_type(),generate_private_key("genesis"));
    db.push_transaction(trx);
    trx.clear();
-   BOOST_CHECK_EQUAL(get_balance(*nathan, *core), 9000000000);
-   BOOST_CHECK_EQUAL(core->dynamic_asset_data_id(db).accumulated_fees.value, 210000000);
-   // TODO:  Replace this with another check
-   //BOOST_CHECK_EQUAL(account_id_type()(db).statistics(db).cashback_rewards.value, 1000000000-210000000);
+   BOOST_CHECK_EQUAL(get_balance(*nathan, *core), 8950000000);
 
    generate_block();
    nathan = &get_account("nathan");
    core = &asset_id_type()(db);
    const witness_object* witness = &db.fetch_block_by_number(db.head_block_num())->witness(db);
 
-   BOOST_CHECK_GT(core->dynamic_asset_data_id(db).accumulated_fees.value, 0);
    BOOST_CHECK_EQUAL(witness->accumulated_income.value, 0);
 
    auto schedule_maint = [&]()
@@ -1900,7 +1900,7 @@ BOOST_AUTO_TEST_CASE( witness_withdraw_pay_test )
       {
          _dpo.next_maintenance_time = db.head_block_time() + 1;
       } );
-   } ;
+   };
 
    // generate some blocks
    while( db.head_block_num() < 30 )
@@ -1913,6 +1913,8 @@ BOOST_AUTO_TEST_CASE( witness_withdraw_pay_test )
    // maintenance will be in block 31.  time of block 31 - time of block 1 = 30 * 5 seconds.
 
    schedule_maint();
+   // TODO:  Replace this with another check
+   //BOOST_CHECK_EQUAL(account_id_type()(db).statistics(db).cashback_rewards.value, 1000000000-200000000);
    // first witness paid from old budget (so no pay)
    BOOST_CHECK_EQUAL( core->burned(db).value, 0 );
    generate_block();
@@ -1966,25 +1968,6 @@ BOOST_AUTO_TEST_CASE( witness_withdraw_pay_test )
    BOOST_CHECK_EQUAL(core->burned(db).value, 210000000 - ref_budget );
    BOOST_CHECK_EQUAL(witness->accumulated_income.value, 0);
 } FC_LOG_AND_RETHROW() }
-
-/**
- *  To have a secure random number we need to ensure that the same
- *  delegate does not get to produce two blocks in a row.  There is
- *  always a chance that the last delegate of one round will be the
- *  first delegate of the next round.
- *
- *  This means that when we shuffle delegates we need to make sure
- *  that there is at least N/2 delegates between consecutive turns
- *  of the same delegate.    This means that durring the random
- *  shuffle we need to restrict the placement of delegates to maintain
- *  this invariant.
- */
-BOOST_AUTO_TEST_CASE_EXPECTED_FAILURES( unimp_delegate_groups_test, 1 )
-BOOST_AUTO_TEST_CASE( unimp_delegate_groups_test )
-{
-   BOOST_FAIL( "not implemented" );
-}
-
 
 /**
  * This test should simulate a prediction market which means the following:
@@ -2124,7 +2107,7 @@ BOOST_AUTO_TEST_CASE( unimp_transfer_cashback_test )
 
    const account_object& sam  = create_account( "sam" );
    transfer(account_id_type()(db), sam, asset(30000));
-   upgrade_to_prime(sam);
+   upgrade_to_lifetime_member(sam);
 
    ilog( "Creating alice" );
    const account_object& alice  = create_account( "alice", sam, sam, 0 );

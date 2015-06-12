@@ -119,6 +119,7 @@ void database_fixture::verify_asset_supplies( )const
    for( const account_statistics_object& a : statistics_index )
    {
       reported_core_in_orders += a.total_core_in_orders;
+      total_balances[asset_id_type()] += a.pending_fees + a.pending_vested_fees;
    }
    for( const limit_order_object& o : db.get_index_type<limit_order_index>().indices() )
    {
@@ -670,27 +671,28 @@ void database_fixture::enable_fees(
 {
    db.modify(global_property_id_type()(db), [fee](global_property_object& gpo)
    {
-      for( int i=0; i < FEE_TYPE_COUNT; ++i)
-         gpo.parameters.current_fees.set(i, fee);
-      gpo.parameters.current_fees.set( prime_upgrade_fee_type, 10*fee.value );
+      fc::reflector<fee_schedule_type>::visit(fee_schedule_type::fee_set_visitor{gpo.parameters.current_fees,
+                                                                                 uint32_t(fee.value)});
+      gpo.parameters.current_fees.membership_annual_fee = 3*fee.value;
+      gpo.parameters.current_fees.membership_lifetime_fee = 10*fee.value;
    } );
 }
 
-void database_fixture::upgrade_to_prime(account_id_type account)
+void database_fixture::upgrade_to_lifetime_member(account_id_type account)
 {
-   upgrade_to_prime(account(db));
+   upgrade_to_lifetime_member(account(db));
 }
 
-void database_fixture::upgrade_to_prime( const account_object& account )
+void database_fixture::upgrade_to_lifetime_member( const account_object& account )
 {
    try
    {
-      account_update_operation op;
-      op.account = account.id;
-      op.upgrade_to_prime = true;
-      trx.operations.emplace_back(operation(op));
+      account_upgrade_operation op;
+      op.account_to_upgrade = account.get_id();
+      op.upgrade_to_lifetime_member = true;
+      trx.operations = {op};
       db.push_transaction( trx, ~0 );
-      FC_ASSERT( account.is_prime() );
+      FC_ASSERT( op.account_to_upgrade(db).is_lifetime_member() );
       trx.clear();
    }
    FC_CAPTURE_AND_RETHROW((account))

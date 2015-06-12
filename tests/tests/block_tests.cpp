@@ -424,7 +424,7 @@ BOOST_FIXTURE_TEST_CASE( maintenance_interval, database_fixture )
       BOOST_CHECK_GT(maintenence_time.sec_since_epoch(), db.head_block_time().sec_since_epoch());
       auto initial_properties = db.get_global_properties();
       const account_object& nathan = create_account("nathan");
-      upgrade_to_prime(nathan);
+      upgrade_to_lifetime_member(nathan);
       const delegate_object nathans_delegate = create_delegate(nathan);
       {
          account_update_operation op;

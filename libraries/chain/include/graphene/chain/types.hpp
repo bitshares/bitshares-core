@@ -89,6 +89,7 @@ namespace graphene { namespace chain {
    };
 
    inline bool is_relative( object_id_type o ){ return o.space() == 0; }
+<<<<<<< HEAD
    /**
     *  There are many types of fees charged by the network
     *  for different operations. These fees are published by
@@ -137,6 +138,8 @@ namespace graphene { namespace chain {
       blind_transfer_fee_type, ///< the cost per killobyte of the blinded transfer size
       FEE_TYPE_COUNT ///< Sentry value which contains the number of different fee types
    };
+=======
+>>>>>>> dfee44a40827e40becf4d8f21bff5b2bfa1303a2
 
    /**
     *  List all object types from all namespaces here so they can
@@ -376,6 +379,7 @@ namespace graphene { namespace chain {
 
    struct fee_schedule_type
    {
+<<<<<<< HEAD
        fee_schedule_type()
        {
           memset( (char*)this, 0, sizeof(*this) );
@@ -424,6 +428,74 @@ namespace graphene { namespace chain {
        uint32_t worker_create_fee; ///< the cost to create a new worker
        uint32_t worker_delete_fee; ///< the cost to delete a worker
        uint32_t blind_transfer_fee; ///< cost per kb for blind transfers
+=======
+      /**
+       * @brief The fee_set_visitor struct sets all fees to a particular value in one fell swoop
+       *
+       * Example:
+       * @code
+       * fee_schedule_type sch;
+       * // Set all fees to 50
+       * fc::reflector<fee_schedule_type>::visit(fee_schedule_type::fee_set_visitor{sch, 50});
+       * @endcode
+       */
+      struct fee_set_visitor {
+         fee_schedule_type& f;
+         uint32_t fee;
+
+         template<typename Member, typename Class, Member (Class::*member)>
+         void operator()(const char*)const
+         {
+            f.*member = fee;
+         }
+      };
+
+      fee_schedule_type()
+      {
+         memset( (char*)this, 0, sizeof(*this) );
+      }
+
+      uint32_t key_create_fee; ///< the cost to register a public key with the blockchain
+      uint32_t account_create_fee; ///< the cost to register the cheapest non-free account
+      uint32_t account_len8_fee;
+      uint32_t account_len7_fee;
+      uint32_t account_len6_fee;
+      uint32_t account_len5_fee;
+      uint32_t account_len4_fee;
+      uint32_t account_len3_fee;
+      uint32_t account_len2_fee;
+      uint32_t account_premium_fee;  ///< accounts with premium names; i.e. @ref is_cheap_name returns false
+      uint32_t account_whitelist_fee; ///< the fee to whitelist an account
+      uint32_t delegate_create_fee; ///< fixed fee for registering as a delegate; used to discourage frivioulous delegates
+      uint32_t witness_withdraw_pay_fee; ///< fee for withdrawing witness pay
+      uint32_t transfer_fee; ///< fee for transferring some asset
+      uint32_t limit_order_fee; ///< fee for placing a limit order in the markets
+      uint32_t short_order_fee; ///< fee for placing a short order in the markets
+      uint32_t publish_feed_fee; ///< fee for publishing a price feed
+      uint32_t asset_create_fee; ///< the cost to register the cheapest asset
+      uint32_t asset_update_fee; ///< the cost to modify a registered asset
+      uint32_t asset_issue_fee; ///< the cost to modify a registered asset
+      uint32_t asset_fund_fee_pool_fee; ///< the cost to add funds to an asset's fee pool
+      uint32_t asset_settle_fee; ///< the cost to trigger a forced settlement of a market-issued asset
+      uint32_t market_fee; ///< a percentage charged on market orders
+      uint32_t transaction_fee; ///< a base price for every transaction
+      uint32_t data_fee; ///< a price per 1024 bytes of user data
+      uint32_t signature_fee; ///< a surcharge on transactions with more than 2 signatures.
+      uint32_t global_parameters_update_fee; ///< the cost to update the global parameters
+      uint32_t membership_annual_fee; ///< the annual cost of a membership subscription
+      uint32_t membership_lifetime_fee; ///< the cost to upgrade to a lifetime member
+      uint32_t withdraw_permission_update_fee; ///< the cost to create/update a withdraw permission
+      uint32_t create_bond_offer_fee;
+      uint32_t cancel_bond_offer_fee;
+      uint32_t accept_bond_offer_fee;
+      uint32_t claim_bond_collateral_fee;
+      uint32_t file_storage_fee_per_day; ///< the cost of leasing a file with 2^16 bytes for 1 day
+      uint32_t vesting_balance_create_fee;
+      uint32_t vesting_balance_withdraw_fee;
+      uint32_t global_settle_fee;
+      uint32_t worker_create_fee; ///< the cost to create a new worker
+      uint32_t worker_delete_fee; ///< the cost to delete a worker
+>>>>>>> dfee44a40827e40becf4d8f21bff5b2bfa1303a2
    };
 
 
@@ -452,8 +524,7 @@ namespace graphene { namespace chain {
 
    struct chain_parameters
    {
-      fee_schedule_type       current_fees; ///< current schedule of fees, indexed by @ref fee_type
-      uint32_t                witness_pay_percent_of_accumulated  = GRAPHENE_DEFAULT_WITNESS_PAY_PERCENT_OF_ACCUMULATED; ///< percentage of accumulated fees in core asset to pay to witnesses for block production
+      fee_schedule_type       current_fees; ///< current schedule of fees
       uint8_t                 block_interval                      = GRAPHENE_DEFAULT_BLOCK_INTERVAL; ///< interval in seconds between blocks
       uint32_t                maintenance_interval                = GRAPHENE_DEFAULT_MAINTENANCE_INTERVAL; ///< interval in sections between blockchain maintenance events
       uint32_t                maximum_transaction_size            = GRAPHENE_DEFAULT_MAX_TRANSACTION_SIZE; ///< maximum allowable size in bytes for a transaction
@@ -467,27 +538,29 @@ namespace graphene { namespace chain {
       uint16_t                maximum_witness_count               = GRAPHENE_DEFAULT_MAX_WITNESSES; ///< maximum number of active witnesses
       uint16_t                maximum_committee_count             = GRAPHENE_DEFAULT_MAX_COMMITTEE; ///< maximum number of active delegates
       uint16_t                maximum_authority_membership        = GRAPHENE_DEFAULT_MAX_AUTHORITY_MEMBERSHIP; ///< largest number of keys/accounts an authority can have
-      uint16_t                burn_percent_of_fee                 = GRAPHENE_DEFAULT_BURN_PERCENT_OF_FEE; ///< the percentage of every fee that is taken out of circulation
-      uint16_t                witness_percent_of_fee              = GRAPHENE_DEFAULT_WITNESS_PERCENT; ///< percent of revenue paid to witnesses
+      uint16_t                burn_percent_of_fee                 = GRAPHENE_DEFAULT_BURN_PERCENT_OF_FEE; ///< the percentage of the network's allocation of a fee that is taken out of circulation
+      uint16_t                network_percent_of_fee              = GRAPHENE_DEFAULT_NETWORK_PERCENT_OF_FEE; ///< percent of transaction fees paid to network
+      uint16_t                lifetime_referrer_percent_of_fee    = GRAPHENE_DEFAULT_LIFETIME_REFERRER_PERCENT_OF_FEE; ///< percent of transaction fees paid to network
       uint32_t                cashback_vesting_period_seconds     = GRAPHENE_DEFAULT_CASHBACK_VESTING_PERIOD_SEC; ///< time after cashback rewards are accrued before they become liquid
+      share_type              cashback_vesting_threshold          = GRAPHENE_DEFAULT_CASHBACK_VESTING_THRESHOLD; ///< the maximum cashback that can be received without vesting
       uint16_t                max_bulk_discount_percent_of_fee    = GRAPHENE_DEFAULT_MAX_BULK_DISCOUNT_PERCENT; ///< the maximum percentage discount for bulk discounts
       share_type              bulk_discount_threshold_min         = GRAPHENE_DEFAULT_BULK_DISCOUNT_THRESHOLD_MIN; ///< the minimum amount of fees paid to qualify for bulk discounts
       share_type              bulk_discount_threshold_max         = GRAPHENE_DEFAULT_BULK_DISCOUNT_THRESHOLD_MAX; ///< the amount of fees paid to qualify for the max bulk discount percent
-      bool                    count_non_prime_votes               = true; ///< set to false to restrict voting privlegages to prime accounts
-      bool                    allow_non_prime_whitelists          = false; ///< true if non-prime accounts may set whitelists and blacklists; false otherwise
+      bool                    count_non_member_votes              = true; ///< set to false to restrict voting privlegages to member accounts
+      bool                    allow_non_member_whitelists         = false; ///< true if non-member accounts may set whitelists and blacklists; false otherwise
       share_type              witness_pay_per_block               = GRAPHENE_DEFAULT_WITNESS_PAY_PER_BLOCK; ///< CORE to be allocated to witnesses (per block)
       share_type              worker_budget_per_day               = GRAPHENE_DEFAULT_WORKER_BUDGET_PER_DAY; ///< CORE to be allocated to workers (per day)
 
       void validate()const
       {
-         FC_ASSERT( witness_percent_of_fee <= GRAPHENE_100_PERCENT );
          FC_ASSERT( burn_percent_of_fee <= GRAPHENE_100_PERCENT );
+         FC_ASSERT( network_percent_of_fee <= GRAPHENE_100_PERCENT );
          FC_ASSERT( max_bulk_discount_percent_of_fee <= GRAPHENE_100_PERCENT );
-         FC_ASSERT( burn_percent_of_fee + witness_percent_of_fee <= GRAPHENE_100_PERCENT );
+         FC_ASSERT( lifetime_referrer_percent_of_fee <= GRAPHENE_100_PERCENT );
+         FC_ASSERT( network_percent_of_fee + lifetime_referrer_percent_of_fee <= GRAPHENE_100_PERCENT );
          FC_ASSERT( bulk_discount_threshold_min <= bulk_discount_threshold_max );
          FC_ASSERT( bulk_discount_threshold_min > 0 );
 
-         FC_ASSERT( witness_pay_percent_of_accumulated < GRAPHENE_WITNESS_PAY_PERCENT_PRECISION );
          FC_ASSERT( block_interval <= GRAPHENE_MAX_BLOCK_INTERVAL );
          FC_ASSERT( block_interval > 0 );
          FC_ASSERT( maintenance_interval > block_interval,
@@ -502,7 +575,6 @@ namespace graphene { namespace chain {
                     "Maximum transaction expiration time must be greater than a block interval" );
          FC_ASSERT( maximum_proposal_lifetime - genesis_proposal_review_period > block_interval,
                     "Genesis proposal review period must be less than the maximum proposal lifetime" );
-         for( uint32_t i = 0; i < FEE_TYPE_COUNT; ++i ) { FC_ASSERT( current_fees.at(i) >= 0 ); }
       }
    };
 
@@ -574,6 +646,7 @@ FC_REFLECT( graphene::chain::fee_schedule_type,
                  (account_len5_fee)
                  (account_len4_fee)
                  (account_len3_fee)
+                 (account_len2_fee)
                  (account_premium_fee)
                  (account_whitelist_fee)
                  (delegate_create_fee)
@@ -592,7 +665,8 @@ FC_REFLECT( graphene::chain::fee_schedule_type,
                  (data_fee)
                  (signature_fee)
                  (global_parameters_update_fee)
-                 (prime_upgrade_fee)
+                 (membership_annual_fee)
+                 (membership_lifetime_fee)
                  (withdraw_permission_update_fee)
                  (create_bond_offer_fee)
                  (cancel_bond_offer_fee)
@@ -606,6 +680,7 @@ FC_REFLECT( graphene::chain::fee_schedule_type,
                  (worker_delete_fee)
                )
 
+<<<<<<< HEAD
 
 FC_REFLECT_ENUM( graphene::chain::fee_type,
                  (key_create_fee_type)
@@ -650,9 +725,10 @@ FC_REFLECT_ENUM( graphene::chain::fee_type,
                  (FEE_TYPE_COUNT)
                )
 
+=======
+>>>>>>> dfee44a40827e40becf4d8f21bff5b2bfa1303a2
 FC_REFLECT( graphene::chain::chain_parameters,
             (current_fees)
-            (witness_pay_percent_of_accumulated)
             (block_interval)
             (maintenance_interval)
             (maximum_transaction_size)
@@ -664,13 +740,15 @@ FC_REFLECT( graphene::chain::chain_parameters,
             (maximum_asset_feed_publishers)
             (maximum_authority_membership)
             (burn_percent_of_fee)
-            (witness_percent_of_fee)
+            (network_percent_of_fee)
+            (lifetime_referrer_percent_of_fee)
             (max_bulk_discount_percent_of_fee)
             (cashback_vesting_period_seconds)
+            (cashback_vesting_threshold)
             (bulk_discount_threshold_min)
             (bulk_discount_threshold_max)
-            (count_non_prime_votes)
-            (allow_non_prime_whitelists)
+            (count_non_member_votes)
+            (allow_non_member_whitelists)
             (witness_pay_per_block)
             (worker_budget_per_day)
           )

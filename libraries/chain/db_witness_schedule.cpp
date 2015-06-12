@@ -35,7 +35,7 @@ pair<witness_id_type, bool> database::get_scheduled_witness(uint32_t slot_num)co
 
    // ask the near scheduler who goes in the given slot
    witness_id_type wid;
-   bool slot_is_near = wso.scheduler.get_slot(slot_num, wid);
+   bool slot_is_near = wso.scheduler.get_slot(slot_num-1, wid);
    if( ! slot_is_near )
    {
       // if the near scheduler doesn't know, we have to extend it to
@@ -47,7 +47,7 @@ pair<witness_id_type, bool> database::get_scheduled_witness(uint32_t slot_num)co
 
       far_future_witness_scheduler far_scheduler =
          far_future_witness_scheduler(wso.scheduler, far_rng);
-      if( !far_scheduler.get_slot(slot_num, wid) )
+      if( !far_scheduler.get_slot(slot_num-1, wid) )
       {
          // no scheduled witness -- somebody set up us the bomb
          // n.b. this code path is impossible, the present
@@ -84,7 +84,7 @@ vector<witness_id_type> database::get_near_witness_schedule()const
 
    vector<witness_id_type> result;
    result.reserve(wso.scheduler.size());
-   uint32_t slot_num = 1;
+   uint32_t slot_num = 0;
    witness_id_type wid;
 
    while( wso.scheduler.get_slot(slot_num++, wid) )

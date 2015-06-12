@@ -76,7 +76,7 @@ BOOST_AUTO_TEST_CASE( issue_whitelist_uia )
       INVOKE(create_advanced_uia);
       const asset_object& advanced = get_asset("ADVANCED");
       const account_object& nathan = create_account("nathan");
-      upgrade_to_prime(nathan);
+      upgrade_to_lifetime_member(nathan);
       trx.clear();
 
       asset_issue_operation op({asset(), advanced.issuer, advanced.amount(1000), nathan.id});
@@ -107,7 +107,7 @@ BOOST_AUTO_TEST_CASE( transfer_whitelist_uia )
       const asset_object& advanced = get_asset("ADVANCED");
       const account_object& nathan = get_account("nathan");
       const account_object& dan = create_account("dan");
-      upgrade_to_prime(dan);
+      upgrade_to_lifetime_member(dan);
       trx.clear();
 
       transfer_operation op({advanced.amount(0), nathan.id, dan.id, advanced.amount(100)});
