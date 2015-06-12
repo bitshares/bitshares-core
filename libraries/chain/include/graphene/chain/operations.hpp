@@ -132,7 +132,7 @@ namespace graphene { namespace chain {
       account_id_type referrer;
       /// Of the fee split between registrar and referrer, this percentage goes to the referrer. The rest goes to the
       /// registrar.
-      uint8_t         referrer_percent = 0;
+      uint16_t        referrer_percent = 0;
 
       string          name;
       authority       owner;

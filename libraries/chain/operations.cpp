@@ -201,8 +201,7 @@ void account_create_operation::validate()const
 {
    FC_ASSERT( fee.amount >= 0 );
    FC_ASSERT( is_valid_name( name ) );
-   FC_ASSERT( referrer_percent >= 0   );
-   FC_ASSERT( referrer_percent <= 100 );
+   FC_ASSERT( referrer_percent <= GRAPHENE_100_PERCENT );
    FC_ASSERT( !owner.auths.empty() );
    auto pos = name.find( '/' );
    if( pos != string::npos )

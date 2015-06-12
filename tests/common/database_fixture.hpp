@@ -67,9 +67,11 @@ using namespace graphene::db;
 #define PUSH_TX( tx, skip_flags ) \
    _push_transaction( tx, skip_flags, __FILE__, __LINE__ )
 
-#define ACTOR(name) \
+#define PREP_ACTOR(name) \
    fc::ecc::private_key name ## _private_key = generate_private_key(BOOST_PP_STRINGIZE(name)); \
-   key_id_type name ## _key_id = register_key(name ## _private_key.get_public_key()).get_id(); \
+   key_id_type name ## _key_id = register_key(name ## _private_key.get_public_key()).get_id();
+#define ACTOR(name) \
+   PREP_ACTOR(name) \
    account_id_type name ## _id = create_account(BOOST_PP_STRINGIZE(name), name ## _key_id).id;
 #define GET_ACTOR(name) \
    fc::ecc::private_key name ## _private_key = generate_private_key(BOOST_PP_STRINGIZE(name)); \
