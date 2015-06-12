@@ -20,8 +20,7 @@ namespace graphene { namespace chain {
 
          fc::ecc::commitment_type                commitment;
          asset_id_type                           asset_id;
-         optional<account_id_type>               owner;
-         address                                 key;
+         static_variant<address,account_id_type> owner;
    };
 
    struct by_asset;
@@ -35,9 +34,7 @@ namespace graphene { namespace chain {
       blinded_balance_object,
       indexed_by<
          ordered_unique< tag<by_id>, member< object, object_id_type, &object::id > >,
-         hashed_unique< tag<by_commitment>, member<blinded_balance_object, commitment_type, &blinded_balance_object::commitment> >,
-         ordered_non_unique< tag<by_owner>, member<blinded_balance_object, account_id_type, &blinded_balance_object::owner> >,
-         ordered_non_unique< tag<by_asset>, member<blinded_balance_object, asset_id_type, &blinded_balance_object::asset_type> >
+         hashed_unique< tag<by_commitment>, member<blinded_balance_object, commitment_type, &blinded_balance_object::commitment> >
       >
    > blinded_balance_object_multi_index_type;
    typedef generic_index<blinded_balance_object, blinded_balance_object_multi_index_type> balance_index;
