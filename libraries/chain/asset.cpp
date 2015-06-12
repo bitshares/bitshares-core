@@ -116,7 +116,7 @@ namespace graphene { namespace chain {
          FC_ASSERT( base.amount > share_type(0) );
          FC_ASSERT( quote.amount > share_type(0) );
          FC_ASSERT( base.asset_id != quote.asset_id );
-      } FC_CAPTURE_AND_RETHROW() }
+      } FC_CAPTURE_AND_RETHROW( (base)(quote) ) }
 
       void price_feed::validate() const
       { try {
@@ -133,6 +133,7 @@ namespace graphene { namespace chain {
          FC_ASSERT( required_maintenance_collateral < required_initial_collateral );
          FC_ASSERT( required_maintenance_collateral >= 1000 );
          FC_ASSERT( call_limit.is_null() || call_limit < ~short_limit );
-      } FC_CAPTURE_AND_RETHROW() }
+      } FC_CAPTURE_AND_RETHROW( (call_limit.is_null())(short_limit.is_null())(call_limit)(short_limit)
+    		  (max_margin_period_sec)(required_maintenance_collateral)(required_initial_collateral) ) }
 
 } } // graphene::chain
