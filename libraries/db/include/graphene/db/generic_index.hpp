@@ -41,7 +41,7 @@ namespace graphene { namespace chain {
          typedef MultiIndexType index_type;
          typedef ObjectType     object_type;
 
-         virtual const object& insert( object&& obj )
+         virtual const object& insert( object&& obj )override
          {
             assert( nullptr != dynamic_cast<ObjectType*>(&obj) );
             auto insert_result = _indices.insert( std::move( static_cast<ObjectType&>(obj) ) );
@@ -49,7 +49,7 @@ namespace graphene { namespace chain {
             return *insert_result.first;
          }
 
-         virtual const object&  create(const std::function<void(object&)>& constructor )
+         virtual const object&  create(const std::function<void(object&)>& constructor )override
          {
             ObjectType item;
             item.id = get_next_id();

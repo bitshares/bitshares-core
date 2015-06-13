@@ -51,7 +51,7 @@ namespace graphene { namespace db {
             modify_callback( _objects[obj.id.instance()] );
          }
 
-         virtual const object& insert( object&& obj )
+         virtual const object& insert( object&& obj )override
          {
             auto instance = obj.id.instance();
             assert( nullptr != dynamic_cast<T*>(&obj) );
@@ -77,7 +77,7 @@ namespace graphene { namespace db {
             return &_objects[instance];
          }
 
-         void inspect_all_objects(std::function<void (const object&)> inspector)const
+         virtual void inspect_all_objects(std::function<void (const object&)> inspector)const override
          {
             try {
                for( const auto& ptr : _objects )

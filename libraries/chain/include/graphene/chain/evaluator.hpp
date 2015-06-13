@@ -186,7 +186,7 @@ namespace graphene { namespace chain {
    class evaluator : public generic_evaluator
    {
       public:
-         virtual int get_type()const { return operation::tag<typename DerivedEvaluator::operation_type>::value; }
+         virtual int get_type()const override { return operation::tag<typename DerivedEvaluator::operation_type>::value; }
 
          virtual operation_result evaluate( const operation& o ) final override
          {

@@ -53,7 +53,7 @@ namespace graphene { namespace db {
             modify_callback( *_objects[obj.id.instance()] );
          }
 
-         virtual const object& insert( object&& obj )
+         virtual const object& insert( object&& obj )override
          {
             auto instance = obj.id.instance();
             assert( nullptr != dynamic_cast<T*>(&obj) );

@@ -166,16 +166,16 @@ namespace graphene { namespace db {
          virtual uint8_t object_type_id()const override
          { return object_type::type_id; }
 
-         virtual object_id_type get_next_id()const               { return _next_id;    }
-         virtual void           use_next_id()                    { ++_next_id.number;  }
-         virtual void           set_next_id( object_id_type id ) { _next_id = id;      }
+         virtual object_id_type get_next_id()const override              { return _next_id;    }
+         virtual void           use_next_id()override                    { ++_next_id.number;  }
+         virtual void           set_next_id( object_id_type id )override { _next_id = id;      }
 
-         virtual const object&  load( const std::vector<char>& data )
+         virtual const object&  load( const std::vector<char>& data )override
          {
             return DerivedIndex::insert( fc::raw::unpack<object_type>( data ) );
          }
 
-         virtual void open( const shared_ptr<graphene::db::level_map<object_id_type, vector<char> >>& db )
+         virtual void open( const shared_ptr<graphene::db::level_map<object_id_type, vector<char> >>& db )override
          {
             auto first = object_id_type( DerivedIndex::object_type::space_id, DerivedIndex::object_type::type_id, 0 );
             auto last = object_id_type( DerivedIndex::object_type::space_id, DerivedIndex::object_type::type_id+1, 0 );
@@ -186,7 +186,7 @@ namespace graphene { namespace db {
                ++itr;
             }
          }
-         virtual const object&  create(const std::function<void(object&)>& constructor )
+         virtual const object&  create(const std::function<void(object&)>& constructor )override
          {
             const auto& result = DerivedIndex::create( constructor );
             on_add( result );
