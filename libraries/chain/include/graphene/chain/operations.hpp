@@ -559,8 +559,7 @@ namespace graphene { namespace chain {
       vector<blind_output>  outputs;
 
       account_id_type fee_payer()const;
-      void            get_required_auth( flat_set<account_id_type>& active_auth_set,
-                                         flat_set<account_id_type>& )const;
+      void            get_required_auth( flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>& )const;
       void            validate()const;
       share_type      calculate_fee( const fee_schedule_type& k )const;
       void            get_balance_delta( balance_accumulator& acc, const operation_result& result = asset())const;
@@ -578,8 +577,7 @@ namespace graphene { namespace chain {
       vector<blind_input>   inputs;
 
       account_id_type fee_payer()const;
-      void            get_required_auth( flat_set<account_id_type>& active_auth_set,
-                                         flat_set<account_id_type>& )const;
+      void            get_required_auth( flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>& )const;
       void            validate()const;
       share_type      calculate_fee( const fee_schedule_type& k )const;
       void            get_balance_delta( balance_accumulator& acc, const operation_result& result = asset())const;
@@ -637,8 +635,7 @@ namespace graphene { namespace chain {
       vector<blind_output>  outputs;
 
       account_id_type fee_payer()const;
-      void            get_required_auth( flat_set<account_id_type>& active_auth_set,
-                                         flat_set<account_id_type>& )const;
+      void            get_required_auth( flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>& )const;
       void            validate()const;
       share_type      calculate_fee( const fee_schedule_type& k )const;
       void            get_balance_delta( balance_accumulator& acc, const operation_result& result = asset())const;
@@ -2047,16 +2044,18 @@ FC_REFLECT( graphene::chain::worker_create_operation,
 FC_REFLECT( graphene::chain::custom_operation, (fee)(payer)(required_auths)(id)(data) )
 FC_REFLECT( graphene::chain::void_result, )
 
-FC_REFLECT( graphene::chain::blind_transfer_operation::blind_memo,
+FC_REFLECT( graphene::chain::blind_memo,
             (from)(amount)(message)(check) )
-FC_REFLECT( graphene::chain::blind_transfer_operation::blind_input,
+FC_REFLECT( graphene::chain::blind_input,
             (commitment)(owner) )
-FC_REFLECT( graphene::chain::blind_transfer_operation::blind_output,
+FC_REFLECT( graphene::chain::blind_output,
             (commitment)(range_proof)(owner)(one_time_key)(encrypted_memo) )
+FC_REFLECT( graphene::chain::transfer_to_blind_operation,
+            (fee)(amount)(from)(outputs) )
+FC_REFLECT( graphene::chain::transfer_from_blind_operation,
+            (fee)(amount)(to)(inputs) )
 FC_REFLECT( graphene::chain::blind_transfer_operation,
-            (fee)(fee_payer_id)
-            (from_account)(from_amount)
-            (to_account)(to_account_name)(to_address)(to_amount) )
+            (fee)(fee_payer_id)(inputs)(outputs) )
 
 FC_REFLECT_TYPENAME( graphene::chain::operation )
 FC_REFLECT_TYPENAME( fc::flat_set<graphene::chain::vote_id_type> )
