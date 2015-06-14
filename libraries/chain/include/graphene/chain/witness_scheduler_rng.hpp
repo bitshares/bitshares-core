@@ -86,11 +86,7 @@ class hash_ctr_rng
       {
          if( bound <= 1 )
             return 0;
-#ifdef __GNUC__
-         uint8_t bitcount( 64 - __builtin_clzll( bound ) );
-#else
-         uint8_t bitcount( 64 - boost::multiprecision::detail::find_msb( bound ) );
-#endif
+         uint8_t bitcount = boost::multiprecision::detail::find_msb( bound ) + 1;
 
          // probability of loop exiting is >= 1/2, so probability of
          // running N times is bounded above by (1/2)^N
