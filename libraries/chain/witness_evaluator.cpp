@@ -45,7 +45,7 @@ object_id_type witness_create_evaluator::do_apply( const witness_create_operatio
    return new_witness_object.id;
 }
 
-object_id_type witness_withdraw_pay_evaluator::do_evaluate(const witness_withdraw_pay_evaluator::operation_type& o)
+void_result witness_withdraw_pay_evaluator::do_evaluate(const witness_withdraw_pay_evaluator::operation_type& o)
 {
    database& d = db();
 
@@ -55,10 +55,10 @@ object_id_type witness_withdraw_pay_evaluator::do_evaluate(const witness_withdra
               ("w", o.amount)("e", witness->accumulated_income) );
    to_account = &d.get(o.to_account);
 
-   return object_id_type();
+   return void_result();
 }
 
-object_id_type witness_withdraw_pay_evaluator::do_apply(const witness_withdraw_pay_evaluator::operation_type& o)
+void_result witness_withdraw_pay_evaluator::do_apply(const witness_withdraw_pay_evaluator::operation_type& o)
 {
    database& d = db();
 
@@ -68,7 +68,7 @@ object_id_type witness_withdraw_pay_evaluator::do_apply(const witness_withdraw_p
       w.accumulated_income -= o.amount;
    });
 
-   return object_id_type();
+   return void_result();
 }
 
 } } // graphene::chain

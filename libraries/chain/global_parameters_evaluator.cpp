@@ -21,20 +21,20 @@
 
 namespace graphene { namespace chain {
 
-object_id_type global_parameters_update_evaluator::do_evaluate(const global_parameters_update_operation& o)
+void_result global_parameters_update_evaluator::do_evaluate(const global_parameters_update_operation& o)
 {
    FC_ASSERT(trx_state->_is_proposed_trx);
 
-   return object_id_type();
+   return void_result();
 }
 
-object_id_type global_parameters_update_evaluator::do_apply(const global_parameters_update_operation& o)
+void_result global_parameters_update_evaluator::do_apply(const global_parameters_update_operation& o)
 {
    db().modify(db().get_global_properties(), [&o](global_property_object& p) {
       p.pending_parameters = o.new_parameters;
    });
 
-   return object_id_type();
+   return void_result();
 }
 
 } } // graphene::chain

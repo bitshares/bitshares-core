@@ -35,8 +35,8 @@ class bond_cancel_offer_evaluator : public evaluator<bond_cancel_offer_evaluator
     public:
         typedef bond_cancel_offer_operation operation_type;
 
-        object_id_type do_evaluate( const bond_cancel_offer_operation& op );
-        object_id_type do_apply( const bond_cancel_offer_operation& op );
+        void_result do_evaluate( const bond_cancel_offer_operation& op );
+        void_result do_apply( const bond_cancel_offer_operation& op );
 
         const bond_offer_object* _offer = nullptr;
 };
@@ -58,8 +58,8 @@ class bond_claim_collateral_evaluator : public evaluator<bond_claim_collateral_e
     public:
         typedef bond_claim_collateral_operation operation_type;
 
-        object_id_type do_evaluate( const bond_claim_collateral_operation& op );
-        object_id_type do_apply( const bond_claim_collateral_operation& op );
+        void_result do_evaluate( const bond_claim_collateral_operation& op );
+        void_result do_apply( const bond_claim_collateral_operation& op );
 
         const bond_object* _bond = nullptr;
         asset              _interest_due;

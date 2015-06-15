@@ -67,21 +67,21 @@ object_id_type bond_create_offer_evaluator::do_apply( const bond_create_offer_op
 }
 
 
-object_id_type bond_cancel_offer_evaluator::do_evaluate( const bond_cancel_offer_operation& op )
+void_result bond_cancel_offer_evaluator::do_evaluate( const bond_cancel_offer_operation& op )
 {
     _offer = &op.offer_id(db());
     FC_ASSERT( op.creator == _offer->offered_by_account );
     FC_ASSERT( _offer->amount == op.refund );
-    return object_id_type();
+    return void_result();
 }
 
-object_id_type bond_cancel_offer_evaluator::do_apply( const bond_cancel_offer_operation& op )
+void_result bond_cancel_offer_evaluator::do_apply( const bond_cancel_offer_operation& op )
 {
     assert( _offer != nullptr );
     db().adjust_balance( op.creator, op.refund );
     db().adjust_core_in_orders( op.creator(db()), -op.refund );
     db().remove( *_offer );
-    return  object_id_type();
+    return  void_result();
 }
 
 object_id_type bond_accept_offer_evaluator::do_evaluate( const bond_accept_offer_operation& op )
@@ -148,7 +148,7 @@ object_id_type bond_accept_offer_evaluator::do_apply( const bond_accept_offer_op
 
 
 
-object_id_type bond_claim_collateral_evaluator::do_evaluate( const bond_claim_collateral_operation& op )
+void_result bond_claim_collateral_evaluator::do_evaluate( const bond_claim_collateral_operation& op )
 {
     _bond = &op.bond_id(db());
     auto head_time = db().get_dynamic_global_properties().time;
@@ -185,10 +185,10 @@ object_id_type bond_claim_collateral_evaluator::do_evaluate( const bond_claim_co
        FC_ASSERT( _bond->collateral == op.collateral_claimed );
        FC_ASSERT( op.payoff_amount == asset(0,_bond->borrowed.asset_id ) );
     }
-    return object_id_type();
+    return void_result();
 }
 
-object_id_type bond_claim_collateral_evaluator::do_apply( const bond_claim_collateral_operation& op )
+void_result bond_claim_collateral_evaluator::do_apply( const bond_claim_collateral_operation& op )
 {
     assert( _bond != nullptr );
 
@@ -212,7 +212,7 @@ object_id_type bond_claim_collateral_evaluator::do_apply( const bond_claim_colla
                bond.start_date = db().get_dynamic_global_properties().time;
           });
 
-    return  object_id_type();
+    return  void_result();
 }
 
 } } // graphene::chain

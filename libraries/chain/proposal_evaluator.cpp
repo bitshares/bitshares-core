@@ -73,7 +73,7 @@ object_id_type proposal_create_evaluator::do_apply(const proposal_create_operati
    return proposal.id;
 }
 
-object_id_type proposal_update_evaluator::do_evaluate(const proposal_update_operation& o)
+void_result proposal_update_evaluator::do_evaluate(const proposal_update_operation& o)
 {
    database& d = db();
 
@@ -102,10 +102,10 @@ object_id_type proposal_update_evaluator::do_evaluate(const proposal_update_oper
       FC_ASSERT( trx_state->signed_by(id) || trx_state->_skip_authority_check );
    }
 
-   return object_id_type();
+   return void_result();
 }
 
-object_id_type proposal_update_evaluator::do_apply(const proposal_update_operation& o)
+void_result proposal_update_evaluator::do_apply(const proposal_update_operation& o)
 {
    database& d = db();
 
@@ -128,7 +128,7 @@ object_id_type proposal_update_evaluator::do_apply(const proposal_update_operati
    // If the proposal has a review period, don't bother attempting to authorize/execute it.
    // Proposals with a review period may never be executed except at their expiration.
    if( _proposal->review_period_time )
-      return object_id_type();
+      return void_result();
 
    if( _proposal->is_authorized_to_execute(&d) )
    {
@@ -143,10 +143,10 @@ object_id_type proposal_update_evaluator::do_apply(const proposal_update_operati
       }
    }
 
-   return object_id_type();
+   return void_result();
 }
 
-object_id_type proposal_delete_evaluator::do_evaluate(const proposal_delete_operation& o)
+void_result proposal_delete_evaluator::do_evaluate(const proposal_delete_operation& o)
 {
    database& d = db();
 
@@ -158,14 +158,14 @@ object_id_type proposal_delete_evaluator::do_evaluate(const proposal_delete_oper
               "Provided authority is not authoritative for this proposal.",
               ("provided", o.fee_paying_account)("required", *required_approvals));
 
-   return object_id_type();
+   return void_result();
 }
 
-object_id_type proposal_delete_evaluator::do_apply(const proposal_delete_operation&)
+void_result proposal_delete_evaluator::do_apply(const proposal_delete_operation&)
 {
    db().remove(*_proposal);
 
-   return object_id_type();
+   return void_result();
 }
 
 } } // graphene::chain

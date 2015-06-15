@@ -40,8 +40,8 @@ namespace graphene { namespace chain {
       public:
          typedef proposal_update_operation operation_type;
 
-         object_id_type do_evaluate( const proposal_update_operation& o );
-         object_id_type do_apply( const proposal_update_operation& o );
+         void_result do_evaluate( const proposal_update_operation& o );
+         void_result do_apply( const proposal_update_operation& o );
 
          const proposal_object* _proposal = nullptr;
          processed_transaction _processed_transaction;
@@ -54,8 +54,8 @@ namespace graphene { namespace chain {
       public:
          typedef proposal_delete_operation operation_type;
 
-         object_id_type do_evaluate( const proposal_delete_operation& o );
-         object_id_type do_apply(const proposal_delete_operation&);
+         void_result do_evaluate( const proposal_delete_operation& o );
+         void_result do_apply(const proposal_delete_operation&);
 
          const proposal_object* _proposal = nullptr;
    };

@@ -69,7 +69,7 @@ object_id_type vesting_balance_create_evaluator::do_apply( const vesting_balance
    return vbo.id;
 }
 
-object_id_type vesting_balance_withdraw_evaluator::do_evaluate( const vesting_balance_withdraw_operation& op )
+void_result vesting_balance_withdraw_evaluator::do_evaluate( const vesting_balance_withdraw_operation& op )
 {
    const database& d = db();
    const time_point_sec now = d.head_block_time();
@@ -81,10 +81,10 @@ object_id_type vesting_balance_withdraw_evaluator::do_evaluate( const vesting_ba
 
    /* const account_object& owner_account = */ op.owner( d );
    // TODO: Check asset authorizations and withdrawals
-   return object_id_type();
+   return void_result();
 }
 
-object_id_type vesting_balance_withdraw_evaluator::do_apply( const vesting_balance_withdraw_operation& op )
+void_result vesting_balance_withdraw_evaluator::do_apply( const vesting_balance_withdraw_operation& op )
 {
    database& d = db();
    const time_point_sec now = d.head_block_time();
@@ -103,7 +103,7 @@ object_id_type vesting_balance_withdraw_evaluator::do_apply( const vesting_balan
    d.adjust_balance( op.owner, op.amount );
 
    // TODO: Check asset authorizations and withdrawals
-   return object_id_type();
+   return void_result();
 }
 
 } } // graphene::chain

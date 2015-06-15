@@ -35,8 +35,8 @@ namespace graphene { namespace chain {
       public:
          typedef witness_withdraw_pay_operation operation_type;
 
-         object_id_type do_evaluate( const operation_type& o );
-         object_id_type do_apply( const operation_type& o );
+         void_result do_evaluate( const operation_type& o );
+         void_result do_apply( const operation_type& o );
 
          const witness_object* witness;
          const account_object* to_account;
