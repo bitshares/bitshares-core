@@ -55,5 +55,5 @@ target_include_directories( graphene_chain
                             PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include" )
 
 if(MSVC)
-  set_source_files_properties( db_init.cpp PROPERTIES COMPILE_FLAGS "/bigobj" )
+  set_source_files_properties( db_init.cpp db_block.cpp PROPERTIES COMPILE_FLAGS "/bigobj" )
 endif(MSVC)
