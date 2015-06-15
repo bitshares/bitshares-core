@@ -3,6 +3,7 @@ file(GLOB HEADERS "include/graphene/chain/*.hpp")
 ## SORT .cpp by most likely to change / break compile
 add_library( graphene_chain
              types.cpp
+             type_id.cpp
              address.cpp
              asset.cpp
 
