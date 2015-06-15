@@ -22,6 +22,8 @@
 #include <graphene/chain/types.hpp>
 
 namespace graphene { namespace chain {
+   typedef  static_variant<address,public_key_type> address_or_key;
+
    /**
     * @class key_object
     * @brief maps an ID to a public key or address
@@ -38,8 +40,9 @@ namespace graphene { namespace chain {
          address key_address()const;
          const public_key_type& key()const { return key_data.get<public_key_type>(); }
 
-         static_variant<address,public_key_type> key_data;
+         address_or_key key_data;
    };
 } }
 
+FC_REFLECT_TYPENAME( graphene::chain::address_or_key )
 FC_REFLECT_DERIVED( graphene::chain::key_object, (graphene::db::object), (key_data) )
