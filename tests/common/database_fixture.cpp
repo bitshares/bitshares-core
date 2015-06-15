@@ -270,11 +270,17 @@ void database_fixture::generate_blocks( uint32_t block_count )
       generate_block();
 }
 
-void database_fixture::generate_blocks( fc::time_point_sec timestamp )
+void database_fixture::generate_blocks(fc::time_point_sec timestamp, bool miss_intermediate_blocks)
 {
+   if( miss_intermediate_blocks )
+   {
+      auto slots_to_miss = db.get_slot_at_time(timestamp) - 1;
+      assert(slots_to_miss > 0);
+      generate_block(~0, generate_private_key("genesis"), slots_to_miss);
+      return;
+   }
    while( db.head_block_time() < timestamp )
       generate_block();
-   return;
 }
 
 account_create_operation database_fixture::make_account(
@@ -683,12 +689,31 @@ void database_fixture::upgrade_to_lifetime_member( const account_object& account
       account_upgrade_operation op;
       op.account_to_upgrade = account.get_id();
       op.upgrade_to_lifetime_member = true;
+      op.fee = op.calculate_fee(db.get_global_properties().parameters.current_fees);
       trx.operations = {op};
-      db.push_transaction( trx, ~0 );
+      db.push_transaction(trx, ~0);
       FC_ASSERT( op.account_to_upgrade(db).is_lifetime_member() );
       trx.clear();
    }
    FC_CAPTURE_AND_RETHROW((account))
+}
+
+void database_fixture::upgrade_to_annual_member(account_id_type account)
+{
+   upgrade_to_annual_member(account(db));
+}
+
+void database_fixture::upgrade_to_annual_member(const account_object& account)
+{
+   try {
+      account_upgrade_operation op;
+      op.account_to_upgrade = account.get_id();
+      op.fee = op.calculate_fee(db.get_global_properties().parameters.current_fees);
+      trx.operations = {op};
+      db.push_transaction(trx, ~0);
+      FC_ASSERT( op.account_to_upgrade(db).is_member(db.head_block_time()) );
+      trx.clear();
+   } FC_CAPTURE_AND_RETHROW((account))
 }
 
 void database_fixture::print_market( const string& syma, const string& symb )const

@@ -119,13 +119,13 @@ struct database_fixture {
     * @brief Generates block_count blocks
     * @param block_count number of blocks to generate
     */
-   void generate_blocks( uint32_t block_count );
+   void generate_blocks(uint32_t block_count);
 
    /**
     * @brief Generates blocks until the head block time matches or exceeds timestamp
     * @param timestamp target time to generate blocks until
     */
-   void generate_blocks( fc::time_point_sec timestamp );
+   void generate_blocks(fc::time_point_sec timestamp, bool miss_intermediate_blocks = false);
 
    account_create_operation make_account(
       const std::string& name = "nathan",
@@ -206,6 +206,8 @@ struct database_fixture {
    void enable_fees( share_type fee = GRAPHENE_BLOCKCHAIN_PRECISION );
    void upgrade_to_lifetime_member( account_id_type account );
    void upgrade_to_lifetime_member( const account_object& account );
+   void upgrade_to_annual_member( account_id_type account );
+   void upgrade_to_annual_member( const account_object& account );
    void print_market( const string& syma, const string& symb )const;
    string pretty( const asset& a )const;
    void print_short_order( const short_order_object& cur )const;

@@ -224,6 +224,7 @@ void_result account_upgrade_evaluator::do_apply(const account_upgrade_evaluator:
       if( o.upgrade_to_lifetime_member )
       {
          // Upgrade to lifetime member. I don't care what the account was before.
+         a.statistics(d).process_fees(a, d);
          a.membership_expiration_date = time_point_sec::maximum();
          a.referrer = a.registrar = a.lifetime_referrer = a.get_id();
          a.lifetime_referrer_fee_percentage = GRAPHENE_100_PERCENT - a.network_fee_percentage;
@@ -234,6 +235,7 @@ void_result account_upgrade_evaluator::do_apply(const account_upgrade_evaluator:
          a.membership_expiration_date += fc::days(365);
       } else {
          // Upgrade from basic account.
+         a.statistics(d).process_fees(a, d);
          assert(a.is_basic_account(d.head_block_time()));
          a.membership_expiration_date = d.head_block_time() + fc::days(365);
       }

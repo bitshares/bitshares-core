@@ -22,6 +22,7 @@
 #include <boost/multi_index/composite_key.hpp>
 
 namespace graphene { namespace chain {
+class database;
 
    /**
     * @class account_statistics_object
@@ -64,8 +65,8 @@ namespace graphene { namespace chain {
           * them yet (registrar, referrer, lifetime referrer, network, etc). This is used as an optimization to avoid
           * doing massive amounts of uint128 arithmetic on each and every operation.
           *
-          *These fees will be paid out as vesting cash-back, and this counter will reset during the maintenance
-          *interval.
+          * These fees will be paid out as vesting cash-back, and this counter will reset during the maintenance
+          * interval.
           */
          share_type pending_fees;
          /**
@@ -76,6 +77,8 @@ namespace graphene { namespace chain {
 
          /// @brief Calculate the percentage discount this user receives on his fees
          uint16_t calculate_bulk_discount_percent(const chain_parameters& params)const;
+         /// @brief Split up and pay out @ref pending_fees and @ref pending_vested_fees
+         void process_fees(const account_object& a, database& d) const;
    };
 
    /**
@@ -189,6 +192,12 @@ namespace graphene { namespace chain {
           * Vesting balance which receives cashback_reward deposits.
           */
          optional<vesting_balance_id_type> cashback_vb;
+         template<typename DB>
+         const vesting_balance_object& cashback_balance(const DB& db)const
+         {
+            FC_ASSERT(cashback_vb);
+            return db.get(*cashback_vb);
+         }
 
          /// @return true if this is a lifetime member account; false otherwise.
          bool is_lifetime_member()const

@@ -16,6 +16,8 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <graphene/chain/vesting_balance_object.hpp>
+
 #include <boost/test/unit_test.hpp>
 
 #include "../common/database_fixture.hpp"
@@ -36,15 +38,15 @@ BOOST_AUTO_TEST_CASE( cashback_test )
     *  /----------------\         /----------------\          |                          *
     *  |  ann (Annual)  |         |  dumy (basic)  |          |                          *
     *  \----------------/         \----------------/          |-------------.            *
-    *    | Refers &    L--------------------------------.     |             |            *
-    *    v Registers           Refers                   v     v             |            *
+    *    | Refers      L--------------------------------.     |             |            *
+    *    v                     Refers                   v     v             |            *
     *  /----------------\                         /----------------\        |            *
-    *  |  scud (basic)  |                         |  stud (basic)  |        |            *
-    *  \----------------/                         | (Upgrades to   |        |            *
+    *  |  scud (basic)  |<------------------------|  stud (basic)  |        |            *
+    *  \----------------/      Registers          | (Upgrades to   |        |            *
     *                                             |   Lifetime)    |        v            *
     *                                             \----------------/   /--------------\  *
     *                                                         L------->| pleb (Basic) |  *
-    *                                                                  \--------------/  *
+    *                                                          Refers  \--------------/  *
     *                                                                                    *
     */
    ACTOR(life);
@@ -62,6 +64,7 @@ BOOST_AUTO_TEST_CASE( cashback_test )
    const auto& fees = db.get_global_properties().parameters.current_fees;
 
 #define CustomRegisterActor(actor_name, registrar_name, referrer_name, referrer_rate) \
+   account_id_type actor_name ## _id; \
    { \
       account_create_operation op; \
       op.registrar = registrar_name ## _id; \
@@ -74,10 +77,31 @@ BOOST_AUTO_TEST_CASE( cashback_test )
       op.fee = op.calculate_fee(fees); \
       trx.operations = {op}; \
       trx.sign(registrar_name ## _key_id, registrar_name ## _private_key); \
-      db.push_transaction(trx); \
+      actor_name ## _id = db.push_transaction(trx).operation_results.front().get<object_id_type>(); \
+      trx.clear(); \
    }
 
    CustomRegisterActor(ann, life, life, 75);
+
+   transfer(life_id, ann_id, asset(1000000));
+   upgrade_to_annual_member(ann_id);
+
+   CustomRegisterActor(dumy, reggie, life, 75);
+   CustomRegisterActor(stud, reggie, ann, 80);
+
+   transfer(life_id, stud_id, asset(1000000));
+   upgrade_to_lifetime_member(stud_id);
+
+   CustomRegisterActor(pleb, reggie, stud, 95);
+   CustomRegisterActor(scud, stud, ann, 80);
+
+   generate_block();
+   generate_blocks(db.get_dynamic_global_properties().next_maintenance_time, true);
+
+   BOOST_CHECK_EQUAL(life_id(db).cashback_balance(db).balance.amount.value, 78000);
+   BOOST_CHECK_EQUAL(reggie_id(db).cashback_balance(db).balance.amount.value, 34000);
+   BOOST_CHECK_EQUAL(ann_id(db).cashback_balance(db).balance.amount.value, 40000);
+   BOOST_CHECK_EQUAL(stud_id(db).cashback_balance(db).balance.amount.value, 8000);
 } FC_LOG_AND_RETHROW() }
 
 BOOST_AUTO_TEST_SUITE_END()
