@@ -116,6 +116,7 @@ namespace graphene { namespace chain {
       withdraw_permission_object_type,
       bond_offer_object_type,
       bond_object_type,
+      file_object_type,
       vesting_balance_object_type,
       worker_object_type,
       OBJECT_TYPE_COUNT ///< Sentry value which contains the number of different object types
@@ -162,6 +163,7 @@ namespace graphene { namespace chain {
    class withdraw_permission_object;
    class bond_object;
    class bond_offer_object;
+   class file_object;
    class vesting_balance_object;
    class witness_schedule_object;
    class worker_object;
@@ -181,6 +183,7 @@ namespace graphene { namespace chain {
    typedef object_id< protocol_ids, withdraw_permission_object_type,withdraw_permission_object>   withdraw_permission_id_type;
    typedef object_id< protocol_ids, bond_offer_object_type,         bond_offer_object>            bond_offer_id_type;
    typedef object_id< protocol_ids, bond_object_type,               bond_object>                  bond_id_type;
+   typedef object_id< protocol_ids, file_object_type,               file_object>                  file_id_type;
    typedef object_id< protocol_ids, vesting_balance_object_type,    vesting_balance_object>       vesting_balance_id_type;
    typedef object_id< protocol_ids, worker_object_type,             worker_object>                worker_id_type;
 
@@ -383,6 +386,7 @@ namespace graphene { namespace chain {
       uint32_t cancel_bond_offer_fee;
       uint32_t accept_bond_offer_fee;
       uint32_t claim_bond_collateral_fee;
+      uint32_t file_storage_fee_per_day; ///< the cost of leasing a file with 2^16 bytes for 1 day
       uint32_t vesting_balance_create_fee;
       uint32_t vesting_balance_withdraw_fee;
       uint32_t global_settle_fee;
@@ -505,6 +509,7 @@ FC_REFLECT_ENUM( graphene::chain::object_type,
                  (withdraw_permission_object_type)
                  (bond_offer_object_type)
                  (bond_object_type)
+                 (file_object_type)
                  (vesting_balance_object_type)
                  (worker_object_type)
                  (OBJECT_TYPE_COUNT)
@@ -563,6 +568,7 @@ FC_REFLECT( graphene::chain::fee_schedule_type,
                  (cancel_bond_offer_fee)
                  (accept_bond_offer_fee)
                  (claim_bond_collateral_fee)
+                 (file_storage_fee_per_day)
                  (vesting_balance_create_fee)
                  (vesting_balance_withdraw_fee)
                  (global_settle_fee)
@@ -611,6 +617,7 @@ FC_REFLECT_TYPENAME( graphene::chain::operation_history_id_type )
 FC_REFLECT_TYPENAME( graphene::chain::withdraw_permission_id_type )
 FC_REFLECT_TYPENAME( graphene::chain::bond_offer_id_type )
 FC_REFLECT_TYPENAME( graphene::chain::bond_id_type )
+FC_REFLECT_TYPENAME( graphene::chain::file_id_type )
 FC_REFLECT_TYPENAME( graphene::chain::vesting_balance_id_type )
 FC_REFLECT_TYPENAME( graphene::chain::worker_id_type )
 FC_REFLECT_TYPENAME( graphene::chain::relative_key_id_type )

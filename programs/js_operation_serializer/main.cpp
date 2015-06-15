@@ -18,6 +18,7 @@
 #include <graphene/chain/operations.hpp>
 #include <graphene/chain/bond_object.hpp>
 #include <graphene/chain/vesting_balance_object.hpp>
+#include <graphene/chain/file_object.hpp>
 #include <graphene/chain/withdraw_permission_object.hpp>
 #include <graphene/chain/proposal_object.hpp>
 #include <graphene/chain/witness_object.hpp>
@@ -68,7 +69,7 @@ string remove_namespace( string str )
 
 template<typename T>
 void generate_serializer();
-template<typename T>
+template<typename T> 
 void register_serializer();
 
 
@@ -95,7 +96,7 @@ struct js_name<fc::array<T,N>>
 };
 template<size_t N>   struct js_name<fc::array<char,N>>    { static std::string name(){ return  "bytes "+ fc::to_string(N); }; };
 template<size_t N>   struct js_name<fc::array<uint8_t,N>> { static std::string name(){ return  "bytes "+ fc::to_string(N); }; };
-template<typename T> struct js_name< fc::optional<T> >    { static std::string name(){ return "optional " + js_name<T>::name(); } };
+template<typename T> struct js_name< fc::optional<T> >    { static std::string name(){ return "optional " + js_name<T>::name(); } }; 
 template<>           struct js_name< object_id_type >     { static std::string name(){ return "object_id_type"; } };
 template<typename T> struct js_name< fc::flat_set<T> >    { static std::string name(){ return "set " + js_name<T>::name(); } };
 template<typename T> struct js_name< std::vector<T> >     { static std::string name(){ return "array " + js_name<T>::name(); } };
@@ -114,8 +115,8 @@ template<> struct js_name< time_point_sec >    { static std::string name(){ retu
 template<uint8_t S, uint8_t T, typename O>
 struct js_name<graphene::db::object_id<S,T,O> >
 {
-   static std::string name(){
-      return "protocol_id_type \"" + remove_namespace(fc::get_typename<O>::name()) + "\"";
+   static std::string name(){ 
+      return "protocol_id_type \"" + remove_namespace(fc::get_typename<O>::name()) + "\""; 
    };
 };
 
@@ -131,7 +132,7 @@ struct js_name< fc::flat_map<K,V> > { static std::string name(){ return "map (" 
 
 template<typename... T> struct js_sv_name;
 
-template<typename A> struct js_sv_name<A>
+template<typename A> struct js_sv_name<A> 
 { static std::string name(){ return  "\n    " + js_name<A>::name(); } };
 
 template<typename A, typename... T>
@@ -141,10 +142,10 @@ struct js_sv_name<A,T...> { static std::string name(){ return  "\n    " + js_nam
 template<typename... T>
 struct js_name< fc::static_variant<T...> >
 {
-   static std::string name( std::string n = ""){
+   static std::string name( std::string n = ""){ 
       static const std::string name = n;
       if( name == "" )
-         return "static_variant [" + js_sv_name<T...>::name() + "\n]";
+         return "static_variant [" + js_sv_name<T...>::name() + "\n]"; 
       else return name;
    }
 };
@@ -289,7 +290,7 @@ class register_member_visitor
       }
 };
 
-template<typename T, bool reflected>
+template<typename T, bool reflected> 
 struct serializer
 {
    static_assert( fc::reflector<T>::is_defined::value == reflected, "invalid template arguments" );
