@@ -173,9 +173,6 @@ struct operation_get_impacted_accounts
    }
 
    void operator()( const asset_create_operation& o )const { }
-   void operator()( const file_write_operation& o )const {
-      _impacted.insert( o.owner );
-   }
 
    void operator()( const asset_update_operation& o )const {
       if( o.new_issuer )
