@@ -232,6 +232,18 @@ struct operation_get_impacted_accounts
       _impacted.insert( account_id_type() );
    }
 
+   void operator()( const bond_create_offer_operation& o )const { }
+   void operator()( const bond_cancel_offer_operation& o )const { }
+   void operator()( const bond_accept_offer_operation& o )const {
+      _impacted.insert( o.borrower );
+      _impacted.insert( o.lender );
+   }
+   void operator()( const bond_claim_collateral_operation& o )const
+   {
+      _impacted.insert( o.lender );
+      _impacted.insert( o.claimer );
+   }
+
    void operator()( const vesting_balance_create_operation& o )const
    {
       _impacted.insert( o.creator );

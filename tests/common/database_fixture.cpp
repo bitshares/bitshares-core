@@ -24,6 +24,7 @@
 
 #include <graphene/chain/account_object.hpp>
 #include <graphene/chain/asset_object.hpp>
+#include <graphene/chain/bond_object.hpp>
 #include <graphene/chain/delegate_object.hpp>
 #include <graphene/chain/limit_order_object.hpp>
 #include <graphene/chain/short_order_object.hpp>
@@ -149,6 +150,12 @@ void database_fixture::verify_asset_supplies( )const
    for( const witness_object& witness_obj : db.get_index_type<simple_index<witness_object>>() )
    {
       total_balances[asset_id_type()] += witness_obj.accumulated_income;
+   }
+   for( const bond_offer_object& bond_offer : db.get_index_type<bond_offer_index>().indices() )
+   {
+      total_balances[ bond_offer.amount.asset_id ] += bond_offer.amount.amount;
+      if( bond_offer.amount.asset_id == asset_id_type() )
+         core_in_orders += bond_offer.amount.amount;
    }
    for( const vesting_balance_object& vbo : db.get_index_type< simple_index<vesting_balance_object> >() )
       total_balances[ vbo.balance.asset_id ] += vbo.balance.amount;

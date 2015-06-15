@@ -26,6 +26,7 @@
 #include <graphene/chain/proposal_object.hpp>
 #include <graphene/chain/operation_history_object.hpp>
 #include <graphene/chain/withdraw_permission_object.hpp>
+#include <graphene/chain/bond_object.hpp>
 
 using namespace fc;
 using namespace graphene::chain;
@@ -86,6 +87,10 @@ object* create_object( const variant& v )
          return create_object_of_type< operation_history_object >( v );
       case withdraw_permission_object_type:
          return create_object_of_type< withdraw_permission_object >( v );
+      case bond_offer_object_type:
+         return create_object_of_type< bond_offer_object >( v );
+      case bond_object_type:
+         return create_object_of_type< bond_object >( v );
       default:
          ;
    }

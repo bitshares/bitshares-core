@@ -21,6 +21,7 @@
 #include <graphene/chain/account_object.hpp>
 #include <graphene/chain/asset_object.hpp>
 #include <graphene/chain/block_summary_object.hpp>
+#include <graphene/chain/bond_object.hpp>
 #include <graphene/chain/delegate_object.hpp>
 #include <graphene/chain/global_property_object.hpp>
 #include <graphene/chain/key_object.hpp>
@@ -36,6 +37,7 @@
 
 #include <graphene/chain/account_evaluator.hpp>
 #include <graphene/chain/asset_evaluator.hpp>
+#include <graphene/chain/bond_evaluator.hpp>
 #include <graphene/chain/custom_evaluator.hpp>
 #include <graphene/chain/delegate_evaluator.hpp>
 #include <graphene/chain/global_parameters_evaluator.hpp>
@@ -87,6 +89,10 @@ void database::initialize_evaluators()
    register_evaluator<global_parameters_update_evaluator>();
    register_evaluator<witness_create_evaluator>();
    register_evaluator<witness_withdraw_pay_evaluator>();
+   register_evaluator<bond_create_offer_evaluator>();
+   register_evaluator<bond_cancel_offer_evaluator>();
+   register_evaluator<bond_accept_offer_evaluator>();
+   register_evaluator<bond_claim_collateral_evaluator>();
    register_evaluator<vesting_balance_create_evaluator>();
    register_evaluator<vesting_balance_withdraw_evaluator>();
    register_evaluator<withdraw_permission_create_evaluator>();
@@ -112,6 +118,8 @@ void database::initialize_indexes()
    add_index< primary_index<call_order_index > >();
    add_index< primary_index<proposal_index > >();
    add_index< primary_index<withdraw_permission_index > >();
+   add_index< primary_index<bond_index > >();
+   add_index< primary_index<bond_offer_index > >();
    add_index< primary_index<simple_index<vesting_balance_object> > >();
    add_index< primary_index<worker_index> >();
 

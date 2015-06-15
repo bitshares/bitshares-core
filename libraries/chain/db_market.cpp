@@ -20,6 +20,7 @@
 
 #include <graphene/chain/account_object.hpp>
 #include <graphene/chain/asset_object.hpp>
+#include <graphene/chain/bond_object.hpp>
 #include <graphene/chain/limit_order_object.hpp>
 #include <graphene/chain/short_order_object.hpp>
 
@@ -32,6 +33,7 @@ namespace graphene { namespace chain {
     calculate the USD->CORE price and convert all USD balances to CORE at that price and subtract CORE from total
        - any fees accumulated by the issuer in the bitasset are forfeit / not redeemed
        - cancel all open orders with bitasset in it
+       - any bonds with the bitasset as collateral get converted to CORE as collateral
        - any bitassets that use this bitasset as collateral are immediately settled at their feed price
        - convert all balances in bitasset to CORE and subtract from total
        - any prediction markets with usd as the backing get converted to CORE as the backing
@@ -108,6 +110,38 @@ void database::globally_settle_asset( const asset_object& mia, const price& sett
 
     // settle all balances
     asset total_mia_settled = mia.amount(0);
+
+   // convert collateral held in bonds
+    const auto& bond_idx = get_index_type<bond_index>().indices().get<by_collateral>();
+    auto bond_itr = bond_idx.find( bitasset.id );
+    while( bond_itr != bond_idx.end() )
+    {
+       if( bond_itr->collateral.asset_id == bitasset.id )
+       {
+          auto settled_amount = bond_itr->collateral * settlement_price;
+          total_mia_settled += bond_itr->collateral;
+          collateral_gathered -= settled_amount;
+          modify( *bond_itr, [&]( bond_object& obj ) {
+                  obj.collateral = settled_amount;
+                  });
+       }
+       else break;
+    }
+
+    // cancel all bond offers holding the bitasset and refund the offer
+    const auto& bond_offer_idx = get_index_type<bond_offer_index>().indices().get<by_asset>();
+    auto bond_offer_itr = bond_offer_idx.find( bitasset.id );
+    while( bond_offer_itr != bond_offer_idx.end() )
+    {
+       if( bond_offer_itr->amount.asset_id == bitasset.id )
+       {
+          adjust_balance( bond_offer_itr->offered_by_account, bond_offer_itr->amount );
+          auto old_itr = bond_offer_itr;
+          bond_offer_itr++;
+          remove( *old_itr );
+       }
+       else break;
+    }
 
     const auto& index = get_index_type<account_balance_index>().indices().get<by_asset>();
     auto range = index.equal_range(mia.get_id());

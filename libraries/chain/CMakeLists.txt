@@ -18,6 +18,7 @@ add_library( graphene_chain
              proposal_evaluator.cpp
              short_order_evaluator.cpp
              limit_order_evaluator.cpp
+             bond_evaluator.cpp
              vesting_balance_evaluator.cpp
              withdraw_permission_evaluator.cpp
              worker_evaluator.cpp

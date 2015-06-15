@@ -2080,6 +2080,7 @@ BOOST_AUTO_TEST_CASE( margin_call_black_swan )
  *  2) Short Orders for BitAsset backed by BitUSD
  *  3) Call Orders for BitAsset backed by BitUSD
  *  4) Issuer Fees
+ *  5) Bond Market Collateral
  *
  *  This test should fail until the black swan handling code can
  *  perform a recursive blackswan for any other BitAssets that use
@@ -2136,6 +2137,69 @@ BOOST_AUTO_TEST_CASE( unimp_transfer_cashback_test )
       throw;
    }
 }
+
+BOOST_AUTO_TEST_CASE( bond_create_offer_test )
+{ try {
+   bond_create_offer_operation op;
+   op.fee = asset( 0, 0 );
+   op.creator = account_id_type();
+   op.amount = asset( 1, 0 );
+   op.collateral_rate = price( asset( 1, 0 ), asset( 1, 1 ) );
+   op.min_loan_period_sec = 1;
+   op.loan_period_sec = 1;
+
+   // Fee must be non-negative
+   REQUIRE_OP_VALIDATION_SUCCESS( op, fee, asset( 1, 0 ) );
+   REQUIRE_OP_VALIDATION_SUCCESS( op, fee, asset( 0, 0 ) );
+   REQUIRE_OP_VALIDATION_FAILURE( op, fee, asset( -1, 0 ) );
+
+   // Amount must be positive
+   REQUIRE_OP_VALIDATION_SUCCESS( op, amount, asset( 1, 0 ) );
+   REQUIRE_OP_VALIDATION_FAILURE( op, amount, asset( 0, 0 ) );
+   REQUIRE_OP_VALIDATION_FAILURE( op, amount, asset( -1, 0 ) );
+
+   // Collateral rate must be valid
+   REQUIRE_OP_VALIDATION_SUCCESS( op, collateral_rate, price( asset( 1, 0 ), asset( 1, 1 ) ) );
+   REQUIRE_OP_VALIDATION_FAILURE( op, collateral_rate, price( asset( 0, 0 ), asset( 1, 1 ) ) );
+   REQUIRE_OP_VALIDATION_FAILURE( op, collateral_rate, price( asset( 1, 0 ), asset( 0, 1 ) ) );
+   REQUIRE_OP_VALIDATION_FAILURE( op, collateral_rate, price( asset( 1, 0 ), asset( 1, 0 ) ) );
+
+   // Min loan period must be at least 1 sec
+   REQUIRE_OP_VALIDATION_SUCCESS( op, min_loan_period_sec, 1 );
+   REQUIRE_OP_VALIDATION_FAILURE( op, min_loan_period_sec, 0 );
+
+   // Loan period must be greater than min load period
+   REQUIRE_OP_VALIDATION_SUCCESS( op, loan_period_sec, op.min_loan_period_sec + 1 );
+   REQUIRE_OP_VALIDATION_FAILURE( op, loan_period_sec, 0 );
+
+   // Interest APR cannot be greater than max
+   REQUIRE_OP_VALIDATION_FAILURE( op, interest_apr, GRAPHENE_MAX_INTEREST_APR + 1 );
+   REQUIRE_OP_VALIDATION_SUCCESS( op, interest_apr, GRAPHENE_MAX_INTEREST_APR );
+   REQUIRE_OP_VALIDATION_SUCCESS( op, interest_apr, 0 );
+
+   // Setup world state we will need to test actual evaluation
+   INVOKE( create_uia );
+   const auto& test_asset = get_asset( "TEST" );
+   const auto& nathan_account = create_account( "nathan" );
+   transfer( account_id_type()( db ), nathan_account, asset( 1, 0 ) );
+
+   op.creator = nathan_account.get_id();
+   op.collateral_rate.quote.asset_id = test_asset.get_id();
+   trx.operations.emplace_back( op );
+
+   // Insufficient funds in creator account
+   REQUIRE_THROW_WITH_VALUE( op, creator, account_id_type( 1 ) );
+
+   // Insufficient principle
+   REQUIRE_THROW_WITH_VALUE( op, amount, asset( 2, 0 ) );
+
+   // Insufficient collateral
+   op.offer_to_borrow = true;
+   REQUIRE_THROW_WITH_VALUE( op, amount, asset( 1, test_asset.get_id() ) );
+
+   // This op should be fully valid
+   REQUIRE_OP_EVALUATION_SUCCESS( op, offer_to_borrow, false );
+} FC_LOG_AND_RETHROW() }
 
 BOOST_AUTO_TEST_CASE( vesting_balance_create_test )
 { try {
