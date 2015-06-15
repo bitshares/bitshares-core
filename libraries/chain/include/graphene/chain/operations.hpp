@@ -1249,123 +1249,6 @@ namespace graphene { namespace chain {
    };
 
    /**
-    * @ingroup operations
-    *
-    * Bond offers are objects that exist on the blockchain and can be
-    * filled in full or in part by someone using the accept_bond_offer
-    * operation. When the offer is accepted a new bond_object is
-    * created that defines the terms of the loan.
-    *
-    *  @return bond_offer_id
-    */
-   struct bond_create_offer_operation
-   {
-      asset                   fee;
-      account_id_type         creator;
-      bool                    offer_to_borrow = false; ///< Offer to borrow if true, and offer to lend otherwise
-      asset                   amount; ///< Amount to lend or secure depending on above
-      share_type              min_match; ///< asset id same as amount.asset_id and sets the minimum match that will be accepted
-      price                   collateral_rate; ///< To derive amount of collateral or principle based on above
-      /** after this time the lender can let the loan float or collect the collateral at will */
-      uint32_t                min_loan_period_sec = 0; ///< the earliest the loan may be paid off
-      uint32_t                loan_period_sec = 0;
-      uint16_t                interest_apr = 0; ///< MAX_INTEREST_APR == 100% and is max value
-
-      account_id_type   fee_payer()const { return creator; }
-      void              get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>&)const;
-      void              validate()const;
-      share_type        calculate_fee( const fee_schedule_type& k )const;
-      void              get_balance_delta( balance_accumulator& acc, const operation_result& result = asset())const
-      {
-         acc.adjust( fee_payer(), -fee );
-         acc.adjust( creator, -amount );
-      }
-   };
-
-   /**
-    * @ingroup operations
-    *  Subtracts refund from bond_offer.amount and frees bond_offer if refund == bond_offer.amount
-    */
-   struct bond_cancel_offer_operation
-   {
-      asset                 fee;
-      account_id_type       creator;
-      bond_offer_id_type    offer_id;
-      asset                 refund;
-
-      account_id_type   fee_payer()const { return creator; }
-      void              get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>&)const;
-      void              validate()const;
-      share_type        calculate_fee( const fee_schedule_type& k )const;
-      void              get_balance_delta( balance_accumulator& acc, const operation_result& result = asset())const
-      {
-         acc.adjust( fee_payer(), -fee );
-         acc.adjust( creator, refund );
-      }
-   };
-
-   /**
-    * @ingroup operations
-    *  @return new bond_id
-    */
-   struct bond_accept_offer_operation
-   {
-      asset               fee;
-      account_id_type     claimer;
-      account_id_type     lender;
-      account_id_type     borrower; ///< included in case of offer to borrow, because borrower will receive funds
-      bond_offer_id_type  offer_id;
-      asset               amount_borrowed;       ///< should equal amount_collateral * offer_id->collateral_rate
-      asset               amount_collateral; ///< should equal amount_borrowed * offer_id->collateral_rate
-
-      account_id_type   fee_payer()const { return claimer; }
-      void              get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>&)const;
-      void              validate()const;
-      share_type        calculate_fee( const fee_schedule_type& k )const;
-      void              get_balance_delta( balance_accumulator& acc, const operation_result& result = asset())const
-      {
-         acc.adjust( fee_payer(), -fee );
-         if( claimer == lender )
-            acc.adjust( claimer, -amount_borrowed );
-         else // claimer == borrower
-            acc.adjust( claimer, -amount_collateral );
-         acc.adjust( borrower, amount_borrowed );
-      }
-   };
-
-   /**
-    * @ingroup operations
-    *  After the loan period the lender can claim
-    *  the collateral, prior to the loan period expiring
-    *  the borrower can claim it by paying off the loan
-    */
-   struct bond_claim_collateral_operation
-   {
-      asset            fee;
-      account_id_type  claimer; ///< must be bond_id->lender or bond_id->borrower
-      account_id_type  lender; ///< must be bond_id->lender
-      bond_id_type     bond_id;
-      asset            payoff_amount;
-
-      /** the borrower can claim a percentage of the collateral propotional to the
-       * percentage of the debt+interest that was paid off
-       */
-      asset            collateral_claimed;
-
-      account_id_type   fee_payer()const { return claimer; }
-      void              get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>&)const;
-      void              validate()const;
-      share_type        calculate_fee( const fee_schedule_type& k )const;
-      void              get_balance_delta( balance_accumulator& acc, const operation_result& result = asset())const
-      {
-         acc.adjust( fee_payer(), -fee );
-         acc.adjust( claimer, -payoff_amount );
-         acc.adjust( claimer, collateral_claimed );
-         acc.adjust( lender, payoff_amount );
-      }
-   };
-
-   /**
     * @brief Create a vesting balance.
     * @ingroup operations
     *
@@ -1544,10 +1427,6 @@ namespace graphene { namespace chain {
             global_parameters_update_operation,
             vesting_balance_create_operation,
             vesting_balance_withdraw_operation,
-            bond_create_offer_operation,
-            bond_cancel_offer_operation,
-            bond_accept_offer_operation,
-            bond_claim_collateral_operation,
             worker_create_operation,
             custom_operation
          > operation;
@@ -1775,11 +1654,6 @@ FC_REFLECT( graphene::chain::withdraw_permission_update_operation, (fee)(withdra
 FC_REFLECT( graphene::chain::withdraw_permission_claim_operation, (fee)(withdraw_permission)(withdraw_from_account)(withdraw_to_account)(amount_to_withdraw)(memo) );
 FC_REFLECT( graphene::chain::withdraw_permission_delete_operation, (fee)(withdraw_from_account)(authorized_account)
             (withdrawal_permission) )
-
-FC_REFLECT( graphene::chain::bond_create_offer_operation, (fee)(creator)(offer_to_borrow)(amount)(min_match)(collateral_rate)(min_loan_period_sec)(loan_period_sec)(interest_apr) )
-FC_REFLECT( graphene::chain::bond_cancel_offer_operation, (fee)(creator)(offer_id)(refund) )
-FC_REFLECT( graphene::chain::bond_accept_offer_operation, (fee)(claimer)(lender)(borrower)(offer_id)(amount_borrowed)(amount_collateral) )
-FC_REFLECT( graphene::chain::bond_claim_collateral_operation, (fee)(claimer)(lender)(bond_id)(payoff_amount)(collateral_claimed) )
 
 FC_REFLECT( graphene::chain::vesting_balance_create_operation, (fee)(creator)(owner)(amount)(vesting_seconds) )
 FC_REFLECT( graphene::chain::vesting_balance_withdraw_operation, (fee)(vesting_balance)(owner)(amount) )
