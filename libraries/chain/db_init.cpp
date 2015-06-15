@@ -23,7 +23,6 @@
 #include <graphene/chain/block_summary_object.hpp>
 #include <graphene/chain/bond_object.hpp>
 #include <graphene/chain/delegate_object.hpp>
-#include <graphene/chain/file_object.hpp>
 #include <graphene/chain/global_property_object.hpp>
 #include <graphene/chain/key_object.hpp>
 #include <graphene/chain/limit_order_object.hpp>
@@ -121,7 +120,6 @@ void database::initialize_indexes()
    add_index< primary_index<withdraw_permission_index > >();
    add_index< primary_index<bond_index > >();
    add_index< primary_index<bond_offer_index > >();
-   add_index< primary_index<file_object_index> >();
    add_index< primary_index<simple_index<vesting_balance_object> > >();
    add_index< primary_index<worker_index> >();
 

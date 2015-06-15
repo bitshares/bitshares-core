@@ -1249,81 +1249,6 @@ namespace graphene { namespace chain {
    };
 
    /**
-    *  @brief create/update the contents of a file.
-    *
-    *  Any account may pay a fee and write no data to extend the lease seconds
-    *  on a file.
-    *
-    *  If the file size increasees, the current lease_seconds will be adjusted downward to maintain
-    *  the same byte-days-leased.   Then any new leased seconds will be added based upon the
-    *  new file size.
-    *
-    *  @see file_object
-    */
-   struct file_write_operation
-   {
-      public:
-         /**
-          *  The fee charges is proportional to @ref file_size * @ref lease_seconds
-          */
-         asset                   fee;
-         /**
-          * THe account that is paying the update fee
-          */
-         account_id_type         payer;
-
-         /** file_id 0 indicates a new file should be created */
-         file_id_type            file_id;
-
-         /** may read/write accoding to flags, write permission is required to change owner/group/flags */
-         account_id_type         owner;
-
-         /** may read/write according fo flags, but may not update flags or owner */
-         account_id_type         group;
-
-         /**
-          *  Must be less than or equal to 0x2f
-          */
-         uint8_t                 flags = 0;
-
-         /**
-          *  If the file doesn't exist, it will be intialized to file_size with 0
-          *  before writing data.
-          *
-          *  @pre  data.size() + offset <=  2^16
-          */
-         uint16_t                offset = 0;
-         vector<char>            data;
-
-         /**
-          *  The length of time to extend the lease on the file, must be less
-          *  than 10 years.
-          */
-         uint32_t                lease_seconds = 0;
-
-         /**
-          * File size must be greater than 0
-          */
-         uint16_t                file_size = 0;
-
-         /**
-          *  If file_id is not 0, then precondition checksum verifies that
-          *  the file contents are as expected prior to writing data.
-          */
-         optional<checksum_type> precondition_checksum;
-
-         account_id_type fee_payer()const { return payer; }
-         void            get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>&)const { active_auth_set.insert(fee_payer()); }
-         void            validate()const;
-         share_type      calculate_fee( const fee_schedule_type& k )const;
-
-         void            get_balance_delta( balance_accumulator& acc, const operation_result& result = asset())const
-         {
-            acc.adjust( fee_payer(), -fee );
-         }
-   };
-
-   /**
     * @ingroup operations
     *
     * Bond offers are objects that exist on the blockchain and can be
@@ -1617,7 +1542,6 @@ namespace graphene { namespace chain {
             withdraw_permission_delete_operation,
             fill_order_operation,
             global_parameters_update_operation,
-            file_write_operation,
             vesting_balance_create_operation,
             vesting_balance_withdraw_operation,
             bond_create_offer_operation,
@@ -1851,8 +1775,6 @@ FC_REFLECT( graphene::chain::withdraw_permission_update_operation, (fee)(withdra
 FC_REFLECT( graphene::chain::withdraw_permission_claim_operation, (fee)(withdraw_permission)(withdraw_from_account)(withdraw_to_account)(amount_to_withdraw)(memo) );
 FC_REFLECT( graphene::chain::withdraw_permission_delete_operation, (fee)(withdraw_from_account)(authorized_account)
             (withdrawal_permission) )
-
-FC_REFLECT( graphene::chain::file_write_operation, (fee)(payer)(file_id)(owner)(group)(flags)(offset)(data)(lease_seconds)(file_size)(precondition_checksum) )
 
 FC_REFLECT( graphene::chain::bond_create_offer_operation, (fee)(creator)(offer_to_borrow)(amount)(min_match)(collateral_rate)(min_loan_period_sec)(loan_period_sec)(interest_apr) )
 FC_REFLECT( graphene::chain::bond_cancel_offer_operation, (fee)(creator)(offer_id)(refund) )
