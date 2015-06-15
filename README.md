@@ -6,6 +6,11 @@ This is a quick introduction to get new developers up to speed on Graphene.
 Starting Graphene
 -----------------
 
+For Ubuntu 14.04 LTS users, see this link first:
+    https://github.com/cryptonomex/graphene/wiki/build-ubuntu
+    
+and then proceed with:
+
     git clone https://github.com/cryptonomex/graphene.git
     cd graphene
     git submodule update --init --recursive
