@@ -93,6 +93,8 @@ namespace graphene { namespace db {
          virtual vector<char> pack()const  { return fc::raw::pack( static_cast<const DerivedClass&>(*this) ); }
    };
 
+   typedef flat_map<uint8_t, object_id_type> annotation_map;
+
    /**
     *  @class annotated_object
     *  @brief An object that is easily extended by providing pointers to other objects, one for each space.
@@ -117,12 +119,11 @@ namespace graphene { namespace db {
           *  Annotations should be accessed via get_annotation and set_annotation so
           *  that they can be maintained in sorted order.
           */
-         flat_map<uint8_t,object_id_type> annotations;
+         annotation_map annotations;
    };
 
 } } // graphene::db
 
+FC_REFLECT_TYPENAME( graphene::db::annotation_map )
 FC_REFLECT( graphene::db::object, (id) )
 FC_REFLECT_DERIVED_TEMPLATE( (typename Derived), graphene::db::annotated_object<Derived>, (graphene::db::object), (annotations) )
-
-

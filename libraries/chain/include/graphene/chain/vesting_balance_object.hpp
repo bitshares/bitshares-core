@@ -149,6 +149,8 @@ FC_REFLECT(graphene::chain::cdd_vesting_policy,
            (coin_seconds_earned_last_update)
           )
 
+FC_REFLECT_TYPENAME( graphene::chain::vesting_policy )
+
 FC_REFLECT_DERIVED(graphene::chain::vesting_balance_object, (graphene::db::object),
                    (owner)
                    (balance)

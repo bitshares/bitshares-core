@@ -1571,4 +1571,5 @@ FC_REFLECT( graphene::chain::custom_operation, (fee)(payer)(required_auths)(id)(
 FC_REFLECT( graphene::chain::void_result, )
 
 FC_REFLECT_TYPENAME( graphene::chain::operation )
+FC_REFLECT_TYPENAME( graphene::chain::operation_result )
 FC_REFLECT_TYPENAME( fc::flat_set<graphene::chain::vote_id_type> )

@@ -576,6 +576,8 @@ FC_REFLECT( graphene::chain::chain_parameters,
             (worker_budget_per_day)
           )
 
+FC_REFLECT_TYPENAME( graphene::chain::share_type )
+
 FC_REFLECT_TYPENAME( graphene::chain::key_id_type )
 FC_REFLECT_TYPENAME( graphene::chain::account_id_type )
 FC_REFLECT_TYPENAME( graphene::chain::asset_id_type )
