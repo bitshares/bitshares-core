@@ -8,12 +8,29 @@ struct index_entry
    uint32_t      block_size = 0;
    block_id_type block_id;
 };
+ }} 
+FC_REFLECT( graphene::chain::index_entry, (block_pos)(block_size)(block_id) );
+
+namespace graphene { namespace chain {
 
 void block_database::open( const fc::path& dbdir )
-{
-  _block_num_to_pos.open( (dbdir/"index").generic_string().c_str(), std::fstream::binary );
-  _blocks.open( (dbdir/"blocks").generic_string().c_str(), std::fstream::binary );
-}
+{ try {
+   idump((sizeof(index_entry)) );
+   fc::create_directories(dbdir);
+   _block_num_to_pos.exceptions(std::ios_base::failbit | std::ios_base::badbit);
+   _blocks.exceptions(std::ios_base::failbit | std::ios_base::badbit);
+
+   if( !fc::exists( dbdir/"index" ) )
+   {
+     _block_num_to_pos.open( (dbdir/"index").generic_string().c_str(), std::fstream::binary | std::fstream::in | std::fstream::out | std::fstream::trunc);
+     _blocks.open( (dbdir/"blocks").generic_string().c_str(), std::fstream::binary | std::fstream::in | std::fstream::out | std::fstream::trunc);
+   }
+   else
+   {
+     _block_num_to_pos.open( (dbdir/"index").generic_string().c_str(), std::fstream::binary | std::fstream::in | std::fstream::out );
+     _blocks.open( (dbdir/"blocks").generic_string().c_str(), std::fstream::binary | std::fstream::in | std::fstream::out );
+   }
+} FC_CAPTURE_AND_RETHROW( (dbdir) ) }
 
 
 bool block_database::is_open()const
@@ -51,7 +68,7 @@ void block_database::store( const block_id_type& id, const signed_block& b )
 
 
 void block_database::remove( const block_id_type& id )
-{
+{ try {
    index_entry e;
    auto index_pos = sizeof(e)*block_header::num_from_id(id);
    _block_num_to_pos.seekg( 0, _block_num_to_pos.end );
@@ -60,12 +77,13 @@ void block_database::remove( const block_id_type& id )
    _block_num_to_pos.seekg( index_pos );
    _block_num_to_pos.read( (char*)&e, sizeof(e) );
 
-   FC_ASSERT( e.block_id == id );
-
-   e.block_size = 0;
-   _block_num_to_pos.seekp( sizeof(e)*block_header::num_from_id(id) );
-   _block_num_to_pos.write( (char*)&e, sizeof(e) );
-}
+   if( e.block_id == id )
+   {
+      e.block_size = 0;
+      _block_num_to_pos.seekp( sizeof(e)*block_header::num_from_id(id) );
+      _block_num_to_pos.write( (char*)&e, sizeof(e) );
+   }
+} FC_CAPTURE_AND_RETHROW( (id) ) }
 
 
 
@@ -100,7 +118,7 @@ block_id_type          block_database::fetch_block_id( uint32_t block_num )const
 
 
 optional<signed_block> block_database::fetch_optional( const block_id_type& id )const
-{
+{ try {
    index_entry e;
    auto index_pos = sizeof(e)*block_header::num_from_id(id);
    _block_num_to_pos.seekg( 0, _block_num_to_pos.end );
@@ -114,25 +132,31 @@ optional<signed_block> block_database::fetch_optional( const block_id_type& id )
    vector<char> data( e.block_size );
    _blocks.seekg( e.block_pos );
    _blocks.read( data.data(), e.block_size );
-   return fc::raw::unpack<signed_block>(data);
-}
+   auto result = fc::raw::unpack<signed_block>(data);
+   FC_ASSERT( result.id() == e.block_id );
+   return result;
+} FC_CAPTURE_AND_RETHROW( (id) ) }
 
 
 optional<signed_block> block_database::fetch_by_number( uint32_t block_num )const
-{
+{ try {
    index_entry e;
    auto index_pos = sizeof(e)*block_num;
    _block_num_to_pos.seekg( 0, _block_num_to_pos.end );
    FC_ASSERT( _block_num_to_pos.tellg() > index_pos );
 
-   _block_num_to_pos.seekg( index_pos );
+   _block_num_to_pos.seekg( index_pos, _block_num_to_pos.beg );
+   wdump((int64_t(_block_num_to_pos.tellg())) );
    _block_num_to_pos.read( (char*)&e, sizeof(e) );
+   wdump((block_num)(e));
 
    vector<char> data( e.block_size );
    _blocks.seekg( e.block_pos );
    _blocks.read( data.data(), e.block_size );
-   return fc::raw::unpack<signed_block>(data);
-}
+   auto result = fc::raw::unpack<signed_block>(data);
+   FC_ASSERT( result.id() == e.block_id );
+   return result;
+} FC_CAPTURE_AND_RETHROW( (block_num) ) }
 
 
 optional<signed_block> block_database::last()const
@@ -145,14 +169,21 @@ optional<signed_block> block_database::last()const
 
    _block_num_to_pos.seekg( -sizeof(index_entry), _block_num_to_pos.end );
    _block_num_to_pos.read( (char*)&e, sizeof(e) );
-  
+   while( e.block_size == 0 && _blocks.tellg() > 0 )
+   {
+      _block_num_to_pos.seekg( -sizeof(index_entry), _block_num_to_pos.cur );
+      _block_num_to_pos.read( (char*)&e, sizeof(e) );
+   }
+
    if( e.block_size == 0 ) 
       return optional<signed_block>();
 
    vector<char> data( e.block_size );
    _blocks.seekg( e.block_pos );
    _blocks.read( data.data(), e.block_size );
-   return fc::raw::unpack<signed_block>(data);
+   auto result = fc::raw::unpack<signed_block>(data);
+   wdump((result));
+   return result;
 }
 
 

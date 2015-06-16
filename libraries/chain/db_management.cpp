@@ -41,7 +41,10 @@ void database::open( const fc::path& data_dir, const genesis_allocation& initial
    _block_id_to_block.open( data_dir / "database" / "block_num_to_block" );
 
    if( !find(global_property_id_type()) )
+   {
+      ilog( "Init Genesis State" );
       init_genesis(initial_allocation);
+   }
 
    _pending_block.previous  = head_block_id();
    _pending_block.timestamp = head_block_time();
@@ -96,6 +99,7 @@ void database::close(uint32_t blocks_to_rewind)
    for(uint32_t i = 0; i < blocks_to_rewind && head_block_num() > 0; ++i)
       pop_block();
 
+   object_database::flush();
    object_database::close();
 
    if( _block_id_to_block.is_open() )

@@ -53,6 +53,7 @@ namespace graphene { namespace chain {
    checksum_type signed_block::calculate_merkle_root()const
    {
       if( transactions.size() == 0 ) return checksum_type();
+      wdump((transactions.size()));
 
       vector<digest_type>  ids;
       ids.resize( ((transactions.size() + 1)/2)*2 );

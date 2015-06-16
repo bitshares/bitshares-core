@@ -37,6 +37,73 @@ using namespace graphene::chain;
 
 BOOST_AUTO_TEST_SUITE(block_tests)
 
+BOOST_AUTO_TEST_CASE( block_database_test )
+{ 
+   try {
+      fc::temp_directory data_dir;
+
+      block_database bdb;
+      bdb.open( data_dir.path() );
+      FC_ASSERT( bdb.is_open() );
+      bdb.close();
+      FC_ASSERT( !bdb.is_open() );
+      bdb.open( data_dir.path() );
+
+      signed_block b;
+      for( uint32_t i = 0; i < 5; ++i )
+      {
+         if( i > 0 ) b.previous = b.id();
+         b.witness = witness_id_type(i+1); 
+         edump((b));
+         bdb.store( b.id(), b );
+
+         auto fetch = bdb.fetch_by_number( b.block_num() );
+         idump((fetch));
+         FC_ASSERT( fetch.valid() );
+         FC_ASSERT( fetch->witness ==  b.witness );
+         fetch = bdb.fetch_by_number( i+1 );
+         idump((fetch));
+         FC_ASSERT( fetch.valid() );
+         FC_ASSERT( fetch->witness ==  b.witness );
+         fetch = bdb.fetch_optional( b.id() );
+         idump((fetch));
+         FC_ASSERT( fetch.valid() );
+         FC_ASSERT( fetch->witness ==  b.witness );
+      }
+      ilog("-----------" );
+
+      for( uint32_t i = 1; i < 5; ++i )
+      {
+         auto blk = bdb.fetch_by_number( i );
+         FC_ASSERT( blk.valid() );
+         idump((blk)(i));
+         FC_ASSERT( blk->witness == witness_id_type(blk->block_num()) );
+      }
+      
+      auto last = bdb.last();
+      FC_ASSERT( last );
+      FC_ASSERT( last->id() == b.id() );
+
+      bdb.close();
+      bdb.open( data_dir.path() );
+      last = bdb.last();
+      FC_ASSERT( last );
+      FC_ASSERT( last->id() == b.id() );
+
+      for( uint32_t i = 0; i < 5; ++i )
+      {
+         auto blk = bdb.fetch_by_number( i+1 );
+         FC_ASSERT( blk.valid() );
+         idump((blk)(i));
+         FC_ASSERT( blk->witness == witness_id_type(blk->block_num()) );
+      }
+
+   } catch (fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
 BOOST_AUTO_TEST_CASE( generate_empty_blocks )
 {
    try {
@@ -142,7 +209,7 @@ BOOST_AUTO_TEST_CASE( fork_blocks )
       db2.open( data_dir2.path(), genesis_allocation() );
 
       auto delegate_priv_key  = fc::ecc::private_key::regenerate(fc::sha256::hash(string("genesis")) );
-      for( uint32_t i = 0; i < 20; ++i )
+      for( uint32_t i = 0; i < 10; ++i )
       {
          now += db1.block_interval();
          auto b =  db1.generate_block( now, db1.get_scheduled_witness( 1 ).first, delegate_priv_key );
@@ -150,20 +217,19 @@ BOOST_AUTO_TEST_CASE( fork_blocks )
             db2.push_block(b);
          } FC_CAPTURE_AND_RETHROW( ("db2") );
       }
-      for( uint32_t i = 20; i < 23; ++i )
+      for( uint32_t i = 10; i < 13; ++i )
       {
          now += db1.block_interval();
          auto b =  db1.generate_block( now, db1.get_scheduled_witness( 1 ).first, delegate_priv_key );
       }
       string db1_tip = db1.head_block_id().str();
-      for( uint32_t i = 23; i < 26; ++i )
+      for( uint32_t i = 13; i < 16; ++i )
       {
          now += db2.block_interval();
          auto b =  db2.generate_block( now, db2.get_scheduled_witness( db2.get_slot_at_time( now ) ).first, delegate_priv_key );
          // notify both databases of the new block.
          // only db2 should switch to the new fork, db1 should not
          db1.push_block(b);
-         db2.push_block(b);
          BOOST_CHECK_EQUAL(db1.head_block_id().str(), db1_tip);
          BOOST_CHECK_EQUAL(db2.head_block_id().str(), b.id().str());
       }
@@ -171,8 +237,8 @@ BOOST_AUTO_TEST_CASE( fork_blocks )
       //The two databases are on distinct forks now, but at the same height. Make a block on db2, make it invalid, then
       //pass it to db1 and assert that db1 doesn't switch to the new fork.
       signed_block good_block;
-      BOOST_CHECK_EQUAL(db1.head_block_num(), 23);
-      BOOST_CHECK_EQUAL(db2.head_block_num(), 23);
+      BOOST_CHECK_EQUAL(db1.head_block_num(), 13);
+      BOOST_CHECK_EQUAL(db2.head_block_num(), 13);
       {
          now += db2.block_interval();
          auto b =  db2.generate_block( now, db2.get_scheduled_witness( 1 ).first, delegate_priv_key );
@@ -180,14 +246,14 @@ BOOST_AUTO_TEST_CASE( fork_blocks )
          b.transactions.emplace_back(signed_transaction());
          b.transactions.back().operations.emplace_back(transfer_operation());
          b.sign(delegate_priv_key);
-         BOOST_CHECK_EQUAL(b.block_num(), 24);
+         BOOST_CHECK_EQUAL(b.block_num(), 14);
          BOOST_CHECK_THROW(db1.push_block(b), fc::exception);
       }
-      BOOST_CHECK_EQUAL(db1.head_block_num(), 23);
+      BOOST_CHECK_EQUAL(db1.head_block_num(), 13);
       BOOST_CHECK_EQUAL(db1.head_block_id().str(), db1_tip);
 
       // assert that db1 switches to new fork with good block
-      BOOST_CHECK_EQUAL(db2.head_block_num(), 24);
+      BOOST_CHECK_EQUAL(db2.head_block_num(), 14);
       db1.push_block(good_block);
       BOOST_CHECK_EQUAL(db1.head_block_id().str(), db2.head_block_id().str());
    } catch (fc::exception& e) {
