@@ -68,6 +68,7 @@ void object_database::flush()
    ilog("Save object_database in ${d}", ("d", _data_dir));
    for( uint32_t space = 0; space < _index.size(); ++space )
    {
+      fc::create_directories( _data_dir / "object_database" / fc::to_string(space) );
       const auto types = _index[space].size();
       for( uint32_t type = 0; type  <  types; ++type )
          if( _index[space][type] )

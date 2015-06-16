@@ -177,7 +177,7 @@ namespace graphene { namespace db {
          virtual void           set_next_id( object_id_type id )override { _next_id = id;      }
 
          virtual void open( const path& db )override
-         {
+         { 
             if( !fc::exists( db ) ) return;
             fc::file_mapping fm( db.generic_string().c_str(), fc::read_only );
             fc::mapped_region mr( fm, fc::read_only, 0, fc::file_size(db) );
@@ -195,7 +195,9 @@ namespace graphene { namespace db {
 
          virtual void save( const path& db ) override 
          {
-            std::ofstream out( db.generic_string(), std::ofstream::binary );
+            std::ofstream out( db.generic_string(), 
+                               std::ofstream::binary | std::ofstream::out | std::ofstream::trunc );
+            FC_ASSERT( out );
             out.write( (char*)&_next_id, sizeof(_next_id) );
             this->inspect_all_objects( [&]( const object& o ) {
                 auto vec = fc::raw::pack( static_cast<const object_type&>(o) );

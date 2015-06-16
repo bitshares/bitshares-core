@@ -84,7 +84,6 @@ bool database::push_block( const signed_block& new_block, uint32_t skip )
 { try {
    if( !(skip&skip_fork_db) )
    {
-      wdump((new_block.id())(new_block.previous));
       auto new_head = _fork_db.push_block( new_block );
       //If the head block from the longest chain does not build off of the current head, we need to switch forks.
       if( new_head->data.previous != head_block_id() )
@@ -115,12 +114,13 @@ bool database::push_block( const signed_block& new_block, uint32_t skip )
                 try {
                    auto session = _undo_db.start_undo_session();
                    apply_block( (*ritr)->data, skip );
-                   _block_id_to_block.store( new_block.id(), (*ritr)->data );
+                   _block_id_to_block.store( (*ritr)->id, (*ritr)->data );
                    session.commit();
                 }
                 catch ( const fc::exception& e ) { except = e; }
                 if( except )
                 {
+                   wdump((except->to_detail_string()));
                    elog( "Encountered error when switching to a longer fork at id ${id}. Going back.",
                           ("id", (*ritr)->id) );
                    // remove the rest of branches.first from the fork_db, those blocks are invalid
@@ -325,7 +325,7 @@ void database::apply_block( const signed_block& next_block, uint32_t skip )
 { try {
    _applied_ops.clear();
 
-   FC_ASSERT( (skip & skip_merkle_check) || next_block.transaction_merkle_root == next_block.calculate_merkle_root() );
+   FC_ASSERT( (skip & skip_merkle_check) || next_block.transaction_merkle_root == next_block.calculate_merkle_root(), "", ("next_block.transaction_merkle_root",next_block.transaction_merkle_root)("calc",next_block.calculate_merkle_root())("next_block",next_block)("id",next_block.id()) );
 
    const witness_object& signing_witness = validate_block_header(skip, next_block);
    const auto& global_props = get_global_properties();
