@@ -1011,7 +1011,7 @@ public:
       return sign_transaction( tx, broadcast );
    }
 
-   signed_transaction short_sell_asset(string seller_name, string amount_to_sell, string asset_symbol,
+   signed_transaction borrow_asset(string seller_name, string amount_to_sell, string asset_symbol,
                                        string amount_of_collateral, bool broadcast = false)
    {
       account_object seller = get_account(seller_name);
@@ -1019,11 +1019,10 @@ public:
       FC_ASSERT(mia.is_market_issued());
       asset_object collateral = get_asset(get_object(*mia.bitasset_data_id).options.short_backing_asset);
 
-      short_order_create_operation op;
-      op.seller = seller.id;
-      op.expiration = fc::time_point::now() + fc::days(365*10);
-      op.amount_to_sell = mia.amount_from_string(amount_to_sell);
-      op.collateral = collateral.amount_from_string(amount_of_collateral);
+      call_order_update_operation op;
+      op.funding_account = seller.id;
+      op.amount_to_cover   = -mia.amount_from_string(amount_to_sell);
+      op.collateral_to_add = collateral.amount_from_string(amount_of_collateral);
 
       signed_transaction trx;
       trx.operations = {op};
@@ -1040,27 +1039,11 @@ public:
          FC_ASSERT(order_id.space() == protocol_ids, "Invalid order ID ${id}", ("id", order_id));
          signed_transaction trx;
 
-         switch( order_id.type() )
-         {
-         case short_order_object_type: {
-            short_order_cancel_operation op;
-            op.fee_paying_account = get_object<short_order_object>(order_id).seller;
-            op.order = order_id;
-            op.fee = op.calculate_fee(_remote_db->get_global_properties().parameters.current_fees);
-            trx.operations = {op};
-            break;
-         }
-         case limit_order_object_type: {
-            limit_order_cancel_operation op;
-            op.fee_paying_account = get_object<limit_order_object>(order_id).seller;
-            op.order = order_id;
-            op.fee = op.calculate_fee(_remote_db->get_global_properties().parameters.current_fees);
-            trx.operations = {op};
-            break;
-         }
-         default:
-            FC_THROW("Invalid order ID ${id}", ("id", order_id));
-         }
+         limit_order_cancel_operation op;
+         op.fee_paying_account = get_object<limit_order_object>(order_id).seller;
+         op.order = order_id;
+         op.fee = op.calculate_fee(_remote_db->get_global_properties().parameters.current_fees);
+         trx.operations = {op};
 
          trx.validate();
          return sign_transaction(trx, broadcast);
@@ -1382,11 +1365,6 @@ vector<operation_history_object> wallet_api::get_account_history(string name, in
 vector<limit_order_object> wallet_api::get_limit_orders(string a, string b, uint32_t limit)const
 {
    return my->_remote_db->get_limit_orders(get_asset(a).id, get_asset(b).id, limit);
-}
-
-vector<short_order_object> wallet_api::get_short_orders(string a, uint32_t limit)const
-{
-   return my->_remote_db->get_short_orders(get_asset(a).id, limit);
 }
 
 vector<call_order_object> wallet_api::get_call_orders(string a, uint32_t limit)const
@@ -1740,11 +1718,11 @@ signed_transaction wallet_api::sell_asset(string seller_account,
                          symbol_to_receive, expiration, fill_or_kill, broadcast);
 }
 
-signed_transaction wallet_api::short_sell_asset(string seller_name, string amount_to_sell,
+signed_transaction wallet_api::borrow_asset(string seller_name, string amount_to_sell,
                                                 string asset_symbol, string amount_of_collateral, bool broadcast)
 {
    FC_ASSERT(!is_locked());
-   return my->short_sell_asset(seller_name, amount_to_sell, asset_symbol, amount_of_collateral, broadcast);
+   return my->borrow_asset(seller_name, amount_to_sell, asset_symbol, amount_of_collateral, broadcast);
 }
 } }
 

@@ -141,9 +141,7 @@ struct operation_get_impacted_accounts
    }
 
    void operator()( const limit_order_create_operation& o )const { }
-   void operator()( const short_order_create_operation& o )const { }
    void operator()( const limit_order_cancel_operation& o )const { }
-   void operator()( const short_order_cancel_operation& o )const { }
    void operator()( const call_order_update_operation& o )const { }
    void operator()( const key_create_operation& o )const { }
    void operator()( const custom_operation& o )const { }

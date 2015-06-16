@@ -22,7 +22,7 @@
 #include <graphene/chain/operation_history_object.hpp>
 #include <graphene/chain/asset_object.hpp>
 #include <graphene/chain/limit_order_object.hpp>
-#include <graphene/chain/short_order_object.hpp>
+#include <graphene/chain/call_order_object.hpp>
 #include <graphene/chain/key_object.hpp>
 #include <graphene/net/node.hpp>
 #include <fc/api.hpp>
@@ -142,13 +142,6 @@ namespace graphene { namespace app {
           * @return The limit orders, ordered from least price to greatest
           */
          vector<limit_order_object> get_limit_orders(asset_id_type a, asset_id_type b, uint32_t limit)const;
-         /**
-          * @brief Get short orders in a given asset
-          * @param a ID of asset being sold
-          * @param limit Maximum number of orders to retrieve
-          * @return The short orders, ordered from least price to greatest
-          */
-         vector<short_order_object> get_short_orders(asset_id_type a, uint32_t limit)const;
          /**
           * @brief Get call orders in a given asset
           * @param a ID of asset being called
@@ -342,7 +335,6 @@ FC_API(graphene::app::database_api,
        (get_named_account_balances)
        (lookup_asset_symbols)
        (get_limit_orders)
-       (get_short_orders)
        (get_call_orders)
        (get_settle_orders)
        (list_assets)

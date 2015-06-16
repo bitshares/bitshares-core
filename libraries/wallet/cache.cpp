@@ -22,7 +22,7 @@
 #include <graphene/chain/delegate_object.hpp>
 #include <graphene/chain/witness_object.hpp>
 #include <graphene/chain/limit_order_object.hpp>
-#include <graphene/chain/short_order_object.hpp>
+#include <graphene/chain/call_order_object.hpp>
 #include <graphene/chain/proposal_object.hpp>
 #include <graphene/chain/operation_history_object.hpp>
 #include <graphene/chain/withdraw_permission_object.hpp>
@@ -72,8 +72,6 @@ object* create_object( const variant& v )
          return create_object_of_type< witness_object >( v );
       case limit_order_object_type:
          return create_object_of_type< limit_order_object >( v );
-      case short_order_object_type:
-         return create_object_of_type< short_order_object >( v );
       case call_order_object_type:
          return create_object_of_type< call_order_object >( v );
       /*
