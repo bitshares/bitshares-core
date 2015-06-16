@@ -151,7 +151,7 @@ void database::init_genesis(const genesis_allocation& initial_allocation)
          n.owner.add_authority(genesis_key.get_id(), 1);
          n.owner.weight_threshold = 1;
          n.active = n.owner;
-         n.memo_key = genesis_key.id;
+         n.options.memo_key = genesis_key.id;
          n.statistics = genesis_statistics.id;
       });
 
@@ -262,7 +262,7 @@ void database::init_genesis(const genesis_allocation& initial_allocation)
       auto mangle_to_name = [](const fc::static_variant<public_key_type, address>& key) {
          string addr = string(key.which() == std::decay<decltype(key)>::type::tag<address>::value? key.get<address>()
                                                                                                  : key.get<public_key_type>());
-         string result = "bts";
+         string result = "import";
          string key_string = string(addr).substr(sizeof(GRAPHENE_ADDRESS_PREFIX)-1);
          for( char c : key_string )
          {
@@ -295,7 +295,7 @@ void database::init_genesis(const genesis_allocation& initial_allocation)
          cop.registrar = account_id_type(1);
          cop.active = account_authority;
          cop.owner = account_authority;
-         cop.memo_key = key_id;
+         cop.options.memo_key = key_id;
          trx.operations.push_back(cop);
          trx.validate();
          auto ptrx = apply_transaction(trx, ~0);

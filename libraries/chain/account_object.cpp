@@ -131,4 +131,19 @@ void account_statistics_object::process_fees(const account_object& a, database& 
    }
 }
 
+void account_object::options_type::validate() const
+{
+   auto needed_witnesses = num_witness;
+   auto needed_committee = num_committee;
+
+   for( vote_id_type id : votes )
+      if( id.type() == vote_id_type::witness && needed_witnesses )
+         --needed_witnesses;
+      else if ( id.type() == vote_id_type::committee && needed_committee )
+         --needed_committee;
+
+   FC_ASSERT( needed_witnesses == 0 && needed_committee == 0,
+              "May not specify fewer witnesses or committee members than the number voted for.");
+}
+
 } } // graphene::chain

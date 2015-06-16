@@ -448,7 +448,7 @@ flat_set<key_id_type> account_history_plugin_impl::get_keys_for_account( const a
    flat_set<key_id_type> key_id_set;
    key_id_set.reserve(owner_auths.size() + active_auths.size() + 2);
 
-   key_id_set.insert(acct.memo_key);
+   key_id_set.insert(acct.options.memo_key);
 
    // we don't use get_keys() here to avoid an intermediate copy operation
    for( const pair<object_id_type, weight_type>& item : active_auths )

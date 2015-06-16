@@ -149,9 +149,11 @@ void account_update_operation::validate()const
 {
    FC_ASSERT( fee.amount >= 0 );
    FC_ASSERT( account != account_id_type() );
-   FC_ASSERT( owner || active || voting_account || memo_key || vote );
-}
+   FC_ASSERT( owner || active || new_options );
 
+   if( new_options )
+      new_options->validate();
+}
 
 share_type asset_create_operation::calculate_fee( const fee_schedule_type& schedule )const
 {
@@ -209,10 +211,7 @@ void account_create_operation::validate()const
       FC_ASSERT( owner.weight_threshold == 1 );
       FC_ASSERT( owner.auths.size() == 1 );
    }
-   FC_ASSERT( num_witness + num_committee >= num_witness );  // no overflow
-   FC_ASSERT( num_witness + num_committee <= vote.size() );
-   // FC_ASSERT( (num_witness == 0) || (num_witness&0x01) == 0, "must be odd number" );
-   // FC_ASSERT( (num_committee == 0) || (num_committee&0x01) == 0, "must be odd number" );
+   options.validate();
 }
 
 

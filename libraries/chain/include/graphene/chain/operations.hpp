@@ -27,6 +27,7 @@
 #include <graphene/chain/authority.hpp>
 #include <graphene/chain/asset_object.hpp>
 #include <graphene/chain/worker_object.hpp>
+#include <graphene/chain/account_object.hpp>
 
 #include <fc/static_variant.hpp>
 #include <fc/uint128.hpp>
@@ -137,12 +138,8 @@ namespace graphene { namespace chain {
       string          name;
       authority       owner;
       authority       active;
-      account_id_type voting_account;
-      object_id_type  memo_key = key_id_type();
 
-      uint16_t        num_witness = 0;
-      uint16_t        num_committee = 0;
-      flat_set<vote_id_type> vote;
+      account_object::options_type options;
 
       account_id_type fee_payer()const { return registrar; }
       void       get_required_auth(flat_set<account_id_type>& active_auth_set , flat_set<account_id_type>&)const;
@@ -203,15 +200,17 @@ namespace graphene { namespace chain {
     */
    struct account_update_operation
    {
-      asset                                   fee;
-      account_id_type                         account;
-      optional<authority>                     owner;
-      optional<authority>                     active;
-      optional<account_id_type>               voting_account;
-      optional<object_id_type>                memo_key;
-      optional<flat_set<vote_id_type>>        vote;
-      uint16_t                                num_witness = 0;
-      uint16_t                                num_committee = 0;
+      asset fee;
+      /// The account to update
+      account_id_type account;
+
+      /// New owner authority. If set, this operation requires owner authority to execute.
+      optional<authority> owner;
+      /// New active authority. If set, this operation requires owner authority to execute.
+      optional<authority> active;
+
+      /// New account options
+      optional<account_object::options_type> new_options;
 
       account_id_type fee_payer()const { return account; }
       void       get_required_auth(flat_set<account_id_type>& active_auth_set , flat_set<account_id_type>& owner_auth_set)const;
@@ -1566,13 +1565,11 @@ FC_REFLECT( graphene::chain::key_create_operation,
 FC_REFLECT( graphene::chain::account_create_operation,
             (fee)(registrar)
             (referrer)(referrer_percent)
-            (name)
-            (owner)(active)(voting_account)(memo_key)
-            (num_witness)(num_committee)(vote)
+            (name)(owner)(active)(options)
           )
 
 FC_REFLECT( graphene::chain::account_update_operation,
-            (fee)(account)(owner)(active)(voting_account)(memo_key)(num_witness)(num_committee)(vote)
+            (fee)(account)(owner)(active)(new_options)
           )
 FC_REFLECT( graphene::chain::account_upgrade_operation, (fee)(account_to_upgrade)(upgrade_to_lifetime_member) )
 

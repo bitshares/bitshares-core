@@ -112,7 +112,6 @@
 #define GRAPHENE_DEFAULT_WORKER_BUDGET_PER_DAY            (GRAPHENE_BLOCKCHAIN_PRECISION * int64_t(500) * 1000 )
 
 #define GRAPHENE_MAX_INTEREST_APR                            uint16_t( 10000 )
-#define GRAPHENE_LEGACY_NAME_IMPORT_PERIOD                   3000000 /** 3 million blocks */
 
 /**
  *  Reserved Account IDs with special meaning

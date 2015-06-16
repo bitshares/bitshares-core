@@ -429,8 +429,8 @@ BOOST_FIXTURE_TEST_CASE( maintenance_interval, database_fixture )
       {
          account_update_operation op;
          op.account = nathan.id;
-         op.vote = nathan.votes;
-         op.vote->insert(nathans_delegate.vote_id);
+         op.new_options = nathan.options;
+         op.new_options->votes.insert(nathans_delegate.vote_id);
          trx.operations.push_back(op);
          db.push_transaction(trx, ~0);
          trx.operations.clear();
