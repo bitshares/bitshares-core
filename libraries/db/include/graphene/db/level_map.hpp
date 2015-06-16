@@ -45,6 +45,7 @@ namespace graphene { namespace db {
      public:
         void open( const fc::path& dir, bool create = true, size_t cache_size = 0 )
         { try {
+           idump( (dir)(create));
            FC_ASSERT( !is_open(), "Database is already open!" );
 
            ldb::Options opts;

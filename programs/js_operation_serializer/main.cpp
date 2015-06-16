@@ -21,7 +21,7 @@
 #include <graphene/chain/proposal_object.hpp>
 #include <graphene/chain/witness_object.hpp>
 #include <graphene/chain/key_object.hpp>
-#include <graphene/chain/short_order_object.hpp>
+#include <graphene/chain/call_order_object.hpp>
 #include <graphene/chain/limit_order_object.hpp>
 #include <graphene/chain/account_object.hpp>
 #include <graphene/chain/block.hpp>

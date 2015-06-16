@@ -26,7 +26,7 @@
 #include <graphene/chain/delegate_object.hpp>
 #include <graphene/chain/key_object.hpp>
 #include <graphene/chain/limit_order_object.hpp>
-#include <graphene/chain/short_order_object.hpp>
+#include <graphene/chain/call_order_object.hpp>
 #include <graphene/chain/vesting_balance_object.hpp>
 #include <graphene/chain/withdraw_permission_object.hpp>
 #include <graphene/chain/witness_object.hpp>
@@ -314,18 +314,12 @@ BOOST_AUTO_TEST_CASE( update_mia )
          pop.publisher = account_id_type(1);
          price_feed feed;
          feed.call_limit = price(bit_usd.amount(5), bit_usd.amount(5));
-         feed.short_limit = feed.call_limit;
          REQUIRE_THROW_WITH_VALUE(pop, feed, feed);
          feed.call_limit = price(bit_usd.amount(5), asset(5));
-         feed.short_limit = ~feed.call_limit;
          REQUIRE_THROW_WITH_VALUE(pop, feed, feed);
-         feed.short_limit = price(asset(4), bit_usd.amount(5));
-         REQUIRE_THROW_WITH_VALUE(pop, feed, feed);
-         std::swap(feed.call_limit, feed.short_limit);
          pop.feed = feed;
          REQUIRE_THROW_WITH_VALUE(pop, feed.max_margin_period_sec, 0);
          REQUIRE_THROW_WITH_VALUE(pop, feed.required_maintenance_collateral, 0);
-         REQUIRE_THROW_WITH_VALUE(pop, feed.required_initial_collateral, 500);
          trx.operations.back() = pop;
          db.push_transaction(trx, ~0);
       }
@@ -344,129 +338,6 @@ BOOST_AUTO_TEST_CASE( update_mia )
       db.push_transaction(trx, ~0);
       BOOST_CHECK(bit_usd.issuer == account_id_type());
    } catch ( const fc::exception& e ) {
-      elog( "${e}", ("e", e.to_detail_string() ) );
-      throw;
-   }
-}
-
-BOOST_AUTO_TEST_CASE( create_short_test )
-{
-   try {
-      const asset_object& bitusd = create_bitasset( "BITUSD" );
-      const account_object& shorter_account  = create_account( "shorter" );
-      transfer( genesis_account(db), shorter_account, asset( 10000 ) );
-      auto first_short = create_short( shorter_account, bitusd.amount(100), asset( 100 ) ); // 1:1 price
-      BOOST_REQUIRE( first_short != nullptr );
-      BOOST_REQUIRE( create_short( shorter_account, bitusd.amount(100), asset( 200 ) ) ); // 1:2 price
-      BOOST_REQUIRE( create_short( shorter_account, bitusd.amount(100), asset( 300 ) ) ); // 1:3 price
-      BOOST_REQUIRE_EQUAL( get_balance(shorter_account, asset_id_type()(db) ), 10000-600 );
-   }catch ( const fc::exception& e )
-   {
-      elog( "${e}", ("e", e.to_detail_string() ) );
-      throw;
-   }
-}
-BOOST_AUTO_TEST_CASE( cancel_short_test )
-{
-   try {
-      const asset_object& bitusd = create_bitasset( "BITUSD" );
-      const account_object& shorter_account  = create_account( "shorter" );
-      transfer( genesis_account(db), shorter_account, asset( 10000 ) );
-      auto first_short = create_short( shorter_account, bitusd.amount(100), asset( 100 ) ); // 1:1 price
-      BOOST_REQUIRE( first_short != nullptr );
-      BOOST_REQUIRE( create_short( shorter_account, bitusd.amount(100), asset( 200 ) ) ); // 1:2 price
-      BOOST_REQUIRE( create_short( shorter_account, bitusd.amount(100), asset( 300 ) ) ); // 1:3 price
-      BOOST_REQUIRE_EQUAL( get_balance(shorter_account, asset_id_type()(db) ), 10000-600 );
-      auto refund = cancel_short_order( *first_short );
-      BOOST_REQUIRE_EQUAL( get_balance(shorter_account, asset_id_type()(db) ), 10000-500 );
-      FC_ASSERT( refund == asset(100) );
-   }catch ( const fc::exception& e )
-   {
-      elog( "${e}", ("e", e.to_detail_string() ) );
-      throw;
-   }
-}
-
-/**
- *  Assume there exists an offer to buy BITUSD
- *  Create a short that exactly matches that offer at a price 2:1
- */
-BOOST_AUTO_TEST_CASE( match_short_now_exact )
-{
-   try {
-      const asset_object& bitusd = create_bitasset( "BITUSD" );
-      const account_object& shorter_account  = create_account( "shorter" );
-      const account_object& buyer_account  = create_account( "buyer" );
-      transfer( genesis_account(db), shorter_account, asset( 10000 ) );
-      transfer( genesis_account(db), buyer_account, asset( 10000 ) );
-
-      auto buy_order = create_sell_order( buyer_account, asset(200), bitusd.amount(100) );
-      BOOST_REQUIRE( buy_order );
-      auto first_short = create_short( shorter_account, bitusd.amount(100), asset( 200 ) ); // 1:1 price
-      BOOST_REQUIRE( first_short == nullptr );
-      print_call_orders();
-      //print_short_market("","");
-   }catch ( const fc::exception& e )
-   {
-      elog( "${e}", ("e", e.to_detail_string() ) );
-      throw;
-   }
-}
-
-/**
- *  Assume there exists an offer to buy BITUSD
- *  Create a short that exactly matches that offer at a price 2:1
- */
-BOOST_AUTO_TEST_CASE( dont_match_short )
-{
-   try {
-      const asset_object& bitusd = create_bitasset( "BITUSD" );
-      const account_object& shorter_account  = create_account( "shorter" );
-      const account_object& buyer_account  = create_account( "buyer" );
-      transfer( genesis_account(db), shorter_account, asset( 10000 ) );
-      transfer( genesis_account(db), buyer_account, asset( 10000 ) );
-
-      create_sell_order( buyer_account, asset(125), bitusd.amount(100) );
-      create_sell_order( buyer_account, asset(150), bitusd.amount(100) );
-      auto buy_order = create_sell_order( buyer_account, asset(100), bitusd.amount(100) );
-      //print_market("","");
-      BOOST_REQUIRE( buy_order );
-      auto first_short  = create_short( shorter_account, bitusd.amount(100), asset( 200 ) ); // 1:1 price
-      auto second_short = create_short( shorter_account, bitusd.amount(100), asset( 300 ) ); // 1:1 price
-      auto third_short  = create_short( shorter_account, bitusd.amount(100), asset( 400 ) ); // 1:1 price
-      //print_short_market("","");
-      BOOST_REQUIRE( first_short && second_short && third_short );
-      //print_joint_market("","");
-   }catch ( const fc::exception& e )
-   {
-      elog( "${e}", ("e", e.to_detail_string() ) );
-      throw;
-   }
-}
-/**
- *  Assume there exists an offer to buy BITUSD
- *  Create a short that exactly matches that offer at a price 2:1
- */
-BOOST_AUTO_TEST_CASE( match_all_short_with_surplus_collaterl )
-{
-   try {
-      const asset_object& bitusd = create_bitasset( "BITUSD" );
-      const account_object& shorter_account  = create_account( "shorter" );
-      const account_object& buyer_account  = create_account( "buyer" );
-      transfer( genesis_account(db), shorter_account, asset( 10000 ) );
-      transfer( genesis_account(db), buyer_account, asset( 10000 ) );
-
-      //auto buy_order = create_sell_order( buyer_account, asset(200), bitusd.amount(101) );
-      auto buy_order = create_sell_order( buyer_account, asset(300), bitusd.amount(100) );
-      print_market("","");
-      BOOST_REQUIRE( buy_order );
-      auto first_short = create_short( shorter_account, bitusd.amount(100), asset( 200 ) ); // 1:1 price
-      print_short_market("","");
-      BOOST_REQUIRE( !first_short );
-      //print_short_market("","");
-      print_call_orders();
-   }catch ( const fc::exception& e )
-   {
       elog( "${e}", ("e", e.to_detail_string() ) );
       throw;
    }
@@ -916,7 +787,6 @@ BOOST_AUTO_TEST_CASE( delegate_feeds )
       asset_publish_feed_operation op({asset(), active_witnesses[0]});
       op.asset_id = bit_usd.get_id();
       op.feed.call_limit = price(asset(GRAPHENE_BLOCKCHAIN_PRECISION),bit_usd.amount(30));
-      op.feed.short_limit = ~price(asset(GRAPHENE_BLOCKCHAIN_PRECISION),bit_usd.amount(10));
       // We'll expire margins after a month
       op.feed.max_margin_period_sec = fc::days(30).to_seconds();
       // Accept defaults for required collateral
@@ -938,38 +808,29 @@ BOOST_AUTO_TEST_CASE( delegate_feeds )
 
       const asset_bitasset_data_object& bitasset = bit_usd.bitasset_data(db);
       BOOST_CHECK(bitasset.current_feed.call_limit.to_real() == GRAPHENE_BLOCKCHAIN_PRECISION / 30.0);
-      BOOST_CHECK_EQUAL(bitasset.current_feed.short_limit.to_real(), 10.0 / GRAPHENE_BLOCKCHAIN_PRECISION);
       BOOST_CHECK(bitasset.current_feed.max_margin_period_sec == fc::days(30).to_seconds());
-      BOOST_CHECK(bitasset.current_feed.required_initial_collateral == GRAPHENE_DEFAULT_INITIAL_COLLATERAL_RATIO);
       BOOST_CHECK(bitasset.current_feed.required_maintenance_collateral == GRAPHENE_DEFAULT_MAINTENANCE_COLLATERAL_RATIO);
 
       op.publisher = active_witnesses[1];
       op.feed.call_limit = price(asset(GRAPHENE_BLOCKCHAIN_PRECISION),bit_usd.amount(25));
-      op.feed.short_limit = ~price(asset(GRAPHENE_BLOCKCHAIN_PRECISION),bit_usd.amount(20));
       op.feed.max_margin_period_sec = fc::days(10).to_seconds();
       trx.operations.back() = op;
       db.push_transaction(trx, ~0);
 
       BOOST_CHECK_EQUAL(bitasset.current_feed.call_limit.to_real(), GRAPHENE_BLOCKCHAIN_PRECISION / 25.0);
-      BOOST_CHECK_EQUAL(bitasset.current_feed.short_limit.to_real(), 20.0 / GRAPHENE_BLOCKCHAIN_PRECISION);
       BOOST_CHECK(bitasset.current_feed.max_margin_period_sec == fc::days(30).to_seconds());
-      BOOST_CHECK(bitasset.current_feed.required_initial_collateral == GRAPHENE_DEFAULT_INITIAL_COLLATERAL_RATIO);
       BOOST_CHECK(bitasset.current_feed.required_maintenance_collateral == GRAPHENE_DEFAULT_MAINTENANCE_COLLATERAL_RATIO);
 
       op.publisher = active_witnesses[2];
       op.feed.call_limit = price(asset(GRAPHENE_BLOCKCHAIN_PRECISION),bit_usd.amount(40));
-      op.feed.short_limit = ~price(asset(GRAPHENE_BLOCKCHAIN_PRECISION),bit_usd.amount(10));
       op.feed.max_margin_period_sec = fc::days(100).to_seconds();
       // But this delegate is an idiot.
-      op.feed.required_initial_collateral = 1001;
       op.feed.required_maintenance_collateral = 1000;
       trx.operations.back() = op;
       db.push_transaction(trx, ~0);
 
       BOOST_CHECK_EQUAL(bitasset.current_feed.call_limit.to_real(), GRAPHENE_BLOCKCHAIN_PRECISION / 30.0);
-      BOOST_CHECK_EQUAL(bitasset.current_feed.short_limit.to_real(), 10.0 / GRAPHENE_BLOCKCHAIN_PRECISION);
       BOOST_CHECK(bitasset.current_feed.max_margin_period_sec == fc::days(30).to_seconds());
-      BOOST_CHECK(bitasset.current_feed.required_initial_collateral == GRAPHENE_DEFAULT_INITIAL_COLLATERAL_RATIO);
       BOOST_CHECK(bitasset.current_feed.required_maintenance_collateral == GRAPHENE_DEFAULT_MAINTENANCE_COLLATERAL_RATIO);
    } catch (const fc::exception& e) {
       edump((e.to_detail_string()));
@@ -977,241 +838,12 @@ BOOST_AUTO_TEST_CASE( delegate_feeds )
    }
 }
 
-/**
- *  Assume there exists an offer to buy BITUSD
- *  Create a short that exactly matches that offer at a price 2:1
- */
-BOOST_AUTO_TEST_CASE( limit_match_existing_short_exact )
-{
-   try {
-      const asset_object& bitusd = create_bitasset( "BITUSD" );
-      const account_object& shorter_account  = create_account( "shorter" );
-      const account_object& buyer_account  = create_account( "buyer" );
-      transfer( genesis_account(db), shorter_account, asset( 10000 ) );
-      transfer( genesis_account(db), buyer_account, asset( 10000 ) );
-
-      create_sell_order( buyer_account, asset(125), bitusd.amount(100) );
-      create_sell_order( buyer_account, asset(150), bitusd.amount(100) );
-      auto buy_order = create_sell_order( buyer_account, asset(100), bitusd.amount(100) );
-      //print_market("","");
-      BOOST_REQUIRE( buy_order );
-      auto first_short = create_short( shorter_account, bitusd.amount(100), asset( 200 ) ); // 1:1 price
-      auto second_short = create_short( shorter_account, bitusd.amount(100), asset( 300 ) ); // 1:1 price
-      auto third_short = create_short( shorter_account, bitusd.amount(100), asset( 400 ) ); // 1:1 price
-      //print_short_market("","");
-      BOOST_REQUIRE( first_short && second_short && third_short );
-      //print_joint_market("","");
-      auto unmatched_order = create_sell_order( buyer_account, asset(200), bitusd.amount(100) );
-      //print_joint_market("","");
-      BOOST_REQUIRE( !unmatched_order );
-      // now it shouldn't fill
-      unmatched_order = create_sell_order( buyer_account, asset(200), bitusd.amount(100) );
-      //print_joint_market("","");
-      BOOST_REQUIRE( unmatched_order );
-      BOOST_CHECK( unmatched_order->amount_for_sale() == asset(200) );
-      BOOST_CHECK( unmatched_order->amount_to_receive() == bitusd.amount(100) );
-      BOOST_CHECK( second_short->amount_for_sale() == bitusd.amount(100) );
-      BOOST_CHECK( third_short->amount_for_sale() == bitusd.amount(100) );
-   }catch ( const fc::exception& e )
-   {
-      elog( "${e}", ("e", e.to_detail_string() ) );
-      throw;
-   }
-}
-
-/**
- *  Assume there exists an offer to buy BITUSD
- *  Create a short that exactly matches that offer at a price 2:1
- */
-BOOST_AUTO_TEST_CASE( limit_match_existing_short_partial_exact_price )
-{
-   try {
-      const asset_object& bitusd = create_bitasset( "BITUSD" );
-      const account_object& shorter_account  = create_account( "shorter" );
-      const account_object& buyer_account  = create_account( "buyer" );
-      transfer( genesis_account(db), shorter_account, asset( 10000 ) );
-      transfer( genesis_account(db), buyer_account, asset( 10000 ) );
-
-      create_sell_order( buyer_account, asset(125), bitusd.amount(100) );
-      create_sell_order( buyer_account, asset(150), bitusd.amount(100) );
-      auto buy_order = create_sell_order( buyer_account, asset(100), bitusd.amount(100) );
-      //print_market("","");
-      BOOST_REQUIRE( buy_order );
-      auto first_short = create_short( shorter_account, bitusd.amount(100), asset( 200 ) ); // 1:1 price
-      auto second_short = create_short( shorter_account, bitusd.amount(100), asset( 300 ) ); // 1:1 price
-      auto third_short = create_short( shorter_account, bitusd.amount(100), asset( 400 ) ); // 1:1 price
-      //print_short_market("","");
-      BOOST_REQUIRE( first_short && second_short && third_short );
-      //print_joint_market("","");
-      auto unmatched_order = create_sell_order( buyer_account, asset(100), bitusd.amount(50) );
-      //print_joint_market("","");
-      BOOST_REQUIRE( !unmatched_order );
-      BOOST_CHECK( first_short->amount_for_sale() == bitusd.amount(50) );
-      BOOST_CHECK( first_short->get_collateral()  == asset(100) );
-      BOOST_CHECK( second_short->amount_for_sale() == bitusd.amount(100) );
-      BOOST_CHECK( third_short->amount_for_sale() == bitusd.amount(100) );
-
-   }catch ( const fc::exception& e )
-   {
-      elog( "${e}", ("e", e.to_detail_string() ) );
-      throw;
-   }
-}
-/**
- *  Assume there exists an offer to buy BITUSD
- *  Create a short that exactly matches that offer at a price 2:1
- */
-BOOST_AUTO_TEST_CASE( limit_match_existing_short_partial_over_price )
-{
-   try {
-      const asset_object& bitusd = create_bitasset( "BITUSD" );
-      const account_object& shorter_account  = create_account( "shorter" );
-      const account_object& buyer_account  = create_account( "buyer" );
-      transfer( genesis_account(db), shorter_account, asset( 10000 ) );
-      transfer( genesis_account(db), buyer_account, asset( 10000 ) );
-
-      create_sell_order( buyer_account, asset(125), bitusd.amount(100) );
-      create_sell_order( buyer_account, asset(150), bitusd.amount(100) );
-      auto buy_order = create_sell_order( buyer_account, asset(100), bitusd.amount(100) );
-      //print_market("","");
-      BOOST_REQUIRE( buy_order );
-      auto first_short = create_short( shorter_account, bitusd.amount(100), asset( 200 ) ); // 1:1 price
-      auto second_short = create_short( shorter_account, bitusd.amount(100), asset( 300 ) ); // 1:1 price
-      auto third_short = create_short( shorter_account, bitusd.amount(100), asset( 400 ) ); // 1:1 price
-      BOOST_REQUIRE( first_short && second_short && third_short );
-      //print_joint_market("","");
-      auto unmatched_order = create_sell_order( buyer_account, asset(100), bitusd.amount(40) );
-      //print_joint_market("","");
-      BOOST_REQUIRE( !unmatched_order );
-      BOOST_CHECK( first_short->amount_for_sale() == bitusd.amount(50) );
-      BOOST_CHECK( first_short->get_collateral()  == asset(100) );
-      BOOST_CHECK( second_short->amount_for_sale() == bitusd.amount(100) );
-      BOOST_CHECK( third_short->amount_for_sale() == bitusd.amount(100) );
-
-   }catch ( const fc::exception& e )
-   {
-      elog( "${e}", ("e", e.to_detail_string() ) );
-      throw;
-   }
-}
-
-/**
- *  Assume there exists an offer to buy BITUSD
- *  Create a short that exactly matches that offer at a price 2:1
- */
-BOOST_AUTO_TEST_CASE( limit_match_multiple_existing_short_partial_over_price )
-{
-   try {
-      const asset_object& bitusd = create_bitasset( "BITUSD" );
-      const account_object& shorter_account  = create_account( "shorter" );
-      const account_object& buyer_account  = create_account( "buyer" );
-      transfer( genesis_account(db), shorter_account, asset( 10000 ) );
-      transfer( genesis_account(db), buyer_account, asset( 10000 ) );
-
-      create_sell_order( buyer_account, asset(125), bitusd.amount(100) );
-      create_sell_order( buyer_account, asset(150), bitusd.amount(100) );
-      auto buy_order = create_sell_order( buyer_account, asset(100), bitusd.amount(100) );
-      //print_market("","");
-      BOOST_REQUIRE( buy_order );
-      auto first_short = create_short( shorter_account, bitusd.amount(100), asset( 200 ) ); // 1:1 price
-      auto next_short = create_short( shorter_account, bitusd.amount(100), asset( 210 ) ); // 1:1 price
-      auto second_short = create_short( shorter_account, bitusd.amount(100), asset( 300 ) ); // 1:1 price
-      auto third_short = create_short( shorter_account, bitusd.amount(100), asset( 400 ) ); // 1:1 price
-      //print_short_market("","");
-      BOOST_REQUIRE( first_short && second_short && third_short );
-      auto unmatched_order = create_sell_order( buyer_account, asset(200+115), bitusd.amount(150) );
-     // print_joint_market("","");
-      BOOST_REQUIRE( !unmatched_order );
-      //wdump( (next_short->amount_for_sale().amount)(next_short->get_collateral().amount) );
-      BOOST_CHECK( next_short->amount_for_sale() == bitusd.amount(46) );
-      BOOST_CHECK( next_short->get_collateral()  == asset(97) );
-      BOOST_CHECK( second_short->amount_for_sale() == bitusd.amount(100) );
-      BOOST_CHECK( third_short->amount_for_sale() == bitusd.amount(100) );
-      print_call_orders();
-
-   }catch ( const fc::exception& e )
-   {
-      elog( "${e}", ("e", e.to_detail_string() ) );
-      throw;
-   }
-}
-
-/**
- *  Assume there exists an offer to buy BITUSD
- *  Create a short that exactly matches that offer at a price 2:1
- */
-BOOST_AUTO_TEST_CASE( limit_dont_match_existing_short_partial_over_price )
-{
-   try {
-      const asset_object& bitusd = create_bitasset( "BITUSD" );
-      const account_object& shorter_account  = create_account( "shorter" );
-      const account_object& buyer_account  = create_account( "buyer" );
-      transfer( genesis_account(db), shorter_account, asset( 10000 ) );
-      transfer( genesis_account(db), buyer_account, asset( 10000 ) );
-
-      create_sell_order( buyer_account, asset(125), bitusd.amount(100) );
-      create_sell_order( buyer_account, asset(150), bitusd.amount(100) );
-      auto buy_order = create_sell_order( buyer_account, asset(100), bitusd.amount(100) );
-      BOOST_REQUIRE( buy_order );
-      auto first_short = create_short( shorter_account, bitusd.amount(100), asset( 200 ) ); // 1:1 price
-      auto second_short = create_short( shorter_account, bitusd.amount(100), asset( 300 ) ); // 1:1 price
-      auto third_short = create_short( shorter_account, bitusd.amount(100), asset( 400 ) ); // 1:1 price
-      //print_short_market("","");
-      BOOST_REQUIRE( first_short && second_short && third_short );
-      //print_joint_market("","");
-      auto unmatched_order = create_sell_order( buyer_account, asset(100), bitusd.amount(60) );
-      BOOST_REQUIRE( unmatched_order );
-      BOOST_CHECK( first_short->amount_for_sale() == bitusd.amount(100) );
-      BOOST_CHECK( first_short->get_collateral()  == asset(200) );
-      BOOST_CHECK( second_short->amount_for_sale() == bitusd.amount(100) );
-      BOOST_CHECK( third_short->amount_for_sale() == bitusd.amount(100) );
-   }catch ( const fc::exception& e )
-   {
-      elog( "${e}", ("e", e.to_detail_string() ) );
-      throw;
-   }
-}
-
-BOOST_AUTO_TEST_CASE( multiple_shorts_matching_multiple_bids_in_order )
-{ try {
-   const asset_object& bitusd = create_bitasset( "BITUSD" );
-   const account_object& shorter1_account  = create_account( "shorter1" );
-   const account_object& shorter2_account  = create_account( "shorter2" );
-   const account_object& shorter3_account  = create_account( "shorter3" );
-   const account_object& buyer_account  = create_account( "buyer" );
-   transfer( genesis_account(db), shorter1_account, asset( 10000 ) );
-   transfer( genesis_account(db), shorter2_account, asset( 10000 ) );
-   transfer( genesis_account(db), shorter3_account, asset( 10000 ) );
-   transfer( genesis_account(db), buyer_account, asset( 10000 ) );
-
-   BOOST_REQUIRE( create_sell_order( buyer_account, asset(125), bitusd.amount(100) ) );
-   BOOST_REQUIRE( create_sell_order( buyer_account, asset(150), bitusd.amount(100) ) );
-   BOOST_REQUIRE( create_sell_order( buyer_account, asset(200), bitusd.amount(100) ) );
-   print_joint_market("","");
-   BOOST_REQUIRE( !create_short( shorter1_account, bitusd.amount(100), asset( 200 ) ) );
-   BOOST_REQUIRE( !create_short( shorter2_account, bitusd.amount(100), asset( 150 ) ) );
-   BOOST_REQUIRE( !create_short( shorter3_account, bitusd.amount(100), asset( 125 ) ) );
-   print_call_orders();
-
-   auto& index = db.get_index_type<call_order_index>().indices().get<by_account>();
-   BOOST_CHECK(index.find(boost::make_tuple(buyer_account.id, bitusd.id)) == index.end());
-   BOOST_CHECK(index.find(boost::make_tuple(shorter1_account.id, bitusd.id)) != index.end());
-   BOOST_CHECK(index.find(boost::make_tuple(shorter1_account.id, bitusd.id))->get_debt() == bitusd.amount(100) );
-   BOOST_CHECK(index.find(boost::make_tuple(shorter1_account.id, bitusd.id))->call_price == price(asset(300), bitusd.amount(100)) );
-   BOOST_CHECK(index.find(boost::make_tuple(shorter2_account.id, bitusd.id)) != index.end());
-   BOOST_CHECK(index.find(boost::make_tuple(shorter2_account.id, bitusd.id))->get_debt() == bitusd.amount(100) );
-   BOOST_CHECK(index.find(boost::make_tuple(shorter3_account.id, bitusd.id)) != index.end());
-   BOOST_CHECK(index.find(boost::make_tuple(shorter3_account.id, bitusd.id))->get_debt() == bitusd.amount(100) );
-}catch ( const fc::exception& e )
-{
-  elog( "${e}", ("e", e.to_detail_string() ) );
-  throw;
-} }
 
 BOOST_AUTO_TEST_CASE( full_cover_test )
 {
    try {
-      INVOKE(multiple_shorts_matching_multiple_bids_in_order);
+      FC_ASSERT( "Reimplement with new borrowing semantics" );
+      /*
       const asset_object& bit_usd = get_asset("BITUSD");
       const asset_object& core = asset_id_type()(db);
       const account_object& debt_holder = get_account("shorter1");
@@ -1239,6 +871,7 @@ BOOST_AUTO_TEST_CASE( full_cover_test )
 
       BOOST_CHECK_EQUAL(get_balance(debt_holder, bit_usd), 0);
       BOOST_CHECK(index.find(boost::make_tuple(debt_holder.id, bit_usd.id)) == index.end());
+      */
    } catch( fc::exception& e) {
       edump((e.to_detail_string()));
       throw;
@@ -1248,7 +881,7 @@ BOOST_AUTO_TEST_CASE( full_cover_test )
 BOOST_AUTO_TEST_CASE( partial_cover_test )
 {
    try {
-      INVOKE(multiple_shorts_matching_multiple_bids_in_order);
+      FC_ASSERT( "Reimplement with new borrowing semantics" );
       const asset_object& bit_usd = get_asset("BITUSD");
       const asset_object& core = asset_id_type()(db);
       const account_object& debt_holder = get_account("shorter1");
@@ -1319,251 +952,6 @@ BOOST_AUTO_TEST_CASE( partial_cover_test )
    }
 }
 
-BOOST_AUTO_TEST_CASE( limit_order_matching_mix_of_shorts_and_limits )
-{ try {
-   const asset_object& bitusd      = create_bitasset( "BITUSD" );
-   const asset_object& core         = get_asset( GRAPHENE_SYMBOL );
-   const account_object& shorter1  = create_account( "shorter1" );
-   const account_object& shorter2  = create_account( "shorter2" );
-   const account_object& shorter3  = create_account( "shorter3" );
-   const account_object& buyer1    = create_account( "buyer1" );
-   const account_object& buyer2    = create_account( "buyer2" );
-   const account_object& buyer3    = create_account( "buyer3" );
-
-   transfer( genesis_account(db), shorter1, core.amount( 10000 ) );
-   transfer( genesis_account(db), shorter2, core.amount( 10000 ) );
-   transfer( genesis_account(db), shorter3, core.amount( 10000 ) );
-   transfer( genesis_account(db), buyer1, core.amount( 10000 ) );
-   transfer( genesis_account(db), buyer2, core.amount( 10000 ) );
-   transfer( genesis_account(db), buyer3, core.amount( 10000 ) );
-
-   // create some BitUSD
-   BOOST_REQUIRE( create_sell_order( buyer1, core.amount(1000), bitusd.amount(1000) ) );
-   BOOST_REQUIRE( !create_short( shorter1, bitusd.amount(1000), core.amount(1000) )   );
-   BOOST_REQUIRE_EQUAL( get_balance(buyer1, bitusd), 990 ); // 1000 - 1% fee
-
-   // create a mixture of BitUSD sells and shorts
-   BOOST_REQUIRE( create_short(      shorter1, bitusd.amount(100), core.amount(125) )   );
-   BOOST_REQUIRE( create_sell_order( buyer1,   bitusd.amount(100), core.amount(150) )   );
-   BOOST_REQUIRE( create_short(      shorter2, bitusd.amount(100), core.amount(200) )   );
-   BOOST_REQUIRE( create_sell_order( buyer1,   bitusd.amount(100), core.amount(225) )   );
-   BOOST_REQUIRE( create_short(      shorter3, bitusd.amount(100), core.amount(250) )   );
-
-   print_joint_market("",""); // may have bugs
-
-   // buy up everything but the highest order
-   auto unfilled_order = create_sell_order( buyer2, core.amount(700), bitusd.amount(311) );
-   if( unfilled_order ) wdump((*unfilled_order));
-   print_joint_market("","");
-   if( unfilled_order ) wdump((*unfilled_order));
-   BOOST_REQUIRE( !unfilled_order );
-   BOOST_REQUIRE_EQUAL( get_balance(buyer2, bitusd), 396 );
-
-   print_joint_market("","");
-   print_call_orders();
-
-}catch ( const fc::exception& e )
-{
-  elog( "${e}", ("e", e.to_detail_string() ) );
-  throw;
-} }
-
-BOOST_AUTO_TEST_CASE( big_short )
-{
-   try {
-      const asset_object& bitusd      = create_bitasset( "BITUSD" );
-      const asset_object& core         = get_asset( GRAPHENE_SYMBOL );
-      const account_object& shorter1  = create_account( "shorter1" );
-      const account_object& buyer1    = create_account( "buyer1" );
-      const account_object& buyer2    = create_account( "buyer2" );
-      const account_object& buyer3    = create_account( "buyer3" );
-
-      transfer( genesis_account(db), shorter1, asset( 10000 ) );
-      transfer( genesis_account(db), buyer1, asset( 10000 ) );
-      transfer( genesis_account(db), buyer2, asset( 10000 ) );
-      transfer( genesis_account(db), buyer3, asset( 10000 ) );
-
-      create_sell_order(buyer1, core.amount(500), bitusd.amount(500));
-      create_sell_order(buyer2, core.amount(500), bitusd.amount(600));
-      auto unmatched_buy3 = create_sell_order(buyer3, core.amount(500), bitusd.amount(700));
-
-      auto unmatched = create_short(shorter1, bitusd.amount(1300), core.amount(800));
-      if( unmatched ) wdump((*unmatched));
-
-      BOOST_CHECK( !unmatched );
-      BOOST_CHECK( unmatched_buy3 );
-      BOOST_CHECK_EQUAL( unmatched_buy3->amount_for_sale().amount.value, 358);
-      // The extra 1 is rounding leftovers; it has to go somewhere.
-      BOOST_CHECK_EQUAL( unmatched_buy3->amount_to_receive().amount.value, 501);
-      // All three buyers offered 500 CORE for varying numbers of dollars.
-      BOOST_CHECK_EQUAL(get_balance(buyer1, core), 9500);
-      BOOST_CHECK_EQUAL(get_balance(buyer2, core), 9500);
-      BOOST_CHECK_EQUAL(get_balance(buyer3, core), 9500);
-      // Sans the 1% market fee, buyer1 got 500 USD, buyer2 got 600 USD
-      BOOST_CHECK_EQUAL(get_balance(buyer1, bitusd), 495);
-      BOOST_CHECK_EQUAL(get_balance(buyer2, bitusd), 594);
-      // Buyer3 wanted 700 USD, but the shorter only had 1300-500-600=200 left, so buyer3 got 200.
-      BOOST_CHECK_EQUAL(get_balance(buyer3, bitusd), 198);
-      // Shorter1 never had any USD, so he shouldn't have any now. He paid 800 CORE, so he should have 9200 left.
-      BOOST_CHECK_EQUAL(get_balance(shorter1, bitusd), 0);
-      BOOST_CHECK_EQUAL(get_balance(shorter1, core), 9200);
-
-      const auto& call_index = db.get_index_type<call_order_index>().indices().get<by_account>();
-      const auto call_itr = call_index.find(boost::make_tuple(shorter1.id, bitusd.id));
-      BOOST_CHECK(call_itr != call_index.end());
-      const call_order_object& call_object = *call_itr;
-      BOOST_CHECK(call_object.borrower == shorter1.id);
-      //  800 from shorter1, 500 from buyer1 and buyer2 each, 500/700*200 from buyer3 totals 1942
-      BOOST_CHECK_EQUAL(call_object.collateral.value, 1942);
-      // Shorter1 sold 1300 USD. Make sure that's recorded accurately.
-      BOOST_CHECK_EQUAL(call_object.debt.value, 1300);
-      // 13 USD was paid in market fees.
-      BOOST_CHECK_EQUAL(bitusd.dynamic_asset_data_id(db).accumulated_fees.value, 13);
-   } catch( const fc::exception& e) {
-      edump((e.to_detail_string()));
-      throw;
-   }
-}
-
-BOOST_AUTO_TEST_CASE( big_short2 )
-{
-   try {
-      const asset_object& bitusd      = create_bitasset( "BITUSD" );
-      const asset_object& core         = get_asset( GRAPHENE_SYMBOL );
-      const account_object& shorter1  = create_account( "shorter1" );
-      const account_object& buyer1    = create_account( "buyer1" );
-      const account_object& buyer2    = create_account( "buyer2" );
-      const account_object& buyer3    = create_account( "buyer3" );
-
-      transfer( genesis_account(db), shorter1, asset( 10000 ) );
-      transfer( genesis_account(db), buyer1, asset( 10000 ) );
-      transfer( genesis_account(db), buyer2, asset( 10000 ) );
-      transfer( genesis_account(db), buyer3, asset( 10000 ) );
-
-      create_sell_order(buyer1, core.amount(500), bitusd.amount(500));
-      create_sell_order(buyer2, core.amount(500), bitusd.amount(600));
-      auto unmatched_buy3 = create_sell_order(buyer3, core.amount(500), bitusd.amount(700));
-
-      //We want to perfectly match the first two orders, so that's 1100 USD at 500/600 = 916
-      auto unmatched = create_short(shorter1, bitusd.amount(1100), core.amount(916));
-      if( unmatched ) wdump((*unmatched));
-
-      BOOST_CHECK( !unmatched );
-      BOOST_CHECK( unmatched_buy3 );
-      BOOST_CHECK_EQUAL( unmatched_buy3->amount_for_sale().amount.value, 500);
-      // The extra 1 is rounding leftovers; it has to go somewhere.
-      BOOST_CHECK_EQUAL( unmatched_buy3->amount_to_receive().amount.value, 700);
-      // All three buyers offered 500 CORE for varying numbers of dollars.
-      BOOST_CHECK_EQUAL(get_balance(buyer1, core), 9500);
-      BOOST_CHECK_EQUAL(get_balance(buyer2, core), 9500);
-      BOOST_CHECK_EQUAL(get_balance(buyer3, core), 9500);
-      // Sans the 1% market fee, buyer1 got 500 USD, buyer2 got 600 USD
-      BOOST_CHECK_EQUAL(get_balance(buyer1, bitusd), 495);
-      BOOST_CHECK_EQUAL(get_balance(buyer2, bitusd), 594);
-      // Buyer3's order wasn't matched. He should have no USD.
-      BOOST_CHECK_EQUAL(get_balance(buyer3, bitusd), 0);
-      // Shorter1 never had any USD, so he shouldn't have any now. He paid 916 CORE, so he should have 9084 left.
-      BOOST_CHECK_EQUAL(get_balance(shorter1, bitusd), 0);
-      BOOST_CHECK_EQUAL(get_balance(shorter1, core), 9084);
-
-      const auto& call_index = db.get_index_type<call_order_index>().indices().get<by_account>();
-      const auto call_itr = call_index.find(boost::make_tuple(shorter1.id, bitusd.id));
-      BOOST_CHECK(call_itr != call_index.end());
-      const call_order_object& call_object = *call_itr;
-      BOOST_CHECK(call_object.borrower == shorter1.id);
-      // 916 from shorter1, 500 from buyer1 and buyer2 each adds to 1916
-      BOOST_CHECK_EQUAL(call_object.collateral.value, 1916);
-      // Shorter1 sold 1100 USD. Make sure that's recorded accurately.
-      BOOST_CHECK_EQUAL(call_object.debt.value, 1100);
-      // 11 USD was paid in market fees.
-      BOOST_CHECK_EQUAL(bitusd.dynamic_asset_data_id(db).accumulated_fees.value, 11);
-   } catch( const fc::exception& e) {
-      edump((e.to_detail_string()));
-      throw;
-   }
-}
-
-BOOST_AUTO_TEST_CASE( big_short3 )
-{
-   try {
-      const asset_object& bitusd      = create_bitasset( "BITUSD" );
-      const asset_object& core         = get_asset( GRAPHENE_SYMBOL );
-      const account_object& shorter1  = create_account( "shorter1" );
-      const account_object& buyer1    = create_account( "buyer1" );
-      const account_object& buyer2    = create_account( "buyer2" );
-      const account_object& buyer3    = create_account( "buyer3" );
-
-      transfer( genesis_account(db), shorter1, asset( 10000 ) );
-      transfer( genesis_account(db), buyer1, asset( 10000 ) );
-      transfer( genesis_account(db), buyer2, asset( 10000 ) );
-      transfer( genesis_account(db), buyer3, asset( 10000 ) );
-
-      create_short(shorter1, bitusd.amount(1300), core.amount(800));
-
-      print_joint_market("","");
-
-      create_sell_order(buyer1, core.amount(500), bitusd.amount(500));
-      create_sell_order(buyer2, core.amount(500), bitusd.amount(600));
-      auto unmatched_buy3 = create_sell_order(buyer3, core.amount(500), bitusd.amount(700));
-
-      print_joint_market("","");
-
-      BOOST_CHECK( unmatched_buy3 );
-      BOOST_CHECK_EQUAL( unmatched_buy3->amount_for_sale().amount.value, 500);
-      BOOST_CHECK_EQUAL( unmatched_buy3->amount_to_receive().amount.value, 700);
-      BOOST_CHECK_EQUAL(get_balance(buyer1, core), 9500);
-      BOOST_CHECK_EQUAL(get_balance(buyer2, core), 9500);
-      BOOST_CHECK_EQUAL(get_balance(buyer3, core), 9500);
-      BOOST_CHECK_EQUAL(get_balance(buyer1, bitusd), 804);
-      BOOST_CHECK_EQUAL(get_balance(buyer2, bitusd), 484);
-      BOOST_CHECK_EQUAL(get_balance(buyer3, bitusd), 0);
-      BOOST_CHECK_EQUAL(get_balance(shorter1, bitusd), 0);
-      BOOST_CHECK_EQUAL(get_balance(shorter1, core), 9200);
-
-      const auto& call_index = db.get_index_type<call_order_index>().indices().get<by_account>();
-      const auto call_itr = call_index.find(boost::make_tuple(shorter1.id, bitusd.id));
-      BOOST_CHECK(call_itr != call_index.end());
-      const call_order_object& call_object = *call_itr;
-      BOOST_CHECK(call_object.borrower == shorter1.id);
-      BOOST_CHECK_EQUAL(call_object.collateral.value, 1600);
-      BOOST_CHECK_EQUAL(call_object.debt.value, 1300);
-      BOOST_CHECK_EQUAL(bitusd.dynamic_asset_data_id(db).accumulated_fees.value, 12);
-   } catch( const fc::exception& e) {
-      edump((e.to_detail_string()));
-      throw;
-   }
-}
-
-/**
-  * Originally, this test exposed a bug in vote tallying causing the total number of votes to exceed the number of
-  * voting shares. This bug was resolved in commit 489b0dafe981c3b96b17f23cfc9ddc348173c529
-  */
-BOOST_AUTO_TEST_CASE(break_vote_count)
-{
-   try {
-      const asset_object& bitusd      = create_bitasset( "BITUSD" );
-      const asset_object& core        = get_asset( GRAPHENE_SYMBOL );
-      const account_object& shorter1  = create_account( "shorter1" );
-      const account_object& buyer1    = create_account( "buyer1" );
-
-      transfer( genesis_account(db), shorter1, asset( 100000000 ) );
-      transfer( genesis_account(db), buyer1, asset( 100000000 ) );
-
-      create_short(shorter1, bitusd.amount(1300), core.amount(800));
-
-      create_sell_order(buyer1, core.amount(500), bitusd.amount(500));
-
-      BOOST_CHECK_EQUAL(get_balance(buyer1, core), 99999500);
-      BOOST_CHECK_EQUAL(get_balance(buyer1, bitusd), 804);
-      BOOST_CHECK_EQUAL(get_balance(shorter1, bitusd), 0);
-      BOOST_CHECK_EQUAL(get_balance(shorter1, core), 99999200);
-
-      create_sell_order(shorter1, core.amount(90000000), bitusd.amount(1));
-   } catch( const fc::exception& e) {
-      edump((e.to_detail_string()));
-      throw;
-   }
-}
 
 /**
  *  Create an order such that when the trade executes at the
@@ -1600,6 +988,8 @@ BOOST_AUTO_TEST_CASE( trade_amount_equals_zero )
 
 BOOST_AUTO_TEST_CASE( margin_call_limit_test )
 { try {
+      FC_ASSERT( "TODO - Reimplement with new short semantics" );
+      /*
       const asset_object& bitusd      = create_bitasset( "BITUSD" );
       const asset_object& core         = get_asset( GRAPHENE_SYMBOL );
 
@@ -1663,6 +1053,7 @@ BOOST_AUTO_TEST_CASE( margin_call_limit_test )
       BOOST_CHECK_THROW(db.get_object(below_id), fc::exception);
       BOOST_CHECK(call.get_debt() == bitusd.amount(210));
       BOOST_CHECK(call.get_collateral() == core.amount(803));
+      */
    } catch( const fc::exception& e) {
       edump((e.to_detail_string()));
       throw;
@@ -1671,6 +1062,8 @@ BOOST_AUTO_TEST_CASE( margin_call_limit_test )
 
 BOOST_AUTO_TEST_CASE( margin_call_limit_test_protected )
 { try {
+      FC_ASSERT( "TODO - Reimplement with new short semantics" );
+      /*
       const asset_object& bitusd      = create_bitasset( "BITUSD" );
       const asset_object& core         = get_asset( GRAPHENE_SYMBOL );
 
@@ -1698,6 +1091,7 @@ BOOST_AUTO_TEST_CASE( margin_call_limit_test_protected )
       auto unmatched = create_sell_order( buyer1, bitusd.amount(990), core.amount(1500) );
       if( unmatched ) edump((*unmatched));
       BOOST_REQUIRE( unmatched );
+      */
 
    } catch( const fc::exception& e) {
       edump((e.to_detail_string()));
@@ -1707,6 +1101,8 @@ BOOST_AUTO_TEST_CASE( margin_call_limit_test_protected )
 
 BOOST_AUTO_TEST_CASE( dont_margin_call_limit_test )
 { try {
+      FC_ASSERT( "TODO - Reimplement with new short semantics" );
+      /*
       const asset_object& bitusd      = create_bitasset( "BITUSD" );
       const asset_object& core         = get_asset( GRAPHENE_SYMBOL );
 
@@ -1733,6 +1129,7 @@ BOOST_AUTO_TEST_CASE( dont_margin_call_limit_test )
       auto unmatched = create_sell_order( buyer1, bitusd.amount(990), core.amount(1100) );
       if( unmatched ) edump((*unmatched));
       BOOST_REQUIRE( unmatched );
+      */
 
    } catch( const fc::exception& e) {
       edump((e.to_detail_string()));
@@ -1742,6 +1139,8 @@ BOOST_AUTO_TEST_CASE( dont_margin_call_limit_test )
 
 BOOST_AUTO_TEST_CASE( margin_call_short_test )
 { try {
+      FC_ASSERT( "TODO - Reimplement with new short semantics" );
+      /*
       const asset_object& bitusd      = create_bitasset( "BITUSD" );
       const asset_object& core         = get_asset( GRAPHENE_SYMBOL );
 
@@ -1769,6 +1168,7 @@ BOOST_AUTO_TEST_CASE( margin_call_short_test )
       auto unmatched = create_short( buyer1, bitusd.amount(990), core.amount(1500) );
       if( unmatched ) edump((*unmatched));
       BOOST_REQUIRE( !unmatched );
+      */
 
    } catch( const fc::exception& e) {
       edump((e.to_detail_string()));
@@ -1778,6 +1178,8 @@ BOOST_AUTO_TEST_CASE( margin_call_short_test )
 
 BOOST_AUTO_TEST_CASE( margin_call_short_test_limit_protected )
 { try {
+      FC_ASSERT( "TODO - Reimplement with new short semantics" );
+      /*
       const asset_object& bitusd      = create_bitasset( "BITUSD" );
       const asset_object& core         = get_asset( GRAPHENE_SYMBOL );
 
@@ -1805,6 +1207,7 @@ BOOST_AUTO_TEST_CASE( margin_call_short_test_limit_protected )
       auto unmatched = create_short( buyer1, bitusd.amount(990), core.amount(1500) );
       if( unmatched ) edump((*unmatched));
       BOOST_REQUIRE( unmatched );
+      */
 
    } catch( const fc::exception& e) {
       edump((e.to_detail_string()));
@@ -2032,66 +1435,12 @@ BOOST_AUTO_TEST_CASE( unimp_bulk_discount_test )
  */
 BOOST_AUTO_TEST_CASE( margin_call_black_swan )
 { try {
-      const asset_object& bitusd      = create_bitasset( "BITUSD" );
-      const asset_object& core         = get_asset( GRAPHENE_SYMBOL );
-
-      db.modify( bitusd.bitasset_data(db), [&]( asset_bitasset_data_object& usd ){
-                 usd.current_feed.call_limit = core.amount(30) / bitusd.amount(1);
-                 });
-
-      const account_object& shorter1  = create_account( "shorter1" );
-      const account_object& shorter2  = create_account( "shorter2" );
-      const account_object& buyer1    = create_account( "buyer1" );
-      const account_object& buyer2    = create_account( "buyer2" );
-
-      transfer( genesis_account(db), shorter1, asset( 10000 ) );
-      transfer( genesis_account(db), shorter2, asset( 10000 ) );
-      transfer( genesis_account(db), buyer1, asset( 10000 ) );
-      transfer( genesis_account(db), buyer2, asset( 10000 ) );
-
-      BOOST_REQUIRE( create_sell_order( buyer1, asset(1000), bitusd.amount(1000) ) );
-      BOOST_REQUIRE( !create_short( shorter1, bitusd.amount(1000), asset(1000) )   );
-      BOOST_REQUIRE_EQUAL( get_balance(buyer1, bitusd), 990 ); // 1000 - 1% fee
-
-      verify_asset_supplies();
-      ilog( "=================================== START===================================\n\n");
-      // this should cause the highest bid to below the margin call threshold
-      // which means it should be filled by the cover, except the cover does not
-      // have enough collateral and thus a black swan event should occur.
-      auto unmatched = create_sell_order( buyer1, bitusd.amount(990), core.amount(5000) );
-      if( unmatched ) edump((*unmatched));
-      /** black swans should cause all of the bitusd to be converted into backing
-       * asset at the price of the least collateralized call position at the time. This
-       * means that this sell order would be removed.
-       */
-      BOOST_REQUIRE( !unmatched );
-
+      FC_ASSERT( "TODO - Reimplement with new short semantics" );
    } catch( const fc::exception& e) {
       edump((e.to_detail_string()));
       throw;
    }
 }
-/**
- *  This test sets up a far more complex blackswan scenerio where the
- *  BitUSD exists in the following places:
- *
- *  0) Limit Orders for the BitAsset
- *  1) Limit Orders for UIA Assets
- *  2) Short Orders for BitAsset backed by BitUSD
- *  3) Call Orders for BitAsset backed by BitUSD
- *  4) Issuer Fees
- *
- *  This test should fail until the black swan handling code can
- *  perform a recursive blackswan for any other BitAssets that use
- *  BitUSD as collateral.
- */
-BOOST_AUTO_TEST_CASE_EXPECTED_FAILURES( unimp_advanced_black_swan, 1 )
-BOOST_AUTO_TEST_CASE( unimp_advanced_black_swan )
-{
-   BOOST_FAIL( "not implemented" );
-}
-
-
 
 /**
  *  Assume the referrer gets 99% of transaction fee
