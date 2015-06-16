@@ -20,6 +20,7 @@
 #include <graphene/chain/block.hpp>
 #include <graphene/chain/asset.hpp>
 #include <graphene/chain/global_property_object.hpp>
+#include <graphene/chain/node_property_object.hpp>
 #include <graphene/chain/account_object.hpp>
 #include <graphene/chain/asset_object.hpp>
 #include <graphene/chain/fork_database.hpp>
@@ -215,6 +216,7 @@ namespace graphene { namespace chain {
          const asset_object&                    get_core_asset()const;
          const global_property_object&          get_global_properties()const;
          const dynamic_global_property_object&  get_dynamic_global_properties()const;
+         const node_property_object&            get_node_properties()const;
          const fee_schedule_type&               current_fee_schedule()const;
 
          time_point_sec head_block_time()const;
@@ -353,7 +355,7 @@ namespace graphene { namespace chain {
          ///Steps involved in applying a new block
          ///@{
 
-         const witness_object& validate_block_header( uint32_t skip, const signed_block& next_block )const;
+         const witness_object& validate_block_header( const signed_block& next_block )const;
          void create_block_summary(const signed_block& next_block);
 
          //////////////////// db_update.cpp ////////////////////

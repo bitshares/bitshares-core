@@ -16,45 +16,26 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #pragma once
-#include <graphene/chain/operations.hpp>
-#include <graphene/chain/authority.hpp>
-#include <graphene/chain/asset.hpp>
+#include <graphene/db/object.hpp>
 
 namespace graphene { namespace chain {
-   class database;
-   struct signed_transaction;
 
    /**
-    *  Place holder for state tracked while processing a
-    *  transaction.  This class provides helper methods
-    *  that are common to many different operations and
-    *  also tracks which keys have signed the transaction
+    * @brief Contains per-node database configuration.
+    *
+    *  Transactions are evaluated differently based on per-node state.
+    *  Settings here may change based on whether the node is syncing or up-to-date.
+    *  Or whether the node is a witness node. Or if we're processing a
+    *  transaction in a witness-signed block vs. a fresh transaction
+    *  from the p2p network.  Or configuration-specified tradeoffs of
+    *  performance/hardfork resilience vs. paranoia.
     */
-   class transaction_evaluation_state
+   class node_property_object
    {
       public:
-         transaction_evaluation_state( database* db = nullptr )
-         :_db(db){}
+         node_property_object() : skip_flags(0) {}
+         ~node_property_object(){}
 
-         bool check_authority( const account_object&, authority::classification auth_class = authority::active, int depth = 0 );
-
-         database& db()const { FC_ASSERT( _db ); return *_db; }
-
-         bool signed_by( key_id_type id )const;
-
-         /** derived from signatures on transaction
-         flat_set<address>                                          signed_by;
-         */
-         /** cached approval (accounts and keys) */
-         flat_set< pair<object_id_type,authority::classification> > approved_by;
-
-         /**
-          * Used to lookup new objects using transaction relative IDs
-          */
-         vector<operation_result>   operation_results;
-
-         const signed_transaction* _trx = nullptr;
-         database*                 _db = nullptr;
-         bool                      _is_proposed_trx = false;
+         bool skip_authority_check;
    };
-} } // namespace graphene::chain
+} } // graphene::chain
