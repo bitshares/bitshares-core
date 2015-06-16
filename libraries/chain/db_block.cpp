@@ -30,7 +30,7 @@ namespace graphene { namespace chain {
 
 bool database::is_known_block( const block_id_type& id )const
 {
-   return _fork_db.is_known_block(id) || _block_id_to_block.find(id).valid();
+   return _fork_db.is_known_block(id) || _block_id_to_block.contains(id);
 }
 /**
  * Only return true *if* the transaction has not expired or been invalidated. If this
@@ -45,10 +45,7 @@ bool database::is_known_transaction( const transaction_id_type& id )const
 
 block_id_type  database::get_block_id_for_num( uint32_t block_num )const
 { try {
-   block_id_type lb; lb._hash[0] = htonl(block_num);
-   auto itr = _block_id_to_block.lower_bound( lb );
-   FC_ASSERT( itr.valid() && itr.key()._hash[0] == lb._hash[0] );
-   return itr.key();
+   return _block_id_to_block.fetch_block_id( block_num );
 } FC_CAPTURE_AND_RETHROW( (block_num) ) }
 
 optional<signed_block> database::fetch_block_by_id( const block_id_type& id )const
@@ -65,12 +62,7 @@ optional<signed_block> database::fetch_block_by_number( uint32_t num )const
    if( results.size() == 1 )
       return results[0]->data;
    else
-   {
-      block_id_type lb; lb._hash[0] = htonl(num);
-      auto itr = _block_id_to_block.lower_bound( lb );
-      if( itr.valid() && itr.key()._hash[0] == lb._hash[0] )
-         return itr.value();
-   }
+      return _block_id_to_block.fetch_by_number(num);
    return optional<signed_block>();
 }
 

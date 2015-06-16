@@ -20,9 +20,6 @@
 #include <graphene/db/index.hpp>
 #include <graphene/db/undo_database.hpp>
 
-#include <graphene/db/level_map.hpp>
-#include <graphene/db/level_pod_map.hpp>
-
 #include <fc/log/logger.hpp>
 
 #include <map>
@@ -150,7 +147,6 @@ namespace graphene { namespace db {
 
          fc::path                                                  _data_dir;
          vector< vector< unique_ptr<index> > >                     _index;
-         shared_ptr<db::level_map<object_id_type, vector<char> >>  _object_id_to_object;
    };
 
 } } // graphene::db

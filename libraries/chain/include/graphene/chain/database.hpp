@@ -23,11 +23,10 @@
 #include <graphene/chain/account_object.hpp>
 #include <graphene/chain/asset_object.hpp>
 #include <graphene/chain/fork_database.hpp>
+#include <graphene/chain/block_database.hpp>
 
 #include <graphene/db/object_database.hpp>
 #include <graphene/db/object.hpp>
-#include <graphene/db/level_map.hpp>
-#include <graphene/db/level_pod_map.hpp>
 #include <graphene/db/simple_index.hpp>
 #include <fc/signals.hpp>
 
@@ -376,7 +375,7 @@ namespace graphene { namespace chain {
           *  until the fork is resolved.  This should make maintaining
           *  the fork tree relatively simple.
           */
-         graphene::db::level_map<block_id_type, signed_block>   _block_id_to_block;
+         block_database   _block_id_to_block;
 
          /**
           * Contains the set of ops that are in the process of being applied from

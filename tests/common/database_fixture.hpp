@@ -20,6 +20,7 @@
 #include <graphene/app/application.hpp>
 #include <graphene/chain/database.hpp>
 #include <graphene/chain/key_object.hpp>
+#include <fc/io/json.hpp>
 
 using namespace graphene::db;
 

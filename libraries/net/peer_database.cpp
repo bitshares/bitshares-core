@@ -28,7 +28,7 @@
 #include <fc/io/json.hpp>
 
 #include <graphene/net/peer_database.hpp>
-#include <graphene/db/level_pod_map.hpp>
+//#include <graphene/db/level_pod_map.hpp>
 
 
 
@@ -76,8 +76,8 @@ namespace graphene { namespace net {
                                                         > 
                                           > potential_peer_set;
     //private:
-      typedef graphene::db::level_pod_map<uint32_t, potential_peer_record> potential_peer_leveldb;
-      potential_peer_leveldb    _leveldb;
+      //typedef graphene::db::level_pod_map<uint32_t, potential_peer_record> potential_peer_leveldb;
+      //potential_peer_leveldb    _leveldb;
 
       potential_peer_set     _potential_peer_set;
 
@@ -109,6 +109,7 @@ namespace graphene { namespace net {
 
     void peer_database_impl::open(const fc::path& databaseFilename)
     {
+       /*
       try
       {
         _leveldb.open(databaseFilename);
@@ -135,16 +136,18 @@ namespace graphene { namespace net {
           iter = _potential_peer_set.erase(iter);
         }
       }
+      */
     }
 
     void peer_database_impl::close()
     {
-      _leveldb.close();
+      //_leveldb.close();
       _potential_peer_set.clear();
     }
 
     void peer_database_impl::clear()
     {
+       /*
       auto iter = _leveldb.begin();
       while (iter.valid())
       {
@@ -159,6 +162,7 @@ namespace graphene { namespace net {
           // shouldn't happen, and if it does there's not much we can do
         }
       }
+      */
       _potential_peer_set.clear();
     }
 
@@ -167,7 +171,7 @@ namespace graphene { namespace net {
       auto iter = _potential_peer_set.get<endpoint_index>().find(endpointToErase);
       if (iter != _potential_peer_set.get<endpoint_index>().end())
       {
-        _leveldb.remove(iter->database_key);
+        //_leveldb.remove(iter->database_key);
         _potential_peer_set.get<endpoint_index>().erase(iter);
       }
     }
@@ -178,16 +182,16 @@ namespace graphene { namespace net {
       if (iter != _potential_peer_set.get<endpoint_index>().end())
       {
         _potential_peer_set.get<endpoint_index>().modify(iter, [&updatedRecord](potential_peer_database_entry& entry) { entry.peer_record = updatedRecord; });
-        _leveldb.store(iter->database_key, updatedRecord);
+        //_leveldb.store(iter->database_key, updatedRecord);
       }
       else
       {
         uint32_t last_database_key;
-        _leveldb.last(last_database_key);
+        //_leveldb.last(last_database_key);
         uint32_t new_database_key = last_database_key + 1;
         potential_peer_database_entry new_database_entry(new_database_key, updatedRecord);
         _potential_peer_set.get<endpoint_index>().insert(new_database_entry);
-        _leveldb.store(new_database_key, updatedRecord);
+        //_leveldb.store(new_database_key, updatedRecord);
       }
     }
 
@@ -314,12 +318,14 @@ namespace graphene { namespace net {
     std::vector<potential_peer_record> peer_database::get_all()const
     {
         std::vector<potential_peer_record> results;
+        /*
         auto itr = my->_leveldb.begin();
         while( itr.valid() )
         {
            results.push_back( itr.value() );
            ++itr;
         }
+        */
         return results;
     }
 
