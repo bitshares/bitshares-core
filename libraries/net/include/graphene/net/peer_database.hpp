@@ -102,8 +102,6 @@ namespace graphene { namespace net {
     potential_peer_record lookup_or_create_entry_for_endpoint(const fc::ip::endpoint& endpointToLookup);
     fc::optional<potential_peer_record> lookup_entry_for_endpoint(const fc::ip::endpoint& endpointToLookup);
 
-    std::vector<potential_peer_record> get_all()const;
-
     typedef detail::peer_database_iterator iterator;
     iterator begin() const;
     iterator end() const;

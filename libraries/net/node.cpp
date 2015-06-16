@@ -400,7 +400,7 @@ namespace graphene { namespace net { namespace detail {
       fc::sha256           _chain_id;
 
 #define NODE_CONFIGURATION_FILENAME      "node_config.json"
-#define POTENTIAL_PEER_DATABASE_FILENAME "peers.leveldb"
+#define POTENTIAL_PEER_DATABASE_FILENAME "peers.json"
       fc::path             _node_configuration_directory;
       node_configuration   _node_configuration;
 
@@ -3595,6 +3595,19 @@ namespace graphene { namespace net { namespace detail {
     void node_impl::close()
     {
       VERIFY_CORRECT_THREAD();
+
+      try
+      {
+        _potential_peer_db.close();
+      }
+      catch ( const fc::exception& e )
+      {
+        wlog( "Exception thrown while closing P2P peer database, ignoring: ${e}", ("e",e) );
+      }
+      catch (...)
+      {
+        wlog( "Exception thrown while closing P2P peer database, ignoring" );
+      }
 
       // First, stop accepting incoming network connections
       try

@@ -28,7 +28,6 @@
 #include <fc/io/json.hpp>
 
 #include <graphene/net/peer_database.hpp>
-//#include <graphene/db/level_pod_map.hpp>
 
 
 
@@ -37,49 +36,25 @@ namespace graphene { namespace net {
   {
     using namespace boost::multi_index;
 
-    struct potential_peer_database_entry
-    {
-      uint32_t              database_key;
-      potential_peer_record peer_record;
-
-      potential_peer_database_entry(uint32_t database_key, const potential_peer_record& peer_record) :
-        database_key(database_key),
-        peer_record(peer_record)
-      {}
-      potential_peer_database_entry(const potential_peer_database_entry& other) :
-        database_key(other.database_key),
-        peer_record(other.peer_record)
-      {}
-
-      const fc::time_point_sec& get_last_seen_time() const { return peer_record.last_seen_time; }
-      const fc::ip::endpoint&   get_endpoint() const { return peer_record.endpoint; }
-    };
-
     class peer_database_impl
     {
     public:
       struct last_seen_time_index {};
       struct endpoint_index {};
-      typedef boost::multi_index_container< potential_peer_database_entry, 
-                                              indexed_by< ordered_non_unique< tag<last_seen_time_index>, 
-                                                                              const_mem_fun< potential_peer_database_entry, 
-                                                                                             const fc::time_point_sec&, 
-                                                                                             &potential_peer_database_entry::get_last_seen_time> 
-                                                                            >,
-                                                          hashed_unique< tag<endpoint_index>, 
-                                                                         const_mem_fun< potential_peer_database_entry, 
-                                                                                        const fc::ip::endpoint&, 
-                                                                                        &potential_peer_database_entry::get_endpoint 
-                                                                                      >, 
-                                                                         std::hash<fc::ip::endpoint>  
-                                                                       > 
-                                                        > 
-                                          > potential_peer_set;
-    //private:
-      //typedef graphene::db::level_pod_map<uint32_t, potential_peer_record> potential_peer_leveldb;
-      //potential_peer_leveldb    _leveldb;
+      typedef boost::multi_index_container<potential_peer_record, 
+                                           indexed_by<ordered_non_unique<tag<last_seen_time_index>, 
+                                                                         member<potential_peer_record, 
+                                                                                fc::time_point_sec, 
+                                                                                &potential_peer_record::last_seen_time> >,
+                                                      hashed_unique<tag<endpoint_index>, 
+                                                                    member<potential_peer_record, 
+                                                                           fc::ip::endpoint, 
+                                                                           &potential_peer_record::endpoint>, 
+                                                                    std::hash<fc::ip::endpoint> > > > potential_peer_set;
 
+    private:
       potential_peer_set     _potential_peer_set;
+      fc::path _peer_database_filename;
 
     public:
       void open(const fc::path& databaseFilename);
@@ -104,65 +79,54 @@ namespace graphene { namespace net {
         _iterator(iterator)
       {}
     };
-    peer_database_iterator::peer_database_iterator( const peer_database_iterator& c )
-    :boost::iterator_facade<peer_database_iterator, const potential_peer_record, boost::forward_traversal_tag>(c){}
+    peer_database_iterator::peer_database_iterator( const peer_database_iterator& c ) :
+      boost::iterator_facade<peer_database_iterator, const potential_peer_record, boost::forward_traversal_tag>(c){}
 
-    void peer_database_impl::open(const fc::path& databaseFilename)
+    void peer_database_impl::open(const fc::path& peer_database_filename)
     {
-       /*
-      try
+      _peer_database_filename = peer_database_filename;
+      if (fc::exists(_peer_database_filename))
       {
-        _leveldb.open(databaseFilename);
-      }
-      catch (const graphene::db::level_pod_map_open_failure&) 
-      {
-        fc::remove_all(databaseFilename);
-        _leveldb.open(databaseFilename);
-      }
-
-      _potential_peer_set.clear();
-
-      for (auto iter = _leveldb.begin(); iter.valid(); ++iter)
-        _potential_peer_set.insert(potential_peer_database_entry(iter.key(), iter.value()));
-#define MAXIMUM_PEERDB_SIZE 1000
-      if (_potential_peer_set.size() > MAXIMUM_PEERDB_SIZE)
-      {
-        // prune database to a reasonable size
-        auto iter = _potential_peer_set.begin();
-        std::advance(iter, MAXIMUM_PEERDB_SIZE);
-        while (iter != _potential_peer_set.end())
+        try
         {
-          _leveldb.remove(iter->database_key);
-          iter = _potential_peer_set.erase(iter);
+          std::vector<potential_peer_record> peer_records = fc::json::from_file(_peer_database_filename).as<std::vector<potential_peer_record> >();
+          std::copy(peer_records.begin(), peer_records.end(), std::inserter(_potential_peer_set, _potential_peer_set.end()));
+#define MAXIMUM_PEERDB_SIZE 1000
+          if (_potential_peer_set.size() > MAXIMUM_PEERDB_SIZE)
+          {
+            // prune database to a reasonable size
+            auto iter = _potential_peer_set.begin();
+            std::advance(iter, MAXIMUM_PEERDB_SIZE);
+            _potential_peer_set.erase(iter, _potential_peer_set.end());
+          }
+        }
+        catch (const fc::exception& e)
+        {
+          elog("error opening peer database file ${peer_database_filename}, starting with a clean database", 
+               ("peer_database_filename", _peer_database_filename));
         }
       }
-      */
     }
 
     void peer_database_impl::close()
     {
-      //_leveldb.close();
+      std::vector<potential_peer_record> peer_records;
+      peer_records.reserve(_potential_peer_set.size());
+      std::copy(_potential_peer_set.begin(), _potential_peer_set.end(), std::back_inserter(peer_records));
+      try
+      {
+        fc::json::save_to_file(peer_records, _peer_database_filename);
+      }
+      catch (const fc::exception& e)
+      {
+        elog("error saving peer database to file ${peer_database_filename}", 
+             ("peer_database_filename", _peer_database_filename));
+      }
       _potential_peer_set.clear();
     }
 
     void peer_database_impl::clear()
     {
-       /*
-      auto iter = _leveldb.begin();
-      while (iter.valid())
-      {
-        uint32_t key_to_remove = iter.key();
-        ++iter;
-        try
-        {
-          _leveldb.remove(key_to_remove);
-        }
-        catch (fc::exception&)
-        {
-          // shouldn't happen, and if it does there's not much we can do
-        }
-      }
-      */
       _potential_peer_set.clear();
     }
 
@@ -170,36 +134,23 @@ namespace graphene { namespace net {
     {
       auto iter = _potential_peer_set.get<endpoint_index>().find(endpointToErase);
       if (iter != _potential_peer_set.get<endpoint_index>().end())
-      {
-        //_leveldb.remove(iter->database_key);
         _potential_peer_set.get<endpoint_index>().erase(iter);
-      }
     }
 
     void peer_database_impl::update_entry(const potential_peer_record& updatedRecord)
     {
       auto iter = _potential_peer_set.get<endpoint_index>().find(updatedRecord.endpoint);
       if (iter != _potential_peer_set.get<endpoint_index>().end())
-      {
-        _potential_peer_set.get<endpoint_index>().modify(iter, [&updatedRecord](potential_peer_database_entry& entry) { entry.peer_record = updatedRecord; });
-        //_leveldb.store(iter->database_key, updatedRecord);
-      }
+        _potential_peer_set.get<endpoint_index>().modify(iter, [&updatedRecord](potential_peer_record& record) { record = updatedRecord; });
       else
-      {
-        uint32_t last_database_key;
-        //_leveldb.last(last_database_key);
-        uint32_t new_database_key = last_database_key + 1;
-        potential_peer_database_entry new_database_entry(new_database_key, updatedRecord);
-        _potential_peer_set.get<endpoint_index>().insert(new_database_entry);
-        //_leveldb.store(new_database_key, updatedRecord);
-      }
+        _potential_peer_set.get<endpoint_index>().insert(updatedRecord);
     }
 
     potential_peer_record peer_database_impl::lookup_or_create_entry_for_endpoint(const fc::ip::endpoint& endpointToLookup)
     {
       auto iter = _potential_peer_set.get<endpoint_index>().find(endpointToLookup);
       if (iter != _potential_peer_set.get<endpoint_index>().end())
-        return iter->peer_record;
+        return *iter;
       return potential_peer_record(endpointToLookup);
     }
 
@@ -207,7 +158,7 @@ namespace graphene { namespace net {
     {
       auto iter = _potential_peer_set.get<endpoint_index>().find(endpointToLookup);
       if (iter != _potential_peer_set.get<endpoint_index>().end())
-        return iter->peer_record;
+        return *iter;
       return fc::optional<potential_peer_record>();
     }
 
@@ -251,12 +202,10 @@ namespace graphene { namespace net {
 
     const potential_peer_record& peer_database_iterator::dereference() const
     {
-      return my->_iterator->peer_record;
+      return *my->_iterator;
     }
 
   } // end namespace detail
-
-
 
   peer_database::peer_database() :
     my(new detail::peer_database_impl)
@@ -315,19 +264,5 @@ namespace graphene { namespace net {
   {
     return my->size();
   }
-    std::vector<potential_peer_record> peer_database::get_all()const
-    {
-        std::vector<potential_peer_record> results;
-        /*
-        auto itr = my->_leveldb.begin();
-        while( itr.valid() )
-        {
-           results.push_back( itr.value() );
-           ++itr;
-        }
-        */
-        return results;
-    }
-
 
 } } // end namespace graphene::net
