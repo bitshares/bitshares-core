@@ -57,8 +57,8 @@ BOOST_AUTO_TEST_CASE( create_account_test )
       REQUIRE_THROW_WITH_VALUE(op, name, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
       REQUIRE_THROW_WITH_VALUE(op, name, "aaaa.");
       REQUIRE_THROW_WITH_VALUE(op, name, ".aaaa");
-      REQUIRE_THROW_WITH_VALUE(op, voting_account, account_id_type(999999999));
-      REQUIRE_THROW_WITH_VALUE(op, memo_key, key_id_type(999999999));
+      REQUIRE_THROW_WITH_VALUE(op, options.voting_account, account_id_type(999999999));
+      REQUIRE_THROW_WITH_VALUE(op, options.memo_key, key_id_type(999999999));
 
       auto auth_bak = op.owner;
       op.owner.add_authority(account_id_type(9999999999), 10);
@@ -85,8 +85,8 @@ BOOST_AUTO_TEST_CASE( create_account_test )
       BOOST_CHECK(nathan_account.owner.auths.at(genesis_key) == 123);
       BOOST_REQUIRE(nathan_account.active.auths.size() == 1);
       BOOST_CHECK(nathan_account.active.auths.at(genesis_key) == 321);
-      BOOST_CHECK(nathan_account.voting_account == account_id_type());
-      BOOST_CHECK(nathan_account.memo_key == genesis_key);
+      BOOST_CHECK(nathan_account.options.voting_account == account_id_type());
+      BOOST_CHECK(nathan_account.options.memo_key == genesis_key);
 
       const account_statistics_object& statistics = nathan_account.statistics(db);
       BOOST_CHECK(statistics.id.space() == implementation_ids);
@@ -159,13 +159,13 @@ BOOST_AUTO_TEST_CASE( update_account )
       op.account = nathan.id;
       op.owner = authority(2, key_id, 1, key_id_type(), 1);
       op.active = authority(2, key_id, 1, key_id_type(), 1);
-      //op.voting_account = key_id;
-      op.vote = flat_set<vote_id_type>({active_delegates[0](db).vote_id, active_delegates[5](db).vote_id});
+      op.new_options = nathan.options;
+      op.new_options->votes = flat_set<vote_id_type>({active_delegates[0](db).vote_id, active_delegates[5](db).vote_id});
+      op.new_options->num_committee = 2;
       trx.operations.back() = op;
       db.push_transaction(trx, ~0);
 
-      //BOOST_CHECK(nathan.voting_key == key_id);
-      BOOST_CHECK(nathan.memo_key == key_id_type());
+      BOOST_CHECK(nathan.options.memo_key == key_id_type());
       BOOST_CHECK(nathan.active.weight_threshold == 2);
       BOOST_CHECK(nathan.active.auths.size() == 2);
       BOOST_CHECK(nathan.active.auths.at(key_id) == 1);
@@ -174,7 +174,7 @@ BOOST_AUTO_TEST_CASE( update_account )
       BOOST_CHECK(nathan.owner.auths.size() == 2);
       BOOST_CHECK(nathan.owner.auths.at(key_id) == 1);
       BOOST_CHECK(nathan.owner.auths.at(key_id_type()) == 1);
-      BOOST_CHECK(nathan.votes.size() == 2);
+      BOOST_CHECK(nathan.options.votes.size() == 2);
 
       /** these votes are no longer tallied in real time
       BOOST_CHECK(active_delegates[0](db).vote(db).total_votes == 30000);

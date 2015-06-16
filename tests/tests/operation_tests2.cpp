@@ -399,10 +399,12 @@ BOOST_AUTO_TEST_CASE( witness_create )
    {
       account_update_operation op;
       op.account = nathan_id;
-      op.vote = nathan_id(db).votes;
-      op.vote->insert(nathan_witness_id(db).vote_id);
-      op.num_witness = std::count_if(op.vote->begin(), op.vote->end(), [](vote_id_type id) { return id.type() == vote_id_type::witness; });
-      op.num_committee = std::count_if(op.vote->begin(), op.vote->end(), [](vote_id_type id) { return id.type() == vote_id_type::committee; });
+      op.new_options = nathan_id(db).options;
+      op.new_options->votes.insert(nathan_witness_id(db).vote_id);
+      op.new_options->num_witness = std::count_if(op.new_options->votes.begin(), op.new_options->votes.end(),
+                                                  [](vote_id_type id) { return id.type() == vote_id_type::witness; });
+      op.new_options->num_committee = std::count_if(op.new_options->votes.begin(), op.new_options->votes.end(),
+                                                    [](vote_id_type id) { return id.type() == vote_id_type::committee; });
       trx.operations.push_back(op);
       trx.sign(nathan_key_id, nathan_private_key);
       db.push_transaction(trx);
@@ -540,8 +542,8 @@ BOOST_AUTO_TEST_CASE( worker_pay_test )
    {
       account_update_operation op;
       op.account = nathan_id;
-      op.vote = nathan_id(db).votes;
-      op.vote->insert(worker_id_type()(db).vote_for);
+      op.new_options = nathan_id(db).options;
+      op.new_options->votes.insert(worker_id_type()(db).vote_for);
       trx.operations.push_back(op);
       db.push_transaction(trx, ~0);
       trx.clear();
@@ -580,8 +582,8 @@ BOOST_AUTO_TEST_CASE( worker_pay_test )
    {
       account_update_operation op;
       op.account = nathan_id;
-      op.vote = nathan_id(db).votes;
-      op.vote->erase(worker_id_type()(db).vote_for);
+      op.new_options = nathan_id(db).options;
+      op.new_options->votes.erase(worker_id_type()(db).vote_for);
       trx.operations.push_back(op);
       db.push_transaction(trx, ~0);
       trx.clear();
@@ -653,8 +655,8 @@ BOOST_AUTO_TEST_CASE( refund_worker_test )
    {
       account_update_operation op;
       op.account = nathan_id;
-      op.vote = nathan_id(db).votes;
-      op.vote->insert(worker_id_type()(db).vote_for);
+      op.new_options = nathan_id(db).options;
+      op.new_options->votes.insert(worker_id_type()(db).vote_for);
       trx.operations.push_back(op);
       db.push_transaction(trx, ~0);
       trx.clear();

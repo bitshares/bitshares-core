@@ -144,6 +144,7 @@ class database;
 
          /// The account's name. This name must be unique among all account names on the graph. May not be empty.
          string name;
+
          /**
           * The owner authority represents absolute control over the account. Usually the keys in this authority will
           * be kept in cold storage, as they should not be needed very often and compromise of these keys constitutes
@@ -154,19 +155,30 @@ class database;
          /// The owner authority contains the hot keys of the account. This authority has control over nearly all
          /// operations the account may perform.
          authority active;
-         /// The memo key is the key this account will typically use to encrypt/sign transaction memos and other non-
-         /// validated account activities. This field is here to prevent confusion if the active authority has zero or
-         /// multiple keys in it.
-         key_id_type memo_key;
-         /// If this field is set to an account ID other than 0, this account's votes will be ignored and its stake
-         /// will be counted as voting for the referenced account's selected votes instead.
-         account_id_type voting_account;
 
-         uint16_t num_witness = 0;
-         uint16_t num_committee = 0;
-         /// This is the list of vote IDs this account votes for. The weight of these votes is determined by this
-         /// account's balance of core asset.
-         flat_set<vote_id_type> votes;
+         /// These are the fields which can be updated by the active authority.
+         struct options_type {
+            /// The memo key is the key this account will typically use to encrypt/sign transaction memos and other non-
+            /// validated account activities. This field is here to prevent confusion if the active authority has zero or
+            /// multiple keys in it.
+            object_id_type memo_key = key_id_type();
+            key_id_type get_memo_key()const { return memo_key; }
+            /// If this field is set to an account ID other than 0, this account's votes will be ignored and its stake
+            /// will be counted as voting for the referenced account's selected votes instead.
+            account_id_type voting_account;
+
+            /// The number of active witnesses this account votes the blockchain should appoint
+            /// Must not exceed the actual number of witnesses voted for in @ref votes
+            uint16_t num_witness = 0;
+            /// The number of active committee members this account votes the blockchain should appoint
+            /// Must not exceed the actual number of committee members voted for in @ref votes
+            uint16_t num_committee = 0;
+            /// This is the list of vote IDs this account votes for. The weight of these votes is determined by this
+            /// account's balance of core asset.
+            flat_set<vote_id_type> votes;
+
+            void validate()const;
+         } options;
 
          /// The reference implementation records the account's statistics in a separate object. This field contains the
          /// ID of that object.
@@ -293,8 +305,10 @@ FC_REFLECT_DERIVED( graphene::chain::account_object,
                     (graphene::db::annotated_object<graphene::chain::account_object>),
                     (membership_expiration_date)(registrar)(referrer)(lifetime_referrer)
                     (network_fee_percentage)(lifetime_referrer_fee_percentage)(referrer_rewards_percentage)
-                    (name)(owner)(active)(memo_key)(voting_account)(num_witness)(num_committee)(votes)
-                    (statistics)(whitelisting_accounts)(blacklisting_accounts)(cashback_vb) )
+                    (name)(owner)(active)(options)(statistics)(whitelisting_accounts)(blacklisting_accounts)
+                    (cashback_vb) )
+
+FC_REFLECT(graphene::chain::account_object::options_type, (memo_key)(voting_account)(num_witness)(num_committee)(votes))
 
 FC_REFLECT_DERIVED( graphene::chain::account_balance_object,
                     (graphene::db::object),

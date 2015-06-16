@@ -193,7 +193,7 @@ void database_fixture::verify_account_history_plugin_index( )const
             if( auth.first.type() == key_object_type )
                acct_addresses.insert( key_id_type( auth.first )(db).key_address() );
          }
-         acct_addresses.insert( acct.memo_key(db).key_address() );
+         acct_addresses.insert( acct.options.get_memo_key()(db).key_address() );
          for( const address& addr : acct_addresses )
             tuples_from_db.emplace_back( account_id, addr );
       }
@@ -294,7 +294,7 @@ account_create_operation database_fixture::make_account(
    create_account.name = name;
    create_account.owner = authority(123, key, 123);
    create_account.active = authority(321, key, 321);
-   create_account.memo_key = key;
+   create_account.options.memo_key = key;
 
    auto& active_delegates = db.get_global_properties().active_delegates;
    if( active_delegates.size() > 0 )
@@ -305,9 +305,9 @@ account_create_operation database_fixture::make_account(
       votes.insert(active_delegates[rand() % active_delegates.size()](db).vote_id);
       votes.insert(active_delegates[rand() % active_delegates.size()](db).vote_id);
       votes.insert(active_delegates[rand() % active_delegates.size()](db).vote_id);
-      create_account.vote = flat_set<vote_id_type>(votes.begin(), votes.end());
+      create_account.options.votes = flat_set<vote_id_type>(votes.begin(), votes.end());
    }
-   create_account.num_committee = create_account.vote.size();
+   create_account.options.num_committee = create_account.options.votes.size();
 
    create_account.fee = create_account.calculate_fee(db.current_fee_schedule());
    return create_account;
@@ -332,7 +332,7 @@ account_create_operation database_fixture::make_account(
       create_account.name = name;
       create_account.owner = authority(123, key, 123);
       create_account.active = authority(321, key, 321);
-      create_account.memo_key = key;
+      create_account.options.memo_key = key;
 
       const vector<delegate_id_type>& active_delegates = db.get_global_properties().active_delegates;
       if( active_delegates.size() > 0 )
@@ -343,9 +343,9 @@ account_create_operation database_fixture::make_account(
          votes.insert(active_delegates[rand() % active_delegates.size()](db).vote_id);
          votes.insert(active_delegates[rand() % active_delegates.size()](db).vote_id);
          votes.insert(active_delegates[rand() % active_delegates.size()](db).vote_id);
-         create_account.vote = flat_set<vote_id_type>(votes.begin(), votes.end());
+         create_account.options.votes = flat_set<vote_id_type>(votes.begin(), votes.end());
       }
-      create_account.num_committee = create_account.vote.size();
+      create_account.options.num_committee = create_account.options.votes.size();
 
       create_account.fee = create_account.calculate_fee(db.current_fee_schedule());
       return create_account;
@@ -499,7 +499,7 @@ const account_object& database_fixture::create_account(
       account_create_op.name = name;
       account_create_op.owner = authority(1234, key_rkid, 1234);
       account_create_op.active = authority(5678, key_rkid, 5678);
-      account_create_op.memo_key = key_rkid;
+      account_create_op.options.memo_key = key_rkid;
       trx.operations.push_back( account_create_op );
 
       trx.validate();

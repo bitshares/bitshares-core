@@ -115,7 +115,15 @@ namespace graphene { namespace chain {
       return rel_id;
    }
 
-   authority generic_evaluator::resolve_relative_ids( const authority& a )const
+   void generic_evaluator::check_relative_ids(const authority& a)const
+   {
+      for( const auto& item : a.auths )
+      {
+          auto id = get_relative_id( item.first );
+          FC_ASSERT( id.type() == key_object_type || id.type() == account_object_type );
+      }
+   }
+   authority generic_evaluator::resolve_relative_ids(const authority& a)const
    {
       authority result;
       result.auths.reserve( a.auths.size() );
