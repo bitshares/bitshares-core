@@ -74,6 +74,9 @@ namespace graphene { namespace chain {
         { return balance.asset_id; }
   };
 
+   struct by_collateral;
+   struct by_account;
+   struct by_price;
    typedef multi_index_container<
       call_order_object,
       indexed_by<
@@ -101,7 +104,6 @@ namespace graphene { namespace chain {
       >
    > call_order_multi_index_type;
 
-   struct by_account;
    struct by_expiration;
    typedef multi_index_container<
       force_settlement_object,

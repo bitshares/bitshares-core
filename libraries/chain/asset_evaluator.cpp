@@ -18,7 +18,7 @@
 #include <graphene/chain/asset_evaluator.hpp>
 #include <graphene/chain/asset_object.hpp>
 #include <graphene/chain/account_object.hpp>
-#include <graphene/chain/short_order_object.hpp>
+#include <graphene/chain/call_order_object.hpp>
 #include <graphene/chain/database.hpp>
 
 #include <functional>

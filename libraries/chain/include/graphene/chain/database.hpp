@@ -281,7 +281,6 @@ namespace graphene { namespace chain {
          template<typename OrderType>
          int match( const limit_order_object& bid, const OrderType& ask, const price& match_price );
          int match( const limit_order_object& bid, const limit_order_object& ask, const price& trade_price );
-         int match( const limit_order_object& bid, const short_order_object& ask, const price& trade_price );
          /// @return the amount of asset settled
          asset match(const call_order_object& call,
                    const force_settlement_object& settle,
@@ -293,7 +292,6 @@ namespace graphene { namespace chain {
           * @return true if the order was completely filled and thus freed.
           */
          bool fill_order( const limit_order_object& order, const asset& pays, const asset& receives );
-         bool fill_order( const short_order_object& order, const asset& pays, const asset& receives );
          bool fill_order( const call_order_object& order, const asset& pays, const asset& receives );
          bool fill_order( const force_settlement_object& settle, const asset& pays, const asset& receives );
 

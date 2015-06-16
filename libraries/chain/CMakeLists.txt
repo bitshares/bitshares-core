@@ -16,7 +16,7 @@ add_library( graphene_chain
              asset_evaluator.cpp
              transfer_evaluator.cpp
              proposal_evaluator.cpp
-             short_order_evaluator.cpp
+             call_order_evaluator.cpp
              limit_order_evaluator.cpp
              vesting_balance_evaluator.cpp
              withdraw_permission_evaluator.cpp

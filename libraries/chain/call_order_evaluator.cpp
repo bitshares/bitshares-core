@@ -16,9 +16,9 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #include <graphene/chain/database.hpp>
-#include <graphene/chain/short_order_evaluator.hpp>
+#include <graphene/chain/call_order_evaluator.hpp>
 #include <graphene/chain/account_object.hpp>
-#include <graphene/chain/short_order_object.hpp>
+#include <graphene/chain/call_order_object.hpp>
 #include <graphene/chain/limit_order_object.hpp>
 #include <fc/uint128.hpp>
 
@@ -47,17 +47,17 @@ asset call_order_update_evaluator::do_evaluate(const call_order_update_operation
                  o.maintenance_collateral_ratio > _bitasset_data->current_feed.required_maintenance_collateral );
    }
 
-   if( o.amount_to_cover > 0 )
+   if( o.amount_to_cover.amount > 0 )
    {
       FC_ASSERT( d.get_balance(*_paying_account, *_debt_asset) >= o.amount_to_cover,
                  "Cannot cover by ${c} when payer only has ${b}",
                  ("c", o.amount_to_cover.amount)("b", d.get_balance(*_paying_account, *_debt_asset).amount) );
    }
-   if( o.collateral_to_add > 0 )
+   if( o.collateral_to_add.amount > 0 )
    {
-      FC_ASSERT( d.get_balance(*_paying_account, bitasset_data.options.short_backing_asset(d)) >= o.collateral_to_add,
+      FC_ASSERT( d.get_balance(*_paying_account, _bitasset_data->options.short_backing_asset(d)) >= o.collateral_to_add,
                  "Cannot increase collateral by ${c} when payer only has ${b}", ("c", o.amount_to_cover.amount)
-                 ("b", d.get_balance(*_paying_account, bitasset_data.options.short_backing_asset(d)).amount) );
+                 ("b", d.get_balance(*_paying_account, _bitasset_data->options.short_backing_asset(d)).amount) );
    }
 
    return asset();
@@ -73,7 +73,7 @@ asset call_order_update_evaluator::do_apply(const call_order_update_operation& o
    d.adjust_balance( o.funding_account, -o.collateral_to_add);
 
    // Deduct the debt paid from the total supply of the debt asset.
-   if( o.amount_to_cover != 0 )
+   if( o.amount_to_cover.amount != 0 )
    {
       d.modify(_debt_asset->dynamic_asset_data_id(d), [&](asset_dynamic_data_object& dynamic_asset) {
          dynamic_asset.current_supply -= o.amount_to_cover.amount;
@@ -88,7 +88,7 @@ asset call_order_update_evaluator::do_apply(const call_order_update_operation& o
       FC_ASSERT( o.collateral_to_add.amount > 0 );
       FC_ASSERT( o.amount_to_cover.amount < 0 );
       d.create<call_order_object>( [&](call_order_object& call ){
-                                   call.owner = o.funding_account;
+                                   call.borrower = o.funding_account;
                                    call.collateral = o.collateral_to_add.amount;
                                    call.debt = -o.amount_to_cover.amount;
                                    call.maintenance_collateral_ratio = o.maintenance_collateral_ratio;
@@ -99,11 +99,11 @@ asset call_order_update_evaluator::do_apply(const call_order_update_operation& o
    }
    else
    {
-      if( itr->debt - o.amount_to_cover == 0 )
+      if( itr->debt - o.amount_to_cover.amount == 0 )
       {
-         FC_ASSERT( o.collateral_to_add == 0 );
+         FC_ASSERT( o.collateral_to_add.amount == 0 );
          collateral_returned = itr->get_collateral();
-         d.adjust_balance( o.funding_account, call.
+         d.adjust_balance( o.funding_account, collateral_returned );
          d.remove( *itr );
       }
       else

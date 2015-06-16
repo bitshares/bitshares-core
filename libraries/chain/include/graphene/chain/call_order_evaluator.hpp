@@ -34,7 +34,7 @@ namespace graphene { namespace chain {
          const asset_object* _debt_asset = nullptr;
          const account_object* _paying_account = nullptr;
          const call_order_object* _order = nullptr;
-         const bitasset_data_object* _bitasset_data = nullptr;
+         const asset_bitasset_data_object* _bitasset_data = nullptr;
    };
 
 } } // graphene::chain

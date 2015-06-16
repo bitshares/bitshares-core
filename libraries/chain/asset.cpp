@@ -122,18 +122,11 @@ namespace graphene { namespace chain {
       { try {
          if( !call_limit.is_null() )
             call_limit.validate();
-         if( !short_limit.is_null() )
-            short_limit.validate();
          if( !settlement_price.is_null() )
             settlement_price.validate();
-         FC_ASSERT( call_limit.is_null() == short_limit.is_null() );
-         FC_ASSERT( call_limit.base.asset_id == short_limit.quote.asset_id );
-         FC_ASSERT( call_limit.quote.asset_id == short_limit.base.asset_id );
          FC_ASSERT( max_margin_period_sec > 0 );
-         FC_ASSERT( required_maintenance_collateral < required_initial_collateral );
          FC_ASSERT( required_maintenance_collateral >= 1000 );
-         FC_ASSERT( call_limit.is_null() || call_limit < ~short_limit );
-      } FC_CAPTURE_AND_RETHROW( (call_limit.is_null())(short_limit.is_null())(call_limit)(short_limit)
-    		  (max_margin_period_sec)(required_maintenance_collateral)(required_initial_collateral) ) }
+      } FC_CAPTURE_AND_RETHROW( (call_limit.is_null())(call_limit)
+    		  (max_margin_period_sec)(required_maintenance_collateral) ) }
 
 } } // graphene::chain

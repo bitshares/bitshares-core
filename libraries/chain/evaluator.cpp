@@ -23,7 +23,7 @@
 #include <graphene/chain/account_object.hpp>
 #include <graphene/chain/delegate_object.hpp>
 #include <graphene/chain/limit_order_object.hpp>
-#include <graphene/chain/short_order_object.hpp>
+#include <graphene/chain/call_order_object.hpp>
 
 #include <fc/uint128.hpp>
 

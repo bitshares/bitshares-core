@@ -18,7 +18,6 @@
 #include <graphene/chain/limit_order_evaluator.hpp>
 #include <graphene/chain/account_object.hpp>
 #include <graphene/chain/limit_order_object.hpp>
-#include <graphene/chain/short_order_object.hpp>
 #include <fc/uint128.hpp>
 
 namespace graphene { namespace chain {
@@ -104,44 +103,13 @@ object_id_type limit_order_create_evaluator::do_apply( const limit_order_create_
          if( converted_some && !db().find(result) ) // then we were filled by call order
             return result;
       }
-      const auto& short_order_idx = db().get_index_type<short_order_index>();
-      const auto& sell_price_idx = short_order_idx.indices().get<by_price>();
-
-      FC_ASSERT( max_price.max() >= max_price );
-      auto short_itr = sell_price_idx.lower_bound( max_price.max() );
-      auto short_end = sell_price_idx.upper_bound( max_price );
-
-      while( !filled )
-      {
-         if( limit_itr != limit_end )
-         {
-            if( short_itr != short_end && limit_itr->sell_price < short_itr->sell_price )
-            {
-               auto old_short_itr = short_itr;
-               ++short_itr;
-               filled = (db().match( new_order_object, *old_short_itr, old_short_itr->sell_price ) != 2 );
-            }
-            else
-            {
-               auto old_limit_itr = limit_itr;
-               ++limit_itr;
-               filled = (db().match( new_order_object, *old_limit_itr, old_limit_itr->sell_price ) != 2 );
-            }
-         }
-         else if( short_itr != short_end  )
-         {
-            auto old_short_itr = short_itr;
-            ++short_itr;
-            filled = (db().match( new_order_object, *old_short_itr, old_short_itr->sell_price ) != 2 );
-         }
-         else break;
-      }
    }
-   else while( !filled && limit_itr != limit_end  )
+
+   while( !filled &&  limit_itr != limit_end )
    {
-         auto old_itr = limit_itr;
-         ++limit_itr;
-         filled = (db().match( new_order_object, *old_itr, old_itr->sell_price ) != 2);
+      auto old_limit_itr = limit_itr;
+      ++limit_itr;
+      filled = (db().match( new_order_object, *old_limit_itr, old_limit_itr->sell_price ) != 2 );
    }
 
    //Possible optimization: only check calls if the new order completely filled some old order

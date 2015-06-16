@@ -26,7 +26,7 @@
 #include <graphene/chain/key_object.hpp>
 #include <graphene/chain/limit_order_object.hpp>
 #include <graphene/chain/proposal_object.hpp>
-#include <graphene/chain/short_order_object.hpp>
+#include <graphene/chain/call_order_object.hpp>
 #include <graphene/chain/transaction_object.hpp>
 #include <graphene/chain/vesting_balance_object.hpp>
 #include <graphene/chain/withdraw_permission_object.hpp>
@@ -42,7 +42,7 @@
 #include <graphene/chain/key_evaluator.hpp>
 #include <graphene/chain/limit_order_evaluator.hpp>
 #include <graphene/chain/proposal_evaluator.hpp>
-#include <graphene/chain/short_order_evaluator.hpp>
+#include <graphene/chain/call_order_evaluator.hpp>
 #include <graphene/chain/transfer_evaluator.hpp>
 #include <graphene/chain/vesting_balance_evaluator.hpp>
 #include <graphene/chain/withdraw_permission_evaluator.hpp>
@@ -75,8 +75,6 @@ void database::initialize_evaluators()
    register_evaluator<asset_global_settle_evaluator>();
    register_evaluator<limit_order_create_evaluator>();
    register_evaluator<limit_order_cancel_evaluator>();
-   register_evaluator<short_order_create_evaluator>();
-   register_evaluator<short_order_cancel_evaluator>();
    register_evaluator<call_order_update_evaluator>();
    register_evaluator<transfer_evaluator>();
    register_evaluator<asset_fund_fee_pool_evaluator>();
@@ -108,7 +106,6 @@ void database::initialize_indexes()
    add_index< primary_index<simple_index<delegate_object>> >();
    add_index< primary_index<simple_index<witness_object>> >();
    add_index< primary_index<limit_order_index > >();
-   add_index< primary_index<short_order_index > >();
    add_index< primary_index<call_order_index > >();
    add_index< primary_index<proposal_index > >();
    add_index< primary_index<withdraw_permission_index > >();
