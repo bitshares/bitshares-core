@@ -827,89 +827,6 @@ namespace graphene { namespace chain {
       }
    };
 
-   /**
-    *  @ingroup operations
-    *
-    *  Define a new short order, if it is filled it will
-    *  be merged with existing call orders for the same
-    *  account.  If maintenance_collateral_ratio is set
-    *  it will update any existing open call orders to
-    *  use the new maintenance level.
-    *
-    *  When shorting you specify the total amount to sell
-    *  and the amount of collateral along with the initial
-    *  ratio.  The price it will sell at is (amount_to_sell/(collateral*initial_collateral_ratio/2000))
-    */
-   struct short_order_create_operation
-   {
-      /// The account placing a short order (this account must sign the transaction)
-      account_id_type seller;
-      /// The amount of market-issued asset to short sell
-      asset           amount_to_sell;
-      /// The fee paid by seller
-      asset           fee;
-      /// The amount of collateral to withdraw from the seller
-      asset           collateral;
-      /// Fixed point representation of initial collateral ratio, with three digits of precision
-      /// Must be greater than or equal to the minimum specified by price feed
-      uint16_t        initial_collateral_ratio    = GRAPHENE_DEFAULT_INITIAL_COLLATERAL_RATIO;
-      /// Fixed point representation of maintenance collateral ratio, with three digits of precision
-      /// Must be greater than or equal to the minimum specified by price feed
-      uint16_t        maintenance_collateral_ratio = GRAPHENE_DEFAULT_MAINTENANCE_COLLATERAL_RATIO;
-      /// Expiration time for this order. Any unfilled portion of this order which is on the books at or past this time
-      /// will automatically be canceled.
-      time_point_sec  expiration = time_point_sec::maximum();
-
-      account_id_type fee_payer()const { return seller; }
-      void       get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>&)const;
-      void       validate()const;
-      share_type calculate_fee( const fee_schedule_type& k )const;
-
-      pair<asset_id_type,asset_id_type> get_market()const
-      {
-         return amount_to_sell.asset_id < collateral.asset_id ?
-                std::make_pair( amount_to_sell.asset_id, collateral.asset_id ) :
-                std::make_pair( collateral.asset_id, amount_to_sell.asset_id );
-      }
-
-      /** convention: amount_to_sell / amount_to_receive */
-      price      sell_price()const { return ~price::call_price(amount_to_sell, collateral, initial_collateral_ratio); }
-
-      /** convention: amount_to_sell / amount_to_receive means we are
-       * selling collateral to receive debt
-       **/
-      price call_price() const { return price::call_price(amount_to_sell, collateral, maintenance_collateral_ratio); }
-
-      void            get_balance_delta( balance_accumulator& acc, const operation_result& result = asset())const
-      {
-         acc.adjust( fee_payer(), -fee );
-         acc.adjust( seller, -collateral );
-      }
-   };
-
-   /**
-    * @ingroup operations
-    * Cancel the short order and return the balance to the
-    * order->seller account.
-    */
-   struct short_order_cancel_operation
-   {
-      short_order_id_type order;
-      account_id_type     fee_paying_account; ///< Must be order->seller
-      asset               fee; ///< paid by order->seller
-
-      account_id_type fee_payer()const { return fee_paying_account; }
-      void            get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>&)const;
-      void            validate()const;
-      share_type      calculate_fee( const fee_schedule_type& k )const;
-
-      void            get_balance_delta( balance_accumulator& acc, const operation_result& result )const
-      {
-         acc.adjust( fee_payer(), -fee );
-         acc.adjust( fee_payer(), result.get<asset>() );
-      }
-   };
-
 
    /**
     *  @ingroup operations
@@ -924,13 +841,15 @@ namespace graphene { namespace chain {
     *  have appropriate asset_ids, even if the amount is zero.
     *
     *  @note this operation can be used to force a market order using the collateral without requiring outside funds.
+    *
+    *  @note this operation can be used to issue new bitassets provided there is sufficient collateral
     */
    struct call_order_update_operation
    {
       account_id_type     funding_account; ///< pays fee, collateral, and cover
       asset               fee; ///< paid by funding_account
       asset               collateral_to_add; ///< the amount of collateral to add to the margin position
-      asset               amount_to_cover; ///< the amount of the debt to be paid off
+      asset               amount_to_cover; ///< the amount of the debt to be paid off, may be negative to issue new debt
       uint16_t            maintenance_collateral_ratio = 0; ///< 0 means don't change, 1000 means feed
 
       account_id_type fee_payer()const { return funding_account; }
@@ -1393,9 +1312,7 @@ namespace graphene { namespace chain {
    typedef fc::static_variant<
             transfer_operation,
             limit_order_create_operation,
-            short_order_create_operation,
             limit_order_cancel_operation,
-            short_order_cancel_operation,
             call_order_update_operation,
             key_create_operation,
             account_create_operation,
@@ -1594,9 +1511,6 @@ FC_REFLECT( graphene::chain::limit_order_create_operation,
           )
 FC_REFLECT( graphene::chain::fill_order_operation, (fee)(order_id)(account_id)(pays)(receives) )
 FC_REFLECT( graphene::chain::limit_order_cancel_operation,(fee)(fee_paying_account)(order) )
-FC_REFLECT( graphene::chain::short_order_cancel_operation,(fee)(fee_paying_account)(order) )
-FC_REFLECT( graphene::chain::short_order_create_operation, (fee)(seller)(amount_to_sell)(collateral)
-            (initial_collateral_ratio)(maintenance_collateral_ratio)(expiration) )
 FC_REFLECT( graphene::chain::call_order_update_operation, (fee)(funding_account)(collateral_to_add)(amount_to_cover)(maintenance_collateral_ratio) )
 
 FC_REFLECT( graphene::chain::transfer_operation,

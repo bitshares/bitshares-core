@@ -121,7 +121,7 @@ namespace graphene { namespace chain {
 
    /**
     *  @class price_feed
-    *  @brief defines market parameters for shorts and margin positions
+    *  @brief defines market parameters for margin positions
     */
    struct price_feed
    {
@@ -132,10 +132,6 @@ namespace graphene { namespace chain {
        */
       price call_limit;
       /**
-       * Short orders will only be matched against bids above this price.
-       */
-      price short_limit;
-      /**
        * Forced settlements will evaluate using this price.
        */
       price settlement_price;
@@ -143,20 +139,6 @@ namespace graphene { namespace chain {
        * Maximum number of seconds margin positions should be able to remain open.
        */
       uint32_t max_margin_period_sec = GRAPHENE_DEFAULT_MARGIN_PERIOD_SEC;
-
-      /**
-       *  Required maintenance collateral is defined
-       *  as a fixed point number with a maximum value of 10.000
-       *  and a minimum value of 1.000.
-       *
-       *  This value must be greater than required_maintenance_collateral or
-       *  a margin call would be triggered immediately.
-       *
-       *  Default requirement is $2 of collateral per $1 of debt based
-       *  upon the premise that both parties to every trade should bring
-       *  equal value to the table.
-       */
-      uint16_t required_initial_collateral = GRAPHENE_DEFAULT_INITIAL_COLLATERAL_RATIO;
 
       /**
        *  Required maintenance collateral is defined
@@ -191,6 +173,7 @@ namespace graphene { namespace chain {
 
 FC_REFLECT( graphene::chain::asset, (amount)(asset_id) )
 FC_REFLECT( graphene::chain::price, (base)(quote) )
-#define GRAPHENE_PRICE_FEED_FIELDS (call_limit)(short_limit)(settlement_price)(max_margin_period_sec)\
-   (required_initial_collateral)(required_maintenance_collateral)
+
+#define GRAPHENE_PRICE_FEED_FIELDS (call_limit)(settlement_price)(max_margin_period_sec)(required_maintenance_collateral)
+
 FC_REFLECT( graphene::chain::price_feed, GRAPHENE_PRICE_FEED_FIELDS )

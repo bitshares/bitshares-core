@@ -108,7 +108,6 @@ namespace graphene { namespace chain {
       delegate_object_type,
       witness_object_type,
       limit_order_object_type,
-      short_order_object_type,
       call_order_object_type,
       custom_object_type,
       proposal_object_type,
@@ -152,7 +151,6 @@ namespace graphene { namespace chain {
    class force_settlement_object;
    class key_object;
    class limit_order_object;
-   class short_order_object;
    class call_order_object;
    class custom_object;
    class proposal_object;
@@ -169,7 +167,6 @@ namespace graphene { namespace chain {
    typedef object_id< protocol_ids, delegate_object_type,           delegate_object>              delegate_id_type;
    typedef object_id< protocol_ids, witness_object_type,            witness_object>               witness_id_type;
    typedef object_id< protocol_ids, limit_order_object_type,        limit_order_object>           limit_order_id_type;
-   typedef object_id< protocol_ids, short_order_object_type,        short_order_object>           short_order_id_type;
    typedef object_id< protocol_ids, call_order_object_type,         call_order_object>            call_order_id_type;
    typedef object_id< protocol_ids, custom_object_type,             custom_object>                custom_id_type;
    typedef object_id< protocol_ids, proposal_object_type,           proposal_object>              proposal_id_type;
@@ -358,7 +355,7 @@ namespace graphene { namespace chain {
       uint32_t witness_withdraw_pay_fee; ///< fee for withdrawing witness pay
       uint32_t transfer_fee; ///< fee for transferring some asset
       uint32_t limit_order_fee; ///< fee for placing a limit order in the markets
-      uint32_t short_order_fee; ///< fee for placing a short order in the markets
+      uint32_t call_order_fee; ///< fee for placing a call order in the markets
       uint32_t publish_feed_fee; ///< fee for publishing a price feed
       uint32_t asset_create_fee; ///< the cost to register the cheapest asset
       uint32_t asset_update_fee; ///< the cost to modify a registered asset
@@ -487,7 +484,6 @@ FC_REFLECT_ENUM( graphene::chain::object_type,
                  (delegate_object_type)
                  (witness_object_type)
                  (limit_order_object_type)
-                 (short_order_object_type)
                  (call_order_object_type)
                  (custom_object_type)
                  (proposal_object_type)
@@ -532,7 +528,7 @@ FC_REFLECT( graphene::chain::fee_schedule_type,
                  (witness_withdraw_pay_fee)
                  (transfer_fee)
                  (limit_order_fee)
-                 (short_order_fee)
+                 (call_order_fee)
                  (publish_feed_fee)
                  (asset_create_fee)
                  (asset_update_fee)
@@ -587,7 +583,6 @@ FC_REFLECT_TYPENAME( graphene::chain::force_settlement_id_type )
 FC_REFLECT_TYPENAME( graphene::chain::delegate_id_type )
 FC_REFLECT_TYPENAME( graphene::chain::witness_id_type )
 FC_REFLECT_TYPENAME( graphene::chain::limit_order_id_type )
-FC_REFLECT_TYPENAME( graphene::chain::short_order_id_type )
 FC_REFLECT_TYPENAME( graphene::chain::call_order_id_type )
 FC_REFLECT_TYPENAME( graphene::chain::custom_id_type )
 FC_REFLECT_TYPENAME( graphene::chain::proposal_id_type )

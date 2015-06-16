@@ -393,37 +393,6 @@ share_type limit_order_cancel_operation::calculate_fee(const fee_schedule_type& 
    return k.limit_order_fee;
 }
 
-void short_order_create_operation::get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>&) const
-{
-   active_auth_set.insert(seller);
-}
-
-void short_order_create_operation::validate()const
-{
-   FC_ASSERT( fee.amount >= 0 );
-   FC_ASSERT( initial_collateral_ratio >= GRAPHENE_MIN_COLLATERAL_RATIO     );
-   FC_ASSERT( initial_collateral_ratio >  maintenance_collateral_ratio );
-   FC_ASSERT( initial_collateral_ratio <= GRAPHENE_MAX_COLLATERAL_RATIO     );
-}
-
-share_type short_order_create_operation::calculate_fee(const fee_schedule_type& k) const
-{
-   return k.short_order_fee;
-}
-void short_order_cancel_operation::get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>&) const
-{
-   active_auth_set.insert(fee_paying_account);
-}
-
-void short_order_cancel_operation::validate()const
-{
-   FC_ASSERT( fee.amount >= 0 );
-}
-
-share_type short_order_cancel_operation::calculate_fee(const fee_schedule_type& k) const
-{
-   return k.short_order_fee;
-}
 
 void call_order_update_operation::get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>&) const
 {
@@ -433,18 +402,13 @@ void call_order_update_operation::get_required_auth(flat_set<account_id_type>& a
 void call_order_update_operation::validate()const
 {
    FC_ASSERT( fee.amount >= 0 );
-   FC_ASSERT( collateral_to_add.amount > 0 || amount_to_cover.amount > 0 || maintenance_collateral_ratio > 0 );
-   if( amount_to_cover.amount == 0 )   FC_ASSERT( collateral_to_add.amount >= 0 );
-   if( collateral_to_add.amount.value <= 0 ) FC_ASSERT( amount_to_cover.amount.value > 0 );
-
-   FC_ASSERT( amount_to_cover.amount >= 0 );
    FC_ASSERT( amount_to_cover.asset_id != collateral_to_add.asset_id );
    FC_ASSERT( maintenance_collateral_ratio == 0 || maintenance_collateral_ratio >= 1000 );
 }
 
 share_type call_order_update_operation::calculate_fee(const fee_schedule_type& k) const
 {
-   return k.short_order_fee;
+   return k.call_order_fee;
 }
 
 proposal_create_operation proposal_create_operation::genesis_proposal(const database& db)
