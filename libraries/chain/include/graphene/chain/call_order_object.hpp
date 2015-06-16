@@ -120,7 +120,6 @@ namespace graphene { namespace chain {
    > force_settlement_object_multi_index_type;
 
 
-  typedef generic_index<short_order_object, short_order_multi_index_type>                    short_order_index;
   typedef generic_index<call_order_object, call_order_multi_index_type>                      call_order_index;
   typedef generic_index<force_settlement_object, force_settlement_object_multi_index_type>   force_settlement_index;
 } } // graphene::chain
