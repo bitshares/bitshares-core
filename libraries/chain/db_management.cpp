@@ -33,7 +33,7 @@ database::~database(){
       _pending_block_session->commit();
 }
 
-void database::open( const fc::path& data_dir, const genesis_allocation& initial_allocation )
+void database::open( const fc::path& data_dir, const genesis_state_type& initial_allocation )
 { try {
    ilog("Open database in ${d}", ("d", data_dir));
    object_database::open( data_dir );
@@ -55,7 +55,7 @@ void database::open( const fc::path& data_dir, const genesis_allocation& initial
 
 } FC_CAPTURE_AND_RETHROW( (data_dir) ) }
 
-void database::reindex(fc::path data_dir, const genesis_allocation& initial_allocation)
+void database::reindex(fc::path data_dir, const genesis_state_type& initial_allocation)
 { try {
    wipe(data_dir, false);
    open(data_dir, initial_allocation);

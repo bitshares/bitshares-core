@@ -116,7 +116,7 @@ BOOST_AUTO_TEST_CASE( generate_empty_blocks )
       auto delegate_priv_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("genesis")) );
       {
          database db;
-         db.open(data_dir.path(), genesis_allocation() );
+         db.open(data_dir.path(), genesis_state_type() );
          b = db.generate_block( now, db.get_scheduled_witness( 1 ).first, delegate_priv_key );
 
          for( uint32_t i = 1; i < 200; ++i )
@@ -161,7 +161,7 @@ BOOST_AUTO_TEST_CASE( undo_block )
       fc::temp_directory data_dir;
       {
          database db;
-         db.open(data_dir.path(), genesis_allocation() );
+         db.open(data_dir.path(), genesis_state_type() );
          fc::time_point_sec now( GRAPHENE_GENESIS_TIMESTAMP );
 
          auto delegate_priv_key  = fc::ecc::private_key::regenerate(fc::sha256::hash(string("genesis")) );
@@ -204,15 +204,15 @@ BOOST_AUTO_TEST_CASE( fork_blocks )
       fc::time_point_sec now( GRAPHENE_GENESIS_TIMESTAMP );
 
       database db1;
-      db1.open( data_dir1.path(), genesis_allocation() );
+      db1.open(data_dir1.path(), genesis_state_type());
       database db2;
-      db2.open( data_dir2.path(), genesis_allocation() );
+      db2.open(data_dir2.path(), genesis_state_type());
 
       auto delegate_priv_key  = fc::ecc::private_key::regenerate(fc::sha256::hash(string("genesis")) );
       for( uint32_t i = 0; i < 10; ++i )
       {
          now += db1.block_interval();
-         auto b =  db1.generate_block( now, db1.get_scheduled_witness( 1 ).first, delegate_priv_key );
+         auto b = db1.generate_block(now, db1.get_scheduled_witness(1).first, delegate_priv_key);
          try {
             db2.push_block(b);
          } FC_CAPTURE_AND_RETHROW( ("db2") );
@@ -220,13 +220,13 @@ BOOST_AUTO_TEST_CASE( fork_blocks )
       for( uint32_t i = 10; i < 13; ++i )
       {
          now += db1.block_interval();
-         auto b =  db1.generate_block( now, db1.get_scheduled_witness( 1 ).first, delegate_priv_key );
+         auto b =  db1.generate_block(now, db1.get_scheduled_witness(1).first, delegate_priv_key);
       }
       string db1_tip = db1.head_block_id().str();
       for( uint32_t i = 13; i < 16; ++i )
       {
          now += db2.block_interval();
-         auto b =  db2.generate_block( now, db2.get_scheduled_witness( db2.get_slot_at_time( now ) ).first, delegate_priv_key );
+         auto b =  db2.generate_block(now, db2.get_scheduled_witness(db2.get_slot_at_time(now)).first, delegate_priv_key);
          // notify both databases of the new block.
          // only db2 should switch to the new fork, db1 should not
          db1.push_block(b);
@@ -241,7 +241,7 @@ BOOST_AUTO_TEST_CASE( fork_blocks )
       BOOST_CHECK_EQUAL(db2.head_block_num(), 13);
       {
          now += db2.block_interval();
-         auto b =  db2.generate_block( now, db2.get_scheduled_witness( 1 ).first, delegate_priv_key );
+         auto b = db2.generate_block(now, db2.get_scheduled_witness(1).first, delegate_priv_key);
          good_block = b;
          b.transactions.emplace_back(signed_transaction());
          b.transactions.back().operations.emplace_back(transfer_operation());
@@ -265,7 +265,7 @@ BOOST_AUTO_TEST_CASE( fork_blocks )
 BOOST_AUTO_TEST_CASE( undo_pending )
 {
    try {
-      fc::time_point_sec now( GRAPHENE_GENESIS_TIMESTAMP );
+      fc::time_point_sec now(GRAPHENE_GENESIS_TIMESTAMP);
       fc::temp_directory data_dir;
       {
          database db;

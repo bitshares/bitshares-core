@@ -44,7 +44,7 @@ BOOST_AUTO_TEST_CASE( operation_sanity_check )
 BOOST_AUTO_TEST_CASE( genesis_and_persistence_bench )
 {
    try {
-      genesis_allocation allocation;
+      genesis_state_type genesis_state;
 
 #ifdef NDEBUG
       ilog("Running in release mode.");
@@ -57,14 +57,15 @@ BOOST_AUTO_TEST_CASE( genesis_and_persistence_bench )
 #endif
 
       for( int i = 0; i < account_count; ++i )
-         allocation.emplace_back(public_key_type(fc::ecc::private_key::regenerate(fc::digest(i)).get_public_key()),
-                                 GRAPHENE_INITIAL_SUPPLY / account_count);
+         genesis_state.allocation_targets.emplace_back("target"+fc::to_string(i),
+                                                       public_key_type(fc::ecc::private_key::regenerate(fc::digest(i)).get_public_key()),
+                                                       GRAPHENE_INITIAL_SUPPLY / account_count);
 
       fc::temp_directory data_dir(fc::current_path());
 
       {
          database db;
-         db.open(data_dir.path(), allocation);
+         db.open(data_dir.path(), genesis_state);
 
          for( int i = 11; i < account_count + 11; ++i)
             BOOST_CHECK(db.get_balance(account_id_type(i), asset_id_type()).amount == GRAPHENE_INITIAL_SUPPLY / account_count);
@@ -110,7 +111,7 @@ BOOST_AUTO_TEST_CASE( genesis_and_persistence_bench )
 
          auto start_time = fc::time_point::now();
          wlog( "about to start reindex..." );
-         db.reindex(data_dir.path(), allocation);
+         db.reindex(data_dir.path(), genesis_state);
          ilog("Replayed database in ${t} milliseconds.", ("t", (fc::time_point::now() - start_time).count() / 1000));
 
          for( int i = 0; i < blocks_to_produce; ++i )

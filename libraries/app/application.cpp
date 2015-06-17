@@ -149,9 +149,10 @@ namespace detail {
          fc::create_directories(_data_dir / "blockchain/dblock");
 
          auto nathan_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("nathan")));
-         genesis_allocation initial_allocation = {{graphene::chain::public_key_type(nathan_key.get_public_key()), 1}};
+         genesis_state_type initial_state;
+         initial_state.allocation_targets.emplace_back("nathan", address(public_key_type(nathan_key.get_public_key())), 1);
          if( _options->count("genesis-json") )
-            initial_allocation = fc::json::from_file(_options->at("genesis-json").as<boost::filesystem::path>()).as<genesis_allocation>();
+            initial_state = fc::json::from_file(_options->at("genesis-json").as<boost::filesystem::path>()).as<genesis_state_type>();
          else
             dlog("Allocating all stake to ${key}", ("key", utilities::key_to_wif(nathan_key)));
 
@@ -161,12 +162,12 @@ namespace detail {
          if( _options->count("replay-blockchain") )
          {
             ilog("Replaying blockchain on user request.");
-            _chain_db->reindex(_data_dir/"blockchain", initial_allocation);
+            _chain_db->reindex(_data_dir/"blockchain", initial_state);
          } else if( clean )
-            _chain_db->open(_data_dir / "blockchain", initial_allocation);
+            _chain_db->open(_data_dir / "blockchain", initial_state);
          else {
             wlog("Detected unclean shutdown. Replaying blockchain...");
-            _chain_db->reindex(_data_dir / "blockchain", initial_allocation);
+            _chain_db->reindex(_data_dir / "blockchain", initial_state);
          }
 
          reset_p2p_node(_data_dir);

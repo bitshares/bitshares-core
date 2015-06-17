@@ -38,7 +38,30 @@ namespace graphene { namespace chain {
    using graphene::db::abstract_object;
    using graphene::db::object;
 
-   typedef vector<std::pair<fc::static_variant<address, public_key_type>, share_type >> genesis_allocation;
+   struct genesis_state_type {
+       struct allocation_target_type {
+           allocation_target_type(const string& name = string(), const address& addr = address(), share_type weight = share_type())
+               : name(name), addr(addr), weight(weight){}
+           string name;
+           address addr;
+           share_type weight;
+       };
+       struct initial_witness_type {
+           /// Must correspond to one of the allocation targets.
+           string owner_name;
+           public_key_type block_signing_key;
+           secret_hash_type initial_secret;
+       };
+       struct initial_committee_member_type {
+           /// Must correspond to one of the allocation targets.
+           string owner_name;
+       };
+
+       chain_parameters initial_parameters;
+       vector<allocation_target_type> allocation_targets;
+       vector<initial_witness_type> initial_witnesses;
+       vector<initial_committee_member_type> initial_committee;
+   };
 
    /**
     *   @class database
@@ -67,14 +90,14 @@ namespace graphene { namespace chain {
             skip_merkle_check           = 0x200  ///< used while reindexing
          };
 
-         void open(const fc::path& data_dir, const genesis_allocation& initial_allocation = genesis_allocation());
+         void open(const fc::path& data_dir, const genesis_state_type& initial_allocation = genesis_state_type());
          /**
           * @brief Rebuild object graph from block history and open detabase
           *
           * This method may be called after or instead of @ref database::open, and will rebuild the object graph by
           * replaying blockchain history. When this method exits successfully, the database will be open.
           */
-         void reindex(fc::path data_dir, const genesis_allocation& initial_allocation = genesis_allocation());
+         void reindex(fc::path data_dir, const genesis_state_type& initial_allocation = genesis_state_type());
 
          /**
           * @brief wipe Delete database from disk, and potentially the raw chain as well.
@@ -205,7 +228,7 @@ namespace graphene { namespace chain {
          void initialize_evaluators();
          /// Reset the object graph in-memory
          void initialize_indexes();
-         void init_genesis(const genesis_allocation& initial_allocation = genesis_allocation());
+         void init_genesis(const genesis_state_type& genesis_state = genesis_state_type());
 
          template<typename EvaluatorType>
          void register_evaluator()
@@ -423,3 +446,8 @@ namespace graphene { namespace chain {
    }
 
 } }
+
+FC_REFLECT(graphene::chain::genesis_state_type::allocation_target_type, (name)(addr)(weight))
+FC_REFLECT(graphene::chain::genesis_state_type::initial_witness_type, (owner_name)(block_signing_key)(initial_secret))
+FC_REFLECT(graphene::chain::genesis_state_type::initial_committee_member_type, (owner_name))
+FC_REFLECT(graphene::chain::genesis_state_type, (initial_parameters)(allocation_targets)(initial_witnesses)(initial_committee))

@@ -40,7 +40,7 @@ BOOST_AUTO_TEST_CASE( two_node_network )
       fc::temp_directory app_dir;
       fc::temp_directory app2_dir;
       fc::temp_file genesis_json;
-      fc::json::save_to_file(genesis_allocation(), genesis_json.path());
+      fc::json::save_to_file(genesis_state_type(), genesis_json.path());
 
       fc::time_point_sec now( GRAPHENE_GENESIS_TIMESTAMP );
 
