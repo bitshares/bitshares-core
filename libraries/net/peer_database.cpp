@@ -113,8 +113,12 @@ namespace graphene { namespace net {
       std::vector<potential_peer_record> peer_records;
       peer_records.reserve(_potential_peer_set.size());
       std::copy(_potential_peer_set.begin(), _potential_peer_set.end(), std::back_inserter(peer_records));
+
       try
       {
+        fc::path peer_database_filename_dir = _peer_database_filename.parent_path();
+        if (!fc::exists(peer_database_filename_dir))
+          fc::create_directories(peer_database_filename_dir);
         fc::json::save_to_file(peer_records, _peer_database_filename);
       }
       catch (const fc::exception& e)
