@@ -126,7 +126,7 @@ struct database_fixture {
     * @brief Generates blocks until the head block time matches or exceeds timestamp
     * @param timestamp target time to generate blocks until
     */
-   void generate_blocks(fc::time_point_sec timestamp, bool miss_intermediate_blocks = false);
+   void generate_blocks(fc::time_point_sec timestamp, bool miss_intermediate_blocks = true);
 
    account_create_operation make_account(
       const std::string& name = "nathan",

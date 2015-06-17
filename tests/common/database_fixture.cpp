@@ -274,8 +274,9 @@ void database_fixture::generate_blocks(fc::time_point_sec timestamp, bool miss_i
 {
    if( miss_intermediate_blocks )
    {
+      generate_block();
       auto slots_to_miss = db.get_slot_at_time(timestamp) - 1;
-      assert(slots_to_miss > 0);
+      if( slots_to_miss <= 0 ) return;
       generate_block(~0, generate_private_key("genesis"), slots_to_miss);
       return;
    }

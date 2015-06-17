@@ -272,8 +272,7 @@ void database::process_budget()
       });
       modify(dpo, [&]( dynamic_global_property_object& _dpo )
       {
-         // Should this be +=?
-         _dpo.witness_budget = witness_budget;
+         _dpo.witness_budget += witness_budget;
          _dpo.last_budget_time = now;
       });
 
@@ -406,8 +405,10 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
          next_maintenance_time = time_point_sec() +
                (((next_block.timestamp.sec_since_epoch() / maintenance_interval) + 1) * maintenance_interval);
       else
-         next_maintenance_time += maintenance_interval;
-      assert( next_maintenance_time > next_block.timestamp );
+         // It's possible we have missed blocks for at least a maintenance interval.
+         // In this case, we'll need to bump the next maintenance time more than once.
+         do next_maintenance_time += maintenance_interval;
+         while( next_maintenance_time < head_block_time() );
    }
 
    modify(get_dynamic_global_properties(), [next_maintenance_time](dynamic_global_property_object& d) {

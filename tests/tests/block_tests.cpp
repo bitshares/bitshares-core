@@ -568,7 +568,7 @@ BOOST_FIXTURE_TEST_CASE( short_order_expiration, database_fixture )
    BOOST_CHECK_EQUAL( get_balance(*nathan, *core), 49500 );
    auto id = short_itr->id;
 
-   generate_blocks(op.expiration);
+   generate_blocks(op.expiration, false);
    test = &get_asset("TEST");
    core = &asset_id_type()(db);
    nathan = &get_account("nathan");
@@ -611,7 +611,7 @@ BOOST_FIXTURE_TEST_CASE( limit_order_expiration, database_fixture )
    BOOST_CHECK_EQUAL( get_balance(*nathan, *core), 49500 );
    auto id = limit_itr->id;
 
-   generate_blocks(op.expiration);
+   generate_blocks(op.expiration, false);
    test = &get_asset("TEST");
    core = &asset_id_type()(db);
    nathan = &get_account("nathan");
