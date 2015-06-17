@@ -92,11 +92,6 @@ string database_fixture::generate_anon_acct_name()
    return "anon-acct-x" + std::to_string( anon_acct_count++ );
 }
 
-void database_fixture::_push_transaction( const signed_transaction& tx, uint32_t skip_flags, const char* file, int line )
-{
-   db.push_transaction( tx, skip_flags );
-}
-
 void database_fixture::verify_asset_supplies( )const
 {
    wlog("*** Begin asset supply verification ***");
@@ -881,5 +876,19 @@ int64_t database_fixture::get_balance( const account_object& account, const asse
 {
   return db.get_balance(account.get_id(), a.get_id()).amount.value;
 }
+
+namespace test {
+
+bool _push_block( database& db, const signed_block& b, uint32_t skip_flags /* = 0 */ )
+{
+   return db.push_block( b, skip_flags);
+}
+
+processed_transaction _push_transaction( database& db, const signed_transaction& tx, uint32_t skip_flags /* = 0 */ )
+{
+   return db.push_transaction( tx, skip_flags );
+}
+
+} // graphene::chain::test
 
 } } // graphene::chain

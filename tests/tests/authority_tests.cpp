@@ -943,38 +943,38 @@ BOOST_FIXTURE_TEST_CASE( bogus_signature, database_fixture )
       wdump( (active_set)(owner_set)(alice_key_id)
        (alice_account_object) );
 
-      PUSH_TX( trx, skip );
+      db.push_transaction( trx, skip );
 
       trx.operations.push_back( xfer_op );
       // Alice's signature is now invalid
       edump((trx));
-      BOOST_REQUIRE_THROW( PUSH_TX( trx, skip ), fc::exception );
+      BOOST_REQUIRE_THROW( db.push_transaction( trx, skip ), fc::exception );
       // Re-sign, now OK (sig is replaced)
       trx.sign( alice_key_id, alice_key );
-      PUSH_TX( trx, skip );
+      db.push_transaction( trx, skip );
 
       trx.signatures.clear();
       trx.sign( charlie_key_id, alice_key );
       // Sign with Alice's key (valid) claiming to be Charlie
-      BOOST_REQUIRE_THROW( PUSH_TX( trx, skip ), fc::exception );
+      BOOST_REQUIRE_THROW( db.push_transaction( trx, skip ), fc::exception );
       // and with Charlie's key (invalid) claiming to be Alice
       trx.sign( charlie_key_id, alice_key );
-      BOOST_REQUIRE_THROW( PUSH_TX( trx, skip ), fc::exception );
+      BOOST_REQUIRE_THROW( db.push_transaction( trx, skip ), fc::exception );
       trx.signatures.clear();
       // okay, now sign ONLY with Charlie's key claiming to be Alice
       trx.sign( charlie_key_id, alice_key );
-      BOOST_REQUIRE_THROW( PUSH_TX( trx, skip ), fc::exception );
+      BOOST_REQUIRE_THROW( db.push_transaction( trx, skip ), fc::exception );
 
       trx.signatures.clear();
       trx.operations.pop_back();
       trx.sign( alice_key_id, alice_key );
       trx.sign( charlie_key_id, charlie_key );
       // Signed by third-party Charlie (irrelevant key, not in authority)
-      PUSH_TX( trx, skip );
+      db.push_transaction( trx, skip );
       trx.operations.push_back( xfer_op );
       trx.sign( alice_key_id, alice_key );
       // Alice's sig is valid but Charlie's is invalid
-      BOOST_REQUIRE_THROW( PUSH_TX( trx, skip ), fc::exception );
+      BOOST_REQUIRE_THROW( db.push_transaction( trx, skip ), fc::exception );
    }
    FC_LOG_AND_RETHROW()
 }
