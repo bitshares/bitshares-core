@@ -66,6 +66,7 @@ IF(NOT "${Boost_VERSION}" MATCHES "1.53(.*)")
 ENDIF()
 
 if( WIN32 )
+
     message( STATUS "Configuring Graphene on WIN32")
     set( DB_VERSION 60 )
     set( BDB_STATIC_LIBS 1 )
@@ -98,13 +99,6 @@ if( WIN32 )
     SET(TCL_LIBRARY ${TCL_LIBS})
 
 else( WIN32 ) # Apple AND Linux
-    list(APPEND LEVELDB_BUILD_DEFINES LEVELDB_PLATFORM_POSIX LEVELDB_ATOMIC_PRESENT)
-    if( APPLE )
-        list(APPEND LEVELDB_BUILD_DEFINES OS_MACOSX)
-    else() # Linux
-        list(APPEND LEVELDB_BUILD_DEFINES OS_LINUX)
-        list(APPEND LEVELDB_BUILD_LIBRARIES pthread)
-    endif()
 
     find_library(READLINE_LIBRARIES NAMES readline)
     find_path(READLINE_INCLUDE_DIR readline/readline.h)
