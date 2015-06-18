@@ -220,6 +220,7 @@ void database::init_genesis(const genesis_state_type& genesis_state)
    // Create global properties
    create<global_property_object>([&](global_property_object& p) {
        p.chain_id = fc::digest(genesis_state);
+       p.parameters = genesis_state.initial_parameters;
    });
    create<dynamic_global_property_object>( [&](dynamic_global_property_object& p) {
       p.time = fc::time_point_sec(GRAPHENE_GENESIS_TIMESTAMP);
