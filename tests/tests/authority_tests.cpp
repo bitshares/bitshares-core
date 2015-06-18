@@ -468,6 +468,7 @@ BOOST_FIXTURE_TEST_CASE( fired_delegates, database_fixture )
    BOOST_CHECK(pid(db).is_authorized_to_execute(&db));
 
    nathan = &get_account("nathan");
+   // no money yet
    BOOST_CHECK_EQUAL(get_balance(*nathan, asset_id_type()(db)), 5000);
 
    {
@@ -481,17 +482,21 @@ BOOST_FIXTURE_TEST_CASE( fired_delegates, database_fixture )
       PUSH_TX( db, trx, ~0 );
       trx.operations.clear();
    }
+   // still no money
+   BOOST_CHECK_EQUAL(get_balance(*nathan, asset_id_type()(db)), 5000);
 
    //Time passes... the set of active delegates gets updated.
    generate_blocks(maintenance_time);
    //The proposal is no longer authorized, because the active delegates got changed.
    BOOST_CHECK(!pid(db).is_authorized_to_execute(&db));
+   // still no money
+   BOOST_CHECK_EQUAL(get_balance(*nathan, asset_id_type()(db)), 5000);
+
    //Time passes... the proposal has now expired.
    generate_blocks(pid(db).expiration_time);
    BOOST_CHECK(db.find(pid) == nullptr);
 
-   //Nathan didn't get any more money because the proposal was rejected.
-   nathan = &get_account("nathan");
+   //Nathan never got any more money because the proposal was rejected.
    BOOST_CHECK_EQUAL(get_balance(*nathan, asset_id_type()(db)), 5000);
 } FC_LOG_AND_RETHROW() }
 
