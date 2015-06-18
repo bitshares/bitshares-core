@@ -457,18 +457,21 @@ BOOST_FIXTURE_TEST_CASE( fired_delegates, database_fixture )
    sign(trx, key_id_type(), genesis_key);
    const proposal_object& prop = db.get<proposal_object>(PUSH_TX( db, trx ).operation_results.front().get<object_id_type>());
    proposal_id_type pid = prop.id;
-   BOOST_CHECK(!prop.is_authorized_to_execute(&db));
+   BOOST_CHECK(!pid(db).is_authorized_to_execute(&db));
 
    //Genesis key approves of the proposal.
    proposal_update_operation uop;
    uop.fee_paying_account = GRAPHENE_TEMP_ACCOUNT;
-   uop.proposal = prop.id;
+   uop.proposal = pid;
    uop.key_approvals_to_add.emplace(1);
    uop.key_approvals_to_add.emplace(2);
    uop.key_approvals_to_add.emplace(3);
    uop.key_approvals_to_add.emplace(4);
    uop.key_approvals_to_add.emplace(5);
    uop.key_approvals_to_add.emplace(6);
+   uop.key_approvals_to_add.emplace(7);
+   uop.key_approvals_to_add.emplace(8);
+   uop.key_approvals_to_add.emplace(9);
    trx.operations.back() = uop;
    trx.sign(key_id_type(1), genesis_key);
    trx.signatures[key_id_type(2)] = trx.signatures[key_id_type(1)];
@@ -476,12 +479,15 @@ BOOST_FIXTURE_TEST_CASE( fired_delegates, database_fixture )
    trx.signatures[key_id_type(4)] = trx.signatures[key_id_type(1)];
    trx.signatures[key_id_type(5)] = trx.signatures[key_id_type(1)];
    trx.signatures[key_id_type(6)] = trx.signatures[key_id_type(1)];
+   trx.signatures[key_id_type(7)] = trx.signatures[key_id_type(1)];
+   trx.signatures[key_id_type(8)] = trx.signatures[key_id_type(1)];
+   trx.signatures[key_id_type(9)] = trx.signatures[key_id_type(1)];
    trx.sign(key_id_type(), genesis_key);
    PUSH_TX( db, trx );
-   BOOST_CHECK(prop.is_authorized_to_execute(&db));
+   BOOST_CHECK(pid(db).is_authorized_to_execute(&db));
 
    //Time passes... the proposal is now in its review period.
-   generate_blocks(*prop.review_period_time);
+   generate_blocks(*pid(db).review_period_time);
 
    fc::time_point_sec maintenance_time = db.get_dynamic_global_properties().next_maintenance_time;
    BOOST_CHECK_LT(maintenance_time.sec_since_epoch(), pid(db).expiration_time.sec_since_epoch());
