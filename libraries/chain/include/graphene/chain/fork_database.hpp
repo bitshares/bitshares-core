@@ -69,7 +69,7 @@ namespace graphene { namespace chain {
          bool                             is_known_block( const block_id_type& id )const;
          shared_ptr<fork_item>            fetch_block( const block_id_type& id )const;
          vector<item_ptr>                 fetch_block_by_number( uint32_t n )const;
-         shared_ptr<fork_item>            push_block( signed_block b );
+         shared_ptr<fork_item>            push_block(const signed_block& b );
          shared_ptr<fork_item>            head()const { return _head; }
          void                             pop_block();
 

@@ -40,10 +40,9 @@ void     fork_database::start_block( signed_block b )
    _head = item;
 }
 
-shared_ptr<fork_item>  fork_database::push_block( signed_block b )
+shared_ptr<fork_item>  fork_database::push_block( const signed_block& b )
 {
-   auto item = std::make_shared<fork_item>( std::move(b) );
-   //wdump((item->num)(_head?_head->num:0));
+   auto item = std::make_shared<fork_item>( b );
 
    if( _head && b.previous != block_id_type() )
    {

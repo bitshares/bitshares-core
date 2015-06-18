@@ -370,7 +370,7 @@ void_result asset_publish_feeds_evaluator::do_evaluate(const asset_publish_feed_
    FC_ASSERT(base.is_market_issued());
 
    const asset_bitasset_data_object& bitasset = base.bitasset_data(d);
-   FC_ASSERT(bitasset.options.short_backing_asset == o.feed.settlement_price.quote.asset_id);
+   FC_ASSERT(o.feed.settlement_price.quote.asset_id == bitasset.options.short_backing_asset);
    //Verify that the publisher is authoritative to publish a feed
    if( base.issuer == account_id_type() )
    {
