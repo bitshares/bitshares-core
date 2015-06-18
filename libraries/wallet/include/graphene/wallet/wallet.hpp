@@ -26,8 +26,8 @@ using namespace graphene::utilities;
 using namespace std;
 
 namespace fc{
-void to_variant(const account_object_multi_index_type& accts, variant& vo);
-void from_variant(const variant &var, account_object_multi_index_type &vo);
+void to_variant(const account_multi_index_type& accts, variant& vo);
+void from_variant(const variant &var, account_multi_index_type &vo);
 }
 
 namespace graphene { namespace wallet {
@@ -49,7 +49,7 @@ struct plain_keys
 
 struct wallet_data
 {
-   account_object_multi_index_type my_accounts;
+   account_multi_index_type my_accounts;
    /// @return IDs of all accounts in @ref my_accounts
    vector<object_id_type> my_account_ids()const
    {

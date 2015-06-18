@@ -685,7 +685,7 @@ BOOST_AUTO_TEST_CASE( refund_worker_test )
 
 BOOST_AUTO_TEST_CASE( force_settlement_unavailable )
 { try {
-   auto private_key = generate_private_key("genesis");
+   auto private_key = delegate_priv_key;
    account_id_type nathan_id = create_account("nathan").get_id();
    account_id_type shorter1_id = create_account("shorter1").get_id();
    account_id_type shorter2_id = create_account("shorter2").get_id();

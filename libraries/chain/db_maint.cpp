@@ -169,7 +169,7 @@ void database::update_active_delegates()
    modify( get_global_properties(), [&]( global_property_object& gp ) {
       gp.active_delegates.clear();
       std::transform(delegates.begin(), delegates.end(),
-                     std::back_inserter(gp.active_delegates),
+                     std::inserter(gp.active_delegates, gp.active_delegates.begin()),
                      [](const delegate_object& d) { return d.id; });
    });
 } FC_CAPTURE_AND_RETHROW() }

@@ -36,9 +36,9 @@ database::~database(){
 void database::open( const fc::path& data_dir, const genesis_state_type& initial_allocation )
 { try {
    ilog("Open database in ${d}", ("d", data_dir));
-   object_database::open( data_dir );
+   object_database::open(data_dir);
 
-   _block_id_to_block.open( data_dir / "database" / "block_num_to_block" );
+   _block_id_to_block.open(data_dir / "database" / "block_num_to_block");
 
    if( !find(global_property_id_type()) )
    {

@@ -88,12 +88,13 @@ struct database_fixture {
    // the reason we use an app is to exercise the indexes of built-in
    //   plugins
    graphene::app::application app;
+   genesis_state_type genesis_state;
    chain::database &db;
    signed_transaction trx;
    key_id_type genesis_key;
    account_id_type genesis_account;
    fc::ecc::private_key private_key = fc::ecc::private_key::generate();
-   fc::ecc::private_key delegate_priv_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("genesis")) );
+   fc::ecc::private_key delegate_priv_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("null_key")) );
    fc::time_point_sec genesis_time = fc::time_point_sec( GRAPHENE_GENESIS_TIMESTAMP );
    fc::time_point_sec now          = fc::time_point_sec( GRAPHENE_GENESIS_TIMESTAMP );
    const key_object* key1= nullptr;
@@ -113,7 +114,7 @@ struct database_fixture {
    void verify_account_history_plugin_index( )const;
    void open_database();
    signed_block generate_block(uint32_t skip = ~0,
-                               const fc::ecc::private_key& key = generate_private_key("genesis"),
+                               const fc::ecc::private_key& key = generate_private_key("null_key"),
                                int miss_blocks = 0);
 
    /**
@@ -189,10 +190,10 @@ struct database_fixture {
    const delegate_object& create_delegate( const account_object& owner );
    const witness_object& create_witness(account_id_type owner,
                                         key_id_type signing_key = key_id_type(),
-                                        const fc::ecc::private_key& signing_private_key = generate_private_key("genesis"));
+                                        const fc::ecc::private_key& signing_private_key = generate_private_key("null_key"));
    const witness_object& create_witness(const account_object& owner,
                                         key_id_type signing_key = key_id_type(),
-                                        const fc::ecc::private_key& signing_private_key = generate_private_key("genesis"));
+                                        const fc::ecc::private_key& signing_private_key = generate_private_key("null_key"));
    const key_object& register_key( const public_key_type& key );
    const key_object& register_address( const address& addr );
    uint64_t fund( const account_object& account, const asset& amount = asset(500000) );

@@ -35,7 +35,7 @@ void witness_plugin::plugin_set_program_options(
          ("witness-id,w", bpo::value<vector<string>>()->composing()->multitoken(),
           "ID of witness controlled by this node (e.g. \"1.7.0\", quotes are required, may specify multiple times)")
          ("private-key", bpo::value<vector<string>>()->composing()->multitoken()->
-          DEFAULT_VALUE_VECTOR(std::make_pair(chain::key_id_type(), fc::ecc::private_key::regenerate(fc::sha256::hash(std::string("genesis"))))),
+          DEFAULT_VALUE_VECTOR(std::make_pair(chain::key_id_type(), fc::ecc::private_key::regenerate(fc::sha256::hash(std::string("null_key"))))),
           "Tuple of [key ID, private key] (may specify multiple times)")
          ;
    config_file_options.add(command_line_options);

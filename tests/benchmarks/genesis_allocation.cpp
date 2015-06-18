@@ -85,7 +85,7 @@ BOOST_AUTO_TEST_CASE( genesis_and_persistence_bench )
             BOOST_CHECK(db.get_balance(account_id_type(i), asset_id_type()).amount == GRAPHENE_INITIAL_SUPPLY / account_count);
 
          int blocks_out = 0;
-         auto delegate_priv_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("genesis")) );
+         auto delegate_priv_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("null_key")) );
          auto aw = db.get_global_properties().active_witnesses;
          auto b =  db.generate_block( db.get_slot_time( 1 ), db.get_scheduled_witness( 1 ).first, delegate_priv_key, ~0 );
 

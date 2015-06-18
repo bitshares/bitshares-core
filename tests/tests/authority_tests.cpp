@@ -233,7 +233,7 @@ BOOST_AUTO_TEST_CASE( recursive_accounts )
       trx.operations.push_back(op);
       sign(trx, key2.id,parent2_key);
       sign(trx, grandparent_key_obj.id,grandparent_key);
-      sign(trx, key_id_type(), generate_private_key("genesis"));
+      sign(trx, key_id_type(), delegate_priv_key);
       //Fails due to recursion depth.
       BOOST_CHECK_THROW(db.push_transaction(trx, database::skip_transaction_dupe_check), fc::exception);
       sign(trx, child_key_obj.id, child_key);
@@ -269,7 +269,7 @@ BOOST_AUTO_TEST_CASE( proposed_single_account )
    try {
       INVOKE(any_two_of_three);
 
-      fc::ecc::private_key genesis_key = generate_private_key("genesis");
+      fc::ecc::private_key genesis_key = delegate_priv_key;
       fc::ecc::private_key nathan_key1 = fc::ecc::private_key::regenerate(fc::digest("key1"));
       fc::ecc::private_key nathan_key2 = fc::ecc::private_key::regenerate(fc::digest("key2"));
       fc::ecc::private_key nathan_key3 = fc::ecc::private_key::regenerate(fc::digest("key3"));
@@ -338,7 +338,7 @@ BOOST_AUTO_TEST_CASE( proposed_single_account )
 BOOST_AUTO_TEST_CASE( genesis_authority )
 { try {
    fc::ecc::private_key nathan_key = fc::ecc::private_key::generate();
-   fc::ecc::private_key genesis_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("genesis")));
+   fc::ecc::private_key genesis_key = delegate_priv_key;
    const auto& nathan_key_obj = register_key(nathan_key.get_public_key());
    key_id_type nathan_key_id = nathan_key_obj.get_id();
    const account_object nathan = create_account("nathan", nathan_key_obj.id);
@@ -415,7 +415,7 @@ BOOST_AUTO_TEST_CASE( genesis_authority )
 BOOST_FIXTURE_TEST_CASE( fired_delegates, database_fixture )
 { try {
    generate_block();
-   fc::ecc::private_key genesis_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("genesis")));
+   fc::ecc::private_key genesis_key = delegate_priv_key;
    fc::ecc::private_key delegate_key = fc::ecc::private_key::generate();
    auto delegate_key_object = register_key(delegate_key.get_public_key());
 
@@ -812,7 +812,7 @@ BOOST_FIXTURE_TEST_CASE( max_authority_membership, database_fixture )
       transaction tx;
       processed_transaction ptx;
 
-      private_key_type genesis_key = generate_private_key("genesis");
+      private_key_type genesis_key = delegate_priv_key;
       // Sam is the creator of accounts
       private_key_type sam_key = generate_private_key("sam");
 
@@ -903,7 +903,7 @@ BOOST_FIXTURE_TEST_CASE( bogus_signature, database_fixture )
 {
    try
    {
-      private_key_type genesis_key = generate_private_key("genesis");
+      private_key_type genesis_key = delegate_priv_key;
       // Sam is the creator of accounts
       private_key_type alice_key = generate_private_key("alice");
       private_key_type bob_key = generate_private_key("bob");
@@ -987,8 +987,10 @@ BOOST_FIXTURE_TEST_CASE( voting_account, database_fixture )
    delegate_id_type nathan_delegate = create_delegate(nathan_id(db)).id;
    delegate_id_type vikram_delegate = create_delegate(vikram_id(db)).id;
 
+   wdump((db.get_balance(account_id_type(), asset_id_type())));
    generate_block();
 
+   wdump((db.get_balance(account_id_type(), asset_id_type())));
    transfer(account_id_type(), nathan_id, asset(1000000));
    transfer(account_id_type(), vikram_id, asset(100));
 

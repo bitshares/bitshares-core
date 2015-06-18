@@ -49,7 +49,7 @@ BOOST_FIXTURE_TEST_CASE( update_account_keys, database_fixture )
         ;
 
       // Sam is the creator of accounts
-      private_key_type genesis_key = generate_private_key("genesis");
+      private_key_type genesis_key = delegate_priv_key;
       private_key_type sam_key = generate_private_key("sam");
 
       //

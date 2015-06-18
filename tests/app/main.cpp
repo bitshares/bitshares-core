@@ -68,7 +68,7 @@ BOOST_AUTO_TEST_CASE( two_node_network )
       ilog("Connected!");
 
       fc::ecc::private_key nathan_key = fc::ecc::private_key::generate();
-      fc::ecc::private_key genesis_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("genesis")));
+      fc::ecc::private_key genesis_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("null_key")));
       graphene::chain::signed_transaction trx;
       trx.set_expiration(now + fc::seconds(30));
       std::shared_ptr<chain::database> db2 = app2.chain_database();

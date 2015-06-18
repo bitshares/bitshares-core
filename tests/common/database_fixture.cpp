@@ -53,7 +53,18 @@ database_fixture::database_fixture()
    ahplugin->plugin_set_app( &app );
    ahplugin->plugin_initialize( options );
 
-   db.init_genesis();
+   secret_hash_type::encoder enc;
+   fc::raw::pack(enc, delegate_priv_key);
+   fc::raw::pack(enc, secret_hash_type());
+   for( int i = 0; i < 10; ++i )
+   {
+      genesis_state.allocation_targets.emplace_back("init"+fc::to_string(i), delegate_priv_key.get_public_key(), 0, true);
+      genesis_state.initial_committee.push_back({"init"+fc::to_string(i)});
+   }
+   genesis_state.initial_witnesses = vector<genesis_state_type::initial_witness_type>(10, {"committee-account",
+                                                                                           delegate_priv_key.get_public_key(),
+                                                                                           secret_hash_type::hash(enc.result())});
+   db.init_genesis(genesis_state);
    ahplugin->plugin_startup();
 
    generate_block();
@@ -79,8 +90,8 @@ database_fixture::~database_fixture()
 
 fc::ecc::private_key database_fixture::generate_private_key(string seed)
 {
-   static const fc::ecc::private_key genesis = fc::ecc::private_key::regenerate(fc::sha256::hash(string("genesis")));
-   if( seed == "genesis" )
+   static const fc::ecc::private_key genesis = fc::ecc::private_key::regenerate(fc::sha256::hash(string("null_key")));
+   if( seed == "null_key" )
       return genesis;
    return fc::ecc::private_key::regenerate(fc::sha256::hash(seed));
 }
@@ -250,7 +261,7 @@ void database_fixture::open_database()
 {
    if( !data_dir ) {
       data_dir = fc::temp_directory();
-      db.open(data_dir->path());
+      db.open(data_dir->path(), genesis_state);
    }
 }
 
@@ -277,7 +288,7 @@ void database_fixture::generate_blocks(fc::time_point_sec timestamp, bool miss_i
       generate_block();
       auto slots_to_miss = db.get_slot_at_time(timestamp) - 1;
       if( slots_to_miss <= 0 ) return;
-      generate_block(~0, generate_private_key("genesis"), slots_to_miss);
+      generate_block(~0, delegate_priv_key, slots_to_miss);
       return;
    }
    while( db.head_block_time() < timestamp )
