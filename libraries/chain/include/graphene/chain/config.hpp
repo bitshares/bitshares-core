@@ -65,6 +65,7 @@
 #define GRAPHENE_MAX_COLLATERAL_RATIO                   32000 // higher than this is unnecessary and may exceed int16 storage
 #define GRAPHENE_DEFAULT_INITIAL_COLLATERAL_RATIO       2000
 #define GRAPHENE_DEFAULT_MAINTENANCE_COLLATERAL_RATIO   1750
+#define GRAPHENE_DEFAULT_MAX_SHORT_SQUEEZE_RATIO        1500
 #define GRAPHENE_DEFAULT_MARGIN_PERIOD_SEC              (30*60*60*24)
 
 #define GRAPHENE_DEFAULT_NUM_WITNESSES                        (101)

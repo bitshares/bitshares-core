@@ -32,7 +32,6 @@ namespace graphene { namespace chain {
 
 void block_database::open( const fc::path& dbdir )
 { try {
-   idump((sizeof(index_entry)) );
    fc::create_directories(dbdir);
    _block_num_to_pos.exceptions(std::ios_base::failbit | std::ios_base::badbit);
    _blocks.exceptions(std::ios_base::failbit | std::ios_base::badbit);

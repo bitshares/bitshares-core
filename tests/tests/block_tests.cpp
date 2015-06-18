@@ -26,7 +26,7 @@
 #include <graphene/chain/key_object.hpp>
 #include <graphene/chain/limit_order_object.hpp>
 #include <graphene/chain/proposal_object.hpp>
-#include <graphene/chain/short_order_object.hpp>
+#include <graphene/chain/call_order_object.hpp>
 #include <graphene/chain/witness_schedule_object.hpp>
 
 #include <fc/crypto/digest.hpp>
@@ -70,30 +70,29 @@ BOOST_AUTO_TEST_CASE( block_database_test )
       for( uint32_t i = 0; i < 5; ++i )
       {
          if( i > 0 ) b.previous = b.id();
-         b.witness = witness_id_type(i+1);
-         edump((b));
+         b.witness = witness_id_type(i+1); 
          bdb.store( b.id(), b );
 
          auto fetch = bdb.fetch_by_number( b.block_num() );
-         idump((fetch));
+         //idump((fetch));
          FC_ASSERT( fetch.valid() );
          FC_ASSERT( fetch->witness ==  b.witness );
          fetch = bdb.fetch_by_number( i+1 );
-         idump((fetch));
+         //idump((fetch));
          FC_ASSERT( fetch.valid() );
          FC_ASSERT( fetch->witness ==  b.witness );
          fetch = bdb.fetch_optional( b.id() );
-         idump((fetch));
+         //idump((fetch));
          FC_ASSERT( fetch.valid() );
          FC_ASSERT( fetch->witness ==  b.witness );
       }
-      ilog("-----------" );
+      //ilog("-----------" );
 
       for( uint32_t i = 1; i < 5; ++i )
       {
          auto blk = bdb.fetch_by_number( i );
          FC_ASSERT( blk.valid() );
-         idump((blk)(i));
+         //idump((blk)(i));
          FC_ASSERT( blk->witness == witness_id_type(blk->block_num()) );
       }
 
@@ -111,7 +110,7 @@ BOOST_AUTO_TEST_CASE( block_database_test )
       {
          auto blk = bdb.fetch_by_number( i+1 );
          FC_ASSERT( blk.valid() );
-         idump((blk)(i));
+         //idump((blk)(i));
          FC_ASSERT( blk->witness == witness_id_type(blk->block_num()) );
       }
 
@@ -150,7 +149,7 @@ BOOST_AUTO_TEST_CASE( generate_empty_blocks )
          db.close();
       }
       {
-         wlog( "------------------------------------------------" );
+         //wlog( "------------------------------------------------" );
          database db;
          db.open(data_dir.path() );
          BOOST_CHECK_EQUAL( db.head_block_num(), 200 );
@@ -190,15 +189,15 @@ BOOST_AUTO_TEST_CASE( undo_block )
          BOOST_CHECK( db.head_block_num() == 5 );
          db.pop_block();
          now -= db.block_interval();
-         wdump( (witness_schedule_id_type()(db)) );
+         //wdump( (witness_schedule_id_type()(db)) );
          BOOST_CHECK( db.head_block_num() == 4 );
          db.pop_block();
          now -= db.block_interval();
-         wdump( (witness_schedule_id_type()(db)) );
+         //wdump( (witness_schedule_id_type()(db)) );
          BOOST_CHECK( db.head_block_num() == 3 );
          db.pop_block();
          now -= db.block_interval();
-         wdump( (witness_schedule_id_type()(db)) );
+         //wdump( (witness_schedule_id_type()(db)) );
          BOOST_CHECK( db.head_block_num() == 2 );
          for( uint32_t i = 0; i < 5; ++i )
          {
@@ -540,53 +539,6 @@ BOOST_FIXTURE_TEST_CASE( maintenance_interval, database_fixture )
    }
 }
 
-/**
- *  Orders should specify a valid expiration time and they will ba automatically canceled if not filled by that time.
- *  This feature allows people to safely submit orders that have a limited lifetime, which is essential to some
- *  traders.
- */
-BOOST_FIXTURE_TEST_CASE( short_order_expiration, database_fixture )
-{ try {
-   //Get a sane head block time
-   generate_block();
-
-   auto* test = &create_bitasset("TEST");
-   auto* core = &asset_id_type()(db);
-   auto* nathan = &create_account("nathan");
-   auto* genesis = &account_id_type()(db);
-
-   transfer(*genesis, *nathan, core->amount(50000));
-
-   BOOST_CHECK_EQUAL( get_balance(*nathan, *core), 50000 );
-
-   short_order_create_operation op;
-   op.seller = nathan->id;
-   op.amount_to_sell = test->amount(500);
-   op.collateral = core->amount(500);
-   op.expiration = db.head_block_time() + fc::seconds(10);
-   trx.operations.push_back(op);
-   auto ptrx = PUSH_TX( db, trx, ~0 );
-
-   BOOST_CHECK_EQUAL( get_balance(*nathan, *core), 49500 );
-
-   auto ptrx_id = ptrx.operation_results.back().get<object_id_type>();
-   auto short_index = db.get_index_type<short_order_index>().indices();
-   auto short_itr = short_index.begin();
-   BOOST_REQUIRE( short_itr != short_index.end() );
-   BOOST_REQUIRE( short_itr->id == ptrx_id );
-   BOOST_REQUIRE( db.find_object(short_itr->id) );
-   BOOST_CHECK_EQUAL( get_balance(*nathan, *core), 49500 );
-   auto id = short_itr->id;
-
-   generate_blocks(op.expiration, false);
-   test = &get_asset("TEST");
-   core = &asset_id_type()(db);
-   nathan = &get_account("nathan");
-   genesis = &account_id_type()(db);
-
-   BOOST_CHECK(db.find_object(id) == nullptr);
-   BOOST_CHECK_EQUAL( get_balance(*nathan, *core), 50000 );
-} FC_LOG_AND_RETHROW() }
 
 BOOST_FIXTURE_TEST_CASE( limit_order_expiration, database_fixture )
 { try {
@@ -690,7 +642,11 @@ BOOST_FIXTURE_TEST_CASE( change_block_interval, database_fixture )
 
 BOOST_FIXTURE_TEST_CASE( force_settlement, database_fixture )
 { try {
+   FC_ASSERT( !"TODO" );
+   /*
    auto private_key = delegate_priv_key;
+   auto private_key = generate_private_key("genesis");
+>>>>>>> short_refactor
    account_id_type nathan_id = create_account("nathan").get_id();
    account_id_type shorter1_id = create_account("shorter1").get_id();
    account_id_type shorter2_id = create_account("shorter2").get_id();
@@ -810,6 +766,7 @@ BOOST_FIXTURE_TEST_CASE( force_settlement, database_fixture )
    BOOST_CHECK(db.find(settle_id));
    BOOST_CHECK_EQUAL(get_balance(nathan_id, asset_id_type()), 5878);
    BOOST_CHECK(!db.get_index_type<call_order_index>().indices().empty());
+   */
 } FC_LOG_AND_RETHROW() }
 
 BOOST_FIXTURE_TEST_CASE( pop_block_twice, database_fixture )
@@ -883,9 +840,7 @@ BOOST_FIXTURE_TEST_CASE( witness_scheduler_missed_blocks, database_fixture )
    });
 
    near_schedule = db.get_near_witness_schedule();
-   idump((db.head_block_time()));
    generate_block(0, delegate_priv_key, 2);
-   idump((db.head_block_time()));
    BOOST_CHECK(db.get_dynamic_global_properties().current_witness == near_schedule[2]);
 
    near_schedule.erase(near_schedule.begin(), near_schedule.begin() + 3);

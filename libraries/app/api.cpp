@@ -215,22 +215,6 @@ namespace graphene { namespace app {
        return result;
     }
 
-    vector<short_order_object> database_api::get_short_orders(asset_id_type a, uint32_t limit)const
-    {
-      const auto& short_order_idx = _db.get_index_type<short_order_index>();
-      const auto& sell_price_idx = short_order_idx.indices().get<by_price>();
-      const asset_object& mia = _db.get(a);
-
-      FC_ASSERT( mia.is_market_issued(), "must be a market issued asset" );
-
-      price index_price = price::min(mia.get_id(), mia.bitasset_data(_db).options.short_backing_asset);
-
-      auto short_itr = sell_price_idx.lower_bound(index_price.max());
-      auto short_end = sell_price_idx.upper_bound(index_price.min());
-
-      return vector<short_order_object>(short_itr, short_end);
-    }
-
     vector<call_order_object> database_api::get_call_orders(asset_id_type a, uint32_t limit)const
     {
        const auto& call_index = _db.get_index_type<call_order_index>().indices().get<by_price>();
@@ -358,15 +342,11 @@ namespace graphene { namespace app {
              case operation::tag<limit_order_create_operation>::value:
                 market = op.op.get<limit_order_create_operation>().get_market();
                 break;
-             case operation::tag<short_order_create_operation>::value:
-                market = op.op.get<limit_order_create_operation>().get_market();
-                break;
              case operation::tag<fill_order_operation>::value:
                 market = op.op.get<fill_order_operation>().get_market();
                 break;
                 /*
              case operation::tag<limit_order_cancel_operation>::value:
-             case operation::tag<short_order_cancel_operation>::value:
              */
              default: break;
           }

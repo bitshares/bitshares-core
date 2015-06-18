@@ -76,10 +76,13 @@ using namespace graphene::db;
    key_id_type name ## _key_id = register_key(name ## _private_key.get_public_key()).get_id();
 #define ACTOR(name) \
    PREP_ACTOR(name) \
-   account_id_type name ## _id = create_account(BOOST_PP_STRINGIZE(name), name ## _key_id).id;
+   const auto& name = create_account(BOOST_PP_STRINGIZE(name), name ## _key_id); \
+   account_id_type name ## _id = name.id; (void)name ## _id;
+
 #define GET_ACTOR(name) \
    fc::ecc::private_key name ## _private_key = generate_private_key(BOOST_PP_STRINGIZE(name)); \
-   account_id_type name ## _id = get_account(BOOST_PP_STRINGIZE(name)).id; \
+   const account_object& name = get_account(BOOST_PP_STRINGIZE(name)); \
+   account_id_type name ## _id = name.id; \
    key_id_type name ## _key_id = name ## _id(db).active.auths.begin()->first;
 
 #define ACTORS_IMPL(r, data, elem) ACTOR(elem)
@@ -144,6 +147,11 @@ struct database_fixture {
       key_id_type key = key_id_type()
       );
 
+   void  update_feed_producers( const asset_object& mia, flat_set<account_id_type> producers );
+   void  publish_feed( const asset_object& mia, const account_object& by, const price_feed& f );
+   void  borrow( const account_object& who, asset what, asset collateral, price call_price = price());
+   void  cover( const account_object& who, asset what, asset collateral_freed, price call_price = price());
+
    const asset_object& get_asset( const string& symbol )const;
    const account_object& get_account( const string& name )const;
    const asset_object& create_bitasset(const string& name,
@@ -153,20 +161,6 @@ struct database_fixture {
    const asset_object& create_user_issued_asset( const string& name );
    void issue_uia( const account_object& recipient, asset amount );
 
-   const short_order_object* create_short(
-      account_id_type seller,
-      const asset& amount_to_sell,
-      const asset& collateral_provided,
-      uint16_t initial_collateral_ratio = 2000,
-      uint16_t maintenance_collateral_ratio = 1750
-      );
-   const short_order_object* create_short(
-      const account_object& seller,
-      const asset& amount_to_sell,
-      const asset& collateral_provided,
-      uint16_t initial_collateral_ratio = 2000,
-      uint16_t maintenance_collateral_ratio = 1750
-      );
 
    const account_object& create_account(
       const string& name,
@@ -203,7 +197,6 @@ struct database_fixture {
    const limit_order_object* create_sell_order( account_id_type user, const asset& amount, const asset& recv );
    const limit_order_object* create_sell_order( const account_object& user, const asset& amount, const asset& recv );
    asset cancel_limit_order( const limit_order_object& order );
-   asset cancel_short_order( const short_order_object& order );
    void transfer( account_id_type from, account_id_type to, const asset& amount, const asset& fee = asset() );
    void transfer( const account_object& from, const account_object& to, const asset& amount, const asset& fee = asset() );
    void fund_fee_pool( const account_object& from, const asset_object& asset_to_fund, const share_type amount );
@@ -214,11 +207,9 @@ struct database_fixture {
    void upgrade_to_annual_member( const account_object& account );
    void print_market( const string& syma, const string& symb )const;
    string pretty( const asset& a )const;
-   void print_short_order( const short_order_object& cur )const;
    void print_limit_order( const limit_order_object& cur )const;
    void print_call_orders( )const;
    void print_joint_market( const string& syma, const string& symb )const;
-   void print_short_market( const string& syma, const string& symb )const;
    int64_t get_balance( account_id_type account, asset_id_type a )const;
    int64_t get_balance( const account_object& account, const asset_object& a )const;
 };

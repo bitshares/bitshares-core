@@ -400,13 +400,13 @@ application::~application()
 {
    if( my->_p2p_network )
    {
-      ilog("Closing p2p node");
+      //ilog("Closing p2p node");
       my->_p2p_network->close();
       my->_p2p_network.reset();
    }
    if( my->_chain_db )
    {
-      ilog("Closing chain database");
+      //ilog("Closing chain database");
       my->_chain_db->close();
    }
 }

@@ -101,13 +101,13 @@ namespace graphene { namespace chain {
       price price::min( asset_id_type base, asset_id_type quote ) { return asset( 1, base ) / asset( GRAPHENE_MAX_SHARE_SUPPLY, quote); }
 
       price price::call_price(const asset& debt, const asset& collateral, uint16_t collateral_ratio)
-      {
+      { try {
          fc::uint128 tmp( collateral.amount.value );
          tmp *= collateral_ratio - 1000;
          tmp /= 1000;
          FC_ASSERT( tmp <= GRAPHENE_MAX_SHARE_SUPPLY );
          return asset( tmp.to_uint64(), collateral.asset_id) / debt;
-      }
+      } FC_CAPTURE_AND_RETHROW( (debt)(collateral)(collateral_ratio) ) }
 
       bool price::is_null() const { return *this == price(); }
 
@@ -120,20 +120,10 @@ namespace graphene { namespace chain {
 
       void price_feed::validate() const
       { try {
-         if( !call_limit.is_null() )
-            call_limit.validate();
-         if( !short_limit.is_null() )
-            short_limit.validate();
          if( !settlement_price.is_null() )
             settlement_price.validate();
-         FC_ASSERT( call_limit.is_null() == short_limit.is_null() );
-         FC_ASSERT( call_limit.base.asset_id == short_limit.quote.asset_id );
-         FC_ASSERT( call_limit.quote.asset_id == short_limit.base.asset_id );
-         FC_ASSERT( max_margin_period_sec > 0 );
-         FC_ASSERT( required_maintenance_collateral < required_initial_collateral );
-         FC_ASSERT( required_maintenance_collateral >= 1000 );
-         FC_ASSERT( call_limit.is_null() || call_limit < ~short_limit );
-      } FC_CAPTURE_AND_RETHROW( (call_limit.is_null())(short_limit.is_null())(call_limit)(short_limit)
-    		  (max_margin_period_sec)(required_maintenance_collateral)(required_initial_collateral) ) }
+         FC_ASSERT( maximum_short_squeeze_ratio >= 1000 );
+         FC_ASSERT( maintenance_collateral_ratio >= maximum_short_squeeze_ratio );
+      } FC_CAPTURE_AND_RETHROW( (*this) ) }
 
 } } // graphene::chain

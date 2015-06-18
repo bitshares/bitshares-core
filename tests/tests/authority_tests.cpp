@@ -966,14 +966,12 @@ BOOST_FIXTURE_TEST_CASE( bogus_signature, database_fixture )
 
       flat_set<account_id_type> active_set, owner_set;
       xfer_op.get<transfer_operation>().get_required_auth(active_set, owner_set);
-      wdump( (active_set)(owner_set)(alice_key_id)
-       (alice_account_object) );
+ //     wdump( (active_set)(owner_set)(alice_key_id) (alice_account_object) );
 
       PUSH_TX( db,  trx, skip  );
 
       trx.operations.push_back( xfer_op );
       // Alice's signature is now invalid
-      edump((trx));
       BOOST_REQUIRE_THROW( PUSH_TX( db,  trx, skip  ), fc::exception );
       // Re-sign, now OK (sig is replaced)
       trx.sign( alice_key_id, alice_key );
@@ -1013,10 +1011,10 @@ BOOST_FIXTURE_TEST_CASE( voting_account, database_fixture )
    delegate_id_type nathan_delegate = create_delegate(nathan_id(db)).id;
    delegate_id_type vikram_delegate = create_delegate(vikram_id(db)).id;
 
-   wdump((db.get_balance(account_id_type(), asset_id_type())));
+   //wdump((db.get_balance(account_id_type(), asset_id_type())));
    generate_block();
 
-   wdump((db.get_balance(account_id_type(), asset_id_type())));
+   //wdump((db.get_balance(account_id_type(), asset_id_type())));
    transfer(account_id_type(), nathan_id, asset(1000000));
    transfer(account_id_type(), vikram_id, asset(100));
 

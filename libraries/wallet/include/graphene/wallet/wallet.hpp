@@ -114,7 +114,6 @@ class wallet_api
       vector<asset_object>              list_assets(const string& lowerbound, uint32_t limit)const;
       vector<operation_history_object>  get_account_history(string name, int limit)const;
       vector<limit_order_object>        get_limit_orders(string a, string b, uint32_t limit)const;
-      vector<short_order_object>        get_short_orders(string a, uint32_t limit)const;
       vector<call_order_object>         get_call_orders(string a, uint32_t limit)const;
       vector<force_settlement_object>   get_settle_orders(string a, uint32_t limit)const;
       global_property_object            get_global_properties() const;
@@ -204,7 +203,11 @@ class wallet_api
                                     bool     fill_or_kill = false,
                                     bool     broadcast = false);
 
-      signed_transaction short_sell_asset(string seller_name, string amount_to_sell, string asset_symbol,
+      /**
+       *  This method will create a transaction with two operations, the first one will borrow amount_to_sell
+       *  given amount of collateral 
+       */
+      signed_transaction borrow_asset(string seller_name, string amount_to_sell, string asset_symbol,
                                           string amount_of_collateral, bool broadcast = false);
 
       signed_transaction create_asset(string issuer,
@@ -272,7 +275,7 @@ FC_API( graphene::wallet::wallet_api,
         (upgrade_account)
         (create_account_with_brain_key)
         (sell_asset)
-        (short_sell_asset)
+        (borrow_asset)
         (transfer)
         (create_asset)
         (issue_asset)
@@ -289,7 +292,6 @@ FC_API( graphene::wallet::wallet_api,
         (load_wallet_file)
         (normalize_brain_key)
         (get_limit_orders)
-        (get_short_orders)
         (get_call_orders)
         (get_settle_orders)
         (save_wallet_file)

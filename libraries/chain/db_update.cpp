@@ -22,7 +22,7 @@
 #include <graphene/chain/global_property_object.hpp>
 #include <graphene/chain/limit_order_object.hpp>
 #include <graphene/chain/proposal_object.hpp>
-#include <graphene/chain/short_order_object.hpp>
+#include <graphene/chain/call_order_object.hpp>
 #include <graphene/chain/transaction_object.hpp>
 #include <graphene/chain/withdraw_permission_object.hpp>
 #include <graphene/chain/witness_object.hpp>
@@ -119,32 +119,21 @@ void database::clear_expired_proposals()
 void database::clear_expired_orders()
 {
    with_skip_flags(
-      get_node_properties().skip_flags | skip_authority_check, [&]()
-      {
-   transaction_evaluation_state cancel_context(this);
+      get_node_properties().skip_flags | skip_authority_check, [&](){
+         transaction_evaluation_state cancel_context(this);
 
-   //Cancel expired limit orders
-   auto& limit_index = get_index_type<limit_order_index>().indices().get<by_expiration>();
-   while( !limit_index.empty() && limit_index.begin()->expiration <= head_block_time() )
-   {
-      limit_order_cancel_operation canceler;
-      const limit_order_object& order = *limit_index.begin();
-      canceler.fee_paying_account = order.seller;
-      canceler.order = order.id;
-      apply_operation(cancel_context, canceler);
-   }
+         //Cancel expired limit orders
+         auto& limit_index = get_index_type<limit_order_index>().indices().get<by_expiration>();
+         while( !limit_index.empty() && limit_index.begin()->expiration <= head_block_time() )
+         {
+            limit_order_cancel_operation canceler;
+            const limit_order_object& order = *limit_index.begin();
+            canceler.fee_paying_account = order.seller;
+            canceler.order = order.id;
+            apply_operation(cancel_context, canceler);
+         }
+     });
 
-   //Cancel expired short orders
-   auto& short_index = get_index_type<short_order_index>().indices().get<by_expiration>();
-   while( !short_index.empty() && short_index.begin()->expiration <= head_block_time() )
-   {
-      const short_order_object& order = *short_index.begin();
-      short_order_cancel_operation canceler;
-      canceler.fee_paying_account = order.seller;
-      canceler.order = order.id;
-      apply_operation(cancel_context, canceler);
-   }
-      } );
 
    //Process expired force settlement orders
    auto& settlement_index = get_index_type<force_settlement_index>().indices().get<by_expiration>();

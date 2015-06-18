@@ -121,43 +121,10 @@ namespace graphene { namespace chain {
 
    /**
     *  @class price_feed
-    *  @brief defines market parameters for shorts and margin positions
+    *  @brief defines market parameters for margin positions
     */
    struct price_feed
    {
-      /**
-       * This is the lowest price at which margin positions will be forced to sell their collateral. This does not
-       * directly affect the price at which margin positions will be called; it is only a safety to prevent calls at
-       * unreasonable prices.
-       */
-      price call_limit;
-      /**
-       * Short orders will only be matched against bids above this price.
-       */
-      price short_limit;
-      /**
-       * Forced settlements will evaluate using this price.
-       */
-      price settlement_price;
-      /**
-       * Maximum number of seconds margin positions should be able to remain open.
-       */
-      uint32_t max_margin_period_sec = GRAPHENE_DEFAULT_MARGIN_PERIOD_SEC;
-
-      /**
-       *  Required maintenance collateral is defined
-       *  as a fixed point number with a maximum value of 10.000
-       *  and a minimum value of 1.000.
-       *
-       *  This value must be greater than required_maintenance_collateral or
-       *  a margin call would be triggered immediately.
-       *
-       *  Default requirement is $2 of collateral per $1 of debt based
-       *  upon the premise that both parties to every trade should bring
-       *  equal value to the table.
-       */
-      uint16_t required_initial_collateral = GRAPHENE_DEFAULT_INITIAL_COLLATERAL_RATIO;
-
       /**
        *  Required maintenance collateral is defined
        *  as a fixed point number with a maximum value of 10.000
@@ -169,19 +136,49 @@ namespace graphene { namespace chain {
        *  equals value_of_collateral using rate.
        *
        *  Default requirement is $1.75 of collateral per $1 of debt
+       *
+       *  BlackSwan ---> SQR ---> MCR ----> SP
        */
-      uint16_t required_maintenance_collateral = GRAPHENE_DEFAULT_MAINTENANCE_COLLATERAL_RATIO;
+      ///@{
+      /**
+       * Forced settlements will evaluate using this price, defined as BITASSET / COLLATERAL 
+       */
+      price settlement_price;
 
-      friend bool operator < ( const price_feed& a, const price_feed& b )
+      /** Fixed point between 1.000 and 10.000 */
+      uint16_t maintenance_collateral_ratio = GRAPHENE_DEFAULT_MAINTENANCE_COLLATERAL_RATIO;
+
+      /** Fixed point between 1.000 and 10.000 */
+      uint16_t maximum_short_squeeze_ratio = GRAPHENE_DEFAULT_MAX_SHORT_SQUEEZE_RATIO;
+
+      /**
+       *  When updating a call order the following condition must be maintained:
+       *
+       *  debt * maintenance_price() < collateral 
+       *  debt * settlement_price    < debt * maintenance
+       *  debt * maintenance_price() < debt * max_short_squeeze_price() 
+       */
+      price maintenance_price()const
       {
-         return std::tie( a.call_limit.base.asset_id, a.call_limit.quote.asset_id ) <
-                std::tie( b.call_limit.base.asset_id, b.call_limit.quote.asset_id );
+         return ~price::call_price( settlement_price.base, settlement_price.quote, maintenance_collateral_ratio );
       }
+
+      /** When selling collateral to pay off debt, the least amount of debt to receive should be 
+       *  min_usd = max_short_squeeze_price() * collateral 
+       *
+       *  This is provided to ensure that a black swan cannot be trigged due to poor liquidity alone, it
+       *  must be confirmed by having the max_short_squeeze_price() move below the black swan price.
+       */
+      price max_short_squeeze_price()const
+      {
+         return ~price::call_price( settlement_price.base, settlement_price.quote, maximum_short_squeeze_ratio );
+      }
+      ///@}
 
       friend bool operator == ( const price_feed& a, const price_feed& b )
       {
-         return std::tie( a.call_limit.base.asset_id, a.call_limit.quote.asset_id ) ==
-                std::tie( b.call_limit.base.asset_id, b.call_limit.quote.asset_id );
+         return std::tie( a.settlement_price, a.maintenance_collateral_ratio, a.maximum_short_squeeze_ratio ) ==
+                std::tie( b.settlement_price, b.maintenance_collateral_ratio, b.maximum_short_squeeze_ratio );
       }
 
       void validate() const;
@@ -191,6 +188,8 @@ namespace graphene { namespace chain {
 
 FC_REFLECT( graphene::chain::asset, (amount)(asset_id) )
 FC_REFLECT( graphene::chain::price, (base)(quote) )
-#define GRAPHENE_PRICE_FEED_FIELDS (call_limit)(short_limit)(settlement_price)(max_margin_period_sec)\
-   (required_initial_collateral)(required_maintenance_collateral)
+
+#define GRAPHENE_PRICE_FEED_FIELDS (settlement_price)(maintenance_collateral_ratio)(maximum_short_squeeze_ratio)
+
 FC_REFLECT( graphene::chain::price_feed, GRAPHENE_PRICE_FEED_FIELDS )
+

@@ -18,7 +18,7 @@
 #include <graphene/chain/asset_evaluator.hpp>
 #include <graphene/chain/asset_object.hpp>
 #include <graphene/chain/account_object.hpp>
-#include <graphene/chain/short_order_object.hpp>
+#include <graphene/chain/call_order_object.hpp>
 #include <graphene/chain/database.hpp>
 
 #include <functional>
@@ -365,16 +365,17 @@ void_result asset_publish_feeds_evaluator::do_evaluate(const asset_publish_feed_
 { try {
    database& d = db();
 
-   const asset_object& quote = o.asset_id(d);
+   const asset_object& base = o.asset_id(d);
    //Verify that this feed is for a market-issued asset and that asset is backed by the base
-   FC_ASSERT(quote.is_market_issued());
+   FC_ASSERT(base.is_market_issued());
 
-   const asset_bitasset_data_object& bitasset = quote.bitasset_data(d);
-   FC_ASSERT(bitasset.options.short_backing_asset == o.feed.call_limit.base.asset_id);
+   const asset_bitasset_data_object& bitasset = base.bitasset_data(d);
+   FC_ASSERT(bitasset.options.short_backing_asset == o.feed.settlement_price.quote.asset_id);
    //Verify that the publisher is authoritative to publish a feed
-   if( quote.issuer == account_id_type() )
+   if( base.issuer == account_id_type() )
    {
       //It's a delegate-fed asset. Verify that publisher is an active delegate or witness.
+      // TODO: replace account_id_type with global variable for delegates account id
       FC_ASSERT(d.get(account_id_type()).active.auths.count(o.publisher) ||
                 d.get_global_properties().witness_accounts.count(o.publisher));
    } else {
@@ -388,9 +389,9 @@ void_result asset_publish_feeds_evaluator::do_apply(const asset_publish_feed_ope
 { try {
    database& d = db();
 
-   const asset_object& quote = o.asset_id(d);
+   const asset_object& base = o.asset_id(d);
    // Store medians for this asset
-   d.modify(quote.bitasset_data(d), [&o,&d](asset_bitasset_data_object& a) {
+   d.modify(base.bitasset_data(d), [&o,&d](asset_bitasset_data_object& a) {
       a.feeds[o.publisher] = make_pair(d.head_block_time(), o.feed);
       a.update_median_feeds(d.head_block_time());
    });

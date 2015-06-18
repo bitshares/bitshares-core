@@ -99,7 +99,7 @@ bool database::_push_block( const signed_block& new_block )
       //If the head block from the longest chain does not build off of the current head, we need to switch forks.
       if( new_head->data.previous != head_block_id() )
       {
-         edump((new_head->data.previous));
+         //edump((new_head->data.previous));
          //If the newly pushed block is the same height as head, we get head back in new_head
          //Only switch forks if new_head is actually higher than head
          if( new_head->data.block_num() > head_block_num() )
@@ -107,11 +107,11 @@ bool database::_push_block( const signed_block& new_block )
             auto branches = _fork_db.fetch_branch_from( new_head->data.id(), _pending_block.previous );
             for( auto item : branches.first )
             {
-               wdump( ("new")(item->id)(item->data.previous) );
+          //     wdump( ("new")(item->id)(item->data.previous) );
             }
             for( auto item : branches.second )
             {
-               wdump( ("old")(item->id)(item->data.previous) );
+          //     wdump( ("old")(item->id)(item->data.previous) );
             }
 
             // pop blocks until we hit the forked block
@@ -131,9 +131,9 @@ bool database::_push_block( const signed_block& new_block )
                 catch ( const fc::exception& e ) { except = e; }
                 if( except )
                 {
-                   wdump((except->to_detail_string()));
-                   elog( "Encountered error when switching to a longer fork at id ${id}. Going back.",
-                          ("id", (*ritr)->id) );
+                   //wdump((except->to_detail_string()));
+                   // elog( "Encountered error when switching to a longer fork at id ${id}. Going back.",
+                   //       ("id", (*ritr)->id) );
                    // remove the rest of branches.first from the fork_db, those blocks are invalid
                    while( ritr != branches.first.rend() )
                    {
@@ -239,8 +239,8 @@ processed_transaction database::push_proposal(const proposal_object& proposal)
                      return std::make_pair(id, authority::owner);
                   });
 
-   ilog("Attempting to push proposal ${prop}", ("prop", proposal));
-   idump((eval_state.approved_by));
+   //ilog("Attempting to push proposal ${prop}", ("prop", proposal));
+   //idump((eval_state.approved_by));
 
    eval_state.operation_results.reserve(proposal.proposed_transaction.operations.size());
    processed_transaction ptrx(proposal.proposed_transaction);

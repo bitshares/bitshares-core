@@ -65,7 +65,7 @@ index& object_database::get_mutable_index(uint8_t space_id, uint8_t type_id)
 
 void object_database::flush()
 {
-   ilog("Save object_database in ${d}", ("d", _data_dir));
+//   ilog("Save object_database in ${d}", ("d", _data_dir));
    for( uint32_t space = 0; space < _index.size(); ++space )
    {
       fc::create_directories( _data_dir / "object_database" / fc::to_string(space) );
@@ -86,7 +86,7 @@ void object_database::wipe(const fc::path& data_dir)
 
 void object_database::open(const fc::path& data_dir)
 { try {
-   ilog("Open object_database in ${d}", ("d", data_dir));
+//   ilog("Open object_database in ${d}", ("d", data_dir));
    _data_dir = data_dir;
    for( uint32_t space = 0; space < _index.size(); ++space )
       for( uint32_t type = 0; type  < _index[space].size(); ++type )
