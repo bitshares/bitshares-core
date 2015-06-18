@@ -118,7 +118,10 @@ void database::clear_expired_proposals()
 
 void database::clear_expired_orders()
 {
-   transaction_evaluation_state cancel_context(this, true);
+   with_skip_flags(
+      get_node_properties().skip_flags | skip_authority_check, [&]()
+      {
+   transaction_evaluation_state cancel_context(this);
 
    //Cancel expired limit orders
    auto& limit_index = get_index_type<limit_order_index>().indices().get<by_expiration>();
@@ -141,6 +144,7 @@ void database::clear_expired_orders()
       canceler.order = order.id;
       apply_operation(cancel_context, canceler);
    }
+      } );
 
    //Process expired force settlement orders
    auto& settlement_index = get_index_type<force_settlement_index>().indices().get<by_expiration>();
