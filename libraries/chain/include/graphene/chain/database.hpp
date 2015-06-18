@@ -498,14 +498,6 @@ namespace graphene { namespace chain {
            (void)l;
        }
    }
-   template<class... Types>
-   void database::perform_account_maintenance(std::tuple<Types...> helpers)
-   {
-      const auto& idx = get_index_type<account_index>().indices();
-      for( const account_object& a : idx )
-         detail::for_each(helpers, a, detail::gen_seq<sizeof...(Types)>());
-   }
-
 } }
 
 FC_REFLECT(graphene::chain::genesis_state_type::allocation_target_type, (name)(addr)(weight))

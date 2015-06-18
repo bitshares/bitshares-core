@@ -628,9 +628,9 @@ void database_fixture::update_feed_producers( const asset_object& mia, flat_set<
    op.asset_to_update = mia.id;
    op.issuer = mia.issuer;
    op.new_feed_producers = std::move(producers);
-   trx.operations.emplace_back( std::move(op) );
+   trx.operations = {std::move(op)};
 
-   for( auto& op : trx.operations ) op.visit( operation_set_fee( db.current_fee_schedule() ) );
+   trx.visit(operation_set_fee(db.current_fee_schedule()));
    trx.validate();
    db.push_transaction(trx, ~0);
    trx.operations.clear();

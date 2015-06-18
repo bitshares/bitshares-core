@@ -95,13 +95,39 @@ BOOST_AUTO_TEST_CASE( cashback_test )
    CustomRegisterActor(pleb, reggie, stud, 95);
    CustomRegisterActor(scud, stud, ann, 80);
 
-   generate_block();
-   generate_blocks(db.get_dynamic_global_properties().next_maintenance_time, true);
+   generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+   enable_fees(10000);
 
    BOOST_CHECK_EQUAL(life_id(db).cashback_balance(db).balance.amount.value, 78000);
    BOOST_CHECK_EQUAL(reggie_id(db).cashback_balance(db).balance.amount.value, 34000);
    BOOST_CHECK_EQUAL(ann_id(db).cashback_balance(db).balance.amount.value, 40000);
    BOOST_CHECK_EQUAL(stud_id(db).cashback_balance(db).balance.amount.value, 8000);
+
+   transfer(stud_id, scud_id, asset(500000));
+   transfer(scud_id, pleb_id, asset(400000));
+   transfer(pleb_id, dumy_id, asset(300000));
+   transfer(dumy_id, reggie_id, asset(200000));
+
+   generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+
+   BOOST_CHECK_EQUAL(life_id(db).cashback_balance(db).balance.amount.value, 87750);
+   BOOST_CHECK_EQUAL(reggie_id(db).cashback_balance(db).balance.amount.value, 35500);
+   BOOST_CHECK_EQUAL(ann_id(db).cashback_balance(db).balance.amount.value, 44000);
+   BOOST_CHECK_EQUAL(stud_id(db).cashback_balance(db).balance.amount.value, 24750);
+
+   generate_blocks(ann_id(db).membership_expiration_date);
+   generate_block();
+   enable_fees(10000);
+
+   //ann's membership has expired, so scud's fee should go up to life instead.
+   transfer(scud_id, pleb_id, asset(10));
+
+   generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+
+   BOOST_CHECK_EQUAL(life_id(db).cashback_balance(db).balance.amount.value, 94750);
+   BOOST_CHECK_EQUAL(reggie_id(db).cashback_balance(db).balance.amount.value, 35500);
+   BOOST_CHECK_EQUAL(ann_id(db).cashback_balance(db).balance.amount.value, 44000);
+   BOOST_CHECK_EQUAL(stud_id(db).cashback_balance(db).balance.amount.value, 25750);
 } FC_LOG_AND_RETHROW() }
 
 BOOST_AUTO_TEST_SUITE_END()
