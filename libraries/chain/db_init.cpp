@@ -232,6 +232,7 @@ void database::init_genesis(const genesis_state_type& genesis_state)
    });
    create<dynamic_global_property_object>( [&](dynamic_global_property_object& p) {
       p.time = fc::time_point_sec(GRAPHENE_GENESIS_TIMESTAMP);
+      p.witness_budget = 0;
    });
    create<block_summary_object>([&](block_summary_object& p) {
    });
