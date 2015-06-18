@@ -64,6 +64,31 @@ namespace graphene { namespace chain {
        vector<initial_committee_member_type> initial_committee;
    };
 
+   namespace detail
+   {
+      /**
+       * Class used to help the with_skip_flags implementation.
+       * It must be defined in this header because it must be
+       * available to the with_skip_flags implementation,
+       * which is a template and therefore must also be defined
+       * in this header.
+       */
+      struct skip_flags_restorer
+      {
+         skip_flags_restorer( node_property_object& npo, uint32_t old_skip_flags )
+            : _npo( npo ), _old_skip_flags( old_skip_flags )
+         {}
+
+         ~skip_flags_restorer()
+         {
+            _npo.skip_flags = _old_skip_flags;
+         }
+
+         node_property_object& _npo;
+         uint32_t _old_skip_flags;
+      };
+   }
+
    /**
     *   @class database
     *   @brief tracks the blockchain state in an extensible manner
@@ -124,6 +149,9 @@ namespace graphene { namespace chain {
 
          bool push_block( const signed_block& b, uint32_t skip = skip_nothing );
          processed_transaction push_transaction( const signed_transaction& trx, uint32_t skip = skip_nothing );
+         bool _push_block( const signed_block& b );
+         processed_transaction _push_transaction( const signed_transaction& trx );
+
          ///@throws fc::exception if the proposed transaction fails to apply.
          processed_transaction push_proposal( const proposal_object& proposal );
 
@@ -131,7 +159,12 @@ namespace graphene { namespace chain {
             const fc::time_point_sec when,
             witness_id_type witness_id,
             const fc::ecc::private_key& block_signing_private_key,
-            uint32_t skip = 0
+            uint32_t skip
+            );
+         signed_block _generate_block(
+            const fc::time_point_sec when,
+            witness_id_type witness_id,
+            const fc::ecc::private_key& block_signing_private_key
             );
 
          void pop_block();
@@ -224,6 +257,25 @@ namespace graphene { namespace chain {
          block_id_type  head_block_id()const;
 
          decltype( chain_parameters::block_interval ) block_interval( )const;
+
+         node_property_object& node_properties();
+
+         /**
+          * Set the skip_flags to the given value, call callback,
+          * then reset skip_flags to their previous value after
+          * callback is done.
+          */
+         template< typename Lambda >
+         void with_skip_flags(
+            uint32_t skip_flags,
+            Lambda callback )
+         {
+            node_property_object& npo = node_properties();
+            detail::skip_flags_restorer restorer( npo, npo.skip_flags );
+            npo.skip_flags = skip_flags;
+            callback();
+            return;
+         }
 
          //////////////////// db_init.cpp ////////////////////
 
@@ -350,12 +402,15 @@ namespace graphene { namespace chain {
 
          void                  apply_block( const signed_block& next_block, uint32_t skip = skip_nothing );
          processed_transaction apply_transaction( const signed_transaction& trx, uint32_t skip = skip_nothing );
+         void                  _apply_block( const signed_block& next_block );
+         processed_transaction _apply_transaction( const signed_transaction& trx );
          operation_result      apply_operation( transaction_evaluation_state& eval_state, const operation& op );
 
          ///Steps involved in applying a new block
          ///@{
 
-         const witness_object& validate_block_header( const signed_block& next_block )const;
+         const witness_object& validate_block_header( uint32_t skip, const signed_block& next_block )const;
+         const witness_object& _validate_block_header( const signed_block& next_block )const;
          void create_block_summary(const signed_block& next_block);
 
          //////////////////// db_update.cpp ////////////////////
@@ -419,6 +474,8 @@ namespace graphene { namespace chain {
          vector<uint64_t>                  _witness_count_histogram_buffer;
          vector<uint64_t>                  _committee_count_histogram_buffer;
          uint64_t                          _total_voting_stake;
+
+         node_property_object              _node_property_object;
    };
 
    namespace detail

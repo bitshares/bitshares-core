@@ -36,6 +36,6 @@ namespace graphene { namespace chain {
          node_property_object() : skip_flags(0) {}
          ~node_property_object(){}
 
-         bool skip_authority_check;
+         uint32_t skip_flags;
    };
 } } // graphene::chain

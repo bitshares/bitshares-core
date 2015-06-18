@@ -81,7 +81,18 @@ const signed_transaction& database::get_recent_transaction(const transaction_id_
  * @return true if we switched forks as a result of this push.
  */
 bool database::push_block( const signed_block& new_block, uint32_t skip )
+{
+   bool result;
+   with_skip_flags( skip, [&]()
+   {
+      result = _push_block( new_block );
+   } );
+   return result;
+}
+
+bool database::_push_block( const signed_block& new_block )
 { try {
+   uint32_t skip = get_node_properties().skip_flags;
    if( !(skip&skip_fork_db) )
    {
       auto new_head = _fork_db.push_block( new_block );
@@ -182,12 +193,23 @@ bool database::push_block( const signed_block& new_block, uint32_t skip )
  */
 processed_transaction database::push_transaction( const signed_transaction& trx, uint32_t skip )
 {
+   processed_transaction result;
+   with_skip_flags( skip, [&]()
+   {
+      result = _push_transaction( trx );
+   } );
+   return result;
+}
+
+processed_transaction database::_push_transaction( const signed_transaction& trx )
+{
+   uint32_t skip = get_node_properties().skip_flags;
    //wdump((trx.digest())(trx.id()));
    // If this is the first transaction pushed after applying a block, start a new undo session.
    // This allows us to quickly rewind to the clean state of the head block, in case a new block arrives.
    if( !_pending_block_session ) _pending_block_session = _undo_db.start_undo_session();
    auto session = _undo_db.start_undo_session();
-   auto processed_trx = apply_transaction( trx, skip );
+   auto processed_trx = _apply_transaction( trx );
    _pending_block.transactions.push_back(processed_trx);
 
    FC_ASSERT( (skip & skip_block_size_check) ||
@@ -241,7 +263,22 @@ signed_block database::generate_block(
    uint32_t skip /* = 0 */
    )
 {
+   signed_block result;
+   with_skip_flags( skip, [&]()
+   {
+      result = _generate_block( when, witness_id, block_signing_private_key );
+   } );
+   return result;
+}
+
+signed_block database::_generate_block(
+   fc::time_point_sec when,
+   witness_id_type witness_id,
+   const fc::ecc::private_key& block_signing_private_key
+   )
+{
    try {
+   uint32_t skip = get_node_properties().skip_flags;
    uint32_t slot_num = get_slot_at_time( when );
    witness_id_type scheduled_witness = get_scheduled_witness( slot_num ).first;
    FC_ASSERT( scheduled_witness == witness_id );
@@ -322,7 +359,17 @@ const vector<operation_history_object>& database::get_applied_operations() const
 //////////////////// private methods ////////////////////
 
 void database::apply_block( const signed_block& next_block, uint32_t skip )
+{
+   with_skip_flags( skip, [&]()
+   {
+      _apply_block( next_block );
+   } );
+   return;
+}
+
+void database::_apply_block( const signed_block& next_block )
 { try {
+   uint32_t skip = get_node_properties().skip_flags;
    _applied_ops.clear();
 
    FC_ASSERT( (skip & skip_merkle_check) || next_block.transaction_merkle_root == next_block.calculate_merkle_root(), "", ("next_block.transaction_merkle_root",next_block.transaction_merkle_root)("calc",next_block.calculate_merkle_root())("next_block",next_block)("id",next_block.id()) );
@@ -375,16 +422,27 @@ void database::apply_block( const signed_block& next_block, uint32_t skip )
 
 
    update_pending_block(next_block, current_block_interval);
-} FC_CAPTURE_AND_RETHROW( (next_block.block_num())(skip) )  }
+} FC_CAPTURE_AND_RETHROW( (next_block.block_num()) )  }
 
 processed_transaction database::apply_transaction( const signed_transaction& trx, uint32_t skip )
+{
+   processed_transaction result;
+   with_skip_flags( skip, [&]()
+   {
+      result = _apply_transaction( trx );
+   } );
+   return result;
+}
+
+processed_transaction database::_apply_transaction( const signed_transaction& trx )
 { try {
+   uint32_t skip = get_node_properties().skip_flags;
    trx.validate();
    auto& trx_idx = get_mutable_index_type<transaction_index>();
    auto trx_id = trx.id();
    FC_ASSERT( (skip & skip_transaction_dupe_check) ||
               trx_idx.indices().get<by_trx_id>().find(trx_id) == trx_idx.indices().get<by_trx_id>().end() );
-   transaction_evaluation_state eval_state(this, skip&skip_authority_check );
+   transaction_evaluation_state eval_state(this);
    const chain_parameters& chain_parameters = get_global_properties().parameters;
    eval_state._trx = &trx;
 
