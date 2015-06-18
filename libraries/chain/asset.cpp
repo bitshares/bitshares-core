@@ -126,4 +126,26 @@ namespace graphene { namespace chain {
          FC_ASSERT( maintenance_collateral_ratio >= maximum_short_squeeze_ratio );
       } FC_CAPTURE_AND_RETHROW( (*this) ) }
 
+      price price_feed::max_short_squeeze_price()const
+      {
+         asset collateral = settlement_price.quote;
+         fc::uint128 tmp( collateral.amount.value );
+         tmp *= maximum_short_squeeze_ratio - 1000;
+         tmp /= 1000;
+         FC_ASSERT( tmp <= GRAPHENE_MAX_SHARE_SUPPLY );
+         collateral.amount = tmp.to_uint64();
+         return settlement_price.base / collateral;
+      }
+      price price_feed::maintenance_price()const
+      {
+         asset collateral = settlement_price.quote;
+         fc::uint128 tmp( collateral.amount.value );
+         tmp *= maintenance_collateral_ratio - 1000;
+         tmp /= 1000;
+         FC_ASSERT( tmp <= GRAPHENE_MAX_SHARE_SUPPLY );
+         collateral.amount = tmp.to_uint64();
+         return settlement_price.base / collateral;
+      }
+
+
 } } // graphene::chain

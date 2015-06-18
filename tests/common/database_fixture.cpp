@@ -41,6 +41,7 @@
 namespace graphene { namespace chain {
 
 using std::cout;
+using std::cerr;
 
 database_fixture::database_fixture()
    : app(), db( *app.chain_database() )
@@ -745,25 +746,25 @@ void database_fixture::print_market( const string& syma, const string& symb )con
    const auto& limit_idx = db.get_index_type<limit_order_index>();
    const auto& price_idx = limit_idx.indices().get<by_price>();
 
-   cout << std::fixed;
-   cout.precision(5);
-   cout << std::setw(10) << std::left  << "NAME"      << " ";
-   cout << std::setw(16) << std::right << "FOR SALE"  << " ";
-   cout << std::setw(16) << std::right << "FOR WHAT"  << " ";
-   cout << std::setw(10) << std::right << "PRICE"   << " ";
-   cout << std::setw(10) << std::right << "1/PRICE" << "\n";
-   cout << string(70, '=') << std::endl;
+   cerr << std::fixed;
+   cerr.precision(5);
+   cerr << std::setw(10) << std::left  << "NAME"      << " ";
+   cerr << std::setw(16) << std::right << "FOR SALE"  << " ";
+   cerr << std::setw(16) << std::right << "FOR WHAT"  << " ";
+   cerr << std::setw(10) << std::right << "PRICE (S/W)"   << " ";
+   cerr << std::setw(10) << std::right << "1/PRICE (W/S)" << "\n";
+   cerr << string(70, '=') << std::endl;
    auto cur = price_idx.begin();
    while( cur != price_idx.end() )
    {
-      cout << std::setw( 10 ) << std::left   << cur->seller(db).name << " ";
-      cout << std::setw( 10 ) << std::right  << cur->for_sale.value << " ";
-      cout << std::setw( 5 )  << std::left   << cur->amount_for_sale().asset_id(db).symbol << " ";
-      cout << std::setw( 10 ) << std::right  << cur->amount_to_receive().amount.value << " ";
-      cout << std::setw( 5 )  << std::left   << cur->amount_to_receive().asset_id(db).symbol << " ";
-      cout << std::setw( 10 ) << std::right  << cur->sell_price.to_real() << " ";
-      cout << std::setw( 10 ) << std::right  << (~cur->sell_price).to_real() << " ";
-      cout << "\n";
+      cerr << std::setw( 10 ) << std::left   << cur->seller(db).name << " ";
+      cerr << std::setw( 10 ) << std::right  << cur->for_sale.value << " ";
+      cerr << std::setw( 5 )  << std::left   << cur->amount_for_sale().asset_id(db).symbol << " ";
+      cerr << std::setw( 10 ) << std::right  << cur->amount_to_receive().amount.value << " ";
+      cerr << std::setw( 5 )  << std::left   << cur->amount_to_receive().asset_id(db).symbol << " ";
+      cerr << std::setw( 10 ) << std::right  << cur->sell_price.to_real() << " ";
+      cerr << std::setw( 10 ) << std::right  << (~cur->sell_price).to_real() << " ";
+      cerr << "\n";
       ++cur;
    }
 }
@@ -793,8 +794,10 @@ void database_fixture::print_call_orders()const
   cout << std::setw(10) << std::right << "TYPE"      << " ";
   cout << std::setw(16) << std::right << "DEBT"  << " ";
   cout << std::setw(16) << std::right << "COLLAT"  << " ";
-  cout << std::setw(16) << std::right << "CALL PRICE"     << " ";
-  cout << std::setw(16) << std::right << "~CALL PRICE"     << "\n";
+  cout << std::setw(16) << std::right << "CALL PRICE(D/C)"     << " ";
+  cout << std::setw(16) << std::right << "~CALL PRICE(C/D)"     << " ";
+  cout << std::setw(16) << std::right << "SWAN(D/C)"     << " ";
+  cout << std::setw(16) << std::right << "SWAN(C/D)"     << "\n";
   cout << string(70, '=');
 
   for( const call_order_object& o : db.get_index_type<call_order_index>().indices() )
@@ -805,6 +808,8 @@ void database_fixture::print_call_orders()const
      cout << std::setw( 16 ) << std::right  << pretty( o.get_collateral() ) << " ";
      cout << std::setw( 16 ) << std::right  << o.call_price.to_real() << " ";
      cout << std::setw( 16 ) << std::right  << (~o.call_price).to_real() << " ";
+     cout << std::setw( 16 ) << std::right  << (o.get_debt()/o.get_collateral()).to_real() << " ";
+     cout << std::setw( 16 ) << std::right  << (~(o.get_debt()/o.get_collateral())).to_real() << " ";
   }
      std::cout << "\n";
 }
@@ -818,7 +823,7 @@ void database_fixture::print_joint_market( const string& syma, const string& sym
   cout << std::setw(10) << std::right << "TYPE"      << " ";
   cout << std::setw(16) << std::right << "FOR SALE"  << " ";
   cout << std::setw(16) << std::right << "FOR WHAT"  << " ";
-  cout << std::setw(16) << std::right << "PRICE"     << "\n";
+  cout << std::setw(16) << std::right << "PRICE (S/W)" << "\n";
   cout << string(70, '=');
 
   const auto& limit_idx = db.get_index_type<limit_order_index>();

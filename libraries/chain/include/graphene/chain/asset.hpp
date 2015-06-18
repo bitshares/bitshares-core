@@ -158,10 +158,7 @@ namespace graphene { namespace chain {
        *  debt * settlement_price    < debt * maintenance
        *  debt * maintenance_price() < debt * max_short_squeeze_price() 
        */
-      price maintenance_price()const
-      {
-         return ~price::call_price( settlement_price.base, settlement_price.quote, maintenance_collateral_ratio );
-      }
+      price maintenance_price()const;
 
       /** When selling collateral to pay off debt, the least amount of debt to receive should be 
        *  min_usd = max_short_squeeze_price() * collateral 
@@ -169,10 +166,7 @@ namespace graphene { namespace chain {
        *  This is provided to ensure that a black swan cannot be trigged due to poor liquidity alone, it
        *  must be confirmed by having the max_short_squeeze_price() move below the black swan price.
        */
-      price max_short_squeeze_price()const
-      {
-         return ~price::call_price( settlement_price.base, settlement_price.quote, maximum_short_squeeze_ratio );
-      }
+      price max_short_squeeze_price()const;
       ///@}
 
       friend bool operator == ( const price_feed& a, const price_feed& b )

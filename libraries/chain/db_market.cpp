@@ -388,10 +388,12 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
     const limit_order_index& limit_index = get_index_type<limit_order_index>();
     const auto& limit_price_index = limit_index.indices().get<by_price>();
 
+    // looking for limit orders selling the most USD for the least CORE
     auto max_price = price::max( mia.id, bitasset.options.short_backing_asset );
-    auto min_price = bitasset.current_feed.max_short_squeeze_price();
-    /*
-    if( require_orders )
+    // stop when limit orders are selling too little USD for too much CORE
+    //auto min_price = bitasset.current_feed.max_short_squeeze_price();
+    auto min_price = price::min( mia.id, bitasset.options.short_backing_asset );
+    idump((bitasset.current_feed.settlement_price)(bitasset.current_feed.settlement_price.to_real()));
     {
        for( const auto& order : limit_price_index )
           wdump((order)(order.sell_price.to_real()));
@@ -404,24 +406,21 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
        wdump((max_price)(max_price.to_real()));
        wdump((min_price)(min_price.to_real()));
     }
-    */
 
-    FC_ASSERT( max_price.base.asset_id == min_price.base.asset_id );
+    assert( max_price.base.asset_id == min_price.base.asset_id );
     // wlog( "from ${a} Debt/Col to ${b} Debt/Col ", ("a", max_price.to_real())("b",min_price.to_real()) );
     // NOTE limit_price_index is sorted from greatest to least
     auto limit_itr = limit_price_index.lower_bound( max_price );
     auto limit_end = limit_price_index.upper_bound( min_price ); 
 
-    /*
     if( limit_itr != limit_price_index.end() )
        wdump((*limit_itr)(limit_itr->sell_price.to_real()));
     if( limit_end != limit_price_index.end() )
        wdump((*limit_end)(limit_end->sell_price.to_real()));
-       */
 
     if( limit_itr == limit_end )
     {
-       //wlog( "no orders available to fill margin calls" );
+       wlog( "no orders available to fill margin calls" );
        return false;
     }
 

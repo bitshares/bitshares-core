@@ -39,10 +39,25 @@ using namespace graphene::chain;
 
 BOOST_FIXTURE_TEST_SUITE( operation_tests, database_fixture )
 
+BOOST_AUTO_TEST_CASE( feed_limit_logic_test )
+{
+   try {
+      asset usd(100,1);
+      asset core(200,1);
+      price_feed feed; 
+      feed.settlement_price = usd / core;
+
+      FC_ASSERT( usd * feed.settlement_price < usd * feed.maintenance_price() );
+      FC_ASSERT( usd * feed.maintenance_price() < usd * feed.max_short_squeeze_price() );
+
+   } catch (fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
 BOOST_AUTO_TEST_CASE( call_order_update_test )
 { 
    try {
-      BOOST_TEST_MESSAGE("creating actors dan and sam" );
       ACTORS((dan)(sam));
       const auto& bitusd = create_bitasset("BITUSD");
       const auto& core   = asset_id_type()(db);
@@ -120,6 +135,315 @@ BOOST_AUTO_TEST_CASE( call_order_update_test )
       throw;
    }
 }
+
+/**
+ *  This test sets up a situation where a margin call will be executed and ensures that
+ *  it is properly filled.
+ *
+ *  A margin call can happen in the following situation:
+ *  0. there exists a bid above the mas short squeeze price
+ *  1. highest bid is lower than the call price of an order
+ *  2. the asset is not a prediction market 
+ *  3. there is a valid price feed
+ */
+BOOST_AUTO_TEST_CASE( margin_call_limit_test )
+{ try {
+      ACTORS((buyer)(seller)(borrower)(borrower2)(feedproducer));
+
+      const auto& bitusd = create_bitasset("BITUSD");
+      const auto& core   = asset_id_type()(db);
+
+      int64_t init_balance(1000000);
+
+      transfer(genesis_account, buyer_id, asset(init_balance));
+      transfer(genesis_account, borrower_id, asset(init_balance));
+      transfer(genesis_account, borrower2_id, asset(init_balance));
+      update_feed_producers( bitusd, {feedproducer.id} );
+
+      price_feed current_feed; 
+      current_feed.settlement_price = bitusd.amount( 100 ) / core.amount(100);
+      auto default_call_price = ~price::call_price( bitusd.amount(100), asset(100), 1750); 
+
+      // starting out with price 1:1 
+      publish_feed( bitusd, feedproducer, current_feed );
+
+      // start out with 2:1 collateral 
+      borrow( borrower, bitusd.amount(5000), asset(10000), default_call_price );
+      borrow( borrower2, bitusd.amount(5000), asset(30000), default_call_price );
+      elog( "selling USD at 1:1, should be ok because we have 2:1 collateral" );
+      create_sell_order( borrower, bitusd.amount(5000), core.amount(5000) );
+      elog( "buying USD at 1:1" );
+      create_sell_order( buyer, core.amount(5000), bitusd.amount(5000) );
+
+      BOOST_REQUIRE_EQUAL( get_balance( borrower, bitusd ), 0 );
+      BOOST_REQUIRE_EQUAL( get_balance( buyer, bitusd ), 4950 ); // 1% market fee
+      BOOST_REQUIRE_EQUAL( get_balance( borrower, core ), init_balance - 10000 + 5000 );
+      BOOST_REQUIRE_EQUAL( get_balance( buyer, core ), init_balance  - 5000 );
+
+      ilog( "print call orders..." );
+      print_call_orders();
+      ilog( "print market..." );
+      print_market( "", "" );
+
+      // sell the BitUSD for 50% more which represents a 33% fall in the value of the collateral
+      const auto order  = create_sell_order( borrower2, bitusd.amount(1000), core.amount(1400) );
+      const auto order2 = create_sell_order( borrower2, bitusd.amount(1000), core.amount(1600) );
+      const auto order3 = create_sell_order( borrower2, bitusd.amount(1000), core.amount(1700) );
+      const auto order4 = create_sell_order( borrower2, bitusd.amount(1000), core.amount(1800) );
+      const auto order5 = create_sell_order( borrower2, bitusd.amount(950),  core.amount(1850) );
+
+      ilog( "print call orders..." );
+      print_call_orders();
+      ilog( "print market..." );
+      print_market( "", "" );
+
+      FC_ASSERT( order, "order should not match because sell price is below short squeeze protection" ); 
+      wdump((bitusd.bitasset_data(db).current_feed.max_short_squeeze_price().to_real()));
+      wdump((bitusd.bitasset_data(db).current_feed.maintenance_price().to_real()));
+      wdump(((order->sell_price).to_real()));
+
+      // update the feed to indicate a 33% drop in value
+      BOOST_TEST_MESSAGE( "Update feed to indicate CORE fell in value by 33%" );
+      current_feed.settlement_price = bitusd.amount( 100 ) / core.amount(200);
+      publish_feed( bitusd, feedproducer, current_feed );
+
+
+      /*
+      const asset_object& bitusd      = create_bitasset( "BITUSD" );
+      const asset_object& core         = get_asset( GRAPHENE_SYMBOL );
+
+      db.modify( bitusd.bitasset_data(db), [&]( asset_bitasset_data_object& usd ){
+                 usd.current_feed.call_limit = core.amount(3) / bitusd.amount(1);
+                 });
+
+      const account_object& shorter1  = create_account( "shorter1" );
+      const account_object& shorter2  = create_account( "shorter2" );
+      const account_object& buyer1    = create_account( "buyer1" );
+      const account_object& buyer2    = create_account( "buyer2" );
+
+      transfer( genesis_account(db), shorter1, asset( 10000 ) );
+      transfer( genesis_account(db), shorter2, asset( 10000 ) );
+      transfer( genesis_account(db), buyer1, asset( 10000 ) );
+      transfer( genesis_account(db), buyer2, asset( 10000 ) );
+
+      BOOST_REQUIRE( create_sell_order( buyer1, asset(1000), bitusd.amount(1000) ) );
+      BOOST_REQUIRE( !create_short( shorter1, bitusd.amount(1000), asset(1000) )   );
+      BOOST_REQUIRE_EQUAL( get_balance(buyer1, bitusd), 990 ); // 1000 - 1% fee
+
+      const auto& call_index = db.get_index_type<call_order_index>().indices().get<by_account>();
+      const auto call_itr = call_index.find(boost::make_tuple(shorter1.id, bitusd.id));
+      BOOST_REQUIRE( call_itr != call_index.end() );
+      const call_order_object& call = *call_itr;
+      BOOST_CHECK(call.get_collateral() == core.amount(2000));
+      BOOST_CHECK(call.get_debt() == bitusd.amount(1000));
+      BOOST_CHECK(call.call_price == price(core.amount(1500), bitusd.amount(1000)));
+      BOOST_CHECK_EQUAL(get_balance(shorter1, core), 9000);
+
+      ilog( "=================================== START===================================\n\n");
+      // this should cause the highest bid to below the margin call threshold
+      // which means it should be filled by the cover
+      auto unmatched = create_sell_order( buyer1, bitusd.amount(495), core.amount(750) );
+      if( unmatched ) edump((*unmatched));
+      BOOST_CHECK( !unmatched );
+      BOOST_CHECK(call.get_debt() == bitusd.amount(505));
+      BOOST_CHECK(call.get_collateral() == core.amount(1250));
+
+      auto below_call_price = create_sell_order(buyer1, bitusd.amount(200), core.amount(1));
+      BOOST_REQUIRE(below_call_price);
+      auto above_call_price = create_sell_order(buyer1, bitusd.amount(200), core.amount(303));
+      BOOST_REQUIRE(above_call_price);
+      auto above_id = above_call_price->id;
+
+      cancel_limit_order(*below_call_price);
+      BOOST_CHECK_THROW(db.get_object(above_id), fc::exception);
+      BOOST_CHECK(call.get_debt() == bitusd.amount(305));
+      BOOST_CHECK(call.get_collateral() == core.amount(947));
+
+      below_call_price = create_sell_order(buyer1, bitusd.amount(200), core.amount(1));
+      BOOST_REQUIRE(below_call_price);
+      auto below_id = below_call_price->id;
+      above_call_price = create_sell_order(buyer1, bitusd.amount(95), core.amount(144));
+      BOOST_REQUIRE(above_call_price);
+      above_id = above_call_price->id;
+      auto match_below_call = create_sell_order(buyer2, core.amount(1), bitusd.amount(200));
+      BOOST_CHECK(!match_below_call);
+
+      BOOST_CHECK_THROW(db.get_object(above_id), fc::exception);
+      BOOST_CHECK_THROW(db.get_object(below_id), fc::exception);
+      BOOST_CHECK(call.get_debt() == bitusd.amount(210));
+      BOOST_CHECK(call.get_collateral() == core.amount(803));
+      */
+   } catch( const fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
+BOOST_AUTO_TEST_CASE( margin_call_limit_test_protected )
+{ try {
+      FC_ASSERT( !"TODO - Reimplement with new short semantics" );
+      /*
+      const asset_object& bitusd      = create_bitasset( "BITUSD" );
+      const asset_object& core         = get_asset( GRAPHENE_SYMBOL );
+
+      db.modify( bitusd.bitasset_data(db), [&]( asset_bitasset_data_object& usd ){
+                 usd.current_feed.call_limit = core.amount(1) / bitusd.amount(1);
+                 });
+
+      const account_object& shorter1  = create_account( "shorter1" );
+      const account_object& shorter2  = create_account( "shorter2" );
+      const account_object& buyer1    = create_account( "buyer1" );
+      const account_object& buyer2    = create_account( "buyer2" );
+
+      transfer( genesis_account(db), shorter1, asset( 10000 ) );
+      transfer( genesis_account(db), shorter2, asset( 10000 ) );
+      transfer( genesis_account(db), buyer1, asset( 10000 ) );
+      transfer( genesis_account(db), buyer2, asset( 10000 ) );
+
+      BOOST_REQUIRE( create_sell_order( buyer1, asset(1000), bitusd.amount(1000) ) );
+      BOOST_REQUIRE( !create_short( shorter1, bitusd.amount(1000), asset(1000) )   );
+      BOOST_REQUIRE_EQUAL( get_balance(buyer1, bitusd), 990 ); // 1000 - 1% fee
+
+      ilog( "=================================== START===================================\n\n");
+      // this should cause the highest bid to below the margin call threshold
+      // which means it should be filled by the cover
+      auto unmatched = create_sell_order( buyer1, bitusd.amount(990), core.amount(1500) );
+      if( unmatched ) edump((*unmatched));
+      BOOST_REQUIRE( unmatched );
+      */
+
+   } catch( const fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
+BOOST_AUTO_TEST_CASE( dont_margin_call_limit_test )
+{ try {
+      FC_ASSERT( !"TODO - Reimplement with new short semantics" );
+      /*
+      const asset_object& bitusd      = create_bitasset( "BITUSD" );
+      const asset_object& core         = get_asset( GRAPHENE_SYMBOL );
+
+      db.modify( bitusd.bitasset_data(db), [&]( asset_bitasset_data_object& usd ){
+                 usd.current_feed.call_limit = core.amount(3) / bitusd.amount(1);
+                 });
+
+      const account_object& shorter1  = create_account( "shorter1" );
+      const account_object& shorter2  = create_account( "shorter2" );
+      const account_object& buyer1    = create_account( "buyer1" );
+      const account_object& buyer2    = create_account( "buyer2" );
+
+      transfer( genesis_account(db), shorter1, asset( 10000 ) );
+      transfer( genesis_account(db), shorter2, asset( 10000 ) );
+      transfer( genesis_account(db), buyer1, asset( 10000 ) );
+      transfer( genesis_account(db), buyer2, asset( 10000 ) );
+
+      BOOST_REQUIRE( create_sell_order( buyer1, asset(1000), bitusd.amount(1000) ) );
+      BOOST_REQUIRE( !create_short( shorter1, bitusd.amount(1000), asset(1000) )   );
+      BOOST_REQUIRE_EQUAL( get_balance(buyer1, bitusd), 990 ); // 1000 - 1% fee
+
+      // this should cause the highest bid to below the margin call threshold
+      // which means it should be filled by the cover
+      auto unmatched = create_sell_order( buyer1, bitusd.amount(990), core.amount(1100) );
+      if( unmatched ) edump((*unmatched));
+      BOOST_REQUIRE( unmatched );
+      */
+
+   } catch( const fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
+BOOST_AUTO_TEST_CASE( margin_call_short_test )
+{ try {
+      FC_ASSERT( !"TODO - Reimplement with new short semantics" );
+      /*
+      const asset_object& bitusd      = create_bitasset( "BITUSD" );
+      const asset_object& core         = get_asset( GRAPHENE_SYMBOL );
+
+      db.modify( bitusd.bitasset_data(db), [&]( asset_bitasset_data_object& usd ){
+                 usd.current_feed.call_limit = core.amount(3) / bitusd.amount(1);
+                 });
+
+      const account_object& shorter1  = create_account( "shorter1" );
+      const account_object& shorter2  = create_account( "shorter2" );
+      const account_object& buyer1    = create_account( "buyer1" );
+      const account_object& buyer2    = create_account( "buyer2" );
+
+      transfer( genesis_account(db), shorter1, asset( 10000 ) );
+      transfer( genesis_account(db), shorter2, asset( 10000 ) );
+      transfer( genesis_account(db), buyer1, asset( 10000 ) );
+      transfer( genesis_account(db), buyer2, asset( 10000 ) );
+
+      BOOST_REQUIRE( create_sell_order( buyer1, asset(1000), bitusd.amount(1000) ) );
+      BOOST_REQUIRE( !create_short( shorter1, bitusd.amount(1000), asset(1000) )   );
+      BOOST_REQUIRE_EQUAL( get_balance(buyer1, bitusd), 990 ); // 1000 - 1% fee
+      ilog( "=================================== START===================================\n\n");
+
+      // this should cause the highest bid to below the margin call threshold
+      // which means it should be filled by the cover
+      auto unmatched = create_short( buyer1, bitusd.amount(990), core.amount(1500) );
+      if( unmatched ) edump((*unmatched));
+      BOOST_REQUIRE( !unmatched );
+      */
+
+   } catch( const fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
+BOOST_AUTO_TEST_CASE( margin_call_short_test_limit_protected )
+{ try {
+      FC_ASSERT( !"TODO - Reimplement with new short semantics" );
+      /*
+      const asset_object& bitusd      = create_bitasset( "BITUSD" );
+      const asset_object& core         = get_asset( GRAPHENE_SYMBOL );
+
+      db.modify( bitusd.bitasset_data(db), [&]( asset_bitasset_data_object& usd ){
+                 usd.current_feed.call_limit = core.amount(3) / bitusd.amount(4);
+                 });
+
+      const account_object& shorter1  = create_account( "shorter1" );
+      const account_object& shorter2  = create_account( "shorter2" );
+      const account_object& buyer1    = create_account( "buyer1" );
+      const account_object& buyer2    = create_account( "buyer2" );
+
+      transfer( genesis_account(db), shorter1, asset( 10000 ) );
+      transfer( genesis_account(db), shorter2, asset( 10000 ) );
+      transfer( genesis_account(db), buyer1, asset( 10000 ) );
+      transfer( genesis_account(db), buyer2, asset( 10000 ) );
+
+      BOOST_REQUIRE( create_sell_order( buyer1, asset(1000), bitusd.amount(1000) ) );
+      BOOST_REQUIRE( !create_short( shorter1, bitusd.amount(1000), asset(1000) )   );
+      BOOST_REQUIRE_EQUAL( get_balance(buyer1, bitusd), 990 ); // 1000 - 1% fee
+      ilog( "=================================== START===================================\n\n");
+
+      // this should cause the highest bid to below the margin call threshold
+      // which means it should be filled by the cover
+      auto unmatched = create_short( buyer1, bitusd.amount(990), core.amount(1500) );
+      if( unmatched ) edump((*unmatched));
+      BOOST_REQUIRE( unmatched );
+      */
+
+   } catch( const fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
+
+
+
+
+
+
+
+
+
+
 
 BOOST_AUTO_TEST_CASE( create_account_test )
 {
@@ -947,234 +1271,6 @@ BOOST_AUTO_TEST_CASE( trade_amount_equals_zero )
    }
 }
 
-BOOST_AUTO_TEST_CASE( margin_call_limit_test )
-{ try {
-      FC_ASSERT( !"TODO - Reimplement with new short semantics" );
-      /*
-      const asset_object& bitusd      = create_bitasset( "BITUSD" );
-      const asset_object& core         = get_asset( GRAPHENE_SYMBOL );
-
-      db.modify( bitusd.bitasset_data(db), [&]( asset_bitasset_data_object& usd ){
-                 usd.current_feed.call_limit = core.amount(3) / bitusd.amount(1);
-                 });
-
-      const account_object& shorter1  = create_account( "shorter1" );
-      const account_object& shorter2  = create_account( "shorter2" );
-      const account_object& buyer1    = create_account( "buyer1" );
-      const account_object& buyer2    = create_account( "buyer2" );
-
-      transfer( genesis_account(db), shorter1, asset( 10000 ) );
-      transfer( genesis_account(db), shorter2, asset( 10000 ) );
-      transfer( genesis_account(db), buyer1, asset( 10000 ) );
-      transfer( genesis_account(db), buyer2, asset( 10000 ) );
-
-      BOOST_REQUIRE( create_sell_order( buyer1, asset(1000), bitusd.amount(1000) ) );
-      BOOST_REQUIRE( !create_short( shorter1, bitusd.amount(1000), asset(1000) )   );
-      BOOST_REQUIRE_EQUAL( get_balance(buyer1, bitusd), 990 ); // 1000 - 1% fee
-
-      const auto& call_index = db.get_index_type<call_order_index>().indices().get<by_account>();
-      const auto call_itr = call_index.find(boost::make_tuple(shorter1.id, bitusd.id));
-      BOOST_REQUIRE( call_itr != call_index.end() );
-      const call_order_object& call = *call_itr;
-      BOOST_CHECK(call.get_collateral() == core.amount(2000));
-      BOOST_CHECK(call.get_debt() == bitusd.amount(1000));
-      BOOST_CHECK(call.call_price == price(core.amount(1500), bitusd.amount(1000)));
-      BOOST_CHECK_EQUAL(get_balance(shorter1, core), 9000);
-
-      ilog( "=================================== START===================================\n\n");
-      // this should cause the highest bid to below the margin call threshold
-      // which means it should be filled by the cover
-      auto unmatched = create_sell_order( buyer1, bitusd.amount(495), core.amount(750) );
-      if( unmatched ) edump((*unmatched));
-      BOOST_CHECK( !unmatched );
-      BOOST_CHECK(call.get_debt() == bitusd.amount(505));
-      BOOST_CHECK(call.get_collateral() == core.amount(1250));
-
-      auto below_call_price = create_sell_order(buyer1, bitusd.amount(200), core.amount(1));
-      BOOST_REQUIRE(below_call_price);
-      auto above_call_price = create_sell_order(buyer1, bitusd.amount(200), core.amount(303));
-      BOOST_REQUIRE(above_call_price);
-      auto above_id = above_call_price->id;
-
-      cancel_limit_order(*below_call_price);
-      BOOST_CHECK_THROW(db.get_object(above_id), fc::exception);
-      BOOST_CHECK(call.get_debt() == bitusd.amount(305));
-      BOOST_CHECK(call.get_collateral() == core.amount(947));
-
-      below_call_price = create_sell_order(buyer1, bitusd.amount(200), core.amount(1));
-      BOOST_REQUIRE(below_call_price);
-      auto below_id = below_call_price->id;
-      above_call_price = create_sell_order(buyer1, bitusd.amount(95), core.amount(144));
-      BOOST_REQUIRE(above_call_price);
-      above_id = above_call_price->id;
-      auto match_below_call = create_sell_order(buyer2, core.amount(1), bitusd.amount(200));
-      BOOST_CHECK(!match_below_call);
-
-      BOOST_CHECK_THROW(db.get_object(above_id), fc::exception);
-      BOOST_CHECK_THROW(db.get_object(below_id), fc::exception);
-      BOOST_CHECK(call.get_debt() == bitusd.amount(210));
-      BOOST_CHECK(call.get_collateral() == core.amount(803));
-      */
-   } catch( const fc::exception& e) {
-      edump((e.to_detail_string()));
-      throw;
-   }
-}
-
-BOOST_AUTO_TEST_CASE( margin_call_limit_test_protected )
-{ try {
-      FC_ASSERT( !"TODO - Reimplement with new short semantics" );
-      /*
-      const asset_object& bitusd      = create_bitasset( "BITUSD" );
-      const asset_object& core         = get_asset( GRAPHENE_SYMBOL );
-
-      db.modify( bitusd.bitasset_data(db), [&]( asset_bitasset_data_object& usd ){
-                 usd.current_feed.call_limit = core.amount(1) / bitusd.amount(1);
-                 });
-
-      const account_object& shorter1  = create_account( "shorter1" );
-      const account_object& shorter2  = create_account( "shorter2" );
-      const account_object& buyer1    = create_account( "buyer1" );
-      const account_object& buyer2    = create_account( "buyer2" );
-
-      transfer( genesis_account(db), shorter1, asset( 10000 ) );
-      transfer( genesis_account(db), shorter2, asset( 10000 ) );
-      transfer( genesis_account(db), buyer1, asset( 10000 ) );
-      transfer( genesis_account(db), buyer2, asset( 10000 ) );
-
-      BOOST_REQUIRE( create_sell_order( buyer1, asset(1000), bitusd.amount(1000) ) );
-      BOOST_REQUIRE( !create_short( shorter1, bitusd.amount(1000), asset(1000) )   );
-      BOOST_REQUIRE_EQUAL( get_balance(buyer1, bitusd), 990 ); // 1000 - 1% fee
-
-      ilog( "=================================== START===================================\n\n");
-      // this should cause the highest bid to below the margin call threshold
-      // which means it should be filled by the cover
-      auto unmatched = create_sell_order( buyer1, bitusd.amount(990), core.amount(1500) );
-      if( unmatched ) edump((*unmatched));
-      BOOST_REQUIRE( unmatched );
-      */
-
-   } catch( const fc::exception& e) {
-      edump((e.to_detail_string()));
-      throw;
-   }
-}
-
-BOOST_AUTO_TEST_CASE( dont_margin_call_limit_test )
-{ try {
-      FC_ASSERT( !"TODO - Reimplement with new short semantics" );
-      /*
-      const asset_object& bitusd      = create_bitasset( "BITUSD" );
-      const asset_object& core         = get_asset( GRAPHENE_SYMBOL );
-
-      db.modify( bitusd.bitasset_data(db), [&]( asset_bitasset_data_object& usd ){
-                 usd.current_feed.call_limit = core.amount(3) / bitusd.amount(1);
-                 });
-
-      const account_object& shorter1  = create_account( "shorter1" );
-      const account_object& shorter2  = create_account( "shorter2" );
-      const account_object& buyer1    = create_account( "buyer1" );
-      const account_object& buyer2    = create_account( "buyer2" );
-
-      transfer( genesis_account(db), shorter1, asset( 10000 ) );
-      transfer( genesis_account(db), shorter2, asset( 10000 ) );
-      transfer( genesis_account(db), buyer1, asset( 10000 ) );
-      transfer( genesis_account(db), buyer2, asset( 10000 ) );
-
-      BOOST_REQUIRE( create_sell_order( buyer1, asset(1000), bitusd.amount(1000) ) );
-      BOOST_REQUIRE( !create_short( shorter1, bitusd.amount(1000), asset(1000) )   );
-      BOOST_REQUIRE_EQUAL( get_balance(buyer1, bitusd), 990 ); // 1000 - 1% fee
-
-      // this should cause the highest bid to below the margin call threshold
-      // which means it should be filled by the cover
-      auto unmatched = create_sell_order( buyer1, bitusd.amount(990), core.amount(1100) );
-      if( unmatched ) edump((*unmatched));
-      BOOST_REQUIRE( unmatched );
-      */
-
-   } catch( const fc::exception& e) {
-      edump((e.to_detail_string()));
-      throw;
-   }
-}
-
-BOOST_AUTO_TEST_CASE( margin_call_short_test )
-{ try {
-      FC_ASSERT( !"TODO - Reimplement with new short semantics" );
-      /*
-      const asset_object& bitusd      = create_bitasset( "BITUSD" );
-      const asset_object& core         = get_asset( GRAPHENE_SYMBOL );
-
-      db.modify( bitusd.bitasset_data(db), [&]( asset_bitasset_data_object& usd ){
-                 usd.current_feed.call_limit = core.amount(3) / bitusd.amount(1);
-                 });
-
-      const account_object& shorter1  = create_account( "shorter1" );
-      const account_object& shorter2  = create_account( "shorter2" );
-      const account_object& buyer1    = create_account( "buyer1" );
-      const account_object& buyer2    = create_account( "buyer2" );
-
-      transfer( genesis_account(db), shorter1, asset( 10000 ) );
-      transfer( genesis_account(db), shorter2, asset( 10000 ) );
-      transfer( genesis_account(db), buyer1, asset( 10000 ) );
-      transfer( genesis_account(db), buyer2, asset( 10000 ) );
-
-      BOOST_REQUIRE( create_sell_order( buyer1, asset(1000), bitusd.amount(1000) ) );
-      BOOST_REQUIRE( !create_short( shorter1, bitusd.amount(1000), asset(1000) )   );
-      BOOST_REQUIRE_EQUAL( get_balance(buyer1, bitusd), 990 ); // 1000 - 1% fee
-      ilog( "=================================== START===================================\n\n");
-
-      // this should cause the highest bid to below the margin call threshold
-      // which means it should be filled by the cover
-      auto unmatched = create_short( buyer1, bitusd.amount(990), core.amount(1500) );
-      if( unmatched ) edump((*unmatched));
-      BOOST_REQUIRE( !unmatched );
-      */
-
-   } catch( const fc::exception& e) {
-      edump((e.to_detail_string()));
-      throw;
-   }
-}
-
-BOOST_AUTO_TEST_CASE( margin_call_short_test_limit_protected )
-{ try {
-      FC_ASSERT( !"TODO - Reimplement with new short semantics" );
-      /*
-      const asset_object& bitusd      = create_bitasset( "BITUSD" );
-      const asset_object& core         = get_asset( GRAPHENE_SYMBOL );
-
-      db.modify( bitusd.bitasset_data(db), [&]( asset_bitasset_data_object& usd ){
-                 usd.current_feed.call_limit = core.amount(3) / bitusd.amount(4);
-                 });
-
-      const account_object& shorter1  = create_account( "shorter1" );
-      const account_object& shorter2  = create_account( "shorter2" );
-      const account_object& buyer1    = create_account( "buyer1" );
-      const account_object& buyer2    = create_account( "buyer2" );
-
-      transfer( genesis_account(db), shorter1, asset( 10000 ) );
-      transfer( genesis_account(db), shorter2, asset( 10000 ) );
-      transfer( genesis_account(db), buyer1, asset( 10000 ) );
-      transfer( genesis_account(db), buyer2, asset( 10000 ) );
-
-      BOOST_REQUIRE( create_sell_order( buyer1, asset(1000), bitusd.amount(1000) ) );
-      BOOST_REQUIRE( !create_short( shorter1, bitusd.amount(1000), asset(1000) )   );
-      BOOST_REQUIRE_EQUAL( get_balance(buyer1, bitusd), 990 ); // 1000 - 1% fee
-      ilog( "=================================== START===================================\n\n");
-
-      // this should cause the highest bid to below the margin call threshold
-      // which means it should be filled by the cover
-      auto unmatched = create_short( buyer1, bitusd.amount(990), core.amount(1500) );
-      if( unmatched ) edump((*unmatched));
-      BOOST_REQUIRE( unmatched );
-      */
-
-   } catch( const fc::exception& e) {
-      edump((e.to_detail_string()));
-      throw;
-   }
-}
 
 /**
  *  Create an order that cannot be filled immediately and have the
