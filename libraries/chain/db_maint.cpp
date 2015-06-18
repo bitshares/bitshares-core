@@ -50,6 +50,14 @@ vector<std::reference_wrapper<const ObjectType>> database::sort_votable_objects(
    return refs;
 }
 
+template<class... Types>
+void database::perform_account_maintenance(std::tuple<Types...> helpers)
+{
+   const auto& idx = get_index_type<account_index>().indices();
+   for( const account_object& a : idx )
+      detail::for_each(helpers, a, detail::gen_seq<sizeof...(Types)>());
+}
+
 void database::pay_workers( share_type& budget )
 {
 //   ilog("Processing payroll! Available budget is ${b}", ("b", budget));

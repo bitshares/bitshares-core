@@ -640,10 +640,12 @@ BOOST_FIXTURE_TEST_CASE( change_block_interval, database_fixture )
    BOOST_CHECK_EQUAL(db.head_block_time().sec_since_epoch() - past_time, 2);
 } FC_LOG_AND_RETHROW() }
 
-BOOST_FIXTURE_TEST_CASE( force_settlement, database_fixture )
-{ try {
-   FC_ASSERT( !"TODO" );
+BOOST_AUTO_TEST_CASE_EXPECTED_FAILURES( unimp_force_settlement, 1 )
+BOOST_FIXTURE_TEST_CASE( unimp_force_settlement, database_fixture )
+{
+   BOOST_FAIL( "TODO" );
    /*
+   try {
    auto private_key = delegate_priv_key;
    auto private_key = generate_private_key("genesis");
 >>>>>>> short_refactor
@@ -766,24 +768,14 @@ BOOST_FIXTURE_TEST_CASE( force_settlement, database_fixture )
    BOOST_CHECK(db.find(settle_id));
    BOOST_CHECK_EQUAL(get_balance(nathan_id, asset_id_type()), 5878);
    BOOST_CHECK(!db.get_index_type<call_order_index>().indices().empty());
-   */
-} FC_LOG_AND_RETHROW() }
+} FC_LOG_AND_RETHROW()
+*/
+}
 
 BOOST_FIXTURE_TEST_CASE( pop_block_twice, database_fixture )
 {
    try
    {
-/*
-            skip_delegate_signature     = 0x01, ///< used while reindexing
-            skip_transaction_signatures = 0x02, ///< used by non delegate nodes
-            skip_undo_block             = 0x04, ///< used while reindexing
-            skip_undo_transaction       = 0x08, ///< used while applying block
-            skip_transaction_dupe_check = 0x10, ///< used while reindexing
-            skip_fork_db                = 0x20, ///< used while reindexing
-            skip_block_size_check       = 0x40, ///< used when applying locally generated transactions
-            skip_tapos_check            = 0x80, ///< used while reindexing -- note this skips expiration check as well
-*/
-
       uint32_t skip_flags = (
            database::skip_delegate_signature
          | database::skip_transaction_signatures
