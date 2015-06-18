@@ -135,70 +135,98 @@ block_id_type          block_database::fetch_block_id( uint32_t block_num )const
 
 
 optional<signed_block> block_database::fetch_optional( const block_id_type& id )const
-{ try {
-   index_entry e;
-   auto index_pos = sizeof(e)*block_header::num_from_id(id);
-   _block_num_to_pos.seekg( 0, _block_num_to_pos.end );
-   FC_ASSERT( _block_num_to_pos.tellg() > index_pos );
-
-   _block_num_to_pos.seekg( index_pos );
-   _block_num_to_pos.read( (char*)&e, sizeof(e) );
-
-   if( e.block_id != id ) return optional<signed_block>();
-
-   vector<char> data( e.block_size );
-   _blocks.seekg( e.block_pos );
-   _blocks.read( data.data(), e.block_size );
-   auto result = fc::raw::unpack<signed_block>(data);
-   FC_ASSERT( result.id() == e.block_id );
-   return result;
-} FC_CAPTURE_AND_RETHROW( (id) ) }
-
+{
+   try 
+   {
+      index_entry e;
+      auto index_pos = sizeof(e)*block_header::num_from_id(id);
+      _block_num_to_pos.seekg( 0, _block_num_to_pos.end );
+      FC_ASSERT( _block_num_to_pos.tellg() > index_pos );
+   
+      _block_num_to_pos.seekg( index_pos );
+      _block_num_to_pos.read( (char*)&e, sizeof(e) );
+   
+      if( e.block_id != id ) return optional<signed_block>();
+   
+      vector<char> data( e.block_size );
+      _blocks.seekg( e.block_pos );
+      _blocks.read( data.data(), e.block_size );
+      auto result = fc::raw::unpack<signed_block>(data);
+      FC_ASSERT( result.id() == e.block_id );
+      return result;
+   }
+   catch (const fc::exception&)
+   {
+   }
+   catch (const std::exception&)
+   {
+   }
+   return optional<signed_block>();
+}
 
 optional<signed_block> block_database::fetch_by_number( uint32_t block_num )const
-{ try {
-   index_entry e;
-   auto index_pos = sizeof(e)*block_num;
-   _block_num_to_pos.seekg( 0, _block_num_to_pos.end );
-   FC_ASSERT( _block_num_to_pos.tellg() > index_pos );
+{
+   try 
+   {
+      index_entry e;
+      auto index_pos = sizeof(e)*block_num;
+      _block_num_to_pos.seekg( 0, _block_num_to_pos.end );
+      FC_ASSERT( _block_num_to_pos.tellg() > index_pos );
 
-   _block_num_to_pos.seekg( index_pos, _block_num_to_pos.beg );
-   _block_num_to_pos.read( (char*)&e, sizeof(e) );
+      _block_num_to_pos.seekg( index_pos, _block_num_to_pos.beg );
+      _block_num_to_pos.read( (char*)&e, sizeof(e) );
 
-   vector<char> data( e.block_size );
-   _blocks.seekg( e.block_pos );
-   _blocks.read( data.data(), e.block_size );
-   auto result = fc::raw::unpack<signed_block>(data);
-   FC_ASSERT( result.id() == e.block_id );
-   return result;
-} FC_CAPTURE_AND_RETHROW( (block_num) ) }
+      vector<char> data( e.block_size );
+      _blocks.seekg( e.block_pos );
+      _blocks.read( data.data(), e.block_size );
+      auto result = fc::raw::unpack<signed_block>(data);
+      FC_ASSERT( result.id() == e.block_id );
+      return result;
+   }
+   catch (const fc::exception&)
+   {
+   }
+   catch (const std::exception&)
+   {
+   }
+   return optional<signed_block>();
+}
 
 
 optional<signed_block> block_database::last()const
 {
-   index_entry e;
-   _block_num_to_pos.seekg( 0, _block_num_to_pos.end );
-
-   if( _block_num_to_pos.tellp() < sizeof(index_entry) )
-      return optional<signed_block>();
-
-   _block_num_to_pos.seekg( -sizeof(index_entry), _block_num_to_pos.end );
-   _block_num_to_pos.read( (char*)&e, sizeof(e) );
-   while( e.block_size == 0 && _blocks.tellg() > 0 )
+   try 
    {
-      _block_num_to_pos.seekg( -sizeof(index_entry), _block_num_to_pos.cur );
+      index_entry e;
+      _block_num_to_pos.seekg( 0, _block_num_to_pos.end );
+
+      if( _block_num_to_pos.tellp() < sizeof(index_entry) )
+         return optional<signed_block>();
+
+      _block_num_to_pos.seekg( -sizeof(index_entry), _block_num_to_pos.end );
       _block_num_to_pos.read( (char*)&e, sizeof(e) );
+      while( e.block_size == 0 && _blocks.tellg() > 0 )
+      {
+         _block_num_to_pos.seekg( -sizeof(index_entry), _block_num_to_pos.cur );
+         _block_num_to_pos.read( (char*)&e, sizeof(e) );
+      }
+
+      if( e.block_size == 0 )
+         return optional<signed_block>();
+
+      vector<char> data( e.block_size );
+      _blocks.seekg( e.block_pos );
+      _blocks.read( data.data(), e.block_size );
+      auto result = fc::raw::unpack<signed_block>(data);
+      return result;
    }
-
-   if( e.block_size == 0 )
-      return optional<signed_block>();
-
-   vector<char> data( e.block_size );
-   _blocks.seekg( e.block_pos );
-   _blocks.read( data.data(), e.block_size );
-   auto result = fc::raw::unpack<signed_block>(data);
-   return result;
+   catch (const fc::exception&)
+   {
+   }
+   catch (const std::exception&)
+   {
+   }
+   return optional<signed_block>();
 }
-
 
 } }
