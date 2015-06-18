@@ -17,6 +17,7 @@
  */
 #include <graphene/witness/witness.hpp>
 
+#include <graphene/chain/database.hpp>
 #include <graphene/chain/witness_object.hpp>
 #include <graphene/time/time.hpp>
 
@@ -176,7 +177,8 @@ void witness_plugin::block_production_loop()
          auto block = db.generate_block(
             scheduled_time,
             scheduled_witness,
-            _private_keys[ scheduled_key ]
+            _private_keys[ scheduled_key ],
+            graphene::chain::database::skip_nothing
             );
          ilog("Generated block #${n} with timestamp ${t} at time ${c}",
               ("n", block.block_num())("t", block.timestamp)("c", now));
