@@ -117,7 +117,7 @@ BOOST_AUTO_TEST_CASE( generate_empty_blocks )
       {
          database db;
          db.open(data_dir.path(), genesis_state_type() );
-         b = db.generate_block( now, db.get_scheduled_witness( 1 ).first, delegate_priv_key );
+         b = db.generate_block( now, db.get_scheduled_witness( 1 ).first, delegate_priv_key, database::skip_nothing );
 
          for( uint32_t i = 1; i < 200; ++i )
          {
@@ -127,7 +127,7 @@ BOOST_AUTO_TEST_CASE( generate_empty_blocks )
             witness_id_type cur_witness = db.get_scheduled_witness( 1 ).first;
             // TODO:  Uncomment this when witness scheduling implemented
             BOOST_CHECK( cur_witness != prev_witness );
-            b = db.generate_block( now, cur_witness, delegate_priv_key );
+            b = db.generate_block( now, cur_witness, delegate_priv_key, database::skip_nothing );
             BOOST_CHECK( b.witness == cur_witness );
          }
          db.close();
@@ -145,7 +145,7 @@ BOOST_AUTO_TEST_CASE( generate_empty_blocks )
             witness_id_type cur_witness = db.get_scheduled_witness( 1 ).first;
             // TODO:  Uncomment this when witness scheduling implemented
             BOOST_CHECK( cur_witness != prev_witness );
-            b = db.generate_block( now, cur_witness, delegate_priv_key );
+            b = db.generate_block( now, cur_witness, delegate_priv_key, database::skip_nothing );
          }
          BOOST_CHECK_EQUAL( db.head_block_num(), 400 );
       }
@@ -168,7 +168,7 @@ BOOST_AUTO_TEST_CASE( undo_block )
          for( uint32_t i = 0; i < 5; ++i )
          {
             now += db.block_interval();
-            auto b = db.generate_block( now, db.get_scheduled_witness( 1 ).first, delegate_priv_key );
+            auto b = db.generate_block( now, db.get_scheduled_witness( 1 ).first, delegate_priv_key, database::skip_nothing );
          }
          BOOST_CHECK( db.head_block_num() == 5 );
          db.pop_block();
@@ -186,7 +186,7 @@ BOOST_AUTO_TEST_CASE( undo_block )
          for( uint32_t i = 0; i < 5; ++i )
          {
             now += db.block_interval();
-            auto b = db.generate_block( now, db.get_scheduled_witness( 1 ).first, delegate_priv_key );
+            auto b = db.generate_block( now, db.get_scheduled_witness( 1 ).first, delegate_priv_key, database::skip_nothing );
          }
          BOOST_CHECK( db.head_block_num() == 7 );
       }
@@ -212,7 +212,7 @@ BOOST_AUTO_TEST_CASE( fork_blocks )
       for( uint32_t i = 0; i < 10; ++i )
       {
          now += db1.block_interval();
-         auto b = db1.generate_block(now, db1.get_scheduled_witness(1).first, delegate_priv_key);
+         auto b = db1.generate_block(now, db1.get_scheduled_witness(1).first, delegate_priv_key, database::skip_nothing);
          try {
             PUSH_BLOCK( db2, b );
          } FC_CAPTURE_AND_RETHROW( ("db2") );
@@ -220,13 +220,13 @@ BOOST_AUTO_TEST_CASE( fork_blocks )
       for( uint32_t i = 10; i < 13; ++i )
       {
          now += db1.block_interval();
-         auto b =  db1.generate_block(now, db1.get_scheduled_witness(1).first, delegate_priv_key);
+         auto b =  db1.generate_block(now, db1.get_scheduled_witness(1).first, delegate_priv_key, database::skip_nothing);
       }
       string db1_tip = db1.head_block_id().str();
       for( uint32_t i = 13; i < 16; ++i )
       {
          now += db2.block_interval();
-         auto b =  db2.generate_block(now, db2.get_scheduled_witness(db2.get_slot_at_time(now)).first, delegate_priv_key);
+         auto b =  db2.generate_block(now, db2.get_scheduled_witness(db2.get_slot_at_time(now)).first, delegate_priv_key, database::skip_nothing);
          // notify both databases of the new block.
          // only db2 should switch to the new fork, db1 should not
          PUSH_BLOCK( db1, b );
@@ -241,7 +241,7 @@ BOOST_AUTO_TEST_CASE( fork_blocks )
       BOOST_CHECK_EQUAL(db2.head_block_num(), 13);
       {
          now += db2.block_interval();
-         auto b = db2.generate_block(now, db2.get_scheduled_witness(1).first, delegate_priv_key);
+         auto b = db2.generate_block(now, db2.get_scheduled_witness(1).first, delegate_priv_key, database::skip_nothing);
          good_block = b;
          b.transactions.emplace_back(signed_transaction());
          b.transactions.back().operations.emplace_back(transfer_operation());
@@ -296,7 +296,7 @@ BOOST_AUTO_TEST_CASE( undo_pending )
          PUSH_TX( db, trx );
 
          now += db.block_interval();
-         auto b = db.generate_block( now, db.get_scheduled_witness( 1 ).first, delegate_priv_key );
+         auto b = db.generate_block( now, db.get_scheduled_witness( 1 ).first, delegate_priv_key, database::skip_nothing );
 
          BOOST_CHECK(nathan_id(db).name == "nathan");
 
@@ -348,17 +348,17 @@ BOOST_AUTO_TEST_CASE( switch_forks_undo_create )
 
       auto aw = db1.get_global_properties().active_witnesses;
       now += db1.block_interval();
-      auto b =  db1.generate_block( now, db1.get_scheduled_witness( 1 ).first, delegate_priv_key );
+      auto b =  db1.generate_block( now, db1.get_scheduled_witness( 1 ).first, delegate_priv_key, database::skip_nothing );
 
       BOOST_CHECK(nathan_id(db1).name == "nathan");
 
       now = fc::time_point_sec( GRAPHENE_GENESIS_TIMESTAMP );
       now += db2.block_interval();
-      b =  db2.generate_block( now, db2.get_scheduled_witness( 1 ).first, delegate_priv_key );
+      b =  db2.generate_block( now, db2.get_scheduled_witness( 1 ).first, delegate_priv_key, database::skip_nothing );
       PUSH_BLOCK( db1, b );
       aw = db2.get_global_properties().active_witnesses;
       now += db2.block_interval();
-      b =  db2.generate_block( now, db2.get_scheduled_witness( 1 ).first, delegate_priv_key );
+      b =  db2.generate_block( now, db2.get_scheduled_witness( 1 ).first, delegate_priv_key, database::skip_nothing );
       PUSH_BLOCK( db1, b );
 
       BOOST_CHECK_THROW(nathan_id(db1), fc::exception);
@@ -367,7 +367,7 @@ BOOST_AUTO_TEST_CASE( switch_forks_undo_create )
 
       aw = db2.get_global_properties().active_witnesses;
       now += db2.block_interval();
-      b =  db2.generate_block( now, db2.get_scheduled_witness( 1 ).first, delegate_priv_key );
+      b =  db2.generate_block( now, db2.get_scheduled_witness( 1 ).first, delegate_priv_key, database::skip_nothing );
       PUSH_BLOCK( db1, b );
 
       BOOST_CHECK(nathan_id(db1).name == "nathan");
@@ -443,7 +443,7 @@ BOOST_AUTO_TEST_CASE( tapos )
       const graphene::db::index& account_idx = db1.get_index(protocol_ids, account_object_type);
 
       now += db1.block_interval();
-      auto b = db1.generate_block( now, db1.get_scheduled_witness( 1 ).first, delegate_priv_key );
+      auto b = db1.generate_block( now, db1.get_scheduled_witness( 1 ).first, delegate_priv_key, database::skip_nothing );
 
       signed_transaction trx;
       //This transaction must be in the next block after its reference, or it is invalid.
@@ -462,7 +462,7 @@ BOOST_AUTO_TEST_CASE( tapos )
       PUSH_TX( db1, trx );
 
       now += db1.block_interval();
-      b = db1.generate_block( now, db1.get_scheduled_witness( 1 ).first, delegate_priv_key );
+      b = db1.generate_block( now, db1.get_scheduled_witness( 1 ).first, delegate_priv_key, database::skip_nothing );
 
       trx.operations.clear();
       trx.signatures.clear();
