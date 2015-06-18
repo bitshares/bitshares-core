@@ -152,16 +152,47 @@ void database::init_genesis(const genesis_state_type& genesis_state)
          n.active = n.owner;
          n.statistics = create<account_statistics_object>( [&](account_statistics_object& b){}).id;
       });
-   create<account_object>([this](account_object& a) {
-       a.name = "null-account";
+   FC_ASSERT(committee_account.get_id() == GRAPHENE_COMMITTEE_ACCOUNT);
+   FC_ASSERT(create<account_object>([this](account_object& a) {
+       a.name = "witness-account";
        a.statistics = create<account_statistics_object>([](account_statistics_object&){}).id;
-       a.owner = authority(1, key_id_type(), 1);
-       a.active = a.owner;
-       a.registrar = a.lifetime_referrer = a.referrer = account_id_type(1);
+       a.owner.weight_threshold = 1;
+       a.active.weight_threshold = 1;
+       a.registrar = a.lifetime_referrer = a.referrer = GRAPHENE_WITNESS_ACCOUNT;
        a.membership_expiration_date = time_point_sec::maximum();
        a.network_fee_percentage = GRAPHENE_DEFAULT_NETWORK_PERCENT_OF_FEE;
        a.lifetime_referrer_fee_percentage = GRAPHENE_100_PERCENT - GRAPHENE_DEFAULT_NETWORK_PERCENT_OF_FEE;
-   });
+   }).get_id() == GRAPHENE_WITNESS_ACCOUNT);
+   FC_ASSERT(create<account_object>([this](account_object& a) {
+       a.name = "relaxed-committee-account";
+       a.statistics = create<account_statistics_object>([](account_statistics_object&){}).id;
+       a.owner.weight_threshold = 1;
+       a.active.weight_threshold = 1;
+       a.registrar = a.lifetime_referrer = a.referrer = GRAPHENE_RELAXED_COMMITTEE_ACCOUNT;
+       a.membership_expiration_date = time_point_sec::maximum();
+       a.network_fee_percentage = GRAPHENE_DEFAULT_NETWORK_PERCENT_OF_FEE;
+       a.lifetime_referrer_fee_percentage = GRAPHENE_100_PERCENT - GRAPHENE_DEFAULT_NETWORK_PERCENT_OF_FEE;
+   }).get_id() == GRAPHENE_RELAXED_COMMITTEE_ACCOUNT);
+   FC_ASSERT(create<account_object>([this](account_object& a) {
+       a.name = "null-account";
+       a.statistics = create<account_statistics_object>([](account_statistics_object&){}).id;
+       a.owner.weight_threshold = 0;
+       a.active.weight_threshold = 0;
+       a.registrar = a.lifetime_referrer = a.referrer = GRAPHENE_NULL_ACCOUNT;
+       a.membership_expiration_date = time_point_sec::maximum();
+       a.network_fee_percentage = GRAPHENE_DEFAULT_NETWORK_PERCENT_OF_FEE;
+       a.lifetime_referrer_fee_percentage = GRAPHENE_100_PERCENT - GRAPHENE_DEFAULT_NETWORK_PERCENT_OF_FEE;
+   }).get_id() == GRAPHENE_NULL_ACCOUNT);
+   FC_ASSERT(create<account_object>([this](account_object& a) {
+       a.name = "temp-account";
+       a.statistics = create<account_statistics_object>([](account_statistics_object&){}).id;
+       a.owner.weight_threshold = 0;
+       a.active.weight_threshold = 0;
+       a.registrar = a.lifetime_referrer = a.referrer = GRAPHENE_TEMP_ACCOUNT;
+       a.membership_expiration_date = time_point_sec::maximum();
+       a.network_fee_percentage = GRAPHENE_DEFAULT_NETWORK_PERCENT_OF_FEE;
+       a.lifetime_referrer_fee_percentage = GRAPHENE_100_PERCENT - GRAPHENE_DEFAULT_NETWORK_PERCENT_OF_FEE;
+   }).get_id() == GRAPHENE_TEMP_ACCOUNT);
 
    // Create core asset
    const asset_dynamic_data_object& dyn_asset =

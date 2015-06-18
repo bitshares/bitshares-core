@@ -55,7 +55,7 @@ genesis_state_type make_genesis() {
 BOOST_AUTO_TEST_SUITE(block_tests)
 
 BOOST_AUTO_TEST_CASE( block_database_test )
-{ 
+{
    try {
       fc::temp_directory data_dir;
 
@@ -70,7 +70,7 @@ BOOST_AUTO_TEST_CASE( block_database_test )
       for( uint32_t i = 0; i < 5; ++i )
       {
          if( i > 0 ) b.previous = b.id();
-         b.witness = witness_id_type(i+1); 
+         b.witness = witness_id_type(i+1);
          edump((b));
          bdb.store( b.id(), b );
 
@@ -96,7 +96,7 @@ BOOST_AUTO_TEST_CASE( block_database_test )
          idump((blk)(i));
          FC_ASSERT( blk->witness == witness_id_type(blk->block_num()) );
       }
-      
+
       auto last = bdb.last();
       FC_ASSERT( last );
       FC_ASSERT( last->id() == b.id() );
@@ -288,7 +288,7 @@ BOOST_AUTO_TEST_CASE( undo_pending )
          database db;
          db.open(data_dir.path(), make_genesis());
 
-         auto delegate_priv_key  = fc::ecc::private_key::regenerate(fc::sha256::hash(string("null_key")) );
+         auto delegate_priv_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("null_key")) );
          const graphene::db::index& account_idx = db.get_index(protocol_ids, account_object_type);
 
          {
@@ -298,14 +298,14 @@ BOOST_AUTO_TEST_CASE( undo_pending )
             db.push_transaction(trx, ~0);
 
             now += db.block_interval();
-            auto b = db.generate_block( now, db.get_scheduled_witness( 1 ).first, delegate_priv_key, ~0 );
+            auto b = db.generate_block(now, db.get_scheduled_witness(1).first, delegate_priv_key, ~0);
          }
 
          signed_transaction trx;
          trx.set_expiration( now + db.get_global_properties().parameters.maximum_time_until_expiration );
          account_id_type nathan_id = account_idx.get_next_id();
          account_create_operation cop;
-         cop.registrar = account_id_type(1);
+         cop.registrar = GRAPHENE_TEMP_ACCOUNT;
          cop.name = "nathan";
          cop.owner = authority(1, key_id_type(), 1);
          trx.operations.push_back(cop);
@@ -313,20 +313,18 @@ BOOST_AUTO_TEST_CASE( undo_pending )
          db.push_transaction(trx);
 
          now += db.block_interval();
-         auto b = db.generate_block( now, db.get_scheduled_witness( 1 ).first, delegate_priv_key );
+         auto b = db.generate_block(now, db.get_scheduled_witness(1).first, delegate_priv_key);
 
          BOOST_CHECK(nathan_id(db).name == "nathan");
 
          trx.clear();
          trx.set_expiration(db.head_block_time() + db.get_global_properties().parameters.maximum_time_until_expiration-1);
          trx.operations.push_back(transfer_operation({asset(1),account_id_type(1), nathan_id, asset(5000)}));
-         trx.sign( key_id_type(), delegate_priv_key );
-         db.push_transaction(trx);
+         db.push_transaction(trx, ~0);
          trx.clear();
          trx.set_expiration(db.head_block_time() + db.get_global_properties().parameters.maximum_time_until_expiration-2);
          trx.operations.push_back(transfer_operation({asset(1),account_id_type(1), nathan_id, asset(5000)}));
-         trx.sign( key_id_type(), delegate_priv_key );
-         db.push_transaction(trx);
+         db.push_transaction(trx, ~0);
 
          BOOST_CHECK(db.get_balance(nathan_id, asset_id_type()).amount == 10000);
          db.clear_pending();
@@ -356,7 +354,7 @@ BOOST_AUTO_TEST_CASE( switch_forks_undo_create )
       trx.set_expiration(now + db1.get_global_properties().parameters.maximum_time_until_expiration);
       account_id_type nathan_id = account_idx.get_next_id();
       account_create_operation cop;
-      cop.registrar = account_id_type(1);
+      cop.registrar = GRAPHENE_TEMP_ACCOUNT;
       cop.name = "nathan";
       cop.owner = authority(1, key_id_type(), 1);
       trx.operations.push_back(cop);
@@ -365,17 +363,17 @@ BOOST_AUTO_TEST_CASE( switch_forks_undo_create )
 
       auto aw = db1.get_global_properties().active_witnesses;
       now += db1.block_interval();
-      auto b =  db1.generate_block( now, db1.get_scheduled_witness( 1 ).first, delegate_priv_key );
+      auto b =  db1.generate_block( now, db1.get_scheduled_witness(1).first, delegate_priv_key );
 
       BOOST_CHECK(nathan_id(db1).name == "nathan");
 
       now = fc::time_point_sec( GRAPHENE_GENESIS_TIMESTAMP );
       now += db2.block_interval();
-      b =  db2.generate_block( now, db2.get_scheduled_witness( 1 ).first, delegate_priv_key );
+      b =  db2.generate_block(now, db2.get_scheduled_witness(1).first, delegate_priv_key);
       db1.push_block(b);
       aw = db2.get_global_properties().active_witnesses;
       now += db2.block_interval();
-      b =  db2.generate_block( now, db2.get_scheduled_witness( 1 ).first, delegate_priv_key );
+      b =  db2.generate_block(now, db2.get_scheduled_witness(1).first, delegate_priv_key);
       db1.push_block(b);
 
       BOOST_CHECK_THROW(nathan_id(db1), fc::exception);
@@ -384,7 +382,7 @@ BOOST_AUTO_TEST_CASE( switch_forks_undo_create )
 
       aw = db2.get_global_properties().active_witnesses;
       now += db2.block_interval();
-      b =  db2.generate_block( now, db2.get_scheduled_witness( 1 ).first, delegate_priv_key );
+      b =  db2.generate_block(now, db2.get_scheduled_witness(1).first, delegate_priv_key);
       db1.push_block(b);
 
       BOOST_CHECK(nathan_id(db1).name == "nathan");
@@ -643,22 +641,30 @@ BOOST_FIXTURE_TEST_CASE( change_block_interval, database_fixture )
 
    {
       proposal_create_operation cop = proposal_create_operation::genesis_proposal(db);
-      cop.fee_paying_account = account_id_type(1);
+      cop.fee_paying_account = GRAPHENE_TEMP_ACCOUNT;
       cop.expiration_time = db.head_block_time() + *cop.review_period_seconds + 10;
       global_parameters_update_operation uop;
       uop.new_parameters.block_interval = 1;
       cop.proposed_ops.emplace_back(uop);
       trx.operations.push_back(cop);
-      trx.sign(key_id_type(),delegate_priv_key);
       db.push_transaction(trx);
    }
    {
       proposal_update_operation uop;
-      uop.fee_paying_account = account_id_type(1);
-      uop.active_approvals_to_add = {account_id_type(1), account_id_type(2), account_id_type(3), account_id_type(4),
-                                     account_id_type(5), account_id_type(6), account_id_type(7), account_id_type(8)};
+      uop.fee_paying_account = GRAPHENE_TEMP_ACCOUNT;
+      uop.active_approvals_to_add = {get_account("init0").get_id(), get_account("init1").get_id(),
+                                     get_account("init2").get_id(), get_account("init3").get_id(),
+                                     get_account("init4").get_id(), get_account("init5").get_id(),
+                                     get_account("init6").get_id(), get_account("init7").get_id()};
       trx.operations.push_back(uop);
-      trx.sign(key_id_type(),delegate_priv_key);
+      trx.sign(get_account("init0").active.get_keys().front(),delegate_priv_key);
+      trx.sign(get_account("init1").active.get_keys().front(),delegate_priv_key);
+      trx.sign(get_account("init2").active.get_keys().front(),delegate_priv_key);
+      trx.sign(get_account("init3").active.get_keys().front(),delegate_priv_key);
+      trx.sign(get_account("init4").active.get_keys().front(),delegate_priv_key);
+      trx.sign(get_account("init5").active.get_keys().front(),delegate_priv_key);
+      trx.sign(get_account("init6").active.get_keys().front(),delegate_priv_key);
+      trx.sign(get_account("init7").active.get_keys().front(),delegate_priv_key);
       db.push_transaction(trx);
       BOOST_CHECK(proposal_id_type()(db).is_authorized_to_execute(&db));
    }
@@ -693,7 +699,7 @@ BOOST_FIXTURE_TEST_CASE( force_settlement, database_fixture )
    transfer(account_id_type()(db), shorter1_id(db), asset(100000000));
    transfer(account_id_type()(db), shorter2_id(db), asset(100000000));
    transfer(account_id_type()(db), shorter3_id(db), asset(100000000));
-   asset_id_type bit_usd = create_bitasset("BITUSD", account_id_type(1), 0).get_id();
+   asset_id_type bit_usd = create_bitasset("BITUSD", GRAPHENE_TEMP_ACCOUNT, 0).get_id();
    {
       asset_update_bitasset_operation op;
       op.asset_to_update = bit_usd;

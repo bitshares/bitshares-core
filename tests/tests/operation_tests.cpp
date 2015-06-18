@@ -308,10 +308,11 @@ BOOST_AUTO_TEST_CASE( update_mia )
       trx.operations.back() = op;
       db.push_transaction(trx, ~0);
 
+      idump((bit_usd));
       {
          asset_publish_feed_operation pop;
          pop.asset_id = bit_usd.get_id();
-         pop.publisher = account_id_type(1);
+         pop.publisher = get_account("init0").get_id();
          price_feed feed;
          feed.call_limit = price(bit_usd.amount(5), bit_usd.amount(5));
          feed.short_limit = feed.call_limit;
@@ -1949,6 +1950,7 @@ BOOST_AUTO_TEST_CASE( witness_withdraw_pay_test )
    trx.set_expiration(db.head_block_time() + GRAPHENE_DEFAULT_MAX_TIME_UNTIL_EXPIRATION);
    // last one was unpaid, so pull out a paid one for checks
    witness = paid_witness;
+   wdump((*witness));
    // Withdraw the witness's pay
    enable_fees(1);
    witness_withdraw_pay_operation wop;
@@ -1960,8 +1962,7 @@ BOOST_AUTO_TEST_CASE( witness_withdraw_pay_test )
    trx.operations.back() = wop;
    trx.visit(operation_set_fee(db.current_fee_schedule()));
    trx.validate();
-   trx.sign(key_id_type(),delegate_priv_key);
-   db.push_transaction(trx);
+   db.push_transaction(trx, database::skip_authority_check);
    trx.clear();
 
    BOOST_CHECK_EQUAL(get_balance(witness->witness_account(db), *core), witness_ppb - 1/*fee*/);

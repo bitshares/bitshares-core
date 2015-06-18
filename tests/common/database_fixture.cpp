@@ -50,20 +50,20 @@ database_fixture::database_fixture()
    boost::program_options::variables_map options;
 
    // app.initialize();
-   ahplugin->plugin_set_app( &app );
-   ahplugin->plugin_initialize( options );
+   ahplugin->plugin_set_app(&app);
+   ahplugin->plugin_initialize(options);
 
    secret_hash_type::encoder enc;
    fc::raw::pack(enc, delegate_priv_key);
    fc::raw::pack(enc, secret_hash_type());
+   auto secret = secret_hash_type::hash(enc.result());
    for( int i = 0; i < 10; ++i )
    {
-      genesis_state.allocation_targets.emplace_back("init"+fc::to_string(i), delegate_priv_key.get_public_key(), 0, true);
-      genesis_state.initial_committee.push_back({"init"+fc::to_string(i)});
+      auto name = "init"+fc::to_string(i);
+      genesis_state.allocation_targets.emplace_back(name, delegate_priv_key.get_public_key(), 0, true);
+      genesis_state.initial_committee.push_back({name});
+      genesis_state.initial_witnesses.push_back({name, delegate_priv_key.get_public_key(), secret});
    }
-   genesis_state.initial_witnesses = vector<genesis_state_type::initial_witness_type>(10, {"committee-account",
-                                                                                           delegate_priv_key.get_public_key(),
-                                                                                           secret_hash_type::hash(enc.result())});
    db.init_genesis(genesis_state);
    ahplugin->plugin_startup();
 
@@ -182,7 +182,7 @@ void database_fixture::verify_account_history_plugin_index( )const
       return;
 
    const std::shared_ptr<graphene::account_history::account_history_plugin> pin =
-      app.get_plugin<graphene::account_history::account_history_plugin>( "account_history" );
+      app.get_plugin<graphene::account_history::account_history_plugin>("account_history");
    if( pin->tracked_accounts().size() == 0 )
    {
       vector< pair< account_id_type, address > > tuples_from_db;
