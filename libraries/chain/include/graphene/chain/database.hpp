@@ -20,6 +20,7 @@
 #include <graphene/chain/block.hpp>
 #include <graphene/chain/asset.hpp>
 #include <graphene/chain/global_property_object.hpp>
+#include <graphene/chain/node_property_object.hpp>
 #include <graphene/chain/account_object.hpp>
 #include <graphene/chain/asset_object.hpp>
 #include <graphene/chain/fork_database.hpp>
@@ -38,7 +39,55 @@ namespace graphene { namespace chain {
    using graphene::db::abstract_object;
    using graphene::db::object;
 
-   typedef vector<std::pair<fc::static_variant<address, public_key_type>, share_type >> genesis_allocation;
+   struct genesis_state_type {
+       struct allocation_target_type {
+           allocation_target_type(const string& name = string(), const address& addr = address(), share_type weight = share_type())
+               : name(name), addr(addr), weight(weight){}
+           string name;
+           address addr;
+           share_type weight;
+       };
+       struct initial_witness_type {
+           /// Must correspond to one of the allocation targets.
+           string owner_name;
+           public_key_type block_signing_key;
+           secret_hash_type initial_secret;
+       };
+       struct initial_committee_member_type {
+           /// Must correspond to one of the allocation targets.
+           string owner_name;
+       };
+
+       chain_parameters initial_parameters;
+       vector<allocation_target_type> allocation_targets;
+       vector<initial_witness_type> initial_witnesses;
+       vector<initial_committee_member_type> initial_committee;
+   };
+
+   namespace detail
+   {
+      /**
+       * Class used to help the with_skip_flags implementation.
+       * It must be defined in this header because it must be
+       * available to the with_skip_flags implementation,
+       * which is a template and therefore must also be defined
+       * in this header.
+       */
+      struct skip_flags_restorer
+      {
+         skip_flags_restorer( node_property_object& npo, uint32_t old_skip_flags )
+            : _npo( npo ), _old_skip_flags( old_skip_flags )
+         {}
+
+         ~skip_flags_restorer()
+         {
+            _npo.skip_flags = _old_skip_flags;
+         }
+
+         node_property_object& _npo;
+         uint32_t _old_skip_flags;
+      };
+   }
 
    /**
     *   @class database
@@ -67,14 +116,14 @@ namespace graphene { namespace chain {
             skip_merkle_check           = 0x200  ///< used while reindexing
          };
 
-         void open(const fc::path& data_dir, const genesis_allocation& initial_allocation = genesis_allocation());
+         void open(const fc::path& data_dir, const genesis_state_type& initial_allocation = genesis_state_type());
          /**
           * @brief Rebuild object graph from block history and open detabase
           *
           * This method may be called after or instead of @ref database::open, and will rebuild the object graph by
           * replaying blockchain history. When this method exits successfully, the database will be open.
           */
-         void reindex(fc::path data_dir, const genesis_allocation& initial_allocation = genesis_allocation());
+         void reindex(fc::path data_dir, const genesis_state_type& initial_allocation = genesis_state_type());
 
          /**
           * @brief wipe Delete database from disk, and potentially the raw chain as well.
@@ -100,6 +149,9 @@ namespace graphene { namespace chain {
 
          bool push_block( const signed_block& b, uint32_t skip = skip_nothing );
          processed_transaction push_transaction( const signed_transaction& trx, uint32_t skip = skip_nothing );
+         bool _push_block( const signed_block& b );
+         processed_transaction _push_transaction( const signed_transaction& trx );
+
          ///@throws fc::exception if the proposed transaction fails to apply.
          processed_transaction push_proposal( const proposal_object& proposal );
 
@@ -107,7 +159,12 @@ namespace graphene { namespace chain {
             const fc::time_point_sec when,
             witness_id_type witness_id,
             const fc::ecc::private_key& block_signing_private_key,
-            uint32_t skip = 0
+            uint32_t skip
+            );
+         signed_block _generate_block(
+            const fc::time_point_sec when,
+            witness_id_type witness_id,
+            const fc::ecc::private_key& block_signing_private_key
             );
 
          void pop_block();
@@ -192,6 +249,7 @@ namespace graphene { namespace chain {
          const asset_object&                    get_core_asset()const;
          const global_property_object&          get_global_properties()const;
          const dynamic_global_property_object&  get_dynamic_global_properties()const;
+         const node_property_object&            get_node_properties()const;
          const fee_schedule_type&               current_fee_schedule()const;
 
          time_point_sec head_block_time()const;
@@ -200,12 +258,31 @@ namespace graphene { namespace chain {
 
          decltype( chain_parameters::block_interval ) block_interval( )const;
 
+         node_property_object& node_properties();
+
+         /**
+          * Set the skip_flags to the given value, call callback,
+          * then reset skip_flags to their previous value after
+          * callback is done.
+          */
+         template< typename Lambda >
+         void with_skip_flags(
+            uint32_t skip_flags,
+            Lambda callback )
+         {
+            node_property_object& npo = node_properties();
+            detail::skip_flags_restorer restorer( npo, npo.skip_flags );
+            npo.skip_flags = skip_flags;
+            callback();
+            return;
+         }
+
          //////////////////// db_init.cpp ////////////////////
 
          void initialize_evaluators();
          /// Reset the object graph in-memory
          void initialize_indexes();
-         void init_genesis(const genesis_allocation& initial_allocation = genesis_allocation());
+         void init_genesis(const genesis_state_type& genesis_state = genesis_state_type());
 
          template<typename EvaluatorType>
          void register_evaluator()
@@ -323,12 +400,15 @@ namespace graphene { namespace chain {
 
          void                  apply_block( const signed_block& next_block, uint32_t skip = skip_nothing );
          processed_transaction apply_transaction( const signed_transaction& trx, uint32_t skip = skip_nothing );
+         void                  _apply_block( const signed_block& next_block );
+         processed_transaction _apply_transaction( const signed_transaction& trx );
          operation_result      apply_operation( transaction_evaluation_state& eval_state, const operation& op );
 
          ///Steps involved in applying a new block
          ///@{
 
          const witness_object& validate_block_header( uint32_t skip, const signed_block& next_block )const;
+         const witness_object& _validate_block_header( const signed_block& next_block )const;
          void create_block_summary(const signed_block& next_block);
 
          //////////////////// db_update.cpp ////////////////////
@@ -392,6 +472,8 @@ namespace graphene { namespace chain {
          vector<uint64_t>                  _witness_count_histogram_buffer;
          vector<uint64_t>                  _committee_count_histogram_buffer;
          uint64_t                          _total_voting_stake;
+
+         node_property_object              _node_property_object;
    };
 
    namespace detail
@@ -421,3 +503,8 @@ namespace graphene { namespace chain {
    }
 
 } }
+
+FC_REFLECT(graphene::chain::genesis_state_type::allocation_target_type, (name)(addr)(weight))
+FC_REFLECT(graphene::chain::genesis_state_type::initial_witness_type, (owner_name)(block_signing_key)(initial_secret))
+FC_REFLECT(graphene::chain::genesis_state_type::initial_committee_member_type, (owner_name))
+FC_REFLECT(graphene::chain::genesis_state_type, (initial_parameters)(allocation_targets)(initial_witnesses)(initial_committee))

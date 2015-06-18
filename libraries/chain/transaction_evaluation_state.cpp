@@ -25,7 +25,9 @@
 namespace graphene { namespace chain {
    bool transaction_evaluation_state::check_authority( const account_object& account, authority::classification auth_class, int depth )
    {
-      if( _skip_authority_check || approved_by.find(make_pair(account.id, auth_class)) != approved_by.end() )
+      if( (!_is_proposed_trx) && (_db->get_node_properties().skip_flags & database::skip_authority_check) )
+         return true;
+      if( approved_by.find(make_pair(account.id, auth_class)) != approved_by.end() )
          return true;
 
       FC_ASSERT( account.id.instance() != 0 || _is_proposed_trx );

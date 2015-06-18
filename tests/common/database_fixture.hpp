@@ -24,6 +24,12 @@
 
 using namespace graphene::db;
 
+#define PUSH_TX \
+   graphene::chain::test::_push_transaction
+
+#define PUSH_BLOCK \
+   graphene::chain::test::_push_block
+
 // See below
 #define REQUIRE_OP_VALIDATION_SUCCESS( op, field, value ) \
 { \
@@ -64,9 +70,6 @@ using namespace graphene::db;
 ///This allows me to build consecutive test cases. It's pretty ugly, but it works well enough for unit tests.
 /// i.e. This allows a test on update_account to begin with the database at the end state of create_account.
 #define INVOKE(test) ((struct test*)this)->test_method(); trx.clear()
-
-#define PUSH_TX( tx, skip_flags ) \
-   _push_transaction( tx, skip_flags, __FILE__, __LINE__ )
 
 #define PREP_ACTOR(name) \
    fc::ecc::private_key name ## _private_key = generate_private_key(BOOST_PP_STRINGIZE(name)); \
@@ -111,7 +114,6 @@ struct database_fixture {
 
    static fc::ecc::private_key generate_private_key(string seed);
    string generate_anon_acct_name();
-   void _push_transaction( const signed_transaction& tx, uint32_t skip_flags, const char* file, int line );
    void verify_asset_supplies( )const;
    void verify_account_history_plugin_index( )const;
    void open_database();
@@ -129,7 +131,7 @@ struct database_fixture {
     * @brief Generates blocks until the head block time matches or exceeds timestamp
     * @param timestamp target time to generate blocks until
     */
-   void generate_blocks(fc::time_point_sec timestamp, bool miss_intermediate_blocks = false);
+   void generate_blocks(fc::time_point_sec timestamp, bool miss_intermediate_blocks = true);
 
    account_create_operation make_account(
       const std::string& name = "nathan",
@@ -210,5 +212,10 @@ struct database_fixture {
    int64_t get_balance( account_id_type account, asset_id_type a )const;
    int64_t get_balance( const account_object& account, const asset_object& a )const;
 };
+
+namespace test {
+bool _push_block( database& db, const signed_block& b, uint32_t skip_flags = 0 );
+processed_transaction _push_transaction( database& db, const signed_transaction& tx, uint32_t skip_flags = 0 );
+}
 
 } }

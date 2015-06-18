@@ -63,4 +63,14 @@ decltype( chain_parameters::block_interval ) database::block_interval( )const
    return get_global_properties().parameters.block_interval;
 }
 
+const node_property_object& database::get_node_properties()const
+{
+   return _node_property_object;
+}
+
+node_property_object& database::node_properties()
+{
+   return _node_property_object;
+}
+
 } }

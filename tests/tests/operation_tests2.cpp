@@ -70,7 +70,7 @@ BOOST_AUTO_TEST_CASE( withdraw_permission_create )
    }
 
    trx.sign(nathan_key_id, nathan_private_key);
-   db.push_transaction(trx);
+   PUSH_TX( db, trx );
    trx.clear();
 } FC_LOG_AND_RETHROW() }
 
@@ -108,7 +108,7 @@ BOOST_AUTO_TEST_CASE( withdraw_permission_test )
       op.amount_to_withdraw = asset(1);
       trx.operations.push_back(op);
       //Throws because we haven't entered the first withdrawal period yet.
-      BOOST_REQUIRE_THROW(db.push_transaction(trx), fc::exception);
+      BOOST_REQUIRE_THROW(PUSH_TX( db, trx ), fc::exception);
       //Get to the actual withdrawal period
       generate_blocks(permit(db).period_start_time);
 
@@ -122,7 +122,7 @@ BOOST_AUTO_TEST_CASE( withdraw_permission_test )
       trx.clear();
       trx.operations.push_back(op);
       trx.sign(dan_key_id, dan_private_key);
-      db.push_transaction(trx);
+      PUSH_TX( db, trx );
 
       // would be legal on its own, but doesn't work because trx already withdrew
       REQUIRE_THROW_WITH_VALUE(op, amount_to_withdraw, asset(5));
@@ -131,7 +131,7 @@ BOOST_AUTO_TEST_CASE( withdraw_permission_test )
       trx.operations.back() = op;    // withdraw 1
       trx.ref_block_prefix++;        // make it different from previous trx so it's non-duplicate
       trx.sign(dan_key_id, dan_private_key);
-      db.push_transaction(trx);
+      PUSH_TX( db, trx );
       trx.clear();
    }
 
@@ -162,11 +162,11 @@ BOOST_AUTO_TEST_CASE( withdraw_permission_test )
       trx.operations.push_back(op);
       trx.sign(dan_key_id, dan_private_key);
       //Throws because nathan doesn't have the money
-      BOOST_CHECK_THROW(db.push_transaction(trx), fc::exception);
+      BOOST_CHECK_THROW(PUSH_TX( db, trx ), fc::exception);
       op.amount_to_withdraw = asset(1);
       trx.operations.back() = op;
       trx.sign(dan_key_id, dan_private_key);
-      db.push_transaction(trx);
+      PUSH_TX( db, trx );
    }
 
    BOOST_CHECK_EQUAL(get_balance(nathan_id, asset_id_type()), 0);
@@ -196,7 +196,7 @@ BOOST_AUTO_TEST_CASE( withdraw_permission_test )
       trx.operations.push_back(op);
       trx.sign(dan_key_id, dan_private_key);
       //Throws because the permission has expired
-      BOOST_CHECK_THROW(db.push_transaction(trx), fc::exception);
+      BOOST_CHECK_THROW(PUSH_TX( db, trx ), fc::exception);
    }
 } FC_LOG_AND_RETHROW() }
 
@@ -226,7 +226,7 @@ BOOST_AUTO_TEST_CASE( withdraw_permission_nominal_case )
       // so tx's have different txid's
       trx.ref_block_prefix++;
       trx.sign(dan_key_id, dan_private_key);
-      db.push_transaction(trx);
+      PUSH_TX( db, trx );
       // tx's involving withdraw_permissions can't delete it even
       // if no further withdrawals are possible
       BOOST_CHECK(db.find_object(permit) != nullptr);
@@ -273,7 +273,7 @@ BOOST_AUTO_TEST_CASE( withdraw_permission_update )
       REQUIRE_THROW_WITH_VALUE(op, period_start_time, db.head_block_time() - 50);
       trx.operations.back() = op;
       trx.sign(nathan_key_id, nathan_private_key);
-      db.push_transaction(trx);
+      PUSH_TX( db, trx );
    }
 
    {
@@ -297,7 +297,7 @@ BOOST_AUTO_TEST_CASE( withdraw_permission_delete )
    trx.set_expiration(db.head_block_id());
    trx.operations.push_back(op);
    trx.sign(get_account("nathan").active.auths.begin()->first, generate_private_key("nathan"));
-   db.push_transaction(trx);
+   PUSH_TX( db, trx );
 } FC_LOG_AND_RETHROW() }
 
 BOOST_AUTO_TEST_CASE( mia_feeds )
@@ -313,7 +313,7 @@ BOOST_AUTO_TEST_CASE( mia_feeds )
       op.new_issuer = nathan_id;
       op.new_options = obj.options;
       trx.operations.push_back(op);
-      db.push_transaction(trx, ~0);
+      PUSH_TX( db, trx, ~0 );
       generate_block();
       trx.clear();
    }
@@ -324,7 +324,7 @@ BOOST_AUTO_TEST_CASE( mia_feeds )
       op.new_feed_producers = {dan_id, ben_id, vikram_id};
       trx.operations.push_back(op);
       trx.sign(nathan_key_id, nathan_private_key);
-      db.push_transaction(trx);
+      PUSH_TX( db, trx );
       generate_block(database::skip_nothing);
    }
    {
@@ -340,7 +340,7 @@ BOOST_AUTO_TEST_CASE( mia_feeds )
       // We'll expire margins after a month
       // Accept defaults for required collateral
       trx.operations.emplace_back(op);
-      db.push_transaction(trx, ~0);
+      PUSH_TX( db, trx, ~0 );
 
       const asset_bitasset_data_object& bitasset = bit_usd.bitasset_data(db);
       BOOST_CHECK(bitasset.current_feed.settlement_price.to_real() == GRAPHENE_BLOCKCHAIN_PRECISION / 30.0);
@@ -349,7 +349,7 @@ BOOST_AUTO_TEST_CASE( mia_feeds )
       op.publisher = ben_id;
       op.feed.settlement_price = price(asset(GRAPHENE_BLOCKCHAIN_PRECISION),bit_usd.amount(25));
       trx.operations.back() = op;
-      db.push_transaction(trx, ~0);
+      PUSH_TX( db, trx, ~0 );
 
       BOOST_CHECK_EQUAL(bitasset.current_feed.settlement_price.to_real(), GRAPHENE_BLOCKCHAIN_PRECISION / 25.0);
       BOOST_CHECK(bitasset.current_feed.maintenance_collateral_ratio == GRAPHENE_DEFAULT_MAINTENANCE_COLLATERAL_RATIO);
@@ -358,14 +358,14 @@ BOOST_AUTO_TEST_CASE( mia_feeds )
       op.feed.settlement_price = price(asset(GRAPHENE_BLOCKCHAIN_PRECISION),bit_usd.amount(40));
       op.feed.maintenance_collateral_ratio = 1000;
       trx.operations.back() = op;
-      db.push_transaction(trx, ~0);
+      PUSH_TX( db, trx, ~0 );
 
       BOOST_CHECK_EQUAL(bitasset.current_feed.settlement_price.to_real(), GRAPHENE_BLOCKCHAIN_PRECISION / 30.0);
       BOOST_CHECK(bitasset.current_feed.maintenance_collateral_ratio == GRAPHENE_DEFAULT_MAINTENANCE_COLLATERAL_RATIO);
 
       op.publisher = nathan_id;
       trx.operations.back() = op;
-      BOOST_CHECK_THROW(db.push_transaction(trx, ~0), fc::exception);
+      BOOST_CHECK_THROW(PUSH_TX( db, trx, ~0 ), fc::exception);
    }
 } FC_LOG_AND_RETHROW() }
 
@@ -391,7 +391,7 @@ BOOST_AUTO_TEST_CASE( witness_create )
                                                     [](vote_id_type id) { return id.type() == vote_id_type::committee; });
       trx.operations.push_back(op);
       trx.sign(nathan_key_id, nathan_private_key);
-      db.push_transaction(trx);
+      PUSH_TX( db, trx );
       trx.clear();
    }
 
@@ -468,7 +468,7 @@ BOOST_AUTO_TEST_CASE( global_settle_test )
       REQUIRE_THROW_WITH_VALUE(op, issuer, account_id_type(2));
       trx.operations.back() = op;
       trx.sign(nathan_key_id, nathan_private_key);
-      db.push_transaction(trx);
+      PUSH_TX( db, trx );
    }
 
    BOOST_CHECK_EQUAL(get_balance(valentine_id, bit_usd_id), 0);
@@ -502,7 +502,7 @@ BOOST_AUTO_TEST_CASE( worker_create_test )
       REQUIRE_THROW_WITH_VALUE(op, work_end_date, op.work_begin_date);
       trx.operations.back() = op;
       trx.sign(nathan_key_id, nathan_private_key);
-      db.push_transaction(trx);
+      PUSH_TX( db, trx );
    }
 
    const worker_object& worker = worker_id_type()(db);
@@ -532,7 +532,7 @@ BOOST_AUTO_TEST_CASE( worker_pay_test )
       op.new_options = nathan_id(db).options;
       op.new_options->votes.insert(worker_id_type()(db).vote_for);
       trx.operations.push_back(op);
-      db.push_transaction(trx, ~0);
+      PUSH_TX( db, trx, ~0 );
       trx.clear();
    }
    {
@@ -540,7 +540,7 @@ BOOST_AUTO_TEST_CASE( worker_pay_test )
       op.payer = account_id_type();
       op.amount_to_burn = asset(GRAPHENE_INITIAL_SUPPLY/2);
       trx.operations.push_back(op);
-      db.push_transaction(trx, ~0);
+      PUSH_TX( db, trx, ~0 );
       trx.clear();
    }
 
@@ -557,7 +557,7 @@ BOOST_AUTO_TEST_CASE( worker_pay_test )
       trx.set_expiration(db.head_block_id());
       trx.operations.push_back(op);
       trx.sign(nathan_key_id, nathan_private_key);
-      db.push_transaction(trx);
+      PUSH_TX( db, trx );
       trx.signatures.clear();
       REQUIRE_THROW_WITH_VALUE(op, amount, asset(1));
       trx.clear();
@@ -572,7 +572,7 @@ BOOST_AUTO_TEST_CASE( worker_pay_test )
       op.new_options = nathan_id(db).options;
       op.new_options->votes.erase(worker_id_type()(db).vote_for);
       trx.operations.push_back(op);
-      db.push_transaction(trx, ~0);
+      PUSH_TX( db, trx, ~0 );
       trx.clear();
    }
 
@@ -592,7 +592,7 @@ BOOST_AUTO_TEST_CASE( worker_pay_test )
       REQUIRE_THROW_WITH_VALUE(op, amount, asset(501));
       trx.operations.back() = op;
       trx.sign(nathan_key_id, nathan_private_key);
-      db.push_transaction(trx);
+      PUSH_TX( db, trx );
       trx.signatures.clear();
       trx.clear();
    }
@@ -625,7 +625,7 @@ BOOST_AUTO_TEST_CASE( refund_worker_test )
       REQUIRE_THROW_WITH_VALUE(op, work_end_date, op.work_begin_date);
       trx.operations.back() = op;
       trx.sign(nathan_key_id, nathan_private_key);
-      db.push_transaction(trx);
+      PUSH_TX( db, trx );
       trx.clear();
    }
 
@@ -645,7 +645,7 @@ BOOST_AUTO_TEST_CASE( refund_worker_test )
       op.new_options = nathan_id(db).options;
       op.new_options->votes.insert(worker_id_type()(db).vote_for);
       trx.operations.push_back(op);
-      db.push_transaction(trx, ~0);
+      PUSH_TX( db, trx, ~0 );
       trx.clear();
    }
    {
@@ -653,14 +653,17 @@ BOOST_AUTO_TEST_CASE( refund_worker_test )
       op.payer = account_id_type();
       op.amount_to_burn = asset(GRAPHENE_INITIAL_SUPPLY/2);
       trx.operations.push_back(op);
-      db.push_transaction(trx, ~0);
+      PUSH_TX( db, trx, ~0 );
       trx.clear();
    }
 
    // auto supply = asset_id_type()(db).dynamic_data(db).current_supply;
+   verify_asset_supplies();
    generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+   verify_asset_supplies();
    BOOST_CHECK_EQUAL(worker_id_type()(db).worker.get<refund_worker_type>().total_burned.value, 1000);
    generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+   verify_asset_supplies();
    BOOST_CHECK_EQUAL(worker_id_type()(db).worker.get<refund_worker_type>().total_burned.value, 2000);
    generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
    BOOST_CHECK(!db.get(worker_id_type()).is_active(db.head_block_time()));
@@ -690,7 +693,7 @@ BOOST_AUTO_TEST_CASE( force_settlement_unavailable )
       op.new_options.maximum_force_settlement_volume = 9000;
       trx.clear();
       trx.operations.push_back(op);
-      db.push_transaction(trx, ~0);
+      PUSH_TX( db, trx, ~0 );
       trx.clear();
    }
    generate_block();
@@ -730,7 +733,7 @@ BOOST_AUTO_TEST_CASE( force_settlement_unavailable )
       trx.operations.push_back(pop);
    }
    trx.sign(key_id_type(),private_key);
-   db.push_transaction(trx);
+   PUSH_TX( db, trx );
    trx.clear();
 
    asset_settle_operation sop;
@@ -738,7 +741,7 @@ BOOST_AUTO_TEST_CASE( force_settlement_unavailable )
    sop.amount = asset(50, bit_usd);
    trx.operations = {sop};
    //Force settlement is disabled; check that it fails
-   BOOST_CHECK_THROW(db.push_transaction(trx, ~0), fc::exception);
+   BOOST_CHECK_THROW(PUSH_TX( db, trx, ~0 ), fc::exception);
    {
       //Enable force settlement
       asset_update_operation op;
@@ -748,7 +751,7 @@ BOOST_AUTO_TEST_CASE( force_settlement_unavailable )
       op.new_options.flags &= ~disable_force_settle;
       trx.operations = {op};
       trx.sign(key_id_type(), private_key);
-      db.push_transaction(trx);
+      PUSH_TX( db, trx );
       trx.operations = {sop};
    }
    REQUIRE_THROW_WITH_VALUE(sop, amount, asset(999999, bit_usd));
@@ -756,7 +759,7 @@ BOOST_AUTO_TEST_CASE( force_settlement_unavailable )
    trx.sign(key_id_type(),private_key);
 
    //Partially settle a call
-   force_settlement_id_type settle_id = db.push_transaction(trx).operation_results.front().get<object_id_type>();
+   force_settlement_id_type settle_id = PUSH_TX( db, trx ).operation_results.front().get<object_id_type>();
    trx.clear();
    call_order_id_type call_id = db.get_index_type<call_order_index>().indices().get<by_collateral>().begin()->id;
    BOOST_CHECK_EQUAL(settle_id(db).balance.amount.value, 50);
@@ -778,7 +781,7 @@ BOOST_AUTO_TEST_CASE( force_settlement_unavailable )
       trx.operations.push_back(op);
       trx.set_expiration(db.head_block_id());
       trx.sign(key_id_type(), private_key);
-      db.push_transaction(trx);
+      PUSH_TX( db, trx );
       //Check that force settlements were all canceled
       BOOST_CHECK(db.get_index_type<force_settlement_index>().indices().empty());
       BOOST_CHECK_EQUAL(get_balance(nathan_id, bit_usd), bit_usd(db).dynamic_data(db).current_supply.value);

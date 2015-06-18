@@ -146,17 +146,17 @@ BOOST_AUTO_TEST_CASE( create_account_test )
       op.owner.add_authority(account_id_type(9999999999), 10);
       trx.operations.back() = op;
       op.owner = auth_bak;
-      BOOST_REQUIRE_THROW(db.push_transaction(trx, ~0), fc::exception);
+      BOOST_REQUIRE_THROW(PUSH_TX( db, trx, ~0 ), fc::exception);
       op.owner = auth_bak;
       op.owner.add_authority(key_id_type(9999999999), 10);
       trx.operations.back() = op;
-      BOOST_REQUIRE_THROW(db.push_transaction(trx, ~0), fc::exception);
+      BOOST_REQUIRE_THROW(PUSH_TX( db, trx, ~0 ), fc::exception);
       op.owner = auth_bak;
 
       trx.operations.back() = op;
       trx.sign( key_id_type(), fc::ecc::private_key::regenerate(fc::sha256::hash(string("genesis"))) );
       trx.validate();
-      db.push_transaction(trx, ~0);
+      PUSH_TX( db, trx, ~0 );
 
       const account_object& nathan_account = *db.get_index_type<account_index>().indices().get<by_name>().find("nathan");
       BOOST_CHECK(nathan_account.id.space() == protocol_ids);
@@ -206,15 +206,15 @@ BOOST_AUTO_TEST_CASE( child_account )
       trx.operations.emplace_back(op);
       sign(trx, key_id_type(), fc::ecc::private_key::regenerate(fc::sha256::hash(string("genesis"))));
 
-      BOOST_REQUIRE_THROW(db.push_transaction(trx), fc::exception);
+      BOOST_REQUIRE_THROW(PUSH_TX( db, trx ), fc::exception);
       sign(trx, nathan_key.id,nathan_private_key);
-      BOOST_REQUIRE_THROW(db.push_transaction(trx), fc::exception);
+      BOOST_REQUIRE_THROW(PUSH_TX( db, trx ), fc::exception);
       trx.signatures.clear();
       op.owner = authority(1, account_id_type(nathan.id), 1);
       trx.operations = {op};
       sign(trx, key_id_type(), fc::ecc::private_key::regenerate(fc::sha256::hash(string("genesis"))));
       sign(trx, nathan_key.id, nathan_private_key);
-      db.push_transaction(trx);
+      PUSH_TX( db, trx );
 
       BOOST_CHECK( get_account("nathan/child").active.auths == op.active.auths );
    } catch (fc::exception& e) {
@@ -235,7 +235,7 @@ BOOST_AUTO_TEST_CASE( update_account )
       transfer(account_id_type()(db), nathan, asset(30000));
 
       trx.operations.emplace_back(key_create_operation({asset(),nathan.id,address(nathan_new_key.get_public_key())}));
-      db.push_transaction(trx, ~0);
+      PUSH_TX( db, trx, ~0 );
 
       account_update_operation op;
       op.account = nathan.id;
@@ -245,7 +245,7 @@ BOOST_AUTO_TEST_CASE( update_account )
       op.new_options->votes = flat_set<vote_id_type>({active_delegates[0](db).vote_id, active_delegates[5](db).vote_id});
       op.new_options->num_committee = 2;
       trx.operations.back() = op;
-      db.push_transaction(trx, ~0);
+      PUSH_TX( db, trx, ~0 );
 
       BOOST_CHECK(nathan.options.memo_key == key_id_type());
       BOOST_CHECK(nathan.active.weight_threshold == 2);
@@ -275,7 +275,7 @@ BOOST_AUTO_TEST_CASE( update_account )
          op.upgrade_to_lifetime_member = true;
          op.fee = op.calculate_fee(db.get_global_properties().parameters.current_fees);
          trx.operations = {op};
-         db.push_transaction(trx, ~0);
+         PUSH_TX( db, trx, ~0 );
       }
 
       BOOST_CHECK( nathan.is_lifetime_member() );
@@ -303,7 +303,7 @@ BOOST_AUTO_TEST_CASE( transfer_core_asset )
 
       asset fee = trx.operations.front().get<transfer_operation>().fee;
       trx.validate();
-      db.push_transaction(trx, ~0);
+      PUSH_TX( db, trx, ~0 );
 
       BOOST_CHECK_EQUAL(get_balance(account_id_type()(db), asset_id_type()(db)),
                         (genesis_balance.amount - 10000 - fee.amount).value);
@@ -322,7 +322,7 @@ BOOST_AUTO_TEST_CASE( transfer_core_asset )
 
       fee = trx.operations.front().get<transfer_operation>().fee;
       trx.validate();
-      db.push_transaction(trx, ~0);
+      PUSH_TX( db, trx, ~0 );
 
       BOOST_CHECK_EQUAL(get_balance(nathan_account, asset_id_type()(db)), 8000 - fee.amount.value);
       BOOST_CHECK_EQUAL(get_balance(account_id_type()(db), asset_id_type()(db)), genesis_balance.amount.value + 2000);
@@ -346,7 +346,7 @@ BOOST_AUTO_TEST_CASE( create_delegate )
       trx.operations.back() = op;
 
       delegate_id_type delegate_id = db.get_index_type<primary_index<simple_index<delegate_object>>>().get_next_id();
-      db.push_transaction(trx, ~0);
+      PUSH_TX( db, trx, ~0 );
       const delegate_object& d = delegate_id(db);
 
       BOOST_CHECK(d.delegate_account == account_id_type());
@@ -384,11 +384,11 @@ BOOST_AUTO_TEST_CASE( update_mia )
       trx.operations.emplace_back(op);
 
       trx.operations.back() = op;
-      db.push_transaction(trx, ~0);
+      PUSH_TX( db, trx, ~0 );
       std::swap(op.new_options.flags, op.new_options.issuer_permissions);
       op.new_issuer = account_id_type();
       trx.operations.back() = op;
-      db.push_transaction(trx, ~0);
+      PUSH_TX( db, trx, ~0 );
 
       {
          asset_publish_feed_operation pop;
@@ -402,7 +402,7 @@ BOOST_AUTO_TEST_CASE( update_mia )
          pop.feed = feed;
          REQUIRE_THROW_WITH_VALUE(pop, feed.maintenance_collateral_ratio, 0);
          trx.operations.back() = pop;
-         db.push_transaction(trx, ~0);
+         PUSH_TX( db, trx, ~0 );
       }
 
       trx.operations.clear();
@@ -410,13 +410,13 @@ BOOST_AUTO_TEST_CASE( update_mia )
       op.issuer = account_id_type();
       op.new_issuer = nathan.id;
       trx.operations.emplace_back(op);
-      db.push_transaction(trx, ~0);
+      PUSH_TX( db, trx, ~0 );
       BOOST_CHECK(bit_usd.issuer == nathan.id);
 
       op.issuer = nathan.id;
       op.new_issuer = account_id_type();
       trx.operations.back() = op;
-      db.push_transaction(trx, ~0);
+      PUSH_TX( db, trx, ~0 );
       BOOST_CHECK(bit_usd.issuer == account_id_type());
    } catch ( const fc::exception& e ) {
       elog( "${e}", ("e", e.to_detail_string() ) );
@@ -440,7 +440,7 @@ BOOST_AUTO_TEST_CASE( create_uia )
       creator.common_options.flags = charge_market_fee;
       creator.common_options.core_exchange_rate = price({asset(2),asset(1,1)});
       trx.operations.push_back(std::move(creator));
-      db.push_transaction(trx, ~0);
+      PUSH_TX( db, trx, ~0 );
 
       const asset_object& test_asset = test_asset_id(db);
       BOOST_CHECK(test_asset.symbol == "TEST");
@@ -449,7 +449,7 @@ BOOST_AUTO_TEST_CASE( create_uia )
       BOOST_CHECK(test_asset.options.max_supply == 100000000);
       BOOST_CHECK(!test_asset.bitasset_data_id.valid());
       BOOST_CHECK(test_asset.options.market_fee_percent == GRAPHENE_MAX_MARKET_FEE_PERCENT/100);
-      BOOST_REQUIRE_THROW(db.push_transaction(trx, ~0), fc::exception);
+      BOOST_REQUIRE_THROW(PUSH_TX( db, trx, ~0 ), fc::exception);
 
       const asset_dynamic_data_object& test_asset_dynamic_data = test_asset.dynamic_asset_data_id(db);
       BOOST_CHECK(test_asset_dynamic_data.current_supply == 0);
@@ -499,22 +499,22 @@ BOOST_AUTO_TEST_CASE( update_uia )
 
       op.new_options.core_exchange_rate = price(asset(3), test.amount(5));
       trx.operations.back() = op;
-      db.push_transaction(trx, ~0);
+      PUSH_TX( db, trx, ~0 );
       REQUIRE_THROW_WITH_VALUE(op, new_options.core_exchange_rate, price());
       op.new_options.core_exchange_rate = test.options.core_exchange_rate;
       op.new_issuer = nathan.id;
       trx.operations.back() = op;
-      db.push_transaction(trx, ~0);
+      PUSH_TX( db, trx, ~0 );
       op.issuer = nathan.id;
       op.new_issuer.reset();
       op.new_options.flags = transfer_restricted | white_list;
       trx.operations.back() = op;
-      db.push_transaction(trx, ~0);
+      PUSH_TX( db, trx, ~0 );
       REQUIRE_THROW_WITH_VALUE(op, new_options.issuer_permissions, test.options.issuer_permissions & ~white_list);
       op.new_options.issuer_permissions = test.options.issuer_permissions & ~white_list;
       op.new_options.flags = 0;
       trx.operations.back() = op;
-      db.push_transaction(trx, ~0);
+      PUSH_TX( db, trx, ~0 );
       op.new_options.issuer_permissions = test.options.issuer_permissions;
       op.new_options.flags = test.options.flags;
       BOOST_CHECK(!(test.options.issuer_permissions & white_list));
@@ -522,9 +522,9 @@ BOOST_AUTO_TEST_CASE( update_uia )
       REQUIRE_THROW_WITH_VALUE(op, new_options.flags, white_list);
       op.new_issuer = account_id_type();
       trx.operations.back() = op;
-      db.push_transaction(trx, ~0);
+      PUSH_TX( db, trx, ~0 );
       op.issuer = account_id_type();
-      BOOST_REQUIRE_THROW(db.push_transaction(trx, ~0), fc::exception);
+      BOOST_REQUIRE_THROW(PUSH_TX( db, trx, ~0 ), fc::exception);
       op.new_issuer.reset();
    } catch(fc::exception& e) {
       edump((e.to_detail_string()));
@@ -549,7 +549,7 @@ BOOST_AUTO_TEST_CASE( issue_uia )
       REQUIRE_THROW_WITH_VALUE(op, issue_to_account, account_id_type(999999999));
 
       trx.operations.back() = op;
-      db.push_transaction(trx, ~0);
+      PUSH_TX( db, trx, ~0 );
 
       const asset_dynamic_data_object& test_dynamic_data = test_asset.dynamic_asset_data_id(db);
       BOOST_CHECK_EQUAL(get_balance(nathan_account, test_asset), 5000000);
@@ -557,7 +557,7 @@ BOOST_AUTO_TEST_CASE( issue_uia )
       BOOST_CHECK(test_dynamic_data.accumulated_fees == 0);
       BOOST_CHECK(test_dynamic_data.fee_pool == 0);
 
-      db.push_transaction(trx, ~0);
+      PUSH_TX( db, trx, ~0 );
 
       BOOST_CHECK_EQUAL(get_balance(nathan_account, test_asset), 10000000);
       BOOST_CHECK(test_dynamic_data.current_supply == 10000000);
@@ -580,11 +580,11 @@ BOOST_AUTO_TEST_CASE( transfer_uia )
 
       BOOST_CHECK_EQUAL(get_balance(nathan, uia), 10000000);
       trx.operations.push_back(transfer_operation({asset(),nathan.id, genesis.id, uia.amount(5000)}));
-      db.push_transaction(trx, ~0);
+      PUSH_TX( db, trx, ~0 );
       BOOST_CHECK_EQUAL(get_balance(nathan, uia), 10000000 - 5000);
       BOOST_CHECK_EQUAL(get_balance(genesis, uia), 5000);
 
-      db.push_transaction(trx, ~0);
+      PUSH_TX( db, trx, ~0 );
       BOOST_CHECK_EQUAL(get_balance(nathan, uia), 10000000 - 10000);
       BOOST_CHECK_EQUAL(get_balance(genesis, uia), 10000);
    } catch(fc::exception& e) {
@@ -782,7 +782,7 @@ BOOST_AUTO_TEST_CASE( uia_fees )
       BOOST_CHECK(fee.amount > 0);
       asset core_fee = fee*test_asset.options.core_exchange_rate;
       trx.operations.push_back(std::move(op));
-      db.push_transaction(trx, ~0);
+      PUSH_TX( db, trx, ~0 );
 
       BOOST_CHECK_EQUAL(get_balance(nathan_account, test_asset),
                         (old_balance - fee - test_asset.amount(100)).amount.value);
@@ -791,7 +791,7 @@ BOOST_AUTO_TEST_CASE( uia_fees )
       BOOST_CHECK(asset_dynamic.fee_pool == 1000000 - core_fee.amount);
 
       //Do it again, for good measure.
-      db.push_transaction(trx, ~0);
+      PUSH_TX( db, trx, ~0 );
       BOOST_CHECK_EQUAL(get_balance(nathan_account, test_asset),
                         (old_balance - fee - fee - test_asset.amount(200)).amount.value);
       BOOST_CHECK_EQUAL(get_balance(genesis_account, test_asset), 200);
@@ -808,7 +808,7 @@ BOOST_AUTO_TEST_CASE( uia_fees )
       BOOST_CHECK_EQUAL(get_balance(nathan_account, asset_id_type()(db)), 20);
 
       trx.operations.emplace_back(std::move(op));
-      db.push_transaction(trx, ~0);
+      PUSH_TX( db, trx, ~0 );
 
       BOOST_CHECK_EQUAL(get_balance(nathan_account, asset_id_type()(db)), 0);
       BOOST_CHECK_EQUAL(get_balance(nathan_account, test_asset),
@@ -855,7 +855,7 @@ BOOST_AUTO_TEST_CASE( delegate_feeds )
          asset_update_operation uop(get_asset("BITUSD"));
          uop.new_issuer = account_id_type();
          trx.operations.push_back(uop);
-         db.push_transaction(trx, ~0);
+         PUSH_TX( db, trx, ~0 );
          trx.clear();
       }
       generate_block();
@@ -870,7 +870,7 @@ BOOST_AUTO_TEST_CASE( delegate_feeds )
       op.feed.settlement_price = price(asset(GRAPHENE_BLOCKCHAIN_PRECISION),bit_usd.amount(30));
       // Accept defaults for required collateral
       trx.operations.emplace_back(op);
-      db.push_transaction(trx, ~0);
+      PUSH_TX( db, trx, ~0 );
 
       {
          //Dumb sanity check of some operators. Only here to improve code coverage. :D
@@ -892,7 +892,7 @@ BOOST_AUTO_TEST_CASE( delegate_feeds )
       op.publisher = active_witnesses[1];
       op.feed.settlement_price = price(asset(GRAPHENE_BLOCKCHAIN_PRECISION),bit_usd.amount(25));
       trx.operations.back() = op;
-      db.push_transaction(trx, ~0);
+      PUSH_TX( db, trx, ~0 );
 
       BOOST_CHECK_EQUAL(bitasset.current_feed.settlement_price.to_real(), GRAPHENE_BLOCKCHAIN_PRECISION / 25.0);
       BOOST_CHECK(bitasset.current_feed.maintenance_collateral_ratio == GRAPHENE_DEFAULT_MAINTENANCE_COLLATERAL_RATIO);
@@ -902,7 +902,7 @@ BOOST_AUTO_TEST_CASE( delegate_feeds )
       // But this delegate is an idiot.
       op.feed.maintenance_collateral_ratio = 1000;
       trx.operations.back() = op;
-      db.push_transaction(trx, ~0);
+      PUSH_TX( db, trx, ~0 );
 
       BOOST_CHECK_EQUAL(bitasset.current_feed.settlement_price.to_real(), GRAPHENE_BLOCKCHAIN_PRECISION / 30.0);
       BOOST_CHECK(bitasset.current_feed.maintenance_collateral_ratio == GRAPHENE_DEFAULT_MAINTENANCE_COLLATERAL_RATIO);
@@ -911,7 +911,6 @@ BOOST_AUTO_TEST_CASE( delegate_feeds )
       throw;
    }
 }
-
 
 
 /**
@@ -1195,10 +1194,10 @@ BOOST_AUTO_TEST_CASE( limit_order_fill_or_kill )
 
    trx.operations.clear();
    trx.operations.push_back(op);
-   BOOST_CHECK_THROW(db.push_transaction(trx, ~0), fc::exception);
+   BOOST_CHECK_THROW(PUSH_TX( db, trx, ~0 ), fc::exception);
    op.fill_or_kill = false;
    trx.operations.back() = op;
-   db.push_transaction(trx, ~0);
+   PUSH_TX( db, trx, ~0 );
 } FC_LOG_AND_RETHROW() }
 
 /// Shameless code coverage plugging. Otherwise, these calls never happen.
@@ -1246,7 +1245,7 @@ BOOST_AUTO_TEST_CASE( witness_withdraw_pay_test )
    trx.visit(operation_set_fee(db.current_fee_schedule()));
    trx.validate();
    trx.sign(key_id_type(),generate_private_key("genesis"));
-   db.push_transaction(trx);
+   PUSH_TX( db, trx );
    trx.clear();
    BOOST_CHECK_EQUAL(get_balance(*nathan, *core), 8950000000);
 
@@ -1325,7 +1324,7 @@ BOOST_AUTO_TEST_CASE( witness_withdraw_pay_test )
    trx.visit(operation_set_fee(db.current_fee_schedule()));
    trx.validate();
    trx.sign(key_id_type(),generate_private_key("genesis"));
-   db.push_transaction(trx);
+   PUSH_TX( db, trx );
    trx.clear();
 
    BOOST_CHECK_EQUAL(get_balance(witness->witness_account(db), *core), witness_ppb - 1/*fee*/);
@@ -1555,7 +1554,7 @@ BOOST_AUTO_TEST_CASE( vesting_balance_withdraw_test )
       create_op.vesting_seconds = vesting_seconds;
       tx.operations.push_back( create_op );
 
-      processed_transaction ptx = db.push_transaction( tx, ~0 );
+      processed_transaction ptx = PUSH_TX( db,  tx, ~0  );
       const vesting_balance_object& vbo = vesting_balance_id_type(
          ptx.operation_results[0].get<object_id_type>())(db);
 

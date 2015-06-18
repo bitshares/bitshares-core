@@ -16,28 +16,26 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #pragma once
-#include <fstream>
-#include <graphene/chain/block.hpp>
+#include <graphene/db/object.hpp>
 
 namespace graphene { namespace chain {
-   class block_database 
+
+   /**
+    * @brief Contains per-node database configuration.
+    *
+    *  Transactions are evaluated differently based on per-node state.
+    *  Settings here may change based on whether the node is syncing or up-to-date.
+    *  Or whether the node is a witness node. Or if we're processing a
+    *  transaction in a witness-signed block vs. a fresh transaction
+    *  from the p2p network.  Or configuration-specified tradeoffs of
+    *  performance/hardfork resilience vs. paranoia.
+    */
+   class node_property_object
    {
       public:
-         void open( const fc::path& dbdir );
-         bool is_open()const;
-         void flush();
-         void close();
+         node_property_object() : skip_flags(0) {}
+         ~node_property_object(){}
 
-         void store( const block_id_type& id, const signed_block& b );
-         void remove( const block_id_type& id );
-
-         bool                   contains( const block_id_type& id )const;
-         block_id_type          fetch_block_id( uint32_t block_num )const;
-         optional<signed_block> fetch_optional( const block_id_type& id )const;
-         optional<signed_block> fetch_by_number( uint32_t block_num )const;
-         optional<signed_block> last()const;
-      private:
-         mutable std::fstream _blocks;
-         mutable std::fstream _block_num_to_pos;
+         uint32_t skip_flags;
    };
-} }
+} } // graphene::chain

@@ -33,8 +33,8 @@ namespace graphene { namespace chain {
    class transaction_evaluation_state
    {
       public:
-         transaction_evaluation_state( database* db = nullptr, bool skip_authority_check = false )
-         :_db(db),_skip_authority_check(skip_authority_check){}
+         transaction_evaluation_state( database* db = nullptr )
+         :_db(db){}
 
          bool check_authority( const account_object&, authority::classification auth_class = authority::active, int depth = 0 );
 
@@ -55,7 +55,6 @@ namespace graphene { namespace chain {
 
          const signed_transaction* _trx = nullptr;
          database*                 _db = nullptr;
-         bool                      _skip_authority_check = false;
          bool                      _is_proposed_trx = false;
    };
 } } // namespace graphene::chain

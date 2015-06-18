@@ -124,7 +124,7 @@ void database::initialize_indexes()
    add_index< primary_index< simple_index< witness_schedule_object       > > >();
 }
 
-void database::init_genesis(const genesis_allocation& initial_allocation)
+void database::init_genesis(const genesis_state_type& genesis_state)
 { try {
    _undo_db.disable();
 
@@ -219,7 +219,7 @@ void database::init_genesis(const genesis_allocation& initial_allocation)
          for( const witness_id_type& wit : init_witnesses )
             p.active_witnesses.insert( wit );
          p.next_available_vote_id = delegates_and_witnesses * 2;
-         p.chain_id = fc::digest(initial_allocation);
+         p.chain_id = fc::digest(genesis_state);
       });
    (void)properties;
 
@@ -250,11 +250,11 @@ void database::init_genesis(const genesis_allocation& initial_allocation)
    assert( get_balance(account_id_type(), asset_id_type()) == asset(dyn_asset.current_supply) );
    (void)core_asset;
 
-   if( !initial_allocation.empty() )
+   if( !genesis_state.allocation_targets.empty() )
    {
       share_type total_allocation = 0;
-      for( const auto& handout : initial_allocation )
-         total_allocation += handout.second;
+      for( const auto& handout : genesis_state.allocation_targets )
+         total_allocation += handout.weight;
 
       auto mangle_to_name = [](const fc::static_variant<public_key_type, address>& key) {
          string addr = string(key.which() == std::decay<decltype(key)>::type::tag<address>::value? key.get<address>()
@@ -273,22 +273,22 @@ void database::init_genesis(const genesis_allocation& initial_allocation)
 
       fc::time_point start_time = fc::time_point::now();
 
-      for( const auto& handout : initial_allocation )
+      for( const auto& handout : genesis_state.allocation_targets )
       {
-         asset amount(handout.second);
+         asset amount(handout.weight);
          amount.amount = ((fc::uint128(amount.amount.value) * GRAPHENE_INITIAL_SUPPLY)/total_allocation.value).to_uint64();
          if( amount.amount == 0 )
          {
-            wlog("Skipping zero allocation to ${k}", ("k", handout.first));
+            wlog("Skipping zero allocation to ${k}", ("k", handout.name));
             continue;
          }
 
          signed_transaction trx;
-         trx.operations.emplace_back(key_create_operation({asset(), genesis_account.id, handout.first}));
+         trx.operations.emplace_back(key_create_operation({asset(), genesis_account.id, handout.addr}));
          relative_key_id_type key_id(0);
          authority account_authority(1, key_id, 1);
          account_create_operation cop;
-         cop.name = mangle_to_name(handout.first);
+         cop.name = handout.name;
          cop.registrar = account_id_type(1);
          cop.active = account_authority;
          cop.owner = account_authority;
@@ -322,7 +322,7 @@ void database::init_genesis(const genesis_allocation& initial_allocation)
 
       fc::microseconds duration = fc::time_point::now() - start_time;
       ilog("Finished allocating to ${n} accounts in ${t} milliseconds.",
-           ("n", initial_allocation.size())("t", duration.count() / 1000));
+           ("n", genesis_state.allocation_targets.size())("t", duration.count() / 1000));
    }
 
    _undo_db.enable();

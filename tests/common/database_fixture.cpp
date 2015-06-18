@@ -72,6 +72,8 @@ database_fixture::~database_fixture()
       verify_account_history_plugin_index();
    }
 
+   BOOST_CHECK( db.get_node_properties().skip_flags == database::skip_nothing );
+
    if( data_dir )
       db.close();
    return;
@@ -90,11 +92,6 @@ string database_fixture::generate_anon_acct_name()
    // names of the form "anon-acct-x123" ; the "x" is necessary
    //    to workaround issue #46
    return "anon-acct-x" + std::to_string( anon_acct_count++ );
-}
-
-void database_fixture::_push_transaction( const signed_transaction& tx, uint32_t skip_flags, const char* file, int line )
-{
-   db.push_transaction( tx, skip_flags );
 }
 
 void database_fixture::verify_asset_supplies( )const
@@ -268,8 +265,9 @@ void database_fixture::generate_blocks(fc::time_point_sec timestamp, bool miss_i
 {
    if( miss_intermediate_blocks )
    {
+      generate_block();
       auto slots_to_miss = db.get_slot_at_time(timestamp) - 1;
-      assert(slots_to_miss > 0);
+      if( slots_to_miss <= 0 ) return;
       generate_block(~0, generate_private_key("genesis"), slots_to_miss);
       return;
    }
@@ -834,5 +832,19 @@ int64_t database_fixture::get_balance( const account_object& account, const asse
 {
   return db.get_balance(account.get_id(), a.get_id()).amount.value;
 }
+
+namespace test {
+
+bool _push_block( database& db, const signed_block& b, uint32_t skip_flags /* = 0 */ )
+{
+   return db.push_block( b, skip_flags);
+}
+
+processed_transaction _push_transaction( database& db, const signed_transaction& tx, uint32_t skip_flags /* = 0 */ )
+{
+   return db.push_transaction( tx, skip_flags );
+}
+
+} // graphene::chain::test
 
 } } // graphene::chain

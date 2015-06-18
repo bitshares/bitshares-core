@@ -93,13 +93,16 @@ void_result proposal_update_evaluator::do_evaluate(const proposal_update_operati
       FC_ASSERT( _proposal->available_owner_approvals.find(id) != _proposal->available_owner_approvals.end(),
                  "", ("id", id)("available", _proposal->available_owner_approvals) );
    }
-   for( key_id_type id : o.key_approvals_to_add )
+   if( (d.get_node_properties().skip_flags & database::skip_authority_check) == 0 )
    {
-      FC_ASSERT( trx_state->signed_by(id) || trx_state->_skip_authority_check );
-   }
-   for( key_id_type id : o.key_approvals_to_remove )
-   {
-      FC_ASSERT( trx_state->signed_by(id) || trx_state->_skip_authority_check );
+      for( key_id_type id : o.key_approvals_to_add )
+      {
+         FC_ASSERT( trx_state->signed_by(id) );
+      }
+      for( key_id_type id : o.key_approvals_to_remove )
+      {
+         FC_ASSERT( trx_state->signed_by(id) );
+      }
    }
 
    return void_result();
