@@ -65,6 +65,7 @@
 #define GRAPHENE_MAX_COLLATERAL_RATIO                   32000 // higher than this is unnecessary and may exceed int16 storage
 #define GRAPHENE_DEFAULT_INITIAL_COLLATERAL_RATIO       2000
 #define GRAPHENE_DEFAULT_MAINTENANCE_COLLATERAL_RATIO   1750
+#define GRAPHENE_DEFAULT_MAX_SHORT_SQUEEZE_RATIO        1500
 #define GRAPHENE_DEFAULT_MARGIN_PERIOD_SEC              (30*60*60*24)
 
 #define GRAPHENE_DEFAULT_NUM_WITNESSES                        (101)
@@ -112,7 +113,6 @@
 #define GRAPHENE_DEFAULT_WORKER_BUDGET_PER_DAY            (GRAPHENE_BLOCKCHAIN_PRECISION * int64_t(500) * 1000 )
 
 #define GRAPHENE_MAX_INTEREST_APR                            uint16_t( 10000 )
-#define GRAPHENE_LEGACY_NAME_IMPORT_PERIOD                   3000000 /** 3 million blocks */
 
 /**
  *  Reserved Account IDs with special meaning

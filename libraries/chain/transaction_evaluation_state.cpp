@@ -57,7 +57,7 @@ namespace graphene { namespace chain {
                {
                   if( depth == GRAPHENE_MAX_SIG_CHECK_DEPTH )
                   {
-                     elog("Failing authority verification due to recursion depth.");
+                     //elog("Failing authority verification due to recursion depth.");
                      return false;
                   }
                   if( check_authority( *dynamic_cast<const account_object*>( &auth_item ), auth_class, depth + 1 ) )

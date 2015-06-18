@@ -45,13 +45,10 @@ namespace graphene { namespace chain {
         asset_id_type debt_type()const { return call_price.quote.asset_id; }
         price collateralization()const { return get_collateral() / get_debt(); }
 
-        void update_call_price() { call_price = price::call_price(get_debt(), get_collateral(), maintenance_collateral_ratio); }
-
         account_id_type  borrower;
         share_type       collateral;  ///< call_price.base.asset_id, access via get_collateral
         share_type       debt;        ///< call_price.quote.asset_id, access via get_collateral
         price            call_price;
-        uint16_t         maintenance_collateral_ratio;
   };
 
   /**
@@ -128,6 +125,6 @@ namespace graphene { namespace chain {
 
 
 FC_REFLECT_DERIVED( graphene::chain::call_order_object, (graphene::db::object),
-                    (borrower)(collateral)(debt)(call_price)(maintenance_collateral_ratio) )
+                    (borrower)(collateral)(debt)(call_price) )
 
 FC_REFLECT( graphene::chain::force_settlement_object, (owner)(balance)(settlement_date) )

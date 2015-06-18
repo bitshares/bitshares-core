@@ -474,7 +474,8 @@ BOOST_FIXTURE_TEST_CASE( fired_delegates, database_fixture )
       //Oh noes! Nathan votes for a whole new slate of delegates!
       account_update_operation op;
       op.account = nathan->id;
-      op.vote = delegates;
+      op.new_options = nathan->options;
+      op.new_options->votes = delegates;
       trx.operations.push_back(op);
       trx.set_expiration(db.head_block_time() + GRAPHENE_DEFAULT_MAX_TIME_UNTIL_EXPIRATION);
       db.push_transaction(trx, ~0);
@@ -874,7 +875,7 @@ BOOST_FIXTURE_TEST_CASE( max_authority_membership, database_fixture )
              anon_create_op.owner = owner_auth;
              anon_create_op.active = active_auth;
              anon_create_op.registrar = sam_account_object.id;
-             anon_create_op.memo_key = sam_account_object.memo_key;
+             anon_create_op.options.memo_key = sam_account_object.options.memo_key;
              anon_create_op.name = generate_anon_acct_name();
 
              tx.operations.push_back( anon_create_op );
@@ -913,10 +914,10 @@ BOOST_FIXTURE_TEST_CASE( bogus_signature, database_fixture )
       account_object bob_account_object = create_account( "bob", bob_key );
       account_object charlie_account_object = create_account( "charlie", charlie_key );
 
-      key_id_type alice_key_id = alice_account_object.memo_key;
+      key_id_type alice_key_id = alice_account_object.options.memo_key;
       // unneeded, comment it out to silence compiler warning
       //key_id_type bob_key_id = bob_account_object.memo_key;
-      key_id_type charlie_key_id = charlie_account_object.memo_key;
+      key_id_type charlie_key_id = charlie_account_object.options.memo_key;
 
       uint32_t skip = database::skip_transaction_dupe_check;
 
@@ -939,14 +940,13 @@ BOOST_FIXTURE_TEST_CASE( bogus_signature, database_fixture )
 
       flat_set<account_id_type> active_set, owner_set;
       xfer_op.get<transfer_operation>().get_required_auth(active_set, owner_set);
-      wdump( (active_set)(owner_set)(alice_key_id)
-       (alice_account_object) );
+ //     wdump( (active_set)(owner_set)(alice_key_id) (alice_account_object) );
 
       PUSH_TX( trx, skip );
 
       trx.operations.push_back( xfer_op );
       // Alice's signature is now invalid
-      edump((trx));
+      //edump((trx));
       BOOST_REQUIRE_THROW( PUSH_TX( trx, skip ), fc::exception );
       // Re-sign, now OK (sig is replaced)
       trx.sign( alice_key_id, alice_key );
@@ -994,9 +994,10 @@ BOOST_FIXTURE_TEST_CASE( voting_account, database_fixture )
    {
       account_update_operation op;
       op.account = nathan_id;
-      op.voting_account = vikram_id;
-      op.vote = flat_set<vote_id_type>{nathan_delegate(db).vote_id};
-      op.num_committee = 1;
+      op.new_options = nathan_id(db).options;
+      op.new_options->voting_account = vikram_id;
+      op.new_options->votes = flat_set<vote_id_type>{nathan_delegate(db).vote_id};
+      op.new_options->num_committee = 1;
       trx.operations.push_back(op);
       trx.sign(nathan_key_id, nathan_private_key);
       db.push_transaction(trx);
@@ -1005,10 +1006,15 @@ BOOST_FIXTURE_TEST_CASE( voting_account, database_fixture )
    {
       account_update_operation op;
       op.account = vikram_id;
-      op.vote = vikram_id(db).votes;
-      op.vote->insert(vikram_delegate(db).vote_id);
-      op.num_committee = 11;
+      op.new_options = vikram_id(db).options;
+      op.new_options->votes.insert(vikram_delegate(db).vote_id);
+      op.new_options->num_committee = 11;
       trx.operations.push_back(op);
+      trx.sign(vikram_key_id, vikram_private_key);
+      // Fails because num_committee is larger than the cardinality of committee members being voted for
+      BOOST_CHECK_THROW(db.push_transaction(trx), fc::exception);
+      op.new_options->num_committee = 3;
+      trx.operations = {op};
       trx.sign(vikram_key_id, vikram_private_key);
       db.push_transaction(trx);
       trx.clear();

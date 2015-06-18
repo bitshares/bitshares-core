@@ -65,21 +65,6 @@ IF(NOT "${Boost_VERSION}" MATCHES "1.53(.*)")
    SET(Boost_LIBRARIES ${BOOST_LIBRARIES_TEMP} ${Boost_LIBRARIES})
 ENDIF()
 
-set( LEVEL_DB_DIR "${CMAKE_SOURCE_DIR}/libraries/leveldb" )
-
-file( GLOB LEVEL_DB_SOURCES "${LEVEL_DB_DIR}/db/*.cc"
-			    "${LEVEL_DB_DIR}/helpers/memenv/memenv.cc"
-			    "${LEVEL_DB_DIR}/table/*.cc"
-			    "${LEVEL_DB_DIR}/util/*.cc" )
-foreach( filename ${LEVEL_DB_SOURCES} )
-    if( ${filename} MATCHES ".*_test.cc" OR ${filename} MATCHES ".*_bench.cc" OR ${filename} MATCHES ".*_main.cc" )
-	list( REMOVE_ITEM LEVEL_DB_SOURCES ${filename} )
-    endif()
-endforeach()
-set(LEVELDB_BUILD_DEFINES)
-set(LEVELDB_BUILD_LIBRARIES)
-set(LEVELDB_BUILD_PRIVATE_INCLUDES "${LEVEL_DB_DIR}")
-
 if( WIN32 )
     message( STATUS "Configuring Graphene on WIN32")
     set( DB_VERSION 60 )
@@ -112,13 +97,7 @@ if( WIN32 )
     SET(TCL_LIBS "${TCL_LIBS}${TCL_LIB_PATH}/${TCL_LIB_NAME}g${TCL_LIB_EXT}")
     SET(TCL_LIBRARY ${TCL_LIBS})
 
-    SET(LEVELDB_PORT_FILE "${LEVEL_DB_DIR}/port/port_win.cc" )
-    list(APPEND LEVELDB_BUILD_DEFINES OS_WINDOWS LEVELDB_PLATFORM_WINDOWS )
-    list(APPEND LEVELDB_BUILD_LIBRARIES shlwapi.lib)
-    list(INSERT LEVELDB_BUILD_PRIVATE_INCLUDES 0 "${CMAKE_SOURCE_DIR}/libraries/leveldb-msvc/include")
 else( WIN32 ) # Apple AND Linux
-    SET(LEVELDB_PORT_FILE "${LEVEL_DB_DIR}/port/port_posix.cc" )
-
     list(APPEND LEVELDB_BUILD_DEFINES LEVELDB_PLATFORM_POSIX LEVELDB_ATOMIC_PRESENT)
     if( APPLE )
         list(APPEND LEVELDB_BUILD_DEFINES OS_MACOSX)
@@ -168,13 +147,6 @@ else( WIN32 ) # Apple AND Linux
     # set( CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -gdwarf-2 -g3" )
 
 endif( WIN32 )
-
-list(APPEND LEVEL_DB_SOURCES "${LEVELDB_PORT_FILE}")
-add_library( leveldb ${LEVEL_DB_SOURCES} )
-target_link_libraries( leveldb ${LEVELDB_BUILD_LIBRARIES} )
-target_include_directories( leveldb PRIVATE ${LEVELDB_BUILD_PRIVATE_INCLUDES}
-                                    PUBLIC "${LEVEL_DB_DIR}/include" )
-set_target_properties(leveldb PROPERTIES COMPILE_DEFINITIONS "${LEVELDB_BUILD_DEFINES}")
 
 find_package( BerkeleyDB )
 

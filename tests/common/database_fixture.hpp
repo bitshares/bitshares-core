@@ -20,6 +20,7 @@
 #include <graphene/app/application.hpp>
 #include <graphene/chain/database.hpp>
 #include <graphene/chain/key_object.hpp>
+#include <fc/io/json.hpp>
 
 using namespace graphene::db;
 
@@ -67,13 +68,18 @@ using namespace graphene::db;
 #define PUSH_TX( tx, skip_flags ) \
    _push_transaction( tx, skip_flags, __FILE__, __LINE__ )
 
-#define ACTOR(name) \
+#define PREP_ACTOR(name) \
    fc::ecc::private_key name ## _private_key = generate_private_key(BOOST_PP_STRINGIZE(name)); \
-   key_id_type name ## _key_id = register_key(name ## _private_key.get_public_key()).get_id(); \
-   account_id_type name ## _id = create_account(BOOST_PP_STRINGIZE(name), name ## _key_id).id;
+   key_id_type name ## _key_id = register_key(name ## _private_key.get_public_key()).get_id();
+#define ACTOR(name) \
+   PREP_ACTOR(name) \
+   const auto& name = create_account(BOOST_PP_STRINGIZE(name), name ## _key_id); \
+   account_id_type name ## _id = name.id; (void)name ## _id;
+
 #define GET_ACTOR(name) \
    fc::ecc::private_key name ## _private_key = generate_private_key(BOOST_PP_STRINGIZE(name)); \
-   account_id_type name ## _id = get_account(BOOST_PP_STRINGIZE(name)).id; \
+   const account_object& name = get_account(BOOST_PP_STRINGIZE(name)); \
+   account_id_type name ## _id = name.id; \
    key_id_type name ## _key_id = name ## _id(db).active.auths.begin()->first;
 
 #define ACTORS_IMPL(r, data, elem) ACTOR(elem)
@@ -117,13 +123,13 @@ struct database_fixture {
     * @brief Generates block_count blocks
     * @param block_count number of blocks to generate
     */
-   void generate_blocks( uint32_t block_count );
+   void generate_blocks(uint32_t block_count);
 
    /**
     * @brief Generates blocks until the head block time matches or exceeds timestamp
     * @param timestamp target time to generate blocks until
     */
-   void generate_blocks( fc::time_point_sec timestamp );
+   void generate_blocks(fc::time_point_sec timestamp, bool miss_intermediate_blocks = false);
 
    account_create_operation make_account(
       const std::string& name = "nathan",
@@ -137,6 +143,11 @@ struct database_fixture {
       uint8_t referrer_percent = 100,
       key_id_type key = key_id_type()
       );
+
+   void  update_feed_producers( const asset_object& mia, flat_set<account_id_type> producers );
+   void  publish_feed( const asset_object& mia, const account_object& by, const price_feed& f );
+   void  borrow( const account_object& who, asset what, asset collateral, price call_price = price());
+   void  cover( const account_object& who, asset what, asset collateral_freed, price call_price = price());
 
    const asset_object& get_asset( const string& symbol )const;
    const account_object& get_account( const string& name )const;
@@ -189,6 +200,8 @@ struct database_fixture {
    void enable_fees( share_type fee = GRAPHENE_BLOCKCHAIN_PRECISION );
    void upgrade_to_lifetime_member( account_id_type account );
    void upgrade_to_lifetime_member( const account_object& account );
+   void upgrade_to_annual_member( account_id_type account );
+   void upgrade_to_annual_member( const account_object& account );
    void print_market( const string& syma, const string& symb )const;
    string pretty( const asset& a )const;
    void print_limit_order( const limit_order_object& cur )const;

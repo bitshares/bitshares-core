@@ -149,9 +149,11 @@ void account_update_operation::validate()const
 {
    FC_ASSERT( fee.amount >= 0 );
    FC_ASSERT( account != account_id_type() );
-   FC_ASSERT( owner || active || voting_account || memo_key || vote );
-}
+   FC_ASSERT( owner || active || new_options );
 
+   if( new_options )
+      new_options->validate();
+}
 
 share_type asset_create_operation::calculate_fee( const fee_schedule_type& schedule )const
 {
@@ -201,8 +203,7 @@ void account_create_operation::validate()const
 {
    FC_ASSERT( fee.amount >= 0 );
    FC_ASSERT( is_valid_name( name ) );
-   FC_ASSERT( referrer_percent >= 0   );
-   FC_ASSERT( referrer_percent <= 100 );
+   FC_ASSERT( referrer_percent <= GRAPHENE_100_PERCENT );
    FC_ASSERT( !owner.auths.empty() );
    auto pos = name.find( '/' );
    if( pos != string::npos )
@@ -210,10 +211,7 @@ void account_create_operation::validate()const
       FC_ASSERT( owner.weight_threshold == 1 );
       FC_ASSERT( owner.auths.size() == 1 );
    }
-   FC_ASSERT( num_witness + num_committee >= num_witness );  // no overflow
-   FC_ASSERT( num_witness + num_committee <= vote.size() );
-   // FC_ASSERT( (num_witness == 0) || (num_witness&0x01) == 0, "must be odd number" );
-   // FC_ASSERT( (num_committee == 0) || (num_committee&0x01) == 0, "must be odd number" );
+   options.validate();
 }
 
 
@@ -400,11 +398,13 @@ void call_order_update_operation::get_required_auth(flat_set<account_id_type>& a
 }
 
 void call_order_update_operation::validate()const
-{
+{ try {
    FC_ASSERT( fee.amount >= 0 );
-   FC_ASSERT( amount_to_cover.asset_id != collateral_to_add.asset_id );
-   FC_ASSERT( maintenance_collateral_ratio == 0 || maintenance_collateral_ratio >= 1000 );
-}
+   FC_ASSERT( delta_collateral.asset_id != delta_debt.asset_id );
+   FC_ASSERT( delta_debt.asset_id       == call_price.base.asset_id );
+   FC_ASSERT( delta_collateral.asset_id == call_price.quote.asset_id );
+   call_price.validate();
+} FC_CAPTURE_AND_RETHROW((*this)) }
 
 share_type call_order_update_operation::calculate_fee(const fee_schedule_type& k) const
 {

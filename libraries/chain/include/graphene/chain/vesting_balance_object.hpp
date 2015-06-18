@@ -98,8 +98,7 @@ namespace graphene { namespace chain {
       > vesting_policy;
 
    /**
-    * Timelocked balance object is a balance that is locked by the
-    * blockchain for a period of time.
+    * Vesting balance object is a balance that is locked by the blockchain for a period of time.
     */
    class vesting_balance_object : public abstract_object<vesting_balance_object>
    {

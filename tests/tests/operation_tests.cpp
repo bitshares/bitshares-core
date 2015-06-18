@@ -39,6 +39,88 @@ using namespace graphene::chain;
 
 BOOST_FIXTURE_TEST_SUITE( operation_tests, database_fixture )
 
+BOOST_AUTO_TEST_CASE( call_order_update_test )
+{ 
+   try {
+      BOOST_TEST_MESSAGE("creating actors dan and sam" );
+      ACTORS((dan)(sam));
+      const auto& bitusd = create_bitasset("BITUSD");
+      const auto& core   = asset_id_type()(db);
+
+      transfer(genesis_account, dan_id, asset(10000000));
+      update_feed_producers( bitusd, {sam.id} );
+
+      price_feed current_feed; current_feed.settlement_price = bitusd.amount( 100 ) / core.amount(100);
+      publish_feed( bitusd, sam, current_feed );
+
+      FC_ASSERT( bitusd.bitasset_data(db).current_feed.settlement_price == current_feed.settlement_price );
+
+      auto default_call_price = ~price::call_price( bitusd.amount(5000), asset(5000), 1750); 
+
+      BOOST_TEST_MESSAGE( "attempting to borrow using 2x collateral at 1:1 price now that there is a valid order" );
+      borrow( dan, bitusd.amount(5000), asset(10000), default_call_price );
+      BOOST_REQUIRE_EQUAL( get_balance( dan, bitusd ), 5000 );
+      BOOST_REQUIRE_EQUAL( get_balance( dan, core ), 10000000 - 10000 );
+
+      BOOST_TEST_MESSAGE( "covering 2500 usd and freeing 5000 core..." );
+      cover( dan, bitusd.amount(2500), asset(5000), default_call_price );
+      BOOST_REQUIRE_EQUAL( get_balance( dan, bitusd ), 2500 );
+      BOOST_REQUIRE_EQUAL( get_balance( dan, core ), 10000000 - 10000 + 5000  );
+
+      BOOST_TEST_MESSAGE( "verifying that attempting to cover the full amount without claiming the collateral fails" );
+      BOOST_REQUIRE_THROW( cover( dan, bitusd.amount(2500), core.amount(0), default_call_price  ), fc::exception );
+
+      cover( dan, bitusd.amount(2500), core.amount(5000), default_call_price );
+
+      BOOST_REQUIRE_EQUAL( get_balance( dan, bitusd ), 0 );
+      BOOST_REQUIRE_EQUAL( get_balance( dan, core ), 10000000  );
+
+      borrow( dan, bitusd.amount(5000), asset(10000), default_call_price );
+      BOOST_REQUIRE_EQUAL( get_balance( dan, bitusd ), 5000 );
+      BOOST_REQUIRE_EQUAL( get_balance( dan, core ), 10000000 - 10000  );
+
+   
+      // test just increasing collateral
+      BOOST_TEST_MESSAGE( "increasing collateral" );
+      borrow( dan, bitusd.amount(0), asset(10000), default_call_price );
+
+      BOOST_REQUIRE_EQUAL( get_balance( dan, bitusd ), 5000 );
+      BOOST_REQUIRE_EQUAL( get_balance( dan, core ), 10000000 - 20000  );
+
+      // test just decreasing debt
+      BOOST_TEST_MESSAGE( "decreasing debt" );
+      cover( dan, bitusd.amount(1000), asset(0), default_call_price );
+
+      BOOST_REQUIRE_EQUAL( get_balance( dan, bitusd ), 4000 );
+      BOOST_REQUIRE_EQUAL( get_balance( dan, core ), 10000000 - 20000  );
+
+      BOOST_TEST_MESSAGE( "increasing debt without increasing collateral" );
+      borrow( dan, bitusd.amount(1000), asset(0), default_call_price );
+
+      BOOST_REQUIRE_EQUAL( get_balance( dan, bitusd ), 5000 );
+      BOOST_REQUIRE_EQUAL( get_balance( dan, core ), 10000000 - 20000  );
+
+      BOOST_TEST_MESSAGE( "increasing debt without increasing collateral again" );
+      BOOST_REQUIRE_THROW( borrow( dan, bitusd.amount(80000), asset(0), default_call_price ), fc::exception );
+      BOOST_TEST_MESSAGE( "attempting to claim all collateral without paying off debt" );
+      BOOST_REQUIRE_THROW( cover( dan, bitusd.amount(0), asset(20000), default_call_price ), fc::exception );
+      BOOST_TEST_MESSAGE( "attempting reduce collateral without paying off any debt" );
+      cover( dan, bitusd.amount(0), asset(1000), default_call_price );
+
+      BOOST_TEST_MESSAGE( "attempting change call price without changing debt/collateral ratio" );
+      default_call_price = ~price::call_price( bitusd.amount(100), asset(50), 1750); 
+      cover( dan, bitusd.amount(0), asset(0), default_call_price );
+
+      BOOST_TEST_MESSAGE( "attempting change call price to be below minimum for debt/collateral ratio" );
+      default_call_price = ~price::call_price( bitusd.amount(100), asset(500), 1750); 
+      BOOST_REQUIRE_THROW( cover( dan, bitusd.amount(0), asset(0), default_call_price ), fc::exception );
+
+   } catch (fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
 BOOST_AUTO_TEST_CASE( create_account_test )
 {
    try {
@@ -57,8 +139,8 @@ BOOST_AUTO_TEST_CASE( create_account_test )
       REQUIRE_THROW_WITH_VALUE(op, name, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
       REQUIRE_THROW_WITH_VALUE(op, name, "aaaa.");
       REQUIRE_THROW_WITH_VALUE(op, name, ".aaaa");
-      REQUIRE_THROW_WITH_VALUE(op, voting_account, account_id_type(999999999));
-      REQUIRE_THROW_WITH_VALUE(op, memo_key, key_id_type(999999999));
+      REQUIRE_THROW_WITH_VALUE(op, options.voting_account, account_id_type(999999999));
+      REQUIRE_THROW_WITH_VALUE(op, options.memo_key, key_id_type(999999999));
 
       auto auth_bak = op.owner;
       op.owner.add_authority(account_id_type(9999999999), 10);
@@ -85,8 +167,8 @@ BOOST_AUTO_TEST_CASE( create_account_test )
       BOOST_CHECK(nathan_account.owner.auths.at(genesis_key) == 123);
       BOOST_REQUIRE(nathan_account.active.auths.size() == 1);
       BOOST_CHECK(nathan_account.active.auths.at(genesis_key) == 321);
-      BOOST_CHECK(nathan_account.voting_account == account_id_type());
-      BOOST_CHECK(nathan_account.memo_key == genesis_key);
+      BOOST_CHECK(nathan_account.options.voting_account == account_id_type());
+      BOOST_CHECK(nathan_account.options.memo_key == genesis_key);
 
       const account_statistics_object& statistics = nathan_account.statistics(db);
       BOOST_CHECK(statistics.id.space() == implementation_ids);
@@ -159,13 +241,13 @@ BOOST_AUTO_TEST_CASE( update_account )
       op.account = nathan.id;
       op.owner = authority(2, key_id, 1, key_id_type(), 1);
       op.active = authority(2, key_id, 1, key_id_type(), 1);
-      //op.voting_account = key_id;
-      op.vote = flat_set<vote_id_type>({active_delegates[0](db).vote_id, active_delegates[5](db).vote_id});
+      op.new_options = nathan.options;
+      op.new_options->votes = flat_set<vote_id_type>({active_delegates[0](db).vote_id, active_delegates[5](db).vote_id});
+      op.new_options->num_committee = 2;
       trx.operations.back() = op;
       db.push_transaction(trx, ~0);
 
-      //BOOST_CHECK(nathan.voting_key == key_id);
-      BOOST_CHECK(nathan.memo_key == key_id_type());
+      BOOST_CHECK(nathan.options.memo_key == key_id_type());
       BOOST_CHECK(nathan.active.weight_threshold == 2);
       BOOST_CHECK(nathan.active.auths.size() == 2);
       BOOST_CHECK(nathan.active.auths.at(key_id) == 1);
@@ -174,7 +256,7 @@ BOOST_AUTO_TEST_CASE( update_account )
       BOOST_CHECK(nathan.owner.auths.size() == 2);
       BOOST_CHECK(nathan.owner.auths.at(key_id) == 1);
       BOOST_CHECK(nathan.owner.auths.at(key_id_type()) == 1);
-      BOOST_CHECK(nathan.votes.size() == 2);
+      BOOST_CHECK(nathan.options.votes.size() == 2);
 
       /** these votes are no longer tallied in real time
       BOOST_CHECK(active_delegates[0](db).vote(db).total_votes == 30000);
@@ -313,13 +395,12 @@ BOOST_AUTO_TEST_CASE( update_mia )
          pop.asset_id = bit_usd.get_id();
          pop.publisher = account_id_type(1);
          price_feed feed;
-         feed.call_limit = price(bit_usd.amount(5), bit_usd.amount(5));
+         feed.settlement_price = price(bit_usd.amount(5), bit_usd.amount(5));
          REQUIRE_THROW_WITH_VALUE(pop, feed, feed);
-         feed.call_limit = price(bit_usd.amount(5), asset(5));
+         feed.settlement_price = price(bit_usd.amount(5), asset(5));
          REQUIRE_THROW_WITH_VALUE(pop, feed, feed);
          pop.feed = feed;
-         REQUIRE_THROW_WITH_VALUE(pop, feed.max_margin_period_sec, 0);
-         REQUIRE_THROW_WITH_VALUE(pop, feed.required_maintenance_collateral, 0);
+         REQUIRE_THROW_WITH_VALUE(pop, feed.maintenance_collateral_ratio, 0);
          trx.operations.back() = pop;
          db.push_transaction(trx, ~0);
       }
@@ -533,9 +614,9 @@ BOOST_AUTO_TEST_CASE( create_buy_uia_multiple_match_new )
 
    BOOST_CHECK_EQUAL( get_balance( buyer_account, test_asset ), 9700 );
 
-   print_market( "", "" );
+   //print_market( "", "" );
    auto unmatched = create_sell_order( seller_account, core_asset.amount(300), test_asset.amount(150) );
-   print_market( "", "" );
+   //print_market( "", "" );
    BOOST_CHECK( !db.find( first_id ) );
    BOOST_CHECK( !db.find( second_id ) );
    BOOST_CHECK( db.find( third_id ) );
@@ -573,9 +654,9 @@ BOOST_AUTO_TEST_CASE( create_buy_exact_match_uia )
 
    BOOST_CHECK_EQUAL( get_balance( buyer_account, test_asset ), 9700 );
 
-   print_market( "", "" );
+   //print_market( "", "" );
    auto unmatched = create_sell_order( seller_account, core_asset.amount(100), test_asset.amount(100) );
-   print_market( "", "" );
+   //print_market( "", "" );
    BOOST_CHECK( !db.find( first_id ) );
    BOOST_CHECK( db.find( second_id ) );
    BOOST_CHECK( db.find( third_id ) );
@@ -614,9 +695,9 @@ BOOST_AUTO_TEST_CASE( create_buy_uia_multiple_match_new_reverse )
 
    BOOST_CHECK_EQUAL( get_balance( buyer_account, test_asset ), 9700 );
 
-   print_market( "", "" );
+   //print_market( "", "" );
    auto unmatched = create_sell_order( seller_account, core_asset.amount(300), test_asset.amount(150) );
-   print_market( "", "" );
+   //print_market( "", "" );
    BOOST_CHECK( !db.find( first_id ) );
    BOOST_CHECK( !db.find( second_id ) );
    BOOST_CHECK( db.find( third_id ) );
@@ -656,9 +737,9 @@ BOOST_AUTO_TEST_CASE( create_buy_uia_multiple_match_new_reverse_fract )
 
    BOOST_CHECK_EQUAL( get_balance( buyer_account, test_asset ), 9700 );
 
-   print_market( "", "" );
+   //print_market( "", "" );
    auto unmatched = create_sell_order( seller_account, core_asset.amount(30), test_asset.amount(150) );
-   print_market( "", "" );
+   //print_market( "", "" );
    BOOST_CHECK( !db.find( first_id ) );
    BOOST_CHECK( !db.find( second_id ) );
    BOOST_CHECK( db.find( third_id ) );
@@ -786,9 +867,7 @@ BOOST_AUTO_TEST_CASE( delegate_feeds )
 
       asset_publish_feed_operation op({asset(), active_witnesses[0]});
       op.asset_id = bit_usd.get_id();
-      op.feed.call_limit = price(asset(GRAPHENE_BLOCKCHAIN_PRECISION),bit_usd.amount(30));
-      // We'll expire margins after a month
-      op.feed.max_margin_period_sec = fc::days(30).to_seconds();
+      op.feed.settlement_price = price(asset(GRAPHENE_BLOCKCHAIN_PRECISION),bit_usd.amount(30));
       // Accept defaults for required collateral
       trx.operations.emplace_back(op);
       db.push_transaction(trx, ~0);
@@ -807,150 +886,32 @@ BOOST_AUTO_TEST_CASE( delegate_feeds )
       }
 
       const asset_bitasset_data_object& bitasset = bit_usd.bitasset_data(db);
-      BOOST_CHECK(bitasset.current_feed.call_limit.to_real() == GRAPHENE_BLOCKCHAIN_PRECISION / 30.0);
-      BOOST_CHECK(bitasset.current_feed.max_margin_period_sec == fc::days(30).to_seconds());
-      BOOST_CHECK(bitasset.current_feed.required_maintenance_collateral == GRAPHENE_DEFAULT_MAINTENANCE_COLLATERAL_RATIO);
+      BOOST_CHECK(bitasset.current_feed.settlement_price.to_real() == GRAPHENE_BLOCKCHAIN_PRECISION / 30.0);
+      BOOST_CHECK(bitasset.current_feed.maintenance_collateral_ratio == GRAPHENE_DEFAULT_MAINTENANCE_COLLATERAL_RATIO);
 
       op.publisher = active_witnesses[1];
-      op.feed.call_limit = price(asset(GRAPHENE_BLOCKCHAIN_PRECISION),bit_usd.amount(25));
-      op.feed.max_margin_period_sec = fc::days(10).to_seconds();
+      op.feed.settlement_price = price(asset(GRAPHENE_BLOCKCHAIN_PRECISION),bit_usd.amount(25));
       trx.operations.back() = op;
       db.push_transaction(trx, ~0);
 
-      BOOST_CHECK_EQUAL(bitasset.current_feed.call_limit.to_real(), GRAPHENE_BLOCKCHAIN_PRECISION / 25.0);
-      BOOST_CHECK(bitasset.current_feed.max_margin_period_sec == fc::days(30).to_seconds());
-      BOOST_CHECK(bitasset.current_feed.required_maintenance_collateral == GRAPHENE_DEFAULT_MAINTENANCE_COLLATERAL_RATIO);
+      BOOST_CHECK_EQUAL(bitasset.current_feed.settlement_price.to_real(), GRAPHENE_BLOCKCHAIN_PRECISION / 25.0);
+      BOOST_CHECK(bitasset.current_feed.maintenance_collateral_ratio == GRAPHENE_DEFAULT_MAINTENANCE_COLLATERAL_RATIO);
 
       op.publisher = active_witnesses[2];
-      op.feed.call_limit = price(asset(GRAPHENE_BLOCKCHAIN_PRECISION),bit_usd.amount(40));
-      op.feed.max_margin_period_sec = fc::days(100).to_seconds();
+      op.feed.settlement_price = price(asset(GRAPHENE_BLOCKCHAIN_PRECISION),bit_usd.amount(40));
       // But this delegate is an idiot.
-      op.feed.required_maintenance_collateral = 1000;
+      op.feed.maintenance_collateral_ratio = 1000;
       trx.operations.back() = op;
       db.push_transaction(trx, ~0);
 
-      BOOST_CHECK_EQUAL(bitasset.current_feed.call_limit.to_real(), GRAPHENE_BLOCKCHAIN_PRECISION / 30.0);
-      BOOST_CHECK(bitasset.current_feed.max_margin_period_sec == fc::days(30).to_seconds());
-      BOOST_CHECK(bitasset.current_feed.required_maintenance_collateral == GRAPHENE_DEFAULT_MAINTENANCE_COLLATERAL_RATIO);
+      BOOST_CHECK_EQUAL(bitasset.current_feed.settlement_price.to_real(), GRAPHENE_BLOCKCHAIN_PRECISION / 30.0);
+      BOOST_CHECK(bitasset.current_feed.maintenance_collateral_ratio == GRAPHENE_DEFAULT_MAINTENANCE_COLLATERAL_RATIO);
    } catch (const fc::exception& e) {
       edump((e.to_detail_string()));
       throw;
    }
 }
 
-
-BOOST_AUTO_TEST_CASE( full_cover_test )
-{
-   try {
-      FC_ASSERT( "Reimplement with new borrowing semantics" );
-      /*
-      const asset_object& bit_usd = get_asset("BITUSD");
-      const asset_object& core = asset_id_type()(db);
-      const account_object& debt_holder = get_account("shorter1");
-      const account_object& usd_holder = get_account("buyer");
-      auto& index = db.get_index_type<call_order_index>().indices().get<by_account>();
-
-      BOOST_CHECK(index.find(boost::make_tuple(debt_holder.id, bit_usd.id)) != index.end());
-
-      transfer(usd_holder, debt_holder, bit_usd.amount(100), bit_usd.amount(0));
-
-      call_order_update_operation op;
-      op.funding_account = debt_holder.id;
-      op.collateral_to_add = core.amount(-400);
-      op.amount_to_cover = bit_usd.amount(100);
-
-      trx.operations.push_back(op);
-      REQUIRE_THROW_WITH_VALUE(op, funding_account, usd_holder.id);
-      REQUIRE_THROW_WITH_VALUE(op, amount_to_cover, bit_usd.amount(-20));
-      REQUIRE_THROW_WITH_VALUE(op, amount_to_cover, bit_usd.amount(200));
-      REQUIRE_THROW_WITH_VALUE(op, collateral_to_add, core.amount(GRAPHENE_INITIAL_SUPPLY));
-      REQUIRE_THROW_WITH_VALUE(op, collateral_to_add, bit_usd.amount(20));
-      REQUIRE_THROW_WITH_VALUE(op, maintenance_collateral_ratio, 2);
-      trx.operations.back() = op;
-      db.push_transaction(trx, ~0);
-
-      BOOST_CHECK_EQUAL(get_balance(debt_holder, bit_usd), 0);
-      BOOST_CHECK(index.find(boost::make_tuple(debt_holder.id, bit_usd.id)) == index.end());
-      */
-   } catch( fc::exception& e) {
-      edump((e.to_detail_string()));
-      throw;
-   }
-}
-
-BOOST_AUTO_TEST_CASE( partial_cover_test )
-{
-   try {
-      FC_ASSERT( "Reimplement with new borrowing semantics" );
-      const asset_object& bit_usd = get_asset("BITUSD");
-      const asset_object& core = asset_id_type()(db);
-      const account_object& debt_holder = get_account("shorter1");
-      const account_object& usd_holder = get_account("buyer");
-      auto& index = db.get_index_type<call_order_index>().indices().get<by_account>();
-      const call_order_object& debt = *index.find(boost::make_tuple(debt_holder.id, bit_usd.id));
-
-      BOOST_CHECK(index.find(boost::make_tuple(debt_holder.id, bit_usd.id)) != index.end());
-
-      ilog("..." );
-      transfer(usd_holder, debt_holder, bit_usd.amount(50), bit_usd.amount(0));
-      ilog("..." );
-      BOOST_CHECK_EQUAL(get_balance(debt_holder, bit_usd), 50);
-
-      trx.operations.clear();
-      call_order_update_operation op;
-      op.funding_account = debt_holder.id;
-      op.collateral_to_add = core.amount(0);
-      op.amount_to_cover = bit_usd.amount(50);
-      trx.operations.push_back(op);
-      db.push_transaction(trx, ~0);
-
-      BOOST_CHECK_EQUAL(get_balance(debt_holder, bit_usd), 0);
-      BOOST_CHECK(index.find(boost::make_tuple(debt_holder.id, bit_usd.id)) != index.end());
-      BOOST_CHECK_EQUAL(debt.debt.value, 50);
-      BOOST_CHECK_EQUAL(debt.collateral.value, 400);
-      BOOST_CHECK(debt.call_price == price(core.amount(300), bit_usd.amount(50)));
-
-      op.collateral_to_add = core.amount(52);
-      op.amount_to_cover = bit_usd.amount(0);
-      trx.operations.back() = op;
-      db.push_transaction(trx, ~0);
-      ilog("..." );
-
-      BOOST_CHECK(debt.call_price == price(core.amount(339), bit_usd.amount(50)));
-
-      op.collateral_to_add = core.amount(0);
-      op.amount_to_cover = bit_usd.amount(0);
-      op.maintenance_collateral_ratio = 1800;
-      REQUIRE_THROW_WITH_VALUE(op, maintenance_collateral_ratio, 1300);
-      REQUIRE_THROW_WITH_VALUE(op, maintenance_collateral_ratio, 2500);
-      op.collateral_to_add = core.amount(8);
-      trx.operations.back() = op;
-      db.push_transaction(trx, ~0);
-
-      BOOST_CHECK(debt.call_price == price(core.amount(368), bit_usd.amount(50)));
-
-      op.amount_to_cover = bit_usd.amount(50);
-      op.collateral_to_add.amount = 0;
-      trx.operations.back() = op;
-      BOOST_CHECK_EQUAL(get_balance(debt_holder, bit_usd), 0);
-      BOOST_CHECK_THROW(db.push_transaction(trx, ~0), fc::exception);
-
-      trx.operations.clear();
-      ilog("..." );
-      transfer(usd_holder, debt_holder, bit_usd.amount(50), bit_usd.amount(0));
-      trx.operations.clear();
-      op.collateral_to_add.amount = -460;
-      op.validate();
-      ilog("..." );
-      trx.operations.push_back(op);
-      db.push_transaction(trx, ~0);
-
-      BOOST_CHECK(index.find(boost::make_tuple(debt_holder.id, bit_usd.id)) == index.end());
-   } catch( fc::exception& e) {
-      edump((e.to_detail_string()));
-      throw;
-   }
-}
 
 
 /**
@@ -976,9 +937,9 @@ BOOST_AUTO_TEST_CASE( trade_amount_equals_zero )
       BOOST_CHECK_EQUAL(get_balance(core_seller, test), 0);
       BOOST_CHECK_EQUAL(get_balance(core_seller, core), 100000000);
 
-      ilog( "=================================== START===================================\n\n");
+      //ilog( "=================================== START===================================\n\n");
       create_sell_order(core_seller, core.amount(1), test.amount(900000));
-      ilog( "=================================== STEP===================================\n\n");
+      //ilog( "=================================== STEP===================================\n\n");
       create_sell_order(core_buyer, test.amount(900001), core.amount(1));
    } catch( const fc::exception& e) {
       edump((e.to_detail_string()));
@@ -1380,7 +1341,7 @@ BOOST_AUTO_TEST_CASE( witness_withdraw_pay_test )
  * 3) Ensure that margin calls do not occur even if the highest bid would indicate it
  * 4) Match some Orders
  * 5) Trigger Global Settle on the Asset
- * 6) The maitenance collateral must always be 1:1
+ * 6) The maintenance collateral must always be 1:1
  */
 BOOST_AUTO_TEST_CASE_EXPECTED_FAILURES( unimp_prediction_market_test, 1 )
 BOOST_AUTO_TEST_CASE( unimp_prediction_market_test )

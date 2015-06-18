@@ -34,6 +34,7 @@ add_library( graphene_chain
 
              transaction_evaluation_state.cpp
              fork_database.cpp
+             block_database.cpp
 
              db_balance.cpp
              db_block.cpp
@@ -49,7 +50,7 @@ add_library( graphene_chain
              ${HEADERS}
            )
 
-target_link_libraries( graphene_chain fc graphene_db leveldb )
+target_link_libraries( graphene_chain fc graphene_db )
 target_include_directories( graphene_chain
                             PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include" )
 

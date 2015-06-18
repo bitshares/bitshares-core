@@ -166,7 +166,7 @@ BOOST_FIXTURE_TEST_CASE( update_account_keys, database_fixture )
                   // size() < num_active_keys is possible when some keys are duplicates
                   create_op.active.weight_threshold = create_op.active.auths.size();
 
-                  create_op.memo_key = key_ids[ *(it++) ] ;
+                  create_op.options.memo_key = key_ids[ *(it++) ] ;
                   create_op.registrar = sam_account_object.id;
                   trx.operations.push_back( create_op );
                   // trx.sign( sam_key );
@@ -191,6 +191,7 @@ BOOST_FIXTURE_TEST_CASE( update_account_keys, database_fixture )
                      update_op.account = alice_account_id;
                      update_op.owner = authority();
                      update_op.active = authority();
+                     update_op.new_options = create_op.options;
 
                      for( int owner_index=0; owner_index<num_owner_keys; owner_index++ )
                         update_op.owner->auths[ key_ids[ *(it++) ] ] = 1;
@@ -200,7 +201,8 @@ BOOST_FIXTURE_TEST_CASE( update_account_keys, database_fixture )
                         update_op.active->auths[ key_ids[ *(it++) ] ] = 1;
                      // size() < num_active_keys is possible when some keys are duplicates
                      update_op.active->weight_threshold = update_op.active->auths.size();
-                     update_op.memo_key = key_ids[ *(it++) ] ;
+                     FC_ASSERT( update_op.new_options.valid() );
+                     update_op.new_options->memo_key = key_ids[ *(it++) ] ;
 
                      trx.operations.push_back( update_op );
                      for( int i=0; i<int(create_op.owner.weight_threshold); i++)

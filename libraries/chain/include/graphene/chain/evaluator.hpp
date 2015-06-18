@@ -102,6 +102,7 @@ namespace graphene { namespace chain {
 
          object_id_type get_relative_id( object_id_type rel_id )const;
 
+         void check_relative_ids(const authority& a)const;
          authority resolve_relative_ids( const authority& a )const;
 
          asset                            fee_from_account;

@@ -20,6 +20,7 @@
 #include <graphene/app/application.hpp>
 
 #include <boost/program_options.hpp>
+#include <fc/io/json.hpp>
 
 namespace graphene { namespace app {
 namespace bpo = boost::program_options;

@@ -27,6 +27,7 @@
 #include <graphene/chain/authority.hpp>
 #include <graphene/chain/asset_object.hpp>
 #include <graphene/chain/worker_object.hpp>
+#include <graphene/chain/account_object.hpp>
 
 #include <fc/static_variant.hpp>
 #include <fc/uint128.hpp>
@@ -132,17 +133,13 @@ namespace graphene { namespace chain {
       account_id_type referrer;
       /// Of the fee split between registrar and referrer, this percentage goes to the referrer. The rest goes to the
       /// registrar.
-      uint8_t         referrer_percent = 0;
+      uint16_t        referrer_percent = 0;
 
       string          name;
       authority       owner;
       authority       active;
-      account_id_type voting_account;
-      object_id_type  memo_key = key_id_type();
 
-      uint16_t        num_witness = 0;
-      uint16_t        num_committee = 0;
-      flat_set<vote_id_type> vote;
+      account_object::options_type options;
 
       account_id_type fee_payer()const { return registrar; }
       void       get_required_auth(flat_set<account_id_type>& active_auth_set , flat_set<account_id_type>&)const;
@@ -203,15 +200,17 @@ namespace graphene { namespace chain {
     */
    struct account_update_operation
    {
-      asset                                   fee;
-      account_id_type                         account;
-      optional<authority>                     owner;
-      optional<authority>                     active;
-      optional<account_id_type>               voting_account;
-      optional<object_id_type>                memo_key;
-      optional<flat_set<vote_id_type>>        vote;
-      uint16_t                                num_witness = 0;
-      uint16_t                                num_committee = 0;
+      asset fee;
+      /// The account to update
+      account_id_type account;
+
+      /// New owner authority. If set, this operation requires owner authority to execute.
+      optional<authority> owner;
+      /// New active authority. If set, this operation requires owner authority to execute.
+      optional<authority> active;
+
+      /// New account options
+      optional<account_object::options_type> new_options;
 
       account_id_type fee_payer()const { return account; }
       void       get_required_auth(flat_set<account_id_type>& active_auth_set , flat_set<account_id_type>& owner_auth_set)const;
@@ -810,10 +809,10 @@ namespace graphene { namespace chain {
     */
    struct limit_order_cancel_operation
    {
+      asset               fee;
       limit_order_id_type order;
       /** must be order->seller */
       account_id_type     fee_paying_account;
-      asset               fee;
 
       account_id_type fee_payer()const { return fee_paying_account; }
       void            get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>&)const;
@@ -831,26 +830,22 @@ namespace graphene { namespace chain {
    /**
     *  @ingroup operations
     *
-    *  This operation can be used to add collateral, cover, and adjust the margin call price with a new maintenance
-    *  collateral ratio.
+    *  This operation can be used to add collateral, cover, and adjust the margin call price for a particular user.
     *
-    *  The only way to "cancel" a call order is to pay off the balance due. The order is invalid if the payoff amount
-    *  is greater than the amount due.
+    *  For prediction markets the collateral and debt must always be equal.
     *
-    *  @note the call_order_id is implied by the funding_account and assets involved. This implies that the assets must
-    *  have appropriate asset_ids, even if the amount is zero.
+    *  This operation will fail if it would trigger a margin call that couldn't be filled.  If the margin call hits
+    *  the call price limit then it will fail if the call price is above the settlement price.
     *
     *  @note this operation can be used to force a market order using the collateral without requiring outside funds.
-    *
-    *  @note this operation can be used to issue new bitassets provided there is sufficient collateral
     */
    struct call_order_update_operation
    {
-      account_id_type     funding_account; ///< pays fee, collateral, and cover
       asset               fee; ///< paid by funding_account
-      asset               collateral_to_add; ///< the amount of collateral to add to the margin position
-      asset               amount_to_cover; ///< the amount of the debt to be paid off, may be negative to issue new debt
-      uint16_t            maintenance_collateral_ratio = 0; ///< 0 means don't change, 1000 means feed
+      account_id_type     funding_account; ///< pays fee, collateral, and cover
+      asset               delta_collateral; ///< the amount of collateral to add to the margin position
+      asset               delta_debt; ///< the amount of the debt to be paid off, may be negative to issue new debt
+      price               call_price; ///< the price at which the collateral will be sold to cover the debt
 
       account_id_type fee_payer()const { return funding_account; }
       void            get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>&)const;
@@ -859,8 +854,8 @@ namespace graphene { namespace chain {
       void            get_balance_delta( balance_accumulator& acc, const operation_result& result = asset())const
       {
          acc.adjust( fee_payer(), -fee );
-         acc.adjust( funding_account, -collateral_to_add );
-         acc.adjust( funding_account, -amount_to_cover );
+         acc.adjust( funding_account, -delta_collateral );
+         acc.adjust( funding_account, delta_debt );
       }
    };
 
@@ -1483,13 +1478,11 @@ FC_REFLECT( graphene::chain::key_create_operation,
 FC_REFLECT( graphene::chain::account_create_operation,
             (fee)(registrar)
             (referrer)(referrer_percent)
-            (name)
-            (owner)(active)(voting_account)(memo_key)
-            (num_witness)(num_committee)(vote)
+            (name)(owner)(active)(options)
           )
 
 FC_REFLECT( graphene::chain::account_update_operation,
-            (fee)(account)(owner)(active)(voting_account)(memo_key)(num_witness)(num_committee)(vote)
+            (fee)(account)(owner)(active)(new_options)
           )
 FC_REFLECT( graphene::chain::account_upgrade_operation, (fee)(account_to_upgrade)(upgrade_to_lifetime_member) )
 
@@ -1511,7 +1504,7 @@ FC_REFLECT( graphene::chain::limit_order_create_operation,
           )
 FC_REFLECT( graphene::chain::fill_order_operation, (fee)(order_id)(account_id)(pays)(receives) )
 FC_REFLECT( graphene::chain::limit_order_cancel_operation,(fee)(fee_paying_account)(order) )
-FC_REFLECT( graphene::chain::call_order_update_operation, (fee)(funding_account)(collateral_to_add)(amount_to_cover)(maintenance_collateral_ratio) )
+FC_REFLECT( graphene::chain::call_order_update_operation, (fee)(funding_account)(delta_collateral)(delta_debt)(call_price) )
 
 FC_REFLECT( graphene::chain::transfer_operation,
             (fee)(from)(to)(amount)(memo) )

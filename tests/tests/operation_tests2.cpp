@@ -215,7 +215,7 @@ BOOST_AUTO_TEST_CASE( withdraw_permission_nominal_case )
    while(true)
    {
       const withdraw_permission_object& permit_object = permit(db);
-      wdump( (permit_object) );
+      //wdump( (permit_object) );
       withdraw_permission_claim_operation op;
       op.withdraw_permission = permit;
       op.withdraw_from_account = nathan_id;
@@ -336,38 +336,32 @@ BOOST_AUTO_TEST_CASE( mia_feeds )
       const asset_object& bit_usd = bit_usd_id(db);
       asset_publish_feed_operation op({asset(), vikram_id});
       op.asset_id = bit_usd_id;
-      op.feed.call_limit = price(asset(GRAPHENE_BLOCKCHAIN_PRECISION),bit_usd.amount(30));
+      op.feed.settlement_price = price(asset(GRAPHENE_BLOCKCHAIN_PRECISION),bit_usd.amount(30));
       // We'll expire margins after a month
-      op.feed.max_margin_period_sec = fc::days(30).to_seconds();
       // Accept defaults for required collateral
       trx.operations.emplace_back(op);
       db.push_transaction(trx, ~0);
 
       const asset_bitasset_data_object& bitasset = bit_usd.bitasset_data(db);
-      BOOST_CHECK(bitasset.current_feed.call_limit.to_real() == GRAPHENE_BLOCKCHAIN_PRECISION / 30.0);
-      BOOST_CHECK(bitasset.current_feed.max_margin_period_sec == fc::days(30).to_seconds());
-      BOOST_CHECK(bitasset.current_feed.required_maintenance_collateral == GRAPHENE_DEFAULT_MAINTENANCE_COLLATERAL_RATIO);
+      BOOST_CHECK(bitasset.current_feed.settlement_price.to_real() == GRAPHENE_BLOCKCHAIN_PRECISION / 30.0);
+      BOOST_CHECK(bitasset.current_feed.maintenance_collateral_ratio == GRAPHENE_DEFAULT_MAINTENANCE_COLLATERAL_RATIO);
 
       op.publisher = ben_id;
-      op.feed.call_limit = price(asset(GRAPHENE_BLOCKCHAIN_PRECISION),bit_usd.amount(25));
-      op.feed.max_margin_period_sec = fc::days(10).to_seconds();
+      op.feed.settlement_price = price(asset(GRAPHENE_BLOCKCHAIN_PRECISION),bit_usd.amount(25));
       trx.operations.back() = op;
       db.push_transaction(trx, ~0);
 
-      BOOST_CHECK_EQUAL(bitasset.current_feed.call_limit.to_real(), GRAPHENE_BLOCKCHAIN_PRECISION / 25.0);
-      BOOST_CHECK(bitasset.current_feed.max_margin_period_sec == fc::days(30).to_seconds());
-      BOOST_CHECK(bitasset.current_feed.required_maintenance_collateral == GRAPHENE_DEFAULT_MAINTENANCE_COLLATERAL_RATIO);
+      BOOST_CHECK_EQUAL(bitasset.current_feed.settlement_price.to_real(), GRAPHENE_BLOCKCHAIN_PRECISION / 25.0);
+      BOOST_CHECK(bitasset.current_feed.maintenance_collateral_ratio == GRAPHENE_DEFAULT_MAINTENANCE_COLLATERAL_RATIO);
 
       op.publisher = dan_id;
-      op.feed.call_limit = price(asset(GRAPHENE_BLOCKCHAIN_PRECISION),bit_usd.amount(40));
-      op.feed.max_margin_period_sec = fc::days(100).to_seconds();
-      op.feed.required_maintenance_collateral = 1000;
+      op.feed.settlement_price = price(asset(GRAPHENE_BLOCKCHAIN_PRECISION),bit_usd.amount(40));
+      op.feed.maintenance_collateral_ratio = 1000;
       trx.operations.back() = op;
       db.push_transaction(trx, ~0);
 
-      BOOST_CHECK_EQUAL(bitasset.current_feed.call_limit.to_real(), GRAPHENE_BLOCKCHAIN_PRECISION / 30.0);
-      BOOST_CHECK(bitasset.current_feed.max_margin_period_sec == fc::days(30).to_seconds());
-      BOOST_CHECK(bitasset.current_feed.required_maintenance_collateral == GRAPHENE_DEFAULT_MAINTENANCE_COLLATERAL_RATIO);
+      BOOST_CHECK_EQUAL(bitasset.current_feed.settlement_price.to_real(), GRAPHENE_BLOCKCHAIN_PRECISION / 30.0);
+      BOOST_CHECK(bitasset.current_feed.maintenance_collateral_ratio == GRAPHENE_DEFAULT_MAINTENANCE_COLLATERAL_RATIO);
 
       op.publisher = nathan_id;
       trx.operations.back() = op;
@@ -389,10 +383,12 @@ BOOST_AUTO_TEST_CASE( witness_create )
    {
       account_update_operation op;
       op.account = nathan_id;
-      op.vote = nathan_id(db).votes;
-      op.vote->insert(nathan_witness_id(db).vote_id);
-      op.num_witness = std::count_if(op.vote->begin(), op.vote->end(), [](vote_id_type id) { return id.type() == vote_id_type::witness; });
-      op.num_committee = std::count_if(op.vote->begin(), op.vote->end(), [](vote_id_type id) { return id.type() == vote_id_type::committee; });
+      op.new_options = nathan_id(db).options;
+      op.new_options->votes.insert(nathan_witness_id(db).vote_id);
+      op.new_options->num_witness = std::count_if(op.new_options->votes.begin(), op.new_options->votes.end(),
+                                                  [](vote_id_type id) { return id.type() == vote_id_type::witness; });
+      op.new_options->num_committee = std::count_if(op.new_options->votes.begin(), op.new_options->votes.end(),
+                                                    [](vote_id_type id) { return id.type() == vote_id_type::committee; });
       trx.operations.push_back(op);
       trx.sign(nathan_key_id, nathan_private_key);
       db.push_transaction(trx);
@@ -533,8 +529,8 @@ BOOST_AUTO_TEST_CASE( worker_pay_test )
    {
       account_update_operation op;
       op.account = nathan_id;
-      op.vote = nathan_id(db).votes;
-      op.vote->insert(worker_id_type()(db).vote_for);
+      op.new_options = nathan_id(db).options;
+      op.new_options->votes.insert(worker_id_type()(db).vote_for);
       trx.operations.push_back(op);
       db.push_transaction(trx, ~0);
       trx.clear();
@@ -573,8 +569,8 @@ BOOST_AUTO_TEST_CASE( worker_pay_test )
    {
       account_update_operation op;
       op.account = nathan_id;
-      op.vote = nathan_id(db).votes;
-      op.vote->erase(worker_id_type()(db).vote_for);
+      op.new_options = nathan_id(db).options;
+      op.new_options->votes.erase(worker_id_type()(db).vote_for);
       trx.operations.push_back(op);
       db.push_transaction(trx, ~0);
       trx.clear();
@@ -646,8 +642,8 @@ BOOST_AUTO_TEST_CASE( refund_worker_test )
    {
       account_update_operation op;
       op.account = nathan_id;
-      op.vote = nathan_id(db).votes;
-      op.vote->insert(worker_id_type()(db).vote_for);
+      op.new_options = nathan_id(db).options;
+      op.new_options->votes.insert(worker_id_type()(db).vote_for);
       trx.operations.push_back(op);
       db.push_transaction(trx, ~0);
       trx.clear();

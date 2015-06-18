@@ -35,20 +35,23 @@ database::~database(){
 
 void database::open( const fc::path& data_dir, const genesis_allocation& initial_allocation )
 { try {
-   ilog("Open database in ${d}", ("d", data_dir));
+ //  ilog("Open database in ${d}", ("d", data_dir));
    object_database::open( data_dir );
 
    _block_id_to_block.open( data_dir / "database" / "block_num_to_block" );
 
    if( !find(global_property_id_type()) )
+   {
+//      ilog( "Init Genesis State" );
       init_genesis(initial_allocation);
+   }
 
    _pending_block.previous  = head_block_id();
    _pending_block.timestamp = head_block_time();
 
-   auto last_block_itr = _block_id_to_block.last();
-   if( last_block_itr.valid() )
-      _fork_db.start_block( last_block_itr.value() );
+   auto last_block= _block_id_to_block.last();
+   if( last_block.valid() )
+      _fork_db.start_block( *last_block );
 
 } FC_CAPTURE_AND_RETHROW( (data_dir) ) }
 
@@ -58,19 +61,22 @@ void database::reindex(fc::path data_dir, const genesis_allocation& initial_allo
    open(data_dir, initial_allocation);
 
    auto start = fc::time_point::now();
-   auto itr = _block_id_to_block.begin();
+   auto last_block = _block_id_to_block.last();
+   if( !last_block ) return;
+
+   const auto last_block_num = last_block->block_num();
+
    // TODO: disable undo tracking durring reindex, this currently causes crashes in the benchmark test
    //_undo_db.disable();
-   while( itr.valid() )
+   for( uint32_t i = 1; i <= last_block_num; ++i )
    {
-      apply_block( itr.value(), skip_delegate_signature |
+      apply_block( *_block_id_to_block.fetch_by_number(i), skip_delegate_signature |
                                 skip_transaction_signatures |
                                 skip_undo_block |
                                 skip_undo_transaction |
                                 skip_transaction_dupe_check |
                                 skip_tapos_check |
                                 skip_authority_check );
-      ++itr;
    }
    //_undo_db.enable();
    auto end = fc::time_point::now();
@@ -93,6 +99,7 @@ void database::close(uint32_t blocks_to_rewind)
    for(uint32_t i = 0; i < blocks_to_rewind && head_block_num() > 0; ++i)
       pop_block();
 
+   object_database::flush();
    object_database::close();
 
    if( _block_id_to_block.is_open() )

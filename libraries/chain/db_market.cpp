@@ -69,9 +69,10 @@ void database::globally_settle_asset( const asset_object& mia, const price& sett
    const limit_order_index& limit_index = get_index_type<limit_order_index>();
    const auto& limit_price_index = limit_index.indices().get<by_price>();
 
+    auto max_short_squeeze = bitasset.current_feed.max_short_squeeze_price();
     // cancel all orders selling the market issued asset
     auto limit_itr = limit_price_index.lower_bound(price::max(mia.id, bitasset.options.short_backing_asset));
-    auto limit_end = limit_price_index.upper_bound(~bitasset.current_feed.call_limit);
+    auto limit_end = limit_price_index.upper_bound(~max_short_squeeze);
     while( limit_itr != limit_end )
     {
        const auto& order = *limit_itr;
@@ -363,13 +364,22 @@ bool database::fill_order(const force_settlement_object& settle, const asset& pa
 } FC_CAPTURE_AND_RETHROW( (settle)(pays)(receives) ) }
 
 /**
+ *  Starting with the least collateralized orders, fill them if their
+ *  call price is above the max(lowest bid,call_limit).  
  *
+ *  This method will return true if it filled a short or limit
+ *
+ *  @param mia - the market issued asset that should be called.
+ *  @param enable_black_swan - when adjusting collateral, triggering a black swan is invalid and will throw
+ *                             if enable_black_swan is not set to true.
+ *
+ *  @return true if a margin call was executed.
  */
-bool database::check_call_orders( const asset_object& mia )
+bool database::check_call_orders( const asset_object& mia, bool enable_black_swan )
 { try {
     if( !mia.is_market_issued() ) return false;
     const asset_bitasset_data_object& bitasset = mia.bitasset_data(*this);
-    if( bitasset.current_feed.call_limit.is_null() ) return false;
+    if( bitasset.current_feed.settlement_price.is_null() ) return false;
     if( bitasset.is_prediction_market ) return false;
 
     const call_order_index& call_index = get_index_type<call_order_index>();
@@ -378,9 +388,42 @@ bool database::check_call_orders( const asset_object& mia )
     const limit_order_index& limit_index = get_index_type<limit_order_index>();
     const auto& limit_price_index = limit_index.indices().get<by_price>();
 
+    auto max_price = price::max( mia.id, bitasset.options.short_backing_asset );
+    auto min_price = bitasset.current_feed.max_short_squeeze_price();
+    /*
+    if( require_orders )
+    {
+       for( const auto& order : limit_price_index )
+          wdump((order)(order.sell_price.to_real()));
 
-    auto limit_itr = limit_price_index.lower_bound( price::max( mia.id, bitasset.options.short_backing_asset ) );
-    auto limit_end = limit_price_index.upper_bound( ~bitasset.current_feed.call_limit );
+       for( const auto& call : call_price_index )
+          idump((call)(call.call_price.to_real()));
+
+       // limit pirce index is sorted from highest price to lowest price.
+       //auto limit_itr = limit_price_index.lower_bound( price::max( mia.id, bitasset.options.short_backing_asset ) );
+       wdump((max_price)(max_price.to_real()));
+       wdump((min_price)(min_price.to_real()));
+    }
+    */
+
+    FC_ASSERT( max_price.base.asset_id == min_price.base.asset_id );
+    // wlog( "from ${a} Debt/Col to ${b} Debt/Col ", ("a", max_price.to_real())("b",min_price.to_real()) );
+    // NOTE limit_price_index is sorted from greatest to least
+    auto limit_itr = limit_price_index.lower_bound( max_price );
+    auto limit_end = limit_price_index.upper_bound( min_price ); 
+
+    /*
+    if( limit_itr != limit_price_index.end() )
+       wdump((*limit_itr)(limit_itr->sell_price.to_real()));
+    if( limit_end != limit_price_index.end() )
+       wdump((*limit_end)(limit_end->sell_price.to_real()));
+       */
+
+    if( limit_itr == limit_end )
+    {
+       //wlog( "no orders available to fill margin calls" );
+       return false;
+    }
 
     auto call_itr = call_price_index.lower_bound( price::min( bitasset.options.short_backing_asset, mia.id ) );
     auto call_end = call_price_index.upper_bound( price::max( bitasset.options.short_backing_asset, mia.id ) );
@@ -411,6 +454,7 @@ bool database::check_call_orders( const asset_object& mia )
 
        if( usd_to_buy * match_price > call_itr->get_collateral() )
        {
+          FC_ASSERT( enable_black_swan );
           elog( "black swan, we do not have enough collateral to cover at this price" );
           globally_settle_asset( mia, call_itr->get_debt() / call_itr->get_collateral() );
           return true;
@@ -500,7 +544,7 @@ asset database::pay_market_fees( const asset_object& recv_asset, const asset& re
    {
       const auto& recv_dyn_data = recv_asset.dynamic_asset_data_id(*this);
       modify( recv_dyn_data, [&]( asset_dynamic_data_object& obj ){
-                   idump((issuer_fees));
+                   //idump((issuer_fees));
          obj.accumulated_fees += issuer_fees.amount;
       });
    }

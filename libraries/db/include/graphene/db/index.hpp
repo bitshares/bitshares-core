@@ -17,10 +17,13 @@
  */
 #pragma once
 #include <graphene/db/object.hpp>
-#include <graphene/db/level_map.hpp>
+#include <fc/interprocess/file_mapping.hpp>
+#include <fc/io/raw.hpp>
+#include <fstream>
 
 namespace graphene { namespace db {
    class object_database;
+   using fc::path;
 
    /**
     * @class index_observer
@@ -80,9 +83,12 @@ namespace graphene { namespace db {
          virtual const object&  create( const std::function<void(object&)>& constructor ) = 0;
 
          /**
-          *  Opens the index loading objects from a level_db database
+          *  Opens the index loading objects from a file
           */
-         virtual void open( const shared_ptr<graphene::db::level_map<object_id_type, vector<char> >>& db ){}
+         virtual void open( const fc::path& db ) = 0;
+         virtual void save( const fc::path& db ) = 0;
+
+
 
          /** @return the object with id or nullptr if not found */
          virtual const object*      find( object_id_type id )const = 0;
@@ -170,22 +176,42 @@ namespace graphene { namespace db {
          virtual void           use_next_id()override                    { ++_next_id.number;  }
          virtual void           set_next_id( object_id_type id )override { _next_id = id;      }
 
+         virtual void open( const path& db )override
+         { 
+            if( !fc::exists( db ) ) return;
+            fc::file_mapping fm( db.generic_string().c_str(), fc::read_only );
+            fc::mapped_region mr( fm, fc::read_only, 0, fc::file_size(db) );
+            fc::datastream<const char*> ds( (const char*)mr.get_address(), mr.get_size() );
+            fc::raw::unpack(ds, _next_id);
+            try {
+               vector<char> tmp;
+               while( true ) 
+               {
+                  fc::raw::unpack( ds, tmp );
+                  load( tmp );
+               }
+            } catch ( const fc::exception&  ){}
+         }
+
+         virtual void save( const path& db ) override 
+         {
+            std::ofstream out( db.generic_string(), 
+                               std::ofstream::binary | std::ofstream::out | std::ofstream::trunc );
+            FC_ASSERT( out );
+            out.write( (char*)&_next_id, sizeof(_next_id) );
+            this->inspect_all_objects( [&]( const object& o ) {
+                auto vec = fc::raw::pack( static_cast<const object_type&>(o) );
+                auto packed_vec = fc::raw::pack( vec );
+                out.write( packed_vec.data(), packed_vec.size() );
+            });
+         }
+
          virtual const object&  load( const std::vector<char>& data )override
          {
             return DerivedIndex::insert( fc::raw::unpack<object_type>( data ) );
          }
 
-         virtual void open( const shared_ptr<graphene::db::level_map<object_id_type, vector<char> >>& db )override
-         {
-            auto first = object_id_type( DerivedIndex::object_type::space_id, DerivedIndex::object_type::type_id, 0 );
-            auto last = object_id_type( DerivedIndex::object_type::space_id, DerivedIndex::object_type::type_id+1, 0 );
-            auto itr = db->lower_bound( first );
-            while( itr.valid() && itr.key() < last )
-            {
-               load( itr.value() );
-               ++itr;
-            }
-         }
+
          virtual const object&  create(const std::function<void(object&)>& constructor )override
          {
             const auto& result = DerivedIndex::create( constructor );

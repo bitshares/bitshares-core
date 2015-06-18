@@ -30,7 +30,7 @@ namespace graphene { namespace chain {
 
 bool database::is_known_block( const block_id_type& id )const
 {
-   return _fork_db.is_known_block(id) || _block_id_to_block.find(id).valid();
+   return _fork_db.is_known_block(id) || _block_id_to_block.contains(id);
 }
 /**
  * Only return true *if* the transaction has not expired or been invalidated. If this
@@ -45,10 +45,7 @@ bool database::is_known_transaction( const transaction_id_type& id )const
 
 block_id_type  database::get_block_id_for_num( uint32_t block_num )const
 { try {
-   block_id_type lb; lb._hash[0] = htonl(block_num);
-   auto itr = _block_id_to_block.lower_bound( lb );
-   FC_ASSERT( itr.valid() && itr.key()._hash[0] == lb._hash[0] );
-   return itr.key();
+   return _block_id_to_block.fetch_block_id( block_num );
 } FC_CAPTURE_AND_RETHROW( (block_num) ) }
 
 optional<signed_block> database::fetch_block_by_id( const block_id_type& id )const
@@ -65,12 +62,7 @@ optional<signed_block> database::fetch_block_by_number( uint32_t num )const
    if( results.size() == 1 )
       return results[0]->data;
    else
-   {
-      block_id_type lb; lb._hash[0] = htonl(num);
-      auto itr = _block_id_to_block.lower_bound( lb );
-      if( itr.valid() && itr.key()._hash[0] == lb._hash[0] )
-         return itr.value();
-   }
+      return _block_id_to_block.fetch_by_number(num);
    return optional<signed_block>();
 }
 
@@ -92,12 +84,11 @@ bool database::push_block( const signed_block& new_block, uint32_t skip )
 { try {
    if( !(skip&skip_fork_db) )
    {
-      wdump((new_block.id())(new_block.previous));
       auto new_head = _fork_db.push_block( new_block );
       //If the head block from the longest chain does not build off of the current head, we need to switch forks.
       if( new_head->data.previous != head_block_id() )
       {
-         edump((new_head->data.previous));
+         //edump((new_head->data.previous));
          //If the newly pushed block is the same height as head, we get head back in new_head
          //Only switch forks if new_head is actually higher than head
          if( new_head->data.block_num() > head_block_num() )
@@ -105,11 +96,11 @@ bool database::push_block( const signed_block& new_block, uint32_t skip )
             auto branches = _fork_db.fetch_branch_from( new_head->data.id(), _pending_block.previous );
             for( auto item : branches.first )
             {
-               wdump( ("new")(item->id)(item->data.previous) );
+          //     wdump( ("new")(item->id)(item->data.previous) );
             }
             for( auto item : branches.second )
             {
-               wdump( ("old")(item->id)(item->data.previous) );
+          //     wdump( ("old")(item->id)(item->data.previous) );
             }
 
             // pop blocks until we hit the forked block
@@ -123,14 +114,15 @@ bool database::push_block( const signed_block& new_block, uint32_t skip )
                 try {
                    auto session = _undo_db.start_undo_session();
                    apply_block( (*ritr)->data, skip );
-                   _block_id_to_block.store( new_block.id(), (*ritr)->data );
+                   _block_id_to_block.store( (*ritr)->id, (*ritr)->data );
                    session.commit();
                 }
                 catch ( const fc::exception& e ) { except = e; }
                 if( except )
                 {
-                   elog( "Encountered error when switching to a longer fork at id ${id}. Going back.",
-                          ("id", (*ritr)->id) );
+                   //wdump((except->to_detail_string()));
+                   // elog( "Encountered error when switching to a longer fork at id ${id}. Going back.",
+                   //       ("id", (*ritr)->id) );
                    // remove the rest of branches.first from the fork_db, those blocks are invalid
                    while( ritr != branches.first.rend() )
                    {
@@ -225,8 +217,8 @@ processed_transaction database::push_proposal(const proposal_object& proposal)
                      return std::make_pair(id, authority::owner);
                   });
 
-   ilog("Attempting to push proposal ${prop}", ("prop", proposal));
-   idump((eval_state.approved_by));
+   //ilog("Attempting to push proposal ${prop}", ("prop", proposal));
+   //idump((eval_state.approved_by));
 
    eval_state.operation_results.reserve(proposal.proposed_transaction.operations.size());
    processed_transaction ptrx(proposal.proposed_transaction);
@@ -333,7 +325,7 @@ void database::apply_block( const signed_block& next_block, uint32_t skip )
 { try {
    _applied_ops.clear();
 
-   FC_ASSERT( (skip & skip_merkle_check) || next_block.transaction_merkle_root == next_block.calculate_merkle_root() );
+   FC_ASSERT( (skip & skip_merkle_check) || next_block.transaction_merkle_root == next_block.calculate_merkle_root(), "", ("next_block.transaction_merkle_root",next_block.transaction_merkle_root)("calc",next_block.calculate_merkle_root())("next_block",next_block)("id",next_block.id()) );
 
    const witness_object& signing_witness = validate_block_header(skip, next_block);
    const auto& global_props = get_global_properties();

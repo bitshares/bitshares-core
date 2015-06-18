@@ -724,7 +724,7 @@ public:
       account_create_op.name = name;
       account_create_op.owner = authority(1, owner_rkid, 1);
       account_create_op.active = authority(1, active_rkid, 1);
-      account_create_op.memo_key = active_rkid;
+      account_create_op.options.memo_key = active_rkid;
 
       signed_transaction tx;
 
@@ -820,7 +820,7 @@ public:
          account_create_op.name = account_name;
          account_create_op.owner = authority(1, owner_rkid, 1);
          account_create_op.active = authority(1, active_rkid, 1);
-         account_create_op.memo_key = active_rkid;
+         account_create_op.options.memo_key = active_rkid;
 
          // current_fee_schedule()
          // find_account(pay_from_account)
@@ -1021,8 +1021,8 @@ public:
 
       call_order_update_operation op;
       op.funding_account = seller.id;
-      op.amount_to_cover   = -mia.amount_from_string(amount_to_sell);
-      op.collateral_to_add = collateral.amount_from_string(amount_of_collateral);
+      op.delta_debt   = mia.amount_from_string(amount_to_sell);
+      op.delta_collateral = collateral.amount_from_string(amount_of_collateral);
 
       signed_transaction trx;
       trx.operations = {op};
@@ -1070,10 +1070,10 @@ public:
       if( memo.size() )
          {
             xfer_op.memo = memo_data();
-            xfer_op.memo->from = from_account.memo_key;
-            xfer_op.memo->to = to_account.memo_key;
-            xfer_op.memo->set_message(get_private_key(from_account.memo_key),
-                                      get_public_key(to_account.memo_key), memo);
+            xfer_op.memo->from = from_account.options.memo_key;
+            xfer_op.memo->to = to_account.options.memo_key;
+            xfer_op.memo->set_message(get_private_key(from_account.options.memo_key),
+                                      get_public_key(to_account.options.memo_key), memo);
          }
 
       signed_transaction tx;
@@ -1100,10 +1100,10 @@ public:
       if( memo.size() )
       {
          issue_op.memo = memo_data();
-         issue_op.memo->from = issuer.memo_key;
-         issue_op.memo->to = to.memo_key;
-         issue_op.memo->set_message(get_private_key(issuer.memo_key),
-                                    get_public_key(to.memo_key), memo);
+         issue_op.memo->from = issuer.options.memo_key;
+         issue_op.memo->to = to.options.memo_key;
+         issue_op.memo->set_message(get_private_key(issuer.options.memo_key),
+                                    get_public_key(to.options.memo_key), memo);
       }
 
       signed_transaction tx;
@@ -1183,7 +1183,7 @@ void dbg_make_mia(string creator, string symbol)
 
 void flood_network(string prefix, uint32_t number_of_transactions)
 {
-   const account_object& master = *_wallet.my_accounts.get<by_name>().lower_bound("bts");
+   const account_object& master = *_wallet.my_accounts.get<by_name>().lower_bound("import");
    int number_of_accounts = number_of_transactions / 3;
    number_of_transactions -= number_of_accounts;
    auto key = derive_private_key("floodshill", 0);
