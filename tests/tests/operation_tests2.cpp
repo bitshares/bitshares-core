@@ -446,8 +446,7 @@ BOOST_AUTO_TEST_CASE( witness_create )
    generator_helper h = std::for_each(near_witnesses.begin(), near_witnesses.end(),
                                       generator_helper{*this, nathan_witness_id, nathan_private_key, false});
    BOOST_CHECK(h.nathan_generated_block);
-
-   generate_block();
+   generate_block(0, nathan_private_key);
 } FC_LOG_AND_RETHROW() }
 
 BOOST_AUTO_TEST_CASE( global_settle_test )
@@ -685,7 +684,7 @@ BOOST_AUTO_TEST_CASE( refund_worker_test )
 
 BOOST_AUTO_TEST_CASE( force_settlement_unavailable )
 { try {
-   auto private_key = generate_private_key("genesis");
+   auto private_key = delegate_priv_key;
    account_id_type nathan_id = create_account("nathan").get_id();
    account_id_type shorter1_id = create_account("shorter1").get_id();
    account_id_type shorter2_id = create_account("shorter2").get_id();
@@ -694,7 +693,7 @@ BOOST_AUTO_TEST_CASE( force_settlement_unavailable )
    transfer(account_id_type()(db), shorter1_id(db), asset(100000000));
    transfer(account_id_type()(db), shorter2_id(db), asset(100000000));
    transfer(account_id_type()(db), shorter3_id(db), asset(100000000));
-   asset_id_type bit_usd = create_bitasset("BITUSD", account_id_type(1), 0, disable_force_settle).get_id();
+   asset_id_type bit_usd = create_bitasset("BITUSD", GRAPHENE_TEMP_ACCOUNT, 0, disable_force_settle).get_id();
    FC_ASSERT( bit_usd(db).is_market_issued() );
    {
       asset_update_bitasset_operation op;
@@ -757,7 +756,7 @@ BOOST_AUTO_TEST_CASE( force_settlement_unavailable )
    {
       //Enable force settlement
       asset_update_operation op;
-      op.issuer = account_id_type(1);
+      op.issuer = bit_usd(db).issuer;
       op.asset_to_update = bit_usd;
       op.new_options = bit_usd(db).options;
       op.new_options.flags &= ~disable_force_settle;
@@ -786,7 +785,7 @@ BOOST_AUTO_TEST_CASE( force_settlement_unavailable )
    {
       //Disable force settlement
       asset_update_operation op;
-      op.issuer = account_id_type(1);
+      op.issuer = bit_usd(db).issuer;
       op.asset_to_update = bit_usd;
       op.new_options = bit_usd(db).options;
       op.new_options.flags |= disable_force_settle;

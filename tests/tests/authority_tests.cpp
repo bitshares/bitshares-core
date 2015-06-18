@@ -233,7 +233,7 @@ BOOST_AUTO_TEST_CASE( recursive_accounts )
       trx.operations.push_back(op);
       sign(trx, key2.id,parent2_key);
       sign(trx, grandparent_key_obj.id,grandparent_key);
-      sign(trx, key_id_type(), generate_private_key("genesis"));
+      sign(trx, key_id_type(), delegate_priv_key);
       //Fails due to recursion depth.
       BOOST_CHECK_THROW(PUSH_TX( db, trx, database::skip_transaction_dupe_check ), fc::exception);
       sign(trx, child_key_obj.id, child_key);
@@ -269,19 +269,20 @@ BOOST_AUTO_TEST_CASE( proposed_single_account )
    try {
       INVOKE(any_two_of_three);
 
-      fc::ecc::private_key genesis_key = generate_private_key("genesis");
+      fc::ecc::private_key genesis_key = delegate_priv_key;
       fc::ecc::private_key nathan_key1 = fc::ecc::private_key::regenerate(fc::digest("key1"));
       fc::ecc::private_key nathan_key2 = fc::ecc::private_key::regenerate(fc::digest("key2"));
       fc::ecc::private_key nathan_key3 = fc::ecc::private_key::regenerate(fc::digest("key3"));
 
+      const account_object& moneyman = create_account("moneyman");
       const account_object& nathan = get_account("nathan");
       const asset_object& core = asset_id_type()(db);
 
-      transfer(account_id_type()(db), account_id_type(1)(db), core.amount(1000000));
+      transfer(account_id_type()(db), moneyman, core.amount(1000000));
 
       //Following any_two_of_three, nathan's active authority is satisfied by any two of {key1,key2,key3}
-      proposal_create_operation op = {account_id_type(1), asset(),
-                                      {{transfer_operation{asset(),nathan.id, account_id_type(1), core.amount(100)}}},
+      proposal_create_operation op = {moneyman.get_id(), asset(),
+                                      {{transfer_operation{asset(),nathan.id, moneyman.get_id(), core.amount(100)}}},
                                       db.head_block_time() + fc::days(1)};
       asset nathan_start_balance = db.get_balance(nathan.get_id(), core.get_id());
       {
@@ -289,7 +290,7 @@ BOOST_AUTO_TEST_CASE( proposed_single_account )
          op.get_required_auth(active_set, owner_set);
          BOOST_CHECK_EQUAL(active_set.size(), 1);
          BOOST_CHECK_EQUAL(owner_set.size(), 0);
-         BOOST_CHECK(*active_set.begin() == account_id_type(1));
+         BOOST_CHECK(*active_set.begin() == moneyman.get_id());
 
          active_set.clear();
          op.proposed_ops.front().get_required_auth(active_set, owner_set);
@@ -338,7 +339,7 @@ BOOST_AUTO_TEST_CASE( proposed_single_account )
 BOOST_AUTO_TEST_CASE( genesis_authority )
 { try {
    fc::ecc::private_key nathan_key = fc::ecc::private_key::generate();
-   fc::ecc::private_key genesis_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("genesis")));
+   fc::ecc::private_key genesis_key = delegate_priv_key;
    const auto& nathan_key_obj = register_key(nathan_key.get_public_key());
    key_id_type nathan_key_id = nathan_key_obj.get_id();
    const account_object nathan = create_account("nathan", nathan_key_obj.id);
@@ -391,20 +392,29 @@ BOOST_AUTO_TEST_CASE( genesis_authority )
    trx.operations.clear();
    trx.signatures.clear();
    proposal_update_operation uop;
-   uop.fee_paying_account = account_id_type(1);
+   uop.fee_paying_account = GRAPHENE_TEMP_ACCOUNT;
    uop.proposal = prop.id;
-   uop.key_approvals_to_add.emplace();
+   uop.key_approvals_to_add.emplace(1);
+   uop.key_approvals_to_add.emplace(2);
+   uop.key_approvals_to_add.emplace(3);
+   uop.key_approvals_to_add.emplace(4);
+   uop.key_approvals_to_add.emplace(5);
+   uop.key_approvals_to_add.emplace(6);
    trx.operations.push_back(uop);
-   trx.sign(key_id_type(), genesis_key);
-   PUSH_TX( db, trx );
+   trx.sign(key_id_type(1), genesis_key);
+   trx.signatures[key_id_type(2)] = trx.signatures[key_id_type(1)];
+   trx.signatures[key_id_type(3)] = trx.signatures[key_id_type(1)];
+   trx.signatures[key_id_type(4)] = trx.signatures[key_id_type(1)];
+   trx.signatures[key_id_type(5)] = trx.signatures[key_id_type(1)];
+   trx.signatures[key_id_type(6)] = trx.signatures[key_id_type(1)];
+   db.push_transaction(trx);
    BOOST_CHECK_EQUAL(get_balance(nathan, asset_id_type()(db)), 0);
    BOOST_CHECK(db.get<proposal_object>(prop.id).is_authorized_to_execute(&db));
 
    generate_blocks(*prop.review_period_time);
-   uop.key_approvals_to_add.clear();
-   uop.active_approvals_to_add.insert(account_id_type(1));
+   uop.key_approvals_to_add = {key_id_type(7)};
    trx.operations.back() = uop;
-   trx.sign(key_id_type(), genesis_key);
+   trx.sign(key_id_type(7), genesis_key);
    // Should throw because the transaction is now in review.
    BOOST_CHECK_THROW(PUSH_TX( db, trx ), fc::exception);
 
@@ -415,7 +425,7 @@ BOOST_AUTO_TEST_CASE( genesis_authority )
 BOOST_FIXTURE_TEST_CASE( fired_delegates, database_fixture )
 { try {
    generate_block();
-   fc::ecc::private_key genesis_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("genesis")));
+   fc::ecc::private_key genesis_key = delegate_priv_key;
    fc::ecc::private_key delegate_key = fc::ecc::private_key::generate();
    auto delegate_key_object = register_key(delegate_key.get_public_key());
 
@@ -440,7 +450,7 @@ BOOST_FIXTURE_TEST_CASE( fired_delegates, database_fixture )
 
    //A proposal is created to give nathan lots more money.
    proposal_create_operation pop = proposal_create_operation::genesis_proposal(db);
-   pop.fee_paying_account = account_id_type(1);
+   pop.fee_paying_account = GRAPHENE_TEMP_ACCOUNT;
    pop.expiration_time = db.head_block_time() + *pop.review_period_seconds * 3;
    pop.proposed_ops.emplace_back(transfer_operation({asset(),account_id_type(), nathan->id, asset(100000)}));
    trx.operations.push_back(pop);
@@ -451,10 +461,21 @@ BOOST_FIXTURE_TEST_CASE( fired_delegates, database_fixture )
 
    //Genesis key approves of the proposal.
    proposal_update_operation uop;
-   uop.fee_paying_account = account_id_type(1);
+   uop.fee_paying_account = GRAPHENE_TEMP_ACCOUNT;
    uop.proposal = prop.id;
-   uop.key_approvals_to_add.emplace();
+   uop.key_approvals_to_add.emplace(1);
+   uop.key_approvals_to_add.emplace(2);
+   uop.key_approvals_to_add.emplace(3);
+   uop.key_approvals_to_add.emplace(4);
+   uop.key_approvals_to_add.emplace(5);
+   uop.key_approvals_to_add.emplace(6);
    trx.operations.back() = uop;
+   trx.sign(key_id_type(1), genesis_key);
+   trx.signatures[key_id_type(2)] = trx.signatures[key_id_type(1)];
+   trx.signatures[key_id_type(3)] = trx.signatures[key_id_type(1)];
+   trx.signatures[key_id_type(4)] = trx.signatures[key_id_type(1)];
+   trx.signatures[key_id_type(5)] = trx.signatures[key_id_type(1)];
+   trx.signatures[key_id_type(6)] = trx.signatures[key_id_type(1)];
    trx.sign(key_id_type(), genesis_key);
    PUSH_TX( db, trx );
    BOOST_CHECK(prop.is_authorized_to_execute(&db));
@@ -817,7 +838,7 @@ BOOST_FIXTURE_TEST_CASE( max_authority_membership, database_fixture )
       transaction tx;
       processed_transaction ptx;
 
-      private_key_type genesis_key = generate_private_key("genesis");
+      private_key_type genesis_key = delegate_priv_key;
       // Sam is the creator of accounts
       private_key_type sam_key = generate_private_key("sam");
 
@@ -908,7 +929,7 @@ BOOST_FIXTURE_TEST_CASE( bogus_signature, database_fixture )
 {
    try
    {
-      private_key_type genesis_key = generate_private_key("genesis");
+      private_key_type genesis_key = delegate_priv_key;
       // Sam is the creator of accounts
       private_key_type alice_key = generate_private_key("alice");
       private_key_type bob_key = generate_private_key("bob");
@@ -992,8 +1013,10 @@ BOOST_FIXTURE_TEST_CASE( voting_account, database_fixture )
    delegate_id_type nathan_delegate = create_delegate(nathan_id(db)).id;
    delegate_id_type vikram_delegate = create_delegate(vikram_id(db)).id;
 
+   wdump((db.get_balance(account_id_type(), asset_id_type())));
    generate_block();
 
+   wdump((db.get_balance(account_id_type(), asset_id_type())));
    transfer(account_id_type(), nathan_id, asset(1000000));
    transfer(account_id_type(), vikram_id, asset(100));
 

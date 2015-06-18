@@ -27,7 +27,8 @@ namespace graphene { namespace chain {
    {
       if( (!_is_proposed_trx) && (_db->get_node_properties().skip_flags & database::skip_authority_check) )
          return true;
-      if( approved_by.find(make_pair(account.id, auth_class)) != approved_by.end() )
+      if( account.get_id() == GRAPHENE_TEMP_ACCOUNT ||
+          approved_by.find(make_pair(account.id, auth_class)) != approved_by.end() )
          return true;
 
       FC_ASSERT( account.id.instance() != 0 || _is_proposed_trx );

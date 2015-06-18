@@ -41,11 +41,15 @@ namespace graphene { namespace chain {
 
    struct genesis_state_type {
        struct allocation_target_type {
-           allocation_target_type(const string& name = string(), const address& addr = address(), share_type weight = share_type())
-               : name(name), addr(addr), weight(weight){}
+           allocation_target_type(const string& name = string(),
+                                  const address& addr = address(),
+                                  share_type weight = share_type(),
+                                  bool is_lifetime_member = false)
+               : name(name), addr(addr), weight(weight),is_lifetime_member(is_lifetime_member){}
            string name;
            address addr;
            share_type weight;
+           bool is_lifetime_member;
        };
        struct initial_witness_type {
            /// Must correspond to one of the allocation targets.

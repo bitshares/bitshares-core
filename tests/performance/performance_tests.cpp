@@ -35,7 +35,7 @@ BOOST_AUTO_TEST_CASE( transfer_benchmark )
 {
    fc::ecc::private_key nathan_key = fc::ecc::private_key::generate();
    const key_object& key = register_key(nathan_key.get_public_key());
-   const auto& genesis = account_id_type()(db); //get_account( "genesis" );
+   const auto& genesis = account_id_type()(db);
    auto start = fc::time_point::now();
    for( uint32_t i = 0; i < 1000*1000; ++i )
    {

@@ -292,12 +292,12 @@ class database;
          hashed_unique< tag<by_id>, member< object, object_id_type, &object::id > >,
          ordered_non_unique< tag<by_name>, member<account_object, string, &account_object::name> >
       >
-   > account_object_multi_index_type;
+   > account_multi_index_type;
 
    /**
     * @ingroup object_index
     */
-   typedef generic_index<account_object, account_object_multi_index_type> account_index;
+   typedef generic_index<account_object, account_multi_index_type> account_index;
 
 }}
 

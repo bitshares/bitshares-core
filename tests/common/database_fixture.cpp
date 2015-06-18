@@ -50,10 +50,21 @@ database_fixture::database_fixture()
    boost::program_options::variables_map options;
 
    // app.initialize();
-   ahplugin->plugin_set_app( &app );
-   ahplugin->plugin_initialize( options );
+   ahplugin->plugin_set_app(&app);
+   ahplugin->plugin_initialize(options);
 
-   db.init_genesis();
+   secret_hash_type::encoder enc;
+   fc::raw::pack(enc, delegate_priv_key);
+   fc::raw::pack(enc, secret_hash_type());
+   auto secret = secret_hash_type::hash(enc.result());
+   for( int i = 0; i < 10; ++i )
+   {
+      auto name = "init"+fc::to_string(i);
+      genesis_state.allocation_targets.emplace_back(name, delegate_priv_key.get_public_key(), 0, true);
+      genesis_state.initial_committee.push_back({name});
+      genesis_state.initial_witnesses.push_back({name, delegate_priv_key.get_public_key(), secret});
+   }
+   db.init_genesis(genesis_state);
    ahplugin->plugin_startup();
 
    generate_block();
@@ -81,8 +92,8 @@ database_fixture::~database_fixture()
 
 fc::ecc::private_key database_fixture::generate_private_key(string seed)
 {
-   static const fc::ecc::private_key genesis = fc::ecc::private_key::regenerate(fc::sha256::hash(string("genesis")));
-   if( seed == "genesis" )
+   static const fc::ecc::private_key genesis = fc::ecc::private_key::regenerate(fc::sha256::hash(string("null_key")));
+   if( seed == "null_key" )
       return genesis;
    return fc::ecc::private_key::regenerate(fc::sha256::hash(seed));
 }
@@ -168,7 +179,7 @@ void database_fixture::verify_account_history_plugin_index( )const
       return;
 
    const std::shared_ptr<graphene::account_history::account_history_plugin> pin =
-      app.get_plugin<graphene::account_history::account_history_plugin>( "account_history" );
+      app.get_plugin<graphene::account_history::account_history_plugin>("account_history");
    if( pin->tracked_accounts().size() == 0 )
    {
       vector< pair< account_id_type, address > > tuples_from_db;
@@ -247,7 +258,7 @@ void database_fixture::open_database()
 {
    if( !data_dir ) {
       data_dir = fc::temp_directory();
-      db.open(data_dir->path());
+      db.open(data_dir->path(), genesis_state);
    }
 }
 
@@ -274,7 +285,7 @@ void database_fixture::generate_blocks(fc::time_point_sec timestamp, bool miss_i
       generate_block();
       auto slots_to_miss = db.get_slot_at_time(timestamp) - 1;
       if( slots_to_miss <= 0 ) return;
-      generate_block(~0, generate_private_key("genesis"), slots_to_miss);
+      generate_block(~0, delegate_priv_key, slots_to_miss);
       return;
    }
    while( db.head_block_time() < timestamp )

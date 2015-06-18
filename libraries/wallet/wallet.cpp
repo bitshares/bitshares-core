@@ -1748,13 +1748,13 @@ signed_transaction wallet_api::short_sell_asset(string seller_name, string amoun
 }
 } }
 
-void fc::to_variant(const account_object_multi_index_type& accts, fc::variant& vo)
+void fc::to_variant(const account_multi_index_type& accts, fc::variant& vo)
 {
    vo = vector<account_object>(accts.begin(), accts.end());
 }
 
-void fc::from_variant(const fc::variant& var, account_object_multi_index_type& vo)
+void fc::from_variant(const fc::variant& var, account_multi_index_type& vo)
 {
    const vector<account_object>& v = var.as<vector<account_object>>();
-   vo = account_object_multi_index_type(v.begin(), v.end());
+   vo = account_multi_index_type(v.begin(), v.end());
 }

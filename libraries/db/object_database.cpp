@@ -84,7 +84,7 @@ void object_database::wipe(const fc::path& data_dir)
    assert(!fc::exists(data_dir / "object_database"));
 }
 
-void object_database::open( const fc::path& data_dir )
+void object_database::open(const fc::path& data_dir)
 { try {
    ilog("Open object_database in ${d}", ("d", data_dir));
    _data_dir = data_dir;

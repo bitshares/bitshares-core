@@ -72,7 +72,7 @@ BOOST_AUTO_TEST_CASE( create_account_test )
       op.owner = auth_bak;
 
       trx.operations.back() = op;
-      trx.sign( key_id_type(), fc::ecc::private_key::regenerate(fc::sha256::hash(string("genesis"))) );
+      trx.sign(key_id_type(), delegate_priv_key);
       trx.validate();
       PUSH_TX( db, trx, ~0 );
 
@@ -122,7 +122,7 @@ BOOST_AUTO_TEST_CASE( child_account )
       op.owner = authority(1, child_key.get_id(), 1);
       op.active = authority(1, child_key.get_id(), 1);
       trx.operations.emplace_back(op);
-      sign(trx, key_id_type(), fc::ecc::private_key::regenerate(fc::sha256::hash(string("genesis"))));
+      trx.sign({}, delegate_priv_key);
 
       BOOST_REQUIRE_THROW(PUSH_TX( db, trx ), fc::exception);
       sign(trx, nathan_key.id,nathan_private_key);
@@ -130,9 +130,9 @@ BOOST_AUTO_TEST_CASE( child_account )
       trx.signatures.clear();
       op.owner = authority(1, account_id_type(nathan.id), 1);
       trx.operations = {op};
-      sign(trx, key_id_type(), fc::ecc::private_key::regenerate(fc::sha256::hash(string("genesis"))));
-      sign(trx, nathan_key.id, nathan_private_key);
-      PUSH_TX( db, trx );
+      trx.sign({}, delegate_priv_key);
+      trx.sign(nathan_key.id, nathan_private_key);
+      db.push_transaction(trx);
 
       BOOST_CHECK( get_account("nathan/child").active.auths == op.active.auths );
    } catch (fc::exception& e) {
@@ -308,10 +308,11 @@ BOOST_AUTO_TEST_CASE( update_mia )
       trx.operations.back() = op;
       PUSH_TX( db, trx, ~0 );
 
+      idump((bit_usd));
       {
          asset_publish_feed_operation pop;
          pop.asset_id = bit_usd.get_id();
-         pop.publisher = account_id_type(1);
+         pop.publisher = get_account("init0").get_id();
          price_feed feed;
          feed.call_limit = price(bit_usd.amount(5), bit_usd.amount(5));
          feed.short_limit = feed.call_limit;
@@ -1881,8 +1882,8 @@ BOOST_AUTO_TEST_CASE( witness_withdraw_pay_test )
    trx.operations.push_back(uop);
    trx.visit(operation_set_fee(db.current_fee_schedule()));
    trx.validate();
-   trx.sign(key_id_type(),generate_private_key("genesis"));
-   PUSH_TX( db, trx );
+   trx.sign(key_id_type(),delegate_priv_key);
+   db.push_transaction(trx);
    trx.clear();
    BOOST_CHECK_EQUAL(get_balance(*nathan, *core), 8950000000);
 
@@ -1949,6 +1950,7 @@ BOOST_AUTO_TEST_CASE( witness_withdraw_pay_test )
    trx.set_expiration(db.head_block_time() + GRAPHENE_DEFAULT_MAX_TIME_UNTIL_EXPIRATION);
    // last one was unpaid, so pull out a paid one for checks
    witness = paid_witness;
+   wdump((*witness));
    // Withdraw the witness's pay
    enable_fees(1);
    witness_withdraw_pay_operation wop;
@@ -1960,8 +1962,7 @@ BOOST_AUTO_TEST_CASE( witness_withdraw_pay_test )
    trx.operations.back() = wop;
    trx.visit(operation_set_fee(db.current_fee_schedule()));
    trx.validate();
-   trx.sign(key_id_type(),generate_private_key("genesis"));
-   PUSH_TX( db, trx );
+   db.push_transaction(trx, database::skip_authority_check);
    trx.clear();
 
    BOOST_CHECK_EQUAL(get_balance(witness->witness_account(db), *core), witness_ppb - 1/*fee*/);
