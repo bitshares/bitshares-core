@@ -515,6 +515,7 @@ processed_transaction database::_apply_transaction( const signed_transaction& tr
 
    eval_state.operation_results.reserve( trx.operations.size() );
 
+   //Finally process the operations
    processed_transaction ptrx(trx);
    _current_op_in_trx = 0;
    for( const auto& op : ptrx.operations )
@@ -523,6 +524,11 @@ processed_transaction database::_apply_transaction( const signed_transaction& tr
       ++_current_op_in_trx;
    }
    ptrx.operation_results = std::move( eval_state.operation_results );
+
+   //Make sure the temp account has no non-zero balances
+   const auto& index = get_index_type<account_balance_index>().indices().get<by_account>();
+   auto range = index.equal_range(GRAPHENE_TEMP_ACCOUNT);
+   std::for_each(range.first, range.second, [](const account_balance_object& b) { FC_ASSERT(b.balance == 0); });
 
    return ptrx;
 } FC_CAPTURE_AND_RETHROW( (trx) ) }

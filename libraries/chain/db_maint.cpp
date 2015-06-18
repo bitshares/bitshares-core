@@ -100,6 +100,34 @@ void database::update_active_witnesses()
    auto wits = sort_votable_objects<witness_object>(std::max(witness_count*2+1, GRAPHENE_MIN_WITNESS_COUNT));
    const global_property_object& gpo = get_global_properties();
 
+   // Update witness authority
+   modify( get(GRAPHENE_WITNESS_ACCOUNT), [&]( account_object& a ) {
+      uint64_t total_votes = 0;
+      map<account_id_type, uint64_t> weights;
+      a.active.weight_threshold = 0;
+      a.active.auths.clear();
+
+      for( const witness_object& wit : wits )
+      {
+         weights.emplace(wit.witness_account, _vote_tally_buffer[wit.vote_id]);
+         total_votes += _vote_tally_buffer[wit.vote_id];
+      }
+
+      // total_votes is 64 bits. Subtract the number of leading low bits from 64 to get the number of useful bits,
+      // then I want to keep the most significant 16 bits of what's left.
+      int8_t bits_to_drop = std::max(int(boost::multiprecision::detail::find_msb(total_votes)) - 15, 0);
+      for( const auto& weight : weights )
+      {
+         // Ensure that everyone has at least one vote. Zero weights aren't allowed.
+         uint16_t votes = std::max((weight.second >> bits_to_drop), uint64_t(1) );
+         a.active.auths[weight.first] += votes;
+         a.active.weight_threshold += votes;
+      }
+
+      a.active.weight_threshold /= 2;
+      a.active.weight_threshold += 1;
+   });
+
    modify( gpo, [&]( global_property_object& gp ){
       gp.active_witnesses.clear();
       gp.active_witnesses.reserve( wits.size() );
@@ -139,11 +167,12 @@ void database::update_active_delegates()
 
    // Update genesis authorities
    if( !delegates.empty() )
-      modify( get(account_id_type()), [&]( account_object& a ) {
+   {
+      modify( get(GRAPHENE_COMMITTEE_ACCOUNT), [&]( account_object& a ) {
          uint64_t total_votes = 0;
          map<account_id_type, uint64_t> weights;
-         a.owner.weight_threshold = 0;
-         a.owner.auths.clear();
+         a.active.weight_threshold = 0;
+         a.active.auths.clear();
 
          for( const delegate_object& del : delegates )
          {
@@ -158,14 +187,17 @@ void database::update_active_delegates()
          {
             // Ensure that everyone has at least one vote. Zero weights aren't allowed.
             uint16_t votes = std::max((weight.second >> bits_to_drop), uint64_t(1) );
-            a.owner.auths[weight.first] += votes;
-            a.owner.weight_threshold += votes;
+            a.active.auths[weight.first] += votes;
+            a.active.weight_threshold += votes;
          }
 
-         a.owner.weight_threshold /= 2;
-         a.owner.weight_threshold += 1;
-         a.active = a.owner;
+         a.active.weight_threshold /= 2;
+         a.active.weight_threshold += 1;
       });
+      modify( get(GRAPHENE_RELAXED_COMMITTEE_ACCOUNT), [&](account_object& a) {
+         a.active = get(GRAPHENE_COMMITTEE_ACCOUNT).active;
+      });
+   }
    modify( get_global_properties(), [&]( global_property_object& gp ) {
       gp.active_delegates.clear();
       std::transform(delegates.begin(), delegates.end(),
