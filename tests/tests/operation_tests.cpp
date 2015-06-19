@@ -43,7 +43,7 @@ BOOST_AUTO_TEST_CASE( feed_limit_logic_test )
 {
    try {
       asset usd(100,1);
-      asset core(200,1);
+      asset core(100,0);
       price_feed feed; 
       feed.settlement_price = usd / core;
 
