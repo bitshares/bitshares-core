@@ -40,7 +40,6 @@ BOOST_AUTO_TEST_CASE( two_node_network )
       fc::temp_directory app_dir;
       fc::temp_directory app2_dir;
       fc::temp_file genesis_json;
-      fc::json::save_to_file(genesis_state_type(), genesis_json.path());
 
       fc::time_point_sec now( GRAPHENE_GENESIS_TIMESTAMP );
 
@@ -48,7 +47,6 @@ BOOST_AUTO_TEST_CASE( two_node_network )
       app1.register_plugin<graphene::account_history::account_history_plugin>();
       bpo::variables_map cfg;
       cfg.emplace("p2p-endpoint", bpo::variable_value(string("127.0.0.1:3939"), false));
-      cfg.emplace("genesis-json", bpo::variable_value(boost::filesystem::path(genesis_json.path()), false));
       app1.initialize(app_dir.path(), cfg);
 
       graphene::app::application app2;
@@ -63,19 +61,20 @@ BOOST_AUTO_TEST_CASE( two_node_network )
       app2.startup();
       fc::usleep(fc::milliseconds(500));
 
-      BOOST_CHECK_EQUAL(app1.p2p_node()->get_connection_count(), 1);
+      BOOST_REQUIRE_EQUAL(app1.p2p_node()->get_connection_count(), 1);
       BOOST_CHECK_EQUAL(std::string(app1.p2p_node()->get_connected_peers().front().host.get_address()), "127.0.0.1");
       ilog("Connected!");
 
       fc::ecc::private_key nathan_key = fc::ecc::private_key::generate();
-      fc::ecc::private_key genesis_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("null_key")));
+      fc::ecc::private_key genesis_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("nathan")));
       graphene::chain::signed_transaction trx;
       trx.set_expiration(now + fc::seconds(30));
       std::shared_ptr<chain::database> db2 = app2.chain_database();
 
-      trx.operations.push_back(key_create_operation({asset(), account_id_type(1), public_key_type(nathan_key.get_public_key())}));
+      trx.operations.push_back(key_create_operation({asset(),
+                                                     GRAPHENE_TEMP_ACCOUNT,
+                                                     public_key_type(nathan_key.get_public_key())}));
       trx.validate();
-      trx.sign(key_id_type(0), genesis_key);
       processed_transaction ptrx = app1.chain_database()->push_transaction(trx);
       app1.p2p_node()->broadcast(graphene::net::trx_message(trx));
       key_id_type nathan_key_id = ptrx.operation_results.front().get<object_id_type>();
@@ -85,8 +84,10 @@ BOOST_AUTO_TEST_CASE( two_node_network )
       ilog("Pushed transaction");
 
       now += GRAPHENE_DEFAULT_BLOCK_INTERVAL;
-      app2.p2p_node()->broadcast(graphene::net::block_message(db2->generate_block(
-         now, db2->get_scheduled_witness( 1 ).first, genesis_key, database::skip_nothing )));
+      app2.p2p_node()->broadcast(graphene::net::block_message(db2->generate_block(now,
+                                                                                  db2->get_scheduled_witness(1).first,
+                                                                                  genesis_key,
+                                                                                  database::skip_nothing)));
 
       fc::usleep(fc::milliseconds(500));
       BOOST_CHECK_EQUAL(app1.p2p_node()->get_connection_count(), 1);
