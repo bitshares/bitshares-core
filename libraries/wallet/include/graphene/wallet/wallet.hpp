@@ -208,7 +208,7 @@ class wallet_api
        *  given amount of collateral 
        */
       signed_transaction borrow_asset(string seller_name, string amount_to_sell, string asset_symbol,
-                                          string amount_of_collateral, bool broadcast = false);
+                                      string amount_of_collateral, bool broadcast = false);
 
       signed_transaction create_asset(string issuer,
                                       string symbol,
@@ -218,8 +218,45 @@ class wallet_api
                                       bool broadcast = false);
 
       signed_transaction issue_asset(string to_account, string amount,
+                                     string symbol,
+                                     string memo,
+                                     bool broadcast = false);
+
+      signed_transaction update_asset(string symbol,
+                                      optional<string> new_issuer,
+                                      asset_object::asset_options new_options,
+                                      bool broadcast = false);
+
+      signed_transaction update_bitasset(string symbol,
+                                         asset_object::bitasset_options new_options,
+                                         bool broadcast = false);
+
+      signed_transaction update_asset_feed_producers(string symbol,
+                                                     flat_set<string> new_feed_producers,
+                                                     bool broadcast = false);
+      
+      signed_transaction publish_asset_feed(string publishing_account,
+                                            string symbol,
+                                            price_feed feed,
+                                            bool broadcast = false);
+
+      signed_transaction fund_asset_fee_pool(string from,
+                                             string symbol,
+                                             string amount,
+                                             bool broadcast = false);
+
+      signed_transaction burn_asset(string from,
+                                    string amount,
+                                    string symbol,
+                                    bool broadcast = false);
+
+      signed_transaction global_settle_asset(string symbol,
+                                             price settle_price,
+                                             bool broadcast = false);
+
+      signed_transaction settle_asset(string account_to_settle,
+                                      string amount_to_settle,
                                       string symbol,
-                                      string memo,
                                       bool broadcast = false);
 
       signed_transaction sign_transaction(signed_transaction tx, bool broadcast = false);
@@ -278,9 +315,17 @@ FC_API( graphene::wallet::wallet_api,
         (borrow_asset)
         (transfer)
         (create_asset)
+        (update_asset)
+        (update_bitasset)
+        (update_asset_feed_producers)
+        (publish_asset_feed)
         (issue_asset)
         (get_asset)
         (get_bitasset_data)
+        (fund_asset_fee_pool)
+        (burn_asset)
+        (global_settle_asset)
+        (settle_asset)
         (get_account)
         (get_account_id)
         (get_block)
