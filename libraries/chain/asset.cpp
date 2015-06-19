@@ -130,7 +130,7 @@ namespace graphene { namespace chain {
       {
          asset collateral = settlement_price.quote;
          fc::uint128 tmp( collateral.amount.value );
-         tmp *= maximum_short_squeeze_ratio - 1000;
+         tmp *= maximum_short_squeeze_ratio;
          tmp /= 1000;
          FC_ASSERT( tmp <= GRAPHENE_MAX_SHARE_SUPPLY );
          collateral.amount = tmp.to_uint64();
@@ -140,7 +140,7 @@ namespace graphene { namespace chain {
       {
          asset collateral = settlement_price.quote;
          fc::uint128 tmp( collateral.amount.value );
-         tmp *= maintenance_collateral_ratio - 1000;
+         tmp *= maintenance_collateral_ratio;
          tmp /= 1000;
          FC_ASSERT( tmp <= GRAPHENE_MAX_SHARE_SUPPLY );
          collateral.amount = tmp.to_uint64();

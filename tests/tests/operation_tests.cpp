@@ -145,6 +145,10 @@ BOOST_AUTO_TEST_CASE( call_order_update_test )
  *  1. highest bid is lower than the call price of an order
  *  2. the asset is not a prediction market 
  *  3. there is a valid price feed
+ *
+ *  This test creates two scenarios: 
+ *  a) when the bids are above the short squeese limit (should execute)
+ *  b) when the bids are below the short squeeze limit (should not execute)
  */
 BOOST_AUTO_TEST_CASE( margin_call_limit_test )
 { try {
@@ -168,111 +172,34 @@ BOOST_AUTO_TEST_CASE( margin_call_limit_test )
       publish_feed( bitusd, feedproducer, current_feed );
 
       // start out with 2:1 collateral 
-      borrow( borrower, bitusd.amount(5000), asset(10000), default_call_price );
-      borrow( borrower2, bitusd.amount(5000), asset(30000), default_call_price );
-      elog( "selling USD at 1:1, should be ok because we have 2:1 collateral" );
-      create_sell_order( borrower, bitusd.amount(5000), core.amount(5000) );
-      elog( "buying USD at 1:1" );
-      create_sell_order( buyer, core.amount(5000), bitusd.amount(5000) );
+      borrow( borrower, bitusd.amount(1000), asset(2000), default_call_price );
+      borrow( borrower2, bitusd.amount(1000), asset(4000), default_call_price );
 
-      BOOST_REQUIRE_EQUAL( get_balance( borrower, bitusd ), 0 );
-      BOOST_REQUIRE_EQUAL( get_balance( buyer, bitusd ), 4950 ); // 1% market fee
-      BOOST_REQUIRE_EQUAL( get_balance( borrower, core ), init_balance - 10000 + 5000 );
-      BOOST_REQUIRE_EQUAL( get_balance( buyer, core ), init_balance  - 5000 );
+      BOOST_REQUIRE_EQUAL( get_balance( borrower, bitusd ), 1000 );
+      BOOST_REQUIRE_EQUAL( get_balance( borrower2, bitusd ), 1000 );
+      BOOST_REQUIRE_EQUAL( get_balance( borrower , core ), init_balance - 2000 );
+      BOOST_REQUIRE_EQUAL( get_balance( borrower2, core ), init_balance - 4000 );
 
-      ilog( "print call orders..." );
-      print_call_orders();
-      ilog( "print market..." );
-      print_market( "", "" );
+      // this should trigger margin call that is below the call limit, but above the
+      // protection threshold.
+      BOOST_TEST_MESSAGE( "Creating a margin call that is NOT protected by the max short squeeze price" );
+      auto order = create_sell_order( borrower2, bitusd.amount(1000), core.amount(1400) );
+      BOOST_REQUIRE( order == nullptr );
 
-      // sell the BitUSD for 50% more which represents a 33% fall in the value of the collateral
-      const auto order  = create_sell_order( borrower2, bitusd.amount(1000), core.amount(1400) );
-      const auto order2 = create_sell_order( borrower2, bitusd.amount(1000), core.amount(1600) );
-      const auto order3 = create_sell_order( borrower2, bitusd.amount(1000), core.amount(1700) );
-      const auto order4 = create_sell_order( borrower2, bitusd.amount(1000), core.amount(1800) );
-      const auto order5 = create_sell_order( borrower2, bitusd.amount(950),  core.amount(1850) );
+      BOOST_REQUIRE_EQUAL( get_balance( borrower2, core ), init_balance - 4000 + 1400 );
+      BOOST_REQUIRE_EQUAL( get_balance( borrower2, bitusd ), 0 );
 
-      ilog( "print call orders..." );
-      print_call_orders();
-      ilog( "print market..." );
-      print_market( "", "" );
-
-      FC_ASSERT( order, "order should not match because sell price is below short squeeze protection" ); 
-      wdump((bitusd.bitasset_data(db).current_feed.max_short_squeeze_price().to_real()));
-      wdump((bitusd.bitasset_data(db).current_feed.maintenance_price().to_real()));
-      wdump(((order->sell_price).to_real()));
-
-      // update the feed to indicate a 33% drop in value
-      BOOST_TEST_MESSAGE( "Update feed to indicate CORE fell in value by 33%" );
-      current_feed.settlement_price = bitusd.amount( 100 ) / core.amount(200);
-      publish_feed( bitusd, feedproducer, current_feed );
+      BOOST_REQUIRE_EQUAL( get_balance( borrower, core ), init_balance - 2000 + 600 );
+      BOOST_REQUIRE_EQUAL( get_balance( borrower, bitusd ), 1000 );
 
 
-      /*
-      const asset_object& bitusd      = create_bitasset( "BITUSD" );
-      const asset_object& core         = get_asset( GRAPHENE_SYMBOL );
+      BOOST_TEST_MESSAGE( "Creating a margin call that is protected by the max short squeeze price" );
+      borrow( borrower, bitusd.amount(1000), asset(2000), default_call_price );
+      borrow( borrower2, bitusd.amount(1000), asset(4000), default_call_price );
 
-      db.modify( bitusd.bitasset_data(db), [&]( asset_bitasset_data_object& usd ){
-                 usd.current_feed.call_limit = core.amount(3) / bitusd.amount(1);
-                 });
-
-      const account_object& shorter1  = create_account( "shorter1" );
-      const account_object& shorter2  = create_account( "shorter2" );
-      const account_object& buyer1    = create_account( "buyer1" );
-      const account_object& buyer2    = create_account( "buyer2" );
-
-      transfer( genesis_account(db), shorter1, asset( 10000 ) );
-      transfer( genesis_account(db), shorter2, asset( 10000 ) );
-      transfer( genesis_account(db), buyer1, asset( 10000 ) );
-      transfer( genesis_account(db), buyer2, asset( 10000 ) );
-
-      BOOST_REQUIRE( create_sell_order( buyer1, asset(1000), bitusd.amount(1000) ) );
-      BOOST_REQUIRE( !create_short( shorter1, bitusd.amount(1000), asset(1000) )   );
-      BOOST_REQUIRE_EQUAL( get_balance(buyer1, bitusd), 990 ); // 1000 - 1% fee
-
-      const auto& call_index = db.get_index_type<call_order_index>().indices().get<by_account>();
-      const auto call_itr = call_index.find(boost::make_tuple(shorter1.id, bitusd.id));
-      BOOST_REQUIRE( call_itr != call_index.end() );
-      const call_order_object& call = *call_itr;
-      BOOST_CHECK(call.get_collateral() == core.amount(2000));
-      BOOST_CHECK(call.get_debt() == bitusd.amount(1000));
-      BOOST_CHECK(call.call_price == price(core.amount(1500), bitusd.amount(1000)));
-      BOOST_CHECK_EQUAL(get_balance(shorter1, core), 9000);
-
-      ilog( "=================================== START===================================\n\n");
-      // this should cause the highest bid to below the margin call threshold
-      // which means it should be filled by the cover
-      auto unmatched = create_sell_order( buyer1, bitusd.amount(495), core.amount(750) );
-      if( unmatched ) edump((*unmatched));
-      BOOST_CHECK( !unmatched );
-      BOOST_CHECK(call.get_debt() == bitusd.amount(505));
-      BOOST_CHECK(call.get_collateral() == core.amount(1250));
-
-      auto below_call_price = create_sell_order(buyer1, bitusd.amount(200), core.amount(1));
-      BOOST_REQUIRE(below_call_price);
-      auto above_call_price = create_sell_order(buyer1, bitusd.amount(200), core.amount(303));
-      BOOST_REQUIRE(above_call_price);
-      auto above_id = above_call_price->id;
-
-      cancel_limit_order(*below_call_price);
-      BOOST_CHECK_THROW(db.get_object(above_id), fc::exception);
-      BOOST_CHECK(call.get_debt() == bitusd.amount(305));
-      BOOST_CHECK(call.get_collateral() == core.amount(947));
-
-      below_call_price = create_sell_order(buyer1, bitusd.amount(200), core.amount(1));
-      BOOST_REQUIRE(below_call_price);
-      auto below_id = below_call_price->id;
-      above_call_price = create_sell_order(buyer1, bitusd.amount(95), core.amount(144));
-      BOOST_REQUIRE(above_call_price);
-      above_id = above_call_price->id;
-      auto match_below_call = create_sell_order(buyer2, core.amount(1), bitusd.amount(200));
-      BOOST_CHECK(!match_below_call);
-
-      BOOST_CHECK_THROW(db.get_object(above_id), fc::exception);
-      BOOST_CHECK_THROW(db.get_object(below_id), fc::exception);
-      BOOST_CHECK(call.get_debt() == bitusd.amount(210));
-      BOOST_CHECK(call.get_collateral() == core.amount(803));
-      */
+      // this should trigger margin call without protection from the price feed.
+      order = create_sell_order( borrower2, bitusd.amount(1000), core.amount(1800) );
+      BOOST_REQUIRE( order != nullptr );
    } catch( const fc::exception& e) {
       edump((e.to_detail_string()));
       throw;

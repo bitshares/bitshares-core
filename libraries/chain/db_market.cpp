@@ -290,7 +290,7 @@ bool database::fill_order( const limit_order_object& order, const asset& pays, c
 
 bool database::fill_order( const call_order_object& order, const asset& pays, const asset& receives )
 { try {
-   idump((pays)(receives)(order));
+   //idump((pays)(receives)(order));
    assert( order.get_debt().asset_id == receives.asset_id );
    assert( order.get_collateral().asset_id == pays.asset_id );
    assert( order.get_collateral() >= pays );
@@ -311,7 +311,7 @@ bool database::fill_order( const call_order_object& order, const asset& pays, co
    const asset_dynamic_data_object& mia_ddo = mia.dynamic_asset_data_id(*this);
 
    modify( mia_ddo, [&]( asset_dynamic_data_object& ao ){
-       idump((receives));
+       //idump((receives));
         ao.current_supply -= receives.amount;
       });
 
@@ -391,8 +391,11 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
     // looking for limit orders selling the most USD for the least CORE
     auto max_price = price::max( mia.id, bitasset.options.short_backing_asset );
     // stop when limit orders are selling too little USD for too much CORE
-    //auto min_price = bitasset.current_feed.max_short_squeeze_price();
-    auto min_price = price::min( mia.id, bitasset.options.short_backing_asset );
+    auto min_price = bitasset.current_feed.max_short_squeeze_price();
+ //   edump((bitasset.current_feed));
+ //   edump((min_price.to_real())(min_price));
+    //auto min_price = price::min( mia.id, bitasset.options.short_backing_asset );
+/*
     idump((bitasset.current_feed.settlement_price)(bitasset.current_feed.settlement_price.to_real()));
     {
        for( const auto& order : limit_price_index )
@@ -406,6 +409,7 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
        wdump((max_price)(max_price.to_real()));
        wdump((min_price)(min_price.to_real()));
     }
+    */
 
     assert( max_price.base.asset_id == min_price.base.asset_id );
     // wlog( "from ${a} Debt/Col to ${b} Debt/Col ", ("a", max_price.to_real())("b",min_price.to_real()) );
@@ -413,21 +417,23 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
     auto limit_itr = limit_price_index.lower_bound( max_price );
     auto limit_end = limit_price_index.upper_bound( min_price ); 
 
+ /*
     if( limit_itr != limit_price_index.end() )
        wdump((*limit_itr)(limit_itr->sell_price.to_real()));
     if( limit_end != limit_price_index.end() )
        wdump((*limit_end)(limit_end->sell_price.to_real()));
+*/
 
     if( limit_itr == limit_end )
     {
-       wlog( "no orders available to fill margin calls" );
+//       wlog( "no orders available to fill margin calls" );
        return false;
     }
 
     auto call_itr = call_price_index.lower_bound( price::min( bitasset.options.short_backing_asset, mia.id ) );
     auto call_end = call_price_index.upper_bound( price::max( bitasset.options.short_backing_asset, mia.id ) );
 
-    bool filled_short_or_limit = false;
+    bool filled_limit = false;
 
     while( call_itr != call_end )
     {
@@ -440,16 +446,20 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
           match_price      = limit_itr->sell_price;
           usd_for_sale     = limit_itr->amount_for_sale();
        }
-       else return filled_short_or_limit;
+       else return filled_limit;
+//       wdump((match_price));
+//       edump((usd_for_sale));
 
        match_price.validate();
 
+//       wdump((match_price)(~call_itr->call_price) );
        if( match_price > ~call_itr->call_price )
        {
-          return filled_short_or_limit;
+          return filled_limit;
        }
 
        auto usd_to_buy   = call_itr->get_debt();
+//       edump((usd_to_buy));
 
        if( usd_to_buy * match_price > call_itr->get_collateral() )
        {
@@ -462,12 +472,13 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
        asset call_pays, call_receives, order_pays, order_receives;
        if( usd_to_buy >= usd_for_sale )
        {  // fill order
+          //ilog( "filling all of limit order" );
           call_receives   = usd_for_sale;
           order_receives  = usd_for_sale * match_price;
           call_pays       = order_receives;
           order_pays      = usd_for_sale;
 
-          filled_short_or_limit = true;
+          filled_limit = true;
           filled_call           = (usd_to_buy == usd_for_sale);
        }
        else // fill call
@@ -484,11 +495,11 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
        if( filled_call ) ++call_itr;
        fill_order( *old_call_itr, call_pays, call_receives );
 
-       auto old_limit_itr = !filled_call ? limit_itr++ : limit_itr;
+       auto old_limit_itr = filled_limit ? limit_itr++ : limit_itr;
        fill_order( *old_limit_itr, order_pays, order_receives );
     } // whlie call_itr != call_end
 
-    return filled_short_or_limit;
+    return filled_limit;
 } FC_CAPTURE_AND_RETHROW() }
 
 void database::pay_order( const account_object& receiver, const asset& receives, const asset& pays )
