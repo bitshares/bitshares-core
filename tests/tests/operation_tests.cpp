@@ -247,7 +247,6 @@ BOOST_AUTO_TEST_CASE( black_swan )
       auto order = create_sell_order( borrower2, bitusd.amount(1000), core.amount(3000) );
 
       FC_ASSERT( bitusd.bitasset_data(db).has_settlement() );
-      wdump(( bitusd.bitasset_data(db) ));
 
       force_settle( borrower, bitusd.amount(100) );
   

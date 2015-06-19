@@ -405,7 +405,7 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
        if( usd_to_buy * match_price > call_itr->get_collateral() )
        {
           FC_ASSERT( enable_black_swan );
-          elog( "black swan, we do not have enough collateral to cover at this price" );
+          //elog( "black swan, we do not have enough collateral to cover at this price" );
           globally_settle_asset( mia, call_itr->get_debt() / call_itr->get_collateral() );
           return true;
        }
