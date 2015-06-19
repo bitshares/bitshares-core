@@ -122,7 +122,9 @@ namespace graphene { namespace chain {
       { try {
          if( !settlement_price.is_null() )
             settlement_price.validate();
-         FC_ASSERT( maximum_short_squeeze_ratio >= 1000 );
+         FC_ASSERT( maximum_short_squeeze_ratio >= GRAPHENE_MIN_COLLATERAL_RATIO );
+         FC_ASSERT( maximum_short_squeeze_ratio <= GRAPHENE_MAX_COLLATERAL_RATIO );
+         FC_ASSERT( maintenance_collateral_ratio >= GRAPHENE_MIN_COLLATERAL_RATIO );
          FC_ASSERT( maintenance_collateral_ratio <= maximum_short_squeeze_ratio );
       } FC_CAPTURE_AND_RETHROW( (*this) ) }
 

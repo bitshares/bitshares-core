@@ -356,8 +356,8 @@ BOOST_AUTO_TEST_CASE( mia_feeds )
 
       op.publisher = dan_id;
       op.feed.settlement_price = ~price(asset(GRAPHENE_BLOCKCHAIN_PRECISION),bit_usd.amount(40));
-      op.feed.maximum_short_squeeze_ratio = 1000;
-      op.feed.maintenance_collateral_ratio = 1000;
+      op.feed.maximum_short_squeeze_ratio = 1001;
+      op.feed.maintenance_collateral_ratio = 1001;
       trx.operations.back() = op;
       PUSH_TX( db, trx, ~0 );
 

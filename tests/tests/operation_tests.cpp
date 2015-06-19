@@ -44,7 +44,7 @@ BOOST_AUTO_TEST_CASE( feed_limit_logic_test )
    try {
       asset usd(100,1);
       asset core(100,0);
-      price_feed feed; 
+      price_feed feed;
       feed.settlement_price = usd / core;
 
       FC_ASSERT( usd * feed.settlement_price < usd * feed.maintenance_price() );
@@ -56,7 +56,7 @@ BOOST_AUTO_TEST_CASE( feed_limit_logic_test )
    }
 }
 BOOST_AUTO_TEST_CASE( call_order_update_test )
-{ 
+{
    try {
       ACTORS((dan)(sam));
       const auto& bitusd = create_bitasset("BITUSD");
@@ -70,7 +70,7 @@ BOOST_AUTO_TEST_CASE( call_order_update_test )
 
       FC_ASSERT( bitusd.bitasset_data(db).current_feed.settlement_price == current_feed.settlement_price );
 
-      auto default_call_price = ~price::call_price( bitusd.amount(5000), asset(5000), 1750); 
+      auto default_call_price = ~price::call_price( bitusd.amount(5000), asset(5000), 1750);
 
       BOOST_TEST_MESSAGE( "attempting to borrow using 2x collateral at 1:1 price now that there is a valid order" );
       borrow( dan, bitusd.amount(5000), asset(10000), default_call_price );
@@ -94,7 +94,7 @@ BOOST_AUTO_TEST_CASE( call_order_update_test )
       BOOST_REQUIRE_EQUAL( get_balance( dan, bitusd ), 5000 );
       BOOST_REQUIRE_EQUAL( get_balance( dan, core ), 10000000 - 10000  );
 
-   
+
       // test just increasing collateral
       BOOST_TEST_MESSAGE( "increasing collateral" );
       borrow( dan, bitusd.amount(0), asset(10000), default_call_price );
@@ -123,11 +123,11 @@ BOOST_AUTO_TEST_CASE( call_order_update_test )
       cover( dan, bitusd.amount(0), asset(1000), default_call_price );
 
       BOOST_TEST_MESSAGE( "attempting change call price without changing debt/collateral ratio" );
-      default_call_price = ~price::call_price( bitusd.amount(100), asset(50), 1750); 
+      default_call_price = ~price::call_price( bitusd.amount(100), asset(50), 1750);
       cover( dan, bitusd.amount(0), asset(0), default_call_price );
 
       BOOST_TEST_MESSAGE( "attempting change call price to be below minimum for debt/collateral ratio" );
-      default_call_price = ~price::call_price( bitusd.amount(100), asset(500), 1750); 
+      default_call_price = ~price::call_price( bitusd.amount(100), asset(500), 1750);
       BOOST_REQUIRE_THROW( cover( dan, bitusd.amount(0), asset(0), default_call_price ), fc::exception );
 
    } catch (fc::exception& e) {
@@ -143,10 +143,10 @@ BOOST_AUTO_TEST_CASE( call_order_update_test )
  *  A margin call can happen in the following situation:
  *  0. there exists a bid above the mas short squeeze price
  *  1. highest bid is lower than the call price of an order
- *  2. the asset is not a prediction market 
+ *  2. the asset is not a prediction market
  *  3. there is a valid price feed
  *
- *  This test creates two scenarios: 
+ *  This test creates two scenarios:
  *  a) when the bids are above the short squeese limit (should execute)
  *  b) when the bids are below the short squeeze limit (should not execute)
  */
@@ -164,14 +164,14 @@ BOOST_AUTO_TEST_CASE( margin_call_limit_test )
       transfer(genesis_account, borrower2_id, asset(init_balance));
       update_feed_producers( bitusd, {feedproducer.id} );
 
-      price_feed current_feed; 
+      price_feed current_feed;
       current_feed.settlement_price = bitusd.amount( 100 ) / core.amount(100);
-      auto default_call_price = ~price::call_price( bitusd.amount(100), asset(100), 1750); 
+      auto default_call_price = ~price::call_price( bitusd.amount(100), asset(100), 1750);
 
-      // starting out with price 1:1 
+      // starting out with price 1:1
       publish_feed( bitusd, feedproducer, current_feed );
 
-      // start out with 2:1 collateral 
+      // start out with 2:1 collateral
       borrow( borrower, bitusd.amount(1000), asset(2000), default_call_price );
       borrow( borrower2, bitusd.amount(1000), asset(4000), default_call_price );
 
@@ -456,8 +456,7 @@ BOOST_AUTO_TEST_CASE( create_mia )
    }
 }
 
-BOOST_AUTO_TEST_CASE_EXPECTED_FAILURES( broken_update_mia, 1 )
-BOOST_AUTO_TEST_CASE( broken_update_mia )
+BOOST_AUTO_TEST_CASE( update_mia )
 {
    try {
       INVOKE(create_mia);
@@ -477,7 +476,6 @@ BOOST_AUTO_TEST_CASE( broken_update_mia )
       trx.operations.back() = op;
       PUSH_TX( db, trx, ~0 );
 
-      //idump((bit_usd));
       {
          asset_publish_feed_operation pop;
          pop.asset_id = bit_usd.get_id();
@@ -485,8 +483,9 @@ BOOST_AUTO_TEST_CASE( broken_update_mia )
          price_feed feed;
          feed.settlement_price = price(bit_usd.amount(5), bit_usd.amount(5));
          REQUIRE_THROW_WITH_VALUE(pop, feed, feed);
-         feed.settlement_price = price(bit_usd.amount(5), asset(5));
+         feed.settlement_price = ~price(bit_usd.amount(5), asset(5));
          REQUIRE_THROW_WITH_VALUE(pop, feed, feed);
+         feed.settlement_price = price(bit_usd.amount(5), asset(5));
          pop.feed = feed;
          REQUIRE_THROW_WITH_VALUE(pop, feed.maintenance_collateral_ratio, 0);
          trx.operations.back() = pop;
