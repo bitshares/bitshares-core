@@ -62,7 +62,6 @@ void database::globally_settle_asset( const asset_object& mia, const price& sett
    while( call_itr != call_end )
    {
       auto pays = call_itr->get_debt() * settlement_price;
-      wdump( (call_itr->get_debt() ) );
       collateral_gathered += pays;
       const auto&  order = *call_itr;
       ++call_itr;
@@ -321,8 +320,8 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
 { try {
     if( !mia.is_market_issued() ) return false;
     const asset_bitasset_data_object& bitasset = mia.bitasset_data(*this);
-    if( bitasset.current_feed.settlement_price.is_null() ) return false;
     if( bitasset.is_prediction_market ) return false;
+    if( bitasset.current_feed.settlement_price.is_null() ) return false;
 
     const call_order_index& call_index = get_index_type<call_order_index>();
     const auto& call_price_index = call_index.indices().get<by_price>();

@@ -65,7 +65,7 @@ void_result call_order_update_evaluator::do_evaluate(const call_order_update_ope
 
 
 void_result call_order_update_evaluator::do_apply(const call_order_update_operation& o)
-{
+{ try {
    database& d = db();
    //wdump( (_bitasset_data->current_feed) );
 
@@ -97,6 +97,7 @@ void_result call_order_update_evaluator::do_apply(const call_order_update_operat
    auto& call_idx = d.get_index_type<call_order_index>().indices().get<by_account>();
    auto itr = call_idx.find( boost::make_tuple(o.funding_account, o.delta_debt.asset_id) );
    const call_order_object* call_obj = nullptr;
+
    if( itr == call_idx.end() )
    {
       FC_ASSERT( o.delta_collateral.amount > 0 );
@@ -127,34 +128,38 @@ void_result call_order_update_evaluator::do_apply(const call_order_update_operat
       d.remove( *call_obj );
       return void_result();
    }
-   auto collateral = call_obj->get_collateral();
 
-   auto mp = _bitasset_data->current_feed.maintenance_price();
-
-//   edump((debt)(collateral)((debt/collateral).to_real())(mp.to_real()) );
- //  edump((debt*mp));
-   /// paying off the debt at the user specified call price should require
-   /// less collateral than paying off the debt at the maitenance price
-   auto col_at_call_price    = debt * o.call_price;
-   auto col_at_min_callprice = debt * mp;
-   FC_ASSERT( col_at_call_price <= col_at_min_callprice, "", ("debt*o.callprice",debt*o.call_price)("debt*mp",debt*mp) );
-   FC_ASSERT( col_at_call_price <= collateral );
-
-   //wdump( (o.call_price)(mp)(call_obj->call_price.to_real())(mp.to_real()) );
-   //FC_ASSERT( call_obj->call_price <= mp );
-
-   auto call_order_id = call_obj->id;
-
-   //ilog( "checking call orders" );
-
-   // check to see if the order needs to be margin called now, but don't allow black swans and require there to be 
-   // limit orders available that could be used to fill the order.
-   if( d.check_call_orders( *_debt_asset, false ) )
+   /** then we must check for margin calls and other issues */
+   if( !_bitasset_data->is_prediction_market )
    {
-       FC_ASSERT( !d.find_object( call_order_id ), "If updating the call order triggers a margin call, then it must completely cover the order" );
+      auto collateral = call_obj->get_collateral();
+      auto mp = _bitasset_data->current_feed.maintenance_price();
+
+   //   edump((debt)(collateral)((debt/collateral).to_real())(mp.to_real()) );
+    //  edump((debt*mp));
+      /// paying off the debt at the user specified call price should require
+      /// less collateral than paying off the debt at the maitenance price
+      auto col_at_call_price    = debt * o.call_price;
+      auto col_at_min_callprice = debt * mp;
+      FC_ASSERT( col_at_call_price <= col_at_min_callprice, "", ("debt*o.callprice",debt*o.call_price)("debt*mp",debt*mp) );
+      FC_ASSERT( col_at_call_price <= collateral );
+
+      //wdump( (o.call_price)(mp)(call_obj->call_price.to_real())(mp.to_real()) );
+      //FC_ASSERT( call_obj->call_price <= mp );
+
+      auto call_order_id = call_obj->id;
+
+      //ilog( "checking call orders" );
+
+      // check to see if the order needs to be margin called now, but don't allow black swans and require there to be 
+      // limit orders available that could be used to fill the order.
+      if( d.check_call_orders( *_debt_asset, false ) )
+      {
+          FC_ASSERT( !d.find_object( call_order_id ), "If updating the call order triggers a margin call, then it must completely cover the order" );
+      }
    }
 
    return void_result();
-}
+} FC_CAPTURE_AND_RETHROW( (o) ) }
 
 } } // graphene::chain

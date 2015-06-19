@@ -147,6 +147,7 @@ struct database_fixture {
       key_id_type key = key_id_type()
       );
 
+   void  force_global_settle( const asset_object& what, const price& p );
    void  force_settle( const account_object& who, asset what );
    void  update_feed_producers( const asset_object& mia, flat_set<account_id_type> producers );
    void  publish_feed( const asset_object& mia, const account_object& by, const price_feed& f );
@@ -156,6 +157,10 @@ struct database_fixture {
    const asset_object& get_asset( const string& symbol )const;
    const account_object& get_account( const string& name )const;
    const asset_object& create_bitasset(const string& name,
+                                       account_id_type issuer = account_id_type(1),
+                                       uint16_t market_fee_percent = 100 /*1%*/,
+                                       uint16_t flags = charge_market_fee);
+   const asset_object& create_prediction_market(const string& name,
                                        account_id_type issuer = account_id_type(1),
                                        uint16_t market_fee_percent = 100 /*1%*/,
                                        uint16_t flags = charge_market_fee);

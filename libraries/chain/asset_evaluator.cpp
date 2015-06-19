@@ -348,6 +348,8 @@ object_id_type asset_settle_evaluator::do_evaluate(const asset_settle_evaluator:
    FC_ASSERT(asset_to_settle->is_market_issued());
    const auto& bitasset = asset_to_settle->bitasset_data(d);
    FC_ASSERT(asset_to_settle->can_force_settle() || bitasset.has_settlement() );
+   if( bitasset.is_prediction_market ) 
+      FC_ASSERT( bitasset.has_settlement(), "global settlement must occur before force settling a prediction market"  );
    FC_ASSERT(d.get_balance(d.get(op.account), *asset_to_settle) >= op.amount);
 
    return d.get_index_type<force_settlement_index>().get_next_id();

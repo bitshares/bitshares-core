@@ -398,6 +398,32 @@ const asset_object& database_fixture::create_bitasset(
    return db.get<asset_object>(ptx.operation_results[0].get<object_id_type>());
 } FC_CAPTURE_AND_RETHROW( (name)(flags) ) }
 
+const asset_object& database_fixture::create_prediction_market(
+   const string& name,
+   account_id_type issuer /* = 1 */,
+   uint16_t market_fee_percent /* = 100 */ /* 1% */,
+   uint16_t flags /* = charge_market_fee */
+   )
+{ try {
+   asset_create_operation creator;
+   creator.issuer = issuer;
+   creator.fee = asset();
+   creator.symbol = name;
+   creator.common_options.max_supply = GRAPHENE_MAX_SHARE_SUPPLY;
+   creator.precision = 2;
+   creator.common_options.market_fee_percent = market_fee_percent;
+   creator.common_options.issuer_permissions = flags | global_settle;
+   creator.common_options.flags = flags & ~global_settle;
+   creator.common_options.core_exchange_rate = price({asset(1,1),asset(1)});
+   creator.bitasset_options = asset_object::bitasset_options();
+   creator.is_prediction_market = true;
+   trx.operations.push_back(std::move(creator));
+   trx.validate();
+   processed_transaction ptx = db.push_transaction(trx, ~0);
+   trx.operations.clear();
+   return db.get<asset_object>(ptx.operation_results[0].get<object_id_type>());
+} FC_CAPTURE_AND_RETHROW( (name)(flags) ) }
+
 const asset_object& database_fixture::create_user_issued_asset( const string& name )
 {
    asset_create_operation creator;
@@ -660,6 +686,21 @@ void  database_fixture::publish_feed( const asset_object& mia, const account_obj
    db.push_transaction(trx, ~0);
    trx.operations.clear();
 }
+
+void database_fixture::force_global_settle( const asset_object& what, const price& p )
+{ try {
+   trx.set_expiration(db.head_block_time() + fc::minutes(1));
+   trx.operations.clear();
+   asset_global_settle_operation sop;
+   sop.issuer = what.issuer;
+   sop.asset_to_settle = what.id;
+   sop.settle_price = p;
+   trx.operations.push_back(sop);
+   for( auto& op : trx.operations ) op.visit( operation_set_fee( db.current_fee_schedule() ) );
+   trx.validate();
+   db.push_transaction(trx, ~0);
+   trx.operations.clear();
+} FC_CAPTURE_AND_RETHROW( (what)(p) ) }
 
 void  database_fixture::force_settle( const account_object& who, asset what )
 { try {

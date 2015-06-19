@@ -259,6 +259,48 @@ BOOST_AUTO_TEST_CASE( black_swan )
    }
 }
 
+BOOST_AUTO_TEST_CASE( prediction_market )
+{ try {
+      ACTORS((judge)(dan)(nathan));
+
+      const auto& pmark = create_prediction_market("PMARK", judge_id);
+      const auto& core  = asset_id_type()(db);
+
+      int64_t init_balance(1000000);
+      transfer(genesis_account, judge_id, asset(init_balance));
+      transfer(genesis_account, dan_id, asset(init_balance));
+      transfer(genesis_account, nathan_id, asset(init_balance));
+
+      auto default_call_price = ~price::call_price( pmark.amount(100), asset(100), 1750);
+
+      BOOST_TEST_MESSAGE( "Require throw for mismatch collateral amounts" );
+      BOOST_REQUIRE_THROW( borrow( dan, pmark.amount(1000), asset(2000), default_call_price ), fc::exception );
+
+      BOOST_TEST_MESSAGE( "Open position with equal collateral" );
+      borrow( dan, pmark.amount(1000), asset(1000), default_call_price );
+
+      BOOST_TEST_MESSAGE( "Cover position with unequal asset should fail." );
+      BOOST_REQUIRE_THROW( cover( dan, pmark.amount(500), asset(1000), default_call_price ), fc::exception );
+
+      BOOST_TEST_MESSAGE( "Cover half of position with equal ammounts" );
+      cover( dan, pmark.amount(500), asset(500), default_call_price );
+
+      BOOST_TEST_MESSAGE( "Verify that forced settlment fails before global settlement" );
+      BOOST_REQUIRE_THROW( force_settle( dan, pmark.amount(100) ), fc::exception );
+      
+      BOOST_TEST_MESSAGE( "Shouldn't be allowed to force settle at more than 1 collateral per debt" );
+      BOOST_REQUIRE_THROW( force_global_settle( pmark, pmark.amount(100) / core.amount(105) ), fc::exception );
+
+      force_global_settle( pmark, pmark.amount(100) / core.amount(95) );
+
+      BOOST_TEST_MESSAGE( "Verify that forced settlment succeedes after global settlement" );
+      force_settle( dan, pmark.amount(100) );
+
+   } catch( const fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
 
 
 BOOST_AUTO_TEST_CASE( create_account_test )
