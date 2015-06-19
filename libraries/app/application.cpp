@@ -150,6 +150,18 @@ namespace detail {
 
          auto nathan_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("nathan")));
          genesis_state_type initial_state;
+         secret_hash_type::encoder enc;
+         fc::raw::pack(enc, nathan_key);
+         fc::raw::pack(enc, secret_hash_type());
+         for( int i = 0; i < 10; ++i )
+         {
+            initial_state.allocation_targets.emplace_back("init"+fc::to_string(i), nathan_key.get_public_key(), 0, true);
+            initial_state.initial_committee.push_back({"init"+fc::to_string(i)});
+         }
+         initial_state.initial_witnesses = vector<genesis_state_type::initial_witness_type>(10, {"committee-account",
+                                                                                                 nathan_key.get_public_key(),
+                                                                                                 secret_hash_type::hash(enc.result())});
+
          initial_state.allocation_targets.emplace_back("nathan", address(public_key_type(nathan_key.get_public_key())), 1);
          if( _options->count("genesis-json") )
             initial_state = fc::json::from_file(_options->at("genesis-json").as<boost::filesystem::path>()).as<genesis_state_type>();

@@ -19,6 +19,7 @@
 
 #include <graphene/chain/database.hpp>
 #include <graphene/chain/witness_object.hpp>
+#include <graphene/chain/key_object.hpp>
 #include <graphene/time/time.hpp>
 
 #include <fc/thread/thread.hpp>
@@ -36,7 +37,7 @@ void witness_plugin::plugin_set_program_options(
          ("witness-id,w", bpo::value<vector<string>>()->composing()->multitoken(),
           "ID of witness controlled by this node (e.g. \"1.7.0\", quotes are required, may specify multiple times)")
          ("private-key", bpo::value<vector<string>>()->composing()->multitoken()->
-          DEFAULT_VALUE_VECTOR(std::make_pair(chain::key_id_type(), fc::ecc::private_key::regenerate(fc::sha256::hash(std::string("null_key"))))),
+          DEFAULT_VALUE_VECTOR(std::make_pair(chain::key_id_type(), fc::ecc::private_key::regenerate(fc::sha256::hash(std::string("nathan"))))),
           "Tuple of [key ID, private key] (may specify multiple times)")
          ;
    config_file_options.add(command_line_options);
@@ -63,9 +64,23 @@ void witness_plugin::plugin_startup()
       graphene::time::now();
       for( auto wit : _witnesses )
    {
-      auto key = wit(database()).signing_key;
-      if( !_private_keys.count(key) )
+      auto signing_key = wit(database()).signing_key;
+      if( !_private_keys.count(signing_key) )
       {
+         // Check if it's a duplicate key of one I do have
+         bool found_duplicate = false;
+         for( const auto& private_key : _private_keys )
+            if( chain::public_key_type(private_key.second.get_public_key()) == signing_key(database()).key_address() )
+            {
+               ilog("Found duplicate key: ${k1} matches ${k2}; using this key to sign for ${w}",
+                    ("k1", private_key.first)("k2", signing_key)("w", wit));
+               _private_keys[signing_key] = private_key.second;
+               found_duplicate = true;
+               break;
+            }
+         if( found_duplicate )
+            continue;
+
          elog("Unable to find key for witness ${w}. Removing it from my witnesses.", ("w", wit));
          bad_wits.insert(wit);
       }
