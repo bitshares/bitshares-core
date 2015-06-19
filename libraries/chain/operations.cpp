@@ -162,6 +162,7 @@ share_type asset_create_operation::calculate_fee( const fee_schedule_type& sched
    uint32_t s = symbol.size();
    while( s <= 6 ) {  core_fee_required *= 30; ++s; }
 
+   core_fee_required += ((fc::raw::pack_size(*this)*schedule.data_fee)/1024);
    return core_fee_required;
 }
 
@@ -288,7 +289,7 @@ void asset_update_operation::validate()const
 
 share_type asset_update_operation::calculate_fee( const fee_schedule_type& k )const
 {
-   return k.asset_update_fee;
+   return k.asset_update_fee + ((fc::raw::pack_size(*this)*k.data_fee)/1024);
 }
 
 void asset_burn_operation::get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>&) const

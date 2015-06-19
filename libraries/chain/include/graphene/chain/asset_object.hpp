@@ -156,6 +156,11 @@ namespace graphene { namespace chain {
             /** defines the assets that this asset may not be traded against in the market, must not overlap whitelist */
             flat_set<asset_id_type>   blacklist_markets;
 
+            /** data that describes the meaning/purpose of this asset, fee will be charged proportional to
+             * size of description.
+             */
+            string                    description;
+
             /// Perform internal consistency checks.
             /// @throws fc::exception if any check fails
             void validate()const;
@@ -323,6 +328,7 @@ FC_REFLECT( graphene::chain::asset_object::asset_options,
             (blacklist_authorities)
             (whitelist_markets)
             (blacklist_markets)
+            (description)
           )
 FC_REFLECT( graphene::chain::asset_object::bitasset_options,
             (feed_lifetime_sec)
