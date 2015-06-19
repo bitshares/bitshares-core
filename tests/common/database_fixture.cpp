@@ -78,13 +78,14 @@ database_fixture::database_fixture()
 
 database_fixture::~database_fixture()
 {
+   // If we're unwinding due to an exception, don't do any more checks.
+   // This way, boost test's last checkpoint tells us approximately where the error was.
    if( !std::uncaught_exception() )
    {
       verify_asset_supplies();
       verify_account_history_plugin_index();
+      BOOST_CHECK( db.get_node_properties().skip_flags == database::skip_nothing );
    }
-
-   BOOST_CHECK( db.get_node_properties().skip_flags == database::skip_nothing );
 
    if( data_dir )
       db.close();
