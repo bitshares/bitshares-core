@@ -148,6 +148,11 @@ void database_fixture::verify_asset_supplies( )const
       if( asset_obj.id != asset_id_type() )
          BOOST_CHECK_EQUAL(total_balances[asset_obj.id].value, asset_obj.dynamic_asset_data_id(db).current_supply.value);
       total_balances[asset_id_type()] += asset_obj.dynamic_asset_data_id(db).fee_pool;
+      if( asset_obj.is_market_issued() )
+      {
+         const auto& bad = asset_obj.bitasset_data(db);
+         total_balances[bad.options.short_backing_asset] += bad.settlement_fund;
+      }
    }
    for( const witness_object& witness_obj : db.get_index_type<simple_index<witness_object>>() )
    {
@@ -654,6 +659,20 @@ void  database_fixture::publish_feed( const asset_object& mia, const account_obj
    db.push_transaction(trx, ~0);
    trx.operations.clear();
 }
+
+void  database_fixture::force_settle( const account_object& who, asset what )
+{ try {
+   trx.set_expiration(db.head_block_time() + fc::minutes(1));
+   trx.operations.clear();
+   asset_settle_operation sop;
+   sop.account = who.id;
+   sop.amount = what;
+   trx.operations.push_back(sop);
+   for( auto& op : trx.operations ) op.visit( operation_set_fee( db.current_fee_schedule() ) );
+   trx.validate();
+   db.push_transaction(trx, ~0);
+   trx.operations.clear();
+} FC_CAPTURE_AND_RETHROW( (who)(what) ) }
 
 void  database_fixture::borrow( const account_object& who, asset what, asset collateral, price call_price )
 { try {

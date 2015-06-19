@@ -37,10 +37,11 @@ namespace graphene { namespace chain {
 */
 void database::globally_settle_asset( const asset_object& mia, const price& settlement_price )
 { try {
+   /*
    elog( "BLACK SWAN!" );
    debug_dump();
-
    edump( (mia.symbol)(settlement_price) );
+   */
 
    const asset_bitasset_data_object& bitasset = mia.bitasset_data(*this);
    FC_ASSERT( !bitasset.has_settlement(), "black swan already occurred, it should not happen again" );
@@ -53,6 +54,7 @@ void database::globally_settle_asset( const asset_object& mia, const price& sett
 
    const call_order_index& call_index = get_index_type<call_order_index>();
    const auto& call_price_index = call_index.indices().get<by_price>();
+
 
    // cancel all call orders and accumulate it into collateral_gathered
    auto call_itr = call_price_index.lower_bound( price::min( bitasset.options.short_backing_asset, mia.id ) );
@@ -72,10 +74,13 @@ void database::globally_settle_asset( const asset_object& mia, const price& sett
            obj.settlement_fund  = collateral_gathered.amount;
            });
 
-   /// TODO: after all margin positions are closed, the current supply will be reported as 0, but
+   /// After all margin positions are closed, the current supply will be reported as 0, but
    /// that is a lie, the supply didn't change.   We need to capture the current supply before
    /// filling all call orders and then restore it afterward.   Then in the force settlement
    /// evaluator reduce the supply
+   modify( mia_dyn, [&]( asset_dynamic_data_object& obj ){
+           obj.current_supply = original_mia_supply;
+         });
 
 } FC_CAPTURE_AND_RETHROW( (mia)(settlement_price) ) }
 

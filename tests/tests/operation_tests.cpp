@@ -206,6 +206,60 @@ BOOST_AUTO_TEST_CASE( margin_call_limit_test )
    }
 }
 
+/**
+ *  This test sets up the minimum condition for a black swan to occur but does
+ *  not test the full range of cases that may be possible during a black swan.
+ */
+BOOST_AUTO_TEST_CASE( black_swan )
+{ try {
+      ACTORS((buyer)(seller)(borrower)(borrower2)(feedproducer));
+
+      const auto& bitusd = create_bitasset("BITUSD");
+      const auto& core   = asset_id_type()(db);
+
+      int64_t init_balance(1000000);
+
+      transfer(genesis_account, buyer_id, asset(init_balance));
+      transfer(genesis_account, borrower_id, asset(init_balance));
+      transfer(genesis_account, borrower2_id, asset(init_balance));
+      update_feed_producers( bitusd, {feedproducer.id} );
+
+      price_feed current_feed;
+      current_feed.settlement_price = bitusd.amount( 100 ) / core.amount(100);
+      auto default_call_price = ~price::call_price( bitusd.amount(100), asset(100), 1750);
+
+      // starting out with price 1:1
+      publish_feed( bitusd, feedproducer, current_feed );
+
+      // start out with 2:1 collateral
+      borrow( borrower, bitusd.amount(1000), asset(2000), default_call_price );
+      borrow( borrower2, bitusd.amount(1000), asset(4000), default_call_price );
+
+      BOOST_REQUIRE_EQUAL( get_balance( borrower, bitusd ), 1000 );
+      BOOST_REQUIRE_EQUAL( get_balance( borrower2, bitusd ), 1000 );
+      BOOST_REQUIRE_EQUAL( get_balance( borrower , core ), init_balance - 2000 );
+      BOOST_REQUIRE_EQUAL( get_balance( borrower2, core ), init_balance - 4000 );
+
+      current_feed.settlement_price = bitusd.amount( 100 ) / core.amount(200);
+      publish_feed( bitusd, feedproducer, current_feed );
+
+      /// this sell order is designed to trigger a black swan
+      auto order = create_sell_order( borrower2, bitusd.amount(1000), core.amount(3000) );
+
+      FC_ASSERT( bitusd.bitasset_data(db).has_settlement() );
+      wdump(( bitusd.bitasset_data(db) ));
+
+      force_settle( borrower, bitusd.amount(100) );
+  
+      BOOST_TEST_MESSAGE( "Verify that we cannot borrow after black swan" );
+      BOOST_REQUIRE_THROW( borrow( borrower, bitusd.amount(1000), asset(2000), default_call_price ), fc::exception );
+   } catch( const fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
+
 
 BOOST_AUTO_TEST_CASE( create_account_test )
 {
@@ -1248,20 +1302,6 @@ BOOST_AUTO_TEST_CASE( unimp_bulk_discount_test )
    //const account_object& shorter2  = create_account( "bob" );
    BOOST_FAIL( "not implemented" );
 }
-
-/**
- *  This test sets up the minimum condition for a black swan to occur but does
- *  not test the full range of cases that may be possible during a black swan.
- */
-BOOST_AUTO_TEST_CASE( margin_call_black_swan )
-{ try {
-      FC_ASSERT( "TODO - Reimplement with new short semantics" );
-   } catch( const fc::exception& e) {
-      edump((e.to_detail_string()));
-      throw;
-   }
-}
-
 /**
  *  Assume the referrer gets 99% of transaction fee
  */
