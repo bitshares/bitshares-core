@@ -115,7 +115,7 @@ share_type account_create_operation::calculate_fee( const fee_schedule_type& sch
 
    FC_ASSERT( s >= 2 );
 
-   if( s == 8 )
+   if( s >= 8 && s < 63 )
      core_fee_required = schedule.account_len8_fee;
    else if( s == 7 )
      core_fee_required = schedule.account_len7_fee;
