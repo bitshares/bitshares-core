@@ -233,6 +233,9 @@ share_type database::get_max_budget( fc::time_point_sec now )const
    // are available for the budget at this point, but not included
    // in core.burned().
    share_type reserve = core.burned(*this) + core_dd.accumulated_fees;
+   // Similarly, we consider leftover witness_budget to be burned
+   // at the BEGINNING of the maintenance interval.
+   reserve += dpo.witness_budget;
 
    fc::uint128_t budget_u128 = reserve.value;
    budget_u128 *= uint64_t(dt);
@@ -303,16 +306,24 @@ void database::process_budget()
       pay_workers(leftover_worker_funds);
       available_funds += leftover_worker_funds;
 
+      share_type unused_prev_witness_budget = dpo.witness_budget;
       modify(core, [&]( asset_dynamic_data_object& _core )
       {
-         _core.current_supply = (_core.current_supply + witness_budget +
-                                 worker_budget - leftover_worker_funds -
-                                 _core.accumulated_fees);
+         _core.current_supply = (_core.current_supply
+                                 + witness_budget
+                                 + worker_budget
+                                 - leftover_worker_funds
+                                 - _core.accumulated_fees
+                                 - unused_prev_witness_budget
+                                );
          _core.accumulated_fees = 0;
       });
       modify(dpo, [&]( dynamic_global_property_object& _dpo )
       {
-         _dpo.witness_budget += witness_budget;
+         // Since initial witness_budget was rolled into
+         // available_funds, we replace it with witness_budget
+         // instead of adding it.
+         _dpo.witness_budget = witness_budget;
          _dpo.last_budget_time = now;
       });
 

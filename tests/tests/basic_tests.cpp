@@ -62,6 +62,20 @@ BOOST_AUTO_TEST_CASE( price_test )
     BOOST_CHECK( ~price::min(0,1) == price::max(1,0) );
     BOOST_CHECK( ~price::max(0,1) < ~price::min(0,1) );
     BOOST_CHECK( ~price::max(0,1) <= ~price::min(0,1) );
+    price a(asset(1), asset(2,1));
+    price b(asset(2), asset(2,1));
+    price c(asset(1), asset(2,1));
+    BOOST_CHECK(a < b);
+    BOOST_CHECK(b > a);
+    BOOST_CHECK(a == c);
+    BOOST_CHECK(!(b == c));
+
+    price_feed dummy;
+    dummy.maintenance_collateral_ratio = 1002;
+    dummy.maximum_short_squeeze_ratio = 1234;
+    dummy.settlement_price = price(asset(1000), asset(2000, 1));
+    price_feed dummy2 = dummy;
+    BOOST_CHECK(dummy == dummy2);
 }
 
 BOOST_AUTO_TEST_CASE( serialization_tests )

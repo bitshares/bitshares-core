@@ -987,7 +987,6 @@ BOOST_AUTO_TEST_CASE( cancel_limit_order_test )
  }
 }
 
-BOOST_AUTO_TEST_CASE_EXPECTED_FAILURES( delegate_feeds, 1 )
 BOOST_AUTO_TEST_CASE( delegate_feeds )
 {
    using namespace graphene::chain;
@@ -1009,44 +1008,31 @@ BOOST_AUTO_TEST_CASE( delegate_feeds )
 
       asset_publish_feed_operation op({asset(), active_witnesses[0]});
       op.asset_id = bit_usd.get_id();
-      op.feed.settlement_price = price(asset(GRAPHENE_BLOCKCHAIN_PRECISION),bit_usd.amount(30));
+      op.feed.settlement_price = ~price(asset(GRAPHENE_BLOCKCHAIN_PRECISION),bit_usd.amount(30));
       // Accept defaults for required collateral
       trx.operations.emplace_back(op);
       PUSH_TX( db, trx, ~0 );
 
-      {
-         //Dumb sanity check of some operators. Only here to improve code coverage. :D
-         price_feed dummy = op.feed;
-         BOOST_CHECK(op.feed == dummy);
-         price a(asset(1), bit_usd.amount(2));
-         price b(asset(2), bit_usd.amount(2));
-         price c(asset(1), bit_usd.amount(2));
-         BOOST_CHECK(a < b);
-         BOOST_CHECK(b > a);
-         BOOST_CHECK(a == c);
-         BOOST_CHECK(!(b == c));
-      }
-
       const asset_bitasset_data_object& bitasset = bit_usd.bitasset_data(db);
-      BOOST_CHECK(bitasset.current_feed.settlement_price.to_real() == GRAPHENE_BLOCKCHAIN_PRECISION / 30.0);
+      BOOST_CHECK(bitasset.current_feed.settlement_price.to_real() == 30.0 / GRAPHENE_BLOCKCHAIN_PRECISION);
       BOOST_CHECK(bitasset.current_feed.maintenance_collateral_ratio == GRAPHENE_DEFAULT_MAINTENANCE_COLLATERAL_RATIO);
 
       op.publisher = active_witnesses[1];
-      op.feed.settlement_price = price(asset(GRAPHENE_BLOCKCHAIN_PRECISION),bit_usd.amount(25));
+      op.feed.settlement_price = ~price(asset(GRAPHENE_BLOCKCHAIN_PRECISION),bit_usd.amount(25));
       trx.operations.back() = op;
       PUSH_TX( db, trx, ~0 );
 
-      BOOST_CHECK_EQUAL(bitasset.current_feed.settlement_price.to_real(), GRAPHENE_BLOCKCHAIN_PRECISION / 25.0);
+      BOOST_CHECK_EQUAL(bitasset.current_feed.settlement_price.to_real(), 30.0 / GRAPHENE_BLOCKCHAIN_PRECISION);
       BOOST_CHECK(bitasset.current_feed.maintenance_collateral_ratio == GRAPHENE_DEFAULT_MAINTENANCE_COLLATERAL_RATIO);
 
       op.publisher = active_witnesses[2];
-      op.feed.settlement_price = price(asset(GRAPHENE_BLOCKCHAIN_PRECISION),bit_usd.amount(40));
+      op.feed.settlement_price = ~price(asset(GRAPHENE_BLOCKCHAIN_PRECISION),bit_usd.amount(40));
       // But this delegate is an idiot.
-      op.feed.maintenance_collateral_ratio = 1000;
+      op.feed.maintenance_collateral_ratio = 1001;
       trx.operations.back() = op;
       PUSH_TX( db, trx, ~0 );
 
-      BOOST_CHECK_EQUAL(bitasset.current_feed.settlement_price.to_real(), GRAPHENE_BLOCKCHAIN_PRECISION / 30.0);
+      BOOST_CHECK_EQUAL(bitasset.current_feed.settlement_price.to_real(), 30.0 / GRAPHENE_BLOCKCHAIN_PRECISION);
       BOOST_CHECK(bitasset.current_feed.maintenance_collateral_ratio == GRAPHENE_DEFAULT_MAINTENANCE_COLLATERAL_RATIO);
    } catch (const fc::exception& e) {
       edump((e.to_detail_string()));
@@ -1130,11 +1116,10 @@ BOOST_AUTO_TEST_CASE( witness_withdraw_pay_test )
    //   which will initialize last_budget_time
    generate_block();
 
-   // budget should be 25 satoshis based on 30 blocks at 5-second interval
-   // with 17 / 2**32 rate per block
-   const int ref_budget = 125;
-   // set to a value which will exhaust ref_budget after three witnesses
+   // Based on the size of the reserve fund later in the test, the witness budget will be set to this value
+   const int ref_budget = 624;
    const int witness_ppb = 55;
+
    db.modify( db.get_global_properties(), [&]( global_property_object& _gpo )
    {
       _gpo.parameters.witness_pay_per_block = witness_ppb;
@@ -1190,43 +1175,36 @@ BOOST_AUTO_TEST_CASE( witness_withdraw_pay_test )
    // maintenance will be in block 31.  time of block 31 - time of block 1 = 30 * 5 seconds.
 
    schedule_maint();
-   // TODO:  Replace this with another check
-   //BOOST_CHECK_EQUAL(account_id_type()(db).statistics(db).cashback_rewards.value, 1000000000-200000000);
-   // first witness paid from old budget (so no pay)
-   BOOST_CHECK_EQUAL( core->burned(db).value, 0 );
+   // The 80% lifetime referral fee went to the committee account, which burned it. Check that it's here.
+   BOOST_CHECK_EQUAL( core->burned(db).value, 840000000 );
    generate_block();
-   BOOST_CHECK_EQUAL( core->burned(db).value, 210000000 - ref_budget );
+   BOOST_CHECK_EQUAL( core->burned(db).value, 840000000 + 210000000 - ref_budget );
    BOOST_CHECK_EQUAL( db.get_dynamic_global_properties().witness_budget.value, ref_budget );
    witness = &db.fetch_block_by_number(db.head_block_num())->witness(db);
+   // first witness paid from old budget (so no pay)
    BOOST_CHECK_EQUAL( witness->accumulated_income.value, 0 );
    // second witness finally gets paid!
    generate_block();
    witness = &db.fetch_block_by_number(db.head_block_num())->witness(db);
    BOOST_CHECK_EQUAL( witness->accumulated_income.value, witness_ppb );
    BOOST_CHECK_EQUAL( db.get_dynamic_global_properties().witness_budget.value, ref_budget - witness_ppb );
-   const witness_object* paid_witness = witness;
 
-   // full payment to next witness
    generate_block();
    witness = &db.fetch_block_by_number(db.head_block_num())->witness(db);
    BOOST_CHECK_EQUAL( witness->accumulated_income.value, witness_ppb );
    BOOST_CHECK_EQUAL( db.get_dynamic_global_properties().witness_budget.value, ref_budget - 2 * witness_ppb );
 
-   // partial payment to last witness
    generate_block();
    witness = &db.fetch_block_by_number(db.head_block_num())->witness(db);
-   BOOST_CHECK_EQUAL( witness->accumulated_income.value, ref_budget - 2 * witness_ppb );
-   BOOST_CHECK_EQUAL( db.get_dynamic_global_properties().witness_budget.value, 0 );
+   BOOST_CHECK_EQUAL( witness->accumulated_income.value, witness_ppb );
+   BOOST_CHECK_EQUAL( db.get_dynamic_global_properties().witness_budget.value, ref_budget - 3 * witness_ppb );
 
    generate_block();
    witness = &db.fetch_block_by_number(db.head_block_num())->witness(db);
-   BOOST_CHECK_EQUAL( witness->accumulated_income.value, 0 );
-   BOOST_CHECK_EQUAL( db.get_dynamic_global_properties().witness_budget.value, 0 );
+   BOOST_CHECK_EQUAL( witness->accumulated_income.value, witness_ppb );
+   BOOST_CHECK_EQUAL( db.get_dynamic_global_properties().witness_budget.value, ref_budget - 4 * witness_ppb );
 
    trx.set_expiration(db.head_block_time() + GRAPHENE_DEFAULT_MAX_TIME_UNTIL_EXPIRATION);
-   // last one was unpaid, so pull out a paid one for checks
-   witness = paid_witness;
-   //wdump((*witness));
    // Withdraw the witness's pay
    enable_fees(1);
    witness_withdraw_pay_operation wop;
@@ -1242,7 +1220,7 @@ BOOST_AUTO_TEST_CASE( witness_withdraw_pay_test )
    trx.clear();
 
    BOOST_CHECK_EQUAL(get_balance(witness->witness_account(db), *core), witness_ppb - 1/*fee*/);
-   BOOST_CHECK_EQUAL(core->burned(db).value, 210000000 - ref_budget );
+   BOOST_CHECK_EQUAL(core->burned(db).value, 840000000 + 210000000 - ref_budget );
    BOOST_CHECK_EQUAL(witness->accumulated_income.value, 0);
 } FC_LOG_AND_RETHROW() }
 
