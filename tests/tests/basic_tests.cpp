@@ -41,6 +41,15 @@ using namespace graphene::db;
 
 BOOST_FIXTURE_TEST_SUITE( basic_tests, database_fixture )
 
+/** verify that names are 
+ * https://github.com/cryptonomex/graphene/issues/15
+ */
+BOOST_AUTO_TEST_CASE( valid_name_test )
+{
+   BOOST_REQUIRE( is_valid_name( "aaa-bbb-1" ) );
+   BOOST_REQUIRE( !is_valid_name( "1aaa-bbb" ) );
+}
+
 BOOST_AUTO_TEST_CASE( price_test )
 {
     BOOST_CHECK( price::max(0,1) > price::min(0,1) );
