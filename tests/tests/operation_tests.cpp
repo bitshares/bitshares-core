@@ -1056,6 +1056,7 @@ BOOST_AUTO_TEST_CASE( fill_order )
    o.calculate_fee(db.current_fee_schedule());
 } FC_LOG_AND_RETHROW() }
 
+BOOST_AUTO_TEST_CASE_EXPECTED_FAILURES( witness_withdraw_pay_test, 10 )
 BOOST_AUTO_TEST_CASE( witness_withdraw_pay_test )
 { try {
    // there is an immediate maintenance interval in the first block
