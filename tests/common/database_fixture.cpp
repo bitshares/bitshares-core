@@ -718,7 +718,6 @@ void  database_fixture::force_settle( const account_object& who, asset what )
 
 void  database_fixture::borrow( const account_object& who, asset what, asset collateral, price call_price )
 { try {
-   asset call_price_collateral((collateral.amount.value * 3)/4, collateral.asset_id );
    trx.set_expiration(db.head_block_time() + fc::minutes(1));
    trx.operations.clear();
    trx.operations.push_back( call_order_update_operation({ asset(), who.id, collateral, what, call_price }));;

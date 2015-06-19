@@ -147,12 +147,14 @@ struct database_fixture {
       key_id_type key = key_id_type()
       );
 
-   void  force_global_settle( const asset_object& what, const price& p );
-   void  force_settle( const account_object& who, asset what );
-   void  update_feed_producers( const asset_object& mia, flat_set<account_id_type> producers );
-   void  publish_feed( const asset_object& mia, const account_object& by, const price_feed& f );
-   void  borrow( const account_object& who, asset what, asset collateral, price call_price = price());
-   void  cover( const account_object& who, asset what, asset collateral_freed, price call_price = price());
+   void force_global_settle(const asset_object& what, const price& p);
+   void force_settle(const account_object& who, asset what);
+   void update_feed_producers(const asset_object& mia, flat_set<account_id_type> producers);
+   void publish_feed(const asset_object& mia, const account_object& by, const price_feed& f);
+   void borrow(account_id_type who, asset what, asset collateral, price call_price = price())
+   { borrow(who(db), what, collateral, call_price); }
+   void borrow(const account_object& who, asset what, asset collateral, price call_price);
+   void cover(const account_object& who, asset what, asset collateral_freed, price call_price = price());
 
    const asset_object& get_asset( const string& symbol )const;
    const account_object& get_account( const string& name )const;
