@@ -114,7 +114,7 @@ namespace graphene { namespace chain {
          typedef asset_settle_operation operation_type;
 
          object_id_type do_evaluate(const operation_type& op);
-         object_id_type do_apply(const operation_type& op);
+         operation_result do_apply(const operation_type& op);
 
          const asset_object* asset_to_settle = nullptr;
    };

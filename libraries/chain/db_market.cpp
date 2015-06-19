@@ -28,14 +28,12 @@
 namespace graphene { namespace chain {
 
 /**
-    for each short order, fill it at settlement price and place funds received into a total
-    calculate the USD->CORE price and convert all USD balances to CORE at that price and subtract CORE from total
-       - any fees accumulated by the issuer in the bitasset are forfeit / not redeemed
-       - cancel all open orders with bitasset in it
-       - any bitassets that use this bitasset as collateral are immediately settled at their feed price
-       - convert all balances in bitasset to CORE and subtract from total
-       - any prediction markets with usd as the backing get converted to CORE as the backing
-    any CORE left over due to rounding errors is paid to accumulated fees
+ * All margin positions are force closed at the swan price
+ * Collateral received goes into a force-settlement fund
+ * No new margin positions can be created for this asset
+ * No more price feed updates
+ * Force settlement happens without delay at the swan price, deducting from force-settlement fund
+ * No more asset updates may be issued.
 */
 void database::globally_settle_asset( const asset_object& mia, const price& settlement_price )
 { try {
@@ -45,6 +43,8 @@ void database::globally_settle_asset( const asset_object& mia, const price& sett
    edump( (mia.symbol)(settlement_price) );
 
    const asset_bitasset_data_object& bitasset = mia.bitasset_data(*this);
+   FC_ASSERT( !bitasset.has_settlement(), "black swan already occurred, it should not happen again" );
+
    const asset_object& backing_asset = bitasset.options.short_backing_asset(*this);
    asset collateral_gathered = backing_asset.amount(0);
 
@@ -54,93 +54,30 @@ void database::globally_settle_asset( const asset_object& mia, const price& sett
    const call_order_index& call_index = get_index_type<call_order_index>();
    const auto& call_price_index = call_index.indices().get<by_price>();
 
-    auto call_itr = call_price_index.lower_bound( price::min( bitasset.options.short_backing_asset, mia.id ) );
-    auto call_end = call_price_index.upper_bound( price::max( bitasset.options.short_backing_asset, mia.id ) );
-    while( call_itr != call_end )
-    {
-       auto pays = call_itr->get_debt() * settlement_price;
-       wdump( (call_itr->get_debt() ) );
-       collateral_gathered += pays;
-       const auto&  order = *call_itr;
-       ++call_itr;
-       FC_ASSERT( fill_order( order, pays, order.get_debt() ) );
-    }
-
-   const limit_order_index& limit_index = get_index_type<limit_order_index>();
-   const auto& limit_price_index = limit_index.indices().get<by_price>();
-
-    auto max_short_squeeze = bitasset.current_feed.max_short_squeeze_price();
-    // cancel all orders selling the market issued asset
-    auto limit_itr = limit_price_index.lower_bound(price::max(mia.id, bitasset.options.short_backing_asset));
-    auto limit_end = limit_price_index.upper_bound(~max_short_squeeze);
-    while( limit_itr != limit_end )
-    {
-       const auto& order = *limit_itr;
-       ilog( "CANCEL LIMIT ORDER" );
-        idump((order));
-       ++limit_itr;
-       cancel_order( order );
-    }
-
-    limit_itr = limit_price_index.begin();
-    while( limit_itr != limit_end )
-    {
-       if( limit_itr->amount_for_sale().asset_id == mia.id )
-       {
-          const auto& order = *limit_itr;
-          ilog( "CANCEL_AGAIN" );
-          edump((order));
-          ++limit_itr;
-          cancel_order( order );
-       }
-    }
-
-   limit_itr = limit_price_index.begin();
-   while( limit_itr != limit_end )
+   // cancel all call orders and accumulate it into collateral_gathered
+   auto call_itr = call_price_index.lower_bound( price::min( bitasset.options.short_backing_asset, mia.id ) );
+   auto call_end = call_price_index.upper_bound( price::max( bitasset.options.short_backing_asset, mia.id ) );
+   while( call_itr != call_end )
    {
-      if( limit_itr->amount_for_sale().asset_id == mia.id )
-      {
-         const auto& order = *limit_itr;
-         edump((order));
-         ++limit_itr;
-         cancel_order( order );
-      }
+      auto pays = call_itr->get_debt() * settlement_price;
+      wdump( (call_itr->get_debt() ) );
+      collateral_gathered += pays;
+      const auto&  order = *call_itr;
+      ++call_itr;
+      FC_ASSERT( fill_order( order, pays, order.get_debt() ) );
    }
 
-    // settle all balances
-    asset total_mia_settled = mia.amount(0);
+   modify( bitasset, [&]( asset_bitasset_data_object& obj ){
+           obj.settlement_price = settlement_price;
+           obj.settlement_fund  = collateral_gathered.amount;
+           });
 
-    const auto& index = get_index_type<account_balance_index>().indices().get<by_asset>();
-    auto range = index.equal_range(mia.get_id());
-    for( auto itr = range.first; itr != range.second; ++itr )
-    {
-       auto mia_balance = itr->get_balance();
-       if( mia_balance.amount > 0 )
-       {
-          adjust_balance(itr->owner, -mia_balance);
-          auto settled_amount = mia_balance * settlement_price;
-          idump( (mia_balance)(settled_amount)(settlement_price) );
-          adjust_balance(itr->owner, settled_amount);
-          total_mia_settled += mia_balance;
-          collateral_gathered -= settled_amount;
-       }
-    }
+   /// TODO: after all margin positions are closed, the current supply will be reported as 0, but
+   /// that is a lie, the supply didn't change.   We need to capture the current supply before
+   /// filling all call orders and then restore it afterward.   Then in the force settlement
+   /// evaluator reduce the supply
 
-    // TODO: convert payments held in escrow
-
-    modify( mia_dyn, [&]( asset_dynamic_data_object& obj ){
-       total_mia_settled.amount += obj.accumulated_fees;
-       obj.accumulated_fees = 0;
-    });
-
-    wlog( "====================== AFTER SETTLE BLACK SWAN UNCLAIMED SETTLEMENT FUNDS ==============\n" );
-    wdump((collateral_gathered)(total_mia_settled)(original_mia_supply)(mia_dyn.current_supply));
-    modify( bitasset.options.short_backing_asset(*this).dynamic_asset_data_id(*this), [&]( asset_dynamic_data_object& obj ){
-       obj.accumulated_fees += collateral_gathered.amount;
-    });
-
-    FC_ASSERT( total_mia_settled.amount == original_mia_supply, "", ("total_settled",total_mia_settled)("original",original_mia_supply) );
-   } FC_CAPTURE_AND_RETHROW( (mia)(settlement_price) ) }
+} FC_CAPTURE_AND_RETHROW( (mia)(settlement_price) ) }
 
 void database::cancel_order(const force_settlement_object& order, bool create_virtual_op)
 {

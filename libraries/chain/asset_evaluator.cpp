@@ -247,6 +247,7 @@ void_result asset_update_bitasset_evaluator::do_evaluate(const asset_update_bita
    FC_ASSERT(a.is_market_issued(), "Cannot update BitAsset-specific settings on a non-BitAsset.");
 
    const asset_bitasset_data_object& b = a.bitasset_data(d);
+   FC_ASSERT( !b.has_settlement(), "Cannot update a bitasset after a settlement has executed" );
    if( o.new_options.short_backing_asset != b.options.short_backing_asset )
    {
       FC_ASSERT(a.dynamic_asset_data_id(d).current_supply == 0);
@@ -345,21 +346,40 @@ object_id_type asset_settle_evaluator::do_evaluate(const asset_settle_evaluator:
    const database& d = db();
    asset_to_settle = &op.amount.asset_id(d);
    FC_ASSERT(asset_to_settle->is_market_issued());
-   FC_ASSERT(asset_to_settle->can_force_settle());
+   const auto& bitasset = asset_to_settle->bitasset_data(d);
+   FC_ASSERT(asset_to_settle->can_force_settle() || bitasset.has_settlement() );
    FC_ASSERT(d.get_balance(d.get(op.account), *asset_to_settle) >= op.amount);
 
    return d.get_index_type<force_settlement_index>().get_next_id();
 }
 
-object_id_type asset_settle_evaluator::do_apply(const asset_settle_evaluator::operation_type& op)
+operation_result asset_settle_evaluator::do_apply(const asset_settle_evaluator::operation_type& op)
 {
    database& d = db();
    d.adjust_balance(op.account, -op.amount);
-   return d.create<force_settlement_object>([&](force_settlement_object& s) {
-      s.owner = op.account;
-      s.balance = op.amount;
-      s.settlement_date = d.head_block_time() + asset_to_settle->bitasset_data(d).options.force_settlement_delay_sec;
-   }).id;
+
+   const auto& bitasset = asset_to_settle->bitasset_data(d);
+   if( bitasset.has_settlement() )
+   {
+      auto settled_amount = op.amount * bitasset.settlement_price;
+      FC_ASSERT( settled_amount.amount <= bitasset.settlement_fund );
+
+      d.modify( bitasset, [&]( asset_bitasset_data_object& obj ){
+                obj.settlement_fund -= settled_amount.amount;
+                });
+
+      d.adjust_balance(op.account, settled_amount);
+
+      return settled_amount;
+   }
+   else
+   {
+      return d.create<force_settlement_object>([&](force_settlement_object& s) {
+         s.owner = op.account;
+         s.balance = op.amount;
+         s.settlement_date = d.head_block_time() + asset_to_settle->bitasset_data(d).options.force_settlement_delay_sec;
+      }).id;
+   }
 }
 
 void_result asset_publish_feeds_evaluator::do_evaluate(const asset_publish_feed_operation& o)
@@ -371,6 +391,7 @@ void_result asset_publish_feeds_evaluator::do_evaluate(const asset_publish_feed_
    FC_ASSERT(base.is_market_issued());
 
    const asset_bitasset_data_object& bitasset = base.bitasset_data(d);
+   FC_ASSERT( !bitasset.has_settlement(), "No further feeds may be published after a settlement event" );
    FC_ASSERT(o.feed.settlement_price.quote.asset_id == bitasset.options.short_backing_asset);
    //Verify that the publisher is authoritative to publish a feed
    if( base.issuer == account_id_type() )

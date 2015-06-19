@@ -35,6 +35,10 @@ void_result call_order_update_evaluator::do_evaluate(const call_order_update_ope
 
    _bitasset_data  = &_debt_asset->bitasset_data(d);
 
+   /// if there is a settlement for this asset, then no further margin positions may be taken and
+   /// all existing margin positions should have been closed va database::globally_settle_asset
+   FC_ASSERT( !_bitasset_data->has_settlement() );
+
    FC_ASSERT( o.delta_collateral.asset_id == _bitasset_data->options.short_backing_asset );
 
    if( _bitasset_data->is_prediction_market )
