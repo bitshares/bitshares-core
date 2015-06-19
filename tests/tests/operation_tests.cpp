@@ -1158,15 +1158,6 @@ BOOST_AUTO_TEST_CASE( witness_withdraw_pay_test )
    //   which will initialize last_budget_time
    generate_block();
 
-   // Based on the size of the reserve fund later in the test, the witness budget will be set to this value
-   const int ref_budget = 624;
-   const int witness_ppb = 55;
-
-   db.modify( db.get_global_properties(), [&]( global_property_object& _gpo )
-   {
-      _gpo.parameters.witness_pay_per_block = witness_ppb;
-   } );
-
    // Make an account and upgrade it to prime, so that witnesses get some pay
    create_account("nathan");
    transfer(account_id_type()(db), get_account("nathan"), asset(10000000000));
@@ -1176,6 +1167,27 @@ BOOST_AUTO_TEST_CASE( witness_withdraw_pay_test )
    const account_object* nathan = &get_account("nathan");
    enable_fees(105000000);
    BOOST_CHECK_GT(db.current_fee_schedule().membership_lifetime_fee, 0);
+   // Based on the size of the reserve fund later in the test, the witness budget will be set to this value
+   const uint64_t ref_budget =
+      ((uint64_t( db.current_fee_schedule().membership_lifetime_fee )
+         * GRAPHENE_CORE_ASSET_CYCLE_RATE * 30
+         * db.get_global_properties().parameters.block_interval
+       ) + ((uint64_t(1) << GRAPHENE_CORE_ASSET_CYCLE_RATE_BITS)-1)
+      ) >> GRAPHENE_CORE_ASSET_CYCLE_RATE_BITS
+      ;
+   // change this if ref_budget changes
+   BOOST_CHECK_EQUAL( ref_budget, 624 );
+   const uint64_t witness_ppb = ref_budget * 10 / 23 + 1;
+   // change this if ref_budget changes
+   BOOST_CHECK_EQUAL( witness_ppb, 272 );
+   // following two inequalities need to hold for maximal code coverage
+   BOOST_CHECK_LT( witness_ppb * 2, ref_budget );
+   BOOST_CHECK_GT( witness_ppb * 3, ref_budget );
+
+   db.modify( db.get_global_properties(), [&]( global_property_object& _gpo )
+   {
+      _gpo.parameters.witness_pay_per_block = witness_ppb;
+   } );
 
    BOOST_CHECK_EQUAL(core->dynamic_asset_data_id(db).accumulated_fees.value, 0);
    account_upgrade_operation uop;
@@ -1228,6 +1240,7 @@ BOOST_AUTO_TEST_CASE( witness_withdraw_pay_test )
    // second witness finally gets paid!
    generate_block();
    witness = &db.fetch_block_by_number(db.head_block_num())->witness(db);
+   const witness_object* paid_witness = witness;
    BOOST_CHECK_EQUAL( witness->accumulated_income.value, witness_ppb );
    BOOST_CHECK_EQUAL( db.get_dynamic_global_properties().witness_budget.value, ref_budget - witness_ppb );
 
@@ -1238,17 +1251,19 @@ BOOST_AUTO_TEST_CASE( witness_withdraw_pay_test )
 
    generate_block();
    witness = &db.fetch_block_by_number(db.head_block_num())->witness(db);
-   BOOST_CHECK_EQUAL( witness->accumulated_income.value, witness_ppb );
-   BOOST_CHECK_EQUAL( db.get_dynamic_global_properties().witness_budget.value, ref_budget - 3 * witness_ppb );
+   BOOST_CHECK_LT( witness->accumulated_income.value, witness_ppb );
+   BOOST_CHECK_EQUAL( witness->accumulated_income.value, ref_budget - 2 * witness_ppb );
+   BOOST_CHECK_EQUAL( db.get_dynamic_global_properties().witness_budget.value, 0 );
 
    generate_block();
    witness = &db.fetch_block_by_number(db.head_block_num())->witness(db);
-   BOOST_CHECK_EQUAL( witness->accumulated_income.value, witness_ppb );
-   BOOST_CHECK_EQUAL( db.get_dynamic_global_properties().witness_budget.value, ref_budget - 4 * witness_ppb );
+   BOOST_CHECK_EQUAL( witness->accumulated_income.value, 0 );
+   BOOST_CHECK_EQUAL( db.get_dynamic_global_properties().witness_budget.value, 0 );
 
    trx.set_expiration(db.head_block_time() + GRAPHENE_DEFAULT_MAX_TIME_UNTIL_EXPIRATION);
    // Withdraw the witness's pay
    enable_fees(1);
+   witness = paid_witness;
    witness_withdraw_pay_operation wop;
    wop.from_witness = witness->id;
    wop.to_account = witness->witness_account;
