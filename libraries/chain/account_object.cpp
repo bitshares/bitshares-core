@@ -78,14 +78,11 @@ void account_statistics_object::process_fees(const account_object& a, database& 
 
       auto pay_out_fees = [&](const account_object& account, share_type core_fee_total, bool require_vesting)
       {
-         // Check the referrer and registrar -- if they're no longer members, pay up to the lifetime member instead.
+         // Check the referrer -- if he's no longer a member, pay to the lifetime referrer instead.
+         // No need to check the registrar; registrars are required to be lifetime members.
          if( account.referrer(d).is_basic_account(d.head_block_time()) )
             d.modify(account, [](account_object& a) {
                a.referrer = a.lifetime_referrer;
-            });
-         if( account.registrar(d).is_basic_account(d.head_block_time()) )
-            d.modify(account, [](account_object& a) {
-               a.registrar = a.lifetime_referrer;
             });
 
          share_type network_cut = cut_fee(core_fee_total, account.network_fee_percentage);
