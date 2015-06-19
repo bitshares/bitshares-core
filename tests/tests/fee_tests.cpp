@@ -130,4 +130,45 @@ BOOST_AUTO_TEST_CASE( cashback_test )
    BOOST_CHECK_EQUAL(stud_id(db).cashback_balance(db).balance.amount.value, 25750);
 } FC_LOG_AND_RETHROW() }
 
+BOOST_AUTO_TEST_CASE(bulk_discount)
+{ try {
+   ACTOR(nathan);
+   // Give nathan ALLLLLL the money!
+   transfer(GRAPHENE_COMMITTEE_ACCOUNT, nathan_id, db.get_balance(GRAPHENE_COMMITTEE_ACCOUNT, asset_id_type()));
+   enable_fees(GRAPHENE_BLOCKCHAIN_PRECISION*10);
+   upgrade_to_lifetime_member(nathan_id);
+   share_type new_fees;
+   while( nathan_id(db).statistics(db).lifetime_fees_paid + new_fees < GRAPHENE_DEFAULT_BULK_DISCOUNT_THRESHOLD_MIN )
+   {
+      transfer(nathan_id, GRAPHENE_COMMITTEE_ACCOUNT, asset(1));
+      new_fees += transfer_operation().calculate_fee(db.current_fee_schedule());
+   }
+   generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+   enable_fees(GRAPHENE_BLOCKCHAIN_PRECISION*10);
+   auto old_cashback = nathan_id(db).cashback_balance(db).balance;
+
+   transfer(nathan_id, GRAPHENE_COMMITTEE_ACCOUNT, asset(1));
+   generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+   enable_fees(GRAPHENE_BLOCKCHAIN_PRECISION*10);
+
+   BOOST_CHECK_EQUAL(nathan_id(db).cashback_balance(db).balance.amount.value,
+                     old_cashback.amount.value + GRAPHENE_BLOCKCHAIN_PRECISION * 8);
+
+   new_fees = 0;
+   while( nathan_id(db).statistics(db).lifetime_fees_paid + new_fees < GRAPHENE_DEFAULT_BULK_DISCOUNT_THRESHOLD_MAX )
+   {
+      transfer(nathan_id, GRAPHENE_COMMITTEE_ACCOUNT, asset(1));
+      new_fees += transfer_operation().calculate_fee(db.current_fee_schedule());
+   }
+   generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+   enable_fees(GRAPHENE_BLOCKCHAIN_PRECISION*10);
+   old_cashback = nathan_id(db).cashback_balance(db).balance;
+
+   transfer(nathan_id, GRAPHENE_COMMITTEE_ACCOUNT, asset(1));
+   generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+
+   BOOST_CHECK_EQUAL(nathan_id(db).cashback_balance(db).balance.amount.value,
+                     old_cashback.amount.value + GRAPHENE_BLOCKCHAIN_PRECISION * 9);
+} FC_LOG_AND_RETHROW() }
+
 BOOST_AUTO_TEST_SUITE_END()

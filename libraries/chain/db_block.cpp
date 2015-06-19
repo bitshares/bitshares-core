@@ -306,8 +306,6 @@ signed_block database::_generate_block(
    if( !(skip & skip_delegate_signature) ) _pending_block.sign( block_signing_private_key );
 
    FC_ASSERT( fc::raw::pack_size(_pending_block) <= get_global_properties().parameters.maximum_block_size );
-   //This line used to std::move(_pending_block) but this is unsafe as _pending_block is later referenced without being
-   //reinitialized. Future optimization could be to move it, then reinitialize it with the values we need to preserve.
    signed_block tmp = _pending_block;
    tmp.transaction_merkle_root = tmp.calculate_merkle_root();
    _pending_block.transactions.clear();
