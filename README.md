@@ -38,7 +38,31 @@ A list of CLI wallet commands is available [here](https://bitshares.github.io/do
 Code coverage testing
 ---------------------
 
-TODO:  Write something here
+Check how much code is covered by unit tests, using gcov/lcov (see http://ltp.sourceforge.net/coverage/lcov.php ).
+
+    cmake -D ENABLE_COVERAGE_TESTING=true -D CMAKE_BUILD_TYPE=Debug .
+    make
+    lcov --capture --initial --directory . --output-file base.info --no-external
+    libraries/fc/bloom_test
+    libraries/fc/task_cancel_test
+    libraries/fc/api
+    libraries/fc/blind
+    libraries/fc/ecc_test test
+    libraries/fc/real128_test
+    libraries/fc/lzma_test README.md
+    libraries/fc/ntp_test
+    tests/intense_test
+    tests/app_test
+    tests/chain_bench
+    tests/chain_test
+    tests/performance_test
+    lcov --capture --directory . --output-file test.info --no-external
+    lcov --add-tracefile base.info --add-tracefile test.info --output-file total.info
+    lcov -o interesting.info -r total.info libraries/fc/vendor/\* libraries/fc/tests/\* tests/\*
+    mkdir -p lcov
+    genhtml interesting.info --output-directory lcov --prefix `pwd`
+
+Now open `lcov/index.html` in a browser.
 
 Unit testing
 ------------
