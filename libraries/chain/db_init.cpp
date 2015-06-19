@@ -36,6 +36,7 @@
 
 #include <graphene/chain/account_evaluator.hpp>
 #include <graphene/chain/asset_evaluator.hpp>
+#include <graphene/chain/assert_evaluator.hpp>
 #include <graphene/chain/custom_evaluator.hpp>
 #include <graphene/chain/delegate_evaluator.hpp>
 #include <graphene/chain/global_parameters_evaluator.hpp>
@@ -73,6 +74,7 @@ void database::initialize_evaluators()
    register_evaluator<asset_update_feed_producers_evaluator>();
    register_evaluator<asset_settle_evaluator>();
    register_evaluator<asset_global_settle_evaluator>();
+   register_evaluator<assert_evaluator>();
    register_evaluator<limit_order_create_evaluator>();
    register_evaluator<limit_order_cancel_evaluator>();
    register_evaluator<call_order_update_evaluator>();

@@ -2,13 +2,13 @@
 #include <graphene/chain/account_object.hpp>
 #include <graphene/chain/asset_object.hpp>
 #include <graphene/chain/block_summary_object.hpp>
+#include <graphene/chain/call_order_object.hpp>
 #include <graphene/chain/delegate_object.hpp>
 #include <graphene/chain/global_property_object.hpp>
 #include <graphene/chain/key_object.hpp>
 #include <graphene/chain/limit_order_object.hpp>
 #include <graphene/chain/operation_history_object.hpp>
 #include <graphene/chain/proposal_object.hpp>
-#include <graphene/chain/short_order_object.hpp>
 #include <graphene/chain/transaction_object.hpp>
 #include <graphene/chain/vesting_balance_object.hpp>
 #include <graphene/chain/withdraw_permission_object.hpp>
@@ -59,9 +59,6 @@ const uint8_t operation_history_object::type_id;
 
 const uint8_t proposal_object::space_id;
 const uint8_t proposal_object::type_id;
-
-const uint8_t short_order_object::space_id;
-const uint8_t short_order_object::type_id;
 
 const uint8_t transaction_object::space_id;
 const uint8_t transaction_object::type_id;

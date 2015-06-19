@@ -813,4 +813,14 @@ share_type account_upgrade_operation::calculate_fee(const fee_schedule_type& k) 
    return k.membership_annual_fee;
 }
 
+void assert_operation::validate()const
+{
+   FC_ASSERT( fee.amount >= 0 );
+}
+void assert_operation::get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>&)const
+{
+   active_auth_set.insert(fee_paying_account);
+   active_auth_set.insert(required_auths.begin(), required_auths.end());
+}
+
 } } // namespace graphene::chain

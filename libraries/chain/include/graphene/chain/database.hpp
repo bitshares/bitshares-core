@@ -109,7 +109,7 @@ namespace graphene { namespace chain {
          {
             skip_nothing                = 0x00,
             skip_delegate_signature     = 0x01,  ///< used while reindexing
-            skip_transaction_signatures = 0x02,  ///< used by non delegate nodes
+            skip_transaction_signatures = 0x02,  ///< used by non-witness nodes
             skip_undo_block             = 0x04,  ///< used while reindexing
             skip_undo_transaction       = 0x08,  ///< used while applying block
             skip_transaction_dupe_check = 0x10,  ///< used while reindexing
@@ -117,7 +117,9 @@ namespace graphene { namespace chain {
             skip_block_size_check       = 0x40,  ///< used when applying locally generated transactions
             skip_tapos_check            = 0x80,  ///< used while reindexing -- note this skips expiration check as well
             skip_authority_check        = 0x100, ///< used while reindexing -- disables any checking of authority on transactions
-            skip_merkle_check           = 0x200  ///< used while reindexing
+            skip_merkle_check           = 0x200, ///< used while reindexing
+            skip_assert_evaluation      = 0x400, ///< used while reindexing
+            skip_unknown_predicate      = 0x800  ///< used by non-witness nodes to allow unknown predicates
          };
 
          void open(const fc::path& data_dir, const genesis_state_type& initial_allocation = genesis_state_type());

@@ -83,6 +83,7 @@
 #define GRAPHENE_DEFAULT_CASHBACK_VESTING_THRESHOLD           (GRAPHENE_BLOCKCHAIN_PRECISION*int64_t(100))
 #define GRAPHENE_DEFAULT_BURN_PERCENT_OF_FEE                  (20*GRAPHENE_1_PERCENT)
 #define GRAPHENE_WITNESS_PAY_PERCENT_PRECISION                (1000000000)
+#define GRAPHENE_DEFAULT_MAX_ASSERT_OPCODE                    1
 #define GRAPHENE_GENESIS_TIMESTAMP                            (1431700000)  /// Should be divisible by GRAPHENE_DEFAULT_BLOCK_INTERVAL
 
 // counter initialization values used to derive near and far future seeds for shuffling witnesses
