@@ -1056,18 +1056,16 @@ BOOST_AUTO_TEST_CASE( fill_order )
    o.calculate_fee(db.current_fee_schedule());
 } FC_LOG_AND_RETHROW() }
 
-BOOST_AUTO_TEST_CASE_EXPECTED_FAILURES( witness_withdraw_pay_test, 10 )
 BOOST_AUTO_TEST_CASE( witness_withdraw_pay_test )
 { try {
    // there is an immediate maintenance interval in the first block
    //   which will initialize last_budget_time
    generate_block();
 
-   // budget should be 25 satoshis based on 30 blocks at 5-second interval
-   // with 17 / 2**32 rate per block
-   const int ref_budget = 125;
-   // set to a value which will exhaust ref_budget after three witnesses
+   // Based on the size of the reserve fund later in the test, the witness budget will be set to this value
+   const int ref_budget = 624;
    const int witness_ppb = 55;
+
    db.modify( db.get_global_properties(), [&]( global_property_object& _gpo )
    {
       _gpo.parameters.witness_pay_per_block = witness_ppb;
@@ -1123,43 +1121,36 @@ BOOST_AUTO_TEST_CASE( witness_withdraw_pay_test )
    // maintenance will be in block 31.  time of block 31 - time of block 1 = 30 * 5 seconds.
 
    schedule_maint();
-   // TODO:  Replace this with another check
-   //BOOST_CHECK_EQUAL(account_id_type()(db).statistics(db).cashback_rewards.value, 1000000000-200000000);
-   // first witness paid from old budget (so no pay)
-   BOOST_CHECK_EQUAL( core->burned(db).value, 0 );
+   // The 80% lifetime referral fee went to the committee account, which burned it. Check that it's here.
+   BOOST_CHECK_EQUAL( core->burned(db).value, 840000000 );
    generate_block();
-   BOOST_CHECK_EQUAL( core->burned(db).value, 210000000 - ref_budget );
+   BOOST_CHECK_EQUAL( core->burned(db).value, 840000000 + 210000000 - ref_budget );
    BOOST_CHECK_EQUAL( db.get_dynamic_global_properties().witness_budget.value, ref_budget );
    witness = &db.fetch_block_by_number(db.head_block_num())->witness(db);
+   // first witness paid from old budget (so no pay)
    BOOST_CHECK_EQUAL( witness->accumulated_income.value, 0 );
    // second witness finally gets paid!
    generate_block();
    witness = &db.fetch_block_by_number(db.head_block_num())->witness(db);
    BOOST_CHECK_EQUAL( witness->accumulated_income.value, witness_ppb );
    BOOST_CHECK_EQUAL( db.get_dynamic_global_properties().witness_budget.value, ref_budget - witness_ppb );
-   const witness_object* paid_witness = witness;
 
-   // full payment to next witness
    generate_block();
    witness = &db.fetch_block_by_number(db.head_block_num())->witness(db);
    BOOST_CHECK_EQUAL( witness->accumulated_income.value, witness_ppb );
    BOOST_CHECK_EQUAL( db.get_dynamic_global_properties().witness_budget.value, ref_budget - 2 * witness_ppb );
 
-   // partial payment to last witness
    generate_block();
    witness = &db.fetch_block_by_number(db.head_block_num())->witness(db);
-   BOOST_CHECK_EQUAL( witness->accumulated_income.value, ref_budget - 2 * witness_ppb );
-   BOOST_CHECK_EQUAL( db.get_dynamic_global_properties().witness_budget.value, 0 );
+   BOOST_CHECK_EQUAL( witness->accumulated_income.value, witness_ppb );
+   BOOST_CHECK_EQUAL( db.get_dynamic_global_properties().witness_budget.value, ref_budget - 3 * witness_ppb );
 
    generate_block();
    witness = &db.fetch_block_by_number(db.head_block_num())->witness(db);
-   BOOST_CHECK_EQUAL( witness->accumulated_income.value, 0 );
-   BOOST_CHECK_EQUAL( db.get_dynamic_global_properties().witness_budget.value, 0 );
+   BOOST_CHECK_EQUAL( witness->accumulated_income.value, witness_ppb );
+   BOOST_CHECK_EQUAL( db.get_dynamic_global_properties().witness_budget.value, ref_budget - 4 * witness_ppb );
 
    trx.set_expiration(db.head_block_time() + GRAPHENE_DEFAULT_MAX_TIME_UNTIL_EXPIRATION);
-   // last one was unpaid, so pull out a paid one for checks
-   witness = paid_witness;
-   //wdump((*witness));
    // Withdraw the witness's pay
    enable_fees(1);
    witness_withdraw_pay_operation wop;
@@ -1175,7 +1166,7 @@ BOOST_AUTO_TEST_CASE( witness_withdraw_pay_test )
    trx.clear();
 
    BOOST_CHECK_EQUAL(get_balance(witness->witness_account(db), *core), witness_ppb - 1/*fee*/);
-   BOOST_CHECK_EQUAL(core->burned(db).value, 210000000 - ref_budget );
+   BOOST_CHECK_EQUAL(core->burned(db).value, 840000000 + 210000000 - ref_budget );
    BOOST_CHECK_EQUAL(witness->accumulated_income.value, 0);
 } FC_LOG_AND_RETHROW() }
 
