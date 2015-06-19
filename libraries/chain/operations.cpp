@@ -401,9 +401,7 @@ void call_order_update_operation::validate()const
 { try {
    FC_ASSERT( fee.amount >= 0 );
    FC_ASSERT( delta_collateral.asset_id != delta_debt.asset_id );
-   FC_ASSERT( delta_debt.asset_id       == call_price.base.asset_id );
-   FC_ASSERT( delta_collateral.asset_id == call_price.quote.asset_id );
-   call_price.validate();
+   FC_ASSERT( delta_collateral.amount != 0 || delta_debt.amount != 0 );
 } FC_CAPTURE_AND_RETHROW((*this)) }
 
 share_type call_order_update_operation::calculate_fee(const fee_schedule_type& k) const

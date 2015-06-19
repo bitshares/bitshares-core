@@ -64,8 +64,8 @@
 // These are NOT percentages
 #define GRAPHENE_MIN_COLLATERAL_RATIO                   1001  // lower than this could result in divide by 0
 #define GRAPHENE_MAX_COLLATERAL_RATIO                   32000 // higher than this is unnecessary and may exceed int16 storage
-#define GRAPHENE_DEFAULT_MAINTENANCE_COLLATERAL_RATIO   1500 // We require collateral of 1.5x or more
-#define GRAPHENE_DEFAULT_MAX_SHORT_SQUEEZE_RATIO        1750 // If there is a squeeze you are protected up to 1.75x... but black swan could occur first
+#define GRAPHENE_DEFAULT_MAINTENANCE_COLLATERAL_RATIO   1750 // Call when collateral only pays off 175% the debt
+#define GRAPHENE_DEFAULT_MAX_SHORT_SQUEEZE_RATIO        1500 // Stop calling when collateral only pays off 150% of the debt
 #define GRAPHENE_DEFAULT_MARGIN_PERIOD_SEC              (30*60*60*24)
 
 #define GRAPHENE_DEFAULT_NUM_WITNESSES                        (101)

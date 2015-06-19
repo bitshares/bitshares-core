@@ -845,7 +845,6 @@ namespace graphene { namespace chain {
       account_id_type     funding_account; ///< pays fee, collateral, and cover
       asset               delta_collateral; ///< the amount of collateral to add to the margin position
       asset               delta_debt; ///< the amount of the debt to be paid off, may be negative to issue new debt
-      price               call_price; ///< the price at which the collateral will be sold to cover the debt
 
       account_id_type fee_payer()const { return funding_account; }
       void            get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>&)const;
@@ -1504,7 +1503,7 @@ FC_REFLECT( graphene::chain::limit_order_create_operation,
           )
 FC_REFLECT( graphene::chain::fill_order_operation, (fee)(order_id)(account_id)(pays)(receives) )
 FC_REFLECT( graphene::chain::limit_order_cancel_operation,(fee)(fee_paying_account)(order) )
-FC_REFLECT( graphene::chain::call_order_update_operation, (fee)(funding_account)(delta_collateral)(delta_debt)(call_price) )
+FC_REFLECT( graphene::chain::call_order_update_operation, (fee)(funding_account)(delta_collateral)(delta_debt) )
 
 FC_REFLECT( graphene::chain::transfer_operation,
             (fee)(from)(to)(amount)(memo) )

@@ -151,10 +151,10 @@ struct database_fixture {
    void force_settle(const account_object& who, asset what);
    void update_feed_producers(const asset_object& mia, flat_set<account_id_type> producers);
    void publish_feed(const asset_object& mia, const account_object& by, const price_feed& f);
-   void borrow(account_id_type who, asset what, asset collateral, price call_price = price())
-   { borrow(who(db), what, collateral, call_price); }
-   void borrow(const account_object& who, asset what, asset collateral, price call_price);
-   void cover(const account_object& who, asset what, asset collateral_freed, price call_price = price());
+   void borrow(account_id_type who, asset what, asset collateral)
+   { borrow(who(db), what, collateral); }
+   void borrow(const account_object& who, asset what, asset collateral);
+   void cover(const account_object& who, asset what, asset collateral_freed);
 
    const asset_object& get_asset( const string& symbol )const;
    const account_object& get_account( const string& name )const;
