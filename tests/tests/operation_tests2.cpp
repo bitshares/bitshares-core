@@ -300,8 +300,7 @@ BOOST_AUTO_TEST_CASE( withdraw_permission_delete )
    PUSH_TX( db, trx );
 } FC_LOG_AND_RETHROW() }
 
-BOOST_AUTO_TEST_CASE_EXPECTED_FAILURES( broken_mia_feeds, 1 )
-BOOST_AUTO_TEST_CASE( broken_mia_feeds )
+BOOST_AUTO_TEST_CASE( mia_feeds )
 { try {
    ACTORS((nathan)(dan)(ben)(vikram));
    asset_id_type bit_usd_id = create_bitasset("BITUSD").id;
@@ -337,31 +336,32 @@ BOOST_AUTO_TEST_CASE( broken_mia_feeds )
       const asset_object& bit_usd = bit_usd_id(db);
       asset_publish_feed_operation op({asset(), vikram_id});
       op.asset_id = bit_usd_id;
-      op.feed.settlement_price = price(asset(GRAPHENE_BLOCKCHAIN_PRECISION),bit_usd.amount(30));
+      op.feed.settlement_price = ~price(asset(GRAPHENE_BLOCKCHAIN_PRECISION),bit_usd.amount(30));
       // We'll expire margins after a month
       // Accept defaults for required collateral
       trx.operations.emplace_back(op);
       PUSH_TX( db, trx, ~0 );
 
       const asset_bitasset_data_object& bitasset = bit_usd.bitasset_data(db);
-      BOOST_CHECK(bitasset.current_feed.settlement_price.to_real() == GRAPHENE_BLOCKCHAIN_PRECISION / 30.0);
+      BOOST_CHECK(bitasset.current_feed.settlement_price.to_real() == 30.0 / GRAPHENE_BLOCKCHAIN_PRECISION);
       BOOST_CHECK(bitasset.current_feed.maintenance_collateral_ratio == GRAPHENE_DEFAULT_MAINTENANCE_COLLATERAL_RATIO);
 
       op.publisher = ben_id;
-      op.feed.settlement_price = price(asset(GRAPHENE_BLOCKCHAIN_PRECISION),bit_usd.amount(25));
+      op.feed.settlement_price = ~price(asset(GRAPHENE_BLOCKCHAIN_PRECISION),bit_usd.amount(25));
       trx.operations.back() = op;
       PUSH_TX( db, trx, ~0 );
 
-      BOOST_CHECK_EQUAL(bitasset.current_feed.settlement_price.to_real(), GRAPHENE_BLOCKCHAIN_PRECISION / 25.0);
+      BOOST_CHECK_EQUAL(bitasset.current_feed.settlement_price.to_real(), 30.0 / GRAPHENE_BLOCKCHAIN_PRECISION);
       BOOST_CHECK(bitasset.current_feed.maintenance_collateral_ratio == GRAPHENE_DEFAULT_MAINTENANCE_COLLATERAL_RATIO);
 
       op.publisher = dan_id;
-      op.feed.settlement_price = price(asset(GRAPHENE_BLOCKCHAIN_PRECISION),bit_usd.amount(40));
+      op.feed.settlement_price = ~price(asset(GRAPHENE_BLOCKCHAIN_PRECISION),bit_usd.amount(40));
+      op.feed.maximum_short_squeeze_ratio = 1000;
       op.feed.maintenance_collateral_ratio = 1000;
       trx.operations.back() = op;
       PUSH_TX( db, trx, ~0 );
 
-      BOOST_CHECK_EQUAL(bitasset.current_feed.settlement_price.to_real(), GRAPHENE_BLOCKCHAIN_PRECISION / 30.0);
+      BOOST_CHECK_EQUAL(bitasset.current_feed.settlement_price.to_real(), 30.0 / GRAPHENE_BLOCKCHAIN_PRECISION);
       BOOST_CHECK(bitasset.current_feed.maintenance_collateral_ratio == GRAPHENE_DEFAULT_MAINTENANCE_COLLATERAL_RATIO);
 
       op.publisher = nathan_id;
@@ -479,7 +479,7 @@ BOOST_AUTO_TEST_CASE( unimp_global_settle_test )
    BOOST_CHECK_EQUAL(get_balance(ben_id, asset_id_type()), 10091);
    BOOST_CHECK_EQUAL(get_balance(dan_id, bit_usd_id), 0);
    BOOST_CHECK_EQUAL(get_balance(dan_id, asset_id_type()), 9850);
-} FC_LOG_AND_RETHROW() 
+} FC_LOG_AND_RETHROW()
    */
 }
 
