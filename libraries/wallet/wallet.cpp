@@ -1080,6 +1080,24 @@ public:
       return sign_transaction( tx, broadcast );
    } FC_CAPTURE_AND_RETHROW( (account_to_settle)(amount_to_settle)(symbol)(broadcast) ) }
 
+   signed_transaction whitelist_account(string authorizing_account,
+                                        string account_to_list,
+                                        account_whitelist_operation::account_listing new_listing_status,
+                                        bool broadcast /* = false */)
+   { try {
+      account_whitelist_operation whitelist_op;
+      whitelist_op.authorizing_account = get_account_id(authorizing_account);
+      whitelist_op.account_to_list = get_account_id(account_to_list);
+      whitelist_op.new_listing = new_listing_status;
+
+      signed_transaction tx;
+      tx.operations.push_back( whitelist_op );
+      tx.visit( operation_set_fee( _remote_db->get_global_properties().parameters.current_fees ) );
+      tx.validate();
+
+      return sign_transaction( tx, broadcast );
+   } FC_CAPTURE_AND_RETHROW( (authorizing_account)(account_to_list)(new_listing_status)(broadcast) ) }
+
    signed_transaction sign_transaction(signed_transaction tx, bool broadcast = false)
    {
       flat_set<account_id_type> req_active_approvals;
@@ -1763,7 +1781,7 @@ signed_transaction wallet_api::global_settle_asset(string symbol,
                                                    price settle_price,
                                                    bool broadcast /* = false */)
 {
-   return global_settle_asset(symbol, settle_price, broadcast);
+   return my->global_settle_asset(symbol, settle_price, broadcast);
 }
 
 signed_transaction wallet_api::settle_asset(string account_to_settle,
@@ -1771,7 +1789,15 @@ signed_transaction wallet_api::settle_asset(string account_to_settle,
                                             string symbol,
                                             bool broadcast /* = false */)
 {
-   return settle_asset(account_to_settle, amount_to_settle, symbol);
+   return my->settle_asset(account_to_settle, amount_to_settle, symbol, broadcast);
+}
+
+signed_transaction wallet_api::whitelist_account(string authorizing_account,
+                                                 string account_to_list,
+                                                 account_whitelist_operation::account_listing new_listing_status,
+                                                 bool broadcast /* = false */)
+{
+   return my->whitelist_account(authorizing_account, account_to_list, new_listing_status, broadcast);
 }
 
 void wallet_api::set_wallet_filename(string wallet_filename)

@@ -259,6 +259,11 @@ class wallet_api
                                       string symbol,
                                       bool broadcast = false);
 
+      signed_transaction whitelist_account(string authorizing_account,
+                                           string account_to_list,
+                                           account_whitelist_operation::account_listing new_listing_status,
+                                           bool broadcast = false);
+
       signed_transaction sign_transaction(signed_transaction tx, bool broadcast = false);
 
       void dbg_make_uia(string creator, string symbol);

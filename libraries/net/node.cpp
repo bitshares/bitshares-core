@@ -4930,9 +4930,7 @@ namespace graphene { namespace net { namespace detail {
 
   void node::close()
   {
-    wlog( ".... WARNING NOT DOING ANYTHING WHEN I SHOULD ......" );
-    return;
-    my->close();
+    INVOKE_IN_IMPL(close);
   }
 
   struct simulated_network::node_info
