@@ -67,7 +67,6 @@ void_result call_order_update_evaluator::do_evaluate(const call_order_update_ope
 void_result call_order_update_evaluator::do_apply(const call_order_update_operation& o)
 { try {
    database& d = db();
-   //wdump( (_bitasset_data->current_feed) );
 
    if( o.delta_debt.amount != 0 )
    {
@@ -104,11 +103,12 @@ void_result call_order_update_evaluator::do_apply(const call_order_update_operat
       FC_ASSERT( o.delta_debt.amount > 0 );
 
       call_obj = &d.create<call_order_object>( [&](call_order_object& call ){
-                                   call.borrower = o.funding_account;
-                                   call.collateral = o.delta_collateral.amount;
-                                   call.debt = o.delta_debt.amount;
-                                   call.call_price = ~o.call_price;
-                                   });
+         call.borrower = o.funding_account;
+         call.collateral = o.delta_collateral.amount;
+         call.debt = o.delta_debt.amount;
+         call.call_price = price::call_price(o.delta_debt, o.delta_collateral,
+                                             _bitasset_data->current_feed.maintenance_collateral_ratio);
+      });
    }
    else
    {
@@ -117,41 +117,32 @@ void_result call_order_update_evaluator::do_apply(const call_order_update_operat
       d.modify( *call_obj, [&]( call_order_object& call ){
           call.collateral += o.delta_collateral.amount;
           call.debt       += o.delta_debt.amount;
-          call.call_price  = ~o.call_price;
+          call.call_price  =  price::call_price(call.get_debt(), call.get_collateral(),
+                                                _bitasset_data->current_feed.maintenance_collateral_ratio);
       });
    }
 
    auto debt = call_obj->get_debt();
-   if( debt.amount == 0 ) 
+   if( debt.amount == 0 )
    {
       FC_ASSERT( call_obj->collateral == 0 );
       d.remove( *call_obj );
       return void_result();
    }
 
-   /** then we must check for margin calls and other issues */
+   FC_ASSERT(call_obj->collateral > 0 && call_obj->debt > 0);
+
+   // then we must check for margin calls and other issues
    if( !_bitasset_data->is_prediction_market )
    {
-      auto collateral = call_obj->get_collateral();
-      auto mp = _bitasset_data->current_feed.maintenance_price();
-
-   //   edump((debt)(collateral)((debt/collateral).to_real())(mp.to_real()) );
-    //  edump((debt*mp));
-      /// paying off the debt at the user specified call price should require
-      /// less collateral than paying off the debt at the maitenance price
-      auto col_at_call_price    = debt * o.call_price;
-      auto col_at_min_callprice = debt * mp;
-      FC_ASSERT( col_at_call_price <= col_at_min_callprice, "", ("debt*o.callprice",debt*o.call_price)("debt*mp",debt*mp) );
-      FC_ASSERT( col_at_call_price <= collateral );
-
-      //wdump( (o.call_price)(mp)(call_obj->call_price.to_real())(mp.to_real()) );
-      //FC_ASSERT( call_obj->call_price <= mp );
+      // Check that the order's debt per collateral is less than the system's minimum debt per collateral.
+      FC_ASSERT( ~call_obj->call_price <= _bitasset_data->current_feed.settlement_price,
+                 "Insufficient collateral for debt.",
+                 ("a", ~call_obj->call_price)("b", _bitasset_data->current_feed.settlement_price));
 
       auto call_order_id = call_obj->id;
 
-      //ilog( "checking call orders" );
-
-      // check to see if the order needs to be margin called now, but don't allow black swans and require there to be 
+      // check to see if the order needs to be margin called now, but don't allow black swans and require there to be
       // limit orders available that could be used to fill the order.
       if( d.check_call_orders( *_debt_asset, false ) )
       {

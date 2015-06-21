@@ -716,22 +716,22 @@ void  database_fixture::force_settle( const account_object& who, asset what )
    trx.operations.clear();
 } FC_CAPTURE_AND_RETHROW( (who)(what) ) }
 
-void  database_fixture::borrow( const account_object& who, asset what, asset collateral, price call_price )
+void  database_fixture::borrow(const account_object& who, asset what, asset collateral)
 { try {
    trx.set_expiration(db.head_block_time() + fc::minutes(1));
    trx.operations.clear();
-   trx.operations.push_back( call_order_update_operation({ asset(), who.id, collateral, what, call_price }));;
+   trx.operations.push_back(call_order_update_operation({asset(), who.id, collateral, what}));;
    for( auto& op : trx.operations ) op.visit( operation_set_fee( db.current_fee_schedule() ) );
    trx.validate();
    db.push_transaction(trx, ~0);
    trx.operations.clear();
 } FC_CAPTURE_AND_RETHROW( (who.name)(what)(collateral) ) }
 
-void  database_fixture::cover( const account_object& who, asset what, asset collateral, price call_price )
+void  database_fixture::cover(const account_object& who, asset what, asset collateral)
 { try {
    trx.set_expiration(db.head_block_time() + fc::minutes(1));
    trx.operations.clear();
-   trx.operations.push_back( call_order_update_operation({ asset(), who.id, -collateral, -what, call_price }));
+   trx.operations.push_back( call_order_update_operation({asset(), who.id, -collateral, -what}));
    for( auto& op : trx.operations ) op.visit( operation_set_fee( db.current_fee_schedule() ) );
    trx.validate();
    db.push_transaction(trx, ~0);

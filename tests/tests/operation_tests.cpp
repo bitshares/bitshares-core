@@ -42,13 +42,27 @@ BOOST_FIXTURE_TEST_SUITE( operation_tests, database_fixture )
 BOOST_AUTO_TEST_CASE( feed_limit_logic_test )
 {
    try {
-      asset usd(100,1);
-      asset core(100,0);
+      asset usd(1000,1);
+      asset core(1000,0);
       price_feed feed;
       feed.settlement_price = usd / core;
 
-      FC_ASSERT( usd * feed.settlement_price < usd * feed.maintenance_price() );
-      FC_ASSERT( usd * feed.maintenance_price() < usd * feed.max_short_squeeze_price() );
+      // require 3x min collateral
+      auto swanp = usd / core;
+      auto callp = ~price::call_price( usd, core, 1750 );
+      // 1:1 collateral 
+      wdump((callp.to_real())(callp));
+      wdump((swanp.to_real())(swanp));
+      FC_ASSERT( callp.to_real() > swanp.to_real() );
+
+      /*
+      wdump((feed.settlement_price.to_real()));
+      wdump((feed.maintenance_price().to_real()));
+      wdump((feed.max_short_squeeze_price().to_real()));
+
+      BOOST_CHECK( usd * feed.settlement_price < usd * feed.maintenance_price() );
+      BOOST_CHECK( usd * feed.maintenance_price() < usd * feed.max_short_squeeze_price() );
+      */
 
    } catch (fc::exception& e) {
       edump((e.to_detail_string()));
@@ -70,65 +84,58 @@ BOOST_AUTO_TEST_CASE( call_order_update_test )
 
       FC_ASSERT( bitusd.bitasset_data(db).current_feed.settlement_price == current_feed.settlement_price );
 
-      auto default_call_price = ~price::call_price( bitusd.amount(5000), asset(5000), 1750);
-
       BOOST_TEST_MESSAGE( "attempting to borrow using 2x collateral at 1:1 price now that there is a valid order" );
-      borrow( dan, bitusd.amount(5000), asset(10000), default_call_price );
+      borrow( dan, bitusd.amount(5000), asset(10000));
       BOOST_REQUIRE_EQUAL( get_balance( dan, bitusd ), 5000 );
       BOOST_REQUIRE_EQUAL( get_balance( dan, core ), 10000000 - 10000 );
 
       BOOST_TEST_MESSAGE( "covering 2500 usd and freeing 5000 core..." );
-      cover( dan, bitusd.amount(2500), asset(5000), default_call_price );
+      cover( dan, bitusd.amount(2500), asset(5000));
       BOOST_REQUIRE_EQUAL( get_balance( dan, bitusd ), 2500 );
       BOOST_REQUIRE_EQUAL( get_balance( dan, core ), 10000000 - 10000 + 5000  );
 
       BOOST_TEST_MESSAGE( "verifying that attempting to cover the full amount without claiming the collateral fails" );
-      BOOST_REQUIRE_THROW( cover( dan, bitusd.amount(2500), core.amount(0), default_call_price  ), fc::exception );
+      BOOST_REQUIRE_THROW( cover( dan, bitusd.amount(2500), core.amount(0)  ), fc::exception );
 
-      cover( dan, bitusd.amount(2500), core.amount(5000), default_call_price );
+      cover( dan, bitusd.amount(2500), core.amount(5000));
 
       BOOST_REQUIRE_EQUAL( get_balance( dan, bitusd ), 0 );
       BOOST_REQUIRE_EQUAL( get_balance( dan, core ), 10000000  );
 
-      borrow( dan, bitusd.amount(5000), asset(10000), default_call_price );
+      borrow( dan, bitusd.amount(5000), asset(10000));
       BOOST_REQUIRE_EQUAL( get_balance( dan, bitusd ), 5000 );
       BOOST_REQUIRE_EQUAL( get_balance( dan, core ), 10000000 - 10000  );
 
 
       // test just increasing collateral
       BOOST_TEST_MESSAGE( "increasing collateral" );
-      borrow( dan, bitusd.amount(0), asset(10000), default_call_price );
+      borrow( dan, bitusd.amount(0), asset(10000));
 
       BOOST_REQUIRE_EQUAL( get_balance( dan, bitusd ), 5000 );
       BOOST_REQUIRE_EQUAL( get_balance( dan, core ), 10000000 - 20000  );
 
       // test just decreasing debt
       BOOST_TEST_MESSAGE( "decreasing debt" );
-      cover( dan, bitusd.amount(1000), asset(0), default_call_price );
+      cover( dan, bitusd.amount(1000), asset(0));
 
       BOOST_REQUIRE_EQUAL( get_balance( dan, bitusd ), 4000 );
       BOOST_REQUIRE_EQUAL( get_balance( dan, core ), 10000000 - 20000  );
 
       BOOST_TEST_MESSAGE( "increasing debt without increasing collateral" );
-      borrow( dan, bitusd.amount(1000), asset(0), default_call_price );
+      borrow( dan, bitusd.amount(1000), asset(0));
 
       BOOST_REQUIRE_EQUAL( get_balance( dan, bitusd ), 5000 );
       BOOST_REQUIRE_EQUAL( get_balance( dan, core ), 10000000 - 20000  );
 
       BOOST_TEST_MESSAGE( "increasing debt without increasing collateral again" );
-      BOOST_REQUIRE_THROW( borrow( dan, bitusd.amount(80000), asset(0), default_call_price ), fc::exception );
+      BOOST_REQUIRE_THROW( borrow( dan, bitusd.amount(80000), asset(0)), fc::exception );
       BOOST_TEST_MESSAGE( "attempting to claim all collateral without paying off debt" );
-      BOOST_REQUIRE_THROW( cover( dan, bitusd.amount(0), asset(20000), default_call_price ), fc::exception );
+      BOOST_REQUIRE_THROW( cover( dan, bitusd.amount(0), asset(20000)), fc::exception );
       BOOST_TEST_MESSAGE( "attempting reduce collateral without paying off any debt" );
-      cover( dan, bitusd.amount(0), asset(1000), default_call_price );
-
-      BOOST_TEST_MESSAGE( "attempting change call price without changing debt/collateral ratio" );
-      default_call_price = ~price::call_price( bitusd.amount(100), asset(50), 1750);
-      cover( dan, bitusd.amount(0), asset(0), default_call_price );
+      cover( dan, bitusd.amount(0), asset(1000));
 
       BOOST_TEST_MESSAGE( "attempting change call price to be below minimum for debt/collateral ratio" );
-      default_call_price = ~price::call_price( bitusd.amount(100), asset(500), 1750);
-      BOOST_REQUIRE_THROW( cover( dan, bitusd.amount(0), asset(0), default_call_price ), fc::exception );
+      BOOST_REQUIRE_THROW( cover( dan, bitusd.amount(0), asset(0)), fc::exception );
 
    } catch (fc::exception& e) {
       edump((e.to_detail_string()));
@@ -166,14 +173,13 @@ BOOST_AUTO_TEST_CASE( margin_call_limit_test )
 
       price_feed current_feed;
       current_feed.settlement_price = bitusd.amount( 100 ) / core.amount(100);
-      auto default_call_price = ~price::call_price( bitusd.amount(100), asset(100), 1750);
 
       // starting out with price 1:1
       publish_feed( bitusd, feedproducer, current_feed );
 
       // start out with 2:1 collateral
-      borrow( borrower, bitusd.amount(1000), asset(2000), default_call_price );
-      borrow( borrower2, bitusd.amount(1000), asset(4000), default_call_price );
+      borrow( borrower, bitusd.amount(1000), asset(2000));
+      borrow( borrower2, bitusd.amount(1000), asset(4000) );
 
       BOOST_REQUIRE_EQUAL( get_balance( borrower, bitusd ), 1000 );
       BOOST_REQUIRE_EQUAL( get_balance( borrower2, bitusd ), 1000 );
@@ -194,8 +200,8 @@ BOOST_AUTO_TEST_CASE( margin_call_limit_test )
 
 
       BOOST_TEST_MESSAGE( "Creating a margin call that is protected by the max short squeeze price" );
-      borrow( borrower, bitusd.amount(1000), asset(2000), default_call_price );
-      borrow( borrower2, bitusd.amount(1000), asset(4000), default_call_price );
+      borrow( borrower, bitusd.amount(1000), asset(2000) );
+      borrow( borrower2, bitusd.amount(1000), asset(4000) );
 
       // this should trigger margin call without protection from the price feed.
       order = create_sell_order( borrower2, bitusd.amount(1000), core.amount(1800) );
@@ -226,14 +232,13 @@ BOOST_AUTO_TEST_CASE( black_swan )
 
       price_feed current_feed;
       current_feed.settlement_price = bitusd.amount( 100 ) / core.amount(100);
-      auto default_call_price = ~price::call_price( bitusd.amount(100), asset(100), 1750);
 
       // starting out with price 1:1
       publish_feed( bitusd, feedproducer, current_feed );
 
       // start out with 2:1 collateral
-      borrow( borrower, bitusd.amount(1000), asset(2000), default_call_price );
-      borrow( borrower2, bitusd.amount(1000), asset(4000), default_call_price );
+      borrow( borrower, bitusd.amount(1000), asset(2000) );
+      borrow( borrower2, bitusd.amount(1000), asset(4000) );
 
       BOOST_REQUIRE_EQUAL( get_balance( borrower, bitusd ), 1000 );
       BOOST_REQUIRE_EQUAL( get_balance( borrower2, bitusd ), 1000 );
@@ -249,9 +254,9 @@ BOOST_AUTO_TEST_CASE( black_swan )
       FC_ASSERT( bitusd.bitasset_data(db).has_settlement() );
 
       force_settle( borrower, bitusd.amount(100) );
-  
+
       BOOST_TEST_MESSAGE( "Verify that we cannot borrow after black swan" );
-      BOOST_REQUIRE_THROW( borrow( borrower, bitusd.amount(1000), asset(2000), default_call_price ), fc::exception );
+      BOOST_REQUIRE_THROW( borrow( borrower, bitusd.amount(1000), asset(2000) ), fc::exception );
    } catch( const fc::exception& e) {
       edump((e.to_detail_string()));
       throw;
@@ -270,23 +275,21 @@ BOOST_AUTO_TEST_CASE( prediction_market )
       transfer(genesis_account, dan_id, asset(init_balance));
       transfer(genesis_account, nathan_id, asset(init_balance));
 
-      auto default_call_price = ~price::call_price( pmark.amount(100), asset(100), 1750);
-
       BOOST_TEST_MESSAGE( "Require throw for mismatch collateral amounts" );
-      BOOST_REQUIRE_THROW( borrow( dan, pmark.amount(1000), asset(2000), default_call_price ), fc::exception );
+      BOOST_REQUIRE_THROW( borrow( dan, pmark.amount(1000), asset(2000) ), fc::exception );
 
       BOOST_TEST_MESSAGE( "Open position with equal collateral" );
-      borrow( dan, pmark.amount(1000), asset(1000), default_call_price );
+      borrow( dan, pmark.amount(1000), asset(1000) );
 
       BOOST_TEST_MESSAGE( "Cover position with unequal asset should fail." );
-      BOOST_REQUIRE_THROW( cover( dan, pmark.amount(500), asset(1000), default_call_price ), fc::exception );
+      BOOST_REQUIRE_THROW( cover( dan, pmark.amount(500), asset(1000) ), fc::exception );
 
       BOOST_TEST_MESSAGE( "Cover half of position with equal ammounts" );
-      cover( dan, pmark.amount(500), asset(500), default_call_price );
+      cover( dan, pmark.amount(500), asset(500) );
 
       BOOST_TEST_MESSAGE( "Verify that forced settlment fails before global settlement" );
       BOOST_REQUIRE_THROW( force_settle( dan, pmark.amount(100) ), fc::exception );
-      
+
       BOOST_TEST_MESSAGE( "Shouldn't be allowed to force settle at more than 1 collateral per debt" );
       BOOST_REQUIRE_THROW( force_global_settle( pmark, pmark.amount(100) / core.amount(105) ), fc::exception );
 

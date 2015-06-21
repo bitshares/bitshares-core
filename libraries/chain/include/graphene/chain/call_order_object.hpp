@@ -48,7 +48,7 @@ namespace graphene { namespace chain {
         account_id_type  borrower;
         share_type       collateral;  ///< call_price.base.asset_id, access via get_collateral
         share_type       debt;        ///< call_price.quote.asset_id, access via get_collateral
-        price            call_price;
+        price            call_price;  ///< Debt / Collateral 
   };
 
   /**

@@ -99,12 +99,21 @@ namespace graphene { namespace chain {
       }
       price price::max( asset_id_type base, asset_id_type quote ) { return asset( share_type(GRAPHENE_MAX_SHARE_SUPPLY), base ) / asset( share_type(1), quote); }
       price price::min( asset_id_type base, asset_id_type quote ) { return asset( 1, base ) / asset( GRAPHENE_MAX_SHARE_SUPPLY, quote); }
-
+ 
+      /**
+       *  The black swan price is defined as debt/collateral, we want to perform a margin call
+       *  before debt == collateral.   Given a debt/collateral ratio of 1 USD / CORE and
+       *  a maintenance collateral requirement of 2x we can define the call price to be
+       *  2 USD / CORE.   
+       *
+       *  This method divides the collateral by the maintenance collateral ratio to derive
+       *  a call price for the given black swan ratio.
+       */
       price price::call_price(const asset& debt, const asset& collateral, uint16_t collateral_ratio)
       { try {
          fc::uint128 tmp( collateral.amount.value );
-         tmp *= collateral_ratio - 1000;
-         tmp /= 1000;
+         tmp *= 1000;
+         tmp /= collateral_ratio;
          FC_ASSERT( tmp <= GRAPHENE_MAX_SHARE_SUPPLY );
          return asset( tmp.to_uint64(), collateral.asset_id) / debt;
       } FC_CAPTURE_AND_RETHROW( (debt)(collateral)(collateral_ratio) ) }
@@ -125,7 +134,8 @@ namespace graphene { namespace chain {
          FC_ASSERT( maximum_short_squeeze_ratio >= GRAPHENE_MIN_COLLATERAL_RATIO );
          FC_ASSERT( maximum_short_squeeze_ratio <= GRAPHENE_MAX_COLLATERAL_RATIO );
          FC_ASSERT( maintenance_collateral_ratio >= GRAPHENE_MIN_COLLATERAL_RATIO );
-         FC_ASSERT( maintenance_collateral_ratio <= maximum_short_squeeze_ratio );
+         FC_ASSERT( maintenance_collateral_ratio <= GRAPHENE_MAX_COLLATERAL_RATIO );
+         //FC_ASSERT( maintenance_collateral_ratio >= maximum_short_squeeze_ratio );
       } FC_CAPTURE_AND_RETHROW( (*this) ) }
 
       price price_feed::max_short_squeeze_price()const
@@ -138,6 +148,7 @@ namespace graphene { namespace chain {
          collateral.amount = tmp.to_uint64();
          return settlement_price.base / collateral;
       }
+      /*
       price price_feed::maintenance_price()const
       {
          asset collateral = settlement_price.quote;
@@ -148,6 +159,7 @@ namespace graphene { namespace chain {
          collateral.amount = tmp.to_uint64();
          return settlement_price.base / collateral;
       }
+      */
 
 
 } } // graphene::chain

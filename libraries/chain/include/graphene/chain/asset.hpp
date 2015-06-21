@@ -157,8 +157,8 @@ namespace graphene { namespace chain {
        *  debt * maintenance_price() < collateral 
        *  debt * settlement_price    < debt * maintenance
        *  debt * maintenance_price() < debt * max_short_squeeze_price() 
-       */
       price maintenance_price()const;
+       */
 
       /** When selling collateral to pay off debt, the least amount of debt to receive should be 
        *  min_usd = max_short_squeeze_price() * collateral 
