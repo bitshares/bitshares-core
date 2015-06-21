@@ -333,6 +333,7 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
     auto max_price = price::max( mia.id, bitasset.options.short_backing_asset );
     // stop when limit orders are selling too little USD for too much CORE
     auto min_price = bitasset.current_feed.max_short_squeeze_price();
+    /*
  //   edump((bitasset.current_feed));
     edump((min_price.to_real())(min_price));
     edump((max_price.to_real())(max_price));
@@ -350,6 +351,7 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
        wdump((max_price)(max_price.to_real()));
        wdump((min_price)(min_price.to_real()));
     }
+    */
 
     assert( max_price.base.asset_id == min_price.base.asset_id );
      wlog( "from ${a} Debt/Col to ${b} Debt/Col ", ("a", max_price.to_real())("b",min_price.to_real()) );

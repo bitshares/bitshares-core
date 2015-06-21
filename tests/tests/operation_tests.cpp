@@ -42,10 +42,18 @@ BOOST_FIXTURE_TEST_SUITE( operation_tests, database_fixture )
 BOOST_AUTO_TEST_CASE( feed_limit_logic_test )
 {
    try {
-      asset usd(100,1);
-      asset core(100,0);
+      asset usd(1000,1);
+      asset core(1000,0);
       price_feed feed;
       feed.settlement_price = usd / core;
+
+      // require 3x min collateral
+      auto swanp = usd / core;
+      auto callp = ~price::call_price( usd, core, 1750 );
+      // 1:1 collateral 
+      wdump((callp.to_real())(callp));
+      wdump((swanp.to_real())(swanp));
+      FC_ASSERT( callp.to_real() > swanp.to_real() );
 
       /*
       wdump((feed.settlement_price.to_real()));
