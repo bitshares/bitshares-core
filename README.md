@@ -75,7 +75,7 @@ Witness node
 
 The role of the witness node is to broadcast transactions, download blocks, and optionally sign them.
 
-./witness_node --rpc-endpoint "127.0.0.1:8090" --enable-stale-production  -w \""1.7.0"\" \""1.7.1"\" \""1.7.2"\" \""1.7.3"\" \""1.7.4"\" --private-key "[\"1.2.0\",\"aeebad4a796fcc2e15dc4c6061b45ed9b373f26adfc798ca7d2d8cc58182718e\"]"
+./witness_node --rpc-endpoint "127.0.0.1:8090" --enable-stale-production -w \""1.7.0"\" \""1.7.1"\" \""1.7.2"\" \""1.7.3"\" \""1.7.4"\" --private-key "[\"1.2.0\",\"d2653ff7cbb2d8ff129ac27ef5781ce68b2558c41a74af1f2ddca635cbeef07d\"]"
 
 Running specific tests
 ----------------------
