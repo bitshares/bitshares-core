@@ -1097,7 +1097,75 @@ public:
 
       return sign_transaction( tx, broadcast );
    } FC_CAPTURE_AND_RETHROW( (authorizing_account)(account_to_list)(new_listing_status)(broadcast) ) }
+   
+   signed_transaction vote_for_delegate(string voting_account,
+                                        string delegate,
+                                        bool approve,
+                                        bool broadcast /* = false */)
+   { try {
+      account_object voting_account_object = get_account(voting_account);
+      account_id_type delegate_owner_account_id = get_account_id(delegate);
+      fc::optional<delegate_object> delegate_obj = _remote_db->get_delegate_by_account(delegate_owner_account_id);
+      if (!delegate_obj)
+         FC_THROW("Account ${delegate} is not registered as a delegate", ("delegate", delegate));
+      if (approve)
+      {
+         auto insert_result = voting_account_object.options.votes.insert(delegate_obj->vote_id);
+         if (!insert_result.second)
+            FC_THROW("Account ${account} was already voting for delegate ${delegate}", ("account", voting_account)("delegate", delegate));
+      }
+      else
+      {
+         unsigned votes_removed = voting_account_object.options.votes.erase(delegate_obj->vote_id);
+         if (!votes_removed)
+            FC_THROW("Account ${account} is already not voting for delegate ${delegate}", ("account", voting_account)("delegate", delegate));
+      }
+      account_update_operation account_update_op;
+      account_update_op.account = voting_account_object.id;
+      account_update_op.new_options = voting_account_object.options;
 
+      signed_transaction tx;
+      tx.operations.push_back( account_update_op );
+      tx.visit( operation_set_fee( _remote_db->get_global_properties().parameters.current_fees ) );
+      tx.validate();
+
+      return sign_transaction( tx, broadcast );
+   } FC_CAPTURE_AND_RETHROW( (voting_account)(delegate)(approve)(broadcast) ) }
+   
+   signed_transaction vote_for_witness(string voting_account,
+                                        string witness,
+                                        bool approve,
+                                        bool broadcast /* = false */)
+   { try {
+      account_object voting_account_object = get_account(voting_account);
+      account_id_type witness_owner_account_id = get_account_id(witness);
+      fc::optional<witness_object> witness_obj = _remote_db->get_witness_by_account(witness_owner_account_id);
+      if (!witness_obj)
+         FC_THROW("Account ${witness} is not registered as a witness", ("witness", witness));
+      if (approve)
+      {
+         auto insert_result = voting_account_object.options.votes.insert(witness_obj->vote_id);
+         if (!insert_result.second)
+            FC_THROW("Account ${account} was already voting for witness ${witness}", ("account", voting_account)("witness", witness));
+      }
+      else
+      {
+         unsigned votes_removed = voting_account_object.options.votes.erase(witness_obj->vote_id);
+         if (!votes_removed)
+            FC_THROW("Account ${account} is already not voting for witness ${witness}", ("account", voting_account)("witness", witness));
+      }
+      account_update_operation account_update_op;
+      account_update_op.account = voting_account_object.id;
+      account_update_op.new_options = voting_account_object.options;
+
+      signed_transaction tx;
+      tx.operations.push_back( account_update_op );
+      tx.visit( operation_set_fee( _remote_db->get_global_properties().parameters.current_fees ) );
+      tx.validate();
+
+      return sign_transaction( tx, broadcast );
+   } FC_CAPTURE_AND_RETHROW( (voting_account)(witness)(approve)(broadcast) ) }
+   
    signed_transaction sign_transaction(signed_transaction tx, bool broadcast = false)
    {
       flat_set<account_id_type> req_active_approvals;
@@ -1799,6 +1867,22 @@ signed_transaction wallet_api::whitelist_account(string authorizing_account,
 {
    return my->whitelist_account(authorizing_account, account_to_list, new_listing_status, broadcast);
 }
+
+signed_transaction wallet_api::vote_for_delegate(string voting_account,
+                                                 string witness,
+                                                 bool approve,
+                                                 bool broadcast /* = false */)
+{
+   return my->vote_for_delegate(voting_account, witness, approve, broadcast);
+}
+
+signed_transaction wallet_api::vote_for_witness(string voting_account,
+                                                string witness,
+                                                bool approve,
+                                                bool broadcast /* = false */)
+{
+   return my->vote_for_witness(voting_account, witness, approve, broadcast);
+} 
 
 void wallet_api::set_wallet_filename(string wallet_filename)
 {
