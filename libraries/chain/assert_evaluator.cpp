@@ -55,8 +55,8 @@ void_result assert_evaluator::do_evaluate( const assert_operation& o )
       unsigned_int t;
       fc::raw::unpack( is, t );
       // everyone checks: delegates must have allocated an opcode for it
-      FC_ASSERT( t < _db.get_global_properties().parameters.max_predicate_opcode );
-      if( t >= predicate::count() )
+      FC_ASSERT( t.value < _db.get_global_properties().parameters.max_predicate_opcode );
+      if( t.value >= predicate::count() )
       {
          //
          // delegates allocated an opcode, but our client doesn't know
