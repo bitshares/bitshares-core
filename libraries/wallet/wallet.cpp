@@ -1098,6 +1098,40 @@ public:
       return sign_transaction( tx, broadcast );
    } FC_CAPTURE_AND_RETHROW( (authorizing_account)(account_to_list)(new_listing_status)(broadcast) ) }
    
+   signed_transaction create_delegate(string owner_account,
+                                      bool broadcast /* = false */)
+   { try {
+
+      delegate_create_operation delegate_create_op;
+      delegate_create_op.delegate_account = get_account_id(owner_account);
+      if (_remote_db->get_delegate_by_account(delegate_create_op.delegate_account))
+         FC_THROW("Account ${owner_account} is already a delegate", ("owner_account", owner_account));
+
+      signed_transaction tx;
+      tx.operations.push_back( delegate_create_op );
+      tx.visit( operation_set_fee( _remote_db->get_global_properties().parameters.current_fees ) );
+      tx.validate();
+
+      return sign_transaction( tx, broadcast );
+   } FC_CAPTURE_AND_RETHROW( (owner_account)(broadcast) ) }
+
+   signed_transaction create_witness(string owner_account,
+                                     bool broadcast /* = false */)
+   { try {
+
+      witness_create_operation witness_create_op;
+      witness_create_op.witness_account = get_account_id(owner_account);
+      if (_remote_db->get_witness_by_account(witness_create_op.witness_account))
+         FC_THROW("Account ${owner_account} is already a witness", ("owner_account", owner_account));
+
+      signed_transaction tx;
+      tx.operations.push_back( witness_create_op );
+      tx.visit( operation_set_fee( _remote_db->get_global_properties().parameters.current_fees ) );
+      tx.validate();
+
+      return sign_transaction( tx, broadcast );
+   } FC_CAPTURE_AND_RETHROW( (owner_account)(broadcast) ) }
+
    signed_transaction vote_for_delegate(string voting_account,
                                         string delegate,
                                         bool approve,
@@ -1166,6 +1200,37 @@ public:
       return sign_transaction( tx, broadcast );
    } FC_CAPTURE_AND_RETHROW( (voting_account)(witness)(approve)(broadcast) ) }
    
+   signed_transaction set_voting_proxy(string account_to_modify,
+                                       optional<string> voting_account,
+                                       bool broadcast /* = false */)
+   { try {
+      account_object account_object_to_modify = get_account(account_to_modify);
+      if (voting_account)
+      {
+         account_id_type new_voting_account_id = get_account_id(*voting_account);
+         if (account_object_to_modify.options.voting_account == new_voting_account_id)
+            FC_THROW("Voting proxy for ${account} is already set to ${voter}", ("account", account_to_modify)("voter", *voting_account));
+         account_object_to_modify.options.voting_account = new_voting_account_id;
+      }
+      else
+      {
+         if (account_object_to_modify.options.voting_account == account_id_type())
+            FC_THROW("Account ${account} is already voting for itself", ("account", account_to_modify));
+         account_object_to_modify.options.voting_account = account_id_type();
+      }
+      
+      account_update_operation account_update_op;
+      account_update_op.account = account_object_to_modify.id;
+      account_update_op.new_options = account_object_to_modify.options;
+
+      signed_transaction tx;
+      tx.operations.push_back( account_update_op );
+      tx.visit( operation_set_fee( _remote_db->get_global_properties().parameters.current_fees ) );
+      tx.validate();
+
+      return sign_transaction( tx, broadcast );
+   } FC_CAPTURE_AND_RETHROW( (account_to_modify)(voting_account)(broadcast) ) }
+
    signed_transaction sign_transaction(signed_transaction tx, bool broadcast = false)
    {
       flat_set<account_id_type> req_active_approvals;
@@ -1868,6 +1933,18 @@ signed_transaction wallet_api::whitelist_account(string authorizing_account,
    return my->whitelist_account(authorizing_account, account_to_list, new_listing_status, broadcast);
 }
 
+signed_transaction wallet_api::create_delegate(string owner_account,
+                                               bool broadcast /* = false */)
+{
+   return my->create_delegate(owner_account, broadcast);
+}
+
+signed_transaction wallet_api::create_witness(string owner_account,
+                                              bool broadcast /* = false */)
+{
+   return my->create_witness(owner_account, broadcast);
+}
+
 signed_transaction wallet_api::vote_for_delegate(string voting_account,
                                                  string witness,
                                                  bool approve,
@@ -1883,6 +1960,13 @@ signed_transaction wallet_api::vote_for_witness(string voting_account,
 {
    return my->vote_for_witness(voting_account, witness, approve, broadcast);
 } 
+
+signed_transaction wallet_api::set_voting_proxy(string account_to_modify,
+                                                optional<string> voting_account,
+                                                bool broadcast /* = false */)
+{
+   return my->set_voting_proxy(account_to_modify, voting_account, broadcast);
+}
 
 void wallet_api::set_wallet_filename(string wallet_filename)
 {

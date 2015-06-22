@@ -264,6 +264,12 @@ class wallet_api
                                            account_whitelist_operation::account_listing new_listing_status,
                                            bool broadcast = false);
 
+      signed_transaction create_delegate(string owner_account,
+                                         bool broadcast = false);
+
+      signed_transaction create_witness(string owner_account,
+                                        bool broadcast = false);
+
       signed_transaction vote_for_delegate(string voting_account,
                                            string witness,
                                            bool approve,
@@ -272,6 +278,10 @@ class wallet_api
       signed_transaction vote_for_witness(string voting_account,
                                           string witness,
                                           bool approve,
+                                          bool broadcast = false);
+
+      signed_transaction set_voting_proxy(string account_to_modify,
+                                          optional<string> voting_account,
                                           bool broadcast = false);
 
       signed_transaction sign_transaction(signed_transaction tx, bool broadcast = false);
@@ -342,8 +352,11 @@ FC_API( graphene::wallet::wallet_api,
         (global_settle_asset)
         (settle_asset)
         (whitelist_account)
+        (create_delegate)
+        (create_witness)
         (vote_for_delegate)
         (vote_for_witness)
+        (set_voting_proxy)
         (get_account)
         (get_account_id)
         (get_block)
