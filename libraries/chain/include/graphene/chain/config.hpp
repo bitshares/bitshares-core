@@ -130,9 +130,14 @@
  *  Reserved Account IDs with special meaning
  */
 ///@{
+/// Represents the current committee members, two-week review period (GRAPHENE_DEFAULT_GENESIS_PROPOSAL_REVIEW_PERIOD_SEC)
 #define GRAPHENE_COMMITTEE_ACCOUNT (graphene::chain::account_id_type(0))
+/// Represents the current witnesses
 #define GRAPHENE_WITNESS_ACCOUNT (graphene::chain::account_id_type(1))
+/// Represents the current committee members
 #define GRAPHENE_RELAXED_COMMITTEE_ACCOUNT (graphene::chain::account_id_type(2))
+/// Represents the canonical account with NO authority (nobody can access funds in null account)
 #define GRAPHENE_NULL_ACCOUNT (graphene::chain::account_id_type(3))
+/// Represents the canonical account with WILDCARD authority (anybody can access funds in temp account)
 #define GRAPHENE_TEMP_ACCOUNT (graphene::chain::account_id_type(4))
 ///@}
