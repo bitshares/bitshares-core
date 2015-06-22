@@ -222,12 +222,18 @@ int main( int argc, char** argv )
       tmpl_params["cmp_attr_impl_body"] = generate_cmp_attr_impl( switch_table );
 
       std::ifstream template_file( argv[1] );
+      if (!template_file)
+        FC_THROW("Error opening template file ${template_file}", ("template_file", argv[1]));
       std::stringstream ss;
       ss << template_file.rdbuf();
       std::string result = fc::format_string( ss.str(), tmpl_params );
       std::ofstream result_file( argv[2] );
       result_file << result;
    }
-   catch ( const fc::exception& e ){ edump((e.to_detail_string())); }
+   catch ( const fc::exception& e )
+   { 
+     edump((e.to_detail_string()));
+     return 1;
+   }
    return 0;
 }

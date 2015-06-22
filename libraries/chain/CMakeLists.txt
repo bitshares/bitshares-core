@@ -13,10 +13,10 @@ target_include_directories( field_reflector
 
 target_link_libraries( field_reflector fc graphene_db )
 
-add_custom_command( OUTPUT db_reflect_cmp.cpp
-                    COMMAND field_reflector db_reflect_cmp.tmpl db_reflect_cmp.cpp.new
-                    COMMAND ${CMAKE_COMMAND} -E copy_if_different db_reflect_cmp.cpp.new db_reflect_cmp.cpp
-                    COMMAND ${CMAKE_COMMAND} -E remove db_reflect_cmp.cpp.new
+add_custom_command( OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/db_reflect_cmp.cpp
+                    COMMAND field_reflector ${CMAKE_CURRENT_SOURCE_DIR}/db_reflect_cmp.tmpl ${CMAKE_CURRENT_BINARY_DIR}/db_reflect_cmp.cpp.new
+                    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_BINARY_DIR}/db_reflect_cmp.cpp.new ${CMAKE_CURRENT_BINARY_DIR}/db_reflect_cmp.cpp
+                    COMMAND ${CMAKE_COMMAND} -E remove ${CMAKE_CURRENT_BINARY_DIR}/db_reflect_cmp.cpp.new
                     DEPENDS field_reflector db_reflect_cmp.tmpl
                   )
 
@@ -25,7 +25,7 @@ add_library( graphene_chain
              types.cpp
              type_id.cpp
 
-             db_reflect_cmp.cpp
+             ${CMAKE_CURRENT_BINARY_DIR}/db_reflect_cmp.cpp
 
              address.cpp
              asset.cpp
