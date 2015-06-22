@@ -17,10 +17,8 @@
  */
 #include <graphene/app/api.hpp>
 #include <graphene/app/application.hpp>
-#include <graphene/chain/asset_object.hpp>
 #include <graphene/chain/database.hpp>
 #include <graphene/utilities/key_conversion.hpp>
-#include <graphene/chain/operation_history_object.hpp>
 
 #include <fc/crypto/hex.hpp>
 
@@ -167,7 +165,7 @@ namespace graphene { namespace app {
        else
        {
           result.reserve(assets.size());
-           
+
           std::transform(assets.begin(), assets.end(), std::back_inserter(result),
                          [this, acnt](asset_id_type id) { return _db.get_balance(acnt, id); });
        }
@@ -242,13 +240,31 @@ namespace graphene { namespace app {
 
        auto itr = assets_by_symbol.lower_bound(lower_bound_symbol);
 
-       if( lower_bound_symbol == "" ) 
+       if( lower_bound_symbol == "" )
           itr = assets_by_symbol.begin();
 
        while(limit-- && itr != assets_by_symbol.end())
           result.emplace_back(*itr++);
 
        return result;
+    }
+
+    fc::optional<delegate_object> database_api::get_delegate_by_account(account_id_type account) const
+    {
+       const auto& idx = _db.get_index_type<delegate_index>().indices().get<by_account>();
+       auto itr = idx.find(account);
+       if( itr != idx.end() )
+          return *itr;
+       return {};
+    }
+
+    fc::optional<witness_object> database_api::get_witness_by_account(account_id_type account) const
+    {
+       const auto& idx = _db.get_index_type<witness_index>().indices().get<by_account>();
+       auto itr = idx.find(account);
+       if( itr != idx.end() )
+          return *itr;
+       return {};
     }
 
     login_api::login_api(application& a)

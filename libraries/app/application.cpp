@@ -153,14 +153,14 @@ namespace detail {
          secret_hash_type::encoder enc;
          fc::raw::pack(enc, nathan_key);
          fc::raw::pack(enc, secret_hash_type());
+         auto secret = secret_hash_type::hash(enc.result());
          for( int i = 0; i < 10; ++i )
          {
-            initial_state.allocation_targets.emplace_back("init"+fc::to_string(i), nathan_key.get_public_key(), 0, true);
-            initial_state.initial_committee.push_back({"init"+fc::to_string(i)});
+            auto name = "init"+fc::to_string(i);
+            initial_state.allocation_targets.emplace_back(name, nathan_key.get_public_key(), 0, true);
+            initial_state.initial_committee.push_back({name});
+            initial_state.initial_witnesses.push_back({name, nathan_key.get_public_key(), secret});
          }
-         initial_state.initial_witnesses = vector<genesis_state_type::initial_witness_type>(10, {"committee-account",
-                                                                                                 nathan_key.get_public_key(),
-                                                                                                 secret_hash_type::hash(enc.result())});
 
          initial_state.allocation_targets.emplace_back("nathan", address(public_key_type(nathan_key.get_public_key())), 1);
          if( _options->count("genesis-json") )

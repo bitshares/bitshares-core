@@ -41,14 +41,14 @@ genesis_state_type make_genesis() {
    secret_hash_type::encoder enc;
    fc::raw::pack(enc, delegate_priv_key);
    fc::raw::pack(enc, secret_hash_type());
+   auto secret = secret_hash_type::hash(enc.result());
    for( int i = 0; i < 10; ++i )
    {
-      genesis_state.allocation_targets.emplace_back("init"+fc::to_string(i), delegate_priv_key.get_public_key(), 0, true);
-      genesis_state.initial_committee.push_back({"init"+fc::to_string(i)});
+      auto name = "init"+fc::to_string(i);
+      genesis_state.allocation_targets.emplace_back(name, delegate_priv_key.get_public_key(), 0, true);
+      genesis_state.initial_committee.push_back({name});
+      genesis_state.initial_witnesses.push_back({name, delegate_priv_key.get_public_key(), secret});
    }
-   genesis_state.initial_witnesses = vector<genesis_state_type::initial_witness_type>(10, {"committee-account",
-                                                                                           delegate_priv_key.get_public_key(),
-                                                                                           secret_hash_type::hash(enc.result())});
    return genesis_state;
 }
 
@@ -70,7 +70,7 @@ BOOST_AUTO_TEST_CASE( block_database_test )
       for( uint32_t i = 0; i < 5; ++i )
       {
          if( i > 0 ) b.previous = b.id();
-         b.witness = witness_id_type(i+1); 
+         b.witness = witness_id_type(i+1);
          bdb.store( b.id(), b );
 
          auto fetch = bdb.fetch_by_number( b.block_num() );

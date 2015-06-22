@@ -399,8 +399,8 @@ namespace graphene { namespace chain {
          optional<undo_database::session>       _pending_block_session;
          vector< unique_ptr<op_evaluator> >     _operation_evaluators;
 
-         template<class ObjectType>
-         vector<std::reference_wrapper<const ObjectType>> sort_votable_objects(size_t count)const;
+         template<class Index>
+         vector<std::reference_wrapper<const typename Index::object_type>> sort_votable_objects(size_t count)const;
 
          //////////////////// db_block.cpp ////////////////////
 

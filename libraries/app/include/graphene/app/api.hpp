@@ -24,7 +24,10 @@
 #include <graphene/chain/limit_order_object.hpp>
 #include <graphene/chain/call_order_object.hpp>
 #include <graphene/chain/key_object.hpp>
+#include <graphene/chain/delegate_object.hpp>
+#include <graphene/chain/witness_object.hpp>
 #include <graphene/net/node.hpp>
+
 #include <fc/api.hpp>
 
 namespace graphene { namespace app {
@@ -164,6 +167,19 @@ namespace graphene { namespace app {
           * @return The assets found
           */
          vector<asset_object> list_assets(const string& lower_bound_symbol, uint32_t limit)const;
+
+         /**
+          * @brief Get the delegate owned by a given account
+          * @param account The ID of the account whose delegate should be retrieved
+          * @return The delegate object, or null if the account does not have a delegate
+          */
+         fc::optional<delegate_object> get_delegate_by_account(account_id_type account)const;
+         /**
+          * @brief Get the witness owned by a given account
+          * @param account The ID of the account whose witness should be retrieved
+          * @return The witness object, or null if the account does not have a witness
+          */
+         fc::optional<witness_object> get_witness_by_account(account_id_type account)const;
 
          /**
           * @group Push Notification Methods
@@ -338,6 +354,8 @@ FC_API(graphene::app::database_api,
        (get_call_orders)
        (get_settle_orders)
        (list_assets)
+       (get_delegate_by_account)
+       (get_witness_by_account)
        (subscribe_to_objects)
        (unsubscribe_from_objects)
        (subscribe_to_market)
