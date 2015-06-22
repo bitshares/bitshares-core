@@ -202,6 +202,7 @@ processed_transaction database::_push_transaction( const signed_transaction& trx
    FC_ASSERT( (skip & skip_block_size_check) ||
               fc::raw::pack_size(_pending_block) <= get_global_properties().parameters.maximum_block_size );
 
+   notify_changed_objects();
    // The transaction applied successfully. Merge its changes into the pending block session.
    session.merge();
    return processed_trx;
@@ -397,14 +398,18 @@ void database::_apply_block( const signed_block& next_block )
    applied_block( next_block ); //emit
    _applied_ops.clear();
 
+   notify_changed_objects();
+
+   update_pending_block(next_block, current_block_interval);
+} FC_CAPTURE_AND_RETHROW( (next_block.block_num()) )  }
+
+void database::notify_changed_objects()
+{
    const auto& head_undo = _undo_db.head();
    vector<object_id_type> changed_ids;  changed_ids.reserve(head_undo.old_values.size());
    for( const auto& item : head_undo.old_values ) changed_ids.push_back(item.first);
    changed_objects(changed_ids);
-
-
-   update_pending_block(next_block, current_block_interval);
-} FC_CAPTURE_AND_RETHROW( (next_block.block_num()) )  }
+}
 
 processed_transaction database::apply_transaction( const signed_transaction& trx, uint32_t skip )
 {
