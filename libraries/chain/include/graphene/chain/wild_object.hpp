@@ -15,34 +15,47 @@
  * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
 #pragma once
-#include <graphene/db/object.hpp>
-#include <graphene/chain/address.hpp>
+
 #include <fc/static_variant.hpp>
-#include <graphene/chain/types.hpp>
 
-namespace graphene { namespace chain {
-   typedef  static_variant<address,public_key_type> address_or_key;
+#include <graphene/chain/account_object.hpp>
+#include <graphene/chain/call_order_object.hpp>
+#include <graphene/chain/delegate_object.hpp>
+#include <graphene/chain/key_object.hpp>
+#include <graphene/chain/limit_order_object.hpp>
+#include <graphene/chain/operation_history_object.hpp>
+#include <graphene/chain/proposal_object.hpp>
+#include <graphene/chain/vesting_balance_object.hpp>
+#include <graphene/chain/withdraw_permission_object.hpp>
+#include <graphene/chain/witness_object.hpp>
 
-   /**
-    * @class key_object
-    * @brief maps an ID to a public key or address
-    * @ingroup object 
-    * @ingroup protocol
-    */
-   class key_object : public graphene::db::abstract_object<key_object>
-   {
-      public:
-         static const uint8_t space_id = protocol_ids;
-         static const uint8_t type_id  = key_object_type;
+namespace graphene { namespace chain { namespace impl {
 
-         key_id_type get_id()const  { return key_id_type( id.instance() ); }
-         address key_address()const;
-         const public_key_type& key()const { return key_data.get<public_key_type>(); }
+/**
+ * A static_variant of all object types.
+ *
+ * Used by field_reflector, this ultimately determines the object
+ * types which may be inspected by pred_field_lit_cmp.
+ */
+typedef fc::static_variant<
+      //null_object,
+      //base_object,
+      key_object,
+      account_object,
+      asset_object,
+      force_settlement_object,
+      delegate_object,
+      witness_object,
+      limit_order_object,
+      call_order_object,
+      //custom_object,
+      proposal_object,
+      operation_history_object,
+      withdraw_permission_object,
+      vesting_balance_object,
+      worker_object
+ > wild_object;
 
-         address_or_key key_data;
-   };
-} }
-
-FC_REFLECT_TYPENAME( graphene::chain::address_or_key )
-FC_REFLECT_DERIVED( graphene::chain::key_object, (graphene::db::object), (key_data) )
+} } }

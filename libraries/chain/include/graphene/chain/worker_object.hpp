@@ -188,6 +188,8 @@ FC_REFLECT( graphene::chain::refund_worker_type, (total_burned) )
 FC_REFLECT( graphene::chain::refund_worker_type::initializer, )
 FC_REFLECT( graphene::chain::vesting_balance_worker_type, (balance) )
 FC_REFLECT( graphene::chain::vesting_balance_worker_type::initializer, (pay_vesting_period_days) )
+FC_REFLECT_TYPENAME( graphene::chain::worker_type )
+FC_REFLECT_TYPENAME( graphene::chain::worker_initializer )
 FC_REFLECT_DERIVED( graphene::chain::worker_object, (graphene::db::object),
                     (worker_account)
                     (work_begin_date)

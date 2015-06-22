@@ -36,6 +36,7 @@
 
 #include <graphene/chain/account_evaluator.hpp>
 #include <graphene/chain/asset_evaluator.hpp>
+#include <graphene/chain/assert_evaluator.hpp>
 #include <graphene/chain/custom_evaluator.hpp>
 #include <graphene/chain/delegate_evaluator.hpp>
 #include <graphene/chain/global_parameters_evaluator.hpp>
@@ -73,6 +74,7 @@ void database::initialize_evaluators()
    register_evaluator<asset_update_feed_producers_evaluator>();
    register_evaluator<asset_settle_evaluator>();
    register_evaluator<asset_global_settle_evaluator>();
+   register_evaluator<assert_evaluator>();
    register_evaluator<limit_order_create_evaluator>();
    register_evaluator<limit_order_cancel_evaluator>();
    register_evaluator<call_order_update_evaluator>();
@@ -103,8 +105,8 @@ void database::initialize_indexes()
    add_index< primary_index<force_settlement_index> >();
    add_index< primary_index<account_index> >();
    add_index< primary_index<simple_index<key_object>> >();
-   add_index< primary_index<simple_index<delegate_object>> >();
-   add_index< primary_index<simple_index<witness_object>> >();
+   add_index< primary_index<delegate_index> >();
+   add_index< primary_index<witness_index> >();
    add_index< primary_index<limit_order_index > >();
    add_index< primary_index<call_order_index > >();
    add_index< primary_index<proposal_index > >();
@@ -116,12 +118,12 @@ void database::initialize_indexes()
    add_index< primary_index<transaction_index                             > >();
    add_index< primary_index<account_balance_index                         > >();
    add_index< primary_index<asset_bitasset_data_index                     > >();
-   add_index< primary_index<simple_index< global_property_object         >> >();
-   add_index< primary_index<simple_index< dynamic_global_property_object >> >();
-   add_index< primary_index<simple_index< account_statistics_object      >> >();
-   add_index< primary_index<simple_index< asset_dynamic_data_object      >> >();
-   add_index< primary_index<flat_index<   block_summary_object           >> >();
-   add_index< primary_index< simple_index< witness_schedule_object       > > >();
+   add_index< primary_index<simple_index<global_property_object          >> >();
+   add_index< primary_index<simple_index<dynamic_global_property_object  >> >();
+   add_index< primary_index<simple_index<account_statistics_object       >> >();
+   add_index< primary_index<simple_index<asset_dynamic_data_object       >> >();
+   add_index< primary_index<flat_index<  block_summary_object            >> >();
+   add_index< primary_index<simple_index<witness_schedule_object         >> >();
 }
 
 void database::init_genesis(const genesis_state_type& genesis_state)
@@ -354,6 +356,6 @@ void database::init_genesis(const genesis_state_type& genesis_state)
    assert( wso.id == witness_schedule_id_type() );
 
    _undo_db.enable();
-} FC_LOG_AND_RETHROW() }
+} FC_CAPTURE_AND_RETHROW((genesis_state)) }
 
 } }

@@ -31,18 +31,19 @@
 
 namespace graphene { namespace chain {
 
-template<class ObjectType>
-vector<std::reference_wrapper<const ObjectType>> database::sort_votable_objects(size_t count) const
+template<class Index>
+vector<std::reference_wrapper<const typename Index::object_type>> database::sort_votable_objects(size_t count) const
 {
-   const auto& all_objects = dynamic_cast<const simple_index<ObjectType>&>(get_index<ObjectType>());
+   using ObjectType = typename Index::object_type;
+   const auto& all_objects = get_index_type<Index>().indices();
    count = std::min(count, all_objects.size());
    vector<std::reference_wrapper<const ObjectType>> refs;
    refs.reserve(all_objects.size());
    std::transform(all_objects.begin(), all_objects.end(),
                   std::back_inserter(refs),
                   [](const ObjectType& o) { return std::cref(o); });
-   std::partial_sort( refs.begin(), refs.begin() + count, refs.end(),
-                   [this]( const ObjectType& a, const ObjectType& b )->bool {
+   std::partial_sort(refs.begin(), refs.begin() + count, refs.end(),
+                   [this](const ObjectType& a, const ObjectType& b)->bool {
       return _vote_tally_buffer[a.vote_id] > _vote_tally_buffer[b.vote_id];
    });
 
@@ -105,7 +106,7 @@ void database::update_active_witnesses()
           && (stake_tally <= stake_target) )
       stake_tally += _witness_count_histogram_buffer[++witness_count];
 
-   auto wits = sort_votable_objects<witness_object>(std::max(witness_count*2+1, GRAPHENE_MIN_WITNESS_COUNT));
+   auto wits = sort_votable_objects<witness_index>(std::max(witness_count*2+1, GRAPHENE_MIN_WITNESS_COUNT));
    const global_property_object& gpo = get_global_properties();
 
    // Update witness authority
@@ -171,12 +172,12 @@ void database::update_active_delegates()
           && (stake_tally <= stake_target) )
       stake_tally += _committee_count_histogram_buffer[++delegate_count];
 
-   auto delegates = sort_votable_objects<delegate_object>(std::max(delegate_count*2+1, GRAPHENE_MIN_DELEGATE_COUNT));
+   auto delegates = sort_votable_objects<delegate_index>(std::max(delegate_count*2+1, GRAPHENE_MIN_DELEGATE_COUNT));
 
    // Update genesis authorities
    if( !delegates.empty() )
    {
-      modify( get(GRAPHENE_COMMITTEE_ACCOUNT), [&]( account_object& a ) {
+      modify(get(GRAPHENE_COMMITTEE_ACCOUNT), [&](account_object& a) {
          uint64_t total_votes = 0;
          map<account_id_type, uint64_t> weights;
          a.active.weight_threshold = 0;
@@ -202,11 +203,11 @@ void database::update_active_delegates()
          a.active.weight_threshold /= 2;
          a.active.weight_threshold += 1;
       });
-      modify( get(GRAPHENE_RELAXED_COMMITTEE_ACCOUNT), [&](account_object& a) {
+      modify(get(GRAPHENE_RELAXED_COMMITTEE_ACCOUNT), [&](account_object& a) {
          a.active = get(GRAPHENE_COMMITTEE_ACCOUNT).active;
       });
    }
-   modify( get_global_properties(), [&]( global_property_object& gp ) {
+   modify(get_global_properties(), [&](global_property_object& gp) {
       gp.active_delegates.clear();
       std::transform(delegates.begin(), delegates.end(),
                      std::inserter(gp.active_delegates, gp.active_delegates.begin()),

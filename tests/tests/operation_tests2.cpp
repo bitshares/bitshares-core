@@ -29,6 +29,9 @@
 #include <graphene/chain/vesting_balance_object.hpp>
 #include <graphene/chain/withdraw_permission_object.hpp>
 
+#include <graphene/chain/predicate.hpp>
+#include <graphene/chain/db_reflect_cmp.hpp>
+
 #include <fc/crypto/digest.hpp>
 
 #include "../common/database_fixture.hpp"
@@ -795,6 +798,47 @@ BOOST_AUTO_TEST_CASE( unimp_force_settlement_unavailable )
    }
    } FC_LOG_AND_RETHROW()
     */
+}
+
+BOOST_AUTO_TEST_CASE( assert_op_test )
+{
+   try {
+   // create some objects
+   auto nathan_private_key = generate_private_key("nathan");
+   auto dan_private_key = generate_private_key("dan");
+   public_key_type nathan_public_key = nathan_private_key.get_public_key();
+   public_key_type dan_public_key = dan_private_key.get_public_key();
+   key_id_type nathan_key_id = register_key(nathan_public_key).id;
+   key_id_type dan_key_id = register_key(dan_public_key).id;
+   account_id_type nathan_id = create_account("nathan", nathan_key_id).id;
+
+   assert_operation op;
+   decltype( key_object::key_data ) lit_key = nathan_public_key;
+
+   // nathan checks that his public key is equal to the given value.
+   op.fee_paying_account = nathan_id;
+   op.predicates = vector< vector< char > >();
+   op.predicates.push_back(
+      fc::raw::pack(
+      predicate(
+      pred_field_lit_cmp( nathan_key_id, 1, fc::raw::pack( lit_key ), opc_equal_to )
+      )
+      ) );
+   trx.operations.push_back(op);
+   trx.sign( nathan_key_id, nathan_private_key );
+   PUSH_TX( db, trx );
+
+   // nathan checks that his public key is not equal to the given value (fail)
+   op.predicates.back() =
+      fc::raw::pack(
+      predicate(
+      pred_field_lit_cmp( nathan_key_id, 1, fc::raw::pack( lit_key ), opc_not_equal_to )
+      )
+      );
+   trx.operations.back() = op;
+   trx.sign( nathan_key_id, nathan_private_key );
+   BOOST_CHECK_THROW( PUSH_TX( db, trx ), fc::exception );
+   } FC_LOG_AND_RETHROW()
 }
 
 // TODO:  Write linear VBO tests

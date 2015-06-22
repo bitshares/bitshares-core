@@ -15,34 +15,46 @@
  * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
 #pragma once
-#include <graphene/db/object.hpp>
-#include <graphene/chain/address.hpp>
-#include <fc/static_variant.hpp>
+
 #include <graphene/chain/types.hpp>
 
+#include <vector>
+
 namespace graphene { namespace chain {
-   typedef  static_variant<address,public_key_type> address_or_key;
 
-   /**
-    * @class key_object
-    * @brief maps an ID to a public key or address
-    * @ingroup object 
-    * @ingroup protocol
-    */
-   class key_object : public graphene::db::abstract_object<key_object>
-   {
-      public:
-         static const uint8_t space_id = protocol_ids;
-         static const uint8_t type_id  = key_object_type;
+class database;
 
-         key_id_type get_id()const  { return key_id_type( id.instance() ); }
-         address key_address()const;
-         const public_key_type& key()const { return key_data.get<public_key_type>(); }
+class pred_field_lit_cmp
+{
+public:
+   pred_field_lit_cmp(
+      object_id_type obj_id,
+      uint16_t field_num,
+      const vector<char>& lit,
+      uint8_t opc
+      ) :
+      _obj_id( obj_id ),
+      _field_num( field_num ),
+      _lit( lit ),
+      _opc( opc )
+   {}
+   pred_field_lit_cmp() {}    // necessary for instantiating static_variant
+   ~pred_field_lit_cmp() {}
 
-         address_or_key key_data;
-   };
+   bool check_predicate( const database& db )const;
+
+   object_id_type _obj_id;
+   uint16_t _field_num;
+   vector<char> _lit;
+   uint8_t _opc;
+};
+
+typedef static_variant<
+   pred_field_lit_cmp
+  > predicate;
+
 } }
 
-FC_REFLECT_TYPENAME( graphene::chain::address_or_key )
-FC_REFLECT_DERIVED( graphene::chain::key_object, (graphene::db::object), (key_data) )
+FC_REFLECT( graphene::chain::pred_field_lit_cmp, (_obj_id)(_field_num)(_lit)(_opc) );

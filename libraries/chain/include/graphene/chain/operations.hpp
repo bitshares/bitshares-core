@@ -103,6 +103,25 @@ namespace graphene { namespace chain {
     */
 
    /**
+    *  @brief assert that some conditions are true.
+    *  @ingroup operations
+    */
+   struct assert_operation
+   {
+      asset fee;
+      account_id_type fee_paying_account;
+      vector< vector< char > > predicates;
+      flat_set<account_id_type> required_auths;
+
+      account_id_type fee_payer()const { return fee_paying_account; }
+      void            get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>&)const;
+      share_type      calculate_fee( const fee_schedule_type& k )const{ return k.assert_op_fee; }
+      void            validate()const;
+
+      void get_balance_delta( balance_accumulator& acc, const operation_result& result = asset())const { acc.adjust( fee_payer(), -fee ); }
+   };
+
+   /**
     *  @brief reserves a new ID to refer to a particular key or address.
     *  @ingroup operations
     */
@@ -1339,7 +1358,8 @@ namespace graphene { namespace chain {
             vesting_balance_create_operation,
             vesting_balance_withdraw_operation,
             worker_create_operation,
-            custom_operation
+            custom_operation,
+            assert_operation
          > operation;
 
    /// @} // operations group
@@ -1568,7 +1588,10 @@ FC_REFLECT( graphene::chain::worker_create_operation,
             (fee)(owner)(work_begin_date)(work_end_date)(daily_pay)(initializer) )
 
 FC_REFLECT( graphene::chain::custom_operation, (fee)(payer)(required_auths)(id)(data) )
+FC_REFLECT( graphene::chain::assert_operation, (fee)(fee_paying_account)(predicates)(required_auths) )
+
 FC_REFLECT( graphene::chain::void_result, )
 
 FC_REFLECT_TYPENAME( graphene::chain::operation )
+FC_REFLECT_TYPENAME( graphene::chain::operation_result )
 FC_REFLECT_TYPENAME( fc::flat_set<graphene::chain::vote_id_type> )

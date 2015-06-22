@@ -88,6 +88,19 @@ namespace graphene { namespace db {
          ///@}
 
          template<typename T>
+         static const T& cast( const object& obj )
+         {
+            assert( nullptr != dynamic_cast<const T*>(&obj) );
+            return static_cast<const T&>(obj);
+         }
+         template<typename T>
+         static T& cast( object& obj )
+         {
+            assert( nullptr != dynamic_cast<T*>(&obj) );
+            return static_cast<T&>(obj);
+         }
+
+         template<typename T>
          const T& get( object_id_type id )const
          {
             const object& obj = get_object( id );

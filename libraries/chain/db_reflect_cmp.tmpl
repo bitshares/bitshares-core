@@ -15,34 +15,29 @@
  * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#pragma once
-#include <graphene/db/object.hpp>
-#include <graphene/chain/address.hpp>
-#include <fc/static_variant.hpp>
-#include <graphene/chain/types.hpp>
 
-namespace graphene { namespace chain {
-   typedef  static_variant<address,public_key_type> address_or_key;
+${generated_file_banner}
 
-   /**
-    * @class key_object
-    * @brief maps an ID to a public key or address
-    * @ingroup object 
-    * @ingroup protocol
-    */
-   class key_object : public graphene::db::abstract_object<key_object>
-   {
-      public:
-         static const uint8_t space_id = protocol_ids;
-         static const uint8_t type_id  = key_object_type;
+/*
+object_descriptor = ${object_descriptor}
+*/
 
-         key_id_type get_id()const  { return key_id_type( id.instance() ); }
-         address key_address()const;
-         const public_key_type& key()const { return key_data.get<public_key_type>(); }
+#include <graphene/chain/db_reflect_cmp.hpp>
+#include <graphene/chain/db_reflect_cmp_impl.hpp>
+#include <graphene/chain/wild_object.hpp>
 
-         address_or_key key_data;
-   };
-} }
+#include <graphene/db/object_database.hpp>
 
-FC_REFLECT_TYPENAME( graphene::chain::address_or_key )
-FC_REFLECT_DERIVED( graphene::chain::key_object, (graphene::db::object), (key_data) )
+namespace graphene { namespace chain { namespace impl {
+
+bool cmp_attr_impl(
+   const object& obj,
+   uint16_t field_num,
+   const vector<char>& lit,
+   uint8_t opc
+   )
+{
+${cmp_attr_impl_body}
+}
+
+} } } // graphene::chain::detail

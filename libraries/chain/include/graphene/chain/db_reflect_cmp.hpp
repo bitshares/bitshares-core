@@ -15,34 +15,46 @@
  * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
 #pragma once
+
+#include <vector>
+
 #include <graphene/db/object.hpp>
-#include <graphene/chain/address.hpp>
-#include <fc/static_variant.hpp>
-#include <graphene/chain/types.hpp>
 
 namespace graphene { namespace chain {
-   typedef  static_variant<address,public_key_type> address_or_key;
 
-   /**
-    * @class key_object
-    * @brief maps an ID to a public key or address
-    * @ingroup object 
-    * @ingroup protocol
-    */
-   class key_object : public graphene::db::abstract_object<key_object>
-   {
-      public:
-         static const uint8_t space_id = protocol_ids;
-         static const uint8_t type_id  = key_object_type;
+enum comparison_opcode
+{
+   opc_equal_to,
+   opc_not_equal_to,
+   opc_greater,
+   opc_less,
+   opc_greater_equal,
+   opc_less_equal
+};
 
-         key_id_type get_id()const  { return key_id_type( id.instance() ); }
-         address key_address()const;
-         const public_key_type& key()const { return key_data.get<public_key_type>(); }
+namespace impl {
 
-         address_or_key key_data;
-   };
+/**
+ * Compare the given field of the given object to the literal string.
+ * The comparison opcode is specified by opc, which should be one
+ * of comparison_opcode.
+ *
+ * The default behavior is to only allow opc_equal_to or
+ * opc_not_equal_to, and implement these based on comparing the
+ * serialized field to the given bytes.
+ *
+ * To override the default behavior, provide a template override
+ * for _cmp() in db_reflect_cmp_impl.hpp.  Beware adding such an
+ * override will create a witness-only hardfork!
+ */
+bool cmp_attr_impl(
+   const graphene::db::object& obj,
+   uint16_t field_num,
+   const std::vector<char>& lit,
+   uint8_t opc
+   );
+}
+
 } }
-
-FC_REFLECT_TYPENAME( graphene::chain::address_or_key )
-FC_REFLECT_DERIVED( graphene::chain::key_object, (graphene::db::object), (key_data) )

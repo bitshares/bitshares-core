@@ -243,6 +243,9 @@ struct operation_get_impacted_accounts
 
    void operator()( const worker_create_operation& )const
    {}
+
+   void operator()( const assert_operation& )const
+   {}
 };
 
 account_create_observer::~account_create_observer()

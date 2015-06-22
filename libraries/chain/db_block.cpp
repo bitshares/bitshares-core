@@ -80,7 +80,7 @@ const signed_transaction& database::get_recent_transaction(const transaction_id_
  *
  * @return true if we switched forks as a result of this push.
  */
-bool database::push_block( const signed_block& new_block, uint32_t skip )
+bool database::push_block(const signed_block& new_block, uint32_t skip)
 {
    bool result;
    with_skip_flags( skip, [&]()
@@ -90,29 +90,20 @@ bool database::push_block( const signed_block& new_block, uint32_t skip )
    return result;
 }
 
-bool database::_push_block( const signed_block& new_block )
+bool database::_push_block(const signed_block& new_block)
 { try {
    uint32_t skip = get_node_properties().skip_flags;
    if( !(skip&skip_fork_db) )
    {
-      auto new_head = _fork_db.push_block( new_block );
+      auto new_head = _fork_db.push_block(new_block);
       //If the head block from the longest chain does not build off of the current head, we need to switch forks.
       if( new_head->data.previous != head_block_id() )
       {
-         //edump((new_head->data.previous));
          //If the newly pushed block is the same height as head, we get head back in new_head
          //Only switch forks if new_head is actually higher than head
          if( new_head->data.block_num() > head_block_num() )
          {
-            auto branches = _fork_db.fetch_branch_from( new_head->data.id(), _pending_block.previous );
-            for( auto item : branches.first )
-            {
-          //     wdump( ("new")(item->id)(item->data.previous) );
-            }
-            for( auto item : branches.second )
-            {
-          //     wdump( ("old")(item->id)(item->data.previous) );
-            }
+            auto branches = _fork_db.fetch_branch_from(new_head->data.id(), _pending_block.previous);
 
             // pop blocks until we hit the forked block
             while( head_block_id() != branches.second.back()->data.previous )
@@ -131,9 +122,6 @@ bool database::_push_block( const signed_block& new_block )
                 catch ( const fc::exception& e ) { except = e; }
                 if( except )
                 {
-                   //wdump((except->to_detail_string()));
-                   // elog( "Encountered error when switching to a longer fork at id ${id}. Going back.",
-                   //       ("id", (*ritr)->id) );
                    // remove the rest of branches.first from the fork_db, those blocks are invalid
                    while( ritr != branches.first.rend() )
                    {
@@ -170,8 +158,8 @@ bool database::_push_block( const signed_block& new_block )
 
    try {
       auto session = _undo_db.start_undo_session();
-      apply_block( new_block, skip );
-      _block_id_to_block.store( new_block.id(), new_block );
+      apply_block(new_block, skip);
+      _block_id_to_block.store(new_block.id(), new_block);
       session.commit();
    } catch ( const fc::exception& e ) {
       elog("Failed to push new block:\n${e}", ("e", e.to_detail_string()));
@@ -204,7 +192,6 @@ processed_transaction database::push_transaction( const signed_transaction& trx,
 processed_transaction database::_push_transaction( const signed_transaction& trx )
 {
    uint32_t skip = get_node_properties().skip_flags;
-   //wdump((trx.digest())(trx.id()));
    // If this is the first transaction pushed after applying a block, start a new undo session.
    // This allows us to quickly rewind to the clean state of the head block, in case a new block arrives.
    if( !_pending_block_session ) _pending_block_session = _undo_db.start_undo_session();
@@ -238,9 +225,6 @@ processed_transaction database::push_proposal(const proposal_object& proposal)
                   []( account_id_type id ) {
                      return std::make_pair(id, authority::owner);
                   });
-
-   //ilog("Attempting to push proposal ${prop}", ("prop", proposal));
-   //idump((eval_state.approved_by));
 
    eval_state.operation_results.reserve(proposal.proposed_transaction.operations.size());
    processed_transaction ptrx(proposal.proposed_transaction);

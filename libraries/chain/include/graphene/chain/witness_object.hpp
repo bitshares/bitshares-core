@@ -18,6 +18,7 @@
 #pragma once
 #include <graphene/chain/asset.hpp>
 #include <graphene/db/object.hpp>
+#include <graphene/db/generic_index.hpp>
 
 namespace graphene { namespace chain {
    using namespace graphene::db;
@@ -40,6 +41,19 @@ namespace graphene { namespace chain {
          witness_object() : vote_id(vote_id_type::witness) {}
    };
 
+   struct by_account;
+   using witness_multi_index_type = multi_index_container<
+      witness_object,
+      indexed_by<
+         hashed_unique< tag<by_id>,
+            member<object, object_id_type, &object::id>
+         >,
+         hashed_unique< tag<by_account>,
+            member<witness_object, account_id_type, &witness_object::witness_account>
+         >
+      >
+   >;
+   using witness_index = generic_index<witness_object, witness_multi_index_type>;
 } } // graphene::chain
 
 FC_REFLECT_DERIVED( graphene::chain::witness_object, (graphene::db::object),
@@ -49,4 +63,3 @@ FC_REFLECT_DERIVED( graphene::chain::witness_object, (graphene::db::object),
                     (last_secret)
                     (accumulated_income)
                     (vote_id) )
-

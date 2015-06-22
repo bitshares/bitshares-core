@@ -21,8 +21,6 @@
 namespace graphene { namespace chain {
    address key_object::key_address()const
    {
-      typedef  static_variant<address,public_key_type> address_or_key;
-
       switch( key_data.which() )
       {
          case address_or_key::tag<address>::value:
