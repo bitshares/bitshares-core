@@ -128,7 +128,6 @@ namespace graphene { namespace chain {
             /// in this field means a 1% fee is charged on market trades of this asset.
             uint16_t                market_fee_percent = 0;
             share_type              max_market_fee = GRAPHENE_MAX_SHARE_SUPPLY;
-            share_type              min_market_fee;
 
             /// The flags which the issuer has permission to update. See @ref asset_issuer_permission_flags
             uint16_t                issuer_permissions = UIA_ASSET_ISSUER_PERMISSION_MASK;
@@ -320,7 +319,6 @@ FC_REFLECT( graphene::chain::asset_object::asset_options,
             (max_supply)
             (market_fee_percent)
             (max_market_fee)
-            (min_market_fee)
             (issuer_permissions)
             (flags)
             (core_exchange_rate)

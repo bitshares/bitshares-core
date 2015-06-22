@@ -471,7 +471,7 @@ asset database::calculate_market_fee( const asset_object& trade_asset, const ass
    if( !trade_asset.charges_market_fees() )
       return trade_asset.amount(0);
    if( trade_asset.options.market_fee_percent == 0 )
-      return trade_asset.amount(trade_asset.options.min_market_fee);
+      return trade_asset.amount(0);
 
    fc::uint128 a(trade_amount.amount.value);
    a *= trade_asset.options.market_fee_percent;
@@ -480,8 +480,6 @@ asset database::calculate_market_fee( const asset_object& trade_asset, const ass
 
    if( percent_fee.amount > trade_asset.options.max_market_fee )
       percent_fee.amount = trade_asset.options.max_market_fee;
-   else if( percent_fee.amount < trade_asset.options.min_market_fee )
-      percent_fee.amount = trade_asset.options.min_market_fee;
 
    return percent_fee;
 }
