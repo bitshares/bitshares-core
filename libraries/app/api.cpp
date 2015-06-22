@@ -446,4 +446,22 @@ namespace graphene { namespace app {
        return result;
     }
 
+    /** TODO: add secondary index that will accelerate this process */
+    vector<proposal_object> database_api::get_proposed_transactions( account_id_type id )const
+    {
+       const auto& idx = _db.get_index_type<proposal_index>();
+       vector<proposal_object> result;
+
+       idx.inspect_all_objects( [&](const object& obj){
+               const proposal_object& p = static_cast<const proposal_object&>(obj);
+               if( p.required_active_approvals.find( id ) != p.required_active_approvals.end() )
+                  result.push_back(p);
+               else if ( p.required_owner_approvals.find( id ) != p.required_owner_approvals.end() )
+                  result.push_back(p);
+               else if ( p.available_active_approvals.find( id ) != p.available_active_approvals.end() )
+                  result.push_back(p);
+       });
+       return result;
+    }
+
 } } // graphene::app

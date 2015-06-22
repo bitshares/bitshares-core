@@ -26,6 +26,7 @@
 #include <graphene/chain/key_object.hpp>
 #include <graphene/chain/delegate_object.hpp>
 #include <graphene/chain/witness_object.hpp>
+#include <graphene/chain/proposal_object.hpp>
 #include <graphene/net/node.hpp>
 
 #include <fc/api.hpp>
@@ -226,6 +227,13 @@ namespace graphene { namespace app {
 
          /// @brief Get a hexdump of the serialized binary form of a transaction
          std::string get_transaction_hex(const signed_transaction& trx)const;
+
+         /**
+          *  @return the set of proposed transactions relevant to the specified account id.
+          */
+         vector<proposal_object> get_proposed_transactions( account_id_type id )const;
+
+
       private:
          /** called every time a block is applied to report the objects that were changed */
          void on_objects_changed(const vector<object_id_type>& ids);
@@ -362,6 +370,7 @@ FC_API(graphene::app::database_api,
        (unsubscribe_from_market)
        (cancel_all_subscriptions)
        (get_transaction_hex)
+       (get_proposed_transactions)
      )
 FC_API(graphene::app::history_api, (get_account_history))
 FC_API(graphene::app::network_api, (broadcast_transaction)(add_node)(get_connected_peers))
