@@ -165,13 +165,23 @@ namespace graphene { namespace chain {
 
       price price_feed::max_short_squeeze_price()const
       {
+         boost::rational<uint64_t> sp( settlement_price.base.amount.value, settlement_price.quote.amount.value ); //debt.amount.value,collateral.amount.value); 
+         boost::rational<uint64_t> ratio( 1000, maximum_short_squeeze_ratio );
+         auto cp = sp * ratio;
+         return (asset( cp.numerator(), settlement_price.base.asset_id ) / asset( cp.denominator(), settlement_price.quote.asset_id ));
+
+         /*
          asset collateral = settlement_price.quote;
          fc::uint128 tmp( collateral.amount.value );
          tmp *= maximum_short_squeeze_ratio;
          tmp /= 1000;
          FC_ASSERT( tmp <= GRAPHENE_MAX_SHARE_SUPPLY );
          collateral.amount = tmp.to_uint64();
-         return settlement_price.base / collateral;
+         auto tmp2 = settlement_price.base / collateral;
+         wdump((rtn)(tmp2));
+         return rtn;
+         */
+         
       }
       /*
       price price_feed::maintenance_price()const
