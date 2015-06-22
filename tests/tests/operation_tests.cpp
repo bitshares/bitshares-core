@@ -51,8 +51,8 @@ BOOST_AUTO_TEST_CASE( feed_limit_logic_test )
       auto swanp = usd / core;
       auto callp = ~price::call_price( usd, core, 1750 );
       // 1:1 collateral 
-      wdump((callp.to_real())(callp));
-      wdump((swanp.to_real())(swanp));
+//      wdump((callp.to_real())(callp));
+//      wdump((swanp.to_real())(swanp));
       FC_ASSERT( callp.to_real() > swanp.to_real() );
 
       /*

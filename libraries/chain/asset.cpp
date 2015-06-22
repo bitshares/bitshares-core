@@ -17,6 +17,7 @@
  */
 #include <graphene/chain/asset.hpp>
 #include <fc/uint128.hpp>
+#include <boost/rational.hpp>
 
 namespace graphene { namespace chain {
       bool operator < ( const asset& a, const asset& b )
@@ -108,14 +109,38 @@ namespace graphene { namespace chain {
        *
        *  This method divides the collateral by the maintenance collateral ratio to derive
        *  a call price for the given black swan ratio.
+       *
+       *  There exists some cases where the debt and collateral values are so small that
+       *  dividing by the collateral ratio will result in a 0 price or really poor 
+       *  rounding errors.   No matter what the collateral part of the price ratio can
+       *  never go to 0 and the debt can never go more than GRAPHENE_MAX_SHARE_SUPPLY
+       *
+       *  CR * DEBT/COLLAT or DEBT/(COLLAT/CR)
        */
-      price price::call_price(const asset& debt, const asset& collateral, uint16_t collateral_ratio)
+      price price::call_price( const asset& debt, const asset& collateral, uint16_t collateral_ratio)
       { try {
+         //wdump((debt)(collateral)(collateral_ratio));
+         boost::rational<uint64_t> swan(debt.amount.value,collateral.amount.value); 
+         boost::rational<uint64_t> ratio( collateral_ratio, 1000 );
+         auto cp = swan * ratio;
+         return ~(asset( cp.numerator(), debt.asset_id ) / asset( cp.denominator(), collateral.asset_id ));
+
+         /*
+         while( collateral.amount < 100000 && debt.amount < GRAPHENE_MAX_SHARE_SUPPLY/100 )
+         {
+            collateral.amount *= 1000;
+            debt.amount *= 1000;
+         }
+            
          fc::uint128 tmp( collateral.amount.value );
          tmp *= 1000;
          tmp /= collateral_ratio;
          FC_ASSERT( tmp <= GRAPHENE_MAX_SHARE_SUPPLY );
-         return asset( tmp.to_uint64(), collateral.asset_id) / debt;
+         asset col( tmp.to_uint64(), collateral.asset_id);
+
+         if( col.amount == 0 ) col.amount = 1;
+         return col / debt;
+         */
       } FC_CAPTURE_AND_RETHROW( (debt)(collateral)(collateral_ratio) ) }
 
       bool price::is_null() const { return *this == price(); }

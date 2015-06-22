@@ -117,8 +117,11 @@ void_result call_order_update_evaluator::do_apply(const call_order_update_operat
       d.modify( *call_obj, [&]( call_order_object& call ){
           call.collateral += o.delta_collateral.amount;
           call.debt       += o.delta_debt.amount;
-          call.call_price  =  price::call_price(call.get_debt(), call.get_collateral(),
-                                                _bitasset_data->current_feed.maintenance_collateral_ratio);
+          if( call.debt > 0 )
+          {
+             call.call_price  =  price::call_price(call.get_debt(), call.get_collateral(),
+                                                   _bitasset_data->current_feed.maintenance_collateral_ratio);
+          }
       });
    }
 

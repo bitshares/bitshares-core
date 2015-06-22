@@ -354,7 +354,7 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
     */
 
     assert( max_price.base.asset_id == min_price.base.asset_id );
-     wlog( "from ${a} Debt/Col to ${b} Debt/Col ", ("a", max_price.to_real())("b",min_price.to_real()) );
+    // wlog( "from ${a} Debt/Col to ${b} Debt/Col ", ("a", max_price.to_real())("b",min_price.to_real()) );
     // NOTE limit_price_index is sorted from greatest to least
     auto limit_itr = limit_price_index.lower_bound( max_price );
     auto limit_end = limit_price_index.upper_bound( min_price ); 
