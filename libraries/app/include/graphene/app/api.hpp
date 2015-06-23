@@ -29,10 +29,14 @@
 #include <graphene/chain/proposal_object.hpp>
 #include <graphene/net/node.hpp>
 
+
+#include <graphene/market_history/market_history_plugin.hpp>
+
 #include <fc/api.hpp>
 
 namespace graphene { namespace app {
    using namespace graphene::chain;
+   using namespace graphene::market_history;
 
    class application;
 
@@ -270,6 +274,7 @@ namespace graphene { namespace app {
                                                            int limit = 100,
                                                            operation_history_id_type start = operation_history_id_type())const;
 
+      vector<bucket_object> get_market_history( asset_id_type a, asset_id_type b, uint32_t bucket_seconds, fc::time_point_sec start, fc::time_point_sec end )const;
    private:
         application&              _app;
    };
@@ -372,7 +377,7 @@ FC_API(graphene::app::database_api,
        (get_transaction_hex)
        (get_proposed_transactions)
      )
-FC_API(graphene::app::history_api, (get_account_history))
+FC_API(graphene::app::history_api, (get_account_history)(get_market_history))
 FC_API(graphene::app::network_api, (broadcast_transaction)(add_node)(get_connected_peers))
 FC_API(graphene::app::login_api,
        (login)

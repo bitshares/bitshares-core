@@ -42,6 +42,10 @@ namespace bpo = boost::program_options;
 
 struct bucket_key
 {
+   bucket_key( asset_id_type a, asset_id_type b, uint32_t s, fc::time_point_sec o )
+   :base(a),quote(b),seconds(s),open(o){}
+   bucket_key(){}
+
    asset_id_type      base;
    asset_id_type      quote;
    uint32_t           seconds = 0;

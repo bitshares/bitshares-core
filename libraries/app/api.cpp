@@ -445,6 +445,28 @@ namespace graphene { namespace app {
        }
        return result;
     }
+    vector<bucket_object> history_api::get_market_history( asset_id_type a, asset_id_type b, uint32_t bucket_seconds, fc::time_point_sec start, fc::time_point_sec end )const
+    { try {
+       FC_ASSERT(_app.chain_database());
+       const auto& db = *_app.chain_database();
+       vector<bucket_object> result;
+       result.reserve(100);
+
+       if( a > b ) std::swap(a,b);
+
+       const auto& bidx = db.get_index_type<bucket_index>();
+       const auto& by_key_idx = bidx.indices().get<by_key>();
+
+       auto itr = by_key_idx.lower_bound( bucket_key( a, b, bucket_seconds, start ) );
+       while( itr != by_key_idx.end() && itr->key.open <= end && result.size() < 100 )
+       {
+          if( !(itr->key.base == a && itr->key.quote == b && itr->key.seconds == bucket_seconds) )
+            return result;
+          result.push_back(*itr);
+          ++itr;
+       }
+       return result;
+    } FC_CAPTURE_AND_RETHROW( (a)(b)(bucket_seconds)(start)(end) ) }
 
     /** TODO: add secondary index that will accelerate this process */
     vector<proposal_object> database_api::get_proposed_transactions( account_id_type id )const
@@ -463,5 +485,6 @@ namespace graphene { namespace app {
        });
        return result;
     }
+
 
 } } // graphene::app
