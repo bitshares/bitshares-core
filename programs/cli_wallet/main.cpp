@@ -88,7 +88,6 @@ int main( int argc, char** argv )
       ac.rotate               = true;
       ac.rotation_interval    = fc::hours( 1 );
       ac.rotation_limit       = fc::days( 1 );
-      ac.rotation_compression = false;
 
       std::cout << "Logging RPC to file: " << (data_dir / ac.filename).preferred_string() << "\n";
 

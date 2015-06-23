@@ -1,6 +1,7 @@
 [submodule "docs"]
 	path = docs
 	url = https://github.com/cryptonomex/graphene.wiki.git
+    ignore = dirty
 [submodule "libraries/fc"]
     path = libraries/fc
     url = https://github.com/cryptonomex/fc.git
