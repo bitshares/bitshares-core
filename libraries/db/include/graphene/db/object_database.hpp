@@ -122,7 +122,7 @@ namespace graphene { namespace db {
          const T& get( object_id<SpaceID,TypeID,T> id )const { return get<T>(id); }
 
          template<typename IndexType>
-         const IndexType* add_index()
+         IndexType* add_index()
          {
             typedef typename IndexType::object_type ObjectType;
             if( _index[ObjectType::space_id].size() <= ObjectType::type_id  )
@@ -130,7 +130,7 @@ namespace graphene { namespace db {
             assert(!_index[ObjectType::space_id][ObjectType::type_id]);
             unique_ptr<index> indexptr( new IndexType(*this) );
             _index[ObjectType::space_id][ObjectType::type_id] = std::move(indexptr);
-            return static_cast<const IndexType*>(_index[ObjectType::space_id][ObjectType::type_id].get());
+            return static_cast<IndexType*>(_index[ObjectType::space_id][ObjectType::type_id].get());
          }
 
          void pop_undo();

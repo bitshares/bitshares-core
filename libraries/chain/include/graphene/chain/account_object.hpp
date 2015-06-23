@@ -256,6 +256,44 @@ class database;
          delegate_id_type    delegate_id; // optional
    };
 
+   /**
+    *  @brief This secondary index will allow a reverse lookup of all accounts that a particular key or account
+    *  is an potential signing authority. 
+    */
+   class account_member_index : public secondary_index
+   {
+      public:
+         virtual void object_inserted( const object& obj ) override;
+         virtual void object_removed( const object& obj ) override;
+         virtual void about_to_modify( const object& before ) override;
+         virtual void object_modified( const object& after  ) override;
+
+
+         /** given an account or key, map it to the set of accounts that reference it in an active or owner authority */
+         map< object_id_type, set<account_id_type> > account_to_memberships;
+
+
+      protected:
+         set<object_id_type>  get_members( const account_object& a )const;
+         set<object_id_type>  before_members;
+   };
+
+   /**
+    *  @brief This secondary index will allow a reverse lookup of all accounts that have been referred by
+    *  a particular account.
+    */
+   class account_referrer_index : public secondary_index
+   {
+      public:
+         virtual void object_inserted( const object& obj ) override;
+         virtual void object_removed( const object& obj ) override;
+         virtual void about_to_modify( const object& before ) override;
+         virtual void object_modified( const object& after  ) override;
+
+         /** maps the referrer to the set of accounts that they have referred */
+         map< account_id_type, set<account_id_type> > referred_by;
+   };
+
    struct by_asset;
    struct by_account;
    struct by_balance;

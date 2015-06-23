@@ -123,6 +123,16 @@ namespace graphene { namespace db {
 
    };
 
+   class secondary_index
+   {
+      public:
+         virtual ~secondary_index(){};
+         virtual void object_inserted( const object& obj ){};
+         virtual void object_removed( const object& obj ){};
+         virtual void about_to_modify( const object& before ){};
+         virtual void object_modified( const object& after  ){};
+   };
+
    /**
     *   Defines the common implementation
     */
@@ -143,12 +153,31 @@ namespace graphene { namespace db {
          /** called just after obj is modified */
          void on_modify( const object& obj );
 
+         template<typename T>
+         void add_secondary_index()
+         {
+            _sindex.emplace_back( new T() );
+         }
+
+         template<typename T>
+         const T& get_secondary_index()const
+         {
+            for( const auto& item : _sindex )
+            {
+               const T* result = dynamic_cast<const T*>(item.get());
+               if( result != nullptr ) return *result;
+            }
+            assert( !"invalid index type" );
+         }
+
       protected:
-         vector< shared_ptr<index_observer> > _observers;
+         vector< shared_ptr<index_observer> >   _observers;
+         vector< unique_ptr<secondary_index> >  _sindex;
 
       private:
          object_database& _db;
    };
+
 
    /**
     * @class primary_index
@@ -215,12 +244,16 @@ namespace graphene { namespace db {
          virtual const object&  create(const std::function<void(object&)>& constructor )override
          {
             const auto& result = DerivedIndex::create( constructor );
+            for( const auto& item : _sindex )
+               item->object_inserted( result );
             on_add( result );
             return result;
          }
 
          virtual void  remove( const object& obj ) override
          {
+            for( const auto& item : _sindex )
+               item->object_removed( obj );
             on_remove(obj);
             DerivedIndex::remove(obj);
          }
@@ -228,7 +261,11 @@ namespace graphene { namespace db {
          virtual void modify( const object& obj, const std::function<void(object&)>& m )override
          {
             save_undo( obj );
+            for( const auto& item : _sindex )
+               item->about_to_modify( obj );
             DerivedIndex::modify( obj, m );
+            for( const auto& item : _sindex )
+               item->object_modified( obj );
             on_modify( obj );
          }
 

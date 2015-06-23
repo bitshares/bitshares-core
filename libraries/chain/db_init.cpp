@@ -103,7 +103,10 @@ void database::initialize_indexes()
    //Protocol object indexes
    add_index< primary_index<asset_index> >();
    add_index< primary_index<force_settlement_index> >();
-   add_index< primary_index<account_index> >();
+   auto acnt_index = add_index< primary_index<account_index> >();
+   acnt_index->add_secondary_index<account_member_index>();
+   acnt_index->add_secondary_index<account_referrer_index>();
+
    add_index< primary_index<simple_index<key_object>> >();
    add_index< primary_index<delegate_index> >();
    add_index< primary_index<witness_index> >();
