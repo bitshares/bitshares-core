@@ -21,53 +21,63 @@
 
 namespace graphene { namespace chain {
 
-bool is_valid_symbol( const string& symbol );
-bool is_valid_name( const string& s );
-
 class database;
 
+namespace pred {
+
 /**
- *  Used to verify that account_id->name is account_name 
+ *  Used to verify that account_id->name is equal to the given string literal.
  */
-struct verify_account_name
+struct account_name_eq_lit
 {
    account_id_type account_id;
-   string          account_name;
+   string          name;
 
    /**
-    *  Perform state independent checks, such as verifying that
-    *  account_name is a valid name for an account.
+    *  Perform state-independent checks.  Verify
+    *  account_name is a valid account name.
     */
-   bool validate()const { return is_valid_name( account_name ); }
+   bool validate()const;
+
+   /**
+    * Evaluate the predicate.
+    */
+   bool evaluate( const database& db )const;
 };
 
 /**
- *  Used to verify that account_id->name is account_name 
+ *  Used to verify that asset_id->symbol is equal to the given string literal.
  */
-struct verify_symbol
+struct asset_symbol_eq_lit
 {
    asset_id_type   asset_id;
    string          symbol;
 
    /**
-    *  Perform state independent checks, such as verifying that
-    *  account_name is a valid name for an account.
+    *  Perform state independent checks.  Verify symbol is a
+    *  valid asset symbol.
     */
-   bool validate()const { return is_valid_symbol( symbol ); }
+   bool validate()const;
+
+   /**
+    * Evaluate the predicate.
+    */
+   bool evaluate( const database& db )const;
 };
 
+}
+
 /**
- *  When defining predicates do not make the protocol dependent upon 
- *  implementation details.  
+ *  When defining predicates do not make the protocol dependent upon
+ *  implementation details.
  */
 typedef static_variant<
-   verify_account_name,
-   verify_symbol
+   pred::account_name_eq_lit,
+   pred::asset_symbol_eq_lit
   > predicate;
 
 } }
 
-FC_REFLECT( graphene::chain::verify_account_name, (account_id)(account_name) )
-FC_REFLECT( graphene::chain::verify_symbol,  (asset_id)(symbol) )
+FC_REFLECT( graphene::chain::pred::account_name_eq_lit, (account_id)(name) )
+FC_REFLECT( graphene::chain::pred::asset_symbol_eq_lit, (asset_id)(symbol) )
 FC_REFLECT_TYPENAME( graphene::chain::predicate )
- 

@@ -24,20 +24,17 @@
 
 namespace graphene { namespace chain {
 
-struct predicate_visitor
+struct predicate_evaluator
 {
    typedef bool result_type;
    const database& db;
 
-   predicate_visitor( const database& d ):db(d){}
+   predicate_evaluator( const database& d ):db(d){}
 
-   bool operator()( const verify_account_name& p )const
+   template< typename T >
+   bool operator()( const T& p )const
    {
-      return p.account_id(db).name == p.account_name;
-   }
-   bool operator()( const verify_symbol& p )const
-   {
-      return p.asset_id(db).symbol == p.symbol;
+      return p.evaluate( db );
    }
 };
 
@@ -63,7 +60,7 @@ void_result assert_evaluator::do_evaluate( const assert_operation& o )
 
       FC_ASSERT( p.which() >= 0 );
       FC_ASSERT( unsigned(p.which()) < max_predicate_opcode );
-      FC_ASSERT( p.visit( predicate_visitor( _db ) ) );
+      FC_ASSERT( p.visit( predicate_evaluator( _db ) ) );
    }
    return void_result();
 }

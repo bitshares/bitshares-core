@@ -7,6 +7,7 @@ add_library( graphene_chain
 
              address.cpp
              asset.cpp
+             predicate.cpp
 
              operations.cpp
 
