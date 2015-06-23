@@ -25,6 +25,10 @@
 #include <graphene/chain/types.hpp>
 #include <graphene/chain/asset.hpp>
 #include <graphene/chain/authority.hpp>
+#include <graphene/chain/predicate.hpp>
+
+/// TODO: why does this file depend upon database objects?
+/// we should remove these headers 
 #include <graphene/chain/asset_object.hpp>
 #include <graphene/chain/worker_object.hpp>
 #include <graphene/chain/account_object.hpp>
@@ -1184,6 +1188,25 @@ namespace graphene { namespace chain {
       }
    };
 
+   struct linear_vesting_policy_initializer 
+   {
+      /** while vesting begins on begin_date, none may be claimed before the start_claim time */
+      fc::time_point_sec start_claim;
+      fc::time_point_sec begin_date;
+      uint32_t           vesting_seconds = 0;
+   };
+
+   struct ccd_vesting_policy_initializer
+   {
+      /** while coindays may accrue over time, none may be claimed before the start_claim time */
+      fc::time_point_sec start_claim;
+      uint32_t           vesting_seconds = 0;
+      ccd_vesting_policy_initializer( uint32_t vest_sec = 0, fc::time_point_sec sc = fc::time_point_sec() ):start_claim(sc),vesting_seconds(vest_sec){}
+   };
+
+   typedef fc::static_variant< linear_vesting_policy_initializer, ccd_vesting_policy_initializer > vesting_policy_initializer;
+
+
    /**
     * @brief Create a vesting balance.
     * @ingroup operations
@@ -1203,11 +1226,11 @@ namespace graphene { namespace chain {
     */
    struct vesting_balance_create_operation
    {
-      asset            fee;
-      account_id_type  creator;         ///< Who provides funds initially
-      account_id_type  owner;           ///< Who is able to withdraw the balance
-      asset            amount;
-      uint32_t         vesting_seconds;
+      asset                       fee;
+      account_id_type             creator;         ///< Who provides funds initially
+      account_id_type             owner;           ///< Who is able to withdraw the balance
+      asset                       amount;
+      vesting_policy_initializer  policy;
 
       account_id_type   fee_payer()const { return creator; }
       void              get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>&)const;
@@ -1219,6 +1242,7 @@ namespace graphene { namespace chain {
          acc.adjust( creator, -amount );
       }
    };
+
 
    /**
     * @brief Withdraw from a vesting balance.
@@ -1585,7 +1609,7 @@ FC_REFLECT( graphene::chain::withdraw_permission_claim_operation, (fee)(withdraw
 FC_REFLECT( graphene::chain::withdraw_permission_delete_operation, (fee)(withdraw_from_account)(authorized_account)
             (withdrawal_permission) )
 
-FC_REFLECT( graphene::chain::vesting_balance_create_operation, (fee)(creator)(owner)(amount)(vesting_seconds) )
+FC_REFLECT( graphene::chain::vesting_balance_create_operation, (fee)(creator)(owner)(amount)(policy) )
 FC_REFLECT( graphene::chain::vesting_balance_withdraw_operation, (fee)(vesting_balance)(owner)(amount) )
 
 FC_REFLECT( graphene::chain::worker_create_operation,
@@ -1599,3 +1623,6 @@ FC_REFLECT( graphene::chain::void_result, )
 FC_REFLECT_TYPENAME( graphene::chain::operation )
 FC_REFLECT_TYPENAME( graphene::chain::operation_result )
 FC_REFLECT_TYPENAME( fc::flat_set<graphene::chain::vote_id_type> )
+FC_REFLECT(graphene::chain::linear_vesting_policy_initializer, (start_claim)(begin_date)(vesting_seconds) )
+FC_REFLECT(graphene::chain::ccd_vesting_policy_initializer, (start_claim)(vesting_seconds) )
+FC_REFLECT_TYPENAME( graphene::chain::vesting_policy_initializer )

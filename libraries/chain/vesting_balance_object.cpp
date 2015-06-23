@@ -31,6 +31,8 @@ inline bool sum_below_max_shares(const asset& a, const asset& b)
 
 asset linear_vesting_policy::get_allowed_withdraw(const vesting_policy_context& ctx) const
 {
+   if(ctx.now <= start_claim)
+      return asset(0, ctx.balance.asset_id);
    if(ctx.now <= begin_date)
       return asset(0, ctx.balance.asset_id);
    if(vesting_seconds == 0)
@@ -96,6 +98,8 @@ void cdd_vesting_policy::update_coin_seconds_earned(const vesting_policy_context
 
 asset cdd_vesting_policy::get_allowed_withdraw(const vesting_policy_context& ctx)const
 {
+   if(ctx.now <= start_claim)
+      return asset(0, ctx.balance.asset_id);
    fc::uint128_t cs_earned = compute_coin_seconds_earned(ctx);
    fc::uint128_t withdraw_available = cs_earned / vesting_seconds;
    assert(withdraw_available <= ctx.balance.amount.value);

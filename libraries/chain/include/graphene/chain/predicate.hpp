@@ -21,6 +21,9 @@
 
 namespace graphene { namespace chain {
 
+bool is_valid_symbol( const string& symbol );
+bool is_valid_name( const string& s );
+
 class database;
 
 /**
@@ -66,4 +69,5 @@ typedef static_variant<
 
 FC_REFLECT( graphene::chain::verify_account_name, (account_id)(account_name) )
 FC_REFLECT( graphene::chain::verify_symbol,  (asset_id)(symbol) )
+FC_REFLECT_TYPENAME( graphene::chain::predicate )
  

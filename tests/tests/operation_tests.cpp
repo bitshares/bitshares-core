@@ -1395,7 +1395,8 @@ BOOST_AUTO_TEST_CASE( vesting_balance_create_test )
    op.creator = account_id_type();
    op.owner = account_id_type();
    op.amount = test_asset.amount( 100 );
-   op.vesting_seconds = 60*60*24;
+   //op.vesting_seconds = 60*60*24;
+   op.policy = ccd_vesting_policy_initializer{ 60*60*24 };
 
    // Fee must be non-negative
    REQUIRE_OP_VALIDATION_SUCCESS( op, fee, core.amount(  1 )  );
@@ -1406,10 +1407,6 @@ BOOST_AUTO_TEST_CASE( vesting_balance_create_test )
    REQUIRE_OP_VALIDATION_SUCCESS( op, amount, core.amount(  1 ) );
    REQUIRE_OP_VALIDATION_FAILURE( op, amount, core.amount(  0 ) );
    REQUIRE_OP_VALIDATION_FAILURE( op, amount, core.amount( -1 ) );
-
-   // Min vesting period must be at least 1 sec
-   REQUIRE_OP_VALIDATION_SUCCESS( op, vesting_seconds, 1 );
-   REQUIRE_OP_VALIDATION_FAILURE( op, vesting_seconds, 0 );
 
    // Setup world state we will need to test actual evaluation
    const account_object& alice_account = create_account( "alice" );
@@ -1488,7 +1485,7 @@ BOOST_AUTO_TEST_CASE( vesting_balance_withdraw_test )
       create_op.creator = creator;
       create_op.owner = owner;
       create_op.amount = amount;
-      create_op.vesting_seconds = vesting_seconds;
+      create_op.policy = ccd_vesting_policy_initializer( vesting_seconds );
       tx.operations.push_back( create_op );
 
       processed_transaction ptx = PUSH_TX( db,  tx, ~0  );
