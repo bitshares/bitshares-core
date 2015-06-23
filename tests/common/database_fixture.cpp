@@ -65,6 +65,7 @@ database_fixture::database_fixture()
       genesis_state.initial_committee.push_back({name});
       genesis_state.initial_witnesses.push_back({name, delegate_priv_key.get_public_key(), secret});
    }
+   fc::reflector<fee_schedule_type>::visit(fee_schedule_type::fee_set_visitor{genesis_state.initial_parameters.current_fees, 0});
    db.init_genesis(genesis_state);
    ahplugin->plugin_startup();
 

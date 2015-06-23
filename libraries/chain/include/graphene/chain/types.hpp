@@ -335,11 +335,6 @@ namespace graphene { namespace chain {
          }
       };
 
-      fee_schedule_type()
-      {
-         memset((char*)this, 0, sizeof(*this));
-      }
-
       /// The number of bytes to charge a data fee for
       const static int BYTES_PER_DATA_FEE = 1024;
 
@@ -348,57 +343,54 @@ namespace graphene { namespace chain {
           return data_size(ts...) / BYTES_PER_DATA_FEE * data_fee;
       }
 
-      uint32_t key_create_fee; ///< the cost to register a public key with the blockchain
-      uint32_t account_create_fee; ///< the cost to register the cheapest non-free account
-      uint32_t account_update_fee; ///< the cost to update an existing account
-      uint32_t account_transfer_fee; ///< the cost to transfer an account to a new owner
-      uint32_t account_len8up_fee;
-      uint32_t account_len7_fee;
-      uint32_t account_len6_fee;
-      uint32_t account_len5_fee;
-      uint32_t account_len4_fee;
-      uint32_t account_len3_fee;
-      uint32_t account_len2_fee;
-      uint32_t asset_len3_fee;
-      uint32_t asset_len4_fee;
-      uint32_t asset_len5_fee;
-      uint32_t asset_len6_fee;
-      uint32_t asset_len7up_fee;
-      uint32_t account_whitelist_fee; ///< the fee to whitelist an account
-      uint32_t delegate_create_fee; ///< fixed fee for registering as a delegate; used to discourage frivolous delegates
-      uint32_t witness_withdraw_pay_fee; ///< fee for withdrawing witness pay
-      uint32_t transfer_fee; ///< fee for transferring some asset
-      uint32_t limit_order_create_fee; ///< fee for placing a limit order in the markets
-      uint32_t limit_order_cancel_fee; ///< fee for canceling a limit order
-      uint32_t call_order_fee; ///< fee for placing a call order in the markets
-      uint32_t publish_feed_fee; ///< fee for publishing a price feed
-      uint32_t asset_create_fee; ///< the cost to register the cheapest asset
-      uint32_t asset_update_fee; ///< the cost to modify a registered asset
-      uint32_t asset_issue_fee; ///< the cost to modify a registered asset
-      uint32_t asset_burn_fee; ///< the cost to burn an asset
-      uint32_t asset_fund_fee_pool_fee; ///< the cost to add funds to an asset's fee pool
-      uint32_t asset_settle_fee; ///< the cost to trigger a forced settlement of a market-issued asset
-      uint32_t market_fee; ///< a percentage charged on market orders
-      uint32_t transaction_fee; ///< a base price for every transaction
-      uint32_t data_fee; ///< a price per BYTES_PER_DATA_FEE bytes of user data
-      uint32_t signature_fee; ///< a surcharge on transactions with more than 2 signatures.
-      uint32_t global_parameters_update_fee; ///< the cost to update the global parameters
-      uint32_t membership_annual_fee; ///< the annual cost of a membership subscription
-      uint32_t membership_lifetime_fee; ///< the cost to upgrade to a lifetime member
-      uint32_t withdraw_permission_create_fee; ///< the cost to create a withdraw permission
-      uint32_t withdraw_permission_update_fee; ///< the cost to update a withdraw permission
-      uint32_t withdraw_permission_claim_fee; ///< the cost to withdraw from a withdraw permission
-      uint32_t withdraw_permission_delete_fee; ///< the cost to delete a withdraw permission
-      uint32_t vesting_balance_create_fee;
-      uint32_t vesting_balance_withdraw_fee;
-      uint32_t global_settle_fee;
-      uint32_t worker_create_fee; ///< the cost to create a new worker
-      uint32_t worker_delete_fee; ///< the cost to delete a worker
-      uint32_t assert_op_fee; ///< fee per assert operation
-      uint32_t proposal_create_fee; ///< fee for creating a proposed transaction
-      uint32_t proposal_update_fee; ///< fee for adding or removing approval of a proposed transaction
-      uint32_t proposal_delete_fee; ///< fee for deleting a proposed transaction
-      uint32_t custom_operation_fee; ///< fee for a custom operation
+      uint32_t key_create_fee = 270300; ///< the cost to register a public key with the blockchain
+      uint32_t account_create_fee = 666666; ///< the cost to register the cheapest non-free account
+      uint32_t account_update_fee = 150000; ///< the cost to update an existing account
+      uint32_t account_transfer_fee = 300000; ///< the cost to transfer an account to a new owner
+      uint32_t account_whitelist_fee = 300000; ///< the fee to whitelist an account
+      uint32_t account_len8up_fee = 1500000;
+      uint32_t account_len7_fee = 7000000;
+      uint32_t account_len6_fee = 14000000;
+      uint32_t account_len5_fee = 70000000;
+      uint32_t account_len4_fee = 280000000;
+      uint32_t account_len3_fee = 680000000;
+      uint32_t account_len2_fee = 1000000000;
+      uint32_t asset_create_fee = 680000000; ///< the cost to register the cheapest asset
+      uint32_t asset_update_fee = 150000; ///< the cost to modify a registered asset
+      uint32_t asset_issue_fee = 700000; ///< the cost to print a UIA and send it to an account
+      uint32_t asset_burn_fee = 1500000; ///< the cost to burn an asset
+      uint32_t asset_fund_fee_pool_fee = 150000; ///< the cost to add funds to an asset's fee pool
+      uint32_t asset_settle_fee = 7000000; ///< the cost to trigger a forced settlement of a market-issued asset
+      uint32_t asset_global_settle_fee = 140000000; ///< the cost to trigger a global forced settlement of a market asset
+      uint32_t asset_len7up_fee = 140000000;
+      uint32_t asset_len6_fee = 675000000;
+      uint32_t asset_len5_fee = 1350000000;
+      uint32_t asset_len4_fee = 2700000000;
+      uint64_t asset_len3_fee = 7000000000;
+      uint32_t delegate_create_fee = 680000000; ///< fee for registering as a delegate; used to discourage frivolous delegates
+      uint32_t witness_create_fee = 680000000; /// < fee for registering as a witness
+      uint32_t witness_withdraw_pay_fee = 1500000; ///< fee for withdrawing witness pay
+      uint32_t transfer_fee = 2700000; ///< fee for transferring some asset
+      uint32_t limit_order_create_fee = 666666; ///< fee for placing a limit order in the markets
+      uint32_t limit_order_cancel_fee = 150000; ///< fee for canceling a limit order
+      uint32_t call_order_fee = 800000; ///< fee for placing a call order in the markets
+      uint32_t publish_feed_fee = 666666; ///< fee for publishing a price feed
+      uint32_t data_fee = 13500000; ///< a price per BYTES_PER_DATA_FEE bytes of user data
+      uint32_t global_parameters_update_fee = 1350000; ///< the cost to update the global parameters
+      uint32_t membership_annual_fee = 270000000; ///< the annual cost of a membership subscription
+      uint32_t membership_lifetime_fee = 1350000000; ///< the cost to upgrade to a lifetime member
+      uint32_t withdraw_permission_create_fee = 2700000; ///< the cost to create a withdraw permission
+      uint32_t withdraw_permission_update_fee = 150000; ///< the cost to update a withdraw permission
+      uint32_t withdraw_permission_claim_fee = 700000; ///< the cost to withdraw from a withdraw permission
+      uint32_t withdraw_permission_delete_fee = 150000; ///< the cost to delete a withdraw permission
+      uint32_t vesting_balance_create_fee = 7000000;
+      uint32_t vesting_balance_withdraw_fee = 2700000;
+      uint32_t worker_create_fee = 680000000; ///< the cost to create a new worker
+      uint32_t assert_op_fee = 150000; ///< fee per assert operation
+      uint32_t proposal_create_fee = 7000000; ///< fee for creating a proposed transaction
+      uint32_t proposal_update_fee = 1500000; ///< fee for adding or removing approval of a proposed transaction
+      uint32_t proposal_delete_fee = 150000; ///< fee for deleting a proposed transaction
+      uint32_t custom_operation_fee = 300000; ///< fee for a custom operation
 
    protected:
       size_t data_size()const {
@@ -565,6 +557,7 @@ FC_REFLECT( graphene::chain::fee_schedule_type,
             (asset_len7up_fee)
             (account_whitelist_fee)
             (delegate_create_fee)
+            (witness_create_fee)
             (witness_withdraw_pay_fee)
             (transfer_fee)
             (limit_order_create_fee)
@@ -577,10 +570,7 @@ FC_REFLECT( graphene::chain::fee_schedule_type,
             (asset_burn_fee)
             (asset_fund_fee_pool_fee)
             (asset_settle_fee)
-            (market_fee)
-            (transaction_fee)
             (data_fee)
-            (signature_fee)
             (global_parameters_update_fee)
             (membership_annual_fee)
             (membership_lifetime_fee)
@@ -590,9 +580,8 @@ FC_REFLECT( graphene::chain::fee_schedule_type,
             (withdraw_permission_delete_fee)
             (vesting_balance_create_fee)
             (vesting_balance_withdraw_fee)
-            (global_settle_fee)
+            (asset_global_settle_fee)
             (worker_create_fee)
-            (worker_delete_fee)
             (assert_op_fee)
             (proposal_create_fee)
             (proposal_update_fee)
