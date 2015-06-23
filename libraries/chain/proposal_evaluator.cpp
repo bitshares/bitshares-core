@@ -22,8 +22,8 @@
 
 namespace graphene { namespace chain {
 
-object_id_type proposal_create_evaluator::do_evaluate(const proposal_create_operation& o)
-{
+void_result proposal_create_evaluator::do_evaluate(const proposal_create_operation& o)
+{ try {
    const database& d = db();
    const auto& global_parameters = d.get_global_properties().parameters;
 
@@ -47,11 +47,11 @@ object_id_type proposal_create_evaluator::do_evaluate(const proposal_create_oper
       _proposed_trx.operations.push_back(op.op);
    _proposed_trx.validate();
 
-   return object_id_type();
-}
+   return void_result();
+} FC_CAPTURE_AND_RETHROW( (o) ) }
 
 object_id_type proposal_create_evaluator::do_apply(const proposal_create_operation& o)
-{
+{ try {
    database& d = db();
 
    const proposal_object& proposal = d.create<proposal_object>([&](proposal_object& proposal) {
@@ -71,10 +71,10 @@ object_id_type proposal_create_evaluator::do_apply(const proposal_create_operati
    });
 
    return proposal.id;
-}
+} FC_CAPTURE_AND_RETHROW( (o) ) }
 
 void_result proposal_update_evaluator::do_evaluate(const proposal_update_operation& o)
-{
+{ try {
    database& d = db();
 
    _proposal = &o.proposal(d);
@@ -106,10 +106,10 @@ void_result proposal_update_evaluator::do_evaluate(const proposal_update_operati
    }
 
    return void_result();
-}
+} FC_CAPTURE_AND_RETHROW( (o) ) }
 
 void_result proposal_update_evaluator::do_apply(const proposal_update_operation& o)
-{
+{ try {
    database& d = db();
 
    // Potential optimization: if _executed_proposal is true, we can skip the modify step and make push_proposal skip
@@ -147,10 +147,10 @@ void_result proposal_update_evaluator::do_apply(const proposal_update_operation&
    }
 
    return void_result();
-}
+} FC_CAPTURE_AND_RETHROW( (o) ) }
 
 void_result proposal_delete_evaluator::do_evaluate(const proposal_delete_operation& o)
-{
+{ try {
    database& d = db();
 
    _proposal = &o.proposal(d);
@@ -162,13 +162,13 @@ void_result proposal_delete_evaluator::do_evaluate(const proposal_delete_operati
               ("provided", o.fee_paying_account)("required", *required_approvals));
 
    return void_result();
-}
+} FC_CAPTURE_AND_RETHROW( (o) ) }
 
-void_result proposal_delete_evaluator::do_apply(const proposal_delete_operation&)
-{
+void_result proposal_delete_evaluator::do_apply(const proposal_delete_operation& o)
+{ try {
    db().remove(*_proposal);
 
    return void_result();
-}
+} FC_CAPTURE_AND_RETHROW( (o) ) }
 
 } } // graphene::chain

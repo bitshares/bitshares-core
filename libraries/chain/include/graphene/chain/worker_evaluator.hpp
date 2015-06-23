@@ -26,7 +26,7 @@ namespace graphene { namespace chain {
       public:
          typedef worker_create_operation operation_type;
 
-         object_id_type do_evaluate( const operation_type& o );
+         void_result do_evaluate( const operation_type& o );
          object_id_type do_apply( const operation_type& o );
    };
 

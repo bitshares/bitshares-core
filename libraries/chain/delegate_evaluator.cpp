@@ -22,14 +22,15 @@
 #include <graphene/chain/account_object.hpp>
 
 namespace graphene { namespace chain {
-object_id_type delegate_create_evaluator::do_evaluate( const delegate_create_operation& op )
-{
+
+void_result delegate_create_evaluator::do_evaluate( const delegate_create_operation& op )
+{ try {
    FC_ASSERT(db().get(op.delegate_account).is_lifetime_member());
-   return object_id_type();
-}
+   return void_result();
+} FC_CAPTURE_AND_RETHROW( (op) ) }
 
 object_id_type delegate_create_evaluator::do_apply( const delegate_create_operation& op )
-{
+{ try {
    vote_id_type vote_id;
    db().modify(db().get_global_properties(), [&vote_id](global_property_object& p) {
       vote_id = p.get_next_vote_id(vote_id_type::committee);
@@ -40,6 +41,6 @@ object_id_type delegate_create_evaluator::do_apply( const delegate_create_operat
          obj.vote_id            = vote_id;
    });
    return new_del_object.id;
-}
+} FC_CAPTURE_AND_RETHROW( (op) ) }
 
 } } // graphene::chain

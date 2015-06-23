@@ -22,7 +22,7 @@
 
 namespace graphene { namespace chain {
 
-object_id_type withdraw_permission_create_evaluator::do_evaluate(const operation_type& op)
+void_result withdraw_permission_create_evaluator::do_evaluate(const operation_type& op)
 { try {
    database& d = db();
    FC_ASSERT(d.find_object(op.withdraw_from_account));
@@ -32,7 +32,7 @@ object_id_type withdraw_permission_create_evaluator::do_evaluate(const operation
    FC_ASSERT(op.period_start_time + op.periods_until_expiration * op.withdrawal_period_sec > d.head_block_time());
    FC_ASSERT(op.withdrawal_period_sec >= d.get_global_properties().parameters.block_interval);
 
-   return d.get_index_type<withdraw_permission_index>().get_next_id();
+   return void_result();
 } FC_CAPTURE_AND_RETHROW( (op) ) }
 
 object_id_type withdraw_permission_create_evaluator::do_apply(const operation_type& op)
@@ -42,7 +42,7 @@ object_id_type withdraw_permission_create_evaluator::do_apply(const operation_ty
       p.authorized_account = op.authorized_account;
       p.withdrawal_limit = op.withdrawal_limit;
       p.withdrawal_period_sec = op.withdrawal_period_sec;
-      p.expiration = op.period_start_time + op.periods_until_expiration * op.withdrawal_period_sec; 
+      p.expiration = op.period_start_time + op.periods_until_expiration * op.withdrawal_period_sec;
       p.period_start_time = op.period_start_time;
    }).id;
 } FC_CAPTURE_AND_RETHROW( (op) ) }
@@ -133,9 +133,9 @@ void_result withdraw_permission_delete_evaluator::do_evaluate(const withdraw_per
 } FC_CAPTURE_AND_RETHROW( (op) ) }
 
 void_result withdraw_permission_delete_evaluator::do_apply(const withdraw_permission_delete_evaluator::operation_type& op)
-{
+{ try {
    db().remove(db().get(op.withdrawal_permission));
    return void_result();
-}
+} FC_CAPTURE_AND_RETHROW( (op) ) }
 
 } } // graphene::chain
