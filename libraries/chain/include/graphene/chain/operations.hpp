@@ -314,6 +314,7 @@ namespace graphene { namespace chain {
       asset                                 fee;
       /// The account which owns the delegate. This account pays the fee for this operation.
       account_id_type                       delegate_account;
+      string                                url;
 
       account_id_type fee_payer()const { return delegate_account; }
       void get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>&)const;
@@ -334,6 +335,7 @@ namespace graphene { namespace chain {
       asset             fee;
       /// The account which owns the delegate. This account pays the fee for this operation.
       account_id_type   witness_account;
+      string            url;
       key_id_type       block_signing_key;
       secret_hash_type  initial_secret;
 
@@ -1543,9 +1545,9 @@ FC_REFLECT( graphene::chain::account_whitelist_operation, (fee)(authorizing_acco
 FC_REFLECT( graphene::chain::account_transfer_operation, (fee)(account_id)(new_owner) )
 
 FC_REFLECT( graphene::chain::delegate_create_operation,
-            (fee)(delegate_account) )
+            (fee)(delegate_account)(url) )
 
-FC_REFLECT( graphene::chain::witness_create_operation, (fee)(witness_account)(block_signing_key)(initial_secret) )
+FC_REFLECT( graphene::chain::witness_create_operation, (fee)(witness_account)(url)(block_signing_key)(initial_secret) )
 FC_REFLECT( graphene::chain::witness_withdraw_pay_operation, (fee)(from_witness)(to_account)(amount) )
 
 FC_REFLECT( graphene::chain::limit_order_create_operation,

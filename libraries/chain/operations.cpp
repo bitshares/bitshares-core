@@ -341,6 +341,7 @@ void delegate_create_operation::get_required_auth(flat_set<account_id_type>& act
 void delegate_create_operation::validate()const
 {
    FC_ASSERT( fee.amount >= 0 );
+   FC_ASSERT(url.size() < GRAPHENE_MAX_URL_LENGTH );
 }
 
 void asset_fund_fee_pool_operation::get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>&) const
@@ -539,6 +540,7 @@ void witness_create_operation::get_required_auth(flat_set<graphene::chain::accou
 void witness_create_operation::validate() const
 {
    FC_ASSERT(fee.amount >= 0);
+   FC_ASSERT(url.size() < GRAPHENE_MAX_URL_LENGTH );
 }
 
 share_type witness_create_operation::calculate_fee(const fee_schedule_type& k) const
@@ -779,7 +781,7 @@ void worker_create_operation::validate() const
    FC_ASSERT(daily_pay > 0);
    FC_ASSERT(daily_pay < GRAPHENE_BLOCKCHAIN_MAX_SHARES);
    FC_ASSERT(name.size() < GRAPHENE_MAX_WORKER_NAME_LENGTH );
-   FC_ASSERT(url.size() < GRAPHENE_MAX_WORKER_URL_LENGTH );
+   FC_ASSERT(url.size() < GRAPHENE_MAX_URL_LENGTH );
 }
 
 share_type worker_create_operation::calculate_fee(const fee_schedule_type& k) const
