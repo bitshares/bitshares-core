@@ -1,35 +1,12 @@
 file(GLOB HEADERS "include/graphene/chain/*.hpp")
 
-add_executable( field_reflector
-                field_reflector.cpp
-                types.cpp
-                type_id.cpp
-                address.cpp
-                key_object.cpp
-                ${HEADERS} )
-
-target_include_directories( field_reflector
-                            PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include" )
-
-target_link_libraries( field_reflector fc graphene_db )
-
-add_custom_command( OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/db_reflect_cmp.cpp
-                    COMMAND field_reflector ${CMAKE_CURRENT_SOURCE_DIR}/db_reflect_cmp.tmpl ${CMAKE_CURRENT_BINARY_DIR}/db_reflect_cmp.cpp.new
-                    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_BINARY_DIR}/db_reflect_cmp.cpp.new ${CMAKE_CURRENT_BINARY_DIR}/db_reflect_cmp.cpp
-                    COMMAND ${CMAKE_COMMAND} -E remove ${CMAKE_CURRENT_BINARY_DIR}/db_reflect_cmp.cpp.new
-                    DEPENDS field_reflector db_reflect_cmp.tmpl
-                  )
-
 ## SORT .cpp by most likely to change / break compile
 add_library( graphene_chain
              types.cpp
              type_id.cpp
 
-             ${CMAKE_CURRENT_BINARY_DIR}/db_reflect_cmp.cpp
-
              address.cpp
              asset.cpp
-             predicate.cpp
 
              operations.cpp
 

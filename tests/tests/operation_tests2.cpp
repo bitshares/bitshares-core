@@ -820,9 +820,7 @@ BOOST_AUTO_TEST_CASE( assert_op_test )
    op.predicates = vector< vector< char > >();
    op.predicates.push_back(
       fc::raw::pack(
-      predicate(
-      pred_field_lit_cmp( nathan_key_id, 1, fc::raw::pack( lit_key ), opc_equal_to )
-      )
+      predicate( verify_account_name{ nathan_id, "nathan" } )
       ) );
    trx.operations.push_back(op);
    trx.sign( nathan_key_id, nathan_private_key );
@@ -831,9 +829,7 @@ BOOST_AUTO_TEST_CASE( assert_op_test )
    // nathan checks that his public key is not equal to the given value (fail)
    op.predicates.back() =
       fc::raw::pack(
-      predicate(
-      pred_field_lit_cmp( nathan_key_id, 1, fc::raw::pack( lit_key ), opc_not_equal_to )
-      )
+      predicate( verify_account_name{ nathan_id, "dan" } )
       );
    trx.operations.back() = op;
    trx.sign( nathan_key_id, nathan_private_key );

@@ -105,17 +105,21 @@ namespace graphene { namespace chain {
    /**
     *  @brief assert that some conditions are true.
     *  @ingroup operations
+    *
+    *  This operation performs no changes to the database state, but can but used to verify 
+    *  pre or post conditions for other operations.  
+    *
     */
    struct assert_operation
    {
-      asset fee;
-      account_id_type fee_paying_account;
-      vector< vector< char > > predicates;
+      asset                     fee;
+      account_id_type           fee_paying_account;
+      vector< vector< char > >  predicates;
       flat_set<account_id_type> required_auths;
 
       account_id_type fee_payer()const { return fee_paying_account; }
       void            get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>&)const;
-      share_type      calculate_fee( const fee_schedule_type& k )const{ return k.assert_op_fee; }
+      share_type      calculate_fee( const fee_schedule_type& k )const;
       void            validate()const;
 
       void get_balance_delta( balance_accumulator& acc, const operation_result& result = asset())const { acc.adjust( fee_payer(), -fee ); }

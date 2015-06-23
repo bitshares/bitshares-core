@@ -24,61 +24,44 @@
 
 namespace graphene { namespace chain {
 
-namespace detail {
-
-struct predicate_check_visitor
+struct predicate_visitor 
 {
-   predicate_check_visitor( const database& d ): _db(d){}
-
    typedef bool result_type;
-   template<typename Predicate> bool operator()( const Predicate& pred )const
+   const database& db;
+
+   predicate_visitor( const database& d ):db(d){}
+   
+   bool operator()( const verify_account_name& p )const
    {
-      return pred.check_predicate( _db );
+      return p.account_id(db).name == p.account_name;
    }
-
-   const database& _db;
+   bool operator()( const verify_symbol& p )const
+   {
+      return p.asset_id(db).symbol == p.symbol;
+   }
 };
-
-} // graphene::chain::detail
 
 void_result assert_evaluator::do_evaluate( const assert_operation& o )
 {
    const database& _db = db();
    uint32_t skip = _db.get_node_properties().skip_flags;
-   // TODO:  Skip flags
+
    if( skip & database::skip_assert_evaluation )
       return void_result();
-   for( const vector<char>& s_pred : o.predicates )
+
+   for( const vector<char>& pdata : o.predicates )
    {
-      std::istringstream is( string( s_pred.begin(), s_pred.end() ) );
-      // de-serialize just the static_variant tag
-      unsigned_int t;
-      fc::raw::unpack( is, t );
-      // everyone checks: delegates must have allocated an opcode for it
-      FC_ASSERT( t.value < _db.get_global_properties().parameters.max_predicate_opcode );
-      if( t.value >= predicate::count() )
+      fc::datastream<const char*> ds( pdata.data(), pdata.size() );
+      predicate p;
+      try {
+         fc::raw::unpack( ds, p );
+      } catch ( const fc::exception& e )
       {
-         //
-         // delegates allocated an opcode, but our client doesn't know
-         //  the semantics (i.e. we are running an old client)
-         //
-         // skip_unknown_predicate indicates we're cool with assuming
-         //  unknown predicates pass
-         //
          if( skip & database::skip_unknown_predicate )
             continue;
-         //
-         // ok, unknown predicate must die
-         //
-         FC_ASSERT( false, "unknown predicate" );
+         throw;
       }
-      // rewind to beginning, unpack it, and check it
-      is.clear();
-      is.seekg(0);
-      predicate pred;
-      fc::raw::unpack( is, pred );
-      bool pred_passed = pred.visit( detail::predicate_check_visitor( _db ) );
-      FC_ASSERT( pred_passed );
+      FC_ASSERT( p.visit( predicate_visitor( _db ) ) );
    }
    return void_result();
 }

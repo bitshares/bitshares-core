@@ -17,6 +17,7 @@
  */
 #include <graphene/chain/database.hpp>
 #include <graphene/chain/operations.hpp>
+#include <graphene/chain/predicate.hpp>
 #include <fc/crypto/aes.hpp>
 
 namespace graphene { namespace chain {
@@ -813,14 +814,47 @@ share_type account_upgrade_operation::calculate_fee(const fee_schedule_type& k) 
    return k.membership_annual_fee;
 }
 
+struct predicate_validator 
+{
+   typedef void result_type;
+   
+   template<typename T>
+   void operator()( const T& p )const
+   {
+      p.validate();
+   }
+};
+
 void assert_operation::validate()const
 {
    FC_ASSERT( fee.amount >= 0 );
+   for( const auto& item : predicates )
+   {
+      FC_ASSERT( item.size() > 0 );
+      fc::datastream<const char*> ds( item.data(), item.size() );
+      predicate p;
+      try {
+         fc::raw::unpack( ds, p );
+      } 
+      catch ( const fc::exception& e )
+      {
+         continue;
+      }
+      p.visit( predicate_validator() );
+   }
 }
 void assert_operation::get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>&)const
 {
    active_auth_set.insert(fee_paying_account);
    active_auth_set.insert(required_auths.begin(), required_auths.end());
+}
+
+/**
+ * The fee for assert operations is proportional to their size
+ */
+share_type  assert_operation::calculate_fee( const fee_schedule_type& k )const
+{ 
+   return (k.assert_op_fee * fc::raw::pack_size(*this)) / 1024; 
 }
 
 } } // namespace graphene::chain

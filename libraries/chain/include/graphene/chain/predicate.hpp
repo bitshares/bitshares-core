@@ -15,46 +15,55 @@
  * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
 #pragma once
 
 #include <graphene/chain/types.hpp>
-
-#include <vector>
 
 namespace graphene { namespace chain {
 
 class database;
 
-class pred_field_lit_cmp
+/**
+ *  Used to verify that account_id->name is account_name 
+ */
+struct verify_account_name
 {
-public:
-   pred_field_lit_cmp(
-      object_id_type obj_id,
-      uint16_t field_num,
-      const vector<char>& lit,
-      uint8_t opc
-      ) :
-      _obj_id( obj_id ),
-      _field_num( field_num ),
-      _lit( lit ),
-      _opc( opc )
-   {}
-   pred_field_lit_cmp() {}    // necessary for instantiating static_variant
-   ~pred_field_lit_cmp() {}
+   account_id_type account_id;
+   string          account_name;
 
-   bool check_predicate( const database& db )const;
-
-   object_id_type _obj_id;
-   uint16_t _field_num;
-   vector<char> _lit;
-   uint8_t _opc;
+   /**
+    *  Perform state independent checks, such as verifying that
+    *  account_name is a valid name for an account.
+    */
+   bool validate()const { return is_valid_name( account_name ); }
 };
 
+/**
+ *  Used to verify that account_id->name is account_name 
+ */
+struct verify_symbol
+{
+   asset_id_type   asset_id;
+   string          symbol;
+
+   /**
+    *  Perform state independent checks, such as verifying that
+    *  account_name is a valid name for an account.
+    */
+   bool validate()const { return is_valid_symbol( symbol ); }
+};
+
+/**
+ *  When defining predicates do not make the protocol dependent upon 
+ *  implementation details.  
+ */
 typedef static_variant<
-   pred_field_lit_cmp
+   verify_account_name,
+   verify_symbol
   > predicate;
 
 } }
 
-FC_REFLECT( graphene::chain::pred_field_lit_cmp, (_obj_id)(_field_num)(_lit)(_opc) );
+FC_REFLECT( graphene::chain::verify_account_name, (account_id)(account_name) )
+FC_REFLECT( graphene::chain::verify_symbol,  (asset_id)(symbol) )
+ 
