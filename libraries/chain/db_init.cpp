@@ -334,7 +334,9 @@ void database::init_genesis(const genesis_state_type& genesis_state)
    });
 
    // Initialize witness schedule
+#ifndef NDEBUG
    const witness_schedule_object& wso =
+#endif
    create<witness_schedule_object>([&](witness_schedule_object& _wso)
    {
       memset(_wso.rng_seed.begin(), 0, _wso.rng_seed.size());

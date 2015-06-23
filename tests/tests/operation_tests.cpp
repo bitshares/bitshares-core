@@ -249,7 +249,7 @@ BOOST_AUTO_TEST_CASE( black_swan )
       publish_feed( bitusd, feedproducer, current_feed );
 
       /// this sell order is designed to trigger a black swan
-      create_sell_order(borrower2, bitusd.amount(1000), core.amount(3000));
+      create_sell_order( borrower2, bitusd.amount(1000), core.amount(3000) );
 
       FC_ASSERT( bitusd.bitasset_data(db).has_settlement() );
 

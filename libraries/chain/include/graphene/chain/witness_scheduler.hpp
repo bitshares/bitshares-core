@@ -40,6 +40,7 @@ class generic_witness_scheduler
    public:
       void check_invariant() const
       {
+#ifndef NDEBUG
          CountType tokens = _ineligible_no_turn.size() + _eligible.size();
          CountType turns = _eligible.size();
          for( const std::pair< WitnessID, bool >& item : _ineligible_waiting_for_token )
@@ -47,7 +48,7 @@ class generic_witness_scheduler
 
          assert( _tokens == tokens );
          assert( _turns == turns   );
-
+#endif
 
          flat_set< WitnessID > witness_set;
          // make sure each witness_id occurs only once among the three states
