@@ -1284,33 +1284,6 @@ BOOST_AUTO_TEST_CASE( witness_withdraw_pay_test )
 } FC_LOG_AND_RETHROW() }
 
 /**
- * This test should simulate a prediction market which means the following:
- *
- * 1) Issue a BitAsset without Forced Settling & With Global Settling
- * 2) Don't Publish any Price Feeds
- * 3) Ensure that margin calls do not occur even if the highest bid would indicate it
- * 4) Match some Orders
- * 5) Trigger Global Settle on the Asset
- * 6) The maintenance collateral must always be 1:1
- */
-BOOST_AUTO_TEST_CASE_EXPECTED_FAILURES( unimp_prediction_market_test, 1 )
-BOOST_AUTO_TEST_CASE( unimp_prediction_market_test )
-{
-   BOOST_FAIL( "not implemented" );
-}
-
-/**
- *  This test should verify that the asset_global_settle operation works as expected,
- *  make sure that global settling cannot be performed by anyone other than the
- *  issuer and only if the global settle bit is set.
- */
-BOOST_AUTO_TEST_CASE_EXPECTED_FAILURES( unimp_global_settle_test_2, 1 )
-BOOST_AUTO_TEST_CASE( unimp_global_settle_test_2 )
-{
-   BOOST_FAIL( "not implemented" );
-}
-
-/**
  *  Asset Burn Test should make sure that all assets except bitassets
  *  can be burned and all supplies add up.
  */
