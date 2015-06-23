@@ -51,5 +51,6 @@ void_result transfer_evaluator::do_apply( const transfer_operation& o )
    db().adjust_balance( o.from, -o.amount );
    db().adjust_balance( o.to, o.amount );
    return void_result();
-} FC_CAPTURE_AND_RETHROW( (o) )}
+} FC_CAPTURE_AND_RETHROW( (o) ) }
+
 } } // graphene::chain

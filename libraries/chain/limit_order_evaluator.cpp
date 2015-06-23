@@ -21,8 +21,8 @@
 #include <fc/uint128.hpp>
 
 namespace graphene { namespace chain {
-object_id_type limit_order_create_evaluator::do_evaluate( const limit_order_create_operation& op )
-{
+void_result limit_order_create_evaluator::do_evaluate( const limit_order_create_operation& op )
+{ try {
    database& d = db();
 
    FC_ASSERT( op.expiration >= d.head_block_time() );
@@ -42,13 +42,11 @@ object_id_type limit_order_create_evaluator::do_evaluate( const limit_order_crea
    FC_ASSERT( d.get_balance( _seller, _sell_asset ) >= op.amount_to_sell, "insufficient balance",
               ("balance",d.get_balance(_seller,_sell_asset))("amount_to_sell",op.amount_to_sell) );
 
-   return object_id_type();
-}
-template<typename I>
-std::reverse_iterator<I> reverse( const I& itr ) { return std::reverse_iterator<I>(itr); }
+   return void_result();
+} FC_CAPTURE_AND_RETHROW( (op) ) }
 
 object_id_type limit_order_create_evaluator::do_apply( const limit_order_create_operation& op )
-{
+{ try {
    const auto& seller_stats = _seller->statistics(db());
    db().modify( seller_stats, [&]( account_statistics_object& bal ){
          if( op.amount_to_sell.asset_id == asset_id_type() )
@@ -120,23 +118,21 @@ object_id_type limit_order_create_evaluator::do_apply( const limit_order_create_
    FC_ASSERT( !op.fill_or_kill || db().find_object(result) == nullptr );
 
    return result;
-} // limit_order_evaluator::do_apply
+} FC_CAPTURE_AND_RETHROW( (op) ) }
 
-asset limit_order_cancel_evaluator::do_evaluate( const limit_order_cancel_operation& o )
-{
-   database&    d = db();
+void_result limit_order_cancel_evaluator::do_evaluate( const limit_order_cancel_operation& o )
+{ try {
+   database& d = db();
 
    _order = &o.order(d);
-   FC_ASSERT( _order->seller == o.fee_paying_account  );
-   auto refunded = _order->amount_for_sale();
-   //adjust_balance( fee_paying_account, &refunded.asset_id(d),  refunded.amount );
+   FC_ASSERT( _order->seller == o.fee_paying_account );
 
-  return refunded;
-}
+   return void_result();
+} FC_CAPTURE_AND_RETHROW( (o) ) }
 
 asset limit_order_cancel_evaluator::do_apply( const limit_order_cancel_operation& o )
-{
-   database&   d = db();
+{ try {
+   database& d = db();
 
    auto base_asset = _order->sell_price.base.asset_id;
    auto quote_asset = _order->sell_price.quote.asset_id;
@@ -150,5 +146,6 @@ asset limit_order_cancel_evaluator::do_apply( const limit_order_cancel_operation
    db().check_call_orders(quote_asset(d));
 
    return refunded;
-}
+} FC_CAPTURE_AND_RETHROW( (o) ) }
+
 } } // graphene::chain

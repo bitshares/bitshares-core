@@ -24,7 +24,7 @@
 #include <functional>
 
 namespace graphene { namespace chain {
-object_id_type asset_create_evaluator::do_evaluate( const asset_create_operation& op )
+void_result asset_create_evaluator::do_evaluate( const asset_create_operation& op )
 { try {
    database& d = db();
 
@@ -59,11 +59,11 @@ object_id_type asset_create_evaluator::do_evaluate( const asset_create_operation
                  op.bitasset_options->force_settlement_delay_sec > chain_parameters.block_interval );
    }
 
-   return object_id_type();
+   return void_result();
 } FC_CAPTURE_AND_RETHROW( (op) ) }
 
 object_id_type asset_create_evaluator::do_apply( const asset_create_operation& op )
-{
+{ try {
    const asset_dynamic_data_object& dyn_asset =
       db().create<asset_dynamic_data_object>( [&]( asset_dynamic_data_object& a ) {
          a.current_supply = 0;
@@ -95,8 +95,8 @@ object_id_type asset_create_evaluator::do_apply( const asset_create_operation& o
       });
    assert( new_asset.id == next_asset_id );
 
-   return next_asset_id;
-}
+   return new_asset.id;
+} FC_CAPTURE_AND_RETHROW( (op) ) }
 
 void_result asset_issue_evaluator::do_evaluate( const asset_issue_operation& o )
 { try {
@@ -120,7 +120,7 @@ void_result asset_issue_evaluator::do_evaluate( const asset_issue_operation& o )
 } FC_CAPTURE_AND_RETHROW( (o) ) }
 
 void_result asset_issue_evaluator::do_apply( const asset_issue_operation& o )
-{
+{ try {
    db().adjust_balance( o.issue_to_account, o.asset_to_issue );
 
    db().modify( *asset_dyn_data, [&]( asset_dynamic_data_object& data ){
@@ -128,7 +128,7 @@ void_result asset_issue_evaluator::do_apply( const asset_issue_operation& o )
    });
 
    return void_result();
-}
+} FC_CAPTURE_AND_RETHROW( (o) ) }
 
 void_result asset_burn_evaluator::do_evaluate( const asset_burn_operation& o )
 { try {
@@ -151,7 +151,7 @@ void_result asset_burn_evaluator::do_evaluate( const asset_burn_operation& o )
 } FC_CAPTURE_AND_RETHROW( (o) ) }
 
 void_result asset_burn_evaluator::do_apply( const asset_burn_operation& o )
-{
+{ try {
    db().adjust_balance( o.payer, -o.amount_to_burn );
 
    db().modify( *asset_dyn_data, [&]( asset_dynamic_data_object& data ){
@@ -159,7 +159,7 @@ void_result asset_burn_evaluator::do_apply( const asset_burn_operation& o )
    });
 
    return void_result();
-}
+} FC_CAPTURE_AND_RETHROW( (o) ) }
 
 void_result asset_fund_fee_pool_evaluator::do_evaluate(const asset_fund_fee_pool_operation& o)
 { try {
@@ -173,7 +173,7 @@ void_result asset_fund_fee_pool_evaluator::do_evaluate(const asset_fund_fee_pool
 } FC_CAPTURE_AND_RETHROW( (o) ) }
 
 void_result asset_fund_fee_pool_evaluator::do_apply(const asset_fund_fee_pool_operation& o)
-{
+{ try {
    db().adjust_balance(o.from_account, -o.amount);
 
    db().modify( *asset_dyn_data, [&]( asset_dynamic_data_object& data ) {
@@ -181,7 +181,7 @@ void_result asset_fund_fee_pool_evaluator::do_apply(const asset_fund_fee_pool_op
    });
 
    return void_result();
-}
+} FC_CAPTURE_AND_RETHROW( (o) ) }
 
 void_result asset_update_evaluator::do_evaluate(const asset_update_operation& o)
 { try {
@@ -214,7 +214,7 @@ void_result asset_update_evaluator::do_evaluate(const asset_update_operation& o)
 } FC_CAPTURE_AND_RETHROW((o)) }
 
 void_result asset_update_evaluator::do_apply(const asset_update_operation& o)
-{
+{ try {
    database& d = db();
 
    // If we are now disabling force settlements, cancel all open force settlement orders
@@ -236,10 +236,10 @@ void_result asset_update_evaluator::do_apply(const asset_update_operation& o)
    });
 
    return void_result();
-}
+} FC_CAPTURE_AND_RETHROW( (o) ) }
 
 void_result asset_update_bitasset_evaluator::do_evaluate(const asset_update_bitasset_operation& o)
-{
+{ try {
    database& d = db();
 
    const asset_object& a = o.asset_to_update(d);
@@ -258,19 +258,19 @@ void_result asset_update_bitasset_evaluator::do_evaluate(const asset_update_bita
    FC_ASSERT( o.issuer == a.issuer, "", ("o.issuer", o.issuer)("a.issuer", a.issuer) );
 
    return void_result();
-}
+} FC_CAPTURE_AND_RETHROW( (o) ) }
 
 void_result asset_update_bitasset_evaluator::do_apply(const asset_update_bitasset_operation& o)
-{
+{ try {
    db().modify(*bitasset_to_update, [&o](asset_bitasset_data_object& b) {
       b.options = o.new_options;
    });
 
    return void_result();
-}
+} FC_CAPTURE_AND_RETHROW( (o) ) }
 
 void_result asset_update_feed_producers_evaluator::do_evaluate(const asset_update_feed_producers_evaluator::operation_type& o)
-{
+{ try {
    database& d = db();
 
    FC_ASSERT( o.new_feed_producers.size() <= d.get_global_properties().parameters.maximum_asset_feed_publishers );
@@ -286,10 +286,10 @@ void_result asset_update_feed_producers_evaluator::do_evaluate(const asset_updat
    bitasset_to_update = &b;
    FC_ASSERT( a.issuer == o.issuer );
    return void_result();
-}
+} FC_CAPTURE_AND_RETHROW( (o) ) }
 
 void_result asset_update_feed_producers_evaluator::do_apply(const asset_update_feed_producers_evaluator::operation_type& o)
-{
+{ try {
    db().modify(*bitasset_to_update, [&](asset_bitasset_data_object& a) {
       //This is tricky because I have a set of publishers coming in, but a map of publisher to feed is stored.
       //I need to update the map such that the keys match the new publishers, but not munge the old price feeds from
@@ -311,11 +311,10 @@ void_result asset_update_feed_producers_evaluator::do_apply(const asset_update_f
 
 
    return void_result();
-}
-
+} FC_CAPTURE_AND_RETHROW( (o) ) }
 
 void_result asset_global_settle_evaluator::do_evaluate(const asset_global_settle_evaluator::operation_type& op)
-{
+{ try {
    const database& d = db();
    asset_to_settle = &op.asset_to_settle(d);
    FC_ASSERT(asset_to_settle->is_market_issued());
@@ -332,31 +331,31 @@ void_result asset_global_settle_evaluator::do_evaluate(const asset_global_settle
              "Cannot force settle at supplied price: least collateralized short lacks sufficient collateral to settle.");
 
    return void_result();
-}
+} FC_CAPTURE_AND_RETHROW( (op) ) }
 
 void_result asset_global_settle_evaluator::do_apply(const asset_global_settle_evaluator::operation_type& op)
-{
+{ try {
    database& d = db();
    d.globally_settle_asset( op.asset_to_settle(db()), op.settle_price );
    return void_result();
-}
+} FC_CAPTURE_AND_RETHROW( (op) ) }
 
-object_id_type asset_settle_evaluator::do_evaluate(const asset_settle_evaluator::operation_type& op)
-{
+void_result asset_settle_evaluator::do_evaluate(const asset_settle_evaluator::operation_type& op)
+{ try {
    const database& d = db();
    asset_to_settle = &op.amount.asset_id(d);
    FC_ASSERT(asset_to_settle->is_market_issued());
    const auto& bitasset = asset_to_settle->bitasset_data(d);
    FC_ASSERT(asset_to_settle->can_force_settle() || bitasset.has_settlement() );
-   if( bitasset.is_prediction_market ) 
+   if( bitasset.is_prediction_market )
       FC_ASSERT( bitasset.has_settlement(), "global settlement must occur before force settling a prediction market"  );
    FC_ASSERT(d.get_balance(d.get(op.account), *asset_to_settle) >= op.amount);
 
-   return d.get_index_type<force_settlement_index>().get_next_id();
-}
+   return void_result();
+} FC_CAPTURE_AND_RETHROW( (op) ) }
 
 operation_result asset_settle_evaluator::do_apply(const asset_settle_evaluator::operation_type& op)
-{
+{ try {
    database& d = db();
    d.adjust_balance(op.account, -op.amount);
 
@@ -388,7 +387,7 @@ operation_result asset_settle_evaluator::do_apply(const asset_settle_evaluator::
          s.settlement_date = d.head_block_time() + asset_to_settle->bitasset_data(d).options.force_settlement_delay_sec;
       }).id;
    }
-}
+} FC_CAPTURE_AND_RETHROW( (op) ) }
 
 void_result asset_publish_feeds_evaluator::do_evaluate(const asset_publish_feed_operation& o)
 { try {
@@ -430,6 +429,6 @@ void_result asset_publish_feeds_evaluator::do_apply(const asset_publish_feed_ope
    db().check_call_orders( base );
 
    return void_result();
-   } FC_CAPTURE_AND_RETHROW((o)) }
+} FC_CAPTURE_AND_RETHROW((o)) }
 
 } } // graphene::chain

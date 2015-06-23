@@ -22,19 +22,19 @@
 namespace graphene { namespace chain {
 
 void_result global_parameters_update_evaluator::do_evaluate(const global_parameters_update_operation& o)
-{
+{ try {
    FC_ASSERT(trx_state->_is_proposed_trx);
 
    return void_result();
-}
+} FC_CAPTURE_AND_RETHROW( (o) ) }
 
 void_result global_parameters_update_evaluator::do_apply(const global_parameters_update_operation& o)
-{
+{ try {
    db().modify(db().get_global_properties(), [&o](global_property_object& p) {
       p.pending_parameters = o.new_parameters;
    });
 
    return void_result();
-}
+} FC_CAPTURE_AND_RETHROW( (o) ) }
 
 } } // graphene::chain

@@ -23,8 +23,8 @@
 
 namespace graphene { namespace chain {
 
-object_id_type vesting_balance_create_evaluator::do_evaluate( const vesting_balance_create_operation& op )
-{
+void_result vesting_balance_create_evaluator::do_evaluate( const vesting_balance_create_operation& op )
+{ try {
    const database& d = db();
 
    const account_object& creator_account = op.creator( d );
@@ -36,14 +36,14 @@ object_id_type vesting_balance_create_evaluator::do_evaluate( const vesting_bala
    FC_ASSERT( d.get_balance( creator_account.id, op.amount.asset_id ) >= op.amount );
    FC_ASSERT( !op.amount.asset_id(d).is_transfer_restricted() );
 
-   return object_id_type();
-}
+   return void_result();
+} FC_CAPTURE_AND_RETHROW( (op) ) }
 
 struct init_policy_visitor
 {
    typedef void result_type;
 
-   init_policy_visitor( vesting_policy& po, 
+   init_policy_visitor( vesting_policy& po,
                         const share_type& begin_balance,
                         const fc::time_point_sec& n ):p(po),init_balance(begin_balance),now(n){}
 
@@ -73,7 +73,7 @@ struct init_policy_visitor
 };
 
 object_id_type vesting_balance_create_evaluator::do_apply( const vesting_balance_create_operation& op )
-{
+{ try {
    database& d = db();
    const time_point_sec now = d.head_block_time();
 
@@ -91,10 +91,10 @@ object_id_type vesting_balance_create_evaluator::do_apply( const vesting_balance
 
 
    return vbo.id;
-}
+} FC_CAPTURE_AND_RETHROW( (op) ) }
 
 void_result vesting_balance_withdraw_evaluator::do_evaluate( const vesting_balance_withdraw_operation& op )
-{
+{ try {
    const database& d = db();
    const time_point_sec now = d.head_block_time();
 
@@ -106,10 +106,10 @@ void_result vesting_balance_withdraw_evaluator::do_evaluate( const vesting_balan
    /* const account_object& owner_account = */ op.owner( d );
    // TODO: Check asset authorizations and withdrawals
    return void_result();
-}
+} FC_CAPTURE_AND_RETHROW( (op) ) }
 
 void_result vesting_balance_withdraw_evaluator::do_apply( const vesting_balance_withdraw_operation& op )
-{
+{ try {
    database& d = db();
    const time_point_sec now = d.head_block_time();
 
@@ -128,6 +128,6 @@ void_result vesting_balance_withdraw_evaluator::do_apply( const vesting_balance_
 
    // TODO: Check asset authorizations and withdrawals
    return void_result();
-}
+} FC_CAPTURE_AND_RETHROW( (op) ) }
 
 } } // graphene::chain

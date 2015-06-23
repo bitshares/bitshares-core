@@ -26,7 +26,7 @@ namespace graphene { namespace chain {
       public:
          typedef delegate_create_operation operation_type;
 
-         object_id_type do_evaluate( const delegate_create_operation& o );
+         void_result do_evaluate( const delegate_create_operation& o );
          object_id_type do_apply( const delegate_create_operation& o );
    };
 

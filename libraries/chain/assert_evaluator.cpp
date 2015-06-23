@@ -39,7 +39,7 @@ struct predicate_evaluator
 };
 
 void_result assert_evaluator::do_evaluate( const assert_operation& o )
-{
+{ try {
    const database& _db = db();
    uint32_t skip = _db.get_node_properties().skip_flags;
    auto max_predicate_opcode = _db.get_global_properties().parameters.max_predicate_opcode;
@@ -63,12 +63,12 @@ void_result assert_evaluator::do_evaluate( const assert_operation& o )
       FC_ASSERT( p.visit( predicate_evaluator( _db ) ) );
    }
    return void_result();
-}
+} FC_CAPTURE_AND_RETHROW( (o) ) }
 
 void_result assert_evaluator::do_apply( const assert_operation& o )
-{
+{ try {
    // assert_operation is always a no-op
    return void_result();
-}
+} FC_CAPTURE_AND_RETHROW( (o) ) }
 
 } } // graphene::chain

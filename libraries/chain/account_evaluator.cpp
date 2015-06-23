@@ -113,7 +113,7 @@ object_id_type account_create_evaluator::do_apply( const account_create_operatio
 
 
 void_result account_update_evaluator::do_evaluate( const account_update_operation& o )
-{
+{ try {
    database& d = db();
 
    const auto& chain_params = db().get_global_properties().parameters;
@@ -152,9 +152,10 @@ void_result account_update_evaluator::do_evaluate( const account_update_operatio
    }
 
    return void_result();
-}
+} FC_CAPTURE_AND_RETHROW( (o) ) }
+
 void_result account_update_evaluator::do_apply( const account_update_operation& o )
-{
+{ try {
    db().modify( *acnt, [&](account_object& a){
       if( o.owner ) a.owner = resolve_relative_ids(*o.owner);
       if( o.active ) a.active = resolve_relative_ids(*o.active);
@@ -165,7 +166,7 @@ void_result account_update_evaluator::do_apply( const account_update_operation& 
       }
    });
    return void_result();
-}
+} FC_CAPTURE_AND_RETHROW( (o) ) }
 
 void_result account_whitelist_evaluator::do_evaluate(const account_whitelist_operation& o)
 { try {
@@ -179,7 +180,7 @@ void_result account_whitelist_evaluator::do_evaluate(const account_whitelist_ope
 } FC_CAPTURE_AND_RETHROW( (o) ) }
 
 void_result account_whitelist_evaluator::do_apply(const account_whitelist_operation& o)
-{
+{ try {
    database& d = db();
 
    d.modify(*listed_account, [&o](account_object& a) {
@@ -194,20 +195,20 @@ void_result account_whitelist_evaluator::do_apply(const account_whitelist_operat
    });
 
    return void_result();
-}
+} FC_CAPTURE_AND_RETHROW( (o) ) }
 
 void_result account_upgrade_evaluator::do_evaluate(const account_upgrade_evaluator::operation_type& o)
-{
+{ try {
    database& d = db();
 
    account = &d.get(o.account_to_upgrade);
    FC_ASSERT(!account->is_lifetime_member());
 
    return {};
-}
+} FC_CAPTURE_AND_RETHROW( (o) ) }
 
 void_result account_upgrade_evaluator::do_apply(const account_upgrade_evaluator::operation_type& o)
-{
+{ try {
    database& d = db();
 
    d.modify(*account, [&](account_object& a) {
@@ -232,6 +233,6 @@ void_result account_upgrade_evaluator::do_apply(const account_upgrade_evaluator:
    });
 
    return {};
-}
+} FC_CAPTURE_AND_RETHROW( (o) ) }
 
 } } // graphene::chain

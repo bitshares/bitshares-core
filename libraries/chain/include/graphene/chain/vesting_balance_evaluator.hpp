@@ -29,7 +29,7 @@ class vesting_balance_create_evaluator : public evaluator<vesting_balance_create
     public:
         typedef vesting_balance_create_operation operation_type;
 
-        object_id_type do_evaluate( const vesting_balance_create_operation& op );
+        void_result do_evaluate( const vesting_balance_create_operation& op );
         object_id_type do_apply( const vesting_balance_create_operation& op );
 };
 

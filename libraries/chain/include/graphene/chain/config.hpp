@@ -63,11 +63,12 @@
 #define GRAPHENE_DEFAULT_MAX_ASSET_FEED_PUBLISHERS              10
 
 /**
- *  These ratios are fixed point numbers with a denominator of 1000, the
+ *  These ratios are fixed point numbers with a denominator of GRAPHENE_COLLATERAL_RATIO_DENOM, the
  *  minimum maitenance collateral is therefore 1.001x and the default 
  *  maintenance ratio is 1.75x 
  */
 ///@{
+#define GRAPHENE_COLLATERAL_RATIO_DENOM                 1000
 #define GRAPHENE_MIN_COLLATERAL_RATIO                   1001  ///< lower than this could result in divide by 0
 #define GRAPHENE_MAX_COLLATERAL_RATIO                   32000 ///< higher than this is unnecessary and may exceed int16 storage
 #define GRAPHENE_DEFAULT_MAINTENANCE_COLLATERAL_RATIO   1750 ///< Call when collateral only pays off 175% the debt

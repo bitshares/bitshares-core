@@ -128,7 +128,7 @@ namespace graphene { namespace chain {
       /**
        *  Required maintenance collateral is defined
        *  as a fixed point number with a maximum value of 10.000
-       *  and a minimum value of 1.000.  (denominated in 1000)
+       *  and a minimum value of 1.000.  (denominated in GRAPHENE_COLLATERAL_RATIO_DENOM)
        *
        *  A black swan event occurs when value_of_collateral equals
        *  value_of_debt, to avoid a black swan a margin call is
@@ -145,10 +145,10 @@ namespace graphene { namespace chain {
        */
       price settlement_price;
 
-      /** Fixed point between 1.000 and 10.000, implied fixed point denominator is 1000 */
+      /** Fixed point between 1.000 and 10.000, implied fixed point denominator is GRAPHENE_COLLATERAL_RATIO_DENOM */
       uint16_t maintenance_collateral_ratio = GRAPHENE_DEFAULT_MAINTENANCE_COLLATERAL_RATIO;
 
-      /** Fixed point between 1.000 and 10.000, implied fixed point denominator is 1000 */
+      /** Fixed point between 1.000 and 10.000, implied fixed point denominator is GRAPHENE_COLLATERAL_RATIO_DENOM */
       uint16_t maximum_short_squeeze_ratio = GRAPHENE_DEFAULT_MAX_SHORT_SQUEEZE_RATIO;
 
       /**
