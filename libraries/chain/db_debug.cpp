@@ -73,7 +73,7 @@ void database::debug_dump()
       total_balances[asset_obj.id] += asset_obj.dynamic_asset_data_id(db).accumulated_fees;
       total_balances[asset_id_type()] += asset_obj.dynamic_asset_data_id(db).fee_pool;
    }
-   for( const witness_object& witness_obj : db.get_index_type<simple_index<witness_object>>() )
+   for( const witness_object& witness_obj : db.get_index_type<witness_index>().indices() )
    {
       //idump((witness_obj));
       total_balances[asset_id_type()] += witness_obj.accumulated_income;
