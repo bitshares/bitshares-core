@@ -61,7 +61,7 @@ struct init_policy_visitor
       p = policy;
    }
 
-   void operator()( const ccd_vesting_policy_initializer& i )const
+   void operator()( const cdd_vesting_policy_initializer& i )const
    {
       cdd_vesting_policy policy;
       policy.vesting_seconds = i.vesting_seconds;

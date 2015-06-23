@@ -50,7 +50,7 @@ BOOST_AUTO_TEST_CASE( feed_limit_logic_test )
       // require 3x min collateral
       auto swanp = usd / core;
       auto callp = ~price::call_price( usd, core, 1750 );
-      // 1:1 collateral 
+      // 1:1 collateral
 //      wdump((callp.to_real())(callp));
 //      wdump((swanp.to_real())(swanp));
       FC_ASSERT( callp.to_real() > swanp.to_real() );
@@ -1388,7 +1388,7 @@ BOOST_AUTO_TEST_CASE( vesting_balance_create_test )
    INVOKE( create_uia );
 
    const asset_object& core = asset_id_type()(db);
-   const asset_object& test_asset = get_asset( "TEST" );
+   const asset_object& test_asset = get_asset("TEST");
 
    vesting_balance_create_operation op;
    op.fee = core.amount( 0 );
@@ -1396,36 +1396,36 @@ BOOST_AUTO_TEST_CASE( vesting_balance_create_test )
    op.owner = account_id_type();
    op.amount = test_asset.amount( 100 );
    //op.vesting_seconds = 60*60*24;
-   op.policy = ccd_vesting_policy_initializer{ 60*60*24 };
+   op.policy = cdd_vesting_policy_initializer{ 60*60*24 };
 
    // Fee must be non-negative
-   REQUIRE_OP_VALIDATION_SUCCESS( op, fee, core.amount(  1 )  );
-   REQUIRE_OP_VALIDATION_SUCCESS( op, fee, core.amount(  0 )  );
-   REQUIRE_OP_VALIDATION_FAILURE( op, fee, core.amount( -1 ) );
+   REQUIRE_OP_VALIDATION_SUCCESS( op, fee, core.amount(1) );
+   REQUIRE_OP_VALIDATION_SUCCESS( op, fee, core.amount(0) );
+   REQUIRE_OP_VALIDATION_FAILURE( op, fee, core.amount(-1) );
 
    // Amount must be positive
-   REQUIRE_OP_VALIDATION_SUCCESS( op, amount, core.amount(  1 ) );
-   REQUIRE_OP_VALIDATION_FAILURE( op, amount, core.amount(  0 ) );
-   REQUIRE_OP_VALIDATION_FAILURE( op, amount, core.amount( -1 ) );
+   REQUIRE_OP_VALIDATION_SUCCESS( op, amount, core.amount(1) );
+   REQUIRE_OP_VALIDATION_FAILURE( op, amount, core.amount(0) );
+   REQUIRE_OP_VALIDATION_FAILURE( op, amount, core.amount(-1) );
 
    // Setup world state we will need to test actual evaluation
-   const account_object& alice_account = create_account( "alice" );
-   const account_object& bob_account = create_account( "bob" );
+   const account_object& alice_account = create_account("alice");
+   const account_object& bob_account = create_account("bob");
 
-   transfer( genesis_account(db), alice_account, core.amount( 100000 ) );
+   transfer(genesis_account(db), alice_account, core.amount(100000));
 
    op.creator = alice_account.get_id();
    op.owner = alice_account.get_id();
 
-   account_id_type nobody = account_id_type( 1234 );
+   account_id_type nobody = account_id_type(1234);
 
-   trx.operations.push_back( op );
+   trx.operations.push_back(op);
    // Invalid account_id's
    REQUIRE_THROW_WITH_VALUE( op, creator, nobody );
    REQUIRE_THROW_WITH_VALUE( op,   owner, nobody );
 
    // Insufficient funds
-   REQUIRE_THROW_WITH_VALUE( op, amount, core.amount( 999999999 ) );
+   REQUIRE_THROW_WITH_VALUE( op, amount, core.amount(999999999) );
    // Alice can fund a bond to herself or to Bob
    op.amount = core.amount( 1000 );
    REQUIRE_OP_EVALUATION_SUCCESS( op, owner, alice_account.get_id() );
@@ -1485,7 +1485,7 @@ BOOST_AUTO_TEST_CASE( vesting_balance_withdraw_test )
       create_op.creator = creator;
       create_op.owner = owner;
       create_op.amount = amount;
-      create_op.policy = ccd_vesting_policy_initializer( vesting_seconds );
+      create_op.policy = cdd_vesting_policy_initializer(vesting_seconds);
       tx.operations.push_back( create_op );
 
       processed_transaction ptx = PUSH_TX( db,  tx, ~0  );

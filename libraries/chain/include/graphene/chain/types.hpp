@@ -18,7 +18,6 @@
 #pragma once
 #include <fc/container/flat_fwd.hpp>
 #include <fc/io/varint.hpp>
-#include <fc/io/raw_fwd.hpp>
 #include <fc/io/enum_type.hpp>
 #include <fc/crypto/sha224.hpp>
 #include <fc/crypto/elliptic.hpp>
@@ -28,6 +27,7 @@
 #include <fc/safe.hpp>
 #include <fc/container/flat.hpp>
 #include <fc/string.hpp>
+#include <fc/io/raw.hpp>
 #include <memory>
 #include <vector>
 #include <deque>
@@ -337,45 +337,77 @@ namespace graphene { namespace chain {
 
       fee_schedule_type()
       {
-         memset( (char*)this, 0, sizeof(*this) );
+         memset((char*)this, 0, sizeof(*this));
+      }
+
+      /// The number of bytes to charge a data fee for
+      const static int BYTES_PER_DATA_FEE = 1024;
+
+      template <class... Ts>
+      uint32_t total_data_fee(Ts... ts)const {
+          return data_size(ts...) / BYTES_PER_DATA_FEE * data_fee;
       }
 
       uint32_t key_create_fee; ///< the cost to register a public key with the blockchain
       uint32_t account_create_fee; ///< the cost to register the cheapest non-free account
-      uint32_t account_len8_fee;
+      uint32_t account_update_fee; ///< the cost to update an existing account
+      uint32_t account_transfer_fee; ///< the cost to transfer an account to a new owner
+      uint32_t account_len8up_fee;
       uint32_t account_len7_fee;
       uint32_t account_len6_fee;
       uint32_t account_len5_fee;
       uint32_t account_len4_fee;
       uint32_t account_len3_fee;
       uint32_t account_len2_fee;
-      uint32_t account_premium_fee;  ///< accounts with premium names; i.e. @ref is_cheap_name returns false
+      uint32_t asset_len3_fee;
+      uint32_t asset_len4_fee;
+      uint32_t asset_len5_fee;
+      uint32_t asset_len6_fee;
+      uint32_t asset_len7up_fee;
       uint32_t account_whitelist_fee; ///< the fee to whitelist an account
-      uint32_t delegate_create_fee; ///< fixed fee for registering as a delegate; used to discourage frivioulous delegates
+      uint32_t delegate_create_fee; ///< fixed fee for registering as a delegate; used to discourage frivolous delegates
       uint32_t witness_withdraw_pay_fee; ///< fee for withdrawing witness pay
       uint32_t transfer_fee; ///< fee for transferring some asset
-      uint32_t limit_order_fee; ///< fee for placing a limit order in the markets
+      uint32_t limit_order_create_fee; ///< fee for placing a limit order in the markets
+      uint32_t limit_order_cancel_fee; ///< fee for canceling a limit order
       uint32_t call_order_fee; ///< fee for placing a call order in the markets
       uint32_t publish_feed_fee; ///< fee for publishing a price feed
       uint32_t asset_create_fee; ///< the cost to register the cheapest asset
       uint32_t asset_update_fee; ///< the cost to modify a registered asset
       uint32_t asset_issue_fee; ///< the cost to modify a registered asset
+      uint32_t asset_burn_fee; ///< the cost to burn an asset
       uint32_t asset_fund_fee_pool_fee; ///< the cost to add funds to an asset's fee pool
       uint32_t asset_settle_fee; ///< the cost to trigger a forced settlement of a market-issued asset
       uint32_t market_fee; ///< a percentage charged on market orders
       uint32_t transaction_fee; ///< a base price for every transaction
-      uint32_t data_fee; ///< a price per 1024 bytes of user data
+      uint32_t data_fee; ///< a price per BYTES_PER_DATA_FEE bytes of user data
       uint32_t signature_fee; ///< a surcharge on transactions with more than 2 signatures.
       uint32_t global_parameters_update_fee; ///< the cost to update the global parameters
       uint32_t membership_annual_fee; ///< the annual cost of a membership subscription
       uint32_t membership_lifetime_fee; ///< the cost to upgrade to a lifetime member
-      uint32_t withdraw_permission_update_fee; ///< the cost to create/update a withdraw permission
+      uint32_t withdraw_permission_create_fee; ///< the cost to create a withdraw permission
+      uint32_t withdraw_permission_update_fee; ///< the cost to update a withdraw permission
+      uint32_t withdraw_permission_claim_fee; ///< the cost to withdraw from a withdraw permission
+      uint32_t withdraw_permission_delete_fee; ///< the cost to delete a withdraw permission
       uint32_t vesting_balance_create_fee;
       uint32_t vesting_balance_withdraw_fee;
       uint32_t global_settle_fee;
       uint32_t worker_create_fee; ///< the cost to create a new worker
       uint32_t worker_delete_fee; ///< the cost to delete a worker
       uint32_t assert_op_fee; ///< fee per assert operation
+      uint32_t proposal_create_fee; ///< fee for creating a proposed transaction
+      uint32_t proposal_update_fee; ///< fee for adding or removing approval of a proposed transaction
+      uint32_t proposal_delete_fee; ///< fee for deleting a proposed transaction
+      uint32_t custom_operation_fee; ///< fee for a custom operation
+
+   protected:
+      size_t data_size()const {
+          return 0;
+      }
+      template <class T, class... Ts>
+      size_t data_size(T t, Ts... ts)const {
+          return fc::raw::pack_size(t) + data_size(ts...);
+      }
    };
 
 
@@ -515,43 +547,57 @@ FC_REFLECT_ENUM( graphene::chain::meta_info_object_type, (meta_account_object_ty
 
 
 FC_REFLECT( graphene::chain::fee_schedule_type,
-                 (key_create_fee)
-                 (account_create_fee)
-                 (account_len8_fee)
-                 (account_len7_fee)
-                 (account_len6_fee)
-                 (account_len5_fee)
-                 (account_len4_fee)
-                 (account_len3_fee)
-                 (account_len2_fee)
-                 (account_premium_fee)
-                 (account_whitelist_fee)
-                 (delegate_create_fee)
-                 (witness_withdraw_pay_fee)
-                 (transfer_fee)
-                 (limit_order_fee)
-                 (call_order_fee)
-                 (publish_feed_fee)
-                 (asset_create_fee)
-                 (asset_update_fee)
-                 (asset_issue_fee)
-                 (asset_fund_fee_pool_fee)
-                 (asset_settle_fee)
-                 (market_fee)
-                 (transaction_fee)
-                 (data_fee)
-                 (signature_fee)
-                 (global_parameters_update_fee)
-                 (membership_annual_fee)
-                 (membership_lifetime_fee)
-                 (withdraw_permission_update_fee)
-                 (vesting_balance_create_fee)
-                 (vesting_balance_withdraw_fee)
-                 (global_settle_fee)
-                 (worker_create_fee)
-                 (worker_delete_fee)
-                 (assert_op_fee)
-               )
+            (key_create_fee)
+            (account_create_fee)
+            (account_update_fee)
+            (account_transfer_fee)
+            (account_len8up_fee)
+            (account_len7_fee)
+            (account_len6_fee)
+            (account_len5_fee)
+            (account_len4_fee)
+            (account_len3_fee)
+            (account_len2_fee)
+            (asset_len3_fee)
+            (asset_len4_fee)
+            (asset_len5_fee)
+            (asset_len6_fee)
+            (asset_len7up_fee)
+            (account_whitelist_fee)
+            (delegate_create_fee)
+            (witness_withdraw_pay_fee)
+            (transfer_fee)
+            (limit_order_create_fee)
+            (limit_order_cancel_fee)
+            (call_order_fee)
+            (publish_feed_fee)
+            (asset_create_fee)
+            (asset_update_fee)
+            (asset_issue_fee)
+            (asset_burn_fee)
+            (asset_fund_fee_pool_fee)
+            (asset_settle_fee)
+            (market_fee)
+            (transaction_fee)
+            (data_fee)
+            (signature_fee)
+            (global_parameters_update_fee)
+            (membership_annual_fee)
+            (membership_lifetime_fee)
+            (withdraw_permission_create_fee)
+            (withdraw_permission_update_fee)
+            (withdraw_permission_claim_fee)
+            (withdraw_permission_delete_fee)
+            (vesting_balance_create_fee)
+            (vesting_balance_withdraw_fee)
+            (global_settle_fee)
+            (worker_create_fee)
+            (worker_delete_fee)
+            (assert_op_fee)
+            (proposal_create_fee)
+            (proposal_update_fee)
+            (proposal_delete_fee)
+          )
 
 FC_REFLECT( graphene::chain::chain_parameters,
             (current_fees)

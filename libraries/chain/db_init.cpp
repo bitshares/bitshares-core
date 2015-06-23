@@ -249,8 +249,6 @@ void database::init_genesis(const genesis_state_type& genesis_state)
       for( const auto& handout : genesis_state.allocation_targets )
          total_allocation += handout.weight;
 
-      fc::time_point start_time = fc::time_point::now();
-
       for( const auto& handout : genesis_state.allocation_targets )
       {
          asset amount(handout.weight);
@@ -298,10 +296,6 @@ void database::init_genesis(const genesis_state_type& genesis_state)
             });
          }
       }
-
- //     fc::microseconds duration = fc::time_point::now() - start_time;
- //     ilog("Finished allocating to ${n} accounts in ${t} milliseconds.",
- //          ("n", genesis_state.allocation_targets.size())("t", duration.count() / 1000));
    }
 
    flat_set<delegate_id_type> init_delegates;
