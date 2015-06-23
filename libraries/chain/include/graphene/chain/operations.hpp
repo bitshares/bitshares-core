@@ -1305,6 +1305,8 @@ namespace graphene { namespace chain {
       time_point_sec       work_begin_date;
       time_point_sec       work_end_date;
       share_type           daily_pay;
+      string               name;
+      string               url;
       /// This should be set to the initializer appropriate for the type of worker to be created.
       worker_initializer   initializer;
 
@@ -1613,7 +1615,7 @@ FC_REFLECT( graphene::chain::vesting_balance_create_operation, (fee)(creator)(ow
 FC_REFLECT( graphene::chain::vesting_balance_withdraw_operation, (fee)(vesting_balance)(owner)(amount) )
 
 FC_REFLECT( graphene::chain::worker_create_operation,
-            (fee)(owner)(work_begin_date)(work_end_date)(daily_pay)(initializer) )
+            (fee)(owner)(work_begin_date)(work_end_date)(daily_pay)(name)(url)(initializer) )
 
 FC_REFLECT( graphene::chain::custom_operation, (fee)(payer)(required_auths)(id)(data) )
 FC_REFLECT( graphene::chain::assert_operation, (fee)(fee_paying_account)(predicates)(required_auths) )

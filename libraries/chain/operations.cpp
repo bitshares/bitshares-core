@@ -778,6 +778,8 @@ void worker_create_operation::validate() const
    FC_ASSERT(work_end_date > work_begin_date);
    FC_ASSERT(daily_pay > 0);
    FC_ASSERT(daily_pay < GRAPHENE_BLOCKCHAIN_MAX_SHARES);
+   FC_ASSERT(name.size() < GRAPHENE_MAX_WORKER_NAME_LENGTH );
+   FC_ASSERT(url.size() < GRAPHENE_MAX_WORKER_URL_LENGTH );
 }
 
 share_type worker_create_operation::calculate_fee(const fee_schedule_type& k) const

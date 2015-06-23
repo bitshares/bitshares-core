@@ -86,6 +86,9 @@
 #define GRAPHENE_DEFAULT_MAX_ASSERT_OPCODE                    1
 #define GRAPHENE_GENESIS_TIMESTAMP                            (1431700000)  /// Should be divisible by GRAPHENE_DEFAULT_BLOCK_INTERVAL
 
+#define GRAPHENE_MAX_WORKER_NAME_LENGTH                       63
+#define GRAPHENE_MAX_WORKER_URL_LENGTH                        127
+
 // counter initialization values used to derive near and far future seeds for shuffling witnesses
 // we use the fractional bits of sqrt(2) in hex
 #define GRAPHENE_NEAR_SCHEDULE_CTR_IV                    ( (uint64_t( 0x6a09 ) << 0x30)    \
