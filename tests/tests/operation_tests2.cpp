@@ -437,28 +437,61 @@ BOOST_AUTO_TEST_CASE( witness_create )
    generate_block(0, nathan_private_key);
 } FC_LOG_AND_RETHROW() }
 
-BOOST_AUTO_TEST_CASE_EXPECTED_FAILURES( unimp_global_settle_test, 1 )
-BOOST_AUTO_TEST_CASE( unimp_global_settle_test )
+/**
+ *  This test should verify that the asset_global_settle operation works as expected,
+ *  make sure that global settling cannot be performed by anyone other than the
+ *  issuer and only if the global settle bit is set.
+ */
+BOOST_AUTO_TEST_CASE( global_settle_test )
 {
-   BOOST_FAIL( "TODO - Reimplement this" );
-   /*
    try {
    ACTORS((nathan)(ben)(valentine)(dan));
    asset_id_type bit_usd_id = create_bitasset("BITUSD", nathan_id, 100, global_settle | charge_market_fee).get_id();
+
+   update_feed_producers( bit_usd_id(db), { nathan_id } );
+
+   price_feed feed;
+   feed.settlement_price = price( asset( 1000, bit_usd_id ), asset( 500 ) );
+   feed.maintenance_collateral_ratio = 175 * GRAPHENE_COLLATERAL_RATIO_DENOM / 100;
+   feed.maximum_short_squeeze_ratio = 150 * GRAPHENE_COLLATERAL_RATIO_DENOM / 100;
+   publish_feed( bit_usd_id(db), nathan, feed );
+
    transfer(genesis_account, ben_id, asset(10000));
    transfer(genesis_account, valentine_id, asset(10000));
    transfer(genesis_account, dan_id, asset(10000));
-   create_short(ben_id, asset(1000, bit_usd_id), asset(1000));
-   create_sell_order(valentine_id, asset(1000), asset(1000, bit_usd_id));
-   create_short(valentine_id, asset(500, bit_usd_id), asset(600));
-   create_sell_order(dan_id, asset(600), asset(500, bit_usd_id));
+   borrow(ben, asset(1000, bit_usd_id), asset(1000));
+   BOOST_CHECK_EQUAL(get_balance(ben_id, bit_usd_id), 1000);
+   BOOST_CHECK_EQUAL(get_balance(ben_id, asset_id_type()), 9000);
 
-   BOOST_CHECK_EQUAL(get_balance(valentine_id, bit_usd_id), 990);
-   BOOST_CHECK_EQUAL(get_balance(valentine_id, asset_id_type()), 8400);
+   create_sell_order(ben_id, asset(1000, bit_usd_id), asset(1000));
    BOOST_CHECK_EQUAL(get_balance(ben_id, bit_usd_id), 0);
    BOOST_CHECK_EQUAL(get_balance(ben_id, asset_id_type()), 9000);
+
+   create_sell_order(valentine_id, asset(1000), asset(1000, bit_usd_id));
+   BOOST_CHECK_EQUAL(get_balance(ben_id, bit_usd_id), 0);
+   BOOST_CHECK_EQUAL(get_balance(ben_id, asset_id_type()), 10000);
+   BOOST_CHECK_EQUAL(get_balance(valentine_id, bit_usd_id), 990);
+   BOOST_CHECK_EQUAL(get_balance(valentine_id, asset_id_type()), 9000);
+
+   borrow(valentine, asset(500, bit_usd_id), asset(600));
+   BOOST_CHECK_EQUAL(get_balance(valentine_id, bit_usd_id), 1490);
+   BOOST_CHECK_EQUAL(get_balance(valentine_id, asset_id_type()), 8400);
+
+   create_sell_order(valentine_id, asset(500, bit_usd_id), asset(600));
+   BOOST_CHECK_EQUAL(get_balance(valentine_id, bit_usd_id), 990);
+   BOOST_CHECK_EQUAL(get_balance(valentine_id, asset_id_type()), 8400);
+
+   create_sell_order(dan_id, asset(600), asset(500, bit_usd_id));
+   BOOST_CHECK_EQUAL(get_balance(valentine_id, bit_usd_id), 990);
+   BOOST_CHECK_EQUAL(get_balance(valentine_id, asset_id_type()), 9000);
+   BOOST_CHECK_EQUAL(get_balance(ben_id, bit_usd_id), 0);
+   BOOST_CHECK_EQUAL(get_balance(ben_id, asset_id_type()), 10000);
    BOOST_CHECK_EQUAL(get_balance(dan_id, bit_usd_id), 495);
    BOOST_CHECK_EQUAL(get_balance(dan_id, asset_id_type()), 9400);
+
+   // add some collateral
+   borrow(ben, asset(0, bit_usd_id), asset(1000));
+   BOOST_CHECK_EQUAL(get_balance(ben_id, asset_id_type()), 9000);
 
    {
       asset_global_settle_operation op;
@@ -476,6 +509,9 @@ BOOST_AUTO_TEST_CASE( unimp_global_settle_test )
       PUSH_TX( db, trx );
    }
 
+   force_settle(valentine_id(db), asset(990, bit_usd_id));
+   force_settle(dan_id(db), asset(495, bit_usd_id));
+
    BOOST_CHECK_EQUAL(get_balance(valentine_id, bit_usd_id), 0);
    BOOST_CHECK_EQUAL(get_balance(valentine_id, asset_id_type()), 10046);
    BOOST_CHECK_EQUAL(get_balance(ben_id, bit_usd_id), 0);
@@ -483,7 +519,6 @@ BOOST_AUTO_TEST_CASE( unimp_global_settle_test )
    BOOST_CHECK_EQUAL(get_balance(dan_id, bit_usd_id), 0);
    BOOST_CHECK_EQUAL(get_balance(dan_id, asset_id_type()), 9850);
 } FC_LOG_AND_RETHROW()
-   */
 }
 
 BOOST_AUTO_TEST_CASE( worker_create_test )
