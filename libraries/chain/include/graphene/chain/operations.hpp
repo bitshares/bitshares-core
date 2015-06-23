@@ -348,7 +348,7 @@ namespace graphene { namespace chain {
       void validate()const;
       share_type calculate_fee(const fee_schedule_type& k)const;
 
-      void get_balance_delta( balance_accumulator& acc, const operation_result& result = asset())const { acc.adjust( fee_payer(), -fee ); }
+      void get_balance_delta(balance_accumulator& acc, const operation_result& result = asset())const { acc.adjust(fee_payer(), -fee); }
    };
 
    /**

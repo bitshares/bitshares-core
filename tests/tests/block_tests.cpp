@@ -49,6 +49,7 @@ genesis_state_type make_genesis() {
       genesis_state.initial_committee.push_back({name});
       genesis_state.initial_witnesses.push_back({name, delegate_priv_key.get_public_key(), secret});
    }
+   fc::reflector<fee_schedule_type>::visit(fee_schedule_type::fee_set_visitor{genesis_state.initial_parameters.current_fees, 0});
    return genesis_state;
 }
 
@@ -74,25 +75,20 @@ BOOST_AUTO_TEST_CASE( block_database_test )
          bdb.store( b.id(), b );
 
          auto fetch = bdb.fetch_by_number( b.block_num() );
-         //idump((fetch));
          FC_ASSERT( fetch.valid() );
          FC_ASSERT( fetch->witness ==  b.witness );
          fetch = bdb.fetch_by_number( i+1 );
-         //idump((fetch));
          FC_ASSERT( fetch.valid() );
          FC_ASSERT( fetch->witness ==  b.witness );
          fetch = bdb.fetch_optional( b.id() );
-         //idump((fetch));
          FC_ASSERT( fetch.valid() );
          FC_ASSERT( fetch->witness ==  b.witness );
       }
-      //ilog("-----------" );
 
       for( uint32_t i = 1; i < 5; ++i )
       {
          auto blk = bdb.fetch_by_number( i );
          FC_ASSERT( blk.valid() );
-         //idump((blk)(i));
          FC_ASSERT( blk->witness == witness_id_type(blk->block_num()) );
       }
 
@@ -110,7 +106,6 @@ BOOST_AUTO_TEST_CASE( block_database_test )
       {
          auto blk = bdb.fetch_by_number( i+1 );
          FC_ASSERT( blk.valid() );
-         //idump((blk)(i));
          FC_ASSERT( blk->witness == witness_id_type(blk->block_num()) );
       }
 
@@ -141,7 +136,6 @@ BOOST_AUTO_TEST_CASE( generate_empty_blocks )
             witness_id_type prev_witness = b.witness;
             now += db.block_interval();
             witness_id_type cur_witness = db.get_scheduled_witness( 1 ).first;
-            // TODO:  Uncomment this when witness scheduling implemented
             BOOST_CHECK( cur_witness != prev_witness );
             b = db.generate_block( now, cur_witness, delegate_priv_key, database::skip_nothing );
             BOOST_CHECK( b.witness == cur_witness );
@@ -149,7 +143,6 @@ BOOST_AUTO_TEST_CASE( generate_empty_blocks )
          db.close();
       }
       {
-         //wlog( "------------------------------------------------" );
          database db;
          db.open(data_dir.path() );
          BOOST_CHECK_EQUAL( db.head_block_num(), 200 );
@@ -159,7 +152,6 @@ BOOST_AUTO_TEST_CASE( generate_empty_blocks )
             witness_id_type prev_witness = b.witness;
             now += db.block_interval();
             witness_id_type cur_witness = db.get_scheduled_witness( 1 ).first;
-            // TODO:  Uncomment this when witness scheduling implemented
             BOOST_CHECK( cur_witness != prev_witness );
             b = db.generate_block( now, cur_witness, delegate_priv_key, database::skip_nothing );
          }
@@ -189,15 +181,12 @@ BOOST_AUTO_TEST_CASE( undo_block )
          BOOST_CHECK( db.head_block_num() == 5 );
          db.pop_block();
          now -= db.block_interval();
-         //wdump( (witness_schedule_id_type()(db)) );
          BOOST_CHECK( db.head_block_num() == 4 );
          db.pop_block();
          now -= db.block_interval();
-         //wdump( (witness_schedule_id_type()(db)) );
          BOOST_CHECK( db.head_block_num() == 3 );
          db.pop_block();
          now -= db.block_interval();
-         //wdump( (witness_schedule_id_type()(db)) );
          BOOST_CHECK( db.head_block_num() == 2 );
          for( uint32_t i = 0; i < 5; ++i )
          {

@@ -805,34 +805,28 @@ BOOST_AUTO_TEST_CASE( assert_op_test )
    try {
    // create some objects
    auto nathan_private_key = generate_private_key("nathan");
-   auto dan_private_key = generate_private_key("dan");
    public_key_type nathan_public_key = nathan_private_key.get_public_key();
-   public_key_type dan_public_key = dan_private_key.get_public_key();
    key_id_type nathan_key_id = register_key(nathan_public_key).id;
-   key_id_type dan_key_id = register_key(dan_public_key).id;
    account_id_type nathan_id = create_account("nathan", nathan_key_id).id;
 
    assert_operation op;
-   decltype( key_object::key_data ) lit_key = nathan_public_key;
+   decltype(key_object::key_data) lit_key = nathan_public_key;
 
    // nathan checks that his public key is equal to the given value.
    op.fee_paying_account = nathan_id;
-   op.predicates = vector< vector< char > >();
+   op.predicates = vector<vector<char>>();
    op.predicates.push_back(
       fc::raw::pack(
-      predicate( pred::account_name_eq_lit{ nathan_id, "nathan" } )
-      ) );
+      predicate(pred::account_name_eq_lit{ nathan_id, "nathan" })
+      ));
    trx.operations.push_back(op);
-   trx.sign( nathan_key_id, nathan_private_key );
+   trx.sign(nathan_key_id, nathan_private_key);
    PUSH_TX( db, trx );
 
    // nathan checks that his public key is not equal to the given value (fail)
-   op.predicates.back() =
-      fc::raw::pack(
-      predicate( pred::account_name_eq_lit{ nathan_id, "dan" } )
-      );
+   op.predicates.back() = fc::raw::pack(predicate(pred::account_name_eq_lit{ nathan_id, "dan" }));
    trx.operations.back() = op;
-   trx.sign( nathan_key_id, nathan_private_key );
+   trx.sign(nathan_key_id, nathan_private_key);
    BOOST_CHECK_THROW( PUSH_TX( db, trx ), fc::exception );
    } FC_LOG_AND_RETHROW()
 }

@@ -228,35 +228,35 @@ BOOST_AUTO_TEST_CASE( black_swan )
       transfer(genesis_account, buyer_id, asset(init_balance));
       transfer(genesis_account, borrower_id, asset(init_balance));
       transfer(genesis_account, borrower2_id, asset(init_balance));
-      update_feed_producers( bitusd, {feedproducer.id} );
+      update_feed_producers(bitusd, {feedproducer.id});
 
       price_feed current_feed;
-      current_feed.settlement_price = bitusd.amount( 100 ) / core.amount(100);
+      current_feed.settlement_price = bitusd.amount(100) / core.amount(100);
 
       // starting out with price 1:1
-      publish_feed( bitusd, feedproducer, current_feed );
+      publish_feed(bitusd, feedproducer, current_feed);
 
       // start out with 2:1 collateral
-      borrow( borrower, bitusd.amount(1000), asset(2000) );
-      borrow( borrower2, bitusd.amount(1000), asset(4000) );
+      borrow(borrower, bitusd.amount(1000), asset(2000));
+      borrow(borrower2, bitusd.amount(1000), asset(4000));
 
-      BOOST_REQUIRE_EQUAL( get_balance( borrower, bitusd ), 1000 );
-      BOOST_REQUIRE_EQUAL( get_balance( borrower2, bitusd ), 1000 );
-      BOOST_REQUIRE_EQUAL( get_balance( borrower , core ), init_balance - 2000 );
-      BOOST_REQUIRE_EQUAL( get_balance( borrower2, core ), init_balance - 4000 );
+      BOOST_REQUIRE_EQUAL( get_balance(borrower, bitusd), 1000 );
+      BOOST_REQUIRE_EQUAL( get_balance(borrower2, bitusd), 1000 );
+      BOOST_REQUIRE_EQUAL( get_balance(borrower , core), init_balance - 2000 );
+      BOOST_REQUIRE_EQUAL( get_balance(borrower2, core), init_balance - 4000 );
 
       current_feed.settlement_price = bitusd.amount( 100 ) / core.amount(200);
       publish_feed( bitusd, feedproducer, current_feed );
 
       /// this sell order is designed to trigger a black swan
-      auto order = create_sell_order( borrower2, bitusd.amount(1000), core.amount(3000) );
+      create_sell_order(borrower2, bitusd.amount(1000), core.amount(3000));
 
       FC_ASSERT( bitusd.bitasset_data(db).has_settlement() );
 
-      force_settle( borrower, bitusd.amount(100) );
+      force_settle(borrower, bitusd.amount(100));
 
       BOOST_TEST_MESSAGE( "Verify that we cannot borrow after black swan" );
-      BOOST_REQUIRE_THROW( borrow( borrower, bitusd.amount(1000), asset(2000) ), fc::exception );
+      BOOST_REQUIRE_THROW( borrow(borrower, bitusd.amount(1000), asset(2000)), fc::exception );
    } catch( const fc::exception& e) {
       edump((e.to_detail_string()));
       throw;

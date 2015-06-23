@@ -575,7 +575,7 @@ void witness_create_operation::validate() const
 
 share_type witness_create_operation::calculate_fee(const fee_schedule_type& k) const
 {
-   return k.delegate_create_fee + k.total_data_fee(url);
+   return k.witness_create_fee + k.total_data_fee(url);
 }
 
 void withdraw_permission_update_operation::get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>&)const
@@ -668,7 +668,7 @@ void        asset_global_settle_operation::validate()const
 
 share_type  asset_global_settle_operation::calculate_fee(const fee_schedule_type& k)const
 {
-   return k.global_settle_fee;
+   return k.asset_global_settle_fee;
 }
 
 void asset_settle_operation::get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>&) const
