@@ -104,9 +104,9 @@ class plugin : public abstract_plugin
          bpo::options_description& config_file_options
          ) override;
 
-   protected:
       chain::database& database() { return *app().chain_database(); }
       application& app()const { assert(_app); return *_app; }
+   protected:
       net::node& p2p_node() { return *app().p2p_node(); }
 
    private:
