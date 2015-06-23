@@ -24,13 +24,13 @@
 
 namespace graphene { namespace chain {
 
-struct predicate_visitor 
+struct predicate_visitor
 {
    typedef bool result_type;
    const database& db;
 
    predicate_visitor( const database& d ):db(d){}
-   
+
    bool operator()( const verify_account_name& p )const
    {
       return p.account_id(db).name == p.account_name;
@@ -45,6 +45,7 @@ void_result assert_evaluator::do_evaluate( const assert_operation& o )
 {
    const database& _db = db();
    uint32_t skip = _db.get_node_properties().skip_flags;
+   auto max_predicate_opcode = _db.get_global_properties().parameters.max_predicate_opcode;
 
    if( skip & database::skip_assert_evaluation )
       return void_result();
@@ -53,14 +54,15 @@ void_result assert_evaluator::do_evaluate( const assert_operation& o )
    {
       fc::datastream<const char*> ds( pdata.data(), pdata.size() );
       predicate p;
-      try {
-         fc::raw::unpack( ds, p );
-      } catch ( const fc::exception& e )
-      {
-         if( skip & database::skip_unknown_predicate )
-            continue;
-         throw;
-      }
+      //
+      // FC_ASSERT deep in the bowels of static_variant implementation
+      // will trip if we get a predicate which isn't in our code's
+      // static_variant.  This is desired behavior.
+      //
+      fc::raw::unpack( ds, p );
+
+      FC_ASSERT( p.which() >= 0 );
+      FC_ASSERT( unsigned(p.which()) < max_predicate_opcode );
       FC_ASSERT( p.visit( predicate_visitor( _db ) ) );
    }
    return void_result();
