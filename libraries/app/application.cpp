@@ -152,6 +152,8 @@ namespace detail {
 
          auto nathan_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("nathan")));
          genesis_state_type initial_state;
+         fc::reflector<fee_schedule_type>::visit(
+                  fee_schedule_type::fee_set_visitor{initial_state.initial_parameters.current_fees, 0});
          secret_hash_type::encoder enc;
          fc::raw::pack(enc, nathan_key);
          fc::raw::pack(enc, secret_hash_type());
