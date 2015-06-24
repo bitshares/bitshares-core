@@ -478,6 +478,25 @@ namespace graphene { namespace app {
        return result;
     } FC_CAPTURE_AND_RETHROW( (a)(b)(bucket_seconds)(start)(end) ) }
 
+    /**
+     *  @return all accounts that referr to the key or account id in their owner or active authorities.
+     */
+    vector<account_id_type> database_api::get_account_references( object_id_type key_or_account_id )const
+    {
+       const auto& idx = _db.get_index_type<account_index>();
+       const auto& aidx = dynamic_cast<const primary_index<account_index>&>(idx);
+       const auto& refs = aidx.get_secondary_index<graphene::chain::account_member_index>();
+       auto itr = refs.account_to_memberships.find(key_or_account_id);
+       vector<account_id_type> result;
+
+       if( itr != refs.account_to_memberships.end() )
+       {
+          result.reserve( itr->second.size() );
+          for( auto item : itr->second ) result.push_back(item);
+       }
+       return result;
+    }
+
     /** TODO: add secondary index that will accelerate this process */
     vector<proposal_object> database_api::get_proposed_transactions( account_id_type id )const
     {

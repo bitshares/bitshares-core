@@ -237,6 +237,10 @@ namespace graphene { namespace app {
           */
          vector<proposal_object> get_proposed_transactions( account_id_type id )const;
 
+         /**
+          *  @return all accounts that referr to the key or account id in their owner or active authorities.
+          */
+         vector<account_id_type> get_account_references( object_id_type key_or_account_id )const;
 
       private:
          /** called every time a block is applied to report the objects that were changed */
@@ -378,6 +382,7 @@ FC_API(graphene::app::database_api,
        (cancel_all_subscriptions)
        (get_transaction_hex)
        (get_proposed_transactions)
+       (get_account_references)
      )
 FC_API(graphene::app::history_api, (get_account_history)(get_market_history)(get_market_history_buckets))
 FC_API(graphene::app::network_api, (broadcast_transaction)(add_node)(get_connected_peers))
