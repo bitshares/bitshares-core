@@ -209,7 +209,11 @@ void market_history_plugin::plugin_initialize(const boost::program_options::vari
    database().applied_block.connect( [&]( const signed_block& b){ my->update_market_histories(b); } );
    database().add_index< primary_index< bucket_index  > >();
 
-   LOAD_VALUE_SET(options, "bucket-size", my->_tracked_buckets, uint32_t);
+   if( options.count( "bucket-size" ) )
+   {
+      const std::vector<uint32_t>& buckets = options["bucket-size"].as<std::vector<uint32_t>>(); 
+      for( auto o : buckets ) my->_tracked_buckets.insert(o);
+   }
    if( options.count( "history-per-size" ) )
       my->_maximum_history_per_bucket_size = options["history-per-size"].as<uint32_t>();
 } FC_CAPTURE_AND_RETHROW() }
