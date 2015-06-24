@@ -103,11 +103,18 @@ void database::initialize_indexes()
    //Protocol object indexes
    add_index< primary_index<asset_index> >();
    add_index< primary_index<force_settlement_index> >();
+
    auto acnt_index = add_index< primary_index<account_index> >();
    acnt_index->add_secondary_index<account_member_index>();
    acnt_index->add_secondary_index<account_referrer_index>();
 
-   add_index< primary_index<simple_index<key_object>> >();
+   // this is the fast effecient version for validation only
+   // add_index< primary_index<simple_index<key_object>> >();
+   
+   // this is the slower version designed to aid GUI use.  We will
+   // default to the "slow" version until we need a faster version.
+   add_index< primary_index<key_index> >();
+
    add_index< primary_index<delegate_index> >();
    add_index< primary_index<witness_index> >();
    add_index< primary_index<limit_order_index > >();

@@ -56,6 +56,7 @@ namespace graphene { namespace chain {
 
        explicit operator std::string()const; ///< converts to base58 + checksum
 
+       friend size_t hash_value( const address& v ) { return *((size_t*)&v.addr._hash[2]); }
        fc::ripemd160 addr;
    };
    inline bool operator == ( const address& a, const address& b ) { return a.addr == b.addr; }
