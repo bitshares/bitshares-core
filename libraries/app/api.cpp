@@ -515,5 +515,23 @@ namespace graphene { namespace app {
        return result;
     }
 
+    /**
+     *  @return all key_ids that have been registered for a given address. 
+     */
+    vector<key_id_type>  database_api::get_keys_for_address( const address& a )const
+    { try {
+       vector<key_id_type> result;
+       const auto& idx = _db.get_index_type<key_index>();
+       const auto& aidx = idx.indices().get<by_address>();
+       auto itr = aidx.find(a);
+
+       while( itr != aidx.end() && itr->key_address() == a )
+       {
+          result.push_back( itr->id );
+          ++itr;
+       }
+       return result;
+    } FC_CAPTURE_AND_RETHROW( (a) ) } 
+
 
 } } // graphene::app

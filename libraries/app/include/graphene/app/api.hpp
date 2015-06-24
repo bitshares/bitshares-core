@@ -242,6 +242,11 @@ namespace graphene { namespace app {
           */
          vector<account_id_type> get_account_references( object_id_type key_or_account_id )const;
 
+         /**
+          *  @return all key_ids that have been registered for a given address. 
+          */
+         vector<key_id_type>  get_keys_for_address( const address& a )const;
+
       private:
          /** called every time a block is applied to report the objects that were changed */
          void on_objects_changed(const vector<object_id_type>& ids);
@@ -383,6 +388,7 @@ FC_API(graphene::app::database_api,
        (get_transaction_hex)
        (get_proposed_transactions)
        (get_account_references)
+       (get_keys_for_address)
      )
 FC_API(graphene::app::history_api, (get_account_history)(get_market_history)(get_market_history_buckets))
 FC_API(graphene::app::network_api, (broadcast_transaction)(add_node)(get_connected_peers))
