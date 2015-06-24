@@ -258,25 +258,27 @@ namespace graphene { namespace app {
     */
    class history_api
    {
-   public:
-      history_api(application& app):_app(app){}
+      public:
+         history_api(application& app):_app(app){}
 
-      /**
-       * @brief Get operations relevant to the specificed account
-       * @param account The account whose history should be queried
-       * @param stop ID of the earliest operation to retrieve
-       * @param limit Maximum number of operations to retrieve (must not exceed 100)
-       * @param start ID of the most recent operation to retrieve
-       * @return A list of operations performed by account, ordered from most recent to oldest.
-       */
-      vector<operation_history_object> get_account_history(account_id_type account,
-                                                           operation_history_id_type stop = operation_history_id_type(),
-                                                           int limit = 100,
-                                                           operation_history_id_type start = operation_history_id_type())const;
+         /**
+          * @brief Get operations relevant to the specificed account
+          * @param account The account whose history should be queried
+          * @param stop ID of the earliest operation to retrieve
+          * @param limit Maximum number of operations to retrieve (must not exceed 100)
+          * @param start ID of the most recent operation to retrieve
+          * @return A list of operations performed by account, ordered from most recent to oldest.
+          */
+         vector<operation_history_object> get_account_history(account_id_type account,
+                                                              operation_history_id_type stop = operation_history_id_type(),
+                                                              int limit = 100,
+                                                              operation_history_id_type start = operation_history_id_type())const;
 
-      vector<bucket_object> get_market_history( asset_id_type a, asset_id_type b, uint32_t bucket_seconds, fc::time_point_sec start, fc::time_point_sec end )const;
-   private:
-        application&              _app;
+         vector<bucket_object> get_market_history( asset_id_type a, asset_id_type b, uint32_t bucket_seconds, 
+                                                   fc::time_point_sec start, fc::time_point_sec end )const;
+         flat_set<uint32_t>    get_market_history_buckets()const;
+      private:
+           application&              _app;
    };
 
    /**
@@ -377,7 +379,7 @@ FC_API(graphene::app::database_api,
        (get_transaction_hex)
        (get_proposed_transactions)
      )
-FC_API(graphene::app::history_api, (get_account_history)(get_market_history))
+FC_API(graphene::app::history_api, (get_account_history)(get_market_history)(get_market_history_buckets))
 FC_API(graphene::app::network_api, (broadcast_transaction)(add_node)(get_connected_peers))
 FC_API(graphene::app::login_api,
        (login)

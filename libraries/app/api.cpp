@@ -445,7 +445,17 @@ namespace graphene { namespace app {
        }
        return result;
     }
-    vector<bucket_object> history_api::get_market_history( asset_id_type a, asset_id_type b, uint32_t bucket_seconds, fc::time_point_sec start, fc::time_point_sec end )const
+
+
+    flat_set<uint32_t> history_api::get_market_history_buckets()const
+    {
+       auto hist = _app.get_plugin<market_history_plugin>( "market_history" );
+       FC_ASSERT( hist );
+       return hist->tracked_buckets();
+    }
+
+    vector<bucket_object> history_api::get_market_history( asset_id_type a, asset_id_type b, 
+                                                           uint32_t bucket_seconds, fc::time_point_sec start, fc::time_point_sec end )const
     { try {
        FC_ASSERT(_app.chain_database());
        const auto& db = *_app.chain_database();

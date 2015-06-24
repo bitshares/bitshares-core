@@ -117,8 +117,7 @@ class market_history_plugin : public graphene::app::plugin
          const boost::program_options::variables_map& options) override;
       virtual void plugin_startup() override;
 
-      vector<bucket_object> get_history( const bucket_key& start, const bucket_key& end )const;
-      const flat_set<uint32_t>&    tracked_buckets()const;
+      const flat_set<uint32_t>&   tracked_buckets()const;
 
    private:
       friend class detail::market_history_plugin_impl;
