@@ -19,6 +19,7 @@
 #include <boost/program_options.hpp>
 
 #include <graphene/account_history/account_history_plugin.hpp>
+#include <graphene/market_history/market_history_plugin.hpp>
 
 #include <graphene/db/simple_index.hpp>
 
@@ -46,13 +47,17 @@ using std::cerr;
 database_fixture::database_fixture()
    : app(), db( *app.chain_database() )
 {
+   try {
    auto ahplugin = app.register_plugin<graphene::account_history::account_history_plugin>();
+   auto mhplugin = app.register_plugin<graphene::market_history::market_history_plugin>();
 
    boost::program_options::variables_map options;
 
    // app.initialize();
    ahplugin->plugin_set_app(&app);
    ahplugin->plugin_initialize(options);
+   mhplugin->plugin_set_app(&app);
+   mhplugin->plugin_initialize(options);
 
    secret_hash_type::encoder enc;
    fc::raw::pack(enc, delegate_priv_key);
@@ -68,11 +73,17 @@ database_fixture::database_fixture()
    fc::reflector<fee_schedule_type>::visit(fee_schedule_type::fee_set_visitor{genesis_state.initial_parameters.current_fees, 0});
    db.init_genesis(genesis_state);
    ahplugin->plugin_startup();
+   mhplugin->plugin_startup();
 
    generate_block();
 
    genesis_key(db); // attempt to deref
    trx.set_expiration(db.head_block_time() + fc::minutes(1));
+   } catch ( const fc::exception& e )
+   {
+      edump( (e.to_detail_string()) );
+      throw;
+   }
 
    return;
 }

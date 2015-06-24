@@ -53,6 +53,7 @@ class market_history_plugin_impl
 
       market_history_plugin&     _self;
       flat_set<uint32_t>         _tracked_buckets;
+      uint32_t                   _maximum_history_per_bucket_size = 1000;
 };
 
 
@@ -76,17 +77,23 @@ struct operation_process_fill_order
       auto& db         = _plugin.database();
       const auto& bucket_idx = db.get_index_type<bucket_index>();
 
+      auto max_history = _plugin.max_history();
       for( auto bucket : buckets )
       {
+          auto cutoff      = (fc::time_point() + fc::seconds( bucket * max_history));
+
           bucket_key key;
           key.base    = o.pays.asset_id;
           key.quote   = o.receives.asset_id;
-          price trade_price = o.pays / o.receives;
+
+          /** for every matched order there are two fill order operations created, one for
+           * each side.  We can filter the duplicates by only considering the fill operations where
+           * the base > quote
+           */
           if( key.base > key.quote ) 
-          {
-             std::swap( key.base,key.quote );
-             trade_price = ~trade_price;
-          }
+             continue;
+
+          price trade_price = o.pays / o.receives;
 
           key.seconds = bucket;
           key.open    = fc::time_point() + fc::seconds((_now.sec_since_epoch() / key.seconds) * key.seconds);
@@ -127,6 +134,23 @@ struct operation_process_fill_order
                   }
              });
           }
+
+          if( max_history != 0  )
+          {
+             key.open = fc::time_point_sec();
+             auto itr = by_key_idx.lower_bound( key );
+
+             while( itr != by_key_idx.end() && 
+                    itr->key.base == key.base && 
+                    itr->key.quote == key.quote && 
+                    itr->key.seconds == bucket && 
+                    itr->key.open < cutoff )
+             {
+                auto old_itr = itr;
+                ++itr;
+                db.remove( *old_itr );
+             }
+          }
       }
    }
 };
@@ -136,6 +160,9 @@ market_history_plugin_impl::~market_history_plugin_impl()
 
 void market_history_plugin_impl::update_market_histories( const signed_block& b )
 {
+   if( _maximum_history_per_bucket_size == 0 ) return;
+   if( _tracked_buckets.size() == 0 ) return;
+
    graphene::chain::database& db = database();
    const vector<operation_history_object>& hist = db.get_applied_operations();
    for( auto op : hist )
@@ -169,18 +196,23 @@ void market_history_plugin::plugin_set_program_options(
    )
 {
    cli.add_options()
-         ("bucket-size", boost::program_options::value<std::vector<uint32_t>>()->composing()->multitoken(), "Bucket size in seconds to track history for (may specify multiple times)")
+         ("bucket-size", boost::program_options::value<std::vector<uint32_t>>()->composing()->multitoken(), 
+           "Track market history by grouping orders into buckets of equal size measured in seconds, may specify more than one bucket size")
+         ("history-per-size", boost::program_options::value<uint32_t>()->default_value(1000), 
+           "How far back in time to track history for each bucket size, measured in the number of buckets (default: 1000)")
          ;
    cfg.add(cli);
 }
 
 void market_history_plugin::plugin_initialize(const boost::program_options::variables_map& options)
-{
+{ try {
    database().applied_block.connect( [&]( const signed_block& b){ my->update_market_histories(b); } );
    database().add_index< primary_index< bucket_index  > >();
 
    LOAD_VALUE_SET(options, "bucket-size", my->_tracked_buckets, uint32_t);
-}
+   if( options.count( "history-per-size" ) )
+      my->_maximum_history_per_bucket_size = options["history-per-size"].as<uint32_t>();
+} FC_CAPTURE_AND_RETHROW() }
 
 void market_history_plugin::plugin_startup()
 {
@@ -189,6 +221,11 @@ void market_history_plugin::plugin_startup()
 const flat_set<uint32_t>& market_history_plugin::tracked_buckets() const
 {
    return my->_tracked_buckets;
+}
+
+uint32_t market_history_plugin::max_history()const
+{
+   return my->_maximum_history_per_bucket_size;
 }
 
 } }

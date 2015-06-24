@@ -117,6 +117,7 @@ class market_history_plugin : public graphene::app::plugin
          const boost::program_options::variables_map& options) override;
       virtual void plugin_startup() override;
 
+      uint32_t                    max_history()const;
       const flat_set<uint32_t>&   tracked_buckets()const;
 
    private:
