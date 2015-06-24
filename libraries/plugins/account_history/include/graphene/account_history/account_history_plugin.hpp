@@ -45,29 +45,6 @@ enum account_history_object_type
    bucket_object_type = 1 ///< used in market_history_plugin
 };
 
-class key_account_object : public abstract_object<key_account_object>
-{
-   public:
-      static const uint8_t space_id = ACCOUNT_HISTORY_SPACE_ID;
-      static const uint8_t type_id  = key_account_object_type;
-
-      key_account_object() {}
-      key_account_object( const address& a ) : key(a) {}
-
-      address                   key;
-      flat_set<account_id_type> account_ids;
-};
-
-struct by_key{};
-typedef multi_index_container<
-   key_account_object,
-   indexed_by<
-      hashed_unique< tag<by_id>, member< object, object_id_type, &object::id > >,
-      ordered_unique< tag<by_key>, member< key_account_object, address, &key_account_object::key > >
-   >
-> key_account_object_multi_index_type;
-
-typedef generic_index<key_account_object, key_account_object_multi_index_type> key_account_index;
 
 namespace detail
 {
@@ -95,8 +72,3 @@ class account_history_plugin : public graphene::app::plugin
 
 } } //graphene::account_history
 
-FC_REFLECT_DERIVED( graphene::account_history::key_account_object,
-            (graphene::db::object),
-            (key)
-            (account_ids)
-          )

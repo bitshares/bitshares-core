@@ -34,68 +34,14 @@ namespace graphene { namespace account_history {
 namespace detail
 {
 
-class account_create_observer : public graphene::chain::evaluation_observer
-{
-   public:
-      account_create_observer( account_history_plugin& plugin )
-          : _plugin( plugin ) {}
-      virtual ~account_create_observer();
-
-      virtual void post_evaluate(
-          const transaction_evaluation_state& eval_state,
-          const operation& op,
-          bool apply,
-          generic_evaluator* ge,
-          const operation_result& result ) override;
-
-      account_history_plugin& _plugin;
-};
-
-class account_update_observer : public graphene::chain::evaluation_observer
-{
-   public:
-      account_update_observer( account_history_plugin& plugin )
-          : _plugin( plugin )
-      {
-         _pre_account_keys.reserve( GRAPHENE_DEFAULT_MAX_AUTHORITY_MEMBERSHIP * 2 + 2 );
-      }
-      virtual ~account_update_observer();
-
-      virtual void pre_evaluate(
-          const transaction_evaluation_state& eval_state,
-          const operation& op,
-          bool apply,
-          generic_evaluator* ge ) override;
-
-      virtual void post_evaluate(
-          const transaction_evaluation_state& eval_state,
-          const operation& op,
-          bool apply,
-          generic_evaluator* ge,
-          const operation_result& result ) override;
-
-      virtual void evaluation_failed(
-          const transaction_evaluation_state& eval_state,
-          const operation& op,
-          bool apply,
-          generic_evaluator* ge,
-          const operation_result& result ) override;
-
-      account_history_plugin& _plugin;
-      flat_set< key_id_type > _pre_account_keys;
-};
 
 class account_history_plugin_impl
 {
    public:
       account_history_plugin_impl(account_history_plugin& _plugin)
-         : _self( _plugin ),
-           _create_observer( _plugin ),
-           _update_observer( _plugin )
+         : _self( _plugin )
       { }
       virtual ~account_history_plugin_impl();
-
-      void rebuild_key_account_index();
 
       flat_set<key_id_type> get_keys_for_account(
           const account_id_type& account_id );
@@ -104,7 +50,6 @@ class account_history_plugin_impl
        * and will process/index all operations that were applied in the block.
        */
       void update_account_histories( const signed_block& b );
-      void index_account_keys( const account_id_type& account_id );
 
       graphene::chain::database& database()
       {
@@ -112,8 +57,6 @@ class account_history_plugin_impl
       }
 
       account_history_plugin& _self;
-      account_create_observer _create_observer;
-      account_update_observer _update_observer;
       flat_set<account_id_type> _tracked_accounts;
 };
 
@@ -248,271 +191,13 @@ struct operation_get_impacted_accounts
    {}
 };
 
-account_create_observer::~account_create_observer()
-{
-   return;
-}
-
-void account_create_observer::post_evaluate(
-    const transaction_evaluation_state& eval_state,
-    const operation& op,
-    bool apply,
-    generic_evaluator* ge,
-    const operation_result& result
-    )
-{
-   assert( op.which() == operation::tag<account_create_operation>::value );
-
-   if( !apply )
-      return;
-
-   // if we only care about given accounts, then key -> account mapping
-   //   is not maintained
-   if( _plugin.my->_tracked_accounts.size() > 0 )
-      return;
-
-   account_id_type account_id = result.get< object_id_type >();
-   _plugin.my->index_account_keys( account_id );
-   return;
-}
-
-account_update_observer::~account_update_observer()
-{
-   return;
-}
-
-void account_update_observer::pre_evaluate(
-    const transaction_evaluation_state& eval_state,
-    const operation& op,
-    bool apply,
-    generic_evaluator* ge
-    )
-{
-   assert( op.which() == operation::tag<account_update_operation>::value );
-
-   if( !apply )
-      return;
-
-   // if we only care about given accounts, then key -> account mapping
-   //   is not maintained
-   if( _plugin.my->_tracked_accounts.size() > 0 )
-       return;
-
-   // is this a tx which affects a key?
-   // switch( op.which() )
-   // {
-   // see note in configure() why account_create_operation handling is unnecessary
-   //   case operation::tag<account_create_operation>::value:
-   //      const account_create_operation& create_op = op.get< account_create_operation >();
-   //      break;
-   //   case operation::tag<account_update_operation>::value:
-   //      const account_update_operation& update_op = op.get< account_update_operation >();
-   //      _pre_account_keys.clear();
-   //      get_updatable_account_keys( update_op, _pre_account_keys );
-   //      break;
-   //   default:
-   //      FC_ASSERT( false, "account_update_observer got unexpected operation type" );
-   //}
-
-   const account_update_operation& update_op = op.get< account_update_operation >();
-   _pre_account_keys = _plugin.my->get_keys_for_account( update_op.account );
-   return;
-}
-
-void account_update_observer::post_evaluate(
-    const transaction_evaluation_state& eval_state,
-    const operation& op,
-    bool apply,
-    generic_evaluator* ge,
-    const operation_result& result
-    )
-{
-   assert( op.which() == operation::tag<account_update_operation>::value );
-
-   if( !apply )
-      return;
-
-   graphene::chain::database& db = _plugin.my->database();
-
-   // if we only care about given accounts, then key -> account mapping
-   //   is not maintained
-   if( _plugin.my->_tracked_accounts.size() > 0 )
-       return;
-
-   // wild back-of-envelope heuristic:  most account update ops
-   //   don't add more than two keys
-   flat_set<key_id_type> post_account_keys;
-   post_account_keys.reserve( _pre_account_keys.size() + 2 );
-
-   vector<key_id_type> removed_account_keys;
-   removed_account_keys.reserve( _pre_account_keys.size() );
-
-   const account_update_operation& update_op = op.get< account_update_operation >();
-   post_account_keys = _plugin.my->get_keys_for_account( update_op.account );
-
-   std::set_difference(
-      _pre_account_keys.begin(), _pre_account_keys.end(),
-      post_account_keys.begin(), post_account_keys.end(),
-      std::back_inserter( removed_account_keys )
-      );
-
-   //
-   // If a key_id is in _pre_account_keys but not in post_account_keys,
-   //    then it is placed in removed_account_keys by set_difference().
-   //
-   // Note, the *address* corresponding to this key may still exist
-   //    in the account, because it may be aliased to multiple key_id's.
-   //
-   // We delete the key_account_object for all removed_account_keys.
-   //    This correctly deletes addresses which were removed
-   //    from the account by the update_op.
-   //
-   // Unfortunately, in the case of aliased keys, it deletes
-   //    key_account_object if *any* of the aliases was removed from
-   //    the account.  We want it to delete only if *all* of the aliases
-   //    were removed from the account.
-   //
-   // However, we need to run index_account_keys() afterwards anyway.
-   //    It will re-add to the index any addresses which had been
-   //    deleted -- but only if they still exist in the account under
-   //    at least one alias.
-   //
-   // This is precisely the correct behavior.
-   //
-
-   for( const key_id_type& key_id : removed_account_keys )
-   {
-      auto& index = db.get_index_type<key_account_index>().indices().get<by_key>();
-      auto it = index.find( key_id(db).key_address() );
-      assert( it != index.end() );
-
-      db.modify<key_account_object>( *it, [&]( key_account_object& ka )
-      {
-         ka.account_ids.erase( update_op.account );
-      });
-   }
-
-   _plugin.my->index_account_keys( update_op.account );
-
-   return;
-}
-
-void account_update_observer::evaluation_failed(
-    const transaction_evaluation_state& eval_state,
-    const operation& op,
-    bool apply,
-    generic_evaluator* ge,
-    const operation_result& result
-    )
-{
-   if( !apply )
-      return;
-
-   // if we only care about given accounts, then key -> account mapping
-   //   is not maintained
-   if( _plugin.my->_tracked_accounts.size() > 0 )
-       return;
-
-   // cleaning up here is not strictly necessary, but good "hygiene"
-   _pre_account_keys.clear();
-   return;
-}
 
 account_history_plugin_impl::~account_history_plugin_impl()
 {
    return;
 }
 
-void account_history_plugin_impl::rebuild_key_account_index()
-{
-   // TODO:  We should really delete the index before we re-create it.
-   // TODO:  Building and sorting a vector of tuples is probably more efficient
-   const graphene::chain::database& db = database();
 
-   vector< pair< account_id_type, address > > tuples_from_db;
-   const auto& primary_account_idx = db.get_index_type<account_index>().indices().get<by_id>();
-   for( const account_object& acct : primary_account_idx )
-      index_account_keys( acct.id );
-   return;
-}
-
-flat_set<key_id_type> account_history_plugin_impl::get_keys_for_account( const account_id_type& account_id )
-{
-   const graphene::chain::database& db = database();
-   const account_object& acct = account_id(db);
-
-   const flat_map<object_id_type, weight_type>& owner_auths =
-       acct.owner.auths;
-   const flat_map<object_id_type, weight_type>& active_auths =
-       acct.active.auths;
-
-   flat_set<key_id_type> key_id_set;
-   key_id_set.reserve(owner_auths.size() + active_auths.size() + 2);
-
-   key_id_set.insert(acct.options.memo_key);
-
-   // we don't use get_keys() here to avoid an intermediate copy operation
-   for( const pair<object_id_type, weight_type>& item : active_auths )
-   {
-      if( item.first.type() == key_object_type )
-         key_id_set.insert( item.first );
-   }
-
-   for( const pair<object_id_type, weight_type>& item : owner_auths )
-   {
-      if( item.first.type() == key_object_type )
-         key_id_set.insert( item.first );
-   }
-
-   return key_id_set;
-}
-
-void account_history_plugin_impl::index_account_keys( const account_id_type& account_id )
-{
-   // for each key in account authority... get address, modify(..)
-   graphene::chain::database& db = database();
-
-   flat_set<key_id_type> key_id_set = get_keys_for_account( account_id );
-
-   flat_set<address> address_set;
-
-   //
-   // we pass the addresses through another flat_set because the
-   //    blockchain doesn't force de-duplication of addresses
-   //    (multiple key_id's might refer to the same address)
-   //
-   address_set.reserve( key_id_set.size() );
-
-   for( const key_id_type& key_id : key_id_set )
-      address_set.insert( key_id(db).key_address() );
-
-   // add mappings for the given account
-   for( const address& addr : address_set )
-   {
-       auto& idx = db.get_index_type<key_account_index>().indices().get<by_key>();
-       auto it = idx.find( addr );
-       if( it == idx.end() )
-       {
-          // if unknown, we need to create a new object
-          db.create<key_account_object>( [&]( key_account_object& ka )
-          {
-             ka.key = addr;
-             ka.account_ids.insert( account_id );
-          });
-       }
-       else
-       {
-          // if known, we need to add to existing object
-          db.modify<key_account_object>( *it,
-             [&]( key_account_object& ka )
-             {
-                ka.account_ids.insert( account_id );
-             });
-       }
-   }
-
-   return;
-}
 
 void account_history_plugin_impl::update_account_histories( const signed_block& b )
 {
@@ -555,8 +240,6 @@ void account_history_plugin_impl::update_account_histories( const signed_block& 
          {
             if( impacted.find( account_id ) != impacted.end() )
             {
-               index_account_keys( account_id );
-
                // add history
                const auto& stats_obj = account_id(db).statistics(db);
                const auto& ath = db.create<account_transaction_history_object>( [&]( account_transaction_history_object& obj ){
@@ -603,17 +286,12 @@ void account_history_plugin::plugin_initialize(const boost::program_options::var
    database().applied_block.connect( [&]( const signed_block& b){ my->update_account_histories(b); } );
    database().add_index< primary_index< simple_index< operation_history_object > > >();
    database().add_index< primary_index< simple_index< account_transaction_history_object > > >();
-   database().add_index< primary_index< key_account_index >>();
-
-   database().register_evaluation_observer<account_create_evaluator>( my->_create_observer );
-   database().register_evaluation_observer< graphene::chain::account_update_evaluator >( my->_update_observer );
 
    LOAD_VALUE_SET(options, "tracked-accounts", my->_tracked_accounts, graphene::chain::account_id_type);
 }
 
 void account_history_plugin::plugin_startup()
 {
-   my->rebuild_key_account_index();
 }
 
 flat_set<account_id_type> account_history_plugin::tracked_accounts() const
