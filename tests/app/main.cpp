@@ -45,16 +45,16 @@ BOOST_AUTO_TEST_CASE( two_node_network )
 
       graphene::app::application app1;
       app1.register_plugin<graphene::account_history::account_history_plugin>();
-      bpo::variables_map cfg;
-      cfg.emplace("p2p-endpoint", bpo::variable_value(string("127.0.0.1:3939"), false));
+      boost::program_options::variables_map cfg;
+      cfg.emplace("p2p-endpoint", boost::program_options::variable_value(string("127.0.0.1:3939"), false));
       app1.initialize(app_dir.path(), cfg);
 
       graphene::app::application app2;
       app2.register_plugin<account_history::account_history_plugin>();
       auto cfg2 = cfg;
       cfg2.erase("p2p-endpoint");
-      cfg2.emplace("p2p-endpoint", bpo::variable_value(string("127.0.0.1:4040"), false));
-      cfg2.emplace("seed-node", bpo::variable_value(vector<string>{"127.0.0.1:3939"}, false));
+      cfg2.emplace("p2p-endpoint", boost::program_options::variable_value(string("127.0.0.1:4040"), false));
+      cfg2.emplace("seed-node", boost::program_options::variable_value(vector<string>{"127.0.0.1:3939"}, false));
       app2.initialize(app2_dir.path(), cfg2);
 
       app1.startup();

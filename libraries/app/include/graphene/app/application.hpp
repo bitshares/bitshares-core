@@ -24,7 +24,6 @@
 
 namespace graphene { namespace app {
    namespace detail { class application_impl; }
-   namespace bpo = boost::program_options;
    using std::string;
 
    class abstract_plugin;
@@ -35,10 +34,10 @@ namespace graphene { namespace app {
          application();
          ~application();
 
-         void set_program_options( bpo::options_description& command_line_options,
-                                   bpo::options_description& configuration_file_options )const;
-         void initialize(const fc::path& data_dir, const bpo::variables_map&options);
-         void initialize_plugins( const bpo::variables_map& options );
+         void set_program_options( boost::program_options::options_description& command_line_options,
+                                   boost::program_options::options_description& configuration_file_options )const;
+         void initialize(const fc::path& data_dir, const boost::program_options::variables_map&options);
+         void initialize_plugins( const boost::program_options::variables_map& options );
          void startup();
          void shutdown();
          void startup_plugins();
@@ -50,7 +49,7 @@ namespace graphene { namespace app {
             auto plug = std::make_shared<PluginType>();
             plug->plugin_set_app(this);
 
-            bpo::options_description plugin_cli_options("Options for plugin " + plug->plugin_name()), plugin_cfg_options;
+            boost::program_options::options_description plugin_cli_options("Options for plugin " + plug->plugin_name()), plugin_cfg_options;
             plug->plugin_set_program_options(plugin_cli_options, plugin_cfg_options);
             if( !plugin_cli_options.options().empty() )
                _cli_options.add(plugin_cli_options);
@@ -80,8 +79,8 @@ namespace graphene { namespace app {
          void add_plugin( const string& name, std::shared_ptr<abstract_plugin> p );
          std::shared_ptr<detail::application_impl> my;
 
-         bpo::options_description _cli_options;
-         bpo::options_description _cfg_options;
+         boost::program_options::options_description _cli_options;
+         boost::program_options::options_description _cfg_options;
    };
 
 } }

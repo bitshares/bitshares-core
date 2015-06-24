@@ -23,7 +23,6 @@
 #include <fc/io/json.hpp>
 
 namespace graphene { namespace app {
-namespace bpo = boost::program_options;
 
 class abstract_plugin
 {
@@ -43,7 +42,7 @@ class abstract_plugin
        *
        * @param options The options passed to the application, via configuration files or command line
        */
-      virtual void plugin_initialize( const bpo::variables_map& options ) = 0;
+      virtual void plugin_initialize( const boost::program_options::variables_map& options ) = 0;
 
       /**
        * @brief Begin normal runtime operations
@@ -79,8 +78,8 @@ class abstract_plugin
        * may simply provide an empty implementation of this method.
        */
       virtual void plugin_set_program_options(
-         bpo::options_description& command_line_options,
-         bpo::options_description& config_file_options
+         boost::program_options::options_description& command_line_options,
+         boost::program_options::options_description& config_file_options
          ) = 0;
 };
 
@@ -95,13 +94,13 @@ class plugin : public abstract_plugin
       virtual ~plugin() override;
 
       virtual std::string plugin_name()const override;
-      virtual void plugin_initialize( const bpo::variables_map& options ) override;
+      virtual void plugin_initialize( const boost::program_options::variables_map& options ) override;
       virtual void plugin_startup() override;
       virtual void plugin_shutdown() override;
       virtual void plugin_set_app( application* app ) override;
       virtual void plugin_set_program_options(
-         bpo::options_description& command_line_options,
-         bpo::options_description& config_file_options
+         boost::program_options::options_description& command_line_options,
+         boost::program_options::options_description& config_file_options
          ) override;
 
       chain::database& database() { return *app().chain_database(); }

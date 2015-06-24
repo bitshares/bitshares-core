@@ -169,7 +169,7 @@ void market_history_plugin::plugin_set_program_options(
    )
 {
    cli.add_options()
-         ("bucket-size", bpo::value<std::vector<uint32_t>>()->composing()->multitoken(), "Bucket size in seconds to track history for (may specify multiple times)")
+         ("bucket-size", boost::program_options::value<std::vector<uint32_t>>()->composing()->multitoken(), "Bucket size in seconds to track history for (may specify multiple times)")
          ;
    cfg.add(cli);
 }

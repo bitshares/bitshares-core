@@ -23,7 +23,6 @@
 #include <fc/thread/future.hpp>
 
 namespace graphene { namespace witness_plugin {
-namespace bpo = boost::program_options;
 
 class witness_plugin : public graphene::app::plugin {
 public:
@@ -47,7 +46,7 @@ public:
 
    void set_block_production(bool allow) { _production_enabled = allow; }
 
-   virtual void plugin_initialize( const bpo::variables_map& options ) override;
+   virtual void plugin_initialize( const boost::program_options::variables_map& options ) override;
    virtual void plugin_startup() override;
    virtual void plugin_shutdown() override;
 
@@ -55,7 +54,7 @@ private:
    void schedule_next_production(const graphene::chain::chain_parameters& global_parameters);
    void block_production_loop();
 
-   bpo::variables_map _options;
+   boost::program_options::variables_map _options;
    bool _production_enabled = false;
    std::map<chain::key_id_type, fc::ecc::private_key> _private_keys;
    std::set<chain::witness_id_type> _witnesses;

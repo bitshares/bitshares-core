@@ -50,6 +50,8 @@ using chain::block_id_type;
 
 using std::vector;
 
+namespace bpo = boost::program_options;
+
 namespace detail {
 
    class application_impl : public net::node_delegate

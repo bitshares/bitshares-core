@@ -28,6 +28,8 @@ using namespace graphene::witness_plugin;
 using std::string;
 using std::vector;
 
+namespace bpo = boost::program_options;
+
 void witness_plugin::plugin_set_program_options(
    boost::program_options::options_description& command_line_options,
    boost::program_options::options_description& config_file_options)

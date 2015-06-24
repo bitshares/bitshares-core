@@ -24,7 +24,6 @@
 
 namespace graphene { namespace market_history {
 using namespace chain;
-namespace bpo = boost::program_options;
 
 //
 // Plugins should #define their SPACE_ID's so plugins with
@@ -111,8 +110,11 @@ class market_history_plugin : public graphene::app::plugin
       virtual ~market_history_plugin();
 
       std::string plugin_name()const override;
-      virtual void plugin_set_program_options(bpo::options_description& cli, bpo::options_description& cfg) override;
-      virtual void plugin_initialize(const bpo::variables_map& options) override;
+      virtual void plugin_set_program_options(
+         boost::program_options::options_description& cli,
+         boost::program_options::options_description& cfg) override;
+      virtual void plugin_initialize(
+         const boost::program_options::variables_map& options) override;
       virtual void plugin_startup() override;
 
       vector<bucket_object> get_history( const bucket_key& start, const bucket_key& end )const;
