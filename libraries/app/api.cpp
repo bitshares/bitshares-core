@@ -533,5 +533,20 @@ namespace graphene { namespace app {
        return result;
     } FC_CAPTURE_AND_RETHROW( (a) ) } 
 
+    vector<call_order_object> database_api::get_margin_positions( const account_id_type& id )const
+    { try {
+       const auto& idx = _db.get_index_type<call_order_index>();
+       const auto& aidx = idx.indices().get<by_account>();
+       auto start = aidx.lower_bound( boost::make_tuple( id, 0 ) );
+       auto end = aidx.lower_bound( boost::make_tuple( id+1, 0 ) );
+       vector<call_order_object> result;
+       while( start != end )
+       {
+          result.push_back(*start);
+          ++start;
+       }
+       return result;
+    } FC_CAPTURE_AND_RETHROW( (id) ) }
+
 
 } } // graphene::app

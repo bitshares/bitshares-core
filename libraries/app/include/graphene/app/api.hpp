@@ -247,6 +247,11 @@ namespace graphene { namespace app {
           */
          vector<key_id_type>  get_keys_for_address( const address& a )const;
 
+         /**
+          *  @return all open margin positions for a given account id.
+          */
+         vector<call_order_object> get_margin_positions( const account_id_type& id )const;
+
       private:
          /** called every time a block is applied to report the objects that were changed */
          void on_objects_changed(const vector<object_id_type>& ids);
@@ -389,6 +394,7 @@ FC_API(graphene::app::database_api,
        (get_proposed_transactions)
        (get_account_references)
        (get_keys_for_address)
+       (get_margin_positions)
      )
 FC_API(graphene::app::history_api, (get_account_history)(get_market_history)(get_market_history_buckets))
 FC_API(graphene::app::network_api, (broadcast_transaction)(add_node)(get_connected_peers))
