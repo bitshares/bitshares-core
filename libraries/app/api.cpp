@@ -336,6 +336,10 @@ namespace graphene { namespace app {
              {
                 _subscriptions[id](obj->to_variant());
              }
+             else
+             {
+                _subscriptions[id](fc::variant(id));
+             }
           }
        });
     }
