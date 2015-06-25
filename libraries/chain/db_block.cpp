@@ -181,6 +181,8 @@ bool database::_push_block(const signed_block& new_block)
  */
 processed_transaction database::push_transaction( const signed_transaction& trx, uint32_t skip )
 {
+   _pending_block.timestamp = head_block_time();
+
    processed_transaction result;
    with_skip_flags( skip, [&]()
    {
@@ -294,7 +296,21 @@ signed_block database::_generate_block(
    signed_block tmp = _pending_block;
    tmp.transaction_merkle_root = tmp.calculate_merkle_root();
    _pending_block.transactions.clear();
-   push_block( tmp, skip );
+
+   bool failed = false;
+   try { push_block( tmp, skip ); } catch ( const fc::exception& e ) { failed = true; }
+   if( failed )
+   {
+      for( const auto& trx : tmp.transactions )
+      {
+         try { 
+             push_transaction( trx, skip ); 
+         } catch ( const fc::exception& e ) { 
+             wlog( "Transaction is no longer valid: ${trx}", ("trx",trx) ); 
+         }
+      }
+      return _generate_block( when, witness_id, block_signing_private_key );
+   }
    return tmp;
 } FC_CAPTURE_AND_RETHROW( (witness_id) ) }
 
