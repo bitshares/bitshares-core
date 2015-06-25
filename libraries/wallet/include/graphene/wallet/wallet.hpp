@@ -113,6 +113,7 @@ class wallet_api
       vector<asset>                     list_account_balances(const string& id);
       vector<asset_object>              list_assets(const string& lowerbound, uint32_t limit)const;
       vector<operation_history_object>  get_account_history(string name, int limit)const;
+      vector<bucket_object>             get_market_history(string symbol, string symbol2, uint32_t bucket)const;
       vector<limit_order_object>        get_limit_orders(string a, string b, uint32_t limit)const;
       vector<call_order_object>         get_call_orders(string a, uint32_t limit)const;
       vector<force_settlement_object>   get_settle_orders(string a, uint32_t limit)const;
@@ -362,6 +363,7 @@ FC_API( graphene::wallet::wallet_api,
         (get_block)
         (get_account_count)
         (get_account_history)
+        (get_market_history)
         (get_global_properties)
         (get_dynamic_global_properties)
         (get_object)

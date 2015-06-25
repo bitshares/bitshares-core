@@ -1693,6 +1693,11 @@ vector<operation_history_object> wallet_api::get_account_history(string name, in
    return my->_remote_hist->get_account_history(get_account(name).get_id(), operation_history_id_type(), limit, operation_history_id_type());
 }
 
+vector<bucket_object> wallet_api::get_market_history( string symbol1, string symbol2, uint32_t bucket )const
+{
+   return my->_remote_hist->get_market_history( get_asset_id(symbol1), get_asset_id(symbol2), bucket, fc::time_point_sec(), fc::time_point::now() );
+}
+
 vector<limit_order_object> wallet_api::get_limit_orders(string a, string b, uint32_t limit)const
 {
    return my->_remote_db->get_limit_orders(get_asset(a).id, get_asset(b).id, limit);
