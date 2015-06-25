@@ -312,7 +312,18 @@ public:
    }
    virtual ~wallet_api_impl()
    {
-      _remote_db->cancel_all_subscriptions();
+      try
+      {
+         _remote_db->cancel_all_subscriptions();
+      }
+      catch (const fc::exception& e)
+      {
+         // Right now the wallet_api has no way of knowing if the connection to the
+         // witness has already disconnected (via the witness node exiting first).
+         // If it has exited, cancel_all_subscriptsions() will throw and there's 
+         // nothing we can do about it.
+         // dlog("Caught exception ${e} while canceling database subscriptions", ("e", e));
+      }
    }
 
    void encrypt_keys()
