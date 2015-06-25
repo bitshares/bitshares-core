@@ -145,9 +145,9 @@ int main( int argc, char** argv )
       for( auto& name_formatter : wapiptr->get_result_formatters() )
          wallet_cli->format_result( name_formatter.first, name_formatter.second );
 
-      boost::signals2::scoped_connection closed_connection = con->closed.connect([]{
+      boost::signals2::scoped_connection closed_connection(con->closed.connect([]{
          cerr << "Server has disconnected us.\n";
-      });
+      }));
       (void)(closed_connection);
 
       if( wapiptr->is_new() )
@@ -157,9 +157,9 @@ int main( int argc, char** argv )
       } else
          wallet_cli->set_prompt( "locked >>> " );
 
-      boost::signals2::scoped_connection locked_connection = wapiptr->lock_changed.connect([&](bool locked) {
+      boost::signals2::scoped_connection locked_connection(wapiptr->lock_changed.connect([&](bool locked) {
          wallet_cli->set_prompt(  locked ? "locked >>> " : "unlocked >>> " );
-      });
+      }));
 
       auto _websocket_server = std::make_shared<fc::http::websocket_server>();
       if( options.count("rpc-endpoint") )
