@@ -219,6 +219,7 @@ int main( int argc, char** argv )
    catch ( const fc::exception& e )
    {
       std::cout << e.to_detail_string() << "\n";
+      return -1;
    }
-   return -1;
+   return 0;
 }
