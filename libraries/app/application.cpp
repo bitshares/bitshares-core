@@ -195,16 +195,27 @@ namespace detail {
        * If delegate has the item, the network has no need to fetch it.
        */
       virtual bool has_item( const net::item_id& id ) override
-      { try {
-          if( id.item_type == graphene::net::block_message_type )
-          {
-             return _chain_db->is_known_block( id.item_hash );
-          }
-          else
-          {
-             return _chain_db->is_known_transaction( id.item_hash );
-          }
-      } FC_CAPTURE_AND_RETHROW( (id) ) }
+      { 
+         try 
+         {
+            if( id.item_type == graphene::net::block_message_type )
+            {
+               // for some reason, the contains() function called by is_known_block
+               // throws when the block is not present (instead of returning false)
+               try
+               {
+                  return _chain_db->is_known_block( id.item_hash );
+               }
+               catch (const fc::key_not_found_exception&)
+               {
+                  return false;
+               }
+            }
+            else
+               return _chain_db->is_known_transaction( id.item_hash ); // is_known_transaction behaves normally
+         } 
+         FC_CAPTURE_AND_RETHROW( (id) ) 
+      }
 
       /**
        * @brief allows the application to validate an item prior to broadcasting to peers.
