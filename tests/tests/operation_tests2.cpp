@@ -50,7 +50,7 @@ BOOST_AUTO_TEST_CASE( withdraw_permission_create )
    account_id_type dan_id = create_account("dan", dan_key_id).id;
    transfer(account_id_type(), nathan_id, asset(1000));
    generate_block();
-   trx.set_expiration(db.head_block_time() + GRAPHENE_DEFAULT_MAX_TIME_UNTIL_EXPIRATION);
+   trx.set_expiration(db.head_block_time() + GRAPHENE_DEFAULT_MAX_TIME_UNTIL_EXPIRATION / 2);
 
    {
       withdraw_permission_create_operation op;
@@ -71,9 +71,8 @@ BOOST_AUTO_TEST_CASE( withdraw_permission_create )
       REQUIRE_THROW_WITH_VALUE(op, withdrawal_period_sec, 1);
       trx.operations.back() = op;
    }
-
    trx.sign(nathan_key_id, nathan_private_key);
-   PUSH_TX( db, trx );
+   db.push_transaction( trx );
    trx.clear();
 } FC_LOG_AND_RETHROW() }
 
@@ -87,7 +86,7 @@ BOOST_AUTO_TEST_CASE( withdraw_permission_test )
    account_id_type dan_id = get_account("dan").id;
    key_id_type dan_key_id = dan_id(db).active.auths.begin()->first;
    withdraw_permission_id_type permit;
-   trx.set_expiration(db.head_block_time() + GRAPHENE_DEFAULT_MAX_TIME_UNTIL_EXPIRATION);
+   trx.set_expiration(db.head_block_time() + GRAPHENE_DEFAULT_MAX_TIME_UNTIL_EXPIRATION/2);
 
    fc::time_point_sec first_start_time;
    {
@@ -213,7 +212,7 @@ BOOST_AUTO_TEST_CASE( withdraw_permission_nominal_case )
    account_id_type dan_id = get_account("dan").id;
    key_id_type dan_key_id = dan_id(db).active.auths.begin()->first;
    withdraw_permission_id_type permit;
-   trx.set_expiration(db.head_block_time() + GRAPHENE_DEFAULT_MAX_TIME_UNTIL_EXPIRATION);
+   trx.set_expiration(db.head_block_time() + GRAPHENE_DEFAULT_MAX_TIME_UNTIL_EXPIRATION/2);
 
    while(true)
    {
@@ -255,7 +254,7 @@ BOOST_AUTO_TEST_CASE( withdraw_permission_update )
    account_id_type dan_id = get_account("dan").id;
    key_id_type nathan_key_id = nathan_id(db).active.auths.begin()->first;
    withdraw_permission_id_type permit;
-   trx.set_expiration(db.head_block_time() + GRAPHENE_DEFAULT_MAX_TIME_UNTIL_EXPIRATION);
+   trx.set_expiration(db.head_block_time() + GRAPHENE_DEFAULT_MAX_TIME_UNTIL_EXPIRATION/2);
 
    {
       withdraw_permission_update_operation op;

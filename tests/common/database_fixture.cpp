@@ -932,9 +932,9 @@ bool _push_block( database& db, const signed_block& b, uint32_t skip_flags /* = 
 }
 
 processed_transaction _push_transaction( database& db, const signed_transaction& tx, uint32_t skip_flags /* = 0 */ )
-{
+{ try {
    return db.push_transaction( tx, skip_flags );
-}
+} FC_CAPTURE_AND_RETHROW((tx)) }
 
 } // graphene::chain::test
 

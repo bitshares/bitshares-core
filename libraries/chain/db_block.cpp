@@ -180,7 +180,7 @@ bool database::_push_block(const signed_block& new_block)
  * queues.
  */
 processed_transaction database::push_transaction( const signed_transaction& trx, uint32_t skip )
-{
+{ try {
    _pending_block.timestamp = head_block_time();
 
    processed_transaction result;
@@ -189,7 +189,7 @@ processed_transaction database::push_transaction( const signed_transaction& trx,
       result = _push_transaction( trx );
    } );
    return result;
-}
+} FC_CAPTURE_AND_RETHROW( (trx) ) }
 
 processed_transaction database::_push_transaction( const signed_transaction& trx )
 {
@@ -498,8 +498,9 @@ processed_transaction database::_apply_transaction( const signed_transaction& tr
          FC_ASSERT( trx.ref_block_prefix == tapos_block_summary.block_id._hash[1] );
          trx_expiration = tapos_block_summary.timestamp + chain_parameters.block_interval*trx.relative_expiration;
       } else if( trx.relative_expiration == 0 ) {
-         trx_expiration = fc::time_point_sec(trx.ref_block_prefix);
-         FC_ASSERT( trx_expiration <= _pending_block.timestamp + chain_parameters.maximum_time_until_expiration );
+         trx_expiration = fc::time_point_sec() + fc::seconds(trx.ref_block_prefix);
+         FC_ASSERT( trx_expiration <= _pending_block.timestamp + chain_parameters.maximum_time_until_expiration, "", 
+                    ("trx_expiration",trx_expiration)("_pending_block.timestamp",_pending_block.timestamp)("max_til_exp",chain_parameters.maximum_time_until_expiration));
       }
       FC_ASSERT( _pending_block.timestamp <= trx_expiration );
    } else if( !(skip & skip_transaction_signatures) ) {
