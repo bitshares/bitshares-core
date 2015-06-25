@@ -88,7 +88,8 @@ void block_database::remove( const block_id_type& id )
    index_entry e;
    auto index_pos = sizeof(e)*block_header::num_from_id(id);
    _block_num_to_pos.seekg( 0, _block_num_to_pos.end );
-   FC_ASSERT( _block_num_to_pos.tellg() > index_pos );
+   if ( _block_num_to_pos.tellg() <= index_pos )
+      FC_THROW_EXCEPTION(fc::key_not_found_exception, "Block ${id} not contained in block database", ("id", id));
 
    _block_num_to_pos.seekg( index_pos );
    _block_num_to_pos.read( (char*)&e, sizeof(e) );
@@ -110,8 +111,8 @@ bool  block_database::contains( const block_id_type& id )const
    index_entry e;
    auto index_pos = sizeof(e)*block_header::num_from_id(id);
    _block_num_to_pos.seekg( 0, _block_num_to_pos.end );
-   FC_ASSERT( _block_num_to_pos.tellg() > index_pos );
-
+   if ( _block_num_to_pos.tellg() <= index_pos )
+      FC_THROW_EXCEPTION(fc::key_not_found_exception, "Block ${id} not contained in block database", ("id", id));
    _block_num_to_pos.seekg( index_pos );
    _block_num_to_pos.read( (char*)&e, sizeof(e) );
 
@@ -124,7 +125,8 @@ block_id_type          block_database::fetch_block_id( uint32_t block_num )const
    index_entry e;
    auto index_pos = sizeof(e)*block_num;
    _block_num_to_pos.seekg( 0, _block_num_to_pos.end );
-   FC_ASSERT( _block_num_to_pos.tellg() > index_pos );
+   if ( _block_num_to_pos.tellg() <= index_pos )
+      FC_THROW_EXCEPTION(fc::key_not_found_exception, "Block number ${block_num} not contained in block database", ("block_num", block_num));
 
    _block_num_to_pos.seekg( index_pos );
    _block_num_to_pos.read( (char*)&e, sizeof(e) );
@@ -140,7 +142,8 @@ optional<signed_block> block_database::fetch_optional( const block_id_type& id )
       index_entry e;
       auto index_pos = sizeof(e)*block_header::num_from_id(id);
       _block_num_to_pos.seekg( 0, _block_num_to_pos.end );
-      FC_ASSERT( _block_num_to_pos.tellg() > index_pos );
+      if ( _block_num_to_pos.tellg() <= index_pos )
+         FC_THROW_EXCEPTION(fc::key_not_found_exception, "Block ${id} not contained in block database", ("id", id));
    
       _block_num_to_pos.seekg( index_pos );
       _block_num_to_pos.read( (char*)&e, sizeof(e) );
@@ -170,7 +173,8 @@ optional<signed_block> block_database::fetch_by_number( uint32_t block_num )cons
       index_entry e;
       auto index_pos = sizeof(e)*block_num;
       _block_num_to_pos.seekg( 0, _block_num_to_pos.end );
-      FC_ASSERT( _block_num_to_pos.tellg() > index_pos );
+      if ( _block_num_to_pos.tellg() <= index_pos )
+         FC_THROW_EXCEPTION(fc::key_not_found_exception, "Block number ${block_num} not contained in block database", ("block_num", block_num));
 
       _block_num_to_pos.seekg( index_pos, _block_num_to_pos.beg );
       _block_num_to_pos.read( (char*)&e, sizeof(e) );
