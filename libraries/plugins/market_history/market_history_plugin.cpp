@@ -109,6 +109,7 @@ struct operation_process_fill_order
             const auto& obj = db.create<bucket_object>( [&]( bucket_object& b ){
                  b.key = key;
                  b.quote_volume += trade_price.quote.amount;
+                 b.base_volume += trade_price.base.amount;
                  b.open_base = trade_price.base.amount;
                  b.open_quote = trade_price.quote.amount;
                  b.close_base = trade_price.base.amount;
@@ -118,11 +119,11 @@ struct operation_process_fill_order
                  b.low_base = b.close_base;
                  b.low_quote = b.close_quote;
             });
-            wlog( "    creating bucket ${b}", ("b",obj) );
+            //wlog( "    creating bucket ${b}", ("b",obj) );
           }
           else
           { // update existing bucket
-             wlog( "    before updating bucket ${b}", ("b",*itr) );
+            // wlog( "    before updating bucket ${b}", ("b",*itr) );
              db.modify( *itr, [&]( bucket_object& b ){
                   b.base_volume += trade_price.base.amount;
                   b.quote_volume += trade_price.quote.amount;
@@ -139,7 +140,7 @@ struct operation_process_fill_order
                       b.low_quote = b.close_quote;
                   }
              });
-             wlog( "    after bucket bucket ${b}", ("b",*itr) );
+            // wlog( "    after bucket bucket ${b}", ("b",*itr) );
           }
 
           if( max_history != 0  )
@@ -153,7 +154,7 @@ struct operation_process_fill_order
                     itr->key.seconds == bucket && 
                     itr->key.open < cutoff )
              {
-                elog( "    removing old bucket ${b}", ("b", *itr) );
+             //   elog( "    removing old bucket ${b}", ("b", *itr) );
                 auto old_itr = itr;
                 ++itr;
                 db.remove( *old_itr );
