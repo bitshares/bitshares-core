@@ -58,6 +58,11 @@ void_result asset_create_evaluator::do_evaluate( const asset_create_operation& o
       FC_ASSERT( op.bitasset_options->feed_lifetime_sec > chain_parameters.block_interval &&
                  op.bitasset_options->force_settlement_delay_sec > chain_parameters.block_interval );
    }
+   if( op.is_prediction_market ) 
+   {
+      FC_ASSERT( op.bitasset_options );
+      FC_ASSERT( op.precision == op.bitasset_options->short_backing_asset(d).precision );
+   }
 
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (op) ) }
