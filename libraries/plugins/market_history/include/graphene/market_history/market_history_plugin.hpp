@@ -128,10 +128,11 @@ class market_history_plugin : public graphene::app::plugin
 } } //graphene::market_history
 
 FC_REFLECT( graphene::market_history::bucket_key, (base)(quote)(seconds)(open) )
-FC_REFLECT( graphene::market_history::bucket_object, (key)
-                                                     (high_base)(high_quote)
-                                                     (low_base)(low_quote)
-                                                     (open_base)(open_quote)
-                                                     (close_base)(close_quote)
-                                                     (base_volume)(quote_volume) )
+FC_REFLECT_DERIVED( graphene::market_history::bucket_object, (graphene::db::object), 
+                    (key)
+                    (high_base)(high_quote)
+                    (low_base)(low_quote)
+                    (open_base)(open_quote)
+                    (close_base)(close_quote)
+                    (base_volume)(quote_volume) )
 
