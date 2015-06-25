@@ -308,7 +308,7 @@ void_result asset_update_feed_producers_evaluator::do_apply(const asset_update_f
             a.feeds[*itr];
       a.update_median_feeds(db().head_block_time());
    });
-
+   db().check_call_orders( o.asset_to_update(db()) );
 
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }
@@ -425,7 +425,7 @@ void_result asset_publish_feeds_evaluator::do_apply(const asset_publish_feed_ope
       a.update_median_feeds(d.head_block_time());
    });
 
-   /// TODO: only do this if the median feed actually changed, otherwise there is no point
+   /// TODO: optimization: only do this if the median feed actually changed, otherwise there is no point
    db().check_call_orders( base );
 
    return void_result();

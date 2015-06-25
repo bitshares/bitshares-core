@@ -222,9 +222,13 @@ void database::update_expired_feeds()
    auto& asset_idx = get_index_type<asset_bitasset_data_index>();
    for( const asset_bitasset_data_object* b : asset_idx )
       if( b->feed_is_expired(head_block_time()) )
+      {
          modify(*b, [this](asset_bitasset_data_object& a) {
             a.update_median_feeds(head_block_time());
          });
+
+         check_call_orders( b->current_feed.settlement_price.base.asset_id(*this) );
+      }
 }
 
 void database::update_withdraw_permissions()
