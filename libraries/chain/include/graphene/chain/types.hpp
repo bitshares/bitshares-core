@@ -31,6 +31,7 @@
 #include <memory>
 #include <vector>
 #include <deque>
+#include <cstdint>
 #include <graphene/chain/address.hpp>
 #include <graphene/db/object_id.hpp>
 
@@ -350,9 +351,9 @@ namespace graphene { namespace chain {
       uint32_t account_whitelist_fee = 300000; ///< the fee to whitelist an account
       uint32_t account_len8up_fee = 5*10000000; ///<  about $1
       uint32_t account_len7_fee   = 5*100000000; ///< about $10
-      uint64_t account_len6_fee   = 5*500000000; ///< about $50
-      uint64_t account_len5_fee   = 5*1000000000; ///< about $100
-      uint64_t account_len4_fee   = 5*2000000000; ///< about $200
+      uint64_t account_len6_fee   = 5*UINT64_C(500000000); ///< about $50
+      uint64_t account_len5_fee   = 5*UINT64_C(1000000000); ///< about $100
+      uint64_t account_len4_fee   = 5*UINT64_C(2000000000); ///< about $200
       uint64_t account_len3_fee   = 5*3000000000; ///< about $300
       uint64_t account_len2_fee   = 5*4000000000; ///< about $400 
       uint32_t asset_create_fee = 5ll*500000000;   ///< about $35 for LTM, the cost to register the cheapest asset
@@ -362,7 +363,7 @@ namespace graphene { namespace chain {
       uint32_t asset_fund_fee_pool_fee = 150000; ///< the cost to add funds to an asset's fee pool
       uint32_t asset_settle_fee = 7000000; ///< the cost to trigger a forced settlement of a market-issued asset
       uint32_t asset_global_settle_fee = 140000000; ///< the cost to trigger a global forced settlement of a market asset
-      uint64_t asset_len7up_fee = 5*500000000;   ///< about $35 for LTM
+      uint64_t asset_len7up_fee = 5*UINT64_C(500000000);   ///< about $35 for LTM
       uint64_t asset_len6_fee   = 5*5000000000;  ///< about $350 for LTM
       uint64_t asset_len5_fee   = 5*10000000000; ///< about $700 for LTM
       uint64_t asset_len4_fee   = 5*50000000000; ///< about $3500 for LTM
