@@ -241,13 +241,15 @@ void database::init_genesis(const genesis_state_type& genesis_state)
    create<global_property_object>([&](global_property_object& p) {
        p.chain_id = fc::digest(genesis_state);
        p.parameters = genesis_state.initial_parameters;
+       // Set fees to zero initially, so that genesis initialization needs not pay them
+       // We'll fix it at the end of the function
+       fc::reflector<fee_schedule_type>::visit(fee_schedule_type::fee_set_visitor{p.parameters.current_fees, 0});
    });
    create<dynamic_global_property_object>( [&](dynamic_global_property_object& p) {
       p.time = fc::time_point_sec(GRAPHENE_GENESIS_TIMESTAMP);
       p.witness_budget = 0;
    });
-   create<block_summary_object>([&](block_summary_object& p) {
-   });
+   create<block_summary_object>([&](block_summary_object&) {});
 
    // Create user accounts, apply initial stake allocation
    if( !genesis_state.allocation_targets.empty() )
@@ -260,7 +262,10 @@ void database::init_genesis(const genesis_state_type& genesis_state)
       {
          asset amount(handout.weight);
 
-         key_id_type key_id = apply_operation(genesis_eval_state, key_create_operation({asset(), committee_account.id, handout.addr})).get<object_id_type>();
+         key_id_type key_id = apply_operation(genesis_eval_state,
+                                              key_create_operation({asset(),
+                                                                    committee_account.id,
+                                                                    handout.addr})).get<object_id_type>();
          account_create_operation cop;
          cop.name = handout.name;
          cop.registrar = account_id_type(1);
@@ -360,6 +365,11 @@ void database::init_genesis(const genesis_state_type& genesis_state)
       _wso.last_scheduling_block = 0;
    }) ;
    assert( wso.id == witness_schedule_id_type() );
+
+   // Enable fees
+   modify(get_global_properties(), [&genesis_state](global_property_object& p) {
+      p.parameters.current_fees = genesis_state.initial_parameters.current_fees;
+   });
 
    _undo_db.enable();
 } FC_CAPTURE_AND_RETHROW((genesis_state)) }
