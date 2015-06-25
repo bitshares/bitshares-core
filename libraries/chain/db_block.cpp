@@ -181,8 +181,6 @@ bool database::_push_block(const signed_block& new_block)
  */
 processed_transaction database::push_transaction( const signed_transaction& trx, uint32_t skip )
 { try {
-   _pending_block.timestamp = head_block_time();
-
    processed_transaction result;
    with_skip_flags( skip, [&]()
    {
@@ -502,7 +500,7 @@ processed_transaction database::_apply_transaction( const signed_transaction& tr
          FC_ASSERT( trx_expiration <= _pending_block.timestamp + chain_parameters.maximum_time_until_expiration, "", 
                     ("trx_expiration",trx_expiration)("_pending_block.timestamp",_pending_block.timestamp)("max_til_exp",chain_parameters.maximum_time_until_expiration));
       }
-      FC_ASSERT( _pending_block.timestamp <= trx_expiration );
+      FC_ASSERT( _pending_block.timestamp <= trx_expiration, "", ("pending.timestamp",_pending_block.timestamp)("trx_exp",trx_expiration) );
    } else if( !(skip & skip_transaction_signatures) ) {
       FC_ASSERT(trx.relative_expiration == 0, "May not use transactions with a reference block in block 1!");
    }

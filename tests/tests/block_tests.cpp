@@ -462,8 +462,10 @@ BOOST_AUTO_TEST_CASE( tapos )
       db1.push_transaction(trx);
       now += db1.block_interval();
       b = db1.generate_block(now, db1.get_scheduled_witness(1).first, delegate_priv_key, database::skip_nothing);
+      /*
       now += db1.block_interval();
       b = db1.generate_block(now, db1.get_scheduled_witness(1).first, delegate_priv_key, database::skip_nothing);
+      */
       trx.clear();
 
       trx.operations.push_back(transfer_operation({asset(), account_id_type(), nathan_id, asset(50)}));
