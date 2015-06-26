@@ -400,7 +400,7 @@ const asset_object& database_fixture::create_bitasset(
    creator.fee = asset();
    creator.symbol = name;
    creator.common_options.max_supply = GRAPHENE_MAX_SHARE_SUPPLY;
-   creator.precision = 2;
+   creator.precision = GRAPHENE_BLOCKCHAIN_PRECISION_DIGITS;
    creator.common_options.market_fee_percent = market_fee_percent;
    creator.common_options.issuer_permissions = flags;
    creator.common_options.flags = flags & ~global_settle;

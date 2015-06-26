@@ -219,16 +219,24 @@ void database::clear_expired_orders()
 
 void database::update_expired_feeds()
 {
-   auto& asset_idx = get_index_type<asset_bitasset_data_index>();
-   for( const asset_bitasset_data_object* b : asset_idx )
-      if( b->feed_is_expired(head_block_time()) )
+   auto& asset_idx = get_index_type<asset_index>().indices();
+   for( const asset_object& a : asset_idx )
+   {
+      if( !a.is_market_issued() )
+         continue;
+
+      const asset_bitasset_data_object& b = a.bitasset_data(*this);
+      if( b.feed_is_expired(head_block_time()) )
       {
-         modify(*b, [this](asset_bitasset_data_object& a) {
+         modify(b, [this](asset_bitasset_data_object& a) {
             a.update_median_feeds(head_block_time());
          });
-
-         check_call_orders( b->current_feed.settlement_price.base.asset_id(*this) );
+         modify(a, [&b](asset_object& a) {
+            a.options.core_exchange_rate = b.current_feed.core_exchange_rate;
+         });
+         check_call_orders(b.current_feed.settlement_price.base.asset_id(*this));
       }
+   }
 }
 
 void database::update_withdraw_permissions()

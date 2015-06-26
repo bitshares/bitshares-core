@@ -58,7 +58,7 @@ void_result asset_create_evaluator::do_evaluate( const asset_create_operation& o
       FC_ASSERT( op.bitasset_options->feed_lifetime_sec > chain_parameters.block_interval &&
                  op.bitasset_options->force_settlement_delay_sec > chain_parameters.block_interval );
    }
-   if( op.is_prediction_market ) 
+   if( op.is_prediction_market )
    {
       FC_ASSERT( op.bitasset_options );
       FC_ASSERT( op.precision == op.bitasset_options->short_backing_asset(d).precision );
@@ -313,6 +313,9 @@ void_result asset_update_feed_producers_evaluator::do_apply(const asset_update_f
             a.feeds[*itr];
       a.update_median_feeds(db().head_block_time());
    });
+   db().modify(o.asset_to_update(db()), [this](asset_object& a) {
+      a.options.core_exchange_rate = bitasset_to_update->current_feed.core_exchange_rate;
+   });
    db().check_call_orders( o.asset_to_update(db()) );
 
    return void_result();
@@ -429,9 +432,12 @@ void_result asset_publish_feeds_evaluator::do_apply(const asset_publish_feed_ope
       a.feeds[o.publisher] = make_pair(d.head_block_time(), o.feed);
       a.update_median_feeds(d.head_block_time());
    });
+   d.modify(base, [&d](asset_object& a) {
+      a.options.core_exchange_rate = a.bitasset_data(d).current_feed.core_exchange_rate;
+   });
 
    /// TODO: optimization: only do this if the median feed actually changed, otherwise there is no point
-   db().check_call_orders( base );
+   db().check_call_orders(base);
 
    return void_result();
 } FC_CAPTURE_AND_RETHROW((o)) }

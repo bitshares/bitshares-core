@@ -141,9 +141,12 @@ namespace graphene { namespace chain {
        */
       ///@{
       /**
-       * Forced settlements will evaluate using this price, defined as BITASSET / COLLATERAL 
+       * Forced settlements will evaluate using this price, defined as BITASSET / COLLATERAL
        */
       price settlement_price;
+
+      /// Price at which automatically exchanging this asset for CORE from fee pool occurs (used for paying fees)
+      price core_exchange_rate;
 
       /** Fixed point between 1.000 and 10.000, implied fixed point denominator is GRAPHENE_COLLATERAL_RATIO_DENOM */
       uint16_t maintenance_collateral_ratio = GRAPHENE_DEFAULT_MAINTENANCE_COLLATERAL_RATIO;
@@ -154,14 +157,14 @@ namespace graphene { namespace chain {
       /**
        *  When updating a call order the following condition must be maintained:
        *
-       *  debt * maintenance_price() < collateral 
+       *  debt * maintenance_price() < collateral
        *  debt * settlement_price    < debt * maintenance
-       *  debt * maintenance_price() < debt * max_short_squeeze_price() 
+       *  debt * maintenance_price() < debt * max_short_squeeze_price()
       price maintenance_price()const;
        */
 
-      /** When selling collateral to pay off debt, the least amount of debt to receive should be 
-       *  min_usd = max_short_squeeze_price() * collateral 
+      /** When selling collateral to pay off debt, the least amount of debt to receive should be
+       *  min_usd = max_short_squeeze_price() * collateral
        *
        *  This is provided to ensure that a black swan cannot be trigged due to poor liquidity alone, it
        *  must be confirmed by having the max_short_squeeze_price() move below the black swan price.
@@ -183,7 +186,8 @@ namespace graphene { namespace chain {
 FC_REFLECT( graphene::chain::asset, (amount)(asset_id) )
 FC_REFLECT( graphene::chain::price, (base)(quote) )
 
-#define GRAPHENE_PRICE_FEED_FIELDS (settlement_price)(maintenance_collateral_ratio)(maximum_short_squeeze_ratio)
+#define GRAPHENE_PRICE_FEED_FIELDS (settlement_price)(maintenance_collateral_ratio)(maximum_short_squeeze_ratio) \
+   (core_exchange_rate)
 
 FC_REFLECT( graphene::chain::price_feed, GRAPHENE_PRICE_FEED_FIELDS )
 
