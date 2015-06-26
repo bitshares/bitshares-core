@@ -349,6 +349,16 @@ namespace graphene { namespace chain {
          void cancel_order(const limit_order_object& order, bool create_virtual_op = true);
 
          /**
+          * @brief Process a new limit order through the markets
+          * @param order The new order to process
+          * @return true if order was completely filled; false otherwise
+          *
+          * This function takes a new limit order, and runs the markets attempting to match it with existing orders
+          * already on the books.
+          */
+         bool apply_order(const limit_order_object& new_order_object, bool allow_black_swan = true);
+
+         /**
           * Matches the two orders,
           *
           * @return a bit field indicating which orders were filled (and thus removed)
@@ -381,7 +391,6 @@ namespace graphene { namespace chain {
          // helpers to fill_order
          void pay_order( const account_object& receiver, const asset& receives, const asset& pays );
 
-         bool convert_fees( const asset_object& mia );
          asset calculate_market_fee(const asset_object& recv_asset, const asset& trade_amount);
          asset pay_market_fees( const asset_object& recv_asset, const asset& receives );
 

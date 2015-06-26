@@ -355,7 +355,7 @@ namespace graphene { namespace chain {
       uint64_t account_len5_fee   = 5*UINT64_C(1000000000); ///< about $100
       uint64_t account_len4_fee   = 5*UINT64_C(2000000000); ///< about $200
       uint64_t account_len3_fee   = 5*3000000000; ///< about $300
-      uint64_t account_len2_fee   = 5*4000000000; ///< about $400 
+      uint64_t account_len2_fee   = 5*4000000000; ///< about $400
       uint32_t asset_create_fee = 5ll*500000000;   ///< about $35 for LTM, the cost to register the cheapest asset
       uint32_t asset_update_fee = 150000; ///< the cost to modify a registered asset
       uint32_t asset_issue_fee = 700000; ///< the cost to print a UIA and send it to an account
@@ -456,6 +456,7 @@ namespace graphene { namespace chain {
       share_type              witness_pay_per_block               = GRAPHENE_DEFAULT_WITNESS_PAY_PER_BLOCK; ///< CORE to be allocated to witnesses (per block)
       share_type              worker_budget_per_day               = GRAPHENE_DEFAULT_WORKER_BUDGET_PER_DAY; ///< CORE to be allocated to workers (per day)
       uint16_t                max_predicate_opcode                = GRAPHENE_DEFAULT_MAX_ASSERT_OPCODE; ///< predicate_opcode must be less than this number
+      share_type              fee_liquidation_threshold           = GRAPHENE_DEFAULT_FEE_LIQUIDATION_THRESHOLD; ///< value in CORE at which accumulated fees in blockchain-issued market assets should be liquidated
 
       void validate()const
       {
@@ -614,6 +615,7 @@ FC_REFLECT( graphene::chain::chain_parameters,
             (witness_pay_per_block)
             (worker_budget_per_day)
             (max_predicate_opcode)
+            (fee_liquidation_threshold)
           )
 
 FC_REFLECT_TYPENAME( graphene::chain::share_type )

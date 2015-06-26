@@ -64,8 +64,8 @@
 
 /**
  *  These ratios are fixed point numbers with a denominator of GRAPHENE_COLLATERAL_RATIO_DENOM, the
- *  minimum maitenance collateral is therefore 1.001x and the default 
- *  maintenance ratio is 1.75x 
+ *  minimum maitenance collateral is therefore 1.001x and the default
+ *  maintenance ratio is 1.75x
  */
 ///@{
 #define GRAPHENE_COLLATERAL_RATIO_DENOM                 1000
@@ -92,6 +92,7 @@
 #define GRAPHENE_DEFAULT_BURN_PERCENT_OF_FEE                  (20*GRAPHENE_1_PERCENT)
 #define GRAPHENE_WITNESS_PAY_PERCENT_PRECISION                (1000000000)
 #define GRAPHENE_DEFAULT_MAX_ASSERT_OPCODE                    1
+#define GRAPHENE_DEFAULT_FEE_LIQUIDATION_THRESHOLD            GRAPHENE_BLOCKCHAIN_PRECISION * 100;
 #define GRAPHENE_GENESIS_TIMESTAMP                            (1431700000)  /// Should be divisible by GRAPHENE_DEFAULT_BLOCK_INTERVAL
 
 #define GRAPHENE_MAX_WORKER_NAME_LENGTH                       63

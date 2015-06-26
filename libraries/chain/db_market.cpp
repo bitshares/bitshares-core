@@ -109,7 +109,49 @@ void database::cancel_order( const limit_order_object& order, bool create_virtua
       // TODO: create a virtual cancel operation
    }
 
-   remove( order );
+   remove(order);
+}
+
+bool database::apply_order(const limit_order_object& new_order_object, bool allow_black_swan)
+{
+   auto order_id = new_order_object.id;
+   const asset_object& sell_asset = get(new_order_object.amount_for_sale().asset_id);
+   const asset_object& receive_asset = get(new_order_object.amount_to_receive().asset_id);
+
+   // Possible optimization: We only need to check calls if both are true:
+   //  - The new order is at the front of the book
+   //  - The new order is below the call limit price
+   bool called_some = check_call_orders(sell_asset, allow_black_swan);
+   called_some |= check_call_orders(receive_asset, allow_black_swan);
+   if( called_some && !find_object(order_id) ) // then we were filled by call order
+      return true;
+
+   const auto& limit_price_idx = get_index_type<limit_order_index>().indices().get<by_price>();
+
+   // TODO: it should be possible to simply check the NEXT/PREV iterator after new_order_object to
+   // determine whether or not this order has "changed the book" in a way that requires us to
+   // check orders. For now I just lookup the lower bound and check for equality... this is log(n) vs
+   // constant time check. Potential optimization.
+
+   auto max_price = ~new_order_object.sell_price;
+   auto limit_itr = limit_price_idx.lower_bound(max_price.max());
+   auto limit_end = limit_price_idx.upper_bound(max_price);
+
+   bool finished = false;
+   while( !finished && limit_itr != limit_end )
+   {
+      auto old_limit_itr = limit_itr;
+      ++limit_itr;
+      // match returns 2 when only the old order was fully filled. In this case, we keep matching; otherwise, we stop.
+      finished = (match(new_order_object, *old_limit_itr, old_limit_itr->sell_price) != 2);
+   }
+
+   //Possible optimization: only check calls if the new order completely filled some old order
+   //Do I need to check both assets?
+   check_call_orders(sell_asset, allow_black_swan);
+   check_call_orders(receive_asset, allow_black_swan);
+
+   return find_object(order_id) == nullptr;
 }
 
 /**
@@ -306,7 +348,7 @@ bool database::fill_order(const force_settlement_object& settle, const asset& pa
 
 /**
  *  Starting with the least collateralized orders, fill them if their
- *  call price is above the max(lowest bid,call_limit).  
+ *  call price is above the max(lowest bid,call_limit).
  *
  *  This method will return true if it filled a short or limit
  *
@@ -316,7 +358,7 @@ bool database::fill_order(const force_settlement_object& settle, const asset& pa
  *
  *  @return true if a margin call was executed.
  */
-bool database::check_call_orders( const asset_object& mia, bool enable_black_swan )
+bool database::check_call_orders(const asset_object& mia, bool enable_black_swan)
 { try {
     if( !mia.is_market_issued() ) return false;
     const asset_bitasset_data_object& bitasset = mia.bitasset_data(*this);
@@ -333,42 +375,13 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
     auto max_price = price::max( mia.id, bitasset.options.short_backing_asset );
     // stop when limit orders are selling too little USD for too much CORE
     auto min_price = bitasset.current_feed.max_short_squeeze_price();
-    /*
- //   edump((bitasset.current_feed));
-    edump((min_price.to_real())(min_price));
-    edump((max_price.to_real())(max_price));
-    //auto min_price = price::min( mia.id, bitasset.options.short_backing_asset );
-    idump((bitasset.current_feed.settlement_price)(bitasset.current_feed.settlement_price.to_real()));
-    {
-       for( const auto& order : limit_price_index )
-          wdump((order)(order.sell_price.to_real()));
-
-       for( const auto& call : call_price_index )
-          idump((call)(call.call_price.to_real()));
-
-       // limit pirce index is sorted from highest price to lowest price.
-       //auto limit_itr = limit_price_index.lower_bound( price::max( mia.id, bitasset.options.short_backing_asset ) );
-       wdump((max_price)(max_price.to_real()));
-       wdump((min_price)(min_price.to_real()));
-    }
-    */
 
     assert( max_price.base.asset_id == min_price.base.asset_id );
-    // wlog( "from ${a} Debt/Col to ${b} Debt/Col ", ("a", max_price.to_real())("b",min_price.to_real()) );
     // NOTE limit_price_index is sorted from greatest to least
     auto limit_itr = limit_price_index.lower_bound( max_price );
-    auto limit_end = limit_price_index.upper_bound( min_price ); 
+    auto limit_end = limit_price_index.upper_bound( min_price );
 
- /*
-    if( limit_itr != limit_price_index.end() )
-       wdump((*limit_itr)(limit_itr->sell_price.to_real()));
-    if( limit_end != limit_price_index.end() )
-       wdump((*limit_end)(limit_end->sell_price.to_real()));
-*/
-
-    if( limit_itr == limit_end )
-    {
-//       wlog( "no orders available to fill margin calls" );
+    if( limit_itr == limit_end ) {
        return false;
     }
 
@@ -389,32 +402,26 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
           usd_for_sale     = limit_itr->amount_for_sale();
        }
        else return filled_limit;
-//       wdump((match_price));
-//       edump((usd_for_sale));
 
        match_price.validate();
 
-//       wdump((match_price)(~call_itr->call_price) );
        if( match_price > ~call_itr->call_price )
        {
           return filled_limit;
        }
 
        auto usd_to_buy   = call_itr->get_debt();
-//       edump((usd_to_buy));
 
        if( usd_to_buy * match_price > call_itr->get_collateral() )
        {
           FC_ASSERT( enable_black_swan );
-          //elog( "black swan, we do not have enough collateral to cover at this price" );
-          globally_settle_asset( mia, call_itr->get_debt() / call_itr->get_collateral() );
+          globally_settle_asset(mia, call_itr->get_debt() / call_itr->get_collateral());
           return true;
        }
 
        asset call_pays, call_receives, order_pays, order_receives;
        if( usd_to_buy >= usd_for_sale )
        {  // fill order
-          //ilog( "filling all of limit order" );
           call_receives   = usd_for_sale;
           order_receives  = usd_for_sale * match_price;
           call_pays       = order_receives;
@@ -422,9 +429,7 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
 
           filled_limit = true;
           filled_call           = (usd_to_buy == usd_for_sale);
-       }
-       else // fill call
-       {
+       } else { // fill call
           call_receives  = usd_to_buy;
           order_receives = usd_to_buy * match_price;
           call_pays      = order_receives;
@@ -435,10 +440,10 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
 
        auto old_call_itr = call_itr;
        if( filled_call ) ++call_itr;
-       fill_order( *old_call_itr, call_pays, call_receives );
+       fill_order(*old_call_itr, call_pays, call_receives);
 
        auto old_limit_itr = filled_limit ? limit_itr++ : limit_itr;
-       fill_order( *old_limit_itr, order_pays, order_receives );
+       fill_order(*old_limit_itr, order_pays, order_receives);
     } // whlie call_itr != call_end
 
     return filled_limit;
@@ -452,16 +457,6 @@ void database::pay_order( const account_object& receiver, const asset& receives,
             b.total_core_in_orders -= pays.amount;
    });
    adjust_balance(receiver.get_id(), receives);
-}
-
-/**
- *  For Market Issued assets Managed by Delegates, any fees collected in the MIA need
- *  to be sold and converted into CORE by accepting the best offer on the table.
- */
-bool database::convert_fees( const asset_object& mia )
-{
-   if( mia.issuer != account_id_type() ) return false;
-   return false;
 }
 
 asset database::calculate_market_fee( const asset_object& trade_asset, const asset& trade_amount )

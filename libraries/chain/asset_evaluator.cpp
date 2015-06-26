@@ -54,7 +54,11 @@ void_result asset_create_evaluator::do_evaluate( const asset_create_operation& o
          const asset_object& backing_backing = backing_bitasset_data.options.short_backing_asset(d);
          FC_ASSERT( !backing_backing.is_market_issued(),
                     "May not create a bitasset backed by a bitasset backed by a bitasset." );
-      }
+         FC_ASSERT( op.issuer != GRAPHENE_COMMITTEE_ACCOUNT || backing_backing.get_id() == asset_id_type(),
+                    "May not create a blockchain-controlled market asset which is not backed by CORE.");
+      } else
+         FC_ASSERT( op.issuer != GRAPHENE_COMMITTEE_ACCOUNT || backing.get_id() == asset_id_type(),
+                    "May not create a blockchain-controlled market asset which is not backed by CORE.");
       FC_ASSERT( op.bitasset_options->feed_lifetime_sec > chain_parameters.block_interval &&
                  op.bitasset_options->force_settlement_delay_sec > chain_parameters.block_interval );
    }
@@ -192,12 +196,27 @@ void_result asset_update_evaluator::do_evaluate(const asset_update_operation& o)
 { try {
    database& d = db();
 
-   if( o.new_issuer ) FC_ASSERT(d.find_object(*o.new_issuer));
-
    const asset_object& a = o.asset_to_update(d);
    auto a_copy = a;
    a_copy.options = o.new_options;
    a_copy.validate();
+
+   if( o.new_issuer )
+   {
+      FC_ASSERT(d.find_object(*o.new_issuer));
+      if( a.is_market_issued() && *o.new_issuer == GRAPHENE_COMMITTEE_ACCOUNT )
+      {
+         const asset_object& backing = a.bitasset_data(d).options.short_backing_asset(d);
+         if( backing.is_market_issued() )
+         {
+            const asset_object& backing_backing = backing.bitasset_data(d).options.short_backing_asset(d);
+            FC_ASSERT( backing_backing.get_id() == asset_id_type(),
+                       "May not create a blockchain-controlled market asset which is not backed by CORE.");
+         } else
+            FC_ASSERT( backing.get_id() == asset_id_type(),
+                       "May not create a blockchain-controlled market asset which is not backed by CORE.");
+      }
+   }
 
    //There must be no bits set in o.permissions which are unset in a.issuer_permissions.
    FC_ASSERT(!(o.new_options.issuer_permissions & ~a.options.issuer_permissions),
@@ -257,6 +276,19 @@ void_result asset_update_bitasset_evaluator::do_evaluate(const asset_update_bita
    {
       FC_ASSERT(a.dynamic_asset_data_id(d).current_supply == 0);
       FC_ASSERT(d.find_object(o.new_options.short_backing_asset));
+
+      if( a.issuer == GRAPHENE_COMMITTEE_ACCOUNT )
+      {
+         const asset_object& backing = a.bitasset_data(d).options.short_backing_asset(d);
+         if( backing.is_market_issued() )
+         {
+            const asset_object& backing_backing = backing.bitasset_data(d).options.short_backing_asset(d);
+            FC_ASSERT( backing_backing.get_id() == asset_id_type(),
+                       "May not create a blockchain-controlled market asset which is not backed by CORE.");
+         } else
+            FC_ASSERT( backing.get_id() == asset_id_type(),
+                       "May not create a blockchain-controlled market asset which is not backed by CORE.");
+      }
    }
 
    bitasset_to_update = &b;

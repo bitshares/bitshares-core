@@ -33,6 +33,7 @@
 
 namespace graphene { namespace chain {
    class account_object;
+   class database;
    using namespace graphene::db;
 
    /**

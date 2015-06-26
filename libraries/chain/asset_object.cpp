@@ -16,6 +16,8 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #include <graphene/chain/asset_object.hpp>
+#include <graphene/chain/database.hpp>
+#include <graphene/chain/limit_order_object.hpp>
 
 #include <fc/uint128.hpp>
 
