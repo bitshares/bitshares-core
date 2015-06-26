@@ -839,4 +839,27 @@ BOOST_FIXTURE_TEST_CASE( witness_scheduler_missed_blocks, database_fixture )
    });
 } FC_LOG_AND_RETHROW() }
 
+BOOST_FIXTURE_TEST_CASE( account_create_fee_scaling, database_fixture )
+{ try {
+   auto accounts_per_scale = db.get_global_properties().parameters.accounts_per_fee_scale;
+   enable_fees(1);
+
+   BOOST_CHECK_EQUAL(db.get_global_properties().parameters.current_fees.account_create_fee, 1);
+   for( int i = db.get_dynamic_global_properties().accounts_registered_this_interval; i < accounts_per_scale; ++i )
+      create_account("shill" + fc::to_string(i));
+   generate_block();
+   BOOST_CHECK_EQUAL(db.get_global_properties().parameters.current_fees.account_create_fee, 16);
+   for( int i = 0; i < accounts_per_scale; ++i )
+      create_account("moreshills" + fc::to_string(i));
+   generate_block();
+   BOOST_CHECK_EQUAL(db.get_global_properties().parameters.current_fees.account_create_fee, 256);
+   for( int i = 0; i < accounts_per_scale; ++i )
+      create_account("moarshills" + fc::to_string(i));
+   generate_block();
+   BOOST_CHECK_EQUAL(db.get_global_properties().parameters.current_fees.account_create_fee, 4096);
+
+   generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+   BOOST_CHECK_EQUAL(db.get_global_properties().parameters.current_fees.account_create_fee, 1);
+} FC_LOG_AND_RETHROW() }
+
 BOOST_AUTO_TEST_SUITE_END()

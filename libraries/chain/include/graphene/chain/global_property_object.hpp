@@ -76,9 +76,9 @@ namespace graphene { namespace chain {
          time_point_sec    next_maintenance_time;
          time_point_sec    last_budget_time;
          share_type        witness_budget;
+         uint32_t          accounts_registered_this_interval;
    };
 }}
-
 
 FC_REFLECT_DERIVED( graphene::chain::dynamic_global_property_object, (graphene::db::object),
                     (random)
@@ -88,6 +88,7 @@ FC_REFLECT_DERIVED( graphene::chain::dynamic_global_property_object, (graphene::
                     (current_witness)
                     (next_maintenance_time)
                     (witness_budget)
+                    (accounts_registered_this_interval)
                   )
 
 FC_REFLECT_DERIVED( graphene::chain::global_property_object, (graphene::db::object),

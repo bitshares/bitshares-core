@@ -429,11 +429,18 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
    update_active_witnesses();
    update_active_delegates();
 
-   if( gpo.pending_parameters )
-      modify(gpo, [](global_property_object& p) {
+   modify(gpo, [this](global_property_object& p) {
+      // Remove scaling of account registration fee
+      const auto& dgpo = get_dynamic_global_properties();
+      p.parameters.current_fees.account_create_fee >>= p.parameters.account_fee_scale_bitshifts *
+            (dgpo.accounts_registered_this_interval / p.parameters.accounts_per_fee_scale);
+
+      if( p.pending_parameters )
+      {
          p.parameters = std::move(*p.pending_parameters);
          p.pending_parameters.reset();
-      });
+      }
+   });
 
    auto new_block_interval = global_props.parameters.block_interval;
 
@@ -445,7 +452,7 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
    if( !r )
    {
       _pending_block.timestamp -=  r;
-      assert( (_pending_block.timestamp.sec_since_epoch() % new_block_interval)  == 0 );
+      assert( (_pending_block.timestamp.sec_since_epoch() % new_block_interval) == 0 );
    }
 
    auto next_maintenance_time = get<dynamic_global_property_object>(dynamic_global_property_id_type()).next_maintenance_time;
@@ -465,6 +472,7 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
 
    modify(get_dynamic_global_properties(), [next_maintenance_time](dynamic_global_property_object& d) {
       d.next_maintenance_time = next_maintenance_time;
+      d.accounts_registered_this_interval = 0;
    });
 
    // Reset all BitAsset force settlement volumes to zero

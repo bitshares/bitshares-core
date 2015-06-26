@@ -345,7 +345,7 @@ namespace graphene { namespace chain {
       }
 
       uint32_t key_create_fee = 270300; ///< the cost to register a public key with the blockchain
-      uint32_t account_create_fee = 666666; ///< the cost to register the cheapest non-free account
+      uint64_t account_create_fee = 666666; ///< the cost to register the cheapest non-free account
       uint32_t account_update_fee = 150000; ///< the cost to update an existing account
       uint32_t account_transfer_fee = 300000; ///< the cost to transfer an account to a new owner
       uint32_t account_whitelist_fee = 300000; ///< the fee to whitelist an account
@@ -457,6 +457,8 @@ namespace graphene { namespace chain {
       share_type              worker_budget_per_day               = GRAPHENE_DEFAULT_WORKER_BUDGET_PER_DAY; ///< CORE to be allocated to workers (per day)
       uint16_t                max_predicate_opcode                = GRAPHENE_DEFAULT_MAX_ASSERT_OPCODE; ///< predicate_opcode must be less than this number
       share_type              fee_liquidation_threshold           = GRAPHENE_DEFAULT_FEE_LIQUIDATION_THRESHOLD; ///< value in CORE at which accumulated fees in blockchain-issued market assets should be liquidated
+      uint16_t                accounts_per_fee_scale              = GRAPHENE_DEFAULT_ACCOUNTS_PER_FEE_SCALE; ///< number of accounts between fee scalings
+      uint8_t                 account_fee_scale_bitshifts         = GRAPHENE_DEFAULT_ACCOUNT_FEE_SCALE_BITSHIFTS; ///< number of times to left bitshift account registration fee at each scaling
 
       void validate()const
       {
@@ -616,6 +618,8 @@ FC_REFLECT( graphene::chain::chain_parameters,
             (worker_budget_per_day)
             (max_predicate_opcode)
             (fee_liquidation_threshold)
+            (accounts_per_fee_scale)
+            (account_fee_scale_bitshifts)
           )
 
 FC_REFLECT_TYPENAME( graphene::chain::share_type )

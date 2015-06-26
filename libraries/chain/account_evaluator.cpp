@@ -108,6 +108,17 @@ object_id_type account_create_evaluator::do_apply( const account_create_operatio
          obj.options.memo_key = get_relative_id(obj.options.memo_key);
    });
 
+   const auto& global_properties = db().get_global_properties();
+   const auto& dynamic_properties = db().get_dynamic_global_properties();
+   db().modify(dynamic_properties, [](dynamic_global_property_object& p) {
+      ++p.accounts_registered_this_interval;
+   });
+   if( dynamic_properties.accounts_registered_this_interval %
+       global_properties.parameters.accounts_per_fee_scale == 0 )
+      db().modify(global_properties, [&dynamic_properties](global_property_object& p) {
+         p.parameters.current_fees.account_create_fee <<= p.parameters.account_fee_scale_bitshifts;
+      });
+
    return new_acnt_object.id;
 } FC_CAPTURE_AND_RETHROW((o)) }
 
