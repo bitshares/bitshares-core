@@ -39,62 +39,16 @@
 #include <graphene/chain/asset_object.hpp>
 #include <graphene/utilities/key_conversion.hpp>
 #include <graphene/wallet/wallet.hpp>
-
-#include <boost/algorithm/string/join.hpp>
+#include <graphene/wallet/api_documentation.hpp>
 
 #ifndef WIN32
-#include <sys/types.h>
-#include <sys/stat.h>
+# include <sys/types.h>
+# include <sys/stat.h>
 #endif
 
 namespace graphene { namespace wallet {
 
 namespace detail {
-
-namespace
-{
-template <typename... Args>
-struct types_to_string_list_helper;
-
-template <typename First, typename... Args>
-struct types_to_string_list_helper<First, Args...>
-{
-   std::list<std::string> operator()() const
-   {
-      std::list<std::string> argsList = types_to_string_list_helper<Args...>()();
-      argsList.push_front(fc::get_typename<typename std::decay<First>::type>::name());
-      return argsList;
-   }
-};
-
-template <>
-struct types_to_string_list_helper<>
-{
-   std::list<std::string> operator()() const
-   {
-      return std::list<std::string>();
-   }
-};
-
-template <typename... Args>
-std::list<std::string> types_to_string_list()
-{
-   return types_to_string_list_helper<Args...>()();
-}
-}
-
-struct help_visitor
-{
-   help_visitor( std::stringstream& s ):ss(s){}
-   std::stringstream& ss;
-
-   template<typename R, typename... Args>
-   void operator()( const char* name, std::function<R(Args...)>& memb )const {
-      ss << std::setw(40) << std::left << fc::get_typename<R>::name() << " " << name << "( ";
-      ss << boost::algorithm::join(types_to_string_list<Args...>(), ", ");
-      ss << ")\n";
-   }
-};
 
 // BLOCK  TRX  OP  VOP
 struct operation_printer
@@ -227,6 +181,9 @@ string normalize_brain_key( string s )
 }
 class wallet_api_impl
 {
+public:
+   api_documentation method_documentation;
+private:
    void claim_registered_account(const account_object& account)
    {
       auto it = _wallet.pending_account_registrations.find( account.name );
@@ -1353,7 +1310,7 @@ public:
       return sign_transaction( tx, broadcast );
    }
 
-   signed_transaction borrow_asset(string seller_name, string amount_to_sell, string asset_symbol,
+   signed_transaction borrow_asset(string seller_name, string amount_to_borrow, string asset_symbol,
                                        string amount_of_collateral, bool broadcast = false)
    {
       account_object seller = get_account(seller_name);
@@ -1363,7 +1320,7 @@ public:
 
       call_order_update_operation op;
       op.funding_account = seller.id;
-      op.delta_debt   = mia.amount_from_string(amount_to_sell);
+      op.delta_debt   = mia.amount_from_string(amount_to_borrow);
       op.delta_collateral = collateral.amount_from_string(amount_of_collateral);
 
       signed_transaction trx;
@@ -1458,123 +1415,123 @@ public:
 
    std::map<string,std::function<string(fc::variant,const fc::variants&)>> get_result_formatters() const
    {
-                                                                           std::map<string,std::function<string(fc::variant,const fc::variants&)> > m;
-                                                                           m["help"] = [](variant result, const fc::variants& a)
-   {
-      return result.get_string();
-   };
-
-   m["gethelp"] = [](variant result, const fc::variants& a)
-   {
-      return result.get_string();
-   };
-
-   m["get_account_history"] = [this](variant result, const fc::variants& a)
-   {
-      auto r = result.as<vector<operation_history_object>>();
-      std::stringstream ss;
-
-      for( const operation_history_object& i : r )
+      std::map<string,std::function<string(fc::variant,const fc::variants&)> > m;
+      m["help"] = [](variant result, const fc::variants& a)
       {
-         auto b = _remote_db->get_block_header(i.block_num);
-         FC_ASSERT(b);
-         ss << b->timestamp.to_iso_string() << " ";
-         i.op.visit(operation_printer(ss, *this, i.result));
-         ss << " \n";
-      }
+         return result.get_string();
+      };
 
-      return ss.str();
-   };
+      m["gethelp"] = [](variant result, const fc::variants& a)
+      {
+         return result.get_string();
+      };
 
-   m["list_account_balances"] = [this](variant result, const fc::variants& a)
-   {
-      auto r = result.as<vector<asset>>();
-      vector<asset_object> asset_recs;
-      std::transform(r.begin(), r.end(), std::back_inserter(asset_recs), [this](const asset& a) {
-         return get_asset(a.asset_id);
-      });
+      m["get_account_history"] = [this](variant result, const fc::variants& a)
+      {
+         auto r = result.as<vector<operation_history_object>>();
+         std::stringstream ss;
 
-      std::stringstream ss;
-      for( unsigned i = 0; i < asset_recs.size(); ++i )
-         ss << asset_recs[i].amount_to_pretty_string(r[i]) << "\n";
+         for( const operation_history_object& i : r )
+         {
+            auto b = _remote_db->get_block_header(i.block_num);
+            FC_ASSERT(b);
+            ss << b->timestamp.to_iso_string() << " ";
+            i.op.visit(operation_printer(ss, *this, i.result));
+            ss << " \n";
+         }
 
-      return ss.str();
-   };
+         return ss.str();
+      };
 
-   return m;
-}
+      m["list_account_balances"] = [this](variant result, const fc::variants& a)
+      {
+         auto r = result.as<vector<asset>>();
+         vector<asset_object> asset_recs;
+         std::transform(r.begin(), r.end(), std::back_inserter(asset_recs), [this](const asset& a) {
+            return get_asset(a.asset_id);
+         });
 
-void dbg_make_uia(string creator, string symbol)
-{
-   asset_object::asset_options opts;
-   opts.flags &= ~(white_list | disable_force_settle | global_settle);
-   opts.issuer_permissions = opts.flags;
-   opts.core_exchange_rate = price(asset(1), asset(1,1));
-   create_asset(get_account(creator).name, symbol, 2, opts, {}, true);
-}
+         std::stringstream ss;
+         for( unsigned i = 0; i < asset_recs.size(); ++i )
+            ss << asset_recs[i].amount_to_pretty_string(r[i]) << "\n";
 
-void dbg_make_mia(string creator, string symbol)
-{
-   asset_object::asset_options opts;
-   opts.flags &= ~white_list;
-   opts.issuer_permissions = opts.flags;
-   opts.core_exchange_rate = price(asset(1), asset(1,1));
-   asset_object::bitasset_options bopts;
-   create_asset(get_account(creator).name, symbol, 2, opts, bopts, true);
-}
+         return ss.str();
+      };
 
-void flood_network(string prefix, uint32_t number_of_transactions)
-{
-   const account_object& master = *_wallet.my_accounts.get<by_name>().lower_bound("import");
-   int number_of_accounts = number_of_transactions / 3;
-   number_of_transactions -= number_of_accounts;
-   auto key = derive_private_key("floodshill", 0);
-   try {
-      dbg_make_uia(master.name, "SHILL");
-   } catch(...) {/* Ignore; the asset probably already exists.*/}
-
-   fc::time_point start = fc::time_point::now(); for( int i = 0; i < number_of_accounts; ++i )
-      create_account_with_private_key(key, prefix + fc::to_string(i), master.name, master.name, true, false);
-   fc::time_point end = fc::time_point::now();
-   ilog("Created ${n} accounts in ${time} milliseconds",
-        ("n", number_of_accounts)("time", (end - start).count() / 1000));
-
-   start = fc::time_point::now();
-   for( int i = 0; i < number_of_accounts; ++i )
-   {
-      transfer(master.name, prefix + fc::to_string(i), "10", "CORE", "", true);
-      transfer(master.name, prefix + fc::to_string(i), "1", "CORE", "", true);
+      return m;
    }
-   end = fc::time_point::now();
-   ilog("Transferred to ${n} accounts in ${time} milliseconds",
-        ("n", number_of_accounts*2)("time", (end - start).count() / 1000));
 
-   start = fc::time_point::now();
-   for( int i = 0; i < number_of_accounts; ++i )
-      issue_asset(prefix + fc::to_string(i), "1000", "SHILL", "", true);
-   end = fc::time_point::now();
-   ilog("Issued to ${n} accounts in ${time} milliseconds",
-        ("n", number_of_accounts)("time", (end - start).count() / 1000));
+   void dbg_make_uia(string creator, string symbol)
+   {
+      asset_object::asset_options opts;
+      opts.flags &= ~(white_list | disable_force_settle | global_settle);
+      opts.issuer_permissions = opts.flags;
+      opts.core_exchange_rate = price(asset(1), asset(1,1));
+      create_asset(get_account(creator).name, symbol, 2, opts, {}, true);
+   }
 
-}
+   void dbg_make_mia(string creator, string symbol)
+   {
+      asset_object::asset_options opts;
+      opts.flags &= ~white_list;
+      opts.issuer_permissions = opts.flags;
+      opts.core_exchange_rate = price(asset(1), asset(1,1));
+      asset_object::bitasset_options bopts;
+      create_asset(get_account(creator).name, symbol, 2, opts, bopts, true);
+   }
 
-string                  _wallet_filename;
-wallet_data             _wallet;
+   void flood_network(string prefix, uint32_t number_of_transactions)
+   {
+      const account_object& master = *_wallet.my_accounts.get<by_name>().lower_bound("import");
+      int number_of_accounts = number_of_transactions / 3;
+      number_of_transactions -= number_of_accounts;
+      auto key = derive_private_key("floodshill", 0);
+      try {
+         dbg_make_uia(master.name, "SHILL");
+      } catch(...) {/* Ignore; the asset probably already exists.*/}
 
-map<key_id_type,string> _keys;
-fc::sha512              _checksum;
+      fc::time_point start = fc::time_point::now(); for( int i = 0; i < number_of_accounts; ++i )
+         create_account_with_private_key(key, prefix + fc::to_string(i), master.name, master.name, true, false);
+      fc::time_point end = fc::time_point::now();
+      ilog("Created ${n} accounts in ${time} milliseconds",
+           ("n", number_of_accounts)("time", (end - start).count() / 1000));
 
-fc::api<login_api>      _remote_api;
-fc::api<database_api>   _remote_db;
-fc::api<network_api>    _remote_net;
-fc::api<history_api>    _remote_hist;
+      start = fc::time_point::now();
+      for( int i = 0; i < number_of_accounts; ++i )
+      {
+         transfer(master.name, prefix + fc::to_string(i), "10", "CORE", "", true);
+         transfer(master.name, prefix + fc::to_string(i), "1", "CORE", "", true);
+      }
+      end = fc::time_point::now();
+      ilog("Transferred to ${n} accounts in ${time} milliseconds",
+           ("n", number_of_accounts*2)("time", (end - start).count() / 1000));
+
+      start = fc::time_point::now();
+      for( int i = 0; i < number_of_accounts; ++i )
+         issue_asset(prefix + fc::to_string(i), "1000", "SHILL", "", true);
+      end = fc::time_point::now();
+      ilog("Issued to ${n} accounts in ${time} milliseconds",
+           ("n", number_of_accounts)("time", (end - start).count() / 1000));
+
+   }
+
+   string                  _wallet_filename;
+   wallet_data             _wallet;
+
+   map<key_id_type,string> _keys;
+   fc::sha512              _checksum;
+
+   fc::api<login_api>      _remote_api;
+   fc::api<database_api>   _remote_db;
+   fc::api<network_api>    _remote_net;
+   fc::api<history_api>    _remote_hist;
 
 #ifdef __unix__
-mode_t                  _old_umask;
+   mode_t                  _old_umask;
 #endif
-const string _wallet_filename_extension = ".wallet";
+   const string _wallet_filename_extension = ".wallet";
 
-mutable map<asset_id_type, asset_object> _asset_cache;
+   mutable map<asset_id_type, asset_object> _asset_cache;
 };
 
 void operation_printer::fee(const asset& a)const {
@@ -1737,6 +1694,11 @@ string wallet_api::serialize_transaction( signed_transaction tx )const
 variant wallet_api::get_object( object_id_type id ) const
 {
    return my->_remote_db->get_objects({id});
+}
+
+string wallet_api::get_wallet_filename() const
+{
+   return my->get_wallet_filename();
 }
 
 transaction_handle_type wallet_api::begin_builder_transaction()
@@ -2024,12 +1986,23 @@ dynamic_global_property_object wallet_api::get_dynamic_global_properties() const
 
 string wallet_api::help()const
 {
-   fc::api<wallet_api> tmp;
+   std::vector<std::string> method_names = my->method_documentation.get_method_names();
    std::stringstream ss;
-   tmp->visit( detail::help_visitor(ss) );
+   for (const std::string method_name : method_names)
+   {
+      try
+      {
+         ss << my->method_documentation.get_brief_description(method_name);
+      }
+      catch (const fc::key_not_found_exception&)
+      {
+         ss << method_name << " (no help available)\n";
+      }
+   }
    return ss.str();
 }
-string wallet_api::gethelp(const string& method )const
+
+string wallet_api::gethelp(const string& method)const
 {
    fc::api<wallet_api> tmp;
    std::stringstream ss;
@@ -2077,7 +2050,11 @@ string wallet_api::gethelp(const string& method )const
    }
    else
    {
-      ss << "No help defined for method " << method << "\n";
+      std::string doxygenHelpString = my->method_documentation.get_detailed_description(method);
+      if (!doxygenHelpString.empty())
+         ss << doxygenHelpString;
+      else
+         ss << "No help defined for method " << method << "\n";
    }
 
    return ss.str();
