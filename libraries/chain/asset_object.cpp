@@ -115,7 +115,6 @@ void asset_object::bitasset_options::validate() const
    FC_ASSERT(maximum_force_settlement_volume <= GRAPHENE_100_PERCENT);
 }
 
-
 asset asset_object::amount_from_string(string amount_string) const
 { try {
    bool negative_found = false;

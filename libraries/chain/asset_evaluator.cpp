@@ -345,9 +345,6 @@ void_result asset_update_feed_producers_evaluator::do_apply(const asset_update_f
             a.feeds[*itr];
       a.update_median_feeds(db().head_block_time());
    });
-   db().modify(o.asset_to_update(db()), [this](asset_object& a) {
-      a.options.core_exchange_rate = bitasset_to_update->current_feed.core_exchange_rate;
-   });
    db().check_call_orders( o.asset_to_update(db()) );
 
    return void_result();
@@ -463,9 +460,6 @@ void_result asset_publish_feeds_evaluator::do_apply(const asset_publish_feed_ope
    d.modify(base.bitasset_data(d), [&o,&d](asset_bitasset_data_object& a) {
       a.feeds[o.publisher] = make_pair(d.head_block_time(), o.feed);
       a.update_median_feeds(d.head_block_time());
-   });
-   d.modify(base, [&d](asset_object& a) {
-      a.options.core_exchange_rate = a.bitasset_data(d).current_feed.core_exchange_rate;
    });
 
    /// TODO: optimization: only do this if the median feed actually changed, otherwise there is no point
