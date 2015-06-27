@@ -184,11 +184,9 @@ struct operation_get_impacted_accounts
       _impacted.insert( o.owner );
    }
 
-   void operator()( const worker_create_operation& )const
-   {}
-
-   void operator()( const assert_operation& )const
-   {}
+   void operator()( const worker_create_operation& )const {}
+   void operator()( const assert_operation& )const {}
+   void operator()( const balance_claim_operation& )const {}
 };
 
 

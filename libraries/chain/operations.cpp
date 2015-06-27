@@ -898,4 +898,17 @@ share_type  assert_operation::calculate_fee(const fee_schedule_type& k)const
    return std::max(size_t(1), fc::raw::pack_size(*this) / 1024) * k.assert_op_fee;
 }
 
+void  balance_claim_operation::get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>&)const
+{
+   active_auth_set.insert( fee_payer() );
+}
+
+void  balance_claim_operation::validate()const
+{
+   FC_ASSERT( owners.size() > 0 );
+   FC_ASSERT( total_claimed.amount > 0 );
+   FC_ASSERT( fee == asset() );
+}
+
+
 } } // namespace graphene::chain

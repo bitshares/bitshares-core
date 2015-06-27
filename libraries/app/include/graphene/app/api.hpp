@@ -27,6 +27,7 @@
 #include <graphene/chain/delegate_object.hpp>
 #include <graphene/chain/witness_object.hpp>
 #include <graphene/chain/proposal_object.hpp>
+#include <graphene/chain/balance_object.hpp>
 #include <graphene/net/node.hpp>
 
 
@@ -252,6 +253,9 @@ namespace graphene { namespace app {
           */
          vector<call_order_object> get_margin_positions( const account_id_type& id )const;
 
+         /** @return all unclaimed balance objects for a set of addresses */
+         vector<balance_object>  get_balance_objects( const vector<address>& addrs )const;
+
       private:
          /** called every time a block is applied to report the objects that were changed */
          void on_objects_changed(const vector<object_id_type>& ids);
@@ -395,6 +399,7 @@ FC_API(graphene::app::database_api,
        (get_account_references)
        (get_keys_for_address)
        (get_margin_positions)
+       (get_balance_objects)
      )
 FC_API(graphene::app::history_api, (get_account_history)(get_market_history)(get_market_history_buckets))
 FC_API(graphene::app::network_api, (broadcast_transaction)(add_node)(get_connected_peers))

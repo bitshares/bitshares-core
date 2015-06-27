@@ -130,6 +130,25 @@ namespace graphene { namespace chain {
    };
 
    /**
+    * This operation will claim all initial balance objects owned by any of the addresses and
+    * deposit them into the deposit_to_account.  
+    */
+   struct balance_claim_operation
+   {
+      asset             fee;
+      account_id_type   deposit_to_account;
+      flat_set<address> owners;
+      asset             total_claimed;
+
+      account_id_type fee_payer()const { return deposit_to_account; }
+      void            get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>&)const;
+      share_type      calculate_fee(const fee_schedule_type& k)const { return 0; }
+      void            validate()const;
+
+      void get_balance_delta(balance_accumulator& acc, const operation_result& result = asset())const { acc.adjust(fee_payer(), total_claimed-fee); }
+   };
+
+   /**
     *  @brief reserves a new ID to refer to a particular key or address.
     *  @ingroup operations
     */
@@ -1391,7 +1410,8 @@ namespace graphene { namespace chain {
             vesting_balance_withdraw_operation,
             worker_create_operation,
             custom_operation,
-            assert_operation
+            assert_operation,
+            balance_claim_operation
          > operation;
 
    /// @} // operations group
@@ -1623,6 +1643,7 @@ FC_REFLECT( graphene::chain::custom_operation, (fee)(payer)(required_auths)(id)(
 FC_REFLECT( graphene::chain::assert_operation, (fee)(fee_paying_account)(predicates)(required_auths) )
 
 FC_REFLECT( graphene::chain::void_result, )
+FC_REFLECT( graphene::chain::balance_claim_operation, (fee)(deposit_to_account)(owners)(total_claimed) )
 
 FC_REFLECT_TYPENAME( graphene::chain::operation )
 FC_REFLECT_TYPENAME( graphene::chain::operation_result )

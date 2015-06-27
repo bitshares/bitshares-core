@@ -553,4 +553,24 @@ namespace graphene { namespace app {
     } FC_CAPTURE_AND_RETHROW( (id) ) }
 
 
+    vector<balance_object>  database_api::get_balance_objects( const vector<address>& addrs )const
+    { try {
+         const auto& bal_idx = _db.get_index_type<balance_index>();
+         const auto& by_owner_idx = bal_idx.indices().get<by_owner>();
+
+         vector<balance_object> result;
+
+         for( const auto& owner : addrs )
+         {
+            auto itr = by_owner_idx.lower_bound( boost::make_tuple( owner, asset_id_type(0) ) );
+            while( itr != by_owner_idx.end() && itr->owner == owner )
+            {
+               result.push_back( *itr );
+               ++itr;
+            }
+         }
+         return result;
+    } FC_CAPTURE_AND_RETHROW( (addrs) ) }
+
+
 } } // graphene::app
