@@ -29,3 +29,5 @@ wallet.json
 witness_node_data_dir
 
 *.wallet
+
+programs/witness_node/object_database/*
