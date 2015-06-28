@@ -127,6 +127,12 @@ namespace graphene { namespace chain {
          for( auto& op : operations )
             op.visit( std::forward<Visitor>( visitor ) );
       }
+      template<typename Visitor>
+      void visit( Visitor&& visitor )const
+      {
+         for( auto& op : operations )
+            op.visit( std::forward<Visitor>( visitor ) );
+      }
 
    protected:
       // Intentionally unreflected: does not go on wire

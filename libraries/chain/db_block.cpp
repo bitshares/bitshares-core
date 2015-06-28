@@ -435,6 +435,24 @@ processed_transaction database::apply_transaction( const signed_transaction& trx
    return result;
 }
 
+struct signature_check_visitor
+{
+   typedef void result_type;
+
+   const signed_transaction& trx;
+   signature_check_visitor( const signed_transaction& t ):trx(t){}
+
+   template<typename T>
+   result_type operator()( const T& o )const{}
+
+   result_type operator()( const balance_claim_operation& o )const
+   {
+      for( auto& owner : o.owners )
+         FC_ASSERT( trx.extra_signatures.find(owner) != trx.extra_signatures.end() );
+   }
+
+};
+
 processed_transaction database::_apply_transaction( const signed_transaction& trx )
 { try {
    uint32_t skip = get_node_properties().skip_flags;
@@ -459,6 +477,16 @@ processed_transaction database::_apply_transaction( const signed_transaction& tr
                     ("key_address",sig.first(*this).key_address())
                     ("addr", address(fc::ecc::public_key( sig.second, trx.digest() ))) );
       }
+
+      for( const auto& sig : trx.extra_signatures )
+      {
+         FC_ASSERT( sig.first == address(fc::ecc::public_key( sig.second, trx.digest() )), "",
+                    ("trx",trx)
+                    ("digest",trx.digest())
+                    ("sig.first",sig.first)
+                    ("addr", address(fc::ecc::public_key( sig.second, trx.digest() ))) );
+      }
+      trx.visit( signature_check_visitor(trx) ); 
    }
 
    //If we're skipping tapos check, but not dupe check, assume all transactions have maximum expiration time.
