@@ -2121,6 +2121,62 @@ void wallet_api::set_password( string password )
    lock();
 }
 
+signed_transaction wallet_api::import_balance( string name_or_id, const vector<string>& wif_keys, bool broadcast )
+{ try {
+   FC_ASSERT(!is_locked());
+   account_object claimer = get_account( name_or_id );
+
+   vector<address> addrs;
+   map<address,private_key_type> keys;
+   for( auto wif_key : wif_keys )
+   {
+      auto priv_key = wif_to_key(wif_key);
+      FC_ASSERT( priv_key, "Invalid Private Key", ("key",wif_key) );
+      addrs.push_back( priv_key->get_public_key() );
+      keys[addrs.back()] = *priv_key;
+   }
+
+   auto balances = my->_remote_db->get_balance_objects( addrs );
+   wdump((balances));
+   addrs.clear();
+
+   set<asset_id_type> bal_types;
+   for( auto b : balances ) bal_types.insert( b.balance.asset_id );
+
+   set<address> required_addrs;
+   signed_transaction trx;
+   for( auto a : bal_types )
+   {
+      balance_claim_operation op;
+      op.total_claimed = asset( 0, a );
+      for( auto b : balances ) 
+      {
+         if( b.balance.asset_id == a )
+         {
+            op.total_claimed += b.balance;
+            op.owners.insert( b.owner );
+            op.deposit_to_account = claimer.id;
+            required_addrs.insert( b.owner );
+         }
+      }
+      trx.operations.push_back(op);
+   }
+
+   trx.visit( operation_set_fee( my->_remote_db->get_global_properties().parameters.current_fees ) );
+   trx.validate();
+
+   auto tx = sign_transaction( trx, false );
+
+   for( auto a : required_addrs )
+     tx.sign( a, keys[a] );
+
+   if( broadcast ) 
+      my->_remote_net->broadcast_transaction(tx);
+
+   return tx;
+
+} FC_CAPTURE_AND_RETHROW( (name_or_id) ) }
+
 map<key_id_type, string> wallet_api::dump_private_keys()
 {
    FC_ASSERT(!is_locked());

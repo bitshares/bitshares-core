@@ -46,6 +46,7 @@ object* create_object( const variant& v );
 struct plain_keys
 {
    map<key_id_type, string>  keys;
+   map<address,string>       extra_keys;
    fc::sha512                checksum;
 };
 
@@ -79,6 +80,9 @@ struct wallet_data
 
    /** encrypted keys */
    vector<char>              cipher_keys;
+
+   /** map an account to a set of extra keys that have been imported for that account */
+   map<account_id_type, vector<address> >  extra_keys;
 
    // map of account_name -> base58_private_key for
    //    incomplete account regs
@@ -408,6 +412,12 @@ class wallet_api
        * @returns true if the key was imported
        */
       bool import_key(string account_name_or_id, string wif_key);
+
+      /**
+       * This call will construct a transaction that will claim all balances controled
+       * by wif_keys and deposit them into the given account.
+       */
+      signed_transaction import_balance( string account_name_or_id, const vector<string>& wif_keys, bool broadcast );
 
       /** Transforms a brain key to reduce the chance of errors when re-entering the key from memory.
        *
@@ -903,11 +913,12 @@ class wallet_api
 
 } }
 
-FC_REFLECT( graphene::wallet::plain_keys, (keys)(checksum) )
+FC_REFLECT( graphene::wallet::plain_keys, (keys)(extra_keys)(checksum) )
 
 FC_REFLECT( graphene::wallet::wallet_data,
             (my_accounts)
             (cipher_keys)
+            (extra_keys)
             (pending_account_registrations)
             (ws_server)
             (ws_user)
@@ -935,6 +946,7 @@ FC_API( graphene::wallet::wallet_api,
         (list_account_balances)
         (list_assets)
         (import_key)
+        (import_balance)
         (suggest_brain_key)
         (register_account)
         (upgrade_account)

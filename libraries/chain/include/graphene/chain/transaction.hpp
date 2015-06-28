@@ -148,6 +148,7 @@ namespace graphene { namespace chain {
          : transaction(trx){}
 
       void sign( key_id_type id, const private_key_type& key );
+      void sign( const address& addr, const private_key_type& key );
 
       flat_map<key_id_type,signature_type> signatures;
 

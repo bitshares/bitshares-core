@@ -71,5 +71,16 @@ void graphene::chain::signed_transaction::sign( key_id_type id, const private_ke
       signatures[id] =  key.sign_compact( digest() );
    }
 }
+void graphene::chain::signed_transaction::sign( const address& addr, const private_key_type& key )
+{
+   if( relative_expiration != 0 )
+   {
+      if( !block_id_cache.valid() ) edump((*this));
+      assert(block_id_cache.valid());
+      extra_signatures[addr] =  key.sign_compact( digest(*block_id_cache) );
+   } else {
+      extra_signatures[addr] =  key.sign_compact( digest() );
+   }
+}
 
 } } // graphene::chain
