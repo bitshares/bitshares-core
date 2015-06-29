@@ -41,12 +41,38 @@ using namespace graphene::db;
 
 BOOST_FIXTURE_TEST_SUITE( basic_tests, database_fixture )
 
-/** verify that names are RFC-1035 compliant https://tools.ietf.org/html/rfc1035
+/**
+ * Verify that names are RFC-1035 compliant https://tools.ietf.org/html/rfc1035
  * https://github.com/cryptonomex/graphene/issues/15
  */
 BOOST_AUTO_TEST_CASE( valid_name_test )
 {
+   BOOST_REQUIRE( is_valid_name( "a" ) );
+   BOOST_REQUIRE( !is_valid_name( "A" ) );
+   BOOST_REQUIRE( !is_valid_name( "0" ) );
+   BOOST_REQUIRE( !is_valid_name( "." ) );
+   BOOST_REQUIRE( !is_valid_name( "-" ) );
+
+   BOOST_REQUIRE( is_valid_name( "aa" ) );
+   BOOST_REQUIRE( !is_valid_name( "aA" ) );
+   BOOST_REQUIRE( is_valid_name( "a0" ) );
+   BOOST_REQUIRE( !is_valid_name( "a." ) );
+   BOOST_REQUIRE( !is_valid_name( "a-" ) );
+
+   BOOST_REQUIRE( is_valid_name( "aaa" ) );
+   BOOST_REQUIRE( !is_valid_name( "aAa" ) );
+   BOOST_REQUIRE( is_valid_name( "a0a" ) );
+   BOOST_REQUIRE( is_valid_name( "a.a" ) );
+   BOOST_REQUIRE( is_valid_name( "a-a" ) );
+
+   BOOST_REQUIRE( is_valid_name( "aa0" ) );
+   BOOST_REQUIRE( !is_valid_name( "aA0" ) );
+   BOOST_REQUIRE( is_valid_name( "a00" ) );
+   BOOST_REQUIRE( !is_valid_name( "a.0" ) );
+   BOOST_REQUIRE( is_valid_name( "a-0" ) );
+
    BOOST_REQUIRE( is_valid_name( "aaa-bbb-1" ) );
+   BOOST_REQUIRE( !is_valid_name( "aaa-bbb.1" ) );
 
    BOOST_REQUIRE( !is_valid_name( "aaa,bbb-1" ) );
    BOOST_REQUIRE( !is_valid_name( "aaa_bbb-1" ) );
@@ -65,11 +91,12 @@ BOOST_AUTO_TEST_CASE( valid_name_test )
    BOOST_REQUIRE( is_valid_name( "aaa.bbb-1" ) );
    BOOST_REQUIRE( !is_valid_name( "aaa.bbb.1" ) );
 
-   BOOST_REQUIRE( is_valid_name( "aaa--bbb--1" ) );
-   BOOST_REQUIRE( is_valid_name( "xn--sandmnnchen-p8a.de" ) );
+   BOOST_REQUIRE( !is_valid_name( "aaa--bbb--1" ) );
+   BOOST_REQUIRE( !is_valid_name( "xn--sandmnnchen-p8a.de" ) );
+   BOOST_REQUIRE( is_valid_name( "xn-sandmnnchen-p8a.de" ) );
 
-   BOOST_REQUIRE( is_valid_name( "this-label-has-less-than-64-characters--63-to-be-really-precise" ) );
-   BOOST_REQUIRE( !is_valid_name( "this-label-has-more-than-63-characters---64-to-be-really-precise" ) );
+   BOOST_REQUIRE( is_valid_name( "this-label-has-less-than-64-char.acters-63-to-be-really-precise" ) );
+   BOOST_REQUIRE( !is_valid_name( "this-label-has-more-than-63-char.act.ers-64-to-be-really-precise" ) );
    BOOST_REQUIRE( !is_valid_name( "none.of.these.labels.has.more.than-63.chars--but.still.not.valid" ) );
 }
 

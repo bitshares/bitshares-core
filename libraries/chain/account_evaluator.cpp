@@ -70,18 +70,6 @@ void_result account_create_evaluator::do_evaluate( const account_create_operatio
       FC_ASSERT( current_account_itr == acnt_indx.indices().get<by_name>().end() );
    }
 
-   // verify child account authority
-   auto pos = op.name.find( '/' );
-   if( pos != string::npos )
-   {
-      // TODO: lookup account by op.owner.auths[0] and verify the name
-      // this should be a constant time lookup rather than log(N)
-      auto parent_account_itr = acnt_indx.indices().get<by_name>().find( op.name.substr(0,pos) );
-      FC_ASSERT( parent_account_itr != acnt_indx.indices().get<by_name>().end() );
-      FC_ASSERT( verify_authority( *parent_account_itr, authority::owner ) );
-      FC_ASSERT( op.owner.auths.find( parent_account_itr->id ) != op.owner.auths.end() );
-   }
-
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (op) ) }
 

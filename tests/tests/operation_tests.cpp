@@ -363,50 +363,6 @@ BOOST_AUTO_TEST_CASE( create_account_test )
    }
 }
 
-BOOST_AUTO_TEST_CASE( child_account )
-{
-   try {
-      INVOKE(create_account_test);
-      fc::ecc::private_key child_private_key = fc::ecc::private_key::generate();
-      fc::ecc::private_key nathan_private_key = fc::ecc::private_key::generate();
-      const auto& child_key = register_key(child_private_key.get_public_key());
-      const auto& nathan_key = register_key(nathan_private_key.get_public_key());
-      const account_object& nathan = get_account("nathan");
-      const account_object& root = create_account("root");
-      upgrade_to_lifetime_member(root);
-
-      skip_key_index_test = true;
-      db.modify(nathan, [nathan_key](account_object& a) {
-         a.owner = authority(1, nathan_key.get_id(), 1);
-         a.active = authority(1, nathan_key.get_id(), 1);
-      });
-
-      BOOST_CHECK(nathan.active.get_keys() == vector<key_id_type>{nathan_key.get_id()});
-
-      auto op = make_account("nathan/child");
-      op.registrar = root.id;
-      op.owner = authority(1, child_key.get_id(), 1);
-      op.active = authority(1, child_key.get_id(), 1);
-      trx.operations.emplace_back(op);
-      trx.sign(key_id_type(), delegate_priv_key);
-
-      BOOST_REQUIRE_THROW(PUSH_TX( db, trx ), fc::exception);
-      sign(trx, nathan_key.id,nathan_private_key);
-      BOOST_REQUIRE_THROW(PUSH_TX( db, trx ), fc::exception);
-      trx.signatures.clear();
-      op.owner = authority(1, account_id_type(nathan.id), 1);
-      trx.operations = {op};
-      trx.sign(key_id_type(), delegate_priv_key);
-      trx.sign(nathan_key.id, nathan_private_key);
-      db.push_transaction(trx);
-
-      BOOST_CHECK( get_account("nathan/child").active.auths == op.active.auths );
-   } catch (fc::exception& e) {
-      edump((e.to_detail_string()));
-      throw;
-   }
-}
-
 BOOST_AUTO_TEST_CASE( update_account )
 {
    try {

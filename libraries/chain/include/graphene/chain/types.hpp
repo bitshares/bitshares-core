@@ -210,15 +210,15 @@ namespace graphene { namespace chain {
                       account_transaction_history_object>       account_transaction_history_id_type;
    typedef object_id< implementation_ids, impl_witness_schedule_object_type, witness_schedule_object >                  witness_schedule_id_type;
 
-   typedef fc::array<char,GRAPHENE_MAX_SYMBOL_NAME_LENGTH>   symbol_type;
-   typedef fc::ripemd160                                block_id_type;
-   typedef fc::ripemd160                                checksum_type;
-   typedef fc::ripemd160                                transaction_id_type;
-   typedef fc::sha256                                   digest_type;
-   typedef fc::ecc::compact_signature                   signature_type;
-   typedef safe<int64_t>                                share_type;
-   typedef fc::sha224                                   secret_hash_type;
-   typedef uint16_t                                     weight_type;
+   typedef fc::array<char, GRAPHENE_MAX_ASSET_SYMBOL_LENGTH>    symbol_type;
+   typedef fc::ripemd160                                        block_id_type;
+   typedef fc::ripemd160                                        checksum_type;
+   typedef fc::ripemd160                                        transaction_id_type;
+   typedef fc::sha256                                           digest_type;
+   typedef fc::ecc::compact_signature                           signature_type;
+   typedef safe<int64_t>                                        share_type;
+   typedef fc::sha224                                           secret_hash_type;
+   typedef uint16_t                                             weight_type;
 
    /**
     * @brief An ID for some votable object

@@ -23,77 +23,99 @@
 namespace graphene { namespace chain {
 
 /**
- *  Valid symbols have at most a single "." that is not the first or last character.
+ *  Valid symbols can contain [A, Z], and '.'
+ *  They must start with [A, Z]
+ *  They must end with [A, Z]
+ *  They can contain a maximum of one '.'
  */
 bool is_valid_symbol( const string& symbol )
 {
-    if( symbol.size() < GRAPHENE_MIN_SYMBOL_NAME_LENGTH || symbol.size() > GRAPHENE_MAX_SYMBOL_NAME_LENGTH )
+    if( symbol.size() < GRAPHENE_MIN_ASSET_SYMBOL_LENGTH )
         return false;
 
-    if( symbol.front() == '.' || symbol.back() == '.' )
+    if( symbol.size() > GRAPHENE_MAX_ASSET_SYMBOL_LENGTH )
+        return false;
+
+    if( !isalpha( symbol.front() ) )
+        return false;
+
+    if( !isalpha( symbol.back() ) )
         return false;
 
     bool dot_already_present = false;
     for( const auto c : symbol )
     {
+        if( isalpha( c ) && isupper( c ) )
+            continue;
+
         if( c == '.' )
         {
             if( dot_already_present )
                 return false;
 
             dot_already_present = true;
+            continue;
         }
-        else if( !isalpha( c ) || !isupper( c ) )
-        {
-            return false;
-        }
+
+        return false;
     }
 
     return true;
 }
 
 /**
- *  Valid names are all lower case, start with [a-z] and may
- *  have "." or "-" in the name along with a single '/'.  The
- *  next character after a "/", "." or "-" cannot be [0-9] or
- *  another '.', '-'.
- *
+ *  Valid names can contain [a, z], [0, 9], '.', and '-'
+ *  They must start with [a, z]
+ *  They must end with [a, z] or [0, 9]
+ *  '.' must be followed by [a, z]
+ *  '-' must be followed by [a, z] or [0, 9]
  */
-bool is_valid_name( const string& s )
+bool is_valid_name( const string& name )
 {
-   if( s.size() <  2  ) return false;
-   if( s.size() >= 64 ) return false;
+    if( name.size() < GRAPHENE_MIN_ACCOUNT_NAME_LENGTH )
+        return false;
 
-   int num_slash = 0;
-   char prev = ' ';
-   for( auto c : s )
-   {
-      if( c >= 'a' && c <= 'z' ){}
-      else if( c >= '0' && c <= '9' )
-      {
-         if( prev == ' ' || prev == '.' ||  prev == '/' ) return false;
-      }
-      else switch( c )
-      {
-            case '/':
-               if( ++num_slash > 1 ) return false;
-            case '.':
-               if( prev == '-' ) return false;
-            case '-':
-               if( prev == ' ' || prev == '/' || prev == '.' ) return false;
-              break;
-            default:
-              return false;
-      }
-      prev = c;
-   }
-   switch( s.back() )
-   {
-      case '/': case '-': case '.':
-         return false;
-      default:
-         return true;
-   }
+    if( name.size() > GRAPHENE_MAX_ACCOUNT_NAME_LENGTH )
+        return false;
+
+    if( !isalpha( name.front() ) )
+        return false;
+
+    if( !isalpha( name.back() ) && !isdigit( name.back() ) )
+        return false;
+
+    for( size_t i = 0; i < name.size(); ++i )
+    {
+        const auto c = name.at( i );
+
+        if( isalpha( c ) && islower( c ) )
+            continue;
+
+        if( isdigit( c ) )
+            continue;
+
+        if( c == '.' )
+        {
+            const auto next = name.at( i + 1 );
+            if( !isalpha( next ) )
+                return false;
+
+            continue;
+        }
+
+        if( c == '-' )
+        {
+            const auto next = name.at( i + 1 );
+            if( !isalpha( next ) && !isdigit( next ) )
+                return false;
+
+            continue;
+        }
+
+        return false;
+    }
+
+    return true;
 }
 
 bool is_cheap_name( const string& n )
