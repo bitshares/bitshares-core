@@ -133,7 +133,7 @@ void_result proposal_update_evaluator::do_apply(const proposal_update_operation&
    if( _proposal->review_period_time )
       return void_result();
 
-   if( _proposal->is_authorized_to_execute(&d) )
+   if( _proposal->is_authorized_to_execute(d) )
    {
       // All required approvals are satisfied. Execute!
       _executed_proposal = true;

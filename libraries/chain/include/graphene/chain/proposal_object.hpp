@@ -46,7 +46,31 @@ class proposal_object : public abstract_object<proposal_object>
       flat_set<account_id_type>     available_owner_approvals;
       flat_set<key_id_type>         available_key_approvals;
 
-      bool is_authorized_to_execute(database* db)const;
+      bool is_authorized_to_execute(database& db)const;
+};
+
+/**
+ *  @brief tracks all of the proposal objects that requrie approval of
+ *  an individual account.   
+ *
+ *  @ingroup object
+ *  @ingroup protocol
+ *
+ *  This is a secondary index on the proposal_index
+ *
+ *  @note the set of required approvals is constant
+ */
+class required_approval_index : public secondary_index
+{
+   public:
+      virtual void object_inserted( const object& obj ) override;
+      virtual void object_removed( const object& obj ) override;
+      virtual void about_to_modify( const object& before ) override{};
+      virtual void object_modified( const object& after  ) override{};
+
+      void remove( account_id_type a, proposal_id_type p );
+
+      map<account_id_type, set<proposal_id_type> > _account_to_proposals;
 };
 
 struct by_expiration{};

@@ -383,12 +383,12 @@ BOOST_AUTO_TEST_CASE( genesis_authority )
    BOOST_CHECK(prop.review_period_time && *prop.review_period_time == pop.expiration_time - *pop.review_period_seconds);
    BOOST_CHECK(prop.proposed_transaction.operations.size() == 1);
    BOOST_CHECK_EQUAL(get_balance(nathan, asset_id_type()(db)), 0);
-   BOOST_CHECK(!db.get<proposal_object>(prop.id).is_authorized_to_execute(&db));
+   BOOST_CHECK(!db.get<proposal_object>(prop.id).is_authorized_to_execute(db));
 
    generate_block();
    BOOST_REQUIRE(db.find_object(prop.id));
    BOOST_CHECK_EQUAL(get_balance(nathan, asset_id_type()(db)), 0);
-   BOOST_CHECK(!db.get<proposal_object>(prop.id).is_authorized_to_execute(&db));
+   BOOST_CHECK(!db.get<proposal_object>(prop.id).is_authorized_to_execute(db));
    trx.operations.clear();
    trx.signatures.clear();
    proposal_update_operation uop;
@@ -409,7 +409,7 @@ BOOST_AUTO_TEST_CASE( genesis_authority )
    trx.signatures[key_id_type(6)] = trx.signatures[key_id_type(1)];
    db.push_transaction(trx);
    BOOST_CHECK_EQUAL(get_balance(nathan, asset_id_type()(db)), 0);
-   BOOST_CHECK(db.get<proposal_object>(prop.id).is_authorized_to_execute(&db));
+   BOOST_CHECK(db.get<proposal_object>(prop.id).is_authorized_to_execute(db));
 
    generate_blocks(*prop.review_period_time);
    uop.key_approvals_to_add = {key_id_type(7)};
@@ -457,7 +457,7 @@ BOOST_FIXTURE_TEST_CASE( fired_delegates, database_fixture )
    sign(trx, key_id_type(), genesis_key);
    const proposal_object& prop = db.get<proposal_object>(PUSH_TX( db, trx ).operation_results.front().get<object_id_type>());
    proposal_id_type pid = prop.id;
-   BOOST_CHECK(!pid(db).is_authorized_to_execute(&db));
+   BOOST_CHECK(!pid(db).is_authorized_to_execute(db));
 
    //Genesis key approves of the proposal.
    proposal_update_operation uop;
@@ -484,7 +484,7 @@ BOOST_FIXTURE_TEST_CASE( fired_delegates, database_fixture )
    trx.signatures[key_id_type(9)] = trx.signatures[key_id_type(1)];
    trx.sign(key_id_type(), genesis_key);
    PUSH_TX( db, trx );
-   BOOST_CHECK(pid(db).is_authorized_to_execute(&db));
+   BOOST_CHECK(pid(db).is_authorized_to_execute(db));
 
    //Time passes... the proposal is now in its review period.
    generate_blocks(*pid(db).review_period_time);
@@ -492,7 +492,7 @@ BOOST_FIXTURE_TEST_CASE( fired_delegates, database_fixture )
    fc::time_point_sec maintenance_time = db.get_dynamic_global_properties().next_maintenance_time;
    BOOST_CHECK_LT(maintenance_time.sec_since_epoch(), pid(db).expiration_time.sec_since_epoch());
    //Yay! The proposal to give nathan more money is authorized.
-   BOOST_CHECK(pid(db).is_authorized_to_execute(&db));
+   BOOST_CHECK(pid(db).is_authorized_to_execute(db));
 
    nathan = &get_account("nathan");
    // no money yet
@@ -515,7 +515,7 @@ BOOST_FIXTURE_TEST_CASE( fired_delegates, database_fixture )
    //Time passes... the set of active delegates gets updated.
    generate_blocks(maintenance_time);
    //The proposal is no longer authorized, because the active delegates got changed.
-   BOOST_CHECK(!pid(db).is_authorized_to_execute(&db));
+   BOOST_CHECK(!pid(db).is_authorized_to_execute(db));
    // still no money
    BOOST_CHECK_EQUAL(get_balance(*nathan, asset_id_type()(db)), 5000);
 
@@ -563,7 +563,7 @@ BOOST_FIXTURE_TEST_CASE( proposal_two_accounts, database_fixture )
    const proposal_object& prop = *db.get_index_type<proposal_index>().indices().begin();
    BOOST_CHECK(prop.required_active_approvals.size() == 2);
    BOOST_CHECK(prop.required_owner_approvals.size() == 0);
-   BOOST_CHECK(!prop.is_authorized_to_execute(&db));
+   BOOST_CHECK(!prop.is_authorized_to_execute(db));
 
    {
       proposal_id_type pid = prop.id;
@@ -577,7 +577,7 @@ BOOST_FIXTURE_TEST_CASE( proposal_two_accounts, database_fixture )
       trx.clear();
 
       BOOST_CHECK(db.find_object(pid) != nullptr);
-      BOOST_CHECK(!prop.is_authorized_to_execute(&db));
+      BOOST_CHECK(!prop.is_authorized_to_execute(db));
 
       uop.active_approvals_to_add = {dan.get_id()};
       trx.operations.push_back(uop);
@@ -627,7 +627,7 @@ BOOST_FIXTURE_TEST_CASE( proposal_delete, database_fixture )
    const proposal_object& prop = *db.get_index_type<proposal_index>().indices().begin();
    BOOST_CHECK(prop.required_active_approvals.size() == 2);
    BOOST_CHECK(prop.required_owner_approvals.size() == 0);
-   BOOST_CHECK(!prop.is_authorized_to_execute(&db));
+   BOOST_CHECK(!prop.is_authorized_to_execute(db));
 
    {
       proposal_update_operation uop;
@@ -638,7 +638,7 @@ BOOST_FIXTURE_TEST_CASE( proposal_delete, database_fixture )
       trx.sign(nathan_key_obj.id,nathan_key);
       PUSH_TX( db, trx );
       trx.clear();
-      BOOST_CHECK(!prop.is_authorized_to_execute(&db));
+      BOOST_CHECK(!prop.is_authorized_to_execute(db));
       BOOST_CHECK_EQUAL(prop.available_active_approvals.size(), 1);
 
       std::swap(uop.active_approvals_to_add, uop.active_approvals_to_remove);
@@ -646,7 +646,7 @@ BOOST_FIXTURE_TEST_CASE( proposal_delete, database_fixture )
       trx.sign(nathan_key_obj.id,nathan_key);
       PUSH_TX( db, trx );
       trx.clear();
-      BOOST_CHECK(!prop.is_authorized_to_execute(&db));
+      BOOST_CHECK(!prop.is_authorized_to_execute(db));
       BOOST_CHECK_EQUAL(prop.available_active_approvals.size(), 0);
    }
 
@@ -705,7 +705,7 @@ BOOST_FIXTURE_TEST_CASE( proposal_owner_authority_delete, database_fixture )
    const proposal_object& prop = *db.get_index_type<proposal_index>().indices().begin();
    BOOST_CHECK_EQUAL(prop.required_active_approvals.size(), 1);
    BOOST_CHECK_EQUAL(prop.required_owner_approvals.size(), 1);
-   BOOST_CHECK(!prop.is_authorized_to_execute(&db));
+   BOOST_CHECK(!prop.is_authorized_to_execute(db));
 
    {
       proposal_update_operation uop;
@@ -716,7 +716,7 @@ BOOST_FIXTURE_TEST_CASE( proposal_owner_authority_delete, database_fixture )
       trx.sign(nathan_key_obj.id,nathan_key);
       PUSH_TX( db, trx );
       trx.clear();
-      BOOST_CHECK(!prop.is_authorized_to_execute(&db));
+      BOOST_CHECK(!prop.is_authorized_to_execute(db));
       BOOST_CHECK_EQUAL(prop.available_owner_approvals.size(), 1);
 
       std::swap(uop.owner_approvals_to_add, uop.owner_approvals_to_remove);
@@ -724,7 +724,7 @@ BOOST_FIXTURE_TEST_CASE( proposal_owner_authority_delete, database_fixture )
       trx.sign(nathan_key_obj.id,nathan_key);
       PUSH_TX( db, trx );
       trx.clear();
-      BOOST_CHECK(!prop.is_authorized_to_execute(&db));
+      BOOST_CHECK(!prop.is_authorized_to_execute(db));
       BOOST_CHECK_EQUAL(prop.available_owner_approvals.size(), 0);
    }
 
@@ -784,7 +784,7 @@ BOOST_FIXTURE_TEST_CASE( proposal_owner_authority_complete, database_fixture )
    const proposal_object& prop = *db.get_index_type<proposal_index>().indices().begin();
    BOOST_CHECK_EQUAL(prop.required_active_approvals.size(), 1);
    BOOST_CHECK_EQUAL(prop.required_owner_approvals.size(), 1);
-   BOOST_CHECK(!prop.is_authorized_to_execute(&db));
+   BOOST_CHECK(!prop.is_authorized_to_execute(db));
 
    {
       proposal_id_type pid = prop.id;
@@ -797,7 +797,7 @@ BOOST_FIXTURE_TEST_CASE( proposal_owner_authority_complete, database_fixture )
       trx.sign(dan_key_obj.id,dan_key);
       PUSH_TX( db, trx );
       trx.clear();
-      BOOST_CHECK(!prop.is_authorized_to_execute(&db));
+      BOOST_CHECK(!prop.is_authorized_to_execute(db));
       BOOST_CHECK_EQUAL(prop.available_key_approvals.size(), 1);
 
       std::swap(uop.key_approvals_to_add, uop.key_approvals_to_remove);
@@ -806,7 +806,7 @@ BOOST_FIXTURE_TEST_CASE( proposal_owner_authority_complete, database_fixture )
       trx.sign(dan_key_obj.id,dan_key);
       PUSH_TX( db, trx );
       trx.clear();
-      BOOST_CHECK(!prop.is_authorized_to_execute(&db));
+      BOOST_CHECK(!prop.is_authorized_to_execute(db));
       BOOST_CHECK_EQUAL(prop.available_key_approvals.size(), 0);
 
       std::swap(uop.key_approvals_to_add, uop.key_approvals_to_remove);
@@ -817,7 +817,7 @@ BOOST_FIXTURE_TEST_CASE( proposal_owner_authority_complete, database_fixture )
       trx.sign(dan_key_obj.id,dan_key);
       PUSH_TX( db, trx );
       trx.clear();
-      BOOST_CHECK(!prop.is_authorized_to_execute(&db));
+      BOOST_CHECK(!prop.is_authorized_to_execute(db));
       BOOST_CHECK_EQUAL(prop.available_key_approvals.size(), 1);
 
       uop.key_approvals_to_add.clear();

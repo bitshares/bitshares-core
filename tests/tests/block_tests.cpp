@@ -611,7 +611,7 @@ BOOST_FIXTURE_TEST_CASE( change_block_interval, database_fixture )
       trx.sign(get_account("init6").active.get_keys().front(),delegate_priv_key);
       trx.sign(get_account("init7").active.get_keys().front(),delegate_priv_key);
       db.push_transaction(trx);
-      BOOST_CHECK(proposal_id_type()(db).is_authorized_to_execute(&db));
+      BOOST_CHECK(proposal_id_type()(db).is_authorized_to_execute(db));
    }
 
    BOOST_CHECK_EQUAL(db.get_global_properties().parameters.block_interval, 5);
