@@ -40,16 +40,19 @@ namespace graphene { namespace chain {
    using graphene::db::object;
 
    struct genesis_state_type {
-       struct allocation_target_type {
-           allocation_target_type(const string& name = string(),
+       struct genesis_account_type {
+           genesis_account_type(const string& name = string(),
                                   const address& addr = address(),
-                                  share_type weight = share_type(),
                                   bool is_lifetime_member = false)
-               : name(name), addr(addr), weight(weight),is_lifetime_member(is_lifetime_member){}
+               : name(name), addr(addr), is_lifetime_member(is_lifetime_member){}
            string name;
            address addr;
-           share_type weight;
            bool is_lifetime_member;
+       };
+       struct genesis_balance_type {
+          address owner;
+          string asset_symbol;
+          share_type amount;
        };
        struct initial_witness_type {
            /// Must correspond to one of the allocation targets.
@@ -63,7 +66,8 @@ namespace graphene { namespace chain {
        };
 
        chain_parameters initial_parameters;
-       vector<allocation_target_type> allocation_targets;
+       vector<genesis_account_type> initial_accounts;
+       vector<genesis_balance_type> initial_balances;
        vector<initial_witness_type> initial_witnesses;
        vector<initial_committee_member_type> initial_committee;
    };
@@ -511,7 +515,9 @@ namespace graphene { namespace chain {
    }
 } }
 
-FC_REFLECT(graphene::chain::genesis_state_type::allocation_target_type, (name)(addr)(weight))
+FC_REFLECT(graphene::chain::genesis_state_type::genesis_account_type, (name)(addr)(is_lifetime_member))
+FC_REFLECT(graphene::chain::genesis_state_type::genesis_balance_type,
+           (owner)(asset_symbol)(amount))
 FC_REFLECT(graphene::chain::genesis_state_type::initial_witness_type, (owner_name)(block_signing_key)(initial_secret))
 FC_REFLECT(graphene::chain::genesis_state_type::initial_committee_member_type, (owner_name))
-FC_REFLECT(graphene::chain::genesis_state_type, (initial_parameters)(allocation_targets)(initial_witnesses)(initial_committee))
+FC_REFLECT(graphene::chain::genesis_state_type, (initial_parameters)(initial_accounts)(initial_balances)(initial_witnesses)(initial_committee))

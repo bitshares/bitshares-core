@@ -113,7 +113,7 @@ void database::initialize_indexes()
 
    // this is the fast effecient version for validation only
    // add_index< primary_index<simple_index<key_object>> >();
-   
+
    // this is the slower version designed to aid GUI use.  We will
    // default to the "slow" version until we need a faster version.
    add_index< primary_index<key_index> >();
@@ -258,61 +258,56 @@ void database::init_genesis(const genesis_state_type& genesis_state)
    });
    create<block_summary_object>([&](block_summary_object&) {});
 
-   // Create user accounts, apply initial stake allocation
-   if( !genesis_state.allocation_targets.empty() )
+   // Create genesis balances
+   if( !genesis_state.initial_balances.empty() )
    {
       share_type total_allocation = 0;
-      for( const auto& handout : genesis_state.allocation_targets )
-         total_allocation += handout.weight;
+      // Because we do scaling on balances, the final sum may not quite reach total_allocation
+      // Store the actual number of shares created here
+      share_type final_allocation = 0;
+      for( const auto& handout : genesis_state.initial_balances )
+         total_allocation += handout.amount;
 
-      for( const auto& handout : genesis_state.allocation_targets )
+      const auto& asset_idx = get_index_type<asset_index>().indices().get<by_symbol>();
+      for( const auto& handout : genesis_state.initial_balances )
       {
-         asset amount(handout.weight);
+         final_allocation += create<balance_object>([&handout,&asset_idx,total_allocation](balance_object& b) {
+            b.balance = asset(handout.amount, asset_idx.find(handout.asset_symbol)->get_id());
+            b.balance.amount = ((fc::uint128(b.balance.amount.value) * GRAPHENE_INITIAL_SUPPLY)/total_allocation.value).to_uint64();
+            b.owner = handout.owner;
+         }).balance.amount;
+      }
 
+      assert(final_allocation <= dyn_asset.current_supply);
+      if( final_allocation < dyn_asset.current_supply )
+         modify(dyn_asset, [final_allocation](asset_dynamic_data_object& d) {
+            d.current_supply = final_allocation;
+         });
+   }
+
+   // Create initial accounts
+   if( !genesis_state.initial_accounts.empty() )
+   {
+      for( const auto& account : genesis_state.initial_accounts )
+      {
          key_id_type key_id = apply_operation(genesis_eval_state,
                                               key_create_operation({asset(),
                                                                     committee_account.id,
-                                                                    handout.addr})).get<object_id_type>();
+                                                                    account.addr})).get<object_id_type>();
          account_create_operation cop;
-         cop.name = handout.name;
+         cop.name = account.name;
          cop.registrar = account_id_type(1);
          cop.active = authority(1, key_id, 1);
          cop.owner = cop.active;
          cop.options.memo_key = key_id;
          account_id_type account_id(apply_operation(genesis_eval_state, cop).get<object_id_type>());
 
-         if( handout.is_lifetime_member )
+         if( account.is_lifetime_member )
          {
              account_upgrade_operation op;
              op.account_to_upgrade = account_id;
              op.upgrade_to_lifetime_member = true;
              apply_operation(genesis_eval_state, op);
-         }
-
-         if( amount.amount > 0 )
-         {
-            amount.amount = ((fc::uint128(amount.amount.value) * GRAPHENE_INITIAL_SUPPLY)/total_allocation.value).to_uint64();
-            apply_operation(genesis_eval_state, transfer_operation({asset(),
-                                                                    committee_account.id,
-                                                                    account_id,
-                                                                    amount,
-                                                                    memo_data()
-                                                                   }));
-         }
-      }
-
-      if( total_allocation != 0 )
-      {
-         asset leftovers = get_balance(account_id_type(), asset_id_type());
-         if( leftovers.amount > 0 )
-         {
-            modify(*get_index_type<account_balance_index>().indices().get<by_balance>().find(boost::make_tuple(account_id_type(), asset_id_type())),
-                   [](account_balance_object& b) {
-               b.adjust_balance(-b.get_balance());
-            });
-            modify(core_asset.dynamic_asset_data_id(*this), [&leftovers](asset_dynamic_data_object& d) {
-               d.accumulated_fees += leftovers.amount;
-            });
          }
       }
    }

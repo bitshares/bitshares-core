@@ -23,6 +23,7 @@
 #include <graphene/chain/key_object.hpp>
 #include <graphene/chain/asset_object.hpp>
 #include <graphene/chain/account_object.hpp>
+#include <graphene/chain/balance_object.hpp>
 #include <graphene/chain/witness_object.hpp>
 #include <graphene/chain/delegate_object.hpp>
 #include <graphene/chain/call_order_object.hpp>
@@ -942,6 +943,43 @@ BOOST_AUTO_TEST_CASE( assert_op_test )
    } FC_LOG_AND_RETHROW()
 }
 
+BOOST_AUTO_TEST_CASE( balance_object_test )
+{ try {
+   // Intentionally overriding the fixture's db; I need to control genesis on this one.
+   database db;
+   fc::temp_directory td;
+   genesis_state.initial_balances.push_back({generate_private_key("n").get_public_key(), GRAPHENE_SYMBOL, 1});
+   genesis_state.initial_balances.push_back({generate_private_key("m").get_public_key(), GRAPHENE_SYMBOL, 1});
+   genesis_state.initial_accounts.emplace_back("n", generate_private_key("n").get_public_key(), false);
+
+   db.open(td.path(), genesis_state);
+   const balance_object& balance = *db.get_index_type<balance_index>().indices().find(balance_id_type());
+   BOOST_CHECK_EQUAL(balance.balance.amount.value, GRAPHENE_INITIAL_SUPPLY / 2);
+   BOOST_CHECK_EQUAL(db.get_index_type<balance_index>().indices().find(balance_id_type())->balance.amount.value, GRAPHENE_INITIAL_SUPPLY / 2);
+
+   balance_claim_operation op;
+   op.deposit_to_account = db.get_index_type<account_index>().indices().get<by_name>().find("n")->get_id();
+   op.total_claimed = asset(GRAPHENE_INITIAL_SUPPLY / 2);
+   op.owners.insert(genesis_state.initial_balances.back().owner);
+   trx.operations = {op};
+   trx.sign(*op.owners.begin(), generate_private_key("n"));
+   trx.sign(op.deposit_to_account(db).active.get_keys().front(), generate_private_key("n"));
+   // Fail because I'm claiming the wrong address
+   BOOST_CHECK_THROW(db.push_transaction(trx), fc::exception);
+   trx.clear();
+   op.owners = {genesis_state.initial_balances.front().owner};
+   trx.operations = {op};
+   trx.sign(*op.owners.begin(), generate_private_key("n"));
+   trx.sign(op.deposit_to_account(db).active.get_keys().front(), generate_private_key("n"));
+   // Fail because I'm claiming the wrong address
+   db.push_transaction(trx);
+
+   // Not using fixture's get_balance() here because it uses fixture's db, not my override
+   BOOST_CHECK_EQUAL(db.get_balance(op.deposit_to_account, asset_id_type()).amount.value, GRAPHENE_INITIAL_SUPPLY / 2);
+} FC_LOG_AND_RETHROW() }
+
 // TODO:  Write linear VBO tests
 
 BOOST_AUTO_TEST_SUITE_END()
+
+
