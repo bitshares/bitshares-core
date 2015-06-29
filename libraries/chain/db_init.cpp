@@ -166,8 +166,8 @@ void database::init_genesis(const genesis_state_type& genesis_state)
    create<key_object>( [&null_private_key](key_object& k) {
        k.key_data = public_key_type(null_private_key.get_public_key());
    });
-   create<account_balance_object>( [](account_balance_object& b) {
-      b.balance = GRAPHENE_INITIAL_SUPPLY;
+   create<account_balance_object>([](account_balance_object& b) {
+      b.balance = GRAPHENE_MAX_SHARE_SUPPLY;
    });
    const account_object& committee_account =
       create<account_object>( [&](account_object& n) {
@@ -223,13 +223,13 @@ void database::init_genesis(const genesis_state_type& genesis_state)
 
    // Create core asset
    const asset_dynamic_data_object& dyn_asset =
-      create<asset_dynamic_data_object>( [&]( asset_dynamic_data_object& a ) {
-         a.current_supply = GRAPHENE_INITIAL_SUPPLY;
+      create<asset_dynamic_data_object>([&](asset_dynamic_data_object& a) {
+         a.current_supply = GRAPHENE_MAX_SHARE_SUPPLY;
       });
    const asset_object& core_asset =
      create<asset_object>( [&]( asset_object& a ) {
          a.symbol = GRAPHENE_SYMBOL;
-         a.options.max_supply = GRAPHENE_INITIAL_SUPPLY;
+         a.options.max_supply = GRAPHENE_MAX_SHARE_SUPPLY;
          a.precision = GRAPHENE_BLOCKCHAIN_PRECISION_DIGITS;
          a.options.flags = 0;
          a.options.issuer_permissions = 0;
@@ -258,31 +258,26 @@ void database::init_genesis(const genesis_state_type& genesis_state)
    });
    create<block_summary_object>([&](block_summary_object&) {});
 
-   // Create genesis balances
+   // Create initial balances
    if( !genesis_state.initial_balances.empty() )
    {
       share_type total_allocation = 0;
-      // Because we do scaling on balances, the final sum may not quite reach total_allocation
-      // Store the actual number of shares created here
-      share_type final_allocation = 0;
       for( const auto& handout : genesis_state.initial_balances )
          total_allocation += handout.amount;
 
       const auto& asset_idx = get_index_type<asset_index>().indices().get<by_symbol>();
       for( const auto& handout : genesis_state.initial_balances )
       {
-         final_allocation += create<balance_object>([&handout,&asset_idx,total_allocation](balance_object& b) {
+         create<balance_object>([&handout,&asset_idx,total_allocation](balance_object& b) {
             b.balance = asset(handout.amount, asset_idx.find(handout.asset_symbol)->get_id());
-            b.balance.amount = ((fc::uint128(b.balance.amount.value) * GRAPHENE_INITIAL_SUPPLY)/total_allocation.value).to_uint64();
             b.owner = handout.owner;
-         }).balance.amount;
+         });
       }
 
-      assert(final_allocation <= dyn_asset.current_supply);
-      if( final_allocation < dyn_asset.current_supply )
-         modify(dyn_asset, [final_allocation](asset_dynamic_data_object& d) {
-            d.current_supply = final_allocation;
-         });
+      modify(dyn_asset, [total_allocation](asset_dynamic_data_object& d) {
+         d.current_supply = total_allocation;
+      });
+      adjust_balance(GRAPHENE_COMMITTEE_ACCOUNT, -get_balance(GRAPHENE_COMMITTEE_ACCOUNT,{}));
    }
 
    // Create initial accounts

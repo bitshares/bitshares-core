@@ -351,7 +351,7 @@ void asset_burn_operation::get_required_auth(flat_set<account_id_type>& active_a
 void asset_burn_operation::validate()const
 {
    FC_ASSERT( fee.amount >= 0 );
-   FC_ASSERT( amount_to_burn.amount.value <= GRAPHENE_BLOCKCHAIN_MAX_SHARES );
+   FC_ASSERT( amount_to_burn.amount.value <= GRAPHENE_MAX_SHARE_SUPPLY );
    FC_ASSERT( amount_to_burn.amount.value > 0 );
 }
 
@@ -368,7 +368,7 @@ void asset_issue_operation::get_required_auth(flat_set<account_id_type>& active_
 void asset_issue_operation::validate()const
 {
    FC_ASSERT( fee.amount >= 0 );
-   FC_ASSERT( asset_to_issue.amount.value <= GRAPHENE_BLOCKCHAIN_MAX_SHARES );
+   FC_ASSERT( asset_to_issue.amount.value <= GRAPHENE_MAX_SHARE_SUPPLY );
    FC_ASSERT( asset_to_issue.amount.value > 0 );
    FC_ASSERT( asset_to_issue.asset_id != 0 );
 }
@@ -849,7 +849,7 @@ void worker_create_operation::validate() const
    FC_ASSERT(fee.amount >= 0);
    FC_ASSERT(work_end_date > work_begin_date);
    FC_ASSERT(daily_pay > 0);
-   FC_ASSERT(daily_pay < GRAPHENE_BLOCKCHAIN_MAX_SHARES);
+   FC_ASSERT(daily_pay < GRAPHENE_MAX_SHARE_SUPPLY);
    FC_ASSERT(name.size() < GRAPHENE_MAX_WORKER_NAME_LENGTH );
    FC_ASSERT(url.size() < GRAPHENE_MAX_URL_LENGTH );
 }

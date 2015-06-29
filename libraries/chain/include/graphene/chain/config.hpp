@@ -28,7 +28,7 @@
 
 #define GRAPHENE_MAX_ASSET_NAME_LENGTH 127
 
-#define GRAPHENE_MAX_SHARE_SUPPLY int64_t(1000000000000ll)
+#define GRAPHENE_MAX_SHARE_SUPPLY int64_t(1000000000000000ll)
 #define GRAPHENE_MAX_PAY_RATE 10000 /* 100% */
 #define GRAPHENE_MAX_SIG_CHECK_DEPTH 2
 #define GRAPHENE_MIN_WITNESS_COUNT 10
@@ -49,10 +49,8 @@
 
 #define GRAPHENE_MIN_BLOCK_SIZE_LIMIT (GRAPHENE_MIN_TRANSACTION_SIZE_LIMIT*5) // 5 transactions per block
 #define GRAPHENE_MIN_TRANSACTION_EXPIRATION_LIMIT (GRAPHENE_MAX_BLOCK_INTERVAL * 5) // 5 transactions per block
-#define GRAPHENE_BLOCKCHAIN_MAX_SHARES                          (1000*1000*int64_t(1000)*1000*int64_t(1000))
 #define GRAPHENE_BLOCKCHAIN_PRECISION                           100000
 #define GRAPHENE_BLOCKCHAIN_PRECISION_DIGITS                    5
-#define GRAPHENE_INITIAL_SUPPLY                                 GRAPHENE_BLOCKCHAIN_MAX_SHARES
 #define GRAPHENE_DEFAULT_TRANSFER_FEE                           (1*GRAPHENE_BLOCKCHAIN_PRECISION)
 #define GRAPHENE_MAX_INSTANCE_ID                                (uint64_t(-1)>>16)
 /** percentage fields are fixed point with a denominator of 10,000 */
