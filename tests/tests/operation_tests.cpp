@@ -388,7 +388,7 @@ BOOST_AUTO_TEST_CASE( child_account )
       op.owner = authority(1, child_key.get_id(), 1);
       op.active = authority(1, child_key.get_id(), 1);
       trx.operations.emplace_back(op);
-      trx.sign({}, delegate_priv_key);
+      trx.sign(key_id_type(), delegate_priv_key);
 
       BOOST_REQUIRE_THROW(PUSH_TX( db, trx ), fc::exception);
       sign(trx, nathan_key.id,nathan_private_key);
@@ -396,7 +396,7 @@ BOOST_AUTO_TEST_CASE( child_account )
       trx.signatures.clear();
       op.owner = authority(1, account_id_type(nathan.id), 1);
       trx.operations = {op};
-      trx.sign({}, delegate_priv_key);
+      trx.sign(key_id_type(), delegate_priv_key);
       trx.sign(nathan_key.id, nathan_private_key);
       db.push_transaction(trx);
 
