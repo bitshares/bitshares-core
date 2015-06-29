@@ -237,7 +237,10 @@ namespace graphene { namespace db {
 
          virtual const object&  load( const std::vector<char>& data )override
          {
-            return DerivedIndex::insert( fc::raw::unpack<object_type>( data ) );
+            const auto& result = DerivedIndex::insert( fc::raw::unpack<object_type>( data ) );
+            for( const auto& item : _sindex )
+               item->object_inserted( result );
+            return result;
          }
 
 
