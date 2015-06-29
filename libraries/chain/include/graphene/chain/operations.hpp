@@ -131,7 +131,7 @@ namespace graphene { namespace chain {
 
    /**
     * This operation will claim all initial balance objects owned by any of the addresses and
-    * deposit them into the deposit_to_account.  
+    * deposit them into the deposit_to_account.
     */
    struct balance_claim_operation
    {
@@ -145,7 +145,10 @@ namespace graphene { namespace chain {
       share_type      calculate_fee(const fee_schedule_type& k)const { return 0; }
       void            validate()const;
 
-      void get_balance_delta(balance_accumulator& acc, const operation_result& result = asset())const { acc.adjust(fee_payer(), total_claimed-fee); }
+      void get_balance_delta(balance_accumulator& acc, const operation_result& result = asset())const {
+         acc.adjust(fee_payer(), total_claimed);
+         acc.adjust(fee_payer(), -fee);
+      }
    };
 
    /**

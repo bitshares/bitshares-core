@@ -161,12 +161,12 @@ namespace detail {
          for( int i = 0; i < 10; ++i )
          {
             auto name = "init"+fc::to_string(i);
-            initial_state.allocation_targets.emplace_back(name, nathan_key.get_public_key(), 0, true);
+            initial_state.initial_accounts.emplace_back(name, nathan_key.get_public_key(), true);
             initial_state.initial_committee.push_back({name});
             initial_state.initial_witnesses.push_back({name, nathan_key.get_public_key(), secret});
          }
 
-         initial_state.allocation_targets.emplace_back("nathan", address(public_key_type(nathan_key.get_public_key())), 1);
+         initial_state.initial_accounts.emplace_back("nathan", address(public_key_type(nathan_key.get_public_key())), 1);
          if( _options->count("genesis-json") )
             initial_state = fc::json::from_file(_options->at("genesis-json").as<boost::filesystem::path>()).as<genesis_state_type>();
          else
@@ -195,8 +195,8 @@ namespace detail {
        * If delegate has the item, the network has no need to fetch it.
        */
       virtual bool has_item( const net::item_id& id ) override
-      { 
-         try 
+      {
+         try
          {
             if( id.item_type == graphene::net::block_message_type )
             {
@@ -213,8 +213,8 @@ namespace detail {
             }
             else
                return _chain_db->is_known_transaction( id.item_hash ); // is_known_transaction behaves normally
-         } 
-         FC_CAPTURE_AND_RETHROW( (id) ) 
+         }
+         FC_CAPTURE_AND_RETHROW( (id) )
       }
 
       /**
