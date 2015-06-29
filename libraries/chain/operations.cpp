@@ -23,22 +23,33 @@
 namespace graphene { namespace chain {
 
 /**
- *  Valid symbols have between 3 and 17 upper case characters
- *  with at most a single "." that is not the first or last character.
+ *  Valid symbols have at most a single "." that is not the first or last character.
  */
 bool is_valid_symbol( const string& symbol )
 {
-   if( symbol.size() > 17 ) return false;
-   if( symbol.size() < 3  ) return false;
-   int dot_count = 0;
-   for( auto c : symbol )
-   {
-      if( c == '.' ) ++dot_count;
-      else if( c < 'A' || c > 'Z' ) return false;
-   }
-   if( symbol[0] == '.' || symbol[symbol.size()-1] == '.' )
-      return false;
-   return dot_count <= 1;
+    if( symbol.size() < GRAPHENE_MIN_SYMBOL_NAME_LENGTH || symbol.size() > GRAPHENE_MAX_SYMBOL_NAME_LENGTH )
+        return false;
+
+    if( symbol.front() == '.' || symbol.back() == '.' )
+        return false;
+
+    bool dot_already_present = false;
+    for( const auto c : symbol )
+    {
+        if( c == '.' )
+        {
+            if( dot_already_present )
+                return false;
+
+            dot_already_present = true;
+        }
+        else if( !isalpha( c ) || !isupper( c ) )
+        {
+            return false;
+        }
+    }
+
+    return true;
 }
 
 /**
