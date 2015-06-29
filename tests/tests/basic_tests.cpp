@@ -100,6 +100,33 @@ BOOST_AUTO_TEST_CASE( valid_name_test )
    BOOST_REQUIRE( !is_valid_name( "none.of.these.labels.has.more.than-63.chars--but.still.not.valid" ) );
 }
 
+BOOST_AUTO_TEST_CASE( valid_symbol_test )
+{
+   BOOST_REQUIRE( !is_valid_symbol( "A" ) );
+   BOOST_REQUIRE( !is_valid_symbol( "a" ) );
+   BOOST_REQUIRE( !is_valid_symbol( "0" ) );
+   BOOST_REQUIRE( !is_valid_symbol( "." ) );
+
+   BOOST_REQUIRE( !is_valid_symbol( "AA" ) );
+   BOOST_REQUIRE( !is_valid_symbol( "Aa" ) );
+   BOOST_REQUIRE( !is_valid_symbol( "A0" ) );
+   BOOST_REQUIRE( !is_valid_symbol( "A." ) );
+
+   BOOST_REQUIRE( is_valid_symbol( "AAA" ) );
+   BOOST_REQUIRE( !is_valid_symbol( "AaA" ) );
+   BOOST_REQUIRE( !is_valid_symbol( "A0A" ) );
+   BOOST_REQUIRE( is_valid_symbol( "A.A" ) );
+
+   BOOST_REQUIRE( !is_valid_symbol( "A..A" ) );
+   BOOST_REQUIRE( !is_valid_symbol( "A.A." ) );
+   BOOST_REQUIRE( !is_valid_symbol( "A.A.A" ) );
+
+   BOOST_REQUIRE( is_valid_symbol( "AAAAAAAAAAAAAAAA" ) );
+   BOOST_REQUIRE( !is_valid_symbol( "AAAAAAAAAAAAAAAAA" ) );
+   BOOST_REQUIRE( is_valid_symbol( "A.AAAAAAAAAAAAAA" ) );
+   BOOST_REQUIRE( !is_valid_symbol( "A.AAAAAAAAAAAA.A" ) );
+}
+
 BOOST_AUTO_TEST_CASE( price_test )
 {
     BOOST_CHECK( price::max(0,1) > price::min(0,1) );
