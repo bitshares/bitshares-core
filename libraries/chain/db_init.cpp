@@ -204,8 +204,8 @@ void database::init_genesis(const genesis_state_type& genesis_state)
        a.active.weight_threshold = 1;
        a.registrar = a.lifetime_referrer = a.referrer = GRAPHENE_NULL_ACCOUNT;
        a.membership_expiration_date = time_point_sec::maximum();
-       a.network_fee_percentage = GRAPHENE_DEFAULT_NETWORK_PERCENT_OF_FEE;
-       a.lifetime_referrer_fee_percentage = GRAPHENE_100_PERCENT - GRAPHENE_DEFAULT_NETWORK_PERCENT_OF_FEE;
+       a.network_fee_percentage = 0;
+       a.lifetime_referrer_fee_percentage = GRAPHENE_100_PERCENT;
    }).get_id() == GRAPHENE_NULL_ACCOUNT);
    FC_ASSERT(create<account_object>([this](account_object& a) {
        a.name = "temp-account";
