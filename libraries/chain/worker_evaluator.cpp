@@ -46,6 +46,8 @@ object_id_type worker_create_evaluator::do_apply(const worker_create_evaluator::
       w.daily_pay = o.daily_pay;
       w.work_begin_date = o.work_begin_date;
       w.work_end_date = o.work_end_date;
+      w.name = o.name;
+      w.url = o.url;
       w.vote_for = for_id;
       w.vote_against = against_id;
       w.worker.set_which(o.initializer.which());

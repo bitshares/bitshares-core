@@ -31,12 +31,13 @@ namespace graphene { namespace chain {
          static const uint8_t space_id = protocol_ids;
          static const uint8_t type_id = witness_object_type;
 
-         account_id_type                witness_account;
-         key_id_type                    signing_key;
-         secret_hash_type               next_secret;
-         secret_hash_type               last_secret;
-         share_type                     accumulated_income;
-         vote_id_type                   vote_id;
+         account_id_type  witness_account;
+         key_id_type      signing_key;
+         secret_hash_type next_secret;
+         secret_hash_type last_secret;
+         share_type       accumulated_income;
+         vote_id_type     vote_id;
+         string           url;
 
          witness_object() : vote_id(vote_id_type::witness) {}
    };
@@ -62,4 +63,5 @@ FC_REFLECT_DERIVED( graphene::chain::witness_object, (graphene::db::object),
                     (next_secret)
                     (last_secret)
                     (accumulated_income)
-                    (vote_id) )
+                    (vote_id)
+                    (url) )

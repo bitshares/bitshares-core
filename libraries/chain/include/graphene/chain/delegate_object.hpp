@@ -42,8 +42,9 @@ namespace graphene { namespace chain {
          static const uint8_t space_id = protocol_ids;
          static const uint8_t type_id  = delegate_object_type;
 
-         account_id_type                delegate_account;
-         vote_id_type                   vote_id;
+         account_id_type  delegate_account;
+         vote_id_type     vote_id;
+         string           url;
    };
 
    struct by_account;
@@ -62,5 +63,4 @@ namespace graphene { namespace chain {
 } } // graphene::chain
 
 FC_REFLECT_DERIVED( graphene::chain::delegate_object, (graphene::db::object),
-                    (delegate_account)
-                    (vote_id) )
+                    (delegate_account)(vote_id)(url) )

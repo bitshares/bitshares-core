@@ -39,6 +39,7 @@ object_id_type delegate_create_evaluator::do_apply( const delegate_create_operat
    const auto& new_del_object = db().create<delegate_object>( [&]( delegate_object& obj ){
          obj.delegate_account   = op.delegate_account;
          obj.vote_id            = vote_id;
+         obj.url                = op.url;
    });
    return new_del_object.id;
 } FC_CAPTURE_AND_RETHROW( (op) ) }

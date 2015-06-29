@@ -178,20 +178,24 @@ namespace graphene { namespace chain {
          static const uint8_t type_id =  worker_object_type;
 
          /// ID of the account which owns this worker
-         account_id_type   worker_account;
+         account_id_type worker_account;
          /// Time at which this worker begins receiving pay, if elected
-         time_point_sec    work_begin_date;
+         time_point_sec work_begin_date;
          /// Time at which this worker will cease to receive pay. Worker will be deleted at this time
-         time_point_sec    work_end_date;
+         time_point_sec work_end_date;
          /// Amount in CORE this worker will be paid each day
-         share_type        daily_pay;
+         share_type daily_pay;
          /// ID of this worker's pay balance
-         worker_type       worker;
+         worker_type worker;
+         /// Human-readable name for the worker
+         string name;
+         /// URL to a web page representing this worker
+         string url;
 
          /// Voting ID which represents approval of this worker
-         vote_id_type                   vote_for;
+         vote_id_type vote_for;
          /// Voting ID which represents disapproval of this worker
-         vote_id_type                   vote_against;
+         vote_id_type vote_against;
 
          bool is_active(fc::time_point_sec now)const {
             return now >= work_begin_date && now <= work_end_date;
@@ -221,4 +225,6 @@ FC_REFLECT_DERIVED( graphene::chain::worker_object, (graphene::db::object),
                     (worker)
                     (vote_for)
                     (vote_against)
+                    (name)
+                    (url)
                   )
