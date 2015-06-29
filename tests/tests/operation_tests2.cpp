@@ -710,6 +710,83 @@ BOOST_AUTO_TEST_CASE( refund_worker_test )
    BOOST_CHECK_EQUAL(worker_id_type()(db).worker.get<refund_worker_type>().total_burned.value, 2000);
 }FC_LOG_AND_RETHROW()}
 
+/**
+ * Create a burn worker, vote it in, make sure funds are destroyed.
+ */
+
+BOOST_AUTO_TEST_CASE( burn_worker_test )
+{try{
+   ACTOR(nathan);
+   upgrade_to_lifetime_member(nathan_id);
+   generate_block();
+   generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+   trx.set_expiration(db.head_block_id());
+
+   {
+      worker_create_operation op;
+      op.owner = nathan_id;
+      op.daily_pay = 1000;
+      op.initializer = burn_worker_type::initializer();
+      op.work_begin_date = db.head_block_time() + 10;
+      op.work_end_date = op.work_begin_date + fc::days(2);
+      trx.clear();
+      trx.operations.push_back(op);
+      REQUIRE_THROW_WITH_VALUE(op, daily_pay, -1);
+      REQUIRE_THROW_WITH_VALUE(op, daily_pay, 0);
+      REQUIRE_THROW_WITH_VALUE(op, owner, account_id_type(1000));
+      REQUIRE_THROW_WITH_VALUE(op, work_begin_date, db.head_block_time() - 10);
+      REQUIRE_THROW_WITH_VALUE(op, work_end_date, op.work_begin_date);
+      trx.operations.back() = op;
+      trx.sign(nathan_key_id, nathan_private_key);
+      PUSH_TX( db, trx );
+      trx.clear();
+   }
+
+   const worker_object& worker = worker_id_type()(db);
+   BOOST_CHECK(worker.worker_account == nathan_id);
+   BOOST_CHECK(worker.daily_pay == 1000);
+   BOOST_CHECK(worker.work_begin_date == db.head_block_time() + 10);
+   BOOST_CHECK(worker.work_end_date == db.head_block_time() + 10 + fc::days(2));
+   BOOST_CHECK(worker.vote_for.type() == vote_id_type::worker);
+   BOOST_CHECK(worker.vote_against.type() == vote_id_type::worker);
+
+   transfer(genesis_account, nathan_id, asset(100000));
+
+   {
+      account_update_operation op;
+      op.account = nathan_id;
+      op.new_options = nathan_id(db).options;
+      op.new_options->votes.insert(worker_id_type()(db).vote_for);
+      trx.operations.push_back(op);
+      PUSH_TX( db, trx, ~0 );
+      trx.clear();
+   }
+   {
+      // refund some asset to fill up the pool
+      asset_burn_operation op;
+      op.payer = account_id_type();
+      op.amount_to_burn = asset(GRAPHENE_INITIAL_SUPPLY/2);
+      trx.operations.push_back(op);
+      PUSH_TX( db, trx, ~0 );
+      trx.clear();
+   }
+
+   BOOST_CHECK_EQUAL( get_balance(GRAPHENE_NULL_ACCOUNT, asset_id_type()), 0 );
+   verify_asset_supplies();
+   generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+   verify_asset_supplies();
+   BOOST_CHECK_EQUAL(worker_id_type()(db).worker.get<burn_worker_type>().total_burned.value, 1000);
+   BOOST_CHECK_EQUAL( get_balance(GRAPHENE_NULL_ACCOUNT, asset_id_type()), 1000 );
+   generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+   verify_asset_supplies();
+   BOOST_CHECK_EQUAL(worker_id_type()(db).worker.get<burn_worker_type>().total_burned.value, 2000);
+   BOOST_CHECK_EQUAL( get_balance(GRAPHENE_NULL_ACCOUNT, asset_id_type()), 2000 );
+   generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+   BOOST_CHECK(!db.get(worker_id_type()).is_active(db.head_block_time()));
+   BOOST_CHECK_EQUAL(worker_id_type()(db).worker.get<burn_worker_type>().total_burned.value, 2000);
+   BOOST_CHECK_EQUAL( get_balance(GRAPHENE_NULL_ACCOUNT, asset_id_type()), 2000 );
+}FC_LOG_AND_RETHROW()}
+
 BOOST_AUTO_TEST_CASE_EXPECTED_FAILURES( unimp_force_settlement_unavailable, 1 )
 BOOST_AUTO_TEST_CASE( unimp_force_settlement_unavailable )
 {
