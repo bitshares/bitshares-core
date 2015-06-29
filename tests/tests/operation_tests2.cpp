@@ -579,7 +579,7 @@ BOOST_AUTO_TEST_CASE( worker_pay_test )
    {
       asset_burn_operation op;
       op.payer = account_id_type();
-      op.amount_to_burn = asset(GRAPHENE_INITIAL_SUPPLY/2);
+      op.amount_to_burn = asset(GRAPHENE_MAX_SHARE_SUPPLY/2);
       trx.operations.push_back(op);
       PUSH_TX( db, trx, ~0 );
       trx.clear();
@@ -692,7 +692,7 @@ BOOST_AUTO_TEST_CASE( refund_worker_test )
    {
       asset_burn_operation op;
       op.payer = account_id_type();
-      op.amount_to_burn = asset(GRAPHENE_INITIAL_SUPPLY/2);
+      op.amount_to_burn = asset(GRAPHENE_MAX_SHARE_SUPPLY/2);
       trx.operations.push_back(op);
       PUSH_TX( db, trx, ~0 );
       trx.clear();
@@ -766,7 +766,7 @@ BOOST_AUTO_TEST_CASE( burn_worker_test )
       // refund some asset to fill up the pool
       asset_burn_operation op;
       op.payer = account_id_type();
-      op.amount_to_burn = asset(GRAPHENE_INITIAL_SUPPLY/2);
+      op.amount_to_burn = asset(GRAPHENE_MAX_SHARE_SUPPLY/2);
       trx.operations.push_back(op);
       PUSH_TX( db, trx, ~0 );
       trx.clear();
@@ -954,12 +954,12 @@ BOOST_AUTO_TEST_CASE( balance_object_test )
 
    db.open(td.path(), genesis_state);
    const balance_object& balance = *db.get_index_type<balance_index>().indices().find(balance_id_type());
-   BOOST_CHECK_EQUAL(balance.balance.amount.value, GRAPHENE_INITIAL_SUPPLY / 2);
-   BOOST_CHECK_EQUAL(db.get_index_type<balance_index>().indices().find(balance_id_type())->balance.amount.value, GRAPHENE_INITIAL_SUPPLY / 2);
+   BOOST_CHECK_EQUAL(balance.balance.amount.value, 1);
+   BOOST_CHECK_EQUAL(db.get_index_type<balance_index>().indices().find(balance_id_type())->balance.amount.value, 1);
 
    balance_claim_operation op;
    op.deposit_to_account = db.get_index_type<account_index>().indices().get<by_name>().find("n")->get_id();
-   op.total_claimed = asset(GRAPHENE_INITIAL_SUPPLY / 2);
+   op.total_claimed = asset(1);
    op.owners.insert(genesis_state.initial_balances.back().owner);
    trx.operations = {op};
    trx.sign(*op.owners.begin(), generate_private_key("n"));
@@ -975,7 +975,7 @@ BOOST_AUTO_TEST_CASE( balance_object_test )
    db.push_transaction(trx);
 
    // Not using fixture's get_balance() here because it uses fixture's db, not my override
-   BOOST_CHECK_EQUAL(db.get_balance(op.deposit_to_account, asset_id_type()).amount.value, GRAPHENE_INITIAL_SUPPLY / 2);
+   BOOST_CHECK_EQUAL(db.get_balance(op.deposit_to_account, asset_id_type()).amount.value, 1);
 } FC_LOG_AND_RETHROW() }
 
 // TODO:  Write linear VBO tests
