@@ -70,8 +70,14 @@ void database::pay_workers( share_type& budget )
          active_workers.emplace_back(w);
    });
 
+   // worker with more votes is preferred
+   // if two workers exactly tie for votes, worker with lower ID is preferred
    std::sort(active_workers.begin(), active_workers.end(), [this](const worker_object& wa, const worker_object& wb) {
-      return wa.approving_stake(_vote_tally_buffer) > wb.approving_stake(_vote_tally_buffer);
+      share_type wa_vote = wa.approving_stake(_vote_tally_buffer);
+      share_type wb_vote = wb.approving_stake(_vote_tally_buffer);
+      if( wa_vote != wb_vote )
+         return wa_vote > wb_vote;
+      return wa.id < wb.id;
    });
 
    for( int i = 0; i < active_workers.size() && budget > 0; ++i )
