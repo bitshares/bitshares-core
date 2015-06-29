@@ -73,6 +73,12 @@ namespace graphene { namespace app {
           * @return the referenced block, or null if no matching block was found
           */
          optional<signed_block>            get_block(uint32_t block_num)const;
+
+         /** 
+          * @brief used to fetch an individual transaction.
+          */
+         processed_transaction   get_transaction( uint32_t block_num, uint32_t trx_in_block )const;
+
          /**
           * @brief Retrieve the current @ref global_property_object
           */
@@ -372,6 +378,7 @@ FC_API(graphene::app::database_api,
        (get_objects)
        (get_block_header)
        (get_block)
+       (get_transaction)
        (get_global_properties)
        (get_dynamic_global_properties)
        (get_keys)

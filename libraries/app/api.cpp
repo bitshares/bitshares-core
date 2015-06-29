@@ -59,6 +59,13 @@ namespace graphene { namespace app {
     {
        return _db.fetch_block_by_number(block_num);
     }
+    processed_transaction database_api::get_transaction(uint32_t block_num, uint32_t trx_num)const
+    {
+       auto opt_block = _db.fetch_block_by_number(block_num);
+       FC_ASSERT( opt_block );
+       FC_ASSERT( opt_block->transactions.size() > trx_num );
+       return opt_block->transactions[trx_num];
+    }
 
     vector<optional<account_object>> database_api::lookup_account_names(const vector<string>& account_names)const
     {
