@@ -67,8 +67,9 @@ bool is_valid_name( const string& s )
             case '/':
                if( ++num_slash > 1 ) return false;
             case '.':
+               if( prev == '-' ) return false;
             case '-':
-               if( prev == ' ' || prev == '/' || prev == '.' || prev == '-' ) return false;
+               if( prev == ' ' || prev == '/' || prev == '.' ) return false;
               break;
             default:
               return false;
