@@ -373,6 +373,37 @@ BOOST_AUTO_TEST_CASE( mia_feeds )
    }
 } FC_LOG_AND_RETHROW() }
 
+BOOST_AUTO_TEST_CASE( feed_limit_test )
+{ try {
+   INVOKE( mia_feeds );
+   const asset_object& bit_usd = get_asset("BITUSD");
+   const asset_bitasset_data_object& bitasset = bit_usd.bitasset_data(db);
+   GET_ACTOR(nathan);
+
+   BOOST_CHECK(!bitasset.current_feed.settlement_price.is_null());
+
+   BOOST_TEST_MESSAGE("Setting minimum feeds to 4");
+   asset_update_bitasset_operation op;
+   op.new_options.minimum_feeds = 4;
+   op.asset_to_update = bit_usd.get_id();
+   op.issuer = bit_usd.issuer;
+   trx.operations = {op};
+   trx.sign(nathan_key_id, nathan_private_key);
+   db.push_transaction(trx);
+
+   BOOST_TEST_MESSAGE("Checking current_feed is null");
+   BOOST_CHECK(bitasset.current_feed.settlement_price.is_null());
+
+   BOOST_TEST_MESSAGE("Setting minimum feeds to 3");
+   op.new_options.minimum_feeds = 3;
+   trx.operations = {op};
+   trx.sign(nathan_key_id, nathan_private_key);
+   db.push_transaction(trx);
+
+   BOOST_TEST_MESSAGE("Checking current_feed is not null");
+   BOOST_CHECK(!bitasset.current_feed.settlement_price.is_null());
+} FC_LOG_AND_RETHROW() }
+
 BOOST_AUTO_TEST_CASE( witness_create )
 { try {
    ACTOR(nathan);

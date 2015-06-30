@@ -299,8 +299,16 @@ void_result asset_update_bitasset_evaluator::do_evaluate(const asset_update_bita
 
 void_result asset_update_bitasset_evaluator::do_apply(const asset_update_bitasset_operation& o)
 { try {
-   db().modify(*bitasset_to_update, [&o](asset_bitasset_data_object& b) {
+   bool should_update_feeds = false;
+   // If the minimum number of feeds to calculate a median has changed, we need to recalculate the median
+   if( o.new_options.minimum_feeds != bitasset_to_update->options.minimum_feeds )
+      should_update_feeds = true;
+
+   db().modify(*bitasset_to_update, [&](asset_bitasset_data_object& b) {
       b.options = o.new_options;
+
+      if( should_update_feeds )
+         b.update_median_feeds(db().head_block_time());
    });
 
    return void_result();
