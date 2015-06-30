@@ -468,10 +468,62 @@ processed_transaction database::_apply_transaction( const signed_transaction& tr
          //Check the TaPoS reference and expiration time
          //Remember that the TaPoS block number is abbreviated; it contains only the lower 16 bits.
          //Lookup TaPoS block summary by block number (remember block summary instances are the block numbers)
+
+         // Let N = head_block_num(), a = N & 0xFFFF, and r = trx.ref_block_num
+         //
+         // We want to solve for the largest block height x such that
+         // these two conditions hold:
+         //
+         // (a) 0x10000 divides x-r
+         // (b) x <= N
+         //
+         // Let us define:
+         //
+         // x1 = N-a+r
+         // x0 = x1-2^16
+         // x2 = x1+2^16
+         //
+         // It is clear that x0, x1, x2 are consecutive solutions to (a).
+         //
+         // Since r < 2^16 and a < 2^16, it follows that
+         // -2^16 < r-a < 2^16.  From this we know that x0 < N and x2 > N.
+         //
+         // Case (1): x1 <= N.  In this case, x1 must be the greatest
+         // integer that satisfies (a) and (b); for x2, the next
+         // largest integer that satisfies (a), does not satisfy (b).
+         //
+         // Case (2): x1 > N.  In this case, x0 must be the greatest
+         // integer that satisfies (a) and (b); for x1, the next
+         // largest integer that satisfies (a), does not satisfy (b).
+         //
+         int64_t N = head_block_num();
+         int64_t a = N & 0xFFFF;
+         int64_t r = trx.ref_block_num;
+
+         int64_t x1 = N-a+r;
+         int64_t x0 = x1 - 0x10000;
+         int64_t x2 = x1 + 0x10000;
+
+         assert( x0 < N );
+         assert( x1 >= 0 );
+         assert( x2 > N );
+
+         uint32_t ref_block_height;
+         if( x1 <= N )
+         {
+            FC_ASSERT( x1 > 0 );
+            ref_block_height = uint32_t( x1 );
+         }
+         else
+         {
+            ref_block_height = uint32_t( x0 );
+         }
+
          const block_summary_object& tapos_block_summary
-               = static_cast<const block_summary_object&>(get_index<block_summary_object>()
-                                                          .get(block_summary_id_type((head_block_num() & ~0xffff)
-                                                                                     + trx.ref_block_num)));
+               = static_cast<const block_summary_object&>(
+                  get_index<block_summary_object>()
+                  .get(block_summary_id_type(ref_block_height))
+                  );
 
          //This is the signature check for transactions with relative expiration.
          if( !(skip & skip_transaction_signatures) )
