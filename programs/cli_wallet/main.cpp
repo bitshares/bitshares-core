@@ -210,6 +210,35 @@ int main( int argc, char** argv )
                std::shared_ptr< fc::rpc::http_api_connection > conn =
                   std::make_shared< fc::rpc::http_api_connection>();
                conn->register_api( wapi );
+               // allow unlocking with password in HTTP header
+               std::string unlock_password = req.get_header( "Graphene-Wallet-Password" );
+               if( unlock_password != "" )
+               {
+                  fc::optional< std::string > unlock_error;
+                  fc::rpc::request unlock_request;
+                  fc::variants args;
+                  args.push_back( unlock_password );
+                  unlock_request.method = "unlock";
+                  unlock_request.params = args;
+
+                  try
+                  {
+                     conn->_rpc_state.local_call( unlock_request.method, unlock_request.params );
+                  }
+                  catch ( const fc::exception& e )
+                  {
+                     unlock_error = fc::json::to_string( fc::rpc::response( *unlock_request.id,
+                        fc::rpc::error_object{ 1, e.to_detail_string(), fc::variant(e)} ) );
+                  }
+                  if( unlock_error.valid() )
+                  {
+                     // FC's IO framework doesn't allow write() in exception handler
+                     resp.set_status( fc::http::reply::InternalServerError );
+                     resp.set_length( unlock_error->length() );
+                     resp.write( unlock_error->c_str(), unlock_error->length() );
+                     return;
+                  }
+               }
                conn->on_request( req, resp );
             } );
       }
