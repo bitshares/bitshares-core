@@ -297,7 +297,7 @@ BOOST_AUTO_TEST_CASE( undo_pending )
          cop.name = "nathan";
          cop.owner = authority(1, key_id_type(), 1);
          trx.operations.push_back(cop);
-         trx.sign( key_id_type(), delegate_priv_key );
+         //trx.sign( delegate_priv_key );
          PUSH_TX( db, trx );
 
          now += db.block_interval();
@@ -576,6 +576,43 @@ BOOST_FIXTURE_TEST_CASE( limit_order_expiration, database_fixture )
    BOOST_CHECK_EQUAL( get_balance(*nathan, *core), 50000 );
 } FC_LOG_AND_RETHROW() }
 
+BOOST_FIXTURE_TEST_CASE( double_sign_check, database_fixture )
+{ try {
+   generate_block();
+   const auto& from = account_id_type()(db);
+   ACTOR(to);
+   asset amount(1000);
+
+   trx.set_expiration(db.head_block_time() + fc::minutes(1));
+   trx.operations.push_back(transfer_operation({ asset(), from.id, to.id, amount, memo_data() }));
+   for( auto& op : trx.operations ) op.visit( operation_set_fee( db.current_fee_schedule() ) );
+   trx.validate();
+
+   db.push_transaction(trx, ~0);
+
+   trx.operations.clear();
+   trx.operations.push_back(transfer_operation({ asset(), to.id, from.id, amount, memo_data() }));
+   for( auto& op : trx.operations ) op.visit( operation_set_fee( db.current_fee_schedule() ) );
+   trx.validate();
+
+   BOOST_TEST_MESSAGE( "Verify that not-signing causes an exception" );
+   BOOST_REQUIRE_THROW( db.push_transaction(trx, 0 ), fc::exception );
+   trx.sign( to_private_key );
+
+   BOOST_TEST_MESSAGE( "Verify that double-signing causes an exception" );
+   BOOST_REQUIRE_THROW( db.push_transaction(trx, 0 ), fc::exception );
+
+   BOOST_TEST_MESSAGE( "Verify that signing with an extra, unused key fails" );
+   trx.signatures.pop_back();
+   trx.sign( generate_private_key("bogus") );
+   BOOST_REQUIRE_THROW( db.push_transaction(trx, 0 ), fc::exception );
+
+   BOOST_TEST_MESSAGE( "Verify that signing once with the proper key passes" );
+   db.push_transaction(trx, 0 );
+   trx.sign( to_private_key );
+
+} FC_LOG_AND_RETHROW() }
+
 BOOST_FIXTURE_TEST_CASE( change_block_interval, database_fixture )
 { try {
    generate_block();
@@ -603,6 +640,7 @@ BOOST_FIXTURE_TEST_CASE( change_block_interval, database_fixture )
                                      get_account("init6").get_id(), get_account("init7").get_id()};
       trx.operations.push_back(uop);
       trx.sign(get_account("init0").active.get_keys().front(),delegate_priv_key);
+      /*
       trx.sign(get_account("init1").active.get_keys().front(),delegate_priv_key);
       trx.sign(get_account("init2").active.get_keys().front(),delegate_priv_key);
       trx.sign(get_account("init3").active.get_keys().front(),delegate_priv_key);
@@ -610,6 +648,7 @@ BOOST_FIXTURE_TEST_CASE( change_block_interval, database_fixture )
       trx.sign(get_account("init5").active.get_keys().front(),delegate_priv_key);
       trx.sign(get_account("init6").active.get_keys().front(),delegate_priv_key);
       trx.sign(get_account("init7").active.get_keys().front(),delegate_priv_key);
+      */
       db.push_transaction(trx);
       BOOST_CHECK(proposal_id_type()(db).is_authorized_to_execute(db));
    }

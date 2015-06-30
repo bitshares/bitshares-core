@@ -439,8 +439,8 @@ struct signature_check_visitor
 {
    typedef void result_type;
 
-   const signed_transaction& trx;
-   signature_check_visitor( const signed_transaction& t ):trx(t){}
+   flat_map<address,bool>&  sigs;
+   signature_check_visitor( flat_map<address,bool>& s ):sigs(s){}
 
    template<typename T>
    result_type operator()( const T& o )const{}
@@ -448,7 +448,11 @@ struct signature_check_visitor
    result_type operator()( const balance_claim_operation& o )const
    {
       for( auto& owner : o.owners )
-         FC_ASSERT( trx.extra_signatures.find(owner) != trx.extra_signatures.end() );
+      {
+         auto itr = sigs.find(owner);
+         FC_ASSERT( itr != sigs.end() );
+         itr->second = true;
+      }
    }
 
 };
@@ -468,25 +472,12 @@ processed_transaction database::_apply_transaction( const signed_transaction& tr
    //This check is used only if this transaction has an absolute expiration time.
    if( !(skip & skip_transaction_signatures) && trx.relative_expiration == 0 )
    {
-      for( const auto& sig : trx.signatures )
-      {
-         FC_ASSERT( sig.first(*this).key_address() == fc::ecc::public_key( sig.second, trx.digest() ), "",
-                    ("trx",trx)
-                    ("digest",trx.digest())
-                    ("sig.first",sig.first)
-                    ("key_address",sig.first(*this).key_address())
-                    ("addr", address(fc::ecc::public_key( sig.second, trx.digest() ))) );
-      }
+      eval_state._sigs.reserve( trx.signatures.size() );
 
-      for( const auto& sig : trx.extra_signatures )
-      {
-         FC_ASSERT( sig.first == address(fc::ecc::public_key( sig.second, trx.digest() )), "",
-                    ("trx",trx)
-                    ("digest",trx.digest())
-                    ("sig.first",sig.first)
-                    ("addr", address(fc::ecc::public_key( sig.second, trx.digest() ))) );
-      }
-      trx.visit( signature_check_visitor(trx) ); 
+      for( const auto& sig : trx.signatures )
+         FC_ASSERT( eval_state._sigs.insert( std::make_pair( address(fc::ecc::public_key( sig, trx.digest() )), false) ).second, "Multiple signatures by same key detected" ) ;
+
+      trx.visit( signature_check_visitor(eval_state._sigs) ); 
    }
 
    //If we're skipping tapos check, but not dupe check, assume all transactions have maximum expiration time.
@@ -509,15 +500,12 @@ processed_transaction database::_apply_transaction( const signed_transaction& tr
          //This is the signature check for transactions with relative expiration.
          if( !(skip & skip_transaction_signatures) )
          {
+            eval_state._sigs.reserve( trx.signatures.size() );
+
             for( const auto& sig : trx.signatures )
-            {
-               address trx_addr = fc::ecc::public_key(sig.second, trx.digest(tapos_block_summary.block_id));
-               FC_ASSERT(sig.first(*this).key_address() == trx_addr,
-                          "",
-                          ("sig.first",sig.first)
-                          ("key_address",sig.first(*this).key_address())
-                          ("addr", trx_addr));
-            }
+               FC_ASSERT( eval_state._sigs.insert( std::make_pair(address(fc::ecc::public_key( sig, trx.digest(tapos_block_summary.block_id) )),false) ).second, "Multiple signatures by same key detected" ) ;
+
+            trx.visit( signature_check_visitor(eval_state._sigs) ); 
          }
 
          //Verify TaPoS block summary has correct ID prefix, and that this block's time is not past the expiration
@@ -560,11 +548,17 @@ processed_transaction database::_apply_transaction( const signed_transaction& tr
    auto range = index.equal_range(GRAPHENE_TEMP_ACCOUNT);
    std::for_each(range.first, range.second, [](const account_balance_object& b) { FC_ASSERT(b.balance == 0); });
 
+   if( !(skip & (skip_transaction_signatures|skip_authority_check))  )
+   {
+      for( const auto& item : eval_state._sigs )
+         FC_ASSERT( item.second, "All signatures must be used", ("item",item) );
+   }
+
    return ptrx;
 } FC_CAPTURE_AND_RETHROW( (trx) ) }
 
 operation_result database::apply_operation(transaction_evaluation_state& eval_state, const operation& op)
-{
+{ try {
    int i_which = op.which();
    uint64_t u_which = uint64_t( i_which );
    if( i_which < 0 )
@@ -578,7 +572,7 @@ operation_result database::apply_operation(transaction_evaluation_state& eval_st
    auto result = eval->evaluate( eval_state, op, true );
    set_applied_operation_result( op_id, result );
    return result;
-}
+} FC_CAPTURE_AND_RETHROW( (eval_state._sigs) ) }
 
 const witness_object& database::validate_block_header( uint32_t skip, const signed_block& next_block )const
 {

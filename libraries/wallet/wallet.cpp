@@ -2168,7 +2168,7 @@ signed_transaction wallet_api::import_balance( string name_or_id, const vector<s
    auto tx = sign_transaction( trx, false );
 
    for( auto a : required_addrs )
-     tx.sign( a, keys[a] );
+     tx.sign( keys[a] );
 
    if( broadcast ) 
       my->_remote_net->broadcast_transaction(tx);

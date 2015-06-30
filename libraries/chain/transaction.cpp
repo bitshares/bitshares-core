@@ -60,26 +60,15 @@ graphene::chain::transaction_id_type graphene::chain::transaction::id() const
    memcpy(result._hash, hash._hash, std::min(sizeof(result), sizeof(hash)));
    return result;
 }
-void graphene::chain::signed_transaction::sign( key_id_type id, const private_key_type& key )
+void graphene::chain::signed_transaction::sign(  const private_key_type& key )
 {
    if( relative_expiration != 0 )
    {
       if( !block_id_cache.valid() ) edump((*this));
       assert(block_id_cache.valid());
-      signatures[id] =  key.sign_compact( digest(*block_id_cache) );
+      signatures.push_back(  key.sign_compact( digest(*block_id_cache) ) );
    } else {
-      signatures[id] =  key.sign_compact( digest() );
-   }
-}
-void graphene::chain::signed_transaction::sign( const address& addr, const private_key_type& key )
-{
-   if( relative_expiration != 0 )
-   {
-      if( !block_id_cache.valid() ) edump((*this));
-      assert(block_id_cache.valid());
-      extra_signatures[addr] =  key.sign_compact( digest(*block_id_cache) );
-   } else {
-      extra_signatures[addr] =  key.sign_compact( digest() );
+      signatures.push_back( key.sign_compact( digest() ) );
    }
 }
 

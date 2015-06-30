@@ -89,7 +89,7 @@ database_fixture::database_fixture()
 }
 
 database_fixture::~database_fixture()
-{
+{ try {
    // If we're unwinding due to an exception, don't do any more checks.
    // This way, boost test's last checkpoint tells us approximately where the error was.
    if( !std::uncaught_exception() )
@@ -102,7 +102,7 @@ database_fixture::~database_fixture()
    if( data_dir )
       db.close();
    return;
-}
+} FC_CAPTURE_AND_RETHROW() }
 
 fc::ecc::private_key database_fixture::generate_private_key(string seed)
 {

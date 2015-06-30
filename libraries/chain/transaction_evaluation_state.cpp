@@ -17,6 +17,7 @@
  */
 #include <graphene/chain/transaction_evaluation_state.hpp>
 #include <graphene/chain/account_object.hpp>
+#include <graphene/chain/key_object.hpp>
 #include <graphene/chain/asset_object.hpp>
 #include <graphene/chain/delegate_object.hpp>
 #include <graphene/chain/database.hpp>
@@ -25,7 +26,9 @@
 namespace graphene { namespace chain {
    bool transaction_evaluation_state::check_authority( const account_object& account, authority::classification auth_class, int depth )
    {
-      if( (!_is_proposed_trx) && (_db->get_node_properties().skip_flags & database::skip_authority_check) )
+      if( (!_is_proposed_trx) && (_db->get_node_properties().skip_flags & database::skip_authority_check)  )
+         return true;
+      if( (!_is_proposed_trx) && (_db->get_node_properties().skip_flags & database::skip_transaction_signatures)  )
          return true;
       if( account.get_id() == GRAPHENE_TEMP_ACCOUNT ||
           approved_by.find(make_pair(account.id, auth_class)) != approved_by.end() )
@@ -91,10 +94,15 @@ namespace graphene { namespace chain {
       }
       return false;
    }
-   bool transaction_evaluation_state::signed_by( key_id_type id )const
+   bool transaction_evaluation_state::signed_by( key_id_type id )
    {
       assert(_trx);
-      return _trx->signatures.find(id) != _trx->signatures.end();
+      assert(_db);
+      //wdump((_sigs)(id(*_db).key_address())(*_trx) );
+      auto itr = _sigs.find( id(*_db).key_address() );
+      if( itr != _sigs.end() )
+         return itr->second = true;
+      return false;
    }
 
 } } // namespace graphene::chain

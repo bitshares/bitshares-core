@@ -30,14 +30,14 @@
 namespace graphene { namespace chain {
    database& generic_evaluator::db()const { return trx_state->db(); }
    operation_result generic_evaluator::start_evaluate( transaction_evaluation_state& eval_state, const operation& op, bool apply )
-   {
+   { try {
       trx_state   = &eval_state;
       check_required_authorities(op);
       auto result = evaluate( op );
 
       if( apply ) result = this->apply( op );
       return result;
-   }
+   } FC_CAPTURE_AND_RETHROW() }
 
    void generic_evaluator::prepare_fee(account_id_type account_id, asset fee)
    {
@@ -75,11 +75,12 @@ namespace graphene { namespace chain {
    } FC_CAPTURE_AND_RETHROW() }
 
    bool generic_evaluator::verify_authority( const account_object& a, authority::classification c )
-   {
+   { try {
        return trx_state->check_authority( a, c );
-   }
+   } FC_CAPTURE_AND_RETHROW( (a)(c) ) }
+
    void generic_evaluator::check_required_authorities(const operation& op)
-   {
+   { try {
       flat_set<account_id_type> active_auths;
       flat_set<account_id_type> owner_auths;
       op.visit(operation_get_required_auths(active_auths, owner_auths));
@@ -93,7 +94,7 @@ namespace graphene { namespace chain {
       {
          FC_ASSERT(verify_authority(id(db()), authority::owner), "", ("id", id));
       }
-   }
+   } FC_CAPTURE_AND_RETHROW( (op) ) }
 
    object_id_type generic_evaluator::get_relative_id( object_id_type rel_id )const
    {

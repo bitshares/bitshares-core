@@ -962,15 +962,15 @@ BOOST_AUTO_TEST_CASE( balance_object_test )
    op.total_claimed = asset(1);
    op.owners.insert(genesis_state.initial_balances.back().owner);
    trx.operations = {op};
-   trx.sign(*op.owners.begin(), generate_private_key("n"));
-   trx.sign(op.deposit_to_account(db).active.get_keys().front(), generate_private_key("n"));
+   trx.sign(generate_private_key("n"));
+   //trx.sign(generate_private_key("n"));
    // Fail because I'm claiming the wrong address
    BOOST_CHECK_THROW(db.push_transaction(trx), fc::exception);
    trx.clear();
    op.owners = {genesis_state.initial_balances.front().owner};
    trx.operations = {op};
-   trx.sign(*op.owners.begin(), generate_private_key("n"));
-   trx.sign(op.deposit_to_account(db).active.get_keys().front(), generate_private_key("n"));
+   trx.sign(generate_private_key("n"));
+   //trx.sign(generate_private_key("n"));
    db.push_transaction(trx);
 
    // Not using fixture's get_balance() here because it uses fixture's db, not my override
