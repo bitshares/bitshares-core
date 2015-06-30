@@ -453,7 +453,10 @@ processed_transaction database::_apply_transaction( const signed_transaction& tr
       eval_state._sigs.reserve( trx.signatures.size() );
 
       for( const auto& sig : trx.signatures )
+      {
          FC_ASSERT( eval_state._sigs.insert( std::make_pair( public_key_type(fc::ecc::public_key( sig, trx.digest() )), false) ).second, "Multiple signatures by same key detected" ) ;
+      }
+
    }
 
    //If we're skipping tapos check, but not dupe check, assume all transactions have maximum expiration time.
@@ -531,9 +534,11 @@ processed_transaction database::_apply_transaction( const signed_transaction& tr
             eval_state._sigs.reserve( trx.signatures.size() );
 
             for( const auto& sig : trx.signatures )
+            {
                FC_ASSERT(eval_state._sigs.insert(
                             std::make_pair(public_key_type(fc::ecc::public_key(sig, trx.digest(tapos_block_summary.block_id) )),
                                            false)).second, "Multiple signatures by same key detected");
+            }
          }
 
          //Verify TaPoS block summary has correct ID prefix, and that this block's time is not past the expiration
@@ -579,7 +584,9 @@ processed_transaction database::_apply_transaction( const signed_transaction& tr
    if( !(skip & (skip_transaction_signatures|skip_authority_check))  )
    {
       for( const auto& item : eval_state._sigs )
+      {
          FC_ASSERT( item.second, "All signatures must be used", ("item",item) );
+      }
    }
 
    return ptrx;
