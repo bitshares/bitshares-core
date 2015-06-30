@@ -73,12 +73,6 @@ void database::adjust_balance(const account_object& account, asset delta )
    adjust_balance( account.id, delta);
 }
 
-// TODO:  This method should be removed
-void database::adjust_balance(const account_object* account, asset delta)
-{
-   adjust_balance(*account, delta);
-}
-
 void database::adjust_core_in_orders( const account_object& acnt, asset delta )
 {
    if( delta.asset_id == asset_id_type(0) && delta.amount != 0 )
