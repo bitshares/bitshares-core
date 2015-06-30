@@ -23,8 +23,10 @@
 
 #include <fc/io/json.hpp>
 #include <fc/io/stdio.hpp>
+#include <fc/network/http/server.hpp>
 #include <fc/network/http/websocket.hpp>
 #include <fc/rpc/cli.hpp>
+#include <fc/rpc/http_api.hpp>
 #include <fc/rpc/websocket_api.hpp>
 
 #include <graphene/app/api.hpp>
@@ -65,6 +67,7 @@ int main( int argc, char** argv )
          ("rpc-endpoint,r", bpo::value<string>()->implicit_value("127.0.0.1:8091"), "Endpoint for wallet websocket RPC to listen on")
          ("rpc-tls-endpoint,t", bpo::value<string>()->implicit_value("127.0.0.1:8092"), "Endpoint for wallet websocket TLS RPC to listen on")
          ("rpc-tls-certificate,c", bpo::value<string>()->implicit_value("server.pem"), "PEM certificate for wallet websocket TLS RPC")
+         ("rpc-http-endpoint,h", bpo::value<string>()->implicit_value("127.0.0.1:8093"), "Endpoint for wallet HTTP RPC to listen on")
          ("daemon,d", "Run the wallet in daemon mode" )
          ("wallet-file,w", bpo::value<string>()->implicit_value("wallet.json"), "wallet to load");
 
@@ -191,6 +194,24 @@ int main( int argc, char** argv )
          ilog( "Listening for incoming TLS RPC requests on ${p}", ("p", options.at("rpc-tls-endpoint").as<string>() ));
          _websocket_tls_server->listen( fc::ip::endpoint::from_string(options.at("rpc-tls-endpoint").as<string>()) );
          _websocket_tls_server->start_accept();
+      }
+
+      auto _http_server = std::make_shared<fc::http::server>();
+      if( options.count("rpc-http-endpoint" ) )
+      {
+         ilog( "Listening for incoming HTTP RPC requests on ${p}", ("p", options.at("rpc-http-endpoint").as<string>() ) );
+         _http_server->listen( fc::ip::endpoint::from_string( options.at( "rpc-http-endpoint" ).as<string>() ) );
+         //
+         // due to implementation, on_request() must come AFTER listen()
+         //
+         _http_server->on_request(
+            [&]( const fc::http::request& req, const fc::http::server::response& resp )
+            {
+               std::shared_ptr< fc::rpc::http_api_connection > conn =
+                  std::make_shared< fc::rpc::http_api_connection>();
+               conn->register_api( wapi );
+               conn->on_request( req, resp );
+            } );
       }
 
       if( !options.count( "daemon" ) )
