@@ -73,9 +73,11 @@ void required_approval_index::remove( account_id_type a, proposal_id_type p )
 {
     auto itr = _account_to_proposals.find(a);
     if( itr != _account_to_proposals.end() )
-       itr->second.erase(p);
-    if( itr->second.size() == 0 )
-       _account_to_proposals.erase(itr);
+    {
+        itr->second.erase( p );
+        if( itr->second.empty() )
+            _account_to_proposals.erase( itr->first );
+    }
 }
 
 void required_approval_index::object_removed( const object& obj )
