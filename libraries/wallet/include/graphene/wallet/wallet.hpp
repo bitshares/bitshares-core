@@ -86,7 +86,8 @@ struct wallet_data
 
    // map of account_name -> base58_private_key for
    //    incomplete account regs
-   map<string, string> pending_account_registrations;
+   map<string, vector<string> > pending_account_registrations;
+   map<string, string> pending_witness_registrations;
 
    string                    ws_server = "ws://localhost:8090";
    string                    ws_user;
@@ -258,7 +259,7 @@ class wallet_api
        * @ingroup Transaction Builder API
        */
       void replace_operation_in_builder_transaction(transaction_handle_type handle,
-                                                    int operation_index,
+                                                    unsigned operation_index,
                                                     const operation& new_op);
       /**
        * @ingroup Transaction Builder API
@@ -812,15 +813,39 @@ class wallet_api
       signed_transaction create_delegate(string owner_account,
                                          bool broadcast = false);
 
+      /** Lists all witnesses registered in the blockchain.
+       * This returns a list of all account names that own witnesses, and the associated witness id,
+       * sorted by name.  This lists witnesses whether they are currently voted in or not.
+       *
+       * Use the \c lowerbound and limit parameters to page through the list.  To retrieve all witnesss,
+       * start by setting \c lowerbound to the empty string \c "", and then each iteration, pass
+       * the last witness name returned as the \c lowerbound for the next \c list_witnesss() call.
+       *
+       * @param lowerbound the name of the first witness to return.  If the named witness does not exist, 
+       *                   the list will start at the witness that comes after \c lowerbound
+       * @param limit the maximum number of witnesss to return (max: 1000)
+       * @returns a list of witnesss mapping witness names to witness ids
+       */
+      map<string,witness_id_type>       list_witnesses(const string& lowerbound, uint32_t limit);
+
+      /** Returns information about the given witness.
+       * @param witness_name_or_id the name or id of the witness account owner, or the id of the witness
+       * @returns the information about the witness stored in the block chain
+       */
+      witness_object get_witness(string owner_account);
+
       /** Creates a witness object owned by the given account.
        *
        * An account can have at most one witness object.
        *
        * @param owner_account the name or id of the account which is creating the witness
+       * @param url a URL to include in the witness record in the blockchain.  Clients may
+       *            display this when showing a list of witnesses.  May be blank.
        * @param broadcast true to broadcast the transaction on the network
        * @returns the signed transaction registering a witness
        */
       signed_transaction create_witness(string owner_account,
+                                        string url,
                                         bool broadcast = false);
 
       /** Vote for a given delegate.
@@ -919,7 +944,7 @@ FC_REFLECT( graphene::wallet::wallet_data,
             (my_accounts)
             (cipher_keys)
             (extra_keys)
-            (pending_account_registrations)
+            (pending_account_registrations)(pending_witness_registrations)
             (ws_server)
             (ws_user)
             (ws_password)
@@ -968,6 +993,8 @@ FC_API( graphene::wallet::wallet_api,
         (settle_asset)
         (whitelist_account)
         (create_delegate)
+        (get_witness)
+        (list_witnesses)
         (create_witness)
         (vote_for_delegate)
         (vote_for_witness)

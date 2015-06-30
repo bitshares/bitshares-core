@@ -259,28 +259,38 @@ void database::init_genesis(const genesis_state_type& genesis_state)
    create<block_summary_object>([&](block_summary_object&) {});
 
    // Create initial balances
+   const auto& asset_idx = get_index_type<asset_index>().indices().get<by_symbol>();
+   share_type total_allocation = 0;
    if( !genesis_state.initial_balances.empty() )
    {
-      share_type total_allocation = 0;
-      for( const auto& handout : genesis_state.initial_balances )
-         total_allocation += handout.amount;
-
-      const auto& asset_idx = get_index_type<asset_index>().indices().get<by_symbol>();
       for( const auto& handout : genesis_state.initial_balances )
       {
          create<balance_object>([&handout,&asset_idx,total_allocation](balance_object& b) {
             b.balance = asset(handout.amount, asset_idx.find(handout.asset_symbol)->get_id());
             b.owner = handout.owner;
          });
+         total_allocation += handout.amount;
       }
-
-      modify(dyn_asset, [total_allocation](asset_dynamic_data_object& d) {
-         d.current_supply = total_allocation;
-      });
-      adjust_balance(GRAPHENE_COMMITTEE_ACCOUNT, -get_balance(GRAPHENE_COMMITTEE_ACCOUNT,{}));
    }
 
-   // TODO: Create initial vesting balances
+   // Create initial vesting balances
+   if( !genesis_state.initial_vesting_balances.empty() )
+   {
+      for( const genesis_state_type::initial_vesting_balance_type& vest : genesis_state.initial_vesting_balances )
+      {
+         create<balance_object>([&](balance_object& b) {
+            b.balance = asset(vest.amount, asset_idx.find(vest.asset_symbol)->get_id());
+            b.owner = vest.owner;
+            linear_vesting_policy policy;
+            policy.earliest_withdraw_time = vest.earliest_withdrawal_date;
+            policy.begin_date = vest.vesting_start_date;
+            policy.vesting_seconds = (vest.vesting_end_date - vest.vesting_start_date).to_seconds();
+            policy.begin_balance = b.balance.amount;
+            b.vesting_policy = policy;
+         });
+         total_allocation += vest.amount;
+      }
+   }
 
    // Create initial accounts
    if( !genesis_state.initial_accounts.empty() )
@@ -316,6 +326,15 @@ void database::init_genesis(const genesis_state_type& genesis_state)
              apply_operation(genesis_eval_state, op);
          }
       }
+   }
+
+   // Set current supply based on allocations, if they happened
+   if( total_allocation > 0 )
+   {
+      modify(dyn_asset, [total_allocation](asset_dynamic_data_object& d) {
+         d.current_supply = total_allocation;
+      });
+      adjust_balance(GRAPHENE_COMMITTEE_ACCOUNT, -get_balance(GRAPHENE_COMMITTEE_ACCOUNT,{}));
    }
 
    flat_set<delegate_id_type> init_delegates;

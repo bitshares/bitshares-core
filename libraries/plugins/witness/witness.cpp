@@ -22,6 +22,8 @@
 #include <graphene/chain/key_object.hpp>
 #include <graphene/time/time.hpp>
 
+#include <graphene/utilities/key_conversion.hpp>
+
 #include <fc/thread/thread.hpp>
 
 using namespace graphene::witness_plugin;
@@ -39,8 +41,8 @@ void witness_plugin::plugin_set_program_options(
          ("witness-id,w", bpo::value<vector<string>>()->composing()->multitoken(),
           "ID of witness controlled by this node (e.g. \"1.7.0\", quotes are required, may specify multiple times)")
          ("private-key", bpo::value<vector<string>>()->composing()->multitoken()->
-          DEFAULT_VALUE_VECTOR(std::make_pair(chain::key_id_type(), fc::ecc::private_key::regenerate(fc::sha256::hash(std::string("nathan"))))),
-          "Tuple of [key ID, private key] (may specify multiple times)")
+          DEFAULT_VALUE_VECTOR(std::make_pair(chain::key_id_type(), graphene::utilities::key_to_wif(fc::ecc::private_key::regenerate(fc::sha256::hash(std::string("nathan")))))),
+          "Tuple of [key ID, WIF private key] (may specify multiple times)")
          ;
    config_file_options.add(command_line_options);
 }
@@ -51,12 +53,35 @@ std::string witness_plugin::plugin_name()const
 }
 
 void witness_plugin::plugin_initialize(const boost::program_options::variables_map& options)
-{
+{ try {
    _options = &options;
    LOAD_VALUE_SET(options, "witness-id", _witnesses, chain::witness_id_type)
-   //Define a type T which doesn't have a comma, as I can't put a comma in a macro argument
-   using T = std::pair<chain::key_id_type,fc::ecc::private_key>;
-   LOAD_VALUE_SET(options, "private-key", _private_keys, T)
+   
+   if( options.count("private-key") ) 
+   { 
+      const std::vector<std::string> key_id_to_wif_pair_strings = options["private-key"].as<std::vector<std::string>>();
+      for (const std::string& key_id_to_wif_pair_string : key_id_to_wif_pair_strings)
+      {
+         auto key_id_to_wif_pair = graphene::app::dejsonify<std::pair<chain::key_id_type, std::string> >(key_id_to_wif_pair_string);
+         fc::optional<fc::ecc::private_key> private_key = graphene::utilities::wif_to_key(key_id_to_wif_pair.second);
+         if (!private_key)
+         {
+            // the key isn't in WIF format; see if they are still passing the old native private key format.  This is
+            // just here to ease the transition, can be removed soon
+            try
+            {
+               private_key = fc::variant(key_id_to_wif_pair.second).as<fc::ecc::private_key>();
+            }
+            catch (const fc::exception&)
+            {
+               FC_THROW("Invalid WIF-format private key ${key_string}", ("key_string", key_id_to_wif_pair.second));
+            }
+         }
+         _private_keys[key_id_to_wif_pair.first] = *private_key;
+      }
+   }
+      }
+   catch (const fc::exception& e){ edump((e)); throw; }
 }
 
 void witness_plugin::plugin_startup()

@@ -110,8 +110,8 @@ namespace graphene { namespace chain {
 
          /// Ticker symbol for this asset, i.e. "USD"
          string                  symbol;
-         /// Maximum number of digits after the decimal point
-         uint64_t                precision;
+         /// Maximum number of digits after the decimal point (must be <= 12)
+         uint8_t                 precision;
          /// ID of the account which issued this asset.
          account_id_type         issuer;
 

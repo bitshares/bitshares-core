@@ -145,7 +145,7 @@ asset asset_object::amount_from_string(string amount_string) const
    share_type satoshis = 0;
 
    share_type scaled_precision = 1;
-   for( short i = 0; i < precision; ++i )
+   for( uint8_t i = 0; i < precision; ++i )
       scaled_precision *= 10;
 
    const auto decimal_pos = amount_string.find( '.' );
@@ -178,7 +178,7 @@ asset asset_object::amount_from_string(string amount_string) const
 string asset_object::amount_to_string(share_type amount) const
 {
    share_type scaled_precision = 1;
-   for( short i = 0; i < precision; ++i )
+   for( uint8_t i = 0; i < precision; ++i )
       scaled_precision *= 10;
    assert(scaled_precision > 0);
 

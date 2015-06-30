@@ -37,7 +37,15 @@ std::string key_to_wif(const fc::ecc::private_key& key)
 
 fc::optional<fc::ecc::private_key> wif_to_key( const std::string& wif_key )
 {
-  std::vector<char> wif_bytes = fc::from_base58(wif_key);
+  std::vector<char> wif_bytes;
+  try
+  {
+    wif_bytes = fc::from_base58(wif_key);
+  }
+  catch (const fc::parse_error_exception&)
+  {
+    return fc::optional<fc::ecc::private_key>();
+  }
   if (wif_bytes.size() < 5)
     return fc::optional<fc::ecc::private_key>();
   std::vector<char> key_bytes(wif_bytes.begin() + 1, wif_bytes.end() - 4);
