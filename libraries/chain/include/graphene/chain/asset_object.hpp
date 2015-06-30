@@ -174,6 +174,8 @@ namespace graphene { namespace chain {
          struct bitasset_options {
             /// Time before a price feed expires
             uint32_t feed_lifetime_sec = GRAPHENE_DEFAULT_PRICE_FEED_LIFETIME;
+            /// Minimum number of unexpired feeds required to extract a median feed from
+            uint8_t minimum_feeds = 1;
             /// This is the delay between the time a long requests settlement and the chain evaluates the settlement
             uint32_t force_settlement_delay_sec = GRAPHENE_DEFAULT_FORCE_SETTLEMENT_DELAY;
             /// This is the percent to adjust the feed price in the short's favor in the event of a forced settlement
@@ -332,6 +334,7 @@ FC_REFLECT( graphene::chain::asset_object::asset_options,
           )
 FC_REFLECT( graphene::chain::asset_object::bitasset_options,
             (feed_lifetime_sec)
+            (minimum_feeds)
             (force_settlement_delay_sec)
             (force_settlement_offset_percent)
             (maximum_force_settlement_volume)
