@@ -6,6 +6,7 @@ add_library( graphene_chain
              type_id.cpp
 
              address.cpp
+             pts_address.cpp
              asset.cpp
              predicate.cpp
 

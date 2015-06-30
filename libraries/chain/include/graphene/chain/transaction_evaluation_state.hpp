@@ -41,6 +41,7 @@ namespace graphene { namespace chain {
          database& db()const { FC_ASSERT( _db ); return *_db; }
 
          bool signed_by( key_id_type id );
+         bool signed_by( const address& a, bool maybe_pts = false );
 
          /** derived from signatures on transaction
          flat_set<address>                                          signed_by;
@@ -56,9 +57,9 @@ namespace graphene { namespace chain {
          /** When an address is referenced via check authority it is flagged as being used,
           * all addresses must be flagged as being used or the transaction will fail.
           */
-         flat_map<address, bool>         _sigs;
-         const signed_transaction*       _trx = nullptr;
-         database*                       _db = nullptr;
-         bool                            _is_proposed_trx = false;
+         flat_map<public_key_type, bool>  _sigs;
+         const signed_transaction*        _trx = nullptr;
+         database*                        _db = nullptr;
+         bool                             _is_proposed_trx = false;
    };
 } } // namespace graphene::chain

@@ -38,7 +38,7 @@ bool proposal_object::is_authorized_to_execute(database& db) const
    signed_transaction tmp;
    dry_run_eval._trx = &tmp;
    for( auto key_id : available_key_approvals )
-      dry_run_eval._sigs.insert( std::make_pair(key_id(db).key_address(),true) );
+      dry_run_eval._sigs.insert( std::make_pair(key_id(db).key(),true) );
 
    //insert into dry_run_eval->_trx.signatures
    //dry_run_eval.signed_by.insert(available_key_approvals.begin(), available_key_approvals.end());

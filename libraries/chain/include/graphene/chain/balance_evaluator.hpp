@@ -21,8 +21,8 @@ public:
       database& d = db();
       balance = &op.balance_to_claim(d);
 
-      FC_ASSERT(trx_state->_sigs.count(balance->owner) == 1);
-      trx_state->_sigs[balance->owner] = true;
+
+      FC_ASSERT(trx_state->signed_by( balance->owner, true /*maybe pts*/ ));
       FC_ASSERT(op.total_claimed.asset_id == balance->asset_type());
 
       if( balance->vesting_policy.valid() ) {

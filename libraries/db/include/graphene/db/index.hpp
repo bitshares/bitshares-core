@@ -19,6 +19,8 @@
 #include <graphene/db/object.hpp>
 #include <fc/interprocess/file_mapping.hpp>
 #include <fc/io/raw.hpp>
+#include <fc/io/json.hpp>
+#include <fc/crypto/sha256.hpp>
 #include <fstream>
 
 namespace graphene { namespace db {
@@ -205,13 +207,26 @@ namespace graphene { namespace db {
          virtual void           use_next_id()override                    { ++_next_id.number;  }
          virtual void           set_next_id( object_id_type id )override { _next_id = id;      }
 
+         fc::sha256 get_object_version()const
+         {
+            // TODO: use something other than json to describe the type and detect changes in serialization
+            // json will only detect adding, removing, or renaming fields but will not detect changing types
+            // or changes in the contents of optional values.
+            auto json_obj = fc::json::to_string( object_type() );
+            return fc::sha256::hash(json_obj);
+         }
+
          virtual void open( const path& db )override
          { 
             if( !fc::exists( db ) ) return;
             fc::file_mapping fm( db.generic_string().c_str(), fc::read_only );
             fc::mapped_region mr( fm, fc::read_only, 0, fc::file_size(db) );
             fc::datastream<const char*> ds( (const char*)mr.get_address(), mr.get_size() );
+            fc::sha256 open_ver;
+
             fc::raw::unpack(ds, _next_id);
+            fc::raw::unpack(ds, open_ver);
+            FC_ASSERT( open_ver == get_object_version(), "Incompatible Version, the serialization of objects in this index has changed" );
             try {
                vector<char> tmp;
                while( true ) 
@@ -227,7 +242,9 @@ namespace graphene { namespace db {
             std::ofstream out( db.generic_string(), 
                                std::ofstream::binary | std::ofstream::out | std::ofstream::trunc );
             FC_ASSERT( out );
-            out.write( (char*)&_next_id, sizeof(_next_id) );
+            auto ver  = get_object_version();
+            fc::raw::pack( out, _next_id );
+            fc::raw::pack( out, ver );
             this->inspect_all_objects( [&]( const object& o ) {
                 auto vec = fc::raw::pack( static_cast<const object_type&>(o) );
                 auto packed_vec = fc::raw::pack( vec );

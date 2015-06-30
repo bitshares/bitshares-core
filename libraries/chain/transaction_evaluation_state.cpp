@@ -99,9 +99,30 @@ namespace graphene { namespace chain {
       assert(_trx);
       assert(_db);
       //wdump((_sigs)(id(*_db).key_address())(*_trx) );
-      auto itr = _sigs.find( id(*_db).key_address() );
+      auto itr = _sigs.find( id(*_db).key() );
       if( itr != _sigs.end() )
          return itr->second = true;
+      return false;
+   }
+   bool transaction_evaluation_state::signed_by( const address& a, bool maybe_pts )
+   {
+      if(  _db->get_node_properties().skip_flags & (database::skip_authority_check|database::skip_transaction_signatures)  )
+         return true;
+      for( auto itr = _sigs.begin(); itr != _sigs.end(); ++itr )
+      {
+         if( itr->first == a ) return itr->second = true;
+         if( maybe_pts )
+         {
+             //pts normal
+            if( pts_address( itr->first, false, 56 ) == a ) return itr->second = true;
+             //pts compressed
+            if( pts_address( itr->first, true, 56 ) == a ) return itr->second = true;
+            // btc normal
+            if( pts_address( itr->first, false, 0 ) == a ) return itr->second = true;
+            // btc compressed
+            if( pts_address( itr->first, true, 0 ) == a ) return itr->second = true;
+         }
+      }
       return false;
    }
 
