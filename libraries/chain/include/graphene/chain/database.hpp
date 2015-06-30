@@ -82,6 +82,7 @@ namespace graphene { namespace chain {
        chain_parameters initial_parameters;
        vector<initial_account_type> initial_accounts;
        vector<initial_balance_type> initial_balances;
+       vector<initial_vesting_balance_type> initial_vesting_balances;
        vector<initial_witness_type> initial_witnesses;
        vector<initial_committee_member_type> initial_committee;
    };
@@ -535,4 +536,5 @@ FC_REFLECT(graphene::chain::genesis_state_type::initial_vesting_balance_type,
 FC_REFLECT(graphene::chain::genesis_state_type::initial_witness_type, (owner_name)(block_signing_key)(initial_secret))
 FC_REFLECT(graphene::chain::genesis_state_type::initial_committee_member_type, (owner_name))
 FC_REFLECT(graphene::chain::genesis_state_type,
-           (initial_parameters)(initial_accounts)(initial_balances)(initial_witnesses)(initial_committee))
+           (initial_parameters)(initial_accounts)(initial_balances)
+           (initial_vesting_balances)(initial_witnesses)(initial_committee))
