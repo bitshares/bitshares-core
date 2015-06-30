@@ -58,7 +58,7 @@ namespace graphene { namespace chain {
    class fork_database
    {
       public:
-         typedef vector<item_ptr>      branch_type;
+         typedef vector<item_ptr> branch_type;
 
          fork_database();
          void reset();
@@ -81,8 +81,8 @@ namespace graphene { namespace chain {
          pair< branch_type, branch_type >  fetch_branch_from( block_id_type first,
                                                               block_id_type second )const;
 
-         struct block_id{};
-         struct block_num{};
+         struct block_id;
+         struct block_num;
          typedef multi_index_container<
             item_ptr,
             indexed_by<

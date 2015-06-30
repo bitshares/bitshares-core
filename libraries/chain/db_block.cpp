@@ -301,10 +301,10 @@ signed_block database::_generate_block(
    {
       for( const auto& trx : tmp.transactions )
       {
-         try { 
-             push_transaction( trx, skip ); 
-         } catch ( const fc::exception& e ) { 
-             wlog( "Transaction is no longer valid: ${trx}", ("trx",trx) ); 
+         try {
+             push_transaction( trx, skip );
+         } catch ( const fc::exception& e ) {
+             wlog( "Transaction is no longer valid: ${trx}", ("trx",trx) );
          }
       }
       return _generate_block( when, witness_id, block_signing_private_key );
@@ -435,28 +435,6 @@ processed_transaction database::apply_transaction( const signed_transaction& trx
    return result;
 }
 
-struct signature_check_visitor
-{
-   typedef void result_type;
-
-   flat_map<address,bool>&  sigs;
-   signature_check_visitor( flat_map<address,bool>& s ):sigs(s){}
-
-   template<typename T>
-   result_type operator()( const T& o )const{}
-
-   result_type operator()( const balance_claim_operation& o )const
-   {
-      for( auto& owner : o.owners )
-      {
-         auto itr = sigs.find(owner);
-         FC_ASSERT( itr != sigs.end() );
-         itr->second = true;
-      }
-   }
-
-};
-
 processed_transaction database::_apply_transaction( const signed_transaction& trx )
 { try {
    uint32_t skip = get_node_properties().skip_flags;
@@ -476,8 +454,6 @@ processed_transaction database::_apply_transaction( const signed_transaction& tr
 
       for( const auto& sig : trx.signatures )
          FC_ASSERT( eval_state._sigs.insert( std::make_pair( address(fc::ecc::public_key( sig, trx.digest() )), false) ).second, "Multiple signatures by same key detected" ) ;
-
-      trx.visit( signature_check_visitor(eval_state._sigs) ); 
    }
 
    //If we're skipping tapos check, but not dupe check, assume all transactions have maximum expiration time.
@@ -503,9 +479,9 @@ processed_transaction database::_apply_transaction( const signed_transaction& tr
             eval_state._sigs.reserve( trx.signatures.size() );
 
             for( const auto& sig : trx.signatures )
-               FC_ASSERT( eval_state._sigs.insert( std::make_pair(address(fc::ecc::public_key( sig, trx.digest(tapos_block_summary.block_id) )),false) ).second, "Multiple signatures by same key detected" ) ;
-
-            trx.visit( signature_check_visitor(eval_state._sigs) ); 
+               FC_ASSERT(eval_state._sigs.insert(
+                            std::make_pair(address(fc::ecc::public_key(sig, trx.digest(tapos_block_summary.block_id) )),
+                                           false)).second, "Multiple signatures by same key detected");
          }
 
          //Verify TaPoS block summary has correct ID prefix, and that this block's time is not past the expiration
@@ -513,7 +489,7 @@ processed_transaction database::_apply_transaction( const signed_transaction& tr
          trx_expiration = tapos_block_summary.timestamp + chain_parameters.block_interval*trx.relative_expiration;
       } else if( trx.relative_expiration == 0 ) {
          trx_expiration = fc::time_point_sec() + fc::seconds(trx.ref_block_prefix);
-         FC_ASSERT( trx_expiration <= _pending_block.timestamp + chain_parameters.maximum_time_until_expiration, "", 
+         FC_ASSERT( trx_expiration <= _pending_block.timestamp + chain_parameters.maximum_time_until_expiration, "",
                     ("trx_expiration",trx_expiration)("_pending_block.timestamp",_pending_block.timestamp)("max_til_exp",chain_parameters.maximum_time_until_expiration));
       }
       FC_ASSERT( _pending_block.timestamp <= trx_expiration, "", ("pending.timestamp",_pending_block.timestamp)("trx_exp",trx_expiration) );

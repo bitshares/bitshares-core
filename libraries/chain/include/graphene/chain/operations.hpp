@@ -130,14 +130,19 @@ namespace graphene { namespace chain {
    };
 
    /**
-    * This operation will claim all initial balance objects owned by any of the addresses and
-    * deposit them into the deposit_to_account.
+    * @brief Claim a balance in a @ref balanc_object
+    *
+    * This operation is used to claim the balance in a given @ref balance_object. If the balance object contains a
+    * vesting balance, @ref total_claimed must be set to zero, and all available vested funds will be claimed. If the
+    * object contains a non-vesting balance, @ref total_claimed must be the full balance of the object.
+    *
+    * This operation returns the total amount claimed.
     */
    struct balance_claim_operation
    {
       asset             fee;
       account_id_type   deposit_to_account;
-      flat_set<address> owners;
+      balance_id_type   balance_to_claim;
       asset             total_claimed;
 
       account_id_type fee_payer()const { return deposit_to_account; }
@@ -145,8 +150,8 @@ namespace graphene { namespace chain {
       share_type      calculate_fee(const fee_schedule_type& k)const { return 0; }
       void            validate()const;
 
-      void get_balance_delta(balance_accumulator& acc, const operation_result& result = asset())const {
-         acc.adjust(fee_payer(), total_claimed);
+      void get_balance_delta(balance_accumulator& acc, const operation_result& result)const {
+         acc.adjust(deposit_to_account, result.get<asset>());
          acc.adjust(fee_payer(), -fee);
       }
    };
@@ -1646,7 +1651,7 @@ FC_REFLECT( graphene::chain::custom_operation, (fee)(payer)(required_auths)(id)(
 FC_REFLECT( graphene::chain::assert_operation, (fee)(fee_paying_account)(predicates)(required_auths) )
 
 FC_REFLECT( graphene::chain::void_result, )
-FC_REFLECT( graphene::chain::balance_claim_operation, (fee)(deposit_to_account)(owners)(total_claimed) )
+FC_REFLECT( graphene::chain::balance_claim_operation, (fee)(deposit_to_account)(balance_to_claim)(total_claimed) )
 
 FC_REFLECT_TYPENAME( graphene::chain::operation )
 FC_REFLECT_TYPENAME( graphene::chain::operation_result )

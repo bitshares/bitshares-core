@@ -66,7 +66,10 @@ database_fixture::database_fixture()
    for( int i = 0; i < 10; ++i )
    {
       auto name = "init"+fc::to_string(i);
-      genesis_state.initial_accounts.emplace_back(name, delegate_priv_key.get_public_key(), true);
+      genesis_state.initial_accounts.emplace_back(name,
+                                                  delegate_priv_key.get_public_key(),
+                                                  delegate_priv_key.get_public_key(),
+                                                  true);
       genesis_state.initial_committee.push_back({name});
       genesis_state.initial_witnesses.push_back({name, delegate_priv_key.get_public_key(), secret});
    }

@@ -981,31 +981,32 @@ BOOST_AUTO_TEST_CASE( balance_object_test )
    fc::temp_directory td;
    genesis_state.initial_balances.push_back({generate_private_key("n").get_public_key(), GRAPHENE_SYMBOL, 1});
    genesis_state.initial_balances.push_back({generate_private_key("x").get_public_key(), GRAPHENE_SYMBOL, 1});
-   genesis_state.initial_accounts.emplace_back("n", generate_private_key("n").get_public_key(), false);
+   // TODO: vesting genesis balances
+   genesis_state.initial_accounts.emplace_back("n", generate_private_key("n").get_public_key());
 
    db.open(td.path(), genesis_state);
-   const balance_object& balance = *db.get_index_type<balance_index>().indices().find(balance_id_type());
+   const balance_object& balance = balance_id_type()(db);
    BOOST_CHECK_EQUAL(balance.balance.amount.value, 1);
-   BOOST_CHECK_EQUAL(db.get_index_type<balance_index>().indices().find(balance_id_type(1))->balance.amount.value, 1);
+   BOOST_CHECK_EQUAL(balance_id_type(1)(db).balance.amount.value, 1);
 
    balance_claim_operation op;
    op.deposit_to_account = db.get_index_type<account_index>().indices().get<by_name>().find("n")->get_id();
    op.total_claimed = asset(1);
-   op.owners.insert(genesis_state.initial_balances.back().owner);
+   op.balance_to_claim = balance_id_type(1);
    trx.operations = {op};
    trx.sign(generate_private_key("n"));
-   //trx.sign(generate_private_key("n"));
-   // Fail because I'm claiming the wrong address
+   // Fail because I'm claiming from an address which hasn't signed
    BOOST_CHECK_THROW(db.push_transaction(trx), fc::exception);
    trx.clear();
-   op.owners = {genesis_state.initial_balances.front().owner};
+   op.balance_to_claim = balance_id_type();
    trx.operations = {op};
    trx.sign(generate_private_key("n"));
-   //trx.sign(generate_private_key("n"));
    db.push_transaction(trx);
 
    // Not using fixture's get_balance() here because it uses fixture's db, not my override
    BOOST_CHECK_EQUAL(db.get_balance(op.deposit_to_account, asset_id_type()).amount.value, 1);
+   BOOST_CHECK(db.find_object(balance_id_type()) == nullptr);
+   BOOST_CHECK(db.find_object(balance_id_type(1)) != nullptr);
 } FC_LOG_AND_RETHROW() }
 
 // TODO:  Write linear VBO tests

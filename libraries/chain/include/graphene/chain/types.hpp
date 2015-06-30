@@ -177,7 +177,7 @@ namespace graphene { namespace chain {
    typedef object_id< protocol_ids, withdraw_permission_object_type,withdraw_permission_object>   withdraw_permission_id_type;
    typedef object_id< protocol_ids, vesting_balance_object_type,    vesting_balance_object>       vesting_balance_id_type;
    typedef object_id< protocol_ids, worker_object_type,             worker_object>                worker_id_type;
-   typedef object_id< protocol_ids, balance_object_type,            balance_object>                balance_id_type;
+   typedef object_id< protocol_ids, balance_object_type,            balance_object>               balance_id_type;
 
    typedef object_id< relative_protocol_ids, key_object_type, key_object>           relative_key_id_type;
    typedef object_id< relative_protocol_ids, account_object_type, account_object>   relative_account_id_type;

@@ -24,6 +24,7 @@
 #include <graphene/chain/call_order_object.hpp>
 #include <graphene/chain/limit_order_object.hpp>
 #include <graphene/chain/account_object.hpp>
+#include <graphene/chain/balance_object.hpp>
 #include <graphene/chain/block.hpp>
 #include <iostream>
 

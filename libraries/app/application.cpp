@@ -161,14 +161,21 @@ namespace detail {
          for( int i = 0; i < 10; ++i )
          {
             auto name = "init"+fc::to_string(i);
-            initial_state.initial_accounts.emplace_back(name, nathan_key.get_public_key(), true);
+            initial_state.initial_accounts.emplace_back(name,
+                                                        nathan_key.get_public_key(),
+                                                        nathan_key.get_public_key(),
+                                                        true);
             initial_state.initial_committee.push_back({name});
             initial_state.initial_witnesses.push_back({name, nathan_key.get_public_key(), secret});
          }
 
-         initial_state.initial_accounts.emplace_back("nathan", address(public_key_type(nathan_key.get_public_key())), 1);
+         initial_state.initial_accounts.emplace_back("nathan", nathan_key.get_public_key());
+         initial_state.initial_balances.push_back({nathan_key.get_public_key(),
+                                                   GRAPHENE_SYMBOL,
+                                                   GRAPHENE_MAX_SHARE_SUPPLY});
          if( _options->count("genesis-json") )
-            initial_state = fc::json::from_file(_options->at("genesis-json").as<boost::filesystem::path>()).as<genesis_state_type>();
+            initial_state = fc::json::from_file(_options->at("genesis-json").as<boost::filesystem::path>())
+                  .as<genesis_state_type>();
          else
             dlog("Allocating all stake to ${key}", ("key", utilities::key_to_wif(nathan_key)));
 
@@ -199,20 +206,9 @@ namespace detail {
          try
          {
             if( id.item_type == graphene::net::block_message_type )
-            {
-               // for some reason, the contains() function called by is_known_block
-               // throws when the block is not present (instead of returning false)
-               try
-               {
-                  return _chain_db->is_known_block( id.item_hash );
-               }
-               catch (const fc::key_not_found_exception&)
-               {
-                  return false;
-               }
-            }
+               return _chain_db->is_known_block(id.item_hash);
             else
-               return _chain_db->is_known_transaction( id.item_hash ); // is_known_transaction behaves normally
+               return _chain_db->is_known_transaction(id.item_hash);
          }
          FC_CAPTURE_AND_RETHROW( (id) )
       }
@@ -255,7 +251,7 @@ namespace detail {
       virtual std::vector<item_hash_t> get_item_ids(uint32_t item_type,
                                                     const std::vector<item_hash_t>& blockchain_synopsis,
                                                     uint32_t& remaining_item_count,
-                                                    uint32_t limit ) override
+                                                    uint32_t limit) override
       { try {
          FC_ASSERT( item_type == graphene::net::block_message_type );
          vector<block_id_type>  result;
@@ -268,7 +264,7 @@ namespace detail {
          auto itr = blockchain_synopsis.rbegin();
          while( itr != blockchain_synopsis.rend() )
          {
-            if( _chain_db->is_known_block( *itr ) || *itr == block_id_type() )
+            if( _chain_db->is_known_block(*itr) || *itr == block_id_type() )
             {
                last_known_block_id = *itr;
                break;
@@ -285,7 +281,6 @@ namespace detail {
          if( block_header::num_from_id(result.back()) < _chain_db->head_block_num() )
             remaining_item_count = _chain_db->head_block_num() - block_header::num_from_id(result.back());
 
-         idump((blockchain_synopsis)(limit)(result)(remaining_item_count));
          return result;
       } FC_CAPTURE_AND_RETHROW( (blockchain_synopsis)(remaining_item_count)(limit) ) }
 

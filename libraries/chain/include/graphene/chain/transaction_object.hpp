@@ -34,12 +34,9 @@ namespace graphene { namespace chain {
    using boost::multi_index_container;
    using namespace boost::multi_index;
    /**
-    *  The purpose of this object is to enable the detection
-    *  of duplicate transactions.  When a transaction is
-    *  included in a block a transaction_object is
-    *  added.  At the end of block processing all
-    *  transaction_objects that have expired can
-    *  be removed from the index.
+    * The purpose of this object is to enable the detection of duplicate transactions. When a transaction is included
+    * in a block a transaction_object is added. At the end of block processing all transaction_objects that have
+    * expired can be removed from the index.
     */
    class transaction_object : public abstract_object<transaction_object>
    {
@@ -51,7 +48,6 @@ namespace graphene { namespace chain {
          time_point_sec      expiration;
          transaction_id_type trx_id;
    };
-
 
    struct by_expiration;
    struct by_id;
@@ -66,7 +62,6 @@ namespace graphene { namespace chain {
    > transaction_multi_index_type;
 
    typedef generic_index<transaction_object, transaction_multi_index_type> transaction_index;
-
 } }
 
 FC_REFLECT_DERIVED( graphene::chain::transaction_object, (graphene::db::object), (trx)(expiration) )

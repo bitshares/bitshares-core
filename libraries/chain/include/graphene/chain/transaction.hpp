@@ -153,16 +153,8 @@ namespace graphene { namespace chain {
 
       vector<signature_type> signatures;
 
-//      flat_map<key_id_type,signature_type> signatures;
-
-      /** some operations may depend only upon a signature and not
-       * require account approval.  This allows those extra signatures
-       * to be added to the transaction.
-       */
-//      flat_map<address,signature_type>     extra_signatures;
-
       /// Removes all operations and signatures
-      void clear() { operations.clear(); signatures.clear(); /*extra_signatures.clear();*/ }
+      void clear() { operations.clear(); signatures.clear(); }
    };
 
    /**

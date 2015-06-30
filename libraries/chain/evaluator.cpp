@@ -28,7 +28,8 @@
 #include <fc/uint128.hpp>
 
 namespace graphene { namespace chain {
-   database& generic_evaluator::db()const { return trx_state->db(); }
+database& generic_evaluator::db()const { return trx_state->db(); }
+
    operation_result generic_evaluator::start_evaluate( transaction_evaluation_state& eval_state, const operation& op, bool apply )
    { try {
       trx_state   = &eval_state;

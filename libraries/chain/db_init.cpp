@@ -161,7 +161,7 @@ void database::init_genesis(const genesis_state_type& genesis_state)
 
    transaction_evaluation_state genesis_eval_state(this);
 
-   // Create initial accounts
+   // Create blockchain accounts
    fc::ecc::private_key null_private_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("null_key")));
    create<key_object>( [&null_private_key](key_object& k) {
        k.key_data = public_key_type(null_private_key.get_public_key());
@@ -280,6 +280,8 @@ void database::init_genesis(const genesis_state_type& genesis_state)
       adjust_balance(GRAPHENE_COMMITTEE_ACCOUNT, -get_balance(GRAPHENE_COMMITTEE_ACCOUNT,{}));
    }
 
+   // TODO: Create initial vesting balances
+
    // Create initial accounts
    if( !genesis_state.initial_accounts.empty() )
    {
@@ -288,12 +290,21 @@ void database::init_genesis(const genesis_state_type& genesis_state)
          key_id_type key_id = apply_operation(genesis_eval_state,
                                               key_create_operation({asset(),
                                                                     committee_account.id,
-                                                                    account.addr})).get<object_id_type>();
+                                                                    account.owner_key})).get<object_id_type>();
          account_create_operation cop;
          cop.name = account.name;
          cop.registrar = account_id_type(1);
-         cop.active = authority(1, key_id, 1);
-         cop.owner = cop.active;
+         cop.owner = authority(1, key_id, 1);
+         if( account.owner_key != account.active_key )
+         {
+            key_id = apply_operation(genesis_eval_state,
+                                     key_create_operation({asset(),
+                                                           committee_account.id,
+                                                           account.owner_key})).get<object_id_type>();
+            cop.active = authority(1, key_id, 1);
+         } else {
+            cop.active = cop.owner;
+         }
          cop.options.memo_key = key_id;
          account_id_type account_id(apply_operation(genesis_eval_state, cop).get<object_id_type>());
 

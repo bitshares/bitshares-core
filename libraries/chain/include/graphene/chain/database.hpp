@@ -40,19 +40,33 @@ namespace graphene { namespace chain {
    using graphene::db::object;
 
    struct genesis_state_type {
-       struct genesis_account_type {
-           genesis_account_type(const string& name = string(),
-                                  const address& addr = address(),
-                                  bool is_lifetime_member = false)
-               : name(name), addr(addr), is_lifetime_member(is_lifetime_member){}
+       struct initial_account_type {
+           initial_account_type(const string& name = string(),
+                                const public_key_type& owner_key = public_key_type(),
+                                const public_key_type& active_key = public_key_type(),
+                                bool is_lifetime_member = false)
+               : name(name),
+                 owner_key(owner_key),
+                 active_key(active_key == public_key_type()? owner_key : active_key),
+                 is_lifetime_member(is_lifetime_member)
+           {}
            string name;
-           address addr;
+           public_key_type owner_key;
+           public_key_type active_key;
            bool is_lifetime_member;
        };
-       struct genesis_balance_type {
+       struct initial_balance_type {
           address owner;
           string asset_symbol;
           share_type amount;
+       };
+       struct initial_vesting_balance_type {
+          address owner;
+          string asset_symbol;
+          share_type amount;
+          time_point_sec vesting_start_date;
+          time_point_sec earliest_withdrawal_date;
+          time_point_sec vesting_end_date;
        };
        struct initial_witness_type {
            /// Must correspond to one of the allocation targets.
@@ -66,8 +80,8 @@ namespace graphene { namespace chain {
        };
 
        chain_parameters initial_parameters;
-       vector<genesis_account_type> initial_accounts;
-       vector<genesis_balance_type> initial_balances;
+       vector<initial_account_type> initial_accounts;
+       vector<initial_balance_type> initial_balances;
        vector<initial_witness_type> initial_witnesses;
        vector<initial_committee_member_type> initial_committee;
    };
@@ -513,9 +527,12 @@ namespace graphene { namespace chain {
    }
 } }
 
-FC_REFLECT(graphene::chain::genesis_state_type::genesis_account_type, (name)(addr)(is_lifetime_member))
-FC_REFLECT(graphene::chain::genesis_state_type::genesis_balance_type,
+FC_REFLECT(graphene::chain::genesis_state_type::initial_account_type, (name)(owner_key)(active_key)(is_lifetime_member))
+FC_REFLECT(graphene::chain::genesis_state_type::initial_balance_type,
            (owner)(asset_symbol)(amount))
+FC_REFLECT(graphene::chain::genesis_state_type::initial_vesting_balance_type,
+           (owner)(asset_symbol)(amount)(vesting_start_date)(earliest_withdrawal_date)(vesting_end_date))
 FC_REFLECT(graphene::chain::genesis_state_type::initial_witness_type, (owner_name)(block_signing_key)(initial_secret))
 FC_REFLECT(graphene::chain::genesis_state_type::initial_committee_member_type, (owner_name))
-FC_REFLECT(graphene::chain::genesis_state_type, (initial_parameters)(initial_accounts)(initial_balances)(initial_witnesses)(initial_committee))
+FC_REFLECT(graphene::chain::genesis_state_type,
+           (initial_parameters)(initial_accounts)(initial_balances)(initial_witnesses)(initial_committee))

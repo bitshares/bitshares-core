@@ -44,24 +44,26 @@ namespace graphene { namespace chain {
    };
 
    /**
-    * @brief Linear vesting balance with cliff 
+    * @brief Linear vesting balance with cliff
     *
     * This vesting balance type is used to mimic traditional stock vesting contracts where
-    * each day a certain amount vests until it is fully matured.   
+    * each day a certain amount vests until it is fully matured.
     *
     * @note New funds may not be added to a linear vesting balance.
     */
    struct linear_vesting_policy
    {
-      uint32_t                          vesting_seconds = 0; ///< must be greater than zero
-      /** while coindays may accrue over time, none may be claimed before first_claim date */
-      fc::time_point_sec                start_claim; 
-      /** linear vesting may begin prior to allowing the user to actually claim the funds, this
-       * can be used to create a cliff.
-       */
-      fc::time_point_sec                begin_date;
-      share_type                        begin_balance;   ///< same asset as balance
-      share_type                        total_withdrawn; ///< same asset as balance
+      /// No amount may be withdrawn before this time, regardless of how much has vested.
+      fc::time_point_sec earliest_withdraw_time;
+      /// This is the time at which funds begin vesting.
+      /// Note that withdrawals are still not available until @ref earliest_withdraw_time
+      fc::time_point_sec begin_date;
+      /// Duration of vesting period, in seconds. Must be greater than zero.
+      uint32_t vesting_seconds = 0;
+      /// The total amount of asset to vest
+      share_type begin_balance;
+      /// The total amount of asset which has already been withdrawn
+      share_type total_withdrawn;
 
       asset get_allowed_withdraw(const vesting_policy_context& ctx)const;
       bool is_deposit_allowed(const vesting_policy_context& ctx)const;
@@ -73,20 +75,19 @@ namespace graphene { namespace chain {
       void on_withdraw(const vesting_policy_context& ctx);
    };
 
-
    /**
     * @brief defines vesting in terms of coin-days accrued which allows for dynamic deposit/withdraw
     *
     * The economic effect of this vesting policy is to require a certain amount of "interest" to accrue
     * before the full balance may be withdrawn.  Interest accrues as coindays (balance * length held).  If
-    * some of the balance is withdrawn, the remaining balance must be held longer.  
+    * some of the balance is withdrawn, the remaining balance must be held longer.
     */
    struct cdd_vesting_policy
    {
       uint32_t                       vesting_seconds = 0;
       fc::uint128_t                  coin_seconds_earned;
       /** while coindays may accrue over time, none may be claimed before first_claim date */
-      fc::time_point_sec             start_claim; 
+      fc::time_point_sec             start_claim;
       fc::time_point_sec             coin_seconds_earned_last_update;
 
       /**
@@ -117,7 +118,6 @@ namespace graphene { namespace chain {
       cdd_vesting_policy
       > vesting_policy;
 
-
    /**
     * Vesting balance object is a balance that is locked by the blockchain for a period of time.
     */
@@ -127,15 +127,17 @@ namespace graphene { namespace chain {
          static const uint8_t space_id = protocol_ids;
          static const uint8_t type_id = vesting_balance_object_type;
 
-         account_id_type     owner;
-         asset               balance;
-         vesting_policy      policy;
+         /// Account which owns and may withdraw from this vesting balance
+         account_id_type owner;
+         /// Total amount remaining in this vesting balance
+         /// Includes the unvested funds, and the vested funds which have not yet been withdrawn
+         asset balance;
+         /// The vesting policy stores details on when funds vest, and controls when they may be withdrawn
+         vesting_policy policy;
 
          vesting_balance_object() {}
 
-         /**
-          * Used to increase existing vesting balances.
-          */
+         ///@brief Deposit amount into vesting balance, requiring it to vest before withdrawal
          void deposit(const fc::time_point_sec& now, const asset& amount);
          bool is_deposit_allowed(const fc::time_point_sec& now, const asset& amount)const;
 
@@ -144,12 +146,12 @@ namespace graphene { namespace chain {
          bool is_deposit_vested_allowed(const fc::time_point_sec& now, const asset& amount)const;
 
          /**
-          * Used to remove a vesting balance from the VBO.  As well
-          * as the balance field, coin_seconds_earned and
+          * Used to remove a vesting balance from the VBO. As well as the
+          * balance field, coin_seconds_earned and
           * coin_seconds_earned_last_update fields are updated.
           *
-          * The money doesn't "go" anywhere; the caller is responsible
-          * for crediting it to the proper account.
+          * The money doesn't "go" anywhere; the caller is responsible for
+          * crediting it to the proper account.
           */
          void withdraw(const fc::time_point_sec& now, const asset& amount);
          bool is_withdraw_allowed(const fc::time_point_sec& now, const asset& amount)const;
@@ -158,9 +160,9 @@ namespace graphene { namespace chain {
 } } // graphene::chain
 
 FC_REFLECT(graphene::chain::linear_vesting_policy,
-           (vesting_seconds)
-           (start_claim)
+           (earliest_withdraw_time)
            (begin_date)
+           (vesting_seconds)
            (begin_balance)
            (total_withdrawn)
           )

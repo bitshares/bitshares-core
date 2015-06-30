@@ -277,7 +277,7 @@ public:
       {
          // Right now the wallet_api has no way of knowing if the connection to the
          // witness has already disconnected (via the witness node exiting first).
-         // If it has exited, cancel_all_subscriptsions() will throw and there's 
+         // If it has exited, cancel_all_subscriptsions() will throw and there's
          // nothing we can do about it.
          // dlog("Caught exception ${e} while canceling database subscriptions", ("e", e));
       }
@@ -892,7 +892,7 @@ public:
 
       return sign_transaction( tx, broadcast );
    } FC_CAPTURE_AND_RETHROW( (symbol)(new_issuer)(new_options)(broadcast) ) }
-   
+
    signed_transaction update_bitasset(string symbol,
                                       asset_object::bitasset_options new_options,
                                       bool broadcast /* = false */)
@@ -913,7 +913,7 @@ public:
 
       return sign_transaction( tx, broadcast );
    } FC_CAPTURE_AND_RETHROW( (symbol)(new_options)(broadcast) ) }
-   
+
    signed_transaction update_asset_feed_producers(string symbol,
                                                   flat_set<string> new_feed_producers,
                                                   bool broadcast /* = false */)
@@ -959,7 +959,7 @@ public:
 
       return sign_transaction( tx, broadcast );
    } FC_CAPTURE_AND_RETHROW( (publishing_account)(symbol)(feed)(broadcast) ) }
-   
+
    signed_transaction fund_asset_fee_pool(string from,
                                           string symbol,
                                           string amount,
@@ -983,7 +983,7 @@ public:
 
       return sign_transaction( tx, broadcast );
    } FC_CAPTURE_AND_RETHROW( (from)(symbol)(amount)(broadcast) ) }
-   
+
    signed_transaction burn_asset(string from,
                                  string amount,
                                  string symbol,
@@ -1005,7 +1005,7 @@ public:
 
       return sign_transaction( tx, broadcast );
    } FC_CAPTURE_AND_RETHROW( (from)(amount)(symbol)(broadcast) ) }
-   
+
    signed_transaction global_settle_asset(string symbol,
                                           price settle_price,
                                           bool broadcast /* = false */)
@@ -1065,7 +1065,7 @@ public:
 
       return sign_transaction( tx, broadcast );
    } FC_CAPTURE_AND_RETHROW( (authorizing_account)(account_to_list)(new_listing_status)(broadcast) ) }
-   
+
    signed_transaction create_delegate(string owner_account,
                                       bool broadcast /* = false */)
    { try {
@@ -1133,7 +1133,7 @@ public:
 
       return sign_transaction( tx, broadcast );
    } FC_CAPTURE_AND_RETHROW( (voting_account)(delegate)(approve)(broadcast) ) }
-   
+
    signed_transaction vote_for_witness(string voting_account,
                                         string witness,
                                         bool approve,
@@ -1167,7 +1167,7 @@ public:
 
       return sign_transaction( tx, broadcast );
    } FC_CAPTURE_AND_RETHROW( (voting_account)(witness)(approve)(broadcast) ) }
-   
+
    signed_transaction set_voting_proxy(string account_to_modify,
                                        optional<string> voting_account,
                                        bool broadcast /* = false */)
@@ -1186,7 +1186,7 @@ public:
             FC_THROW("Account ${account} is already voting for itself", ("account", account_to_modify));
          account_object_to_modify.options.voting_account = account_id_type();
       }
-      
+
       account_update_operation account_update_op;
       account_update_op.account = account_object_to_modify.id;
       account_update_op.new_options = account_object_to_modify.options;
@@ -1849,7 +1849,7 @@ signed_transaction wallet_api::update_asset(string symbol,
 {
    return my->update_asset(symbol, new_issuer, new_options, broadcast);
 }
-      
+
 signed_transaction wallet_api::update_bitasset(string symbol,
                                                asset_object::bitasset_options new_options,
                                                bool broadcast /* = false */)
@@ -1937,7 +1937,7 @@ signed_transaction wallet_api::vote_for_witness(string voting_account,
                                                 bool broadcast /* = false */)
 {
    return my->vote_for_witness(voting_account, witness, approve, broadcast);
-} 
+}
 
 signed_transaction wallet_api::set_voting_proxy(string account_to_modify,
                                                 optional<string> voting_account,
@@ -2148,18 +2148,17 @@ signed_transaction wallet_api::import_balance( string name_or_id, const vector<s
    for( auto a : bal_types )
    {
       balance_claim_operation op;
-      op.total_claimed = asset( 0, a );
-      for( auto b : balances ) 
+      op.deposit_to_account = claimer.id;
+      for( const auto& b : balances )
       {
          if( b.balance.asset_id == a )
          {
-            op.total_claimed += b.balance;
-            op.owners.insert( b.owner );
-            op.deposit_to_account = claimer.id;
-            required_addrs.insert( b.owner );
+            op.total_claimed = b.vesting_policy.valid()? asset(0, b.balance.asset_id) : b.balance;
+            op.balance_to_claim = b.id;
+            trx.operations.push_back(op);
+            required_addrs.insert(b.owner);
          }
       }
-      trx.operations.push_back(op);
    }
 
    trx.visit( operation_set_fee( my->_remote_db->get_global_properties().parameters.current_fees ) );
@@ -2170,7 +2169,7 @@ signed_transaction wallet_api::import_balance( string name_or_id, const vector<s
    for( auto a : required_addrs )
      tx.sign( keys[a] );
 
-   if( broadcast ) 
+   if( broadcast )
       my->_remote_net->broadcast_transaction(tx);
 
    return tx;

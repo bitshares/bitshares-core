@@ -48,12 +48,10 @@ void block_database::open( const fc::path& dbdir )
    }
 } FC_CAPTURE_AND_RETHROW( (dbdir) ) }
 
-
 bool block_database::is_open()const
 {
   return _blocks.is_open();
 }
-
 
 void block_database::close()
 {
@@ -66,7 +64,6 @@ void block_database::flush()
   _blocks.flush();
   _block_num_to_pos.flush();
 }
-
 
 void block_database::store( const block_id_type& id, const signed_block& b )
 {
@@ -81,7 +78,6 @@ void block_database::store( const block_id_type& id, const signed_block& b )
    _blocks.write( vec.data(), vec.size() );
    _block_num_to_pos.write( (char*)&e, sizeof(e) );
 }
-
 
 void block_database::remove( const block_id_type& id )
 { try {
@@ -102,25 +98,20 @@ void block_database::remove( const block_id_type& id )
    }
 } FC_CAPTURE_AND_RETHROW( (id) ) }
 
-
-
-
-
-bool  block_database::contains( const block_id_type& id )const
+bool block_database::contains( const block_id_type& id )const
 {
    index_entry e;
    auto index_pos = sizeof(e)*block_header::num_from_id(id);
    _block_num_to_pos.seekg( 0, _block_num_to_pos.end );
    if ( _block_num_to_pos.tellg() <= index_pos )
-      FC_THROW_EXCEPTION(fc::key_not_found_exception, "Block ${id} not contained in block database", ("id", id));
+      return false;
    _block_num_to_pos.seekg( index_pos );
    _block_num_to_pos.read( (char*)&e, sizeof(e) );
 
    return e.block_id == id;
 }
 
-
-block_id_type          block_database::fetch_block_id( uint32_t block_num )const
+block_id_type block_database::fetch_block_id( uint32_t block_num )const
 {
    index_entry e;
    auto index_pos = sizeof(e)*block_num;
@@ -134,22 +125,21 @@ block_id_type          block_database::fetch_block_id( uint32_t block_num )const
    return e.block_id;
 }
 
-
 optional<signed_block> block_database::fetch_optional( const block_id_type& id )const
 {
-   try 
+   try
    {
       index_entry e;
       auto index_pos = sizeof(e)*block_header::num_from_id(id);
       _block_num_to_pos.seekg( 0, _block_num_to_pos.end );
       if ( _block_num_to_pos.tellg() <= index_pos )
-         FC_THROW_EXCEPTION(fc::key_not_found_exception, "Block ${id} not contained in block database", ("id", id));
-   
+         return {};
+
       _block_num_to_pos.seekg( index_pos );
       _block_num_to_pos.read( (char*)&e, sizeof(e) );
-   
+
       if( e.block_id != id ) return optional<signed_block>();
-   
+
       vector<char> data( e.block_size );
       _blocks.seekg( e.block_pos );
       _blocks.read( data.data(), e.block_size );
@@ -168,13 +158,13 @@ optional<signed_block> block_database::fetch_optional( const block_id_type& id )
 
 optional<signed_block> block_database::fetch_by_number( uint32_t block_num )const
 {
-   try 
+   try
    {
       index_entry e;
       auto index_pos = sizeof(e)*block_num;
       _block_num_to_pos.seekg( 0, _block_num_to_pos.end );
       if ( _block_num_to_pos.tellg() <= index_pos )
-         FC_THROW_EXCEPTION(fc::key_not_found_exception, "Block number ${block_num} not contained in block database", ("block_num", block_num));
+         return {};
 
       _block_num_to_pos.seekg( index_pos, _block_num_to_pos.beg );
       _block_num_to_pos.read( (char*)&e, sizeof(e) );
@@ -195,10 +185,9 @@ optional<signed_block> block_database::fetch_by_number( uint32_t block_num )cons
    return optional<signed_block>();
 }
 
-
 optional<signed_block> block_database::last()const
 {
-   try 
+   try
    {
       index_entry e;
       _block_num_to_pos.seekg( 0, _block_num_to_pos.end );
@@ -231,5 +220,4 @@ optional<signed_block> block_database::last()const
    }
    return optional<signed_block>();
 }
-
 } }

@@ -939,8 +939,6 @@ void  balance_claim_operation::get_required_auth(flat_set<account_id_type>& acti
 
 void  balance_claim_operation::validate()const
 {
-   FC_ASSERT( owners.size() > 0 );
-   FC_ASSERT( total_claimed.amount > 0 );
    FC_ASSERT( fee == asset() );
 }
 

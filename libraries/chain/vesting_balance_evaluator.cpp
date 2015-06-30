@@ -56,7 +56,7 @@ struct init_policy_visitor
       linear_vesting_policy policy;
       policy.vesting_seconds = i.vesting_seconds;
       policy.begin_date      = i.begin_date;
-      policy.start_claim     = i.start_claim;
+      policy.earliest_withdraw_time     = i.start_claim;
       policy.begin_balance   = init_balance;
       p = policy;
    }

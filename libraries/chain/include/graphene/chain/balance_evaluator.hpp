@@ -1,47 +1,60 @@
 #pragma once
+
+#include <graphene/chain/database.hpp>
+#include <graphene/chain/transaction.hpp>
+#include <graphene/chain/transaction_evaluation_state.hpp>
+#include <graphene/chain/balance_object.hpp>
 #include <graphene/chain/evaluator.hpp>
 
 namespace graphene { namespace chain {
 
-   /**
-    *  @ingroup operations
-    */
-   class balance_claim_evaluator : public evaluator<balance_claim_evaluator>
+class balance_claim_evaluator : public evaluator<balance_claim_evaluator>
+{
+public:
+   typedef balance_claim_operation operation_type;
+
+   const balance_object* balance = nullptr;
+   asset amount_withdrawn;
+
+   asset do_evaluate(const balance_claim_operation& op)
    {
-      public:
-         typedef balance_claim_operation operation_type;
+      database& d = db();
+      balance = &op.balance_to_claim(d);
 
-         void_result do_evaluate( const balance_claim_operation& op )
-         {
-            return void_result();
-         }
+      FC_ASSERT(trx_state->_sigs.count(balance->owner) == 1);
+      trx_state->_sigs[balance->owner] = true;
+      FC_ASSERT(op.total_claimed.asset_id == balance->asset_type());
 
-         /**
-          *  @note the fee is always 0 for this particular operation because once the
-          *  balance is claimed it frees up memory and it cannot be used to spam the network
-          */
-         void_result do_apply( const balance_claim_operation& op )
-         {
-            const auto& bal_idx = db().get_index_type<balance_index>();
-            const auto& by_owner_idx = bal_idx.indices().get<by_owner>();
+      if( balance->vesting_policy.valid() ) {
+         FC_ASSERT(op.total_claimed.amount == 0);
+         return amount_withdrawn = balance->vesting_policy->get_allowed_withdraw({balance->balance,
+                                                                                  d.head_block_time(),
+                                                                                  {}});
+      }
 
-            asset total(0, op.total_claimed.asset_id);
-            for( const auto& owner : op.owners )
-            {
-               auto itr = by_owner_idx.find( boost::make_tuple( owner, total.asset_id ) );
-               if( itr != by_owner_idx.end() )
-               {
-                  total += itr->balance;
-                  db().remove( *itr );
-               }
-            }
+      FC_ASSERT(op.total_claimed == balance->balance);
+      return amount_withdrawn = op.total_claimed;
+   }
 
-            FC_ASSERT( total == op.total_claimed, "", ("total",total)("op",op) );
+   /**
+    * @note the fee is always 0 for this particular operation because once the
+    * balance is claimed it frees up memory and it cannot be used to spam the network
+    */
+   asset do_apply(const balance_claim_operation& op)
+   {
+      database& d = db();
 
-            db().adjust_balance( op.deposit_to_account, total );
+      if( balance->vesting_policy.valid() && amount_withdrawn < balance->balance )
+         d.modify(*balance, [&](balance_object& b) {
+            b.vesting_policy->on_withdraw({b.balance, d.head_block_time(), amount_withdrawn});
+            b.balance -= amount_withdrawn;
+         });
+      else
+         d.remove(*balance);
 
-            return void_result();
-         }
-   };
+      d.adjust_balance(op.deposit_to_account, amount_withdrawn);
+      return amount_withdrawn;
+   }
+};
 
 } } // graphene::chain

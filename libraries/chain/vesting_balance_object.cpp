@@ -25,13 +25,12 @@ inline bool sum_below_max_shares(const asset& a, const asset& b)
    assert(GRAPHENE_MAX_SHARE_SUPPLY + GRAPHENE_MAX_SHARE_SUPPLY > GRAPHENE_MAX_SHARE_SUPPLY);
    return (a.amount              <= GRAPHENE_MAX_SHARE_SUPPLY)
        && (            b.amount  <= GRAPHENE_MAX_SHARE_SUPPLY)
-       && ((a.amount + b.amount) <= GRAPHENE_MAX_SHARE_SUPPLY)
-      ;
+       && ((a.amount + b.amount) <= GRAPHENE_MAX_SHARE_SUPPLY);
 }
 
 asset linear_vesting_policy::get_allowed_withdraw(const vesting_policy_context& ctx) const
 {
-   if(ctx.now <= start_claim)
+   if(ctx.now <= earliest_withdraw_time)
       return asset(0, ctx.balance.asset_id);
    if(ctx.now <= begin_date)
       return asset(0, ctx.balance.asset_id);
