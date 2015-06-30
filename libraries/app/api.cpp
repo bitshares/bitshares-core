@@ -274,10 +274,51 @@ namespace graphene { namespace app {
        return {};
     }
 
+    uint64_t database_api::get_witness_count()const
+    {
+       return _db.get_index_type<witness_index>().indices().size();
+    }
+
+    map<string, witness_id_type> database_api::lookup_witness_accounts(const string& lower_bound_name, uint32_t limit)const
+    {
+       FC_ASSERT( limit <= 1000 );
+       const auto& witnesses_by_id = _db.get_index_type<witness_index>().indices().get<by_id>();
+
+       // we want to order witnesses by account name, but that name is in the account object
+       // so the witness_index doesn't have a quick way to access it.
+       // get all the names and look them all up, sort them, then figure out what
+       // records to return.  This could be optimized, but we expect the 
+       // number of witnesses to be few and the frequency of calls to be rare
+       std::map<std::string, witness_id_type> witnesses_by_account_name;
+       for (const witness_object& witness : witnesses_by_id)
+           if (auto account_iter = _db.find(witness.witness_account))
+               if (account_iter->name >= lower_bound_name) // we can ignore anything below lower_bound_name 
+                   witnesses_by_account_name.insert(std::make_pair(account_iter->name, witness.id));
+
+       auto end_iter = witnesses_by_account_name.begin();
+       while (end_iter != witnesses_by_account_name.end() && limit--)
+           ++end_iter;
+       witnesses_by_account_name.erase(end_iter, witnesses_by_account_name.end());
+       return witnesses_by_account_name;
+    }
+   
+    vector<optional<witness_object>> database_api::get_witnesses(const vector<witness_id_type>& witness_ids)const
+    {
+       vector<optional<witness_object>> result; result.reserve(witness_ids.size());
+       std::transform(witness_ids.begin(), witness_ids.end(), std::back_inserter(result),
+                      [this](witness_id_type id) -> optional<witness_object> {
+          if(auto o = _db.find(id))
+             return *o;
+          return {};
+       });
+       return result;
+    }
+
     login_api::login_api(application& a)
     :_app(a)
     {
     }
+
     login_api::~login_api()
     {
     }
@@ -466,7 +507,7 @@ namespace graphene { namespace app {
        return fc::to_hex(fc::raw::pack(trx));
     }
 
-    vector<operation_history_object> history_api::get_account_history(account_id_type account, operation_history_id_type stop, int limit, operation_history_id_type start) const
+    vector<operation_history_object> history_api::get_account_history(account_id_type account, operation_history_id_type stop, unsigned limit, operation_history_id_type start) const
     {
        FC_ASSERT(_app.chain_database());
        const auto& db = *_app.chain_database();

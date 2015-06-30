@@ -194,6 +194,28 @@ namespace graphene { namespace app {
          fc::optional<witness_object> get_witness_by_account(account_id_type account)const;
 
          /**
+          * @brief Get the total number of witnesses registered with the blockchain
+          */
+         uint64_t get_witness_count()const;
+
+         /**
+          * @brief Get names and IDs for registered witnesses
+          * @param lower_bound_name Lower bound of the first name to return
+          * @param limit Maximum number of results to return -- must not exceed 1000
+          * @return Map of witness names to corresponding IDs
+          */
+         map<string, witness_id_type> lookup_witness_accounts(const string& lower_bound_name, uint32_t limit)const;
+         
+         /**
+          * @brief Get a list of witnesses by ID
+          * @param witness_ids IDs of the witnesses to retrieve
+          * @return The witnesses corresponding to the provided IDs
+          *
+          * This function has semantics identical to @ref get_objects
+          */
+         vector<optional<witness_object>> get_witnesses(const vector<witness_id_type>& witness_ids)const;
+
+         /**
           * @group Push Notification Methods
           * These methods may be used to get push notifications whenever an object or market is changed
           * @{
@@ -295,7 +317,7 @@ namespace graphene { namespace app {
           */
          vector<operation_history_object> get_account_history(account_id_type account,
                                                               operation_history_id_type stop = operation_history_id_type(),
-                                                              int limit = 100,
+                                                              unsigned limit = 100,
                                                               operation_history_id_type start = operation_history_id_type())const;
 
          vector<bucket_object> get_market_history( asset_id_type a, asset_id_type b, uint32_t bucket_seconds, 
@@ -418,7 +440,10 @@ FC_API(graphene::app::database_api,
        (get_settle_orders)
        (list_assets)
        (get_delegate_by_account)
+       (get_witnesses)
        (get_witness_by_account)
+       (get_witness_count)
+       (lookup_witness_accounts)
        (subscribe_to_objects)
        (unsubscribe_from_objects)
        (subscribe_to_market)

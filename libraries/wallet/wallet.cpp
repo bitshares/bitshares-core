@@ -24,6 +24,8 @@
 #include <string>
 #include <list>
 
+#include <boost/range/adaptor/map.hpp>
+
 #include <fc/io/fstream.hpp>
 #include <fc/io/json.hpp>
 #include <fc/io/stdio.hpp>
@@ -33,6 +35,7 @@
 #include <fc/crypto/aes.hpp>
 #include <fc/crypto/hex.hpp>
 #include <fc/thread/mutex.hpp>
+#include <fc/thread/scoped_lock.hpp>
 
 #include <graphene/app/api.hpp>
 #include <graphene/chain/address.hpp>
@@ -86,11 +89,19 @@ public:
    void operator()(const asset_create_operation& op)const;
 };
 
-template< class T >
-optional< T > maybe_id( const string& name_or_id )
+template<class T>
+optional<T> maybe_id( const string& name_or_id )
 {
    if( std::isdigit( name_or_id.front() ) )
-      return fc::variant(name_or_id).as<T>();
+   {
+      try
+      {
+         return fc::variant(name_or_id).as<T>();
+      }
+      catch (const fc::exception&)
+      {
+      }
+   }
    return optional<T>();
 }
 
@@ -112,10 +123,8 @@ string address_to_shorthash( const address& addr )
    return result;
 }
 
-fc::ecc::private_key derive_private_key(
-      const std::string& prefix_string,
-      int sequence_number
-      )
+fc::ecc::private_key derive_private_key( const std::string& prefix_string,
+                                         int sequence_number )
 {
    std::string sequence_string = std::to_string(sequence_number);
    fc::sha512 h = fc::sha512::hash(prefix_string + " " + sequence_string);
@@ -188,26 +197,47 @@ private:
    {
       auto it = _wallet.pending_account_registrations.find( account.name );
       FC_ASSERT( it != _wallet.pending_account_registrations.end() );
-      if( !import_key( account.name, it->second ) )
-      {
-         // somebody else beat our pending registration, there is
-         //    nothing we can do except log it and move on
-         elog( "account ${name} registered by someone else first!",
-               ("name", account.name) );
-         // might as well remove it from pending regs,
-         //    because there is now no way this registration
-         //    can become valid (even in the extremely rare
-         //    possibility of migrating to a fork where the
-         //    name is available, the user can always
-         //    manually re-register)
-      }
+      for (const std::string& wif_key : it->second)
+         if( !import_key( account.name, wif_key ) )
+         {
+            // somebody else beat our pending registration, there is
+            //    nothing we can do except log it and move on
+            elog( "account ${name} registered by someone else first!",
+                  ("name", account.name) );
+            // might as well remove it from pending regs,
+            //    because there is now no way this registration
+            //    can become valid (even in the extremely rare
+            //    possibility of migrating to a fork where the
+            //    name is available, the user can always
+            //    manually re-register)
+         }
       _wallet.pending_account_registrations.erase( it );
+   }
+
+   // after a witness registration succeeds, this saves the private key in the wallet permanently
+   //
+   void claim_registered_witness(const std::string& witness_name)
+   {
+      auto iter = _wallet.pending_witness_registrations.find(witness_name);
+      FC_ASSERT(iter != _wallet.pending_witness_registrations.end());
+      std::string wif_key = iter->second;
+      
+      // get the list key id this key is registered with in the chain
+      fc::optional<fc::ecc::private_key> witness_private_key = wif_to_key(wif_key);
+      FC_ASSERT(witness_private_key);
+
+      graphene::chain::address witness_key_address = graphene::chain::address(witness_private_key->get_public_key());
+      std::vector<key_id_type> registered_key_ids = _remote_db->get_keys_for_address(witness_key_address);
+
+      for (const key_id_type& id : registered_key_ids)
+         _keys[id] = wif_key;
+      _wallet.pending_witness_registrations.erase(iter);
    }
 
    fc::mutex _resync_mutex;
    void resync()
    {
-      _resync_mutex.lock();
+      fc::scoped_lock<fc::mutex> lock(_resync_mutex);
       // this method is used to update wallet_data annotations
       //   e.g. wallet has been restarted and was not notified
       //   of events while it was down
@@ -216,27 +246,38 @@ private:
       //   notification is received, should also be done here
       //   "batch style" by querying the blockchain
 
-      if( _wallet.pending_account_registrations.size() > 0 )
+      if( !_wallet.pending_account_registrations.empty() )
       {
-         std::vector<string> v_names;
-         v_names.reserve( _wallet.pending_account_registrations.size() );
-         std::transform(_wallet.pending_account_registrations.begin(), _wallet.pending_account_registrations.end(),
-                        std::back_inserter(v_names), [](const std::pair<string, string>& p) {
-            return p.first;
-         });
+         // make a vector of the account names pending registration
+         std::vector<string> pending_account_names = boost::copy_range<std::vector<string> >(boost::adaptors::keys(_wallet.pending_account_registrations));
 
-         std::vector< fc::optional< graphene::chain::account_object >>
-               v_accounts = _remote_db->lookup_account_names( v_names );
+         // look those up on the blockchain
+         std::vector<fc::optional<graphene::chain::account_object >>
+               pending_account_objects = _remote_db->lookup_account_names( pending_account_names );
 
-         for( fc::optional< graphene::chain::account_object > opt_account : v_accounts )
-         {
-            if( ! opt_account.valid() )
-               continue;
-            claim_registered_account(*opt_account);
-         }
+         // if any of them exist, claim them
+         for( const fc::optional<graphene::chain::account_object>& optional_account : pending_account_objects )
+            if( optional_account )
+               claim_registered_account(*optional_account);
       }
+      
+      if (!_wallet.pending_witness_registrations.empty())
+      {
+         // make a vector of the owner accounts for witnesses pending registration
+         std::vector<string> pending_witness_names = boost::copy_range<std::vector<string> >(boost::adaptors::keys(_wallet.pending_witness_registrations));
+      
+         // look up the owners on the blockchain
+         std::vector<fc::optional<graphene::chain::account_object>> owner_account_objects = _remote_db->lookup_account_names(pending_witness_names);
 
-      _resync_mutex.unlock();
+         // if any of them have registered witnesses, claim them
+         for( const fc::optional<graphene::chain::account_object>& optional_account : owner_account_objects )
+            if (optional_account)
+            {
+               fc::optional<witness_object> witness_obj = _remote_db->get_witness_by_account(optional_account->id);
+               if (witness_obj)
+                  claim_registered_witness(optional_account->name);
+            }
+      }
    }
    void enable_umask_protection()
    {
@@ -430,6 +471,7 @@ public:
       FC_ASSERT(opt);
       return *opt;
    }
+
    asset_id_type get_asset_id(string asset_symbol_or_id) const
    {
       FC_ASSERT( asset_symbol_or_id.size() > 0 );
@@ -440,10 +482,12 @@ public:
       FC_ASSERT( (opt_asset.size() > 0) && (opt_asset[0].valid()) );
       return opt_asset[0]->id;
    }
+
    string                            get_wallet_filename() const
    {
       return _wallet_filename;
    }
+
    fc::ecc::private_key              get_private_key(key_id_type id)const
    {
       auto it = _keys.find(id);
@@ -453,6 +497,15 @@ public:
       FC_ASSERT( privkey );
       return *privkey;
    }
+
+   fc::ecc::private_key get_private_key_for_account(const account_object& account)const
+   {
+      vector<key_id_type> active_keys = account.active.get_keys();
+      if (active_keys.size() != 1)
+         FC_THROW("Expecting a simple authority with one active key");
+      return get_private_key(active_keys.front());
+   }
+
    fc::ecc::public_key               get_public_key(key_id_type id)const
    {
       vector<optional<key_object>> keys = _remote_db->get_keys( {id} );
@@ -481,6 +534,8 @@ public:
          if( item.first.type() == key_object_type )
             keys.insert( item.first );
       }
+      keys.insert(acnt.options.get_memo_key());
+
       auto opt_keys = _remote_db->get_keys( vector<key_id_type>(keys.begin(),keys.end()) );
       for( const fc::optional<key_object>& opt_key : opt_keys )
       {
@@ -574,7 +629,7 @@ public:
       _builder_transactions[transaction_handle].operations.emplace_back(op);
    }
    void replace_operation_in_builder_transaction(transaction_handle_type handle,
-                                                 int operation_index,
+                                                 unsigned operation_index,
                                                  const operation& new_op)
    {
       FC_ASSERT(_builder_transactions.count(handle));
@@ -738,6 +793,44 @@ public:
       return sign_transaction( tx, broadcast );
    } FC_CAPTURE_AND_RETHROW( (name) ) }
 
+
+   // This function generates derived keys starting with index 0 and keeps incrementing
+   // the index until it finds a key that isn't registered in the block chain.  To be
+   // safer, it continues checking for a few more keys to make sure there wasn't a short gap
+   // caused by a failed registration or the like.
+   int find_first_unused_derived_key_index(const fc::ecc::private_key& parent_key)
+   {
+      int first_unused_index = 0;
+      int number_of_consecutive_unused_keys = 0;
+      for (int key_index = 0; ; ++key_index)
+      {
+         fc::ecc::private_key derived_private_key = derive_private_key(key_to_wif(parent_key), key_index);
+         graphene::chain::public_key_type derived_public_key = derived_private_key.get_public_key();
+         graphene::chain::address derived_address(derived_public_key);
+         std::vector<key_id_type> registered_keys = _remote_db->get_keys_for_address(derived_address);
+         if (registered_keys.empty())
+         {
+            if (number_of_consecutive_unused_keys)
+            {
+               ++number_of_consecutive_unused_keys;
+               if (number_of_consecutive_unused_keys > 5)
+                  return first_unused_index;
+            }
+            else
+            {
+               first_unused_index = key_index;
+               number_of_consecutive_unused_keys = 1;
+            }
+         }
+         else
+         {
+            // key_index is used
+            first_unused_index = 0;
+            number_of_consecutive_unused_keys = 0;
+         }
+      }
+   }
+
    signed_transaction create_account_with_private_key(fc::ecc::private_key owner_privkey,
                                                       string account_name,
                                                       string registrar_account,
@@ -745,22 +838,25 @@ public:
                                                       bool broadcast = false,
                                                       bool save_wallet = true)
    { try {
-         fc::ecc::private_key active_privkey = derive_private_key( key_to_wif(owner_privkey), 0);
+         int active_key_index = find_first_unused_derived_key_index(owner_privkey);
+         fc::ecc::private_key active_privkey = derive_private_key( key_to_wif(owner_privkey), active_key_index);
+         
+         int memo_key_index = find_first_unused_derived_key_index(active_privkey);
+         fc::ecc::private_key memo_privkey = derive_private_key( key_to_wif(active_privkey), memo_key_index);
 
          graphene::chain::public_key_type owner_pubkey = owner_privkey.get_public_key();
          graphene::chain::public_key_type active_pubkey = active_privkey.get_public_key();
+         graphene::chain::public_key_type memo_pubkey = memo_privkey.get_public_key();
 
          account_create_operation account_create_op;
 
          // TODO:  process when pay_from_account is ID
 
-         account_object registrar_account_object =
-               this->get_account( registrar_account );
+         account_object registrar_account_object = get_account( registrar_account );
 
          account_id_type registrar_account_id = registrar_account_object.id;
 
-         account_object referrer_account_object =
-               this->get_account( referrer_account );
+         account_object referrer_account_object = get_account( referrer_account );
          account_create_op.referrer = referrer_account_object.id;
          account_create_op.referrer_percent = referrer_account_object.referrer_rewards_percentage;
 
@@ -773,18 +869,23 @@ public:
          active_key_create_op.fee_paying_account = registrar_account_id;
          active_key_create_op.key_data = active_pubkey;
 
+         key_create_operation memo_key_create_op;
+         memo_key_create_op.fee_paying_account = registrar_account_id;
+         memo_key_create_op.key_data = memo_pubkey;
+
          // key_create_op.calculate_fee(db.current_fee_schedule());
 
          // TODO:  Check if keys already exist!!!
 
          relative_key_id_type owner_rkid(0);
          relative_key_id_type active_rkid(1);
+         relative_key_id_type memo_rkid(2);
 
          account_create_op.registrar = registrar_account_id;
          account_create_op.name = account_name;
          account_create_op.owner = authority(1, owner_rkid, 1);
          account_create_op.active = authority(1, active_rkid, 1);
-         account_create_op.options.memo_key = active_rkid;
+         account_create_op.options.memo_key = memo_rkid;
 
          // current_fee_schedule()
          // find_account(pay_from_account)
@@ -795,6 +896,7 @@ public:
 
          tx.operations.push_back( owner_key_create_op );
          tx.operations.push_back( active_key_create_op );
+         tx.operations.push_back( memo_key_create_op );
          tx.operations.push_back( account_create_op );
 
          tx.visit( operation_set_fee( _remote_db->get_global_properties().parameters.current_fees ) );
@@ -817,7 +919,8 @@ public:
 
          // we do not insert owner_privkey here because
          //    it is intended to only be used for key recovery
-         _wallet.pending_account_registrations[ account_name ] = key_to_wif( active_privkey );
+         _wallet.pending_account_registrations[account_name].push_back(key_to_wif( active_privkey ));
+         _wallet.pending_account_registrations[account_name].push_back(key_to_wif( memo_privkey ));
          if( save_wallet )
             save_wallet_file();
          if( broadcast )
@@ -1083,19 +1186,77 @@ public:
       return sign_transaction( tx, broadcast );
    } FC_CAPTURE_AND_RETHROW( (owner_account)(broadcast) ) }
 
+   witness_object get_witness(string owner_account)
+   {
+      try 
+      {
+         fc::optional<witness_id_type> witness_id = maybe_id<witness_id_type>(owner_account);
+         if (witness_id)
+         {
+            std::vector<witness_id_type> ids_to_get;
+            ids_to_get.push_back(*witness_id);
+            std::vector<fc::optional<witness_object>> witness_objects = _remote_db->get_witnesses(ids_to_get);
+            if (witness_objects.front())
+               return *witness_objects.front();
+            FC_THROW("No witness is registered for id ${id}", ("id", owner_account));
+         }
+         else
+         {
+            // then maybe it's the owner account
+            try
+            {
+               account_id_type owner_account_id = get_account_id(owner_account);
+               fc::optional<witness_object> witness = _remote_db->get_witness_by_account(owner_account_id);
+               if (witness)
+                  return *witness;
+               else
+                  FC_THROW("No witness is registered for account ${account}", ("account", owner_account));
+            }
+            catch (const fc::exception&)
+            {
+               FC_THROW("No account or witness named ${account}", ("account", owner_account));
+            }
+         }
+      }
+      FC_CAPTURE_AND_RETHROW( (owner_account) )
+   }
+
    signed_transaction create_witness(string owner_account,
+                                     string url,
                                      bool broadcast /* = false */)
    { try {
+      account_object witness_account = get_account(owner_account);
+      fc::ecc::private_key active_private_key = get_private_key_for_account(witness_account);
+      int witness_key_index = find_first_unused_derived_key_index(active_private_key);
+      fc::ecc::private_key witness_private_key = derive_private_key(key_to_wif(active_private_key), witness_key_index);
+      graphene::chain::public_key_type witness_public_key = witness_private_key.get_public_key();
+
+      key_create_operation witness_key_create_op;
+      witness_key_create_op.fee_paying_account = witness_account.id;
+      witness_key_create_op.key_data = witness_public_key;
+
+      relative_key_id_type witness_relative_key_id(0);
 
       witness_create_operation witness_create_op;
-      witness_create_op.witness_account = get_account_id(owner_account);
+      witness_create_op.witness_account = witness_account.id;
+      witness_create_op.block_signing_key = witness_relative_key_id;
+      witness_create_op.url = url;
+      
+      secret_hash_type::encoder enc;
+      fc::raw::pack(enc, witness_private_key);
+      fc::raw::pack(enc, secret_hash_type());
+      witness_create_op.initial_secret = secret_hash_type::hash(enc.result());
+
       if (_remote_db->get_witness_by_account(witness_create_op.witness_account))
          FC_THROW("Account ${owner_account} is already a witness", ("owner_account", owner_account));
 
       signed_transaction tx;
+      tx.operations.push_back( witness_key_create_op );
       tx.operations.push_back( witness_create_op );
       tx.visit( operation_set_fee( _remote_db->get_global_properties().parameters.current_fees ) );
       tx.validate();
+         
+      _wallet.pending_witness_registrations[owner_account] = key_to_wif(witness_private_key);
 
       return sign_transaction( tx, broadcast );
    } FC_CAPTURE_AND_RETHROW( (owner_account)(broadcast) ) }
@@ -1711,7 +1872,7 @@ void wallet_api::add_operation_to_builder_transaction(transaction_handle_type tr
    my->add_operation_to_builder_transaction(transaction_handle, op);
 }
 
-void wallet_api::replace_operation_in_builder_transaction(transaction_handle_type handle, int operation_index, const operation& new_op)
+void wallet_api::replace_operation_in_builder_transaction(transaction_handle_type handle, unsigned operation_index, const operation& new_op)
 {
    my->replace_operation_in_builder_transaction(handle, operation_index, new_op);
 }
@@ -1917,10 +2078,21 @@ signed_transaction wallet_api::create_delegate(string owner_account,
    return my->create_delegate(owner_account, broadcast);
 }
 
+map<string,witness_id_type> wallet_api::list_witnesses(const string& lowerbound, uint32_t limit)
+{
+   return my->_remote_db->lookup_witness_accounts(lowerbound, limit);
+}
+
+witness_object wallet_api::get_witness(string owner_account)
+{
+   return my->get_witness(owner_account);
+}
+
 signed_transaction wallet_api::create_witness(string owner_account,
+                                              string url,
                                               bool broadcast /* = false */)
 {
-   return my->create_witness(owner_account, broadcast);
+   return my->create_witness(owner_account, url, broadcast);
 }
 
 signed_transaction wallet_api::vote_for_delegate(string voting_account,
