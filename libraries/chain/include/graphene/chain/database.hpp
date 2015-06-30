@@ -330,8 +330,6 @@ namespace graphene { namespace chain {
          void adjust_balance(account_id_type account, asset delta);
          /// This is an overloaded method.
          void adjust_balance(const account_object& account, asset delta);
-         /// This is an overloaded method.
-         void adjust_balance(const account_object* account, asset delta);
 
          /**
           * If delta.asset_id is a core asset, adjusts account statistics
