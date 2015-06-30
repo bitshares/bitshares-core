@@ -293,6 +293,29 @@ namespace graphene { namespace app {
        return true;
     }
 
+    network_api::network_api(application& a):_app(a)
+    {
+       _applied_block_connection = _app.chain_database()->applied_block.connect([this](const signed_block& b){ on_applied_block(b); });
+    }
+
+    void network_api::on_applied_block( const signed_block& b )
+    {
+       if( _callbacks.size() )
+       {
+          for( uint32_t trx_num = 0; trx_num < b.transactions.size(); ++trx_num )
+          {
+             const auto& trx = b.transactions[trx_num];
+             auto id = trx.id();
+             auto itr = _callbacks.find(id);
+             auto block_num = b.block_num();
+             if( itr != _callbacks.end() )
+             {
+                fc::async( [=](){ itr->second( fc::variant(transaction_confirmation{ id, block_num, trx_num, trx}) ); } );
+             }
+          }
+       }
+    }
+
     void network_api::add_node(const fc::ip::endpoint& ep)
     {
        _app.p2p_node()->add_node(ep);
@@ -304,6 +327,14 @@ namespace graphene { namespace app {
        _app.chain_database()->push_transaction(trx);
        _app.p2p_node()->broadcast_transaction(trx);
     }
+    void network_api::broadcast_transaction_with_callback( confirmation_callback cb, const signed_transaction& trx)
+    {
+       trx.validate();
+       _callbacks[trx.id()] = cb;
+       _app.chain_database()->push_transaction(trx);
+       _app.p2p_node()->broadcast_transaction(trx);
+    }
+
 
     std::vector<net::peer_status> network_api::get_connected_peers() const
     {

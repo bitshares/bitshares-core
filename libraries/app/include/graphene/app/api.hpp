@@ -313,7 +313,17 @@ namespace graphene { namespace app {
    class network_api
    {
       public:
-         network_api(application& a):_app(a){}
+         network_api(application& a);
+
+         struct transaction_confirmation
+         {
+            transaction_id_type   id;
+            uint32_t              block_num;
+            uint32_t              trx_num;
+            processed_transaction trx;
+         };
+
+         typedef std::function<void(variant/*transaction_confirmation*/)> confirmation_callback;
 
          /**
           * @brief Broadcast a transaction to the network
@@ -323,6 +333,13 @@ namespace graphene { namespace app {
           * apply locally, an error will be thrown and the transaction will not be broadcast.
           */
          void broadcast_transaction(const signed_transaction& trx);
+
+         /** this version of broadcast transaction registers a callback method that will be called when the transaction is
+          * included into a block.  The callback method includes the transaction id, block number, and transaction number in the
+          * block.
+          */
+         void broadcast_transaction_with_callback( confirmation_callback cb, const signed_transaction& trx);
+
          /**
           * @brief add_node Connect to a new peer
           * @param ep The IP/Port of the peer to connect to
@@ -333,8 +350,11 @@ namespace graphene { namespace app {
           */
          std::vector<net::peer_status> get_connected_peers() const;
 
+         void on_applied_block( const signed_block& b );
       private:
-         application&              _app;
+         boost::signals2::scoped_connection             _applied_block_connection;
+         map<transaction_id_type,confirmation_callback> _callbacks;
+         application&                                   _app;
    };
 
    /**
@@ -374,6 +394,9 @@ namespace graphene { namespace app {
 
 }}  // graphene::app
 
+FC_REFLECT( graphene::app::network_api::transaction_confirmation, 
+        (id)(block_num)(trx_num)(trx) )
+
 FC_API(graphene::app::database_api,
        (get_objects)
        (get_block_header)
@@ -409,7 +432,7 @@ FC_API(graphene::app::database_api,
        (get_balance_objects)
      )
 FC_API(graphene::app::history_api, (get_account_history)(get_market_history)(get_market_history_buckets))
-FC_API(graphene::app::network_api, (broadcast_transaction)(add_node)(get_connected_peers))
+FC_API(graphene::app::network_api, (broadcast_transaction)(broadcast_transaction_with_callback)(add_node)(get_connected_peers))
 FC_API(graphene::app::login_api,
        (login)
        (network)
