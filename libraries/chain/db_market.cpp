@@ -243,6 +243,7 @@ bool database::fill_order( const limit_order_object& order, const asset& pays, c
    auto issuer_fees = pay_market_fees( recv_asset, receives );
    pay_order( seller, receives - issuer_fees, pays );
 
+   assert( pays.asset_id != receives.asset_id );
    push_applied_operation( fill_order_operation{ order.id, order.seller, pays, receives, issuer_fees } );
 
    if( pays == order.amount_for_sale() )
@@ -318,6 +319,7 @@ bool database::fill_order( const call_order_object& order, const asset& pays, co
       remove( order );
    }
 
+   assert( pays.asset_id != receives.asset_id );
    push_applied_operation( fill_order_operation{ order.id, order.borrower, pays, receives, asset(0, pays.asset_id) } );
 
    return collateral_freed.valid();
@@ -341,6 +343,7 @@ bool database::fill_order(const force_settlement_object& settle, const asset& pa
    }
    adjust_balance(settle.owner, receives - issuer_fees);
 
+   assert( pays.asset_id != receives.asset_id );
    push_applied_operation( fill_order_operation{ settle.id, settle.owner, pays, receives, issuer_fees } );
 
    return filled;
