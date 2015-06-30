@@ -904,4 +904,50 @@ BOOST_FIXTURE_TEST_CASE( account_create_fee_scaling, database_fixture )
    BOOST_CHECK_EQUAL(db.get_global_properties().parameters.current_fees.account_create_fee, 1);
 } FC_LOG_AND_RETHROW() }
 
+BOOST_FIXTURE_TEST_CASE( tapos_rollover, database_fixture )
+{
+   try
+   {
+      ACTORS((alice)(bob));
+      const auto& core   = asset_id_type()(db);
+
+      BOOST_TEST_MESSAGE( "Give Alice some money" );
+      transfer(genesis_account, alice_id, asset(10000));
+      generate_block();
+
+      BOOST_TEST_MESSAGE( "Generate up to block 0xFF00" );
+      generate_blocks( 0xFF00 );
+      signed_transaction xfer_tx;
+
+      BOOST_TEST_MESSAGE( "Transfer money at/about 0xFF00" );
+      transfer_operation xfer_op;
+      xfer_op.from = alice_id;
+      xfer_op.to = bob_id;
+      xfer_op.amount = asset(1000);
+
+      xfer_tx.operations.push_back( xfer_op );
+      xfer_tx.set_expiration( db.head_block_id(), 0x1000 );
+      sign( xfer_tx, alice_key_id, alice_private_key );
+      PUSH_TX( db, xfer_tx, 0 );
+      generate_block();
+
+      BOOST_TEST_MESSAGE( "Sign new tx's" );
+      xfer_tx.set_expiration( db.head_block_id(), 0x1000 );
+      xfer_tx.signatures.clear();
+      sign( xfer_tx, alice_key_id, alice_private_key );
+
+      BOOST_TEST_MESSAGE( "Generate up to block 0x10010" );
+      generate_blocks( 0x110 );
+
+      BOOST_TEST_MESSAGE( "Transfer at/about block 0x10010 using reference block at/about 0xFF00" );
+      PUSH_TX( db, xfer_tx, 0 );
+      generate_block();
+   }
+   catch (fc::exception& e)
+   {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
 BOOST_AUTO_TEST_SUITE_END()
