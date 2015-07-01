@@ -21,7 +21,6 @@ public:
       database& d = db();
       balance = &op.balance_to_claim(d);
 
-
       FC_ASSERT(trx_state->signed_by( balance->owner, true /*maybe pts*/ ));
       FC_ASSERT(op.total_claimed.asset_id == balance->asset_type());
 

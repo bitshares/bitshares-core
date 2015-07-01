@@ -381,13 +381,13 @@ BOOST_AUTO_TEST_CASE( genesis_authority )
    sign(trx, key_id_type(), genesis_key);
    BOOST_CHECK_THROW(PUSH_TX( db, trx ), fc::exception);
 
-   auto sign = [&] { trx.signatures.clear(); trx.sign(nathan_key_id,nathan_key); };
+   auto sign = [&] { trx.signatures.clear(); trx.sign(nathan_key); };
 
    proposal_create_operation pop;
    pop.proposed_ops.push_back({trx.operations.front()});
    pop.expiration_time = db.head_block_time() + global_params.genesis_proposal_review_period*2;
    pop.fee_paying_account = nathan.id;
-   trx.operations.back() = pop;
+   trx.operations = {pop};
    sign();
 
    // The review period isn't set yet. Make sure it throws.
@@ -480,7 +480,6 @@ BOOST_FIXTURE_TEST_CASE( fired_delegates, database_fixture )
    pop.expiration_time = db.head_block_time() + *pop.review_period_seconds * 3;
    pop.proposed_ops.emplace_back(transfer_operation({asset(),account_id_type(), nathan->id, asset(100000)}));
    trx.operations.push_back(pop);
-   sign(trx, key_id_type(), genesis_key);
    const proposal_object& prop = db.get<proposal_object>(PUSH_TX( db, trx ).operation_results.front().get<object_id_type>());
    proposal_id_type pid = prop.id;
    BOOST_CHECK(!pid(db).is_authorized_to_execute(db));
