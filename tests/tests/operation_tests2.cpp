@@ -735,12 +735,12 @@ BOOST_AUTO_TEST_CASE( refund_worker_test )
    }
 
    // auto supply = asset_id_type()(db).dynamic_data(db).current_supply;
-   verify_asset_supplies();
+   verify_asset_supplies(db);
    generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
-   verify_asset_supplies();
+   verify_asset_supplies(db);
    BOOST_CHECK_EQUAL(worker_id_type()(db).worker.get<refund_worker_type>().total_burned.value, 1000);
    generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
-   verify_asset_supplies();
+   verify_asset_supplies(db);
    BOOST_CHECK_EQUAL(worker_id_type()(db).worker.get<refund_worker_type>().total_burned.value, 2000);
    generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
    BOOST_CHECK(!db.get(worker_id_type()).is_active(db.head_block_time()));
@@ -809,13 +809,13 @@ BOOST_AUTO_TEST_CASE( burn_worker_test )
    }
 
    BOOST_CHECK_EQUAL( get_balance(GRAPHENE_NULL_ACCOUNT, asset_id_type()), 0 );
-   verify_asset_supplies();
+   verify_asset_supplies(db);
    generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
-   verify_asset_supplies();
+   verify_asset_supplies(db);
    BOOST_CHECK_EQUAL(worker_id_type()(db).worker.get<burn_worker_type>().total_burned.value, 1000);
    BOOST_CHECK_EQUAL( get_balance(GRAPHENE_NULL_ACCOUNT, asset_id_type()), 1000 );
    generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
-   verify_asset_supplies();
+   verify_asset_supplies(db);
    BOOST_CHECK_EQUAL(worker_id_type()(db).worker.get<burn_worker_type>().total_burned.value, 2000);
    BOOST_CHECK_EQUAL( get_balance(GRAPHENE_NULL_ACCOUNT, asset_id_type()), 2000 );
    generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);

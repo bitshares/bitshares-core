@@ -97,7 +97,7 @@ database_fixture::~database_fixture()
    // This way, boost test's last checkpoint tells us approximately where the error was.
    if( !std::uncaught_exception() )
    {
-      verify_asset_supplies();
+      verify_asset_supplies(db);
       verify_account_history_plugin_index();
       BOOST_CHECK( db.get_node_properties().skip_flags == database::skip_nothing );
    }
@@ -122,7 +122,7 @@ string database_fixture::generate_anon_acct_name()
    return "anon-acct-x" + std::to_string( anon_acct_count++ );
 }
 
-void database_fixture::verify_asset_supplies( )const
+void database_fixture::verify_asset_supplies( const database& db )
 {
    //wlog("*** Begin asset supply verification ***");
    const asset_dynamic_data_object& core_asset_data = db.get_core_asset().dynamic_asset_data_id(db);
@@ -626,7 +626,9 @@ void database_fixture::sign(signed_transaction& trx, key_id_type key_id, const f
 
 const limit_order_object*database_fixture::create_sell_order(account_id_type user, const asset& amount, const asset& recv)
 {
-   return create_sell_order(user(db), amount, recv);
+   auto r =  create_sell_order(user(db), amount, recv);
+   verify_asset_supplies(db);
+   return r;
 }
 
 const limit_order_object* database_fixture::create_sell_order( const account_object& user, const asset& amount, const asset& recv )
@@ -641,6 +643,7 @@ const limit_order_object* database_fixture::create_sell_order( const account_obj
    trx.validate();
    auto processed = db.push_transaction(trx, ~0);
    trx.operations.clear();
+   verify_asset_supplies(db);
    //wdump((processed));
    return db.find<limit_order_object>( processed.operation_results[0].get<object_id_type>() );
 }
@@ -655,6 +658,7 @@ asset database_fixture::cancel_limit_order( const limit_order_object& order )
   trx.validate();
   auto processed = db.push_transaction(trx, ~0);
   trx.operations.clear();
+   verify_asset_supplies(db);
   return processed.operation_results[0].get<asset>();
 }
 
@@ -686,6 +690,7 @@ void database_fixture::transfer(
       }
       trx.validate();
       db.push_transaction(trx, ~0);
+      verify_asset_supplies(db);
       trx.operations.clear();
    } FC_CAPTURE_AND_RETHROW( (from.id)(to.id)(amount)(fee) )
 }
@@ -704,6 +709,7 @@ void database_fixture::update_feed_producers( const asset_object& mia, flat_set<
    trx.validate();
    db.push_transaction(trx, ~0);
    trx.operations.clear();
+   verify_asset_supplies(db);
 } FC_CAPTURE_AND_RETHROW( (mia)(producers) ) }
 
 
@@ -722,6 +728,7 @@ void  database_fixture::publish_feed( const asset_object& mia, const account_obj
    trx.validate();
    db.push_transaction(trx, ~0);
    trx.operations.clear();
+   verify_asset_supplies(db);
 }
 
 void database_fixture::force_global_settle( const asset_object& what, const price& p )
@@ -737,6 +744,7 @@ void database_fixture::force_global_settle( const asset_object& what, const pric
    trx.validate();
    db.push_transaction(trx, ~0);
    trx.operations.clear();
+   verify_asset_supplies(db);
 } FC_CAPTURE_AND_RETHROW( (what)(p) ) }
 
 void  database_fixture::force_settle( const account_object& who, asset what )
@@ -751,6 +759,7 @@ void  database_fixture::force_settle( const account_object& who, asset what )
    trx.validate();
    db.push_transaction(trx, ~0);
    trx.operations.clear();
+   verify_asset_supplies(db);
 } FC_CAPTURE_AND_RETHROW( (who)(what) ) }
 
 void  database_fixture::borrow(const account_object& who, asset what, asset collateral)
@@ -762,6 +771,7 @@ void  database_fixture::borrow(const account_object& who, asset what, asset coll
    trx.validate();
    db.push_transaction(trx, ~0);
    trx.operations.clear();
+   verify_asset_supplies(db);
 } FC_CAPTURE_AND_RETHROW( (who.name)(what)(collateral) ) }
 
 void  database_fixture::cover(const account_object& who, asset what, asset collateral)
@@ -773,6 +783,7 @@ void  database_fixture::cover(const account_object& who, asset what, asset colla
    trx.validate();
    db.push_transaction(trx, ~0);
    trx.operations.clear();
+   verify_asset_supplies(db);
 } FC_CAPTURE_AND_RETHROW( (who.name)(what)(collateral) ) }
 
 void database_fixture::fund_fee_pool( const account_object& from, const asset_object& asset_to_fund, const share_type amount )
@@ -784,6 +795,7 @@ void database_fixture::fund_fee_pool( const account_object& from, const asset_ob
    trx.validate();
    db.push_transaction(trx, ~0);
    trx.operations.clear();
+   verify_asset_supplies(db);
 }
 
 void database_fixture::enable_fees(
@@ -816,6 +828,7 @@ void database_fixture::upgrade_to_lifetime_member( const account_object& account
       db.push_transaction(trx, ~0);
       FC_ASSERT( op.account_to_upgrade(db).is_lifetime_member() );
       trx.clear();
+      verify_asset_supplies(db);
    }
    FC_CAPTURE_AND_RETHROW((account))
 }
@@ -835,6 +848,7 @@ void database_fixture::upgrade_to_annual_member(const account_object& account)
       db.push_transaction(trx, ~0);
       FC_ASSERT( op.account_to_upgrade(db).is_member(db.head_block_time()) );
       trx.clear();
+      verify_asset_supplies(db);
    } FC_CAPTURE_AND_RETHROW((account))
 }
 
@@ -955,7 +969,9 @@ bool _push_block( database& db, const signed_block& b, uint32_t skip_flags /* = 
 
 processed_transaction _push_transaction( database& db, const signed_transaction& tx, uint32_t skip_flags /* = 0 */ )
 { try {
-   return db.push_transaction( tx, skip_flags );
+   auto pt = db.push_transaction( tx, skip_flags );
+   database_fixture::verify_asset_supplies(db);
+   return pt;
 } FC_CAPTURE_AND_RETHROW((tx)) }
 
 } // graphene::chain::test
