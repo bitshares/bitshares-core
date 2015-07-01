@@ -30,6 +30,8 @@
 
 using namespace graphene::chain;
 
+namespace detail_ns {
+
 string remove_tail_if( const string& str, char c, const string& match )
 {
    auto last = str.find_last_of( c );
@@ -317,6 +319,8 @@ struct serializer
    }
 };
 
+} // namespace detail_ns
+
 int main( int argc, char** argv )
 {
    try {
@@ -326,22 +330,22 @@ int main( int argc, char** argv )
     for( uint32_t i = 0; i < op.count(); ++i )
     {
        op.set_which(i);
-       op.visit( serialize_type_visitor(i) );
+       op.visit( detail_ns::serialize_type_visitor(i) );
     }
     std::cout << "\n";
 
-    js_name<operation>::name("operation");
-    js_name<static_variant<address,public_key_type>>::name("key_data");
-    js_name<operation_result>::name("operation_result");
-    js_name<header_extension>::name("header_extension");
-    js_name<static_variant<refund_worker_type::initializer, vesting_balance_worker_type::initializer>>::name("initializer_type");
-    serializer<signed_block>::init();
-    serializer<block_header>::init();
-    serializer<signed_block_header>::init();
-    serializer<operation>::init();
-    serializer<transaction>::init();
-    serializer<signed_transaction>::init();
-    for( const auto& gen : serializers )
+    detail_ns::js_name<operation>::name("operation");
+    detail_ns::js_name<static_variant<address,public_key_type>>::name("key_data");
+    detail_ns::js_name<operation_result>::name("operation_result");
+    detail_ns::js_name<header_extension>::name("header_extension");
+    detail_ns::js_name<static_variant<refund_worker_type::initializer, vesting_balance_worker_type::initializer>>::name("initializer_type");
+    detail_ns::serializer<signed_block>::init();
+    detail_ns::serializer<block_header>::init();
+    detail_ns::serializer<signed_block_header>::init();
+    detail_ns::serializer<operation>::init();
+    detail_ns::serializer<transaction>::init();
+    detail_ns::serializer<signed_transaction>::init();
+    for( const auto& gen : detail_ns::serializers )
        gen();
 
   } catch ( const fc::exception& e ){ edump((e.to_detail_string())); }

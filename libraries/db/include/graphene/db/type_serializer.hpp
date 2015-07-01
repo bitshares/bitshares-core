@@ -23,9 +23,7 @@ template<typename T>
 void register_serializer();
 
 extern map<string, size_t >                st;
-/*
 extern vector<std::function<void()>>       serializers;
-*/
 
 bool register_serializer( const string& name, std::function<void()> sr );
 
@@ -128,7 +126,7 @@ class serialize_member_visitor
       template<typename Member, class Class, Member (Class::*member)>
       void operator()( const char* name )const
       {
-         current_stream() << name << " : " << "";//js_name<Member>::name();
+         current_stream() << "    " << name << " : " <<  fc::get_typename<Member>::name() <<"\n";
       }
 };
 
@@ -268,6 +266,8 @@ std::string get_type_description()
    current_stream( std::unique_ptr<std::stringstream>(new std::stringstream()) );
    processed_types().clear();
    serializer<T>::init();
+   for( const auto& gen : serializers )
+      gen();
    return current_stream().str();
 }
 
