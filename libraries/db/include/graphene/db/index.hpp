@@ -169,7 +169,7 @@ namespace graphene { namespace db {
                const T* result = dynamic_cast<const T*>(item.get());
                if( result != nullptr ) return *result;
             }
-            FC_ASSERT( !"invalid index type" );
+            FC_THROW_EXCEPTION( fc::assert_exception, "invalid index type" );
          }
 
       protected:
