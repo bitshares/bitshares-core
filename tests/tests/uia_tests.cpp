@@ -70,6 +70,62 @@ BOOST_AUTO_TEST_CASE( create_advanced_uia )
    }
 }
 
+BOOST_AUTO_TEST_CASE( override_transfer_test )
+{ try {
+   ACTORS( (dan)(eric)(sam) );
+   const asset_object& advanced = create_user_issued_asset( "ADVANCED", sam, override_authority );
+   issue_uia( dan, advanced.amount( 1000 ) );
+   trx.validate();
+   db.push_transaction(trx, ~0);
+   trx.operations.clear();
+   BOOST_REQUIRE_EQUAL( get_balance( dan, advanced ), 1000 );
+
+   trx.operations.clear();
+   override_transfer_operation otrans{ asset(), advanced.issuer, dan.id, eric.id, advanced.amount(100) };
+   trx.operations.push_back(otrans);
+
+   BOOST_TEST_MESSAGE( "Require throwing without signature" );
+   BOOST_REQUIRE_THROW( PUSH_TX( db, trx, 0 ), fc::exception);
+   BOOST_TEST_MESSAGE( "Require throwing with dan's signature" );
+   trx.sign( dan_private_key );
+   BOOST_REQUIRE_THROW( PUSH_TX( db, trx, 0 ), fc::exception);
+   BOOST_TEST_MESSAGE( "Pass with issuer's signature" );
+   trx.signatures.clear();
+   trx.sign( sam_private_key );
+   PUSH_TX( db, trx, 0 );
+
+   BOOST_REQUIRE_EQUAL( get_balance( dan, advanced ), 900 );
+   BOOST_REQUIRE_EQUAL( get_balance( eric, advanced ), 100 );
+} FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE( override_transfer_test2 )
+{ try {
+   ACTORS( (dan)(eric)(sam) );
+   const asset_object& advanced = create_user_issued_asset( "ADVANCED", sam, 0 );
+   issue_uia( dan, advanced.amount( 1000 ) );
+   trx.validate();
+   db.push_transaction(trx, ~0);
+   trx.operations.clear();
+   BOOST_REQUIRE_EQUAL( get_balance( dan, advanced ), 1000 );
+
+   trx.operations.clear();
+   override_transfer_operation otrans{ asset(), advanced.issuer, dan.id, eric.id, advanced.amount(100) };
+   trx.operations.push_back(otrans);
+
+   BOOST_TEST_MESSAGE( "Require throwing without signature" );
+   BOOST_REQUIRE_THROW( PUSH_TX( db, trx, 0 ), fc::exception);
+   BOOST_TEST_MESSAGE( "Require throwing with dan's signature" );
+   trx.sign( dan_private_key );
+   BOOST_REQUIRE_THROW( PUSH_TX( db, trx, 0 ), fc::exception);
+   BOOST_TEST_MESSAGE( "Fail because overide_authority flag is not set" );
+   trx.signatures.clear();
+   trx.sign( sam_private_key );
+   BOOST_REQUIRE_THROW( PUSH_TX( db, trx, 0 ), fc::exception );
+
+   BOOST_REQUIRE_EQUAL( get_balance( dan, advanced ), 1000 );
+   BOOST_REQUIRE_EQUAL( get_balance( eric, advanced ), 0 );
+} FC_LOG_AND_RETHROW() }
+
 BOOST_AUTO_TEST_CASE( issue_whitelist_uia )
 {
    try {

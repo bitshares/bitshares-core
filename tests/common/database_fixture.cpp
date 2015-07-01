@@ -461,6 +461,25 @@ const asset_object& database_fixture::create_user_issued_asset( const string& na
    return db.get<asset_object>(ptx.operation_results[0].get<object_id_type>());
 }
 
+const asset_object& database_fixture::create_user_issued_asset( const string& name, const account_object& issuer, uint16_t flags )
+{
+   asset_create_operation creator;
+   creator.issuer = issuer.id;
+   creator.fee = asset();
+   creator.symbol = name;
+   creator.common_options.max_supply = 0;
+   creator.precision = 2;
+   creator.common_options.core_exchange_rate = price({asset(1,1),asset(1)});
+   creator.common_options.max_supply = GRAPHENE_MAX_SHARE_SUPPLY;
+   creator.common_options.flags = flags;
+   creator.common_options.issuer_permissions = flags;
+   trx.operations.push_back(std::move(creator));
+   trx.validate();
+   processed_transaction ptx = db.push_transaction(trx, ~0);
+   trx.operations.clear();
+   return db.get<asset_object>(ptx.operation_results[0].get<object_id_type>());
+}
+
 void database_fixture::issue_uia( const account_object& recipient, asset amount )
 {
    asset_issue_operation op({asset(),amount.asset_id(db).issuer, amount, recipient.id});

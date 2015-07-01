@@ -165,6 +165,9 @@ struct database_fixture {
                                        uint16_t market_fee_percent = 100 /*1%*/,
                                        uint16_t flags = charge_market_fee);
    const asset_object& create_user_issued_asset( const string& name );
+   const asset_object& create_user_issued_asset( const string& name, 
+                                                 const account_object& issuer,
+                                                 uint16_t flags );
    void issue_uia( const account_object& recipient, asset amount );
 
 
