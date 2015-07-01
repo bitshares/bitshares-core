@@ -207,6 +207,14 @@ namespace graphene { namespace app {
          map<string, witness_id_type> lookup_witness_accounts(const string& lower_bound_name, uint32_t limit)const;
          
          /**
+          * @brief Get names and IDs for registered delegates
+          * @param lower_bound_name Lower bound of the first name to return
+          * @param limit Maximum number of results to return -- must not exceed 1000
+          * @return Map of delegate names to corresponding IDs
+          */
+         map<string, delegate_id_type> lookup_delegate_accounts(const string& lower_bound_name, uint32_t limit)const;
+         
+         /**
           * @brief Get a list of witnesses by ID
           * @param witness_ids IDs of the witnesses to retrieve
           * @return The witnesses corresponding to the provided IDs
@@ -214,6 +222,15 @@ namespace graphene { namespace app {
           * This function has semantics identical to @ref get_objects
           */
          vector<optional<witness_object>> get_witnesses(const vector<witness_id_type>& witness_ids)const;
+
+         /**
+          * @brief Get a list of delegates by ID
+          * @param delegate_ids IDs of the delegates to retrieve
+          * @return The delegates corresponding to the provided IDs
+          *
+          * This function has semantics identical to @ref get_objects
+          */
+         vector<optional<delegate_object>> get_delegates(const vector<delegate_id_type>& delegate_ids)const;
 
          /**
           * @group Push Notification Methods
@@ -441,9 +458,11 @@ FC_API(graphene::app::database_api,
        (list_assets)
        (get_delegate_by_account)
        (get_witnesses)
+       (get_delegates)
        (get_witness_by_account)
        (get_witness_count)
        (lookup_witness_accounts)
+       (lookup_delegate_accounts)
        (subscribe_to_objects)
        (unsubscribe_from_objects)
        (subscribe_to_market)

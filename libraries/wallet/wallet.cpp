@@ -279,12 +279,14 @@ private:
             }
       }
    }
+
    void enable_umask_protection()
    {
 #ifdef __unix__
       _old_umask = umask( S_IRWXG | S_IRWXO );
 #endif
    }
+
    void disable_umask_protection()
    {
 #ifdef __unix__
@@ -1169,12 +1171,13 @@ public:
       return sign_transaction( tx, broadcast );
    } FC_CAPTURE_AND_RETHROW( (authorizing_account)(account_to_list)(new_listing_status)(broadcast) ) }
 
-   signed_transaction create_delegate(string owner_account,
+   signed_transaction create_delegate(string owner_account, string url, 
                                       bool broadcast /* = false */)
    { try {
 
       delegate_create_operation delegate_create_op;
       delegate_create_op.delegate_account = get_account_id(owner_account);
+      delegate_create_op.url = url;
       if (_remote_db->get_delegate_by_account(delegate_create_op.delegate_account))
          FC_THROW("Account ${owner_account} is already a delegate", ("owner_account", owner_account));
 
@@ -1215,6 +1218,41 @@ public:
             catch (const fc::exception&)
             {
                FC_THROW("No account or witness named ${account}", ("account", owner_account));
+            }
+         }
+      }
+      FC_CAPTURE_AND_RETHROW( (owner_account) )
+   }
+
+   delegate_object get_delegate(string owner_account)
+   {
+      try 
+      {
+         fc::optional<delegate_id_type> delegate_id = maybe_id<delegate_id_type>(owner_account);
+         if (delegate_id)
+         {
+            std::vector<delegate_id_type> ids_to_get;
+            ids_to_get.push_back(*delegate_id);
+            std::vector<fc::optional<delegate_object>> delegate_objects = _remote_db->get_delegates(ids_to_get);
+            if (delegate_objects.front())
+               return *delegate_objects.front();
+            FC_THROW("No delegate is registered for id ${id}", ("id", owner_account));
+         }
+         else
+         {
+            // then maybe it's the owner account
+            try
+            {
+               account_id_type owner_account_id = get_account_id(owner_account);
+               fc::optional<delegate_object> delegate = _remote_db->get_delegate_by_account(owner_account_id);
+               if (delegate)
+                  return *delegate;
+               else
+                  FC_THROW("No delegate is registered for account ${account}", ("account", owner_account));
+            }
+            catch (const fc::exception&)
+            {
+               FC_THROW("No account or delegate named ${account}", ("account", owner_account));
             }
          }
       }
@@ -2072,15 +2110,20 @@ signed_transaction wallet_api::whitelist_account(string authorizing_account,
    return my->whitelist_account(authorizing_account, account_to_list, new_listing_status, broadcast);
 }
 
-signed_transaction wallet_api::create_delegate(string owner_account,
+signed_transaction wallet_api::create_delegate(string owner_account, string url, 
                                                bool broadcast /* = false */)
 {
-   return my->create_delegate(owner_account, broadcast);
+   return my->create_delegate(owner_account, url, broadcast);
 }
 
 map<string,witness_id_type> wallet_api::list_witnesses(const string& lowerbound, uint32_t limit)
 {
    return my->_remote_db->lookup_witness_accounts(lowerbound, limit);
+}
+
+map<string,delegate_id_type> wallet_api::list_delegates(const string& lowerbound, uint32_t limit)
+{
+   return my->_remote_db->lookup_delegate_accounts(lowerbound, limit);
 }
 
 witness_object wallet_api::get_witness(string owner_account)
