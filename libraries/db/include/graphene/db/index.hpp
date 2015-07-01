@@ -17,6 +17,7 @@
  */
 #pragma once
 #include <graphene/db/object.hpp>
+#include <graphene/db/type_serializer.hpp>
 #include <fc/interprocess/file_mapping.hpp>
 #include <fc/io/raw.hpp>
 #include <fc/io/json.hpp>
@@ -209,11 +210,8 @@ namespace graphene { namespace db {
 
          fc::sha256 get_object_version()const
          {
-            // TODO: use something other than json to describe the type and detect changes in serialization
-            // json will only detect adding, removing, or renaming fields but will not detect changing types
-            // or changes in the contents of optional values.
-            auto json_obj = fc::json::to_string( object_type() );
-            return fc::sha256::hash(json_obj);
+            auto desc = get_type_description<object_type>();
+            return fc::sha256::hash(desc);
          }
 
          virtual void open( const path& db )override
