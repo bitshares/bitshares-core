@@ -783,16 +783,16 @@ namespace graphene { namespace chain {
    };
 
    /**
-    * @brief used to take an asset out of circulation
+    * @brief used to take an asset out of circulation, returning to the issuer
     * @ingroup operations
     *
     * @note You cannot burn market-issued assets.
     */
-   struct asset_burn_operation
+   struct asset_reserve_operation
    {
       asset             fee;
       account_id_type   payer;
-      asset             amount_to_burn;
+      asset             amount_to_reserve;
 
       account_id_type fee_payer()const { return payer; }
       void            get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>&)const;
@@ -801,7 +801,7 @@ namespace graphene { namespace chain {
       void get_balance_delta(balance_accumulator& acc, const operation_result& result = asset())const
       {
          acc.adjust(fee_payer(), -fee);
-         acc.adjust(fee_payer(), -amount_to_burn);
+         acc.adjust(fee_payer(), -amount_to_reserve);
       }
    };
 
@@ -1398,7 +1398,7 @@ namespace graphene { namespace chain {
             asset_update_bitasset_operation,
             asset_update_feed_producers_operation,
             asset_issue_operation,
-            asset_burn_operation,
+            asset_reserve_operation,
             asset_fund_fee_pool_operation,
             asset_settle_operation,
             asset_global_settle_operation,
@@ -1620,8 +1620,8 @@ FC_REFLECT( graphene::chain::asset_settle_operation, (fee)(account)(amount) )
 FC_REFLECT( graphene::chain::asset_global_settle_operation, (fee)(issuer)(asset_to_settle)(settle_price) )
 FC_REFLECT( graphene::chain::asset_issue_operation,
             (fee)(issuer)(asset_to_issue)(issue_to_account)(memo) )
-FC_REFLECT( graphene::chain::asset_burn_operation,
-            (fee)(payer)(amount_to_burn) )
+FC_REFLECT( graphene::chain::asset_reserve_operation,
+            (fee)(payer)(amount_to_reserve) )
 
 FC_REFLECT( graphene::chain::proposal_create_operation, (fee)(fee_paying_account)(expiration_time)
             (proposed_ops)(review_period_seconds) )

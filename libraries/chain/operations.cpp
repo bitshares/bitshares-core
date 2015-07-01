@@ -343,21 +343,21 @@ share_type asset_update_operation::calculate_fee(const fee_schedule_type& k)cons
    return k.asset_update_fee + k.total_data_fee(new_options);
 }
 
-void asset_burn_operation::get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>&) const
+void asset_reserve_operation::get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>&) const
 {
    active_auth_set.insert(payer);
 }
 
-void asset_burn_operation::validate()const
+void asset_reserve_operation::validate()const
 {
    FC_ASSERT( fee.amount >= 0 );
-   FC_ASSERT( amount_to_burn.amount.value <= GRAPHENE_MAX_SHARE_SUPPLY );
-   FC_ASSERT( amount_to_burn.amount.value > 0 );
+   FC_ASSERT( amount_to_reserve.amount.value <= GRAPHENE_MAX_SHARE_SUPPLY );
+   FC_ASSERT( amount_to_reserve.amount.value > 0 );
 }
 
-share_type asset_burn_operation::calculate_fee(const fee_schedule_type& k)const
+share_type asset_reserve_operation::calculate_fee(const fee_schedule_type& k)const
 {
-   return k.asset_burn_fee;
+   return k.asset_reserve_fee;
 }
 
 void asset_issue_operation::get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>&) const

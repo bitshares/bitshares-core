@@ -42,12 +42,12 @@ namespace graphene { namespace chain {
          const account_object*            to_account = nullptr;
    };
 
-   class asset_burn_evaluator : public evaluator<asset_burn_evaluator>
+   class asset_reserve_evaluator : public evaluator<asset_reserve_evaluator>
    {
       public:
-         typedef asset_burn_operation operation_type;
-         void_result do_evaluate( const asset_burn_operation& o );
-         void_result do_apply( const asset_burn_operation& o );
+         typedef asset_reserve_operation operation_type;
+         void_result do_evaluate( const asset_reserve_operation& o );
+         void_result do_apply( const asset_reserve_operation& o );
 
          const asset_dynamic_data_object* asset_dyn_data = nullptr;
          const account_object*            from_account = nullptr;

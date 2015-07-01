@@ -70,7 +70,7 @@ void database::initialize_evaluators()
    register_evaluator<custom_evaluator>();
    register_evaluator<asset_create_evaluator>();
    register_evaluator<asset_issue_evaluator>();
-   register_evaluator<asset_burn_evaluator>();
+   register_evaluator<asset_reserve_evaluator>();
    register_evaluator<asset_update_evaluator>();
    register_evaluator<asset_update_bitasset_evaluator>();
    register_evaluator<asset_update_feed_producers_evaluator>();

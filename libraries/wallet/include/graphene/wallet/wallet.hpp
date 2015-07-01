@@ -731,7 +731,7 @@ class wallet_api
        * @param broadcast true to broadcast the transaction on the network
        * @returns the signed transaction burning the asset
        */
-      signed_transaction burn_asset(string from,
+      signed_transaction reserve_asset(string from,
                                     string amount,
                                     string symbol,
                                     bool broadcast = false);
@@ -988,7 +988,7 @@ FC_API( graphene::wallet::wallet_api,
         (get_asset)
         (get_bitasset_data)
         (fund_asset_fee_pool)
-        (burn_asset)
+        (reserve_asset)
         (global_settle_asset)
         (settle_asset)
         (whitelist_account)

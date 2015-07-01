@@ -133,7 +133,7 @@ BOOST_AUTO_TEST_CASE( transfer_whitelist_uia )
       trx.operations.back() = op;
       //Fail because nathan is blacklisted
       BOOST_REQUIRE_THROW(PUSH_TX( db, trx, ~0 ), fc::exception);
-      trx.operations = {asset_burn_operation{asset(), nathan.id, advanced.amount(10)}};
+      trx.operations = {asset_reserve_operation{asset(), nathan.id, advanced.amount(10)}};
       //Fail because nathan is blacklisted
       BOOST_REQUIRE_THROW(PUSH_TX( db, trx, ~0 ), fc::exception);
       std::swap(op.from, op.to);
@@ -185,7 +185,7 @@ BOOST_AUTO_TEST_CASE( transfer_whitelist_uia )
       BOOST_CHECK(!nathan.is_authorized_asset(advanced));
       BOOST_REQUIRE_THROW(PUSH_TX( db, trx, ~0 ), fc::exception);
 
-      trx.operations = {asset_burn_operation{asset(), dan.id, advanced.amount(10)}};
+      trx.operations = {asset_reserve_operation{asset(), dan.id, advanced.amount(10)}};
       PUSH_TX(db, trx, ~0);
       BOOST_CHECK_EQUAL(get_balance(dan, advanced), 40);
    } catch(fc::exception& e) {

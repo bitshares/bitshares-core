@@ -362,7 +362,7 @@ namespace graphene { namespace chain {
       uint64_t asset_create_fee = 5*UINT64_C(500000000);   ///< about $35 for LTM, the cost to register the cheapest asset
       uint64_t asset_update_fee = 150000; ///< the cost to modify a registered asset
       uint64_t asset_issue_fee = 700000; ///< the cost to print a UIA and send it to an account
-      uint64_t asset_burn_fee = 1500000; ///< the cost to burn an asset
+      uint64_t asset_reserve_fee = 1500000; ///< the cost to return an asset to the reserve pool
       uint64_t asset_fund_fee_pool_fee = 150000; ///< the cost to add funds to an asset's fee pool
       uint64_t asset_settle_fee = 7000000; ///< the cost to trigger a forced settlement of a market-issued asset
       uint64_t asset_global_settle_fee = 140000000; ///< the cost to trigger a global forced settlement of a market asset
@@ -446,7 +446,7 @@ namespace graphene { namespace chain {
       uint16_t                maximum_witness_count               = GRAPHENE_DEFAULT_MAX_WITNESSES; ///< maximum number of active witnesses
       uint16_t                maximum_committee_count             = GRAPHENE_DEFAULT_MAX_COMMITTEE; ///< maximum number of active delegates
       uint16_t                maximum_authority_membership        = GRAPHENE_DEFAULT_MAX_AUTHORITY_MEMBERSHIP; ///< largest number of keys/accounts an authority can have
-      uint16_t                burn_percent_of_fee                 = GRAPHENE_DEFAULT_BURN_PERCENT_OF_FEE; ///< the percentage of the network's allocation of a fee that is taken out of circulation
+      uint16_t                reserve_percent_of_fee                 = GRAPHENE_DEFAULT_BURN_PERCENT_OF_FEE; ///< the percentage of the network's allocation of a fee that is taken out of circulation
       uint16_t                network_percent_of_fee              = GRAPHENE_DEFAULT_NETWORK_PERCENT_OF_FEE; ///< percent of transaction fees paid to network
       uint16_t                lifetime_referrer_percent_of_fee    = GRAPHENE_DEFAULT_LIFETIME_REFERRER_PERCENT_OF_FEE; ///< percent of transaction fees paid to network
       uint32_t                cashback_vesting_period_seconds     = GRAPHENE_DEFAULT_CASHBACK_VESTING_PERIOD_SEC; ///< time after cashback rewards are accrued before they become liquid
@@ -465,7 +465,7 @@ namespace graphene { namespace chain {
 
       void validate()const
       {
-         FC_ASSERT( burn_percent_of_fee <= GRAPHENE_100_PERCENT );
+         FC_ASSERT( reserve_percent_of_fee <= GRAPHENE_100_PERCENT );
          FC_ASSERT( network_percent_of_fee <= GRAPHENE_100_PERCENT );
          FC_ASSERT( max_bulk_discount_percent_of_fee <= GRAPHENE_100_PERCENT );
          FC_ASSERT( lifetime_referrer_percent_of_fee <= GRAPHENE_100_PERCENT );
@@ -575,7 +575,7 @@ FC_REFLECT( graphene::chain::fee_schedule_type,
             (asset_create_fee)
             (asset_update_fee)
             (asset_issue_fee)
-            (asset_burn_fee)
+            (asset_reserve_fee)
             (asset_fund_fee_pool_fee)
             (asset_settle_fee)
             (data_fee)
@@ -608,7 +608,7 @@ FC_REFLECT( graphene::chain::chain_parameters,
             (maximum_asset_whitelist_authorities)
             (maximum_asset_feed_publishers)
             (maximum_authority_membership)
-            (burn_percent_of_fee)
+            (reserve_percent_of_fee)
             (network_percent_of_fee)
             (lifetime_referrer_percent_of_fee)
             (max_bulk_discount_percent_of_fee)

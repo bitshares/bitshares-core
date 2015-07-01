@@ -130,7 +130,7 @@ struct operation_get_impacted_accounts
        _impacted.insert( o.issue_to_account );
    }
 
-   void operator()( const asset_burn_operation& o )const { }
+   void operator()( const asset_reserve_operation& o )const { }
    void operator()( const asset_global_settle_operation& o )const { }
    void operator()( const asset_settle_operation& o )const { }
 

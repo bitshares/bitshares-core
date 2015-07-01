@@ -139,11 +139,11 @@ void_result asset_issue_evaluator::do_apply( const asset_issue_operation& o )
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }
 
-void_result asset_burn_evaluator::do_evaluate( const asset_burn_operation& o )
+void_result asset_reserve_evaluator::do_evaluate( const asset_reserve_operation& o )
 { try {
    database& d   = db();
 
-   const asset_object& a = o.amount_to_burn.asset_id(d);
+   const asset_object& a = o.amount_to_reserve.asset_id(d);
    FC_ASSERT( !a.is_market_issued() );
 
    from_account = &o.payer(d);
@@ -154,17 +154,17 @@ void_result asset_burn_evaluator::do_evaluate( const asset_burn_operation& o )
    }
 
    asset_dyn_data = &a.dynamic_asset_data_id(d);
-   FC_ASSERT( (asset_dyn_data->current_supply - o.amount_to_burn.amount) >= 0 );
+   FC_ASSERT( (asset_dyn_data->current_supply - o.amount_to_reserve.amount) >= 0 );
 
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }
 
-void_result asset_burn_evaluator::do_apply( const asset_burn_operation& o )
+void_result asset_reserve_evaluator::do_apply( const asset_reserve_operation& o )
 { try {
-   db().adjust_balance( o.payer, -o.amount_to_burn );
+   db().adjust_balance( o.payer, -o.amount_to_reserve );
 
    db().modify( *asset_dyn_data, [&]( asset_dynamic_data_object& data ){
-        data.current_supply -= o.amount_to_burn.amount;
+        data.current_supply -= o.amount_to_reserve.amount;
    });
 
    return void_result();

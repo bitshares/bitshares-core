@@ -1087,22 +1087,22 @@ public:
       return sign_transaction( tx, broadcast );
    } FC_CAPTURE_AND_RETHROW( (from)(symbol)(amount)(broadcast) ) }
 
-   signed_transaction burn_asset(string from,
+   signed_transaction reserve_asset(string from,
                                  string amount,
                                  string symbol,
                                  bool broadcast /* = false */)
    { try {
       account_object from_account = get_account(from);
-      optional<asset_object> asset_to_burn = find_asset(symbol);
-      if (!asset_to_burn)
+      optional<asset_object> asset_to_reserve = find_asset(symbol);
+      if (!asset_to_reserve)
         FC_THROW("No asset with that symbol exists!");
 
-      asset_burn_operation burn_op;
-      burn_op.payer = from_account.id;
-      burn_op.amount_to_burn = asset_to_burn->amount_from_string(amount);
+      asset_reserve_operation reserve_op;
+      reserve_op.payer = from_account.id;
+      reserve_op.amount_to_reserve = asset_to_reserve->amount_from_string(amount);
 
       signed_transaction tx;
-      tx.operations.push_back( burn_op );
+      tx.operations.push_back( reserve_op );
       tx.visit( operation_set_fee( _remote_db->get_global_properties().parameters.current_fees ) );
       tx.validate();
 
@@ -2041,7 +2041,7 @@ signed_transaction wallet_api::fund_asset_fee_pool(string from,
    return my->fund_asset_fee_pool(from, symbol, amount, broadcast);
 }
 
-signed_transaction wallet_api::burn_asset(string from,
+signed_transaction wallet_api::reserve_asset(string from,
                                           string amount,
                                           string symbol,
                                           bool broadcast /* = false */)
