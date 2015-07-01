@@ -39,8 +39,8 @@ void_result limit_order_create_evaluator::do_evaluate(const limit_order_create_o
    if( _sell_asset->enforce_white_list() ) FC_ASSERT( _seller->is_authorized_asset( *_sell_asset ) );
    if( _receive_asset->enforce_white_list() ) FC_ASSERT( _seller->is_authorized_asset( *_receive_asset ) );
 
-   FC_ASSERT( d.get_balance( _seller, _sell_asset ) >= op.amount_to_sell, "insufficient balance",
-              ("balance",d.get_balance(_seller,_sell_asset))("amount_to_sell",op.amount_to_sell) );
+   FC_ASSERT( d.get_balance( *_seller, *_sell_asset ) >= op.amount_to_sell, "insufficient balance",
+              ("balance",d.get_balance(*_seller,*_sell_asset))("amount_to_sell",op.amount_to_sell) );
 
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (op) ) }

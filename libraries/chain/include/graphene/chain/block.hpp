@@ -36,7 +36,7 @@ namespace graphene { namespace chain {
       checksum_type                 transaction_merkle_root;
       vector<header_extension>      extensions;
 
-      static uint32_t num_from_id(const block_id_type& id) { return htonl(id._hash[0]); }
+      static uint32_t num_from_id(const block_id_type& id);
    };
 
    struct signed_block_header : public block_header

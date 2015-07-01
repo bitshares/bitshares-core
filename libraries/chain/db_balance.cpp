@@ -38,12 +38,6 @@ asset database::get_balance(const account_object& owner, const asset_object& ass
    return get_balance(owner.get_id(), asset_obj.get_id());
 }
 
-// TODO: this method should be removed
-asset database::get_balance( const account_object* owner, const asset_object* asset_obj )const
-{
-   return get_balance(*owner, *asset_obj);
-}
-
 void database::adjust_balance(account_id_type account, asset delta )
 { try {
    if( delta.amount == 0 )

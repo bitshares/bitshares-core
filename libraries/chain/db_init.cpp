@@ -128,7 +128,8 @@ void database::initialize_indexes()
    prop_index->add_secondary_index<required_approval_index>();
 
    add_index< primary_index<withdraw_permission_index > >();
-   add_index< primary_index<simple_index<vesting_balance_object> > >();
+   //add_index< primary_index<vesting_balance_index> >();
+   add_index< primary_index<simple_index<vesting_balance_object>> >();
    add_index< primary_index<worker_index> >();
    add_index< primary_index<balance_index> >();
 

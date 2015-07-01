@@ -24,6 +24,7 @@
 
 #include <graphene/chain/asset.hpp>
 #include <graphene/db/object.hpp>
+#include <graphene/db/generic_index.hpp>
 
 namespace graphene { namespace chain {
    using namespace graphene::db;
@@ -156,6 +157,19 @@ namespace graphene { namespace chain {
          void withdraw(const fc::time_point_sec& now, const asset& amount);
          bool is_withdraw_allowed(const fc::time_point_sec& now, const asset& amount)const;
    };
+   /**
+    * @ingroup object_index
+    */
+   typedef multi_index_container<
+      vesting_balance_object,
+      indexed_by<
+         hashed_unique< tag<by_id>, member< object, object_id_type, &object::id > >
+      >
+   > vesting_balance_multi_index_type;
+   /**
+    * @ingroup object_index
+    */
+   typedef generic_index<vesting_balance_object, vesting_balance_multi_index_type> vesting_balance_index;
 
 } } // graphene::chain
 

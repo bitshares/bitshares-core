@@ -21,13 +21,6 @@
 
 #include <numeric>
 
-// this is for htonl() and ntohl() functions
-// TODO:  write and use FC wrappers for these functions
-#ifndef WIN32
-   #include <arpa/inet.h>
-#else
-   #include <winsock2.h>
-#endif
 
 namespace graphene { namespace chain {
 

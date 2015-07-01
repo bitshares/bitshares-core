@@ -449,8 +449,7 @@ void_result asset_publish_feeds_evaluator::do_evaluate(const asset_publish_feed_
    if( base.issuer == account_id_type() )
    {
       //It's a delegate-fed asset. Verify that publisher is an active delegate or witness.
-      // TODO: replace account_id_type with global variable for delegates account id
-      FC_ASSERT(d.get(account_id_type()).active.auths.count(o.publisher) ||
+      FC_ASSERT(d.get(GRAPHENE_COMMITTEE_ACCOUNT).active.auths.count(o.publisher) ||
                 d.get_global_properties().witness_accounts.count(o.publisher));
    } else {
       FC_ASSERT(bitasset.feeds.count(o.publisher));
@@ -464,14 +463,17 @@ void_result asset_publish_feeds_evaluator::do_apply(const asset_publish_feed_ope
    database& d = db();
 
    const asset_object& base = o.asset_id(d);
+   const asset_bitasset_data_object& bad = base.bitasset_data(d);
+
+   auto old_feed =  bad.current_feed;
    // Store medians for this asset
-   d.modify(base.bitasset_data(d), [&o,&d](asset_bitasset_data_object& a) {
+   d.modify(bad , [&o,&d](asset_bitasset_data_object& a) {
       a.feeds[o.publisher] = make_pair(d.head_block_time(), o.feed);
       a.update_median_feeds(d.head_block_time());
    });
 
-   /// TODO: optimization: only do this if the median feed actually changed, otherwise there is no point
-   db().check_call_orders(base);
+   if( !(old_feed == bad.current_feed) )
+      db().check_call_orders(base);
 
    return void_result();
 } FC_CAPTURE_AND_RETHROW((o)) }
