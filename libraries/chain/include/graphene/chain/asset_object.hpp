@@ -90,6 +90,7 @@ namespace graphene { namespace chain {
          bool charges_market_fees()const { return options.flags & charge_market_fee; }
          /// @return true if this asset may only be transferred to/from the issuer or market orders
          bool is_transfer_restricted()const { return options.flags & transfer_restricted; }
+         bool can_override()const { return options.flags & override_authority; }
 
          /// Helper function to get an asset object with the given amount in this asset's type
          asset amount(share_type a)const { return asset(a, id); }

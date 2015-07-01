@@ -227,6 +227,15 @@ share_type transfer_operation::calculate_fee( const fee_schedule_type& schedule 
    return core_fee_required;
 }
 
+share_type override_transfer_operation::calculate_fee( const fee_schedule_type& schedule )const
+{
+   share_type core_fee_required = schedule.transfer_fee;
+   if( memo )
+      core_fee_required += schedule.total_data_fee(memo->message);
+   return core_fee_required;
+}
+
+
 struct key_data_validate
 {
    typedef void result_type;
@@ -289,6 +298,20 @@ void transfer_operation::validate()const
    FC_ASSERT( fee.amount >= 0 );
    FC_ASSERT( from != to );
    FC_ASSERT( amount.amount > 0 );
+}
+
+void override_transfer_operation::get_required_auth(flat_set<account_id_type>& active_auth_set,
+                                           flat_set<account_id_type>&) const
+{
+   active_auth_set.insert( issuer );
+}
+
+void override_transfer_operation::validate()const
+{
+   FC_ASSERT( fee.amount >= 0 );
+   FC_ASSERT( from != to );
+   FC_ASSERT( amount.amount > 0 );
+   FC_ASSERT( issuer != from );
 }
 
 void asset_create_operation::get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>&) const

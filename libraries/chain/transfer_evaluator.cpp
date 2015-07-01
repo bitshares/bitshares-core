@@ -53,4 +53,40 @@ void_result transfer_evaluator::do_apply( const transfer_operation& o )
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }
 
+
+
+void_result override_transfer_evaluator::do_evaluate( const override_transfer_operation& op )
+{ try {
+   database& d = db();
+
+   const asset_object&   asset_type      = op.amount.asset_id(d);
+   FC_ASSERT( asset_type.can_override() );
+   FC_ASSERT( asset_type.issuer == op.issuer );
+
+   const account_object& from_account    = op.from(d);
+   const account_object& to_account      = op.to(d);
+   const asset_object&   fee_asset_type  = op.fee.asset_id(d);
+
+   if( asset_type.options.flags & white_list )
+   {
+      FC_ASSERT( to_account.is_authorized_asset( asset_type ) );
+      FC_ASSERT( from_account.is_authorized_asset( asset_type ) );
+   }
+
+   if( fee_asset_type.options.flags & white_list )
+      FC_ASSERT( from_account.is_authorized_asset( asset_type ) );
+
+   FC_ASSERT( d.get_balance( &from_account, &asset_type ).amount >= op.amount.amount,
+              "", ("total_transfer",op.amount)("balance",d.get_balance(&from_account, &asset_type).amount) );
+
+   return void_result();
+} FC_CAPTURE_AND_RETHROW( (op) ) }
+
+void_result override_transfer_evaluator::do_apply( const override_transfer_operation& o )
+{ try {
+   db().adjust_balance( o.from, -o.amount );
+   db().adjust_balance( o.to, o.amount );
+   return void_result();
+} FC_CAPTURE_AND_RETHROW( (o) ) }
+
 } } // graphene::chain

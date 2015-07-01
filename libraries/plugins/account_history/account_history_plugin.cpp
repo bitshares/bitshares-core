@@ -187,6 +187,7 @@ struct operation_get_impacted_accounts
    void operator()( const worker_create_operation& )const {}
    void operator()( const assert_operation& )const {}
    void operator()( const balance_claim_operation& )const {}
+   void operator()( const override_transfer_operation& )const {}
 };
 
 

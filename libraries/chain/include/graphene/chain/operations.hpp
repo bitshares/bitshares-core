@@ -501,13 +501,13 @@ namespace graphene { namespace chain {
     */
    struct transfer_operation
    {
-      asset fee;
+      asset            fee;
       /// Account to transfer asset from
-      account_id_type from;
+      account_id_type  from;
       /// Account to transfer asset to
-      account_id_type to;
+      account_id_type  to;
       /// The amount of asset to transfer from @ref from to @ref to
-      asset amount;
+      asset            amount;
 
       /// User provided data encrypted to the memo key of the "to" account
       optional<memo_data> memo;
@@ -523,6 +523,41 @@ namespace graphene { namespace chain {
          acc.adjust( to, amount );
       }
    };
+
+   /**
+    *  @class override_transfer_operation
+    *  @brief Allows the issuer of an asset to transfer an asset from any account to any account if they have override_authority
+    *  @ingroup operations
+    *
+    *  @pre amount.asset_id->issuer == issuer
+    *  @pre issuer != from  because this is pointless, use a normal transfer operation
+    */
+   struct override_transfer_operation
+   {
+      asset           fee;
+      account_id_type issuer;
+      /// Account to transfer asset from
+      account_id_type from;
+      /// Account to transfer asset to
+      account_id_type to;
+      /// The amount of asset to transfer from @ref from to @ref to
+      asset amount;
+
+      /// User provided data encrypted to the memo key of the "to" account
+      optional<memo_data> memo;
+
+      account_id_type fee_payer()const { return issuer; }
+      void            get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>&)const;
+      void            validate()const;
+      share_type      calculate_fee(const fee_schedule_type& k)const;
+      void get_balance_delta( balance_accumulator& acc, const operation_result& result = asset())const
+      {
+         acc.adjust( fee_payer(), -fee );
+         acc.adjust( from, -amount );
+         acc.adjust( to, amount );
+      }
+   };
+
 
    /**
     * @ingroup operations
@@ -1420,7 +1455,8 @@ namespace graphene { namespace chain {
             worker_create_operation,
             custom_operation,
             assert_operation,
-            balance_claim_operation
+            balance_claim_operation,
+            override_transfer_operation
          > operation;
 
    /// @} // operations group
@@ -1588,6 +1624,8 @@ FC_REFLECT( graphene::chain::call_order_update_operation, (fee)(funding_account)
 
 FC_REFLECT( graphene::chain::transfer_operation,
             (fee)(from)(to)(amount)(memo) )
+FC_REFLECT( graphene::chain::override_transfer_operation,
+            (fee)(issuer)(from)(to)(amount)(memo) )
 
 FC_REFLECT( graphene::chain::asset_create_operation,
             (fee)
