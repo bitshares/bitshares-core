@@ -124,16 +124,19 @@ BOOST_AUTO_TEST_CASE( withdraw_permission_test )
       REQUIRE_THROW_WITH_VALUE(op, amount_to_withdraw, asset(6));
       trx.clear();
       trx.operations.push_back(op);
-      trx.sign(dan_key_id, dan_private_key);
+      trx.sign(dan_private_key);
       PUSH_TX( db, trx );
 
       // would be legal on its own, but doesn't work because trx already withdrew
       REQUIRE_THROW_WITH_VALUE(op, amount_to_withdraw, asset(5));
 
       // Make sure we can withdraw again this period, as long as we're not exceeding the periodic limit
-      trx.operations.back() = op;    // withdraw 1
-      trx.ref_block_prefix++;        // make it different from previous trx so it's non-duplicate
-      trx.sign(dan_key_id, dan_private_key);
+      trx.clear();
+      // withdraw 1
+      trx.operations = {op};
+      // make it different from previous trx so it's non-duplicate
+      trx.ref_block_prefix++;
+      trx.sign(dan_private_key);
       PUSH_TX( db, trx );
       trx.clear();
    }
@@ -149,10 +152,10 @@ BOOST_AUTO_TEST_CASE( withdraw_permission_test )
       BOOST_CHECK(permit_object.withdrawal_limit == asset(5));
       BOOST_CHECK(permit_object.withdrawal_period_sec == fc::hours(1).to_seconds());
       BOOST_CHECK_EQUAL(permit_object.claimed_this_period.value, 2 );
-      BOOST_CHECK(permit_object.expiration == first_start_time + 5*permit_object.withdrawal_period_sec );
+      BOOST_CHECK(permit_object.expiration == first_start_time + 5*permit_object.withdrawal_period_sec);
       generate_blocks(first_start_time + permit_object.withdrawal_period_sec);
       // lazy update:  verify period_start_time isn't updated until new trx occurs
-      BOOST_CHECK(permit_object.period_start_time == first_start_time );
+      BOOST_CHECK(permit_object.period_start_time == first_start_time);
    }
 
    {
@@ -163,11 +166,12 @@ BOOST_AUTO_TEST_CASE( withdraw_permission_test )
       op.withdraw_to_account = dan_id;
       op.amount_to_withdraw = asset(5);
       trx.operations.push_back(op);
-      trx.sign(dan_key_id, dan_private_key);
+      trx.sign(dan_private_key);
       //Throws because nathan doesn't have the money
       BOOST_CHECK_THROW(PUSH_TX( db, trx ), fc::exception);
       op.amount_to_withdraw = asset(1);
-      trx.operations.back() = op;
+      trx.clear();
+      trx.operations = {op};
       trx.sign(dan_key_id, dan_private_key);
       PUSH_TX( db, trx );
    }
@@ -181,14 +185,14 @@ BOOST_AUTO_TEST_CASE( withdraw_permission_test )
       const withdraw_permission_object& permit_object = permit(db);
       BOOST_CHECK(permit_object.authorized_account == dan_id);
       BOOST_CHECK(permit_object.withdraw_from_account == nathan_id);
-      BOOST_CHECK(permit_object.period_start_time == first_start_time + permit_object.withdrawal_period_sec );
-      BOOST_CHECK(permit_object.expiration == first_start_time + 5*permit_object.withdrawal_period_sec );
+      BOOST_CHECK(permit_object.period_start_time == first_start_time + permit_object.withdrawal_period_sec);
+      BOOST_CHECK(permit_object.expiration == first_start_time + 5*permit_object.withdrawal_period_sec);
       BOOST_CHECK(permit_object.withdrawal_limit == asset(5));
       BOOST_CHECK(permit_object.withdrawal_period_sec == fc::hours(1).to_seconds());
       generate_blocks(permit_object.expiration);
    }
    // Ensure the permit object has been garbage collected
-   BOOST_CHECK(db.find_object( permit ) == nullptr );
+   BOOST_CHECK(db.find_object(permit) == nullptr);
 
    {
       withdraw_permission_claim_operation op;
@@ -197,7 +201,7 @@ BOOST_AUTO_TEST_CASE( withdraw_permission_test )
       op.withdraw_to_account = dan_id;
       op.amount_to_withdraw = asset(5);
       trx.operations.push_back(op);
-      trx.sign(dan_key_id, dan_private_key);
+      trx.sign(dan_private_key);
       //Throws because the permission has expired
       BOOST_CHECK_THROW(PUSH_TX( db, trx ), fc::exception);
    }
@@ -388,7 +392,7 @@ BOOST_AUTO_TEST_CASE( feed_limit_test )
    op.asset_to_update = bit_usd.get_id();
    op.issuer = bit_usd.issuer;
    trx.operations = {op};
-   trx.sign(nathan_key_id, nathan_private_key);
+   trx.sign(nathan_private_key);
    db.push_transaction(trx);
 
    BOOST_TEST_MESSAGE("Checking current_feed is null");
@@ -396,8 +400,9 @@ BOOST_AUTO_TEST_CASE( feed_limit_test )
 
    BOOST_TEST_MESSAGE("Setting minimum feeds to 3");
    op.new_options.minimum_feeds = 3;
+   trx.clear();
    trx.operations = {op};
-   trx.sign(nathan_key_id, nathan_private_key);
+   trx.sign(nathan_private_key);
    db.push_transaction(trx);
 
    BOOST_TEST_MESSAGE("Checking current_feed is not null");

@@ -36,7 +36,6 @@ digest_type processed_transaction::merkle_digest()const
 digest_type transaction::digest()const
 {
    //Only use this digest() for transactions with absolute expiration times.
-   if( relative_expiration != 0 ) edump((*this));
    assert(relative_expiration == 0);
    digest_type::encoder enc;
    fc::raw::pack( enc, *this );
@@ -60,15 +59,15 @@ graphene::chain::transaction_id_type graphene::chain::transaction::id() const
    memcpy(result._hash, hash._hash, std::min(sizeof(result), sizeof(hash)));
    return result;
 }
-void graphene::chain::signed_transaction::sign(  const private_key_type& key )
+void graphene::chain::signed_transaction::sign(const private_key_type& key)
 {
    if( relative_expiration != 0 )
    {
-      if( !block_id_cache.valid() ) edump((*this));
+      // Relative expiration is set, meaning we must include the block ID in the signature
       assert(block_id_cache.valid());
-      signatures.push_back(  key.sign_compact( digest(*block_id_cache) ) );
+      signatures.push_back(key.sign_compact(digest(*block_id_cache)));
    } else {
-      signatures.push_back( key.sign_compact( digest() ) );
+      signatures.push_back(key.sign_compact(digest()));
    }
 }
 
