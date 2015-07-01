@@ -357,9 +357,9 @@ namespace graphene { namespace chain {
       uint64_t account_len6_fee   = 5*UINT64_C(500000000); ///< about $50
       uint64_t account_len5_fee   = 5*UINT64_C(1000000000); ///< about $100
       uint64_t account_len4_fee   = 5*UINT64_C(2000000000); ///< about $200
-      uint64_t account_len3_fee   = 5*3000000000; ///< about $300
-      uint64_t account_len2_fee   = 5*4000000000; ///< about $400
-      uint64_t asset_create_fee = 5ll*500000000;   ///< about $35 for LTM, the cost to register the cheapest asset
+      uint64_t account_len3_fee   = 5*UINT64_C(3000000000); ///< about $300
+      uint64_t account_len2_fee   = 5*UINT64_C(4000000000); ///< about $400
+      uint64_t asset_create_fee = 5*UINT64_C(500000000);   ///< about $35 for LTM, the cost to register the cheapest asset
       uint64_t asset_update_fee = 150000; ///< the cost to modify a registered asset
       uint64_t asset_issue_fee = 700000; ///< the cost to print a UIA and send it to an account
       uint64_t asset_burn_fee = 1500000; ///< the cost to burn an asset

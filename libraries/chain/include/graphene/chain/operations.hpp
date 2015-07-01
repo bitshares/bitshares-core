@@ -143,6 +143,7 @@ namespace graphene { namespace chain {
       asset             fee;
       account_id_type   deposit_to_account;
       balance_id_type   balance_to_claim;
+      public_key_type   balance_owner_key;
       asset             total_claimed;
 
       account_id_type fee_payer()const { return deposit_to_account; }
@@ -1651,7 +1652,8 @@ FC_REFLECT( graphene::chain::custom_operation, (fee)(payer)(required_auths)(id)(
 FC_REFLECT( graphene::chain::assert_operation, (fee)(fee_paying_account)(predicates)(required_auths) )
 
 FC_REFLECT( graphene::chain::void_result, )
-FC_REFLECT( graphene::chain::balance_claim_operation, (fee)(deposit_to_account)(balance_to_claim)(total_claimed) )
+FC_REFLECT( graphene::chain::balance_claim_operation,
+            (fee)(deposit_to_account)(balance_to_claim)(balance_owner_key)(total_claimed) )
 
 FC_REFLECT_TYPENAME( graphene::chain::operation )
 FC_REFLECT_TYPENAME( graphene::chain::operation_result )

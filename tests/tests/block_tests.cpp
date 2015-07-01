@@ -349,7 +349,6 @@ BOOST_AUTO_TEST_CASE( switch_forks_undo_create )
       cop.name = "nathan";
       cop.owner = authority(1, key_id_type(), 1);
       trx.operations.push_back(cop);
-      trx.sign( key_id_type(), delegate_priv_key );
       PUSH_TX( db1, trx );
 
       auto aw = db1.get_global_properties().active_witnesses;

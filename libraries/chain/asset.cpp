@@ -90,7 +90,7 @@ namespace graphene { namespace chain {
             FC_ASSERT( result <= GRAPHENE_MAX_SHARE_SUPPLY );
             return asset( result.to_uint64(), b.base.asset_id );
          }
-         FC_ASSERT( !"invalid asset * price", "", ("asset",a)("price",b) );
+         FC_THROW_EXCEPTION( fc::assert_exception, "invalid asset * price", ("asset",a)("price",b) );
       }
 
       price operator / ( const asset& base, const asset& quote )

@@ -107,12 +107,12 @@ void database::update_active_witnesses()
    assert( _witness_count_histogram_buffer.size() > 0 );
    share_type stake_target = _total_voting_stake / 2;
    share_type stake_tally = _witness_count_histogram_buffer[0];
-   int witness_count = 0;
-   while( (size_t(witness_count) < _witness_count_histogram_buffer.size())
+   size_t witness_count = 0;
+   while( (witness_count < _witness_count_histogram_buffer.size() - 1)
           && (stake_tally <= stake_target) )
       stake_tally += _witness_count_histogram_buffer[++witness_count];
 
-   auto wits = sort_votable_objects<witness_index>(std::max(witness_count*2+1, GRAPHENE_MIN_WITNESS_COUNT));
+   auto wits = sort_votable_objects<witness_index>(std::max(witness_count*2+1, (size_t)GRAPHENE_MIN_WITNESS_COUNT));
    const global_property_object& gpo = get_global_properties();
 
    // Update witness authority
@@ -173,12 +173,12 @@ void database::update_active_delegates()
    assert( _committee_count_histogram_buffer.size() > 0 );
    uint64_t stake_target = _total_voting_stake / 2;
    uint64_t stake_tally = _committee_count_histogram_buffer[0];
-   int delegate_count = 0;
-   while( (size_t(delegate_count) < _committee_count_histogram_buffer.size())
+   size_t delegate_count = 0;
+   while( (delegate_count < _committee_count_histogram_buffer.size() - 1)
           && (stake_tally <= stake_target) )
       stake_tally += _committee_count_histogram_buffer[++delegate_count];
 
-   auto delegates = sort_votable_objects<delegate_index>(std::max(delegate_count*2+1, GRAPHENE_MIN_DELEGATE_COUNT));
+   auto delegates = sort_votable_objects<delegate_index>(std::max(delegate_count*2+1, (size_t)GRAPHENE_MIN_DELEGATE_COUNT));
 
    // Update genesis authorities
    if( !delegates.empty() )
