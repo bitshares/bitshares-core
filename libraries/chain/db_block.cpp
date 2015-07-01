@@ -425,17 +425,17 @@ void database::notify_changed_objects()
    changed_objects(changed_ids);
 }
 
-processed_transaction database::apply_transaction( const signed_transaction& trx, uint32_t skip )
+processed_transaction database::apply_transaction(const signed_transaction& trx, uint32_t skip)
 {
    processed_transaction result;
-   with_skip_flags( skip, [&]()
+   with_skip_flags(skip, [&]()
    {
-      result = _apply_transaction( trx );
-   } );
+      result = _apply_transaction(trx);
+   });
    return result;
 }
 
-processed_transaction database::_apply_transaction( const signed_transaction& trx )
+processed_transaction database::_apply_transaction(const signed_transaction& trx)
 { try {
    uint32_t skip = get_node_properties().skip_flags;
    trx.validate();
@@ -450,13 +450,14 @@ processed_transaction database::_apply_transaction( const signed_transaction& tr
    //This check is used only if this transaction has an absolute expiration time.
    if( !(skip & skip_transaction_signatures) && trx.relative_expiration == 0 )
    {
-      eval_state._sigs.reserve( trx.signatures.size() );
+      eval_state._sigs.reserve(trx.signatures.size());
 
       for( const auto& sig : trx.signatures )
       {
-         FC_ASSERT( eval_state._sigs.insert( std::make_pair( public_key_type(fc::ecc::public_key( sig, trx.digest() )), false) ).second, "Multiple signatures by same key detected" ) ;
+         FC_ASSERT( eval_state._sigs.insert(std::make_pair(public_key_type(fc::ecc::public_key(sig, trx.digest())),
+                                                           false)).second,
+                    "Multiple signatures by same key detected" );
       }
-
    }
 
    //If we're skipping tapos check, but not dupe check, assume all transactions have maximum expiration time.
@@ -522,8 +523,8 @@ processed_transaction database::_apply_transaction( const signed_transaction& tr
             ref_block_height = uint32_t( x0 );
          }
 
-         const block_summary_object& tapos_block_summary
-               = static_cast<const block_summary_object&>(
+         const block_summary_object& tapos_block_summary =
+               static_cast<const block_summary_object&>(
                   get_index<block_summary_object>()
                   .get(block_summary_id_type(ref_block_height))
                   );
@@ -531,13 +532,16 @@ processed_transaction database::_apply_transaction( const signed_transaction& tr
          //This is the signature check for transactions with relative expiration.
          if( !(skip & skip_transaction_signatures) )
          {
-            eval_state._sigs.reserve( trx.signatures.size() );
+            eval_state._sigs.reserve(trx.signatures.size());
 
             for( const auto& sig : trx.signatures )
             {
-               FC_ASSERT(eval_state._sigs.insert(
-                            std::make_pair(public_key_type(fc::ecc::public_key(sig, trx.digest(tapos_block_summary.block_id) )),
-                                           false)).second, "Multiple signatures by same key detected");
+               FC_ASSERT(eval_state._sigs.insert(std::make_pair(
+                                                    public_key_type(
+                                                       fc::ecc::public_key(sig,
+                                                                           trx.digest(tapos_block_summary.block_id))),
+                                                    false)).second,
+                         "Multiple signatures by same key detected");
             }
          }
 
@@ -564,7 +568,7 @@ processed_transaction database::_apply_transaction( const signed_transaction& tr
       });
    }
 
-   eval_state.operation_results.reserve( trx.operations.size() );
+   eval_state.operation_results.reserve(trx.operations.size());
 
    //Finally process the operations
    processed_transaction ptrx(trx);
@@ -574,14 +578,15 @@ processed_transaction database::_apply_transaction( const signed_transaction& tr
       eval_state.operation_results.emplace_back(apply_operation(eval_state, op));
       ++_current_op_in_trx;
    }
-   ptrx.operation_results = std::move( eval_state.operation_results );
+   ptrx.operation_results = std::move(eval_state.operation_results);
 
    //Make sure the temp account has no non-zero balances
    const auto& index = get_index_type<account_balance_index>().indices().get<by_account>();
    auto range = index.equal_range(GRAPHENE_TEMP_ACCOUNT);
    std::for_each(range.first, range.second, [](const account_balance_object& b) { FC_ASSERT(b.balance == 0); });
 
-   if( !(skip & (skip_transaction_signatures|skip_authority_check))  )
+   //Make sure all signatures were needed to validate the transaction
+   if( !(skip & (skip_transaction_signatures|skip_authority_check)) )
    {
       for( const auto& item : eval_state._sigs )
       {

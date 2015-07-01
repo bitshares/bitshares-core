@@ -587,31 +587,33 @@ BOOST_FIXTURE_TEST_CASE( double_sign_check, database_fixture )
 
    trx.set_expiration(db.head_block_time() + fc::minutes(1));
    trx.operations.push_back(transfer_operation({ asset(), from.id, to.id, amount, memo_data() }));
-   for( auto& op : trx.operations ) op.visit( operation_set_fee( db.current_fee_schedule() ) );
+   for( auto& op : trx.operations ) op.visit(operation_set_fee(db.current_fee_schedule()));
    trx.validate();
 
    db.push_transaction(trx, ~0);
 
    trx.operations.clear();
    trx.operations.push_back(transfer_operation({ asset(), to.id, from.id, amount, memo_data() }));
-   for( auto& op : trx.operations ) op.visit( operation_set_fee( db.current_fee_schedule() ) );
+   for( auto& op : trx.operations ) op.visit(operation_set_fee(db.current_fee_schedule()));
    trx.validate();
 
    BOOST_TEST_MESSAGE( "Verify that not-signing causes an exception" );
-   BOOST_REQUIRE_THROW( db.push_transaction(trx, 0 ), fc::exception );
-   trx.sign( to_private_key );
+   BOOST_REQUIRE_THROW( db.push_transaction(trx, 0), fc::exception );
 
    BOOST_TEST_MESSAGE( "Verify that double-signing causes an exception" );
-   BOOST_REQUIRE_THROW( db.push_transaction(trx, 0 ), fc::exception );
+   trx.sign(to_private_key);
+   trx.sign(to_private_key);
+   BOOST_REQUIRE_THROW( db.push_transaction(trx, 0), fc::exception );
 
    BOOST_TEST_MESSAGE( "Verify that signing with an extra, unused key fails" );
    trx.signatures.pop_back();
-   trx.sign( generate_private_key("bogus") );
-   BOOST_REQUIRE_THROW( db.push_transaction(trx, 0 ), fc::exception );
+   trx.sign(generate_private_key("bogus"));
+   BOOST_REQUIRE_THROW( db.push_transaction(trx, 0), fc::exception );
 
    BOOST_TEST_MESSAGE( "Verify that signing once with the proper key passes" );
-   db.push_transaction(trx, 0 );
-   trx.sign( to_private_key );
+   trx.signatures.pop_back();
+   db.push_transaction(trx, 0);
+   trx.sign(to_private_key);
 
 } FC_LOG_AND_RETHROW() }
 
