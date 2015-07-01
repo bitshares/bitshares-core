@@ -21,7 +21,15 @@ public:
       database& d = db();
       balance = &op.balance_to_claim(d);
 
-      FC_ASSERT(trx_state->signed_by( balance->owner, true /*maybe pts*/ ));
+      FC_ASSERT(op.balance_owner_key == balance->owner ||
+                pts_address(op.balance_owner_key, false, 56) == balance->owner ||
+                pts_address(op.balance_owner_key, true, 56) == balance->owner ||
+                pts_address(op.balance_owner_key, false, 0) == balance->owner ||
+                pts_address(op.balance_owner_key, true, 0) == balance->owner,
+                "balance_owner_key does not match balance's owner");
+      if( !(d.get_node_properties().skip_flags & (database::skip_authority_check |
+                                                  database::skip_transaction_signatures)) )
+         FC_ASSERT(trx_state->signed_by(op.balance_owner_key));
       FC_ASSERT(op.total_claimed.asset_id == balance->asset_type());
 
       if( balance->vesting_policy.valid() ) {

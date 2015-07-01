@@ -993,12 +993,14 @@ BOOST_AUTO_TEST_CASE( balance_object_test )
    op.deposit_to_account = db.get_index_type<account_index>().indices().get<by_name>().find("n")->get_id();
    op.total_claimed = asset(1);
    op.balance_to_claim = balance_id_type(1);
+   op.balance_owner_key = generate_private_key("x").get_public_key();
    trx.operations = {op};
    trx.sign(generate_private_key("n"));
    // Fail because I'm claiming from an address which hasn't signed
    BOOST_CHECK_THROW(db.push_transaction(trx), fc::exception);
    trx.clear();
    op.balance_to_claim = balance_id_type();
+   op.balance_owner_key = generate_private_key("n").get_public_key();
    trx.operations = {op};
    trx.sign(generate_private_key("n"));
    db.push_transaction(trx);
