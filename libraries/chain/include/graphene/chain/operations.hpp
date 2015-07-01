@@ -1239,10 +1239,10 @@ namespace graphene { namespace chain {
 
    struct linear_vesting_policy_initializer
    {
-      /** while vesting begins on begin_date, none may be claimed before the start_claim time */
-      fc::time_point_sec start_claim;
-      fc::time_point_sec begin_date;
-      uint32_t           vesting_seconds = 0;
+      /** while vesting begins on begin_timestamp, none may be claimed before vesting_cliff_seconds have passed */
+      fc::time_point_sec begin_timestamp;
+      uint32_t           vesting_cliff_seconds = 0;
+      uint32_t           vesting_duration_seconds = 0;
    };
 
    struct cdd_vesting_policy_initializer
@@ -1673,6 +1673,6 @@ FC_REFLECT( graphene::chain::balance_claim_operation,
 FC_REFLECT_TYPENAME( graphene::chain::operation )
 FC_REFLECT_TYPENAME( graphene::chain::operation_result )
 FC_REFLECT_TYPENAME( fc::flat_set<graphene::chain::vote_id_type> )
-FC_REFLECT(graphene::chain::linear_vesting_policy_initializer, (start_claim)(begin_date)(vesting_seconds) )
+FC_REFLECT(graphene::chain::linear_vesting_policy_initializer, (begin_timestamp)(vesting_cliff_seconds)(vesting_duration_seconds) )
 FC_REFLECT(graphene::chain::cdd_vesting_policy_initializer, (start_claim)(vesting_seconds) )
 FC_REFLECT_TYPENAME( graphene::chain::vesting_policy_initializer )
