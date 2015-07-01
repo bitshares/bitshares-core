@@ -302,11 +302,46 @@ namespace graphene { namespace app {
        return witnesses_by_account_name;
     }
    
+    map<string, delegate_id_type> database_api::lookup_delegate_accounts(const string& lower_bound_name, uint32_t limit)const
+    {
+       FC_ASSERT( limit <= 1000 );
+       const auto& delegates_by_id = _db.get_index_type<delegate_index>().indices().get<by_id>();
+
+       // we want to order delegates by account name, but that name is in the account object
+       // so the delegate_index doesn't have a quick way to access it.
+       // get all the names and look them all up, sort them, then figure out what
+       // records to return.  This could be optimized, but we expect the 
+       // number of delegates to be few and the frequency of calls to be rare
+       std::map<std::string, delegate_id_type> delegates_by_account_name;
+       for (const delegate_object& delegate : delegates_by_id)
+           if (auto account_iter = _db.find(delegate.delegate_account))
+               if (account_iter->name >= lower_bound_name) // we can ignore anything below lower_bound_name 
+                   delegates_by_account_name.insert(std::make_pair(account_iter->name, delegate.id));
+
+       auto end_iter = delegates_by_account_name.begin();
+       while (end_iter != delegates_by_account_name.end() && limit--)
+           ++end_iter;
+       delegates_by_account_name.erase(end_iter, delegates_by_account_name.end());
+       return delegates_by_account_name;
+    }
+   
     vector<optional<witness_object>> database_api::get_witnesses(const vector<witness_id_type>& witness_ids)const
     {
        vector<optional<witness_object>> result; result.reserve(witness_ids.size());
        std::transform(witness_ids.begin(), witness_ids.end(), std::back_inserter(result),
                       [this](witness_id_type id) -> optional<witness_object> {
+          if(auto o = _db.find(id))
+             return *o;
+          return {};
+       });
+       return result;
+    }
+
+    vector<optional<delegate_object>> database_api::get_delegates(const vector<delegate_id_type>& delegate_ids)const
+    {
+       vector<optional<delegate_object>> result; result.reserve(delegate_ids.size());
+       std::transform(delegate_ids.begin(), delegate_ids.end(), std::back_inserter(result),
+                      [this](delegate_id_type id) -> optional<delegate_object> {
           if(auto o = _db.find(id))
              return *o;
           return {};

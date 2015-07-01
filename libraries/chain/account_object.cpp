@@ -96,7 +96,7 @@ void account_statistics_object::process_fees(const account_object& a, database& 
          share_type lifetime_cut = cut_fee(core_fee_total, account.lifetime_referrer_fee_percentage);
          share_type referral = core_fee_total - network_cut - lifetime_cut;
 
-         d.modify(dynamic_asset_data_id_type()(d), [network_cut](asset_dynamic_data_object& d) {
+         d.modify(asset_dynamic_data_id_type()(d), [network_cut](asset_dynamic_data_object& d) {
             d.accumulated_fees += network_cut;
          });
 

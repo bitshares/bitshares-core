@@ -118,7 +118,7 @@ void database::update_witness_schedule(signed_block next_block)
       _wso.slots_since_genesis += schedule_slot;
       witness_scheduler_rng rng(wso.rng_seed.data, _wso.slots_since_genesis);
 
-      _wso.scheduler._min_token_count = gpo.active_witnesses.size() / 2;
+      _wso.scheduler._min_token_count = std::max(int(gpo.active_witnesses.size()) / 2, 1);
       uint32_t drain = schedule_slot;
       while( drain > 0 )
       {

@@ -197,7 +197,7 @@ namespace graphene { namespace chain {
 
    typedef object_id< implementation_ids, impl_global_property_object_type,  global_property_object>                    global_property_id_type;
    typedef object_id< implementation_ids, impl_dynamic_global_property_object_type,  dynamic_global_property_object>    dynamic_global_property_id_type;
-   typedef object_id< implementation_ids, impl_asset_dynamic_data_type,      asset_dynamic_data_object>                 dynamic_asset_data_id_type;
+   typedef object_id< implementation_ids, impl_asset_dynamic_data_type,      asset_dynamic_data_object>                 asset_dynamic_data_id_type;
    typedef object_id< implementation_ids, impl_asset_bitasset_data_type,     asset_bitasset_data_object>                asset_bitasset_data_id_type;
    typedef object_id< implementation_ids, impl_account_balance_object_type,  account_balance_object>                    account_balance_id_type;
    typedef object_id< implementation_ids, impl_account_statistics_object_type,account_statistics_object>                account_statistics_id_type;
@@ -646,7 +646,7 @@ FC_REFLECT_TYPENAME( graphene::chain::relative_key_id_type )
 FC_REFLECT_TYPENAME( graphene::chain::relative_account_id_type )
 FC_REFLECT_TYPENAME( graphene::chain::global_property_id_type )
 FC_REFLECT_TYPENAME( graphene::chain::dynamic_global_property_id_type )
-FC_REFLECT_TYPENAME( graphene::chain::dynamic_asset_data_id_type )
+FC_REFLECT_TYPENAME( graphene::chain::asset_dynamic_data_id_type )
 FC_REFLECT_TYPENAME( graphene::chain::asset_bitasset_data_id_type )
 FC_REFLECT_TYPENAME( graphene::chain::account_balance_id_type )
 FC_REFLECT_TYPENAME( graphene::chain::account_statistics_id_type )

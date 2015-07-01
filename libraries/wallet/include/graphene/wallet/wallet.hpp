@@ -807,10 +807,13 @@ class wallet_api
        * An account can have at most one delegate object.
        *
        * @param owner_account the name or id of the account which is creating the delegate
+       * @param url a URL to include in the delegate record in the blockchain.  Clients may
+       *            display this when showing a list of delegates.  May be blank.
        * @param broadcast true to broadcast the transaction on the network
        * @returns the signed transaction registering a delegate
        */
       signed_transaction create_delegate(string owner_account,
+                                         string url, 
                                          bool broadcast = false);
 
       /** Lists all witnesses registered in the blockchain.
@@ -828,11 +831,32 @@ class wallet_api
        */
       map<string,witness_id_type>       list_witnesses(const string& lowerbound, uint32_t limit);
 
+      /** Lists all delegates registered in the blockchain.
+       * This returns a list of all account names that own delegates, and the associated delegate id,
+       * sorted by name.  This lists delegates whether they are currently voted in or not.
+       *
+       * Use the \c lowerbound and limit parameters to page through the list.  To retrieve all delegates,
+       * start by setting \c lowerbound to the empty string \c "", and then each iteration, pass
+       * the last delegate name returned as the \c lowerbound for the next \c list_delegates() call.
+       *
+       * @param lowerbound the name of the first delegate to return.  If the named delegate does not exist, 
+       *                   the list will start at the delegate that comes after \c lowerbound
+       * @param limit the maximum number of delegates to return (max: 1000)
+       * @returns a list of delegates mapping delegate names to delegate ids
+       */
+      map<string, delegate_id_type>       list_delegates(const string& lowerbound, uint32_t limit);
+
       /** Returns information about the given witness.
-       * @param witness_name_or_id the name or id of the witness account owner, or the id of the witness
+       * @param owner_account the name or id of the witness account owner, or the id of the witness
        * @returns the information about the witness stored in the block chain
        */
       witness_object get_witness(string owner_account);
+
+      /** Returns information about the given delegate.
+       * @param owner_account the name or id of the delegate account owner, or the id of the delegate
+       * @returns the information about the delegate stored in the block chain
+       */
+      delegate_object get_delegate(string owner_account);
 
       /** Creates a witness object owned by the given account.
        *

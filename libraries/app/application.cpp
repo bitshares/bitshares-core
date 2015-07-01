@@ -165,8 +165,8 @@ namespace detail {
                                                         nathan_key.get_public_key(),
                                                         nathan_key.get_public_key(),
                                                         true);
-            initial_state.initial_committee.push_back({name});
-            initial_state.initial_witnesses.push_back({name, nathan_key.get_public_key(), secret});
+            initial_state.initial_committee_candidates.push_back({name});
+            initial_state.initial_witness_candidates.push_back({name, nathan_key.get_public_key(), secret});
          }
 
          initial_state.initial_accounts.emplace_back("nathan", nathan_key.get_public_key());

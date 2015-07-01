@@ -70,8 +70,8 @@ database_fixture::database_fixture()
                                                   delegate_priv_key.get_public_key(),
                                                   delegate_priv_key.get_public_key(),
                                                   true);
-      genesis_state.initial_committee.push_back({name});
-      genesis_state.initial_witnesses.push_back({name, delegate_priv_key.get_public_key(), secret});
+      genesis_state.initial_committee_candidates.push_back({name});
+      genesis_state.initial_witness_candidates.push_back({name, delegate_priv_key.get_public_key(), secret});
    }
    fc::reflector<fee_schedule_type>::visit(fee_schedule_type::fee_set_visitor{genesis_state.initial_parameters.current_fees, 0});
    db.init_genesis(genesis_state);
