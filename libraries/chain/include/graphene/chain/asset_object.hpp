@@ -220,8 +220,11 @@ namespace graphene { namespace chain {
          const asset_dynamic_data_object& dynamic_data(const DB& db)const
          { return db.get(dynamic_asset_data_id); }
 
+         /**
+          *  The total amount of an asset that is reserved for future issuance. 
+          */
          template<class DB>
-         share_type burned( const DB& db )const
+         share_type reserved( const DB& db )const
          { return options.max_supply - dynamic_data(db).current_supply; }
    };
 

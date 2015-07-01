@@ -233,13 +233,13 @@ share_type database::get_max_budget( fc::time_point_sec now )const
 
    int64_t dt = (now - dpo.last_budget_time).to_seconds();
 
-   // We'll consider accumulated_fees to be burned at the BEGINNING
+   // We'll consider accumulated_fees to be reserved at the BEGINNING
    // of the maintenance interval.  However, for speed we only
    // call modify() on the asset_dynamic_data_object once at the
    // end of the maintenance interval.  Thus the accumulated_fees
    // are available for the budget at this point, but not included
-   // in core.burned().
-   share_type reserve = core.burned(*this) + core_dd.accumulated_fees;
+   // in core.reserved().
+   share_type reserve = core.reserved(*this) + core_dd.accumulated_fees;
    // Similarly, we consider leftover witness_budget to be burned
    // at the BEGINNING of the maintenance interval.
    reserve += dpo.witness_budget;

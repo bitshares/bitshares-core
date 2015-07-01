@@ -1188,9 +1188,9 @@ BOOST_AUTO_TEST_CASE( witness_withdraw_pay_test )
 
    schedule_maint();
    // The 80% lifetime referral fee went to the committee account, which burned it. Check that it's here.
-   BOOST_CHECK_EQUAL( core->burned(db).value, 840000000 );
+   BOOST_CHECK_EQUAL( core->reserved(db).value, 840000000 );
    generate_block();
-   BOOST_CHECK_EQUAL( core->burned(db).value, 840000000 + 210000000 - ref_budget );
+   BOOST_CHECK_EQUAL( core->reserved(db).value, 840000000 + 210000000 - ref_budget );
    BOOST_CHECK_EQUAL( db.get_dynamic_global_properties().witness_budget.value, ref_budget );
    witness = &db.fetch_block_by_number(db.head_block_num())->witness(db);
    // first witness paid from old budget (so no pay)
@@ -1235,7 +1235,7 @@ BOOST_AUTO_TEST_CASE( witness_withdraw_pay_test )
    trx.clear();
 
    BOOST_CHECK_EQUAL(get_balance(witness->witness_account(db), *core), witness_ppb - 1/*fee*/);
-   BOOST_CHECK_EQUAL(core->burned(db).value, 840000000 + 210000000 - ref_budget );
+   BOOST_CHECK_EQUAL(core->reserved(db).value, 840000000 + 210000000 - ref_budget );
    BOOST_CHECK_EQUAL(witness->accumulated_income.value, 0);
 } FC_LOG_AND_RETHROW() }
 
