@@ -457,7 +457,9 @@ FC_API(graphene::app::database_api,
        (get_balance_objects)
      )
 FC_API(graphene::app::history_api, (get_account_history)(get_market_history)(get_market_history_buckets))
-FC_API(graphene::app::network_api, (broadcast_transaction)(broadcast_transaction_with_callback)(add_node)(get_connected_peers))
+FC_API(graphene::app::network_api, (broadcast_transaction)(broadcast_transaction_with_callback)
+      /* (add_node)(get_connected_peers) */
+       )
 FC_API(graphene::app::login_api,
        (login)
        (network)
