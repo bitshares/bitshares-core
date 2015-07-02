@@ -94,22 +94,24 @@ When running `witness_node`, initially two API's are available:
 API 0 provides read-only access to the database, while API 1 is
 used to login and gain access to additional, restricted API's.
 
+TODO: the following examples use the old authority definition and thus do not work.  They need to be updated.
+
 Here is an example using `wscat` package from `npm` for websockets:
 
     $ npm install -g wscat
     $ wscat -c ws://127.0.0.1:8090
-    > {"id":1, "method":"call", "params":[0,"get_accounts",[["1.3.0"]]]}
-    < {"id":1,"result":[{"id":"1.3.0","annotations":[],"registrar":"1.3.0","referrer":"1.3.0","referrer_percent":0,"name":"genesis","owner":{"weight_threshold":1,"auths":[["1.2.0",1]]},"active":{"weight_threshold":1,"auths":[["1.2.0",1]]},"memo_key":"1.2.0","voting_account":"1.3.0","num_witness":0,"num_committee":0,"votes":[],"statistics":"2.7.0","whitelisting_accounts":[],"blacklisting_accounts":[]}]}
+    > {"id":1, "method":"call", "params":[0,"get_accounts",[["1.2.0"]]]}
+    < {"id":1,"result":[{"id":"1.2.0","annotations":[],"registrar":"1.2.0","referrer":"1.2.0","referrer_percent":0,"name":"genesis","owner":{"weight_threshold":1,"key_auths":[["PUBLIC_KEY",1]]},"active":{"weight_threshold":1,"key_auths":[["PUBLIC_KEY",1]]},"memo_key":"PUBLIC_KEY","voting_account":"1.2.0","num_witness":0,"num_committee":0,"votes":[],"statistics":"2.7.0","whitelisting_accounts":[],"blacklisting_accounts":[]}]}
     $
 
 We can do the same thing using an HTTP client such as `curl` for API's which do not require login or other session state:
 
-    $ curl --data '{"jsonrpc": "2.0", "method": "call", "params": [0, "get_accounts", [["1.3.0"]]], "id": 1}' http://127.0.0.1:8090/rpc
-    {"id":1,"result":[{"id":"1.3.0","annotations":[],"registrar":"1.3.0","referrer":"1.3.0","referrer_percent":0,"name":"genesis","owner":{"weight_threshold":1,"auths":[["1.2.0",1]]},"active":{"weight_threshold":1,"auths":[["1.2.0",1]]},"memo_key":"1.2.0","voting_account":"1.3.0","num_witness":0,"num_committee":0,"votes":[],"statistics":"2.7.0","whitelisting_accounts":[],"blacklisting_accounts":[]}]}    
+    $ curl --data '{"jsonrpc": "2.0", "method": "call", "params": [0, "get_accounts", [["1.2.0"]]], "id": 1}' http://127.0.0.1:8090/rpc
+    {"id":1,"result":[{"id":"1.2.0","annotations":[],"registrar":"1.2.0","referrer":"1.2.0","referrer_percent":0,"name":"genesis","owner":{"weight_threshold":1,"key_auths":[["PUBLIC_KEY",1]]},"active":{"weight_threshold":1,"key_auths":[["PUBLIC_KEY",1]]},"memo_key":"PUBLIC_KEY","voting_account":"1.2.0","num_witness":0,"num_committee":0,"votes":[],"statistics":"2.7.0","whitelisting_accounts":[],"blacklisting_accounts":[]}]}    
 
 API 0 is accessible using regular JSON-RPC:
 
-    $ curl --data '{"jsonrpc": "2.0", "method": "get_accounts", "params": [["1.3.0"]], "id": 1}' http://127.0.0.1:8090/rpc
+    $ curl --data '{"jsonrpc": "2.0", "method": "get_accounts", "params": [["1.2.0"]], "id": 1}' http://127.0.0.1:8090/rpc
 
 You can use the login API to obtain `network`, `database` and `history` API's.  Here is an example of how to call `add_node` from the `network` API:
 
@@ -142,16 +144,16 @@ witness just because it has the correct private key to do so.  There are
 ten witnesses at genesis of the testnet, block production can be
 enabled for all of them by specifying multiple times in `config.ini`:
 
-    witness-id = "1.7.0"
-    witness-id = "1.7.1"
-    witness-id = "1.7.2"
-    witness-id = "1.7.3"
-    witness-id = "1.7.4"
-    witness-id = "1.7.5"
-    witness-id = "1.7.6"
-    witness-id = "1.7.7"
-    witness-id = "1.7.8"
-    witness-id = "1.7.9"
+    witness-id = "1.6.0"
+    witness-id = "1.6.1"
+    witness-id = "1.6.2"
+    witness-id = "1.6.3"
+    witness-id = "1.6.4"
+    witness-id = "1.6.5"
+    witness-id = "1.6.6"
+    witness-id = "1.6.7"
+    witness-id = "1.6.8"
+    witness-id = "1.6.9"
 
 Questions
 ---------
@@ -192,13 +194,13 @@ Questions
 
 - The answer to the previous question was really confusing.  Can you make it clearer?
 
-    All account ID's are of the form `1.3.x`.  If you were the 9735th account to be registered,
-    your account's ID will be `1.3.9735`.  Account `0` is special (it's the "genesis account,"
+    All account ID's are of the form `1.2.x`.  If you were the 9735th account to be registered,
+    your account's ID will be `1.2.9735`.  Account `0` is special (it's the "genesis account,"
     which is controlled by the delegates and has a few abilities and restrictions other accounts
     do not).
 
-    All asset ID's are of the form `1.4.x`.  If you were the 29th asset to be registered,
-    your asset's ID will be `1.4.29`.  Asset `0` is special (it's BTS, which is considered the "core asset").
+    All asset ID's are of the form `1.3.x`.  If you were the 29th asset to be registered,
+    your asset's ID will be `1.3.29`.  Asset `0` is special (it's BTS, which is considered the "core asset").
 
-    The first and second number together identify the kind of thing you're talking about (`1.3` for accounts,
-    `1.4` for assets).  The third number identifies the particular thing.
+    The first and second number together identify the kind of thing you're talking about (`1.2` for accounts,
+    `1.3` for assets).  The third number identifies the particular thing.
