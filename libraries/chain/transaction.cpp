@@ -17,7 +17,7 @@
  */
 #include <graphene/chain/transaction.hpp>
 #include <fc/io/raw.hpp>
-#include <boost/endian/conversion.hpp>
+#include <fc/bitutil.hpp>
 
 namespace graphene { namespace chain {
 
@@ -83,7 +83,7 @@ void transaction::set_expiration( fc::time_point_sec expiration_time )
 
 void transaction::set_expiration( const block_id_type& reference_block, unsigned_int lifetime_intervals )
 {
-   ref_block_num = boost::endian::endian_reverse(reference_block._hash[0]);
+   ref_block_num = fc::endian_reverse_u32(reference_block._hash[0]);
    ref_block_prefix = reference_block._hash[1];
    relative_expiration = lifetime_intervals;
    block_id_cache = reference_block;

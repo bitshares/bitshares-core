@@ -17,8 +17,7 @@
  */
 #include <graphene/chain/block.hpp>
 #include <fc/io/raw.hpp>
-#include <boost/endian/conversion.hpp>
-
+#include <fc/bitutil.hpp>
 
 namespace graphene { namespace chain {
    digest_type block_header::digest()const
@@ -26,12 +25,15 @@ namespace graphene { namespace chain {
       return digest_type::hash(*this);
    }
 
-   uint32_t block_header::num_from_id(const block_id_type& id) { return boost::endian::endian_reverse(id._hash[0]); }
+   uint32_t block_header::num_from_id(const block_id_type& id)
+   {
+      return fc::endian_reverse_u32(id._hash[0]);
+   }
 
    block_id_type signed_block_header::id()const
    {
       auto tmp = fc::sha224::hash( *this );
-      tmp._hash[0] = boost::endian::endian_reverse(block_num()); // store the block num in the ID, 160 bits is plenty for the hash
+      tmp._hash[0] = fc::endian_reverse_u32(block_num()); // store the block num in the ID, 160 bits is plenty for the hash
       static_assert( sizeof(tmp._hash[0]) == 4, "should be 4 bytes" );
       block_id_type result;
       memcpy(result._hash, tmp._hash, std::min(sizeof(result), sizeof(tmp)));
