@@ -876,7 +876,7 @@ share_type worker_create_operation::calculate_fee(const fee_schedule_type& k) co
 string memo_message::serialize() const
 {
    auto serial_checksum = string(sizeof(checksum), ' ');
-   (uint32_t&)(*serial_checksum.data()) = htonl(checksum);
+   (uint32_t&)(*serial_checksum.data()) = checksum;
    return serial_checksum + text;
 }
 
@@ -884,7 +884,7 @@ memo_message memo_message::deserialize(const string& serial)
 {
    memo_message result;
    FC_ASSERT( serial.size() >= sizeof(result.checksum) );
-   result.checksum = ntohl((uint32_t&)(*serial.data()));
+   result.checksum = ((uint32_t&)(*serial.data()));
    result.text = serial.substr(sizeof(result.checksum));
    return result;
 }
