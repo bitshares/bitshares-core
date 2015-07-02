@@ -60,6 +60,7 @@ graphene::chain::transaction_id_type graphene::chain::transaction::id() const
    memcpy(result._hash, hash._hash, std::min(sizeof(result), sizeof(hash)));
    return result;
 }
+
 void graphene::chain::signed_transaction::sign(const private_key_type& key)
 {
    if( relative_expiration != 0 )
@@ -71,6 +72,15 @@ void graphene::chain::signed_transaction::sign(const private_key_type& key)
       signatures.push_back(key.sign_compact(digest()));
    }
 }
+
+void transaction::set_expiration( fc::time_point_sec expiration_time )
+{
+    ref_block_num = 0;
+    relative_expiration = 0;
+    ref_block_prefix = expiration_time.sec_since_epoch();
+    block_id_cache.reset();
+}
+
 void transaction::set_expiration( const block_id_type& reference_block, unsigned_int lifetime_intervals )
 {
    ref_block_num = boost::endian::endian_reverse(reference_block._hash[0]);

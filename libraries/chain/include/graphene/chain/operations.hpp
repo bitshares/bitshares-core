@@ -351,7 +351,7 @@ namespace graphene { namespace chain {
       /// The account which owns the delegate. This account pays the fee for this operation.
       account_id_type   witness_account;
       string            url;
-      public_key_type   block_signing_key; 
+      public_key_type   block_signing_key;
       secret_hash_type  initial_secret;
 
       account_id_type fee_payer()const { return witness_account; }
