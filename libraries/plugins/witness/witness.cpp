@@ -63,6 +63,7 @@ void witness_plugin::plugin_initialize(const boost::program_options::variables_m
       for (const std::string& key_id_to_wif_pair_string : key_id_to_wif_pair_strings)
       {
          auto key_id_to_wif_pair = graphene::app::dejsonify<std::pair<chain::public_key_type, std::string> >(key_id_to_wif_pair_string);
+         idump((key_id_to_wif_pair));
          fc::optional<fc::ecc::private_key> private_key = graphene::utilities::wif_to_key(key_id_to_wif_pair.second);
          if (!private_key)
          {
@@ -80,9 +81,7 @@ void witness_plugin::plugin_initialize(const boost::program_options::variables_m
          _private_keys[key_id_to_wif_pair.first] = *private_key;
       }
    }
-      }
-   catch (const fc::exception& e){ edump((e)); throw; }
-}
+} FC_LOG_AND_RETHROW() }
 
 void witness_plugin::plugin_startup()
 { try {

@@ -110,6 +110,8 @@ int main( int argc, char** argv )
       idump( (key_to_wif( genesis_private_key ) ) );
 
       fc::ecc::private_key nathan_private_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("nathan")));
+      public_key_type nathan_pub_key = nathan_private_key.get_public_key();
+      idump( (nathan_pub_key) );
       idump( (key_to_wif( nathan_private_key ) ) );
 
       //

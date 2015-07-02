@@ -31,6 +31,10 @@ To set your iniital password to 'password' use:
     >>> set_password password
     >>> unlock password
 
+To import your initial balance:
+
+    >>> import_balance nathan [5KQwrPbwdL6PhXujxW37FSSQZ1JiwsST4cqQzDeyXtP79zkvFD3] true
+
 If you send private keys over this connection, `rpc-endpoint` should be bound to localhost for security.
 
 A list of CLI wallet commands is available [here](https://bitshares.github.io/doxygen/classgraphene_1_1wallet_1_1wallet__api.html).
@@ -75,7 +79,7 @@ Witness node
 
 The role of the witness node is to broadcast transactions, download blocks, and optionally sign them.
 
-./witness_node --rpc-endpoint "127.0.0.1:8090" --enable-stale-production -w \""1.7.0"\" \""1.7.1"\" \""1.7.2"\" \""1.7.3"\" \""1.7.4"\" --private-key "[\"1.2.0\",\"d2653ff7cbb2d8ff129ac27ef5781ce68b2558c41a74af1f2ddca635cbeef07d\"]"
+./witness_node --rpc-endpoint "127.0.0.1:8090" --enable-stale-production -w \""1.6.0"\" \""1.6.1"\" \""1.6.2"\" \""1.6.3"\" \""1.6.4"\" 
 
 Running specific tests
 ----------------------

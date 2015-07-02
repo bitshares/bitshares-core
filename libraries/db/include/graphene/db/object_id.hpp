@@ -179,7 +179,8 @@ struct reflector<graphene::db::object_id<SpaceID,TypeID,T> >
     FC_ASSERT( first_dot != second_dot );
     FC_ASSERT( first_dot != 0 && first_dot != std::string::npos );
     FC_ASSERT( fc::to_uint64( s.substr( 0, first_dot ) ) == SpaceID &&
-               fc::to_uint64( s.substr( first_dot+1, second_dot-first_dot-1 ) ) == TypeID );
+               fc::to_uint64( s.substr( first_dot+1, second_dot-first_dot-1 ) ) == TypeID,
+               "Space.Type.0 (${SpaceID}.${TypeID}.0) doesn't match expected value ${var}", ("TypeID",TypeID)("SpaceID",SpaceID)("var",var) );
     vo.instance = fc::to_uint64(s.substr( second_dot+1 ));
  } FC_CAPTURE_AND_RETHROW( (var) ) }
 

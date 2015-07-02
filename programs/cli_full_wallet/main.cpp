@@ -44,6 +44,7 @@
 #include <fc/log/logger.hpp>
 #include <fc/log/logger_config.hpp>
 
+#include <graphene/witness/witness.hpp>
 #include <graphene/account_history/account_history_plugin.hpp>
 #include <graphene/market_history/market_history_plugin.hpp>
 
@@ -73,7 +74,7 @@ int main( int argc, char** argv )
          ("rpc-tls-certificate,c", bpo::value<string>()->implicit_value("server.pem"), "PEM certificate for wallet websocket TLS RPC")
          ("rpc-http-endpoint,h", bpo::value<string>()->implicit_value("127.0.0.1:8093"), "Endpoint for wallet HTTP RPC to listen on")
          ("daemon,d", "Run the wallet in daemon mode" )
-         ("wallet-file,w", bpo::value<string>()->implicit_value("wallet.json"), "wallet to load");
+         ("wallet-file,W", bpo::value<string>()->implicit_value("wallet.json"), "wallet to load");
 
       bpo::options_description app_options("Graphene Witness Node");
       bpo::options_description cfg_options("Graphene Witness Node");
@@ -83,6 +84,7 @@ int main( int argc, char** argv )
 
       bpo::variables_map options;
 
+      auto witness_plug = node.register_plugin<witness_plugin::witness_plugin>();
       auto history_plug = node.register_plugin<account_history::account_history_plugin>();
       auto market_history_plug = node.register_plugin<market_history::market_history_plugin>();
 
@@ -157,6 +159,7 @@ int main( int argc, char** argv )
       node.startup();
       node.startup_plugins();
 
+      ilog("Started witness node on a chain with ${h} blocks.", ("h", node.chain_database()->head_block_num()));
 
 
       // auto remote_api = apic->get_remote_api< login_api >(1);

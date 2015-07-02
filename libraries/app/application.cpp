@@ -107,6 +107,7 @@ namespace detail {
             wsc->register_api(fc::api<graphene::app::login_api>(login));
             c->set_session_data( wsc );
          });
+         ilog("Configured websocket rpc to listen on ${ip}", ("ip",_options->at("rpc-endpoint").as<string>())); 
          _websocket_server->listen( fc::ip::endpoint::from_string(_options->at("rpc-endpoint").as<string>()) );
          _websocket_server->start_accept();
       } FC_CAPTURE_AND_RETHROW() }
@@ -117,7 +118,10 @@ namespace detail {
          if( !_options->count("rpc-tls-endpoint") )
             return;
          if( !_options->count("server-pem") )
+         {
+            wlog( "Please specify a server-pem to use rpc-tls-endpoint" );
             return;
+         }
 
          string password = _options->count("server-pem-password") ? _options->at("server-pem-password").as<string>() : "";
          _websocket_tls_server = std::make_shared<fc::http::websocket_tls_server>( _options->at("server-pem").as<string>(), password );
@@ -130,6 +134,7 @@ namespace detail {
             wsc->register_api(fc::api<graphene::app::login_api>(login));
             c->set_session_data( wsc );
          });
+         ilog("Configured websocket TLS rpc to listen on ${ip}", ("ip",_options->at("rpc-tls-endpoint").as<string>())); 
          _websocket_tls_server->listen( fc::ip::endpoint::from_string(_options->at("rpc-tls-endpoint").as<string>()) );
          _websocket_tls_server->start_accept();
       } FC_CAPTURE_AND_RETHROW() }
