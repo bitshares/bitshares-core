@@ -54,10 +54,10 @@ struct init_policy_visitor
    void operator()( const linear_vesting_policy_initializer& i )const
    {
       linear_vesting_policy policy;
-      policy.vesting_seconds = i.vesting_seconds;
-      policy.begin_date      = i.begin_date;
-      policy.earliest_withdraw_time     = i.start_claim;
-      policy.begin_balance   = init_balance;
+      policy.begin_timestamp = i.begin_timestamp;
+      policy.vesting_cliff_seconds = i.vesting_cliff_seconds;
+      policy.vesting_duration_seconds = i.vesting_duration_seconds;
+      policy.begin_balance = init_balance;
       p = policy;
    }
 

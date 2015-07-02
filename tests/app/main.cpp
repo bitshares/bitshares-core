@@ -70,9 +70,12 @@ BOOST_AUTO_TEST_CASE( two_node_network )
       trx.set_expiration(now + fc::seconds(30));
       std::shared_ptr<chain::database> db2 = app2.chain_database();
 
-      trx.operations.push_back(assert_operation({asset(),
-                                                     GRAPHENE_TEMP_ACCOUNT,
-                                                     { fc::raw::pack( graphene::chain::pred::asset_symbol_eq_lit{asset_id_type(),"CORE"} ) } }));
+      assert_operation op;
+      op.fee_paying_account = GRAPHENE_TEMP_ACCOUNT;
+      op.predicates.push_back( fc::raw::pack( graphene::chain::pred::asset_symbol_eq_lit{ asset_id_type(), "CORE" } ) );
+
+      trx.operations.push_back( std::move( op ) );
+
       trx.validate();
       processed_transaction ptrx = app1.chain_database()->push_transaction(trx);
       app1.p2p_node()->broadcast(graphene::net::trx_message(trx));

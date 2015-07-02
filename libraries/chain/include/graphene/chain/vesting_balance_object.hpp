@@ -54,17 +54,14 @@ namespace graphene { namespace chain {
     */
    struct linear_vesting_policy
    {
-      /// No amount may be withdrawn before this time, regardless of how much has vested.
-      fc::time_point_sec earliest_withdraw_time;
       /// This is the time at which funds begin vesting.
-      /// Note that withdrawals are still not available until @ref earliest_withdraw_time
-      fc::time_point_sec begin_date;
-      /// Duration of vesting period, in seconds. Must be greater than zero.
-      uint32_t vesting_seconds = 0;
-      /// The total amount of asset to vest
+      fc::time_point_sec begin_timestamp;
+      /// No amount may be withdrawn before this many seconds of the vesting period have elapsed.
+      uint32_t vesting_cliff_seconds = 0;
+      /// Duration of the vesting period, in seconds. Must be greater than 0 and greater than vesting_cliff_seconds.
+      uint32_t vesting_duration_seconds = 0;
+      /// The total amount of asset to vest.
       share_type begin_balance;
-      /// The total amount of asset which has already been withdrawn
-      share_type total_withdrawn;
 
       asset get_allowed_withdraw(const vesting_policy_context& ctx)const;
       bool is_deposit_allowed(const vesting_policy_context& ctx)const;
@@ -174,11 +171,10 @@ namespace graphene { namespace chain {
 } } // graphene::chain
 
 FC_REFLECT(graphene::chain::linear_vesting_policy,
-           (earliest_withdraw_time)
-           (begin_date)
-           (vesting_seconds)
+           (begin_timestamp)
+           (vesting_cliff_seconds)
+           (vesting_duration_seconds)
            (begin_balance)
-           (total_withdrawn)
           )
 
 FC_REFLECT(graphene::chain::cdd_vesting_policy,
