@@ -17,6 +17,7 @@
  */
 #include <graphene/chain/transaction.hpp>
 #include <fc/io/raw.hpp>
+#include <boost/endian/conversion.hpp>
 
 namespace graphene { namespace chain {
 
@@ -69,6 +70,13 @@ void graphene::chain::signed_transaction::sign(const private_key_type& key)
    } else {
       signatures.push_back(key.sign_compact(digest()));
    }
+}
+void transaction::set_expiration( const block_id_type& reference_block, unsigned_int lifetime_intervals )
+{
+   ref_block_num = boost::endian::endian_reverse(reference_block._hash[0]);
+   ref_block_prefix = reference_block._hash[1];
+   relative_expiration = lifetime_intervals;
+   block_id_cache = reference_block;
 }
 
 } } // graphene::chain

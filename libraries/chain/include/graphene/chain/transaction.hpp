@@ -97,20 +97,8 @@ namespace graphene { namespace chain {
       transaction_id_type id()const;
       void validate() const;
 
-      void set_expiration( fc::time_point_sec expiration_time )
-      {
-         ref_block_num = 0;
-         relative_expiration = 0;
-         ref_block_prefix = expiration_time.sec_since_epoch();
-         block_id_cache.reset();
-      }
-      void set_expiration( const block_id_type& reference_block, unsigned_int lifetime_intervals = 3 )
-      {
-         ref_block_num = ntohl(reference_block._hash[0]);
-         ref_block_prefix = reference_block._hash[1];
-         relative_expiration = lifetime_intervals;
-         block_id_cache = reference_block;
-      }
+      void set_expiration( fc::time_point_sec expiration_time );
+      void set_expiration( const block_id_type& reference_block, unsigned_int lifetime_intervals = 3 );
 
       /// visit all operations
       template<typename Visitor>
