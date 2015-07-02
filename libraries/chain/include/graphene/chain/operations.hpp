@@ -157,23 +157,6 @@ namespace graphene { namespace chain {
       }
    };
 
-   /**
-    *  @brief reserves a new ID to refer to a particular key or address.
-    *  @ingroup operations
-    */
-   struct key_create_operation
-   {
-      asset            fee;
-      account_id_type  fee_paying_account;
-      static_variant<address,public_key_type> key_data;
-
-      account_id_type fee_payer()const { return fee_paying_account; }
-      void            get_required_auth(flat_set<account_id_type>& active_auth_set , flat_set<account_id_type>&)const;
-      share_type      calculate_fee(const fee_schedule_type& k)const{ return k.key_create_fee; }
-      void            validate()const;
-
-      void get_balance_delta(balance_accumulator& acc, const operation_result& result = asset())const { acc.adjust(fee_payer(), -fee); }
-   };
 
    /**
     *  @ingroup operations
@@ -368,7 +351,7 @@ namespace graphene { namespace chain {
       /// The account which owns the delegate. This account pays the fee for this operation.
       account_id_type   witness_account;
       string            url;
-      object_id_type    block_signing_key; // key_id_type or relative_key_id_type
+      public_key_type   block_signing_key; 
       secret_hash_type  initial_secret;
 
       account_id_type fee_payer()const { return witness_account; }
@@ -459,8 +442,8 @@ namespace graphene { namespace chain {
     */
    struct memo_data
    {
-      key_id_type from;
-      key_id_type to;
+      public_key_type from;
+      public_key_type to;
       /**
        * 64 bit nonce format:
        * [  8 bits | 56 bits   ]
@@ -1036,8 +1019,8 @@ namespace graphene { namespace chain {
       flat_set<account_id_type>  active_approvals_to_remove;
       flat_set<account_id_type>  owner_approvals_to_add;
       flat_set<account_id_type>  owner_approvals_to_remove;
-      flat_set<key_id_type>      key_approvals_to_add;
-      flat_set<key_id_type>      key_approvals_to_remove;
+      flat_set<public_key_type>  key_approvals_to_add;
+      flat_set<public_key_type>  key_approvals_to_remove;
 
       account_id_type fee_payer()const { return fee_paying_account; }
       void       get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>& owner_auth_set)const;
@@ -1422,7 +1405,6 @@ namespace graphene { namespace chain {
             limit_order_create_operation,
             limit_order_cancel_operation,
             call_order_update_operation,
-            key_create_operation,
             account_create_operation,
             account_update_operation,
             account_whitelist_operation,
@@ -1585,11 +1567,6 @@ namespace graphene { namespace chain {
 FC_REFLECT( graphene::chain::op_wrapper, (op) )
 FC_REFLECT( graphene::chain::memo_message, (checksum)(text) )
 FC_REFLECT( graphene::chain::memo_data, (from)(to)(nonce)(message) )
-
-FC_REFLECT( graphene::chain::key_create_operation,
-            (fee)(fee_paying_account)
-            (key_data)
-          )
 
 FC_REFLECT( graphene::chain::account_create_operation,
             (fee)(registrar)

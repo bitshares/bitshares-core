@@ -18,7 +18,6 @@
 #include <graphene/chain/database.hpp>
 #include <graphene/chain/evaluator.hpp>
 #include <graphene/chain/transaction_evaluation_state.hpp>
-#include <graphene/chain/key_object.hpp>
 #include <graphene/chain/asset_object.hpp>
 #include <graphene/chain/account_object.hpp>
 #include <graphene/chain/delegate_object.hpp>
@@ -85,6 +84,7 @@ database& generic_evaluator::db()const { return trx_state->db(); }
       flat_set<account_id_type> active_auths;
       flat_set<account_id_type> owner_auths;
       op.visit(operation_get_required_auths(active_auths, owner_auths));
+     // idump((active_auths)(owner_auths)(op));
 
       for( auto id : active_auths )
       {
@@ -97,41 +97,12 @@ database& generic_evaluator::db()const { return trx_state->db(); }
       }
    } FC_CAPTURE_AND_RETHROW( (op) ) }
 
-   object_id_type generic_evaluator::get_relative_id( object_id_type rel_id )const
+   void generic_evaluator::verify_authority_accounts( const authority& a )const
    {
-      if( rel_id.space() == relative_protocol_ids )
-      {
-         FC_ASSERT( rel_id.instance() < trx_state->operation_results.size() );
-         // fetch the object just to make sure it exists.
-         auto r = trx_state->operation_results[rel_id.instance()].get<object_id_type>();
-         db().get_object( r ); // make sure it exists.
-         return r;
-      }
-      return rel_id;
-   }
-
-   void generic_evaluator::check_relative_ids(const authority& a)const
-   {
-      for( const auto& item : a.auths )
-      {
-          auto id = get_relative_id( item.first );
-          FC_ASSERT( id.type() == key_object_type || id.type() == account_object_type );
-      }
-   }
-   authority generic_evaluator::resolve_relative_ids(const authority& a)const
-   {
-      authority result;
-      result.auths.reserve( a.auths.size() );
-      result.weight_threshold = a.weight_threshold;
-
-      for( const auto& item : a.auths )
-      {
-          auto id = get_relative_id( item.first );
-          FC_ASSERT( id.type() == key_object_type || id.type() == account_object_type );
-          result.auths[id] = item.second;
-      }
-
-      return result;
+      const auto& chain_params = db().get_global_properties().parameters;
+      FC_ASSERT( a.num_auths() <= chain_params.maximum_authority_membership );
+      for( const auto& acnt : a.account_auths )
+         acnt.first(db());
    }
 
 } }

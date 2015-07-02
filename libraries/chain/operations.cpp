@@ -192,6 +192,16 @@ void account_update_operation::validate()const
    FC_ASSERT( fee.amount >= 0 );
    FC_ASSERT( account != account_id_type() );
    FC_ASSERT( owner || active || new_options );
+   if( owner )
+   {
+      FC_ASSERT( owner->num_auths() != 0 );
+      FC_ASSERT( owner->address_auths.size() == 0 );
+   }
+   if( active )
+   {
+      FC_ASSERT( active->num_auths() != 0 );
+      FC_ASSERT( active->address_auths.size() == 0 );
+   }
 
    if( new_options )
       new_options->validate();
@@ -236,24 +246,6 @@ share_type override_transfer_operation::calculate_fee( const fee_schedule_type& 
 }
 
 
-struct key_data_validate
-{
-   typedef void result_type;
-   void operator()( const address& a )const { FC_ASSERT( a != address() ); }
-   void operator()( const public_key_type& a )const { FC_ASSERT( a != public_key_type() ); }
-};
-void key_create_operation::get_required_auth(flat_set<account_id_type>& active_auth_set,
-                                             flat_set<account_id_type>&) const
-{
-   active_auth_set.insert(fee_paying_account);
-}
-
-void key_create_operation::validate()const
-{
-   FC_ASSERT( fee.amount >= 0 );
-   key_data.visit( key_data_validate() );
-}
-
 void account_create_operation::get_required_auth(flat_set<account_id_type>& active_auth_set,
                                                  flat_set<account_id_type>&) const
 {
@@ -265,13 +257,11 @@ void account_create_operation::validate()const
    FC_ASSERT( fee.amount >= 0 );
    FC_ASSERT( is_valid_name( name ) );
    FC_ASSERT( referrer_percent <= GRAPHENE_100_PERCENT );
-   FC_ASSERT( !owner.auths.empty() );
-   auto pos = name.find( '/' );
-   if( pos != string::npos )
-   {
-      FC_ASSERT( owner.weight_threshold == 1 );
-      FC_ASSERT( owner.auths.size() == 1 );
-   }
+   FC_ASSERT( owner.num_auths() != 0 );
+   FC_ASSERT( owner.address_auths.size() == 0 );
+   // TODO: this asset causes many tests to fail, those tests should probably be updated
+   //FC_ASSERT( active.num_auths() != 0 );
+   FC_ASSERT( active.address_auths.size() == 0 );
    options.validate();
 }
 
@@ -813,7 +803,7 @@ share_type vesting_balance_withdraw_operation::calculate_fee(const fee_schedule_
 void memo_data::set_message( const fc::ecc::private_key& priv,
                              const fc::ecc::public_key& pub, const string& msg )
 {
-   if( from )
+   if( from != public_key_type() )
    {
       uint64_t entropy = fc::sha224::hash(fc::ecc::private_key::generate())._hash[0];
       entropy <<= 32;
@@ -834,7 +824,7 @@ void memo_data::set_message( const fc::ecc::private_key& priv,
 string memo_data::get_message( const fc::ecc::private_key& priv,
                                const fc::ecc::public_key& pub )const
 {
-   if( from )
+   if( from != public_key_type()  )
    {
       auto secret = priv.get_shared_secret(pub);
       auto nonce_plus_secret = fc::sha512::hash(fc::to_string(nonce) + secret.str());

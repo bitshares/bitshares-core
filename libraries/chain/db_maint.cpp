@@ -120,7 +120,7 @@ void database::update_active_witnesses()
       uint64_t total_votes = 0;
       map<account_id_type, uint64_t> weights;
       a.active.weight_threshold = 0;
-      a.active.auths.clear();
+      a.active.clear();
 
       for( const witness_object& wit : wits )
       {
@@ -135,7 +135,7 @@ void database::update_active_witnesses()
       {
          // Ensure that everyone has at least one vote. Zero weights aren't allowed.
          uint16_t votes = std::max((weight.second >> bits_to_drop), uint64_t(1) );
-         a.active.auths[weight.first] += votes;
+         a.active.account_auths[weight.first] += votes;
          a.active.weight_threshold += votes;
       }
 
@@ -187,7 +187,7 @@ void database::update_active_delegates()
          uint64_t total_votes = 0;
          map<account_id_type, uint64_t> weights;
          a.active.weight_threshold = 0;
-         a.active.auths.clear();
+         a.active.clear();
 
          for( const delegate_object& del : delegates )
          {
@@ -202,7 +202,7 @@ void database::update_active_delegates()
          {
             // Ensure that everyone has at least one vote. Zero weights aren't allowed.
             uint16_t votes = std::max((weight.second >> bits_to_drop), uint64_t(1) );
-            a.active.auths[weight.first] += votes;
+            a.active.account_auths[weight.first] += votes;
             a.active.weight_threshold += votes;
          }
 

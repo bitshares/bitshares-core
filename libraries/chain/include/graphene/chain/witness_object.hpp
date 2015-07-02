@@ -32,7 +32,7 @@ namespace graphene { namespace chain {
          static const uint8_t type_id = witness_object_type;
 
          account_id_type  witness_account;
-         key_id_type      signing_key;
+         public_key_type  signing_key;
          secret_hash_type next_secret;
          secret_hash_type last_secret;
          share_type       accumulated_income;

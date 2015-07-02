@@ -23,7 +23,6 @@
 
 #include <graphene/chain/account_object.hpp>
 #include <graphene/chain/asset_object.hpp>
-#include <graphene/chain/key_object.hpp>
 #include <graphene/chain/delegate_object.hpp>
 #include <graphene/chain/witness_scheduler_rng.hpp>
 
@@ -164,25 +163,14 @@ BOOST_AUTO_TEST_CASE( price_test )
     BOOST_CHECK(dummy == dummy2);
 }
 
-BOOST_AUTO_TEST_CASE( serialization_tests )
-{
-   key_object k;
-   k.id = object_id<protocol_ids, key_object_type>(unsigned_int(2));
-   BOOST_CHECK(fc::json::from_string(fc::json::to_string(k.id)).as<key_id_type>() == k.id);
-   BOOST_CHECK(fc::json::from_string(fc::json::to_string(k.id)).as<object_id_type>() == k.id);
-   BOOST_CHECK((fc::json::from_string(fc::json::to_string(k.id)).as<object_id<protocol_ids, key_object_type>>() == k.id));
-   public_key_type public_key = fc::ecc::private_key::generate().get_public_key();
-   k.key_data = address(public_key);
-   BOOST_CHECK(k.key_address() == address(public_key));
-}
 
 BOOST_AUTO_TEST_CASE( memo_test )
 { try {
    memo_data m;
    auto sender = generate_private_key("1");
    auto receiver = generate_private_key("2");
-   m.from = 1;
-   m.to = 2;
+   m.from = sender.get_public_key();
+   m.to = receiver.get_public_key();
    m.set_message(sender, receiver.get_public_key(), "Hello, world!");
    BOOST_CHECK_EQUAL(m.get_message(receiver, sender.get_public_key()), "Hello, world!");
 } FC_LOG_AND_RETHROW() }

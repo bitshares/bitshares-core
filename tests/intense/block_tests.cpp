@@ -23,7 +23,6 @@
 
 #include <graphene/chain/database.hpp>
 #include <graphene/chain/operations.hpp>
-#include <graphene/chain/key_object.hpp>
 #include <graphene/chain/account_object.hpp>
 #include <graphene/chain/proposal_object.hpp>
 #include <graphene/chain/witness_schedule_object.hpp>
@@ -84,10 +83,10 @@ BOOST_FIXTURE_TEST_CASE( update_account_keys, database_fixture )
 
       const int num_keys = 5;
       vector< private_key_type > numbered_private_keys;
-      vector< vector< key_id_type > > numbered_key_id;
+      vector< vector< public_key_type > > numbered_key_id;
       numbered_private_keys.reserve( num_keys );
-      numbered_key_id.push_back( vector<key_id_type>() );
-      numbered_key_id.push_back( vector<key_id_type>() );
+      numbered_key_id.push_back( vector<public_key_type>() );
+      numbered_key_id.push_back( vector<public_key_type>() );
 
       for( int i=0; i<num_keys; i++ )
       {
@@ -96,12 +95,9 @@ BOOST_FIXTURE_TEST_CASE( update_account_keys, database_fixture )
          public_key_type pubkey = privkey.get_public_key();
          address addr( pubkey );
 
-         key_id_type public_key_id = register_key( pubkey ).id;
-         key_id_type addr_id = register_address( addr ).id;
-
          numbered_private_keys.push_back( privkey );
-         numbered_key_id[0].push_back( public_key_id );
-         numbered_key_id[1].push_back( addr_id );
+         numbered_key_id[0].push_back( pubkey );
+         //numbered_key_id[1].push_back( addr );
       }
 
       // each element of possible_key_sched is a list of exactly num_keys
@@ -134,7 +130,7 @@ BOOST_FIXTURE_TEST_CASE( update_account_keys, database_fixture )
       std::cout << "update_account_keys:  this test will take a few minutes...\n";
       for( int use_addresses=0; use_addresses<2; use_addresses++ )
       {
-         vector< key_id_type > key_ids = numbered_key_id[ use_addresses ];
+         vector< public_key_type > key_ids = numbered_key_id[ use_addresses ];
          for( int num_owner_keys=1; num_owner_keys<=2; num_owner_keys++ )
          {
             for( int num_active_keys=1; num_active_keys<=2; num_active_keys++ )
@@ -144,7 +140,7 @@ BOOST_FIXTURE_TEST_CASE( update_account_keys, database_fixture )
                {
                   auto it = key_sched_before.begin();
                   vector< const private_key_type* > owner_privkey;
-                  vector< const key_id_type* > owner_keyid;
+                  vector< const public_key_type* > owner_keyid;
                   owner_privkey.reserve( num_owner_keys );
 
                   trx.clear();
@@ -154,17 +150,17 @@ BOOST_FIXTURE_TEST_CASE( update_account_keys, database_fixture )
                   for( int owner_index=0; owner_index<num_owner_keys; owner_index++ )
                   {
                      int i = *(it++);
-                     create_op.owner.auths[ key_ids[ i ] ] = 1;
+                     create_op.owner.key_auths[ key_ids[ i ] ] = 1;
                      owner_privkey.push_back( &numbered_private_keys[i] );
                      owner_keyid.push_back( &key_ids[ i ] );
                   }
                   // size() < num_owner_keys is possible when some keys are duplicates
-                  create_op.owner.weight_threshold = create_op.owner.auths.size();
+                  create_op.owner.weight_threshold = create_op.owner.key_auths.size();
 
                   for( int active_index=0; active_index<num_active_keys; active_index++ )
-                     create_op.active.auths[ key_ids[ *(it++) ] ] = 1;
+                     create_op.active.key_auths[ key_ids[ *(it++) ] ] = 1;
                   // size() < num_active_keys is possible when some keys are duplicates
-                  create_op.active.weight_threshold = create_op.active.auths.size();
+                  create_op.active.weight_threshold = create_op.active.key_auths.size();
 
                   create_op.options.memo_key = key_ids[ *(it++) ] ;
                   create_op.registrar = sam_account_object.id;
@@ -194,20 +190,20 @@ BOOST_FIXTURE_TEST_CASE( update_account_keys, database_fixture )
                      update_op.new_options = create_op.options;
 
                      for( int owner_index=0; owner_index<num_owner_keys; owner_index++ )
-                        update_op.owner->auths[ key_ids[ *(it++) ] ] = 1;
+                        update_op.owner->key_auths[ key_ids[ *(it++) ] ] = 1;
                      // size() < num_owner_keys is possible when some keys are duplicates
-                     update_op.owner->weight_threshold = update_op.owner->auths.size();
+                     update_op.owner->weight_threshold = update_op.owner->key_auths.size();
                      for( int active_index=0; active_index<num_active_keys; active_index++ )
-                        update_op.active->auths[ key_ids[ *(it++) ] ] = 1;
+                        update_op.active->key_auths[ key_ids[ *(it++) ] ] = 1;
                      // size() < num_active_keys is possible when some keys are duplicates
-                     update_op.active->weight_threshold = update_op.active->auths.size();
+                     update_op.active->weight_threshold = update_op.active->key_auths.size();
                      FC_ASSERT( update_op.new_options.valid() );
                      update_op.new_options->memo_key = key_ids[ *(it++) ] ;
 
                      trx.operations.push_back( update_op );
                      for( int i=0; i<int(create_op.owner.weight_threshold); i++)
                      {
-                        trx.sign( *owner_keyid[i], *owner_privkey[i] );
+                        trx.sign( *owner_privkey[i] );
                         if( i < int(create_op.owner.weight_threshold-1) )
                         {
                            BOOST_REQUIRE_THROW(db.push_transaction(trx), fc::exception);

@@ -17,7 +17,6 @@
  */
 #include <graphene/chain/database.hpp>
 #include <graphene/chain/account_evaluator.hpp>
-#include <graphene/chain/key_object.hpp>
 #include <algorithm>
 
 namespace graphene { namespace chain {
@@ -26,26 +25,14 @@ void_result account_create_evaluator::do_evaluate( const account_create_operatio
 { try {
    database& d = db();
    FC_ASSERT( d.find_object(op.options.voting_account) );
-   FC_ASSERT( is_relative(op.options.memo_key) || d.find_object(op.options.memo_key) );
    FC_ASSERT( fee_paying_account->is_lifetime_member() );
    FC_ASSERT( op.referrer(d).is_member(d.head_block_time()) );
 
    const auto& global_props = d.get_global_properties();
    const auto& chain_params = global_props.parameters;
 
-   FC_ASSERT( op.owner.auths.size() <= chain_params.maximum_authority_membership );
-   FC_ASSERT( op.active.auths.size() <= chain_params.maximum_authority_membership );
-   check_relative_ids(op.owner);
-   check_relative_ids(op.active);
-   FC_ASSERT( d.find(key_id_type(get_relative_id(op.options.memo_key))) );
-   for( auto id : op.owner.auths )
-   {
-      FC_ASSERT( is_relative(id.first) || d.find_object(id.first) );
-   }
-   for( auto id : op.active.auths )
-   {
-      FC_ASSERT( is_relative(id.first) || d.find_object(id.first) );
-   }
+   verify_authority_accounts( op.owner );
+   verify_authority_accounts( op.active );
 
    uint32_t max_vote_id = global_props.next_available_vote_id;
    FC_ASSERT( op.options.num_witness <= chain_params.maximum_witness_count );
@@ -89,11 +76,10 @@ object_id_type account_create_evaluator::do_apply( const account_create_operatio
          obj.referrer_rewards_percentage = o.referrer_percent;
 
          obj.name             = o.name;
-         obj.owner            = resolve_relative_ids(o.owner);
-         obj.active           = resolve_relative_ids(o.active);
+         obj.owner            = o.owner;
+         obj.active           = o.active;
          obj.statistics       = stats_obj.id;
          obj.options          = o.options;
-         obj.options.memo_key = get_relative_id(obj.options.memo_key);
    });
 
    const auto& global_properties = db().get_global_properties();
@@ -117,30 +103,13 @@ void_result account_update_evaluator::do_evaluate( const account_update_operatio
 
    const auto& chain_params = db().get_global_properties().parameters;
 
-   if( o.owner )
-   {
-      FC_ASSERT( o.owner->auths.size() <= chain_params.maximum_authority_membership );
-      check_relative_ids(*o.owner);
-      for( auto id : o.owner->auths )
-      {
-         FC_ASSERT( is_relative(id.first) || db().find<object>(id.first) );
-      }
-   }
-   if( o.active )
-   {
-      FC_ASSERT( o.active->auths.size() <= chain_params.maximum_authority_membership );
-      check_relative_ids(*o.active);
-      for( auto id : o.active->auths )
-      {
-         FC_ASSERT( is_relative(id.first) || db().find<object>(id.first) );
-      }
-   }
+   if( o.owner )  verify_authority_accounts( *o.owner );
+   if( o.active ) verify_authority_accounts( *o.active );
 
    acnt = &o.account(d);
 
    if( o.new_options )
    {
-      FC_ASSERT( d.find(key_id_type(get_relative_id(o.new_options->memo_key))) );
       FC_ASSERT( o.new_options->num_witness <= chain_params.maximum_witness_count );
       FC_ASSERT( o.new_options->num_committee <= chain_params.maximum_committee_count );
       uint32_t max_vote_id = d.get_global_properties().next_available_vote_id;
@@ -156,13 +125,9 @@ void_result account_update_evaluator::do_evaluate( const account_update_operatio
 void_result account_update_evaluator::do_apply( const account_update_operation& o )
 { try {
    db().modify( *acnt, [&](account_object& a){
-      if( o.owner ) a.owner = resolve_relative_ids(*o.owner);
-      if( o.active ) a.active = resolve_relative_ids(*o.active);
-      if( o.new_options )
-      {
-         a.options = *o.new_options;
-         a.options.memo_key = get_relative_id(a.options.memo_key);
-      }
+      if( o.owner ) a.owner = *o.owner;
+      if( o.active ) a.active = *o.active;
+      if( o.new_options ) a.options = *o.new_options;
    });
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }

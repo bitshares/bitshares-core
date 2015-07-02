@@ -20,7 +20,6 @@
 
 #include <graphene/chain/database.hpp>
 #include <graphene/chain/operations.hpp>
-#include <graphene/chain/key_object.hpp>
 #include <graphene/chain/asset_object.hpp>
 #include <graphene/chain/account_object.hpp>
 #include <graphene/chain/balance_object.hpp>
@@ -43,12 +42,13 @@ BOOST_FIXTURE_TEST_SUITE( operation_tests, database_fixture )
 
 BOOST_AUTO_TEST_CASE( withdraw_permission_create )
 { try {
+   //ACTORS((nathan)(dan))
+   //idump((nathan)(dan));
    auto nathan_private_key = generate_private_key("nathan");
    auto dan_private_key = generate_private_key("dan");
-   key_id_type nathan_key_id = register_key(nathan_private_key.get_public_key()).id;
-   key_id_type dan_key_id = register_key(dan_private_key.get_public_key()).id;
-   account_id_type nathan_id = create_account("nathan", nathan_key_id).id;
-   account_id_type dan_id = create_account("dan", dan_key_id).id;
+   account_id_type nathan_id = create_account("nathan", nathan_private_key.get_public_key()).id;
+   account_id_type dan_id = create_account("dan", dan_private_key.get_public_key()).id;
+
    transfer(account_id_type(), nathan_id, asset(1000));
    generate_block();
    trx.set_expiration(db.head_block_time() + GRAPHENE_DEFAULT_MAX_TIME_UNTIL_EXPIRATION / 2);
@@ -72,7 +72,7 @@ BOOST_AUTO_TEST_CASE( withdraw_permission_create )
       REQUIRE_THROW_WITH_VALUE(op, withdrawal_period_sec, 1);
       trx.operations.back() = op;
    }
-   trx.sign(nathan_key_id, nathan_private_key);
+   trx.sign(nathan_private_key);
    db.push_transaction( trx );
    trx.clear();
 } FC_LOG_AND_RETHROW() }
@@ -85,7 +85,6 @@ BOOST_AUTO_TEST_CASE( withdraw_permission_test )
    auto dan_private_key = generate_private_key("dan");
    account_id_type nathan_id = get_account("nathan").id;
    account_id_type dan_id = get_account("dan").id;
-   key_id_type dan_key_id = dan_id(db).active.auths.begin()->first;
    withdraw_permission_id_type permit;
    trx.set_expiration(db.head_block_time() + GRAPHENE_DEFAULT_MAX_TIME_UNTIL_EXPIRATION/2);
 
@@ -172,7 +171,7 @@ BOOST_AUTO_TEST_CASE( withdraw_permission_test )
       op.amount_to_withdraw = asset(1);
       trx.clear();
       trx.operations = {op};
-      trx.sign(dan_key_id, dan_private_key);
+      trx.sign(dan_private_key);
       PUSH_TX( db, trx );
    }
 
@@ -215,7 +214,6 @@ BOOST_AUTO_TEST_CASE( withdraw_permission_nominal_case )
    auto dan_private_key = generate_private_key("dan");
    account_id_type nathan_id = get_account("nathan").id;
    account_id_type dan_id = get_account("dan").id;
-   key_id_type dan_key_id = dan_id(db).active.auths.begin()->first;
    withdraw_permission_id_type permit;
    trx.set_expiration(db.head_block_time() + GRAPHENE_DEFAULT_MAX_TIME_UNTIL_EXPIRATION/2);
 
@@ -232,7 +230,7 @@ BOOST_AUTO_TEST_CASE( withdraw_permission_nominal_case )
       // ref_block_prefix is timestamp, so treat it as a rollable nonce
       // so tx's have different txid's
       trx.ref_block_prefix++;
-      trx.sign(dan_key_id, dan_private_key);
+      trx.sign(dan_private_key);
       PUSH_TX( db, trx );
       // tx's involving withdraw_permissions can't delete it even
       // if no further withdrawals are possible
@@ -257,7 +255,6 @@ BOOST_AUTO_TEST_CASE( withdraw_permission_update )
    auto nathan_private_key = generate_private_key("nathan");
    account_id_type nathan_id = get_account("nathan").id;
    account_id_type dan_id = get_account("dan").id;
-   key_id_type nathan_key_id = nathan_id(db).active.auths.begin()->first;
    withdraw_permission_id_type permit;
    trx.set_expiration(db.head_block_time() + GRAPHENE_DEFAULT_MAX_TIME_UNTIL_EXPIRATION/2);
 
@@ -279,7 +276,7 @@ BOOST_AUTO_TEST_CASE( withdraw_permission_update )
       REQUIRE_THROW_WITH_VALUE(op, authorized_account, account_id_type(0));
       REQUIRE_THROW_WITH_VALUE(op, period_start_time, db.head_block_time() - 50);
       trx.operations.back() = op;
-      trx.sign(nathan_key_id, nathan_private_key);
+      trx.sign(nathan_private_key);
       PUSH_TX( db, trx );
    }
 
@@ -303,7 +300,7 @@ BOOST_AUTO_TEST_CASE( withdraw_permission_delete )
    op.withdraw_from_account = get_account("nathan").id;
    trx.set_expiration(db.head_block_id());
    trx.operations.push_back(op);
-   trx.sign(get_account("nathan").active.auths.begin()->first, generate_private_key("nathan"));
+   trx.sign(generate_private_key("nathan"));
    PUSH_TX( db, trx );
 } FC_LOG_AND_RETHROW() }
 
@@ -330,7 +327,7 @@ BOOST_AUTO_TEST_CASE( mia_feeds )
       op.issuer = nathan_id;
       op.new_feed_producers = {dan_id, ben_id, vikram_id};
       trx.operations.push_back(op);
-      trx.sign(nathan_key_id, nathan_private_key);
+      trx.sign(nathan_private_key);
       PUSH_TX( db, trx );
       generate_block(database::skip_nothing);
    }
@@ -414,7 +411,7 @@ BOOST_AUTO_TEST_CASE( witness_create )
    ACTOR(nathan);
    upgrade_to_lifetime_member(nathan_id);
    trx.clear();
-   witness_id_type nathan_witness_id = create_witness(nathan_id, nathan_key_id, nathan_private_key).id;
+   witness_id_type nathan_witness_id = create_witness(nathan_id, nathan_private_key).id;
    // Give nathan some voting stake
    transfer(genesis_account, nathan_id, asset(10000000));
    generate_block();
@@ -430,7 +427,7 @@ BOOST_AUTO_TEST_CASE( witness_create )
       op.new_options->num_committee = std::count_if(op.new_options->votes.begin(), op.new_options->votes.end(),
                                                     [](vote_id_type id) { return id.type() == vote_id_type::committee; });
       trx.operations.push_back(op);
-      trx.sign(nathan_key_id, nathan_private_key);
+      trx.sign(nathan_private_key);
       PUSH_TX( db, trx );
       trx.clear();
    }
@@ -541,7 +538,7 @@ BOOST_AUTO_TEST_CASE( global_settle_test )
       REQUIRE_THROW_WITH_VALUE(op, asset_to_settle, asset_id_type(100));
       REQUIRE_THROW_WITH_VALUE(op, issuer, account_id_type(2));
       trx.operations.back() = op;
-      trx.sign(nathan_key_id, nathan_private_key);
+      trx.sign(nathan_private_key);
       PUSH_TX( db, trx );
    }
 
@@ -578,7 +575,7 @@ BOOST_AUTO_TEST_CASE( worker_create_test )
       REQUIRE_THROW_WITH_VALUE(op, work_begin_date, db.head_block_time() - 10);
       REQUIRE_THROW_WITH_VALUE(op, work_end_date, op.work_begin_date);
       trx.operations.back() = op;
-      trx.sign(nathan_key_id, nathan_private_key);
+      trx.sign(nathan_private_key);
       PUSH_TX( db, trx );
    }
 
@@ -633,7 +630,7 @@ BOOST_AUTO_TEST_CASE( worker_pay_test )
       op.owner = nathan_id;
       trx.set_expiration(db.head_block_id());
       trx.operations.push_back(op);
-      trx.sign(nathan_key_id, nathan_private_key);
+      trx.sign( nathan_private_key);
       PUSH_TX( db, trx );
       trx.signatures.clear();
       REQUIRE_THROW_WITH_VALUE(op, amount, asset(1));
@@ -668,7 +665,7 @@ BOOST_AUTO_TEST_CASE( worker_pay_test )
       trx.set_expiration(db.head_block_id());
       REQUIRE_THROW_WITH_VALUE(op, amount, asset(501));
       trx.operations.back() = op;
-      trx.sign(nathan_key_id, nathan_private_key);
+      trx.sign( nathan_private_key);
       PUSH_TX( db, trx );
       trx.signatures.clear();
       trx.clear();
@@ -701,7 +698,7 @@ BOOST_AUTO_TEST_CASE( refund_worker_test )
       REQUIRE_THROW_WITH_VALUE(op, work_begin_date, db.head_block_time() - 10);
       REQUIRE_THROW_WITH_VALUE(op, work_end_date, op.work_begin_date);
       trx.operations.back() = op;
-      trx.sign(nathan_key_id, nathan_private_key);
+      trx.sign( nathan_private_key);
       PUSH_TX( db, trx );
       trx.clear();
    }
@@ -774,7 +771,7 @@ BOOST_AUTO_TEST_CASE( burn_worker_test )
       REQUIRE_THROW_WITH_VALUE(op, work_begin_date, db.head_block_time() - 10);
       REQUIRE_THROW_WITH_VALUE(op, work_end_date, op.work_begin_date);
       trx.operations.back() = op;
-      trx.sign(nathan_key_id, nathan_private_key);
+      trx.sign( nathan_private_key);
       PUSH_TX( db, trx );
       trx.clear();
    }
@@ -954,11 +951,9 @@ BOOST_AUTO_TEST_CASE( assert_op_test )
    // create some objects
    auto nathan_private_key = generate_private_key("nathan");
    public_key_type nathan_public_key = nathan_private_key.get_public_key();
-   key_id_type nathan_key_id = register_key(nathan_public_key).id;
-   account_id_type nathan_id = create_account("nathan", nathan_key_id).id;
+   account_id_type nathan_id = create_account("nathan", nathan_public_key).id;
 
    assert_operation op;
-   decltype(key_object::key_data) lit_key = nathan_public_key;
 
    // nathan checks that his public key is equal to the given value.
    op.fee_paying_account = nathan_id;
@@ -968,13 +963,13 @@ BOOST_AUTO_TEST_CASE( assert_op_test )
       predicate(pred::account_name_eq_lit{ nathan_id, "nathan" })
       ));
    trx.operations.push_back(op);
-   trx.sign(nathan_key_id, nathan_private_key);
+   trx.sign(nathan_private_key);
    PUSH_TX( db, trx );
 
    // nathan checks that his public key is not equal to the given value (fail)
    op.predicates.back() = fc::raw::pack(predicate(pred::account_name_eq_lit{ nathan_id, "dan" }));
    trx.operations.back() = op;
-   trx.sign(nathan_key_id, nathan_private_key);
+   trx.sign(nathan_private_key);
    BOOST_CHECK_THROW( PUSH_TX( db, trx ), fc::exception );
    } FC_LOG_AND_RETHROW()
 }

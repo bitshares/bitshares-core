@@ -23,7 +23,6 @@
 #include <graphene/chain/asset_object.hpp>
 #include <graphene/chain/limit_order_object.hpp>
 #include <graphene/chain/call_order_object.hpp>
-#include <graphene/chain/key_object.hpp>
 #include <graphene/chain/delegate_object.hpp>
 #include <graphene/chain/witness_object.hpp>
 #include <graphene/chain/proposal_object.hpp>
@@ -87,14 +86,6 @@ namespace graphene { namespace app {
           * @brief Retrieve the current @ref dynamic_global_property_object
           */
          dynamic_global_property_object get_dynamic_global_properties()const;
-         /**
-          * @brief Get a list of keys by ID
-          * @param key_ids IDs of the keys to retrieve
-          * @return The keys corresponding to the provided IDs
-          *
-          * This function has semantics identical to @ref get_objects
-          */
-         vector<optional<key_object>> get_keys(const vector<key_id_type>& key_ids)const;
          /**
           * @brief Get a list of accounts by ID
           * @param account_ids IDs of the accounts to retrieve
@@ -286,12 +277,8 @@ namespace graphene { namespace app {
          /**
           *  @return all accounts that referr to the key or account id in their owner or active authorities.
           */
-         vector<account_id_type> get_account_references( object_id_type key_or_account_id )const;
-
-         /**
-          *  @return all key_ids that have been registered for a given address. 
-          */
-         vector<key_id_type>  get_keys_for_address( const address& a )const;
+         vector<account_id_type> get_account_references( account_id_type account_id )const;
+         vector<account_id_type> get_key_references( public_key_type account_id )const;
 
          /**
           *  @return all open margin positions for a given account id.
@@ -443,7 +430,6 @@ FC_API(graphene::app::database_api,
        (get_transaction)
        (get_global_properties)
        (get_dynamic_global_properties)
-       (get_keys)
        (get_accounts)
        (get_assets)
        (lookup_account_names)
@@ -471,7 +457,7 @@ FC_API(graphene::app::database_api,
        (get_transaction_hex)
        (get_proposed_transactions)
        (get_account_references)
-       (get_keys_for_address)
+       (get_key_references)
        (get_margin_positions)
        (get_balance_objects)
      )

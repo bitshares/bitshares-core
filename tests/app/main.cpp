@@ -18,7 +18,6 @@
 #include <graphene/app/application.hpp>
 #include <graphene/app/plugin.hpp>
 
-#include <graphene/chain/key_object.hpp>
 #include <graphene/time/time.hpp>
 
 #include <graphene/account_history/account_history_plugin.hpp>
@@ -71,16 +70,14 @@ BOOST_AUTO_TEST_CASE( two_node_network )
       trx.set_expiration(now + fc::seconds(30));
       std::shared_ptr<chain::database> db2 = app2.chain_database();
 
-      trx.operations.push_back(key_create_operation({asset(),
+      trx.operations.push_back(assert_operation({asset(),
                                                      GRAPHENE_TEMP_ACCOUNT,
-                                                     public_key_type(nathan_key.get_public_key())}));
+                                                     { fc::raw::pack( graphene::chain::pred::asset_symbol_eq_lit{asset_id_type(),"CORE"} ) } }));
       trx.validate();
       processed_transaction ptrx = app1.chain_database()->push_transaction(trx);
       app1.p2p_node()->broadcast(graphene::net::trx_message(trx));
-      key_id_type nathan_key_id = ptrx.operation_results.front().get<object_id_type>();
 
       fc::usleep(fc::milliseconds(250));
-      BOOST_CHECK(nathan_key_id(*app2.chain_database()).key_data.get<public_key_type>() == nathan_key.get_public_key());
       ilog("Pushed transaction");
 
       now += GRAPHENE_DEFAULT_BLOCK_INTERVAL;

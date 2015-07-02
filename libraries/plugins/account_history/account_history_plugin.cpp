@@ -23,7 +23,6 @@
 #include <graphene/chain/config.hpp>
 #include <graphene/chain/database.hpp>
 #include <graphene/chain/evaluator.hpp>
-#include <graphene/chain/key_object.hpp>
 #include <graphene/chain/operation_history_object.hpp>
 #include <graphene/chain/transaction_evaluation_state.hpp>
 
@@ -43,8 +42,6 @@ class account_history_plugin_impl
       { }
       virtual ~account_history_plugin_impl();
 
-      flat_set<key_id_type> get_keys_for_account(
-          const account_id_type& account_id );
 
       /** this method is called as a callback after a block is applied
        * and will process/index all operations that were applied in the block.
@@ -72,11 +69,8 @@ struct operation_get_impacted_accounts
 
    void add_authority( const authority& a )const
    {
-      for( auto& item : a.auths )
-      {
-         if( item.first.type() == account_object_type )
-            _impacted.insert( item.first );
-      }
+      for( auto& item : a.account_auths )
+         _impacted.insert( item.first );
    }
 
    void operator()( const transfer_operation& o )const {
@@ -86,7 +80,6 @@ struct operation_get_impacted_accounts
    void operator()( const limit_order_create_operation& o )const { }
    void operator()( const limit_order_cancel_operation& o )const { }
    void operator()( const call_order_update_operation& o )const { }
-   void operator()( const key_create_operation& o )const { }
    void operator()( const custom_operation& o )const { }
 
    void operator()( const account_create_operation& o )const {

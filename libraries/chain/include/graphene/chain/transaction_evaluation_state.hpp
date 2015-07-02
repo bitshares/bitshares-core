@@ -40,8 +40,8 @@ namespace graphene { namespace chain {
 
          database& db()const { FC_ASSERT( _db ); return *_db; }
 
-         bool signed_by(key_id_type id);
          bool signed_by(const public_key_type& k);
+         bool signed_by(const address& k);
 
          /// cached approval (accounts and keys)
          flat_set<pair<object_id_type,authority::classification>> approved_by;

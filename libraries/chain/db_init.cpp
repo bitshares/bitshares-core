@@ -23,7 +23,6 @@
 #include <graphene/chain/block_summary_object.hpp>
 #include <graphene/chain/delegate_object.hpp>
 #include <graphene/chain/global_property_object.hpp>
-#include <graphene/chain/key_object.hpp>
 #include <graphene/chain/balance_object.hpp>
 #include <graphene/chain/limit_order_object.hpp>
 #include <graphene/chain/proposal_object.hpp>
@@ -41,7 +40,6 @@
 #include <graphene/chain/custom_evaluator.hpp>
 #include <graphene/chain/delegate_evaluator.hpp>
 #include <graphene/chain/global_parameters_evaluator.hpp>
-#include <graphene/chain/key_evaluator.hpp>
 #include <graphene/chain/limit_order_evaluator.hpp>
 #include <graphene/chain/proposal_evaluator.hpp>
 #include <graphene/chain/call_order_evaluator.hpp>
@@ -62,7 +60,6 @@ namespace graphene { namespace chain {
 void database::initialize_evaluators()
 {
    _operation_evaluators.resize(255);
-   register_evaluator<key_create_evaluator>();
    register_evaluator<account_create_evaluator>();
    register_evaluator<account_update_evaluator>();
    register_evaluator<account_upgrade_evaluator>();
@@ -113,13 +110,6 @@ void database::initialize_indexes()
    acnt_index->add_secondary_index<account_member_index>();
    acnt_index->add_secondary_index<account_referrer_index>();
 
-   // this is the fast effecient version for validation only
-   // add_index< primary_index<simple_index<key_object>> >();
-
-   // this is the slower version designed to aid GUI use.  We will
-   // default to the "slow" version until we need a faster version.
-   add_index< primary_index<key_index> >();
-
    add_index< primary_index<delegate_index> >();
    add_index< primary_index<witness_index> >();
    add_index< primary_index<limit_order_index > >();
@@ -166,9 +156,6 @@ void database::init_genesis(const genesis_state_type& genesis_state)
 
    // Create blockchain accounts
    fc::ecc::private_key null_private_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("null_key")));
-   create<key_object>( [&null_private_key](key_object& k) {
-       k.key_data = public_key_type(null_private_key.get_public_key());
-   });
    create<account_balance_object>([](account_balance_object& b) {
       b.balance = GRAPHENE_MAX_SHARE_SUPPLY;
    });
@@ -266,25 +253,29 @@ void database::init_genesis(const genesis_state_type& genesis_state)
    {
       for( const auto& account : genesis_state.initial_accounts )
       {
+         /*
          key_id_type key_id = apply_operation(genesis_eval_state,
                                               key_create_operation({asset(),
                                                                     GRAPHENE_TEMP_ACCOUNT,
                                                                     account.owner_key})).get<object_id_type>();
+                                                                    */
          account_create_operation cop;
          cop.name = account.name;
          cop.registrar = GRAPHENE_TEMP_ACCOUNT;
-         cop.owner = authority(1, key_id, 1);
+         cop.owner = authority(1, account.owner_key, 1);
          if( account.owner_key != account.active_key )
          {
+            /*
             key_id = apply_operation(genesis_eval_state,
                                      key_create_operation({asset(),
                                                            GRAPHENE_TEMP_ACCOUNT,
                                                            account.owner_key})).get<object_id_type>();
-            cop.active = authority(1, key_id, 1);
+                                                           */
+            cop.active = authority(1, account.owner_key, 1);
          } else {
             cop.active = cop.owner;
          }
-         cop.options.memo_key = key_id;
+         cop.options.memo_key = account.owner_key;
          account_id_type account_id(apply_operation(genesis_eval_state, cop).get<object_id_type>());
 
          if( account.is_lifetime_member )
@@ -325,15 +316,17 @@ void database::init_genesis(const genesis_state_type& genesis_state)
             int collateral_holder_number = 0;
             for( const auto& collateral_rec : asset.bitasset_options->collateral_records )
             {
+               /*
                key_id_type key_id = apply_operation(genesis_eval_state,
                                                     key_create_operation{{},
                                                                          GRAPHENE_TEMP_ACCOUNT,
                                                                          collateral_rec.owner}).get<object_id_type>();
+                                                                         */
                account_create_operation cop;
                cop.name = asset.symbol + "-collateral-holder-" + std::to_string(collateral_holder_number);
                boost::algorithm::to_lower(cop.name);
                cop.registrar = GRAPHENE_TEMP_ACCOUNT;
-               cop.owner = authority(1, key_id, 1);
+               cop.owner = authority(1, collateral_rec.owner, 1);
                cop.active = cop.owner;
                account_id_type owner_account_id = apply_operation(genesis_eval_state, cop).get<object_id_type>();
 
@@ -429,12 +422,14 @@ void database::init_genesis(const genesis_state_type& genesis_state)
    // Create initial witnesses and delegates
    std::for_each(genesis_state.initial_witness_candidates.begin(), genesis_state.initial_witness_candidates.end(),
                  [&](const genesis_state_type::initial_witness_type& witness) {
+                 /*
       const key_object& signing_key = create<key_object>([&witness](key_object& k) {
          k.key_data = witness.block_signing_key;
       });
+      */
 
       witness_create_operation op;
-      op.block_signing_key = signing_key.get_id();
+      op.block_signing_key = witness.block_signing_key;
       op.initial_secret = witness.initial_secret;
       op.witness_account = get_account_id(witness.owner_name);
       apply_operation(genesis_eval_state, op).get<object_id_type>();

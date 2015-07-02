@@ -44,7 +44,7 @@ class proposal_object : public abstract_object<proposal_object>
       flat_set<account_id_type>     available_active_approvals;
       flat_set<account_id_type>     required_owner_approvals;
       flat_set<account_id_type>     available_owner_approvals;
-      flat_set<key_id_type>         available_key_approvals;
+      flat_set<public_key_type>     available_key_approvals;
 
       bool is_authorized_to_execute(database& db)const;
 };

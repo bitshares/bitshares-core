@@ -24,7 +24,6 @@
 #include <graphene/chain/account_object.hpp>
 #include <graphene/chain/asset_object.hpp>
 #include <graphene/chain/delegate_object.hpp>
-#include <graphene/chain/key_object.hpp>
 
 #include <fc/crypto/digest.hpp>
 

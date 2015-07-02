@@ -18,7 +18,6 @@
 #include <graphene/chain/proposal_evaluator.hpp>
 #include <graphene/chain/proposal_object.hpp>
 #include <graphene/chain/account_object.hpp>
-#include <graphene/chain/key_object.hpp>
 
 namespace graphene { namespace chain {
 
@@ -93,13 +92,16 @@ void_result proposal_update_evaluator::do_evaluate(const proposal_update_operati
       FC_ASSERT( _proposal->available_owner_approvals.find(id) != _proposal->available_owner_approvals.end(),
                  "", ("id", id)("available", _proposal->available_owner_approvals) );
    }
+
+   /*  All authority checks happen outside of evaluators, TODO: verify this is checked elsewhere
+   */
    if( (d.get_node_properties().skip_flags & database::skip_authority_check) == 0 )
    {
-      for( key_id_type id : o.key_approvals_to_add )
+      for( const auto& id : o.key_approvals_to_add )
       {
          FC_ASSERT( trx_state->signed_by(id) );
       }
-      for( key_id_type id : o.key_approvals_to_remove )
+      for( const auto& id : o.key_approvals_to_remove )
       {
          FC_ASSERT( trx_state->signed_by(id) );
       }
@@ -122,9 +124,9 @@ void_result proposal_update_evaluator::do_apply(const proposal_update_operation&
          p.available_active_approvals.erase(id);
       for( account_id_type id : o.owner_approvals_to_remove )
          p.available_owner_approvals.erase(id);
-      for( key_id_type id : o.key_approvals_to_add )
+      for( const auto& id : o.key_approvals_to_add )
          p.available_key_approvals.insert(id);
-      for( key_id_type id : o.key_approvals_to_remove )
+      for( const auto& id : o.key_approvals_to_remove )
          p.available_key_approvals.erase(id);
    });
 

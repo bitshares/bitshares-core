@@ -449,7 +449,7 @@ void_result asset_publish_feeds_evaluator::do_evaluate(const asset_publish_feed_
    if( base.issuer == account_id_type() )
    {
       //It's a delegate-fed asset. Verify that publisher is an active delegate or witness.
-      FC_ASSERT(d.get(GRAPHENE_COMMITTEE_ACCOUNT).active.auths.count(o.publisher) ||
+      FC_ASSERT(d.get(GRAPHENE_COMMITTEE_ACCOUNT).active.account_auths.count(o.publisher) ||
                 d.get_global_properties().witness_accounts.count(o.publisher));
    } else {
       FC_ASSERT(bitasset.feeds.count(o.publisher));

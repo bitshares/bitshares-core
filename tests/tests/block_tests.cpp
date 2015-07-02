@@ -23,7 +23,6 @@
 
 #include <graphene/chain/account_object.hpp>
 #include <graphene/chain/delegate_object.hpp>
-#include <graphene/chain/key_object.hpp>
 #include <graphene/chain/limit_order_object.hpp>
 #include <graphene/chain/proposal_object.hpp>
 #include <graphene/chain/call_order_object.hpp>
@@ -280,6 +279,7 @@ BOOST_AUTO_TEST_CASE( undo_pending )
          db.open(data_dir.path(), make_genesis());
 
          auto delegate_priv_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("null_key")) );
+         public_key_type delegate_pub_key  = delegate_priv_key.get_public_key();
          const graphene::db::index& account_idx = db.get_index(protocol_ids, account_object_type);
 
          {
@@ -298,7 +298,7 @@ BOOST_AUTO_TEST_CASE( undo_pending )
          account_create_operation cop;
          cop.registrar = GRAPHENE_TEMP_ACCOUNT;
          cop.name = "nathan";
-         cop.owner = authority(1, key_id_type(), 1);
+         cop.owner = authority(1, delegate_pub_key, 1);
          trx.operations.push_back(cop);
          //trx.sign( delegate_priv_key );
          PUSH_TX( db, trx );
@@ -339,6 +339,7 @@ BOOST_AUTO_TEST_CASE( switch_forks_undo_create )
 
       fc::time_point_sec now( GRAPHENE_GENESIS_TIMESTAMP );
       auto delegate_priv_key  = fc::ecc::private_key::regenerate(fc::sha256::hash(string("null_key")) );
+      public_key_type delegate_pub_key  = delegate_priv_key.get_public_key();
       const graphene::db::index& account_idx = db1.get_index(protocol_ids, account_object_type);
 
       signed_transaction trx;
@@ -347,7 +348,7 @@ BOOST_AUTO_TEST_CASE( switch_forks_undo_create )
       account_create_operation cop;
       cop.registrar = GRAPHENE_TEMP_ACCOUNT;
       cop.name = "nathan";
-      cop.owner = authority(1, key_id_type(), 1);
+      cop.owner = authority(1, delegate_pub_key, 1);
       trx.operations.push_back(cop);
       PUSH_TX( db1, trx );
 
@@ -397,6 +398,7 @@ BOOST_AUTO_TEST_CASE( duplicate_transactions )
       auto skip_sigs = database::skip_transaction_signatures | database::skip_authority_check;
 
       auto delegate_priv_key  = fc::ecc::private_key::regenerate(fc::sha256::hash(string("null_key")) );
+      public_key_type delegate_pub_key  = delegate_priv_key.get_public_key();
       const graphene::db::index& account_idx = db1.get_index(protocol_ids, account_object_type);
 
       signed_transaction trx;
@@ -404,15 +406,15 @@ BOOST_AUTO_TEST_CASE( duplicate_transactions )
       account_id_type nathan_id = account_idx.get_next_id();
       account_create_operation cop;
       cop.name = "nathan";
-      cop.owner = authority(1, key_id_type(), 1);
+      cop.owner = authority(1, delegate_pub_key, 1);
       trx.operations.push_back(cop);
-      trx.sign( key_id_type(), delegate_priv_key );
+      trx.sign( delegate_priv_key );
       PUSH_TX( db1, trx, skip_sigs );
 
       trx = decltype(trx)();
       trx.set_expiration(db1.head_block_time() + fc::minutes(1));
       trx.operations.push_back(transfer_operation({asset(), account_id_type(), nathan_id, asset(500)}));
-      trx.sign( key_id_type(), delegate_priv_key );
+      trx.sign(  delegate_priv_key );
       PUSH_TX( db1, trx, skip_sigs );
 
       BOOST_CHECK_THROW(PUSH_TX( db1, trx, skip_sigs ), fc::exception);
@@ -445,6 +447,7 @@ BOOST_AUTO_TEST_CASE( tapos )
       const account_object& init1 = *db1.get_index_type<account_index>().indices().get<by_name>().find("init1");
 
       auto delegate_priv_key  = fc::ecc::private_key::regenerate(fc::sha256::hash(string("null_key")) );
+      public_key_type delegate_pub_key  = delegate_priv_key.get_public_key();
       const graphene::db::index& account_idx = db1.get_index(protocol_ids, account_object_type);
 
       now += db1.block_interval();
@@ -458,9 +461,9 @@ BOOST_AUTO_TEST_CASE( tapos )
       account_create_operation cop;
       cop.registrar = init1.id;
       cop.name = "nathan";
-      cop.owner = authority(1, key_id_type(), 1);
+      cop.owner = authority(1, delegate_pub_key, 1);
       trx.operations.push_back(cop);
-      trx.sign(key_id_type(2), delegate_priv_key);
+      trx.sign(delegate_priv_key);
       db1.push_transaction(trx);
       now += db1.block_interval();
       b = db1.generate_block(now, db1.get_scheduled_witness(1).first, delegate_priv_key, database::skip_nothing);
@@ -471,12 +474,12 @@ BOOST_AUTO_TEST_CASE( tapos )
       trx.clear();
 
       trx.operations.push_back(transfer_operation({asset(), account_id_type(), nathan_id, asset(50)}));
-      trx.sign(key_id_type(2), delegate_priv_key);
+      trx.sign(delegate_priv_key);
       //relative_expiration is 1, but ref block is 2 blocks old, so this should fail.
       BOOST_REQUIRE_THROW(PUSH_TX( db1, trx, database::skip_transaction_signatures | database::skip_authority_check ), fc::exception);
       trx.set_expiration(db1.head_block_id(), 2);
       trx.signatures.clear();
-      trx.sign(key_id_type(2), delegate_priv_key);
+      trx.sign(delegate_priv_key);
       db1.push_transaction(trx, database::skip_transaction_signatures | database::skip_authority_check);
    } catch (fc::exception& e) {
       edump((e.to_detail_string()));
@@ -643,7 +646,7 @@ BOOST_FIXTURE_TEST_CASE( change_block_interval, database_fixture )
                                      get_account("init4").get_id(), get_account("init5").get_id(),
                                      get_account("init6").get_id(), get_account("init7").get_id()};
       trx.operations.push_back(uop);
-      trx.sign(get_account("init0").active.get_keys().front(),delegate_priv_key);
+      trx.sign(delegate_priv_key);
       /*
       trx.sign(get_account("init1").active.get_keys().front(),delegate_priv_key);
       trx.sign(get_account("init2").active.get_keys().front(),delegate_priv_key);
@@ -928,14 +931,14 @@ BOOST_FIXTURE_TEST_CASE( tapos_rollover, database_fixture )
 
       xfer_tx.operations.push_back( xfer_op );
       xfer_tx.set_expiration( db.head_block_id(), 0x1000 );
-      sign( xfer_tx, alice_key_id, alice_private_key );
+      sign( xfer_tx, alice_private_key );
       PUSH_TX( db, xfer_tx, 0 );
       generate_block();
 
       BOOST_TEST_MESSAGE( "Sign new tx's" );
       xfer_tx.set_expiration( db.head_block_id(), 0x1000 );
       xfer_tx.signatures.clear();
-      sign( xfer_tx, alice_key_id, alice_private_key );
+      sign( xfer_tx, alice_private_key );
 
       BOOST_TEST_MESSAGE( "Generate up to block 0x10010" );
       generate_blocks( 0x110 );

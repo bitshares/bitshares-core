@@ -23,7 +23,6 @@
 #include <graphene/chain/config.hpp>
 #include <graphene/chain/database.hpp>
 #include <graphene/chain/evaluator.hpp>
-#include <graphene/chain/key_object.hpp>
 #include <graphene/chain/operation_history_object.hpp>
 #include <graphene/chain/transaction_evaluation_state.hpp>
 

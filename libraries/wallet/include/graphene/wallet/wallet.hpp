@@ -45,9 +45,8 @@ object* create_object( const variant& v );
 
 struct plain_keys
 {
-   map<key_id_type, string>  keys;
-   map<address,string>       extra_keys;
-   fc::sha512                checksum;
+   map<public_key_type, string>  keys;
+   fc::sha512                    checksum;
 };
 
 struct wallet_data
@@ -82,7 +81,7 @@ struct wallet_data
    vector<char>              cipher_keys;
 
    /** map an account to a set of extra keys that have been imported for that account */
-   map<account_id_type, vector<address> >  extra_keys;
+   map<account_id_type, set<public_key_type> >  extra_keys;
 
    // map of account_name -> base58_private_key for
    //    incomplete account regs
@@ -328,7 +327,7 @@ class wallet_api
        * using \c import_key()
        * @returns a map containing the private keys, indexed by their key_id
        */
-      map<key_id_type, string> dump_private_keys();
+      map<public_key_type, string> dump_private_keys();
 
       /** Returns a list of all commands supported by the wallet API.
        *
@@ -962,7 +961,7 @@ class wallet_api
 
 } }
 
-FC_REFLECT( graphene::wallet::plain_keys, (keys)(extra_keys)(checksum) )
+FC_REFLECT( graphene::wallet::plain_keys, (keys)(checksum) )
 
 FC_REFLECT( graphene::wallet::wallet_data,
             (my_accounts)

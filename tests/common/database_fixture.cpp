@@ -50,6 +50,7 @@ database_fixture::database_fixture()
    try {
    auto ahplugin = app.register_plugin<graphene::account_history::account_history_plugin>();
    auto mhplugin = app.register_plugin<graphene::market_history::market_history_plugin>();
+   delegate_pub_key = delegate_priv_key.get_public_key();
 
    boost::program_options::variables_map options;
 
@@ -80,7 +81,6 @@ database_fixture::database_fixture()
 
    generate_block();
 
-   genesis_key(db); // attempt to deref
    trx.set_expiration(db.head_block_time() + fc::minutes(1));
    } catch ( const fc::exception& e )
    {
@@ -199,31 +199,31 @@ void database_fixture::verify_account_history_plugin_index( )const
       app.get_plugin<graphene::account_history::account_history_plugin>("account_history");
    if( pin->tracked_accounts().size() == 0 )
    {
+      /*
       vector< pair< account_id_type, address > > tuples_from_db;
       const auto& primary_account_idx = db.get_index_type<account_index>().indices().get<by_id>();
-      flat_set< address > acct_addresses;
+      flat_set< public_key_type > acct_addresses;
       acct_addresses.reserve( 2 * GRAPHENE_DEFAULT_MAX_AUTHORITY_MEMBERSHIP + 2 );
 
       for( const account_object& acct : primary_account_idx )
       {
          account_id_type account_id = acct.id;
          acct_addresses.clear();
-         for( const pair< object_id_type, weight_type >& auth : acct.owner.auths )
+         for( const pair< account_id_type, weight_type >& auth : acct.owner.account_auths )
          {
             if( auth.first.type() == key_object_type )
-               acct_addresses.insert( key_id_type( auth.first )(db).key_address() );
+               acct_addresses.insert(  auth.first );
          }
          for( const pair< object_id_type, weight_type >& auth : acct.active.auths )
          {
             if( auth.first.type() == key_object_type )
-               acct_addresses.insert( key_id_type( auth.first )(db).key_address() );
+               acct_addresses.insert( auth.first );
          }
          acct_addresses.insert( acct.options.get_memo_key()(db).key_address() );
          for( const address& addr : acct_addresses )
             tuples_from_db.emplace_back( account_id, addr );
       }
 
-      /*
       vector< pair< account_id_type, address > > tuples_from_index;
       tuples_from_index.reserve( tuples_from_db.size() );
       const auto& key_account_idx =
@@ -313,9 +313,9 @@ void database_fixture::generate_blocks(fc::time_point_sec timestamp, bool miss_i
 
 account_create_operation database_fixture::make_account(
    const std::string& name /* = "nathan" */,
-   key_id_type key /* = key_id_type() */
+   public_key_type key /* = key_id_type() */
    )
-{
+{ try {
    account_create_operation create_account;
    create_account.registrar = account_id_type();
 
@@ -339,14 +339,14 @@ account_create_operation database_fixture::make_account(
 
    create_account.fee = create_account.calculate_fee(db.current_fee_schedule());
    return create_account;
-}
+} FC_CAPTURE_AND_RETHROW() }
 
 account_create_operation database_fixture::make_account(
    const std::string& name,
    const account_object& registrar,
    const account_object& referrer,
    uint8_t referrer_percent /* = 100 */,
-   key_id_type key /* = key_id_type() */
+   public_key_type key /* = public_key_type() */
    )
 {
    try
@@ -490,7 +490,7 @@ void database_fixture::issue_uia( const account_object& recipient, asset amount 
 
 const account_object& database_fixture::create_account(
    const string& name,
-   const key_id_type& key /* = key_id_type() */
+   const public_key_type& key /* = public_key_type() */
    )
 {
    trx.operations.push_back(make_account(name, key));
@@ -506,7 +506,7 @@ const account_object& database_fixture::create_account(
    const account_object& registrar,
    const account_object& referrer,
    uint8_t referrer_percent /* = 100 */,
-   const key_id_type& key /*= key_id_type()*/
+   const public_key_type& key /*= public_key_type()*/
    )
 {
    try
@@ -534,26 +534,20 @@ const account_object& database_fixture::create_account(
    {
       trx.operations.clear();
 
-      key_create_operation key_op;
-      key_op.fee_paying_account = registrar_id;
-      key_op.key_data = public_key_type( key.get_public_key() );
-      trx.operations.push_back( key_op );
-
       account_create_operation account_create_op;
-      relative_key_id_type key_rkid(0);
 
       account_create_op.registrar = registrar_id;
       account_create_op.name = name;
-      account_create_op.owner = authority(1234, key_rkid, 1234);
-      account_create_op.active = authority(5678, key_rkid, 5678);
-      account_create_op.options.memo_key = key_rkid;
+      account_create_op.owner = authority(1234, public_key_type(key.get_public_key()), 1234);
+      account_create_op.active = authority(5678, public_key_type(key.get_public_key()), 5678);
+      account_create_op.options.memo_key = key.get_public_key();
       trx.operations.push_back( account_create_op );
 
       trx.validate();
 
       processed_transaction ptx = db.push_transaction(trx, ~0);
       //wdump( (ptx) );
-      const account_object& result = db.get<account_object>(ptx.operation_results[1].get<object_id_type>());
+      const account_object& result = db.get<account_object>(ptx.operation_results[0].get<object_id_type>());
       trx.operations.clear();
       return result;
    }
@@ -571,18 +565,17 @@ const delegate_object& database_fixture::create_delegate( const account_object& 
    return db.get<delegate_object>(ptx.operation_results[0].get<object_id_type>());
 }
 
-const witness_object&database_fixture::create_witness(account_id_type owner, key_id_type signing_key, const fc::ecc::private_key& signing_private_key)
+const witness_object&database_fixture::create_witness(account_id_type owner, const fc::ecc::private_key& signing_private_key)
 {
-   return create_witness(owner(db), signing_key, signing_private_key);
+   return create_witness(owner(db), signing_private_key);
 }
 
-const witness_object& database_fixture::create_witness( const account_object& owner, key_id_type signing_key,
+const witness_object& database_fixture::create_witness( const account_object& owner,
                                                         const fc::ecc::private_key& signing_private_key )
 { try {
-      FC_ASSERT(db.get(signing_key).key_address() == public_key_type(signing_private_key.get_public_key()));
    witness_create_operation op;
    op.witness_account = owner.id;
-   op.block_signing_key = signing_key;
+   op.block_signing_key = signing_private_key.get_public_key();
    secret_hash_type::encoder enc;
    fc::raw::pack(enc, signing_private_key);
    fc::raw::pack(enc, secret_hash_type());
@@ -594,21 +587,6 @@ const witness_object& database_fixture::create_witness( const account_object& ow
    return db.get<witness_object>(ptx.operation_results[0].get<object_id_type>());
 } FC_CAPTURE_AND_RETHROW() }
 
-const key_object& database_fixture::register_key( const public_key_type& key )
-{
-   trx.operations.push_back(key_create_operation({asset(),account_id_type(), key}));
-   key_id_type new_key = db.push_transaction(trx, ~0).operation_results[0].get<object_id_type>();
-   trx.operations.clear();
-   return new_key(db);
-}
-
-const key_object& database_fixture::register_address( const address& addr )
-{
-   trx.operations.push_back(key_create_operation({asset(), account_id_type(), addr}));
-   key_id_type new_key = db.push_transaction(trx, ~0).operation_results[0].get<object_id_type>();
-   trx.operations.clear();
-   return new_key(db);
-}
 
 uint64_t database_fixture::fund(
    const account_object& account,
@@ -619,9 +597,9 @@ uint64_t database_fixture::fund(
    return get_balance(account, amount.asset_id(db));
 }
 
-void database_fixture::sign(signed_transaction& trx, key_id_type key_id, const fc::ecc::private_key& key)
+void database_fixture::sign(signed_transaction& trx, const fc::ecc::private_key& key)
 {
-  trx.sign( key_id, key );
+  trx.sign( key );
 }
 
 const limit_order_object*database_fixture::create_sell_order(account_id_type user, const asset& amount, const asset& recv)

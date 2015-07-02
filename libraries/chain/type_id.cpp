@@ -5,7 +5,6 @@
 #include <graphene/chain/call_order_object.hpp>
 #include <graphene/chain/delegate_object.hpp>
 #include <graphene/chain/global_property_object.hpp>
-#include <graphene/chain/key_object.hpp>
 #include <graphene/chain/limit_order_object.hpp>
 #include <graphene/chain/operation_history_object.hpp>
 #include <graphene/chain/proposal_object.hpp>
@@ -47,9 +46,6 @@ const uint8_t force_settlement_object::type_id;
 
 const uint8_t global_property_object::space_id;
 const uint8_t global_property_object::type_id;
-
-const uint8_t key_object::space_id;
-const uint8_t key_object::type_id;
 
 const uint8_t limit_order_object::space_id;
 const uint8_t limit_order_object::type_id;

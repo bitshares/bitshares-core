@@ -71,12 +71,12 @@ BOOST_AUTO_TEST_CASE( cashback_test )
       op.referrer = referrer_name ## _id; \
       op.referrer_percent = referrer_rate*GRAPHENE_1_PERCENT; \
       op.name = BOOST_PP_STRINGIZE(actor_name); \
-      op.options.memo_key = actor_name ## _key_id; \
-      op.active = authority(1, actor_name ## _key_id, 1); \
+      op.options.memo_key = actor_name ## _private_key.get_public_key(); \
+      op.active = authority(1, public_key_type(actor_name ## _private_key.get_public_key()), 1); \
       op.owner = op.active; \
       op.fee = op.calculate_fee(fees); \
       trx.operations = {op}; \
-      trx.sign(registrar_name ## _key_id, registrar_name ## _private_key); \
+      trx.sign( registrar_name ## _private_key); \
       actor_name ## _id = PUSH_TX( db, trx ).operation_results.front().get<object_id_type>(); \
       trx.clear(); \
    }

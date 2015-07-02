@@ -56,7 +56,7 @@ private:
 
    boost::program_options::variables_map _options;
    bool _production_enabled = false;
-   std::map<chain::key_id_type, fc::ecc::private_key> _private_keys;
+   std::map<chain::public_key_type, fc::ecc::private_key> _private_keys;
    std::set<chain::witness_id_type> _witnesses;
    fc::future<void> _block_production_task;
 };

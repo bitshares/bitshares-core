@@ -103,17 +103,6 @@ namespace graphene { namespace app {
        return _db.get(dynamic_global_property_id_type());
     }
 
-    vector<optional<key_object>> database_api::get_keys(const vector<key_id_type>& key_ids)const
-    {
-       vector<optional<key_object>> result; result.reserve(key_ids.size());
-       std::transform(key_ids.begin(), key_ids.end(), std::back_inserter(result),
-                      [this](key_id_type id) -> optional<key_object> {
-          if(auto o = _db.find(id))
-             return *o;
-          return {};
-       });
-       return result;
-    }
 
     vector<optional<account_object>> database_api::get_accounts(const vector<account_id_type>& account_ids)const
     {
@@ -599,15 +588,33 @@ namespace graphene { namespace app {
     /**
      *  @return all accounts that referr to the key or account id in their owner or active authorities.
      */
-    vector<account_id_type> database_api::get_account_references( object_id_type key_or_account_id )const
+    vector<account_id_type> database_api::get_account_references( account_id_type account_id )const
     {
        const auto& idx = _db.get_index_type<account_index>();
        const auto& aidx = dynamic_cast<const primary_index<account_index>&>(idx);
        const auto& refs = aidx.get_secondary_index<graphene::chain::account_member_index>();
-       auto itr = refs.account_to_memberships.find(key_or_account_id);
+       auto itr = refs.account_to_account_memberships.find(account_id);
        vector<account_id_type> result;
 
-       if( itr != refs.account_to_memberships.end() )
+       if( itr != refs.account_to_account_memberships.end() )
+       {
+          result.reserve( itr->second.size() );
+          for( auto item : itr->second ) result.push_back(item);
+       }
+       return result;
+    }
+    /**
+     *  @return all accounts that referr to the key or account id in their owner or active authorities.
+     */
+    vector<account_id_type> database_api::get_key_references( public_key_type key )const
+    {
+       const auto& idx = _db.get_index_type<account_index>();
+       const auto& aidx = dynamic_cast<const primary_index<account_index>&>(idx);
+       const auto& refs = aidx.get_secondary_index<graphene::chain::account_member_index>();
+       auto itr = refs.account_to_key_memberships.find(key);
+       vector<account_id_type> result;
+
+       if( itr != refs.account_to_key_memberships.end() )
        {
           result.reserve( itr->second.size() );
           for( auto item : itr->second ) result.push_back(item);
@@ -632,24 +639,6 @@ namespace graphene { namespace app {
        });
        return result;
     }
-
-    /**
-     *  @return all key_ids that have been registered for a given address. 
-     */
-    vector<key_id_type>  database_api::get_keys_for_address( const address& a )const
-    { try {
-       vector<key_id_type> result;
-       const auto& idx = _db.get_index_type<key_index>();
-       const auto& aidx = idx.indices().get<by_address>();
-       auto itr = aidx.find(a);
-
-       while( itr != aidx.end() && itr->key_address() == a )
-       {
-          result.push_back( itr->id );
-          ++itr;
-       }
-       return result;
-    } FC_CAPTURE_AND_RETHROW( (a) ) } 
 
     vector<call_order_object> database_api::get_margin_positions( const account_id_type& id )const
     { try {

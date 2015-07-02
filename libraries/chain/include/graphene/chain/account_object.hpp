@@ -161,8 +161,7 @@ class database;
             /// The memo key is the key this account will typically use to encrypt/sign transaction memos and other non-
             /// validated account activities. This field is here to prevent confusion if the active authority has zero or
             /// multiple keys in it.
-            object_id_type memo_key = key_id_type();
-            key_id_type get_memo_key()const { return memo_key; }
+            public_key_type  memo_key;
             /// If this field is set to an account ID other than 0, this account's votes will be ignored and its stake
             /// will be counted as voting for the referenced account's selected votes instead.
             account_id_type voting_account;
@@ -252,7 +251,7 @@ class database;
          static const uint8_t space_id = implementation_ids;
          static const uint8_t type_id  = meta_account_object_type;
 
-         key_id_type         memo_key;
+         public_key_type     memo_key;
          delegate_id_type    delegate_id; // optional
    };
 
@@ -270,12 +269,16 @@ class database;
 
 
          /** given an account or key, map it to the set of accounts that reference it in an active or owner authority */
-         map< object_id_type, set<account_id_type> > account_to_memberships;
+         map< account_id_type, set<account_id_type> > account_to_account_memberships;
+         map< public_key_type, set<account_id_type> > account_to_key_memberships;
 
 
       protected:
-         set<object_id_type>  get_members( const account_object& a )const;
-         set<object_id_type>  before_members;
+         set<account_id_type>  get_account_members( const account_object& a )const;
+         set<public_key_type>  get_key_members( const account_object& a )const;
+
+         set<account_id_type>  before_account_members;
+         set<public_key_type>  before_key_members;
    };
 
    /**

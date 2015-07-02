@@ -16,7 +16,6 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <graphene/chain/key_object.hpp>
 #include <graphene/chain/account_object.hpp>
 #include <graphene/chain/asset_object.hpp>
 #include <graphene/chain/delegate_object.hpp>
@@ -58,8 +57,6 @@ object* create_object( const variant& v )
       case base_object_type:
          return create_object_of_type< base_object >( v );
       */
-      case key_object_type:
-         return create_object_of_type< key_object >( v );
       case account_object_type:
          return create_object_of_type< account_object >( v );
       case asset_object_type:

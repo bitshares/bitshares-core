@@ -43,17 +43,17 @@ namespace graphene { namespace chain {
          active = 1,
          key    = 2
       };
-      void add_authority( key_id_type k, weight_type w )
+      void add_authority( const public_key_type& k, weight_type w )
       {
-         auths[k] = w;
+         key_auths[k] = w;
+      }
+      void add_authority( const address& k, weight_type w )
+      {
+         address_auths[k] = w;
       }
       void add_authority( account_id_type k, weight_type w )
       {
-         auths[k] = w;
-      }
-      void add_authority( relative_key_id_type k, weight_type w )
-      {
-         auths[k] = w;
+         account_auths[k] = w;
       }
 
       template<typename AuthType>
@@ -68,24 +68,26 @@ namespace graphene { namespace chain {
          add_authorities(auths...);
       }
 
-      vector<key_id_type> get_keys() const
+      vector<public_key_type> get_keys() const
       {
-         vector<key_id_type> result;
-         result.reserve( auths.size() );
-         for( const pair<object_id_type, weight_type>& item : auths )
-         {
-            if( item.first.type() == key_object_type )
-                result.push_back( item.first );
-         }
+         vector<public_key_type> result;
+         result.reserve( key_auths.size() );
+         for( const auto& k : key_auths )
+            result.push_back(k.first);
          return result;
       }
+      uint32_t num_auths()const { return account_auths.size() + key_auths.size(); }
+      void     clear() { account_auths.clear(); key_auths.clear(); }
 
-      uint32_t                             weight_threshold = 0;
-      flat_map<object_id_type,weight_type> auths;
+      uint32_t                              weight_threshold = 0;
+      flat_map<account_id_type,weight_type> account_auths;
+      flat_map<public_key_type,weight_type> key_auths;
+      /** needed for backward compatibility only */
+      flat_map<address,weight_type>         address_auths;
    };
 
 } } // namespace graphene::chain
 
-FC_REFLECT( graphene::chain::authority, (weight_threshold)(auths) )
+FC_REFLECT( graphene::chain::authority, (weight_threshold)(account_auths)(key_auths)(address_auths) )
 FC_REFLECT_TYPENAME( graphene::chain::authority::classification )
 FC_REFLECT_ENUM( graphene::chain::authority::classification, (owner)(active)(key) )

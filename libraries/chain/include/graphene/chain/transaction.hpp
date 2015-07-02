@@ -140,8 +140,6 @@ namespace graphene { namespace chain {
       signed_transaction( const transaction& trx = transaction() )
          : transaction(trx){}
 
-      /** deprecated, TODO: remove when all references are gone */
-      void sign( key_id_type id, const private_key_type& key ) { sign(key); }
       void sign( const private_key_type& key );
 
       vector<signature_type> signatures;

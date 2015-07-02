@@ -20,7 +20,6 @@
 
 #include <graphene/chain/block_summary_object.hpp>
 #include <graphene/chain/global_property_object.hpp>
-#include <graphene/chain/key_object.hpp>
 #include <graphene/chain/operation_history_object.hpp>
 #include <graphene/chain/proposal_object.hpp>
 #include <graphene/chain/transaction_object.hpp>
@@ -271,7 +270,7 @@ signed_block database::_generate_block(
    const auto& witness_obj = witness_id(*this);
 
    if( !(skip & skip_delegate_signature) )
-      FC_ASSERT( witness_obj.signing_key(*this).key() == block_signing_private_key.get_public_key() );
+      FC_ASSERT( witness_obj.signing_key == block_signing_private_key.get_public_key() );
 
    _pending_block.timestamp = when;
 
@@ -621,7 +620,7 @@ const witness_object& database::validate_block_header( uint32_t skip, const sign
    const witness_object& witness = next_block.witness(*this);
    FC_ASSERT( secret_hash_type::hash(next_block.previous_secret) == witness.next_secret, "",
               ("previous_secret", next_block.previous_secret)("next_secret", witness.next_secret));
-   if( !(skip&skip_delegate_signature) ) FC_ASSERT( next_block.validate_signee( witness.signing_key(*this).key() ) );
+   if( !(skip&skip_delegate_signature) ) FC_ASSERT( next_block.validate_signee( witness.signing_key ) );
 
    uint32_t slot_num = get_slot_at_time( next_block.timestamp );
    FC_ASSERT( slot_num > 0 );

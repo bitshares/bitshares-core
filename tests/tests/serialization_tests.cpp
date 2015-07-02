@@ -21,7 +21,6 @@
 #include <graphene/chain/database.hpp>
 #include <graphene/chain/operations.hpp>
 
-#include <graphene/chain/key_object.hpp>
 
 #include <fc/crypto/digest.hpp>
 #include <fc/reflect/variant.hpp>

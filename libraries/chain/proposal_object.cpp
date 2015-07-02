@@ -18,7 +18,6 @@
 #include <graphene/chain/database.hpp>
 #include <graphene/chain/account_object.hpp>
 #include <graphene/chain/proposal_object.hpp>
-#include <graphene/chain/key_object.hpp>
 
 namespace graphene { namespace chain {
 
@@ -37,8 +36,9 @@ bool proposal_object::is_authorized_to_execute(database& db) const
 
    signed_transaction tmp;
    dry_run_eval._trx = &tmp;
+
    for( auto key_id : available_key_approvals )
-      dry_run_eval._sigs.insert( std::make_pair(key_id(db).key(),true) );
+      dry_run_eval._sigs.insert( std::make_pair(key_id,true) );
 
    //insert into dry_run_eval->_trx.signatures
    //dry_run_eval.signed_by.insert(available_key_approvals.begin(), available_key_approvals.end());

@@ -17,7 +17,6 @@
  */
 #include <graphene/chain/delegate_evaluator.hpp>
 #include <graphene/chain/delegate_object.hpp>
-#include <graphene/chain/key_object.hpp>
 #include <graphene/chain/database.hpp>
 #include <graphene/chain/account_object.hpp>
 

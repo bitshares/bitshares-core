@@ -19,7 +19,6 @@
 
 #include <graphene/app/application.hpp>
 #include <graphene/chain/database.hpp>
-#include <graphene/chain/key_object.hpp>
 #include <fc/io/json.hpp>
 
 using namespace graphene::db;
@@ -72,18 +71,18 @@ using namespace graphene::db;
 #define INVOKE(test) ((struct test*)this)->test_method(); trx.clear()
 
 #define PREP_ACTOR(name) \
-   fc::ecc::private_key name ## _private_key = generate_private_key(BOOST_PP_STRINGIZE(name)); \
-   key_id_type name ## _key_id = register_key(name ## _private_key.get_public_key()).get_id();
+   fc::ecc::private_key name ## _private_key = generate_private_key(BOOST_PP_STRINGIZE(name)); 
+
 #define ACTOR(name) \
    PREP_ACTOR(name) \
-   const auto& name = create_account(BOOST_PP_STRINGIZE(name), name ## _key_id); \
+   const auto& name = create_account(BOOST_PP_STRINGIZE(name), name ## _private_key.get_public_key()); \
    account_id_type name ## _id = name.id; (void)name ## _id;
 
 #define GET_ACTOR(name) \
    fc::ecc::private_key name ## _private_key = generate_private_key(BOOST_PP_STRINGIZE(name)); \
    const account_object& name = get_account(BOOST_PP_STRINGIZE(name)); \
    account_id_type name ## _id = name.id; \
-   key_id_type name ## _key_id = name ## _id(db).active.auths.begin()->first;
+   (void)name ##_id
 
 #define ACTORS_IMPL(r, data, elem) ACTOR(elem)
 #define ACTORS(names) BOOST_PP_SEQ_FOR_EACH(ACTORS_IMPL, ~, names)
@@ -97,15 +96,14 @@ struct database_fixture {
    genesis_state_type genesis_state;
    chain::database &db;
    signed_transaction trx;
-   key_id_type genesis_key;
+   public_key_type genesis_key;
    account_id_type genesis_account;
    fc::ecc::private_key private_key = fc::ecc::private_key::generate();
    fc::ecc::private_key delegate_priv_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("null_key")) );
+   public_key_type delegate_pub_key;
+
    fc::time_point_sec genesis_time = fc::time_point_sec( GRAPHENE_GENESIS_TIMESTAMP );
    fc::time_point_sec now          = fc::time_point_sec( GRAPHENE_GENESIS_TIMESTAMP );
-   const key_object* key1= nullptr;
-   const key_object* key2= nullptr;
-   const key_object* key3= nullptr;
    optional<fc::temp_directory> data_dir;
    bool skip_key_index_test = false;
    uint32_t anon_acct_count;
@@ -136,7 +134,7 @@ struct database_fixture {
 
    account_create_operation make_account(
       const std::string& name = "nathan",
-      key_id_type key = key_id_type()
+      public_key_type = public_key_type()
       );
 
    account_create_operation make_account(
@@ -144,7 +142,7 @@ struct database_fixture {
       const account_object& registrar,
       const account_object& referrer,
       uint8_t referrer_percent = 100,
-      key_id_type key = key_id_type()
+      public_key_type key = public_key_type()
       );
 
    void force_global_settle(const asset_object& what, const price& p);
@@ -173,7 +171,7 @@ struct database_fixture {
 
    const account_object& create_account(
       const string& name,
-      const key_id_type& key = key_id_type()
+      const public_key_type& key = public_key_type()
       );
 
    const account_object& create_account(
@@ -181,7 +179,7 @@ struct database_fixture {
       const account_object& registrar,
       const account_object& referrer,
       uint8_t referrer_percent = 100,
-      const key_id_type& key = key_id_type()
+      const public_key_type& key = public_key_type()
       );
 
    const account_object& create_account(
@@ -194,15 +192,11 @@ struct database_fixture {
 
    const delegate_object& create_delegate( const account_object& owner );
    const witness_object& create_witness(account_id_type owner,
-                                        key_id_type signing_key = key_id_type(),
                                         const fc::ecc::private_key& signing_private_key = generate_private_key("null_key"));
    const witness_object& create_witness(const account_object& owner,
-                                        key_id_type signing_key = key_id_type(),
                                         const fc::ecc::private_key& signing_private_key = generate_private_key("null_key"));
-   const key_object& register_key( const public_key_type& key );
-   const key_object& register_address( const address& addr );
    uint64_t fund( const account_object& account, const asset& amount = asset(500000) );
-   void sign( signed_transaction& trx, key_id_type key_id, const fc::ecc::private_key& key );
+   void sign( signed_transaction& trx, const fc::ecc::private_key& key );
    const limit_order_object* create_sell_order( account_id_type user, const asset& amount, const asset& recv );
    const limit_order_object* create_sell_order( const account_object& user, const asset& amount, const asset& recv );
    asset cancel_limit_order( const limit_order_object& order );
