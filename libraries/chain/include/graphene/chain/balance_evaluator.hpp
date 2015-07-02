@@ -5,6 +5,7 @@
 #include <graphene/chain/transaction_evaluation_state.hpp>
 #include <graphene/chain/balance_object.hpp>
 #include <graphene/chain/evaluator.hpp>
+#include <graphene/chain/exceptions.hpp>
 
 namespace graphene { namespace chain {
 
@@ -34,6 +35,9 @@ public:
 
       if( balance->vesting_policy.valid() ) {
          FC_ASSERT(op.total_claimed.amount == 0);
+         if( d.head_block_time() - balance->last_claim_date < fc::days(1) )
+            FC_THROW_EXCEPTION(balance_claimed_too_often,
+                               "Genesis vesting balances may not be claimed more than once per day.");
          return amount_withdrawn = balance->vesting_policy->get_allowed_withdraw({balance->balance,
                                                                                   d.head_block_time(),
                                                                                   {}});
@@ -55,6 +59,7 @@ public:
          d.modify(*balance, [&](balance_object& b) {
             b.vesting_policy->on_withdraw({b.balance, d.head_block_time(), amount_withdrawn});
             b.balance -= amount_withdrawn;
+            b.last_claim_date = d.head_block_time();
          });
       else
          d.remove(*balance);

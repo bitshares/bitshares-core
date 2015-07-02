@@ -389,7 +389,7 @@ void database::init_genesis(const genesis_state_type& genesis_state)
    {
       create<balance_object>([&](balance_object& b) {
          b.owner = vest.owner;
-         b.balance = asset( vest.amount, assets_by_symbol.find( vest.asset_symbol )->get_id() );
+         b.balance = asset(vest.amount, assets_by_symbol.find(vest.asset_symbol)->get_id());
 
          linear_vesting_policy policy;
          policy.begin_timestamp = vest.begin_timestamp;
@@ -397,7 +397,7 @@ void database::init_genesis(const genesis_state_type& genesis_state)
          policy.vesting_duration_seconds = vest.vesting_duration_seconds;
          policy.begin_balance = vest.begin_balance;
 
-         b.vesting_policy = std::move( policy );
+         b.vesting_policy = std::move(policy);
       });
       total_allocation += vest.amount;
    }

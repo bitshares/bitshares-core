@@ -63,6 +63,7 @@ namespace graphene { namespace chain {
    FC_DECLARE_DERIVED_EXCEPTION( expired_transaction,               graphene::chain::evaluation_error, 31010, "expired transaction" );
    FC_DECLARE_DERIVED_EXCEPTION( invalid_transaction_expiration,    graphene::chain::evaluation_error, 31011, "invalid transaction expiration" );
    FC_DECLARE_DERIVED_EXCEPTION( oversized_transaction,             graphene::chain::evaluation_error, 31012, "transaction exceeded the maximum transaction size" );
+   FC_DECLARE_DERIVED_EXCEPTION( balance_claimed_too_often,         graphene::chain::evaluation_error, 31013, "balance claimed too often" );
 
    FC_DECLARE_DERIVED_EXCEPTION( invalid_account_name,              graphene::chain::evaluation_error, 32001, "invalid account name" );
    FC_DECLARE_DERIVED_EXCEPTION( unknown_account_id,                graphene::chain::evaluation_error, 32002, "unknown account id" );

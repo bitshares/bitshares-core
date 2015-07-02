@@ -13,6 +13,7 @@ namespace graphene { namespace chain {
          address owner;
          asset   balance;
          optional<linear_vesting_policy> vesting_policy;
+         time_point_sec last_claim_date;
          asset_id_type asset_type()const { return balance.asset_id; }
    };
 
@@ -39,4 +40,5 @@ namespace graphene { namespace chain {
    using balance_index = generic_index<balance_object, balance_multi_index_type>;
 } }
 
-FC_REFLECT_DERIVED( graphene::chain::balance_object, (graphene::db::object), (owner)(balance)(vesting_policy) )
+FC_REFLECT_DERIVED( graphene::chain::balance_object, (graphene::db::object),
+                    (owner)(balance)(vesting_policy)(last_claim_date) )
