@@ -10,9 +10,9 @@ cd programs/witness_node
 # if you have previously run a witness node, you may need to remove the old blockchain.
 # at this early stage, new commits often make it impossible to reuse an old database
 #   rm -r witness_node_data_dir
-./witness_node --rpc-endpoint --enable-stale-production --witness-id \""1.7.0"\" \""1.7.1"\" \""1.7.2"\" \""1.7.3"\" \""1.7.4"\"  \""1.7.5"\" \""1.7.6"\" \""1.7.7"\" \""1.7.8"\" \""1.7.9"\" --private-key "[\"1.2.0\",\"5KQwrPbwdL6PhXujxW37FSSQZ1JiwsST4cqQzDeyXtP79zkvFD3\"]"
+./witness_node --rpc-endpoint --enable-stale-production --witness-id \""1.6.0"\" \""1.6.1"\" \""1.6.2"\" \""1.6.3"\" \""1.6.4"\"  \""1.6.5"\" \""1.6.6"\" \""1.6.7"\" \""1.6.8"\" \""1.6.9"\" 
 ````
-The initial genesis state has ten pre-configured delegates (1.7.0-9) that all
+The initial genesis state has ten pre-configured delegates (1.6.0-9) that all
 use the same private key to sign their blocks.  Launching `witness_node` this
 way allows you to act as all ten delegates.
 
@@ -47,7 +47,7 @@ will use it as the registrar.
 unlocked >>> import_key "nathan" 5KQwrPbwdL6PhXujxW37FSSQZ1JiwsST4cqQzDeyXtP79zkvFD3
 unlocked >>> list_my_accounts
 [{
-    "id": "1.3.15",
+    "id": "1.2.15",
     ...
     "name": "nathan",
     ...
@@ -89,16 +89,16 @@ will simply be the ten default witnesses:
 unlocked >>> get_global_properties
 ...
   "active_witnesses": [
-    "1.7.0",
-    "1.7.1",
-    "1.7.2",
-    "1.7.3",
-    "1.7.4",
-    "1.7.5",
-    "1.7.6",
-    "1.7.7",
-    "1.7.8",
-    "1.7.9"
+    "1.6.0",
+    "1.6.1",
+    "1.6.2",
+    "1.6.3",
+    "1.6.4",
+    "1.6.5",
+    "1.6.6",
+    "1.6.7",
+    "1.6.8",
+    "1.6.9"
   ],
 ...
 ```
@@ -115,21 +115,18 @@ unlocked >>> create_witness my-account "http://foo.bar.com/" true
       21,{
         "fee": {
           "amount": 0,
-          "asset_id": "1.4.0"
+          "asset_id": "1.3.0"
         },
-        "witness_account": "1.3.16",
+        "witness_account": "1.2.16",
         "url": "http://foo.bar.com/",
-        "block_signing_key": "1.2.0",
+        "block_signing_key": "PUBLIC KEY",
         "initial_secret": "00000000000000000000000000000000000000000000000000000000"
       }
     ]
   ],
-  "signatures": [[
-      "1.2.23",
+  "signatures": [
       "1f2ad5597af2ac4bf7a50f1eef2db49c9c0f7616718776624c2c09a2dd72a0c53a26e8c2bc928f783624c4632924330fc03f08345c8f40b9790efa2e4157184a37"
-    ]
-  ],
-  "extra_signatures": []
+  ]
 }
 ```
 Our witness is registered, but it can't produce blocks because nobody has voted
@@ -139,15 +136,15 @@ it in.  You can see the current list of active witnesses with
 unlocked >>> get_global_properties
 {
   "active_witnesses": [
-    "1.7.0",
-    "1.7.1",
-    "1.7.2",
-    "1.7.3",
-    "1.7.4",
-    "1.7.5",
-    "1.7.7",
-    "1.7.8",
-    "1.7.9"
+    "1.6.0",
+    "1.6.1",
+    "1.6.2",
+    "1.6.3",
+    "1.6.4",
+    "1.6.5",
+    "1.6.7",
+    "1.6.8",
+    "1.6.9"
   ],
   ...
 ```
@@ -164,7 +161,7 @@ Now we wait until the next maintenance interval.
 voted in.  
 
 Even though it's voted in, it isn't producing any blocks yet because we only
-told the witness_node to produce blocks for 1.7.0 - 1.7.9 on the command line,
+told the witness_node to produce blocks for 1.6.0 - 1.6.9 on the command line,
 and it doesn't know the private key for the witness.  Get the witness object to
 find out its id and the key we need, then find the the private key.  
 
@@ -173,9 +170,9 @@ terminal, don't do this with someone looking over your shoulder.
 ```
 unlocked >>> get_witness my-account
 {
-  "id": "1.7.10",
+  "id": "1.6.10",
   ...
-  "signing_key": "1.2.25",
+  "signing_key": "PUBLIC_KEY....",
   ...
 }
 unlocked >>> dump_private_keys
@@ -189,7 +186,7 @@ unlocked >>> dump_private_keys
 ```
 Now we need to re-start the witness, so shut down the wallet (ctrl-d),  and
 shut down the witness (ctrl-c).  Re-launch the witness, now mentioning the new
-witness 1.7.0 and its key 1.2.25:
+witness 1.6.0 and its key 1.2.25:
 ```
-./witness_node --rpc-endpoint --enable-stale-production --witness-id \""1.7.0"\" \""1.7.1"\" \""1.7.2"\" \""1.7.3"\" \""1.7.4"\"  \""1.7.5"\" \""1.7.6"\" \""1.7.7"\" \""1.7.8"\" \""1.7.9"\" \""1.7.10"\" --private-key "[\"1.2.0\",\"5KQwrPbwdL6PhXujxW37FSSQZ1JiwsST4cqQzDeyXtP79zkvFD3\"]" "[\"1.2.25\",\"5JGi7DM7J8fSTizZ4D9roNgd8dUc5pirUe9taxYCUUsnvQ4zCaQ\"]"
+./witness_node --rpc-endpoint --enable-stale-production --witness-id \""1.6.0"\" \""1.6.1"\" \""1.6.2"\" \""1.6.3"\" \""1.6.4"\"  \""1.6.5"\" \""1.6.6"\" \""1.6.7"\" \""1.6.8"\" \""1.6.9"\" \""1.6.10"\" --private-key "[\"PUBLIC_KEY_FOR_5KQwr...\",\"5KQwrPbwdL6PhXujxW37FSSQZ1JiwsST4cqQzDeyXtP79zkvFD3\"]" "[\"PUBLIC_KEY_FOR_5JGi7...\",\"5JGi7DM7J8fSTizZ4D9roNgd8dUc5pirUe9taxYCUUsnvQ4zCaQ\"]"
 ```
