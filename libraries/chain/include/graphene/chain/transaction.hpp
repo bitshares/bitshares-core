@@ -21,6 +21,7 @@
 
 #include <numeric>
 
+#include <arpa/inet.h> // for htonl
 
 namespace graphene { namespace chain {
 
