@@ -953,6 +953,7 @@ void  balance_claim_operation::get_required_auth(flat_set<account_id_type>& acti
 void  balance_claim_operation::validate()const
 {
    FC_ASSERT( fee == asset() );
+   FC_ASSERT( balance_owner_key != public_key_type() );
 }
 
 

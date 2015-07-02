@@ -1107,7 +1107,6 @@ BOOST_AUTO_TEST_CASE( witness_withdraw_pay_test )
 
    const asset_object* core = &asset_id_type()(db);
    const account_object* nathan = &get_account("nathan");
-   idump((*nathan));
    enable_fees(105000000);
    BOOST_CHECK_GT(db.current_fee_schedule().membership_lifetime_fee, 0);
    // Based on the size of the reserve fund later in the test, the witness budget will be set to this value

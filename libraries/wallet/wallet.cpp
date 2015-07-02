@@ -2262,6 +2262,7 @@ signed_transaction wallet_api::import_balance( string name_or_id, const vector<s
          {
             op.total_claimed = b.vesting_policy.valid()? asset(0, b.balance.asset_id) : b.balance;
             op.balance_to_claim = b.id;
+            op.balance_owner_key = keys[b.owner].get_public_key();
             trx.operations.push_back(op);
             required_addrs.insert(b.owner);
          }
