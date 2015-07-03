@@ -25,6 +25,7 @@
 #include <list>
 
 #include <boost/range/adaptor/map.hpp>
+#include <boost/range/algorithm_ext/insert.hpp>
 
 #include <fc/io/fstream.hpp>
 #include <fc/io/json.hpp>
@@ -504,25 +505,37 @@ public:
       return get_private_key(active_keys.front());
    }
 
-
+   // imports the private key into the wallet, and associate it in some way (?) with the
+   // given account name.
+   // @returns true if the key matches a current active/owner/memo key for the named
+   //          account, false otherwise (but it is stored either way)
    bool import_key(string account_name_or_id, string wif_key)
    {
-      auto opt_priv_key = wif_to_key(wif_key);
-      FC_ASSERT( opt_priv_key.valid() );
-      graphene::chain::public_key_type wif_pub_key = opt_priv_key->get_public_key();
+      fc::optional<fc::ecc::private_key> optional_private_key = wif_to_key(wif_key);
+      if (!optional_private_key)
+         FC_THROW("Invalid private key ${key}", ("key", wif_key));
+      graphene::chain::public_key_type wif_pub_key = optional_private_key->get_public_key();
+      
+      account_object account = get_account( account_name_or_id );
+
+      // make a list of all current public keys for the named account
+      flat_set<public_key_type> all_keys_for_account;
+      boost::insert(all_keys_for_account, account.active.get_keys());
+      boost::insert(all_keys_for_account, account.owner.get_keys());
+      all_keys_for_account.insert(account.options.memo_key);
+
       _keys[wif_pub_key] = wif_key;
 
-      auto acnt = get_account( account_name_or_id );
-
-      if( _wallet.update_account(acnt) )
+      if( _wallet.update_account(account) )
          _remote_db->subscribe_to_objects([this](const fc::variant& v) {
             _wallet.update_account(v.as<account_object>());
-         }, {acnt.id});
+         }, {account.id});
 
-      _wallet.extra_keys[acnt.id].insert(wif_pub_key);
+      _wallet.extra_keys[account.id].insert(wif_pub_key);
 
-      return false;
+      return all_keys_for_account.find(wif_pub_key) != all_keys_for_account.end();
    }
+
    bool load_wallet_file(string wallet_filename = "")
    {
       //
@@ -2021,6 +2034,11 @@ map<string,delegate_id_type> wallet_api::list_delegates(const string& lowerbound
 witness_object wallet_api::get_witness(string owner_account)
 {
    return my->get_witness(owner_account);
+}
+
+delegate_object wallet_api::get_delegate(string owner_account)
+{
+   return my->get_delegate(owner_account);
 }
 
 signed_transaction wallet_api::create_witness(string owner_account,

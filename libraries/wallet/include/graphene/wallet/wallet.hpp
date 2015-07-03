@@ -325,7 +325,7 @@ class wallet_api
        *
        * The keys are printed in WIF format.  You can import these keys into another wallet
        * using \c import_key()
-       * @returns a map containing the private keys, indexed by their key_id
+       * @returns a map containing the private keys, indexed by their public key 
        */
       map<public_key_type, string> dump_private_keys();
 
@@ -1017,7 +1017,9 @@ FC_API( graphene::wallet::wallet_api,
         (whitelist_account)
         (create_delegate)
         (get_witness)
+        (get_delegate)
         (list_witnesses)
+        (list_delegates)
         (create_witness)
         (vote_for_delegate)
         (vote_for_witness)
