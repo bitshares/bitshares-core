@@ -94,10 +94,11 @@ namespace graphene { namespace chain {
       }
 
       price operator / ( const asset& base, const asset& quote )
-      {
+      { try {
          FC_ASSERT( base.asset_id != quote.asset_id );
          return price{base,quote};
-      }
+      } FC_CAPTURE_AND_RETHROW( (base)(quote) ) }
+
       price price::max( asset_id_type base, asset_id_type quote ) { return asset( share_type(GRAPHENE_MAX_SHARE_SUPPLY), base ) / asset( share_type(1), quote); }
       price price::min( asset_id_type base, asset_id_type quote ) { return asset( 1, base ) / asset( GRAPHENE_MAX_SHARE_SUPPLY, quote); }
  

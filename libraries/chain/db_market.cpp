@@ -55,13 +55,16 @@ void database::globally_settle_asset( const asset_object& mia, const price& sett
    const call_order_index& call_index = get_index_type<call_order_index>();
    const auto& call_price_index = call_index.indices().get<by_price>();
 
-
    // cancel all call orders and accumulate it into collateral_gathered
    auto call_itr = call_price_index.lower_bound( price::min( bitasset.options.short_backing_asset, mia.id ) );
    auto call_end = call_price_index.upper_bound( price::max( bitasset.options.short_backing_asset, mia.id ) );
    while( call_itr != call_end )
    {
       auto pays = call_itr->get_debt() * settlement_price;
+
+      if( pays > call_itr->get_collateral() )
+         pays = call_itr->get_collateral();
+
       collateral_gathered += pays;
       const auto&  order = *call_itr;
       ++call_itr;
@@ -69,7 +72,8 @@ void database::globally_settle_asset( const asset_object& mia, const price& sett
    }
 
    modify( bitasset, [&]( asset_bitasset_data_object& obj ){
-           obj.settlement_price = settlement_price;
+           assert( collateral_gathered.asset_id == settlement_price.quote.asset_id );
+           obj.settlement_price = mia.amount(original_mia_supply) / collateral_gathered; //settlement_price;
            obj.settlement_fund  = collateral_gathered.amount;
            });
 
@@ -418,7 +422,8 @@ bool database::check_call_orders(const asset_object& mia, bool enable_black_swan
        if( usd_to_buy * match_price > call_itr->get_collateral() )
        {
           FC_ASSERT( enable_black_swan );
-          globally_settle_asset(mia, call_itr->get_debt() / call_itr->get_collateral());
+          //globally_settle_asset(mia, call_itr->get_debt() / call_itr->get_collateral());
+          globally_settle_asset(mia, bitasset.current_feed.settlement_price );// call_itr->get_debt() / call_itr->get_collateral());
           return true;
        }
 

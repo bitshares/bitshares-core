@@ -546,11 +546,11 @@ BOOST_AUTO_TEST_CASE( global_settle_test )
    force_settle(dan_id(db), asset(495, bit_usd_id));
 
    BOOST_CHECK_EQUAL(get_balance(valentine_id, bit_usd_id), 0);
-   BOOST_CHECK_EQUAL(get_balance(valentine_id, asset_id_type()), 10046);
+   BOOST_CHECK_EQUAL(get_balance(valentine_id, asset_id_type()), 10045);
    BOOST_CHECK_EQUAL(get_balance(ben_id, bit_usd_id), 0);
    BOOST_CHECK_EQUAL(get_balance(ben_id, asset_id_type()), 10091);
    BOOST_CHECK_EQUAL(get_balance(dan_id, bit_usd_id), 0);
-   BOOST_CHECK_EQUAL(get_balance(dan_id, asset_id_type()), 9850);
+   BOOST_CHECK_EQUAL(get_balance(dan_id, asset_id_type()), 9849);
 } FC_LOG_AND_RETHROW()
 }
 
