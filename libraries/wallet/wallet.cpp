@@ -26,6 +26,9 @@
 
 #include <boost/range/adaptor/map.hpp>
 #include <boost/range/algorithm_ext/insert.hpp>
+#include <boost/range/algorithm_ext/erase.hpp>
+#include <boost/range/algorithm/unique.hpp>
+#include <boost/range/algorithm/sort.hpp>
 
 #include <fc/io/fstream.hpp>
 #include <fc/io/json.hpp>
@@ -1385,7 +1388,6 @@ public:
             approving_key_set.insert( approving_key );
       }
 
-
       tx.set_expiration(get_dynamic_global_properties().head_block_id);
 
       for( public_key_type& key : approving_key_set )
@@ -2294,12 +2296,15 @@ signed_transaction wallet_api::import_balance( string name_or_id, const vector<s
 
    for( auto a : required_addrs )
      tx.sign( keys[a] );
-
+   
+   // if the key for a balance object was the same as a key for the account we're importing it into,
+   // we may end up with duplicate signatures, so remove those
+   boost::erase(tx.signatures, boost::unique<boost::return_found_end>(boost::sort(tx.signatures)));
+   
    if( broadcast )
       my->_remote_net->broadcast_transaction(tx);
 
    return tx;
-
 } FC_CAPTURE_AND_RETHROW( (name_or_id) ) }
 
 map<public_key_type, string> wallet_api::dump_private_keys()
