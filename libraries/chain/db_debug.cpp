@@ -85,7 +85,9 @@ void database::debug_dump()
 
    const auto& vbidx = db.get_index_type<simple_index<vesting_balance_object>>();
    for( const auto& s : vbidx )
+   {
       idump(("vesting_balance")(s));
+   }
 }
 
 } }

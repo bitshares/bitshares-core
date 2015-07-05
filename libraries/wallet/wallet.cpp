@@ -25,7 +25,6 @@
 #include <list>
 
 #include <boost/range/adaptor/map.hpp>
-#include <boost/range/algorithm_ext/insert.hpp>
 #include <boost/range/algorithm_ext/erase.hpp>
 #include <boost/range/algorithm/unique.hpp>
 #include <boost/range/algorithm/sort.hpp>
@@ -523,8 +522,10 @@ public:
 
       // make a list of all current public keys for the named account
       flat_set<public_key_type> all_keys_for_account;
-      boost::insert(all_keys_for_account, account.active.get_keys());
-      boost::insert(all_keys_for_account, account.owner.get_keys());
+      std::vector<public_key_type> active_keys = account.active.get_keys();
+      std::vector<public_key_type> owner_keys = account.owner.get_keys();
+      std::copy(active_keys.begin(), active_keys.end(), std::inserter(all_keys_for_account, all_keys_for_account.end()));
+      std::copy(owner_keys.begin(), owner_keys.end(), std::inserter(all_keys_for_account, all_keys_for_account.end()));
       all_keys_for_account.insert(account.options.memo_key);
 
       _keys[wif_pub_key] = wif_key;

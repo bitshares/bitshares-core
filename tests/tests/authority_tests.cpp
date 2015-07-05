@@ -427,7 +427,8 @@ BOOST_AUTO_TEST_CASE( genesis_authority )
    BOOST_CHECK(db.get<proposal_object>(prop.id).is_authorized_to_execute(db));
 
    generate_blocks(*prop.review_period_time);
-   uop.key_approvals_to_add = {genesis_key.get_public_key()}; // was 7
+   uop.key_approvals_to_add.clear();
+   uop.key_approvals_to_add.insert(genesis_key.get_public_key()); // was 7
    trx.operations.back() = uop;
    trx.sign( genesis_key);
    // Should throw because the transaction is now in review.
