@@ -8,7 +8,7 @@ Starting Graphene
 
 For Ubuntu 14.04 LTS users, see this link first:
     https://github.com/cryptonomex/graphene/wiki/build-ubuntu
-    
+
 and then proceed with:
 
     git clone https://github.com/cryptonomex/graphene.git
@@ -18,7 +18,9 @@ and then proceed with:
     make
     ./programs/witness_node/witness_node
 
-This will launch the witness node. If you would like to launch the command-line wallet, you must first specify a port for communication with the witness node. To do this, add text to `witness_node_data_dir/config.ini` as follows, then restart the node:
+This will launch the witness node. If you would like to launch the command-line wallet, you must first specify a port
+for communication with the witness node. To do this, add text to `witness_node_data_dir/config.ini` as follows, then
+restart the node:
 
     rpc-endpoint = 127.0.0.1:8090
 
@@ -37,7 +39,8 @@ To import your initial balance:
 
 If you send private keys over this connection, `rpc-endpoint` should be bound to localhost for security.
 
-A list of CLI wallet commands is available [here](https://bitshares.github.io/doxygen/classgraphene_1_1wallet_1_1wallet__api.html).
+A list of CLI wallet commands is available
+[here](https://github.com/cryptonomex/graphene/blob/master/libraries/wallet/include/graphene/wallet/wallet.hpp).
 
 Code coverage testing
 ---------------------
@@ -79,7 +82,9 @@ Witness node
 
 The role of the witness node is to broadcast transactions, download blocks, and optionally sign them.
 
-./witness_node --rpc-endpoint "127.0.0.1:8090" --enable-stale-production -w \""1.6.0"\" \""1.6.1"\" \""1.6.2"\" \""1.6.3"\" \""1.6.4"\" 
+```
+./witness_node --rpc-endpoint "127.0.0.1:8090" --enable-stale-production -w \""1.6.0"\" \""1.6.1"\" \""1.6.2"\" \""1.6.3"\" \""1.6.4"\"
+```
 
 Running specific tests
 ----------------------
@@ -107,7 +112,7 @@ Here is an example using `wscat` package from `npm` for websockets:
 We can do the same thing using an HTTP client such as `curl` for API's which do not require login or other session state:
 
     $ curl --data '{"jsonrpc": "2.0", "method": "call", "params": [0, "get_accounts", [["1.2.0"]]], "id": 1}' http://127.0.0.1:8090/rpc
-    {"id":1,"result":[{"id":"1.2.0","annotations":[],"registrar":"1.2.0","referrer":"1.2.0","referrer_percent":0,"name":"genesis","owner":{"weight_threshold":1,"key_auths":[["PUBLIC_KEY",1]]},"active":{"weight_threshold":1,"key_auths":[["PUBLIC_KEY",1]]},"memo_key":"PUBLIC_KEY","voting_account":"1.2.0","num_witness":0,"num_committee":0,"votes":[],"statistics":"2.7.0","whitelisting_accounts":[],"blacklisting_accounts":[]}]}    
+    {"id":1,"result":[{"id":"1.2.0","annotations":[],"registrar":"1.2.0","referrer":"1.2.0","referrer_percent":0,"name":"genesis","owner":{"weight_threshold":1,"key_auths":[["PUBLIC_KEY",1]]},"active":{"weight_threshold":1,"key_auths":[["PUBLIC_KEY",1]]},"memo_key":"PUBLIC_KEY","voting_account":"1.2.0","num_witness":0,"num_committee":0,"votes":[],"statistics":"2.7.0","whitelisting_accounts":[],"blacklisting_accounts":[]}]}
 
 API 0 is accessible using regular JSON-RPC:
 
