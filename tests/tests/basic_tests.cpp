@@ -25,6 +25,7 @@
 #include <graphene/chain/asset_object.hpp>
 #include <graphene/chain/delegate_object.hpp>
 #include <graphene/chain/witness_scheduler_rng.hpp>
+#include <graphene/chain/exceptions.hpp>
 
 #include <graphene/db/simple_index.hpp>
 
@@ -174,7 +175,15 @@ BOOST_AUTO_TEST_CASE( memo_test )
    auto receiver = generate_private_key("2");
    m.from = sender.get_public_key();
    m.to = receiver.get_public_key();
-   m.set_message(sender, receiver.get_public_key(), "Hello, world!");
+   m.set_message(sender, receiver.get_public_key(), "Hello, world!", 12345);
+
+   decltype(fc::digest(m)) hash("8de72a07d093a589f574460deb19023b4aff354b561eb34590d9f4629f51dbf3");
+   if( fc::digest(m) != hash )
+   {
+      // If this happens, notify the web guys that the memo serialization format changed.
+      edump((m)(fc::digest(m)));
+      BOOST_FAIL("Memo format has changed. Notify the web guys and update this test.");
+   }
    BOOST_CHECK_EQUAL(m.get_message(receiver, sender.get_public_key()), "Hello, world!");
 } FC_LOG_AND_RETHROW() }
 
@@ -317,6 +326,11 @@ BOOST_AUTO_TEST_CASE( data_fees )
    BOOST_CHECK_EQUAL(fs.total_data_fee(x, fs, authority()), 0);
    auto keys = vector<private_key_type>(100, private_key_type::generate());
    BOOST_CHECK_EQUAL(fs.total_data_fee(keys, x), (fc::raw::pack_size(keys) + fc::raw::pack_size(x)) / 1024 * 10);
+}
+
+BOOST_AUTO_TEST_CASE( exceptions )
+{
+   BOOST_CHECK_THROW(FC_THROW_EXCEPTION(invalid_claim_amount, "Etc"), invalid_claim_amount);
 }
 
 BOOST_AUTO_TEST_SUITE_END()

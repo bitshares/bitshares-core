@@ -133,10 +133,8 @@ namespace graphene { namespace chain {
     * @brief Claim a balance in a @ref balanc_object
     *
     * This operation is used to claim the balance in a given @ref balance_object. If the balance object contains a
-    * vesting balance, @ref total_claimed must be set to zero, and all available vested funds will be claimed. If the
-    * object contains a non-vesting balance, @ref total_claimed must be the full balance of the object.
-    *
-    * This operation returns the total amount claimed.
+    * vesting balance, @ref total_claimed must not exceed @ref balance_object::available at the time of evaluation. If
+    * the object contains a non-vesting balance, @ref total_claimed must be the full balance of the object.
     */
    struct balance_claim_operation
    {
@@ -151,12 +149,11 @@ namespace graphene { namespace chain {
       share_type      calculate_fee(const fee_schedule_type& k)const { return 0; }
       void            validate()const;
 
-      void get_balance_delta(balance_accumulator& acc, const operation_result& result)const {
-         acc.adjust(deposit_to_account, result.get<asset>());
+      void get_balance_delta(balance_accumulator& acc, const operation_result& = asset())const {
+         acc.adjust(deposit_to_account, total_claimed);
          acc.adjust(fee_payer(), -fee);
       }
    };
-
 
    /**
     *  @ingroup operations
@@ -455,17 +452,18 @@ namespace graphene { namespace chain {
        * be unique with high probability as long as the generating host has a high-resolution clock OR a strong source
        * of entropy for generating private keys.
        */
-      uint64_t    nonce;
+      uint64_t nonce;
       /**
        * This field contains the AES encrypted packed @ref memo_message
        */
       vector<char> message;
 
-      void        set_message( const fc::ecc::private_key& priv,
-                               const fc::ecc::public_key& pub, const string& msg );
+      /// @note custom_nonce is for debugging only; do not set to a nonzero value in production
+      void        set_message(const fc::ecc::private_key& priv,
+                              const fc::ecc::public_key& pub, const string& msg, uint64_t custom_nonce = 0);
 
-      std::string get_message( const fc::ecc::private_key& priv,
-                               const fc::ecc::public_key& pub )const;
+      std::string get_message(const fc::ecc::private_key& priv,
+                              const fc::ecc::public_key& pub)const;
    };
 
    /**
