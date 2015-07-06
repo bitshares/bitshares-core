@@ -947,6 +947,24 @@ class wallet_api
        */
       signed_transaction sign_transaction(signed_transaction tx, bool broadcast = false);
 
+      /** Returns an uninitialized object representing a given blockchain operation.
+       *
+       * This returns a default-initialized object of the given type; it can be used 
+       * during early development of the wallet when we don't yet have custom commands for
+       * creating all of the operations the blockchain supports.  
+       *
+       * Any operation the blockchain supports can be created using the transaction builder's
+       * \c add_operation_to_builder_transaction() , but to do that from the CLI you need to 
+       * know what the JSON form of the operation looks like.  This will give you a template
+       * you can fill in.  It's better than nothing.
+       * 
+       * @param operation_type the type of operation to return, must be one of the 
+       *                       operations defined in `graphene/chain/operations.hpp`
+       *                       (e.g., "global_parameters_update_operation")
+       * @return a default-constructed operation of the given type
+       */
+      operation get_prototype_operation(string operation_type);
+
       void dbg_make_uia(string creator, string symbol);
       void dbg_make_mia(string creator, string symbol);
       void flood_network(string prefix, uint32_t number_of_transactions);
@@ -1041,6 +1059,7 @@ FC_API( graphene::wallet::wallet_api,
         (save_wallet_file)
         (serialize_transaction)
         (sign_transaction)
+        (get_prototype_operation)
         (dbg_make_uia)
         (dbg_make_mia)
         (flood_network)
