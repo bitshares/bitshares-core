@@ -29,12 +29,20 @@ namespace graphene {
    {
       FC_ASSERT( is_valid( base58str ) );
       std::string prefix( GRAPHENE_ADDRESS_PREFIX );
+
+      // TODO: This is temporary for testing
+      if( is_valid( base58str, "BTS" ) ) prefix = std::string( "BTS" );
+
       std::vector<char> v = fc::from_base58( base58str.substr( prefix.size() ) );
       memcpy( (char*)addr._hash, v.data(), std::min<size_t>( v.size()-4, sizeof( addr ) ) );
    }
 
    bool address::is_valid( const std::string& base58str, const std::string& prefix )
    {
+      // TODO: This is temporary for testing
+      if( prefix == GRAPHENE_ADDRESS_PREFIX && is_valid( base58str, "BTS" ) )
+          return true;
+
       const size_t prefix_len = prefix.size();
       if( base58str.size() <= prefix_len )
           return false;

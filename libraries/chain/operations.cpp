@@ -187,11 +187,9 @@ share_type account_create_operation::calculate_fee( const fee_schedule_type& sch
 
    uint32_t s = name.size();
    if( is_cheap_name(name) )
-      s = 63;
+      s = 8;
 
-   FC_ASSERT( s >= 2 );
-
-   if( s >= 8 && s < 63 )
+   if( s >= 8 )
      core_fee_required = schedule.account_len8up_fee;
    else if( s == 7 )
      core_fee_required = schedule.account_len7_fee;
@@ -203,7 +201,7 @@ share_type account_create_operation::calculate_fee( const fee_schedule_type& sch
      core_fee_required = schedule.account_len4_fee;
    else if( s == 3 )
      core_fee_required = schedule.account_len3_fee;
-   else if( s == 2 )
+   else if( s <= 2 )
       core_fee_required = schedule.account_len2_fee;
 
    // Authorities and vote lists can be arbitrarily large, so charge a data fee for big ones

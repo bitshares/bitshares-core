@@ -459,6 +459,6 @@ void database::init_genesis(const genesis_state_type& genesis_state)
    });
 
    _undo_db.enable();
-} FC_CAPTURE_AND_RETHROW((genesis_state)) }
+} FC_CAPTURE_AND_RETHROW(()) }
 
 } }
