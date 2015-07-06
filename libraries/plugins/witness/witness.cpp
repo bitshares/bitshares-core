@@ -36,10 +36,11 @@ void witness_plugin::plugin_set_program_options(
    boost::program_options::options_description& config_file_options)
 {
    auto default_priv_key = fc::ecc::private_key::regenerate(fc::sha256::hash(std::string("nathan")));
+   string witness_id_example = fc::json::to_string(chain::witness_id_type());
    command_line_options.add_options()
          ("enable-stale-production", bpo::bool_switch()->notifier([this](bool e){_production_enabled = e;}), "Enable block production, even if the chain is stale")
          ("witness-id,w", bpo::value<vector<string>>()->composing()->multitoken(),
-          "ID of witness controlled by this node (e.g. \"1.7.0\", quotes are required, may specify multiple times)")
+          ("ID of witness controlled by this node (e.g. " + witness_id_example + ", quotes are required, may specify multiple times)").c_str())
          ("private-key", bpo::value<vector<string>>()->composing()->multitoken()->
           DEFAULT_VALUE_VECTOR(std::make_pair(chain::public_key_type(default_priv_key.get_public_key()), graphene::utilities::key_to_wif(default_priv_key))),
           "Tuple of [PublicKey, WIF private key] (may specify multiple times)")
@@ -56,9 +57,9 @@ void witness_plugin::plugin_initialize(const boost::program_options::variables_m
 { try {
    _options = &options;
    LOAD_VALUE_SET(options, "witness-id", _witnesses, chain::witness_id_type)
-   
-   if( options.count("private-key") ) 
-   { 
+
+   if( options.count("private-key") )
+   {
       const std::vector<std::string> key_id_to_wif_pair_strings = options["private-key"].as<std::vector<std::string>>();
       for (const std::string& key_id_to_wif_pair_string : key_id_to_wif_pair_strings)
       {

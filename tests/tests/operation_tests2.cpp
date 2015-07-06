@@ -981,6 +981,7 @@ BOOST_AUTO_TEST_CASE( balance_object_test )
    fc::temp_directory td;
    genesis_state.initial_balances.push_back({generate_private_key("n").get_public_key(), GRAPHENE_SYMBOL, 1});
    genesis_state.initial_balances.push_back({generate_private_key("x").get_public_key(), GRAPHENE_SYMBOL, 1});
+//   genesis_state.initial_vesting_balances.push_back({generate_private_key("v").get_public_key(), GRAPHENE_SYMBOL, 1});
    // TODO: vesting genesis balances
    genesis_state.initial_accounts.emplace_back("n", generate_private_key("n").get_public_key());
 
