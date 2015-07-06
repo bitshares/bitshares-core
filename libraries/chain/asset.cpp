@@ -20,58 +20,49 @@
 #include <boost/rational.hpp>
 
 namespace graphene { namespace chain {
-      bool operator < ( const asset& a, const asset& b )
+
+      bool operator == ( const price& a, const price& b )
       {
-         return std::tie( a.asset_id, a.amount ) < std::tie( b.asset_id, b.amount);
+         if( std::tie( a.base.asset_id, a.quote.asset_id ) != std::tie( b.base.asset_id, b.quote.asset_id ) )
+             return false;
+
+         const auto amult = fc::uint128( b.quote.amount.value ) * a.base.amount.value;
+         const auto bmult = fc::uint128( a.quote.amount.value ) * b.base.amount.value;
+
+         return amult == bmult;
       }
-      bool operator <= ( const asset& a, const asset& b )
-      {
-         return std::tie( a.asset_id, a.amount ) <= std::tie( b.asset_id, b.amount);
-      }
+
       bool operator < ( const price& a, const price& b )
       {
          if( a.base.asset_id < b.base.asset_id ) return true;
          if( a.base.asset_id > b.base.asset_id ) return false;
          if( a.quote.asset_id < b.quote.asset_id ) return true;
          if( a.quote.asset_id > b.quote.asset_id ) return false;
-         auto amult = fc::uint128(b.quote.amount.value) * a.base.amount.value;
-         auto bmult = fc::uint128(a.quote.amount.value) * b.base.amount.value;
-         assert( (a.to_real() < b.to_real()) == (amult < bmult) );
+
+         const auto amult = fc::uint128( b.quote.amount.value ) * a.base.amount.value;
+         const auto bmult = fc::uint128( a.quote.amount.value ) * b.base.amount.value;
+
          return amult < bmult;
       }
+
       bool operator <= ( const price& a, const price& b )
       {
-         if( a.base.asset_id < b.base.asset_id ) return true;
-         if( a.base.asset_id > b.base.asset_id ) return false;
-         if( a.quote.asset_id < b.quote.asset_id ) return true;
-         if( a.quote.asset_id > b.quote.asset_id ) return false;
-         auto amult = fc::uint128(b.quote.amount.value) * a.base.amount.value;
-         auto bmult = fc::uint128(a.quote.amount.value) * b.base.amount.value;
-         assert( (a.to_real() <= b.to_real()) == (amult <= bmult) );
-         return amult <= bmult;
+         return (a == b) || (a < b);
       }
-      bool operator == ( const price& a, const price& b )
-      {
-         if( a.base.asset_id < b.base.asset_id ) return true;
-         if( a.base.asset_id > b.base.asset_id ) return false;
-         if( a.quote.asset_id < b.quote.asset_id ) return true;
-         if( a.quote.asset_id > b.quote.asset_id ) return false;
-         auto amult = fc::uint128(a.quote.amount.value) * b.base.amount.value;
-         auto bmult = fc::uint128(b.quote.amount.value) * a.base.amount.value;
-         return amult == bmult;
-      }
+
       bool operator != ( const price& a, const price& b )
       {
-         return !(a==b);
+         return !(a == b);
+      }
+
+      bool operator > ( const price& a, const price& b )
+      {
+         return !(a <= b);
       }
 
       bool operator >= ( const price& a, const price& b )
       {
          return !(a < b);
-      }
-      bool operator > ( const price& a, const price& b )
-      {
-         return !(a <= b);
       }
 
       asset operator * ( const asset& a, const price& b )
@@ -101,18 +92,18 @@ namespace graphene { namespace chain {
 
       price price::max( asset_id_type base, asset_id_type quote ) { return asset( share_type(GRAPHENE_MAX_SHARE_SUPPLY), base ) / asset( share_type(1), quote); }
       price price::min( asset_id_type base, asset_id_type quote ) { return asset( 1, base ) / asset( GRAPHENE_MAX_SHARE_SUPPLY, quote); }
- 
+
       /**
        *  The black swan price is defined as debt/collateral, we want to perform a margin call
        *  before debt == collateral.   Given a debt/collateral ratio of 1 USD / CORE and
        *  a maintenance collateral requirement of 2x we can define the call price to be
-       *  2 USD / CORE.   
+       *  2 USD / CORE.
        *
        *  This method divides the collateral by the maintenance collateral ratio to derive
        *  a call price for the given black swan ratio.
        *
        *  There exists some cases where the debt and collateral values are so small that
-       *  dividing by the collateral ratio will result in a 0 price or really poor 
+       *  dividing by the collateral ratio will result in a 0 price or really poor
        *  rounding errors.   No matter what the collateral part of the price ratio can
        *  never go to 0 and the debt can never go more than GRAPHENE_MAX_SHARE_SUPPLY
        *
@@ -121,7 +112,7 @@ namespace graphene { namespace chain {
       price price::call_price( const asset& debt, const asset& collateral, uint16_t collateral_ratio)
       { try {
          //wdump((debt)(collateral)(collateral_ratio));
-         boost::rational<uint64_t> swan(debt.amount.value,collateral.amount.value); 
+         boost::rational<uint64_t> swan(debt.amount.value,collateral.amount.value);
          boost::rational<uint64_t> ratio( collateral_ratio, GRAPHENE_COLLATERAL_RATIO_DENOM );
          auto cp = swan * ratio;
          return ~(asset( cp.numerator(), debt.asset_id ) / asset( cp.denominator(), collateral.asset_id ));
@@ -149,7 +140,7 @@ namespace graphene { namespace chain {
 
       price price_feed::max_short_squeeze_price()const
       {
-         boost::rational<uint64_t> sp( settlement_price.base.amount.value, settlement_price.quote.amount.value ); //debt.amount.value,collateral.amount.value); 
+         boost::rational<uint64_t> sp( settlement_price.base.amount.value, settlement_price.quote.amount.value ); //debt.amount.value,collateral.amount.value);
          boost::rational<uint64_t> ratio( GRAPHENE_COLLATERAL_RATIO_DENOM, maximum_short_squeeze_ratio );
          auto cp = sp * ratio;
          return (asset( cp.numerator(), settlement_price.base.asset_id ) / asset( cp.denominator(), settlement_price.quote.asset_id ));
