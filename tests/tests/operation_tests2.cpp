@@ -467,7 +467,6 @@ BOOST_AUTO_TEST_CASE( witness_create )
    generator_helper h = std::for_each(near_witnesses.begin(), near_witnesses.end(),
                                       generator_helper{*this, nathan_witness_id, nathan_private_key, false});
    BOOST_CHECK(h.nathan_generated_block);
-   generate_block(0, nathan_private_key);
 } FC_LOG_AND_RETHROW() }
 
 /**
