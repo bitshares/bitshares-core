@@ -63,58 +63,98 @@ bool is_valid_symbol( const string& symbol )
     return true;
 }
 
+
+
 /**
- *  Valid names can contain [a, z], [0, 9], '.', and '-'
- *  They must start with [a, z]
- *  They must end with [a, z] or [0, 9]
- *  '.' must be followed by [a, z]
- *  '-' must be followed by [a, z] or [0, 9]
+ * Names must comply with the following grammar (RFC 1035):
+ * <domain> ::= <subdomain> | " "
+ * <subdomain> ::= <label> | <subdomain> "." <label>
+ * <label> ::= <letter> [ [ <ldh-str> ] <let-dig> ]
+ * <ldh-str> ::= <let-dig-hyp> | <let-dig-hyp> <ldh-str>
+ * <let-dig-hyp> ::= <let-dig> | "-"
+ * <let-dig> ::= <letter> | <digit>
+ *
+ * Which is equivalent to the following:
+ *
+ * <domain> ::= <subdomain> | " "
+ * <subdomain> ::= <label> ("." <label>)*
+ * <label> ::= <letter> [ [ <let-dig-hyp>+ ] <let-dig> ]
+ * <let-dig-hyp> ::= <let-dig> | "-"
+ * <let-dig> ::= <letter> | <digit>
+ *
+ * I.e. a valid name consists of a dot-separated sequence
+ * of one or more labels consisting of the following rules:
+ *
+ * - Each label is three characters or more
+ * - Each label begins with a letter
+ * - Each label ends with a letter or digit
+ * - Each label contains only letters, digits or hyphens
+ *
+ * In addition we require the following:
+ *
+ * - All letters are lowercase
+ * - Length is between (inclusive) GRAPHENE_MIN_ACCOUNT_NAME_LENGTH and GRAPHENE_MAX_ACCOUNT_NAME_LENGTH
  */
+
 bool is_valid_name( const string& name )
 {
-    if( name.size() < GRAPHENE_MIN_ACCOUNT_NAME_LENGTH )
+    const size_t len = name.size();
+    if( len < GRAPHENE_MIN_ACCOUNT_NAME_LENGTH )
         return false;
 
-    if( name.size() > GRAPHENE_MAX_ACCOUNT_NAME_LENGTH )
+    if( len > GRAPHENE_MAX_ACCOUNT_NAME_LENGTH )
         return false;
 
-    if( !isalpha( name.front() ) )
-        return false;
-
-    if( !isalpha( name.back() ) && !isdigit( name.back() ) )
-        return false;
-
-    for( size_t i = 0; i < name.size(); ++i )
+    size_t begin = 0;
+    while( true )
     {
-        const auto c = name.at( i );
-
-        if( isalpha( c ) && islower( c ) )
-            continue;
-
-        if( isdigit( c ) )
-            continue;
-
-        if( c == '.' )
-        {
-            const auto next = name.at( i + 1 );
-            if( !isalpha( next ) )
+       size_t end = name.find_first_of( '.', begin );
+       if( end == std::string::npos )
+          end = len;
+       if( end - begin < 3 )
+          return false;
+       switch( name[begin] )
+       {
+          case 'a': case 'b': case 'c': case 'd': case 'e': case 'f': case 'g': case 'h':
+          case 'i': case 'j': case 'k': case 'l': case 'm': case 'n': case 'o': case 'p':
+          case 'q': case 'r': case 's': case 't': case 'u': case 'v': case 'w': case 'x':
+          case 'y': case 'z':
+             break;
+          default:
+             return false;
+       }
+       switch( name[end-1] )
+       {
+          case 'a': case 'b': case 'c': case 'd': case 'e': case 'f': case 'g': case 'h':
+          case 'i': case 'j': case 'k': case 'l': case 'm': case 'n': case 'o': case 'p':
+          case 'q': case 'r': case 's': case 't': case 'u': case 'v': case 'w': case 'x':
+          case 'y': case 'z':
+          case '0': case '1': case '2': case '3': case '4': case '5': case '6': case '7':
+          case '8': case '9':
+             break;
+          default:
+             return false;
+       }
+       for( size_t i=begin+1; i<end-1; i++ )
+       {
+          switch( name[i] )
+          {
+             case 'a': case 'b': case 'c': case 'd': case 'e': case 'f': case 'g': case 'h':
+             case 'i': case 'j': case 'k': case 'l': case 'm': case 'n': case 'o': case 'p':
+             case 'q': case 'r': case 's': case 't': case 'u': case 'v': case 'w': case 'x':
+             case 'y': case 'z':
+             case '0': case '1': case '2': case '3': case '4': case '5': case '6': case '7':
+             case '8': case '9':
+             case '-':
+                break;
+             default:
                 return false;
-
-            continue;
-        }
-
-        if( c == '-' )
-        {
-            const auto next = name.at( i + 1 );
-            if( !isalpha( next ) && !isdigit( next ) )
-                return false;
-
-            continue;
-        }
-
-        return false;
+          }
+       }
+       if( end == len )
+          break;
+       begin = end+1;
     }
-
     return true;
 }
 
