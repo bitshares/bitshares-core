@@ -74,7 +74,7 @@ database_fixture::database_fixture()
       genesis_state.initial_committee_candidates.push_back({name});
       genesis_state.initial_witness_candidates.push_back({name, delegate_priv_key.get_public_key(), secret});
    }
-   fc::reflector<fee_schedule_type>::visit(fee_schedule_type::fee_set_visitor{genesis_state.initial_parameters.current_fees, 0});
+   genesis_state.initial_parameters.current_fees.set_all_fees(0);
    db.init_genesis(genesis_state);
    ahplugin->plugin_startup();
    mhplugin->plugin_startup();
@@ -782,8 +782,7 @@ void database_fixture::enable_fees(
 {
    db.modify(global_property_id_type()(db), [fee](global_property_object& gpo)
    {
-      fc::reflector<fee_schedule_type>::visit(fee_schedule_type::fee_set_visitor{gpo.parameters.current_fees,
-                                                                                 uint32_t(fee.value)});
+      gpo.parameters.current_fees.set_all_fees(fee.value);
       gpo.parameters.current_fees.membership_annual_fee = 3*fee.value;
       gpo.parameters.current_fees.membership_lifetime_fee = 10*fee.value;
    } );

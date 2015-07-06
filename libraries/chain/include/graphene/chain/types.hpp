@@ -28,6 +28,7 @@
 #include <fc/container/flat.hpp>
 #include <fc/string.hpp>
 #include <fc/io/raw.hpp>
+#include <fc/uint128.hpp>
 #include <memory>
 #include <vector>
 #include <deque>
@@ -312,35 +313,24 @@ namespace graphene { namespace chain {
 
    struct fee_schedule_type
    {
-      /**
-       * @brief The fee_set_visitor struct sets all fees to a particular value in one fell swoop
-       *
-       * Example:
-       * @code
-       * fee_schedule_type sch;
-       * // Set all fees to 50
-       * fc::reflector<fee_schedule_type>::visit(fee_schedule_type::fee_set_visitor{sch, 50});
-       * @endcode
-       */
-      struct fee_set_visitor {
-         fee_schedule_type& f;
-         uint32_t fee;
-
-         template<typename Member, typename Class, Member (Class::*member)>
-         void operator()(const char*)const
-         {
-            f.*member = fee;
-         }
-      };
-
       /// The number of bytes to charge a data fee for
       const static int BYTES_PER_DATA_FEE = 1024;
 
       template <class... Ts>
       uint32_t total_data_fee(Ts... ts)const {
           return data_size(ts...) / BYTES_PER_DATA_FEE * data_fee;
+         // return ((fc::uint128(data_size(ts...)) * data_fee) / BYTES_PER_DATA_FEE).to_uint64();
       }
 
+
+
+      /**
+       *  Standard fees 
+       *
+       *  These fees are listed because they will be updated frequently and it is lower 
+       *  overhead than having a key/value map.
+       */
+      ///@{
       uint64_t key_create_fee = 270300; ///< the cost to register a public key with the blockchain
       uint64_t account_create_fee = 666666; ///< the cost to register the cheapest non-free account
       uint64_t account_update_fee = 150000; ///< the cost to update an existing account
@@ -370,7 +360,6 @@ namespace graphene { namespace chain {
       uint64_t witness_withdraw_pay_fee = 1500000; ///< fee for withdrawing witness pay
       uint64_t transfer_fee = 2700000; ///< fee for transferring some asset
       uint64_t limit_order_create_fee = 666666; ///< fee for placing a limit order in the markets
-      uint64_t limit_order_cancel_fee = 0; ///< fee for canceling a limit order
       uint64_t call_order_fee = 800000; ///< fee for placing a call order in the markets
       uint64_t publish_feed_fee = 10000; ///< fee for publishing a price feed
       uint64_t data_fee = 13500000; ///< a price per BYTES_PER_DATA_FEE bytes of user data
@@ -380,22 +369,49 @@ namespace graphene { namespace chain {
       uint64_t withdraw_permission_create_fee = 2700000; ///< the cost to create a withdraw permission
       uint64_t withdraw_permission_update_fee = 150000; ///< the cost to update a withdraw permission
       uint64_t withdraw_permission_claim_fee = 700000; ///< the cost to withdraw from a withdraw permission
-      uint64_t withdraw_permission_delete_fee = 0; ///< the cost to delete a withdraw permission
       uint64_t vesting_balance_create_fee = 7000000;
       uint64_t vesting_balance_withdraw_fee = 2700000;
       uint64_t worker_create_fee = 680000000; ///< the cost to create a new worker
       uint64_t assert_op_fee = 150000; ///< fee per assert operation
       uint64_t proposal_create_fee = 7000000; ///< fee for creating a proposed transaction
       uint64_t proposal_update_fee = 1500000; ///< fee for adding or removing approval of a proposed transaction
-      uint64_t proposal_delete_fee = 0; ///< fee for deleting a proposed transaction
       uint64_t custom_operation_fee = 300000; ///< fee for a custom operation
+      ///@{
+
+      void set_all_fees( uint64_t v );
+
+      /** Advanced Fees
+       *
+       * THese fields are reserved for future expansion of the fee schedule without breaking the
+       * protocol serialization.
+       */
+      ///@{
+      enum advanced_fee_id
+      {
+          withdraw_permission_delete_fee_id = 1, ///< the cost to delete a withdraw permission
+          proposal_delete_fee_id            = 2, ///< fee for deleting a proposed transaction
+          limit_order_cancel_fee_id         = 3  ///< fee for canceling a limit order
+      };
+
+      uint64_t get_advanced_fee( advanced_fee_id id )const
+      {
+         auto itr = advanced.find(id);
+         if( itr == advanced.end() ) return 0;
+         return itr->second;
+      }
+
+      uint64_t withdraw_permission_delete_fee()const {  return get_advanced_fee( withdraw_permission_delete_fee_id ); } 
+
+
+      flat_map<unsigned_int,uint64_t> advanced;
+      ///@}
 
    protected:
-      size_t data_size()const {
+      uint64_t data_size()const {
           return 0;
       }
       template <class T, class... Ts>
-      size_t data_size(T t, Ts... ts)const {
+      uint64_t data_size(T t, Ts... ts)const {
           return fc::raw::pack_size(t) + data_size(ts...);
       }
    };
@@ -562,7 +578,6 @@ FC_REFLECT( graphene::chain::fee_schedule_type,
             (witness_withdraw_pay_fee)
             (transfer_fee)
             (limit_order_create_fee)
-            (limit_order_cancel_fee)
             (call_order_fee)
             (publish_feed_fee)
             (asset_create_fee)
@@ -578,7 +593,6 @@ FC_REFLECT( graphene::chain::fee_schedule_type,
             (withdraw_permission_create_fee)
             (withdraw_permission_update_fee)
             (withdraw_permission_claim_fee)
-            (withdraw_permission_delete_fee)
             (vesting_balance_create_fee)
             (vesting_balance_withdraw_fee)
             (asset_global_settle_fee)
@@ -586,8 +600,12 @@ FC_REFLECT( graphene::chain::fee_schedule_type,
             (assert_op_fee)
             (proposal_create_fee)
             (proposal_update_fee)
-            (proposal_delete_fee)
+            (advanced)
           )
+FC_REFLECT_ENUM( graphene::chain::fee_schedule_type::advanced_fee_id, 
+                 (withdraw_permission_delete_fee_id)
+                 (proposal_delete_fee_id)
+                 (limit_order_cancel_fee_id) )
 
 FC_REFLECT( graphene::chain::chain_parameters,
             (current_fees)

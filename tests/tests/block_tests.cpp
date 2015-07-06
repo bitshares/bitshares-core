@@ -51,7 +51,7 @@ genesis_state_type make_genesis() {
       genesis_state.initial_committee_candidates.push_back({name});
       genesis_state.initial_witness_candidates.push_back({name, delegate_priv_key.get_public_key(), secret});
    }
-   fc::reflector<fee_schedule_type>::visit(fee_schedule_type::fee_set_visitor{genesis_state.initial_parameters.current_fees, 0});
+   genesis_state.initial_parameters.current_fees.set_all_fees(0);
    return genesis_state;
 }
 

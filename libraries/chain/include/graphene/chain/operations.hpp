@@ -1050,8 +1050,7 @@ namespace graphene { namespace chain {
       account_id_type fee_payer()const { return fee_paying_account; }
       void       get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>& owner_auth_set)const;
       void       validate()const;
-      share_type calculate_fee(const fee_schedule_type& k)const
-      { return k.proposal_delete_fee; }
+      share_type calculate_fee(const fee_schedule_type& k)const;
       void       get_balance_delta(balance_accumulator& acc, const operation_result& result = asset())const { acc.adjust(fee_payer(), -fee); }
    };
    ///@}
