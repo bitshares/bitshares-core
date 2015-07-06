@@ -1328,6 +1328,32 @@ public:
       return sign_transaction( tx, broadcast );
    } FC_CAPTURE_AND_RETHROW( (account_to_modify)(voting_account)(broadcast) ) }
 
+   signed_transaction set_desired_witness_and_delegate_count(string account_to_modify,
+                                                             uint16_t desired_number_of_witnesses,
+                                                             uint16_t desired_number_of_delegates,
+                                                             bool broadcast /* = false */)
+   { try {
+      account_object account_object_to_modify = get_account(account_to_modify);
+
+      if (account_object_to_modify.options.num_witness == desired_number_of_witnesses &&
+          account_object_to_modify.options.num_committee == desired_number_of_delegates)
+         FC_THROW("Account ${account} is already voting for ${witnesses} witnesses and ${delegates} delegates", 
+                  ("account", account_to_modify)("witnesses", desired_number_of_witnesses)("delegates",desired_number_of_witnesses));
+      account_object_to_modify.options.num_witness = desired_number_of_witnesses;
+      account_object_to_modify.options.num_committee = desired_number_of_delegates;
+
+      account_update_operation account_update_op;
+      account_update_op.account = account_object_to_modify.id;
+      account_update_op.new_options = account_object_to_modify.options;
+
+      signed_transaction tx;
+      tx.operations.push_back( account_update_op );
+      tx.visit( operation_set_fee( _remote_db->get_global_properties().parameters.current_fees ) );
+      tx.validate();
+
+      return sign_transaction( tx, broadcast );
+   } FC_CAPTURE_AND_RETHROW( (account_to_modify)(desired_number_of_witnesses)(desired_number_of_delegates)(broadcast) ) }
+
    signed_transaction sign_transaction(signed_transaction tx, bool broadcast = false)
    {
       flat_set<account_id_type> req_active_approvals;
@@ -2072,6 +2098,15 @@ signed_transaction wallet_api::set_voting_proxy(string account_to_modify,
                                                 bool broadcast /* = false */)
 {
    return my->set_voting_proxy(account_to_modify, voting_account, broadcast);
+}
+
+signed_transaction wallet_api::set_desired_witness_and_delegate_count(string account_to_modify,
+                                                                      uint16_t desired_number_of_witnesses,
+                                                                      uint16_t desired_number_of_delegates,
+                                                                      bool broadcast /* = false */)
+{
+   return my->set_desired_witness_and_delegate_count(account_to_modify, desired_number_of_witnesses, 
+                                                     desired_number_of_delegates, broadcast);
 }
 
 void wallet_api::set_wallet_filename(string wallet_filename)

@@ -936,6 +936,31 @@ class wallet_api
       signed_transaction set_voting_proxy(string account_to_modify,
                                           optional<string> voting_account,
                                           bool broadcast = false);
+      
+      /** Set your vote for the number of witnesses and delegates in the system.
+       *
+       * Each account can voice their opinion on how many delegates and how many 
+       * witnesses there should be in the active delegate/active witness list.  These
+       * are independent of each other.  You must vote your approval of at least as many
+       * delegates or witnesses as you claim there should be (you can't say that there should
+       * be 20 delegates but only vote for 10). 
+       *
+       * There are maximum values for each set in the blockchain parameters (currently 
+       * defaulting to 1001).
+       *
+       * This setting can be changed at any time.  If your account has a voting proxy
+       * set, your preferences will be ignored.
+       *
+       * @param account_to_modify the name or id of the account to update
+       * @param number_of_delegates the number 
+       *
+       * @param broadcast true if you wish to broadcast the transaction
+       * @return the signed transaction changing your vote proxy settings
+       */
+      signed_transaction set_desired_witness_and_delegate_count(string account_to_modify,
+                                                                uint16_t desired_number_of_witnesses,
+                                                                uint16_t desired_number_of_delegates,
+                                                                bool broadcast = false);
 
       /** Signs a transaction.
        *
@@ -1042,6 +1067,7 @@ FC_API( graphene::wallet::wallet_api,
         (vote_for_delegate)
         (vote_for_witness)
         (set_voting_proxy)
+        (set_desired_witness_and_delegate_count)
         (get_account)
         (get_account_id)
         (get_block)
