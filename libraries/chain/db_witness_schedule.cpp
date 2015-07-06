@@ -106,6 +106,8 @@ void database::update_witness_schedule(signed_block next_block)
    // triggering FC_ASSERT elsewhere
 
    assert( schedule_slot > 0 );
+   witness_id_type first_witness;
+   bool slot_is_near = wso.scheduler.get_slot( schedule_slot-1, first_witness );
 
    witness_id_type wit;
 
@@ -119,13 +121,21 @@ void database::update_witness_schedule(signed_block next_block)
       witness_scheduler_rng rng(wso.rng_seed.data, _wso.slots_since_genesis);
 
       _wso.scheduler._min_token_count = std::max(int(gpo.active_witnesses.size()) / 2, 1);
-      uint32_t drain = schedule_slot;
-      while( drain > 0 )
+
+      if( slot_is_near )
       {
-         if( _wso.scheduler.size() == 0 )
-            break;
-         _wso.scheduler.consume_schedule();
-         --drain;
+         uint32_t drain = schedule_slot;
+         while( drain > 0 )
+         {
+            if( _wso.scheduler.size() == 0 )
+               break;
+            _wso.scheduler.consume_schedule();
+            --drain;
+         }
+      }
+      else
+      {
+         _wso.scheduler.reset_schedule( first_witness );
       }
       while( !_wso.scheduler.get_slot(schedule_needs_filled, wit) )
       {
