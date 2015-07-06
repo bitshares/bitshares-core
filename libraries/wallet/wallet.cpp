@@ -301,7 +301,7 @@ public:
       : self(s),
         _remote_api(rapi),
         _remote_db(rapi->database()),
-        _remote_net(rapi->network()),
+        _remote_net_broadcast(rapi->network_broadcast()),
         _remote_hist(rapi->history())
    {
       _remote_db->subscribe_to_objects( [=]( const fc::variant& obj )
@@ -737,7 +737,7 @@ public:
       }
 
       if( broadcast )
-         _remote_net->broadcast_transaction( tx );
+         _remote_net_broadcast->broadcast_transaction( tx );
       return tx;
    } FC_CAPTURE_AND_RETHROW( (name)(owner)(active)(registrar_account)(referrer_account)(referrer_percent)(broadcast) ) }
 
@@ -863,7 +863,7 @@ public:
          if( save_wallet )
             save_wallet_file();
          if( broadcast )
-            _remote_net->broadcast_transaction( tx );
+            _remote_net_broadcast->broadcast_transaction( tx );
          return tx;
    } FC_CAPTURE_AND_RETHROW( (account_name)(registrar_account)(referrer_account)(broadcast) ) }
 
@@ -1446,7 +1446,7 @@ public:
       }
 
       if( broadcast )
-         _remote_net->broadcast_transaction( tx );
+         _remote_net_broadcast->broadcast_transaction( tx );
 
       return tx;
    }
@@ -1691,7 +1691,7 @@ public:
 
    fc::api<login_api>      _remote_api;
    fc::api<database_api>   _remote_db;
-   fc::api<network_api>    _remote_net;
+   fc::api<network_broadcast_api>   _remote_net_broadcast;
    fc::api<history_api>    _remote_hist;
 
 #ifdef __unix__
@@ -2436,7 +2436,7 @@ signed_transaction wallet_api::import_balance( string name_or_id, const vector<s
    boost::erase(tx.signatures, boost::unique<boost::return_found_end>(boost::sort(tx.signatures)));
    
    if( broadcast )
-      my->_remote_net->broadcast_transaction(tx);
+      my->_remote_net_broadcast->broadcast_transaction(tx);
 
    return tx;
 } FC_CAPTURE_AND_RETHROW( (name_or_id) ) }

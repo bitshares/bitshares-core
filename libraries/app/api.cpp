@@ -350,20 +350,22 @@ namespace graphene { namespace app {
     bool login_api::login(const string& user, const string& password)
     {
        auto db_api = std::make_shared<database_api>(std::ref(*_app.chain_database()));
-       auto net_api = std::make_shared<network_api>(std::ref(_app));
+       auto net_broadcast_api = std::make_shared<network_broadcast_api>(std::ref(_app));
        auto hist_api = std::make_shared<history_api>(_app);
+       auto net_node_api = std::make_shared<network_node_api>(std::ref(_app));
        _database_api = db_api;
-       _network_api = net_api;
+       _network_broadcast_api = net_broadcast_api;
        _history_api = hist_api;
+       _network_node_api = net_node_api;
        return true;
     }
 
-    network_api::network_api(application& a):_app(a)
+    network_broadcast_api::network_broadcast_api(application& a):_app(a)
     {
        _applied_block_connection = _app.chain_database()->applied_block.connect([this](const signed_block& b){ on_applied_block(b); });
     }
 
-    void network_api::on_applied_block( const signed_block& b )
+    void network_broadcast_api::on_applied_block( const signed_block& b )
     {
        if( _callbacks.size() )
        {
@@ -381,18 +383,14 @@ namespace graphene { namespace app {
        }
     }
 
-    void network_api::add_node(const fc::ip::endpoint& ep)
-    {
-       _app.p2p_node()->add_node(ep);
-    }
-
-    void network_api::broadcast_transaction(const signed_transaction& trx)
+    void network_broadcast_api::broadcast_transaction(const signed_transaction& trx)
     {
        trx.validate();
        _app.chain_database()->push_transaction(trx);
        _app.p2p_node()->broadcast_transaction(trx);
     }
-    void network_api::broadcast_transaction_with_callback( confirmation_callback cb, const signed_transaction& trx)
+
+    void network_broadcast_api::broadcast_transaction_with_callback( confirmation_callback cb, const signed_transaction& trx)
     {
        trx.validate();
        _callbacks[trx.id()] = cb;
@@ -400,16 +398,30 @@ namespace graphene { namespace app {
        _app.p2p_node()->broadcast_transaction(trx);
     }
 
+    network_node_api::network_node_api( application& a ) : _app( a )
+    {
+    }
 
-    std::vector<net::peer_status> network_api::get_connected_peers() const
+    void network_node_api::add_node(const fc::ip::endpoint& ep)
+    {
+       _app.p2p_node()->add_node(ep);
+    }
+
+    std::vector<net::peer_status> network_node_api::get_connected_peers() const
     {
       return _app.p2p_node()->get_connected_peers();
     }
 
-    fc::api<network_api> login_api::network()const
+    fc::api<network_broadcast_api> login_api::network_broadcast()const
     {
-       FC_ASSERT(_network_api);
-       return *_network_api;
+       FC_ASSERT(_network_broadcast_api);
+       return *_network_broadcast_api;
+    }
+
+    fc::api<network_node_api> login_api::network_node()const
+    {
+       FC_ASSERT(_network_node_api);
+       return *_network_node_api;
     }
 
     fc::api<database_api> login_api::database()const
