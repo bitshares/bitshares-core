@@ -10,6 +10,14 @@ namespace graphene { namespace chain {
          static const uint8_t space_id = protocol_ids;
          static const uint8_t type_id  = balance_object_type;
 
+         bool is_vesting_balance()const
+         { return vesting_policy.valid(); }
+         asset available(fc::time_point_sec now)const
+         {
+            return is_vesting_balance()? vesting_policy->get_allowed_withdraw({balance, now, {}})
+                                       : balance;
+         }
+
          address owner;
          asset   balance;
          optional<linear_vesting_policy> vesting_policy;

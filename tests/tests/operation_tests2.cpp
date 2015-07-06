@@ -28,7 +28,7 @@
 #include <graphene/chain/call_order_object.hpp>
 #include <graphene/chain/vesting_balance_object.hpp>
 #include <graphene/chain/withdraw_permission_object.hpp>
-
+#include <graphene/chain/exceptions.hpp>
 #include <graphene/chain/predicate.hpp>
 #include <graphene/chain/db_reflect_cmp.hpp>
 
@@ -980,9 +980,28 @@ BOOST_AUTO_TEST_CASE( balance_object_test )
    fc::temp_directory td;
    genesis_state.initial_balances.push_back({generate_private_key("n").get_public_key(), GRAPHENE_SYMBOL, 1});
    genesis_state.initial_balances.push_back({generate_private_key("x").get_public_key(), GRAPHENE_SYMBOL, 1});
-//   genesis_state.initial_vesting_balances.push_back({generate_private_key("v").get_public_key(), GRAPHENE_SYMBOL, 1});
-   // TODO: vesting genesis balances
-   genesis_state.initial_accounts.emplace_back("n", generate_private_key("n").get_public_key());
+   auto starting_time = time_point_sec((time_point::now().sec_since_epoch() / GRAPHENE_DEFAULT_BLOCK_INTERVAL + 1) *
+         GRAPHENE_DEFAULT_BLOCK_INTERVAL);
+
+   auto n_key = generate_private_key("n");
+   auto x_key = generate_private_key("x");
+   auto v1_key = generate_private_key("v1");
+   auto v2_key = generate_private_key("v2");
+
+   genesis_state_type::initial_vesting_balance_type vest;
+   vest.owner = v1_key.get_public_key();
+   vest.asset_symbol = GRAPHENE_SYMBOL;
+   vest.amount = 500;
+   vest.begin_balance = vest.amount;
+   vest.begin_timestamp = starting_time;
+   vest.vesting_duration_seconds = 60;
+   genesis_state.initial_vesting_balances.push_back(vest);
+   vest.owner = v2_key.get_public_key();
+   vest.begin_timestamp -= fc::seconds(30);
+   vest.amount = 400;
+   genesis_state.initial_vesting_balances.push_back(vest);
+
+   genesis_state.initial_accounts.emplace_back("n", n_key.get_public_key());
 
    db.open(td.path(), genesis_state);
    const balance_object& balance = balance_id_type()(db);
@@ -993,22 +1012,87 @@ BOOST_AUTO_TEST_CASE( balance_object_test )
    op.deposit_to_account = db.get_index_type<account_index>().indices().get<by_name>().find("n")->get_id();
    op.total_claimed = asset(1);
    op.balance_to_claim = balance_id_type(1);
-   op.balance_owner_key = generate_private_key("x").get_public_key();
+   op.balance_owner_key = x_key.get_public_key();
    trx.operations = {op};
-   trx.sign(generate_private_key("n"));
+   trx.sign(n_key);
    // Fail because I'm claiming from an address which hasn't signed
    BOOST_CHECK_THROW(db.push_transaction(trx), fc::exception);
    trx.clear();
    op.balance_to_claim = balance_id_type();
-   op.balance_owner_key = generate_private_key("n").get_public_key();
+   op.balance_owner_key = n_key.get_public_key();
    trx.operations = {op};
-   trx.sign(generate_private_key("n"));
+   trx.sign(n_key);
    db.push_transaction(trx);
 
    // Not using fixture's get_balance() here because it uses fixture's db, not my override
    BOOST_CHECK_EQUAL(db.get_balance(op.deposit_to_account, asset_id_type()).amount.value, 1);
    BOOST_CHECK(db.find_object(balance_id_type()) == nullptr);
    BOOST_CHECK(db.find_object(balance_id_type(1)) != nullptr);
+
+   auto slot = db.get_slot_at_time(starting_time);
+   db.generate_block(starting_time, db.get_scheduled_witness(slot).first, delegate_priv_key, database::skip_nothing);
+
+   const balance_object& vesting_balance_1 = balance_id_type(2)(db);
+   const balance_object& vesting_balance_2 = balance_id_type(3)(db);
+   BOOST_CHECK(vesting_balance_1.is_vesting_balance());
+   BOOST_CHECK_EQUAL(vesting_balance_1.balance.amount.value, 500);
+   BOOST_CHECK_EQUAL(vesting_balance_1.available(db.head_block_time()).amount.value, 0);
+   BOOST_CHECK(vesting_balance_2.is_vesting_balance());
+   BOOST_CHECK_EQUAL(vesting_balance_2.balance.amount.value, 400);
+   BOOST_CHECK_EQUAL(vesting_balance_2.available(db.head_block_time()).amount.value, 150);
+
+   op.balance_to_claim = vesting_balance_1.id;
+   op.total_claimed = asset(1);
+   op.balance_owner_key = v1_key.get_public_key();
+   trx.clear();
+   trx.set_expiration(db.head_block_id());
+   trx.operations = {op};
+   trx.sign(n_key);
+   trx.sign(v1_key);
+   // Attempting to claim 1 from a balance with 0 available
+   BOOST_CHECK_THROW(db.push_transaction(trx), invalid_claim_amount);
+
+   op.balance_to_claim = vesting_balance_2.id;
+   op.total_claimed.amount = 151;
+   op.balance_owner_key = v2_key.get_public_key();
+   trx.operations = {op};
+   trx.signatures.clear();
+   trx.sign(n_key);
+   trx.sign(v2_key);
+   // Attempting to claim 151 from a balance with 150 available
+   BOOST_CHECK_THROW(db.push_transaction(trx), invalid_claim_amount);
+
+   op.balance_to_claim = vesting_balance_2.id;
+   op.total_claimed.amount = 100;
+   op.balance_owner_key = v2_key.get_public_key();
+   trx.operations = {op};
+   trx.signatures.clear();
+   trx.sign(n_key);
+   trx.sign(v2_key);
+   db.push_transaction(trx);
+
+   BOOST_CHECK_EQUAL(db.get_balance(op.deposit_to_account, asset_id_type()).amount.value, 101);
+   op.total_claimed.amount = 10;
+   trx.operations = {op};
+   trx.signatures.clear();
+   trx.sign(n_key);
+   trx.sign(v2_key);
+   // Attempting to claim twice within a day
+   BOOST_CHECK_THROW(db.push_transaction(trx), balance_claimed_too_often);
+
+// TODO: test withdrawing entire vesting_balance_1 balance, remainder of vesting_balance_2 balance
+//   slot = db.get_slot_at_time(vesting_balance_1.vesting_policy->begin_timestamp + 60);
+//   db.generate_block(starting_time, db.get_scheduled_witness(slot).first, delegate_priv_key, database::skip_nothing);
+
+//   op.balance_to_claim = vesting_balance_1.id;
+//   op.total_claimed.amount = 500;
+//   op.balance_owner_key = v1_key.get_public_key();
+//   trx.operations = {op};
+//   trx.signatures.clear();
+//   trx.sign(n_key);
+//   trx.sign(v2_key);
+//   db.push_transaction(trx);
+//   BOOST_CHECK(db.find_object(op.balance_to_claim) == nullptr);
 } FC_LOG_AND_RETHROW() }
 
 // TODO:  Write linear VBO tests

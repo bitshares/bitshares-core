@@ -133,7 +133,7 @@ namespace graphene { namespace chain {
          // after all observers receive evaluation_failed)
 
          T eval;
-         optional< fc::exception > evaluation_exception;
+         shared_ptr<fc::exception> evaluation_exception;
          size_t observer_count = 0;
          operation_result result;
 
@@ -156,7 +156,7 @@ namespace graphene { namespace chain {
          }
          catch( const fc::exception& e )
          {
-            evaluation_exception = e;
+            evaluation_exception = e.dynamic_copy_exception();
          }
 
          while( observer_count > 0 )
@@ -165,7 +165,7 @@ namespace graphene { namespace chain {
             const auto& obs = eval_observers[observer_count];
             try
             {
-               if( !evaluation_exception.valid() )
+               if( evaluation_exception )
                   obs->post_evaluate(eval_state, op, apply, &eval, result);
                else
                   obs->evaluation_failed(eval_state, op, apply, &eval, result);
@@ -176,8 +176,8 @@ namespace graphene { namespace chain {
             }
          }
 
-         if( evaluation_exception.valid() )
-            throw *evaluation_exception;
+         if( evaluation_exception )
+            evaluation_exception->dynamic_rethrow_exception();
          return result;
       }
    };
