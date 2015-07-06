@@ -1907,7 +1907,10 @@ bool wallet_api::import_key(string account_name_or_id, string wif_key)
 {
    FC_ASSERT(!is_locked());
    // backup wallet
-   string shorthash = detail::address_to_shorthash(wif_to_key(wif_key)->get_public_key());
+   fc::optional<fc::ecc::private_key> optional_private_key = wif_to_key(wif_key);
+   if (!optional_private_key)
+      FC_THROW("Invalid private key ${key}", ("key", wif_key));
+   string shorthash = detail::address_to_shorthash(optional_private_key->get_public_key());
    copy_wallet_file( "before-import-key-" + shorthash );
 
    if( my->import_key(account_name_or_id, wif_key) )
