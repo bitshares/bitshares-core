@@ -54,6 +54,38 @@ namespace bpo = boost::program_options;
 
 namespace detail {
 
+   genesis_state_type create_example_genesis() {
+      auto nathan_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("nathan")));
+      dlog("Allocating all stake to ${key}", ("key", utilities::key_to_wif(nathan_key)));
+      genesis_state_type initial_state;
+      /*
+      fc::reflector<fee_schedule_type>::visit(
+               fee_schedule_type::fee_set_visitor{initial_state.initial_parameters.current_fees, 0});
+               */
+      initial_state.initial_parameters.current_fees.set_all_fees(0);
+      secret_hash_type::encoder enc;
+      fc::raw::pack(enc, nathan_key);
+      fc::raw::pack(enc, secret_hash_type());
+      auto secret = secret_hash_type::hash(enc.result());
+      initial_state.initial_active_witnesses = 10;
+      for( int i = 0; i < initial_state.initial_active_witnesses; ++i )
+      {
+         auto name = "init"+fc::to_string(i);
+         initial_state.initial_accounts.emplace_back(name,
+                                                     nathan_key.get_public_key(),
+                                                     nathan_key.get_public_key(),
+                                                     true);
+         initial_state.initial_committee_candidates.push_back({name});
+         initial_state.initial_witness_candidates.push_back({name, nathan_key.get_public_key(), secret});
+      }
+
+      initial_state.initial_accounts.emplace_back("nathan", nathan_key.get_public_key());
+      initial_state.initial_balances.push_back({nathan_key.get_public_key(),
+                                                GRAPHENE_SYMBOL,
+                                                GRAPHENE_MAX_SHARE_SUPPLY});
+      return initial_state;
+   }
+
    class application_impl : public net::node_delegate
    {
    public:
@@ -107,7 +139,7 @@ namespace detail {
             wsc->register_api(fc::api<graphene::app::login_api>(login));
             c->set_session_data( wsc );
          });
-         ilog("Configured websocket rpc to listen on ${ip}", ("ip",_options->at("rpc-endpoint").as<string>())); 
+         ilog("Configured websocket rpc to listen on ${ip}", ("ip",_options->at("rpc-endpoint").as<string>()));
          _websocket_server->listen( fc::ip::endpoint::from_string(_options->at("rpc-endpoint").as<string>()) );
          _websocket_server->start_accept();
       } FC_CAPTURE_AND_RETHROW() }
@@ -134,7 +166,7 @@ namespace detail {
             wsc->register_api(fc::api<graphene::app::login_api>(login));
             c->set_session_data( wsc );
          });
-         ilog("Configured websocket TLS rpc to listen on ${ip}", ("ip",_options->at("rpc-tls-endpoint").as<string>())); 
+         ilog("Configured websocket TLS rpc to listen on ${ip}", ("ip",_options->at("rpc-tls-endpoint").as<string>()));
          _websocket_tls_server->listen( fc::ip::endpoint::from_string(_options->at("rpc-tls-endpoint").as<string>()) );
          _websocket_tls_server->start_accept();
       } FC_CAPTURE_AND_RETHROW() }
@@ -155,8 +187,9 @@ namespace detail {
          bool clean = !fc::exists(_data_dir / "blockchain/dblock");
          fc::create_directories(_data_dir / "blockchain/dblock");
 
-         auto nathan_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("nathan")));
          genesis_state_type initial_state;
+   /*
+<<<<<<< HEAD
          initial_state.initial_parameters.current_fees.set_all_fees(0);
          secret_hash_type::encoder enc;
          fc::raw::pack(enc, nathan_key);
@@ -177,11 +210,14 @@ namespace detail {
          initial_state.initial_balances.push_back({nathan_key.get_public_key(),
                                                    GRAPHENE_SYMBOL,
                                                    GRAPHENE_MAX_SHARE_SUPPLY});
+=======
+>>>>>>> b89ff4e6b1d732fbfe0cba20b4f41ea7df560f3c
+                                                   */
          if( _options->count("genesis-json") )
             initial_state = fc::json::from_file(_options->at("genesis-json").as<boost::filesystem::path>())
                   .as<genesis_state_type>();
          else
-            dlog("Allocating all stake to ${key}", ("key", utilities::key_to_wif(nathan_key)));
+            initial_state = create_example_genesis();
 
          if( _options->count("resync-blockchain") )
             _chain_db->wipe(_data_dir / "blockchain", true);
@@ -426,13 +462,11 @@ application::~application()
 {
    if( my->_p2p_network )
    {
-      //ilog("Closing p2p node");
       my->_p2p_network->close();
       my->_p2p_network.reset();
    }
    if( my->_chain_db )
    {
-      //ilog("Closing chain database");
       my->_chain_db->close();
    }
 }
@@ -451,6 +485,10 @@ void application::set_program_options(boost::program_options::options_descriptio
          ;
    command_line_options.add(configuration_file_options);
    command_line_options.add_options()
+         ("create-genesis-json", bpo::value<boost::filesystem::path>(),
+          "Path to create a Genesis State at. If a well-formed JSON file exists at the path, it will be parsed and any "
+          "missing fields in a Genesis State will be added, and any unknown fields will be removed. If no file or an "
+          "invalid file is found, it will be replaced with an example Genesis State.")
          ("replay-blockchain", "Rebuild object graph by replaying all blocks")
          ("resync-blockchain", "Delete all blocks and re-sync with network from scratch")
          ;
@@ -462,6 +500,31 @@ void application::initialize(const fc::path& data_dir, const boost::program_opti
 {
    my->_data_dir = data_dir;
    my->_options = &options;
+
+   if( options.count("create-genesis-json") )
+   {
+      fc::path genesis_out = options.at("create-genesis-json").as<boost::filesystem::path>();
+      genesis_state_type genesis_state = detail::create_example_genesis();
+      if( fc::exists(genesis_out) )
+      {
+         try {
+            genesis_state = fc::json::from_file(genesis_out).as<genesis_state_type>();
+         } catch(const fc::exception& e) {
+            std::cerr << "Unable to parse existing genesis file:\n" << e.to_string()
+                      << "\nWould you like to replace it? [y/N] ";
+            char response = std::cin.get();
+            if( toupper(response) != 'Y' )
+               return;
+         }
+
+         std::cerr << "Updating genesis state in file " << genesis_out.generic_string() << "\n";
+      } else {
+         std::cerr << "Creating example genesis state in file " << genesis_out.generic_string() << "\n";
+      }
+      fc::json::save_to_file(genesis_state, genesis_out);
+
+      std::exit(EXIT_SUCCESS);
+   }
 }
 
 void application::startup()

@@ -16,8 +16,8 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #pragma once
-#include <graphene/chain/types.hpp>
 #include <graphene/chain/config.hpp>
+#include <graphene/chain/types.hpp>
 
 namespace graphene { namespace chain {
 
@@ -42,20 +42,34 @@ namespace graphene { namespace chain {
          return *this;
       }
       asset operator -()const { return asset( -amount, asset_id ); }
+
       friend bool operator == ( const asset& a, const asset& b )
       {
-         return tie(a.asset_id,a.amount) == tie(b.asset_id,b.amount);
+         return std::tie( a.asset_id, a.amount ) == std::tie( b.asset_id, b.amount );
       }
-      friend bool operator >= ( const asset& a, const asset& b )
+      friend bool operator < ( const asset& a, const asset& b )
       {
          FC_ASSERT( a.asset_id == b.asset_id );
-         return a.amount >= b.amount;
+         return a.amount < b.amount;
+      }
+      friend bool operator <= ( const asset& a, const asset& b )
+      {
+         return (a == b) || (a < b);
+      }
+
+      friend bool operator != ( const asset& a, const asset& b )
+      {
+         return !(a == b);
       }
       friend bool operator > ( const asset& a, const asset& b )
       {
-         FC_ASSERT( a.asset_id == b.asset_id );
-         return a.amount > b.amount;
+         return !(a <= b);
       }
+      friend bool operator >= ( const asset& a, const asset& b )
+      {
+         return !(a < b);
+      }
+
       friend asset operator - ( const asset& a, const asset& b )
       {
          FC_ASSERT( a.asset_id == b.asset_id );
@@ -66,7 +80,6 @@ namespace graphene { namespace chain {
          FC_ASSERT( a.asset_id == b.asset_id );
          return asset( a.amount + b.amount, a.asset_id );
       }
-
    };
 
    /**

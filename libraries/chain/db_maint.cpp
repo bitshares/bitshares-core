@@ -143,16 +143,16 @@ void database::update_active_witnesses()
       a.active.weight_threshold += 1;
    });
 
-   modify( gpo, [&]( global_property_object& gp ){
+   modify(gpo, [&]( global_property_object& gp ){
       gp.active_witnesses.clear();
-      gp.active_witnesses.reserve( wits.size() );
+      gp.active_witnesses.reserve(wits.size());
       std::transform(wits.begin(), wits.end(),
                      std::inserter(gp.active_witnesses, gp.active_witnesses.end()),
                      [](const witness_object& w) {
          return w.id;
       });
       gp.witness_accounts.clear();
-      gp.witness_accounts.reserve( wits.size() );
+      gp.witness_accounts.reserve(wits.size());
       std::transform(wits.begin(), wits.end(),
                      std::inserter(gp.witness_accounts, gp.witness_accounts.end()),
                      [](const witness_object& w) {
@@ -161,11 +161,10 @@ void database::update_active_witnesses()
    });
 
    const witness_schedule_object& wso = witness_schedule_id_type()(*this);
-   modify( wso, [&]( witness_schedule_object& _wso )
+   modify(wso, [&](witness_schedule_object& _wso)
    {
-      _wso.scheduler.update( gpo.active_witnesses );
-   } );
-
+      _wso.scheduler.update(gpo.active_witnesses);
+   });
 } FC_CAPTURE_AND_RETHROW() }
 
 void database::update_active_delegates()

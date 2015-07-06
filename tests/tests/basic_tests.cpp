@@ -46,84 +46,87 @@ BOOST_FIXTURE_TEST_SUITE( basic_tests, database_fixture )
  */
 BOOST_AUTO_TEST_CASE( valid_name_test )
 {
-   BOOST_REQUIRE( is_valid_name( "a" ) );
-   BOOST_REQUIRE( !is_valid_name( "A" ) );
-   BOOST_REQUIRE( !is_valid_name( "0" ) );
-   BOOST_REQUIRE( !is_valid_name( "." ) );
-   BOOST_REQUIRE( !is_valid_name( "-" ) );
+   BOOST_CHECK( !is_valid_name( "a" ) );
+   BOOST_CHECK( !is_valid_name( "A" ) );
+   BOOST_CHECK( !is_valid_name( "0" ) );
+   BOOST_CHECK( !is_valid_name( "." ) );
+   BOOST_CHECK( !is_valid_name( "-" ) );
 
-   BOOST_REQUIRE( is_valid_name( "aa" ) );
-   BOOST_REQUIRE( !is_valid_name( "aA" ) );
-   BOOST_REQUIRE( is_valid_name( "a0" ) );
-   BOOST_REQUIRE( !is_valid_name( "a." ) );
-   BOOST_REQUIRE( !is_valid_name( "a-" ) );
+   BOOST_CHECK( !is_valid_name( "aa" ) );
+   BOOST_CHECK( !is_valid_name( "aA" ) );
+   BOOST_CHECK( !is_valid_name( "a0" ) );
+   BOOST_CHECK( !is_valid_name( "a." ) );
+   BOOST_CHECK( !is_valid_name( "a-" ) );
 
-   BOOST_REQUIRE( is_valid_name( "aaa" ) );
-   BOOST_REQUIRE( !is_valid_name( "aAa" ) );
-   BOOST_REQUIRE( is_valid_name( "a0a" ) );
-   BOOST_REQUIRE( is_valid_name( "a.a" ) );
-   BOOST_REQUIRE( is_valid_name( "a-a" ) );
+   BOOST_CHECK( is_valid_name( "aaa" ) );
+   BOOST_CHECK( !is_valid_name( "aAa" ) );
+   BOOST_CHECK( is_valid_name( "a0a" ) );
+   BOOST_CHECK( !is_valid_name( "a.a" ) );
+   BOOST_CHECK( is_valid_name( "a-a" ) );
 
-   BOOST_REQUIRE( is_valid_name( "aa0" ) );
-   BOOST_REQUIRE( !is_valid_name( "aA0" ) );
-   BOOST_REQUIRE( is_valid_name( "a00" ) );
-   BOOST_REQUIRE( !is_valid_name( "a.0" ) );
-   BOOST_REQUIRE( is_valid_name( "a-0" ) );
+   BOOST_CHECK( is_valid_name( "aa0" ) );
+   BOOST_CHECK( !is_valid_name( "aA0" ) );
+   BOOST_CHECK( is_valid_name( "a00" ) );
+   BOOST_CHECK( !is_valid_name( "a.0" ) );
+   BOOST_CHECK( is_valid_name( "a-0" ) );
 
-   BOOST_REQUIRE( is_valid_name( "aaa-bbb-1" ) );
-   BOOST_REQUIRE( !is_valid_name( "aaa-bbb.1" ) );
+   BOOST_CHECK(  is_valid_name( "aaa-bbb-ccc" ) );
+   BOOST_CHECK(  is_valid_name( "aaa-bbb.ccc" ) );
 
-   BOOST_REQUIRE( !is_valid_name( "aaa,bbb-1" ) );
-   BOOST_REQUIRE( !is_valid_name( "aaa_bbb-1" ) );
-   BOOST_REQUIRE( !is_valid_name( "aaa-BBB-1" ) );
+   BOOST_CHECK( !is_valid_name( "aaa,bbb-ccc" ) );
+   BOOST_CHECK( !is_valid_name( "aaa_bbb-ccc" ) );
+   BOOST_CHECK( !is_valid_name( "aaa-BBB-ccc" ) );
 
-   BOOST_REQUIRE( !is_valid_name( "1aaa-bbb" ) );
-   BOOST_REQUIRE( !is_valid_name( "-aaa-bbb-1" ) );
-   BOOST_REQUIRE( !is_valid_name( ".aaa-bbb-1" ) );
-   BOOST_REQUIRE( !is_valid_name( "/aaa-bbb-1" ) );
+   BOOST_CHECK( !is_valid_name( "1aaa-bbb" ) );
+   BOOST_CHECK( !is_valid_name( "-aaa-bbb-ccc" ) );
+   BOOST_CHECK( !is_valid_name( ".aaa-bbb-ccc" ) );
+   BOOST_CHECK( !is_valid_name( "/aaa-bbb-ccc" ) );
 
-   BOOST_REQUIRE( !is_valid_name( "aaa-bbb-1-" ) );
-   BOOST_REQUIRE( !is_valid_name( "aaa-bbb-1." ) );
-   BOOST_REQUIRE( !is_valid_name( "aaa-bbb-1/" ) );
+   BOOST_CHECK( !is_valid_name( "aaa-bbb-ccc-" ) );
+   BOOST_CHECK( !is_valid_name( "aaa-bbb-ccc." ) );
+   BOOST_CHECK( !is_valid_name( "aaa-bbb-ccc.." ) );
+   BOOST_CHECK( !is_valid_name( "aaa-bbb-ccc/" ) );
 
-   BOOST_REQUIRE( !is_valid_name( "aaa..bbb-1" ) );
-   BOOST_REQUIRE( is_valid_name( "aaa.bbb-1" ) );
-   BOOST_REQUIRE( !is_valid_name( "aaa.bbb.1" ) );
+   BOOST_CHECK( !is_valid_name( "aaa..bbb-ccc" ) );
+   BOOST_CHECK( is_valid_name( "aaa.bbb-ccc" ) );
+   BOOST_CHECK( is_valid_name( "aaa.bbb.ccc" ) );
 
-   BOOST_REQUIRE( !is_valid_name( "aaa--bbb--1" ) );
-   BOOST_REQUIRE( !is_valid_name( "xn--sandmnnchen-p8a.de" ) );
-   BOOST_REQUIRE( is_valid_name( "xn-sandmnnchen-p8a.de" ) );
+   BOOST_CHECK(  is_valid_name( "aaa--bbb--ccc" ) );
+   BOOST_CHECK( !is_valid_name( "xn--sandmnnchen-p8a.de" ) );
+   BOOST_CHECK(  is_valid_name( "xn--sandmnnchen-p8a.dex" ) );
+   BOOST_CHECK( !is_valid_name( "xn-sandmnnchen-p8a.de" ) );
+   BOOST_CHECK(  is_valid_name( "xn-sandmnnchen-p8a.dex" ) );
 
-   BOOST_REQUIRE( is_valid_name( "this-label-has-less-than-64-char.acters-63-to-be-really-precise" ) );
-   BOOST_REQUIRE( !is_valid_name( "this-label-has-more-than-63-char.act.ers-64-to-be-really-precise" ) );
-   BOOST_REQUIRE( !is_valid_name( "none.of.these.labels.has.more.than-63.chars--but.still.not.valid" ) );
+   BOOST_CHECK(  is_valid_name( "this-label-has-less-than-64-char.acters-63-to-be-really-precise" ) );
+   BOOST_CHECK( !is_valid_name( "this-label-has-more-than-63-char.act.ers-64-to-be-really-precise" ) );
+   BOOST_CHECK( !is_valid_name( "none.of.these.labels.has.more.than-63.chars--but.still.not.valid" ) );
 }
 
 BOOST_AUTO_TEST_CASE( valid_symbol_test )
 {
-   BOOST_REQUIRE( !is_valid_symbol( "A" ) );
-   BOOST_REQUIRE( !is_valid_symbol( "a" ) );
-   BOOST_REQUIRE( !is_valid_symbol( "0" ) );
-   BOOST_REQUIRE( !is_valid_symbol( "." ) );
+   BOOST_CHECK( !is_valid_symbol( "A" ) );
+   BOOST_CHECK( !is_valid_symbol( "a" ) );
+   BOOST_CHECK( !is_valid_symbol( "0" ) );
+   BOOST_CHECK( !is_valid_symbol( "." ) );
 
-   BOOST_REQUIRE( !is_valid_symbol( "AA" ) );
-   BOOST_REQUIRE( !is_valid_symbol( "Aa" ) );
-   BOOST_REQUIRE( !is_valid_symbol( "A0" ) );
-   BOOST_REQUIRE( !is_valid_symbol( "A." ) );
+   BOOST_CHECK( !is_valid_symbol( "AA" ) );
+   BOOST_CHECK( !is_valid_symbol( "Aa" ) );
+   BOOST_CHECK( !is_valid_symbol( "A0" ) );
+   BOOST_CHECK( !is_valid_symbol( "A." ) );
 
-   BOOST_REQUIRE( is_valid_symbol( "AAA" ) );
-   BOOST_REQUIRE( !is_valid_symbol( "AaA" ) );
-   BOOST_REQUIRE( !is_valid_symbol( "A0A" ) );
-   BOOST_REQUIRE( is_valid_symbol( "A.A" ) );
+   BOOST_CHECK( is_valid_symbol( "AAA" ) );
+   BOOST_CHECK( !is_valid_symbol( "AaA" ) );
+   BOOST_CHECK( !is_valid_symbol( "A0A" ) );
+   BOOST_CHECK( is_valid_symbol( "A.A" ) );
 
-   BOOST_REQUIRE( !is_valid_symbol( "A..A" ) );
-   BOOST_REQUIRE( !is_valid_symbol( "A.A." ) );
-   BOOST_REQUIRE( !is_valid_symbol( "A.A.A" ) );
+   BOOST_CHECK( !is_valid_symbol( "A..A" ) );
+   BOOST_CHECK( !is_valid_symbol( "A.A." ) );
+   BOOST_CHECK( !is_valid_symbol( "A.A.A" ) );
 
-   BOOST_REQUIRE( is_valid_symbol( "AAAAAAAAAAAAAAAA" ) );
-   BOOST_REQUIRE( !is_valid_symbol( "AAAAAAAAAAAAAAAAA" ) );
-   BOOST_REQUIRE( is_valid_symbol( "A.AAAAAAAAAAAAAA" ) );
-   BOOST_REQUIRE( !is_valid_symbol( "A.AAAAAAAAAAAA.A" ) );
+   BOOST_CHECK( is_valid_symbol( "AAAAAAAAAAAAAAAA" ) );
+   BOOST_CHECK( !is_valid_symbol( "AAAAAAAAAAAAAAAAA" ) );
+   BOOST_CHECK( is_valid_symbol( "A.AAAAAAAAAAAAAA" ) );
+   BOOST_CHECK( !is_valid_symbol( "A.AAAAAAAAAAAA.A" ) );
 }
 
 BOOST_AUTO_TEST_CASE( price_test )

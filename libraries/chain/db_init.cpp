@@ -140,6 +140,8 @@ void database::init_genesis(const genesis_state_type& genesis_state)
 { try {
    FC_ASSERT(genesis_state.initial_witness_candidates.size() > 0,
              "Cannot start a chain with zero witnesses.");
+   FC_ASSERT(genesis_state.initial_active_witnesses <= genesis_state.initial_witness_candidates.size(),
+             "initial_active_witnesses is larger than the number of candidate witnesses.");
 
    _undo_db.disable();
    struct auth_inhibitor {
@@ -252,24 +254,12 @@ void database::init_genesis(const genesis_state_type& genesis_state)
    // Create initial accounts
    for( const auto& account : genesis_state.initial_accounts )
    {
-      /*
-      key_id_type key_id = apply_operation(genesis_eval_state,
-                                           key_create_operation({asset(),
-                                                                 GRAPHENE_TEMP_ACCOUNT,
-                                                                 account.owner_key})).get<object_id_type>();
-                                                                 */
       account_create_operation cop;
       cop.name = account.name;
       cop.registrar = GRAPHENE_TEMP_ACCOUNT;
       cop.owner = authority(1, account.owner_key, 1);
       if( account.owner_key != account.active_key )
       {
-         /*
-         key_id = apply_operation(genesis_eval_state,
-                                  key_create_operation({asset(),
-                                                        GRAPHENE_TEMP_ACCOUNT,
-                                                        account.owner_key})).get<object_id_type>();
-                                                        */
          cop.active = authority(1, account.owner_key, 1);
       } else {
          cop.active = cop.owner;
@@ -286,21 +276,27 @@ void database::init_genesis(const genesis_state_type& genesis_state)
       }
    }
 
+   // Helper function to get account ID by name
    const auto& accounts_by_name = get_index_type<account_index>().indices().get<by_name>();
    auto get_account_id = [&accounts_by_name](const string& name) {
       auto itr = accounts_by_name.find(name);
-      FC_ASSERT(itr != accounts_by_name.end());
+      FC_ASSERT(itr != accounts_by_name.end(),
+                "Unable to find account '${acct}'. Did you forget to add a record for it to initial_accounts?",
+                ("acct", name));
+      return itr->get_id();
+   };
+
+   // Helper function to get asset ID by symbol
+   const auto& assets_by_symbol = get_index_type<asset_index>().indices().get<by_symbol>();
+   auto get_asset_id = [&assets_by_symbol](const string& symbol) {
+      auto itr = assets_by_symbol.find(symbol);
+      FC_ASSERT(itr != assets_by_symbol.end(),
+                "Unable to find asset '${sym}'. Did you forget to add a record for it to initial_assets?",
+                ("sym", symbol));
       return itr->get_id();
    };
 
    // Create initial assets
-   const auto& assets_by_symbol = get_index_type<asset_index>().indices().get<by_symbol>();
-   auto get_asset_id = [&assets_by_symbol](const string& symbol) {
-      auto itr = assets_by_symbol.find(symbol);
-      FC_ASSERT(itr != assets_by_symbol.end());
-      return itr->get_id();
-   };
-
    for( const genesis_state_type::initial_asset_type& asset : genesis_state.initial_assets )
    {
       asset_dynamic_data_id_type dynamic_data_id;
@@ -314,12 +310,6 @@ void database::init_genesis(const genesis_state_type& genesis_state)
          int collateral_holder_number = 0;
          for( const auto& collateral_rec : asset.bitasset_options->collateral_records )
          {
-            /*
-            key_id_type key_id = apply_operation(genesis_eval_state,
-                                                 key_create_operation{{},
-                                                                      GRAPHENE_TEMP_ACCOUNT,
-                                                                      collateral_rec.owner}).get<object_id_type>();
-                                                                      */
             account_create_operation cop;
             cop.name = asset.symbol + "-collateral-holder-" + std::to_string(collateral_holder_number);
             boost::algorithm::to_lower(cop.name);
@@ -415,17 +405,11 @@ void database::init_genesis(const genesis_state_type& genesis_state)
    // Create initial witnesses and delegates
    std::for_each(genesis_state.initial_witness_candidates.begin(), genesis_state.initial_witness_candidates.end(),
                  [&](const genesis_state_type::initial_witness_type& witness) {
-                 /*
-      const key_object& signing_key = create<key_object>([&witness](key_object& k) {
-         k.key_data = witness.block_signing_key;
-      });
-      */
-
       witness_create_operation op;
       op.block_signing_key = witness.block_signing_key;
       op.initial_secret = witness.initial_secret;
       op.witness_account = get_account_id(witness.owner_name);
-      apply_operation(genesis_eval_state, op).get<object_id_type>();
+      apply_operation(genesis_eval_state, op);
    });
    std::for_each(genesis_state.initial_committee_candidates.begin(), genesis_state.initial_committee_candidates.end(),
                  [&](const genesis_state_type::initial_committee_member_type& member) {
@@ -459,10 +443,10 @@ void database::init_genesis(const genesis_state_type& genesis_state)
       auto init_witnesses = get_global_properties().active_witnesses;
 
       _wso.scheduler = witness_scheduler();
-      _wso.scheduler._min_token_count = init_witnesses.size() / 2;
+      _wso.scheduler._min_token_count = std::max(int(init_witnesses.size()) / 2, 1);
       _wso.scheduler.update(init_witnesses);
 
-      for( size_t i=0; i<init_witnesses.size(); i++ )
+      for( size_t i=0; i<init_witnesses.size(); ++i )
          _wso.scheduler.produce_schedule(rng);
 
       _wso.last_scheduling_block = 0;

@@ -41,7 +41,8 @@ genesis_state_type make_genesis() {
    fc::raw::pack(enc, delegate_priv_key);
    fc::raw::pack(enc, secret_hash_type());
    auto secret = secret_hash_type::hash(enc.result());
-   for( int i = 0; i < 10; ++i )
+   genesis_state.initial_active_witnesses = 10;
+   for( int i = 0; i < genesis_state.initial_active_witnesses; ++i )
    {
       auto name = "init"+fc::to_string(i);
       genesis_state.initial_accounts.emplace_back(name,
@@ -584,19 +585,19 @@ BOOST_FIXTURE_TEST_CASE( limit_order_expiration, database_fixture )
 BOOST_FIXTURE_TEST_CASE( double_sign_check, database_fixture )
 { try {
    generate_block();
-   const auto& from = account_id_type()(db);
-   ACTOR(to);
+   const auto& alice = account_id_type()(db);
+   ACTOR(bob);
    asset amount(1000);
 
    trx.set_expiration(db.head_block_time() + fc::minutes(1));
-   trx.operations.push_back(transfer_operation({ asset(), from.id, to.id, amount, memo_data() }));
+   trx.operations.push_back(transfer_operation({ asset(), alice.id, bob.id, amount, memo_data() }));
    for( auto& op : trx.operations ) op.visit(operation_set_fee(db.current_fee_schedule()));
    trx.validate();
 
    db.push_transaction(trx, ~0);
 
    trx.operations.clear();
-   trx.operations.push_back(transfer_operation({ asset(), to.id, from.id, amount, memo_data() }));
+   trx.operations.push_back(transfer_operation({ asset(), bob.id, alice.id, amount, memo_data() }));
    for( auto& op : trx.operations ) op.visit(operation_set_fee(db.current_fee_schedule()));
    trx.validate();
 
@@ -604,8 +605,8 @@ BOOST_FIXTURE_TEST_CASE( double_sign_check, database_fixture )
    BOOST_REQUIRE_THROW( db.push_transaction(trx, 0), fc::exception );
 
    BOOST_TEST_MESSAGE( "Verify that double-signing causes an exception" );
-   trx.sign(to_private_key);
-   trx.sign(to_private_key);
+   trx.sign(bob_private_key);
+   trx.sign(bob_private_key);
    BOOST_REQUIRE_THROW( db.push_transaction(trx, 0), fc::exception );
 
    BOOST_TEST_MESSAGE( "Verify that signing with an extra, unused key fails" );
@@ -616,7 +617,7 @@ BOOST_FIXTURE_TEST_CASE( double_sign_check, database_fixture )
    BOOST_TEST_MESSAGE( "Verify that signing once with the proper key passes" );
    trx.signatures.pop_back();
    db.push_transaction(trx, 0);
-   trx.sign(to_private_key);
+   trx.sign(bob_private_key);
 
 } FC_LOG_AND_RETHROW() }
 

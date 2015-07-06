@@ -64,7 +64,8 @@ database_fixture::database_fixture()
    fc::raw::pack(enc, delegate_priv_key);
    fc::raw::pack(enc, secret_hash_type());
    auto secret = secret_hash_type::hash(enc.result());
-   for( int i = 0; i < 10; ++i )
+   genesis_state.initial_active_witnesses = 10;
+   for( int i = 0; i < genesis_state.initial_active_witnesses; ++i )
    {
       auto name = "init"+fc::to_string(i);
       genesis_state.initial_accounts.emplace_back(name,
