@@ -59,7 +59,7 @@ namespace detail {
       dlog("Allocating all stake to ${key}", ("key", utilities::key_to_wif(nathan_key)));
       genesis_state_type initial_state;
       fc::reflector<fee_schedule_type>::visit(
-               fee_schedule_type::fee_set_visitor{initial_state.initial_parameters.current_fees, 0});
+               fee_schedule_type::fee_set_visitor{initial_state.initial_parameters.current_fees, GRAPHENE_BLOCKCHAIN_PRECISION});
       secret_hash_type::encoder enc;
       fc::raw::pack(enc, nathan_key);
       fc::raw::pack(enc, secret_hash_type());
