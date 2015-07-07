@@ -42,8 +42,6 @@ BOOST_FIXTURE_TEST_SUITE( operation_tests, database_fixture )
 
 BOOST_AUTO_TEST_CASE( withdraw_permission_create )
 { try {
-   //ACTORS((nathan)(dan))
-   //idump((nathan)(dan));
    auto nathan_private_key = generate_private_key("nathan");
    auto dan_private_key = generate_private_key("dan");
    account_id_type nathan_id = create_account("nathan", nathan_private_key.get_public_key()).id;
@@ -1031,6 +1029,7 @@ BOOST_AUTO_TEST_CASE( balance_object_test )
 
    auto slot = db.get_slot_at_time(starting_time);
    db.generate_block(starting_time, db.get_scheduled_witness(slot).first, delegate_priv_key, database::skip_nothing);
+   trx.set_expiration(db.head_block_id());
 
    const balance_object& vesting_balance_1 = balance_id_type(2)(db);
    const balance_object& vesting_balance_2 = balance_id_type(3)(db);
@@ -1045,7 +1044,6 @@ BOOST_AUTO_TEST_CASE( balance_object_test )
    op.total_claimed = asset(1);
    op.balance_owner_key = v1_key.get_public_key();
    trx.clear();
-   trx.set_expiration(db.head_block_id());
    trx.operations = {op};
    trx.sign(n_key);
    trx.sign(v1_key);
@@ -1070,8 +1068,9 @@ BOOST_AUTO_TEST_CASE( balance_object_test )
    trx.sign(n_key);
    trx.sign(v2_key);
    db.push_transaction(trx);
-
    BOOST_CHECK_EQUAL(db.get_balance(op.deposit_to_account, asset_id_type()).amount.value, 101);
+   BOOST_CHECK_EQUAL(vesting_balance_2.balance.amount.value, 300);
+
    op.total_claimed.amount = 10;
    trx.operations = {op};
    trx.signatures.clear();
@@ -1080,23 +1079,47 @@ BOOST_AUTO_TEST_CASE( balance_object_test )
    // Attempting to claim twice within a day
    BOOST_CHECK_THROW(db.push_transaction(trx), balance_claimed_too_often);
 
-// TODO: test withdrawing entire vesting_balance_1 balance, remainder of vesting_balance_2 balance
-//   slot = db.get_slot_at_time(vesting_balance_1.vesting_policy->begin_timestamp + 60);
-//   db.generate_block(starting_time, db.get_scheduled_witness(slot).first, delegate_priv_key, database::skip_nothing);
+   db.generate_block(db.get_slot_time(1), db.get_scheduled_witness(1).first, delegate_priv_key, database::skip_nothing);
+   slot = db.get_slot_at_time(vesting_balance_1.vesting_policy->begin_timestamp + 60);
+   db.generate_block(db.get_slot_time(slot), db.get_scheduled_witness(slot).first, delegate_priv_key, database::skip_nothing);
+   trx.set_expiration(db.head_block_id());
 
-//   op.balance_to_claim = vesting_balance_1.id;
-//   op.total_claimed.amount = 500;
-//   op.balance_owner_key = v1_key.get_public_key();
-//   trx.operations = {op};
-//   trx.signatures.clear();
-//   trx.sign(n_key);
-//   trx.sign(v2_key);
-//   db.push_transaction(trx);
-//   BOOST_CHECK(db.find_object(op.balance_to_claim) == nullptr);
+   op.balance_to_claim = vesting_balance_1.id;
+   op.total_claimed.amount = 500;
+   op.balance_owner_key = v1_key.get_public_key();
+   trx.operations = {op};
+   trx.signatures.clear();
+   trx.sign(n_key);
+   trx.sign(v1_key);
+   db.push_transaction(trx);
+   BOOST_CHECK(db.find_object(op.balance_to_claim) == nullptr);
+   BOOST_CHECK_EQUAL(db.get_balance(op.deposit_to_account, asset_id_type()).amount.value, 601);
+
+   op.balance_to_claim = vesting_balance_2.id;
+   op.balance_owner_key = v2_key.get_public_key();
+   op.total_claimed.amount = 10;
+   trx.operations = {op};
+   trx.signatures.clear();
+   trx.sign(n_key);
+   trx.sign(v2_key);
+   // Attempting to claim twice within a day
+   BOOST_CHECK_THROW(db.push_transaction(trx), balance_claimed_too_often);
+
+   db.generate_block(db.get_slot_time(1), db.get_scheduled_witness(1).first, delegate_priv_key, database::skip_nothing);
+   slot = db.get_slot_at_time(db.head_block_time() + fc::days(1));
+   db.generate_block(db.get_slot_time(slot), db.get_scheduled_witness(slot).first, delegate_priv_key, database::skip_nothing);
+   trx.set_expiration(db.head_block_id());
+
+   op.total_claimed = vesting_balance_2.balance;
+   trx.operations = {op};
+   trx.signatures.clear();
+   trx.sign(n_key);
+   trx.sign(v2_key);
+   db.push_transaction(trx);
+   BOOST_CHECK(db.find_object(op.balance_to_claim) == nullptr);
+   BOOST_CHECK_EQUAL(db.get_balance(op.deposit_to_account, asset_id_type()).amount.value, 901);
 } FC_LOG_AND_RETHROW() }
 
 // TODO:  Write linear VBO tests
 
 BOOST_AUTO_TEST_SUITE_END()
-
-

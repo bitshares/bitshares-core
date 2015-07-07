@@ -322,8 +322,6 @@ namespace graphene { namespace chain {
          // return ((fc::uint128(data_size(ts...)) * data_fee) / BYTES_PER_DATA_FEE).to_uint64();
       }
 
-
-
       /**
        *  Standard fees 
        *
