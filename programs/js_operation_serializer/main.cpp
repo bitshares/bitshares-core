@@ -138,7 +138,6 @@ template<typename A> struct js_sv_name<A>
 template<typename A, typename... T>
 struct js_sv_name<A,T...> { static std::string name(){ return  "\n    " + js_name<A>::name() +"    " + js_sv_name<T...>::name(); } };
 
-
 template<typename... T>
 struct js_name< fc::static_variant<T...> >
 {
@@ -149,6 +148,17 @@ struct js_name< fc::static_variant<T...> >
       else return name;
    }
 };
+template<>
+struct js_name< fc::static_variant<> >
+{
+   static std::string name( std::string n = ""){
+      static const std::string name = n;
+      if( name == "" )
+         return "static_variant []";
+      else return name;
+   }
+};
+
 
 
 template<typename T, bool reflected = fc::reflector<T>::is_defined::value>
@@ -279,6 +289,26 @@ struct serializer< fc::static_variant<T...>, false >
       std::cout <<  js_name<fc::static_variant<T...>>::name() << " = static_variant [" + js_sv_name<T...>::name() + "\n]\n\n";
    }
 };
+template<>
+struct serializer< fc::static_variant<>, false >
+{
+   static void init()
+   {
+      static bool init = false;
+      if( !init )
+      {
+         init = true;
+         fc::static_variant<> var;
+         register_serializer( js_name<fc::static_variant<>>::name(), [=](){ generate(); } );
+      }
+   }
+
+   static void generate()
+   {
+      std::cout <<  js_name<fc::static_variant<>>::name() << " = static_variant []\n\n";
+   }
+};
+
 
 class register_member_visitor
 {
@@ -337,6 +367,7 @@ int main( int argc, char** argv )
     detail_ns::js_name<static_variant<address,public_key_type>>::name("key_data");
     detail_ns::js_name<operation_result>::name("operation_result");
     detail_ns::js_name<header_extension>::name("header_extension");
+    detail_ns::js_name<parameter_extension>::name("parameter_extension");
     detail_ns::js_name<static_variant<refund_worker_type::initializer, vesting_balance_worker_type::initializer,burn_worker_type::initializer>>::name("worker_initializer");
     detail_ns::js_name<static_variant<linear_vesting_policy_initializer,cdd_vesting_policy_initializer>>::name("vesting_policy_initializer");
     detail_ns::serializer<signed_block>::init();

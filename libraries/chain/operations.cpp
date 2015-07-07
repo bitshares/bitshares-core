@@ -492,7 +492,7 @@ void limit_order_cancel_operation::validate()const
 
 share_type limit_order_cancel_operation::calculate_fee(const fee_schedule_type& k) const
 {
-   return k.get_advanced_fee(fee_schedule_type::limit_order_cancel_fee_id);
+   return k.get_extended_fee(fee_schedule_type::limit_order_cancel_fee_id);
 }
 
 void call_order_update_operation::get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>&) const
@@ -594,7 +594,7 @@ void proposal_delete_operation::get_required_auth(flat_set<account_id_type>& act
         active_auth_set.insert(fee_paying_account);
 }
 share_type proposal_delete_operation::calculate_fee(const fee_schedule_type& k)const
-{ return k.get_advanced_fee( fee_schedule_type::proposal_delete_fee_id ); }
+{ return k.get_extended_fee( fee_schedule_type::proposal_delete_fee_id ); }
 
 void account_transfer_operation::validate()const
 {
@@ -717,7 +717,7 @@ void withdraw_permission_delete_operation::validate() const
 
 share_type withdraw_permission_delete_operation::calculate_fee(const fee_schedule_type& k) const
 {
-   return k.get_advanced_fee( fee_schedule_type::withdraw_permission_delete_fee_id );
+   return k.get_extended_fee( fee_schedule_type::withdraw_permission_delete_fee_id );
 }
 
 void withdraw_permission_create_operation::get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>&) const

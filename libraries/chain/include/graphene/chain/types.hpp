@@ -386,24 +386,24 @@ namespace graphene { namespace chain {
        * protocol serialization.
        */
       ///@{
-      enum advanced_fee_id
+      enum extended_fee_id
       {
           withdraw_permission_delete_fee_id = 1, ///< the cost to delete a withdraw permission
           proposal_delete_fee_id            = 2, ///< fee for deleting a proposed transaction
           limit_order_cancel_fee_id         = 3  ///< fee for canceling a limit order
       };
 
-      uint64_t get_advanced_fee( advanced_fee_id id )const
+      uint64_t get_extended_fee( extended_fee_id id )const
       {
-         auto itr = advanced.find(id);
-         if( itr == advanced.end() ) return 0;
+         auto itr = extended.find(id);
+         if( itr == extended.end() ) return 0;
          return itr->second;
       }
 
-      uint64_t withdraw_permission_delete_fee()const {  return get_advanced_fee( withdraw_permission_delete_fee_id ); } 
+      uint64_t withdraw_permission_delete_fee()const {  return get_extended_fee( withdraw_permission_delete_fee_id ); } 
 
 
-      flat_map<unsigned_int,uint64_t> advanced;
+      flat_map<unsigned_int,uint64_t> extended;
       ///@}
 
    protected:
@@ -443,6 +443,8 @@ namespace graphene { namespace chain {
        bool is_valid_v1( const std::string& base58str );
    };
 
+   typedef static_variant<>  parameter_extension;
+
    struct chain_parameters
    {
       fee_schedule_type       current_fees; ///< current schedule of fees
@@ -475,6 +477,7 @@ namespace graphene { namespace chain {
       share_type              fee_liquidation_threshold           = GRAPHENE_DEFAULT_FEE_LIQUIDATION_THRESHOLD; ///< value in CORE at which accumulated fees in blockchain-issued market assets should be liquidated
       uint16_t                accounts_per_fee_scale              = GRAPHENE_DEFAULT_ACCOUNTS_PER_FEE_SCALE; ///< number of accounts between fee scalings
       uint8_t                 account_fee_scale_bitshifts         = GRAPHENE_DEFAULT_ACCOUNT_FEE_SCALE_BITSHIFTS; ///< number of times to left bitshift account registration fee at each scaling
+      vector<parameter_extension> extensions;
 
       void validate()const
       {
@@ -603,9 +606,9 @@ FC_REFLECT( graphene::chain::fee_schedule_type,
             (assert_op_fee)
             (proposal_create_fee)
             (proposal_update_fee)
-            (advanced)
+            (extended)
           )
-FC_REFLECT_ENUM( graphene::chain::fee_schedule_type::advanced_fee_id, 
+FC_REFLECT_ENUM( graphene::chain::fee_schedule_type::extended_fee_id, 
                  (withdraw_permission_delete_fee_id)
                  (proposal_delete_fee_id)
                  (limit_order_cancel_fee_id) )
@@ -641,6 +644,7 @@ FC_REFLECT( graphene::chain::chain_parameters,
             (fee_liquidation_threshold)
             (accounts_per_fee_scale)
             (account_fee_scale_bitshifts)
+            (extensions)
           )
 
 FC_REFLECT_TYPENAME( graphene::chain::share_type )
