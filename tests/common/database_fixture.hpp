@@ -23,6 +23,8 @@
 
 using namespace graphene::db;
 
+#define GRAPHENE_TESTING_GENESIS_TIMESTAMP (1431700000)
+
 #define PUSH_TX \
    graphene::chain::test::_push_transaction
 
@@ -102,8 +104,6 @@ struct database_fixture {
    fc::ecc::private_key delegate_priv_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("null_key")) );
    public_key_type delegate_pub_key;
 
-   fc::time_point_sec genesis_time = fc::time_point_sec( GRAPHENE_GENESIS_TIMESTAMP );
-   fc::time_point_sec now          = fc::time_point_sec( GRAPHENE_GENESIS_TIMESTAMP );
    optional<fc::temp_directory> data_dir;
    bool skip_key_index_test = false;
    uint32_t anon_acct_count;

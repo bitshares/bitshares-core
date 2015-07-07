@@ -36,6 +36,9 @@ using namespace graphene::chain;
 
 genesis_state_type make_genesis() {
    genesis_state_type genesis_state;
+
+   genesis_state.initial_timestamp = time_point_sec( GRAPHENE_TESTING_GENESIS_TIMESTAMP );
+
    auto delegate_priv_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("null_key")));
    genesis_state.initial_active_witnesses = 10;
    for( int i = 0; i < genesis_state.initial_active_witnesses; ++i )
@@ -117,7 +120,7 @@ BOOST_AUTO_TEST_CASE( block_database_test )
 BOOST_AUTO_TEST_CASE( generate_empty_blocks )
 {
    try {
-      fc::time_point_sec now( GRAPHENE_GENESIS_TIMESTAMP );
+      fc::time_point_sec now( GRAPHENE_TESTING_GENESIS_TIMESTAMP );
       fc::temp_directory data_dir;
       signed_block b;
 
@@ -169,7 +172,7 @@ BOOST_AUTO_TEST_CASE( undo_block )
       {
          database db;
          db.open(data_dir.path(), make_genesis() );
-         fc::time_point_sec now( GRAPHENE_GENESIS_TIMESTAMP );
+         fc::time_point_sec now( GRAPHENE_TESTING_GENESIS_TIMESTAMP );
 
          auto delegate_priv_key  = fc::ecc::private_key::regenerate(fc::sha256::hash(string("null_key")) );
          for( uint32_t i = 0; i < 5; ++i )
@@ -205,7 +208,7 @@ BOOST_AUTO_TEST_CASE( fork_blocks )
    try {
       fc::temp_directory data_dir1;
       fc::temp_directory data_dir2;
-      fc::time_point_sec now( GRAPHENE_GENESIS_TIMESTAMP );
+      fc::time_point_sec now( GRAPHENE_TESTING_GENESIS_TIMESTAMP );
 
       database db1;
       db1.open(data_dir1.path(), make_genesis());
@@ -269,7 +272,7 @@ BOOST_AUTO_TEST_CASE( fork_blocks )
 BOOST_AUTO_TEST_CASE( undo_pending )
 {
    try {
-      fc::time_point_sec now(GRAPHENE_GENESIS_TIMESTAMP);
+      fc::time_point_sec now(GRAPHENE_TESTING_GENESIS_TIMESTAMP);
       fc::temp_directory data_dir;
       {
          database db;
@@ -334,7 +337,7 @@ BOOST_AUTO_TEST_CASE( switch_forks_undo_create )
       db1.open(dir1.path(), make_genesis());
       db2.open(dir2.path(), make_genesis());
 
-      fc::time_point_sec now( GRAPHENE_GENESIS_TIMESTAMP );
+      fc::time_point_sec now( GRAPHENE_TESTING_GENESIS_TIMESTAMP );
       auto delegate_priv_key  = fc::ecc::private_key::regenerate(fc::sha256::hash(string("null_key")) );
       public_key_type delegate_pub_key  = delegate_priv_key.get_public_key();
       const graphene::db::index& account_idx = db1.get_index(protocol_ids, account_object_type);
@@ -355,7 +358,7 @@ BOOST_AUTO_TEST_CASE( switch_forks_undo_create )
 
       BOOST_CHECK(nathan_id(db1).name == "nathan");
 
-      now = fc::time_point_sec( GRAPHENE_GENESIS_TIMESTAMP );
+      now = fc::time_point_sec( GRAPHENE_TESTING_GENESIS_TIMESTAMP );
       now += db2.block_interval();
       b =  db2.generate_block(now, db2.get_scheduled_witness(1).first, delegate_priv_key, database::skip_nothing);
       db1.push_block(b);
@@ -384,7 +387,7 @@ BOOST_AUTO_TEST_CASE( switch_forks_undo_create )
 BOOST_AUTO_TEST_CASE( duplicate_transactions )
 {
    try {
-      fc::time_point_sec now( GRAPHENE_GENESIS_TIMESTAMP );
+      fc::time_point_sec now( GRAPHENE_TESTING_GENESIS_TIMESTAMP );
       fc::temp_directory dir1,
                          dir2;
       database db1,
@@ -433,7 +436,7 @@ BOOST_AUTO_TEST_CASE( duplicate_transactions )
 BOOST_AUTO_TEST_CASE( tapos )
 {
    try {
-      fc::time_point_sec now( GRAPHENE_GENESIS_TIMESTAMP );
+      fc::time_point_sec now( GRAPHENE_TESTING_GENESIS_TIMESTAMP );
       fc::temp_directory dir1,
                          dir2;
       database db1,

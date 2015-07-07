@@ -60,6 +60,8 @@ database_fixture::database_fixture()
    mhplugin->plugin_set_app(&app);
    mhplugin->plugin_initialize(options);
 
+   genesis_state.initial_timestamp = time_point_sec( GRAPHENE_TESTING_GENESIS_TIMESTAMP );
+
    genesis_state.initial_active_witnesses = 10;
    for( int i = 0; i < genesis_state.initial_active_witnesses; ++i )
    {

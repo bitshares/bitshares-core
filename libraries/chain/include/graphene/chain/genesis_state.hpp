@@ -124,6 +124,6 @@ FC_REFLECT(graphene::chain::genesis_state_type::initial_committee_member_type, (
 FC_REFLECT(graphene::chain::genesis_state_type::initial_worker_type, (owner_name)(daily_pay))
 
 FC_REFLECT(graphene::chain::genesis_state_type,
-           (initial_parameters)(initial_accounts)(initial_assets)(initial_balances)
+           (initial_timestamp)(initial_parameters)(initial_accounts)(initial_assets)(initial_balances)
            (initial_vesting_balances)(initial_active_witnesses)(initial_witness_candidates)
            (initial_committee_candidates)(initial_worker_candidates))

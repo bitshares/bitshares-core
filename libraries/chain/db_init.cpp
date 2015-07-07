@@ -138,6 +138,9 @@ void database::initialize_indexes()
 
 void database::init_genesis(const genesis_state_type& genesis_state)
 { try {
+   FC_ASSERT( genesis_state.initial_timestamp != time_point_sec(), "Must initialize genesis timestamp." );
+   FC_ASSERT( genesis_state.initial_timestamp.sec_since_epoch() % GRAPHENE_DEFAULT_BLOCK_INTERVAL == 0,
+              "Genesis timestamp must be divisible by GRAPHENE_DEFAULT_BLOCK_INTERVAL." );
    FC_ASSERT(genesis_state.initial_witness_candidates.size() > 0,
              "Cannot start a chain with zero witnesses.");
    FC_ASSERT(genesis_state.initial_active_witnesses <= genesis_state.initial_witness_candidates.size(),
@@ -246,7 +249,7 @@ void database::init_genesis(const genesis_state_type& genesis_state)
 
    });
    create<dynamic_global_property_object>( [&](dynamic_global_property_object& p) {
-      p.time = fc::time_point_sec(GRAPHENE_GENESIS_TIMESTAMP);
+      p.time = genesis_state.initial_timestamp;
       p.witness_budget = 0;
    });
    create<block_summary_object>([&](block_summary_object&) {});
@@ -426,7 +429,7 @@ void database::init_genesis(const genesis_state_type& genesis_state)
    {
        worker_create_operation op;
        op.owner = get_account_id( worker.owner_name );
-       op.work_begin_date = time_point_sec( GRAPHENE_GENESIS_TIMESTAMP );
+       op.work_begin_date = genesis_state.initial_timestamp;
        op.work_end_date = time_point_sec::maximum();
        op.daily_pay = worker.daily_pay;
        op.name = "Genesis-Worker-" + worker.owner_name;

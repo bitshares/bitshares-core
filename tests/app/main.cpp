@@ -40,7 +40,8 @@ BOOST_AUTO_TEST_CASE( two_node_network )
       fc::temp_directory app2_dir;
       fc::temp_file genesis_json;
 
-      fc::time_point_sec now( GRAPHENE_GENESIS_TIMESTAMP );
+      // TODO: Time should be read from the blockchain
+      fc::time_point_sec now( 1431700000 );
 
       graphene::app::application app1;
       app1.register_plugin<graphene::account_history::account_history_plugin>();
