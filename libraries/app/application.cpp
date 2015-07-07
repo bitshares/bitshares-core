@@ -61,6 +61,9 @@ namespace detail {
       genesis_state_type initial_state;
       initial_state.initial_parameters.current_fees.set_all_fees(GRAPHENE_BLOCKCHAIN_PRECISION);
       initial_state.initial_active_witnesses = 10;
+      initial_state.initial_timestamp = time_point_sec(time_point::now().sec_since_epoch() /
+            initial_state.initial_parameters.block_interval *
+            initial_state.initial_parameters.block_interval);
       for( int i = 0; i < initial_state.initial_active_witnesses; ++i )
       {
          auto name = "init"+fc::to_string(i);
