@@ -26,6 +26,7 @@
 #include <graphene/chain/account_object.hpp>
 #include <graphene/chain/proposal_object.hpp>
 #include <graphene/chain/witness_schedule_object.hpp>
+#include <graphene/chain/vesting_balance_object.hpp>
 
 #include <fc/crypto/digest.hpp>
 
@@ -400,5 +401,92 @@ BOOST_FIXTURE_TEST_CASE( generic_scheduler_mc_test, database_fixture )
       throw;
    }
 }
+
+BOOST_FIXTURE_TEST_CASE( tapos_rollover, database_fixture )
+{
+   try
+   {
+      ACTORS((alice)(bob));
+      const auto& core   = asset_id_type()(db);
+
+      BOOST_TEST_MESSAGE( "Give Alice some money" );
+      transfer(genesis_account, alice_id, asset(10000));
+      generate_block();
+
+      BOOST_TEST_MESSAGE( "Generate up to block 0xFF00" );
+      generate_blocks( 0xFF00 );
+      signed_transaction xfer_tx;
+
+      BOOST_TEST_MESSAGE( "Transfer money at/about 0xFF00" );
+      transfer_operation xfer_op;
+      xfer_op.from = alice_id;
+      xfer_op.to = bob_id;
+      xfer_op.amount = asset(1000);
+
+      xfer_tx.operations.push_back( xfer_op );
+      xfer_tx.set_expiration( db.head_block_id(), 0x1000 );
+      sign( xfer_tx, alice_private_key );
+      PUSH_TX( db, xfer_tx, 0 );
+      generate_block();
+
+      BOOST_TEST_MESSAGE( "Sign new tx's" );
+      xfer_tx.set_expiration( db.head_block_id(), 0x1000 );
+      xfer_tx.signatures.clear();
+      sign( xfer_tx, alice_private_key );
+
+      BOOST_TEST_MESSAGE( "Generate up to block 0x10010" );
+      generate_blocks( 0x110 );
+
+      BOOST_TEST_MESSAGE( "Transfer at/about block 0x10010 using reference block at/about 0xFF00" );
+      PUSH_TX( db, xfer_tx, 0 );
+      generate_block();
+   }
+   catch (fc::exception& e)
+   {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
+BOOST_FIXTURE_TEST_CASE(bulk_discount, database_fixture)
+{ try {
+   ACTOR(nathan);
+   // Give nathan ALLLLLL the money!
+   transfer(GRAPHENE_COMMITTEE_ACCOUNT, nathan_id, db.get_balance(GRAPHENE_COMMITTEE_ACCOUNT, asset_id_type()));
+   enable_fees(GRAPHENE_BLOCKCHAIN_PRECISION*10);
+   upgrade_to_lifetime_member(nathan_id);
+   share_type new_fees;
+   while( nathan_id(db).statistics(db).lifetime_fees_paid + new_fees < GRAPHENE_DEFAULT_BULK_DISCOUNT_THRESHOLD_MIN )
+   {
+      transfer(nathan_id, GRAPHENE_COMMITTEE_ACCOUNT, asset(1));
+      new_fees += transfer_operation().calculate_fee(db.current_fee_schedule());
+   }
+   generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+   enable_fees(GRAPHENE_BLOCKCHAIN_PRECISION*10);
+   auto old_cashback = nathan_id(db).cashback_balance(db).balance;
+
+   transfer(nathan_id, GRAPHENE_COMMITTEE_ACCOUNT, asset(1));
+   generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+   enable_fees(GRAPHENE_BLOCKCHAIN_PRECISION*10);
+
+   BOOST_CHECK_EQUAL(nathan_id(db).cashback_balance(db).balance.amount.value,
+                     old_cashback.amount.value + GRAPHENE_BLOCKCHAIN_PRECISION * 8);
+
+   new_fees = 0;
+   while( nathan_id(db).statistics(db).lifetime_fees_paid + new_fees < GRAPHENE_DEFAULT_BULK_DISCOUNT_THRESHOLD_MAX )
+   {
+      transfer(nathan_id, GRAPHENE_COMMITTEE_ACCOUNT, asset(1));
+      new_fees += transfer_operation().calculate_fee(db.current_fee_schedule());
+   }
+   generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+   enable_fees(GRAPHENE_BLOCKCHAIN_PRECISION*10);
+   old_cashback = nathan_id(db).cashback_balance(db).balance;
+
+   transfer(nathan_id, GRAPHENE_COMMITTEE_ACCOUNT, asset(1));
+   generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+
+   BOOST_CHECK_EQUAL(nathan_id(db).cashback_balance(db).balance.amount.value,
+                     old_cashback.amount.value + GRAPHENE_BLOCKCHAIN_PRECISION * 9);
+} FC_LOG_AND_RETHROW() }
 
 BOOST_AUTO_TEST_SUITE_END()
