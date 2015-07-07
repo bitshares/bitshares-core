@@ -1328,6 +1328,32 @@ public:
       return sign_transaction( tx, broadcast );
    } FC_CAPTURE_AND_RETHROW( (account_to_modify)(voting_account)(broadcast) ) }
 
+   signed_transaction set_desired_witness_and_delegate_count(string account_to_modify,
+                                                             uint16_t desired_number_of_witnesses,
+                                                             uint16_t desired_number_of_delegates,
+                                                             bool broadcast /* = false */)
+   { try {
+      account_object account_object_to_modify = get_account(account_to_modify);
+
+      if (account_object_to_modify.options.num_witness == desired_number_of_witnesses &&
+          account_object_to_modify.options.num_committee == desired_number_of_delegates)
+         FC_THROW("Account ${account} is already voting for ${witnesses} witnesses and ${delegates} delegates", 
+                  ("account", account_to_modify)("witnesses", desired_number_of_witnesses)("delegates",desired_number_of_witnesses));
+      account_object_to_modify.options.num_witness = desired_number_of_witnesses;
+      account_object_to_modify.options.num_committee = desired_number_of_delegates;
+
+      account_update_operation account_update_op;
+      account_update_op.account = account_object_to_modify.id;
+      account_update_op.new_options = account_object_to_modify.options;
+
+      signed_transaction tx;
+      tx.operations.push_back( account_update_op );
+      tx.visit( operation_set_fee( _remote_db->get_global_properties().parameters.current_fees ) );
+      tx.validate();
+
+      return sign_transaction( tx, broadcast );
+   } FC_CAPTURE_AND_RETHROW( (account_to_modify)(desired_number_of_witnesses)(desired_number_of_delegates)(broadcast) ) }
+
    signed_transaction sign_transaction(signed_transaction tx, bool broadcast = false)
    {
       flat_set<account_id_type> req_active_approvals;
@@ -1895,7 +1921,10 @@ bool wallet_api::import_key(string account_name_or_id, string wif_key)
 {
    FC_ASSERT(!is_locked());
    // backup wallet
-   string shorthash = detail::address_to_shorthash(wif_to_key(wif_key)->get_public_key());
+   fc::optional<fc::ecc::private_key> optional_private_key = wif_to_key(wif_key);
+   if (!optional_private_key)
+      FC_THROW("Invalid private key ${key}", ("key", wif_key));
+   string shorthash = detail::address_to_shorthash(optional_private_key->get_public_key());
    copy_wallet_file( "before-import-key-" + shorthash );
 
    if( my->import_key(account_name_or_id, wif_key) )
@@ -2088,6 +2117,15 @@ signed_transaction wallet_api::set_voting_proxy(string account_to_modify,
    return my->set_voting_proxy(account_to_modify, voting_account, broadcast);
 }
 
+signed_transaction wallet_api::set_desired_witness_and_delegate_count(string account_to_modify,
+                                                                      uint16_t desired_number_of_witnesses,
+                                                                      uint16_t desired_number_of_delegates,
+                                                                      bool broadcast /* = false */)
+{
+   return my->set_desired_witness_and_delegate_count(account_to_modify, desired_number_of_witnesses, 
+                                                     desired_number_of_delegates, broadcast);
+}
+
 void wallet_api::set_wallet_filename(string wallet_filename)
 {
    my->_wallet_filename = wallet_filename;
@@ -2097,6 +2135,87 @@ signed_transaction wallet_api::sign_transaction(signed_transaction tx, bool broa
 { try {
    return my->sign_transaction( tx, broadcast);
 } FC_CAPTURE_AND_RETHROW( (tx) ) }
+
+operation wallet_api::get_prototype_operation(string operation_name)
+{
+   if (operation_name == "assert_operation")
+      return graphene::chain::assert_operation();
+   if (operation_name == "balance_claim_operation")
+      return graphene::chain::balance_claim_operation();
+   if (operation_name == "account_create_operation")
+      return graphene::chain::account_create_operation();
+   if (operation_name == "account_whitelist_operation")
+      return graphene::chain::account_whitelist_operation();
+   if (operation_name == "account_update_operation")
+      return graphene::chain::account_update_operation();
+   if (operation_name == "account_upgrade_operation")
+      return graphene::chain::account_upgrade_operation();
+   if (operation_name == "account_transfer_operation")
+      return graphene::chain::account_transfer_operation();
+   if (operation_name == "delegate_create_operation")
+      return graphene::chain::delegate_create_operation();
+   if (operation_name == "witness_create_operation")
+      return graphene::chain::witness_create_operation();
+   if (operation_name == "witness_withdraw_pay_operation")
+      return graphene::chain::witness_withdraw_pay_operation();
+   if (operation_name == "global_parameters_update_operation")
+      return graphene::chain::global_parameters_update_operation();
+   if (operation_name == "transfer_operation")
+      return graphene::chain::transfer_operation();
+   if (operation_name == "override_transfer_operation")
+      return graphene::chain::override_transfer_operation();
+   if (operation_name == "asset_create_operation")
+      return graphene::chain::asset_create_operation();
+   if (operation_name == "asset_global_settle_operation")
+      return graphene::chain::asset_global_settle_operation();
+   if (operation_name == "asset_settle_operation")
+      return graphene::chain::asset_settle_operation();
+   if (operation_name == "asset_fund_fee_pool_operation")
+      return graphene::chain::asset_fund_fee_pool_operation();
+   if (operation_name == "asset_update_operation")
+      return graphene::chain::asset_update_operation();
+   if (operation_name == "asset_update_bitasset_operation")
+      return graphene::chain::asset_update_bitasset_operation();
+   if (operation_name == "asset_update_feed_producers_operation")
+      return graphene::chain::asset_update_feed_producers_operation();
+   if (operation_name == "asset_publish_feed_operation")
+      return graphene::chain::asset_publish_feed_operation();
+   if (operation_name == "asset_issue_operation")
+      return graphene::chain::asset_issue_operation();
+   if (operation_name == "asset_reserve_operation")
+      return graphene::chain::asset_reserve_operation();
+   if (operation_name == "limit_order_create_operation")
+      return graphene::chain::limit_order_create_operation();
+   if (operation_name == "limit_order_cancel_operation")
+      return graphene::chain::limit_order_cancel_operation();
+   if (operation_name == "call_order_update_operation")
+      return graphene::chain::call_order_update_operation();
+   if (operation_name == "proposal_create_operation")
+      return graphene::chain::proposal_create_operation();
+   if (operation_name == "proposal_update_operation")
+      return graphene::chain::proposal_update_operation();
+   if (operation_name == "proposal_delete_operation")
+      return graphene::chain::proposal_delete_operation();
+   if (operation_name == "fill_order_operation")
+      return graphene::chain::fill_order_operation();
+   if (operation_name == "withdraw_permission_create_operation")
+      return graphene::chain::withdraw_permission_create_operation();
+   if (operation_name == "withdraw_permission_update_operation")
+      return graphene::chain::withdraw_permission_update_operation();
+   if (operation_name == "withdraw_permission_claim_operation")
+      return graphene::chain::withdraw_permission_claim_operation();
+   if (operation_name == "withdraw_permission_delete_operation")
+      return graphene::chain::withdraw_permission_delete_operation();
+   if (operation_name == "vesting_balance_create_operation")
+      return graphene::chain::vesting_balance_create_operation();
+   if (operation_name == "vesting_balance_withdraw_operation")
+      return graphene::chain::vesting_balance_withdraw_operation();
+   if (operation_name == "worker_create_operation")
+      return graphene::chain::worker_create_operation();
+   if (operation_name == "custom_operation")
+      return graphene::chain::custom_operation();
+   FC_THROW("Unsupported operation: \"${operation_name}\"", ("operation_name", operation_name));
+}
 
 void wallet_api::dbg_make_uia(string creator, string symbol)
 {

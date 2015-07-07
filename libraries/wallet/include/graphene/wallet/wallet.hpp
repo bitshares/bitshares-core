@@ -936,6 +936,31 @@ class wallet_api
       signed_transaction set_voting_proxy(string account_to_modify,
                                           optional<string> voting_account,
                                           bool broadcast = false);
+      
+      /** Set your vote for the number of witnesses and delegates in the system.
+       *
+       * Each account can voice their opinion on how many delegates and how many 
+       * witnesses there should be in the active delegate/active witness list.  These
+       * are independent of each other.  You must vote your approval of at least as many
+       * delegates or witnesses as you claim there should be (you can't say that there should
+       * be 20 delegates but only vote for 10). 
+       *
+       * There are maximum values for each set in the blockchain parameters (currently 
+       * defaulting to 1001).
+       *
+       * This setting can be changed at any time.  If your account has a voting proxy
+       * set, your preferences will be ignored.
+       *
+       * @param account_to_modify the name or id of the account to update
+       * @param number_of_delegates the number 
+       *
+       * @param broadcast true if you wish to broadcast the transaction
+       * @return the signed transaction changing your vote proxy settings
+       */
+      signed_transaction set_desired_witness_and_delegate_count(string account_to_modify,
+                                                                uint16_t desired_number_of_witnesses,
+                                                                uint16_t desired_number_of_delegates,
+                                                                bool broadcast = false);
 
       /** Signs a transaction.
        *
@@ -946,6 +971,24 @@ class wallet_api
        * @return the signed version of the transaction
        */
       signed_transaction sign_transaction(signed_transaction tx, bool broadcast = false);
+
+      /** Returns an uninitialized object representing a given blockchain operation.
+       *
+       * This returns a default-initialized object of the given type; it can be used 
+       * during early development of the wallet when we don't yet have custom commands for
+       * creating all of the operations the blockchain supports.  
+       *
+       * Any operation the blockchain supports can be created using the transaction builder's
+       * \c add_operation_to_builder_transaction() , but to do that from the CLI you need to 
+       * know what the JSON form of the operation looks like.  This will give you a template
+       * you can fill in.  It's better than nothing.
+       * 
+       * @param operation_type the type of operation to return, must be one of the 
+       *                       operations defined in `graphene/chain/operations.hpp`
+       *                       (e.g., "global_parameters_update_operation")
+       * @return a default-constructed operation of the given type
+       */
+      operation get_prototype_operation(string operation_type);
 
       void dbg_make_uia(string creator, string symbol);
       void dbg_make_mia(string creator, string symbol);
@@ -1024,6 +1067,7 @@ FC_API( graphene::wallet::wallet_api,
         (vote_for_delegate)
         (vote_for_witness)
         (set_voting_proxy)
+        (set_desired_witness_and_delegate_count)
         (get_account)
         (get_account_id)
         (get_block)
@@ -1041,6 +1085,7 @@ FC_API( graphene::wallet::wallet_api,
         (save_wallet_file)
         (serialize_transaction)
         (sign_transaction)
+        (get_prototype_operation)
         (dbg_make_uia)
         (dbg_make_mia)
         (flood_network)
