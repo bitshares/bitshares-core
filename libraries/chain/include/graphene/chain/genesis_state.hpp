@@ -74,7 +74,6 @@ struct genesis_state_type {
       /// Must correspond to one of the initial accounts
       string owner_name;
       public_key_type block_signing_key;
-      secret_hash_type initial_secret;
    };
    struct initial_committee_member_type {
       /// Must correspond to one of the initial accounts
@@ -98,7 +97,7 @@ FC_REFLECT(graphene::chain::genesis_state_type::initial_balance_type,
            (owner)(asset_symbol)(amount))
 FC_REFLECT(graphene::chain::genesis_state_type::initial_vesting_balance_type,
            (owner)(asset_symbol)(amount)(begin_timestamp)(vesting_duration_seconds)(begin_balance))
-FC_REFLECT(graphene::chain::genesis_state_type::initial_witness_type, (owner_name)(block_signing_key)(initial_secret))
+FC_REFLECT(graphene::chain::genesis_state_type::initial_witness_type, (owner_name)(block_signing_key))
 FC_REFLECT(graphene::chain::genesis_state_type::initial_committee_member_type, (owner_name))
 FC_REFLECT(graphene::chain::genesis_state_type::initial_asset_type::initial_bitasset_options::initial_collateral_position,
            (collateral)(debt))

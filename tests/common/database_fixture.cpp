@@ -60,10 +60,6 @@ database_fixture::database_fixture()
    mhplugin->plugin_set_app(&app);
    mhplugin->plugin_initialize(options);
 
-   secret_hash_type::encoder enc;
-   fc::raw::pack(enc, delegate_priv_key);
-   fc::raw::pack(enc, secret_hash_type());
-   auto secret = secret_hash_type::hash(enc.result());
    genesis_state.initial_active_witnesses = 10;
    for( int i = 0; i < genesis_state.initial_active_witnesses; ++i )
    {
@@ -73,7 +69,7 @@ database_fixture::database_fixture()
                                                   delegate_priv_key.get_public_key(),
                                                   true);
       genesis_state.initial_committee_candidates.push_back({name});
-      genesis_state.initial_witness_candidates.push_back({name, delegate_priv_key.get_public_key(), secret});
+      genesis_state.initial_witness_candidates.push_back({name, delegate_priv_key.get_public_key()});
    }
    genesis_state.initial_parameters.current_fees.set_all_fees(0);
    db.init_genesis(genesis_state);

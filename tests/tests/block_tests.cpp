@@ -37,10 +37,6 @@ using namespace graphene::chain;
 genesis_state_type make_genesis() {
    genesis_state_type genesis_state;
    auto delegate_priv_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("null_key")));
-   secret_hash_type::encoder enc;
-   fc::raw::pack(enc, delegate_priv_key);
-   fc::raw::pack(enc, secret_hash_type());
-   auto secret = secret_hash_type::hash(enc.result());
    genesis_state.initial_active_witnesses = 10;
    for( int i = 0; i < genesis_state.initial_active_witnesses; ++i )
    {
@@ -50,7 +46,7 @@ genesis_state_type make_genesis() {
                                                   delegate_priv_key.get_public_key(),
                                                   true);
       genesis_state.initial_committee_candidates.push_back({name});
-      genesis_state.initial_witness_candidates.push_back({name, delegate_priv_key.get_public_key(), secret});
+      genesis_state.initial_witness_candidates.push_back({name, delegate_priv_key.get_public_key()});
    }
    genesis_state.initial_parameters.current_fees.set_all_fees(0);
    return genesis_state;

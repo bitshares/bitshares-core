@@ -59,10 +59,6 @@ namespace detail {
       dlog("Allocating all stake to ${key}", ("key", utilities::key_to_wif(nathan_key)));
       genesis_state_type initial_state;
       initial_state.initial_parameters.current_fees.set_all_fees(GRAPHENE_BLOCKCHAIN_PRECISION);
-      secret_hash_type::encoder enc;
-      fc::raw::pack(enc, nathan_key);
-      fc::raw::pack(enc, secret_hash_type());
-      auto secret = secret_hash_type::hash(enc.result());
       initial_state.initial_active_witnesses = 10;
       for( int i = 0; i < initial_state.initial_active_witnesses; ++i )
       {
@@ -72,7 +68,7 @@ namespace detail {
                                                      nathan_key.get_public_key(),
                                                      true);
          initial_state.initial_committee_candidates.push_back({name});
-         initial_state.initial_witness_candidates.push_back({name, nathan_key.get_public_key(), secret});
+         initial_state.initial_witness_candidates.push_back({name, nathan_key.get_public_key()});
       }
 
       initial_state.initial_accounts.emplace_back("nathan", nathan_key.get_public_key());

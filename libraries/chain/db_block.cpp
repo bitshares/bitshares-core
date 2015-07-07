@@ -274,10 +274,18 @@ signed_block database::_generate_block(
 
    _pending_block.timestamp = when;
 
-   secret_hash_type::encoder last_enc;
-   fc::raw::pack( last_enc, block_signing_private_key );
-   fc::raw::pack( last_enc, witness_obj.last_secret );
-   _pending_block.previous_secret = last_enc.result();
+   // Genesis witnesses start with a default initial secret
+   if( witness_obj.next_secret_hash == secret_hash_type::hash( secret_hash_type() ) )
+   {
+       _pending_block.previous_secret = secret_hash_type();
+   }
+   else
+   {
+       secret_hash_type::encoder last_enc;
+       fc::raw::pack( last_enc, block_signing_private_key );
+       fc::raw::pack( last_enc, witness_obj.previous_secret );
+       _pending_block.previous_secret = last_enc.result();
+   }
 
    secret_hash_type::encoder next_enc;
    fc::raw::pack( next_enc, block_signing_private_key );
@@ -618,8 +626,8 @@ const witness_object& database::validate_block_header( uint32_t skip, const sign
    FC_ASSERT( _pending_block.previous == next_block.previous, "", ("pending.prev",_pending_block.previous)("next.prev",next_block.previous) );
    FC_ASSERT( _pending_block.timestamp <= next_block.timestamp, "", ("_pending_block.timestamp",_pending_block.timestamp)("next",next_block.timestamp)("blocknum",next_block.block_num()) );
    const witness_object& witness = next_block.witness(*this);
-   FC_ASSERT( secret_hash_type::hash(next_block.previous_secret) == witness.next_secret, "",
-              ("previous_secret", next_block.previous_secret)("next_secret", witness.next_secret));
+   FC_ASSERT( secret_hash_type::hash( next_block.previous_secret ) == witness.next_secret_hash, "",
+              ("previous_secret", next_block.previous_secret)("next_secret_hash", witness.next_secret_hash));
    if( !(skip&skip_delegate_signature) ) FC_ASSERT( next_block.validate_signee( witness.signing_key ) );
 
    uint32_t slot_num = get_slot_at_time( next_block.timestamp );
