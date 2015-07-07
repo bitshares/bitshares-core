@@ -42,7 +42,7 @@ void_result proposal_create_evaluator::do_evaluate(const proposal_create_operati
       }
       if( auths.find(account_id_type()) != auths.end() )
          FC_ASSERT( o.review_period_seconds
-                    && *o.review_period_seconds >= global_parameters.genesis_proposal_review_period );
+                    && *o.review_period_seconds >= global_parameters.committee_proposal_review_period );
    }
 
    for( const op_wrapper& op : o.proposed_ops )

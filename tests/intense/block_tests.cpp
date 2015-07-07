@@ -72,7 +72,7 @@ BOOST_FIXTURE_TEST_CASE( update_account_keys, database_fixture )
       generate_block( skip_flags );
 
       db.modify(db.get_global_properties(), [](global_property_object& p) {
-         p.parameters.genesis_proposal_review_period = fc::hours(1).to_seconds();
+         p.parameters.committee_proposal_review_period = fc::hours(1).to_seconds();
       });
 
       transaction tx;

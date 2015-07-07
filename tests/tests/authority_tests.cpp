@@ -366,7 +366,7 @@ BOOST_AUTO_TEST_CASE( genesis_authority )
    // Signatures are for suckers.
    db.modify(db.get_global_properties(), [](global_property_object& p) {
       // Turn the review period WAY down, so it doesn't take long to produce blocks to that point in simulated time.
-      p.parameters.genesis_proposal_review_period = fc::days(1).to_seconds();
+      p.parameters.committee_proposal_review_period = fc::days(1).to_seconds();
    });
 
    BOOST_TEST_MESSAGE( "transfering 100000 CORE to nathan, signing with genesis key" );
@@ -378,19 +378,19 @@ BOOST_AUTO_TEST_CASE( genesis_authority )
 
    proposal_create_operation pop;
    pop.proposed_ops.push_back({trx.operations.front()});
-   pop.expiration_time = db.head_block_time() + global_params.genesis_proposal_review_period*2;
+   pop.expiration_time = db.head_block_time() + global_params.committee_proposal_review_period*2;
    pop.fee_paying_account = nathan.id;
    trx.operations = {pop};
    sign();
 
    // The review period isn't set yet. Make sure it throws.
    BOOST_REQUIRE_THROW( PUSH_TX( db, trx ), fc::exception );
-   pop.review_period_seconds = global_params.genesis_proposal_review_period / 2;
+   pop.review_period_seconds = global_params.committee_proposal_review_period / 2;
    trx.operations.back() = pop;
    sign();
    // The review period is too short. Make sure it throws.
    BOOST_REQUIRE_THROW( PUSH_TX( db, trx ), fc::exception );
-   pop.review_period_seconds = global_params.genesis_proposal_review_period;
+   pop.review_period_seconds = global_params.committee_proposal_review_period;
    trx.operations.back() = pop;
    sign();
    proposal_object prop = db.get<proposal_object>(PUSH_TX( db, trx ).operation_results.front().get<object_id_type>());
@@ -405,7 +405,7 @@ BOOST_AUTO_TEST_CASE( genesis_authority )
    generate_block();
    BOOST_REQUIRE(db.find_object(prop.id));
    BOOST_CHECK_EQUAL(get_balance(nathan, asset_id_type()(db)), 0);
-   
+
    BOOST_TEST_MESSAGE( "Checking that the proposal is not authorized to execute" );
    BOOST_REQUIRE(!db.get<proposal_object>(prop.id).is_authorized_to_execute(db));
    trx.operations.clear();
@@ -456,7 +456,7 @@ BOOST_FIXTURE_TEST_CASE( fired_delegates, database_fixture )
 
    db.modify(db.get_global_properties(), [](global_property_object& p) {
       // Turn the review period WAY down, so it doesn't take long to produce blocks to that point in simulated time.
-      p.parameters.genesis_proposal_review_period = fc::days(1).to_seconds();
+      p.parameters.committee_proposal_review_period = fc::days(1).to_seconds();
    });
 
    for( int i = 0; i < 15; ++i )
@@ -840,7 +840,7 @@ BOOST_FIXTURE_TEST_CASE( max_authority_membership, database_fixture )
       generate_block();
 
       db.modify(db.get_global_properties(), [](global_property_object& p) {
-         p.parameters.genesis_proposal_review_period = fc::hours(1).to_seconds();
+         p.parameters.committee_proposal_review_period = fc::hours(1).to_seconds();
       });
 
       transaction tx;

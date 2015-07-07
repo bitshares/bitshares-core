@@ -85,16 +85,16 @@ struct genesis_state_type {
       share_type daily_pay;
    };
 
-   chain_parameters initial_parameters;
-   vector<initial_account_type> initial_accounts;
-   vector<initial_asset_type> initial_assets;
-   vector<initial_balance_type> initial_balances;
-   vector<initial_vesting_balance_type> initial_vesting_balances;
-   int initial_active_witnesses = GRAPHENE_DEFAULT_NUM_WITNESSES;
-   vector<initial_witness_type> initial_witness_candidates;
-   // These are only candidates; the chain will have no active committee members at genesis
-   vector<initial_committee_member_type> initial_committee_candidates;
-   vector<initial_worker_type> initial_worker_candidates;
+   time_point_sec                           initial_timestamp;
+   chain_parameters                         initial_parameters;
+   vector<initial_account_type>             initial_accounts;
+   vector<initial_asset_type>               initial_assets;
+   vector<initial_balance_type>             initial_balances;
+   vector<initial_vesting_balance_type>     initial_vesting_balances;
+   int                                      initial_active_witnesses = GRAPHENE_DEFAULT_NUM_WITNESSES;
+   vector<initial_witness_type>             initial_witness_candidates;
+   vector<initial_committee_member_type>    initial_committee_candidates;
+   vector<initial_worker_type>              initial_worker_candidates;
 };
 } } // namespace graphene::chain
 

@@ -457,7 +457,7 @@ proposal_create_operation proposal_create_operation::genesis_proposal(const data
    auto global_params = db.get_global_properties().parameters;
    proposal_create_operation op = {account_id_type(), asset(), {},
                                    db.head_block_time() + global_params.maximum_proposal_lifetime,
-                                   global_params.genesis_proposal_review_period};
+                                   global_params.committee_proposal_review_period};
    op.fee = op.calculate_fee(global_params.current_fees);
    return op;
 }
@@ -859,11 +859,11 @@ struct required_active_visitor
 
    /** for most operations this is just the fee payer */
    template<typename T>
-   void operator()(const T& o)const 
-   { 
+   void operator()(const T& o)const
+   {
       result.insert( o.fee_payer() );
    }
-   void operator()(const account_update_operation& o)const 
+   void operator()(const account_update_operation& o)const
    {
       /// if owner authority is required, no active authority is required
       if( !(o.owner || o.active) ) /// TODO: document why active cannot be updated by active?
@@ -906,7 +906,7 @@ struct required_owner_visitor
    template<typename T>
    void operator()(const T& o)const {}
 
-   void operator()(const account_update_operation& o)const 
+   void operator()(const account_update_operation& o)const
    {
       if( o.owner || o.active ) /// TODO: document why active cannot be updated by active?
          result.insert( o.account );
