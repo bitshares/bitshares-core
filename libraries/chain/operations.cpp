@@ -216,14 +216,6 @@ share_type account_update_operation::calculate_fee( const fee_schedule_type& sch
       core_fee_required += schedule.total_data_fee(new_options->votes);
    return core_fee_required;
 }
-void account_update_operation::get_required_auth(flat_set<account_id_type>& active_auth_set,
-                                                 flat_set<account_id_type>& owner_auth_set) const
-{
-   if( owner || active )
-      owner_auth_set.insert(account);
-   else
-      active_auth_set.insert(account);
-}
 
 void account_update_operation::validate()const
 {
@@ -284,11 +276,6 @@ share_type override_transfer_operation::calculate_fee( const fee_schedule_type& 
 }
 
 
-void account_create_operation::get_required_auth(flat_set<account_id_type>& active_auth_set,
-                                                 flat_set<account_id_type>&) const
-{
-   active_auth_set.insert(registrar);
-}
 
 void account_create_operation::validate()const
 {
@@ -315,23 +302,12 @@ void asset_publish_feed_operation::validate()const
    feed.validate();
 }
 
-void transfer_operation::get_required_auth(flat_set<account_id_type>& active_auth_set,
-                                           flat_set<account_id_type>&) const
-{
-   active_auth_set.insert( from );
-}
 
 void transfer_operation::validate()const
 {
    FC_ASSERT( fee.amount >= 0 );
    FC_ASSERT( from != to );
    FC_ASSERT( amount.amount > 0 );
-}
-
-void override_transfer_operation::get_required_auth(flat_set<account_id_type>& active_auth_set,
-                                           flat_set<account_id_type>&) const
-{
-   active_auth_set.insert( issuer );
 }
 
 void override_transfer_operation::validate()const
@@ -342,10 +318,6 @@ void override_transfer_operation::validate()const
    FC_ASSERT( issuer != from );
 }
 
-void asset_create_operation::get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>&) const
-{
-   active_auth_set.insert(issuer);
-}
 
 void  asset_create_operation::validate()const
 {
@@ -373,10 +345,6 @@ asset_update_operation::asset_update_operation(const asset_object& old)
    new_options = old.options;
 }
 
-void asset_update_operation::get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>&) const
-{
-   active_auth_set.insert(issuer);
-}
 
 void asset_update_operation::validate()const
 {
@@ -394,10 +362,6 @@ share_type asset_update_operation::calculate_fee(const fee_schedule_type& k)cons
    return k.asset_update_fee + k.total_data_fee(new_options);
 }
 
-void asset_reserve_operation::get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>&) const
-{
-   active_auth_set.insert(payer);
-}
 
 void asset_reserve_operation::validate()const
 {
@@ -411,10 +375,6 @@ share_type asset_reserve_operation::calculate_fee(const fee_schedule_type& k)con
    return k.asset_reserve_fee;
 }
 
-void asset_issue_operation::get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>&) const
-{
-   active_auth_set.insert(issuer);
-}
 
 void asset_issue_operation::validate()const
 {
@@ -434,10 +394,6 @@ share_type delegate_create_operation::calculate_fee( const fee_schedule_type& k 
    return k.delegate_create_fee + k.total_data_fee(url);
 }
 
-void delegate_create_operation::get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>&) const
-{
-   active_auth_set.insert(delegate_account);
-}
 
 void delegate_create_operation::validate()const
 {
@@ -445,10 +401,6 @@ void delegate_create_operation::validate()const
    FC_ASSERT(url.size() < GRAPHENE_MAX_URL_LENGTH );
 }
 
-void asset_fund_fee_pool_operation::get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>&) const
-{
-   active_auth_set.insert(from_account);
-}
 
 void asset_fund_fee_pool_operation::validate() const
 {
@@ -462,10 +414,6 @@ share_type asset_fund_fee_pool_operation::calculate_fee(const fee_schedule_type&
    return k.asset_fund_fee_pool_fee;
 }
 
-void limit_order_create_operation::get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>&) const
-{
-   active_auth_set.insert(seller);
-}
 
 void limit_order_create_operation::validate()const
 {
@@ -480,10 +428,6 @@ share_type limit_order_create_operation::calculate_fee(const fee_schedule_type& 
    return k.limit_order_create_fee;
 }
 
-void limit_order_cancel_operation::get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>&) const
-{
-   active_auth_set.insert(fee_paying_account);
-}
 
 void limit_order_cancel_operation::validate()const
 {
@@ -495,10 +439,6 @@ share_type limit_order_cancel_operation::calculate_fee(const fee_schedule_type& 
    return k.get_extended_fee(fee_schedule_type::limit_order_cancel_fee_id);
 }
 
-void call_order_update_operation::get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>&) const
-{
-   active_auth_set.insert(funding_account);
-}
 
 void call_order_update_operation::validate()const
 { try {
@@ -522,10 +462,6 @@ proposal_create_operation proposal_create_operation::genesis_proposal(const data
    return op;
 }
 
-void proposal_create_operation::get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>&) const
-{
-   active_auth_set.insert(fee_paying_account);
-}
 
 void proposal_create_operation::validate() const
 {
@@ -538,19 +474,6 @@ share_type proposal_create_operation::calculate_fee(const fee_schedule_type& k) 
    return k.proposal_create_fee + k.total_data_fee(proposed_ops);
 }
 
-void proposal_update_operation::get_required_auth(flat_set<account_id_type>& active_auth_set,
-                                                  flat_set<account_id_type>& owner_auth_set) const
-{
-   active_auth_set.insert(fee_paying_account);
-   for( auto id : active_approvals_to_add )
-      active_auth_set.insert(id);
-   for( auto id : active_approvals_to_remove )
-      active_auth_set.insert(id);
-   for( auto id : owner_approvals_to_add )
-      owner_auth_set.insert(id);
-   for( auto id : owner_approvals_to_remove )
-      owner_auth_set.insert(id);
-}
 
 void proposal_update_operation::validate() const
 {
@@ -585,14 +508,6 @@ share_type proposal_update_operation::calculate_fee(const fee_schedule_type& k) 
                                                    key_approvals_to_remove);
 }
 
-void proposal_delete_operation::get_required_auth(flat_set<account_id_type>& active_auth_set,
-                                                  flat_set<account_id_type>& owner_auth_set) const
-{
-    if( using_owner_authority )
-        owner_auth_set.insert(fee_paying_account);
-    else
-        active_auth_set.insert(fee_paying_account);
-}
 share_type proposal_delete_operation::calculate_fee(const fee_schedule_type& k)const
 { return k.get_extended_fee( fee_schedule_type::proposal_delete_fee_id ); }
 
@@ -601,10 +516,6 @@ void account_transfer_operation::validate()const
    FC_ASSERT( fee.amount >= 0 );
 }
 
-void account_transfer_operation::get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>&)const
-{
-   active_auth_set.insert( account_id );
-}
 
 share_type  account_transfer_operation::calculate_fee( const fee_schedule_type& k )const
 {
@@ -617,10 +528,6 @@ void proposal_delete_operation::validate() const
    FC_ASSERT( fee.amount >= 0 );
 }
 
-void witness_withdraw_pay_operation::get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>&) const
-{
-   active_auth_set.insert(to_account);
-}
 
 void witness_withdraw_pay_operation::validate() const
 {
@@ -633,10 +540,6 @@ share_type witness_withdraw_pay_operation::calculate_fee(const fee_schedule_type
    return k.witness_withdraw_pay_fee;
 }
 
-void account_whitelist_operation::get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>&) const
-{
-   active_auth_set.insert(authorizing_account);
-}
 
 void global_parameters_update_operation::validate() const
 {
@@ -649,10 +552,6 @@ share_type global_parameters_update_operation::calculate_fee(const fee_schedule_
    return k.global_parameters_update_fee;
 }
 
-void witness_create_operation::get_required_auth(flat_set<graphene::chain::account_id_type>& active_auth_set, flat_set<graphene::chain::account_id_type>&) const
-{
-   active_auth_set.insert(witness_account);
-}
 
 void witness_create_operation::validate() const
 {
@@ -665,10 +564,6 @@ share_type witness_create_operation::calculate_fee(const fee_schedule_type& k) c
    return k.witness_create_fee + k.total_data_fee(url);
 }
 
-void withdraw_permission_update_operation::get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>&)const
-{
-   active_auth_set.insert( withdraw_from_account );
-}
 
 void withdraw_permission_update_operation::validate()const
 {
@@ -682,11 +577,6 @@ void withdraw_permission_update_operation::validate()const
 share_type withdraw_permission_update_operation::calculate_fee( const fee_schedule_type& schedule )const
 {
    return schedule.withdraw_permission_update_fee;
-}
-
-void withdraw_permission_claim_operation::get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>&)const
-{
-   active_auth_set.insert( withdraw_to_account );
 }
 
 void withdraw_permission_claim_operation::validate()const
@@ -704,10 +594,6 @@ share_type withdraw_permission_claim_operation::calculate_fee(const fee_schedule
    return core_fee_required;
 }
 
-void withdraw_permission_delete_operation::get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>&) const
-{
-   active_auth_set.insert(withdraw_from_account);
-}
 
 void withdraw_permission_delete_operation::validate() const
 {
@@ -720,10 +606,6 @@ share_type withdraw_permission_delete_operation::calculate_fee(const fee_schedul
    return k.get_extended_fee( fee_schedule_type::withdraw_permission_delete_fee_id );
 }
 
-void withdraw_permission_create_operation::get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>&) const
-{
-   active_auth_set.insert(withdraw_from_account);
-}
 
 void withdraw_permission_create_operation::validate() const
 {
@@ -740,13 +622,6 @@ share_type withdraw_permission_create_operation::calculate_fee(const fee_schedul
    return k.withdraw_permission_create_fee;
 }
 
-
-void        asset_global_settle_operation::get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>&)const
-{
-   active_auth_set.insert( fee_payer() );
-
-}
-
 void        asset_global_settle_operation::validate()const
 {
    FC_ASSERT( fee.amount >= 0 );
@@ -758,10 +633,6 @@ share_type  asset_global_settle_operation::calculate_fee(const fee_schedule_type
    return k.asset_global_settle_fee;
 }
 
-void asset_settle_operation::get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>&) const
-{
-   active_auth_set.insert( account );
-}
 
 void asset_settle_operation::validate() const
 {
@@ -774,16 +645,6 @@ share_type asset_settle_operation::calculate_fee(const fee_schedule_type& k) con
    return k.asset_settle_fee;
 }
 
-
-void graphene::chain::asset_publish_feed_operation::get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>&) const
-{
-   active_auth_set.insert(publisher);
-}
-
-void asset_update_bitasset_operation::get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>&) const
-{
-   active_auth_set.insert(issuer);
-}
 
 void asset_update_bitasset_operation::validate() const
 {
@@ -806,12 +667,6 @@ share_type asset_update_feed_producers_operation::calculate_fee(const fee_schedu
    return k.asset_update_fee + k.total_data_fee(new_feed_producers);
 }
 
-void vesting_balance_create_operation::get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>&)const
-{
-    // owner's authorization isn't needed since this is effectively a transfer of value TO the owner
-   active_auth_set.insert(creator);
-}
-
 share_type vesting_balance_create_operation::calculate_fee(const fee_schedule_type& k)const
 {
    // We don't want to have custom inspection for each policy type; instead, charge a data fee for big ones
@@ -822,11 +677,6 @@ void vesting_balance_create_operation::validate()const
 {
    FC_ASSERT( fee.amount >= 0 );
    FC_ASSERT( amount.amount > 0 );
-}
-
-void vesting_balance_withdraw_operation::get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>&)const
-{
-   active_auth_set.insert(owner);
 }
 
 void vesting_balance_withdraw_operation::validate()const
@@ -883,10 +733,6 @@ string memo_data::get_message(const fc::ecc::private_key& priv,
    }
 }
 
-void custom_operation::get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>&)const
-{
-   active_auth_set.insert(required_auths.begin(), required_auths.end());
-}
 void custom_operation::validate()const
 {
    FC_ASSERT( fee.amount > 0 );
@@ -894,11 +740,6 @@ void custom_operation::validate()const
 share_type custom_operation::calculate_fee(const fee_schedule_type& k)const
 {
    return k.custom_operation_fee + k.total_data_fee(required_auths, data);
-}
-
-void worker_create_operation::get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>&) const
-{
-   active_auth_set.insert(owner);
 }
 
 void worker_create_operation::validate() const
@@ -974,11 +815,6 @@ void assert_operation::validate()const
       p.visit( predicate_validator() );
    }
 }
-void assert_operation::get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>&)const
-{
-   active_auth_set.insert(fee_paying_account);
-   active_auth_set.insert(required_auths.begin(), required_auths.end());
-}
 
 /**
  * The fee for assert operations is proportional to their size,
@@ -989,15 +825,135 @@ share_type  assert_operation::calculate_fee(const fee_schedule_type& k)const
    return std::max(size_t(1), fc::raw::pack_size(*this) / 1024) * k.assert_op_fee;
 }
 
-void  balance_claim_operation::get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>&)const
-{
-   active_auth_set.insert( fee_payer() );
-}
-
 void  balance_claim_operation::validate()const
 {
    FC_ASSERT( fee == asset() );
    FC_ASSERT( balance_owner_key != public_key_type() );
+}
+
+struct required_auth_visitor
+{
+   typedef void result_type;
+
+   vector<authority>& result;
+
+   required_auth_visitor( vector<authority>& r ):result(r){}
+
+   /** for most operations this is a no-op */
+   template<typename T>
+   void operator()(const T& )const {}
+};
+
+struct required_active_visitor
+{
+   typedef void result_type;
+
+   flat_set<account_id_type>& result;
+
+   required_active_visitor( flat_set<account_id_type>& r ):result(r){}
+
+   /** for most operations this is just the fee payer */
+   template<typename T>
+   void operator()(const T& o)const 
+   { 
+      result.insert( o.fee_payer() );
+   }
+   void operator()(const account_update_operation& o)const 
+   {
+      /// if owner authority is required, no active authority is required
+      if( !(o.owner || o.active) ) /// TODO: document why active cannot be updated by active?
+         result.insert( o.fee_payer() );
+   }
+   void operator()( const proposal_delete_operation& o )const
+   {
+      if( !o.using_owner_authority )
+         result.insert( o.fee_payer() );
+   }
+
+   void operator()( const proposal_update_operation& o )const
+   {
+      result.insert( o.fee_payer() );
+      for( auto id : o.active_approvals_to_add )
+         result.insert(id);
+      for( auto id : o.active_approvals_to_remove )
+         result.insert(id);
+   }
+   void operator()( const custom_operation& o )const
+   {
+      result.insert( o.required_auths.begin(), o.required_auths.end() );
+   }
+   void operator()( const assert_operation& o )const
+   {
+      result.insert( o.fee_payer() );
+      result.insert( o.required_auths.begin(), o.required_auths.end() );
+   }
+};
+
+struct required_owner_visitor
+{
+   typedef void result_type;
+
+   flat_set<account_id_type>& result;
+
+   required_owner_visitor( flat_set<account_id_type>& r ):result(r){}
+
+   /** for most operations this is a no-op */
+   template<typename T>
+   void operator()(const T& o)const {}
+
+   void operator()(const account_update_operation& o)const 
+   {
+      if( o.owner || o.active ) /// TODO: document why active cannot be updated by active?
+         result.insert( o.account );
+   }
+
+   void operator()( const proposal_delete_operation& o )const
+   {
+      if( o.using_owner_authority )
+         result.insert( o.fee_payer() );
+   }
+
+   void operator()( const proposal_update_operation& o )const
+   {
+      for( auto id : o.owner_approvals_to_add )
+         result.insert(id);
+      for( auto id : o.owner_approvals_to_remove )
+         result.insert(id);
+   }
+};
+
+
+void operation_get_required_authorities( const operation& op, vector<authority>& result )
+{
+   op.visit( required_auth_visitor( result ) );
+}
+void operation_get_required_active_authorities( const operation& op, flat_set<account_id_type>& result )
+{
+   op.visit( required_active_visitor( result ) );
+}
+void operation_get_required_owner_authorities( const operation& op, flat_set<account_id_type>& result )
+{
+   op.visit( required_owner_visitor( result ) );
+}
+
+/**
+ * @brief Used to validate operations in a polymorphic manner
+ */
+struct operation_validator
+{
+   typedef void result_type;
+   template<typename T>
+   void operator()( const T& v )const { v.validate(); }
+};
+
+void operation_validate( const operation& op )
+{
+   op.visit( operation_validator() );
+}
+
+void op_wrapper::validate()const
+{
+   operation_validate(op);
 }
 
 

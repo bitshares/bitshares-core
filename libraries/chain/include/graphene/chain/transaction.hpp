@@ -114,6 +114,8 @@ namespace graphene { namespace chain {
             op.visit( std::forward<Visitor>( visitor ) );
       }
 
+      void get_required_authorities( flat_set<account_id_type>& active, flat_set<account_id_type>& owner, vector<authority>& other );
+
    protected:
       // Intentionally unreflected: does not go on wire
       optional<block_id_type> block_id_cache;

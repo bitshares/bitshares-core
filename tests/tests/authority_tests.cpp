@@ -300,13 +300,16 @@ BOOST_AUTO_TEST_CASE( proposed_single_account )
       asset nathan_start_balance = db.get_balance(nathan.get_id(), core.get_id());
       {
          flat_set<account_id_type> active_set, owner_set;
-         op.get_required_auth(active_set, owner_set);
+         operation_get_required_active_authorities(op,active_set);
+         operation_get_required_owner_authorities(op,owner_set);
          BOOST_CHECK_EQUAL(active_set.size(), 1);
          BOOST_CHECK_EQUAL(owner_set.size(), 0);
          BOOST_CHECK(*active_set.begin() == moneyman.get_id());
 
          active_set.clear();
-         op.proposed_ops.front().get_required_auth(active_set, owner_set);
+         //op.proposed_ops.front().get_required_auth(active_set, owner_set);
+         operation_get_required_active_authorities( op.proposed_ops.front().op, active_set );
+         operation_get_required_owner_authorities( op.proposed_ops.front().op, owner_set );
          BOOST_CHECK_EQUAL(active_set.size(), 1);
          BOOST_CHECK_EQUAL(owner_set.size(), 0);
          BOOST_CHECK(*active_set.begin() == nathan.id);
@@ -965,8 +968,8 @@ BOOST_FIXTURE_TEST_CASE( bogus_signature, database_fixture )
       trx.sign(alice_key );
 
       flat_set<account_id_type> active_set, owner_set;
-      xfer_op.get<transfer_operation>().get_required_auth(active_set, owner_set);
- //     wdump( (active_set)(owner_set)(alice_key_id) (alice_account_object) );
+      vector<authority> others;
+      trx.get_required_authorities( active_set, owner_set, others );
 
       PUSH_TX( db,  trx, skip  );
 

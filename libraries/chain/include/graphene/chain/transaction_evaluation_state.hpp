@@ -38,6 +38,10 @@ namespace graphene { namespace chain {
                               authority::classification auth_class = authority::active,
                               int depth = 0);
 
+         bool check_authority(const authority&,
+                              authority::classification auth_class = authority::active,
+                              int depth = 0);
+
          database& db()const { FC_ASSERT( _db ); return *_db; }
 
          bool signed_by(const public_key_type& k);

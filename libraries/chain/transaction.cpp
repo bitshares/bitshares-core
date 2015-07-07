@@ -48,7 +48,7 @@ void transaction::validate() const
       FC_ASSERT( ref_block_num == 0 && ref_block_prefix > 0 );
 
    for( const auto& op : operations )
-      op.visit(operation_validator());
+      operation_validate(op); 
 }
 
 graphene::chain::transaction_id_type graphene::chain::transaction::id() const
@@ -87,6 +87,15 @@ void transaction::set_expiration( const block_id_type& reference_block, unsigned
    ref_block_prefix = reference_block._hash[1];
    relative_expiration = lifetime_intervals;
    block_id_cache = reference_block;
+}
+void transaction::get_required_authorities( flat_set<account_id_type>& active, flat_set<account_id_type>& owner, vector<authority>& other )
+{
+   for( const auto& op : operations )
+   {
+      operation_get_required_active_authorities( op, active );
+      operation_get_required_owner_authorities( op, owner );
+      operation_get_required_authorities( op, other );
+   }
 }
 
 } } // graphene::chain

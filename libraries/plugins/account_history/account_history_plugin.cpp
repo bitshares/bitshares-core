@@ -152,7 +152,10 @@ struct operation_get_impacted_accounts
 
    void operator()( const proposal_create_operation& o )const {
        for( auto op : o.proposed_ops )
-          op.op.visit( operation_get_required_auths( _impacted, _impacted ) );
+       {
+          operation_get_required_active_authorities( op.op, _impacted );
+          operation_get_required_owner_authorities( op.op, _impacted );
+       }
    }
 
    void operator()( const proposal_update_operation& o )const { }
@@ -204,7 +207,8 @@ void account_history_plugin_impl::update_account_histories( const signed_block& 
 
       // get the set of accounts this operation applies to
       flat_set<account_id_type> impacted;
-      op.op.visit( operation_get_required_auths( impacted, impacted ) );
+      operation_get_required_active_authorities( op.op, impacted );
+      operation_get_required_owner_authorities( op.op, impacted );
       op.op.visit( operation_get_impacted_accounts( oho, _self, impacted ) );
 
       // for each operation this account applies to that is in the config link it into the history

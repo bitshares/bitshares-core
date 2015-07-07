@@ -83,18 +83,22 @@ database& generic_evaluator::db()const { return trx_state->db(); }
    { try {
       flat_set<account_id_type> active_auths;
       flat_set<account_id_type> owner_auths;
-      op.visit(operation_get_required_auths(active_auths, owner_auths));
-     // idump((active_auths)(owner_auths)(op));
+      vector<authority>         other_auths;
+
+      operation_get_required_active_authorities( op, active_auths );
+      operation_get_required_owner_authorities( op, owner_auths );
+      operation_get_required_authorities( op, other_auths );
 
       for( auto id : active_auths )
-      {
          FC_ASSERT(verify_authority(id(db()), authority::active) ||
                    verify_authority(id(db()), authority::owner), "", ("id", id));
-      }
+
       for( auto id : owner_auths )
-      {
          FC_ASSERT(verify_authority(id(db()), authority::owner), "", ("id", id));
-      }
+
+      for( const auto& auth : other_auths )
+         FC_ASSERT(trx_state->check_authority(auth));
+
    } FC_CAPTURE_AND_RETHROW( (op) ) }
 
    void generic_evaluator::verify_authority_accounts( const authority& a )const

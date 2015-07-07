@@ -1332,12 +1332,13 @@ public:
    {
       flat_set<account_id_type> req_active_approvals;
       flat_set<account_id_type> req_owner_approvals;
+      vector<authority>         other_auths;
 
-      tx.visit( operation_get_required_auths( req_active_approvals, req_owner_approvals ) );
+      tx.get_required_authorities( req_active_approvals, req_owner_approvals, other_auths );
 
-      // TODO:  Only sign if the wallet considers ACCOUNTS to be owned.
-      //        Currently the wallet only owns KEYS and will happily sign
-      //        for any account...
+      for( const auto& auth : other_auths )
+         for( const auto& a : auth.account_auths )
+            req_active_approvals.insert(a.first);
 
       // std::merge lets us de-duplicate account_id's that occur in both
       //   sets, and dump them into a vector (as required by remote_db api)
@@ -1347,8 +1348,12 @@ public:
                  req_owner_approvals.begin() , req_owner_approvals.end(),
                  std::back_inserter(v_approving_account_ids));
 
+      /// TODO: fetch the accounts specified via other_auths as well.
+
       vector< optional<account_object> > approving_account_objects =
             _remote_db->get_accounts( v_approving_account_ids );
+
+      /// TODO: recursively check one layer deeper in the authority tree for keys
 
       FC_ASSERT( approving_account_objects.size() == v_approving_account_ids.size() );
 
@@ -1388,6 +1393,11 @@ public:
          for( const public_key_type& approving_key : v_approving_keys )
             approving_key_set.insert( approving_key );
       }
+      for( const authority& a : other_auths )
+      {
+         for( const auto& k : a.key_auths )
+            approving_key_set.insert( k.first );
+      }
 
       tx.set_expiration(get_dynamic_global_properties().head_block_id);
 
@@ -1403,6 +1413,10 @@ public:
             }
             tx.sign( *privkey );
          }
+         /// TODO: if transaction has enough signatures to be "valid" don't add any more,
+         /// there are cases where the wallet may have more keys than strictly necessary and
+         /// the transaction will be rejected if the transaction validates without requiring
+         /// all signatures provided
       }
 
       if( broadcast )

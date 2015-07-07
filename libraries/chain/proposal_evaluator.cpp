@@ -36,7 +36,10 @@ void_result proposal_create_evaluator::do_evaluate(const proposal_create_operati
       // If we're dealing with the genesis authority, make sure this transaction has a sufficient review period.
       flat_set<account_id_type> auths;
       for( auto& op : o.proposed_ops )
-         op.op.visit(operation_get_required_auths(auths, auths));
+      {
+         operation_get_required_active_authorities(op.op, auths);
+         operation_get_required_owner_authorities(op.op, auths);
+      }
       if( auths.find(account_id_type()) != auths.end() )
          FC_ASSERT( o.review_period_seconds
                     && *o.review_period_seconds >= global_parameters.genesis_proposal_review_period );
@@ -61,7 +64,13 @@ object_id_type proposal_create_evaluator::do_apply(const proposal_create_operati
 
       //Populate the required approval sets
       flat_set<account_id_type> required_active;
-      _proposed_trx.visit(operation_get_required_auths(required_active, proposal.required_owner_approvals));
+
+      for( auto& op : _proposed_trx.operations )
+      {
+         operation_get_required_active_authorities(op, required_active);
+         operation_get_required_owner_authorities(op, proposal.required_owner_approvals);
+      }
+
       //All accounts which must provide both owner and active authority should be omitted from the active authority set;
       //owner authority approval implies active authority approval.
       std::set_difference(required_active.begin(), required_active.end(),

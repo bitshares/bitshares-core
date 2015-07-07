@@ -35,21 +35,27 @@ namespace graphene { namespace chain {
 
       FC_ASSERT( account.id.instance() != 0 || _is_proposed_trx, "", ("account",account)("is_proposed",_is_proposed_trx) );
 
-      const authority* au = nullptr;
+      bool valid = false;
       switch( auth_class )
       {
          case authority::owner:
-            au = &account.owner;
+            valid = check_authority( account.owner, auth_class, depth );
             break;
          case authority::active:
-            au = &account.active;
+            valid = check_authority( account.active, auth_class, depth );
             break;
          default:
             FC_ASSERT( false, "Invalid Account Auth Class" );
       };
+      if( valid )
+         approved_by.insert( std::make_pair(account.id, auth_class) );
+      return valid;
+   }
 
+   bool transaction_evaluation_state::check_authority( const authority& au, authority::classification auth_class, int depth )
+   {
       uint32_t total_weight = 0;
-      for( const auto& auth : au->account_auths )
+      for( const auto& auth : au.account_auths )
       {
          if( approved_by.find( std::make_pair(auth.first,auth_class) ) != approved_by.end() )
             total_weight += auth.second;
@@ -68,36 +74,30 @@ namespace graphene { namespace chain {
             }
          }
       }
-      for( const auto& key : au->key_auths )
+      for( const auto& key : au.key_auths )
       {
          if( signed_by( key.first ) )
             total_weight += key.second;
       }
-      for( const auto& key : au->address_auths )
+      for( const auto& key : au.address_auths )
       {
          if( signed_by( key.first ) )
             total_weight += key.second;
       }
 
-      if( total_weight >= au->weight_threshold )
-      {
-         approved_by.insert( std::make_pair(account.id, auth_class) );
-         return true;
-      }
-      return false;
+      return total_weight >= au.weight_threshold;
    }
 
    bool transaction_evaluation_state::signed_by(const public_key_type& k)
    {
       auto itr = _sigs.find(k);
-      if( itr != _sigs.end() )
-         return itr->second = true;
-      return false;
+      return itr != _sigs.end() && (itr->second = true);
    }
+
    bool transaction_evaluation_state::signed_by(const address& k)
    {
       for( auto itr = _sigs.begin(); itr != _sigs.end(); ++itr )
-         if( itr->first == k ) return true;
+         if( itr->first == k ) return itr->second = true;
       return false;
    }
 

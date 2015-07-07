@@ -122,7 +122,6 @@ namespace graphene { namespace chain {
       flat_set<account_id_type>  required_auths;
 
       account_id_type fee_payer()const { return fee_paying_account; }
-      void            get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>&)const;
       share_type      calculate_fee(const fee_schedule_type& k)const;
       void            validate()const;
 
@@ -145,7 +144,6 @@ namespace graphene { namespace chain {
       asset             total_claimed;
 
       account_id_type fee_payer()const { return deposit_to_account; }
-      void            get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>&)const;
       share_type      calculate_fee(const fee_schedule_type& k)const { return 0; }
       void            validate()const;
 
@@ -177,7 +175,6 @@ namespace graphene { namespace chain {
       account_object::options_type options;
 
       account_id_type fee_payer()const { return registrar; }
-      void       get_required_auth(flat_set<account_id_type>& active_auth_set , flat_set<account_id_type>&)const;
       void       validate()const;
       share_type calculate_fee( const fee_schedule_type& k )const;
 
@@ -223,7 +220,6 @@ namespace graphene { namespace chain {
       uint8_t new_listing;
 
       account_id_type fee_payer()const { return authorizing_account; }
-      void get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>&)const;
       void validate()const { FC_ASSERT( fee.amount >= 0 ); FC_ASSERT(new_listing < 0x4); }
       share_type calculate_fee(const fee_schedule_type& k)const { return k.account_whitelist_fee; }
 
@@ -245,14 +241,13 @@ namespace graphene { namespace chain {
 
       /// New owner authority. If set, this operation requires owner authority to execute.
       optional<authority> owner;
-      /// New active authority. If set, this operation requires owner authority to execute.
+      /// New active authority. If set, this operation requires owner authority to execute: TODO: why?
       optional<authority> active;
 
       /// New account options
       optional<account_object::options_type> new_options;
 
       account_id_type fee_payer()const { return account; }
-      void       get_required_auth(flat_set<account_id_type>& active_auth_set , flat_set<account_id_type>& owner_auth_set)const;
       void       validate()const;
       share_type calculate_fee( const fee_schedule_type& k )const;
       void get_balance_delta( balance_accumulator& acc, const operation_result& result = asset())const { acc.adjust( fee_payer(), -fee ); }
@@ -280,8 +275,6 @@ namespace graphene { namespace chain {
       bool              upgrade_to_lifetime_member = false;
 
       account_id_type fee_payer()const { return account_to_upgrade; }
-      void       get_required_auth(flat_set<account_id_type>& active_auth_set , flat_set<account_id_type>&)const
-      { active_auth_set.insert(account_to_upgrade); }
       void       validate()const;
       share_type calculate_fee( const fee_schedule_type& k )const;
       void get_balance_delta( balance_accumulator& acc, const operation_result& = asset())const { acc.adjust( fee_payer(), -fee ); }
@@ -307,7 +300,6 @@ namespace graphene { namespace chain {
       account_id_type new_owner;
 
       account_id_type fee_payer()const { return account_id; }
-      void        get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>&)const;
       void        validate()const;
       share_type  calculate_fee( const fee_schedule_type& k )const;
 
@@ -329,7 +321,6 @@ namespace graphene { namespace chain {
       string                                url;
 
       account_id_type fee_payer()const { return delegate_account; }
-      void get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>&)const;
       void validate()const;
       share_type calculate_fee( const fee_schedule_type& k )const;
       void get_balance_delta( balance_accumulator& acc, const operation_result& result = asset())const { acc.adjust( fee_payer(), -fee ); }
@@ -352,7 +343,6 @@ namespace graphene { namespace chain {
       secret_hash_type  initial_secret;
 
       account_id_type fee_payer()const { return witness_account; }
-      void get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>&)const;
       void validate()const;
       share_type calculate_fee(const fee_schedule_type& k)const;
 
@@ -372,7 +362,6 @@ namespace graphene { namespace chain {
       share_type       amount;
 
       account_id_type fee_payer()const { return to_account; }
-      void       get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>&)const;
       void       validate()const;
       share_type calculate_fee(const fee_schedule_type& k)const;
 
@@ -400,8 +389,6 @@ namespace graphene { namespace chain {
       chain_parameters new_parameters;
 
       account_id_type fee_payer()const { return account_id_type(); }
-      void get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>&)const
-      { active_auth_set.insert(account_id_type()); }
       void validate()const;
       share_type calculate_fee(const fee_schedule_type& k)const;
       void get_balance_delta( balance_accumulator& acc, const operation_result& result = asset())const { acc.adjust( fee_payer(), -fee ); }
@@ -494,7 +481,6 @@ namespace graphene { namespace chain {
       optional<memo_data> memo;
 
       account_id_type fee_payer()const { return from; }
-      void       get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>&)const;
       void       validate()const;
       share_type calculate_fee(const fee_schedule_type& k)const;
       void get_balance_delta( balance_accumulator& acc, const operation_result& result = asset())const
@@ -528,7 +514,6 @@ namespace graphene { namespace chain {
       optional<memo_data> memo;
 
       account_id_type fee_payer()const { return issuer; }
-      void            get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>&)const;
       void            validate()const;
       share_type      calculate_fee(const fee_schedule_type& k)const;
       void get_balance_delta( balance_accumulator& acc, const operation_result& result = asset())const
@@ -566,7 +551,6 @@ namespace graphene { namespace chain {
       bool is_prediction_market = false;
 
       account_id_type fee_payer()const { return issuer; }
-      void            get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>&)const;
       void            validate()const;
       share_type      calculate_fee( const fee_schedule_type& k )const;
       void            get_balance_delta(balance_accumulator& acc, const operation_result& result = asset())const { acc.adjust(fee_payer(), -fee); }
@@ -590,7 +574,6 @@ namespace graphene { namespace chain {
       price           settle_price;
 
       account_id_type fee_payer()const { return issuer; }
-      void            get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>&)const;
       void            validate()const;
       share_type      calculate_fee(const fee_schedule_type& k)const;
       void            get_balance_delta(balance_accumulator& acc, const operation_result& result = asset())const { acc.adjust(fee_payer(), -fee); }
@@ -618,7 +601,6 @@ namespace graphene { namespace chain {
       asset           amount;
 
       account_id_type fee_payer()const { return account; }
-      void            get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>&)const;
       void            validate()const;
       share_type      calculate_fee(const fee_schedule_type& k)const;
       void get_balance_delta(balance_accumulator& acc, const operation_result& result = asset())const
@@ -639,7 +621,6 @@ namespace graphene { namespace chain {
       share_type      amount; ///< core asset
 
       account_id_type fee_payer()const { return from_account; }
-      void       get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>&)const;
       void       validate()const;
       share_type calculate_fee(const fee_schedule_type& k)const;
       void       get_balance_delta(balance_accumulator& acc, const operation_result& result = asset())const
@@ -679,7 +660,6 @@ namespace graphene { namespace chain {
       asset_object::asset_options new_options;
 
       account_id_type fee_payer()const { return issuer; }
-      void            get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>&)const;
       void            validate()const;
       share_type      calculate_fee(const fee_schedule_type& k)const;
       void            get_balance_delta(balance_accumulator& acc, const operation_result& result = asset())const { acc.adjust(fee_payer(), -fee); }
@@ -707,7 +687,6 @@ namespace graphene { namespace chain {
       asset_object::bitasset_options new_options;
 
       account_id_type fee_payer()const { return issuer; }
-      void            get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>&)const;
       void            validate()const;
       share_type      calculate_fee(const fee_schedule_type& k)const;
       void            get_balance_delta(balance_accumulator& acc, const operation_result& result = asset())const { acc.adjust(fee_payer(), -fee); }
@@ -738,8 +717,6 @@ namespace graphene { namespace chain {
       flat_set<account_id_type> new_feed_producers;
 
       account_id_type fee_payer()const { return issuer; }
-      void            get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>&)const
-      { active_auth_set.insert(fee_payer()); }
       void            validate()const;
       share_type      calculate_fee(const fee_schedule_type& k)const;
       void            get_balance_delta(balance_accumulator& acc, const operation_result& result = asset())const
@@ -770,7 +747,6 @@ namespace graphene { namespace chain {
       price_feed             feed;
 
       account_id_type fee_payer()const { return publisher; }
-      void       get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>&)const;
       void       validate()const;
       share_type calculate_fee( const fee_schedule_type& k )const;
       void get_balance_delta(balance_accumulator& acc, const operation_result& result = asset())const { acc.adjust(fee_payer(), -fee); }
@@ -791,7 +767,6 @@ namespace graphene { namespace chain {
       optional<memo_data>  memo;
 
       account_id_type fee_payer()const { return issuer; }
-      void            get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>&)const;
       void            validate()const;
       share_type      calculate_fee(const fee_schedule_type& k)const;
       void get_balance_delta(balance_accumulator& acc, const operation_result& result = asset())const
@@ -811,7 +786,6 @@ namespace graphene { namespace chain {
       asset             amount_to_reserve;
 
       account_id_type fee_payer()const { return payer; }
-      void            get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>&)const;
       void            validate()const;
       share_type      calculate_fee(const fee_schedule_type& k)const;
       void get_balance_delta(balance_accumulator& acc, const operation_result& result = asset())const
@@ -860,7 +834,6 @@ namespace graphene { namespace chain {
                 std::make_pair(min_to_receive.asset_id, amount_to_sell.asset_id);
       }
       account_id_type fee_payer()const { return seller; }
-      void            get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>&)const;
       void            validate()const;
       share_type      calculate_fee(const fee_schedule_type& k)const;
       price           get_price()const { return amount_to_sell / min_to_receive; }
@@ -887,7 +860,6 @@ namespace graphene { namespace chain {
       account_id_type     fee_paying_account;
 
       account_id_type fee_payer()const { return fee_paying_account; }
-      void            get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>&)const;
       void            validate()const;
       share_type      calculate_fee(const fee_schedule_type& k)const;
       void            get_balance_delta(balance_accumulator& acc, const operation_result& result = asset())const
@@ -918,7 +890,6 @@ namespace graphene { namespace chain {
       asset               delta_debt; ///< the amount of the debt to be paid off, may be negative to issue new debt
 
       account_id_type fee_payer()const { return funding_account; }
-      void            get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>&)const;
       void            validate()const;
       share_type      calculate_fee(const fee_schedule_type& k)const;
       void            get_balance_delta(balance_accumulator& acc, const operation_result& result = asset())const
@@ -983,7 +954,6 @@ namespace graphene { namespace chain {
        static proposal_create_operation genesis_proposal(const class database& db);
 
       account_id_type fee_payer()const { return fee_paying_account; }
-      void       get_required_auth( flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>& )const;
       void       validate()const;
       share_type calculate_fee(const fee_schedule_type& k)const;
       void       get_balance_delta(balance_accumulator& acc, const operation_result& result = asset())const
@@ -1021,7 +991,6 @@ namespace graphene { namespace chain {
       flat_set<public_key_type>  key_approvals_to_remove;
 
       account_id_type fee_payer()const { return fee_paying_account; }
-      void       get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>& owner_auth_set)const;
       void       validate()const;
       share_type calculate_fee(const fee_schedule_type& k)const;
       void       get_balance_delta(balance_accumulator& acc, const operation_result& result = asset())const { acc.adjust(fee_payer(), -fee); }
@@ -1046,7 +1015,6 @@ namespace graphene { namespace chain {
       proposal_id_type  proposal;
 
       account_id_type fee_payer()const { return fee_paying_account; }
-      void       get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>& owner_auth_set)const;
       void       validate()const;
       share_type calculate_fee(const fee_schedule_type& k)const;
       void       get_balance_delta(balance_accumulator& acc, const operation_result& result = asset())const { acc.adjust(fee_payer(), -fee); }
@@ -1076,8 +1044,6 @@ namespace graphene { namespace chain {
                 std::make_pair( receives.asset_id, pays.asset_id );
       }
       account_id_type fee_payer()const { return account_id; }
-      void            get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>&)const
-      { active_auth_set.insert(fee_payer()); }
       void            validate()const { FC_ASSERT( !"virtual operation" ); }
       share_type      calculate_fee(const fee_schedule_type& k)const
       // This is a virtual operation; there is no fee
@@ -1124,7 +1090,6 @@ namespace graphene { namespace chain {
       time_point_sec    period_start_time;
 
       account_id_type fee_payer()const { return withdraw_from_account; }
-      void            get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>&)const;
       void            validate()const;
       share_type      calculate_fee(const fee_schedule_type& k)const;
       void            get_balance_delta(balance_accumulator& acc, const operation_result& result = asset())const { acc.adjust(fee_payer(), -fee); }
@@ -1160,7 +1125,6 @@ namespace graphene { namespace chain {
       uint32_t                      periods_until_expiration;
 
       account_id_type fee_payer()const { return withdraw_from_account; }
-      void            get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>&)const;
       void            validate()const;
       share_type      calculate_fee(const fee_schedule_type& k)const;
       void            get_balance_delta(balance_accumulator& acc, const operation_result& result = asset())const { acc.adjust(fee_payer(), -fee); }
@@ -1195,7 +1159,6 @@ namespace graphene { namespace chain {
       optional<memo_data>         memo;
 
       account_id_type fee_payer()const { return withdraw_to_account; }
-      void            get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>&)const;
       void            validate()const;
       share_type      calculate_fee(const fee_schedule_type& k)const;
       void            get_balance_delta(balance_accumulator& acc, const operation_result& result = asset())const
@@ -1225,7 +1188,6 @@ namespace graphene { namespace chain {
       withdraw_permission_id_type   withdrawal_permission;
 
       account_id_type fee_payer()const { return withdraw_from_account; }
-      void            get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>&)const;
       void            validate()const;
       share_type      calculate_fee(const fee_schedule_type& k)const;
       void            get_balance_delta(balance_accumulator& acc, const operation_result& result = asset())const
@@ -1278,7 +1240,6 @@ namespace graphene { namespace chain {
       vesting_policy_initializer  policy;
 
       account_id_type   fee_payer()const { return creator; }
-      void              get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>&)const;
       void              validate()const;
       share_type        calculate_fee(const fee_schedule_type& k)const;
       void              get_balance_delta(balance_accumulator& acc, const operation_result& result = asset())const
@@ -1306,7 +1267,6 @@ namespace graphene { namespace chain {
       asset                   amount;
 
       account_id_type   fee_payer()const { return owner; }
-      void              get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>&)const;
       void              validate()const;
       share_type        calculate_fee(const fee_schedule_type& k)const;
       void              get_balance_delta(balance_accumulator& acc, const operation_result& result = asset())const
@@ -1356,7 +1316,6 @@ namespace graphene { namespace chain {
       worker_initializer   initializer;
 
       account_id_type   fee_payer()const { return owner; }
-      void              get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>&)const;
       void              validate()const;
       share_type        calculate_fee(const fee_schedule_type& k)const;
       void              get_balance_delta(balance_accumulator& acc, const operation_result& result = asset())const
@@ -1383,7 +1342,6 @@ namespace graphene { namespace chain {
       vector<char>              data;
 
       account_id_type   fee_payer()const { return payer; }
-      void              get_required_auth(flat_set<account_id_type>& active_auth_set, flat_set<account_id_type>&)const;
       void              validate()const;
       share_type        calculate_fee(const fee_schedule_type& k)const;
       void              get_balance_delta(balance_accumulator& acc, const operation_result& result = asset())const
@@ -1440,6 +1398,18 @@ namespace graphene { namespace chain {
 
    /// @} // operations group
 
+
+   /**
+    *  Appends required authorites to the result vector.  The authorities appended are not the
+    *  same as those returned by get_required_auth 
+    *
+    *  @return a set of required authorities for @ref op
+    */
+   void operation_get_required_authorities( const operation& op, vector<authority>& result );
+   void operation_get_required_active_authorities( const operation& op, flat_set<account_id_type>& result );
+   void operation_get_required_owner_authorities( const operation& op, flat_set<account_id_type>& result );
+   void operation_validate( const operation& op );
+
    /**
     *  Used to track the result of applying an operation and when it was applied.
     */
@@ -1452,40 +1422,6 @@ namespace graphene { namespace chain {
       uint16_t         op_num;
    };
 
-   /**
-    * @brief Used to find accounts which must sign off on operations in a polymorphic manner
-    */
-   struct operation_get_required_auths
-   {
-      flat_set<account_id_type>& active_auth_set;
-      flat_set<account_id_type>& owner_auth_set;
-      operation_get_required_auths(flat_set<account_id_type>& active_auth_set,
-                                   flat_set<account_id_type>& owner_auth_set)
-         : active_auth_set(active_auth_set),
-           owner_auth_set(owner_auth_set)
-      {}
-      typedef void result_type;
-      template<typename T>
-      void operator()(const T& v)const
-      {
-         v.get_required_auth(active_auth_set, owner_auth_set);
-#ifndef NDEBUG
-         if( !(active_auth_set.count(v.fee_payer()) || owner_auth_set.count(v.fee_payer())) )
-            elog("Fee payer not in required auths on ${op}", ("op", fc::get_typename<T>::name()));
-         assert(active_auth_set.count(v.fee_payer()) || owner_auth_set.count(v.fee_payer()));
-#endif
-      }
-   };
-
-   /**
-    * @brief Used to validate operations in a polymorphic manner
-    */
-   struct operation_validator
-   {
-      typedef void result_type;
-      template<typename T>
-      void operator()( const T& v )const { v.validate(); }
-   };
 
    /**
     * @brief Used to calculate fees in a polymorphic manner
@@ -1551,11 +1487,7 @@ namespace graphene { namespace chain {
       public:
       op_wrapper(const operation& op = operation()):op(op){}
       operation op;
-
-      void       validate()const { op.visit( operation_validator() ); }
-      void       get_required_auth(flat_set<account_id_type>& active, flat_set<account_id_type>& owner) {
-         op.visit(operation_get_required_auths(active, owner));
-      }
+      void       validate()const;
       asset      set_fee( const fee_schedule_type& k ) { return op.visit( operation_set_fee( k ) ); }
       share_type calculate_fee( const fee_schedule_type& k )const { return op.visit( operation_calculate_fee( k ) ); }
    };
