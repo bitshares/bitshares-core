@@ -16,6 +16,7 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #include <graphene/app/api.hpp>
+#include <graphene/app/api_access.hpp>
 #include <graphene/app/application.hpp>
 #include <graphene/chain/database.hpp>
 #include <graphene/utilities/key_conversion.hpp>
@@ -349,15 +350,45 @@ namespace graphene { namespace app {
 
     bool login_api::login(const string& user, const string& password)
     {
-       auto db_api = std::make_shared<database_api>(std::ref(*_app.chain_database()));
-       auto net_broadcast_api = std::make_shared<network_broadcast_api>(std::ref(_app));
-       auto hist_api = std::make_shared<history_api>(_app);
-       auto net_node_api = std::make_shared<network_node_api>(std::ref(_app));
-       _database_api = db_api;
-       _network_broadcast_api = net_broadcast_api;
-       _history_api = hist_api;
-       _network_node_api = net_node_api;
+       optional< api_access_info > acc = _app.get_api_access_info( user );
+       if( !acc.valid() )
+          return false;
+       if( acc->password_hash_b64 != "*" )
+       {
+          std::string password_salt = fc::base64_decode( acc->password_salt_b64 );
+          std::string acc_password_hash = fc::base64_decode( acc->password_hash_b64 );
+
+          fc::sha256 hash_obj = fc::sha256::hash( password + password_salt );
+          if( hash_obj.data_size() != acc_password_hash.length() )
+             return false;
+          if( memcmp( hash_obj.data(), acc_password_hash.c_str(), hash_obj.data_size() ) != 0 )
+             return false;
+       }
+
+       for( const std::string& api_name : acc->allowed_apis )
+          enable_api( api_name );
        return true;
+    }
+
+    void login_api::enable_api( const std::string& api_name )
+    {
+       if( api_name == "database_api" )
+       {
+          _database_api = std::make_shared< database_api >( std::ref( *_app.chain_database() ) );
+       }
+       else if( api_name == "network_broadcast_api" )
+       {
+          _network_broadcast_api = std::make_shared< network_broadcast_api >( std::ref( _app ) );
+       }
+       else if( api_name == "history_api" )
+       {
+          _history_api = std::make_shared< history_api >( _app );
+       }
+       else if( api_name == "network_node_api" )
+       {
+          _network_node_api = std::make_shared< network_node_api >( std::ref(_app) );
+       }
+       return;
     }
 
     network_broadcast_api::network_broadcast_api(application& a):_app(a)

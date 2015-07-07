@@ -15,9 +15,10 @@
  * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+#include <graphene/app/api.hpp>
+#include <graphene/app/api_access.hpp>
 #include <graphene/app/application.hpp>
 #include <graphene/app/plugin.hpp>
-#include <graphene/app/api.hpp>
 
 #include <graphene/net/core_messages.hpp>
 
@@ -200,10 +201,40 @@ namespace detail {
             _chain_db->reindex(_data_dir / "blockchain", initial_state);
          }
 
+         if( _options->count("apiaccess") )
+            _apiaccess = fc::json::from_file( _options->at("apiaccess").as<boost::filesystem::path>() )
+               .as<api_access>();
+         else
+         {
+            // TODO:  Remove this generous default access policy
+            // when the UI logs in properly
+            _apiaccess = api_access();
+            api_access_info wild_access;
+            wild_access.password_hash_b64 = "*";
+            wild_access.password_salt_b64 = "*";
+            wild_access.allowed_apis.push_back( "database_api" );
+            wild_access.allowed_apis.push_back( "network_broadcast_api" );
+            wild_access.allowed_apis.push_back( "history_api" );
+            _apiaccess.permission_map["*"] = wild_access;
+         }
+
          reset_p2p_node(_data_dir);
          reset_websocket_server();
          reset_websocket_tls_server();
       } FC_CAPTURE_AND_RETHROW() }
+
+      optional< api_access_info > get_api_access_info( const string& username )const
+      {
+         optional< api_access_info > result;
+         auto it = _apiaccess.permission_map.find( username );
+         if( it == _apiaccess.permission_map.end() )
+         {
+            it = _apiaccess.permission_map.find( "*" );
+            if( it == _apiaccess.permission_map.end() )
+               return result;
+         }
+         return it->second;
+      }
 
       /**
        * If delegate has the item, the network has no need to fetch it.
@@ -410,6 +441,7 @@ namespace detail {
 
       fc::path _data_dir;
       const bpo::variables_map* _options = nullptr;
+      api_access _apiaccess;
 
       std::shared_ptr<graphene::chain::database>            _chain_db;
       std::shared_ptr<graphene::net::node>                  _p2p_network;
@@ -449,6 +481,7 @@ void application::set_program_options(boost::program_options::options_descriptio
          ("server-pem,p", bpo::value<string>()->implicit_value("server.pem"), "The TLS certificate file for this server")
          ("server-pem-password,P", bpo::value<string>()->implicit_value(""), "Password for this certificate")
          ("genesis-json", bpo::value<boost::filesystem::path>(), "File to read Genesis State from")
+         ("apiaccess", bpo::value<boost::filesystem::path>(), "JSON file specifying API permissions")
          ;
    command_line_options.add(configuration_file_options);
    command_line_options.add_options()
@@ -517,6 +550,11 @@ std::shared_ptr<chain::database> application::chain_database() const
 void application::set_block_production(bool producing_blocks)
 {
    my->_is_block_producer = producing_blocks;
+}
+
+optional< api_access_info > application::get_api_access_info( const string& username )const
+{
+   return my->get_api_access_info( username );
 }
 
 void graphene::app::application::add_plugin(const string& name, std::shared_ptr<graphene::app::abstract_plugin> p)

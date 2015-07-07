@@ -29,7 +29,6 @@
 #include <graphene/chain/balance_object.hpp>
 #include <graphene/net/node.hpp>
 
-
 #include <graphene/market_history/market_history_plugin.hpp>
 
 #include <fc/api.hpp>
@@ -439,6 +438,9 @@ namespace graphene { namespace app {
          fc::api<network_node_api> network_node()const;
 
       private:
+         /// @brief Called to enable an API, not reflected.
+         void enable_api( const string& api_name );
+
          application&                      _app;
          optional< fc::api<database_api> > _database_api;
          optional< fc::api<network_broadcast_api> > _network_broadcast_api;
