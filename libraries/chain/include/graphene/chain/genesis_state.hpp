@@ -79,6 +79,11 @@ struct genesis_state_type {
       /// Must correspond to one of the initial accounts
       string owner_name;
    };
+   struct initial_worker_type {
+      /// Must correspond to one of the initial accounts
+      string owner_name;
+      share_type daily_pay;
+   };
 
    chain_parameters initial_parameters;
    vector<initial_account_type> initial_accounts;
@@ -89,26 +94,36 @@ struct genesis_state_type {
    vector<initial_witness_type> initial_witness_candidates;
    // These are only candidates; the chain will have no active committee members at genesis
    vector<initial_committee_member_type> initial_committee_candidates;
+   vector<initial_worker_type> initial_worker_candidates;
 };
 } } // namespace graphene::chain
 
 FC_REFLECT(graphene::chain::genesis_state_type::initial_account_type, (name)(owner_key)(active_key)(is_lifetime_member))
-FC_REFLECT(graphene::chain::genesis_state_type::initial_balance_type,
-           (owner)(asset_symbol)(amount))
-FC_REFLECT(graphene::chain::genesis_state_type::initial_vesting_balance_type,
-           (owner)(asset_symbol)(amount)(begin_timestamp)(vesting_duration_seconds)(begin_balance))
-FC_REFLECT(graphene::chain::genesis_state_type::initial_witness_type, (owner_name)(block_signing_key))
-FC_REFLECT(graphene::chain::genesis_state_type::initial_committee_member_type, (owner_name))
-FC_REFLECT(graphene::chain::genesis_state_type::initial_asset_type::initial_bitasset_options::initial_collateral_position,
-           (collateral)(debt))
-FC_REFLECT(graphene::chain::genesis_state_type::initial_asset_type::initial_bitasset_options,
-           (feed_lifetime_sec)(minimum_feeds)(force_settlement_delay_sec)(force_settlement_offset_percent)
-           (maximum_force_settlement_volume)(backing_asset_symbol)(maintenance_collateral_ratio)(collateral_records))
+
 FC_REFLECT(graphene::chain::genesis_state_type::initial_asset_type,
            (symbol)(description)(precision)(issuer_name)(max_supply)(market_fee_percent)
            (issuer_permissions)(flags)(bitasset_options)(initial_accumulated_fees))
 
+FC_REFLECT(graphene::chain::genesis_state_type::initial_asset_type::initial_bitasset_options,
+           (feed_lifetime_sec)(minimum_feeds)(force_settlement_delay_sec)(force_settlement_offset_percent)
+           (maximum_force_settlement_volume)(backing_asset_symbol)(maintenance_collateral_ratio)(collateral_records))
+
+FC_REFLECT(graphene::chain::genesis_state_type::initial_asset_type::initial_bitasset_options::initial_collateral_position,
+           (collateral)(debt))
+
+FC_REFLECT(graphene::chain::genesis_state_type::initial_balance_type,
+           (owner)(asset_symbol)(amount))
+
+FC_REFLECT(graphene::chain::genesis_state_type::initial_vesting_balance_type,
+           (owner)(asset_symbol)(amount)(begin_timestamp)(vesting_duration_seconds)(begin_balance))
+
+FC_REFLECT(graphene::chain::genesis_state_type::initial_witness_type, (owner_name)(block_signing_key))
+
+FC_REFLECT(graphene::chain::genesis_state_type::initial_committee_member_type, (owner_name))
+
+FC_REFLECT(graphene::chain::genesis_state_type::initial_worker_type, (owner_name)(daily_pay))
+
 FC_REFLECT(graphene::chain::genesis_state_type,
            (initial_parameters)(initial_accounts)(initial_assets)(initial_balances)
            (initial_vesting_balances)(initial_active_witnesses)(initial_witness_candidates)
-           (initial_committee_candidates))
+           (initial_committee_candidates)(initial_worker_candidates))

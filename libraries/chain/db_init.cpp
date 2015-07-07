@@ -402,21 +402,38 @@ void database::init_genesis(const genesis_state_type& genesis_state)
       adjust_balance(GRAPHENE_COMMITTEE_ACCOUNT, -get_balance(GRAPHENE_COMMITTEE_ACCOUNT,{}));
    }
 
-   // Create initial witnesses and delegates
+   // Create initial witnesses
    std::for_each(genesis_state.initial_witness_candidates.begin(), genesis_state.initial_witness_candidates.end(),
                  [&](const genesis_state_type::initial_witness_type& witness) {
       witness_create_operation op;
+      op.witness_account = get_account_id(witness.owner_name);
       op.block_signing_key = witness.block_signing_key;
       op.initial_secret = secret_hash_type::hash( secret_hash_type() );
-      op.witness_account = get_account_id(witness.owner_name);
       apply_operation(genesis_eval_state, op);
    });
+
+   // Create initial committee members
    std::for_each(genesis_state.initial_committee_candidates.begin(), genesis_state.initial_committee_candidates.end(),
                  [&](const genesis_state_type::initial_committee_member_type& member) {
       delegate_create_operation op;
       op.delegate_account = get_account_id(member.owner_name);
-      apply_operation(genesis_eval_state, op).get<object_id_type>();
+      apply_operation(genesis_eval_state, op);
    });
+
+   // Create initial workers
+   std::for_each( genesis_state.initial_worker_candidates.begin(), genesis_state.initial_worker_candidates.end(),
+                  [ & ]( const genesis_state_type::initial_worker_type& worker )
+   {
+       worker_create_operation op;
+       op.owner = get_account_id( worker.owner_name );
+       op.work_begin_date = time_point_sec( GRAPHENE_GENESIS_TIMESTAMP );
+       op.work_end_date = time_point_sec::maximum();
+       op.daily_pay = worker.daily_pay;
+       op.name = "Genesis-Worker-" + worker.owner_name;
+       op.initializer = vesting_balance_worker_type::initializer( 0 );
+
+       apply_operation( genesis_eval_state, std::move( op ) );
+   } );
 
    // Set active witnesses
    modify(get_global_properties(), [&](global_property_object& p) {
