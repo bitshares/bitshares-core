@@ -20,6 +20,7 @@
 #include <graphene/chain/account_object.hpp>
 #include <graphene/chain/call_order_object.hpp>
 #include <graphene/chain/limit_order_object.hpp>
+#include <graphene/chain/exceptions.hpp>
 #include <fc/uint128.hpp>
 
 namespace graphene { namespace chain {
@@ -43,8 +44,8 @@ void_result call_order_update_evaluator::do_evaluate(const call_order_update_ope
 
    if( _bitasset_data->is_prediction_market )
       FC_ASSERT( o.delta_collateral.amount == o.delta_debt.amount );
-   else
-      FC_ASSERT( !_bitasset_data->current_feed.settlement_price.is_null() );
+   else if( _bitasset_data->current_feed.settlement_price.is_null() )
+      FC_THROW_EXCEPTION(insufficient_feeds, "Cannot borrow asset with no price feed.");
 
    if( o.delta_debt.amount < 0 )
    {

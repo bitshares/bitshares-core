@@ -73,7 +73,7 @@ using namespace graphene::db;
 #define INVOKE(test) ((struct test*)this)->test_method(); trx.clear()
 
 #define PREP_ACTOR(name) \
-   fc::ecc::private_key name ## _private_key = generate_private_key(BOOST_PP_STRINGIZE(name)); 
+   fc::ecc::private_key name ## _private_key = generate_private_key(BOOST_PP_STRINGIZE(name));
 
 #define ACTOR(name) \
    PREP_ACTOR(name) \
@@ -146,10 +146,20 @@ struct database_fixture {
       );
 
    void force_global_settle(const asset_object& what, const price& p);
+   void force_settle(account_id_type who, asset what)
+   { force_settle(who(db), what); }
    void force_settle(const account_object& who, asset what);
+   void update_feed_producers(asset_id_type mia, flat_set<account_id_type> producers)
+   { update_feed_producers(mia(db), producers); }
    void update_feed_producers(const asset_object& mia, flat_set<account_id_type> producers);
+   void publish_feed(asset_id_type mia, account_id_type by, const price_feed& f)
+   { publish_feed(mia(db), by(db), f); }
    void publish_feed(const asset_object& mia, const account_object& by, const price_feed& f);
+   void borrow(account_id_type who, asset what, asset collateral)
+   { borrow(who(db), what, collateral); }
    void borrow(const account_object& who, asset what, asset collateral);
+   void cover(account_id_type who, asset what, asset collateral_freed)
+   { cover(who(db), what, collateral_freed); }
    void cover(const account_object& who, asset what, asset collateral_freed);
 
    const asset_object& get_asset( const string& symbol )const;
@@ -163,7 +173,7 @@ struct database_fixture {
                                        uint16_t market_fee_percent = 100 /*1%*/,
                                        uint16_t flags = charge_market_fee);
    const asset_object& create_user_issued_asset( const string& name );
-   const asset_object& create_user_issued_asset( const string& name, 
+   const asset_object& create_user_issued_asset( const string& name,
                                                  const account_object& issuer,
                                                  uint16_t flags );
    void issue_uia( const account_object& recipient, asset amount );

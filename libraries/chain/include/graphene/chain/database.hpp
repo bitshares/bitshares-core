@@ -69,7 +69,7 @@ namespace graphene { namespace chain {
     *   @class database
     *   @brief tracks the blockchain state in an extensible manner
     */
-   class database : public object_database
+   class database : public db::object_database
    {
       public:
          //////////////////// db_management.cpp ////////////////////
