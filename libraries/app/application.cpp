@@ -180,31 +180,6 @@ namespace detail {
          fc::create_directories(_data_dir / "blockchain/dblock");
 
          genesis_state_type initial_state;
-   /*
-<<<<<<< HEAD
-         initial_state.initial_parameters.current_fees.set_all_fees(0);
-         secret_hash_type::encoder enc;
-         fc::raw::pack(enc, nathan_key);
-         fc::raw::pack(enc, secret_hash_type());
-         auto secret = secret_hash_type::hash(enc.result());
-         for( int i = 0; i < 10; ++i )
-         {
-            auto name = "init"+fc::to_string(i);
-            initial_state.initial_accounts.emplace_back(name,
-                                                        nathan_key.get_public_key(),
-                                                        nathan_key.get_public_key(),
-                                                        true);
-            initial_state.initial_committee_candidates.push_back({name});
-            initial_state.initial_witness_candidates.push_back({name, nathan_key.get_public_key(), secret});
-         }
-
-         initial_state.initial_accounts.emplace_back("nathan", nathan_key.get_public_key());
-         initial_state.initial_balances.push_back({nathan_key.get_public_key(),
-                                                   GRAPHENE_SYMBOL,
-                                                   GRAPHENE_MAX_SHARE_SUPPLY});
-=======
->>>>>>> b89ff4e6b1d732fbfe0cba20b4f41ea7df560f3c
-                                                   */
          if( _options->count("genesis-json") )
             initial_state = fc::json::from_file(_options->at("genesis-json").as<boost::filesystem::path>())
                   .as<genesis_state_type>();
