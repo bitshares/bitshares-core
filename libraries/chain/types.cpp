@@ -105,35 +105,6 @@ namespace graphene { namespace chain {
     {
        return p1.key_data != p2.key_data;
     }
-    /**
-     * @brief The fee_set_visitor struct sets all fees to a particular value in one fell swoop
-     *
-     * Example:
-     * @code
-     * fee_schedule_type sch;
-     * // Set all fees to 50
-     * fc::reflector<fee_schedule_type>::visit(fee_schedule_type::fee_set_visitor{sch, 50});
-     * @endcode
-     */
-    struct fee_set_visitor {
-       fee_schedule_type& f;
-       uint64_t fee;
-    
-       template<typename Member, typename Class, uint64_t (Class::*member)>
-       void operator()(const char*)const
-       {
-          f.*member = fee;
-       }
-       template<typename Member, typename Class, flat_map<unsigned_int,uint64_t> (Class::*member)>
-       void operator()(const char*)const
-       {
-       }
-    };
-
-    void fee_schedule_type::set_all_fees( uint64_t v )
-    {
-       fc::reflector<fee_schedule_type>::visit(fee_set_visitor{*this, v});
-    }
 
 } } // graphene::chain
 

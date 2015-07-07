@@ -34,7 +34,7 @@ namespace graphene { namespace chain {
       secret_hash_type              next_secret_hash;
       secret_hash_type              previous_secret;
       checksum_type                 transaction_merkle_root;
-      vector<header_extension>      extensions;
+      flat_set<header_extension>    extensions;
 
       static uint32_t num_from_id(const block_id_type& id);
    };

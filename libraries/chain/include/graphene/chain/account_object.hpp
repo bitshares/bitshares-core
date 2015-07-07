@@ -20,6 +20,7 @@
 #include <graphene/chain/asset.hpp>
 #include <graphene/db/generic_index.hpp>
 #include <boost/multi_index/composite_key.hpp>
+#include <graphene/chain/operations.hpp>
 
 namespace graphene { namespace chain {
 class database;
@@ -156,28 +157,8 @@ class database;
          /// operations the account may perform.
          authority active;
 
-         /// These are the fields which can be updated by the active authority.
-         struct options_type {
-            /// The memo key is the key this account will typically use to encrypt/sign transaction memos and other non-
-            /// validated account activities. This field is here to prevent confusion if the active authority has zero or
-            /// multiple keys in it.
-            public_key_type  memo_key;
-            /// If this field is set to an account ID other than 0, this account's votes will be ignored and its stake
-            /// will be counted as voting for the referenced account's selected votes instead.
-            account_id_type voting_account;
-
-            /// The number of active witnesses this account votes the blockchain should appoint
-            /// Must not exceed the actual number of witnesses voted for in @ref votes
-            uint16_t num_witness = 0;
-            /// The number of active committee members this account votes the blockchain should appoint
-            /// Must not exceed the actual number of committee members voted for in @ref votes
-            uint16_t num_committee = 0;
-            /// This is the list of vote IDs this account votes for. The weight of these votes is determined by this
-            /// account's balance of core asset.
-            flat_set<vote_id_type> votes;
-
-            void validate()const;
-         } options;
+         typedef account_options  options_type;
+         account_options options;
 
          /// The reference implementation records the account's statistics in a separate object. This field contains the
          /// ID of that object.
@@ -348,8 +329,6 @@ FC_REFLECT_DERIVED( graphene::chain::account_object,
                     (network_fee_percentage)(lifetime_referrer_fee_percentage)(referrer_rewards_percentage)
                     (name)(owner)(active)(options)(statistics)(whitelisting_accounts)(blacklisting_accounts)
                     (cashback_vb) )
-
-FC_REFLECT(graphene::chain::account_object::options_type, (memo_key)(voting_account)(num_witness)(num_committee)(votes))
 
 FC_REFLECT_DERIVED( graphene::chain::account_balance_object,
                     (graphene::db::object),

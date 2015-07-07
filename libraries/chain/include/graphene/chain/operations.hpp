@@ -31,7 +31,6 @@
 /// we should remove these headers
 #include <graphene/chain/asset_object.hpp>
 #include <graphene/chain/worker_object.hpp>
-#include <graphene/chain/account_object.hpp>
 
 #include <fc/static_variant.hpp>
 #include <fc/uint128.hpp>
@@ -46,13 +45,13 @@ namespace graphene { namespace chain {
    struct void_result{};
    typedef fc::static_variant<void_result,object_id_type,asset> operation_result;
 
-   struct balance_accumulator
+   struct base_operation
    {
-      void  adjust( account_id_type account, const asset& delta )
+      template<typename T>
+      share_type calculate_fee(const T& params)const
       {
-         balance[ std::make_pair(account, delta.asset_id) ] += delta.amount;
+         return params.fee;
       }
-      flat_map< pair<account_id_type, asset_id_type>, share_type > balance;
    };
 
    /**
@@ -114,18 +113,19 @@ namespace graphene { namespace chain {
     *  pre or post conditions for other operations.
     *
     */
-   struct assert_operation
+   struct assert_operation : public base_operation
    {
+      struct fee_parameters_type { share_type fee = 150000; };
+
       asset                      fee;
       account_id_type            fee_paying_account;
+      // TODO: replace this with a pure vector<static_variant> because all nodes need to know about all predicates and 
+      // this will simplify the code.
       vector<vector<char>>       predicates;
       flat_set<account_id_type>  required_auths;
 
       account_id_type fee_payer()const { return fee_paying_account; }
-      share_type      calculate_fee(const fee_schedule_type& k)const;
       void            validate()const;
-
-      void get_balance_delta(balance_accumulator& acc, const operation_result& result = asset())const { acc.adjust(fee_payer(), -fee); }
    };
 
    /**
@@ -135,8 +135,10 @@ namespace graphene { namespace chain {
     * vesting balance, @ref total_claimed must not exceed @ref balance_object::available at the time of evaluation. If
     * the object contains a non-vesting balance, @ref total_claimed must be the full balance of the object.
     */
-   struct balance_claim_operation
+   struct balance_claim_operation : public base_operation
    {
+      struct fee_parameters_type {};
+
       asset             fee;
       account_id_type   deposit_to_account;
       balance_id_type   balance_to_claim;
@@ -144,20 +146,46 @@ namespace graphene { namespace chain {
       asset             total_claimed;
 
       account_id_type fee_payer()const { return deposit_to_account; }
-      share_type      calculate_fee(const fee_schedule_type& k)const { return 0; }
+      share_type      calculate_fee(const fee_parameters_type& )const { return 0; }
       void            validate()const;
+   };
 
-      void get_balance_delta(balance_accumulator& acc, const operation_result& = asset())const {
-         acc.adjust(deposit_to_account, total_claimed);
-         acc.adjust(fee_payer(), -fee);
-      }
+
+   /// These are the fields which can be updated by the active authority.
+   struct account_options 
+   {
+      /// The memo key is the key this account will typically use to encrypt/sign transaction memos and other non-
+      /// validated account activities. This field is here to prevent confusion if the active authority has zero or
+      /// multiple keys in it.
+      public_key_type  memo_key;
+      /// If this field is set to an account ID other than 0, this account's votes will be ignored and its stake
+      /// will be counted as voting for the referenced account's selected votes instead.
+      account_id_type voting_account;
+
+      /// The number of active witnesses this account votes the blockchain should appoint
+      /// Must not exceed the actual number of witnesses voted for in @ref votes
+      uint16_t num_witness = 0;
+      /// The number of active committee members this account votes the blockchain should appoint
+      /// Must not exceed the actual number of committee members voted for in @ref votes
+      uint16_t num_committee = 0;
+      /// This is the list of vote IDs this account votes for. The weight of these votes is determined by this
+      /// account's balance of core asset.
+      flat_set<vote_id_type> votes;
+
+      void validate()const;
    };
 
    /**
     *  @ingroup operations
     */
-   struct account_create_operation
+   struct account_create_operation : public base_operation
    {
+      struct fee_parameters_type { 
+         uint64_t basic_fee      = 5*GRAPHENE_BLOCKCHAIN_PRECISION; ///< the cost to register the cheapest non-free account
+         uint64_t premium_fee    = 2000*GRAPHENE_BLOCKCHAIN_PRECISION; ///< the cost to register the cheapest non-free account
+         uint32_t price_per_kbyte = GRAPHENE_BLOCKCHAIN_PRECISION;
+      };
+
       asset           fee;
       /// This account pays the fee. Must be a lifetime member.
       account_id_type registrar;
@@ -172,13 +200,11 @@ namespace graphene { namespace chain {
       authority       owner;
       authority       active;
 
-      account_object::options_type options;
+      account_options options;
 
       account_id_type fee_payer()const { return registrar; }
-      void       validate()const;
-      share_type calculate_fee( const fee_schedule_type& k )const;
-
-      void get_balance_delta( balance_accumulator& acc, const operation_result& result = asset())const { acc.adjust( fee_payer(), -fee ); }
+      void            validate()const;
+      share_type      calculate_fee(const fee_parameters_type& )const;
    };
 
    /**
@@ -200,8 +226,9 @@ namespace graphene { namespace chain {
     * This operation requires authorizing_account's signature, but not account_to_list's. The fee is paid by
     * authorizing_account.
     */
-   struct account_whitelist_operation
+   struct account_whitelist_operation : public base_operation
    {
+      struct fee_parameters_type { share_type fee = 300000; };
       enum account_listing {
          no_listing = 0x0, ///< No opinion is specified about this account
          white_listed = 0x1, ///< This account is whitelisted, but not blacklisted
@@ -221,9 +248,6 @@ namespace graphene { namespace chain {
 
       account_id_type fee_payer()const { return authorizing_account; }
       void validate()const { FC_ASSERT( fee.amount >= 0 ); FC_ASSERT(new_listing < 0x4); }
-      share_type calculate_fee(const fee_schedule_type& k)const { return k.account_whitelist_fee; }
-
-      void get_balance_delta( balance_accumulator& acc, const operation_result& result = asset())const { acc.adjust( fee_payer(), -fee ); }
    };
 
    /**
@@ -233,8 +257,13 @@ namespace graphene { namespace chain {
     * This operation is used to update an existing account. It can be used to update the authorities, or adjust the options on the account.
     * See @ref account_object::options_type for the options which may be updated.
     */
-   struct account_update_operation
+   struct account_update_operation : public base_operation
    {
+      struct fee_parameters_type { 
+         share_type fee             = 20 * GRAPHENE_BLOCKCHAIN_PRECISION; 
+         uint32_t   price_per_kbyte = GRAPHENE_BLOCKCHAIN_PRECISION;
+      };
+
       asset fee;
       /// The account to update
       account_id_type account;
@@ -245,12 +274,11 @@ namespace graphene { namespace chain {
       optional<authority> active;
 
       /// New account options
-      optional<account_object::options_type> new_options;
+      optional<account_options> new_options;
 
       account_id_type fee_payer()const { return account; }
       void       validate()const;
-      share_type calculate_fee( const fee_schedule_type& k )const;
-      void get_balance_delta( balance_accumulator& acc, const operation_result& result = asset())const { acc.adjust( fee_payer(), -fee ); }
+      share_type calculate_fee( const fee_parameters_type& k )const;
    };
 
    /**
@@ -266,8 +294,13 @@ namespace graphene { namespace chain {
     * Any account may use this operation to become a lifetime member by setting @ref upgrade_to_lifetime_member to
     * true. Once an account has become a lifetime member, it may not use this operation anymore.
     */
-   struct account_upgrade_operation
+   struct account_upgrade_operation : public base_operation
    {
+      struct fee_parameters_type { 
+         uint64_t membership_annual_fee   =  2000 * GRAPHENE_BLOCKCHAIN_PRECISION;
+         uint64_t membership_lifetime_fee = 10000 * GRAPHENE_BLOCKCHAIN_PRECISION; ///< the cost to upgrade to a lifetime member
+      };
+
       asset             fee;
       /// The account to upgrade; must not already be a lifetime member
       account_id_type   account_to_upgrade;
@@ -276,8 +309,7 @@ namespace graphene { namespace chain {
 
       account_id_type fee_payer()const { return account_to_upgrade; }
       void       validate()const;
-      share_type calculate_fee( const fee_schedule_type& k )const;
-      void get_balance_delta( balance_accumulator& acc, const operation_result& = asset())const { acc.adjust( fee_payer(), -fee ); }
+      share_type calculate_fee( const fee_parameters_type& k )const;
    };
 
    /**
@@ -293,17 +325,17 @@ namespace graphene { namespace chain {
     *
     * This operation will clear the account's whitelist statuses, but not the blacklist statuses.
     */
-   struct account_transfer_operation
+   struct account_transfer_operation : public base_operation
    {
+      struct fee_parameters_type { uint64_t fee = 500 * GRAPHENE_BLOCKCHAIN_PRECISION; };
+
       asset           fee;
       account_id_type account_id;
       account_id_type new_owner;
 
       account_id_type fee_payer()const { return account_id; }
       void        validate()const;
-      share_type  calculate_fee( const fee_schedule_type& k )const;
 
-      void get_balance_delta( balance_accumulator& acc, const operation_result& result = asset())const { acc.adjust( fee_payer(), -fee ); }
    };
 
    /**
@@ -313,17 +345,17 @@ namespace graphene { namespace chain {
     * Accounts which wish to become delegates may use this operation to create a delegate object which stakeholders may
     * vote on to approve its position as a delegate.
     */
-   struct delegate_create_operation
+   struct delegate_create_operation : public base_operation
    {
+      struct fee_parameters_type { uint64_t fee = 5000 * GRAPHENE_BLOCKCHAIN_PRECISION; };
+
       asset                                 fee;
       /// The account which owns the delegate. This account pays the fee for this operation.
       account_id_type                       delegate_account;
       string                                url;
 
       account_id_type fee_payer()const { return delegate_account; }
-      void validate()const;
-      share_type calculate_fee( const fee_schedule_type& k )const;
-      void get_balance_delta( balance_accumulator& acc, const operation_result& result = asset())const { acc.adjust( fee_payer(), -fee ); }
+      void            validate()const;
    };
 
   /**
@@ -333,8 +365,10 @@ namespace graphene { namespace chain {
     * Accounts which wish to become witnesses may use this operation to create a witness object which stakeholders may
     * vote on to approve its position as a witness.
     */
-   struct witness_create_operation
+   struct witness_create_operation : public base_operation
    {
+      struct fee_parameters_type { uint64_t fee = 5000 * GRAPHENE_BLOCKCHAIN_PRECISION; };
+
       asset             fee;
       /// The account which owns the delegate. This account pays the fee for this operation.
       account_id_type   witness_account;
@@ -343,18 +377,20 @@ namespace graphene { namespace chain {
       secret_hash_type  initial_secret;
 
       account_id_type fee_payer()const { return witness_account; }
-      void validate()const;
-      share_type calculate_fee(const fee_schedule_type& k)const;
-
-      void get_balance_delta(balance_accumulator& acc, const operation_result& result = asset())const { acc.adjust(fee_payer(), -fee); }
+      void            validate()const;
    };
 
    /**
     * @ingroup operations
     *  Used to move witness pay from accumulated_income to their account balance.
+    *
+    * TODO: remove this operation, send witness pay into a vesting balance object and
+    * have the witness claim the funds from there.
     */
-   struct witness_withdraw_pay_operation
+   struct witness_withdraw_pay_operation : public base_operation
    {
+      struct fee_parameters_type { uint64_t fee = 20 * GRAPHENE_BLOCKCHAIN_PRECISION; };
+
       asset            fee;
       /// The account to pay. Must match from_witness->witness_account. This account pays the fee for this operation.
       account_id_type  to_account;
@@ -362,14 +398,7 @@ namespace graphene { namespace chain {
       share_type       amount;
 
       account_id_type fee_payer()const { return to_account; }
-      void       validate()const;
-      share_type calculate_fee(const fee_schedule_type& k)const;
-
-      void get_balance_delta( balance_accumulator& acc, const operation_result& result = asset())const
-      {
-         acc.adjust( fee_payer(), -fee );
-         acc.adjust( to_account, amount );
-      }
+      void            validate()const;
    };
 
    /**
@@ -383,15 +412,15 @@ namespace graphene { namespace chain {
     * This operation may only be used in a proposed transaction, and a proposed transaction which contains this
     * operation must have a review period specified in the current global parameters before it may be accepted.
     */
-   struct global_parameters_update_operation
+   struct global_parameters_update_operation : public base_operation
    {
-      asset fee;
-      chain_parameters new_parameters;
+      struct fee_parameters_type { uint64_t fee = GRAPHENE_BLOCKCHAIN_PRECISION; };
+
+      asset                         fee;
+      fc::fwd<chain_parameters,100> new_parameters;
 
       account_id_type fee_payer()const { return account_id_type(); }
       void validate()const;
-      share_type calculate_fee(const fee_schedule_type& k)const;
-      void get_balance_delta( balance_accumulator& acc, const operation_result& result = asset())const { acc.adjust( fee_payer(), -fee ); }
    };
 
    /**
@@ -467,8 +496,13 @@ namespace graphene { namespace chain {
     *  @post to account's balance will be increased by amount
     *  @return n/a
     */
-   struct transfer_operation
+   struct transfer_operation : public base_operation
    {
+      struct fee_parameters_type { 
+         uint64_t base_fee       = 20 * GRAPHENE_BLOCKCHAIN_PRECISION; 
+         uint32_t price_per_kbyte = 10; /// only required for large memos.
+      };
+
       asset            fee;
       /// Account to transfer asset from
       account_id_type  from;
@@ -481,14 +515,8 @@ namespace graphene { namespace chain {
       optional<memo_data> memo;
 
       account_id_type fee_payer()const { return from; }
-      void       validate()const;
-      share_type calculate_fee(const fee_schedule_type& k)const;
-      void get_balance_delta( balance_accumulator& acc, const operation_result& result = asset())const
-      {
-         acc.adjust( fee_payer(), -fee );
-         acc.adjust( from, -amount );
-         acc.adjust( to, amount );
-      }
+      void            validate()const;
+      share_type      calculate_fee(const fee_parameters_type& k)const;
    };
 
    /**
@@ -499,8 +527,13 @@ namespace graphene { namespace chain {
     *  @pre amount.asset_id->issuer == issuer
     *  @pre issuer != from  because this is pointless, use a normal transfer operation
     */
-   struct override_transfer_operation
+   struct override_transfer_operation : public base_operation
    {
+      struct fee_parameters_type { 
+         uint64_t base_fee       = 20 * GRAPHENE_BLOCKCHAIN_PRECISION;
+         uint32_t price_per_kbyte = 10; /// only required for large memos.
+      };
+
       asset           fee;
       account_id_type issuer;
       /// Account to transfer asset from
@@ -515,21 +548,22 @@ namespace graphene { namespace chain {
 
       account_id_type fee_payer()const { return issuer; }
       void            validate()const;
-      share_type      calculate_fee(const fee_schedule_type& k)const;
-      void get_balance_delta( balance_accumulator& acc, const operation_result& result = asset())const
-      {
-         acc.adjust( fee_payer(), -fee );
-         acc.adjust( from, -amount );
-         acc.adjust( to, amount );
-      }
+      share_type      calculate_fee(const fee_parameters_type& k)const;
    };
 
 
    /**
     * @ingroup operations
     */
-   struct asset_create_operation
+   struct asset_create_operation : public base_operation
    {
+      struct fee_parameters_type { 
+         uint64_t symbol3        = 500000 * GRAPHENE_BLOCKCHAIN_PRECISION;
+         uint64_t symbol4        = 300000 * GRAPHENE_BLOCKCHAIN_PRECISION;
+         uint64_t long_symbol    = 5000   * GRAPHENE_BLOCKCHAIN_PRECISION;
+         uint32_t price_per_kbyte = 10; /// only required for large memos.
+      };
+
       asset                   fee;
       /// This account must sign and pay the fee for this operation. Later, this account may update the asset
       account_id_type         issuer;
@@ -552,8 +586,7 @@ namespace graphene { namespace chain {
 
       account_id_type fee_payer()const { return issuer; }
       void            validate()const;
-      share_type      calculate_fee( const fee_schedule_type& k )const;
-      void            get_balance_delta(balance_accumulator& acc, const operation_result& result = asset())const { acc.adjust(fee_payer(), -fee); }
+      share_type      calculate_fee( const fee_parameters_type& k )const;
    };
 
    /**
@@ -566,8 +599,10 @@ namespace graphene { namespace chain {
     *  used as backing for other bitassets, those bitassets will be force settled at their current
     *  feed price.
     */
-   struct asset_global_settle_operation
+   struct asset_global_settle_operation : public base_operation
    {
+      struct fee_parameters_type { uint64_t fee = 500 * GRAPHENE_BLOCKCHAIN_PRECISION; };
+
       asset           fee;
       account_id_type issuer; ///< must equal @ref asset_to_settle->issuer
       asset_id_type   asset_to_settle;
@@ -575,8 +610,6 @@ namespace graphene { namespace chain {
 
       account_id_type fee_payer()const { return issuer; }
       void            validate()const;
-      share_type      calculate_fee(const fee_schedule_type& k)const;
-      void            get_balance_delta(balance_accumulator& acc, const operation_result& result = asset())const { acc.adjust(fee_payer(), -fee); }
    };
 
    /**
@@ -592,8 +625,18 @@ namespace graphene { namespace chain {
     *
     * The fee is paid by @ref account, and @ref account must authorize this operation
     */
-   struct asset_settle_operation
+   struct asset_settle_operation : public base_operation
    {
+      struct fee_parameters_type { 
+         /** this fee should be high to encourage small settlement requests to
+          * be performed on the market rather than via forced settlement. 
+          *
+          * Note that in the event of a black swan or prediction market close out
+          * everyone will have to pay this fee.
+          */
+         uint64_t fee      = 100 * GRAPHENE_BLOCKCHAIN_PRECISION;
+      };
+
       asset           fee;
       /// Account requesting the force settlement. This account pays the fee
       account_id_type account;
@@ -602,19 +645,15 @@ namespace graphene { namespace chain {
 
       account_id_type fee_payer()const { return account; }
       void            validate()const;
-      share_type      calculate_fee(const fee_schedule_type& k)const;
-      void get_balance_delta(balance_accumulator& acc, const operation_result& result = asset())const
-      {
-         acc.adjust( fee_payer(), -fee );
-         acc.adjust( account, -amount );
-      }
    };
 
    /**
     * @ingroup operations
     */
-   struct asset_fund_fee_pool_operation
+   struct asset_fund_fee_pool_operation : public base_operation
    {
+      struct fee_parameters_type { uint64_t fee =  GRAPHENE_BLOCKCHAIN_PRECISION; };
+
       asset           fee; ///< core asset
       account_id_type from_account;
       asset_id_type   asset_id;
@@ -622,12 +661,6 @@ namespace graphene { namespace chain {
 
       account_id_type fee_payer()const { return from_account; }
       void       validate()const;
-      share_type calculate_fee(const fee_schedule_type& k)const;
-      void       get_balance_delta(balance_accumulator& acc, const operation_result& result = asset())const
-      {
-         acc.adjust(fee_payer(), -fee);
-         acc.adjust(fee_payer(), -amount);
-      }
    };
 
    /**
@@ -645,10 +678,17 @@ namespace graphene { namespace chain {
     * @pre @ref new_options SHALL be internally consistent, as verified by @ref validate()
     * @post @ref asset_to_update will have options matching those of new_options
     */
-   struct asset_update_operation
+   struct asset_update_operation : public base_operation
    {
+      struct fee_parameters_type { 
+         uint64_t fee            = 500 * GRAPHENE_BLOCKCHAIN_PRECISION;
+         uint32_t price_per_kbyte = 10;
+      };
+
       asset_update_operation(){}
+
       /// Initializes the operation to apply changes to the provided asset, and copies old.options into @ref new_options
+      /// TODO: operations should not depend upon data model objects, reverse the dependency
       asset_update_operation(const asset_object& old);
 
       asset           fee;
@@ -657,12 +697,12 @@ namespace graphene { namespace chain {
 
       /// If the asset is to be given a new issuer, specify his ID here.
       optional<account_id_type>   new_issuer;
+      /// TODO: operations should not depend upon data model objects, reverse the dependency
       asset_object::asset_options new_options;
 
       account_id_type fee_payer()const { return issuer; }
       void            validate()const;
-      share_type      calculate_fee(const fee_schedule_type& k)const;
-      void            get_balance_delta(balance_accumulator& acc, const operation_result& result = asset())const { acc.adjust(fee_payer(), -fee); }
+      share_type      calculate_fee(const fee_parameters_type& k)const;
    };
 
    /**
@@ -678,8 +718,10 @@ namespace graphene { namespace chain {
     * @pre @ref new_options SHALL be internally consistent, as verified by @ref validate()
     * @post @ref asset_to_update will have BitAsset-specific options matching those of new_options
     */
-   struct asset_update_bitasset_operation
+   struct asset_update_bitasset_operation : public base_operation
    {
+      struct fee_parameters_type { uint64_t fee = 500 * GRAPHENE_BLOCKCHAIN_PRECISION; };
+
       asset           fee;
       account_id_type issuer;
       asset_id_type   asset_to_update;
@@ -688,8 +730,6 @@ namespace graphene { namespace chain {
 
       account_id_type fee_payer()const { return issuer; }
       void            validate()const;
-      share_type      calculate_fee(const fee_schedule_type& k)const;
-      void            get_balance_delta(balance_accumulator& acc, const operation_result& result = asset())const { acc.adjust(fee_payer(), -fee); }
    };
 
    /**
@@ -708,8 +748,10 @@ namespace graphene { namespace chain {
     * @post All valid feeds supplied by feed producers in @ref new_feed_producers, which were already feed producers
     * prior to execution of this operation, will be preserved
     */
-   struct asset_update_feed_producers_operation
+   struct asset_update_feed_producers_operation : public base_operation
    {
+      struct fee_parameters_type { uint64_t fee = 500 * GRAPHENE_BLOCKCHAIN_PRECISION; };
+
       asset           fee;
       account_id_type issuer;
       asset_id_type   asset_to_update;
@@ -718,9 +760,6 @@ namespace graphene { namespace chain {
 
       account_id_type fee_payer()const { return issuer; }
       void            validate()const;
-      share_type      calculate_fee(const fee_schedule_type& k)const;
-      void            get_balance_delta(balance_accumulator& acc, const operation_result& result = asset())const
-      { acc.adjust(fee_payer(), -fee); }
    };
 
    /**
@@ -739,24 +778,29 @@ namespace graphene { namespace chain {
     * settlement price may be flipped either direction, as long as it is a ratio between the market-issued asset and
     * its collateral.
     */
-   struct asset_publish_feed_operation
+   struct asset_publish_feed_operation : public base_operation
    {
+      struct fee_parameters_type { uint64_t fee = GRAPHENE_BLOCKCHAIN_PRECISION; };
+
       asset                  fee; ///< paid for by publisher
       account_id_type        publisher;
       asset_id_type          asset_id; ///< asset for which the feed is published
       price_feed             feed;
 
       account_id_type fee_payer()const { return publisher; }
-      void       validate()const;
-      share_type calculate_fee( const fee_schedule_type& k )const;
-      void get_balance_delta(balance_accumulator& acc, const operation_result& result = asset())const { acc.adjust(fee_payer(), -fee); }
+      void            validate()const;
    };
 
    /**
     * @ingroup operations
     */
-   struct asset_issue_operation
+   struct asset_issue_operation : public base_operation
    {
+      struct fee_parameters_type { 
+         uint64_t fee = 20 * GRAPHENE_BLOCKCHAIN_PRECISION; 
+         uint32_t price_per_kbyte = GRAPHENE_BLOCKCHAIN_PRECISION;
+      };
+
       asset            fee;
       account_id_type  issuer; ///< Must be asset_to_issue->asset_id->issuer
       asset            asset_to_issue;
@@ -768,9 +812,7 @@ namespace graphene { namespace chain {
 
       account_id_type fee_payer()const { return issuer; }
       void            validate()const;
-      share_type      calculate_fee(const fee_schedule_type& k)const;
-      void get_balance_delta(balance_accumulator& acc, const operation_result& result = asset())const
-      { acc.adjust(fee_payer(), -fee); acc.adjust(issue_to_account, asset_to_issue); }
+      share_type      calculate_fee(const fee_parameters_type& k)const;
    };
 
    /**
@@ -779,20 +821,16 @@ namespace graphene { namespace chain {
     *
     * @note You cannot burn market-issued assets.
     */
-   struct asset_reserve_operation
+   struct asset_reserve_operation : public base_operation
    {
+      struct fee_parameters_type { uint64_t fee = 20 * GRAPHENE_BLOCKCHAIN_PRECISION; };
+
       asset             fee;
       account_id_type   payer;
       asset             amount_to_reserve;
 
       account_id_type fee_payer()const { return payer; }
       void            validate()const;
-      share_type      calculate_fee(const fee_schedule_type& k)const;
-      void get_balance_delta(balance_accumulator& acc, const operation_result& result = asset())const
-      {
-         acc.adjust(fee_payer(), -fee);
-         acc.adjust(fee_payer(), -amount_to_reserve);
-      }
    };
 
    /**
@@ -813,8 +851,10 @@ namespace graphene { namespace chain {
     *  Market orders are matched in the order they are included
     *  in the block chain.
     */
-   struct limit_order_create_operation
+   struct limit_order_create_operation : public base_operation
    {
+      struct fee_parameters_type { uint64_t fee = 5 * GRAPHENE_BLOCKCHAIN_PRECISION; };
+
       asset           fee;
       account_id_type seller;
       asset           amount_to_sell;
@@ -835,13 +875,7 @@ namespace graphene { namespace chain {
       }
       account_id_type fee_payer()const { return seller; }
       void            validate()const;
-      share_type      calculate_fee(const fee_schedule_type& k)const;
       price           get_price()const { return amount_to_sell / min_to_receive; }
-      void            get_balance_delta(balance_accumulator& acc, const operation_result& result = asset())const
-      {
-         acc.adjust(fee_payer(), -fee);
-         acc.adjust(seller, -amount_to_sell);
-      }
    };
 
 
@@ -852,8 +886,10 @@ namespace graphene { namespace chain {
     *
     *  @return the amount actually refunded
     */
-   struct limit_order_cancel_operation
+   struct limit_order_cancel_operation : public base_operation
    {
+      struct fee_parameters_type { uint64_t fee = 0; };
+
       asset               fee;
       limit_order_id_type order;
       /** must be order->seller */
@@ -861,12 +897,6 @@ namespace graphene { namespace chain {
 
       account_id_type fee_payer()const { return fee_paying_account; }
       void            validate()const;
-      share_type      calculate_fee(const fee_schedule_type& k)const;
-      void            get_balance_delta(balance_accumulator& acc, const operation_result& result = asset())const
-      {
-         acc.adjust(fee_payer(), -fee);
-         acc.adjust(fee_payer(), result.get<asset>());
-      }
    };
 
 
@@ -882,22 +912,18 @@ namespace graphene { namespace chain {
     *
     *  @note this operation can be used to force a market order using the collateral without requiring outside funds.
     */
-   struct call_order_update_operation
+   struct call_order_update_operation : public base_operation
    {
-      asset               fee; ///< paid by funding_account
+      /** this is slightly more expensive than limit orders, this pricing impacts prediction markets */
+      struct fee_parameters_type { uint64_t fee = 20 * GRAPHENE_BLOCKCHAIN_PRECISION; };
+
+      asset               fee;
       account_id_type     funding_account; ///< pays fee, collateral, and cover
       asset               delta_collateral; ///< the amount of collateral to add to the margin position
       asset               delta_debt; ///< the amount of the debt to be paid off, may be negative to issue new debt
 
       account_id_type fee_payer()const { return funding_account; }
       void            validate()const;
-      share_type      calculate_fee(const fee_schedule_type& k)const;
-      void            get_balance_delta(balance_accumulator& acc, const operation_result& result = asset())const
-      {
-         acc.adjust(fee_payer(), -fee);
-         acc.adjust(funding_account, -delta_collateral);
-         acc.adjust(funding_account, delta_debt);
-      }
    };
 
    /**
@@ -941,10 +967,15 @@ namespace graphene { namespace chain {
     * expiration_time cannot be farther in the future than the maximum expiration time set in the global properties
     * object.
     */
-   struct proposal_create_operation
+   struct proposal_create_operation : public base_operation
    {
-       account_id_type    fee_paying_account;
+       struct fee_parameters_type { 
+          uint64_t fee            = 20 * GRAPHENE_BLOCKCHAIN_PRECISION; 
+          uint32_t price_per_kbyte = 10;
+       };
+
        asset              fee;
+       account_id_type    fee_paying_account;
        vector<op_wrapper> proposed_ops;
        time_point_sec     expiration_time;
        optional<uint32_t> review_period_seconds;
@@ -954,10 +985,8 @@ namespace graphene { namespace chain {
        static proposal_create_operation genesis_proposal(const class database& db);
 
       account_id_type fee_payer()const { return fee_paying_account; }
-      void       validate()const;
-      share_type calculate_fee(const fee_schedule_type& k)const;
-      void       get_balance_delta(balance_accumulator& acc, const operation_result& result = asset())const
-      { acc.adjust(fee_payer(), -fee); }
+      void            validate()const;
+      share_type      calculate_fee(const fee_parameters_type& k)const;
    };
 
    /**
@@ -978,8 +1007,13 @@ namespace graphene { namespace chain {
     * If an account's owner and active authority are both required, only the owner authority may approve. An attempt to
     * add or remove active authority approval to such a proposal will fail.
     */
-   struct proposal_update_operation
+   struct proposal_update_operation : public base_operation
    {
+      struct fee_parameters_type { 
+         uint64_t fee            = 20 * GRAPHENE_BLOCKCHAIN_PRECISION; 
+         uint32_t price_per_kbyte = 10;
+      };
+
       account_id_type            fee_paying_account;
       asset                      fee;
       proposal_id_type           proposal;
@@ -991,9 +1025,8 @@ namespace graphene { namespace chain {
       flat_set<public_key_type>  key_approvals_to_remove;
 
       account_id_type fee_payer()const { return fee_paying_account; }
-      void       validate()const;
-      share_type calculate_fee(const fee_schedule_type& k)const;
-      void       get_balance_delta(balance_accumulator& acc, const operation_result& result = asset())const { acc.adjust(fee_payer(), -fee); }
+      void            validate()const;
+      share_type      calculate_fee(const fee_parameters_type& k)const;
    };
 
    /**
@@ -1007,8 +1040,10 @@ namespace graphene { namespace chain {
     * proposal expires. Using this operation, he can prevent any further breath from being wasted on such an absurd
     * proposal.
     */
-   struct proposal_delete_operation
+   struct proposal_delete_operation : public base_operation
    {
+      struct fee_parameters_type { uint64_t fee =  GRAPHENE_BLOCKCHAIN_PRECISION; };
+
       account_id_type   fee_paying_account;
       bool              using_owner_authority = false;
       asset             fee;
@@ -1016,8 +1051,6 @@ namespace graphene { namespace chain {
 
       account_id_type fee_payer()const { return fee_paying_account; }
       void       validate()const;
-      share_type calculate_fee(const fee_schedule_type& k)const;
-      void       get_balance_delta(balance_accumulator& acc, const operation_result& result = asset())const { acc.adjust(fee_payer(), -fee); }
    };
    ///@}
 
@@ -1028,8 +1061,10 @@ namespace graphene { namespace chain {
     * emitted for the purpose of accurately tracking account history, accelerating
     * a reindex.
     */
-   struct fill_order_operation
+   struct fill_order_operation : public base_operation
    {
+      struct fee_parameters_type {};
+
       object_id_type      order_id;
       account_id_type     account_id;
       asset               pays;
@@ -1045,13 +1080,9 @@ namespace graphene { namespace chain {
       }
       account_id_type fee_payer()const { return account_id; }
       void            validate()const { FC_ASSERT( !"virtual operation" ); }
-      share_type      calculate_fee(const fee_schedule_type& k)const
-      // This is a virtual operation; there is no fee
-      { return 0; }
 
-      void get_balance_delta(balance_accumulator& acc, const operation_result& result = asset())const {
-         acc.adjust(account_id, receives);
-      }
+      /// This is a virtual operation; there is no fee
+      share_type      calculate_fee(const fee_parameters_type& k)const { return 0; }
    };
 
    /**
@@ -1073,8 +1104,10 @@ namespace graphene { namespace chain {
     * The fee for this operation is paid by withdraw_from_account, and this account is required to authorize this
     * operation.
     */
-   struct withdraw_permission_create_operation
+   struct withdraw_permission_create_operation : public base_operation
    {
+      struct fee_parameters_type { uint64_t fee =  GRAPHENE_BLOCKCHAIN_PRECISION; };
+
       asset             fee;
       /// The account authorizing withdrawals from its balances
       account_id_type   withdraw_from_account;
@@ -1091,8 +1124,6 @@ namespace graphene { namespace chain {
 
       account_id_type fee_payer()const { return withdraw_from_account; }
       void            validate()const;
-      share_type      calculate_fee(const fee_schedule_type& k)const;
-      void            get_balance_delta(balance_accumulator& acc, const operation_result& result = asset())const { acc.adjust(fee_payer(), -fee); }
    };
 
    /**
@@ -1106,8 +1137,10 @@ namespace graphene { namespace chain {
     *
     * Fee is paid by withdraw_from_account, which is required to authorize this operation
     */
-   struct withdraw_permission_update_operation
+   struct withdraw_permission_update_operation : public base_operation
    {
+      struct fee_parameters_type { uint64_t fee =  GRAPHENE_BLOCKCHAIN_PRECISION; };
+
       asset                         fee;
       /// This account pays the fee. Must match permission_to_update->withdraw_from_account
       account_id_type               withdraw_from_account;
@@ -1126,8 +1159,6 @@ namespace graphene { namespace chain {
 
       account_id_type fee_payer()const { return withdraw_from_account; }
       void            validate()const;
-      share_type      calculate_fee(const fee_schedule_type& k)const;
-      void            get_balance_delta(balance_accumulator& acc, const operation_result& result = asset())const { acc.adjust(fee_payer(), -fee); }
    };
 
    /**
@@ -1143,8 +1174,13 @@ namespace graphene { namespace chain {
     *
     * Fee is paid by withdraw_to_account, which is required to authorize this operation
     */
-   struct withdraw_permission_claim_operation
+   struct withdraw_permission_claim_operation : public base_operation
    {
+      struct fee_parameters_type { 
+         uint64_t fee = 20*GRAPHENE_BLOCKCHAIN_PRECISION; 
+         uint32_t price_per_kbyte = 10;
+      };
+
       /// Paid by withdraw_to_account
       asset                       fee;
       /// ID of the permission authorizing this withdrawal
@@ -1160,13 +1196,7 @@ namespace graphene { namespace chain {
 
       account_id_type fee_payer()const { return withdraw_to_account; }
       void            validate()const;
-      share_type      calculate_fee(const fee_schedule_type& k)const;
-      void            get_balance_delta(balance_accumulator& acc, const operation_result& result = asset())const
-      {
-         acc.adjust(fee_payer(), -fee);
-         acc.adjust(withdraw_to_account, amount_to_withdraw);
-         acc.adjust(withdraw_from_account, -amount_to_withdraw);
-      }
+      share_type      calculate_fee(const fee_parameters_type& k)const;
    };
 
    /**
@@ -1177,8 +1207,10 @@ namespace graphene { namespace chain {
     *
     * Fee is paid by withdraw_from_account, which is required to authorize this operation
     */
-   struct withdraw_permission_delete_operation
+   struct withdraw_permission_delete_operation : public base_operation
    {
+      struct fee_parameters_type { uint64_t fee = 0; };
+
       asset                         fee;
       /// Must match withdrawal_permission->withdraw_from_account. This account pays the fee.
       account_id_type               withdraw_from_account;
@@ -1189,11 +1221,6 @@ namespace graphene { namespace chain {
 
       account_id_type fee_payer()const { return withdraw_from_account; }
       void            validate()const;
-      share_type      calculate_fee(const fee_schedule_type& k)const;
-      void            get_balance_delta(balance_accumulator& acc, const operation_result& result = asset())const
-      {
-         acc.adjust(fee_payer(), -fee);
-      }
    };
 
    struct linear_vesting_policy_initializer
@@ -1231,8 +1258,10 @@ namespace graphene { namespace chain {
     *
     * @return ID of newly created vesting_balance_object
     */
-   struct vesting_balance_create_operation
+   struct vesting_balance_create_operation : public base_operation
    {
+      struct fee_parameters_type { uint64_t fee = GRAPHENE_BLOCKCHAIN_PRECISION; };
+
       asset                       fee;
       account_id_type             creator; ///< Who provides funds initially
       account_id_type             owner; ///< Who is able to withdraw the balance
@@ -1241,12 +1270,6 @@ namespace graphene { namespace chain {
 
       account_id_type   fee_payer()const { return creator; }
       void              validate()const;
-      share_type        calculate_fee(const fee_schedule_type& k)const;
-      void              get_balance_delta(balance_accumulator& acc, const operation_result& result = asset())const
-      {
-         acc.adjust(fee_payer(), -fee);
-         acc.adjust(creator, -amount);
-      }
    };
 
 
@@ -1259,8 +1282,10 @@ namespace graphene { namespace chain {
     *
     * @return Nothing
     */
-   struct vesting_balance_withdraw_operation
+   struct vesting_balance_withdraw_operation : public base_operation
    {
+      struct fee_parameters_type { uint64_t fee = 20*GRAPHENE_BLOCKCHAIN_PRECISION; };
+
       asset                   fee;
       vesting_balance_id_type vesting_balance;
       account_id_type         owner; ///< Must be vesting_balance.owner
@@ -1268,12 +1293,6 @@ namespace graphene { namespace chain {
 
       account_id_type   fee_payer()const { return owner; }
       void              validate()const;
-      share_type        calculate_fee(const fee_schedule_type& k)const;
-      void              get_balance_delta(balance_accumulator& acc, const operation_result& result = asset())const
-      {
-         acc.adjust(fee_payer(), -fee);
-         acc.adjust(owner, amount);
-      }
    };
 
    /**
@@ -1303,8 +1322,10 @@ namespace graphene { namespace chain {
     * @brief Create a new worker object
     * @ingroup operations
     */
-   struct worker_create_operation
+   struct worker_create_operation : public base_operation
    {
+      struct fee_parameters_type { uint64_t fee = 5000*GRAPHENE_BLOCKCHAIN_PRECISION; };
+
       asset                fee;
       account_id_type      owner;
       time_point_sec       work_begin_date;
@@ -1317,12 +1338,6 @@ namespace graphene { namespace chain {
 
       account_id_type   fee_payer()const { return owner; }
       void              validate()const;
-      share_type        calculate_fee(const fee_schedule_type& k)const;
-      void              get_balance_delta(balance_accumulator& acc, const operation_result& result = asset())const
-      {
-         acc.adjust(fee_payer(), -fee);
-      }
-
    };
    ///@}
 
@@ -1333,8 +1348,13 @@ namespace graphene { namespace chain {
     * There is no validation for this operation other than that required auths are valid and a fee
     * is paid that is appropriate for the data contained.
     */
-   struct custom_operation
+   struct custom_operation : public base_operation
    {
+      struct fee_parameters_type { 
+         uint64_t fee = GRAPHENE_BLOCKCHAIN_PRECISION; 
+         uint32_t price_per_kbyte = 10;
+      };
+
       asset                     fee;
       account_id_type           payer;
       flat_set<account_id_type> required_auths;
@@ -1343,11 +1363,7 @@ namespace graphene { namespace chain {
 
       account_id_type   fee_payer()const { return payer; }
       void              validate()const;
-      share_type        calculate_fee(const fee_schedule_type& k)const;
-      void              get_balance_delta(balance_accumulator& acc, const operation_result& result = asset())const
-      {
-         acc.adjust(fee_payer(), -fee);
-      }
+      share_type        calculate_fee(const fee_parameters_type& k)const;
    };
 
    /**
@@ -1398,7 +1414,6 @@ namespace graphene { namespace chain {
 
    /// @} // operations group
 
-
    /**
     *  Appends required authorites to the result vector.  The authorities appended are not the
     *  same as those returned by get_required_auth 
@@ -1422,77 +1437,18 @@ namespace graphene { namespace chain {
       uint16_t         op_num;
    };
 
-
-   /**
-    * @brief Used to calculate fees in a polymorphic manner
-    *
-    * If you wish to pay fees in an asset other than CORE, use the core_exchange_rate argument to specify the rate of
-
-    * exchange rate. It is up to the caller to ensure that the core_exchange_rate converts to an asset accepted by the
-    * delegates at a rate which they will accept.
-    */
-   struct operation_calculate_fee
-   {
-      const fee_schedule_type& fees;
-      const price& core_exchange_rate;
-      operation_calculate_fee( const fee_schedule_type& f, const price& core_exchange_rate = price::unit_price() )
-         : fees(f),
-           core_exchange_rate(core_exchange_rate)
-      {}
-      typedef share_type result_type;
-      template<typename T>
-      share_type operator()( const T& v )const { return (v.calculate_fee(fees) * core_exchange_rate).amount; }
-   };
-
-   /**
-    * @brief Used to set fees in a polymorphic manner
-    *
-    * If you wish to pay fees in an asset other than CORE, use the core_exchange_rate argument to specify the rate of
-    * conversion you wish to use. The operation's fee will be set by multiplying the CORE fee by the provided exchange
-    * rate. It is up to the caller to ensure that the core_exchange_rate converts to an asset accepted by the delegates
-    * at a rate which they will accept.
-    *
-    * If total_fee is not nullptr, the total fee for all operations visited will be stored in the provided share_type.
-    * The share_type will be set to zero when the visitor is constructed.
-    */
-   struct operation_set_fee
-   {
-      const fee_schedule_type& fees;
-      const price& core_exchange_rate;
-      share_type* total_fee;
-      operation_set_fee( const fee_schedule_type& f,
-                         const price& core_exchange_rate = price::unit_price(),
-                         share_type* total_fee = nullptr )
-         : fees(f),
-           core_exchange_rate(core_exchange_rate),
-           total_fee(total_fee)
-      {
-         if( total_fee )
-            *total_fee = 0;
-      }
-      typedef asset result_type;
-      template<typename T>
-      asset operator()( T& v )const {
-         asset fee = (v.calculate_fee(fees)) * core_exchange_rate;
-         if( total_fee ) *total_fee += fee.amount;
-         return v.fee = fee;
-      }
-   };
-
    /**
     *  @brief necessary to support nested operations inside the proposal_create_operation
     */
    struct op_wrapper
    {
       public:
-      op_wrapper(const operation& op = operation()):op(op){}
-      operation op;
-      void       validate()const;
-      asset      set_fee( const fee_schedule_type& k ) { return op.visit( operation_set_fee( k ) ); }
-      share_type calculate_fee( const fee_schedule_type& k )const { return op.visit( operation_calculate_fee( k ) ); }
+         op_wrapper(const operation& op = operation()):op(op){}
+         operation op;
    };
 
 } } // graphene::chain
+
 FC_REFLECT( graphene::chain::op_wrapper, (op) )
 FC_REFLECT( graphene::chain::memo_message, (checksum)(text) )
 FC_REFLECT( graphene::chain::memo_data, (from)(to)(nonce)(message) )
@@ -1503,12 +1459,54 @@ FC_REFLECT( graphene::chain::account_create_operation,
             (name)(owner)(active)(options)
           )
 
+FC_REFLECT( graphene::chain::account_create_operation::fee_parameters_type, (basic_fee)(premium_fee)(price_per_kbyte) )
+FC_REFLECT( graphene::chain::account_whitelist_operation::fee_parameters_type, (fee) )
+FC_REFLECT( graphene::chain::account_update_operation::fee_parameters_type, (fee)(price_per_kbyte) )
+FC_REFLECT( graphene::chain::account_upgrade_operation::fee_parameters_type, (membership_annual_fee)(membership_lifetime_fee) )
+FC_REFLECT( graphene::chain::account_transfer_operation::fee_parameters_type, (fee) )
+FC_REFLECT( graphene::chain::delegate_create_operation::fee_parameters_type, (fee) )
+FC_REFLECT( graphene::chain::witness_create_operation::fee_parameters_type, (fee) )
+FC_REFLECT( graphene::chain::witness_withdraw_pay_operation::fee_parameters_type, (fee) )
+FC_REFLECT( graphene::chain::global_parameters_update_operation::fee_parameters_type, (fee) )
+FC_REFLECT( graphene::chain::transfer_operation::fee_parameters_type, (base_fee)(price_per_kbyte) )
+FC_REFLECT( graphene::chain::override_transfer_operation::fee_parameters_type, (base_fee)(price_per_kbyte) )
+FC_REFLECT( graphene::chain::asset_create_operation::fee_parameters_type, (symbol3)(symbol4)(long_symbol)(price_per_kbyte) )
+FC_REFLECT( graphene::chain::asset_global_settle_operation::fee_parameters_type, (fee) )
+FC_REFLECT( graphene::chain::asset_settle_operation::fee_parameters_type, (fee) )
+FC_REFLECT( graphene::chain::asset_fund_fee_pool_operation::fee_parameters_type, (fee) )
+FC_REFLECT( graphene::chain::asset_update_operation::fee_parameters_type, (fee)(price_per_kbyte) )
+FC_REFLECT( graphene::chain::asset_update_bitasset_operation::fee_parameters_type, (fee) )
+FC_REFLECT( graphene::chain::asset_update_feed_producers_operation::fee_parameters_type, (fee) )
+FC_REFLECT( graphene::chain::asset_publish_feed_operation::fee_parameters_type, (fee) )
+FC_REFLECT( graphene::chain::asset_issue_operation::fee_parameters_type, (fee)(price_per_kbyte) )
+FC_REFLECT( graphene::chain::asset_reserve_operation::fee_parameters_type, (fee) )
+FC_REFLECT( graphene::chain::limit_order_create_operation::fee_parameters_type, (fee) )
+FC_REFLECT( graphene::chain::limit_order_cancel_operation::fee_parameters_type, (fee) )
+FC_REFLECT( graphene::chain::call_order_update_operation::fee_parameters_type, (fee) )
+FC_REFLECT( graphene::chain::proposal_create_operation::fee_parameters_type, (fee)(price_per_kbyte) )
+FC_REFLECT( graphene::chain::proposal_update_operation::fee_parameters_type, (fee)(price_per_kbyte) )
+FC_REFLECT( graphene::chain::proposal_delete_operation::fee_parameters_type, (fee) )
+FC_REFLECT( graphene::chain::withdraw_permission_create_operation::fee_parameters_type, (fee) )
+FC_REFLECT( graphene::chain::withdraw_permission_update_operation::fee_parameters_type, (fee) )
+FC_REFLECT( graphene::chain::withdraw_permission_claim_operation::fee_parameters_type, (fee)(price_per_kbyte) )
+FC_REFLECT( graphene::chain::withdraw_permission_delete_operation::fee_parameters_type, (fee) )
+FC_REFLECT( graphene::chain::vesting_balance_create_operation::fee_parameters_type, (fee) )
+FC_REFLECT( graphene::chain::vesting_balance_withdraw_operation::fee_parameters_type, (fee) )
+FC_REFLECT( graphene::chain::worker_create_operation::fee_parameters_type, (fee) )
+FC_REFLECT( graphene::chain::custom_operation::fee_parameters_type, (fee)(price_per_kbyte) )
+
+/// THIS IS THE ONLY VIRTUAL OPERATION THUS FAR... 
+FC_REFLECT( graphene::chain::fill_order_operation::fee_parameters_type,  )
+
 FC_REFLECT( graphene::chain::account_update_operation,
             (fee)(account)(owner)(active)(new_options)
           )
-FC_REFLECT( graphene::chain::account_upgrade_operation, (fee)(account_to_upgrade)(upgrade_to_lifetime_member) )
+
+FC_REFLECT( graphene::chain::account_upgrade_operation, 
+            (fee)(account_to_upgrade)(upgrade_to_lifetime_member) )
 
 FC_REFLECT_TYPENAME( graphene::chain::account_whitelist_operation::account_listing)
+
 FC_REFLECT_ENUM( graphene::chain::account_whitelist_operation::account_listing,
                 (no_listing)(white_listed)(black_listed)(white_and_black_listed))
 
@@ -1599,9 +1597,12 @@ FC_REFLECT( graphene::chain::void_result, )
 FC_REFLECT( graphene::chain::balance_claim_operation,
             (fee)(deposit_to_account)(balance_to_claim)(balance_owner_key)(total_claimed) )
 
+FC_REFLECT(graphene::chain::account_options, (memo_key)(voting_account)(num_witness)(num_committee)(votes))
+
 FC_REFLECT_TYPENAME( graphene::chain::operation )
 FC_REFLECT_TYPENAME( graphene::chain::operation_result )
 FC_REFLECT_TYPENAME( fc::flat_set<graphene::chain::vote_id_type> )
 FC_REFLECT(graphene::chain::linear_vesting_policy_initializer, (begin_timestamp)(vesting_cliff_seconds)(vesting_duration_seconds) )
 FC_REFLECT(graphene::chain::cdd_vesting_policy_initializer, (start_claim)(vesting_seconds) )
 FC_REFLECT_TYPENAME( graphene::chain::vesting_policy_initializer )
+

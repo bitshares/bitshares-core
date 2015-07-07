@@ -16,6 +16,7 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #pragma once
+#include <graphene/chain/chain_parameters.hpp>
 #include <graphene/chain/database.hpp>
 #include <graphene/chain/authority.hpp>
 #include <graphene/chain/asset.hpp>
