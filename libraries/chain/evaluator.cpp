@@ -97,7 +97,7 @@ database& generic_evaluator::db()const { return trx_state->db(); }
          FC_ASSERT(verify_authority(id(db()), authority::owner), "", ("id", id));
 
       for( const auto& auth : other_auths )
-         FC_ASSERT(trx_state->check_authority(auth));
+         FC_ASSERT(trx_state->check_authority(auth), "invalid authority", ("auth",auth)("sigs",trx_state->_sigs));
 
    } FC_CAPTURE_AND_RETHROW( (op) ) }
 

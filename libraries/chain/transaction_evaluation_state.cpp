@@ -53,7 +53,13 @@ namespace graphene { namespace chain {
    }
 
    bool transaction_evaluation_state::check_authority( const authority& au, authority::classification auth_class, int depth )
-   {
+   { try {
+
+      if( (!_is_proposed_trx) && (_db->get_node_properties().skip_flags & database::skip_authority_check)  )
+         return true;
+      if( (!_is_proposed_trx) && (_db->get_node_properties().skip_flags & database::skip_transaction_signatures)  )
+         return true;
+
       uint32_t total_weight = 0;
       for( const auto& auth : au.account_auths )
       {
@@ -86,7 +92,7 @@ namespace graphene { namespace chain {
       }
 
       return total_weight >= au.weight_threshold;
-   }
+   } FC_CAPTURE_AND_RETHROW( (au)(auth_class)(depth) ) }
 
    bool transaction_evaluation_state::signed_by(const public_key_type& k)
    {

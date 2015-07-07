@@ -13,6 +13,7 @@ add_library( graphene_chain
              operations.cpp
 
              evaluator.cpp
+             balance_evaluator.cpp
              global_parameters_evaluator.cpp
              account_evaluator.cpp
              assert_evaluator.cpp

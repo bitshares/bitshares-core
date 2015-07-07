@@ -842,6 +842,11 @@ struct required_auth_visitor
    /** for most operations this is a no-op */
    template<typename T>
    void operator()(const T& )const {}
+
+   void operator()( const balance_claim_operation& o )const
+   {
+      result.push_back( authority( 1, o.balance_owner_key, 1 ) );
+   }
 };
 
 struct required_active_visitor
