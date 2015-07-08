@@ -261,13 +261,11 @@ void database::init_genesis(const genesis_state_type& genesis_state)
       cop.name = account.name;
       cop.registrar = GRAPHENE_TEMP_ACCOUNT;
       cop.owner = authority(1, account.owner_key, 1);
-      if( account.owner_key != account.active_key )
-      {
-         cop.active = authority(1, account.owner_key, 1);
-      } else {
+      if( account.owner_key != account.active_key && account.active_key != public_key_type() )
+         cop.active = authority(1, account.active_key, 1);
+      else
          cop.active = cop.owner;
-      }
-      cop.options.memo_key = account.owner_key;
+      cop.options.memo_key = account.active_key;
       account_id_type account_id(apply_operation(genesis_eval_state, cop).get<object_id_type>());
 
       if( account.is_lifetime_member )
