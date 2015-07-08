@@ -19,6 +19,7 @@
 #include <boost/test/unit_test.hpp>
 
 #include <graphene/chain/database.hpp>
+#include <graphene/chain/exceptions.hpp>
 #include <graphene/chain/operations.hpp>
 
 #include <graphene/chain/account_object.hpp>
@@ -84,10 +85,10 @@ BOOST_AUTO_TEST_CASE( override_transfer_test )
    trx.operations.push_back(otrans);
 
    BOOST_TEST_MESSAGE( "Require throwing without signature" );
-   GRAPHENE_REQUIRE_THROW( PUSH_TX( db, trx, 0 ), fc::exception);
+   GRAPHENE_REQUIRE_THROW( PUSH_TX( db, trx, 0 ), tx_missing_active_auth );
    BOOST_TEST_MESSAGE( "Require throwing with dan's signature" );
    trx.sign( dan_private_key );
-   GRAPHENE_REQUIRE_THROW( PUSH_TX( db, trx, 0 ), fc::exception);
+   GRAPHENE_REQUIRE_THROW( PUSH_TX( db, trx, 0 ), tx_missing_active_auth );
    BOOST_TEST_MESSAGE( "Pass with issuer's signature" );
    trx.signatures.clear();
    trx.sign( sam_private_key );
