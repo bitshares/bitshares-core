@@ -80,7 +80,7 @@ BOOST_AUTO_TEST_CASE( any_two_of_three )
       transfer_operation op = {asset(), nathan.id, account_id_type(), core.amount(500)};
       trx.operations.push_back(op);
       sign(trx, nathan_key1);
-      BOOST_CHECK_THROW(PUSH_TX( db, trx, database::skip_transaction_dupe_check ), fc::exception);
+      GRAPHENE_CHECK_THROW(PUSH_TX( db, trx, database::skip_transaction_dupe_check ), fc::exception);
       sign(trx, nathan_key2);
       PUSH_TX( db, trx, database::skip_transaction_dupe_check );
       BOOST_CHECK_EQUAL(get_balance(nathan, core), old_balance - 500);
@@ -100,7 +100,7 @@ BOOST_AUTO_TEST_CASE( any_two_of_three )
       trx.signatures.clear();
       //sign(trx, fc::ecc::private_key::generate());
       sign(trx,nathan_key3);
-      BOOST_CHECK_THROW(PUSH_TX( db, trx, database::skip_transaction_dupe_check ), fc::exception);
+      GRAPHENE_CHECK_THROW(PUSH_TX( db, trx, database::skip_transaction_dupe_check ), fc::exception);
       BOOST_CHECK_EQUAL(get_balance(nathan, core), old_balance - 1500);
    } catch (fc::exception& e) {
       edump((e.to_detail_string()));
@@ -135,16 +135,16 @@ BOOST_AUTO_TEST_CASE( recursive_accounts )
       BOOST_TEST_MESSAGE( "Attempting to transfer with no signatures, should fail" );
       transfer_operation op = {asset(), child.id, account_id_type(), core.amount(500)};
       trx.operations.push_back(op);
-      BOOST_CHECK_THROW(PUSH_TX( db, trx, database::skip_transaction_dupe_check ), fc::exception);
+      GRAPHENE_CHECK_THROW(PUSH_TX( db, trx, database::skip_transaction_dupe_check ), fc::exception);
 
       BOOST_TEST_MESSAGE( "Attempting to transfer with parent1 signature, should fail" );
       sign(trx,parent1_key);
-      BOOST_CHECK_THROW(PUSH_TX( db, trx, database::skip_transaction_dupe_check ), fc::exception);
+      GRAPHENE_CHECK_THROW(PUSH_TX( db, trx, database::skip_transaction_dupe_check ), fc::exception);
       trx.signatures.clear();
 
       BOOST_TEST_MESSAGE( "Attempting to transfer with parent2 signature, should fail" );
       sign(trx,parent2_key);
-      BOOST_CHECK_THROW(PUSH_TX( db, trx, database::skip_transaction_dupe_check ), fc::exception);
+      GRAPHENE_CHECK_THROW(PUSH_TX( db, trx, database::skip_transaction_dupe_check ), fc::exception);
 
       BOOST_TEST_MESSAGE( "Attempting to transfer with parent1 and parent2 signature, should succeed" );
       sign(trx,parent1_key);
@@ -172,14 +172,14 @@ BOOST_AUTO_TEST_CASE( recursive_accounts )
       op = {asset(),child.id, account_id_type(), core.amount(500)};
       trx.operations.push_back(op);
       BOOST_TEST_MESSAGE( "Attempting transfer with no signatures, should fail" );
-      BOOST_CHECK_THROW(PUSH_TX( db, trx, database::skip_transaction_dupe_check ), fc::exception);
+      GRAPHENE_CHECK_THROW(PUSH_TX( db, trx, database::skip_transaction_dupe_check ), fc::exception);
       BOOST_TEST_MESSAGE( "Attempting transfer just parent1, should fail" );
       sign(trx, parent1_key);
-      BOOST_CHECK_THROW(PUSH_TX( db, trx, database::skip_transaction_dupe_check ), fc::exception);
+      GRAPHENE_CHECK_THROW(PUSH_TX( db, trx, database::skip_transaction_dupe_check ), fc::exception);
       trx.signatures.clear();
       BOOST_TEST_MESSAGE( "Attempting transfer just parent2, should fail" );
       sign(trx, parent2_key);
-      BOOST_CHECK_THROW(PUSH_TX( db, trx, database::skip_transaction_dupe_check ), fc::exception);
+      GRAPHENE_CHECK_THROW(PUSH_TX( db, trx, database::skip_transaction_dupe_check ), fc::exception);
 
       BOOST_TEST_MESSAGE( "Attempting transfer both parents, should succeed" );
       sign(trx,  parent1_key);
@@ -216,7 +216,7 @@ BOOST_AUTO_TEST_CASE( recursive_accounts )
       trx.operations.push_back(op);
       sign(trx, parent1_key);
       sign(trx, parent2_key);
-      BOOST_CHECK_THROW(PUSH_TX( db, trx, database::skip_transaction_dupe_check ), fc::exception);
+      GRAPHENE_CHECK_THROW(PUSH_TX( db, trx, database::skip_transaction_dupe_check ), fc::exception);
       trx.signatures.clear();
       trx.sign( parent2_key );
       trx.sign( grandparent_key );
@@ -244,7 +244,7 @@ BOOST_AUTO_TEST_CASE( recursive_accounts )
       sign(trx, grandparent_key);
       sign(trx, delegate_priv_key);
       //Fails due to recursion depth.
-      BOOST_CHECK_THROW(PUSH_TX( db, trx, database::skip_transaction_dupe_check ), fc::exception);
+      GRAPHENE_CHECK_THROW(PUSH_TX( db, trx, database::skip_transaction_dupe_check ), fc::exception);
       BOOST_TEST_MESSAGE( "verify child key can override recursion checks" );
       trx.signatures.clear();
       sign(trx,  child_key);
@@ -268,7 +268,7 @@ BOOST_AUTO_TEST_CASE( recursive_accounts )
       trx.operations.push_back(op);
       sign(trx, parent2_key);
       //Fails due to recursion depth.
-      BOOST_CHECK_THROW(PUSH_TX( db, trx, database::skip_transaction_dupe_check ), fc::exception);
+      GRAPHENE_CHECK_THROW(PUSH_TX( db, trx, database::skip_transaction_dupe_check ), fc::exception);
    } catch (fc::exception& e) {
       edump((e.to_detail_string()));
       throw;
@@ -331,11 +331,11 @@ BOOST_AUTO_TEST_CASE( proposed_single_account )
       trx.operations = {proposal_update_operation{account_id_type(), asset(), proposal.id,{nathan.id},flat_set<account_id_type>{},flat_set<account_id_type>{},flat_set<account_id_type>{},flat_set<public_key_type>{},flat_set<public_key_type>{}}};
       trx.sign(  genesis_key );
       //Genesis may not add nathan's approval.
-      BOOST_CHECK_THROW(PUSH_TX( db, trx ), fc::exception);
+      GRAPHENE_CHECK_THROW(PUSH_TX( db, trx ), fc::exception);
       trx.operations = {proposal_update_operation{account_id_type(), asset(), proposal.id,{account_id_type()},flat_set<account_id_type>{},flat_set<account_id_type>{},flat_set<account_id_type>{},flat_set<public_key_type>{},flat_set<public_key_type>{}}};
       trx.sign(  genesis_key );
       //Genesis has no stake in the transaction.
-      BOOST_CHECK_THROW(PUSH_TX( db, trx ), fc::exception);
+      GRAPHENE_CHECK_THROW(PUSH_TX( db, trx ), fc::exception);
 
       trx.signatures.clear();
       trx.operations = {proposal_update_operation{nathan.id, asset(), proposal.id,{nathan.id},flat_set<account_id_type>{},flat_set<account_id_type>{},flat_set<account_id_type>{},flat_set<public_key_type>{},flat_set<public_key_type>{}}};
@@ -372,7 +372,7 @@ BOOST_AUTO_TEST_CASE( genesis_authority )
    BOOST_TEST_MESSAGE( "transfering 100000 CORE to nathan, signing with genesis key" );
    trx.operations.push_back(transfer_operation({asset(), account_id_type(), nathan.id, asset(100000)}));
    sign(trx, genesis_key);
-   BOOST_CHECK_THROW(PUSH_TX( db, trx ), fc::exception);
+   GRAPHENE_CHECK_THROW(PUSH_TX( db, trx ), fc::exception);
 
    auto sign = [&] { trx.signatures.clear(); trx.sign(nathan_key); };
 
@@ -384,12 +384,12 @@ BOOST_AUTO_TEST_CASE( genesis_authority )
    sign();
 
    // The review period isn't set yet. Make sure it throws.
-   BOOST_REQUIRE_THROW( PUSH_TX( db, trx ), fc::exception );
+   GRAPHENE_REQUIRE_THROW( PUSH_TX( db, trx ), fc::exception );
    pop.review_period_seconds = global_params.committee_proposal_review_period / 2;
    trx.operations.back() = pop;
    sign();
    // The review period is too short. Make sure it throws.
-   BOOST_REQUIRE_THROW( PUSH_TX( db, trx ), fc::exception );
+   GRAPHENE_REQUIRE_THROW( PUSH_TX( db, trx ), fc::exception );
    pop.review_period_seconds = global_params.committee_proposal_review_period;
    trx.operations.back() = pop;
    sign();
@@ -435,7 +435,7 @@ BOOST_AUTO_TEST_CASE( genesis_authority )
    trx.operations.back() = uop;
    trx.sign( genesis_key);
    // Should throw because the transaction is now in review.
-   BOOST_CHECK_THROW(PUSH_TX( db, trx ), fc::exception);
+   GRAPHENE_CHECK_THROW(PUSH_TX( db, trx ), fc::exception);
 
    generate_blocks(prop.expiration_time);
    BOOST_CHECK_EQUAL(get_balance(nathan, asset_id_type()(db)), 100000);
@@ -590,7 +590,7 @@ BOOST_FIXTURE_TEST_CASE( proposal_two_accounts, database_fixture )
       uop.active_approvals_to_add = {dan.get_id()};
       trx.operations.push_back(uop);
       trx.sign(nathan_key);
-      BOOST_REQUIRE_THROW(PUSH_TX( db, trx ), fc::exception);
+      GRAPHENE_REQUIRE_THROW(PUSH_TX( db, trx ), fc::exception);
       trx.sign(dan_key);
       PUSH_TX( db, trx );
 
@@ -911,7 +911,7 @@ BOOST_FIXTURE_TEST_CASE( max_authority_membership, database_fixture )
 
              if( num_keys > max_authority_membership )
              {
-                BOOST_REQUIRE_THROW(PUSH_TX( db, tx, ~0 ), fc::exception);
+                GRAPHENE_REQUIRE_THROW(PUSH_TX( db, tx, ~0 ), fc::exception);
              }
              else
              {
@@ -976,7 +976,7 @@ BOOST_FIXTURE_TEST_CASE( bogus_signature, database_fixture )
       trx.operations.push_back( xfer_op );
       BOOST_TEST_MESSAGE( "Invalidating Alices Signature" );
       // Alice's signature is now invalid
-      BOOST_REQUIRE_THROW( PUSH_TX( db,  trx, skip  ), fc::exception );
+      GRAPHENE_REQUIRE_THROW( PUSH_TX( db,  trx, skip  ), fc::exception );
       // Re-sign, now OK (sig is replaced)
       BOOST_TEST_MESSAGE( "Resign with Alice's Signature" );
       trx.signatures.clear();
@@ -988,7 +988,7 @@ BOOST_FIXTURE_TEST_CASE( bogus_signature, database_fixture )
       trx.sign( alice_key );
       trx.sign( charlie_key );
       // Signed by third-party Charlie (irrelevant key, not in authority)
-      BOOST_REQUIRE_THROW( PUSH_TX( db,  trx, skip  ), fc::exception );
+      GRAPHENE_REQUIRE_THROW( PUSH_TX( db,  trx, skip  ), fc::exception );
    }
    FC_LOG_AND_RETHROW()
 }
@@ -1029,7 +1029,7 @@ BOOST_FIXTURE_TEST_CASE( voting_account, database_fixture )
       trx.operations.push_back(op);
       trx.sign(vikram_private_key);
       // Fails because num_committee is larger than the cardinality of committee members being voted for
-      BOOST_CHECK_THROW(PUSH_TX( db, trx ), fc::exception);
+      GRAPHENE_CHECK_THROW(PUSH_TX( db, trx ), fc::exception);
       op.new_options->num_committee = 3;
       trx.operations = {op};
       trx.signatures.clear();

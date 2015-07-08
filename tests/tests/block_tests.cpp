@@ -254,7 +254,7 @@ BOOST_AUTO_TEST_CASE( fork_blocks )
          b.transactions.back().operations.emplace_back(transfer_operation());
          b.sign(delegate_priv_key);
          BOOST_CHECK_EQUAL(b.block_num(), 14);
-         BOOST_CHECK_THROW(PUSH_BLOCK( db1, b ), fc::exception);
+         GRAPHENE_CHECK_THROW(PUSH_BLOCK( db1, b ), fc::exception);
       }
       BOOST_CHECK_EQUAL(db1.head_block_num(), 13);
       BOOST_CHECK_EQUAL(db1.head_block_id().str(), db1_tip);
@@ -367,7 +367,7 @@ BOOST_AUTO_TEST_CASE( switch_forks_undo_create )
       b =  db2.generate_block(now, db2.get_scheduled_witness(1).first, delegate_priv_key, database::skip_nothing);
       db1.push_block(b);
 
-      BOOST_CHECK_THROW(nathan_id(db1), fc::exception);
+      GRAPHENE_CHECK_THROW(nathan_id(db1), fc::exception);
 
       PUSH_TX( db2, trx );
 
@@ -417,14 +417,14 @@ BOOST_AUTO_TEST_CASE( duplicate_transactions )
       trx.sign(  delegate_priv_key );
       PUSH_TX( db1, trx, skip_sigs );
 
-      BOOST_CHECK_THROW(PUSH_TX( db1, trx, skip_sigs ), fc::exception);
+      GRAPHENE_CHECK_THROW(PUSH_TX( db1, trx, skip_sigs ), fc::exception);
 
       now += db1.block_interval();
       auto b = db1.generate_block( now, db1.get_scheduled_witness( 1 ).first, delegate_priv_key, skip_sigs );
       PUSH_BLOCK( db2, b, skip_sigs );
 
-      BOOST_CHECK_THROW(PUSH_TX( db1, trx, skip_sigs ), fc::exception);
-      BOOST_CHECK_THROW(PUSH_TX( db2, trx, skip_sigs ), fc::exception);
+      GRAPHENE_CHECK_THROW(PUSH_TX( db1, trx, skip_sigs ), fc::exception);
+      GRAPHENE_CHECK_THROW(PUSH_TX( db2, trx, skip_sigs ), fc::exception);
       BOOST_CHECK_EQUAL(db1.get_balance(nathan_id, asset_id_type()).amount.value, 500);
       BOOST_CHECK_EQUAL(db2.get_balance(nathan_id, asset_id_type()).amount.value, 500);
    } catch (fc::exception& e) {
@@ -476,7 +476,7 @@ BOOST_AUTO_TEST_CASE( tapos )
       trx.operations.push_back(transfer_operation({asset(), account_id_type(), nathan_id, asset(50)}));
       trx.sign(delegate_priv_key);
       //relative_expiration is 1, but ref block is 2 blocks old, so this should fail.
-      BOOST_REQUIRE_THROW(PUSH_TX( db1, trx, database::skip_transaction_signatures | database::skip_authority_check ), fc::exception);
+      GRAPHENE_REQUIRE_THROW(PUSH_TX( db1, trx, database::skip_transaction_signatures | database::skip_authority_check ), fc::exception);
       trx.set_expiration(db1.head_block_id(), 2);
       trx.signatures.clear();
       trx.sign(delegate_priv_key);
@@ -601,17 +601,17 @@ BOOST_FIXTURE_TEST_CASE( double_sign_check, database_fixture )
    trx.validate();
 
    BOOST_TEST_MESSAGE( "Verify that not-signing causes an exception" );
-   BOOST_REQUIRE_THROW( db.push_transaction(trx, 0), fc::exception );
+   GRAPHENE_REQUIRE_THROW( db.push_transaction(trx, 0), fc::exception );
 
    BOOST_TEST_MESSAGE( "Verify that double-signing causes an exception" );
    trx.sign(bob_private_key);
    trx.sign(bob_private_key);
-   BOOST_REQUIRE_THROW( db.push_transaction(trx, 0), fc::exception );
+   GRAPHENE_REQUIRE_THROW( db.push_transaction(trx, 0), fc::exception );
 
    BOOST_TEST_MESSAGE( "Verify that signing with an extra, unused key fails" );
    trx.signatures.pop_back();
    trx.sign(generate_private_key("bogus"));
-   BOOST_REQUIRE_THROW( db.push_transaction(trx, 0), fc::exception );
+   GRAPHENE_REQUIRE_THROW( db.push_transaction(trx, 0), fc::exception );
 
    BOOST_TEST_MESSAGE( "Verify that signing once with the proper key passes" );
    trx.signatures.pop_back();
@@ -776,7 +776,7 @@ BOOST_FIXTURE_TEST_CASE( unimp_force_settlement, database_fixture )
    trx.operations.push_back(sop);
    trx.sign(key_id_type(),private_key);
    //Trx has expired by now. Make sure it throws.
-   BOOST_CHECK_THROW(settle_id = PUSH_TX( db, trx ).operation_results.front().get<object_id_type>(), fc::exception);
+   GRAPHENE_CHECK_THROW(settle_id = PUSH_TX( db, trx ).operation_results.front().get<object_id_type>(), fc::exception);
    trx.set_expiration(db.head_block_time() + fc::minutes(1));
    trx.sign(key_id_type(),private_key);
    settle_id = PUSH_TX( db, trx ).operation_results.front().get<object_id_type>();

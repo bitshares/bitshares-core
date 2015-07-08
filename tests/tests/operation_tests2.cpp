@@ -108,7 +108,7 @@ BOOST_AUTO_TEST_CASE( withdraw_permission_test )
       op.amount_to_withdraw = asset(1);
       trx.operations.push_back(op);
       //Throws because we haven't entered the first withdrawal period yet.
-      BOOST_REQUIRE_THROW(PUSH_TX( db, trx ), fc::exception);
+      GRAPHENE_REQUIRE_THROW(PUSH_TX( db, trx ), fc::exception);
       //Get to the actual withdrawal period
       generate_blocks(permit(db).period_start_time);
 
@@ -165,7 +165,7 @@ BOOST_AUTO_TEST_CASE( withdraw_permission_test )
       trx.operations.push_back(op);
       trx.sign(dan_private_key);
       //Throws because nathan doesn't have the money
-      BOOST_CHECK_THROW(PUSH_TX( db, trx ), fc::exception);
+      GRAPHENE_CHECK_THROW(PUSH_TX( db, trx ), fc::exception);
       op.amount_to_withdraw = asset(1);
       trx.clear();
       trx.operations = {op};
@@ -200,7 +200,7 @@ BOOST_AUTO_TEST_CASE( withdraw_permission_test )
       trx.operations.push_back(op);
       trx.sign(dan_private_key);
       //Throws because the permission has expired
-      BOOST_CHECK_THROW(PUSH_TX( db, trx ), fc::exception);
+      GRAPHENE_CHECK_THROW(PUSH_TX( db, trx ), fc::exception);
    }
 } FC_LOG_AND_RETHROW() }
 
@@ -368,7 +368,7 @@ BOOST_AUTO_TEST_CASE( mia_feeds )
 
       op.publisher = nathan_id;
       trx.operations.back() = op;
-      BOOST_CHECK_THROW(PUSH_TX( db, trx, ~0 ), fc::exception);
+      GRAPHENE_CHECK_THROW(PUSH_TX( db, trx, ~0 ), fc::exception);
    }
 } FC_LOG_AND_RETHROW() }
 
@@ -893,7 +893,7 @@ BOOST_AUTO_TEST_CASE( unimp_force_settlement_unavailable )
    sop.amount = asset(50, bit_usd);
    trx.operations = {sop};
    //Force settlement is disabled; check that it fails
-   BOOST_CHECK_THROW(PUSH_TX( db, trx, ~0 ), fc::exception);
+   GRAPHENE_CHECK_THROW(PUSH_TX( db, trx, ~0 ), fc::exception);
    {
       //Enable force settlement
       asset_update_operation op;
@@ -967,7 +967,7 @@ BOOST_AUTO_TEST_CASE( assert_op_test )
    op.predicates.back() = fc::raw::pack(predicate(pred::account_name_eq_lit{ nathan_id, "dan" }));
    trx.operations.back() = op;
    trx.sign(nathan_private_key);
-   BOOST_CHECK_THROW( PUSH_TX( db, trx ), fc::exception );
+   GRAPHENE_CHECK_THROW( PUSH_TX( db, trx ), fc::exception );
    } FC_LOG_AND_RETHROW()
 }
 
@@ -1014,7 +1014,7 @@ BOOST_AUTO_TEST_CASE( balance_object_test )
    trx.operations = {op};
    trx.sign(n_key);
    // Fail because I'm claiming from an address which hasn't signed
-   BOOST_CHECK_THROW(db.push_transaction(trx), fc::exception);
+   GRAPHENE_CHECK_THROW(db.push_transaction(trx), fc::exception);
    trx.clear();
    op.balance_to_claim = balance_id_type();
    op.balance_owner_key = n_key.get_public_key();
@@ -1048,7 +1048,7 @@ BOOST_AUTO_TEST_CASE( balance_object_test )
    trx.sign(n_key);
    trx.sign(v1_key);
    // Attempting to claim 1 from a balance with 0 available
-   BOOST_CHECK_THROW(db.push_transaction(trx), invalid_claim_amount);
+   GRAPHENE_CHECK_THROW(db.push_transaction(trx), invalid_claim_amount);
 
    op.balance_to_claim = vesting_balance_2.id;
    op.total_claimed.amount = 151;
@@ -1058,7 +1058,7 @@ BOOST_AUTO_TEST_CASE( balance_object_test )
    trx.sign(n_key);
    trx.sign(v2_key);
    // Attempting to claim 151 from a balance with 150 available
-   BOOST_CHECK_THROW(db.push_transaction(trx), invalid_claim_amount);
+   GRAPHENE_CHECK_THROW(db.push_transaction(trx), invalid_claim_amount);
 
    op.balance_to_claim = vesting_balance_2.id;
    op.total_claimed.amount = 100;
@@ -1077,7 +1077,7 @@ BOOST_AUTO_TEST_CASE( balance_object_test )
    trx.sign(n_key);
    trx.sign(v2_key);
    // Attempting to claim twice within a day
-   BOOST_CHECK_THROW(db.push_transaction(trx), balance_claimed_too_often);
+   GRAPHENE_CHECK_THROW(db.push_transaction(trx), balance_claimed_too_often);
 
    db.generate_block(db.get_slot_time(1), db.get_scheduled_witness(1).first, delegate_priv_key, database::skip_nothing);
    slot = db.get_slot_at_time(vesting_balance_1.vesting_policy->begin_timestamp + 60);
@@ -1103,7 +1103,7 @@ BOOST_AUTO_TEST_CASE( balance_object_test )
    trx.sign(n_key);
    trx.sign(v2_key);
    // Attempting to claim twice within a day
-   BOOST_CHECK_THROW(db.push_transaction(trx), balance_claimed_too_often);
+   GRAPHENE_CHECK_THROW(db.push_transaction(trx), balance_claimed_too_often);
 
    db.generate_block(db.get_slot_time(1), db.get_scheduled_witness(1).first, delegate_priv_key, database::skip_nothing);
    slot = db.get_slot_at_time(db.head_block_time() + fc::days(1));

@@ -207,7 +207,7 @@ BOOST_FIXTURE_TEST_CASE( update_account_keys, database_fixture )
                         trx.sign( *owner_privkey[i] );
                         if( i < int(create_op.owner.weight_threshold-1) )
                         {
-                           BOOST_REQUIRE_THROW(db.push_transaction(trx), fc::exception);
+                           GRAPHENE_REQUIRE_THROW(db.push_transaction(trx), fc::exception);
                         }
                         else
                         {
