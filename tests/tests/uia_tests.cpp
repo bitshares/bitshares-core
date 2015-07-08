@@ -169,7 +169,7 @@ BOOST_AUTO_TEST_CASE( transfer_whitelist_uia )
       transfer_operation op({advanced.amount(0), nathan.id, dan.id, advanced.amount(100)});
       trx.operations.push_back(op);
       //Fail because dan is not whitelisted.
-      GRAPHENE_REQUIRE_THROW(PUSH_TX( db, trx, ~0 ), fc::exception);
+      GRAPHENE_REQUIRE_THROW(PUSH_TX( db, trx, ~0 ), transfer_to_account_not_whitelisted );
 
       account_whitelist_operation wop({asset(), account_id_type(), dan.id, account_whitelist_operation::white_listed});
       trx.operations.back() = wop;
@@ -188,7 +188,7 @@ BOOST_AUTO_TEST_CASE( transfer_whitelist_uia )
       op.amount = advanced.amount(50);
       trx.operations.back() = op;
       //Fail because nathan is blacklisted
-      GRAPHENE_REQUIRE_THROW(PUSH_TX( db, trx, ~0 ), fc::exception);
+      GRAPHENE_REQUIRE_THROW(PUSH_TX( db, trx, ~0 ), transfer_from_account_not_whitelisted );
       trx.operations = {asset_reserve_operation{asset(), nathan.id, advanced.amount(10)}};
       //Fail because nathan is blacklisted
       GRAPHENE_REQUIRE_THROW(PUSH_TX( db, trx, ~0 ), fc::exception);

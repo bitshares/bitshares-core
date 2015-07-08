@@ -17,6 +17,7 @@
  */
 #include <graphene/chain/transfer_evaluator.hpp>
 #include <graphene/chain/account_object.hpp>
+#include <graphene/chain/exceptions.hpp>
 
 namespace graphene { namespace chain {
 void_result transfer_evaluator::do_evaluate( const transfer_operation& op )
@@ -30,8 +31,20 @@ void_result transfer_evaluator::do_evaluate( const transfer_operation& op )
 
    if( asset_type.options.flags & white_list )
    {
-      FC_ASSERT( to_account.is_authorized_asset( asset_type ) );
-      FC_ASSERT( from_account.is_authorized_asset( asset_type ) );
+      GRAPHENE_ASSERT(
+         from_account.is_authorized_asset( asset_type ),
+         transfer_from_account_not_whitelisted,
+         "'from' account ${from} is not whitelisted for asset ${asset}",
+         ("from",op.from)
+         ("asset",op.amount.asset_id)
+         );
+      GRAPHENE_ASSERT(
+         to_account.is_authorized_asset( asset_type ),
+         transfer_to_account_not_whitelisted,
+         "'to' account ${to} is not whitelisted for asset ${asset}",
+         ("to",op.to)
+         ("asset",op.amount.asset_id)
+         );
    }
 
    if( fee_asset_type.options.flags & white_list )
@@ -60,7 +73,12 @@ void_result override_transfer_evaluator::do_evaluate( const override_transfer_op
    database& d = db();
 
    const asset_object&   asset_type      = op.amount.asset_id(d);
-   FC_ASSERT( asset_type.can_override() );
+   GRAPHENE_ASSERT(
+      asset_type.can_override(),
+      override_transfer_not_permitted,
+      "override_transfer not permitted for asset ${asset}",
+      ("asset", op.amount.asset_id)
+      );
    FC_ASSERT( asset_type.issuer == op.issuer );
 
    const account_object& from_account    = op.from(d);

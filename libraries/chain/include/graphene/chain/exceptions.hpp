@@ -76,11 +76,61 @@ namespace graphene { namespace chain {
    FC_DECLARE_DERIVED_EXCEPTION( invalid_pts_address,               graphene::chain::utility_exception, 3060001, "invalid pts address" )
    FC_DECLARE_DERIVED_EXCEPTION( insufficient_feeds,                graphene::chain::chain_exception, 37006, "insufficient feeds" )
 
+   GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( transfer );
+
+   GRAPHENE_DECLARE_OP_EVALUATE_EXCEPTION( from_account_not_whitelisted, transfer, 1, "owner mismatch" )
+   GRAPHENE_DECLARE_OP_EVALUATE_EXCEPTION( to_account_not_whitelisted, transfer, 2, "owner mismatch" )
+
+   //GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( limit_order_create );
+   //GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( limit_order_cancel );
+   //GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( call_order_update );
+   //GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( account_create );
+   //GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( account_update );
+   //GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( account_whitelist );
+   //GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( account_upgrade );
+   //GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( account_transfer );
+   //GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( asset_create );
+   //GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( asset_update );
+   //GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( asset_update_bitasset );
+   //GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( asset_update_feed_producers );
+   //GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( asset_issue );
+   //GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( asset_reserve );
+   //GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( asset_fund_fee_pool );
+   //GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( asset_settle );
+   //GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( asset_global_settle );
+   //GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( asset_publish_feed );
+   //GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( delegate_create );
+   //GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( witness_create );
+   //GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( witness_withdraw_pay );
+
+   GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( proposal_create );
+
+   GRAPHENE_DECLARE_OP_EVALUATE_EXCEPTION( review_period_required, proposal_create, 1, "review_period required" )
+   GRAPHENE_DECLARE_OP_EVALUATE_EXCEPTION( review_period_insufficient, proposal_create, 2, "review_period insufficient" )
+
+   //GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( proposal_update );
+   //GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( proposal_delete );
+   //GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( withdraw_permission_create );
+   //GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( withdraw_permission_update );
+   //GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( withdraw_permission_claim );
+   //GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( withdraw_permission_delete );
+   //GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( fill_order );
+   //GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( global_parameters_update );
+   //GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( vesting_balance_create );
+   //GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( vesting_balance_withdraw );
+   //GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( worker_create );
+   //GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( custom );
+   //GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( assert );
+
    GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( balance_claim );
 
    GRAPHENE_DECLARE_OP_EVALUATE_EXCEPTION( claimed_too_often, balance_claim, 1, "balance claimed too often" )
    GRAPHENE_DECLARE_OP_EVALUATE_EXCEPTION( invalid_claim_amount, balance_claim, 2, "invalid claim amount" )
    GRAPHENE_DECLARE_OP_EVALUATE_EXCEPTION( owner_mismatch, balance_claim, 3, "owner mismatch" )
+
+   GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( override_transfer );
+
+   GRAPHENE_DECLARE_OP_EVALUATE_EXCEPTION( not_permitted, override_transfer, 1, "not permitted" )
 
    /*
    FC_DECLARE_DERIVED_EXCEPTION( addition_overflow,                 graphene::chain::chain_exception, 30002, "addition overflow" )

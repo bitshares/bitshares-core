@@ -18,6 +18,7 @@
 #include <graphene/chain/proposal_evaluator.hpp>
 #include <graphene/chain/proposal_object.hpp>
 #include <graphene/chain/account_object.hpp>
+#include <graphene/chain/exceptions.hpp>
 
 namespace graphene { namespace chain {
 
@@ -41,8 +42,21 @@ void_result proposal_create_evaluator::do_evaluate(const proposal_create_operati
          operation_get_required_owner_authorities(op.op, auths);
       }
       if( auths.find(account_id_type()) != auths.end() )
-         FC_ASSERT( o.review_period_seconds
-                    && *o.review_period_seconds >= global_parameters.committee_proposal_review_period );
+      {
+         GRAPHENE_ASSERT(
+            o.review_period_seconds.valid(),
+            proposal_create_review_period_required,
+            "Review period not given, but at least ${min} required",
+            ("min", global_parameters.committee_proposal_review_period)
+         );
+         GRAPHENE_ASSERT(
+            *o.review_period_seconds >= global_parameters.committee_proposal_review_period,
+            proposal_create_review_period_insufficient,
+            "Review period of ${t} required, but at least ${min} required",
+            ("t", *o.review_period_seconds)
+            ("min", global_parameters.committee_proposal_review_period)
+         );
+      }
    }
 
    for( const op_wrapper& op : o.proposed_ops )

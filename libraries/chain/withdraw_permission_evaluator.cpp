@@ -19,6 +19,7 @@
 #include <graphene/chain/withdraw_permission_object.hpp>
 #include <graphene/chain/account_object.hpp>
 #include <graphene/chain/database.hpp>
+#include <graphene/chain/exceptions.hpp>
 
 namespace graphene { namespace chain {
 

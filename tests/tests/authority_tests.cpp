@@ -19,6 +19,7 @@
 #include <boost/test/unit_test.hpp>
 
 #include <graphene/chain/database.hpp>
+#include <graphene/chain/exceptions.hpp>
 #include <graphene/chain/operations.hpp>
 
 #include <graphene/chain/account_object.hpp>
@@ -384,12 +385,12 @@ BOOST_AUTO_TEST_CASE( genesis_authority )
    sign();
 
    // The review period isn't set yet. Make sure it throws.
-   GRAPHENE_REQUIRE_THROW( PUSH_TX( db, trx ), fc::exception );
+   GRAPHENE_REQUIRE_THROW( PUSH_TX( db, trx ), proposal_create_review_period_required );
    pop.review_period_seconds = global_params.committee_proposal_review_period / 2;
    trx.operations.back() = pop;
    sign();
    // The review period is too short. Make sure it throws.
-   GRAPHENE_REQUIRE_THROW( PUSH_TX( db, trx ), fc::exception );
+   GRAPHENE_REQUIRE_THROW( PUSH_TX( db, trx ), proposal_create_review_period_insufficient );
    pop.review_period_seconds = global_params.committee_proposal_review_period;
    trx.operations.back() = pop;
    sign();
