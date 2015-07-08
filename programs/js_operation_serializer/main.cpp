@@ -367,7 +367,6 @@ int main( int argc, char** argv )
     detail_ns::js_name<static_variant<address,public_key_type>>::name("key_data");
     detail_ns::js_name<operation_result>::name("operation_result");
     detail_ns::js_name<header_extension>::name("header_extension");
-    detail_ns::js_name<parameter_extension>::name("parameter_extension");
     detail_ns::js_name<static_variant<refund_worker_type::initializer, vesting_balance_worker_type::initializer,burn_worker_type::initializer>>::name("worker_initializer");
     detail_ns::js_name<static_variant<linear_vesting_policy_initializer,cdd_vesting_policy_initializer>>::name("vesting_policy_initializer");
     detail_ns::serializer<signed_block>::init();
