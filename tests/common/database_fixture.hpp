@@ -21,6 +21,8 @@
 #include <graphene/chain/database.hpp>
 #include <fc/io/json.hpp>
 
+#include <iostream>
+
 using namespace graphene::db;
 
 #define GRAPHENE_TESTING_GENESIS_TIMESTAMP (1431700000)
@@ -39,13 +41,6 @@ using namespace graphene::db;
    op.validate(); \
    op.field = temp; \
 }
-#define REQUIRE_OP_VALIDATION_FAILURE( op, field, value ) \
-{ \
-   const auto temp = op.field; \
-   op.field = value; \
-   BOOST_REQUIRE_THROW( op.validate(), fc::exception ); \
-   op.field = temp; \
-}
 #define REQUIRE_OP_EVALUATION_SUCCESS( op, field, value ) \
 { \
    const auto temp = op.field; \
@@ -54,17 +49,61 @@ using namespace graphene::db;
    op.field = temp; \
    db.push_transaction( trx, ~0 ); \
 }
-///Shortcut to require an exception when processing a transaction with an operation containing an expected bad value
-/// Uses require insteach of check, because these transactions are expected to fail. If they don't, subsequent tests
-/// may spuriously succeed or fail due to unexpected database state.
-#define REQUIRE_THROW_WITH_VALUE(op, field, value) \
+
+#define GRAPHENE_REQUIRE_THROW( expr, exc_type )          \
+{                                                         \
+   std::string req_throw_info = fc::json::to_string(      \
+      fc::mutable_variant_object()                        \
+      ("source_file", __FILE__)                           \
+      ("source_lineno", __LINE__)                         \
+      ("expr", #expr)                                     \
+      ("exc_type", #exc_type)                             \
+      );                                                  \
+   std::cout << "GRAPHENE_REQUIRE_THROW begin "           \
+      << req_throw_info << std::endl;                     \
+   BOOST_REQUIRE_THROW( expr, exc_type );                 \
+   std::cout << "GRAPHENE_REQUIRE_THROW end "             \
+      << req_throw_info << std::endl;                     \
+}
+
+#define GRAPHENE_CHECK_THROW( expr, exc_type )            \
+{                                                         \
+   std::string req_throw_info = fc::json::to_string(      \
+      fc::mutable_variant_object()                        \
+      ("source_file", __FILE__)                           \
+      ("source_lineno", __LINE__)                         \
+      ("expr", #expr)                                     \
+      ("exc_type", #exc_type)                             \
+      );                                                  \
+   std::cout << "GRAPHENE_CHECK_THROW begin "             \
+      << req_throw_info << std::endl;                     \
+   BOOST_CHECK_THROW( expr, exc_type );                   \
+   std::cout << "GRAPHENE_CHECK_THROW end "               \
+      << req_throw_info << std::endl;                     \
+}
+
+#define REQUIRE_OP_VALIDATION_FAILURE_2( op, field, value, exc_type ) \
+{ \
+   const auto temp = op.field; \
+   op.field = value; \
+   GRAPHENE_REQUIRE_THROW( op.validate(), exc_type ); \
+   op.field = temp; \
+}
+#define REQUIRE_OP_VALIDATION_FAILURE( op, field, value ) \
+   REQUIRE_OP_VALIDATION_FAILURE_2( op, field, value, fc::exception )
+
+#define REQUIRE_THROW_WITH_VALUE_2(op, field, value, exc_type) \
 { \
    auto bak = op.field; \
    op.field = value; \
    trx.operations.back() = op; \
    op.field = bak; \
-   BOOST_REQUIRE_THROW(db.push_transaction(trx, ~0), fc::exception); \
+   GRAPHENE_REQUIRE_THROW(db.push_transaction(trx, ~0), exc_type); \
 }
+
+#define REQUIRE_THROW_WITH_VALUE( op, field, value ) \
+   REQUIRE_THROW_WITH_VALUE_2( op, field, value, fc::exception )
+
 ///This simply resets v back to its default-constructed value. Requires v to have a working assingment operator and
 /// default constructor.
 #define RESET(v) v = decltype(v)()
