@@ -44,7 +44,11 @@ vector<std::reference_wrapper<const typename Index::object_type>> database::sort
                   [](const ObjectType& o) { return std::cref(o); });
    std::partial_sort(refs.begin(), refs.begin() + count, refs.end(),
                    [this](const ObjectType& a, const ObjectType& b)->bool {
-      return _vote_tally_buffer[a.vote_id] > _vote_tally_buffer[b.vote_id];
+      share_type oa_vote = _vote_tally_buffer[a.vote_id];
+      share_type ob_vote = _vote_tally_buffer[b.vote_id];
+      if( oa_vote != ob_vote )
+         return oa_vote > ob_vote;
+      return a.vote_id < b.vote_id;
    });
 
    refs.resize(count, refs.front());
