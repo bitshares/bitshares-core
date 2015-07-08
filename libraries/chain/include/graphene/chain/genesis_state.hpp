@@ -23,7 +23,7 @@ struct genesis_state_type {
       string name;
       public_key_type owner_key;
       public_key_type active_key;
-      bool is_lifetime_member;
+      bool is_lifetime_member = false;
    };
    struct initial_asset_type {
       string symbol;
