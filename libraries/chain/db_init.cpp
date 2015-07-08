@@ -297,7 +297,7 @@ void database::init_genesis(const genesis_state_type& genesis_state)
        p.parameters = genesis_state.initial_parameters;
        // Set fees to zero initially, so that genesis initialization needs not pay them
        // We'll fix it at the end of the function
-       p.parameters.current_fees->set_all_fees(0);
+       p.parameters.current_fees->zero_all_fees();
 
    });
    create<dynamic_global_property_object>( [&](dynamic_global_property_object& p) {

@@ -18,7 +18,6 @@
 #pragma once
 
 #include <graphene/app/api.hpp>
-#include <graphene/chain/address.hpp>
 #include <graphene/utilities/key_conversion.hpp>
 
 using namespace graphene::app;
@@ -606,8 +605,8 @@ class wallet_api
       signed_transaction create_asset(string issuer,
                                       string symbol,
                                       uint8_t precision,
-                                      asset_object::asset_options common,
-                                      fc::optional<asset_object::bitasset_options> bitasset_opts,
+                                      asset_options common,
+                                      fc::optional<bitasset_options> bitasset_opts,
                                       bool broadcast = false);
 
       /** Issue new shares of an asset.
@@ -642,7 +641,7 @@ class wallet_api
        */
       signed_transaction update_asset(string symbol,
                                       optional<string> new_issuer,
-                                      asset_object::asset_options new_options,
+                                      asset_options new_options,
                                       bool broadcast = false);
 
       /** Update the options specific to a BitAsset.
@@ -659,7 +658,7 @@ class wallet_api
        * @returns the signed transaction updating the bitasset
        */
       signed_transaction update_bitasset(string symbol,
-                                         asset_object::bitasset_options new_options,
+                                         bitasset_options new_options,
                                          bool broadcast = false);
 
       /** Update the set of feed-producing accounts for a BitAsset.

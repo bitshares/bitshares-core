@@ -18,7 +18,7 @@
 #pragma once
 
 #include <graphene/net/config.hpp>
-#include <graphene/chain/block.hpp>
+#include <graphene/chain/protocol/block.hpp>
 
 #include <fc/crypto/ripemd160.hpp>
 #include <fc/crypto/elliptic.hpp>

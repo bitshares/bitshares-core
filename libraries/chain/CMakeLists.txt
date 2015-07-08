@@ -5,6 +5,7 @@ add_library( graphene_chain
              protocol/types.cpp
              protocol/address.cpp
              protocol/asset.cpp
+             protocol/assert.cpp
              protocol/account.cpp
              protocol/transfer.cpp
              protocol/delegate.cpp
@@ -19,6 +20,7 @@ add_library( graphene_chain
              protocol/operations.cpp
              protocol/transaction.cpp
              protocol/block.cpp
+             protocol/fee_schedule.cpp
 
              pts_address.cpp
 

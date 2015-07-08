@@ -17,7 +17,6 @@
  */
 #pragma once
 #include <graphene/chain/evaluator.hpp>
-#include <graphene/chain/protocol/block.hpp>
 #include <graphene/chain/global_property_object.hpp>
 #include <graphene/chain/node_property_object.hpp>
 #include <graphene/chain/account_object.hpp>
@@ -30,6 +29,8 @@
 #include <graphene/db/object.hpp>
 #include <graphene/db/simple_index.hpp>
 #include <fc/signals.hpp>
+
+#include <graphene/chain/protocol/protocol.hpp>
 
 #include <fc/log/logger.hpp>
 

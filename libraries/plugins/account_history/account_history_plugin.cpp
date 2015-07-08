@@ -73,117 +73,15 @@ struct operation_get_impacted_accounts
          _impacted.insert( item.first );
    }
 
-   void operator()( const transfer_operation& o )const {
-      _impacted.insert( o.to );
-   }
-
-   void operator()( const limit_order_create_operation& o )const { }
-   void operator()( const limit_order_cancel_operation& o )const { }
-   void operator()( const call_order_update_operation& o )const { }
-   void operator()( const custom_operation& o )const { }
-
    void operator()( const account_create_operation& o )const {
       _impacted.insert( _op_history.result.get<object_id_type>() );
    }
 
-   void operator()( const account_update_operation& o )const {
-      if( o.owner )
-      {
-         add_authority( *o.owner );
-      }
-      if( o.active )
-      {
-         add_authority( *o.active );
-      }
-   }
-   void operator()( const account_upgrade_operation& )const {}
-   void operator()( const account_transfer_operation& o )const
+   template<typename T>
+   void operator()( const T& o )const 
    {
-      _impacted.insert( o.new_owner );
+      o.get_impacted_accounts( _impacted );
    }
-
-   void operator()( const account_whitelist_operation& o )const {
-       _impacted.insert( o.account_to_list );
-   }
-
-   void operator()( const asset_create_operation& o )const { }
-
-   void operator()( const asset_update_operation& o )const {
-      if( o.new_issuer )
-         _impacted.insert(*o.new_issuer);
-   }
-   void operator()( const asset_update_bitasset_operation& o )const {
-   }
-   void operator()( const asset_update_feed_producers_operation& o )const {
-      for( auto id : o.new_feed_producers )
-         _impacted.insert(id);
-   }
-
-   void operator()( const asset_issue_operation& o )const {
-       _impacted.insert( o.issue_to_account );
-   }
-
-   void operator()( const asset_reserve_operation& o )const { }
-   void operator()( const asset_global_settle_operation& o )const { }
-   void operator()( const asset_settle_operation& o )const { }
-
-   void operator()( const asset_fund_fee_pool_operation& o )const { }
-   void operator()( const asset_publish_feed_operation& o )const { }
-   void operator()( const delegate_create_operation& o )const { }
-
-   void operator()( const withdraw_permission_create_operation& o )const{
-      _impacted.insert(o.authorized_account);
-   }
-   void operator()( const withdraw_permission_claim_operation& o )const{
-      _impacted.insert( o.withdraw_from_account );
-   }
-   void operator()( const withdraw_permission_update_operation& o )const{
-      _impacted.insert( o.authorized_account );
-   }
-   void operator()( const withdraw_permission_delete_operation& o )const{
-      _impacted.insert( o.authorized_account );
-   }
-
-   void operator()( const witness_create_operation& o )const {
-      _impacted.insert(o.witness_account);
-   }
-
-   void operator()( const witness_withdraw_pay_operation& o )const { }
-
-   void operator()( const proposal_create_operation& o )const {
-       for( auto op : o.proposed_ops )
-       {
-          operation_get_required_active_authorities( op.op, _impacted );
-          operation_get_required_owner_authorities( op.op, _impacted );
-       }
-   }
-
-   void operator()( const proposal_update_operation& o )const { }
-   void operator()( const proposal_delete_operation& o )const { }
-
-   void operator()( const fill_order_operation& o )const {
-      _impacted.insert( o.account_id );
-   }
-
-   void operator()(const global_parameters_update_operation& )const {
-      _impacted.insert( account_id_type() );
-   }
-
-   void operator()( const vesting_balance_create_operation& o )const
-   {
-      _impacted.insert( o.creator );
-      _impacted.insert( o.owner );
-   }
-
-   void operator()( const vesting_balance_withdraw_operation& o )const
-   {
-      _impacted.insert( o.owner );
-   }
-
-   void operator()( const worker_create_operation& )const {}
-   void operator()( const assert_operation& )const {}
-   void operator()( const balance_claim_operation& )const {}
-   void operator()( const override_transfer_operation& )const {}
 };
 
 
@@ -207,9 +105,13 @@ void account_history_plugin_impl::update_account_histories( const signed_block& 
 
       // get the set of accounts this operation applies to
       flat_set<account_id_type> impacted;
-      operation_get_required_active_authorities( op.op, impacted );
-      operation_get_required_owner_authorities( op.op, impacted );
+      vector<authority> other;
+      operation_get_required_authorities( op.op, impacted, impacted, other );
       op.op.visit( operation_get_impacted_accounts( oho, _self, impacted ) );
+
+      for( auto& a : other )
+         for( auto& item : a.account_auths )
+            impacted.insert( item.first );
 
       // for each operation this account applies to that is in the config link it into the history
       if( _tracked_accounts.size() == 0 )

@@ -74,6 +74,11 @@ namespace graphene { namespace chain {
       void validate()const{}
 
       static uint64_t calculate_data_fee( uint64_t bytes, uint64_t price_per_kbyte );
+      static void add_authority_accounts( flat_set<account_id_type>& i, const authority& a )
+      {
+         for( auto& item : a.account_auths )
+            i.insert( item.first );
+      }
    };
 
    ///@}

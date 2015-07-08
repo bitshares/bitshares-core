@@ -15,16 +15,14 @@
  * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#include <graphene/chain/operations.hpp>
+#include <graphene/chain/protocol/protocol.hpp>
 #include <graphene/chain/vesting_balance_object.hpp>
 #include <graphene/chain/withdraw_permission_object.hpp>
 #include <graphene/chain/proposal_object.hpp>
 #include <graphene/chain/witness_object.hpp>
-#include <graphene/chain/call_order_object.hpp>
-#include <graphene/chain/limit_order_object.hpp>
+#include <graphene/chain/market_evaluator.hpp>
 #include <graphene/chain/account_object.hpp>
 #include <graphene/chain/balance_object.hpp>
-#include <graphene/chain/block.hpp>
 #include <iostream>
 
 using namespace graphene::chain;
@@ -368,7 +366,6 @@ int main( int argc, char** argv )
     detail_ns::js_name<operation_result>::name("operation_result");
     detail_ns::js_name<header_extension>::name("header_extension");
     detail_ns::js_name<parameter_extension>::name("parameter_extension");
-    detail_ns::js_name<static_variant<refund_worker_type::initializer, vesting_balance_worker_type::initializer,burn_worker_type::initializer>>::name("worker_initializer");
     detail_ns::js_name<static_variant<linear_vesting_policy_initializer,cdd_vesting_policy_initializer>>::name("vesting_policy_initializer");
     detail_ns::serializer<signed_block>::init();
     detail_ns::serializer<block_header>::init();

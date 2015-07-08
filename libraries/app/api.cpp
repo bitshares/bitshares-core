@@ -19,6 +19,7 @@
 #include <graphene/app/application.hpp>
 #include <graphene/chain/database.hpp>
 #include <graphene/utilities/key_conversion.hpp>
+#include <graphene/chain/protocol/fee_schedule.hpp>
 
 #include <fc/crypto/hex.hpp>
 

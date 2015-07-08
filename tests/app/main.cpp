@@ -72,7 +72,7 @@ BOOST_AUTO_TEST_CASE( two_node_network )
 
       assert_operation op;
       op.fee_paying_account = GRAPHENE_TEMP_ACCOUNT;
-      op.predicates.push_back( fc::raw::pack( graphene::chain::pred::asset_symbol_eq_lit{ asset_id_type(), "CORE" } ) );
+      op.predicates.push_back( graphene::chain::asset_symbol_eq_lit_predicate{ asset_id_type(), "CORE" }  );
 
       trx.operations.push_back( std::move( op ) );
 

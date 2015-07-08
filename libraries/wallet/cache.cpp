@@ -20,8 +20,7 @@
 #include <graphene/chain/asset_object.hpp>
 #include <graphene/chain/delegate_object.hpp>
 #include <graphene/chain/witness_object.hpp>
-#include <graphene/chain/limit_order_object.hpp>
-#include <graphene/chain/call_order_object.hpp>
+#include <graphene/chain/market_evaluator.hpp>
 #include <graphene/chain/proposal_object.hpp>
 #include <graphene/chain/operation_history_object.hpp>
 #include <graphene/chain/withdraw_permission_object.hpp>

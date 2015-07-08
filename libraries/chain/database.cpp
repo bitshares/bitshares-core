@@ -1,4 +1,5 @@
 /// This file combines these sources to perform a partial unity build
+#include <fc/smart_ref_impl.hpp>
 #include "db_balance.cpp"
 #include "db_block.cpp"
 #include "db_debug.cpp"

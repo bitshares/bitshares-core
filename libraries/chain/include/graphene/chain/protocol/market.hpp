@@ -130,6 +130,8 @@ namespace graphene { namespace chain {
 
       /// This is a virtual operation; there is no fee
       share_type      calculate_fee(const fee_parameters_type& k)const { return 0; }
+      void get_impacted_accounts( flat_set<account_id_type>& i)const
+      { i.insert( account_id ); }
    };
 
 } } // graphene::chain

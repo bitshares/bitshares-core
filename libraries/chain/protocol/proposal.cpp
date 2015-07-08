@@ -55,5 +55,12 @@ share_type proposal_update_operation::calculate_fee(const fee_parameters_type& k
 {
    return k.fee + calculate_data_fee( fc::raw::pack_size(*this), k.price_per_kbyte );
 }
-
+void proposal_create_operation::get_impacted_accounts( flat_set<account_id_type>& i )const
+{
+   vector<authority> other;
+   for( const auto& op : proposed_ops )
+      operation_get_required_authorities( op.op, i, i, other );
+   for( auto& o : other )
+      add_authority_accounts( i, o );
+}
 } } // graphene::chain

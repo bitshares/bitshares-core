@@ -43,6 +43,9 @@ namespace graphene { namespace chain {
 
       account_id_type fee_payer()const { return withdraw_from_account; }
       void            validate()const;
+
+      void get_impacted_accounts( flat_set<account_id_type>& i)const
+      { i.insert( authorized_account ); }
    };
 
    /**
@@ -78,6 +81,8 @@ namespace graphene { namespace chain {
 
       account_id_type fee_payer()const { return withdraw_from_account; }
       void            validate()const;
+      void get_impacted_accounts( flat_set<account_id_type>& i)const
+      { i.insert( authorized_account ); }
    };
 
    /**
@@ -116,6 +121,8 @@ namespace graphene { namespace chain {
       account_id_type fee_payer()const { return withdraw_to_account; }
       void            validate()const;
       share_type      calculate_fee(const fee_parameters_type& k)const;
+      void get_impacted_accounts( flat_set<account_id_type>& i)const
+      { i.insert( withdraw_from_account ); }
    };
 
    /**
@@ -140,6 +147,8 @@ namespace graphene { namespace chain {
 
       account_id_type fee_payer()const { return withdraw_from_account; }
       void            validate()const;
+      void get_impacted_accounts( flat_set<account_id_type>& i)const
+      { i.insert( authorized_account ); }
    };
 
 } } // graphene::chain

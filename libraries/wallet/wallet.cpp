@@ -41,11 +41,11 @@
 #include <fc/thread/scoped_lock.hpp>
 
 #include <graphene/app/api.hpp>
-#include <graphene/chain/address.hpp>
 #include <graphene/chain/asset_object.hpp>
 #include <graphene/utilities/key_conversion.hpp>
 #include <graphene/wallet/wallet.hpp>
 #include <graphene/wallet/api_documentation.hpp>
+#include <fc/smart_ref_impl.hpp>
 
 #ifndef WIN32
 # include <sys/types.h>
@@ -76,13 +76,13 @@ public:
    template<typename T>
    void operator()(const T& op)const
    {
-      balance_accumulator acc;
-      op.get_balance_delta( acc, result );
+      //balance_accumulator acc;
+      //op.get_balance_delta( acc, result );
       string op_name = fc::get_typename<T>::name();
       if( op_name.find_last_of(':') != string::npos )
          op_name.erase(0, op_name.find_last_of(':')+1);
       out << op_name <<" ";
-      out << "balance delta: " << fc::json::to_string(acc.balance) <<"   ";
+     // out << "balance delta: " << fc::json::to_string(acc.balance) <<"   ";
       out << fc::json::to_string(op.fee_payer()) << "  fee: " << fc::json::to_string(op.fee);
    }
    void operator()(const transfer_operation& op)const;
@@ -378,6 +378,12 @@ public:
       return ob.template as<T>();
    }
 
+   void set_operation_fees( signed_transaction& tx, const fee_schedule& s  )
+   {
+      for( auto& op : tx.operations )
+         s.set_fee(op);
+   }
+
    variant info() const
    {
       auto global_props = get_global_properties();
@@ -612,12 +618,12 @@ public:
       _builder_transactions[transaction_handle].operations.emplace_back(op);
    }
    void replace_operation_in_builder_transaction(transaction_handle_type handle,
-                                                 unsigned operation_index,
+                                                 uint32_t operation_index,
                                                  const operation& new_op)
    {
       FC_ASSERT(_builder_transactions.count(handle));
       signed_transaction& trx = _builder_transactions[handle];
-      FC_ASSERT(operation_index >= 0 && operation_index < trx.operations.size());
+      FC_ASSERT( operation_index < trx.operations.size());
       trx.operations[operation_index] = new_op;
    }
    asset set_fees_on_builder_transaction(transaction_handle_type handle, string fee_asset = GRAPHENE_SYMBOL)
@@ -626,24 +632,20 @@ public:
 
       auto fee_asset_obj = get_asset(fee_asset);
       asset total_fee = fee_asset_obj.amount(0);
+
+      auto gprops = _remote_db->get_global_properties().parameters;
       if( fee_asset_obj.get_id() != asset_id_type() )
       {
-         _builder_transactions[handle].visit(
-                  operation_set_fee(_remote_db->get_global_properties().parameters.current_fees,
-                                    fee_asset_obj.options.core_exchange_rate,
-                                    &total_fee.amount)
-                  );
+         for( auto& op : _builder_transactions[handle].operations )
+            total_fee += gprops.current_fees->set_fee( op, fee_asset_obj.options.core_exchange_rate );
 
          FC_ASSERT((total_fee * fee_asset_obj.options.core_exchange_rate).amount <=
                    get_object<asset_dynamic_data_object>(fee_asset_obj.dynamic_asset_data_id).fee_pool,
                    "Cannot pay fees in ${asset}, as this asset's fee pool is insufficiently funded.",
                    ("asset", fee_asset_obj.symbol));
       } else {
-         _builder_transactions[handle].visit(
-                  operation_set_fee(_remote_db->get_global_properties().parameters.current_fees,
-                                    price::unit_price(),
-                                    &total_fee.amount)
-                  );
+         for( auto& op : _builder_transactions[handle].operations )
+            total_fee += gprops.current_fees->set_fee( op );
       }
 
       return total_fee;
@@ -671,8 +673,8 @@ public:
                      [](const operation& op) -> op_wrapper { return op; });
       if( review_period_seconds )
          op.review_period_seconds = review_period_seconds;
-      op.fee = op.calculate_fee(_remote_db->get_global_properties().parameters.current_fees);
       trx.operations = {op};
+      _remote_db->get_global_properties().parameters.current_fees->set_fee( trx.operations.front() );
 
       return trx = sign_transaction(trx, broadcast);
    }
@@ -680,6 +682,7 @@ public:
    {
       _builder_transactions.erase(handle);
    }
+
 
    signed_transaction register_account(string name,
                                        public_key_type owner,
@@ -716,7 +719,8 @@ public:
 
       tx.operations.push_back( account_create_op );
 
-      tx.visit( operation_set_fee( _remote_db->get_global_properties().parameters.current_fees ) );
+      auto current_fees = _remote_db->get_global_properties().parameters.current_fees;
+      set_operation_fees( tx, current_fees );
 
       vector<public_key_type> paying_keys = registrar_account_object.active.get_keys();
 
@@ -741,6 +745,7 @@ public:
       return tx;
    } FC_CAPTURE_AND_RETHROW( (name)(owner)(active)(registrar_account)(referrer_account)(referrer_percent)(broadcast) ) }
 
+
    signed_transaction upgrade_account(string name, bool broadcast)
    { try {
       FC_ASSERT( !self.is_locked() );
@@ -752,7 +757,7 @@ public:
       op.account_to_upgrade = account_obj.get_id();
       op.upgrade_to_lifetime_member = true;
       tx.operations = {op};
-      tx.visit( operation_set_fee( _remote_db->get_global_properties().parameters.current_fees ) );
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees );
       tx.validate();
 
       return sign_transaction( tx, broadcast );
@@ -838,7 +843,7 @@ public:
 
          tx.operations.push_back( account_create_op );
 
-         tx.visit( operation_set_fee( _remote_db->get_global_properties().parameters.current_fees ) );
+         set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees);
 
          vector<public_key_type> paying_keys = registrar_account_object.active.get_keys();
 
@@ -884,8 +889,8 @@ public:
    signed_transaction create_asset(string issuer,
                                    string symbol,
                                    uint8_t precision,
-                                   asset_object::asset_options common,
-                                   fc::optional<asset_object::bitasset_options> bitasset_opts,
+                                   asset_options common,
+                                   fc::optional<bitasset_options> bitasset_opts,
                                    bool broadcast = false)
    { try {
       account_object issuer_account = get_account( issuer );
@@ -900,7 +905,7 @@ public:
 
       signed_transaction tx;
       tx.operations.push_back( create_op );
-      tx.visit( operation_set_fee( _remote_db->get_global_properties().parameters.current_fees ) );
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees);
       tx.validate();
 
       return sign_transaction( tx, broadcast );
@@ -908,7 +913,7 @@ public:
 
    signed_transaction update_asset(string symbol,
                                    optional<string> new_issuer,
-                                   asset_object::asset_options new_options,
+                                   asset_options new_options,
                                    bool broadcast /* = false */)
    { try {
       optional<asset_object> asset_to_update = find_asset(symbol);
@@ -929,14 +934,14 @@ public:
 
       signed_transaction tx;
       tx.operations.push_back( update_op );
-      tx.visit( operation_set_fee( _remote_db->get_global_properties().parameters.current_fees ) );
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees);
       tx.validate();
 
       return sign_transaction( tx, broadcast );
    } FC_CAPTURE_AND_RETHROW( (symbol)(new_issuer)(new_options)(broadcast) ) }
 
    signed_transaction update_bitasset(string symbol,
-                                      asset_object::bitasset_options new_options,
+                                      bitasset_options new_options,
                                       bool broadcast /* = false */)
    { try {
       optional<asset_object> asset_to_update = find_asset(symbol);
@@ -950,7 +955,7 @@ public:
 
       signed_transaction tx;
       tx.operations.push_back( update_op );
-      tx.visit( operation_set_fee( _remote_db->get_global_properties().parameters.current_fees ) );
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees);
       tx.validate();
 
       return sign_transaction( tx, broadcast );
@@ -974,7 +979,7 @@ public:
 
       signed_transaction tx;
       tx.operations.push_back( update_op );
-      tx.visit( operation_set_fee( _remote_db->get_global_properties().parameters.current_fees ) );
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees);
       tx.validate();
 
       return sign_transaction( tx, broadcast );
@@ -996,7 +1001,7 @@ public:
 
       signed_transaction tx;
       tx.operations.push_back( publish_op );
-      tx.visit( operation_set_fee( _remote_db->get_global_properties().parameters.current_fees ) );
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees);
       tx.validate();
 
       return sign_transaction( tx, broadcast );
@@ -1020,7 +1025,7 @@ public:
 
       signed_transaction tx;
       tx.operations.push_back( fund_op );
-      tx.visit( operation_set_fee( _remote_db->get_global_properties().parameters.current_fees ) );
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees);
       tx.validate();
 
       return sign_transaction( tx, broadcast );
@@ -1042,7 +1047,7 @@ public:
 
       signed_transaction tx;
       tx.operations.push_back( reserve_op );
-      tx.visit( operation_set_fee( _remote_db->get_global_properties().parameters.current_fees ) );
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees);
       tx.validate();
 
       return sign_transaction( tx, broadcast );
@@ -1063,7 +1068,7 @@ public:
 
       signed_transaction tx;
       tx.operations.push_back( settle_op );
-      tx.visit( operation_set_fee( _remote_db->get_global_properties().parameters.current_fees ) );
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees);
       tx.validate();
 
       return sign_transaction( tx, broadcast );
@@ -1084,7 +1089,7 @@ public:
 
       signed_transaction tx;
       tx.operations.push_back( settle_op );
-      tx.visit( operation_set_fee( _remote_db->get_global_properties().parameters.current_fees ) );
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees);
       tx.validate();
 
       return sign_transaction( tx, broadcast );
@@ -1102,7 +1107,7 @@ public:
 
       signed_transaction tx;
       tx.operations.push_back( whitelist_op );
-      tx.visit( operation_set_fee( _remote_db->get_global_properties().parameters.current_fees ) );
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees);
       tx.validate();
 
       return sign_transaction( tx, broadcast );
@@ -1120,7 +1125,7 @@ public:
 
       signed_transaction tx;
       tx.operations.push_back( delegate_create_op );
-      tx.visit( operation_set_fee( _remote_db->get_global_properties().parameters.current_fees ) );
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees);
       tx.validate();
 
       return sign_transaction( tx, broadcast );
@@ -1221,7 +1226,7 @@ public:
 
       signed_transaction tx;
       tx.operations.push_back( witness_create_op );
-      tx.visit( operation_set_fee( _remote_db->get_global_properties().parameters.current_fees ) );
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees);
       tx.validate();
          
       _wallet.pending_witness_registrations[owner_account] = key_to_wif(witness_private_key);
@@ -1257,7 +1262,7 @@ public:
 
       signed_transaction tx;
       tx.operations.push_back( account_update_op );
-      tx.visit( operation_set_fee( _remote_db->get_global_properties().parameters.current_fees ) );
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees);
       tx.validate();
 
       return sign_transaction( tx, broadcast );
@@ -1291,7 +1296,7 @@ public:
 
       signed_transaction tx;
       tx.operations.push_back( account_update_op );
-      tx.visit( operation_set_fee( _remote_db->get_global_properties().parameters.current_fees ) );
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees);
       tx.validate();
 
       return sign_transaction( tx, broadcast );
@@ -1322,7 +1327,7 @@ public:
 
       signed_transaction tx;
       tx.operations.push_back( account_update_op );
-      tx.visit( operation_set_fee( _remote_db->get_global_properties().parameters.current_fees ) );
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees);
       tx.validate();
 
       return sign_transaction( tx, broadcast );
@@ -1348,7 +1353,7 @@ public:
 
       signed_transaction tx;
       tx.operations.push_back( account_update_op );
-      tx.visit( operation_set_fee( _remote_db->get_global_properties().parameters.current_fees ) );
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees);
       tx.validate();
 
       return sign_transaction( tx, broadcast );
@@ -1472,7 +1477,7 @@ public:
 
       signed_transaction tx;
       tx.operations.push_back(op);
-      tx.visit( operation_set_fee( _remote_db->get_global_properties().parameters.current_fees ) );
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees);
       tx.validate();
 
       return sign_transaction( tx, broadcast );
@@ -1493,7 +1498,7 @@ public:
 
       signed_transaction trx;
       trx.operations = {op};
-      trx.visit(operation_set_fee(_remote_db->get_global_properties().parameters.current_fees));
+      set_operation_fees( trx, _remote_db->get_global_properties().parameters.current_fees);
       trx.validate();
       idump((broadcast));
 
@@ -1509,7 +1514,7 @@ public:
          limit_order_cancel_operation op;
          op.fee_paying_account = get_object<limit_order_object>(order_id).seller;
          op.order = order_id;
-         op.fee = op.calculate_fee(_remote_db->get_global_properties().parameters.current_fees);
+         set_operation_fees( trx, _remote_db->get_global_properties().parameters.current_fees);
          trx.operations = {op};
 
          trx.validate();
@@ -1545,7 +1550,7 @@ public:
 
       signed_transaction tx;
       tx.operations.push_back(xfer_op);
-      tx.visit(operation_set_fee(_remote_db->get_global_properties().parameters.current_fees));
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees);
       tx.validate();
 
       return sign_transaction(tx, broadcast);
@@ -1575,7 +1580,7 @@ public:
 
       signed_transaction tx;
       tx.operations.push_back(issue_op);
-      tx.visit(operation_set_fee(_remote_db->get_global_properties().parameters.current_fees));
+      set_operation_fees(tx,_remote_db->get_global_properties().parameters.current_fees);
       tx.validate();
 
       return sign_transaction(tx, broadcast);
@@ -1631,7 +1636,7 @@ public:
 
    void dbg_make_uia(string creator, string symbol)
    {
-      asset_object::asset_options opts;
+      asset_options opts;
       opts.flags &= ~(white_list | disable_force_settle | global_settle);
       opts.issuer_permissions = opts.flags;
       opts.core_exchange_rate = price(asset(1), asset(1,1));
@@ -1640,11 +1645,11 @@ public:
 
    void dbg_make_mia(string creator, string symbol)
    {
-      asset_object::asset_options opts;
+      asset_options opts;
       opts.flags &= ~white_list;
       opts.issuer_permissions = opts.flags;
       opts.core_exchange_rate = price(asset(1), asset(1,1));
-      asset_object::bitasset_options bopts;
+      bitasset_options bopts;
       create_asset(get_account(creator).name, symbol, 2, opts, bopts, true);
    }
 
@@ -1984,8 +1989,8 @@ signed_transaction wallet_api::transfer(string from, string to, string amount,
 signed_transaction wallet_api::create_asset(string issuer,
                                             string symbol,
                                             uint8_t precision,
-                                            asset_object::asset_options common,
-                                            fc::optional<asset_object::bitasset_options> bitasset_opts,
+                                            asset_options common,
+                                            fc::optional<bitasset_options> bitasset_opts,
                                             bool broadcast)
 
 {
@@ -1994,14 +1999,14 @@ signed_transaction wallet_api::create_asset(string issuer,
 
 signed_transaction wallet_api::update_asset(string symbol,
                                             optional<string> new_issuer,
-                                            asset_object::asset_options new_options,
+                                            asset_options new_options,
                                             bool broadcast /* = false */)
 {
    return my->update_asset(symbol, new_issuer, new_options, broadcast);
 }
 
 signed_transaction wallet_api::update_bitasset(string symbol,
-                                               asset_object::bitasset_options new_options,
+                                               bitasset_options new_options,
                                                bool broadcast /* = false */)
 {
    return my->update_bitasset(symbol, new_options, broadcast);
@@ -2158,8 +2163,8 @@ operation wallet_api::get_prototype_operation(string operation_name)
       return graphene::chain::witness_create_operation();
    if (operation_name == "witness_withdraw_pay_operation")
       return graphene::chain::witness_withdraw_pay_operation();
-   if (operation_name == "global_parameters_update_operation")
-      return graphene::chain::global_parameters_update_operation();
+   if (operation_name == "delegate_update_global_parameters_operation")
+      return graphene::chain::delegate_update_global_parameters_operation();
    if (operation_name == "transfer_operation")
       return graphene::chain::transfer_operation();
    if (operation_name == "override_transfer_operation")
@@ -2304,9 +2309,9 @@ string wallet_api::gethelp(const string& method)const
       ss << "usage: ISSUER SYMBOL PRECISION_DIGITS OPTIONS BITASSET_OPTIONS BROADCAST\n\n";
       ss << "PRECISION_DIGITS: the number of digits after the decimal point\n\n";
       ss << "Example value of OPTIONS: \n";
-      ss << fc::json::to_pretty_string( graphene::chain::asset_object::asset_options() );
+      ss << fc::json::to_pretty_string( graphene::chain::asset_options() );
       ss << "\nExample value of BITASSET_OPTIONS: \n";
-      ss << fc::json::to_pretty_string( graphene::chain::asset_object::bitasset_options() );
+      ss << fc::json::to_pretty_string( graphene::chain::bitasset_options() );
       ss << "\nBITASSET_OPTIONS may be null\n";
    }
    else
@@ -2423,7 +2428,7 @@ signed_transaction wallet_api::import_balance( string name_or_id, const vector<s
       }
    }
 
-   trx.visit( operation_set_fee( my->_remote_db->get_global_properties().parameters.current_fees ) );
+   my->set_operation_fees( trx, my->_remote_db->get_global_properties().parameters.current_fees );
    trx.validate();
 
    auto tx = sign_transaction( trx, false );

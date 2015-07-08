@@ -60,6 +60,14 @@ namespace graphene { namespace chain {
       account_id_type fee_payer()const { return registrar; }
       void            validate()const;
       share_type      calculate_fee(const fee_parameters_type& )const;
+
+      void            get_impacted_accounts( flat_set<account_id_type>& i )const
+      { 
+         i.insert(registrar); 
+         i.insert(referrer);
+         add_authority_accounts( i, owner );
+         add_authority_accounts( i, active );
+      }
    };
 
    /**
@@ -91,6 +99,16 @@ namespace graphene { namespace chain {
       account_id_type fee_payer()const { return account; }
       void       validate()const;
       share_type calculate_fee( const fee_parameters_type& k )const;
+
+      void get_required_owner_authorities( flat_set<account_id_type>& a )const
+      { if( owner || active ) a.insert( account ); }
+
+      void       get_impacted_accounts( flat_set<account_id_type>& i )const
+      { 
+         i.insert(account);
+         if( owner ) add_authority_accounts( i, *owner );
+         if( active ) add_authority_accounts( i, *active );
+      }
    };
 
 
@@ -135,6 +153,10 @@ namespace graphene { namespace chain {
 
       account_id_type fee_payer()const { return authorizing_account; }
       void validate()const { FC_ASSERT( fee.amount >= 0 ); FC_ASSERT(new_listing < 0x4); }
+
+      void       get_impacted_accounts( flat_set<account_id_type>& i )const
+      { i.insert(account_to_list); }
+
    };
 
 
@@ -192,6 +214,11 @@ namespace graphene { namespace chain {
 
       account_id_type fee_payer()const { return account_id; }
       void        validate()const;
+
+      void       get_impacted_accounts( flat_set<account_id_type>& i )const
+      { 
+         i.insert(new_owner);
+      }
 
    };
 

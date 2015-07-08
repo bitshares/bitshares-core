@@ -30,7 +30,7 @@
 #include <fc/rpc/websocket_api.hpp>
 
 #include <graphene/app/api.hpp>
-#include <graphene/chain/address.hpp>
+#include <graphene/chain/protocol/protocol.hpp>
 #include <graphene/utilities/key_conversion.hpp>
 #include <graphene/wallet/wallet.hpp>
 

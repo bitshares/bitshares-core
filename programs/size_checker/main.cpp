@@ -20,7 +20,7 @@
 #include <fc/variant.hpp>
 #include <fc/variant_object.hpp>
 
-#include <graphene/chain/operations.hpp>
+#include <graphene/chain/protocol/protocol.hpp>
 
 #include <algorithm>
 #include <iostream>

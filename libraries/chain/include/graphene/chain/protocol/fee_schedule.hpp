@@ -25,9 +25,9 @@ namespace graphene { namespace chain {
        *  and then calculates the appropriate fee.
        */
       asset calculate_fee( const operation& op, const price& core_exchange_rate = price::unit_price() )const;
-      void  set_fee( operation& op, const price& core_exchange_rate = price::unit_price() )const;
+      asset set_fee( operation& op, const price& core_exchange_rate = price::unit_price() )const;
 
-      void set_all_fees( uint64_t fee_amount );
+      void zero_all_fees();
 
       /**
        *  Validates all of the parameters are present and accounted for.
