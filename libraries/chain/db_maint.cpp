@@ -112,9 +112,10 @@ void database::update_active_witnesses()
    share_type stake_target = _total_voting_stake / 2;
    share_type stake_tally = _witness_count_histogram_buffer[0];
    size_t witness_count = 0;
-   while( (witness_count < _witness_count_histogram_buffer.size() - 1)
-          && (stake_tally <= stake_target) )
-      stake_tally += _witness_count_histogram_buffer[++witness_count];
+   if( stake_target > 0 )
+      while( (witness_count < _witness_count_histogram_buffer.size() - 1)
+             && (stake_tally <= stake_target) )
+         stake_tally += _witness_count_histogram_buffer[++witness_count];
 
    auto wits = sort_votable_objects<witness_index>(std::max(witness_count*2+1, (size_t)GRAPHENE_MIN_WITNESS_COUNT));
    const global_property_object& gpo = get_global_properties();
@@ -177,9 +178,10 @@ void database::update_active_delegates()
    uint64_t stake_target = _total_voting_stake / 2;
    uint64_t stake_tally = _committee_count_histogram_buffer[0];
    size_t delegate_count = 0;
-   while( (delegate_count < _committee_count_histogram_buffer.size() - 1)
-          && (stake_tally <= stake_target) )
-      stake_tally += _committee_count_histogram_buffer[++delegate_count];
+   if( stake_target > 0 )
+      while( (delegate_count < _committee_count_histogram_buffer.size() - 1)
+             && (stake_tally <= stake_target) )
+         stake_tally += _committee_count_histogram_buffer[++delegate_count];
 
    auto delegates = sort_votable_objects<delegate_index>(std::max(delegate_count*2+1, (size_t)GRAPHENE_MIN_DELEGATE_COUNT));
 
@@ -381,7 +383,7 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
                uint32_t offset = id.instance();
                // if they somehow managed to specify an illegal offset, ignore it.
                if( offset < d._vote_tally_buffer.size() )
-                  d._vote_tally_buffer[ offset ] += voting_stake;
+                  d._vote_tally_buffer[offset] += voting_stake;
             }
 
             if( opinion_account.options.num_witness <= props.parameters.maximum_witness_count )
@@ -394,7 +396,7 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
                // in particular, this takes care of the case where a
                // member was voting for a high number, then the
                // parameter was lowered.
-               d._witness_count_histogram_buffer[ offset ] += voting_stake;
+               d._witness_count_histogram_buffer[offset] += voting_stake;
             }
             if( opinion_account.options.num_committee <= props.parameters.maximum_committee_count )
             {
@@ -404,7 +406,7 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
                // are turned into votes for maximum_committee_count.
                //
                // same rationale as for witnesses
-               d._committee_count_histogram_buffer[ offset ] += voting_stake;
+               d._committee_count_histogram_buffer[offset] += voting_stake;
             }
 
             d._total_voting_stake += voting_stake;
