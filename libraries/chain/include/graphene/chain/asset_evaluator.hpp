@@ -16,8 +16,8 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #pragma once
+#include <graphene/chain/protocol/operations.hpp>
 #include <graphene/chain/evaluator.hpp>
-#include <graphene/chain/operations.hpp>
 #include <graphene/chain/database.hpp>
 
 namespace graphene { namespace chain {

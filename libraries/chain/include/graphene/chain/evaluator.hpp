@@ -16,8 +16,7 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #pragma once
-#include <graphene/chain/operations.hpp>
-#include <graphene/chain/authority.hpp>
+#include <graphene/chain/protocol/operations.hpp>
 
 namespace graphene { namespace chain {
 
@@ -194,7 +193,7 @@ namespace graphene { namespace chain {
          const auto& op = o.get<typename DerivedEvaluator::operation_type>();
 
          prepare_fee(op.fee_payer(), op.fee);
-         FC_ASSERT( core_fee_paid >= op.calculate_fee(db().current_fee_schedule()) );
+         FC_ASSERT( core_fee_paid >= db().current_fee_schedule().calculate_fee( op ).amount );
 
          return eval->do_evaluate(op);
       }

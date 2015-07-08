@@ -19,6 +19,8 @@
 #include <graphene/chain/delegate_object.hpp>
 #include <graphene/chain/database.hpp>
 #include <graphene/chain/account_object.hpp>
+#include <graphene/chain/protocol/fee_schedule.hpp>
+#include <graphene/chain/transaction_evaluation_state.hpp>
 
 namespace graphene { namespace chain {
 
@@ -42,5 +44,23 @@ object_id_type delegate_create_evaluator::do_apply( const delegate_create_operat
    });
    return new_del_object.id;
 } FC_CAPTURE_AND_RETHROW( (op) ) }
+
+
+
+void_result delegate_update_global_parameters_evaluator::do_evaluate(const delegate_update_global_parameters_operation& o)
+{ try {
+   FC_ASSERT(trx_state->_is_proposed_trx);
+
+   return void_result();
+} FC_CAPTURE_AND_RETHROW( (o) ) }
+
+void_result delegate_update_global_parameters_evaluator::do_apply(const delegate_update_global_parameters_operation& o)
+{ try {
+   db().modify(db().get_global_properties(), [&o](global_property_object& p) {
+      p.pending_parameters = o.new_parameters;
+   });
+
+   return void_result();
+} FC_CAPTURE_AND_RETHROW( (o) ) }
 
 } } // graphene::chain

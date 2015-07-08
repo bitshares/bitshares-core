@@ -18,6 +18,7 @@
 #include <graphene/chain/proposal_evaluator.hpp>
 #include <graphene/chain/proposal_object.hpp>
 #include <graphene/chain/account_object.hpp>
+#include <graphene/chain/protocol/fee_schedule.hpp>
 
 namespace graphene { namespace chain {
 
@@ -35,11 +36,14 @@ void_result proposal_create_evaluator::do_evaluate(const proposal_create_operati
    {
       // If we're dealing with the genesis authority, make sure this transaction has a sufficient review period.
       flat_set<account_id_type> auths;
+      vector<authority> other;
       for( auto& op : o.proposed_ops )
       {
-         operation_get_required_active_authorities(op.op, auths);
-         operation_get_required_owner_authorities(op.op, auths);
+         operation_get_required_authorities(op.op, auths, auths, other);
       }
+
+      FC_ASSERT( other.size() == 0 ); // TODO: what about other??? 
+
       if( auths.find(account_id_type()) != auths.end() )
          FC_ASSERT( o.review_period_seconds
                     && *o.review_period_seconds >= global_parameters.genesis_proposal_review_period );
@@ -64,12 +68,11 @@ object_id_type proposal_create_evaluator::do_apply(const proposal_create_operati
 
       //Populate the required approval sets
       flat_set<account_id_type> required_active;
-
+      vector<authority> other;
+      
+      // TODO: consider caching values from evaluate?
       for( auto& op : _proposed_trx.operations )
-      {
-         operation_get_required_active_authorities(op, required_active);
-         operation_get_required_owner_authorities(op, proposal.required_owner_approvals);
-      }
+         operation_get_required_authorities(op, required_active, proposal.required_owner_approvals, other);
 
       //All accounts which must provide both owner and active authority should be omitted from the active authority set;
       //owner authority approval implies active authority approval.

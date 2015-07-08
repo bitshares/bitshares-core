@@ -16,8 +16,7 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #pragma once
-#include <graphene/chain/authority.hpp>
-#include <graphene/chain/asset.hpp>
+#include <graphene/chain/protocol/authority.hpp>
 #include <graphene/db/generic_index.hpp>
 
 namespace graphene { namespace chain {

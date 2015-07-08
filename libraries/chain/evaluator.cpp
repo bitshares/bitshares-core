@@ -21,8 +21,8 @@
 #include <graphene/chain/asset_object.hpp>
 #include <graphene/chain/account_object.hpp>
 #include <graphene/chain/delegate_object.hpp>
-#include <graphene/chain/limit_order_object.hpp>
-#include <graphene/chain/call_order_object.hpp>
+#include <graphene/chain/market_evaluator.hpp>
+#include <graphene/chain/protocol/fee_schedule.hpp>
 
 #include <fc/uint128.hpp>
 
@@ -85,9 +85,7 @@ database& generic_evaluator::db()const { return trx_state->db(); }
       flat_set<account_id_type> owner_auths;
       vector<authority>         other_auths;
 
-      operation_get_required_active_authorities( op, active_auths );
-      operation_get_required_owner_authorities( op, owner_auths );
-      operation_get_required_authorities( op, other_auths );
+      operation_get_required_authorities( op, active_auths, owner_auths, other_auths );
 
       for( auto id : active_auths )
          FC_ASSERT(verify_authority(id(db()), authority::active) ||

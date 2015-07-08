@@ -20,7 +20,7 @@
 // needed to serialize witness_scheduler
 #include <fc/container/deque.hpp>
 
-#include <graphene/chain/types.hpp>
+#include <graphene/chain/protocol/types.hpp>
 #include <graphene/chain/witness_scheduler.hpp>
 #include <graphene/chain/witness_scheduler_rng.hpp>
 

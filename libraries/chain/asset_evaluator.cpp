@@ -18,7 +18,7 @@
 #include <graphene/chain/asset_evaluator.hpp>
 #include <graphene/chain/asset_object.hpp>
 #include <graphene/chain/account_object.hpp>
-#include <graphene/chain/call_order_object.hpp>
+#include <graphene/chain/market_evaluator.hpp>
 #include <graphene/chain/database.hpp>
 
 #include <functional>
@@ -42,8 +42,7 @@ void_result asset_create_evaluator::do_evaluate( const asset_create_operation& o
    auto asset_symbol_itr = asset_indx.find( op.symbol );
    FC_ASSERT( asset_symbol_itr == asset_indx.end() );
 
-   core_fee_paid -= op.calculate_fee(d.current_fee_schedule()).value/2;
-   assert( core_fee_paid >= 0 );
+   core_fee_paid -= core_fee_paid.value/2;
 
    if( op.bitasset_options )
    {
@@ -76,7 +75,7 @@ object_id_type asset_create_evaluator::do_apply( const asset_create_operation& o
    const asset_dynamic_data_object& dyn_asset =
       db().create<asset_dynamic_data_object>( [&]( asset_dynamic_data_object& a ) {
          a.current_supply = 0;
-         a.fee_pool = op.calculate_fee(db().current_fee_schedule()).value / 2;
+         a.fee_pool = core_fee_paid; //op.calculate_fee(db().current_fee_schedule()).value / 2;
       });
 
    asset_bitasset_data_id_type bit_asset_id;

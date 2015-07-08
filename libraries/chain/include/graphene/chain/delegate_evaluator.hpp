@@ -30,4 +30,14 @@ namespace graphene { namespace chain {
          object_id_type do_apply( const delegate_create_operation& o );
    };
 
+   class delegate_update_global_parameters_evaluator : public evaluator<delegate_update_global_parameters_evaluator>
+   {
+      public:
+         typedef delegate_update_global_parameters_operation operation_type;
+
+         void_result do_evaluate( const delegate_update_global_parameters_operation& o );
+         void_result do_apply( const delegate_update_global_parameters_operation& o );
+   };
+
+
 } } // graphene::chain

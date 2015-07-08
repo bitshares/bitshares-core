@@ -17,8 +17,7 @@
  */
 #pragma once
 
-#include <graphene/chain/types.hpp>
-#include <graphene/chain/transaction.hpp>
+#include <graphene/chain/protocol/transaction.hpp>
 #include <graphene/chain/transaction_evaluation_state.hpp>
 
 #include <graphene/db/generic_index.hpp>

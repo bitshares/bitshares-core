@@ -16,14 +16,12 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #pragma once
-#include <graphene/chain/authority.hpp>
-#include <graphene/chain/asset.hpp>
+#include <graphene/chain/protocol/operations.hpp>
 #include <graphene/db/generic_index.hpp>
 #include <boost/multi_index/composite_key.hpp>
-#include <graphene/chain/operations.hpp>
 
 namespace graphene { namespace chain {
-class database;
+   class database;
 
    /**
     * @class account_statistics_object

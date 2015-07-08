@@ -18,7 +18,6 @@
 
 #include <graphene/chain/assert_evaluator.hpp>
 #include <graphene/chain/database.hpp>
-#include <graphene/chain/predicate.hpp>
 
 #include <sstream>
 
@@ -26,15 +25,18 @@ namespace graphene { namespace chain {
 
 struct predicate_evaluator
 {
-   typedef bool result_type;
+   typedef void result_type;
    const database& db;
 
    predicate_evaluator( const database& d ):db(d){}
 
-   template< typename T >
-   bool operator()( const T& p )const
+   void operator()( const  account_name_eq_lit_predicate& p )const
    {
-      return p.evaluate( db );
+      FC_ASSERT( p.account_id(db).name == p.name );
+   }
+   void operator()( const  asset_symbol_eq_lit_predicate& p )const
+   {
+      FC_ASSERT( p.asset_id(db).symbol == p.symbol );
    }
 };
 
@@ -47,20 +49,11 @@ void_result assert_evaluator::do_evaluate( const assert_operation& o )
    if( skip & database::skip_assert_evaluation )
       return void_result();
 
-   for( const vector<char>& pdata : o.predicates )
+   for( const auto& p : o.predicates )
    {
-      fc::datastream<const char*> ds( pdata.data(), pdata.size() );
-      predicate p;
-      //
-      // FC_ASSERT deep in the bowels of static_variant implementation
-      // will trip if we get a predicate which isn't in our code's
-      // static_variant.  This is desired behavior.
-      //
-      fc::raw::unpack( ds, p );
-
       FC_ASSERT( p.which() >= 0 );
       FC_ASSERT( unsigned(p.which()) < max_predicate_opcode );
-      FC_ASSERT( p.visit( predicate_evaluator( _db ) ) );
+      p.visit( predicate_evaluator( _db ) );
    }
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }

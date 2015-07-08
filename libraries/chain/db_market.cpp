@@ -20,8 +20,7 @@
 
 #include <graphene/chain/account_object.hpp>
 #include <graphene/chain/asset_object.hpp>
-#include <graphene/chain/limit_order_object.hpp>
-#include <graphene/chain/call_order_object.hpp>
+#include <graphene/chain/market_evaluator.hpp>
 
 #include <fc/uint128.hpp>
 
@@ -248,7 +247,7 @@ bool database::fill_order( const limit_order_object& order, const asset& pays, c
    pay_order( seller, receives - issuer_fees, pays );
 
    assert( pays.asset_id != receives.asset_id );
-   push_applied_operation( fill_order_operation{ order.id, order.seller, pays, receives, issuer_fees } );
+   push_applied_operation( fill_order_operation( order.id, order.seller, pays, receives, issuer_fees ) );
 
    if( pays == order.amount_for_sale() )
    {

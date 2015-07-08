@@ -16,6 +16,8 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #include <graphene/chain/block_database.hpp>
+#include <graphene/chain/protocol/fee_schedule.hpp>
+#include <fc/io/raw.hpp>
 
 namespace graphene { namespace chain {
 

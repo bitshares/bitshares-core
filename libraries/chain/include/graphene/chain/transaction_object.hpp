@@ -18,7 +18,7 @@
 #pragma once
 #include <fc/io/raw.hpp>
 
-#include <graphene/chain/transaction.hpp>
+#include <graphene/chain/protocol/transaction.hpp>
 #include <graphene/db/index.hpp>
 #include <graphene/db/generic_index.hpp>
 #include <fc/uint128.hpp>

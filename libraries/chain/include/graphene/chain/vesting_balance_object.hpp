@@ -17,14 +17,16 @@
  */
 #pragma once
 
-#include <algorithm>
+#include <graphene/chain/protocol/asset.hpp>
+#include <graphene/db/object.hpp>
+#include <graphene/db/generic_index.hpp>
 
 #include <fc/static_variant.hpp>
 #include <fc/uint128.hpp>
 
-#include <graphene/chain/asset.hpp>
-#include <graphene/db/object.hpp>
-#include <graphene/db/generic_index.hpp>
+#include <algorithm>
+
+
 
 namespace graphene { namespace chain {
    using namespace graphene::db;

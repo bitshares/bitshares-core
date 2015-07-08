@@ -25,7 +25,7 @@
 #include <graphene/chain/vesting_balance_object.hpp>
 #include <graphene/chain/witness_object.hpp>
 #include <graphene/chain/witness_schedule_object.hpp>
-#include <graphene/chain/worker_object.hpp>
+#include <graphene/chain/worker_evaluator.hpp>
 
 #include <fc/uint128.hpp>
 
@@ -58,6 +58,25 @@ void database::perform_account_maintenance(std::tuple<Types...> helpers)
    for( const account_object& a : idx )
       detail::for_each(helpers, a, detail::gen_seq<sizeof...(Types)>());
 }
+
+/// @brief A visitor for @ref worker_type which calls pay_worker on the worker within
+struct worker_pay_visitor
+{
+   private:
+      share_type pay;
+      database& db;
+
+   public:
+      worker_pay_visitor(share_type pay, database& db)
+         : pay(pay), db(db) {}
+
+      typedef void result_type;
+      template<typename W>
+      void operator()(W& worker)const
+      {
+         worker.pay_worker(pay, db);
+      }
+};
 
 void database::pay_workers( share_type& budget )
 {
@@ -436,9 +455,12 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
 
    modify(gpo, [this](global_property_object& p) {
       // Remove scaling of account registration fee
+     /*
+      /// TODO reimplement this 
       const auto& dgpo = get_dynamic_global_properties();
       p.parameters.current_fees.account_create_fee >>= p.parameters.account_fee_scale_bitshifts *
             (dgpo.accounts_registered_this_interval / p.parameters.accounts_per_fee_scale);
+     */
 
       if( p.pending_parameters )
       {

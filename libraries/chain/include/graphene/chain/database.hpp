@@ -17,8 +17,7 @@
  */
 #pragma once
 #include <graphene/chain/evaluator.hpp>
-#include <graphene/chain/block.hpp>
-#include <graphene/chain/asset.hpp>
+#include <graphene/chain/protocol/block.hpp>
 #include <graphene/chain/global_property_object.hpp>
 #include <graphene/chain/node_property_object.hpp>
 #include <graphene/chain/account_object.hpp>
@@ -227,7 +226,7 @@ namespace graphene { namespace chain {
          const global_property_object&          get_global_properties()const;
          const dynamic_global_property_object&  get_dynamic_global_properties()const;
          const node_property_object&            get_node_properties()const;
-         const fee_schedule_type&               current_fee_schedule()const;
+         const fee_schedule&                    current_fee_schedule()const;
 
          time_point_sec head_block_time()const;
          uint32_t       head_block_num()const;

@@ -20,12 +20,12 @@
 
 #include <graphene/chain/asset_object.hpp>
 #include <graphene/chain/global_property_object.hpp>
-#include <graphene/chain/limit_order_object.hpp>
 #include <graphene/chain/proposal_object.hpp>
-#include <graphene/chain/call_order_object.hpp>
 #include <graphene/chain/transaction_object.hpp>
+#include <graphene/chain/market_evaluator.hpp>
 #include <graphene/chain/withdraw_permission_object.hpp>
 #include <graphene/chain/witness_object.hpp>
+#include <graphene/chain/protocol/fee_schedule.hpp>
 
 #include <fc/uint128.hpp>
 

@@ -19,6 +19,7 @@
 #include <graphene/chain/database.hpp>
 
 #include <graphene/chain/operation_history_object.hpp>
+#include <graphene/chain/protocol/fee_schedule.hpp>
 
 namespace graphene { namespace chain {
 

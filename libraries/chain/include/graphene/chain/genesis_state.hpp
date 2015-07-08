@@ -1,6 +1,6 @@
 #pragma once
 
-#include <graphene/chain/types.hpp>
+#include <graphene/chain/protocol/types.hpp>
 
 #include <string>
 #include <vector>

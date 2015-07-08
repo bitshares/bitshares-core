@@ -38,7 +38,7 @@ const dynamic_global_property_object&database::get_dynamic_global_properties() c
    return get( dynamic_global_property_id_type() );
 }
 
-const fee_schedule_type&  database::current_fee_schedule()const
+const fee_schedule&  database::current_fee_schedule()const
 {
    return get_global_properties().parameters.current_fees;
 }
