@@ -93,7 +93,19 @@ namespace graphene { namespace chain {
             skip_assert_evaluation      = 0x400  ///< used while reindexing
          };
 
-         void open(const fc::path& data_dir, const genesis_state_type& initial_allocation = genesis_state_type());
+         /**
+          * @brief Open a database, creating a new one if necessary
+          *
+          * Opens a database in the specified directory. If no initialized database is found, genesis_loader is called
+          * and its return value is used as the genesis state when initializing the new database
+          *
+          * genesis_loader will not be called if an existing database is found.
+          *
+          * @param data_dir Path to open or create database in
+          * @param genesis_loader A callable object which returns the genesis state to initialize new databases on
+          */
+         template<typename F>
+         void open(const fc::path& data_dir, F&& genesis_loader);
          /**
           * @brief Rebuild object graph from block history and open detabase
           *
@@ -477,4 +489,24 @@ namespace graphene { namespace chain {
            (void)l;
        }
    }
+
+   template<typename F>
+   void database::open(const fc::path& data_dir, F&& genesis_loader)
+   { try {
+         object_database::open(data_dir);
+
+         _block_id_to_block.open(data_dir / "database" / "block_num_to_block");
+
+         if( !find(global_property_id_type()) )
+            init_genesis(genesis_loader());
+
+         _pending_block.previous  = head_block_id();
+         _pending_block.timestamp = head_block_time();
+
+         auto last_block= _block_id_to_block.last();
+         if( last_block.valid() )
+            _fork_db.start_block( *last_block );
+
+   } FC_CAPTURE_AND_RETHROW( (data_dir) ) }
+
 } }

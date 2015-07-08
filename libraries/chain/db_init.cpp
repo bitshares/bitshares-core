@@ -248,7 +248,7 @@ void database::init_genesis(const genesis_state_type& genesis_state)
        p.parameters.current_fees.set_all_fees(0);
 
    });
-   create<dynamic_global_property_object>( [&](dynamic_global_property_object& p) {
+   create<dynamic_global_property_object>([&](dynamic_global_property_object& p) {
       p.time = genesis_state.initial_timestamp;
       p.witness_budget = 0;
    });

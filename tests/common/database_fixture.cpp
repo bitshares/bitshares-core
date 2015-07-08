@@ -286,7 +286,7 @@ void database_fixture::open_database()
 {
    if( !data_dir ) {
       data_dir = fc::temp_directory();
-      db.open(data_dir->path(), genesis_state);
+      db.open(data_dir->path(), [this]{return genesis_state;});
    }
 }
 

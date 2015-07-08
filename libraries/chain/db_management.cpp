@@ -20,6 +20,8 @@
 
 #include <graphene/chain/operation_history_object.hpp>
 
+#include <functional>
+
 namespace graphene { namespace chain {
 
 database::database()
@@ -33,31 +35,10 @@ database::~database(){
       _pending_block_session->commit();
 }
 
-void database::open( const fc::path& data_dir, const genesis_state_type& initial_allocation )
-{ try {
-   object_database::open( data_dir );
-
-   _block_id_to_block.open(data_dir / "database" / "block_num_to_block");
-
-   if( !find(global_property_id_type()) )
-   {
-//      ilog( "Init Genesis State" );
-      init_genesis(initial_allocation);
-   }
-
-   _pending_block.previous  = head_block_id();
-   _pending_block.timestamp = head_block_time();
-
-   auto last_block= _block_id_to_block.last();
-   if( last_block.valid() )
-      _fork_db.start_block( *last_block );
-
-} FC_CAPTURE_AND_RETHROW( (data_dir) ) }
-
 void database::reindex(fc::path data_dir, const genesis_state_type& initial_allocation)
 { try {
    wipe(data_dir, false);
-   open(data_dir, initial_allocation);
+   open(data_dir, [&initial_allocation]{return initial_allocation;});
 
    auto start = fc::time_point::now();
    auto last_block = _block_id_to_block.last();
@@ -69,13 +50,13 @@ void database::reindex(fc::path data_dir, const genesis_state_type& initial_allo
    //_undo_db.disable();
    for( uint32_t i = 1; i <= last_block_num; ++i )
    {
-      apply_block( *_block_id_to_block.fetch_by_number(i), skip_delegate_signature |
+      apply_block(*_block_id_to_block.fetch_by_number(i), skip_delegate_signature |
                                 skip_transaction_signatures |
                                 skip_undo_block |
                                 skip_undo_transaction |
                                 skip_transaction_dupe_check |
                                 skip_tapos_check |
-                                skip_authority_check );
+                                skip_authority_check);
    }
    //_undo_db.enable();
    auto end = fc::time_point::now();

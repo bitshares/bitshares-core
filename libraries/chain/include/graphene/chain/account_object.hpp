@@ -161,7 +161,7 @@ class database;
             /// The memo key is the key this account will typically use to encrypt/sign transaction memos and other non-
             /// validated account activities. This field is here to prevent confusion if the active authority has zero or
             /// multiple keys in it.
-            public_key_type  memo_key;
+            public_key_type memo_key;
             /// If this field is set to an account ID other than 0, this account's votes will be ignored and its stake
             /// will be counted as voting for the referenced account's selected votes instead.
             account_id_type voting_account;
@@ -257,7 +257,7 @@ class database;
 
    /**
     *  @brief This secondary index will allow a reverse lookup of all accounts that a particular key or account
-    *  is an potential signing authority. 
+    *  is an potential signing authority.
     */
    class account_member_index : public secondary_index
    {

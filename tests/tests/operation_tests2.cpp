@@ -1001,7 +1001,7 @@ BOOST_AUTO_TEST_CASE( balance_object_test )
 
    genesis_state.initial_accounts.emplace_back("n", n_key.get_public_key());
 
-   db.open(td.path(), genesis_state);
+   db.open(td.path(), [this]{return genesis_state;});
    const balance_object& balance = balance_id_type()(db);
    BOOST_CHECK_EQUAL(balance.balance.amount.value, 1);
    BOOST_CHECK_EQUAL(balance_id_type(1)(db).balance.amount.value, 1);

@@ -183,12 +183,14 @@ namespace detail {
          bool clean = !fc::exists(_data_dir / "blockchain/dblock");
          fc::create_directories(_data_dir / "blockchain/dblock");
 
-         genesis_state_type initial_state;
-         if( _options->count("genesis-json") )
-            initial_state = fc::json::from_file(_options->at("genesis-json").as<boost::filesystem::path>())
-                  .as<genesis_state_type>();
-         else
-            initial_state = create_example_genesis();
+         auto initial_state = [&] {
+            ilog("Initializing database...");
+            if( _options->count("genesis-json") )
+               return fc::json::from_file(_options->at("genesis-json").as<boost::filesystem::path>())
+                     .as<genesis_state_type>();
+            else
+               return create_example_genesis();
+         };
 
          if( _options->count("resync-blockchain") )
             _chain_db->wipe(_data_dir / "blockchain", true);
@@ -196,12 +198,12 @@ namespace detail {
          if( _options->count("replay-blockchain") )
          {
             ilog("Replaying blockchain on user request.");
-            _chain_db->reindex(_data_dir/"blockchain", initial_state);
+            _chain_db->reindex(_data_dir/"blockchain", initial_state());
          } else if( clean )
             _chain_db->open(_data_dir / "blockchain", initial_state);
          else {
             wlog("Detected unclean shutdown. Replaying blockchain...");
-            _chain_db->reindex(_data_dir / "blockchain", initial_state);
+            _chain_db->reindex(_data_dir / "blockchain", initial_state());
          }
 
          if( _options->count("apiaccess") )
@@ -226,13 +228,13 @@ namespace detail {
          reset_websocket_tls_server();
       } FC_CAPTURE_AND_RETHROW() }
 
-      optional< api_access_info > get_api_access_info( const string& username )const
+      optional< api_access_info > get_api_access_info(const string& username)const
       {
          optional< api_access_info > result;
-         auto it = _apiaccess.permission_map.find( username );
+         auto it = _apiaccess.permission_map.find(username);
          if( it == _apiaccess.permission_map.end() )
          {
-            it = _apiaccess.permission_map.find( "*" );
+            it = _apiaccess.permission_map.find("*");
             if( it == _apiaccess.permission_map.end() )
                return result;
          }
@@ -242,7 +244,7 @@ namespace detail {
       /**
        * If delegate has the item, the network has no need to fetch it.
        */
-      virtual bool has_item( const net::item_id& id ) override
+      virtual bool has_item(const net::item_id& id) override
       {
          try
          {
@@ -262,7 +264,7 @@ namespace detail {
        *
        * @throws exception if error validating the item, otherwise the item is safe to broadcast on.
        */
-      virtual bool handle_block( const graphene::net::block_message& blk_msg, bool sync_mode ) override
+      virtual bool handle_block(const graphene::net::block_message& blk_msg, bool sync_mode) override
       { try {
          ilog("Got block #${n} from network", ("n", blk_msg.block.block_num()));
          try {
@@ -273,7 +275,7 @@ namespace detail {
          }
       } FC_CAPTURE_AND_RETHROW( (blk_msg)(sync_mode) ) }
 
-      virtual bool handle_transaction( const graphene::net::trx_message& trx_msg, bool sync_mode ) override
+      virtual bool handle_transaction(const graphene::net::trx_message& trx_msg, bool sync_mode) override
       { try {
          ilog("Got transaction from network");
          _chain_db->push_transaction( trx_msg.trx );
@@ -328,18 +330,18 @@ namespace detail {
       /**
        * Given the hash of the requested data, fetch the body.
        */
-      virtual message get_item( const item_id& id ) override
+      virtual message get_item(const item_id& id) override
       { try {
          ilog("Request for item ${id}", ("id", id));
          if( id.item_type == graphene::net::block_message_type )
          {
-            auto opt_block = _chain_db->fetch_block_by_id( id.item_hash );
+            auto opt_block = _chain_db->fetch_block_by_id(id.item_hash);
             if( !opt_block )
                elog("Couldn't find block ${id} -- corresponding ID in our chain is ${id2}",
                     ("id", id.item_hash)("id2", _chain_db->get_block_id_for_num(block_header::num_from_id(id.item_hash))));
             FC_ASSERT( opt_block.valid() );
             ilog("Serving up block #${num}", ("num", opt_block->block_num()));
-            return block_message( std::move(*opt_block) );
+            return block_message(std::move(*opt_block));
          }
          return trx_message( _chain_db->get_recent_transaction( id.item_hash ) );
       } FC_CAPTURE_AND_RETHROW( (id) ) }
@@ -364,18 +366,18 @@ namespace detail {
        *     &c.
        *   the last item in the list will be the hash of the most recent block on our preferred chain
        */
-      virtual std::vector<item_hash_t> get_blockchain_synopsis( uint32_t item_type,
-                                                                const graphene::net::item_hash_t& reference_point,
-                                                                uint32_t number_of_blocks_after_reference_point ) override
+      virtual std::vector<item_hash_t> get_blockchain_synopsis(uint32_t item_type,
+                                                               const graphene::net::item_hash_t& reference_point,
+                                                               uint32_t number_of_blocks_after_reference_point) override
       { try {
          std::vector<item_hash_t> result;
          result.reserve(30);
          auto head_block_num = _chain_db->head_block_num();
-         result.push_back( _chain_db->head_block_id() );
+         result.push_back(_chain_db->head_block_id());
          auto current = 1;
          while( current < head_block_num )
          {
-            result.push_back( _chain_db->get_block_id_for_num( head_block_num - current ) );
+            result.push_back(_chain_db->get_block_id_for_num(head_block_num - current));
             current = current*2;
          }
          std::reverse( result.begin(), result.end() );
@@ -390,7 +392,7 @@ namespace detail {
        * @param item_count the number of items known to the node that haven't been sent to handle_item() yet.
        *                   After `item_count` more calls to handle_item(), the node will be in sync
        */
-      virtual void     sync_status( uint32_t item_type, uint32_t item_count ) override
+      virtual void     sync_status(uint32_t item_type, uint32_t item_count) override
       {
          // any status reports to GUI go here
       }
@@ -398,7 +400,7 @@ namespace detail {
       /**
        * Call any time the number of connected peers changes.
        */
-      virtual void     connection_count_changed( uint32_t c ) override
+      virtual void     connection_count_changed(uint32_t c) override
       {
         // any status reports to GUI go here
       }

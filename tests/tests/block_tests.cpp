@@ -129,7 +129,7 @@ BOOST_AUTO_TEST_CASE( generate_empty_blocks )
       auto delegate_priv_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("null_key")) );
       {
          database db;
-         db.open(data_dir.path(), make_genesis() );
+         db.open(data_dir.path(), make_genesis );
          b = db.generate_block(now, db.get_scheduled_witness(1).first, delegate_priv_key, database::skip_nothing);
 
          for( uint32_t i = 1; i < 200; ++i )
@@ -137,25 +137,25 @@ BOOST_AUTO_TEST_CASE( generate_empty_blocks )
             BOOST_CHECK( db.head_block_id() == b.id() );
             witness_id_type prev_witness = b.witness;
             now += db.block_interval();
-            witness_id_type cur_witness = db.get_scheduled_witness( 1 ).first;
+            witness_id_type cur_witness = db.get_scheduled_witness(1).first;
             BOOST_CHECK( cur_witness != prev_witness );
-            b = db.generate_block( now, cur_witness, delegate_priv_key, database::skip_nothing );
+            b = db.generate_block(now, cur_witness, delegate_priv_key, database::skip_nothing);
             BOOST_CHECK( b.witness == cur_witness );
          }
          db.close();
       }
       {
          database db;
-         db.open(data_dir.path() );
+         db.open(data_dir.path(), []{return genesis_state_type();});
          BOOST_CHECK_EQUAL( db.head_block_num(), 200 );
          for( uint32_t i = 0; i < 200; ++i )
          {
             BOOST_CHECK( db.head_block_id() == b.id() );
             witness_id_type prev_witness = b.witness;
             now += db.block_interval();
-            witness_id_type cur_witness = db.get_scheduled_witness( 1 ).first;
+            witness_id_type cur_witness = db.get_scheduled_witness(1).first;
             BOOST_CHECK( cur_witness != prev_witness );
-            b = db.generate_block( now, cur_witness, delegate_priv_key, database::skip_nothing );
+            b = db.generate_block(now, cur_witness, delegate_priv_key, database::skip_nothing);
          }
          BOOST_CHECK_EQUAL( db.head_block_num(), 400 );
       }
@@ -171,7 +171,7 @@ BOOST_AUTO_TEST_CASE( undo_block )
       fc::temp_directory data_dir;
       {
          database db;
-         db.open(data_dir.path(), make_genesis() );
+         db.open(data_dir.path(), make_genesis);
          fc::time_point_sec now( GRAPHENE_TESTING_GENESIS_TIMESTAMP );
 
          auto delegate_priv_key  = fc::ecc::private_key::regenerate(fc::sha256::hash(string("null_key")) );
@@ -211,9 +211,9 @@ BOOST_AUTO_TEST_CASE( fork_blocks )
       fc::time_point_sec now( GRAPHENE_TESTING_GENESIS_TIMESTAMP );
 
       database db1;
-      db1.open(data_dir1.path(), make_genesis());
+      db1.open(data_dir1.path(), make_genesis);
       database db2;
-      db2.open(data_dir2.path(), make_genesis());
+      db2.open(data_dir2.path(), make_genesis);
 
       auto delegate_priv_key  = fc::ecc::private_key::regenerate(fc::sha256::hash(string("null_key")) );
       for( uint32_t i = 0; i < 10; ++i )
@@ -276,7 +276,7 @@ BOOST_AUTO_TEST_CASE( undo_pending )
       fc::temp_directory data_dir;
       {
          database db;
-         db.open(data_dir.path(), make_genesis());
+         db.open(data_dir.path(), make_genesis);
 
          auto delegate_priv_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("null_key")) );
          public_key_type delegate_pub_key  = delegate_priv_key.get_public_key();
@@ -334,8 +334,8 @@ BOOST_AUTO_TEST_CASE( switch_forks_undo_create )
                          dir2;
       database db1,
                db2;
-      db1.open(dir1.path(), make_genesis());
-      db2.open(dir2.path(), make_genesis());
+      db1.open(dir1.path(), make_genesis);
+      db2.open(dir2.path(), make_genesis);
 
       fc::time_point_sec now( GRAPHENE_TESTING_GENESIS_TIMESTAMP );
       auto delegate_priv_key  = fc::ecc::private_key::regenerate(fc::sha256::hash(string("null_key")) );
@@ -392,8 +392,8 @@ BOOST_AUTO_TEST_CASE( duplicate_transactions )
                          dir2;
       database db1,
                db2;
-      db1.open(dir1.path(), make_genesis());
-      db2.open(dir2.path(), make_genesis());
+      db1.open(dir1.path(), make_genesis);
+      db2.open(dir2.path(), make_genesis);
 
       auto skip_sigs = database::skip_transaction_signatures | database::skip_authority_check;
 
@@ -441,8 +441,8 @@ BOOST_AUTO_TEST_CASE( tapos )
                          dir2;
       database db1,
                db2;
-      db1.open(dir1.path(), make_genesis());
-      db2.open(dir2.path(), make_genesis());
+      db1.open(dir1.path(), make_genesis);
+      db2.open(dir2.path(), make_genesis);
 
       const account_object& init1 = *db1.get_index_type<account_index>().indices().get<by_name>().find("init1");
 
@@ -451,7 +451,7 @@ BOOST_AUTO_TEST_CASE( tapos )
       const graphene::db::index& account_idx = db1.get_index(protocol_ids, account_object_type);
 
       now += db1.block_interval();
-      auto b = db1.generate_block( now, db1.get_scheduled_witness( 1 ).first, delegate_priv_key, database::skip_nothing );
+      auto b = db1.generate_block(now, db1.get_scheduled_witness( 1 ).first, delegate_priv_key, database::skip_nothing);
 
       signed_transaction trx;
       //This transaction must be in the next block after its reference, or it is invalid.
@@ -467,10 +467,6 @@ BOOST_AUTO_TEST_CASE( tapos )
       db1.push_transaction(trx);
       now += db1.block_interval();
       b = db1.generate_block(now, db1.get_scheduled_witness(1).first, delegate_priv_key, database::skip_nothing);
-      /*
-      now += db1.block_interval();
-      b = db1.generate_block(now, db1.get_scheduled_witness(1).first, delegate_priv_key, database::skip_nothing);
-      */
       trx.clear();
 
       trx.operations.push_back(transfer_operation({asset(), account_id_type(), nathan_id, asset(50)}));
