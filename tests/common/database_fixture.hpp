@@ -59,11 +59,13 @@ using namespace graphene::db;
       ("expr", #expr)                                     \
       ("exc_type", #exc_type)                             \
       );                                                  \
-   std::cout << "GRAPHENE_REQUIRE_THROW begin "           \
-      << req_throw_info << std::endl;                     \
+   if( fc::enable_record_assert_trip )                    \
+      std::cout << "GRAPHENE_REQUIRE_THROW begin "        \
+         << req_throw_info << std::endl;                  \
    BOOST_REQUIRE_THROW( expr, exc_type );                 \
-   std::cout << "GRAPHENE_REQUIRE_THROW end "             \
-      << req_throw_info << std::endl;                     \
+   if( fc::enable_record_assert_trip )                    \
+      std::cout << "GRAPHENE_REQUIRE_THROW end "          \
+         << req_throw_info << std::endl;                  \
 }
 
 #define GRAPHENE_CHECK_THROW( expr, exc_type )            \
@@ -75,11 +77,13 @@ using namespace graphene::db;
       ("expr", #expr)                                     \
       ("exc_type", #exc_type)                             \
       );                                                  \
-   std::cout << "GRAPHENE_CHECK_THROW begin "             \
-      << req_throw_info << std::endl;                     \
+   if( fc::enable_record_assert_trip )                    \
+      std::cout << "GRAPHENE_CHECK_THROW begin "          \
+         << req_throw_info << std::endl;                  \
    BOOST_CHECK_THROW( expr, exc_type );                   \
-   std::cout << "GRAPHENE_CHECK_THROW end "               \
-      << req_throw_info << std::endl;                     \
+   if( fc::enable_record_assert_trip )                    \
+      std::cout << "GRAPHENE_CHECK_THROW end "            \
+         << req_throw_info << std::endl;                  \
 }
 
 #define REQUIRE_OP_VALIDATION_FAILURE_2( op, field, value, exc_type ) \
