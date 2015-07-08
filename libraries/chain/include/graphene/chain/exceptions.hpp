@@ -18,12 +18,66 @@
 #pragma once
 
 #include <fc/exception/exception.hpp>
+#include <graphene/chain/operations.hpp>
+
+#define GRAPHENE_ASSERT( expr, exc_type, ... )                        \
+   if( !(expr) )                                                      \
+   {                                                                  \
+      FC_THROW_EXCEPTION( exc_type, __VA_ARGS__ );                    \
+   }
+
+#define GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( op_name )                \
+   FC_DECLARE_DERIVED_EXCEPTION(                                      \
+      op_name ## _validate_exception,                                 \
+      graphene::chain::operation_validate_exception,                  \
+      3040000 + 100 * operation::tag< op_name ## _operation >::value, \
+      #op_name "_operation validation exception"                      \
+      )                                                               \
+   FC_DECLARE_DERIVED_EXCEPTION(                                      \
+      op_name ## _evaluate_exception,                                 \
+      graphene::chain::operation_evaluate_exception,                  \
+      3050000 + 100 * operation::tag< op_name ## _operation >::value, \
+      #op_name "_operation evaluation exception"                      \
+      )
+
+#define GRAPHENE_DECLARE_OP_VALIDATE_EXCEPTION( exc_name, op_name, seqnum, msg ) \
+   FC_DECLARE_DERIVED_EXCEPTION(                                      \
+      op_name ## _ ## exc_name,                                       \
+      graphene::chain::op_name ## _validate_exception,                \
+      3040000 + 100 * operation::tag< op_name ## _operation >::value  \
+         + seqnum,                                                    \
+      msg                                                             \
+      )
+
+#define GRAPHENE_DECLARE_OP_EVALUATE_EXCEPTION( exc_name, op_name, seqnum, msg ) \
+   FC_DECLARE_DERIVED_EXCEPTION(                                      \
+      op_name ## _ ## exc_name,                                       \
+      graphene::chain::op_name ## _evaluate_exception,                \
+      3050000 + 100 * operation::tag< op_name ## _operation >::value  \
+         + seqnum,                                                    \
+      msg                                                             \
+      )
 
 namespace graphene { namespace chain {
-   // registered in chain_database.cpp
 
-   FC_DECLARE_EXCEPTION( chain_exception, 30000, "Blockchain Exception" )
-   FC_DECLARE_DERIVED_EXCEPTION( invalid_pts_address,               graphene::chain::chain_exception, 30001, "invalid pts address" )
+   FC_DECLARE_EXCEPTION( chain_exception, 3000000, "blockchain exception" )
+   FC_DECLARE_DERIVED_EXCEPTION( database_query_exception,          graphene::chain::chain_exception, 3010000, "database query exception" )
+   FC_DECLARE_DERIVED_EXCEPTION( block_validate_exception,          graphene::chain::chain_exception, 3020000, "block validation exception" )
+   FC_DECLARE_DERIVED_EXCEPTION( transaction_exception,             graphene::chain::chain_exception, 3030000, "transaction validation exception" )
+   FC_DECLARE_DERIVED_EXCEPTION( operation_validate_exception,      graphene::chain::chain_exception, 3040000, "operation validation exception" )
+   FC_DECLARE_DERIVED_EXCEPTION( operation_evaluate_exception,      graphene::chain::chain_exception, 3050000, "operation evaluation exception" )
+   FC_DECLARE_DERIVED_EXCEPTION( utility_exception,                 graphene::chain::chain_exception, 3060000, "utility method exception" )
+
+   FC_DECLARE_DERIVED_EXCEPTION( invalid_pts_address,               graphene::chain::utility_exception, 3060001, "invalid pts address" )
+   FC_DECLARE_DERIVED_EXCEPTION( insufficient_feeds,                graphene::chain::chain_exception, 37006, "insufficient feeds" )
+
+   GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( balance_claim );
+
+   GRAPHENE_DECLARE_OP_EVALUATE_EXCEPTION( claimed_too_often, balance_claim, 1, "balance claimed too often" )
+   GRAPHENE_DECLARE_OP_EVALUATE_EXCEPTION( invalid_claim_amount, balance_claim, 2, "invalid claim amount" )
+   GRAPHENE_DECLARE_OP_EVALUATE_EXCEPTION( owner_mismatch, balance_claim, 3, "owner mismatch" )
+
+   /*
    FC_DECLARE_DERIVED_EXCEPTION( addition_overflow,                 graphene::chain::chain_exception, 30002, "addition overflow" )
    FC_DECLARE_DERIVED_EXCEPTION( subtraction_overflow,              graphene::chain::chain_exception, 30003, "subtraction overflow" )
    FC_DECLARE_DERIVED_EXCEPTION( asset_type_mismatch,               graphene::chain::chain_exception, 30004, "asset/price mismatch" )
@@ -63,8 +117,6 @@ namespace graphene { namespace chain {
    FC_DECLARE_DERIVED_EXCEPTION( expired_transaction,               graphene::chain::evaluation_error, 31010, "expired transaction" )
    FC_DECLARE_DERIVED_EXCEPTION( invalid_transaction_expiration,    graphene::chain::evaluation_error, 31011, "invalid transaction expiration" )
    FC_DECLARE_DERIVED_EXCEPTION( oversized_transaction,             graphene::chain::evaluation_error, 31012, "transaction exceeded the maximum transaction size" )
-   FC_DECLARE_DERIVED_EXCEPTION( balance_claimed_too_often,         graphene::chain::evaluation_error, 31013, "balance claimed too often" )
-   FC_DECLARE_DERIVED_EXCEPTION( invalid_claim_amount,              graphene::chain::evaluation_error, 31013, "invalid claim amount" )
 
    FC_DECLARE_DERIVED_EXCEPTION( invalid_account_name,              graphene::chain::evaluation_error, 32001, "invalid account name" )
    FC_DECLARE_DERIVED_EXCEPTION( unknown_account_id,                graphene::chain::evaluation_error, 32002, "unknown account id" )
@@ -111,5 +163,6 @@ namespace graphene { namespace chain {
    FC_DECLARE_DERIVED_EXCEPTION( price_multiplication_overflow,     graphene::chain::evaluation_error, 38001, "price multiplication overflow" )
    FC_DECLARE_DERIVED_EXCEPTION( price_multiplication_underflow,    graphene::chain::evaluation_error, 38002, "price multiplication underflow" )
    FC_DECLARE_DERIVED_EXCEPTION( price_multiplication_undefined,    graphene::chain::evaluation_error, 38003, "price multiplication undefined product 0*inf" )
+   */
 
 } } // graphene::chain

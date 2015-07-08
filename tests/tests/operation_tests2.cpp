@@ -1048,7 +1048,7 @@ BOOST_AUTO_TEST_CASE( balance_object_test )
    trx.sign(n_key);
    trx.sign(v1_key);
    // Attempting to claim 1 from a balance with 0 available
-   GRAPHENE_CHECK_THROW(db.push_transaction(trx), invalid_claim_amount);
+   GRAPHENE_CHECK_THROW(db.push_transaction(trx), balance_claim_invalid_claim_amount);
 
    op.balance_to_claim = vesting_balance_2.id;
    op.total_claimed.amount = 151;
@@ -1058,7 +1058,7 @@ BOOST_AUTO_TEST_CASE( balance_object_test )
    trx.sign(n_key);
    trx.sign(v2_key);
    // Attempting to claim 151 from a balance with 150 available
-   GRAPHENE_CHECK_THROW(db.push_transaction(trx), invalid_claim_amount);
+   GRAPHENE_CHECK_THROW(db.push_transaction(trx), balance_claim_invalid_claim_amount);
 
    op.balance_to_claim = vesting_balance_2.id;
    op.total_claimed.amount = 100;
@@ -1077,7 +1077,7 @@ BOOST_AUTO_TEST_CASE( balance_object_test )
    trx.sign(n_key);
    trx.sign(v2_key);
    // Attempting to claim twice within a day
-   GRAPHENE_CHECK_THROW(db.push_transaction(trx), balance_claimed_too_often);
+   GRAPHENE_CHECK_THROW(db.push_transaction(trx), balance_claim_claimed_too_often);
 
    db.generate_block(db.get_slot_time(1), db.get_scheduled_witness(1).first, delegate_priv_key, database::skip_nothing);
    slot = db.get_slot_at_time(vesting_balance_1.vesting_policy->begin_timestamp + 60);
@@ -1103,7 +1103,7 @@ BOOST_AUTO_TEST_CASE( balance_object_test )
    trx.sign(n_key);
    trx.sign(v2_key);
    // Attempting to claim twice within a day
-   GRAPHENE_CHECK_THROW(db.push_transaction(trx), balance_claimed_too_often);
+   GRAPHENE_CHECK_THROW(db.push_transaction(trx), balance_claim_claimed_too_often);
 
    db.generate_block(db.get_slot_time(1), db.get_scheduled_witness(1).first, delegate_priv_key, database::skip_nothing);
    slot = db.get_slot_at_time(db.head_block_time() + fc::days(1));
