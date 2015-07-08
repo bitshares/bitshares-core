@@ -189,7 +189,15 @@ Questions
 - Is there a way to generate help with parameter names and method descriptions?
 
     Yes. Documentation of the code base, including APIs, can be generated using Doxygen. Simply run `doxygen` in this directory.
-    We are thinking of integrating Doxygen's XML output format to provide a better `help` command to the CLI wallet.
+
+    If both Doxygen and perl are available in your build environment, the CLI wallet's `help` and `gethelp`
+    commands will display help generated from the doxygen documentation.  
+
+    If your CLI wallet's `help` command displays descriptions without parameter names like 
+        `signed_transaction transfer(string, string, string, string, string, bool)`
+    it means CMake was unable to find Doxygen or perl during configuration.  If found, the
+    output should look like this:
+        `signed_transaction transfer(string from, string to, string amount, string asset_symbol, string memo, bool broadcast)`
 
 - Is there a way to allow external program to drive `cli_wallet` via websocket, JSONRPC, or HTTP?
 
