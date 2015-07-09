@@ -33,3 +33,6 @@ witness_node_data_dir
 programs/witness_node/object_database/*
 
 object_database/*
+
+*.pyc
+*.pyo

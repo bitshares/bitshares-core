@@ -20,6 +20,7 @@
 #include <graphene/chain/account_object.hpp>
 #include <graphene/chain/market_evaluator.hpp>
 #include <graphene/chain/database.hpp>
+#include <graphene/chain/exceptions.hpp>
 
 #include <functional>
 
@@ -393,6 +394,8 @@ void_result asset_settle_evaluator::do_evaluate(const asset_settle_evaluator::op
    FC_ASSERT(asset_to_settle->can_force_settle() || bitasset.has_settlement() );
    if( bitasset.is_prediction_market )
       FC_ASSERT( bitasset.has_settlement(), "global settlement must occur before force settling a prediction market"  );
+   else if( bitasset.current_feed.settlement_price.is_null() )
+      FC_THROW_EXCEPTION(insufficient_feeds, "Cannot force settle with no price feed.");
    FC_ASSERT(d.get_balance(d.get(op.account), *asset_to_settle) >= op.amount);
 
    return void_result();

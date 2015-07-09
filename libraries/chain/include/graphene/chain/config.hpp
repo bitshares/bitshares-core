@@ -86,7 +86,7 @@
 #define GRAPHENE_DEFAULT_MAX_WITNESSES                        (1001) // SHOULD BE ODD
 #define GRAPHENE_DEFAULT_MAX_COMMITTEE                        (1001) // SHOULD BE ODD
 #define GRAPHENE_DEFAULT_MAX_PROPOSAL_LIFETIME_SEC            (60*60*24*7*4) // Four weeks
-#define GRAPHENE_DEFAULT_GENESIS_PROPOSAL_REVIEW_PERIOD_SEC   (60*60*24*7*2) // Two weeks
+#define GRAPHENE_DEFAULT_COMMITTEE_PROPOSAL_REVIEW_PERIOD_SEC (60*60*24*7*2) // Two weeks
 #define GRAPHENE_DEFAULT_NETWORK_PERCENT_OF_FEE               (20*GRAPHENE_1_PERCENT)
 #define GRAPHENE_DEFAULT_LIFETIME_REFERRER_PERCENT_OF_FEE     (30*GRAPHENE_1_PERCENT)
 #define GRAPHENE_DEFAULT_MAX_BULK_DISCOUNT_PERCENT            (50*GRAPHENE_1_PERCENT)
@@ -100,7 +100,6 @@
 #define GRAPHENE_DEFAULT_FEE_LIQUIDATION_THRESHOLD            GRAPHENE_BLOCKCHAIN_PRECISION * 100;
 #define GRAPHENE_DEFAULT_ACCOUNTS_PER_FEE_SCALE               1000
 #define GRAPHENE_DEFAULT_ACCOUNT_FEE_SCALE_BITSHIFTS          4
-#define GRAPHENE_GENESIS_TIMESTAMP                            (1431700000)  /// Should be divisible by GRAPHENE_DEFAULT_BLOCK_INTERVAL
 
 #define GRAPHENE_MAX_WORKER_NAME_LENGTH                       63
 
@@ -139,7 +138,7 @@
  *  Reserved Account IDs with special meaning
  */
 ///@{
-/// Represents the current committee members, two-week review period (GRAPHENE_DEFAULT_GENESIS_PROPOSAL_REVIEW_PERIOD_SEC)
+/// Represents the current committee members, two-week review period
 #define GRAPHENE_COMMITTEE_ACCOUNT (graphene::chain::account_id_type(0))
 /// Represents the current witnesses
 #define GRAPHENE_WITNESS_ACCOUNT (graphene::chain::account_id_type(1))

@@ -236,7 +236,7 @@ namespace graphene { namespace chain {
 
    /**
     *  @brief This secondary index will allow a reverse lookup of all accounts that a particular key or account
-    *  is an potential signing authority. 
+    *  is an potential signing authority.
     */
    class account_member_index : public secondary_index
    {

@@ -94,7 +94,7 @@ BOOST_AUTO_TEST_CASE( call_order_update_test )
       BOOST_REQUIRE_EQUAL( get_balance( dan, core ), 10000000 - 10000 + 5000  );
 
       BOOST_TEST_MESSAGE( "verifying that attempting to cover the full amount without claiming the collateral fails" );
-      BOOST_REQUIRE_THROW( cover( dan, bitusd.amount(2500), core.amount(0)  ), fc::exception );
+      GRAPHENE_REQUIRE_THROW( cover( dan, bitusd.amount(2500), core.amount(0)  ), fc::exception );
 
       cover( dan, bitusd.amount(2500), core.amount(5000));
 
@@ -127,14 +127,14 @@ BOOST_AUTO_TEST_CASE( call_order_update_test )
       BOOST_REQUIRE_EQUAL( get_balance( dan, core ), 10000000 - 20000  );
 
       BOOST_TEST_MESSAGE( "increasing debt without increasing collateral again" );
-      BOOST_REQUIRE_THROW( borrow( dan, bitusd.amount(80000), asset(0)), fc::exception );
+      GRAPHENE_REQUIRE_THROW( borrow( dan, bitusd.amount(80000), asset(0)), fc::exception );
       BOOST_TEST_MESSAGE( "attempting to claim all collateral without paying off debt" );
-      BOOST_REQUIRE_THROW( cover( dan, bitusd.amount(0), asset(20000)), fc::exception );
+      GRAPHENE_REQUIRE_THROW( cover( dan, bitusd.amount(0), asset(20000)), fc::exception );
       BOOST_TEST_MESSAGE( "attempting reduce collateral without paying off any debt" );
       cover( dan, bitusd.amount(0), asset(1000));
 
       BOOST_TEST_MESSAGE( "attempting change call price to be below minimum for debt/collateral ratio" );
-      BOOST_REQUIRE_THROW( cover( dan, bitusd.amount(0), asset(0)), fc::exception );
+      GRAPHENE_REQUIRE_THROW( cover( dan, bitusd.amount(0), asset(0)), fc::exception );
 
    } catch (fc::exception& e) {
       edump((e.to_detail_string()));
@@ -255,7 +255,7 @@ BOOST_AUTO_TEST_CASE( black_swan )
       force_settle(borrower, bitusd.amount(100));
 
       BOOST_TEST_MESSAGE( "Verify that we cannot borrow after black swan" );
-      BOOST_REQUIRE_THROW( borrow(borrower, bitusd.amount(1000), asset(2000)), fc::exception );
+      GRAPHENE_REQUIRE_THROW( borrow(borrower, bitusd.amount(1000), asset(2000)), fc::exception );
    } catch( const fc::exception& e) {
       edump((e.to_detail_string()));
       throw;
@@ -275,22 +275,22 @@ BOOST_AUTO_TEST_CASE( prediction_market )
       transfer(genesis_account, nathan_id, asset(init_balance));
 
       BOOST_TEST_MESSAGE( "Require throw for mismatch collateral amounts" );
-      BOOST_REQUIRE_THROW( borrow( dan, pmark.amount(1000), asset(2000) ), fc::exception );
+      GRAPHENE_REQUIRE_THROW( borrow( dan, pmark.amount(1000), asset(2000) ), fc::exception );
 
       BOOST_TEST_MESSAGE( "Open position with equal collateral" );
       borrow( dan, pmark.amount(1000), asset(1000) );
 
       BOOST_TEST_MESSAGE( "Cover position with unequal asset should fail." );
-      BOOST_REQUIRE_THROW( cover( dan, pmark.amount(500), asset(1000) ), fc::exception );
+      GRAPHENE_REQUIRE_THROW( cover( dan, pmark.amount(500), asset(1000) ), fc::exception );
 
       BOOST_TEST_MESSAGE( "Cover half of position with equal ammounts" );
       cover( dan, pmark.amount(500), asset(500) );
 
       BOOST_TEST_MESSAGE( "Verify that forced settlment fails before global settlement" );
-      BOOST_REQUIRE_THROW( force_settle( dan, pmark.amount(100) ), fc::exception );
+      GRAPHENE_REQUIRE_THROW( force_settle( dan, pmark.amount(100) ), fc::exception );
 
       BOOST_TEST_MESSAGE( "Shouldn't be allowed to force settle at more than 1 collateral per debt" );
-      BOOST_REQUIRE_THROW( force_global_settle( pmark, pmark.amount(100) / core.amount(105) ), fc::exception );
+      GRAPHENE_REQUIRE_THROW( force_global_settle( pmark, pmark.amount(100) / core.amount(105) ), fc::exception );
 
       force_global_settle( pmark, pmark.amount(100) / core.amount(95) );
 
@@ -328,7 +328,7 @@ BOOST_AUTO_TEST_CASE( create_account_test )
       op.owner.add_authority(account_id_type(9999999999), 10);
       trx.operations.back() = op;
       op.owner = auth_bak;
-      BOOST_REQUIRE_THROW(PUSH_TX( db, trx, ~0 ), fc::exception);
+      GRAPHENE_REQUIRE_THROW(PUSH_TX( db, trx, ~0 ), fc::exception);
       op.owner = auth_bak;
 
       trx.operations.back() = op;
@@ -487,7 +487,7 @@ BOOST_AUTO_TEST_CASE( create_mia )
       BOOST_CHECK(bitusd.symbol == "BITUSD");
       BOOST_CHECK(bitusd.bitasset_data(db).options.short_backing_asset == asset_id_type());
       BOOST_CHECK(bitusd.dynamic_asset_data_id(db).current_supply == 0);
-      BOOST_REQUIRE_THROW( create_bitasset("BITUSD"), fc::exception);
+      GRAPHENE_REQUIRE_THROW( create_bitasset("BITUSD"), fc::exception);
    } catch ( const fc::exception& e ) {
       elog( "${e}", ("e", e.to_detail_string() ) );
       throw;
@@ -574,7 +574,7 @@ BOOST_AUTO_TEST_CASE( create_uia )
       BOOST_CHECK(test_asset.options.max_supply == 100000000);
       BOOST_CHECK(!test_asset.bitasset_data_id.valid());
       BOOST_CHECK(test_asset.options.market_fee_percent == GRAPHENE_MAX_MARKET_FEE_PERCENT/100);
-      BOOST_REQUIRE_THROW(PUSH_TX( db, trx, ~0 ), fc::exception);
+      GRAPHENE_REQUIRE_THROW(PUSH_TX( db, trx, ~0 ), fc::exception);
 
       const asset_dynamic_data_object& test_asset_dynamic_data = test_asset.dynamic_asset_data_id(db);
       BOOST_CHECK(test_asset_dynamic_data.current_supply == 0);
@@ -649,7 +649,7 @@ BOOST_AUTO_TEST_CASE( update_uia )
       trx.operations.back() = op;
       PUSH_TX( db, trx, ~0 );
       op.issuer = account_id_type();
-      BOOST_REQUIRE_THROW(PUSH_TX( db, trx, ~0 ), fc::exception);
+      GRAPHENE_REQUIRE_THROW(PUSH_TX( db, trx, ~0 ), fc::exception);
       op.new_issuer.reset();
    } catch(fc::exception& e) {
       edump((e.to_detail_string()));
@@ -1078,7 +1078,7 @@ BOOST_AUTO_TEST_CASE( limit_order_fill_or_kill )
 
    trx.operations.clear();
    trx.operations.push_back(op);
-   BOOST_CHECK_THROW(PUSH_TX( db, trx, ~0 ), fc::exception);
+   GRAPHENE_CHECK_THROW(PUSH_TX( db, trx, ~0 ), fc::exception);
    op.fill_or_kill = false;
    trx.operations.back() = op;
    PUSH_TX( db, trx, ~0 );
@@ -1088,7 +1088,7 @@ BOOST_AUTO_TEST_CASE( limit_order_fill_or_kill )
 BOOST_AUTO_TEST_CASE( fill_order )
 { try {
    fill_order_operation o;
-   BOOST_CHECK_THROW(o.validate(), fc::exception);
+   GRAPHENE_CHECK_THROW(o.validate(), fc::exception);
    o.calculate_fee(db.current_fee_schedule());
 } FC_LOG_AND_RETHROW() }
 

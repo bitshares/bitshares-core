@@ -18,12 +18,121 @@
 #pragma once
 
 #include <fc/exception/exception.hpp>
+#include <graphene/chain/protocol/protocol.hpp>
+
+#define GRAPHENE_ASSERT( expr, exc_type, ... )                        \
+   if( !(expr) )                                                      \
+   {                                                                  \
+      FC_THROW_EXCEPTION( exc_type, __VA_ARGS__ );                    \
+   }
+
+#define GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( op_name )                \
+   FC_DECLARE_DERIVED_EXCEPTION(                                      \
+      op_name ## _validate_exception,                                 \
+      graphene::chain::operation_validate_exception,                  \
+      3040000 + 100 * operation::tag< op_name ## _operation >::value, \
+      #op_name "_operation validation exception"                      \
+      )                                                               \
+   FC_DECLARE_DERIVED_EXCEPTION(                                      \
+      op_name ## _evaluate_exception,                                 \
+      graphene::chain::operation_evaluate_exception,                  \
+      3050000 + 100 * operation::tag< op_name ## _operation >::value, \
+      #op_name "_operation evaluation exception"                      \
+      )
+
+#define GRAPHENE_DECLARE_OP_VALIDATE_EXCEPTION( exc_name, op_name, seqnum, msg ) \
+   FC_DECLARE_DERIVED_EXCEPTION(                                      \
+      op_name ## _ ## exc_name,                                       \
+      graphene::chain::op_name ## _validate_exception,                \
+      3040000 + 100 * operation::tag< op_name ## _operation >::value  \
+         + seqnum,                                                    \
+      msg                                                             \
+      )
+
+#define GRAPHENE_DECLARE_OP_EVALUATE_EXCEPTION( exc_name, op_name, seqnum, msg ) \
+   FC_DECLARE_DERIVED_EXCEPTION(                                      \
+      op_name ## _ ## exc_name,                                       \
+      graphene::chain::op_name ## _evaluate_exception,                \
+      3050000 + 100 * operation::tag< op_name ## _operation >::value  \
+         + seqnum,                                                    \
+      msg                                                             \
+      )
 
 namespace graphene { namespace chain {
-   // registered in chain_database.cpp
 
-   FC_DECLARE_EXCEPTION( chain_exception, 30000, "Blockchain Exception" )
-   FC_DECLARE_DERIVED_EXCEPTION( invalid_pts_address,               graphene::chain::chain_exception, 30001, "invalid pts address" )
+   FC_DECLARE_EXCEPTION( chain_exception, 3000000, "blockchain exception" )
+   FC_DECLARE_DERIVED_EXCEPTION( database_query_exception,          graphene::chain::chain_exception, 3010000, "database query exception" )
+   FC_DECLARE_DERIVED_EXCEPTION( block_validate_exception,          graphene::chain::chain_exception, 3020000, "block validation exception" )
+   FC_DECLARE_DERIVED_EXCEPTION( transaction_exception,             graphene::chain::chain_exception, 3030000, "transaction validation exception" )
+   FC_DECLARE_DERIVED_EXCEPTION( operation_validate_exception,      graphene::chain::chain_exception, 3040000, "operation validation exception" )
+   FC_DECLARE_DERIVED_EXCEPTION( operation_evaluate_exception,      graphene::chain::chain_exception, 3050000, "operation evaluation exception" )
+   FC_DECLARE_DERIVED_EXCEPTION( utility_exception,                 graphene::chain::chain_exception, 3060000, "utility method exception" )
+
+   FC_DECLARE_DERIVED_EXCEPTION( tx_missing_active_auth,            graphene::chain::transaction_exception, 3030001, "missing required active authority" )
+   FC_DECLARE_DERIVED_EXCEPTION( tx_missing_owner_auth,             graphene::chain::transaction_exception, 3030002, "missing required owner authority" )
+   FC_DECLARE_DERIVED_EXCEPTION( tx_missing_other_auth,             graphene::chain::transaction_exception, 3030003, "missing required other authority" )
+   //FC_DECLARE_DERIVED_EXCEPTION( tx_irrelevant_authority,           graphene::chain::transaction_exception, 3030004, "irrelevant authority" )
+
+   FC_DECLARE_DERIVED_EXCEPTION( invalid_pts_address,               graphene::chain::utility_exception, 3060001, "invalid pts address" )
+   FC_DECLARE_DERIVED_EXCEPTION( insufficient_feeds,                graphene::chain::chain_exception, 37006, "insufficient feeds" )
+
+   GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( transfer );
+
+   GRAPHENE_DECLARE_OP_EVALUATE_EXCEPTION( from_account_not_whitelisted, transfer, 1, "owner mismatch" )
+   GRAPHENE_DECLARE_OP_EVALUATE_EXCEPTION( to_account_not_whitelisted, transfer, 2, "owner mismatch" )
+
+   //GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( limit_order_create );
+   //GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( limit_order_cancel );
+   //GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( call_order_update );
+   //GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( account_create );
+   //GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( account_update );
+   //GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( account_whitelist );
+   //GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( account_upgrade );
+   //GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( account_transfer );
+   //GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( asset_create );
+   //GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( asset_update );
+   //GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( asset_update_bitasset );
+   //GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( asset_update_feed_producers );
+   //GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( asset_issue );
+   //GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( asset_reserve );
+   //GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( asset_fund_fee_pool );
+   //GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( asset_settle );
+   //GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( asset_global_settle );
+   //GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( asset_publish_feed );
+   //GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( delegate_create );
+   //GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( witness_create );
+   //GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( witness_withdraw_pay );
+
+   GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( proposal_create );
+
+   GRAPHENE_DECLARE_OP_EVALUATE_EXCEPTION( review_period_required, proposal_create, 1, "review_period required" )
+   GRAPHENE_DECLARE_OP_EVALUATE_EXCEPTION( review_period_insufficient, proposal_create, 2, "review_period insufficient" )
+
+   //GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( proposal_update );
+   //GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( proposal_delete );
+   //GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( withdraw_permission_create );
+   //GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( withdraw_permission_update );
+   //GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( withdraw_permission_claim );
+   //GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( withdraw_permission_delete );
+   //GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( fill_order );
+   //GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( global_parameters_update );
+   //GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( vesting_balance_create );
+   //GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( vesting_balance_withdraw );
+   //GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( worker_create );
+   //GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( custom );
+   //GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( assert );
+
+   GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( balance_claim );
+
+   GRAPHENE_DECLARE_OP_EVALUATE_EXCEPTION( claimed_too_often, balance_claim, 1, "balance claimed too often" )
+   GRAPHENE_DECLARE_OP_EVALUATE_EXCEPTION( invalid_claim_amount, balance_claim, 2, "invalid claim amount" )
+   GRAPHENE_DECLARE_OP_EVALUATE_EXCEPTION( owner_mismatch, balance_claim, 3, "owner mismatch" )
+
+   GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( override_transfer );
+
+   GRAPHENE_DECLARE_OP_EVALUATE_EXCEPTION( not_permitted, override_transfer, 1, "not permitted" )
+
+   /*
    FC_DECLARE_DERIVED_EXCEPTION( addition_overflow,                 graphene::chain::chain_exception, 30002, "addition overflow" )
    FC_DECLARE_DERIVED_EXCEPTION( subtraction_overflow,              graphene::chain::chain_exception, 30003, "subtraction overflow" )
    FC_DECLARE_DERIVED_EXCEPTION( asset_type_mismatch,               graphene::chain::chain_exception, 30004, "asset/price mismatch" )
@@ -63,8 +172,6 @@ namespace graphene { namespace chain {
    FC_DECLARE_DERIVED_EXCEPTION( expired_transaction,               graphene::chain::evaluation_error, 31010, "expired transaction" )
    FC_DECLARE_DERIVED_EXCEPTION( invalid_transaction_expiration,    graphene::chain::evaluation_error, 31011, "invalid transaction expiration" )
    FC_DECLARE_DERIVED_EXCEPTION( oversized_transaction,             graphene::chain::evaluation_error, 31012, "transaction exceeded the maximum transaction size" )
-   FC_DECLARE_DERIVED_EXCEPTION( balance_claimed_too_often,         graphene::chain::evaluation_error, 31013, "balance claimed too often" )
-   FC_DECLARE_DERIVED_EXCEPTION( invalid_claim_amount,              graphene::chain::evaluation_error, 31013, "invalid claim amount" )
 
    FC_DECLARE_DERIVED_EXCEPTION( invalid_account_name,              graphene::chain::evaluation_error, 32001, "invalid account name" )
    FC_DECLARE_DERIVED_EXCEPTION( unknown_account_id,                graphene::chain::evaluation_error, 32002, "unknown account id" )
@@ -111,5 +218,6 @@ namespace graphene { namespace chain {
    FC_DECLARE_DERIVED_EXCEPTION( price_multiplication_overflow,     graphene::chain::evaluation_error, 38001, "price multiplication overflow" )
    FC_DECLARE_DERIVED_EXCEPTION( price_multiplication_underflow,    graphene::chain::evaluation_error, 38002, "price multiplication underflow" )
    FC_DECLARE_DERIVED_EXCEPTION( price_multiplication_undefined,    graphene::chain::evaluation_error, 38003, "price multiplication undefined product 0*inf" )
+   */
 
 } } // graphene::chain

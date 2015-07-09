@@ -21,7 +21,11 @@
 #include <graphene/chain/database.hpp>
 #include <fc/io/json.hpp>
 
+#include <iostream>
+
 using namespace graphene::db;
+
+#define GRAPHENE_TESTING_GENESIS_TIMESTAMP (1431700000)
 
 #define PUSH_TX \
    graphene::chain::test::_push_transaction
@@ -37,13 +41,6 @@ using namespace graphene::db;
    op.validate(); \
    op.field = temp; \
 }
-#define REQUIRE_OP_VALIDATION_FAILURE( op, field, value ) \
-{ \
-   const auto temp = op.field; \
-   op.field = value; \
-   BOOST_REQUIRE_THROW( op.validate(), fc::exception ); \
-   op.field = temp; \
-}
 #define REQUIRE_OP_EVALUATION_SUCCESS( op, field, value ) \
 { \
    const auto temp = op.field; \
@@ -52,17 +49,65 @@ using namespace graphene::db;
    op.field = temp; \
    db.push_transaction( trx, ~0 ); \
 }
-///Shortcut to require an exception when processing a transaction with an operation containing an expected bad value
-/// Uses require insteach of check, because these transactions are expected to fail. If they don't, subsequent tests
-/// may spuriously succeed or fail due to unexpected database state.
-#define REQUIRE_THROW_WITH_VALUE(op, field, value) \
+
+#define GRAPHENE_REQUIRE_THROW( expr, exc_type )          \
+{                                                         \
+   std::string req_throw_info = fc::json::to_string(      \
+      fc::mutable_variant_object()                        \
+      ("source_file", __FILE__)                           \
+      ("source_lineno", __LINE__)                         \
+      ("expr", #expr)                                     \
+      ("exc_type", #exc_type)                             \
+      );                                                  \
+   if( fc::enable_record_assert_trip )                    \
+      std::cout << "GRAPHENE_REQUIRE_THROW begin "        \
+         << req_throw_info << std::endl;                  \
+   BOOST_REQUIRE_THROW( expr, exc_type );                 \
+   if( fc::enable_record_assert_trip )                    \
+      std::cout << "GRAPHENE_REQUIRE_THROW end "          \
+         << req_throw_info << std::endl;                  \
+}
+
+#define GRAPHENE_CHECK_THROW( expr, exc_type )            \
+{                                                         \
+   std::string req_throw_info = fc::json::to_string(      \
+      fc::mutable_variant_object()                        \
+      ("source_file", __FILE__)                           \
+      ("source_lineno", __LINE__)                         \
+      ("expr", #expr)                                     \
+      ("exc_type", #exc_type)                             \
+      );                                                  \
+   if( fc::enable_record_assert_trip )                    \
+      std::cout << "GRAPHENE_CHECK_THROW begin "          \
+         << req_throw_info << std::endl;                  \
+   BOOST_CHECK_THROW( expr, exc_type );                   \
+   if( fc::enable_record_assert_trip )                    \
+      std::cout << "GRAPHENE_CHECK_THROW end "            \
+         << req_throw_info << std::endl;                  \
+}
+
+#define REQUIRE_OP_VALIDATION_FAILURE_2( op, field, value, exc_type ) \
+{ \
+   const auto temp = op.field; \
+   op.field = value; \
+   GRAPHENE_REQUIRE_THROW( op.validate(), exc_type ); \
+   op.field = temp; \
+}
+#define REQUIRE_OP_VALIDATION_FAILURE( op, field, value ) \
+   REQUIRE_OP_VALIDATION_FAILURE_2( op, field, value, fc::exception )
+
+#define REQUIRE_THROW_WITH_VALUE_2(op, field, value, exc_type) \
 { \
    auto bak = op.field; \
    op.field = value; \
    trx.operations.back() = op; \
    op.field = bak; \
-   BOOST_REQUIRE_THROW(db.push_transaction(trx, ~0), fc::exception); \
+   GRAPHENE_REQUIRE_THROW(db.push_transaction(trx, ~0), exc_type); \
 }
+
+#define REQUIRE_THROW_WITH_VALUE( op, field, value ) \
+   REQUIRE_THROW_WITH_VALUE_2( op, field, value, fc::exception )
+
 ///This simply resets v back to its default-constructed value. Requires v to have a working assingment operator and
 /// default constructor.
 #define RESET(v) v = decltype(v)()
@@ -71,7 +116,7 @@ using namespace graphene::db;
 #define INVOKE(test) ((struct test*)this)->test_method(); trx.clear()
 
 #define PREP_ACTOR(name) \
-   fc::ecc::private_key name ## _private_key = generate_private_key(BOOST_PP_STRINGIZE(name)); 
+   fc::ecc::private_key name ## _private_key = generate_private_key(BOOST_PP_STRINGIZE(name));
 
 #define ACTOR(name) \
    PREP_ACTOR(name) \
@@ -102,8 +147,6 @@ struct database_fixture {
    fc::ecc::private_key delegate_priv_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("null_key")) );
    public_key_type delegate_pub_key;
 
-   fc::time_point_sec genesis_time = fc::time_point_sec( GRAPHENE_GENESIS_TIMESTAMP );
-   fc::time_point_sec now          = fc::time_point_sec( GRAPHENE_GENESIS_TIMESTAMP );
    optional<fc::temp_directory> data_dir;
    bool skip_key_index_test = false;
    uint32_t anon_acct_count;
@@ -146,10 +189,20 @@ struct database_fixture {
       );
 
    void force_global_settle(const asset_object& what, const price& p);
+   void force_settle(account_id_type who, asset what)
+   { force_settle(who(db), what); }
    void force_settle(const account_object& who, asset what);
+   void update_feed_producers(asset_id_type mia, flat_set<account_id_type> producers)
+   { update_feed_producers(mia(db), producers); }
    void update_feed_producers(const asset_object& mia, flat_set<account_id_type> producers);
+   void publish_feed(asset_id_type mia, account_id_type by, const price_feed& f)
+   { publish_feed(mia(db), by(db), f); }
    void publish_feed(const asset_object& mia, const account_object& by, const price_feed& f);
+   void borrow(account_id_type who, asset what, asset collateral)
+   { borrow(who(db), what, collateral); }
    void borrow(const account_object& who, asset what, asset collateral);
+   void cover(account_id_type who, asset what, asset collateral_freed)
+   { cover(who(db), what, collateral_freed); }
    void cover(const account_object& who, asset what, asset collateral_freed);
 
    const asset_object& get_asset( const string& symbol )const;
@@ -163,7 +216,7 @@ struct database_fixture {
                                        uint16_t market_fee_percent = 100 /*1%*/,
                                        uint16_t flags = charge_market_fee);
    const asset_object& create_user_issued_asset( const string& name );
-   const asset_object& create_user_issued_asset( const string& name, 
+   const asset_object& create_user_issued_asset( const string& name,
                                                  const account_object& issuer,
                                                  uint16_t flags );
    void issue_uia( const account_object& recipient, asset amount );

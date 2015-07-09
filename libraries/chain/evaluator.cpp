@@ -17,7 +17,9 @@
  */
 #include <graphene/chain/database.hpp>
 #include <graphene/chain/evaluator.hpp>
+#include <graphene/chain/exceptions.hpp>
 #include <graphene/chain/transaction_evaluation_state.hpp>
+
 #include <graphene/chain/asset_object.hpp>
 #include <graphene/chain/account_object.hpp>
 #include <graphene/chain/delegate_object.hpp>
@@ -88,14 +90,24 @@ database& generic_evaluator::db()const { return trx_state->db(); }
       operation_get_required_authorities( op, active_auths, owner_auths, other_auths );
 
       for( auto id : active_auths )
-         FC_ASSERT(verify_authority(id(db()), authority::active) ||
-                   verify_authority(id(db()), authority::owner), "", ("id", id));
+         GRAPHENE_ASSERT(
+            verify_authority(id(db()), authority::active) ||
+            verify_authority(id(db()), authority::owner),
+            tx_missing_active_auth,
+            "missing required active authority ${id}", ("id", id));
 
       for( auto id : owner_auths )
-         FC_ASSERT(verify_authority(id(db()), authority::owner), "", ("id", id));
+         GRAPHENE_ASSERT(
+            verify_authority(id(db()), authority::owner),
+            tx_missing_owner_auth,
+            "missing required owner authority ${id}", ("id", id));
 
       for( const auto& auth : other_auths )
-         FC_ASSERT(trx_state->check_authority(auth), "invalid authority", ("auth",auth)("sigs",trx_state->_sigs));
+         GRAPHENE_ASSERT(
+            trx_state->check_authority(auth),
+            tx_missing_other_auth,
+            "missing required authority ${auth}",
+            ("auth",auth)("sigs",trx_state->_sigs));
 
    } FC_CAPTURE_AND_RETHROW( (op) ) }
 

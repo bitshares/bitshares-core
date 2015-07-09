@@ -36,6 +36,9 @@ using namespace graphene::chain;
 
 genesis_state_type make_genesis() {
    genesis_state_type genesis_state;
+
+   genesis_state.initial_timestamp = time_point_sec( GRAPHENE_TESTING_GENESIS_TIMESTAMP );
+
    auto delegate_priv_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("null_key")));
    genesis_state.initial_active_witnesses = 10;
    for( int i = 0; i < genesis_state.initial_active_witnesses; ++i )
@@ -117,7 +120,7 @@ BOOST_AUTO_TEST_CASE( block_database_test )
 BOOST_AUTO_TEST_CASE( generate_empty_blocks )
 {
    try {
-      fc::time_point_sec now( GRAPHENE_GENESIS_TIMESTAMP );
+      fc::time_point_sec now( GRAPHENE_TESTING_GENESIS_TIMESTAMP );
       fc::temp_directory data_dir;
       signed_block b;
 
@@ -126,7 +129,7 @@ BOOST_AUTO_TEST_CASE( generate_empty_blocks )
       auto delegate_priv_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("null_key")) );
       {
          database db;
-         db.open(data_dir.path(), make_genesis() );
+         db.open(data_dir.path(), make_genesis );
          b = db.generate_block(now, db.get_scheduled_witness(1).first, delegate_priv_key, database::skip_nothing);
 
          for( uint32_t i = 1; i < 200; ++i )
@@ -134,25 +137,25 @@ BOOST_AUTO_TEST_CASE( generate_empty_blocks )
             BOOST_CHECK( db.head_block_id() == b.id() );
             witness_id_type prev_witness = b.witness;
             now += db.block_interval();
-            witness_id_type cur_witness = db.get_scheduled_witness( 1 ).first;
+            witness_id_type cur_witness = db.get_scheduled_witness(1).first;
             BOOST_CHECK( cur_witness != prev_witness );
-            b = db.generate_block( now, cur_witness, delegate_priv_key, database::skip_nothing );
+            b = db.generate_block(now, cur_witness, delegate_priv_key, database::skip_nothing);
             BOOST_CHECK( b.witness == cur_witness );
          }
          db.close();
       }
       {
          database db;
-         db.open(data_dir.path() );
+         db.open(data_dir.path(), []{return genesis_state_type();});
          BOOST_CHECK_EQUAL( db.head_block_num(), 200 );
          for( uint32_t i = 0; i < 200; ++i )
          {
             BOOST_CHECK( db.head_block_id() == b.id() );
             witness_id_type prev_witness = b.witness;
             now += db.block_interval();
-            witness_id_type cur_witness = db.get_scheduled_witness( 1 ).first;
+            witness_id_type cur_witness = db.get_scheduled_witness(1).first;
             BOOST_CHECK( cur_witness != prev_witness );
-            b = db.generate_block( now, cur_witness, delegate_priv_key, database::skip_nothing );
+            b = db.generate_block(now, cur_witness, delegate_priv_key, database::skip_nothing);
          }
          BOOST_CHECK_EQUAL( db.head_block_num(), 400 );
       }
@@ -168,8 +171,8 @@ BOOST_AUTO_TEST_CASE( undo_block )
       fc::temp_directory data_dir;
       {
          database db;
-         db.open(data_dir.path(), make_genesis() );
-         fc::time_point_sec now( GRAPHENE_GENESIS_TIMESTAMP );
+         db.open(data_dir.path(), make_genesis);
+         fc::time_point_sec now( GRAPHENE_TESTING_GENESIS_TIMESTAMP );
 
          auto delegate_priv_key  = fc::ecc::private_key::regenerate(fc::sha256::hash(string("null_key")) );
          for( uint32_t i = 0; i < 5; ++i )
@@ -205,12 +208,12 @@ BOOST_AUTO_TEST_CASE( fork_blocks )
    try {
       fc::temp_directory data_dir1;
       fc::temp_directory data_dir2;
-      fc::time_point_sec now( GRAPHENE_GENESIS_TIMESTAMP );
+      fc::time_point_sec now( GRAPHENE_TESTING_GENESIS_TIMESTAMP );
 
       database db1;
-      db1.open(data_dir1.path(), make_genesis());
+      db1.open(data_dir1.path(), make_genesis);
       database db2;
-      db2.open(data_dir2.path(), make_genesis());
+      db2.open(data_dir2.path(), make_genesis);
 
       auto delegate_priv_key  = fc::ecc::private_key::regenerate(fc::sha256::hash(string("null_key")) );
       for( uint32_t i = 0; i < 10; ++i )
@@ -251,7 +254,7 @@ BOOST_AUTO_TEST_CASE( fork_blocks )
          b.transactions.back().operations.emplace_back(transfer_operation());
          b.sign(delegate_priv_key);
          BOOST_CHECK_EQUAL(b.block_num(), 14);
-         BOOST_CHECK_THROW(PUSH_BLOCK( db1, b ), fc::exception);
+         GRAPHENE_CHECK_THROW(PUSH_BLOCK( db1, b ), fc::exception);
       }
       BOOST_CHECK_EQUAL(db1.head_block_num(), 13);
       BOOST_CHECK_EQUAL(db1.head_block_id().str(), db1_tip);
@@ -269,11 +272,11 @@ BOOST_AUTO_TEST_CASE( fork_blocks )
 BOOST_AUTO_TEST_CASE( undo_pending )
 {
    try {
-      fc::time_point_sec now(GRAPHENE_GENESIS_TIMESTAMP);
+      fc::time_point_sec now(GRAPHENE_TESTING_GENESIS_TIMESTAMP);
       fc::temp_directory data_dir;
       {
          database db;
-         db.open(data_dir.path(), make_genesis());
+         db.open(data_dir.path(), make_genesis);
 
          auto delegate_priv_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("null_key")) );
          public_key_type delegate_pub_key  = delegate_priv_key.get_public_key();
@@ -331,10 +334,10 @@ BOOST_AUTO_TEST_CASE( switch_forks_undo_create )
                          dir2;
       database db1,
                db2;
-      db1.open(dir1.path(), make_genesis());
-      db2.open(dir2.path(), make_genesis());
+      db1.open(dir1.path(), make_genesis);
+      db2.open(dir2.path(), make_genesis);
 
-      fc::time_point_sec now( GRAPHENE_GENESIS_TIMESTAMP );
+      fc::time_point_sec now( GRAPHENE_TESTING_GENESIS_TIMESTAMP );
       auto delegate_priv_key  = fc::ecc::private_key::regenerate(fc::sha256::hash(string("null_key")) );
       public_key_type delegate_pub_key  = delegate_priv_key.get_public_key();
       const graphene::db::index& account_idx = db1.get_index(protocol_ids, account_object_type);
@@ -355,7 +358,7 @@ BOOST_AUTO_TEST_CASE( switch_forks_undo_create )
 
       BOOST_CHECK(nathan_id(db1).name == "nathan");
 
-      now = fc::time_point_sec( GRAPHENE_GENESIS_TIMESTAMP );
+      now = fc::time_point_sec( GRAPHENE_TESTING_GENESIS_TIMESTAMP );
       now += db2.block_interval();
       b =  db2.generate_block(now, db2.get_scheduled_witness(1).first, delegate_priv_key, database::skip_nothing);
       db1.push_block(b);
@@ -364,7 +367,7 @@ BOOST_AUTO_TEST_CASE( switch_forks_undo_create )
       b =  db2.generate_block(now, db2.get_scheduled_witness(1).first, delegate_priv_key, database::skip_nothing);
       db1.push_block(b);
 
-      BOOST_CHECK_THROW(nathan_id(db1), fc::exception);
+      GRAPHENE_CHECK_THROW(nathan_id(db1), fc::exception);
 
       PUSH_TX( db2, trx );
 
@@ -384,13 +387,13 @@ BOOST_AUTO_TEST_CASE( switch_forks_undo_create )
 BOOST_AUTO_TEST_CASE( duplicate_transactions )
 {
    try {
-      fc::time_point_sec now( GRAPHENE_GENESIS_TIMESTAMP );
+      fc::time_point_sec now( GRAPHENE_TESTING_GENESIS_TIMESTAMP );
       fc::temp_directory dir1,
                          dir2;
       database db1,
                db2;
-      db1.open(dir1.path(), make_genesis());
-      db2.open(dir2.path(), make_genesis());
+      db1.open(dir1.path(), make_genesis);
+      db2.open(dir2.path(), make_genesis);
 
       auto skip_sigs = database::skip_transaction_signatures | database::skip_authority_check;
 
@@ -414,14 +417,14 @@ BOOST_AUTO_TEST_CASE( duplicate_transactions )
       trx.sign(  delegate_priv_key );
       PUSH_TX( db1, trx, skip_sigs );
 
-      BOOST_CHECK_THROW(PUSH_TX( db1, trx, skip_sigs ), fc::exception);
+      GRAPHENE_CHECK_THROW(PUSH_TX( db1, trx, skip_sigs ), fc::exception);
 
       now += db1.block_interval();
       auto b = db1.generate_block( now, db1.get_scheduled_witness( 1 ).first, delegate_priv_key, skip_sigs );
       PUSH_BLOCK( db2, b, skip_sigs );
 
-      BOOST_CHECK_THROW(PUSH_TX( db1, trx, skip_sigs ), fc::exception);
-      BOOST_CHECK_THROW(PUSH_TX( db2, trx, skip_sigs ), fc::exception);
+      GRAPHENE_CHECK_THROW(PUSH_TX( db1, trx, skip_sigs ), fc::exception);
+      GRAPHENE_CHECK_THROW(PUSH_TX( db2, trx, skip_sigs ), fc::exception);
       BOOST_CHECK_EQUAL(db1.get_balance(nathan_id, asset_id_type()).amount.value, 500);
       BOOST_CHECK_EQUAL(db2.get_balance(nathan_id, asset_id_type()).amount.value, 500);
    } catch (fc::exception& e) {
@@ -433,13 +436,13 @@ BOOST_AUTO_TEST_CASE( duplicate_transactions )
 BOOST_AUTO_TEST_CASE( tapos )
 {
    try {
-      fc::time_point_sec now( GRAPHENE_GENESIS_TIMESTAMP );
+      fc::time_point_sec now( GRAPHENE_TESTING_GENESIS_TIMESTAMP );
       fc::temp_directory dir1,
                          dir2;
       database db1,
                db2;
-      db1.open(dir1.path(), make_genesis());
-      db2.open(dir2.path(), make_genesis());
+      db1.open(dir1.path(), make_genesis);
+      db2.open(dir2.path(), make_genesis);
 
       const account_object& init1 = *db1.get_index_type<account_index>().indices().get<by_name>().find("init1");
 
@@ -448,7 +451,7 @@ BOOST_AUTO_TEST_CASE( tapos )
       const graphene::db::index& account_idx = db1.get_index(protocol_ids, account_object_type);
 
       now += db1.block_interval();
-      auto b = db1.generate_block( now, db1.get_scheduled_witness( 1 ).first, delegate_priv_key, database::skip_nothing );
+      auto b = db1.generate_block(now, db1.get_scheduled_witness( 1 ).first, delegate_priv_key, database::skip_nothing);
 
       signed_transaction trx;
       //This transaction must be in the next block after its reference, or it is invalid.
@@ -464,16 +467,12 @@ BOOST_AUTO_TEST_CASE( tapos )
       db1.push_transaction(trx);
       now += db1.block_interval();
       b = db1.generate_block(now, db1.get_scheduled_witness(1).first, delegate_priv_key, database::skip_nothing);
-      /*
-      now += db1.block_interval();
-      b = db1.generate_block(now, db1.get_scheduled_witness(1).first, delegate_priv_key, database::skip_nothing);
-      */
       trx.clear();
 
       trx.operations.push_back(transfer_operation({asset(), account_id_type(), nathan_id, asset(50)}));
       trx.sign(delegate_priv_key);
       //relative_expiration is 1, but ref block is 2 blocks old, so this should fail.
-      BOOST_REQUIRE_THROW(PUSH_TX( db1, trx, database::skip_transaction_signatures | database::skip_authority_check ), fc::exception);
+      GRAPHENE_REQUIRE_THROW(PUSH_TX( db1, trx, database::skip_transaction_signatures | database::skip_authority_check ), fc::exception);
       trx.set_expiration(db1.head_block_id(), 2);
       trx.signatures.clear();
       trx.sign(delegate_priv_key);
@@ -598,17 +597,17 @@ BOOST_FIXTURE_TEST_CASE( double_sign_check, database_fixture )
    trx.validate();
 
    BOOST_TEST_MESSAGE( "Verify that not-signing causes an exception" );
-   BOOST_REQUIRE_THROW( db.push_transaction(trx, 0), fc::exception );
+   GRAPHENE_REQUIRE_THROW( db.push_transaction(trx, 0), fc::exception );
 
    BOOST_TEST_MESSAGE( "Verify that double-signing causes an exception" );
    trx.sign(bob_private_key);
    trx.sign(bob_private_key);
-   BOOST_REQUIRE_THROW( db.push_transaction(trx, 0), fc::exception );
+   GRAPHENE_REQUIRE_THROW( db.push_transaction(trx, 0), fc::exception );
 
    BOOST_TEST_MESSAGE( "Verify that signing with an extra, unused key fails" );
    trx.signatures.pop_back();
    trx.sign(generate_private_key("bogus"));
-   BOOST_REQUIRE_THROW( db.push_transaction(trx, 0), fc::exception );
+   GRAPHENE_REQUIRE_THROW( db.push_transaction(trx, 0), fc::exception );
 
    BOOST_TEST_MESSAGE( "Verify that signing once with the proper key passes" );
    trx.signatures.pop_back();
@@ -622,7 +621,7 @@ BOOST_FIXTURE_TEST_CASE( change_block_interval, database_fixture )
    generate_block();
 
    db.modify(db.get_global_properties(), [](global_property_object& p) {
-      p.parameters.genesis_proposal_review_period = fc::hours(1).to_seconds();
+      p.parameters.committee_proposal_review_period = fc::hours(1).to_seconds();
    });
 
    {
@@ -773,7 +772,7 @@ BOOST_FIXTURE_TEST_CASE( unimp_force_settlement, database_fixture )
    trx.operations.push_back(sop);
    trx.sign(key_id_type(),private_key);
    //Trx has expired by now. Make sure it throws.
-   BOOST_CHECK_THROW(settle_id = PUSH_TX( db, trx ).operation_results.front().get<object_id_type>(), fc::exception);
+   GRAPHENE_CHECK_THROW(settle_id = PUSH_TX( db, trx ).operation_results.front().get<object_id_type>(), fc::exception);
    trx.set_expiration(db.head_block_time() + fc::minutes(1));
    trx.sign(key_id_type(),private_key);
    settle_id = PUSH_TX( db, trx ).operation_results.front().get<object_id_type>();
@@ -823,13 +822,13 @@ BOOST_FIXTURE_TEST_CASE( pop_block_twice, database_fixture )
       // Sam is the creator of accounts
       private_key_type genesis_key = delegate_priv_key;
       private_key_type sam_key = generate_private_key("sam");
-      account_object sam_account_object = create_account( "sam", sam_key );
+      account_object sam_account_object = create_account("sam", sam_key);
 
       //Get a sane head block time
       generate_block( skip_flags );
 
       db.modify(db.get_global_properties(), [](global_property_object& p) {
-         p.parameters.genesis_proposal_review_period = fc::hours(1).to_seconds();
+         p.parameters.committee_proposal_review_period = fc::hours(1).to_seconds();
       });
 
       transaction tx;
@@ -839,18 +838,16 @@ BOOST_FIXTURE_TEST_CASE( pop_block_twice, database_fixture )
       // transfer from genesis account to Sam account
       transfer(genesis_account_object, sam_account_object, core.amount(100000));
 
-      generate_block( skip_flags );
+      generate_block(skip_flags);
 
-      create_account( "alice" );
-      generate_block( skip_flags );
-      create_account( "bob" );
-      generate_block( skip_flags );
+      create_account("alice");
+      generate_block(skip_flags);
+      create_account("bob");
+      generate_block(skip_flags);
 
       db.pop_block();
       db.pop_block();
-   }
-   catch( const fc::exception& e )
-   {
+   } catch(const fc::exception& e) {
       edump( (e.to_detail_string()) );
       throw;
    }
@@ -881,74 +878,5 @@ BOOST_FIXTURE_TEST_CASE( witness_scheduler_missed_blocks, database_fixture )
       BOOST_CHECK(db.get_dynamic_global_properties().current_witness == id);
    });
 } FC_LOG_AND_RETHROW() }
-
-BOOST_FIXTURE_TEST_CASE( account_create_fee_scaling, database_fixture )
-{ try {
-   auto accounts_per_scale = db.get_global_properties().parameters.accounts_per_fee_scale;
-   enable_fees(1);
-
-   BOOST_CHECK_EQUAL(db.get_global_properties().parameters.current_fees.account_create_fee, 1);
-   for( int i = db.get_dynamic_global_properties().accounts_registered_this_interval; i < accounts_per_scale; ++i )
-      create_account("shill" + fc::to_string(i));
-   generate_block();
-   BOOST_CHECK_EQUAL(db.get_global_properties().parameters.current_fees.account_create_fee, 16);
-   for( int i = 0; i < accounts_per_scale; ++i )
-      create_account("moreshills" + fc::to_string(i));
-   generate_block();
-   BOOST_CHECK_EQUAL(db.get_global_properties().parameters.current_fees.account_create_fee, 256);
-   for( int i = 0; i < accounts_per_scale; ++i )
-      create_account("moarshills" + fc::to_string(i));
-   generate_block();
-   BOOST_CHECK_EQUAL(db.get_global_properties().parameters.current_fees.account_create_fee, 4096);
-
-   generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
-   BOOST_CHECK_EQUAL(db.get_global_properties().parameters.current_fees.account_create_fee, 1);
-} FC_LOG_AND_RETHROW() }
-
-BOOST_FIXTURE_TEST_CASE( tapos_rollover, database_fixture )
-{
-   try
-   {
-      ACTORS((alice)(bob));
-      const auto& core   = asset_id_type()(db);
-
-      BOOST_TEST_MESSAGE( "Give Alice some money" );
-      transfer(genesis_account, alice_id, asset(10000));
-      generate_block();
-
-      BOOST_TEST_MESSAGE( "Generate up to block 0xFF00" );
-      generate_blocks( 0xFF00 );
-      signed_transaction xfer_tx;
-
-      BOOST_TEST_MESSAGE( "Transfer money at/about 0xFF00" );
-      transfer_operation xfer_op;
-      xfer_op.from = alice_id;
-      xfer_op.to = bob_id;
-      xfer_op.amount = asset(1000);
-
-      xfer_tx.operations.push_back( xfer_op );
-      xfer_tx.set_expiration( db.head_block_id(), 0x1000 );
-      sign( xfer_tx, alice_private_key );
-      PUSH_TX( db, xfer_tx, 0 );
-      generate_block();
-
-      BOOST_TEST_MESSAGE( "Sign new tx's" );
-      xfer_tx.set_expiration( db.head_block_id(), 0x1000 );
-      xfer_tx.signatures.clear();
-      sign( xfer_tx, alice_private_key );
-
-      BOOST_TEST_MESSAGE( "Generate up to block 0x10010" );
-      generate_blocks( 0x110 );
-
-      BOOST_TEST_MESSAGE( "Transfer at/about block 0x10010 using reference block at/about 0xFF00" );
-      PUSH_TX( db, xfer_tx, 0 );
-      generate_block();
-   }
-   catch (fc::exception& e)
-   {
-      edump((e.to_detail_string()));
-      throw;
-   }
-}
 
 BOOST_AUTO_TEST_SUITE_END()

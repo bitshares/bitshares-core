@@ -23,9 +23,6 @@
 
 namespace graphene { namespace chain {
 
-static_assert((GRAPHENE_GENESIS_TIMESTAMP % GRAPHENE_DEFAULT_BLOCK_INTERVAL) == 0,
-              "GRAPHENE_GENESIS_TIMESTAMP must be aligned to a block interval.");
-
 pair<witness_id_type, bool> database::get_scheduled_witness(uint32_t slot_num)const
 {
    if( slot_num == 0 )

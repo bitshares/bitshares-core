@@ -8,7 +8,7 @@ proposal_create_operation proposal_create_operation::genesis_proposal(const chai
 {
    proposal_create_operation op;
    op.expiration_time = head_block_time + global_params.maximum_proposal_lifetime;
-   op.review_period_seconds = global_params.genesis_proposal_review_period;
+   op.review_period_seconds = global_params.committee_proposal_review_period;
    return op;
 }
 

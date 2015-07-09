@@ -38,6 +38,7 @@
 #include <cstdint>
 #include <graphene/chain/protocol/address.hpp>
 #include <graphene/db/object_id.hpp>
+#include <graphene/chain/protocol/config.hpp>
 
 namespace graphene { namespace chain {
    using namespace graphene::db;
@@ -316,7 +317,6 @@ namespace graphene { namespace chain {
          return std::to_string(type()) + ":" + std::to_string(instance());
       }
    };
-
    struct public_key_type
    {
        struct binary_key
@@ -325,9 +325,7 @@ namespace graphene { namespace chain {
           uint32_t                 check;
           fc::ecc::public_key_data data;
        };
-
        fc::ecc::public_key_data key_data;
-
        public_key_type();
        public_key_type( const fc::ecc::public_key_data& data );
        public_key_type( const fc::ecc::public_key& pubkey );
@@ -338,10 +336,10 @@ namespace graphene { namespace chain {
        friend bool operator == ( const public_key_type& p1, const fc::ecc::public_key& p2);
        friend bool operator == ( const public_key_type& p1, const public_key_type& p2);
        friend bool operator != ( const public_key_type& p1, const public_key_type& p2);
-
        // TODO: This is temporary for testing
        bool is_valid_v1( const std::string& base58str );
    };
+
 
 
 } }  // graphene::chain
@@ -398,7 +396,6 @@ FC_REFLECT_ENUM( graphene::chain::impl_object_type,
                )
 
 FC_REFLECT_ENUM( graphene::chain::meta_info_object_type, (meta_account_object_type)(meta_asset_object_type) )
-
 
 FC_REFLECT_TYPENAME( graphene::chain::share_type )
 

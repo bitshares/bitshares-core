@@ -30,6 +30,7 @@ namespace graphene { namespace chain {
 
    struct vesting_balance_worker_initializer
    {
+      vesting_balance_worker_initializer(uint16_t days=0):pay_vesting_period_days(days){}
       uint16_t pay_vesting_period_days = 0;
    };
 

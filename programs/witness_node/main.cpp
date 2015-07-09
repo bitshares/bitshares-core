@@ -119,7 +119,7 @@ int main(int argc, char** argv) {
       node.startup_plugins();
 
       fc::promise<int>::ptr exit_promise = new fc::promise<int>("UNIX Signal Handler");
-#ifdef __unix__
+#if defined __APPLE__ || defined __unix__
       fc::set_signal_handler([&exit_promise](int signal) {
          exit_promise->set_value(signal);
       }, SIGINT);

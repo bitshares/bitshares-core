@@ -193,6 +193,9 @@ void database::initialize_indexes()
 
 void database::init_genesis(const genesis_state_type& genesis_state)
 { try {
+   FC_ASSERT( genesis_state.initial_timestamp != time_point_sec(), "Must initialize genesis timestamp." );
+   FC_ASSERT( genesis_state.initial_timestamp.sec_since_epoch() % GRAPHENE_DEFAULT_BLOCK_INTERVAL == 0,
+              "Genesis timestamp must be divisible by GRAPHENE_DEFAULT_BLOCK_INTERVAL." );
    FC_ASSERT(genesis_state.initial_witness_candidates.size() > 0,
              "Cannot start a chain with zero witnesses.");
    FC_ASSERT(genesis_state.initial_active_witnesses <= genesis_state.initial_witness_candidates.size(),
@@ -300,8 +303,8 @@ void database::init_genesis(const genesis_state_type& genesis_state)
        p.parameters.current_fees->zero_all_fees();
 
    });
-   create<dynamic_global_property_object>( [&](dynamic_global_property_object& p) {
-      p.time = fc::time_point_sec(GRAPHENE_GENESIS_TIMESTAMP);
+   create<dynamic_global_property_object>([&](dynamic_global_property_object& p) {
+      p.time = genesis_state.initial_timestamp;
       p.witness_budget = 0;
    });
    create<block_summary_object>([&](block_summary_object&) {});
@@ -313,13 +316,16 @@ void database::init_genesis(const genesis_state_type& genesis_state)
       cop.name = account.name;
       cop.registrar = GRAPHENE_TEMP_ACCOUNT;
       cop.owner = authority(1, account.owner_key, 1);
-      if( account.owner_key != account.active_key )
+      if( account.active_key == public_key_type() )
       {
-         cop.active = authority(1, account.owner_key, 1);
-      } else {
          cop.active = cop.owner;
+         cop.options.memo_key = account.owner_key;
       }
-      cop.options.memo_key = account.owner_key;
+      else
+      {
+         cop.active = authority(1, account.active_key, 1);
+         cop.options.memo_key = account.active_key;
+      }
       account_id_type account_id(apply_operation(genesis_eval_state, cop).get<object_id_type>());
 
       if( account.is_lifetime_member )
@@ -457,31 +463,45 @@ void database::init_genesis(const genesis_state_type& genesis_state)
       adjust_balance(GRAPHENE_COMMITTEE_ACCOUNT, -get_balance(GRAPHENE_COMMITTEE_ACCOUNT,{}));
    }
 
-   // Create initial witnesses and delegates
+   // Create initial witnesses
    std::for_each(genesis_state.initial_witness_candidates.begin(), genesis_state.initial_witness_candidates.end(),
                  [&](const genesis_state_type::initial_witness_type& witness) {
       witness_create_operation op;
+      op.witness_account = get_account_id(witness.owner_name);
       op.block_signing_key = witness.block_signing_key;
       op.initial_secret = secret_hash_type::hash( secret_hash_type() );
-      op.witness_account = get_account_id(witness.owner_name);
       apply_operation(genesis_eval_state, op);
    });
+
+   // Create initial committee members
    std::for_each(genesis_state.initial_committee_candidates.begin(), genesis_state.initial_committee_candidates.end(),
                  [&](const genesis_state_type::initial_committee_member_type& member) {
       delegate_create_operation op;
       op.delegate_account = get_account_id(member.owner_name);
-      apply_operation(genesis_eval_state, op).get<object_id_type>();
+      apply_operation(genesis_eval_state, op);
+   });
+
+   // Create initial workers
+   std::for_each(genesis_state.initial_worker_candidates.begin(), genesis_state.initial_worker_candidates.end(),
+                  [&](const genesis_state_type::initial_worker_type& worker)
+   {
+       worker_create_operation op;
+       op.owner = get_account_id(worker.owner_name);
+       op.work_begin_date = genesis_state.initial_timestamp;
+       op.work_end_date = time_point_sec::maximum();
+       op.daily_pay = worker.daily_pay;
+       op.name = "Genesis-Worker-" + worker.owner_name;
+       op.initializer = vesting_balance_worker_initializer{uint16_t(0)};
+
+       apply_operation(genesis_eval_state, std::move(op));
    });
 
    // Set active witnesses
    modify(get_global_properties(), [&](global_property_object& p) {
-      auto idx = get_index_type<witness_index>().indices();
-      for( auto itr = idx.begin();
-           itr != idx.end() && p.active_witnesses.size() < genesis_state.initial_active_witnesses;
-           ++itr )
+      for( int i = 0; i < genesis_state.initial_active_witnesses; ++i )
       {
-          p.active_witnesses.insert(itr->id);
-          p.witness_accounts.insert(itr->witness_account);
+         p.active_witnesses.insert(i);
+         p.witness_accounts.insert(get(witness_id_type(i)).witness_account);
       }
    });
 

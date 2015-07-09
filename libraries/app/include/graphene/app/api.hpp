@@ -28,7 +28,6 @@
 #include <graphene/chain/balance_object.hpp>
 #include <graphene/net/node.hpp>
 
-
 #include <graphene/market_history/market_history_plugin.hpp>
 
 #include <fc/api.hpp>
@@ -44,7 +43,7 @@ namespace graphene { namespace app {
     *
     * This API exposes accessors on the database which query state tracked by a blockchain validating node. This API is
     * read-only; all modifications to the database must be performed via transactions. Transactions are broadcast via
-    * the @ref network_api.
+    * the @ref network_broadcast_api.
     */
    class database_api
    {
@@ -331,14 +330,12 @@ namespace graphene { namespace app {
    };
 
    /**
-    * @brief The network_api class implements the RPC API for the network
-    *
-    * This API has methods to query the network status, connect to new peers, and send transactions.
+    * @brief The network_broadcast_api class allows broadcasting of transactions.
     */
-   class network_api
+   class network_broadcast_api
    {
       public:
-         network_api(application& a);
+         network_broadcast_api(application& a);
 
          struct transaction_confirmation
          {
@@ -366,19 +363,46 @@ namespace graphene { namespace app {
          void broadcast_transaction_with_callback( confirmation_callback cb, const signed_transaction& trx);
 
          /**
-          * @brief add_node Connect to a new peer
-          * @param ep The IP/Port of the peer to connect to
+          * @brief Not reflected, thus not accessible to API clients.
+          *
+          * This function is registered to receive the applied_block
+          * signal from the chain database when a block is received.
+          * It then dispatches callbacks to clients who have requested
+          * to be notified when a particular txid is included in a block.
           */
-         void add_node(const fc::ip::endpoint& ep);
-         /**
-          * @brief Get status of all current connections to peers
-          */
-         std::vector<net::peer_status> get_connected_peers() const;
-
          void on_applied_block( const signed_block& b );
       private:
          boost::signals2::scoped_connection             _applied_block_connection;
          map<transaction_id_type,confirmation_callback> _callbacks;
+         application&                                   _app;
+   };
+
+   /**
+    * @brief The network_node_api class allows maintenance of p2p connections.
+    */
+   class network_node_api
+   {
+      public:
+         network_node_api(application& a);
+
+         /**
+          * @brief add_node Connect to a new peer
+          * @param ep The IP/Port of the peer to connect to
+          */
+         void add_node(const fc::ip::endpoint& ep);
+
+         /**
+          * @brief Get status of all current connections to peers
+          * @brief Not reflected, thus not accessible to API clients.
+          *
+          * This function is registered to receive the applied_block
+          * signal from the chain database when a block is received.
+          * It then dispatches callbacks to clients who have requested
+          * to be notified when a particular txid is included in a block.
+           */
+         std::vector<net::peer_status> get_connected_peers() const;
+
+      private:
          application&                                   _app;
    };
 
@@ -403,23 +427,29 @@ namespace graphene { namespace app {
           * has sucessfully authenticated.
           */
          bool login(const string& user, const string& password);
-         /// @brief Retrieve the network API
-         fc::api<network_api> network()const;
+         /// @brief Retrieve the network broadcast API
+         fc::api<network_broadcast_api> network_broadcast()const;
          /// @brief Retrieve the database API
          fc::api<database_api> database()const;
          /// @brief Retrieve the history API
          fc::api<history_api> history()const;
+         /// @brief Retrieve the network node API
+         fc::api<network_node_api> network_node()const;
 
       private:
+         /// @brief Called to enable an API, not reflected.
+         void enable_api( const string& api_name );
+
          application&                      _app;
          optional< fc::api<database_api> > _database_api;
-         optional< fc::api<network_api> >  _network_api;
+         optional< fc::api<network_broadcast_api> > _network_broadcast_api;
+         optional< fc::api<network_node_api> > _network_node_api;
          optional< fc::api<history_api> >  _history_api;
    };
 
 }}  // graphene::app
 
-FC_REFLECT( graphene::app::network_api::transaction_confirmation, 
+FC_REFLECT( graphene::app::network_broadcast_api::transaction_confirmation,
         (id)(block_num)(trx_num)(trx) )
 
 FC_API(graphene::app::database_api,
@@ -460,13 +490,23 @@ FC_API(graphene::app::database_api,
        (get_margin_positions)
        (get_balance_objects)
      )
-FC_API(graphene::app::history_api, (get_account_history)(get_market_history)(get_market_history_buckets))
-FC_API(graphene::app::network_api, (broadcast_transaction)(broadcast_transaction_with_callback)
-      /* (add_node)(get_connected_peers) */
-       )
+FC_API(graphene::app::history_api,
+       (get_account_history)
+       (get_market_history)
+       (get_market_history_buckets)
+     )
+FC_API(graphene::app::network_broadcast_api,
+       (broadcast_transaction)
+       (broadcast_transaction_with_callback)
+     )
+FC_API(graphene::app::network_node_api,
+       (add_node)
+       (get_connected_peers)
+     )
 FC_API(graphene::app::login_api,
        (login)
-       (network)
+       (network_broadcast)
        (database)
        (history)
+       (network_node)
      )

@@ -330,7 +330,7 @@ BOOST_AUTO_TEST_CASE( data_fees )
 
 BOOST_AUTO_TEST_CASE( exceptions )
 {
-   BOOST_CHECK_THROW(FC_THROW_EXCEPTION(invalid_claim_amount, "Etc"), invalid_claim_amount);
+   GRAPHENE_CHECK_THROW(FC_THROW_EXCEPTION(balance_claim_invalid_claim_amount, "Etc"), balance_claim_invalid_claim_amount);
 }
 
 BOOST_AUTO_TEST_SUITE_END()

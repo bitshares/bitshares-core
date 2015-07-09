@@ -1,0 +1,41 @@
+  "initial_balances": [{
+      "owner": "BTSHYhQcrjVg5kBzCoeeD38eQdncCC5pBgee",
+      "asset_symbol": "CORE",
+      "amount": 100000000000
+    },{
+      "owner": "BTSPgQZg5929ht1NBdEvsGKqoQ7buRu3nKf4",
+      "asset_symbol": "CORE",
+      "amount": 100000000000
+    },{
+      "owner": "BTSC9zrLXSAPUQaVmQPk1S9dMqSzT7jPqYU7",
+      "asset_symbol": "CORE",
+      "amount": 100000000000
+    },{
+      "owner": "BTS93aQPtbbkXwaSjtHaREsNVcCvbfHo93aZ",
+      "asset_symbol": "CORE",
+      "amount": 100000000000
+    },{
+      "owner": "BTS6RM4UfsYFPDuhbmgkvDS9ip8Kvqundvyk",
+      "asset_symbol": "CORE",
+      "amount": 100000000000
+    },{
+      "owner": "BTSNVkZXdqWWSzqHVxvfetMe347is6kEkC4K",
+      "asset_symbol": "CORE",
+      "amount": 100000000000
+    },{
+      "owner": "BTS5GHzWZ64Luoajqsz6JGjTKVMgWYkGV9SQ",
+      "asset_symbol": "CORE",
+      "amount": 100000000000
+    },{
+      "owner": "BTSDCVRFez92bW9doRLjnFCKLJnpM58mgmMb",
+      "asset_symbol": "CORE",
+      "amount": 100000000000
+    },{
+      "owner": "BTS5CCdX3JYLBptYMuCjbsezqGYzN9vG9JCu",
+      "asset_symbol": "CORE",
+      "amount": 100000000000
+    },{
+      "owner": "BTSEQ3yQdr3EMDL2eRqGiceMCpoanaW16Puw",
+      "asset_symbol": "CORE",
+      "amount": 100000000000
+    },{

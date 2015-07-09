@@ -7,27 +7,38 @@ void_result balance_claim_evaluator::do_evaluate(const balance_claim_operation& 
    database& d = db();
    balance = &op.balance_to_claim(d);
 
-   FC_ASSERT(op.balance_owner_key == balance->owner ||
+   GRAPHENE_ASSERT(
+             op.balance_owner_key == balance->owner ||
              pts_address(op.balance_owner_key, false, 56) == balance->owner ||
              pts_address(op.balance_owner_key, true, 56) == balance->owner ||
              pts_address(op.balance_owner_key, false, 0) == balance->owner ||
              pts_address(op.balance_owner_key, true, 0) == balance->owner,
-             "balance_owner_key does not match balance's owner");
+             balance_claim_owner_mismatch,
+             "Balance owner key was specified as '${op}' but balance's actual owner is '${bal}'",
+             ("op", op.balance_owner_key)
+             ("bal", balance->owner)
+             );
    if( !(d.get_node_properties().skip_flags & (database::skip_authority_check |
                                                database::skip_transaction_signatures)) )
 
    FC_ASSERT(op.total_claimed.asset_id == balance->asset_type());
 
-   if( balance->is_vesting_balance() ) {
-      if( !balance->vesting_policy->is_withdraw_allowed({balance->balance,
-                                                        d.head_block_time(),
-                                                        op.total_claimed}) )
-         FC_THROW_EXCEPTION(invalid_claim_amount,
-                            "Attempted to claim ${c} from a vesting balance with ${a} available",
-                            ("c", op.total_claimed)("a", balance->available(d.head_block_time())));
-      if( d.head_block_time() - balance->last_claim_date < fc::days(1) )
-         FC_THROW_EXCEPTION(balance_claimed_too_often,
-                            "Genesis vesting balances may not be claimed more than once per day.");
+   if( balance->is_vesting_balance() )
+   {
+      GRAPHENE_ASSERT(
+         balance->vesting_policy->is_withdraw_allowed(
+            { balance->balance,
+              d.head_block_time(),
+              op.total_claimed } ),
+         balance_claim_invalid_claim_amount,
+         "Attempted to claim ${c} from a vesting balance with ${a} available",
+         ("c", op.total_claimed)("a", balance->available(d.head_block_time()))
+         );
+      GRAPHENE_ASSERT(
+         d.head_block_time() - balance->last_claim_date >= fc::days(1),
+         balance_claim_claimed_too_often,
+         "Genesis vesting balances may not be claimed more than once per day."
+         );
       return {};
    }
 
