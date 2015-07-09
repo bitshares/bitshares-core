@@ -81,6 +81,7 @@ namespace graphene { namespace chain {
       *this = get_default();
       for( fee_parameters& i : parameters )
          i.visit( zero_fee_visitor() );
+      this->scale = 0;
    }
 
    asset fee_schedule::calculate_fee( const operation& op, const price& core_exchange_rate )const
@@ -89,7 +90,6 @@ namespace graphene { namespace chain {
       fee_parameters params; params.set_which(op.which());
       auto itr = parameters.find(params);
       if( itr != parameters.end() ) params = *itr;
-      //idump( (params) );
       auto base_value = op.visit( calc_fee_visitor( params ) );
       auto scaled = fc::uint128(base_value) * scale;
       scaled /= GRAPHENE_100_PERCENT;

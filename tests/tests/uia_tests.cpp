@@ -179,6 +179,7 @@ BOOST_AUTO_TEST_CASE( transfer_whitelist_uia )
       upgrade_to_lifetime_member(dan);
       trx.clear();
 
+      BOOST_TEST_MESSAGE( "Atempting to transfer asset ADVANCED from nathan to dan when dan is not whitelisted, should fail" );
       transfer_operation op;
       op.fee = advanced.amount(0);
       op.from = nathan.id;
@@ -188,39 +189,48 @@ BOOST_AUTO_TEST_CASE( transfer_whitelist_uia )
       //Fail because dan is not whitelisted.
       GRAPHENE_REQUIRE_THROW(PUSH_TX( db, trx, ~0 ), transfer_to_account_not_whitelisted );
 
+      BOOST_TEST_MESSAGE( "Adding dan to whitelist for asset ADVANCED" );
       account_whitelist_operation wop;
       wop.authorizing_account = account_id_type();
       wop.account_to_list = dan.id;
       wop.new_listing = account_whitelist_operation::white_listed;
       trx.operations.back() = wop;
       PUSH_TX( db, trx, ~0 );
+      BOOST_TEST_MESSAGE( "Attempting to trnsfer from nathan to dan after whitelisting dan, should succeed" );
       trx.operations.back() = op;
       PUSH_TX( db, trx, ~0 );
 
       BOOST_CHECK_EQUAL(get_balance(nathan, advanced), 900);
       BOOST_CHECK_EQUAL(get_balance(dan, advanced), 100);
 
+      BOOST_TEST_MESSAGE( "Attempting to blacklist nathan" );
       wop.new_listing |= account_whitelist_operation::black_listed;
       wop.account_to_list = nathan.id;
       trx.operations.back() = wop;
       PUSH_TX( db, trx, ~0 );
 
+      BOOST_TEST_MESSAGE( "Attempting to transfer from nathan after blacklisting, should fail" );
       op.amount = advanced.amount(50);
       trx.operations.back() = op;
       //Fail because nathan is blacklisted
       GRAPHENE_REQUIRE_THROW(PUSH_TX( db, trx, ~0 ), transfer_from_account_not_whitelisted );
+
+
+      BOOST_TEST_MESSAGE( "Attempting to burn from nathan after blacklisting, should fail" );
       asset_reserve_operation burn;
       burn.payer = nathan.id;
       burn.amount_to_reserve = advanced.amount(10);
-      trx.operations.emplace_back(burn);
+      trx.operations.back() = burn;
       //Fail because nathan is blacklisted
       GRAPHENE_REQUIRE_THROW(PUSH_TX( db, trx, ~0 ), fc::exception);
+      BOOST_TEST_MESSAGE( "Attempting transfer from dan back to nathan, should fail because nathan is blacklisted" );
       std::swap(op.from, op.to);
       trx.operations.back() = op;
       //Fail because nathan is blacklisted
       GRAPHENE_REQUIRE_THROW(PUSH_TX( db, trx, ~0 ), fc::exception);
 
       {
+         BOOST_TEST_MESSAGE( "Changing the blacklist authority to dan" );
          asset_update_operation op;
          op.asset_to_update = advanced.id;
          op.new_options = advanced.options;
@@ -231,11 +241,13 @@ BOOST_AUTO_TEST_CASE( transfer_whitelist_uia )
          BOOST_CHECK(advanced.options.blacklist_authorities.find(dan.id) != advanced.options.blacklist_authorities.end());
       }
 
+      BOOST_TEST_MESSAGE( "Attempting to transfer from dan back to nathan" );
       trx.operations.back() = op;
       PUSH_TX( db, trx, ~0 );
       BOOST_CHECK_EQUAL(get_balance(nathan, advanced), 950);
       BOOST_CHECK_EQUAL(get_balance(dan, advanced), 50);
 
+      BOOST_TEST_MESSAGE( "Blacklisting nathan by dan" );
       wop.authorizing_account = dan.id;
       wop.account_to_list = nathan.id;
       wop.new_listing = account_whitelist_operation::black_listed;
@@ -266,7 +278,7 @@ BOOST_AUTO_TEST_CASE( transfer_whitelist_uia )
 
       burn.payer = dan.id;
       burn.amount_to_reserve = advanced.amount(10);
-      trx.operations.emplace_back(burn);
+      trx.operations.back() = burn;
       PUSH_TX(db, trx, ~0);
       BOOST_CHECK_EQUAL(get_balance(dan, advanced), 40);
    } catch(fc::exception& e) {

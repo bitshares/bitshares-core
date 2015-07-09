@@ -26,8 +26,11 @@ using namespace graphene::chain;
 
 BOOST_FIXTURE_TEST_SUITE( fee_tests, database_fixture )
 
+#define CORE uint64_t(GRAPHENE_BLOCKCHAIN_PRECISION)
+
 BOOST_AUTO_TEST_CASE( cashback_test )
 { try {
+   wlog("");
    /*                        Account Structure used in this test                         *
     *                                                                                    *
     *               /-----------------\       /-------------------\                      *
@@ -56,8 +59,8 @@ BOOST_AUTO_TEST_CASE( cashback_test )
    PREP_ACTOR(dumy);
    PREP_ACTOR(stud);
    PREP_ACTOR(pleb);
-   transfer(account_id_type(), life_id, asset(100000000));
-   transfer(account_id_type(), reggie_id, asset(100000000));
+   transfer(account_id_type(), life_id,   asset(500000*CORE));
+   transfer(account_id_type(), reggie_id, asset(500000*CORE));
    upgrade_to_lifetime_member(life_id);
    upgrade_to_lifetime_member(reggie_id);
    enable_fees();
@@ -75,6 +78,7 @@ BOOST_AUTO_TEST_CASE( cashback_test )
       op.active = authority(1, public_key_type(actor_name ## _private_key.get_public_key()), 1); \
       op.owner = op.active; \
       op.fee = fees->calculate_fee(op);  \
+      idump((op.fee)); \
       trx.operations = {op}; \
       trx.sign( registrar_name ## _private_key); \
       actor_name ## _id = PUSH_TX( db, trx ).operation_results.front().get<object_id_type>(); \
@@ -83,13 +87,13 @@ BOOST_AUTO_TEST_CASE( cashback_test )
 
    CustomRegisterActor(ann, life, life, 75);
 
-   transfer(life_id, ann_id, asset(1000000));
+   transfer(life_id, ann_id, asset(3000*CORE));
    upgrade_to_annual_member(ann_id);
 
    CustomRegisterActor(dumy, reggie, life, 75);
    CustomRegisterActor(stud, reggie, ann, 80);
 
-   transfer(life_id, stud_id, asset(1000000));
+   transfer(life_id, stud_id, asset(20000*CORE));
    upgrade_to_lifetime_member(stud_id);
 
    CustomRegisterActor(pleb, reggie, stud, 95);
@@ -103,10 +107,10 @@ BOOST_AUTO_TEST_CASE( cashback_test )
    BOOST_CHECK_EQUAL(ann_id(db).cashback_balance(db).balance.amount.value, 40000);
    BOOST_CHECK_EQUAL(stud_id(db).cashback_balance(db).balance.amount.value, 8000);
 
-   transfer(stud_id, scud_id, asset(500000));
-   transfer(scud_id, pleb_id, asset(400000));
-   transfer(pleb_id, dumy_id, asset(300000));
-   transfer(dumy_id, reggie_id, asset(200000));
+   transfer(stud_id, scud_id, asset(5*CORE));
+   transfer(scud_id, pleb_id, asset(4*CORE));
+   transfer(pleb_id, dumy_id, asset(3*CORE));
+   transfer(dumy_id, reggie_id, asset(2*CORE));
 
    generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
 

@@ -46,7 +46,7 @@ namespace graphene { namespace chain {
        *  @note must be sorted by fee_parameters.which() and have no duplicates
        */
       flat_set<fee_parameters> parameters;
-      uint32_t                 scale; ///< fee * scale / GRAPHENE_100_PERCENT
+      uint32_t                 scale = GRAPHENE_100_PERCENT; ///< fee * scale / GRAPHENE_100_PERCENT
    };
 
    typedef fee_schedule fee_schedule_type;

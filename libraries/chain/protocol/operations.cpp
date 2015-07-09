@@ -189,7 +189,7 @@ void operation_get_required_authorities( const operation& op,
                                          flat_set<account_id_type>& owner,
                                          vector<authority>&  other )
 {
-
+   op.visit( operation_get_required_auth( active, owner, other ) );
 }
 
 } } // namespace graphene::chain

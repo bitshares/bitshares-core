@@ -1128,10 +1128,10 @@ BOOST_AUTO_TEST_CASE( witness_withdraw_pay_test )
       ) >> GRAPHENE_CORE_ASSET_CYCLE_RATE_BITS
       ;
    // change this if ref_budget changes
-   BOOST_CHECK_EQUAL( ref_budget, 624 );
+   BOOST_CHECK_EQUAL( ref_budget, 594 );
    const uint64_t witness_ppb = ref_budget * 10 / 23 + 1;
    // change this if ref_budget changes
-   BOOST_CHECK_EQUAL( witness_ppb, 272 );
+   BOOST_CHECK_EQUAL( witness_ppb, 259 );
    // following two inequalities need to hold for maximal code coverage
    BOOST_CHECK_LT( witness_ppb * 2, ref_budget );
    BOOST_CHECK_GT( witness_ppb * 3, ref_budget );

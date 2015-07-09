@@ -329,7 +329,7 @@ BOOST_AUTO_TEST_CASE( proposed_single_account )
 
          active_set.clear();
          other.clear();
-         operation_get_required_authorities(op,active_set,owner_set,other);
+         operation_get_required_authorities(op.proposed_ops.front().op,active_set,owner_set,other);
          BOOST_CHECK_EQUAL(active_set.size(), 1);
          BOOST_CHECK_EQUAL(owner_set.size(), 0);
          BOOST_CHECK_EQUAL(other.size(), 0);
@@ -351,6 +351,7 @@ BOOST_AUTO_TEST_CASE( proposed_single_account )
 
       proposal_update_operation pup;
       pup.proposal = proposal.id;
+      pup.fee_paying_account = nathan.id;
       pup.active_approvals_to_add.insert(nathan.id);
 
       trx.operations = {pup};

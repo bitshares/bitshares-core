@@ -38,6 +38,11 @@ asset database::get_balance(const account_object& owner, const asset_object& ass
    return get_balance(owner.get_id(), asset_obj.get_id());
 }
 
+string database::to_pretty_string( const asset& a )const
+{
+   return a.asset_id(*this).amount_to_pretty_string(a.amount);
+}
+
 void database::adjust_balance(account_id_type account, asset delta )
 { try {
    if( delta.amount == 0 )
@@ -54,7 +59,8 @@ void database::adjust_balance(account_id_type account, asset delta )
          b.balance = delta.amount.value;
       });
    } else {
-      FC_ASSERT(delta.amount > 0 || itr->get_balance() >= -delta);
+      if( delta.amount < 0 )
+         FC_ASSERT( itr->get_balance() >= -delta, "Insufficient Balance: ${b} is less than required ${r}", ("b",to_pretty_string(itr->get_balance()))("r",to_pretty_string(-delta)));
       modify(*itr, [delta](account_balance_object& b) {
          b.adjust_balance(delta);
       });
