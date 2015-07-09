@@ -90,7 +90,7 @@ vector<witness_id_type> database::get_near_witness_schedule()const
    return result;
 }
 
-void database::update_witness_schedule(signed_block next_block)
+void database::update_witness_schedule(const signed_block& next_block)
 {
    const global_property_object& gpo = get_global_properties();
    const witness_schedule_object& wso = get(witness_schedule_id_type());
@@ -109,6 +109,7 @@ void database::update_witness_schedule(signed_block next_block)
    witness_id_type wit;
 
    const dynamic_global_property_object& dpo = get_dynamic_global_properties();
+   
    assert( dpo.random.data_size() == witness_scheduler_rng::seed_length );
    assert( witness_scheduler_rng::seed_length == wso.rng_seed.size() );
 

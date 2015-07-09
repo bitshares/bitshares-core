@@ -38,7 +38,7 @@ class nullary_rng
  * The sha256_ctr_rng generates bits using SHA256 in counter (CTR)
  * mode.
  */
-template< class HashClass, int SeedLength=32 >
+template< class HashClass, int SeedLength=sizeof(secret_hash_type) >
 class hash_ctr_rng
 {
    public:

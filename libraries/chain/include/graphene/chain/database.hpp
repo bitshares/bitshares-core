@@ -422,7 +422,7 @@ namespace graphene { namespace chain {
          void update_withdraw_permissions();
 
          //////////////////// db_witness_schedule.cpp ////////////////////
-         void update_witness_schedule(signed_block next_block);    /// no-op except for scheduling blocks
+         void update_witness_schedule(const signed_block& next_block);    /// no-op except for scheduling blocks
 
          ///Steps performed only at maintenance intervals
          ///@{

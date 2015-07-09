@@ -122,7 +122,7 @@
 
 // counter used to determine bits of entropy
 // must be less than or equal to secret_hash_type::data_length()
-#define GRAPHENE_RNG_SEED_LENGTH (224 / 8)
+#define GRAPHENE_RNG_SEED_LENGTH (160 / 8)
 
 /**
  * every second, the fraction of burned core asset which cycles is

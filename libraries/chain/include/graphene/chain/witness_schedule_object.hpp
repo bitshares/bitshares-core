@@ -56,7 +56,7 @@ class witness_schedule_object : public abstract_object<witness_schedule_object>
       witness_scheduler scheduler;
       uint32_t last_scheduling_block;
       uint64_t slots_since_genesis = 0;
-      fc::array< char, GRAPHENE_RNG_SEED_LENGTH > rng_seed;
+      fc::array< char, sizeof(secret_hash_type) > rng_seed;
 };
 
 } }
