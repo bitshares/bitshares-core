@@ -20,11 +20,12 @@
 #include <fc/exception/exception.hpp>
 #include <graphene/chain/operations.hpp>
 
-#define GRAPHENE_ASSERT( expr, exc_type, ... )                        \
+#define GRAPHENE_ASSERT( expr, exc_type, FORMAT, ... )                \
+   FC_MULTILINE_MACRO_BEGIN                                           \
    if( !(expr) )                                                      \
-   {                                                                  \
-      FC_THROW_EXCEPTION( exc_type, __VA_ARGS__ );                    \
-   }
+      FC_THROW_EXCEPTION( exc_type, FORMAT, __VA_ARGS__ );            \
+   FC_MULTILINE_MACRO_END
+
 
 #define GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( op_name )                \
    FC_DECLARE_DERIVED_EXCEPTION(                                      \
