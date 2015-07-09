@@ -30,7 +30,6 @@
 #include <graphene/chain/withdraw_permission_object.hpp>
 #include <graphene/chain/exceptions.hpp>
 #include <graphene/chain/predicate.hpp>
-#include <graphene/chain/db_reflect_cmp.hpp>
 
 #include <fc/crypto/digest.hpp>
 
