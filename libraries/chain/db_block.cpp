@@ -82,6 +82,7 @@ const signed_transaction& database::get_recent_transaction(const transaction_id_
  */
 bool database::push_block(const signed_block& new_block, uint32_t skip)
 {
+
    bool result;
    with_skip_flags( skip, [&]()
    {
@@ -365,6 +366,21 @@ const vector<operation_history_object>& database::get_applied_operations() const
 
 void database::apply_block( const signed_block& next_block, uint32_t skip )
 {
+   auto block_num = next_block.block_num();
+   if( _checkpoints.size() )
+   {
+      auto itr = _checkpoints.find( block_num );
+      if( itr != _checkpoints.end() )
+         FC_ASSERT( next_block.id() == itr->second, "Block did not match checkpoint", ("checkpoint",*itr)("block_id",next_block.id()) );
+
+      auto last = _checkpoints.rbegin();
+      if( last->first >= block_num )
+      {
+         // WE CAN SKIP ALMOST EVERYTHING
+         skip = ~0;
+      }
+   }
+
    with_skip_flags( skip, [&]()
    {
       _apply_block( next_block );
@@ -647,6 +663,12 @@ void database::create_block_summary(const signed_block& next_block)
          p.timestamp = next_block.timestamp;
    });
    FC_ASSERT( sum.id.instance() == next_block.block_num(), "", ("summary.id",sum.id)("next.block_num",next_block.block_num()) );
+}
+
+void database::add_checkpoints( const flat_map<uint32_t,block_id_type>& checkpts )
+{
+   for( const auto& i : checkpts )
+      _checkpoints[i.first] = i.second;
 }
 
 } }

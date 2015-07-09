@@ -136,6 +136,9 @@ namespace graphene { namespace chain {
          optional<signed_block>     fetch_block_by_number( uint32_t num )const;
          const signed_transaction&  get_recent_transaction( const transaction_id_type& trx_id )const;
 
+         void                              add_checkpoints( const flat_map<uint32_t,block_id_type>& checkpts );
+         const flat_map<uint32_t,block_id_type> get_checkpoints()const { return _checkpoints; }
+
          bool push_block( const signed_block& b, uint32_t skip = skip_nothing );
          processed_transaction push_transaction( const signed_transaction& trx, uint32_t skip = skip_nothing );
          bool _push_block( const signed_block& b );
@@ -469,6 +472,8 @@ namespace graphene { namespace chain {
          vector<uint64_t>                  _witness_count_histogram_buffer;
          vector<uint64_t>                  _committee_count_histogram_buffer;
          uint64_t                          _total_voting_stake;
+
+         flat_map<uint32_t,block_id_type>  _checkpoints;
 
          node_property_object              _node_property_object;
    };
