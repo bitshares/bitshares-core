@@ -23,6 +23,10 @@ namespace graphene { namespace chain {
       account_id_type fee_payer()const { return deposit_to_account; }
       share_type      calculate_fee(const fee_parameters_type& )const { return 0; }
       void            validate()const;
+      void            get_required_authorities( vector<authority>& a )const
+      {
+         a.push_back( authority( 1, balance_owner_key, 1 ) );
+      }
    };
 
 }} // graphene::chain
