@@ -60,7 +60,7 @@ void database::adjust_balance(account_id_type account, asset delta )
       });
    } else {
       if( delta.amount < 0 )
-         FC_ASSERT( itr->get_balance() >= -delta, "Insufficient Balance: ${b} is less than required ${r}", ("b",to_pretty_string(itr->get_balance()))("r",to_pretty_string(-delta)));
+         FC_ASSERT( itr->get_balance() >= -delta, "Insufficient Balance: ${a}'s balance of ${b} is less than required ${r}", ("a",account(*this).name)("b",to_pretty_string(itr->get_balance()))("r",to_pretty_string(-delta)));
       modify(*itr, [delta](account_balance_object& b) {
          b.adjust_balance(delta);
       });

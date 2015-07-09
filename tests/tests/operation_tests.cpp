@@ -1112,7 +1112,8 @@ BOOST_AUTO_TEST_CASE( witness_withdraw_pay_test )
 
    // Make an account and upgrade it to prime, so that witnesses get some pay
    create_account("nathan", delegate_pub_key);
-   transfer(account_id_type()(db), get_account("nathan"), asset(10000000000));
+   transfer(account_id_type()(db), get_account("nathan"), asset(20000*CORE));
+   transfer(account_id_type()(db), get_account("init3"), asset(20*CORE));
    generate_block();
 
    const asset_object* core = &asset_id_type()(db);
@@ -1153,7 +1154,7 @@ BOOST_AUTO_TEST_CASE( witness_withdraw_pay_test )
    trx.sign(delegate_priv_key);
    db.push_transaction(trx);
    trx.clear();
-   BOOST_CHECK_EQUAL(get_balance(*nathan, *core), 8950000000);
+   BOOST_CHECK_EQUAL(get_balance(*nathan, *core), 20000*CORE - account_upgrade_operation::fee_parameters_type().membership_lifetime_fee );;
 
    generate_block();
    nathan = &get_account("nathan");
@@ -1184,9 +1185,9 @@ BOOST_AUTO_TEST_CASE( witness_withdraw_pay_test )
 
    schedule_maint();
    // The 80% lifetime referral fee went to the committee account, which burned it. Check that it's here.
-   BOOST_CHECK_EQUAL( core->reserved(db).value, 840000000 );
+   BOOST_CHECK_EQUAL( core->reserved(db).value, 8000*CORE );
    generate_block();
-   BOOST_CHECK_EQUAL( core->reserved(db).value, 840000000 + 210000000 - ref_budget );
+   BOOST_CHECK_EQUAL( core->reserved(db).value, 999999406 );
    BOOST_CHECK_EQUAL( db.get_dynamic_global_properties().witness_budget.value, ref_budget );
    witness = &db.fetch_block_by_number(db.head_block_num())->witness(db);
    // first witness paid from old budget (so no pay)
@@ -1230,8 +1231,8 @@ BOOST_AUTO_TEST_CASE( witness_withdraw_pay_test )
    db.push_transaction(trx, database::skip_authority_check);
    trx.clear();
 
-   BOOST_CHECK_EQUAL(get_balance(witness->witness_account(db), *core), witness_ppb - 1/*fee*/);
-   BOOST_CHECK_EQUAL(core->reserved(db).value, 840000000 + 210000000 - ref_budget );
+   BOOST_CHECK_EQUAL(get_balance(witness->witness_account(db), *core), witness_ppb );
+   BOOST_CHECK_EQUAL(core->reserved(db).value, 999999406 );
    BOOST_CHECK_EQUAL(witness->accumulated_income.value, 0);
 } FC_LOG_AND_RETHROW() }
 
