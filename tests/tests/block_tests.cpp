@@ -642,6 +642,7 @@ BOOST_FIXTURE_TEST_CASE( change_block_interval, database_fixture )
       p.parameters.committee_proposal_review_period = fc::hours(1).to_seconds();
    });
 
+   BOOST_TEST_MESSAGE( "Creating a proposal to change the block_interval to 1 second" );
    {
       proposal_create_operation cop = proposal_create_operation::genesis_proposal(db.get_global_properties().parameters, db.head_block_time());
       cop.fee_paying_account = GRAPHENE_TEMP_ACCOUNT;
@@ -652,6 +653,7 @@ BOOST_FIXTURE_TEST_CASE( change_block_interval, database_fixture )
       trx.operations.push_back(cop);
       db.push_transaction(trx);
    }
+   BOOST_TEST_MESSAGE( "Updating proposal by signing with the delegate private key" );
    {
       proposal_update_operation uop;
       uop.fee_paying_account = GRAPHENE_TEMP_ACCOUNT;
@@ -673,6 +675,7 @@ BOOST_FIXTURE_TEST_CASE( change_block_interval, database_fixture )
       db.push_transaction(trx);
       BOOST_CHECK(proposal_id_type()(db).is_authorized_to_execute(db));
    }
+   BOOST_TEST_MESSAGE( "Verifying that the interval didn't change immediately" );
 
    BOOST_CHECK_EQUAL(db.get_global_properties().parameters.block_interval, 5);
    auto past_time = db.head_block_time().sec_since_epoch();
@@ -681,10 +684,15 @@ BOOST_FIXTURE_TEST_CASE( change_block_interval, database_fixture )
    generate_block();
    BOOST_CHECK_EQUAL(db.head_block_time().sec_since_epoch() - past_time, 10);
 
+   BOOST_TEST_MESSAGE( "Generating blocks until proposal expires" );
    generate_blocks(proposal_id_type()(db).expiration_time + 5);
+   BOOST_TEST_MESSAGE( "Verify that the block interval is still 5 seconds" );
    BOOST_CHECK_EQUAL(db.get_global_properties().parameters.block_interval, 5);
+
+   BOOST_TEST_MESSAGE( "Generating blocks until next maintenance interval" );
    generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
 
+   BOOST_TEST_MESSAGE( "Verify that the new block interval is 1 second" );
    BOOST_CHECK_EQUAL(db.get_global_properties().parameters.block_interval, 1);
    past_time = db.head_block_time().sec_since_epoch();
    generate_block();
