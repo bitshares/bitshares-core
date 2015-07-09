@@ -91,24 +91,30 @@ database& generic_evaluator::db()const { return trx_state->db(); }
       operation_get_required_authorities( op, active_auths, owner_auths, other_auths );
 
       for( auto id : active_auths )
+      {
          GRAPHENE_ASSERT(
             verify_authority(id(db()), authority::active) ||
             verify_authority(id(db()), authority::owner),
             tx_missing_active_auth,
             "missing required active authority ${id}", ("id", id));
+      }
 
       for( auto id : owner_auths )
+      {
          GRAPHENE_ASSERT(
             verify_authority(id(db()), authority::owner),
             tx_missing_owner_auth,
             "missing required owner authority ${id}", ("id", id));
+      }
 
       for( const auto& auth : other_auths )
+      {
          GRAPHENE_ASSERT(
             trx_state->check_authority(auth),
             tx_missing_other_auth,
             "missing required authority ${auth}",
             ("auth",auth)("sigs",trx_state->_sigs));
+      }
 
    } FC_CAPTURE_AND_RETHROW( (op) ) }
 

@@ -26,7 +26,6 @@ using namespace graphene::chain;
 
 BOOST_FIXTURE_TEST_SUITE( fee_tests, database_fixture )
 
-#define CORE uint64_t(GRAPHENE_BLOCKCHAIN_PRECISION)
 
 BOOST_AUTO_TEST_CASE( cashback_test )
 { try {
