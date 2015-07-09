@@ -117,7 +117,7 @@ namespace graphene { namespace chain {
       asset_options              common_options;
       /// Options only available for BitAssets. MUST be non-null if and only if the @ref market_issued flag is set in
       /// common_options.flags
-      optional<bitasset_options> bitasset_options;
+      optional<bitasset_options> bitasset_opts;
       /// For BitAssets, set this to true if the asset implements a @ref prediction_market; false otherwise
       bool is_prediction_market = false;
 
@@ -412,7 +412,7 @@ FC_REFLECT( graphene::chain::asset_create_operation,
             (symbol)
             (precision)
             (common_options)
-            (bitasset_options)
+            (bitasset_opts)
             (is_prediction_market)
           )
 FC_REFLECT( graphene::chain::asset_update_operation,

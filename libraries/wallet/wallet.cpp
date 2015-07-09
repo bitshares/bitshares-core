@@ -901,7 +901,7 @@ public:
       create_op.symbol = symbol;
       create_op.precision = precision;
       create_op.common_options = common;
-      create_op.bitasset_options = bitasset_opts;
+      create_op.bitasset_opts = bitasset_opts;
 
       signed_transaction tx;
       tx.operations.push_back( create_op );
@@ -1751,7 +1751,7 @@ void operation_printer::operator()(const account_update_operation& op) const
 void operation_printer::operator()(const asset_create_operation& op) const
 {
    out << "Create ";
-   if( op.bitasset_options.valid() )
+   if( op.bitasset_opts.valid() )
       out << "BitAsset ";
    else
       out << "User-Issue Asset ";

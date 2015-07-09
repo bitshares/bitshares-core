@@ -362,14 +362,14 @@ void database::init_genesis(const genesis_state_type& genesis_state)
    {
       asset_dynamic_data_id_type dynamic_data_id;
       optional<asset_bitasset_data_id_type> bitasset_data_id;
-      if( asset.bitasset_options.valid() )
+      if( asset.bitasset_opts.valid() )
       {
          share_type total_allocated;
          asset_id_type new_asset_id = get_index_type<asset_index>().get_next_id();
-         asset_id_type collateral_asset_id = get_asset_id(asset.bitasset_options->backing_asset_symbol);
+         asset_id_type collateral_asset_id = get_asset_id(asset.bitasset_opts->backing_asset_symbol);
 
          int collateral_holder_number = 0;
-         for( const auto& collateral_rec : asset.bitasset_options->collateral_records )
+         for( const auto& collateral_rec : asset.bitasset_opts->collateral_records )
          {
             account_create_operation cop;
             cop.name = asset.symbol + "-collateral-holder-" + std::to_string(collateral_holder_number);
@@ -385,19 +385,19 @@ void database::init_genesis(const genesis_state_type& genesis_state)
                c.debt = collateral_rec.debt;
                c.call_price = price::call_price(chain::asset(c.debt, new_asset_id),
                                                 chain::asset(c.collateral, collateral_asset_id),
-                                                asset.bitasset_options->maintenance_collateral_ratio);
+                                                asset.bitasset_opts->maintenance_collateral_ratio);
             });
 
             total_allocated += collateral_rec.debt;
          }
 
          bitasset_data_id = create<asset_bitasset_data_object>([&](asset_bitasset_data_object& b) {
-            b.options.feed_lifetime_sec = asset.bitasset_options->feed_lifetime_sec;
-            b.options.minimum_feeds = asset.bitasset_options->minimum_feeds;
-            b.options.force_settlement_delay_sec = asset.bitasset_options->force_settlement_delay_sec;
-            b.options.force_settlement_offset_percent = asset.bitasset_options->force_settlement_offset_percent;
-            b.options.maximum_force_settlement_volume = asset.bitasset_options->maximum_force_settlement_volume;
-            b.options.short_backing_asset = get_asset_id(asset.bitasset_options->backing_asset_symbol);
+            b.options.feed_lifetime_sec = asset.bitasset_opts->feed_lifetime_sec;
+            b.options.minimum_feeds = asset.bitasset_opts->minimum_feeds;
+            b.options.force_settlement_delay_sec = asset.bitasset_opts->force_settlement_delay_sec;
+            b.options.force_settlement_offset_percent = asset.bitasset_opts->force_settlement_offset_percent;
+            b.options.maximum_force_settlement_volume = asset.bitasset_opts->maximum_force_settlement_volume;
+            b.options.short_backing_asset = get_asset_id(asset.bitasset_opts->backing_asset_symbol);
          }).id;
 
          dynamic_data_id = create<asset_dynamic_data_object>([&](asset_dynamic_data_object& d) {

@@ -72,13 +72,13 @@ void  asset_create_operation::validate()const
    FC_ASSERT( is_valid_symbol(symbol) );
    common_options.validate();
    if( common_options.issuer_permissions & (disable_force_settle|global_settle) )
-      FC_ASSERT( bitasset_options.valid() );
+      FC_ASSERT( bitasset_opts.valid() );
    if( is_prediction_market )
    {
-      FC_ASSERT( bitasset_options.valid(), "Cannot have a User-Issued Asset implement a prediction market." );
+      FC_ASSERT( bitasset_opts.valid(), "Cannot have a User-Issued Asset implement a prediction market." );
       FC_ASSERT( common_options.issuer_permissions & global_settle );
    }
-   if( bitasset_options ) bitasset_options->validate();
+   if( bitasset_opts ) bitasset_opts->validate();
 
    asset dummy = asset(1) * common_options.core_exchange_rate;
    FC_ASSERT(dummy.asset_id == asset_id_type(1));
@@ -147,7 +147,7 @@ void asset_update_feed_producers_operation::validate() const
    FC_ASSERT( fee.amount >= 0 );
 }
 
-void        asset_global_settle_operation::validate()const
+void asset_global_settle_operation::validate()const
 {
    FC_ASSERT( fee.amount >= 0 );
    FC_ASSERT( asset_to_settle == settle_price.base.asset_id );

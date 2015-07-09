@@ -417,7 +417,7 @@ const asset_object& database_fixture::create_bitasset(
    creator.common_options.issuer_permissions = flags;
    creator.common_options.flags = flags & ~global_settle;
    creator.common_options.core_exchange_rate = price({asset(1,1),asset(1)});
-   creator.bitasset_options = bitasset_options();
+   creator.bitasset_opts = bitasset_options();
    trx.operations.push_back(std::move(creator));
    trx.validate();
    processed_transaction ptx = db.push_transaction(trx, ~0);
@@ -442,7 +442,7 @@ const asset_object& database_fixture::create_prediction_market(
    creator.common_options.issuer_permissions = flags | global_settle;
    creator.common_options.flags = flags & ~global_settle;
    creator.common_options.core_exchange_rate = price({asset(1,1),asset(1)});
-   creator.bitasset_options = bitasset_options();
+   creator.bitasset_opts = bitasset_options();
    creator.is_prediction_market = true;
    trx.operations.push_back(std::move(creator));
    trx.validate();

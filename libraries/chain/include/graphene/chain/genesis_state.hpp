@@ -53,7 +53,7 @@ struct genesis_state_type {
          uint16_t maintenance_collateral_ratio;
          vector<initial_collateral_position> collateral_records;
       };
-      optional<initial_bitasset_options> bitasset_options;
+      optional<initial_bitasset_options> bitasset_opts;
 
       share_type initial_accumulated_fees;
    };
@@ -102,7 +102,7 @@ FC_REFLECT(graphene::chain::genesis_state_type::initial_account_type, (name)(own
 
 FC_REFLECT(graphene::chain::genesis_state_type::initial_asset_type,
            (symbol)(description)(precision)(issuer_name)(max_supply)(market_fee_percent)
-           (issuer_permissions)(flags)(bitasset_options)(initial_accumulated_fees))
+           (issuer_permissions)(flags)(bitasset_opts)(initial_accumulated_fees))
 
 FC_REFLECT(graphene::chain::genesis_state_type::initial_asset_type::initial_bitasset_options,
            (feed_lifetime_sec)(minimum_feeds)(force_settlement_delay_sec)(force_settlement_offset_percent)

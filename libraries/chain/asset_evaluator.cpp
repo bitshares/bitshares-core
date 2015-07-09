@@ -45,9 +45,9 @@ void_result asset_create_evaluator::do_evaluate( const asset_create_operation& o
 
    core_fee_paid -= core_fee_paid.value/2;
 
-   if( op.bitasset_options )
+   if( op.bitasset_opts )
    {
-      const asset_object& backing = op.bitasset_options->short_backing_asset(d);
+      const asset_object& backing = op.bitasset_opts->short_backing_asset(d);
       if( backing.is_market_issued() )
       {
          const asset_bitasset_data_object& backing_bitasset_data = backing.bitasset_data(d);
@@ -59,13 +59,13 @@ void_result asset_create_evaluator::do_evaluate( const asset_create_operation& o
       } else
          FC_ASSERT( op.issuer != GRAPHENE_COMMITTEE_ACCOUNT || backing.get_id() == asset_id_type(),
                     "May not create a blockchain-controlled market asset which is not backed by CORE.");
-      FC_ASSERT( op.bitasset_options->feed_lifetime_sec > chain_parameters.block_interval &&
-                 op.bitasset_options->force_settlement_delay_sec > chain_parameters.block_interval );
+      FC_ASSERT( op.bitasset_opts->feed_lifetime_sec > chain_parameters.block_interval &&
+                 op.bitasset_opts->force_settlement_delay_sec > chain_parameters.block_interval );
    }
    if( op.is_prediction_market )
    {
-      FC_ASSERT( op.bitasset_options );
-      FC_ASSERT( op.precision == op.bitasset_options->short_backing_asset(d).precision );
+      FC_ASSERT( op.bitasset_opts );
+      FC_ASSERT( op.precision == op.bitasset_opts->short_backing_asset(d).precision );
    }
 
    return void_result();
@@ -80,9 +80,9 @@ object_id_type asset_create_evaluator::do_apply( const asset_create_operation& o
       });
 
    asset_bitasset_data_id_type bit_asset_id;
-   if( op.bitasset_options.valid() )
+   if( op.bitasset_opts.valid() )
       bit_asset_id = db().create<asset_bitasset_data_object>( [&]( asset_bitasset_data_object& a ) {
-            a.options = *op.bitasset_options;
+            a.options = *op.bitasset_opts;
             a.is_prediction_market = op.is_prediction_market;
          }).id;
 
@@ -99,7 +99,7 @@ object_id_type asset_create_evaluator::do_apply( const asset_create_operation& o
          else
             a.options.core_exchange_rate.base.asset_id = next_asset_id;
          a.dynamic_asset_data_id = dyn_asset.id;
-         if( op.bitasset_options.valid() )
+         if( op.bitasset_opts.valid() )
             a.bitasset_data_id = bit_asset_id;
       });
    assert( new_asset.id == next_asset_id );
