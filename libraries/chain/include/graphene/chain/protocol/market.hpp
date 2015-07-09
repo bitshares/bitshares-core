@@ -36,6 +36,7 @@ namespace graphene { namespace chain {
 
       /// If this flag is set the entire order must be filled or the operation is rejected
       bool fill_or_kill = false;
+      extensions_type   extensions;
 
       pair<asset_id_type,asset_id_type> get_market()const
       {
@@ -64,6 +65,7 @@ namespace graphene { namespace chain {
       limit_order_id_type order;
       /** must be order->seller */
       account_id_type     fee_paying_account;
+      extensions_type   extensions;
 
       account_id_type fee_payer()const { return fee_paying_account; }
       void            validate()const;
@@ -92,6 +94,7 @@ namespace graphene { namespace chain {
       account_id_type     funding_account; ///< pays fee, collateral, and cover
       asset               delta_collateral; ///< the amount of collateral to add to the margin position
       asset               delta_debt; ///< the amount of the debt to be paid off, may be negative to issue new debt
+      extensions_type     extensions;
 
       account_id_type fee_payer()const { return funding_account; }
       void            validate()const;
@@ -143,7 +146,7 @@ FC_REFLECT( graphene::chain::call_order_update_operation::fee_parameters_type, (
 FC_REFLECT( graphene::chain::fill_order_operation::fee_parameters_type,  )
 
 
-FC_REFLECT( graphene::chain::limit_order_create_operation,(fee)(seller)(amount_to_sell)(min_to_receive)(expiration)(fill_or_kill))
-FC_REFLECT( graphene::chain::limit_order_cancel_operation,(fee)(fee_paying_account)(order) )
-FC_REFLECT( graphene::chain::call_order_update_operation, (fee)(funding_account)(delta_collateral)(delta_debt) )
+FC_REFLECT( graphene::chain::limit_order_create_operation,(fee)(seller)(amount_to_sell)(min_to_receive)(expiration)(fill_or_kill)(extensions))
+FC_REFLECT( graphene::chain::limit_order_cancel_operation,(fee)(fee_paying_account)(order)(extensions) )
+FC_REFLECT( graphene::chain::call_order_update_operation, (fee)(funding_account)(delta_collateral)(delta_debt)(extensions) )
 FC_REFLECT( graphene::chain::fill_order_operation, (fee)(order_id)(account_id)(pays)(receives) )

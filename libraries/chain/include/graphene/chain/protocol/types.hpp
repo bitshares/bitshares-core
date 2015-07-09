@@ -73,6 +73,7 @@ namespace graphene { namespace chain {
    using                               fc::ecc::range_proof_type;
    using                               fc::ecc::range_proof_info;
    using                               fc::ecc::commitment_type;
+   struct void_t{};
 
    typedef fc::ecc::private_key        private_key_type;
 
@@ -423,5 +424,6 @@ FC_REFLECT_TYPENAME( graphene::chain::transaction_obj_id_type )
 FC_REFLECT_TYPENAME( graphene::chain::block_summary_id_type )
 FC_REFLECT_TYPENAME( graphene::chain::account_transaction_history_id_type )
 FC_REFLECT_TYPENAME( graphene::chain::witness_schedule_id_type )
+FC_REFLECT( graphene::chain::void_t, )
 
 FC_REFLECT_ENUM( graphene::chain::asset_issuer_permission_flags, (charge_market_fee)(white_list)(transfer_restricted)(override_authority)(disable_force_settle)(global_settle) )

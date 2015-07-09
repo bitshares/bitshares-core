@@ -35,6 +35,7 @@ namespace graphene { namespace chain {
 
       /// User provided data encrypted to the memo key of the "to" account
       optional<memo_data> memo;
+      extensions_type   extensions;
 
       account_id_type fee_payer()const { return from; }
       void            validate()const;
@@ -69,6 +70,7 @@ namespace graphene { namespace chain {
 
       /// User provided data encrypted to the memo key of the "to" account
       optional<memo_data> memo;
+      extensions_type   extensions;
 
       account_id_type fee_payer()const { return issuer; }
       void            validate()const;
@@ -86,6 +88,6 @@ namespace graphene { namespace chain {
 FC_REFLECT( graphene::chain::transfer_operation::fee_parameters_type, (fee)(price_per_kbyte) )
 FC_REFLECT( graphene::chain::override_transfer_operation::fee_parameters_type, (fee)(price_per_kbyte) )
 
-FC_REFLECT( graphene::chain::override_transfer_operation, (fee)(issuer)(from)(to)(amount)(memo) )
-FC_REFLECT( graphene::chain::transfer_operation, (fee)(from)(to)(amount)(memo) )
+FC_REFLECT( graphene::chain::override_transfer_operation, (fee)(issuer)(from)(to)(amount)(memo)(extensions) )
+FC_REFLECT( graphene::chain::transfer_operation, (fee)(from)(to)(amount)(memo)(extensions) )
 

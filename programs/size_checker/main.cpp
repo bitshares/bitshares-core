@@ -86,5 +86,7 @@ int main( int argc, char** argv )
       std::cout << "]\n";
    }
    catch ( const fc::exception& e ){ edump((e.to_detail_string())); }
+   idump((sizeof(signed_block)));
+   idump((fc::raw::pack_size(signed_block())));
    return 0;
 }

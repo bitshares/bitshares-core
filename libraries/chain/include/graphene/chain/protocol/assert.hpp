@@ -59,6 +59,7 @@ namespace graphene { namespace chain {
       account_id_type            fee_paying_account;
       vector<predicate>          predicates;
       flat_set<account_id_type>  required_auths;
+      extensions_type            extensions;
 
       account_id_type fee_payer()const { return fee_paying_account; }
       void            validate()const;
@@ -71,4 +72,4 @@ FC_REFLECT( graphene::chain::assert_operation::fee_parameters_type, (fee) )
 FC_REFLECT( graphene::chain::account_name_eq_lit_predicate, (account_id)(name) )
 FC_REFLECT( graphene::chain::asset_symbol_eq_lit_predicate, (asset_id)(symbol) )
 FC_REFLECT_TYPENAME( graphene::chain::predicate )
-FC_REFLECT( graphene::chain::assert_operation, (fee)(fee_paying_account)(predicates)(required_auths) )
+FC_REFLECT( graphene::chain::assert_operation, (fee)(fee_paying_account)(predicates)(required_auths)(extensions) )

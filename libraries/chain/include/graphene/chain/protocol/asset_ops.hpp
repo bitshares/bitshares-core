@@ -53,6 +53,7 @@ namespace graphene { namespace chain {
        * size of description.
        */
       string description;
+      extensions_type extensions;
 
       /// Perform internal consistency checks.
       /// @throws fc::exception if any check fails
@@ -82,6 +83,7 @@ namespace graphene { namespace chain {
       /// This speicifies which asset type is used to collateralize short sales
       /// This field may only be updated if the current supply of the asset is zero.
       asset_id_type short_backing_asset;
+      extensions_type extensions;
 
       /// Perform internal consistency checks.
       /// @throws fc::exception if any check fails
@@ -120,6 +122,7 @@ namespace graphene { namespace chain {
       optional<bitasset_options> bitasset_opts;
       /// For BitAssets, set this to true if the asset implements a @ref prediction_market; false otherwise
       bool is_prediction_market = false;
+      extensions_type extensions;
 
       account_id_type fee_payer()const { return issuer; }
       void            validate()const;
@@ -144,6 +147,7 @@ namespace graphene { namespace chain {
       account_id_type issuer; ///< must equal @ref asset_to_settle->issuer
       asset_id_type   asset_to_settle;
       price           settle_price;
+      extensions_type extensions;
 
       account_id_type fee_payer()const { return issuer; }
       void            validate()const;
@@ -179,6 +183,7 @@ namespace graphene { namespace chain {
       account_id_type account;
       /// Amount of asset to force settle. This must be a market-issued asset
       asset           amount;
+      extensions_type extensions;
 
       account_id_type fee_payer()const { return account; }
       void            validate()const;
@@ -195,6 +200,7 @@ namespace graphene { namespace chain {
       account_id_type from_account;
       asset_id_type   asset_id;
       share_type      amount; ///< core asset
+      extensions_type extensions;
 
       account_id_type fee_payer()const { return from_account; }
       void       validate()const;
@@ -231,6 +237,7 @@ namespace graphene { namespace chain {
       /// If the asset is to be given a new issuer, specify his ID here.
       optional<account_id_type>   new_issuer;
       asset_options               new_options;
+      extensions_type             extensions;
 
       account_id_type fee_payer()const { return issuer; }
       void            validate()const;
@@ -261,6 +268,7 @@ namespace graphene { namespace chain {
       asset_id_type   asset_to_update;
 
       bitasset_options new_options;
+      extensions_type  extensions;
 
       account_id_type fee_payer()const { return issuer; }
       void            validate()const;
@@ -291,6 +299,7 @@ namespace graphene { namespace chain {
       asset_id_type   asset_to_update;
 
       flat_set<account_id_type> new_feed_producers;
+      extensions_type           extensions;
 
       account_id_type fee_payer()const { return issuer; }
       void            validate()const;
@@ -320,6 +329,7 @@ namespace graphene { namespace chain {
       account_id_type        publisher;
       asset_id_type          asset_id; ///< asset for which the feed is published
       price_feed             feed;
+      extensions_type        extensions;
 
       account_id_type fee_payer()const { return publisher; }
       void            validate()const;
@@ -343,6 +353,7 @@ namespace graphene { namespace chain {
 
       /** user provided data encrypted to the memo key of the "to" account */
       optional<memo_data>  memo;
+      extensions_type      extensions;
 
       account_id_type fee_payer()const { return issuer; }
       void            validate()const;
@@ -364,6 +375,7 @@ namespace graphene { namespace chain {
       asset             fee;
       account_id_type   payer;
       asset             amount_to_reserve;
+      extensions_type   extensions;
 
       account_id_type fee_payer()const { return payer; }
       void            validate()const;
@@ -383,6 +395,7 @@ FC_REFLECT( graphene::chain::asset_options,
             (whitelist_markets)
             (blacklist_markets)
             (description)
+            (extensions)
           )
 FC_REFLECT( graphene::chain::bitasset_options,
             (feed_lifetime_sec)
@@ -391,6 +404,7 @@ FC_REFLECT( graphene::chain::bitasset_options,
             (force_settlement_offset_percent)
             (maximum_force_settlement_volume)
             (short_backing_asset)
+            (extensions)
           )
 
 
@@ -414,6 +428,7 @@ FC_REFLECT( graphene::chain::asset_create_operation,
             (common_options)
             (bitasset_opts)
             (is_prediction_market)
+            (extensions)
           )
 FC_REFLECT( graphene::chain::asset_update_operation,
             (fee)
@@ -421,24 +436,26 @@ FC_REFLECT( graphene::chain::asset_update_operation,
             (asset_to_update)
             (new_issuer)
             (new_options)
+            (extensions)
           )
 FC_REFLECT( graphene::chain::asset_update_bitasset_operation,
             (fee)
             (issuer)
             (asset_to_update)
             (new_options)
+            (extensions)
           )
 FC_REFLECT( graphene::chain::asset_update_feed_producers_operation,
-            (fee)(issuer)(asset_to_update)(new_feed_producers)
+            (fee)(issuer)(asset_to_update)(new_feed_producers)(extensions)
           )
 FC_REFLECT( graphene::chain::asset_publish_feed_operation,
-            (fee)(publisher)(asset_id)(feed) )
-FC_REFLECT( graphene::chain::asset_settle_operation, (fee)(account)(amount) )
-FC_REFLECT( graphene::chain::asset_global_settle_operation, (fee)(issuer)(asset_to_settle)(settle_price) )
+            (fee)(publisher)(asset_id)(feed)(extensions) )
+FC_REFLECT( graphene::chain::asset_settle_operation, (fee)(account)(amount)(extensions) )
+FC_REFLECT( graphene::chain::asset_global_settle_operation, (fee)(issuer)(asset_to_settle)(settle_price)(extensions) )
 FC_REFLECT( graphene::chain::asset_issue_operation,
-            (fee)(issuer)(asset_to_issue)(issue_to_account)(memo) )
+            (fee)(issuer)(asset_to_issue)(issue_to_account)(memo)(extensions) )
 FC_REFLECT( graphene::chain::asset_reserve_operation,
-            (fee)(payer)(amount_to_reserve) )
+            (fee)(payer)(amount_to_reserve)(extensions) )
 
-FC_REFLECT( graphene::chain::asset_fund_fee_pool_operation, (fee)(from_account)(asset_id)(amount) );
+FC_REFLECT( graphene::chain::asset_fund_fee_pool_operation, (fee)(from_account)(asset_id)(amount)(extensions) );
 

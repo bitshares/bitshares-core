@@ -20,9 +20,6 @@
 
 namespace graphene { namespace chain {
 
-   struct void_header{};
-   typedef fc::static_variant<void_header> header_extension;
-
    struct block_header
    {
       digest_type                   digest()const;
@@ -33,7 +30,7 @@ namespace graphene { namespace chain {
       secret_hash_type              next_secret_hash;
       secret_hash_type              previous_secret;
       checksum_type                 transaction_merkle_root;
-      flat_set<header_extension>    extensions;
+      extensions_type               extensions;
 
       static uint32_t num_from_id(const block_id_type& id);
    };
@@ -56,7 +53,6 @@ namespace graphene { namespace chain {
 
 } } // graphene::chain
 
-FC_REFLECT( graphene::chain::void_header, )
 FC_REFLECT( graphene::chain::block_header, (previous)(timestamp)(witness)
             (next_secret_hash)(previous_secret)(transaction_merkle_root)(extensions) )
 FC_REFLECT_DERIVED( graphene::chain::signed_block_header, (graphene::chain::block_header), (delegate_signature) )

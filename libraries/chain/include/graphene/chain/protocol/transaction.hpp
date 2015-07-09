@@ -87,6 +87,7 @@ namespace graphene { namespace chain {
        */
       uint16_t           relative_expiration = 1;
       vector<operation>  operations;
+      extensions_type    extensions;
 
       /// Calculate the digest for a transaction with a reference block
       /// @param ref_block_id Full block ID of the reference block
@@ -164,6 +165,6 @@ namespace graphene { namespace chain {
 
 } }
 
-FC_REFLECT( graphene::chain::transaction, (ref_block_num)(ref_block_prefix)(relative_expiration)(operations) )
+FC_REFLECT( graphene::chain::transaction, (ref_block_num)(ref_block_prefix)(relative_expiration)(operations)(extensions) )
 FC_REFLECT_DERIVED( graphene::chain::signed_transaction, (graphene::chain::transaction), (signatures) )
 FC_REFLECT_DERIVED( graphene::chain::processed_transaction, (graphene::chain::signed_transaction), (operation_results) )
