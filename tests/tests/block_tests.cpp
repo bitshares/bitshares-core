@@ -19,13 +19,11 @@
 #include <boost/test/unit_test.hpp>
 
 #include <graphene/chain/database.hpp>
-#include <graphene/chain/operations.hpp>
 
 #include <graphene/chain/account_object.hpp>
 #include <graphene/chain/delegate_object.hpp>
-#include <graphene/chain/limit_order_object.hpp>
 #include <graphene/chain/proposal_object.hpp>
-#include <graphene/chain/call_order_object.hpp>
+#include <graphene/chain/market_evaluator.hpp>
 #include <graphene/chain/witness_schedule_object.hpp>
 
 #include <fc/crypto/digest.hpp>
@@ -51,7 +49,7 @@ genesis_state_type make_genesis() {
       genesis_state.initial_committee_candidates.push_back({name});
       genesis_state.initial_witness_candidates.push_back({name, delegate_priv_key.get_public_key()});
    }
-   genesis_state.initial_parameters.current_fees.set_all_fees(0);
+   genesis_state.initial_parameters.current_fees->zero_all_fees();
    return genesis_state;
 }
 
@@ -282,10 +280,13 @@ BOOST_AUTO_TEST_CASE( undo_pending )
          public_key_type delegate_pub_key  = delegate_priv_key.get_public_key();
          const graphene::db::index& account_idx = db.get_index(protocol_ids, account_object_type);
 
+         transfer_operation t;
+         t.to = account_id_type(1);
+         t.amount = asset( 10000000 );
          {
             signed_transaction trx;
             trx.set_expiration(db.head_block_time() + fc::minutes(1));
-            trx.operations.push_back(transfer_operation({asset(), account_id_type(), account_id_type(1), asset(10000000)}));
+            trx.operations.push_back(t);
             PUSH_TX( db, trx, ~0 );
 
             now += db.block_interval();
@@ -310,11 +311,15 @@ BOOST_AUTO_TEST_CASE( undo_pending )
 
          trx.clear();
          trx.set_expiration(db.head_block_time() + db.get_global_properties().parameters.maximum_time_until_expiration-1);
-         trx.operations.push_back(transfer_operation({asset(1),account_id_type(1), nathan_id, asset(5000)}));
+         t.fee = asset(1);
+         t.from = account_id_type(1);
+         t.to = nathan_id;
+         t.amount = asset(5000);
+         trx.operations.push_back(t);
          db.push_transaction(trx, ~0);
          trx.clear();
          trx.set_expiration(db.head_block_time() + db.get_global_properties().parameters.maximum_time_until_expiration-2);
-         trx.operations.push_back(transfer_operation({asset(1),account_id_type(1), nathan_id, asset(5000)}));
+         trx.operations.push_back(t);
          db.push_transaction(trx, ~0);
 
          BOOST_CHECK(db.get_balance(nathan_id, asset_id_type()).amount == 10000);
@@ -413,7 +418,10 @@ BOOST_AUTO_TEST_CASE( duplicate_transactions )
 
       trx = decltype(trx)();
       trx.set_expiration(db1.head_block_time() + fc::minutes(1));
-      trx.operations.push_back(transfer_operation({asset(), account_id_type(), nathan_id, asset(500)}));
+      transfer_operation t;
+      t.to = nathan_id;
+      t.amount = asset(500);
+      trx.operations.push_back(t);
       trx.sign(  delegate_priv_key );
       PUSH_TX( db1, trx, skip_sigs );
 
@@ -469,7 +477,10 @@ BOOST_AUTO_TEST_CASE( tapos )
       b = db1.generate_block(now, db1.get_scheduled_witness(1).first, delegate_priv_key, database::skip_nothing);
       trx.clear();
 
-      trx.operations.push_back(transfer_operation({asset(), account_id_type(), nathan_id, asset(50)}));
+      transfer_operation t;
+      t.to = nathan_id;
+      t.amount = asset(50);
+      trx.operations.push_back(t);
       trx.sign(delegate_priv_key);
       //relative_expiration is 1, but ref block is 2 blocks old, so this should fail.
       GRAPHENE_REQUIRE_THROW(PUSH_TX( db1, trx, database::skip_transaction_signatures | database::skip_authority_check ), fc::exception);
@@ -585,15 +596,22 @@ BOOST_FIXTURE_TEST_CASE( double_sign_check, database_fixture )
    asset amount(1000);
 
    trx.set_expiration(db.head_block_time() + fc::minutes(1));
-   trx.operations.push_back(transfer_operation({ asset(), alice.id, bob.id, amount, memo_data() }));
-   for( auto& op : trx.operations ) op.visit(operation_set_fee(db.current_fee_schedule()));
+   transfer_operation t;
+   t.from = alice.id;
+   t.to = bob.id;
+   t.amount = amount;
+   trx.operations.push_back(t);
+   for( auto& op : trx.operations ) db.current_fee_schedule().set_fee(op);
    trx.validate();
 
    db.push_transaction(trx, ~0);
 
    trx.operations.clear();
-   trx.operations.push_back(transfer_operation({ asset(), bob.id, alice.id, amount, memo_data() }));
-   for( auto& op : trx.operations ) op.visit(operation_set_fee(db.current_fee_schedule()));
+   t.from = bob.id;
+   t.to = alice.id;
+   t.amount = amount;
+   trx.operations.push_back(t);
+   for( auto& op : trx.operations ) db.current_fee_schedule().set_fee(op); 
    trx.validate();
 
    BOOST_TEST_MESSAGE( "Verify that not-signing causes an exception" );
@@ -625,10 +643,10 @@ BOOST_FIXTURE_TEST_CASE( change_block_interval, database_fixture )
    });
 
    {
-      proposal_create_operation cop = proposal_create_operation::genesis_proposal(db);
+      proposal_create_operation cop = proposal_create_operation::genesis_proposal(db.get_global_properties().parameters, db.head_block_time());
       cop.fee_paying_account = GRAPHENE_TEMP_ACCOUNT;
       cop.expiration_time = db.head_block_time() + *cop.review_period_seconds + 10;
-      global_parameters_update_operation uop;
+      delegate_update_global_parameters_operation uop;
       uop.new_parameters.block_interval = 1;
       cop.proposed_ops.emplace_back(uop);
       trx.operations.push_back(cop);

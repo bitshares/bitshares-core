@@ -19,17 +19,16 @@
 #include <boost/test/unit_test.hpp>
 
 #include <graphene/chain/database.hpp>
-#include <graphene/chain/operations.hpp>
 #include <graphene/chain/asset_object.hpp>
 #include <graphene/chain/account_object.hpp>
 #include <graphene/chain/balance_object.hpp>
 #include <graphene/chain/witness_object.hpp>
 #include <graphene/chain/delegate_object.hpp>
-#include <graphene/chain/call_order_object.hpp>
+#include <graphene/chain/market_evaluator.hpp>
+#include <graphene/chain/worker_evaluator.hpp>
 #include <graphene/chain/vesting_balance_object.hpp>
 #include <graphene/chain/withdraw_permission_object.hpp>
 #include <graphene/chain/exceptions.hpp>
-#include <graphene/chain/predicate.hpp>
 #include <graphene/chain/db_reflect_cmp.hpp>
 
 #include <fc/crypto/digest.hpp>
@@ -336,7 +335,8 @@ BOOST_AUTO_TEST_CASE( mia_feeds )
    }
    {
       const asset_object& bit_usd = bit_usd_id(db);
-      asset_publish_feed_operation op({asset(), vikram_id});
+      asset_publish_feed_operation op;
+      op.publisher = vikram_id;
       op.asset_id = bit_usd_id;
       op.feed.settlement_price = ~price(asset(GRAPHENE_BLOCKCHAIN_PRECISION),bit_usd.amount(30));
       // We'll expire margins after a month
@@ -561,7 +561,7 @@ BOOST_AUTO_TEST_CASE( worker_create_test )
       worker_create_operation op;
       op.owner = nathan_id;
       op.daily_pay = 1000;
-      op.initializer = vesting_balance_worker_type::initializer(1);
+      op.initializer = vesting_balance_worker_initializer(1);
       op.work_begin_date = db.head_block_time() + 10;
       op.work_end_date = op.work_begin_date + fc::days(2);
       trx.clear();
@@ -684,7 +684,7 @@ BOOST_AUTO_TEST_CASE( refund_worker_test )
       worker_create_operation op;
       op.owner = nathan_id;
       op.daily_pay = 1000;
-      op.initializer = refund_worker_type::initializer();
+      op.initializer = refund_worker_initializer();
       op.work_begin_date = db.head_block_time() + 10;
       op.work_end_date = op.work_begin_date + fc::days(2);
       trx.clear();
@@ -757,7 +757,7 @@ BOOST_AUTO_TEST_CASE( burn_worker_test )
       worker_create_operation op;
       op.owner = nathan_id;
       op.daily_pay = 1000;
-      op.initializer = burn_worker_type::initializer();
+      op.initializer = burn_worker_initializer();
       op.work_begin_date = db.head_block_time() + 10;
       op.work_end_date = op.work_begin_date + fc::days(2);
       trx.clear();
@@ -954,17 +954,13 @@ BOOST_AUTO_TEST_CASE( assert_op_test )
 
    // nathan checks that his public key is equal to the given value.
    op.fee_paying_account = nathan_id;
-   op.predicates = vector<vector<char>>();
-   op.predicates.push_back(
-      fc::raw::pack(
-      predicate(pred::account_name_eq_lit{ nathan_id, "nathan" })
-      ));
+   op.predicates.emplace_back(account_name_eq_lit_predicate{ nathan_id, "nathan" });
    trx.operations.push_back(op);
    trx.sign(nathan_private_key);
    PUSH_TX( db, trx );
 
    // nathan checks that his public key is not equal to the given value (fail)
-   op.predicates.back() = fc::raw::pack(predicate(pred::account_name_eq_lit{ nathan_id, "dan" }));
+   op.predicates.back() = account_name_eq_lit_predicate{ nathan_id, "dan" };
    trx.operations.back() = op;
    trx.sign(nathan_private_key);
    GRAPHENE_CHECK_THROW( PUSH_TX( db, trx ), fc::exception );

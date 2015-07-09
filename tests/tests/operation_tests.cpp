@@ -18,14 +18,11 @@
 
 #include <boost/test/unit_test.hpp>
 
-#include <graphene/chain/operations.hpp>
-
 #include <graphene/chain/account_object.hpp>
 #include <graphene/chain/asset_object.hpp>
 #include <graphene/chain/database.hpp>
 #include <graphene/chain/delegate_object.hpp>
-#include <graphene/chain/limit_order_object.hpp>
-#include <graphene/chain/call_order_object.hpp>
+#include <graphene/chain/market_evaluator.hpp>
 #include <graphene/chain/vesting_balance_object.hpp>
 #include <graphene/chain/withdraw_permission_object.hpp>
 #include <graphene/chain/witness_object.hpp>
@@ -397,7 +394,7 @@ BOOST_AUTO_TEST_CASE( update_account )
          account_upgrade_operation op;
          op.account_to_upgrade = nathan.id;
          op.upgrade_to_lifetime_member = true;
-         op.fee = op.calculate_fee(db.get_global_properties().parameters.current_fees);
+         op.fee = db.get_global_properties().parameters.current_fees->calculate_fee(op);
          trx.operations = {op};
          PUSH_TX( db, trx, ~0 );
       }
@@ -418,12 +415,12 @@ BOOST_AUTO_TEST_CASE( transfer_core_asset )
       asset genesis_balance = db.get_balance(account_id_type(), asset_id_type());
 
       const account_object& nathan_account = *db.get_index_type<account_index>().indices().get<by_name>().find("nathan");
-      trx.operations.push_back(transfer_operation({asset(),genesis_account,
-                                                   nathan_account.id,
-                                                   asset(10000),
-                                                   memo_data()
-                                                  }));
-      trx.visit( operation_set_fee( db.current_fee_schedule() ) );
+      transfer_operation top;
+      top.from = genesis_account;
+      top.to = nathan_account.id;
+      top.amount = asset( 10000);
+      trx.operations.push_back(top);
+      for( auto& op : trx.operations ) db.current_fee_schedule().set_fee(op);
 
       asset fee = trx.operations.front().get<transfer_operation>().fee;
       trx.validate();
@@ -436,13 +433,12 @@ BOOST_AUTO_TEST_CASE( transfer_core_asset )
       BOOST_CHECK_EQUAL(get_balance(nathan_account, asset_id_type()(db)), 10000);
 
       trx = signed_transaction();
-      trx.operations.push_back(transfer_operation({asset(),
-                                                   nathan_account.id,
-                                                   genesis_account,
-                                                   asset(2000),
-                                                   memo_data()
-                                                  }));
-      trx.visit( operation_set_fee( db.current_fee_schedule() ) );
+      top.from = nathan_account.id;
+      top.to = genesis_account;
+      top.amount = asset(2000);
+      trx.operations.push_back(top);
+
+      for( auto& op : trx.operations ) db.current_fee_schedule().set_fee(op);
 
       fee = trx.operations.front().get<transfer_operation>().fee;
       trx.validate();
@@ -666,7 +662,10 @@ BOOST_AUTO_TEST_CASE( issue_uia )
       const asset_object& test_asset = *db.get_index_type<asset_index>().indices().get<by_symbol>().find("TEST");
       const account_object& nathan_account = *db.get_index_type<account_index>().indices().get<by_name>().find("nathan");
 
-      asset_issue_operation op({asset(),test_asset.issuer, test_asset.amount(5000000),  nathan_account.id});
+      asset_issue_operation op;
+      op.issuer = test_asset.issuer;
+      op.asset_to_issue =  test_asset.amount(5000000);
+      op.issue_to_account = nathan_account.id;
       trx.operations.push_back(op);
 
       REQUIRE_THROW_WITH_VALUE(op, asset_to_issue, asset(200));
@@ -704,7 +703,11 @@ BOOST_AUTO_TEST_CASE( transfer_uia )
       const account_object& genesis = account_id_type()(db);
 
       BOOST_CHECK_EQUAL(get_balance(nathan, uia), 10000000);
-      trx.operations.push_back(transfer_operation({asset(),nathan.id, genesis.id, uia.amount(5000)}));
+      transfer_operation top;
+      top.to = nathan.id;
+      top.from = genesis.id;
+      top.amount = uia.amount(5000);
+      trx.operations.push_back(top);
       PUSH_TX( db, trx, ~0 );
       BOOST_CHECK_EQUAL(get_balance(nathan, uia), 10000000 - 5000);
       BOOST_CHECK_EQUAL(get_balance(genesis, uia), 5000);
@@ -899,8 +902,12 @@ BOOST_AUTO_TEST_CASE( uia_fees )
       fund_fee_pool(genesis_account, test_asset, 1000000);
       BOOST_CHECK(asset_dynamic.fee_pool == 1000000);
 
-      transfer_operation op({test_asset.amount(0), nathan_account.id, genesis_account.id, test_asset.amount(100)});
-      op.fee = asset(op.calculate_fee(db.current_fee_schedule())) * test_asset.options.core_exchange_rate;
+      transfer_operation op;
+      op.fee = test_asset.amount(0);
+      op.from = nathan_account.id;
+      op.to   = genesis_account.id;
+      op.amount = test_asset.amount(100);
+      op.fee = db.current_fee_schedule().calculate_fee( op, test_asset.options.core_exchange_rate );
       BOOST_CHECK(op.fee.asset_id == test_asset.id);
       asset old_balance = db.get_balance(nathan_account.get_id(), test_asset.get_id());
       asset fee = op.fee;
@@ -977,7 +984,11 @@ BOOST_AUTO_TEST_CASE( delegate_feeds )
    try {
       INVOKE( create_mia );
       {
-         asset_update_operation uop(get_asset("BITUSD"));
+         auto& current = get_asset( "BITUSD" );
+         asset_update_operation uop;
+         uop.issuer =  current.issuer;
+         uop.asset_to_update = current.id;
+         uop.new_options = current.options;
          uop.new_issuer = account_id_type();
          trx.operations.push_back(uop);
          PUSH_TX( db, trx, ~0 );
@@ -990,7 +1001,8 @@ BOOST_AUTO_TEST_CASE( delegate_feeds )
                                                       global_props.witness_accounts.end());
       BOOST_REQUIRE_EQUAL(active_witnesses.size(), 10);
 
-      asset_publish_feed_operation op({asset(), active_witnesses[0]});
+      asset_publish_feed_operation op;
+      op.publisher = active_witnesses[0];
       op.asset_id = bit_usd.get_id();
       op.feed.settlement_price = ~price(asset(GRAPHENE_BLOCKCHAIN_PRECISION),bit_usd.amount(30));
       // Accept defaults for required collateral
@@ -1089,7 +1101,7 @@ BOOST_AUTO_TEST_CASE( fill_order )
 { try {
    fill_order_operation o;
    GRAPHENE_CHECK_THROW(o.validate(), fc::exception);
-   o.calculate_fee(db.current_fee_schedule());
+   //o.calculate_fee(db.current_fee_schedule());
 } FC_LOG_AND_RETHROW() }
 
 BOOST_AUTO_TEST_CASE( witness_withdraw_pay_test )
@@ -1105,11 +1117,11 @@ BOOST_AUTO_TEST_CASE( witness_withdraw_pay_test )
 
    const asset_object* core = &asset_id_type()(db);
    const account_object* nathan = &get_account("nathan");
-   enable_fees(105000000);
-   BOOST_CHECK_GT(db.current_fee_schedule().membership_lifetime_fee, 0);
+   enable_fees();//105000000);
+   BOOST_CHECK_GT(db.current_fee_schedule().get<account_upgrade_operation>().membership_lifetime_fee, 0);
    // Based on the size of the reserve fund later in the test, the witness budget will be set to this value
    const uint64_t ref_budget =
-      ((uint64_t( db.current_fee_schedule().membership_lifetime_fee )
+      ((uint64_t( db.current_fee_schedule().get<account_upgrade_operation>().membership_lifetime_fee )
          * GRAPHENE_CORE_ASSET_CYCLE_RATE * 30
          * db.get_global_properties().parameters.block_interval
        ) + ((uint64_t(1) << GRAPHENE_CORE_ASSET_CYCLE_RATE_BITS)-1)
@@ -1136,7 +1148,7 @@ BOOST_AUTO_TEST_CASE( witness_withdraw_pay_test )
    uop.upgrade_to_lifetime_member = true;
    trx.set_expiration(db.head_block_id());
    trx.operations.push_back(uop);
-   trx.visit(operation_set_fee(db.current_fee_schedule()));
+   for( auto& op : trx.operations ) db.current_fee_schedule().set_fee(op);
    trx.validate();
    trx.sign(delegate_priv_key);
    db.push_transaction(trx);
@@ -1204,7 +1216,7 @@ BOOST_AUTO_TEST_CASE( witness_withdraw_pay_test )
 
    trx.set_expiration(db.head_block_time() + GRAPHENE_DEFAULT_MAX_TIME_UNTIL_EXPIRATION);
    // Withdraw the witness's pay
-   enable_fees(1);
+   enable_fees();//1);
    witness = paid_witness;
    witness_withdraw_pay_operation wop;
    wop.from_witness = witness->id;
@@ -1213,7 +1225,7 @@ BOOST_AUTO_TEST_CASE( witness_withdraw_pay_test )
    trx.operations.push_back(wop);
    REQUIRE_THROW_WITH_VALUE(wop, amount, witness->accumulated_income.value * 2);
    trx.operations.back() = wop;
-   trx.visit(operation_set_fee(db.current_fee_schedule()));
+   for( auto& op : trx.operations ) db.current_fee_schedule().set_fee(op);
    trx.validate();
    db.push_transaction(trx, database::skip_authority_check);
    trx.clear();

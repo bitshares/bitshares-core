@@ -19,7 +19,7 @@
 #include <boost/test/unit_test.hpp>
 
 #include <graphene/chain/database.hpp>
-#include <graphene/chain/operations.hpp>
+#include <graphene/chain/protocol/protocol.hpp>
 
 #include <graphene/chain/account_object.hpp>
 #include <graphene/chain/asset_object.hpp>
@@ -315,18 +315,6 @@ BOOST_AUTO_TEST_CASE( witness_rng_test_bits )
    } FC_LOG_AND_RETHROW()
 }
 
-BOOST_AUTO_TEST_CASE( data_fees )
-{
-   fee_schedule_type fs;
-   fs.data_fee = 10;
-   int x = 1489520937;
-   BOOST_CHECK_EQUAL(fs.total_data_fee(), 0);
-   BOOST_CHECK_EQUAL(fs.total_data_fee(fs), 0);
-   BOOST_CHECK_EQUAL(fs.total_data_fee(fs.key_create_fee), 0);
-   BOOST_CHECK_EQUAL(fs.total_data_fee(x, fs, authority()), 0);
-   auto keys = vector<private_key_type>(100, private_key_type::generate());
-   BOOST_CHECK_EQUAL(fs.total_data_fee(keys, x), (fc::raw::pack_size(keys) + fc::raw::pack_size(x)) / 1024 * 10);
-}
 
 BOOST_AUTO_TEST_CASE( exceptions )
 {

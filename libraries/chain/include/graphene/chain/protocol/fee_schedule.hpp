@@ -34,6 +34,14 @@ namespace graphene { namespace chain {
        */
       void validate()const;
 
+      template<typename Operation>
+      const typename Operation::fee_parameters_type& get()const
+      {
+         auto itr = parameters.find( typename Operation::fee_parameters_type() );
+         FC_ASSERT( itr != parameters.end() );
+         return itr->template get<typename Operation::fee_parameters_type>();
+      }
+
       /**
        *  @note must be sorted by fee_parameters.which() and have no duplicates
        */

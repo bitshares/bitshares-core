@@ -20,7 +20,6 @@
 
 #include <graphene/chain/database.hpp>
 #include <graphene/chain/exceptions.hpp>
-#include <graphene/chain/operations.hpp>
 
 #include <graphene/chain/account_object.hpp>
 #include <graphene/chain/asset_object.hpp>
@@ -81,7 +80,11 @@ BOOST_AUTO_TEST_CASE( override_transfer_test )
    BOOST_REQUIRE_EQUAL( get_balance( dan, advanced ), 1000 );
 
    trx.operations.clear();
-   override_transfer_operation otrans{ asset(), advanced.issuer, dan.id, eric.id, advanced.amount(100) };
+   override_transfer_operation otrans;
+   otrans.issuer = advanced.issuer;
+   otrans.from = dan.id;
+   otrans.to   = eric.id;
+   otrans.amount = advanced.amount(100);
    trx.operations.push_back(otrans);
 
    BOOST_TEST_MESSAGE( "Require throwing without signature" );
@@ -109,7 +112,11 @@ BOOST_AUTO_TEST_CASE( override_transfer_test2 )
    BOOST_REQUIRE_EQUAL( get_balance( dan, advanced ), 1000 );
 
    trx.operations.clear();
-   override_transfer_operation otrans{ asset(), advanced.issuer, dan.id, eric.id, advanced.amount(100) };
+   override_transfer_operation otrans;
+   otrans.issuer = advanced.issuer;
+   otrans.from = dan.id;
+   otrans.to   = eric.id;
+   otrans.amount = advanced.amount(100);
    trx.operations.push_back(otrans);
 
    BOOST_TEST_MESSAGE( "Require throwing without signature" );
@@ -135,12 +142,18 @@ BOOST_AUTO_TEST_CASE( issue_whitelist_uia )
       upgrade_to_lifetime_member(nathan);
       trx.clear();
 
-      asset_issue_operation op({asset(), advanced.issuer, advanced.amount(1000), nathan.id});
+      asset_issue_operation op;
+      op.issuer = advanced.issuer;
+      op.asset_to_issue = advanced.amount(1000);
+      op.issue_to_account = nathan.id; //({asset(), advanced.issuer, advanced.amount(1000), nathan.id});
       trx.operations.emplace_back(op);
       //Fail because nathan is not whitelisted.
       GRAPHENE_REQUIRE_THROW(PUSH_TX( db, trx, ~0 ), fc::exception);
 
-      account_whitelist_operation wop({asset(), account_id_type(), nathan.id, account_whitelist_operation::white_listed});
+      account_whitelist_operation wop;
+      wop.authorizing_account = account_id_type();
+      wop.account_to_list = nathan.id;
+      wop.new_listing = account_whitelist_operation::white_listed;
 
       trx.operations.back() = wop;
       PUSH_TX( db, trx, ~0 );
@@ -166,12 +179,19 @@ BOOST_AUTO_TEST_CASE( transfer_whitelist_uia )
       upgrade_to_lifetime_member(dan);
       trx.clear();
 
-      transfer_operation op({advanced.amount(0), nathan.id, dan.id, advanced.amount(100)});
+      transfer_operation op;
+      op.fee = advanced.amount(0);
+      op.from = nathan.id;
+      op.to = dan.id;
+      op.amount = advanced.amount(100); //({advanced.amount(0), nathan.id, dan.id, advanced.amount(100)});
       trx.operations.push_back(op);
       //Fail because dan is not whitelisted.
       GRAPHENE_REQUIRE_THROW(PUSH_TX( db, trx, ~0 ), transfer_to_account_not_whitelisted );
 
-      account_whitelist_operation wop({asset(), account_id_type(), dan.id, account_whitelist_operation::white_listed});
+      account_whitelist_operation wop;
+      wop.authorizing_account = account_id_type();
+      wop.account_to_list = dan.id;
+      wop.new_listing = account_whitelist_operation::white_listed;
       trx.operations.back() = wop;
       PUSH_TX( db, trx, ~0 );
       trx.operations.back() = op;
@@ -189,7 +209,10 @@ BOOST_AUTO_TEST_CASE( transfer_whitelist_uia )
       trx.operations.back() = op;
       //Fail because nathan is blacklisted
       GRAPHENE_REQUIRE_THROW(PUSH_TX( db, trx, ~0 ), transfer_from_account_not_whitelisted );
-      trx.operations = {asset_reserve_operation{asset(), nathan.id, advanced.amount(10)}};
+      asset_reserve_operation burn;
+      burn.payer = nathan.id;
+      burn.amount_to_reserve = advanced.amount(10);
+      trx.operations.emplace_back(burn);
       //Fail because nathan is blacklisted
       GRAPHENE_REQUIRE_THROW(PUSH_TX( db, trx, ~0 ), fc::exception);
       std::swap(op.from, op.to);
@@ -241,7 +264,9 @@ BOOST_AUTO_TEST_CASE( transfer_whitelist_uia )
       BOOST_CHECK(!nathan.is_authorized_asset(advanced));
       GRAPHENE_REQUIRE_THROW(PUSH_TX( db, trx, ~0 ), fc::exception);
 
-      trx.operations = {asset_reserve_operation{asset(), dan.id, advanced.amount(10)}};
+      burn.payer = dan.id;
+      burn.amount_to_reserve = advanced.amount(10);
+      trx.operations.emplace_back(burn);
       PUSH_TX(db, trx, ~0);
       BOOST_CHECK_EQUAL(get_balance(dan, advanced), 40);
    } catch(fc::exception& e) {

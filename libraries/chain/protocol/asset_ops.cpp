@@ -85,15 +85,6 @@ void  asset_create_operation::validate()const
    FC_ASSERT(precision <= 12);
 }
 
-/*
-asset_update_operation::asset_update_operation(const asset_object& old)
-{
-   issuer = old.issuer;
-   asset_to_update = old.get_id();
-   new_options = old.options;
-}
-*/
-
 void asset_update_operation::validate()const
 {
    FC_ASSERT( fee.amount >= 0 );

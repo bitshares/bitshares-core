@@ -19,7 +19,6 @@
 #include <boost/test/unit_test.hpp>
 
 #include <graphene/chain/database.hpp>
-#include <graphene/chain/operations.hpp>
 
 
 #include <fc/crypto/digest.hpp>

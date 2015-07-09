@@ -224,10 +224,6 @@ namespace graphene { namespace chain {
 
       asset_update_operation(){}
 
-      /// Initializes the operation to apply changes to the provided asset, and copies old.options into @ref new_options
-      /// TODO: operations should not depend upon data model objects, reverse the dependency
-      // asset_update_operation(const asset_object& old);
-
       asset           fee;
       account_id_type issuer;
       asset_id_type   asset_to_update;

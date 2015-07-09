@@ -44,7 +44,10 @@ BOOST_AUTO_TEST_CASE( simple_single_signature )
       const asset_object& core = asset_id_type()(db);
       auto old_balance = fund(nathan);
 
-      transfer_operation op = {asset(),nathan.id, account_id_type(), core.amount(500)};
+      transfer_operation op;
+      op.from = nathan.id;
+      op.to = account_id_type();
+      op.amount = core.amount(500);
       trx.operations.push_back(op);
       sign(trx, nathan_key);
       PUSH_TX( db, trx, database::skip_transaction_dupe_check );
@@ -78,7 +81,10 @@ BOOST_AUTO_TEST_CASE( any_two_of_three )
          trx.signatures.clear();
       } FC_CAPTURE_AND_RETHROW ((nathan.active))
 
-      transfer_operation op = {asset(), nathan.id, account_id_type(), core.amount(500)};
+      transfer_operation op;
+      op.from = nathan.id;
+      op.to = account_id_type();
+      op.amount = core.amount(500);
       trx.operations.push_back(op);
       sign(trx, nathan_key1);
       GRAPHENE_CHECK_THROW(PUSH_TX( db, trx, database::skip_transaction_dupe_check ), fc::exception);
@@ -134,7 +140,9 @@ BOOST_AUTO_TEST_CASE( recursive_accounts )
       auto old_balance = fund(child);
 
       BOOST_TEST_MESSAGE( "Attempting to transfer with no signatures, should fail" );
-      transfer_operation op = {asset(), child.id, account_id_type(), core.amount(500)};
+      transfer_operation op; 
+      op.from = child.id;
+      op.amount = core.amount(500);
       trx.operations.push_back(op);
       GRAPHENE_CHECK_THROW(PUSH_TX( db, trx, database::skip_transaction_dupe_check ), fc::exception);
 
@@ -170,8 +178,11 @@ BOOST_AUTO_TEST_CASE( recursive_accounts )
          trx.signatures.clear();
       }
 
-      op = {asset(),child.id, account_id_type(), core.amount(500)};
+      op.from = child.id;
+      op.to = account_id_type();
+      op.amount = core.amount(500);
       trx.operations.push_back(op);
+
       BOOST_TEST_MESSAGE( "Attempting transfer with no signatures, should fail" );
       GRAPHENE_CHECK_THROW(PUSH_TX( db, trx, database::skip_transaction_dupe_check ), fc::exception);
       BOOST_TEST_MESSAGE( "Attempting transfer just parent1, should fail" );
@@ -295,24 +306,33 @@ BOOST_AUTO_TEST_CASE( proposed_single_account )
 
       //Following any_two_of_three, nathan's active authority is satisfied by any two of {key1,key2,key3}
       BOOST_TEST_MESSAGE( "moneyman is creating proposal for nathan to transfer 100 CORE to moneyman" );
-      proposal_create_operation op = {moneyman.id, asset(),
-                                      {{transfer_operation{asset(),nathan.id, moneyman.get_id(), core.amount(100)}}},
-                                      db.head_block_time() + fc::days(1)};
+
+      transfer_operation transfer_op;
+      transfer_op.from = nathan.id;
+      transfer_op.to  = moneyman.get_id();
+      transfer_op.amount = core.amount(100); 
+
+      proposal_create_operation op;
+      op.fee_paying_account = moneyman.id;
+      op.proposed_ops.emplace_back( transfer_op );
+      op.expiration_time =  db.head_block_time() + fc::days(1);
+                                     
       asset nathan_start_balance = db.get_balance(nathan.get_id(), core.get_id());
       {
+         vector<authority> other;
          flat_set<account_id_type> active_set, owner_set;
-         operation_get_required_active_authorities(op,active_set);
-         operation_get_required_owner_authorities(op,owner_set);
+         operation_get_required_authorities(op,active_set,owner_set,other);
          BOOST_CHECK_EQUAL(active_set.size(), 1);
          BOOST_CHECK_EQUAL(owner_set.size(), 0);
+         BOOST_CHECK_EQUAL(other.size(), 0);
          BOOST_CHECK(*active_set.begin() == moneyman.get_id());
 
          active_set.clear();
-         //op.proposed_ops.front().get_required_auth(active_set, owner_set);
-         operation_get_required_active_authorities( op.proposed_ops.front().op, active_set );
-         operation_get_required_owner_authorities( op.proposed_ops.front().op, owner_set );
+         other.clear();
+         operation_get_required_authorities(op,active_set,owner_set,other);
          BOOST_CHECK_EQUAL(active_set.size(), 1);
          BOOST_CHECK_EQUAL(owner_set.size(), 0);
+         BOOST_CHECK_EQUAL(other.size(), 0);
          BOOST_CHECK(*active_set.begin() == nathan.id);
       }
 
@@ -329,21 +349,28 @@ BOOST_AUTO_TEST_CASE( proposed_single_account )
       BOOST_CHECK_EQUAL(proposal.available_owner_approvals.size(), 0);
       BOOST_CHECK(*proposal.required_active_approvals.begin() == nathan.id);
 
-      trx.operations = {proposal_update_operation{account_id_type(), asset(), proposal.id,{nathan.id},flat_set<account_id_type>{},flat_set<account_id_type>{},flat_set<account_id_type>{},flat_set<public_key_type>{},flat_set<public_key_type>{}}};
+      proposal_update_operation pup;
+      pup.proposal = proposal.id;
+      pup.active_approvals_to_add.insert(nathan.id);
+
+      trx.operations = {pup};
       trx.sign(  genesis_key );
       //Genesis may not add nathan's approval.
       GRAPHENE_CHECK_THROW(PUSH_TX( db, trx ), fc::exception);
-      trx.operations = {proposal_update_operation{account_id_type(), asset(), proposal.id,{account_id_type()},flat_set<account_id_type>{},flat_set<account_id_type>{},flat_set<account_id_type>{},flat_set<public_key_type>{},flat_set<public_key_type>{}}};
+      pup.active_approvals_to_add.clear();
+      pup.active_approvals_to_add.insert(account_id_type());
+      trx.operations = {pup};
       trx.sign(  genesis_key );
       //Genesis has no stake in the transaction.
       GRAPHENE_CHECK_THROW(PUSH_TX( db, trx ), fc::exception);
 
       trx.signatures.clear();
-      trx.operations = {proposal_update_operation{nathan.id, asset(), proposal.id,{nathan.id},flat_set<account_id_type>{},flat_set<account_id_type>{},flat_set<account_id_type>{},flat_set<public_key_type>{},flat_set<public_key_type>{}}};
+      pup.active_approvals_to_add.clear();
+      pup.active_approvals_to_add.insert(nathan.id);
+      
+      trx.operations = {pup};
       trx.sign(  nathan_key3 );
       trx.sign(  nathan_key2 );
-      // TODO: verify the key_id is proper...
-      //trx.signatures = {nathan_key3.sign_compact(trx.digest()), nathan_key2.sign_compact(trx.digest())};
 
       BOOST_CHECK_EQUAL(get_balance(nathan, core), nathan_start_balance.amount.value);
       PUSH_TX( db, trx );
@@ -371,7 +398,10 @@ BOOST_AUTO_TEST_CASE( genesis_authority )
    });
 
    BOOST_TEST_MESSAGE( "transfering 100000 CORE to nathan, signing with genesis key" );
-   trx.operations.push_back(transfer_operation({asset(), account_id_type(), nathan.id, asset(100000)}));
+   transfer_operation top;
+   top.to = nathan.id;
+   top.amount = asset(100000);
+   trx.operations.push_back(top);
    sign(trx, genesis_key);
    GRAPHENE_CHECK_THROW(PUSH_TX( db, trx ), fc::exception);
 
@@ -468,10 +498,14 @@ BOOST_FIXTURE_TEST_CASE( fired_delegates, database_fixture )
    }
 
    //A proposal is created to give nathan lots more money.
-   proposal_create_operation pop = proposal_create_operation::genesis_proposal(db);
+   proposal_create_operation pop = proposal_create_operation::genesis_proposal(db.get_global_properties().parameters, db.head_block_time());
    pop.fee_paying_account = GRAPHENE_TEMP_ACCOUNT;
    pop.expiration_time = db.head_block_time() + *pop.review_period_seconds * 3;
-   pop.proposed_ops.emplace_back(transfer_operation({asset(),account_id_type(), nathan->id, asset(100000)}));
+
+   transfer_operation top;
+   top.to = nathan->id;
+   top.amount = asset(100000);
+   pop.proposed_ops.emplace_back(top);
    trx.operations.push_back(pop);
    const proposal_object& prop = db.get<proposal_object>(PUSH_TX( db, trx ).operation_results.front().get<object_id_type>());
    proposal_id_type pid = prop.id;
@@ -954,13 +988,11 @@ BOOST_FIXTURE_TEST_CASE( bogus_signature, database_fixture )
       const asset_object& core = asset_id_type()(db);
       transfer(genesis_account_object, alice_account_object, core.amount(100000));
 
-      operation xfer_op = transfer_operation(
-         {core.amount(0),
-          alice_account_object.id,
-          bob_account_object.id,
-          core.amount( 5000 ),
-          memo_data() });
-      xfer_op.visit( operation_set_fee( db.current_fee_schedule() ) );
+      transfer_operation xfer_op;
+      xfer_op.from = alice_account_object.id;
+      xfer_op.to = bob_account_object.id;
+      xfer_op.amount = core.amount(5000);
+      xfer_op.fee = db.current_fee_schedule().calculate_fee( xfer_op );
 
       trx.clear();
       trx.operations.push_back( xfer_op );

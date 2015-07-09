@@ -60,7 +60,7 @@ BOOST_AUTO_TEST_CASE( cashback_test )
    transfer(account_id_type(), reggie_id, asset(100000000));
    upgrade_to_lifetime_member(life_id);
    upgrade_to_lifetime_member(reggie_id);
-   enable_fees(10000);
+   enable_fees();
    const auto& fees = db.get_global_properties().parameters.current_fees;
 
 #define CustomRegisterActor(actor_name, registrar_name, referrer_name, referrer_rate) \
@@ -74,7 +74,7 @@ BOOST_AUTO_TEST_CASE( cashback_test )
       op.options.memo_key = actor_name ## _private_key.get_public_key(); \
       op.active = authority(1, public_key_type(actor_name ## _private_key.get_public_key()), 1); \
       op.owner = op.active; \
-      op.fee = op.calculate_fee(fees); \
+      op.fee = fees->calculate_fee(op);  \
       trx.operations = {op}; \
       trx.sign( registrar_name ## _private_key); \
       actor_name ## _id = PUSH_TX( db, trx ).operation_results.front().get<object_id_type>(); \
@@ -96,7 +96,7 @@ BOOST_AUTO_TEST_CASE( cashback_test )
    CustomRegisterActor(scud, stud, ann, 80);
 
    generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
-   enable_fees(10000);
+   enable_fees();
 
    BOOST_CHECK_EQUAL(life_id(db).cashback_balance(db).balance.amount.value, 78000);
    BOOST_CHECK_EQUAL(reggie_id(db).cashback_balance(db).balance.amount.value, 34000);
@@ -117,7 +117,7 @@ BOOST_AUTO_TEST_CASE( cashback_test )
 
    generate_blocks(ann_id(db).membership_expiration_date);
    generate_block();
-   enable_fees(10000);
+   enable_fees();
 
    //ann's membership has expired, so scud's fee should go up to life instead.
    transfer(scud_id, pleb_id, asset(10));
