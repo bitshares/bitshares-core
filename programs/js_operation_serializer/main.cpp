@@ -16,6 +16,7 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #include <graphene/chain/protocol/protocol.hpp>
+#include <graphene/chain/protocol/fee_schedule.hpp>
 #include <graphene/chain/vesting_balance_object.hpp>
 #include <graphene/chain/withdraw_permission_object.hpp>
 #include <graphene/chain/proposal_object.hpp>
@@ -95,6 +96,7 @@ struct js_name<fc::array<T,N>>
 template<size_t N>   struct js_name<fc::array<char,N>>    { static std::string name(){ return  "bytes "+ fc::to_string(N); }; };
 template<size_t N>   struct js_name<fc::array<uint8_t,N>> { static std::string name(){ return  "bytes "+ fc::to_string(N); }; };
 template<typename T> struct js_name< fc::optional<T> >    { static std::string name(){ return "optional " + js_name<T>::name(); } };
+template<typename T> struct js_name< fc::smart_ref<T> >   { static std::string name(){ return js_name<T>::name(); } };
 template<>           struct js_name< object_id_type >     { static std::string name(){ return "object_id_type"; } };
 template<typename T> struct js_name< fc::flat_set<T> >    { static std::string name(){ return "set " + js_name<T>::name(); } };
 template<typename T> struct js_name< std::vector<T> >     { static std::string name(){ return "array " + js_name<T>::name(); } };
@@ -221,6 +223,15 @@ struct serializer<std::vector<T>,false>
    static void init() { serializer<T>::init(); }
    static void generate() {}
 };
+
+template<typename T>
+struct serializer<fc::smart_ref<T>,false>
+{
+   static void init() { 
+      serializer<T>::init(); }
+   static void generate() {}
+};
+
 template<>
 struct serializer<std::vector<operation>,false>
 {
@@ -361,12 +372,15 @@ int main( int argc, char** argv )
     }
     std::cout << "\n";
 
+    detail_ns::js_name<fee_parameters>::name("fee_parameters");
     detail_ns::js_name<operation>::name("operation");
-    detail_ns::js_name<static_variant<address,public_key_type>>::name("key_data");
     detail_ns::js_name<operation_result>::name("operation_result");
     detail_ns::js_name<header_extension>::name("header_extension");
     detail_ns::js_name<worker_initializer>::name("worker_initializer");
-    detail_ns::js_name<static_variant<linear_vesting_policy_initializer,cdd_vesting_policy_initializer>>::name("vesting_policy_initializer");
+    detail_ns::js_name<predicate>::name("predicate");
+    detail_ns::js_name<vesting_policy_initializer>::name("vesting_policy_initializer");
+    detail_ns::serializer<fee_parameters>::init();
+    detail_ns::serializer<fee_schedule>::init();
     detail_ns::serializer<signed_block>::init();
     detail_ns::serializer<block_header>::init();
     detail_ns::serializer<signed_block_header>::init();
