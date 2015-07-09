@@ -193,7 +193,9 @@ namespace graphene { namespace chain {
          const auto& op = o.get<typename DerivedEvaluator::operation_type>();
 
          prepare_fee(op.fee_payer(), op.fee);
-         FC_ASSERT( core_fee_paid >= db().current_fee_schedule().calculate_fee( op ).amount );
+         FC_ASSERT( core_fee_paid >= db().current_fee_schedule().calculate_fee( op ).amount,
+                    "Insufficient Fee Paid",
+                    ("core_fee_paid",core_fee_paid)("required",db().current_fee_schedule().calculate_fee( op ).amount) );
 
          return eval->do_evaluate(op);
       }

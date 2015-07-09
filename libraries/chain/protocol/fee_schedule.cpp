@@ -72,22 +72,24 @@ namespace graphene { namespace chain {
       template<typename ParamType>
       result_type operator()(  ParamType& op )const
       {
-         memset( (char*)&op, sizeof(op), 0 );
+         memset( (char*)&op, 0, sizeof(op) );
       }
    };
 
    void fee_schedule::zero_all_fees()
    {
       *this = get_default();
-      for( auto& i : parameters )
+      for( fee_parameters& i : parameters )
          i.visit( zero_fee_visitor() );
    }
 
    asset fee_schedule::calculate_fee( const operation& op, const price& core_exchange_rate )const
    {
+      //idump( (op)(core_exchange_rate) );
       fee_parameters params; params.set_which(op.which());
       auto itr = parameters.find(params);
       if( itr != parameters.end() ) params = *itr;
+      //idump( (params) );
       auto base_value = op.visit( calc_fee_visitor( params ) );
       auto scaled = fc::uint128(base_value) * scale;
       scaled /= GRAPHENE_100_PERCENT;
