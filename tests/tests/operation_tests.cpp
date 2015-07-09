@@ -704,10 +704,11 @@ BOOST_AUTO_TEST_CASE( transfer_uia )
 
       BOOST_CHECK_EQUAL(get_balance(nathan, uia), 10000000);
       transfer_operation top;
-      top.to = nathan.id;
-      top.from = genesis.id;
+      top.from = nathan.id;
+      top.to = genesis.id;
       top.amount = uia.amount(5000);
       trx.operations.push_back(top);
+      BOOST_TEST_MESSAGE( "Transfering 5000 TEST from nathan to genesis" );
       PUSH_TX( db, trx, ~0 );
       BOOST_CHECK_EQUAL(get_balance(nathan, uia), 10000000 - 5000);
       BOOST_CHECK_EQUAL(get_balance(genesis, uia), 5000);
