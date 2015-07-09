@@ -197,6 +197,20 @@ namespace detail {
          if( _options->count("resync-blockchain") )
             _chain_db->wipe(_data_dir / "blockchain", true);
 
+         if( _options->count("checkpoint") )
+         {
+            auto cps = _options->at("checkpoint").as<vector<string>>();
+            flat_map<uint32_t,block_id_type> loaded_checkpoints;
+            loaded_checkpoints.reserve( cps.size() );
+            for( auto cp : cps )
+            {
+               auto item = fc::json::from_string(cp).as<std::pair<uint32_t,block_id_type> >();
+               loaded_checkpoints[item.first] = item.second;
+            }
+            _chain_db->add_checkpoints( loaded_checkpoints );
+         }
+
+
          if( _options->count("replay-blockchain") )
          {
             ilog("Replaying blockchain on user request.");
@@ -483,12 +497,13 @@ void application::set_program_options(boost::program_options::options_descriptio
    configuration_file_options.add_options()
          ("p2p-endpoint", bpo::value<string>(), "Endpoint for P2P node to listen on")
          ("seed-node,s", bpo::value<vector<string>>()->composing(), "P2P nodes to connect to on startup (may specify multiple times)")
+         ("checkpoint,c", bpo::value<vector<string>>()->composing(), "Pairs of [BLOCK_NUM,BLOCK_ID] that should be enforced as checkpoints.")
          ("rpc-endpoint", bpo::value<string>()->implicit_value("127.0.0.1:8090"), "Endpoint for websocket RPC to listen on")
          ("rpc-tls-endpoint", bpo::value<string>()->implicit_value("127.0.0.1:8089"), "Endpoint for TLS websocket RPC to listen on")
          ("server-pem,p", bpo::value<string>()->implicit_value("server.pem"), "The TLS certificate file for this server")
          ("server-pem-password,P", bpo::value<string>()->implicit_value(""), "Password for this certificate")
          ("genesis-json", bpo::value<boost::filesystem::path>(), "File to read Genesis State from")
-         ("apiaccess", bpo::value<boost::filesystem::path>(), "JSON file specifying API permissions")
+         ("api-access", bpo::value<boost::filesystem::path>(), "JSON file specifying API permissions")
          ;
    command_line_options.add(configuration_file_options);
    command_line_options.add_options()
