@@ -899,8 +899,8 @@ BOOST_AUTO_TEST_CASE( uia_fees )
       const account_object& nathan_account = get_account("nathan");
       const account_object& genesis_account = account_id_type()(db);
 
-      fund_fee_pool(genesis_account, test_asset, 1000000);
-      BOOST_CHECK(asset_dynamic.fee_pool == 1000000);
+      fund_fee_pool(genesis_account, test_asset, 1000*CORE);
+      BOOST_CHECK(asset_dynamic.fee_pool == 1000*CORE);
 
       transfer_operation op;
       op.fee = test_asset.amount(0);
@@ -920,7 +920,7 @@ BOOST_AUTO_TEST_CASE( uia_fees )
                         (old_balance - fee - test_asset.amount(100)).amount.value);
       BOOST_CHECK_EQUAL(get_balance(genesis_account, test_asset), 100);
       BOOST_CHECK(asset_dynamic.accumulated_fees == fee.amount);
-      BOOST_CHECK(asset_dynamic.fee_pool == 1000000 - core_fee.amount);
+      BOOST_CHECK(asset_dynamic.fee_pool == 1000*CORE - core_fee.amount);
 
       //Do it again, for good measure.
       PUSH_TX( db, trx, ~0 );
@@ -928,13 +928,12 @@ BOOST_AUTO_TEST_CASE( uia_fees )
                         (old_balance - fee - fee - test_asset.amount(200)).amount.value);
       BOOST_CHECK_EQUAL(get_balance(genesis_account, test_asset), 200);
       BOOST_CHECK(asset_dynamic.accumulated_fees == fee.amount + fee.amount);
-      BOOST_CHECK(asset_dynamic.fee_pool == 1000000 - core_fee.amount - core_fee.amount);
+      BOOST_CHECK(asset_dynamic.fee_pool == 1000*CORE - core_fee.amount - core_fee.amount);
 
       op = std::move(trx.operations.back().get<transfer_operation>());
       trx.operations.clear();
       op.amount = asset(20);
 
-      asset genesis_balance_before = db.get_balance(account_id_type(), asset_id_type());
       BOOST_CHECK_EQUAL(get_balance(nathan_account, asset_id_type()(db)), 0);
       transfer(genesis_account, nathan_account, asset(20));
       BOOST_CHECK_EQUAL(get_balance(nathan_account, asset_id_type()(db)), 20);
@@ -946,10 +945,8 @@ BOOST_AUTO_TEST_CASE( uia_fees )
       BOOST_CHECK_EQUAL(get_balance(nathan_account, test_asset),
                         (old_balance - fee - fee - fee - test_asset.amount(200)).amount.value);
       BOOST_CHECK_EQUAL(get_balance(genesis_account, test_asset), 200);
-      BOOST_CHECK_EQUAL(get_balance(genesis_account, asset_id_type()(db)),
-                        (genesis_balance_before - asset(GRAPHENE_BLOCKCHAIN_PRECISION)).amount.value);
       BOOST_CHECK(asset_dynamic.accumulated_fees == fee.amount.value * 3);
-      BOOST_CHECK(asset_dynamic.fee_pool == 1000000 - core_fee.amount.value * 3);
+      BOOST_CHECK(asset_dynamic.fee_pool == 1000*CORE - core_fee.amount.value * 3);
    } catch (fc::exception& e) {
       edump((e.to_detail_string()));
       throw;
