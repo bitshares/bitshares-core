@@ -203,7 +203,7 @@ struct database_fixture {
    void transfer( account_id_type from, account_id_type to, const asset& amount, const asset& fee = asset() );
    void transfer( const account_object& from, const account_object& to, const asset& amount, const asset& fee = asset() );
    void fund_fee_pool( const account_object& from, const asset_object& asset_to_fund, const share_type amount );
-   void enable_fees( share_type fee = GRAPHENE_BLOCKCHAIN_PRECISION );
+   void enable_fees();
    void upgrade_to_lifetime_member( account_id_type account );
    void upgrade_to_lifetime_member( const account_object& account );
    void upgrade_to_annual_member( account_id_type account );

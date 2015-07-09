@@ -31,6 +31,7 @@
 #include <graphene/chain/witness_object.hpp>
 
 #include <fc/crypto/digest.hpp>
+#include <fc/smart_ref_impl.hpp>
 
 #include <iostream>
 #include <iomanip>
@@ -70,7 +71,7 @@ database_fixture::database_fixture()
       genesis_state.initial_committee_candidates.push_back({name});
       genesis_state.initial_witness_candidates.push_back({name, delegate_priv_key.get_public_key()});
    }
-   genesis_state.initial_parameters.current_fees.set_all_fees(0);
+   genesis_state.initial_parameters.current_fees->zero_all_fees();
    db.init_genesis(genesis_state);
    ahplugin->plugin_startup();
    mhplugin->plugin_startup();
@@ -333,7 +334,7 @@ account_create_operation database_fixture::make_account(
    }
    create_account.options.num_committee = create_account.options.votes.size();
 
-   create_account.fee = create_account.calculate_fee(db.current_fee_schedule());
+   create_account.fee = db.current_fee_schedule().calculate_fee( create_account );
    return create_account;
 } FC_CAPTURE_AND_RETHROW() }
 
@@ -371,7 +372,7 @@ account_create_operation database_fixture::make_account(
       }
       create_account.options.num_committee = create_account.options.votes.size();
 
-      create_account.fee = create_account.calculate_fee(db.current_fee_schedule());
+      create_account.fee = db.current_fee_schedule().calculate_fee( create_account );
       return create_account;
    }
    FC_CAPTURE_AND_RETHROW((name)(referrer_percent))
@@ -404,7 +405,7 @@ const asset_object& database_fixture::create_bitasset(
    creator.common_options.issuer_permissions = flags;
    creator.common_options.flags = flags & ~global_settle;
    creator.common_options.core_exchange_rate = price({asset(1,1),asset(1)});
-   creator.bitasset_options = asset_object::bitasset_options();
+   creator.bitasset_options = bitasset_options();
    trx.operations.push_back(std::move(creator));
    trx.validate();
    processed_transaction ptx = db.push_transaction(trx, ~0);
@@ -429,7 +430,7 @@ const asset_object& database_fixture::create_prediction_market(
    creator.common_options.issuer_permissions = flags | global_settle;
    creator.common_options.flags = flags & ~global_settle;
    creator.common_options.core_exchange_rate = price({asset(1,1),asset(1)});
-   creator.bitasset_options = asset_object::bitasset_options();
+   creator.bitasset_options = bitasset_options();
    creator.is_prediction_market = true;
    trx.operations.push_back(std::move(creator));
    trx.validate();
@@ -478,7 +479,10 @@ const asset_object& database_fixture::create_user_issued_asset( const string& na
 
 void database_fixture::issue_uia( const account_object& recipient, asset amount )
 {
-   asset_issue_operation op({asset(),amount.asset_id(db).issuer, amount, recipient.id});
+   asset_issue_operation op;
+   op.issuer = amount.asset_id(db).issuer;
+   op.asset_to_issue = amount;
+   op.issue_to_account = recipient.id;
    trx.validate();
    trx.operations.push_back(op);
    return;
@@ -613,7 +617,7 @@ const limit_order_object* database_fixture::create_sell_order( const account_obj
    buy_order.amount_to_sell = amount;
    buy_order.min_to_receive = recv;
    trx.operations.push_back(buy_order);
-   for( auto& op : trx.operations ) op.visit( operation_set_fee( db.current_fee_schedule() ) );
+   for( auto& op : trx.operations ) db.current_fee_schedule().set_fee(op);
    trx.validate();
    auto processed = db.push_transaction(trx, ~0);
    trx.operations.clear();
@@ -628,7 +632,7 @@ asset database_fixture::cancel_limit_order( const limit_order_object& order )
   cancel_order.fee_paying_account = order.seller;
   cancel_order.order = order.id;
   trx.operations.push_back(cancel_order);
-  for( auto& op : trx.operations ) op.visit( operation_set_fee( db.current_fee_schedule() ) );
+  for( auto& op : trx.operations ) db.current_fee_schedule().set_fee(op);
   trx.validate();
   auto processed = db.push_transaction(trx, ~0);
   trx.operations.clear();
@@ -656,11 +660,15 @@ void database_fixture::transfer(
    try
    {
       trx.set_expiration(db.head_block_time() + fc::minutes(1));
-      trx.operations.push_back(transfer_operation({ fee, from.id, to.id, amount, memo_data() }));
+      transfer_operation trans;
+      trans.from = from.id;
+      trans.to   = to.id;
+      trans.amount = amount;
+      trx.operations.push_back(trans);
 
       if( fee == asset() )
       {
-         for( auto& op : trx.operations ) op.visit( operation_set_fee( db.current_fee_schedule() ) );
+         for( auto& op : trx.operations ) db.current_fee_schedule().set_fee(op);
       }
       trx.validate();
       db.push_transaction(trx, ~0);
@@ -679,7 +687,7 @@ void database_fixture::update_feed_producers( const asset_object& mia, flat_set<
    op.new_feed_producers = std::move(producers);
    trx.operations = {std::move(op)};
 
-   trx.visit(operation_set_fee(db.current_fee_schedule()));
+   for( auto& op : trx.operations ) db.current_fee_schedule().set_fee(op);
    trx.validate();
    db.push_transaction(trx, ~0);
    trx.operations.clear();
@@ -698,7 +706,7 @@ void  database_fixture::publish_feed( const asset_object& mia, const account_obj
    op.feed = f;
    trx.operations.emplace_back( std::move(op) );
 
-   for( auto& op : trx.operations ) op.visit( operation_set_fee( db.current_fee_schedule() ) );
+   for( auto& op : trx.operations ) db.current_fee_schedule().set_fee(op);
    trx.validate();
    db.push_transaction(trx, ~0);
    trx.operations.clear();
@@ -714,7 +722,7 @@ void database_fixture::force_global_settle( const asset_object& what, const pric
    sop.asset_to_settle = what.id;
    sop.settle_price = p;
    trx.operations.push_back(sop);
-   for( auto& op : trx.operations ) op.visit( operation_set_fee( db.current_fee_schedule() ) );
+   for( auto& op : trx.operations ) db.current_fee_schedule().set_fee(op);
    trx.validate();
    db.push_transaction(trx, ~0);
    trx.operations.clear();
@@ -729,7 +737,7 @@ void  database_fixture::force_settle( const account_object& who, asset what )
    sop.account = who.id;
    sop.amount = what;
    trx.operations.push_back(sop);
-   for( auto& op : trx.operations ) op.visit( operation_set_fee( db.current_fee_schedule() ) );
+   for( auto& op : trx.operations ) db.current_fee_schedule().set_fee(op);
    trx.validate();
    db.push_transaction(trx, ~0);
    trx.operations.clear();
@@ -740,8 +748,12 @@ void  database_fixture::borrow(const account_object& who, asset what, asset coll
 { try {
    trx.set_expiration(db.head_block_time() + fc::minutes(1));
    trx.operations.clear();
-   trx.operations.push_back(call_order_update_operation({asset(), who.id, collateral, what}));;
-   for( auto& op : trx.operations ) op.visit( operation_set_fee( db.current_fee_schedule() ) );
+   call_order_update_operation update;
+   update.funding_account = who.id;
+   update.delta_collateral = collateral;
+   update.delta_debt = what;
+   trx.operations.push_back(update);
+   for( auto& op : trx.operations ) db.current_fee_schedule().set_fee(op);
    trx.validate();
    db.push_transaction(trx, ~0);
    trx.operations.clear();
@@ -752,8 +764,12 @@ void  database_fixture::cover(const account_object& who, asset what, asset colla
 { try {
    trx.set_expiration(db.head_block_time() + fc::minutes(1));
    trx.operations.clear();
-   trx.operations.push_back( call_order_update_operation({asset(), who.id, -collateral, -what}));
-   for( auto& op : trx.operations ) op.visit( operation_set_fee( db.current_fee_schedule() ) );
+   call_order_update_operation update;
+   update.funding_account = who.id;
+   update.delta_collateral = -collateral;
+   update.delta_debt = -what;
+   trx.operations.push_back(update);
+   for( auto& op : trx.operations ) db.current_fee_schedule().set_fee(op);
    trx.validate();
    db.push_transaction(trx, ~0);
    trx.operations.clear();
@@ -762,25 +778,24 @@ void  database_fixture::cover(const account_object& who, asset what, asset colla
 
 void database_fixture::fund_fee_pool( const account_object& from, const asset_object& asset_to_fund, const share_type amount )
 {
-   trx.operations.push_back( asset_fund_fee_pool_operation({asset(), from.id, asset_to_fund.id, amount}) );
+   asset_fund_fee_pool_operation fund;
+   fund.from_account = from.id;
+   fund.asset_id = asset_to_fund.id;
+   fund.amount = amount;
+   trx.operations.push_back( fund );
 
-   for( auto& op : trx.operations )
-      op.visit( operation_set_fee( db.current_fee_schedule() ) );
+   for( auto& op : trx.operations ) db.current_fee_schedule().set_fee(op);
    trx.validate();
    db.push_transaction(trx, ~0);
    trx.operations.clear();
    verify_asset_supplies(db);
 }
 
-void database_fixture::enable_fees(
-   share_type fee /* = GRAPHENE_BLOCKCHAIN_PRECISION */
-   )
+void database_fixture::enable_fees()
 {
-   db.modify(global_property_id_type()(db), [fee](global_property_object& gpo)
+   db.modify(global_property_id_type()(db), [](global_property_object& gpo)
    {
-      gpo.parameters.current_fees.set_all_fees(fee.value);
-      gpo.parameters.current_fees.membership_annual_fee = 3*fee.value;
-      gpo.parameters.current_fees.membership_lifetime_fee = 10*fee.value;
+      gpo.parameters.current_fees = fee_schedule::get_default();
    } );
 }
 
@@ -796,7 +811,7 @@ void database_fixture::upgrade_to_lifetime_member( const account_object& account
       account_upgrade_operation op;
       op.account_to_upgrade = account.get_id();
       op.upgrade_to_lifetime_member = true;
-      op.fee = op.calculate_fee(db.get_global_properties().parameters.current_fees);
+      op.fee = db.get_global_properties().parameters.current_fees->calculate_fee(op);
       trx.operations = {op};
       db.push_transaction(trx, ~0);
       FC_ASSERT( op.account_to_upgrade(db).is_lifetime_member() );
@@ -816,7 +831,7 @@ void database_fixture::upgrade_to_annual_member(const account_object& account)
    try {
       account_upgrade_operation op;
       op.account_to_upgrade = account.get_id();
-      op.fee = op.calculate_fee(db.get_global_properties().parameters.current_fees);
+      op.fee = db.get_global_properties().parameters.current_fees->calculate_fee(op);
       trx.operations = {op};
       db.push_transaction(trx, ~0);
       FC_ASSERT( op.account_to_upgrade(db).is_member(db.head_block_time()) );
