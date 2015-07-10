@@ -48,6 +48,13 @@ struct plain_keys
    fc::sha512                    checksum;
 };
 
+struct brain_key_info
+{
+   string brain_priv_key;
+   string wif_priv_key;
+   public_key_type pub_key;
+};
+
 struct wallet_data
 {
    account_multi_index_type my_accounts;
@@ -386,7 +393,7 @@ class wallet_api
        * be easy to write down (and, with effort, memorize).
        * @returns a suggested brain_key
        */
-      string  suggest_brain_key()const;
+      brain_key_info suggest_brain_key()const;
 
       /** Converts a signed_transaction in JSON form to its binary representation.
        *
@@ -1014,6 +1021,12 @@ FC_REFLECT( graphene::wallet::wallet_data,
             (ws_user)
             (ws_password)
           )
+
+FC_REFLECT( graphene::wallet::brain_key_info,
+            (brain_priv_key)
+            (wif_priv_key)
+            (pub_key)
+          );
 
 FC_API( graphene::wallet::wallet_api,
         (help)

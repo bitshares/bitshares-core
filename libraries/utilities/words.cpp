@@ -18,6 +18,8 @@
 #include <stdint.h>
 #include <graphene/utilities/words.hpp>
 
+namespace graphene { namespace words {
+
 const const_char_ptr word_list[] = { 
 "a",
 "aa",
@@ -49771,3 +49773,5 @@ void hide_unused_warning() {
   (void)word_list_size; 
   (void)word_list; 
 }
+
+} } // graphene::words
