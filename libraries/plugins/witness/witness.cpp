@@ -86,12 +86,28 @@ void witness_plugin::plugin_initialize(const boost::program_options::variables_m
 
 void witness_plugin::plugin_startup()
 { try {
-      std::set<chain::witness_id_type> bad_wits;
-      //Start NTP time client
-      graphene::time::now();
-      for( auto wit : _witnesses )
+   chain::database& d = database();
+   std::set<chain::witness_id_type> bad_wits;
+   //Start NTP time client
+   graphene::time::now();
+   for( auto wit : _witnesses )
    {
-      auto signing_key = wit(database()).signing_key;
+      if( d.find(wit) == nullptr )
+      {
+         if( app().is_finished_syncing() )
+         {
+            elog("ERROR: Unable to find witness ${w}, even though syncing has finished. This witness will be ignored.",
+                 ("w", wit));
+            continue;
+         } else {
+            wlog("WARNING: Unable to find witness ${w}. Postponing initialization until syncing finishes.",
+                 ("w", wit));
+            app().syncing_finished.connect([this]{plugin_startup();});
+            return;
+         }
+      }
+
+      auto signing_key = wit(d).signing_key;
       if( !_private_keys.count(signing_key) )
       {
          // Check if it's a duplicate key of one I do have
@@ -119,7 +135,7 @@ void witness_plugin::plugin_startup()
    {
       ilog("Launching block production for ${n} witnesses.", ("n", _witnesses.size()));
       app().set_block_production(true);
-      schedule_next_production(database().get_global_properties().parameters);
+      schedule_next_production(d.get_global_properties().parameters);
    } else
       elog("No witnesses configured! Please add witness IDs and private keys to configuration.");
 } FC_CAPTURE_AND_RETHROW() }

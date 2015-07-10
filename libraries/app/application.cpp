@@ -32,6 +32,7 @@
 #include <fc/rpc/websocket_api.hpp>
 
 #include <boost/filesystem/path.hpp>
+#include <boost/signals2.hpp>
 
 #include <iostream>
 
@@ -284,10 +285,16 @@ namespace detail {
       { try {
          ilog("Got block #${n} from network", ("n", blk_msg.block.block_num()));
          try {
-            return _chain_db->push_block( blk_msg.block, _is_block_producer? database::skip_nothing : database::skip_transaction_signatures );
+            return _chain_db->push_block(blk_msg.block, _is_block_producer? database::skip_nothing : database::skip_transaction_signatures);
          } catch( const fc::exception& e ) {
             elog("Error when pushing block:\n${e}", ("e", e.to_detail_string()));
             throw;
+         }
+
+         if( !_is_finished_syncing && !sync_mode )
+         {
+            _is_finished_syncing = true;
+            _self->syncing_finished();
          }
       } FC_CAPTURE_AND_RETHROW( (blk_msg)(sync_mode) ) }
 
@@ -408,7 +415,7 @@ namespace detail {
        * @param item_count the number of items known to the node that haven't been sent to handle_item() yet.
        *                   After `item_count` more calls to handle_item(), the node will be in sync
        */
-      virtual void     sync_status(uint32_t item_type, uint32_t item_count) override
+      virtual void sync_status(uint32_t item_type, uint32_t item_count) override
       {
          // any status reports to GUI go here
       }
@@ -416,7 +423,7 @@ namespace detail {
       /**
        * Call any time the number of connected peers changes.
        */
-      virtual void     connection_count_changed(uint32_t c) override
+      virtual void connection_count_changed(uint32_t c) override
       {
         // any status reports to GUI go here
       }
@@ -470,6 +477,8 @@ namespace detail {
       std::shared_ptr<fc::http::websocket_tls_server>  _websocket_tls_server;
 
       std::map<string, std::shared_ptr<abstract_plugin>> _plugins;
+
+      bool _is_finished_syncing = false;
    };
 
 }
@@ -577,6 +586,11 @@ void application::set_block_production(bool producing_blocks)
 optional< api_access_info > application::get_api_access_info( const string& username )const
 {
    return my->get_api_access_info( username );
+}
+
+bool application::is_finished_syncing() const
+{
+   return my->_is_finished_syncing;
 }
 
 void graphene::app::application::add_plugin(const string& name, std::shared_ptr<graphene::app::abstract_plugin> p)

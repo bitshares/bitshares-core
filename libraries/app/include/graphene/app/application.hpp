@@ -77,6 +77,10 @@ namespace graphene { namespace app {
          void set_block_production(bool producing_blocks);
          fc::optional< api_access_info > get_api_access_info( const string& username )const;
 
+         bool is_finished_syncing()const;
+         /// Emitted when syncing finishes (is_finished_syncing will return true)
+         boost::signals2::signal<void()> syncing_finished;
+
       private:
          void add_plugin( const string& name, std::shared_ptr<abstract_plugin> p );
          std::shared_ptr<detail::application_impl> my;
