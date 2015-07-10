@@ -18,6 +18,7 @@
 #include <graphene/chain/protocol/block.hpp>
 #include <fc/io/raw.hpp>
 #include <fc/bitutil.hpp>
+#include <algorithm>
 
 namespace graphene { namespace chain {
    digest_type block_header::digest()const
