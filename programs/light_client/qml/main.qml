@@ -2,9 +2,12 @@ import QtQuick 2.5
 import QtQuick.Controls 1.4
 import QtQuick.Dialogs 1.2
 
+import Qt.labs.settings 1.0
+
 import Graphene.Client 0.1
 
 ApplicationWindow {
+   id: window
    visible: true
    width: 640
    height: 480
@@ -26,26 +29,25 @@ ApplicationWindow {
 
    DataModel {
       id: model
-      objectName: "model"
+   }
+   Settings {
+      id: appSettings
+      category: "appSettings"
    }
 
-   MainForm {
-      id: form
-      anchors.fill: parent
-      button1.onClicked: {
-         console.log(JSON.stringify(model.getAccount(3)))
-         messageDialog.show(qsTr("Account name is %1").arg(model.getAccount(3).name))
-      }
-      button2.onClicked: messageDialog.show(qsTr("Account name is %1").arg(model.getAccount("steve").name))
+   Label {
+      anchors.centerIn: parent
+      font.pointSize: 75
+      text: "Dashboard goes here"
+      opacity: .5
    }
 
-   MessageDialog {
-      id: messageDialog
-      title: qsTr("May I have your attention, please?")
-
-      function show(caption) {
-         messageDialog.text = caption;
-         messageDialog.open();
-      }
+   // This Settings is only for geometry -- it doesn't get an id. See appSettings for normal settings
+   Settings {
+      category: "windowGeometry"
+      property alias x: window.x
+      property alias y: window.y
+      property alias width: window.width
+      property alias height: window.height
    }
 }
