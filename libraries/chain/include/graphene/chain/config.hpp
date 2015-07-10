@@ -38,6 +38,7 @@
  * make the network unable to operate.
  */
 #define GRAPHENE_MIN_TRANSACTION_SIZE_LIMIT 1024
+#define GRAPHENE_MIN_BLOCK_INTERVAL   1 /* seconds */
 #define GRAPHENE_MAX_BLOCK_INTERVAL  30 /* seconds */
 
 #define GRAPHENE_DEFAULT_BLOCK_INTERVAL  5 /* seconds */

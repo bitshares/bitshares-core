@@ -341,8 +341,6 @@ namespace graphene { namespace chain {
        bool is_valid_v1( const std::string& base58str );
    };
 
-
-
 } }  // graphene::chain
 
 namespace fc

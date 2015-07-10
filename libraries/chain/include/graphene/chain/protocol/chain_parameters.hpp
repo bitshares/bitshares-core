@@ -75,6 +75,7 @@ namespace graphene { namespace chain {
          FC_ASSERT( bulk_discount_threshold_min <= bulk_discount_threshold_max );
          FC_ASSERT( bulk_discount_threshold_min > 0 );
 
+         FC_ASSERT( block_interval >= GRAPHENE_MIN_BLOCK_INTERVAL );
          FC_ASSERT( block_interval <= GRAPHENE_MAX_BLOCK_INTERVAL );
          FC_ASSERT( block_interval > 0 );
          FC_ASSERT( maintenance_interval > block_interval,

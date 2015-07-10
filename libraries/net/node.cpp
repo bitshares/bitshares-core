@@ -2415,7 +2415,7 @@ namespace graphene { namespace net { namespace detail {
         // they must be an attacker or have a buggy client.
         fc::time_point_sec minimum_time_of_last_offered_block =
             originating_peer->last_block_time_delegate_has_seen + // timestamp of the block immediately before the first unfetched block
-            originating_peer->number_of_unfetched_item_ids * GRAPHENE_MAX_BLOCK_INTERVAL;
+            originating_peer->number_of_unfetched_item_ids * GRAPHENE_MIN_BLOCK_INTERVAL;
         if (minimum_time_of_last_offered_block > _delegate->get_blockchain_now() + GRAPHENE_NET_FUTURE_SYNC_BLOCKS_GRACE_PERIOD_SEC)
         {
           wlog("Disconnecting from peer ${peer} who offered us an implausible number of blocks, their last block would be in the future (${timestamp})",
