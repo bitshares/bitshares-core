@@ -114,7 +114,7 @@ namespace graphene { namespace chain {
             op.visit( std::forward<Visitor>( visitor ) );
       }
 
-      void get_required_authorities( flat_set<account_id_type>& active, flat_set<account_id_type>& owner, vector<authority>& other );
+      void get_required_authorities( flat_set<account_id_type>& active, flat_set<account_id_type>& owner, vector<authority>& other )const;
 
    protected:
       // Intentionally unreflected: does not go on wire
@@ -129,7 +129,23 @@ namespace graphene { namespace chain {
       signed_transaction( const transaction& trx = transaction() )
          : transaction(trx){}
 
-      void sign( const private_key_type& key );
+      /** signs and appends to signatures */
+      const signature_type& sign( const private_key_type& key );
+
+      /** returns signature but does not append */
+      signature_type sign( const private_key_type& key )const;
+
+      /**
+       *  Given a set of private keys sign this transaction with a minimial subset of required keys.
+       *
+       *  @pram get_auth   - used to fetch the active authority required for an account referenced by another authority
+       */
+      void sign( const vector<private_key_type>& keys, 
+                 const std::function<const authority*(account_id_type)>& get_active,
+                 const std::function<const authority*(account_id_type)>& get_owner  );
+      
+      bool verify( const std::function<const authority*(account_id_type)>& get_active,
+                   const std::function<const authority*(account_id_type)>& get_owner  )const;
 
       vector<signature_type> signatures;
 

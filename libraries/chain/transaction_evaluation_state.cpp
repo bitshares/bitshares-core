@@ -60,10 +60,34 @@ namespace graphene { namespace chain {
          return true;
 
       uint32_t total_weight = 0;
+
+      for( const auto& key : au.key_auths )
+      {
+         if( signed_by( key.first ) )
+         {
+            total_weight += key.second;
+            if( total_weight >= au.weight_threshold )
+               return true;
+         }
+      }
+      for( const auto& key : au.address_auths )
+      {
+         if( signed_by( key.first ) )
+         {
+            total_weight += key.second;
+            if( total_weight >= au.weight_threshold )
+               return true;
+         }
+      }
+
       for( const auto& auth : au.account_auths )
       {
          if( approved_by.find( std::make_pair(auth.first,auth_class) ) != approved_by.end() )
+         {
             total_weight += auth.second;
+            if( total_weight >= au.weight_threshold )
+               return true;
+         }
          else
          {
             if( depth == GRAPHENE_MAX_SIG_CHECK_DEPTH )
@@ -76,18 +100,10 @@ namespace graphene { namespace chain {
             {
                approved_by.insert( std::make_pair(acnt.id,auth_class) );
                total_weight += auth.second;
+               if( total_weight >= au.weight_threshold )
+                  return true;
             }
          }
-      }
-      for( const auto& key : au.key_auths )
-      {
-         if( signed_by( key.first ) )
-            total_weight += key.second;
-      }
-      for( const auto& key : au.address_auths )
-      {
-         if( signed_by( key.first ) )
-            total_weight += key.second;
       }
 
       return total_weight >= au.weight_threshold;

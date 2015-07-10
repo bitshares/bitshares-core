@@ -63,16 +63,27 @@ graphene::chain::transaction_id_type graphene::chain::transaction::id() const
    return result;
 }
 
-void graphene::chain::signed_transaction::sign(const private_key_type& key)
+const signature_type& graphene::chain::signed_transaction::sign(const private_key_type& key)
 {
    if( relative_expiration != 0 )
    {
       // Relative expiration is set, meaning we must include the block ID in the signature
-      assert(block_id_cache.valid());
+      FC_ASSERT(block_id_cache.valid());
       signatures.push_back(key.sign_compact(digest(*block_id_cache)));
    } else {
       signatures.push_back(key.sign_compact(digest()));
    }
+   return signatures.back();
+}
+signature_type graphene::chain::signed_transaction::sign(const private_key_type& key)const
+{
+   if( relative_expiration != 0 )
+   {
+      // Relative expiration is set, meaning we must include the block ID in the signature
+      FC_ASSERT(block_id_cache.valid());
+      return key.sign_compact(digest(*block_id_cache));
+   }
+   return key.sign_compact(digest());
 }
 
 void transaction::set_expiration( fc::time_point_sec expiration_time )
@@ -90,10 +101,163 @@ void transaction::set_expiration( const block_id_type& reference_block, unsigned
    relative_expiration = lifetime_intervals;
    block_id_cache = reference_block;
 }
-void transaction::get_required_authorities( flat_set<account_id_type>& active, flat_set<account_id_type>& owner, vector<authority>& other )
+void transaction::get_required_authorities( flat_set<account_id_type>& active, flat_set<account_id_type>& owner, vector<authority>& other )const
 {
    for( const auto& op : operations )
       operation_get_required_authorities( op, active, owner, other );
+}
+
+struct sign_state
+{
+      /** returns true if we have a signature for this key or can 
+       * produce a signature for this key, else returns false. 
+       */
+      bool signed_by( const public_key_type& k )
+      {
+         auto itr = signatures.find(k);
+         if( itr == signatures.end() )
+         {
+            auto pk = keys.find(k);
+            if( pk  != keys.end() )
+            {
+               signatures[k]   = trx.sign(pk->second);
+               checked_sigs.insert(k);
+               return true;
+            }
+            return false;
+         }
+         checked_sigs.insert(k);
+         return true;
+      }
+
+      /**
+       *  Checks to see if we have signatures of the active authorites of
+       *  the accounts specified in authority or the keys specified. 
+       */
+      bool check_authority( const authority* au, int depth = 0 )
+      {
+         if( au == nullptr ) return false;
+         const authority& auth = *au;
+
+         uint32_t total_weight = 0;
+         for( const auto& k : auth.key_auths )
+            if( signed_by( k.first ) )
+            {
+               total_weight += k.second;
+               if( total_weight >= auth.weight_threshold )
+                  return true;
+            }
+
+         for( const auto& a : auth.account_auths )
+         {
+            if( approved_by.find(a.first) == approved_by.end() )
+            {
+               if( depth == GRAPHENE_MAX_SIG_CHECK_DEPTH )
+                  return false;
+               if( check_authority( get_active( a.first ), depth+1 ) )
+               {
+                  approved_by.insert( a.first );
+                  total_weight += a.second;
+                  if( total_weight >= auth.weight_threshold )
+                     return true;
+               }
+            }
+            else
+            {
+               total_weight += a.second;
+               if( total_weight >= auth.weight_threshold )
+                  return true;
+            }
+         }
+         return total_weight >= auth.weight_threshold;
+      }
+
+      bool remove_unused_signatures()
+      {
+         vector<public_key_type> remove_sigs;
+         for( const auto& sig : signatures )
+            if( checked_sigs.find(sig.first) == checked_sigs.end() )
+               remove_sigs.push_back( sig.first );
+         for( auto& sig : remove_sigs )
+            signatures.erase(sig);
+         return remove_sigs.size() != 0;
+      }
+
+      sign_state( const signed_transaction& t, const std::function<const authority*(account_id_type)>& a,
+                  const vector<private_key_type>& kys = vector<private_key_type>() )
+      :trx(t),get_active(a)
+      {
+         auto d = trx.digest();
+         for( const auto& sig : trx.signatures )
+            signatures[ fc::ecc::public_key( sig, d ) ] = sig;
+      
+         for( const auto& key : kys ) 
+            keys[key.get_public_key()] = key;
+      }
+
+      const signed_transaction&                               trx;
+      const std::function<const authority*(account_id_type)>& get_active;
+
+      flat_map<public_key_type,private_key_type>         keys;
+      flat_map<public_key_type,signature_type>  signatures;
+
+      set<public_key_type>      checked_sigs;
+      flat_set<account_id_type> approved_by;
+
+};
+
+/**
+ *  Given a set of private keys sign this transaction with a minimial subset of required keys.
+ */
+void signed_transaction::sign( const vector<private_key_type>& keys, 
+                               const std::function<const authority*(account_id_type)>& get_active,
+                               const std::function<const authority*(account_id_type)>& get_owner  )
+{
+   flat_set<account_id_type> required_active;
+   flat_set<account_id_type> required_owner;
+   vector<authority> other;
+   get_required_authorities( required_active, required_owner, other );
+
+   sign_state s(*this,get_active,keys);
+
+   for( const auto& auth : other )
+      s.check_authority(&auth);
+   for( auto id : required_active )
+      s.check_authority(get_active(id));
+   for( auto id : required_owner )
+      s.check_authority(get_owner(id));
+   
+   s.remove_unused_signatures();
+
+   signatures.clear();
+   for( const auto& sig : s.signatures )
+      signatures.push_back(sig.second);
+}
+
+bool signed_transaction::verify( const std::function<const authority*(account_id_type)>& get_active,
+                                 const std::function<const authority*(account_id_type)>& get_owner  )const
+{
+   flat_set<account_id_type> required_active;
+   flat_set<account_id_type> required_owner;
+   vector<authority> other;
+   get_required_authorities( required_active, required_owner, other );
+
+   sign_state s(*this,get_active);
+
+   for( const auto& auth : other )
+      if( !s.check_authority(&auth) )
+         return false;
+
+   // fetch all of the top level authorities
+   for( auto id : required_active )
+      if( !s.check_authority(get_active(id)) )
+         return false;
+   for( auto id : required_owner )
+      if( !s.check_authority(get_owner(id)) )
+         return false;
+   if( s.remove_unused_signatures() )
+      return false;
+   return true;
 }
 
 } } // graphene::chain
