@@ -727,6 +727,7 @@ public:
 
       vector<public_key_type> paying_keys = registrar_account_object.active.get_keys();
 
+      tx.set_expiration(get_dynamic_global_properties().head_block_id);
       tx.validate();
 
       for( public_key_type& key : paying_keys )
