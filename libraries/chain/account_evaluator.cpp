@@ -82,7 +82,6 @@ object_id_type account_create_evaluator::do_apply( const account_create_operatio
          obj.options          = o.options;
    });
 
-   const auto& global_properties = db().get_global_properties();
    const auto& dynamic_properties = db().get_dynamic_global_properties();
    db().modify(dynamic_properties, [](dynamic_global_property_object& p) {
       ++p.accounts_registered_this_interval;
