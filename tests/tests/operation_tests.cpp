@@ -362,7 +362,7 @@ BOOST_AUTO_TEST_CASE( update_account )
       const public_key_type key_id = nathan_new_key.get_public_key();
       const auto& active_delegates = db.get_global_properties().active_delegates;
 
-      transfer(account_id_type()(db), nathan, asset(30000));
+      transfer(account_id_type()(db), nathan, asset(1000000000));
 
       trx.operations.clear();
       account_update_operation op;
@@ -386,8 +386,6 @@ BOOST_AUTO_TEST_CASE( update_account )
       BOOST_CHECK(nathan.owner.key_auths.at(key_id) == 1);
       BOOST_CHECK(nathan.owner.key_auths.at(delegate_pub_key) == 1);
       BOOST_CHECK(nathan.options.votes.size() == 2);
-
-      transfer(account_id_type()(db), nathan, asset(3000000));
 
       enable_fees();
       {
