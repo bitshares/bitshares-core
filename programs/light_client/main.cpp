@@ -4,9 +4,13 @@
 
 #include "ClientDataModel.hpp"
 
+
 int main(int argc, char *argv[])
 {
+   fc::thread::current().set_name( "main" );
    QApplication app(argc, argv);
+
+   qRegisterMetaType<std::function<void()>>();
 
    qmlRegisterType<Asset>("Graphene.Client", 0, 1, "Asset");
    qmlRegisterType<Balance>("Graphene.Client", 0, 1, "Balance");

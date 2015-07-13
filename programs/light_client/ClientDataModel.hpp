@@ -7,6 +7,7 @@
 #include <QQmlListProperty>
 
 
+Q_DECLARE_METATYPE(std::function<void()>)
 
 
 class Asset : public QObject {
@@ -78,7 +79,11 @@ class GrapheneApplication : public QObject {
    bool                        m_isConnected = false;
 
    fc::http::websocket_client  m_client;
-   fc::future<bool>            m_done;
+   fc::future<void>            m_done;
+
+   void setIsConnected( bool v );
+
+   Q_SLOT void execute( const std::function<void()>& )const;
 public:
    GrapheneApplication( QObject* parent = nullptr );
    ~GrapheneApplication();
@@ -88,7 +93,10 @@ public:
       return m_model;
    }
 
-   Q_INVOKABLE bool start(QString dataDirectory, QString apiUrl);
+   Q_INVOKABLE void start( QString dataDirectory, 
+                           QString apiUrl, 
+                           QString user, 
+                           QString pass );
 
    bool isConnected() const
    {
@@ -97,4 +105,5 @@ public:
 
 signals:
    void isConnectedChanged(bool isConnected);
+   void queueExecute( const std::function<void()>& );
 };
