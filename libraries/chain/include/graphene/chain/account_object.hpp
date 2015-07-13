@@ -310,7 +310,7 @@ namespace graphene { namespace chain {
       account_object,
       indexed_by<
          hashed_unique< tag<by_id>, member< object, object_id_type, &object::id > >,
-         ordered_non_unique< tag<by_name>, member<account_object, string, &account_object::name> >
+         ordered_unique< tag<by_name>, member<account_object, string, &account_object::name> >
       >
    > account_multi_index_type;
 
