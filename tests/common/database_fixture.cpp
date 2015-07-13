@@ -30,6 +30,8 @@
 #include <graphene/chain/vesting_balance_object.hpp>
 #include <graphene/chain/witness_object.hpp>
 
+#include <graphene/utilities/tempdir.hpp>
+
 #include <fc/crypto/digest.hpp>
 #include <fc/smart_ref_impl.hpp>
 
@@ -285,7 +287,7 @@ void database_fixture::verify_account_history_plugin_index( )const
 void database_fixture::open_database()
 {
    if( !data_dir ) {
-      data_dir = fc::temp_directory();
+      data_dir = fc::temp_directory( graphene::utilities::temp_directory_path() );
       db.open(data_dir->path(), [this]{return genesis_state;});
    }
 }
