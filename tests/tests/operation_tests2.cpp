@@ -19,6 +19,8 @@
 #include <boost/test/unit_test.hpp>
 
 #include <graphene/chain/database.hpp>
+#include <graphene/chain/exceptions.hpp>
+
 #include <graphene/chain/asset_object.hpp>
 #include <graphene/chain/account_object.hpp>
 #include <graphene/chain/balance_object.hpp>
@@ -28,7 +30,8 @@
 #include <graphene/chain/worker_evaluator.hpp>
 #include <graphene/chain/vesting_balance_object.hpp>
 #include <graphene/chain/withdraw_permission_object.hpp>
-#include <graphene/chain/exceptions.hpp>
+
+#include <graphene/utilities/tempdir.hpp>
 
 #include <fc/crypto/digest.hpp>
 
@@ -970,7 +973,7 @@ BOOST_AUTO_TEST_CASE( balance_object_test )
 { try {
    // Intentionally overriding the fixture's db; I need to control genesis on this one.
    database db;
-   fc::temp_directory td;
+   fc::temp_directory td( graphene::utilities::temp_directory_path() );
    genesis_state.initial_balances.push_back({generate_private_key("n").get_public_key(), GRAPHENE_SYMBOL, 1});
    genesis_state.initial_balances.push_back({generate_private_key("x").get_public_key(), GRAPHENE_SYMBOL, 1});
    auto starting_time = time_point_sec((time_point::now().sec_since_epoch() / GRAPHENE_DEFAULT_BLOCK_INTERVAL + 1) *

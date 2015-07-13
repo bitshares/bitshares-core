@@ -20,6 +20,8 @@
 
 #include <graphene/time/time.hpp>
 
+#include <graphene/utilities/tempdir.hpp>
+
 #include <graphene/account_history/account_history_plugin.hpp>
 
 #include <fc/thread/thread.hpp>
@@ -36,8 +38,8 @@ BOOST_AUTO_TEST_CASE( two_node_network )
    using namespace graphene::chain;
    using namespace graphene::app;
    try {
-      fc::temp_directory app_dir;
-      fc::temp_directory app2_dir;
+      fc::temp_directory app_dir( graphene::utilities::temp_directory_path() );
+      fc::temp_directory app2_dir( graphene::utilities::temp_directory_path() );
       fc::temp_file genesis_json;
 
       // TODO: Time should be read from the blockchain

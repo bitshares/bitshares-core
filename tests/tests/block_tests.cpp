@@ -26,6 +26,8 @@
 #include <graphene/chain/market_evaluator.hpp>
 #include <graphene/chain/witness_schedule_object.hpp>
 
+#include <graphene/utilities/tempdir.hpp>
+
 #include <fc/crypto/digest.hpp>
 
 #include "../common/database_fixture.hpp"
@@ -58,7 +60,7 @@ BOOST_AUTO_TEST_SUITE(block_tests)
 BOOST_AUTO_TEST_CASE( block_database_test )
 {
    try {
-      fc::temp_directory data_dir;
+      fc::temp_directory data_dir( graphene::utilities::temp_directory_path() );
 
       block_database bdb;
       bdb.open( data_dir.path() );
@@ -119,7 +121,7 @@ BOOST_AUTO_TEST_CASE( generate_empty_blocks )
 {
    try {
       fc::time_point_sec now( GRAPHENE_TESTING_GENESIS_TIMESTAMP );
-      fc::temp_directory data_dir;
+      fc::temp_directory data_dir( graphene::utilities::temp_directory_path() );
       signed_block b;
 
       now += GRAPHENE_DEFAULT_BLOCK_INTERVAL;
@@ -166,7 +168,7 @@ BOOST_AUTO_TEST_CASE( generate_empty_blocks )
 BOOST_AUTO_TEST_CASE( undo_block )
 {
    try {
-      fc::temp_directory data_dir;
+      fc::temp_directory data_dir( graphene::utilities::temp_directory_path() );
       {
          database db;
          db.open(data_dir.path(), make_genesis);
@@ -204,8 +206,8 @@ BOOST_AUTO_TEST_CASE( undo_block )
 BOOST_AUTO_TEST_CASE( fork_blocks )
 {
    try {
-      fc::temp_directory data_dir1;
-      fc::temp_directory data_dir2;
+      fc::temp_directory data_dir1( graphene::utilities::temp_directory_path() );
+      fc::temp_directory data_dir2( graphene::utilities::temp_directory_path() );
       fc::time_point_sec now( GRAPHENE_TESTING_GENESIS_TIMESTAMP );
 
       database db1;
@@ -271,7 +273,7 @@ BOOST_AUTO_TEST_CASE( undo_pending )
 {
    try {
       fc::time_point_sec now(GRAPHENE_TESTING_GENESIS_TIMESTAMP);
-      fc::temp_directory data_dir;
+      fc::temp_directory data_dir( graphene::utilities::temp_directory_path() );
       {
          database db;
          db.open(data_dir.path(), make_genesis);
@@ -335,8 +337,8 @@ BOOST_AUTO_TEST_CASE( undo_pending )
 BOOST_AUTO_TEST_CASE( switch_forks_undo_create )
 {
    try {
-      fc::temp_directory dir1,
-                         dir2;
+      fc::temp_directory dir1( graphene::utilities::temp_directory_path() ),
+                         dir2( graphene::utilities::temp_directory_path() );
       database db1,
                db2;
       db1.open(dir1.path(), make_genesis);
@@ -393,8 +395,8 @@ BOOST_AUTO_TEST_CASE( duplicate_transactions )
 {
    try {
       fc::time_point_sec now( GRAPHENE_TESTING_GENESIS_TIMESTAMP );
-      fc::temp_directory dir1,
-                         dir2;
+      fc::temp_directory dir1( graphene::utilities::temp_directory_path() ),
+                         dir2( graphene::utilities::temp_directory_path() );
       database db1,
                db2;
       db1.open(dir1.path(), make_genesis);
@@ -445,8 +447,8 @@ BOOST_AUTO_TEST_CASE( tapos )
 {
    try {
       fc::time_point_sec now( GRAPHENE_TESTING_GENESIS_TIMESTAMP );
-      fc::temp_directory dir1,
-                         dir2;
+      fc::temp_directory dir1( graphene::utilities::temp_directory_path() ),
+                         dir2( graphene::utilities::temp_directory_path() );
       database db1,
                db2;
       db1.open(dir1.path(), make_genesis);

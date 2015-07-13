@@ -17,6 +17,7 @@
  */
 #include <graphene/chain/database.hpp>
 #include <graphene/chain/account_object.hpp>
+#include <graphene/utilities/tempdir.hpp>
 
 #include <graphene/time/time.hpp>
 
@@ -58,7 +59,7 @@ BOOST_AUTO_TEST_CASE( genesis_and_persistence_bench )
          genesis_state.initial_accounts.emplace_back("target"+fc::to_string(i),
                                                      public_key_type(fc::ecc::private_key::regenerate(fc::digest(i)).get_public_key()));
 
-      fc::temp_directory data_dir(fc::current_path());
+      fc::temp_directory data_dir( graphene::utilities::temp_directory_path() );
 
       {
          database db;
