@@ -18,7 +18,7 @@ Account* ChainDataModel::getAccount(qint64 id)
 
    auto acct = new Account(this);
    acct->setProperty("id", id);
-   acct->setProperty("name", "LOADING");
+   acct->setProperty("accountName", "LOADING");
    auto insert_result = m_accounts.insert( acct );
 
    /** execute in app thread */
@@ -31,7 +31,7 @@ Account* ChainDataModel::getAccount(qint64 id)
           /** execute in main */
           Q_EMIT queueExecute( [=](){
              this->m_accounts.modify( insert_result.first,
-                [=]( Account* a ){ a->setProperty("name", name ); }
+                [=]( Account* a ){ a->setProperty("accountName", name ); }
              );
           });
         }
@@ -56,27 +56,51 @@ Account* ChainDataModel::getAccount(qint64 id)
 
 Account* ChainDataModel::getAccount(QString name)
 {
-   auto itr = m_accounts.get<::by_name>().find(name);
-   if( itr != m_accounts.get<::by_name>().end() )
+   {
+      auto itr = m_accounts.get<by_account_name>().begin();
+      while( itr != m_accounts.get<by_account_name>().end() )
+      {
+         edump(( (*itr)->getAccountName().toStdString()));
+         if((*itr)->name() == name.toStdString() )
+            wlog( "THEY ARE THE SAME" );
+         ++itr;
+      }
+   }
+   auto& by_name_index = m_accounts.get<by_account_name>();
+   {
+      for( auto itr = by_name_index.begin(); itr != by_name_index.end(); ++itr )
+         wdump(( (*itr)->getAccountName().toStdString()));
+   }
+   auto itr = by_name_index.find(name.toStdString());
+   idump((itr != by_name_index.end()));
+   if( itr != by_name_index.end() )
    {
       return *itr;
    }
 
    auto acct = new Account(this);
    acct->setProperty("id", --m_account_query_num );
-   acct->setProperty("name", name);
+   acct->setProperty("accountName", name);
    auto insert_result = m_accounts.insert( acct );
+   edump( (insert_result.second) );
+   edump( (int64_t(*insert_result.first))(int64_t(acct)) );
+   auto itr2 = by_name_index.find(name.toStdString());
+   assert( itr2 != by_name_index.end() );
 
    /** execute in app thread */
    m_thread->async( [=](){
       try {
+        ilog( "look up names.." );
         auto result = m_db_api->lookup_account_names( {name.toStdString()} );
+        idump((result));
         if( result.size() && result.front().valid() )
         {
           /** execute in main */
           Q_EMIT queueExecute( [=](){
              this->m_accounts.modify( insert_result.first,
                 [=]( Account* a ){
+                   ilog( "setting id ${i}", ("i",result.front()->id.instance()) );
+                   idump((int64_t(a)));
                    a->setProperty("id", result.front()->id.instance() );
                 }
              );
@@ -87,7 +111,7 @@ Account* ChainDataModel::getAccount(QString name)
           /** execute in main */
           Q_EMIT queueExecute( [=](){
              acct->deleteLater();
-             m_accounts.erase( insert_result.first );
+             this->m_accounts.erase( insert_result.first );
           });
         }
       }
@@ -98,6 +122,7 @@ Account* ChainDataModel::getAccount(QString name)
       }
    });
 
+   idump((int64_t(acct)));
    return acct;
 }
 
@@ -142,17 +167,20 @@ void GrapheneApplication::start( QString apiurl, QString user, QString pass )
       return;
    }
    try {
-      auto con  = m_client.connect( apiurl.toStdString() );
+      m_client = std::make_shared<fc::http::websocket_client>();
+      ilog( "connecting...${s}", ("s",apiurl.toStdString()) );
+      auto con  = m_client->connect( apiurl.toStdString() );
       auto apic = std::make_shared<fc::rpc::websocket_api_connection>(*con);
       auto remote_api = apic->get_remote_api< login_api >(1);
       auto db_api = apic->get_remote_api< database_api >(0);
-
       if( !remote_api->login( user.toStdString(), pass.toStdString() ) )
       {
+         elog( "login failed" );
          Q_EMIT loginFailed();
          return;
       }
 
+      ilog( "connecting..." );
       queueExecute( [=](){
          m_model->setDatabaseAPI( db_api );
       });

@@ -47,11 +47,11 @@ class Balance : public QObject {
 class Account : public QObject {
    Q_OBJECT
 
-   Q_PROPERTY(QString name MEMBER name NOTIFY nameChanged)
+   Q_PROPERTY(QString accountName MEMBER accountName NOTIFY accountNameChanged)
    Q_PROPERTY(qint64 id MEMBER id NOTIFY idChanged)
    Q_PROPERTY(QQmlListProperty<Balance> balances READ balances)
 
-   QString name;
+   QString accountName;
    qint64 id;
    QList<Balance*> m_balances;
 
@@ -59,18 +59,19 @@ public:
    Account(QObject* parent = nullptr)
       : QObject(parent){}
 
-   const QString& getName()const { return name; }
+   const QString& getAccountName()const { return accountName; }
    qint64        getId()const   { return id;   }
+   std::string   name()const { return accountName.toStdString(); }
 
    QQmlListProperty<Balance> balances();
 
 signals:
-   void nameChanged();
+   void accountNameChanged();
    void idChanged();
 };
 
 struct by_id;
-struct by_name;
+struct by_account_name;
 /**
  * @ingroup object_index
  */
@@ -78,7 +79,8 @@ typedef multi_index_container<
    Account*,
    indexed_by<
       hashed_unique< tag<by_id>,  const_mem_fun<Account, qint64, &Account::getId > >,
-      ordered_non_unique< tag<by_name>, const_mem_fun<Account, const QString&, &Account::getName> >
+      hashed_unique< tag<by_account_name>, const_mem_fun<Account, std::string, &Account::name> >
+//      ordered_non_unique< tag<by_account_name>, const_mem_fun<Account, std::string, &Account::name> >
    >
 > account_multi_index_type;
 
@@ -125,8 +127,8 @@ class GrapheneApplication : public QObject {
    ChainDataModel*             m_model       = nullptr;
    bool                        m_isConnected = false;
 
-   fc::http::websocket_client  m_client;
-   fc::future<void>            m_done;
+   std::shared_ptr<fc::http::websocket_client>  m_client;
+   fc::future<void>                        m_done;
 
    void setIsConnected( bool v );
 

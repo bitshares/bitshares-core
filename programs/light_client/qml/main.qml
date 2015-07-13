@@ -61,16 +61,23 @@ ApplicationWindow {
          text: "Lookup"
          onClicked: {
             var acct = app.model.getAccount(nameField.text)
+            console.log(JSON.stringify(acct))
             // @disable-check M126
             if (acct == null)
                console.log("Got back null account")
             else if (acct.id >= 0)
+            {
+               console.log("ID ALREADY SET" );
                console.log(JSON.stringify(acct))
+            }
             else
+            {
                console.log("Waiting for result...")
                acct.idChanged.connect(function(loadedAcct) {
+                  console.log( "ID CHANGED" );
                   console.log(JSON.stringify(loadedAcct))
                })
+            }
          }
       }
    }
