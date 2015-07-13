@@ -1,6 +1,7 @@
 import QtQuick 2.5
 import QtQuick.Controls 1.4
 import QtQuick.Dialogs 1.2
+import QtQuick.Window 2.2
 
 import Qt.labs.settings 1.0
 
@@ -47,9 +48,10 @@ ApplicationWindow {
       anchors.centerIn: parent
       Button {
          text: "Transfer"
-         onClicked: formBox.showForm(Qt.createComponent("TransferForm.qml"), function() {
-            console.log("Closed form")
-         })
+         onClicked: formBox.showForm(Qt.createComponent("TransferForm.qml"), {},
+                                     function() {
+                                        console.log("Closed form")
+                                     })
       }
       TextField {
          id: nameField
@@ -73,6 +75,7 @@ ApplicationWindow {
                })
          }
       }
+
    }
 
    FormBox {
