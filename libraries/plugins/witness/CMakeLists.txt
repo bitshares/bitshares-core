@@ -1,4 +1,4 @@
-file(GLOB HEADERS "include/graphene/delegate/*.hpp")
+file(GLOB HEADERS "include/graphene/witness/*.hpp")
 
 add_library( graphene_witness 
              witness.cpp

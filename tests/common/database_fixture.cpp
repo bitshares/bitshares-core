@@ -62,7 +62,7 @@ database_fixture::database_fixture()
    }
    auto ahplugin = app.register_plugin<graphene::account_history::account_history_plugin>();
    auto mhplugin = app.register_plugin<graphene::market_history::market_history_plugin>();
-   delegate_pub_key = delegate_priv_key.get_public_key();
+   init_account_pub_key = init_account_priv_key.get_public_key();
 
    boost::program_options::variables_map options;
 
@@ -79,11 +79,11 @@ database_fixture::database_fixture()
    {
       auto name = "init"+fc::to_string(i);
       genesis_state.initial_accounts.emplace_back(name,
-                                                  delegate_priv_key.get_public_key(),
-                                                  delegate_priv_key.get_public_key(),
+                                                  init_account_priv_key.get_public_key(),
+                                                  init_account_priv_key.get_public_key(),
                                                   true);
       genesis_state.initial_committee_candidates.push_back({name});
-      genesis_state.initial_witness_candidates.push_back({name, delegate_priv_key.get_public_key()});
+      genesis_state.initial_witness_candidates.push_back({name, init_account_priv_key.get_public_key()});
    }
    genesis_state.initial_parameters.current_fees->zero_all_fees();
    db.init_genesis(genesis_state);
@@ -315,7 +315,7 @@ void database_fixture::generate_blocks(fc::time_point_sec timestamp, bool miss_i
       generate_block();
       auto slots_to_miss = db.get_slot_at_time(timestamp) - 1;
       if( slots_to_miss <= 0 ) return;
-      generate_block(~0, delegate_priv_key, slots_to_miss);
+      generate_block(~0, init_account_priv_key, slots_to_miss);
       return;
    }
    while( db.head_block_time() < timestamp )

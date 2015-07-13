@@ -254,7 +254,7 @@ BOOST_AUTO_TEST_CASE( recursive_accounts )
       trx.operations.push_back(op);
       sign(trx, parent2_key);
       sign(trx, grandparent_key);
-      sign(trx, delegate_priv_key);
+      sign(trx, init_account_priv_key);
       //Fails due to recursion depth.
       GRAPHENE_CHECK_THROW(PUSH_TX( db, trx, database::skip_transaction_dupe_check ), fc::exception);
       BOOST_TEST_MESSAGE( "verify child key can override recursion checks" );
@@ -293,12 +293,12 @@ BOOST_AUTO_TEST_CASE( proposed_single_account )
    try {
       INVOKE(any_two_of_three);
 
-      fc::ecc::private_key committee_key = delegate_priv_key;
+      fc::ecc::private_key committee_key = init_account_priv_key;
       fc::ecc::private_key nathan_key1 = fc::ecc::private_key::regenerate(fc::digest("key1"));
       fc::ecc::private_key nathan_key2 = fc::ecc::private_key::regenerate(fc::digest("key2"));
       fc::ecc::private_key nathan_key3 = fc::ecc::private_key::regenerate(fc::digest("key3"));
 
-      const account_object& moneyman = create_account("moneyman", delegate_pub_key);
+      const account_object& moneyman = create_account("moneyman", init_account_pub_key);
       const account_object& nathan = get_account("nathan");
       const asset_object& core = asset_id_type()(db);
 
@@ -340,7 +340,7 @@ BOOST_AUTO_TEST_CASE( proposed_single_account )
       trx.set_expiration(db.head_block_id());
 
       //idump((moneyman));
-      trx.sign( delegate_priv_key );
+      trx.sign( init_account_priv_key );
       const proposal_object& proposal = db.get<proposal_object>(PUSH_TX( db, trx ).operation_results.front().get<object_id_type>());
 
       BOOST_CHECK_EQUAL(proposal.required_active_approvals.size(), 1);
@@ -386,7 +386,7 @@ BOOST_AUTO_TEST_CASE( proposed_single_account )
 BOOST_AUTO_TEST_CASE( committee_authority )
 { try {
    fc::ecc::private_key nathan_key = fc::ecc::private_key::generate();
-   fc::ecc::private_key committee_key = delegate_priv_key;
+   fc::ecc::private_key committee_key = init_account_priv_key;
    const account_object nathan = create_account("nathan", nathan_key.get_public_key());
    const auto& global_params = db.get_global_properties().parameters;
 
@@ -476,7 +476,7 @@ BOOST_AUTO_TEST_CASE( committee_authority )
 BOOST_FIXTURE_TEST_CASE( fired_delegates, database_fixture )
 { try {
    generate_block();
-   fc::ecc::private_key committee_key = delegate_priv_key;
+   fc::ecc::private_key committee_key = init_account_priv_key;
    fc::ecc::private_key delegate_key = fc::ecc::private_key::generate();
 
    //Meet nathan. He has a little money.
@@ -516,7 +516,7 @@ BOOST_FIXTURE_TEST_CASE( fired_delegates, database_fixture )
    proposal_update_operation uop;
    uop.fee_paying_account = GRAPHENE_TEMP_ACCOUNT;
    uop.proposal = pid;
-   uop.key_approvals_to_add.emplace(delegate_pub_key);
+   uop.key_approvals_to_add.emplace(init_account_pub_key);
    /* TODO: what should this really be?
    uop.key_approvals_to_add.emplace(2);
    uop.key_approvals_to_add.emplace(3);
@@ -882,7 +882,7 @@ BOOST_FIXTURE_TEST_CASE( max_authority_membership, database_fixture )
       transaction tx;
       processed_transaction ptx;
 
-      private_key_type committee_key = delegate_priv_key;
+      private_key_type committee_key = init_account_priv_key;
       // Sam is the creator of accounts
       private_key_type sam_key = generate_private_key("sam");
 
@@ -968,7 +968,7 @@ BOOST_FIXTURE_TEST_CASE( bogus_signature, database_fixture )
 {
    try
    {
-      private_key_type committee_key = delegate_priv_key;
+      private_key_type committee_key = init_account_priv_key;
       // Sam is the creator of accounts
       private_key_type alice_key = generate_private_key("alice");
       private_key_type bob_key = generate_private_key("bob");

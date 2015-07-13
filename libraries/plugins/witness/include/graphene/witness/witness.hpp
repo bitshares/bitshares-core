@@ -64,4 +64,4 @@ private:
    fc::future<void> _block_production_task;
 };
 
-} } //graphene::delegate
+} } //graphene::witness_plugin

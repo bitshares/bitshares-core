@@ -23,7 +23,6 @@
 
 #include <graphene/chain/account_object.hpp>
 #include <graphene/chain/asset_object.hpp>
-#include <graphene/chain/delegate_object.hpp>
 #include <graphene/chain/witness_scheduler_rng.hpp>
 #include <graphene/chain/exceptions.hpp>
 

@@ -83,9 +83,9 @@ BOOST_AUTO_TEST_CASE( genesis_and_persistence_bench )
             BOOST_CHECK(db.get_balance(account_id_type(i), asset_id_type()).amount == GRAPHENE_MAX_SHARE_SUPPLY / account_count);
 
          int blocks_out = 0;
-         auto delegate_priv_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("null_key")) );
+         auto witness_priv_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("null_key")) );
          auto aw = db.get_global_properties().active_witnesses;
-         auto b =  db.generate_block( db.get_slot_time( 1 ), db.get_scheduled_witness( 1 ).first, delegate_priv_key, ~0 );
+         auto b =  db.generate_block( db.get_slot_time( 1 ), db.get_scheduled_witness( 1 ).first, witness_priv_key, ~0 );
 
          start_time = fc::time_point::now();
          /* TODO: get this buliding again
@@ -96,7 +96,7 @@ BOOST_AUTO_TEST_CASE( genesis_and_persistence_bench )
             db.push_transaction(trx, ~0);
 
             aw = db.get_global_properties().active_witnesses;
-            b =  db.generate_block( db.get_slot_time( 1 ), db.get_scheduled_witness( 1 ).first, delegate_priv_key, ~0 );
+            b =  db.generate_block( db.get_slot_time( 1 ), db.get_scheduled_witness( 1 ).first, witness_priv_key, ~0 );
          }
          */
          ilog("Pushed ${c} blocks (1 op each, no validation) in ${t} milliseconds.",

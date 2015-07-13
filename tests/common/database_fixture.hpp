@@ -144,8 +144,8 @@ struct database_fixture {
    public_key_type committee_key;
    account_id_type committee_account;
    fc::ecc::private_key private_key = fc::ecc::private_key::generate();
-   fc::ecc::private_key delegate_priv_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("null_key")) );
-   public_key_type delegate_pub_key;
+   fc::ecc::private_key init_account_priv_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("null_key")) );
+   public_key_type init_account_pub_key;
 
    optional<fc::temp_directory> data_dir;
    bool skip_key_index_test = false;

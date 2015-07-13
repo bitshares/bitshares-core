@@ -150,7 +150,7 @@ void witness_plugin::plugin_shutdown()
 
 void witness_plugin::schedule_next_production(const graphene::chain::chain_parameters& global_parameters)
 {
-   //Get next production time for *any* delegate
+   //Get next production time for *any* witness
    auto block_interval = global_parameters.block_interval;
    fc::time_point next_block_time = fc::time_point_sec() +
          (graphene::time::now().sec_since_epoch() / block_interval + 1) * block_interval;
@@ -158,7 +158,7 @@ void witness_plugin::schedule_next_production(const graphene::chain::chain_param
    if( graphene::time::ntp_time().valid() )
       next_block_time -= graphene::time::ntp_error();
 
-   //Sleep until the next production time for *any* delegate
+   //Sleep until the next production time for *any* witness
    _block_production_task = fc::schedule([this]{block_production_loop();},
                                          next_block_time, "Witness Block Production");
 }
