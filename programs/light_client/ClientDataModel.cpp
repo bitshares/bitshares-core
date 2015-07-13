@@ -21,3 +21,9 @@ QQmlListProperty<Balance> Account::balances()
 {
    return QQmlListProperty<Balance>(this, m_balances);
 }
+
+
+
+void GrapheneApplication::initialize( QString datadir, QString apiurl )
+{
+}
