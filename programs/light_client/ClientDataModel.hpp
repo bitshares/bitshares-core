@@ -1,7 +1,13 @@
 #pragma once
+#pragma GCC diagnostic ignored "-Wunknown-pragmas"
+#include <fc/network/http/websocket.hpp>
+#include <fc/thread/thread.hpp>
 
 #include <QObject>
 #include <QQmlListProperty>
+
+
+
 
 class Asset : public QObject {
    Q_OBJECT
@@ -51,6 +57,13 @@ class ChainDataModel : public QObject {
 public:
    Q_INVOKABLE Account* getAccount(quint64 id)const;
    Q_INVOKABLE Account* getAccount(QString name)const;
+
+   ChainDataModel(){}
+   ChainDataModel( fc::thread& t, QObject* parent = nullptr );
+
+private:
+   fc::thread*                 m_thread = nullptr;
+   std::string                 m_api_url;
 };
 
 class GrapheneApplication : public QObject {
@@ -59,16 +72,23 @@ class GrapheneApplication : public QObject {
    Q_PROPERTY(ChainDataModel* model READ model CONSTANT)
    Q_PROPERTY(bool isConnected READ isConnected NOTIFY isConnectedChanged)
 
-   ChainDataModel* m_model;
-   bool m_isConnected;
 
+   fc::thread                  m_thread;
+   ChainDataModel*             m_model       = nullptr;
+   bool                        m_isConnected = false;
+
+   fc::http::websocket_client  m_client;
+   fc::future<bool>            m_done;
 public:
+   GrapheneApplication( QObject* parent = nullptr );
+   ~GrapheneApplication();
+
    ChainDataModel* model() const
    {
       return m_model;
    }
 
-   Q_INVOKABLE void initialize(QString dataDirectory, QString apiUrl);
+   Q_INVOKABLE bool start(QString dataDirectory, QString apiUrl);
 
    bool isConnected() const
    {
