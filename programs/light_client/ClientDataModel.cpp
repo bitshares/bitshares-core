@@ -1,7 +1,7 @@
 #include "ClientDataModel.hpp"
 
 
-Account* ClientDataModel::getAccount(quint64 id) const
+Account* ChainDataModel::getAccount(quint64 id) const
 {
    auto acct = new Account;
    acct->setProperty("id", id);
@@ -9,7 +9,7 @@ Account* ClientDataModel::getAccount(quint64 id) const
    return acct;
 }
 
-Account*ClientDataModel::getAccount(QString name) const
+Account*ChainDataModel::getAccount(QString name) const
 {
    auto acct = new Account;
    acct->setProperty("id", 800);

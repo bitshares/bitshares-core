@@ -27,8 +27,8 @@ ApplicationWindow {
       }
    }
 
-   DataModel {
-      id: model
+   GrapheneApplication {
+      id: app
    }
    Settings {
       id: appSettings
