@@ -76,6 +76,13 @@ namespace graphene { namespace chain {
          time_point_sec    last_budget_time;
          share_type        witness_budget;
          uint32_t          accounts_registered_this_interval;
+         /** if the interval changes then how we calculate witness participation will
+          * also change.  Normally witness participation is defined as % of blocks
+          * produced in the last round which is calculated by dividing the delta
+          * time between block N and N-NUM_WITNESSES by the block interval to calculate
+          * the number of blocks produced.
+          */
+         uint32_t          first_maintenance_block_with_current_interval = 0;
    };
 }}
 
@@ -88,6 +95,7 @@ FC_REFLECT_DERIVED( graphene::chain::dynamic_global_property_object, (graphene::
                     (next_maintenance_time)
                     (witness_budget)
                     (accounts_registered_this_interval)
+                    (first_maintenance_block_with_current_interval)
                   )
 
 FC_REFLECT_DERIVED( graphene::chain::global_property_object, (graphene::db::object),

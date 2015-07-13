@@ -56,6 +56,9 @@ private:
 
    boost::program_options::variables_map _options;
    bool _production_enabled = false;
+   bool _consecutive_production_enabled = false;
+   int  _required_witness_participation = 33;
+
    std::map<chain::public_key_type, fc::ecc::private_key> _private_keys;
    std::set<chain::witness_id_type> _witnesses;
    fc::future<void> _block_production_task;

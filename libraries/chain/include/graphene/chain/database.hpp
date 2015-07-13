@@ -136,6 +136,12 @@ namespace graphene { namespace chain {
          optional<signed_block>     fetch_block_by_number( uint32_t num )const;
          const signed_transaction&  get_recent_transaction( const transaction_id_type& trx_id )const;
 
+         /**
+          *  Calculate the percent of block production slots that were missed in the
+          *  past 100 blocks.  
+          */
+         double witness_participation_rate()const;
+
          void                              add_checkpoints( const flat_map<uint32_t,block_id_type>& checkpts );
          const flat_map<uint32_t,block_id_type> get_checkpoints()const { return _checkpoints; }
 
@@ -246,9 +252,10 @@ namespace graphene { namespace chain {
          const node_property_object&            get_node_properties()const;
          const fee_schedule&                    current_fee_schedule()const;
 
-         time_point_sec head_block_time()const;
-         uint32_t       head_block_num()const;
-         block_id_type  head_block_id()const;
+         time_point_sec   head_block_time()const;
+         uint32_t         head_block_num()const;
+         block_id_type    head_block_id()const;
+         witness_id_type  head_block_witness()const;
 
          decltype( chain_parameters::block_interval ) block_interval( )const;
 

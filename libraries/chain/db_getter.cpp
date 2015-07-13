@@ -73,4 +73,14 @@ node_property_object& database::node_properties()
    return _node_property_object;
 }
 
+double database::witness_participation_rate()const
+{
+    if( head_block_num() < 10 ) return 1; // sample size is too small
+    uint32_t produced = std::min<uint32_t>( head_block_num()-1, 100 );
+    auto prior = fetch_block_by_number( head_block_num() - produced );
+    auto delta_time = head_block_time() - prior->timestamp;
+    auto expected_slots = delta_time.to_seconds() / get_global_properties().parameters.block_interval;
+    return double(produced) / expected_slots;
+}
+
 } }
