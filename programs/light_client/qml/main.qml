@@ -35,11 +35,18 @@ ApplicationWindow {
       category: "appSettings"
    }
 
-   Label {
+   Button {
+      text: "Transfer"
       anchors.centerIn: parent
-      font.pointSize: 75
-      text: "Dashboard goes here"
-      opacity: .5
+      onClicked: formBox.showForm(Qt.createComponent("TransferForm.qml"), function() {
+         console.log("Closed form")
+      })
+   }
+
+   FormBox {
+      id: formBox
+      anchors.fill: parent
+      z: 10
    }
 
    // This Settings is only for geometry -- it doesn't get an id. See appSettings for normal settings

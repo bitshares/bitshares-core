@@ -19,8 +19,11 @@ int main(int argc, char *argv[])
    qmlRegisterType<GrapheneApplication>("Graphene.Client", 0, 1, "GrapheneApplication");
 
    QQmlApplicationEngine engine;
+#ifdef NDEBUG
    engine.load(QUrl(QStringLiteral("qrc:/main.qml")));
+#else
+   engine.load(QUrl(QStringLiteral("qml/main.qml")));
+#endif
 
    return app.exec();
 }
-

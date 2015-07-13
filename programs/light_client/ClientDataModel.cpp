@@ -31,7 +31,6 @@ QQmlListProperty<Balance> Account::balances()
    return QQmlListProperty<Balance>(this, m_balances);
 }
 
-
 GrapheneApplication::GrapheneApplication( QObject* parent )
 :QObject( parent ),m_thread("app")
 {
