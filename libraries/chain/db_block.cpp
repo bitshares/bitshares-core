@@ -271,7 +271,7 @@ signed_block database::_generate_block(
 
    const auto& witness_obj = witness_id(*this);
 
-   if( !(skip & skip_delegate_signature) )
+   if( !(skip & skip_witness_signature) )
       FC_ASSERT( witness_obj.signing_key == block_signing_private_key.get_public_key() );
 
    _pending_block.timestamp = when;
@@ -297,7 +297,7 @@ signed_block database::_generate_block(
    _pending_block.transaction_merkle_root = _pending_block.calculate_merkle_root();
 
    _pending_block.witness = witness_id;
-   if( !(skip & skip_delegate_signature) ) _pending_block.sign( block_signing_private_key );
+   if( !(skip & skip_witness_signature) ) _pending_block.sign( block_signing_private_key );
 
    FC_ASSERT( fc::raw::pack_size(_pending_block) <= get_global_properties().parameters.maximum_block_size );
    signed_block tmp = _pending_block;
@@ -645,7 +645,7 @@ const witness_object& database::validate_block_header( uint32_t skip, const sign
    const witness_object& witness = next_block.witness(*this);
    FC_ASSERT( secret_hash_type::hash( next_block.previous_secret ) == witness.next_secret_hash, "",
               ("previous_secret", next_block.previous_secret)("next_secret_hash", witness.next_secret_hash));
-   if( !(skip&skip_delegate_signature) ) FC_ASSERT( next_block.validate_signee( witness.signing_key ) );
+   if( !(skip&skip_witness_signature) ) FC_ASSERT( next_block.validate_signee( witness.signing_key ) );
 
    uint32_t slot_num = get_slot_at_time( next_block.timestamp );
    FC_ASSERT( slot_num > 0 );

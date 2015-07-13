@@ -1431,16 +1431,16 @@ namespace graphene { namespace net { namespace detail {
       {
         _average_network_usage_second_counter = 0;
         ++_average_network_usage_minute_counter;
-        uint32_t average_read_this_minute = (uint32_t)boost::accumulate(_average_network_read_speed_seconds, UINT64_C(0)) / (uint32_t)_average_network_read_speed_seconds.size();
+        uint32_t average_read_this_minute = (uint32_t)boost::accumulate(_average_network_read_speed_seconds, uint64_t(0)) / (uint32_t)_average_network_read_speed_seconds.size();
         _average_network_read_speed_minutes.push_back(average_read_this_minute);
-        uint32_t average_written_this_minute = (uint32_t)boost::accumulate(_average_network_write_speed_seconds, UINT64_C(0)) / (uint32_t)_average_network_write_speed_seconds.size();
+        uint32_t average_written_this_minute = (uint32_t)boost::accumulate(_average_network_write_speed_seconds, uint64_t(0)) / (uint32_t)_average_network_write_speed_seconds.size();
         _average_network_write_speed_minutes.push_back(average_written_this_minute);
         if (_average_network_usage_minute_counter >= 60)
         {
           _average_network_usage_minute_counter = 0;
-          uint32_t average_read_this_hour = (uint32_t)boost::accumulate(_average_network_read_speed_minutes, UINT64_C(0)) / (uint32_t)_average_network_read_speed_minutes.size();
+          uint32_t average_read_this_hour = (uint32_t)boost::accumulate(_average_network_read_speed_minutes, uint64_t(0)) / (uint32_t)_average_network_read_speed_minutes.size();
           _average_network_read_speed_hours.push_back(average_read_this_hour);
-          uint32_t average_written_this_hour = (uint32_t)boost::accumulate(_average_network_write_speed_minutes, UINT64_C(0)) / (uint32_t)_average_network_write_speed_minutes.size();
+          uint32_t average_written_this_hour = (uint32_t)boost::accumulate(_average_network_write_speed_minutes, uint64_t(0)) / (uint32_t)_average_network_write_speed_minutes.size();
           _average_network_write_speed_hours.push_back(average_written_this_hour);
         }
       }

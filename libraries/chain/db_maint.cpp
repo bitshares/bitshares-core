@@ -20,7 +20,7 @@
 
 #include <graphene/chain/account_object.hpp>
 #include <graphene/chain/asset_object.hpp>
-#include <graphene/chain/delegate_object.hpp>
+#include <graphene/chain/committee_member_object.hpp>
 #include <graphene/chain/global_property_object.hpp>
 #include <graphene/chain/vesting_balance_object.hpp>
 #include <graphene/chain/witness_object.hpp>
@@ -191,21 +191,21 @@ void database::update_active_witnesses()
    });
 } FC_CAPTURE_AND_RETHROW() }
 
-void database::update_active_delegates()
+void database::update_active_committee_members()
 { try {
    assert( _committee_count_histogram_buffer.size() > 0 );
    uint64_t stake_target = _total_voting_stake / 2;
    uint64_t stake_tally = _committee_count_histogram_buffer[0];
-   size_t delegate_count = 0;
+   size_t committee_member_count = 0;
    if( stake_target > 0 )
-      while( (delegate_count < _committee_count_histogram_buffer.size() - 1)
+      while( (committee_member_count < _committee_count_histogram_buffer.size() - 1)
              && (stake_tally <= stake_target) )
-         stake_tally += _committee_count_histogram_buffer[++delegate_count];
+         stake_tally += _committee_count_histogram_buffer[++committee_member_count];
 
-   auto delegates = sort_votable_objects<delegate_index>(std::max(delegate_count*2+1, (size_t)GRAPHENE_MIN_DELEGATE_COUNT));
+   auto committee_members = sort_votable_objects<committee_member_index>(std::max(committee_member_count*2+1, (size_t)GRAPHENE_MIN_COMMITTEE_MEMBER_COUNT));
 
-   // Update genesis authorities
-   if( !delegates.empty() )
+   // Update committee authorities
+   if( !committee_members.empty() )
    {
       modify(get(GRAPHENE_COMMITTEE_ACCOUNT), [&](account_object& a) {
          uint64_t total_votes = 0;
@@ -213,9 +213,9 @@ void database::update_active_delegates()
          a.active.weight_threshold = 0;
          a.active.clear();
 
-         for( const delegate_object& del : delegates )
+         for( const committee_member_object& del : committee_members )
          {
-            weights.emplace(del.delegate_account, _vote_tally_buffer[del.vote_id]);
+            weights.emplace(del.committee_member_account, _vote_tally_buffer[del.vote_id]);
             total_votes += _vote_tally_buffer[del.vote_id];
          }
 
@@ -238,10 +238,10 @@ void database::update_active_delegates()
       });
    }
    modify(get_global_properties(), [&](global_property_object& gp) {
-      gp.active_delegates.clear();
-      std::transform(delegates.begin(), delegates.end(),
-                     std::inserter(gp.active_delegates, gp.active_delegates.begin()),
-                     [](const delegate_object& d) { return d.id; });
+      gp.active_committee_members.clear();
+      std::transform(committee_members.begin(), committee_members.end(),
+                     std::inserter(gp.active_committee_members, gp.active_committee_members.begin()),
+                     [](const committee_member_object& d) { return d.id; });
    });
 } FC_CAPTURE_AND_RETHROW() }
 
@@ -457,7 +457,7 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
                 c(_vote_tally_buffer);
 
    update_active_witnesses();
-   update_active_delegates();
+   update_active_committee_members();
 
    modify(gpo, [this](global_property_object& p) {
       // Remove scaling of account registration fee

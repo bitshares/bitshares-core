@@ -47,8 +47,8 @@ class Balance : public QObject {
 class Account : public QObject {
    Q_OBJECT
 
-   Q_PROPERTY(QString name MEMBER name)
-   Q_PROPERTY(qint64 id MEMBER id)
+   Q_PROPERTY(QString name MEMBER name NOTIFY nameChanged)
+   Q_PROPERTY(qint64 id MEMBER id NOTIFY idChanged)
    Q_PROPERTY(QQmlListProperty<Balance> balances READ balances)
 
    QString name;
@@ -63,9 +63,13 @@ public:
    qint64        getId()const   { return id;   }
 
    QQmlListProperty<Balance> balances();
+
+signals:
+   void nameChanged();
+   void idChanged();
 };
 
-struct by_id; 
+struct by_id;
 struct by_name;
 /**
  * @ingroup object_index

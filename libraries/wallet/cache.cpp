@@ -18,7 +18,7 @@
 
 #include <graphene/chain/account_object.hpp>
 #include <graphene/chain/asset_object.hpp>
-#include <graphene/chain/delegate_object.hpp>
+#include <graphene/chain/committee_member_object.hpp>
 #include <graphene/chain/witness_object.hpp>
 #include <graphene/chain/market_evaluator.hpp>
 #include <graphene/chain/proposal_object.hpp>
@@ -62,8 +62,8 @@ object* create_object( const variant& v )
          return create_object_of_type< asset_object >( v );
       case force_settlement_object_type:
          return create_object_of_type< force_settlement_object >( v );
-      case delegate_object_type:
-         return create_object_of_type< delegate_object >( v );
+      case committee_member_object_type:
+         return create_object_of_type< committee_member_object >( v );
       case witness_object_type:
          return create_object_of_type< witness_object >( v );
       case limit_order_object_type:

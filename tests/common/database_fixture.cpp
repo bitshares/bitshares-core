@@ -25,7 +25,7 @@
 
 #include <graphene/chain/account_object.hpp>
 #include <graphene/chain/asset_object.hpp>
-#include <graphene/chain/delegate_object.hpp>
+#include <graphene/chain/committee_member_object.hpp>
 #include <graphene/chain/market_evaluator.hpp>
 #include <graphene/chain/vesting_balance_object.hpp>
 #include <graphene/chain/witness_object.hpp>
@@ -62,7 +62,7 @@ database_fixture::database_fixture()
    }
    auto ahplugin = app.register_plugin<graphene::account_history::account_history_plugin>();
    auto mhplugin = app.register_plugin<graphene::market_history::market_history_plugin>();
-   delegate_pub_key = delegate_priv_key.get_public_key();
+   init_account_pub_key = init_account_priv_key.get_public_key();
 
    boost::program_options::variables_map options;
 
@@ -79,11 +79,11 @@ database_fixture::database_fixture()
    {
       auto name = "init"+fc::to_string(i);
       genesis_state.initial_accounts.emplace_back(name,
-                                                  delegate_priv_key.get_public_key(),
-                                                  delegate_priv_key.get_public_key(),
+                                                  init_account_priv_key.get_public_key(),
+                                                  init_account_priv_key.get_public_key(),
                                                   true);
       genesis_state.initial_committee_candidates.push_back({name});
-      genesis_state.initial_witness_candidates.push_back({name, delegate_priv_key.get_public_key()});
+      genesis_state.initial_witness_candidates.push_back({name, init_account_priv_key.get_public_key()});
    }
    genesis_state.initial_parameters.current_fees->zero_all_fees();
    db.init_genesis(genesis_state);
@@ -120,9 +120,9 @@ database_fixture::~database_fixture()
 
 fc::ecc::private_key database_fixture::generate_private_key(string seed)
 {
-   static const fc::ecc::private_key genesis = fc::ecc::private_key::regenerate(fc::sha256::hash(string("null_key")));
+   static const fc::ecc::private_key committee = fc::ecc::private_key::regenerate(fc::sha256::hash(string("null_key")));
    if( seed == "null_key" )
-      return genesis;
+      return committee;
    return fc::ecc::private_key::regenerate(fc::sha256::hash(seed));
 }
 
@@ -315,7 +315,7 @@ void database_fixture::generate_blocks(fc::time_point_sec timestamp, bool miss_i
       generate_block();
       auto slots_to_miss = db.get_slot_at_time(timestamp) - 1;
       if( slots_to_miss <= 0 ) return;
-      generate_block(~0, delegate_priv_key, slots_to_miss);
+      generate_block(~0, init_account_priv_key, slots_to_miss);
       return;
    }
    while( db.head_block_time() < timestamp )
@@ -335,15 +335,15 @@ account_create_operation database_fixture::make_account(
    create_account.active = authority(321, key, 321);
    create_account.options.memo_key = key;
 
-   auto& active_delegates = db.get_global_properties().active_delegates;
-   if( active_delegates.size() > 0 )
+   auto& active_committee_members = db.get_global_properties().active_committee_members;
+   if( active_committee_members.size() > 0 )
    {
       set<vote_id_type> votes;
-      votes.insert(active_delegates[rand() % active_delegates.size()](db).vote_id);
-      votes.insert(active_delegates[rand() % active_delegates.size()](db).vote_id);
-      votes.insert(active_delegates[rand() % active_delegates.size()](db).vote_id);
-      votes.insert(active_delegates[rand() % active_delegates.size()](db).vote_id);
-      votes.insert(active_delegates[rand() % active_delegates.size()](db).vote_id);
+      votes.insert(active_committee_members[rand() % active_committee_members.size()](db).vote_id);
+      votes.insert(active_committee_members[rand() % active_committee_members.size()](db).vote_id);
+      votes.insert(active_committee_members[rand() % active_committee_members.size()](db).vote_id);
+      votes.insert(active_committee_members[rand() % active_committee_members.size()](db).vote_id);
+      votes.insert(active_committee_members[rand() % active_committee_members.size()](db).vote_id);
       create_account.options.votes = flat_set<vote_id_type>(votes.begin(), votes.end());
    }
    create_account.options.num_committee = create_account.options.votes.size();
@@ -373,15 +373,15 @@ account_create_operation database_fixture::make_account(
       create_account.active = authority(321, key, 321);
       create_account.options.memo_key = key;
 
-      const vector<delegate_id_type>& active_delegates = db.get_global_properties().active_delegates;
-      if( active_delegates.size() > 0 )
+      const vector<committee_member_id_type>& active_committee_members = db.get_global_properties().active_committee_members;
+      if( active_committee_members.size() > 0 )
       {
          set<vote_id_type> votes;
-         votes.insert(active_delegates[rand() % active_delegates.size()](db).vote_id);
-         votes.insert(active_delegates[rand() % active_delegates.size()](db).vote_id);
-         votes.insert(active_delegates[rand() % active_delegates.size()](db).vote_id);
-         votes.insert(active_delegates[rand() % active_delegates.size()](db).vote_id);
-         votes.insert(active_delegates[rand() % active_delegates.size()](db).vote_id);
+         votes.insert(active_committee_members[rand() % active_committee_members.size()](db).vote_id);
+         votes.insert(active_committee_members[rand() % active_committee_members.size()](db).vote_id);
+         votes.insert(active_committee_members[rand() % active_committee_members.size()](db).vote_id);
+         votes.insert(active_committee_members[rand() % active_committee_members.size()](db).vote_id);
+         votes.insert(active_committee_members[rand() % active_committee_members.size()](db).vote_id);
          create_account.options.votes = flat_set<vote_id_type>(votes.begin(), votes.end());
       }
       create_account.options.num_committee = create_account.options.votes.size();
@@ -568,15 +568,15 @@ const account_object& database_fixture::create_account(
    FC_CAPTURE_AND_RETHROW( (name)(registrar_id)(referrer_id) )
 }
 
-const delegate_object& database_fixture::create_delegate( const account_object& owner )
+const committee_member_object& database_fixture::create_committee_member( const account_object& owner )
 {
-   delegate_create_operation op;
-   op.delegate_account = owner.id;
+   committee_member_create_operation op;
+   op.committee_member_account = owner.id;
    trx.operations.push_back(op);
    trx.validate();
    processed_transaction ptx = db.push_transaction(trx, ~0);
    trx.operations.clear();
-   return db.get<delegate_object>(ptx.operation_results[0].get<object_id_type>());
+   return db.get<committee_member_object>(ptx.operation_results[0].get<object_id_type>());
 }
 
 const witness_object&database_fixture::create_witness(account_id_type owner, const fc::ecc::private_key& signing_private_key)

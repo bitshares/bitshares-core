@@ -38,13 +38,41 @@ ApplicationWindow {
       id: appSettings
       category: "appSettings"
    }
+   Connections {
+      target: app
+      onExceptionThrown: console.log("Exception from app: " + message)
+   }
 
-   Button {
-      text: "Transfer"
+   Column {
       anchors.centerIn: parent
-      onClicked: formBox.showForm(Qt.createComponent("TransferForm.qml"), function() {
-         console.log("Closed form")
-      })
+      Button {
+         text: "Transfer"
+         onClicked: formBox.showForm(Qt.createComponent("TransferForm.qml"), function() {
+            console.log("Closed form")
+         })
+      }
+      TextField {
+         id: nameField
+         onAccepted: lookupButton.clicked()
+         focus: true
+      }
+      Button {
+         id: lookupButton
+         text: "Lookup"
+         onClicked: {
+            var acct = app.model.getAccount(nameField.text)
+            // @disable-check M126
+            if (acct == null)
+               console.log("Got back null account")
+            else if (acct.id >= 0)
+               console.log(JSON.stringify(acct))
+            else
+               console.log("Waiting for result...")
+               acct.idChanged.connect(function(loadedAcct) {
+                  console.log(JSON.stringify(loadedAcct))
+               })
+         }
+      }
    }
 
    FormBox {

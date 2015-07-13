@@ -247,9 +247,9 @@ namespace graphene { namespace app {
        return result;
     }
 
-    fc::optional<delegate_object> database_api::get_delegate_by_account(account_id_type account) const
+    fc::optional<committee_member_object> database_api::get_committee_member_by_account(account_id_type account) const
     {
-       const auto& idx = _db.get_index_type<delegate_index>().indices().get<by_account>();
+       const auto& idx = _db.get_index_type<committee_member_index>().indices().get<by_account>();
        auto itr = idx.find(account);
        if( itr != idx.end() )
           return *itr;
@@ -293,27 +293,27 @@ namespace graphene { namespace app {
        return witnesses_by_account_name;
     }
    
-    map<string, delegate_id_type> database_api::lookup_delegate_accounts(const string& lower_bound_name, uint32_t limit)const
+    map<string, committee_member_id_type> database_api::lookup_committee_member_accounts(const string& lower_bound_name, uint32_t limit)const
     {
        FC_ASSERT( limit <= 1000 );
-       const auto& delegates_by_id = _db.get_index_type<delegate_index>().indices().get<by_id>();
+       const auto& committee_members_by_id = _db.get_index_type<committee_member_index>().indices().get<by_id>();
 
-       // we want to order delegates by account name, but that name is in the account object
-       // so the delegate_index doesn't have a quick way to access it.
+       // we want to order committee_members by account name, but that name is in the account object
+       // so the committee_member_index doesn't have a quick way to access it.
        // get all the names and look them all up, sort them, then figure out what
        // records to return.  This could be optimized, but we expect the 
-       // number of delegates to be few and the frequency of calls to be rare
-       std::map<std::string, delegate_id_type> delegates_by_account_name;
-       for (const delegate_object& delegate : delegates_by_id)
-           if (auto account_iter = _db.find(delegate.delegate_account))
+       // number of committee_members to be few and the frequency of calls to be rare
+       std::map<std::string, committee_member_id_type> committee_members_by_account_name;
+       for (const committee_member_object& committee_member : committee_members_by_id)
+           if (auto account_iter = _db.find(committee_member.committee_member_account))
                if (account_iter->name >= lower_bound_name) // we can ignore anything below lower_bound_name 
-                   delegates_by_account_name.insert(std::make_pair(account_iter->name, delegate.id));
+                   committee_members_by_account_name.insert(std::make_pair(account_iter->name, committee_member.id));
 
-       auto end_iter = delegates_by_account_name.begin();
-       while (end_iter != delegates_by_account_name.end() && limit--)
+       auto end_iter = committee_members_by_account_name.begin();
+       while (end_iter != committee_members_by_account_name.end() && limit--)
            ++end_iter;
-       delegates_by_account_name.erase(end_iter, delegates_by_account_name.end());
-       return delegates_by_account_name;
+       committee_members_by_account_name.erase(end_iter, committee_members_by_account_name.end());
+       return committee_members_by_account_name;
     }
    
     vector<optional<witness_object>> database_api::get_witnesses(const vector<witness_id_type>& witness_ids)const
@@ -328,11 +328,11 @@ namespace graphene { namespace app {
        return result;
     }
 
-    vector<optional<delegate_object>> database_api::get_delegates(const vector<delegate_id_type>& delegate_ids)const
+    vector<optional<committee_member_object>> database_api::get_committee_members(const vector<committee_member_id_type>& committee_member_ids)const
     {
-       vector<optional<delegate_object>> result; result.reserve(delegate_ids.size());
-       std::transform(delegate_ids.begin(), delegate_ids.end(), std::back_inserter(result),
-                      [this](delegate_id_type id) -> optional<delegate_object> {
+       vector<optional<committee_member_object>> result; result.reserve(committee_member_ids.size());
+       std::transform(committee_member_ids.begin(), committee_member_ids.end(), std::back_inserter(result),
+                      [this](committee_member_id_type id) -> optional<committee_member_object> {
           if(auto o = _db.find(id))
              return *o;
           return {};

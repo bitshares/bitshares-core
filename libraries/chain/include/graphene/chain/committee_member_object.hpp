@@ -26,41 +26,41 @@ namespace graphene { namespace chain {
    class account_object;
 
    /**
-    *  @brief tracks information about a delegate account.
+    *  @brief tracks information about a committee_member account.
     *  @ingroup object
     *
-    *  A delegate is responsible for setting blockchain parameters and has
-    *  dynamic multi-sig control over the genesis account.  The current set of
-    *  active delegates has control.
+    *  A committee_member is responsible for setting blockchain parameters and has
+    *  dynamic multi-sig control over the committee account.  The current set of
+    *  active committee_members has control.
     *
-    *  Delegates were separated into a separate object to make iterating over
-    *  the set of delegate easy.
+    *  committee_members were separated into a separate object to make iterating over
+    *  the set of committee_member easy.
     */
-   class delegate_object : public abstract_object<delegate_object>
+   class committee_member_object : public abstract_object<committee_member_object>
    {
       public:
          static const uint8_t space_id = protocol_ids;
-         static const uint8_t type_id  = delegate_object_type;
+         static const uint8_t type_id  = committee_member_object_type;
 
-         account_id_type  delegate_account;
+         account_id_type  committee_member_account;
          vote_id_type     vote_id;
          string           url;
    };
 
    struct by_account;
-   using delegate_multi_index_type = multi_index_container<
-      delegate_object,
+   using committee_member_multi_index_type = multi_index_container<
+      committee_member_object,
       indexed_by<
          ordered_unique< tag<by_id>,
             member<object, object_id_type, &object::id>
          >,
          hashed_unique< tag<by_account>,
-            member<delegate_object, account_id_type, &delegate_object::delegate_account>
+            member<committee_member_object, account_id_type, &committee_member_object::committee_member_account>
          >
       >
    >;
-   using delegate_index = generic_index<delegate_object, delegate_multi_index_type>;
+   using committee_member_index = generic_index<committee_member_object, committee_member_multi_index_type>;
 } } // graphene::chain
 
-FC_REFLECT_DERIVED( graphene::chain::delegate_object, (graphene::db::object),
-                    (delegate_account)(vote_id)(url) )
+FC_REFLECT_DERIVED( graphene::chain::committee_member_object, (graphene::db::object),
+                    (committee_member_account)(vote_id)(url) )

@@ -10,7 +10,7 @@ using namespace graphene::app;
 ChainDataModel::ChainDataModel( fc::thread& t, QObject* parent )
 :QObject(parent),m_thread(&t){}
 
-Account* ChainDataModel::getAccount(qint64 id) 
+Account* ChainDataModel::getAccount(qint64 id)
 {
    auto itr = m_accounts.find( id );
    if( itr != m_accounts.end() )
@@ -22,7 +22,7 @@ Account* ChainDataModel::getAccount(qint64 id)
    auto insert_result = m_accounts.insert( acct );
 
    /** execute in app thread */
-   m_thread->async( [=](){ 
+   m_thread->async( [=](){
       try {
         auto result = m_db_api->get_accounts( {account_id_type(id)} );
         if( result.size() && result.front().valid() )
@@ -30,7 +30,7 @@ Account* ChainDataModel::getAccount(qint64 id)
           QString name = QString::fromStdString( result.front()->name );
           /** execute in main */
           Q_EMIT queueExecute( [=](){
-             this->m_accounts.modify( insert_result.first, 
+             this->m_accounts.modify( insert_result.first,
                 [=]( Account* a ){ a->setProperty("name", name ); }
              );
           });
@@ -43,9 +43,10 @@ Account* ChainDataModel::getAccount(qint64 id)
              m_accounts.erase( insert_result.first );
           });
         }
-      } 
+      }
       catch ( const fc::exception& e )
       {
+         edump((e.to_detail_string()));
          Q_EMIT exceptionThrown( QString::fromStdString(e.to_string()) );
       }
    });
@@ -53,7 +54,7 @@ Account* ChainDataModel::getAccount(qint64 id)
    return acct;
 }
 
-Account* ChainDataModel::getAccount(QString name) 
+Account* ChainDataModel::getAccount(QString name)
 {
    auto itr = m_accounts.get<::by_name>().find(name);
    if( itr != m_accounts.get<::by_name>().end() )
@@ -61,23 +62,22 @@ Account* ChainDataModel::getAccount(QString name)
       return *itr;
    }
 
-
    auto acct = new Account(this);
    acct->setProperty("id", --m_account_query_num );
    acct->setProperty("name", name);
    auto insert_result = m_accounts.insert( acct );
 
    /** execute in app thread */
-   m_thread->async( [=](){ 
+   m_thread->async( [=](){
       try {
         auto result = m_db_api->lookup_account_names( {name.toStdString()} );
         if( result.size() && result.front().valid() )
         {
           /** execute in main */
           Q_EMIT queueExecute( [=](){
-             this->m_accounts.modify( insert_result.first, 
-                [=]( Account* a ){ 
-                   a->setProperty("id", result.front()->id.instance() ); 
+             this->m_accounts.modify( insert_result.first,
+                [=]( Account* a ){
+                   a->setProperty("id", result.front()->id.instance() );
                 }
              );
           });
@@ -90,14 +90,15 @@ Account* ChainDataModel::getAccount(QString name)
              m_accounts.erase( insert_result.first );
           });
         }
-      } 
+      }
       catch ( const fc::exception& e )
       {
+         edump((e.to_detail_string()));
          Q_EMIT exceptionThrown( QString::fromStdString(e.to_string()) );
       }
    });
 
-   return nullptr;
+   return acct;
 }
 
 QQmlListProperty<Balance> Account::balances()

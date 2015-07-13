@@ -191,9 +191,9 @@ Questions
     Yes. Documentation of the code base, including APIs, can be generated using Doxygen. Simply run `doxygen` in this directory.
 
     If both Doxygen and perl are available in your build environment, the CLI wallet's `help` and `gethelp`
-    commands will display help generated from the doxygen documentation.  
+    commands will display help generated from the doxygen documentation.
 
-    If your CLI wallet's `help` command displays descriptions without parameter names like 
+    If your CLI wallet's `help` command displays descriptions without parameter names like
         `signed_transaction transfer(string, string, string, string, string, bool)`
     it means CMake was unable to find Doxygen or perl during configuration.  If found, the
     output should look like this:
@@ -231,8 +231,8 @@ Questions
 - The answer to the previous question was really confusing.  Can you make it clearer?
 
     All account ID's are of the form `1.2.x`.  If you were the 9735th account to be registered,
-    your account's ID will be `1.2.9735`.  Account `0` is special (it's the "genesis account,"
-    which is controlled by the delegates and has a few abilities and restrictions other accounts
+    your account's ID will be `1.2.9735`.  Account `0` is special (it's the "committee account,"
+    which is controlled by the committee members and has a few abilities and restrictions other accounts
     do not).
 
     All asset ID's are of the form `1.3.x`.  If you were the 29th asset to be registered,

@@ -6,7 +6,7 @@
 #include <graphene/chain/protocol/asset_ops.hpp>
 #include <graphene/chain/protocol/balance.hpp>
 #include <graphene/chain/protocol/custom.hpp>
-#include <graphene/chain/protocol/delegate.hpp>
+#include <graphene/chain/protocol/committee_member.hpp>
 #include <graphene/chain/protocol/market.hpp>
 #include <graphene/chain/protocol/proposal.hpp>
 #include <graphene/chain/protocol/transfer.hpp>
@@ -52,8 +52,8 @@ namespace graphene { namespace chain {
             withdraw_permission_update_operation,
             withdraw_permission_claim_operation,
             withdraw_permission_delete_operation,
-            delegate_create_operation,
-            delegate_update_global_parameters_operation,
+            committee_member_create_operation,
+            committee_member_update_global_parameters_operation,
             vesting_balance_create_operation,
             vesting_balance_withdraw_operation,
             worker_create_operation,

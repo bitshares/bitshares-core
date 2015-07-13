@@ -15,7 +15,7 @@ namespace graphene { namespace chain {
       struct fee_parameters_type { uint64_t fee = 5000 * GRAPHENE_BLOCKCHAIN_PRECISION; };
 
       asset             fee;
-      /// The account which owns the delegate. This account pays the fee for this operation.
+      /// The account which owns the witness. This account pays the fee for this operation.
       account_id_type   witness_account;
       string            url;
       public_key_type   block_signing_key;

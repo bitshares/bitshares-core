@@ -51,7 +51,7 @@ void database::reindex(fc::path data_dir, const genesis_state_type& initial_allo
    //_undo_db.disable();
    for( uint32_t i = 1; i <= last_block_num; ++i )
    {
-      apply_block(*_block_id_to_block.fetch_by_number(i), skip_delegate_signature |
+      apply_block(*_block_id_to_block.fetch_by_number(i), skip_witness_signature |
                                 skip_transaction_signatures |
                                 skip_undo_block |
                                 skip_undo_transaction |

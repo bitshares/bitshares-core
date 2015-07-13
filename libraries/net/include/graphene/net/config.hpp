@@ -25,12 +25,12 @@
  * used for automated testing (creating artificial net splits,
  * tracking where messages came from and when)
  */
-#define ENABLE_P2P_DEBUGGING_API                        1
+#define ENABLE_P2P_DEBUGGING_API                             1
 
 /**
  * 2MiB
  */
-#define MAX_MESSAGE_SIZE                                1024*1024*2
+#define MAX_MESSAGE_SIZE                                     1024*1024*2
 #define GRAPHENE_NET_DEFAULT_PEER_CONNECTION_RETRY_TIME      30 // seconds
 
 /**
@@ -47,7 +47,6 @@
 #define GRAPHENE_NET_TEST_P2P_PORT                           1700
 #define GRAPHENE_NET_DEFAULT_P2P_PORT                        1776
 #define GRAPHENE_NET_DEFAULT_DESIRED_CONNECTIONS             20
-#define GRAPHENE_NET_DELEGATE_DESIRED_CONNECTIONS            50
 #define GRAPHENE_NET_DEFAULT_MAX_CONNECTIONS                 200
 
 #define GRAPHENE_NET_MAXIMUM_QUEUED_MESSAGES_IN_BYTES        (1024 * 1024)

@@ -22,7 +22,7 @@
 #include <graphene/chain/operation_history_object.hpp>
 #include <graphene/chain/asset_object.hpp>
 #include <graphene/chain/market_evaluator.hpp>
-#include <graphene/chain/delegate_object.hpp>
+#include <graphene/chain/committee_member_object.hpp>
 #include <graphene/chain/witness_object.hpp>
 #include <graphene/chain/proposal_object.hpp>
 #include <graphene/chain/balance_object.hpp>
@@ -170,11 +170,11 @@ namespace graphene { namespace app {
          vector<asset_object> list_assets(const string& lower_bound_symbol, uint32_t limit)const;
 
          /**
-          * @brief Get the delegate owned by a given account
-          * @param account The ID of the account whose delegate should be retrieved
-          * @return The delegate object, or null if the account does not have a delegate
+          * @brief Get the committee_member owned by a given account
+          * @param account The ID of the account whose committee_member should be retrieved
+          * @return The committee_member object, or null if the account does not have a committee_member
           */
-         fc::optional<delegate_object> get_delegate_by_account(account_id_type account)const;
+         fc::optional<committee_member_object> get_committee_member_by_account(account_id_type account)const;
          /**
           * @brief Get the witness owned by a given account
           * @param account The ID of the account whose witness should be retrieved
@@ -196,12 +196,12 @@ namespace graphene { namespace app {
          map<string, witness_id_type> lookup_witness_accounts(const string& lower_bound_name, uint32_t limit)const;
          
          /**
-          * @brief Get names and IDs for registered delegates
+          * @brief Get names and IDs for registered committee_members
           * @param lower_bound_name Lower bound of the first name to return
           * @param limit Maximum number of results to return -- must not exceed 1000
-          * @return Map of delegate names to corresponding IDs
+          * @return Map of committee_member names to corresponding IDs
           */
-         map<string, delegate_id_type> lookup_delegate_accounts(const string& lower_bound_name, uint32_t limit)const;
+         map<string, committee_member_id_type> lookup_committee_member_accounts(const string& lower_bound_name, uint32_t limit)const;
          
          /**
           * @brief Get a list of witnesses by ID
@@ -213,13 +213,13 @@ namespace graphene { namespace app {
          vector<optional<witness_object>> get_witnesses(const vector<witness_id_type>& witness_ids)const;
 
          /**
-          * @brief Get a list of delegates by ID
-          * @param delegate_ids IDs of the delegates to retrieve
-          * @return The delegates corresponding to the provided IDs
+          * @brief Get a list of committee_members by ID
+          * @param committee_member_ids IDs of the committee_members to retrieve
+          * @return The committee_members corresponding to the provided IDs
           *
           * This function has semantics identical to @ref get_objects
           */
-         vector<optional<delegate_object>> get_delegates(const vector<delegate_id_type>& delegate_ids)const;
+         vector<optional<committee_member_object>> get_committee_members(const vector<committee_member_id_type>& committee_member_ids)const;
 
          /**
           * @group Push Notification Methods
@@ -471,13 +471,13 @@ FC_API(graphene::app::database_api,
        (get_call_orders)
        (get_settle_orders)
        (list_assets)
-       (get_delegate_by_account)
+       (get_committee_member_by_account)
        (get_witnesses)
-       (get_delegates)
+       (get_committee_members)
        (get_witness_by_account)
        (get_witness_count)
        (lookup_witness_accounts)
-       (lookup_delegate_accounts)
+       (lookup_committee_member_accounts)
        (subscribe_to_objects)
        (unsubscribe_from_objects)
        (subscribe_to_market)

@@ -325,7 +325,7 @@ void_result asset_update_feed_producers_evaluator::do_evaluate(const asset_updat
    const asset_object& a = o.asset_to_update(d);
 
    FC_ASSERT(a.is_market_issued(), "Cannot update feed producers on a non-BitAsset.");
-   FC_ASSERT(a.issuer != account_id_type(), "Cannot set feed producers on a genesis-issued asset.");
+   FC_ASSERT(a.issuer != GRAPHENE_COMMITTEE_ACCOUNT, "Cannot set feed producers on a committee-issued asset.");
 
    const asset_bitasset_data_object& b = a.bitasset_data(d);
    bitasset_to_update = &b;
@@ -450,7 +450,7 @@ void_result asset_publish_feeds_evaluator::do_evaluate(const asset_publish_feed_
    //Verify that the publisher is authoritative to publish a feed
    if( base.issuer == account_id_type() )
    {
-      //It's a delegate-fed asset. Verify that publisher is an active delegate or witness.
+      //It's a committee_member-fed asset. Verify that publisher is an active committee_member or witness.
       FC_ASSERT(d.get(GRAPHENE_COMMITTEE_ACCOUNT).active.account_auths.count(o.publisher) ||
                 d.get_global_properties().witness_accounts.count(o.publisher));
    } else {

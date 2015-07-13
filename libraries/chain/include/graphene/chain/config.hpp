@@ -32,9 +32,9 @@
 #define GRAPHENE_MAX_PAY_RATE 10000 /* 100% */
 #define GRAPHENE_MAX_SIG_CHECK_DEPTH 2
 #define GRAPHENE_MIN_WITNESS_COUNT 10
-#define GRAPHENE_MIN_DELEGATE_COUNT 10
+#define GRAPHENE_MIN_COMMITTEE_MEMBER_COUNT 10
 /**
- * Don't allow the delegates to publish a limit that would
+ * Don't allow the committee_members to publish a limit that would
  * make the network unable to operate.
  */
 #define GRAPHENE_MIN_TRANSACTION_SIZE_LIMIT 1024

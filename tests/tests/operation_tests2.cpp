@@ -25,7 +25,7 @@
 #include <graphene/chain/account_object.hpp>
 #include <graphene/chain/balance_object.hpp>
 #include <graphene/chain/witness_object.hpp>
-#include <graphene/chain/delegate_object.hpp>
+#include <graphene/chain/committee_member_object.hpp>
 #include <graphene/chain/market_evaluator.hpp>
 #include <graphene/chain/worker_evaluator.hpp>
 #include <graphene/chain/vesting_balance_object.hpp>
@@ -413,7 +413,7 @@ BOOST_AUTO_TEST_CASE( witness_create )
    trx.clear();
    witness_id_type nathan_witness_id = create_witness(nathan_id, nathan_private_key).id;
    // Give nathan some voting stake
-   transfer(genesis_account, nathan_id, asset(10000000));
+   transfer(committee_account, nathan_id, asset(10000000));
    generate_block();
    trx.set_expiration(db.head_block_id());
 
@@ -488,9 +488,9 @@ BOOST_AUTO_TEST_CASE( global_settle_test )
    feed.maximum_short_squeeze_ratio = 150 * GRAPHENE_COLLATERAL_RATIO_DENOM / 100;
    publish_feed( bit_usd_id(db), nathan, feed );
 
-   transfer(genesis_account, ben_id, asset(10000));
-   transfer(genesis_account, valentine_id, asset(10000));
-   transfer(genesis_account, dan_id, asset(10000));
+   transfer(committee_account, ben_id, asset(10000));
+   transfer(committee_account, valentine_id, asset(10000));
+   transfer(committee_account, dan_id, asset(10000));
    borrow(ben, asset(1000, bit_usd_id), asset(1000));
    BOOST_CHECK_EQUAL(get_balance(ben_id, bit_usd_id), 1000);
    BOOST_CHECK_EQUAL(get_balance(ben_id, asset_id_type()), 9000);
@@ -597,7 +597,7 @@ BOOST_AUTO_TEST_CASE( worker_pay_test )
    INVOKE(worker_create_test);
    GET_ACTOR(nathan);
    generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
-   transfer(genesis_account, nathan_id, asset(100000));
+   transfer(committee_account, nathan_id, asset(100000));
 
    {
       account_update_operation op;
@@ -710,7 +710,7 @@ BOOST_AUTO_TEST_CASE( refund_worker_test )
    BOOST_CHECK(worker.vote_for.type() == vote_id_type::worker);
    BOOST_CHECK(worker.vote_against.type() == vote_id_type::worker);
 
-   transfer(genesis_account, nathan_id, asset(100000));
+   transfer(committee_account, nathan_id, asset(100000));
 
    {
       account_update_operation op;
@@ -783,7 +783,7 @@ BOOST_AUTO_TEST_CASE( burn_worker_test )
    BOOST_CHECK(worker.vote_for.type() == vote_id_type::worker);
    BOOST_CHECK(worker.vote_against.type() == vote_id_type::worker);
 
-   transfer(genesis_account, nathan_id, asset(100000));
+   transfer(committee_account, nathan_id, asset(100000));
 
    {
       account_update_operation op;
@@ -826,8 +826,8 @@ BOOST_AUTO_TEST_CASE( unimp_force_settlement_unavailable )
    BOOST_FAIL( "TODO - Reimplement this" );
    /*
    try {
-   auto private_key = delegate_priv_key;
-   auto private_key = generate_private_key("genesis");
+   auto private_key = init_account_priv_key;
+   auto private_key = generate_private_key("committee");
 >>>>>>> short_refactor
    account_id_type nathan_id = create_account("nathan").get_id();
    account_id_type shorter1_id = create_account("shorter1").get_id();
@@ -1026,7 +1026,7 @@ BOOST_AUTO_TEST_CASE( balance_object_test )
    BOOST_CHECK(db.find_object(balance_id_type(1)) != nullptr);
 
    auto slot = db.get_slot_at_time(starting_time);
-   db.generate_block(starting_time, db.get_scheduled_witness(slot).first, delegate_priv_key, database::skip_nothing);
+   db.generate_block(starting_time, db.get_scheduled_witness(slot).first, init_account_priv_key, database::skip_nothing);
    trx.set_expiration(db.head_block_id());
 
    const balance_object& vesting_balance_1 = balance_id_type(2)(db);
@@ -1077,9 +1077,9 @@ BOOST_AUTO_TEST_CASE( balance_object_test )
    // Attempting to claim twice within a day
    GRAPHENE_CHECK_THROW(db.push_transaction(trx), balance_claim_claimed_too_often);
 
-   db.generate_block(db.get_slot_time(1), db.get_scheduled_witness(1).first, delegate_priv_key, database::skip_nothing);
+   db.generate_block(db.get_slot_time(1), db.get_scheduled_witness(1).first, init_account_priv_key, database::skip_nothing);
    slot = db.get_slot_at_time(vesting_balance_1.vesting_policy->begin_timestamp + 60);
-   db.generate_block(db.get_slot_time(slot), db.get_scheduled_witness(slot).first, delegate_priv_key, database::skip_nothing);
+   db.generate_block(db.get_slot_time(slot), db.get_scheduled_witness(slot).first, init_account_priv_key, database::skip_nothing);
    trx.set_expiration(db.head_block_id());
 
    op.balance_to_claim = vesting_balance_1.id;
@@ -1103,9 +1103,9 @@ BOOST_AUTO_TEST_CASE( balance_object_test )
    // Attempting to claim twice within a day
    GRAPHENE_CHECK_THROW(db.push_transaction(trx), balance_claim_claimed_too_often);
 
-   db.generate_block(db.get_slot_time(1), db.get_scheduled_witness(1).first, delegate_priv_key, database::skip_nothing);
+   db.generate_block(db.get_slot_time(1), db.get_scheduled_witness(1).first, init_account_priv_key, database::skip_nothing);
    slot = db.get_slot_at_time(db.head_block_time() + fc::days(1));
-   db.generate_block(db.get_slot_time(slot), db.get_scheduled_witness(slot).first, delegate_priv_key, database::skip_nothing);
+   db.generate_block(db.get_slot_time(slot), db.get_scheduled_witness(slot).first, init_account_priv_key, database::skip_nothing);
    trx.set_expiration(db.head_block_id());
 
    op.total_claimed = vesting_balance_2.balance;

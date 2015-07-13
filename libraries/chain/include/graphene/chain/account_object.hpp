@@ -108,7 +108,7 @@ namespace graphene { namespace chain {
     * @ingroup protocol
     *
     * Accounts are the primary unit of authority on the graphene system. Users must have an account in order to use
-    * assets, trade in the markets, vote for delegates, etc.
+    * assets, trade in the markets, vote for committee_members, etc.
     */
    class account_object : public graphene::db::annotated_object<account_object>
    {
@@ -231,7 +231,7 @@ namespace graphene { namespace chain {
          static const uint8_t type_id  = meta_account_object_type;
 
          public_key_type     memo_key;
-         delegate_id_type    delegate_id; // optional
+         committee_member_id_type    committee_member_id; // optional
    };
 
    /**
@@ -334,7 +334,7 @@ FC_REFLECT_DERIVED( graphene::chain::account_balance_object,
 
 FC_REFLECT_DERIVED( graphene::chain::meta_account_object,
                     (graphene::db::object),
-                    (memo_key)(delegate_id) )
+                    (memo_key)(committee_member_id) )
 
 FC_REFLECT_DERIVED( graphene::chain::account_statistics_object, (graphene::chain::object),
                     (most_recent_op)

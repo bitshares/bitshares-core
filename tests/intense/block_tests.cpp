@@ -43,13 +43,13 @@ BOOST_FIXTURE_TEST_CASE( update_account_keys, database_fixture )
       const asset_object& core = asset_id_type()(db);
       uint32_t skip_flags =
           database::skip_transaction_dupe_check
-        | database::skip_delegate_signature
+        | database::skip_witness_signature
         | database::skip_transaction_signatures
         | database::skip_authority_check
         ;
 
       // Sam is the creator of accounts
-      private_key_type genesis_key = delegate_priv_key;
+      private_key_type committee_key = init_account_priv_key;
       private_key_type sam_key = generate_private_key("sam");
 
       //
@@ -78,9 +78,9 @@ BOOST_FIXTURE_TEST_CASE( update_account_keys, database_fixture )
       transaction tx;
       processed_transaction ptx;
 
-      account_object genesis_account_object = genesis_account(db);
-      // transfer from genesis account to Sam account
-      transfer(genesis_account_object, sam_account_object, core.amount(100000));
+      account_object committee_account_object = committee_account(db);
+      // transfer from committee account to Sam account
+      transfer(committee_account_object, sam_account_object, core.amount(100000));
 
       const int num_keys = 5;
       vector< private_key_type > numbered_private_keys;
@@ -239,14 +239,14 @@ BOOST_FIXTURE_TEST_CASE( update_account_keys, database_fixture )
 
 /**
  *  To have a secure random number we need to ensure that the same
- *  delegate does not get to produce two blocks in a row.  There is
- *  always a chance that the last delegate of one round will be the
- *  first delegate of the next round.
+ *  witness does not get to produce two blocks in a row.  There is
+ *  always a chance that the last witness of one round will be the
+ *  first witness of the next round.
  *
- *  This means that when we shuffle delegates we need to make sure
- *  that there is at least N/2 delegates between consecutive turns
- *  of the same delegate.    This means that durring the random
- *  shuffle we need to restrict the placement of delegates to maintain
+ *  This means that when we shuffle witness we need to make sure
+ *  that there is at least N/2 witness between consecutive turns
+ *  of the same witness.    This means that durring the random
+ *  shuffle we need to restrict the placement of witness to maintain
  *  this invariant.
  *
  *  This test checks the requirement using Monte Carlo approach
@@ -316,14 +316,14 @@ BOOST_FIXTURE_TEST_CASE( witness_order_mc_test, database_fixture )
 
 /**
  *  To have a secure random number we need to ensure that the same
- *  delegate does not get to produce two blocks in a row.  There is
- *  always a chance that the last delegate of one round will be the
- *  first delegate of the next round.
+ *  witness does not get to produce two blocks in a row.  There is
+ *  always a chance that the last witness of one round will be the
+ *  first witness of the next round.
  *
- *  This means that when we shuffle delegates we need to make sure
- *  that there is at least N/2 delegates between consecutive turns
- *  of the same delegate.    This means that durring the random
- *  shuffle we need to restrict the placement of delegates to maintain
+ *  This means that when we shuffle witness we need to make sure
+ *  that there is at least N/2 witness between consecutive turns
+ *  of the same witness.    This means that durring the random
+ *  shuffle we need to restrict the placement of witness to maintain
  *  this invariant.
  *
  *  This test checks the requirement using Monte Carlo approach
@@ -410,7 +410,7 @@ BOOST_FIXTURE_TEST_CASE( tapos_rollover, database_fixture )
       const auto& core   = asset_id_type()(db);
 
       BOOST_TEST_MESSAGE( "Give Alice some money" );
-      transfer(genesis_account, alice_id, asset(10000));
+      transfer(committee_account, alice_id, asset(10000));
       generate_block();
 
       BOOST_TEST_MESSAGE( "Generate up to block 0xFF00" );
