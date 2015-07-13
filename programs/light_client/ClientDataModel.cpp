@@ -38,8 +38,6 @@ GrapheneApplication::GrapheneApplication( QObject* parent )
             this, &GrapheneApplication::execute );
 
    m_model = new ChainDataModel( m_thread, this );
-
-   start( "", "", "", "" );
 }
 
 GrapheneApplication::~GrapheneApplication()
@@ -55,11 +53,11 @@ void GrapheneApplication::setIsConnected( bool v )
    }
 }
 
-void GrapheneApplication::start( QString datadir, QString apiurl, QString user, QString pass )
+void GrapheneApplication::start( QString apiurl, QString user, QString pass )
 {
    if( !m_thread.is_current() )
    {
-      m_done = m_thread.async( [=](){ return start( datadir, apiurl, user, pass ); }  );
+      m_done = m_thread.async( [=](){ return start( apiurl, user, pass ); }  );
       return;
    }
    try {

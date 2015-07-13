@@ -9,6 +9,9 @@ int main(int argc, char *argv[])
 {
    fc::thread::current().set_name( "main" );
    QApplication app(argc, argv);
+   app.setApplicationName("Graphene Client");
+   app.setOrganizationDomain("cryptonomex.org");
+   app.setOrganizationName("Cryptonomex, Inc.");
 
    qRegisterMetaType<std::function<void()>>();
 

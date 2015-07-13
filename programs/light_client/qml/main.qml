@@ -13,6 +13,10 @@ ApplicationWindow {
    height: 480
    title: qsTr("Hello World")
 
+   Component.onCompleted: {
+      app.start("ws://localhost:8090", "user", "pass")
+   }
+
    menuBar: MenuBar {
       Menu {
          title: qsTr("File")

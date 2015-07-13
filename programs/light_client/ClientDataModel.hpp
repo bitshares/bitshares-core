@@ -93,9 +93,8 @@ public:
       return m_model;
    }
 
-   Q_INVOKABLE void start( QString dataDirectory, 
-                           QString apiUrl, 
-                           QString user, 
+   Q_INVOKABLE void start(QString apiUrl,
+                           QString user,
                            QString pass );
 
    bool isConnected() const
