@@ -11,14 +11,25 @@
 #include <fc/thread/thread.hpp>
 #include <graphene/app/api.hpp>
 
+#include <QCryptographicHash>
 #include <QObject>
 #include <QQmlListProperty>
+#include <QtQml>
 
 using boost::multi_index_container;
 using namespace boost::multi_index;
 
 Q_DECLARE_METATYPE(std::function<void()>)
 
+class Crypto {
+   Q_GADGET
+
+public:
+   Q_INVOKABLE QString sha256(QByteArray data) {
+      return QCryptographicHash::hash(data, QCryptographicHash::Sha256).toHex();
+   }
+};
+QML_DECLARE_TYPE(Crypto)
 
 class Asset : public QObject {
    Q_OBJECT

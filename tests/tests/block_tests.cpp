@@ -907,4 +907,128 @@ BOOST_FIXTURE_TEST_CASE( witness_scheduler_missed_blocks, database_fixture )
    });
 } FC_LOG_AND_RETHROW() }
 
+BOOST_FIXTURE_TEST_CASE( rsf_missed_blocks, database_fixture )
+{
+   try
+   {
+      generate_block();
+
+      auto rsf = [&]() -> string
+      {
+         fc::uint128 rsf = db.get( witness_schedule_id_type() ).recent_slots_filled;
+         string result = "";
+         result.reserve(128);
+         for( int i=0; i<128; i++ )
+         {
+            result += ((rsf.lo & 1) == 0) ? '0' : '1';
+            rsf >>= 1;
+         }
+         return result;
+      };
+
+      auto pct = []( uint32_t x ) -> uint32_t
+      {
+         return uint64_t( GRAPHENE_100_PERCENT ) * x / 128;
+      };
+
+      BOOST_CHECK_EQUAL( rsf(),
+         "1111111111111111111111111111111111111111111111111111111111111111"
+         "1111111111111111111111111111111111111111111111111111111111111111"
+      );
+      BOOST_CHECK_EQUAL( db.witness_participation_rate(), GRAPHENE_100_PERCENT );
+
+      generate_block( ~0, init_account_priv_key, 1 );
+      BOOST_CHECK_EQUAL( rsf(),
+         "0111111111111111111111111111111111111111111111111111111111111111"
+         "1111111111111111111111111111111111111111111111111111111111111111"
+      );
+      BOOST_CHECK_EQUAL( db.witness_participation_rate(), pct(127) );
+
+      generate_block( ~0, init_account_priv_key, 1 );
+      BOOST_CHECK_EQUAL( rsf(),
+         "0101111111111111111111111111111111111111111111111111111111111111"
+         "1111111111111111111111111111111111111111111111111111111111111111"
+      );
+      BOOST_CHECK_EQUAL( db.witness_participation_rate(), pct(126) );
+
+      generate_block( ~0, init_account_priv_key, 2 );
+      BOOST_CHECK_EQUAL( rsf(),
+         "0010101111111111111111111111111111111111111111111111111111111111"
+         "1111111111111111111111111111111111111111111111111111111111111111"
+      );
+      BOOST_CHECK_EQUAL( db.witness_participation_rate(), pct(124) );
+
+      generate_block( ~0, init_account_priv_key, 3 );
+      BOOST_CHECK_EQUAL( rsf(),
+         "0001001010111111111111111111111111111111111111111111111111111111"
+         "1111111111111111111111111111111111111111111111111111111111111111"
+      );
+      BOOST_CHECK_EQUAL( db.witness_participation_rate(), pct(121) );
+
+      generate_block( ~0, init_account_priv_key, 5 );
+      BOOST_CHECK_EQUAL( rsf(),
+         "0000010001001010111111111111111111111111111111111111111111111111"
+         "1111111111111111111111111111111111111111111111111111111111111111"
+      );
+      BOOST_CHECK_EQUAL( db.witness_participation_rate(), pct(116) );
+
+      generate_block( ~0, init_account_priv_key, 8 );
+      BOOST_CHECK_EQUAL( rsf(),
+         "0000000010000010001001010111111111111111111111111111111111111111"
+         "1111111111111111111111111111111111111111111111111111111111111111"
+      );
+      BOOST_CHECK_EQUAL( db.witness_participation_rate(), pct(108) );
+
+      generate_block( ~0, init_account_priv_key, 13 );
+      BOOST_CHECK_EQUAL( rsf(),
+         "0000000000000100000000100000100010010101111111111111111111111111"
+         "1111111111111111111111111111111111111111111111111111111111111111"
+      );
+      BOOST_CHECK_EQUAL( db.witness_participation_rate(), pct(95) );
+
+      generate_block();
+      BOOST_CHECK_EQUAL( rsf(),
+         "1000000000000010000000010000010001001010111111111111111111111111"
+         "1111111111111111111111111111111111111111111111111111111111111111"
+      );
+      BOOST_CHECK_EQUAL( db.witness_participation_rate(), pct(95) );
+
+      generate_block();
+      BOOST_CHECK_EQUAL( rsf(),
+         "1100000000000001000000001000001000100101011111111111111111111111"
+         "1111111111111111111111111111111111111111111111111111111111111111"
+      );
+      BOOST_CHECK_EQUAL( db.witness_participation_rate(), pct(95) );
+
+      generate_block();
+      BOOST_CHECK_EQUAL( rsf(),
+         "1110000000000000100000000100000100010010101111111111111111111111"
+         "1111111111111111111111111111111111111111111111111111111111111111"
+      );
+      BOOST_CHECK_EQUAL( db.witness_participation_rate(), pct(95) );
+
+      generate_block();
+      BOOST_CHECK_EQUAL( rsf(),
+         "1111000000000000010000000010000010001001010111111111111111111111"
+         "1111111111111111111111111111111111111111111111111111111111111111"
+      );
+      BOOST_CHECK_EQUAL( db.witness_participation_rate(), pct(95) );
+
+      generate_block( ~0, init_account_priv_key, 64 );
+      BOOST_CHECK_EQUAL( rsf(),
+         "0000000000000000000000000000000000000000000000000000000000000000"
+         "1111100000000000001000000001000001000100101011111111111111111111"
+      );
+      BOOST_CHECK_EQUAL( db.witness_participation_rate(), pct(31) );
+
+      generate_block( ~0, init_account_priv_key, 32 );
+      BOOST_CHECK_EQUAL( rsf(),
+         "0000000000000000000000000000000010000000000000000000000000000000"
+         "0000000000000000000000000000000001111100000000000001000000001000"
+      );
+      BOOST_CHECK_EQUAL( db.witness_participation_rate(), pct(8) );
+   }
+   FC_LOG_AND_RETHROW()
+}
+
 BOOST_AUTO_TEST_SUITE_END()

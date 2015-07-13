@@ -5,6 +5,7 @@ import QtQuick.Dialogs 1.2
 Rectangle {
    id: greySheet
    state: "HIDDEN"
+   color: Qt.rgba(0, 0, 0, showOpacity)
 
    property real showOpacity: .5
    property int animationTime: 300
@@ -18,8 +19,11 @@ Rectangle {
    /// Emitted when closed, following fade-out animation
    signal closed
 
-   function showForm(formType, closedCallback) {
-      formLoader.sourceComponent = formType
+   function showForm(formType, params, closedCallback) {
+      if (formType.status === Component.Error)
+         console.log(formType.errorString())
+
+      formContainer.data = [formType.createObject(formContainer, params)]
       if (closedCallback instanceof Function)
          internal.callback = closedCallback
       state = "SHOWN"
@@ -35,12 +39,12 @@ Rectangle {
       acceptedButtons: Qt.AllButtons
    }
    MouseArea {
-      anchors.fill: formLoader
+      anchors.fill: formContainer
       acceptedButtons: Qt.AllButtons
       onClicked: mouse.accepted = true
    }
-   Loader {
-      id: formLoader
+   Item {
+      id: formContainer
       anchors.centerIn: parent
       width: parent.width / 2
       height: parent.height / 2
@@ -51,7 +55,7 @@ Rectangle {
          name: "HIDDEN"
          PropertyChanges {
             target: greySheet
-            color: Qt.rgba(0, 0, 0, 0)
+            opacity: 0
             enabled: false
          }
          StateChangeScript {
@@ -63,10 +67,12 @@ Rectangle {
          StateChangeScript {
             name: "postHidden"
             script: {
+               console.log("Post")
                greySheet.closed()
-               formLoader.sourceComponent = undefined
+               formContainer.data = []
                if (internal.callback instanceof Function)
                   internal.callback()
+               internal.callback = undefined
             }
          }
       },
@@ -74,7 +80,7 @@ Rectangle {
          name: "SHOWN"
          PropertyChanges {
             target: greySheet
-            color: Qt.rgba(0, 0, 0, showOpacity)
+            opacity: 1
             enabled: true
          }
          StateChangeScript {
@@ -95,22 +101,28 @@ Rectangle {
       Transition {
          from: "HIDDEN"
          to: "SHOWN"
-         ScriptAction { scriptName: "preShown" }
-         ColorAnimation {
-            target: greySheet
-            duration: animationTime
+         SequentialAnimation {
+            ScriptAction { scriptName: "preShown" }
+            PropertyAnimation {
+               target: greySheet
+               property: "opacity"
+               duration: animationTime
+            }
+            ScriptAction { scriptName: "postShown" }
          }
-         ScriptAction { scriptName: "postShown" }
       },
       Transition {
          from: "SHOWN"
          to: "HIDDEN"
-         ScriptAction { scriptName: "preHidden" }
-         ColorAnimation {
-            target: greySheet
-            duration: animationTime
+         SequentialAnimation {
+            ScriptAction { scriptName: "preHidden" }
+            PropertyAnimation {
+               target: greySheet
+               property: "opacity"
+               duration: animationTime
+            }
+            ScriptAction { scriptName: "postHidden" }
          }
-         ScriptAction { scriptName: "postHidden" }
       }
    ]
 

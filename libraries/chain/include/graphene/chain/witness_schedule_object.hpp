@@ -19,6 +19,7 @@
 
 // needed to serialize witness_scheduler
 #include <fc/container/deque.hpp>
+#include <fc/uint128.hpp>
 
 #include <graphene/chain/protocol/types.hpp>
 #include <graphene/chain/witness_scheduler.hpp>
@@ -57,6 +58,12 @@ class witness_schedule_object : public abstract_object<witness_schedule_object>
       uint32_t last_scheduling_block;
       uint64_t slots_since_genesis = 0;
       fc::array< char, sizeof(secret_hash_type) > rng_seed;
+
+      /**
+       * Not necessary for consensus, but used for figuring out the participation rate.
+       * The nth bit is 0 if the nth slot was unfilled, else it is 1.
+       */
+      fc::uint128 recent_slots_filled;
 };
 
 } }
@@ -77,4 +84,5 @@ FC_REFLECT_DERIVED( graphene::chain::witness_schedule_object, (graphene::chain::
                     (last_scheduling_block)
                     (slots_since_genesis)
                     (rng_seed)
+                    (recent_slots_filled)
                     )
