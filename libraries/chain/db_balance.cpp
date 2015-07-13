@@ -52,7 +52,10 @@ void database::adjust_balance(account_id_type account, asset delta )
    auto itr = index.find(boost::make_tuple(account, delta.asset_id));
    if(itr == index.end())
    {
-      FC_ASSERT(delta.amount > 0);
+      FC_ASSERT( delta.amount > 0, "Insufficient Balance: ${a}'s balance of ${b} is less than required ${r}", 
+                 ("a",account(*this).name)
+                 ("b",to_pretty_string(asset(0,delta.asset_id)))
+                 ("r",to_pretty_string(-delta)));
       create<account_balance_object>([account,&delta](account_balance_object& b) {
          b.owner = account;
          b.asset_type = delta.asset_id;
