@@ -141,6 +141,16 @@ void database::update_witness_schedule(const signed_block& next_block)
             memcpy(_wso.rng_seed.begin(), dpo.random.data(), dpo.random.data_size());
       }
       _wso.last_scheduling_block = next_block.block_num();
+      _wso.recent_slots_filled = (
+           (_wso.recent_slots_filled << 1)
+           + 1) << (schedule_slot - 1);
    });
 }
+
+uint32_t database::witness_participation_rate()const
+{
+   const witness_schedule_object& wso = get(witness_schedule_id_type());
+   return uint64_t(GRAPHENE_100_PERCENT) * wso.recent_slots_filled.popcount() / 128;
+}
+
 } }

@@ -525,6 +525,8 @@ void database::init_genesis(const genesis_state_type& genesis_state)
          _wso.scheduler.produce_schedule(rng);
 
       _wso.last_scheduling_block = 0;
+
+      _wso.recent_slots_filled = fc::uint128::max_value();
    });
    assert( wso.id == witness_schedule_id_type() );
 

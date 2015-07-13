@@ -39,7 +39,7 @@ void witness_plugin::plugin_set_program_options(
    string witness_id_example = fc::json::to_string(chain::witness_id_type());
    command_line_options.add_options()
          ("enable-stale-production", bpo::bool_switch()->notifier([this](bool e){_production_enabled = e;}), "Enable block production, even if the chain is stale.")
-         ("required-participation", bpo::bool_switch()->notifier([this](int e){_required_witness_participation = e;}), "Percent of witnesses (0-99) that must be participating in order to produce blocks")
+         ("required-participation", bpo::bool_switch()->notifier([this](int e){_required_witness_participation = uint32_t(e*GRAPHENE_1_PERCENT);}), "Percent of witnesses (0-99) that must be participating in order to produce blocks")
          ("allow-consecutive", bpo::bool_switch()->notifier([this](bool e){_consecutive_production_enabled = e;}), "Allow block production, even if the last block was produced by the same witness.")
          ("witness-id,w", bpo::value<vector<string>>()->composing()->multitoken(),
           ("ID of witness controlled by this node (e.g. " + witness_id_example + ", quotes are required, may specify multiple times)").c_str())
@@ -191,11 +191,11 @@ void witness_plugin::block_production_loop()
          return false;
       }
 
-      double prate = db.witness_participation_rate();
-      if( int(100*prate)  < _required_witness_participation ) 
+      uint32_t prate = db.witness_participation_rate();
+      if( prate < _required_witness_participation )
       {
          elog("Not producing block because node appers to be on a minority fork with only ${x}% witness participation",
-              ("x",uint32_t(100*prate) ) );
+              ("x",uint32_t(100*uint64_t(prate) / GRAPHENE_1_PERCENT) ) );
          return false;
       }
 

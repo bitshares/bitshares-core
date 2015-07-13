@@ -138,9 +138,9 @@ namespace graphene { namespace chain {
 
          /**
           *  Calculate the percent of block production slots that were missed in the
-          *  past 100 blocks.  
+          *  past 128 blocks, not including the current block.
           */
-         double witness_participation_rate()const;
+         uint32_t witness_participation_rate()const;
 
          void                              add_checkpoints( const flat_map<uint32_t,block_id_type>& checkpts );
          const flat_map<uint32_t,block_id_type> get_checkpoints()const { return _checkpoints; }
