@@ -21,7 +21,7 @@
 #include <graphene/chain/account_object.hpp>
 #include <graphene/chain/asset_object.hpp>
 #include <graphene/chain/database.hpp>
-#include <graphene/chain/delegate_object.hpp>
+#include <graphene/chain/committee_member_object.hpp>
 #include <graphene/chain/market_evaluator.hpp>
 #include <graphene/chain/vesting_balance_object.hpp>
 #include <graphene/chain/withdraw_permission_object.hpp>
@@ -360,7 +360,7 @@ BOOST_AUTO_TEST_CASE( update_account )
       const account_object& nathan = create_account("nathan", init_account_pub_key);
       const fc::ecc::private_key nathan_new_key = fc::ecc::private_key::generate();
       const public_key_type key_id = nathan_new_key.get_public_key();
-      const auto& active_delegates = db.get_global_properties().active_delegates;
+      const auto& active_committee_members = db.get_global_properties().active_committee_members;
 
       transfer(account_id_type()(db), nathan, asset(1000000000));
 
@@ -370,7 +370,7 @@ BOOST_AUTO_TEST_CASE( update_account )
       op.owner = authority(2, key_id, 1, init_account_pub_key, 1);
       op.active = authority(2, key_id, 1, init_account_pub_key, 1);
       op.new_options = nathan.options;
-      op.new_options->votes = flat_set<vote_id_type>({active_delegates[0](db).vote_id, active_delegates[5](db).vote_id});
+      op.new_options->votes = flat_set<vote_id_type>({active_committee_members[0](db).vote_id, active_committee_members[5](db).vote_id});
       op.new_options->num_committee = 2;
       trx.operations.push_back(op);
       BOOST_TEST_MESSAGE( "Updating account" );
@@ -451,23 +451,23 @@ BOOST_AUTO_TEST_CASE( transfer_core_asset )
    }
 }
 
-BOOST_AUTO_TEST_CASE( create_delegate )
+BOOST_AUTO_TEST_CASE( create_committee_member )
 {
    try {
-      delegate_create_operation op;
-      op.delegate_account = account_id_type();
+      committee_member_create_operation op;
+      op.committee_member_account = account_id_type();
       op.fee = asset();
       trx.operations.push_back(op);
 
-      REQUIRE_THROW_WITH_VALUE(op, delegate_account, account_id_type(99999999));
+      REQUIRE_THROW_WITH_VALUE(op, committee_member_account, account_id_type(99999999));
       REQUIRE_THROW_WITH_VALUE(op, fee, asset(-600));
       trx.operations.back() = op;
 
-      delegate_id_type delegate_id = db.get_index_type<primary_index<simple_index<delegate_object>>>().get_next_id();
+      committee_member_id_type committee_member_id = db.get_index_type<primary_index<simple_index<committee_member_object>>>().get_next_id();
       PUSH_TX( db, trx, ~0 );
-      const delegate_object& d = delegate_id(db);
+      const committee_member_object& d = committee_member_id(db);
 
-      BOOST_CHECK(d.delegate_account == account_id_type());
+      BOOST_CHECK(d.committee_member_account == account_id_type());
    } catch (fc::exception& e) {
       edump((e.to_detail_string()));
       throw;

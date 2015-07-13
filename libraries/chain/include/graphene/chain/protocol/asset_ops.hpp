@@ -311,7 +311,7 @@ namespace graphene { namespace chain {
     *
     * Price feed providers use this operation to publish their price feeds for market-issued assets. A price feed is
     * used to tune the market for a particular market-issued asset. For each value in the feed, the median across all
-    * delegate feeds for that asset is calculated and the market for the asset is configured with the median of that
+    * committee_member feeds for that asset is calculated and the market for the asset is configured with the median of that
     * value.
     *
     * The feed in the operation contains three prices: a call price limit, a short price limit, and a settlement price.

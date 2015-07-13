@@ -400,7 +400,7 @@ public:
       result["next_maintenance_time"] = fc::get_approximate_relative_time_string(dynamic_props.next_maintenance_time);
       result["chain_id"] = global_props.chain_id;
       result["active_witnesses"] = global_props.active_witnesses;
-      result["active_delegates"] = global_props.active_delegates;
+      result["active_committee_members"] = global_props.active_committee_members;
       result["entropy"] = dynamic_props.random;
       return result;
    }
@@ -1117,18 +1117,18 @@ public:
       return sign_transaction( tx, broadcast );
    } FC_CAPTURE_AND_RETHROW( (authorizing_account)(account_to_list)(new_listing_status)(broadcast) ) }
 
-   signed_transaction create_delegate(string owner_account, string url, 
+   signed_transaction create_committee_member(string owner_account, string url, 
                                       bool broadcast /* = false */)
    { try {
 
-      delegate_create_operation delegate_create_op;
-      delegate_create_op.delegate_account = get_account_id(owner_account);
-      delegate_create_op.url = url;
-      if (_remote_db->get_delegate_by_account(delegate_create_op.delegate_account))
-         FC_THROW("Account ${owner_account} is already a delegate", ("owner_account", owner_account));
+      committee_member_create_operation committee_member_create_op;
+      committee_member_create_op.committee_member_account = get_account_id(owner_account);
+      committee_member_create_op.url = url;
+      if (_remote_db->get_committee_member_by_account(committee_member_create_op.committee_member_account))
+         FC_THROW("Account ${owner_account} is already a committee_member", ("owner_account", owner_account));
 
       signed_transaction tx;
-      tx.operations.push_back( delegate_create_op );
+      tx.operations.push_back( committee_member_create_op );
       set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees);
       tx.validate();
 
@@ -1170,19 +1170,19 @@ public:
       FC_CAPTURE_AND_RETHROW( (owner_account) )
    }
 
-   delegate_object get_delegate(string owner_account)
+   committee_member_object get_committee_member(string owner_account)
    {
       try 
       {
-         fc::optional<delegate_id_type> delegate_id = maybe_id<delegate_id_type>(owner_account);
-         if (delegate_id)
+         fc::optional<committee_member_id_type> committee_member_id = maybe_id<committee_member_id_type>(owner_account);
+         if (committee_member_id)
          {
-            std::vector<delegate_id_type> ids_to_get;
-            ids_to_get.push_back(*delegate_id);
-            std::vector<fc::optional<delegate_object>> delegate_objects = _remote_db->get_delegates(ids_to_get);
-            if (delegate_objects.front())
-               return *delegate_objects.front();
-            FC_THROW("No delegate is registered for id ${id}", ("id", owner_account));
+            std::vector<committee_member_id_type> ids_to_get;
+            ids_to_get.push_back(*committee_member_id);
+            std::vector<fc::optional<committee_member_object>> committee_member_objects = _remote_db->get_committee_members(ids_to_get);
+            if (committee_member_objects.front())
+               return *committee_member_objects.front();
+            FC_THROW("No committee_member is registered for id ${id}", ("id", owner_account));
          }
          else
          {
@@ -1190,15 +1190,15 @@ public:
             try
             {
                account_id_type owner_account_id = get_account_id(owner_account);
-               fc::optional<delegate_object> delegate = _remote_db->get_delegate_by_account(owner_account_id);
-               if (delegate)
-                  return *delegate;
+               fc::optional<committee_member_object> committee_member = _remote_db->get_committee_member_by_account(owner_account_id);
+               if (committee_member)
+                  return *committee_member;
                else
-                  FC_THROW("No delegate is registered for account ${account}", ("account", owner_account));
+                  FC_THROW("No committee_member is registered for account ${account}", ("account", owner_account));
             }
             catch (const fc::exception&)
             {
-               FC_THROW("No account or delegate named ${account}", ("account", owner_account));
+               FC_THROW("No account or committee_member named ${account}", ("account", owner_account));
             }
          }
       }
@@ -1238,27 +1238,27 @@ public:
       return sign_transaction( tx, broadcast );
    } FC_CAPTURE_AND_RETHROW( (owner_account)(broadcast) ) }
 
-   signed_transaction vote_for_delegate(string voting_account,
-                                        string delegate,
+   signed_transaction vote_for_committee_member(string voting_account,
+                                        string committee_member,
                                         bool approve,
                                         bool broadcast /* = false */)
    { try {
       account_object voting_account_object = get_account(voting_account);
-      account_id_type delegate_owner_account_id = get_account_id(delegate);
-      fc::optional<delegate_object> delegate_obj = _remote_db->get_delegate_by_account(delegate_owner_account_id);
-      if (!delegate_obj)
-         FC_THROW("Account ${delegate} is not registered as a delegate", ("delegate", delegate));
+      account_id_type committee_member_owner_account_id = get_account_id(committee_member);
+      fc::optional<committee_member_object> committee_member_obj = _remote_db->get_committee_member_by_account(committee_member_owner_account_id);
+      if (!committee_member_obj)
+         FC_THROW("Account ${committee_member} is not registered as a committee_member", ("committee_member", committee_member));
       if (approve)
       {
-         auto insert_result = voting_account_object.options.votes.insert(delegate_obj->vote_id);
+         auto insert_result = voting_account_object.options.votes.insert(committee_member_obj->vote_id);
          if (!insert_result.second)
-            FC_THROW("Account ${account} was already voting for delegate ${delegate}", ("account", voting_account)("delegate", delegate));
+            FC_THROW("Account ${account} was already voting for committee_member ${committee_member}", ("account", voting_account)("committee_member", committee_member));
       }
       else
       {
-         unsigned votes_removed = voting_account_object.options.votes.erase(delegate_obj->vote_id);
+         unsigned votes_removed = voting_account_object.options.votes.erase(committee_member_obj->vote_id);
          if (!votes_removed)
-            FC_THROW("Account ${account} is already not voting for delegate ${delegate}", ("account", voting_account)("delegate", delegate));
+            FC_THROW("Account ${account} is already not voting for committee_member ${committee_member}", ("account", voting_account)("committee_member", committee_member));
       }
       account_update_operation account_update_op;
       account_update_op.account = voting_account_object.id;
@@ -1270,7 +1270,7 @@ public:
       tx.validate();
 
       return sign_transaction( tx, broadcast );
-   } FC_CAPTURE_AND_RETHROW( (voting_account)(delegate)(approve)(broadcast) ) }
+   } FC_CAPTURE_AND_RETHROW( (voting_account)(committee_member)(approve)(broadcast) ) }
 
    signed_transaction vote_for_witness(string voting_account,
                                         string witness,
@@ -1337,19 +1337,19 @@ public:
       return sign_transaction( tx, broadcast );
    } FC_CAPTURE_AND_RETHROW( (account_to_modify)(voting_account)(broadcast) ) }
 
-   signed_transaction set_desired_witness_and_delegate_count(string account_to_modify,
+   signed_transaction set_desired_witness_and_committee_member_count(string account_to_modify,
                                                              uint16_t desired_number_of_witnesses,
-                                                             uint16_t desired_number_of_delegates,
+                                                             uint16_t desired_number_of_committee_members,
                                                              bool broadcast /* = false */)
    { try {
       account_object account_object_to_modify = get_account(account_to_modify);
 
       if (account_object_to_modify.options.num_witness == desired_number_of_witnesses &&
-          account_object_to_modify.options.num_committee == desired_number_of_delegates)
-         FC_THROW("Account ${account} is already voting for ${witnesses} witnesses and ${delegates} delegates", 
-                  ("account", account_to_modify)("witnesses", desired_number_of_witnesses)("delegates",desired_number_of_witnesses));
+          account_object_to_modify.options.num_committee == desired_number_of_committee_members)
+         FC_THROW("Account ${account} is already voting for ${witnesses} witnesses and ${committee_members} committee_members", 
+                  ("account", account_to_modify)("witnesses", desired_number_of_witnesses)("committee_members",desired_number_of_witnesses));
       account_object_to_modify.options.num_witness = desired_number_of_witnesses;
-      account_object_to_modify.options.num_committee = desired_number_of_delegates;
+      account_object_to_modify.options.num_committee = desired_number_of_committee_members;
 
       account_update_operation account_update_op;
       account_update_op.account = account_object_to_modify.id;
@@ -1361,7 +1361,7 @@ public:
       tx.validate();
 
       return sign_transaction( tx, broadcast );
-   } FC_CAPTURE_AND_RETHROW( (account_to_modify)(desired_number_of_witnesses)(desired_number_of_delegates)(broadcast) ) }
+   } FC_CAPTURE_AND_RETHROW( (account_to_modify)(desired_number_of_witnesses)(desired_number_of_committee_members)(broadcast) ) }
 
    signed_transaction sign_transaction(signed_transaction tx, bool broadcast = false)
    {
@@ -2095,10 +2095,10 @@ signed_transaction wallet_api::whitelist_account(string authorizing_account,
    return my->whitelist_account(authorizing_account, account_to_list, new_listing_status, broadcast);
 }
 
-signed_transaction wallet_api::create_delegate(string owner_account, string url, 
+signed_transaction wallet_api::create_committee_member(string owner_account, string url, 
                                                bool broadcast /* = false */)
 {
-   return my->create_delegate(owner_account, url, broadcast);
+   return my->create_committee_member(owner_account, url, broadcast);
 }
 
 map<string,witness_id_type> wallet_api::list_witnesses(const string& lowerbound, uint32_t limit)
@@ -2106,9 +2106,9 @@ map<string,witness_id_type> wallet_api::list_witnesses(const string& lowerbound,
    return my->_remote_db->lookup_witness_accounts(lowerbound, limit);
 }
 
-map<string,delegate_id_type> wallet_api::list_delegates(const string& lowerbound, uint32_t limit)
+map<string,committee_member_id_type> wallet_api::list_committee_members(const string& lowerbound, uint32_t limit)
 {
-   return my->_remote_db->lookup_delegate_accounts(lowerbound, limit);
+   return my->_remote_db->lookup_committee_member_accounts(lowerbound, limit);
 }
 
 witness_object wallet_api::get_witness(string owner_account)
@@ -2116,9 +2116,9 @@ witness_object wallet_api::get_witness(string owner_account)
    return my->get_witness(owner_account);
 }
 
-delegate_object wallet_api::get_delegate(string owner_account)
+committee_member_object wallet_api::get_committee_member(string owner_account)
 {
-   return my->get_delegate(owner_account);
+   return my->get_committee_member(owner_account);
 }
 
 signed_transaction wallet_api::create_witness(string owner_account,
@@ -2128,12 +2128,12 @@ signed_transaction wallet_api::create_witness(string owner_account,
    return my->create_witness(owner_account, url, broadcast);
 }
 
-signed_transaction wallet_api::vote_for_delegate(string voting_account,
+signed_transaction wallet_api::vote_for_committee_member(string voting_account,
                                                  string witness,
                                                  bool approve,
                                                  bool broadcast /* = false */)
 {
-   return my->vote_for_delegate(voting_account, witness, approve, broadcast);
+   return my->vote_for_committee_member(voting_account, witness, approve, broadcast);
 }
 
 signed_transaction wallet_api::vote_for_witness(string voting_account,
@@ -2151,13 +2151,13 @@ signed_transaction wallet_api::set_voting_proxy(string account_to_modify,
    return my->set_voting_proxy(account_to_modify, voting_account, broadcast);
 }
 
-signed_transaction wallet_api::set_desired_witness_and_delegate_count(string account_to_modify,
+signed_transaction wallet_api::set_desired_witness_and_committee_member_count(string account_to_modify,
                                                                       uint16_t desired_number_of_witnesses,
-                                                                      uint16_t desired_number_of_delegates,
+                                                                      uint16_t desired_number_of_committee_members,
                                                                       bool broadcast /* = false */)
 {
-   return my->set_desired_witness_and_delegate_count(account_to_modify, desired_number_of_witnesses, 
-                                                     desired_number_of_delegates, broadcast);
+   return my->set_desired_witness_and_committee_member_count(account_to_modify, desired_number_of_witnesses, 
+                                                     desired_number_of_committee_members, broadcast);
 }
 
 void wallet_api::set_wallet_filename(string wallet_filename)
@@ -2186,14 +2186,14 @@ operation wallet_api::get_prototype_operation(string operation_name)
       return graphene::chain::account_upgrade_operation();
    if (operation_name == "account_transfer_operation")
       return graphene::chain::account_transfer_operation();
-   if (operation_name == "delegate_create_operation")
-      return graphene::chain::delegate_create_operation();
+   if (operation_name == "committee_member_create_operation")
+      return graphene::chain::committee_member_create_operation();
    if (operation_name == "witness_create_operation")
       return graphene::chain::witness_create_operation();
    if (operation_name == "witness_withdraw_pay_operation")
       return graphene::chain::witness_withdraw_pay_operation();
-   if (operation_name == "delegate_update_global_parameters_operation")
-      return graphene::chain::delegate_update_global_parameters_operation();
+   if (operation_name == "committee_member_update_global_parameters_operation")
+      return graphene::chain::committee_member_update_global_parameters_operation();
    if (operation_name == "transfer_operation")
       return graphene::chain::transfer_operation();
    if (operation_name == "override_transfer_operation")

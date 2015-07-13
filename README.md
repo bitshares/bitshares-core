@@ -232,7 +232,7 @@ Questions
 
     All account ID's are of the form `1.2.x`.  If you were the 9735th account to be registered,
     your account's ID will be `1.2.9735`.  Account `0` is special (it's the "committee account,"
-    which is controlled by the delegates and has a few abilities and restrictions other accounts
+    which is controlled by the committee members and has a few abilities and restrictions other accounts
     do not).
 
     All asset ID's are of the form `1.3.x`.  If you were the 29th asset to be registered,
