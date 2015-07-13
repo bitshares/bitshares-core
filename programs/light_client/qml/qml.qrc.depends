@@ -1,8 +1,0 @@
-<RCC>
-    <qresource prefix="/">
-        <file>main.qml</file>
-        <file>TransferForm.qml</file>
-        <file>FormBox.qml</file>
-    </qresource>
-</RCC>
-
