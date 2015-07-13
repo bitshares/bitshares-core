@@ -57,9 +57,9 @@ namespace graphene { namespace chain {
        optional<uint32_t> review_period_seconds;
        extensions_type    extensions;
 
-       /// Constructs a proposal_create_operation suitable for genesis proposals, with fee, expiration time and review
+       /// Constructs a proposal_create_operation suitable for committee proposals, with fee, expiration time and review
        /// period set appropriately.
-       static proposal_create_operation genesis_proposal(const chain_parameters& param, fc::time_point_sec head_block_time );
+       static proposal_create_operation committee_proposal(const chain_parameters& param, fc::time_point_sec head_block_time );
 
        account_id_type fee_payer()const { return fee_paying_account; }
        void            validate()const;

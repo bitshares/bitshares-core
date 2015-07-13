@@ -238,7 +238,7 @@ BOOST_AUTO_TEST_CASE( recursive_accounts )
       BOOST_CHECK_EQUAL(get_balance(child, core), old_balance - 2000);
       trx.clear();
 
-      BOOST_TEST_MESSAGE( "Update grandparent account authority to be genesis account" );
+      BOOST_TEST_MESSAGE( "Update grandparent account authority to be committee account" );
       {
          account_update_operation op;
          op.account = grandparent.id;
@@ -293,7 +293,7 @@ BOOST_AUTO_TEST_CASE( proposed_single_account )
    try {
       INVOKE(any_two_of_three);
 
-      fc::ecc::private_key genesis_key = delegate_priv_key;
+      fc::ecc::private_key committee_key = delegate_priv_key;
       fc::ecc::private_key nathan_key1 = fc::ecc::private_key::regenerate(fc::digest("key1"));
       fc::ecc::private_key nathan_key2 = fc::ecc::private_key::regenerate(fc::digest("key2"));
       fc::ecc::private_key nathan_key3 = fc::ecc::private_key::regenerate(fc::digest("key3"));
@@ -355,14 +355,14 @@ BOOST_AUTO_TEST_CASE( proposed_single_account )
       pup.active_approvals_to_add.insert(nathan.id);
 
       trx.operations = {pup};
-      trx.sign(  genesis_key );
-      //Genesis may not add nathan's approval.
+      trx.sign(  committee_key );
+      //committee may not add nathan's approval.
       GRAPHENE_CHECK_THROW(PUSH_TX( db, trx ), fc::exception);
       pup.active_approvals_to_add.clear();
       pup.active_approvals_to_add.insert(account_id_type());
       trx.operations = {pup};
-      trx.sign(  genesis_key );
-      //Genesis has no stake in the transaction.
+      trx.sign(  committee_key );
+      //committee has no stake in the transaction.
       GRAPHENE_CHECK_THROW(PUSH_TX( db, trx ), fc::exception);
 
       trx.signatures.clear();
@@ -382,11 +382,11 @@ BOOST_AUTO_TEST_CASE( proposed_single_account )
    }
 }
 
-/// Verify that genesis authority cannot be invoked in a normal transaction
-BOOST_AUTO_TEST_CASE( genesis_authority )
+/// Verify that committee authority cannot be invoked in a normal transaction
+BOOST_AUTO_TEST_CASE( committee_authority )
 { try {
    fc::ecc::private_key nathan_key = fc::ecc::private_key::generate();
-   fc::ecc::private_key genesis_key = delegate_priv_key;
+   fc::ecc::private_key committee_key = delegate_priv_key;
    const account_object nathan = create_account("nathan", nathan_key.get_public_key());
    const auto& global_params = db.get_global_properties().parameters;
 
@@ -398,12 +398,12 @@ BOOST_AUTO_TEST_CASE( genesis_authority )
       p.parameters.committee_proposal_review_period = fc::days(1).to_seconds();
    });
 
-   BOOST_TEST_MESSAGE( "transfering 100000 CORE to nathan, signing with genesis key" );
+   BOOST_TEST_MESSAGE( "transfering 100000 CORE to nathan, signing with committee key" );
    transfer_operation top;
    top.to = nathan.id;
    top.amount = asset(100000);
    trx.operations.push_back(top);
-   sign(trx, genesis_key);
+   sign(trx, committee_key);
    GRAPHENE_CHECK_THROW(PUSH_TX( db, trx ), fc::exception);
 
    auto sign = [&] { trx.signatures.clear(); trx.sign(nathan_key); };
@@ -446,7 +446,7 @@ BOOST_AUTO_TEST_CASE( genesis_authority )
    uop.fee_paying_account = GRAPHENE_TEMP_ACCOUNT;
    uop.proposal = prop.id;
 
-   uop.key_approvals_to_add.emplace(genesis_key.get_public_key());
+   uop.key_approvals_to_add.emplace(committee_key.get_public_key());
    /*
    uop.key_approvals_to_add.emplace(1);
    uop.key_approvals_to_add.emplace(2);
@@ -456,16 +456,16 @@ BOOST_AUTO_TEST_CASE( genesis_authority )
    uop.key_approvals_to_add.emplace(6);
    */
    trx.operations.push_back(uop);
-   trx.sign(genesis_key);
+   trx.sign(committee_key);
    db.push_transaction(trx);
    BOOST_CHECK_EQUAL(get_balance(nathan, asset_id_type()(db)), 0);
    BOOST_CHECK(db.get<proposal_object>(prop.id).is_authorized_to_execute(db));
 
    generate_blocks(*prop.review_period_time);
    uop.key_approvals_to_add.clear();
-   uop.key_approvals_to_add.insert(genesis_key.get_public_key()); // was 7
+   uop.key_approvals_to_add.insert(committee_key.get_public_key()); // was 7
    trx.operations.back() = uop;
-   trx.sign( genesis_key);
+   trx.sign( committee_key);
    // Should throw because the transaction is now in review.
    GRAPHENE_CHECK_THROW(PUSH_TX( db, trx ), fc::exception);
 
@@ -476,7 +476,7 @@ BOOST_AUTO_TEST_CASE( genesis_authority )
 BOOST_FIXTURE_TEST_CASE( fired_delegates, database_fixture )
 { try {
    generate_block();
-   fc::ecc::private_key genesis_key = delegate_priv_key;
+   fc::ecc::private_key committee_key = delegate_priv_key;
    fc::ecc::private_key delegate_key = fc::ecc::private_key::generate();
 
    //Meet nathan. He has a little money.
@@ -499,7 +499,7 @@ BOOST_FIXTURE_TEST_CASE( fired_delegates, database_fixture )
    }
 
    //A proposal is created to give nathan lots more money.
-   proposal_create_operation pop = proposal_create_operation::genesis_proposal(db.get_global_properties().parameters, db.head_block_time());
+   proposal_create_operation pop = proposal_create_operation::committee_proposal(db.get_global_properties().parameters, db.head_block_time());
    pop.fee_paying_account = GRAPHENE_TEMP_ACCOUNT;
    pop.expiration_time = db.head_block_time() + *pop.review_period_seconds * 3;
 
@@ -512,7 +512,7 @@ BOOST_FIXTURE_TEST_CASE( fired_delegates, database_fixture )
    proposal_id_type pid = prop.id;
    BOOST_CHECK(!pid(db).is_authorized_to_execute(db));
 
-   //Genesis key approves of the proposal.
+   //committee key approves of the proposal.
    proposal_update_operation uop;
    uop.fee_paying_account = GRAPHENE_TEMP_ACCOUNT;
    uop.proposal = pid;
@@ -528,7 +528,7 @@ BOOST_FIXTURE_TEST_CASE( fired_delegates, database_fixture )
    uop.key_approvals_to_add.emplace(9);
    */
    trx.operations.back() = uop;
-   trx.sign(genesis_key);
+   trx.sign(committee_key);
    PUSH_TX( db, trx );
    BOOST_CHECK(pid(db).is_authorized_to_execute(db));
 
@@ -882,17 +882,17 @@ BOOST_FIXTURE_TEST_CASE( max_authority_membership, database_fixture )
       transaction tx;
       processed_transaction ptx;
 
-      private_key_type genesis_key = delegate_priv_key;
+      private_key_type committee_key = delegate_priv_key;
       // Sam is the creator of accounts
       private_key_type sam_key = generate_private_key("sam");
 
       account_object sam_account_object = create_account( "sam", sam_key );
       upgrade_to_lifetime_member(sam_account_object);
-      account_object genesis_account_object = genesis_account(db);
+      account_object committee_account_object = committee_account(db);
 
       const asset_object& core = asset_id_type()(db);
 
-      transfer(genesis_account_object, sam_account_object, core.amount(100000));
+      transfer(committee_account_object, sam_account_object, core.amount(100000));
 
       // have Sam create some keys
 
@@ -968,13 +968,13 @@ BOOST_FIXTURE_TEST_CASE( bogus_signature, database_fixture )
 {
    try
    {
-      private_key_type genesis_key = delegate_priv_key;
+      private_key_type committee_key = delegate_priv_key;
       // Sam is the creator of accounts
       private_key_type alice_key = generate_private_key("alice");
       private_key_type bob_key = generate_private_key("bob");
       private_key_type charlie_key = generate_private_key("charlie");
 
-      account_object genesis_account_object = genesis_account(db);
+      account_object committee_account_object = committee_account(db);
       account_object alice_account_object = create_account( "alice", alice_key );
       account_object bob_account_object = create_account( "bob", bob_key );
       account_object charlie_account_object = create_account( "charlie", charlie_key );
@@ -987,7 +987,7 @@ BOOST_FIXTURE_TEST_CASE( bogus_signature, database_fixture )
       // send from Sam -> Alice, signed by Sam
 
       const asset_object& core = asset_id_type()(db);
-      transfer(genesis_account_object, alice_account_object, core.amount(100000));
+      transfer(committee_account_object, alice_account_object, core.amount(100000));
 
       transfer_operation xfer_op;
       xfer_op.from = alice_account_object.id;

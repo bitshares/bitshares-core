@@ -555,9 +555,9 @@ BOOST_FIXTURE_TEST_CASE( limit_order_expiration, database_fixture )
    auto* test = &create_bitasset("TEST");
    auto* core = &asset_id_type()(db);
    auto* nathan = &create_account("nathan");
-   auto* genesis = &account_id_type()(db);
+   auto* committee = &account_id_type()(db);
 
-   transfer(*genesis, *nathan, core->amount(50000));
+   transfer(*committee, *nathan, core->amount(50000));
 
    BOOST_CHECK_EQUAL( get_balance(*nathan, *core), 50000 );
 
@@ -584,7 +584,7 @@ BOOST_FIXTURE_TEST_CASE( limit_order_expiration, database_fixture )
    test = &get_asset("TEST");
    core = &asset_id_type()(db);
    nathan = &get_account("nathan");
-   genesis = &account_id_type()(db);
+   committee = &account_id_type()(db);
 
    BOOST_CHECK(db.find_object(id) == nullptr);
    BOOST_CHECK_EQUAL( get_balance(*nathan, *core), 50000 );
@@ -646,7 +646,7 @@ BOOST_FIXTURE_TEST_CASE( change_block_interval, database_fixture )
 
    BOOST_TEST_MESSAGE( "Creating a proposal to change the block_interval to 1 second" );
    {
-      proposal_create_operation cop = proposal_create_operation::genesis_proposal(db.get_global_properties().parameters, db.head_block_time());
+      proposal_create_operation cop = proposal_create_operation::committee_proposal(db.get_global_properties().parameters, db.head_block_time());
       cop.fee_paying_account = GRAPHENE_TEMP_ACCOUNT;
       cop.expiration_time = db.head_block_time() + *cop.review_period_seconds + 10;
       delegate_update_global_parameters_operation uop;
@@ -710,7 +710,7 @@ BOOST_FIXTURE_TEST_CASE( unimp_force_settlement, database_fixture )
    /*
    try {
    auto private_key = delegate_priv_key;
-   auto private_key = generate_private_key("genesis");
+   auto private_key = generate_private_key("committee");
 >>>>>>> short_refactor
    account_id_type nathan_id = create_account("nathan").get_id();
    account_id_type shorter1_id = create_account("shorter1").get_id();
@@ -848,7 +848,7 @@ BOOST_FIXTURE_TEST_CASE( pop_block_twice, database_fixture )
       const asset_object& core = asset_id_type()(db);
 
       // Sam is the creator of accounts
-      private_key_type genesis_key = delegate_priv_key;
+      private_key_type committee_key = delegate_priv_key;
       private_key_type sam_key = generate_private_key("sam");
       account_object sam_account_object = create_account("sam", sam_key);
 
@@ -862,9 +862,9 @@ BOOST_FIXTURE_TEST_CASE( pop_block_twice, database_fixture )
       transaction tx;
       processed_transaction ptx;
 
-      account_object genesis_account_object = genesis_account(db);
-      // transfer from genesis account to Sam account
-      transfer(genesis_account_object, sam_account_object, core.amount(100000));
+      account_object committee_account_object = committee_account(db);
+      // transfer from committee account to Sam account
+      transfer(committee_account_object, sam_account_object, core.amount(100000));
 
       generate_block(skip_flags);
 

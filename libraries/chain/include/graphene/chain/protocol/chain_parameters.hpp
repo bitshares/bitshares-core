@@ -36,7 +36,7 @@ namespace graphene { namespace chain {
       smart_ref<fee_schedule> current_fees;                       ///< current schedule of fees
       uint8_t                 block_interval                      = GRAPHENE_DEFAULT_BLOCK_INTERVAL; ///< interval in seconds between blocks
       uint32_t                maintenance_interval                = GRAPHENE_DEFAULT_MAINTENANCE_INTERVAL; ///< interval in sections between blockchain maintenance events
-      uint32_t                committee_proposal_review_period    = GRAPHENE_DEFAULT_COMMITTEE_PROPOSAL_REVIEW_PERIOD_SEC; ///< minimum time in seconds that a proposed transaction requiring genesis authority may not be signed, prior to expiration
+      uint32_t                committee_proposal_review_period    = GRAPHENE_DEFAULT_COMMITTEE_PROPOSAL_REVIEW_PERIOD_SEC; ///< minimum time in seconds that a proposed transaction requiring committee authority may not be signed, prior to expiration
       uint32_t                maximum_transaction_size            = GRAPHENE_DEFAULT_MAX_TRANSACTION_SIZE; ///< maximum allowable size in bytes for a transaction
       uint32_t                maximum_block_size                  = GRAPHENE_DEFAULT_MAX_BLOCK_SIZE; ///< maximum allowable size in bytes for a block
       uint32_t                maximum_undo_history                = GRAPHENE_DEFAULT_MAX_UNDO_HISTORY; ///< maximum number of undo states to keep in RAM
@@ -89,7 +89,7 @@ namespace graphene { namespace chain {
          FC_ASSERT( maximum_time_until_expiration > block_interval,
                     "Maximum transaction expiration time must be greater than a block interval" );
          FC_ASSERT( maximum_proposal_lifetime - committee_proposal_review_period > block_interval,
-                    "Genesis proposal review period must be less than the maximum proposal lifetime" );
+                    "Committee proposal review period must be less than the maximum proposal lifetime" );
       }
    };
 

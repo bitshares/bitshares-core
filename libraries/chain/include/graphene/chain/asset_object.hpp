@@ -167,7 +167,7 @@ namespace graphene { namespace chain {
          /// The tunable options for BitAssets are stored in this field.
          bitasset_options options;
 
-         /// Feeds published for this asset. If issuer is not genesis, the keys in this map are the feed publishing
+         /// Feeds published for this asset. If issuer is not committee, the keys in this map are the feed publishing
          /// accounts; otherwise, the feed publishers are the currently active delegates and witnesses and this map
          /// should be treated as an implementation detail. The timestamp on each feed is the time it was published.
          flat_map<account_id_type, pair<time_point_sec,price_feed>> feeds;

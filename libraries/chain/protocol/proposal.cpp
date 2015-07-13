@@ -4,7 +4,7 @@
 
 namespace graphene { namespace chain {
 
-proposal_create_operation proposal_create_operation::genesis_proposal(const chain_parameters& global_params, fc::time_point_sec head_block_time )
+proposal_create_operation proposal_create_operation::committee_proposal(const chain_parameters& global_params, fc::time_point_sec head_block_time )
 {
    proposal_create_operation op;
    op.expiration_time = head_block_time + global_params.maximum_proposal_lifetime;

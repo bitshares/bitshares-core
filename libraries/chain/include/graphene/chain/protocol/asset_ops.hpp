@@ -282,7 +282,7 @@ namespace graphene { namespace chain {
     * This operation is used to specify which accounts may produce feeds for a given BitAsset.
     *
     * @pre @ref issuer MUST be an existing account, and MUST match asset_object::issuer on @ref asset_to_update
-    * @pre @ref issuer MUST NOT be the genesis account
+    * @pre @ref issuer MUST NOT be the committee account
     * @pre @ref asset_to_update MUST be a BitAsset, i.e. @ref asset_object::is_market_issued() returns true
     * @pre @ref fee MUST be nonnegative, and @ref issuer MUST have a sufficient balance to pay it
     * @pre Cardinality of @ref new_feed_producers MUST NOT exceed @ref chain_parameters::maximum_asset_feed_publishers

@@ -68,7 +68,7 @@ BOOST_AUTO_TEST_CASE( two_node_network )
       ilog("Connected!");
 
       fc::ecc::private_key nathan_key = fc::ecc::private_key::generate();
-      fc::ecc::private_key genesis_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("nathan")));
+      fc::ecc::private_key committee_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("nathan")));
       graphene::chain::signed_transaction trx;
       trx.set_expiration(now + fc::seconds(30));
       std::shared_ptr<chain::database> db2 = app2.chain_database();
@@ -89,7 +89,7 @@ BOOST_AUTO_TEST_CASE( two_node_network )
       now += GRAPHENE_DEFAULT_BLOCK_INTERVAL;
       app2.p2p_node()->broadcast(graphene::net::block_message(db2->generate_block(now,
                                                                                   db2->get_scheduled_witness(1).first,
-                                                                                  genesis_key,
+                                                                                  committee_key,
                                                                                   database::skip_nothing)));
 
       fc::usleep(fc::milliseconds(500));

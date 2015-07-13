@@ -49,7 +49,7 @@ BOOST_FIXTURE_TEST_CASE( update_account_keys, database_fixture )
         ;
 
       // Sam is the creator of accounts
-      private_key_type genesis_key = delegate_priv_key;
+      private_key_type committee_key = delegate_priv_key;
       private_key_type sam_key = generate_private_key("sam");
 
       //
@@ -78,9 +78,9 @@ BOOST_FIXTURE_TEST_CASE( update_account_keys, database_fixture )
       transaction tx;
       processed_transaction ptx;
 
-      account_object genesis_account_object = genesis_account(db);
-      // transfer from genesis account to Sam account
-      transfer(genesis_account_object, sam_account_object, core.amount(100000));
+      account_object committee_account_object = committee_account(db);
+      // transfer from committee account to Sam account
+      transfer(committee_account_object, sam_account_object, core.amount(100000));
 
       const int num_keys = 5;
       vector< private_key_type > numbered_private_keys;
@@ -410,7 +410,7 @@ BOOST_FIXTURE_TEST_CASE( tapos_rollover, database_fixture )
       const auto& core   = asset_id_type()(db);
 
       BOOST_TEST_MESSAGE( "Give Alice some money" );
-      transfer(genesis_account, alice_id, asset(10000));
+      transfer(committee_account, alice_id, asset(10000));
       generate_block();
 
       BOOST_TEST_MESSAGE( "Generate up to block 0xFF00" );

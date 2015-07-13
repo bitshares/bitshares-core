@@ -120,9 +120,9 @@ database_fixture::~database_fixture()
 
 fc::ecc::private_key database_fixture::generate_private_key(string seed)
 {
-   static const fc::ecc::private_key genesis = fc::ecc::private_key::regenerate(fc::sha256::hash(string("null_key")));
+   static const fc::ecc::private_key committee = fc::ecc::private_key::regenerate(fc::sha256::hash(string("null_key")));
    if( seed == "null_key" )
-      return genesis;
+      return committee;
    return fc::ecc::private_key::regenerate(fc::sha256::hash(seed));
 }
 

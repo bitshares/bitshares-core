@@ -413,7 +413,7 @@ BOOST_AUTO_TEST_CASE( witness_create )
    trx.clear();
    witness_id_type nathan_witness_id = create_witness(nathan_id, nathan_private_key).id;
    // Give nathan some voting stake
-   transfer(genesis_account, nathan_id, asset(10000000));
+   transfer(committee_account, nathan_id, asset(10000000));
    generate_block();
    trx.set_expiration(db.head_block_id());
 
@@ -488,9 +488,9 @@ BOOST_AUTO_TEST_CASE( global_settle_test )
    feed.maximum_short_squeeze_ratio = 150 * GRAPHENE_COLLATERAL_RATIO_DENOM / 100;
    publish_feed( bit_usd_id(db), nathan, feed );
 
-   transfer(genesis_account, ben_id, asset(10000));
-   transfer(genesis_account, valentine_id, asset(10000));
-   transfer(genesis_account, dan_id, asset(10000));
+   transfer(committee_account, ben_id, asset(10000));
+   transfer(committee_account, valentine_id, asset(10000));
+   transfer(committee_account, dan_id, asset(10000));
    borrow(ben, asset(1000, bit_usd_id), asset(1000));
    BOOST_CHECK_EQUAL(get_balance(ben_id, bit_usd_id), 1000);
    BOOST_CHECK_EQUAL(get_balance(ben_id, asset_id_type()), 9000);
@@ -597,7 +597,7 @@ BOOST_AUTO_TEST_CASE( worker_pay_test )
    INVOKE(worker_create_test);
    GET_ACTOR(nathan);
    generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
-   transfer(genesis_account, nathan_id, asset(100000));
+   transfer(committee_account, nathan_id, asset(100000));
 
    {
       account_update_operation op;
@@ -710,7 +710,7 @@ BOOST_AUTO_TEST_CASE( refund_worker_test )
    BOOST_CHECK(worker.vote_for.type() == vote_id_type::worker);
    BOOST_CHECK(worker.vote_against.type() == vote_id_type::worker);
 
-   transfer(genesis_account, nathan_id, asset(100000));
+   transfer(committee_account, nathan_id, asset(100000));
 
    {
       account_update_operation op;
@@ -783,7 +783,7 @@ BOOST_AUTO_TEST_CASE( burn_worker_test )
    BOOST_CHECK(worker.vote_for.type() == vote_id_type::worker);
    BOOST_CHECK(worker.vote_against.type() == vote_id_type::worker);
 
-   transfer(genesis_account, nathan_id, asset(100000));
+   transfer(committee_account, nathan_id, asset(100000));
 
    {
       account_update_operation op;
@@ -827,7 +827,7 @@ BOOST_AUTO_TEST_CASE( unimp_force_settlement_unavailable )
    /*
    try {
    auto private_key = delegate_priv_key;
-   auto private_key = generate_private_key("genesis");
+   auto private_key = generate_private_key("committee");
 >>>>>>> short_refactor
    account_id_type nathan_id = create_account("nathan").get_id();
    account_id_type shorter1_id = create_account("shorter1").get_id();

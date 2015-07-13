@@ -35,7 +35,7 @@ void_result proposal_create_evaluator::do_evaluate(const proposal_create_operati
               "Proposal review period must be less than its overall lifetime." );
 
    {
-      // If we're dealing with the genesis authority, make sure this transaction has a sufficient review period.
+      // If we're dealing with the committee authority, make sure this transaction has a sufficient review period.
       flat_set<account_id_type> auths;
       vector<authority> other;
       for( auto& op : o.proposed_ops )

@@ -72,7 +72,7 @@ BOOST_AUTO_TEST_CASE( call_order_update_test )
       const auto& bitusd = create_bitasset("BITUSD");
       const auto& core   = asset_id_type()(db);
 
-      transfer(genesis_account, dan_id, asset(10000000));
+      transfer(committee_account, dan_id, asset(10000000));
       update_feed_producers( bitusd, {sam.id} );
 
       price_feed current_feed; current_feed.settlement_price = bitusd.amount( 100 ) / core.amount(100);
@@ -162,9 +162,9 @@ BOOST_AUTO_TEST_CASE( margin_call_limit_test )
 
       int64_t init_balance(1000000);
 
-      transfer(genesis_account, buyer_id, asset(init_balance));
-      transfer(genesis_account, borrower_id, asset(init_balance));
-      transfer(genesis_account, borrower2_id, asset(init_balance));
+      transfer(committee_account, buyer_id, asset(init_balance));
+      transfer(committee_account, borrower_id, asset(init_balance));
+      transfer(committee_account, borrower2_id, asset(init_balance));
       update_feed_producers( bitusd, {feedproducer.id} );
 
       price_feed current_feed;
@@ -221,9 +221,9 @@ BOOST_AUTO_TEST_CASE( black_swan )
 
       int64_t init_balance(1000000);
 
-      transfer(genesis_account, buyer_id, asset(init_balance));
-      transfer(genesis_account, borrower_id, asset(init_balance));
-      transfer(genesis_account, borrower2_id, asset(init_balance));
+      transfer(committee_account, buyer_id, asset(init_balance));
+      transfer(committee_account, borrower_id, asset(init_balance));
+      transfer(committee_account, borrower2_id, asset(init_balance));
       update_feed_producers(bitusd, {feedproducer.id});
 
       price_feed current_feed;
@@ -267,9 +267,9 @@ BOOST_AUTO_TEST_CASE( prediction_market )
       const auto& core  = asset_id_type()(db);
 
       int64_t init_balance(1000000);
-      transfer(genesis_account, judge_id, asset(init_balance));
-      transfer(genesis_account, dan_id, asset(init_balance));
-      transfer(genesis_account, nathan_id, asset(init_balance));
+      transfer(committee_account, judge_id, asset(init_balance));
+      transfer(committee_account, dan_id, asset(init_balance));
+      transfer(committee_account, nathan_id, asset(init_balance));
 
       BOOST_TEST_MESSAGE( "Require throw for mismatch collateral amounts" );
       GRAPHENE_REQUIRE_THROW( borrow( dan, pmark.amount(1000), asset(2000) ), fc::exception );
@@ -339,11 +339,11 @@ BOOST_AUTO_TEST_CASE( create_account_test )
       BOOST_CHECK(nathan_account.name == "nathan");
 
       BOOST_REQUIRE(nathan_account.owner.num_auths() == 1);
-      BOOST_CHECK(nathan_account.owner.key_auths.at(genesis_key) == 123);
+      BOOST_CHECK(nathan_account.owner.key_auths.at(committee_key) == 123);
       BOOST_REQUIRE(nathan_account.active.num_auths() == 1);
-      BOOST_CHECK(nathan_account.active.key_auths.at(genesis_key) == 321);
+      BOOST_CHECK(nathan_account.active.key_auths.at(committee_key) == 321);
       BOOST_CHECK(nathan_account.options.voting_account == account_id_type());
-      BOOST_CHECK(nathan_account.options.memo_key == genesis_key);
+      BOOST_CHECK(nathan_account.options.memo_key == committee_key);
 
       const account_statistics_object& statistics = nathan_account.statistics(db);
       BOOST_CHECK(statistics.id.space() == implementation_ids);
@@ -409,12 +409,12 @@ BOOST_AUTO_TEST_CASE( transfer_core_asset )
    try {
       INVOKE(create_account_test);
 
-      account_id_type genesis_account;
-      asset genesis_balance = db.get_balance(account_id_type(), asset_id_type());
+      account_id_type committee_account;
+      asset committee_balance = db.get_balance(account_id_type(), asset_id_type());
 
       const account_object& nathan_account = *db.get_index_type<account_index>().indices().get<by_name>().find("nathan");
       transfer_operation top;
-      top.from = genesis_account;
+      top.from = committee_account;
       top.to = nathan_account.id;
       top.amount = asset( 10000);
       trx.operations.push_back(top);
@@ -425,14 +425,14 @@ BOOST_AUTO_TEST_CASE( transfer_core_asset )
       PUSH_TX( db, trx, ~0 );
 
       BOOST_CHECK_EQUAL(get_balance(account_id_type()(db), asset_id_type()(db)),
-                        (genesis_balance.amount - 10000 - fee.amount).value);
-      genesis_balance = db.get_balance(account_id_type(), asset_id_type());
+                        (committee_balance.amount - 10000 - fee.amount).value);
+      committee_balance = db.get_balance(account_id_type(), asset_id_type());
 
       BOOST_CHECK_EQUAL(get_balance(nathan_account, asset_id_type()(db)), 10000);
 
       trx = signed_transaction();
       top.from = nathan_account.id;
-      top.to = genesis_account;
+      top.to = committee_account;
       top.amount = asset(2000);
       trx.operations.push_back(top);
 
@@ -443,7 +443,7 @@ BOOST_AUTO_TEST_CASE( transfer_core_asset )
       PUSH_TX( db, trx, ~0 );
 
       BOOST_CHECK_EQUAL(get_balance(nathan_account, asset_id_type()(db)), 8000 - fee.amount.value);
-      BOOST_CHECK_EQUAL(get_balance(account_id_type()(db), asset_id_type()(db)), genesis_balance.amount.value + 2000);
+      BOOST_CHECK_EQUAL(get_balance(account_id_type()(db), asset_id_type()(db)), committee_balance.amount.value + 2000);
 
    } catch (fc::exception& e) {
       edump((e.to_detail_string()));
@@ -698,22 +698,22 @@ BOOST_AUTO_TEST_CASE( transfer_uia )
 
       const asset_object& uia = *db.get_index_type<asset_index>().indices().get<by_symbol>().find("TEST");
       const account_object& nathan = *db.get_index_type<account_index>().indices().get<by_name>().find("nathan");
-      const account_object& genesis = account_id_type()(db);
+      const account_object& committee = account_id_type()(db);
 
       BOOST_CHECK_EQUAL(get_balance(nathan, uia), 10000000);
       transfer_operation top;
       top.from = nathan.id;
-      top.to = genesis.id;
+      top.to = committee.id;
       top.amount = uia.amount(5000);
       trx.operations.push_back(top);
-      BOOST_TEST_MESSAGE( "Transfering 5000 TEST from nathan to genesis" );
+      BOOST_TEST_MESSAGE( "Transfering 5000 TEST from nathan to committee" );
       PUSH_TX( db, trx, ~0 );
       BOOST_CHECK_EQUAL(get_balance(nathan, uia), 10000000 - 5000);
-      BOOST_CHECK_EQUAL(get_balance(genesis, uia), 5000);
+      BOOST_CHECK_EQUAL(get_balance(committee, uia), 5000);
 
       PUSH_TX( db, trx, ~0 );
       BOOST_CHECK_EQUAL(get_balance(nathan, uia), 10000000 - 10000);
-      BOOST_CHECK_EQUAL(get_balance(genesis, uia), 10000);
+      BOOST_CHECK_EQUAL(get_balance(committee, uia), 10000);
    } catch(fc::exception& e) {
       edump((e.to_detail_string()));
       throw;
@@ -730,7 +730,7 @@ BOOST_AUTO_TEST_CASE( create_buy_uia_multiple_match_new )
    const account_object& buyer_account  = create_account( "buyer" );
    const account_object& seller_account = create_account( "seller" );
 
-   transfer( genesis_account(db), buyer_account, test_asset.amount( 10000 ) );
+   transfer( committee_account(db), buyer_account, test_asset.amount( 10000 ) );
    transfer( nathan_account, seller_account, core_asset.amount(10000) );
 
    BOOST_CHECK_EQUAL( get_balance( buyer_account, test_asset ), 10000 );
@@ -770,7 +770,7 @@ BOOST_AUTO_TEST_CASE( create_buy_exact_match_uia )
    const account_object& buyer_account  = create_account( "buyer" );
    const account_object& seller_account = create_account( "seller" );
 
-   transfer( genesis_account(db), seller_account, asset( 10000 ) );
+   transfer( committee_account(db), seller_account, asset( 10000 ) );
    transfer( nathan_account, buyer_account, test_asset.amount(10000) );
 
    BOOST_CHECK_EQUAL( get_balance( buyer_account, test_asset ), 10000 );
@@ -811,7 +811,7 @@ BOOST_AUTO_TEST_CASE( create_buy_uia_multiple_match_new_reverse )
    const account_object& buyer_account  = create_account( "buyer" );
    const account_object& seller_account = create_account( "seller" );
 
-   transfer( genesis_account(db), seller_account, asset( 10000 ) );
+   transfer( committee_account(db), seller_account, asset( 10000 ) );
    transfer( nathan_account, buyer_account, test_asset.amount(10000),test_asset.amount(0) );
 
    BOOST_CHECK_EQUAL( get_balance( buyer_account, test_asset ), 10000 );
@@ -851,7 +851,7 @@ BOOST_AUTO_TEST_CASE( create_buy_uia_multiple_match_new_reverse_fract )
    const account_object& buyer_account  = create_account( "buyer" );
    const account_object& seller_account = create_account( "seller" );
 
-   transfer( genesis_account(db), seller_account, asset( 30 ) );
+   transfer( committee_account(db), seller_account, asset( 30 ) );
    transfer( nathan_account, buyer_account, test_asset.amount(10000),test_asset.amount(0) );
 
    BOOST_CHECK_EQUAL( get_balance( buyer_account, test_asset ), 10000 );
@@ -896,15 +896,15 @@ BOOST_AUTO_TEST_CASE( uia_fees )
       const asset_object& test_asset = get_asset("TEST");
       const asset_dynamic_data_object& asset_dynamic = test_asset.dynamic_asset_data_id(db);
       const account_object& nathan_account = get_account("nathan");
-      const account_object& genesis_account = account_id_type()(db);
+      const account_object& committee_account = account_id_type()(db);
 
-      fund_fee_pool(genesis_account, test_asset, 1000*CORE);
+      fund_fee_pool(committee_account, test_asset, 1000*CORE);
       BOOST_CHECK(asset_dynamic.fee_pool == 1000*CORE);
 
       transfer_operation op;
       op.fee = test_asset.amount(0);
       op.from = nathan_account.id;
-      op.to   = genesis_account.id;
+      op.to   = committee_account.id;
       op.amount = test_asset.amount(100);
       op.fee = db.current_fee_schedule().calculate_fee( op, test_asset.options.core_exchange_rate );
       BOOST_CHECK(op.fee.asset_id == test_asset.id);
@@ -917,7 +917,7 @@ BOOST_AUTO_TEST_CASE( uia_fees )
 
       BOOST_CHECK_EQUAL(get_balance(nathan_account, test_asset),
                         (old_balance - fee - test_asset.amount(100)).amount.value);
-      BOOST_CHECK_EQUAL(get_balance(genesis_account, test_asset), 100);
+      BOOST_CHECK_EQUAL(get_balance(committee_account, test_asset), 100);
       BOOST_CHECK(asset_dynamic.accumulated_fees == fee.amount);
       BOOST_CHECK(asset_dynamic.fee_pool == 1000*CORE - core_fee.amount);
 
@@ -925,7 +925,7 @@ BOOST_AUTO_TEST_CASE( uia_fees )
       PUSH_TX( db, trx, ~0 );
       BOOST_CHECK_EQUAL(get_balance(nathan_account, test_asset),
                         (old_balance - fee - fee - test_asset.amount(200)).amount.value);
-      BOOST_CHECK_EQUAL(get_balance(genesis_account, test_asset), 200);
+      BOOST_CHECK_EQUAL(get_balance(committee_account, test_asset), 200);
       BOOST_CHECK(asset_dynamic.accumulated_fees == fee.amount + fee.amount);
       BOOST_CHECK(asset_dynamic.fee_pool == 1000*CORE - core_fee.amount - core_fee.amount);
 
@@ -934,7 +934,7 @@ BOOST_AUTO_TEST_CASE( uia_fees )
       op.amount = asset(20);
 
       BOOST_CHECK_EQUAL(get_balance(nathan_account, asset_id_type()(db)), 0);
-      transfer(genesis_account, nathan_account, asset(20));
+      transfer(committee_account, nathan_account, asset(20));
       BOOST_CHECK_EQUAL(get_balance(nathan_account, asset_id_type()(db)), 20);
 
       trx.operations.emplace_back(std::move(op));
@@ -943,7 +943,7 @@ BOOST_AUTO_TEST_CASE( uia_fees )
       BOOST_CHECK_EQUAL(get_balance(nathan_account, asset_id_type()(db)), 0);
       BOOST_CHECK_EQUAL(get_balance(nathan_account, test_asset),
                         (old_balance - fee - fee - fee - test_asset.amount(200)).amount.value);
-      BOOST_CHECK_EQUAL(get_balance(genesis_account, test_asset), 200);
+      BOOST_CHECK_EQUAL(get_balance(committee_account, test_asset), 200);
       BOOST_CHECK(asset_dynamic.accumulated_fees == fee.amount.value * 3);
       BOOST_CHECK(asset_dynamic.fee_pool == 1000*CORE - core_fee.amount.value * 3);
    } catch (fc::exception& e) {
@@ -958,7 +958,7 @@ BOOST_AUTO_TEST_CASE( cancel_limit_order_test )
    const asset_object&   test_asset     = get_asset( "TEST" );
    const account_object& buyer_account  = create_account( "buyer" );
 
-   transfer( genesis_account(db), buyer_account, asset( 10000 ) );
+   transfer( committee_account(db), buyer_account, asset( 10000 ) );
 
    BOOST_CHECK_EQUAL( get_balance(buyer_account, asset_id_type()(db)), 10000 );
    auto sell_order = create_sell_order( buyer_account, asset(1000), test_asset.amount(100+450*1) );
@@ -1049,7 +1049,7 @@ BOOST_AUTO_TEST_CASE( trade_amount_equals_zero )
       const account_object& core_seller = create_account( "shorter1" );
       const account_object& core_buyer = get_account("nathan");
 
-      transfer( genesis_account(db), core_seller, asset( 100000000 ) );
+      transfer( committee_account(db), core_seller, asset( 100000000 ) );
 
       BOOST_CHECK_EQUAL(get_balance(core_buyer, core), 0);
       BOOST_CHECK_EQUAL(get_balance(core_buyer, test), 10000000);
@@ -1334,7 +1334,7 @@ BOOST_AUTO_TEST_CASE( vesting_balance_create_test )
    const account_object& alice_account = create_account("alice");
    const account_object& bob_account = create_account("bob");
 
-   transfer(genesis_account(db), alice_account, core.amount(100000));
+   transfer(committee_account(db), alice_account, core.amount(100000));
 
    op.creator = alice_account.get_id();
    op.owner = alice_account.get_id();
@@ -1383,7 +1383,7 @@ BOOST_AUTO_TEST_CASE( vesting_balance_withdraw_test )
    const account_object& alice_account = create_account( "alice" );
    const account_object& bob_account = create_account( "bob" );
 
-   transfer( genesis_account(db), alice_account, core.amount( 1000000 ) );
+   transfer( committee_account(db), alice_account, core.amount( 1000000 ) );
 
    auto spin_vbo_clock = [&]( const vesting_balance_object& vbo, uint32_t dt_secs )
    {
@@ -1422,7 +1422,7 @@ BOOST_AUTO_TEST_CASE( vesting_balance_withdraw_test )
    auto top_up = [&]()
    {
       trx.clear();
-      transfer( genesis_account(db),
+      transfer( committee_account(db),
          alice_account,
          core.amount( 1000000 - db.get_balance( alice_account, core ).amount )
          );

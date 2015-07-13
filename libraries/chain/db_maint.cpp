@@ -204,7 +204,7 @@ void database::update_active_delegates()
 
    auto delegates = sort_votable_objects<delegate_index>(std::max(delegate_count*2+1, (size_t)GRAPHENE_MIN_DELEGATE_COUNT));
 
-   // Update genesis authorities
+   // Update committee authorities
    if( !delegates.empty() )
    {
       modify(get(GRAPHENE_COMMITTEE_ACCOUNT), [&](account_object& a) {

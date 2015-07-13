@@ -141,8 +141,8 @@ struct database_fixture {
    genesis_state_type genesis_state;
    chain::database &db;
    signed_transaction trx;
-   public_key_type genesis_key;
-   account_id_type genesis_account;
+   public_key_type committee_key;
+   account_id_type committee_account;
    fc::ecc::private_key private_key = fc::ecc::private_key::generate();
    fc::ecc::private_key delegate_priv_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("null_key")) );
    public_key_type delegate_pub_key;
