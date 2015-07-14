@@ -76,9 +76,9 @@ ApplicationWindow {
             else
             {
                console.log("Waiting for result...")
-               acct.idChanged.connect(function(loadedAcct) {
+               acct.idChanged.connect(function() {
                   console.log( "ID CHANGED" );
-                  console.log(JSON.stringify(loadedAcct))
+                  console.log(JSON.stringify(acct))
                })
             }
          }

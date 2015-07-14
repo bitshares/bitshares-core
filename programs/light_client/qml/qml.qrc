@@ -3,8 +3,10 @@
         <file>main.qml</file>
         <file>TransferForm.qml</file>
         <file>FormBox.qml</file>
-        <file>jdenticon/jdenticon-1.0.1.min.js</file>
         <file>Scaling.qml</file>
+        <file>Identicon.qml</file>
+        <file>AccountPicker.qml</file>
+        <file>jdenticon/jdenticon-1.0.1.min.js</file>
     </qresource>
 </RCC>
 

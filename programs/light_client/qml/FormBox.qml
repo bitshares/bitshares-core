@@ -22,8 +22,14 @@ Rectangle {
    function showForm(formType, params, closedCallback) {
       if (formType.status === Component.Error)
          console.log(formType.errorString())
+      if (!params instanceof Object)
+         params = {app: app}
+      else
+         params.app = app
 
-      formContainer.data = [formType.createObject(formContainer, params)]
+      var form = formType.createObject(formContainer, params)
+      formContainer.data = [form]
+      form.finished.connect(function(){state = "HIDDEN"})
       if (closedCallback instanceof Function)
          internal.callback = closedCallback
       state = "SHOWN"

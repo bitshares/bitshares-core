@@ -19,6 +19,7 @@ using boost::multi_index_container;
 using namespace boost::multi_index;
 
 using ObjectId = qint64;
+Q_DECLARE_METATYPE(ObjectId)
 
 Q_DECLARE_METATYPE(std::function<void()>)
 
