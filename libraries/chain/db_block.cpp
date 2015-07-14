@@ -547,11 +547,7 @@ processed_transaction database::_apply_transaction(const signed_transaction& trx
             ref_block_height = uint32_t( x0 );
          }
 
-         const block_summary_object& tapos_block_summary =
-               static_cast<const block_summary_object&>(
-                  get_index<block_summary_object>()
-                  .get(block_summary_id_type(ref_block_height))
-                  );
+         const auto& tapos_block_summary = block_summary_id_type( ref_block_height )(*this);
 
          //This is the signature check for transactions with relative expiration.
          if( !(skip & skip_transaction_signatures) )
@@ -561,9 +557,7 @@ processed_transaction database::_apply_transaction(const signed_transaction& trx
             for( const auto& sig : trx.signatures )
             {
                FC_ASSERT(eval_state._sigs.insert(std::make_pair(
-                                                    public_key_type(
-                                                       fc::ecc::public_key(sig,
-                                                                           trx.digest(tapos_block_summary.block_id))),
+                                                    public_key_type( fc::ecc::public_key(sig, trx.digest())),
                                                     false)).second,
                          "Multiple signatures by same key detected");
             }

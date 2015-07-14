@@ -35,12 +35,26 @@ namespace graphene { namespace chain {
    };
 
    /**
+    * Used to verify that a specific block is part of the
+    * blockchain history.  This helps protect some high-value
+    * transactions to newly created IDs
+    *
+    * The block ID must be within the last 2^16 blocks.
+    */
+   struct block_id_predicate
+   {
+      block_id_type id;
+      bool validate()const{ return true; }
+   };
+
+   /**
     *  When defining predicates do not make the protocol dependent upon
     *  implementation details.
     */
    typedef static_variant<
       account_name_eq_lit_predicate,
-      asset_symbol_eq_lit_predicate
+      asset_symbol_eq_lit_predicate,
+      block_id_predicate
      > predicate;
 
 
@@ -71,5 +85,7 @@ namespace graphene { namespace chain {
 FC_REFLECT( graphene::chain::assert_operation::fee_parameters_type, (fee) )
 FC_REFLECT( graphene::chain::account_name_eq_lit_predicate, (account_id)(name) )
 FC_REFLECT( graphene::chain::asset_symbol_eq_lit_predicate, (asset_id)(symbol) )
+FC_REFLECT( graphene::chain::block_id_predicate, (id) )
 FC_REFLECT_TYPENAME( graphene::chain::predicate )
 FC_REFLECT( graphene::chain::assert_operation, (fee)(fee_paying_account)(predicates)(required_auths)(extensions) )
+ 

@@ -89,13 +89,10 @@ namespace graphene { namespace chain {
       vector<operation>  operations;
       extensions_type    extensions;
 
-      /// Calculate the digest for a transaction with a reference block
-      /// @param ref_block_id Full block ID of the reference block
-      digest_type digest(const block_id_type& ref_block_id)const;
       /// Calculate the digest for a transaction with an absolute expiration time
-      digest_type digest()const;
+      digest_type         digest()const;
       transaction_id_type id()const;
-      void validate() const;
+      void                validate() const;
 
       void set_expiration( fc::time_point_sec expiration_time );
       void set_expiration( const block_id_type& reference_block, unsigned_int lifetime_intervals = 3 );
@@ -115,10 +112,6 @@ namespace graphene { namespace chain {
       }
 
       void get_required_authorities( flat_set<account_id_type>& active, flat_set<account_id_type>& owner, vector<authority>& other )const;
-
-   protected:
-      // Intentionally unreflected: does not go on wire
-      optional<block_id_type> block_id_cache;
    };
 
    /**
@@ -134,6 +127,14 @@ namespace graphene { namespace chain {
 
       /** returns signature but does not append */
       signature_type sign( const private_key_type& key )const;
+
+      /**
+       *  The purpose of this method is to identify the minimal subset of @ref available_keys that are
+       *  required to sign 
+       */
+      set<public_key_type> get_required_signatures( const set<public_key_type>& available_keys,
+                                                    const map<account_id_type,authority>& active_authorities,
+                                                    const map<account_id_type,authority>& owner_authorities )const;
 
       /**
        *  Given a set of private keys sign this transaction with a minimial subset of required keys.

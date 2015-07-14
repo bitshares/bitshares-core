@@ -17,6 +17,7 @@
  */
 
 #include <graphene/chain/assert_evaluator.hpp>
+#include <graphene/chain/block_summary_object.hpp>
 #include <graphene/chain/database.hpp>
 
 #include <sstream>
@@ -37,6 +38,10 @@ struct predicate_evaluator
    void operator()( const  asset_symbol_eq_lit_predicate& p )const
    {
       FC_ASSERT( p.asset_id(db).symbol == p.symbol );
+   }
+   void operator()( const block_id_predicate& p )const
+   {
+      FC_ASSERT( block_summary_id_type( block_header::num_from_id( p.id ) )(db).block_id == p.id );
    }
 };
 
