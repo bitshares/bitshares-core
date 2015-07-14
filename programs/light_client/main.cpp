@@ -13,6 +13,7 @@ int main(int argc, char *argv[])
    app.setOrganizationName("Cryptonomex, Inc.");
 
    qRegisterMetaType<std::function<void()>>();
+   qRegisterMetaType<ObjectId>();
 
    qmlRegisterType<Asset>("Graphene.Client", 0, 1, "Asset");
    qmlRegisterType<Balance>("Graphene.Client", 0, 1, "Balance");
@@ -21,11 +22,9 @@ int main(int argc, char *argv[])
    qmlRegisterType<GrapheneApplication>("Graphene.Client", 0, 1, "GrapheneApplication");
 
    QQmlApplicationEngine engine;
-   /*
    QVariant crypto;
    crypto.setValue(Crypto());
    engine.rootContext()->setContextProperty("Crypto", crypto);
-   */
 #ifdef NDEBUG
    engine.load(QUrl(QStringLiteral("qrc:/main.qml")));
 #else

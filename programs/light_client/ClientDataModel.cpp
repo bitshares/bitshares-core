@@ -134,13 +134,14 @@ Asset* ChainDataModel::getAsset(QString symbol)
 
 
 
-Account* ChainDataModel::getAccount(qint64 id)
+Account* ChainDataModel::getAccount(ObjectId id)
 {
    auto& by_id_idx = m_accounts.get<::by_id>();
    auto itr = by_id_idx.find(id);
    if( itr == by_id_idx.end() )
    {
       auto tmp = new Account;
+      QQmlEngine::setObjectOwnership(tmp, QQmlEngine::CppOwnership);
       tmp->id = id; --m_account_query_num;
       tmp->name = QString::number( --m_account_query_num);
       auto result = m_accounts.insert( tmp );
@@ -173,7 +174,7 @@ Account* ChainDataModel::getAccount(qint64 id)
                  );
               }
            });
-         } 
+         }
          catch ( const fc::exception& e )
          {
             Q_EMIT exceptionThrown( QString::fromStdString(e.to_string()) );
@@ -191,6 +192,7 @@ Account* ChainDataModel::getAccount(QString name)
    if( itr == by_name_idx.end() )
    {
       auto tmp = new Account;
+      QQmlEngine::setObjectOwnership(tmp, QQmlEngine::CppOwnership);
       tmp->id = --m_account_query_num;
       tmp->name = name;
       auto result = m_accounts.insert( tmp );
@@ -218,12 +220,12 @@ Account* ChainDataModel::getAccount(QString name)
               {
                  by_symbol_idx.modify( itr,
                     [=]( Account* a ){
-                       a->setProperty("id", result.front()->id.instance() );
+                       a->setProperty("id", ObjectId(result.front()->id.instance()));
                     }
                  );
               }
            });
-         } 
+         }
          catch ( const fc::exception& e )
          {
             Q_EMIT exceptionThrown( QString::fromStdString(e.to_string()) );
@@ -278,6 +280,7 @@ void GrapheneApplication::start( QString apiurl, QString user, QString pass )
       m_client = std::make_shared<fc::http::websocket_client>();
       ilog( "connecting...${s}", ("s",apiurl.toStdString()) );
       auto con  = m_client->connect( apiurl.toStdString() );
+      m_connectionClosed = con->closed.connect([this]{queueExecute([this]{setIsConnected(false);});});
       auto apic = std::make_shared<fc::rpc::websocket_api_connection>(*con);
       auto remote_api = apic->get_remote_api< login_api >(1);
       auto db_api = apic->get_remote_api< database_api >(0);

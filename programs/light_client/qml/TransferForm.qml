@@ -3,57 +3,61 @@ import QtQuick.Controls 1.4
 import QtQuick.Dialogs 1.2
 import QtQuick.Layouts 1.2
 
+import Graphene.Client 0.1
+
 import "."
-import "jdenticon/jdenticon-1.0.1.min.js" as Jdenticon
 
 Rectangle {
    anchors.fill: parent
 
+   property alias senderAccount: senderPicker.account
+   property alias receiverAccount: recipientPicker.account
+
+   property GrapheneApplication app
+   signal finished
+
    Component.onCompleted: console.log("Made a transfer form")
    Component.onDestruction: console.log("Destroyed a transfer form")
 
-   Column {
+   ColumnLayout {
       anchors.centerIn: parent
+      width: parent.width - Scaling.cm(2)
+      spacing: Scaling.cm(1)
 
+      AccountPicker {
+         id: senderPicker
+         width: parent.width
+         Component.onCompleted: setFocus()
+         placeholderText: qsTr("Sender")
+      }
+      AccountPicker {
+         id: recipientPicker
+         width: parent.width
+         placeholderText: qsTr("Recipient")
+         layoutDirection: Qt.RightToLeft
+      }
       RowLayout {
-         Canvas {
-            id: identicon
-            width: Scaling.cm(2)
-            height: Scaling.cm(2)
-            contextType: "2d"
-
-            onPaint: {
-               if (nameField.text)
-                  Jdenticon.draw(identicon, nameField.text)
-               else {
-                  var context = identicon.context
-                  context.reset()
-                  var draw_circle = function(context, x, y, radius) {
-                     context.beginPath()
-                     context.arc(x, y, radius, 0, 2 * Math.PI, false)
-                     context.fillStyle = "rgba(0, 0, 0, 0.1)"
-                     context.fill()
-                  }
-                  var size = Math.min(identicon.height, identicon.width)
-                  var centerX = size / 2
-                  var centerY = size / 2
-                  var radius = size/15
-                  draw_circle(context, centerX, centerY, radius)
-                  draw_circle(context, 2*radius, 2*radius, radius)
-                  draw_circle(context, centerX, 2*radius, radius)
-                  draw_circle(context, size - 2*radius, 2*radius, radius)
-                  draw_circle(context, size - 2*radius, centerY, radius)
-                  draw_circle(context, size - 2*radius, size - 2*radius, radius)
-                  draw_circle(context, centerX, size - 2*radius, radius)
-                  draw_circle(context, 2*radius, size - 2*radius, radius)
-                  draw_circle(context, 2*radius, centerY, radius)
-               }
-            }
+         width: parent.width
+         SpinBox {
+            Layout.preferredWidth: Scaling.cm(4)
+            Layout.minimumWidth: Scaling.cm(1.5)
+            enabled: senderPicker.account
+            minimumValue: 0
+            maximumValue: Number.POSITIVE_INFINITY
          }
-         TextField {
-            id: nameField
-            Layout.fillWidth: true
-            onTextChanged: identicon.requestPaint()
+         ComboBox {
+            Layout.minimumWidth: Scaling.cm(3)
+            enabled: senderPicker.account
+            model: ["CORE", "USD", "GOLD"]
+         }
+         Item { Layout.fillWidth: true }
+         Button {
+            text: qsTr("Cancel")
+            onClicked: finished()
+         }
+         Button {
+            text: qsTr("Transfer")
+            enabled: senderPicker.account
          }
       }
    }

@@ -16,6 +16,8 @@ file(GLOB QML qml/*)
 qt5_add_resources(QML_QRC qml/qml.qrc)
 
 add_executable(light_client ClientDataModel.cpp ClientDataModel.hpp main.cpp ${QML_QRC} ${QML})
-add_dependencies(light_client gen_qrc)
+if (CMAKE_VERSION VERSION_LESS 3.0)
+    add_dependencies(light_client gen_qrc)
+endif()
 
 target_link_libraries(light_client PRIVATE Qt5::Core Qt5::Widgets Qt5::Quick graphene_chain graphene_utilities fc graphene_app )

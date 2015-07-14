@@ -174,10 +174,10 @@ void witness_plugin::block_production_loop()
       _production_enabled = true;
 
    // is anyone scheduled to produce now or one second in the future?
-   uint32_t slot = db.get_slot_at_time( graphene::time::now() + fc::seconds(1) );
+   const fc::time_point_sec now = graphene::time::now();
+   uint32_t slot = db.get_slot_at_time( now );
    graphene::chain::witness_id_type scheduled_witness = db.get_scheduled_witness( slot ).first;
    fc::time_point_sec scheduled_time = db.get_slot_time( slot );
-   fc::time_point_sec now = graphene::time::now();
    graphene::chain::public_key_type scheduled_key = scheduled_witness( db ).signing_key;
 
    auto is_scheduled = [&]()
@@ -194,7 +194,7 @@ void witness_plugin::block_production_loop()
       uint32_t prate = db.witness_participation_rate();
       if( prate < _required_witness_participation )
       {
-         elog("Not producing block because node appers to be on a minority fork with only ${x}% witness participation",
+         elog("Not producing block because node appears to be on a minority fork with only ${x}% witness participation",
               ("x",uint32_t(100*uint64_t(prate) / GRAPHENE_1_PERCENT) ) );
          return false;
       }
@@ -212,20 +212,18 @@ void witness_plugin::block_production_loop()
          return false;
       }
 
-      // the local clock must be at least 1 second ahead of
-      // head_block_time.
-      if( (now - db.head_block_time()).to_seconds() <= 1 ) {
+      // the local clock must be at least 1 second ahead of head_block_time.
+      if( (now - db.head_block_time()).to_seconds() < GRAPHENE_MIN_BLOCK_INTERVAL ) {
          elog("Not producing block because head block is less than a second old.");
          return false;
       }
 
       // the local clock must be within 500 milliseconds of
       // the scheduled production time.
-      if( llabs((scheduled_time - now).count()) > fc::milliseconds(250).count() ) {
+      if( llabs((scheduled_time - now).count()) > fc::milliseconds( 500 ).count() ) {
          elog("Not producing block because network time is not within 250ms of scheduled block time.");
          return false;
       }
-
 
       // we must know the private key corresponding to the witness's
       // published block production key.

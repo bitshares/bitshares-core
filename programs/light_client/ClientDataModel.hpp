@@ -11,25 +11,38 @@
 #include <fc/thread/thread.hpp>
 #include <graphene/app/api.hpp>
 
+#include <QtQml>
 #include <QObject>
 #include <QQmlListProperty>
 
 using boost::multi_index_container;
 using namespace boost::multi_index;
 
+using ObjectId = qint64;
+Q_DECLARE_METATYPE(ObjectId)
+
 Q_DECLARE_METATYPE(std::function<void()>)
 
 class GrapheneObject : public QObject
 {
    Q_OBJECT
-   Q_PROPERTY(qint64 id MEMBER id NOTIFY idChanged)
+   Q_PROPERTY(ObjectId id MEMBER id NOTIFY idChanged)
 
    public:
-      qint64 id;
+      ObjectId id;
 
    Q_SIGNALS:
       void idChanged();
 };
+class Crypto {
+   Q_GADGET
+
+public:
+   Q_INVOKABLE QString sha256(QByteArray data) {
+      return QCryptographicHash::hash(data, QCryptographicHash::Sha256).toHex();
+   }
+};
+QML_DECLARE_TYPE(Crypto)
 
 
 class Asset : public GrapheneObject  {
@@ -77,7 +90,6 @@ class Account : public GrapheneObject {
 
    public:
       const QString& getName()const { return name; }
-
       QQmlListProperty<Balance> balances();
 
       QString name;
@@ -90,19 +102,16 @@ struct by_account_name;
 typedef multi_index_container<
    Account*,
    indexed_by<
-      hashed_unique< tag<by_id>,  member<GrapheneObject, qint64, &GrapheneObject::id > >,
+      hashed_unique< tag<by_id>,  member<GrapheneObject, ObjectId, &GrapheneObject::id > >,
       ordered_unique< tag<by_account_name>, member<Account, QString, &Account::name> >
    >
 > account_multi_index_type;
-
-
-
 
 class ChainDataModel : public QObject {
    Q_OBJECT
 
 public:
-   Q_INVOKABLE Account* getAccount(qint64 id);
+   Q_INVOKABLE Account* getAccount(ObjectId id);
    Q_INVOKABLE Account* getAccount(QString name);
    Q_INVOKABLE Asset*   getAsset(qint64 id);
    Q_INVOKABLE Asset*   getAsset(QString symbol);
@@ -121,14 +130,10 @@ private:
    std::string                           m_api_url;
    fc::api<graphene::app::database_api>  m_db_api;
 
-   qint64                                m_account_query_num = -1;
+   ObjectId                                m_account_query_num = -1;
    account_multi_index_type              m_accounts;
    asset_multi_index_type                m_assets;
 };
-
-
-
-
 
 class GrapheneApplication : public QObject {
    Q_OBJECT
@@ -140,6 +145,8 @@ class GrapheneApplication : public QObject {
    fc::thread                  m_thread;
    ChainDataModel*             m_model       = nullptr;
    bool                        m_isConnected = false;
+
+   boost::signals2::scoped_connection m_connectionClosed;
 
    std::shared_ptr<fc::http::websocket_client>  m_client;
    fc::future<void>                        m_done;
