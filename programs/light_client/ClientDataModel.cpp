@@ -12,118 +12,102 @@ ChainDataModel::ChainDataModel( fc::thread& t, QObject* parent )
 
 Account* ChainDataModel::getAccount(qint64 id)
 {
-   auto itr = m_accounts.find( id );
-   if( itr != m_accounts.end() )
-      return *itr;
+   auto& by_id_idx = m_accounts.get<::by_id>();
+   auto itr = by_id_idx.find(id);
+   if( itr == by_id_idx.end() )
+   {
+      auto tmp = new Account;
+      tmp->id = id; --m_account_query_num;
+      tmp->name = QString::number( --m_account_query_num);
+      auto result = m_accounts.insert( tmp );
+      assert( result.second );
 
-   auto acct = new Account(this);
-   acct->setProperty("id", id);
-   acct->setProperty("accountName", "LOADING");
-   auto insert_result = m_accounts.insert( acct );
+      /** execute in app thread */
+      m_thread->async( [this,id](){
+         try {
+           ilog( "look up names.." );
+           auto result = m_db_api->get_accounts( {account_id_type(id)} );
+           /** execute in main */
+           Q_EMIT queueExecute( [this,result,id](){
+              wlog( "process result" );
+              auto& by_id_idx = this->m_accounts.get<::by_id>();
+              auto itr = by_id_idx.find(id);
+              assert( itr != by_id_idx.end() );
 
-   /** execute in app thread */
-   m_thread->async( [=](){
-      try {
-        auto result = m_db_api->get_accounts( {account_id_type(id)} );
-        if( result.size() && result.front().valid() )
-        {
-          QString name = QString::fromStdString( result.front()->name );
-          /** execute in main */
-          Q_EMIT queueExecute( [=](){
-             this->m_accounts.modify( insert_result.first,
-                [=]( Account* a ){ a->setProperty("accountName", name ); }
-             );
-          });
-        }
-        else
-        {
-          /** execute in main */
-          Q_EMIT queueExecute( [=](){
-             acct->deleteLater();
-             m_accounts.erase( insert_result.first );
-          });
-        }
-      }
-      catch ( const fc::exception& e )
-      {
-         edump((e.to_detail_string()));
-         Q_EMIT exceptionThrown( QString::fromStdString(e.to_string()) );
-      }
-   });
-
-   return acct;
+              if( result.size() == 0 || !result.front() )
+              {
+                  elog( "delete later" );
+                  (*itr)->deleteLater();
+                  by_id_idx.erase( itr );
+              }
+              else
+              {
+                 by_id_idx.modify( itr,
+                    [=]( Account* a ){
+                       a->setProperty("name", QString::fromStdString(result.front()->name) );
+                    }
+                 );
+              }
+           });
+         } 
+         catch ( const fc::exception& e )
+         {
+            Q_EMIT exceptionThrown( QString::fromStdString(e.to_string()) );
+         }
+       });
+      return *result.first;
+   }
+   return *itr;
 }
 
 Account* ChainDataModel::getAccount(QString name)
 {
+   auto& by_name_idx = m_accounts.get<by_account_name>();
+   auto itr = by_name_idx.find(name);
+   if( itr == by_name_idx.end() )
    {
-      auto itr = m_accounts.get<by_account_name>().begin();
-      while( itr != m_accounts.get<by_account_name>().end() )
-      {
-         edump(( (*itr)->getAccountName().toStdString()));
-         if((*itr)->name() == name.toStdString() )
-            wlog( "THEY ARE THE SAME" );
-         ++itr;
-      }
-   }
-   auto& by_name_index = m_accounts.get<by_account_name>();
-   {
-      for( auto itr = by_name_index.begin(); itr != by_name_index.end(); ++itr )
-         wdump(( (*itr)->getAccountName().toStdString()));
-   }
-   auto itr = by_name_index.find(name.toStdString());
-   idump((itr != by_name_index.end()));
-   if( itr != by_name_index.end() )
-   {
-      return *itr;
-   }
+      auto tmp = new Account;
+      tmp->id = --m_account_query_num;
+      tmp->name = name;
+      auto result = m_accounts.insert( tmp );
+      assert( result.second );
 
-   auto acct = new Account(this);
-   acct->setProperty("id", --m_account_query_num );
-   acct->setProperty("accountName", name);
-   auto insert_result = m_accounts.insert( acct );
-   edump( (insert_result.second) );
-   edump( (int64_t(*insert_result.first))(int64_t(acct)) );
-   auto itr2 = by_name_index.find(name.toStdString());
-   assert( itr2 != by_name_index.end() );
+      /** execute in app thread */
+      m_thread->async( [this,name](){
+         try {
+           ilog( "look up names.." );
+           auto result = m_db_api->lookup_account_names( {name.toStdString()} );
+           /** execute in main */
+           Q_EMIT queueExecute( [this,result,name](){
+              wlog( "process result" );
+              auto& by_name_idx = this->m_accounts.get<by_account_name>();
+              auto itr = by_name_idx.find(name);
+              assert( itr != by_name_idx.end() );
 
-   /** execute in app thread */
-   m_thread->async( [=](){
-      try {
-        ilog( "look up names.." );
-        auto result = m_db_api->lookup_account_names( {name.toStdString()} );
-        idump((result));
-        if( result.size() && result.front().valid() )
-        {
-          /** execute in main */
-          Q_EMIT queueExecute( [=](){
-             this->m_accounts.modify( insert_result.first,
-                [=]( Account* a ){
-                   ilog( "setting id ${i}", ("i",result.front()->id.instance()) );
-                   idump((int64_t(a)));
-                   a->setProperty("id", result.front()->id.instance() );
-                }
-             );
-          });
-        }
-        else
-        {
-          /** execute in main */
-          Q_EMIT queueExecute( [=](){
-             acct->deleteLater();
-             this->m_accounts.erase( insert_result.first );
-          });
-        }
-      }
-      catch ( const fc::exception& e )
-      {
-         edump((e.to_detail_string()));
-         Q_EMIT exceptionThrown( QString::fromStdString(e.to_string()) );
-      }
-   });
-
-   idump((int64_t(acct)));
-   return acct;
+              if( result.size() == 0 || !result.front() )
+              {
+                  elog( "delete later" );
+                  (*itr)->deleteLater();
+                  by_name_idx.erase( itr );
+              }
+              else
+              {
+                 by_name_idx.modify( itr,
+                    [=]( Account* a ){
+                       a->setProperty("id", result.front()->id.instance() );
+                    }
+                 );
+              }
+           });
+         } 
+         catch ( const fc::exception& e )
+         {
+            Q_EMIT exceptionThrown( QString::fromStdString(e.to_string()) );
+         }
+       });
+      return *result.first;
+   }
+   return *itr;
 }
 
 QQmlListProperty<Balance> Account::balances()

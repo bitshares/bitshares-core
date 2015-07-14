@@ -11,25 +11,14 @@
 #include <fc/thread/thread.hpp>
 #include <graphene/app/api.hpp>
 
-#include <QCryptographicHash>
 #include <QObject>
 #include <QQmlListProperty>
-#include <QtQml>
 
 using boost::multi_index_container;
 using namespace boost::multi_index;
 
 Q_DECLARE_METATYPE(std::function<void()>)
 
-class Crypto {
-   Q_GADGET
-
-public:
-   Q_INVOKABLE QString sha256(QByteArray data) {
-      return QCryptographicHash::hash(data, QCryptographicHash::Sha256).toHex();
-   }
-};
-QML_DECLARE_TYPE(Crypto)
 
 class Asset : public QObject {
    Q_OBJECT
@@ -58,26 +47,26 @@ class Balance : public QObject {
 class Account : public QObject {
    Q_OBJECT
 
-   Q_PROPERTY(QString accountName MEMBER accountName NOTIFY accountNameChanged)
+   Q_PROPERTY(QString name MEMBER name NOTIFY nameChanged)
    Q_PROPERTY(qint64 id MEMBER id NOTIFY idChanged)
    Q_PROPERTY(QQmlListProperty<Balance> balances READ balances)
 
-   QString accountName;
-   qint64 id;
    QList<Balance*> m_balances;
 
 public:
-   Account(QObject* parent = nullptr)
-      : QObject(parent){}
+ //  Account(QObject* parent = nullptr)
+ //     : QObject(parent){}
 
-   const QString& getAccountName()const { return accountName; }
+   const QString& getName()const { return name; }
    qint64        getId()const   { return id;   }
-   std::string   name()const { return accountName.toStdString(); }
 
    QQmlListProperty<Balance> balances();
 
+   QString name;
+   qint64 id;
+
 signals:
-   void accountNameChanged();
+   void nameChanged();
    void idChanged();
 };
 
@@ -90,8 +79,7 @@ typedef multi_index_container<
    Account*,
    indexed_by<
       hashed_unique< tag<by_id>,  const_mem_fun<Account, qint64, &Account::getId > >,
-      hashed_unique< tag<by_account_name>, const_mem_fun<Account, std::string, &Account::name> >
-//      ordered_non_unique< tag<by_account_name>, const_mem_fun<Account, std::string, &Account::name> >
+      ordered_unique< tag<by_account_name>, const_mem_fun<Account, const QString&, &Account::getName> >
    >
 > account_multi_index_type;
 

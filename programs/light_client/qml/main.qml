@@ -55,12 +55,12 @@ ApplicationWindow {
       }
       TextField {
          id: nameField
-         onAccepted: lookupButton.clicked()
+         onAccepted: lookupNameButton.clicked()
          focus: true
       }
       Button {
-         id: lookupButton
-         text: "Lookup"
+         id: lookupNameButton
+         text: "Lookup Name"
          onClicked: {
             var acct = app.model.getAccount(nameField.text)
             console.log(JSON.stringify(acct))
@@ -82,6 +82,37 @@ ApplicationWindow {
             }
          }
       }
+
+      TextField {
+         id: idField
+         onAccepted: lookupIdButton.clicked()
+         focus: true
+      }
+      Button {
+         id: lookupIdButton
+         text: "Lookup ID"
+         onClicked: {
+            var acct = app.model.getAccount(parseInt(idField.text))
+            console.log(JSON.stringify(acct))
+            // @disable-check M126
+            if (acct == null)
+               console.log("Got back null account")
+            else if ( !(parseInt(acct.name) <= 0)  )
+            {
+               console.log("NAME ALREADY SET" );
+               console.log(JSON.stringify(acct))
+            }
+            else
+            {
+               console.log("Waiting for result...")
+               acct.nameChanged.connect(function(loadedAcct) {
+                  console.log( "NAME CHANGED" );
+                  console.log(JSON.stringify(acct))
+               })
+            }
+         }
+      }
+      
 
    }
 
