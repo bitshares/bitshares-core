@@ -17,6 +17,7 @@ Account* ChainDataModel::getAccount(ObjectId id)
    if( itr == by_id_idx.end() )
    {
       auto tmp = new Account;
+      QQmlEngine::setObjectOwnership(tmp, QQmlEngine::CppOwnership);
       tmp->id = id; --m_account_query_num;
       tmp->name = QString::number( --m_account_query_num);
       auto result = m_accounts.insert( tmp );
@@ -67,6 +68,7 @@ Account* ChainDataModel::getAccount(QString name)
    if( itr == by_name_idx.end() )
    {
       auto tmp = new Account;
+      QQmlEngine::setObjectOwnership(tmp, QQmlEngine::CppOwnership);
       tmp->id = --m_account_query_num;
       tmp->name = name;
       auto result = m_accounts.insert( tmp );

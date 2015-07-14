@@ -49,6 +49,24 @@ RowLayout {
                                                                   : account.id)
                })
          }
+
+         Behavior on text {
+            SequentialAnimation {
+               PropertyAnimation {
+                  target: accountDetails
+                  property: "opacity"
+                  from: 1; to: 0
+                  duration: 100
+               }
+               PropertyAction { target: accountDetails; property: "text" }
+               PropertyAnimation {
+                  target: accountDetails
+                  property: "opacity"
+                  from: 0; to: 1
+                  duration: 100
+               }
+            }
+         }
       }
    }
 }
