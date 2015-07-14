@@ -35,25 +35,36 @@ Rectangle {
       state = "SHOWN"
    }
 
-   MouseArea {
-      id: mouseTrap
+   FocusScope {
+      id: scope
       anchors.fill: parent
-      onClicked: {
-         mouse.accepted = true
-         greySheet.state = "HIDDEN"
+
+      // Do not let focus leave this scope while form is open
+      onFocusChanged: if (enabled && !focus) forceActiveFocus()
+
+      Keys.onEscapePressed: greySheet.state = "HIDDEN"
+
+      MouseArea {
+         id: mouseTrap
+         anchors.fill: parent
+         onClicked: {
+            mouse.accepted = true
+            greySheet.state = "HIDDEN"
+         }
+         acceptedButtons: Qt.AllButtons
       }
-      acceptedButtons: Qt.AllButtons
-   }
-   MouseArea {
-      anchors.fill: formContainer
-      acceptedButtons: Qt.AllButtons
-      onClicked: mouse.accepted = true
-   }
-   Item {
-      id: formContainer
-      anchors.centerIn: parent
-      width: parent.width / 2
-      height: parent.height / 2
+      MouseArea {
+         // This mouse area blocks clicks inside the form from reaching the mouseTrap
+         anchors.fill: formContainer
+         acceptedButtons: Qt.AllButtons
+         onClicked: mouse.accepted = true
+      }
+      Item {
+         id: formContainer
+         anchors.centerIn: parent
+         width: parent.width / 2
+         height: parent.height / 2
+      }
    }
 
    states: [

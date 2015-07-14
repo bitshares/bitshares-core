@@ -113,8 +113,6 @@ ApplicationWindow {
             }
          }
       }
-
-
    }
 
    FormBox {
