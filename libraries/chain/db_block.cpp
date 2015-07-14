@@ -578,7 +578,6 @@ void database::create_block_summary(const signed_block& next_block)
    block_summary_id_type sid(next_block.block_num() & 0xffff );
    modify( sid(*this), [&](block_summary_object& p) {
          p.block_id = next_block.id();
-         p.timestamp = next_block.timestamp;
    });
 }
 
