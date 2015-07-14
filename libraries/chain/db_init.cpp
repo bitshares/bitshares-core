@@ -214,6 +214,9 @@ void database::init_genesis(const genesis_state_type& genesis_state)
 
    transaction_evaluation_state genesis_eval_state(this);
 
+   flat_index<block_summary_object>& bsi = get_mutable_index_type< flat_index<block_summary_object> >(); 
+   bsi.resize(0xffff+1);
+
    // Create blockchain accounts
    fc::ecc::private_key null_private_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("null_key")));
    create<account_balance_object>([](account_balance_object& b) {

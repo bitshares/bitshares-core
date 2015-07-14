@@ -105,6 +105,12 @@ namespace graphene { namespace db {
 
          size_t size()const{ return _objects.size(); }
 
+         void resize( uint32_t s ) { 
+            _objects.resize(s); 
+            for( uint32_t i = 0; i < s; ++i )
+               _objects[i].id = object_id_type(object_type::space_id,object_type::type_id,i);
+         }
+
       private:
          vector< T > _objects;
    };

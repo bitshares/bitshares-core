@@ -524,6 +524,7 @@ processed_transaction database::_apply_transaction(const signed_transaction& trx
          // integer that satisfies (a) and (b); for x1, the next
          // largest integer that satisfies (a), does not satisfy (b).
          //
+         /**
          int64_t N = head_block_num();
          int64_t a = N & 0xFFFF;
          int64_t r = trx.ref_block_num;
@@ -546,8 +547,9 @@ processed_transaction database::_apply_transaction(const signed_transaction& trx
          {
             ref_block_height = uint32_t( x0 );
          }
+         */
 
-         const auto& tapos_block_summary = block_summary_id_type( ref_block_height )(*this);
+         const auto& tapos_block_summary = block_summary_id_type( trx.ref_block_num )(*this);
 
          //This is the signature check for transactions with relative expiration.
          if( !(skip & skip_transaction_signatures) )
@@ -652,11 +654,11 @@ const witness_object& database::validate_block_header( uint32_t skip, const sign
 
 void database::create_block_summary(const signed_block& next_block)
 {
-   const auto& sum = create<block_summary_object>( [&](block_summary_object& p) {
+   block_summary_id_type sid(next_block.block_num() & 0xffff );
+   modify( sid(*this), [&](block_summary_object& p) {
          p.block_id = next_block.id();
          p.timestamp = next_block.timestamp;
    });
-   FC_ASSERT( sum.id.instance() == next_block.block_num(), "", ("summary.id",sum.id)("next.block_num",next_block.block_num()) );
 }
 
 void database::add_checkpoints( const flat_map<uint32_t,block_id_type>& checkpts )

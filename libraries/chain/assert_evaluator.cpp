@@ -41,7 +41,7 @@ struct predicate_evaluator
    }
    void operator()( const block_id_predicate& p )const
    {
-      FC_ASSERT( block_summary_id_type( block_header::num_from_id( p.id ) )(db).block_id == p.id );
+      FC_ASSERT( block_summary_id_type( block_header::num_from_id( p.id ) & 0xffff )(db).block_id == p.id );
    }
 };
 
