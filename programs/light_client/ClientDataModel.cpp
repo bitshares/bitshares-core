@@ -10,6 +10,130 @@ using namespace graphene::app;
 ChainDataModel::ChainDataModel( fc::thread& t, QObject* parent )
 :QObject(parent),m_thread(&t){}
 
+
+Asset* ChainDataModel::getAsset(qint64 id)
+{
+   auto& by_id_idx = m_assets.get<::by_id>();
+   auto itr = by_id_idx.find(id);
+   if( itr == by_id_idx.end() )
+   {
+      auto tmp = new Asset;
+      tmp->id = id; --m_account_query_num;
+      tmp->symbol = QString::number( --m_account_query_num);
+      auto result = m_assets.insert( tmp );
+      assert( result.second );
+
+      /** execute in app thread */
+      m_thread->async( [this,id](){
+         try {
+           ilog( "look up symbol.." );
+           auto result = m_db_api->get_assets( {asset_id_type(id)} );
+           wdump((result));
+
+           /** execute in main */
+           Q_EMIT queueExecute( [this,result,id](){
+              wlog( "process result" );
+              auto& by_id_idx = this->m_assets.get<::by_id>();
+              auto itr = by_id_idx.find(id);
+              assert( itr != by_id_idx.end() );
+
+              if( result.size() == 0 || !result.front() )
+              {
+                  elog( "delete later" );
+                  (*itr)->deleteLater();
+                  by_id_idx.erase( itr );
+              }
+              else
+              {
+                 by_id_idx.modify( itr,
+                    [=]( Asset* a ){
+                       a->setProperty("symbol", QString::fromStdString(result.front()->symbol) );
+                       a->setProperty("precision", result.front()->precision );
+                    }
+                 );
+              }
+           });
+         } 
+         catch ( const fc::exception& e )
+         {
+            Q_EMIT exceptionThrown( QString::fromStdString(e.to_string()) );
+         }
+       });
+      return *result.first;
+   }
+   return *itr;
+}
+
+Asset* ChainDataModel::getAsset(QString symbol)
+{
+   auto& by_symbol_idx = m_assets.get<by_symbol_name>();
+   auto itr = by_symbol_idx.find(symbol);
+   if( itr == by_symbol_idx.end() )
+   {
+      auto tmp = new Asset;
+      tmp->id = --m_account_query_num;
+      tmp->symbol = symbol;
+      auto result = m_assets.insert( tmp );
+      assert( result.second );
+
+      /** execute in app thread */
+      m_thread->async( [this,symbol](){
+         try {
+           ilog( "look up symbol.." );
+           auto result = m_db_api->lookup_asset_symbols( {symbol.toStdString()} );
+           /** execute in main */
+           Q_EMIT queueExecute( [this,result,symbol](){
+              wlog( "process result" );
+              auto& by_symbol_idx = this->m_assets.get<by_symbol_name>();
+              auto itr = by_symbol_idx.find(symbol);
+              assert( itr != by_symbol_idx.end() );
+
+              if( result.size() == 0 || !result.front() )
+              {
+                  elog( "delete later" );
+                  (*itr)->deleteLater();
+                  by_symbol_idx.erase( itr );
+              }
+              else
+              {
+                 by_symbol_idx.modify( itr,
+                    [=]( Asset* a ){
+                       a->setProperty("id", result.front()->id.instance() );
+                       a->setProperty("precision", result.front()->precision );
+                    }
+                 );
+              }
+           });
+         } 
+         catch ( const fc::exception& e )
+         {
+            Q_EMIT exceptionThrown( QString::fromStdString(e.to_string()) );
+         }
+       });
+      return *result.first;
+   }
+   return *itr;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 Account* ChainDataModel::getAccount(qint64 id)
 {
    auto& by_id_idx = m_accounts.get<::by_id>();
@@ -80,19 +204,19 @@ Account* ChainDataModel::getAccount(QString name)
            /** execute in main */
            Q_EMIT queueExecute( [this,result,name](){
               wlog( "process result" );
-              auto& by_name_idx = this->m_accounts.get<by_account_name>();
-              auto itr = by_name_idx.find(name);
-              assert( itr != by_name_idx.end() );
+              auto& by_symbol_idx = this->m_accounts.get<by_account_name>();
+              auto itr = by_symbol_idx.find(name);
+              assert( itr != by_symbol_idx.end() );
 
               if( result.size() == 0 || !result.front() )
               {
                   elog( "delete later" );
                   (*itr)->deleteLater();
-                  by_name_idx.erase( itr );
+                  by_symbol_idx.erase( itr );
               }
               else
               {
-                 by_name_idx.modify( itr,
+                 by_symbol_idx.modify( itr,
                     [=]( Account* a ){
                        a->setProperty("id", result.front()->id.instance() );
                     }

@@ -134,10 +134,12 @@ int main( int argc, char** argv )
          wdata.ws_password = options.at("server-rpc-password").as<std::string>();
 
       fc::http::websocket_client client;
+      idump((wdata.ws_server));
       auto con  = client.connect( wdata.ws_server );
       auto apic = std::make_shared<fc::rpc::websocket_api_connection>(*con);
 
       auto remote_api = apic->get_remote_api< login_api >(1);
+      edump((wdata.ws_user)(wdata.ws_password) );
       FC_ASSERT( remote_api->login( wdata.ws_user, wdata.ws_password ) );
 
       auto wapiptr = std::make_shared<wallet_api>(remote_api);

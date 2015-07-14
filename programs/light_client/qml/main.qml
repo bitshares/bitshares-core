@@ -75,24 +75,24 @@ ApplicationWindow {
             else
             {
                console.log("Waiting for result...")
-               acct.idChanged.connect(function(loadedAcct) {
+               acct.idChanged.connect(function() {
                   console.log( "ID CHANGED" );
-                  console.log(JSON.stringify(loadedAcct))
+                  console.log(JSON.stringify(acct))
                })
             }
          }
       }
 
       TextField {
-         id: idField
-         onAccepted: lookupIdButton.clicked()
+         id: accountIdField
+         onAccepted: lookupAccountIdButton.clicked()
          focus: true
       }
       Button {
-         id: lookupIdButton
-         text: "Lookup ID"
+         id: lookupAccountIdButton
+         text: "Lookup Account ID"
          onClicked: {
-            var acct = app.model.getAccount(parseInt(idField.text))
+            var acct = app.model.getAccount(parseInt(accountIdField.text))
             console.log(JSON.stringify(acct))
             // @disable-check M126
             if (acct == null)
@@ -105,7 +105,37 @@ ApplicationWindow {
             else
             {
                console.log("Waiting for result...")
-               acct.nameChanged.connect(function(loadedAcct) {
+               acct.nameChanged.connect(function() {
+                  console.log( "NAME CHANGED" );
+                  console.log(JSON.stringify(acct))
+               })
+            }
+         }
+      }
+
+      TextField {
+         id: assetIdField
+         onAccepted: lookupassetIdButton.clicked()
+         focus: true
+      }
+      Button {
+         id: lookupassetIdButton
+         text: "Lookup Asset ID"
+         onClicked: {
+            var acct = app.model.getAsset(parseInt(assetIdField.text))
+            console.log(JSON.stringify(acct))
+            // @disable-check M126
+            if (acct == null)
+               console.log("Got back null asset")
+            else if ( !(parseInt(acct.name) <= 0)  )
+            {
+               console.log("NAME ALREADY SET" );
+               console.log(JSON.stringify(acct))
+            }
+            else
+            {
+               console.log("Waiting for result...")
+               acct.nameChanged.connect(function() {
                   console.log( "NAME CHANGED" );
                   console.log(JSON.stringify(acct))
                })

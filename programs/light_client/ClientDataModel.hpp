@@ -19,67 +19,79 @@ using namespace boost::multi_index;
 
 Q_DECLARE_METATYPE(std::function<void()>)
 
+class GrapheneObject : public QObject
+{
+   Q_OBJECT
+   Q_PROPERTY(qint64 id MEMBER id NOTIFY idChanged)
 
-class Asset : public QObject {
+   public:
+      qint64 id;
+
+   Q_SIGNALS:
+      void idChanged();
+};
+
+
+class Asset : public GrapheneObject  {
    Q_OBJECT
 
    Q_PROPERTY(QString symbol MEMBER symbol)
-   Q_PROPERTY(qint64 id MEMBER id)
-   Q_PROPERTY(quint8 precision MEMBER precision)
+   Q_PROPERTY(quint32 precision MEMBER precision)
 
-   QString symbol;
-   qint64 id;
-   quint8 precision;
+   public:
+      QString symbol;
+      quint32 precision;
+
+
+   Q_SIGNALS:
+      void symbolChanged();
 };
 
-class Balance : public QObject {
+struct by_id;
+struct by_symbol_name;
+typedef multi_index_container<
+   Asset*,
+   indexed_by<
+      hashed_unique< tag<by_id>,  member<GrapheneObject, qint64, &GrapheneObject::id > >,
+      ordered_unique< tag<by_symbol_name>, member<Asset, QString, &Asset::symbol> >
+   >
+> asset_multi_index_type;
+
+class Balance : public GrapheneObject {
    Q_OBJECT
 
    Q_PROPERTY(Asset* type MEMBER type)
    Q_PROPERTY(qint64 amount MEMBER amount)
-   Q_PROPERTY(qint64 id MEMBER id)
 
    Asset* type;
    qint64 amount;
-   qint64 id;
 };
 
-class Account : public QObject {
+class Account : public GrapheneObject {
    Q_OBJECT
 
    Q_PROPERTY(QString name MEMBER name NOTIFY nameChanged)
-   Q_PROPERTY(qint64 id MEMBER id NOTIFY idChanged)
    Q_PROPERTY(QQmlListProperty<Balance> balances READ balances)
 
    QList<Balance*> m_balances;
 
-public:
- //  Account(QObject* parent = nullptr)
- //     : QObject(parent){}
+   public:
+      const QString& getName()const { return name; }
 
-   const QString& getName()const { return name; }
-   qint64        getId()const   { return id;   }
+      QQmlListProperty<Balance> balances();
 
-   QQmlListProperty<Balance> balances();
+      QString name;
 
-   QString name;
-   qint64 id;
-
-signals:
-   void nameChanged();
-   void idChanged();
+   Q_SIGNALS:
+      void nameChanged();
 };
 
-struct by_id;
 struct by_account_name;
-/**
- * @ingroup object_index
- */
 typedef multi_index_container<
    Account*,
    indexed_by<
-      hashed_unique< tag<by_id>,  const_mem_fun<Account, qint64, &Account::getId > >,
-      ordered_unique< tag<by_account_name>, const_mem_fun<Account, const QString&, &Account::getName> >
+      hashed_unique< tag<by_id>,  member<GrapheneObject, qint64, &GrapheneObject::id > >,
+      ordered_unique< tag<by_account_name>, member<Account, QString, &Account::name> >
    >
 > account_multi_index_type;
 
@@ -92,6 +104,8 @@ class ChainDataModel : public QObject {
 public:
    Q_INVOKABLE Account* getAccount(qint64 id);
    Q_INVOKABLE Account* getAccount(QString name);
+   Q_INVOKABLE Asset*   getAsset(qint64 id);
+   Q_INVOKABLE Asset*   getAsset(QString symbol);
 
    ChainDataModel(){}
    ChainDataModel( fc::thread& t, QObject* parent = nullptr );
@@ -109,6 +123,7 @@ private:
 
    qint64                                m_account_query_num = -1;
    account_multi_index_type              m_accounts;
+   asset_multi_index_type                m_assets;
 };
 
 
