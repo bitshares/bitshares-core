@@ -727,7 +727,9 @@ public:
 
       vector<public_key_type> paying_keys = registrar_account_object.active.get_keys();
 
-      tx.set_expiration(get_dynamic_global_properties().head_block_id);
+      auto dyn_props = get_dynamic_global_properties();
+      tx.set_reference_block( dyn_props.head_block_id );
+      tx.set_expiration( dyn_props.time + fc::seconds(30) );
       tx.validate();
 
       for( public_key_type& key : paying_keys )
@@ -851,7 +853,9 @@ public:
 
          vector<public_key_type> paying_keys = registrar_account_object.active.get_keys();
 
-         tx.set_expiration(get_dynamic_global_properties().head_block_id);
+         auto dyn_props = get_dynamic_global_properties();
+         tx.set_reference_block( dyn_props.head_block_id );
+         tx.set_expiration( dyn_props.time + fc::seconds(30) );
          tx.validate();
 
          for( public_key_type& key : paying_keys )
@@ -1434,7 +1438,9 @@ public:
             approving_key_set.insert( k.first );
       }
 
-      tx.set_expiration(get_dynamic_global_properties().head_block_id);
+      auto dyn_props = get_dynamic_global_properties();
+      tx.set_reference_block( dyn_props.head_block_id );
+      tx.set_expiration( dyn_props.time + fc::seconds(30) );
 
       for( public_key_type& key : approving_key_set )
       {

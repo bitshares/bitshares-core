@@ -1143,7 +1143,8 @@ BOOST_AUTO_TEST_CASE( witness_withdraw_pay_test )
    account_upgrade_operation uop;
    uop.account_to_upgrade = nathan->get_id();
    uop.upgrade_to_lifetime_member = true;
-   trx.set_expiration(db.head_block_id());
+   trx.set_expiration( db.head_block_time() + fc::seconds( 3 * db.get_global_properties().parameters.block_interval ));
+   trx.set_reference_block( db.head_block_id() );
    trx.operations.push_back(uop);
    for( auto& op : trx.operations ) db.current_fee_schedule().set_fee(op);
    trx.validate();

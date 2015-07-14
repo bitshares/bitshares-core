@@ -90,7 +90,7 @@ void database::clear_expired_transactions()
    const auto& global_parameters = get_global_properties().parameters;
    auto forking_window_time = global_parameters.maximum_undo_history * global_parameters.block_interval;
    while( !dedupe_index.empty()
-          && head_block_time() - dedupe_index.rbegin()->expiration >= fc::seconds(forking_window_time) )
+          && head_block_time() - dedupe_index.rbegin()->trx.expiration >= fc::seconds(forking_window_time) )
       transaction_idx.remove(*dedupe_index.rbegin());
 }
 

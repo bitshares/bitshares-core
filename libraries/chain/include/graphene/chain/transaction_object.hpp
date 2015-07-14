@@ -45,8 +45,9 @@ namespace graphene { namespace chain {
          static const uint8_t type_id  = impl_transaction_object_type;
 
          signed_transaction  trx;
-         time_point_sec      expiration;
          transaction_id_type trx_id;
+
+         time_point_sec get_expiration()const { return trx.expiration; }
    };
 
    struct by_expiration;
@@ -57,11 +58,11 @@ namespace graphene { namespace chain {
       indexed_by<
          hashed_unique< tag<by_id>, member< object, object_id_type, &object::id > >,
          hashed_unique< tag<by_trx_id>, BOOST_MULTI_INDEX_MEMBER(transaction_object, transaction_id_type, trx_id), std::hash<transaction_id_type> >,
-         ordered_non_unique< tag<by_expiration>, BOOST_MULTI_INDEX_MEMBER(transaction_object, time_point_sec, expiration)>
+         ordered_non_unique< tag<by_expiration>, const_mem_fun<transaction_object, time_point_sec, &transaction_object::get_expiration > >
       >
    > transaction_multi_index_type;
 
    typedef generic_index<transaction_object, transaction_multi_index_type> transaction_index;
 } }
 
-FC_REFLECT_DERIVED( graphene::chain::transaction_object, (graphene::db::object), (trx)(expiration) )
+FC_REFLECT_DERIVED( graphene::chain::transaction_object, (graphene::db::object), (trx)(trx_id) )

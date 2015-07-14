@@ -34,20 +34,8 @@ namespace graphene { namespace chain {
     * hours with a 1 second interval.
     *
     * All transactions must expire so that the network does not have to maintain a permanent record of all transactions
-    * ever published. There are two accepted ways to specify the transaction's expiration time. The first is to choose
-    * a reference block, which is generally the most recent block the wallet is aware of when it signs the transaction,
-    * and specify a number of block intervals after the reference block until the transaction expires. The second
-    * expiration mechanism is to explicitly specify a timestamp of expiration.
-    *
-    * Note: The number of block intervals is different than the number of blocks. In effect the maximum period that a
-    * transaction is theoretically valid is 18 hours (1 sec interval) to 3.5 days (5 sec interval) if the reference
-    * block was the most recent block.
-    *
-    * If a transaction is to expire after a number of block intervals from a reference block, the reference block
-    * should be identified in the transaction header using the @ref ref_block_num, @ref ref_block_prefix, and @ref
-    * relative_expiration fields. If the transaction is instead to expire at an absolute timestamp, @ref
-    * ref_block_prefix should be treated as a 32-bit timestamp of the expiration time, and @ref ref_block_num and @ref
-    * relative_expiration must both be set to zero.
+    * ever published.  A transaction may not have an expiration date too far in the future because this would require
+    * keeping too much transaction history in memory.
     *
     * The block prefix is the first 4 bytes of the block hash of the reference block number, which is the second 4
     * bytes of the @ref block_id_type (the first 4 bytes of the block ID are the block number)
@@ -58,7 +46,7 @@ namespace graphene { namespace chain {
     * probably have a longer re-org window to ensure their transaction can still go through in the event of a momentary
     * disruption in service.
     *
-    * @note It is not recommended to set the @ref ref_block_num, @ref ref_block_prefix, and @ref relative_expiration
+    * @note It is not recommended to set the @ref ref_block_num, @ref ref_block_prefix, and @ref expiration
     * fields manually. Call the appropriate overload of @ref set_expiration instead.
     *
     * @{
@@ -80,12 +68,12 @@ namespace graphene { namespace chain {
        * @ref block_id_type
        */
       uint32_t           ref_block_prefix = 0;
+
       /**
-       * This field specifies the number of block intervals after the reference block until this transaction becomes
-       * invalid. If this field is set to zero, the @ref ref_block_prefix is interpreted as an absolute timestamp of
-       * the time the transaction becomes invalid.
+       * This field specifies the absolute expiration for this transaction.
        */
-      uint16_t           relative_expiration = 1;
+      fc::time_point_sec expiration;
+
       vector<operation>  operations;
       extensions_type    extensions;
 
@@ -95,7 +83,7 @@ namespace graphene { namespace chain {
       void                validate() const;
 
       void set_expiration( fc::time_point_sec expiration_time );
-      void set_expiration( const block_id_type& reference_block, unsigned_int lifetime_intervals = 3 );
+      void set_reference_block( const block_id_type& reference_block );
 
       /// visit all operations
       template<typename Visitor>
@@ -182,6 +170,6 @@ namespace graphene { namespace chain {
 
 } }
 
-FC_REFLECT( graphene::chain::transaction, (ref_block_num)(ref_block_prefix)(relative_expiration)(operations)(extensions) )
+FC_REFLECT( graphene::chain::transaction, (ref_block_num)(ref_block_prefix)(expiration)(operations)(extensions) )
 FC_REFLECT_DERIVED( graphene::chain::signed_transaction, (graphene::chain::transaction), (signatures) )
 FC_REFLECT_DERIVED( graphene::chain::processed_transaction, (graphene::chain::signed_transaction), (operation_results) )

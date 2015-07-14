@@ -133,7 +133,7 @@ BOOST_AUTO_TEST_CASE( withdraw_permission_test )
       // withdraw 1
       trx.operations = {op};
       // make it different from previous trx so it's non-duplicate
-      trx.ref_block_prefix++;
+      trx.expiration += fc::seconds(1);
       trx.sign(dan_private_key);
       PUSH_TX( db, trx );
       trx.clear();
@@ -226,9 +226,9 @@ BOOST_AUTO_TEST_CASE( withdraw_permission_nominal_case )
       op.withdraw_to_account = dan_id;
       op.amount_to_withdraw = asset(5);
       trx.operations.push_back(op);
-      // ref_block_prefix is timestamp, so treat it as a rollable nonce
+      // expiration is timestamp, so treat it as a rollable nonce
       // so tx's have different txid's
-      trx.ref_block_prefix++;
+      trx.expiration += fc::seconds(1);
       trx.sign(dan_private_key);
       PUSH_TX( db, trx );
       // tx's involving withdraw_permissions can't delete it even
@@ -297,7 +297,7 @@ BOOST_AUTO_TEST_CASE( withdraw_permission_delete )
    withdraw_permission_delete_operation op;
    op.authorized_account = get_account("dan").id;
    op.withdraw_from_account = get_account("nathan").id;
-   trx.set_expiration(db.head_block_id());
+   trx.set_reference_block(db.head_block_id());  trx.set_expiration( db.head_block_time() + fc::seconds( 3 * db.get_global_properties().parameters.block_interval ) );
    trx.operations.push_back(op);
    trx.sign(generate_private_key("nathan"));
    PUSH_TX( db, trx );
@@ -415,7 +415,7 @@ BOOST_AUTO_TEST_CASE( witness_create )
    // Give nathan some voting stake
    transfer(committee_account, nathan_id, asset(10000000));
    generate_block();
-   trx.set_expiration(db.head_block_id());
+   trx.set_reference_block(db.head_block_id());  trx.set_expiration( db.head_block_time() + fc::seconds( 3 * db.get_global_properties().parameters.block_interval ) );
 
    {
       account_update_operation op;
@@ -627,7 +627,7 @@ BOOST_AUTO_TEST_CASE( worker_pay_test )
       op.vesting_balance = worker_id_type()(db).worker.get<vesting_balance_worker_type>().balance;
       op.amount = asset(500);
       op.owner = nathan_id;
-      trx.set_expiration(db.head_block_id());
+      trx.set_reference_block(db.head_block_id());  trx.set_expiration( db.head_block_time() + fc::seconds( 3 * db.get_global_properties().parameters.block_interval ) );
       trx.operations.push_back(op);
       trx.sign( nathan_private_key);
       PUSH_TX( db, trx );
@@ -657,11 +657,11 @@ BOOST_AUTO_TEST_CASE( worker_pay_test )
       op.vesting_balance = worker_id_type()(db).worker.get<vesting_balance_worker_type>().balance;
       op.amount = asset(500);
       op.owner = nathan_id;
-      trx.set_expiration(db.head_block_id());
+      trx.set_reference_block(db.head_block_id());  trx.set_expiration( db.head_block_time() + fc::seconds( 3 * db.get_global_properties().parameters.block_interval ) );
       trx.operations.push_back(op);
       REQUIRE_THROW_WITH_VALUE(op, amount, asset(500));
       generate_blocks(db.head_block_time() + fc::hours(12));
-      trx.set_expiration(db.head_block_id());
+      trx.set_reference_block(db.head_block_id());  trx.set_expiration( db.head_block_time() + fc::seconds( 3 * db.get_global_properties().parameters.block_interval ) );
       REQUIRE_THROW_WITH_VALUE(op, amount, asset(501));
       trx.operations.back() = op;
       trx.sign( nathan_private_key);
@@ -680,7 +680,7 @@ BOOST_AUTO_TEST_CASE( refund_worker_test )
    upgrade_to_lifetime_member(nathan_id);
    generate_block();
    generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
-   trx.set_expiration(db.head_block_id());
+   trx.set_reference_block(db.head_block_id());  trx.set_expiration( db.head_block_time() + fc::seconds( 3 * db.get_global_properties().parameters.block_interval ) );
 
    {
       worker_create_operation op;
@@ -753,7 +753,7 @@ BOOST_AUTO_TEST_CASE( burn_worker_test )
    upgrade_to_lifetime_member(nathan_id);
    generate_block();
    generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
-   trx.set_expiration(db.head_block_id());
+   trx.set_reference_block(db.head_block_id());  trx.set_expiration( db.head_block_time() + fc::seconds( 3 * db.get_global_properties().parameters.block_interval ) );
 
    {
       worker_create_operation op;
@@ -933,7 +933,7 @@ BOOST_AUTO_TEST_CASE( unimp_force_settlement_unavailable )
       op.new_options = bit_usd(db).options;
       op.new_options.flags |= disable_force_settle;
       trx.operations.push_back(op);
-      trx.set_expiration(db.head_block_id());
+      trx.set_reference_block(db.head_block_id());  trx.set_expiration( db.head_block_time() + fc::seconds( 3 * db.get_global_properties().parameters.block_interval ) );
       trx.sign(key_id_type(), private_key);
       PUSH_TX( db, trx );
       //Check that force settlements were all canceled
@@ -1027,7 +1027,7 @@ BOOST_AUTO_TEST_CASE( balance_object_test )
 
    auto slot = db.get_slot_at_time(starting_time);
    db.generate_block(starting_time, db.get_scheduled_witness(slot).first, init_account_priv_key, database::skip_nothing);
-   trx.set_expiration(db.head_block_id());
+   trx.set_reference_block(db.head_block_id());  trx.set_expiration( db.head_block_time() + fc::seconds( 3 * db.get_global_properties().parameters.block_interval ) );
 
    const balance_object& vesting_balance_1 = balance_id_type(2)(db);
    const balance_object& vesting_balance_2 = balance_id_type(3)(db);
@@ -1080,7 +1080,7 @@ BOOST_AUTO_TEST_CASE( balance_object_test )
    db.generate_block(db.get_slot_time(1), db.get_scheduled_witness(1).first, init_account_priv_key, database::skip_nothing);
    slot = db.get_slot_at_time(vesting_balance_1.vesting_policy->begin_timestamp + 60);
    db.generate_block(db.get_slot_time(slot), db.get_scheduled_witness(slot).first, init_account_priv_key, database::skip_nothing);
-   trx.set_expiration(db.head_block_id());
+   trx.set_reference_block(db.head_block_id());  trx.set_expiration( db.head_block_time() + fc::seconds( 3 * db.get_global_properties().parameters.block_interval ) );
 
    op.balance_to_claim = vesting_balance_1.id;
    op.total_claimed.amount = 500;
@@ -1106,7 +1106,7 @@ BOOST_AUTO_TEST_CASE( balance_object_test )
    db.generate_block(db.get_slot_time(1), db.get_scheduled_witness(1).first, init_account_priv_key, database::skip_nothing);
    slot = db.get_slot_at_time(db.head_block_time() + fc::days(1));
    db.generate_block(db.get_slot_time(slot), db.get_scheduled_witness(slot).first, init_account_priv_key, database::skip_nothing);
-   trx.set_expiration(db.head_block_id());
+   trx.set_reference_block(db.head_block_id());  trx.set_expiration( db.head_block_time() + fc::seconds( 3 * db.get_global_properties().parameters.block_interval ) );
 
    op.total_claimed = vesting_balance_2.balance;
    trx.operations = {op};

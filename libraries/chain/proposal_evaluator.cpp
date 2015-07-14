@@ -75,6 +75,7 @@ object_id_type proposal_create_evaluator::do_apply(const proposal_create_operati
    database& d = db();
 
    const proposal_object& proposal = d.create<proposal_object>([&](proposal_object& proposal) {
+      _proposed_trx.expiration = o.expiration_time;
       proposal.proposed_transaction = _proposed_trx;
       proposal.expiration_time = o.expiration_time;
       if( o.review_period_seconds )

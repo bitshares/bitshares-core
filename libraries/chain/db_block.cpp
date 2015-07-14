@@ -471,8 +471,7 @@ processed_transaction database::_apply_transaction(const signed_transaction& trx
    const chain_parameters& chain_parameters = get_global_properties().parameters;
    eval_state._trx = &trx;
 
-   //This check is used only if this transaction has an absolute expiration time.
-   if( !(skip & skip_transaction_signatures) && trx.relative_expiration == 0 )
+   if( !(skip & skip_transaction_signatures) )
    {
       eval_state._sigs.reserve(trx.signatures.size());
 
@@ -484,105 +483,27 @@ processed_transaction database::_apply_transaction(const signed_transaction& trx
       }
    }
 
-   //If we're skipping tapos check, but not dupe check, assume all transactions have maximum expiration time.
-   fc::time_point_sec trx_expiration = _pending_block.timestamp + chain_parameters.maximum_time_until_expiration;
-
    //Skip all manner of expiration and TaPoS checking if we're on block 1; It's impossible that the transaction is
    //expired, and TaPoS makes no sense as no blocks exist.
    if( BOOST_LIKELY(head_block_num() > 0) )
    {
-      if( !(skip & skip_tapos_check) && trx.relative_expiration != 0 )
+      if( !(skip & skip_tapos_check) )
       {
-         //Check the TaPoS reference and expiration time
-         //Remember that the TaPoS block number is abbreviated; it contains only the lower 16 bits.
-         //Lookup TaPoS block summary by block number (remember block summary instances are the block numbers)
-
-         // Let N = head_block_num(), a = N & 0xFFFF, and r = trx.ref_block_num
-         //
-         // We want to solve for the largest block height x such that
-         // these two conditions hold:
-         //
-         // (a) 0x10000 divides x-r
-         // (b) x <= N
-         //
-         // Let us define:
-         //
-         // x1 = N-a+r
-         // x0 = x1-2^16
-         // x2 = x1+2^16
-         //
-         // It is clear that x0, x1, x2 are consecutive solutions to (a).
-         //
-         // Since r < 2^16 and a < 2^16, it follows that
-         // -2^16 < r-a < 2^16.  From this we know that x0 < N and x2 > N.
-         //
-         // Case (1): x1 <= N.  In this case, x1 must be the greatest
-         // integer that satisfies (a) and (b); for x2, the next
-         // largest integer that satisfies (a), does not satisfy (b).
-         //
-         // Case (2): x1 > N.  In this case, x0 must be the greatest
-         // integer that satisfies (a) and (b); for x1, the next
-         // largest integer that satisfies (a), does not satisfy (b).
-         //
-         /**
-         int64_t N = head_block_num();
-         int64_t a = N & 0xFFFF;
-         int64_t r = trx.ref_block_num;
-
-         int64_t x1 = N-a+r;
-         int64_t x0 = x1 - 0x10000;
-         int64_t x2 = x1 + 0x10000;
-
-         assert( x0 < N );
-         assert( x1 >= 0 );
-         assert( x2 > N );
-
-         uint32_t ref_block_height;
-         if( x1 <= N )
-         {
-            FC_ASSERT( x1 > 0 );
-            ref_block_height = uint32_t( x1 );
-         }
-         else
-         {
-            ref_block_height = uint32_t( x0 );
-         }
-         */
-
          const auto& tapos_block_summary = block_summary_id_type( trx.ref_block_num )(*this);
-
-         //This is the signature check for transactions with relative expiration.
-         if( !(skip & skip_transaction_signatures) )
-         {
-            eval_state._sigs.reserve(trx.signatures.size());
-
-            for( const auto& sig : trx.signatures )
-            {
-               FC_ASSERT(eval_state._sigs.insert(std::make_pair(
-                                                    public_key_type( fc::ecc::public_key(sig, trx.digest())),
-                                                    false)).second,
-                         "Multiple signatures by same key detected");
-            }
-         }
 
          //Verify TaPoS block summary has correct ID prefix, and that this block's time is not past the expiration
          FC_ASSERT( trx.ref_block_prefix == tapos_block_summary.block_id._hash[1] );
-         trx_expiration = tapos_block_summary.timestamp + chain_parameters.block_interval*trx.relative_expiration;
-      } else if( trx.relative_expiration == 0 ) {
-         trx_expiration = fc::time_point_sec() + fc::seconds(trx.ref_block_prefix);
-         FC_ASSERT( trx_expiration <= _pending_block.timestamp + chain_parameters.maximum_time_until_expiration, "",
-                    ("trx_expiration",trx_expiration)("_pending_block.timestamp",_pending_block.timestamp)("max_til_exp",chain_parameters.maximum_time_until_expiration));
-      }
-      FC_ASSERT( _pending_block.timestamp <= trx_expiration, "", ("pending.timestamp",_pending_block.timestamp)("trx_exp",trx_expiration) );
-   } else if( !(skip & skip_transaction_signatures) ) {
-      FC_ASSERT(trx.relative_expiration == 0, "May not use transactions with a reference block in block 1!");
-   }
+      } 
+      
+      FC_ASSERT( trx.expiration <= _pending_block.timestamp + chain_parameters.maximum_time_until_expiration, "",
+                 ("trx.expiration",trx.expiration)("_pending_block.timestamp",_pending_block.timestamp)("max_til_exp",chain_parameters.maximum_time_until_expiration));
+      FC_ASSERT( _pending_block.timestamp <= trx.expiration, "", ("pending.timestamp",_pending_block.timestamp)("trx.exp",trx.expiration) );
+   } 
 
    //Insert transaction into unique transactions database.
    if( !(skip & skip_transaction_dupe_check) )
    {
       create<transaction_object>([&](transaction_object& transaction) {
-         transaction.expiration = trx_expiration;
          transaction.trx_id = trx_id;
          transaction.trx = trx;
       });

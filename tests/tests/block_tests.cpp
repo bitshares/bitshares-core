@@ -288,6 +288,7 @@ BOOST_AUTO_TEST_CASE( undo_pending )
          {
             signed_transaction trx;
             trx.set_expiration(db.head_block_time() + fc::minutes(1));
+
             trx.operations.push_back(t);
             PUSH_TX( db, trx, ~0 );
 
@@ -465,7 +466,8 @@ BOOST_AUTO_TEST_CASE( tapos )
 
       signed_transaction trx;
       //This transaction must be in the next block after its reference, or it is invalid.
-      trx.set_expiration(db1.head_block_id(), 1);
+      trx.set_expiration( db1.head_block_time() + fc::seconds( 1 * db1.get_global_properties().parameters.block_interval ));
+      trx.set_reference_block( db1.head_block_id() );
 
       account_id_type nathan_id = account_idx.get_next_id();
       account_create_operation cop;
@@ -486,7 +488,8 @@ BOOST_AUTO_TEST_CASE( tapos )
       trx.sign(init_account_priv_key);
       //relative_expiration is 1, but ref block is 2 blocks old, so this should fail.
       GRAPHENE_REQUIRE_THROW(PUSH_TX( db1, trx, database::skip_transaction_signatures | database::skip_authority_check ), fc::exception);
-      trx.set_expiration(db1.head_block_id(), 2);
+      trx.set_expiration( db1.head_block_time() + fc::seconds( 2 * db1.get_global_properties().parameters.block_interval ));
+      trx.set_reference_block( db1.head_block_id() );
       trx.signatures.clear();
       trx.sign(init_account_priv_key);
       db1.push_transaction(trx, database::skip_transaction_signatures | database::skip_authority_check);

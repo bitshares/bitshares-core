@@ -37,9 +37,6 @@ digest_type transaction::digest()const
 }
 void transaction::validate() const
 {
-   if( relative_expiration == 0 )
-      FC_ASSERT( ref_block_num == 0 && ref_block_prefix > 0 );
-
    for( const auto& op : operations )
       operation_validate(op); 
 }
@@ -66,16 +63,14 @@ signature_type graphene::chain::signed_transaction::sign(const private_key_type&
 
 void transaction::set_expiration( fc::time_point_sec expiration_time )
 {
-    ref_block_num = 0;
-    relative_expiration = 0;
-    ref_block_prefix = expiration_time.sec_since_epoch();
+    expiration = expiration_time;
 }
 
-void transaction::set_expiration( const block_id_type& reference_block, unsigned_int lifetime_intervals )
+void transaction::set_reference_block( const block_id_type& reference_block )
 {
    ref_block_num = fc::endian_reverse_u32(reference_block._hash[0]);
+   if( ref_block_num == 0 ) ref_block_prefix = 0;
    ref_block_prefix = reference_block._hash[1];
-   relative_expiration = lifetime_intervals;
 }
 
 void transaction::get_required_authorities( flat_set<account_id_type>& active, flat_set<account_id_type>& owner, vector<authority>& other )const

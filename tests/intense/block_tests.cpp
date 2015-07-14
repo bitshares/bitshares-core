@@ -424,13 +424,16 @@ BOOST_FIXTURE_TEST_CASE( tapos_rollover, database_fixture )
       xfer_op.amount = asset(1000);
 
       xfer_tx.operations.push_back( xfer_op );
-      xfer_tx.set_expiration( db.head_block_id(), 0x1000 );
+      xfer_tx.set_expiration( db.head_block_time() + fc::seconds( 0x1000 * db.get_global_properties().parameters.block_interval ) );
+      xfer_tx.set_reference_block( db.head_block_id() );
+
       sign( xfer_tx, alice_private_key );
       PUSH_TX( db, xfer_tx, 0 );
       generate_block();
 
       BOOST_TEST_MESSAGE( "Sign new tx's" );
-      xfer_tx.set_expiration( db.head_block_id(), 0x1000 );
+      xfer_tx.set_expiration( db.head_block_time() + fc::seconds( 0x1000 * db.get_global_properties().parameters.block_interval ) );
+      xfer_tx.set_reference_block( db.head_block_id() );
       xfer_tx.signatures.clear();
       sign( xfer_tx, alice_private_key );
 
