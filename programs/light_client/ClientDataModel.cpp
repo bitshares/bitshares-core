@@ -49,7 +49,7 @@ Account* ChainDataModel::getAccount(qint64 id)
                  );
               }
            });
-         } 
+         }
          catch ( const fc::exception& e )
          {
             Q_EMIT exceptionThrown( QString::fromStdString(e.to_string()) );
@@ -94,12 +94,12 @@ Account* ChainDataModel::getAccount(QString name)
               {
                  by_name_idx.modify( itr,
                     [=]( Account* a ){
-                       a->setProperty("id", result.front()->id.instance() );
+                       a->setProperty("id", qint64(result.front()->id.instance()));
                     }
                  );
               }
            });
-         } 
+         }
          catch ( const fc::exception& e )
          {
             Q_EMIT exceptionThrown( QString::fromStdString(e.to_string()) );
