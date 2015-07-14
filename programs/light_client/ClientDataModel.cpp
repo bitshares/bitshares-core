@@ -156,6 +156,7 @@ void GrapheneApplication::start( QString apiurl, QString user, QString pass )
       m_client = std::make_shared<fc::http::websocket_client>();
       ilog( "connecting...${s}", ("s",apiurl.toStdString()) );
       auto con  = m_client->connect( apiurl.toStdString() );
+      m_connectionClosed = con->closed.connect([this]{queueExecute([this]{setIsConnected(false);});});
       auto apic = std::make_shared<fc::rpc::websocket_api_connection>(*con);
       auto remote_api = apic->get_remote_api< login_api >(1);
       auto db_api = apic->get_remote_api< database_api >(0);

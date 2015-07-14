@@ -129,6 +129,8 @@ class GrapheneApplication : public QObject {
    ChainDataModel*             m_model       = nullptr;
    bool                        m_isConnected = false;
 
+   boost::signals2::scoped_connection m_connectionClosed;
+
    std::shared_ptr<fc::http::websocket_client>  m_client;
    fc::future<void>                        m_done;
 

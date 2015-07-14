@@ -14,10 +14,6 @@ ApplicationWindow {
    height: 480
    title: qsTr("Hello World")
 
-   Component.onCompleted: {
-      app.start("ws://localhost:8090", "user", "pass")
-   }
-
    menuBar: MenuBar {
       Menu {
          title: qsTr("File")
@@ -32,9 +28,22 @@ ApplicationWindow {
          }
       }
    }
+   statusBar: StatusBar {
+      Label {
+         anchors.right: parent.right
+         text: app.isConnected? qsTr("Connected") : qsTr("Disconnected")
+      }
+   }
 
    GrapheneApplication {
       id: app
+  }
+   Timer {
+      running: !app.isConnected
+      interval: 5000
+      repeat: true
+      onTriggered: app.start("ws://localhost:8090", "user", "pass")
+      triggeredOnStart: true
    }
    Settings {
       id: appSettings
@@ -47,6 +56,8 @@ ApplicationWindow {
 
    Column {
       anchors.centerIn: parent
+      enabled: app.isConnected
+
       Button {
          text: "Transfer"
          onClicked: formBox.showForm(Qt.createComponent("TransferForm.qml"), {},
