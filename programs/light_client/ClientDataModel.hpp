@@ -11,24 +11,36 @@
 #include <fc/thread/thread.hpp>
 #include <graphene/app/api.hpp>
 
+#include <QtQml>
 #include <QObject>
 #include <QQmlListProperty>
 
 using boost::multi_index_container;
 using namespace boost::multi_index;
 
+using ObjectId = qint64;
+
 Q_DECLARE_METATYPE(std::function<void()>)
 
+class Crypto {
+   Q_GADGET
+
+public:
+   Q_INVOKABLE QString sha256(QByteArray data) {
+      return QCryptographicHash::hash(data, QCryptographicHash::Sha256).toHex();
+   }
+};
+QML_DECLARE_TYPE(Crypto)
 
 class Asset : public QObject {
    Q_OBJECT
 
    Q_PROPERTY(QString symbol MEMBER symbol)
-   Q_PROPERTY(qint64 id MEMBER id)
+   Q_PROPERTY(ObjectId id MEMBER id)
    Q_PROPERTY(quint8 precision MEMBER precision)
 
    QString symbol;
-   qint64 id;
+   ObjectId id;
    quint8 precision;
 };
 
@@ -37,33 +49,30 @@ class Balance : public QObject {
 
    Q_PROPERTY(Asset* type MEMBER type)
    Q_PROPERTY(qint64 amount MEMBER amount)
-   Q_PROPERTY(qint64 id MEMBER id)
+   Q_PROPERTY(ObjectId id MEMBER id)
 
    Asset* type;
    qint64 amount;
-   qint64 id;
+   ObjectId id;
 };
 
 class Account : public QObject {
    Q_OBJECT
 
    Q_PROPERTY(QString name MEMBER name NOTIFY nameChanged)
-   Q_PROPERTY(qint64 id MEMBER id NOTIFY idChanged)
+   Q_PROPERTY(ObjectId id MEMBER id NOTIFY idChanged)
    Q_PROPERTY(QQmlListProperty<Balance> balances READ balances)
 
    QList<Balance*> m_balances;
 
 public:
- //  Account(QObject* parent = nullptr)
- //     : QObject(parent){}
-
    const QString& getName()const { return name; }
-   qint64        getId()const   { return id;   }
+   ObjectId        getId()const   { return id;   }
 
    QQmlListProperty<Balance> balances();
 
    QString name;
-   qint64 id;
+   ObjectId id;
 
 signals:
    void nameChanged();
@@ -75,22 +84,19 @@ struct by_account_name;
 /**
  * @ingroup object_index
  */
-typedef multi_index_container<
+using account_multi_index_type = multi_index_container<
    Account*,
    indexed_by<
-      hashed_unique< tag<by_id>,  const_mem_fun<Account, qint64, &Account::getId > >,
+      hashed_unique< tag<by_id>,  const_mem_fun<Account, ObjectId, &Account::getId > >,
       ordered_unique< tag<by_account_name>, const_mem_fun<Account, const QString&, &Account::getName> >
    >
-> account_multi_index_type;
-
-
-
+>;
 
 class ChainDataModel : public QObject {
    Q_OBJECT
 
 public:
-   Q_INVOKABLE Account* getAccount(qint64 id);
+   Q_INVOKABLE Account* getAccount(ObjectId id);
    Q_INVOKABLE Account* getAccount(QString name);
 
    ChainDataModel(){}
@@ -107,13 +113,9 @@ private:
    std::string                           m_api_url;
    fc::api<graphene::app::database_api>  m_db_api;
 
-   qint64                                m_account_query_num = -1;
+   ObjectId                                m_account_query_num = -1;
    account_multi_index_type              m_accounts;
 };
-
-
-
-
 
 class GrapheneApplication : public QObject {
    Q_OBJECT

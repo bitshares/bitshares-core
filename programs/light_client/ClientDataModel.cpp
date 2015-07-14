@@ -10,7 +10,7 @@ using namespace graphene::app;
 ChainDataModel::ChainDataModel( fc::thread& t, QObject* parent )
 :QObject(parent),m_thread(&t){}
 
-Account* ChainDataModel::getAccount(qint64 id)
+Account* ChainDataModel::getAccount(ObjectId id)
 {
    auto& by_id_idx = m_accounts.get<::by_id>();
    auto itr = by_id_idx.find(id);
@@ -94,7 +94,7 @@ Account* ChainDataModel::getAccount(QString name)
               {
                  by_name_idx.modify( itr,
                     [=]( Account* a ){
-                       a->setProperty("id", qint64(result.front()->id.instance()));
+                       a->setProperty("id", ObjectId(result.front()->id.instance()));
                     }
                  );
               }

@@ -28,6 +28,7 @@ ApplicationWindow {
          MenuItem {
             text: qsTr("Exit")
             onTriggered: Qt.quit();
+            shortcut: "Ctrl+Q"
          }
       }
    }
@@ -112,7 +113,7 @@ ApplicationWindow {
             }
          }
       }
-      
+
 
    }
 
