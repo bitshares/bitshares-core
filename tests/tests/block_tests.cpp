@@ -303,6 +303,7 @@ BOOST_AUTO_TEST_CASE( undo_pending )
          cop.registrar = GRAPHENE_TEMP_ACCOUNT;
          cop.name = "nathan";
          cop.owner = authority(1, init_account_pub_key, 1);
+         cop.active = cop.owner;
          trx.operations.push_back(cop);
          //trx.sign( init_account_priv_key );
          PUSH_TX( db, trx );
@@ -357,6 +358,7 @@ BOOST_AUTO_TEST_CASE( switch_forks_undo_create )
       cop.registrar = GRAPHENE_TEMP_ACCOUNT;
       cop.name = "nathan";
       cop.owner = authority(1, init_account_pub_key, 1);
+      cop.active = cop.owner;
       trx.operations.push_back(cop);
       PUSH_TX( db1, trx );
 
@@ -415,6 +417,7 @@ BOOST_AUTO_TEST_CASE( duplicate_transactions )
       account_create_operation cop;
       cop.name = "nathan";
       cop.owner = authority(1, init_account_pub_key, 1);
+      cop.active = cop.owner;
       trx.operations.push_back(cop);
       trx.sign( init_account_priv_key );
       PUSH_TX( db1, trx, skip_sigs );
@@ -474,6 +477,7 @@ BOOST_AUTO_TEST_CASE( tapos )
       cop.registrar = init1.id;
       cop.name = "nathan";
       cop.owner = authority(1, init_account_pub_key, 1);
+      cop.active = cop.owner;
       trx.operations.push_back(cop);
       trx.sign(init_account_priv_key);
       db1.push_transaction(trx);

@@ -139,8 +139,7 @@ void account_create_operation::validate()const
    FC_ASSERT( referrer_percent <= GRAPHENE_100_PERCENT );
    FC_ASSERT( owner.num_auths() != 0 );
    FC_ASSERT( owner.address_auths.size() == 0 );
-   // TODO: this asset causes many tests to fail, those tests should probably be updated
-   //FC_ASSERT( active.num_auths() != 0 );
+   FC_ASSERT( active.num_auths() != 0 );
    FC_ASSERT( active.address_auths.size() == 0 );
    options.validate();
 }
