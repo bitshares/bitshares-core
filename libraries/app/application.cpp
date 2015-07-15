@@ -30,6 +30,7 @@
 
 #include <fc/rpc/api_connection.hpp>
 #include <fc/rpc/websocket_api.hpp>
+#include <fc/network/resolve.hpp>
 
 #include <boost/filesystem/path.hpp>
 #include <boost/signals2.hpp>
@@ -101,12 +102,15 @@ namespace detail {
          if( _options->count("seed-node") )
          {
             auto seeds = _options->at("seed-node").as<vector<string>>();
-            for( const string& ep : seeds )
+            for( const string& endpoint_string : seeds )
             {
-               fc::ip::endpoint node = fc::ip::endpoint::from_string(ep);
-               ilog("Adding seed node ${ip}", ("ip", node));
-               _p2p_network->add_node(node);
-               _p2p_network->connect_to_endpoint(node);
+               std::vector<fc::ip::endpoint> endpoints = resolve_string_to_ip_endpoints(endpoint_string);
+               for (const fc::ip::endpoint& endpoint : endpoints)
+               {
+                  ilog("Adding seed node ${endpoint}", ("endpoint", endpoint));
+                  _p2p_network->add_node(endpoint);
+                  _p2p_network->connect_to_endpoint(endpoint);
+               }
             }
          }
 
@@ -122,6 +126,33 @@ namespace detail {
                                               _chain_db->head_block_id()),
                                  std::vector<uint32_t>());
       } FC_CAPTURE_AND_RETHROW() }
+
+      std::vector<fc::ip::endpoint> resolve_string_to_ip_endpoints(const std::string& endpoint_string)
+      {
+         try
+         {
+            string::size_type colon_pos = endpoint_string.find(':');
+            if (colon_pos == std::string::npos)
+               FC_THROW("Missing required port number in endpoint string \"${endpoint_string}\"", 
+                        ("endpoint_string", endpoint_string));
+            std::string port_string = endpoint_string.substr(colon_pos + 1);
+            try
+            {
+               uint16_t port = boost::lexical_cast<uint16_t>(port_string);
+
+               std::string hostname = endpoint_string.substr(0, colon_pos);
+               std::vector<fc::ip::endpoint> endpoints = fc::resolve(hostname, port);
+               if (endpoints.empty())
+                  FC_THROW_EXCEPTION(fc::unknown_host_exception, "The host name can not be resolved: ${hostname}", ("hostname", hostname));
+               return endpoints;
+            }
+            catch (const boost::bad_lexical_cast&)
+            {
+               FC_THROW("Bad port: ${port}", ("port", port_string));
+            }
+         }
+         FC_CAPTURE_AND_RETHROW((endpoint_string))
+      }
 
       void reset_websocket_server()
       { try {
@@ -395,9 +426,9 @@ namespace detail {
       { try {
          std::vector<item_hash_t> result;
          result.reserve(30);
-         auto head_block_num = _chain_db->head_block_num();
+         uint32_t head_block_num = _chain_db->head_block_num();
          result.push_back(_chain_db->head_block_id());
-         auto current = 1;
+         uint32_t current = 1;
          while( current < head_block_num )
          {
             result.push_back(_chain_db->get_block_id_for_num(head_block_num - current));
