@@ -35,7 +35,7 @@ namespace graphene { namespace chain {
          public_key_type  signing_key;
          secret_hash_type next_secret_hash;
          secret_hash_type previous_secret;
-         share_type       accumulated_income;
+         optional< vesting_balance_id_type > pay_vb;
          vote_id_type     vote_id;
          string           url;
 
@@ -62,6 +62,6 @@ FC_REFLECT_DERIVED( graphene::chain::witness_object, (graphene::db::object),
                     (signing_key)
                     (next_secret_hash)
                     (previous_secret)
-                    (accumulated_income)
+                    (pay_vb)
                     (vote_id)
                     (url) )
