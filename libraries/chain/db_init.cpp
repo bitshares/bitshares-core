@@ -142,7 +142,6 @@ void database::initialize_evaluators()
    register_evaluator<proposal_update_evaluator>();
    register_evaluator<proposal_delete_evaluator>();
    register_evaluator<witness_create_evaluator>();
-   register_evaluator<witness_withdraw_pay_evaluator>();
    register_evaluator<vesting_balance_create_evaluator>();
    register_evaluator<vesting_balance_withdraw_evaluator>();
    register_evaluator<withdraw_permission_create_evaluator>();

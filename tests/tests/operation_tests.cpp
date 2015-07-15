@@ -1100,7 +1100,7 @@ BOOST_AUTO_TEST_CASE( fill_order )
    //o.calculate_fee(db.current_fee_schedule());
 } FC_LOG_AND_RETHROW() }
 
-BOOST_AUTO_TEST_CASE( witness_withdraw_pay_test )
+BOOST_AUTO_TEST_CASE( witness_pay_test )
 { try {
    // there is an immediate maintenance interval in the first block
    //   which will initialize last_budget_time
@@ -1112,9 +1112,17 @@ BOOST_AUTO_TEST_CASE( witness_withdraw_pay_test )
    transfer(account_id_type()(db), get_account("init3"), asset(20*CORE));
    generate_block();
 
+   auto last_witness_vbo_balance = [&]() -> share_type
+   {
+      const witness_object& wit = db.fetch_block_by_number(db.head_block_num())->witness(db);
+      if( !wit.pay_vb.valid() )
+         return 0;
+      return (*wit.pay_vb)(db).balance.amount;
+   };
+
    const asset_object* core = &asset_id_type()(db);
    const account_object* nathan = &get_account("nathan");
-   enable_fees();//105000000);
+   enable_fees();
    BOOST_CHECK_GT(db.current_fee_schedule().get<account_upgrade_operation>().membership_lifetime_fee, 0);
    // Based on the size of the reserve fund later in the test, the witness budget will be set to this value
    const uint64_t ref_budget =
@@ -1156,9 +1164,7 @@ BOOST_AUTO_TEST_CASE( witness_withdraw_pay_test )
    generate_block();
    nathan = &get_account("nathan");
    core = &asset_id_type()(db);
-   const witness_object* witness = &db.fetch_block_by_number(db.head_block_num())->witness(db);
-
-   BOOST_CHECK_EQUAL(witness->accumulated_income.value, 0);
+   BOOST_CHECK_EQUAL( last_witness_vbo_balance().value, 0 );
 
    auto schedule_maint = [&]()
    {
@@ -1174,8 +1180,7 @@ BOOST_AUTO_TEST_CASE( witness_withdraw_pay_test )
    while( db.head_block_num() < 30 )
    {
       generate_block();
-      witness = &db.fetch_block_by_number(db.head_block_num())->witness(db);
-      BOOST_CHECK_EQUAL( witness->accumulated_income.value, 0 );
+      BOOST_CHECK_EQUAL( last_witness_vbo_balance().value, 0 );
    }
    BOOST_CHECK_EQUAL( db.head_block_num(), 30 );
    // maintenance will be in block 31.  time of block 31 - time of block 1 = 30 * 5 seconds.
@@ -1186,51 +1191,27 @@ BOOST_AUTO_TEST_CASE( witness_withdraw_pay_test )
    generate_block();
    BOOST_CHECK_EQUAL( core->reserved(db).value, 999999406 );
    BOOST_CHECK_EQUAL( db.get_dynamic_global_properties().witness_budget.value, ref_budget );
-   witness = &db.fetch_block_by_number(db.head_block_num())->witness(db);
    // first witness paid from old budget (so no pay)
-   BOOST_CHECK_EQUAL( witness->accumulated_income.value, 0 );
+   BOOST_CHECK_EQUAL( last_witness_vbo_balance().value, 0 );
    // second witness finally gets paid!
    generate_block();
-   witness = &db.fetch_block_by_number(db.head_block_num())->witness(db);
-   const witness_object* paid_witness = witness;
-   BOOST_CHECK_EQUAL( witness->accumulated_income.value, witness_ppb );
+   BOOST_CHECK_EQUAL( last_witness_vbo_balance().value, witness_ppb );
    BOOST_CHECK_EQUAL( db.get_dynamic_global_properties().witness_budget.value, ref_budget - witness_ppb );
 
    generate_block();
-   witness = &db.fetch_block_by_number(db.head_block_num())->witness(db);
-   BOOST_CHECK_EQUAL( witness->accumulated_income.value, witness_ppb );
+   BOOST_CHECK_EQUAL( last_witness_vbo_balance().value, witness_ppb );
    BOOST_CHECK_EQUAL( db.get_dynamic_global_properties().witness_budget.value, ref_budget - 2 * witness_ppb );
 
    generate_block();
-   witness = &db.fetch_block_by_number(db.head_block_num())->witness(db);
-   BOOST_CHECK_LT( witness->accumulated_income.value, witness_ppb );
-   BOOST_CHECK_EQUAL( witness->accumulated_income.value, ref_budget - 2 * witness_ppb );
+   BOOST_CHECK_LT( last_witness_vbo_balance().value, witness_ppb );
+   BOOST_CHECK_EQUAL( last_witness_vbo_balance().value, ref_budget - 2 * witness_ppb );
    BOOST_CHECK_EQUAL( db.get_dynamic_global_properties().witness_budget.value, 0 );
 
    generate_block();
-   witness = &db.fetch_block_by_number(db.head_block_num())->witness(db);
-   BOOST_CHECK_EQUAL( witness->accumulated_income.value, 0 );
+   BOOST_CHECK_EQUAL( last_witness_vbo_balance().value, 0 );
    BOOST_CHECK_EQUAL( db.get_dynamic_global_properties().witness_budget.value, 0 );
-
-   trx.set_expiration(db.head_block_time() + GRAPHENE_DEFAULT_MAX_TIME_UNTIL_EXPIRATION);
-   // Withdraw the witness's pay
-   enable_fees();//1);
-   witness = paid_witness;
-   witness_withdraw_pay_operation wop;
-   wop.from_witness = witness->id;
-   wop.to_account = witness->witness_account;
-   wop.amount = witness->accumulated_income;
-   trx.operations.push_back(wop);
-   REQUIRE_THROW_WITH_VALUE(wop, amount, witness->accumulated_income.value * 2);
-   trx.operations.back() = wop;
-   for( auto& op : trx.operations ) db.current_fee_schedule().set_fee(op);
-   trx.validate();
-   db.push_transaction(trx, database::skip_authority_check);
-   trx.clear();
-
-   BOOST_CHECK_EQUAL(get_balance(witness->witness_account(db), *core), witness_ppb );
    BOOST_CHECK_EQUAL(core->reserved(db).value, 999999406 );
-   BOOST_CHECK_EQUAL(witness->accumulated_income.value, 0);
+
 } FC_LOG_AND_RETHROW() }
 
 /**
@@ -1410,6 +1391,7 @@ BOOST_AUTO_TEST_CASE( vesting_balance_withdraw_test )
       create_op.amount = amount;
       create_op.policy = cdd_vesting_policy_initializer(vesting_seconds);
       tx.operations.push_back( create_op );
+      tx.set_expiration( db.head_block_time() + fc::minutes(5) );
 
       processed_transaction ptx = PUSH_TX( db,  tx, ~0  );
       const vesting_balance_object& vbo = vesting_balance_id_type(

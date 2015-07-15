@@ -327,8 +327,30 @@ namespace graphene { namespace chain {
           */
          void adjust_core_in_orders( const account_object& acnt, asset delta );
 
+         /**
+          * @brief Helper to make lazy deposit to CDD VBO.
+          *
+          * If the given optional VBID is not valid(),
+          * or it does not have a CDD vesting policy,
+          * or the owner / vesting_seconds of the policy
+          * does not match the parameter, then credit amount
+          * to newly created VBID and return it.
+          *
+          * Otherwise, credit amount to ovbid.
+          * 
+          * @return ID of newly created VBO, but only if VBO was created.
+          */
+         optional< vesting_balance_id_type > deposit_lazy_vesting(
+            const optional< vesting_balance_id_type >& ovbid,
+            share_type amount,
+            uint32_t req_vesting_seconds,
+            account_id_type req_owner,
+            bool require_vesting );
+
          // helper to handle cashback rewards
          void deposit_cashback(const account_object& acct, share_type amount, bool require_vesting = true);
+         // helper to handle witness pay
+         void deposit_witness_pay(const witness_object& wit, share_type amount);
 
          //////////////////// db_debug.cpp ////////////////////
 

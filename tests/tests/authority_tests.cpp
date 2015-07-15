@@ -909,6 +909,7 @@ BOOST_FIXTURE_TEST_CASE( max_authority_membership, database_fixture )
          private_key_type privkey = generate_private_key( seed );
          private_keys.push_back( privkey );
       }
+      tx.set_expiration( db.head_block_time() + fc::minutes(5) );
       ptx = PUSH_TX( db, tx, ~0 );
 
       vector<public_key_type> key_ids;
@@ -946,6 +947,7 @@ BOOST_FIXTURE_TEST_CASE( max_authority_membership, database_fixture )
              anon_create_op.name = generate_anon_acct_name();
 
              tx.operations.push_back( anon_create_op );
+             tx.set_expiration( db.head_block_time() + fc::minutes(5) );
 
              if( num_keys > max_authority_membership )
              {

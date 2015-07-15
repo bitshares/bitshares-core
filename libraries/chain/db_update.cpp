@@ -83,11 +83,12 @@ void database::update_signing_witness(const witness_object& signing_witness, con
       _dpo.witness_budget -= witness_pay;
    } );
 
+   deposit_witness_pay( signing_witness, witness_pay );
+
    modify( signing_witness, [&]( witness_object& _wit )
    {
       _wit.previous_secret = new_block.previous_secret;
       _wit.next_secret_hash = new_block.next_secret_hash;
-      _wit.accumulated_income += witness_pay;
    } );
 }
 

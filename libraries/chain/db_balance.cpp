@@ -21,6 +21,7 @@
 #include <graphene/chain/account_object.hpp>
 #include <graphene/chain/asset_object.hpp>
 #include <graphene/chain/vesting_balance_object.hpp>
+#include <graphene/chain/witness_object.hpp>
 
 namespace graphene { namespace chain {
 
@@ -86,6 +87,54 @@ void database::adjust_core_in_orders( const account_object& acnt, asset delta )
    }
 }
 
+optional< vesting_balance_id_type > database::deposit_lazy_vesting(
+   const optional< vesting_balance_id_type >& ovbid,
+   share_type amount, uint32_t req_vesting_seconds,
+   account_id_type req_owner,
+   bool require_vesting )
+{
+   if( amount == 0 )
+      return optional< vesting_balance_id_type >();
+
+   fc::time_point_sec now = head_block_time();
+
+   while( true )
+   {
+      if( !ovbid.valid() )
+         break;
+      const vesting_balance_object& vbo = (*ovbid)(*this);
+      if( vbo.owner != req_owner )
+         break;
+      if( vbo.policy.which() != vesting_policy::tag< cdd_vesting_policy >::value )
+         break;
+      if( vbo.policy.get< cdd_vesting_policy >().vesting_seconds != req_vesting_seconds )
+         break;
+      modify( vbo, [&]( vesting_balance_object& _vbo )
+      {
+         if( require_vesting )
+            _vbo.deposit(now, amount);
+         else
+            _vbo.deposit_vested(now, amount);
+      } );
+      return optional< vesting_balance_id_type >();
+   }
+
+   const vesting_balance_object& vbo = create< vesting_balance_object >( [&]( vesting_balance_object& _vbo )
+   {
+      _vbo.owner = req_owner;
+      _vbo.balance = amount;
+
+      cdd_vesting_policy policy;
+      policy.vesting_seconds = req_vesting_seconds;
+      policy.coin_seconds_earned = require_vesting ? 0 : amount.value * policy.vesting_seconds;
+      policy.coin_seconds_earned_last_update = now;
+
+      _vbo.policy = policy;
+   } );
+
+   return vbo.id;
+}
+
 void database::deposit_cashback(const account_object& acct, share_type amount, bool require_vesting)
 {
    // If we don't have a VBO, or if it has the wrong maturity
@@ -105,46 +154,43 @@ void database::deposit_cashback(const account_object& acct, share_type amount, b
       return;
    }
 
-   uint32_t global_vesting_seconds = get_global_properties().parameters.cashback_vesting_period_seconds;
-   fc::time_point_sec now = head_block_time();
+   optional< vesting_balance_id_type > new_vbid = deposit_lazy_vesting(
+      acct.cashback_vb,
+      amount,
+      get_global_properties().parameters.cashback_vesting_period_seconds,
+      acct.id,
+      require_vesting );
 
-   while( true )
+   if( new_vbid.valid() )
    {
-      if( !acct.cashback_vb.valid() )
-         break;
-      const vesting_balance_object& cashback_vb = (*acct.cashback_vb)(*this);
-      if( cashback_vb.policy.which() != vesting_policy::tag< cdd_vesting_policy >::value )
-         break;
-      if( cashback_vb.policy.get< cdd_vesting_policy >().vesting_seconds != global_vesting_seconds )
-         break;
-
-      modify( cashback_vb, [&]( vesting_balance_object& obj )
+      modify( acct, [&]( account_object& _acct )
       {
-         if( require_vesting )
-            obj.deposit(now, amount);
-         else
-            obj.deposit_vested(now, amount);
+         _acct.cashback_vb = *new_vbid;
       } );
-      return;
    }
 
-   const vesting_balance_object& cashback_vb = create< vesting_balance_object >( [&]( vesting_balance_object& obj )
+   return;
+}
+
+void database::deposit_witness_pay(const witness_object& wit, share_type amount)
+{
+   if( amount == 0 )
+      return;
+
+   optional< vesting_balance_id_type > new_vbid = deposit_lazy_vesting(
+      wit.pay_vb,
+      amount,
+      get_global_properties().parameters.witness_pay_vesting_seconds,
+      wit.witness_account,
+      true );
+
+   if( new_vbid.valid() )
    {
-      obj.owner = acct.id;
-      obj.balance = amount;
-
-      cdd_vesting_policy policy;
-      policy.vesting_seconds = global_vesting_seconds;
-      policy.coin_seconds_earned = require_vesting? 0 : amount.value * policy.vesting_seconds;
-      policy.coin_seconds_earned_last_update = now;
-
-      obj.policy = policy;
-   } );
-
-   modify( acct, [&]( account_object& _acct )
-   {
-      _acct.cashback_vb = cashback_vb.id;
-   } );
+      modify( wit, [&]( witness_object& _wit )
+      {
+         _wit.pay_vb = *new_vbid;
+      } );
+   }
 
    return;
 }

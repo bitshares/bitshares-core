@@ -2196,8 +2196,6 @@ operation wallet_api::get_prototype_operation(string operation_name)
       return graphene::chain::committee_member_create_operation();
    if (operation_name == "witness_create_operation")
       return graphene::chain::witness_create_operation();
-   if (operation_name == "witness_withdraw_pay_operation")
-      return graphene::chain::witness_withdraw_pay_operation();
    if (operation_name == "committee_member_update_global_parameters_operation")
       return graphene::chain::committee_member_update_global_parameters_operation();
    if (operation_name == "transfer_operation")

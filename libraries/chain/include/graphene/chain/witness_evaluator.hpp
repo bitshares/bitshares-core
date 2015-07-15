@@ -30,15 +30,4 @@ namespace graphene { namespace chain {
          object_id_type do_apply( const witness_create_operation& o );
    };
 
-   class witness_withdraw_pay_evaluator : public evaluator<witness_withdraw_pay_evaluator>
-   {
-      public:
-         typedef witness_withdraw_pay_operation operation_type;
-
-         void_result do_evaluate( const operation_type& o );
-         void_result do_apply( const operation_type& o );
-
-         const witness_object* witness;
-         const account_object* to_account;
-   };
 } } // graphene::chain

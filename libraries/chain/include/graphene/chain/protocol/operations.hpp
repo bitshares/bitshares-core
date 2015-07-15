@@ -44,7 +44,6 @@ namespace graphene { namespace chain {
             asset_global_settle_operation,
             asset_publish_feed_operation,
             witness_create_operation,
-            witness_withdraw_pay_operation,
             proposal_create_operation,
             proposal_update_operation,
             proposal_delete_operation,
