@@ -20,7 +20,7 @@ RowLayout {
    }
 
    Identicon {
-      name: accountNameField.text
+      name: account && account.name == accountNameField.text? accountNameField.text : ""
       width: Scaling.cm(2)
       height: Scaling.cm(2)
    }
