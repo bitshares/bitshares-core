@@ -82,16 +82,14 @@ namespace graphene { namespace chain {
             skip_nothing                = 0,
             skip_witness_signature      = 1 << 0,  ///< used while reindexing
             skip_transaction_signatures = 1 << 1,  ///< used by non-witness nodes
-            skip_undo_block             = 1 << 2,  ///< used while reindexing
-            skip_undo_transaction       = 1 << 3,  ///< used while applying block
-            skip_transaction_dupe_check = 1 << 4,  ///< used while reindexing
-            skip_fork_db                = 1 << 5,  ///< used while reindexing
-            skip_block_size_check       = 1 << 6,  ///< used when applying locally generated transactions
-            skip_tapos_check            = 1 << 7,  ///< used while reindexing -- note this skips expiration check as well
-            skip_authority_check        = 1 << 8, ///< used while reindexing -- disables any checking of authority on transactions
-            skip_merkle_check           = 1 << 9, ///< used while reindexing
-            skip_assert_evaluation      = 1 << 10,  ///< used while reindexing
-            skip_undo_history_check     = 1 << 11  ///< used while reindexing
+            skip_transaction_dupe_check = 1 << 2,  ///< used while reindexing
+            skip_fork_db                = 1 << 3,  ///< used while reindexing
+            skip_block_size_check       = 1 << 4,  ///< used when applying locally generated transactions
+            skip_tapos_check            = 1 << 5,  ///< used while reindexing -- note this skips expiration check as well
+            skip_authority_check        = 1 << 6,  ///< used while reindexing -- disables any checking of authority on transactions
+            skip_merkle_check           = 1 << 7,  ///< used while reindexing
+            skip_assert_evaluation      = 1 << 8,  ///< used while reindexing
+            skip_undo_history_check     = 1 << 9   ///< used while reindexing
          };
 
          /**

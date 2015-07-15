@@ -53,8 +53,6 @@ void database::reindex(fc::path data_dir, const genesis_state_type& initial_allo
    {
       apply_block(*_block_id_to_block.fetch_by_number(i), skip_witness_signature |
                                 skip_transaction_signatures |
-                                skip_undo_block |
-                                skip_undo_transaction |
                                 skip_transaction_dupe_check |
                                 skip_tapos_check |
                                 skip_authority_check);
