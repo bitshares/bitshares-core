@@ -18,6 +18,7 @@ Asset* ChainDataModel::getAsset(qint64 id)
    if( itr == by_id_idx.end() )
    {
       auto tmp = new Asset;
+      QQmlEngine::setObjectOwnership(tmp, QQmlEngine::CppOwnership);
       tmp->id = id; --m_account_query_num;
       tmp->symbol = QString::number( --m_account_query_num);
       auto result = m_assets.insert( tmp );
@@ -53,7 +54,7 @@ Asset* ChainDataModel::getAsset(qint64 id)
                  );
               }
            });
-         } 
+         }
          catch ( const fc::exception& e )
          {
             Q_EMIT exceptionThrown( QString::fromStdString(e.to_string()) );
@@ -71,6 +72,7 @@ Asset* ChainDataModel::getAsset(QString symbol)
    if( itr == by_symbol_idx.end() )
    {
       auto tmp = new Asset;
+      QQmlEngine::setObjectOwnership(tmp, QQmlEngine::CppOwnership);
       tmp->id = --m_account_query_num;
       tmp->symbol = symbol;
       auto result = m_assets.insert( tmp );
@@ -104,7 +106,7 @@ Asset* ChainDataModel::getAsset(QString symbol)
                  );
               }
            });
-         } 
+         }
          catch ( const fc::exception& e )
          {
             Q_EMIT exceptionThrown( QString::fromStdString(e.to_string()) );
@@ -114,25 +116,6 @@ Asset* ChainDataModel::getAsset(QString symbol)
    }
    return *itr;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 Account* ChainDataModel::getAccount(ObjectId id)
 {
@@ -206,19 +189,19 @@ Account* ChainDataModel::getAccount(QString name)
            /** execute in main */
            Q_EMIT queueExecute( [this,result,name](){
               wlog( "process result" );
-              auto& by_symbol_idx = this->m_accounts.get<by_account_name>();
-              auto itr = by_symbol_idx.find(name);
-              assert( itr != by_symbol_idx.end() );
+              auto& by_name_idx = this->m_accounts.get<by_account_name>();
+              auto itr = by_name_idx.find(name);
+              assert( itr != by_name_idx.end() );
 
               if( result.size() == 0 || !result.front() )
               {
                   elog( "delete later" );
                   (*itr)->deleteLater();
-                  by_symbol_idx.erase( itr );
+                  by_name_idx.erase( itr );
               }
               else
               {
-                 by_symbol_idx.modify( itr,
+                 by_name_idx.modify( itr,
                     [=]( Account* a ){
                        a->setProperty("id", ObjectId(result.front()->id.instance()));
                     }
