@@ -193,6 +193,30 @@ string normalize_brain_key( string s )
    }
    return result;
 }
+
+struct op_prototype_visitor
+{
+   typedef void result_type;
+
+   int t = 0;
+   flat_map< std::string, operation >& name2op;
+
+   op_prototype_visitor(
+      int _t,
+      flat_map< std::string, operation >& _prototype_ops
+      ):t(_t), name2op(_prototype_ops) {}
+
+   template<typename Type>
+   result_type operator()( const Type& op )const
+   {
+      string name = fc::get_typename<Type>::name();
+      size_t p = name.rfind(':');
+      if( p != string::npos )
+         name = name.substr( p+1 );
+      name2op[ name ] = Type();
+   }
+};
+
 class wallet_api_impl
 {
 public:
@@ -296,6 +320,17 @@ private:
 #endif
    }
 
+   void init_prototype_ops()
+   {
+      operation op;
+      for( int t=0; t<op.count(); t++ )
+      {
+         op.set_which( t );
+         op.visit( op_prototype_visitor(t, _prototype_ops) );
+      }
+      return;
+   }
+
    map<transaction_handle_type, signed_transaction> _builder_transactions;
 
 public:
@@ -307,6 +342,7 @@ public:
         _remote_net_broadcast(rapi->network_broadcast()),
         _remote_hist(rapi->history())
    {
+      init_prototype_ops();
       _remote_db->subscribe_to_objects( [=]( const fc::variant& obj )
       {
          fc::async([this]{resync();}, "Resync after block");
@@ -1698,6 +1734,14 @@ public:
 
    }
 
+   operation get_prototype_operation( string operation_name )
+   {
+      auto it = _prototype_ops.find( operation_name );
+      if( it == _prototype_ops.end() )
+         FC_THROW("Unsupported operation: \"${operation_name}\"", ("operation_name", operation_name));
+      return it->second;
+   }
+
    string                  _wallet_filename;
    wallet_data             _wallet;
 
@@ -1708,6 +1752,8 @@ public:
    fc::api<database_api>   _remote_db;
    fc::api<network_broadcast_api>   _remote_net_broadcast;
    fc::api<history_api>    _remote_hist;
+
+   flat_map<string, operation> _prototype_ops;
 
 #ifdef __unix__
    mode_t                  _old_umask;
@@ -2178,81 +2224,7 @@ signed_transaction wallet_api::sign_transaction(signed_transaction tx, bool broa
 
 operation wallet_api::get_prototype_operation(string operation_name)
 {
-   if (operation_name == "assert_operation")
-      return graphene::chain::assert_operation();
-   if (operation_name == "balance_claim_operation")
-      return graphene::chain::balance_claim_operation();
-   if (operation_name == "account_create_operation")
-      return graphene::chain::account_create_operation();
-   if (operation_name == "account_whitelist_operation")
-      return graphene::chain::account_whitelist_operation();
-   if (operation_name == "account_update_operation")
-      return graphene::chain::account_update_operation();
-   if (operation_name == "account_upgrade_operation")
-      return graphene::chain::account_upgrade_operation();
-   if (operation_name == "account_transfer_operation")
-      return graphene::chain::account_transfer_operation();
-   if (operation_name == "committee_member_create_operation")
-      return graphene::chain::committee_member_create_operation();
-   if (operation_name == "witness_create_operation")
-      return graphene::chain::witness_create_operation();
-   if (operation_name == "committee_member_update_global_parameters_operation")
-      return graphene::chain::committee_member_update_global_parameters_operation();
-   if (operation_name == "transfer_operation")
-      return graphene::chain::transfer_operation();
-   if (operation_name == "override_transfer_operation")
-      return graphene::chain::override_transfer_operation();
-   if (operation_name == "asset_create_operation")
-      return graphene::chain::asset_create_operation();
-   if (operation_name == "asset_global_settle_operation")
-      return graphene::chain::asset_global_settle_operation();
-   if (operation_name == "asset_settle_operation")
-      return graphene::chain::asset_settle_operation();
-   if (operation_name == "asset_fund_fee_pool_operation")
-      return graphene::chain::asset_fund_fee_pool_operation();
-   if (operation_name == "asset_update_operation")
-      return graphene::chain::asset_update_operation();
-   if (operation_name == "asset_update_bitasset_operation")
-      return graphene::chain::asset_update_bitasset_operation();
-   if (operation_name == "asset_update_feed_producers_operation")
-      return graphene::chain::asset_update_feed_producers_operation();
-   if (operation_name == "asset_publish_feed_operation")
-      return graphene::chain::asset_publish_feed_operation();
-   if (operation_name == "asset_issue_operation")
-      return graphene::chain::asset_issue_operation();
-   if (operation_name == "asset_reserve_operation")
-      return graphene::chain::asset_reserve_operation();
-   if (operation_name == "limit_order_create_operation")
-      return graphene::chain::limit_order_create_operation();
-   if (operation_name == "limit_order_cancel_operation")
-      return graphene::chain::limit_order_cancel_operation();
-   if (operation_name == "call_order_update_operation")
-      return graphene::chain::call_order_update_operation();
-   if (operation_name == "proposal_create_operation")
-      return graphene::chain::proposal_create_operation();
-   if (operation_name == "proposal_update_operation")
-      return graphene::chain::proposal_update_operation();
-   if (operation_name == "proposal_delete_operation")
-      return graphene::chain::proposal_delete_operation();
-   if (operation_name == "fill_order_operation")
-      return graphene::chain::fill_order_operation();
-   if (operation_name == "withdraw_permission_create_operation")
-      return graphene::chain::withdraw_permission_create_operation();
-   if (operation_name == "withdraw_permission_update_operation")
-      return graphene::chain::withdraw_permission_update_operation();
-   if (operation_name == "withdraw_permission_claim_operation")
-      return graphene::chain::withdraw_permission_claim_operation();
-   if (operation_name == "withdraw_permission_delete_operation")
-      return graphene::chain::withdraw_permission_delete_operation();
-   if (operation_name == "vesting_balance_create_operation")
-      return graphene::chain::vesting_balance_create_operation();
-   if (operation_name == "vesting_balance_withdraw_operation")
-      return graphene::chain::vesting_balance_withdraw_operation();
-   if (operation_name == "worker_create_operation")
-      return graphene::chain::worker_create_operation();
-   if (operation_name == "custom_operation")
-      return graphene::chain::custom_operation();
-   FC_THROW("Unsupported operation: \"${operation_name}\"", ("operation_name", operation_name));
+   return my->get_prototype_operation( operation_name );
 }
 
 void wallet_api::dbg_make_uia(string creator, string symbol)
