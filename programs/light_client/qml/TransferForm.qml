@@ -22,28 +22,33 @@ Rectangle {
    ColumnLayout {
       anchors.centerIn: parent
       width: parent.width - Scaling.cm(2)
-      spacing: Scaling.cm(1)
+      spacing: Scaling.mm(5)
 
       AccountPicker {
          id: senderPicker
-         width: parent.width
+         Layout.fillWidth: true
          Layout.minimumWidth: Scaling.cm(5)
          Component.onCompleted: setFocus()
          placeholderText: qsTr("Sender")
          showBalance: balances? balances.reduce(function(foundIndex, balance, index) {
                                                    if (foundIndex >= 0) return foundIndex
-                                                   return balance.type.symbol === assetBox.currentText? index : -1
+                                                   return balance.type.symbol === assetField.currentText? index : -1
                                                 }, -1) : -1
       }
       AccountPicker {
          id: recipientPicker
-         width: parent.width
+         Layout.fillWidth: true
          Layout.minimumWidth: Scaling.cm(5)
          placeholderText: qsTr("Recipient")
          layoutDirection: Qt.RightToLeft
       }
+      TextField {
+         id: memoField
+         Layout.fillWidth: true
+         placeholderText: qsTr("Memo")
+      }
       RowLayout {
-         width: parent.width
+         Layout.fillWidth: true
          SpinBox {
             id: amountField
             Layout.preferredWidth: Scaling.cm(4)
@@ -57,7 +62,7 @@ Rectangle {
                             senderPicker.balances[senderPicker.showBalance] : null
          }
          ComboBox {
-            id: assetBox
+            id: assetField
             Layout.minimumWidth: Scaling.cm(3)
             enabled: Boolean(senderPicker.balances)
             model: enabled? senderPicker.balances.filter(function(balance) { return balance.amount > 0 })
