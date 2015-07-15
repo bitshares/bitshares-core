@@ -77,7 +77,15 @@ namespace graphene { namespace chain {
          time_point_sec    next_maintenance_time;
          time_point_sec    last_budget_time;
          share_type        witness_budget;
-         uint32_t          accounts_registered_this_interval;
+         uint32_t          accounts_registered_this_interval = 0;
+         /**
+          *  Every time a block is missed this increases by 2, every time a block is found it decreases by 1 it is
+          *  never less than 0
+          *
+          *  If the recently_missed_count hits 2*UNDO_HISTORY then no ew blocks may be pushed.  
+          */
+         uint32_t          recently_missed_count = 0;
+
          /** if the interval changes then how we calculate witness participation will
           * also change.  Normally witness participation is defined as % of blocks
           * produced in the last round which is calculated by dividing the delta
@@ -97,6 +105,7 @@ FC_REFLECT_DERIVED( graphene::chain::dynamic_global_property_object, (graphene::
                     (next_maintenance_time)
                     (witness_budget)
                     (accounts_registered_this_interval)
+                    (recently_missed_count)
                     (first_maintenance_block_with_current_interval)
                   )
 

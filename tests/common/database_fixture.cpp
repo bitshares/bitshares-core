@@ -296,6 +296,7 @@ signed_block database_fixture::generate_block(uint32_t skip, const fc::ecc::priv
 {
    open_database();
 
+   skip |= database::skip_undo_history_check;
    // skip == ~0 will skip checks specified in database::validation_steps
    return db.generate_block(db.get_slot_time(miss_blocks + 1),
                             db.get_scheduled_witness(miss_blocks + 1).first,

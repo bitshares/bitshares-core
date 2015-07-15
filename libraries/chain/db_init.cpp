@@ -156,6 +156,7 @@ void database::initialize_evaluators()
 void database::initialize_indexes()
 {
    reset_indexes();
+   _undo_db.set_max_size( GRAPHENE_MIN_UNDO_HISTORY );
 
    //Protocol object indexes
    add_index< primary_index<asset_index> >();

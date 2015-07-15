@@ -25,6 +25,7 @@
 #include <graphene/chain/transaction_object.hpp>
 #include <graphene/chain/witness_object.hpp>
 #include <graphene/chain/protocol/fee_schedule.hpp>
+#include <graphene/chain/exceptions.hpp>
 
 namespace graphene { namespace chain {
 
@@ -305,7 +306,9 @@ signed_block database::_generate_block(
    _pending_block.transactions.clear();
 
    bool failed = false;
-   try { push_block( tmp, skip ); } catch ( const fc::exception& e ) { failed = true; }
+   try { push_block( tmp, skip ); } 
+   catch ( const undo_database_exception& e ) { throw; }
+   catch ( const fc::exception& e ) { failed = true; }
    if( failed )
    {
       for( const auto& trx : tmp.transactions )
@@ -378,6 +381,14 @@ void database::apply_block( const signed_block& next_block, uint32_t skip )
       {
          // WE CAN SKIP ALMOST EVERYTHING
          skip = ~0;
+
+         /** clear the recently missed count because the checkpoint indicates that
+          * we will never have to go back further than this.
+          */
+         const auto& _dgp = dynamic_global_property_id_type(0)(*this);
+         modify( _dgp, [&]( dynamic_global_property_object& dgp ){
+            dgp.recently_missed_count = 0;
+         });
       }
    }
 

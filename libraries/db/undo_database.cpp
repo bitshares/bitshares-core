@@ -28,7 +28,7 @@ undo_database::session undo_database::start_undo_session()
 {
    if( _disabled ) return session(*this);
 
-   if( size() == max_size() )
+   while( size() > max_size() )
       _stack.pop_front();
 
    _stack.emplace_back();

@@ -36,6 +36,10 @@ void database::update_global_dynamic_data( const signed_block& b )
    const dynamic_global_property_object& _dgp =
       dynamic_global_property_id_type(0)(*this);
 
+   const auto& global_props = get_global_properties();
+   auto delta_time = b.timestamp - _dgp.time;
+   auto missed_blocks = (delta_time.to_seconds() / global_props.parameters.block_interval)  - 1;
+
    //
    // dynamic global properties updating
    //
@@ -44,11 +48,27 @@ void database::update_global_dynamic_data( const signed_block& b )
       fc::raw::pack( enc, dgp.random );
       fc::raw::pack( enc, b.previous_secret );
       dgp.random = enc.result();
+
+      if( missed_blocks )
+         dgp.recently_missed_count += 2*missed_blocks;
+      else if( dgp.recently_missed_count > 0 )
+         dgp.recently_missed_count--;
+
       dgp.head_block_number = b.block_num();
       dgp.head_block_id = b.id();
       dgp.time = b.timestamp;
       dgp.current_witness = b.witness;
    });
+
+   if( !(get_node_properties().skip_flags & skip_undo_history_check) )
+   {
+      GRAPHENE_ASSERT( _dgp.recently_missed_count  < GRAPHENE_MAX_UNDO_HISTORY, undo_database_exception,
+                 "The database does not have enough undo history to support a blockchain with so many missed blocks. "
+                 "Please add a checkpoint if you would like to continue applying blocks beyond this point.",
+                 ("recently_missed",_dgp.recently_missed_count)("max_undo",GRAPHENE_MAX_UNDO_HISTORY) );
+   }
+
+   _undo_db.set_max_size( _dgp.recently_missed_count + GRAPHENE_MIN_UNDO_HISTORY );
 }
 
 void database::update_signing_witness(const witness_object& signing_witness, const signed_block& new_block)
@@ -88,9 +108,8 @@ void database::clear_expired_transactions()
    auto& transaction_idx = static_cast<transaction_index&>(get_mutable_index(implementation_ids, impl_transaction_object_type));
    const auto& dedupe_index = transaction_idx.indices().get<by_expiration>();
    const auto& global_parameters = get_global_properties().parameters;
-   auto forking_window_time = global_parameters.maximum_undo_history * global_parameters.block_interval;
    while( !dedupe_index.empty()
-          && head_block_time() - dedupe_index.rbegin()->trx.expiration >= fc::seconds(forking_window_time) )
+          && head_block_time() - dedupe_index.rbegin()->trx.expiration >= fc::seconds(global_parameters.maximum_expiration) )
       transaction_idx.remove(*dedupe_index.rbegin());
 }
 
