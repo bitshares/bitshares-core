@@ -47,7 +47,7 @@ void database::reindex(fc::path data_dir, const genesis_state_type& initial_allo
 
    const auto last_block_num = last_block->block_num();
 
-   // TODO: disable undo tracking durring reindex, this currently causes crashes in the benchmark test
+   // TODO: disable undo tracking during reindex, this currently causes crashes in the benchmark test
    //_undo_db.disable();
    for( uint32_t i = 1; i <= last_block_num; ++i )
    {

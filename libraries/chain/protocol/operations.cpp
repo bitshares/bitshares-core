@@ -71,7 +71,7 @@ struct required_active_visitor
    void operator()(const account_update_operation& o)const 
    {
       /// if owner authority is required, no active authority is required
-      if( !(o.owner || o.active) ) /// TODO: document why active cannot be updated by active?
+      if( !(o.owner || o.active) )
          result.insert( o.fee_payer() );
    }
    void operator()( const proposal_delete_operation& o )const
@@ -113,7 +113,7 @@ struct required_owner_visitor
 
    void operator()(const account_update_operation& o)const 
    {
-      if( o.owner || o.active ) /// TODO: document why active cannot be updated by active?
+      if( o.owner || o.active )
          result.insert( o.account );
    }
 

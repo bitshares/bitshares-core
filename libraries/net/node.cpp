@@ -2576,7 +2576,6 @@ namespace graphene { namespace net { namespace detail {
         wlog("Peer doesn't have the requested item.");
         trigger_fetch_items_loop();
         return;
-        // TODO: reschedule fetching this item from a different peer
       }
 
       auto sync_item_iter = originating_peer->sync_items_requested_from_peer.find(requested_item);
@@ -3261,7 +3260,6 @@ namespace graphene { namespace net { namespace detail {
                                                          (current_time_reply_message_received.reply_transmitted_time - reply_received_time)).count() / 2);
       originating_peer->round_trip_delay = (reply_received_time - current_time_reply_message_received.request_sent_time) -
                                            (current_time_reply_message_received.reply_transmitted_time - current_time_reply_message_received.request_received_time);
-      // TODO
     }
 
     void node_impl::forward_firewall_check_to_next_available_peer(firewall_check_state_data* firewall_check_state)
@@ -4397,7 +4395,7 @@ namespace graphene { namespace net { namespace detail {
       }
 
       ilog( "--------- MEMORY USAGE ------------" );
-      ilog( "node._active_sync_requests size: ${size}", ("size", _active_sync_requests.size() ) ); // TODO: un-break this
+      ilog( "node._active_sync_requests size: ${size}", ("size", _active_sync_requests.size() ) );
       ilog( "node._received_sync_items size: ${size}", ("size", _received_sync_items.size() ) );
       ilog( "node._new_received_sync_items size: ${size}", ("size", _new_received_sync_items.size() ) );
       ilog( "node._items_to_fetch size: ${size}", ("size", _items_to_fetch.size() ) );
@@ -4506,28 +4504,28 @@ namespace graphene { namespace net { namespace detail {
         ASSERT_TASK_NOT_PREEMPTED(); // don't yield while iterating over _active_connections
 
         peer_status this_peer_status;
-        this_peer_status.version = 0; // TODO
+        this_peer_status.version = 0;
         fc::optional<fc::ip::endpoint> endpoint = peer->get_remote_endpoint();
         if (endpoint)
           this_peer_status.host = *endpoint;
         fc::mutable_variant_object peer_details;
         peer_details["addr"] = endpoint ? (std::string)*endpoint : std::string();
         peer_details["addrlocal"] = (std::string)peer->get_local_endpoint();
-        peer_details["services"] = "00000001"; // TODO: assign meaning, right now this just prints what bitcoin prints
+        peer_details["services"] = "00000001";
         peer_details["lastsend"] = peer->get_last_message_sent_time().sec_since_epoch();
         peer_details["lastrecv"] = peer->get_last_message_received_time().sec_since_epoch();
         peer_details["bytessent"] = peer->get_total_bytes_sent();
         peer_details["bytesrecv"] = peer->get_total_bytes_received();
         peer_details["conntime"] = peer->get_connection_time();
-        peer_details["pingtime"] = ""; // TODO: fill me for bitcoin compatibility
-        peer_details["pingwait"] = ""; // TODO: fill me for bitcoin compatibility
-        peer_details["version"] = ""; // TODO: fill me for bitcoin compatibility
+        peer_details["pingtime"] = "";
+        peer_details["pingwait"] = "";
+        peer_details["version"] = "";
         peer_details["subver"] = peer->user_agent;
         peer_details["inbound"] = peer->direction == peer_connection_direction::inbound;
         peer_details["firewall_status"] = peer->is_firewalled;
-        peer_details["startingheight"] = ""; // TODO: fill me for bitcoin compatibility
-        peer_details["banscore"] = ""; // TODO: fill me for bitcoin compatibility
-        peer_details["syncnode"] = ""; // TODO: fill me for bitcoin compatibility
+        peer_details["startingheight"] = "";
+        peer_details["banscore"] = "";
+        peer_details["syncnode"] = "";
 
         if (peer->fc_git_revision_sha)
         {

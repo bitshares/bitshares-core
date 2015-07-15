@@ -587,10 +587,8 @@ public:
 
    bool load_wallet_file(string wallet_filename = "")
    {
-      //
       // TODO:  Merge imported wallet with existing wallet,
       //        instead of replacing it
-      //
       if( wallet_filename == "" )
          wallet_filename = _wallet_filename;
 

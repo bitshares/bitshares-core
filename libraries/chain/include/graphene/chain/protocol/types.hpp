@@ -81,7 +81,7 @@ namespace graphene { namespace chain {
    {
       charge_market_fee    = 0x01, /**< an issuer-specified percentage of all market trades in this asset is paid to the issuer */
       white_list           = 0x02, /**< accounts must be whitelisted in order to hold this asset */
-      override_authority   = 0x04, /**< @todo issuer may transfer asset back to himself */
+      override_authority   = 0x04, /**< issuer may transfer asset back to himself */
       transfer_restricted  = 0x08, /**< require the issuer to be one party to every transfer */
       disable_force_settle = 0x10, /**< disable force settling */
       global_settle        = 0x20  /**< allow the bitasset issuer to force a global settling -- this may be set in permissions, but not flags */

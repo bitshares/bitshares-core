@@ -92,7 +92,7 @@ namespace graphene { namespace chain {
 
       /// New owner authority. If set, this operation requires owner authority to execute.
       optional<authority> owner;
-      /// New active authority. If set, this operation requires owner authority to execute: TODO: why?
+      /// New active authority. If set, this operation requires owner authority to execute.
       optional<authority> active;
 
       /// New account options

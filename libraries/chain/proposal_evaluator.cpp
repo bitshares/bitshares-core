@@ -120,7 +120,7 @@ void_result proposal_update_evaluator::do_evaluate(const proposal_update_operati
                  "", ("id", id)("available", _proposal->available_owner_approvals) );
    }
 
-   /*  All authority checks happen outside of evaluators, TODO: verify this is checked elsewhere
+   /*  All authority checks happen outside of evaluators
    */
    if( (d.get_node_properties().skip_flags & database::skip_authority_check) == 0 )
    {
