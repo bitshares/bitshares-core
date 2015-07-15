@@ -1391,6 +1391,7 @@ BOOST_AUTO_TEST_CASE( vesting_balance_withdraw_test )
       create_op.amount = amount;
       create_op.policy = cdd_vesting_policy_initializer(vesting_seconds);
       tx.operations.push_back( create_op );
+      tx.set_expiration( db.head_block_time() + fc::minutes(5) );
 
       processed_transaction ptx = PUSH_TX( db,  tx, ~0  );
       const vesting_balance_object& vbo = vesting_balance_id_type(
