@@ -100,7 +100,7 @@ Asset* ChainDataModel::getAsset(QString symbol)
               {
                  by_symbol_idx.modify( itr,
                     [=]( Asset* a ){
-                       a->setProperty("id", result.front()->id.instance() );
+                       a->setProperty("id", ObjectId(result.front()->id.instance()));
                        a->setProperty("precision", result.front()->precision );
                     }
                  );
