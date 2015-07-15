@@ -13,7 +13,10 @@ find_package(Qt5Quick)
 
 file(GLOB QML qml/*)
 
-qt5_add_resources(QML_QRC qml/qml.qrc)
+# Skip building QRC in debug mode, since we access the QML files directly on disk in debug mode
+if (NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
+    qt5_add_resources(QML_QRC qml/qml.qrc)
+endif()
 
 add_executable(light_client ClientDataModel.cpp ClientDataModel.hpp main.cpp ${QML_QRC} ${QML})
 if (CMAKE_VERSION VERSION_LESS 3.0)

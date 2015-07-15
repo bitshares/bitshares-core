@@ -28,6 +28,7 @@ int main(int argc, char *argv[])
 #ifdef NDEBUG
    engine.load(QUrl(QStringLiteral("qrc:/main.qml")));
 #else
+   QQmlDebuggingEnabler enabler;
    engine.load(QUrl(QStringLiteral("qml/main.qml")));
 #endif
 

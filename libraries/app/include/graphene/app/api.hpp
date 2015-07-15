@@ -71,7 +71,7 @@ namespace graphene { namespace app {
           */
          optional<signed_block>            get_block(uint32_t block_num)const;
 
-         /** 
+         /**
           * @brief used to fetch an individual transaction.
           */
          processed_transaction   get_transaction( uint32_t block_num, uint32_t trx_in_block )const;
@@ -120,7 +120,7 @@ namespace graphene { namespace app {
          /**
           * @brief Get an account's balances in various assets
           * @param id ID of the account to get balances for
-          * @param assets IDs of the assets to get balances of
+          * @param assets IDs of the assets to get balances of; if empty, get all assets account has a balance in
           * @return Balances of the account
           */
          vector<asset> get_account_balances(account_id_type id, const flat_set<asset_id_type>& assets)const;
@@ -194,7 +194,7 @@ namespace graphene { namespace app {
           * @return Map of witness names to corresponding IDs
           */
          map<string, witness_id_type> lookup_witness_accounts(const string& lower_bound_name, uint32_t limit)const;
-         
+
          /**
           * @brief Get names and IDs for registered committee_members
           * @param lower_bound_name Lower bound of the first name to return
@@ -202,7 +202,7 @@ namespace graphene { namespace app {
           * @return Map of committee_member names to corresponding IDs
           */
          map<string, committee_member_id_type> lookup_committee_member_accounts(const string& lower_bound_name, uint32_t limit)const;
-         
+
          /**
           * @brief Get a list of witnesses by ID
           * @param witness_ids IDs of the witnesses to retrieve
@@ -322,7 +322,7 @@ namespace graphene { namespace app {
                                                               unsigned limit = 100,
                                                               operation_history_id_type start = operation_history_id_type())const;
 
-         vector<bucket_object> get_market_history( asset_id_type a, asset_id_type b, uint32_t bucket_seconds, 
+         vector<bucket_object> get_market_history( asset_id_type a, asset_id_type b, uint32_t bucket_seconds,
                                                    fc::time_point_sec start, fc::time_point_sec end )const;
          flat_set<uint32_t>    get_market_history_buckets()const;
       private:

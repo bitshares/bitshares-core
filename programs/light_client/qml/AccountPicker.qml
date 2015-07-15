@@ -9,8 +9,11 @@ import "."
 
 RowLayout {
    property Account account
+   property var balances: account? Object.keys(account.balances).map(function(key){return account.balances[key]})
+                                 : null
 
    property alias placeholderText: accountNameField.placeholderText
+   property int showBalance: -1
 
    function setFocus() {
       accountNameField.forceActiveFocus()
@@ -29,25 +32,37 @@ RowLayout {
          width: parent.width
          onEditingFinished: accountDetails.update(text)
       }
-      Label {
+      Text {
          id: accountDetails
+         width: parent.width
+         height: text? implicitHeight : 0
+
+         Behavior on height { NumberAnimation{ easing.type: Easing.InOutQuad } }
+
          function update(name) {
             if (!name)
             {
                text = ""
+               account = null
                return
             }
 
             account = app.model.getAccount(name)
-            if (account == null)
+            if (account == null) {
                text = qsTr("Error fetching account.")
-            else
+            } else {
                text = Qt.binding(function() {
                   if (account == null)
                      return qsTr("Account does not exist.")
-                  return qsTr("Account ID: %1").arg(account.id < 0? qsTr("Loading...")
-                                                                  : account.id)
+                  var text = qsTr("Account ID: %1").arg(account.id < 0? qsTr("Loading...")
+                                                                      : account.id)
+                  if (showBalance >= 0) {
+                     text += "\n" + qsTr("Balance: %1 %2").arg(balances[showBalance].amountReal())
+                                                          .arg(balances[showBalance].type.symbol)
+                  }
+                  return text
                })
+            }
          }
 
          Behavior on text {

@@ -11,16 +11,13 @@ ChainDataModel::ChainDataModel( fc::thread& t, QObject* parent )
 :QObject(parent),m_thread(&t){}
 
 
-Asset* ChainDataModel::getAsset(qint64 id)
+Asset* ChainDataModel::getAsset(ObjectId id)
 {
    auto& by_id_idx = m_assets.get<::by_id>();
    auto itr = by_id_idx.find(id);
    if( itr == by_id_idx.end() )
    {
-      auto tmp = new Asset;
-      QQmlEngine::setObjectOwnership(tmp, QQmlEngine::CppOwnership);
-      tmp->id = id; --m_account_query_num;
-      tmp->symbol = QString::number( --m_account_query_num);
+      auto tmp = new Asset(id, QString::number(--m_account_query_num), 0, this);
       auto result = m_assets.insert( tmp );
       assert( result.second );
 
@@ -71,10 +68,7 @@ Asset* ChainDataModel::getAsset(QString symbol)
    auto itr = by_symbol_idx.find(symbol);
    if( itr == by_symbol_idx.end() )
    {
-      auto tmp = new Asset;
-      QQmlEngine::setObjectOwnership(tmp, QQmlEngine::CppOwnership);
-      tmp->id = --m_account_query_num;
-      tmp->symbol = symbol;
+      auto tmp = new Asset(--m_account_query_num, symbol, 0, this);
       auto result = m_assets.insert( tmp );
       assert( result.second );
 
@@ -123,10 +117,7 @@ Account* ChainDataModel::getAccount(ObjectId id)
    auto itr = by_id_idx.find(id);
    if( itr == by_id_idx.end() )
    {
-      auto tmp = new Account;
-      QQmlEngine::setObjectOwnership(tmp, QQmlEngine::CppOwnership);
-      tmp->id = id; --m_account_query_num;
-      tmp->name = QString::number( --m_account_query_num);
+      auto tmp = new Account(id, QString::number(--m_account_query_num), this);
       auto result = m_accounts.insert( tmp );
       assert( result.second );
 
@@ -174,10 +165,7 @@ Account* ChainDataModel::getAccount(QString name)
    auto itr = by_name_idx.find(name);
    if( itr == by_name_idx.end() )
    {
-      auto tmp = new Account;
-      QQmlEngine::setObjectOwnership(tmp, QQmlEngine::CppOwnership);
-      tmp->id = --m_account_query_num;
-      tmp->name = name;
+      auto tmp = new Account(--m_account_query_num, name, this);
       auto result = m_accounts.insert( tmp );
       assert( result.second );
 
@@ -221,6 +209,19 @@ Account* ChainDataModel::getAccount(QString name)
 
 QQmlListProperty<Balance> Account::balances()
 {
+   // This entire block is dummy data. Throw it away when this function gets a real implementation.
+   if (m_balances.empty())
+   {
+      auto asset = new Asset(0, QStringLiteral("CORE"), 5, this);
+      m_balances.append(new Balance);
+      m_balances.back()->setProperty("amount", 5000000);
+      m_balances.back()->setProperty("type", QVariant::fromValue(asset));
+      asset = new Asset(0, QStringLiteral("USD"), 2, this);
+      m_balances.append(new Balance);
+      m_balances.back()->setProperty("amount", 3099);
+      m_balances.back()->setProperty("type", QVariant::fromValue(asset));
+   }
+
    return QQmlListProperty<Balance>(this, m_balances);
 }
 

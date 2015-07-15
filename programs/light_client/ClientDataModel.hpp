@@ -26,13 +26,21 @@ Q_DECLARE_METATYPE(std::function<void()>)
 class GrapheneObject : public QObject
 {
    Q_OBJECT
-   Q_PROPERTY(ObjectId id MEMBER id NOTIFY idChanged)
+   Q_PROPERTY(ObjectId id MEMBER m_id READ id NOTIFY idChanged)
 
-   public:
-      ObjectId id;
+   ObjectId m_id;
 
-   Q_SIGNALS:
-      void idChanged();
+public:
+   GrapheneObject(ObjectId id = -1, QObject* parent = nullptr)
+      : QObject(parent), m_id(id)
+   {}
+
+   ObjectId id() const {
+      return m_id;
+   }
+
+Q_SIGNALS:
+   void idChanged();
 };
 class Crypto {
    Q_GADGET
@@ -45,19 +53,34 @@ public:
 QML_DECLARE_TYPE(Crypto)
 
 
-class Asset : public GrapheneObject  {
+class Asset : public GrapheneObject {
    Q_OBJECT
 
-   Q_PROPERTY(QString symbol MEMBER symbol)
-   Q_PROPERTY(quint32 precision MEMBER precision)
+   Q_PROPERTY(QString symbol MEMBER m_symbol READ symbol NOTIFY symbolChanged)
+   Q_PROPERTY(quint32 precision MEMBER m_precision NOTIFY precisionChanged)
 
-   public:
-      QString symbol;
-      quint32 precision;
+   QString m_symbol;
+   quint32 m_precision;
 
+public:
+   Asset(ObjectId id = -1, QString symbol = QString(), quint32 precision = 0, QObject* parent = nullptr)
+      : GrapheneObject(id, parent), m_symbol(symbol), m_precision(precision)
+   {}
 
-   Q_SIGNALS:
-      void symbolChanged();
+   QString symbol() const {
+      return m_symbol;
+   }
+
+   quint64 precisionPower() const {
+      quint64 power = 1;
+      for (int i = 0; i < m_precision; ++i)
+         power *= 10;
+      return power;
+   }
+
+Q_SIGNALS:
+   void symbolChanged();
+   void precisionChanged();
 };
 
 struct by_id;
@@ -65,45 +88,59 @@ struct by_symbol_name;
 typedef multi_index_container<
    Asset*,
    indexed_by<
-      hashed_unique< tag<by_id>,  member<GrapheneObject, qint64, &GrapheneObject::id > >,
-      ordered_unique< tag<by_symbol_name>, member<Asset, QString, &Asset::symbol> >
+      hashed_unique< tag<by_id>, const_mem_fun<GrapheneObject, ObjectId, &GrapheneObject::id > >,
+      ordered_unique< tag<by_symbol_name>, const_mem_fun<Asset, QString, &Asset::symbol> >
    >
 > asset_multi_index_type;
 
 class Balance : public GrapheneObject {
    Q_OBJECT
 
-   Q_PROPERTY(Asset* type MEMBER type)
-   Q_PROPERTY(qint64 amount MEMBER amount)
+   Q_PROPERTY(Asset* type MEMBER type NOTIFY typeChanged)
+   Q_PROPERTY(qint64 amount MEMBER amount NOTIFY amountChanged)
 
    Asset* type;
    qint64 amount;
+
+public:
+   // This ultimately needs to be replaced with a string equivalent
+   Q_INVOKABLE qreal amountReal() const {
+      return amount / qreal(type->precisionPower());
+   }
+
+Q_SIGNALS:
+   void typeChanged();
+   void amountChanged();
 };
 
 class Account : public GrapheneObject {
    Q_OBJECT
 
-   Q_PROPERTY(QString name MEMBER name NOTIFY nameChanged)
-   Q_PROPERTY(QQmlListProperty<Balance> balances READ balances)
+   Q_PROPERTY(QString name MEMBER m_name READ name NOTIFY nameChanged)
+   Q_PROPERTY(QQmlListProperty<Balance> balances READ balances NOTIFY balancesChanged)
 
+   QString m_name;
    QList<Balance*> m_balances;
 
-   public:
-      const QString& getName()const { return name; }
-      QQmlListProperty<Balance> balances();
+public:
+   Account(ObjectId id = -1, QString name = QString(), QObject* parent = nullptr)
+      : GrapheneObject(id, parent), m_name(name)
+   {}
 
-      QString name;
+   QString name()const { return m_name; }
+   QQmlListProperty<Balance> balances();
 
-   Q_SIGNALS:
-      void nameChanged();
+Q_SIGNALS:
+   void nameChanged();
+   void balancesChanged();
 };
 
 struct by_account_name;
 typedef multi_index_container<
    Account*,
    indexed_by<
-      hashed_unique< tag<by_id>,  member<GrapheneObject, ObjectId, &GrapheneObject::id > >,
-      ordered_unique< tag<by_account_name>, member<Account, QString, &Account::name> >
+      hashed_unique< tag<by_id>, const_mem_fun<GrapheneObject, ObjectId, &GrapheneObject::id > >,
+      ordered_unique< tag<by_account_name>, const_mem_fun<Account, QString, &Account::name> >
    >
 > account_multi_index_type;
 
@@ -113,7 +150,7 @@ class ChainDataModel : public QObject {
 public:
    Q_INVOKABLE Account* getAccount(ObjectId id);
    Q_INVOKABLE Account* getAccount(QString name);
-   Q_INVOKABLE Asset*   getAsset(qint64 id);
+   Q_INVOKABLE Asset*   getAsset(ObjectId id);
    Q_INVOKABLE Asset*   getAsset(QString symbol);
 
    ChainDataModel(){}
