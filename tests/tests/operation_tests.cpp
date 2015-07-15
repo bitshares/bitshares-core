@@ -439,6 +439,7 @@ BOOST_AUTO_TEST_CASE( transfer_core_asset )
       for( auto& op : trx.operations ) db.current_fee_schedule().set_fee(op);
 
       fee = trx.operations.front().get<transfer_operation>().fee;
+      trx.set_expiration( db.head_block_time() + fc::minutes(5) );
       trx.validate();
       PUSH_TX( db, trx, ~0 );
 
