@@ -174,8 +174,7 @@ void database::initialize_indexes()
    prop_index->add_secondary_index<required_approval_index>();
 
    add_index< primary_index<withdraw_permission_index > >();
-   //add_index< primary_index<vesting_balance_index> >();
-   add_index< primary_index<simple_index<vesting_balance_object>> >();
+   add_index< primary_index<vesting_balance_index> >();
    add_index< primary_index<worker_index> >();
    add_index< primary_index<balance_index> >();
 
@@ -214,7 +213,7 @@ void database::init_genesis(const genesis_state_type& genesis_state)
 
    transaction_evaluation_state genesis_eval_state(this);
 
-   flat_index<block_summary_object>& bsi = get_mutable_index_type< flat_index<block_summary_object> >(); 
+   flat_index<block_summary_object>& bsi = get_mutable_index_type< flat_index<block_summary_object> >();
    bsi.resize(0xffff+1);
 
    // Create blockchain accounts

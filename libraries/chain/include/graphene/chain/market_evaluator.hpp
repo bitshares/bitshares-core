@@ -34,6 +34,7 @@ namespace graphene { namespace chain {
   struct by_id;
   struct by_price;
   struct by_expiration;
+  struct by_account;
   typedef multi_index_container<
      limit_order_object,
      indexed_by<
@@ -46,7 +47,8 @@ namespace graphene { namespace chain {
               member< object, object_id_type, &object::id>
            >,
            composite_key_compare< std::greater<price>, std::less<object_id_type> >
-        >
+        >,
+        ordered_non_unique< tag<by_account>, member<limit_order_object, account_id_type, &limit_order_object::seller>>
      >
   > limit_order_multi_index_type;
 
@@ -74,7 +76,7 @@ namespace graphene { namespace chain {
         account_id_type  borrower;
         share_type       collateral;  ///< call_price.base.asset_id, access via get_collateral
         share_type       debt;        ///< call_price.quote.asset_id, access via get_collateral
-        price            call_price;  ///< Debt / Collateral 
+        price            call_price;  ///< Debt / Collateral
   };
 
   /**

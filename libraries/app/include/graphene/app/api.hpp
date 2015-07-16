@@ -57,29 +57,29 @@ namespace graphene { namespace app {
           *
           * If any of the provided IDs does not map to an object, a null variant is returned in its position.
           */
-         fc::variants                      get_objects(const vector<object_id_type>& ids)const;
+         fc::variants get_objects(const vector<object_id_type>& ids)const;
          /**
           * @brief Retrieve a block header
           * @param block_num Height of the block whose header should be returned
           * @return header of the referenced block, or null if no matching block was found
           */
-         optional<block_header>            get_block_header(uint32_t block_num)const;
+         optional<block_header> get_block_header(uint32_t block_num)const;
          /**
           * @brief Retrieve a full, signed block
           * @param block_num Height of the block to be returned
           * @return the referenced block, or null if no matching block was found
           */
-         optional<signed_block>            get_block(uint32_t block_num)const;
+         optional<signed_block> get_block(uint32_t block_num)const;
 
          /**
           * @brief used to fetch an individual transaction.
           */
-         processed_transaction   get_transaction( uint32_t block_num, uint32_t trx_in_block )const;
+         processed_transaction get_transaction( uint32_t block_num, uint32_t trx_in_block )const;
 
          /**
           * @brief Retrieve the current @ref global_property_object
           */
-         global_property_object            get_global_properties()const;
+         global_property_object get_global_properties()const;
          /**
           * @brief Retrieve the current @ref dynamic_global_property_object
           */
@@ -137,6 +137,21 @@ namespace graphene { namespace app {
           * @return Map of account names to corresponding IDs
           */
          map<string,account_id_type> lookup_accounts(const string& lower_bound_name, uint32_t limit)const;
+
+         /**
+          * @brief Fetch all objects relevant to the specified accounts and subscribe to updates
+          * @param callback Function to call with updates
+          * @param names_or_ids Each item must be the name or ID of an account to retrieve
+          * @return Map of string from @ref names_or_ids to the corresponding account
+          *
+          * This function fetches all relevant objects for the given accounts, and subscribes to updates to the given
+          * accounts. If any of the strings in @ref names_or_ids cannot be tied to an account, that input will be
+          * ignored. All other accounts will be retrieved and subscribed.
+          *
+          * TODO: Describe the return value and argument to callback in detail
+          */
+         std::map<string,fc::variant> get_full_accounts(std::function<void(const variant&)> callback,
+                                                        const vector<string>& names_or_ids);
 
          /**
           * @brief Get limit orders in a given market
@@ -324,9 +339,9 @@ namespace graphene { namespace app {
 
          vector<bucket_object> get_market_history( asset_id_type a, asset_id_type b, uint32_t bucket_seconds,
                                                    fc::time_point_sec start, fc::time_point_sec end )const;
-         flat_set<uint32_t>    get_market_history_buckets()const;
+         flat_set<uint32_t> get_market_history_buckets()const;
       private:
-           application&              _app;
+           application& _app;
    };
 
    /**
@@ -403,7 +418,7 @@ namespace graphene { namespace app {
          std::vector<net::peer_status> get_connected_peers() const;
 
       private:
-         application&                                   _app;
+         application& _app;
    };
 
    /**
@@ -440,7 +455,7 @@ namespace graphene { namespace app {
          /// @brief Called to enable an API, not reflected.
          void enable_api( const string& api_name );
 
-         application&                      _app;
+         application& _app;
          optional< fc::api<database_api> > _database_api;
          optional< fc::api<network_broadcast_api> > _network_broadcast_api;
          optional< fc::api<network_node_api> > _network_node_api;
@@ -464,6 +479,7 @@ FC_API(graphene::app::database_api,
        (lookup_account_names)
        (get_account_count)
        (lookup_accounts)
+       (get_full_accounts)
        (get_account_balances)
        (get_named_account_balances)
        (lookup_asset_symbols)

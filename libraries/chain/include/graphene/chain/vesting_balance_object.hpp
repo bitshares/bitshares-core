@@ -159,10 +159,14 @@ namespace graphene { namespace chain {
    /**
     * @ingroup object_index
     */
+   struct by_account;
    typedef multi_index_container<
       vesting_balance_object,
       indexed_by<
-         hashed_unique< tag<by_id>, member< object, object_id_type, &object::id > >
+         hashed_unique< tag<by_id>, member< object, object_id_type, &object::id > >,
+         ordered_non_unique< tag<by_account>,
+            member<vesting_balance_object, account_id_type, &vesting_balance_object::owner>
+         >
       >
    > vesting_balance_multi_index_type;
    /**

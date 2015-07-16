@@ -149,6 +149,87 @@ namespace graphene { namespace app {
        return result;
     }
 
+    std::map<std::string, fc::variant> database_api::get_full_accounts(std::function<void(const variant&)> callback,
+                                                                       const vector<std::string>& names_or_ids)
+    {
+       std::map<std::string, fc::variant> results;
+       std::set<object_id_type> ids_to_subscribe;
+
+       for (const std::string& account_name_or_id : names_or_ids)
+       {
+          const account_object* account = nullptr;
+          if (std::isdigit(account_name_or_id[0]))
+             account = _db.find(fc::variant(account_name_or_id).as<account_id_type>());
+          else
+          {
+             const auto& idx = _db.get_index_type<account_index>().indices().get<by_name>();
+             auto itr = idx.find(account_name_or_id);
+             if (itr != idx.end())
+                account = &*itr;
+          }
+          if (account == nullptr)
+             continue;
+
+          ids_to_subscribe.insert({account->id, account->statistics});
+
+          fc::mutable_variant_object full_account;
+
+          // Add the account itself, its statistics object, cashback balance, and referral account names
+          full_account("account", *account)("statistics", account->statistics(_db))
+                ("registrar_name", account->registrar(_db).name)("referrer_name", account->referrer(_db).name)
+                ("lifetime_referrer_name", account->lifetime_referrer(_db).name);
+          if (account->cashback_vb)
+          {
+             ids_to_subscribe.insert(*account->cashback_vb);
+             full_account("cashback_balance", account->cashback_balance(_db));
+          }
+
+          // Add the account's balances
+          auto balance_range = _db.get_index_type<account_balance_index>().indices().get<by_account>().equal_range(account->id);
+          vector<account_balance_object> balances;
+          std::for_each(balance_range.first, balance_range.second,
+                        [&balances, &ids_to_subscribe](const account_balance_object& balance) {
+                           balances.emplace_back(balance);
+                           ids_to_subscribe.insert(balance.id);
+                        });
+          idump((balances));
+          full_account("balances", balances);
+
+          // Add the account's vesting balances
+          auto vesting_range = _db.get_index_type<vesting_balance_index>().indices().get<by_account>().equal_range(account->id);
+          vector<vesting_balance_object> vesting_balances;
+          std::for_each(vesting_range.first, vesting_range.second,
+                        [&vesting_balances, &ids_to_subscribe](const vesting_balance_object& balance) {
+                           vesting_balances.emplace_back(balance);
+                           ids_to_subscribe.insert(balance.id);
+                        });
+          full_account("vesting_balances", vesting_balances);
+
+          // Add the account's orders
+          auto order_range = _db.get_index_type<limit_order_index>().indices().get<by_account>().equal_range(account->id);
+          vector<limit_order_object> orders;
+          std::for_each(order_range.first, order_range.second,
+                        [&orders, &ids_to_subscribe] (const limit_order_object& order) {
+                           orders.emplace_back(order);
+                           ids_to_subscribe.insert(order.id);
+                        });
+          auto call_range = _db.get_index_type<call_order_index>().indices().get<by_account>().equal_range(account->id);
+          vector<call_order_object> calls;
+          std::for_each(call_range.first, call_range.second,
+                        [&calls, &ids_to_subscribe] (const call_order_object& call) {
+                           calls.emplace_back(call);
+                           ids_to_subscribe.insert(call.id);
+                        });
+          full_account("limit_orders", orders)("call_orders", calls);
+
+          results[account_name_or_id] = full_account;
+       }
+
+       wdump((results));
+       subscribe_to_objects(callback, vector<object_id_type>(ids_to_subscribe.begin(), ids_to_subscribe.end()));
+       return results;
+    }
+
     vector<asset> database_api::get_account_balances(account_id_type acnt, const flat_set<asset_id_type>& assets)const
     {
        vector<asset> result;
@@ -278,12 +359,12 @@ namespace graphene { namespace app {
        // we want to order witnesses by account name, but that name is in the account object
        // so the witness_index doesn't have a quick way to access it.
        // get all the names and look them all up, sort them, then figure out what
-       // records to return.  This could be optimized, but we expect the 
+       // records to return.  This could be optimized, but we expect the
        // number of witnesses to be few and the frequency of calls to be rare
        std::map<std::string, witness_id_type> witnesses_by_account_name;
        for (const witness_object& witness : witnesses_by_id)
            if (auto account_iter = _db.find(witness.witness_account))
-               if (account_iter->name >= lower_bound_name) // we can ignore anything below lower_bound_name 
+               if (account_iter->name >= lower_bound_name) // we can ignore anything below lower_bound_name
                    witnesses_by_account_name.insert(std::make_pair(account_iter->name, witness.id));
 
        auto end_iter = witnesses_by_account_name.begin();
@@ -292,7 +373,7 @@ namespace graphene { namespace app {
        witnesses_by_account_name.erase(end_iter, witnesses_by_account_name.end());
        return witnesses_by_account_name;
     }
-   
+
     map<string, committee_member_id_type> database_api::lookup_committee_member_accounts(const string& lower_bound_name, uint32_t limit)const
     {
        FC_ASSERT( limit <= 1000 );
@@ -301,12 +382,12 @@ namespace graphene { namespace app {
        // we want to order committee_members by account name, but that name is in the account object
        // so the committee_member_index doesn't have a quick way to access it.
        // get all the names and look them all up, sort them, then figure out what
-       // records to return.  This could be optimized, but we expect the 
+       // records to return.  This could be optimized, but we expect the
        // number of committee_members to be few and the frequency of calls to be rare
        std::map<std::string, committee_member_id_type> committee_members_by_account_name;
        for (const committee_member_object& committee_member : committee_members_by_id)
            if (auto account_iter = _db.find(committee_member.committee_member_account))
-               if (account_iter->name >= lower_bound_name) // we can ignore anything below lower_bound_name 
+               if (account_iter->name >= lower_bound_name) // we can ignore anything below lower_bound_name
                    committee_members_by_account_name.insert(std::make_pair(account_iter->name, committee_member.id));
 
        auto end_iter = committee_members_by_account_name.begin();
@@ -315,7 +396,7 @@ namespace graphene { namespace app {
        committee_members_by_account_name.erase(end_iter, committee_members_by_account_name.end());
        return committee_members_by_account_name;
     }
-   
+
     vector<optional<witness_object>> database_api::get_witnesses(const vector<witness_id_type>& witness_ids)const
     {
        vector<optional<witness_object>> result; result.reserve(witness_ids.size());
@@ -605,7 +686,7 @@ namespace graphene { namespace app {
        return hist->tracked_buckets();
     }
 
-    vector<bucket_object> history_api::get_market_history( asset_id_type a, asset_id_type b, 
+    vector<bucket_object> history_api::get_market_history( asset_id_type a, asset_id_type b,
                                                            uint32_t bucket_seconds, fc::time_point_sec start, fc::time_point_sec end )const
     { try {
        FC_ASSERT(_app.chain_database());
