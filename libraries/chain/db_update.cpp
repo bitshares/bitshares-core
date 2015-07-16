@@ -39,10 +39,10 @@ void database::update_global_dynamic_data( const signed_block& b )
    const auto& global_props = get_global_properties();
    auto delta_time = b.timestamp - _dgp.time;
    auto missed_blocks = (delta_time.to_seconds() / global_props.parameters.block_interval)  - 1;
+   if( _dgp.head_block_number == 0 )
+       missed_blocks = 0;
 
-   //
    // dynamic global properties updating
-   //
    modify( _dgp, [&]( dynamic_global_property_object& dgp ){
       secret_hash_type::encoder enc;
       fc::raw::pack( enc, dgp.random );
@@ -62,7 +62,7 @@ void database::update_global_dynamic_data( const signed_block& b )
 
    if( !(get_node_properties().skip_flags & skip_undo_history_check) )
    {
-      GRAPHENE_ASSERT( _dgp.recently_missed_count  < GRAPHENE_MAX_UNDO_HISTORY, undo_database_exception,
+      GRAPHENE_ASSERT( _dgp.recently_missed_count < GRAPHENE_MAX_UNDO_HISTORY, undo_database_exception,
                  "The database does not have enough undo history to support a blockchain with so many missed blocks. "
                  "Please add a checkpoint if you would like to continue applying blocks beyond this point.",
                  ("recently_missed",_dgp.recently_missed_count)("max_undo",GRAPHENE_MAX_UNDO_HISTORY) );
