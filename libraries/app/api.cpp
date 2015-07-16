@@ -650,20 +650,27 @@ namespace graphene { namespace app {
     /**
      *  @return all accounts that referr to the key or account id in their owner or active authorities.
      */
-    vector<account_id_type> database_api::get_key_references( public_key_type key )const
+    vector<vector<account_id_type>> database_api::get_key_references( vector<public_key_type> keys )const
     {
-       const auto& idx = _db.get_index_type<account_index>();
-       const auto& aidx = dynamic_cast<const primary_index<account_index>&>(idx);
-       const auto& refs = aidx.get_secondary_index<graphene::chain::account_member_index>();
-       auto itr = refs.account_to_key_memberships.find(key);
-       vector<account_id_type> result;
+       vector< vector<account_id_type> > final_result;
+       final_result.reserve(keys.size());
 
-       if( itr != refs.account_to_key_memberships.end() )
+       for( auto& key : keys )
        {
-          result.reserve( itr->second.size() );
-          for( auto item : itr->second ) result.push_back(item);
+          const auto& idx = _db.get_index_type<account_index>();
+          const auto& aidx = dynamic_cast<const primary_index<account_index>&>(idx);
+          const auto& refs = aidx.get_secondary_index<graphene::chain::account_member_index>();
+          auto itr = refs.account_to_key_memberships.find(key);
+          vector<account_id_type> result;
+
+          if( itr != refs.account_to_key_memberships.end() )
+          {
+             result.reserve( itr->second.size() );
+             for( auto item : itr->second ) result.push_back(item);
+          }
+          final_result.emplace_back( std::move(result) );
        }
-       return result;
+       return final_result;
     }
 
     /** TODO: add secondary index that will accelerate this process */

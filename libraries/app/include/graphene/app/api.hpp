@@ -276,7 +276,7 @@ namespace graphene { namespace app {
           *  @return all accounts that referr to the key or account id in their owner or active authorities.
           */
          vector<account_id_type> get_account_references( account_id_type account_id )const;
-         vector<account_id_type> get_key_references( public_key_type account_id )const;
+         vector<vector<account_id_type>> get_key_references( vector<public_key_type> key )const;
 
          /**
           *  @return all open margin positions for a given account id.
