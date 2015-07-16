@@ -216,6 +216,7 @@ processed_transaction database::push_proposal(const proposal_object& proposal)
    eval_state._is_proposed_trx = true;
 
    //Inject the approving authorities into the transaction eval state
+   /*
    std::transform(proposal.required_active_approvals.begin(),
                   proposal.required_active_approvals.end(),
                   std::inserter(eval_state.approved_by, eval_state.approved_by.begin()),
@@ -228,6 +229,7 @@ processed_transaction database::push_proposal(const proposal_object& proposal)
                   []( account_id_type id ) {
                      return std::make_pair(id, authority::owner);
                   });
+                  */
 
    eval_state.operation_results.reserve(proposal.proposed_transaction.operations.size());
    processed_transaction ptrx(proposal.proposed_transaction);
@@ -482,8 +484,13 @@ processed_transaction database::_apply_transaction(const signed_transaction& trx
    const chain_parameters& chain_parameters = get_global_properties().parameters;
    eval_state._trx = &trx;
 
-   if( !(skip & skip_transaction_signatures) )
+   if( !(skip & (skip_transaction_signatures | skip_authority_check) ) )
    {
+      auto get_active = [&]( account_id_type id ) { return &id(*this).active; };
+      auto get_owner  = [&]( account_id_type id ) { return &id(*this).owner;  };
+      trx.verify_authority( get_active, get_owner );
+
+      /*
       eval_state._sigs.reserve(trx.signatures.size());
 
       for( const auto& sig : trx.signatures )
@@ -492,6 +499,7 @@ processed_transaction database::_apply_transaction(const signed_transaction& trx
                                                            false)).second,
                     "Multiple signatures by same key detected" );
       }
+      */
    }
 
    //Skip all manner of expiration and TaPoS checking if we're on block 1; It's impossible that the transaction is
@@ -538,6 +546,7 @@ processed_transaction database::_apply_transaction(const signed_transaction& trx
    std::for_each(range.first, range.second, [](const account_balance_object& b) { FC_ASSERT(b.balance == 0); });
 
    //Make sure all signatures were needed to validate the transaction
+   /*
    if( !(skip & (skip_transaction_signatures|skip_authority_check)) )
    {
       for( const auto& item : eval_state._sigs )
@@ -545,6 +554,7 @@ processed_transaction database::_apply_transaction(const signed_transaction& trx
          FC_ASSERT( item.second, "All signatures must be used", ("item",item) );
       }
    }
+   */
 
    return ptrx;
 } FC_CAPTURE_AND_RETHROW( (trx) ) }
@@ -564,7 +574,7 @@ operation_result database::apply_operation(transaction_evaluation_state& eval_st
    auto result = eval->evaluate( eval_state, op, true );
    set_applied_operation_result( op_id, result );
    return result;
-} FC_CAPTURE_AND_RETHROW( (eval_state._sigs) ) }
+} FC_CAPTURE_AND_RETHROW(  ) }
 
 const witness_object& database::validate_block_header( uint32_t skip, const signed_block& next_block )const
 {

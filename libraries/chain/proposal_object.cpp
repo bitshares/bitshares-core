@@ -24,6 +24,22 @@ namespace graphene { namespace chain {
 bool proposal_object::is_authorized_to_execute(database& db) const
 {
    transaction_evaluation_state dry_run_eval(&db);
+
+   try {
+      verify_authority( proposed_transaction.operations, 
+                        available_key_approvals,
+                        [&]( account_id_type id ){ return &id(db).active; },
+                        [&]( account_id_type id ){ return &id(db).owner;  },
+                        available_active_approvals,
+                        available_owner_approvals );
+   } catch ( const fc::exception& e )
+   {
+      return false;
+   }
+   return true;
+
+
+   /*
    dry_run_eval._is_proposed_trx = true;
    std::transform(available_active_approvals.begin(), available_active_approvals.end(),
                   std::inserter(dry_run_eval.approved_by, dry_run_eval.approved_by.end()), [](object_id_type id) {
@@ -50,8 +66,8 @@ bool proposal_object::is_authorized_to_execute(database& db) const
    for( const auto& id : required_owner_approvals )
       if( !dry_run_eval.check_authority(id(db), authority::owner) )
          return false;
+         */
 
-   return true;
 }
 
 
