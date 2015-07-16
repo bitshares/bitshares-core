@@ -18,9 +18,11 @@
 
 #include <boost/test/unit_test.hpp>
 
+#include <graphene/chain/database.hpp>
+#include <graphene/chain/exceptions.hpp>
+
 #include <graphene/chain/account_object.hpp>
 #include <graphene/chain/asset_object.hpp>
-#include <graphene/chain/database.hpp>
 #include <graphene/chain/committee_member_object.hpp>
 #include <graphene/chain/market_evaluator.hpp>
 #include <graphene/chain/vesting_balance_object.hpp>
@@ -1227,13 +1229,85 @@ BOOST_AUTO_TEST_CASE( unimp_burn_asset_test )
 
 /**
  * This test demonstrates how using the call_order_update_operation to
- * increase the maintenance collateral ratio above the current market
- * price, perhaps setting it to infinity.
+ * trigger a margin call is legal if there is a matching order.
  */
-BOOST_AUTO_TEST_CASE_EXPECTED_FAILURES( unimp_cover_with_collateral_test, 1 )
-BOOST_AUTO_TEST_CASE( unimp_cover_with_collateral_test )
+BOOST_AUTO_TEST_CASE( cover_with_collateral_test )
 {
-   BOOST_FAIL( "not implemented" );
+   try
+   {
+      ACTORS((alice)(bob)(sam));
+      const auto& bitusd = create_bitasset("BITUSD");
+      const auto& core   = asset_id_type()(db);
+
+      BOOST_TEST_MESSAGE( "Setting price feed to $0.02 / 100" );
+      transfer(committee_account, alice_id, asset(10000000));
+      update_feed_producers( bitusd, {sam.id} );
+
+      price_feed current_feed;
+      current_feed.settlement_price = bitusd.amount( 2 ) / core.amount(100);
+      publish_feed( bitusd, sam, current_feed );
+
+      BOOST_REQUIRE( bitusd.bitasset_data(db).current_feed.settlement_price == current_feed.settlement_price );
+
+      BOOST_TEST_MESSAGE( "Alice borrows some BitUSD at 2x collateral and gives it to Bob" );
+      const call_order_object* call_order = borrow( alice, bitusd.amount(100), asset(10000) );
+      BOOST_REQUIRE( call_order != nullptr );
+
+      // wdump( (*call_order) );
+
+      transfer( alice_id, bob_id, bitusd.amount(100) );
+
+      auto update_call_order = [&]( account_id_type acct, asset delta_collateral, asset delta_debt )
+      {
+         call_order_update_operation op;
+         op.funding_account = acct;
+         op.delta_collateral = delta_collateral;
+         op.delta_debt = delta_debt;
+         transaction tx;
+         tx.operations.push_back( op );
+         tx.set_expiration( db.head_block_time() + fc::minutes(5) );
+         db.push_transaction( tx, database::skip_authority_check | database::skip_tapos_check | database::skip_transaction_signatures );
+      } ;
+
+      // margin call requirement:  1.75x
+      BOOST_TEST_MESSAGE( "Alice decreases her collateral to maint level plus one satoshi" );
+      asset delta_collateral = asset(int64_t( current_feed.maintenance_collateral_ratio ) * 5000 / GRAPHENE_COLLATERAL_RATIO_DENOM - 10000 + 1 );
+      update_call_order( alice_id, delta_collateral, bitusd.amount(0) );
+      // wdump( (*call_order) );
+
+      BOOST_TEST_MESSAGE( "Alice cannot decrease her collateral by one satoshi, there is no buyer" );
+      GRAPHENE_REQUIRE_THROW( update_call_order( alice_id, asset(-1), bitusd.amount(0) ), call_order_update_unfilled_margin_call );
+      // wdump( (*call_order) );
+
+      BOOST_TEST_MESSAGE( "Bob offers to sell most of the BitUSD at the feed" );
+      const limit_order_object* order = create_sell_order( bob_id, bitusd.amount(99), asset(4950) );
+      BOOST_REQUIRE( order != nullptr );
+      limit_order_id_type order1_id = order->id;
+      BOOST_CHECK_EQUAL( order->for_sale.value, 99 );
+      // wdump( (*call_order) );
+
+      BOOST_TEST_MESSAGE( "Alice still cannot decrease her collateral to maint level" );
+      GRAPHENE_REQUIRE_THROW( update_call_order( alice_id, asset(-1), bitusd.amount(0) ), call_order_update_unfilled_margin_call );
+      // wdump( (*call_order) );
+
+      BOOST_TEST_MESSAGE( "Bob offers to sell the last of his BitUSD in another order" );
+      order = create_sell_order( bob_id, bitusd.amount(1), asset(50) );
+      BOOST_REQUIRE( order != nullptr );
+      limit_order_id_type order2_id = order->id;
+      BOOST_CHECK_EQUAL( order->for_sale.value, 1 );
+      // wdump( (*call_order) );
+
+      BOOST_TEST_MESSAGE( "Alice decreases her collateral to maint level and Bob's orders fill" );
+      update_call_order( alice_id, asset(-1), bitusd.amount(0) );
+
+      BOOST_CHECK( db.find( order1_id ) == nullptr );
+      BOOST_CHECK( db.find( order2_id ) == nullptr );
+   }
+   catch (fc::exception& e)
+   {
+      edump((e.to_detail_string()));
+      throw;
+   }
 }
 
 BOOST_AUTO_TEST_CASE_EXPECTED_FAILURES( unimp_bulk_discount_test, 1 )
