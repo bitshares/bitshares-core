@@ -755,7 +755,7 @@ void  database_fixture::force_settle( const account_object& who, asset what )
    verify_asset_supplies(db);
 } FC_CAPTURE_AND_RETHROW( (who)(what) ) }
 
-void  database_fixture::borrow(const account_object& who, asset what, asset collateral)
+const call_order_object* database_fixture::borrow(const account_object& who, asset what, asset collateral)
 { try {
    trx.set_expiration(db.head_block_time() + fc::minutes(1));
    trx.operations.clear();
@@ -769,6 +769,14 @@ void  database_fixture::borrow(const account_object& who, asset what, asset coll
    db.push_transaction(trx, ~0);
    trx.operations.clear();
    verify_asset_supplies(db);
+
+   auto& call_idx = db.get_index_type<call_order_index>().indices().get<by_account>();
+   auto itr = call_idx.find( boost::make_tuple(who.id, what.asset_id) );
+   const call_order_object* call_obj = nullptr;
+
+   if( itr != call_idx.end() )
+      call_obj = &*itr;
+   return call_obj;
 } FC_CAPTURE_AND_RETHROW( (who.name)(what)(collateral) ) }
 
 void  database_fixture::cover(const account_object& who, asset what, asset collateral)

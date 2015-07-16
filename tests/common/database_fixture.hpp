@@ -198,9 +198,9 @@ struct database_fixture {
    void publish_feed(asset_id_type mia, account_id_type by, const price_feed& f)
    { publish_feed(mia(db), by(db), f); }
    void publish_feed(const asset_object& mia, const account_object& by, const price_feed& f);
-   void borrow(account_id_type who, asset what, asset collateral)
-   { borrow(who(db), what, collateral); }
-   void borrow(const account_object& who, asset what, asset collateral);
+   const call_order_object* borrow(account_id_type who, asset what, asset collateral)
+   { return borrow(who(db), what, collateral); }
+   const call_order_object* borrow(const account_object& who, asset what, asset collateral);
    void cover(account_id_type who, asset what, asset collateral_freed)
    { cover(who(db), what, collateral_freed); }
    void cover(const account_object& who, asset what, asset collateral_freed);
