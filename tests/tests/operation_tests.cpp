@@ -1217,15 +1217,6 @@ BOOST_AUTO_TEST_CASE( witness_pay_test )
 
 } FC_LOG_AND_RETHROW() }
 
-/**
- *  Asset Burn Test should make sure that all assets except bitassets
- *  can be burned and all supplies add up.
- */
-BOOST_AUTO_TEST_CASE_EXPECTED_FAILURES( unimp_burn_asset_test, 1 )
-BOOST_AUTO_TEST_CASE( unimp_burn_asset_test )
-{
-   BOOST_FAIL( "not implemented" );
-}
 
 /**
  * This test demonstrates how using the call_order_update_operation to

@@ -104,7 +104,10 @@ namespace graphene { namespace chain {
       share_type calculate_fee( const fee_parameters_type& k )const;
 
       void get_required_owner_authorities( flat_set<account_id_type>& a )const
-      { if( owner || active ) a.insert( account ); }
+      { if( owner ) a.insert( account ); }
+
+      void get_required_active_authorities( flat_set<account_id_type>& a )const
+      { if( !owner ) a.insert( account ); }
 
       void       get_impacted_accounts( flat_set<account_id_type>& i )const
       { 

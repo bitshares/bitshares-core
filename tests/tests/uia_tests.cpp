@@ -296,13 +296,5 @@ BOOST_AUTO_TEST_CASE( unimp_halt_transfers_flag_test )
    BOOST_FAIL( "not implemented" );
 }
 
-/**
- * verify that issuers can retract funds
- */
-BOOST_AUTO_TEST_CASE_EXPECTED_FAILURES( unimp_fund_retraction_test, 1 )
-BOOST_AUTO_TEST_CASE( unimp_fund_retraction_test )
-{
-   BOOST_FAIL( "not implemented" );
-}
 
 BOOST_AUTO_TEST_SUITE_END()
