@@ -97,7 +97,7 @@ bool database::_push_block(const signed_block& new_block)
    uint32_t skip = get_node_properties().skip_flags;
    if( !(skip&skip_fork_db) )
    {
-      auto new_head = _fork_db.push_block(new_block);
+      shared_ptr<fork_item> new_head = _fork_db.push_block(new_block);
       //If the head block from the longest chain does not build off of the current head, we need to switch forks.
       if( new_head->data.previous != head_block_id() )
       {
@@ -116,7 +116,7 @@ bool database::_push_block(const signed_block& new_block)
             {
                 optional<fc::exception> except;
                 try {
-                   auto session = _undo_db.start_undo_session();
+                   undo_database::session session = _undo_db.start_undo_session();
                    apply_block( (*ritr)->data, skip );
                    _block_id_to_block.store( (*ritr)->id, (*ritr)->data );
                    session.commit();

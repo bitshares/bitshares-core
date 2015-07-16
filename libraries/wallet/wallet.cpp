@@ -1707,8 +1707,9 @@ public:
          dbg_make_uia(master.name, "SHILL");
       } catch(...) {/* Ignore; the asset probably already exists.*/}
 
-      fc::time_point start = fc::time_point::now(); for( int i = 0; i < number_of_accounts; ++i )
-         create_account_with_private_key(key, prefix + fc::to_string(i), master.name, master.name, true, false);
+      fc::time_point start = fc::time_point::now(); 
+      for( int i = 0; i < number_of_accounts; ++i )
+         create_account_with_private_key(key, prefix + fc::to_string(i), master.name, master.name, /* broadcast = */ true, /* save wallet = */ false);
       fc::time_point end = fc::time_point::now();
       ilog("Created ${n} accounts in ${time} milliseconds",
            ("n", number_of_accounts)("time", (end - start).count() / 1000));

@@ -62,8 +62,7 @@ namespace graphene { namespace net {
          virtual bool has_item( const net::item_id& id ) = 0;
 
          /**
-          *  @brief allows the application to validate an item prior to
-          *         broadcasting to peers.
+          *  @brief Called when a new block comes in from the network
           *
           *  @param sync_mode true if the message was fetched through the sync process, false during normal operation
           *  @returns true if this message caused the blockchain to switch forks, false if it did not
@@ -71,21 +70,26 @@ namespace graphene { namespace net {
           *  @throws exception if error validating the item, otherwise the item is
           *          safe to broadcast on.
           */
-         virtual bool handle_block( const graphene::net::block_message& blk_msg, bool syncmode ) = 0;
-         virtual bool handle_transaction( const graphene::net::trx_message& trx_msg, bool syncmode  ) = 0;
+         virtual bool handle_block( const graphene::net::block_message& blk_msg, bool sync_mode, 
+                                    std::vector<fc::uint160_t>& contained_transaction_message_ids ) = 0;
+         
+         /**
+          *  @brief Called when a new transaction comes in from the network
+          *
+          *  @throws exception if error validating the item, otherwise the item is
+          *          safe to broadcast on.
+          */
+         virtual void handle_transaction( const graphene::net::trx_message& trx_msg ) = 0;
 
-         virtual bool handle_message( const message& message_to_process, bool sync_mode )
-         {
-            switch( message_to_process.msg_type )
-            {
-               case block_message_type:
-                  return handle_block(message_to_process.as<block_message>(), sync_mode);
-               case trx_message_type:
-                  return handle_transaction(message_to_process.as<trx_message>(), sync_mode);
-               default:
-                  FC_THROW( "Invalid Message Type" );
-            };
-         }
+         /**
+          *  @brief Called when a new message comes in from the network other than a
+          *         block or a transaction.  Currently there are no other possible 
+          *         messages, so this should never be called.
+          *
+          *  @throws exception if error validating the item, otherwise the item is
+          *          safe to broadcast on.
+          */
+         virtual void handle_message( const message& message_to_process ) = 0;
 
          /**
           *  Assuming all data elements are ordered in some way, this method should

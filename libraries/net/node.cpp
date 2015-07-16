@@ -276,6 +276,8 @@ namespace graphene { namespace net { namespace detail {
                                                                                        boost::accumulators::tag::count> > call_stats_accumulator;
 #define NODE_DELEGATE_METHOD_NAMES (has_item) \
                                    (handle_message) \
+                                   (handle_block) \
+                                   (handle_transaction) \
                                    (get_item_ids) \
                                    (get_item) \
                                    (get_chain_id) \
@@ -367,9 +369,9 @@ namespace graphene { namespace net { namespace detail {
       fc::variant_object get_call_statistics();
 
       bool has_item( const net::item_id& id ) override;
-      bool handle_message( const message&, bool sync_mode ) override;
-      bool handle_block( const graphene::net::block_message& blk_msg, bool syncmode ) override;
-      bool handle_transaction( const graphene::net::trx_message& trx_msg, bool syncmode ) override;
+      void handle_message( const message& ) override;
+      bool handle_block( const graphene::net::block_message& block_message, bool sync_mode, std::vector<fc::uint160_t>& contained_transaction_message_ids ) override;
+      void handle_transaction( const graphene::net::trx_message& transaction_message ) override;
       std::vector<item_hash_t> get_item_ids(uint32_t item_type,
                                             const std::vector<item_hash_t>& blockchain_synopsis,
                                             uint32_t& remaining_item_count,
@@ -448,9 +450,11 @@ namespace graphene { namespace net { namespace detail {
       bool                   _items_to_fetch_updated;
       fc::future<void>       _fetch_item_loop_done;
 
+      struct item_id_index{};
       typedef boost::multi_index_container<prioritized_item_id,
                                            boost::multi_index::indexed_by<boost::multi_index::ordered_unique<boost::multi_index::identity<prioritized_item_id> >,
-                                                                          boost::multi_index::hashed_unique<boost::multi_index::member<prioritized_item_id, item_id, &prioritized_item_id::item>,
+                                                                          boost::multi_index::hashed_unique<boost::multi_index::tag<item_id_index>, 
+                                                                                                            boost::multi_index::member<prioritized_item_id, item_id, &prioritized_item_id::item>,
                                                                                                             std::hash<item_id> > >
                                            > items_to_fetch_set_type;
       unsigned _items_to_fetch_sequence_counter;
@@ -2777,7 +2781,8 @@ namespace graphene { namespace net { namespace detail {
 
       try
       {
-        _delegate->handle_block(block_message_to_send, true);
+        std::vector<fc::uint160_t> contained_transaction_message_ids;
+        _delegate->handle_block(block_message_to_send, true, contained_transaction_message_ids);
         ilog("Successfully pushed sync block ${num} (id:${id})",
              ("num", block_message_to_send.block.block_num())
              ("id", block_message_to_send.block_id));
@@ -3095,12 +3100,31 @@ namespace graphene { namespace net { namespace detail {
         if (std::find(_most_recent_blocks_accepted.begin(), _most_recent_blocks_accepted.end(),
                       block_message_to_process.block_id) == _most_recent_blocks_accepted.end())
         {
-          _delegate->handle_block(block_message_to_process, false);
+          std::vector<fc::uint160_t> contained_transaction_message_ids;
+          _delegate->handle_block(block_message_to_process, false, contained_transaction_message_ids);
           message_validated_time = fc::time_point::now();
           ilog("Successfully pushed block ${num} (id:${id})",
                ("num", block_message_to_process.block.block_num())
                ("id", block_message_to_process.block_id));
           _most_recent_blocks_accepted.push_back(block_message_to_process.block_id);
+
+          bool new_transaction_discovered = false;
+          for (const item_hash_t& transaction_message_hash : contained_transaction_message_ids)
+          {
+            size_t items_erased = _items_to_fetch.get<item_id_index>().erase(item_id(trx_message_type, transaction_message_hash));
+            // there are two ways we could behave here: we could either act as if we received
+            // the transaction outside the block and offer it to our peers, or we could just
+            // forget about it (we would still advertise this block to our peers so they should
+            // get the transaction through that mechanism).
+            // We take the second approach, bring in the next if block to try the first approach
+            //if (items_erased)
+            //{
+            //  new_transaction_discovered = true;
+            //  _new_inventory.insert(item_id(trx_message_type, transaction_message_hash));
+            //}
+          }
+          if (new_transaction_discovered)
+            trigger_advertise_inventory_loop();
         }
         else
           dlog( "Already received and accepted this block (presumably through sync mechanism), treating it as accepted" );
@@ -3532,7 +3556,10 @@ namespace graphene { namespace net { namespace detail {
         fc::time_point message_validated_time;
         try
         {
-           _delegate->handle_message( message_to_process, false );
+          if (message_to_process.msg_type == trx_message_type)
+            _delegate->handle_transaction( message_to_process.as<trx_message>() );
+          else
+            _delegate->handle_message( message_to_process );
           message_validated_time = fc::time_point::now();
         }
         catch ( const insufficient_relay_fee& )
@@ -4914,8 +4941,8 @@ namespace graphene { namespace net { namespace detail {
     INVOKE_IN_IMPL(clear_peer_database);
   }
 
-  void node::set_total_bandwidth_limit( uint32_t upload_bytes_per_second,
-                                       uint32_t download_bytes_per_second )
+  void node::set_total_bandwidth_limit(uint32_t upload_bytes_per_second,
+                                       uint32_t download_bytes_per_second)
   {
     INVOKE_IN_IMPL(set_total_bandwidth_limit, upload_bytes_per_second, download_bytes_per_second);
   }
@@ -4968,7 +4995,16 @@ namespace graphene { namespace net { namespace detail {
     {
       try
       {
-        destination_node->delegate->handle_message(destination_node->messages_to_deliver.front(), false);
+        const message& message_to_deliver = destination_node->messages_to_deliver.front();
+        if (message_to_deliver.msg_type == trx_message_type)
+          destination_node->delegate->handle_transaction(message_to_deliver.as<trx_message>());
+        else if (message_to_deliver.msg_type == block_message_type)
+        {
+          std::vector<fc::uint160_t> contained_transaction_message_ids;
+          destination_node->delegate->handle_block(message_to_deliver.as<block_message>(), false, contained_transaction_message_ids);
+        }
+        else
+          destination_node->delegate->handle_message(message_to_deliver);
       }
       catch ( const fc::exception& e )
       {
@@ -5098,27 +5134,25 @@ namespace graphene { namespace net { namespace detail {
       INVOKE_AND_COLLECT_STATISTICS(has_item, id);
     }
 
-    bool statistics_gathering_node_delegate_wrapper::handle_message( const message& message_to_handle, bool sync_mode )
+    void statistics_gathering_node_delegate_wrapper::handle_message( const message& message_to_handle )
     {
-      INVOKE_AND_COLLECT_STATISTICS(handle_message, message_to_handle, sync_mode);
+      INVOKE_AND_COLLECT_STATISTICS(handle_message, message_to_handle);
     }
 
-    bool statistics_gathering_node_delegate_wrapper::handle_block( const graphene::net::block_message& blk_msg, bool syncmode )
+    bool statistics_gathering_node_delegate_wrapper::handle_block( const graphene::net::block_message& block_message, bool sync_mode, std::vector<fc::uint160_t>& contained_transaction_message_ids)
     {
-       if (_thread->is_current())  {  return _node_delegate->handle_block(blk_msg,syncmode);  }
-       else  return _thread->async([&](){  return _node_delegate->handle_block(blk_msg,syncmode);  }, "invoke handle_block").wait();
+      INVOKE_AND_COLLECT_STATISTICS(handle_block, block_message, sync_mode, contained_transaction_message_ids);
     }
 
-    bool statistics_gathering_node_delegate_wrapper::handle_transaction( const graphene::net::trx_message& trx_msg, bool syncmode  )
+    void statistics_gathering_node_delegate_wrapper::handle_transaction( const graphene::net::trx_message& transaction_message )
     {
-       if (_thread->is_current())  {  return _node_delegate->handle_transaction(trx_msg,syncmode);  }
-       else  return _thread->async([&](){  return _node_delegate->handle_transaction(trx_msg,syncmode);  }, "invoke handle_transaction").wait();
+      INVOKE_AND_COLLECT_STATISTICS(handle_transaction, transaction_message);
     }
 
     std::vector<item_hash_t> statistics_gathering_node_delegate_wrapper::get_item_ids(uint32_t item_type,
-                                                                                  const std::vector<item_hash_t>& blockchain_synopsis,
-                                                                                  uint32_t& remaining_item_count,
-                                                                                  uint32_t limit /* = 2000 */)
+                                                                                      const std::vector<item_hash_t>& blockchain_synopsis,
+                                                                                      uint32_t& remaining_item_count,
+                                                                                      uint32_t limit /* = 2000 */)
     {
       INVOKE_AND_COLLECT_STATISTICS(get_item_ids, item_type, blockchain_synopsis, remaining_item_count, limit);
     }
@@ -5134,8 +5168,8 @@ namespace graphene { namespace net { namespace detail {
     }
 
     std::vector<item_hash_t> statistics_gathering_node_delegate_wrapper::get_blockchain_synopsis(uint32_t item_type,
-                                                                                             const graphene::net::item_hash_t& reference_point /* = graphene::net::item_hash_t() */,
-                                                                                             uint32_t number_of_blocks_after_reference_point /* = 0 */)
+                                                                                                 const graphene::net::item_hash_t& reference_point /* = graphene::net::item_hash_t() */,
+                                                                                                 uint32_t number_of_blocks_after_reference_point /* = 0 */)
     {
       INVOKE_AND_COLLECT_STATISTICS(get_blockchain_synopsis, item_type, reference_point, number_of_blocks_after_reference_point);
     }

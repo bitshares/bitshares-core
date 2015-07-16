@@ -312,11 +312,29 @@ namespace detail {
        *
        * @throws exception if error validating the item, otherwise the item is safe to broadcast on.
        */
-      virtual bool handle_block(const graphene::net::block_message& blk_msg, bool sync_mode) override
+      virtual bool handle_block(const graphene::net::block_message& blk_msg, bool sync_mode,
+                                std::vector<fc::uint160_t>& contained_transaction_message_ids) override
       { try {
          ilog("Got block #${n} from network", ("n", blk_msg.block.block_num()));
          try {
-            return _chain_db->push_block(blk_msg.block, _is_block_producer? database::skip_nothing : database::skip_transaction_signatures);
+            bool result = _chain_db->push_block(blk_msg.block, _is_block_producer ? database::skip_nothing : database::skip_transaction_signatures);
+
+            // the block was accepted, so we now know all of the transactions contained in the block
+            if (!sync_mode)
+            {
+               // if we're not in sync mode, there's a chance we will be seeing some transactions
+               // included in blocks before we see the free-floating transaction itself.  If that
+               // happens, there's no reason to fetch the transactions, so  construct a list of the 
+               // transaction message ids we no longer need.
+               // during sync, it is unlikely that we'll see any old 
+               for (const processed_transaction& transaction : blk_msg.block.transactions)
+               {
+                  graphene::net::trx_message transaction_message(transaction);
+                  contained_transaction_message_ids.push_back(graphene::net::message(transaction_message).id());
+               }
+            }
+
+            return result;
          } catch( const fc::exception& e ) {
             elog("Error when pushing block:\n${e}", ("e", e.to_detail_string()));
             throw;
@@ -329,12 +347,17 @@ namespace detail {
          }
       } FC_CAPTURE_AND_RETHROW( (blk_msg)(sync_mode) ) }
 
-      virtual bool handle_transaction(const graphene::net::trx_message& trx_msg, bool sync_mode) override
+      virtual void handle_transaction(const graphene::net::trx_message& transaction_message) override
       { try {
          ilog("Got transaction from network");
-         _chain_db->push_transaction( trx_msg.trx );
-         return false;
-      } FC_CAPTURE_AND_RETHROW( (trx_msg)(sync_mode) ) }
+         _chain_db->push_transaction( transaction_message.trx );
+      } FC_CAPTURE_AND_RETHROW( (transaction_message) ) }
+
+      virtual void handle_message(const message& message_to_process) override
+      {
+         // not a transaction, not a block
+         FC_THROW( "Invalid Message Type" );
+      }
 
       /**
        * Assuming all data elements are ordered in some way, this method should
