@@ -213,18 +213,31 @@ void_result call_order_update_evaluator::do_apply(const call_order_update_operat
    // then we must check for margin calls and other issues
    if( !_bitasset_data->is_prediction_market )
    {
-      // Check that the order's debt per collateral is less than the system's minimum debt per collateral.
-      FC_ASSERT( ~call_obj->call_price <= _bitasset_data->current_feed.settlement_price,
-                 "Insufficient collateral for debt.",
-                 ("a", ~call_obj->call_price)("b", _bitasset_data->current_feed.settlement_price));
-
       auto call_order_id = call_obj->id;
 
       // check to see if the order needs to be margin called now, but don't allow black swans and require there to be
       // limit orders available that could be used to fill the order.
       if( d.check_call_orders( *_debt_asset, false ) )
       {
-          FC_ASSERT( !d.find_object( call_order_id ), "If updating the call order triggers a margin call, then it must completely cover the order" );
+         // if we filled at least one call order, we are OK if we totally filled.
+         GRAPHENE_ASSERT(
+            !d.find_object( call_order_id ),
+            call_order_update_unfilled_margin_call,
+            "Updating call order would trigger a margin call that cannot be fully filled",
+            ("a", ~call_obj->call_price)("b", _bitasset_data->current_feed.settlement_price)
+            );
+      }
+      else
+      {
+         // We didn't fill any call orders.  This may be because we
+         // aren't in margin call territory, or it may be because there
+         // were no matching orders.  In the latter case, we throw.
+         GRAPHENE_ASSERT(
+            ~call_obj->call_price < _bitasset_data->current_feed.settlement_price,
+            call_order_update_unfilled_margin_call,
+            "Updating call order would trigger a margin call that cannot be fully filled",
+            ("a", ~call_obj->call_price)("b", _bitasset_data->current_feed.settlement_price)
+            );
       }
    }
 
