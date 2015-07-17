@@ -181,7 +181,7 @@ void database_fixture::verify_asset_supplies( const database& db )
          total_balances[bad.options.short_backing_asset] += bad.settlement_fund;
       }
    }
-   for( const vesting_balance_object& vbo : db.get_index_type< simple_index<vesting_balance_object> >() )
+   for( const vesting_balance_object& vbo : db.get_index_type< vesting_balance_index >().indices() )
       total_balances[ vbo.balance.asset_id ] += vbo.balance.amount;
 
    total_balances[asset_id_type()] += db.get_dynamic_global_properties().witness_budget;
