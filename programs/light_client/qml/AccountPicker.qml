@@ -28,9 +28,10 @@ RowLayout {
       Layout.fillWidth: true
       TextField {
          id: accountNameField
-
          width: parent.width
+
          onEditingFinished: accountDetails.update(text)
+         onTextChanged: if (account && account.name !== text) accountDetails.update("")
       }
       Text {
          id: accountDetails
@@ -57,8 +58,8 @@ RowLayout {
                   var text = qsTr("Account ID: %1").arg(account.id < 0? qsTr("Loading...")
                                                                       : account.id)
                   if (showBalance >= 0) {
-                     text += "\n" + qsTr("Balance: %1 %2").arg(balances[showBalance].amountReal())
-                                                          .arg(balances[showBalance].type.symbol)
+                     var bal = balances[showBalance]
+                     text += "\n" + qsTr("Balance: %1 %2").arg(String(bal.amountReal())).arg(bal.type.symbol)
                   }
                   return text
                })

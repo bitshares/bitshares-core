@@ -58,13 +58,13 @@ Rectangle {
             maximumValue: maxBalance? maxBalance.amountReal() : 0
             decimals: maxBalance? maxBalance.type.precision : 0
 
-            property Balance maxBalance: senderPicker.balances && senderPicker.showBalance >= 0?
-                            senderPicker.balances[senderPicker.showBalance] : null
+            property Balance maxBalance: assetField.enabled && senderPicker.showBalance >= 0?
+                                            senderPicker.balances[senderPicker.showBalance] : null
          }
          ComboBox {
             id: assetField
             Layout.minimumWidth: Scaling.cm(3)
-            enabled: Boolean(senderPicker.balances)
+            enabled: senderPicker.balances instanceof Array && senderPicker.balances.length > 0
             model: enabled? senderPicker.balances.filter(function(balance) { return balance.amount > 0 })
                                                  .map(function(balance) { return balance.type.symbol })
                           : ["Asset Type"]
@@ -76,7 +76,7 @@ Rectangle {
          }
          Button {
             text: qsTr("Transfer")
-            enabled: senderPicker.account
+            enabled: senderPicker.account && recipientPicker.account && senderPicker.account !== recipientPicker.account && amountField.value
             onClicked: console.log(amountField.value)
          }
       }
