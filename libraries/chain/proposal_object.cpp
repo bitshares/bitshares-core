@@ -30,7 +30,7 @@ bool proposal_object::is_authorized_to_execute(database& db) const
                         available_key_approvals,
                         [&]( account_id_type id ){ return &id(db).active; },
                         [&]( account_id_type id ){ return &id(db).owner;  },
-                        GRAPHENE_MAX_SIG_CHECK_DEPTH, // TODO make chain param
+                        db.get_global_properties().parameters.max_authority_depth,
                         true, /* allow committeee */
                         available_active_approvals,
                         available_owner_approvals );
@@ -42,37 +42,6 @@ bool proposal_object::is_authorized_to_execute(database& db) const
       return false;
    }
    return true;
-
-
-   /*
-   dry_run_eval._is_proposed_trx = true;
-   std::transform(available_active_approvals.begin(), available_active_approvals.end(),
-                  std::inserter(dry_run_eval.approved_by, dry_run_eval.approved_by.end()), [](object_id_type id) {
-      return make_pair(id, authority::active);
-   });
-   std::transform(available_owner_approvals.begin(), available_owner_approvals.end(),
-                  std::inserter(dry_run_eval.approved_by, dry_run_eval.approved_by.end()), [](object_id_type id) {
-      return make_pair(id, authority::owner);
-   });
-
-   signed_transaction tmp;
-   dry_run_eval._trx = &tmp;
-
-   for( auto key_id : available_key_approvals )
-      dry_run_eval._sigs.insert( std::make_pair(key_id,true) );
-
-   //insert into dry_run_eval->_trx.signatures
-   //dry_run_eval.signed_by.insert(available_key_approvals.begin(), available_key_approvals.end());
-
-   // Check all required approvals. If any of them are unsatisfied, return false.
-   for( const auto& id : required_active_approvals )
-      if( !dry_run_eval.check_authority(id(db), authority::active) )
-         return false;
-   for( const auto& id : required_owner_approvals )
-      if( !dry_run_eval.check_authority(id(db), authority::owner) )
-         return false;
-         */
-
 }
 
 

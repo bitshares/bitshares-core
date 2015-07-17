@@ -64,6 +64,7 @@ namespace graphene { namespace chain {
       share_type              fee_liquidation_threshold           = GRAPHENE_DEFAULT_FEE_LIQUIDATION_THRESHOLD; ///< value in CORE at which accumulated fees in blockchain-issued market assets should be liquidated
       uint16_t                accounts_per_fee_scale              = GRAPHENE_DEFAULT_ACCOUNTS_PER_FEE_SCALE; ///< number of accounts between fee scalings
       uint8_t                 account_fee_scale_bitshifts         = GRAPHENE_DEFAULT_ACCOUNT_FEE_SCALE_BITSHIFTS; ///< number of times to left bitshift account registration fee at each scaling
+      uint8_t                 max_authority_depth                 = GRAPHENE_MAX_SIG_CHECK_DEPTH;
       extensions_type         extensions;
 
       void validate()const
@@ -127,5 +128,6 @@ FC_REFLECT( graphene::chain::chain_parameters,
             (fee_liquidation_threshold)
             (accounts_per_fee_scale)
             (account_fee_scale_bitshifts)
+            (max_authority_depth)
             (extensions)
           )

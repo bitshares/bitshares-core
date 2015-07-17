@@ -472,7 +472,7 @@ processed_transaction database::_apply_transaction(const signed_transaction& trx
    {
       auto get_active = [&]( account_id_type id ) { return &id(*this).active; };
       auto get_owner  = [&]( account_id_type id ) { return &id(*this).owner;  };
-      trx.verify_authority( get_active, get_owner );
+      trx.verify_authority( get_active, get_owner, get_global_properties().parameters.max_authority_depth );
    }
 
    //Skip all manner of expiration and TaPoS checking if we're on block 1; It's impossible that the transaction is
