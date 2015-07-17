@@ -215,22 +215,6 @@ processed_transaction database::push_proposal(const proposal_object& proposal)
    transaction_evaluation_state eval_state(this);
    eval_state._is_proposed_trx = true;
 
-   //Inject the approving authorities into the transaction eval state
-   /*
-   std::transform(proposal.required_active_approvals.begin(),
-                  proposal.required_active_approvals.end(),
-                  std::inserter(eval_state.approved_by, eval_state.approved_by.begin()),
-                  []( account_id_type id ) {
-                     return std::make_pair(id, authority::active);
-                  });
-   std::transform(proposal.required_owner_approvals.begin(),
-                  proposal.required_owner_approvals.end(),
-                  std::inserter(eval_state.approved_by, eval_state.approved_by.begin()),
-                  []( account_id_type id ) {
-                     return std::make_pair(id, authority::owner);
-                  });
-                  */
-
    eval_state.operation_results.reserve(proposal.proposed_transaction.operations.size());
    processed_transaction ptrx(proposal.proposed_transaction);
    eval_state._trx = &ptrx;
@@ -489,17 +473,6 @@ processed_transaction database::_apply_transaction(const signed_transaction& trx
       auto get_active = [&]( account_id_type id ) { return &id(*this).active; };
       auto get_owner  = [&]( account_id_type id ) { return &id(*this).owner;  };
       trx.verify_authority( get_active, get_owner );
-
-      /*
-      eval_state._sigs.reserve(trx.signatures.size());
-
-      for( const auto& sig : trx.signatures )
-      {
-         FC_ASSERT( eval_state._sigs.insert(std::make_pair(public_key_type(fc::ecc::public_key(sig, trx.digest())),
-                                                           false)).second,
-                    "Multiple signatures by same key detected" );
-      }
-      */
    }
 
    //Skip all manner of expiration and TaPoS checking if we're on block 1; It's impossible that the transaction is
@@ -544,17 +517,6 @@ processed_transaction database::_apply_transaction(const signed_transaction& trx
    const auto& index = get_index_type<account_balance_index>().indices().get<by_account>();
    auto range = index.equal_range(GRAPHENE_TEMP_ACCOUNT);
    std::for_each(range.first, range.second, [](const account_balance_object& b) { FC_ASSERT(b.balance == 0); });
-
-   //Make sure all signatures were needed to validate the transaction
-   /*
-   if( !(skip & (skip_transaction_signatures|skip_authority_check)) )
-   {
-      for( const auto& item : eval_state._sigs )
-      {
-         FC_ASSERT( item.second, "All signatures must be used", ("item",item) );
-      }
-   }
-   */
 
    return ptrx;
 } FC_CAPTURE_AND_RETHROW( (trx) ) }

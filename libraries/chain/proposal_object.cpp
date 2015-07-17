@@ -30,10 +30,15 @@ bool proposal_object::is_authorized_to_execute(database& db) const
                         available_key_approvals,
                         [&]( account_id_type id ){ return &id(db).active; },
                         [&]( account_id_type id ){ return &id(db).owner;  },
+                        GRAPHENE_MAX_SIG_CHECK_DEPTH, // TODO make chain param
+                        true, /* allow committeee */
                         available_active_approvals,
                         available_owner_approvals );
-   } catch ( const fc::exception& e )
+   } 
+   catch ( const fc::exception& e )
    {
+      //idump((available_active_approvals));
+      //wlog((e.to_detail_string()));
       return false;
    }
    return true;
