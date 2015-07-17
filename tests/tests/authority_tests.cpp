@@ -340,7 +340,6 @@ BOOST_AUTO_TEST_CASE( proposed_single_account )
       trx.set_expiration( db.head_block_time() + fc::seconds( 3 * db.get_global_properties().parameters.block_interval ));
       trx.set_reference_block( db.head_block_id() );
 
-      //idump((moneyman));
       trx.sign( init_account_priv_key );
       const proposal_object& proposal = db.get<proposal_object>(PUSH_TX( db, trx ).operation_results.front().get<object_id_type>());
 
@@ -353,6 +352,7 @@ BOOST_AUTO_TEST_CASE( proposed_single_account )
       proposal_update_operation pup;
       pup.proposal = proposal.id;
       pup.fee_paying_account = nathan.id;
+      BOOST_TEST_MESSAGE( "Updating the proposal to have nathan's authority" );
       pup.active_approvals_to_add.insert(nathan.id);
 
       trx.operations = {pup};
@@ -399,13 +399,13 @@ BOOST_AUTO_TEST_CASE( committee_authority )
       p.parameters.committee_proposal_review_period = fc::days(1).to_seconds();
    });
 
-   BOOST_TEST_MESSAGE( "transfering 100000 CORE to nathan, signing with committee key" );
+   BOOST_TEST_MESSAGE( "transfering 100000 CORE to nathan, signing with committee key should fail because this requires it to be part of a proposal" );
    transfer_operation top;
    top.to = nathan.id;
    top.amount = asset(100000);
    trx.operations.push_back(top);
    sign(trx, committee_key);
-   GRAPHENE_CHECK_THROW(PUSH_TX( db, trx ), fc::exception);
+   GRAPHENE_CHECK_THROW(PUSH_TX( db, trx ), graphene::chain::invalid_committee_approval );
 
    auto sign = [&] { trx.signatures.clear(); trx.sign(nathan_key); };
 

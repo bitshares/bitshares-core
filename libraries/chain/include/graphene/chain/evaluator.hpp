@@ -84,7 +84,7 @@ namespace graphene { namespace chain {
 
       database& db()const;
 
-      void check_required_authorities(const operation& op);
+      //void check_required_authorities(const operation& op);
    protected:
       /**
        * @brief Fetch objects relevant to fee payer and set pointer members
@@ -98,7 +98,7 @@ namespace graphene { namespace chain {
       /// Pays the fee and returns the number of CORE asset that were paid.
       void pay_fee();
 
-      bool verify_authority(const account_object&, authority::classification);
+      //bool verify_authority(const account_object&, authority::classification);
       object_id_type get_relative_id( object_id_type rel_id )const;
 
       void verify_authority_accounts( const authority& a )const;

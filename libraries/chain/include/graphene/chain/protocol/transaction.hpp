@@ -118,29 +118,33 @@ namespace graphene { namespace chain {
 
       /**
        *  The purpose of this method is to identify the minimal subset of @ref available_keys that are
-       *  required to sign 
+       *  required to sign given the signatures that are already provided.
        */
-      set<public_key_type> get_required_signatures( const set<public_key_type>& available_keys,
-                                                    const map<account_id_type,authority>& active_authorities,
-                                                    const map<account_id_type,authority>& owner_authorities )const;
+      set<public_key_type> get_required_signatures( const flat_set<public_key_type>& available_keys,
+                                                    const std::function<const authority*(account_id_type)>& get_active,
+                                                    const std::function<const authority*(account_id_type)>& get_owner,
+                                                    uint32_t max_recursion = GRAPHENE_MAX_SIG_CHECK_DEPTH
+                                                    )const;
 
-      /**
-       *  Given a set of private keys sign this transaction with a minimial subset of required keys.
-       *
-       *  @pram get_auth   - used to fetch the active authority required for an account referenced by another authority
-       */
-      void sign( const vector<private_key_type>& keys, 
-                 const std::function<const authority*(account_id_type)>& get_active,
-                 const std::function<const authority*(account_id_type)>& get_owner  );
-      
-      bool verify( const std::function<const authority*(account_id_type)>& get_active,
-                   const std::function<const authority*(account_id_type)>& get_owner  )const;
+      void verify_authority( const std::function<const authority*(account_id_type)>& get_active,
+                             const std::function<const authority*(account_id_type)>& get_owner,
+                             uint32_t max_recursion = GRAPHENE_MAX_SIG_CHECK_DEPTH )const;
+
+      flat_set<public_key_type> get_signature_keys()const;
 
       vector<signature_type> signatures;
 
       /// Removes all operations and signatures
       void clear() { operations.clear(); signatures.clear(); }
    };
+
+   void verify_authority( const vector<operation>& ops, const flat_set<public_key_type>& sigs, 
+                          const std::function<const authority*(account_id_type)>& get_active,
+                          const std::function<const authority*(account_id_type)>& get_owner,
+                          uint32_t max_recursion = GRAPHENE_MAX_SIG_CHECK_DEPTH,
+                          bool allow_committe = false,
+                          const flat_set<account_id_type>& active_aprovals = flat_set<account_id_type>(),
+                          const flat_set<account_id_type>& owner_approvals = flat_set<account_id_type>());
 
    /**
     *  @brief captures the result of evaluating the operations contained in the transaction

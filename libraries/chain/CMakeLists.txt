@@ -43,7 +43,6 @@ add_library( graphene_chain
              proposal_object.cpp
              vesting_balance_object.cpp
 
-             transaction_evaluation_state.cpp
              fork_database.cpp
              block_database.cpp
 

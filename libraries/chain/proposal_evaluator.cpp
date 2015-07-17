@@ -121,7 +121,6 @@ void_result proposal_update_evaluator::do_evaluate(const proposal_update_operati
    }
 
    /*  All authority checks happen outside of evaluators
-   */
    if( (d.get_node_properties().skip_flags & database::skip_authority_check) == 0 )
    {
       for( const auto& id : o.key_approvals_to_add )
@@ -133,6 +132,7 @@ void_result proposal_update_evaluator::do_evaluate(const proposal_update_operati
          FC_ASSERT( trx_state->signed_by(id) );
       }
    }
+   */
 
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }

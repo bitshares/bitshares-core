@@ -34,7 +34,7 @@ database& generic_evaluator::db()const { return trx_state->db(); }
    operation_result generic_evaluator::start_evaluate( transaction_evaluation_state& eval_state, const operation& op, bool apply )
    { try {
       trx_state   = &eval_state;
-      check_required_authorities(op);
+      //check_required_authorities(op);
       auto result = evaluate( op );
 
       if( apply ) result = this->apply( op );
@@ -77,6 +77,7 @@ database& generic_evaluator::db()const { return trx_state->db(); }
       });
    } FC_CAPTURE_AND_RETHROW() }
 
+   /*
    bool generic_evaluator::verify_authority( const account_object& a, authority::classification c )
    { try {
        return trx_state->check_authority( a, c );
@@ -117,6 +118,7 @@ database& generic_evaluator::db()const { return trx_state->db(); }
       }
 
    } FC_CAPTURE_AND_RETHROW( (op) ) }
+   */
 
    void generic_evaluator::verify_authority_accounts( const authority& a )const
    {

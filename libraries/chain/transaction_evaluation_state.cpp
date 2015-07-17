@@ -23,6 +23,7 @@
 #include <graphene/chain/exceptions.hpp>
 
 namespace graphene { namespace chain {
+   /*
    bool transaction_evaluation_state::check_authority( const account_object& account, authority::classification auth_class, int depth )
    {
       if( (!_is_proposed_trx) && (_db->get_node_properties().skip_flags & database::skip_authority_check)  )
@@ -121,5 +122,6 @@ namespace graphene { namespace chain {
          if( itr->first == k ) return itr->second = true;
       return false;
    }
+   */
 
 } } // namespace graphene::chain

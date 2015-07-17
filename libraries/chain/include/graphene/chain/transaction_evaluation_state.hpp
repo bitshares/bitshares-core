@@ -32,30 +32,10 @@ namespace graphene { namespace chain {
          transaction_evaluation_state( database* db = nullptr )
          :_db(db){}
 
-         bool check_authority(const account_object&,
-                              authority::classification auth_class = authority::active,
-                              int depth = 0);
 
-         bool check_authority(const authority&,
-                              authority::classification auth_class = authority::active,
-                              int depth = 0);
-
-         database& db()const { FC_ASSERT( _db ); return *_db; }
-
-         bool signed_by(const public_key_type& k);
-         bool signed_by(const address& k);
-
-         /// cached approval (accounts and keys)
-         flat_set<pair<object_id_type,authority::classification>> approved_by;
-
-         /// Used to look up new objects using transaction relative IDs
+         database& db()const { assert( _db ); return *_db; }
          vector<operation_result> operation_results;
 
-         /**
-          * When an address is referenced via check authority it is flagged as being used, all addresses must be
-          * flagged as being used or the transaction will fail.
-          */
-         flat_map<public_key_type, bool>  _sigs;
          const signed_transaction*        _trx = nullptr;
          database*                        _db = nullptr;
          bool                             _is_proposed_trx = false;
