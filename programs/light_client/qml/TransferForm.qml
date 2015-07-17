@@ -7,14 +7,20 @@ import Graphene.Client 0.1
 
 import "."
 
+/**
+ * This is the form for transferring some amount of asset from one account to another.
+ */
 Rectangle {
+   id: root
    anchors.fill: parent
-
-   property alias senderAccount: senderPicker.account
-   property alias receiverAccount: recipientPicker.account
 
    property GrapheneApplication app
    signal finished
+
+   /// The Account object for the sender
+   property alias senderAccount: senderPicker.account
+   /// The Account object for the receiver
+   property alias receiverAccount: recipientPicker.account
 
    Component.onCompleted: console.log("Made a transfer form")
    Component.onDestruction: console.log("Destroyed a transfer form")
@@ -26,6 +32,13 @@ Rectangle {
 
       AccountPicker {
          id: senderPicker
+         // The senderPicker is really the heart of the form. Everything else in the form adjusts based on the account
+         // selected here. The assetField below updates to contain all assets this account has a nonzero balance in.
+         // The amountField updates based on the asset selected in the assetField to have the appropriate precision and
+         // to have a maximum value equal to the account's balance in that asset. The transfer button enables only when
+         // both accounts are set, and a nonzero amount is selected to be transferred.
+
+         app: root.app
          Layout.fillWidth: true
          Layout.minimumWidth: Scaling.cm(5)
          Component.onCompleted: setFocus()
@@ -37,6 +50,7 @@ Rectangle {
       }
       AccountPicker {
          id: recipientPicker
+         app: root.app
          Layout.fillWidth: true
          Layout.minimumWidth: Scaling.cm(5)
          placeholderText: qsTr("Recipient")

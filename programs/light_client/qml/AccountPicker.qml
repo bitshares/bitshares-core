@@ -7,14 +7,21 @@ import Graphene.Client 0.1
 
 import "."
 
+/// A component for choosing an Account from the chain
 RowLayout {
+   property GrapheneApplication app
+   /// The text to show in the name field when it is empty
+   property alias placeholderText: accountNameField.placeholderText
+   /// Index into the balances Array of the balance to show beneath the name field
+   property int showBalance: -1
+
+   /// The Account object the user has selected
    property Account account
+   /// An Array of Balance objects held by account
    property var balances: account? Object.keys(account.balances).map(function(key){return account.balances[key]})
                                  : null
 
-   property alias placeholderText: accountNameField.placeholderText
-   property int showBalance: -1
-
+   /// Set the name field to have active focus
    function setFocus() {
       accountNameField.forceActiveFocus()
    }
