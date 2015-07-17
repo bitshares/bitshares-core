@@ -144,7 +144,12 @@ void_result asset_reserve_evaluator::do_evaluate( const asset_reserve_operation&
    database& d   = db();
 
    const asset_object& a = o.amount_to_reserve.asset_id(d);
-   FC_ASSERT( !a.is_market_issued() );
+   GRAPHENE_ASSERT(
+      !a.is_market_issued(),
+      asset_reserve_invalid_on_mia,
+      "Cannot reserve ${sym} because it is a market-issued asset",
+      ("sym", a.symbol)
+   );
 
    from_account = &o.payer(d);
 

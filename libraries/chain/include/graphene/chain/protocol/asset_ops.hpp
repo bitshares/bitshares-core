@@ -366,7 +366,7 @@ namespace graphene { namespace chain {
     * @brief used to take an asset out of circulation, returning to the issuer
     * @ingroup operations
     *
-    * @note You cannot burn market-issued assets.
+    * @note You cannot use this operation on market-issued assets.
     */
    struct asset_reserve_operation : public base_operation
    {
