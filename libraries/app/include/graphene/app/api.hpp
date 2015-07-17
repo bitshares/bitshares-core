@@ -110,12 +110,12 @@ namespace graphene { namespace app {
          vector<optional<account_object>> lookup_account_names(const vector<string>& account_names)const;
          /**
           * @brief Get a list of assets by symbol
-          * @param asset_symbols Symbols of the assets to retrieve
-          * @return The assets corresponding to the provided symbols
+          * @param asset_symbols Symbols or stringified IDs of the assets to retrieve
+          * @return The assets corresponding to the provided symbols or IDs
           *
           * This function has semantics identical to @ref get_objects
           */
-         vector<optional<asset_object>> lookup_asset_symbols(const vector<string>& asset_symbols)const;
+         vector<optional<asset_object>> lookup_asset_symbols(const vector<string>& symbols_or_ids)const;
 
          /**
           * @brief Get an account's balances in various assets

@@ -18,6 +18,8 @@
 using boost::multi_index_container;
 using namespace boost::multi_index;
 
+using graphene::chain::by_id;
+
 using ObjectId = qint64;
 Q_DECLARE_METATYPE(ObjectId)
 
@@ -83,7 +85,6 @@ Q_SIGNALS:
    void precisionChanged();
 };
 
-struct by_id;
 struct by_symbol_name;
 typedef multi_index_container<
    Asset*,
@@ -130,6 +131,13 @@ public:
    QString name()const { return m_name; }
    QQmlListProperty<Balance> balances();
 
+   void setBalances(QList<Balance*> balances) {
+      if (balances != m_balances) {
+         m_balances = balances;
+         Q_EMIT balancesChanged();
+      }
+   }
+
 Q_SIGNALS:
    void nameChanged();
    void balancesChanged();
@@ -147,6 +155,9 @@ typedef multi_index_container<
 class ChainDataModel : public QObject {
    Q_OBJECT
 
+   void getAssetImpl(QString assetIdentifier, Asset* const * assetInContainer);
+   void getAccountImpl(QString accountIdentifier, Account* const * accountInContainer);
+
 public:
    Q_INVOKABLE Account* getAccount(ObjectId id);
    Q_INVOKABLE Account* getAccount(QString name);
@@ -163,7 +174,7 @@ Q_SIGNALS:
    void exceptionThrown( QString message );
 
 private:
-   fc::thread*                           m_thread = nullptr;
+   fc::thread*                           m_rpc_thread = nullptr;
    std::string                           m_api_url;
    fc::api<graphene::app::database_api>  m_db_api;
 
@@ -186,13 +197,15 @@ class GrapheneApplication : public QObject {
    boost::signals2::scoped_connection m_connectionClosed;
 
    std::shared_ptr<fc::http::websocket_client>  m_client;
-   fc::future<void>                        m_done;
+   fc::future<void> m_done;
 
-   void setIsConnected( bool v );
+   void setIsConnected(bool v);
 
-   Q_SLOT void execute( const std::function<void()>& )const;
+protected Q_SLOTS:
+   void execute(const std::function<void()>&)const;
+
 public:
-   GrapheneApplication( QObject* parent = nullptr );
+   GrapheneApplication(QObject* parent = nullptr);
    ~GrapheneApplication();
 
    ChainDataModel* model() const
@@ -201,8 +214,8 @@ public:
    }
 
    Q_INVOKABLE void start(QString apiUrl,
-                           QString user,
-                           QString pass );
+                          QString user,
+                          QString pass);
 
    bool isConnected() const
    {

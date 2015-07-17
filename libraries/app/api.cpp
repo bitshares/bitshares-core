@@ -82,14 +82,19 @@ namespace graphene { namespace app {
        return result;
     }
 
-    vector<optional<asset_object>> database_api::lookup_asset_symbols(const vector<string>& symbols)const
+    vector<optional<asset_object>> database_api::lookup_asset_symbols(const vector<string>& symbols_or_ids)const
     {
        const auto& assets_by_symbol = _db.get_index_type<asset_index>().indices().get<by_symbol>();
        vector<optional<asset_object> > result;
-       result.reserve(symbols.size());
-       std::transform(symbols.begin(), symbols.end(), std::back_inserter(result),
-                      [&assets_by_symbol](const string& symbol) -> optional<asset_object> {
-          auto itr = assets_by_symbol.find(symbol);
+       result.reserve(symbols_or_ids.size());
+       std::transform(symbols_or_ids.begin(), symbols_or_ids.end(), std::back_inserter(result),
+                      [this, &assets_by_symbol](const string& symbol_or_id) -> optional<asset_object> {
+          if( !symbol_or_id.empty() && std::isdigit(symbol_or_id[0]) )
+          {
+             auto ptr = _db.find(variant(symbol_or_id).as<asset_id_type>());
+             return ptr == nullptr? optional<asset_object>() : *ptr;
+          }
+          auto itr = assets_by_symbol.find(symbol_or_id);
           return itr == assets_by_symbol.end()? optional<asset_object>() : *itr;
        });
        return result;

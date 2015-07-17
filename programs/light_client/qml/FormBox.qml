@@ -84,7 +84,6 @@ Rectangle {
          StateChangeScript {
             name: "postHidden"
             script: {
-               console.log("Post")
                greySheet.closed()
                formContainer.data = []
                if (internal.callback instanceof Function)

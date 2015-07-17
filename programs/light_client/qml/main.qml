@@ -110,15 +110,10 @@ ApplicationWindow {
             if (acct == null)
                console.log("Got back null account")
             else if ( !(parseInt(acct.name) <= 0)  )
-            {
-               console.log("NAME ALREADY SET" );
                console.log(JSON.stringify(acct))
-            }
-            else
-            {
+            else {
                console.log("Waiting for result...")
                acct.nameChanged.connect(function() {
-                  console.log( "NAME CHANGED" );
                   console.log(JSON.stringify(acct))
                })
             }
@@ -141,14 +136,12 @@ ApplicationWindow {
                console.log("Got back null asset")
             else if ( !(parseInt(acct.name) <= 0)  )
             {
-               console.log("NAME ALREADY SET" );
                console.log(JSON.stringify(acct))
             }
             else
             {
                console.log("Waiting for result...")
                acct.nameChanged.connect(function() {
-                  console.log( "NAME CHANGED" );
                   console.log(JSON.stringify(acct))
                })
             }
