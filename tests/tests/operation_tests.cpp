@@ -1221,7 +1221,6 @@ BOOST_AUTO_TEST_CASE( witness_pay_test )
  *  Reserve asset test should make sure that all assets except bitassets
  *  can be burned, and all supplies add up.
  */
-BOOST_AUTO_TEST_CASE_EXPECTED_FAILURES( reserve_asset_test, 1 )
 BOOST_AUTO_TEST_CASE( reserve_asset_test )
 {
    try
@@ -1393,49 +1392,6 @@ BOOST_AUTO_TEST_CASE( unimp_bulk_discount_test )
    //const account_object& shorter1  = create_account( "alice" );
    //const account_object& shorter2  = create_account( "bob" );
    BOOST_FAIL( "not implemented" );
-}
-/**
- *  Assume the referrer gets 99% of transaction fee
- */
-BOOST_AUTO_TEST_CASE_EXPECTED_FAILURES( unimp_transfer_cashback_test, 1 )
-BOOST_AUTO_TEST_CASE( unimp_transfer_cashback_test )
-{
-   try {
-   BOOST_FAIL( "Rewrite this test with VBO based cashback" );
-#if 0
-   generate_blocks(1);
-
-   const account_object& sam  = create_account( "sam" );
-   transfer(account_id_type()(db), sam, asset(30000));
-   upgrade_to_lifetime_member(sam);
-
-   ilog( "Creating alice" );
-   const account_object& alice  = create_account( "alice", sam, sam, 0 );
-   ilog( "Creating bob" );
-   const account_object& bob    = create_account( "bob", sam, sam, 0 );
-
-   transfer(account_id_type()(db), alice, asset(300000));
-
-   enable_fees();
-
-   transfer(alice, bob, asset(100000));
-
-   BOOST_REQUIRE_EQUAL( alice.statistics(db).lifetime_fees_paid.value, GRAPHENE_BLOCKCHAIN_PRECISION  );
-
-   const asset_dynamic_data_object& core_asset_data = db.get_core_asset().dynamic_asset_data_id(db);
-   // 1% of fee goes to witnesses
-   BOOST_CHECK_EQUAL(core_asset_data.accumulated_fees.value,
-                     GRAPHENE_BLOCKCHAIN_PRECISION/100/*witness*/ + GRAPHENE_BLOCKCHAIN_PRECISION/5 /*burn*/);
-   // 99% of fee goes to referrer / registrar sam
-   BOOST_CHECK_EQUAL( sam.statistics(db).cashback_rewards.value,
-                      GRAPHENE_BLOCKCHAIN_PRECISION - GRAPHENE_BLOCKCHAIN_PRECISION/100/*witness*/  - GRAPHENE_BLOCKCHAIN_PRECISION/5/*burn*/);
-
-#endif
-   } catch( const fc::exception& e )
-   {
-      edump((e.to_detail_string()));
-      throw;
-   }
 }
 
 BOOST_AUTO_TEST_CASE( vesting_balance_create_test )
