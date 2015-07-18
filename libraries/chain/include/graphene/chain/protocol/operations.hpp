@@ -14,6 +14,7 @@
 #include <graphene/chain/protocol/withdraw_permission.hpp>
 #include <graphene/chain/protocol/witness.hpp>
 #include <graphene/chain/protocol/worker.hpp>
+#include <graphene/chain/protocol/splitter.hpp>
 
 namespace graphene { namespace chain {
 
@@ -59,7 +60,12 @@ namespace graphene { namespace chain {
             custom_operation,
             assert_operation,
             balance_claim_operation,
-            override_transfer_operation
+            override_transfer_operation,
+            splitter_create_operation,
+            splitter_update_operation,
+            splitter_pay_operation,
+            splitter_payout_operation,
+            splitter_delete_operation
          > operation;
 
    /// @} // operations group
