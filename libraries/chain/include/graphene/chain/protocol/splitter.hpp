@@ -1,4 +1,18 @@
-/* Copyright (c) 2015, Cryptonomex, Inc. */
+/* Copyright (c) 2015, Cryptonomex, Inc. 
+ *
+ * The proposed feature is the Payment Splitter, which is capable of receiving 
+ * payments and disseminating these payments to a pre- defined list of weighted 
+ * targets proportionally to the weight assigned each target. The targets 
+ * defined in this document are accounts, and asset markets. 
+ *
+ * A payment sent to the object may optionally be limited by a
+ * minimum and maximum. The object will collect payments until the total
+ * balance of the object exceeds a threshold, at which point it will auto-
+ * matically pay to the targets, subtracting fees from the balance prior to
+ * processing. Alternatively, a payout can be manually triggered with an
+ * operation that pays the fee explicitly.
+ *
+ * */
 #pragma once
 #include <graphene/chain/protocol/base.hpp>
 
