@@ -50,25 +50,6 @@ void account_balance_object::adjust_balance(const asset& delta)
    balance += delta.amount;
 }
 
-uint16_t account_statistics_object::calculate_bulk_discount_percent(const chain_parameters& params) const
-{
-   uint64_t bulk_discount_percent = 0;
-   if( lifetime_fees_paid >= params.bulk_discount_threshold_max )
-      bulk_discount_percent = params.max_bulk_discount_percent_of_fee;
-   else if(params.bulk_discount_threshold_max.value !=
-           params.bulk_discount_threshold_min.value)
-   {
-      bulk_discount_percent =
-            (params.max_bulk_discount_percent_of_fee *
-             (lifetime_fees_paid.value -
-              params.bulk_discount_threshold_min.value)) /
-            (params.bulk_discount_threshold_max.value -
-             params.bulk_discount_threshold_min.value);
-   }
-   assert( bulk_discount_percent <= GRAPHENE_100_PERCENT );
-
-   return bulk_discount_percent;
-}
 
 void account_statistics_object::process_fees(const account_object& a, database& d) const
 {
@@ -116,17 +97,6 @@ void account_statistics_object::process_fees(const account_object& a, database& 
       share_type vesting_fee_subtotal(pending_fees);
       share_type vested_fee_subtotal(pending_vested_fees);
       share_type vesting_cashback, vested_cashback;
-
-      if( lifetime_fees_paid > props.parameters.bulk_discount_threshold_min &&
-          a.is_member(d.head_block_time()) )
-      {
-         auto bulk_discount_rate = calculate_bulk_discount_percent(props.parameters);
-         vesting_cashback = cut_fee(vesting_fee_subtotal, bulk_discount_rate);
-         vesting_fee_subtotal -= vesting_cashback;
-
-         vested_cashback = cut_fee(vested_fee_subtotal, bulk_discount_rate);
-         vested_fee_subtotal -= vested_cashback;
-      }
 
       pay_out_fees(a, vesting_fee_subtotal, true);
       d.deposit_cashback(a, vesting_cashback, true);

@@ -74,8 +74,6 @@ namespace graphene { namespace chain {
           */
          share_type pending_vested_fees;
 
-         /// @brief Calculate the percentage discount this user receives on his fees
-         uint16_t calculate_bulk_discount_percent(const chain_parameters& params)const;
          /// @brief Split up and pay out @ref pending_fees and @ref pending_vested_fees
          void process_fees(const account_object& a, database& d) const;
    };
