@@ -286,14 +286,84 @@ BOOST_AUTO_TEST_CASE( transfer_whitelist_uia )
    }
 }
 
-
 /**
  * verify that issuers can halt transfers
  */
-BOOST_AUTO_TEST_CASE_EXPECTED_FAILURES( unimp_halt_transfers_flag_test, 1 )
-BOOST_AUTO_TEST_CASE( unimp_halt_transfers_flag_test )
+BOOST_AUTO_TEST_CASE( transfer_restricted_test )
 {
-   BOOST_FAIL( "not implemented" );
+   try
+   {
+      ACTORS( (sam)(alice)(bob) );
+
+      BOOST_TEST_MESSAGE( "Issuing 1000 UIA to Alice" );
+
+      auto _issue_uia = [&]( const account_object& recipient, asset amount )
+      {
+         asset_issue_operation op;
+         op.issuer = amount.asset_id(db).issuer;
+         op.asset_to_issue = amount;
+         op.issue_to_account = recipient.id;
+         transaction tx;
+         tx.operations.push_back( op );
+         tx.set_expiration( db.head_block_time() + fc::minutes(5) );
+         PUSH_TX( db, tx, database::skip_authority_check | database::skip_tapos_check | database::skip_transaction_signatures );
+      } ;
+
+      asset           fee;
+      account_id_type issuer;
+      asset_id_type   asset_to_update;
+
+      /// If the asset is to be given a new issuer, specify his ID here.
+      optional<account_id_type>   new_issuer;
+      asset_options               new_options;
+      extensions_type             extensions;
+
+      const asset_object& uia = create_user_issued_asset( "TXRX", sam, transfer_restricted );
+      _issue_uia( alice, uia.amount( 1000 ) );
+
+      auto _restrict_xfer = [&]( bool xfer_flag )
+      {
+         asset_update_operation op;
+         op.issuer = sam_id;
+         op.asset_to_update = uia.id;
+         op.new_options = uia.options;
+         if( xfer_flag )
+            op.new_options.flags |= transfer_restricted;
+         else
+            op.new_options.flags &= ~transfer_restricted;
+         transaction tx;
+         tx.operations.push_back( op );
+         tx.set_expiration( db.head_block_time() + fc::minutes(5) );
+         PUSH_TX( db, tx, database::skip_authority_check | database::skip_tapos_check | database::skip_transaction_signatures );
+      } ;
+
+      BOOST_TEST_MESSAGE( "Enable transfer_restricted, send fails" );
+
+      transfer_operation xfer_op;
+      xfer_op.from = alice_id;
+      xfer_op.to = bob_id;
+      xfer_op.amount = uia.amount(100);
+      signed_transaction xfer_tx;
+      xfer_tx.operations.push_back( xfer_op );
+      xfer_tx.set_expiration( db.head_block_time() + fc::minutes(5) );
+      sign( xfer_tx, alice_private_key );
+
+      _restrict_xfer( true );
+      GRAPHENE_REQUIRE_THROW( PUSH_TX( db, xfer_tx ), transfer_restricted_transfer_asset );
+
+      BOOST_TEST_MESSAGE( "Disable transfer_restricted, send succeeds" );
+
+      _restrict_xfer( false );
+      PUSH_TX( db, xfer_tx );
+
+      xfer_op.amount = uia.amount(101);
+
+   }
+   catch(fc::exception& e)
+   {
+      edump((e.to_detail_string()));
+      throw;
+   }
 }
 
 
