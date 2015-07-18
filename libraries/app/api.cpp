@@ -154,10 +154,10 @@ namespace graphene { namespace app {
        return result;
     }
 
-    std::map<std::string, fc::variant> database_api::get_full_accounts(std::function<void(const variant&)> callback,
+    std::map<std::string, full_account> database_api::get_full_accounts(std::function<void(const variant&)> callback,
                                                                        const vector<std::string>& names_or_ids)
     {
-       std::map<std::string, fc::variant> results;
+       std::map<std::string, full_account> results;
        std::set<object_id_type> ids_to_subscribe;
 
        for (const std::string& account_name_or_id : names_or_ids)
@@ -177,59 +177,58 @@ namespace graphene { namespace app {
 
           ids_to_subscribe.insert({account->id, account->statistics});
 
-          fc::mutable_variant_object full_account;
+          // fc::mutable_variant_object full_account;
+          full_account acnt;
+          acnt.account = *account;
+          acnt.statistics = account->statistics(_db);
+          acnt.registrar_name = account->registrar(_db).name;
+          acnt.referrer_name = account->referrer(_db).name;
+          acnt.lifetime_referrer_name = account->lifetime_referrer(_db).name;
 
           // Add the account itself, its statistics object, cashback balance, and referral account names
+          /*
           full_account("account", *account)("statistics", account->statistics(_db))
                 ("registrar_name", account->registrar(_db).name)("referrer_name", account->referrer(_db).name)
                 ("lifetime_referrer_name", account->lifetime_referrer(_db).name);
+                */
           if (account->cashback_vb)
           {
              ids_to_subscribe.insert(*account->cashback_vb);
-             full_account("cashback_balance", account->cashback_balance(_db));
+             acnt.cashback_balance = account->cashback_balance(_db);
           }
 
           // Add the account's balances
           auto balance_range = _db.get_index_type<account_balance_index>().indices().get<by_account>().equal_range(account->id);
-          vector<account_balance_object> balances;
+          //vector<account_balance_object> balances;
           std::for_each(balance_range.first, balance_range.second,
-                        [&balances, &ids_to_subscribe](const account_balance_object& balance) {
-                           balances.emplace_back(balance);
+                        [&acnt, &ids_to_subscribe](const account_balance_object& balance) {
+                           acnt.balances.emplace_back(balance);
                            ids_to_subscribe.insert(balance.id);
                         });
-          idump((balances));
-          full_account("balances", balances);
 
           // Add the account's vesting balances
           auto vesting_range = _db.get_index_type<vesting_balance_index>().indices().get<by_account>().equal_range(account->id);
-          vector<vesting_balance_object> vesting_balances;
           std::for_each(vesting_range.first, vesting_range.second,
-                        [&vesting_balances, &ids_to_subscribe](const vesting_balance_object& balance) {
-                           vesting_balances.emplace_back(balance);
+                        [&acnt, &ids_to_subscribe](const vesting_balance_object& balance) {
+                           acnt.vesting_balances.emplace_back(balance);
                            ids_to_subscribe.insert(balance.id);
                         });
-          full_account("vesting_balances", vesting_balances);
 
           // Add the account's orders
           auto order_range = _db.get_index_type<limit_order_index>().indices().get<by_account>().equal_range(account->id);
-          vector<limit_order_object> orders;
           std::for_each(order_range.first, order_range.second,
-                        [&orders, &ids_to_subscribe] (const limit_order_object& order) {
-                           orders.emplace_back(order);
+                        [&acnt, &ids_to_subscribe] (const limit_order_object& order) {
+                           acnt.limit_orders.emplace_back(order);
                            ids_to_subscribe.insert(order.id);
                         });
           auto call_range = _db.get_index_type<call_order_index>().indices().get<by_account>().equal_range(account->id);
-          vector<call_order_object> calls;
           std::for_each(call_range.first, call_range.second,
-                        [&calls, &ids_to_subscribe] (const call_order_object& call) {
-                           calls.emplace_back(call);
+                        [&acnt, &ids_to_subscribe] (const call_order_object& call) {
+                           acnt.call_orders.emplace_back(call);
                            ids_to_subscribe.insert(call.id);
                         });
-          full_account("limit_orders", orders)("call_orders", calls);
-
-          results[account_name_or_id] = full_account;
+          results[account_name_or_id] = acnt;
        }
-
        wdump((results));
        subscribe_to_objects(callback, vector<object_id_type>(ids_to_subscribe.begin(), ids_to_subscribe.end()));
        return results;

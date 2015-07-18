@@ -29,6 +29,7 @@
 #include <graphene/net/node.hpp>
 
 #include <graphene/market_history/market_history_plugin.hpp>
+#include <graphene/app/full_account.hpp>
 
 #include <fc/api.hpp>
 
@@ -150,7 +151,7 @@ namespace graphene { namespace app {
           *
           * TODO: Describe the return value and argument to callback in detail
           */
-         std::map<string,fc::variant> get_full_accounts(std::function<void(const variant&)> callback,
+         std::map<string,full_account> get_full_accounts(std::function<void(const variant&)> callback,
                                                         const vector<string>& names_or_ids);
 
          /**
