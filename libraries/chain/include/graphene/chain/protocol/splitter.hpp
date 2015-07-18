@@ -35,8 +35,10 @@ namespace graphene { namespace chain {
 
    struct splitter_create_operation : public base_operation
    {
-      /// TODO: charge fee based upon size
-      struct fee_parameters_type { uint64_t fee = GRAPHENE_BLOCKCHAIN_PRECISION; };
+      struct fee_parameters_type { 
+         uint64_t fee = GRAPHENE_BLOCKCHAIN_PRECISION; 
+         uint32_t price_per_kbyte = GRAPHENE_BLOCKCHAIN_PRECISION;
+      };
 
       asset                        fee;
       account_id_type              payer;
@@ -59,12 +61,16 @@ namespace graphene { namespace chain {
          }
       }
       account_id_type fee_payer()const { return payer; }
+      share_type      calculate_fee(const fee_parameters_type& k )const
+      { return calculate_data_fee( fc::raw::pack_size(*this), k.price_per_kbyte ) + k.fee; }
    };
 
    struct splitter_update_operation : public base_operation
    {
-      /// TODO: charge fee based upon size
-      struct fee_parameters_type { uint64_t fee = GRAPHENE_BLOCKCHAIN_PRECISION; };
+      struct fee_parameters_type { 
+         uint64_t fee = GRAPHENE_BLOCKCHAIN_PRECISION; 
+         uint32_t price_per_kbyte = GRAPHENE_BLOCKCHAIN_PRECISION;
+      };
 
       asset                    fee;
       splitter_id_type         splitter_id;
@@ -85,6 +91,8 @@ namespace graphene { namespace chain {
       }
 
       account_id_type fee_payer()const { return owner; }
+      share_type      calculate_fee(const fee_parameters_type& k )const
+      { return calculate_data_fee( fc::raw::pack_size(*this), k.price_per_kbyte ) + k.fee; }
    };
 
    struct splitter_pay_operation : public base_operation
@@ -139,8 +147,8 @@ FC_REFLECT( graphene::chain::splitter_update_operation, (fee)(owner)(new_owner)(
 FC_REFLECT( graphene::chain::splitter_pay_operation, (fee)(splitter_id)(paying_account)(payment) )
 FC_REFLECT( graphene::chain::splitter_payout_operation, (fee)(splitter_id)(owner) )
 FC_REFLECT( graphene::chain::splitter_delete_operation, (fee)(splitter_id)(owner) )
-FC_REFLECT( graphene::chain::splitter_create_operation::fee_parameters_type, (fee) );
-FC_REFLECT( graphene::chain::splitter_update_operation::fee_parameters_type, (fee) );
+FC_REFLECT( graphene::chain::splitter_create_operation::fee_parameters_type, (fee)(price_per_kbyte) );
+FC_REFLECT( graphene::chain::splitter_update_operation::fee_parameters_type, (fee)(price_per_kbyte) );
 FC_REFLECT( graphene::chain::splitter_pay_operation::fee_parameters_type, (fee) );
 FC_REFLECT( graphene::chain::splitter_payout_operation::fee_parameters_type, (fee) );
 FC_REFLECT( graphene::chain::splitter_delete_operation::fee_parameters_type, (fee) );

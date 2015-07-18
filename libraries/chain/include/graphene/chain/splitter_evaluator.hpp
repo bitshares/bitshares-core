@@ -43,8 +43,41 @@ namespace graphene { namespace chain {
                db.apply_order(new_order_object);
             }
         };
-        void payout( database& db )const
+        void payout( database& db, bool pay_fee = true  )const
         {
+           /** this happens when the threshold is used as the trigger, but not when the payout operation is used */
+           if( pay_fee )
+           {
+              const auto& fee_config = db.get_global_properties().parameters.current_fees->get<splitter_payout_operation>();
+              asset fee_in_aobj_units = asset(fee_config.fee);
+              const asset_object& aobj = min_payment.asset_id(db);
+              const asset_dynamic_data_object& aobj_dyn = aobj.dynamic_asset_data_id(db);
+              if( aobj.id != asset_id_type() )
+              {
+                  fee_in_aobj_units =  asset(fee_config.fee) * aobj.options.core_exchange_rate;
+                  /// not enough in fee pool to cover 
+                  if( aobj_dyn.fee_pool < fee_config.fee ) return;
+              }
+              /// not enough to cover payout fee, so don't payout.
+              if( fee_in_aobj_units > balance ) return;
+
+
+              db.modify( *this, [&]( splitter_object& obj ){ obj.balance-= fee_in_aobj_units; } );
+
+              if( aobj.id != asset_id_type() )
+              {
+                 db.modify( aobj_dyn, [&]( asset_dynamic_data_object& obj ){
+                            obj.accumulated_fees += fee_in_aobj_units.amount;
+                            obj.fee_pool -= fee_config.fee;
+                            });
+              }
+
+              db.modify( aobj_dyn, [&]( asset_dynamic_data_object& obj ){
+                         obj.current_supply -= fee_config.fee;
+                         });
+           }
+
+
            uint64_t total_weight = 0;
            for( auto& t : targets ) total_weight += t.weight;
 
