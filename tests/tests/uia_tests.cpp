@@ -309,15 +309,6 @@ BOOST_AUTO_TEST_CASE( transfer_restricted_test )
          PUSH_TX( db, tx, database::skip_authority_check | database::skip_tapos_check | database::skip_transaction_signatures );
       } ;
 
-      asset           fee;
-      account_id_type issuer;
-      asset_id_type   asset_to_update;
-
-      /// If the asset is to be given a new issuer, specify his ID here.
-      optional<account_id_type>   new_issuer;
-      asset_options               new_options;
-      extensions_type             extensions;
-
       const asset_object& uia = create_user_issued_asset( "TXRX", sam, transfer_restricted );
       _issue_uia( alice, uia.amount( 1000 ) );
 
