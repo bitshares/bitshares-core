@@ -22,6 +22,8 @@
 #include <graphene/chain/protocol/fee_schedule.hpp>
 #include <graphene/chain/transaction_evaluation_state.hpp>
 
+#include <fc/smart_ref_impl.hpp>
+
 namespace graphene { namespace chain {
 
 void_result committee_member_create_evaluator::do_evaluate( const committee_member_create_operation& op )

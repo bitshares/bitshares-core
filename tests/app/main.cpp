@@ -27,6 +27,7 @@
 #include <graphene/account_history/account_history_plugin.hpp>
 
 #include <fc/thread/thread.hpp>
+#include <fc/smart_ref_impl.hpp>
 
 #include <boost/filesystem/path.hpp>
 

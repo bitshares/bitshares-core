@@ -20,6 +20,7 @@
 #include <graphene/app/application.hpp>
 #include <graphene/chain/database.hpp>
 #include <fc/io/json.hpp>
+#include <fc/smart_ref_impl.hpp>
 
 #include <iostream>
 

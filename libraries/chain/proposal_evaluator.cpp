@@ -21,6 +21,8 @@
 #include <graphene/chain/protocol/fee_schedule.hpp>
 #include <graphene/chain/exceptions.hpp>
 
+#include <fc/smart_ref_impl.hpp>
+
 namespace graphene { namespace chain {
 
 void_result proposal_create_evaluator::do_evaluate(const proposal_create_operation& o)

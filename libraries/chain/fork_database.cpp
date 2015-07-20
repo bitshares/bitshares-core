@@ -16,7 +16,8 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #include <graphene/chain/fork_database.hpp>
-
+#include <graphene/chain/protocol/fee_schedule.hpp>
+#include <fc/smart_ref_impl.hpp>
 
 namespace graphene { namespace chain {
 fork_database::fork_database()

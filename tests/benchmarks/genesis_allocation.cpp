@@ -22,6 +22,7 @@
 #include <graphene/time/time.hpp>
 
 #include <fc/crypto/digest.hpp>
+#include <fc/smart_ref_impl.hpp>
 
 #include <boost/test/auto_unit_test.hpp>
 

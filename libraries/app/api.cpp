@@ -23,6 +23,7 @@
 #include <graphene/chain/protocol/fee_schedule.hpp>
 
 #include <fc/crypto/hex.hpp>
+#include <fc/smart_ref_impl.hpp>
 
 namespace graphene { namespace app {
 

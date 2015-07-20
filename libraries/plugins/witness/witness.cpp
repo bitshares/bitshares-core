@@ -23,6 +23,7 @@
 
 #include <graphene/utilities/key_conversion.hpp>
 
+#include <fc/smart_ref_impl.hpp>
 #include <fc/thread/thread.hpp>
 
 using namespace graphene::witness_plugin;
