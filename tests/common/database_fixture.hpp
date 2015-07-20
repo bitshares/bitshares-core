@@ -190,9 +190,9 @@ struct database_fixture {
       );
 
    void force_global_settle(const asset_object& what, const price& p);
-   void force_settle(account_id_type who, asset what)
-   { force_settle(who(db), what); }
-   void force_settle(const account_object& who, asset what);
+   operation_result force_settle(account_id_type who, asset what)
+   { return force_settle(who(db), what); }
+   operation_result force_settle(const account_object& who, asset what);
    void update_feed_producers(asset_id_type mia, flat_set<account_id_type> producers)
    { update_feed_producers(mia(db), producers); }
    void update_feed_producers(const asset_object& mia, flat_set<account_id_type> producers);

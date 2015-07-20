@@ -740,7 +740,7 @@ void database_fixture::force_global_settle( const asset_object& what, const pric
    verify_asset_supplies(db);
 } FC_CAPTURE_AND_RETHROW( (what)(p) ) }
 
-void  database_fixture::force_settle( const account_object& who, asset what )
+operation_result database_fixture::force_settle( const account_object& who, asset what )
 { try {
    trx.set_expiration(db.head_block_time() + fc::minutes(1));
    trx.operations.clear();
@@ -750,9 +750,11 @@ void  database_fixture::force_settle( const account_object& who, asset what )
    trx.operations.push_back(sop);
    for( auto& op : trx.operations ) db.current_fee_schedule().set_fee(op);
    trx.validate();
-   db.push_transaction(trx, ~0);
+   processed_transaction ptx = db.push_transaction(trx, ~0);
+   const operation_result& op_result = ptx.operation_results.front();
    trx.operations.clear();
    verify_asset_supplies(db);
+   return op_result;
 } FC_CAPTURE_AND_RETHROW( (who)(what) ) }
 
 const call_order_object* database_fixture::borrow(const account_object& who, asset what, asset collateral)
