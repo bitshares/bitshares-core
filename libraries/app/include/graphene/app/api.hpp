@@ -302,6 +302,19 @@ namespace graphene { namespace app {
          /** @return all unclaimed balance objects for a set of addresses */
          vector<balance_object>  get_balance_objects( const vector<address>& addrs )const;
 
+
+         /**
+          *  This API will take a partially signed transaction and a set of public keys that the owner has the ability to sign for
+          *  and return the minimal subset of public keys that should add signatures to the transaction.  
+          */
+         set<public_key_type> get_required_signatures( const signed_transaction& trx, const flat_set<public_key_type>& available_keys )const;
+
+         /**
+          * @return true of the @ref trx has all of the required signatures, otherwise throws an exception
+          */
+         bool                 verify_authority( const signed_transaction& trx )const;
+
+
       private:
          /** called every time a block is applied to report the objects that were changed */
          void on_objects_changed(const vector<object_id_type>& ids);
@@ -506,6 +519,8 @@ FC_API(graphene::app::database_api,
        (get_key_references)
        (get_margin_positions)
        (get_balance_objects)
+       (get_required_signatures)
+       (verify_authority)
      )
 FC_API(graphene::app::history_api,
        (get_account_history)

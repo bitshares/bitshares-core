@@ -812,5 +812,20 @@ namespace graphene { namespace app {
          return result;
     } FC_CAPTURE_AND_RETHROW( (addrs) ) }
 
+    set<public_key_type> database_api::get_required_signatures( const signed_transaction& trx, const flat_set<public_key_type>& available_keys )const
+    {
+       return trx.get_required_signatures( available_keys,
+                                           [&]( account_id_type id ){ return &id(_db).active; },
+                                           [&]( account_id_type id ){ return &id(_db).owner; },
+                                           _db.get_global_properties().parameters.max_authority_depth );
+    }
+
+    bool    database_api::verify_authority( const signed_transaction& trx )const
+    {
+       trx.verify_authority( [&]( account_id_type id ){ return &id(_db).active; },
+                             [&]( account_id_type id ){ return &id(_db).owner; },
+                              _db.get_global_properties().parameters.max_authority_depth );
+       return true;
+    }
 
 } } // graphene::app
