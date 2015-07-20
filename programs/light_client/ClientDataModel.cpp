@@ -89,18 +89,17 @@ void ChainDataModel::getAccountImpl(QString accountIdentifier, Account* const * 
       auto result = m_db_api->get_full_accounts([](const fc::variant& v) {
          idump((v));
       }, {accountIdentifier.toStdString()});
-      fc::variant_object accountPackage;
+      fc::optional<full_account> accountPackage;
 
       if (result.count(accountIdentifier.toStdString())) {
-         accountPackage = result.begin()->second.as<variant_object>();
+         accountPackage = result.at(accountIdentifier.toStdString());
 
          // Fetch all necessary assets
-         auto balances = accountPackage["balances"].as<vector<account_balance_object>>();
          QList<asset_id_type> assetsToFetch;
          QList<Asset* const *> assetPlaceholders;
-         assetsToFetch.reserve(balances.size());
+         assetsToFetch.reserve(accountPackage->balances.size());
          // Get list of asset IDs the account has a balance in
-         std::transform(balances.begin(), balances.end(), std::back_inserter(assetsToFetch),
+         std::transform(accountPackage->balances.begin(), accountPackage->balances.end(), std::back_inserter(assetsToFetch),
                         [](const account_balance_object& b) { return b.asset_type; });
          auto function = [this,&assetsToFetch,&assetPlaceholders] {
             auto itr = assetsToFetch.begin();
@@ -129,19 +128,17 @@ void ChainDataModel::getAccountImpl(QString accountIdentifier, Account* const * 
          ilog("Processing result ${r}", ("r", accountPackage));
          auto itr = m_accounts.iterator_to(*accountInContainer);
 
-         if (!accountPackage.size()) {
+         if (!accountPackage.valid()) {
             (*itr)->deleteLater();
             m_accounts.erase(itr);
          } else {
             m_accounts.modify(itr, [=](Account* a){
-               account_object account = accountPackage["account"].as<account_object>();
-               a->setProperty("id", ObjectId(account.id.instance()));
-               a->setProperty("name", QString::fromStdString(account.name));
+               a->setProperty("id", ObjectId(accountPackage->account.id.instance()));
+               a->setProperty("name", QString::fromStdString(accountPackage->account.name));
 
                // Set balances
                QList<Balance*> balances;
-               auto balanceObjects = accountPackage["balances"].as<vector<account_balance_object>>();
-               std::transform(balanceObjects.begin(), balanceObjects.end(), std::back_inserter(balances),
+               std::transform(accountPackage->balances.begin(), accountPackage->balances.end(), std::back_inserter(balances),
                               [this](const account_balance_object& b) {
                   Balance* bal = new Balance;
                   bal->setParent(this);
