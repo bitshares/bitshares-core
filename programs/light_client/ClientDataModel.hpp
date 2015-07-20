@@ -97,17 +97,23 @@ typedef multi_index_container<
 class Balance : public GrapheneObject {
    Q_OBJECT
 
-   Q_PROPERTY(Asset* type MEMBER type NOTIFY typeChanged)
+   Q_PROPERTY(Asset* type MEMBER m_type READ type NOTIFY typeChanged)
    Q_PROPERTY(qint64 amount MEMBER amount NOTIFY amountChanged)
 
-   Asset* type;
+   Asset* m_type;
    qint64 amount;
 
 public:
    // This ultimately needs to be replaced with a string equivalent
    Q_INVOKABLE qreal amountReal() const {
-      return amount / qreal(type->precisionPower());
+      return amount / qreal(m_type->precisionPower());
    }
+
+   Asset* type()const {
+      return m_type;
+   }
+
+   void update(const graphene::app::account_balance_object& update);
 
 Q_SIGNALS:
    void typeChanged();
@@ -138,6 +144,8 @@ public:
       }
    }
 
+   void update(const graphene::app::account_balance_object& balance);
+
 Q_SIGNALS:
    void nameChanged();
    void balancesChanged();
@@ -154,6 +162,8 @@ typedef multi_index_container<
 
 class ChainDataModel : public QObject {
    Q_OBJECT
+
+   void processUpdatedObject(const fc::variant& update);
 
    void getAssetImpl(QString assetIdentifier, Asset* const * assetInContainer);
    void getAccountImpl(QString accountIdentifier, Account* const * accountInContainer);

@@ -52,6 +52,50 @@ Asset* ChainDataModel::getAsset(QString symbol)
    return *itr;
 }
 
+void ChainDataModel::processUpdatedObject(const fc::variant& update)
+{
+   if (update.is_null())
+      return;
+   if (&fc::thread::current() == m_rpc_thread)
+   {
+      ilog("Proxying object update to app thread.");
+      Q_EMIT queueExecute([this,update]{processUpdatedObject(update);});
+      return;
+   }
+
+   idump((update));
+   try {
+   auto id = update.as<variant_object>()["id"].as<object_id_type>();
+   if (id.space() == protocol_ids) {
+      switch (id.type()) {
+      default:
+         wlog("Update procedure for ${update} is not yet implemented.", ("update", update));
+         break;
+      }
+   } else if (id.space() == implementation_ids) {
+      switch (id.type()) {
+      case impl_account_balance_object_type: {
+         account_balance_object balance = update.as<account_balance_object>();
+         auto owner = m_accounts.find(balance.owner.instance.value);
+         if (owner != m_accounts.end())
+            (*owner)->update(balance);
+         else
+            elog("Got unexpected balance update:\n${u}\nfor an account I don't have.",
+                 ("u", update));
+         break;
+      }
+
+      default:
+         wlog("Update procedure for ${update} is not yet implemented.", ("update", update));
+         break;
+      }
+   } else
+      wlog("Update procedure for ${update} is not yet implemented.", ("update", update));
+   } catch (const fc::exception& e) {
+      elog("Caught exception while updating object: ${e}", ("e", e.to_detail_string()));
+   }
+}
+
 void ChainDataModel::getAssetImpl(QString assetIdentifier, Asset* const * assetInContainer)
 {
    try {
@@ -86,8 +130,8 @@ void ChainDataModel::getAccountImpl(QString accountIdentifier, Account* const * 
 {
    try {
       ilog("Fetching account ${acct}", ("acct", accountIdentifier.toStdString()));
-      auto result = m_db_api->get_full_accounts([](const fc::variant& v) {
-         idump((v));
+      auto result = m_db_api->get_full_accounts([this](const fc::variant& v) {
+         processUpdatedObject(v);
       }, {accountIdentifier.toStdString()});
       fc::optional<full_account> accountPackage;
 
@@ -203,6 +247,27 @@ QQmlListProperty<Balance> Account::balances()
    return QQmlListProperty<Balance>(this, this, count, at);
 }
 
+void Account::update(const account_balance_object& balance)
+{
+   auto balanceItr = std::find_if(m_balances.begin(), m_balances.end(),
+                                  [&balance](Balance* b) { return b->type()->id() == balance.asset_type.instance.value; });
+
+   if (balanceItr != m_balances.end()) {
+      ilog("Updating ${a}'s balance: ${b}", ("a", m_name.toStdString())("b", balance));
+      (*balanceItr)->update(balance);
+      Q_EMIT balancesChanged();
+   } else {
+      ilog("Adding to ${a}'s new balance: ${b}", ("a", m_name.toStdString())("b", balance));
+      Balance* newBalance = new Balance;
+      newBalance->setParent(this);
+      auto model = qobject_cast<ChainDataModel*>(parent());
+      newBalance->setProperty("type", QVariant::fromValue(model->getAsset(balance.asset_type.instance.value)));
+      newBalance->setProperty("amount", QVariant::fromValue(balance.balance.value));
+      m_balances.append(newBalance);
+      Q_EMIT balancesChanged();
+   }
+}
+
 GrapheneApplication::GrapheneApplication(QObject* parent)
 :QObject(parent),m_thread("app")
 {
@@ -267,4 +332,12 @@ void GrapheneApplication::start(QString apiurl, QString user, QString pass)
 Q_SLOT void GrapheneApplication::execute(const std::function<void()>& func)const
 {
    func();
+}
+
+void Balance::update(const account_balance_object& update)
+{
+   if (update.balance != amount) {
+      amount = update.balance.value;
+      emit amountChanged();
+   }
 }
