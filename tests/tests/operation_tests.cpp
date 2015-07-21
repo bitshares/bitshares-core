@@ -614,11 +614,15 @@ BOOST_AUTO_TEST_CASE( update_uia )
       trx.operations.push_back(op);
 
       //Cannot change issuer to same as before
+      BOOST_TEST_MESSAGE( "Make sure changing issuer to same as before is forbidden" );
       REQUIRE_THROW_WITH_VALUE(op, new_issuer, test.issuer);
+
       //Cannot convert to an MIA
+      BOOST_TEST_MESSAGE( "Make sure we can't convert UIA to MIA" );
       REQUIRE_THROW_WITH_VALUE(op, new_options.issuer_permissions, ASSET_ISSUER_PERMISSION_MASK);
       REQUIRE_THROW_WITH_VALUE(op, new_options.core_exchange_rate, price(asset(5), asset(5)));
 
+      BOOST_TEST_MESSAGE( "Test updating core_exchange_rate" );
       op.new_options.core_exchange_rate = price(asset(3), test.amount(5));
       trx.operations.back() = op;
       PUSH_TX( db, trx, ~0 );
@@ -627,21 +631,37 @@ BOOST_AUTO_TEST_CASE( update_uia )
       op.new_issuer = nathan.id;
       trx.operations.back() = op;
       PUSH_TX( db, trx, ~0 );
+
+      BOOST_TEST_MESSAGE( "Test setting flags" );
       op.issuer = nathan.id;
       op.new_issuer.reset();
       op.new_options.flags = transfer_restricted | white_list;
       trx.operations.back() = op;
       PUSH_TX( db, trx, ~0 );
-      REQUIRE_THROW_WITH_VALUE(op, new_options.issuer_permissions, test.options.issuer_permissions & ~white_list);
+
+      BOOST_TEST_MESSAGE( "Disable white_list permission" );
       op.new_options.issuer_permissions = test.options.issuer_permissions & ~white_list;
-      op.new_options.flags = 0;
       trx.operations.back() = op;
       PUSH_TX( db, trx, ~0 );
+
+      BOOST_TEST_MESSAGE( "Can't toggle white_list" );
+      REQUIRE_THROW_WITH_VALUE(op, new_options.flags, test.options.flags & ~white_list);
+
+      BOOST_TEST_MESSAGE( "Can toggle transfer_restricted" );
+      for( int i=0; i<2; i++ )
+      {
+         op.new_options.flags = test.options.flags ^ transfer_restricted;
+         trx.operations.back() = op;
+         PUSH_TX( db, trx, ~0 );
+      }
+
+      BOOST_TEST_MESSAGE( "Make sure white_list can't be re-enabled" );
       op.new_options.issuer_permissions = test.options.issuer_permissions;
       op.new_options.flags = test.options.flags;
       BOOST_CHECK(!(test.options.issuer_permissions & white_list));
       REQUIRE_THROW_WITH_VALUE(op, new_options.issuer_permissions, UIA_ASSET_ISSUER_PERMISSION_MASK);
-      REQUIRE_THROW_WITH_VALUE(op, new_options.flags, white_list);
+
+      BOOST_TEST_MESSAGE( "We can change issuer to account_id_type(), but can't do it again" );
       op.new_issuer = account_id_type();
       trx.operations.back() = op;
       PUSH_TX( db, trx, ~0 );
