@@ -141,7 +141,13 @@ void ChainDataModel::getAccountImpl(QString accountIdentifier, Account* const * 
    try {
       ilog("Fetching account ${acct}", ("acct", accountIdentifier.toStdString()));
       auto result = m_db_api->get_full_accounts([this](const fc::variant& v) {
-         processUpdatedObject(v);
+         vector<variant> updates = v.as<vector<variant>>();
+         for (const variant& update : updates) {
+            if (update.is_object())
+               processUpdatedObject(update);
+            else
+               elog("Handling object deletions is not yet implemented: ${update}", ("update", update));
+         }
       }, {accountIdentifier.toStdString()});
       fc::optional<full_account> accountPackage;
 
