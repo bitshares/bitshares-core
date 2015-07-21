@@ -176,7 +176,7 @@ void ChainDataModel::getAccountImpl(QString accountIdentifier, Account* const * 
             (*itr)->deleteLater();
             m_accounts.erase(itr);
          } else {
-            m_accounts.modify(itr, [=](Account* a){
+            m_accounts.modify(itr, [this,&accountPackage](Account* a){
                a->setProperty("id", ObjectId(accountPackage->account.id.instance()));
                a->setProperty("name", QString::fromStdString(accountPackage->account.name));
 
