@@ -141,6 +141,8 @@ void account_create_operation::validate()const
    FC_ASSERT( owner.address_auths.size() == 0 );
    FC_ASSERT( active.num_auths() != 0 );
    FC_ASSERT( active.address_auths.size() == 0 );
+   FC_ASSERT( !owner.is_impossible(), "cannot create an account with an imposible owner authority threshold" );
+   FC_ASSERT( !active.is_impossible(), "cannot create an account with an imposible active authority threshold" );
    options.validate();
 }
 
@@ -165,11 +167,13 @@ void account_update_operation::validate()const
    {
       FC_ASSERT( owner->num_auths() != 0 );
       FC_ASSERT( owner->address_auths.size() == 0 );
+      FC_ASSERT( !owner->is_impossible(), "cannot update an account with an imposible owner authority threshold" );
    }
    if( active )
    {
       FC_ASSERT( active->num_auths() != 0 );
       FC_ASSERT( active->address_auths.size() == 0 );
+      FC_ASSERT( !active->is_impossible(), "cannot update an account with an imposible active authority threshold" );
    }
 
    if( new_options )

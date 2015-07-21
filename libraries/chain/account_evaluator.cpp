@@ -31,6 +31,7 @@ void_result account_create_evaluator::do_evaluate( const account_create_operatio
    const auto& global_props = d.get_global_properties();
    const auto& chain_params = global_props.parameters;
 
+
    verify_authority_accounts( op.owner );
    verify_authority_accounts( op.active );
 

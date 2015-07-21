@@ -54,6 +54,14 @@ namespace graphene { namespace chain {
       {
          account_auths[k] = w;
       }
+      bool is_impossible()const
+      {
+         uint64_t auth_weights = 0;
+         for( const auto& item : account_auths ) auth_weights += item.second;
+         for( const auto& item : key_auths ) auth_weights += item.second;
+         for( const auto& item : address_auths ) auth_weights += item.second;
+         return auth_weights < weight_threshold;
+      }
 
       template<typename AuthType>
       void add_authorities(AuthType k, weight_type w)
@@ -75,7 +83,7 @@ namespace graphene { namespace chain {
             result.push_back(k.first);
          return result;
       }
-      uint32_t num_auths()const { return account_auths.size() + key_auths.size(); }
+      uint32_t num_auths()const { return account_auths.size() + key_auths.size() + address_auths.size(); }
       void     clear() { account_auths.clear(); key_auths.clear(); }
 
       uint32_t                              weight_threshold = 0;
