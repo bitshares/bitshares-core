@@ -11,8 +11,6 @@ For Ubuntu 14.04 LTS users, see this link first:
 
 and then proceed with:
 
-    sudo apt-get update
-    sudo apt-get install autoconf autotools-dev build-essential cmake g++ git libboost-all-dev libboost-dev libbz2-dev libdb++-dev libdb-dev libicu-dev libreadline-dev libssl-dev libtool openssl python-dev uuid-dev
     git clone https://github.com/cryptonomex/graphene.git
     cd graphene
     git submodule update --init --recursive
