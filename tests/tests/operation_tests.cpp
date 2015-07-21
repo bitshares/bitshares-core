@@ -1405,15 +1405,6 @@ BOOST_AUTO_TEST_CASE( cover_with_collateral_test )
    }
 }
 
-BOOST_AUTO_TEST_CASE_EXPECTED_FAILURES( unimp_bulk_discount_test, 1 )
-BOOST_AUTO_TEST_CASE( unimp_bulk_discount_test )
-{
-   // commented out to silence compiler warnings
-   //const account_object& shorter1  = create_account( "alice" );
-   //const account_object& shorter2  = create_account( "bob" );
-   BOOST_FAIL( "not implemented" );
-}
-
 BOOST_AUTO_TEST_CASE( vesting_balance_create_test )
 { try {
    INVOKE( create_uia );
