@@ -157,6 +157,7 @@ share_type account_update_operation::calculate_fee( const fee_parameters_type& k
 
 void account_update_operation::validate()const
 {
+   FC_ASSERT( account != GRAPHENE_TEMP_ACCOUNT );
    FC_ASSERT( fee.amount >= 0 );
    FC_ASSERT( account != account_id_type() );
    FC_ASSERT( owner || active || new_options );
