@@ -407,7 +407,6 @@ BOOST_FIXTURE_TEST_CASE( tapos_rollover, database_fixture )
    try
    {
       ACTORS((alice)(bob));
-      const auto& core   = asset_id_type()(db);
 
       BOOST_TEST_MESSAGE( "Give Alice some money" );
       transfer(committee_account, alice_id, asset(10000));

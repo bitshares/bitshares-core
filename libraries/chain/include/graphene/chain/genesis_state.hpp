@@ -26,36 +26,23 @@ struct genesis_state_type {
       bool is_lifetime_member = false;
    };
    struct initial_asset_type {
+      struct initial_collateral_position {
+         address owner;
+         share_type collateral;
+         share_type debt;
+      };
+
       string symbol;
+      string issuer_name;
+
       string description;
       uint8_t precision;
-      string issuer_name;
+
       share_type max_supply;
-      uint16_t market_fee_percent;
-      share_type max_market_fee;
-      uint16_t issuer_permissions;
-      uint16_t flags;
+      share_type accumulated_fees;
 
-      struct initial_bitasset_options {
-         uint32_t feed_lifetime_sec;
-         uint8_t minimum_feeds;
-         uint32_t force_settlement_delay_sec;
-         uint16_t force_settlement_offset_percent;
-         uint16_t maximum_force_settlement_volume;
-         string backing_asset_symbol;
-
-         struct initial_collateral_position {
-            address owner;
-            share_type collateral;
-            share_type debt;
-         };
-
-         uint16_t maintenance_collateral_ratio;
-         vector<initial_collateral_position> collateral_records;
-      };
-      optional<initial_bitasset_options> bitasset_opts;
-
-      share_type initial_accumulated_fees;
+      bool is_bitasset = false;
+      vector<initial_collateral_position> collateral_records;
    };
    struct initial_balance_type {
       address owner;
@@ -86,6 +73,7 @@ struct genesis_state_type {
    };
 
    time_point_sec                           initial_timestamp;
+   share_type                               max_core_supply = GRAPHENE_MAX_SHARE_SUPPLY;
    chain_parameters                         initial_parameters;
    vector<initial_account_type>             initial_accounts;
    vector<initial_asset_type>               initial_assets;
@@ -101,15 +89,10 @@ struct genesis_state_type {
 FC_REFLECT(graphene::chain::genesis_state_type::initial_account_type, (name)(owner_key)(active_key)(is_lifetime_member))
 
 FC_REFLECT(graphene::chain::genesis_state_type::initial_asset_type,
-           (symbol)(description)(precision)(issuer_name)(max_supply)(market_fee_percent)
-           (issuer_permissions)(flags)(bitasset_opts)(initial_accumulated_fees))
+           (symbol)(issuer_name)(description)(precision)(max_supply)(accumulated_fees)(is_bitasset)(collateral_records))
 
-FC_REFLECT(graphene::chain::genesis_state_type::initial_asset_type::initial_bitasset_options,
-           (feed_lifetime_sec)(minimum_feeds)(force_settlement_delay_sec)(force_settlement_offset_percent)
-           (maximum_force_settlement_volume)(backing_asset_symbol)(maintenance_collateral_ratio)(collateral_records))
-
-FC_REFLECT(graphene::chain::genesis_state_type::initial_asset_type::initial_bitasset_options::initial_collateral_position,
-           (collateral)(debt))
+FC_REFLECT(graphene::chain::genesis_state_type::initial_asset_type::initial_collateral_position,
+           (owner)(collateral)(debt))
 
 FC_REFLECT(graphene::chain::genesis_state_type::initial_balance_type,
            (owner)(asset_symbol)(amount))
@@ -124,6 +107,6 @@ FC_REFLECT(graphene::chain::genesis_state_type::initial_committee_member_type, (
 FC_REFLECT(graphene::chain::genesis_state_type::initial_worker_type, (owner_name)(daily_pay))
 
 FC_REFLECT(graphene::chain::genesis_state_type,
-           (initial_timestamp)(initial_parameters)(initial_accounts)(initial_assets)(initial_balances)
+           (initial_timestamp)(max_core_supply)(initial_parameters)(initial_accounts)(initial_assets)(initial_balances)
            (initial_vesting_balances)(initial_active_witnesses)(initial_witness_candidates)
            (initial_committee_candidates)(initial_worker_candidates))

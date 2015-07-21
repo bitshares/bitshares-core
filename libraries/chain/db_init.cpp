@@ -286,7 +286,7 @@ void database::init_genesis(const genesis_state_type& genesis_state)
    const asset_object& core_asset =
      create<asset_object>( [&]( asset_object& a ) {
          a.symbol = GRAPHENE_SYMBOL;
-         a.options.max_supply = GRAPHENE_MAX_SHARE_SUPPLY;
+         a.options.max_supply = genesis_state.max_core_supply;
          a.precision = GRAPHENE_BLOCKCHAIN_PRECISION_DIGITS;
          a.options.flags = 0;
          a.options.issuer_permissions = 0;
@@ -356,7 +356,7 @@ void database::init_genesis(const genesis_state_type& genesis_state)
 
    // Helper function to get asset ID by symbol
    const auto& assets_by_symbol = get_index_type<asset_index>().indices().get<by_symbol>();
-   auto get_asset_id = [&assets_by_symbol](const string& symbol) {
+   const auto get_asset_id = [&assets_by_symbol](const string& symbol) {
       auto itr = assets_by_symbol.find(symbol);
       FC_ASSERT(itr != assets_by_symbol.end(),
                 "Unable to find asset '${sym}'. Did you forget to add a record for it to initial_assets?",
@@ -364,19 +364,18 @@ void database::init_genesis(const genesis_state_type& genesis_state)
       return itr->get_id();
    };
 
+   map<asset_id_type, share_type> total_supplies;
+
    // Create initial assets
    for( const genesis_state_type::initial_asset_type& asset : genesis_state.initial_assets )
    {
+      asset_id_type new_asset_id = get_index_type<asset_index>().get_next_id();
       asset_dynamic_data_id_type dynamic_data_id;
       optional<asset_bitasset_data_id_type> bitasset_data_id;
-      if( asset.bitasset_opts.valid() )
+      if( asset.is_bitasset )
       {
-         share_type total_allocated;
-         asset_id_type new_asset_id = get_index_type<asset_index>().get_next_id();
-         asset_id_type collateral_asset_id = get_asset_id(asset.bitasset_opts->backing_asset_symbol);
-
          int collateral_holder_number = 0;
-         for( const auto& collateral_rec : asset.bitasset_opts->collateral_records )
+         for( const auto& collateral_rec : asset.collateral_records )
          {
             account_create_operation cop;
             cop.name = asset.symbol + "-collateral-holder-" + std::to_string(collateral_holder_number);
@@ -391,30 +390,23 @@ void database::init_genesis(const genesis_state_type& genesis_state)
                c.collateral = collateral_rec.collateral;
                c.debt = collateral_rec.debt;
                c.call_price = price::call_price(chain::asset(c.debt, new_asset_id),
-                                                chain::asset(c.collateral, collateral_asset_id),
-                                                asset.bitasset_opts->maintenance_collateral_ratio);
+                                                chain::asset(c.collateral, core_asset.id),
+                                                GRAPHENE_DEFAULT_MAINTENANCE_COLLATERAL_RATIO);
             });
 
-            total_allocated += collateral_rec.debt;
+            total_supplies[ 0 ] += collateral_rec.collateral;
          }
 
          bitasset_data_id = create<asset_bitasset_data_object>([&](asset_bitasset_data_object& b) {
-            b.options.feed_lifetime_sec = asset.bitasset_opts->feed_lifetime_sec;
-            b.options.minimum_feeds = asset.bitasset_opts->minimum_feeds;
-            b.options.force_settlement_delay_sec = asset.bitasset_opts->force_settlement_delay_sec;
-            b.options.force_settlement_offset_percent = asset.bitasset_opts->force_settlement_offset_percent;
-            b.options.maximum_force_settlement_volume = asset.bitasset_opts->maximum_force_settlement_volume;
-            b.options.short_backing_asset = get_asset_id(asset.bitasset_opts->backing_asset_symbol);
+            b.options.short_backing_asset = core_asset.id;
          }).id;
+      }
 
-         dynamic_data_id = create<asset_dynamic_data_object>([&](asset_dynamic_data_object& d) {
-            d.current_supply = total_allocated;
-            d.accumulated_fees = asset.initial_accumulated_fees;
-         }).id;
-      } else
-         dynamic_data_id = create<asset_dynamic_data_object>([&](asset_dynamic_data_object& d) {
-            d.accumulated_fees = asset.initial_accumulated_fees;
-         }).id;
+      dynamic_data_id = create<asset_dynamic_data_object>([&](asset_dynamic_data_object& d) {
+         d.accumulated_fees = asset.accumulated_fees;
+      }).id;
+
+      total_supplies[ new_asset_id ] += asset.accumulated_fees;
 
       create<asset_object>([&](asset_object& a) {
          a.symbol = asset.symbol;
@@ -422,10 +414,6 @@ void database::init_genesis(const genesis_state_type& genesis_state)
          a.precision = asset.precision;
          a.issuer = get_account_id(asset.issuer_name);
          a.options.max_supply = asset.max_supply;
-         a.options.market_fee_percent = asset.market_fee_percent;
-         a.options.max_market_fee = asset.max_market_fee;
-         a.options.issuer_permissions = asset.issuer_permissions;
-         a.options.flags = asset.flags;
 
          a.dynamic_asset_data_id = dynamic_data_id;
          a.bitasset_data_id = bitasset_data_id;
@@ -436,19 +424,22 @@ void database::init_genesis(const genesis_state_type& genesis_state)
    share_type total_allocation;
    for( const auto& handout : genesis_state.initial_balances )
    {
-      create<balance_object>([&handout,&assets_by_symbol,total_allocation](balance_object& b) {
-         b.balance = asset(handout.amount, assets_by_symbol.find(handout.asset_symbol)->get_id());
+      const auto asset_id = get_asset_id(handout.asset_symbol);
+      create<balance_object>([&handout,&get_asset_id,total_allocation,asset_id](balance_object& b) {
+         b.balance = asset(handout.amount, asset_id);
          b.owner = handout.owner;
       });
-      total_allocation += handout.amount;
+
+      total_supplies[ asset_id ] += handout.amount;
    }
 
    // Create initial vesting balances
    for( const genesis_state_type::initial_vesting_balance_type& vest : genesis_state.initial_vesting_balances )
    {
+      const auto asset_id = get_asset_id(vest.asset_symbol);
       create<balance_object>([&](balance_object& b) {
          b.owner = vest.owner;
-         b.balance = asset(vest.amount, assets_by_symbol.find(vest.asset_symbol)->get_id());
+         b.balance = asset(vest.amount, asset_id);
 
          linear_vesting_policy policy;
          policy.begin_timestamp = vest.begin_timestamp;
@@ -458,17 +449,33 @@ void database::init_genesis(const genesis_state_type& genesis_state)
 
          b.vesting_policy = std::move(policy);
       });
-      total_allocation += vest.amount;
+
+      total_supplies[ asset_id ] += vest.amount;
    }
 
-   // Set current supply based on allocations, if they happened
-   if( total_allocation > 0 )
+   if( total_supplies[ 0 ] > 0 )
    {
-      modify(dyn_asset, [total_allocation](asset_dynamic_data_object& d) {
-         d.current_supply = total_allocation;
-      });
-      adjust_balance(GRAPHENE_COMMITTEE_ACCOUNT, -get_balance(GRAPHENE_COMMITTEE_ACCOUNT,{}));
+       adjust_balance(GRAPHENE_COMMITTEE_ACCOUNT, -get_balance(GRAPHENE_COMMITTEE_ACCOUNT,{}));
    }
+   else
+   {
+       total_supplies[ 0 ] = GRAPHENE_MAX_SHARE_SUPPLY;
+   }
+
+   // Save tallied supplies
+   for( const auto& item : total_supplies )
+   {
+       const auto asset_id = item.first;
+       const auto total_supply = item.second;
+
+       modify( get( asset_id ), [ & ]( asset_object& asset ) {
+           modify( get( asset.dynamic_asset_data_id ), [ & ]( asset_dynamic_data_object& asset_data ) {
+               asset_data.current_supply = total_supply;
+           } );
+       } );
+   }
+
+   // TODO: Assert that bitasset debt = supply
 
    // Create initial witnesses
    std::for_each(genesis_state.initial_witness_candidates.begin(), genesis_state.initial_witness_candidates.end(),
