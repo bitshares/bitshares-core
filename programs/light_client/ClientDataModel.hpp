@@ -64,6 +64,8 @@ class Asset : public GrapheneObject {
    QString m_symbol;
    quint32 m_precision;
 
+   graphene::chain::price coreExchangeRate;
+
 public:
    Asset(ObjectId id = -1, QString symbol = QString(), quint32 precision = 0, QObject* parent = nullptr)
       : GrapheneObject(id, parent), m_symbol(symbol), m_precision(precision)
@@ -79,6 +81,8 @@ public:
          power *= 10;
       return power;
    }
+
+   void update(const graphene::chain::asset_object& asset);
 
 Q_SIGNALS:
    void symbolChanged();
@@ -177,36 +181,43 @@ public:
    ChainDataModel(){}
    ChainDataModel( fc::thread& t, QObject* parent = nullptr );
 
-   void setDatabaseAPI( fc::api<graphene::app::database_api> dbapi ){ m_db_api = dbapi; }
+   void setDatabaseAPI(fc::api<graphene::app::database_api> dbapi);
+
+   const graphene::chain::global_property_object& global_properties() const { return m_global_properties; }
 
 Q_SIGNALS:
    void queueExecute( const std::function<void()>& );
    void exceptionThrown( QString message );
 
 private:
-   fc::thread*                           m_rpc_thread = nullptr;
-   std::string                           m_api_url;
-   fc::api<graphene::app::database_api>  m_db_api;
+   fc::thread* m_rpc_thread = nullptr;
+   std::string m_api_url;
+   fc::api<graphene::app::database_api> m_db_api;
 
-   ObjectId                                m_account_query_num = -1;
-   account_multi_index_type              m_accounts;
-   asset_multi_index_type                m_assets;
+   graphene::chain::global_property_object m_global_properties;
+
+   ObjectId m_account_query_num = -1;
+   account_multi_index_type m_accounts;
+   asset_multi_index_type m_assets;
 };
 
+class OperationBuilder;
 class GrapheneApplication : public QObject {
    Q_OBJECT
 
    Q_PROPERTY(ChainDataModel* model READ model CONSTANT)
+   Q_PROPERTY(OperationBuilder* operationBuilder READ operationBuilder CONSTANT)
    Q_PROPERTY(bool isConnected READ isConnected NOTIFY isConnectedChanged)
 
 
-   fc::thread                  m_thread;
-   ChainDataModel*             m_model       = nullptr;
-   bool                        m_isConnected = false;
+   fc::thread m_thread;
+   ChainDataModel* m_model = nullptr;
+   OperationBuilder* m_operationBuilder = nullptr;
+   bool m_isConnected = false;
 
    boost::signals2::scoped_connection m_connectionClosed;
 
-   std::shared_ptr<fc::http::websocket_client>  m_client;
+   std::shared_ptr<fc::http::websocket_client> m_client;
    fc::future<void> m_done;
 
    void setIsConnected(bool v);
@@ -218,9 +229,11 @@ public:
    GrapheneApplication(QObject* parent = nullptr);
    ~GrapheneApplication();
 
-   ChainDataModel* model() const
-   {
+   ChainDataModel* model() const {
       return m_model;
+   }
+   OperationBuilder* operationBuilder() const {
+      return m_operationBuilder;
    }
 
    Q_INVOKABLE void start(QString apiUrl,

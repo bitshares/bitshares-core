@@ -21,6 +21,8 @@ Rectangle {
    property alias senderAccount: senderPicker.account
    /// The Account object for the receiver
    property alias receiverAccount: recipientPicker.account
+   /// The operation created in this form
+   property var operation
 
    Component.onCompleted: console.log("Made a transfer form")
    Component.onDestruction: console.log("Destroyed a transfer form")
@@ -47,6 +49,7 @@ Rectangle {
                                                    if (foundIndex >= 0) return foundIndex
                                                    return balance.type.symbol === assetField.currentText? index : -1
                                                 }, -1) : -1
+         onBalanceClicked: amountField.value = balance
       }
       AccountPicker {
          id: recipientPicker
@@ -77,11 +80,23 @@ Rectangle {
          }
          ComboBox {
             id: assetField
-            Layout.minimumWidth: Scaling.cm(3)
+            Layout.minimumWidth: Scaling.cm(1)
             enabled: senderPicker.balances instanceof Array && senderPicker.balances.length > 0
             model: enabled? senderPicker.balances.filter(function(balance) { return balance.amount > 0 })
                                                  .map(function(balance) { return balance.type.symbol })
                           : ["Asset Type"]
+         }
+         Text {
+            font.pixelSize: assetField.height / 2.5
+            text: {
+               var balance = amountField.maxBalance
+               if (!balance || !balance.type) return ""
+               var precisionAdjustment = Math.pow(10, balance.type.precision)
+
+               var op = app.operationBuilder.transfer(0, 0, amountField.value * precisionAdjustment,
+                                                      balance.type.id, memoField.text, 0)
+               return qsTr("Fee:<br/>") + op.fee / precisionAdjustment + " CORE"
+            }
          }
          Item { Layout.fillWidth: true }
          Button {

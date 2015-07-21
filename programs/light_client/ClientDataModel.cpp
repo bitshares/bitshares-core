@@ -1,4 +1,5 @@
 #include "ClientDataModel.hpp"
+#include "Operations.hpp"
 
 #include <graphene/app/api.hpp>
 #include <graphene/chain/protocol/protocol.hpp>
@@ -18,7 +19,16 @@ QString idToString(graphene::db::object_id_type id) {
 }
 
 ChainDataModel::ChainDataModel(fc::thread& t, QObject* parent)
-:QObject(parent),m_rpc_thread(&t){}
+   :QObject(parent),m_rpc_thread(&t){}
+
+void ChainDataModel::setDatabaseAPI(fc::api<database_api> dbapi) {
+   m_db_api = dbapi;
+   m_rpc_thread->async([this] {
+      m_global_properties = m_db_api->get_global_properties();
+      m_db_api->subscribe_to_objects([this](const variant& v) { m_global_properties = v.as<global_property_object>(); },
+                                     {m_global_properties.id});
+   });
+}
 
 Asset* ChainDataModel::getAsset(ObjectId id)
 {
@@ -275,6 +285,7 @@ GrapheneApplication::GrapheneApplication(QObject* parent)
            this, &GrapheneApplication::execute);
 
    m_model = new ChainDataModel(m_thread, this);
+   m_operationBuilder = new OperationBuilder(*m_model, this);
 
    connect(m_model, &ChainDataModel::queueExecute,
            this, &GrapheneApplication::execute);
@@ -329,6 +340,7 @@ void GrapheneApplication::start(QString apiurl, QString user, QString pass)
       Q_EMIT exceptionThrown(QString::fromStdString(e.to_string()));
    }
 }
+
 Q_SLOT void GrapheneApplication::execute(const std::function<void()>& func)const
 {
    func();
@@ -340,4 +352,22 @@ void Balance::update(const account_balance_object& update)
       amount = update.balance.value;
       emit amountChanged();
    }
+}
+
+
+void Asset::update(const asset_object& asset)
+{
+   if (asset.id.instance() != id())
+      setProperty("id", QVariant::fromValue(asset.id.instance()));
+   if (asset.symbol != m_symbol.toStdString()) {
+      m_symbol = QString::fromStdString(asset.symbol);
+      Q_EMIT symbolChanged();
+   }
+   if (asset.precision != m_precision) {
+      m_precision = asset.precision;
+      Q_EMIT precisionChanged();
+   }
+
+   if (asset.options.core_exchange_rate != coreExchangeRate)
+      coreExchangeRate = asset.options.core_exchange_rate;
 }

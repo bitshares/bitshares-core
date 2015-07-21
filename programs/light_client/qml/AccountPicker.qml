@@ -26,6 +26,8 @@ RowLayout {
       accountNameField.forceActiveFocus()
    }
 
+   signal balanceClicked(var balance)
+
    Identicon {
       name: account && account.name == accountNameField.text? accountNameField.text : ""
       width: Scaling.cm(2)
@@ -44,6 +46,7 @@ RowLayout {
          id: accountDetails
          width: parent.width
          height: text? implicitHeight : 0
+         onLinkActivated: if (link === "balance") balanceClicked(balances[showBalance].amountReal())
 
          Behavior on height { NumberAnimation{ easing.type: Easing.InOutQuad } }
 
@@ -66,7 +69,8 @@ RowLayout {
                                                                       : account.id)
                   if (showBalance >= 0) {
                      var bal = balances[showBalance]
-                     text += "\n" + qsTr("Balance: %1 %2").arg(String(bal.amountReal())).arg(bal.type.symbol)
+                     text += "<br/>" + qsTr("Balance: <a href='balance'>%1</a> %2").arg(String(bal.amountReal()))
+                                                                                   .arg(bal.type.symbol)
                   }
                   return text
                })

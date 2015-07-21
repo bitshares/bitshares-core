@@ -18,7 +18,8 @@ if (NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
     qt5_add_resources(QML_QRC qml/qml.qrc)
 endif()
 
-add_executable(light_client ClientDataModel.cpp ClientDataModel.hpp main.cpp ${QML_QRC} ${QML})
+add_executable(light_client ClientDataModel.cpp ClientDataModel.hpp Operations.cpp main.cpp ${QML_QRC} ${QML})
+
 if (CMAKE_VERSION VERSION_LESS 3.0)
     add_dependencies(light_client gen_qrc)
 endif()

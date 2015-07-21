@@ -3,6 +3,7 @@
 #include <QtQml>
 
 #include "ClientDataModel.hpp"
+#include "Operations.hpp"
 
 int main(int argc, char *argv[])
 {
@@ -14,12 +15,15 @@ int main(int argc, char *argv[])
 
    qRegisterMetaType<std::function<void()>>();
    qRegisterMetaType<ObjectId>();
+   qRegisterMetaType<TransferOperation>();
 
    qmlRegisterType<Asset>("Graphene.Client", 0, 1, "Asset");
    qmlRegisterType<Balance>("Graphene.Client", 0, 1, "Balance");
    qmlRegisterType<Account>("Graphene.Client", 0, 1, "Account");
    qmlRegisterType<ChainDataModel>("Graphene.Client", 0, 1, "DataModel");
    qmlRegisterType<GrapheneApplication>("Graphene.Client", 0, 1, "GrapheneApplication");
+   qmlRegisterUncreatableType<OperationBuilder>("Graphene.Client", 0, 1, "OperationBuilder",
+                                                QStringLiteral("OperationBuilder cannot be created from QML"));
 
    QQmlApplicationEngine engine;
    QVariant crypto;
