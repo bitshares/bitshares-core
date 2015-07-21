@@ -318,12 +318,16 @@ namespace graphene { namespace app {
       private:
          /** called every time a block is applied to report the objects that were changed */
          void on_objects_changed(const vector<object_id_type>& ids);
+         void on_objects_removed(const vector<const object*>& objs);
          void on_applied_block();
 
          fc::future<void>                                                                _broadcast_changes_complete;
+         fc::future<void>                                                                _broadcast_removed_complete;
          boost::signals2::scoped_connection                                              _change_connection;
+         boost::signals2::scoped_connection                                              _removed_connection;
          boost::signals2::scoped_connection                                              _applied_block_connection;
          map<object_id_type, std::function<void(const fc::variant&)> >                   _subscriptions;
+         map<account_id_type, std::function<void(const fc::variant&)> >                  _account_subscriptions;
          map< pair<asset_id_type,asset_id_type>, std::function<void(const variant&)> >  _market_subscriptions;
          graphene::chain::database&                                                      _db;
    };

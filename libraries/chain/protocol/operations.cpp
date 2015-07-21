@@ -133,6 +133,23 @@ struct required_owner_visitor
 };
 
 
+struct get_impacted_account_visitor
+{
+   flat_set<account_id_type>&      _impacted;
+   get_impacted_account_visitor( flat_set<account_id_type>& impact ):_impacted(impact) {}
+   typedef void result_type;
+
+   template<typename T>
+   void operator()( const T& o )const 
+   {
+      o.get_impacted_accounts( _impacted );
+   }
+};
+void operation_get_impacted_accounts( const operation& op, flat_set<account_id_type>& result )
+{
+   op.visit( get_impacted_account_visitor( result ) );
+}
+
 void operation_get_required_authorities( const operation& op, vector<authority>& result )
 {
    op.visit( required_auth_visitor( result ) );

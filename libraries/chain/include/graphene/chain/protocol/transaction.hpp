@@ -100,6 +100,7 @@ namespace graphene { namespace chain {
       }
 
       void get_required_authorities( flat_set<account_id_type>& active, flat_set<account_id_type>& owner, vector<authority>& other )const;
+      void get_impacted_accounts( flat_set<account_id_type>& )const;
    };
 
    /**

@@ -38,6 +38,8 @@ namespace graphene { namespace chain {
          static const uint8_t space_id = implementation_ids;
          static const uint8_t type_id  = impl_account_statistics_object_type;
 
+         account_id_type  owner;
+
          /**
           * Keep the most recent operation as a root pointer to a linked list of the transaction history. This field is
           * not required by core validation and could in theory be made an annotation on the account object, but
@@ -335,6 +337,7 @@ FC_REFLECT_DERIVED( graphene::chain::meta_account_object,
                     (memo_key)(committee_member_id) )
 
 FC_REFLECT_DERIVED( graphene::chain::account_statistics_object, (graphene::chain::object),
+                    (owner)
                     (most_recent_op)
                     (total_core_in_orders)
                     (lifetime_fees_paid)

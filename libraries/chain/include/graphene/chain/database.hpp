@@ -198,6 +198,11 @@ namespace graphene { namespace chain {
           */
          fc::signal<void(const vector<object_id_type>&)> changed_objects;
 
+         /** this signal is emitted any time an object is removed and contains a
+          * pointer to the last value of every object that was removed.
+          */
+         fc::signal<void(const vector<const object*>&)>  removed_objects;
+
          //////////////////// db_witness_schedule.cpp ////////////////////
 
          /**

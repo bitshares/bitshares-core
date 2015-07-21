@@ -68,12 +68,6 @@ struct operation_get_impacted_accounts
    {}
    typedef void result_type;
 
-   void add_authority( const authority& a )const
-   {
-      for( auto& item : a.account_auths )
-         _impacted.insert( item.first );
-   }
-
    void operator()( const account_create_operation& o )const {
       _impacted.insert( _op_history.result.get<object_id_type>() );
    }

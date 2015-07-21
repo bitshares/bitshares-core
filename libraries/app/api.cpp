@@ -21,6 +21,9 @@
 #include <graphene/chain/database.hpp>
 #include <graphene/utilities/key_conversion.hpp>
 #include <graphene/chain/protocol/fee_schedule.hpp>
+#include <graphene/chain/withdraw_permission_object.hpp>
+#include <graphene/chain/worker_evaluator.hpp>
+#include <graphene/chain/transaction_object.hpp>
 
 #include <fc/crypto/hex.hpp>
 #include <fc/smart_ref_impl.hpp>
@@ -31,6 +34,9 @@ namespace graphene { namespace app {
     {
        _change_connection = _db.changed_objects.connect([this](const vector<object_id_type>& ids) {
                                     on_objects_changed(ids);
+                                    });
+       _removed_connection = _db.removed_objects.connect([this](const vector<const object*>& objs) {
+                                    on_objects_removed(objs);
                                     });
        _applied_block_connection = _db.applied_block.connect([this](const signed_block&){ on_applied_block(); });
     }
@@ -158,8 +164,8 @@ namespace graphene { namespace app {
     std::map<std::string, full_account> database_api::get_full_accounts(std::function<void(const variant&)> callback,
                                                                        const vector<std::string>& names_or_ids)
     {
+       FC_ASSERT( _account_subscriptions.size() < 1024 );
        std::map<std::string, full_account> results;
-       std::set<object_id_type> ids_to_subscribe;
 
        for (const std::string& account_name_or_id : names_or_ids)
        {
@@ -176,7 +182,7 @@ namespace graphene { namespace app {
           if (account == nullptr)
              continue;
 
-          ids_to_subscribe.insert({account->id, account->statistics});
+          _account_subscriptions[account->id] = callback;
 
           // fc::mutable_variant_object full_account;
           full_account acnt;
@@ -194,7 +200,6 @@ namespace graphene { namespace app {
                 */
           if (account->cashback_vb)
           {
-             ids_to_subscribe.insert(*account->cashback_vb);
              acnt.cashback_balance = account->cashback_balance(_db);
           }
 
@@ -202,36 +207,31 @@ namespace graphene { namespace app {
           auto balance_range = _db.get_index_type<account_balance_index>().indices().get<by_account>().equal_range(account->id);
           //vector<account_balance_object> balances;
           std::for_each(balance_range.first, balance_range.second,
-                        [&acnt, &ids_to_subscribe](const account_balance_object& balance) {
+                        [&acnt](const account_balance_object& balance) {
                            acnt.balances.emplace_back(balance);
-                           ids_to_subscribe.insert(balance.id);
                         });
 
           // Add the account's vesting balances
           auto vesting_range = _db.get_index_type<vesting_balance_index>().indices().get<by_account>().equal_range(account->id);
           std::for_each(vesting_range.first, vesting_range.second,
-                        [&acnt, &ids_to_subscribe](const vesting_balance_object& balance) {
+                        [&acnt](const vesting_balance_object& balance) {
                            acnt.vesting_balances.emplace_back(balance);
-                           ids_to_subscribe.insert(balance.id);
                         });
 
           // Add the account's orders
           auto order_range = _db.get_index_type<limit_order_index>().indices().get<by_account>().equal_range(account->id);
           std::for_each(order_range.first, order_range.second,
-                        [&acnt, &ids_to_subscribe] (const limit_order_object& order) {
+                        [&acnt] (const limit_order_object& order) {
                            acnt.limit_orders.emplace_back(order);
-                           ids_to_subscribe.insert(order.id);
                         });
           auto call_range = _db.get_index_type<call_order_index>().indices().get<by_account>().equal_range(account->id);
           std::for_each(call_range.first, call_range.second,
-                        [&acnt, &ids_to_subscribe] (const call_order_object& call) {
+                        [&acnt] (const call_order_object& call) {
                            acnt.call_orders.emplace_back(call);
-                           ids_to_subscribe.insert(call.id);
                         });
           results[account_name_or_id] = acnt;
        }
        wdump((results));
-       subscribe_to_objects(callback, vector<object_id_type>(ids_to_subscribe.begin(), ids_to_subscribe.end()));
        return results;
     }
 
@@ -554,24 +554,205 @@ namespace graphene { namespace app {
        return *_history_api;
     }
 
+    vector<account_id_type> get_relevant_accounts( const object* obj )
+    {
+       vector<account_id_type> result;
+       if( obj->id.space() == protocol_ids )
+       {
+          switch( (object_type)obj->id.type() )
+          {
+            case null_object_type:
+            case base_object_type:
+            case OBJECT_TYPE_COUNT:
+               return result;
+            case account_object_type:{
+               result.push_back( obj->id );
+               break;
+            } case asset_object_type:{
+               const auto& aobj = dynamic_cast<const asset_object*>(obj);
+               assert( aobj != nullptr );
+               result.push_back( aobj->issuer );
+               break;
+            } case force_settlement_object_type:{
+               const auto& aobj = dynamic_cast<const force_settlement_object*>(obj);
+               assert( aobj != nullptr );
+               result.push_back( aobj->owner );
+               break;
+            } case committee_member_object_type:{
+               const auto& aobj = dynamic_cast<const committee_member_object*>(obj);
+               assert( aobj != nullptr );
+               result.push_back( aobj->committee_member_account );
+               break;
+            } case witness_object_type:{
+               const auto& aobj = dynamic_cast<const witness_object*>(obj);
+               assert( aobj != nullptr );
+               result.push_back( aobj->witness_account );
+               break;
+            } case limit_order_object_type:{
+               const auto& aobj = dynamic_cast<const limit_order_object*>(obj);
+               assert( aobj != nullptr );
+               result.push_back( aobj->seller );
+               break;
+            } case call_order_object_type:{
+               const auto& aobj = dynamic_cast<const call_order_object*>(obj);
+               assert( aobj != nullptr );
+               result.push_back( aobj->borrower );
+               break;
+            } case custom_object_type:{
+            } case proposal_object_type:{
+               const auto& aobj = dynamic_cast<const proposal_object*>(obj);
+               assert( aobj != nullptr );
+               flat_set<account_id_type> impacted;
+               aobj->proposed_transaction.get_impacted_accounts( impacted );
+               result.reserve( impacted.size() );
+               for( auto& item : impacted ) result.emplace_back(item);
+               break;
+            } case operation_history_object_type:{
+               const auto& aobj = dynamic_cast<const operation_history_object*>(obj);
+               assert( aobj != nullptr );
+               flat_set<account_id_type> impacted;
+               operation_get_impacted_accounts( aobj->op, impacted );
+               result.reserve( impacted.size() );
+               for( auto& item : impacted ) result.emplace_back(item);
+               break;
+            } case withdraw_permission_object_type:{
+               const auto& aobj = dynamic_cast<const withdraw_permission_object*>(obj);
+               assert( aobj != nullptr );
+               result.push_back( aobj->withdraw_from_account );
+               result.push_back( aobj->authorized_account );
+               break;
+            } case vesting_balance_object_type:{
+               const auto& aobj = dynamic_cast<const vesting_balance_object*>(obj);
+               assert( aobj != nullptr );
+               result.push_back( aobj->owner );
+               break;
+            } case worker_object_type:{
+               const auto& aobj = dynamic_cast<const worker_object*>(obj);
+               assert( aobj != nullptr );
+               result.push_back( aobj->worker_account );
+               break;
+            } case balance_object_type:{
+               /** these are free from any accounts */
+            }
+          }
+       }
+       else if( obj->id.space() == implementation_ids )
+       {
+          switch( (impl_object_type)obj->id.type() )
+          {
+                 case impl_global_property_object_type:{
+               } case impl_dynamic_global_property_object_type:{
+               } case impl_index_meta_object_type:{
+               } case impl_asset_dynamic_data_type:{
+               } case impl_asset_bitasset_data_type:{
+                  break;
+               } case impl_account_balance_object_type:{
+                  const auto& aobj = dynamic_cast<const account_balance_object*>(obj);
+                  assert( aobj != nullptr );
+                  result.push_back( aobj->owner );
+                  break;
+               } case impl_account_statistics_object_type:{
+                  const auto& aobj = dynamic_cast<const account_statistics_object*>(obj);
+                  assert( aobj != nullptr );
+                  result.push_back( aobj->owner );
+                  break;
+               } case impl_transaction_object_type:{
+                  const auto& aobj = dynamic_cast<const transaction_object*>(obj);
+                  assert( aobj != nullptr );
+                  flat_set<account_id_type> impacted;
+                  aobj->trx.get_impacted_accounts( impacted );
+                  result.reserve( impacted.size() );
+                  for( auto& item : impacted ) result.emplace_back(item);
+                  break;
+               } case impl_block_summary_object_type:{
+               } case impl_account_transaction_history_object_type:{
+               } case impl_witness_schedule_object_type: {
+               }
+          }
+       }
+       return result;
+    } // end get_relevant_accounts( obj )
+
+
+    void database_api::on_objects_removed( const vector<const object*>& objs )
+    {
+       if( _account_subscriptions.size() )
+       {
+          map<account_id_type, vector<variant> > broadcast_queue; 
+          for( const auto& obj : objs )
+          {
+             auto relevant = get_relevant_accounts( obj );
+             for( const auto& r : relevant )
+             {
+                auto sub = _account_subscriptions.find(r);
+                if( sub != _account_subscriptions.end() )
+                   broadcast_queue[r].emplace_back(obj->to_variant());
+             }
+          }
+
+          _broadcast_removed_complete = fc::async([=](){
+              for( const auto& item : broadcast_queue )
+              {
+                auto sub = _account_subscriptions.find(item.first);
+                if( sub != _account_subscriptions.end() )
+                    sub->second( fc::variant(item.second ) );
+              }
+          });
+       }
+    }
+
     void database_api::on_objects_changed(const vector<object_id_type>& ids)
     {
-       vector<object_id_type> my_objects;
+       vector<object_id_type>                 my_objects;
+       map<account_id_type, vector<variant> > broadcast_queue; 
        for(auto id : ids)
+       {
           if(_subscriptions.find(id) != _subscriptions.end())
              my_objects.push_back(id);
 
+          if( _account_subscriptions.size() )
+          {
+             const object* obj = _db.find_object( id );
+             if( obj )
+             {
+                vector<account_id_type> relevant = get_relevant_accounts( obj );
+                for( const auto& r : relevant )
+                {
+                   auto sub = _account_subscriptions.find(r);
+                   if( sub != _account_subscriptions.end() )
+                      broadcast_queue[r].emplace_back(obj->to_variant());
+                }
+             }
+          }
+       }
+
+
+       /// TODO: consider making _broadcast_changes_complete a deque and
+       /// pushing the future back / popping the prior future if it is complete.
+       /// if a connection hangs then this could get backed up and result in
+       /// a failure to exit cleanly.
        _broadcast_changes_complete = fc::async([=](){
+          for( const auto& item : broadcast_queue )
+          {
+            auto sub = _account_subscriptions.find(item.first);
+            if( sub != _account_subscriptions.end() )
+                sub->second( fc::variant(item.second ) );
+          }
           for(auto id : my_objects)
           {
-             const object* obj = _db.find_object(id);
-             if(obj)
+             // just incase _usbscriptions changed between filter and broadcast
+             auto itr = _subscriptions.find( id );
+             if( itr != _subscriptions.end() )
              {
-                _subscriptions[id](obj->to_variant());
-             }
-             else
-             {
-                _subscriptions[id](fc::variant(id));
+                const object* obj = _db.find_object( id );
+                if( obj != nullptr )
+                {
+                   itr->second(obj->to_variant());
+                }
+                else
+                {
+                   itr->second(fc::variant(id));
+                }
              }
           }
        });
@@ -624,6 +805,11 @@ namespace graphene { namespace app {
              _broadcast_changes_complete.cancel();
              _broadcast_changes_complete.wait();
           }
+          if(_broadcast_removed_complete.valid())
+          {
+             _broadcast_removed_complete.cancel();
+             _broadcast_removed_complete.wait();
+          }
        } catch (const fc::exception& e)
        {
           wlog("${e}", ("e",e.to_detail_string()));
@@ -632,6 +818,7 @@ namespace graphene { namespace app {
 
     bool database_api::subscribe_to_objects( const std::function<void(const fc::variant&)>&  callback, const vector<object_id_type>& ids)
     {
+       FC_ASSERT( _subscriptions.size() < 1024 );
        for(auto id : ids) _subscriptions[id] = callback;
        return true;
     }

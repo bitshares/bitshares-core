@@ -133,10 +133,8 @@ namespace graphene { namespace chain {
       impl_index_meta_object_type,
       impl_asset_dynamic_data_type,
       impl_asset_bitasset_data_type,
-      impl_committee_member_feeds_object_type,
       impl_account_balance_object_type,
       impl_account_statistics_object_type,
-      impl_account_debt_object_type,
       impl_transaction_object_type,
       impl_block_summary_object_type,
       impl_account_transaction_history_object_type,
@@ -193,7 +191,6 @@ namespace graphene { namespace chain {
    class asset_bitasset_data_object;
    class account_balance_object;
    class account_statistics_object;
-   class account_debt_object;
    class transaction_object;
    class block_summary_object;
    class account_transaction_history_object;
@@ -204,7 +201,6 @@ namespace graphene { namespace chain {
    typedef object_id< implementation_ids, impl_asset_bitasset_data_type,     asset_bitasset_data_object>                asset_bitasset_data_id_type;
    typedef object_id< implementation_ids, impl_account_balance_object_type,  account_balance_object>                    account_balance_id_type;
    typedef object_id< implementation_ids, impl_account_statistics_object_type,account_statistics_object>                account_statistics_id_type;
-   typedef object_id< implementation_ids, impl_account_debt_object_type,     account_debt_object>                       account_debt_id_type;
    typedef object_id< implementation_ids, impl_transaction_object_type,      transaction_object>                        transaction_obj_id_type;
    typedef object_id< implementation_ids, impl_block_summary_object_type,    block_summary_object>                      block_summary_id_type;
 
@@ -384,10 +380,8 @@ FC_REFLECT_ENUM( graphene::chain::impl_object_type,
                  (impl_index_meta_object_type)
                  (impl_asset_dynamic_data_type)
                  (impl_asset_bitasset_data_type)
-                 (impl_committee_member_feeds_object_type)
                  (impl_account_balance_object_type)
                  (impl_account_statistics_object_type)
-                 (impl_account_debt_object_type)
                  (impl_transaction_object_type)
                  (impl_block_summary_object_type)
                  (impl_account_transaction_history_object_type)
@@ -417,7 +411,6 @@ FC_REFLECT_TYPENAME( graphene::chain::asset_dynamic_data_id_type )
 FC_REFLECT_TYPENAME( graphene::chain::asset_bitasset_data_id_type )
 FC_REFLECT_TYPENAME( graphene::chain::account_balance_id_type )
 FC_REFLECT_TYPENAME( graphene::chain::account_statistics_id_type )
-FC_REFLECT_TYPENAME( graphene::chain::account_debt_id_type )
 FC_REFLECT_TYPENAME( graphene::chain::transaction_obj_id_type )
 FC_REFLECT_TYPENAME( graphene::chain::block_summary_id_type )
 FC_REFLECT_TYPENAME( graphene::chain::account_transaction_history_id_type )
