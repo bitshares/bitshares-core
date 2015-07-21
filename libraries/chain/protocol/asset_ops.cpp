@@ -168,8 +168,6 @@ void asset_options::validate()const
    FC_ASSERT( max_market_fee >= 0 && max_market_fee <= GRAPHENE_MAX_SHARE_SUPPLY );
    // There must be no high bits in permissions whose meaning is not known.
    FC_ASSERT( !(issuer_permissions & ~ASSET_ISSUER_PERMISSION_MASK) );
-   // There must be no high bits in flags which are not also high in permissions.
-   FC_ASSERT( !(flags & ~issuer_permissions ) );
    // The global_settle flag may never be set (this is a permission only)
    FC_ASSERT( !(flags & global_settle) );
    core_exchange_rate.validate();

@@ -223,9 +223,13 @@ void_result asset_update_evaluator::do_evaluate(const asset_update_operation& o)
       }
    }
 
-   //There must be no bits set in o.permissions which are unset in a.issuer_permissions.
+   // new issuer_permissions must be subset of old issuer permissions
    FC_ASSERT(!(o.new_options.issuer_permissions & ~a.options.issuer_permissions),
              "Cannot reinstate previously revoked issuer permissions on an asset.");
+
+   // changed flags must be subset of old issuer permissions
+   FC_ASSERT(!((o.new_options.flags ^ a.options.flags) & ~a.options.issuer_permissions),
+             "Flag change is forbidden by issuer permissions");
 
    asset_to_update = &a;
    FC_ASSERT( o.issuer == a.issuer, "", ("o.issuer", o.issuer)("a.issuer", a.issuer) );
