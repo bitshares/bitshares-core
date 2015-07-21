@@ -160,6 +160,26 @@ namespace graphene { namespace app {
 
        return result;
     }
+    void database_api::unsubscribe_from_accounts( const vector<std::string>& names_or_ids )
+    {
+       for (const std::string& account_name_or_id : names_or_ids)
+       {
+          const account_object* account = nullptr;
+          if (std::isdigit(account_name_or_id[0]))
+             account = _db.find(fc::variant(account_name_or_id).as<account_id_type>());
+          else
+          {
+             const auto& idx = _db.get_index_type<account_index>().indices().get<by_name>();
+             auto itr = idx.find(account_name_or_id);
+             if (itr != idx.end())
+                account = &*itr;
+          }
+          if (account == nullptr)
+             continue;
+
+          _account_subscriptions.erase(account->id);
+       }
+    }
 
     std::map<std::string, full_account> database_api::get_full_accounts(std::function<void(const variant&)> callback,
                                                                        const vector<std::string>& names_or_ids)
@@ -690,29 +710,59 @@ namespace graphene { namespace app {
              }
           }
 
-          _broadcast_removed_complete = fc::async([=](){
-              for( const auto& item : broadcast_queue )
-              {
-                auto sub = _account_subscriptions.find(item.first);
-                if( sub != _account_subscriptions.end() )
-                    sub->second( fc::variant(item.second ) );
-              }
-          });
+          if( broadcast_queue.size() )
+          {
+             _broadcast_removed_complete = fc::async([=](){
+                 for( const auto& item : broadcast_queue )
+                 {
+                   auto sub = _account_subscriptions.find(item.first);
+                   if( sub != _account_subscriptions.end() )
+                       sub->second( fc::variant(item.second ) );
+                 }
+             });
+          }
+       }
+       if( _market_subscriptions.size() )
+       {
+          map< pair<asset_id_type, asset_id_type>, vector<variant> > broadcast_queue;
+          for( const auto& obj : objs )
+          {
+             const limit_order_object* order = dynamic_cast<const limit_order_object*>(obj);
+             if( order )
+             {
+                auto sub = _market_subscriptions.find( order->get_market() );
+                if( sub != _market_subscriptions.end() )
+                   broadcast_queue[order->get_market()].emplace_back( order->id );
+             }
+          }
+          if( broadcast_queue.size() )
+          {
+             _broadcast_removed_complete = fc::async([=](){
+                 for( const auto& item : broadcast_queue )
+                 {
+                   auto sub = _market_subscriptions.find(item.first);
+                   if( sub != _market_subscriptions.end() )
+                       sub->second( fc::variant(item.second ) );
+                 }
+             });
+          }
        }
     }
 
     void database_api::on_objects_changed(const vector<object_id_type>& ids)
     {
-       vector<object_id_type>                 my_objects;
-       map<account_id_type, vector<variant> > broadcast_queue; 
+       vector<object_id_type>                       my_objects;
+       map<account_id_type, vector<variant> >       broadcast_queue; 
+       map< pair<asset_id_type, asset_id_type>,  vector<variant> > market_broadcast_queue;
        for(auto id : ids)
        {
           if(_subscriptions.find(id) != _subscriptions.end())
              my_objects.push_back(id);
 
+          const object* obj = nullptr;
           if( _account_subscriptions.size() )
           {
-             const object* obj = _db.find_object( id );
+             obj = _db.find_object( id );
              if( obj )
              {
                 vector<account_id_type> relevant = get_relevant_accounts( obj );
@@ -721,6 +771,21 @@ namespace graphene { namespace app {
                    auto sub = _account_subscriptions.find(r);
                    if( sub != _account_subscriptions.end() )
                       broadcast_queue[r].emplace_back(obj->to_variant());
+                }
+             }
+          }
+
+          if( _market_subscriptions.size() )
+          {
+             if( !_account_subscriptions.size() ) obj = _db.find_object( id );
+             if( obj )
+             {
+                const limit_order_object* order = dynamic_cast<const limit_order_object*>(obj);
+                if( order )
+                {
+                   auto sub = _market_subscriptions.find( order->get_market() );
+                   if( sub != _market_subscriptions.end() )
+                      market_broadcast_queue[order->get_market()].emplace_back( order->id );
                 }
              }
           }
@@ -736,6 +801,12 @@ namespace graphene { namespace app {
           {
             auto sub = _account_subscriptions.find(item.first);
             if( sub != _account_subscriptions.end() )
+                sub->second( fc::variant(item.second ) );
+          }
+          for( const auto& item : market_broadcast_queue )
+          {
+            auto sub = _market_subscriptions.find(item.first);
+            if( sub != _market_subscriptions.end() )
                 sub->second( fc::variant(item.second ) );
           }
           for(auto id : my_objects)
@@ -766,6 +837,7 @@ namespace graphene { namespace app {
        if(_market_subscriptions.size() == 0)
           return;
 
+       
        const auto& ops = _db.get_applied_operations();
        map< std::pair<asset_id_type,asset_id_type>, vector<pair<operation, operation_result>> > subscribed_markets_ops;
        for(const auto& op : ops)
@@ -773,9 +845,11 @@ namespace graphene { namespace app {
           std::pair<asset_id_type,asset_id_type> market;
           switch(op.op.which())
           {
+             /*  This is sent via the object_changed callback
              case operation::tag<limit_order_create_operation>::value:
                 market = op.op.get<limit_order_create_operation>().get_market();
                 break;
+             */
              case operation::tag<fill_order_operation>::value:
                 market = op.op.get<fill_order_operation>().get_market();
                 break;
