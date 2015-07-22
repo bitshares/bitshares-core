@@ -90,4 +90,3 @@ FC_REFLECT( graphene::chain::override_transfer_operation::fee_parameters_type, (
 
 FC_REFLECT( graphene::chain::override_transfer_operation, (fee)(issuer)(from)(to)(amount)(memo)(extensions) )
 FC_REFLECT( graphene::chain::transfer_operation, (fee)(from)(to)(amount)(memo)(extensions) )
-

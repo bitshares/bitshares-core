@@ -117,11 +117,12 @@ using namespace graphene::db;
 #define INVOKE(test) ((struct test*)this)->test_method(); trx.clear()
 
 #define PREP_ACTOR(name) \
-   fc::ecc::private_key name ## _private_key = generate_private_key(BOOST_PP_STRINGIZE(name));
+   fc::ecc::private_key name ## _private_key = generate_private_key(BOOST_PP_STRINGIZE(name));   \
+   public_key_type name ## _public_key = name ## _private_key.get_public_key();
 
 #define ACTOR(name) \
    PREP_ACTOR(name) \
-   const auto& name = create_account(BOOST_PP_STRINGIZE(name), name ## _private_key.get_public_key()); \
+   const auto& name = create_account(BOOST_PP_STRINGIZE(name), name ## _public_key); \
    account_id_type name ## _id = name.id; (void)name ## _id;
 
 #define GET_ACTOR(name) \
