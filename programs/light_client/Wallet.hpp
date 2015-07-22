@@ -68,10 +68,10 @@ class Wallet : public QObject
       /** @pre hasBrainKey() */
       Q_INVOKABLE QString getBrainKey();
 
-      Q_INVOKABLE bool    isLocked()const;
-      Q_INVOKABLE QString unlock( QString password );
-      Q_INVOKABLE bool    lock();
-      Q_INVOKABLE bool    changePassword( QString new_password );
+      Q_INVOKABLE bool isLocked()const;
+      Q_INVOKABLE bool unlock( QString password );
+      Q_INVOKABLE bool lock();
+      Q_INVOKABLE bool changePassword( QString new_password );
 
       /**
        * @pre !isLocked();

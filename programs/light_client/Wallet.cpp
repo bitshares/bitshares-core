@@ -131,9 +131,16 @@ bool Wallet::isLocked()const
    if( !isOpen() ) return true;
    return false;
 }
-QString Wallet::unlock( QString password )
+bool Wallet::unlock( QString password )
 {
-   return QString();
+   if( !isLocked() ) return true;
+   auto pw_str                  = password.toStdString();
+   auto password_hash           = fc::sha512::hash( pw_str.c_str(), pw_str.size() );
+   auto plain_txt = fc::aes_decrypt( password_hash, _data.encrypted_master_key );
+   _decrypted_master_key = fc::raw::unpack<fc::sha512>(plain_txt);
+   if( _data.master_key_digest != fc::sha512::hash(_decrypted_master_key) )
+      _decrypted_master_key = fc::sha512();
+   return !isLocked();
 }
 
 bool Wallet::lock()
@@ -146,7 +153,15 @@ bool Wallet::lock()
 bool  Wallet::changePassword( QString new_password )
 {
    if( !isOpen() ) return false;
-   return false;
+   if( isLocked() ) return false;
+
+   auto pw_str                  = new_password.toStdString();
+   auto password_hash           = fc::sha512::hash( pw_str.c_str(), pw_str.size() );
+   _data.encrypted_master_key   = fc::aes_encrypt( password_hash, fc::raw::pack(_decrypted_master_key) );
+
+   save();
+
+   return true;
 }
 
 QString Wallet::getActivePrivateKey( QString owner_pub_key, uint32_t seq )
