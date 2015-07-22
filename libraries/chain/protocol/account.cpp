@@ -34,6 +34,10 @@ namespace graphene { namespace chain {
  */
 bool is_valid_name( const string& name )
 {
+#if GRAPHENE_MIN_ACCOUNT_NAME_LENGTH < 3
+#error This is_valid_name implementation implicitly enforces minimum name length of 3.
+#endif
+
     const size_t len = name.size();
     if( len < GRAPHENE_MIN_ACCOUNT_NAME_LENGTH )
         return false;
