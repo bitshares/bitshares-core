@@ -1,6 +1,6 @@
 #pragma once
 
-#include "ClientDataModel.hpp"
+#include "ChainDataModel.hpp"
 
 #include <graphene/chain/protocol/transfer.hpp>
 

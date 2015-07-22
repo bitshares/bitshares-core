@@ -2,8 +2,20 @@
 #include <QQmlApplicationEngine>
 #include <QtQml>
 
-#include "ClientDataModel.hpp"
+#include "GrapheneApplication.hpp"
+#include "ChainDataModel.hpp"
 #include "Operations.hpp"
+#include "Balance.hpp"
+
+class Crypto {
+   Q_GADGET
+
+public:
+   Q_INVOKABLE QString sha256(QByteArray data) {
+      return QCryptographicHash::hash(data, QCryptographicHash::Sha256).toHex();
+   }
+};
+QML_DECLARE_TYPE(Crypto)
 
 int main(int argc, char *argv[])
 {
@@ -38,3 +50,5 @@ int main(int argc, char *argv[])
 
    return app.exec();
 }
+
+#include "main.moc"
