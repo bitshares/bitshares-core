@@ -116,4 +116,29 @@ namespace graphene { namespace chain {
       return f;
    }
 
+   void chain_parameters::validate()const
+   {
+      current_fees->validate();
+      FC_ASSERT( reserve_percent_of_fee <= GRAPHENE_100_PERCENT );
+      FC_ASSERT( network_percent_of_fee <= GRAPHENE_100_PERCENT );
+      FC_ASSERT( lifetime_referrer_percent_of_fee <= GRAPHENE_100_PERCENT );
+      FC_ASSERT( network_percent_of_fee + lifetime_referrer_percent_of_fee <= GRAPHENE_100_PERCENT );
+
+      FC_ASSERT( block_interval >= GRAPHENE_MIN_BLOCK_INTERVAL );
+      FC_ASSERT( block_interval <= GRAPHENE_MAX_BLOCK_INTERVAL );
+      FC_ASSERT( block_interval > 0 );
+      FC_ASSERT( maintenance_interval > block_interval,
+                 "Maintenance interval must be longer than block interval" );
+      FC_ASSERT( maintenance_interval % block_interval == 0,
+                 "Maintenance interval must be a multiple of block interval" );
+      FC_ASSERT( maximum_transaction_size >= GRAPHENE_MIN_TRANSACTION_SIZE_LIMIT,
+                 "Transaction size limit is too low" );
+      FC_ASSERT( maximum_block_size >= GRAPHENE_MIN_BLOCK_SIZE_LIMIT,
+                 "Block size limit is too low" );
+      FC_ASSERT( maximum_time_until_expiration > block_interval,
+                 "Maximum transaction expiration time must be greater than a block interval" );
+      FC_ASSERT( maximum_proposal_lifetime - committee_proposal_review_period > block_interval,
+                 "Committee proposal review period must be less than the maximum proposal lifetime" );
+   }
+
 } } // graphene::chain
