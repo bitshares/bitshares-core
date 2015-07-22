@@ -322,13 +322,6 @@ namespace graphene { namespace chain {
           * @param delta Asset ID and amount to adjust balance by
           */
          void adjust_balance(account_id_type account, asset delta);
-         /// This is an overloaded method.
-         void adjust_balance(const account_object& account, asset delta);
-
-         /**
-          * If delta.asset_id is a core asset, adjusts account statistics
-          */
-         void adjust_core_in_orders( const account_object& acnt, asset delta );
 
          /**
           * @brief Helper to make lazy deposit to CDD VBO.
