@@ -23,14 +23,18 @@ FC_REFLECT( key_data, (label)(encrypted_private_key) );
 
 struct wallet_file
 {
-   optional<vector<char>>          encrypted_brain_key;
-   optional<vector<char>>          encrypted_master_key;
+   vector<char>                    encrypted_brain_key;
+   fc::sha512                      brain_key_digest;
+   vector<char>                    encrypted_master_key;
+   fc::sha512                      master_key_digest;
    map<public_key_type, key_data>  encrypted_private_keys;
 };
 
 FC_REFLECT( wallet_file, 
             (encrypted_brain_key)
+            (brain_key_digest)
             (encrypted_master_key)
+            (master_key_digest)
             (encrypted_private_keys) 
           );
 
@@ -49,9 +53,10 @@ class Wallet : public QObject
 
       Q_INVOKABLE bool open( QString file_path );
       Q_INVOKABLE bool close();
+      Q_INVOKABLE bool isOpen()const;
       Q_INVOKABLE bool save();
       Q_INVOKABLE bool saveAs( QString file_path );
-      Q_INVOKABLE bool create( QString file_path, QString brain_key = QString() );
+      Q_INVOKABLE bool create( QString file_path, QString password, QString brain_key = QString() );
 
       /** required to generate new owner keys */
       Q_INVOKABLE bool loadBrainKey( QString brain_key );
@@ -61,7 +66,7 @@ class Wallet : public QObject
       Q_INVOKABLE bool hasBrainKey()const;
 
       /** @pre hasBrainKey() */
-      Q_INVOKABLE QString getBrainKey()const;
+      Q_INVOKABLE QString getBrainKey();
 
       Q_INVOKABLE bool    isLocked()const;
       Q_INVOKABLE QString unlock( QString password );
@@ -113,9 +118,11 @@ class Wallet : public QObject
    private:
       fc::path                  _wallet_file_path;
       wallet_file               _data;
+      /** used to decrypt all of the encrypted private keys */
       fc::sha512                _decrypted_master_key;
       flat_set<public_key_type> _available_private_keys;
       map<QString,QString>      _label_to_key;
+      QString                   _brain_key;
 };
 
 
