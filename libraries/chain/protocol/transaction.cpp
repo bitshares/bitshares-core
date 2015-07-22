@@ -267,6 +267,31 @@ set<public_key_type> signed_transaction::get_required_signatures( const flat_set
    return result;
 }
 
+set<public_key_type> signed_transaction::minimize_required_signatures(
+   const flat_set<public_key_type>& available_keys,
+   const std::function<const authority*(account_id_type)>& get_active,
+   const std::function<const authority*(account_id_type)>& get_owner,
+   uint32_t max_recursion
+   ) const
+{
+   set< public_key_type > s = get_required_signatures( available_keys, get_active, get_owner, max_recursion );
+   flat_set< public_key_type > result( s.begin(), s.end() );
+
+   for( const public_key_type& k : s )
+   {
+      result.erase( k );
+      try
+      {
+         graphene::chain::verify_authority( operations, result, get_active, get_owner, max_recursion );
+         continue;  // element stays erased if verify_authority is ok
+      }
+      catch( const tx_missing_owner_auth& e ) {}
+      catch( const tx_missing_active_auth& e ) {}
+      catch( const tx_missing_other_auth& e ) {}
+      result.insert( k );
+   }
+   return set<public_key_type>( result.begin(), result.end() );
+}
 
 void signed_transaction::verify_authority( const std::function<const authority*(account_id_type)>& get_active,
                                            const std::function<const authority*(account_id_type)>& get_owner,

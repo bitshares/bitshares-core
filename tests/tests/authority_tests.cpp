@@ -1085,7 +1085,7 @@ BOOST_FIXTURE_TEST_CASE( voting_account, database_fixture )
                          vikram_committee_member) != db.get_global_properties().active_committee_members.end());
 } FC_LOG_AND_RETHROW() }
 
-/**
+/*
  * Simple corporate accounts:
  *
  * Well Corp.       Alice 50, Bob 50             T=60
@@ -1197,6 +1197,104 @@ BOOST_FIXTURE_TEST_CASE( get_required_signatures_test, database_fixture )
       // TODO:  Check removing sigs      
       // TODO:  Accounts with mix of keys and accounts in their authority
       // TODO:  Tx with multiple ops requiring different sigs
+   }
+   catch(fc::exception& e)
+   {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
+/*
+ * Pathological case
+ *
+ *      Roco(T=2)
+ *    1/         \2
+ *   Styx(T=2)   Thud(T=1)
+ *  1/     \1       |1
+ * Alice  Bob     Alice
+ */
+
+BOOST_FIXTURE_TEST_CASE( nonminimal_sig_test, database_fixture )
+{
+   try
+   {
+      ACTORS(
+         (alice)(bob)
+         (roco)
+         (styx)(thud)
+         );
+
+      auto set_auth = [&](
+         account_id_type aid,
+         const authority& auth
+         )
+      {
+         signed_transaction tx;
+         account_update_operation op;
+         op.account = aid;
+         op.active = auth;
+         op.owner = auth;
+         tx.operations.push_back( op );
+         tx.set_expiration( db.head_block_time() + fc::minutes( 5 ) );
+         PUSH_TX( db, tx, database::skip_transaction_signatures | database::skip_authority_check );
+      } ;
+
+      auto get_active = [&](
+         account_id_type aid
+         ) -> const authority*
+      {
+         return &(aid(db).active);
+      } ;
+
+      auto get_owner = [&](
+         account_id_type aid
+         ) -> const authority*
+      {
+         return &(aid(db).owner);
+      } ;
+
+      auto chk = [&](
+         const signed_transaction& tx,
+         flat_set<public_key_type> available_keys,
+         set<public_key_type> ref_set
+         ) -> bool
+      {
+         //wdump( (tx)(available_keys) );
+         set<public_key_type> result_set = tx.get_required_signatures( available_keys, get_active, get_owner );
+         //wdump( (result_set)(ref_set) );
+         return result_set == ref_set;
+      } ;
+
+      auto chk_min = [&](
+         const signed_transaction& tx,
+         flat_set<public_key_type> available_keys,
+         set<public_key_type> ref_set
+         ) -> bool
+      {
+         //wdump( (tx)(available_keys) );
+         set<public_key_type> result_set = tx.minimize_required_signatures( available_keys, get_active, get_owner );
+         //wdump( (result_set)(ref_set) );
+         return result_set == ref_set;
+      } ;
+
+      set_auth( roco_id, authority( 2, styx_id, 1, thud_id, 2 ) );
+      set_auth( styx_id, authority( 2, alice_id, 1, bob_id, 1 ) );
+      set_auth( thud_id, authority( 1, alice_id, 1 ) );
+
+      signed_transaction tx;
+      transfer_operation op;
+      op.from = roco_id;
+      op.to = bob_id;
+      op.amount = asset(1);
+      tx.operations.push_back( op );
+
+      BOOST_CHECK( chk( tx, { alice_public_key, bob_public_key }, { alice_public_key, bob_public_key } ) );
+      BOOST_CHECK( chk_min( tx, { alice_public_key, bob_public_key }, { alice_public_key } ) );
+
+      GRAPHENE_REQUIRE_THROW( tx.verify_authority( get_active, get_owner ), fc::exception );
+      tx.sign( alice_private_key );
+      tx.verify_authority( get_active, get_owner );
    }
    catch(fc::exception& e)
    {

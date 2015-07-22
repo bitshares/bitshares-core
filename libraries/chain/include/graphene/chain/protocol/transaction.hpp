@@ -118,18 +118,36 @@ namespace graphene { namespace chain {
       signature_type sign( const private_key_type& key )const;
 
       /**
-       *  The purpose of this method is to identify the minimal subset of @ref available_keys that are
-       *  required to sign given the signatures that are already provided.
+       *  The purpose of this method is to identify some subset of
+       *  @ref available_keys that will produce sufficient signatures
+       *  for a transaction.  The result is not always a minimal set of
+       *  signatures, but any non-minimal result will still pass
+       *  validation.
        */
-      set<public_key_type> get_required_signatures( const flat_set<public_key_type>& available_keys,
-                                                    const std::function<const authority*(account_id_type)>& get_active,
-                                                    const std::function<const authority*(account_id_type)>& get_owner,
-                                                    uint32_t max_recursion = GRAPHENE_MAX_SIG_CHECK_DEPTH
-                                                    )const;
+      set<public_key_type> get_required_signatures(
+         const flat_set<public_key_type>& available_keys,
+         const std::function<const authority*(account_id_type)>& get_active,
+         const std::function<const authority*(account_id_type)>& get_owner,
+         uint32_t max_recursion = GRAPHENE_MAX_SIG_CHECK_DEPTH
+         )const;
 
       void verify_authority( const std::function<const authority*(account_id_type)>& get_active,
                              const std::function<const authority*(account_id_type)>& get_owner,
                              uint32_t max_recursion = GRAPHENE_MAX_SIG_CHECK_DEPTH )const;
+
+      /**
+       * This is a slower replacement for get_required_signatures()
+       * which returns a minimal set in all cases, including
+       * some cases where get_required_signatures() returns a
+       * non-minimal set.
+       */
+
+      set<public_key_type> minimize_required_signatures(
+         const flat_set<public_key_type>& available_keys,
+         const std::function<const authority*(account_id_type)>& get_active,
+         const std::function<const authority*(account_id_type)>& get_owner,
+         uint32_t max_recursion = GRAPHENE_MAX_SIG_CHECK_DEPTH
+         ) const;
 
       flat_set<public_key_type> get_signature_keys()const;
 
