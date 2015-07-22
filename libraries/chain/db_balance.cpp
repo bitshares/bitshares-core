@@ -72,21 +72,6 @@ void database::adjust_balance(account_id_type account, asset delta )
 
 } FC_CAPTURE_AND_RETHROW( (account)(delta) ) }
 
-void database::adjust_balance(const account_object& account, asset delta )
-{
-   adjust_balance( account.id, delta);
-}
-
-void database::adjust_core_in_orders( const account_object& acnt, asset delta )
-{
-   if( delta.asset_id == asset_id_type(0) && delta.amount != 0 )
-   {
-      modify( acnt.statistics(*this), [&](account_statistics_object& stat){
-          stat.total_core_in_orders += delta.amount;
-      });
-   }
-}
-
 optional< vesting_balance_id_type > database::deposit_lazy_vesting(
    const optional< vesting_balance_id_type >& ovbid,
    share_type amount, uint32_t req_vesting_seconds,

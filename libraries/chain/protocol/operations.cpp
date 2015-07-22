@@ -19,7 +19,6 @@
 
 namespace graphene { namespace chain {
 
-
 uint64_t base_operation::calculate_data_fee( uint64_t bytes, uint64_t price_per_kbyte )
 {
    auto result = (fc::uint128(bytes) * price_per_kbyte) / 1024;
@@ -27,10 +26,7 @@ uint64_t base_operation::calculate_data_fee( uint64_t bytes, uint64_t price_per_
    return result.to_uint64();
 }
 
-
-
-
-void  balance_claim_operation::validate()const
+void balance_claim_operation::validate()const
 {
    FC_ASSERT( fee == asset() );
    FC_ASSERT( balance_owner_key != public_key_type() );
@@ -54,88 +50,9 @@ struct required_auth_visitor
    }
 };
 
-struct required_active_visitor
-{
-   typedef void result_type;
-
-   flat_set<account_id_type>& result;
-
-   required_active_visitor( flat_set<account_id_type>& r ):result(r){}
-
-   /** for most operations this is just the fee payer */
-   template<typename T>
-   void operator()(const T& o)const 
-   { 
-      result.insert( o.fee_payer() );
-   }
-   void operator()(const account_update_operation& o)const 
-   {
-      /// if owner authority is required, no active authority is required
-      if( !(o.owner || o.active) )
-         result.insert( o.fee_payer() );
-   }
-   void operator()( const proposal_delete_operation& o )const
-   {
-      if( !o.using_owner_authority )
-         result.insert( o.fee_payer() );
-   }
-
-   void operator()( const proposal_update_operation& o )const
-   {
-      result.insert( o.fee_payer() );
-      for( auto id : o.active_approvals_to_add )
-         result.insert(id);
-      for( auto id : o.active_approvals_to_remove )
-         result.insert(id);
-   }
-   void operator()( const custom_operation& o )const
-   {
-      result.insert( o.required_auths.begin(), o.required_auths.end() );
-   }
-   void operator()( const assert_operation& o )const
-   {
-      result.insert( o.fee_payer() );
-      result.insert( o.required_auths.begin(), o.required_auths.end() );
-   }
-};
-
-struct required_owner_visitor
-{
-   typedef void result_type;
-
-   flat_set<account_id_type>& result;
-
-   required_owner_visitor( flat_set<account_id_type>& r ):result(r){}
-
-   /** for most operations this is a no-op */
-   template<typename T>
-   void operator()(const T& o)const {}
-
-   void operator()(const account_update_operation& o)const 
-   {
-      if( o.owner || o.active )
-         result.insert( o.account );
-   }
-
-   void operator()( const proposal_delete_operation& o )const
-   {
-      if( o.using_owner_authority )
-         result.insert( o.fee_payer() );
-   }
-
-   void operator()( const proposal_update_operation& o )const
-   {
-      for( auto id : o.owner_approvals_to_add )
-         result.insert(id);
-      for( auto id : o.owner_approvals_to_remove )
-         result.insert(id);
-   }
-};
-
-
 struct get_impacted_account_visitor
 {
-   flat_set<account_id_type>&      _impacted;
+   flat_set<account_id_type>& _impacted;
    get_impacted_account_visitor( flat_set<account_id_type>& impact ):_impacted(impact) {}
    typedef void result_type;
 
@@ -145,6 +62,7 @@ struct get_impacted_account_visitor
       o.get_impacted_accounts( _impacted );
    }
 };
+
 void operation_get_impacted_accounts( const operation& op, flat_set<account_id_type>& result )
 {
    op.visit( get_impacted_account_visitor( result ) );
@@ -153,14 +71,6 @@ void operation_get_impacted_accounts( const operation& op, flat_set<account_id_t
 void operation_get_required_authorities( const operation& op, vector<authority>& result )
 {
    op.visit( required_auth_visitor( result ) );
-}
-void operation_get_required_active_authorities( const operation& op, flat_set<account_id_type>& result )
-{
-   op.visit( required_active_visitor( result ) );
-}
-void operation_get_required_owner_authorities( const operation& op, flat_set<account_id_type>& result )
-{
-   op.visit( required_owner_visitor( result ) );
 }
 
 /**
