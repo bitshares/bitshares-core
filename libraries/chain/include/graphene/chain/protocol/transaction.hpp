@@ -87,16 +87,20 @@ namespace graphene { namespace chain {
 
       /// visit all operations
       template<typename Visitor>
-      void visit( Visitor&& visitor )
+      vector<typename Visitor::result_type> visit( Visitor&& visitor )
       {
+         vector<typename Visitor::result_type> results;
          for( auto& op : operations )
-            op.visit( std::forward<Visitor>( visitor ) );
+            results.push_back(op.visit( std::forward<Visitor>( visitor ) ));
+         return results;
       }
       template<typename Visitor>
-      void visit( Visitor&& visitor )const
+      vector<typename Visitor::result_type> visit( Visitor&& visitor )const
       {
+         vector<typename Visitor::result_type> results;
          for( auto& op : operations )
-            op.visit( std::forward<Visitor>( visitor ) );
+            results.push_back(op.visit( std::forward<Visitor>( visitor ) ));
+         return results;
       }
 
       void get_required_authorities( flat_set<account_id_type>& active, flat_set<account_id_type>& owner, vector<authority>& other )const;
@@ -157,7 +161,7 @@ namespace graphene { namespace chain {
       void clear() { operations.clear(); signatures.clear(); }
    };
 
-   void verify_authority( const vector<operation>& ops, const flat_set<public_key_type>& sigs, 
+   void verify_authority( const vector<operation>& ops, const flat_set<public_key_type>& sigs,
                           const std::function<const authority*(account_id_type)>& get_active,
                           const std::function<const authority*(account_id_type)>& get_owner,
                           uint32_t max_recursion = GRAPHENE_MAX_SIG_CHECK_DEPTH,
