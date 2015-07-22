@@ -133,7 +133,7 @@ namespace detail {
          {
             string::size_type colon_pos = endpoint_string.find(':');
             if (colon_pos == std::string::npos)
-               FC_THROW("Missing required port number in endpoint string \"${endpoint_string}\"", 
+               FC_THROW("Missing required port number in endpoint string \"${endpoint_string}\"",
                         ("endpoint_string", endpoint_string));
             std::string port_string = endpoint_string.substr(colon_pos + 1);
             try
@@ -315,7 +315,9 @@ namespace detail {
       virtual bool handle_block(const graphene::net::block_message& blk_msg, bool sync_mode,
                                 std::vector<fc::uint160_t>& contained_transaction_message_ids) override
       { try {
-         ilog("Got block #${n} from network", ("n", blk_msg.block.block_num()));
+         if (!sync_mode || blk_msg.block.block_num() % 10000 == 0)
+            ilog("Got block #${n} from network", ("n", blk_msg.block.block_num()));
+
          try {
             bool result = _chain_db->push_block(blk_msg.block, _is_block_producer ? database::skip_nothing : database::skip_transaction_signatures);
 
@@ -324,9 +326,9 @@ namespace detail {
             {
                // if we're not in sync mode, there's a chance we will be seeing some transactions
                // included in blocks before we see the free-floating transaction itself.  If that
-               // happens, there's no reason to fetch the transactions, so  construct a list of the 
+               // happens, there's no reason to fetch the transactions, so  construct a list of the
                // transaction message ids we no longer need.
-               // during sync, it is unlikely that we'll see any old 
+               // during sync, it is unlikely that we'll see any old
                for (const processed_transaction& transaction : blk_msg.block.transactions)
                {
                   graphene::net::trx_message transaction_message(transaction);
