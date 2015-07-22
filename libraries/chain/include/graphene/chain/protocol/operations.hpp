@@ -14,6 +14,7 @@
 #include <graphene/chain/protocol/withdraw_permission.hpp>
 #include <graphene/chain/protocol/witness.hpp>
 #include <graphene/chain/protocol/worker.hpp>
+#include <graphene/chain/protocol/confidential.hpp>
 
 namespace graphene { namespace chain {
 
@@ -59,7 +60,10 @@ namespace graphene { namespace chain {
             custom_operation,
             assert_operation,
             balance_claim_operation,
-            override_transfer_operation
+            override_transfer_operation,
+            transfer_to_blind_operation,
+            blind_transfer_operation,
+            transfer_from_blind_operation
          > operation;
 
    /// @} // operations group

@@ -143,6 +143,10 @@ namespace graphene { namespace chain {
 
    GRAPHENE_DECLARE_OP_EVALUATE_EXCEPTION( not_permitted, override_transfer, 1, "not permitted" )
 
+
+   GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( blind_transfer );
+   GRAPHENE_DECLARE_OP_EVALUATE_EXCEPTION( unknown_commitment, blind_transfer, 1, "Attempting to claim an unknown prior commitment" );
+
    /*
    FC_DECLARE_DERIVED_EXCEPTION( addition_overflow,                 graphene::chain::chain_exception, 30002, "addition overflow" )
    FC_DECLARE_DERIVED_EXCEPTION( subtraction_overflow,              graphene::chain::chain_exception, 30003, "subtraction overflow" )

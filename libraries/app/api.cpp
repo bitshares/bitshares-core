@@ -24,6 +24,7 @@
 #include <graphene/chain/withdraw_permission_object.hpp>
 #include <graphene/chain/worker_evaluator.hpp>
 #include <graphene/chain/transaction_object.hpp>
+#include <graphene/chain/confidential_evaluator.hpp>
 
 #include <fc/crypto/hex.hpp>
 #include <fc/smart_ref_impl.hpp>
@@ -684,6 +685,13 @@ namespace graphene { namespace app {
                   result.reserve( impacted.size() );
                   for( auto& item : impacted ) result.emplace_back(item);
                   break;
+               } case impl_blinded_balance_object_type:{
+                  const auto& aobj = dynamic_cast<const blinded_balance_object*>(obj);
+                  assert( aobj != nullptr );
+                  result.reserve( aobj->owner.account_auths.size() );
+                  for( const auto& a : aobj->owner.account_auths )
+                     result.push_back( a.first );
+                  break;
                } case impl_block_summary_object_type:{
                } case impl_account_transaction_history_object_type:{
                } case impl_witness_schedule_object_type: {
@@ -1087,6 +1095,19 @@ namespace graphene { namespace app {
                              [&]( account_id_type id ){ return &id(_db).owner; },
                               _db.get_global_properties().parameters.max_authority_depth );
        return true;
+    }
+    vector<blinded_balance_object> database_api::get_blinded_balances( const flat_set<commitment_type>& commitments )const
+    {
+       vector<blinded_balance_object> result; result.reserve(commitments.size());
+       const auto& bal_idx = _db.get_index_type<blinded_balance_index>();
+       const auto& by_commitment_idx = bal_idx.indices().get<by_commitment>();
+       for( const auto& c : commitments )
+       {
+          auto itr = by_commitment_idx.find( c );
+          if( itr != by_commitment_idx.end() )
+             result.push_back( *itr );
+       }
+       return result;
     }
 
 } } // graphene::app

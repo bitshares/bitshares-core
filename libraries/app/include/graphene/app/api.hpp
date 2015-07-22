@@ -26,6 +26,7 @@
 #include <graphene/chain/witness_object.hpp>
 #include <graphene/chain/proposal_object.hpp>
 #include <graphene/chain/balance_object.hpp>
+#include <graphene/chain/confidential_evaluator.hpp>
 #include <graphene/net/node.hpp>
 
 #include <graphene/market_history/market_history_plugin.hpp>
@@ -317,6 +318,12 @@ namespace graphene { namespace app {
           * @return true of the @ref trx has all of the required signatures, otherwise throws an exception
           */
          bool                 verify_authority( const signed_transaction& trx )const;
+
+
+         /**
+          *  @return the set of blinded balance objects by commitment ID
+          */
+         vector<blinded_balance_object> get_blinded_balances( const flat_set<commitment_type>& commitments )const;
 
 
       private:

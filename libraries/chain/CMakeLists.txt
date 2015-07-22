@@ -21,6 +21,7 @@ add_library( graphene_chain
              protocol/transaction.cpp
              protocol/block.cpp
              protocol/fee_schedule.cpp
+             protocol/confidential.cpp
 
              pts_address.cpp
 
@@ -37,6 +38,7 @@ add_library( graphene_chain
              vesting_balance_evaluator.cpp
              withdraw_permission_evaluator.cpp
              worker_evaluator.cpp
+             confidential_evaluator.cpp
 
              account_object.cpp
              asset_object.cpp

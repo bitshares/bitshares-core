@@ -83,6 +83,14 @@ namespace graphene { namespace chain {
             result.push_back(k.first);
          return result;
       }
+
+      friend bool operator == ( const authority& a, const authority& b )
+      {
+         return (a.weight_threshold == b.weight_threshold) &&
+                (a.account_auths == b.account_auths) &&
+                (a.key_auths == b.key_auths) &&
+                (a.address_auths == b.address_auths); 
+      }
       uint32_t num_auths()const { return account_auths.size() + key_auths.size() + address_auths.size(); }
       void     clear() { account_auths.clear(); key_auths.clear(); }
 
