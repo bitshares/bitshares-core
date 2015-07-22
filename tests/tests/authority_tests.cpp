@@ -1085,4 +1085,124 @@ BOOST_FIXTURE_TEST_CASE( voting_account, database_fixture )
                          vikram_committee_member) != db.get_global_properties().active_committee_members.end());
 } FC_LOG_AND_RETHROW() }
 
+/**
+ * Simple corporate accounts:
+ *
+ * Well Corp.       Alice 50, Bob 50             T=60
+ * Xylo Company     Alice 30, Cindy 50           T=40
+ * Yaya Inc.        Bob 10, Dan 10, Edy 10       T=20
+ * Zyzz Co.         Dan 50                       T=40
+ *
+ * Complex corporate accounts:
+ *
+ * Mega Corp.       Well 30, Yes 30              T=40
+ * Nova Ltd.        Alice 10, Well 10            T=20
+ * Odle Intl.       Dan 10, Yes 10, Zyzz 10      T=20
+ * Poxx LLC         Well 10, Xylo 10, Yes 20, Zyzz 20   T=40
+ */
+
+BOOST_FIXTURE_TEST_CASE( get_required_signatures_test, database_fixture )
+{
+   try
+   {
+      ACTORS(
+              (alice)(bob)(cindy)(dan)(edy)
+              (mega)(nova)(odle)(poxx)
+              (well)(xylo)(yaya)(zyzz)
+            );
+
+      auto set_auth = [&](
+         account_id_type aid,
+         const authority& auth
+         )
+      {
+         signed_transaction tx;
+         account_update_operation op;
+         op.account = aid;
+         op.active = auth;
+         op.owner = auth;
+         tx.operations.push_back( op );
+         tx.set_expiration( db.head_block_time() + fc::minutes( 5 ) );
+         PUSH_TX( db, tx, database::skip_transaction_signatures | database::skip_authority_check );
+      } ;
+
+      auto get_active = [&](
+         account_id_type aid
+         ) -> const authority*
+      {
+         return &(aid(db).active);
+      } ;
+
+      auto get_owner = [&](
+         account_id_type aid
+         ) -> const authority*
+      {
+         return &(aid(db).owner);
+      } ;
+
+      auto chk = [&](
+         const signed_transaction& tx,
+         flat_set<public_key_type> available_keys,
+         set<public_key_type> ref_set
+         ) -> bool
+      {
+         //wdump( (tx)(available_keys) );
+         set<public_key_type> result_set = tx.get_required_signatures( available_keys, get_active, get_owner );
+         //wdump( (result_set)(ref_set) );
+         return result_set == ref_set;
+      } ;
+
+      set_auth( well_id, authority( 60, alice_id, 50, bob_id, 50 ) );
+      set_auth( xylo_id, authority( 40, alice_id, 30, cindy_id, 50 ) );
+      set_auth( yaya_id, authority( 20, bob_id, 10, dan_id, 10, edy_id, 10 ) );
+      set_auth( zyzz_id, authority( 40, dan_id, 50 ) );
+
+      set_auth( mega_id, authority( 40, well_id, 30, yaya_id, 30 ) );
+      set_auth( nova_id, authority( 20, alice_id, 10, well_id, 10 ) );
+      set_auth( odle_id, authority( 20, dan_id, 10, yaya_id, 10, zyzz_id, 10 ) );
+      set_auth( poxx_id, authority( 40, well_id, 10, xylo_id, 10, yaya_id, 20, zyzz_id, 20 ) );
+
+      signed_transaction tx;
+      flat_set< public_key_type > all_keys
+         { alice_public_key, bob_public_key, cindy_public_key, dan_public_key, edy_public_key };
+
+      tx.operations.push_back( transfer_operation() );
+      transfer_operation& op = tx.operations.back().get<transfer_operation>();
+      op.to = edy_id;
+      op.amount = asset(1);
+
+      op.from = alice_id;
+      BOOST_CHECK( chk( tx, all_keys, { alice_public_key } ) );
+      op.from = bob_id;
+      BOOST_CHECK( chk( tx, all_keys, { bob_public_key } ) );
+      op.from = well_id;
+      BOOST_CHECK( chk( tx, all_keys, { alice_public_key, bob_public_key } ) );
+      op.from = xylo_id;
+      BOOST_CHECK( chk( tx, all_keys, { alice_public_key, cindy_public_key } ) );
+      op.from = yaya_id;
+      BOOST_CHECK( chk( tx, all_keys, { bob_public_key, dan_public_key } ) );
+      op.from = zyzz_id;
+      BOOST_CHECK( chk( tx, all_keys, { dan_public_key } ) );
+
+      op.from = mega_id;
+      BOOST_CHECK( chk( tx, all_keys, { alice_public_key, bob_public_key, dan_public_key } ) );
+      op.from = nova_id;
+      BOOST_CHECK( chk( tx, all_keys, { alice_public_key, bob_public_key } ) );
+      op.from = odle_id;
+      BOOST_CHECK( chk( tx, all_keys, { bob_public_key, dan_public_key } ) );
+      op.from = poxx_id;
+      BOOST_CHECK( chk( tx, all_keys, { alice_public_key, bob_public_key, cindy_public_key, dan_public_key } ) );
+
+      // TODO:  Add sigs to tx, then check
+      // TODO:  Check removing sigs      
+      // TODO:  Accounts with mix of keys and accounts in their authority
+      // TODO:  Tx with multiple ops requiring different sigs
+   }
+   catch(fc::exception& e)
+   {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
 BOOST_AUTO_TEST_SUITE_END()
