@@ -4,6 +4,7 @@
 
 #include "GrapheneApplication.hpp"
 #include "ChainDataModel.hpp"
+#include "Transaction.hpp"
 #include "Operations.hpp"
 #include "Balance.hpp"
 
@@ -27,13 +28,17 @@ int main(int argc, char *argv[])
 
    qRegisterMetaType<std::function<void()>>();
    qRegisterMetaType<ObjectId>();
-   qRegisterMetaType<TransferOperation>();
 
    qmlRegisterType<Asset>("Graphene.Client", 0, 1, "Asset");
    qmlRegisterType<Balance>("Graphene.Client", 0, 1, "Balance");
    qmlRegisterType<Account>("Graphene.Client", 0, 1, "Account");
    qmlRegisterType<ChainDataModel>("Graphene.Client", 0, 1, "DataModel");
    qmlRegisterType<GrapheneApplication>("Graphene.Client", 0, 1, "GrapheneApplication");
+   qmlRegisterType<Transaction>("Graphene.Client", 0, 1, "Transaction");
+
+   qmlRegisterInterface<OperationBase>("OperationBase");
+   qmlRegisterType<TransferOperation>("Graphene.Client", 0, 1, "TransferOperation");
+
    qmlRegisterUncreatableType<OperationBuilder>("Graphene.Client", 0, 1, "OperationBuilder",
                                                 QStringLiteral("OperationBuilder cannot be created from QML"));
 

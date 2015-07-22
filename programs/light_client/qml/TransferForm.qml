@@ -95,6 +95,7 @@ Rectangle {
 
                var op = app.operationBuilder.transfer(0, 0, amountField.value * precisionAdjustment,
                                                       balance.type.id, memoField.text, 0)
+
                return qsTr("Fee:<br/>") + op.fee / precisionAdjustment + " CORE"
             }
          }

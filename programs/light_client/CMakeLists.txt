@@ -27,6 +27,7 @@ add_executable(light_client
         Asset.cpp 
         Account.cpp 
         Balance.cpp 
+        Transaction.cpp
         main.cpp ${QML_QRC} ${QML})
 
 if (CMAKE_VERSION VERSION_LESS 3.0)
