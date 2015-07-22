@@ -84,10 +84,11 @@ namespace graphene { namespace chain {
       override_authority   = 0x04, /**< issuer may transfer asset back to himself */
       transfer_restricted  = 0x08, /**< require the issuer to be one party to every transfer */
       disable_force_settle = 0x10, /**< disable force settling */
-      global_settle        = 0x20  /**< allow the bitasset issuer to force a global settling -- this may be set in permissions, but not flags */
+      global_settle        = 0x20, /**< allow the bitasset issuer to force a global settling -- this may be set in permissions, but not flags */
+      disable_confidential = 0x40  /**< allow the asset to be used with confidential transactions */
    };
-   const static uint32_t ASSET_ISSUER_PERMISSION_MASK = charge_market_fee|white_list|override_authority|transfer_restricted|disable_force_settle|global_settle;
-   const static uint32_t UIA_ASSET_ISSUER_PERMISSION_MASK = charge_market_fee|white_list|override_authority|transfer_restricted;
+   const static uint32_t ASSET_ISSUER_PERMISSION_MASK = charge_market_fee|white_list|override_authority|transfer_restricted|disable_force_settle|global_settle|disable_confidential;
+   const static uint32_t UIA_ASSET_ISSUER_PERMISSION_MASK = charge_market_fee|white_list|override_authority|transfer_restricted|disable_confidential;
 
    enum reserved_spaces
    {
@@ -138,7 +139,8 @@ namespace graphene { namespace chain {
       impl_transaction_object_type,
       impl_block_summary_object_type,
       impl_account_transaction_history_object_type,
-      impl_witness_schedule_object_type
+      impl_witness_schedule_object_type,
+      impl_blinded_balance_object_type
    };
 
    enum meta_info_object_type
@@ -386,6 +388,7 @@ FC_REFLECT_ENUM( graphene::chain::impl_object_type,
                  (impl_block_summary_object_type)
                  (impl_account_transaction_history_object_type)
                  (impl_witness_schedule_object_type)
+                 (impl_blinded_balance_object_type)
                )
 
 FC_REFLECT_ENUM( graphene::chain::meta_info_object_type, (meta_account_object_type)(meta_asset_object_type) )
@@ -417,4 +420,4 @@ FC_REFLECT_TYPENAME( graphene::chain::account_transaction_history_id_type )
 FC_REFLECT_TYPENAME( graphene::chain::witness_schedule_id_type )
 FC_REFLECT( graphene::chain::void_t, )
 
-FC_REFLECT_ENUM( graphene::chain::asset_issuer_permission_flags, (charge_market_fee)(white_list)(transfer_restricted)(override_authority)(disable_force_settle)(global_settle) )
+FC_REFLECT_ENUM( graphene::chain::asset_issuer_permission_flags, (charge_market_fee)(white_list)(transfer_restricted)(override_authority)(disable_force_settle)(global_settle)(disable_confidential) )
