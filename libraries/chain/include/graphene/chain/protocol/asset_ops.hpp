@@ -458,4 +458,3 @@ FC_REFLECT( graphene::chain::asset_reserve_operation,
             (fee)(payer)(amount_to_reserve)(extensions) )
 
 FC_REFLECT( graphene::chain::asset_fund_fee_pool_operation, (fee)(from_account)(asset_id)(amount)(extensions) );
-

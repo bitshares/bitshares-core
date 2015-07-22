@@ -203,4 +203,3 @@ FC_REFLECT( graphene::chain::price, (base)(quote) )
    (core_exchange_rate)
 
 FC_REFLECT( graphene::chain::price_feed, GRAPHENE_PRICE_FEED_FIELDS )
-
