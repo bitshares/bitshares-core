@@ -20,6 +20,7 @@
 #include <graphene/chain/database.hpp>
 #include <graphene/chain/account_object.hpp>
 #include <graphene/chain/protocol/fee_schedule.hpp>
+#include <graphene/chain/protocol/vote.hpp>
 #include <graphene/chain/transaction_evaluation_state.hpp>
 
 #include <fc/smart_ref_impl.hpp>
@@ -36,7 +37,7 @@ object_id_type committee_member_create_evaluator::do_apply( const committee_memb
 { try {
    vote_id_type vote_id;
    db().modify(db().get_global_properties(), [&vote_id](global_property_object& p) {
-      vote_id = p.get_next_vote_id(vote_id_type::committee);
+      vote_id = get_next_vote_id(p, vote_id_type::committee);
    });
 
    const auto& new_del_object = db().create<committee_member_object>( [&]( committee_member_object& obj ){
@@ -46,8 +47,6 @@ object_id_type committee_member_create_evaluator::do_apply( const committee_memb
    });
    return new_del_object.id;
 } FC_CAPTURE_AND_RETHROW( (op) ) }
-
-
 
 void_result committee_member_update_global_parameters_evaluator::do_evaluate(const committee_member_update_global_parameters_operation& o)
 { try {

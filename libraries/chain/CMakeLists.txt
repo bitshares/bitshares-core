@@ -22,6 +22,7 @@ add_library( graphene_chain
              protocol/block.cpp
              protocol/fee_schedule.cpp
              protocol/confidential.cpp
+             protocol/vote.cpp
 
              pts_address.cpp
 
