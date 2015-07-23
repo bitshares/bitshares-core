@@ -99,6 +99,18 @@ struct wallet_data
    string                    ws_password;
 };
 
+struct exported_account_keys
+{
+    string account_name;
+    vector<vector<char>> encrypted_private_keys;
+};
+
+struct exported_keys
+{
+    fc::sha512 password_checksum;
+    vector<exported_account_keys> account_keys;
+};
+
 namespace detail {
 class wallet_api_impl;
 }
@@ -1027,6 +1039,10 @@ FC_REFLECT( graphene::wallet::brain_key_info,
             (wif_priv_key)
             (pub_key)
           );
+
+FC_REFLECT( graphene::wallet::exported_account_keys, (account_name)(encrypted_private_keys) )
+
+FC_REFLECT( graphene::wallet::exported_keys, (password_checksum)(account_keys) )
 
 FC_API( graphene::wallet::wallet_api,
         (help)
