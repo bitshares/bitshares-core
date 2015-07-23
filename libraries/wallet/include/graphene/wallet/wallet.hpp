@@ -55,6 +55,54 @@ struct brain_key_info
    public_key_type pub_key;
 };
 
+
+/**
+ *  Contains the confirmation receipt the sender must give the receiver and
+ *  the meta data about the receipt that helps the sender identify which receipt is
+ *  for the receiver and which is for the change address.
+ */
+struct blind_confirmation 
+{
+   struct output
+   {
+      string                          label;
+      string                          pub_key;
+      stealth_confirmation::memo_data decrypted_memo;
+      stealth_confirmation            confirmation;
+      string                          confirmation_receipt;
+   };
+
+   signed_transaction     trx;
+   vector<output>         outputs;
+};
+
+struct blind_balance
+{
+   asset                     amount;
+   public_key_type           from; ///< the account this balance came from
+   public_key_type           to; ///< the account this balance is logically associated with
+   public_key_type           one_time_key; ///< used to derive the authority key and blinding factor
+   fc::ecc::commitment_type  commitment;
+};
+
+struct key_label
+{
+   string          label;
+   public_key_type key;
+};
+
+
+struct by_label;
+struct by_key;
+typedef multi_index_container<
+   key_label,
+   indexed_by<
+      ordered_unique< tag<by_label>, member< key_label, string, &key_label::label > >,
+      ordered_unique< tag<by_key>, member< key_label, public_key_type, &key_label::key > >
+   >
+> key_label_index_type;
+
+
 struct wallet_data
 {
    account_multi_index_type my_accounts;
@@ -93,6 +141,9 @@ struct wallet_data
    //    incomplete account regs
    map<string, vector<string> > pending_account_registrations;
    map<string, string> pending_witness_registrations;
+
+   key_label_index_type                                              labeled_keys;
+   map<asset_id_type, map<public_key_type, vector<blind_balance> > > blinded_balances;
 
    string                    ws_server = "ws://localhost:8090";
    string                    ws_user;
@@ -532,6 +583,54 @@ class wallet_api
                                   string asset_symbol,
                                   string memo,
                                   bool broadcast = false);
+
+
+
+      /** These methods are used for stealth transfers */
+      ///@{
+      /**
+       *  This method can be used 
+       */
+      void                        set_key_label( public_key_type, string label );
+
+      /**
+       *  Generates a new blind account for the given brain key and assigns it the given label.
+       */
+      public_key_type             create_blind_account( string label, string brain_key  );
+
+      /**
+       * @return the total balance of all blinded commitments that can be claimed by the
+       * given account key or label
+       */
+      asset                       get_blind_balance( string key_or_label )const;
+      /** @return all blind accounts */
+      map<string,public_key_type> get_blind_accounts()const;
+      /** @return all blind accounts for which this wallet has the private key */
+      map<string,public_key_type> get_my_blind_accounts()const;
+      /** @return the public key associated with the given label */
+      public_key_type             get_public_key( string label )const;
+      ///@}
+
+
+      /**
+       *  Given a confirmation receipt, this method will parse it for a blinded balance and confirm
+       *  that it exists in the blockchain.  If it exists then it will report the amount received and
+       *  who sent it.
+       *
+       *  @param opt_from - if not empty and the sender is a unknown public key, then the unknown public key will be given the label opt_from
+       *  @param confirmation_receipt - a base58 encoded stealth confirmation 
+       */
+      stealth_confirmation::memo_data receive_blind_transfer( string confirmation_receipt, string opt_from );
+
+      /**
+       *  Transfers a public balance from @from to one or more blinded balances using a
+       *  stealth transfer.
+       */
+      blind_confirmation transfer_to_blind( string from, 
+                                            string asset_symbol,
+                                            /** map from key or label to amount */
+                                            map<string, string> to_amounts, 
+                                            bool broadcast = false );
 
       /** Place a limit order attempting to sell one asset for another.
        *
@@ -1022,6 +1121,11 @@ class wallet_api
 
 } }
 
+FC_REFLECT( graphene::wallet::key_label, (label)(key) )
+FC_REFLECT( graphene::wallet::blind_balance, (amount)(from)(to)(one_time_key)(commitment) )
+FC_REFLECT( graphene::wallet::blind_confirmation::output, (label)(pub_key)(decrypted_memo)(confirmation)(confirmation_receipt) )
+FC_REFLECT( graphene::wallet::blind_confirmation, (trx)(outputs) )
+
 FC_REFLECT( graphene::wallet::plain_keys, (keys)(checksum) )
 
 FC_REFLECT( graphene::wallet::wallet_data,
@@ -1029,6 +1133,8 @@ FC_REFLECT( graphene::wallet::wallet_data,
             (cipher_keys)
             (extra_keys)
             (pending_account_registrations)(pending_witness_registrations)
+            (labeled_keys)
+            (blinded_balances)
             (ws_server)
             (ws_user)
             (ws_password)

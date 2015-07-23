@@ -426,6 +426,7 @@ public:
          if( !fc::exists( dest_parent ) )
             fc::create_directories( dest_parent );
          fc::copy( src_path, dest_path );
+         disable_umask_protection();
       }
       catch(...)
       {
@@ -674,6 +675,7 @@ public:
          outfile.write( data.c_str(), data.length() );
          outfile.flush();
          outfile.close();
+         disable_umask_protection();
       }
       catch(...)
       {
