@@ -273,6 +273,9 @@ struct database_fixture {
 };
 
 namespace test {
+/// set a reasonable expiration time for the transaction
+void set_expiration( const database& db, transaction& tx );
+
 bool _push_block( database& db, const signed_block& b, uint32_t skip_flags = 0 );
 processed_transaction _push_transaction( database& db, const signed_transaction& tx, uint32_t skip_flags = 0 );
 }

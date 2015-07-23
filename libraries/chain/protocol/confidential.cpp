@@ -4,6 +4,7 @@
 
 #include <fc/crypto/base58.hpp>
 #include <fc/io/raw.hpp>
+#include <fc/crypto/elliptic.hpp>
 
 namespace graphene { namespace chain {
 

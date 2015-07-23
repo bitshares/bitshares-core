@@ -33,6 +33,7 @@
 #include "../common/database_fixture.hpp"
 
 using namespace graphene::chain;
+using namespace graphene::chain::test;
 
 genesis_state_type make_genesis() {
    genesis_state_type genesis_state;
@@ -287,7 +288,7 @@ BOOST_AUTO_TEST_CASE( undo_pending )
          t.amount = asset( 10000000 );
          {
             signed_transaction trx;
-            trx.set_expiration(db.head_block_time() + fc::minutes(1));
+            set_expiration( db, trx );
 
             trx.operations.push_back(t);
             PUSH_TX( db, trx, ~0 );
@@ -297,7 +298,7 @@ BOOST_AUTO_TEST_CASE( undo_pending )
          }
 
          signed_transaction trx;
-         trx.set_expiration( now + db.get_global_properties().parameters.maximum_time_until_expiration );
+         set_expiration( db, trx );
          account_id_type nathan_id = account_idx.get_next_id();
          account_create_operation cop;
          cop.registrar = GRAPHENE_TEMP_ACCOUNT;
@@ -314,7 +315,7 @@ BOOST_AUTO_TEST_CASE( undo_pending )
          BOOST_CHECK(nathan_id(db).name == "nathan");
 
          trx.clear();
-         trx.set_expiration(db.head_block_time() + db.get_global_properties().parameters.maximum_time_until_expiration-1);
+         set_expiration( db, trx );
          t.fee = asset(1);
          t.from = account_id_type(1);
          t.to = nathan_id;
@@ -322,7 +323,7 @@ BOOST_AUTO_TEST_CASE( undo_pending )
          trx.operations.push_back(t);
          db.push_transaction(trx, ~0);
          trx.clear();
-         trx.set_expiration(db.head_block_time() + db.get_global_properties().parameters.maximum_time_until_expiration-2);
+         set_expiration( db, trx );
          trx.operations.push_back(t);
          db.push_transaction(trx, ~0);
 
@@ -352,7 +353,7 @@ BOOST_AUTO_TEST_CASE( switch_forks_undo_create )
       const graphene::db::index& account_idx = db1.get_index(protocol_ids, account_object_type);
 
       signed_transaction trx;
-      trx.set_expiration(now + db1.get_global_properties().parameters.maximum_time_until_expiration);
+      set_expiration( db1, trx );
       account_id_type nathan_id = account_idx.get_next_id();
       account_create_operation cop;
       cop.registrar = GRAPHENE_TEMP_ACCOUNT;
@@ -412,7 +413,7 @@ BOOST_AUTO_TEST_CASE( duplicate_transactions )
       const graphene::db::index& account_idx = db1.get_index(protocol_ids, account_object_type);
 
       signed_transaction trx;
-      trx.set_expiration(db1.head_block_time() + fc::minutes(1));
+      set_expiration( db1, trx );
       account_id_type nathan_id = account_idx.get_next_id();
       account_create_operation cop;
       cop.name = "nathan";
@@ -423,7 +424,7 @@ BOOST_AUTO_TEST_CASE( duplicate_transactions )
       PUSH_TX( db1, trx, skip_sigs );
 
       trx = decltype(trx)();
-      trx.set_expiration(db1.head_block_time() + fc::minutes(1));
+      set_expiration( db1, trx );
       transfer_operation t;
       t.to = nathan_id;
       t.amount = asset(500);
@@ -492,8 +493,7 @@ BOOST_AUTO_TEST_CASE( tapos )
       trx.sign(init_account_priv_key);
       //relative_expiration is 1, but ref block is 2 blocks old, so this should fail.
       GRAPHENE_REQUIRE_THROW(PUSH_TX( db1, trx, database::skip_transaction_signatures | database::skip_authority_check ), fc::exception);
-      trx.set_expiration( db1.head_block_time() + fc::seconds( 2 * db1.get_global_properties().parameters.block_interval ));
-      trx.set_reference_block( db1.head_block_id() );
+      set_expiration( db1, trx );
       trx.signatures.clear();
       trx.sign(init_account_priv_key);
       db1.push_transaction(trx, database::skip_transaction_signatures | database::skip_authority_check);
@@ -604,7 +604,7 @@ BOOST_FIXTURE_TEST_CASE( double_sign_check, database_fixture )
    ACTOR(bob);
    asset amount(1000);
 
-   trx.set_expiration(db.head_block_time() + fc::minutes(1));
+   set_expiration( db, trx );
    transfer_operation t;
    t.from = alice.id;
    t.to = bob.id;

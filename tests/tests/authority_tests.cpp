@@ -33,6 +33,7 @@
 #include "../common/database_fixture.hpp"
 
 using namespace graphene::chain;
+using namespace graphene::chain::test;
 
 BOOST_FIXTURE_TEST_SUITE( authority_tests, database_fixture )
 
@@ -337,8 +338,7 @@ BOOST_AUTO_TEST_CASE( proposed_single_account )
       }
 
       trx.operations.push_back(op);
-      trx.set_expiration( db.head_block_time() + fc::seconds( 3 * db.get_global_properties().parameters.block_interval ));
-      trx.set_reference_block( db.head_block_id() );
+      set_expiration( db, trx );
 
       trx.sign( init_account_priv_key );
       const proposal_object& proposal = db.get<proposal_object>(PUSH_TX( db, trx ).operation_results.front().get<object_id_type>());
@@ -552,7 +552,7 @@ BOOST_FIXTURE_TEST_CASE( fired_committee_members, database_fixture )
       op.new_options = nathan->options;
       op.new_options->votes = committee_members;
       trx.operations.push_back(op);
-      trx.set_expiration(db.head_block_time() + GRAPHENE_DEFAULT_MAX_TIME_UNTIL_EXPIRATION);
+      set_expiration( db, trx );
       PUSH_TX( db, trx, ~0 );
       trx.operations.clear();
    }
@@ -832,6 +832,7 @@ BOOST_FIXTURE_TEST_CASE( proposal_owner_authority_complete, database_fixture )
       uop.proposal = prop.id;
       uop.key_approvals_to_add.insert(dan.active.key_auths.begin()->first);
       trx.operations.push_back(uop);
+      set_expiration( db, trx );
       trx.sign(nathan_key);
       trx.sign(dan_key);
       PUSH_TX( db, trx );
@@ -841,6 +842,7 @@ BOOST_FIXTURE_TEST_CASE( proposal_owner_authority_complete, database_fixture )
 
       std::swap(uop.key_approvals_to_add, uop.key_approvals_to_remove);
       trx.operations.push_back(uop);
+      trx.expiration += fc::seconds(1);  // Survive trx dupe check
       trx.sign(nathan_key);
       trx.sign(dan_key);
       PUSH_TX( db, trx );
@@ -849,10 +851,8 @@ BOOST_FIXTURE_TEST_CASE( proposal_owner_authority_complete, database_fixture )
       BOOST_CHECK_EQUAL(prop.available_key_approvals.size(), 0);
 
       std::swap(uop.key_approvals_to_add, uop.key_approvals_to_remove);
-      // Survive trx dupe check
-      trx.set_expiration( db.head_block_time() + fc::seconds( 5 * db.get_global_properties().parameters.block_interval ));
-      trx.set_reference_block( db.head_block_id() );
       trx.operations.push_back(uop);
+      trx.expiration += fc::seconds(1);  // Survive trx dupe check
       trx.sign(nathan_key);
       trx.sign(dan_key);
       PUSH_TX( db, trx );
@@ -863,6 +863,7 @@ BOOST_FIXTURE_TEST_CASE( proposal_owner_authority_complete, database_fixture )
       uop.key_approvals_to_add.clear();
       uop.owner_approvals_to_add.insert(nathan.get_id());
       trx.operations.push_back(uop);
+      trx.expiration += fc::seconds(1);  // Survive trx dupe check
       trx.sign(nathan_key);
       PUSH_TX( db, trx );
       trx.clear();
@@ -909,7 +910,7 @@ BOOST_FIXTURE_TEST_CASE( max_authority_membership, database_fixture )
          private_key_type privkey = generate_private_key( seed );
          private_keys.push_back( privkey );
       }
-      tx.set_expiration( db.head_block_time() + fc::minutes(5) );
+      set_expiration( db, tx );
       ptx = PUSH_TX( db, tx, ~0 );
 
       vector<public_key_type> key_ids;
@@ -947,7 +948,7 @@ BOOST_FIXTURE_TEST_CASE( max_authority_membership, database_fixture )
              anon_create_op.name = generate_anon_acct_name();
 
              tx.operations.push_back( anon_create_op );
-             tx.set_expiration( db.head_block_time() + fc::minutes(5) );
+             set_expiration( db, tx );
 
              if( num_keys > max_authority_membership )
              {
@@ -1122,7 +1123,7 @@ BOOST_FIXTURE_TEST_CASE( get_required_signatures_test, database_fixture )
          op.active = auth;
          op.owner = auth;
          tx.operations.push_back( op );
-         tx.set_expiration( db.head_block_time() + fc::minutes( 5 ) );
+         set_expiration( db, tx );
          PUSH_TX( db, tx, database::skip_transaction_signatures | database::skip_authority_check );
       } ;
 
@@ -1236,7 +1237,7 @@ BOOST_FIXTURE_TEST_CASE( nonminimal_sig_test, database_fixture )
          op.active = auth;
          op.owner = auth;
          tx.operations.push_back( op );
-         tx.set_expiration( db.head_block_time() + fc::minutes( 5 ) );
+         set_expiration( db, tx );
          PUSH_TX( db, tx, database::skip_transaction_signatures | database::skip_authority_check );
       } ;
 
