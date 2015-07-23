@@ -108,6 +108,8 @@ BOOST_AUTO_TEST_CASE( withdraw_permission_test )
       op.withdraw_from_account = nathan_id;
       op.withdraw_to_account = dan_id;
       op.amount_to_withdraw = asset(1);
+      set_expiration( db, trx );
+
       trx.operations.push_back(op);
       //Throws because we haven't entered the first withdrawal period yet.
       GRAPHENE_REQUIRE_THROW(PUSH_TX( db, trx ), fc::exception);
@@ -121,6 +123,7 @@ BOOST_AUTO_TEST_CASE( withdraw_permission_test )
       REQUIRE_THROW_WITH_VALUE(op, withdraw_to_account, account_id_type());
       REQUIRE_THROW_WITH_VALUE(op, amount_to_withdraw, asset(10));
       REQUIRE_THROW_WITH_VALUE(op, amount_to_withdraw, asset(6));
+      set_expiration( db, trx );
       trx.clear();
       trx.operations.push_back(op);
       trx.sign(dan_private_key);
@@ -165,12 +168,14 @@ BOOST_AUTO_TEST_CASE( withdraw_permission_test )
       op.withdraw_to_account = dan_id;
       op.amount_to_withdraw = asset(5);
       trx.operations.push_back(op);
+      set_expiration( db, trx );
       trx.sign(dan_private_key);
       //Throws because nathan doesn't have the money
       GRAPHENE_CHECK_THROW(PUSH_TX( db, trx ), fc::exception);
       op.amount_to_withdraw = asset(1);
       trx.clear();
       trx.operations = {op};
+      set_expiration( db, trx );
       trx.sign(dan_private_key);
       PUSH_TX( db, trx );
    }
@@ -200,6 +205,7 @@ BOOST_AUTO_TEST_CASE( withdraw_permission_test )
       op.withdraw_to_account = dan_id;
       op.amount_to_withdraw = asset(5);
       trx.operations.push_back(op);
+      set_expiration( db, trx );
       trx.sign(dan_private_key);
       //Throws because the permission has expired
       GRAPHENE_CHECK_THROW(PUSH_TX( db, trx ), fc::exception);
@@ -215,7 +221,6 @@ BOOST_AUTO_TEST_CASE( withdraw_permission_nominal_case )
    account_id_type nathan_id = get_account("nathan").id;
    account_id_type dan_id = get_account("dan").id;
    withdraw_permission_id_type permit;
-   set_expiration( db, trx );
 
    while(true)
    {
@@ -227,9 +232,7 @@ BOOST_AUTO_TEST_CASE( withdraw_permission_nominal_case )
       op.withdraw_to_account = dan_id;
       op.amount_to_withdraw = asset(5);
       trx.operations.push_back(op);
-      // expiration is timestamp, so treat it as a rollable nonce
-      // so tx's have different txid's
-      trx.expiration += fc::seconds(1);
+      set_expiration( db, trx );
       trx.sign(dan_private_key);
       PUSH_TX( db, trx );
       // tx's involving withdraw_permissions can't delete it even

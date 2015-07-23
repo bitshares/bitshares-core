@@ -832,6 +832,7 @@ BOOST_FIXTURE_TEST_CASE( proposal_owner_authority_complete, database_fixture )
       uop.proposal = prop.id;
       uop.key_approvals_to_add.insert(dan.active.key_auths.begin()->first);
       trx.operations.push_back(uop);
+      set_expiration( db, trx );
       trx.sign(nathan_key);
       trx.sign(dan_key);
       PUSH_TX( db, trx );
@@ -841,6 +842,7 @@ BOOST_FIXTURE_TEST_CASE( proposal_owner_authority_complete, database_fixture )
 
       std::swap(uop.key_approvals_to_add, uop.key_approvals_to_remove);
       trx.operations.push_back(uop);
+      trx.expiration += fc::seconds(1);  // Survive trx dupe check
       trx.sign(nathan_key);
       trx.sign(dan_key);
       PUSH_TX( db, trx );
@@ -849,10 +851,8 @@ BOOST_FIXTURE_TEST_CASE( proposal_owner_authority_complete, database_fixture )
       BOOST_CHECK_EQUAL(prop.available_key_approvals.size(), 0);
 
       std::swap(uop.key_approvals_to_add, uop.key_approvals_to_remove);
-      // Survive trx dupe check
-      set_expiration( db, trx );
-      trx.set_reference_block( db.head_block_id() );
       trx.operations.push_back(uop);
+      trx.expiration += fc::seconds(1);  // Survive trx dupe check
       trx.sign(nathan_key);
       trx.sign(dan_key);
       PUSH_TX( db, trx );
@@ -863,6 +863,7 @@ BOOST_FIXTURE_TEST_CASE( proposal_owner_authority_complete, database_fixture )
       uop.key_approvals_to_add.clear();
       uop.owner_approvals_to_add.insert(nathan.get_id());
       trx.operations.push_back(uop);
+      trx.expiration += fc::seconds(1);  // Survive trx dupe check
       trx.sign(nathan_key);
       PUSH_TX( db, trx );
       trx.clear();
