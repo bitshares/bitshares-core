@@ -2456,7 +2456,7 @@ void wallet_api::lock()
    FC_ASSERT( !is_locked() );
    encrypt_keys();
    for( auto key : my->_keys )
-      key.second = key_to_wif({});
+      key.second = key_to_wif(fc::ecc::private_key());
    my->_keys.clear();
    my->_checksum = fc::sha512();
    my->self.lock_changed(true);
