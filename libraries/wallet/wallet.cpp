@@ -1908,6 +1908,9 @@ void operation_printer::operator()(const asset_create_operation& op) const
 }
 
 }}}
+
+
+
 namespace graphene { namespace wallet {
 
 wallet_api::wallet_api(fc::api<login_api> rapi)
@@ -2573,7 +2576,379 @@ signed_transaction wallet_api::borrow_asset(string seller_name, string amount_to
    FC_ASSERT(!is_locked());
    return my->borrow_asset(seller_name, amount_to_sell, asset_symbol, amount_of_collateral, broadcast);
 }
-} }
+
+string wallet_api::get_key_label( public_key_type key )const
+{
+   auto key_itr   = my->_wallet.labeled_keys.get<by_key>().find(key);
+   if( key_itr != my->_wallet.labeled_keys.get<by_key>().end() )
+      return key_itr->label;
+   return string();
+}
+
+public_key_type  wallet_api::get_public_key( string label )const
+{
+   auto key_itr   = my->_wallet.labeled_keys.get<by_label>().find(label);
+   if( key_itr != my->_wallet.labeled_keys.get<by_label>().end() )
+      return key_itr->key;
+   return public_key_type();
+}
+
+bool               wallet_api::set_key_label( public_key_type key, string label )
+{
+   auto result = my->_wallet.labeled_keys.insert( key_label{label,key} );
+   if( result.second  ) return true;
+
+   auto key_itr   = my->_wallet.labeled_keys.get<by_key>().find(key);
+   auto label_itr = my->_wallet.labeled_keys.get<by_label>().find(label);
+   if( label_itr == my->_wallet.labeled_keys.get<by_label>().end() )
+   {
+      if( key_itr != my->_wallet.labeled_keys.get<by_key>().end() )
+         return my->_wallet.labeled_keys.get<by_key>().modify( key_itr, [&]( key_label& obj ){ obj.label = label; } );
+   }
+   return false;
+}
+map<string,public_key_type> wallet_api::get_blind_accounts()const
+{
+   map<string,public_key_type> result;
+   for( const auto& item : my->_wallet.labeled_keys )
+      result[item.label] = item.key;
+   return result;
+}
+map<string,public_key_type> wallet_api::get_my_blind_accounts()const
+{
+   FC_ASSERT( !is_locked() );
+   map<string,public_key_type> result;
+   for( const auto& item : my->_wallet.labeled_keys )
+   {
+      if( my->_keys.find(item.key) != my->_keys.end() )
+         result[item.label] = item.key;
+   }
+   return result;
+}
+
+public_key_type    wallet_api::create_blind_account( string label, string brain_key  )
+{
+   FC_ASSERT( !is_locked() );
+
+   auto label_itr = my->_wallet.labeled_keys.get<by_label>().find(label);
+   if( label_itr !=  my->_wallet.labeled_keys.get<by_label>().end() )
+      FC_ASSERT( !"Key with label already exists" );
+   brain_key = fc::trim_and_normalize_spaces( brain_key );
+   auto secret = fc::sha256::hash( brain_key.c_str(), brain_key.size() );
+   auto priv_key = fc::ecc::private_key::regenerate( secret );
+   public_key_type pub_key  = priv_key.get_public_key();
+
+   FC_ASSERT( set_key_label( pub_key, label ) );
+
+   my->_keys[pub_key] = graphene::utilities::key_to_wif( priv_key );
+
+   save_wallet_file();
+   return pub_key;
+}
+
+vector<asset>   wallet_api::get_blind_balances( string key_or_label )
+{
+   vector<asset> result;
+
+   auto pub_key = get_public_key( key_or_label );
+   if( pub_key == public_key_type() ) 
+   {
+      try {
+         pub_key = variant(key_or_label).as<public_key_type>();
+      } catch ( ... )
+      {
+         FC_ASSERT( false, "Unknown key or label '${v}'", ("v",key_or_label) );
+      }
+   }
+
+   for( auto& asset_itr : my->_wallet.blinded_balances )
+   {
+      asset balance( 0, asset_itr.first );
+      auto owner_itr = asset_itr.second.find( pub_key );
+      if( owner_itr != asset_itr.second.end() )
+      {
+         for( auto& bb : owner_itr->second  )
+         {
+            if( !bb.used ) 
+            {
+               auto result = my->_remote_db->get_blinded_balances( {bb.commitment} );
+               if( result.size() == 0 )
+                  bb.used = true;
+               else
+                  balance += bb.amount;
+            }
+         }
+      }
+      if( balance.amount > 0 )
+         result.push_back(balance);
+   }
+   return result;
+}
+
+blind_confirmation wallet_api::blind_transfer( string from_key_or_label,
+                                               string to_key_or_label,
+                                               string amount_in,
+                                               string symbol,
+                                               bool broadcast )
+{ try {
+   FC_ASSERT( !is_locked() );
+   blind_confirmation conf;
+   public_key_type from_key = get_public_key(from_key_or_label);
+   public_key_type to_key   = get_public_key(to_key_or_label);
+
+   fc::optional<asset_object> asset_obj = get_asset(symbol);
+   FC_ASSERT(asset_obj.valid(), "Could not find asset matching ${asset}", ("asset", symbol));
+
+   blind_transfer_operation blind_tr;
+   blind_tr.outputs.resize(2);
+
+   auto fees  = my->_remote_db->get_global_properties().parameters.current_fees;
+
+   auto amount = asset_obj->amount_from_string(amount_in);
+
+   asset total_amount = asset_obj->amount(0);
+
+   auto& asset_itr = my->_wallet.blinded_balances[amount.asset_id];
+
+   vector<fc::sha256> blinding_factors;
+
+   //auto from_priv_key = my->get_private_key( from_key );
+
+   blind_tr.fee  = fees->calculate_fee( blind_tr, asset_obj->options.core_exchange_rate );
+
+   auto owner_itr = asset_itr.find( from_key );
+   if( owner_itr != asset_itr.end() )
+   {
+      for( auto& bb : owner_itr->second  )
+      {
+         if( !bb.used ) 
+         {
+            auto result = my->_remote_db->get_blinded_balances( {bb.commitment} );
+            if( result.size() == 0 )
+               bb.used = true;
+            else
+            {
+               // ADD THIS TO THE INPUTS!
+               blind_tr.inputs.push_back( {bb.commitment,result.front().owner} );
+
+               blinding_factors.push_back( bb.blinding_factor );
+
+               total_amount += bb.amount;
+               if( total_amount >= amount + blind_tr.fee ) 
+                  break;
+            }
+         }
+      }
+   }
+
+   FC_ASSERT( total_amount >= amount+blind_tr.fee, "Insufficent Balance", ("available",total_amount)("amount",amount)("fee",blind_tr.fee) );
+
+   auto one_time_key = fc::ecc::private_key::generate();
+   auto secret       = one_time_key.get_shared_secret( to_key );
+   auto child        = fc::sha256::hash( secret );
+   auto nonce        = fc::sha256::hash( one_time_key.get_secret() );
+   auto blind_factor = fc::sha256::hash( child );
+
+   auto from_secret  = one_time_key.get_shared_secret( from_key );
+   auto from_child   = fc::sha256::hash( from_secret );
+   auto from_nonce   = fc::sha256::hash( nonce );
+
+   auto change = total_amount - amount - blind_tr.fee;
+   fc::sha256 change_blind_factor;
+   fc::sha256 to_blind_factor;
+   if( change.amount > 0 )
+   {
+      blinding_factors.push_back( blind_factor );
+      change_blind_factor = fc::ecc::blind_sum( blinding_factors, blinding_factors.size() - 1 );
+   }
+   else // change == 0
+   {
+      blind_tr.outputs.resize(1);
+      blind_factor = fc::ecc::blind_sum( blinding_factors, blinding_factors.size() );
+      blinding_factors.push_back( blind_factor );
+   }
+   fc::ecc::public_key from_pub_key = from_key;
+   fc::ecc::public_key to_pub_key = to_key;
+
+   blind_output out;
+   out.owner       = authority( 1, public_key_type( from_pub_key.child( from_child ) ), 1 );
+   out.commitment  = fc::ecc::blind( change_blind_factor, amount.amount.value );
+
+   blind_confirmation confirm;
+
+   if( blind_tr.outputs.size() > 1 )
+   {
+      out.range_proof = fc::ecc::range_proof_sign( 0, out.commitment, blind_factor, nonce,  0, 0, amount.amount.value );
+
+      blind_output change_out;
+      change_out.owner       = authority( 1, public_key_type( to_pub_key.child( child ) ), 1 );
+      change_out.commitment  = fc::ecc::blind( change_blind_factor, change.amount.value );
+      change_out.range_proof = fc::ecc::range_proof_sign( 0, out.commitment, change_blind_factor, from_nonce,  0, 0, change.amount.value );
+      blind_tr.outputs[1] = change_out;
+
+
+      blind_confirmation::output conf_output;
+      conf_output.label = from_key_or_label;
+      conf_output.pub_key = from_key;
+      conf_output.decrypted_memo.from = from_key;
+      conf_output.decrypted_memo.amount = change;
+      conf_output.decrypted_memo.blinding_factor = change_blind_factor;
+      conf_output.decrypted_memo.commitment = change_out.commitment;
+      conf_output.decrypted_memo.check   = from_secret._hash[0]; 
+      conf_output.confirmation.one_time_key = one_time_key.get_public_key();
+      conf_output.confirmation.to = from_key;
+      conf_output.confirmation.encrypted_memo = fc::aes_encrypt( secret, fc::raw::pack( conf_output.decrypted_memo ) );
+      conf_output.confirmation_receipt = conf_output.confirmation;
+
+      confirm.outputs.push_back( conf_output );
+   }
+   blind_tr.outputs[0] = out;
+
+   blind_confirmation::output conf_output;
+   conf_output.label = to_key_or_label;
+   conf_output.pub_key = to_key;
+   conf_output.decrypted_memo.from = from_key;
+   conf_output.decrypted_memo.amount = amount;
+   conf_output.decrypted_memo.blinding_factor = blind_factor;
+   conf_output.decrypted_memo.commitment = out.commitment;
+   conf_output.decrypted_memo.check   = secret._hash[0]; 
+   conf_output.confirmation.one_time_key = one_time_key.get_public_key();
+   conf_output.confirmation.to = to_key;
+   conf_output.confirmation.encrypted_memo = fc::aes_encrypt( secret, fc::raw::pack( conf_output.decrypted_memo ) );
+   conf_output.confirmation_receipt = conf_output.confirmation;
+
+   confirm.outputs.push_back( conf_output );
+
+   /** commitments must be in sorted order */
+   std::sort( blind_tr.outputs.begin(), blind_tr.outputs.end(), 
+              [&]( const blind_output& a, const blind_output& b ){ return a.commitment < b.commitment; } );
+
+   confirm.trx.validate();
+   confirm.trx = sign_transaction(confirm.trx, broadcast);
+
+   return conf;
+} FC_CAPTURE_AND_RETHROW( (from_key_or_label)(to_key_or_label)(amount_in)(symbol)(broadcast) ) }
+
+
+
+/**
+ *  Transfers a public balance from @from to one or more blinded balances using a
+ *  stealth transfer.
+ */
+blind_confirmation wallet_api::transfer_to_blind( string from_account_id_or_name, 
+                                                  string asset_symbol,
+                                                  /** map from key or label to amount */
+                                                  map<string, string> to_amounts, 
+                                                  bool broadcast )
+{ try {
+   FC_ASSERT( !is_locked() );
+
+   blind_confirmation confirm;
+   account_object from_account = my->get_account(from_account_id_or_name);
+
+   fc::optional<asset_object> asset_obj = get_asset(asset_symbol);
+   FC_ASSERT(asset_obj, "Could not find asset matching ${asset}", ("asset", asset_symbol));
+
+   transfer_to_blind_operation bop;
+   bop.from   = from_account.id;
+
+   vector<fc::sha256> blinding_factors;
+
+   asset total_amount = asset_obj->amount(0);
+
+   for( auto item : to_amounts )
+   {
+      auto one_time_key = fc::ecc::private_key::generate();
+      auto to_key       = get_public_key( item.first );
+      auto secret       = one_time_key.get_shared_secret( to_key );
+      auto child        = fc::sha256::hash( secret );
+      auto nonce        = fc::sha256::hash( one_time_key.get_secret() );
+      auto blind_factor = fc::sha256::hash( child );
+
+      blinding_factors.push_back( blind_factor );
+
+      auto amount = asset_obj->amount_from_string(item.second);
+      total_amount += amount;
+      
+
+      fc::ecc::public_key to_pub_key = to_key;
+      blind_output out;
+      out.owner       = authority( 1, public_key_type( to_pub_key.child( child ) ), 1 );
+      out.commitment  = fc::ecc::blind( blind_factor, amount.amount.value );
+      if( to_amounts.size() > 1 )
+         out.range_proof = fc::ecc::range_proof_sign( 0, out.commitment, blind_factor, nonce,  0, 0, amount.amount.value );
+
+
+      blind_confirmation::output conf_output;
+      conf_output.label = item.first;
+      conf_output.pub_key = to_key;
+      conf_output.decrypted_memo.amount = amount;
+      conf_output.decrypted_memo.blinding_factor = blind_factor;
+      conf_output.decrypted_memo.commitment = out.commitment;
+      conf_output.decrypted_memo.check   = secret._hash[0]; 
+      conf_output.confirmation.one_time_key = one_time_key.get_public_key();
+      conf_output.confirmation.to = to_key;
+      conf_output.confirmation.encrypted_memo = fc::aes_encrypt( secret, fc::raw::pack( conf_output.decrypted_memo ) );
+      conf_output.confirmation_receipt = conf_output.confirmation;
+
+      confirm.outputs.push_back( conf_output );
+
+      bop.outputs.push_back(out);
+   }
+   bop.amount          = total_amount;
+   bop.blinding_factor = fc::ecc::blind_sum( blinding_factors, blinding_factors.size() );
+
+   /** commitments must be in sorted order */
+   std::sort( bop.outputs.begin(), bop.outputs.end(), 
+              [&]( const blind_output& a, const blind_output& b ){ return a.commitment < b.commitment; } );
+
+   confirm.trx.operations.push_back( bop );
+   my->set_operation_fees( confirm.trx, my->_remote_db->get_global_properties().parameters.current_fees);
+   confirm.trx.validate();
+   confirm.trx = sign_transaction(confirm.trx, broadcast);
+   return confirm;
+} FC_CAPTURE_AND_RETHROW( (from_account_id_or_name)(asset_symbol)(to_amounts) ) }
+
+stealth_confirmation::memo_data wallet_api::receive_blind_transfer( string confirmation_receipt, string opt_from )
+{
+   FC_ASSERT( !is_locked() );
+   stealth_confirmation conf(confirmation_receipt);
+   FC_ASSERT( conf.to );
+
+   auto to_priv_key_itr = my->_keys.find( *conf.to );
+   FC_ASSERT( to_priv_key_itr != my->_keys.end(), "No private key for receiver", ("conf",conf) );
+   auto to_priv_key = wif_to_key( to_priv_key_itr->second );
+   FC_ASSERT( to_priv_key );
+
+   auto secret       = to_priv_key->get_shared_secret( conf.one_time_key );
+   auto child        = fc::sha256::hash( secret );
+   //auto blind_factor = fc::sha256::hash( child );
+
+   auto plain_memo = fc::aes_decrypt( secret, conf.encrypted_memo );
+   auto memo = fc::raw::unpack<stealth_confirmation::memo_data>( plain_memo );
+   
+   auto bbal = my->_remote_db->get_blinded_balances( {memo.commitment} );
+   FC_ASSERT( bbal.size(), "commitment not found in blockchain", ("memo",memo) );
+
+   blind_balance bal;
+   bal.amount = memo.amount;
+   bal.to     = *conf.to;
+   if( memo.from ) bal.from   = *memo.from;
+   bal.one_time_key = conf.one_time_key;
+   bal.blinding_factor = memo.blinding_factor;
+   bal.commitment = memo.commitment;
+   bal.used = false;
+
+   // TODO: confirm the amount matches the commitment (verify the blinding factor
+
+   // TODO: make sure the same blind balance isn't included twice
+
+   my->_wallet.blinded_balances[memo.amount.asset_id][bal.to].push_back( bal );
+
+   return memo;
+}
+
+} } // graphene::wallet
 
 void fc::to_variant(const account_multi_index_type& accts, fc::variant& vo)
 {

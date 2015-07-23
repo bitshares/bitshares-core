@@ -2,6 +2,9 @@
 #include <graphene/chain/confidential_evaluator.hpp>
 #include <graphene/chain/database.hpp>
 
+#include <fc/crypto/base58.hpp>
+#include <fc/io/raw.hpp>
+
 namespace graphene { namespace chain {
 
 void transfer_to_blind_operation::validate()const
@@ -38,7 +41,7 @@ void transfer_to_blind_operation::validate()const
 
 share_type transfer_to_blind_operation::calculate_fee( const fee_parameters_type& k )const
 {
-    return k.fee + outputs.size() * k.price_per_output  + calculate_data_fee( fc::raw::pack_size(*this), k.price_per_kb );
+    return k.fee + outputs.size() * k.price_per_output;
 }
 
 
@@ -110,12 +113,26 @@ void blind_transfer_operation::validate()const
 
 share_type blind_transfer_operation::calculate_fee( const fee_parameters_type& k )const
 {
-    return k.fee + outputs.size() * k.price_per_output + calculate_data_fee( fc::raw::pack_size(*this), k.price_per_kb );; 
+    return k.fee + outputs.size() * k.price_per_output;
 }
 
 
 
 
+/**
+ *  Packs *this then encodes as base58 encoded string.
+ */
+stealth_confirmation::operator string()const
+{
+   return fc::to_base58( fc::raw::pack( *this ) );
+}
+/**
+ * Unpacks from a base58 string
+ */
+stealth_confirmation::stealth_confirmation( const std::string& base58 )
+{
+   *this = fc::raw::unpack<stealth_confirmation>( fc::from_base58( base58 ) );
+}
 
 
 

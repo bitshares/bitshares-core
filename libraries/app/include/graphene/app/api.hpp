@@ -537,6 +537,7 @@ FC_API(graphene::app::database_api,
        (get_balance_objects)
        (get_required_signatures)
        (verify_authority)
+       (get_blinded_balances)
      )
 FC_API(graphene::app::history_api,
        (get_account_history)

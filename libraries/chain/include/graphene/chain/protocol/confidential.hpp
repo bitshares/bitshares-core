@@ -82,8 +82,9 @@ struct stealth_confirmation
 {
    struct memo_data
    {
-      public_key_type           from;
+      optional<public_key_type> from;
       asset                     amount;
+      fc::sha256                blinding_factor;
       fc::ecc::commitment_type  commitment;
       uint32_t                  check = 0;
    };
@@ -98,8 +99,9 @@ struct stealth_confirmation
    stealth_confirmation( const std::string& base58 );
    stealth_confirmation(){}
 
-   public_key_type one_time_key;
-   vector<char>    encrypted_memo;
+   public_key_type           one_time_key;
+   optional<public_key_type> to;
+   vector<char>              encrypted_memo;
 };
 
 /**
@@ -129,7 +131,6 @@ struct transfer_to_blind_operation : public base_operation
    struct fee_parameters_type { 
       uint64_t fee              = 5*GRAPHENE_BLOCKCHAIN_PRECISION; ///< the cost to register the cheapest non-free account
       uint32_t price_per_output = 5*GRAPHENE_BLOCKCHAIN_PRECISION;
-      uint32_t price_per_kb     = 5*GRAPHENE_BLOCKCHAIN_PRECISION;
    };
 
 
@@ -231,7 +232,6 @@ struct blind_transfer_operation : public base_operation
    struct fee_parameters_type { 
       uint64_t fee              = 5*GRAPHENE_BLOCKCHAIN_PRECISION; ///< the cost to register the cheapest non-free account
       uint32_t price_per_output = 5*GRAPHENE_BLOCKCHAIN_PRECISION;
-      uint32_t price_per_kb     = 5*GRAPHENE_BLOCKCHAIN_PRECISION;
    };
 
    asset                 fee;
@@ -261,10 +261,10 @@ struct blind_transfer_operation : public base_operation
 } } // graphene::chain
 
 FC_REFLECT( graphene::chain::stealth_confirmation,
-            (one_time_key)(encrypted_memo) )
+            (one_time_key)(to)(encrypted_memo) )
 
 FC_REFLECT( graphene::chain::stealth_confirmation::memo_data,
-            (from)(amount)(commitment)(check) );
+            (from)(amount)(blinding_factor)(commitment)(check) );
 
 FC_REFLECT( graphene::chain::blind_memo,
             (from)(amount)(message)(check) )
@@ -278,7 +278,7 @@ FC_REFLECT( graphene::chain::transfer_from_blind_operation,
             (fee)(amount)(to)(blinding_factor)(inputs) )
 FC_REFLECT( graphene::chain::blind_transfer_operation,
             (fee)(inputs)(outputs) )
-FC_REFLECT( graphene::chain::transfer_to_blind_operation::fee_parameters_type, (fee)(price_per_output)(price_per_kb) )
+FC_REFLECT( graphene::chain::transfer_to_blind_operation::fee_parameters_type, (fee)(price_per_output) )
 FC_REFLECT( graphene::chain::transfer_from_blind_operation::fee_parameters_type, (fee) )
-FC_REFLECT( graphene::chain::blind_transfer_operation::fee_parameters_type, (fee)(price_per_output)(price_per_kb) )
+FC_REFLECT( graphene::chain::blind_transfer_operation::fee_parameters_type, (fee)(price_per_output) )
 

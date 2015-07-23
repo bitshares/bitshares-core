@@ -66,7 +66,7 @@ struct blind_confirmation
    struct output
    {
       string                          label;
-      string                          pub_key;
+      public_key_type                 pub_key;
       stealth_confirmation::memo_data decrypted_memo;
       stealth_confirmation            confirmation;
       string                          confirmation_receipt;
@@ -82,7 +82,9 @@ struct blind_balance
    public_key_type           from; ///< the account this balance came from
    public_key_type           to; ///< the account this balance is logically associated with
    public_key_type           one_time_key; ///< used to derive the authority key and blinding factor
+   fc::sha256                blinding_factor;
    fc::ecc::commitment_type  commitment;
+   bool                      used = false;
 };
 
 struct key_label
@@ -589,9 +591,14 @@ class wallet_api
       /** These methods are used for stealth transfers */
       ///@{
       /**
-       *  This method can be used 
+       *  This method can be used to set the label for a public key
+       *
+       *  @note No two keys can have the same label.
+       *
+       *  @return true if the label was set, otherwise false
        */
-      void                        set_key_label( public_key_type, string label );
+      bool                        set_key_label( public_key_type, string label );
+      string                      get_key_label( public_key_type )const;
 
       /**
        *  Generates a new blind account for the given brain key and assigns it the given label.
@@ -602,7 +609,7 @@ class wallet_api
        * @return the total balance of all blinded commitments that can be claimed by the
        * given account key or label
        */
-      asset                       get_blind_balance( string key_or_label )const;
+      vector<asset>                get_blind_balances( string key_or_label );
       /** @return all blind accounts */
       map<string,public_key_type> get_blind_accounts()const;
       /** @return all blind accounts for which this wallet has the private key */
@@ -626,11 +633,17 @@ class wallet_api
        *  Transfers a public balance from @from to one or more blinded balances using a
        *  stealth transfer.
        */
-      blind_confirmation transfer_to_blind( string from, 
+      blind_confirmation transfer_to_blind( string from_account_id_or_name, 
                                             string asset_symbol,
                                             /** map from key or label to amount */
                                             map<string, string> to_amounts, 
                                             bool broadcast = false );
+
+      blind_confirmation blind_transfer( string from_key_or_label,
+                                         string to_key_or_label,
+                                         string amount,
+                                         string symbol,
+                                         bool broadcast = false );
 
       /** Place a limit order attempting to sell one asset for another.
        *
@@ -1122,7 +1135,7 @@ class wallet_api
 } }
 
 FC_REFLECT( graphene::wallet::key_label, (label)(key) )
-FC_REFLECT( graphene::wallet::blind_balance, (amount)(from)(to)(one_time_key)(commitment) )
+FC_REFLECT( graphene::wallet::blind_balance, (amount)(from)(to)(one_time_key)(commitment)(used) )
 FC_REFLECT( graphene::wallet::blind_confirmation::output, (label)(pub_key)(decrypted_memo)(confirmation)(confirmation_receipt) )
 FC_REFLECT( graphene::wallet::blind_confirmation, (trx)(outputs) )
 
@@ -1223,4 +1236,13 @@ FC_API( graphene::wallet::wallet_api,
         (dbg_make_uia)
         (dbg_make_mia)
         (flood_network)
+        (set_key_label)
+        (get_key_label)
+        (get_public_key)
+        (get_blind_accounts)
+        (get_my_blind_accounts)
+        (get_blind_balances)
+        (create_blind_account)
+        (transfer_to_blind)
+        (receive_blind_transfer)
       )
