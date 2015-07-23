@@ -16,13 +16,18 @@ using graphene::chain::digest_type;
 using graphene::chain::signature_type;
 using fc::optional;
 
+QString toQString( const std::string& s );
+QString toQString( public_key_type k );
+
 struct key_data
 {
    string       label; /** unique label assigned to this key */
    /** encrypted as a packed std::string containing a wif private key */
-   vector<char> encrypted_private_key;
+   vector<char>              encrypted_private_key;
+   int32_t                   brain_sequence = -1;
+   optional<public_key_type> owner; /// if this key was derived from an owner key + sequence
 };
-FC_REFLECT( key_data, (label)(encrypted_private_key) );
+FC_REFLECT( key_data, (label)(encrypted_private_key)(brain_sequence)(owner) );
 
 struct wallet_file
 {
@@ -51,10 +56,9 @@ FC_REFLECT( wallet_file,
  */
 class Wallet : public QObject
 {
+   Q_OBJECT
    public:
-      Q_OBJECT
-
-      Wallet();
+      Wallet( QObject* parent = nullptr );
       ~Wallet();
 
       Q_INVOKABLE bool open( QString file_path );
@@ -101,6 +105,7 @@ class Wallet : public QObject
       Q_INVOKABLE bool    setKeyLabel( QString pubkey, QString label );
       Q_INVOKABLE QString getPublicKey( QString label );
       Q_INVOKABLE QString getPrivateKey( QString pubkey );
+      Q_INVOKABLE bool    hasPrivateKey( QString pubkey, bool include_with_brain_key = false );
 
       /** imports a public key and assigns it a label */
       Q_INVOKABLE bool    importPublicKey( QString pubkey, QString label = QString() );
@@ -130,6 +135,10 @@ class Wallet : public QObject
                                                    const set<public_key_type>& keys )const;
 
       const flat_set<public_key_type>& getAvailablePrivateKeys()const;
+
+   Q_SIGNALS:
+      void isLockedChanged( bool state );
+      void isOpenChanged( bool state );
 
    private:
       fc::path                  _wallet_file_path;

@@ -1,5 +1,6 @@
 #include "GrapheneApplication.hpp"
 #include "ChainDataModel.hpp"
+#include "Wallet.hpp"
 #include "Operations.hpp"
 
 #include <graphene/app/api.hpp>
@@ -17,6 +18,7 @@ GrapheneApplication::GrapheneApplication(QObject* parent)
 
    m_model = new ChainDataModel(m_thread, this);
    m_operationBuilder = new OperationBuilder(*m_model, this);
+   m_wallet = new Wallet( this );
 
    connect(m_model, &ChainDataModel::queueExecute,
            this, &GrapheneApplication::execute);

@@ -6,7 +6,8 @@
 QString toQString( const std::string& s ) { QString result; result.fromStdString( s ); return result; }
 QString toQString( public_key_type k ) { return toQString( fc::variant(k).as_string() ); }
 
-Wallet::Wallet()
+Wallet::Wallet( QObject* parent )
+:QObject(parent)
 {
 }
 
@@ -35,6 +36,7 @@ bool Wallet::open( QString file_path )
    }
    _wallet_file_path = p;
 
+   Q_EMIT isOpenChanged( true );
    return true;
 }
 
@@ -48,6 +50,7 @@ bool Wallet::close()
    if( !isOpen() ) return false;
    save();
    _wallet_file_path = fc::path();
+   Q_EMIT isOpenChanged( false );
    return false;
 }
 
@@ -158,6 +161,8 @@ bool Wallet::unlock( QString password )
    _decrypted_master_key = fc::raw::unpack<fc::sha512>(plain_txt);
    if( _data.master_key_digest != fc::sha512::hash(_decrypted_master_key) )
       _decrypted_master_key = fc::sha512();
+
+   Q_EMIT isLockedChanged( isLocked() );
    return !isLocked();
 }
 
@@ -166,6 +171,8 @@ bool Wallet::lock()
    if( !isOpen() ) return false;
    _brain_key            = QString();
    _decrypted_master_key = fc::sha512();
+
+   Q_EMIT isLockedChanged( isLocked() );
    return true;
 }
 bool  Wallet::changePassword( QString new_password )
@@ -180,6 +187,22 @@ bool  Wallet::changePassword( QString new_password )
    save();
 
    return true;
+}
+bool    Wallet::hasPrivateKey( QString pubkey, bool include_with_brain_key )
+{
+   auto pub = fc::variant( pubkey.toStdString() ).as<public_key_type>();
+   auto itr = _data.encrypted_private_keys.find(pub);
+   if( itr == _data.encrypted_private_keys.end() )
+      return false;
+   if( itr->second.encrypted_private_key.size() ) 
+      return true;
+   if( include_with_brain_key && itr->second.brain_sequence >= 0 )
+   {
+      if( !itr->second.owner )
+         return true;
+      return hasPrivateKey( toQString( *itr->second.owner ), include_with_brain_key );
+   }
+   return false;
 }
 
 QString Wallet::getPrivateKey( QString pubkey )
@@ -203,6 +226,7 @@ QString Wallet::getPublicKey( QString wif_private_key )const
    if( !priv ) return QString();
 
    auto pub = public_key_type(priv->get_public_key());
+
    return toQString( fc::variant( pub ).as_string() );
 }
 
@@ -223,6 +247,8 @@ QString Wallet::getActivePrivateKey( QString owner_pub_key, uint32_t seq )
 
    public_key_type active_pub_key(priv_key->get_public_key());
    _data.encrypted_private_keys[active_pub_key].encrypted_private_key = fc::aes_encrypt( _decrypted_master_key, fc::raw::pack( wif ) );
+   _data.encrypted_private_keys[active_pub_key].owner = fc::variant( owner_pub_key.toStdString() ).as<public_key_type>();
+   _data.encrypted_private_keys[active_pub_key].brain_sequence = seq;
    _available_private_keys.insert( active_pub_key );
 
    return toQString(wif);
@@ -244,6 +270,7 @@ QString Wallet::getOwnerPrivateKey( uint32_t seq )
 
    public_key_type owner_pub_key(priv_key->get_public_key());
    _data.encrypted_private_keys[owner_pub_key].encrypted_private_key = fc::aes_encrypt( _decrypted_master_key, fc::raw::pack( wif ) );
+   _data.encrypted_private_keys[owner_pub_key].brain_sequence = seq;
    _available_private_keys.insert( owner_pub_key );
 
    return toQString( wif );

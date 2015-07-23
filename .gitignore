@@ -6,6 +6,8 @@ CMakeCache.txt
 CMakeFiles
 Makefile
 compile_commands.json
+moc_*
+*.moc
 
 libraries/utilities/git_revision.cpp
 

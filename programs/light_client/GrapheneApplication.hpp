@@ -7,24 +7,28 @@
 
 #include <QObject>
 
+
 namespace fc { namespace http {
 class websocket_client;
 }}
 
 class ChainDataModel;
 class OperationBuilder;
+class Wallet;
 class GrapheneApplication : public QObject {
    Q_OBJECT
 
    Q_PROPERTY(ChainDataModel* model READ model CONSTANT)
    Q_PROPERTY(OperationBuilder* operationBuilder READ operationBuilder CONSTANT)
+   Q_PROPERTY(Wallet* wallet READ wallet CONSTANT)
    Q_PROPERTY(bool isConnected READ isConnected NOTIFY isConnectedChanged)
 
 
-   fc::thread m_thread;
-   ChainDataModel* m_model = nullptr;
+   fc::thread        m_thread;
+   ChainDataModel*   m_model = nullptr;
+   Wallet*           m_wallet = nullptr;
    OperationBuilder* m_operationBuilder = nullptr;
-   bool m_isConnected = false;
+   bool              m_isConnected = false;
 
    boost::signals2::scoped_connection m_connectionClosed;
 
@@ -39,6 +43,8 @@ protected Q_SLOTS:
 public:
    GrapheneApplication(QObject* parent = nullptr);
    ~GrapheneApplication();
+
+   Wallet* wallet()const { return m_wallet; }
 
    ChainDataModel* model() const {
       return m_model;

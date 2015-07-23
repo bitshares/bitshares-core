@@ -79,21 +79,21 @@ void ChainDataModel::processUpdatedObject(const fc::variant& update)
    auto id = update.as<variant_object>()["id"].as<object_id_type>();
    if (id.space() == protocol_ids) {
       switch (id.type()) {
-      default:
-         wlog("Update procedure for ${update} is not yet implemented.", ("update", update));
-         break;
+         default:
+            wlog("Update procedure for ${update} is not yet implemented.", ("update", update));
+            break;
       }
    } else if (id.space() == implementation_ids) {
       switch (id.type()) {
-      case impl_account_balance_object_type: {
-         account_balance_object balance = update.as<account_balance_object>();
-         auto owner = m_accounts.find(balance.owner.instance.value);
-         if (owner != m_accounts.end())
-            (*owner)->update(balance);
-         else
-            elog("Got unexpected balance update:\n${u}\nfor an account I don't have.",
-                 ("u", update));
-         break;
+         case impl_account_balance_object_type: {
+            account_balance_object balance = update.as<account_balance_object>();
+            auto owner = m_accounts.find(balance.owner.instance.value);
+            if (owner != m_accounts.end())
+               (*owner)->update(balance);
+            else
+               elog("Got unexpected balance update:\n${u}\nfor an account I don't have.",
+                    ("u", update));
+            break;
       }
 
       default:
@@ -195,7 +195,7 @@ void ChainDataModel::getAccountImpl(QString accountIdentifier, Account* const * 
          } else {
             m_accounts.modify(itr, [this,&accountPackage](Account* a){
                a->setProperty("id", ObjectId(accountPackage->account.id.instance()));
-               a->setProperty("name", QString::fromStdString(accountPackage->account.name));
+               a->setAccountObject( accountPackage->account );
 
                // Set balances
                QList<Balance*> balances;
