@@ -3,6 +3,8 @@
 
 #include <graphene/chain/protocol/types.hpp>
 #include <QObject>
+#include <QList>
+#include <QPair>
 
 using std::string;
 using std::vector;
@@ -17,6 +19,7 @@ using fc::optional;
 struct key_data
 {
    string       label; /** unique label assigned to this key */
+   /** encrypted as a packed std::string containing a wif private key */
    vector<char> encrypted_private_key;
 };
 FC_REFLECT( key_data, (label)(encrypted_private_key) );
@@ -42,6 +45,9 @@ FC_REFLECT( wallet_file,
 /**
  *  @class Wallet
  *  @brief Securely maintains a set of labeled public and private keys
+ *
+ *  @note this API is designed for use with QML which does not support exceptions so
+ *  all errors are passed via return values.
  */
 class Wallet : public QObject
 {
@@ -79,6 +85,7 @@ class Wallet : public QObject
        * @return WIF private key 
        */
       Q_INVOKABLE QString getActivePrivateKey( QString owner_public_key, uint32_t sequence );
+      Q_INVOKABLE QString getActivePublicKey( QString owner_public_key, uint32_t sequence );
 
       /**
        * @pre !isLocked();
@@ -87,9 +94,13 @@ class Wallet : public QObject
        * @return WIF private key 
        */
       Q_INVOKABLE QString getOwnerPrivateKey( uint32_t sequence );
+      Q_INVOKABLE QString getOwnerPublicKey( uint32_t sequence );
+      Q_INVOKABLE QString getPublicKey( QString wif_private_key )const;
 
       Q_INVOKABLE QString getKeyLabel( QString pubkey );
+      Q_INVOKABLE bool    setKeyLabel( QString pubkey, QString label );
       Q_INVOKABLE QString getPublicKey( QString label );
+      Q_INVOKABLE QString getPrivateKey( QString pubkey );
 
       /** imports a public key and assigns it a label */
       Q_INVOKABLE bool    importPublicKey( QString pubkey, QString label = QString() );
@@ -106,6 +117,11 @@ class Wallet : public QObject
       /** removes only the private key, keeping the public key and label */
       Q_INVOKABLE bool    removePrivateKey( QString pubkey );
 
+      /**
+       *  @param only_if_private  filter any public keys for which the wallet lacks a private key
+       *  @return a list of PUBLICKEY, LABEL for all known public keys
+       */
+      Q_INVOKABLE QList<QPair<QString,QString> > getAllPublicKeys( bool only_if_private )const;
 
       /**
        * @pre !isLocked()

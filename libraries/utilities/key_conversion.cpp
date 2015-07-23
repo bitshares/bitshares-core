@@ -21,9 +21,8 @@
 
 namespace graphene { namespace utilities {
 
-std::string key_to_wif(const fc::ecc::private_key& key)
+std::string key_to_wif(const fc::sha256& secret )
 {
-  fc::sha256 secret = key.get_secret();
   const size_t size_of_data_to_hash = sizeof(secret) + 1;
   const size_t size_of_hash_bytes = 4;
   char data[size_of_data_to_hash + size_of_hash_bytes];
@@ -33,6 +32,10 @@ std::string key_to_wif(const fc::ecc::private_key& key)
   digest = fc::sha256::hash(digest);
   memcpy(data + size_of_data_to_hash, (char*)&digest, size_of_hash_bytes);
   return fc::to_base58(data, sizeof(data));
+}
+std::string key_to_wif(const fc::ecc::private_key& key)
+{
+  return key_to_wif( key.get_secret() );
 }
 
 fc::optional<fc::ecc::private_key> wif_to_key( const std::string& wif_key )
