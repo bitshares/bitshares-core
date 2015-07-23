@@ -41,6 +41,8 @@
 
 #include "database_fixture.hpp"
 
+using namespace graphene::chain::test;
+
 namespace graphene { namespace chain {
 
 using std::cout;
@@ -92,7 +94,7 @@ database_fixture::database_fixture()
 
    generate_block();
 
-   trx.set_expiration(db.head_block_time() + fc::minutes(1));
+   set_expiration( db, trx );
    } catch ( const fc::exception& e )
    {
       edump( (e.to_detail_string()) );
@@ -598,7 +600,6 @@ const witness_object& database_fixture::create_witness( const account_object& ow
    return db.get<witness_object>(ptx.operation_results[0].get<object_id_type>());
 } FC_CAPTURE_AND_RETHROW() }
 
-
 uint64_t database_fixture::fund(
    const account_object& account,
    const asset& amount /* = asset(500000) */
@@ -651,7 +652,6 @@ asset database_fixture::cancel_limit_order( const limit_order_object& order )
   return processed.operation_results[0].get<asset>();
 }
 
-
 void database_fixture::transfer(
    account_id_type from,
    account_id_type to,
@@ -670,7 +670,7 @@ void database_fixture::transfer(
 {
    try
    {
-      trx.set_expiration(db.head_block_time() + fc::minutes(1));
+      set_expiration( db, trx );
       transfer_operation trans;
       trans.from = from.id;
       trans.to   = to.id;
@@ -690,7 +690,7 @@ void database_fixture::transfer(
 
 void database_fixture::update_feed_producers( const asset_object& mia, flat_set<account_id_type> producers )
 { try {
-   trx.set_expiration(db.head_block_time() + fc::minutes(1));
+   set_expiration( db, trx );
    trx.operations.clear();
    asset_update_feed_producers_operation op;
    op.asset_to_update = mia.id;
@@ -705,10 +705,9 @@ void database_fixture::update_feed_producers( const asset_object& mia, flat_set<
    verify_asset_supplies(db);
 } FC_CAPTURE_AND_RETHROW( (mia)(producers) ) }
 
-
-void  database_fixture::publish_feed( const asset_object& mia, const account_object& by, const price_feed& f )
+void database_fixture::publish_feed( const asset_object& mia, const account_object& by, const price_feed& f )
 {
-   trx.set_expiration(db.head_block_time() + fc::minutes(1));
+   set_expiration( db, trx );
    trx.operations.clear();
 
    asset_publish_feed_operation op;
@@ -726,7 +725,7 @@ void  database_fixture::publish_feed( const asset_object& mia, const account_obj
 
 void database_fixture::force_global_settle( const asset_object& what, const price& p )
 { try {
-   trx.set_expiration(db.head_block_time() + fc::minutes(1));
+   set_expiration( db, trx );
    trx.operations.clear();
    asset_global_settle_operation sop;
    sop.issuer = what.issuer;
@@ -742,7 +741,7 @@ void database_fixture::force_global_settle( const asset_object& what, const pric
 
 operation_result database_fixture::force_settle( const account_object& who, asset what )
 { try {
-   trx.set_expiration(db.head_block_time() + fc::minutes(1));
+   set_expiration( db, trx );
    trx.operations.clear();
    asset_settle_operation sop;
    sop.account = who.id;
@@ -759,7 +758,7 @@ operation_result database_fixture::force_settle( const account_object& who, asse
 
 const call_order_object* database_fixture::borrow(const account_object& who, asset what, asset collateral)
 { try {
-   trx.set_expiration(db.head_block_time() + fc::minutes(1));
+   set_expiration( db, trx );
    trx.operations.clear();
    call_order_update_operation update;
    update.funding_account = who.id;
@@ -781,9 +780,9 @@ const call_order_object* database_fixture::borrow(const account_object& who, ass
    return call_obj;
 } FC_CAPTURE_AND_RETHROW( (who.name)(what)(collateral) ) }
 
-void  database_fixture::cover(const account_object& who, asset what, asset collateral)
+void database_fixture::cover(const account_object& who, asset what, asset collateral)
 { try {
-   trx.set_expiration(db.head_block_time() + fc::minutes(1));
+   set_expiration( db, trx );
    trx.operations.clear();
    call_order_update_operation update;
    update.funding_account = who.id;
@@ -958,7 +957,6 @@ void database_fixture::print_joint_market( const string& syma, const string& sym
   }
 }
 
-
 int64_t database_fixture::get_balance( account_id_type account, asset_id_type a )const
 {
   return db.get_balance(account, a).amount.value;
@@ -970,6 +968,14 @@ int64_t database_fixture::get_balance( const account_object& account, const asse
 }
 
 namespace test {
+
+void set_expiration( const database& db, transaction& tx )
+{
+   const chain_parameters& params = db.get_global_properties().parameters;
+   tx.set_reference_block(db.head_block_id());
+   tx.set_expiration( db.head_block_time() + fc::seconds( params.block_interval * 3 ) );
+   return;
+}
 
 bool _push_block( database& db, const signed_block& b, uint32_t skip_flags /* = 0 */ )
 {

@@ -29,6 +29,7 @@
 #include "../common/database_fixture.hpp"
 
 using namespace graphene::chain;
+using namespace graphene::chain::test;
 
 BOOST_FIXTURE_TEST_SUITE( uia_tests, database_fixture )
 
@@ -305,7 +306,7 @@ BOOST_AUTO_TEST_CASE( transfer_restricted_test )
          op.issue_to_account = recipient.id;
          transaction tx;
          tx.operations.push_back( op );
-         tx.set_expiration( db.head_block_time() + fc::minutes(5) );
+         set_expiration( db, tx );
          PUSH_TX( db, tx, database::skip_authority_check | database::skip_tapos_check | database::skip_transaction_signatures );
       } ;
 
@@ -324,7 +325,7 @@ BOOST_AUTO_TEST_CASE( transfer_restricted_test )
             op.new_options.flags &= ~transfer_restricted;
          transaction tx;
          tx.operations.push_back( op );
-         tx.set_expiration( db.head_block_time() + fc::minutes(5) );
+         set_expiration( db, tx );
          PUSH_TX( db, tx, database::skip_authority_check | database::skip_tapos_check | database::skip_transaction_signatures );
       } ;
 
@@ -336,7 +337,7 @@ BOOST_AUTO_TEST_CASE( transfer_restricted_test )
       xfer_op.amount = uia.amount(100);
       signed_transaction xfer_tx;
       xfer_tx.operations.push_back( xfer_op );
-      xfer_tx.set_expiration( db.head_block_time() + fc::minutes(5) );
+      set_expiration( db, xfer_tx );
       sign( xfer_tx, alice_private_key );
 
       _restrict_xfer( true );

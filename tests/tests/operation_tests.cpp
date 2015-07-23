@@ -34,6 +34,7 @@
 #include "../common/database_fixture.hpp"
 
 using namespace graphene::chain;
+using namespace graphene::chain::test;
 
 BOOST_FIXTURE_TEST_SUITE( operation_tests, database_fixture )
 
@@ -441,7 +442,7 @@ BOOST_AUTO_TEST_CASE( transfer_core_asset )
       for( auto& op : trx.operations ) db.current_fee_schedule().set_fee(op);
 
       fee = trx.operations.front().get<transfer_operation>().fee;
-      trx.set_expiration( db.head_block_time() + fc::minutes(5) );
+      set_expiration( db, trx );
       trx.validate();
       PUSH_TX( db, trx, ~0 );
 
@@ -1174,8 +1175,7 @@ BOOST_AUTO_TEST_CASE( witness_pay_test )
    account_upgrade_operation uop;
    uop.account_to_upgrade = nathan->get_id();
    uop.upgrade_to_lifetime_member = true;
-   trx.set_expiration( db.head_block_time() + fc::seconds( 3 * db.get_global_properties().parameters.block_interval ));
-   trx.set_reference_block( db.head_block_id() );
+   set_expiration( db, trx );
    trx.operations.push_back(uop);
    for( auto& op : trx.operations ) db.current_fee_schedule().set_fee(op);
    trx.validate();
@@ -1258,7 +1258,7 @@ BOOST_AUTO_TEST_CASE( reserve_asset_test )
          op.amount_to_reserve = amount_to_reserve;
          transaction tx;
          tx.operations.push_back( op );
-         tx.set_expiration( db.head_block_time() + fc::minutes(5) );
+         set_expiration( db, tx );
          db.push_transaction( tx, database::skip_authority_check | database::skip_tapos_check | database::skip_transaction_signatures );
       } ;
 
@@ -1270,7 +1270,7 @@ BOOST_AUTO_TEST_CASE( reserve_asset_test )
          op.issue_to_account = recipient.id;
          transaction tx;
          tx.operations.push_back( op );
-         tx.set_expiration( db.head_block_time() + fc::minutes(5) );
+         set_expiration( db, tx );
          db.push_transaction( tx, database::skip_authority_check | database::skip_tapos_check | database::skip_transaction_signatures );
       } ;
 
@@ -1360,7 +1360,7 @@ BOOST_AUTO_TEST_CASE( cover_with_collateral_test )
          op.delta_debt = delta_debt;
          transaction tx;
          tx.operations.push_back( op );
-         tx.set_expiration( db.head_block_time() + fc::minutes(5) );
+         set_expiration( db, tx );
          db.push_transaction( tx, database::skip_authority_check | database::skip_tapos_check | database::skip_transaction_signatures );
       } ;
 
@@ -1509,7 +1509,7 @@ BOOST_AUTO_TEST_CASE( vesting_balance_withdraw_test )
       create_op.amount = amount;
       create_op.policy = cdd_vesting_policy_initializer(vesting_seconds);
       tx.operations.push_back( create_op );
-      tx.set_expiration( db.head_block_time() + fc::minutes(5) );
+      set_expiration( db, tx );
 
       processed_transaction ptx = PUSH_TX( db,  tx, ~0  );
       const vesting_balance_object& vbo = vesting_balance_id_type(
