@@ -2,6 +2,8 @@
 #include <graphene/chain/confidential_evaluator.hpp>
 #include <graphene/chain/database.hpp>
 
+#include <fc/crypto/elliptic.hpp>
+
 namespace graphene { namespace chain {
 
 void transfer_to_blind_operation::validate()const
@@ -110,7 +112,7 @@ void blind_transfer_operation::validate()const
 
 share_type blind_transfer_operation::calculate_fee( const fee_parameters_type& k )const
 {
-    return k.fee + outputs.size() * k.price_per_output + calculate_data_fee( fc::raw::pack_size(*this), k.price_per_kb );; 
+    return k.fee + outputs.size() * k.price_per_output + calculate_data_fee( fc::raw::pack_size(*this), k.price_per_kb );;
 }
 
 
