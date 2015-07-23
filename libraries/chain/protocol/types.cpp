@@ -121,13 +121,4 @@ namespace fc
         vo = graphene::chain::public_key_type( var.as_string() );
     }
 
-    void to_variant(const graphene::chain::vote_id_type& var, variant& vo)
-    {
-       vo = string(var);
-    }
-    void from_variant(const variant& var, graphene::chain::vote_id_type& vo)
-    {
-       vo = graphene::chain::vote_id_type(var.as_string());
-    }
-
 } // fc

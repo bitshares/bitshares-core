@@ -2,6 +2,21 @@ file(GLOB HEADERS "include/graphene/chain/*.hpp")
 
 ## SORT .cpp by most likely to change / break compile
 add_library( graphene_chain
+
+             # As database takes the longest to compile, start it first
+             database.cpp
+
+#             db_balance.cpp
+#             db_block.cpp
+#             db_debug.cpp
+#             db_getter.cpp
+#             db_init.cpp
+#             db_maint.cpp
+#             db_management.cpp
+#             db_market.cpp
+#             db_update.cpp
+#             db_witness_schedule.cpp
+
              protocol/types.cpp
              protocol/address.cpp
              protocol/asset.cpp
@@ -22,6 +37,7 @@ add_library( graphene_chain
              protocol/block.cpp
              protocol/fee_schedule.cpp
              protocol/confidential.cpp
+             protocol/vote.cpp
 
              pts_address.cpp
 
@@ -47,19 +63,6 @@ add_library( graphene_chain
 
              fork_database.cpp
              block_database.cpp
-
-             database.cpp
-
-#             db_balance.cpp
-#             db_block.cpp
-#             db_debug.cpp
-#             db_getter.cpp
-#             db_init.cpp
-#             db_maint.cpp
-#             db_management.cpp
-#             db_market.cpp
-#             db_update.cpp
-#             db_witness_schedule.cpp
 
              ${HEADERS}
            )

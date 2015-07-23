@@ -16,6 +16,7 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #pragma once
+#include <graphene/chain/protocol/base.hpp>
 #include <graphene/chain/protocol/types.hpp>
 #include <fc/smart_ref_fwd.hpp>
 

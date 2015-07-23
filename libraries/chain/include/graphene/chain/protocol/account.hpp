@@ -1,5 +1,6 @@
 #pragma once
 #include <graphene/chain/protocol/base.hpp>
+#include <graphene/chain/protocol/vote.hpp>
 
 namespace graphene { namespace chain { 
 
