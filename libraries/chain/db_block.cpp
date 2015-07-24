@@ -395,6 +395,7 @@ void database::_apply_block( const signed_block& next_block )
    const witness_object& signing_witness = validate_block_header(skip, next_block);
    const auto& global_props = get_global_properties();
    const auto& dynamic_global_props = get<dynamic_global_property_object>(dynamic_global_property_id_type());
+   bool maint_needed = (dynamic_global_props.next_maintenance_time <= next_block.timestamp);
 
    _current_block_num    = next_block.block_num();
    _current_trx_in_block = 0;
@@ -418,7 +419,7 @@ void database::_apply_block( const signed_block& next_block )
    auto current_block_interval = global_props.parameters.block_interval;
 
    // Are we at the maintenance interval?
-   if( dynamic_global_props.next_maintenance_time <= next_block.timestamp )
+   if( maint_needed )
       // This will update _pending_block.timestamp if the block interval has changed
       perform_chain_maintenance(next_block, global_props);
 
@@ -428,6 +429,13 @@ void database::_apply_block( const signed_block& next_block )
    clear_expired_orders();
    update_expired_feeds();
    update_withdraw_permissions();
+
+   // n.b., update_maintenance_flag() happens this late
+   // because get_slot_time() / get_slot_at_time() is needed above
+   // TODO:  figure out if we could collapse this function into
+   // update_global_dynamic_data() as perhaps these methods only need
+   // to be called for header validation?
+   update_maintenance_flag( maint_needed );
 
    // notify observers that the block has been applied
    applied_block( next_block ); //emit

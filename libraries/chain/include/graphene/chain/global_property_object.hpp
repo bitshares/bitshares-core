@@ -82,13 +82,25 @@ namespace graphene { namespace chain {
           */
          uint32_t          recently_missed_count = 0;
 
-         /** if the interval changes then how we calculate witness participation will
-          * also change.  Normally witness participation is defined as % of blocks
-          * produced in the last round which is calculated by dividing the delta
-          * time between block N and N-NUM_WITNESSES by the block interval to calculate
-          * the number of blocks produced.
+         /**
+          * dynamic_flags specifies chain state properties that can be
+          * expressed in one bit.
           */
-         uint32_t          first_maintenance_block_with_current_interval = 0;
+         uint32_t dynamic_flags = 0;
+
+         enum dynamic_flag_bits
+         {
+            /**
+             * If maintenance_flag is set, then the head block is a
+             * maintenance block.  This means
+             * get_time_slot(1) - head_block_time() will have a gap
+             * due to maintenance duration.
+             *
+             * This flag answers the question, "Was maintenance
+             * performed in the last call to apply_block()?"
+             */
+            maintenance_flag = 0x01
+         };
    };
 }}
 
@@ -102,7 +114,7 @@ FC_REFLECT_DERIVED( graphene::chain::dynamic_global_property_object, (graphene::
                     (witness_budget)
                     (accounts_registered_this_interval)
                     (recently_missed_count)
-                    (first_maintenance_block_with_current_interval)
+                    (dynamic_flags)
                   )
 
 FC_REFLECT_DERIVED( graphene::chain::global_property_object, (graphene::db::object),

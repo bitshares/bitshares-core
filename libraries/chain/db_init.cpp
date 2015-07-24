@@ -312,6 +312,7 @@ void database::init_genesis(const genesis_state_type& genesis_state)
    });
    create<dynamic_global_property_object>([&](dynamic_global_property_object& p) {
       p.time = genesis_state.initial_timestamp;
+      p.dynamic_flags = 0;
       p.witness_budget = 0;
    });
    create<block_summary_object>([&](block_summary_object&) {});
