@@ -43,6 +43,7 @@ OperationBase* Transaction::operationAt(int index) const {
 
 void Transaction::appendOperation(OperationBase* op)
 {
+   op->setParent(this);
    m_transaction.operations.push_back(op->genericOperation());
    Q_EMIT operationsChanged();
 }

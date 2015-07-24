@@ -3,10 +3,9 @@
 #include <fc/crypto/aes.hpp>
 #include <fc/io/json.hpp>
 
-QString toQString( const std::string& s ) { QString result; result.fromStdString( s ); return result; }
-QString toQString( public_key_type k ) { return toQString( fc::variant(k).as_string() ); }
+QString toQString(public_key_type k) { return QString::fromStdString(fc::variant(k).as_string()); }
 
-Wallet::Wallet( QObject* parent )
+Wallet::Wallet(QObject* parent)
 :QObject(parent)
 {
 }
@@ -16,10 +15,10 @@ Wallet::~Wallet()
    close();
 }
 
-bool Wallet::open( QString file_path )
+bool Wallet::open(QString file_path)
 {
-   fc::path p( file_path.toStdString() );
-   if( !fc::exists( p ) )
+   fc::path p(file_path.toStdString());
+   if( !fc::exists(p) )
    {
       ilog( "Unable to open wallet file '${f}', it does not exist", ("f",p) );
       return false;
@@ -30,7 +29,7 @@ bool Wallet::open( QString file_path )
    for( const auto& key : _data.encrypted_private_keys )
    {
       if( key.second.label != string() )
-         _label_to_key[toQString(key.second.label)] = toQString( key.first );
+         _label_to_key[QString::fromStdString(key.second.label)] = toQString(key.first);
       if( key.second.encrypted_private_key.size() )
          _available_private_keys.insert( key.first );
    }
@@ -194,7 +193,7 @@ bool    Wallet::hasPrivateKey( QString pubkey, bool include_with_brain_key )
    auto itr = _data.encrypted_private_keys.find(pub);
    if( itr == _data.encrypted_private_keys.end() )
       return false;
-   if( itr->second.encrypted_private_key.size() ) 
+   if( itr->second.encrypted_private_key.size() )
       return true;
    if( include_with_brain_key && itr->second.brain_sequence >= 0 )
    {
@@ -217,7 +216,7 @@ QString Wallet::getPrivateKey( QString pubkey )
    if( itr->second.encrypted_private_key.size() == 0 )
       return QString();
    auto plain = fc::aes_decrypt( _decrypted_master_key, itr->second.encrypted_private_key );
-   return toQString( fc::raw::unpack<std::string>(plain) );
+   return QString::fromStdString( fc::raw::unpack<std::string>(plain) );
 }
 
 QString Wallet::getPublicKey( QString wif_private_key )const
@@ -227,7 +226,7 @@ QString Wallet::getPublicKey( QString wif_private_key )const
 
    auto pub = public_key_type(priv->get_public_key());
 
-   return toQString( fc::variant( pub ).as_string() );
+   return QString::fromStdString( fc::variant( pub ).as_string() );
 }
 
 QString Wallet::getActivePrivateKey( QString owner_pub_key, uint32_t seq )
@@ -251,7 +250,7 @@ QString Wallet::getActivePrivateKey( QString owner_pub_key, uint32_t seq )
    _data.encrypted_private_keys[active_pub_key].brain_sequence = seq;
    _available_private_keys.insert( active_pub_key );
 
-   return toQString(wif);
+   return QString::fromStdString(wif);
 }
 
 QString Wallet::getOwnerPrivateKey( uint32_t seq )
@@ -273,7 +272,7 @@ QString Wallet::getOwnerPrivateKey( uint32_t seq )
    _data.encrypted_private_keys[owner_pub_key].brain_sequence = seq;
    _available_private_keys.insert( owner_pub_key );
 
-   return toQString( wif );
+   return QString::fromStdString( wif );
 }
 
 QString Wallet::getActivePublicKey( QString active_pub, uint32_t seq )
@@ -294,11 +293,11 @@ QString Wallet::getKeyLabel( QString pubkey )
    auto itr = _data.encrypted_private_keys.find( key );
    if( itr == _data.encrypted_private_keys.end() )
       return QString();
-   return toQString( itr->second.label );
+   return QString::fromStdString( itr->second.label );
 }
 /**
  *  The same label may not be assigned to more than one key, this method will
- *  fail if a key with the same label already exists.  
+ *  fail if a key with the same label already exists.
  *
  *  @return true if the label was set
  */
@@ -310,7 +309,7 @@ bool    Wallet::setKeyLabel( QString pubkey, QString label )
       auto old_label = _data.encrypted_private_keys[pub].label;
       _data.encrypted_private_keys[pub].label = string();
       if( old_label.size() )
-         _label_to_key.erase( toQString( old_label )  );
+         _label_to_key.erase( QString::fromStdString( old_label )  );
 
       return true;
    }
@@ -336,7 +335,7 @@ QList<QPair<QString,QString> > Wallet::getAllPublicKeys( bool only_if_private )c
    for( const auto& item : _data.encrypted_private_keys )
    {
       if( only_if_private && !item.second.encrypted_private_key.size() ) continue;
-      result.push_back( qMakePair( toQString( item.first ), toQString( item.second.label ) ) );
+      result.push_back( qMakePair( toQString( item.first ), QString::fromStdString( item.second.label ) ) );
    }
 
    return result;
@@ -359,9 +358,9 @@ bool    Wallet::importPublicKey( QString pubkey, QString label )
    return setKeyLabel( pubkey, label );
 }
 
-/** 
+/**
  * @param wifkey a private key in (WIF) Wallet Import Format
- * @pre !isLocked() 
+ * @pre !isLocked()
  **/
 bool    Wallet::importPrivateKey( QString wifkey, QString label )
 {
@@ -390,14 +389,14 @@ bool    Wallet::removePublicKey( QString pubkey )
    auto itr = _data.encrypted_private_keys.find(pub);
    if( itr != _data.encrypted_private_keys.end() )
    {
-      _label_to_key.erase( toQString(itr->second.label) );
+      _label_to_key.erase( QString::fromStdString(itr->second.label) );
       _data.encrypted_private_keys.erase(itr);
       return true;
    }
    return false;
 }
 
-/** removes only the private key, keeping the public key and label 
+/** removes only the private key, keeping the public key and label
  *
  * @pre isOpen() && !isLocked()
  **/
@@ -416,7 +415,7 @@ bool    Wallet::removePrivateKey( QString pubkey )
 /**
  * @pre !isLocked()
  */
-vector<signature_type>           Wallet::signDigest( const digest_type& d, 
+vector<signature_type>           Wallet::signDigest( const digest_type& d,
                                              const set<public_key_type>& keys )const
 {
    vector<signature_type> result;

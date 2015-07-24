@@ -15,14 +15,21 @@ Rectangle {
    anchors.fill: parent
 
    property GrapheneApplication app
-   signal finished
+   signal canceled
+   signal completed(TransferOperation op)
 
    /// The Account object for the sender
    property alias senderAccount: senderPicker.account
    /// The Account object for the receiver
    property alias receiverAccount: recipientPicker.account
-   /// The operation created in this form
-   property var operation
+
+   function operation() {
+      if (!transferButton.enabled) return app.operationBuilder.transfer(0,0,0,0, memoField.text, 0)
+
+      return app.operationBuilder.transfer(senderPicker.account.id, recipientPicker.account.id,
+                                           amountField.value * amountField.precisionAdjustment,
+                                           amountField.maxBalance.type.id, memoField.text, 0)
+   }
 
    Component.onCompleted: console.log("Made a transfer form")
    Component.onDestruction: console.log("Destroyed a transfer form")
@@ -77,6 +84,12 @@ Rectangle {
 
             property Balance maxBalance: assetField.enabled && senderPicker.showBalance >= 0?
                                             senderPicker.balances[senderPicker.showBalance] : null
+            property int precisionAdjustment: maxBalance? Math.pow(10, maxBalance.type.precision) : 1
+
+            // Workaround to preserve value in case form gets disabled then re-enabled
+            onEnabledChanged: if (!enabled) __valueBackup = value
+            onMaximumValueChanged: if (enabled && maximumValue > __valueBackup) value = __valueBackup
+            property real __valueBackup
          }
          ComboBox {
             id: assetField
@@ -89,25 +102,21 @@ Rectangle {
          Text {
             font.pixelSize: assetField.height / 2.5
             text: {
-               var balance = amountField.maxBalance
-               if (!balance || !balance.type) return ""
-               var precisionAdjustment = Math.pow(10, balance.type.precision)
-
-               var op = app.operationBuilder.transfer(0, 0, amountField.value * precisionAdjustment,
-                                                      balance.type.id, memoField.text, 0)
-
-               return qsTr("Fee:<br/>") + op.fee / precisionAdjustment + " CORE"
+               if (!senderPicker.account)
+                  return ""
+               return qsTr("Fee:<br/>") + operation().fee / amountField.precisionAdjustment + " CORE"
             }
          }
          Item { Layout.fillWidth: true }
          Button {
             text: qsTr("Cancel")
-            onClicked: finished()
+            onClicked: canceled()
          }
          Button {
+            id: transferButton
             text: qsTr("Transfer")
             enabled: senderPicker.account && recipientPicker.account && senderPicker.account !== recipientPicker.account && amountField.value
-            onClicked: console.log(amountField.value)
+            onClicked: completed(operation)
          }
       }
    }

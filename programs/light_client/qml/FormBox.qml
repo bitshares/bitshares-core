@@ -29,7 +29,8 @@ Rectangle {
 
       var form = formType.createObject(formContainer, params)
       formContainer.data = [form]
-      form.finished.connect(function(){state = "HIDDEN"})
+      form.canceled.connect(function(){state = "HIDDEN"; internal.callbackArgs = []})
+      form.completed.connect(function(){state = "HIDDEN"; internal.callbackArgs = arguments})
       if (closedCallback instanceof Function)
          internal.callback = closedCallback
       state = "SHOWN"
@@ -89,6 +90,7 @@ Rectangle {
                if (internal.callback instanceof Function)
                   internal.callback()
                internal.callback = undefined
+               internal.callbackArgs = []
             }
          }
       },
@@ -145,5 +147,6 @@ Rectangle {
    QtObject {
       id: internal
       property var callback
+      property var callbackArgs
    }
 }

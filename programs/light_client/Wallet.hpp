@@ -16,7 +16,6 @@ using graphene::chain::digest_type;
 using graphene::chain::signature_type;
 using fc::optional;
 
-QString toQString( const std::string& s );
 QString toQString( public_key_type k );
 
 struct key_data
@@ -38,12 +37,12 @@ struct wallet_file
    map<public_key_type, key_data>  encrypted_private_keys;
 };
 
-FC_REFLECT( wallet_file, 
+FC_REFLECT( wallet_file,
             (encrypted_brain_key)
             (brain_key_digest)
             (encrypted_master_key)
             (master_key_digest)
-            (encrypted_private_keys) 
+            (encrypted_private_keys)
           );
 
 
@@ -57,6 +56,8 @@ FC_REFLECT( wallet_file,
 class Wallet : public QObject
 {
    Q_OBJECT
+   Q_PROPERTY(bool isOpen READ isOpen NOTIFY isOpenChanged)
+   Q_PROPERTY(bool isLocked READ isLocked NOTIFY isLockedChanged)
    public:
       Wallet( QObject* parent = nullptr );
       ~Wallet();
@@ -86,7 +87,7 @@ class Wallet : public QObject
       /**
        * @pre !isLocked();
        * @post save()
-       * @return WIF private key 
+       * @return WIF private key
        */
       Q_INVOKABLE QString getActivePrivateKey( QString owner_public_key, uint32_t sequence );
       Q_INVOKABLE QString getActivePublicKey( QString owner_public_key, uint32_t sequence );
@@ -95,7 +96,7 @@ class Wallet : public QObject
        * @pre !isLocked();
        * @pre hasBrainKey();
        * @post save()
-       * @return WIF private key 
+       * @return WIF private key
        */
       Q_INVOKABLE QString getOwnerPrivateKey( uint32_t sequence );
       Q_INVOKABLE QString getOwnerPublicKey( uint32_t sequence );
@@ -110,9 +111,9 @@ class Wallet : public QObject
       /** imports a public key and assigns it a label */
       Q_INVOKABLE bool    importPublicKey( QString pubkey, QString label = QString() );
 
-      /** 
+      /**
        * @param wifkey a private key in (WIF) Wallet Import Format
-       * @pre !isLocked() 
+       * @pre !isLocked()
        **/
       Q_INVOKABLE bool    importPrivateKey( QString wifkey, QString label = QString() );
 
@@ -131,7 +132,7 @@ class Wallet : public QObject
       /**
        * @pre !isLocked()
        */
-      vector<signature_type>           signDigest( const digest_type& d, 
+      vector<signature_type>           signDigest( const digest_type& d,
                                                    const set<public_key_type>& keys )const;
 
       const flat_set<public_key_type>& getAvailablePrivateKeys()const;
@@ -149,5 +150,3 @@ class Wallet : public QObject
       map<QString,QString>      _label_to_key;
       QString                   _brain_key;
 };
-
-

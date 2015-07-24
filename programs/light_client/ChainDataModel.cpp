@@ -195,7 +195,7 @@ void ChainDataModel::getAccountImpl(QString accountIdentifier, Account* const * 
          } else {
             m_accounts.modify(itr, [this,&accountPackage](Account* a){
                a->setProperty("id", ObjectId(accountPackage->account.id.instance()));
-               a->setAccountObject( accountPackage->account );
+               a->setAccountObject(accountPackage->account);
 
                // Set balances
                QList<Balance*> balances;

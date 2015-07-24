@@ -18,13 +18,8 @@ public:
    QQmlListProperty<OperationBase> operations();
 
    OperationBase* operationAt(int index) const;
-   void appendOperation(OperationBase* op);
    int operationCount() const {
       return m_transaction.operations.size();
-   }
-   void clearOperations() {
-      m_transaction.operations.clear();
-      Q_EMIT operationsChanged();
    }
 
 public slots:
@@ -35,6 +30,16 @@ public slots:
 
       m_status = status;
       emit statusChanged(status);
+   }
+
+   /**
+    * @brief Append the operation to the transaction
+    * @param op The operation to append. This Transaction will take ownership of the operation.
+    */
+   void appendOperation(OperationBase* op);
+   void clearOperations() {
+      m_transaction.operations.clear();
+      Q_EMIT operationsChanged();
    }
 
 signals:
