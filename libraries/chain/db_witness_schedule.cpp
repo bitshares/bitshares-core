@@ -62,6 +62,14 @@ fc::time_point_sec database::get_slot_time(uint32_t slot_num)const
       return fc::time_point_sec();
 
    auto interval = block_interval();
+
+   if( head_block_num() == 0 )
+   {
+      // n.b. first block is at genesis_time plus one block interval
+      fc::time_point_sec genesis_time = get_dynamic_global_properties().time;
+      return genesis_time + slot_num * interval;
+   }
+
    auto head_block_abs_slot = head_block_time().sec_since_epoch() / interval;
    fc::time_point_sec first_slot_time(head_block_abs_slot * interval);
    return first_slot_time + slot_num * interval;
