@@ -1062,6 +1062,16 @@ namespace graphene { namespace app {
     } FC_CAPTURE_AND_RETHROW( (id) ) }
 
 
+    vector<asset>           database_api::get_vested_balances( const vector<balance_id_type>& objs )const
+    { try {
+        vector<asset> result;
+        result.reserve( objs.size() );
+        auto now = _db.head_block_time();
+        for( auto obj : objs )
+           result.push_back( obj(_db).available( now ) );
+        return result;
+    } FC_CAPTURE_AND_RETHROW( (objs) ) }
+
     vector<balance_object>  database_api::get_balance_objects( const vector<address>& addrs )const
     { try {
          const auto& bal_idx = _db.get_index_type<balance_index>();
