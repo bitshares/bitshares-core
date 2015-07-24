@@ -73,13 +73,11 @@ BOOST_AUTO_TEST_CASE( override_transfer_test )
 { try {
    ACTORS( (dan)(eric)(sam) );
    const asset_object& advanced = create_user_issued_asset( "ADVANCED", sam, override_authority );
+   BOOST_TEST_MESSAGE( "Issuing 1000 ADVANCED to dan" );
    issue_uia( dan, advanced.amount( 1000 ) );
-   trx.validate();
-   db.push_transaction(trx, ~0);
-   trx.operations.clear();
+   BOOST_TEST_MESSAGE( "Checking dan's balance" );
    BOOST_REQUIRE_EQUAL( get_balance( dan, advanced ), 1000 );
 
-   trx.operations.clear();
    override_transfer_operation otrans;
    otrans.issuer = advanced.issuer;
    otrans.from = dan.id;
@@ -106,9 +104,6 @@ BOOST_AUTO_TEST_CASE( override_transfer_test2 )
    ACTORS( (dan)(eric)(sam) );
    const asset_object& advanced = create_user_issued_asset( "ADVANCED", sam, 0 );
    issue_uia( dan, advanced.amount( 1000 ) );
-   trx.validate();
-   db.push_transaction(trx, ~0);
-   trx.operations.clear();
    BOOST_REQUIRE_EQUAL( get_balance( dan, advanced ), 1000 );
 
    trx.operations.clear();

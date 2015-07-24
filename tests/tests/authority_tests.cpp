@@ -902,7 +902,6 @@ BOOST_FIXTURE_TEST_CASE( max_authority_membership, database_fixture )
       int keys_to_create = 2*GRAPHENE_DEFAULT_MAX_AUTHORITY_MEMBERSHIP;
       vector<private_key_type> private_keys;
 
-      tx = transaction();
       private_keys.reserve( keys_to_create );
       for( int i=0; i<keys_to_create; i++ )
       {
@@ -911,7 +910,6 @@ BOOST_FIXTURE_TEST_CASE( max_authority_membership, database_fixture )
          private_keys.push_back( privkey );
       }
       set_expiration( db, tx );
-      ptx = PUSH_TX( db, tx, ~0 );
 
       vector<public_key_type> key_ids;
 

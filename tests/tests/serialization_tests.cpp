@@ -34,6 +34,11 @@ BOOST_AUTO_TEST_CASE( serialization_raw_test )
 {
    try {
       make_account();
+      transfer_operation op;
+      op.from = account_id_type(1);
+      op.to = account_id_type(2);
+      op.amount = asset(100);
+      trx.operations.push_back( op );
       auto packed = fc::raw::pack( trx );
       signed_transaction unpacked = fc::raw::unpack<signed_transaction>(packed);
       unpacked.validate();
@@ -47,6 +52,11 @@ BOOST_AUTO_TEST_CASE( serialization_json_test )
 {
    try {
       make_account();
+      transfer_operation op;
+      op.from = account_id_type(1);
+      op.to = account_id_type(2);
+      op.amount = asset(100);
+      trx.operations.push_back( op );
       fc::variant packed(trx);
       signed_transaction unpacked = packed.as<signed_transaction>();
       unpacked.validate();
