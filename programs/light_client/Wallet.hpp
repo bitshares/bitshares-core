@@ -56,6 +56,8 @@ FC_REFLECT( wallet_file,
 class Wallet : public QObject
 {
    Q_OBJECT
+   Q_PROPERTY(bool isOpen READ isOpen NOTIFY isOpenChanged)
+   Q_PROPERTY(bool isLocked READ isLocked NOTIFY isLockedChanged)
    public:
       Wallet( QObject* parent = nullptr );
       ~Wallet();
@@ -148,5 +150,3 @@ class Wallet : public QObject
       map<QString,QString>      _label_to_key;
       QString                   _brain_key;
 };
-
-

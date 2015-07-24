@@ -3,6 +3,7 @@
         <file>main.qml</file>
         <file>TransferForm.qml</file>
         <file>FormBox.qml</file>
+        <file>FormFlipper.qml</file>
         <file>Scaling.qml</file>
         <file>Identicon.qml</file>
         <file>AccountPicker.qml</file>

@@ -60,10 +60,15 @@ ApplicationWindow {
 
       Button {
          text: "Transfer"
-         onClicked: formBox.showForm(Qt.createComponent("TransferForm.qml"), {},
-                                     function() {
-                                        console.log("Closed form")
-                                     })
+         onClicked: {
+            var front = Qt.createComponent("TransferForm.qml")
+            // TODO: make back into a preview and confirm dialog
+            var back = Qt.createComponent("TransferForm.qml")
+            formBox.showForm(Qt.createComponent("FormFlipper.qml"), {frontComponent: front, backComponent: back},
+                             function() {
+                                console.log("Closed form")
+                             })
+         }
       }
       TextField {
          id: nameField
