@@ -1135,7 +1135,7 @@ class wallet_api
 } }
 
 FC_REFLECT( graphene::wallet::key_label, (label)(key) )
-FC_REFLECT( graphene::wallet::blind_balance, (amount)(from)(to)(one_time_key)(commitment)(used) )
+FC_REFLECT( graphene::wallet::blind_balance, (amount)(from)(to)(one_time_key)(blinding_factor)(commitment)(used) )
 FC_REFLECT( graphene::wallet::blind_confirmation::output, (label)(pub_key)(decrypted_memo)(confirmation)(confirmation_receipt) )
 FC_REFLECT( graphene::wallet::blind_confirmation, (trx)(outputs) )
 
@@ -1244,5 +1244,6 @@ FC_API( graphene::wallet::wallet_api,
         (get_blind_balances)
         (create_blind_account)
         (transfer_to_blind)
+        (blind_transfer)
         (receive_blind_transfer)
       )
