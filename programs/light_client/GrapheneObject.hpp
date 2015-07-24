@@ -5,8 +5,6 @@
 
 #include <functional>
 
-QString toQString( const std::string& s );
-
 using ObjectId = qint64;
 Q_DECLARE_METATYPE(ObjectId)
 
