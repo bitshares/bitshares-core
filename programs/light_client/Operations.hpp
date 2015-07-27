@@ -37,7 +37,6 @@ class TransferOperation : public OperationBase {
    Q_PROPERTY(QString memo READ memo WRITE setMemo NOTIFY memoChanged)
 
    graphene::chain::transfer_operation m_op;
-   QString m_memo;
 
 public:
    TransferOperation(){}
@@ -57,9 +56,9 @@ public:
    ObjectId receiver() const { return m_op.to.instance.value; }
    qint64 amount() const { return m_op.amount.amount.value; }
    ObjectId amountType() const { return m_op.amount.asset_id.instance.value; }
-   /// This does not deal with encrypted memos. The memo stored here is unencrypted, and does not get stored in the
-   /// underlying graphene operation. The encryption and storage steps must be handled elsewhere.
-   QString memo() const { return m_memo; }
+   /// This does not deal with encrypted memos. The memo stored here is unencrypted. The encryption step must be
+   /// performed elsewhere.
+   QString memo() const;
 
    const graphene::chain::transfer_operation& operation() const { return m_op; }
    graphene::chain::transfer_operation& operation() { return m_op; }
@@ -101,14 +100,9 @@ public Q_SLOTS:
       m_op.amount.asset_id = arg;
       Q_EMIT amountTypeChanged();
    }
-   /// This does not deal with encrypted memos. The memo stored here is unencrypted, and does not get stored in the
-   /// underlying graphene operation. The encryption and storage steps must be handled elsewhere.
-   void setMemo(QString memo) {
-      if (memo == m_memo)
-         return;
-      m_memo = memo;
-      Q_EMIT memoChanged();
-   }
+   /// This does not deal with encrypted memos. The memo stored here is unencrypted. The encryption step must be
+   /// performed elsewhere.
+   void setMemo(QString memo);
 
 Q_SIGNALS:
    void feeChanged();
@@ -136,7 +130,7 @@ public:
    OperationBuilder(ChainDataModel& model, QObject* parent = nullptr)
       : QObject(parent), model(model){}
 
-   Q_INVOKABLE TransferOperation* transfer(ObjectId sender, ObjectId receiver,
-                                           qint64 amount, ObjectId amountType, QString memo, ObjectId feeType);
+   Q_INVOKABLE TransferOperation* transfer(ObjectId sender, ObjectId receiver, qint64 amount,
+                                           ObjectId amountType, QString memo, ObjectId feeType);
 
 };

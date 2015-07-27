@@ -2,6 +2,7 @@
 #include "ChainDataModel.hpp"
 #include "Wallet.hpp"
 #include "Operations.hpp"
+#include "Transaction.hpp"
 
 #include <graphene/app/api.hpp>
 
@@ -72,6 +73,11 @@ void GrapheneApplication::start(QString apiurl, QString user, QString pass)
    {
       Q_EMIT exceptionThrown(QString::fromStdString(e.to_string()));
    }
+}
+
+Transaction* GrapheneApplication::createTransaction() const
+{
+   return new Transaction;
 }
 
 Q_SLOT void GrapheneApplication::execute(const std::function<void()>& func)const

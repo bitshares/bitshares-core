@@ -33,6 +33,8 @@ Rectangle {
       form.completed.connect(function(){state = "HIDDEN"; internal.callbackArgs = arguments})
       if (closedCallback instanceof Function)
          internal.callback = closedCallback
+      // Notify the form that it's about to go live
+      form.display({})
       state = "SHOWN"
    }
 

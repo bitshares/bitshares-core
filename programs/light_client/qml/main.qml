@@ -63,7 +63,7 @@ ApplicationWindow {
          onClicked: {
             var front = Qt.createComponent("TransferForm.qml")
             // TODO: make back into a preview and confirm dialog
-            var back = Qt.createComponent("TransferForm.qml")
+            var back = Qt.createComponent("TransactionConfirmationForm.qml")
             formBox.showForm(Qt.createComponent("FormFlipper.qml"), {frontComponent: front, backComponent: back},
                              function() {
                                 console.log("Closed form")

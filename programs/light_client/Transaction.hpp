@@ -50,6 +50,6 @@ private:
    Q_PROPERTY(Status status READ status WRITE setStatus NOTIFY statusChanged)
    Q_PROPERTY(QQmlListProperty<OperationBase> operations READ operations NOTIFY operationsChanged)
 
-   Status m_status;
+   Status m_status = Unbroadcasted;
    graphene::chain::transaction m_transaction;
 };
