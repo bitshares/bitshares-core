@@ -30,6 +30,8 @@ public:
          power *= 10;
       return power;
    }
+   /// Given an amount like 123401, return "1234.01"
+   Q_INVOKABLE QString formatAmount(qint64 amount) const;
 
    void update(const graphene::chain::asset_object& asset);
 

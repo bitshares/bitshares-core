@@ -29,4 +29,39 @@ FormBase {
          trx.appendOperation(arg[op])
       console.log(JSON.stringify(trx))
    }
+
+   Component {
+      id: transactionDelegate
+
+      Rectangle {
+         width: Scaling.cm(10)
+         height: childrenRect.height + Scaling.cm(1)
+         radius: Scaling.mm(3)
+         color: "#EEEEEE"
+         border.width: Scaling.mm(.25)
+         border.color: "black"
+
+         Column {
+            y: Scaling.cm(.5)
+            x: y
+            width: parent.width - Scaling.cm(1)
+            Repeater {
+               model: trx.operations
+               Label {
+                  property Asset transferAsset: app.model.getAsset(modelData.amountType)
+                  property Asset feeAsset: app.model.getAsset(modelData.feeType)
+                  text: qsTr("Transfer %1 %2 from %3 to %4\nFee: %5 %6").arg(transferAsset.formatAmount(modelData.amount))
+                  .arg(transferAsset.symbol)
+                  .arg(app.model.getAccount(modelData.sender).name)
+                  .arg(app.model.getAccount(modelData.receiver).name)
+                  .arg(feeAsset.formatAmount(modelData.fee))
+                  .arg(feeAsset.symbol)
+               }
+            }
+         }
+      }
+   }
+   Loader {
+      sourceComponent: trx && Array.prototype.slice.call(trx.operations).length > 0? transactionDelegate : undefined
+   }
 }
