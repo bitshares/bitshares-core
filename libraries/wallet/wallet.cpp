@@ -2983,7 +2983,9 @@ blind_confirmation wallet_api::blind_transfer_help( string from_key_or_label,
    if( broadcast )
    {
       for( const auto& out : confirm.outputs )
+      {
          try { receive_blind_transfer( out.confirmation_receipt, from_key_or_label, "" ); } catch ( ... ){}
+      }
    }
 
    return confirm;
@@ -3070,7 +3072,9 @@ blind_confirmation wallet_api::transfer_to_blind( string from_account_id_or_name
    if( broadcast )
    {
       for( const auto& out : confirm.outputs )
+      {
          try { receive_blind_transfer( out.confirmation_receipt, "@"+from_account.name, "from @"+from_account.name ); } catch ( ... ){}
+      }
    }
 
    return confirm;
