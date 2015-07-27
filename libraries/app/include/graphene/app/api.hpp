@@ -328,6 +328,12 @@ namespace graphene { namespace app {
          vector<blinded_balance_object> get_blinded_balances( const flat_set<commitment_type>& commitments )const;
 
 
+         /**
+          *  For each operation calculate the required fee in the specified asset type.  If the asset type does
+          *  not have a valid core_exchange_rate
+          */
+         vector<asset> get_required_fees( const vector<operation>& ops, asset_id_type id = asset_id_type() )const;
+
       private:
          /** called every time a block is applied to report the objects that were changed */
          void on_objects_changed(const vector<object_id_type>& ids);
@@ -541,6 +547,7 @@ FC_API(graphene::app::database_api,
        (get_required_signatures)
        (verify_authority)
        (get_blinded_balances)
+       (get_required_fees)
      )
 FC_API(graphene::app::history_api,
        (get_account_history)

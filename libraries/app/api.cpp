@@ -1120,4 +1120,14 @@ namespace graphene { namespace app {
        return result;
     }
 
+    vector<asset> database_api::get_required_fees( const vector<operation>& ops, asset_id_type id )const
+    {
+       vector<asset> result;
+       result.reserve(ops.size());
+       const asset_object&  a = id(_db);
+       for( const auto& op : ops )
+          result.push_back( _db.current_fee_schedule().calculate_fee( op, a.options.core_exchange_rate ) );
+       return result;
+    }
+
 } } // graphene::app
