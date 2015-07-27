@@ -208,18 +208,24 @@ void verify_authority( const vector<operation>& ops, const flat_set<public_key_t
       s.approved_by.insert( id );
 
    for( const auto& auth : other )
+   {
       GRAPHENE_ASSERT( s.check_authority(&auth), tx_missing_other_auth, "Missing Authority", ("auth",auth)("sigs",sigs) );
+   }
 
    // fetch all of the top level authorities
    for( auto id : required_active )
+   {
       GRAPHENE_ASSERT( s.check_authority(id) || 
                        s.check_authority(get_owner(id)), 
                        tx_missing_active_auth, "Missing Active Authority ${id}", ("id",id)("auth",*get_active(id))("owner",*get_owner(id)) );
+   }
 
    for( auto id : required_owner )
+   {
       GRAPHENE_ASSERT( owner_approvals.find(id) != owner_approvals.end() ||
                        s.check_authority(get_owner(id)), 
                        tx_missing_other_auth, "Missing Owner Authority ${id}", ("id",id)("auth",*get_owner(id)) );
+   }
 
    FC_ASSERT( !s.remove_unused_signatures(), "Unnecessary signatures detected" );
 } FC_CAPTURE_AND_RETHROW( (ops)(sigs) ) }
@@ -230,7 +236,9 @@ flat_set<public_key_type> signed_transaction::get_signature_keys()const
    auto d = digest();
    flat_set<public_key_type> result;
    for( const auto&  sig : signatures )
+   {
       FC_ASSERT( result.insert( fc::ecc::public_key(sig,d) ).second, "Duplicate Signature detected" );
+   }
    return result;
 } FC_CAPTURE_AND_RETHROW() }
 

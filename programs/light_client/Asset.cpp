@@ -4,6 +4,13 @@
 
 #include <QVariant>
 
+QString Asset::formatAmount(qint64 amount) const
+{
+   graphene::chain::asset_object ao;
+   ao.precision = m_precision;
+   return QString::fromStdString(ao.amount_to_string(amount));
+}
+
 void Asset::update(const graphene::chain::asset_object& asset)
 {
    if (asset.id.instance() != id())

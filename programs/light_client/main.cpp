@@ -20,7 +20,10 @@ QML_DECLARE_TYPE(Crypto)
 
 int main(int argc, char *argv[])
 {
-   fc::thread::current().set_name( "main" );
+#ifndef NDEBUG
+   QQmlDebuggingEnabler enabler;
+#endif
+   fc::thread::current().set_name("main");
    QApplication app(argc, argv);
    app.setApplicationName("Graphene Client");
    app.setOrganizationDomain("cryptonomex.org");
@@ -28,6 +31,7 @@ int main(int argc, char *argv[])
 
    qRegisterMetaType<std::function<void()>>();
    qRegisterMetaType<ObjectId>();
+   qRegisterMetaType<QList<OperationBase*>>();
 
    qmlRegisterType<Asset>("Graphene.Client", 0, 1, "Asset");
    qmlRegisterType<Balance>("Graphene.Client", 0, 1, "Balance");
@@ -49,7 +53,6 @@ int main(int argc, char *argv[])
 #ifdef NDEBUG
    engine.load(QUrl(QStringLiteral("qrc:/main.qml")));
 #else
-   QQmlDebuggingEnabler enabler;
    engine.load(QUrl(QStringLiteral("qml/main.qml")));
 #endif
 

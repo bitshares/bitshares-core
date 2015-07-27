@@ -49,7 +49,7 @@ namespace graphene { namespace db {
     *  @brief abstract base class for accessing objects indexed in various ways.
     *
     *  All indexes assume that there exists an object ID space that will grow
-    *  for ever in a seqential manner.  These IDs are used to identify the
+    *  forever in a seqential manner.  These IDs are used to identify the
     *  index, type, and instance of the object.
     *
     *  Items in an index can only be modified via a call to modify and

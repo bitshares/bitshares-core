@@ -43,6 +43,11 @@ OperationBase* Transaction::operationAt(int index) const {
 
 void Transaction::appendOperation(OperationBase* op)
 {
+   if (op == nullptr)
+   {
+      qWarning("Unable to append null operation to transaction");
+      return;
+   }
    op->setParent(this);
    m_transaction.operations.push_back(op->genericOperation());
    Q_EMIT operationsChanged();

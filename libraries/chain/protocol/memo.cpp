@@ -6,8 +6,10 @@ namespace graphene { namespace chain {
 void memo_data::set_message(const fc::ecc::private_key& priv, const fc::ecc::public_key& pub,
                             const string& msg, uint64_t custom_nonce)
 {
-   if( from != public_key_type() )
+   if( priv != fc::ecc::private_key() && public_key_type(pub) != public_key_type() )
    {
+      from = priv.get_public_key();
+      to = pub;
       if( custom_nonce == 0 )
       {
          uint64_t entropy = fc::sha224::hash(fc::ecc::private_key::generate())._hash[0];

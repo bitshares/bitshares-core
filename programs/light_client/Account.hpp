@@ -51,7 +51,6 @@ public:
 
    void update(const account_balance_object& balance);
 
-
    /**
     * Anything greater than 1.0 means full authority.
     * Anything between (0 and 1.0) means partial authority

@@ -1,7 +1,9 @@
 <RCC>
     <qresource prefix="/">
         <file>main.qml</file>
+        <file>FormBase.qml</file>
         <file>TransferForm.qml</file>
+        <file>TransactionConfirmationForm.qml</file>
         <file>FormBox.qml</file>
         <file>FormFlipper.qml</file>
         <file>Scaling.qml</file>

@@ -14,6 +14,8 @@ class websocket_client;
 
 class ChainDataModel;
 class OperationBuilder;
+class OperationBase;
+class Transaction;
 class Wallet;
 class GrapheneApplication : public QObject {
    Q_OBJECT
@@ -61,6 +63,9 @@ public:
    {
       return m_isConnected;
    }
+
+   /// Convenience method to get a Transaction in QML. Caller takes ownership of the new Transaction.
+   Q_INVOKABLE Transaction* createTransaction() const;
 
 Q_SIGNALS:
    void exceptionThrown(QString message);
