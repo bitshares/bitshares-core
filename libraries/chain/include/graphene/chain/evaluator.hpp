@@ -98,10 +98,7 @@ namespace graphene { namespace chain {
       /// Pays the fee and returns the number of CORE asset that were paid.
       void pay_fee();
 
-      //bool verify_authority(const account_object&, authority::classification);
       object_id_type get_relative_id( object_id_type rel_id )const;
-
-      void verify_authority_accounts( const authority& a )const;
 
       asset                            fee_from_account;
       share_type                       core_fee_paid;

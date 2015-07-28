@@ -951,7 +951,7 @@ BOOST_FIXTURE_TEST_CASE( max_authority_membership, database_fixture )
 
              if( num_keys > max_authority_membership )
              {
-                GRAPHENE_REQUIRE_THROW(PUSH_TX( db, tx, ~0 ), fc::exception);
+                GRAPHENE_REQUIRE_THROW( PUSH_TX( db, tx, ~0 ), account_create_max_auth_exceeded );
              }
              else
              {

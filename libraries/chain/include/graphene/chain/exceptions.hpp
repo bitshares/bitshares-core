@@ -81,7 +81,6 @@ namespace graphene { namespace chain {
    FC_DECLARE_DERIVED_EXCEPTION( insufficient_feeds,                graphene::chain::chain_exception, 37006, "insufficient feeds" )
 
    GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( transfer );
-
    GRAPHENE_DECLARE_OP_EVALUATE_EXCEPTION( from_account_not_whitelisted, transfer, 1, "owner mismatch" )
    GRAPHENE_DECLARE_OP_EVALUATE_EXCEPTION( to_account_not_whitelisted, transfer, 2, "owner mismatch" )
    GRAPHENE_DECLARE_OP_EVALUATE_EXCEPTION( restricted_transfer_asset, transfer, 3, "restricted transfer asset" )
@@ -89,11 +88,16 @@ namespace graphene { namespace chain {
    //GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( limit_order_create );
    //GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( limit_order_cancel );
    GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( call_order_update );
-
    GRAPHENE_DECLARE_OP_EVALUATE_EXCEPTION( unfilled_margin_call, call_order_update, 1, "Updating call order would trigger a margin call that cannot be fully filled" )
 
-   //GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( account_create );
-   //GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( account_update );
+   GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( account_create );
+   GRAPHENE_DECLARE_OP_EVALUATE_EXCEPTION( max_auth_exceeded, account_create, 1, "Exceeds max authority fan-out" )
+   GRAPHENE_DECLARE_OP_EVALUATE_EXCEPTION( auth_account_not_found, account_create, 2, "Auth account not found" )
+
+   GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( account_update );
+   GRAPHENE_DECLARE_OP_EVALUATE_EXCEPTION( max_auth_exceeded, account_update, 1, "Exceeds max authority fan-out" )
+   GRAPHENE_DECLARE_OP_EVALUATE_EXCEPTION( auth_account_not_found, account_update, 2, "Auth account not found" )
+
    //GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( account_whitelist );
    //GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( account_upgrade );
    //GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( account_transfer );
@@ -104,7 +108,6 @@ namespace graphene { namespace chain {
    //GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( asset_issue );
 
    GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( asset_reserve );
-
    GRAPHENE_DECLARE_OP_EVALUATE_EXCEPTION( invalid_on_mia, asset_reserve, 1, "invalid on mia" )
 
    //GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( asset_fund_fee_pool );
@@ -115,7 +118,6 @@ namespace graphene { namespace chain {
    //GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( witness_create );
 
    GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( proposal_create );
-
    GRAPHENE_DECLARE_OP_EVALUATE_EXCEPTION( review_period_required, proposal_create, 1, "review_period required" )
    GRAPHENE_DECLARE_OP_EVALUATE_EXCEPTION( review_period_insufficient, proposal_create, 2, "review_period insufficient" )
 
@@ -134,15 +136,12 @@ namespace graphene { namespace chain {
    //GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( assert );
 
    GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( balance_claim );
-
    GRAPHENE_DECLARE_OP_EVALUATE_EXCEPTION( claimed_too_often, balance_claim, 1, "balance claimed too often" )
    GRAPHENE_DECLARE_OP_EVALUATE_EXCEPTION( invalid_claim_amount, balance_claim, 2, "invalid claim amount" )
    GRAPHENE_DECLARE_OP_EVALUATE_EXCEPTION( owner_mismatch, balance_claim, 3, "owner mismatch" )
 
    GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( override_transfer );
-
    GRAPHENE_DECLARE_OP_EVALUATE_EXCEPTION( not_permitted, override_transfer, 1, "not permitted" )
-
 
    GRAPHENE_DECLARE_OP_BASE_EXCEPTIONS( blind_transfer );
    GRAPHENE_DECLARE_OP_EVALUATE_EXCEPTION( unknown_commitment, blind_transfer, 1, "Attempting to claim an unknown prior commitment" );
@@ -234,5 +233,9 @@ namespace graphene { namespace chain {
    FC_DECLARE_DERIVED_EXCEPTION( price_multiplication_underflow,    graphene::chain::evaluation_error, 38002, "price multiplication underflow" )
    FC_DECLARE_DERIVED_EXCEPTION( price_multiplication_undefined,    graphene::chain::evaluation_error, 38003, "price multiplication undefined product 0*inf" )
    */
+
+   #define GRAPHENE_RECODE_EXC( cause_type, effect_type ) \
+      catch( const cause_type& e ) \
+      { throw( effect_type( e.what(), e.get_log() ) ); }
 
 } } // graphene::chain
