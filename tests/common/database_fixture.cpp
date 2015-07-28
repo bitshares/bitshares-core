@@ -974,7 +974,7 @@ void set_expiration( const database& db, transaction& tx )
 {
    const chain_parameters& params = db.get_global_properties().parameters;
    tx.set_reference_block(db.head_block_id());
-   tx.set_expiration( db.head_block_time() + fc::seconds( params.block_interval * 3 ) );
+   tx.set_expiration( db.head_block_time() + fc::seconds( params.block_interval * (params.maintenance_skip_slots + 1) * 3 ) );
    return;
 }
 
