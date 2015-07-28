@@ -621,7 +621,7 @@ BOOST_FIXTURE_TEST_CASE( double_sign_check, database_fixture )
    BOOST_TEST_MESSAGE( "Verify that double-signing causes an exception" );
    trx.sign(bob_private_key);
    trx.sign(bob_private_key);
-   GRAPHENE_REQUIRE_THROW( db.push_transaction(trx, 0), fc::exception );
+   GRAPHENE_REQUIRE_THROW( db.push_transaction(trx, 0), tx_duplicate_sig );
 
    BOOST_TEST_MESSAGE( "Verify that signing with an extra, unused key fails" );
    trx.signatures.pop_back();

@@ -241,7 +241,10 @@ flat_set<public_key_type> signed_transaction::get_signature_keys()const
    flat_set<public_key_type> result;
    for( const auto&  sig : signatures )
    {
-      FC_ASSERT( result.insert( fc::ecc::public_key(sig,d) ).second, "Duplicate Signature detected" );
+      GRAPHENE_ASSERT(
+         result.insert( fc::ecc::public_key(sig,d) ).second,
+         tx_duplicate_sig,
+         "Duplicate Signature detected" );
    }
    return result;
 } FC_CAPTURE_AND_RETHROW() }

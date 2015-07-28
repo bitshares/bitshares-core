@@ -74,8 +74,8 @@ namespace graphene { namespace chain {
    FC_DECLARE_DERIVED_EXCEPTION( tx_missing_owner_auth,             graphene::chain::transaction_exception, 3030002, "missing required owner authority" )
    FC_DECLARE_DERIVED_EXCEPTION( tx_missing_other_auth,             graphene::chain::transaction_exception, 3030003, "missing required other authority" )
    FC_DECLARE_DERIVED_EXCEPTION( tx_irrelevant_sig,                 graphene::chain::transaction_exception, 3030004, "irrelevant signature included" )
-   FC_DECLARE_DERIVED_EXCEPTION( invalid_committee_approval,        graphene::chain::transaction_exception, 3030005, 
-                                 "committee account cannot directly approve transaction" )
+   FC_DECLARE_DERIVED_EXCEPTION( tx_duplicate_sig,                  graphene::chain::transaction_exception, 3030005, "duplicate signature included" )
+   FC_DECLARE_DERIVED_EXCEPTION( invalid_committee_approval,        graphene::chain::transaction_exception, 3030006, "committee account cannot directly approve transaction" )
 
    FC_DECLARE_DERIVED_EXCEPTION( invalid_pts_address,               graphene::chain::utility_exception, 3060001, "invalid pts address" )
    FC_DECLARE_DERIVED_EXCEPTION( insufficient_feeds,                graphene::chain::chain_exception, 37006, "insufficient feeds" )

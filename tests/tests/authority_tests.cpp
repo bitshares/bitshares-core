@@ -462,6 +462,7 @@ BOOST_AUTO_TEST_CASE( committee_authority )
    BOOST_CHECK_EQUAL(get_balance(nathan, asset_id_type()(db)), 0);
    BOOST_CHECK(db.get<proposal_object>(prop.id).is_authorized_to_execute(db));
 
+   trx.signatures.clear();
    generate_blocks(*prop.review_period_time);
    uop.key_approvals_to_add.clear();
    uop.key_approvals_to_add.insert(committee_key.get_public_key()); // was 7
