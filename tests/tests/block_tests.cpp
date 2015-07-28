@@ -125,22 +125,20 @@ BOOST_AUTO_TEST_CASE( generate_empty_blocks )
       fc::temp_directory data_dir( graphene::utilities::temp_directory_path() );
       signed_block b;
 
-      now += GRAPHENE_DEFAULT_BLOCK_INTERVAL;
       // TODO:  Don't generate this here
       auto init_account_priv_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("null_key")) );
       {
          database db;
          db.open(data_dir.path(), make_genesis );
-         b = db.generate_block(now, db.get_scheduled_witness(1).first, init_account_priv_key, database::skip_nothing);
+         b = db.generate_block(db.get_slot_time(1), db.get_scheduled_witness(1).first, init_account_priv_key, database::skip_nothing);
 
          for( uint32_t i = 1; i < 200; ++i )
          {
             BOOST_CHECK( db.head_block_id() == b.id() );
             witness_id_type prev_witness = b.witness;
-            now += db.block_interval();
             witness_id_type cur_witness = db.get_scheduled_witness(1).first;
             BOOST_CHECK( cur_witness != prev_witness );
-            b = db.generate_block(now, cur_witness, init_account_priv_key, database::skip_nothing);
+            b = db.generate_block(db.get_slot_time(1), cur_witness, init_account_priv_key, database::skip_nothing);
             BOOST_CHECK( b.witness == cur_witness );
          }
          db.close();
@@ -153,10 +151,9 @@ BOOST_AUTO_TEST_CASE( generate_empty_blocks )
          {
             BOOST_CHECK( db.head_block_id() == b.id() );
             witness_id_type prev_witness = b.witness;
-            now += db.block_interval();
             witness_id_type cur_witness = db.get_scheduled_witness(1).first;
             BOOST_CHECK( cur_witness != prev_witness );
-            b = db.generate_block(now, cur_witness, init_account_priv_key, database::skip_nothing);
+            b = db.generate_block(db.get_slot_time(1), cur_witness, init_account_priv_key, database::skip_nothing);
          }
          BOOST_CHECK_EQUAL( db.head_block_num(), 400 );
       }
@@ -174,26 +171,36 @@ BOOST_AUTO_TEST_CASE( undo_block )
          database db;
          db.open(data_dir.path(), make_genesis);
          fc::time_point_sec now( GRAPHENE_TESTING_GENESIS_TIMESTAMP );
+         std::vector< time_point_sec > time_stack;
 
          auto init_account_priv_key  = fc::ecc::private_key::regenerate(fc::sha256::hash(string("null_key")) );
          for( uint32_t i = 0; i < 5; ++i )
          {
-            now += db.block_interval();
+            now = db.get_slot_time(1);
+            time_stack.push_back( now );
             auto b = db.generate_block( now, db.get_scheduled_witness( 1 ).first, init_account_priv_key, database::skip_nothing );
          }
          BOOST_CHECK( db.head_block_num() == 5 );
+         BOOST_CHECK( db.head_block_time() == now );
          db.pop_block();
-         now -= db.block_interval();
+         time_stack.pop_back();
+         now = time_stack.back();
          BOOST_CHECK( db.head_block_num() == 4 );
+         BOOST_CHECK( db.head_block_time() == now );
          db.pop_block();
-         now -= db.block_interval();
+         time_stack.pop_back();
+         now = time_stack.back();
          BOOST_CHECK( db.head_block_num() == 3 );
+         BOOST_CHECK( db.head_block_time() == now );
          db.pop_block();
-         now -= db.block_interval();
+         time_stack.pop_back();
+         now = time_stack.back();
          BOOST_CHECK( db.head_block_num() == 2 );
+         BOOST_CHECK( db.head_block_time() == now );
          for( uint32_t i = 0; i < 5; ++i )
          {
-            now += db.block_interval();
+            now = db.get_slot_time(1);
+            time_stack.push_back( now );
             auto b = db.generate_block( now, db.get_scheduled_witness( 1 ).first, init_account_priv_key, database::skip_nothing );
          }
          BOOST_CHECK( db.head_block_num() == 7 );
@@ -209,7 +216,6 @@ BOOST_AUTO_TEST_CASE( fork_blocks )
    try {
       fc::temp_directory data_dir1( graphene::utilities::temp_directory_path() );
       fc::temp_directory data_dir2( graphene::utilities::temp_directory_path() );
-      fc::time_point_sec now( GRAPHENE_TESTING_GENESIS_TIMESTAMP );
 
       database db1;
       db1.open(data_dir1.path(), make_genesis);
@@ -219,22 +225,21 @@ BOOST_AUTO_TEST_CASE( fork_blocks )
       auto init_account_priv_key  = fc::ecc::private_key::regenerate(fc::sha256::hash(string("null_key")) );
       for( uint32_t i = 0; i < 10; ++i )
       {
-         now += db1.block_interval();
-         auto b = db1.generate_block(now, db1.get_scheduled_witness(1).first, init_account_priv_key, database::skip_nothing);
+         auto b = db1.generate_block(db1.get_slot_time(1), db1.get_scheduled_witness(1).first, init_account_priv_key, database::skip_nothing);
          try {
             PUSH_BLOCK( db2, b );
          } FC_CAPTURE_AND_RETHROW( ("db2") );
       }
       for( uint32_t i = 10; i < 13; ++i )
       {
-         now += db1.block_interval();
-         auto b =  db1.generate_block(now, db1.get_scheduled_witness(1).first, init_account_priv_key, database::skip_nothing);
+         auto b =  db1.generate_block(db1.get_slot_time(1), db1.get_scheduled_witness(1).first, init_account_priv_key, database::skip_nothing);
       }
       string db1_tip = db1.head_block_id().str();
+      uint32_t next_slot = 3;
       for( uint32_t i = 13; i < 16; ++i )
       {
-         now += db2.block_interval();
-         auto b =  db2.generate_block(now, db2.get_scheduled_witness(db2.get_slot_at_time(now)).first, init_account_priv_key, database::skip_nothing);
+         auto b =  db2.generate_block(db2.get_slot_time(next_slot), db2.get_scheduled_witness(next_slot).first, init_account_priv_key, database::skip_nothing);
+         next_slot = 1;
          // notify both databases of the new block.
          // only db2 should switch to the new fork, db1 should not
          PUSH_BLOCK( db1, b );
@@ -248,8 +253,7 @@ BOOST_AUTO_TEST_CASE( fork_blocks )
       BOOST_CHECK_EQUAL(db1.head_block_num(), 13);
       BOOST_CHECK_EQUAL(db2.head_block_num(), 13);
       {
-         now += db2.block_interval();
-         auto b = db2.generate_block(now, db2.get_scheduled_witness(1).first, init_account_priv_key, database::skip_nothing);
+         auto b = db2.generate_block(db2.get_slot_time(1), db2.get_scheduled_witness(1).first, init_account_priv_key, database::skip_nothing);
          good_block = b;
          b.transactions.emplace_back(signed_transaction());
          b.transactions.back().operations.emplace_back(transfer_operation());
@@ -273,7 +277,6 @@ BOOST_AUTO_TEST_CASE( fork_blocks )
 BOOST_AUTO_TEST_CASE( undo_pending )
 {
    try {
-      fc::time_point_sec now(GRAPHENE_TESTING_GENESIS_TIMESTAMP);
       fc::temp_directory data_dir( graphene::utilities::temp_directory_path() );
       {
          database db;
@@ -293,8 +296,7 @@ BOOST_AUTO_TEST_CASE( undo_pending )
             trx.operations.push_back(t);
             PUSH_TX( db, trx, ~0 );
 
-            now += db.block_interval();
-            auto b = db.generate_block(now, db.get_scheduled_witness(1).first, init_account_priv_key, ~0);
+            auto b = db.generate_block(db.get_slot_time(1), db.get_scheduled_witness(1).first, init_account_priv_key, ~0);
          }
 
          signed_transaction trx;
@@ -309,8 +311,7 @@ BOOST_AUTO_TEST_CASE( undo_pending )
          //trx.sign( init_account_priv_key );
          PUSH_TX( db, trx );
 
-         now += db.block_interval();
-         auto b = db.generate_block(now, db.get_scheduled_witness(1).first, init_account_priv_key, database::skip_nothing);
+         auto b = db.generate_block(db.get_slot_time(1), db.get_scheduled_witness(1).first, init_account_priv_key, database::skip_nothing);
 
          BOOST_CHECK(nathan_id(db).name == "nathan");
 
@@ -347,7 +348,6 @@ BOOST_AUTO_TEST_CASE( switch_forks_undo_create )
       db1.open(dir1.path(), make_genesis);
       db2.open(dir2.path(), make_genesis);
 
-      fc::time_point_sec now( GRAPHENE_TESTING_GENESIS_TIMESTAMP );
       auto init_account_priv_key  = fc::ecc::private_key::regenerate(fc::sha256::hash(string("null_key")) );
       public_key_type init_account_pub_key  = init_account_priv_key.get_public_key();
       const graphene::db::index& account_idx = db1.get_index(protocol_ids, account_object_type);
@@ -363,19 +363,19 @@ BOOST_AUTO_TEST_CASE( switch_forks_undo_create )
       trx.operations.push_back(cop);
       PUSH_TX( db1, trx );
 
+      // generate blocks
+      // db1 : A
+      // db2 : B C D
+
       auto aw = db1.get_global_properties().active_witnesses;
-      now += db1.block_interval();
-      auto b =  db1.generate_block(now, db1.get_scheduled_witness(1).first, init_account_priv_key, database::skip_nothing);
+      auto b = db1.generate_block(db1.get_slot_time(1), db1.get_scheduled_witness(1).first, init_account_priv_key, database::skip_nothing);
 
       BOOST_CHECK(nathan_id(db1).name == "nathan");
 
-      now = fc::time_point_sec( GRAPHENE_TESTING_GENESIS_TIMESTAMP );
-      now += db2.block_interval();
-      b =  db2.generate_block(now, db2.get_scheduled_witness(1).first, init_account_priv_key, database::skip_nothing);
+      b = db2.generate_block(db2.get_slot_time(1), db2.get_scheduled_witness(1).first, init_account_priv_key, database::skip_nothing);
       db1.push_block(b);
       aw = db2.get_global_properties().active_witnesses;
-      now += db2.block_interval();
-      b =  db2.generate_block(now, db2.get_scheduled_witness(1).first, init_account_priv_key, database::skip_nothing);
+      b = db2.generate_block(db2.get_slot_time(1), db2.get_scheduled_witness(1).first, init_account_priv_key, database::skip_nothing);
       db1.push_block(b);
 
       GRAPHENE_CHECK_THROW(nathan_id(db1), fc::exception);
@@ -383,8 +383,7 @@ BOOST_AUTO_TEST_CASE( switch_forks_undo_create )
       PUSH_TX( db2, trx );
 
       aw = db2.get_global_properties().active_witnesses;
-      now += db2.block_interval();
-      b =  db2.generate_block(now, db2.get_scheduled_witness(1).first, init_account_priv_key, database::skip_nothing);
+      b = db2.generate_block(db2.get_slot_time(1), db2.get_scheduled_witness(1).first, init_account_priv_key, database::skip_nothing);
       db1.push_block(b);
 
       BOOST_CHECK(nathan_id(db1).name == "nathan");
@@ -398,7 +397,6 @@ BOOST_AUTO_TEST_CASE( switch_forks_undo_create )
 BOOST_AUTO_TEST_CASE( duplicate_transactions )
 {
    try {
-      fc::time_point_sec now( GRAPHENE_TESTING_GENESIS_TIMESTAMP );
       fc::temp_directory dir1( graphene::utilities::temp_directory_path() ),
                          dir2( graphene::utilities::temp_directory_path() );
       database db1,
@@ -434,8 +432,7 @@ BOOST_AUTO_TEST_CASE( duplicate_transactions )
 
       GRAPHENE_CHECK_THROW(PUSH_TX( db1, trx, skip_sigs ), fc::exception);
 
-      now += db1.block_interval();
-      auto b = db1.generate_block( now, db1.get_scheduled_witness( 1 ).first, init_account_priv_key, skip_sigs );
+      auto b = db1.generate_block( db1.get_slot_time(1), db1.get_scheduled_witness( 1 ).first, init_account_priv_key, skip_sigs );
       PUSH_BLOCK( db2, b, skip_sigs );
 
       GRAPHENE_CHECK_THROW(PUSH_TX( db1, trx, skip_sigs ), fc::exception);
@@ -451,13 +448,9 @@ BOOST_AUTO_TEST_CASE( duplicate_transactions )
 BOOST_AUTO_TEST_CASE( tapos )
 {
    try {
-      fc::time_point_sec now( GRAPHENE_TESTING_GENESIS_TIMESTAMP );
-      fc::temp_directory dir1( graphene::utilities::temp_directory_path() ),
-                         dir2( graphene::utilities::temp_directory_path() );
-      database db1,
-               db2;
+      fc::temp_directory dir1( graphene::utilities::temp_directory_path() );
+      database db1;
       db1.open(dir1.path(), make_genesis);
-      db2.open(dir2.path(), make_genesis);
 
       const account_object& init1 = *db1.get_index_type<account_index>().indices().get<by_name>().find("init1");
 
@@ -465,12 +458,11 @@ BOOST_AUTO_TEST_CASE( tapos )
       public_key_type init_account_pub_key  = init_account_priv_key.get_public_key();
       const graphene::db::index& account_idx = db1.get_index(protocol_ids, account_object_type);
 
-      now += db1.block_interval();
-      auto b = db1.generate_block(now, db1.get_scheduled_witness( 1 ).first, init_account_priv_key, database::skip_nothing);
+      auto b = db1.generate_block( db1.get_slot_time(1), db1.get_scheduled_witness( 1 ).first, init_account_priv_key, database::skip_nothing);
 
       signed_transaction trx;
       //This transaction must be in the next block after its reference, or it is invalid.
-      trx.set_expiration( db1.head_block_time() + fc::seconds( 1 * db1.get_global_properties().parameters.block_interval ));
+      trx.set_expiration( db1.get_slot_time(1) );
       trx.set_reference_block( db1.head_block_id() );
 
       account_id_type nathan_id = account_idx.get_next_id();
@@ -482,8 +474,7 @@ BOOST_AUTO_TEST_CASE( tapos )
       trx.operations.push_back(cop);
       trx.sign(init_account_priv_key);
       db1.push_transaction(trx);
-      now += db1.block_interval();
-      b = db1.generate_block(now, db1.get_scheduled_witness(1).first, init_account_priv_key, database::skip_nothing);
+      b = db1.generate_block(db1.get_slot_time(1), db1.get_scheduled_witness(1).first, init_account_priv_key, database::skip_nothing);
       trx.clear();
 
       transfer_operation t;
@@ -700,6 +691,7 @@ BOOST_FIXTURE_TEST_CASE( change_block_interval, database_fixture )
 
    BOOST_TEST_MESSAGE( "Generating blocks until next maintenance interval" );
    generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+   generate_block();   // get the maintenance skip slots out of the way
 
    BOOST_TEST_MESSAGE( "Verify that the new block interval is 1 second" );
    BOOST_CHECK_EQUAL(db.get_global_properties().parameters.block_interval, 1);

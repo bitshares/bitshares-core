@@ -1144,6 +1144,7 @@ BOOST_AUTO_TEST_CASE( witness_pay_test )
       return (*wit.pay_vb)(db).balance.amount;
    };
 
+   const auto block_interval = db.get_global_properties().parameters.block_interval;
    const asset_object* core = &asset_id_type()(db);
    const account_object* nathan = &get_account("nathan");
    enable_fees();
@@ -1152,7 +1153,7 @@ BOOST_AUTO_TEST_CASE( witness_pay_test )
    const uint64_t ref_budget =
       ((uint64_t( db.current_fee_schedule().get<account_upgrade_operation>().membership_lifetime_fee )
          * GRAPHENE_CORE_ASSET_CYCLE_RATE * 30
-         * db.get_global_properties().parameters.block_interval
+         * block_interval
        ) + ((uint64_t(1) << GRAPHENE_CORE_ASSET_CYCLE_RATE_BITS)-1)
       ) >> GRAPHENE_CORE_ASSET_CYCLE_RATE_BITS
       ;
@@ -1180,7 +1181,8 @@ BOOST_AUTO_TEST_CASE( witness_pay_test )
    for( auto& op : trx.operations ) db.current_fee_schedule().set_fee(op);
    trx.validate();
    trx.sign(init_account_priv_key);
-   db.push_transaction(trx);
+   PUSH_TX( db, trx );
+   auto pay_fee_time = db.head_block_time().sec_since_epoch();
    trx.clear();
    BOOST_CHECK_EQUAL(get_balance(*nathan, *core), 20000*CORE - account_upgrade_operation::fee_parameters_type().membership_lifetime_fee );;
 
@@ -1200,13 +1202,12 @@ BOOST_AUTO_TEST_CASE( witness_pay_test )
    BOOST_TEST_MESSAGE( "Generating some blocks" );
 
    // generate some blocks
-   while( db.head_block_num() < 30 )
+   while( db.head_block_time().sec_since_epoch() - pay_fee_time < 24 * block_interval )
    {
       generate_block();
       BOOST_CHECK_EQUAL( last_witness_vbo_balance().value, 0 );
    }
-   BOOST_CHECK_EQUAL( db.head_block_num(), 30 );
-   // maintenance will be in block 31.  time of block 31 - time of block 1 = 30 * 5 seconds.
+   BOOST_CHECK_EQUAL( db.head_block_time().sec_since_epoch() - pay_fee_time, 24 * block_interval );
 
    schedule_maint();
    // The 80% lifetime referral fee went to the committee account, which burned it. Check that it's here.
