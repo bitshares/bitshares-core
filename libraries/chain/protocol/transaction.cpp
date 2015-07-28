@@ -224,7 +224,7 @@ void verify_authority( const vector<operation>& ops, const flat_set<public_key_t
    {
       GRAPHENE_ASSERT( owner_approvals.find(id) != owner_approvals.end() ||
                        s.check_authority(get_owner(id)), 
-                       tx_missing_other_auth, "Missing Owner Authority ${id}", ("id",id)("auth",*get_owner(id)) );
+                       tx_missing_owner_auth, "Missing Owner Authority ${id}", ("id",id)("auth",*get_owner(id)) );
    }
 
    GRAPHENE_ASSERT(
