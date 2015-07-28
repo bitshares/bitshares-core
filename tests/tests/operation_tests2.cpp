@@ -1029,8 +1029,9 @@ BOOST_AUTO_TEST_CASE( assert_op_test )
    PUSH_TX( db, trx );
 
    // nathan checks that his public key is not equal to the given value (fail)
-   op.predicates.back() = account_name_eq_lit_predicate{ nathan_id, "dan" };
-   trx.operations.back() = op;
+   trx.clear();
+   op.predicates.emplace_back(account_name_eq_lit_predicate{ nathan_id, "dan" });
+   trx.operations.push_back(op);
    trx.sign(nathan_private_key);
    GRAPHENE_CHECK_THROW( PUSH_TX( db, trx ), fc::exception );
    } FC_LOG_AND_RETHROW()

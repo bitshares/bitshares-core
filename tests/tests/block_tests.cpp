@@ -19,6 +19,7 @@
 #include <boost/test/unit_test.hpp>
 
 #include <graphene/chain/database.hpp>
+#include <graphene/chain/exceptions.hpp>
 
 #include <graphene/chain/account_object.hpp>
 #include <graphene/chain/committee_member_object.hpp>
@@ -625,7 +626,7 @@ BOOST_FIXTURE_TEST_CASE( double_sign_check, database_fixture )
    BOOST_TEST_MESSAGE( "Verify that signing with an extra, unused key fails" );
    trx.signatures.pop_back();
    trx.sign(generate_private_key("bogus"));
-   GRAPHENE_REQUIRE_THROW( db.push_transaction(trx, 0), fc::exception );
+   GRAPHENE_REQUIRE_THROW( db.push_transaction(trx, 0), tx_irrelevant_sig );
 
    BOOST_TEST_MESSAGE( "Verify that signing once with the proper key passes" );
    trx.signatures.pop_back();

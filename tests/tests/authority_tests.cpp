@@ -1025,7 +1025,7 @@ BOOST_FIXTURE_TEST_CASE( bogus_signature, database_fixture )
       trx.sign( alice_key );
       trx.sign( charlie_key );
       // Signed by third-party Charlie (irrelevant key, not in authority)
-      GRAPHENE_REQUIRE_THROW( PUSH_TX( db,  trx, skip  ), fc::exception );
+      GRAPHENE_REQUIRE_THROW( PUSH_TX( db,  trx, skip  ), tx_irrelevant_sig );
    }
    FC_LOG_AND_RETHROW()
 }

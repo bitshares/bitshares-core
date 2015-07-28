@@ -227,7 +227,11 @@ void verify_authority( const vector<operation>& ops, const flat_set<public_key_t
                        tx_missing_other_auth, "Missing Owner Authority ${id}", ("id",id)("auth",*get_owner(id)) );
    }
 
-   FC_ASSERT( !s.remove_unused_signatures(), "Unnecessary signatures detected" );
+   GRAPHENE_ASSERT(
+      !s.remove_unused_signatures(),
+      tx_irrelevant_sig,
+      "Unnecessary signature(s) detected"
+      );
 } FC_CAPTURE_AND_RETHROW( (ops)(sigs) ) }
 
 
