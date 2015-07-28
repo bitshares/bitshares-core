@@ -253,6 +253,7 @@ signed_block database::_generate_block(
    try {
    uint32_t skip = get_node_properties().skip_flags;
    uint32_t slot_num = get_slot_at_time( when );
+   FC_ASSERT( slot_num > 0 );
    witness_id_type scheduled_witness = get_scheduled_witness( slot_num ).first;
    FC_ASSERT( scheduled_witness == witness_id );
 
