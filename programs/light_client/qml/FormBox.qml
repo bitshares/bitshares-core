@@ -90,7 +90,7 @@ Rectangle {
                greySheet.closed()
                formContainer.data = []
                if (internal.callback instanceof Function)
-                  internal.callback()
+                  internal.callback.apply(this, internal.callbackArgs)
                internal.callback = undefined
                internal.callbackArgs = []
             }
