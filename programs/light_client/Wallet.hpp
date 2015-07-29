@@ -18,6 +18,8 @@ using graphene::chain::digest_type;
 using graphene::chain::signature_type;
 using fc::optional;
 
+class Transaction;
+
 QString toQString(public_key_type k);
 
 struct key_data
@@ -125,6 +127,7 @@ class Wallet : public QObject
       /**
        * @pre !isLocked()
        */
+      Q_INVOKABLE void sign(Transaction* transaction) const;
       vector<signature_type>           signDigest(const digest_type& d,
                                                   const set<public_key_type>& keys)const;
 

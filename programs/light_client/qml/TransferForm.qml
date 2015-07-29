@@ -104,7 +104,9 @@ FormBase {
       }
       Button {
          id: transferButton
-         text: qsTr("Transfer")
+         text: !senderAccount ||
+               !senderAccount.isLoaded ||
+               senderPicker.accountControlLevel >= 1? qsTr("Transfer") : qsTr("Propose")
          enabled: senderPicker.account && recipientPicker.account && senderPicker.account !== recipientPicker.account && amountField.value
          onClicked: completed([operation()])
       }

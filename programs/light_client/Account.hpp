@@ -21,6 +21,7 @@ class Account : public GrapheneObject {
 
    Q_PROPERTY(QString name READ name NOTIFY nameChanged)
    Q_PROPERTY(QQmlListProperty<Balance> balances READ balances NOTIFY balancesChanged)
+   Q_PROPERTY(QString memoKey READ memoKey NOTIFY memoKeyChanged)
    Q_PROPERTY(bool isLoaded MEMBER m_loaded NOTIFY loaded)
 
    account_object  m_account;
@@ -36,6 +37,7 @@ public:
    void setAccountObject(const account_object& obj);
 
    QString name()const { return QString::fromStdString(m_account.name); }
+   QString memoKey()const;
    QQmlListProperty<Balance> balances();
 
    void setBalances(QList<Balance*> balances) {
@@ -60,5 +62,6 @@ public:
 Q_SIGNALS:
    void nameChanged();
    void balancesChanged();
+   void memoKeyChanged();
    void loaded();
 };

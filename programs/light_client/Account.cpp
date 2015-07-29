@@ -6,15 +6,25 @@
 
 void Account::setAccountObject(const graphene::chain::account_object& obj)
 {
-   auto old_name = m_account.name;
+   auto oldName = m_account.name;
+   auto oldMemoKey = memoKey();
+
    m_account = obj;
-   if (old_name != m_account.name)
+   if (oldName != m_account.name)
       Q_EMIT nameChanged();
+   if (oldMemoKey != memoKey())
+      Q_EMIT memoKeyChanged();
+
    if (!m_loaded) {
       m_loaded = true;
       Q_EMIT loaded();
       qDebug() << name() << "loaded.";
    }
+}
+
+QString Account::memoKey() const
+{
+   return toQString(m_account.options.memo_key);
 }
 
 QQmlListProperty<Balance> Account::balances()

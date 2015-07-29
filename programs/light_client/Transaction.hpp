@@ -22,6 +22,10 @@ public:
       return m_transaction.operations.size();
    }
 
+   graphene::chain::signed_transaction& internalTransaction() {
+      return m_transaction;
+   }
+
 public slots:
    void setStatus(Status status)
    {
@@ -51,5 +55,5 @@ private:
    Q_PROPERTY(QQmlListProperty<OperationBase> operations READ operations NOTIFY operationsChanged)
 
    Status m_status = Unbroadcasted;
-   graphene::chain::transaction m_transaction;
+   graphene::chain::signed_transaction m_transaction;
 };
