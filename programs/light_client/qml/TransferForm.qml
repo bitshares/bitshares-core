@@ -92,9 +92,9 @@ FormBase {
       Text {
          font.pixelSize: assetField.height / 2.5
          text: {
-            if (!senderPicker.account)
+            if (!senderPicker.account || !amountField.maxBalance)
                return ""
-            return qsTr("Fee:<br/>") + operation().fee / amountField.precisionAdjustment + " CORE"
+            return qsTr("Fee:<br/>") + amountField.maxBalance.type.formatAmount(operation().fee) + " CORE"
          }
       }
       Item { Layout.fillWidth: true }

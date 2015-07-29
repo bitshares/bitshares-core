@@ -19,9 +19,9 @@ RowLayout {
    property Account account
    /// A real in the range [0,1] representing the amount of control the wallet has over this account
    property real accountControlLevel: account && account.isLoaded? account.getActiveControl(app.wallet) : 0
-   onAccountControlLevelChanged: console.log("New acl: " + accountControlLevel)
    /// An Array of Balance objects held by account
    property var balances: account? Object.keys(account.balances).map(function(key){return account.balances[key]})
+                                                                .filter(function(balance){return balance.amount > 0})
                                  : null
 
    /// Set the name field to have active focus
