@@ -24,10 +24,8 @@ FormBase {
 
    onDisplay: {
       trx = app.createTransaction()
-      console.log(JSON.stringify(arg))
       for (var op in arg)
          trx.appendOperation(arg[op])
-      console.log(JSON.stringify(trx))
    }
 
    Component {

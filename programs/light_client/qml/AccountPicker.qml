@@ -17,6 +17,9 @@ RowLayout {
 
    /// The Account object the user has selected
    property Account account
+   /// A real in the range [0,1] representing the amount of control the wallet has over this account
+   property real accountControlLevel: account && account.isLoaded? account.getActiveControl(app.wallet) : 0
+   onAccountControlLevelChanged: console.log("New acl: " + accountControlLevel)
    /// An Array of Balance objects held by account
    property var balances: account? Object.keys(account.balances).map(function(key){return account.balances[key]})
                                  : null
@@ -32,6 +35,8 @@ RowLayout {
       name: account && account.name == accountNameField.text? accountNameField.text : ""
       width: Scaling.cm(2)
       height: Scaling.cm(2)
+      showOwnership: accountControlLevel > 0
+      fullOwnership: accountControlLevel >= 1
    }
    Column {
       Layout.fillWidth: true
@@ -65,8 +70,8 @@ RowLayout {
                text = Qt.binding(function() {
                   if (account == null)
                      return qsTr("Account does not exist.")
-                  var text = qsTr("Account ID: %1").arg(account.id < 0? qsTr("Loading...")
-                                                                      : account.id)
+                  var text = qsTr("Account ID: %1").arg(!account.isLoaded? qsTr("Loading...")
+                                                                         : account.id)
                   if (showBalance >= 0) {
                      var bal = balances[showBalance]
                      text += "<br/>" + qsTr("Balance: <a href='balance'>%1</a> %2").arg(String(bal.amountReal()))

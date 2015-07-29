@@ -8,6 +8,8 @@
 
 #include <fc/rpc/websocket_api.hpp>
 
+#include <QStandardPaths>
+
 using graphene::app::login_api;
 using graphene::app::database_api;
 
@@ -19,7 +21,7 @@ GrapheneApplication::GrapheneApplication(QObject* parent)
 
    m_model = new ChainDataModel(m_thread, this);
    m_operationBuilder = new OperationBuilder(*m_model, this);
-   m_wallet = new Wallet( this );
+   m_wallet = new Wallet(this);
 
    connect(m_model, &ChainDataModel::queueExecute,
            this, &GrapheneApplication::execute);
@@ -73,6 +75,11 @@ void GrapheneApplication::start(QString apiurl, QString user, QString pass)
    {
       Q_EMIT exceptionThrown(QString::fromStdString(e.to_string()));
    }
+}
+
+QString GrapheneApplication::defaultDataPath()
+{
+   return QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
 }
 
 Transaction* GrapheneApplication::createTransaction() const

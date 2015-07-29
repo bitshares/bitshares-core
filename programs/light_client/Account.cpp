@@ -4,6 +4,19 @@
 
 #include <graphene/chain/account_object.hpp>
 
+void Account::setAccountObject(const graphene::chain::account_object& obj)
+{
+   auto old_name = m_account.name;
+   m_account = obj;
+   if (old_name != m_account.name)
+      Q_EMIT nameChanged();
+   if (!m_loaded) {
+      m_loaded = true;
+      Q_EMIT loaded();
+      qDebug() << name() << "loaded.";
+   }
+}
+
 QQmlListProperty<Balance> Account::balances()
 {
    auto count = [](QQmlListProperty<Balance>* list) {
@@ -16,41 +29,60 @@ QQmlListProperty<Balance> Account::balances()
    return QQmlListProperty<Balance>(this, this, count, at);
 }
 
-double Account::getActiveControl( Wallet* w )const
+double Account::getActiveControl(Wallet* w, int depth)const
 {
-   if( m_account.active.num_auths() == 0 ) return 0;
-   if( m_account.active.weight_threshold == 0 ) return 0;
+   if (depth >= GRAPHENE_MAX_SIG_CHECK_DEPTH) return 0;
+   if (m_account.active.num_auths() == 0) return 0;
+   if (m_account.active.weight_threshold == 0) return 0;
 
    uint64_t weight = 0;
-   for( auto& key : m_account.active.key_auths )
+   for (auto& key : m_account.active.key_auths)
    {
-      if( w->hasPrivateKey( toQString(key.first) ) ) weight += key.second;
-   }
-   for( auto& acnt :  m_account.active.account_auths )
-   {
-      // TODO: lookup Account, check to see if we have full control of it, and
-      // add its weight if we do.  Be sure to limit recursion depth
+      if (w->hasPrivateKey(toQString(key.first))) weight += key.second;
    }
 
-   return double(weight) / double( m_account.active.weight_threshold );
+   ChainDataModel* model = qobject_cast<ChainDataModel*>(parent());
+   for (auto& acnt : m_account.active.account_auths)
+   {
+      Account* account = model->getAccount(acnt.first.instance.value);
+      if (!account->m_loaded) {
+         QEventLoop el;
+         connect(account, &Account::loaded, &el, &QEventLoop::quit);
+         QTimer::singleShot(1000, &el, SLOT(quit()));
+         el.exec();
+         if (!account->m_loaded)
+            // We don't have this account loaded yet... Oh well, move along
+            continue;
+      }
+      if (account->getActiveControl(w, depth + 1) >= 1.0)
+         weight += acnt.second;
+   }
+
+   return double(weight) / double(m_account.active.weight_threshold);
 }
 
-double Account::getOwnerControl( Wallet* w )const
+double Account::getOwnerControl(Wallet* w)const
 {
-   if( m_account.owner.num_auths() == 0 ) return 0;
-   if( m_account.owner.weight_threshold == 0 ) return 0;
+   if (m_account.owner.num_auths() == 0) return 0;
+   if (m_account.owner.weight_threshold == 0) return 0;
    uint64_t weight = 0;
-   for( auto& key : m_account.owner.key_auths )
+   for (auto& key : m_account.owner.key_auths)
    {
-      if( w->hasPrivateKey( toQString(key.first) ) ) weight += key.second;
-   }
-   for( auto& acnt :  m_account.owner.account_auths )
-   {
-      // TODO: lookup Account, check to see if we have full *ACTIVE* control of it, and
-      // add its weight if we do.  Be sure to limit recursion depth
+      if (w->hasPrivateKey(toQString(key.first))) weight += key.second;
    }
 
-   return double(weight) / double( m_account.owner.weight_threshold );
+   ChainDataModel* model = qobject_cast<ChainDataModel*>(parent());
+   for (auto& acnt : m_account.owner.account_auths)
+   {
+      Account* account = model->getAccount(acnt.first.instance.value);
+      if (!account->m_loaded)
+         // We don't have this account loaded yet... Oh well, move along
+         continue;
+      if (account->getActiveControl(w) >= 1.0)
+         weight += acnt.second;
+   }
+
+   return double(weight) / double(m_account.owner.weight_threshold);
 }
 
 void Account::update(const graphene::chain::account_balance_object& balance)

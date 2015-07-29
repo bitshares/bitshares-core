@@ -31,13 +31,21 @@ ApplicationWindow {
    statusBar: StatusBar {
       Label {
          anchors.right: parent.right
-         text: app.isConnected? qsTr("Connected") : qsTr("Disconnected")
+         text: qsTr("Network: %1   Wallet: %2").arg(app.isConnected? qsTr("Connected") : qsTr("Disconnected"))
+         .arg(app.wallet.isLocked? qsTr("Locked") : qsTr("Unlocked"))
       }
    }
 
    GrapheneApplication {
       id: app
-  }
+      Component.onCompleted: {
+         var walletFile = appSettings.walletPath + "/wallet.json"
+         if (!wallet.open(walletFile)) {
+            // TODO: onboarding experience
+            wallet.create(walletFile, "default password", "default brain key")
+         }
+      }
+   }
    Timer {
       running: !app.isConnected
       interval: 5000
@@ -48,6 +56,8 @@ ApplicationWindow {
    Settings {
       id: appSettings
       category: "appSettings"
+
+      property string walletPath: app.defaultDataPath()
    }
    Connections {
       target: app
@@ -151,6 +161,32 @@ ApplicationWindow {
                })
             }
          }
+      }
+      TextField {
+         id: passwordField
+         echoMode: TextInput.Password
+      }
+      Button {
+         text: app.wallet.isLocked? "Unlock wallet" : "Lock wallet"
+         onClicked: {
+            if (app.wallet.isLocked)
+               app.wallet.unlock(passwordField.text)
+            else
+               app.wallet.lock()
+         }
+      }
+      TextField {
+         id: keyField
+         placeholderText: "Private key"
+      }
+      TextField {
+         id: keyLabelField
+         placeholderText: "Key label"
+      }
+      Button {
+         text: "Import key"
+         enabled: !app.wallet.isLocked && keyField.text && keyLabelField.text
+         onClicked: app.wallet.importPrivateKey(keyField.text, keyLabelField.text)
       }
    }
 

@@ -2,9 +2,11 @@
 #pragma GCC diagnostic ignored "-Wunknown-pragmas"
 
 #include <graphene/chain/protocol/types.hpp>
+
 #include <QObject>
 #include <QList>
 #include <QPair>
+#include <QtQml>
 
 using std::string;
 using std::vector;
@@ -16,7 +18,7 @@ using graphene::chain::digest_type;
 using graphene::chain::signature_type;
 using fc::optional;
 
-QString toQString( public_key_type k );
+QString toQString(public_key_type k);
 
 struct key_data
 {
@@ -26,7 +28,6 @@ struct key_data
    int32_t                   brain_sequence = -1;
    optional<public_key_type> owner; /// if this key was derived from an owner key + sequence
 };
-FC_REFLECT( key_data, (label)(encrypted_private_key)(brain_sequence)(owner) );
 
 struct wallet_file
 {
@@ -36,14 +37,6 @@ struct wallet_file
    fc::sha512                      master_key_digest;
    map<public_key_type, key_data>  encrypted_private_keys;
 };
-
-FC_REFLECT( wallet_file,
-            (encrypted_brain_key)
-            (brain_key_digest)
-            (encrypted_master_key)
-            (master_key_digest)
-            (encrypted_private_keys)
-          );
 
 
 /**
@@ -62,15 +55,15 @@ class Wallet : public QObject
       Wallet( QObject* parent = nullptr );
       ~Wallet();
 
-      Q_INVOKABLE bool open( QString file_path );
+      Q_INVOKABLE bool open(QString file_path);
       Q_INVOKABLE bool close();
-      Q_INVOKABLE bool isOpen()const;
+      bool isOpen()const;
       Q_INVOKABLE bool save();
-      Q_INVOKABLE bool saveAs( QString file_path );
-      Q_INVOKABLE bool create( QString file_path, QString password, QString brain_key = QString() );
+      Q_INVOKABLE bool saveAs(QString file_path);
+      Q_INVOKABLE bool create(QString file_path, QString password, QString brain_key = QString());
 
       /** required to generate new owner keys */
-      Q_INVOKABLE bool loadBrainKey( QString brain_key );
+      Q_INVOKABLE bool loadBrainKey(QString brain_key);
 
       /** removes brain key to secure owner keys */
       Q_INVOKABLE bool purgeBrainKey();
@@ -79,18 +72,18 @@ class Wallet : public QObject
       /** @pre hasBrainKey() */
       Q_INVOKABLE QString getBrainKey();
 
-      Q_INVOKABLE bool isLocked()const;
-      Q_INVOKABLE bool unlock( QString password );
+      bool isLocked()const;
+      Q_INVOKABLE bool unlock(QString password);
       Q_INVOKABLE bool lock();
-      Q_INVOKABLE bool changePassword( QString new_password );
+      Q_INVOKABLE bool changePassword(QString new_password);
 
       /**
        * @pre !isLocked();
        * @post save()
        * @return WIF private key
        */
-      Q_INVOKABLE QString getActivePrivateKey( QString owner_public_key, uint32_t sequence );
-      Q_INVOKABLE QString getActivePublicKey( QString owner_public_key, uint32_t sequence );
+      Q_INVOKABLE QString getActivePrivateKey(QString owner_public_key, uint32_t sequence);
+      Q_INVOKABLE QString getActivePublicKey(QString owner_public_key, uint32_t sequence);
 
       /**
        * @pre !isLocked();
@@ -98,48 +91,48 @@ class Wallet : public QObject
        * @post save()
        * @return WIF private key
        */
-      Q_INVOKABLE QString getOwnerPrivateKey( uint32_t sequence );
-      Q_INVOKABLE QString getOwnerPublicKey( uint32_t sequence );
-      Q_INVOKABLE QString getPublicKey( QString wif_private_key )const;
+      Q_INVOKABLE QString getOwnerPrivateKey(uint32_t sequence);
+      Q_INVOKABLE QString getOwnerPublicKey(uint32_t sequence);
+      Q_INVOKABLE QString getPublicKey(QString wif_private_key)const;
 
-      Q_INVOKABLE QString getKeyLabel( QString pubkey );
-      Q_INVOKABLE bool    setKeyLabel( QString pubkey, QString label );
-      Q_INVOKABLE QString getPublicKey( QString label );
-      Q_INVOKABLE QString getPrivateKey( QString pubkey );
-      Q_INVOKABLE bool    hasPrivateKey( QString pubkey, bool include_with_brain_key = false );
+      Q_INVOKABLE QString getKeyLabel(QString pubkey);
+      Q_INVOKABLE bool    setKeyLabel(QString pubkey, QString label);
+      Q_INVOKABLE QString getPublicKey(QString label);
+      Q_INVOKABLE QString getPrivateKey(QString pubkey);
+      Q_INVOKABLE bool    hasPrivateKey(QString pubkey, bool include_with_brain_key = false);
 
       /** imports a public key and assigns it a label */
-      Q_INVOKABLE bool    importPublicKey( QString pubkey, QString label = QString() );
+      Q_INVOKABLE bool    importPublicKey(QString pubkey, QString label = QString());
 
       /**
        * @param wifkey a private key in (WIF) Wallet Import Format
        * @pre !isLocked()
        **/
-      Q_INVOKABLE bool    importPrivateKey( QString wifkey, QString label = QString() );
+      Q_INVOKABLE bool    importPrivateKey(QString wifkey, QString label = QString());
 
       /** removes the key, its lablel and its private key */
-      Q_INVOKABLE bool    removePublicKey( QString pubkey );
+      Q_INVOKABLE bool    removePublicKey(QString pubkey);
 
       /** removes only the private key, keeping the public key and label */
-      Q_INVOKABLE bool    removePrivateKey( QString pubkey );
+      Q_INVOKABLE bool    removePrivateKey(QString pubkey);
 
       /**
        *  @param only_if_private  filter any public keys for which the wallet lacks a private key
        *  @return a list of PUBLICKEY, LABEL for all known public keys
        */
-      Q_INVOKABLE QList<QPair<QString,QString> > getAllPublicKeys( bool only_if_private )const;
+      Q_INVOKABLE QList<QPair<QString,QString>> getAllPublicKeys(bool only_if_private)const;
 
       /**
        * @pre !isLocked()
        */
-      vector<signature_type>           signDigest( const digest_type& d,
-                                                   const set<public_key_type>& keys )const;
+      vector<signature_type>           signDigest(const digest_type& d,
+                                                  const set<public_key_type>& keys)const;
 
       const flat_set<public_key_type>& getAvailablePrivateKeys()const;
 
    Q_SIGNALS:
-      void isLockedChanged( bool state );
-      void isOpenChanged( bool state );
+      void isLockedChanged(bool state);
+      void isOpenChanged(bool state);
 
    private:
       fc::path                  _wallet_file_path;
@@ -150,3 +143,13 @@ class Wallet : public QObject
       map<QString,QString>      _label_to_key;
       QString                   _brain_key;
 };
+QML_DECLARE_TYPE(Wallet)
+
+FC_REFLECT( key_data, (label)(encrypted_private_key)(brain_sequence)(owner) )
+FC_REFLECT( wallet_file,
+            (encrypted_brain_key)
+            (brain_key_digest)
+            (encrypted_master_key)
+            (master_key_digest)
+            (encrypted_private_keys)
+          )

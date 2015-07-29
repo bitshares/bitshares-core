@@ -100,7 +100,7 @@ FormBase {
       Item { Layout.fillWidth: true }
       Button {
          text: qsTr("Cancel")
-         onClicked: canceled()
+         onClicked: canceled({})
       }
       Button {
          id: transferButton

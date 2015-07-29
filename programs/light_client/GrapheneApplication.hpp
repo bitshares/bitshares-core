@@ -64,6 +64,8 @@ public:
       return m_isConnected;
    }
 
+   Q_INVOKABLE static QString defaultDataPath();
+
    /// Convenience method to get a Transaction in QML. Caller takes ownership of the new Transaction.
    Q_INVOKABLE Transaction* createTransaction() const;
 

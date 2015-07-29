@@ -7,6 +7,7 @@
 #include "Transaction.hpp"
 #include "Operations.hpp"
 #include "Balance.hpp"
+#include "Wallet.hpp"
 
 class Crypto {
    Q_GADGET
@@ -37,6 +38,7 @@ int main(int argc, char *argv[])
    qmlRegisterType<Balance>("Graphene.Client", 0, 1, "Balance");
    qmlRegisterType<Account>("Graphene.Client", 0, 1, "Account");
    qmlRegisterType<ChainDataModel>("Graphene.Client", 0, 1, "DataModel");
+   qmlRegisterType<Wallet>("Graphene.Client", 0, 1, "Wallet");
    qmlRegisterType<GrapheneApplication>("Graphene.Client", 0, 1, "GrapheneApplication");
    qmlRegisterType<Transaction>("Graphene.Client", 0, 1, "Transaction");
 
