@@ -708,6 +708,7 @@ namespace graphene { namespace app {
                   result.push_back( aobj->owner );
                   break;
                } case impl_account_statistics_object_type:{
+                  elog( "stats object" );
                   const auto& aobj = dynamic_cast<const account_statistics_object*>(obj);
                   assert( aobj != nullptr );
                   result.push_back( aobj->owner );
@@ -801,6 +802,7 @@ namespace graphene { namespace app {
        map< pair<asset_id_type, asset_id_type>,  vector<variant> > market_broadcast_queue;
        for(auto id : ids)
        {
+          edump((id)(_account_subscriptions.size()));
           if(_subscriptions.find(id) != _subscriptions.end())
              my_objects.push_back(id);
 
@@ -811,6 +813,7 @@ namespace graphene { namespace app {
              if( obj )
              {
                 vector<account_id_type> relevant = get_relevant_accounts( obj );
+                edump(("relevant accounts")(relevant)(obj->id));
                 for( const auto& r : relevant )
                 {
                    auto sub = _account_subscriptions.find(r);
@@ -818,6 +821,8 @@ namespace graphene { namespace app {
                       broadcast_queue[r].emplace_back(obj->to_variant());
                 }
              }
+             else
+                elog( "unable to find object ${id}", ("id",id) );
           }
 
           if( _market_subscriptions.size() )
@@ -843,11 +848,19 @@ namespace graphene { namespace app {
        /// a failure to exit cleanly.
        _broadcast_changes_complete = fc::async([=](){
           for( const auto& item : broadcast_queue )
+            edump((item.second));
+
+          for( const auto& item : broadcast_queue )
           {
             edump( (item) );
-            auto sub = _account_subscriptions.find(item.first);
-            if( sub != _account_subscriptions.end() )
-                sub->second( fc::variant(item.second ) );
+            try {
+               auto sub = _account_subscriptions.find(item.first);
+               if( sub != _account_subscriptions.end() )
+                   sub->second( fc::variant(item.second ) );
+            } catch ( const fc::exception& e )
+            {
+               edump((e.to_detail_string()));
+            }
           }
           for( const auto& item : market_broadcast_queue )
           {
