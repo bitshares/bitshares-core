@@ -9,6 +9,7 @@
         <file>Scaling.qml</file>
         <file>Identicon.qml</file>
         <file>AccountPicker.qml</file>
+        <file>TooltipArea.qml</file>
         <file>jdenticon/jdenticon-1.0.1.min.js</file>
     </qresource>
 </RCC>

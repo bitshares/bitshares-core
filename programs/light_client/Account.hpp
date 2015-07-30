@@ -21,9 +21,12 @@ class Account : public GrapheneObject {
 
    Q_PROPERTY(QString name READ name NOTIFY nameChanged)
    Q_PROPERTY(QQmlListProperty<Balance> balances READ balances NOTIFY balancesChanged)
+   Q_PROPERTY(QString memoKey READ memoKey NOTIFY memoKeyChanged)
+   Q_PROPERTY(bool isLoaded MEMBER m_loaded NOTIFY loaded)
 
    account_object  m_account;
    QList<Balance*> m_balances;
+   bool m_loaded = false;
 
 public:
    Account(ObjectId id = -1, QString name = QString(), QObject* parent = nullptr)
@@ -31,15 +34,10 @@ public:
    {
       m_account.name = name.toStdString();
    }
-   void setAccountObject(const account_object& obj)
-   {
-      auto old_name = m_account.name;
-      m_account = obj;
-      if (old_name != m_account.name)
-         Q_EMIT nameChanged();
-   }
+   void setAccountObject(const account_object& obj);
 
    QString name()const { return QString::fromStdString(m_account.name); }
+   QString memoKey()const;
    QQmlListProperty<Balance> balances();
 
    void setBalances(QList<Balance*> balances) {
@@ -58,10 +56,12 @@ public:
     *
     * @return the percent of direct control the wallet has over the account.
     */
-   Q_INVOKABLE double getOwnerControl( Wallet* w )const;
-   Q_INVOKABLE double getActiveControl( Wallet* w )const;
+   Q_INVOKABLE double getOwnerControl(Wallet* w)const;
+   Q_INVOKABLE double getActiveControl(Wallet* w , int depth = 0)const;
 
 Q_SIGNALS:
    void nameChanged();
    void balancesChanged();
+   void memoKeyChanged();
+   void loaded();
 };

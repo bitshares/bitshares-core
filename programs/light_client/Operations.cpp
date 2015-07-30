@@ -1,4 +1,7 @@
 #include "Operations.hpp"
+#include "Wallet.hpp"
+
+#include <graphene/utilities/key_conversion.hpp>
 
 #include <fc/smart_ref_impl.hpp>
 
@@ -31,6 +34,38 @@ QString TransferOperation::memo() const {
    return memo;
 }
 
+bool TransferOperation::canEncryptMemo(Wallet* wallet, ChainDataModel* model) const
+{
+   if (!m_op.memo) return false;
+   auto pub = model->getAccount(sender())->memoKey();
+   if (!wallet->hasPrivateKey(pub)) return false;
+   return graphene::utilities::wif_to_key(wallet->getPrivateKey(pub).toStdString()).valid();
+}
+
+bool TransferOperation::canDecryptMemo(Wallet* wallet, ChainDataModel* model) const
+{
+   if (!m_op.memo) return false;
+   auto pub = model->getAccount(receiver())->memoKey();
+   if (!wallet->hasPrivateKey(pub)) return false;
+   return graphene::utilities::wif_to_key(wallet->getPrivateKey(pub).toStdString()).valid();
+}
+
+QString TransferOperation::decryptedMemo(Wallet* wallet, ChainDataModel* model) const
+{
+   fc::ecc::private_key privateKey;
+   fc::ecc::public_key publicKey;
+
+   if (canEncryptMemo(wallet, model)) {
+      privateKey = *graphene::utilities::wif_to_key(wallet->getPrivateKey(model->getAccount(sender())->memoKey()).toStdString());
+      publicKey = m_op.memo->to;
+   } else if (canDecryptMemo(wallet, model)) {
+      privateKey = *graphene::utilities::wif_to_key(wallet->getPrivateKey(model->getAccount(receiver())->memoKey()).toStdString());
+      publicKey = m_op.memo->from;
+   } else return QString::null;
+
+   return QString::fromStdString(m_op.memo->get_message(privateKey, publicKey));
+}
+
 void TransferOperation::setMemo(QString memo) {
    if (memo == this->memo())
       return;
@@ -39,5 +74,14 @@ void TransferOperation::setMemo(QString memo) {
    while (memo.size() % 32)
       memo.append('\0');
    m_op.memo->set_message({}, {}, memo.toStdString());
+   Q_EMIT memoChanged();
+}
+
+void TransferOperation::encryptMemo(Wallet* wallet, ChainDataModel* model)
+{
+   if (!canEncryptMemo(wallet, model)) return;
+   auto privateKey = graphene::utilities::wif_to_key(wallet->getPrivateKey(model->getAccount(sender())->memoKey()).toStdString());
+   if (!privateKey) return;
+   m_op.memo->set_message(*privateKey, public_key_type(model->getAccount(receiver())->memoKey().toStdString()), memo().toStdString());
    Q_EMIT memoChanged();
 }

@@ -92,19 +92,21 @@ FormBase {
       Text {
          font.pixelSize: assetField.height / 2.5
          text: {
-            if (!senderPicker.account)
+            if (!senderPicker.account || !amountField.maxBalance)
                return ""
-            return qsTr("Fee:<br/>") + operation().fee / amountField.precisionAdjustment + " CORE"
+            return qsTr("Fee:<br/>") + amountField.maxBalance.type.formatAmount(operation().fee) + " CORE"
          }
       }
       Item { Layout.fillWidth: true }
       Button {
          text: qsTr("Cancel")
-         onClicked: canceled()
+         onClicked: canceled({})
       }
       Button {
          id: transferButton
-         text: qsTr("Transfer")
+         text: !senderAccount ||
+               !senderAccount.isLoaded ||
+               senderPicker.accountControlLevel >= 1? qsTr("Transfer") : qsTr("Propose")
          enabled: senderPicker.account && recipientPicker.account && senderPicker.account !== recipientPicker.account && amountField.value
          onClicked: completed([operation()])
       }

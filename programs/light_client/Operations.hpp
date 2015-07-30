@@ -57,8 +57,12 @@ public:
    qint64 amount() const { return m_op.amount.amount.value; }
    ObjectId amountType() const { return m_op.amount.asset_id.instance.value; }
    /// This does not deal with encrypted memos. The memo stored here is unencrypted. The encryption step must be
-   /// performed elsewhere.
+   /// performed by calling encryptMemo()
    QString memo() const;
+
+   Q_INVOKABLE bool canEncryptMemo(Wallet* wallet, ChainDataModel* model) const;
+   Q_INVOKABLE bool canDecryptMemo(Wallet* wallet, ChainDataModel* model) const;
+   Q_INVOKABLE QString decryptedMemo(Wallet* wallet, ChainDataModel* model) const;
 
    const graphene::chain::transfer_operation& operation() const { return m_op; }
    graphene::chain::transfer_operation& operation() { return m_op; }
@@ -101,8 +105,9 @@ public Q_SLOTS:
       Q_EMIT amountTypeChanged();
    }
    /// This does not deal with encrypted memos. The memo stored here is unencrypted. The encryption step must be
-   /// performed elsewhere.
+   /// performed by calling encryptMemo()
    void setMemo(QString memo);
+   void encryptMemo(Wallet* wallet, ChainDataModel* model);
 
 Q_SIGNALS:
    void feeChanged();

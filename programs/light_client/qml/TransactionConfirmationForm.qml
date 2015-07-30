@@ -24,10 +24,8 @@ FormBase {
 
    onDisplay: {
       trx = app.createTransaction()
-      console.log(JSON.stringify(arg))
       for (var op in arg)
          trx.appendOperation(arg[op])
-      console.log(JSON.stringify(trx))
    }
 
    Component {
@@ -63,5 +61,38 @@ FormBase {
    }
    Loader {
       sourceComponent: trx && Array.prototype.slice.call(trx.operations).length > 0? transactionDelegate : undefined
+   }
+   RowLayout {
+      Layout.fillWidth: true
+      Item { Layout.fillWidth: true }
+      Button {
+         text: qsTr("Cancel")
+         onClicked: {
+            canceled({})
+            trx = null
+         }
+      }
+      TextField {
+         id: passwordField
+         Layout.preferredWidth: app.wallet.isLocked? Scaling.cm(4) : 0
+         echoMode: TextInput.Password
+         placeholderText: qsTr("Wallet password")
+         visible: width > 0
+         onAccepted: finishButton.clicked()
+
+         Behavior on Layout.preferredWidth { NumberAnimation { duration: 200; easing.type: Easing.InOutQuad } }
+      }
+      Button {
+         id: finishButton
+         text: app.wallet.isLocked? qsTr("Unlock") : qsTr("Finish")
+         onClicked: {
+            if (app.wallet.isLocked)
+               app.wallet.unlock(passwordField.text)
+            else {
+               app.wallet.sign(trx)
+               completed(trx)
+            }
+         }
+      }
    }
 }
