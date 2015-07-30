@@ -3,6 +3,7 @@ file(GLOB HEADERS "include/graphene/app/*.hpp")
 add_library( graphene_app 
              api.cpp
              application.cpp
+             impacted.cpp
              plugin.cpp
            )
 

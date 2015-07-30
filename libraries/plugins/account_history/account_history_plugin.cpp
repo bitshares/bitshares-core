@@ -18,6 +18,8 @@
 
 #include <graphene/account_history/account_history_plugin.hpp>
 
+#include <graphene/app/impacted.hpp>
+
 #include <graphene/chain/account_evaluator.hpp>
 #include <graphene/chain/account_object.hpp>
 #include <graphene/chain/config.hpp>
@@ -58,34 +60,10 @@ class account_history_plugin_impl
       flat_set<account_id_type> _tracked_accounts;
 };
 
-struct operation_get_impacted_accounts
-{
-   const operation_history_object& _op_history;
-   const account_history_plugin&   _plugin;
-   flat_set<account_id_type>&      _impacted;
-   operation_get_impacted_accounts( const operation_history_object& oho, const account_history_plugin& ahp, flat_set<account_id_type>& impact )
-      :_op_history(oho),_plugin(ahp),_impacted(impact)
-   {}
-   typedef void result_type;
-
-   void operator()( const account_create_operation& o )const {
-      _impacted.insert( _op_history.result.get<object_id_type>() );
-   }
-
-   template<typename T>
-   void operator()( const T& o )const 
-   {
-      o.get_impacted_accounts( _impacted );
-   }
-};
-
-
 account_history_plugin_impl::~account_history_plugin_impl()
 {
    return;
 }
-
-
 
 void account_history_plugin_impl::update_account_histories( const signed_block& b )
 {
@@ -102,7 +80,11 @@ void account_history_plugin_impl::update_account_histories( const signed_block& 
       flat_set<account_id_type> impacted;
       vector<authority> other;
       operation_get_required_authorities( op.op, impacted, impacted, other );
-      op.op.visit( operation_get_impacted_accounts( oho, _self, impacted ) );
+
+      if( op.op.which() == operation::tag< account_create_operation >::value )
+         impacted.insert( oho.result.get<object_id_type>() );
+      else
+         graphene::app::operation_get_impacted_accounts( op.op, impacted );
 
       for( auto& a : other )
          for( auto& item : a.account_auths )

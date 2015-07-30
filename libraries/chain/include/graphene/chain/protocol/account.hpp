@@ -63,14 +63,6 @@ namespace graphene { namespace chain {
       account_id_type fee_payer()const { return registrar; }
       void            validate()const;
       share_type      calculate_fee(const fee_parameters_type& )const;
-
-      void            get_impacted_accounts( flat_set<account_id_type>& i )const
-      { 
-         i.insert(registrar); 
-         i.insert(referrer);
-         add_authority_accounts( i, owner );
-         add_authority_accounts( i, active );
-      }
    };
 
    /**
@@ -109,15 +101,7 @@ namespace graphene { namespace chain {
 
       void get_required_active_authorities( flat_set<account_id_type>& a )const
       { if( !owner ) a.insert( account ); }
-
-      void       get_impacted_accounts( flat_set<account_id_type>& i )const
-      { 
-         i.insert(account);
-         if( owner ) add_authority_accounts( i, *owner );
-         if( active ) add_authority_accounts( i, *active );
-      }
    };
-
 
    /**
     * @brief This operation is used to whitelist and blacklist accounts, primarily for transacting in whitelisted assets
@@ -161,12 +145,7 @@ namespace graphene { namespace chain {
 
       account_id_type fee_payer()const { return authorizing_account; }
       void validate()const { FC_ASSERT( fee.amount >= 0 ); FC_ASSERT(new_listing < 0x4); }
-
-      void       get_impacted_accounts( flat_set<account_id_type>& i )const
-      { i.insert(account_to_list); }
-
    };
-
 
    /**
     * @brief Manage an account's membership status
@@ -224,15 +203,10 @@ namespace graphene { namespace chain {
 
       account_id_type fee_payer()const { return account_id; }
       void        validate()const;
-
-      void       get_impacted_accounts( flat_set<account_id_type>& i )const
-      { 
-         i.insert(new_owner);
-      }
-
    };
 
-} }
+} } // graphene::chain
+
 FC_REFLECT(graphene::chain::account_options, (memo_key)(voting_account)(num_witness)(num_committee)(votes)(extensions))
 FC_REFLECT_TYPENAME( graphene::chain::account_whitelist_operation::account_listing)
 FC_REFLECT_ENUM( graphene::chain::account_whitelist_operation::account_listing,

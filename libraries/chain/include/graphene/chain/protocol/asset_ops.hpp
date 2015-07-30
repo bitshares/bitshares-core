@@ -242,8 +242,6 @@ namespace graphene { namespace chain {
       account_id_type fee_payer()const { return issuer; }
       void            validate()const;
       share_type      calculate_fee(const fee_parameters_type& k)const;
-      void get_impacted_accounts( flat_set<account_id_type>& i)const
-      { if( new_issuer ) i.insert( *new_issuer ); }
    };
 
    /**
@@ -358,8 +356,6 @@ namespace graphene { namespace chain {
       account_id_type fee_payer()const { return issuer; }
       void            validate()const;
       share_type      calculate_fee(const fee_parameters_type& k)const;
-      void get_impacted_accounts( flat_set<account_id_type>& i)const
-      { i.insert( issue_to_account ); }
    };
 
    /**
@@ -381,8 +377,8 @@ namespace graphene { namespace chain {
       void            validate()const;
    };
 
-
 } } // graphene::chain
+
 FC_REFLECT( graphene::chain::asset_options,
             (max_supply)
             (market_fee_percent)

@@ -79,24 +79,7 @@ namespace graphene { namespace chain {
                                             flat_set<account_id_type>& owner,
                                             vector<authority>&  other );
 
-   void operation_get_impacted_accounts( const operation& op,
-                                         flat_set<account_id_type>& accounts );
-
    void operation_validate( const operation& op );
-
-   /**
-    *  Used to track the result of applying an operation and when it was applied.
-    *
-    *  TODO: this doesn't belong here.
-    */
-   struct applied_operation
-   {
-      operation        op;
-      operation_result result;
-      uint32_t         block_num;
-      uint16_t         transaction_num;
-      uint16_t         op_num;
-   };
 
    /**
     *  @brief necessary to support nested operations inside the proposal_create_operation

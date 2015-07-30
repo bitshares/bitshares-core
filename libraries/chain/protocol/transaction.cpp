@@ -316,10 +316,4 @@ void signed_transaction::verify_authority( const std::function<const authority*(
    graphene::chain::verify_authority( operations, get_signature_keys(), get_active, get_owner, max_recursion );
 } FC_CAPTURE_AND_RETHROW( (*this) ) }
 
-void transaction::get_impacted_accounts( flat_set<account_id_type>& impacted ) const
-{
-   for( const auto& op : operations )
-      operation_get_impacted_accounts( op, impacted );
-}
-
 } } // graphene::chain

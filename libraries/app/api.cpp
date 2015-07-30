@@ -20,6 +20,7 @@
 #include <graphene/app/api.hpp>
 #include <graphene/app/api_access.hpp>
 #include <graphene/app/application.hpp>
+#include <graphene/app/impacted.hpp>
 #include <graphene/chain/database.hpp>
 #include <graphene/utilities/key_conversion.hpp>
 #include <graphene/chain/protocol/fee_schedule.hpp>
@@ -659,7 +660,7 @@ namespace graphene { namespace app {
                const auto& aobj = dynamic_cast<const proposal_object*>(obj);
                assert( aobj != nullptr );
                flat_set<account_id_type> impacted;
-               aobj->proposed_transaction.get_impacted_accounts( impacted );
+               transaction_get_impacted_accounts( aobj->proposed_transaction, impacted );
                result.reserve( impacted.size() );
                for( auto& item : impacted ) result.emplace_back(item);
                break;
@@ -716,7 +717,7 @@ namespace graphene { namespace app {
                   const auto& aobj = dynamic_cast<const transaction_object*>(obj);
                   assert( aobj != nullptr );
                   flat_set<account_id_type> impacted;
-                  aobj->trx.get_impacted_accounts( impacted );
+                  transaction_get_impacted_accounts( aobj->trx, impacted );
                   result.reserve( impacted.size() );
                   for( auto& item : impacted ) result.emplace_back(item);
                   break;

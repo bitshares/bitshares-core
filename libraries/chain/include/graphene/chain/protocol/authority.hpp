@@ -101,6 +101,14 @@ namespace graphene { namespace chain {
       flat_map<address,weight_type>         address_auths;
    };
 
+/**
+ * Add all account members of the given authority to the given flat_set.
+ */
+void add_authority_accounts(
+   flat_set<account_id_type>& result,
+   const authority& a
+   );
+
 } } // namespace graphene::chain
 
 FC_REFLECT( graphene::chain::authority, (weight_threshold)(account_auths)(key_auths)(address_auths) )

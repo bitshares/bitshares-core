@@ -19,6 +19,7 @@ add_library( graphene_chain
 
              protocol/types.cpp
              protocol/address.cpp
+             protocol/authority.cpp
              protocol/asset.cpp
              protocol/assert.cpp
              protocol/account.cpp
