@@ -35,6 +35,7 @@ namespace graphene { namespace app {
 
     database_api::database_api(graphene::chain::database& db):_db(db)
     {
+       wlog("creating database api ${x}", ("x",int64_t(this)) );
        _change_connection = _db.changed_objects.connect([this](const vector<object_id_type>& ids) {
                                     on_objects_changed(ids);
                                     });
@@ -42,6 +43,29 @@ namespace graphene { namespace app {
                                     on_objects_removed(objs);
                                     });
        _applied_block_connection = _db.applied_block.connect([this](const signed_block&){ on_applied_block(); });
+    }
+
+    database_api::~database_api()
+    {
+       elog("freeing database api ${x}", ("x",int64_t(this)) );
+       try {
+          if(_broadcast_changes_complete.valid())
+          {
+             _broadcast_changes_complete.cancel();
+              ilog( "waiting..");
+             _broadcast_changes_complete.wait();
+          }
+          if(_broadcast_removed_complete.valid())
+          {
+             _broadcast_removed_complete.cancel();
+              ilog( "waiting..");
+             _broadcast_removed_complete.wait();
+          }
+          ilog( "done" );
+       } catch (const fc::exception& e)
+       {
+          wlog("${e}", ("e",e.to_detail_string()));
+       }
     }
 
     fc::variants database_api::get_objects(const vector<object_id_type>& ids)const
@@ -185,7 +209,7 @@ namespace graphene { namespace app {
     }
 
     std::map<std::string, full_account> database_api::get_full_accounts(std::function<void(const variant&)> callback,
-                                                                       const vector<std::string>& names_or_ids)
+                                                                       const vector<std::string>& names_or_ids, bool subscribe)
     {
        FC_ASSERT( _account_subscriptions.size() < 1024 );
        std::map<std::string, full_account> results;
@@ -205,7 +229,16 @@ namespace graphene { namespace app {
           if (account == nullptr)
              continue;
 
-          _account_subscriptions[account->id] = callback;
+          if( subscribe )
+          {
+             ilog( "subscribe to ${id}", ("id",account->name) );
+             _account_subscriptions[account->id] = callback;
+          }
+          else
+          {
+             wlog( "unsubscribe to ${id}", ("id",account->name) );
+             _account_subscriptions.erase(account->id);
+          }
 
           // fc::mutable_variant_object full_account;
           full_account acnt;
@@ -725,6 +758,7 @@ namespace graphene { namespace app {
              _broadcast_removed_complete = fc::async([=](){
                  for( const auto& item : broadcast_queue )
                  {
+                   idump((item.first)(item.second) );
                    auto sub = _account_subscriptions.find(item.first);
                    if( sub != _account_subscriptions.end() )
                        sub->second( fc::variant(item.second ) );
@@ -761,6 +795,7 @@ namespace graphene { namespace app {
 
     void database_api::on_objects_changed(const vector<object_id_type>& ids)
     {
+       idump((ids)(_account_subscriptions.size()));
        vector<object_id_type>                       my_objects;
        map<account_id_type, vector<variant> >       broadcast_queue; 
        map< pair<asset_id_type, asset_id_type>,  vector<variant> > market_broadcast_queue;
@@ -809,6 +844,7 @@ namespace graphene { namespace app {
        _broadcast_changes_complete = fc::async([=](){
           for( const auto& item : broadcast_queue )
           {
+            edump( (item) );
             auto sub = _account_subscriptions.find(item.first);
             if( sub != _account_subscriptions.end() )
                 sub->second( fc::variant(item.second ) );
@@ -881,24 +917,6 @@ namespace graphene { namespace app {
        });
     }
 
-    database_api::~database_api()
-    {
-       try {
-          if(_broadcast_changes_complete.valid())
-          {
-             _broadcast_changes_complete.cancel();
-             _broadcast_changes_complete.wait();
-          }
-          if(_broadcast_removed_complete.valid())
-          {
-             _broadcast_removed_complete.cancel();
-             _broadcast_removed_complete.wait();
-          }
-       } catch (const fc::exception& e)
-       {
-          wlog("${e}", ("e",e.to_detail_string()));
-       }
-    }
 
     bool database_api::subscribe_to_objects( const std::function<void(const fc::variant&)>&  callback, const vector<object_id_type>& ids)
     {
