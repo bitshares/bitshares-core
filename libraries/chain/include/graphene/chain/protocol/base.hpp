@@ -1,8 +1,8 @@
 #pragma once
+
 #include <graphene/chain/protocol/types.hpp>
 #include <graphene/chain/protocol/asset.hpp>
 #include <graphene/chain/protocol/authority.hpp>
-
 
 namespace graphene { namespace chain {
 
@@ -70,15 +70,9 @@ namespace graphene { namespace chain {
       void get_required_authorities( vector<authority>& )const{}
       void get_required_active_authorities( flat_set<account_id_type>& )const{}
       void get_required_owner_authorities( flat_set<account_id_type>& )const{}
-      void get_impacted_accounts( flat_set<account_id_type>& )const{}
       void validate()const{}
 
       static uint64_t calculate_data_fee( uint64_t bytes, uint64_t price_per_kbyte );
-      static void add_authority_accounts( flat_set<account_id_type>& i, const authority& a )
-      {
-         for( auto& item : a.account_auths )
-            i.insert( item.first );
-      }
    };
 
    /**
@@ -100,6 +94,7 @@ namespace graphene { namespace chain {
 
    ///@}
 
-} }
+} } // graphene::chain
+
 FC_REFLECT_TYPENAME( graphene::chain::operation_result )
 FC_REFLECT( graphene::chain::void_result, )

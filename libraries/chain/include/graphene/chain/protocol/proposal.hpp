@@ -64,8 +64,6 @@ namespace graphene { namespace chain {
        account_id_type fee_payer()const { return fee_paying_account; }
        void            validate()const;
        share_type      calculate_fee(const fee_parameters_type& k)const;
-
-      void get_impacted_accounts( flat_set<account_id_type>& )const;
    };
 
    /**

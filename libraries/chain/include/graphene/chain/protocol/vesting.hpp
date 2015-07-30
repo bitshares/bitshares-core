@@ -56,9 +56,6 @@ namespace graphene { namespace chain {
          FC_ASSERT( fee.amount >= 0 );
          FC_ASSERT( amount.amount > 0 );
       }
-      void get_impacted_accounts( flat_set<account_id_type>& i )const
-      { i.insert(owner); }
-
    };
 
    /**
@@ -87,7 +84,8 @@ namespace graphene { namespace chain {
       }
    };
 
-}} // graphene::chain
+} } // graphene::chain
+
 FC_REFLECT( graphene::chain::vesting_balance_create_operation::fee_parameters_type, (fee) )
 FC_REFLECT( graphene::chain::vesting_balance_withdraw_operation::fee_parameters_type, (fee) )
 

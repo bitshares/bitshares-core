@@ -56,14 +56,6 @@ share_type proposal_update_operation::calculate_fee(const fee_parameters_type& k
 {
    return k.fee + calculate_data_fee( fc::raw::pack_size(*this), k.price_per_kbyte );
 }
-void proposal_create_operation::get_impacted_accounts( flat_set<account_id_type>& i )const
-{
-   vector<authority> other;
-   for( const auto& op : proposed_ops )
-      operation_get_required_authorities( op.op, i, i, other );
-   for( auto& o : other )
-      add_authority_accounts( i, o );
-}
 
 void proposal_update_operation::get_required_authorities( vector<authority>& o )const
 {
@@ -76,14 +68,17 @@ void proposal_update_operation::get_required_authorities( vector<authority>& o )
 
    o.emplace_back( std::move(auth) );
 }
+
 void proposal_update_operation::get_required_active_authorities( flat_set<account_id_type>& a )const
 {
    for( const auto& i : active_approvals_to_add )    a.insert(i);
    for( const auto& i : active_approvals_to_remove ) a.insert(i);
 }
+
 void proposal_update_operation::get_required_owner_authorities( flat_set<account_id_type>& a )const
 {
    for( const auto& i : owner_approvals_to_add )    a.insert(i);
    for( const auto& i : owner_approvals_to_remove ) a.insert(i);
 }
+
 } } // graphene::chain

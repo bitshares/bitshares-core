@@ -104,7 +104,6 @@ namespace graphene { namespace chain {
       }
 
       void get_required_authorities( flat_set<account_id_type>& active, flat_set<account_id_type>& owner, vector<authority>& other )const;
-      void get_impacted_accounts( flat_set<account_id_type>& )const;
    };
 
    /**
@@ -194,8 +193,7 @@ namespace graphene { namespace chain {
 
    /// @} transactions group
 
-
-} }
+} } // graphene::chain
 
 FC_REFLECT( graphene::chain::transaction, (ref_block_num)(ref_block_prefix)(expiration)(operations)(extensions) )
 FC_REFLECT_DERIVED( graphene::chain::signed_transaction, (graphene::chain::transaction), (signatures) )

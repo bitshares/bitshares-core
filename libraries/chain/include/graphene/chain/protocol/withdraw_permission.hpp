@@ -43,9 +43,6 @@ namespace graphene { namespace chain {
 
       account_id_type fee_payer()const { return withdraw_from_account; }
       void            validate()const;
-
-      void get_impacted_accounts( flat_set<account_id_type>& i)const
-      { i.insert( authorized_account ); }
    };
 
    /**
@@ -81,8 +78,6 @@ namespace graphene { namespace chain {
 
       account_id_type fee_payer()const { return withdraw_from_account; }
       void            validate()const;
-      void get_impacted_accounts( flat_set<account_id_type>& i)const
-      { i.insert( authorized_account ); }
    };
 
    /**
@@ -121,8 +116,6 @@ namespace graphene { namespace chain {
       account_id_type fee_payer()const { return withdraw_to_account; }
       void            validate()const;
       share_type      calculate_fee(const fee_parameters_type& k)const;
-      void get_impacted_accounts( flat_set<account_id_type>& i)const
-      { i.insert( withdraw_from_account ); }
    };
 
    /**
@@ -147,11 +140,10 @@ namespace graphene { namespace chain {
 
       account_id_type fee_payer()const { return withdraw_from_account; }
       void            validate()const;
-      void get_impacted_accounts( flat_set<account_id_type>& i)const
-      { i.insert( authorized_account ); }
    };
 
 } } // graphene::chain
+
 FC_REFLECT( graphene::chain::withdraw_permission_create_operation::fee_parameters_type, (fee) )
 FC_REFLECT( graphene::chain::withdraw_permission_update_operation::fee_parameters_type, (fee) )
 FC_REFLECT( graphene::chain::withdraw_permission_claim_operation::fee_parameters_type, (fee)(price_per_kbyte) )
@@ -164,4 +156,3 @@ FC_REFLECT( graphene::chain::withdraw_permission_update_operation, (fee)(withdra
 FC_REFLECT( graphene::chain::withdraw_permission_claim_operation, (fee)(withdraw_permission)(withdraw_from_account)(withdraw_to_account)(amount_to_withdraw)(memo) );
 FC_REFLECT( graphene::chain::withdraw_permission_delete_operation, (fee)(withdraw_from_account)(authorized_account)
             (withdrawal_permission) )
-

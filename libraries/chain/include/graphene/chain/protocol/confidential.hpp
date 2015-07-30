@@ -143,13 +143,6 @@ struct transfer_to_blind_operation : public base_operation
    account_id_type fee_payer()const { return from; }
    void            validate()const;
    share_type      calculate_fee(const fee_parameters_type& )const;
-
-   void            get_impacted_accounts( flat_set<account_id_type>& i )const
-   { 
-      i.insert(from); 
-      for( const auto& out : outputs )
-         add_authority_accounts( i, out.owner ); 
-   }
 };
 
 /**
@@ -171,12 +164,6 @@ struct transfer_from_blind_operation : public base_operation
    account_id_type fee_payer()const { return GRAPHENE_TEMP_ACCOUNT; }
    void            validate()const;
 
-   void            get_impacted_accounts( flat_set<account_id_type>& i )const
-   { 
-      i.insert(to); 
-      for( const auto& in : inputs )
-         add_authority_accounts( i, in.owner ); 
-   }
    void            get_required_authorities( vector<authority>& a )const
    {
       for( const auto& in : inputs )
@@ -243,13 +230,6 @@ struct blind_transfer_operation : public base_operation
    void            validate()const;
    share_type      calculate_fee( const fee_parameters_type& k )const;
 
-   void            get_impacted_accounts( flat_set<account_id_type>& i )const
-   { 
-      for( const auto& in : inputs )
-         add_authority_accounts( i, in.owner ); 
-      for( const auto& out : outputs )
-         add_authority_accounts( i, out.owner ); 
-   }
    void            get_required_authorities( vector<authority>& a )const
    {
       for( const auto& in : inputs )
@@ -258,6 +238,7 @@ struct blind_transfer_operation : public base_operation
 };
 
 ///@} endgroup stealth
+
 } } // graphene::chain
 
 FC_REFLECT( graphene::chain::stealth_confirmation,
@@ -281,4 +262,3 @@ FC_REFLECT( graphene::chain::blind_transfer_operation,
 FC_REFLECT( graphene::chain::transfer_to_blind_operation::fee_parameters_type, (fee)(price_per_output) )
 FC_REFLECT( graphene::chain::transfer_from_blind_operation::fee_parameters_type, (fee) )
 FC_REFLECT( graphene::chain::blind_transfer_operation::fee_parameters_type, (fee)(price_per_output) )
-

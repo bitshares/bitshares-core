@@ -29,7 +29,7 @@ namespace graphene { namespace chain {
       }
    };
 
-}} // graphene::chain
+} } // graphene::chain
 
 FC_REFLECT( graphene::chain::balance_claim_operation::fee_parameters_type,  )
 FC_REFLECT( graphene::chain::balance_claim_operation,
