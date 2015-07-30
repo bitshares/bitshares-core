@@ -89,5 +89,15 @@ int main( int argc, char** argv )
    catch ( const fc::exception& e ){ edump((e.to_detail_string())); }
    idump((sizeof(signed_block)));
    idump((fc::raw::pack_size(signed_block())));
+   idump((sizeof(memo_data)));
+
+   memo_data memo;
+   private_key_type alice_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("alice")) );
+   private_key_type bob_key   = fc::ecc::private_key::regenerate(fc::sha256::hash(string("bob")) );
+   memo.from = alice_key.get_public_key();
+   memo.to = bob_key.get_public_key();
+   memo.set_message( alice_key, memo.to,
+      "this message is exactly forty characters" );
+   idump((fc::raw::pack_size(memo)));
    return 0;
 }
