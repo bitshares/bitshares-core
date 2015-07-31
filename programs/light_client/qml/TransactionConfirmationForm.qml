@@ -65,6 +65,7 @@ FormBase {
    UnlockingFinishButtons {
       app: base.app
       Layout.fillWidth: true
+      rightButtonText: qsTr("Commit")
       onLeftButtonClicked: {
          canceled({})
          trx = null
@@ -73,7 +74,8 @@ FormBase {
          if (app.wallet.isLocked)
             app.wallet.unlock(passwordField.text)
          else {
-            app.wallet.sign(trx)
+            app.signTransaction(trx)
+            app.model.broadcast(trx)
             completed(trx)
          }
       }

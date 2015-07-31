@@ -352,16 +352,6 @@ QList<QPair<QString,QString>> Wallet::getAllPublicKeys(bool only_if_private)cons
    return result;
 }
 
-void Wallet::sign(Transaction* transaction) const
-{
-   if (transaction == nullptr) return;
-
-   auto& trx = transaction->internalTransaction();
-   flat_set<public_key_type> pubKeys = getAvailablePrivateKeys();
-   trx.signatures = signDigest(trx.digest(), set<public_key_type>(pubKeys.begin(), pubKeys.end()));
-   idump((trx));
-}
-
 QString Wallet::getPublicKey(QString label)
 {
    if( !isOpen() ) return QString::null;

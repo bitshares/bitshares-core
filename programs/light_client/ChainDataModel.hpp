@@ -34,6 +34,7 @@ typedef multi_index_container<
    >
 > account_multi_index_type;
 
+class Transaction;
 class ChainDataModel : public QObject {
    Q_OBJECT
 
@@ -52,8 +53,13 @@ public:
    ChainDataModel(fc::thread& t, QObject* parent = nullptr);
 
    void setDatabaseAPI(fc::api<graphene::app::database_api> dbapi);
+   void setNetworkAPI(fc::api<graphene::app::network_broadcast_api> napi);
 
    const graphene::chain::global_property_object& global_properties() const { return m_global_properties; }
+   const graphene::chain::dynamic_global_property_object& dynamic_global_properties() const { return m_dynamic_global_properties; }
+
+public Q_SLOTS:
+   void broadcast(Transaction* transaction);
 
 Q_SIGNALS:
    void queueExecute(const std::function<void()>&);
@@ -63,8 +69,10 @@ private:
    fc::thread* m_rpc_thread = nullptr;
    std::string m_api_url;
    fc::api<graphene::app::database_api> m_db_api;
+   fc::api<graphene::app::network_broadcast_api> m_net_api;
 
    graphene::chain::global_property_object m_global_properties;
+   graphene::chain::dynamic_global_property_object m_dynamic_global_properties;
 
    ObjectId m_account_query_num = -1;
    account_multi_index_type m_accounts;

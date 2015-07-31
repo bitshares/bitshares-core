@@ -64,10 +64,12 @@ void GrapheneApplication::start(QString apiurl, QString user, QString pass)
          Q_EMIT loginFailed();
          return;
       }
+      auto net_api = remote_api->network_broadcast();
 
       ilog("connecting...");
       queueExecute([=](){
          m_model->setDatabaseAPI(db_api);
+         m_model->setNetworkAPI(net_api);
       });
 
       queueExecute([=](){ setIsConnected(true); });
@@ -86,6 +88,26 @@ Transaction* GrapheneApplication::createTransaction() const
 {
    return new Transaction;
 }
+
+void GrapheneApplication::signTransaction(Transaction* transaction) const
+{
+   if (transaction == nullptr) return;
+
+   auto getActiveAuth = [this](graphene::chain::account_id_type id) {
+      return &model()->getAccount(id.instance.value)->accountObject().active;
+   };
+   auto getOwnerAuth = [this](graphene::chain::account_id_type id) {
+      return &model()->getAccount(id.instance.value)->accountObject().owner;
+   };
+
+   auto& trx = transaction->internalTransaction();
+   trx.set_reference_block(model()->dynamic_global_properties().head_block_id);
+   flat_set<public_key_type> pubKeys = wallet()->getAvailablePrivateKeys();
+   auto requiredKeys = trx.get_required_signatures(pubKeys, getActiveAuth, getOwnerAuth);
+   trx.signatures = wallet()->signDigest(trx.digest(), requiredKeys);
+   idump((trx));
+}
+
 
 Q_SLOT void GrapheneApplication::execute(const std::function<void()>& func)const
 {

@@ -1,6 +1,7 @@
 #include "ChainDataModel.hpp"
 #include "Balance.hpp"
 #include "Operations.hpp"
+#include "Transaction.hpp"
 
 #include <graphene/app/api.hpp>
 #include <graphene/chain/protocol/protocol.hpp>
@@ -26,9 +27,33 @@ void ChainDataModel::setDatabaseAPI(fc::api<database_api> dbapi) {
    m_db_api = dbapi;
    m_rpc_thread->async([this] {
       m_global_properties = m_db_api->get_global_properties();
-      m_db_api->subscribe_to_objects([this](const variant& v) { m_global_properties = v.as<global_property_object>(); },
-                                     {m_global_properties.id});
+      m_db_api->subscribe_to_objects([this](const variant& v) {
+         m_global_properties = v.as<global_property_object>();
+      }, {m_global_properties.id});
+
+      m_dynamic_global_properties = m_db_api->get_dynamic_global_properties();
+      m_db_api->subscribe_to_objects([this](const variant& d) {
+         m_dynamic_global_properties = d.as<dynamic_global_property_object>();
+      }, {m_dynamic_global_properties.id});
    });
+}
+
+void ChainDataModel::setNetworkAPI(fc::api<network_broadcast_api> napi)
+{
+   m_net_api = napi;
+}
+
+void ChainDataModel::broadcast(Transaction* transaction)
+{
+   try {
+      m_net_api->broadcast_transaction_with_callback([transaction](const fc::variant&) {
+         transaction->setStatus(Transaction::Complete);
+      }, transaction->internalTransaction());
+      transaction->setStatus(Transaction::Pending);
+   } catch (const fc::exception& e) {
+      transaction->setStatus(Transaction::Failed);
+      Q_EMIT exceptionThrown(QString::fromStdString(e.to_string()));
+   }
 }
 
 Asset* ChainDataModel::getAsset(ObjectId id)

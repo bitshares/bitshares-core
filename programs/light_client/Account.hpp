@@ -35,6 +35,9 @@ public:
       m_account.name = name.toStdString();
    }
    void setAccountObject(const account_object& obj);
+   const account_object& accountObject()const {
+      return m_account;
+   }
 
    QString name()const { return QString::fromStdString(m_account.name); }
    QString memoKey()const;

@@ -564,7 +564,7 @@ namespace graphene { namespace app {
        _app.p2p_node()->broadcast_transaction(trx);
     }
 
-    void network_broadcast_api::broadcast_transaction_with_callback( confirmation_callback cb, const signed_transaction& trx)
+    void network_broadcast_api::broadcast_transaction_with_callback(confirmation_callback cb, const signed_transaction& trx)
     {
        trx.validate();
        _callbacks[trx.id()] = cb;
@@ -741,7 +741,7 @@ namespace graphene { namespace app {
     {
        if( _account_subscriptions.size() )
        {
-          map<account_id_type, vector<variant> > broadcast_queue; 
+          map<account_id_type, vector<variant> > broadcast_queue;
           for( const auto& obj : objs )
           {
              auto relevant = get_relevant_accounts( obj );
@@ -795,7 +795,7 @@ namespace graphene { namespace app {
     void database_api::on_objects_changed(const vector<object_id_type>& ids)
     {
        vector<object_id_type>                       my_objects;
-       map<account_id_type, vector<variant> >       broadcast_queue; 
+       map<account_id_type, vector<variant> >       broadcast_queue;
        map< pair<asset_id_type, asset_id_type>,  vector<variant> > market_broadcast_queue;
        for(auto id : ids)
        {
@@ -888,7 +888,7 @@ namespace graphene { namespace app {
        if(_market_subscriptions.size() == 0)
           return;
 
-       
+
        const auto& ops = _db.get_applied_operations();
        map< std::pair<asset_id_type,asset_id_type>, vector<pair<operation, operation_result>> > subscribed_markets_ops;
        for(const auto& op : ops)

@@ -68,6 +68,7 @@ public:
 
    /// Convenience method to get a Transaction in QML. Caller takes ownership of the new Transaction.
    Q_INVOKABLE Transaction* createTransaction() const;
+   Q_INVOKABLE void signTransaction(Transaction* transaction) const;
 
 Q_SIGNALS:
    void exceptionThrown(QString message);
