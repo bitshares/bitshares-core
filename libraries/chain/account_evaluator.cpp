@@ -85,9 +85,6 @@ void_result account_create_evaluator::do_evaluate( const account_create_operatio
 
 object_id_type account_create_evaluator::do_apply( const account_create_operation& o )
 { try {
-   const auto& stats_obj = db().create<account_statistics_object>( [&]( account_statistics_object& ){
-   });
-
    const auto& new_acnt_object = db().create<account_object>( [&]( account_object& obj ){
          obj.registrar = o.registrar;
          obj.referrer = o.referrer;
@@ -101,8 +98,8 @@ object_id_type account_create_evaluator::do_apply( const account_create_operatio
          obj.name             = o.name;
          obj.owner            = o.owner;
          obj.active           = o.active;
-         obj.statistics       = stats_obj.id;
          obj.options          = o.options;
+         obj.statistics = db().create<account_statistics_object>([&](account_statistics_object& s){s.owner = obj.id;}).id;
    });
 
    const auto& dynamic_properties = db().get_dynamic_global_properties();

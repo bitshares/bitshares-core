@@ -288,7 +288,6 @@ namespace graphene { namespace app {
                         });
           results[account_name_or_id] = acnt;
        }
-       wdump((results));
        return results;
     }
 
@@ -709,7 +708,6 @@ namespace graphene { namespace app {
                   result.push_back( aobj->owner );
                   break;
                } case impl_account_statistics_object_type:{
-                  elog( "stats object" );
                   const auto& aobj = dynamic_cast<const account_statistics_object*>(obj);
                   assert( aobj != nullptr );
                   result.push_back( aobj->owner );
@@ -760,7 +758,6 @@ namespace graphene { namespace app {
              _broadcast_removed_complete = fc::async([=](){
                  for( const auto& item : broadcast_queue )
                  {
-                   idump((item.first)(item.second) );
                    auto sub = _account_subscriptions.find(item.first);
                    if( sub != _account_subscriptions.end() )
                        sub->second( fc::variant(item.second ) );
@@ -797,13 +794,11 @@ namespace graphene { namespace app {
 
     void database_api::on_objects_changed(const vector<object_id_type>& ids)
     {
-       idump((ids)(_account_subscriptions.size()));
        vector<object_id_type>                       my_objects;
        map<account_id_type, vector<variant> >       broadcast_queue; 
        map< pair<asset_id_type, asset_id_type>,  vector<variant> > market_broadcast_queue;
        for(auto id : ids)
        {
-          edump((id)(_account_subscriptions.size()));
           if(_subscriptions.find(id) != _subscriptions.end())
              my_objects.push_back(id);
 
@@ -814,7 +809,6 @@ namespace graphene { namespace app {
              if( obj )
              {
                 vector<account_id_type> relevant = get_relevant_accounts( obj );
-                edump(("relevant accounts")(relevant)(obj->id));
                 for( const auto& r : relevant )
                 {
                    auto sub = _account_subscriptions.find(r);
@@ -848,9 +842,6 @@ namespace graphene { namespace app {
        /// if a connection hangs then this could get backed up and result in
        /// a failure to exit cleanly.
        _broadcast_changes_complete = fc::async([=](){
-          for( const auto& item : broadcast_queue )
-            edump((item.second));
-
           for( const auto& item : broadcast_queue )
           {
             edump( (item) );
@@ -932,11 +923,11 @@ namespace graphene { namespace app {
     }
 
 
-    bool database_api::subscribe_to_objects( const std::function<void(const fc::variant&)>&  callback, const vector<object_id_type>& ids)
+    vector<variant> database_api::subscribe_to_objects( const std::function<void(const fc::variant&)>&  callback, const vector<object_id_type>& ids)
     {
        FC_ASSERT( _subscriptions.size() < 1024 );
        for(auto id : ids) _subscriptions[id] = callback;
-       return true;
+       return get_objects( ids );
     }
 
     bool database_api::unsubscribe_from_objects(const vector<object_id_type>& ids)

@@ -251,8 +251,9 @@ namespace graphene { namespace app {
           * @brief Request notifications when some object(s) change
           * @param callback Callback method which is called with the new version of a changed object
           * @param ids The set of object IDs to watch
+          * @return get_objects(ids)
           */
-         bool subscribe_to_objects(const std::function<void(const fc::variant&)>& callback,
+         vector<variant> subscribe_to_objects(const std::function<void(const fc::variant&)>& callback,
                                    const vector<object_id_type>& ids);
          /**
           * @brief Stop receiving notifications for some object(s)
