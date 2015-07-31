@@ -149,7 +149,8 @@ void ChainDataModel::getAccountImpl(QString accountIdentifier, Account* const * 
             else
                elog("Handling object deletions is not yet implemented: ${update}", ("update", update));
          }
-      }, {accountIdentifier.toStdString()});
+         // TODO: replace true on the next line with a smarter decision as to whether we need status updates or not
+      }, {accountIdentifier.toStdString()}, true);
       fc::optional<full_account> accountPackage;
 
       if (result.count(accountIdentifier.toStdString())) {
