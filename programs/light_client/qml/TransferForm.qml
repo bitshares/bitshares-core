@@ -1,6 +1,5 @@
 import QtQuick 2.5
 import QtQuick.Controls 1.4
-import QtQuick.Dialogs 1.2
 import QtQuick.Layouts 1.2
 
 import Graphene.Client 0.1
@@ -19,7 +18,7 @@ FormBase {
    property alias receiverAccount: recipientPicker.account
 
    function operation() {
-      if (!transferButton.enabled) return app.operationBuilder.transfer(0,0,0,0, memoField.text, 0)
+      if (!finishLine.rightButtonEnabled) return app.operationBuilder.transfer(0,0,0,0, memoField.text, 0)
 
       return app.operationBuilder.transfer(senderPicker.account.id, recipientPicker.account.id,
                                            amountField.value * amountField.precisionAdjustment,
@@ -56,10 +55,18 @@ FormBase {
       placeholderText: qsTr("Recipient")
       layoutDirection: Qt.RightToLeft
    }
-   TextField {
-      id: memoField
+   RowLayout {
       Layout.fillWidth: true
-      placeholderText: qsTr("Memo")
+      TextField {
+         id: memoField
+         Layout.fillWidth: true
+         placeholderText: qsTr("Memo")
+      }
+      CheckBox {
+         id: encryptMemoField
+         text: qsTr("Encrypt Memo")
+         checked: true
+      }
    }
    RowLayout {
       Layout.fillWidth: true
@@ -97,18 +104,25 @@ FormBase {
             return qsTr("Fee:<br/>") + amountField.maxBalance.type.formatAmount(operation().fee) + " CORE"
          }
       }
-      Item { Layout.fillWidth: true }
-      Button {
-         text: qsTr("Cancel")
-         onClicked: canceled({})
-      }
-      Button {
-         id: transferButton
-         text: !senderAccount ||
+   }
+   UnlockingFinishButtons {
+      id: finishLine
+      app: base.app
+      rightButtonText: {
+         return !senderAccount ||
                !senderAccount.isLoaded ||
                senderPicker.accountControlLevel >= 1? qsTr("Transfer") : qsTr("Propose")
-         enabled: senderPicker.account && recipientPicker.account && senderPicker.account !== recipientPicker.account && amountField.value
-         onClicked: completed([operation()])
+      }
+      rightButtonEnabled: senderPicker.account && recipientPicker.account && senderPicker.account !== recipientPicker.account && amountField.value
+      requiresUnlocking: encryptMemoField.checked
+      Layout.fillWidth: true
+
+      onLeftButtonClicked: canceled({})
+      onRightButtonClicked: {
+         var op = operation()
+         if (encryptMemoField.checked)
+            op.encryptMemo(app.wallet, app.model)
+         completed([op])
       }
    }
 }

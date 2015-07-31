@@ -28,10 +28,23 @@ TransferOperation* OperationBuilder::transfer(ObjectId sender, ObjectId receiver
 QString TransferOperation::memo() const {
    if (!m_op.memo)
       return QString::null;
+   if (memoIsEncrypted())
+      return tr("Encrypted Memo");
    QString memo = QString::fromStdString(m_op.memo->get_message({}, {}));
    while (memo.endsWith('\0'))
       memo.chop(1);
    return memo;
+}
+
+bool TransferOperation::memoIsEncrypted() const
+{
+   if (!m_op.memo)
+      return false;
+   if (m_op.memo->message.empty())
+      return false;
+   if (m_op.memo->from == public_key_type() && m_op.memo->to == public_key_type())
+      return false;
+   return true;
 }
 
 bool TransferOperation::canEncryptMemo(Wallet* wallet, ChainDataModel* model) const

@@ -35,6 +35,7 @@ class TransferOperation : public OperationBase {
    Q_PROPERTY(qint64 amount READ amount WRITE setAmount NOTIFY amountChanged)
    Q_PROPERTY(ObjectId amountType READ amountType WRITE setAmountType NOTIFY amountTypeChanged)
    Q_PROPERTY(QString memo READ memo WRITE setMemo NOTIFY memoChanged)
+   Q_PROPERTY(bool memoIsEncrypted READ memoIsEncrypted NOTIFY memoChanged)
 
    graphene::chain::transfer_operation m_op;
 
@@ -60,6 +61,7 @@ public:
    /// performed by calling encryptMemo()
    QString memo() const;
 
+   bool memoIsEncrypted()const;
    Q_INVOKABLE bool canEncryptMemo(Wallet* wallet, ChainDataModel* model) const;
    Q_INVOKABLE bool canDecryptMemo(Wallet* wallet, ChainDataModel* model) const;
    Q_INVOKABLE QString decryptedMemo(Wallet* wallet, ChainDataModel* model) const;
