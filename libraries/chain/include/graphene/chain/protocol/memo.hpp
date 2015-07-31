@@ -13,6 +13,10 @@ namespace graphene { namespace chain {
     *  If @ref from == @ref to and @ref from == 0 then no encryption is used, the memo is public.
     *  If @ref from == @ref to and @ref from != 0 then invalid memo data
     *
+    *  The reason we include *both* keys is to allow the wallet to
+    *  rebuild the data for any transfer, including the memo, from the
+    *  user's private keys and the contents of the blockchain --
+    *  regardless of whether the user is the sender or receiver.
     */
    struct memo_data
    {
