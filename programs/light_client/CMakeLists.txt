@@ -35,3 +35,11 @@ if (CMAKE_VERSION VERSION_LESS 3.0)
 endif()
 
 target_link_libraries(light_client PRIVATE Qt5::Core Qt5::Widgets Qt5::Quick graphene_chain graphene_utilities fc graphene_app )
+
+install( TARGETS
+   light_client
+
+   RUNTIME DESTINATION bin
+   LIBRARY DESTINATION lib
+   ARCHIVE DESTINATION lib
+)

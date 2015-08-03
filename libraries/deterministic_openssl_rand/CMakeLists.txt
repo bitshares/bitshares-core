@@ -17,3 +17,11 @@ if (USE_PCH)
   set_target_properties(deterministic_openssl_rand PROPERTIES COTIRE_ADD_UNITY_BUILD FALSE)
   cotire(deterministic_openssl_rand)
 endif(USE_PCH)
+
+install( TARGETS
+   deterministic_openssl_rand
+
+   RUNTIME DESTINATION bin
+   LIBRARY DESTINATION lib
+   ARCHIVE DESTINATION lib
+)

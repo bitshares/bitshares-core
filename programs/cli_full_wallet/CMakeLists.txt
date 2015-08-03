@@ -15,3 +15,11 @@ target_link_libraries( cli_full_wallet
 if(MSVC)
   set_source_files_properties( main.cpp PROPERTIES COMPILE_FLAGS "/bigobj" )
 endif(MSVC)
+
+install( TARGETS
+   cli_full_wallet
+
+   RUNTIME DESTINATION bin
+   LIBRARY DESTINATION lib
+   ARCHIVE DESTINATION lib
+)

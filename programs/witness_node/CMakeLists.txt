@@ -11,3 +11,11 @@ endif()
 
 target_link_libraries( witness_node
                        PRIVATE graphene_app graphene_account_history graphene_market_history graphene_witness graphene_chain fc ${CMAKE_DL_LIBS} ${PLATFORM_SPECIFIC_LIBS} )
+
+install( TARGETS
+   witness_node
+
+   RUNTIME DESTINATION bin
+   LIBRARY DESTINATION lib
+   ARCHIVE DESTINATION lib
+)

@@ -29,3 +29,11 @@ target_include_directories( graphene_db PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/incl
 if(MSVC)
   set_source_files_properties( wallet.cpp PROPERTIES COMPILE_FLAGS "/bigobj" )
 endif(MSVC)
+
+install( TARGETS
+   graphene_wallet
+
+   RUNTIME DESTINATION bin
+   LIBRARY DESTINATION lib
+   ARCHIVE DESTINATION lib
+)

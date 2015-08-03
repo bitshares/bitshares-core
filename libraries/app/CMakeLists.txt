@@ -14,3 +14,11 @@ target_include_directories( graphene_app
 if(MSVC)
   set_source_files_properties( application.cpp api.cpp PROPERTIES COMPILE_FLAGS "/bigobj" )
 endif(MSVC)
+
+INSTALL( TARGETS
+   graphene_app
+
+   RUNTIME DESTINATION bin
+   LIBRARY DESTINATION lib
+   ARCHIVE DESTINATION lib
+)

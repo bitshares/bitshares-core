@@ -75,3 +75,11 @@ target_include_directories( graphene_chain
 if(MSVC)
   set_source_files_properties( db_init.cpp db_block.cpp database.cpp PROPERTIES COMPILE_FLAGS "/bigobj" )
 endif(MSVC)
+
+INSTALL( TARGETS
+   graphene_chain
+
+   RUNTIME DESTINATION bin
+   LIBRARY DESTINATION lib
+   ARCHIVE DESTINATION lib
+)

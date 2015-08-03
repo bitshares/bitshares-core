@@ -29,3 +29,11 @@ if (USE_PCH)
   set_target_properties(graphene_utilities PROPERTIES COTIRE_ADD_UNITY_BUILD FALSE)
   cotire(graphene_utilities)
 endif(USE_PCH)
+
+install( TARGETS
+   graphene_utilities
+
+   RUNTIME DESTINATION bin
+   LIBRARY DESTINATION lib
+   ARCHIVE DESTINATION lib
+)
