@@ -17,6 +17,8 @@ Canvas {
          Jdenticon.draw(identicon, name)
       else {
          var context = identicon.context
+         if (!context) return
+
          context.reset()
          var draw_circle = function(context, x, y, radius) {
             context.beginPath()

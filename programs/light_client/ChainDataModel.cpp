@@ -88,6 +88,10 @@ Asset* ChainDataModel::getAsset(QString symbol)
    return *itr;
 }
 
+QDateTime ChainDataModel::chainTime() const {
+   return QDateTime::fromTime_t(m_dynamic_global_properties.time.sec_since_epoch());
+}
+
 void ChainDataModel::processUpdatedObject(const fc::variant& update)
 {
    if (update.is_null())

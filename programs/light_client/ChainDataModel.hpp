@@ -8,6 +8,7 @@
 #include "Asset.hpp"
 #include "Account.hpp"
 
+#include <QDateTime>
 #include <QObject>
 
 using graphene::chain::by_id;
@@ -37,6 +38,7 @@ typedef multi_index_container<
 class Transaction;
 class ChainDataModel : public QObject {
    Q_OBJECT
+   Q_PROPERTY(QDateTime chainTime READ chainTime NOTIFY blockReceived)
 
    void processUpdatedObject(const fc::variant& update);
 
@@ -48,6 +50,8 @@ public:
    Q_INVOKABLE Account* getAccount(QString name);
    Q_INVOKABLE Asset* getAsset(ObjectId id);
    Q_INVOKABLE Asset* getAsset(QString symbol);
+
+   QDateTime chainTime() const;
 
    ChainDataModel(){}
    ChainDataModel(fc::thread& t, QObject* parent = nullptr);
@@ -64,6 +68,7 @@ public Q_SLOTS:
 Q_SIGNALS:
    void queueExecute(const std::function<void()>&);
    void exceptionThrown(QString message);
+   void blockReceived();
 
 private:
    fc::thread* m_rpc_thread = nullptr;

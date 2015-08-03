@@ -56,6 +56,12 @@ int main(int argc, char *argv[])
    engine.load(QUrl(QStringLiteral("qrc:/main.qml")));
 #else
    engine.load(QUrl(QStringLiteral("qml/main.qml")));
+   QFileSystemWatcher watcher;
+   qDebug() << watcher.addPath("qml/");
+   QObject::connect(&watcher, &QFileSystemWatcher::directoryChanged, &engine, [&](QString path) {
+      qDebug() << "Changed file" << path;
+      engine.clearComponentCache();
+   });
 #endif
 
    return app.exec();

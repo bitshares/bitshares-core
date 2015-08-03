@@ -16,8 +16,8 @@ Flipable {
    property bool flipped: false
 
    Component.onCompleted: {
-      back = backComponent.createObject(flipable, {app: app, enabled: Qt.binding(function(){return flipped})})
-      front = frontComponent.createObject(flipable, {app: app, enabled: Qt.binding(function(){return !flipped})})
+      back = backComponent.createObject(flipable, {app: app, enabled: Qt.binding(function(){return rotation.angle > 90})})
+      front = frontComponent.createObject(flipable, {app: app, enabled: Qt.binding(function(){return rotation.angle < 90})})
       front.canceled.connect(function() { canceled.apply(this, arguments) })
       front.completed.connect(function() {
          back.display.apply(this, arguments)
