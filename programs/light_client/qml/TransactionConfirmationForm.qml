@@ -28,27 +28,25 @@ FormBase {
          trx.appendOperation(arg[op])
    }
 
-   Component {
-      id: transactionDelegate
+   Rectangle {
+      width: Scaling.cm(10)
+      height: childrenRect.height + Scaling.cm(1)
+      radius: Scaling.mm(3)
+      color: "#EEEEEE"
+      border.width: Scaling.mm(.25)
+      border.color: "black"
 
-      Rectangle {
-         width: Scaling.cm(10)
-         height: childrenRect.height + Scaling.cm(1)
-         radius: Scaling.mm(3)
-         color: "#EEEEEE"
-         border.width: Scaling.mm(.25)
-         border.color: "black"
-
-         Column {
-            y: Scaling.cm(.5)
-            x: y
-            width: parent.width - Scaling.cm(1)
-            Repeater {
-               model: trx.operations
-               Label {
-                  property Asset transferAsset: app.model.getAsset(modelData.amountType)
-                  property Asset feeAsset: app.model.getAsset(modelData.feeType)
-                  text: qsTr("Transfer %1 %2 from %3 to %4\nFee: %5 %6").arg(transferAsset.formatAmount(modelData.amount))
+      Column {
+         y: Scaling.cm(.5)
+         x: y
+         width: parent.width - Scaling.cm(1)
+         Repeater {
+            model: trx? trx.operations : []
+            Label {
+               property Asset transferAsset: app.model.getAsset(modelData.amountType)
+               property Asset feeAsset: app.model.getAsset(modelData.feeType)
+               text: {
+                  return qsTr("Transfer %1 %2 from %3 to %4\nFee: %5 %6").arg(transferAsset.formatAmount(modelData.amount))
                   .arg(transferAsset.symbol)
                   .arg(app.model.getAccount(modelData.sender).name)
                   .arg(app.model.getAccount(modelData.receiver).name)
@@ -59,8 +57,26 @@ FormBase {
          }
       }
    }
-   Loader {
-      sourceComponent: trx && Array.prototype.slice.call(trx.operations).length > 0? transactionDelegate : undefined
+   Item { width: 1; height: 1 }
+   RowLayout {
+      Label {
+         text: qsTr("Transaction expires in")
+      }
+      ComboBox {
+         id: expirationSelector
+         model: [qsTr("five seconds"), qsTr("thirty seconds"), qsTr("a minute"), qsTr("an hour"), qsTr("a month"), qsTr("a year")]
+
+         function getExpiration() {
+            switch(expirationSelector.currentIndex) {
+               case 0: return new Date(app.model.chainTime.getTime() + 1000*5)
+               case 1: return new Date(app.model.chainTime.getTime() + 1000*30)
+               case 2: return new Date(app.model.chainTime.getTime() + 1000*60)
+               case 3: return new Date(app.model.chainTime.getTime() + 1000*60*60)
+               case 4: return new Date(app.model.chainTime.getTime() + 1000*60*60*24*30)
+               case 5: return new Date(app.model.chainTime.getTime() + 1000*60*60*24*365)
+            }
+         }
+      }
    }
    UnlockingFinishButtons {
       app: base.app
@@ -74,6 +90,7 @@ FormBase {
          if (app.wallet.isLocked)
             app.wallet.unlock(passwordField.text)
          else {
+            trx.setExpiration(expirationSelector.getExpiration())
             app.signTransaction(trx)
             app.model.broadcast(trx)
             completed(trx)
