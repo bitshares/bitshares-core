@@ -110,6 +110,8 @@ namespace graphene { namespace app {
           * This function has semantics identical to @ref get_objects
           */
          vector<optional<account_object>> lookup_account_names(const vector<string>& account_names)const;
+         optional<account_object> get_account_by_name( string name )const;
+
          /**
           * @brief Get a list of assets by symbol
           * @param asset_symbols Symbols or stringified IDs of the assets to retrieve
@@ -515,6 +517,7 @@ FC_API(graphene::app::database_api,
        (get_accounts)
        (get_assets)
        (lookup_account_names)
+       (get_account_by_name)
        (get_account_count)
        (lookup_accounts)
        (get_full_accounts)

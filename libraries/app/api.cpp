@@ -1155,4 +1155,13 @@ namespace graphene { namespace app {
        return result;
     }
 
+    optional<account_object> database_api::get_account_by_name( string name )const
+    {
+       const auto& idx = _db.get_index_type<account_index>().indices().get<by_name>();
+       auto itr = idx.find(name);
+       if (itr != idx.end())
+          return *itr;
+       return optional<account_object>();
+    }
+
 } } // graphene::app
