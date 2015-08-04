@@ -1,5 +1,6 @@
 #pragma once
 
+#include <graphene/chain/protocol/chain_parameters.hpp>
 #include <graphene/chain/protocol/types.hpp>
 
 #include <string>
