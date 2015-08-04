@@ -1,7 +1,10 @@
 #pragma once
 
 #include <graphene/chain/protocol/chain_parameters.hpp>
+#include <graphene/chain/protocol/chain_id.hpp>
 #include <graphene/chain/protocol/types.hpp>
+
+#include <fc/crypto/sha256.hpp>
 
 #include <string>
 #include <vector>
@@ -84,7 +87,15 @@ struct genesis_state_type {
    vector<initial_witness_type>             initial_witness_candidates;
    vector<initial_committee_member_type>    initial_committee_candidates;
    vector<initial_worker_type>              initial_worker_candidates;
+
+   /**
+    * Get the chain_id corresponding to this genesis state.
+    *
+    * This is the SHA256 serialization of the genesis_state.
+    */
+   chain_id_type compute_chain_id() const;
 };
+
 } } // namespace graphene::chain
 
 FC_REFLECT(graphene::chain::genesis_state_type::initial_account_type, (name)(owner_key)(active_key)(is_lifetime_member))

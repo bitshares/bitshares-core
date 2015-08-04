@@ -34,7 +34,7 @@ if (CMAKE_VERSION VERSION_LESS 3.0)
     add_dependencies(light_client gen_qrc)
 endif()
 
-target_link_libraries(light_client PRIVATE Qt5::Core Qt5::Widgets Qt5::Quick graphene_chain graphene_utilities fc graphene_app )
+target_link_libraries(light_client PRIVATE Qt5::Core Qt5::Widgets Qt5::Quick graphene_chain graphene_egenesis_brief graphene_utilities fc graphene_app )
 
 install( TARGETS
    light_client

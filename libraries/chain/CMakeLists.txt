@@ -18,6 +18,7 @@ add_library( graphene_chain
 #             db_witness_schedule.cpp
 
              protocol/types.cpp
+             protocol/chain_id.cpp
              protocol/address.cpp
              protocol/authority.cpp
              protocol/asset.cpp
@@ -39,6 +40,8 @@ add_library( graphene_chain
              protocol/fee_schedule.cpp
              protocol/confidential.cpp
              protocol/vote.cpp
+
+             genesis_state.cpp
 
              pts_address.cpp
 
