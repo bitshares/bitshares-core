@@ -3,6 +3,8 @@
         <file>main.qml</file>
         <file>FormBase.qml</file>
         <file>TransferForm.qml</file>
+        <file>TransactionDelegate.qml</file>
+        <file>TransferOperationDelegate.qml</file>
         <file>TransactionConfirmationForm.qml</file>
         <file>FormBox.qml</file>
         <file>FormFlipper.qml</file>

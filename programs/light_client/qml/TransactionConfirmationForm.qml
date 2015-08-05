@@ -34,40 +34,26 @@ FormBase {
    }
 
    Rectangle {
-      id: trxBackground
-      anchors.fill: trxColumn
-      anchors.margins: Scaling.mm(-2)
+      id: background
+      Layout.preferredHeight: childrenRect.height + Scaling.mm(4)
+      Layout.preferredWidth: childrenRect.width + Scaling.mm(4)
       layer.enabled: true
       layer.effect: DropShadow {
          radius: 8.0
          samples: 16
          horizontalOffset: Scaling.mm(.5)
          verticalOffset: Scaling.mm(.5)
-         source: trxBackground
+         source: background
          color: "#80000000"
          transparentBorder: true
       }
-   }
-   Column {
-      id: trxColumn
-      Layout.preferredWidth: Scaling.cm(10)
-      spacing: Scaling.mm(2)
 
-      Repeater {
-         Layout.alignment: Qt.AlignHCenter | Qt.AlignVCenter
-         model: trx.operations
-         Label {
-            property Asset transferAsset: app.model.getAsset(modelData.amountType)
-            property Asset feeAsset: app.model.getAsset(modelData.feeType)
-            text: {
-               return qsTr("Transfer %1 %2 from %3 to %4\nFee: %5 %6").arg(transferAsset.formatAmount(modelData.amount))
-               .arg(transferAsset.symbol)
-               .arg(app.model.getAccount(modelData.sender).name)
-               .arg(app.model.getAccount(modelData.receiver).name)
-               .arg(feeAsset.formatAmount(modelData.fee))
-               .arg(feeAsset.symbol)
-            }
-         }
+      TransactionDelegate {
+         x: Scaling.mm(2)
+         y: Scaling.mm(2)
+         trx: __trx
+         Layout.preferredWidth: Scaling.cm(10)
+         app: base.app
       }
    }
    RowLayout {

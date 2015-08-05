@@ -79,6 +79,8 @@ FormBase {
          maximumValue: maxBalance? maxBalance.amountReal() : 0
          decimals: maxBalance? maxBalance.type.precision : 0
 
+         Keys.onReturnPressed: if (finishLine.rightButtonEnabled) finishLine.clickRight()
+
          property Balance maxBalance: assetField.enabled && senderPicker.showBalance >= 0?
                                          senderPicker.balances[senderPicker.showBalance] : null
          property int precisionAdjustment: maxBalance? Math.pow(10, maxBalance.type.precision) : 1
@@ -114,7 +116,7 @@ FormBase {
                senderPicker.accountControlLevel >= 1? qsTr("Transfer") : qsTr("Propose")
       }
       rightButtonEnabled: senderPicker.account && recipientPicker.account && senderPicker.account !== recipientPicker.account && amountField.value
-      requiresUnlocking: encryptMemoField.checked
+      requiresUnlocking: encryptMemoField.checked && memoField.text
       Layout.fillWidth: true
 
       onLeftButtonClicked: canceled({})

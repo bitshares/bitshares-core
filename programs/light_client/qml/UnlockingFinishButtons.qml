@@ -18,8 +18,12 @@ RowLayout {
    signal leftButtonClicked
    signal rightButtonClicked
 
+   function clickLeft() { leftButton.clicked() }
+   function clickRight() { rightButton.clicked() }
+
    Item { Layout.fillWidth: true }
    Button {
+      id: leftButton
       text: leftButtonText
       onClicked: leftButtonClicked()
    }

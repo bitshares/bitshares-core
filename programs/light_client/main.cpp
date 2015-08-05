@@ -42,7 +42,8 @@ int main(int argc, char *argv[])
    qmlRegisterType<GrapheneApplication>("Graphene.Client", 0, 1, "GrapheneApplication");
    qmlRegisterType<Transaction>("Graphene.Client", 0, 1, "Transaction");
 
-   qmlRegisterInterface<OperationBase>("OperationBase");
+   qmlRegisterUncreatableType<OperationBase>("Graphene.Client", 0, 1, "OperationBase",
+                                             "OperationBase is an abstract base class; cannot be created");
    qmlRegisterType<TransferOperation>("Graphene.Client", 0, 1, "TransferOperation");
 
    qmlRegisterUncreatableType<OperationBuilder>("Graphene.Client", 0, 1, "OperationBuilder",
