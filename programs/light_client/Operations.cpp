@@ -31,7 +31,7 @@ QString TransferOperation::memo() const {
    if (memoIsEncrypted())
       return tr("Encrypted Memo");
    QString memo = QString::fromStdString(m_op.memo->get_message({}, {}));
-   while (memo.endsWith('\0'))
+   while (memo.endsWith(QChar('\0')))
       memo.chop(1);
    return memo;
 }
