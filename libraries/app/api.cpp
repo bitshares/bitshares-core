@@ -1135,15 +1135,15 @@ namespace graphene { namespace app {
        trx.get_required_signatures( _db.get_chain_id(),
                                     flat_set<public_key_type>(),
                                     [&]( account_id_type id ){ 
-                                        const auto& auth = &id(_db).active
+                                        const auto& auth = id(_db).active;
                                         for( const auto& k : auth.get_keys() )
-                                          result.insert(k)
+                                          result.insert(k);
                                         return &auth; },
                                     [&]( account_id_type id ){ 
-                                        const auto& auth = &id(_db).owner
+                                        const auto& auth = id(_db).owner;
                                         for( const auto& k : auth.get_keys() )
-                                          result.insert(k)
-                                        return &auth; },
+                                          result.insert(k);
+                                        return &auth; 
                                         },
                                     _db.get_global_properties().parameters.max_authority_depth );
 
