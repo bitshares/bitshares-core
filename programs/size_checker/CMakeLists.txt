@@ -4,7 +4,7 @@ if( UNIX AND NOT APPLE )
 endif()
 
 target_link_libraries( size_checker
-                       PRIVATE graphene_chain graphene_egenesis_none fc ${CMAKE_DL_LIBS} ${PLATFORM_SPECIFIC_LIBS} )
+                       PRIVATE graphene_chain fc ${CMAKE_DL_LIBS} ${PLATFORM_SPECIFIC_LIBS} )
 
 install( TARGETS
    size_checker

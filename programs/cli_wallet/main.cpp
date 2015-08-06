@@ -32,7 +32,7 @@
 
 #include <graphene/app/api.hpp>
 #include <graphene/chain/protocol/protocol.hpp>
-#include <graphene/egenesis/egenesis.hpp>
+//#include <graphene/egenesis/egenesis.hpp>
 #include <graphene/utilities/key_conversion.hpp>
 #include <graphene/wallet/wallet.hpp>
 
@@ -146,8 +146,10 @@ int main( int argc, char** argv )
          }
          else
          {
+            /*
             wdata.chain_id = graphene::egenesis::get_egenesis_chain_id();
             std::cout << "Starting a new wallet with chain ID " << wdata.chain_id << " (from egenesis)\n";
+            */
          }
       }
 
@@ -169,6 +171,7 @@ int main( int argc, char** argv )
       // TODO:  Error message here
       FC_ASSERT( remote_api->login( wdata.ws_user, wdata.ws_password ) );
 
+      wdata.chain_id = remote_api->database()->get_chain_id();
       auto wapiptr = std::make_shared<wallet_api>( wdata.chain_id, remote_api );
       wapiptr->set_wallet_filename( wallet_file.generic_string() );
       wapiptr->load_wallet_file();
