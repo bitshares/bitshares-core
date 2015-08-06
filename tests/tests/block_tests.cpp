@@ -498,6 +498,71 @@ BOOST_AUTO_TEST_CASE( tapos )
    }
 }
 
+BOOST_FIXTURE_TEST_CASE( optional_tapos, database_fixture )
+{
+   try
+   {
+      ACTORS( (alice)(bob) );
+
+      generate_block();
+
+      BOOST_TEST_MESSAGE( "Create transaction" );
+
+      transfer( account_id_type(), alice_id, asset( 1000000 ) );
+      transfer_operation op;
+      op.from = alice_id;
+      op.to = bob_id;
+      op.amount = asset( 1000 );
+      signed_transaction tx;
+      tx.operations.push_back( op );
+      set_expiration( db, tx );
+
+      BOOST_TEST_MESSAGE( "ref_block_num=0, ref_block_prefix=0" );
+
+      tx.ref_block_num = 0;
+      tx.ref_block_prefix = 0;
+      tx.signatures.clear();
+      sign( tx, alice_private_key );
+      PUSH_TX( db, tx );
+
+      BOOST_TEST_MESSAGE( "proper ref_block_num, ref_block_prefix" );
+
+      set_expiration( db, tx );
+      tx.signatures.clear();
+      sign( tx, alice_private_key );
+      PUSH_TX( db, tx );
+
+      BOOST_TEST_MESSAGE( "ref_block_num=0, ref_block_prefix=12345678" );
+
+      tx.ref_block_num = 0;
+      tx.ref_block_prefix = 0x12345678;
+      tx.signatures.clear();
+      sign( tx, alice_private_key );
+      GRAPHENE_REQUIRE_THROW( PUSH_TX( db, tx ), fc::exception );
+
+      BOOST_TEST_MESSAGE( "ref_block_num=1, ref_block_prefix=12345678" );
+
+      tx.ref_block_num = 1;
+      tx.ref_block_prefix = 0x12345678;
+      tx.signatures.clear();
+      sign( tx, alice_private_key );
+      GRAPHENE_REQUIRE_THROW( PUSH_TX( db, tx ), fc::exception );
+
+      BOOST_TEST_MESSAGE( "ref_block_num=9999, ref_block_prefix=12345678" );
+
+      tx.ref_block_num = 9999;
+      tx.ref_block_prefix = 0x12345678;
+      tx.signatures.clear();
+      sign( tx, alice_private_key );
+      GRAPHENE_REQUIRE_THROW( PUSH_TX( db, tx ), fc::exception );
+   }
+   catch (fc::exception& e)
+   {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
 BOOST_FIXTURE_TEST_CASE( maintenance_interval, database_fixture )
 {
    try {
