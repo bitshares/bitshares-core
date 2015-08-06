@@ -4,7 +4,7 @@
 #include <string>
 
 #include <fc/crypto/sha256.hpp>
-#include <graphene/chain/protocol/chain_id.hpp>
+#include <graphene/chain/protocol/types.hpp>
 #include <graphene/chain/genesis_state.hpp>
 
 namespace graphene { namespace egenesis {

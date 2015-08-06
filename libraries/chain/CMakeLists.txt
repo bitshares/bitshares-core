@@ -18,7 +18,6 @@ add_library( graphene_chain
 #             db_witness_schedule.cpp
 
              protocol/types.cpp
-             protocol/chain_id.cpp
              protocol/address.cpp
              protocol/authority.cpp
              protocol/asset.cpp

@@ -20,13 +20,15 @@
 #include <graphene/app/application.hpp>
 #include <graphene/app/plugin.hpp>
 
+#include <graphene/chain/protocol/fee_schedule.hpp>
+#include <graphene/chain/protocol/types.hpp>
+
 #include <graphene/net/core_messages.hpp>
 
 #include <graphene/time/time.hpp>
 
 #include <graphene/utilities/key_conversion.hpp>
-#include <graphene/chain/protocol/chain_id.hpp>
-#include <graphene/chain/protocol/fee_schedule.hpp>
+
 #include <fc/smart_ref_impl.hpp>
 
 #include <fc/rpc/api_connection.hpp>

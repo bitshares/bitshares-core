@@ -18,8 +18,8 @@
 #pragma once
 #include <fc/uint128.hpp>
 
-#include <graphene/chain/protocol/chain_id.hpp>
 #include <graphene/chain/protocol/chain_parameters.hpp>
+#include <graphene/chain/protocol/types.hpp>
 #include <graphene/chain/database.hpp>
 #include <graphene/db/object.hpp>
 

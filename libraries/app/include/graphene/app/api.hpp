@@ -16,9 +16,13 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #pragma once
-#include <graphene/chain/protocol/chain_id.hpp>
+
+#include <graphene/app/full_account.hpp>
+
 #include <graphene/chain/protocol/types.hpp>
+
 #include <graphene/chain/database.hpp>
+
 #include <graphene/chain/account_object.hpp>
 #include <graphene/chain/operation_history_object.hpp>
 #include <graphene/chain/asset_object.hpp>
@@ -27,11 +31,12 @@
 #include <graphene/chain/witness_object.hpp>
 #include <graphene/chain/proposal_object.hpp>
 #include <graphene/chain/balance_object.hpp>
+
 #include <graphene/chain/confidential_evaluator.hpp>
-#include <graphene/net/node.hpp>
 
 #include <graphene/market_history/market_history_plugin.hpp>
-#include <graphene/app/full_account.hpp>
+
+#include <graphene/net/node.hpp>
 
 #include <fc/api.hpp>
 

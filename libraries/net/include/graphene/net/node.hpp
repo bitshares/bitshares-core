@@ -21,7 +21,6 @@
 #include <graphene/net/message.hpp>
 #include <graphene/net/peer_database.hpp>
 
-#include <graphene/chain/protocol/chain_id.hpp>
 #include <graphene/chain/protocol/types.hpp>
 
 #include <list>

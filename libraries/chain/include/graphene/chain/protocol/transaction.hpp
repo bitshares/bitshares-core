@@ -16,8 +16,8 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #pragma once
-#include <graphene/chain/protocol/chain_id.hpp>
 #include <graphene/chain/protocol/operations.hpp>
+#include <graphene/chain/protocol/types.hpp>
 
 #include <numeric>
 

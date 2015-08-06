@@ -1,7 +1,6 @@
 #pragma once
 
 #include <graphene/chain/protocol/chain_parameters.hpp>
-#include <graphene/chain/protocol/chain_id.hpp>
 #include <graphene/chain/protocol/types.hpp>
 
 #include <fc/crypto/sha256.hpp>

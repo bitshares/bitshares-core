@@ -16,7 +16,6 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <graphene/chain/protocol/chain_id.hpp>
 #include <graphene/egenesis/egenesis.hpp>
 
 namespace graphene { namespace egenesis {
