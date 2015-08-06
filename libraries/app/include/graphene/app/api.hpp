@@ -332,6 +332,13 @@ namespace graphene { namespace app {
          set<public_key_type> get_required_signatures( const signed_transaction& trx, const flat_set<public_key_type>& available_keys )const;
 
          /**
+          *  This method will return the set of all public keys that could possibly sign for a given transaction.  This call can
+          *  be used by wallets to filter their set of public keys to just the relevant subset prior to calling @ref get_required_signatures
+          *  to get the minimum subset. 
+          */
+         set<public_key_type> get_potential_signatures( const signed_transaction& trx )const;
+
+         /**
           * @return true of the @ref trx has all of the required signatures, otherwise throws an exception
           */
          bool                 verify_authority( const signed_transaction& trx )const;
@@ -562,6 +569,7 @@ FC_API(graphene::app::database_api,
        (get_balance_objects)
        (get_vested_balances)
        (get_required_signatures)
+       (get_potential_signatures)
        (verify_authority)
        (get_blinded_balances)
        (get_required_fees)

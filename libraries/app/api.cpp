@@ -1129,6 +1129,26 @@ namespace graphene { namespace app {
                                            [&]( account_id_type id ){ return &id(_db).owner; },
                                            _db.get_global_properties().parameters.max_authority_depth );
     }
+    set<public_key_type> database_api::get_potential_signatures( const signed_transaction& trx )const
+    {
+       set<public_key_type> result;
+       trx.get_required_signatures( _db.get_chain_id(),
+                                    flat_set<public_key_type>(),
+                                    [&]( account_id_type id ){ 
+                                        const auto& auth = &id(_db).active
+                                        for( const auto& k : auth.get_keys() )
+                                          result.insert(k)
+                                        return &auth; },
+                                    [&]( account_id_type id ){ 
+                                        const auto& auth = &id(_db).owner
+                                        for( const auto& k : auth.get_keys() )
+                                          result.insert(k)
+                                        return &auth; },
+                                        },
+                                    _db.get_global_properties().parameters.max_authority_depth );
+
+       return result;
+    }
 
     bool database_api::verify_authority( const signed_transaction& trx )const
     {
