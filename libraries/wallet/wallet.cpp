@@ -359,13 +359,21 @@ private:
 
 public:
    wallet_api& self;
-   wallet_api_impl( wallet_api& s, fc::api<login_api> rapi )
+   wallet_api_impl( wallet_api& s, const chain_id_type& chain_id, fc::api<login_api> rapi )
       : self(s),
+        _chain_id(chain_id),
         _remote_api(rapi),
         _remote_db(rapi->database()),
         _remote_net_broadcast(rapi->network_broadcast()),
         _remote_hist(rapi->history())
    {
+      chain_id_type remote_chain_id = _remote_db->get_chain_id();
+      if( remote_chain_id != _chain_id )
+      {
+         FC_THROW( "Remote server gave us an unexpected chain_id",
+            ("remote_chain_id", remote_chain_id)
+            ("chain_id", chain_id) );
+      }
       init_prototype_ops();
       _remote_db->subscribe_to_objects( [=]( const fc::variant& obj )
       {
@@ -636,6 +644,10 @@ public:
       if( !_wallet.my_accounts.empty() )
          _remote_db->unsubscribe_from_objects(_wallet.my_account_ids());
       _wallet = fc::json::from_file( wallet_filename ).as< wallet_data >();
+      if( _wallet.chain_id != _chain_id )
+         FC_THROW( "Wallet chain ID does not match",
+            ("wallet.chain_id", _wallet.chain_id)
+            ("chain_id", _chain_id) );
       if( !_wallet.my_accounts.empty() )
          _remote_db->subscribe_to_objects([this](const fc::variant& v) {
             _wallet.update_account(v.as<account_object>());
@@ -815,7 +827,7 @@ public:
             {
                FC_ASSERT( false, "Malformed private key in _keys" );
             }
-            tx.sign( *privkey );
+            tx.sign( *privkey, _chain_id );
          }
       }
 
@@ -938,7 +950,7 @@ public:
             {
                fc::optional< fc::ecc::private_key > privkey = wif_to_key( it->second );
                FC_ASSERT( privkey.valid(), "Malformed private key in _keys" );
-               tx.sign( *privkey );
+               tx.sign( *privkey, _chain_id );
             }
          }
 
@@ -1537,7 +1549,7 @@ public:
             {
                fc::optional<fc::ecc::private_key> privkey = wif_to_key( it->second );
                FC_ASSERT( privkey.valid(), "Malformed private key in _keys" );
-               tx.sign( *privkey );
+               tx.sign( *privkey, _chain_id );
             }
             /// TODO: if transaction has enough signatures to be "valid" don't add any more,
             /// there are cases where the wallet may have more keys than strictly necessary and
@@ -1901,6 +1913,7 @@ public:
    map<public_key_type,string> _keys;
    fc::sha512                  _checksum;
 
+   chain_id_type           _chain_id;
    fc::api<login_api>      _remote_api;
    fc::api<database_api>   _remote_db;
    fc::api<network_broadcast_api>   _remote_net_broadcast;
@@ -2007,8 +2020,8 @@ void operation_printer::operator()(const asset_create_operation& op) const
 
 namespace graphene { namespace wallet {
 
-wallet_api::wallet_api(fc::api<login_api> rapi)
-   : my(new detail::wallet_api_impl(*this, rapi))
+wallet_api::wallet_api(const chain_id_type& chain_id, fc::api<login_api> rapi)
+   : my(new detail::wallet_api_impl(*this, chain_id, rapi))
 {
 }
 
@@ -2628,7 +2641,7 @@ signed_transaction wallet_api::import_balance( string name_or_id, const vector<s
    auto tx = sign_transaction( trx, false );
 
    for( auto a : required_addrs )
-     tx.sign( keys[a] );
+     tx.sign( keys[a], my->_chain_id );
    
    // if the key for a balance object was the same as a key for the account we're importing it into,
    // we may end up with duplicate signatures, so remove those

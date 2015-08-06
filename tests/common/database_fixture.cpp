@@ -612,7 +612,12 @@ uint64_t database_fixture::fund(
 
 void database_fixture::sign(signed_transaction& trx, const fc::ecc::private_key& key)
 {
-  trx.sign( key );
+   trx.sign( key, db.get_chain_id() );
+}
+
+digest_type database_fixture::digest( const transaction& tx )
+{
+   return tx.digest();
 }
 
 const limit_order_object*database_fixture::create_sell_order(account_id_type user, const asset& amount, const asset& recv)

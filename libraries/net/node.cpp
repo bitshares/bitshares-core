@@ -378,7 +378,7 @@ namespace graphene { namespace net { namespace detail {
                                             uint32_t& remaining_item_count,
                                             uint32_t limit = 2000) override;
       message get_item( const item_id& id ) override;
-      fc::sha256 get_chain_id() const override;
+      chain_id_type get_chain_id() const override;
       std::vector<item_hash_t> get_blockchain_synopsis(uint32_t item_type,
                                                        const graphene::net::item_hash_t& reference_point = graphene::net::item_hash_t(),
                                                        uint32_t number_of_blocks_after_reference_point = 0) override;
@@ -5163,7 +5163,7 @@ namespace graphene { namespace net { namespace detail {
       INVOKE_AND_COLLECT_STATISTICS(get_item, id);
     }
 
-    fc::sha256 statistics_gathering_node_delegate_wrapper::get_chain_id() const
+    chain_id_type statistics_gathering_node_delegate_wrapper::get_chain_id() const
     {
       INVOKE_AND_COLLECT_STATISTICS(get_chain_id);
     }

@@ -88,11 +88,11 @@ BOOST_AUTO_TEST_CASE( override_transfer_test )
    BOOST_TEST_MESSAGE( "Require throwing without signature" );
    GRAPHENE_REQUIRE_THROW( PUSH_TX( db, trx, 0 ), tx_missing_active_auth );
    BOOST_TEST_MESSAGE( "Require throwing with dan's signature" );
-   trx.sign( dan_private_key );
+   sign( trx,  dan_private_key  );
    GRAPHENE_REQUIRE_THROW( PUSH_TX( db, trx, 0 ), tx_missing_active_auth );
    BOOST_TEST_MESSAGE( "Pass with issuer's signature" );
    trx.signatures.clear();
-   trx.sign( sam_private_key );
+   sign( trx,  sam_private_key  );
    PUSH_TX( db, trx, 0 );
 
    BOOST_REQUIRE_EQUAL( get_balance( dan, advanced ), 900 );
@@ -117,11 +117,11 @@ BOOST_AUTO_TEST_CASE( override_transfer_test2 )
    BOOST_TEST_MESSAGE( "Require throwing without signature" );
    GRAPHENE_REQUIRE_THROW( PUSH_TX( db, trx, 0 ), fc::exception);
    BOOST_TEST_MESSAGE( "Require throwing with dan's signature" );
-   trx.sign( dan_private_key );
+   sign( trx,  dan_private_key  );
    GRAPHENE_REQUIRE_THROW( PUSH_TX( db, trx, 0 ), fc::exception);
    BOOST_TEST_MESSAGE( "Fail because overide_authority flag is not set" );
    trx.signatures.clear();
-   trx.sign( sam_private_key );
+   sign( trx,  sam_private_key  );
    GRAPHENE_REQUIRE_THROW( PUSH_TX( db, trx, 0 ), fc::exception );
 
    BOOST_REQUIRE_EQUAL( get_balance( dan, advanced ), 1000 );

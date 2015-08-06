@@ -16,6 +16,7 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #pragma once
+#include <graphene/chain/protocol/chain_id.hpp>
 #include <graphene/chain/protocol/types.hpp>
 #include <graphene/chain/database.hpp>
 #include <graphene/chain/account_object.hpp>
@@ -82,6 +83,12 @@ namespace graphene { namespace app {
           * @brief Retrieve the current @ref global_property_object
           */
          global_property_object get_global_properties()const;
+
+         /**
+          * @brief Get the chain ID
+          */
+         chain_id_type get_chain_id()const;
+
          /**
           * @brief Retrieve the current @ref dynamic_global_property_object
           */
@@ -513,6 +520,7 @@ FC_API(graphene::app::database_api,
        (get_block)
        (get_transaction)
        (get_global_properties)
+       (get_chain_id)
        (get_dynamic_global_properties)
        (get_accounts)
        (get_assets)

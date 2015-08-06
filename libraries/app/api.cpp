@@ -140,6 +140,11 @@ namespace graphene { namespace app {
        return _db.get(global_property_id_type());
     }
 
+    chain_id_type database_api::get_chain_id()const
+    {
+       return _db.get_chain_id();
+    }
+
     dynamic_global_property_object database_api::get_dynamic_global_properties()const
     {
        return _db.get(dynamic_global_property_id_type());
@@ -1118,15 +1123,17 @@ namespace graphene { namespace app {
 
     set<public_key_type> database_api::get_required_signatures( const signed_transaction& trx, const flat_set<public_key_type>& available_keys )const
     {
-       return trx.get_required_signatures( available_keys,
+       return trx.get_required_signatures( _db.get_chain_id(),
+                                           available_keys,
                                            [&]( account_id_type id ){ return &id(_db).active; },
                                            [&]( account_id_type id ){ return &id(_db).owner; },
                                            _db.get_global_properties().parameters.max_authority_depth );
     }
 
-    bool    database_api::verify_authority( const signed_transaction& trx )const
+    bool database_api::verify_authority( const signed_transaction& trx )const
     {
-       trx.verify_authority( [&]( account_id_type id ){ return &id(_db).active; },
+       trx.verify_authority( _db.get_chain_id(),
+                             [&]( account_id_type id ){ return &id(_db).active; },
                              [&]( account_id_type id ){ return &id(_db).owner; },
                               _db.get_global_properties().parameters.max_authority_depth );
        return true;

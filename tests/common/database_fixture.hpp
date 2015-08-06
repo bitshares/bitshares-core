@@ -251,6 +251,7 @@ struct database_fixture {
    const witness_object& create_witness(const account_object& owner,
                                         const fc::ecc::private_key& signing_private_key = generate_private_key("null_key"));
    uint64_t fund( const account_object& account, const asset& amount = asset(500000) );
+   digest_type digest( const transaction& tx );
    void sign( signed_transaction& trx, const fc::ecc::private_key& key );
    const limit_order_object* create_sell_order( account_id_type user, const asset& amount, const asset& recv );
    const limit_order_object* create_sell_order( const account_object& user, const asset& amount, const asset& recv );

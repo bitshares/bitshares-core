@@ -222,6 +222,7 @@ BOOST_AUTO_TEST_CASE( fork_blocks )
       db1.open(data_dir1.path(), make_genesis);
       database db2;
       db2.open(data_dir2.path(), make_genesis);
+      BOOST_CHECK( db1.get_chain_id() == db2.get_chain_id() );
 
       auto init_account_priv_key  = fc::ecc::private_key::regenerate(fc::sha256::hash(string("null_key")) );
       for( uint32_t i = 0; i < 10; ++i )
@@ -258,7 +259,7 @@ BOOST_AUTO_TEST_CASE( fork_blocks )
          good_block = b;
          b.transactions.emplace_back(signed_transaction());
          b.transactions.back().operations.emplace_back(transfer_operation());
-         b.sign(init_account_priv_key);
+         b.sign( init_account_priv_key );
          BOOST_CHECK_EQUAL(b.block_num(), 14);
          GRAPHENE_CHECK_THROW(PUSH_BLOCK( db1, b ), fc::exception);
       }
@@ -309,7 +310,7 @@ BOOST_AUTO_TEST_CASE( undo_pending )
          cop.owner = authority(1, init_account_pub_key, 1);
          cop.active = cop.owner;
          trx.operations.push_back(cop);
-         //trx.sign( init_account_priv_key );
+         //sign( trx,  init_account_priv_key  );
          PUSH_TX( db, trx );
 
          auto b = db.generate_block(db.get_slot_time(1), db.get_scheduled_witness(1).first, init_account_priv_key, database::skip_nothing);
@@ -348,6 +349,7 @@ BOOST_AUTO_TEST_CASE( switch_forks_undo_create )
                db2;
       db1.open(dir1.path(), make_genesis);
       db2.open(dir2.path(), make_genesis);
+      BOOST_CHECK( db1.get_chain_id() == db2.get_chain_id() );
 
       auto init_account_priv_key  = fc::ecc::private_key::regenerate(fc::sha256::hash(string("null_key")) );
       public_key_type init_account_pub_key  = init_account_priv_key.get_public_key();
@@ -404,6 +406,7 @@ BOOST_AUTO_TEST_CASE( duplicate_transactions )
                db2;
       db1.open(dir1.path(), make_genesis);
       db2.open(dir2.path(), make_genesis);
+      BOOST_CHECK( db1.get_chain_id() == db2.get_chain_id() );
 
       auto skip_sigs = database::skip_transaction_signatures | database::skip_authority_check;
 
@@ -419,7 +422,7 @@ BOOST_AUTO_TEST_CASE( duplicate_transactions )
       cop.owner = authority(1, init_account_pub_key, 1);
       cop.active = cop.owner;
       trx.operations.push_back(cop);
-      trx.sign( init_account_priv_key );
+      trx.sign( init_account_priv_key, db1.get_chain_id() );
       PUSH_TX( db1, trx, skip_sigs );
 
       trx = decltype(trx)();
@@ -428,7 +431,7 @@ BOOST_AUTO_TEST_CASE( duplicate_transactions )
       t.to = nathan_id;
       t.amount = asset(500);
       trx.operations.push_back(t);
-      trx.sign(  init_account_priv_key );
+      trx.sign( init_account_priv_key, db1.get_chain_id() );
       PUSH_TX( db1, trx, skip_sigs );
 
       GRAPHENE_CHECK_THROW(PUSH_TX( db1, trx, skip_sigs ), fc::exception);
@@ -473,7 +476,7 @@ BOOST_AUTO_TEST_CASE( tapos )
       cop.owner = authority(1, init_account_pub_key, 1);
       cop.active = cop.owner;
       trx.operations.push_back(cop);
-      trx.sign(init_account_priv_key);
+      trx.sign( init_account_priv_key, db1.get_chain_id() );
       db1.push_transaction(trx);
       b = db1.generate_block(db1.get_slot_time(1), db1.get_scheduled_witness(1).first, init_account_priv_key, database::skip_nothing);
       trx.clear();
@@ -482,12 +485,12 @@ BOOST_AUTO_TEST_CASE( tapos )
       t.to = nathan_id;
       t.amount = asset(50);
       trx.operations.push_back(t);
-      trx.sign(init_account_priv_key);
+      trx.sign( init_account_priv_key, db1.get_chain_id() );
       //relative_expiration is 1, but ref block is 2 blocks old, so this should fail.
       GRAPHENE_REQUIRE_THROW(PUSH_TX( db1, trx, database::skip_transaction_signatures | database::skip_authority_check ), fc::exception);
       set_expiration( db1, trx );
       trx.signatures.clear();
-      trx.sign(init_account_priv_key);
+      trx.sign( init_account_priv_key, db1.get_chain_id() );
       db1.push_transaction(trx, database::skip_transaction_signatures | database::skip_authority_check);
    } catch (fc::exception& e) {
       edump((e.to_detail_string()));
@@ -619,19 +622,19 @@ BOOST_FIXTURE_TEST_CASE( double_sign_check, database_fixture )
    GRAPHENE_REQUIRE_THROW( db.push_transaction(trx, 0), fc::exception );
 
    BOOST_TEST_MESSAGE( "Verify that double-signing causes an exception" );
-   trx.sign(bob_private_key);
-   trx.sign(bob_private_key);
+   sign( trx, bob_private_key );
+   sign( trx, bob_private_key );
    GRAPHENE_REQUIRE_THROW( db.push_transaction(trx, 0), tx_duplicate_sig );
 
    BOOST_TEST_MESSAGE( "Verify that signing with an extra, unused key fails" );
    trx.signatures.pop_back();
-   trx.sign(generate_private_key("bogus"));
+   sign( trx, generate_private_key("bogus" ));
    GRAPHENE_REQUIRE_THROW( db.push_transaction(trx, 0), tx_irrelevant_sig );
 
    BOOST_TEST_MESSAGE( "Verify that signing once with the proper key passes" );
    trx.signatures.pop_back();
    db.push_transaction(trx, 0);
-   trx.sign(bob_private_key);
+   sign( trx, bob_private_key );
 
 } FC_LOG_AND_RETHROW() }
 
@@ -663,15 +666,15 @@ BOOST_FIXTURE_TEST_CASE( change_block_interval, database_fixture )
                                      get_account("init4").get_id(), get_account("init5").get_id(),
                                      get_account("init6").get_id(), get_account("init7").get_id()};
       trx.operations.push_back(uop);
-      trx.sign(init_account_priv_key);
+      sign( trx, init_account_priv_key );
       /*
-      trx.sign(get_account("init1").active.get_keys().front(),init_account_priv_key);
-      trx.sign(get_account("init2").active.get_keys().front(),init_account_priv_key);
-      trx.sign(get_account("init3").active.get_keys().front(),init_account_priv_key);
-      trx.sign(get_account("init4").active.get_keys().front(),init_account_priv_key);
-      trx.sign(get_account("init5").active.get_keys().front(),init_account_priv_key);
-      trx.sign(get_account("init6").active.get_keys().front(),init_account_priv_key);
-      trx.sign(get_account("init7").active.get_keys().front(),init_account_priv_key);
+      sign( trx, get_account("init1" ).active.get_keys().front(),init_account_priv_key);
+      sign( trx, get_account("init2" ).active.get_keys().front(),init_account_priv_key);
+      sign( trx, get_account("init3" ).active.get_keys().front(),init_account_priv_key);
+      sign( trx, get_account("init4" ).active.get_keys().front(),init_account_priv_key);
+      sign( trx, get_account("init5" ).active.get_keys().front(),init_account_priv_key);
+      sign( trx, get_account("init6" ).active.get_keys().front(),init_account_priv_key);
+      sign( trx, get_account("init7" ).active.get_keys().front(),init_account_priv_key);
       */
       db.push_transaction(trx);
       BOOST_CHECK(proposal_id_type()(db).is_authorized_to_execute(db));

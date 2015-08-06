@@ -25,6 +25,7 @@
 #include <graphene/time/time.hpp>
 
 #include <graphene/utilities/key_conversion.hpp>
+#include <graphene/chain/protocol/chain_id.hpp>
 #include <graphene/chain/protocol/fee_schedule.hpp>
 #include <fc/smart_ref_impl.hpp>
 
@@ -425,7 +426,7 @@ namespace detail {
          return trx_message( _chain_db->get_recent_transaction( id.item_hash ) );
       } FC_CAPTURE_AND_RETHROW( (id) ) }
 
-      virtual fc::sha256 get_chain_id()const override
+      virtual chain_id_type get_chain_id()const override
       {
          return _chain_db->get_global_properties().chain_id;
       }

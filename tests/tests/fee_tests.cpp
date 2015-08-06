@@ -155,7 +155,7 @@ BOOST_AUTO_TEST_CASE( cashback_test )
       op.owner = op.active; \
       op.fee = fees->calculate_fee(op); \
       trx.operations = {op}; \
-      trx.sign( registrar_name ## _private_key); \
+      sign( trx,  registrar_name ## _private_key ); \
       actor_name ## _id = PUSH_TX( db, trx ).operation_results.front().get<object_id_type>(); \
       trx.clear(); \
    }

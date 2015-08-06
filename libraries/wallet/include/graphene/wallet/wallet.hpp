@@ -143,6 +143,8 @@ typedef multi_index_container<
 
 struct wallet_data
 {
+   /** Chain ID this wallet is used with */
+   chain_id_type chain_id;
    account_multi_index_type my_accounts;
    /// @return IDs of all accounts in @ref my_accounts
    vector<object_id_type> my_account_ids()const
@@ -211,7 +213,7 @@ class wallet_api_impl;
 class wallet_api
 {
    public:
-      wallet_api(fc::api<login_api> rapi);
+      wallet_api( const chain_id_type& chain_id, fc::api<login_api> rapi );
       virtual ~wallet_api();
 
       bool copy_wallet_file( string destination_filename );
@@ -1191,7 +1193,6 @@ class wallet_api
 
       std::map<string,std::function<string(fc::variant,const fc::variants&)>> get_result_formatters() const;
 
-
       fc::signal<void(bool)> lock_changed;
       std::shared_ptr<detail::wallet_api_impl> my;
       void encrypt_keys();
@@ -1207,6 +1208,7 @@ FC_REFLECT( graphene::wallet::blind_confirmation, (trx)(outputs) )
 FC_REFLECT( graphene::wallet::plain_keys, (keys)(checksum) )
 
 FC_REFLECT( graphene::wallet::wallet_data,
+            (chain_id)
             (my_accounts)
             (cipher_keys)
             (extra_keys)

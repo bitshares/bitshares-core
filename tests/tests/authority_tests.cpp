@@ -231,8 +231,8 @@ BOOST_AUTO_TEST_CASE( recursive_accounts )
       sign(trx, parent2_key);
       GRAPHENE_CHECK_THROW(PUSH_TX( db, trx, database::skip_transaction_dupe_check ), fc::exception);
       trx.signatures.clear();
-      trx.sign( parent2_key );
-      trx.sign( grandparent_key );
+      sign( trx,  parent2_key  );
+      sign( trx,  grandparent_key  );
 
       BOOST_TEST_MESSAGE( "Attempt to transfer using parent2_key and grandparent_key" );
       PUSH_TX( db, trx, database::skip_transaction_dupe_check );
@@ -340,7 +340,7 @@ BOOST_AUTO_TEST_CASE( proposed_single_account )
       trx.operations.push_back(op);
       set_expiration( db, trx );
 
-      trx.sign( init_account_priv_key );
+      sign( trx,  init_account_priv_key  );
       const proposal_object& proposal = db.get<proposal_object>(PUSH_TX( db, trx ).operation_results.front().get<object_id_type>());
 
       BOOST_CHECK_EQUAL(proposal.required_active_approvals.size(), 1);
@@ -356,13 +356,13 @@ BOOST_AUTO_TEST_CASE( proposed_single_account )
       pup.active_approvals_to_add.insert(nathan.id);
 
       trx.operations = {pup};
-      trx.sign(  committee_key );
+      sign( trx,   committee_key  );
       //committee may not add nathan's approval.
       GRAPHENE_CHECK_THROW(PUSH_TX( db, trx ), fc::exception);
       pup.active_approvals_to_add.clear();
       pup.active_approvals_to_add.insert(account_id_type());
       trx.operations = {pup};
-      trx.sign(  committee_key );
+      sign( trx,   committee_key  );
       //committee has no stake in the transaction.
       GRAPHENE_CHECK_THROW(PUSH_TX( db, trx ), fc::exception);
 
@@ -371,8 +371,8 @@ BOOST_AUTO_TEST_CASE( proposed_single_account )
       pup.active_approvals_to_add.insert(nathan.id);
       
       trx.operations = {pup};
-      trx.sign(  nathan_key3 );
-      trx.sign(  nathan_key2 );
+      sign( trx,   nathan_key3  );
+      sign( trx,   nathan_key2  );
 
       BOOST_CHECK_EQUAL(get_balance(nathan, core), nathan_start_balance.amount.value);
       PUSH_TX( db, trx );
@@ -407,25 +407,25 @@ BOOST_AUTO_TEST_CASE( committee_authority )
    sign(trx, committee_key);
    GRAPHENE_CHECK_THROW(PUSH_TX( db, trx ), graphene::chain::invalid_committee_approval );
 
-   auto sign = [&] { trx.signatures.clear(); trx.sign(nathan_key); };
+   auto _sign = [&] { trx.signatures.clear(); sign( trx, nathan_key ); };
 
    proposal_create_operation pop;
    pop.proposed_ops.push_back({trx.operations.front()});
    pop.expiration_time = db.head_block_time() + global_params.committee_proposal_review_period*2;
    pop.fee_paying_account = nathan.id;
    trx.operations = {pop};
-   sign();
+   _sign();
 
    // The review period isn't set yet. Make sure it throws.
    GRAPHENE_REQUIRE_THROW( PUSH_TX( db, trx ), proposal_create_review_period_required );
    pop.review_period_seconds = global_params.committee_proposal_review_period / 2;
    trx.operations.back() = pop;
-   sign();
+   _sign();
    // The review period is too short. Make sure it throws.
    GRAPHENE_REQUIRE_THROW( PUSH_TX( db, trx ), proposal_create_review_period_insufficient );
    pop.review_period_seconds = global_params.committee_proposal_review_period;
    trx.operations.back() = pop;
-   sign();
+   _sign();
    proposal_object prop = db.get<proposal_object>(PUSH_TX( db, trx ).operation_results.front().get<object_id_type>());
    BOOST_REQUIRE(db.find_object(prop.id));
 
@@ -457,7 +457,7 @@ BOOST_AUTO_TEST_CASE( committee_authority )
    uop.key_approvals_to_add.emplace(6);
    */
    trx.operations.push_back(uop);
-   trx.sign(committee_key);
+   sign( trx, committee_key );
    db.push_transaction(trx);
    BOOST_CHECK_EQUAL(get_balance(nathan, asset_id_type()(db)), 0);
    BOOST_CHECK(db.get<proposal_object>(prop.id).is_authorized_to_execute(db));
@@ -467,7 +467,7 @@ BOOST_AUTO_TEST_CASE( committee_authority )
    uop.key_approvals_to_add.clear();
    uop.key_approvals_to_add.insert(committee_key.get_public_key()); // was 7
    trx.operations.back() = uop;
-   trx.sign( committee_key);
+   sign( trx,  committee_key );
    // Should throw because the transaction is now in review.
    GRAPHENE_CHECK_THROW(PUSH_TX( db, trx ), fc::exception);
 
@@ -530,7 +530,7 @@ BOOST_FIXTURE_TEST_CASE( fired_committee_members, database_fixture )
    uop.key_approvals_to_add.emplace(9);
    */
    trx.operations.back() = uop;
-   trx.sign(committee_key);
+   sign( trx, committee_key );
    PUSH_TX( db, trx );
    BOOST_CHECK(pid(db).is_authorized_to_execute(db));
 
@@ -601,7 +601,7 @@ BOOST_FIXTURE_TEST_CASE( proposal_two_accounts, database_fixture )
       pop.fee_paying_account = nathan.get_id();
       pop.expiration_time = db.head_block_time() + fc::days(1);
       trx.operations.push_back(pop);
-      trx.sign(nathan_key);
+      sign( trx, nathan_key );
       PUSH_TX( db, trx );
       trx.clear();
    }
@@ -618,7 +618,7 @@ BOOST_FIXTURE_TEST_CASE( proposal_two_accounts, database_fixture )
       uop.active_approvals_to_add.insert(nathan.get_id());
       uop.fee_paying_account = nathan.get_id();
       trx.operations.push_back(uop);
-      trx.sign(nathan_key);
+      sign( trx, nathan_key );
       PUSH_TX( db, trx );
       trx.clear();
 
@@ -627,9 +627,9 @@ BOOST_FIXTURE_TEST_CASE( proposal_two_accounts, database_fixture )
 
       uop.active_approvals_to_add = {dan.get_id()};
       trx.operations.push_back(uop);
-      trx.sign(nathan_key);
+      sign( trx, nathan_key );
       GRAPHENE_REQUIRE_THROW(PUSH_TX( db, trx ), fc::exception);
-      trx.sign(dan_key);
+      sign( trx, dan_key );
       PUSH_TX( db, trx );
 
       BOOST_CHECK(db.find_object(pid) == nullptr);
@@ -663,7 +663,7 @@ BOOST_FIXTURE_TEST_CASE( proposal_delete, database_fixture )
       pop.fee_paying_account = nathan.get_id();
       pop.expiration_time = db.head_block_time() + fc::days(1);
       trx.operations.push_back(pop);
-      trx.sign(nathan_key);
+      sign( trx, nathan_key );
       PUSH_TX( db, trx );
       trx.clear();
    }
@@ -679,7 +679,7 @@ BOOST_FIXTURE_TEST_CASE( proposal_delete, database_fixture )
       uop.proposal = prop.id;
       uop.active_approvals_to_add.insert(nathan.get_id());
       trx.operations.push_back(uop);
-      trx.sign(nathan_key);
+      sign( trx, nathan_key );
       PUSH_TX( db, trx );
       trx.clear();
       BOOST_CHECK(!prop.is_authorized_to_execute(db));
@@ -687,7 +687,7 @@ BOOST_FIXTURE_TEST_CASE( proposal_delete, database_fixture )
 
       std::swap(uop.active_approvals_to_add, uop.active_approvals_to_remove);
       trx.operations.push_back(uop);
-      trx.sign(nathan_key);
+      sign( trx, nathan_key );
       PUSH_TX( db, trx );
       trx.clear();
       BOOST_CHECK(!prop.is_authorized_to_execute(db));
@@ -700,7 +700,7 @@ BOOST_FIXTURE_TEST_CASE( proposal_delete, database_fixture )
       dop.fee_paying_account = nathan.get_id();
       dop.proposal = pid;
       trx.operations.push_back(dop);
-      trx.sign(nathan_key);
+      sign( trx, nathan_key );
       PUSH_TX( db, trx );
       BOOST_CHECK(db.find_object(pid) == nullptr);
       BOOST_CHECK_EQUAL(get_balance(nathan, asset_id_type()(db)), 100000);
@@ -739,7 +739,7 @@ BOOST_FIXTURE_TEST_CASE( proposal_owner_authority_delete, database_fixture )
       pop.fee_paying_account = nathan.get_id();
       pop.expiration_time = db.head_block_time() + fc::days(1);
       trx.operations.push_back(pop);
-      trx.sign(nathan_key);
+      sign( trx, nathan_key );
       PUSH_TX( db, trx );
       trx.clear();
    }
@@ -755,7 +755,7 @@ BOOST_FIXTURE_TEST_CASE( proposal_owner_authority_delete, database_fixture )
       uop.proposal = prop.id;
       uop.owner_approvals_to_add.insert(nathan.get_id());
       trx.operations.push_back(uop);
-      trx.sign(nathan_key);
+      sign( trx, nathan_key );
       PUSH_TX( db, trx );
       trx.clear();
       BOOST_CHECK(!prop.is_authorized_to_execute(db));
@@ -763,7 +763,7 @@ BOOST_FIXTURE_TEST_CASE( proposal_owner_authority_delete, database_fixture )
 
       std::swap(uop.owner_approvals_to_add, uop.owner_approvals_to_remove);
       trx.operations.push_back(uop);
-      trx.sign(nathan_key);
+      sign( trx, nathan_key );
       PUSH_TX( db, trx );
       trx.clear();
       BOOST_CHECK(!prop.is_authorized_to_execute(db));
@@ -777,7 +777,7 @@ BOOST_FIXTURE_TEST_CASE( proposal_owner_authority_delete, database_fixture )
       dop.proposal = pid;
       dop.using_owner_authority = true;
       trx.operations.push_back(dop);
-      trx.sign(nathan_key);
+      sign( trx, nathan_key );
       PUSH_TX( db, trx );
       BOOST_CHECK(db.find_object(pid) == nullptr);
       BOOST_CHECK_EQUAL(get_balance(nathan, asset_id_type()(db)), 100000);
@@ -816,7 +816,7 @@ BOOST_FIXTURE_TEST_CASE( proposal_owner_authority_complete, database_fixture )
       pop.fee_paying_account = nathan.get_id();
       pop.expiration_time = db.head_block_time() + fc::days(1);
       trx.operations.push_back(pop);
-      trx.sign(nathan_key);
+      sign( trx, nathan_key );
       PUSH_TX( db, trx );
       trx.clear();
    }
@@ -834,8 +834,8 @@ BOOST_FIXTURE_TEST_CASE( proposal_owner_authority_complete, database_fixture )
       uop.key_approvals_to_add.insert(dan.active.key_auths.begin()->first);
       trx.operations.push_back(uop);
       set_expiration( db, trx );
-      trx.sign(nathan_key);
-      trx.sign(dan_key);
+      sign( trx, nathan_key );
+      sign( trx, dan_key );
       PUSH_TX( db, trx );
       trx.clear();
       BOOST_CHECK(!prop.is_authorized_to_execute(db));
@@ -844,8 +844,8 @@ BOOST_FIXTURE_TEST_CASE( proposal_owner_authority_complete, database_fixture )
       std::swap(uop.key_approvals_to_add, uop.key_approvals_to_remove);
       trx.operations.push_back(uop);
       trx.expiration += fc::seconds(1);  // Survive trx dupe check
-      trx.sign(nathan_key);
-      trx.sign(dan_key);
+      sign( trx, nathan_key );
+      sign( trx, dan_key );
       PUSH_TX( db, trx );
       trx.clear();
       BOOST_CHECK(!prop.is_authorized_to_execute(db));
@@ -854,8 +854,8 @@ BOOST_FIXTURE_TEST_CASE( proposal_owner_authority_complete, database_fixture )
       std::swap(uop.key_approvals_to_add, uop.key_approvals_to_remove);
       trx.operations.push_back(uop);
       trx.expiration += fc::seconds(1);  // Survive trx dupe check
-      trx.sign(nathan_key);
-      trx.sign(dan_key);
+      sign( trx, nathan_key );
+      sign( trx, dan_key );
       PUSH_TX( db, trx );
       trx.clear();
       BOOST_CHECK(!prop.is_authorized_to_execute(db));
@@ -865,7 +865,7 @@ BOOST_FIXTURE_TEST_CASE( proposal_owner_authority_complete, database_fixture )
       uop.owner_approvals_to_add.insert(nathan.get_id());
       trx.operations.push_back(uop);
       trx.expiration += fc::seconds(1);  // Survive trx dupe check
-      trx.sign(nathan_key);
+      sign( trx, nathan_key );
       PUSH_TX( db, trx );
       trx.clear();
       BOOST_CHECK(db.find_object(pid) == nullptr);
@@ -1003,7 +1003,7 @@ BOOST_FIXTURE_TEST_CASE( bogus_signature, database_fixture )
       trx.operations.push_back( xfer_op );
 
       BOOST_TEST_MESSAGE( "Transfer signed by alice" );
-      trx.sign(alice_key );
+      sign( trx, alice_key  );
 
       flat_set<account_id_type> active_set, owner_set;
       vector<authority> others;
@@ -1018,13 +1018,13 @@ BOOST_FIXTURE_TEST_CASE( bogus_signature, database_fixture )
       // Re-sign, now OK (sig is replaced)
       BOOST_TEST_MESSAGE( "Resign with Alice's Signature" );
       trx.signatures.clear();
-      trx.sign( alice_key );
+      sign( trx,  alice_key  );
       PUSH_TX( db,  trx, skip  );
 
       trx.signatures.clear();
       trx.operations.pop_back();
-      trx.sign( alice_key );
-      trx.sign( charlie_key );
+      sign( trx,  alice_key  );
+      sign( trx,  charlie_key  );
       // Signed by third-party Charlie (irrelevant key, not in authority)
       GRAPHENE_REQUIRE_THROW( PUSH_TX( db,  trx, skip  ), tx_irrelevant_sig );
    }
@@ -1054,7 +1054,7 @@ BOOST_FIXTURE_TEST_CASE( voting_account, database_fixture )
       op.new_options->votes = flat_set<vote_id_type>{nathan_committee_member(db).vote_id};
       op.new_options->num_committee = 1;
       trx.operations.push_back(op);
-      trx.sign(nathan_private_key);
+      sign( trx, nathan_private_key );
       PUSH_TX( db, trx );
       trx.clear();
    }
@@ -1065,13 +1065,13 @@ BOOST_FIXTURE_TEST_CASE( voting_account, database_fixture )
       op.new_options->votes.insert(vikram_committee_member(db).vote_id);
       op.new_options->num_committee = 11;
       trx.operations.push_back(op);
-      trx.sign(vikram_private_key);
+      sign( trx, vikram_private_key );
       // Fails because num_committee is larger than the cardinality of committee members being voted for
       GRAPHENE_CHECK_THROW(PUSH_TX( db, trx ), fc::exception);
       op.new_options->num_committee = 3;
       trx.operations = {op};
       trx.signatures.clear();
-      trx.sign(vikram_private_key);
+      sign( trx, vikram_private_key );
       PUSH_TX( db, trx );
       trx.clear();
    }
@@ -1147,7 +1147,7 @@ BOOST_FIXTURE_TEST_CASE( get_required_signatures_test, database_fixture )
          ) -> bool
       {
          //wdump( (tx)(available_keys) );
-         set<public_key_type> result_set = tx.get_required_signatures( available_keys, get_active, get_owner );
+         set<public_key_type> result_set = tx.get_required_signatures( db.get_chain_id(), available_keys, get_active, get_owner );
          //wdump( (result_set)(ref_set) );
          return result_set == ref_set;
       } ;
@@ -1261,7 +1261,7 @@ BOOST_FIXTURE_TEST_CASE( nonminimal_sig_test, database_fixture )
          ) -> bool
       {
          //wdump( (tx)(available_keys) );
-         set<public_key_type> result_set = tx.get_required_signatures( available_keys, get_active, get_owner );
+         set<public_key_type> result_set = tx.get_required_signatures( db.get_chain_id(), available_keys, get_active, get_owner );
          //wdump( (result_set)(ref_set) );
          return result_set == ref_set;
       } ;
@@ -1273,7 +1273,7 @@ BOOST_FIXTURE_TEST_CASE( nonminimal_sig_test, database_fixture )
          ) -> bool
       {
          //wdump( (tx)(available_keys) );
-         set<public_key_type> result_set = tx.minimize_required_signatures( available_keys, get_active, get_owner );
+         set<public_key_type> result_set = tx.minimize_required_signatures( db.get_chain_id(), available_keys, get_active, get_owner );
          //wdump( (result_set)(ref_set) );
          return result_set == ref_set;
       } ;
@@ -1292,9 +1292,9 @@ BOOST_FIXTURE_TEST_CASE( nonminimal_sig_test, database_fixture )
       BOOST_CHECK( chk( tx, { alice_public_key, bob_public_key }, { alice_public_key, bob_public_key } ) );
       BOOST_CHECK( chk_min( tx, { alice_public_key, bob_public_key }, { alice_public_key } ) );
 
-      GRAPHENE_REQUIRE_THROW( tx.verify_authority( get_active, get_owner ), fc::exception );
-      tx.sign( alice_private_key );
-      tx.verify_authority( get_active, get_owner );
+      GRAPHENE_REQUIRE_THROW( tx.verify_authority( db.get_chain_id(), get_active, get_owner ), fc::exception );
+      sign( tx, alice_private_key );
+      tx.verify_authority( db.get_chain_id(), get_active, get_owner );
    }
    catch(fc::exception& e)
    {

@@ -24,10 +24,11 @@
 
 namespace graphene { namespace chain {
 
-
 digest_type processed_transaction::merkle_digest()const
 {
-   return digest_type::hash(*this);
+   digest_type::encoder enc;
+   fc::raw::pack( enc, *this );
+   return enc.result();
 }
 
 digest_type transaction::digest()const
@@ -36,6 +37,15 @@ digest_type transaction::digest()const
    fc::raw::pack( enc, *this );
    return enc.result();
 }
+
+digest_type transaction::sig_digest( const chain_id_type& chain_id )const
+{
+   digest_type::encoder enc;
+   fc::raw::pack( enc, chain_id );
+   fc::raw::pack( enc, *this );
+   return enc.result();
+}
+
 void transaction::validate() const
 {
    FC_ASSERT( operations.size() > 0, "A transaction must have at least one operation", ("trx",*this) );
@@ -45,22 +55,25 @@ void transaction::validate() const
 
 graphene::chain::transaction_id_type graphene::chain::transaction::id() const
 {
-   digest_type::encoder enc;
-   fc::raw::pack(enc, *this);
-   auto hash = enc.result();
+   auto h = digest();
    transaction_id_type result;
-   memcpy(result._hash, hash._hash, std::min(sizeof(result), sizeof(hash)));
+   memcpy(result._hash, h._hash, std::min(sizeof(result), sizeof(h)));
    return result;
 }
 
-const signature_type& graphene::chain::signed_transaction::sign(const private_key_type& key)
+const signature_type& graphene::chain::signed_transaction::sign(const private_key_type& key, const chain_id_type& chain_id)
 {
-   signatures.push_back(key.sign_compact(digest()));
+   digest_type h = sig_digest( chain_id );
+   signatures.push_back(key.sign_compact(h));
    return signatures.back();
 }
-signature_type graphene::chain::signed_transaction::sign(const private_key_type& key)const
+
+signature_type graphene::chain::signed_transaction::sign(const private_key_type& key, const chain_id_type& chain_id)const
 {
-   return key.sign_compact(digest());
+   digest_type::encoder enc;
+   fc::raw::pack( enc, chain_id );
+   fc::raw::pack( enc, *this );
+   return key.sign_compact(enc.result());
 }
 
 void transaction::set_expiration( fc::time_point_sec expiration_time )
@@ -234,9 +247,9 @@ void verify_authority( const vector<operation>& ops, const flat_set<public_key_t
 } FC_CAPTURE_AND_RETHROW( (ops)(sigs) ) }
 
 
-flat_set<public_key_type> signed_transaction::get_signature_keys()const
+flat_set<public_key_type> signed_transaction::get_signature_keys( const chain_id_type& chain_id )const
 { try {
-   auto d = digest();
+   auto d = sig_digest( chain_id );
    flat_set<public_key_type> result;
    for( const auto&  sig : signatures )
    {
@@ -250,10 +263,12 @@ flat_set<public_key_type> signed_transaction::get_signature_keys()const
 
 
 
-set<public_key_type> signed_transaction::get_required_signatures( const flat_set<public_key_type>& available_keys,
-                                              const std::function<const authority*(account_id_type)>& get_active,
-                                              const std::function<const authority*(account_id_type)>& get_owner,
-                                              uint32_t max_recursion_depth )const
+set<public_key_type> signed_transaction::get_required_signatures(
+   const chain_id_type& chain_id,
+   const flat_set<public_key_type>& available_keys,
+   const std::function<const authority*(account_id_type)>& get_active,
+   const std::function<const authority*(account_id_type)>& get_owner,
+   uint32_t max_recursion_depth )const
 {
    flat_set<account_id_type> required_active;
    flat_set<account_id_type> required_owner;
@@ -261,7 +276,7 @@ set<public_key_type> signed_transaction::get_required_signatures( const flat_set
    get_required_authorities( required_active, required_owner, other );
 
 
-   sign_state s(get_signature_keys(),get_active,available_keys);
+   sign_state s(get_signature_keys( chain_id ),get_active,available_keys);
    s.max_recursion = max_recursion_depth;
 
    for( const auto& auth : other )
@@ -283,13 +298,14 @@ set<public_key_type> signed_transaction::get_required_signatures( const flat_set
 }
 
 set<public_key_type> signed_transaction::minimize_required_signatures(
+   const chain_id_type& chain_id,
    const flat_set<public_key_type>& available_keys,
    const std::function<const authority*(account_id_type)>& get_active,
    const std::function<const authority*(account_id_type)>& get_owner,
    uint32_t max_recursion
    ) const
 {
-   set< public_key_type > s = get_required_signatures( available_keys, get_active, get_owner, max_recursion );
+   set< public_key_type > s = get_required_signatures( chain_id, available_keys, get_active, get_owner, max_recursion );
    flat_set< public_key_type > result( s.begin(), s.end() );
 
    for( const public_key_type& k : s )
@@ -308,11 +324,13 @@ set<public_key_type> signed_transaction::minimize_required_signatures(
    return set<public_key_type>( result.begin(), result.end() );
 }
 
-void signed_transaction::verify_authority( const std::function<const authority*(account_id_type)>& get_active,
-                                           const std::function<const authority*(account_id_type)>& get_owner,
-                                           uint32_t max_recursion )const
+void signed_transaction::verify_authority(
+   const chain_id_type& chain_id,
+   const std::function<const authority*(account_id_type)>& get_active,
+   const std::function<const authority*(account_id_type)>& get_owner,
+   uint32_t max_recursion )const
 { try {
-   graphene::chain::verify_authority( operations, get_signature_keys(), get_active, get_owner, max_recursion );
+   graphene::chain::verify_authority( operations, get_signature_keys( chain_id ), get_active, get_owner, max_recursion );
 } FC_CAPTURE_AND_RETHROW( (*this) ) }
 
 } } // graphene::chain

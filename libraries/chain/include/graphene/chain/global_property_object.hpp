@@ -18,8 +18,8 @@
 #pragma once
 #include <fc/uint128.hpp>
 
-#include <graphene/chain/protocol/chain_parameters.hpp>
 #include <graphene/chain/protocol/chain_id.hpp>
+#include <graphene/chain/protocol/chain_parameters.hpp>
 #include <graphene/chain/database.hpp>
 #include <graphene/db/object.hpp>
 
@@ -48,7 +48,7 @@ namespace graphene { namespace chain {
          // n.b. witness scheduling is done by witness_schedule object
          flat_set<account_id_type>  witness_accounts; // updated once per maintenance interval
 
-         fc::sha256                 chain_id;
+         chain_id_type              chain_id;
    };
 
    /**

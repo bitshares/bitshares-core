@@ -21,6 +21,7 @@
 #include <graphene/net/message.hpp>
 #include <graphene/net/peer_database.hpp>
 
+#include <graphene/chain/protocol/chain_id.hpp>
 #include <graphene/chain/protocol/types.hpp>
 
 #include <list>
@@ -28,6 +29,7 @@
 namespace graphene { namespace net {
 
   using fc::variant_object;
+  using graphene::chain::chain_id_type;
 
   namespace detail
   {
@@ -108,7 +110,7 @@ namespace graphene { namespace net {
           */
          virtual message get_item( const item_id& id ) = 0;
 
-         virtual fc::sha256 get_chain_id()const = 0;
+         virtual chain_id_type get_chain_id()const = 0;
 
          /**
           * Returns a synopsis of the blockchain used for syncing.

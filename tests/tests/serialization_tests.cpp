@@ -42,7 +42,7 @@ BOOST_AUTO_TEST_CASE( serialization_raw_test )
       auto packed = fc::raw::pack( trx );
       signed_transaction unpacked = fc::raw::unpack<signed_transaction>(packed);
       unpacked.validate();
-      BOOST_CHECK( trx.digest() == unpacked.digest() );
+      BOOST_CHECK( digest(trx) == digest(unpacked) );
    } catch (fc::exception& e) {
       edump((e.to_detail_string()));
       throw;
@@ -60,7 +60,7 @@ BOOST_AUTO_TEST_CASE( serialization_json_test )
       fc::variant packed(trx);
       signed_transaction unpacked = packed.as<signed_transaction>();
       unpacked.validate();
-      BOOST_CHECK( trx.digest() == unpacked.digest() );
+      BOOST_CHECK( digest(trx) == digest(unpacked) );
    } catch (fc::exception& e) {
       edump((e.to_detail_string()));
       throw;
@@ -78,7 +78,5 @@ BOOST_AUTO_TEST_CASE( json_tests )
       throw;
    }
 }
-
-
 
 BOOST_AUTO_TEST_SUITE_END()

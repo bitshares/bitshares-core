@@ -332,7 +332,7 @@ BOOST_AUTO_TEST_CASE( create_account_test )
       op.owner = auth_bak;
 
       trx.operations.back() = op;
-      trx.sign( init_account_priv_key);
+      sign( trx,  init_account_priv_key );
       trx.validate();
       PUSH_TX( db, trx, ~0 );
 
@@ -1180,7 +1180,7 @@ BOOST_AUTO_TEST_CASE( witness_pay_test )
    trx.operations.push_back(uop);
    for( auto& op : trx.operations ) db.current_fee_schedule().set_fee(op);
    trx.validate();
-   trx.sign(init_account_priv_key);
+   sign( trx, init_account_priv_key );
    PUSH_TX( db, trx );
    auto pay_fee_time = db.head_block_time().sec_since_epoch();
    trx.clear();

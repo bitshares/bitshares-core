@@ -478,6 +478,7 @@ processed_transaction database::_apply_transaction(const signed_transaction& trx
    uint32_t skip = get_node_properties().skip_flags;
    trx.validate();
    auto& trx_idx = get_mutable_index_type<transaction_index>();
+   const chain_id_type& chain_id = get_chain_id();
    auto trx_id = trx.id();
    FC_ASSERT( (skip & skip_transaction_dupe_check) ||
               trx_idx.indices().get<by_trx_id>().find(trx_id) == trx_idx.indices().get<by_trx_id>().end() );
@@ -489,7 +490,7 @@ processed_transaction database::_apply_transaction(const signed_transaction& trx
    {
       auto get_active = [&]( account_id_type id ) { return &id(*this).active; };
       auto get_owner  = [&]( account_id_type id ) { return &id(*this).owner;  };
-      trx.verify_authority( get_active, get_owner, get_global_properties().parameters.max_authority_depth );
+      trx.verify_authority( chain_id, get_active, get_owner, get_global_properties().parameters.max_authority_depth );
    }
 
    //Skip all manner of expiration and TaPoS checking if we're on block 1; It's impossible that the transaction is

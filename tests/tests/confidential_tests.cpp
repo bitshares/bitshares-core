@@ -72,7 +72,7 @@ BOOST_AUTO_TEST_CASE( confidential_test )
    to_blind.outputs = {out2,out1};
 
    trx.operations = {to_blind};
-   trx.sign( dan_private_key );
+   sign( trx,  dan_private_key  );
    db.push_transaction(trx);
    trx.signatures.clear();
 
@@ -92,7 +92,7 @@ BOOST_AUTO_TEST_CASE( confidential_test )
    blind_tr.outputs = {out3,out4};
    blind_tr.validate();
    trx.operations = {blind_tr};
-   trx.sign( owner2_key );
+   sign( trx,  owner2_key  );
    db.push_transaction(trx);
 
    BOOST_TEST_MESSAGE( "Attempting to double spend the same commitments" );

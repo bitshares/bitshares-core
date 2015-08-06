@@ -16,6 +16,7 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #pragma once
+#include <graphene/chain/protocol/chain_id.hpp>
 #include <graphene/chain/protocol/operations.hpp>
 
 #include <numeric>
@@ -77,10 +78,12 @@ namespace graphene { namespace chain {
       vector<operation>  operations;
       extensions_type    extensions;
 
-      /// Calculate the digest for a transaction with an absolute expiration time
+      /// Calculate the digest for a transaction
       digest_type         digest()const;
       transaction_id_type id()const;
       void                validate() const;
+      /// Calculate the digest used for signature validation
+      digest_type         sig_digest( const chain_id_type& chain_id )const;
 
       void set_expiration( fc::time_point_sec expiration_time );
       void set_reference_block( const block_id_type& reference_block );
@@ -115,10 +118,10 @@ namespace graphene { namespace chain {
          : transaction(trx){}
 
       /** signs and appends to signatures */
-      const signature_type& sign( const private_key_type& key );
+      const signature_type& sign( const private_key_type& key, const chain_id_type& chain_id );
 
       /** returns signature but does not append */
-      signature_type sign( const private_key_type& key )const;
+      signature_type sign( const private_key_type& key, const chain_id_type& chain_id )const;
 
       /**
        *  The purpose of this method is to identify some subset of
@@ -128,15 +131,18 @@ namespace graphene { namespace chain {
        *  validation.
        */
       set<public_key_type> get_required_signatures(
+         const chain_id_type& chain_id,
          const flat_set<public_key_type>& available_keys,
          const std::function<const authority*(account_id_type)>& get_active,
          const std::function<const authority*(account_id_type)>& get_owner,
          uint32_t max_recursion = GRAPHENE_MAX_SIG_CHECK_DEPTH
          )const;
 
-      void verify_authority( const std::function<const authority*(account_id_type)>& get_active,
-                             const std::function<const authority*(account_id_type)>& get_owner,
-                             uint32_t max_recursion = GRAPHENE_MAX_SIG_CHECK_DEPTH )const;
+      void verify_authority(
+         const chain_id_type& chain_id,
+         const std::function<const authority*(account_id_type)>& get_active,
+         const std::function<const authority*(account_id_type)>& get_owner,
+         uint32_t max_recursion = GRAPHENE_MAX_SIG_CHECK_DEPTH )const;
 
       /**
        * This is a slower replacement for get_required_signatures()
@@ -146,13 +152,14 @@ namespace graphene { namespace chain {
        */
 
       set<public_key_type> minimize_required_signatures(
+         const chain_id_type& chain_id,
          const flat_set<public_key_type>& available_keys,
          const std::function<const authority*(account_id_type)>& get_active,
          const std::function<const authority*(account_id_type)>& get_owner,
          uint32_t max_recursion = GRAPHENE_MAX_SIG_CHECK_DEPTH
          ) const;
 
-      flat_set<public_key_type> get_signature_keys()const;
+      flat_set<public_key_type> get_signature_keys( const chain_id_type& chain_id )const;
 
       vector<signature_type> signatures;
 
