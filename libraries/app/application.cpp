@@ -23,6 +23,8 @@
 #include <graphene/chain/protocol/fee_schedule.hpp>
 #include <graphene/chain/protocol/types.hpp>
 
+#include <graphene/egenesis/egenesis.hpp>
+
 #include <graphene/net/core_messages.hpp>
 
 #include <graphene/time/time.hpp>
@@ -226,7 +228,13 @@ namespace detail {
                return fc::json::from_file(_options->at("genesis-json").as<boost::filesystem::path>())
                      .as<genesis_state_type>();
             else
-               return create_example_genesis();
+            {
+               std::string egenesis_json;
+               graphene::egenesis::compute_egenesis_json( egenesis_json );
+               FC_ASSERT( egenesis_json != "" );
+               FC_ASSERT( graphene::egenesis::get_egenesis_json_hash() == fc::sha256::hash( egenesis_json ) );
+               return fc::json::from_string( egenesis_json ).as<genesis_state_type>();
+            }
          };
 
          if( _options->count("resync-blockchain") )
