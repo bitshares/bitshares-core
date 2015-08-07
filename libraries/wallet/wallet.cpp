@@ -379,6 +379,7 @@ public:
       {
          fc::async([this]{resync();}, "Resync after block");
       }, {dynamic_global_property_id_type()} );
+      _wallet.chain_id = _chain_id;
    }
    virtual ~wallet_api_impl()
    {
