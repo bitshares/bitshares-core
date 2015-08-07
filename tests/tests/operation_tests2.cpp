@@ -1190,6 +1190,32 @@ BOOST_AUTO_TEST_CASE( balance_object_test )
    BOOST_CHECK_EQUAL(db.get_balance(op.deposit_to_account, asset_id_type()).amount.value, 901);
 } FC_LOG_AND_RETHROW() }
 
+BOOST_AUTO_TEST_CASE(transfer_with_memo) {
+   try {
+      ACTOR(alice);
+      ACTOR(bob);
+      transfer(account_id_type(), alice_id, asset(1000));
+      BOOST_CHECK_EQUAL(get_balance(alice_id, asset_id_type()), 1000);
+
+      transfer_operation op;
+      op.from = alice_id;
+      op.to = bob_id;
+      op.amount = asset(500);
+      op.memo = memo_data();
+      op.memo->set_message(alice_private_key, bob_public_key, "Dear Bob,\n\nMoney!\n\nLove, Alice");
+      trx.operations = {op};
+      trx.sign(alice_private_key, db.get_global_properties().chain_id);
+      db.push_transaction(trx);
+
+      BOOST_CHECK_EQUAL(get_balance(alice_id, asset_id_type()), 500);
+      BOOST_CHECK_EQUAL(get_balance(bob_id, asset_id_type()), 500);
+
+      auto memo = db.get_recent_transaction(trx.id()).operations.front().get<transfer_operation>().memo;
+      BOOST_CHECK(memo);
+      BOOST_CHECK_EQUAL(memo->get_message(bob_private_key, alice_public_key), "Dear Bob,\n\nMoney!\n\nLove, Alice");
+   } FC_LOG_AND_RETHROW()
+}
+
 // TODO:  Write linear VBO tests
 
 BOOST_AUTO_TEST_SUITE_END()
