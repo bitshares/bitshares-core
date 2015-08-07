@@ -100,10 +100,11 @@ void GrapheneApplication::signTransaction(Transaction* transaction) const
       return &model()->getAccount(id.instance.value)->accountObject().owner;
    };
 
+   auto& chainId = model()->global_properties().chain_id;
    auto& trx = transaction->internalTransaction();
    trx.set_reference_block(model()->dynamic_global_properties().head_block_id);
    flat_set<public_key_type> pubKeys = wallet()->getAvailablePrivateKeys();
-   auto requiredKeys = trx.get_required_signatures(pubKeys, getActiveAuth, getOwnerAuth);
+   auto requiredKeys = trx.get_required_signatures(chainId, pubKeys, getActiveAuth, getOwnerAuth);
    trx.signatures = wallet()->signDigest(trx.digest(), requiredKeys);
    idump((trx));
 }
