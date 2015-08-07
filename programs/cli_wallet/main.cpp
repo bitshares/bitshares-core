@@ -142,12 +142,12 @@ int main( int argc, char** argv )
          if( options.count("chain-id") )
          {
             wdata.chain_id = chain_id_type(options.at("chain-id").as<std::string>());
-            std::cout << "Starting a new wallet with chain ID " << wdata.chain_id << " (from CLI)\n";
+            std::cout << "Starting a new wallet with chain ID " << wdata.chain_id.str() << " (from CLI)\n";
          }
          else
          {
             wdata.chain_id = graphene::egenesis::get_egenesis_chain_id();
-            std::cout << "Starting a new wallet with chain ID " << wdata.chain_id << " (from egenesis)\n";
+            std::cout << "Starting a new wallet with chain ID " << wdata.chain_id.str() << " (from egenesis)\n";
          }
       }
 
