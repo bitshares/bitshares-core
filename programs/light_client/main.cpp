@@ -33,6 +33,7 @@ int main(int argc, char *argv[])
    qRegisterMetaType<std::function<void()>>();
    qRegisterMetaType<ObjectId>();
    qRegisterMetaType<QList<OperationBase*>>();
+   qRegisterMetaType<Transaction::Status>();
 
    qmlRegisterType<Asset>("Graphene.Client", 0, 1, "Asset");
    qmlRegisterType<Balance>("Graphene.Client", 0, 1, "Balance");

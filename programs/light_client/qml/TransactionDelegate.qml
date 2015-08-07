@@ -12,6 +12,11 @@ ColumnLayout {
    property Transaction trx
    property GrapheneApplication app
 
+   Text {
+      font.bold: true
+      font.pointSize: Scaling.cm(.4)
+      text: qsTr("Transaction Status: %1").arg(trx.statusString)
+   }
    Repeater {
       model: trx.operations
       Loader {

@@ -48,12 +48,22 @@ FormBase {
          transparentBorder: true
       }
 
-      TransactionDelegate {
+      // Debugging shim; disable before release
+      Loader {
+         id: delegateLoader
          x: Scaling.mm(2)
          y: Scaling.mm(2)
-         trx: __trx
          Layout.preferredWidth: Scaling.cm(10)
-         app: base.app
+         Component.onCompleted: setSource("TransactionDelegate.qml", {"trx": __trx, "app": base.app})
+
+         MouseArea {
+            anchors.fill: parent
+            onClicked: {
+               console.log("Reloading transaction")
+               delegateLoader.source = ""
+               delegateLoader.setSource("TransactionDelegate.qml", {"trx": __trx, "app": base.app})
+            }
+         }
       }
    }
    RowLayout {

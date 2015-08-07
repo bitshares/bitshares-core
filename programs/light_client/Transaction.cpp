@@ -19,6 +19,11 @@ struct OperationConverter {
    }
 };
 
+QString Transaction::statusString() const
+{
+   return QMetaEnum::fromType<Status>().valueToKey(status());
+}
+
 QQmlListProperty<OperationBase> Transaction::operations()
 {
    auto append = [](QQmlListProperty<OperationBase>* list, OperationBase* op) {

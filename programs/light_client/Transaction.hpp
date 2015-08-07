@@ -17,6 +17,7 @@ public:
    Q_ENUM(Status);
 
    Status status() const { return m_status; }
+   QString statusString() const;
    QQmlListProperty<OperationBase> operations();
 
    OperationBase* operationAt(int index) const;
@@ -72,6 +73,7 @@ signals:
 
 private:
    Q_PROPERTY(Status status READ status WRITE setStatus NOTIFY statusChanged)
+   Q_PROPERTY(QString statusString READ statusString NOTIFY statusChanged STORED false)
    Q_PROPERTY(QQmlListProperty<OperationBase> operations READ operations NOTIFY operationsChanged)
    Q_PROPERTY(QDateTime expiration READ expiration WRITE setExpiration NOTIFY expirationChanged)
 
