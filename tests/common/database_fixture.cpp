@@ -822,7 +822,7 @@ void database_fixture::enable_fees()
    db.modify(global_property_id_type()(db), [](global_property_object& gpo)
    {
       gpo.parameters.current_fees = fee_schedule::get_default();
-   } );
+   });
 }
 
 void database_fixture::upgrade_to_lifetime_member(account_id_type account)

@@ -5,7 +5,7 @@ namespace graphene { namespace chain {
 
    template<typename T> struct transform_to_fee_parameters;
    template<typename ...T>
-   struct transform_to_fee_parameters<fc::static_variant<T...>> 
+   struct transform_to_fee_parameters<fc::static_variant<T...>>
    {
       typedef fc::static_variant< typename T::fee_parameters_type... > type;
    };
@@ -21,7 +21,7 @@ namespace graphene { namespace chain {
       static fee_schedule get_default();
 
       /**
-       *  Finds the appropriate fee parameter struct for the operation 
+       *  Finds the appropriate fee parameter struct for the operation
        *  and then calculates the appropriate fee.
        */
       asset calculate_fee( const operation& op, const price& core_exchange_rate = price::unit_price() )const;
@@ -41,6 +41,13 @@ namespace graphene { namespace chain {
          FC_ASSERT( itr != parameters.end() );
          return itr->template get<typename Operation::fee_parameters_type>();
       }
+      template<typename Operation>
+      typename Operation::fee_parameters_type& get()
+      {
+         auto itr = parameters.find( typename Operation::fee_parameters_type() );
+         FC_ASSERT( itr != parameters.end() );
+         return itr->template get<typename Operation::fee_parameters_type>();
+      }
 
       /**
        *  @note must be sorted by fee_parameters.which() and have no duplicates
@@ -51,7 +58,7 @@ namespace graphene { namespace chain {
 
    typedef fee_schedule fee_schedule_type;
 
-} } // graphene::chain 
+} } // graphene::chain
 
 FC_REFLECT_TYPENAME( graphene::chain::fee_parameters )
 FC_REFLECT( graphene::chain::fee_schedule, (parameters)(scale) )

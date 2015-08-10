@@ -461,12 +461,9 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
 
    modify(gpo, [this](global_property_object& p) {
       // Remove scaling of account registration fee
-     /*
-      /// TODO reimplement this 
       const auto& dgpo = get_dynamic_global_properties();
-      p.parameters.current_fees.account_create_fee >>= p.parameters.account_fee_scale_bitshifts *
+      p.parameters.current_fees->get<account_create_operation>().basic_fee >>= p.parameters.account_fee_scale_bitshifts *
             (dgpo.accounts_registered_this_interval / p.parameters.accounts_per_fee_scale);
-     */
 
       if( p.pending_parameters )
       {
