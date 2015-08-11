@@ -21,6 +21,8 @@
 
 namespace graphene { namespace chain {
 
+   extern const int64_t scaled_precision_lut[];
+
    struct asset
    {
       asset( share_type a = 0, asset_id_type id = asset_id_type() )
@@ -79,6 +81,12 @@ namespace graphene { namespace chain {
       {
          FC_ASSERT( a.asset_id == b.asset_id );
          return asset( a.amount + b.amount, a.asset_id );
+      }
+
+      static share_type scaled_precision( uint8_t precision )
+      {
+         FC_ASSERT( precision < 19 );
+         return scaled_precision_lut[ precision ];
       }
    };
 

@@ -921,7 +921,7 @@ BOOST_AUTO_TEST_CASE( uia_fees )
       const asset_dynamic_data_object& asset_dynamic = test_asset.dynamic_asset_data_id(db);
       const account_object& nathan_account = get_account("nathan");
       const account_object& committee_account = account_id_type()(db);
-      const auto prec = asset_id_type()(db).precision;
+      const share_type prec = asset::scaled_precision( asset_id_type()(db).precision );
 
       fund_fee_pool(committee_account, test_asset, 1000*prec);
       BOOST_CHECK(asset_dynamic.fee_pool == 1000*prec);
@@ -1128,7 +1128,7 @@ BOOST_AUTO_TEST_CASE( fill_order )
 BOOST_AUTO_TEST_CASE( witness_pay_test )
 { try {
 
-   const auto prec = asset_id_type()(db).precision;
+   const share_type prec = asset::scaled_precision( asset_id_type()(db).precision );
 
    // there is an immediate maintenance interval in the first block
    //   which will initialize last_budget_time
@@ -1188,7 +1188,7 @@ BOOST_AUTO_TEST_CASE( witness_pay_test )
    PUSH_TX( db, trx );
    auto pay_fee_time = db.head_block_time().sec_since_epoch();
    trx.clear();
-   BOOST_CHECK_EQUAL(get_balance(*nathan, *core), 20000*prec - account_upgrade_operation::fee_parameters_type().membership_lifetime_fee );;
+   BOOST_CHECK( get_balance(*nathan, *core) == 20000*prec - account_upgrade_operation::fee_parameters_type().membership_lifetime_fee );;
 
    generate_block();
    nathan = &get_account("nathan");
@@ -1215,7 +1215,7 @@ BOOST_AUTO_TEST_CASE( witness_pay_test )
 
    schedule_maint();
    // The 80% lifetime referral fee went to the committee account, which burned it. Check that it's here.
-   BOOST_CHECK_EQUAL( core->reserved(db).value, 8000*prec );
+   BOOST_CHECK( core->reserved(db).value == 8000*prec );
    generate_block();
    BOOST_CHECK_EQUAL( core->reserved(db).value, 999999406 );
    BOOST_CHECK_EQUAL( db.get_dynamic_global_properties().witness_budget.value, ref_budget );

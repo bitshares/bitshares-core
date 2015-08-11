@@ -314,10 +314,40 @@ BOOST_AUTO_TEST_CASE( witness_rng_test_bits )
    } FC_LOG_AND_RETHROW()
 }
 
-
 BOOST_AUTO_TEST_CASE( exceptions )
 {
    GRAPHENE_CHECK_THROW(FC_THROW_EXCEPTION(balance_claim_invalid_claim_amount, "Etc"), balance_claim_invalid_claim_amount);
+}
+
+BOOST_AUTO_TEST_CASE( scaled_precision )
+{
+   const int64_t _k = 1000;
+   const int64_t _m = _k*_k;
+   const int64_t _g = _m*_k;
+   const int64_t _t = _g*_k;
+   const int64_t _p = _t*_k;
+   const int64_t _e = _p*_k;
+
+   BOOST_CHECK( asset::scaled_precision( 0) == share_type(   1   ) );
+   BOOST_CHECK( asset::scaled_precision( 1) == share_type(  10   ) );
+   BOOST_CHECK( asset::scaled_precision( 2) == share_type( 100   ) );
+   BOOST_CHECK( asset::scaled_precision( 3) == share_type(   1*_k) );
+   BOOST_CHECK( asset::scaled_precision( 4) == share_type(  10*_k) );
+   BOOST_CHECK( asset::scaled_precision( 5) == share_type( 100*_k) );
+   BOOST_CHECK( asset::scaled_precision( 6) == share_type(   1*_m) );
+   BOOST_CHECK( asset::scaled_precision( 7) == share_type(  10*_m) );
+   BOOST_CHECK( asset::scaled_precision( 8) == share_type( 100*_m) );
+   BOOST_CHECK( asset::scaled_precision( 9) == share_type(   1*_g) );
+   BOOST_CHECK( asset::scaled_precision(10) == share_type(  10*_g) );
+   BOOST_CHECK( asset::scaled_precision(11) == share_type( 100*_g) );
+   BOOST_CHECK( asset::scaled_precision(12) == share_type(   1*_t) );
+   BOOST_CHECK( asset::scaled_precision(13) == share_type(  10*_t) );
+   BOOST_CHECK( asset::scaled_precision(14) == share_type( 100*_t) );
+   BOOST_CHECK( asset::scaled_precision(15) == share_type(   1*_p) );
+   BOOST_CHECK( asset::scaled_precision(16) == share_type(  10*_p) );
+   BOOST_CHECK( asset::scaled_precision(17) == share_type( 100*_p) );
+   BOOST_CHECK( asset::scaled_precision(18) == share_type(   1*_e) );
+   GRAPHENE_CHECK_THROW( asset::scaled_precision(19), fc::exception );
 }
 
 BOOST_AUTO_TEST_SUITE_END()

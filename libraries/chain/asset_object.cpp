@@ -110,9 +110,7 @@ asset asset_object::amount_from_string(string amount_string) const
 
    share_type satoshis = 0;
 
-   share_type scaled_precision = 1;
-   for( uint8_t i = 0; i < precision; ++i )
-      scaled_precision *= 10;
+   share_type scaled_precision = asset::scaled_precision( precision );
 
    const auto decimal_pos = amount_string.find( '.' );
    const string lhs = amount_string.substr( negative_found, decimal_pos );
