@@ -22,6 +22,7 @@
 #include <graphene/app/application.hpp>
 #include <graphene/app/impacted.hpp>
 #include <graphene/chain/database.hpp>
+#include <graphene/chain/get_config.hpp>
 #include <graphene/utilities/key_conversion.hpp>
 #include <graphene/chain/protocol/fee_schedule.hpp>
 #include <graphene/chain/withdraw_permission_object.hpp>
@@ -138,6 +139,11 @@ namespace graphene { namespace app {
     global_property_object database_api::get_global_properties()const
     {
        return _db.get(global_property_id_type());
+    }
+
+    fc::variant_object database_api::get_config()const
+    {
+       return get_config();
     }
 
     chain_id_type database_api::get_chain_id()const

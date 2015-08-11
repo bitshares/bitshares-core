@@ -90,6 +90,11 @@ namespace graphene { namespace app {
          global_property_object get_global_properties()const;
 
          /**
+          * @brief Retrieve compile-time constants
+          */
+         fc::variant_object get_config()const;
+
+         /**
           * @brief Get the chain ID
           */
          chain_id_type get_chain_id()const;

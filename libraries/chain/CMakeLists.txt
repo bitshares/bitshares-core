@@ -41,6 +41,7 @@ add_library( graphene_chain
              protocol/vote.cpp
 
              genesis_state.cpp
+             get_config.cpp
 
              pts_address.cpp
 
