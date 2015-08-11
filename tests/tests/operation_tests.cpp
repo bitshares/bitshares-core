@@ -921,9 +921,10 @@ BOOST_AUTO_TEST_CASE( uia_fees )
       const asset_dynamic_data_object& asset_dynamic = test_asset.dynamic_asset_data_id(db);
       const account_object& nathan_account = get_account("nathan");
       const account_object& committee_account = account_id_type()(db);
+      const auto prec = asset_id_type()(db).precision;
 
-      fund_fee_pool(committee_account, test_asset, 1000*CORE);
-      BOOST_CHECK(asset_dynamic.fee_pool == 1000*CORE);
+      fund_fee_pool(committee_account, test_asset, 1000*prec);
+      BOOST_CHECK(asset_dynamic.fee_pool == 1000*prec);
 
       transfer_operation op;
       op.fee = test_asset.amount(0);
@@ -943,7 +944,7 @@ BOOST_AUTO_TEST_CASE( uia_fees )
                         (old_balance - fee - test_asset.amount(100)).amount.value);
       BOOST_CHECK_EQUAL(get_balance(committee_account, test_asset), 100);
       BOOST_CHECK(asset_dynamic.accumulated_fees == fee.amount);
-      BOOST_CHECK(asset_dynamic.fee_pool == 1000*CORE - core_fee.amount);
+      BOOST_CHECK(asset_dynamic.fee_pool == 1000*prec - core_fee.amount);
 
       //Do it again, for good measure.
       PUSH_TX( db, trx, ~0 );
@@ -951,7 +952,7 @@ BOOST_AUTO_TEST_CASE( uia_fees )
                         (old_balance - fee - fee - test_asset.amount(200)).amount.value);
       BOOST_CHECK_EQUAL(get_balance(committee_account, test_asset), 200);
       BOOST_CHECK(asset_dynamic.accumulated_fees == fee.amount + fee.amount);
-      BOOST_CHECK(asset_dynamic.fee_pool == 1000*CORE - core_fee.amount - core_fee.amount);
+      BOOST_CHECK(asset_dynamic.fee_pool == 1000*prec - core_fee.amount - core_fee.amount);
 
       op = std::move(trx.operations.back().get<transfer_operation>());
       trx.operations.clear();
@@ -969,7 +970,7 @@ BOOST_AUTO_TEST_CASE( uia_fees )
                         (old_balance - fee - fee - fee - test_asset.amount(200)).amount.value);
       BOOST_CHECK_EQUAL(get_balance(committee_account, test_asset), 200);
       BOOST_CHECK(asset_dynamic.accumulated_fees == fee.amount.value * 3);
-      BOOST_CHECK(asset_dynamic.fee_pool == 1000*CORE - core_fee.amount.value * 3);
+      BOOST_CHECK(asset_dynamic.fee_pool == 1000*prec - core_fee.amount.value * 3);
    } catch (fc::exception& e) {
       edump((e.to_detail_string()));
       throw;
@@ -1126,14 +1127,17 @@ BOOST_AUTO_TEST_CASE( fill_order )
 
 BOOST_AUTO_TEST_CASE( witness_pay_test )
 { try {
+
+   const auto prec = asset_id_type()(db).precision;
+
    // there is an immediate maintenance interval in the first block
    //   which will initialize last_budget_time
    generate_block();
 
    // Make an account and upgrade it to prime, so that witnesses get some pay
    create_account("nathan", init_account_pub_key);
-   transfer(account_id_type()(db), get_account("nathan"), asset(20000*CORE));
-   transfer(account_id_type()(db), get_account("init3"), asset(20*CORE));
+   transfer(account_id_type()(db), get_account("nathan"), asset(20000*prec));
+   transfer(account_id_type()(db), get_account("init3"), asset(20*prec));
    generate_block();
 
    auto last_witness_vbo_balance = [&]() -> share_type
@@ -1184,7 +1188,7 @@ BOOST_AUTO_TEST_CASE( witness_pay_test )
    PUSH_TX( db, trx );
    auto pay_fee_time = db.head_block_time().sec_since_epoch();
    trx.clear();
-   BOOST_CHECK_EQUAL(get_balance(*nathan, *core), 20000*CORE - account_upgrade_operation::fee_parameters_type().membership_lifetime_fee );;
+   BOOST_CHECK_EQUAL(get_balance(*nathan, *core), 20000*prec - account_upgrade_operation::fee_parameters_type().membership_lifetime_fee );;
 
    generate_block();
    nathan = &get_account("nathan");
@@ -1211,7 +1215,7 @@ BOOST_AUTO_TEST_CASE( witness_pay_test )
 
    schedule_maint();
    // The 80% lifetime referral fee went to the committee account, which burned it. Check that it's here.
-   BOOST_CHECK_EQUAL( core->reserved(db).value, 8000*CORE );
+   BOOST_CHECK_EQUAL( core->reserved(db).value, 8000*prec );
    generate_block();
    BOOST_CHECK_EQUAL( core->reserved(db).value, 999999406 );
    BOOST_CHECK_EQUAL( db.get_dynamic_global_properties().witness_budget.value, ref_budget );
