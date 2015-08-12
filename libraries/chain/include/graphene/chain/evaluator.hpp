@@ -16,6 +16,7 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #pragma once
+#include <graphene/chain/exceptions.hpp>
 #include <graphene/chain/protocol/operations.hpp>
 
 namespace graphene { namespace chain {
@@ -190,7 +191,8 @@ namespace graphene { namespace chain {
          const auto& op = o.get<typename DerivedEvaluator::operation_type>();
 
          prepare_fee(op.fee_payer(), op.fee);
-         FC_ASSERT( core_fee_paid >= db().current_fee_schedule().calculate_fee( op ).amount,
+         GRAPHENE_ASSERT( core_fee_paid >= db().current_fee_schedule().calculate_fee( op ).amount,
+                    insufficient_fee,
                     "Insufficient Fee Paid",
                     ("core_fee_paid",core_fee_paid)("required",db().current_fee_schedule().calculate_fee( op ).amount) );
 

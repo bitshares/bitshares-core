@@ -24,8 +24,49 @@
 #include "../common/database_fixture.hpp"
 
 using namespace graphene::chain;
+using namespace graphene::chain::test;
 
 BOOST_FIXTURE_TEST_SUITE( fee_tests, database_fixture )
+
+BOOST_AUTO_TEST_CASE( nonzero_fee_test )
+{
+   try
+   {
+      ACTORS((alice)(bob));
+
+      const share_type prec = asset::scaled_precision( asset_id_type()(db).precision );
+
+      // Return number of core shares (times precision)
+      auto _core = [&]( int64_t x ) -> asset
+      {  return asset( x*prec );    };
+
+      transfer( committee_account, alice_id, _core(1000000) );
+
+      // make sure the database requires our fee to be nonzero
+      enable_fees();
+
+      signed_transaction tx;
+      transfer_operation xfer_op;
+      xfer_op.from = alice_id;
+      xfer_op.to = bob_id;
+      xfer_op.amount = _core(1000);
+      xfer_op.fee = _core(0);
+      tx.operations.push_back( xfer_op );
+      set_expiration( db, tx );
+      sign( tx, alice_private_key );
+      GRAPHENE_REQUIRE_THROW( PUSH_TX( db, tx ), insufficient_fee );
+   }
+   catch( const fc::exception& e )
+   {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
+
+///////////////////////////////////////////////////////////////
+// cashback_test infrastructure                              //
+///////////////////////////////////////////////////////////////
 
 #define CHECK_BALANCE( actor_name, amount ) \
    BOOST_CHECK_EQUAL( get_balance( actor_name ## _id, asset_id_type() ), amount )
