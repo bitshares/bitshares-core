@@ -15,5 +15,8 @@ class BlockChain : public QObject {
 
 public:
    BlockChain();
-   virtual ~BlockChain(){}
+   virtual ~BlockChain();
+
+public Q_SLOTS:
+   void start();
 };

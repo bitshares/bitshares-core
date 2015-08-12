@@ -17,7 +17,7 @@ qt5_add_resources(QML_QRC qml/qml.qrc)
 add_executable(full_web_node BlockChain.cpp main.cpp ${QML_QRC} ${QML})
 
 target_link_libraries(full_web_node PRIVATE Qt5::Core Qt5::Quick Qt5::WebEngine
-   graphene_chain graphene_egenesis_brief graphene_utilities fc graphene_account_history graphene_market_history graphene_app )
+   graphene_chain graphene_egenesis_full graphene_utilities fc graphene_account_history graphene_market_history graphene_app )
 
 install( TARGETS
    full_web_node

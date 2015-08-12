@@ -7,6 +7,8 @@ Window {
    width: Screen.width / 2
    height: Screen.height / 2
 
+   Component.onCompleted: blockChain.start()
+
    Rectangle { anchors.fill: parent; color: "#1F1F1F" }
    WebEngineView {
       anchors.fill: parent
