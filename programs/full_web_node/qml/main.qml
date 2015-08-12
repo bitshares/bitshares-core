@@ -3,11 +3,14 @@ import QtQuick.Window 2.2
 import QtWebEngine 1.0
 
 Window {
-   width: 800
-   height: 600
-   visible: true
+   id: window
+   width: Screen.width / 2
+   height: Screen.height / 2
 
+   Rectangle { anchors.fill: parent; color: "#1F1F1F" }
    WebEngineView {
       anchors.fill: parent
+      url: "http://localhost:8080"
+      onLoadProgressChanged: if (loadProgress === 100) window.visible = true
    }
 }
