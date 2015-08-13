@@ -16,6 +16,7 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <fc/smart_ref_impl.hpp>
 #include <fc/uint128.hpp>
 #include <graphene/chain/vesting_balance_object.hpp>
 

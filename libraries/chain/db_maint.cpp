@@ -16,6 +16,9 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <fc/smart_ref_impl.hpp>
+#include <fc/uint128.hpp>
+
 #include <graphene/chain/database.hpp>
 
 #include <graphene/chain/account_object.hpp>
@@ -26,8 +29,6 @@
 #include <graphene/chain/witness_object.hpp>
 #include <graphene/chain/witness_schedule_object.hpp>
 #include <graphene/chain/worker_evaluator.hpp>
-
-#include <fc/uint128.hpp>
 
 namespace graphene { namespace chain {
 
