@@ -223,6 +223,16 @@ namespace graphene { namespace app {
          fc::optional<witness_object> get_witness_by_account(account_id_type account)const;
 
          /**
+          *  @brief Given a set of votes, return the objects they are voting for.  
+          *
+          *  This will be a mixture of committee_member_object, witness_objects, and worker_objects 
+          *
+          *  The results will be in the same order as the votes.  Null will be returned for
+          *  any vote ids that are not found.
+          */
+         vector<variant> lookup_vote_ids( const vector<vote_id_type>& votes )const;
+
+         /**
           * @brief Get the total number of witnesses registered with the blockchain
           */
          uint64_t get_witness_count()const;
@@ -558,6 +568,7 @@ FC_API(graphene::app::database_api,
        (get_witnesses)
        (get_committee_members)
        (get_witness_by_account)
+       (lookup_vote_ids)
        (get_witness_count)
        (lookup_witness_accounts)
        (lookup_committee_member_accounts)

@@ -43,6 +43,7 @@ namespace graphene { namespace chain {
    };
 
    struct by_account;
+   struct by_vote_id;
    using witness_multi_index_type = multi_index_container<
       witness_object,
       indexed_by<
@@ -51,6 +52,9 @@ namespace graphene { namespace chain {
          >,
          hashed_unique< tag<by_account>,
             member<witness_object, account_id_type, &witness_object::witness_account>
+         >,
+         hashed_unique< tag<by_vote_id>,
+            member<witness_object, vote_id_type, &witness_object::vote_id>
          >
       >
    >;

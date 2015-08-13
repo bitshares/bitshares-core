@@ -52,6 +52,7 @@ struct vote_id_type
    /// Lower 8 bits are type; upper 24 bits are instance
    uint32_t content;
 
+   friend size_t hash_value( vote_id_type v ) { return std::hash<uint32_t>()(v.content); }
    enum vote_type
    {
       committee,

@@ -417,6 +417,44 @@ namespace graphene { namespace app {
           return *itr;
        return {};
     }
+    vector<variant> database_api::lookup_vote_ids( const vector<vote_id_type>& votes )const
+    {
+       FC_ASSERT( votes.size() < 100, "Only 100 votes can be queried at a time" );
+
+       const auto& witness_idx = _db.get_index_type<witness_index>().indices().get<by_vote_id>();
+       const auto& committee_idx = _db.get_index_type<committee_member_index>().indices().get<by_vote_id>();
+
+       vector<variant> result;
+       result.reserve( votes.size() );
+       for( auto id : votes )
+       {
+          switch( id.type() )
+          {
+             case vote_id_type::committee:
+             {
+                auto itr = committee_idx.find( id );
+                if( itr != committee_idx.end() )
+                   result.emplace_back( variant( *itr ) );
+                else
+                   result.emplace_back( variant() );
+                break;
+             }
+             case vote_id_type::witness:
+             {
+                auto itr = witness_idx.find( id );
+                if( itr != witness_idx.end() )
+                   result.emplace_back( variant( *itr ) );
+                else
+                   result.emplace_back( variant() );
+                break;
+             }
+             case vote_id_type::worker:
+                break;
+             case vote_id_type::VOTE_TYPE_COUNT: break; // supress unused enum value warnings
+          }
+       }
+       return result;
+    }
 
     uint64_t database_api::get_witness_count()const
     {
