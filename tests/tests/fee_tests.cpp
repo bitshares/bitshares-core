@@ -434,18 +434,21 @@ BOOST_AUTO_TEST_CASE( account_create_fee_scaling )
       gpo.parameters.current_fees->get<account_create_operation>().basic_fee = 1;
    });
 
-   BOOST_CHECK_EQUAL(db.get_global_properties().parameters.current_fees->get<account_create_operation>().basic_fee, 1);
    for( int i = db.get_dynamic_global_properties().accounts_registered_this_interval; i < accounts_per_scale; ++i )
+   {
+      BOOST_CHECK_EQUAL(db.get_global_properties().parameters.current_fees->get<account_create_operation>().basic_fee, 1);
       create_account("shill" + fc::to_string(i));
-   generate_block();
-   BOOST_CHECK_EQUAL(db.get_global_properties().parameters.current_fees->get<account_create_operation>().basic_fee, 16);
+   }
    for( int i = 0; i < accounts_per_scale; ++i )
+   {
+      BOOST_CHECK_EQUAL(db.get_global_properties().parameters.current_fees->get<account_create_operation>().basic_fee, 16);
       create_account("moreshills" + fc::to_string(i));
-   generate_block();
-   BOOST_CHECK_EQUAL(db.get_global_properties().parameters.current_fees->get<account_create_operation>().basic_fee, 256);
+   }
    for( int i = 0; i < accounts_per_scale; ++i )
+   {
+      BOOST_CHECK_EQUAL(db.get_global_properties().parameters.current_fees->get<account_create_operation>().basic_fee, 256);
       create_account("moarshills" + fc::to_string(i));
-   generate_block();
+   }
    BOOST_CHECK_EQUAL(db.get_global_properties().parameters.current_fees->get<account_create_operation>().basic_fee, 4096);
 
    generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
