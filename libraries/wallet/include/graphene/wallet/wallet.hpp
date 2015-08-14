@@ -194,6 +194,7 @@ struct exported_account_keys
 {
     string account_name;
     vector<vector<char>> encrypted_private_keys;
+    vector<public_key_type> public_keys;
 };
 
 struct exported_keys
@@ -1226,7 +1227,7 @@ FC_REFLECT( graphene::wallet::brain_key_info,
             (pub_key)
           );
 
-FC_REFLECT( graphene::wallet::exported_account_keys, (account_name)(encrypted_private_keys) )
+FC_REFLECT( graphene::wallet::exported_account_keys, (account_name)(encrypted_private_keys)(public_keys) )
 
 FC_REFLECT( graphene::wallet::exported_keys, (password_checksum)(account_keys) )
 
