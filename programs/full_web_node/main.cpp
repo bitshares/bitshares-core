@@ -26,7 +26,7 @@ int main(int argc, char *argv[])
    serverThread.async([&webGuiServer] {
       webGuiServer.listen(fc::ip::endpoint::from_string("127.0.0.1:8080"));
       webGuiServer.on_request([](const fc::http::request& request, const fc::http::server::response& response) {
-         QString path = QStringLiteral("/Users/nathan/graphene-ui/web/dist") + QString::fromStdString(request.path);
+         QString path = QStringLiteral(":") + QString::fromStdString(request.path);
          if (path.endsWith('/'))
             path.append(QStringLiteral("index.html"));
          QFile file(path);
