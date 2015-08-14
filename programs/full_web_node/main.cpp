@@ -20,20 +20,13 @@ int main(int argc, char *argv[])
    app.setOrganizationDomain("cryptonomex.org");
    app.setOrganizationName("Cryptonomex, Inc.");
 
-   QThread chainThread;
-   fc::promise<BlockChain*>::ptr chain = new fc::promise<BlockChain*>;
-   QObject::connect(&chainThread, &QThread::started, [&app, &chain] {
-      chain->set_value(new BlockChain);
-   });
-   chainThread.start();
-
    QtWebEngine::initialize();
    fc::http::server webGuiServer;
    fc::thread serverThread("HTTP server thread");
    serverThread.async([&webGuiServer] {
       webGuiServer.listen(fc::ip::endpoint::from_string("127.0.0.1:8080"));
       webGuiServer.on_request([](const fc::http::request& request, const fc::http::server::response& response) {
-         QString path = QStringLiteral("/Users/nathan/graphene-ui/web/bundle") + QString::fromStdString(request.path);
+         QString path = QStringLiteral("/Users/nathan/graphene-ui/web/dist") + QString::fromStdString(request.path);
          if (path.endsWith('/'))
             path.append(QStringLiteral("index.html"));
          QFile file(path);
@@ -52,13 +45,9 @@ int main(int argc, char *argv[])
       });
    });
 
+   qmlRegisterType<BlockChain>("Graphene.FullNode", 1, 0, "BlockChain");
    QQmlApplicationEngine engine;
-   auto chainPtr = chain->wait();
-   engine.rootContext()->setContextProperty(QStringLiteral("blockChain"), chainPtr);
    engine.load(QUrl(QStringLiteral("qrc:/main.qml")));
 
-   auto ret = app.exec();
-   chainPtr->deleteLater();
-   chainThread.exit(ret);
-   return ret;
+   return app.exec();
 }

@@ -22,6 +22,7 @@
 
 #include <graphene/chain/protocol/fee_schedule.hpp>
 #include <graphene/chain/protocol/types.hpp>
+#include <graphene/time/time.hpp>
 
 #include <graphene/egenesis/egenesis.hpp>
 
@@ -240,19 +241,18 @@ namespace detail {
          if( _options->count("resync-blockchain") )
             _chain_db->wipe(_data_dir / "blockchain", true);
 
+         flat_map<uint32_t,block_id_type> loaded_checkpoints;
          if( _options->count("checkpoint") )
          {
             auto cps = _options->at("checkpoint").as<vector<string>>();
-            flat_map<uint32_t,block_id_type> loaded_checkpoints;
             loaded_checkpoints.reserve( cps.size() );
             for( auto cp : cps )
             {
                auto item = fc::json::from_string(cp).as<std::pair<uint32_t,block_id_type> >();
                loaded_checkpoints[item.first] = item.second;
             }
-            _chain_db->add_checkpoints( loaded_checkpoints );
          }
-
+         _chain_db->add_checkpoints( loaded_checkpoints );
 
          if( _options->count("replay-blockchain") )
          {
@@ -264,6 +264,18 @@ namespace detail {
             wlog("Detected unclean shutdown. Replaying blockchain...");
             _chain_db->reindex(_data_dir / "blockchain", initial_state());
          }
+
+         if (!_options->count("genesis-json") &&
+             _chain_db->get_global_properties().chain_id != graphene::egenesis::get_egenesis_chain_id()) {
+            elog("Detected old database. Nuking and starting over.");
+            _chain_db->wipe(_data_dir / "blockchain", true);
+            _chain_db.reset();
+            _chain_db = std::make_shared<chain::database>();
+            _chain_db->add_checkpoints(loaded_checkpoints);
+            _chain_db->open(_data_dir / "blockchain", initial_state);
+         }
+
+         graphene::time::now();
 
          if( _options->count("apiaccess") )
             _apiaccess = fc::json::from_file( _options->at("apiaccess").as<boost::filesystem::path>() )

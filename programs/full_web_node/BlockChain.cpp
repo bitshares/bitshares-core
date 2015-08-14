@@ -15,7 +15,7 @@
 #include <QDir>
 
 BlockChain::BlockChain()
-   : chainThread(fc::thread::current()),
+   : chainThread(new fc::thread("chainThread")),
      fcTaskScheduler(new QTimer(this)),
      grapheneApp(new graphene::app::application)
 {
@@ -25,25 +25,33 @@ BlockChain::BlockChain()
    fcTaskScheduler->start();
 }
 
-BlockChain::~BlockChain(){
-   grapheneApp->shutdown_plugins();
+BlockChain::~BlockChain() {
+   startFuture.cancel_and_wait(__FUNCTION__);
+   chainThread->async([this] {
+      grapheneApp->shutdown_plugins();
+      delete grapheneApp;
+   }).wait();
+   delete chainThread;
 }
 
 void BlockChain::start()
 {
-   try {
-   grapheneApp->register_plugin<graphene::account_history::account_history_plugin>();
-   grapheneApp->register_plugin<graphene::market_history::market_history_plugin>();
+   startFuture = chainThread->async([this] {
+      try {
+         grapheneApp->register_plugin<graphene::account_history::account_history_plugin>();
+         grapheneApp->register_plugin<graphene::market_history::market_history_plugin>();
 
-   QString dataDir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
-   QDir(dataDir).mkpath(".");
-   boost::program_options::variables_map map;
-   map.insert({"rpc-endpoint",boost::program_options::variable_value(std::string("127.0.0.1:8090"), false)});
-   map.insert({"seed-node",boost::program_options::variable_value(std::vector<std::string>{("104.200.28.117:61705")}, false)});
-   grapheneApp->initialize(dataDir.toStdString(), map);
-   grapheneApp->startup();
-   grapheneApp->startup_plugins();
-   } catch (const fc::exception& e) {
-      elog("Crap went wrong: ${e}", ("e", e.to_detail_string()));
-   }
+         QString dataDir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+         QDir(dataDir).mkpath(".");
+         boost::program_options::variables_map map;
+         map.insert({"rpc-endpoint",boost::program_options::variable_value(std::string("127.0.0.1:8090"), false)});
+         map.insert({"seed-node",boost::program_options::variable_value(std::vector<std::string>{("104.200.28.117:61705")}, false)});
+         grapheneApp->initialize(dataDir.toStdString(), map);
+         grapheneApp->startup();
+         grapheneApp->startup_plugins();
+      } catch (const fc::exception& e) {
+         elog("Crap went wrong: ${e}", ("e", e.to_detail_string()));
+      }
+      QMetaObject::invokeMethod(this, "started");
+   });
 }
