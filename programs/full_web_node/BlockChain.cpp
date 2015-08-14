@@ -47,6 +47,7 @@ void BlockChain::start()
          map.insert({"rpc-endpoint",boost::program_options::variable_value(std::string("127.0.0.1:8090"), false)});
          map.insert({"seed-node",boost::program_options::variable_value(std::vector<std::string>{("104.200.28.117:61705")}, false)});
          grapheneApp->initialize(dataDir.toStdString(), map);
+         grapheneApp->initialize_plugins(map);
          grapheneApp->startup();
          grapheneApp->startup_plugins();
       } catch (const fc::exception& e) {
