@@ -523,6 +523,10 @@ class wallet_api
        */
       bool import_key(string account_name_or_id, string wif_key);
 
+      map<string, bool> import_accounts( string filename, string password );
+
+      bool import_account_keys( string filename, string password, string src_account_name, string dest_account_name );
+
       /**
        * This call will construct a transaction that will claim all balances controled
        * by wif_keys and deposit them into the given account.
@@ -1255,6 +1259,8 @@ FC_API( graphene::wallet::wallet_api,
         (list_account_balances)
         (list_assets)
         (import_key)
+        (import_accounts)
+        (import_account_keys)
         (import_balance)
         (suggest_brain_key)
         (register_account)

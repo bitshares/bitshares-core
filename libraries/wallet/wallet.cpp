@@ -2225,6 +2225,108 @@ bool wallet_api::import_key(string account_name_or_id, string wif_key)
    return false;
 }
 
+map<string, bool> wallet_api::import_accounts( string filename, string password )
+{
+   FC_ASSERT( !is_locked() );
+   FC_ASSERT( fc::exists( filename ) );
+
+   const auto imported_keys = fc::json::from_file<exported_keys>( filename );
+
+   const auto password_hash = fc::sha512::hash( password );
+   FC_ASSERT( fc::sha512::hash( password_hash ) == imported_keys.password_checksum );
+
+   map<string, bool> result;
+   for( const auto& item : imported_keys.account_keys )
+   {
+       const auto import_this_account = [ & ]() -> bool
+       {
+           try
+           {
+               const account_object account = get_account( item.account_name );
+               const auto& owner_keys = account.owner.get_keys();
+               const auto& active_keys = account.active.get_keys();
+
+               for( const auto& public_key : item.public_keys )
+               {
+                   if( std::find( owner_keys.begin(), owner_keys.end(), public_key ) != owner_keys.end() )
+                       return true;
+
+                   if( std::find( active_keys.begin(), active_keys.end(), public_key ) != active_keys.end() )
+                       return true;
+               }
+           }
+           catch( ... )
+           {
+           }
+
+           return false;
+       };
+
+       const auto should_proceed = import_this_account();
+       result[ item.account_name ] = should_proceed;
+
+       if( should_proceed )
+       {
+           // TODO: First check that all private keys match public keys
+           for( const auto& encrypted_key : item.encrypted_private_keys )
+           {
+               const auto plain_text = fc::aes_decrypt( password_hash, encrypted_key );
+               const auto private_key = fc::raw::unpack<private_key_type>( plain_text );
+
+               import_key( item.account_name, string( graphene::utilities::key_to_wif( private_key ) ) );
+           }
+       }
+   }
+
+   return result;
+}
+
+bool wallet_api::import_account_keys( string filename, string password, string src_account_name, string dest_account_name )
+{
+   FC_ASSERT( !is_locked() );
+   FC_ASSERT( fc::exists( filename ) );
+
+   bool is_my_account = false;
+   const auto accounts = list_my_accounts();
+   for( const auto& account : accounts )
+   {
+       if( account.name == dest_account_name )
+       {
+           is_my_account = true;
+           break;
+       }
+   }
+   FC_ASSERT( is_my_account );
+
+   const auto imported_keys = fc::json::from_file<exported_keys>( filename );
+
+   const auto password_hash = fc::sha512::hash( password );
+   FC_ASSERT( fc::sha512::hash( password_hash ) == imported_keys.password_checksum );
+
+   bool found_account = false;
+   for( const auto& item : imported_keys.account_keys )
+   {
+       if( item.account_name != src_account_name )
+           continue;
+
+       found_account = true;
+
+       for( const auto& encrypted_key : item.encrypted_private_keys )
+       {
+           const auto plain_text = fc::aes_decrypt( password_hash, encrypted_key );
+           const auto private_key = fc::raw::unpack<private_key_type>( plain_text );
+
+           import_key( dest_account_name, string( graphene::utilities::key_to_wif( private_key ) ) );
+       }
+
+       return true;
+   }
+
+   FC_ASSERT( found_account );
+
+   return false;
+}
+
 string wallet_api::normalize_brain_key(string s) const
 {
    return detail::normalize_brain_key( s );
