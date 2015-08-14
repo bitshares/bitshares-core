@@ -12,7 +12,7 @@ Window {
 
    BlockChain {
       id: blockChain
-      onStarted: webView.url = "http://localhost:8080"
+      onStarted: webView.url = "qrc:/index.html"
    }
    Component.onCompleted: blockChain.start()
 
