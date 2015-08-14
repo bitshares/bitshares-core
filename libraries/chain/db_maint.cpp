@@ -82,6 +82,19 @@ struct worker_pay_visitor
          worker.pay_worker(pay, db);
       }
 };
+void database::update_worker_votes()
+{
+   auto& idx = get_index_type<worker_index>();
+   auto itr = idx.begin();
+   while( itr != idx.end() )
+   {
+      modify( **itr, [&]( worker_object& obj ){
+         obj.total_votes_for = _vote_tally_buffer[obj.vote_for];
+         obj.total_votes_against = _vote_tally_buffer[obj.vote_against];
+      });
+      ++itr;
+   }
+}
 
 void database::pay_workers( share_type& budget )
 {
@@ -139,6 +152,13 @@ void database::update_active_witnesses()
 
    auto wits = sort_votable_objects<witness_index>(std::max(witness_count*2+1, (size_t)GRAPHENE_MIN_WITNESS_COUNT));
    const global_property_object& gpo = get_global_properties();
+
+   for( const witness_object& wit : wits )
+   {
+      modify( wit, [&]( witness_object& obj ){
+              obj.total_votes = _vote_tally_buffer[wit.vote_id];
+              });
+   }
 
    // Update witness authority
    modify( get(GRAPHENE_WITNESS_ACCOUNT), [&]( account_object& a ) {
@@ -204,6 +224,13 @@ void database::update_active_committee_members()
          stake_tally += _committee_count_histogram_buffer[++committee_member_count];
 
    auto committee_members = sort_votable_objects<committee_member_index>(std::max(committee_member_count*2+1, (size_t)GRAPHENE_MIN_COMMITTEE_MEMBER_COUNT));
+
+   for( const committee_member_object& del : committee_members )
+   {
+      modify( del, [&]( committee_member_object& obj ){
+              obj.total_votes = _vote_tally_buffer[del.vote_id];
+              });
+   }
 
    // Update committee authorities
    if( !committee_members.empty() )
@@ -459,6 +486,7 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
 
    update_active_witnesses();
    update_active_committee_members();
+   update_worker_votes();
 
    modify(gpo, [this](global_property_object& p) {
       // Remove scaling of account registration fee

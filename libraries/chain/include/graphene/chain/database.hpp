@@ -465,6 +465,7 @@ namespace graphene { namespace chain {
          void perform_chain_maintenance(const signed_block& next_block, const global_property_object& global_props);
          void update_active_witnesses();
          void update_active_committee_members();
+         void update_worker_votes();
 
          template<class... Types>
          void perform_account_maintenance(std::tuple<Types...> helpers);

@@ -44,6 +44,7 @@ namespace graphene { namespace chain {
 
          account_id_type  committee_member_account;
          vote_id_type     vote_id;
+         uint64_t         total_votes = 0;
          string           url;
    };
 
@@ -67,4 +68,4 @@ namespace graphene { namespace chain {
 } } // graphene::chain
 
 FC_REFLECT_DERIVED( graphene::chain::committee_member_object, (graphene::db::object),
-                    (committee_member_account)(vote_id)(url) )
+                    (committee_member_account)(vote_id)(total_votes)(url) )

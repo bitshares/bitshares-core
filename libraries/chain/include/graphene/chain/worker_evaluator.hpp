@@ -121,11 +121,14 @@ namespace graphene { namespace chain {
          /// Voting ID which represents disapproval of this worker
          vote_id_type vote_against;
 
+         uint64_t total_votes_for = 0;
+         uint64_t total_votes_against = 0;
+
          bool is_active(fc::time_point_sec now)const {
             return now >= work_begin_date && now <= work_end_date;
          }
          share_type approving_stake(const vector<uint64_t>& stake_vote_tallies)const {
-            return stake_vote_tallies[vote_for] - stake_vote_tallies[vote_against];
+            return total_votes_for - total_votes_against;// stake_vote_tallies[vote_for] - stake_vote_tallies[vote_against];
          }
    };
 
@@ -155,6 +158,8 @@ FC_REFLECT_DERIVED( graphene::chain::worker_object, (graphene::db::object),
                     (worker)
                     (vote_for)
                     (vote_against)
+                    (total_votes_for)
+                    (total_votes_against)
                     (name)
                     (url)
                   )
