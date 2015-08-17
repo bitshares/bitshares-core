@@ -266,7 +266,7 @@ namespace detail {
          }
 
          if (!_options->count("genesis-json") &&
-             _chain_db->get_global_properties().chain_id != graphene::egenesis::get_egenesis_chain_id()) {
+             _chain_db->get_chain_id() != graphene::egenesis::get_egenesis_chain_id()) {
             elog("Detected old database. Nuking and starting over.");
             _chain_db->wipe(_data_dir / "blockchain", true);
             _chain_db.reset();
@@ -450,7 +450,7 @@ namespace detail {
 
       virtual chain_id_type get_chain_id()const override
       {
-         return _chain_db->get_global_properties().chain_id;
+         return _chain_db->get_chain_id();
       }
 
       /**

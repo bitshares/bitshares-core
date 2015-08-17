@@ -1204,7 +1204,7 @@ BOOST_AUTO_TEST_CASE(transfer_with_memo) {
       op.memo = memo_data();
       op.memo->set_message(alice_private_key, bob_public_key, "Dear Bob,\n\nMoney!\n\nLove, Alice");
       trx.operations = {op};
-      trx.sign(alice_private_key, db.get_global_properties().chain_id);
+      trx.sign(alice_private_key, db.get_chain_id());
       db.push_transaction(trx);
 
       BOOST_CHECK_EQUAL(get_balance(alice_id, asset_id_type()), 500);

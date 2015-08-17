@@ -462,6 +462,7 @@ public:
 
    variant info() const
    {
+      auto chain_props = get_chain_properties();
       auto global_props = get_global_properties();
       auto dynamic_props = get_dynamic_global_properties();
       fc::mutable_variant_object result;
@@ -471,11 +472,15 @@ public:
                                                                           time_point_sec(time_point::now()),
                                                                           " old");
       result["next_maintenance_time"] = fc::get_approximate_relative_time_string(dynamic_props.next_maintenance_time);
-      result["chain_id"] = global_props.chain_id;
+      result["chain_id"] = chain_props.chain_id;
       result["active_witnesses"] = global_props.active_witnesses;
       result["active_committee_members"] = global_props.active_committee_members;
       result["entropy"] = dynamic_props.random;
       return result;
+   }
+   chain_property_object get_chain_properties() const
+   {
+      return _remote_db->get_chain_properties();
    }
    global_property_object get_global_properties() const
    {

@@ -20,10 +20,11 @@
 
 #include <graphene/chain/account_object.hpp>
 #include <graphene/chain/asset_object.hpp>
+#include <graphene/chain/balance_object.hpp>
 #include <graphene/chain/block_summary_object.hpp>
+#include <graphene/chain/chain_property_object.hpp>
 #include <graphene/chain/committee_member_object.hpp>
 #include <graphene/chain/global_property_object.hpp>
-#include <graphene/chain/balance_object.hpp>
 #include <graphene/chain/proposal_object.hpp>
 #include <graphene/chain/transaction_object.hpp>
 #include <graphene/chain/vesting_balance_object.hpp>
@@ -193,6 +194,7 @@ void database::initialize_indexes()
    add_index< primary_index<simple_index<asset_dynamic_data_object       >> >();
    add_index< primary_index<flat_index<  block_summary_object            >> >();
    add_index< primary_index<simple_index<witness_schedule_object         >> >();
+   add_index< primary_index<simple_index<chain_property_object          > > >();
 }
 
 void database::init_genesis(const genesis_state_type& genesis_state)
@@ -301,9 +303,11 @@ void database::init_genesis(const genesis_state_type& genesis_state)
    assert( get_balance(account_id_type(), asset_id_type()) == asset(dyn_asset.current_supply) );
    (void)core_asset;
 
+   chain_id_type chain_id = genesis_state.compute_chain_id();
+
    // Create global properties
    create<global_property_object>([&](global_property_object& p) {
-       p.chain_id = genesis_state.compute_chain_id();
+       p.chain_id = chain_id;
        p.parameters = genesis_state.initial_parameters;
        // Set fees to zero initially, so that genesis initialization needs not pay them
        // We'll fix it at the end of the function
@@ -315,6 +319,10 @@ void database::init_genesis(const genesis_state_type& genesis_state)
       p.dynamic_flags = 0;
       p.witness_budget = 0;
    });
+   create<chain_property_object>([&](chain_property_object& p)
+   {
+      p.chain_id = chain_id;
+   } );
    create<block_summary_object>([&](block_summary_object&) {});
 
    // Create initial accounts

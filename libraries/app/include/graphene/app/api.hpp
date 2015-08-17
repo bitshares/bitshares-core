@@ -24,13 +24,14 @@
 #include <graphene/chain/database.hpp>
 
 #include <graphene/chain/account_object.hpp>
-#include <graphene/chain/operation_history_object.hpp>
 #include <graphene/chain/asset_object.hpp>
-#include <graphene/chain/market_evaluator.hpp>
-#include <graphene/chain/committee_member_object.hpp>
-#include <graphene/chain/witness_object.hpp>
-#include <graphene/chain/proposal_object.hpp>
 #include <graphene/chain/balance_object.hpp>
+#include <graphene/chain/chain_property_object.hpp>
+#include <graphene/chain/committee_member_object.hpp>
+#include <graphene/chain/market_evaluator.hpp>
+#include <graphene/chain/operation_history_object.hpp>
+#include <graphene/chain/proposal_object.hpp>
+#include <graphene/chain/witness_object.hpp>
 
 #include <graphene/chain/confidential_evaluator.hpp>
 
@@ -83,6 +84,11 @@ namespace graphene { namespace app {
           * @brief used to fetch an individual transaction.
           */
          processed_transaction get_transaction( uint32_t block_num, uint32_t trx_in_block )const;
+
+         /**
+          * @brief Retrieve the @ref chain_property_object associated with the chain
+          */
+         chain_property_object get_chain_properties()const;
 
          /**
           * @brief Retrieve the current @ref global_property_object
@@ -546,6 +552,7 @@ FC_API(graphene::app::database_api,
        (get_block_header)
        (get_block)
        (get_transaction)
+       (get_chain_properties)
        (get_global_properties)
        (get_chain_id)
        (get_dynamic_global_properties)

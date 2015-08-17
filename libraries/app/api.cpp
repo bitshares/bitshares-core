@@ -136,6 +136,11 @@ namespace graphene { namespace app {
        return result;
     }
 
+    chain_property_object database_api::get_chain_properties()const
+    {
+       return _db.get(chain_property_id_type());
+    }
+
     global_property_object database_api::get_global_properties()const
     {
        return _db.get(global_property_id_type());
@@ -780,6 +785,7 @@ namespace graphene { namespace app {
                } case impl_block_summary_object_type:{
                } case impl_account_transaction_history_object_type:{
                } case impl_witness_schedule_object_type: {
+               } case impl_chain_property_object_type: {
                }
           }
        }
