@@ -229,9 +229,9 @@ namespace graphene { namespace app {
          fc::optional<witness_object> get_witness_by_account(account_id_type account)const;
 
          /**
-          *  @brief Given a set of votes, return the objects they are voting for.  
+          *  @brief Given a set of votes, return the objects they are voting for.
           *
-          *  This will be a mixture of committee_member_object, witness_objects, and worker_objects 
+          *  This will be a mixture of committee_member_object, witness_objects, and worker_objects
           *
           *  The results will be in the same order as the votes.  Null will be returned for
           *  any vote ids that are not found.
@@ -355,7 +355,7 @@ namespace graphene { namespace app {
          /**
           *  This method will return the set of all public keys that could possibly sign for a given transaction.  This call can
           *  be used by wallets to filter their set of public keys to just the relevant subset prior to calling @ref get_required_signatures
-          *  to get the minimum subset. 
+          *  to get the minimum subset.
           */
          set<public_key_type> get_potential_signatures( const signed_transaction& trx )const;
 

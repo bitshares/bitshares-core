@@ -27,7 +27,7 @@ class delayed_node_plugin : public graphene::app::plugin
    std::unique_ptr<detail::delayed_node_plugin_impl> my;
 public:
    delayed_node_plugin();
-   virtual ~delayed_node_plugin(){}
+   virtual ~delayed_node_plugin();
 
    std::string plugin_name()const override { return "delayed_node"; }
    virtual void plugin_set_program_options(boost::program_options::options_description&,
@@ -38,6 +38,7 @@ public:
 protected:
    void connection_failed();
    void connect();
+   void sync_with_trusted_node(uint32_t remote_head_block_num);
 };
 
 } } //graphene::account_history
