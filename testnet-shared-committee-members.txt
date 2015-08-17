@@ -1,0 +1,204 @@
+  "initial_committee_candidates": [{
+      "owner_name": "init0"
+    },{
+      "owner_name": "init1"
+    },{
+      "owner_name": "init2"
+    },{
+      "owner_name": "init3"
+    },{
+      "owner_name": "init4"
+    },{
+      "owner_name": "init5"
+    },{
+      "owner_name": "init6"
+    },{
+      "owner_name": "init7"
+    },{
+      "owner_name": "init8"
+    },{
+      "owner_name": "init9"
+    },{
+      "owner_name": "init10"
+    },{
+      "owner_name": "init11"
+    },{
+      "owner_name": "init12"
+    },{
+      "owner_name": "init13"
+    },{
+      "owner_name": "init14"
+    },{
+      "owner_name": "init15"
+    },{
+      "owner_name": "init16"
+    },{
+      "owner_name": "init17"
+    },{
+      "owner_name": "init18"
+    },{
+      "owner_name": "init19"
+    },{
+      "owner_name": "init20"
+    },{
+      "owner_name": "init21"
+    },{
+      "owner_name": "init22"
+    },{
+      "owner_name": "init23"
+    },{
+      "owner_name": "init24"
+    },{
+      "owner_name": "init25"
+    },{
+      "owner_name": "init26"
+    },{
+      "owner_name": "init27"
+    },{
+      "owner_name": "init28"
+    },{
+      "owner_name": "init29"
+    },{
+      "owner_name": "init30"
+    },{
+      "owner_name": "init31"
+    },{
+      "owner_name": "init32"
+    },{
+      "owner_name": "init33"
+    },{
+      "owner_name": "init34"
+    },{
+      "owner_name": "init35"
+    },{
+      "owner_name": "init36"
+    },{
+      "owner_name": "init37"
+    },{
+      "owner_name": "init38"
+    },{
+      "owner_name": "init39"
+    },{
+      "owner_name": "init40"
+    },{
+      "owner_name": "init41"
+    },{
+      "owner_name": "init42"
+    },{
+      "owner_name": "init43"
+    },{
+      "owner_name": "init44"
+    },{
+      "owner_name": "init45"
+    },{
+      "owner_name": "init46"
+    },{
+      "owner_name": "init47"
+    },{
+      "owner_name": "init48"
+    },{
+      "owner_name": "init49"
+    },{
+      "owner_name": "init50"
+    },{
+      "owner_name": "init51"
+    },{
+      "owner_name": "init52"
+    },{
+      "owner_name": "init53"
+    },{
+      "owner_name": "init54"
+    },{
+      "owner_name": "init55"
+    },{
+      "owner_name": "init56"
+    },{
+      "owner_name": "init57"
+    },{
+      "owner_name": "init58"
+    },{
+      "owner_name": "init59"
+    },{
+      "owner_name": "init60"
+    },{
+      "owner_name": "init61"
+    },{
+      "owner_name": "init62"
+    },{
+      "owner_name": "init63"
+    },{
+      "owner_name": "init64"
+    },{
+      "owner_name": "init65"
+    },{
+      "owner_name": "init66"
+    },{
+      "owner_name": "init67"
+    },{
+      "owner_name": "init68"
+    },{
+      "owner_name": "init69"
+    },{
+      "owner_name": "init70"
+    },{
+      "owner_name": "init71"
+    },{
+      "owner_name": "init72"
+    },{
+      "owner_name": "init73"
+    },{
+      "owner_name": "init74"
+    },{
+      "owner_name": "init75"
+    },{
+      "owner_name": "init76"
+    },{
+      "owner_name": "init77"
+    },{
+      "owner_name": "init78"
+    },{
+      "owner_name": "init79"
+    },{
+      "owner_name": "init80"
+    },{
+      "owner_name": "init81"
+    },{
+      "owner_name": "init82"
+    },{
+      "owner_name": "init83"
+    },{
+      "owner_name": "init84"
+    },{
+      "owner_name": "init85"
+    },{
+      "owner_name": "init86"
+    },{
+      "owner_name": "init87"
+    },{
+      "owner_name": "init88"
+    },{
+      "owner_name": "init89"
+    },{
+      "owner_name": "init90"
+    },{
+      "owner_name": "init91"
+    },{
+      "owner_name": "init92"
+    },{
+      "owner_name": "init93"
+    },{
+      "owner_name": "init94"
+    },{
+      "owner_name": "init95"
+    },{
+      "owner_name": "init96"
+    },{
+      "owner_name": "init97"
+    },{
+      "owner_name": "init98"
+    },{
+      "owner_name": "init99"
+    },{
+      "owner_name": "init100"
+    }
+  ],
