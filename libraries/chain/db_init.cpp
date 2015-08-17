@@ -307,7 +307,6 @@ void database::init_genesis(const genesis_state_type& genesis_state)
 
    // Create global properties
    create<global_property_object>([&](global_property_object& p) {
-       p.chain_id = chain_id;
        p.parameters = genesis_state.initial_parameters;
        // Set fees to zero initially, so that genesis initialization needs not pay them
        // We'll fix it at the end of the function

@@ -47,8 +47,6 @@ namespace graphene { namespace chain {
          flat_set<witness_id_type>  active_witnesses; // updated once per maintenance interval
          // n.b. witness scheduling is done by witness_schedule object
          flat_set<account_id_type>  witness_accounts; // updated once per maintenance interval
-
-         chain_id_type              chain_id;
    };
 
    /**
@@ -124,5 +122,4 @@ FC_REFLECT_DERIVED( graphene::chain::global_property_object, (graphene::db::obje
                     (next_available_vote_id)
                     (active_committee_members)
                     (active_witnesses)
-                    (chain_id)
                   )
