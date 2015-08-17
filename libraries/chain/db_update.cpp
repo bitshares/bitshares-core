@@ -49,8 +49,12 @@ void database::update_global_dynamic_data( const signed_block& b )
       fc::raw::pack( enc, b.previous_secret );
       dgp.random = enc.result();
 
-      if( missed_blocks )
-         dgp.recently_missed_count += 2*missed_blocks;
+      if( _checkpoints.size() && _checkpoints.rbegin()->first >= b.block_num() )
+         dgp.recently_missed_count = 0;
+      else if( missed_blocks )
+         dgp.recently_missed_count += 4*missed_blocks;
+      else if( dgp.recently_missed_count > 4 )
+         dgp.recently_missed_count -= 3;
       else if( dgp.recently_missed_count > 0 )
          dgp.recently_missed_count--;
 

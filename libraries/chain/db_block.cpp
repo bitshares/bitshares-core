@@ -357,26 +357,14 @@ const vector<operation_history_object>& database::get_applied_operations() const
 void database::apply_block( const signed_block& next_block, uint32_t skip )
 {
    auto block_num = next_block.block_num();
-   if( _checkpoints.size() )
+   if( _checkpoints.size() && _checkpoints.rbegin()->second != block_id_type() )
    {
       auto itr = _checkpoints.find( block_num );
       if( itr != _checkpoints.end() )
          FC_ASSERT( next_block.id() == itr->second, "Block did not match checkpoint", ("checkpoint",*itr)("block_id",next_block.id()) );
 
-      auto last = _checkpoints.rbegin();
-      if( last->first >= block_num )
-      {
-         // WE CAN SKIP ALMOST EVERYTHING
-         skip = ~0;
-
-         /** clear the recently missed count because the checkpoint indicates that
-          * we will never have to go back further than this.
-          */
-         const auto& _dgp = dynamic_global_property_id_type(0)(*this);
-         modify( _dgp, [&]( dynamic_global_property_object& dgp ){
-            dgp.recently_missed_count = 0;
-         });
-      }
+      if( _checkpoints.rbegin()->first >= block_num )
+         skip = ~0;// WE CAN SKIP ALMOST EVERYTHING
    }
 
    with_skip_flags( skip, [&]()
