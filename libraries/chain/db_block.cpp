@@ -85,10 +85,10 @@ bool database::push_block(const signed_block& new_block, uint32_t skip)
 {
 
    bool result;
-   with_skip_flags( skip, [&]()
+   with_skip_flags(skip, [&]()
    {
-      result = _push_block( new_block );
-   } );
+      result = _push_block(new_block);
+   });
    return result;
 }
 
@@ -293,7 +293,7 @@ signed_block database::_generate_block(
    _pending_block.transactions.clear();
 
    bool failed = false;
-   try { push_block( tmp, skip ); } 
+   try { push_block( tmp, skip ); }
    catch ( const undo_database_exception& e ) { throw; }
    catch ( const fc::exception& e ) { failed = true; }
    if( failed )
@@ -443,7 +443,7 @@ void database::notify_changed_objects()
    for( const auto& item : head_undo.new_ids ) changed_ids.push_back(item);
    vector<const object*> removed;
    removed.reserve( head_undo.removed.size() );
-   for( const auto& item : head_undo.removed ) 
+   for( const auto& item : head_undo.removed )
    {
       changed_ids.push_back( item.first );
       removed.emplace_back( item.second.get() );
@@ -491,12 +491,12 @@ processed_transaction database::_apply_transaction(const signed_transaction& trx
 
          //Verify TaPoS block summary has correct ID prefix, and that this block's time is not past the expiration
          FC_ASSERT( trx.ref_block_prefix == tapos_block_summary.block_id._hash[1] );
-      } 
-      
+      }
+
       FC_ASSERT( trx.expiration <= _pending_block.timestamp + chain_parameters.maximum_time_until_expiration, "",
                  ("trx.expiration",trx.expiration)("_pending_block.timestamp",_pending_block.timestamp)("max_til_exp",chain_parameters.maximum_time_until_expiration));
       FC_ASSERT( _pending_block.timestamp <= trx.expiration, "", ("pending.timestamp",_pending_block.timestamp)("trx.exp",trx.expiration) );
-   } 
+   }
 
    //Insert transaction into unique transactions database.
    if( !(skip & skip_transaction_dupe_check) )

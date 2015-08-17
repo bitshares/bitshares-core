@@ -62,31 +62,30 @@ namespace graphene { namespace chain {
          fork_database();
          void reset();
 
-         void                             start_block( signed_block b );
-         void                             remove( block_id_type b );
-         void                             set_head( shared_ptr<fork_item> h );
-         bool                             is_known_block( const block_id_type& id )const;
-         shared_ptr<fork_item>            fetch_block( const block_id_type& id )const;
-         vector<item_ptr>                 fetch_block_by_number( uint32_t n )const;
-         shared_ptr<fork_item>            push_block(const signed_block& b );
+         void                             start_block(signed_block b);
+         void                             remove(block_id_type b);
+         void                             set_head(shared_ptr<fork_item> h);
+         bool                             is_known_block(const block_id_type& id)const;
+         shared_ptr<fork_item>            fetch_block(const block_id_type& id)const;
+         vector<item_ptr>                 fetch_block_by_number(uint32_t n)const;
+         shared_ptr<fork_item>            push_block(const signed_block& b);
          shared_ptr<fork_item>            head()const { return _head; }
          void                             pop_block();
-
 
          /**
           *  Given two head blocks, return two branches of the fork graph that
           *  end with a common ancestor (same prior block)
           */
-         pair< branch_type, branch_type >  fetch_branch_from( block_id_type first,
-                                                              block_id_type second )const;
+         pair< branch_type, branch_type >  fetch_branch_from(block_id_type first,
+                                                             block_id_type second)const;
 
          struct block_id;
          struct block_num;
          typedef multi_index_container<
             item_ptr,
             indexed_by<
-               hashed_unique< tag<block_id>, member< fork_item, block_id_type, &fork_item::id>, std::hash<fc::ripemd160> >,
-               ordered_non_unique< tag<block_num>, member<fork_item,uint32_t,&fork_item::num> >
+               hashed_unique<tag<block_id>, member<fork_item, block_id_type, &fork_item::id>, std::hash<fc::ripemd160>>,
+               ordered_non_unique<tag<block_num>, member<fork_item,uint32_t,&fork_item::num>>
             >
          > fork_multi_index_type;
 
