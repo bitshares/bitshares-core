@@ -84,7 +84,7 @@ struct genesis_state_type {
    vector<initial_asset_type>               initial_assets;
    vector<initial_balance_type>             initial_balances;
    vector<initial_vesting_balance_type>     initial_vesting_balances;
-   uint64_t                                 initial_active_witnesses = GRAPHENE_DEFAULT_NUM_WITNESSES;
+   uint64_t                                 initial_active_witnesses;
    vector<initial_witness_type>             initial_witness_candidates;
    vector<initial_committee_member_type>    initial_committee_candidates;
    vector<initial_worker_type>              initial_worker_candidates;
