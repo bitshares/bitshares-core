@@ -17,28 +17,23 @@
  */
 #pragma once
 
-#include <graphene/chain/immutable_chain_parameters.hpp>
+#include <fc/reflect/reflect.hpp>
+
+#include <cstdint>
+
+#include <graphene/chain/config.hpp>
 
 namespace graphene { namespace chain {
 
-class chain_property_object;
-
-/**
- * Contains invariants which are set at genesis and never changed.
- */
-class chain_property_object : public abstract_object<chain_property_object>
+struct immutable_chain_parameters
 {
-   public:
-      static const uint8_t space_id = implementation_ids;
-      static const uint8_t type_id  = impl_chain_property_object_type;
-
-      chain_id_type chain_id;
-      immutable_chain_parameters immutable_parameters;
+   uint16_t min_committee_member_count = GRAPHENE_DEFAULT_MIN_COMMITTEE_MEMBER_COUNT;
+   uint16_t min_witness_count = GRAPHENE_DEFAULT_MIN_WITNESS_COUNT;
 };
 
-} }
+} } // graphene::chain
 
-FC_REFLECT_DERIVED( graphene::chain::chain_property_object, (graphene::db::object),
-                    (chain_id)
-                    (immutable_parameters)
-                  )
+FC_REFLECT( graphene::chain::immutable_chain_parameters,
+   (min_committee_member_count)
+   (min_witness_count)
+)

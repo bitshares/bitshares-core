@@ -150,7 +150,8 @@ void database::update_active_witnesses()
              && (stake_tally <= stake_target) )
          stake_tally += _witness_count_histogram_buffer[++witness_count];
 
-   auto wits = sort_votable_objects<witness_index>(std::max(witness_count*2+1, (size_t)GRAPHENE_MIN_WITNESS_COUNT));
+   const chain_property_object& cpo = get_chain_properties();
+   auto wits = sort_votable_objects<witness_index>(std::max(witness_count*2+1, (size_t)cpo.immutable_parameters.min_witness_count));
    const global_property_object& gpo = get_global_properties();
 
    for( const witness_object& wit : wits )
@@ -223,7 +224,8 @@ void database::update_active_committee_members()
              && (stake_tally <= stake_target) )
          stake_tally += _committee_count_histogram_buffer[++committee_member_count];
 
-   auto committee_members = sort_votable_objects<committee_member_index>(std::max(committee_member_count*2+1, (size_t)GRAPHENE_MIN_COMMITTEE_MEMBER_COUNT));
+   const chain_property_object& cpo = get_chain_properties();
+   auto committee_members = sort_votable_objects<committee_member_index>(std::max(committee_member_count*2+1, (size_t)cpo.immutable_parameters.min_committee_member_count));
 
    for( const committee_member_object& del : committee_members )
    {

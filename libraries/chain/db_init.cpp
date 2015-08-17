@@ -318,9 +318,14 @@ void database::init_genesis(const genesis_state_type& genesis_state)
       p.dynamic_flags = 0;
       p.witness_budget = 0;
    });
+
+   FC_ASSERT( (genesis_state.immutable_parameters.min_witness_count & 1) == 1, "min_witness_count must be odd" );
+   FC_ASSERT( (genesis_state.immutable_parameters.min_committee_member_count & 1) == 1, "min_committee_member_count must be odd" );
+
    create<chain_property_object>([&](chain_property_object& p)
    {
       p.chain_id = chain_id;
+      p.immutable_parameters = genesis_state.immutable_parameters;
    } );
    create<block_summary_object>([&](block_summary_object&) {});
 

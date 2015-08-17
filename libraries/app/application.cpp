@@ -70,7 +70,7 @@ namespace detail {
       dlog("Allocating all stake to ${key}", ("key", utilities::key_to_wif(nathan_key)));
       genesis_state_type initial_state;
       initial_state.initial_parameters.current_fees = fee_schedule::get_default();//->set_all_fees(GRAPHENE_BLOCKCHAIN_PRECISION);
-      initial_state.initial_active_witnesses = 10;
+      initial_state.initial_active_witnesses = GRAPHENE_DEFAULT_MIN_WITNESS_COUNT;
       initial_state.initial_timestamp = time_point_sec(time_point::now().sec_since_epoch() /
             initial_state.initial_parameters.block_interval *
             initial_state.initial_parameters.block_interval);
@@ -89,6 +89,7 @@ namespace detail {
       initial_state.initial_balances.push_back({nathan_key.get_public_key(),
                                                 GRAPHENE_SYMBOL,
                                                 GRAPHENE_MAX_SHARE_SUPPLY});
+
       return initial_state;
    }
 

@@ -31,8 +31,6 @@
 #define GRAPHENE_MAX_SHARE_SUPPLY int64_t(1000000000000000ll)
 #define GRAPHENE_MAX_PAY_RATE 10000 /* 100% */
 #define GRAPHENE_MAX_SIG_CHECK_DEPTH 2
-#define GRAPHENE_MIN_WITNESS_COUNT 10
-#define GRAPHENE_MIN_COMMITTEE_MEMBER_COUNT 10
 /**
  * Don't allow the committee_members to publish a limit that would
  * make the network unable to operate.
@@ -89,6 +87,8 @@
 
 #define GRAPHENE_DEFAULT_NUM_WITNESSES                        (101)
 #define GRAPHENE_DEFAULT_NUM_COMMITTEE                        (11)
+#define GRAPHENE_DEFAULT_MIN_WITNESS_COUNT                    (11)
+#define GRAPHENE_DEFAULT_MIN_COMMITTEE_MEMBER_COUNT           (11)
 #define GRAPHENE_DEFAULT_MAX_WITNESSES                        (1001) // SHOULD BE ODD
 #define GRAPHENE_DEFAULT_MAX_COMMITTEE                        (1001) // SHOULD BE ODD
 #define GRAPHENE_DEFAULT_MAX_PROPOSAL_LIFETIME_SEC            (60*60*24*7*4) // Four weeks

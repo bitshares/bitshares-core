@@ -2,6 +2,7 @@
 
 #include <graphene/chain/protocol/chain_parameters.hpp>
 #include <graphene/chain/protocol/types.hpp>
+#include <graphene/chain/immutable_chain_parameters.hpp>
 
 #include <fc/crypto/sha256.hpp>
 
@@ -78,6 +79,7 @@ struct genesis_state_type {
    time_point_sec                           initial_timestamp;
    share_type                               max_core_supply = GRAPHENE_MAX_SHARE_SUPPLY;
    chain_parameters                         initial_parameters;
+   immutable_chain_parameters               immutable_parameters;
    vector<initial_account_type>             initial_accounts;
    vector<initial_asset_type>               initial_assets;
    vector<initial_balance_type>             initial_balances;
@@ -120,4 +122,5 @@ FC_REFLECT(graphene::chain::genesis_state_type::initial_worker_type, (owner_name
 FC_REFLECT(graphene::chain::genesis_state_type,
            (initial_timestamp)(max_core_supply)(initial_parameters)(initial_accounts)(initial_assets)(initial_balances)
            (initial_vesting_balances)(initial_active_witnesses)(initial_witness_candidates)
-           (initial_committee_candidates)(initial_worker_candidates))
+           (initial_committee_candidates)(initial_worker_candidates)
+           (immutable_parameters))
