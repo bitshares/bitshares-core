@@ -128,7 +128,7 @@ namespace graphene { namespace chain {
             return now >= work_begin_date && now <= work_end_date;
          }
          share_type approving_stake(const vector<uint64_t>& stake_vote_tallies)const {
-            return total_votes_for - total_votes_against;// stake_vote_tallies[vote_for] - stake_vote_tallies[vote_against];
+            return int64_t( total_votes_for ) - int64_t( total_votes_against );// stake_vote_tallies[vote_for] - stake_vote_tallies[vote_against];
          }
    };
 
