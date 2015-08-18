@@ -50,24 +50,6 @@ namespace graphene { namespace app {
     database_api::~database_api()
     {
        elog("freeing database api ${x}", ("x",int64_t(this)) );
-       try {
-          if(_broadcast_changes_complete.valid())
-          {
-             _broadcast_changes_complete.cancel();
-              ilog( "waiting..");
-             _broadcast_changes_complete.wait();
-          }
-          if(_broadcast_removed_complete.valid())
-          {
-             _broadcast_removed_complete.cancel();
-              ilog( "waiting..");
-             _broadcast_removed_complete.wait();
-          }
-          ilog( "done" );
-       } catch (const fc::exception& e)
-       {
-          wlog("${e}", ("e",e.to_detail_string()));
-       }
     }
 
     fc::variants database_api::get_objects(const vector<object_id_type>& ids)const
@@ -610,15 +592,18 @@ namespace graphene { namespace app {
     {
        if( _callbacks.size() )
        {
+          /// we need to ensure the database_api is not deleted for the life of the async operation
+          auto capture_this = shared_from_this();
           for( uint32_t trx_num = 0; trx_num < b.transactions.size(); ++trx_num )
           {
              const auto& trx = b.transactions[trx_num];
              auto id = trx.id();
              auto itr = _callbacks.find(id);
-             auto block_num = b.block_num();
              if( itr != _callbacks.end() )
              {
-                fc::async( [=](){ itr->second( fc::variant(transaction_confirmation{ id, block_num, trx_num, trx}) ); } );
+                auto block_num = b.block_num();
+                auto& callback = _callbacks.find(id)->second;
+                fc::async( [capture_this,this,id,block_num,trx_num,trx,callback](){ callback( fc::variant(transaction_confirmation{ id, block_num, trx_num, trx}) ); } );
              }
           }
        }
@@ -807,6 +792,9 @@ namespace graphene { namespace app {
 
     void database_api::on_objects_removed( const vector<const object*>& objs )
     {
+       /// we need to ensure the database_api is not deleted for the life of the async operation
+       auto capture_this = shared_from_this();
+
        if( _account_subscriptions.size() )
        {
           map<account_id_type, vector<variant> > broadcast_queue;
@@ -823,7 +811,7 @@ namespace graphene { namespace app {
 
           if( broadcast_queue.size() )
           {
-             _broadcast_removed_complete = fc::async([=](){
+             fc::async([capture_this,broadcast_queue,this](){
                  for( const auto& item : broadcast_queue )
                  {
                    auto sub = _account_subscriptions.find(item.first);
@@ -848,7 +836,7 @@ namespace graphene { namespace app {
           }
           if( broadcast_queue.size() )
           {
-             _broadcast_removed_complete = fc::async([=](){
+             fc::async([capture_this,this,broadcast_queue](){
                  for( const auto& item : broadcast_queue )
                  {
                    auto sub = _market_subscriptions.find(item.first);
@@ -904,12 +892,12 @@ namespace graphene { namespace app {
           }
        }
 
+       auto capture_this = shared_from_this();
 
-       /// TODO: consider making _broadcast_changes_complete a deque and
        /// pushing the future back / popping the prior future if it is complete.
        /// if a connection hangs then this could get backed up and result in
        /// a failure to exit cleanly.
-       _broadcast_changes_complete = fc::async([=](){
+       fc::async([capture_this,this,broadcast_queue,market_broadcast_queue,my_objects](){
           for( const auto& item : broadcast_queue )
           {
             edump( (item) );
@@ -980,7 +968,9 @@ namespace graphene { namespace app {
           if(_market_subscriptions.count(market))
              subscribed_markets_ops[market].push_back(std::make_pair(op.op, op.result));
        }
-       fc::async([=](){
+       /// we need to ensure the database_api is not deleted for the life of the async operation
+       auto capture_this = shared_from_this();
+       fc::async([this,capture_this,subscribed_markets_ops](){
           for(auto item : subscribed_markets_ops)
           {
              auto itr = _market_subscriptions.find(item.first);

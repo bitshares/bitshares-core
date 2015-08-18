@@ -54,7 +54,7 @@ namespace graphene { namespace app {
     * read-only; all modifications to the database must be performed via transactions. Transactions are broadcast via
     * the @ref network_broadcast_api.
     */
-   class database_api
+   class database_api : public std::enable_shared_from_this<database_api>
    {
       public:
          database_api(graphene::chain::database& db);
@@ -383,8 +383,6 @@ namespace graphene { namespace app {
          void on_objects_removed(const vector<const object*>& objs);
          void on_applied_block();
 
-         fc::future<void>                                                                _broadcast_changes_complete;
-         fc::future<void>                                                                _broadcast_removed_complete;
          boost::signals2::scoped_connection                                              _change_connection;
          boost::signals2::scoped_connection                                              _removed_connection;
          boost::signals2::scoped_connection                                              _applied_block_connection;
@@ -427,7 +425,7 @@ namespace graphene { namespace app {
    /**
     * @brief The network_broadcast_api class allows broadcasting of transactions.
     */
-   class network_broadcast_api
+   class network_broadcast_api : public std::enable_shared_from_this<network_broadcast_api>
    {
       public:
          network_broadcast_api(application& a);
