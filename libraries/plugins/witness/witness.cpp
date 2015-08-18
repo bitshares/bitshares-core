@@ -185,10 +185,30 @@ void witness_plugin::block_production_loop()
    {
       // conditions needed to produce a block:
 
+      // we must control the witness scheduled to produce the next block.
+      if( _witnesses.find( scheduled_witness ) == _witnesses.end() ) {
+         return false;
+      }
+
+      // we must know the private key corresponding to the witness's
+      // published block production key.
+      if( _private_keys.find( scheduled_key ) == _private_keys.end() ) {
+         elog("Not producing block because I don't have the private key for ${id}.", ("id", scheduled_key));
+         return false;
+      }
+
+      // the next block must be scheduled after the head block.
+      // if this check fails, the local clock has not advanced far
+      // enough from the head block.
+      if( slot == 0 ) {
+         ilog("Not producing block because next slot time is in the future (likely a maitenance block).");
+         return false;
+      }
+
       // block production must be enabled (i.e. witness must be synced)
       if( !_production_enabled )
       {
-         elog("Not producing block because production is disabled.");
+         wlog("Not producing block because production is disabled until we receive a recent block (see: --enable-stale-production)");
          return false;
       }
 
@@ -197,19 +217,6 @@ void witness_plugin::block_production_loop()
       {
          elog("Not producing block because node appears to be on a minority fork with only ${x}% witness participation",
               ("x",uint32_t(100*uint64_t(prate) / GRAPHENE_1_PERCENT) ) );
-         return false;
-      }
-
-      // the next block must be scheduled after the head block.
-      // if this check fails, the local clock has not advanced far
-      // enough from the head block.
-      if( slot == 0 ) {
-         elog("Not producing block because head block time is in the future (is the system clock set correctly?).");
-         return false;
-      }
-
-      // we must control the witness scheduled to produce the next block.
-      if( _witnesses.find( scheduled_witness ) == _witnesses.end() ) {
          return false;
       }
 
@@ -226,12 +233,6 @@ void witness_plugin::block_production_loop()
          return false;
       }
 
-      // we must know the private key corresponding to the witness's
-      // published block production key.
-      if( _private_keys.find( scheduled_key ) == _private_keys.end() ) {
-         elog("Not producing block because I don't have the private key for ${id}.", ("id", scheduled_key));
-         return false;
-      }
 
       return true;
    };
