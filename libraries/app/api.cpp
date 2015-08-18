@@ -276,6 +276,18 @@ namespace graphene { namespace app {
           {
              acnt.cashback_balance = account->cashback_balance(_db);
           }
+          // Add the account's proposals
+          const auto& proposal_idx = _db.get_index_type<proposal_index>();
+          const auto& pidx = dynamic_cast<const primary_index<proposal_index>&>(proposal_idx);
+          const auto& proposals_by_account = pidx.get_secondary_index<graphene::chain::required_approval_index>();
+          auto  required_approvals_itr = proposals_by_account._account_to_proposals.find( account->id );
+          if( required_approvals_itr != proposals_by_account._account_to_proposals.end() )
+          {
+             acnt.proposals.reserve( required_approvals_itr->second.size() );
+             for( auto proposal_id : required_approvals_itr->second )
+                acnt.proposals.push_back( proposal_id(_db) );
+          }
+
 
           // Add the account's balances
           auto balance_range = _db.get_index_type<account_balance_index>().indices().get<by_account>().equal_range(account->id);
