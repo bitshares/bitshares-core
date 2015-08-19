@@ -14,7 +14,6 @@ class BlockChain : public QObject {
    Q_PROPERTY(QString webPassword MEMBER webPassword CONSTANT)
 
    fc::thread* chainThread;
-   QTimer* fcTaskScheduler;
    graphene::app::application* grapheneApp;
    fc::future<void> startFuture;
    QString webUsername;

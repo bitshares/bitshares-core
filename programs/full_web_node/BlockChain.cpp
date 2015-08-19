@@ -16,16 +16,10 @@
 
 BlockChain::BlockChain()
    : chainThread(new fc::thread("chainThread")),
-     fcTaskScheduler(new QTimer(this)),
      grapheneApp(new graphene::app::application),
      webUsername(QStringLiteral("webui")),
      webPassword(QString::fromStdString(fc::sha256::hash(fc::ecc::private_key::generate())))
-{
-   fcTaskScheduler->setInterval(100);
-   fcTaskScheduler->setSingleShot(false);
-   connect(fcTaskScheduler, &QTimer::timeout, [] {fc::yield();});
-   fcTaskScheduler->start();
-}
+{}
 
 BlockChain::~BlockChain() {
    startFuture.cancel_and_wait(__FUNCTION__);
