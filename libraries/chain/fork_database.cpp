@@ -51,7 +51,7 @@ shared_ptr<fork_item>  fork_database::push_block(const signed_block& b)
    auto item = std::make_shared<fork_item>(b);
    try {
       _push_block(item);
-   } 
+   }
    catch ( const unlinkable_block_exception& e )
    {
       wlog( "Pushing block to fork database that failed to link." );
@@ -65,13 +65,14 @@ void  fork_database::_push_block(const item_ptr& item)
    if( _head ) // make sure the block is within the range that we are caching
    {
       FC_ASSERT( item->num > std::max<int64_t>( 0, int64_t(_head->num) - (_max_size) ) );
-      FC_ASSERT( item->num < _head->num + 32 );
+      FC_ASSERT( item->num < _head->num + MAX_BLOCK_REORDERING );
    }
 
    if( _head && item->previous_id() != block_id_type() )
    {
-      auto itr = _index.get<block_id>().find(item->previous_id());
-      GRAPHENE_ASSERT(itr != _index.get<block_id>().end(), unlinkable_block_exception, "block does not link to known chain");
+      auto& index = _index.get<block_id>();
+      auto itr = index.find(item->previous_id());
+      GRAPHENE_ASSERT(itr != index.end(), unlinkable_block_exception, "block does not link to known chain");
       FC_ASSERT(!(*itr)->invalid);
       item->prev = *itr;
    }
@@ -97,14 +98,13 @@ void  fork_database::_push_block(const item_ptr& item)
 void fork_database::_push_next( const item_ptr& new_item )
 {
     auto& prev_idx = _unlinked_index.get<by_previous>();
-    vector<item_ptr> newly_inserted;
 
     auto itr = prev_idx.find( new_item->id );
     while( itr != prev_idx.end() )
     {
        auto tmp = *itr;
        prev_idx.erase( itr );
-       _push_block( tmp ); 
+       _push_block( tmp );
 
        itr = prev_idx.find( new_item->id );
     }

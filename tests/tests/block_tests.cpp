@@ -276,6 +276,59 @@ BOOST_AUTO_TEST_CASE( fork_blocks )
    }
 }
 
+BOOST_AUTO_TEST_CASE( out_of_order_blocks )
+{
+   try {
+      fc::temp_directory data_dir1( graphene::utilities::temp_directory_path() );
+      fc::temp_directory data_dir2( graphene::utilities::temp_directory_path() );
+
+      database db1;
+      db1.open(data_dir1.path(), make_genesis);
+      database db2;
+      db2.open(data_dir2.path(), make_genesis);
+      BOOST_CHECK( db1.get_chain_id() == db2.get_chain_id() );
+
+      auto init_account_priv_key  = fc::ecc::private_key::regenerate(fc::sha256::hash(string("null_key")) );
+      auto b1 = db1.generate_block(db1.get_slot_time(1), db1.get_scheduled_witness(1).first, init_account_priv_key, database::skip_nothing);
+      auto b2 = db1.generate_block(db1.get_slot_time(1), db1.get_scheduled_witness(1).first, init_account_priv_key, database::skip_nothing);
+      auto b3 = db1.generate_block(db1.get_slot_time(1), db1.get_scheduled_witness(1).first, init_account_priv_key, database::skip_nothing);
+      auto b4 = db1.generate_block(db1.get_slot_time(1), db1.get_scheduled_witness(1).first, init_account_priv_key, database::skip_nothing);
+      auto b5 = db1.generate_block(db1.get_slot_time(1), db1.get_scheduled_witness(1).first, init_account_priv_key, database::skip_nothing);
+      auto b6 = db1.generate_block(db1.get_slot_time(1), db1.get_scheduled_witness(1).first, init_account_priv_key, database::skip_nothing);
+      auto b7 = db1.generate_block(db1.get_slot_time(1), db1.get_scheduled_witness(1).first, init_account_priv_key, database::skip_nothing);
+      auto b8 = db1.generate_block(db1.get_slot_time(1), db1.get_scheduled_witness(1).first, init_account_priv_key, database::skip_nothing);
+      auto b9 = db1.generate_block(db1.get_slot_time(1), db1.get_scheduled_witness(1).first, init_account_priv_key, database::skip_nothing);
+      auto b10 = db1.generate_block(db1.get_slot_time(1), db1.get_scheduled_witness(1).first, init_account_priv_key, database::skip_nothing);
+      auto b11 = db1.generate_block(db1.get_slot_time(1), db1.get_scheduled_witness(1).first, init_account_priv_key, database::skip_nothing);
+      auto b12 = db1.generate_block(db1.get_slot_time(1), db1.get_scheduled_witness(1).first, init_account_priv_key, database::skip_nothing);
+      BOOST_CHECK_EQUAL(db1.head_block_num(), 12);
+      BOOST_CHECK_EQUAL(db2.head_block_num(), 0);
+      PUSH_BLOCK( db2, b1 );
+      BOOST_CHECK_EQUAL(db2.head_block_num(), 1);
+      PUSH_BLOCK( db2, b3 );
+      BOOST_CHECK_EQUAL(db2.head_block_num(), 1);
+      PUSH_BLOCK( db2, b2 );
+      BOOST_CHECK_EQUAL(db2.head_block_num(), 3);
+      PUSH_BLOCK( db2, b5 );
+      PUSH_BLOCK( db2, b6 );
+      PUSH_BLOCK( db2, b7 );
+      BOOST_CHECK_EQUAL(db2.head_block_num(), 3);
+      PUSH_BLOCK( db2, b4 );
+      BOOST_CHECK_EQUAL(db2.head_block_num(), 7);
+      PUSH_BLOCK( db2, b8 );
+      BOOST_CHECK_EQUAL(db2.head_block_num(), 8);
+      PUSH_BLOCK( db2, b11 );
+      PUSH_BLOCK( db2, b10 );
+      PUSH_BLOCK( db2, b12 );
+      BOOST_CHECK_EQUAL(db2.head_block_num(), 8);
+      PUSH_BLOCK( db2, b9 );
+      BOOST_CHECK_EQUAL(db2.head_block_num(), 12);
+   } catch (fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
 BOOST_AUTO_TEST_CASE( undo_pending )
 {
    try {
