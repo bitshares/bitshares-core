@@ -35,6 +35,8 @@ void ChainDataModel::setDatabaseAPI(fc::api<database_api> dbapi) {
       m_db_api->subscribe_to_objects([this](const variant& d) {
          m_dynamic_global_properties = d.as<dynamic_global_property_object>();
       }, {m_dynamic_global_properties.id});
+
+      m_chain_properties = m_db_api->get_chain_properties();
    });
 }
 
