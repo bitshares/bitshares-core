@@ -17,7 +17,9 @@
 BlockChain::BlockChain()
    : chainThread(new fc::thread("chainThread")),
      fcTaskScheduler(new QTimer(this)),
-     grapheneApp(new graphene::app::application)
+     grapheneApp(new graphene::app::application),
+     webUsername(QStringLiteral("webui")),
+     webPassword(QString::fromStdString(fc::sha256::hash(fc::ecc::private_key::generate())))
 {
    fcTaskScheduler->setInterval(100);
    fcTaskScheduler->setSingleShot(false);
@@ -50,6 +52,13 @@ void BlockChain::start()
          grapheneApp->initialize_plugins(map);
          grapheneApp->startup();
          grapheneApp->startup_plugins();
+
+         graphene::app::api_access_info webPermissions;
+         auto passHash = fc::sha256::hash(webPassword.toStdString());
+         webPermissions.password_hash_b64 = fc::base64_encode(passHash.data(), passHash.data_size());
+         webPermissions.password_salt_b64 = fc::base64_encode("");
+         webPermissions.allowed_apis = {"database_api", "network_broadcast_api", "network_node_api", "history_api"};
+         grapheneApp->set_api_access_info(webUsername.toStdString(), std::move(webPermissions));
       } catch (const fc::exception& e) {
          elog("Crap went wrong: ${e}", ("e", e.to_detail_string()));
       }
