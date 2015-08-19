@@ -73,6 +73,7 @@ void database::update_global_dynamic_data( const signed_block& b )
    }
 
    _undo_db.set_max_size( _dgp.recently_missed_count + GRAPHENE_MIN_UNDO_HISTORY );
+   _fork_db.set_max_size( _dgp.recently_missed_count + GRAPHENE_MIN_UNDO_HISTORY );
 }
 
 void database::update_signing_witness(const witness_object& signing_witness, const signed_block& new_block)

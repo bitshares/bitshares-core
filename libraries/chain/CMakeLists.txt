@@ -5,6 +5,7 @@ add_library( graphene_chain
 
              # As database takes the longest to compile, start it first
              database.cpp
+             fork_database.cpp
 
 #             db_balance.cpp
 #             db_block.cpp
@@ -65,7 +66,6 @@ add_library( graphene_chain
              proposal_object.cpp
              vesting_balance_object.cpp
 
-             fork_database.cpp
              block_database.cpp
 
              ${HEADERS}

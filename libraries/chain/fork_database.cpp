@@ -16,6 +16,7 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #include <graphene/chain/fork_database.hpp>
+#include <graphene/chain/exceptions.hpp>
 #include <graphene/chain/protocol/fee_schedule.hpp>
 #include <fc/smart_ref_impl.hpp>
 
@@ -41,14 +42,36 @@ void     fork_database::start_block(signed_block b)
    _head = item;
 }
 
+/**
+ * Pushes the block into the fork database and caches it if it doesn't link
+ *
+ */
 shared_ptr<fork_item>  fork_database::push_block(const signed_block& b)
 {
    auto item = std::make_shared<fork_item>(b);
-
-   if( _head && b.previous != block_id_type() )
+   try {
+      _push_block(item);
+   } 
+   catch ( const unlinkable_block_exception& e )
    {
-      auto itr = _index.get<block_id>().find(b.previous);
-      FC_ASSERT(itr != _index.get<block_id>().end());
+      wlog( "Pushing block to fork database that failed to link." );
+      _unlinked_index.insert( item );
+   }
+   return _head;
+}
+
+void  fork_database::_push_block(const item_ptr& item)
+{
+   if( _head ) // make sure the block is within the range that we are caching
+   {
+      FC_ASSERT( item->num > std::max<int64_t>( 0, int64_t(_head->num) - (_max_size) ) );
+      FC_ASSERT( item->num < _head->num + 32 );
+   }
+
+   if( _head && item->previous_id() != block_id_type() )
+   {
+      auto itr = _index.get<block_id>().find(item->previous_id());
+      GRAPHENE_ASSERT(itr != _index.get<block_id>().end(), unlinkable_block_exception, "block does not link to known chain");
       FC_ASSERT(!(*itr)->invalid);
       item->prev = *itr;
    }
@@ -58,10 +81,69 @@ shared_ptr<fork_item>  fork_database::push_block(const signed_block& b)
    else if( item->num > _head->num )
    {
       _head = item;
-      _index.get<block_num>().erase(_head->num - 1024);
+      _index.get<block_num>().erase(_head->num - _max_size);
+      _unlinked_index.get<block_num>().erase(_head->num - _max_size);
    }
-   return _head;
+
+   _push_next( item );
 }
+
+/**
+ *  Iterate through the unlinked cache and insert anything that
+ *  links to the newly inserted item.  This will start a recursive
+ *  set of calls performing a depth-first insertion of pending blocks as
+ *  _push_next(..) calls _push_block(...) which will in turn call _push_next
+ */
+void fork_database::_push_next( const item_ptr& new_item )
+{
+    auto& prev_idx = _unlinked_index.get<by_previous>();
+    vector<item_ptr> newly_inserted;
+
+    auto itr = prev_idx.find( new_item->id );
+    while( itr != prev_idx.end() )
+    {
+       auto tmp = *itr;
+       prev_idx.erase( itr );
+       _push_block( tmp ); 
+
+       itr = prev_idx.find( new_item->id );
+    }
+}
+
+void fork_database::set_max_size( uint32_t s )
+{
+   _max_size = s;
+   if( !_head ) return;
+
+   { /// index
+      auto& by_num_idx = _index.get<block_num>();
+      auto itr = by_num_idx.begin();
+      while( itr != by_num_idx.end() )
+      {
+         if( (*itr)->num < std::max(int64_t(0),int64_t(_head->num) - _max_size) )
+            by_num_idx.erase(itr);
+         else
+            break;
+         itr = by_num_idx.begin();
+      }
+   }
+   { /// unlinked_index
+      auto& by_num_idx = _unlinked_index.get<block_num>();
+      auto itr = by_num_idx.begin();
+      while( itr != by_num_idx.end() )
+      {
+         if( (*itr)->num < std::max(int64_t(0),int64_t(_head->num) - _max_size) )
+            by_num_idx.erase(itr);
+         else
+            break;
+         itr = by_num_idx.begin();
+      }
+   }
+}
+
+
+
+
 bool fork_database::is_known_block(const block_id_type& id)const
 {
    auto& index = _index.get<block_id>();

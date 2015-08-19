@@ -97,6 +97,9 @@ bool database::_push_block(const signed_block& new_block)
    uint32_t skip = get_node_properties().skip_flags;
    if( !(skip&skip_fork_db) )
    {
+      /// TODO: if the block is greater than the head block and before the next maitenance interval
+      // verify that the block signer is in the current set of active witnesses.
+
       shared_ptr<fork_item> new_head = _fork_db.push_block(new_block);
       //If the head block from the longest chain does not build off of the current head, we need to switch forks.
       if( new_head->data.previous != head_block_id() )
