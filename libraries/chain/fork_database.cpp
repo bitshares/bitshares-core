@@ -64,7 +64,9 @@ void  fork_database::_push_block(const item_ptr& item)
 {
    if( _head ) // make sure the block is within the range that we are caching
    {
-      FC_ASSERT( item->num > std::max<int64_t>( 0, int64_t(_head->num) - (_max_size) ) );
+      FC_ASSERT( item->num > std::max<int64_t>( 0, int64_t(_head->num) - (_max_size) ),
+                 "attempting to push a block that is too old", 
+                 ("item->num",item->num)("head",_head->num)("max_size",_max_size));
       FC_ASSERT( item->num < _head->num + 32 );
    }
 
