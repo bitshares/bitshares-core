@@ -2800,6 +2800,11 @@ string wallet_api::get_key_label( public_key_type key )const
    return string();
 }
 
+string wallet_api::get_private_key( public_key_type pubkey )const
+{
+   return key_to_wif( my->get_private_key( pubkey ) );
+}
+
 public_key_type  wallet_api::get_public_key( string label )const
 {
    try { return fc::variant(label).as<public_key_type>(); } catch ( ... ){}
