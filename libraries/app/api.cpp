@@ -1090,16 +1090,37 @@ namespace graphene { namespace app {
      */
     vector<vector<account_id_type>> database_api::get_key_references( vector<public_key_type> keys )const
     {
+       wdump( (keys) );
        vector< vector<account_id_type> > final_result;
        final_result.reserve(keys.size());
 
        for( auto& key : keys )
        {
+         address a1( pts_address(key, false, 56) );
+         address a2( pts_address(key, true, 56) );
+         address a3( pts_address(key, false, 0)  );
+         address a4( pts_address(key, true, 0)  );
+         address a5( key );
+
           const auto& idx = _db.get_index_type<account_index>();
           const auto& aidx = dynamic_cast<const primary_index<account_index>&>(idx);
           const auto& refs = aidx.get_secondary_index<graphene::chain::account_member_index>();
           auto itr = refs.account_to_key_memberships.find(key);
           vector<account_id_type> result;
+
+          for( auto& a : {a1,a2,a3,a4,a5} )
+          {
+              auto itr = refs.account_to_address_memberships.find(a);
+              if( itr != refs.account_to_address_memberships.end() )
+              {
+                 result.reserve( itr->second.size() );
+                 for( auto item : itr->second )
+                 {
+                    wdump((a)(item)(item(_db).name));
+                    result.push_back(item);
+                 } 
+              }
+          }
 
           if( itr != refs.account_to_key_memberships.end() )
           {

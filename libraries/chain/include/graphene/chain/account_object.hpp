@@ -250,14 +250,18 @@ namespace graphene { namespace chain {
          /** given an account or key, map it to the set of accounts that reference it in an active or owner authority */
          map< account_id_type, set<account_id_type> > account_to_account_memberships;
          map< public_key_type, set<account_id_type> > account_to_key_memberships;
+         /** some accounts use address authorities in the genesis block */
+         map< address, set<account_id_type> >         account_to_address_memberships;
 
 
       protected:
          set<account_id_type>  get_account_members( const account_object& a )const;
          set<public_key_type>  get_key_members( const account_object& a )const;
+         set<address>          get_address_members( const account_object& a )const;
 
          set<account_id_type>  before_account_members;
          set<public_key_type>  before_key_members;
+         set<address>          before_address_members;
    };
 
    /**
