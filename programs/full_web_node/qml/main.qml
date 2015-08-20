@@ -12,7 +12,11 @@ Window {
 
    BlockChain {
       id: blockChain
-      onStarted: webView.url = "qrc:/index.html"
+      onStarted: {
+         var url = "qrc:/index.html#authTokens/" + webUsername + ":" + webPassword
+         console.log("Loading %1 in web view".arg(url))
+         webView.url = url
+      }
    }
    Component.onCompleted: blockChain.start()
 

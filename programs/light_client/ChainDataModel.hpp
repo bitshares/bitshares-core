@@ -61,6 +61,7 @@ public:
 
    const graphene::chain::global_property_object& global_properties() const { return m_global_properties; }
    const graphene::chain::dynamic_global_property_object& dynamic_global_properties() const { return m_dynamic_global_properties; }
+   const graphene::chain::chain_property_object& chain_properties() const { return m_chain_properties; }
 
 public Q_SLOTS:
    void broadcast(Transaction* transaction);
@@ -78,6 +79,7 @@ private:
 
    graphene::chain::global_property_object m_global_properties;
    graphene::chain::dynamic_global_property_object m_dynamic_global_properties;
+   graphene::chain::chain_property_object m_chain_properties;
 
    ObjectId m_account_query_num = -1;
    account_multi_index_type m_accounts;

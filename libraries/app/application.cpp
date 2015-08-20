@@ -313,6 +313,11 @@ namespace detail {
          return it->second;
       }
 
+      void set_api_access_info(const string& username, api_access_info&& permissions)
+      {
+         _apiaccess.permission_map.insert(std::make_pair(username, std::move(permissions)));
+      }
+
       /**
        * If delegate has the item, the network has no need to fetch it.
        */
@@ -666,6 +671,11 @@ void application::set_block_production(bool producing_blocks)
 optional< api_access_info > application::get_api_access_info( const string& username )const
 {
    return my->get_api_access_info( username );
+}
+
+void application::set_api_access_info(const string& username, api_access_info&& permissions)
+{
+   my->set_api_access_info(username, std::move(permissions));
 }
 
 bool application::is_finished_syncing() const

@@ -100,7 +100,7 @@ void GrapheneApplication::signTransaction(Transaction* transaction) const
       return &model()->getAccount(id.instance.value)->accountObject().owner;
    };
 
-   auto& chainId = model()->global_properties().chain_id;
+   auto& chainId = model()->chain_properties().chain_id;
    auto& trx = transaction->internalTransaction();
    trx.set_reference_block(model()->dynamic_global_properties().head_block_id);
    flat_set<public_key_type> pubKeys = wallet()->getAvailablePrivateKeys();

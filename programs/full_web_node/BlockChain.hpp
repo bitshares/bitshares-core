@@ -10,11 +10,14 @@ namespace fc { class thread; }
 namespace graphene { namespace app { class application; } }
 class BlockChain : public QObject {
    Q_OBJECT
+   Q_PROPERTY(QString webUsername MEMBER webUsername CONSTANT)
+   Q_PROPERTY(QString webPassword MEMBER webPassword CONSTANT)
 
    fc::thread* chainThread;
-   QTimer* fcTaskScheduler;
    graphene::app::application* grapheneApp;
    fc::future<void> startFuture;
+   QString webUsername;
+   QString webPassword;
 
 public:
    BlockChain();
