@@ -109,6 +109,9 @@ void block_database::remove( const block_id_type& id )
 
 bool block_database::contains( const block_id_type& id )const
 {
+   if( id == block_id_type() )
+      return false;
+
    index_entry e;
    auto index_pos = sizeof(e)*block_header::num_from_id(id);
    _block_num_to_pos.seekg( 0, _block_num_to_pos.end );
