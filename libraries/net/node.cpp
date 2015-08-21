@@ -289,7 +289,9 @@ namespace graphene { namespace net { namespace detail {
                                    (get_block_time) \
                                    (get_head_block_id) \
                                    (estimate_last_known_fork_from_git_revision_timestamp) \
-                                   (error_encountered)
+                                   (error_encountered) \
+                                   (get_current_block_interval_in_seconds)
+
 
 #define DECLARE_ACCUMULATOR(r, data, method_name) \
       mutable call_stats_accumulator BOOST_PP_CAT(_, BOOST_PP_CAT(method_name, _execution_accumulator)); \
@@ -390,6 +392,7 @@ namespace graphene { namespace net { namespace detail {
       item_hash_t get_head_block_id() const override;
       uint32_t estimate_last_known_fork_from_git_revision_timestamp(uint32_t unix_timestamp) const override;
       void error_encountered(const std::string& message, const fc::oexception& error) override;
+      uint8_t get_current_block_interval_in_seconds() const override;
     };
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1282,9 +1285,10 @@ namespace graphene { namespace net { namespace detail {
         }
 
       // timeout for any active peers is two block intervals
-      uint32_t active_disconnect_timeout = std::max<uint32_t>(5 * GRAPHENE_MAX_BLOCK_INTERVAL / 2, 30);
-      uint32_t active_send_keepalive_timeount = std::max<uint32_t>(active_disconnect_timeout / 2, 11);
-      uint32_t active_ignored_request_timeount = std::max<uint32_t>(GRAPHENE_MAX_BLOCK_INTERVAL / 4, 10);
+      uint8_t current_block_interval_in_seconds = _delegate->get_current_block_interval_in_seconds();
+      uint32_t active_disconnect_timeout = 10 * current_block_interval_in_seconds;
+      uint32_t active_send_keepalive_timeount = active_disconnect_timeout / 2;
+      uint32_t active_ignored_request_timeount = 3 * current_block_interval_in_seconds;
       fc::time_point active_disconnect_threshold = fc::time_point::now() - fc::seconds(active_disconnect_timeout);
       fc::time_point active_send_keepalive_threshold = fc::time_point::now() - fc::seconds(active_send_keepalive_timeount);
       fc::time_point active_ignored_request_threshold = fc::time_point::now() - fc::seconds(active_ignored_request_timeount);
@@ -1334,7 +1338,7 @@ namespace graphene { namespace net { namespace detail {
             peers_to_disconnect_forcibly.push_back(active_peer);
           }
           else if (active_peer->connection_initiation_time < active_send_keepalive_threshold &&
-                    active_peer->get_last_message_received_time() < active_send_keepalive_threshold)
+                   active_peer->get_last_message_received_time() < active_send_keepalive_threshold)
           {
             wlog( "Sending a keepalive message to peer ${peer} who hasn't sent us any messages in the last ${timeout} seconds",
                   ( "peer", active_peer->get_remote_endpoint() )("timeout", active_send_keepalive_timeount ) );
@@ -1387,11 +1391,11 @@ namespace graphene { namespace net { namespace detail {
       peers_to_send_keep_alive.clear();
 
       for (const peer_connection_ptr& peer : peers_to_terminate )
-        {
+      {
         assert(_terminating_connections.find(peer) != _terminating_connections.end());
         _terminating_connections.erase(peer);
         schedule_peer_for_deletion(peer);
-        }
+      }
 
       if (!_node_is_shutting_down && !_terminate_inactive_connections_loop_done.canceled())
          _terminate_inactive_connections_loop_done = fc::schedule( [this](){ terminate_inactive_connections_loop(); },
@@ -5215,6 +5219,11 @@ namespace graphene { namespace net { namespace detail {
     void statistics_gathering_node_delegate_wrapper::error_encountered(const std::string& message, const fc::oexception& error)
     {
       INVOKE_AND_COLLECT_STATISTICS(error_encountered, message, error);
+    }
+
+    uint8_t statistics_gathering_node_delegate_wrapper::get_current_block_interval_in_seconds() const
+    {
+      INVOKE_AND_COLLECT_STATISTICS(get_current_block_interval_in_seconds);
     }
 
 #undef INVOKE_AND_COLLECT_STATISTICS

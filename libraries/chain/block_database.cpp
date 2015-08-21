@@ -156,7 +156,8 @@ optional<signed_block> block_database::fetch_optional( const block_id_type& id )
 
       vector<char> data( e.block_size );
       _blocks.seekg( e.block_pos );
-      _blocks.read( data.data(), e.block_size );
+      if (e.block_size)
+         _blocks.read( data.data(), e.block_size );
       auto result = fc::raw::unpack<signed_block>(data);
       FC_ASSERT( result.id() == e.block_id );
       return result;

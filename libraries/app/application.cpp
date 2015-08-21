@@ -550,6 +550,11 @@ namespace detail {
          // notify GUI or something cool
       }
 
+      uint8_t get_current_block_interval_in_seconds() const override
+      {
+         return _chain_db->get_global_properties().parameters.block_interval;
+      }
+
       application* _self;
 
       fc::path _data_dir;

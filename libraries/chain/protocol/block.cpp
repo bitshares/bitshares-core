@@ -58,18 +58,44 @@ namespace graphene { namespace chain {
 
    checksum_type signed_block::calculate_merkle_root()const
    {
-      if( transactions.size() == 0 ) return checksum_type();
+      if( transactions.size() == 0 ) 
+         return checksum_type();
 
       vector<digest_type>  ids;
       ids.resize( ((transactions.size() + 1)/2)*2 );
       for( uint32_t i = 0; i < transactions.size(); ++i )
          ids[i] = transactions[i].merkle_digest();
 
-      while( ids.size() > 1 )
+      vector<digest_type>::size_type current_number_of_hashes = ids.size();
+      while( true )
       {
+#define AUG_20_TESTNET_COMPATIBLE
+#ifdef AUG_20_TESTNET_COMPATIBLE
          for( uint32_t i = 0; i < transactions.size(); i += 2 )
-            ids[i/2] = digest_type::hash( std::make_pair( ids[i], ids[i+1] ) );
-         ids.resize( ids.size() / 2 );
+#else 
+         for( uint32_t i = 0; i < current_number_of_hashes; i += 2 )
+#endif
+           ids[i/2] = digest_type::hash( std::make_pair( ids[i], ids[i+1] ) );
+         // since we're processing hashes in pairs, we need to ensure that we always
+         // have an even number of hashes in the ids list.  If we would end up with
+         // an odd number, add a default-initialized hash to compensate
+         current_number_of_hashes /= 2;
+#ifdef AUG_20_TESTNET_COMPATIBLE
+         if (current_number_of_hashes <= 1)
+            break;
+#else
+         if (current_number_of_hashes == 1)
+            break;
+         if (current_number_of_hashes % 2)
+         {
+            ++current_number_of_hashes;
+            // TODO: HARD FORK: we should probably enable the next line the next time we fire
+            // up a new testnet; it will change the merkle roots we generate, but will 
+            // give us a better-defined algorithm for calculating them
+            //
+            ids[current_number_of_hashes - 1] = digest_type();
+         }
+#endif
       }
       return checksum_type::hash( ids[0] );
    }

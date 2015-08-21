@@ -158,6 +158,8 @@ namespace graphene { namespace net {
          virtual uint32_t estimate_last_known_fork_from_git_revision_timestamp(uint32_t unix_timestamp) const = 0;
 
          virtual void error_encountered(const std::string& message, const fc::oexception& error) = 0;
+         virtual uint8_t get_current_block_interval_in_seconds() const = 0;
+
    };
 
    /**
