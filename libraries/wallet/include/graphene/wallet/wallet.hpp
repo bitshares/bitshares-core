@@ -357,6 +357,12 @@ class wallet_api
       string                            get_wallet_filename() const;
 
       /**
+       * Get the WIF private key corresponding to a public key.  The
+       * private key must already be in the wallet.
+       */
+      string                            get_private_key( public_key_type pubkey )const;
+
+      /**
        * @ingroup Transaction Builder API
        */
       transaction_handle_type begin_builder_transaction();
@@ -1301,6 +1307,7 @@ FC_API( graphene::wallet::wallet_api,
         (get_global_properties)
         (get_dynamic_global_properties)
         (get_object)
+        (get_private_key)
         (load_wallet_file)
         (normalize_brain_key)
         (get_limit_orders)

@@ -143,22 +143,30 @@ void fork_database::set_max_size( uint32_t s )
    }
 }
 
-
-
-
 bool fork_database::is_known_block(const block_id_type& id)const
 {
    auto& index = _index.get<block_id>();
    auto itr = index.find(id);
-   return itr != index.end();
+   if( itr != index.end() )
+      return true;
+   auto& unlinked_index = _unlinked_index.get<block_id>();
+   auto unlinked_itr = unlinked_index.find(id);
+   return unlinked_itr != unlinked_index.end();
 }
+
 item_ptr fork_database::fetch_block(const block_id_type& id)const
 {
-   auto itr = _index.get<block_id>().find(id);
-   if( itr != _index.get<block_id>().end() )
+   auto& index = _index.get<block_id>();
+   auto itr = index.find(id);
+   if( itr != index.end() )
       return *itr;
+   auto& unlinked_index = _unlinked_index.get<block_id>();
+   auto unlinked_itr = unlinked_index.find(id);
+   if( unlinked_itr != unlinked_index.end() )
+      return *unlinked_itr;
    return item_ptr();
 }
+
 vector<item_ptr> fork_database::fetch_block_by_number(uint32_t num)const
 {
    vector<item_ptr> result;
