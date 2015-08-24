@@ -61,41 +61,24 @@ namespace graphene { namespace chain {
       if( transactions.size() == 0 ) 
          return checksum_type();
 
-      vector<digest_type>  ids;
-      ids.resize( ((transactions.size() + 1)/2)*2 );
+      vector<digest_type> ids;
+      ids.resize( transactions.size() );
       for( uint32_t i = 0; i < transactions.size(); ++i )
          ids[i] = transactions[i].merkle_digest();
 
       vector<digest_type>::size_type current_number_of_hashes = ids.size();
-      while( true )
+      while( current_number_of_hashes > 1 )
       {
-#define AUG_20_TESTNET_COMPATIBLE
-#ifdef AUG_20_TESTNET_COMPATIBLE
-         for( uint32_t i = 0; i < transactions.size(); i += 2 )
-#else 
-         for( uint32_t i = 0; i < current_number_of_hashes; i += 2 )
-#endif
-           ids[i/2] = digest_type::hash( std::make_pair( ids[i], ids[i+1] ) );
-         // since we're processing hashes in pairs, we need to ensure that we always
-         // have an even number of hashes in the ids list.  If we would end up with
-         // an odd number, add a default-initialized hash to compensate
-         current_number_of_hashes /= 2;
-#ifdef AUG_20_TESTNET_COMPATIBLE
-         if (current_number_of_hashes <= 1)
-            break;
-#else
-         if (current_number_of_hashes == 1)
-            break;
-         if (current_number_of_hashes % 2)
-         {
-            ++current_number_of_hashes;
-            // TODO: HARD FORK: we should probably enable the next line the next time we fire
-            // up a new testnet; it will change the merkle roots we generate, but will 
-            // give us a better-defined algorithm for calculating them
-            //
-            ids[current_number_of_hashes - 1] = digest_type();
-         }
-#endif
+         // hash ID's in pairs
+         uint32_t i_max = current_number_of_hashes - (current_number_of_hashes&1);
+         uint32_t k = 0;
+
+         for( uint32_t i = 0; i < i_max; i += 2 )
+            ids[k++] = digest_type::hash( std::make_pair( ids[i], ids[i+1] ) );
+
+         if( current_number_of_hashes&1 )
+            ids[k++] = ids[i_max];
+         current_number_of_hashes = k;
       }
       return checksum_type::hash( ids[0] );
    }
