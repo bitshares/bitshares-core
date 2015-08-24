@@ -115,6 +115,7 @@ vector<witness_id_type> database::get_near_witness_schedule()const
 
 void database::update_witness_schedule(const signed_block& next_block)
 {
+   auto start = fc::time_point::now();
    const global_property_object& gpo = get_global_properties();
    const witness_schedule_object& wso = get(witness_schedule_id_type());
    uint32_t schedule_needs_filled = gpo.active_witnesses.size();
@@ -168,6 +169,12 @@ void database::update_witness_schedule(const signed_block& next_block)
            (_wso.recent_slots_filled << 1)
            + 1) << (schedule_slot - 1);
    });
+   auto end = fc::time_point::now();
+   static uint64_t total_time = 0;
+   static uint64_t calls = 0;
+   total_time += (end - start).count();
+   if( ++calls % 1000 == 0 )
+      idump( ( double(total_time/1000000.0)/calls) );
 }
 
 uint32_t database::witness_participation_rate()const

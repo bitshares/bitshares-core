@@ -557,13 +557,18 @@ const witness_object& database::validate_block_header( uint32_t skip, const sign
    const witness_object& witness = next_block.witness(*this);
    FC_ASSERT( secret_hash_type::hash( next_block.previous_secret ) == witness.next_secret_hash, "",
               ("previous_secret", next_block.previous_secret)("next_secret_hash", witness.next_secret_hash));
-   if( !(skip&skip_witness_signature) ) FC_ASSERT( next_block.validate_signee( witness.signing_key ) );
 
-   uint32_t slot_num = get_slot_at_time( next_block.timestamp );
-   FC_ASSERT( slot_num > 0 );
+   if( !(skip&skip_witness_signature) ) 
+      FC_ASSERT( next_block.validate_signee( witness.signing_key ) );
 
-   witness_id_type scheduled_witness = get_scheduled_witness( slot_num ).first;
-   FC_ASSERT( next_block.witness == scheduled_witness );
+   if( !skip_witness_schedule_check )
+   {
+      uint32_t slot_num = get_slot_at_time( next_block.timestamp );
+      FC_ASSERT( slot_num > 0 );
+
+      witness_id_type scheduled_witness = get_scheduled_witness( slot_num ).first;
+      FC_ASSERT( next_block.witness == scheduled_witness );
+   }
 
    return witness;
 }

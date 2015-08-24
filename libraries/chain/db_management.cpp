@@ -53,11 +53,12 @@ void database::reindex(fc::path data_dir, const genesis_state_type& initial_allo
    _undo_db.disable();
    for( uint32_t i = 1; i <= last_block_num; ++i )
    {
-      if( i % 1000 == 0 ) std::cerr << "   " << double(i*100)/last_block_num << "%      \r";
+      if( i % 2000 == 0 ) std::cerr << "   " << double(i*100)/last_block_num << "%   "<<i << " of " <<last_block_num<<"   \n";
       apply_block(*_block_id_to_block.fetch_by_number(i), skip_witness_signature |
                                 skip_transaction_signatures |
                                 skip_transaction_dupe_check |
                                 skip_tapos_check |
+                                skip_witness_schedule_check |
                                 skip_authority_check);
    }
    _undo_db.enable();

@@ -89,7 +89,8 @@ namespace graphene { namespace chain {
             skip_authority_check        = 1 << 6,  ///< used while reindexing -- disables any checking of authority on transactions
             skip_merkle_check           = 1 << 7,  ///< used while reindexing
             skip_assert_evaluation      = 1 << 8,  ///< used while reindexing
-            skip_undo_history_check     = 1 << 9   ///< used while reindexing
+            skip_undo_history_check     = 1 << 9,  ///< used while reindexing
+            skip_witness_schedule_check = 1 << 10  ///< used whiel reindexing
          };
 
          /**
