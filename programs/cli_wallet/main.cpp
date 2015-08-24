@@ -169,7 +169,7 @@ int main( int argc, char** argv )
       // TODO:  Error message here
       FC_ASSERT( remote_api->login( wdata.ws_user, wdata.ws_password ) );
 
-      auto wapiptr = std::make_shared<wallet_api>( wdata.chain_id, remote_api );
+      auto wapiptr = std::make_shared<wallet_api>( wdata, remote_api );
       wapiptr->set_wallet_filename( wallet_file.generic_string() );
       wapiptr->load_wallet_file();
 

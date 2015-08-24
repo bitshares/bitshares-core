@@ -359,9 +359,9 @@ private:
 
 public:
    wallet_api& self;
-   wallet_api_impl( wallet_api& s, const chain_id_type& chain_id, fc::api<login_api> rapi )
+   wallet_api_impl( wallet_api& s, const wallet_data& initial_data, fc::api<login_api> rapi )
       : self(s),
-        _chain_id(chain_id),
+        _chain_id(initial_data.chain_id),
         _remote_api(rapi),
         _remote_db(rapi->database()),
         _remote_net_broadcast(rapi->network_broadcast()),
@@ -372,7 +372,7 @@ public:
       {
          FC_THROW( "Remote server gave us an unexpected chain_id",
             ("remote_chain_id", remote_chain_id)
-            ("chain_id", chain_id) );
+            ("chain_id", _chain_id) );
       }
       init_prototype_ops();
       _remote_db->subscribe_to_objects( [=]( const fc::variant& obj )
@@ -380,6 +380,9 @@ public:
          fc::async([this]{resync();}, "Resync after block");
       }, {dynamic_global_property_id_type()} );
       _wallet.chain_id = _chain_id;
+      _wallet.ws_server = initial_data.ws_server;
+      _wallet.ws_user = initial_data.ws_user;
+      _wallet.ws_password = initial_data.ws_password;
    }
    virtual ~wallet_api_impl()
    {
@@ -2026,8 +2029,8 @@ void operation_printer::operator()(const asset_create_operation& op) const
 
 namespace graphene { namespace wallet {
 
-wallet_api::wallet_api(const chain_id_type& chain_id, fc::api<login_api> rapi)
-   : my(new detail::wallet_api_impl(*this, chain_id, rapi))
+wallet_api::wallet_api(const wallet_data& initial_data, fc::api<login_api> rapi)
+   : my(new detail::wallet_api_impl(*this, initial_data, rapi))
 {
 }
 

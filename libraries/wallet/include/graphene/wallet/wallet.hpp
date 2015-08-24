@@ -214,7 +214,7 @@ class wallet_api_impl;
 class wallet_api
 {
    public:
-      wallet_api( const chain_id_type& chain_id, fc::api<login_api> rapi );
+      wallet_api( const wallet_data& initial_data, fc::api<login_api> rapi );
       virtual ~wallet_api();
 
       bool copy_wallet_file( string destination_filename );
