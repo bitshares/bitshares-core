@@ -429,7 +429,7 @@ namespace detail {
             if( num > 0 )
                result.push_back(_chain_db->get_block_id_for_num(num));
 
-         if( block_header::num_from_id(result.back()) < _chain_db->head_block_num() )
+         if( !result.empty() && block_header::num_from_id(result.back()) < _chain_db->head_block_num() )
             remaining_item_count = _chain_db->head_block_num() - block_header::num_from_id(result.back());
 
          return result;
