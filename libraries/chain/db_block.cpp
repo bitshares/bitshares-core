@@ -439,20 +439,23 @@ void database::_apply_block( const signed_block& next_block )
 } FC_CAPTURE_AND_RETHROW( (next_block.block_num()) )  }
 
 void database::notify_changed_objects()
-{
-   const auto& head_undo = _undo_db.head();
-   vector<object_id_type> changed_ids;  changed_ids.reserve(head_undo.old_values.size());
-   for( const auto& item : head_undo.old_values ) changed_ids.push_back(item.first);
-   for( const auto& item : head_undo.new_ids ) changed_ids.push_back(item);
-   vector<const object*> removed;
-   removed.reserve( head_undo.removed.size() );
-   for( const auto& item : head_undo.removed )
+{ try {
+   if( _undo_db.enabled() ) 
    {
-      changed_ids.push_back( item.first );
-      removed.emplace_back( item.second.get() );
+      const auto& head_undo = _undo_db.head();
+      vector<object_id_type> changed_ids;  changed_ids.reserve(head_undo.old_values.size());
+      for( const auto& item : head_undo.old_values ) changed_ids.push_back(item.first);
+      for( const auto& item : head_undo.new_ids ) changed_ids.push_back(item);
+      vector<const object*> removed;
+      removed.reserve( head_undo.removed.size() );
+      for( const auto& item : head_undo.removed )
+      {
+         changed_ids.push_back( item.first );
+         removed.emplace_back( item.second.get() );
+      }
+      changed_objects(changed_ids);
    }
-   changed_objects(changed_ids);
-}
+} FC_CAPTURE_AND_RETHROW() }
 
 processed_transaction database::apply_transaction(const signed_transaction& trx, uint32_t skip)
 {

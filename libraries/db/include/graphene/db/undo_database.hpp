@@ -85,6 +85,7 @@ namespace graphene { namespace db {
 
          void    disable();
          void    enable();
+         bool    enabled()const { return !_disabled; }
 
          session start_undo_session();
          /**

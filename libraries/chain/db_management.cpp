@@ -38,6 +38,7 @@ database::~database(){
 
 void database::reindex(fc::path data_dir, const genesis_state_type& initial_allocation)
 { try {
+   ilog( "reindexing blockchain" );
    wipe(data_dir, false);
    open(data_dir, [&initial_allocation]{return initial_allocation;});
 
@@ -47,19 +48,21 @@ void database::reindex(fc::path data_dir, const genesis_state_type& initial_allo
 
    const auto last_block_num = last_block->block_num();
 
+   ilog( "Replaying blocks..." );
    // TODO: disable undo tracking during reindex, this currently causes crashes in the benchmark test
-   //_undo_db.disable();
+   _undo_db.disable();
    for( uint32_t i = 1; i <= last_block_num; ++i )
    {
+      if( i % 1000 == 0 ) std::cerr << "   " << double(i*100)/last_block_num << "%      \r";
       apply_block(*_block_id_to_block.fetch_by_number(i), skip_witness_signature |
                                 skip_transaction_signatures |
                                 skip_transaction_dupe_check |
                                 skip_tapos_check |
                                 skip_authority_check);
    }
-   //_undo_db.enable();
+   _undo_db.enable();
    auto end = fc::time_point::now();
-   wdump( ((end-start).count()/1000000.0) );
+   ilog( "Done reindexing, elapsed time: ${t} sec", ("t",double((end-start).count())/1000000.0 ) );
 } FC_CAPTURE_AND_RETHROW( (data_dir) ) }
 
 void database::wipe(const fc::path& data_dir, bool include_blocks)

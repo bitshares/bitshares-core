@@ -36,26 +36,27 @@ namespace graphene { namespace net {
   /** uses a secure socket to create a connection that reads and writes a stream of `fc::net::message` objects */
   class message_oriented_connection
   {
-  public:
-    message_oriented_connection(message_oriented_connection_delegate* delegate = nullptr);
-    ~message_oriented_connection();
-    fc::tcp_socket& get_socket();
-    void accept();
-    void bind(const fc::ip::endpoint& local_endpoint);
-    void connect_to(const fc::ip::endpoint& remote_endpoint);
+     public:
+       message_oriented_connection(message_oriented_connection_delegate* delegate = nullptr);
+       ~message_oriented_connection();
+       fc::tcp_socket& get_socket();
 
-    void send_message(const message& message_to_send);
-    void close_connection();
-    void destroy_connection();
+       void accept();
+       void bind(const fc::ip::endpoint& local_endpoint);
+       void connect_to(const fc::ip::endpoint& remote_endpoint);
 
-    uint64_t get_total_bytes_sent() const;
-    uint64_t get_total_bytes_received() const;
-    fc::time_point get_last_message_sent_time() const;
-    fc::time_point get_last_message_received_time() const;
-    fc::time_point get_connection_time() const;
-    fc::sha512 get_shared_secret() const;
-  private:
-    std::unique_ptr<detail::message_oriented_connection_impl> my;
+       void send_message(const message& message_to_send);
+       void close_connection();
+       void destroy_connection();
+
+       uint64_t       get_total_bytes_sent() const;
+       uint64_t       get_total_bytes_received() const;
+       fc::time_point get_last_message_sent_time() const;
+       fc::time_point get_last_message_received_time() const;
+       fc::time_point get_connection_time() const;
+       fc::sha512     get_shared_secret() const;
+     private:
+       std::unique_ptr<detail::message_oriented_connection_impl> my;
   };
   typedef std::shared_ptr<message_oriented_connection> message_oriented_connection_ptr;
 

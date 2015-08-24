@@ -26,7 +26,7 @@
 
 namespace graphene { namespace chain {
 
-using boost::container::flat_set;
+//using boost::container::flat_set;
 
 enum witness_scheduler_relax_flags
 {
@@ -50,7 +50,7 @@ class generic_witness_scheduler
          assert( _turns == turns   );
 #endif
 
-         flat_set< WitnessID > witness_set;
+         set< WitnessID > witness_set;
          // make sure each witness_id occurs only once among the three states
          auto process_id = [&]( WitnessID item )
          {
@@ -249,14 +249,15 @@ class generic_witness_scheduler
       template< typename T >
       void update( const T& revised_set )
       {
-         flat_set< WitnessID > current_set;
-         flat_set< WitnessID > schedule_set;
+         set< WitnessID > current_set;
+         set< WitnessID > schedule_set;
 
-         current_set.reserve(
+       /*  current_set.reserve(
               _ineligible_waiting_for_token.size()
             + _ineligible_no_turn.size()
             + _eligible.size()
             + _schedule.size() );
+            */
          for( const auto& item : _ineligible_waiting_for_token )
             current_set.insert( item.first );
          for( const WitnessID& item : _ineligible_no_turn )
@@ -269,16 +270,16 @@ class generic_witness_scheduler
             schedule_set.insert( item );
          }
 
-         flat_set< WitnessID > insertion_set;
-         insertion_set.reserve( revised_set.size() );
+         set< WitnessID > insertion_set;
+         //insertion_set.reserve( revised_set.size() );
          for( const WitnessID& item : revised_set )
          {
             if( current_set.find( item ) == current_set.end() )
                insertion_set.insert( item );
          }
 
-         flat_set< WitnessID > removal_set;
-         removal_set.reserve( current_set.size() );
+         set< WitnessID > removal_set;
+         //removal_set.reserve( current_set.size() );
          for( const WitnessID& item : current_set )
          {
             if( revised_set.find( item ) == revised_set.end() )
@@ -366,7 +367,7 @@ class generic_witness_scheduler
       std::deque < WitnessID > _schedule;
 
       // in _schedule, but not to be replaced
-      flat_set< WitnessID > _lame_duck;
+      set< WitnessID > _lame_duck;
 };
 
 template< typename WitnessID, typename RNG, typename CountType, typename OffsetType, bool debug = true >
