@@ -220,11 +220,9 @@ namespace graphene { namespace chain {
           * Use the get_slot_time() and get_slot_at_time() functions
           * to convert between slot_num and timestamp.
           *
-          * Passing slot_num == 0 returns (witness_id_type(), false)
-          *
-          * The bool value is true if near schedule, false if far schedule.
+          * Passing slot_num == 0 returns witness_id_type()
           */
-         pair<witness_id_type, bool> get_scheduled_witness(uint32_t slot_num)const;
+         witness_id_type get_scheduled_witness(uint32_t slot_num)const;
 
          /**
           * Get the time at which the given slot occurs.
