@@ -57,8 +57,16 @@ namespace graphene { namespace chain {
        optional<uint32_t> review_period_seconds;
        extensions_type    extensions;
 
-       /// Constructs a proposal_create_operation suitable for committee proposals, with fee, expiration time and review
-       /// period set appropriately.
+       /**
+        * Constructs a proposal_create_operation suitable for committee
+        * proposals, with expiration time and review period set
+        * appropriately.  No proposed_ops are added.  When used to
+        * create a proposal to change chain parameters, this method
+        * expects to receive the currently effective parameters, not
+        * the proposed parameters.  (The proposed parameters will go
+        * in proposed_ops, and proposed_ops is untouched by this
+        * function.)
+        */
        static proposal_create_operation committee_proposal(const chain_parameters& param, fc::time_point_sec head_block_time );
 
        account_id_type fee_payer()const { return fee_paying_account; }
@@ -148,4 +156,3 @@ FC_REFLECT( graphene::chain::proposal_update_operation, (fee)(fee_paying_account
             (active_approvals_to_add)(active_approvals_to_remove)(owner_approvals_to_add)(owner_approvals_to_remove)
             (key_approvals_to_add)(key_approvals_to_remove)(extensions) )
 FC_REFLECT( graphene::chain::proposal_delete_operation, (fee)(fee_paying_account)(using_owner_authority)(proposal)(extensions) )
-

@@ -1186,6 +1186,31 @@ class wallet_api
        */
       operation get_prototype_operation(string operation_type);
 
+      /** Creates a transaction to propose a parameter change.
+       *
+       * Multiple parameters can be specified if an atomic change is
+       * desired.
+       *
+       * @param proposing_account The account paying the fee to propose the tx
+       * @param changed_values The values to change; all other chain parameters are filled in with default values
+       * @param broadcast true if you wish to broadcast the transaction
+       * @return the signed version of the transaction
+       */
+      signed_transaction propose_parameter_change(
+         const string& proposing_account,
+         const variant_object& changed_values,
+         bool broadcast = false);
+
+      /** Propose a fee change.
+       * 
+       * Not implemented.
+       * 
+       */
+      signed_transaction propose_fee_change(
+         const string& proposing_account,
+         const variant_object& changed_values,
+         bool broadcast = false);
+
       void dbg_make_uia(string creator, string symbol);
       void dbg_make_mia(string creator, string symbol);
       void flood_network(string prefix, uint32_t number_of_transactions);
@@ -1317,6 +1342,8 @@ FC_API( graphene::wallet::wallet_api,
         (serialize_transaction)
         (sign_transaction)
         (get_prototype_operation)
+        (propose_parameter_change)
+        (propose_fee_change)
         (dbg_make_uia)
         (dbg_make_mia)
         (flood_network)

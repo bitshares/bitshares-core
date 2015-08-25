@@ -1840,6 +1840,45 @@ public:
       return m;
    }
 
+   signed_transaction propose_parameter_change(
+      const string& proposing_account,
+      const variant_object& changed_values,
+      bool broadcast = false)
+   {
+      FC_ASSERT( !changed_values.contains("current_fees") );
+
+      const chain_parameters& current_params = get_global_properties().parameters;
+      chain_parameters new_params = current_params;
+      fc::reflector<chain_parameters>::visit(
+         fc::from_variant_visitor<chain_parameters>( changed_values, new_params )
+         );
+
+      committee_member_update_global_parameters_operation update_op;
+      update_op.new_parameters = new_params;
+
+      proposal_create_operation prop_op = proposal_create_operation::committee_proposal(
+         current_params, get_dynamic_global_properties().time );
+      prop_op.fee_paying_account = get_account(proposing_account).id;
+
+      prop_op.proposed_ops.emplace_back( update_op );
+      current_params.current_fees->set_fee( prop_op.proposed_ops.back().op );
+
+      signed_transaction tx;
+      tx.operations.push_back(prop_op);
+      set_operation_fees(tx, current_params.current_fees);
+      tx.validate();
+
+      return sign_transaction(tx, broadcast);
+   }
+
+   signed_transaction propose_fee_change(
+      const string& proposing_account,
+      const variant_object& changed_values,
+      bool broadcast = false)
+   {
+      FC_ASSERT( false, "not implemented" );
+   }
+
    void dbg_make_uia(string creator, string symbol)
    {
       asset_options opts;
@@ -2556,6 +2595,24 @@ void wallet_api::flood_network(string prefix, uint32_t number_of_transactions)
 {
    FC_ASSERT(!is_locked());
    my->flood_network(prefix, number_of_transactions);
+}
+
+signed_transaction wallet_api::propose_parameter_change(
+   const string& proposing_account,
+   const variant_object& changed_values,
+   bool broadcast /* = false */
+   )
+{
+   return my->propose_parameter_change( proposing_account, changed_values, broadcast );
+}
+
+signed_transaction wallet_api::propose_fee_change(
+   const string& proposing_account,
+   const variant_object& changed_values,
+   bool broadcast /* = false */
+   )
+{
+   return my->propose_fee_change( proposing_account, changed_values, broadcast );
 }
 
 global_property_object wallet_api::get_global_properties() const
