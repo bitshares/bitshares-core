@@ -15,45 +15,87 @@
  * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+#pragma once
 
 #include <graphene/chain/database.hpp>
-
 #include <graphene/chain/global_property_object.hpp>
-#include <graphene/chain/witness_schedule_object.hpp>
+#include <graphene/chain/witness_object.hpp>
 
 namespace graphene { namespace chain {
 
-witness_id_type database::get_scheduled_witness(uint32_t slot_num)const
+using boost::container::flat_set;
+
+witness_id_type database::get_scheduled_witness( uint32_t slot_num )const
 {
-   if( slot_num == 0 )
-      return witness_id_type();
+   //
+   // Each witness gets an arbitration key H(time, witness_id).
+   // The witness with the smallest key is selected to go first.
+   //
+   // As opposed to just using H(time) to determine an index into
+   // an array of eligible witnesses, this has the following desirable
+   // properties:
+   //
+   // - Avoid dynamic memory allocation
+   // - Decreases (but does not eliminate) the probability that a
+   // missed block will change the witness assigned to a future slot
+   //
+   // The hash function is xorshift* as given in
+   // [1] https://en.wikipedia.org/wiki/Xorshift#Xorshift.2A
+   //
 
-   const witness_schedule_object& wso = witness_schedule_id_type()(*this);
+   const flat_set< witness_id_type >& active_witnesses = get_global_properties().active_witnesses;
+   uint32_t n = active_witnesses.size();
+   uint64_t min_witness_separation = (n / 2)+1;
+   uint64_t current_aslot = get_dynamic_global_properties().current_aslot + slot_num;
 
-   // ask the near scheduler who goes in the given slot
-   witness_id_type wid;
-   bool slot_is_near = wso.scheduler.get_slot(slot_num-1, wid);
-   if( ! slot_is_near )
+   uint64_t start_of_current_round_aslot = current_aslot - (current_aslot % n);
+   uint64_t first_ineligible_aslot = std::min(
+      start_of_current_round_aslot, current_aslot - min_witness_separation );
+   //
+   // overflow analysis of above subtraction:
+   //
+   // we always have min_witness_separation <= n, so
+   // if current_aslot < min_witness_separation it follows that
+   // start_of_current_round_aslot == 0
+   //
+   // therefore result of above min() is 0 when subtraction overflows
+   //
+
+   first_ineligible_aslot = std::max( first_ineligible_aslot, uint64_t( 1 ) );
+
+   uint64_t best_k = 0;
+   witness_id_type best_wit;
+   bool success = false;
+
+   uint64_t now_hi = get_slot_time( slot_num ).sec_since_epoch();
+   now_hi <<= 32;
+
+   for( const witness_id_type& wit_id : active_witnesses )
    {
-      // if the near scheduler doesn't know, we have to extend it to
-      //   a far scheduler.
-      // n.b. instantiating it is slow, but block gaps long enough to
-      //   need it are likely pretty rare.
+      const witness_object& wit = wit_id(*this);
+      if( wit.last_aslot >= first_ineligible_aslot )
+         continue;
 
-      witness_scheduler_rng far_rng(wso.rng_seed.begin(), GRAPHENE_FAR_SCHEDULE_CTR_IV);
-
-      far_future_witness_scheduler far_scheduler =
-         far_future_witness_scheduler(wso.scheduler, far_rng);
-      if( !far_scheduler.get_slot(slot_num-1, wid) )
+      uint64_t k = now_hi + uint64_t(wit_id);
+      k ^= (k >> 12);
+      k ^= (k << 25);
+      k ^= (k >> 27);
+      k *= 2685821657736338717ULL;
+      if( k >= best_k )
       {
-         // no scheduled witness -- somebody set up us the bomb
-         // n.b. this code path is impossible, the present
-         // implementation of far_future_witness_scheduler
-         // returns true unconditionally
-         assert( false );
+         best_k = k;
+         best_wit = wit_id;
+         success = true;
       }
    }
-   return wid;
+
+   // the above loop should choose at least 1 because
+   //   at most K elements are susceptible to the filter,
+   //   otherwise we have an inconsistent database (such as
+   //   wit.last_aslot values that are non-unique or in the future)
+
+   assert( success );
+   return best_wit;
 }
 
 fc::time_point_sec database::get_slot_time(uint32_t slot_num)const
@@ -98,89 +140,10 @@ uint32_t database::get_slot_at_time(fc::time_point_sec when)const
    return (when - first_slot_time).to_seconds() / block_interval() + 1;
 }
 
-vector<witness_id_type> database::get_near_witness_schedule()const
-{
-   const witness_schedule_object& wso = witness_schedule_id_type()(*this);
-
-   vector<witness_id_type> result;
-   result.reserve(wso.scheduler.size());
-   uint32_t slot_num = 0;
-   witness_id_type wid;
-
-   while( wso.scheduler.get_slot(slot_num++, wid) )
-      result.emplace_back(wid);
-
-   return result;
-}
-
-void database::update_witness_schedule(const signed_block& next_block)
-{
-   auto start = fc::time_point::now();
-   const global_property_object& gpo = get_global_properties();
-   const witness_schedule_object& wso = get(witness_schedule_id_type());
-   uint32_t schedule_needs_filled = gpo.active_witnesses.size();
-   uint32_t schedule_slot = get_slot_at_time(next_block.timestamp);
-
-   // We shouldn't be able to generate _pending_block with timestamp
-   // in the past, and incoming blocks from the network with timestamp
-   // in the past shouldn't be able to make it this far without
-   // triggering FC_ASSERT elsewhere
-
-   assert( schedule_slot > 0 );
-   witness_id_type first_witness;
-   bool slot_is_near = wso.scheduler.get_slot( schedule_slot-1, first_witness );
-
-   witness_id_type wit;
-
-   const dynamic_global_property_object& dpo = get_dynamic_global_properties();
-   
-   assert( dpo.random.data_size() == witness_scheduler_rng::seed_length );
-   assert( witness_scheduler_rng::seed_length == wso.rng_seed.size() );
-
-   modify(wso, [&](witness_schedule_object& _wso)
-   {
-      _wso.slots_since_genesis += schedule_slot;
-      witness_scheduler_rng rng(wso.rng_seed.data, _wso.slots_since_genesis);
-
-      _wso.scheduler._min_token_count = std::max(int(gpo.active_witnesses.size()) / 2, 1);
-
-      if( slot_is_near )
-      {
-         uint32_t drain = schedule_slot;
-         while( drain > 0 )
-         {
-            if( _wso.scheduler.size() == 0 )
-               break;
-            _wso.scheduler.consume_schedule();
-            --drain;
-         }
-      }
-      else
-      {
-         _wso.scheduler.reset_schedule( first_witness );
-      }
-      while( !_wso.scheduler.get_slot(schedule_needs_filled, wit) )
-      {
-         if( _wso.scheduler.produce_schedule(rng) & emit_turn )
-            memcpy(_wso.rng_seed.begin(), dpo.random.data(), dpo.random.data_size());
-      }
-      _wso.last_scheduling_block = next_block.block_num();
-      _wso.recent_slots_filled = (
-           (_wso.recent_slots_filled << 1)
-           + 1) << (schedule_slot - 1);
-   });
-   auto end = fc::time_point::now();
-   static uint64_t total_time = 0;
-   static uint64_t calls = 0;
-   total_time += (end - start).count();
-   if( ++calls % 1000 == 0 )
-      idump( ( double(total_time/1000000.0)/calls) );
-}
-
 uint32_t database::witness_participation_rate()const
 {
-   const witness_schedule_object& wso = get(witness_schedule_id_type());
-   return uint64_t(GRAPHENE_100_PERCENT) * wso.recent_slots_filled.popcount() / 128;
+   const dynamic_global_property_object& dpo = get_dynamic_global_properties();
+   return uint64_t(GRAPHENE_100_PERCENT) * dpo.recent_slots_filled.popcount() / 128;
 }
 
 } }

@@ -244,11 +244,6 @@ namespace graphene { namespace chain {
           */
          uint32_t get_slot_at_time(fc::time_point_sec when)const;
 
-         /**
-          * Get the near schedule.
-          */
-         vector<witness_id_type> get_near_witness_schedule()const;
-
          //////////////////// db_getter.cpp ////////////////////
 
          const chain_id_type&                   get_chain_id()const;
@@ -450,9 +445,6 @@ namespace graphene { namespace chain {
          void update_expired_feeds();
          void update_maintenance_flag( bool new_maintenance_flag );
          void update_withdraw_permissions();
-
-         //////////////////// db_witness_schedule.cpp ////////////////////
-         void update_witness_schedule(const signed_block& next_block);    /// no-op except for scheduling blocks
 
          ///Steps performed only at maintenance intervals
          ///@{

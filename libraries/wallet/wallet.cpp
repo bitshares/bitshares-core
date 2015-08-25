@@ -478,7 +478,6 @@ public:
       result["chain_id"] = chain_props.chain_id;
       result["active_witnesses"] = global_props.active_witnesses;
       result["active_committee_members"] = global_props.active_committee_members;
-      result["entropy"] = dynamic_props.random;
       return result;
    }
    chain_property_object get_chain_properties() const

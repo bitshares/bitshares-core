@@ -443,34 +443,15 @@ BOOST_AUTO_TEST_CASE( witness_create )
    auto itr = std::find(witnesses.begin(), witnesses.end(), nathan_witness_id);
    BOOST_CHECK(itr != witnesses.end());
 
-   generate_blocks(witnesses.size());
-
-   // make sure we're scheduled to produce
-   vector<witness_id_type> near_witnesses = db.get_near_witness_schedule();
-   BOOST_CHECK( std::find( near_witnesses.begin(), near_witnesses.end(), nathan_witness_id )
-                != near_witnesses.end() );
-
-   struct generator_helper {
-      database_fixture& f;
-      witness_id_type nathan_id;
-      fc::ecc::private_key nathan_key;
-      bool nathan_generated_block;
-
-      void operator()(witness_id_type id) {
-         if( id == nathan_id )
-         {
-            nathan_generated_block = true;
-            f.generate_block(0, nathan_key);
-         } else
-            f.generate_block(0);
-         BOOST_CHECK_EQUAL(f.db.get_dynamic_global_properties().current_witness.instance.value, id.instance.value);
-         f.db.get_near_witness_schedule();
-      }
-   };
-
-   generator_helper h = std::for_each(near_witnesses.begin(), near_witnesses.end(),
-                                      generator_helper{*this, nathan_witness_id, nathan_private_key, false});
-   BOOST_CHECK(h.nathan_generated_block);
+   int produced = 0;
+   // Make sure we get scheduled exactly once in witnesses.size() blocks
+   // TODO:  intense_test that repeats this loop many times
+   for( size_t i=0; i<witnesses.size(); i++ )
+   {
+      if( generate_block().witness == nathan_witness_id )
+         produced++;
+   }
+   BOOST_CHECK_EQUAL( produced, 1 );
 } FC_LOG_AND_RETHROW() }
 
 /**

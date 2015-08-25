@@ -25,7 +25,6 @@
 #include <graphene/chain/committee_member_object.hpp>
 #include <graphene/chain/proposal_object.hpp>
 #include <graphene/chain/market_evaluator.hpp>
-#include <graphene/chain/witness_schedule_object.hpp>
 
 #include <graphene/utilities/tempdir.hpp>
 
@@ -644,7 +643,6 @@ BOOST_FIXTURE_TEST_CASE( maintenance_interval, database_fixture )
                         initial_properties.parameters.maximum_transaction_size);
       BOOST_CHECK_EQUAL(db.get_dynamic_global_properties().next_maintenance_time.sec_since_epoch(),
                         db.head_block_time().sec_since_epoch() + db.get_global_properties().parameters.block_interval);
-      // shuffling is now handled by the witness_schedule_object.
       BOOST_CHECK(db.get_global_properties().active_witnesses == initial_properties.active_witnesses);
       BOOST_CHECK(db.get_global_properties().active_committee_members == initial_properties.active_committee_members);
 
@@ -870,32 +868,6 @@ BOOST_FIXTURE_TEST_CASE( pop_block_twice, database_fixture )
    }
 }
 
-BOOST_FIXTURE_TEST_CASE( witness_scheduler_missed_blocks, database_fixture )
-{ try {
-   db.get_near_witness_schedule();
-   generate_block();
-   auto near_schedule = db.get_near_witness_schedule();
-
-   std::for_each(near_schedule.begin(), near_schedule.end(), [&](witness_id_type id) {
-      generate_block(0);
-      BOOST_CHECK(db.get_dynamic_global_properties().current_witness == id);
-   });
-
-   near_schedule = db.get_near_witness_schedule();
-   generate_block(0, init_account_priv_key, 2);
-   BOOST_CHECK(db.get_dynamic_global_properties().current_witness == near_schedule[2]);
-
-   near_schedule.erase(near_schedule.begin(), near_schedule.begin() + 3);
-   auto new_schedule = db.get_near_witness_schedule();
-   new_schedule.erase(new_schedule.end() - 3, new_schedule.end());
-   BOOST_CHECK(new_schedule == near_schedule);
-
-   std::for_each(near_schedule.begin(), near_schedule.end(), [&](witness_id_type id) {
-      generate_block(0);
-      BOOST_CHECK(db.get_dynamic_global_properties().current_witness == id);
-   });
-} FC_LOG_AND_RETHROW() }
-
 BOOST_FIXTURE_TEST_CASE( rsf_missed_blocks, database_fixture )
 {
    try
@@ -904,7 +876,7 @@ BOOST_FIXTURE_TEST_CASE( rsf_missed_blocks, database_fixture )
 
       auto rsf = [&]() -> string
       {
-         fc::uint128 rsf = db.get( witness_schedule_id_type() ).recent_slots_filled;
+         fc::uint128 rsf = db.get_dynamic_global_properties().recent_slots_filled;
          string result = "";
          result.reserve(128);
          for( int i=0; i<128; i++ )

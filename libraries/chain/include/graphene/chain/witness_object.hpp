@@ -32,6 +32,7 @@ namespace graphene { namespace chain {
          static const uint8_t type_id = witness_object_type;
 
          account_id_type  witness_account;
+         uint64_t         last_aslot = 0;
          public_key_type  signing_key;
          secret_hash_type next_secret_hash;
          secret_hash_type previous_secret;
@@ -64,9 +65,8 @@ namespace graphene { namespace chain {
 
 FC_REFLECT_DERIVED( graphene::chain::witness_object, (graphene::db::object),
                     (witness_account)
+                    (last_aslot)
                     (signing_key)
-                    (next_secret_hash)
-                    (previous_secret)
                     (pay_vb)
                     (vote_id)
                     (total_votes)

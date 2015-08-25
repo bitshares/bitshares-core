@@ -42,7 +42,7 @@ namespace graphene { namespace chain {
          chain_parameters           parameters;
          optional<chain_parameters> pending_parameters;
 
-         uint32_t                   next_available_vote_id = 0;
+         uint32_t                           next_available_vote_id = 0;
          vector<committee_member_id_type>   active_committee_members; // updated once per maintenance interval
          flat_set<witness_id_type>  active_witnesses; // updated once per maintenance interval
          // n.b. witness scheduling is done by witness_schedule object
@@ -64,7 +64,6 @@ namespace graphene { namespace chain {
          static const uint8_t space_id = implementation_ids;
          static const uint8_t type_id  = impl_dynamic_global_property_object_type;
 
-         secret_hash_type  random;
          uint32_t          head_block_number = 0;
          block_id_type     head_block_id;
          time_point_sec    time;
@@ -74,12 +73,27 @@ namespace graphene { namespace chain {
          share_type        witness_budget;
          uint32_t          accounts_registered_this_interval = 0;
          /**
-          *  Every time a block is missed this increases by 2, every time a block is found it decreases by 1 it is
-          *  never less than 0
+          *  Every time a block is missed this increases by
+          *  RECENTLY_MISSED_COUNT_INCREMENT,
+          *  every time a block is found it decreases by
+          *  RECENTLY_MISSED_COUNT_DECREMENT.  It is
+          *  never less than 0.
           *
-          *  If the recently_missed_count hits 2*UNDO_HISTORY then no ew blocks may be pushed.  
+          *  If the recently_missed_count hits 2*UNDO_HISTORY then no new blocks may be pushed.
           */
          uint32_t          recently_missed_count = 0;
+
+         /**
+          * The current absolute slot number.  Equal to the total
+          * number of slots since genesis.  Also equal to the total
+          * number of missed slots plus head_block_number.
+          */
+         uint64_t          current_aslot = 0;
+
+         /**
+          * used to compute witness participation.
+          */
+         fc::uint128_t recent_slots_filled;
 
          /**
           * dynamic_flags specifies chain state properties that can be
@@ -104,7 +118,6 @@ namespace graphene { namespace chain {
 }}
 
 FC_REFLECT_DERIVED( graphene::chain::dynamic_global_property_object, (graphene::db::object),
-                    (random)
                     (head_block_number)
                     (head_block_id)
                     (time)
@@ -113,6 +126,8 @@ FC_REFLECT_DERIVED( graphene::chain::dynamic_global_property_object, (graphene::
                     (witness_budget)
                     (accounts_registered_this_interval)
                     (recently_missed_count)
+                    (current_aslot)
+                    (recent_slots_filled)
                     (dynamic_flags)
                   )
 

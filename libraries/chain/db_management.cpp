@@ -22,6 +22,7 @@
 #include <graphene/chain/protocol/fee_schedule.hpp>
 
 #include <functional>
+#include <iostream>
 
 namespace graphene { namespace chain {
 
