@@ -279,7 +279,7 @@ BOOST_FIXTURE_TEST_CASE( witness_order_mc_test, database_fixture )
          {
              wdump( (db.head_block_num()) );
          }
-         witness_id_type wid = db.get_scheduled_witness( 1 ).first;
+         witness_id_type wid = db.get_scheduled_witness( 1 );
          full_schedule.push_back( wid );
          cur_round.push_back( wid );
          if( cur_round.size() == num_witnesses )

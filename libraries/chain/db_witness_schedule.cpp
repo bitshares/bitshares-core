@@ -23,10 +23,10 @@
 
 namespace graphene { namespace chain {
 
-pair<witness_id_type, bool> database::get_scheduled_witness(uint32_t slot_num)const
+witness_id_type database::get_scheduled_witness(uint32_t slot_num)const
 {
    if( slot_num == 0 )
-      return pair<witness_id_type, bool>(witness_id_type(), false);
+      return witness_id_type();
 
    const witness_schedule_object& wso = witness_schedule_id_type()(*this);
 
@@ -53,7 +53,7 @@ pair<witness_id_type, bool> database::get_scheduled_witness(uint32_t slot_num)co
          assert( false );
       }
    }
-   return pair<witness_id_type, bool>(wid, slot_is_near);
+   return wid;
 }
 
 fc::time_point_sec database::get_slot_time(uint32_t slot_num)const

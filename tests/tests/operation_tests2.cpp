@@ -1098,7 +1098,7 @@ BOOST_AUTO_TEST_CASE( balance_object_test )
    BOOST_CHECK(db.find_object(balance_id_type(1)) != nullptr);
 
    auto slot = db.get_slot_at_time(starting_time);
-   db.generate_block(starting_time, db.get_scheduled_witness(slot).first, init_account_priv_key, skip_flags);
+   db.generate_block(starting_time, db.get_scheduled_witness(slot), init_account_priv_key, skip_flags);
    set_expiration( db, trx );
 
    const balance_object& vesting_balance_1 = balance_id_type(2)(db);
@@ -1149,9 +1149,9 @@ BOOST_AUTO_TEST_CASE( balance_object_test )
    // Attempting to claim twice within a day
    GRAPHENE_CHECK_THROW(db.push_transaction(trx), balance_claim_claimed_too_often);
 
-   db.generate_block(db.get_slot_time(1), db.get_scheduled_witness(1).first, init_account_priv_key, skip_flags);
+   db.generate_block(db.get_slot_time(1), db.get_scheduled_witness(1), init_account_priv_key, skip_flags);
    slot = db.get_slot_at_time(vesting_balance_1.vesting_policy->begin_timestamp + 60);
-   db.generate_block(db.get_slot_time(slot), db.get_scheduled_witness(slot).first, init_account_priv_key, skip_flags);
+   db.generate_block(db.get_slot_time(slot), db.get_scheduled_witness(slot), init_account_priv_key, skip_flags);
    set_expiration( db, trx );
 
    op.balance_to_claim = vesting_balance_1.id;
@@ -1175,9 +1175,9 @@ BOOST_AUTO_TEST_CASE( balance_object_test )
    // Attempting to claim twice within a day
    GRAPHENE_CHECK_THROW(db.push_transaction(trx), balance_claim_claimed_too_often);
 
-   db.generate_block(db.get_slot_time(1), db.get_scheduled_witness(1).first, init_account_priv_key, skip_flags);
+   db.generate_block(db.get_slot_time(1), db.get_scheduled_witness(1), init_account_priv_key, skip_flags);
    slot = db.get_slot_at_time(db.head_block_time() + fc::days(1));
-   db.generate_block(db.get_slot_time(slot), db.get_scheduled_witness(slot).first, init_account_priv_key, skip_flags);
+   db.generate_block(db.get_slot_time(slot), db.get_scheduled_witness(slot), init_account_priv_key, skip_flags);
    set_expiration( db, trx );
 
    op.total_claimed = vesting_balance_2.balance;
