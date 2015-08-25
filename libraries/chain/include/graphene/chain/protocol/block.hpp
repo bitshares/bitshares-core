@@ -27,8 +27,6 @@ namespace graphene { namespace chain {
       uint32_t                      block_num()const { return num_from_id(previous) + 1; }
       fc::time_point_sec            timestamp;
       witness_id_type               witness;
-      secret_hash_type              next_secret_hash;
-      secret_hash_type              previous_secret;
       checksum_type                 transaction_merkle_root;
       extensions_type               extensions;
 
@@ -53,7 +51,6 @@ namespace graphene { namespace chain {
 
 } } // graphene::chain
 
-FC_REFLECT( graphene::chain::block_header, (previous)(timestamp)(witness)
-            (next_secret_hash)(previous_secret)(transaction_merkle_root)(extensions) )
+FC_REFLECT( graphene::chain::block_header, (previous)(timestamp)(witness)(transaction_merkle_root)(extensions) )
 FC_REFLECT_DERIVED( graphene::chain::signed_block_header, (graphene::chain::block_header), (witness_signature) )
 FC_REFLECT_DERIVED( graphene::chain::signed_block, (graphene::chain::signed_block_header), (transactions) )

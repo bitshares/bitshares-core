@@ -139,6 +139,9 @@
 
 #define GRAPHENE_MAX_INTEREST_APR                            uint16_t( 10000 )
 
+#define GRAPHENE_RECENTLY_MISSED_COUNT_INCREMENT             4
+#define GRAPHENE_RECENTLY_MISSED_COUNT_DECREMENT             3
+
 /**
  *  Reserved Account IDs with special meaning
  */

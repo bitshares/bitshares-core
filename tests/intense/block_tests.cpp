@@ -25,7 +25,6 @@
 #include <graphene/chain/protocol/protocol.hpp>
 #include <graphene/chain/account_object.hpp>
 #include <graphene/chain/proposal_object.hpp>
-#include <graphene/chain/witness_schedule_object.hpp>
 #include <graphene/chain/vesting_balance_object.hpp>
 
 #include <fc/crypto/digest.hpp>
