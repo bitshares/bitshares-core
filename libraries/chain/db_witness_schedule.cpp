@@ -132,9 +132,8 @@ void database::update_witness_schedule(const signed_block& next_block)
 
    witness_id_type wit;
 
-   const dynamic_global_property_object& dpo = get_dynamic_global_properties();
+   //const dynamic_global_property_object& dpo = get_dynamic_global_properties();
    
-   assert( dpo.random.data_size() == witness_scheduler_rng::seed_length );
    assert( witness_scheduler_rng::seed_length == wso.rng_seed.size() );
 
    modify(wso, [&](witness_schedule_object& _wso)
@@ -161,8 +160,9 @@ void database::update_witness_schedule(const signed_block& next_block)
       }
       while( !_wso.scheduler.get_slot(schedule_needs_filled, wit) )
       {
+         auto random = fc::ripemd160::hash( next_block.timestamp );
          if( _wso.scheduler.produce_schedule(rng) & emit_turn )
-            memcpy(_wso.rng_seed.begin(), dpo.random.data(), dpo.random.data_size());
+            memcpy(_wso.rng_seed.begin(), random.data(), random.data_size());
       }
       _wso.last_scheduling_block = next_block.block_num();
       _wso.recent_slots_filled = (

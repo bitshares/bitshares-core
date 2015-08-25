@@ -44,11 +44,6 @@ void database::update_global_dynamic_data( const signed_block& b )
 
    // dynamic global properties updating
    modify( _dgp, [&]( dynamic_global_property_object& dgp ){
-      secret_hash_type::encoder enc;
-      fc::raw::pack( enc, dgp.random );
-      fc::raw::pack( enc, b.previous_secret );
-      dgp.random = enc.result();
-
       if( _checkpoints.size() && _checkpoints.rbegin()->first >= b.block_num() )
          dgp.recently_missed_count = 0;
       else if( missed_blocks )
@@ -92,8 +87,7 @@ void database::update_signing_witness(const witness_object& signing_witness, con
 
    modify( signing_witness, [&]( witness_object& _wit )
    {
-      _wit.previous_secret = new_block.previous_secret;
-      _wit.next_secret_hash = new_block.next_secret_hash;
+      _wit.last_slot_num = new_block.block_num(); /// TODO: plus total missed blocks
    } );
 }
 

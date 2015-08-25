@@ -42,7 +42,7 @@ namespace graphene { namespace chain {
          chain_parameters           parameters;
          optional<chain_parameters> pending_parameters;
 
-         uint32_t                   next_available_vote_id = 0;
+         uint32_t                           next_available_vote_id = 0;
          vector<committee_member_id_type>   active_committee_members; // updated once per maintenance interval
          flat_set<witness_id_type>  active_witnesses; // updated once per maintenance interval
          // n.b. witness scheduling is done by witness_schedule object
@@ -64,7 +64,6 @@ namespace graphene { namespace chain {
          static const uint8_t space_id = implementation_ids;
          static const uint8_t type_id  = impl_dynamic_global_property_object_type;
 
-         secret_hash_type  random;
          uint32_t          head_block_number = 0;
          block_id_type     head_block_id;
          time_point_sec    time;
@@ -80,6 +79,11 @@ namespace graphene { namespace chain {
           *  If the recently_missed_count hits 2*UNDO_HISTORY then no ew blocks may be pushed.  
           */
          uint32_t          recently_missed_count = 0;
+
+         /** this is the set of witnesses that may produce the next block because they
+          * haven't produced any blocks recently.
+          */
+         vector<witness_id_type> potential_witnesses;
 
          /**
           * dynamic_flags specifies chain state properties that can be
@@ -104,7 +108,6 @@ namespace graphene { namespace chain {
 }}
 
 FC_REFLECT_DERIVED( graphene::chain::dynamic_global_property_object, (graphene::db::object),
-                    (random)
                     (head_block_number)
                     (head_block_id)
                     (time)
@@ -114,6 +117,7 @@ FC_REFLECT_DERIVED( graphene::chain::dynamic_global_property_object, (graphene::
                     (accounts_registered_this_interval)
                     (recently_missed_count)
                     (dynamic_flags)
+                    (potential_witnesses)
                   )
 
 FC_REFLECT_DERIVED( graphene::chain::global_property_object, (graphene::db::object),
