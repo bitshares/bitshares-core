@@ -275,6 +275,26 @@ void database::init_genesis(const genesis_state_type& genesis_state)
        a.lifetime_referrer_fee_percentage = GRAPHENE_100_PERCENT - GRAPHENE_DEFAULT_NETWORK_PERCENT_OF_FEE;
    }).get_id() == GRAPHENE_TEMP_ACCOUNT);
 
+   // Create more special accounts
+   while( true )
+   {
+      uint64_t id = get_index<account_object>().get_next_id().instance();
+      if( id >= genesis_state.immutable_parameters.num_special_accounts )
+         break;
+      const account_object& acct = create<account_object>([&](account_object& a) {
+          a.name = "special-account-" + std::to_string(id);
+          a.statistics = create<account_statistics_object>([&](account_statistics_object& s){s.owner = a.id;}).id;
+          a.owner.weight_threshold = 1;
+          a.active.weight_threshold = 1;
+          a.registrar = a.lifetime_referrer = a.referrer = id;
+          a.membership_expiration_date = time_point_sec::maximum();
+          a.network_fee_percentage = GRAPHENE_DEFAULT_NETWORK_PERCENT_OF_FEE;
+          a.lifetime_referrer_fee_percentage = GRAPHENE_100_PERCENT - GRAPHENE_DEFAULT_NETWORK_PERCENT_OF_FEE;
+      });
+      FC_ASSERT( acct.get_id() == account_id_type(id) );
+      remove( acct );
+   }
+
    // Create core asset
    const asset_dynamic_data_object& dyn_asset =
       create<asset_dynamic_data_object>([&](asset_dynamic_data_object& a) {
@@ -296,7 +316,32 @@ void database::init_genesis(const genesis_state_type& genesis_state)
       });
    assert( asset_id_type(core_asset.id) == asset().asset_id );
    assert( get_balance(account_id_type(), asset_id_type()) == asset(dyn_asset.current_supply) );
-   (void)core_asset;
+   // Create more special assets
+   while( true )
+   {
+      const asset_dynamic_data_object& dyn_asset =
+         create<asset_dynamic_data_object>([&](asset_dynamic_data_object& a) {
+            a.current_supply = 0;
+         });
+      uint64_t id = get_index<asset_object>().get_next_id().instance();
+      if( id >= genesis_state.immutable_parameters.num_special_assets )
+         break;
+      const asset_object& asset_obj = create<asset_object>( [&]( asset_object& a ) {
+         a.symbol = "SPECIAL" + std::to_string( id );
+         a.options.max_supply = 0;
+         a.precision = GRAPHENE_BLOCKCHAIN_PRECISION_DIGITS;
+         a.options.flags = 0;
+         a.options.issuer_permissions = 0;
+         a.issuer = GRAPHENE_NULL_ACCOUNT;
+         a.options.core_exchange_rate.base.amount = 1;
+         a.options.core_exchange_rate.base.asset_id = 0;
+         a.options.core_exchange_rate.quote.amount = 1;
+         a.options.core_exchange_rate.quote.asset_id = 0;
+         a.dynamic_asset_data_id = dyn_asset.id;
+      });
+      FC_ASSERT( asset_obj.get_id() == asset_id_type(id) );
+      remove( asset_obj );
+   }
 
    chain_id_type chain_id = genesis_state.compute_chain_id();
 
