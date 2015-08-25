@@ -1879,6 +1879,39 @@ public:
       FC_ASSERT( false, "not implemented" );
    }
 
+   signed_transaction approve_proposal(
+      const string& fee_paying_account,
+      const string& proposal_id,
+      const approval_delta& delta,
+      bool broadcast = false)
+   {
+      proposal_update_operation update_op;
+
+      update_op.fee_paying_account = get_account(fee_paying_account).id;
+      update_op.proposal = fc::variant(proposal_id).as<proposal_id_type>();
+      // make sure the proposal exists
+      get_object( update_op.proposal );
+
+      for( const std::string& name : delta.active_approvals_to_add )
+         update_op.active_approvals_to_add.insert( get_account( name ).id );
+      for( const std::string& name : delta.active_approvals_to_remove )
+         update_op.active_approvals_to_remove.insert( get_account( name ).id );
+      for( const std::string& name : delta.owner_approvals_to_add )
+         update_op.owner_approvals_to_add.insert( get_account( name ).id );
+      for( const std::string& name : delta.owner_approvals_to_remove )
+         update_op.owner_approvals_to_remove.insert( get_account( name ).id );
+      for( const std::string& k : delta.key_approvals_to_add )
+         update_op.key_approvals_to_add.insert( public_key_type( k ) );
+      for( const std::string& k : delta.key_approvals_to_remove )
+         update_op.key_approvals_to_remove.insert( public_key_type( k ) );
+
+      signed_transaction tx;
+      tx.operations.push_back(update_op);
+      set_operation_fees(tx, get_global_properties().parameters.current_fees);
+      tx.validate();
+      return sign_transaction(tx, broadcast);
+   }
+
    void dbg_make_uia(string creator, string symbol)
    {
       asset_options opts;
@@ -2613,6 +2646,16 @@ signed_transaction wallet_api::propose_fee_change(
    )
 {
    return my->propose_fee_change( proposing_account, changed_values, broadcast );
+}
+
+signed_transaction wallet_api::approve_proposal(
+   const string& fee_paying_account,
+   const string& proposal_id,
+   const approval_delta& delta,
+   bool broadcast /* = false */
+   )
+{
+   return my->approve_proposal( fee_paying_account, proposal_id, delta, broadcast );
 }
 
 global_property_object wallet_api::get_global_properties() const

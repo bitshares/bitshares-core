@@ -203,6 +203,16 @@ struct exported_keys
     vector<exported_account_keys> account_keys;
 };
 
+struct approval_delta
+{
+   vector<string> active_approvals_to_add;
+   vector<string> active_approvals_to_remove;
+   vector<string> owner_approvals_to_add;
+   vector<string> owner_approvals_to_remove;
+   vector<string> key_approvals_to_add;
+   vector<string> key_approvals_to_remove;
+};
+
 namespace detail {
 class wallet_api_impl;
 }
@@ -1211,10 +1221,24 @@ class wallet_api
          const variant_object& changed_values,
          bool broadcast = false);
 
+      /** Approve or disapprove a proposal.
+       *
+       * @param fee_paying_account The account paying the fee for the op.
+       * @param proposal_id The proposal to modify.
+       * @param delta Members contain approvals to create or remove.  In JSON you can leave empty members undefined.
+       * @param broadcast true if you wish to broadcast the transaction
+       * @return the signed version of the transaction
+       */
+      signed_transaction approve_proposal(
+         const string& fee_paying_account,
+         const string& proposal_id,
+         const approval_delta& delta,
+         bool broadcast /* = false */
+         );
+
       void dbg_make_uia(string creator, string symbol);
       void dbg_make_mia(string creator, string symbol);
       void flood_network(string prefix, uint32_t number_of_transactions);
-
 
       /**
        *  Used to transfer from one set of blinded balances to another
@@ -1268,6 +1292,15 @@ FC_REFLECT( graphene::wallet::exported_keys, (password_checksum)(account_keys) )
 
 FC_REFLECT( graphene::wallet::blind_receipt,
             (date)(from_key)(from_label)(to_key)(to_label)(amount)(memo)(control_authority)(data)(used)(conf) )
+
+FC_REFLECT( graphene::wallet::approval_delta,
+   (active_approvals_to_add)
+   (active_approvals_to_remove)
+   (owner_approvals_to_add)
+   (owner_approvals_to_remove)
+   (key_approvals_to_add)
+   (key_approvals_to_remove)
+)
 
 FC_API( graphene::wallet::wallet_api,
         (help)
@@ -1344,6 +1377,7 @@ FC_API( graphene::wallet::wallet_api,
         (get_prototype_operation)
         (propose_parameter_change)
         (propose_fee_change)
+        (approve_proposal)
         (dbg_make_uia)
         (dbg_make_mia)
         (flood_network)
@@ -1360,4 +1394,3 @@ FC_API( graphene::wallet::wallet_api,
         (blind_history)
         (receive_blind_transfer)
       )
-
