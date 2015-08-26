@@ -54,6 +54,7 @@ namespace graphene { namespace chain {
             withdraw_permission_claim_operation,
             withdraw_permission_delete_operation,
             committee_member_create_operation,
+            committee_member_update_operation,
             committee_member_update_global_parameters_operation,
             vesting_balance_create_operation,
             vesting_balance_withdraw_operation,

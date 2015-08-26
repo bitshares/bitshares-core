@@ -25,6 +25,28 @@ namespace graphene { namespace chain {
    };
 
    /**
+    * @brief Update a committee_member object.
+    * @ingroup operations
+    *
+    * Currently the only field which can be updated is the `url`
+    * field.
+    */
+   struct committee_member_update_operation : public base_operation
+   {
+      struct fee_parameters_type { uint64_t fee = 20 * GRAPHENE_BLOCKCHAIN_PRECISION; };
+
+      asset                                 fee;
+      /// The committee member to update.
+      committee_member_id_type              committee_member;
+      /// The account which owns the committee_member. This account pays the fee for this operation.
+      account_id_type                       committee_member_account;
+      optional< string >                    new_url;
+
+      account_id_type fee_payer()const { return committee_member_account; }
+      void            validate()const;
+   };
+
+   /**
     * @brief Used by committee_members to update the global parameters of the blockchain.
     * @ingroup operations
     *
@@ -50,10 +72,12 @@ namespace graphene { namespace chain {
 
 } } // graphene::chain
 FC_REFLECT( graphene::chain::committee_member_create_operation::fee_parameters_type, (fee) )
+FC_REFLECT( graphene::chain::committee_member_update_operation::fee_parameters_type, (fee) )
 FC_REFLECT( graphene::chain::committee_member_update_global_parameters_operation::fee_parameters_type, (fee) )
 
 
 FC_REFLECT( graphene::chain::committee_member_create_operation,
             (fee)(committee_member_account)(url) )
-
+FC_REFLECT( graphene::chain::committee_member_update_operation,
+            (fee)(committee_member)(committee_member_account)(new_url) )
 FC_REFLECT( graphene::chain::committee_member_update_global_parameters_operation, (fee)(new_parameters) );
