@@ -345,7 +345,7 @@ BOOST_AUTO_TEST_CASE( create_account_test )
       BOOST_CHECK(nathan_account.owner.key_auths.at(committee_key) == 123);
       BOOST_REQUIRE(nathan_account.active.num_auths() == 1);
       BOOST_CHECK(nathan_account.active.key_auths.at(committee_key) == 321);
-      BOOST_CHECK(nathan_account.options.voting_account == account_id_type());
+      BOOST_CHECK(nathan_account.options.voting_account == GRAPHENE_PROXY_TO_SELF_ACCOUNT);
       BOOST_CHECK(nathan_account.options.memo_key == committee_key);
 
       const account_statistics_object& statistics = nathan_account.statistics(db);

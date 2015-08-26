@@ -156,4 +156,6 @@
 #define GRAPHENE_NULL_ACCOUNT (graphene::chain::account_id_type(3))
 /// Represents the canonical account with WILDCARD authority (anybody can access funds in temp account)
 #define GRAPHENE_TEMP_ACCOUNT (graphene::chain::account_id_type(4))
+/// Represents the canonical account for specifying you will vote directly (as opposed to a proxy)
+#define GRAPHENE_PROXY_TO_SELF_ACCOUNT (graphene::chain::account_id_type(5))
 ///@}

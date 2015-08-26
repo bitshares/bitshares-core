@@ -14,9 +14,10 @@ namespace graphene { namespace chain {
       /// validated account activities. This field is here to prevent confusion if the active authority has zero or
       /// multiple keys in it.
       public_key_type  memo_key;
-      /// If this field is set to an account ID other than 0, this account's votes will be ignored and its stake
+      /// If this field is set to an account ID other than GRAPHENE_PROXY_TO_SELF_ACCOUNT,
+      /// then this account's votes will be ignored; its stake
       /// will be counted as voting for the referenced account's selected votes instead.
-      account_id_type voting_account;
+      account_id_type voting_account = GRAPHENE_PROXY_TO_SELF_ACCOUNT;
 
       /// The number of active witnesses this account votes the blockchain should appoint
       /// Must not exceed the actual number of witnesses voted for in @ref votes

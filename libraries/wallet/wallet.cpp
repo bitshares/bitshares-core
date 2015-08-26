@@ -1418,9 +1418,9 @@ public:
       }
       else
       {
-         if (account_object_to_modify.options.voting_account == account_id_type())
+         if (account_object_to_modify.options.voting_account == GRAPHENE_PROXY_TO_SELF_ACCOUNT)
             FC_THROW("Account ${account} is already voting for itself", ("account", account_to_modify));
-         account_object_to_modify.options.voting_account = account_id_type();
+         account_object_to_modify.options.voting_account = GRAPHENE_PROXY_TO_SELF_ACCOUNT;
       }
 
       account_update_operation account_update_op;

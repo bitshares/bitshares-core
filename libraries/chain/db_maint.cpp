@@ -415,7 +415,7 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
             // specifying the opinions.
             const account_object& opinion_account =
                   (stake_account.options.voting_account ==
-                   account_id_type())? stake_account
+                   GRAPHENE_PROXY_TO_SELF_ACCOUNT)? stake_account
                                      : d.get(stake_account.options.voting_account);
 
             const auto& stats = stake_account.statistics(d);
