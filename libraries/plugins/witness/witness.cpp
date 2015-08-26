@@ -26,11 +26,34 @@
 #include <fc/smart_ref_impl.hpp>
 #include <fc/thread/thread.hpp>
 
+#include <iostream>
+
 using namespace graphene::witness_plugin;
 using std::string;
 using std::vector;
 
 namespace bpo = boost::program_options;
+
+void new_chain_banner( const graphene::chain::database& db )
+{
+   std::cerr << "\n"
+      "********************************\n"
+      "*                              *\n"
+      "*   ------- NEW CHAIN ------   *\n"
+      "*   - Welcome to Graphene! -   *\n"
+      "*   ------------------------   *\n"
+      "*                              *\n"
+      "********************************\n"
+      "\n";
+   if( db.get_slot_at_time( graphene::time::now() ) > 200 )
+   {
+      std::cerr << "Your genesis seems to have an old timestamp\n"
+         "Please consider using a script to produce a genesis file with a recent timestamp\n"
+         "\n"
+         ;
+   }
+   return;
+}
 
 void witness_plugin::plugin_set_program_options(
    boost::program_options::options_description& command_line_options,
@@ -138,6 +161,8 @@ void witness_plugin::plugin_startup()
    {
       ilog("Launching block production for ${n} witnesses.", ("n", _witnesses.size()));
       app().set_block_production(true);
+      if( _production_enabled && (d.head_block_num() == 0) )
+         new_chain_banner(d);
       schedule_next_production(d.get_global_properties().parameters);
    } else
       elog("No witnesses configured! Please add witness IDs and private keys to configuration.");
