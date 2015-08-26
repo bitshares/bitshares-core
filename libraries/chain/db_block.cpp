@@ -242,7 +242,7 @@ signed_block database::generate_block(
    signed_block result;
    with_skip_flags( skip, [&]()
    {
-      result = _generate_block( when, witness_id, block_signing_private_key );
+      result = _generate_block( when, witness_id, block_signing_private_key, true );
    } );
    return result;
 }
@@ -250,7 +250,8 @@ signed_block database::generate_block(
 signed_block database::_generate_block(
    fc::time_point_sec when,
    witness_id_type witness_id,
-   const fc::ecc::private_key& block_signing_private_key
+   const fc::ecc::private_key& block_signing_private_key,
+   bool retry_on_failure
    )
 {
    try {
@@ -280,18 +281,45 @@ signed_block database::_generate_block(
    bool failed = false;
    try { push_block( tmp, skip ); }
    catch ( const undo_database_exception& e ) { throw; }
-   catch ( const fc::exception& e ) { failed = true; }
+   catch ( const fc::exception& e )
+   {
+      if( !retry_on_failure )
+      {
+         failed = true;
+      }
+      else
+      {
+         wlog( "Reason for block production failure: ${e}", ("e",e) );
+         throw;
+      }
+   }
    if( failed )
    {
+      uint32_t failed_tx_count = 0;
       for( const auto& trx : tmp.transactions )
       {
-         try {
-             push_transaction( trx, skip );
-         } catch ( const fc::exception& e ) {
-             wlog( "Transaction is no longer valid: ${trx}", ("trx",trx) );
+         try
+         {
+            push_transaction( trx, skip );
+         }
+         catch ( const fc::exception& e )
+         {
+            wlog( "Transaction is no longer valid: ${trx}", ("trx",trx) );
+            failed_tx_count++;
          }
       }
-      return _generate_block( when, witness_id, block_signing_private_key );
+      if( failed_tx_count == 0 )
+      {
+         //
+         // this is in generate_block() so this intensive logging
+         // (dumping a whole block) should be rate-limited
+         // to once per block production attempt
+         //
+         // TODO:  Turn this off again once #261 is resolved.
+         //
+         wlog( "Block creation failed even though all tx's are still valid.  Block: ${b}", ("b",tmp) );
+      }
+      return _generate_block( when, witness_id, block_signing_private_key, false );
    }
    return tmp;
 } FC_CAPTURE_AND_RETHROW( (witness_id) ) }
