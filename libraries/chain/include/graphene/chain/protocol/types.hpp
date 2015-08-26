@@ -216,7 +216,6 @@ namespace graphene { namespace chain {
    typedef fc::sha256                                           digest_type;
    typedef fc::ecc::compact_signature                           signature_type;
    typedef safe<int64_t>                                        share_type;
-   typedef fc::ripemd160                                        secret_hash_type;
    typedef uint16_t                                             weight_type;
 
    struct public_key_type

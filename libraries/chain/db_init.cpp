@@ -555,7 +555,6 @@ void database::init_genesis(const genesis_state_type& genesis_state)
       witness_create_operation op;
       op.witness_account = get_account_id(witness.owner_name);
       op.block_signing_key = witness.block_signing_key;
-      op.initial_secret = secret_hash_type::hash( secret_hash_type() );
       apply_operation(genesis_eval_state, op);
    });
 

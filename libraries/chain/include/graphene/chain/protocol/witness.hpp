@@ -19,7 +19,6 @@ namespace graphene { namespace chain {
       account_id_type   witness_account;
       string            url;
       public_key_type   block_signing_key;
-      secret_hash_type  initial_secret;
 
       account_id_type fee_payer()const { return witness_account; }
       void            validate()const;
@@ -55,7 +54,7 @@ namespace graphene { namespace chain {
 } } // graphene::chain
 
 FC_REFLECT( graphene::chain::witness_create_operation::fee_parameters_type, (fee) )
-FC_REFLECT( graphene::chain::witness_create_operation, (fee)(witness_account)(url)(block_signing_key)(initial_secret) )
+FC_REFLECT( graphene::chain::witness_create_operation, (fee)(witness_account)(url)(block_signing_key) )
 
 FC_REFLECT( graphene::chain::witness_update_operation::fee_parameters_type, (fee) )
 FC_REFLECT( graphene::chain::witness_update_operation, (fee)(witness)(witness_account)(new_url)(new_signing_key) )

@@ -34,8 +34,6 @@ namespace graphene { namespace chain {
          account_id_type  witness_account;
          uint64_t         last_aslot = 0;
          public_key_type  signing_key;
-         secret_hash_type next_secret_hash;
-         secret_hash_type previous_secret;
          optional< vesting_balance_id_type > pay_vb;
          vote_id_type     vote_id;
          uint64_t         total_votes = 0;
