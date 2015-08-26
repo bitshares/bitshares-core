@@ -97,14 +97,26 @@ void delayed_node_plugin::plugin_startup()
    try {
       connect();
 
+      my->database_api->set_subscribe_callback([this] (const fc::variant& v) {
+         auto& updates = v.get_array();
+         for( const auto& v : updates )
+         {
+            if( v.is_object() )
+            {
+               auto& obj = v.get_object();
+               if( obj["id"].as<graphene::chain::object_id_type>() == graphene::chain::dynamic_global_property_id_type() )
+               {
+                  auto props = v.as<graphene::chain::dynamic_global_property_object>();
+                  sync_with_trusted_node(props.head_block_number);
+               }
+            }
+         }
+      }, true);
+
       // Go ahead and get in sync now, before subscribing
       chain::dynamic_global_property_object props = my->database_api->get_dynamic_global_properties();
       sync_with_trusted_node(props.head_block_number);
 
-      my->database_api->subscribe_to_objects([this] (const fc::variant& v) {
-         auto props = v.as<graphene::chain::dynamic_global_property_object>();
-         sync_with_trusted_node(props.head_block_number);
-      }, {graphene::chain::dynamic_global_property_id_type()});
       return;
    } catch (const fc::exception& e) {
       elog("Error during connection: ${e}", ("e", e.to_detail_string()));

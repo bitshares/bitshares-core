@@ -52,8 +52,44 @@ namespace graphene { namespace app {
        elog("freeing database api ${x}", ("x",int64_t(this)) );
     }
 
+    void database_api::set_subscribe_callback( std::function<void(const variant&)> cb, bool clear_filter )
+    {
+       edump((clear_filter));
+       _subscribe_callback = cb;
+       if( clear_filter || !cb )
+       {
+          static fc::bloom_parameters param;
+          param.projected_element_count    = 10000;
+          param.false_positive_probability = 1.0/10000;
+          param.maximum_size = 1024*8*8*2;
+          _subscribe_filter = fc::bloom_filter(param);
+       }
+    }
+
+    void database_api::subscribe_to_id( object_id_type id )const
+    {
+       idump((id));
+       if( _subscribe_callback )
+          _subscribe_filter.insert( (const unsigned char*)&id, sizeof(id) );
+       else
+          elog( "unable to subscribe to id because there is no subscribe callback set" );
+    }
     fc::variants database_api::get_objects(const vector<object_id_type>& ids)const
     {
+       if( _subscribe_callback )  {
+          for( auto id : ids )
+          {
+             if( id.type() == operation_history_object_type && id.space() == protocol_ids ) continue;
+             if( id.type() == impl_account_transaction_history_object_type && id.space() == implementation_ids ) continue;
+
+             subscribe_to_id( id );
+          }
+       }
+       else
+       {
+          elog( "getObjects without subscribe callback??" );
+       }
+
        fc::variants result;
        result.reserve(ids.size());
 
@@ -150,7 +186,10 @@ namespace graphene { namespace app {
        std::transform(account_ids.begin(), account_ids.end(), std::back_inserter(result),
                       [this](account_id_type id) -> optional<account_object> {
           if(auto o = _db.find(id))
+          {
+             subscribe_to_id( id );
              return *o;
+          }
           return {};
        });
        return result;
@@ -162,7 +201,10 @@ namespace graphene { namespace app {
        std::transform(asset_ids.begin(), asset_ids.end(), std::back_inserter(result),
                       [this](asset_id_type id) -> optional<asset_object> {
           if(auto o = _db.find(id))
+          {
+             subscribe_to_id( id );
              return *o;
+          }
           return {};
        });
        return result;
@@ -182,35 +224,17 @@ namespace graphene { namespace app {
        for( auto itr = accounts_by_name.lower_bound(lower_bound_name);
             limit-- && itr != accounts_by_name.end();
             ++itr )
+       {
           result.insert(make_pair(itr->name, itr->get_id()));
+          if( limit == 1 )
+             subscribe_to_id( itr->get_id() );
+       }
 
        return result;
     }
-    void database_api::unsubscribe_from_accounts( const vector<std::string>& names_or_ids )
-    {
-       for (const std::string& account_name_or_id : names_or_ids)
-       {
-          const account_object* account = nullptr;
-          if (std::isdigit(account_name_or_id[0]))
-             account = _db.find(fc::variant(account_name_or_id).as<account_id_type>());
-          else
-          {
-             const auto& idx = _db.get_index_type<account_index>().indices().get<by_name>();
-             auto itr = idx.find(account_name_or_id);
-             if (itr != idx.end())
-                account = &*itr;
-          }
-          if (account == nullptr)
-             continue;
 
-          _account_subscriptions.erase(account->id);
-       }
-    }
-
-    std::map<std::string, full_account> database_api::get_full_accounts(std::function<void(const variant&)> callback,
-                                                                       const vector<std::string>& names_or_ids, bool subscribe)
+    std::map<std::string, full_account> database_api::get_full_accounts( const vector<std::string>& names_or_ids, bool subscribe)
     {
-       FC_ASSERT( _account_subscriptions.size() < 1024 );
        std::map<std::string, full_account> results;
 
        for (const std::string& account_name_or_id : names_or_ids)
@@ -231,12 +255,7 @@ namespace graphene { namespace app {
           if( subscribe )
           {
              ilog( "subscribe to ${id}", ("id",account->name) );
-             _account_subscriptions[account->id] = callback;
-          }
-          else
-          {
-             wlog( "unsubscribe to ${id}", ("id",account->name) );
-             _account_subscriptions.erase(account->id);
+             subscribe_to_id( account->id );
           }
 
           // fc::mutable_variant_object full_account;
@@ -795,7 +814,7 @@ namespace graphene { namespace app {
        /// we need to ensure the database_api is not deleted for the life of the async operation
        auto capture_this = shared_from_this();
 
-       if( _account_subscriptions.size() )
+       if( _subscribe_callback )
        {
           map<account_id_type, vector<variant> > broadcast_queue;
           for( const auto& obj : objs )
@@ -803,24 +822,21 @@ namespace graphene { namespace app {
              auto relevant = get_relevant_accounts( obj );
              for( const auto& r : relevant )
              {
-                auto sub = _account_subscriptions.find(r);
-                if( sub != _account_subscriptions.end() )
+                if( _subscribe_filter.contains(r) )
                    broadcast_queue[r].emplace_back(obj->to_variant());
              }
+             if( relevant.size() == 0 && _subscribe_filter.contains(obj->id) )
+                broadcast_queue[account_id_type()].emplace_back(obj->to_variant());
           }
 
           if( broadcast_queue.size() )
           {
              fc::async([capture_this,broadcast_queue,this](){
-                 for( const auto& item : broadcast_queue )
-                 {
-                   auto sub = _account_subscriptions.find(item.first);
-                   if( sub != _account_subscriptions.end() )
-                       sub->second( fc::variant(item.second ) );
-                 }
+                 _subscribe_callback( fc::variant(broadcast_queue) );
              });
           }
        }
+
        if( _market_subscriptions.size() )
        {
           map< pair<asset_id_type, asset_id_type>, vector<variant> > broadcast_queue;
@@ -850,16 +866,14 @@ namespace graphene { namespace app {
 
     void database_api::on_objects_changed(const vector<object_id_type>& ids)
     {
-       vector<object_id_type>                       my_objects;
-       map<account_id_type, vector<variant> >       broadcast_queue;
+       vector<variant>    updates;
        map< pair<asset_id_type, asset_id_type>,  vector<variant> > market_broadcast_queue;
+
+       idump((ids));
        for(auto id : ids)
        {
-          if(_subscriptions.find(id) != _subscriptions.end())
-             my_objects.push_back(id);
-
           const object* obj = nullptr;
-          if( _account_subscriptions.size() )
+          if( _subscribe_callback )
           {
              obj = _db.find_object( id );
              if( obj )
@@ -867,18 +881,23 @@ namespace graphene { namespace app {
                 vector<account_id_type> relevant = get_relevant_accounts( obj );
                 for( const auto& r : relevant )
                 {
-                   auto sub = _account_subscriptions.find(r);
-                   if( sub != _account_subscriptions.end() )
-                      broadcast_queue[r].emplace_back(obj->to_variant());
+                   if( _subscribe_filter.contains(r) )
+                      updates.emplace_back(obj->to_variant());
                 }
+                if( relevant.size() == 0 && _subscribe_filter.contains(obj->id) )
+                   updates.emplace_back(obj->to_variant());
              }
              else
-                elog( "unable to find object ${id}", ("id",id) );
+             {
+                if( _subscribe_filter.contains(id) )
+                   updates.emplace_back(id); // send just the id to indicate removal
+             }
           }
 
           if( _market_subscriptions.size() )
           {
-             if( !_account_subscriptions.size() ) obj = _db.find_object( id );
+             if( !_subscribe_callback ) 
+                obj = _db.find_object( id );
              if( obj )
              {
                 const limit_order_object* order = dynamic_cast<const limit_order_object*>(obj);
@@ -897,41 +916,14 @@ namespace graphene { namespace app {
        /// pushing the future back / popping the prior future if it is complete.
        /// if a connection hangs then this could get backed up and result in
        /// a failure to exit cleanly.
-       fc::async([capture_this,this,broadcast_queue,market_broadcast_queue,my_objects](){
-          for( const auto& item : broadcast_queue )
-          {
-            edump( (item) );
-            try {
-               auto sub = _account_subscriptions.find(item.first);
-               if( sub != _account_subscriptions.end() )
-                   sub->second( fc::variant(item.second ) );
-            } catch ( const fc::exception& e )
-            {
-               edump((e.to_detail_string()));
-            }
-          }
+       fc::async([capture_this,this,updates,market_broadcast_queue](){
+          if( _subscribe_callback ) _subscribe_callback( updates );
+
           for( const auto& item : market_broadcast_queue )
           {
             auto sub = _market_subscriptions.find(item.first);
             if( sub != _market_subscriptions.end() )
                 sub->second( fc::variant(item.second ) );
-          }
-          for(auto id : my_objects)
-          {
-             // just incase _usbscriptions changed between filter and broadcast
-             auto itr = _subscriptions.find( id );
-             if( itr != _subscriptions.end() )
-             {
-                const object* obj = _db.find_object( id );
-                if( obj != nullptr )
-                {
-                   itr->second(obj->to_variant());
-                }
-                else
-                {
-                   itr->second(fc::variant(id));
-                }
-             }
           }
        });
     }
@@ -978,20 +970,6 @@ namespace graphene { namespace app {
                 itr->second(fc::variant(item.second));
           }
        });
-    }
-
-
-    vector<variant> database_api::subscribe_to_objects( const std::function<void(const fc::variant&)>&  callback, const vector<object_id_type>& ids)
-    {
-       FC_ASSERT( _subscriptions.size() < 1024 );
-       for(auto id : ids) _subscriptions[id] = callback;
-       return get_objects( ids );
-    }
-
-    bool database_api::unsubscribe_from_objects(const vector<object_id_type>& ids)
-    {
-       for(auto id : ids) _subscriptions.erase(id);
-       return true;
     }
 
     void database_api::subscribe_to_market(std::function<void(const variant&)> callback, asset_id_type a, asset_id_type b)
