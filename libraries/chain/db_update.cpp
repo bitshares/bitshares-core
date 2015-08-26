@@ -36,20 +36,19 @@ void database::update_global_dynamic_data( const signed_block& b )
    const dynamic_global_property_object& _dgp =
       dynamic_global_property_id_type(0)(*this);
 
-   const auto& global_props = get_global_properties();
-   auto delta_time = b.timestamp - _dgp.time;
-   auto missed_blocks = (delta_time.to_seconds() / global_props.parameters.block_interval)  - 1;
-   if( _dgp.head_block_number == 0 )
-       missed_blocks = 0;
+   uint32_t missed_blocks = get_slot_at_time( b.timestamp );
+   assert( missed_blocks != 0 );
+   missed_blocks--;
+   if( b.block_num() <= GRAPHENE_MIN_UNDO_HISTORY ) missed_blocks = 0;
 
    // dynamic global properties updating
    modify( _dgp, [&]( dynamic_global_property_object& dgp ){
       if( _checkpoints.size() && _checkpoints.rbegin()->first >= b.block_num() )
          dgp.recently_missed_count = 0;
       else if( missed_blocks )
-         dgp.recently_missed_count += 4*missed_blocks;
-      else if( dgp.recently_missed_count > 4 )
-         dgp.recently_missed_count -= 3;
+         dgp.recently_missed_count += GRAPHENE_RECENTLY_MISSED_COUNT_INCREMENT*missed_blocks;
+      else if( dgp.recently_missed_count > GRAPHENE_RECENTLY_MISSED_COUNT_INCREMENT )
+         dgp.recently_missed_count -= GRAPHENE_RECENTLY_MISSED_COUNT_DECREMENT;
       else if( dgp.recently_missed_count > 0 )
          dgp.recently_missed_count--;
 
@@ -57,6 +56,10 @@ void database::update_global_dynamic_data( const signed_block& b )
       dgp.head_block_id = b.id();
       dgp.time = b.timestamp;
       dgp.current_witness = b.witness;
+      dgp.recent_slots_filled = (
+           (dgp.recent_slots_filled << 1)
+           + 1) << missed_blocks;
+      dgp.current_aslot += missed_blocks+1;
    });
 
    if( !(get_node_properties().skip_flags & skip_undo_history_check) )
@@ -75,6 +78,7 @@ void database::update_signing_witness(const witness_object& signing_witness, con
 {
    const global_property_object& gpo = get_global_properties();
    const dynamic_global_property_object& dpo = get_dynamic_global_properties();
+   uint64_t new_block_aslot = dpo.current_aslot + get_slot_at_time( new_block.timestamp );
 
    share_type witness_pay = std::min( gpo.parameters.witness_pay_per_block, dpo.witness_budget );
 
@@ -87,7 +91,7 @@ void database::update_signing_witness(const witness_object& signing_witness, con
 
    modify( signing_witness, [&]( witness_object& _wit )
    {
-      _wit.last_slot_num = new_block.block_num(); /// TODO: plus total missed blocks
+      _wit.last_aslot = new_block_aslot;
    } );
 }
 

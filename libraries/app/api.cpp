@@ -800,7 +800,6 @@ namespace graphene { namespace app {
                   break;
                } case impl_block_summary_object_type:{
                } case impl_account_transaction_history_object_type:{
-               } case impl_witness_schedule_object_type: {
                } case impl_chain_property_object_type: {
                }
           }

@@ -177,7 +177,7 @@ void witness_plugin::block_production_loop()
    // is anyone scheduled to produce now or one second in the future?
    const fc::time_point_sec now = graphene::time::now();
    uint32_t slot = db.get_slot_at_time( now );
-   graphene::chain::witness_id_type scheduled_witness = db.get_scheduled_witness( slot ).first;
+   graphene::chain::witness_id_type scheduled_witness = db.get_scheduled_witness( slot );
    fc::time_point_sec scheduled_time = db.get_slot_time( slot );
    graphene::chain::public_key_type scheduled_key = scheduled_witness( db ).signing_key;
 

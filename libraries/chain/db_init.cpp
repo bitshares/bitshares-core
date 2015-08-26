@@ -30,7 +30,6 @@
 #include <graphene/chain/vesting_balance_object.hpp>
 #include <graphene/chain/withdraw_permission_object.hpp>
 #include <graphene/chain/witness_object.hpp>
-#include <graphene/chain/witness_schedule_object.hpp>
 
 #include <graphene/chain/account_evaluator.hpp>
 #include <graphene/chain/asset_evaluator.hpp>
@@ -106,9 +105,6 @@ const uint8_t withdraw_permission_object::type_id;
 
 const uint8_t witness_object::space_id;
 const uint8_t witness_object::type_id;
-
-const uint8_t witness_schedule_object::space_id;
-const uint8_t witness_schedule_object::type_id;
 
 const uint8_t worker_object::space_id;
 const uint8_t worker_object::type_id;
@@ -193,7 +189,6 @@ void database::initialize_indexes()
    add_index< primary_index<simple_index<account_statistics_object       >> >();
    add_index< primary_index<simple_index<asset_dynamic_data_object       >> >();
    add_index< primary_index<flat_index<  block_summary_object            >> >();
-   add_index< primary_index<simple_index<witness_schedule_object         >> >();
    add_index< primary_index<simple_index<chain_property_object          > > >();
 }
 
@@ -317,6 +312,7 @@ void database::init_genesis(const genesis_state_type& genesis_state)
       p.time = genesis_state.initial_timestamp;
       p.dynamic_flags = 0;
       p.witness_budget = 0;
+      p.recent_slots_filled = fc::uint128::max_value();
    });
 
    FC_ASSERT( (genesis_state.immutable_parameters.min_witness_count & 1) == 1, "min_witness_count must be odd" );
@@ -537,31 +533,6 @@ void database::init_genesis(const genesis_state_type& genesis_state)
          p.witness_accounts.insert(get(witness_id_type(i)).witness_account);
       }
    });
-
-   // Initialize witness schedule
-#ifndef NDEBUG
-   const witness_schedule_object& wso =
-#endif
-   create<witness_schedule_object>([&](witness_schedule_object& _wso)
-   {
-      memset(_wso.rng_seed.begin(), 0, _wso.rng_seed.size());
-
-      witness_scheduler_rng rng(_wso.rng_seed.begin(), GRAPHENE_NEAR_SCHEDULE_CTR_IV);
-
-      auto init_witnesses = get_global_properties().active_witnesses;
-
-      _wso.scheduler = witness_scheduler();
-      _wso.scheduler._min_token_count = std::max(int(init_witnesses.size()) / 2, 1);
-      _wso.scheduler.update(init_witnesses);
-
-      for( size_t i=0; i<init_witnesses.size(); ++i )
-         _wso.scheduler.produce_schedule(rng);
-
-      _wso.last_scheduling_block = 0;
-
-      _wso.recent_slots_filled = fc::uint128::max_value();
-   });
-   assert( wso.id == witness_schedule_id_type() );
 
    // Enable fees
    modify(get_global_properties(), [&genesis_state](global_property_object& p) {

@@ -140,7 +140,6 @@ namespace graphene { namespace chain {
       impl_transaction_object_type,
       impl_block_summary_object_type,
       impl_account_transaction_history_object_type,
-      impl_witness_schedule_object_type,
       impl_blinded_balance_object_type,
       impl_chain_property_object_type
    };
@@ -165,7 +164,6 @@ namespace graphene { namespace chain {
    class operation_history_object;
    class withdraw_permission_object;
    class vesting_balance_object;
-   class witness_schedule_object;
    class worker_object;
    class balance_object;
 
@@ -209,7 +207,6 @@ namespace graphene { namespace chain {
    typedef object_id< implementation_ids,
                       impl_account_transaction_history_object_type,
                       account_transaction_history_object>       account_transaction_history_id_type;
-   typedef object_id< implementation_ids, impl_witness_schedule_object_type, witness_schedule_object >                  witness_schedule_id_type;
    typedef object_id< implementation_ids, impl_chain_property_object_type,   chain_property_object>                     chain_property_id_type;
 
    typedef fc::array<char, GRAPHENE_MAX_ASSET_SYMBOL_LENGTH>    symbol_type;
@@ -286,7 +283,6 @@ FC_REFLECT_ENUM( graphene::chain::impl_object_type,
                  (impl_transaction_object_type)
                  (impl_block_summary_object_type)
                  (impl_account_transaction_history_object_type)
-                 (impl_witness_schedule_object_type)
                  (impl_blinded_balance_object_type)
                  (impl_chain_property_object_type)
                )
@@ -317,7 +313,6 @@ FC_REFLECT_TYPENAME( graphene::chain::account_statistics_id_type )
 FC_REFLECT_TYPENAME( graphene::chain::transaction_obj_id_type )
 FC_REFLECT_TYPENAME( graphene::chain::block_summary_id_type )
 FC_REFLECT_TYPENAME( graphene::chain::account_transaction_history_id_type )
-FC_REFLECT_TYPENAME( graphene::chain::witness_schedule_id_type )
 FC_REFLECT( graphene::chain::void_t, )
 
 FC_REFLECT_ENUM( graphene::chain::asset_issuer_permission_flags, (charge_market_fee)(white_list)(transfer_restricted)(override_authority)(disable_force_settle)(global_settle)(disable_confidential) )

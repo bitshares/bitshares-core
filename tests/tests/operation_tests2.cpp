@@ -443,34 +443,15 @@ BOOST_AUTO_TEST_CASE( witness_create )
    auto itr = std::find(witnesses.begin(), witnesses.end(), nathan_witness_id);
    BOOST_CHECK(itr != witnesses.end());
 
-   generate_blocks(witnesses.size());
-
-   // make sure we're scheduled to produce
-   vector<witness_id_type> near_witnesses = db.get_near_witness_schedule();
-   BOOST_CHECK( std::find( near_witnesses.begin(), near_witnesses.end(), nathan_witness_id )
-                != near_witnesses.end() );
-
-   struct generator_helper {
-      database_fixture& f;
-      witness_id_type nathan_id;
-      fc::ecc::private_key nathan_key;
-      bool nathan_generated_block;
-
-      void operator()(witness_id_type id) {
-         if( id == nathan_id )
-         {
-            nathan_generated_block = true;
-            f.generate_block(0, nathan_key);
-         } else
-            f.generate_block(0);
-         BOOST_CHECK_EQUAL(f.db.get_dynamic_global_properties().current_witness.instance.value, id.instance.value);
-         f.db.get_near_witness_schedule();
-      }
-   };
-
-   generator_helper h = std::for_each(near_witnesses.begin(), near_witnesses.end(),
-                                      generator_helper{*this, nathan_witness_id, nathan_private_key, false});
-   BOOST_CHECK(h.nathan_generated_block);
+   int produced = 0;
+   // Make sure we get scheduled exactly once in witnesses.size() blocks
+   // TODO:  intense_test that repeats this loop many times
+   for( size_t i=0; i<witnesses.size(); i++ )
+   {
+      if( generate_block().witness == nathan_witness_id )
+         produced++;
+   }
+   BOOST_CHECK_EQUAL( produced, 1 );
 } FC_LOG_AND_RETHROW() }
 
 /**
@@ -1098,7 +1079,7 @@ BOOST_AUTO_TEST_CASE( balance_object_test )
    BOOST_CHECK(db.find_object(balance_id_type(1)) != nullptr);
 
    auto slot = db.get_slot_at_time(starting_time);
-   db.generate_block(starting_time, db.get_scheduled_witness(slot).first, init_account_priv_key, skip_flags);
+   db.generate_block(starting_time, db.get_scheduled_witness(slot), init_account_priv_key, skip_flags);
    set_expiration( db, trx );
 
    const balance_object& vesting_balance_1 = balance_id_type(2)(db);
@@ -1149,9 +1130,9 @@ BOOST_AUTO_TEST_CASE( balance_object_test )
    // Attempting to claim twice within a day
    GRAPHENE_CHECK_THROW(db.push_transaction(trx), balance_claim_claimed_too_often);
 
-   db.generate_block(db.get_slot_time(1), db.get_scheduled_witness(1).first, init_account_priv_key, skip_flags);
+   db.generate_block(db.get_slot_time(1), db.get_scheduled_witness(1), init_account_priv_key, skip_flags);
    slot = db.get_slot_at_time(vesting_balance_1.vesting_policy->begin_timestamp + 60);
-   db.generate_block(db.get_slot_time(slot), db.get_scheduled_witness(slot).first, init_account_priv_key, skip_flags);
+   db.generate_block(db.get_slot_time(slot), db.get_scheduled_witness(slot), init_account_priv_key, skip_flags);
    set_expiration( db, trx );
 
    op.balance_to_claim = vesting_balance_1.id;
@@ -1175,9 +1156,9 @@ BOOST_AUTO_TEST_CASE( balance_object_test )
    // Attempting to claim twice within a day
    GRAPHENE_CHECK_THROW(db.push_transaction(trx), balance_claim_claimed_too_often);
 
-   db.generate_block(db.get_slot_time(1), db.get_scheduled_witness(1).first, init_account_priv_key, skip_flags);
+   db.generate_block(db.get_slot_time(1), db.get_scheduled_witness(1), init_account_priv_key, skip_flags);
    slot = db.get_slot_at_time(db.head_block_time() + fc::days(1));
-   db.generate_block(db.get_slot_time(slot), db.get_scheduled_witness(slot).first, init_account_priv_key, skip_flags);
+   db.generate_block(db.get_slot_time(slot), db.get_scheduled_witness(slot), init_account_priv_key, skip_flags);
    set_expiration( db, trx );
 
    op.total_claimed = vesting_balance_2.balance;

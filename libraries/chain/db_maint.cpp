@@ -16,6 +16,8 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <boost/multiprecision/integer.hpp>
+
 #include <fc/smart_ref_impl.hpp>
 #include <fc/uint128.hpp>
 
@@ -27,7 +29,6 @@
 #include <graphene/chain/global_property_object.hpp>
 #include <graphene/chain/vesting_balance_object.hpp>
 #include <graphene/chain/witness_object.hpp>
-#include <graphene/chain/witness_schedule_object.hpp>
 #include <graphene/chain/worker_evaluator.hpp>
 
 namespace graphene { namespace chain {
@@ -206,11 +207,6 @@ void database::update_active_witnesses()
       });
    });
 
-   const witness_schedule_object& wso = witness_schedule_id_type()(*this);
-   modify(wso, [&](witness_schedule_object& _wso)
-   {
-      _wso.scheduler.update(gpo.active_witnesses);
-   });
 } FC_CAPTURE_AND_RETHROW() }
 
 void database::update_active_committee_members()

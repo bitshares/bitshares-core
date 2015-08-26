@@ -257,7 +257,7 @@ signed_block database::_generate_block(
    uint32_t skip = get_node_properties().skip_flags;
    uint32_t slot_num = get_slot_at_time( when );
    FC_ASSERT( slot_num > 0 );
-   witness_id_type scheduled_witness = get_scheduled_witness( slot_num ).first;
+   witness_id_type scheduled_witness = get_scheduled_witness( slot_num );
    FC_ASSERT( scheduled_witness == witness_id );
 
    const auto& witness_obj = witness_id(*this);
@@ -386,7 +386,6 @@ void database::_apply_block( const signed_block& next_block )
       ++_current_trx_in_block;
    }
 
-   update_witness_schedule(next_block);
    update_global_dynamic_data(next_block);
    update_signing_witness(signing_witness, next_block);
 
@@ -546,7 +545,7 @@ const witness_object& database::validate_block_header( uint32_t skip, const sign
       uint32_t slot_num = get_slot_at_time( next_block.timestamp );
       FC_ASSERT( slot_num > 0 );
 
-      witness_id_type scheduled_witness = get_scheduled_witness( slot_num ).first;
+      witness_id_type scheduled_witness = get_scheduled_witness( slot_num );
       FC_ASSERT( next_block.witness == scheduled_witness );
    }
 

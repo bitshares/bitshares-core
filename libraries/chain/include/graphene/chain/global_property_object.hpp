@@ -73,10 +73,13 @@ namespace graphene { namespace chain {
          share_type        witness_budget;
          uint32_t          accounts_registered_this_interval = 0;
          /**
-          *  Every time a block is missed this increases by 2, every time a block is found it decreases by 1 it is
-          *  never less than 0
+          *  Every time a block is missed this increases by
+          *  RECENTLY_MISSED_COUNT_INCREMENT,
+          *  every time a block is found it decreases by
+          *  RECENTLY_MISSED_COUNT_DECREMENT.  It is
+          *  never less than 0.
           *
-          *  If the recently_missed_count hits 2*UNDO_HISTORY then no ew blocks may be pushed.  
+          *  If the recently_missed_count hits 2*UNDO_HISTORY then no new blocks may be pushed.
           */
          uint32_t          recently_missed_count = 0;
 
@@ -84,6 +87,18 @@ namespace graphene { namespace chain {
           * haven't produced any blocks recently.
           */
          vector<witness_id_type> potential_witnesses;
+
+         /**
+          * The current absolute slot number.  Equal to the total
+          * number of slots since genesis.  Also equal to the total
+          * number of missed slots plus head_block_number.
+          */
+         uint64_t          current_aslot = 0;
+
+         /**
+          * used to compute witness participation.
+          */
+         fc::uint128_t recent_slots_filled;
 
          /**
           * dynamic_flags specifies chain state properties that can be
@@ -116,6 +131,8 @@ FC_REFLECT_DERIVED( graphene::chain::dynamic_global_property_object, (graphene::
                     (witness_budget)
                     (accounts_registered_this_interval)
                     (recently_missed_count)
+                    (current_aslot)
+                    (recent_slots_filled)
                     (dynamic_flags)
                     (potential_witnesses)
                   )

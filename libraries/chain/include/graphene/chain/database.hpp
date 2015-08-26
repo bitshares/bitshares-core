@@ -220,11 +220,9 @@ namespace graphene { namespace chain {
           * Use the get_slot_time() and get_slot_at_time() functions
           * to convert between slot_num and timestamp.
           *
-          * Passing slot_num == 0 returns (witness_id_type(), false)
-          *
-          * The bool value is true if near schedule, false if far schedule.
+          * Passing slot_num == 0 returns witness_id_type()
           */
-         pair<witness_id_type, bool> get_scheduled_witness(uint32_t slot_num)const;
+         witness_id_type get_scheduled_witness(uint32_t slot_num)const;
 
          /**
           * Get the time at which the given slot occurs.
@@ -245,11 +243,6 @@ namespace graphene { namespace chain {
           * If no such N exists, return 0.
           */
          uint32_t get_slot_at_time(fc::time_point_sec when)const;
-
-         /**
-          * Get the near schedule.
-          */
-         vector<witness_id_type> get_near_witness_schedule()const;
 
          //////////////////// db_getter.cpp ////////////////////
 
@@ -452,9 +445,6 @@ namespace graphene { namespace chain {
          void update_expired_feeds();
          void update_maintenance_flag( bool new_maintenance_flag );
          void update_withdraw_permissions();
-
-         //////////////////// db_witness_schedule.cpp ////////////////////
-         void update_witness_schedule(const signed_block& next_block);    /// no-op except for scheduling blocks
 
          ///Steps performed only at maintenance intervals
          ///@{
