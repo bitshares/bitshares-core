@@ -457,7 +457,7 @@ void_result asset_publish_feeds_evaluator::do_evaluate(const asset_publish_feed_
    FC_ASSERT( !bitasset.has_settlement(), "No further feeds may be published after a settlement event" );
    FC_ASSERT(o.feed.settlement_price.quote.asset_id == bitasset.options.short_backing_asset);
    //Verify that the publisher is authoritative to publish a feed
-   if( base.issuer == account_id_type() )
+   if( base.issuer == GRAPHENE_COMMITTEE_ACCOUNT )
    {
       //It's a committee_member-fed asset. Verify that publisher is an active committee_member or witness.
       FC_ASSERT(d.get(GRAPHENE_COMMITTEE_ACCOUNT).active.account_auths.count(o.publisher) ||
