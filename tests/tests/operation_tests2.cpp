@@ -443,12 +443,17 @@ BOOST_AUTO_TEST_CASE( witness_create )
    auto itr = std::find(witnesses.begin(), witnesses.end(), nathan_witness_id);
    BOOST_CHECK(itr != witnesses.end());
 
+   // generate blocks until we are at the beginning of a round
+   while( ((db.get_dynamic_global_properties().current_aslot + 1) % witnesses.size()) != 0 )
+      generate_block();
+
    int produced = 0;
    // Make sure we get scheduled exactly once in witnesses.size() blocks
    // TODO:  intense_test that repeats this loop many times
    for( size_t i=0; i<witnesses.size(); i++ )
    {
-      if( generate_block().witness == nathan_witness_id )
+      signed_block block = generate_block();
+      if( block.witness == nathan_witness_id )
          produced++;
    }
    BOOST_CHECK_EQUAL( produced, 1 );
