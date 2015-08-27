@@ -196,7 +196,7 @@ void load_genesis(
    if( options.count("genesis-json") )
    {
       fc::path genesis_json_filename = get_path( options, "genesis-json" );
-      std::cerr << "chain_identifier:  Reading genesis from file " << genesis_json_filename.preferred_string() << "\n";
+      std::cerr << "embed_genesis:  Reading genesis from file " << genesis_json_filename.preferred_string() << "\n";
       info.genesis_json = std::string();
       read_file_contents( genesis_json_filename, *info.genesis_json );
    }
@@ -206,7 +206,7 @@ void load_genesis(
    if( options.count("chain-id") )
    {
       std::string chain_id_str = options["chain-id"].as<std::string>();
-      std::cerr << "chain_identifier:  Genesis ID from argument is " << chain_id_str << "\n";
+      std::cerr << "embed_genesis:  Genesis ID from argument is " << chain_id_str << "\n";
       info.chain_id = chain_id_str;
    }
    return;
@@ -230,7 +230,7 @@ int main( int argc, char** argv )
    }
    catch (const boost::program_options::error& e)
    {
-      std::cerr << "chain_identifier:  error parsing command line: " << e.what() << "\n";
+      std::cerr << "embed_genesis:  error parsing command line: " << e.what() << "\n";
       return 1;
    }
 
@@ -260,11 +260,11 @@ int main( int argc, char** argv )
 
    for( const std::string& src_dest : options["tmplsub"].as< std::vector< std::string > >() )
    {
-      std::cerr << "chain_identifier:  parsing tmplsub parameter \"" << src_dest << "\"\n";
+      std::cerr << "embed_genesis:  parsing tmplsub parameter \"" << src_dest << "\"\n";
       size_t pos = src_dest.find( "---" );
       if( pos == std::string::npos )
       {
-         std::cerr << "chain_identifier:  could not parse tmplsub parameter:  '---' not found\n";
+         std::cerr << "embed_genesis:  could not parse tmplsub parameter:  '---' not found\n";
          main_return = 1;
          continue;
       }
