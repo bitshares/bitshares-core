@@ -823,7 +823,10 @@ namespace graphene { namespace app {
              for( const auto& r : relevant )
              {
                 if( _subscribe_filter.contains(r) )
+                {
                    broadcast_queue[r].emplace_back(obj->to_variant());
+                   break;
+                }
              }
              if( relevant.size() == 0 && _subscribe_filter.contains(obj->id) )
                 broadcast_queue[account_id_type()].emplace_back(obj->to_variant());
@@ -882,7 +885,10 @@ namespace graphene { namespace app {
                 for( const auto& r : relevant )
                 {
                    if( _subscribe_filter.contains(r) )
+                   {
                       updates.emplace_back(obj->to_variant());
+                      break;
+                   }
                 }
                 if( relevant.size() == 0 && _subscribe_filter.contains(obj->id) )
                    updates.emplace_back(obj->to_variant());
