@@ -375,10 +375,6 @@ public:
             ("chain_id", _chain_id) );
       }
       init_prototype_ops();
-      _remote_db->subscribe_to_objects( [=]( const fc::variant& obj )
-      {
-         fc::async([this]{resync();}, "Resync after block");
-      }, {dynamic_global_property_id_type()} );
       _wallet.chain_id = _chain_id;
       _wallet.ws_server = initial_data.ws_server;
       _wallet.ws_user = initial_data.ws_user;
@@ -629,10 +625,7 @@ public:
 
       _keys[wif_pub_key] = wif_key;
 
-      if( _wallet.update_account(account) )
-         _remote_db->subscribe_to_objects([this](const fc::variant& v) {
-            _wallet.update_account(v.as<account_object>());
-         }, {account.id});
+      _wallet.update_account(account);
 
       _wallet.extra_keys[account.id].insert(wif_pub_key);
 
@@ -649,17 +642,11 @@ public:
       if( ! fc::exists( wallet_filename ) )
          return false;
 
-      if( !_wallet.my_accounts.empty() )
-         _remote_db->unsubscribe_from_objects(_wallet.my_account_ids());
       _wallet = fc::json::from_file( wallet_filename ).as< wallet_data >();
       if( _wallet.chain_id != _chain_id )
          FC_THROW( "Wallet chain ID does not match",
             ("wallet.chain_id", _wallet.chain_id)
             ("chain_id", _chain_id) );
-      if( !_wallet.my_accounts.empty() )
-         _remote_db->subscribe_to_objects([this](const fc::variant& v) {
-            _wallet.update_account(v.as<account_object>());
-         }, _wallet.my_account_ids());
       return true;
    }
    void save_wallet_file(string wallet_filename = "")

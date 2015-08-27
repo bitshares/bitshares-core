@@ -54,6 +54,12 @@ namespace graphene { namespace db {
       object_id_type& operator++(int) { ++number; return *this; }
       object_id_type& operator++()    { ++number; return *this; }
 
+      friend object_id_type operator+(const object_id_type& a, int delta ) { 
+         return object_id_type( a.space(), a.type(), a.instance() + delta );
+      }
+      friend object_id_type operator+(const object_id_type& a, int64_t delta ) { 
+         return object_id_type( a.space(), a.type(), a.instance() + delta );
+      }
       friend size_t hash_value( object_id_type v ) { return std::hash<uint64_t>()(v.number); }
 
       friend bool  operator < ( const object_id_type& a, const object_id_type& b )
@@ -83,6 +89,10 @@ namespace graphene { namespace db {
       object_id( object_id_type id ):instance(id.instance())
       {
       }
+
+      friend object_id operator+(const object_id a, int64_t delta ) { return object_id( uint64_t(a.instance.value+delta) ); }
+      friend object_id operator+(const object_id a, int delta ) { return object_id( uint64_t(a.instance.value+delta) ); }
+
       operator object_id_type()const { return object_id_type( SpaceID, TypeID, instance.value ); }
       operator uint64_t()const { return object_id_type( *this ).number; }
 

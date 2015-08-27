@@ -6,7 +6,7 @@ add_subdirectory( size_checker )
 
 set(BUILD_QT_GUI FALSE CACHE BOOL "Build the Qt-based light client GUI")
 if(BUILD_QT_GUI)
-   add_subdirectory(light_client)
+#   add_subdirectory(light_client)
 endif()
 set(BUILD_WEB_NODE FALSE CACHE BOOL "Build the Qt-based full node with web GUI")
 if(BUILD_WEB_NODE)

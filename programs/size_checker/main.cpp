@@ -64,6 +64,20 @@ int main( int argc, char** argv )
    {
       graphene::chain::operation op;
 
+
+      vector<uint64_t> witnesses; witnesses.resize(50);
+      for( uint32_t i = 0; i < 60*60*24*30; ++i )
+      {
+         witnesses[ rand() % 50 ]++;
+      }
+
+      std::sort( witnesses.begin(), witnesses.end() );
+      idump((witnesses.back() - witnesses.front()) );
+      idump((60*60*24*30/50));
+      idump(("deviation: ")((60*60*24*30/50-witnesses.front())/(60*60*24*30/50.0)));
+
+      idump( (witnesses) );
+
       for( int32_t i = 0; i < op.count(); ++i )
       {
          op.set_which(i);

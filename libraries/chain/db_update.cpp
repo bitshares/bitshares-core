@@ -44,7 +44,7 @@ void database::update_global_dynamic_data( const signed_block& b )
    modify( _dgp, [&]( dynamic_global_property_object& dgp ){
       if( BOOST_UNLIKELY( b.block_num() == 1 ) )
          dgp.recently_missed_count = 0;
-      else if( _checkpoints.size() && _checkpoints.rbegin()->first >= b.block_num() )
+         else if( _checkpoints.size() && _checkpoints.rbegin()->first >= b.block_num() )
          dgp.recently_missed_count = 0;
       else if( missed_blocks )
          dgp.recently_missed_count += GRAPHENE_RECENTLY_MISSED_COUNT_INCREMENT*missed_blocks;

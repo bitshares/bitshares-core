@@ -44,6 +44,7 @@ namespace graphene { namespace chain {
 
    struct by_account;
    struct by_vote_id;
+   struct by_last_block;
    using witness_multi_index_type = multi_index_container<
       witness_object,
       indexed_by<
