@@ -45,12 +45,11 @@ witness_id_type database::get_scheduled_witness( uint32_t slot_num )const
 
    const flat_set< witness_id_type >& active_witnesses = get_global_properties().active_witnesses;
    uint32_t n = active_witnesses.size();
-   uint64_t min_witness_separation = (n / 2)+1;
+   uint64_t min_witness_separation = (n / 2); /// should work in cases where n is 0,1, and 2
    uint64_t current_aslot = get_dynamic_global_properties().current_aslot + slot_num;
 
    uint64_t start_of_current_round_aslot = current_aslot - (current_aslot % n);
-   uint64_t first_ineligible_aslot = std::min(
-      start_of_current_round_aslot, current_aslot - min_witness_separation );
+   uint64_t first_ineligible_aslot = std::min( start_of_current_round_aslot + 1, current_aslot - min_witness_separation );
    //
    // overflow analysis of above subtraction:
    //
@@ -76,7 +75,9 @@ witness_id_type database::get_scheduled_witness( uint32_t slot_num )const
       if( wit.last_aslot >= first_ineligible_aslot )
          continue;
 
-      uint64_t k = now_hi + uint64_t(wit_id);
+      /// High performance random generator
+      /// http://xorshift.di.unimi.it/
+      uint64_t k = now_hi + uint64_t(wit_id)*2685821657736338717ULL;
       k ^= (k >> 12);
       k ^= (k << 25);
       k ^= (k >> 27);
@@ -93,8 +94,17 @@ witness_id_type database::get_scheduled_witness( uint32_t slot_num )const
    //   at most K elements are susceptible to the filter,
    //   otherwise we have an inconsistent database (such as
    //   wit.last_aslot values that are non-unique or in the future)
+   if( !success ) {
+      edump((best_k)(slot_num)(first_ineligible_aslot)(current_aslot)(start_of_current_round_aslot)(min_witness_separation)(active_witnesses.size()));
 
-   assert( success );
+      for( const witness_id_type& wit_id : active_witnesses )
+      {
+         const witness_object& wit = wit_id(*this);
+         if( wit.last_aslot >= first_ineligible_aslot )
+            idump((wit_id)(wit.last_aslot));
+      }
+      assert( success );
+   }
    return best_wit;
 }
 
