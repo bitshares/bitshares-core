@@ -45,11 +45,35 @@ witness_id_type database::get_scheduled_witness( uint32_t slot_num )const
 
    const flat_set< witness_id_type >& active_witnesses = get_global_properties().active_witnesses;
    uint32_t n = active_witnesses.size();
-   uint64_t min_witness_separation = (n / 2); /// should work in cases where n is 0,1, and 2
+   uint64_t min_witness_separation;
+   if( BOOST_UNLIKELY( n < 5 ) )
+   {
+      // special-case 0 and 1.
+      // for 2 give a value which results in witnesses alternating slots
+      // when there is no missed block
+      // for 3-4 give values which don't lock in a single permutation
+      switch( n )
+      {
+         case 0:
+            assert(false);
+         case 1:
+            return *active_witnesses.begin();
+         case 2:
+         case 3:
+            min_witness_separation = 1;
+            break;
+         case 4:
+            min_witness_separation = 2;
+            break;
+      }
+   }
+   else
+      min_witness_separation = (n/2)+1;
+
    uint64_t current_aslot = get_dynamic_global_properties().current_aslot + slot_num;
 
    uint64_t start_of_current_round_aslot = current_aslot - (current_aslot % n);
-   uint64_t first_ineligible_aslot = std::min( start_of_current_round_aslot + 1, current_aslot - min_witness_separation );
+   uint64_t first_ineligible_aslot = std::min( start_of_current_round_aslot, current_aslot - min_witness_separation );
    //
    // overflow analysis of above subtraction:
    //
