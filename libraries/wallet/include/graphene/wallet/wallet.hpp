@@ -213,6 +213,15 @@ struct approval_delta
    vector<string> key_approvals_to_remove;
 };
 
+struct signed_block_with_info : public signed_block
+{
+   signed_block_with_info( const signed_block& block );
+   signed_block_with_info( const signed_block_with_info& block ) = default;
+
+   block_id_type block_id;
+   fc::ecc::public_key signing_key;
+};
+
 namespace detail {
 class wallet_api_impl;
 }
@@ -232,7 +241,7 @@ class wallet_api
       fc::ecc::private_key derive_private_key(const std::string& prefix_string, int sequence_number) const;
 
       variant                           info();
-      optional<signed_block>            get_block( uint32_t num );
+      optional<signed_block_with_info>    get_block( uint32_t num );
       /** Returns the number of accounts registered on the blockchain
        * @returns the number of registered accounts
        */
@@ -1301,6 +1310,9 @@ FC_REFLECT( graphene::wallet::approval_delta,
    (key_approvals_to_add)
    (key_approvals_to_remove)
 )
+
+FC_REFLECT_DERIVED( graphene::wallet::signed_block_with_info, (graphene::chain::signed_block),
+   (block_id)(signing_key) )
 
 FC_API( graphene::wallet::wallet_api,
         (help)

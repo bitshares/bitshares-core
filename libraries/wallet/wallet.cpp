@@ -2096,7 +2096,7 @@ bool wallet_api::copy_wallet_file(string destination_filename)
    return my->copy_wallet_file(destination_filename);
 }
 
-optional<signed_block> wallet_api::get_block(uint32_t num)
+optional<signed_block_with_info> wallet_api::get_block(uint32_t num)
 {
    return my->_remote_db->get_block(num);
 }
@@ -3387,6 +3387,13 @@ vector<blind_receipt> wallet_api::blind_history( string key_or_account )
    }
    std::sort( result.begin(), result.end(), [&]( const blind_receipt& a, const blind_receipt& b ){ return a.date > b.date; } );
    return result;
+}
+
+signed_block_with_info::signed_block_with_info( const signed_block& block )
+   : signed_block( block )
+{
+   block_id = id();
+   signing_key = signee();
 }
 
 } } // graphene::wallet
