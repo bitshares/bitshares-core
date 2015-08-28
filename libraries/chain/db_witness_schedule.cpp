@@ -46,7 +46,7 @@ witness_id_type database::get_scheduled_witness( uint32_t slot_num )const
    const flat_set< witness_id_type >& active_witnesses = get_global_properties().active_witnesses;
    uint32_t n = active_witnesses.size();
    uint64_t min_witness_separation;
-   if( BOOST_UNLIKELY( n < 5 ) )
+   if( GRAPHENE_DEFAULT_MIN_WITNESS_COUNT < 5 && BOOST_UNLIKELY( n < 5 ) )
    {
       // special-case 0 and 1.
       // for 2 give a value which results in witnesses alternating slots

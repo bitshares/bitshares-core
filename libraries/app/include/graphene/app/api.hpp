@@ -297,7 +297,6 @@ namespace graphene { namespace app {
           */
          void cancel_all_subscriptions()
          { set_subscribe_callback( std::function<void(const fc::variant&)>(), true);  _market_subscriptions.clear(); }
-         ///@}
 
          /// @brief Get a hexdump of the serialized binary form of a transaction
          std::string get_transaction_hex(const signed_transaction& trx)const;
@@ -357,7 +356,19 @@ namespace graphene { namespace app {
 
          void set_subscribe_callback( std::function<void(const variant&)> cb, bool clear_filter );
       private:
-         void subscribe_to_id( object_id_type id )const;
+         template<typename T>
+         void subscribe_to_item( const T& i )const
+         {
+            if( !_subscribe_callback ) return;
+            _subscribe_filter.insert( (const char*)&i, sizeof(i) );
+         }
+
+         template<typename T>
+         bool is_subscribed_to_item( const T& i )const
+         {
+            if( !_subscribe_callback ) return false;
+            return _subscribe_filter.contains( i );
+         }
 
          /** called every time a block is applied to report the objects that were changed */
          void on_objects_changed(const vector<object_id_type>& ids);

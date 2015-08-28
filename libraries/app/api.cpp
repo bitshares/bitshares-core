@@ -67,14 +67,6 @@ namespace graphene { namespace app {
        }
     }
 
-    void database_api::subscribe_to_id( object_id_type id )const
-    {
-       idump((id));
-       if( _subscribe_callback )
-          _subscribe_filter.insert( (const unsigned char*)&id, sizeof(id) );
-       else
-          elog( "unable to subscribe to id because there is no subscribe callback set" );
-    }
     fc::variants database_api::get_objects(const vector<object_id_type>& ids)const
     {
        if( _subscribe_callback )  {
@@ -83,7 +75,7 @@ namespace graphene { namespace app {
              if( id.type() == operation_history_object_type && id.space() == protocol_ids ) continue;
              if( id.type() == impl_account_transaction_history_object_type && id.space() == implementation_ids ) continue;
 
-             subscribe_to_id( id );
+             this->subscribe_to_item( id );
           }
        }
        else
@@ -188,7 +180,7 @@ namespace graphene { namespace app {
                       [this](account_id_type id) -> optional<account_object> {
           if(auto o = _db.find(id))
           {
-             subscribe_to_id( id );
+             subscribe_to_item( id );
              return *o;
           }
           return {};
@@ -203,7 +195,7 @@ namespace graphene { namespace app {
                       [this](asset_id_type id) -> optional<asset_object> {
           if(auto o = _db.find(id))
           {
-             subscribe_to_id( id );
+             subscribe_to_item( id );
              return *o;
           }
           return {};
@@ -228,7 +220,7 @@ namespace graphene { namespace app {
        {
           result.insert(make_pair(itr->name, itr->get_id()));
           if( limit == 1 )
-             subscribe_to_id( itr->get_id() );
+             subscribe_to_item( itr->get_id() );
        }
 
        return result;
@@ -256,7 +248,7 @@ namespace graphene { namespace app {
           if( subscribe )
           {
              ilog( "subscribe to ${id}", ("id",account->name) );
-             subscribe_to_id( account->id );
+             subscribe_to_item( account->id );
           }
 
           // fc::mutable_variant_object full_account;
@@ -881,6 +873,28 @@ namespace graphene { namespace app {
              obj = _db.find_object( id );
              if( obj )
              {
+                auto acnt = dynamic_cast<const account_object*>(obj);
+                if( acnt ) 
+                {
+                   bool added_account = false;
+                   for( const auto& key : acnt->owner.key_auths )
+                      if( is_subscribed_to_item( key.first ) )
+                      {
+                         updates.emplace_back( obj->to_variant() );
+                         added_account = true;
+                         break;
+                      }
+                   for( const auto& key : acnt->active.key_auths )
+                      if( is_subscribed_to_item( key.first ) )
+                      {
+                         updates.emplace_back( obj->to_variant() );
+                         added_account = true;
+                         break;
+                      }
+                   if( added_account )
+                      continue;
+                }
+
                 vector<account_id_type> relevant = get_relevant_accounts( obj );
                 for( const auto& r : relevant )
                 {
@@ -1080,11 +1094,19 @@ namespace graphene { namespace app {
 
        for( auto& key : keys )
        {
-         address a1( pts_address(key, false, 56) );
-         address a2( pts_address(key, true, 56) );
-         address a3( pts_address(key, false, 0)  );
-         address a4( pts_address(key, true, 0)  );
-         address a5( key );
+
+          address a1( pts_address(key, false, 56) );
+          address a2( pts_address(key, true, 56) );
+          address a3( pts_address(key, false, 0)  );
+          address a4( pts_address(key, true, 0)  );
+          address a5( key );
+
+          subscribe_to_item( key );
+          subscribe_to_item( a1 );
+          subscribe_to_item( a2 );
+          subscribe_to_item( a3 );
+          subscribe_to_item( a4 );
+          subscribe_to_item( a5 );
 
           const auto& idx = _db.get_index_type<account_index>();
           const auto& aidx = dynamic_cast<const primary_index<account_index>&>(idx);
@@ -1113,6 +1135,10 @@ namespace graphene { namespace app {
           }
           final_result.emplace_back( std::move(result) );
        }
+
+       for( auto i : final_result )
+          subscribe_to_item(i);
+
        return final_result;
     }
 
@@ -1169,6 +1195,7 @@ namespace graphene { namespace app {
 
          for( const auto& owner : addrs )
          {
+            subscribe_to_item( owner );
             auto itr = by_owner_idx.lower_bound( boost::make_tuple( owner, asset_id_type(0) ) );
             while( itr != by_owner_idx.end() && itr->owner == owner )
             {
