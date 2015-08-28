@@ -1,4 +1,5 @@
 add_subdirectory( cli_wallet )
+add_subdirectory( genesis_util )
 add_subdirectory( witness_node )
 add_subdirectory( delayed_node )
 add_subdirectory( js_operation_serializer )
