@@ -227,8 +227,16 @@ namespace detail {
          auto initial_state = [&] {
             ilog("Initializing database...");
             if( _options->count("genesis-json") )
-               return fc::json::from_file(_options->at("genesis-json").as<boost::filesystem::path>())
-                     .as<genesis_state_type>();
+            {
+               genesis_state_type genesis = fc::json::from_file(_options->at("genesis-json").as<boost::filesystem::path>()).as<genesis_state_type>();
+               if( _options->count("genesis-timestamp") )
+               {
+                  genesis.initial_timestamp = graphene::time::now() + genesis.initial_parameters.block_interval + _options->at("genesis-timestamp").as<uint32_t>();
+                  genesis.initial_timestamp -= genesis.initial_timestamp.sec_since_epoch() % genesis.initial_parameters.block_interval;
+                  std::cerr << "Used genesis timestamp:  " << genesis.initial_timestamp.to_iso_string() << " (PLEASE RECORD THIS)\n";
+               }
+               return genesis;
+            }
             else
             {
                std::string egenesis_json;
@@ -612,6 +620,7 @@ void application::set_program_options(boost::program_options::options_descriptio
           "invalid file is found, it will be replaced with an example Genesis State.")
          ("replay-blockchain", "Rebuild object graph by replaying all blocks")
          ("resync-blockchain", "Delete all blocks and re-sync with network from scratch")
+         ("genesis-timestamp", bpo::value<uint32_t>(), "Replace timestamp from genesis.json with current time plus this many seconds (experts only!)")
          ;
    command_line_options.add(_cli_options);
    configuration_file_options.add(_cfg_options);
