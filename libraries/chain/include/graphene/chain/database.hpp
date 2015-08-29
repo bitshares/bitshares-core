@@ -221,7 +221,7 @@ namespace graphene { namespace chain {
           * Use the get_slot_time() and get_slot_at_time() functions
           * to convert between slot_num and timestamp.
           *
-          * Passing slot_num == 0 returns witness_id_type()
+          * Passing slot_num == 0 returns GRAPHENE_NULL_WITNESS
           */
          witness_id_type get_scheduled_witness(uint32_t slot_num)const;
 

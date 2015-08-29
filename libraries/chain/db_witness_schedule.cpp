@@ -43,6 +43,9 @@ witness_id_type database::get_scheduled_witness( uint32_t slot_num )const
    // [1] https://en.wikipedia.org/wiki/Xorshift#Xorshift.2A
    //
 
+   if( slot_num == 0 )
+      return GRAPHENE_NULL_WITNESS;
+
    const flat_set< witness_id_type >& active_witnesses = get_global_properties().active_witnesses;
    uint32_t n = active_witnesses.size();
    uint64_t min_witness_separation;

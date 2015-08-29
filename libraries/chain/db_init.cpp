@@ -549,6 +549,11 @@ void database::init_genesis(const genesis_state_type& genesis_state)
 
    // TODO: Assert that bitasset debt = supply
 
+   // Create special witness account
+   const witness_object& wit = create<witness_object>([&](witness_object& w) {});
+   FC_ASSERT( wit.id == GRAPHENE_NULL_WITNESS );
+   remove(wit);
+
    // Create initial witnesses
    std::for_each(genesis_state.initial_witness_candidates.begin(), genesis_state.initial_witness_candidates.end(),
                  [&](const genesis_state_type::initial_witness_type& witness) {
@@ -583,7 +588,7 @@ void database::init_genesis(const genesis_state_type& genesis_state)
 
    // Set active witnesses
    modify(get_global_properties(), [&](global_property_object& p) {
-      for( int i = 0; i < genesis_state.initial_active_witnesses; ++i )
+      for( int i = 1; i <= genesis_state.initial_active_witnesses; ++i )
       {
          p.active_witnesses.insert(i);
          p.witness_accounts.insert(get(witness_id_type(i)).witness_account);
