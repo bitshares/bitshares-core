@@ -24,6 +24,22 @@
 
 namespace graphene { namespace witness_plugin {
 
+namespace block_production_condition
+{
+   enum block_production_condition_enum
+   {
+      produced = 0,
+      not_synced = 1,
+      not_my_turn = 2,
+      not_time_yet = 3,
+      no_private_key = 4,
+      low_participation = 5,
+      lag = 6,
+      consecutive = 7,
+      exception_producing_block = 8
+   };
+}
+
 class witness_plugin : public graphene::app::plugin {
 public:
    ~witness_plugin() {
@@ -51,8 +67,9 @@ public:
    virtual void plugin_shutdown() override;
 
 private:
-   void schedule_next_production(const graphene::chain::chain_parameters& global_parameters);
-   void block_production_loop();
+   void schedule_production_loop();
+   block_production_condition::block_production_condition_enum block_production_loop();
+   block_production_condition::block_production_condition_enum maybe_produce_block( fc::mutable_variant_object& capture );
 
    boost::program_options::variables_map _options;
    bool _production_enabled = false;
