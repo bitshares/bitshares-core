@@ -60,7 +60,7 @@ void shutdown_ntp_time()
   delete actual_ntp_service;
 }
 
-fc::time_point_sec now()
+fc::time_point now()
 {
    if( simulated_time )
        return fc::time_point() + fc::seconds( simulated_time + adjusted_time_sec );
@@ -72,7 +72,7 @@ fc::time_point_sec now()
       return fc::time_point::now() + fc::seconds( adjusted_time_sec );
 }
 
-fc::time_point_sec nonblocking_now()
+fc::time_point nonblocking_now()
 {
   if (simulated_time)
     return fc::time_point() + fc::seconds(simulated_time + adjusted_time_sec);

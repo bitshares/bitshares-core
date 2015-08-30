@@ -27,8 +27,8 @@ namespace graphene { namespace time {
    extern time_discontinuity_signal_type time_discontinuity_signal;
 
    fc::optional<fc::time_point> ntp_time();
-   fc::time_point_sec           now();
-   fc::time_point_sec           nonblocking_now(); // identical to now() but guaranteed not to block
+   fc::time_point               now();
+   fc::time_point               nonblocking_now(); // identical to now() but guaranteed not to block
    void                         update_ntp_time();
    fc::microseconds             ntp_error();
    void                         shutdown_ntp_time();
