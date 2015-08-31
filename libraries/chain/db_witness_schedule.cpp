@@ -90,7 +90,7 @@ witness_id_type database::get_scheduled_witness( uint32_t slot_num )const
    first_ineligible_aslot = std::max( first_ineligible_aslot, uint64_t( 1 ) );
 
    uint64_t best_k = 0;
-   witness_id_type best_wit;
+   witness_id_type best_wit = GRAPHENE_NULL_WITNESS;
    bool success = false;
 
    uint64_t now_hi = get_slot_time( slot_num ).sec_since_epoch();
@@ -131,6 +131,13 @@ witness_id_type database::get_scheduled_witness( uint32_t slot_num )const
             idump((wit_id)(wit.last_aslot));
       }
 
+      //
+      // TODO:  Comment out assert( success ) for production network.
+      // This code should never be reached, but it has been observed
+      // to rarely happen under conditions we have been unable to
+      // reproduce.  If this point is reached, we want deterministic,
+      // non-crashing behavior.  See #274.
+      //
       assert( success );
    }
 
