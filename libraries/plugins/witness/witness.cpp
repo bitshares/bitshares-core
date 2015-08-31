@@ -81,6 +81,7 @@ std::string witness_plugin::plugin_name()const
 
 void witness_plugin::plugin_initialize(const boost::program_options::variables_map& options)
 { try {
+   ilog("witness plugin:  plugin_initialize() begin");
    _options = &options;
    LOAD_VALUE_SET(options, "witness-id", _witnesses, chain::witness_id_type)
 
@@ -108,10 +109,12 @@ void witness_plugin::plugin_initialize(const boost::program_options::variables_m
          _private_keys[key_id_to_wif_pair.first] = *private_key;
       }
    }
+   ilog("witness plugin:  plugin_initialize() end");
 } FC_LOG_AND_RETHROW() }
 
 void witness_plugin::plugin_startup()
 { try {
+   ilog("witness plugin:  plugin_startup() begin");
    chain::database& d = database();
    std::set<chain::witness_id_type> bad_wits;
    //Start NTP time client
@@ -166,6 +169,7 @@ void witness_plugin::plugin_startup()
       schedule_production_loop();
    } else
       elog("No witnesses configured! Please add witness IDs and private keys to configuration.");
+   ilog("witness plugin:  plugin_startup() end");
 } FC_CAPTURE_AND_RETHROW() }
 
 void witness_plugin::plugin_shutdown()
