@@ -72,17 +72,6 @@ witness_id_type database::get_scheduled_witness( uint32_t slot_num )const
 
    uint64_t current_aslot = get_dynamic_global_properties().current_aslot + slot_num;
 
-   if( slot_num == 0 ) // then return the witness that produced the last block
-   {
-      for( const witness_id_type& wit_id : active_witnesses )
-      {
-         const witness_object& wit = wit_id(*this);
-         if( wit.last_aslot >= current_aslot )
-            return wit_id;
-      }
-   }
-
-
    uint64_t start_of_current_round_aslot = current_aslot - (current_aslot % n);
    uint64_t first_ineligible_aslot = std::min( start_of_current_round_aslot, current_aslot - min_witness_separation );
    //
