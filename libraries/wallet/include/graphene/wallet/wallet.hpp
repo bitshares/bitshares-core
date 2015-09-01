@@ -222,6 +222,22 @@ struct signed_block_with_info : public signed_block
    fc::ecc::public_key signing_key;
 };
 
+struct vesting_balance_object_with_info : public vesting_balance_object
+{
+   vesting_balance_object_with_info( const vesting_balance_object& vbo, fc::time_point_sec now );
+   vesting_balance_object_with_info( const vesting_balance_object_with_info& vbo ) = default;
+
+   /**
+    * How much is allowed to be withdrawn.
+    */
+   asset allowed_withdraw;
+
+   /**
+    * The time at which allowed_withdrawal was calculated.
+    */
+   fc::time_point_sec allowed_withdraw_time;
+};
+
 namespace detail {
 class wallet_api_impl;
 }
@@ -1099,6 +1115,27 @@ class wallet_api
                                         string block_signing_key,
                                         bool broadcast = false);
 
+      /**
+       * Get information about a vesting balance object.
+       *
+       * @param account_name An account name, account ID, or vesting balance object ID.
+       */
+      vector< vesting_balance_object_with_info > get_vesting_balances( string account_name );
+
+      /**
+       * Withdraw a vesting balance.
+       *
+       * @param witness_name The account name of the witness, also accepts account ID or vesting balance ID type.
+       * @param amount The amount to withdraw.
+       * @param asset_symbol The symbol of the asset to withdraw.
+       * @param broadcast true if you wish to broadcast the transaction
+       */
+      signed_transaction withdraw_vesting(
+         string witness_name,
+         string amount,
+         string asset_symbol,
+         bool broadcast = false);
+
       /** Vote for a given committee_member.
        *
        * An account can publish a list of all committee_memberes they approve of.  This 
@@ -1327,6 +1364,9 @@ FC_REFLECT( graphene::wallet::approval_delta,
 FC_REFLECT_DERIVED( graphene::wallet::signed_block_with_info, (graphene::chain::signed_block),
    (block_id)(signing_key) )
 
+FC_REFLECT_DERIVED( graphene::wallet::vesting_balance_object_with_info, (graphene::chain::vesting_balance_object),
+   (allowed_withdraw)(allowed_withdraw_time) )
+
 FC_API( graphene::wallet::wallet_api,
         (help)
         (gethelp)
@@ -1378,6 +1418,8 @@ FC_API( graphene::wallet::wallet_api,
         (list_committee_members)
         (create_witness)
         (update_witness)
+        (get_vesting_balances)
+        (withdraw_vesting)
         (vote_for_committee_member)
         (vote_for_witness)
         (set_voting_proxy)
