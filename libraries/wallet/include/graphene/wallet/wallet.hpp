@@ -219,7 +219,7 @@ struct signed_block_with_info : public signed_block
    signed_block_with_info( const signed_block_with_info& block ) = default;
 
    block_id_type block_id;
-   fc::ecc::public_key signing_key;
+   public_key_type signing_key;
 };
 
 struct vesting_balance_object_with_info : public vesting_balance_object
