@@ -1086,6 +1086,19 @@ class wallet_api
                                         string url,
                                         bool broadcast = false);
 
+      /**
+       * Update a witness object owned by the given account.
+       *
+       * @param witness The name of the witness's owner account.  Also accepts the ID of the owner account or the ID of the witness.
+       * @param url Same as for create_witness.  The empty string makes it remain the same.
+       * @param block_signing_key The new block signing public key.  The empty string makes it remain the same.
+       * @param broadcast true if you wish to broadcast the transaction.
+       */
+      signed_transaction update_witness(string witness_name,
+                                        string url,
+                                        string block_signing_key,
+                                        bool broadcast = false);
+
       /** Vote for a given committee_member.
        *
        * An account can publish a list of all committee_memberes they approve of.  This 
@@ -1364,6 +1377,7 @@ FC_API( graphene::wallet::wallet_api,
         (list_witnesses)
         (list_committee_members)
         (create_witness)
+        (update_witness)
         (vote_for_committee_member)
         (vote_for_witness)
         (set_voting_proxy)

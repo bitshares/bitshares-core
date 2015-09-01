@@ -1318,6 +1318,31 @@ public:
       return sign_transaction( tx, broadcast );
    } FC_CAPTURE_AND_RETHROW( (owner_account)(broadcast) ) }
 
+   signed_transaction update_witness(string witness_name,
+                                     string url,
+                                     string block_signing_key,
+                                     bool broadcast /* = false */)
+   { try {
+      witness_object witness = get_witness(witness_name);
+      account_object witness_account = get_account( witness.witness_account );
+      fc::ecc::private_key active_private_key = get_private_key_for_account(witness_account);
+
+      witness_update_operation witness_update_op;
+      witness_update_op.witness = witness.id;
+      witness_update_op.witness_account = witness_account.id;
+      if( url != "" )
+         witness_update_op.new_url = url;
+      if( block_signing_key != "" )
+         witness_update_op.new_signing_key = public_key_type( block_signing_key );
+
+      signed_transaction tx;
+      tx.operations.push_back( witness_update_op );
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees );
+      tx.validate();
+
+      return sign_transaction( tx, broadcast );
+   } FC_CAPTURE_AND_RETHROW( (witness_name)(url)(block_signing_key)(broadcast) ) }
+
    signed_transaction vote_for_committee_member(string voting_account,
                                         string committee_member,
                                         bool approve,
@@ -2544,6 +2569,15 @@ signed_transaction wallet_api::create_witness(string owner_account,
                                               bool broadcast /* = false */)
 {
    return my->create_witness(owner_account, url, broadcast);
+}
+
+signed_transaction wallet_api::update_witness(
+   string witness_name,
+   string url,
+   string block_signing_key,
+   bool broadcast /* = false */)
+{
+   return my->update_witness(witness_name, url, block_signing_key, broadcast);
 }
 
 signed_transaction wallet_api::vote_for_committee_member(string voting_account,
