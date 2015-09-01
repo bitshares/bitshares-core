@@ -64,7 +64,7 @@ namespace graphene { namespace chain {
       public:
          typedef vector<item_ptr> branch_type;
          /// The maximum number of blocks that may be skipped in an out-of-order push
-         const static int MAX_BLOCK_REORDERING = 32;
+         const static int MAX_BLOCK_REORDERING = 1024;
 
          fork_database();
          void reset();
