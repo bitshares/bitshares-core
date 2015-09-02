@@ -275,6 +275,32 @@ BOOST_AUTO_TEST_CASE( fork_blocks )
    }
 }
 
+
+BOOST_AUTO_TEST_CASE( fork_db_tests )
+{
+   try {
+     fork_database fdb;
+     signed_block prev;
+     signed_block skipped_block;
+     for( uint32_t i = 0; i < 2000; ++i )
+     {
+        signed_block b;
+        b.previous = prev.id();
+        if( b.block_num() == 1800 )
+           skipped_block = b;
+        else
+           fdb.push_block( b );
+        prev = b;
+     }
+     auto head = fdb.head();
+     FC_ASSERT( head && head->data.block_num() == 1799 );
+
+     fdb.push_block(skipped_block);
+     head = fdb.head();
+     FC_ASSERT( head && head->data.block_num() == 2001, "", ("head",head->data.block_num()) );
+  } FC_LOG_AND_RETHROW() 
+}
+
 BOOST_AUTO_TEST_CASE( out_of_order_blocks )
 {
    try {
