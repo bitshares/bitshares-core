@@ -480,12 +480,6 @@ namespace graphene { namespace app {
 
          /**
           * @brief Get status of all current connections to peers
-          * @brief Not reflected, thus not accessible to API clients.
-          *
-          * This function is registered to receive the applied_block
-          * signal from the chain database when a block is received.
-          * It then dispatches callbacks to clients who have requested
-          * to be notified when a particular txid is included in a block.
            */
          std::vector<net::peer_status> get_connected_peers() const;
 

@@ -120,7 +120,7 @@ namespace graphene { namespace net {
     class blockchain_tied_message_cache
     {
     private:
-      static const uint32_t cache_duration_in_blocks = 2;
+      static const uint32_t cache_duration_in_blocks = GRAPHENE_NET_MESSAGE_CACHE_DURATION_IN_BLOCKS;
 
       struct message_hash_index{};
       struct message_contents_hash_index{};

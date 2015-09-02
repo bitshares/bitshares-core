@@ -179,8 +179,9 @@ int main( int argc, char** argv )
       for( auto& name_formatter : wapiptr->get_result_formatters() )
          wallet_cli->format_result( name_formatter.first, name_formatter.second );
 
-      boost::signals2::scoped_connection closed_connection(con->closed.connect([]{
+      boost::signals2::scoped_connection closed_connection(con->closed.connect([=]{
          cerr << "Server has disconnected us.\n";
+         wallet_cli->stop();
       }));
       (void)(closed_connection);
 

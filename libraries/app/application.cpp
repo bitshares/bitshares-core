@@ -286,8 +286,8 @@ namespace detail {
 
          graphene::time::now();
 
-         if( _options->count("apiaccess") )
-            _apiaccess = fc::json::from_file( _options->at("apiaccess").as<boost::filesystem::path>() )
+         if( _options->count("api-access") )
+            _apiaccess = fc::json::from_file( _options->at("api-access").as<boost::filesystem::path>() )
                .as<api_access>();
          else
          {
