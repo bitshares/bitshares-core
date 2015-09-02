@@ -119,7 +119,8 @@ Accessing restricted API's
 --------------------------
 
 You can restrict API's to particular users by specifying an `apiaccess` file in `config.ini`.  Here is an example `apiaccess` file which allows
-user `bytemaster` with password `supersecret` to access four different API's:
+user `bytemaster` with password `supersecret` to access four different API's, while allowing any other user to access the three public API's
+necessary to use the wallet:
 
     {
        "permission_map" :
@@ -130,6 +131,14 @@ user `bytemaster` with password `supersecret` to access four different API's:
                 "password_hash_b64" : "9e9GF7ooXVb9k4BoSfNIPTelXeGOZ5DrgOYMj94elaY=",
                 "password_salt_b64" : "INDdM6iCi/8=",
                 "allowed_apis" : ["database_api", "network_broadcast_api", "history_api", "network_node_api"]
+             }
+          ],
+          [
+             "*",
+             {
+                "password_hash_b64" : "*",
+                "password_salt_b64" : "*",
+                "allowed_apis" : ["database_api", "network_broadcast_api", "history_api"]
              }
           ]
        ]
@@ -237,3 +246,16 @@ Questions
 
     The first and second number together identify the kind of thing you're talking about (`1.2` for accounts,
     `1.3` for assets).  The third number identifies the particular thing.
+
+- How do I get the `network_add_nodes` command to work?  Why is it so complicated?
+
+    You need to follow the instructions in the "Accessing restricted API's" section to
+    allow a username/password access to the `network_node` API.  Then you need
+    to pass the username/password to the `cli_wallet` on the command line or in a config file.
+
+    It's set up this way so that the default configuration is secure even if the RPC port is
+    publicly accessible.  It's fine if your `witness_node` allows the general public to query
+    the database or broadcast transactions (in fact, this is how the hosted web UI works).  It's
+    less fine if your `witness_node` allows the general public to control which p2p nodes it's
+    connecting to.  Therefore the API to add p2p connections needs to be set up with proper access
+    controls.
