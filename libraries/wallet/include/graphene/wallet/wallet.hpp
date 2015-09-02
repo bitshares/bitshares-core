@@ -1299,6 +1299,9 @@ class wallet_api
       void dbg_make_mia(string creator, string symbol);
       void flood_network(string prefix, uint32_t number_of_transactions);
 
+      void network_add_nodes( const vector<string>& nodes );
+      vector< variant > network_get_connected_peers();
+
       /**
        *  Used to transfer from one set of blinded balances to another
        */
@@ -1449,6 +1452,8 @@ FC_API( graphene::wallet::wallet_api,
         (dbg_make_uia)
         (dbg_make_mia)
         (flood_network)
+        (network_add_nodes)
+        (network_get_connected_peers)
         (set_key_label)
         (get_key_label)
         (get_public_key)

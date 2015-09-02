@@ -1996,6 +1996,48 @@ public:
       create_asset(get_account(creator).name, symbol, 2, opts, bopts, true);
    }
 
+   void use_network_node_api()
+   {
+      if( _remote_net_node )
+         return;
+      try
+      {
+         _remote_net_node = _remote_api->network_node();
+      }
+      catch( const fc::exception& e )
+      {
+         std::cerr << "\nCouldn't get network node API.  You probably are not configured\n"
+         "to access the network API on the witness_node you are\n"
+         "connecting to.  Please follow the instructions in README.md to set up an apiaccess file.\n"
+         "\n";
+         throw(e);
+      }
+   }
+
+   void network_add_nodes( const vector<string>& nodes )
+   {
+      use_network_node_api();
+      for( const string& node_address : nodes )
+      {
+         (*_remote_net_node)->add_node( fc::ip::endpoint::from_string( node_address ) );
+      }
+   }
+
+   vector< variant > network_get_connected_peers()
+   {
+      use_network_node_api();
+      const auto peers = (*_remote_net_node)->get_connected_peers();
+      vector< variant > result;
+      result.reserve( peers.size() );
+      for( const auto& peer : peers )
+      {
+         variant v;
+         fc::to_variant( peer, v );
+         result.push_back( v );
+      }
+      return result;
+   }
+
    void flood_network(string prefix, uint32_t number_of_transactions)
    {
       try
@@ -2064,6 +2106,7 @@ public:
    fc::api<database_api>   _remote_db;
    fc::api<network_broadcast_api>   _remote_net_broadcast;
    fc::api<history_api>    _remote_hist;
+   optional< fc::api<network_node_api> > _remote_net_node;
 
    flat_map<string, operation> _prototype_ops;
 
@@ -2710,6 +2753,16 @@ void wallet_api::dbg_make_mia(string creator, string symbol)
 {
    FC_ASSERT(!is_locked());
    my->dbg_make_mia(creator, symbol);
+}
+
+void wallet_api::network_add_nodes( const vector<string>& nodes )
+{
+   my->network_add_nodes( nodes );
+}
+
+vector< variant > wallet_api::network_get_connected_peers()
+{
+   return my->network_get_connected_peers();
 }
 
 void wallet_api::flood_network(string prefix, uint32_t number_of_transactions)
