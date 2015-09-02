@@ -52,6 +52,14 @@
 #define GRAPHENE_NET_MAXIMUM_QUEUED_MESSAGES_IN_BYTES        (1024 * 1024)
 
 /**
+ * When we receive a message from the network, we advertise it to
+ * our peers and save a copy in a cache were we will find it if
+ * a peer requests it.  We expire out old items out of the cache
+ * after this number of blocks go by.
+ */
+#define GRAPHENE_NET_MESSAGE_CACHE_DURATION_IN_BLOCKS        30
+
+/**
  * We prevent a peer from offering us a list of blocks which, if we fetched them
  * all, would result in a blockchain that extended into the future.
  * This parameter gives us some wiggle room, allowing a peer to give us blocks
