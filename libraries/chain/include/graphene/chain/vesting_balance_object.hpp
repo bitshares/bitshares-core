@@ -155,6 +155,11 @@ namespace graphene { namespace chain {
           */
          void withdraw(const fc::time_point_sec& now, const asset& amount);
          bool is_withdraw_allowed(const fc::time_point_sec& now, const asset& amount)const;
+
+         /**
+          * Get amount of allowed withdrawal.
+          */
+         asset get_allowed_withdraw(const time_point_sec& now)const;
    };
    /**
     * @ingroup object_index

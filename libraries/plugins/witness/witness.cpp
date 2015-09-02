@@ -116,49 +116,8 @@ void witness_plugin::plugin_startup()
 { try {
    ilog("witness plugin:  plugin_startup() begin");
    chain::database& d = database();
-   std::set<chain::witness_id_type> bad_wits;
    //Start NTP time client
    graphene::time::now();
-   for( auto wit : _witnesses )
-   {
-      if( d.find(wit) == nullptr )
-      {
-         if( app().is_finished_syncing() )
-         {
-            elog("ERROR: Unable to find witness ${w}, even though syncing has finished. This witness will be ignored.",
-                 ("w", wit));
-            continue;
-         } else {
-            wlog("WARNING: Unable to find witness ${w}. Postponing initialization until syncing finishes.",
-                 ("w", wit));
-            app().syncing_finished.connect([this]{plugin_startup();});
-            return;
-         }
-      }
-
-      auto signing_key = wit(d).signing_key;
-      if( !_private_keys.count(signing_key) )
-      {
-         // Check if it's a duplicate key of one I do have
-         bool found_duplicate = false;
-         for( const auto& private_key : _private_keys )
-            if( chain::public_key_type(private_key.second.get_public_key()) == signing_key )
-            {
-               ilog("Found duplicate key: ${k1} matches ${k2}; using this key to sign for ${w}",
-                    ("k1", private_key.first)("k2", signing_key)("w", wit));
-               _private_keys[signing_key] = private_key.second;
-               found_duplicate = true;
-               break;
-            }
-         if( found_duplicate )
-            continue;
-
-         elog("Unable to find key for witness ${w}. Removing it from my witnesses.", ("w", wit));
-         bad_wits.insert(wit);
-      }
-   }
-   for( auto wit : bad_wits )
-      _witnesses.erase(wit);
 
    if( !_witnesses.empty() )
    {
@@ -211,7 +170,7 @@ block_production_condition::block_production_condition_enum witness_plugin::bloc
    switch( result )
    {
       case block_production_condition::produced:
-         ilog("Generated block #${n} with timestamp ${t} at time ${c}", ("n",capture)("t",capture)("c",capture));
+         ilog("Generated block #${n} with timestamp ${t} at time ${c}", (capture));
          break;
       case block_production_condition::not_synced:
          ilog("Not producing block because production is disabled until we receive a recent block (see: --enable-stale-production)");
@@ -223,10 +182,10 @@ block_production_condition::block_production_condition_enum witness_plugin::bloc
          ilog("Not producing block because slot has not yet arrived");
          break;
       case block_production_condition::no_private_key:
-         ilog("Not producing block because I don't have the private key for ${scheduled_key}", ("scheduled_key",capture) );
+         ilog("Not producing block because I don't have the private key for ${scheduled_key}", (capture) );
          break;
       case block_production_condition::low_participation:
-         elog("Not producing block because node appears to be on a minority fork with only ${pct}% witness participation", ("pct",capture) );
+         elog("Not producing block because node appears to be on a minority fork with only ${pct}% witness participation", (capture) );
          break;
       case block_production_condition::lag:
          elog("Not producing block because node didn't wake up within 500ms of the slot time.");

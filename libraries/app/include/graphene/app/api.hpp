@@ -322,6 +322,7 @@ namespace graphene { namespace app {
 
          vector<asset>  get_vested_balances( const vector<balance_id_type>& objs )const;
 
+         vector<vesting_balance_object> get_vesting_balances( account_id_type account_id )const;
 
          /**
           *  This API will take a partially signed transaction and a set of public keys that the owner has the ability to sign for
@@ -579,6 +580,7 @@ FC_API(graphene::app::database_api,
        (get_margin_positions)
        (get_balance_objects)
        (get_vested_balances)
+       (get_vesting_balances)
        (get_required_signatures)
        (get_potential_signatures)
        (verify_authority)

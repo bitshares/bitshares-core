@@ -182,6 +182,7 @@ VESTING_VISITOR(on_withdraw,);
 VESTING_VISITOR(is_deposit_allowed, const);
 VESTING_VISITOR(is_deposit_vested_allowed, const);
 VESTING_VISITOR(is_withdraw_allowed, const);
+VESTING_VISITOR(get_allowed_withdraw, const);
 
 bool vesting_balance_object::is_deposit_allowed(const time_point_sec& now, const asset& amount)const
 {
@@ -222,6 +223,12 @@ void vesting_balance_object::withdraw(const time_point_sec& now, const asset& am
    on_withdraw_visitor vtor(balance, now, amount);
    policy.visit(vtor);
    balance -= amount;
+}
+
+asset vesting_balance_object::get_allowed_withdraw(const time_point_sec& now)const
+{
+   asset amount = asset();
+   return policy.visit(get_allowed_withdraw_visitor(balance, now, amount));
 }
 
 } } // graphene::chain

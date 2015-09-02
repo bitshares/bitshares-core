@@ -1186,6 +1186,21 @@ namespace graphene { namespace app {
         return result;
     } FC_CAPTURE_AND_RETHROW( (objs) ) }
 
+    vector<vesting_balance_object> database_api::get_vesting_balances( account_id_type account_id )const
+    {
+       try
+       {
+          vector<vesting_balance_object> result;
+          auto vesting_range = _db.get_index_type<vesting_balance_index>().indices().get<by_account>().equal_range(account_id);
+          std::for_each(vesting_range.first, vesting_range.second,
+                        [&result](const vesting_balance_object& balance) {
+                           result.emplace_back(balance);
+                        });
+          return result;
+       }
+       FC_CAPTURE_AND_RETHROW( (account_id) );
+    }
+
     vector<balance_object>  database_api::get_balance_objects( const vector<address>& addrs )const
     { try {
          const auto& bal_idx = _db.get_index_type<balance_index>();

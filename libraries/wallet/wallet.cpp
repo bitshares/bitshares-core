@@ -1318,6 +1318,90 @@ public:
       return sign_transaction( tx, broadcast );
    } FC_CAPTURE_AND_RETHROW( (owner_account)(broadcast) ) }
 
+   signed_transaction update_witness(string witness_name,
+                                     string url,
+                                     string block_signing_key,
+                                     bool broadcast /* = false */)
+   { try {
+      witness_object witness = get_witness(witness_name);
+      account_object witness_account = get_account( witness.witness_account );
+      fc::ecc::private_key active_private_key = get_private_key_for_account(witness_account);
+
+      witness_update_operation witness_update_op;
+      witness_update_op.witness = witness.id;
+      witness_update_op.witness_account = witness_account.id;
+      if( url != "" )
+         witness_update_op.new_url = url;
+      if( block_signing_key != "" )
+         witness_update_op.new_signing_key = public_key_type( block_signing_key );
+
+      signed_transaction tx;
+      tx.operations.push_back( witness_update_op );
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees );
+      tx.validate();
+
+      return sign_transaction( tx, broadcast );
+   } FC_CAPTURE_AND_RETHROW( (witness_name)(url)(block_signing_key)(broadcast) ) }
+
+   vector< vesting_balance_object_with_info > get_vesting_balances( string account_name )
+   { try {
+      fc::optional<vesting_balance_id_type> vbid = maybe_id<vesting_balance_id_type>( account_name );
+      std::vector<vesting_balance_object_with_info> result;
+      fc::time_point_sec now = _remote_db->get_dynamic_global_properties().time;
+
+      if( vbid )
+      {
+         result.emplace_back( get_object<vesting_balance_object>(*vbid), now );
+         return result;
+      }
+
+      // try casting to avoid a round-trip if we were given an account ID
+      fc::optional<account_id_type> acct_id = maybe_id<account_id_type>( account_name );
+      if( !acct_id )
+         acct_id = get_account( account_name ).id;
+
+      vector< vesting_balance_object > vbos = _remote_db->get_vesting_balances( *acct_id );
+      if( vbos.size() == 0 )
+         return result;
+
+      for( const vesting_balance_object& vbo : vbos )
+         result.emplace_back( vbo, now );
+
+      return result;
+   } FC_CAPTURE_AND_RETHROW( (account_name) )
+   }
+
+   signed_transaction withdraw_vesting(
+      string witness_name,
+      string amount,
+      string asset_symbol,
+      bool broadcast = false )
+   { try {
+      asset_object asset_obj = get_asset( asset_symbol );
+      fc::optional<vesting_balance_id_type> vbid = maybe_id<vesting_balance_id_type>(witness_name);
+      if( !vbid )
+      {
+         witness_object wit = get_witness( witness_name );
+         FC_ASSERT( wit.pay_vb );
+         vbid = wit.pay_vb;
+      }
+
+      vesting_balance_object vbo = get_object< vesting_balance_object >( *vbid );
+      vesting_balance_withdraw_operation vesting_balance_withdraw_op;
+
+      vesting_balance_withdraw_op.vesting_balance = *vbid;
+      vesting_balance_withdraw_op.owner = vbo.owner;
+      vesting_balance_withdraw_op.amount = asset_obj.amount_from_string(amount);
+
+      signed_transaction tx;
+      tx.operations.push_back( vesting_balance_withdraw_op );
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees );
+      tx.validate();
+
+      return sign_transaction( tx, broadcast );
+   } FC_CAPTURE_AND_RETHROW( (witness_name)(amount) )
+   }
+
    signed_transaction vote_for_committee_member(string voting_account,
                                         string committee_member,
                                         bool approve,
@@ -2546,6 +2630,29 @@ signed_transaction wallet_api::create_witness(string owner_account,
    return my->create_witness(owner_account, url, broadcast);
 }
 
+signed_transaction wallet_api::update_witness(
+   string witness_name,
+   string url,
+   string block_signing_key,
+   bool broadcast /* = false */)
+{
+   return my->update_witness(witness_name, url, block_signing_key, broadcast);
+}
+
+vector< vesting_balance_object_with_info > wallet_api::get_vesting_balances( string account_name )
+{
+   return my->get_vesting_balances( account_name );
+}
+
+signed_transaction wallet_api::withdraw_vesting(
+   string witness_name,
+   string amount,
+   string asset_symbol,
+   bool broadcast /* = false */)
+{
+   return my->withdraw_vesting( witness_name, amount, asset_symbol, broadcast );
+}
+
 signed_transaction wallet_api::vote_for_committee_member(string voting_account,
                                                  string witness,
                                                  bool approve,
@@ -3394,6 +3501,13 @@ signed_block_with_info::signed_block_with_info( const signed_block& block )
 {
    block_id = id();
    signing_key = signee();
+}
+
+vesting_balance_object_with_info::vesting_balance_object_with_info( const vesting_balance_object& vbo, fc::time_point_sec now )
+   : vesting_balance_object( vbo )
+{
+   allowed_withdraw = get_allowed_withdraw( now );
+   allowed_withdraw_time = now;
 }
 
 } } // graphene::wallet
