@@ -1253,6 +1253,8 @@ namespace graphene { namespace net { namespace detail {
       std::list<peer_connection_ptr> peers_to_send_keep_alive;
       std::list<peer_connection_ptr> peers_to_terminate;
 
+      uint8_t current_block_interval_in_seconds = _delegate->get_current_block_interval_in_seconds();
+
       // Disconnect peers that haven't sent us any data recently
       // These numbers are just guesses and we need to think through how this works better.
       // If we and our peers get disconnected from the rest of the network, we will not
@@ -1261,113 +1263,144 @@ namespace graphene { namespace net { namespace detail {
       // them (but they won't have sent us anything since they aren't getting blocks either).
       // This might not be so bad because it could make us initiate more connections and
       // reconnect with the rest of the network, or it might just futher isolate us.
-
-      uint32_t handshaking_timeout = _peer_inactivity_timeout;
-      fc::time_point handshaking_disconnect_threshold = fc::time_point::now() - fc::seconds(handshaking_timeout);
-      for( const peer_connection_ptr handshaking_peer : _handshaking_connections )
-        if( handshaking_peer->connection_initiation_time < handshaking_disconnect_threshold &&
-            handshaking_peer->get_last_message_received_time() < handshaking_disconnect_threshold &&
-            handshaking_peer->get_last_message_sent_time() < handshaking_disconnect_threshold )
-        {
-          wlog( "Forcibly disconnecting from handshaking peer ${peer} due to inactivity of at least ${timeout} seconds",
-                ( "peer", handshaking_peer->get_remote_endpoint() )("timeout", handshaking_timeout ) );
-          wlog("Peer's negotiating status: ${status}, bytes sent: ${sent}, bytes received: ${received}",
-                ("status", handshaking_peer->negotiation_status)
-                ("sent", handshaking_peer->get_total_bytes_sent())
-                ("received", handshaking_peer->get_total_bytes_received()));
-          handshaking_peer->connection_closed_error = fc::exception(FC_LOG_MESSAGE(warn, "Terminating handshaking connection due to inactivity of ${timeout} seconds.  Negotiating status: ${status}, bytes sent: ${sent}, bytes received: ${received}",
-                                                                                    ("peer", handshaking_peer->get_remote_endpoint())
-                                                                                    ("timeout", handshaking_timeout)
-                                                                                    ("status", handshaking_peer->negotiation_status)
-                                                                                    ("sent", handshaking_peer->get_total_bytes_sent())
-                                                                                    ("received", handshaking_peer->get_total_bytes_received())));
-          peers_to_disconnect_forcibly.push_back( handshaking_peer );
-        }
-
-      // timeout for any active peers is two block intervals
-      uint8_t current_block_interval_in_seconds = _delegate->get_current_block_interval_in_seconds();
-      uint32_t active_disconnect_timeout = 10 * current_block_interval_in_seconds;
-      uint32_t active_send_keepalive_timeount = active_disconnect_timeout / 2;
-      uint32_t active_ignored_request_timeount = 3 * current_block_interval_in_seconds;
-      fc::time_point active_disconnect_threshold = fc::time_point::now() - fc::seconds(active_disconnect_timeout);
-      fc::time_point active_send_keepalive_threshold = fc::time_point::now() - fc::seconds(active_send_keepalive_timeount);
-      fc::time_point active_ignored_request_threshold = fc::time_point::now() - fc::seconds(active_ignored_request_timeount);
-      for( const peer_connection_ptr& active_peer : _active_connections )
       {
-        if( active_peer->connection_initiation_time < active_disconnect_threshold &&
-            active_peer->get_last_message_received_time() < active_disconnect_threshold )
+        // As usual, the first step is to walk through all our peers and figure out which
+        // peers need action (disconneting, sending keepalives, etc), then we walk through 
+        // those lists yielding at our leisure later.
+        ASSERT_TASK_NOT_PREEMPTED();
+
+        uint32_t handshaking_timeout = _peer_inactivity_timeout;
+        fc::time_point handshaking_disconnect_threshold = fc::time_point::now() - fc::seconds(handshaking_timeout);
+        for( const peer_connection_ptr handshaking_peer : _handshaking_connections )
+          if( handshaking_peer->connection_initiation_time < handshaking_disconnect_threshold &&
+              handshaking_peer->get_last_message_received_time() < handshaking_disconnect_threshold &&
+              handshaking_peer->get_last_message_sent_time() < handshaking_disconnect_threshold )
+          {
+            wlog( "Forcibly disconnecting from handshaking peer ${peer} due to inactivity of at least ${timeout} seconds",
+                  ( "peer", handshaking_peer->get_remote_endpoint() )("timeout", handshaking_timeout ) );
+            wlog("Peer's negotiating status: ${status}, bytes sent: ${sent}, bytes received: ${received}",
+                  ("status", handshaking_peer->negotiation_status)
+                  ("sent", handshaking_peer->get_total_bytes_sent())
+                  ("received", handshaking_peer->get_total_bytes_received()));
+            handshaking_peer->connection_closed_error = fc::exception(FC_LOG_MESSAGE(warn, "Terminating handshaking connection due to inactivity of ${timeout} seconds.  Negotiating status: ${status}, bytes sent: ${sent}, bytes received: ${received}",
+                                                                                      ("peer", handshaking_peer->get_remote_endpoint())
+                                                                                      ("timeout", handshaking_timeout)
+                                                                                      ("status", handshaking_peer->negotiation_status)
+                                                                                      ("sent", handshaking_peer->get_total_bytes_sent())
+                                                                                      ("received", handshaking_peer->get_total_bytes_received())));
+            peers_to_disconnect_forcibly.push_back( handshaking_peer );
+          }
+
+        // timeout for any active peers is two block intervals
+        uint32_t active_disconnect_timeout = 10 * current_block_interval_in_seconds;
+        uint32_t active_send_keepalive_timeount = active_disconnect_timeout / 2;
+        uint32_t active_ignored_request_timeount = 3 * current_block_interval_in_seconds;
+        fc::time_point active_disconnect_threshold = fc::time_point::now() - fc::seconds(active_disconnect_timeout);
+        fc::time_point active_send_keepalive_threshold = fc::time_point::now() - fc::seconds(active_send_keepalive_timeount);
+        fc::time_point active_ignored_request_threshold = fc::time_point::now() - fc::seconds(active_ignored_request_timeount);
+        for( const peer_connection_ptr& active_peer : _active_connections )
         {
-          wlog( "Closing connection with peer ${peer} due to inactivity of at least ${timeout} seconds",
-                ( "peer", active_peer->get_remote_endpoint() )("timeout", active_disconnect_timeout ) );
-          peers_to_disconnect_gently.push_back( active_peer );
-        }
-        else
-        {
-          bool disconnect_due_to_request_timeout = false;
-          for (const peer_connection::item_to_time_map_type::value_type& item_and_time : active_peer->sync_items_requested_from_peer)
-            if (item_and_time.second < active_ignored_request_threshold)
-            {
-              wlog("Disconnecting peer ${peer} because they didn't respond to my request for sync item ${id}",
-                    ("peer", active_peer->get_remote_endpoint())("id", item_and_time.first.item_hash));
-              disconnect_due_to_request_timeout = true;
-              break;
-            }
-          if (!disconnect_due_to_request_timeout &&
-              active_peer->item_ids_requested_from_peer &&
-              active_peer->item_ids_requested_from_peer->get<1>() < active_ignored_request_threshold)
-            {
-              wlog("Disconnecting peer ${peer} because they didn't respond to my request for sync item ids after ${id}",
-                    ("peer", active_peer->get_remote_endpoint())
-                    ("id", active_peer->item_ids_requested_from_peer->get<0>().item_hash));
-              disconnect_due_to_request_timeout = true;
-            }
-          if (!disconnect_due_to_request_timeout)
-            for (const peer_connection::item_to_time_map_type::value_type& item_and_time : active_peer->items_requested_from_peer)
+          if( active_peer->connection_initiation_time < active_disconnect_threshold &&
+              active_peer->get_last_message_received_time() < active_disconnect_threshold )
+          {
+            wlog( "Closing connection with peer ${peer} due to inactivity of at least ${timeout} seconds",
+                  ( "peer", active_peer->get_remote_endpoint() )("timeout", active_disconnect_timeout ) );
+            peers_to_disconnect_gently.push_back( active_peer );
+          }
+          else
+          {
+            bool disconnect_due_to_request_timeout = false;
+            for (const peer_connection::item_to_time_map_type::value_type& item_and_time : active_peer->sync_items_requested_from_peer)
               if (item_and_time.second < active_ignored_request_threshold)
               {
-                wlog("Disconnecting peer ${peer} because they didn't respond to my request for item ${id}",
+                wlog("Disconnecting peer ${peer} because they didn't respond to my request for sync item ${id}",
                       ("peer", active_peer->get_remote_endpoint())("id", item_and_time.first.item_hash));
                 disconnect_due_to_request_timeout = true;
                 break;
               }
-          if (disconnect_due_to_request_timeout)
-          {
-            // we should probably disconnect nicely and give them a reason, but right now the logic
-            // for rescheduling the requests only executes when the connection is fully closed,
-            // and we want to get those requests rescheduled as soon as possible
-            peers_to_disconnect_forcibly.push_back(active_peer);
+            if (!disconnect_due_to_request_timeout &&
+                active_peer->item_ids_requested_from_peer &&
+                active_peer->item_ids_requested_from_peer->get<1>() < active_ignored_request_threshold)
+              {
+                wlog("Disconnecting peer ${peer} because they didn't respond to my request for sync item ids after ${id}",
+                      ("peer", active_peer->get_remote_endpoint())
+                      ("id", active_peer->item_ids_requested_from_peer->get<0>().item_hash));
+                disconnect_due_to_request_timeout = true;
+              }
+            if (!disconnect_due_to_request_timeout)
+              for (const peer_connection::item_to_time_map_type::value_type& item_and_time : active_peer->items_requested_from_peer)
+                if (item_and_time.second < active_ignored_request_threshold)
+                {
+                  wlog("Disconnecting peer ${peer} because they didn't respond to my request for item ${id}",
+                        ("peer", active_peer->get_remote_endpoint())("id", item_and_time.first.item_hash));
+                  disconnect_due_to_request_timeout = true;
+                  break;
+                }
+            if (disconnect_due_to_request_timeout)
+            {
+              // we should probably disconnect nicely and give them a reason, but right now the logic
+              // for rescheduling the requests only executes when the connection is fully closed,
+              // and we want to get those requests rescheduled as soon as possible
+              peers_to_disconnect_forcibly.push_back(active_peer);
+            }
+            else if (active_peer->connection_initiation_time < active_send_keepalive_threshold &&
+                     active_peer->get_last_message_received_time() < active_send_keepalive_threshold)
+            {
+              wlog( "Sending a keepalive message to peer ${peer} who hasn't sent us any messages in the last ${timeout} seconds",
+                    ( "peer", active_peer->get_remote_endpoint() )("timeout", active_send_keepalive_timeount ) );
+              peers_to_send_keep_alive.push_back(active_peer);
+            }
           }
-          else if (active_peer->connection_initiation_time < active_send_keepalive_threshold &&
-                   active_peer->get_last_message_received_time() < active_send_keepalive_threshold)
+        }
+
+        fc::time_point closing_disconnect_threshold = fc::time_point::now() - fc::seconds(GRAPHENE_NET_PEER_DISCONNECT_TIMEOUT);
+        for( const peer_connection_ptr& closing_peer : _closing_connections )
+          if( closing_peer->connection_closed_time < closing_disconnect_threshold )
           {
-            wlog( "Sending a keepalive message to peer ${peer} who hasn't sent us any messages in the last ${timeout} seconds",
-                  ( "peer", active_peer->get_remote_endpoint() )("timeout", active_send_keepalive_timeount ) );
-            peers_to_send_keep_alive.push_back(active_peer);
+            // we asked this peer to close their connectoin to us at least GRAPHENE_NET_PEER_DISCONNECT_TIMEOUT
+            // seconds ago, but they haven't done it yet.  Terminate the connection now
+            wlog( "Forcibly disconnecting peer ${peer} who failed to close their connection in a timely manner",
+                  ( "peer", closing_peer->get_remote_endpoint() ) );
+            peers_to_disconnect_forcibly.push_back( closing_peer );
           }
-        }
-      }
 
-      fc::time_point closing_disconnect_threshold = fc::time_point::now() - fc::seconds(GRAPHENE_NET_PEER_DISCONNECT_TIMEOUT);
-      for( const peer_connection_ptr& closing_peer : _closing_connections )
-        if( closing_peer->connection_closed_time < closing_disconnect_threshold )
+        uint32_t failed_terminate_timeout_seconds = 120;
+        fc::time_point failed_terminate_threshold = fc::time_point::now() - fc::seconds(failed_terminate_timeout_seconds);
+        for (const peer_connection_ptr& peer : _terminating_connections )
+          if (peer->get_connection_terminated_time() != fc::time_point::min() &&
+              peer->get_connection_terminated_time() < failed_terminate_threshold)
+          {
+            wlog("Terminating connection with peer ${peer}, closing the connection didn't work", ("peer", peer->get_remote_endpoint()));
+            peers_to_terminate.push_back(peer);
+          }
+
+        // That's the end of the sorting step; now all peers that require further processing are now in one of the
+        // lists peers_to_disconnect_gently,  peers_to_disconnect_forcibly, peers_to_send_keep_alive, or peers_to_terminate
+
+        // if we've decided to delete any peers, do it now; in its current implementation this doesn't yield,
+        // and once we start yielding, we may find that we've moved that peer to another list (closed or active)
+        // and that triggers assertions, maybe even errors
+        for (const peer_connection_ptr& peer : peers_to_terminate )
         {
-          // we asked this peer to close their connectoin to us at least GRAPHENE_NET_PEER_DISCONNECT_TIMEOUT
-          // seconds ago, but they haven't done it yet.  Terminate the connection now
-          wlog( "Forcibly disconnecting peer ${peer} who failed to close their connection in a timely manner",
-                ( "peer", closing_peer->get_remote_endpoint() ) );
-          peers_to_disconnect_forcibly.push_back( closing_peer );
+          assert(_terminating_connections.find(peer) != _terminating_connections.end());
+          _terminating_connections.erase(peer);
+          schedule_peer_for_deletion(peer);
         }
+        peers_to_terminate.clear();
 
-      uint32_t failed_terminate_timeout_seconds = 120;
-      fc::time_point failed_terminate_threshold = fc::time_point::now() - fc::seconds(failed_terminate_timeout_seconds);
-      for (const peer_connection_ptr& peer : _terminating_connections )
-        if (peer->get_connection_terminated_time() != fc::time_point::min() &&
-            peer->get_connection_terminated_time() < failed_terminate_threshold)
+        // if we're going to abruptly disconnect anyone, do it here 
+        // (it doesn't yield).  I don't think there would be any harm if this were 
+        // moved to the yielding section
+        for( const peer_connection_ptr& peer : peers_to_disconnect_forcibly )
         {
-          wlog("Terminating connection with peer ${peer}, closing the connection didn't work", ("peer", peer->get_remote_endpoint()));
-          peers_to_terminate.push_back(peer);
+          move_peer_to_terminating_list(peer);
+          peer->close_connection();
         }
+        peers_to_disconnect_forcibly.clear();
+      } // end ASSERT_TASK_NOT_PREEMPTED()
 
+      // Now process the peers that we need to do yielding functions with (disconnect sends a message with the
+      // disconnect reason, so it may yield)
       for( const peer_connection_ptr& peer : peers_to_disconnect_gently )
       {
         fc::exception detailed_error( FC_LOG_MESSAGE(warn, "Disconnecting due to inactivity",
@@ -1378,24 +1411,10 @@ namespace graphene { namespace net { namespace detail {
       }
       peers_to_disconnect_gently.clear();
 
-      for( const peer_connection_ptr& peer : peers_to_disconnect_forcibly )
-      {
-        move_peer_to_terminating_list(peer);
-        peer->close_connection();
-      }
-      peers_to_disconnect_forcibly.clear();
-
       for( const peer_connection_ptr& peer : peers_to_send_keep_alive )
         peer->send_message(current_time_request_message(),
                            offsetof(current_time_request_message, request_sent_time));
       peers_to_send_keep_alive.clear();
-
-      for (const peer_connection_ptr& peer : peers_to_terminate )
-      {
-        assert(_terminating_connections.find(peer) != _terminating_connections.end());
-        _terminating_connections.erase(peer);
-        schedule_peer_for_deletion(peer);
-      }
 
       if (!_node_is_shutting_down && !_terminate_inactive_connections_loop_done.canceled())
          _terminate_inactive_connections_loop_done = fc::schedule( [this](){ terminate_inactive_connections_loop(); },
