@@ -8,6 +8,7 @@
 #include <fc/reflect/variant.hpp>
 
 namespace graphene { namespace p2p {
+  using namespace graphene::chain;
 
   struct message_header
   {
@@ -94,14 +95,23 @@ namespace graphene { namespace p2p {
 
       std::string         user_agent;
       uint16_t            version;
+      fc::time_point      timestamp;
                           
       fc::ip::address     inbound_address;
       uint16_t            inbound_port;
       uint16_t            outbound_port;
-      node_id_t           node_public_key;
+      public_key_type     node_public_key;
       fc::sha256          chain_id;
       fc::variant_object  user_data;
       block_id_type       head_block;
+  };
+
+  struct hello_reply_message
+  {
+      static const core_message_type_enum type;
+
+      fc::time_point   hello_timestamp;
+      fc::time_point   reply_timestamp;
   };
 
   struct transaction_message 

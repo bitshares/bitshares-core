@@ -18,6 +18,7 @@
 #pragma once
 
 #include <graphene/p2p/node.hpp>
+#include <graphene/p2p/message.hpp>
 #include <graphene/p2p/message_oriented_connection.hpp>
 #include <graphene/p2p/stcp_socket.hpp>
 
@@ -42,16 +43,25 @@ namespace graphene { namespace p2p {
   class peer_connection_delegate
   {
      public:
-       virtual void on_message(peer_connection* originating_peer,
-                               const message& received_message) = 0;
+       virtual void on_message(peer_connection* originating_peer, const message& received_message) = 0;
        virtual void on_connection_closed(peer_connection* originating_peer) = 0;
-       virtual message get_message_for_item(const item_id& item) = 0;
   };
 
   class peer_connection;
   typedef std::shared_ptr<peer_connection> peer_connection_ptr;
 
 
+  /**
+   *   Each connection maintains its own queue of messages to be sent, when an item
+   *   is first pushed to the queue it starts an async fiber that will sequentially write
+   *   all items until there is nothing left to be sent.  
+   *
+   *   If a particular connection is unable to keep up with the real-time stream of 
+   *   messages to be sent then it will be disconnected.  The backlog will be measured in
+   *   seconds.
+   *  
+   *   A multi-index container that tracks the 
+   */
   class peer_connection : public message_oriented_connection_delegate,
                           public std::enable_shared_from_this<peer_connection>
   {

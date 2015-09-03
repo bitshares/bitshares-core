@@ -874,7 +874,6 @@ namespace graphene { namespace app {
              }
           }
 
-          /*
           if( _market_subscriptions.size() )
           {
              if( !_subscribe_callback ) 
@@ -890,7 +889,6 @@ namespace graphene { namespace app {
                 }
              }
           }
-          */
        }
 
        auto capture_this = shared_from_this();

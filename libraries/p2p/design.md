@@ -61,7 +61,10 @@ Each node implements the following protocol:
              send( peer, block_summary )
              
 
-     onConnect( new_peer, new_peer_head_block_num )
+     onHello( new_peer, new_peer_head_block_num )
+
+        replyHello( new_peer ) // ack the hello message with our timestamp to measure latency
+
         if( peers.size() >= max_peers )
            send( new_peer, peers )
            disconnect( new_peer )
@@ -73,6 +76,9 @@ Each node implements the following protocol:
         new_peer.synced = true
         for( peer : peers )
             send( peer, new_peer )
+
+     onHelloReply( from_peer, hello_reply )
+         update_latency_measure, disconnect if too slow
     
      onReceivePeers( from_peer, peers )
         addToPotentialPeers( peers )
