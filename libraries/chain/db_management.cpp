@@ -45,12 +45,15 @@ void database::reindex(fc::path data_dir, const genesis_state_type& initial_allo
 
    auto start = fc::time_point::now();
    auto last_block = _block_id_to_block.last();
-   if( !last_block ) return;
+   if( !last_block ) {
+      elog( "!no last block" );
+      edump((last_block));
+      return;
+   }
 
    const auto last_block_num = last_block->block_num();
 
    ilog( "Replaying blocks..." );
-   // TODO: disable undo tracking during reindex, this currently causes crashes in the benchmark test
    _undo_db.disable();
    for( uint32_t i = 1; i <= last_block_num; ++i )
    {
@@ -106,6 +109,10 @@ void database::close(uint32_t blocks_to_rewind)
 
    for(uint32_t i = 0; i < blocks_to_rewind && head_block_num() > 0; ++i)
       pop_block();
+
+   // pop all of the blocks that we can given our undo history, this should
+   // throw when there is no more undo history to pop
+   try { while( true ) { elog("pop"); pop_block(); } } catch (...){}
 
    object_database::flush();
    object_database::close();

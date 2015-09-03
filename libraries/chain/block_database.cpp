@@ -212,9 +212,11 @@ optional<signed_block> block_database::last()const
 
       _block_num_to_pos.seekg( -sizeof(index_entry), _block_num_to_pos.end );
       _block_num_to_pos.read( (char*)&e, sizeof(e) );
-      while( e.block_size == 0 && _blocks.tellg() > 0 )
+      uint64_t pos = _block_num_to_pos.tellg();
+      while( e.block_size == 0 && pos > 0 )
       {
-         _block_num_to_pos.seekg( -sizeof(index_entry), _block_num_to_pos.cur );
+         pos -= sizeof(index_entry);
+         _block_num_to_pos.seekg( pos );
          _block_num_to_pos.read( (char*)&e, sizeof(e) );
       }
 

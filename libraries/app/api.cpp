@@ -228,6 +228,7 @@ namespace graphene { namespace app {
 
     std::map<std::string, full_account> database_api::get_full_accounts( const vector<std::string>& names_or_ids, bool subscribe)
     {
+       idump((names_or_ids));
        std::map<std::string, full_account> results;
 
        for (const std::string& account_name_or_id : names_or_ids)
@@ -801,35 +802,27 @@ namespace graphene { namespace app {
     } // end get_relevant_accounts( obj )
 
 
+    void database_api::broadcast_updates( const vector<variant>& updates )
+    {
+       if( updates.size() ) {
+          auto capture_this = shared_from_this();
+          fc::async([capture_this,updates](){
+              capture_this->_subscribe_callback( fc::variant(updates) );
+          });
+       }
+    }
+
     void database_api::on_objects_removed( const vector<const object*>& objs )
     {
        /// we need to ensure the database_api is not deleted for the life of the async operation
-       auto capture_this = shared_from_this();
-
        if( _subscribe_callback )
        {
-          map<account_id_type, vector<variant> > broadcast_queue;
-          for( const auto& obj : objs )
-          {
-             auto relevant = get_relevant_accounts( obj );
-             for( const auto& r : relevant )
-             {
-                if( _subscribe_filter.contains(r) )
-                {
-                   broadcast_queue[r].emplace_back(obj->to_variant());
-                   break;
-                }
-             }
-             if( relevant.size() == 0 && _subscribe_filter.contains(obj->id) )
-                broadcast_queue[account_id_type()].emplace_back(obj->to_variant());
-          }
+          vector<variant>    updates;
+          updates.reserve(objs.size());
 
-          if( broadcast_queue.size() )
-          {
-             fc::async([capture_this,broadcast_queue,this](){
-                 _subscribe_callback( fc::variant(broadcast_queue) );
-             });
-          }
+          for( auto obj : objs )
+             updates.emplace_back( obj->id );
+          broadcast_updates( updates );
        }
 
        if( _market_subscriptions.size() )
@@ -847,6 +840,7 @@ namespace graphene { namespace app {
           }
           if( broadcast_queue.size() )
           {
+             auto capture_this = shared_from_this();
              fc::async([capture_this,this,broadcast_queue](){
                  for( const auto& item : broadcast_queue )
                  {
@@ -864,7 +858,6 @@ namespace graphene { namespace app {
        vector<variant>    updates;
        map< pair<asset_id_type, asset_id_type>,  vector<variant> > market_broadcast_queue;
 
-       idump((ids));
        for(auto id : ids)
        {
           const object* obj = nullptr;
@@ -873,47 +866,15 @@ namespace graphene { namespace app {
              obj = _db.find_object( id );
              if( obj )
              {
-                auto acnt = dynamic_cast<const account_object*>(obj);
-                if( acnt ) 
-                {
-                   bool added_account = false;
-                   for( const auto& key : acnt->owner.key_auths )
-                      if( is_subscribed_to_item( key.first ) )
-                      {
-                         updates.emplace_back( obj->to_variant() );
-                         added_account = true;
-                         break;
-                      }
-                   for( const auto& key : acnt->active.key_auths )
-                      if( is_subscribed_to_item( key.first ) )
-                      {
-                         updates.emplace_back( obj->to_variant() );
-                         added_account = true;
-                         break;
-                      }
-                   if( added_account )
-                      continue;
-                }
-
-                vector<account_id_type> relevant = get_relevant_accounts( obj );
-                for( const auto& r : relevant )
-                {
-                   if( _subscribe_filter.contains(r) )
-                   {
-                      updates.emplace_back(obj->to_variant());
-                      break;
-                   }
-                }
-                if( relevant.size() == 0 && _subscribe_filter.contains(obj->id) )
-                   updates.emplace_back(obj->to_variant());
+                updates.emplace_back( obj->to_variant() );
              }
              else
              {
-                if( _subscribe_filter.contains(id) )
-                   updates.emplace_back(id); // send just the id to indicate removal
+                updates.emplace_back(id); // send just the id to indicate removal
              }
           }
 
+          /*
           if( _market_subscriptions.size() )
           {
              if( !_subscribe_callback ) 
@@ -929,6 +890,7 @@ namespace graphene { namespace app {
                 }
              }
           }
+          */
        }
 
        auto capture_this = shared_from_this();
@@ -1223,14 +1185,18 @@ namespace graphene { namespace app {
 
     set<public_key_type> database_api::get_required_signatures( const signed_transaction& trx, const flat_set<public_key_type>& available_keys )const
     {
-       return trx.get_required_signatures( _db.get_chain_id(),
+       wdump((trx)(available_keys));
+       auto result = trx.get_required_signatures( _db.get_chain_id(),
                                            available_keys,
                                            [&]( account_id_type id ){ return &id(_db).active; },
                                            [&]( account_id_type id ){ return &id(_db).owner; },
                                            _db.get_global_properties().parameters.max_authority_depth );
+       wdump((result));
+       return result;
     }
     set<public_key_type> database_api::get_potential_signatures( const signed_transaction& trx )const
     {
+       wdump((trx));
        set<public_key_type> result;
        trx.get_required_signatures( _db.get_chain_id(),
                                     flat_set<public_key_type>(),
@@ -1247,6 +1213,7 @@ namespace graphene { namespace app {
                                         },
                                     _db.get_global_properties().parameters.max_authority_depth );
 
+       wdump((result));
        return result;
     }
 

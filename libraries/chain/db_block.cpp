@@ -331,8 +331,9 @@ signed_block database::_generate_block(
 void database::pop_block()
 { try {
    _pending_block_session.reset();
-   _block_id_to_block.remove( _pending_block.previous );
+   auto prev = _pending_block.previous;
    pop_undo();
+   _block_id_to_block.remove( prev );
    _pending_block.previous  = head_block_id();
    _pending_block.timestamp = head_block_time();
    _fork_db.pop_block();

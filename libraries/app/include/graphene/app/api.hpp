@@ -360,16 +360,24 @@ namespace graphene { namespace app {
          template<typename T>
          void subscribe_to_item( const T& i )const
          {
+            auto vec = fc::raw::pack(i);
             if( !_subscribe_callback ) return;
-            _subscribe_filter.insert( (const char*)&i, sizeof(i) );
+
+            if( !is_subscribed_to_item(i) )
+            {
+               idump((i));
+               _subscribe_filter.insert( vec.data(), vec.size() );//(vecconst char*)&i, sizeof(i) );
+            }
          }
 
          template<typename T>
          bool is_subscribed_to_item( const T& i )const
          {
             if( !_subscribe_callback ) return false;
+            return true;
             return _subscribe_filter.contains( i );
          }
+         void broadcast_updates( const vector<variant>& updates );
 
          /** called every time a block is applied to report the objects that were changed */
          void on_objects_changed(const vector<object_id_type>& ids);
