@@ -82,6 +82,7 @@ void database::wipe(const fc::path& data_dir, bool include_blocks)
 void database::open(
    const fc::path& data_dir,
    std::function<genesis_state_type()> genesis_loader )
+   elog( "Open Database" );
 {
    try
    {
@@ -98,6 +99,9 @@ void database::open(
       auto last_block = _block_id_to_block.last();
       if( last_block.valid() )
          _fork_db.start_block( *last_block );
+
+      idump((last_block->id())(last_block->block_num())(head_block_id())(head_block_num()));
+      FC_ASSERT( last_block->id() == head_block_id() );
    }
    FC_CAPTURE_AND_RETHROW( (data_dir) )
 }
