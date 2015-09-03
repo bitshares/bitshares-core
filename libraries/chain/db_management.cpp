@@ -96,12 +96,14 @@ void database::open(
       _pending_block.previous  = head_block_id();
       _pending_block.timestamp = head_block_time();
 
-      auto last_block = _block_id_to_block.last();
+      fc::optional<signed_block> last_block = _block_id_to_block.last();
       if( last_block.valid() )
+      {
          _fork_db.start_block( *last_block );
-
-      idump((last_block->id())(last_block->block_num())(head_block_id())(head_block_num()));
-      FC_ASSERT( last_block->id() == head_block_id() );
+         idump((last_block->id())(last_block->block_num()));
+      }
+      idump((head_block_id())(head_block_num()));
+      FC_ASSERT( !last_block || last_block->id() == head_block_id() );
    }
    FC_CAPTURE_AND_RETHROW( (data_dir) )
 }
