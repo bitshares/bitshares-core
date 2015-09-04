@@ -120,7 +120,7 @@ bool block_database::contains( const block_id_type& id )const
    _block_num_to_pos.seekg( index_pos );
    _block_num_to_pos.read( (char*)&e, sizeof(e) );
 
-   return e.block_id == id;
+   return e.block_id == id && e.block_size > 0;
 }
 
 block_id_type block_database::fetch_block_id( uint32_t block_num )const

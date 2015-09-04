@@ -43,8 +43,11 @@
 #include <fc/log/file_appender.hpp>
 #include <fc/log/logger.hpp>
 #include <fc/log/logger_config.hpp>
-#ifndef WIN32
-#include <csignal>
+
+#ifdef WIN32
+# include <signal.h>
+#else
+# include <csignal>
 #endif
 
 using namespace graphene::app;
@@ -255,11 +258,9 @@ int main( int argc, char** argv )
       else
       {
         fc::promise<int>::ptr exit_promise = new fc::promise<int>("UNIX Signal Handler");
-#ifdef __unix__
         fc::set_signal_handler([&exit_promise](int signal) {
            exit_promise->set_value(signal);
         }, SIGINT);
-#endif
 
         ilog( "Entering Daemon Mode, ^C to exit" );
         exit_promise->wait();

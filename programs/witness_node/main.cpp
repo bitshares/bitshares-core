@@ -40,8 +40,10 @@
 #include <iostream>
 #include <fstream>
 
-#ifndef WIN32
-#include <csignal>
+#ifdef WIN32
+# include <signal.h> 
+#else
+# include <csignal>
 #endif
 
 using namespace graphene;
@@ -156,11 +158,9 @@ int main(int argc, char** argv) {
       node.startup_plugins();
 
       fc::promise<int>::ptr exit_promise = new fc::promise<int>("UNIX Signal Handler");
-#if defined __APPLE__ || defined __unix__
       fc::set_signal_handler([&exit_promise](int signal) {
          exit_promise->set_value(signal);
       }, SIGINT);
-#endif
 
       ilog("Started witness node on a chain with ${h} blocks.", ("h", node.chain_database()->head_block_num()));
       ilog("Chain ID is ${id}", ("id", node.chain_database()->get_chain_id()) );
