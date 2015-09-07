@@ -197,6 +197,12 @@ namespace graphene { namespace chain {
          fc::signal<void(const signed_block&)>           applied_block;
 
          /**
+          * This signal is emitted any time a new transaction is added to the pending
+          * block state.
+          */
+         fc::signal<void(const signed_transaction&)>     on_pending_transaction;
+
+         /**
           *  Emitted After a block has been applied and committed.  The callback
           *  should not yield and should execute quickly.
           */

@@ -45,6 +45,10 @@ namespace graphene { namespace app {
                                     on_objects_removed(objs);
                                     });
        _applied_block_connection = _db.applied_block.connect([this](const signed_block&){ on_applied_block(); });
+
+       _pending_trx_connection = _db.on_pending_transaction.connect([this](const signed_transaction& trx ){ 
+                             if( _pending_trx_callback ) _pending_trx_callback( fc::variant(trx) );
+                          });
     }
 
     database_api::~database_api()

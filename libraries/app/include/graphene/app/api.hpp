@@ -366,6 +366,7 @@ namespace graphene { namespace app {
          vector<asset> get_required_fees( const vector<operation>& ops, asset_id_type id = asset_id_type() )const;
 
          void set_subscribe_callback( std::function<void(const variant&)> cb, bool clear_filter );
+         void set_pending_transaction_callback( std::function<void(const variant&)> cb ){ _pending_trx_callback = cb; }
       private:
          template<typename T>
          void subscribe_to_item( const T& i )const
@@ -396,10 +397,12 @@ namespace graphene { namespace app {
 
          mutable fc::bloom_filter                _subscribe_filter;
          std::function<void(const fc::variant&)> _subscribe_callback;
+         std::function<void(const fc::variant&)> _pending_trx_callback;
 
          boost::signals2::scoped_connection                                              _change_connection;
          boost::signals2::scoped_connection                                              _removed_connection;
          boost::signals2::scoped_connection                                              _applied_block_connection;
+         boost::signals2::scoped_connection                                              _pending_trx_connection;
          map< pair<asset_id_type,asset_id_type>, std::function<void(const variant&)> >   _market_subscriptions;
          graphene::chain::database&                                                      _db;
    };
@@ -602,6 +605,7 @@ FC_API(graphene::app::database_api,
        (get_blinded_balances)
        (get_required_fees)
        (set_subscribe_callback)
+       (set_pending_transaction_callback)
        (validate_transaction)
      )
 FC_API(graphene::app::history_api,

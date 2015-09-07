@@ -210,6 +210,9 @@ processed_transaction database::_push_transaction( const signed_transaction& trx
    notify_changed_objects();
    // The transaction applied successfully. Merge its changes into the pending block session.
    session.merge();
+
+   // notify anyone listening to pending transactions
+   on_pending_transaction( trx );
    return processed_trx;
 }
 
