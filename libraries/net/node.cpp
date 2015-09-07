@@ -2375,16 +2375,28 @@ namespace graphene { namespace net { namespace detail {
                ("is_first", is_first_item_for_other_peer)("size", item_hashes_received.size()));
           if (!is_first_item_for_other_peer)
           {
+            bool first = true;
             while (!item_hashes_received.empty() &&
                    _delegate->has_item(item_id(blockchain_item_ids_inventory_message_received.item_type,
                                                item_hashes_received.front())))
             {
               assert(item_hashes_received.front() != item_hash_t());
               originating_peer->last_block_delegate_has_seen = item_hashes_received.front();
-              ++originating_peer->last_block_number_delegate_has_seen;
+              if (first)
+              {
+                // we don't yet know the block number of the first block they sent, so look it up
+                originating_peer->last_block_number_delegate_has_seen = _delegate->get_block_number(item_hashes_received.front());
+                first = false;
+              }
+              else
+                ++originating_peer->last_block_number_delegate_has_seen;  // subsequent blocks will follow in immediate sequence
               originating_peer->last_block_time_delegate_has_seen = _delegate->get_block_time(item_hashes_received.front());
-              dlog("popping item because delegate has already seen it.  peer's last block the delegate has seen is now ${block_id} (${block_num})",
-                   ("block_id", originating_peer->last_block_delegate_has_seen )("block_num", originating_peer->last_block_number_delegate_has_seen));
+              dlog("popping item because delegate has already seen it.  peer ${peer}'s last block the delegate has seen is now ${block_id} (actual block #${actual_block_num}, tracked block #${tracked_block_num})",
+                   ("peer", originating_peer->get_remote_endpoint())
+                   ("block_id", originating_peer->last_block_delegate_has_seen)
+                   ("actual_block_num", _delegate->get_block_number(item_hashes_received.front()))
+                   ("tracked_block_num", originating_peer->last_block_number_delegate_has_seen));
+              assert(originating_peer->last_block_number_delegate_has_seen == _delegate->get_block_number(originating_peer->last_block_delegate_has_seen));
               item_hashes_received.pop_front();
             }
             dlog("after removing all items we have already seen, item_hashes_received.size() = ${size}", ("size", item_hashes_received.size()));
