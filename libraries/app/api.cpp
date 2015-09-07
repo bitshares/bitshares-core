@@ -1223,6 +1223,32 @@ namespace graphene { namespace app {
                               _db.get_global_properties().parameters.max_authority_depth );
        return true;
     }
+
+    bool database_api::verify_account_authority( const string& name_or_id, const flat_set<public_key_type>& keys )const
+    {
+       FC_ASSERT( name_or_id.size() > 0);
+       const account_object* account = nullptr;
+       if (std::isdigit(name_or_id[0]))
+          account = _db.find(fc::variant(name_or_id).as<account_id_type>());
+       else
+       {
+          const auto& idx = _db.get_index_type<account_index>().indices().get<by_name>();
+          auto itr = idx.find(name_or_id);
+          if (itr != idx.end())
+             account = &*itr;
+       }
+       FC_ASSERT( account, "no such account" );
+
+
+       /// reuse trx.verify_authority by creating a dummy transfer
+       signed_transaction trx;
+       transfer_operation op;
+       op.from = account->id;
+       trx.operations.emplace_back(op);
+
+       return verify_authority( trx );
+    }
+
     vector<blinded_balance_object> database_api::get_blinded_balances( const flat_set<commitment_type>& commitments )const
     {
        vector<blinded_balance_object> result; result.reserve(commitments.size());

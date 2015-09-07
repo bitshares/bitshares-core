@@ -342,6 +342,11 @@ namespace graphene { namespace app {
           */
          bool                 verify_authority( const signed_transaction& trx )const;
 
+         /**
+          * @return true if the signers have enough authority to authorize an account 
+          */
+         bool                 verify_account_authority( const string& name_or_id, const flat_set<public_key_type>& signers )const;
+
 
          /**
           *  @return the set of blinded balance objects by commitment ID
@@ -586,6 +591,7 @@ FC_API(graphene::app::database_api,
        (get_required_signatures)
        (get_potential_signatures)
        (verify_authority)
+       (verify_account_authority)
        (get_blinded_balances)
        (get_required_fees)
        (set_subscribe_callback)

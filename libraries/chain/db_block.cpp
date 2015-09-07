@@ -83,7 +83,7 @@ const signed_transaction& database::get_recent_transaction(const transaction_id_
  */
 bool database::push_block(const signed_block& new_block, uint32_t skip)
 {
-
+   idump((new_block.block_num())(new_block.id()));
    bool result;
    with_skip_flags(skip, [&]()
    {
