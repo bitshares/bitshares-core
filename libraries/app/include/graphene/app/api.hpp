@@ -347,6 +347,11 @@ namespace graphene { namespace app {
           */
          bool                 verify_account_authority( const string& name_or_id, const flat_set<public_key_type>& signers )const;
 
+         /**
+          *  Validates a transaction against the current state without broadcast it on the network.
+          */
+         processed_transaction validate_transaction( const signed_transaction& trx )const;
+
 
          /**
           *  @return the set of blinded balance objects by commitment ID
@@ -461,6 +466,8 @@ namespace graphene { namespace app {
           * block.
           */
          void broadcast_transaction_with_callback( confirmation_callback cb, const signed_transaction& trx);
+
+         void broadcast_block( const signed_block& block );
 
          /**
           * @brief Not reflected, thus not accessible to API clients.
@@ -595,6 +602,7 @@ FC_API(graphene::app::database_api,
        (get_blinded_balances)
        (get_required_fees)
        (set_subscribe_callback)
+       (validate_transaction)
      )
 FC_API(graphene::app::history_api,
        (get_account_history)
@@ -604,6 +612,7 @@ FC_API(graphene::app::history_api,
 FC_API(graphene::app::network_broadcast_api,
        (broadcast_transaction)
        (broadcast_transaction_with_callback)
+       (broadcast_block)
      )
 FC_API(graphene::app::network_node_api,
        (add_node)

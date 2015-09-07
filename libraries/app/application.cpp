@@ -708,6 +708,11 @@ void application::shutdown_plugins()
       entry.second->plugin_shutdown();
    return;
 }
+void application::shutdown()
+{
+   if( my->_chain_db )
+      my->_chain_db->close();
+}
 
 void application::initialize_plugins( const boost::program_options::variables_map& options )
 {

@@ -404,7 +404,13 @@ namespace graphene { namespace chain {
          asset calculate_market_fee(const asset_object& recv_asset, const asset& trade_amount);
          asset pay_market_fees( const asset_object& recv_asset, const asset& receives );
 
+
          ///@}
+         /**
+          *  This method validates transactions without adding it to the pending state.
+          *  @return true if the transaction would validate
+          */
+         processed_transaction validate_transaction( const signed_transaction& trx );
 
          /**
           * @}
@@ -428,6 +434,7 @@ namespace graphene { namespace chain {
          void                  _apply_block( const signed_block& next_block );
          processed_transaction _apply_transaction( const signed_transaction& trx );
          operation_result      apply_operation( transaction_evaluation_state& eval_state, const operation& op );
+
 
          ///Steps involved in applying a new block
          ///@{

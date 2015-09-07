@@ -213,6 +213,12 @@ processed_transaction database::_push_transaction( const signed_transaction& trx
    return processed_trx;
 }
 
+processed_transaction database::validate_transaction( const signed_transaction& trx )
+{
+   auto session = _undo_db.start_undo_session();
+   return _apply_transaction( trx );
+}
+
 processed_transaction database::push_proposal(const proposal_object& proposal)
 {
    transaction_evaluation_state eval_state(this);

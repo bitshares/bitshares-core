@@ -629,6 +629,12 @@ namespace graphene { namespace app {
        _app.p2p_node()->broadcast_transaction(trx);
     }
 
+    void network_broadcast_api::broadcast_block( const signed_block& b )
+    {
+       _app.chain_database()->push_block(b);
+       _app.p2p_node()->broadcast( net::block_message( b ));
+    }
+
     void network_broadcast_api::broadcast_transaction_with_callback(confirmation_callback cb, const signed_transaction& trx)
     {
        trx.validate();
@@ -1213,6 +1219,13 @@ namespace graphene { namespace app {
 
        wdump((result));
        return result;
+    }
+    /**
+     *  Validates a transaction against the current state without broadcast it on the network.
+     */
+    processed_transaction database_api::validate_transaction( const signed_transaction& trx )const
+    {
+       return _db.validate_transaction(trx);
     }
 
     bool database_api::verify_authority( const signed_transaction& trx )const
