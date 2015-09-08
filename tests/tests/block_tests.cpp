@@ -1018,4 +1018,140 @@ BOOST_FIXTURE_TEST_CASE( rsf_missed_blocks, database_fixture )
    FC_LOG_AND_RETHROW()
 }
 
+BOOST_FIXTURE_TEST_CASE( transaction_invalidated_in_cache, database_fixture )
+{
+   try
+   {
+      ACTORS( (alice)(bob) );
+
+      auto generate_block = [&]( database& d ) -> signed_block
+      {
+         return d.generate_block(d.get_slot_time(1), d.get_scheduled_witness(1), init_account_priv_key, database::skip_nothing);
+      };
+
+      wdump( (db.fetch_block_by_number(1)) );
+      wdump( (db.fetch_block_by_id( db.head_block_id() ) ) );
+
+      signed_block b1 = generate_block(db);
+      wdump( (db.fetch_block_by_number(1)) );
+      wdump( (db.fetch_block_by_id( db.head_block_id() ) ) );
+
+      fc::temp_directory data_dir2( graphene::utilities::temp_directory_path() );
+
+      database db2;
+      db2.open(data_dir2.path(), make_genesis);
+      BOOST_CHECK( db.get_chain_id() == db2.get_chain_id() );
+
+      while( db2.head_block_num() < db.head_block_num() )
+      {
+         wdump( (db.head_block_num()) (db2.head_block_num()) );
+         optional< signed_block > b = db.fetch_block_by_number( db2.head_block_num()+1 );
+         db2.push_block(*b, database::skip_witness_signature);
+      }
+      wlog("caught up db2 to db");
+      BOOST_CHECK( db2.get( alice_id ).name == "alice" );
+      BOOST_CHECK( db2.get( bob_id ).name == "bob" );
+
+      db2.push_block(generate_block(db));
+      transfer( account_id_type(), alice_id, asset( 1000 ) );
+      transfer( account_id_type(),   bob_id, asset( 1000 ) );
+      db2.push_block(generate_block(db));
+
+      BOOST_CHECK_EQUAL(db.get_balance(alice_id, asset_id_type()).amount.value, 1000);
+      BOOST_CHECK_EQUAL(db.get_balance(  bob_id, asset_id_type()).amount.value, 1000);
+      BOOST_CHECK_EQUAL(db2.get_balance(alice_id, asset_id_type()).amount.value, 1000);
+      BOOST_CHECK_EQUAL(db2.get_balance(  bob_id, asset_id_type()).amount.value, 1000);
+
+      auto generate_and_send = [&]( int n )
+      {
+         for( int i=0; i<n; i++ )
+         {
+            signed_block b = generate_block(db2);
+            PUSH_BLOCK( db, b );
+         }
+      };
+
+      auto generate_xfer_tx = [&]( account_id_type from, account_id_type to, share_type amount ) -> signed_transaction
+      {
+         signed_transaction tx;
+         transfer_operation xfer_op;
+         xfer_op.from = from;
+         xfer_op.to = to;
+         xfer_op.amount = asset( amount, asset_id_type() );
+         xfer_op.fee = asset( 0, asset_id_type() );
+         tx.operations.push_back( xfer_op );
+         tx.set_expiration( db.head_block_time() + fc::seconds( 1000 ) );
+         if( from == alice_id )
+            sign( tx, alice_private_key );
+         else
+            sign( tx, bob_private_key );
+         return tx;
+      };
+
+      signed_transaction tx = generate_xfer_tx( alice_id, bob_id, 1000);
+      // put the tx in db tx cache
+      PUSH_TX( db, tx );
+      // generate some blocks with db2, TODO:  make tx expire in db's cache
+      generate_and_send(3);
+
+      BOOST_CHECK_EQUAL(db.get_balance(alice_id, asset_id_type()).amount.value, 1000);
+      BOOST_CHECK_EQUAL(db.get_balance(  bob_id, asset_id_type()).amount.value, 1000);
+
+      // generate a block with db and ensure we don't somehow apply it
+      PUSH_BLOCK(db2, generate_block(db));
+      BOOST_CHECK_EQUAL(db.get_balance(alice_id, asset_id_type()).amount.value, 1000);
+      BOOST_CHECK_EQUAL(db.get_balance(  bob_id, asset_id_type()).amount.value, 1000);
+
+      // now the tricky part...
+      // (A) Bob sends 1000 to Alice
+      // (B) Alice sends 2000 to Bob
+      // (C) Alice sends 500 to Bob
+      //
+      // We push AB, then receive a block containing C.
+      // we need to apply the block, then invalidate B in the cache.
+      // AB results in Alice having 0, Bob having 2000.
+      // C results in Alice having 500, Bob having 1500.
+      //
+      // This needs to occur while switching to a fork.
+      //
+
+      signed_transaction tx_a = generate_xfer_tx( bob_id, alice_id, 1000 );
+      signed_transaction tx_b = generate_xfer_tx( alice_id, bob_id, 2000 );
+      signed_transaction tx_c = generate_xfer_tx( alice_id, bob_id,  500 );
+
+      generate_block( db );
+
+      PUSH_TX( db, tx_a );
+      BOOST_CHECK_EQUAL(db.get_balance(alice_id, asset_id_type()).amount.value, 2000);
+      BOOST_CHECK_EQUAL(db.get_balance(  bob_id, asset_id_type()).amount.value,    0);
+
+      PUSH_TX( db, tx_b );
+      PUSH_TX( db2, tx_c );
+
+      BOOST_CHECK_EQUAL(db.get_balance(alice_id, asset_id_type()).amount.value, 0);
+      BOOST_CHECK_EQUAL(db.get_balance(  bob_id, asset_id_type()).amount.value, 2000);
+
+      BOOST_CHECK_EQUAL(db2.get_balance(alice_id, asset_id_type()).amount.value, 500);
+      BOOST_CHECK_EQUAL(db2.get_balance(  bob_id, asset_id_type()).amount.value, 1500);
+
+      // generate enough blocks on db2 to cause db to switch forks
+      generate_and_send(2);
+
+      // ensure both now reflect db2's view of the world
+      BOOST_CHECK_EQUAL(db.get_balance(alice_id, asset_id_type()).amount.value, 500);
+      BOOST_CHECK_EQUAL(db.get_balance(  bob_id, asset_id_type()).amount.value, 1500);
+
+      BOOST_CHECK_EQUAL(db2.get_balance(alice_id, asset_id_type()).amount.value, 500);
+      BOOST_CHECK_EQUAL(db2.get_balance(  bob_id, asset_id_type()).amount.value, 1500);
+
+      // make sure we can still send blocks
+      generate_and_send(1);
+   }
+   catch (fc::exception& e)
+   {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
 BOOST_AUTO_TEST_SUITE_END()
