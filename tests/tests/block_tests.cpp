@@ -127,12 +127,14 @@ BOOST_AUTO_TEST_CASE( generate_empty_blocks )
 
       // TODO:  Don't generate this here
       auto init_account_priv_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("null_key")) );
+      signed_block b200;
       {
          database db;
          db.open(data_dir.path(), make_genesis );
          b = db.generate_block(db.get_slot_time(1), db.get_scheduled_witness(1), init_account_priv_key, database::skip_nothing);
 
-         for( uint32_t i = 1; i < 200; ++i )
+         // n.b. we generate GRAPHENE_MIN_UNDO_HISTORY+1 extra blocks which will be discarded on save
+         for( uint32_t i = 1; i < 200+GRAPHENE_MIN_UNDO_HISTORY+1; ++i )
          {
             BOOST_CHECK( db.head_block_id() == b.id() );
             witness_id_type prev_witness = b.witness;
@@ -140,6 +142,8 @@ BOOST_AUTO_TEST_CASE( generate_empty_blocks )
             BOOST_CHECK( cur_witness != prev_witness );
             b = db.generate_block(db.get_slot_time(1), cur_witness, init_account_priv_key, database::skip_nothing);
             BOOST_CHECK( b.witness == cur_witness );
+            if( i == 199 )
+               b200 = b;
          }
          db.close();
       }
@@ -147,6 +151,7 @@ BOOST_AUTO_TEST_CASE( generate_empty_blocks )
          database db;
          db.open(data_dir.path(), []{return genesis_state_type();});
          BOOST_CHECK_EQUAL( db.head_block_num(), 200 );
+         b = b200;
          for( uint32_t i = 0; i < 200; ++i )
          {
             BOOST_CHECK( db.head_block_id() == b.id() );
