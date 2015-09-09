@@ -109,9 +109,7 @@ void database::clear_expired_transactions()
    //Transactions must have expired by at least two forking windows in order to be removed.
    auto& transaction_idx = static_cast<transaction_index&>(get_mutable_index(implementation_ids, impl_transaction_object_type));
    const auto& dedupe_index = transaction_idx.indices().get<by_expiration>();
-   const auto& global_parameters = get_global_properties().parameters;
-   while( !dedupe_index.empty()
-          && head_block_time() - dedupe_index.rbegin()->trx.expiration >= fc::seconds(global_parameters.maximum_expiration) )
+   while( (!dedupe_index.empty()) && (head_block_time() > dedupe_index.rbegin()->trx.expiration) )
       transaction_idx.remove(*dedupe_index.rbegin());
 }
 

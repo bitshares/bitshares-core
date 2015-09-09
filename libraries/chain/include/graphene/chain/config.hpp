@@ -45,7 +45,6 @@
 #define GRAPHENE_DEFAULT_MAX_TIME_UNTIL_EXPIRATION (60*60*24) // seconds,  aka: 1 day
 #define GRAPHENE_DEFAULT_MAINTENANCE_INTERVAL  (60*60*24) // seconds, aka: 1 day
 #define GRAPHENE_DEFAULT_MAINTENANCE_SKIP_SLOTS 3  // number of slots to skip for maintenance interval
-#define GRAPHENE_DEFAULT_MAX_EXPIRATION_SEC (60*60) // 1 hour 
 
 #define GRAPHENE_MIN_UNDO_HISTORY 10
 #define GRAPHENE_MAX_UNDO_HISTORY 1000
