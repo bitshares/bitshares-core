@@ -648,6 +648,17 @@ public:
          FC_THROW( "Wallet chain ID does not match",
             ("wallet.chain_id", _wallet.chain_id)
             ("chain_id", _chain_id) );
+
+      vector< account_id_type > my_account_ids;
+      my_account_ids.reserve( _wallet.my_accounts.size() );
+      for( const account_object& acct : _wallet.my_accounts )
+         my_account_ids.push_back( acct.id );
+      // TODO:  Batch requests using _remote_db->get_accounts()
+      // to reduce number of round-trips.  Remember get_accounts() has
+      // a limit of 100 results per call!
+      for( const account_id_type& acct_id : my_account_ids )
+         _wallet.update_account( get_account( acct_id ) );
+
       return true;
    }
    void save_wallet_file(string wallet_filename = "")

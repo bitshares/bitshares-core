@@ -127,12 +127,14 @@ BOOST_AUTO_TEST_CASE( generate_empty_blocks )
 
       // TODO:  Don't generate this here
       auto init_account_priv_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("null_key")) );
+      signed_block b200;
       {
          database db;
          db.open(data_dir.path(), make_genesis );
          b = db.generate_block(db.get_slot_time(1), db.get_scheduled_witness(1), init_account_priv_key, database::skip_nothing);
 
-         for( uint32_t i = 1; i < 200; ++i )
+         // n.b. we generate GRAPHENE_MIN_UNDO_HISTORY+1 extra blocks which will be discarded on save
+         for( uint32_t i = 1; i < 200+GRAPHENE_MIN_UNDO_HISTORY+1; ++i )
          {
             BOOST_CHECK( db.head_block_id() == b.id() );
             witness_id_type prev_witness = b.witness;
@@ -140,6 +142,8 @@ BOOST_AUTO_TEST_CASE( generate_empty_blocks )
             BOOST_CHECK( cur_witness != prev_witness );
             b = db.generate_block(db.get_slot_time(1), cur_witness, init_account_priv_key, database::skip_nothing);
             BOOST_CHECK( b.witness == cur_witness );
+            if( i == 199 )
+               b200 = b;
          }
          db.close();
       }
@@ -147,6 +151,7 @@ BOOST_AUTO_TEST_CASE( generate_empty_blocks )
          database db;
          db.open(data_dir.path(), []{return genesis_state_type();});
          BOOST_CHECK_EQUAL( db.head_block_num(), 200 );
+         b = b200;
          for( uint32_t i = 0; i < 200; ++i )
          {
             BOOST_CHECK( db.head_block_id() == b.id() );
@@ -1016,6 +1021,159 @@ BOOST_FIXTURE_TEST_CASE( rsf_missed_blocks, database_fixture )
       BOOST_CHECK_EQUAL( db.witness_participation_rate(), pct(8) );
    }
    FC_LOG_AND_RETHROW()
+}
+
+BOOST_FIXTURE_TEST_CASE( transaction_invalidated_in_cache, database_fixture )
+{
+   try
+   {
+      ACTORS( (alice)(bob) );
+
+      auto generate_block = [&]( database& d ) -> signed_block
+      {
+         return d.generate_block(d.get_slot_time(1), d.get_scheduled_witness(1), init_account_priv_key, database::skip_nothing);
+      };
+
+      wdump( (db.fetch_block_by_number(1)) );
+      wdump( (db.fetch_block_by_id( db.head_block_id() ) ) );
+
+      signed_block b1 = generate_block(db);
+      wdump( (db.fetch_block_by_number(1)) );
+      wdump( (db.fetch_block_by_id( db.head_block_id() ) ) );
+
+      fc::temp_directory data_dir2( graphene::utilities::temp_directory_path() );
+
+      database db2;
+      db2.open(data_dir2.path(), make_genesis);
+      BOOST_CHECK( db.get_chain_id() == db2.get_chain_id() );
+
+      while( db2.head_block_num() < db.head_block_num() )
+      {
+         wdump( (db.head_block_num()) (db2.head_block_num()) );
+         optional< signed_block > b = db.fetch_block_by_number( db2.head_block_num()+1 );
+         db2.push_block(*b, database::skip_witness_signature);
+      }
+      wlog("caught up db2 to db");
+      BOOST_CHECK( db2.get( alice_id ).name == "alice" );
+      BOOST_CHECK( db2.get( bob_id ).name == "bob" );
+
+      db2.push_block(generate_block(db));
+      transfer( account_id_type(), alice_id, asset( 1000 ) );
+      transfer( account_id_type(),   bob_id, asset( 1000 ) );
+      db2.push_block(generate_block(db));
+
+      BOOST_CHECK_EQUAL(db.get_balance(alice_id, asset_id_type()).amount.value, 1000);
+      BOOST_CHECK_EQUAL(db.get_balance(  bob_id, asset_id_type()).amount.value, 1000);
+      BOOST_CHECK_EQUAL(db2.get_balance(alice_id, asset_id_type()).amount.value, 1000);
+      BOOST_CHECK_EQUAL(db2.get_balance(  bob_id, asset_id_type()).amount.value, 1000);
+
+      auto generate_and_send = [&]( int n )
+      {
+         for( int i=0; i<n; i++ )
+         {
+            signed_block b = generate_block(db2);
+            PUSH_BLOCK( db, b );
+         }
+      };
+
+      auto generate_xfer_tx = [&]( account_id_type from, account_id_type to, share_type amount, int blocks_to_expire=10 ) -> signed_transaction
+      {
+         signed_transaction tx;
+         transfer_operation xfer_op;
+         xfer_op.from = from;
+         xfer_op.to = to;
+         xfer_op.amount = asset( amount, asset_id_type() );
+         xfer_op.fee = asset( 0, asset_id_type() );
+         tx.operations.push_back( xfer_op );
+         tx.set_expiration( db.head_block_time() + blocks_to_expire * db.get_global_properties().parameters.block_interval );
+         if( from == alice_id )
+            sign( tx, alice_private_key );
+         else
+            sign( tx, bob_private_key );
+         return tx;
+      };
+
+      signed_transaction tx = generate_xfer_tx( alice_id, bob_id, 1000, 2 );
+      tx.set_expiration( db.head_block_time() + 2 * db.get_global_properties().parameters.block_interval );
+      tx.signatures.clear();
+      sign( tx, alice_private_key );
+      // put the tx in db tx cache
+      PUSH_TX( db, tx );
+
+      BOOST_CHECK_EQUAL(db.get_balance(alice_id, asset_id_type()).amount.value,    0);
+      BOOST_CHECK_EQUAL(db.get_balance(  bob_id, asset_id_type()).amount.value, 2000);
+
+      // generate some blocks with db2, make tx expire in db's cache
+      generate_and_send(3);
+
+      BOOST_CHECK_EQUAL(db.get_balance(alice_id, asset_id_type()).amount.value, 1000);
+      BOOST_CHECK_EQUAL(db.get_balance(  bob_id, asset_id_type()).amount.value, 1000);
+
+      // generate a block with db and ensure we don't somehow apply it
+      PUSH_BLOCK(db2, generate_block(db));
+      BOOST_CHECK_EQUAL(db.get_balance(alice_id, asset_id_type()).amount.value, 1000);
+      BOOST_CHECK_EQUAL(db.get_balance(  bob_id, asset_id_type()).amount.value, 1000);
+
+      // now the tricky part...
+      // (A) Bob sends 1000 to Alice
+      // (B) Alice sends 2000 to Bob
+      // (C) Alice sends 500 to Bob
+      //
+      // We push AB, then receive a block containing C.
+      // we need to apply the block, then invalidate B in the cache.
+      // AB results in Alice having 0, Bob having 2000.
+      // C results in Alice having 500, Bob having 1500.
+      //
+      // This needs to occur while switching to a fork.
+      //
+
+      signed_transaction tx_a = generate_xfer_tx( bob_id, alice_id, 1000, 3 );
+      signed_transaction tx_b = generate_xfer_tx( alice_id, bob_id, 2000 );
+      signed_transaction tx_c = generate_xfer_tx( alice_id, bob_id,  500 );
+
+      generate_block( db );
+
+      PUSH_TX( db, tx_a );
+      BOOST_CHECK_EQUAL(db.get_balance(alice_id, asset_id_type()).amount.value, 2000);
+      BOOST_CHECK_EQUAL(db.get_balance(  bob_id, asset_id_type()).amount.value,    0);
+
+      PUSH_TX( db, tx_b );
+      PUSH_TX( db2, tx_c );
+
+      BOOST_CHECK_EQUAL(db.get_balance(alice_id, asset_id_type()).amount.value, 0);
+      BOOST_CHECK_EQUAL(db.get_balance(  bob_id, asset_id_type()).amount.value, 2000);
+
+      BOOST_CHECK_EQUAL(db2.get_balance(alice_id, asset_id_type()).amount.value, 500);
+      BOOST_CHECK_EQUAL(db2.get_balance(  bob_id, asset_id_type()).amount.value, 1500);
+
+      // generate enough blocks on db2 to cause db to switch forks
+      generate_and_send(2);
+
+      // db should invalidate B, but still be applying A, so the states don't agree
+
+      BOOST_CHECK_EQUAL(db.get_balance(alice_id, asset_id_type()).amount.value, 1500);
+      BOOST_CHECK_EQUAL(db.get_balance(  bob_id, asset_id_type()).amount.value, 500);
+
+      BOOST_CHECK_EQUAL(db2.get_balance(alice_id, asset_id_type()).amount.value, 500);
+      BOOST_CHECK_EQUAL(db2.get_balance(  bob_id, asset_id_type()).amount.value, 1500);
+
+      // This will cause A to expire in db
+      generate_and_send(1);
+
+      BOOST_CHECK_EQUAL(db.get_balance(alice_id, asset_id_type()).amount.value, 500);
+      BOOST_CHECK_EQUAL(db.get_balance(  bob_id, asset_id_type()).amount.value, 1500);
+
+      BOOST_CHECK_EQUAL(db2.get_balance(alice_id, asset_id_type()).amount.value, 500);
+      BOOST_CHECK_EQUAL(db2.get_balance(  bob_id, asset_id_type()).amount.value, 1500);
+
+      // Make sure we can generate and accept a plain old empty block on top of all this!
+      generate_and_send(1);
+   }
+   catch (fc::exception& e)
+   {
+      edump((e.to_detail_string()));
+      throw;
+   }
 }
 
 BOOST_AUTO_TEST_SUITE_END()

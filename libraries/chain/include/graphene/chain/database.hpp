@@ -40,31 +40,6 @@ namespace graphene { namespace chain {
    using graphene::db::abstract_object;
    using graphene::db::object;
 
-   namespace detail
-   {
-      /**
-       * Class used to help the with_skip_flags implementation.
-       * It must be defined in this header because it must be
-       * available to the with_skip_flags implementation,
-       * which is a template and therefore must also be defined
-       * in this header.
-       */
-      struct skip_flags_restorer
-      {
-         skip_flags_restorer( node_property_object& npo, uint32_t old_skip_flags )
-            : _npo( npo ), _old_skip_flags( old_skip_flags )
-         {}
-
-         ~skip_flags_restorer()
-         {
-            _npo.skip_flags = _old_skip_flags;
-         }
-
-         node_property_object& _npo;
-         uint32_t _old_skip_flags;
-      };
-   }
-
    /**
     *   @class database
     *   @brief tracks the blockchain state in an extensible manner
@@ -269,23 +244,6 @@ namespace graphene { namespace chain {
          decltype( chain_parameters::block_interval ) block_interval( )const;
 
          node_property_object& node_properties();
-
-         /**
-          * Set the skip_flags to the given value, call callback,
-          * then reset skip_flags to their previous value after
-          * callback is done.
-          */
-         template< typename Lambda >
-         void with_skip_flags(
-            uint32_t skip_flags,
-            Lambda callback )
-         {
-            node_property_object& npo = node_properties();
-            detail::skip_flags_restorer restorer( npo, npo.skip_flags );
-            npo.skip_flags = skip_flags;
-            callback();
-            return;
-         }
 
          //////////////////// db_init.cpp ////////////////////
 

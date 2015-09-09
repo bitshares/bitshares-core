@@ -17,6 +17,7 @@
  */
 
 #include <graphene/chain/database.hpp>
+#include <graphene/chain/db_with.hpp>
 
 #include <graphene/chain/block_summary_object.hpp>
 #include <graphene/chain/global_property_object.hpp>
@@ -85,9 +86,13 @@ bool database::push_block(const signed_block& new_block, uint32_t skip)
 {
    idump((new_block.block_num())(new_block.id()));
    bool result;
-   with_skip_flags(skip, [&]()
+   detail::with_skip_flags( *this, skip, [&]()
    {
-      result = _push_block(new_block);
+      detail::without_pending_transactions( *this, std::move(_pending_block.transactions),
+      [&]()
+      {
+         result = _push_block(new_block);
+      });
    });
    return result;
 }
@@ -156,11 +161,6 @@ bool database::_push_block(const signed_block& new_block)
       }
    }
 
-   // If there is a pending block session, then the database state is dirty with pending transactions.
-   // Drop the pending session to reset the database to a clean head block state.
-   // TODO: Preserve pending transactions, and re-apply any which weren't included in the new block.
-   clear_pending();
-
    try {
       auto session = _undo_db.start_undo_session();
       apply_block(new_block, skip);
@@ -187,7 +187,7 @@ bool database::_push_block(const signed_block& new_block)
 processed_transaction database::push_transaction( const signed_transaction& trx, uint32_t skip )
 { try {
    processed_transaction result;
-   with_skip_flags( skip, [&]()
+   detail::with_skip_flags( *this, skip, [&]()
    {
       result = _push_transaction( trx );
    } );
@@ -249,7 +249,7 @@ signed_block database::generate_block(
    )
 {
    signed_block result;
-   with_skip_flags( skip, [&]()
+   detail::with_skip_flags( *this, skip, [&]()
    {
       result = _generate_block( when, witness_id, block_signing_private_key, true );
    } );
@@ -390,7 +390,7 @@ void database::apply_block( const signed_block& next_block, uint32_t skip )
          skip = ~0;// WE CAN SKIP ALMOST EVERYTHING
    }
 
-   with_skip_flags( skip, [&]()
+   detail::with_skip_flags( *this, skip, [&]()
    {
       _apply_block( next_block );
    } );
@@ -479,7 +479,7 @@ void database::notify_changed_objects()
 processed_transaction database::apply_transaction(const signed_transaction& trx, uint32_t skip)
 {
    processed_transaction result;
-   with_skip_flags(skip, [&]()
+   detail::with_skip_flags( *this, skip, [&]()
    {
       result = _apply_transaction(trx);
    });
