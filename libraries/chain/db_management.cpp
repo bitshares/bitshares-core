@@ -101,9 +101,12 @@ void database::open(
       {
          _fork_db.start_block( *last_block );
          idump((last_block->id())(last_block->block_num()));
+         if( last_block->id() != head_block_id() )
+         {
+              FC_ASSERT( head_block_num() == 0, "last block ID does not match current chain state" );
+         }
       }
       idump((head_block_id())(head_block_num()));
-      FC_ASSERT( !last_block || last_block->id() == head_block_id() );
    }
    FC_CAPTURE_AND_RETHROW( (data_dir) )
 }
