@@ -17,6 +17,7 @@
  */
 
 #include <graphene/chain/database.hpp>
+#include <graphene/chain/db_with.hpp>
 
 #include <graphene/chain/asset_object.hpp>
 #include <graphene/chain/global_property_object.hpp>
@@ -100,10 +101,6 @@ void database::update_pending_block(const signed_block& next_block, uint8_t curr
 {
    _pending_block.timestamp = next_block.timestamp + current_block_interval;
    _pending_block.previous = next_block.id();
-   auto old_pending_trx = std::move(_pending_block.transactions);
-   _pending_block.transactions.clear();
-   for( auto old_trx : old_pending_trx )
-      push_transaction( old_trx );
 }
 
 void database::clear_expired_transactions()
@@ -142,7 +139,7 @@ void database::clear_expired_proposals()
 
 void database::clear_expired_orders()
 {
-   with_skip_flags(
+   detail::with_skip_flags( *this,
       get_node_properties().skip_flags | skip_authority_check, [&](){
          transaction_evaluation_state cancel_context(this);
 
@@ -157,7 +154,6 @@ void database::clear_expired_orders()
             apply_operation(cancel_context, canceler);
          }
      });
-
 
    //Process expired force settlement orders
    auto& settlement_index = get_index_type<force_settlement_index>().indices().get<by_expiration>();
