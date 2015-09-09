@@ -1076,7 +1076,7 @@ BOOST_FIXTURE_TEST_CASE( transaction_invalidated_in_cache, database_fixture )
          }
       };
 
-      auto generate_xfer_tx = [&]( account_id_type from, account_id_type to, share_type amount ) -> signed_transaction
+      auto generate_xfer_tx = [&]( account_id_type from, account_id_type to, share_type amount, int blocks_to_expire=10 ) -> signed_transaction
       {
          signed_transaction tx;
          transfer_operation xfer_op;
@@ -1085,7 +1085,7 @@ BOOST_FIXTURE_TEST_CASE( transaction_invalidated_in_cache, database_fixture )
          xfer_op.amount = asset( amount, asset_id_type() );
          xfer_op.fee = asset( 0, asset_id_type() );
          tx.operations.push_back( xfer_op );
-         tx.set_expiration( db.head_block_time() + fc::seconds( 1000 ) );
+         tx.set_expiration( db.head_block_time() + blocks_to_expire * db.get_global_properties().parameters.block_interval );
          if( from == alice_id )
             sign( tx, alice_private_key );
          else
@@ -1093,10 +1093,17 @@ BOOST_FIXTURE_TEST_CASE( transaction_invalidated_in_cache, database_fixture )
          return tx;
       };
 
-      signed_transaction tx = generate_xfer_tx( alice_id, bob_id, 1000);
+      signed_transaction tx = generate_xfer_tx( alice_id, bob_id, 1000, 2 );
+      tx.set_expiration( db.head_block_time() + 2 * db.get_global_properties().parameters.block_interval );
+      tx.signatures.clear();
+      sign( tx, alice_private_key );
       // put the tx in db tx cache
       PUSH_TX( db, tx );
-      // generate some blocks with db2, TODO:  make tx expire in db's cache
+
+      BOOST_CHECK_EQUAL(db.get_balance(alice_id, asset_id_type()).amount.value,    0);
+      BOOST_CHECK_EQUAL(db.get_balance(  bob_id, asset_id_type()).amount.value, 2000);
+
+      // generate some blocks with db2, make tx expire in db's cache
       generate_and_send(3);
 
       BOOST_CHECK_EQUAL(db.get_balance(alice_id, asset_id_type()).amount.value, 1000);
@@ -1120,7 +1127,7 @@ BOOST_FIXTURE_TEST_CASE( transaction_invalidated_in_cache, database_fixture )
       // This needs to occur while switching to a fork.
       //
 
-      signed_transaction tx_a = generate_xfer_tx( bob_id, alice_id, 1000 );
+      signed_transaction tx_a = generate_xfer_tx( bob_id, alice_id, 1000, 3 );
       signed_transaction tx_b = generate_xfer_tx( alice_id, bob_id, 2000 );
       signed_transaction tx_c = generate_xfer_tx( alice_id, bob_id,  500 );
 
@@ -1142,14 +1149,24 @@ BOOST_FIXTURE_TEST_CASE( transaction_invalidated_in_cache, database_fixture )
       // generate enough blocks on db2 to cause db to switch forks
       generate_and_send(2);
 
-      // ensure both now reflect db2's view of the world
+      // db should invalidate B, but still be applying A, so the states don't agree
+
+      BOOST_CHECK_EQUAL(db.get_balance(alice_id, asset_id_type()).amount.value, 1500);
+      BOOST_CHECK_EQUAL(db.get_balance(  bob_id, asset_id_type()).amount.value, 500);
+
+      BOOST_CHECK_EQUAL(db2.get_balance(alice_id, asset_id_type()).amount.value, 500);
+      BOOST_CHECK_EQUAL(db2.get_balance(  bob_id, asset_id_type()).amount.value, 1500);
+
+      // This will cause A to expire in db
+      generate_and_send(1);
+
       BOOST_CHECK_EQUAL(db.get_balance(alice_id, asset_id_type()).amount.value, 500);
       BOOST_CHECK_EQUAL(db.get_balance(  bob_id, asset_id_type()).amount.value, 1500);
 
       BOOST_CHECK_EQUAL(db2.get_balance(alice_id, asset_id_type()).amount.value, 500);
       BOOST_CHECK_EQUAL(db2.get_balance(  bob_id, asset_id_type()).amount.value, 1500);
 
-      // make sure we can still send blocks
+      // Make sure we can generate and accept a plain old empty block on top of all this!
       generate_and_send(1);
    }
    catch (fc::exception& e)
