@@ -36,6 +36,7 @@ namespace graphene { namespace chain {
          optional<signed_block> fetch_optional( const block_id_type& id )const;
          optional<signed_block> fetch_by_number( uint32_t block_num )const;
          optional<signed_block> last()const;
+         optional<block_id_type> last_id()const;
       private:
          mutable std::fstream _blocks;
          mutable std::fstream _block_num_to_pos;
