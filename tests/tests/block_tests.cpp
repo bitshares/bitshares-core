@@ -1076,7 +1076,7 @@ BOOST_FIXTURE_TEST_CASE( transaction_invalidated_in_cache, database_fixture )
          }
       };
 
-      auto generate_xfer_tx = [&]( account_id_type from, account_id_type to, share_type amount, int blocks_to_expire=10 ) -> signed_transaction
+      auto generate_xfer_tx = [&]( account_id_type from, account_id_type to, share_type amount, int blocks_to_expire ) -> signed_transaction
       {
          signed_transaction tx;
          transfer_operation xfer_op;
@@ -1128,8 +1128,8 @@ BOOST_FIXTURE_TEST_CASE( transaction_invalidated_in_cache, database_fixture )
       //
 
       signed_transaction tx_a = generate_xfer_tx( bob_id, alice_id, 1000, 3 );
-      signed_transaction tx_b = generate_xfer_tx( alice_id, bob_id, 2000 );
-      signed_transaction tx_c = generate_xfer_tx( alice_id, bob_id,  500 );
+      signed_transaction tx_b = generate_xfer_tx( alice_id, bob_id, 2000, 10 );
+      signed_transaction tx_c = generate_xfer_tx( alice_id, bob_id,  500, 10 );
 
       generate_block( db );
 

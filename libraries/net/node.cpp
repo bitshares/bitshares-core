@@ -1321,9 +1321,9 @@ namespace graphene { namespace net { namespace detail {
                 active_peer->item_ids_requested_from_peer &&
                 active_peer->item_ids_requested_from_peer->get<1>() < active_ignored_request_threshold)
               {
-                wlog("Disconnecting peer ${peer} because they didn't respond to my request for sync item ids after ${id}",
+                wlog("Disconnecting peer ${peer} because they didn't respond to my request for sync item ids after ${synopsis}",
                       ("peer", active_peer->get_remote_endpoint())
-                      ("id", active_peer->item_ids_requested_from_peer->get<0>().back()));
+                      ("synopsis", active_peer->item_ids_requested_from_peer->get<0>()));
                 disconnect_due_to_request_timeout = true;
               }
             if (!disconnect_due_to_request_timeout)
@@ -2269,6 +2269,7 @@ namespace graphene { namespace net { namespace detail {
 
       std::vector<item_hash_t> synopsis = _delegate->get_blockchain_synopsis(reference_point, number_of_blocks_after_reference_point);
 
+#if 0
       // just for debugging, enable this and set a breakpoint to step through
       if (synopsis.empty())
         synopsis = _delegate->get_blockchain_synopsis(reference_point, number_of_blocks_after_reference_point);
@@ -2277,8 +2278,9 @@ namespace graphene { namespace net { namespace detail {
       // or if the reference point is now past our undo history (that's not). 
       // in the second case, we should mark this peer as one we're unable to sync with and
       // disconnect them.
-      if (reference_point != item_hash_t() &&  synopsis.empty())
+      if (reference_point != item_hash_t() && synopsis.empty())
         FC_THROW_EXCEPTION(block_older_than_undo_history, "You are on a fork I'm unable to switch to");
+#endif
 
       if( number_of_blocks_after_reference_point )
       {

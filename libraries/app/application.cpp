@@ -27,6 +27,7 @@
 #include <graphene/egenesis/egenesis.hpp>
 
 #include <graphene/net/core_messages.hpp>
+#include <graphene/net/exceptions.hpp>
 
 #include <graphene/time/time.hpp>
 
@@ -605,6 +606,14 @@ namespace detail {
                 throw;
               }
             }
+            if (non_fork_high_block_num < low_block_num)
+            {
+              wlog("Unable to generate a usable synopsis because the peer we're generating it for forked too long ago "
+                   "(our chains diverge after block #${non_fork_high_block_num} but only undoable to block #${low_block_num})", 
+                   ("low_block_num", low_block_num)
+                   ("non_fork_high_block_num", non_fork_high_block_num));
+              FC_THROW_EXCEPTION(graphene::net::block_older_than_undo_history, "Peer is are on a fork I'm unable to switch to");
+            }
           }
           else
           {
@@ -620,15 +629,8 @@ namespace detail {
           // non_fork_high_block_num is the block before the fork (if the peer is on a fork, or otherwise it is the same as high_block_num)
           // high_block_num is the block number of the reference block, or the end of the chain if no reference provided
 
-          if (non_fork_high_block_num <= low_block_num)
-          {
-            wlog("Unable to generate a usable synopsis because the peer we're generating it for forked too long ago "
-                 "(our chains diverge after block #${non_fork_high_block_num} but only undoable to block #${low_block_num})", 
-                 ("low_block_num", low_block_num)
-                 ("non_fork_high_block_num", non_fork_high_block_num));
-            return synopsis;
-          }
-
+          // true_high_block_num is the ending block number after the network code appends any item ids it 
+          // knows about that we don't
           uint32_t true_high_block_num = high_block_num + number_of_blocks_after_reference_point;
           do
           {
