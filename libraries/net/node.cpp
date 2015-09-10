@@ -1198,9 +1198,9 @@ namespace graphene { namespace net { namespace detail {
             wdump((inventory_to_advertise));
             for (const item_id& item_to_advertise : inventory_to_advertise)
             {
-              if (peer->inventory_advertised_to_peer.find(item_to_advertise) == peer->inventory_advertised_to_peer.end() )
+              if (peer->inventory_advertised_to_peer.find(item_to_advertise) != peer->inventory_advertised_to_peer.end() )
                  wdump((*peer->inventory_advertised_to_peer.find(item_to_advertise)));
-              if (peer->inventory_peer_advertised_to_us.find(item_to_advertise) == peer->inventory_peer_advertised_to_us.end() )
+              if (peer->inventory_peer_advertised_to_us.find(item_to_advertise) != peer->inventory_peer_advertised_to_us.end() )
                  wdump((*peer->inventory_peer_advertised_to_us.find(item_to_advertise)));
 
               if (peer->inventory_advertised_to_peer.find(item_to_advertise) == peer->inventory_advertised_to_peer.end() &&

@@ -58,12 +58,32 @@ void database::reindex(fc::path data_dir, const genesis_state_type& initial_allo
    for( uint32_t i = 1; i <= last_block_num; ++i )
    {
       if( i % 2000 == 0 ) std::cerr << "   " << double(i*100)/last_block_num << "%   "<<i << " of " <<last_block_num<<"   \n";
-      apply_block(*_block_id_to_block.fetch_by_number(i), skip_witness_signature |
-                                skip_transaction_signatures |
-                                skip_transaction_dupe_check |
-                                skip_tapos_check |
-                                skip_witness_schedule_check |
-                                skip_authority_check);
+      fc::optional< signed_block > block = _block_id_to_block.fetch_by_number(i);
+      if( !block.valid() )
+      {
+         wlog( "Reindexing terminated due to gap:  Block ${i} does not exist!", ("i", i) );
+         uint32_t dropped_count = 0;
+         while( true )
+         {
+            fc::optional< block_id_type > last_id = _block_id_to_block.last_id();
+            // this can trigger if we attempt to e.g. read a file that has block #2 but no block #1
+            if( !last_id.valid() )
+               break;
+            // we've caught up to the gap
+            if( block_header::num_from_id( *last_id ) <= i )
+               break;
+            _block_id_to_block.remove( *last_id );
+            dropped_count++;
+         }
+         wlog( "Dropped ${n} blocks from after the gap", ("n", dropped_count) );
+         break;
+      }
+      apply_block(*block, skip_witness_signature |
+                          skip_transaction_signatures |
+                          skip_transaction_dupe_check |
+                          skip_tapos_check |
+                          skip_witness_schedule_check |
+                          skip_authority_check);
    }
    _undo_db.enable();
    auto end = fc::time_point::now();
@@ -101,9 +121,12 @@ void database::open(
       {
          _fork_db.start_block( *last_block );
          idump((last_block->id())(last_block->block_num()));
+         if( last_block->id() != head_block_id() )
+         {
+              FC_ASSERT( head_block_num() == 0, "last block ID does not match current chain state" );
+         }
       }
       idump((head_block_id())(head_block_num()));
-      FC_ASSERT( !last_block || last_block->id() == head_block_id() );
    }
    FC_CAPTURE_AND_RETHROW( (data_dir) )
 }

@@ -17,6 +17,7 @@
  */
 
 #include <graphene/chain/database.hpp>
+#include <graphene/chain/db_with.hpp>
 
 #include <graphene/chain/asset_object.hpp>
 #include <graphene/chain/global_property_object.hpp>
@@ -100,10 +101,6 @@ void database::update_pending_block(const signed_block& next_block, uint8_t curr
 {
    _pending_block.timestamp = next_block.timestamp + current_block_interval;
    _pending_block.previous = next_block.id();
-   auto old_pending_trx = std::move(_pending_block.transactions);
-   _pending_block.transactions.clear();
-   for( auto old_trx : old_pending_trx )
-      push_transaction( old_trx );
 }
 
 void database::clear_expired_transactions()
@@ -112,9 +109,7 @@ void database::clear_expired_transactions()
    //Transactions must have expired by at least two forking windows in order to be removed.
    auto& transaction_idx = static_cast<transaction_index&>(get_mutable_index(implementation_ids, impl_transaction_object_type));
    const auto& dedupe_index = transaction_idx.indices().get<by_expiration>();
-   const auto& global_parameters = get_global_properties().parameters;
-   while( !dedupe_index.empty()
-          && head_block_time() - dedupe_index.rbegin()->trx.expiration >= fc::seconds(global_parameters.maximum_expiration) )
+   while( (!dedupe_index.empty()) && (head_block_time() > dedupe_index.rbegin()->trx.expiration) )
       transaction_idx.remove(*dedupe_index.rbegin());
 }
 
@@ -142,7 +137,7 @@ void database::clear_expired_proposals()
 
 void database::clear_expired_orders()
 {
-   with_skip_flags(
+   detail::with_skip_flags( *this,
       get_node_properties().skip_flags | skip_authority_check, [&](){
          transaction_evaluation_state cancel_context(this);
 
@@ -157,7 +152,6 @@ void database::clear_expired_orders()
             apply_operation(cancel_context, canceler);
          }
      });
-
 
    //Process expired force settlement orders
    auto& settlement_index = get_index_type<force_settlement_index>().indices().get<by_expiration>();

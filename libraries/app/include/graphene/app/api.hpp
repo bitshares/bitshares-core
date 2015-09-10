@@ -347,6 +347,11 @@ namespace graphene { namespace app {
           */
          bool                 verify_account_authority( const string& name_or_id, const flat_set<public_key_type>& signers )const;
 
+         /**
+          *  Validates a transaction against the current state without broadcast it on the network.
+          */
+         processed_transaction validate_transaction( const signed_transaction& trx )const;
+
 
          /**
           *  @return the set of blinded balance objects by commitment ID
@@ -361,6 +366,8 @@ namespace graphene { namespace app {
          vector<asset> get_required_fees( const vector<operation>& ops, asset_id_type id = asset_id_type() )const;
 
          void set_subscribe_callback( std::function<void(const variant&)> cb, bool clear_filter );
+         void set_pending_transaction_callback( std::function<void(const variant&)> cb ){ _pending_trx_callback = cb; }
+         void set_block_applied_callback( std::function<void(const variant& block_id)> cb ){ _block_applied_callback = cb; }
       private:
          template<typename T>
          void subscribe_to_item( const T& i )const
@@ -391,10 +398,13 @@ namespace graphene { namespace app {
 
          mutable fc::bloom_filter                _subscribe_filter;
          std::function<void(const fc::variant&)> _subscribe_callback;
+         std::function<void(const fc::variant&)> _pending_trx_callback;
+         std::function<void(const fc::variant&)> _block_applied_callback;
 
          boost::signals2::scoped_connection                                              _change_connection;
          boost::signals2::scoped_connection                                              _removed_connection;
          boost::signals2::scoped_connection                                              _applied_block_connection;
+         boost::signals2::scoped_connection                                              _pending_trx_connection;
          map< pair<asset_id_type,asset_id_type>, std::function<void(const variant&)> >   _market_subscriptions;
          graphene::chain::database&                                                      _db;
    };
@@ -461,6 +471,8 @@ namespace graphene { namespace app {
           * block.
           */
          void broadcast_transaction_with_callback( confirmation_callback cb, const signed_transaction& trx);
+
+         void broadcast_block( const signed_block& block );
 
          /**
           * @brief Not reflected, thus not accessible to API clients.
@@ -595,6 +607,9 @@ FC_API(graphene::app::database_api,
        (get_blinded_balances)
        (get_required_fees)
        (set_subscribe_callback)
+       (set_pending_transaction_callback)
+       (set_block_applied_callback)
+       (validate_transaction)
      )
 FC_API(graphene::app::history_api,
        (get_account_history)
@@ -604,6 +619,7 @@ FC_API(graphene::app::history_api,
 FC_API(graphene::app::network_broadcast_api,
        (broadcast_transaction)
        (broadcast_transaction_with_callback)
+       (broadcast_block)
      )
 FC_API(graphene::app::network_node_api,
        (add_node)

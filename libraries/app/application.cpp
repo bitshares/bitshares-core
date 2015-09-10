@@ -221,6 +221,15 @@ namespace detail {
          fc::remove_all(_data_dir / "blockchain/dblock");
       }
 
+      void set_dbg_init_key( genesis_state_type& genesis, const std::string& init_key )
+      {
+         flat_set< std::string > initial_witness_names;
+         public_key_type init_pubkey( init_key );
+         for( uint64_t i=0; i<genesis.initial_active_witnesses; i++ )
+            genesis.initial_witness_candidates[i].block_signing_key = init_pubkey;
+         return;
+      }
+
       void startup()
       { try {
          bool clean = !fc::exists(_data_dir / "blockchain/dblock");
@@ -231,11 +240,25 @@ namespace detail {
             if( _options->count("genesis-json") )
             {
                genesis_state_type genesis = fc::json::from_file(_options->at("genesis-json").as<boost::filesystem::path>()).as<genesis_state_type>();
+               bool modified_genesis = false;
                if( _options->count("genesis-timestamp") )
                {
                   genesis.initial_timestamp = fc::time_point_sec( graphene::time::now() ) + genesis.initial_parameters.block_interval + _options->at("genesis-timestamp").as<uint32_t>();
                   genesis.initial_timestamp -= genesis.initial_timestamp.sec_since_epoch() % genesis.initial_parameters.block_interval;
+                  modified_genesis = true;
                   std::cerr << "Used genesis timestamp:  " << genesis.initial_timestamp.to_iso_string() << " (PLEASE RECORD THIS)\n";
+               }
+               if( _options->count("dbg-init-key") )
+               {
+                  std::string init_key = _options->at( "dbg-init-key" ).as<string>();
+                  FC_ASSERT( genesis.initial_witness_candidates.size() >= genesis.initial_active_witnesses );
+                  set_dbg_init_key( genesis, init_key );
+                  modified_genesis = true;
+                  std::cerr << "Set init witness key to " << init_key << "\n";
+               }
+               if( modified_genesis )
+               {
+                  std::cerr << "WARNING:  GENESIS WAS MODIFIED, YOUR CHAIN ID MAY BE DIFFERENT\n";
                }
                return genesis;
             }
@@ -733,6 +756,7 @@ void application::set_program_options(boost::program_options::options_descriptio
          ("server-pem,p", bpo::value<string>()->implicit_value("server.pem"), "The TLS certificate file for this server")
          ("server-pem-password,P", bpo::value<string>()->implicit_value(""), "Password for this certificate")
          ("genesis-json", bpo::value<boost::filesystem::path>(), "File to read Genesis State from")
+         ("dbg-init-key", bpo::value<string>(), "Block signing key to use for init witnesses, overrides genesis file")
          ("api-access", bpo::value<boost::filesystem::path>(), "JSON file specifying API permissions")
          ;
    command_line_options.add(configuration_file_options);
@@ -830,6 +854,11 @@ void application::shutdown_plugins()
    for( auto& entry : my->_plugins )
       entry.second->plugin_shutdown();
    return;
+}
+void application::shutdown()
+{
+   if( my->_chain_db )
+      my->_chain_db->close();
 }
 
 void application::initialize_plugins( const boost::program_options::variables_map& options )

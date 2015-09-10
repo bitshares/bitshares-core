@@ -53,8 +53,8 @@ void write_default_logging_config_to_stream(std::ostream& out);
 fc::optional<fc::logging_config> load_logging_config_from_ini_file(const fc::path& config_ini_filename);
 
 int main(int argc, char** argv) {
+      app::application* node = new app::application();
    try {
-      app::application node;
       bpo::options_description app_options("Graphene Witness Node");
       bpo::options_description cfg_options("Graphene Witness Node");
       app_options.add_options()
@@ -64,14 +64,14 @@ int main(int argc, char** argv) {
 
       bpo::variables_map options;
 
-      auto witness_plug = node.register_plugin<witness_plugin::witness_plugin>();
-      auto history_plug = node.register_plugin<account_history::account_history_plugin>();
-      auto market_history_plug = node.register_plugin<market_history::market_history_plugin>();
+      auto witness_plug = node->register_plugin<witness_plugin::witness_plugin>();
+      auto history_plug = node->register_plugin<account_history::account_history_plugin>();
+      auto market_history_plug = node->register_plugin<market_history::market_history_plugin>();
 
       try
       {
          bpo::options_description cli, cfg;
-         node.set_program_options(cli, cfg);
+         node->set_program_options(cli, cfg);
          app_options.add(cli);
          cfg_options.add(cfg);
          bpo::store(bpo::parse_command_line(argc, argv, app_options), options);
@@ -151,26 +151,31 @@ int main(int argc, char** argv) {
       }
 
       bpo::notify(options);
-      node.initialize(data_dir, options);
-      node.initialize_plugins( options );
+      node->initialize(data_dir, options);
+      node->initialize_plugins( options );
 
-      node.startup();
-      node.startup_plugins();
+      node->startup();
+      node->startup_plugins();
 
       fc::promise<int>::ptr exit_promise = new fc::promise<int>("UNIX Signal Handler");
       fc::set_signal_handler([&exit_promise](int signal) {
+         elog( "Caught ^C attempting to exit cleanly" );
          exit_promise->set_value(signal);
       }, SIGINT);
 
-      ilog("Started witness node on a chain with ${h} blocks.", ("h", node.chain_database()->head_block_num()));
-      ilog("Chain ID is ${id}", ("id", node.chain_database()->get_chain_id()) );
+      ilog("Started witness node on a chain with ${h} blocks.", ("h", node->chain_database()->head_block_num()));
+      ilog("Chain ID is ${id}", ("id", node->chain_database()->get_chain_id()) );
 
       int signal = exit_promise->wait();
       ilog("Exiting from signal ${n}", ("n", signal));
-      node.shutdown_plugins();
+      node->shutdown_plugins();
+      node->shutdown();
+      delete node;
       return 0;
    } catch( const fc::exception& e ) {
       elog("Exiting with error:\n${e}", ("e", e.to_detail_string()));
+      node->shutdown();
+      delete node;
       return 1;
    }
 }

@@ -165,29 +165,7 @@ it is fairly simple to write API methods to expose database methods.
 Running private testnet
 -----------------------
 
-Normally `witness_node` assumes it won't be producing blocks from
-genesis, or against very old chain state.  We need to get `witness_node`
-to discard this assumption if we actually want to start a new chain,
-so we will need to specify in `config.ini`:
-
-    enable-stale-production = true
-
-We also need to specify which witnesses will produce blocks locally;
-`witness_node` does not assume that it should produce blocks for a given
-witness just because it has the correct private key to do so.  There are
-ten witnesses at genesis of the testnet, block production can be
-enabled for all of them by specifying multiple times in `config.ini`:
-
-    witness-id = "1.6.0"
-    witness-id = "1.6.1"
-    witness-id = "1.6.2"
-    witness-id = "1.6.3"
-    witness-id = "1.6.4"
-    witness-id = "1.6.5"
-    witness-id = "1.6.6"
-    witness-id = "1.6.7"
-    witness-id = "1.6.8"
-    witness-id = "1.6.9"
+See the [documentation](https://github.com/cryptonomex/graphene/wiki/private-testnet) if you want to run a private testnet.
 
 Questions
 ---------

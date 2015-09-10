@@ -45,6 +45,10 @@ namespace graphene { namespace app {
                                     on_objects_removed(objs);
                                     });
        _applied_block_connection = _db.applied_block.connect([this](const signed_block&){ on_applied_block(); });
+
+       _pending_trx_connection = _db.on_pending_transaction.connect([this](const signed_transaction& trx ){ 
+                             if( _pending_trx_callback ) _pending_trx_callback( fc::variant(trx) );
+                          });
     }
 
     database_api::~database_api()
@@ -629,6 +633,12 @@ namespace graphene { namespace app {
        _app.p2p_node()->broadcast_transaction(trx);
     }
 
+    void network_broadcast_api::broadcast_block( const signed_block& b )
+    {
+       _app.chain_database()->push_block(b);
+       _app.p2p_node()->broadcast( net::block_message( b ));
+    }
+
     void network_broadcast_api::broadcast_transaction_with_callback(confirmation_callback cb, const signed_transaction& trx)
     {
        trx.validate();
@@ -913,9 +923,17 @@ namespace graphene { namespace app {
      */
     void database_api::on_applied_block()
     {
+       if (_block_applied_callback)
+       {
+          auto capture_this = shared_from_this();
+          block_id_type block_id = _db.head_block_id();
+          fc::async([this,capture_this,block_id](){
+             _block_applied_callback(fc::variant(block_id));
+          });
+       }
+
        if(_market_subscriptions.size() == 0)
           return;
-
 
        const auto& ops = _db.get_applied_operations();
        map< std::pair<asset_id_type,asset_id_type>, vector<pair<operation, operation_result>> > subscribed_markets_ops;
@@ -1213,6 +1231,13 @@ namespace graphene { namespace app {
 
        wdump((result));
        return result;
+    }
+    /**
+     *  Validates a transaction against the current state without broadcast it on the network.
+     */
+    processed_transaction database_api::validate_transaction( const signed_transaction& trx )const
+    {
+       return _db.validate_transaction(trx);
     }
 
     bool database_api::verify_authority( const signed_transaction& trx )const

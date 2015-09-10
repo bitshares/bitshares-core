@@ -375,6 +375,12 @@ public:
             ("chain_id", _chain_id) );
       }
       init_prototype_ops();
+
+      _remote_db->set_block_applied_callback( [this](const variant& block_id )
+      {
+         on_block_applied( block_id );
+      } );
+
       _wallet.chain_id = _chain_id;
       _wallet.ws_server = initial_data.ws_server;
       _wallet.ws_user = initial_data.ws_user;
@@ -406,6 +412,11 @@ public:
          auto plain_txt = fc::raw::pack(data);
          _wallet.cipher_keys = fc::aes_encrypt( data.checksum, plain_txt );
       }
+   }
+
+   void on_block_applied( const variant& block_id )
+   {
+      fc::async([this]{resync();}, "Resync after block");
    }
 
    bool copy_wallet_file( string destination_filename )
@@ -648,6 +659,51 @@ public:
          FC_THROW( "Wallet chain ID does not match",
             ("wallet.chain_id", _wallet.chain_id)
             ("chain_id", _chain_id) );
+
+      size_t account_pagination = 100;
+      vector< account_id_type > account_ids_to_send;
+      size_t n = _wallet.my_accounts.size();
+      account_ids_to_send.reserve( std::min( account_pagination, n ) );
+      auto it = _wallet.my_accounts.begin();
+
+      for( size_t start=0; start<n; start+=account_pagination )
+      {
+         size_t end = std::min( start+account_pagination, n );
+         assert( end > start );
+         account_ids_to_send.clear();
+         std::vector< account_object > old_accounts;
+         for( size_t i=start; i<end; i++ )
+         {
+            assert( it != _wallet.my_accounts.end() );
+            old_accounts.push_back( *it );
+            account_ids_to_send.push_back( old_accounts.back().id );
+            ++it;
+         }
+         std::vector< optional< account_object > > accounts = _remote_db->get_accounts(account_ids_to_send);
+         // server response should be same length as request
+         FC_ASSERT( accounts.size() == account_ids_to_send.size() );
+         size_t i = 0;
+         for( const optional< account_object >& acct : accounts )
+         {
+            account_object& old_acct = old_accounts[i];
+            if( !acct.valid() )
+            {
+               elog( "Could not find account ${id} : \"${name}\" does not exist on the chain!", ("id", old_acct.id)("name", old_acct.name) );
+               i++;
+               continue;
+            }
+            // this check makes sure the server didn't send results
+            // in a different order, or accounts we didn't request
+            FC_ASSERT( acct->id == old_acct.id );
+            if( fc::json::to_string(*acct) != fc::json::to_string(old_acct) )
+            {
+               wlog( "Account ${id} : \"${name}\" updated on chain", ("id", acct->id)("name", acct->name) );
+            }
+            _wallet.update_account( *acct );
+            i++;
+         }
+      }
+
       return true;
    }
    void save_wallet_file(string wallet_filename = "")
