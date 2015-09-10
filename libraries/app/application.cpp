@@ -497,7 +497,7 @@ namespace detail {
             current = current*2;
          }
          std::reverse( result.begin(), result.end() );
-         idump((reference_point)(number_of_blocks_after_reference_point)(result));
+         //idump((reference_point)(number_of_blocks_after_reference_point)(result));
          return result;
       } FC_CAPTURE_AND_RETHROW( (reference_point)(number_of_blocks_after_reference_point) ) }
 
