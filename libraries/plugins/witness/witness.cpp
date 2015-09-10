@@ -123,8 +123,12 @@ void witness_plugin::plugin_startup()
    {
       ilog("Launching block production for ${n} witnesses.", ("n", _witnesses.size()));
       app().set_block_production(true);
-      if( _production_enabled && (d.head_block_num() == 0) )
-         new_chain_banner(d);
+      if( _production_enabled )
+      {
+         if( d.head_block_num() == 0 )
+            new_chain_banner(d);
+         _production_skip_flags |= graphene::chain::database::skip_undo_history_check;
+      }
       schedule_production_loop();
    } else
       elog("No witnesses configured! Please add witness IDs and private keys to configuration.");
@@ -278,7 +282,7 @@ block_production_condition::block_production_condition_enum witness_plugin::mayb
       scheduled_time,
       scheduled_witness,
       private_key_itr->second,
-      graphene::chain::database::skip_nothing
+      _production_skip_flags
       );
    capture("n", block.block_num())("t", block.timestamp)("c", now);
    p2p_node().broadcast(net::block_message(block));

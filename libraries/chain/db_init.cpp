@@ -331,13 +331,13 @@ void database::init_genesis(const genesis_state_type& genesis_state)
    // Create more special assets
    while( true )
    {
+      uint64_t id = get_index<asset_object>().get_next_id().instance();
+      if( id >= genesis_state.immutable_parameters.num_special_assets )
+         break;
       const asset_dynamic_data_object& dyn_asset =
          create<asset_dynamic_data_object>([&](asset_dynamic_data_object& a) {
             a.current_supply = 0;
          });
-      uint64_t id = get_index<asset_object>().get_next_id().instance();
-      if( id >= genesis_state.immutable_parameters.num_special_assets )
-         break;
       const asset_object& asset_obj = create<asset_object>( [&]( asset_object& a ) {
          a.symbol = "SPECIAL" + std::to_string( id );
          a.options.max_supply = 0;
