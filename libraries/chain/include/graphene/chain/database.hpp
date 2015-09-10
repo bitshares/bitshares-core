@@ -137,6 +137,7 @@ namespace graphene { namespace chain {
          optional<signed_block>     fetch_block_by_id( const block_id_type& id )const;
          optional<signed_block>     fetch_block_by_number( uint32_t num )const;
          const signed_transaction&  get_recent_transaction( const transaction_id_type& trx_id )const;
+         std::vector<block_id_type> get_block_ids_on_fork(block_id_type head_of_fork) const;
 
          /**
           *  Calculate the percent of block production slots that were missed in the
@@ -280,7 +281,8 @@ namespace graphene { namespace chain {
             callback();
             return;
          }
-
+         
+         uint32_t last_non_undoable_block_num() const;
          //////////////////// db_init.cpp ////////////////////
 
          void initialize_evaluators();

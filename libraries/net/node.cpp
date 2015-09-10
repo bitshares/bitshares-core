@@ -37,6 +37,7 @@
 #include <boost/multi_index/hashed_index.hpp>
 #include <boost/logic/tribool.hpp>
 #include <boost/range/algorithm_ext/push_back.hpp>
+#include <boost/range/algorithm/find.hpp>
 #include <boost/range/numeric.hpp>
 
 #include <boost/accumulators/accumulators.hpp>
@@ -279,7 +280,7 @@ namespace graphene { namespace net { namespace detail {
                                    (handle_message) \
                                    (handle_block) \
                                    (handle_transaction) \
-                                   (get_item_ids) \
+                                   (get_block_ids) \
                                    (get_item) \
                                    (get_chain_id) \
                                    (get_blockchain_synopsis) \
@@ -375,15 +376,13 @@ namespace graphene { namespace net { namespace detail {
       void handle_message( const message& ) override;
       bool handle_block( const graphene::net::block_message& block_message, bool sync_mode, std::vector<fc::uint160_t>& contained_transaction_message_ids ) override;
       void handle_transaction( const graphene::net::trx_message& transaction_message ) override;
-      std::vector<item_hash_t> get_item_ids(uint32_t item_type,
-                                            const std::vector<item_hash_t>& blockchain_synopsis,
-                                            uint32_t& remaining_item_count,
-                                            uint32_t limit = 2000) override;
+      std::vector<item_hash_t> get_block_ids(const std::vector<item_hash_t>& blockchain_synopsis,
+                                             uint32_t& remaining_item_count,
+                                             uint32_t limit = 2000) override;
       message get_item( const item_id& id ) override;
       chain_id_type get_chain_id() const override;
-      std::vector<item_hash_t> get_blockchain_synopsis(uint32_t item_type,
-                                                       const graphene::net::item_hash_t& reference_point = graphene::net::item_hash_t(),
-                                                       uint32_t number_of_blocks_after_reference_point = 0) override;
+      std::vector<item_hash_t> get_blockchain_synopsis(const item_hash_t& reference_point, 
+                                                       uint32_t number_of_blocks_after_reference_point) override;
       void     sync_status( uint32_t item_type, uint32_t item_count ) override;
       void     connection_count_changed( uint32_t c ) override;
       uint32_t get_block_number(const item_hash_t& block_id) override;
@@ -1324,7 +1323,7 @@ namespace graphene { namespace net { namespace detail {
               {
                 wlog("Disconnecting peer ${peer} because they didn't respond to my request for sync item ids after ${id}",
                       ("peer", active_peer->get_remote_endpoint())
-                      ("id", active_peer->item_ids_requested_from_peer->get<0>().item_hash));
+                      ("id", active_peer->item_ids_requested_from_peer->get<0>().back()));
                 disconnect_due_to_request_timeout = true;
               }
             if (!disconnect_due_to_request_timeout)
@@ -2155,9 +2154,8 @@ namespace graphene { namespace net { namespace detail {
            ( "synopsis", fetch_blockchain_item_ids_message_received.blockchain_synopsis ) );
 
       blockchain_item_ids_inventory_message reply_message;
-      reply_message.item_hashes_available = _delegate->get_item_ids( fetch_blockchain_item_ids_message_received.item_type,
-                                                                    fetch_blockchain_item_ids_message_received.blockchain_synopsis,
-                                                                    reply_message.total_remaining_item_count );
+      reply_message.item_hashes_available = _delegate->get_block_ids(fetch_blockchain_item_ids_message_received.blockchain_synopsis,
+                                                                     reply_message.total_remaining_item_count );
       reply_message.item_type = fetch_blockchain_item_ids_message_received.item_type;
 
       bool disconnect_from_inhibited_peer = false;
@@ -2170,8 +2168,7 @@ namespace graphene { namespace net { namespace detail {
                reply_message.item_hashes_available.size() == 1 &&
                std::find(fetch_blockchain_item_ids_message_received.blockchain_synopsis.begin(),
                          fetch_blockchain_item_ids_message_received.blockchain_synopsis.end(),
-                         reply_message.item_hashes_available.back() ) != fetch_blockchain_item_ids_message_received.blockchain_synopsis.end()
-             )
+                         reply_message.item_hashes_available.back() ) != fetch_blockchain_item_ids_message_received.blockchain_synopsis.end() )
       {
         /* the last item in the peer's list matches the last item in our list */
         originating_peer->peer_needs_sync_items_from_us = false;
@@ -2270,24 +2267,33 @@ namespace graphene { namespace net { namespace detail {
       // This is pretty expensive, we should find a better way to do this
       std::unique_ptr<std::vector<item_hash_t> > original_ids_of_items_to_get(new std::vector<item_hash_t>(peer->ids_of_items_to_get.begin(), peer->ids_of_items_to_get.end()));
 
-      std::vector<item_hash_t> synopsis = _delegate->get_blockchain_synopsis(_sync_item_type, reference_point, number_of_blocks_after_reference_point);
-      assert(reference_point == item_hash_t() || !synopsis.empty());
+      std::vector<item_hash_t> synopsis = _delegate->get_blockchain_synopsis(reference_point, number_of_blocks_after_reference_point);
 
-      // if we passed in a reference point, we believe it is one the client has already accepted and should
-      // be able to generate a synopsis based on it
-      if( reference_point != item_hash_t() && synopsis.empty() )
-        synopsis = _delegate->get_blockchain_synopsis( _sync_item_type, reference_point, number_of_blocks_after_reference_point );
+      // just for debugging, enable this and set a breakpoint to step through
+      if (synopsis.empty())
+        synopsis = _delegate->get_blockchain_synopsis(reference_point, number_of_blocks_after_reference_point);
+
+      // TODO: it's possible that the returned synopsis is empty if the blockchain is empty (that's fine)
+      // or if the reference point is now past our undo history (that's not). 
+      // in the second case, we should mark this peer as one we're unable to sync with and
+      // disconnect them.
+      if (reference_point != item_hash_t() &&  synopsis.empty())
+        FC_THROW_EXCEPTION(block_older_than_undo_history, "You are on a fork I'm unable to switch to");
 
       if( number_of_blocks_after_reference_point )
       {
         // then the synopsis is incomplete, add the missing elements from ids_of_items_to_get
         uint32_t true_high_block_num = reference_point_block_num + number_of_blocks_after_reference_point;
-        uint32_t low_block_num = 1;
+
+        // in order to generate a seamless synopsis, we need to be using the same low_block_num as the 
+        // backend code; the first block in the synopsis will be the low block number it used
+        uint32_t low_block_num = synopsis.empty() ? 1 : _delegate->get_block_number(synopsis.front());
+        
         do
         {
           if( low_block_num > reference_point_block_num )
-            synopsis.push_back( (*original_ids_of_items_to_get)[low_block_num - reference_point_block_num - 1] );
-          low_block_num += ( (true_high_block_num - low_block_num + 2 ) / 2 );
+            synopsis.push_back((*original_ids_of_items_to_get)[low_block_num - reference_point_block_num - 1]);
+          low_block_num += (true_high_block_num - low_block_num + 2 ) / 2;
         }
         while ( low_block_num <= true_high_block_num );
         assert(synopsis.back() == original_ids_of_items_to_get->back());
@@ -2305,14 +2311,25 @@ namespace graphene { namespace net { namespace detail {
         peer->last_block_time_delegate_has_seen = _delegate->get_block_time(item_hash_t());
       }
 
-      std::vector<item_hash_t> blockchain_synopsis = create_blockchain_synopsis_for_peer( peer );
-      item_hash_t last_item_seen = blockchain_synopsis.empty() ? item_hash_t() : blockchain_synopsis.back();
-      dlog( "sync: sending a request for the next items after ${last_item_seen} to peer ${peer}, (full request is ${blockchain_synopsis})",
-           ( "last_item_seen", last_item_seen )
-           ( "peer", peer->get_remote_endpoint() )
-           ( "blockchain_synopsis", blockchain_synopsis ) );
-      peer->item_ids_requested_from_peer = boost::make_tuple( item_id(_sync_item_type, last_item_seen ), fc::time_point::now() );
-      peer->send_message( fetch_blockchain_item_ids_message(_sync_item_type, blockchain_synopsis ) );
+      fc::oexception synopsis_exception;
+      try
+      {
+        std::vector<item_hash_t> blockchain_synopsis = create_blockchain_synopsis_for_peer( peer );
+      
+        item_hash_t last_item_seen = blockchain_synopsis.empty() ? item_hash_t() : blockchain_synopsis.back();
+        dlog( "sync: sending a request for the next items after ${last_item_seen} to peer ${peer}, (full request is ${blockchain_synopsis})",
+             ( "last_item_seen", last_item_seen )
+             ( "peer", peer->get_remote_endpoint() )
+             ( "blockchain_synopsis", blockchain_synopsis ) );
+        peer->item_ids_requested_from_peer = boost::make_tuple( blockchain_synopsis, fc::time_point::now() );
+        peer->send_message( fetch_blockchain_item_ids_message(_sync_item_type, blockchain_synopsis ) );
+      }
+      catch (const block_older_than_undo_history& e)
+      {
+        synopsis_exception = e;
+      }
+      if (synopsis_exception)
+        disconnect_from_peer(peer, "You are on a fork I'm unable to switch to");
     }
 
     void node_impl::on_blockchain_item_ids_inventory_message(peer_connection* originating_peer,
@@ -2322,6 +2339,33 @@ namespace graphene { namespace net { namespace detail {
       // ignore unless we asked for the data
       if( originating_peer->item_ids_requested_from_peer )
       {
+        // verify that the peer's the block ids the peer sent is a valid response to our request;
+        // It should either be an empty list of blocks, or a list of blocks that builds off of one of 
+        // the blocks in the synopsis we sent
+        if (!blockchain_item_ids_inventory_message_received.item_hashes_available.empty())
+        {
+          const std::vector<item_hash_t>& synopsis_sent_in_request = originating_peer->item_ids_requested_from_peer->get<0>();
+          const item_hash_t& first_item_hash = blockchain_item_ids_inventory_message_received.item_hashes_available.front();
+          if (boost::range::find(synopsis_sent_in_request, first_item_hash) == synopsis_sent_in_request.end())
+          {
+            wlog("Invalid response from peer ${peer_endpoint}.  We requested a list of sync blocks based on the synopsis ${synopsis}, but they "
+                 "provided a list of blocks starting with ${first_block}",
+                 ("peer_endpoint", originating_peer->get_remote_endpoint())
+                 ("synopsis", synopsis_sent_in_request)
+                 ("first_block", first_item_hash));
+            // TODO: enable these once committed
+            //fc::exception error_for_peer(FC_LOG_MESSAGE(error, "You gave an invalid response for my request for sync blocks.  I asked for blocks following something in "
+            //                                            "${synopsis}, but you returned a list of blocks starting with ${first_block} which wasn't one of your choices",  
+            //                                            ("synopsis", synopsis_sent_in_request)
+            //                                            ("first_block", first_item_hash)));
+            //disconnect_from_peer(originating_peer,
+            //                     "You gave an invalid response to my request for sync blocks",
+            //                     true, error_for_peer);
+            disconnect_from_peer(originating_peer,
+                                 "You gave an invalid response to my request for sync blocks");
+            return;
+          }
+        }
         originating_peer->item_ids_requested_from_peer.reset();
 
         dlog( "sync: received a list of ${count} available items from ${peer_endpoint}",
@@ -5185,12 +5229,11 @@ namespace graphene { namespace net { namespace detail {
       INVOKE_AND_COLLECT_STATISTICS(handle_transaction, transaction_message);
     }
 
-    std::vector<item_hash_t> statistics_gathering_node_delegate_wrapper::get_item_ids(uint32_t item_type,
-                                                                                      const std::vector<item_hash_t>& blockchain_synopsis,
-                                                                                      uint32_t& remaining_item_count,
-                                                                                      uint32_t limit /* = 2000 */)
+    std::vector<item_hash_t> statistics_gathering_node_delegate_wrapper::get_block_ids(const std::vector<item_hash_t>& blockchain_synopsis,
+                                                                                       uint32_t& remaining_item_count,
+                                                                                       uint32_t limit /* = 2000 */)
     {
-      INVOKE_AND_COLLECT_STATISTICS(get_item_ids, item_type, blockchain_synopsis, remaining_item_count, limit);
+      INVOKE_AND_COLLECT_STATISTICS(get_block_ids, blockchain_synopsis, remaining_item_count, limit);
     }
 
     message statistics_gathering_node_delegate_wrapper::get_item( const item_id& id )
@@ -5203,11 +5246,9 @@ namespace graphene { namespace net { namespace detail {
       INVOKE_AND_COLLECT_STATISTICS(get_chain_id);
     }
 
-    std::vector<item_hash_t> statistics_gathering_node_delegate_wrapper::get_blockchain_synopsis(uint32_t item_type,
-                                                                                                 const graphene::net::item_hash_t& reference_point /* = graphene::net::item_hash_t() */,
-                                                                                                 uint32_t number_of_blocks_after_reference_point /* = 0 */)
+    std::vector<item_hash_t> statistics_gathering_node_delegate_wrapper::get_blockchain_synopsis(const item_hash_t& reference_point, uint32_t number_of_blocks_after_reference_point)
     {
-      INVOKE_AND_COLLECT_STATISTICS(get_blockchain_synopsis, item_type, reference_point, number_of_blocks_after_reference_point);
+      INVOKE_AND_COLLECT_STATISTICS(get_blockchain_synopsis, reference_point, number_of_blocks_after_reference_point);
     }
 
     void statistics_gathering_node_delegate_wrapper::sync_status( uint32_t item_type, uint32_t item_count )

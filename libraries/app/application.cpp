@@ -47,6 +47,8 @@
 #include <fc/log/logger.hpp>
 #include <fc/log/logger_config.hpp>
 
+#include <boost/range/adaptor/reversed.hpp>
+
 namespace graphene { namespace app {
 using net::item_hash_t;
 using net::item_id;
@@ -398,6 +400,13 @@ namespace detail {
          FC_THROW( "Invalid Message Type" );
       }
 
+      bool is_included_block(const block_id_type& block_id)
+      {
+        uint32_t block_num = block_header::num_from_id(block_id);
+        block_id_type block_id_in_preferred_chain = _chain_db->get_block_id_for_num(block_num);
+        return block_id == block_id_in_preferred_chain;
+      }
+
       /**
        * Assuming all data elements are ordered in some way, this method should
        * return up to limit ids that occur *after* the last ID in synopsis that
@@ -407,12 +416,10 @@ namespace detail {
        * in our blockchain after the last item returned in the result,
        * or 0 if the result contains the last item in the blockchain
        */
-      virtual std::vector<item_hash_t> get_item_ids(uint32_t item_type,
-                                                    const std::vector<item_hash_t>& blockchain_synopsis,
-                                                    uint32_t& remaining_item_count,
-                                                    uint32_t limit) override
+      virtual std::vector<item_hash_t> get_block_ids(const std::vector<item_hash_t>& blockchain_synopsis,
+                                                     uint32_t& remaining_item_count,
+                                                     uint32_t limit) override
       { try {
-         FC_ASSERT( item_type == graphene::net::block_message_type );
          vector<block_id_type>  result;
          remaining_item_count = 0;
          if( _chain_db->head_block_num() == 0 )
@@ -420,18 +427,16 @@ namespace detail {
 
          result.reserve(limit);
          block_id_type last_known_block_id;
-         auto itr = blockchain_synopsis.rbegin();
-         while( itr != blockchain_synopsis.rend() )
-         {
-            if( _chain_db->is_known_block(*itr) || *itr == block_id_type() )
-            {
-               last_known_block_id = *itr;
-               break;
-            }
-            ++itr;
-         }
 
-         for( auto num = block_header::num_from_id(last_known_block_id);
+         for (const item_hash_t& block_id_in_synopsis : boost::adaptors::reverse(blockchain_synopsis))
+           if (block_id_in_synopsis == block_id_type() ||
+               (_chain_db->is_known_block(block_id_in_synopsis) && is_included_block(block_id_in_synopsis)))
+           {
+             last_known_block_id = block_id_in_synopsis;
+             break;
+           }
+
+         for( uint32_t num = block_header::num_from_id(last_known_block_id);
               num <= _chain_db->head_block_num() && result.size() < limit;
               ++num )
             if( num > 0 )
@@ -468,38 +473,156 @@ namespace detail {
       }
 
       /**
-       * Returns a synopsis of the blockchain used for syncing.
-       * This consists of a list of selected item hashes from our current preferred
-       * blockchain, exponentially falling off into the past.  Horrible explanation.
+       * Returns a synopsis of the blockchain used for syncing.  This consists of a list of 
+       * block hashes at intervals exponentially increasing towards the genesis block.
+       * When syncing to a peer, the peer uses this data to determine if we're on the same
+       * fork as they are, and if not, what blocks they need to send us to get us on their
+       * fork.
        *
-       * If the blockchain is empty, it will return the empty list.
-       * If the blockchain has one block, it will return a list containing just that block.
-       * If it contains more than one block:
-       *   the first element in the list will be the hash of the genesis block
-       *   the second element will be the hash of an item at the half way point in the blockchain
-       *   the third will be ~3/4 of the way through the block chain
-       *   the fourth will be at ~7/8...
-       *     &c.
-       *   the last item in the list will be the hash of the most recent block on our preferred chain
+       * In the over-simplified case, this is a straighforward synopsis of our current 
+       * preferred blockchain; when we first connect up to a peer, this is what we will be sending.
+       * It looks like this:
+       *   If the blockchain is empty, it will return the empty list.
+       *   If the blockchain has one block, it will return a list containing just that block.
+       *   If it contains more than one block:
+       *     the first element in the list will be the hash of the highest numbered block that
+       *         we cannot undo
+       *     the second element will be the hash of an item at the half way point in the undoable
+       *         segment of the blockchain
+       *     the third will be ~3/4 of the way through the undoable segment of the block chain
+       *     the fourth will be at ~7/8...
+       *       &c.
+       *     the last item in the list will be the hash of the most recent block on our preferred chain
+       * so if the blockchain had 26 blocks labeled a - z, the synopsis would be:
+       *    a n u x z
+       * the idea being that by sending a small (<30) number of block ids, we can summarize a huge 
+       * blockchain.  The block ids are more dense near the end of the chain where because we are
+       * more likely to be almost in sync when we first connect, and forks are likely to be short.
+       * If the peer we're syncing with in our example is on a fork that started at block 'v',
+       * then they will reply to our synopsis with a list of all blocks starting from block 'u',
+       * the last block they know that we had in common.
+       *
+       * In the real code, there are several complications.
+       *
+       * First, as an optimization, we don't usually send a synopsis of the entire blockchain, we
+       * send a synopsis of only the segment of the blockchain that we have undo data for.  If their
+       * fork doesn't build off of something in our undo history, we would be unable to switch, so there's
+       * no reason to fetch the blocks.
+       *
+       * Second, when a peer replies to our initial synopsis and gives us a list of the blocks they think
+       * we are missing, they only send a chunk of a few thousand blocks at once.  After we get those 
+       * block ids, we need to request more blocks by sending another synopsis (we can't just say "send me
+       * the next 2000 ids" because they may have switched forks themselves and they don't track what
+       * they've sent us).  For faster performance, we want to get a fairly long list of block ids first,
+       * then start downloading the blocks.
+       * The peer doesn't handle these follow-up block id requests any different from the initial request;
+       * it treats the synopsis we send as our blockchain and bases its response entirely off that.  So to
+       * get the response we want (the next chunk of block ids following the last one they sent us, or, 
+       * failing that, the shortest fork off of the last list of block ids they sent), we need to construct
+       * a synopsis as if our blockchain was made up of:
+       *    1. the blocks in our block chain up to the fork point (if there is a fork) or the head block (if no fork)
+       *    2. the blocks we've already pushed from their fork (if there's a fork)
+       *    3. the block ids they've previously sent us
+       * Segment 3 is handled in the p2p code, it just tells us the number of blocks it has (in 
+       * number_of_blocks_after_reference_point) so we can leave space in the synopsis for them.
+       * We're responsible for constructing the synopsis of Segments 1 and 2 from our active blockchain and
+       * fork database.  The reference_point parameter is the last block from that peer that has been
+       * successfully pushed to the blockchain, so that tells us whether the peer is on a fork or on
+       * the main chain.
        */
-      virtual std::vector<item_hash_t> get_blockchain_synopsis(uint32_t item_type,
-                                                               const graphene::net::item_hash_t& reference_point,
+      virtual std::vector<item_hash_t> get_blockchain_synopsis(const item_hash_t& reference_point, 
                                                                uint32_t number_of_blocks_after_reference_point) override
       { try {
-         std::vector<item_hash_t> result;
-         result.reserve(30);
-         uint32_t head_block_num = _chain_db->head_block_num();
-         result.push_back(_chain_db->head_block_id());
-         uint32_t current = 1;
-         while( current < head_block_num )
-         {
-            result.push_back(_chain_db->get_block_id_for_num(head_block_num - current));
-            current = current*2;
-         }
-         std::reverse( result.begin(), result.end() );
-         idump((reference_point)(number_of_blocks_after_reference_point)(result));
-         return result;
-      } FC_CAPTURE_AND_RETHROW( (reference_point)(number_of_blocks_after_reference_point) ) }
+          std::vector<item_hash_t> synopsis;
+          synopsis.reserve(30);
+          uint32_t high_block_num;
+          uint32_t non_fork_high_block_num;
+          uint32_t low_block_num = _chain_db->last_non_undoable_block_num();
+          std::vector<block_id_type> fork_history;
+
+          if (reference_point != item_hash_t())
+          {
+            // the node is asking for a summary of the block chain up to a specified
+            // block, which may or may not be on a fork
+            // for now, assume it's not on a fork
+            if (is_included_block(reference_point))
+            {
+              // reference_point is a block we know about and is on the main chain
+              uint32_t reference_point_block_num = block_header::num_from_id(reference_point);
+              assert(reference_point_block_num > 0);
+              high_block_num = reference_point_block_num;
+              non_fork_high_block_num = high_block_num;
+            }
+            else
+            {
+              // block is a block we know about, but it is on a fork
+              try
+              {
+                std::vector<block_id_type> fork_history = _chain_db->get_block_ids_on_fork(reference_point);
+                // returns a vector where the first element is the common ancestor with the preferred chain,
+                // and the last element is the reference point you passed in
+                assert(fork_history.size() >= 2);
+                assert(fork_history.back() == reference_point);
+                block_id_type last_non_fork_block = fork_history.front();
+                fork_history.erase(fork_history.begin());  // remove the common ancestor
+
+                if (last_non_fork_block == block_id_type()) // if the fork goes all the way back to genesis (does graphene's fork db allow this?)
+                  non_fork_high_block_num = 0;
+                else
+                  non_fork_high_block_num = block_header::num_from_id(last_non_fork_block);
+
+                high_block_num = non_fork_high_block_num + fork_history.size();
+                assert(high_block_num == block_header::num_from_id(fork_history.back()));
+              }
+              catch (const fc::exception& e)
+              {
+                // unable to get fork history for some reason.  maybe not linked?
+                // we can't return a synopsis of its chain
+                elog("Unable to construct a blockchain synopsis for reference hash ${hash}: ${exception}", ("hash", reference_point)("exception", e));
+                throw;
+              }
+            }
+          }
+          else
+          {
+            // no reference point specified, summarize the whole block chain
+            high_block_num = _chain_db->head_block_num();
+            non_fork_high_block_num = high_block_num;
+            if (high_block_num == 0)
+              return synopsis; // we have no blocks
+          }
+
+          // at this point:
+          // low_block_num is the block before the first block we can undo, 
+          // non_fork_high_block_num is the block before the fork (if the peer is on a fork, or otherwise it is the same as high_block_num)
+          // high_block_num is the block number of the reference block, or the end of the chain if no reference provided
+
+          if (non_fork_high_block_num <= low_block_num)
+          {
+            wlog("Unable to generate a usable synopsis because the peer we're generating it for forked too long ago "
+                 "(our chains diverge after block #${non_fork_high_block_num} but only undoable to block #${low_block_num})", 
+                 ("low_block_num", low_block_num)
+                 ("non_fork_high_block_num", non_fork_high_block_num));
+            return synopsis;
+          }
+
+          uint32_t true_high_block_num = high_block_num + number_of_blocks_after_reference_point;
+          do
+          {
+            // for each block in the synopsis, figure out where to pull the block id from.
+            // if it's <= non_fork_high_block_num, we grab it from the main blockchain;
+            // if it's not, we pull it from the fork history
+            if (low_block_num <= non_fork_high_block_num)
+              synopsis.push_back(_chain_db->get_block_id_for_num(low_block_num));
+            else
+              synopsis.push_back(fork_history[low_block_num - non_fork_high_block_num - 1]);
+            low_block_num += (true_high_block_num - low_block_num + 2) / 2;
+          }
+          while (low_block_num <= high_block_num);
+
+          idump((synopsis));
+          return synopsis;
+      } FC_CAPTURE_AND_RETHROW() }
 
       /**
        * Call this after the call to handle_message succeeds.

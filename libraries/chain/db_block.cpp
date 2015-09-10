@@ -75,6 +75,16 @@ const signed_transaction& database::get_recent_transaction(const transaction_id_
    return itr->trx;
 }
 
+std::vector<block_id_type> database::get_block_ids_on_fork(block_id_type head_of_fork) const
+{
+  pair<fork_database::branch_type, fork_database::branch_type> branches = _fork_db.fetch_branch_from(head_block_id(), head_of_fork);
+  assert(branches.first.back()->id == branches.second.back()->id);
+  std::vector<block_id_type> result;
+  for (const item_ptr& fork_block : branches.second)
+    result.emplace_back(fork_block->id);
+  return result;
+}
+
 /**
  * Push block "may fail" in which case every partial change is unwound.  After
  * push block is successful the block is appended to the chain database on disk.
