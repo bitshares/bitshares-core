@@ -375,6 +375,12 @@ public:
             ("chain_id", _chain_id) );
       }
       init_prototype_ops();
+
+      _remote_db->set_block_applied_callback( [this](const variant& block_id )
+      {
+         on_block_applied( block_id );
+      } );
+
       _wallet.chain_id = _chain_id;
       _wallet.ws_server = initial_data.ws_server;
       _wallet.ws_user = initial_data.ws_user;
@@ -406,6 +412,11 @@ public:
          auto plain_txt = fc::raw::pack(data);
          _wallet.cipher_keys = fc::aes_encrypt( data.checksum, plain_txt );
       }
+   }
+
+   void on_block_applied( const variant& block_id )
+   {
+      fc::async([this]{resync();}, "Resync after block");
    }
 
    bool copy_wallet_file( string destination_filename )

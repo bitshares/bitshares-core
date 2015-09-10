@@ -923,9 +923,17 @@ namespace graphene { namespace app {
      */
     void database_api::on_applied_block()
     {
+       if (_block_applied_callback)
+       {
+          auto capture_this = shared_from_this();
+          block_id_type block_id = _db.head_block_id();
+          fc::async([this,capture_this,block_id](){
+             _block_applied_callback(fc::variant(block_id));
+          });
+       }
+
        if(_market_subscriptions.size() == 0)
           return;
-
 
        const auto& ops = _db.get_applied_operations();
        map< std::pair<asset_id_type,asset_id_type>, vector<pair<operation, operation_result>> > subscribed_markets_ops;
