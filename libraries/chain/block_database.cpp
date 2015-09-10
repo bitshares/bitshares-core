@@ -237,4 +237,40 @@ optional<signed_block> block_database::last()const
    }
    return optional<signed_block>();
 }
+
+optional<block_id_type> block_database::last_id()const
+{
+   try
+   {
+      index_entry e;
+      _block_num_to_pos.seekg( 0, _block_num_to_pos.end );
+
+      if( _block_num_to_pos.tellp() < sizeof(index_entry) )
+         return optional<block_id_type>();
+
+      _block_num_to_pos.seekg( -sizeof(index_entry), _block_num_to_pos.end );
+      _block_num_to_pos.read( (char*)&e, sizeof(e) );
+      uint64_t pos = _block_num_to_pos.tellg();
+      while( e.block_size == 0 && pos > 0 )
+      {
+         pos -= sizeof(index_entry);
+         _block_num_to_pos.seekg( pos );
+         _block_num_to_pos.read( (char*)&e, sizeof(e) );
+      }
+
+      if( e.block_size == 0 )
+         return optional<block_id_type>();
+
+      return e.block_id;
+   }
+   catch (const fc::exception&)
+   {
+   }
+   catch (const std::exception&)
+   {
+   }
+   return optional<block_id_type>();
+}
+
+
 } }
