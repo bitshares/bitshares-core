@@ -595,6 +595,21 @@ namespace detail {
               assert(reference_point_block_num > 0);
               high_block_num = reference_point_block_num;
               non_fork_high_block_num = high_block_num;
+
+              if (reference_point_block_num < low_block_num)
+              {
+                // we're on the same fork (at least as far as reference_point) but we've passed 
+                // reference point and could no longer undo that far if we diverged after that 
+                // block.  This should probably only happen due to a race condition where
+                // the network thread calls this function, and then immediately pushes a bunch of blocks, 
+                // then the main thread finally processes this function.
+                // with the current framework, there's not much we can do to tell the network
+                // thread what our current head block is, so we'll just pretend that 
+                // our head is actually the reference point.
+                // this *may* enable us to fetch blocks that we're unable to push, but that should
+                // be a rare case (and correctly handled)
+                low_block_num = reference_point_block_num;
+              }
             }
             else
             {
@@ -659,7 +674,15 @@ namespace detail {
             if (low_block_num <= non_fork_high_block_num)
               synopsis.push_back(_chain_db->get_block_id_for_num(low_block_num));
             else
+            {
+              // for debugging
+              int index = low_block_num - non_fork_high_block_num - 1;
+              if (index < 0 || index > fork_history.size())
+              {
+                int i = 0;
+              }
               synopsis.push_back(fork_history[low_block_num - non_fork_high_block_num - 1]);
+            }
             low_block_num += (true_high_block_num - low_block_num + 2) / 2;
           }
           while (low_block_num <= high_block_num);
