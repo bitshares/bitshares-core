@@ -2162,9 +2162,20 @@ namespace graphene { namespace net { namespace detail {
       }
 
       blockchain_item_ids_inventory_message reply_message;
-      reply_message.item_hashes_available = _delegate->get_block_ids(fetch_blockchain_item_ids_message_received.blockchain_synopsis,
-                                                                     reply_message.total_remaining_item_count );
       reply_message.item_type = fetch_blockchain_item_ids_message_received.item_type;
+      reply_message.total_remaining_item_count = 0;
+      try
+      {
+        reply_message.item_hashes_available = _delegate->get_block_ids(fetch_blockchain_item_ids_message_received.blockchain_synopsis,
+                                                                       reply_message.total_remaining_item_count);
+      }
+      catch (const peer_is_on_an_unreachable_fork&)
+      {
+        dlog("Peer is on a fork and there's no set of blocks we can provide to switch them to our fork");
+        // we reply with an empty list as if we had an empty blockchain; 
+        // we don't want to disconnect because they may be able to provide
+        // us with blocks on their chain
+      }
 
       bool disconnect_from_inhibited_peer = false;
       // if our client doesn't have any items after the item the peer requested, it will send back

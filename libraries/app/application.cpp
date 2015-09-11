@@ -382,6 +382,10 @@ namespace detail {
             ilog("Got block #${n} from network", ("n", blk_msg.block.block_num()));
 
          try {
+            // TODO: in the case where this block is valid but on a fork that's too old for us to switch to,
+            // you can help the network code out by throwing a block_older_than_undo_history exception.
+            // when the net code sees that, it will stop trying to push blocks from that chain, but
+            // leave that peer connected so that they can get sync blocks from us
             bool result = _chain_db->push_block(blk_msg.block, _is_block_producer ? database::skip_nothing : database::skip_transaction_signatures);
 
             // the block was accepted, so we now know all of the transactions contained in the block
@@ -444,22 +448,37 @@ namespace detail {
                                                      uint32_t& remaining_item_count,
                                                      uint32_t limit) override
       { try {
-         vector<block_id_type>  result;
+         vector<block_id_type> result;
          remaining_item_count = 0;
          if( _chain_db->head_block_num() == 0 )
             return result;
 
          result.reserve(limit);
          block_id_type last_known_block_id;
+         
+         if (blockchain_synopsis.empty() ||
+             (blockchain_synopsis.size() == 1 && blockchain_synopsis[0] == block_id_type()))
+         {
+           // peer has sent us an empty synopsis meaning they have no blocks.
+           // A bug in old versions would cause them to send a synopsis containing block 000000000
+           // when they had an empty blockchain, so pretend they sent the right thing here.
 
-         for (const item_hash_t& block_id_in_synopsis : boost::adaptors::reverse(blockchain_synopsis))
-           if (block_id_in_synopsis == block_id_type() ||
-               (_chain_db->is_known_block(block_id_in_synopsis) && is_included_block(block_id_in_synopsis)))
-           {
-             last_known_block_id = block_id_in_synopsis;
-             break;
-           }
-
+           // do nothing, leave last_known_block_id set to zero
+         }
+         else
+         {
+           bool found_a_block_in_synopsis = false;
+           for (const item_hash_t& block_id_in_synopsis : boost::adaptors::reverse(blockchain_synopsis))
+             if (block_id_in_synopsis == block_id_type() ||
+                 (_chain_db->is_known_block(block_id_in_synopsis) && is_included_block(block_id_in_synopsis)))
+             {
+               last_known_block_id = block_id_in_synopsis;
+               found_a_block_in_synopsis = true;
+               break;
+             }
+           if (!found_a_block_in_synopsis)
+             FC_THROW_EXCEPTION(graphene::net::peer_is_on_an_unreachable_fork, "Unable to provide a list of blocks starting at any of the blocks in peer's synopsis");
+         }
          for( uint32_t num = block_header::num_from_id(last_known_block_id);
               num <= _chain_db->head_block_num() && result.size() < limit;
               ++num )
