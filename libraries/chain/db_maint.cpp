@@ -118,7 +118,7 @@ void database::pay_workers( share_type& budget )
       return wa.id < wb.id;
    });
 
-   for( int i = 0; i < active_workers.size() && budget > 0; ++i )
+   for( uint32_t i = 0; i < active_workers.size() && budget > 0; ++i )
    {
       const worker_object& active_worker = active_workers[i];
       share_type requested_pay = active_worker.daily_pay;
