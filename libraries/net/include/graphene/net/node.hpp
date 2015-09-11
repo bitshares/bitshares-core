@@ -99,10 +99,9 @@ namespace graphene { namespace net {
           *  in our blockchain after the last item returned in the result,
           *  or 0 if the result contains the last item in the blockchain
           */
-         virtual std::vector<item_hash_t> get_item_ids(uint32_t item_type,
-                                                       const std::vector<item_hash_t>& blockchain_synopsis,
-                                                       uint32_t& remaining_item_count,
-                                                       uint32_t limit = 2000) = 0;
+         virtual std::vector<item_hash_t> get_block_ids(const std::vector<item_hash_t>& blockchain_synopsis,
+                                                        uint32_t& remaining_item_count,
+                                                        uint32_t limit = 2000) = 0;
 
          /**
           *  Given the hash of the requested data, fetch the body.
@@ -119,14 +118,17 @@ namespace graphene { namespace net {
           * If the blockchain is empty, it will return the empty list.
           * If the blockchain has one block, it will return a list containing just that block.
           * If it contains more than one block:
-          *   the first element in the list will be the hash of the genesis block
-          *   the second element will be the hash of an item at the half way point in the blockchain
-          *   the third will be ~3/4 of the way through the block chain
+          *   the first element in the list will be the hash of the highest numbered block that
+          *       we cannot undo
+          *   the second element will be the hash of an item at the half way point in the undoable
+          *       segment of the blockchain
+          *   the third will be ~3/4 of the way through the undoable segment of the block chain
           *   the fourth will be at ~7/8...
           *     &c.
           *   the last item in the list will be the hash of the most recent block on our preferred chain
           */
-         virtual std::vector<item_hash_t> get_blockchain_synopsis(uint32_t item_type, const graphene::net::item_hash_t& reference_point = graphene::net::item_hash_t(), uint32_t number_of_blocks_after_reference_point = 0) = 0;
+         virtual std::vector<item_hash_t> get_blockchain_synopsis(const item_hash_t& reference_point, 
+                                                                  uint32_t number_of_blocks_after_reference_point) = 0;
 
          /**
           *  Call this after the call to handle_message succeeds.

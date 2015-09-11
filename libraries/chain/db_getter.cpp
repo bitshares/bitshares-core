@@ -84,4 +84,10 @@ node_property_object& database::node_properties()
    return _node_property_object;
 }
 
+uint32_t database::last_non_undoable_block_num() const
+{
+   return head_block_num() - _undo_db.size();
+}
+
+
 } }

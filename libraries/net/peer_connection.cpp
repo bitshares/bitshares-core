@@ -276,8 +276,8 @@ namespace graphene { namespace net
 #ifndef NDEBUG
       struct counter {
         unsigned& _send_message_queue_tasks_counter;
-        counter(unsigned& var) : _send_message_queue_tasks_counter(var) { dlog("entering peer_connection::send_queued_messages_task()"); assert(_send_message_queue_tasks_counter == 0); ++_send_message_queue_tasks_counter; }
-        ~counter() { assert(_send_message_queue_tasks_counter == 1); --_send_message_queue_tasks_counter; dlog("leaving peer_connection::send_queued_messages_task()"); }
+        counter(unsigned& var) : _send_message_queue_tasks_counter(var) { /* dlog("entering peer_connection::send_queued_messages_task()"); */ assert(_send_message_queue_tasks_counter == 0); ++_send_message_queue_tasks_counter; }
+        ~counter() { assert(_send_message_queue_tasks_counter == 1); --_send_message_queue_tasks_counter; /* dlog("leaving peer_connection::send_queued_messages_task()"); */ }
       } concurrent_invocation_counter(_send_message_queue_tasks_running);
 #endif
       while (!_queued_messages.empty())
@@ -286,12 +286,12 @@ namespace graphene { namespace net
         message message_to_send = _queued_messages.front()->get_message(_node);
         try
         {
-          dlog("peer_connection::send_queued_messages_task() calling message_oriented_connection::send_message() "
-               "to send message of type ${type} for peer ${endpoint}",
-               ("type", message_to_send.msg_type)("endpoint", get_remote_endpoint()));
+          //dlog("peer_connection::send_queued_messages_task() calling message_oriented_connection::send_message() "
+          //     "to send message of type ${type} for peer ${endpoint}",
+          //     ("type", message_to_send.msg_type)("endpoint", get_remote_endpoint()));
           _message_connection.send_message(message_to_send);
-          dlog("peer_connection::send_queued_messages_task()'s call to message_oriented_connection::send_message() completed normally for peer ${endpoint}",
-               ("endpoint", get_remote_endpoint()));
+          //dlog("peer_connection::send_queued_messages_task()'s call to message_oriented_connection::send_message() completed normally for peer ${endpoint}",
+          //     ("endpoint", get_remote_endpoint()));
         }
         catch (const fc::canceled_exception&)
         {
@@ -323,7 +323,7 @@ namespace graphene { namespace net
         _total_queued_messages_size -= _queued_messages.front()->get_size_in_queue();
         _queued_messages.pop();
       }
-      dlog("leaving peer_connection::send_queued_messages_task() due to queue exhaustion");
+      //dlog("leaving peer_connection::send_queued_messages_task() due to queue exhaustion");
     }
 
     void peer_connection::send_queueable_message(std::unique_ptr<queued_message>&& message_to_send)
@@ -351,18 +351,18 @@ namespace graphene { namespace net
 
       if (!_send_queued_messages_done.valid() || _send_queued_messages_done.ready())
       {
-        dlog("peer_connection::send_message() is firing up send_queued_message_task");
+        //dlog("peer_connection::send_message() is firing up send_queued_message_task");
         _send_queued_messages_done = fc::async([this](){ send_queued_messages_task(); }, "send_queued_messages_task");
       }
-      else
-        dlog("peer_connection::send_message() doesn't need to fire up send_queued_message_task, it's already running");
+      //else
+      //  dlog("peer_connection::send_message() doesn't need to fire up send_queued_message_task, it's already running");
     }
 
     void peer_connection::send_message(const message& message_to_send, size_t message_send_time_field_offset)
     {
       VERIFY_CORRECT_THREAD();
-      dlog("peer_connection::send_message() enqueueing message of type ${type} for peer ${endpoint}",
-           ("type", message_to_send.msg_type)("endpoint", get_remote_endpoint()));
+      //dlog("peer_connection::send_message() enqueueing message of type ${type} for peer ${endpoint}",
+      //     ("type", message_to_send.msg_type)("endpoint", get_remote_endpoint()));
       std::unique_ptr<queued_message> message_to_enqueue(new real_queued_message(message_to_send, message_send_time_field_offset));
       send_queueable_message(std::move(message_to_enqueue));
     }
@@ -370,8 +370,8 @@ namespace graphene { namespace net
     void peer_connection::send_item(const item_id& item_to_send)
     {
       VERIFY_CORRECT_THREAD();
-      dlog("peer_connection::send_item() enqueueing message of type ${type} for peer ${endpoint}",
-           ("type", item_to_send.item_type)("endpoint", get_remote_endpoint()));
+      //dlog("peer_connection::send_item() enqueueing message of type ${type} for peer ${endpoint}",
+      //     ("type", item_to_send.item_type)("endpoint", get_remote_endpoint()));
       std::unique_ptr<queued_message> message_to_enqueue(new virtual_queued_message(item_to_send));
       send_queueable_message(std::move(message_to_enqueue));
     }
