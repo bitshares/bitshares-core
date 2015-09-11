@@ -624,14 +624,14 @@ namespace detail {
                 elog("Unable to construct a blockchain synopsis for reference hash ${hash}: ${exception}", ("hash", reference_point)("exception", e));
                 throw;
               }
-            }
-            if (non_fork_high_block_num < low_block_num)
-            {
-              wlog("Unable to generate a usable synopsis because the peer we're generating it for forked too long ago "
-                   "(our chains diverge after block #${non_fork_high_block_num} but only undoable to block #${low_block_num})", 
-                   ("low_block_num", low_block_num)
-                   ("non_fork_high_block_num", non_fork_high_block_num));
-              FC_THROW_EXCEPTION(graphene::net::block_older_than_undo_history, "Peer is are on a fork I'm unable to switch to");
+              if (non_fork_high_block_num < low_block_num)
+              {
+                wlog("Unable to generate a usable synopsis because the peer we're generating it for forked too long ago "
+                     "(our chains diverge after block #${non_fork_high_block_num} but only undoable to block #${low_block_num})", 
+                     ("low_block_num", low_block_num)
+                     ("non_fork_high_block_num", non_fork_high_block_num));
+                FC_THROW_EXCEPTION(graphene::net::block_older_than_undo_history, "Peer is are on a fork I'm unable to switch to");
+              }
             }
           }
           else
