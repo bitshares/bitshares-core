@@ -31,6 +31,7 @@
 #include <graphene/chain/market_evaluator.hpp>
 #include <graphene/chain/operation_history_object.hpp>
 #include <graphene/chain/proposal_object.hpp>
+#include <graphene/chain/worker_evaluator.hpp>
 #include <graphene/chain/witness_object.hpp>
 #include <graphene/chain/confidential_evaluator.hpp>
 
@@ -373,6 +374,15 @@ class database_api
        */
       map<string, committee_member_id_type> lookup_committee_member_accounts(const string& lower_bound_name, uint32_t limit)const;
 
+      
+      /// WORKERS 
+      
+      /**
+       * Return the worker objects associated with this account.
+       */
+      vector<worker_object> get_workers_by_account(account_id_type account)const;
+
+
       ///////////
       // Votes //
       ///////////
@@ -517,6 +527,8 @@ FC_API(graphene::app::database_api,
    (get_committee_member_by_account)
    (lookup_committee_member_accounts)
 
+   // workers
+   (get_workers_by_account)
    // Votes
    (lookup_vote_ids)
 

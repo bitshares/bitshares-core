@@ -127,13 +127,29 @@ namespace graphene { namespace chain {
          bool is_active(fc::time_point_sec now)const {
             return now >= work_begin_date && now <= work_end_date;
          }
+
+         /// TODO: remove unused argument
          share_type approving_stake(const vector<uint64_t>& stake_vote_tallies)const {
-            return int64_t( total_votes_for ) - int64_t( total_votes_against );// stake_vote_tallies[vote_for] - stake_vote_tallies[vote_against];
+            return int64_t( total_votes_for ) - int64_t( total_votes_against );
          }
    };
 
-   typedef flat_index<worker_object> worker_index;
 
+   struct by_account;
+   struct by_vote_for;
+   struct by_vote_against;
+   typedef multi_index_container<
+      worker_object,
+      indexed_by<
+         ordered_unique< tag<by_id>, member< object, object_id_type, &object::id > >,
+         ordered_non_unique< tag<by_account>, member< worker_object, account_id_type, &worker_object::worker_account > >,
+         ordered_unique< tag<by_vote_for>, member< worker_object, vote_id_type, &worker_object::vote_for > >,
+         ordered_unique< tag<by_vote_against>, member< worker_object, vote_id_type, &worker_object::vote_against > >
+      >
+   > worker_object_multi_index_type;
+
+   //typedef flat_index<worker_object> worker_index;
+   using worker_index = generic_index<worker_object, worker_object_multi_index_type>;
 
    class worker_create_evaluator : public evaluator<worker_create_evaluator>
    {

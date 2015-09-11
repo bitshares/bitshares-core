@@ -43,6 +43,7 @@ namespace graphene { namespace app {
 
    class application;
 
+
    /**
     * @brief The history_api class implements the RPC API for account history
     *

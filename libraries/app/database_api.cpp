@@ -99,7 +99,7 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       // Blinded balances
       vector<blinded_balance_object> get_blinded_balances( const flat_set<commitment_type>& commitments )const;
 
-   private:
+   //private:
       template<typename T>
       void subscribe_to_item( const T& i )const
       {
@@ -959,6 +959,22 @@ vector<optional<witness_object>> database_api::get_witnesses(const vector<witnes
 {
    return my->get_witnesses( witness_ids );
 }
+
+vector<worker_object> database_api::get_workers_by_account(account_id_type account)const
+{
+    const auto& idx = my->_db.get_index_type<worker_index>().indices().get<by_account>();
+    auto itr = idx.find(account);
+    vector<worker_object> result;
+
+    if( itr != idx.end() && itr->worker_account == account )
+    {
+       result.emplace_back( *itr );
+       ++itr;
+    }
+
+    return result;
+}
+
 
 vector<optional<witness_object>> database_api_impl::get_witnesses(const vector<witness_id_type>& witness_ids)const
 {

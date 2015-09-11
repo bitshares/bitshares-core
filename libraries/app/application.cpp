@@ -31,6 +31,7 @@
 #include <graphene/time/time.hpp>
 
 #include <graphene/utilities/key_conversion.hpp>
+#include <graphene/chain/worker_evaluator.hpp>
 
 #include <fc/smart_ref_impl.hpp>
 

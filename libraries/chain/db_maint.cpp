@@ -86,10 +86,10 @@ struct worker_pay_visitor
 void database::update_worker_votes()
 {
    auto& idx = get_index_type<worker_index>();
-   auto itr = idx.begin();
-   while( itr != idx.end() )
+   auto itr = idx.indices().get<by_account>().begin();
+   while( itr != idx.indices().get<by_account>().end() )
    {
-      modify( **itr, [&]( worker_object& obj ){
+      modify( *itr, [&]( worker_object& obj ){
          obj.total_votes_for = _vote_tally_buffer[obj.vote_for];
          obj.total_votes_against = _vote_tally_buffer[obj.vote_against];
       });
