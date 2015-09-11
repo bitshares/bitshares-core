@@ -2144,14 +2144,22 @@ namespace graphene { namespace net { namespace detail {
                                                          const fetch_blockchain_item_ids_message& fetch_blockchain_item_ids_message_received)
     {
       VERIFY_CORRECT_THREAD();
-      item_id peers_last_item_seen;
-      if( !fetch_blockchain_item_ids_message_received.blockchain_synopsis.empty() )
-        peers_last_item_seen = item_id( fetch_blockchain_item_ids_message_received.item_type,
-                                       fetch_blockchain_item_ids_message_received.blockchain_synopsis.back() );
-      dlog( "sync: received a request for item ids after ${last_item_seen} from peer ${peer_endpoint} (full request: ${synopsis})",
-           ( "last_item_seen", peers_last_item_seen )
-           ( "peer_endpoint", originating_peer->get_remote_endpoint() )
-           ( "synopsis", fetch_blockchain_item_ids_message_received.blockchain_synopsis ) );
+      item_id peers_last_item_seen = item_id(fetch_blockchain_item_ids_message_received.item_type, item_hash_t());
+      if (fetch_blockchain_item_ids_message_received.blockchain_synopsis.empty())
+      {
+        dlog("sync: received a request for item ids starting at the beginning of the chain from peer ${peer_endpoint} (full request: ${synopsis})",
+             ("peer_endpoint", originating_peer->get_remote_endpoint())
+             ("synopsis", fetch_blockchain_item_ids_message_received.blockchain_synopsis));
+      }
+      else
+      {
+        item_hash_t peers_last_item_hash_seen = fetch_blockchain_item_ids_message_received.blockchain_synopsis.back();
+        dlog("sync: received a request for item ids after ${last_item_seen} from peer ${peer_endpoint} (full request: ${synopsis})",
+             ("last_item_seen", peers_last_item_hash_seen)
+             ("peer_endpoint", originating_peer->get_remote_endpoint())
+             ("synopsis", fetch_blockchain_item_ids_message_received.blockchain_synopsis));
+        peers_last_item_seen.item_hash = peers_last_item_hash_seen;
+      }
 
       blockchain_item_ids_inventory_message reply_message;
       reply_message.item_hashes_available = _delegate->get_block_ids(fetch_blockchain_item_ids_message_received.blockchain_synopsis,
@@ -2194,7 +2202,6 @@ namespace graphene { namespace net { namespace detail {
       }
       else
       {
-        //dlog( "sync: peer is out of sync, sending peer ${count} items ids: ${item_ids}", ("count", reply_message.item_hashes_available.size() )("item_ids", reply_message.item_hashes_available ) );
         dlog("sync: peer is out of sync, sending peer ${count} items ids: first: ${first_item_id}, last: ${last_item_id}",
              ("count", reply_message.item_hashes_available.size())
              ("first_item_id", reply_message.item_hashes_available.front())
@@ -2348,24 +2355,49 @@ namespace graphene { namespace net { namespace detail {
         {
           const std::vector<item_hash_t>& synopsis_sent_in_request = originating_peer->item_ids_requested_from_peer->get<0>();
           const item_hash_t& first_item_hash = blockchain_item_ids_inventory_message_received.item_hashes_available.front();
-          if (boost::range::find(synopsis_sent_in_request, first_item_hash) == synopsis_sent_in_request.end())
+
+          if (synopsis_sent_in_request.empty())
           {
-            wlog("Invalid response from peer ${peer_endpoint}.  We requested a list of sync blocks based on the synopsis ${synopsis}, but they "
-                 "provided a list of blocks starting with ${first_block}",
-                 ("peer_endpoint", originating_peer->get_remote_endpoint())
-                 ("synopsis", synopsis_sent_in_request)
-                 ("first_block", first_item_hash));
-            // TODO: enable these once committed
-            //fc::exception error_for_peer(FC_LOG_MESSAGE(error, "You gave an invalid response for my request for sync blocks.  I asked for blocks following something in "
-            //                                            "${synopsis}, but you returned a list of blocks starting with ${first_block} which wasn't one of your choices",  
-            //                                            ("synopsis", synopsis_sent_in_request)
-            //                                            ("first_block", first_item_hash)));
-            //disconnect_from_peer(originating_peer,
-            //                     "You gave an invalid response to my request for sync blocks",
-            //                     true, error_for_peer);
-            disconnect_from_peer(originating_peer,
-                                 "You gave an invalid response to my request for sync blocks");
-            return;
+            // if we sent an empty synopsis, we were asking for all blocks, so the first block should be block 1
+            if (_delegate->get_block_number(first_item_hash) != 1)
+            {
+              wlog("Invalid response from peer ${peer_endpoint}.  We requested a list of sync blocks starting from the beginning of the chain, "
+                   "but they provided a list of blocks starting with ${first_block}",
+                   ("peer_endpoint", originating_peer->get_remote_endpoint())
+                   ("first_block", first_item_hash));
+              // TODO: enable these once committed
+              //fc::exception error_for_peer(FC_LOG_MESSAGE(error, "You gave an invalid response for my request for sync blocks.  I asked for blocks starting from the beginning of the chain, "
+              //                                            "but you returned a list of blocks starting with ${first_block}",  
+              //                                            ("first_block", first_item_hash)));
+              //disconnect_from_peer(originating_peer,
+              //                     "You gave an invalid response to my request for sync blocks",
+              //                     true, error_for_peer);
+              disconnect_from_peer(originating_peer,
+                                   "You gave an invalid response to my request for sync blocks");
+              return;
+            }
+          }
+          else // synopsis was not empty, we expect a response building off one of the blocks we sent
+          {
+            if (boost::range::find(synopsis_sent_in_request, first_item_hash) == synopsis_sent_in_request.end())
+            {
+              wlog("Invalid response from peer ${peer_endpoint}.  We requested a list of sync blocks based on the synopsis ${synopsis}, but they "
+                   "provided a list of blocks starting with ${first_block}",
+                   ("peer_endpoint", originating_peer->get_remote_endpoint())
+                   ("synopsis", synopsis_sent_in_request)
+                   ("first_block", first_item_hash));
+              // TODO: enable these once committed
+              //fc::exception error_for_peer(FC_LOG_MESSAGE(error, "You gave an invalid response for my request for sync blocks.  I asked for blocks following something in "
+              //                                            "${synopsis}, but you returned a list of blocks starting with ${first_block} which wasn't one of your choices",  
+              //                                            ("synopsis", synopsis_sent_in_request)
+              //                                            ("first_block", first_item_hash)));
+              //disconnect_from_peer(originating_peer,
+              //                     "You gave an invalid response to my request for sync blocks",
+              //                     true, error_for_peer);
+              disconnect_from_peer(originating_peer,
+                                   "You gave an invalid response to my request for sync blocks");
+              return;
+            }
           }
         }
         originating_peer->item_ids_requested_from_peer.reset();
