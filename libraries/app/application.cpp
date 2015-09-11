@@ -675,15 +675,7 @@ namespace detail {
             if (low_block_num <= non_fork_high_block_num)
               synopsis.push_back(_chain_db->get_block_id_for_num(low_block_num));
             else
-            {
-              // for debugging
-              int index = low_block_num - non_fork_high_block_num - 1;
-              if (index < 0 || index > fork_history.size())
-              {
-                int i = 0;
-              }
               synopsis.push_back(fork_history[low_block_num - non_fork_high_block_num - 1]);
-            }
             low_block_num += (true_high_block_num - low_block_num + 2) / 2;
           }
           while (low_block_num <= high_block_num);
