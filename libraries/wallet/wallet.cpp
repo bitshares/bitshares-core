@@ -76,7 +76,7 @@ private:
    const wallet_api_impl& wallet;
    operation_result result;
 
-   void fee(const asset& a) const;
+   std::string fee(const asset& a) const;
 
 public:
    operation_printer( ostream& out, const wallet_api_impl& wallet, const operation_result& r = operation_result() )
@@ -84,17 +84,17 @@ public:
         wallet(wallet),
         result(r)
    {}
-   typedef void result_type;
+   typedef std::string result_type;
 
    template<typename T>
-   void operator()(const T& op)const;
+   std::string operator()(const T& op)const;
 
-   void operator()(const transfer_operation& op)const;
-   void operator()(const transfer_from_blind_operation& op)const;
-   void operator()(const transfer_to_blind_operation& op)const;
-   void operator()(const account_create_operation& op)const;
-   void operator()(const account_update_operation& op)const;
-   void operator()(const asset_create_operation& op)const;
+   std::string operator()(const transfer_operation& op)const;
+   std::string operator()(const transfer_from_blind_operation& op)const;
+   std::string operator()(const transfer_to_blind_operation& op)const;
+   std::string operator()(const account_create_operation& op)const;
+   std::string operator()(const account_update_operation& op)const;
+   std::string operator()(const asset_create_operation& op)const;
 };
 
 template<class T>
@@ -1865,11 +1865,12 @@ public:
 
       m["get_account_history"] = [this](variant result, const fc::variants& a)
       {
-         auto r = result.as<vector<operation_history_object>>();
+         auto r = result.as<vector<operation_detail>>();
          std::stringstream ss;
 
-         for( const operation_history_object& i : r )
+         for( operation_detail& d : r )
          {
+            operation_history_object& i = d.op;
             auto b = _remote_db->get_block_header(i.block_num);
             FC_ASSERT(b);
             ss << b->timestamp.to_iso_string() << " ";
@@ -2175,12 +2176,13 @@ public:
    mutable map<asset_id_type, asset_object> _asset_cache;
 };
 
-void operation_printer::fee(const asset& a)const {
+std::string operation_printer::fee(const asset& a)const {
    out << "   (Fee: " << wallet.get_asset(a.asset_id).amount_to_pretty_string(a) << ")";
+   return "";
 }
 
 template<typename T>
-void operation_printer::operator()(const T& op)const
+std::string operation_printer::operator()(const T& op)const
 {
    //balance_accumulator acc;
    //op.get_balance_delta( acc, result );
@@ -2193,16 +2195,18 @@ void operation_printer::operator()(const T& op)const
    out << op_name <<" ";
   // out << "balance delta: " << fc::json::to_string(acc.balance) <<"   ";
    out << payer.name << " fee: " << a.amount_to_pretty_string( op.fee ); 
+   return "";
 }
-void operation_printer::operator()(const transfer_from_blind_operation& op)const
+std::string operation_printer::operator()(const transfer_from_blind_operation& op)const
 {
    auto a = wallet.get_asset( op.fee.asset_id );
    auto receiver = wallet.get_account( op.to );
 
    out <<  receiver.name 
    << " received " << a.amount_to_pretty_string( op.amount ) << " from blinded balance";
+   return "";
 }
-void operation_printer::operator()(const transfer_to_blind_operation& op)const
+std::string operation_printer::operator()(const transfer_to_blind_operation& op)const
 {
    auto fa = wallet.get_asset( op.fee.asset_id );
    auto a = wallet.get_asset( op.amount.asset_id );
@@ -2211,11 +2215,13 @@ void operation_printer::operator()(const transfer_to_blind_operation& op)const
    out <<  sender.name 
    << " sent " << a.amount_to_pretty_string( op.amount ) << " to " << op.outputs.size() << " blinded balance" << (op.outputs.size()>1?"s":"")
    << " fee: " << fa.amount_to_pretty_string( op.fee );
+   return "";
 }
-void operation_printer::operator()(const transfer_operation& op) const
+string operation_printer::operator()(const transfer_operation& op) const
 {
    out << "Transfer " << wallet.get_asset(op.amount.asset_id).amount_to_pretty_string(op.amount)
        << " from " << wallet.get_account(op.from).name << " to " << wallet.get_account(op.to).name;
+   std::string memo;
    if( op.memo )
    {
       if( wallet.is_locked() )
@@ -2227,7 +2233,8 @@ void operation_printer::operator()(const transfer_operation& op) const
                       ("k", op.memo->to));
             auto my_key = wif_to_key(wallet._keys.at(op.memo->to));
             FC_ASSERT(my_key, "Unable to recover private key to decrypt memo. Wallet may be corrupted.");
-            out << " -- Memo: " << op.memo->get_message(*my_key, op.memo->from);
+            memo = op.memo->get_message(*my_key, op.memo->from);
+            out << " -- Memo: " << memo;
          } catch (const fc::exception& e) {
             out << " -- could not decrypt memo";
             elog("Error when decrypting memo: ${e}", ("e", e.to_detail_string()));
@@ -2235,21 +2242,22 @@ void operation_printer::operator()(const transfer_operation& op) const
       }
    }
    fee(op.fee);
+   return memo;
 }
 
-void operation_printer::operator()(const account_create_operation& op) const
+std::string operation_printer::operator()(const account_create_operation& op) const
 {
    out << "Create Account '" << op.name << "'";
-   fee(op.fee);
+   return fee(op.fee);
 }
 
-void operation_printer::operator()(const account_update_operation& op) const
+std::string operation_printer::operator()(const account_update_operation& op) const
 {
    out << "Update Account '" << wallet.get_account(op.account).name << "'";
-   fee(op.fee);
+   return fee(op.fee);
 }
 
-void operation_printer::operator()(const asset_create_operation& op) const
+std::string operation_printer::operator()(const asset_create_operation& op) const
 {
    out << "Create ";
    if( op.bitasset_opts.valid() )
@@ -2257,7 +2265,7 @@ void operation_printer::operator()(const asset_create_operation& op) const
    else
       out << "User-Issue Asset ";
    out << "'" << op.symbol << "' with issuer " << wallet.get_account(op.issuer).name;
-   fee(op.fee);
+   return fee(op.fee);
 }
 
 }}}
@@ -2312,10 +2320,35 @@ vector<asset_object> wallet_api::list_assets(const string& lowerbound, uint32_t 
    return my->_remote_db->list_assets( lowerbound, limit );
 }
 
-vector<operation_history_object> wallet_api::get_account_history(string name, int limit)const
+vector<operation_detail> wallet_api::get_account_history(string name, int limit)const
 {
-   return my->_remote_hist->get_account_history(get_account(name).get_id(), operation_history_id_type(), limit, operation_history_id_type());
+   vector<operation_detail> result;
+   auto account_id = get_account(name).get_id();
+
+   while( limit > 0 )
+   {
+      operation_history_id_type start;
+      if( result.size() ) 
+      {
+         start = result.back().op.id;
+         start = start + 1;
+      }
+
+
+      vector<operation_history_object> current = my->_remote_hist->get_account_history(account_id, operation_history_id_type(), std::min(100,limit), start);
+      for( auto& o : current ) {
+         std::stringstream ss;
+         auto memo = o.op.visit(detail::operation_printer(ss, *my, o.result));
+         result.push_back( operation_detail{ memo, ss.str(), o } );
+      }
+      if( current.size() < std::min(100,limit) )
+         break;
+      limit -= current.size();
+   }
+
+   return result;
 }
+
 
 vector<bucket_object> wallet_api::get_market_history( string symbol1, string symbol2, uint32_t bucket )const
 {

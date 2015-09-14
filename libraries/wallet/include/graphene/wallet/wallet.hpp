@@ -242,6 +242,12 @@ namespace detail {
 class wallet_api_impl;
 }
 
+struct operation_detail {
+   string                   memo;
+   string                   description;
+   operation_history_object op;
+};
+
 /**
  * This wallet assumes it is connected to the database server with a high-bandwidth, low-latency connection and
  * performs minimal caching. This API could be provided locally to be used by a web interface.
@@ -310,7 +316,7 @@ class wallet_api
        * @param limit the number of entries to return (starting from the most recent) (max 100)
        * @returns a list of \c operation_history_objects
        */
-      vector<operation_history_object>  get_account_history(string name, int limit)const;
+      vector<operation_detail>  get_account_history(string name, int limit)const;
 
 
       vector<bucket_object>             get_market_history(string symbol, string symbol2, uint32_t bucket)const;
@@ -1369,6 +1375,9 @@ FC_REFLECT_DERIVED( graphene::wallet::signed_block_with_info, (graphene::chain::
 
 FC_REFLECT_DERIVED( graphene::wallet::vesting_balance_object_with_info, (graphene::chain::vesting_balance_object),
    (allowed_withdraw)(allowed_withdraw_time) )
+
+FC_REFLECT( graphene::wallet::operation_detail, 
+            (memo)(description)(op) )
 
 FC_API( graphene::wallet::wallet_api,
         (help)
