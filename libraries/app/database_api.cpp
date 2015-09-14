@@ -7,6 +7,8 @@
 
 #include <boost/range/iterator_range.hpp>
 
+#include <cctype>
+
 namespace graphene { namespace app {
 
 class database_api_impl;
