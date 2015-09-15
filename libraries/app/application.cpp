@@ -42,6 +42,7 @@
 
 #include <boost/filesystem/path.hpp>
 #include <boost/signals2.hpp>
+#include <boost/range/algorithm/reverse.hpp>
 
 #include <iostream>
 
@@ -617,18 +618,19 @@ namespace detail {
               // block is a block we know about, but it is on a fork
               try
               {
-                std::vector<block_id_type> fork_history = _chain_db->get_block_ids_on_fork(reference_point);
-                // returns a vector where the first element is the common ancestor with the preferred chain,
-                // and the last element is the reference point you passed in
+                fork_history = _chain_db->get_block_ids_on_fork(reference_point);
+                // returns a vector where the last element is the common ancestor with the preferred chain,
+                // and the first element is the reference point you passed in
                 assert(fork_history.size() >= 2);
-                if( fork_history.back() != reference_point )
+
+                if( fork_history.front() != reference_point )
                 {
                    edump( (fork_history)(reference_point) );
-                   assert(fork_history.back() == reference_point);
+                   assert(fork_history.front() == reference_point);
                 }
-
-                block_id_type last_non_fork_block = fork_history.front();
-                fork_history.erase(fork_history.begin());  // remove the common ancestor
+                block_id_type last_non_fork_block = fork_history.back();
+                fork_history.pop_back();  // remove the common ancestor
+                boost::reverse(fork_history);
 
                 if (last_non_fork_block == block_id_type()) // if the fork goes all the way back to genesis (does graphene's fork db allow this?)
                   non_fork_high_block_num = 0;
