@@ -298,6 +298,12 @@ signed_block database::_generate_block(
    _pending_block.transaction_merkle_root = _pending_block.calculate_merkle_root();
 
    _pending_block.witness = witness_id;
+   block_id_type head_id = head_block_id();
+   if( _pending_block.previous != head_id )
+   {
+      wlog( "_pending_block.previous was ${old}, setting to head_block_id ${new}", ("old", _pending_block.previous)("new", head_id) );
+      _pending_block.previous = head_id;
+   }
    if( !(skip & skip_witness_signature) ) _pending_block.sign( block_signing_private_key );
 
    FC_ASSERT( fc::raw::pack_size(_pending_block) <= get_global_properties().parameters.maximum_block_size );
