@@ -285,7 +285,7 @@ block_production_condition::block_production_condition_enum witness_plugin::mayb
       _production_skip_flags
       );
    capture("n", block.block_num())("t", block.timestamp)("c", now);
-   p2p_node().broadcast(net::block_message(block));
+   fc::async( [this,block](){ p2p_node().broadcast(net::block_message(block)); } );
 
    return block_production_condition::produced;
 }

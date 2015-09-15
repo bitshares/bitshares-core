@@ -79,7 +79,14 @@ const signed_transaction& database::get_recent_transaction(const transaction_id_
 std::vector<block_id_type> database::get_block_ids_on_fork(block_id_type head_of_fork) const
 {
   pair<fork_database::branch_type, fork_database::branch_type> branches = _fork_db.fetch_branch_from(head_block_id(), head_of_fork);
-  assert(branches.first.back()->previous_id() == branches.second.back()->previous_id());
+  if( !((branches.first.back()->previous_id() == branches.second.back()->previous_id())) )
+  {
+     edump( (head_of_fork)
+            (head_block_id())
+            (branches.first.size())
+            (branches.second.size()) );
+     assert(branches.first.back()->previous_id() == branches.second.back()->previous_id());
+  }
   std::vector<block_id_type> result;
   for (const item_ptr& fork_block : branches.second)
     result.emplace_back(fork_block->id);

@@ -621,7 +621,12 @@ namespace detail {
                 // returns a vector where the first element is the common ancestor with the preferred chain,
                 // and the last element is the reference point you passed in
                 assert(fork_history.size() >= 2);
-                assert(fork_history.back() == reference_point);
+                if( fork_history.back() != reference_point )
+                {
+                   edump( (fork_history)(reference_point) );
+                   assert(fork_history.back() == reference_point);
+                }
+
                 block_id_type last_non_fork_block = fork_history.front();
                 fork_history.erase(fork_history.begin());  // remove the common ancestor
 
