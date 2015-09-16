@@ -22,6 +22,7 @@
 #include <graphene/chain/exceptions.hpp>
 
 #include <graphene/chain/account_object.hpp>
+#include <graphene/chain/asset_object.hpp>
 #include <graphene/chain/committee_member_object.hpp>
 #include <graphene/chain/proposal_object.hpp>
 #include <graphene/chain/market_evaluator.hpp>
@@ -1168,6 +1169,54 @@ BOOST_FIXTURE_TEST_CASE( transaction_invalidated_in_cache, database_fixture )
 
       // Make sure we can generate and accept a plain old empty block on top of all this!
       generate_and_send(1);
+   }
+   catch (fc::exception& e)
+   {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
+BOOST_AUTO_TEST_CASE( genesis_reserve_ids )
+{
+   try
+   {
+      fc::time_point_sec now( GRAPHENE_TESTING_GENESIS_TIMESTAMP );
+      fc::temp_directory data_dir( graphene::utilities::temp_directory_path() );
+
+      uint32_t num_special_accounts = 100;
+      uint32_t num_special_assets = 30;
+
+      database db;
+      db.open( data_dir.path(), [&]() -> genesis_state_type
+      {
+         genesis_state_type genesis_state = make_genesis();
+         genesis_state_type::initial_asset_type usd;
+
+         usd.symbol = "USD";
+         usd.issuer_name = "init0";
+         usd.description = "federally floated";
+         usd.precision = 4;
+         usd.max_supply = GRAPHENE_MAX_SHARE_SUPPLY;
+         usd.accumulated_fees = 0;
+         usd.is_bitasset = true;
+         
+         genesis_state.immutable_parameters.num_special_accounts = num_special_accounts;
+         genesis_state.immutable_parameters.num_special_assets = num_special_assets;
+         genesis_state.initial_assets.push_back( usd );
+
+         return genesis_state;
+      } );
+
+      const auto& acct_idx = db.get_index_type<account_index>().indices().get<by_name>();
+      auto acct_itr = acct_idx.find("init0");
+      BOOST_REQUIRE( acct_itr != acct_idx.end() );
+      BOOST_CHECK( acct_itr->id == account_id_type( num_special_accounts ) );
+      
+      const auto& asset_idx = db.get_index_type<asset_index>().indices().get<by_symbol>();
+      auto asset_itr = asset_idx.find("USD");
+      BOOST_REQUIRE( asset_itr != asset_idx.end() );
+      BOOST_CHECK( asset_itr->id == asset_id_type( num_special_assets ) );
    }
    catch (fc::exception& e)
    {
