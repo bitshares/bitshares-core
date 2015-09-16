@@ -131,34 +131,19 @@ void database::open(
    FC_CAPTURE_AND_RETHROW( (data_dir) )
 }
 
-
 void database::close(uint32_t blocks_to_rewind)
 {
    _pending_block_session.reset();
 
-   for(uint32_t i = 0; i < blocks_to_rewind && head_block_num() > 0; ++i)
-   {
-      block_id_type popped_block_id = head_block_id();
-      pop_block();
-      _fork_db.remove(popped_block_id);
-      try
-      {
-         _block_id_to_block.remove(popped_block_id);
-      }
-      catch (const fc::key_not_found_exception&)
-      {
-      }
-   }
-
    // pop all of the blocks that we can given our undo history, this should
    // throw when there is no more undo history to pop
-   try 
+   try
    {
-      while( true ) 
-      { 
-         elog("pop"); 
+      while( true )
+      {
+         elog("pop");
          block_id_type popped_block_id = head_block_id();
-         pop_block(); 
+         pop_block();
          _fork_db.remove(popped_block_id); // doesn't throw on missing
          try
          {
@@ -167,8 +152,8 @@ void database::close(uint32_t blocks_to_rewind)
          catch (const fc::key_not_found_exception&)
          {
          }
-      } 
-   } 
+      }
+   }
    catch (...)
    {
    }
