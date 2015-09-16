@@ -395,12 +395,18 @@ account_create_operation database_fixture::make_account(
 
 const asset_object& database_fixture::get_asset( const string& symbol )const
 {
-   return *db.get_index_type<asset_index>().indices().get<by_symbol>().find(symbol);
+   const auto& idx = db.get_index_type<asset_index>().indices().get<by_symbol>();
+   const auto itr = idx.find(symbol);
+   assert( itr != idx.end() );
+   return *itr;
 }
 
 const account_object& database_fixture::get_account( const string& name )const
 {
-   return *db.get_index_type<account_index>().indices().get<by_name>().find(name);
+   const auto& idx = db.get_index_type<account_index>().indices().get<by_name>();
+   const auto itr = idx.find(name);
+   assert( itr != idx.end() );
+   return *itr;
 }
 
 const asset_object& database_fixture::create_bitasset(
