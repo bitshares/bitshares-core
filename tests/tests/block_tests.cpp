@@ -1225,4 +1225,24 @@ BOOST_AUTO_TEST_CASE( genesis_reserve_ids )
    }
 }
 
+BOOST_FIXTURE_TEST_CASE( miss_many_blocks, database_fixture )
+{
+   try
+   {
+      generate_block();
+      generate_block();
+      generate_block();
+      // miss 10 maintenance intervals
+      generate_blocks( db.get_dynamic_global_properties().next_maintenance_time + db.get_global_properties().parameters.maintenance_interval * 10, true );
+      generate_block();
+      generate_block();
+      generate_block();
+   }
+   catch (fc::exception& e)
+   {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
 BOOST_AUTO_TEST_SUITE_END()
