@@ -106,7 +106,7 @@ bool database::push_block(const signed_block& new_block, uint32_t skip)
    bool result;
    detail::with_skip_flags( *this, skip, [&]()
    {
-      detail::without_pending_transactions( *this, std::move(_pending_block.transactions),
+      detail::without_pending_transactions( *this, std::move(_pending_tx),
       [&]()
       {
          result = _push_block(new_block);
@@ -131,7 +131,7 @@ bool database::_push_block(const signed_block& new_block)
          //Only switch forks if new_head is actually higher than head
          if( new_head->data.block_num() > head_block_num() )
          {
-            auto branches = _fork_db.fetch_branch_from(new_head->data.id(), _pending_block.previous);
+            auto branches = _fork_db.fetch_branch_from(new_head->data.id(), head_block_id());
 
             // pop blocks until we hit the forked block
             while( head_block_id() != branches.second.back()->data.previous )
@@ -214,20 +214,23 @@ processed_transaction database::push_transaction( const signed_transaction& trx,
 
 processed_transaction database::_push_transaction( const signed_transaction& trx )
 {
-   uint32_t skip = get_node_properties().skip_flags;
    // If this is the first transaction pushed after applying a block, start a new undo session.
    // This allows us to quickly rewind to the clean state of the head block, in case a new block arrives.
-   if( !_pending_block_session ) _pending_block_session = _undo_db.start_undo_session();
-   auto session = _undo_db.start_undo_session();
-   auto processed_trx = _apply_transaction( trx );
-   _pending_block.transactions.push_back(processed_trx);
+   if( !_pending_tx_session.valid() )
+      _pending_tx_session = _undo_db.start_undo_session();
 
-   FC_ASSERT( (skip & skip_block_size_check) ||
-              fc::raw::pack_size(_pending_block) <= get_global_properties().parameters.maximum_block_size );
+   // Create a temporary undo session as a child of _pending_tx_session.
+   // The temporary session will be discarded by the destructor if
+   // _apply_transaction fails.  If we make it to merge(), we
+   // apply the changes.
+
+   auto temp_session = _undo_db.start_undo_session();
+   auto processed_trx = _apply_transaction( trx );
+   _pending_tx.push_back(processed_trx);
 
    notify_changed_objects();
    // The transaction applied successfully. Merge its changes into the pending block session.
-   session.merge();
+   temp_session.merge();
 
    // notify anyone listening to pending transactions
    on_pending_transaction( trx );
@@ -293,68 +296,77 @@ signed_block database::_generate_block(
    if( !(skip & skip_witness_signature) )
       FC_ASSERT( witness_obj.signing_key == block_signing_private_key.get_public_key() );
 
-   _pending_block.timestamp = when;
+   static const size_t max_block_header_size = fc::raw::pack_size( signed_block_header() ) + 4;
+   auto maximum_block_size = get_global_properties().parameters.maximum_block_size;
+   size_t total_block_size = max_block_header_size;
 
-   _pending_block.transaction_merkle_root = _pending_block.calculate_merkle_root();
+   signed_block pending_block;
 
-   _pending_block.witness = witness_id;
-   block_id_type head_id = head_block_id();
-   if( _pending_block.previous != head_id )
+   //
+   // The following code throws away existing pending_tx_session and
+   // rebuilds it by re-applying pending transactions.
+   //
+   // This rebuild is necessary because pending transactions' validity
+   // and semantics may have changed since they were received, because
+   // time-based semantics are evaluated based on the current block
+   // time.  These changes can only be reflected in the database when
+   // the value of the "when" variable is known, which means we need to
+   // re-apply pending transactions in this method.
+   //
+   _pending_tx_session.reset();
+   _pending_tx_session = _undo_db.start_undo_session();
+
+   uint64_t postponed_tx_count = 0;
+   // pop pending state (reset to head block state)
+   for( const processed_transaction& tx : _pending_tx )
    {
-      wlog( "_pending_block.previous was ${old}, setting to head_block_id ${new}", ("old", _pending_block.previous)("new", head_id) );
-      _pending_block.previous = head_id;
-   }
-   if( !(skip & skip_witness_signature) ) _pending_block.sign( block_signing_private_key );
+      size_t new_total_size = total_block_size + fc::raw::pack_size( tx );
 
-   FC_ASSERT( fc::raw::pack_size(_pending_block) <= get_global_properties().parameters.maximum_block_size );
-   signed_block tmp = _pending_block;
-   tmp.transaction_merkle_root = tmp.calculate_merkle_root();
-   _pending_block.transactions.clear();
+      // postpone transaction if it would make block too big
+      if( new_total_size >= maximum_block_size )
+      {
+         postponed_tx_count++;
+         continue;
+      }
 
-   bool failed = false;
-   try { push_block( tmp, skip ); }
-   catch ( const undo_database_exception& e ) { throw; }
-   catch ( const fc::exception& e )
-   {
-      if( !retry_on_failure )
+      try
       {
-         failed = true;
+         auto temp_session = _undo_db.start_undo_session();
+         processed_transaction ptx = _apply_transaction( tx );
+         temp_session.merge();
+
+         // We have to recompute pack_size(ptx) because it may be different
+         // than pack_size(tx) (i.e. if one or more results increased
+         // their size)
+         total_block_size += fc::raw::pack_size( ptx );
+         pending_block.transactions.push_back( ptx );
       }
-      else
+      catch ( const fc::exception& e )
       {
-         wlog( "Reason for block production failure: ${e}", ("e",e) );
-         throw;
+         // Do nothing, transaction will not be re-applied
+         wlog( "Transaction was not processed while generating block due to ${e}", ("e", e) );
+         wlog( "The transaction was ${t}", ("t", tx) );
       }
    }
-   if( failed )
+   if( postponed_tx_count > 0 )
    {
-      uint32_t failed_tx_count = 0;
-      for( const auto& trx : tmp.transactions )
-      {
-         try
-         {
-            push_transaction( trx, skip );
-         }
-         catch ( const fc::exception& e )
-         {
-            wlog( "Transaction is no longer valid: ${trx}", ("trx",trx) );
-            failed_tx_count++;
-         }
-      }
-      if( failed_tx_count == 0 )
-      {
-         //
-         // this is in generate_block() so this intensive logging
-         // (dumping a whole block) should be rate-limited
-         // to once per block production attempt
-         //
-         // TODO:  Turn this off again once #261 is resolved.
-         //
-         wlog( "Block creation failed even though all tx's are still valid.  Block: ${b}", ("b",tmp) );
-      }
-      return _generate_block( when, witness_id, block_signing_private_key, false );
+      wlog( "Postponed ${n} transactions due to block size limit", ("n", postponed_tx_count) );
    }
-   return tmp;
+   _pending_tx_session.reset();
+
+   pending_block.previous = head_block_id();
+   pending_block.timestamp = when;
+   pending_block.transaction_merkle_root = pending_block.calculate_merkle_root();
+   pending_block.witness = witness_id;
+
+   if( !(skip & skip_witness_signature) )
+      pending_block.sign( block_signing_private_key );
+
+   FC_ASSERT( fc::raw::pack_size(pending_block) <= get_global_properties().parameters.maximum_block_size );
+
+   push_block( pending_block, skip );
+
+   return pending_block;
 } FC_CAPTURE_AND_RETHROW( (witness_id) ) }
 
 /**
@@ -363,19 +375,23 @@ signed_block database::_generate_block(
  */
 void database::pop_block()
 { try {
-   _pending_block_session.reset();
-   auto prev = _pending_block.previous;
+   _pending_tx_session.reset();
+   auto head_id = head_block_id();
+   optional<signed_block> head_block = fetch_block_by_id( head_id );
+   GRAPHENE_ASSERT( head_block.valid(), pop_empty_chain, "there are no blocks to pop" );
    pop_undo();
-   _block_id_to_block.remove( prev );
-   _pending_block.previous  = head_block_id();
-   _pending_block.timestamp = head_block_time();
+   _block_id_to_block.remove( head_id );
    _fork_db.pop_block();
+
+   _popped_tx.insert( _popped_tx.begin(), head_block->transactions.begin(), head_block->transactions.end() );
+
 } FC_CAPTURE_AND_RETHROW() }
 
 void database::clear_pending()
 { try {
-   _pending_block.transactions.clear();
-   _pending_block_session.reset();
+   assert( (_pending_tx.size() == 0) || _pending_tx_session.valid() );
+   _pending_tx.clear();
+   _pending_tx_session.reset();
 } FC_CAPTURE_AND_RETHROW() }
 
 uint32_t database::push_applied_operation( const operation& op )
@@ -451,11 +467,8 @@ void database::_apply_block( const signed_block& next_block )
    update_global_dynamic_data(next_block);
    update_signing_witness(signing_witness, next_block);
 
-   auto current_block_interval = global_props.parameters.block_interval;
-
    // Are we at the maintenance interval?
    if( maint_needed )
-      // This will update _pending_block.timestamp if the block interval has changed
       perform_chain_maintenance(next_block, global_props);
 
    create_block_summary(next_block);
@@ -477,8 +490,6 @@ void database::_apply_block( const signed_block& next_block )
    _applied_ops.clear();
 
    notify_changed_objects();
-
-   update_pending_block(next_block, current_block_interval);
 } FC_CAPTURE_AND_RETHROW( (next_block.block_num()) )  }
 
 void database::notify_changed_objects()
@@ -542,9 +553,11 @@ processed_transaction database::_apply_transaction(const signed_transaction& trx
          FC_ASSERT( trx.ref_block_prefix == tapos_block_summary.block_id._hash[1] );
       }
 
-      FC_ASSERT( trx.expiration <= _pending_block.timestamp + chain_parameters.maximum_time_until_expiration, "",
-                 ("trx.expiration",trx.expiration)("_pending_block.timestamp",_pending_block.timestamp)("max_til_exp",chain_parameters.maximum_time_until_expiration));
-      FC_ASSERT( _pending_block.timestamp <= trx.expiration, "", ("pending.timestamp",_pending_block.timestamp)("trx.exp",trx.expiration) );
+      fc::time_point_sec now = head_block_time();
+
+      FC_ASSERT( trx.expiration <= now + chain_parameters.maximum_time_until_expiration, "",
+                 ("trx.expiration",trx.expiration)("now",now)("max_til_exp",chain_parameters.maximum_time_until_expiration));
+      FC_ASSERT( now <= trx.expiration, "", ("now",now)("trx.exp",trx.expiration) );
    }
 
    //Insert transaction into unique transactions database.
@@ -595,8 +608,8 @@ operation_result database::apply_operation(transaction_evaluation_state& eval_st
 
 const witness_object& database::validate_block_header( uint32_t skip, const signed_block& next_block )const
 {
-   FC_ASSERT( _pending_block.previous == next_block.previous, "", ("pending.prev",_pending_block.previous)("next.prev",next_block.previous) );
-   FC_ASSERT( _pending_block.timestamp <= next_block.timestamp, "", ("_pending_block.timestamp",_pending_block.timestamp)("next",next_block.timestamp)("blocknum",next_block.block_num()) );
+   FC_ASSERT( head_block_id() == next_block.previous, "", ("head_block_id",head_block_id())("next.prev",next_block.previous) );
+   FC_ASSERT( head_block_time() < next_block.timestamp, "", ("head_block_time",head_block_time())("next",next_block.timestamp)("blocknum",next_block.block_num()) );
    const witness_object& witness = next_block.witness(*this);
 
    if( !(skip&skip_witness_signature) ) 

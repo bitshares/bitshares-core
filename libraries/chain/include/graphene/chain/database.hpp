@@ -379,6 +379,11 @@ namespace graphene { namespace chain {
           */
          processed_transaction validate_transaction( const signed_transaction& trx );
 
+
+         /** when popping a block, the transactions that were removed get cached here so they
+          * can be reapplied at the proper time */
+         std::deque< signed_transaction >       _popped_tx;
+
          /**
           * @}
           */
@@ -388,7 +393,7 @@ namespace graphene { namespace chain {
          void notify_changed_objects();
 
       private:
-         optional<undo_database::session>       _pending_block_session;
+         optional<undo_database::session>       _pending_tx_session;
          vector< unique_ptr<op_evaluator> >     _operation_evaluators;
 
          template<class Index>
@@ -413,7 +418,6 @@ namespace graphene { namespace chain {
          //////////////////// db_update.cpp ////////////////////
          void update_global_dynamic_data( const signed_block& b );
          void update_signing_witness(const witness_object& signing_witness, const signed_block& new_block);
-         void update_pending_block(const signed_block& next_block, uint8_t current_block_interval);
          void clear_expired_transactions();
          void clear_expired_proposals();
          void clear_expired_orders();
@@ -439,7 +443,7 @@ namespace graphene { namespace chain {
          ///@}
          ///@}
 
-         signed_block                           _pending_block;
+         vector< processed_transaction >        _pending_tx;
          fork_database                          _fork_db;
 
          /**

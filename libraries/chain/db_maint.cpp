@@ -103,7 +103,7 @@ void database::pay_workers( share_type& budget )
    vector<std::reference_wrapper<const worker_object>> active_workers;
    get_index_type<worker_index>().inspect_all_objects([this, &active_workers](const object& o) {
       const worker_object& w = static_cast<const worker_object&>(o);
-      auto now = _pending_block.timestamp;
+      auto now = head_block_time();
       if( w.is_active(now) && w.approving_stake(_vote_tally_buffer) > 0 )
          active_workers.emplace_back(w);
    });
@@ -122,10 +122,10 @@ void database::pay_workers( share_type& budget )
    {
       const worker_object& active_worker = active_workers[i];
       share_type requested_pay = active_worker.daily_pay;
-      if( _pending_block.timestamp - get_dynamic_global_properties().last_budget_time != fc::days(1) )
+      if( head_block_time() - get_dynamic_global_properties().last_budget_time != fc::days(1) )
       {
          fc::uint128 pay(requested_pay.value);
-         pay *= (_pending_block.timestamp - get_dynamic_global_properties().last_budget_time).count();
+         pay *= (head_block_time() - get_dynamic_global_properties().last_budget_time).count();
          pay /= fc::days(1).count();
          requested_pay = pay.to_uint64();
       }
@@ -322,7 +322,7 @@ void database::process_budget()
       const dynamic_global_property_object& dpo = get_dynamic_global_properties();
       const asset_dynamic_data_object& core =
          asset_id_type(0)(*this).dynamic_asset_data_id(*this);
-      fc::time_point_sec now = _pending_block.timestamp;
+      fc::time_point_sec now = head_block_time();
 
       int64_t time_to_maint = (dpo.next_maintenance_time - now).to_seconds();
       //
@@ -498,19 +498,6 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
          p.pending_parameters.reset();
       }
    });
-
-   auto new_block_interval = global_props.parameters.block_interval;
-
-   // if block interval CHANGED during this block *THEN* we cannot simply
-   // add the interval if we want to maintain the invariant that all timestamps are a multiple
-   // of the interval.
-   _pending_block.timestamp = next_block.timestamp + fc::seconds(new_block_interval);
-   uint32_t r = _pending_block.timestamp.sec_since_epoch()%new_block_interval;
-   if( !r )
-   {
-      _pending_block.timestamp -=  r;
-      assert( (_pending_block.timestamp.sec_since_epoch() % new_block_interval) == 0 );
-   }
 
    auto next_maintenance_time = get<dynamic_global_property_object>(dynamic_global_property_id_type()).next_maintenance_time;
    auto maintenance_interval = gpo.parameters.maintenance_interval;

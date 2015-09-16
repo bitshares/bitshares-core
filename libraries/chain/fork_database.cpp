@@ -186,6 +186,8 @@ vector<item_ptr> fork_database::fetch_block_by_number(uint32_t num)const
 pair<fork_database::branch_type,fork_database::branch_type>
   fork_database::fetch_branch_from(block_id_type first, block_id_type second)const
 { try {
+   // This function gets a branch (i.e. vector<fork_item>) leading
+   // back to the most recent common ancestor.
    pair<branch_type,branch_type> result;
    auto first_branch_itr = _index.get<block_id>().find(first);
    FC_ASSERT(first_branch_itr != _index.get<block_id>().end());

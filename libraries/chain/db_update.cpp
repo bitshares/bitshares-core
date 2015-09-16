@@ -97,12 +97,6 @@ void database::update_signing_witness(const witness_object& signing_witness, con
    } );
 }
 
-void database::update_pending_block(const signed_block& next_block, uint8_t current_block_interval)
-{
-   _pending_block.timestamp = next_block.timestamp + current_block_interval;
-   _pending_block.previous = next_block.id();
-}
-
 void database::clear_expired_transactions()
 {
    //Look for expired transactions in the deduplication list, and remove them.

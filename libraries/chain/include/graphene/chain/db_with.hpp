@@ -56,6 +56,9 @@ struct skip_flags_restorer
 /**
  * Class used to help the without_pending_transactions
  * implementation.
+ *
+ * TODO:  Change the name of this class to better reflect the fact
+ * that it restores popped transactions as well as pending transactions.
  */
 struct pending_transactions_restorer
 {
@@ -67,13 +70,27 @@ struct pending_transactions_restorer
 
    ~pending_transactions_restorer()
    {
+      for( const auto& tx : _db._popped_tx )
+      {
+         try {
+            if( !_db.is_known_transaction( tx.id() ) ) {
+               // since push_transaction() takes a signed_transaction,
+               // the operation_results field will be ignored.
+               _db._push_transaction( tx );
+            }
+         } catch ( const fc::exception&  ) {
+         }
+      }
+      _db._popped_tx.clear();
       for( const processed_transaction& tx : _pending_transactions )
       {
          try
          {
-            // since push_transaction() takes a signed_transaction,
-            // the operation_results field will be ignored.
-            _db.push_transaction( tx );
+            if( !_db.is_known_transaction( tx.id() ) ) {
+               // since push_transaction() takes a signed_transaction,
+               // the operation_results field will be ignored.
+               _db._push_transaction( tx );
+            }
          }
          catch( const fc::exception& e )
          {

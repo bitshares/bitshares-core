@@ -32,9 +32,9 @@ database::database()
    initialize_evaluators();
 }
 
-database::~database(){
-   if( _pending_block_session )
-      _pending_block_session->commit();
+database::~database()
+{
+   clear_pending();
 }
 
 void database::reindex(fc::path data_dir, const genesis_state_type& initial_allocation)
@@ -113,9 +113,6 @@ void database::open(
       if( !find(global_property_id_type()) )
          init_genesis(genesis_loader());
 
-      _pending_block.previous  = head_block_id();
-      _pending_block.timestamp = head_block_time();
-
       fc::optional<signed_block> last_block = _block_id_to_block.last();
       if( last_block.valid() )
       {
@@ -133,7 +130,8 @@ void database::open(
 
 void database::close(uint32_t blocks_to_rewind)
 {
-   _pending_block_session.reset();
+   // TODO:  Save pending tx's on close()
+   clear_pending();
 
    // pop all of the blocks that we can given our undo history, this should
    // throw when there is no more undo history to pop
