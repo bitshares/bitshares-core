@@ -521,10 +521,25 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
          next_maintenance_time = time_point_sec() +
                (((next_block.timestamp.sec_since_epoch() / maintenance_interval) + 1) * maintenance_interval);
       else
-         // It's possible we have missed blocks for at least a maintenance interval.
-         // In this case, we'll need to bump the next maintenance time more than once.
-         do next_maintenance_time += maintenance_interval;
-         while( next_maintenance_time < head_block_time() );
+      {
+         // We want to find the smallest k such that next_maintenance_time + k * maintenance_interval > head_block_time()
+         //  This implies k > ( head_block_time() - next_maintenance_time ) / maintenance_interval
+         //
+         // Let y be the right-hand side of this inequality, i.e.
+         // y = ( head_block_time() - next_maintenance_time ) / maintenance_interval
+         //
+         // and let the fractional part f be y-floor(y).  Clearly 0 <= f < 1.
+         // We can rewrite f = y-floor(y) as floor(y) = y-f.
+         //
+         // Clearly k = floor(y)+1 has k > y as desired.  Now we must
+         // show that this is the least such k, i.e. k-1 <= y.
+         //
+         // But k-1 = floor(y)+1-1 = floor(y) = y-f <= y.
+         // So this k suffices.
+         //
+         auto y = (head_block_time() - next_maintenance_time).to_seconds() / maintenance_interval;
+         next_maintenance_time += (y+1) * maintenance_interval;
+      }
    }
 
    modify(get_dynamic_global_properties(), [next_maintenance_time](dynamic_global_property_object& d) {
