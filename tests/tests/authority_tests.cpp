@@ -488,10 +488,12 @@ BOOST_FIXTURE_TEST_CASE( fired_committee_members, database_fixture )
    nathan = &get_account("nathan");
    flat_set<vote_id_type> committee_members;
 
+   /*
    db.modify(db.get_global_properties(), [](global_property_object& p) {
       // Turn the review period WAY down, so it doesn't take long to produce blocks to that point in simulated time.
       p.parameters.committee_proposal_review_period = fc::days(1).to_seconds();
    });
+   */
 
    for( int i = 0; i < 15; ++i )
    {
@@ -499,11 +501,14 @@ BOOST_FIXTURE_TEST_CASE( fired_committee_members, database_fixture )
       upgrade_to_lifetime_member(account);
       committee_members.insert(create_committee_member(account).vote_id);
    }
+   BOOST_REQUIRE_EQUAL(get_balance(*nathan, asset_id_type()(db)), 5000);
 
    //A proposal is created to give nathan lots more money.
    proposal_create_operation pop = proposal_create_operation::committee_proposal(db.get_global_properties().parameters, db.head_block_time());
    pop.fee_paying_account = GRAPHENE_TEMP_ACCOUNT;
-   pop.expiration_time = db.head_block_time() + *pop.review_period_seconds * 3;
+   pop.expiration_time = db.head_block_time() + *pop.review_period_seconds + fc::days(1).to_seconds();
+   ilog( "Creating proposal to give nathan money that expires: ${e}", ("e", pop.expiration_time ) );
+   ilog( "The proposal has a review period of: ${r} sec", ("r",*pop.review_period_seconds) );
 
    transfer_operation top;
    top.to = nathan->id;
@@ -514,37 +519,35 @@ BOOST_FIXTURE_TEST_CASE( fired_committee_members, database_fixture )
    proposal_id_type pid = prop.id;
    BOOST_CHECK(!pid(db).is_authorized_to_execute(db));
 
+   ilog( "commitee member approves proposal" );
    //committee key approves of the proposal.
    proposal_update_operation uop;
    uop.fee_paying_account = GRAPHENE_TEMP_ACCOUNT;
    uop.proposal = pid;
    uop.key_approvals_to_add.emplace(init_account_pub_key);
-   /* TODO: what should this really be?
-   uop.key_approvals_to_add.emplace(2);
-   uop.key_approvals_to_add.emplace(3);
-   uop.key_approvals_to_add.emplace(4);
-   uop.key_approvals_to_add.emplace(5);
-   uop.key_approvals_to_add.emplace(6);
-   uop.key_approvals_to_add.emplace(7);
-   uop.key_approvals_to_add.emplace(8);
-   uop.key_approvals_to_add.emplace(9);
-   */
    trx.operations.back() = uop;
    sign( trx, committee_key );
    PUSH_TX( db, trx );
    BOOST_CHECK(pid(db).is_authorized_to_execute(db));
 
+   ilog( "Generating blocks for 2 days" );
+   generate_block();
+   BOOST_REQUIRE_EQUAL(get_balance(*nathan, asset_id_type()(db)), 5000);
+   generate_block();
+   BOOST_REQUIRE_EQUAL(get_balance(*nathan, asset_id_type()(db)), 5000);
    //Time passes... the proposal is now in its review period.
-   generate_blocks(*pid(db).review_period_time);
+   //generate_blocks(*pid(db).review_period_time);
+   generate_blocks(db.head_block_time() + fc::days(2) );
+   ilog( "head block time: ${t}", ("t",db.head_block_time()));
 
    fc::time_point_sec maintenance_time = db.get_dynamic_global_properties().next_maintenance_time;
    BOOST_CHECK_LT(maintenance_time.sec_since_epoch(), pid(db).expiration_time.sec_since_epoch());
    //Yay! The proposal to give nathan more money is authorized.
-   BOOST_CHECK(pid(db).is_authorized_to_execute(db));
+   BOOST_REQUIRE(pid(db).is_authorized_to_execute(db));
 
    nathan = &get_account("nathan");
    // no money yet
-   BOOST_CHECK_EQUAL(get_balance(*nathan, asset_id_type()(db)), 5000);
+   BOOST_REQUIRE_EQUAL(get_balance(*nathan, asset_id_type()(db)), 5000);
 
    {
       //Oh noes! Nathan votes for a whole new slate of committee_members!

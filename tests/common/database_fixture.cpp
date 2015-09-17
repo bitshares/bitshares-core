@@ -296,9 +296,11 @@ signed_block database_fixture::generate_block(uint32_t skip, const fc::ecc::priv
 
    skip |= database::skip_undo_history_check;
    // skip == ~0 will skip checks specified in database::validation_steps
-   return db.generate_block(db.get_slot_time(miss_blocks + 1),
+   auto block = db.generate_block(db.get_slot_time(miss_blocks + 1),
                             db.get_scheduled_witness(miss_blocks + 1),
                             key, skip);
+   db.clear_pending();
+   return block;
 }
 
 void database_fixture::generate_blocks( uint32_t block_count )

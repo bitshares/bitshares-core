@@ -464,8 +464,10 @@ BOOST_AUTO_TEST_CASE( switch_forks_undo_create )
       aw = db2.get_global_properties().active_witnesses;
       b = db2.generate_block(db2.get_slot_time(1), db2.get_scheduled_witness(1), init_account_priv_key, database::skip_nothing);
       db1.push_block(b);
-
-      GRAPHENE_CHECK_THROW(nathan_id(db1), fc::exception);
+      GRAPHENE_REQUIRE_THROW(nathan_id(db2), fc::exception);
+      nathan_id(db1); /// it should be included in the pending state
+      db1.clear_pending(); // clear it so that we can verify it was properly removed from pending state.
+      GRAPHENE_REQUIRE_THROW(nathan_id(db1), fc::exception);
 
       PUSH_TX( db2, trx );
 
@@ -550,7 +552,7 @@ BOOST_AUTO_TEST_CASE( tapos )
 
       signed_transaction trx;
       //This transaction must be in the next block after its reference, or it is invalid.
-      trx.set_expiration( db1.get_slot_time(1) );
+      trx.set_expiration( db1.head_block_time() ); //db1.get_slot_time(1) );
       trx.set_reference_block( db1.head_block_id() );
 
       account_id_type nathan_id = account_idx.get_next_id();
