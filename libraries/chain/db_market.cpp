@@ -93,7 +93,11 @@ void database::cancel_order(const force_settlement_object& order, bool create_vi
 
    if( create_virtual_op )
    {
-      // TODO: create virtual op
+      asset_settle_cancel_operation vop;
+      vop.settlement = order.id;
+      vop.account = order.owner;
+      vop.amount = order.balance;
+      push_applied_operation( vop );
    }
 }
 
@@ -109,7 +113,10 @@ void database::cancel_order( const limit_order_object& order, bool create_virtua
 
    if( create_virtual_op )
    {
-      // TODO: create a virtual cancel operation
+      limit_order_cancel_operation vop;
+      vop.order = order.id;
+      vop.fee_paying_account = order.seller;
+      push_applied_operation( vop );
    }
 
    remove(order);

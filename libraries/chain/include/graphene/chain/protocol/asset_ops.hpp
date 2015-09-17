@@ -190,6 +190,29 @@ namespace graphene { namespace chain {
    };
 
    /**
+    * Virtual op generated when force settlement is cancelled.
+    */
+
+   struct asset_settle_cancel_operation : public base_operation
+   {
+      struct fee_parameters_type { };
+
+      asset           fee;
+      force_settlement_id_type settlement;
+      /// Account requesting the force settlement. This account pays the fee
+      account_id_type account;
+      /// Amount of asset to force settle. This must be a market-issued asset
+      asset           amount;
+      extensions_type extensions;
+
+      account_id_type fee_payer()const { return account; }
+      void            validate()const {}
+
+      share_type calculate_fee(const fee_parameters_type& params)const
+      { return 0; }
+   };
+
+   /**
     * @ingroup operations
     */
    struct asset_fund_fee_pool_operation : public base_operation
@@ -407,6 +430,7 @@ FC_REFLECT( graphene::chain::bitasset_options,
 FC_REFLECT( graphene::chain::asset_create_operation::fee_parameters_type, (symbol3)(symbol4)(long_symbol)(price_per_kbyte) )
 FC_REFLECT( graphene::chain::asset_global_settle_operation::fee_parameters_type, (fee) )
 FC_REFLECT( graphene::chain::asset_settle_operation::fee_parameters_type, (fee) )
+FC_REFLECT( graphene::chain::asset_settle_cancel_operation::fee_parameters_type, )
 FC_REFLECT( graphene::chain::asset_fund_fee_pool_operation::fee_parameters_type, (fee) )
 FC_REFLECT( graphene::chain::asset_update_operation::fee_parameters_type, (fee)(price_per_kbyte) )
 FC_REFLECT( graphene::chain::asset_update_bitasset_operation::fee_parameters_type, (fee) )
@@ -447,6 +471,7 @@ FC_REFLECT( graphene::chain::asset_update_feed_producers_operation,
 FC_REFLECT( graphene::chain::asset_publish_feed_operation,
             (fee)(publisher)(asset_id)(feed)(extensions) )
 FC_REFLECT( graphene::chain::asset_settle_operation, (fee)(account)(amount)(extensions) )
+FC_REFLECT( graphene::chain::asset_settle_cancel_operation, (fee)(settlement)(account)(amount)(extensions) )
 FC_REFLECT( graphene::chain::asset_global_settle_operation, (fee)(issuer)(asset_to_settle)(settle_price)(extensions) )
 FC_REFLECT( graphene::chain::asset_issue_operation,
             (fee)(issuer)(asset_to_issue)(issue_to_account)(memo)(extensions) )
