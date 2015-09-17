@@ -58,7 +58,7 @@ void_result proposal_create_evaluator::do_evaluate(const proposal_create_operati
          GRAPHENE_ASSERT(
             *o.review_period_seconds >= global_parameters.committee_proposal_review_period,
             proposal_create_review_period_insufficient,
-            "Review period of ${t} required, but at least ${min} required",
+            "Review period of ${t} specified, but at least ${min} required",
             ("t", *o.review_period_seconds)
             ("min", global_parameters.committee_proposal_review_period)
          );

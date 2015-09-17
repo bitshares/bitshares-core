@@ -103,7 +103,6 @@ void database::open(
    const fc::path& data_dir,
    std::function<genesis_state_type()> genesis_loader )
 {
-   elog( "Open Database" );
    try
    {
       object_database::open(data_dir);
@@ -123,7 +122,7 @@ void database::open(
               FC_ASSERT( head_block_num() == 0, "last block ID does not match current chain state" );
          }
       }
-      idump((head_block_id())(head_block_num()));
+      //idump((head_block_id())(head_block_num()));
    }
    FC_CAPTURE_AND_RETHROW( (data_dir) )
 }
@@ -139,7 +138,7 @@ void database::close(uint32_t blocks_to_rewind)
    {
       while( true )
       {
-         elog("pop");
+      //   elog("pop");
          block_id_type popped_block_id = head_block_id();
          pop_block();
          _fork_db.remove(popped_block_id); // doesn't throw on missing

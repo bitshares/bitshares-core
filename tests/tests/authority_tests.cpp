@@ -557,6 +557,7 @@ BOOST_FIXTURE_TEST_CASE( fired_committee_members, database_fixture )
       PUSH_TX( db, trx, ~0 );
       trx.operations.clear();
    }
+   idump((get_balance(*nathan, asset_id_type()(db))));
    // still no money
    BOOST_CHECK_EQUAL(get_balance(*nathan, asset_id_type()(db)), 5000);
 
