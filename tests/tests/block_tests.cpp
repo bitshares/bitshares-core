@@ -307,6 +307,8 @@ BOOST_AUTO_TEST_CASE( fork_db_tests )
   } FC_LOG_AND_RETHROW() 
 }
 
+/**
+ *  This test has been disabled, out of order blocks should result in the node getting disconnected.
 BOOST_AUTO_TEST_CASE( out_of_order_blocks )
 {
    try {
@@ -359,6 +361,7 @@ BOOST_AUTO_TEST_CASE( out_of_order_blocks )
       throw;
    }
 }
+ */
 
 BOOST_AUTO_TEST_CASE( undo_pending )
 {
