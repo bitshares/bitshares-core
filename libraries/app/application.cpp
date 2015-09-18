@@ -380,8 +380,13 @@ namespace detail {
       virtual bool handle_block(const graphene::net::block_message& blk_msg, bool sync_mode,
                                 std::vector<fc::uint160_t>& contained_transaction_message_ids) override
       { try {
+         auto latency = graphene::time::now() - blk_msg.block.timestamp;
          if (!sync_mode || blk_msg.block.block_num() % 10000 == 0)
-            ilog("Got block #${n} from network", ("n", blk_msg.block.block_num()));
+         {
+            const auto& witness = blk_msg.block.witness(*_chain_db);
+            const auto& witness_account = witness.witness_account(*_chain_db);
+            ilog("Got block #${n} from network with latency of ${l} ms from ${w}", ("n", blk_msg.block.block_num())("l", (latency.count()/1000))("w",witness_account.name)   );
+         }
 
          try {
             // TODO: in the case where this block is valid but on a fork that's too old for us to switch to,
@@ -498,7 +503,7 @@ namespace detail {
        */
       virtual message get_item(const item_id& id) override
       { try {
-         ilog("Request for item ${id}", ("id", id));
+        // ilog("Request for item ${id}", ("id", id));
          if( id.item_type == graphene::net::block_message_type )
          {
             auto opt_block = _chain_db->fetch_block_by_id(id.item_hash);

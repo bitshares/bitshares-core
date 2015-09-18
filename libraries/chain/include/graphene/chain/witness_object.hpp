@@ -38,6 +38,7 @@ namespace graphene { namespace chain {
          vote_id_type     vote_id;
          uint64_t         total_votes = 0;
          string           url;
+         int64_t          total_missed = 0;     
 
          witness_object() : vote_id(vote_id_type::witness) {}
    };
@@ -69,4 +70,6 @@ FC_REFLECT_DERIVED( graphene::chain::witness_object, (graphene::db::object),
                     (pay_vb)
                     (vote_id)
                     (total_votes)
-                    (url) )
+                    (url) 
+                    (total_missed)
+                  )

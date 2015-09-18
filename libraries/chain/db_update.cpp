@@ -40,6 +40,18 @@ void database::update_global_dynamic_data( const signed_block& b )
    uint32_t missed_blocks = get_slot_at_time( b.timestamp );
    assert( missed_blocks != 0 );
    missed_blocks--;
+   if( missed_blocks < 20 ) {
+      for( uint32_t i = 0; i < missed_blocks; ++i ) {
+         const auto& witness_missed = get_scheduled_witness( i+1 )(*this);
+         if(  witness_missed.id != b.witness ) {
+            const auto& witness_account = witness_missed.witness_account(*this); 
+            wlog( "Witness ${name} missed block ${n} around ${t}", ("name",witness_account.name)("n",b.block_num())("t",b.timestamp) );
+            modify( witness_missed, [&]( witness_object& w ) {
+              w.total_missed++;
+            });
+         } 
+      }
+   }
 
    // dynamic global properties updating
    modify( _dgp, [&]( dynamic_global_property_object& dgp ){

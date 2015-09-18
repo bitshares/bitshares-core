@@ -40,7 +40,7 @@ void BlockChain::start()
          QString dataDir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
          QDir(dataDir).mkpath(".");
          boost::program_options::variables_map map;
-         map.insert({"rpc-endpoint",boost::program_options::variable_value(std::string("127.0.0.1:8090"), false)});
+         map.insert({"rpc-endpoint",boost::program_options::variable_value(std::string("127.0.0.1:8091"), false)});
          map.insert({"seed-node",boost::program_options::variable_value(std::vector<std::string>{("104.200.28.117:61705")}, false)});
          grapheneApp->initialize(dataDir.toStdString(), map);
          grapheneApp->initialize_plugins(map);

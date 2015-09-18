@@ -147,7 +147,7 @@ void witness_plugin::schedule_production_loop()
    // If we would wait less than 200ms, wait for the whole second.
    fc::time_point now = graphene::time::now();
    fc::time_point_sec next_second( now + fc::microseconds( 1200000 ) );
-   wdump( (now.time_since_epoch().count())(next_second) );
+   //wdump( (now.time_since_epoch().count())(next_second) );
    _block_production_task = fc::schedule([this]{block_production_loop();},
                                          next_second, "Witness Block Production");
 }
@@ -183,7 +183,7 @@ block_production_condition::block_production_condition_enum witness_plugin::bloc
          ilog("Not producing block because it isn't my turn");
          break;
       case block_production_condition::not_time_yet:
-         ilog("Not producing block because slot has not yet arrived");
+         // ilog("Not producing block because slot has not yet arrived");
          break;
       case block_production_condition::no_private_key:
          ilog("Not producing block because I don't have the private key for ${scheduled_key}", (capture) );
