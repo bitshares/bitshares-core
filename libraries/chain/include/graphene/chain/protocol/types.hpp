@@ -141,7 +141,8 @@ namespace graphene { namespace chain {
       impl_block_summary_object_type,
       impl_account_transaction_history_object_type,
       impl_blinded_balance_object_type,
-      impl_chain_property_object_type
+      impl_chain_property_object_type,
+      impl_witness_schedule_object_type
    };
 
    enum meta_info_object_type
@@ -194,6 +195,7 @@ namespace graphene { namespace chain {
    class block_summary_object;
    class account_transaction_history_object;
    class chain_property_object;
+   class witness_schedule_object;
 
    typedef object_id< implementation_ids, impl_global_property_object_type,  global_property_object>                    global_property_id_type;
    typedef object_id< implementation_ids, impl_dynamic_global_property_object_type,  dynamic_global_property_object>    dynamic_global_property_id_type;
@@ -208,6 +210,7 @@ namespace graphene { namespace chain {
                       impl_account_transaction_history_object_type,
                       account_transaction_history_object>       account_transaction_history_id_type;
    typedef object_id< implementation_ids, impl_chain_property_object_type,   chain_property_object>                     chain_property_id_type;
+   typedef object_id< implementation_ids, impl_witness_schedule_object_type, witness_schedule_object>                   witness_schedule_id_type;
 
    typedef fc::array<char, GRAPHENE_MAX_ASSET_SYMBOL_LENGTH>    symbol_type;
    typedef fc::ripemd160                                        block_id_type;
@@ -284,6 +287,7 @@ FC_REFLECT_ENUM( graphene::chain::impl_object_type,
                  (impl_account_transaction_history_object_type)
                  (impl_blinded_balance_object_type)
                  (impl_chain_property_object_type)
+                 (impl_witness_schedule_object_type)
                )
 
 FC_REFLECT_ENUM( graphene::chain::meta_info_object_type, (meta_account_object_type)(meta_asset_object_type) )

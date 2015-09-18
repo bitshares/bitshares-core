@@ -30,6 +30,7 @@
 #include <graphene/chain/vesting_balance_object.hpp>
 #include <graphene/chain/withdraw_permission_object.hpp>
 #include <graphene/chain/witness_object.hpp>
+#include <graphene/chain/witness_schedule_object.hpp>
 
 #include <graphene/chain/account_evaluator.hpp>
 #include <graphene/chain/asset_evaluator.hpp>
@@ -192,6 +193,7 @@ void database::initialize_indexes()
    add_index< primary_index<simple_index<asset_dynamic_data_object       >> >();
    add_index< primary_index<flat_index<  block_summary_object            >> >();
    add_index< primary_index<simple_index<chain_property_object          > > >();
+   add_index< primary_index<simple_index<witness_schedule_object        > > >();
 }
 
 void database::init_genesis(const genesis_state_type& genesis_state)
@@ -592,13 +594,19 @@ void database::init_genesis(const genesis_state_type& genesis_state)
       {
          p.active_witnesses.insert(i);
          p.witness_accounts.insert(get(witness_id_type(i)).witness_account);
-         p.current_shuffled_witnesses.push_back( witness_id_type(i) );
       }
    });
 
    // Enable fees
    modify(get_global_properties(), [&genesis_state](global_property_object& p) {
       p.parameters.current_fees = genesis_state.initial_parameters.current_fees;
+   });
+
+   // Create witness scheduler
+   create<witness_schedule_object>([&]( witness_schedule_object& wso )
+   {
+      for( const witness_id_type& wid : get_global_properties().active_witnesses )
+         wso.current_shuffled_witnesses.push_back( wid );
    });
 
    _undo_db.enable();
