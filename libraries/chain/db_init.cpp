@@ -592,6 +592,7 @@ void database::init_genesis(const genesis_state_type& genesis_state)
       {
          p.active_witnesses.insert(i);
          p.witness_accounts.insert(get(witness_id_type(i)).witness_account);
+         p.current_shuffled_witnesses.push_back( witness_id_type(i) );
       }
    });
 

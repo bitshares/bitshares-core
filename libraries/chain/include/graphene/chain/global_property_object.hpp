@@ -44,9 +44,10 @@ namespace graphene { namespace chain {
 
          uint32_t                           next_available_vote_id = 0;
          vector<committee_member_id_type>   active_committee_members; // updated once per maintenance interval
-         flat_set<witness_id_type>  active_witnesses; // updated once per maintenance interval
+         flat_set<witness_id_type>          active_witnesses; // updated once per maintenance interval
          // n.b. witness scheduling is done by witness_schedule object
-         flat_set<account_id_type>  witness_accounts; // updated once per maintenance interval
+         flat_set<account_id_type>          witness_accounts; // updated once per maintenance interval
+         vector<witness_id_type>            current_shuffled_witnesses;
    };
 
    /**
@@ -88,7 +89,7 @@ namespace graphene { namespace chain {
           * number of slots since genesis.  Also equal to the total
           * number of missed slots plus head_block_number.
           */
-         uint64_t          current_aslot = 0;
+         uint64_t                current_aslot = 0;
 
          /**
           * used to compute witness participation.
@@ -137,4 +138,5 @@ FC_REFLECT_DERIVED( graphene::chain::global_property_object, (graphene::db::obje
                     (next_available_vote_id)
                     (active_committee_members)
                     (active_witnesses)
+                    (current_shuffled_witnesses)
                   )

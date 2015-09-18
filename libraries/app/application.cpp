@@ -385,7 +385,7 @@ namespace detail {
          {
             const auto& witness = blk_msg.block.witness(*_chain_db);
             const auto& witness_account = witness.witness_account(*_chain_db);
-            ilog("Got block #${n} from network with latency of ${l} ms from ${w}", ("n", blk_msg.block.block_num())("l", (latency.count()/1000))("w",witness_account.name)   );
+            ilog("Got block #${n} with time ${t} from network with latency of ${l} ms from ${w}", ("t",blk_msg.block.timestamp)("n", blk_msg.block.block_num())("l", (latency.count()/1000))("w",witness_account.name)   );
          }
 
          try {

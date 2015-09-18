@@ -64,7 +64,6 @@ void witness_plugin::plugin_set_program_options(
    command_line_options.add_options()
          ("enable-stale-production", bpo::bool_switch()->notifier([this](bool e){_production_enabled = e;}), "Enable block production, even if the chain is stale.")
          ("required-participation", bpo::bool_switch()->notifier([this](int e){_required_witness_participation = uint32_t(e*GRAPHENE_1_PERCENT);}), "Percent of witnesses (0-99) that must be participating in order to produce blocks")
-         ("allow-consecutive", bpo::bool_switch()->notifier([this](bool e){_consecutive_production_enabled = e;}), "Allow block production, even if the last block was produced by the same witness.")
          ("witness-id,w", bpo::value<vector<string>>()->composing()->multitoken(),
           ("ID of witness controlled by this node (e.g. " + witness_id_example + ", quotes are required, may specify multiple times)").c_str())
          ("private-key", bpo::value<vector<string>>()->composing()->multitoken()->
@@ -267,15 +266,6 @@ block_production_condition::block_production_condition_enum witness_plugin::mayb
    {
       capture("scheduled_time", scheduled_time)("now", now);
       return block_production_condition::lag;
-   }
-
-   if( !_consecutive_production_enabled )
-   {
-      if( db.get_dynamic_global_properties().current_witness == scheduled_witness )
-      {
-         capture("scheduled_witness", scheduled_witness);
-         return block_production_condition::consecutive;
-      }
    }
 
    auto block = db.generate_block(

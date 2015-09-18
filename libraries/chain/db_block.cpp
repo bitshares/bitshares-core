@@ -485,6 +485,7 @@ void database::_apply_block( const signed_block& next_block )
    // update_global_dynamic_data() as perhaps these methods only need
    // to be called for header validation?
    update_maintenance_flag( maint_needed );
+   shuffle_witnesses();
 
    // notify observers that the block has been applied
    applied_block( next_block ); //emit
@@ -492,6 +493,36 @@ void database::_apply_block( const signed_block& next_block )
 
    notify_changed_objects();
 } FC_CAPTURE_AND_RETHROW( (next_block.block_num()) )  }
+
+void database::shuffle_witnesses() {
+  const auto& dgp    = get_global_properties();
+  if( head_block_num() % dgp.active_witnesses.size() == 0 ) {
+     modify( dgp, [&]( global_property_object& props ) {
+        props.current_shuffled_witnesses.clear();
+        props.current_shuffled_witnesses.reserve( props.active_witnesses.size() );
+
+        for( auto w : props.active_witnesses ) 
+            props.current_shuffled_witnesses.push_back(w);
+
+        auto now_hi = uint64_t(head_block_time().sec_since_epoch()) << 32;
+        for( uint32_t i = 0; i < props.current_shuffled_witnesses.size(); ++i )
+        {
+            /// High performance random generator
+            /// http://xorshift.di.unimi.it/
+            uint64_t k = now_hi + uint64_t(i)*2685821657736338717ULL;
+            k ^= (k >> 12);
+            k ^= (k << 25);
+            k ^= (k >> 27);
+            k *= 2685821657736338717ULL;
+
+            uint32_t jmax = props.current_shuffled_witnesses.size() - i;
+            uint32_t j = i + k%jmax;
+            std::swap( props.current_shuffled_witnesses[i],
+                       props.current_shuffled_witnesses[j] );
+        }
+     });
+  }
+}
 
 void database::notify_changed_objects()
 { try {

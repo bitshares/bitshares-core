@@ -424,6 +424,7 @@ namespace graphene { namespace chain {
          void update_expired_feeds();
          void update_maintenance_flag( bool new_maintenance_flag );
          void update_withdraw_permissions();
+         void shuffle_witnesses();
 
          ///Steps performed only at maintenance intervals
          ///@{
