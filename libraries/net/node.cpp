@@ -1292,11 +1292,11 @@ namespace graphene { namespace net { namespace detail {
 
         // timeout for any active peers is two block intervals
         uint32_t active_disconnect_timeout = 10 * current_block_interval_in_seconds;
-        uint32_t active_send_keepalive_timeount = active_disconnect_timeout / 2;
-        uint32_t active_ignored_request_timeount = 3 * current_block_interval_in_seconds;
+        uint32_t active_send_keepalive_timeout = active_disconnect_timeout / 2;
+        uint32_t active_ignored_request_timeout = current_block_interval_in_seconds;
         fc::time_point active_disconnect_threshold = fc::time_point::now() - fc::seconds(active_disconnect_timeout);
-        fc::time_point active_send_keepalive_threshold = fc::time_point::now() - fc::seconds(active_send_keepalive_timeount);
-        fc::time_point active_ignored_request_threshold = fc::time_point::now() - fc::seconds(active_ignored_request_timeount);
+        fc::time_point active_send_keepalive_threshold = fc::time_point::now() - fc::seconds(active_send_keepalive_timeout);
+        fc::time_point active_ignored_request_threshold = fc::time_point::now() - fc::seconds(active_ignored_request_timeout);
         for( const peer_connection_ptr& active_peer : _active_connections )
         {
           if( active_peer->connection_initiation_time < active_disconnect_threshold &&
@@ -1346,7 +1346,7 @@ namespace graphene { namespace net { namespace detail {
                      active_peer->get_last_message_received_time() < active_send_keepalive_threshold)
             {
               wlog( "Sending a keepalive message to peer ${peer} who hasn't sent us any messages in the last ${timeout} seconds",
-                    ( "peer", active_peer->get_remote_endpoint() )("timeout", active_send_keepalive_timeount ) );
+                    ( "peer", active_peer->get_remote_endpoint() )("timeout", active_send_keepalive_timeout ) );
               peers_to_send_keep_alive.push_back(active_peer);
             }
           }
