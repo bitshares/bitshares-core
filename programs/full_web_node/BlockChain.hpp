@@ -12,12 +12,14 @@ class BlockChain : public QObject {
    Q_OBJECT
    Q_PROPERTY(QString webUsername MEMBER webUsername CONSTANT)
    Q_PROPERTY(QString webPassword MEMBER webPassword CONSTANT)
+   Q_PROPERTY(QString rpcEndpoint MEMBER rpcEndpoint CONSTANT)
 
    fc::thread* chainThread;
    graphene::app::application* grapheneApp;
    fc::future<void> startFuture;
    QString webUsername;
    QString webPassword;
+   QString rpcEndpoint;
 
 public:
    BlockChain();

@@ -13,7 +13,7 @@ Window {
    BlockChain {
       id: blockChain
       onStarted: {
-         var url = "qrc:/index.html#auth/" + webUsername + ":" + webPassword
+         var url = "qrc:/index.html#auth/" + webUsername + ":" + webPassword + ":" + rpcEndpoint
          console.log("Loading %1 in web view".arg(url))
          webView.url = url
       }

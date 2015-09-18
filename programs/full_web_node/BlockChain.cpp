@@ -13,6 +13,7 @@
 #include <QDebug>
 #include <QStandardPaths>
 #include <QDir>
+#include <QSettings>
 
 BlockChain::BlockChain()
    : chainThread(new fc::thread("chainThread")),
@@ -34,14 +35,17 @@ void BlockChain::start()
 {
    startFuture = chainThread->async([this] {
       try {
+         QSettings settings;
+         rpcEndpoint = settings.value( "rpc-endpoint", "127.0.0.1:8091" ).value<QString>();
+         auto seed_node    = settings.value( "seed-node", "104.236.51.238:1776" ).value<QString>().toStdString();
          grapheneApp->register_plugin<graphene::account_history::account_history_plugin>();
          grapheneApp->register_plugin<graphene::market_history::market_history_plugin>();
 
          QString dataDir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
          QDir(dataDir).mkpath(".");
          boost::program_options::variables_map map;
-         map.insert({"rpc-endpoint",boost::program_options::variable_value(std::string("127.0.0.1:8091"), false)});
-         map.insert({"seed-node",boost::program_options::variable_value(std::vector<std::string>{("104.200.28.117:61705")}, false)});
+         map.insert({"rpc-endpoint",boost::program_options::variable_value(rpcEndpoint.toStdString(), false)});
+         map.insert({"seed-node",boost::program_options::variable_value(std::vector<std::string>{(seed_node)}, false)});
          grapheneApp->initialize(dataDir.toStdString(), map);
          grapheneApp->initialize_plugins(map);
          grapheneApp->startup();
@@ -52,7 +56,7 @@ void BlockChain::start()
          webPermissions.password_hash_b64 = fc::base64_encode(passHash.data(), passHash.data_size());
          webPermissions.password_salt_b64 = fc::base64_encode("");
          webPermissions.allowed_apis = {"database_api", "network_broadcast_api", "network_node_api", "history_api"};
-         grapheneApp->set_api_access_info(webUsername.toStdString(), std::move(webPermissions));
+         grapheneApp->set_api_access_info(webUsername.toStdString(), std::move(webPermissions) );
       } catch (const fc::exception& e) {
          elog("Crap went wrong: ${e}", ("e", e.to_detail_string()));
       }
