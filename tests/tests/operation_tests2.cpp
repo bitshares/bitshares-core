@@ -456,7 +456,7 @@ BOOST_AUTO_TEST_CASE( witness_create )
       if( block.witness == nathan_witness_id )
          produced++;
    }
-   BOOST_CHECK_EQUAL( produced, 1 );
+   BOOST_CHECK_EQUAL( produced, 2 );
 } FC_LOG_AND_RETHROW() }
 
 /**

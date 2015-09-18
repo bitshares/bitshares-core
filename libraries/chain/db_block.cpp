@@ -520,6 +520,7 @@ void database::shuffle_witnesses() {
             std::swap( props.current_shuffled_witnesses[i],
                        props.current_shuffled_witnesses[j] );
         }
+     //   edump( (props.current_shuffled_witnesses) );
      });
   }
 }
