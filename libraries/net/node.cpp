@@ -3230,10 +3230,10 @@ namespace graphene { namespace net { namespace detail {
       fc::time_point message_receive_time = fc::time_point::now();
 
       dlog( "received a block from peer ${endpoint}, passing it to client", ("endpoint", originating_peer->get_remote_endpoint() ) );
-      std::list<peer_connection_ptr> peers_to_disconnect;
+      std::set<peer_connection_ptr> peers_to_disconnect;
       std::string disconnect_reason;
       fc::oexception disconnect_exception;
-
+      fc::oexception restart_sync_exception;
       try
       {
         // we can get into an intersting situation near the end of synchronization.  We can be in
@@ -3250,8 +3250,8 @@ namespace graphene { namespace net { namespace detail {
           _delegate->handle_block(block_message_to_process, false, contained_transaction_message_ids);
           message_validated_time = fc::time_point::now();
           ilog("Successfully pushed block ${num} (id:${id})",
-               ("num", block_message_to_process.block.block_num())
-               ("id", block_message_to_process.block_id));
+                ("num", block_message_to_process.block.block_num())
+                ("id", block_message_to_process.block_id));
           _most_recent_blocks_accepted.push_back(block_message_to_process.block_id);
 
           bool new_transaction_discovered = false;
@@ -3313,7 +3313,7 @@ namespace graphene { namespace net { namespace detail {
               if (next_fork_block_number != 0 &&
                   next_fork_block_number <= block_number)
               {
-                peers_to_disconnect.push_back(peer);
+                peers_to_disconnect.insert(peer);
 #ifdef ENABLE_DEBUG_ULOGS
                 ulog("Disconnecting from peer because their version is too old.  Their version date: ${date}", ("date", peer->graphene_git_revision_unix_timestamp));
 #endif
@@ -3334,7 +3334,11 @@ namespace graphene { namespace net { namespace detail {
       {
         throw;
       }
-      catch ( const fc::exception& e )
+      catch (const unlinkable_block_exception& e) 
+      {
+        restart_sync_exception = e;
+      }
+      catch (const fc::exception& e)
       {
         // client rejected the block.  Disconnect the client and any other clients that offered us this block
         wlog("Failed to push block ${num} (id:${id}), client rejected block sent by peer",
@@ -3344,13 +3348,21 @@ namespace graphene { namespace net { namespace detail {
         disconnect_exception = e;
         disconnect_reason = "You offered me a block that I have deemed to be invalid";
 
-        peers_to_disconnect.push_back( originating_peer->shared_from_this() );
-        /*  This loop fails do disconnect the originating peer  
+        peers_to_disconnect.insert( originating_peer->shared_from_this() );
         for (const peer_connection_ptr& peer : _active_connections)
           if (!peer->ids_of_items_to_get.empty() && peer->ids_of_items_to_get.front() == block_message_to_process.block_id)
-            peers_to_disconnect.push_back(peer);
-        */
+            peers_to_disconnect.insert(peer);
       }
+
+      if (restart_sync_exception)
+      {
+        wlog("Peer ${peer} sent me a block that didn't link to our blockchain.  Restarting sync mode with them to get the missing block. "
+             "Error pushing block was: ${e}",
+             ("peer", originating_peer->get_remote_endpoint())
+             ("e", *restart_sync_exception));
+        start_synchronizing_with_peer(originating_peer->shared_from_this());
+      }
+
       for (const peer_connection_ptr& peer : peers_to_disconnect)
       {
         wlog("disconnecting client ${endpoint} because it offered us the rejected block", ("endpoint", peer->get_remote_endpoint()));

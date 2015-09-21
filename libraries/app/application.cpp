@@ -411,6 +411,10 @@ namespace detail {
             }
 
             return result;
+         } catch ( const graphene::chain::unlinkable_block_exception& e ) {
+            // translate to a graphene::net exception
+            elog("Error when pushing block:\n${e}", ("e", e.to_detail_string()));
+            FC_THROW_EXCEPTION(graphene::net::unlinkable_block_exception, "Error when pushing block:\n${e}", ("e", e.to_detail_string()));
          } catch( const fc::exception& e ) {
             elog("Error when pushing block:\n${e}", ("e", e.to_detail_string()));
             throw;
