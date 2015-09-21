@@ -1,5 +1,6 @@
 
 #include <graphene/app/database_api.hpp>
+#include <graphene/chain/get_config.hpp>
 
 #include <fc/bloom_filter.hpp>
 #include <fc/smart_ref_impl.hpp>
@@ -350,7 +351,7 @@ fc::variant_object database_api::get_config()const
 
 fc::variant_object database_api_impl::get_config()const
 {
-   return get_config();
+   return graphene::chain::get_config();
 }
 
 chain_id_type database_api::get_chain_id()const
