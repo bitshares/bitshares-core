@@ -2495,11 +2495,23 @@ namespace graphene { namespace net { namespace detail {
               originating_peer->last_block_delegate_has_seen = item_hashes_received.front();
               originating_peer->last_block_number_delegate_has_seen = _delegate->get_block_number(item_hashes_received.front());
               originating_peer->last_block_time_delegate_has_seen = _delegate->get_block_time(item_hashes_received.front());
-              dlog("popping item because delegate has already seen it.  peer ${peer}'s last block the delegate has seen is now ${block_id} (actual block #${actual_block_num}, tracked block #${tracked_block_num})",
-                   ("peer", originating_peer->get_remote_endpoint())
-                   ("block_id", originating_peer->last_block_delegate_has_seen)
-                   ("actual_block_num", _delegate->get_block_number(item_hashes_received.front()))
-                   ("tracked_block_num", originating_peer->last_block_number_delegate_has_seen));
+              if( !(originating_peer->last_block_number_delegate_has_seen == _delegate->get_block_number(originating_peer->last_block_delegate_has_seen)) )
+              {
+                 elog("popping item because delegate has already seen it.  peer ${peer}'s last block the delegate has seen is now ${block_id} (actual block #${actual_block_num}, tracked block #${tracked_block_num})",
+                      ("peer", originating_peer->get_remote_endpoint())
+                      ("block_id", originating_peer->last_block_delegate_has_seen)
+                      ("actual_block_num", _delegate->get_block_number(item_hashes_received.front()))
+                      ("tracked_block_num", originating_peer->last_block_number_delegate_has_seen));
+              }
+              else
+              {
+                 dlog("popping item because delegate has already seen it.  peer ${peer}'s last block the delegate has seen is now ${block_id} (actual block #${actual_block_num}, tracked block #${tracked_block_num})",
+                      ("peer", originating_peer->get_remote_endpoint())
+                      ("block_id", originating_peer->last_block_delegate_has_seen)
+                      ("actual_block_num", _delegate->get_block_number(item_hashes_received.front()))
+                      ("tracked_block_num", originating_peer->last_block_number_delegate_has_seen));
+              }
+
               item_hashes_received.pop_front();
             }
             dlog("after removing all items we have already seen, item_hashes_received.size() = ${size}", ("size", item_hashes_received.size()));
