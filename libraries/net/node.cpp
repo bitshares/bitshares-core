@@ -3323,10 +3323,13 @@ namespace graphene { namespace net { namespace detail {
 
         disconnect_exception = e;
         disconnect_reason = "You offered me a block that I have deemed to be invalid";
+
+        peers_to_disconnect.push_back( originating_peer->shared_from_this() );
+        /*  This loop fails do disconnect the originating peer  
         for (const peer_connection_ptr& peer : _active_connections)
-          if (!peer->ids_of_items_to_get.empty() &&
-              peer->ids_of_items_to_get.front() == block_message_to_process.block_id)
+          if (!peer->ids_of_items_to_get.empty() && peer->ids_of_items_to_get.front() == block_message_to_process.block_id)
             peers_to_disconnect.push_back(peer);
+        */
       }
       for (const peer_connection_ptr& peer : peers_to_disconnect)
       {
