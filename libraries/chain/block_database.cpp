@@ -129,7 +129,7 @@ block_id_type block_database::fetch_block_id( uint32_t block_num )const
    index_entry e;
    auto index_pos = sizeof(e)*block_num;
    _block_num_to_pos.seekg( 0, _block_num_to_pos.end );
-   if ( _block_num_to_pos.tellg() <= index_pos )
+   if ( _block_num_to_pos.tellg() <= int64_t(index_pos) )
       FC_THROW_EXCEPTION(fc::key_not_found_exception, "Block number ${block_num} not contained in block database", ("block_num", block_num));
 
    _block_num_to_pos.seekg( index_pos );
