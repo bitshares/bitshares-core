@@ -335,6 +335,7 @@ void_result asset_update_feed_producers_evaluator::do_evaluate(const asset_updat
 
    FC_ASSERT(a.is_market_issued(), "Cannot update feed producers on a non-BitAsset.");
    FC_ASSERT(a.issuer != GRAPHENE_COMMITTEE_ACCOUNT, "Cannot set feed producers on a committee-issued asset.");
+   FC_ASSERT(a.issuer != GRAPHENE_WITNESS_ACCOUNT, "Cannot set feed producers on a witness-issued asset.");
 
    const asset_bitasset_data_object& b = a.bitasset_data(d);
    bitasset_to_update = &b;
@@ -457,12 +458,12 @@ void_result asset_publish_feeds_evaluator::do_evaluate(const asset_publish_feed_
    FC_ASSERT( !bitasset.has_settlement(), "No further feeds may be published after a settlement event" );
    FC_ASSERT(o.feed.settlement_price.quote.asset_id == bitasset.options.short_backing_asset);
    //Verify that the publisher is authoritative to publish a feed
-   if( base.issuer == GRAPHENE_COMMITTEE_ACCOUNT )
+   if( (base.issuer == GRAPHENE_WITNESS_ACCOUNT) || (base.issuer == GRAPHENE_COMMITTEE_ACCOUNT) )
    {
-      //It's a committee_member-fed asset. Verify that publisher is an active committee_member or witness.
-      FC_ASSERT(d.get(GRAPHENE_COMMITTEE_ACCOUNT).active.account_auths.count(o.publisher) ||
-                d.get_global_properties().witness_accounts.count(o.publisher));
-   } else {
+      FC_ASSERT( d.get(base.issuer).active.account_auths.count(o.publisher) );
+   }
+   else
+   {
       FC_ASSERT(bitasset.feeds.count(o.publisher));
    }
 
