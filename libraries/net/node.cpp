@@ -2364,6 +2364,35 @@ namespace graphene { namespace net { namespace detail {
         // the blocks in the synopsis we sent
         if (!blockchain_item_ids_inventory_message_received.item_hashes_available.empty())
         {
+          // what's more, it should be a sequential list of blocks, verify that first
+          uint32_t first_block_number_in_reponse = _delegate->get_block_number(blockchain_item_ids_inventory_message_received.item_hashes_available.front());
+          for (unsigned i = 1; i < blockchain_item_ids_inventory_message_received.item_hashes_available.size(); ++i)
+          {
+            uint32_t actual_num = _delegate->get_block_number(blockchain_item_ids_inventory_message_received.item_hashes_available[i]);
+            uint32_t expected_num = first_block_number_in_reponse + i;
+            if (actual_num != expected_num)
+            {
+            wlog("Invalid response from peer ${peer_endpoint}.  The list of blocks they provided is not sequential, "
+                 "the ${position}th block in their reply was block number ${actual_num}, "
+                 "but it should have been number ${expected_num}",
+                 ("peer_endpoint", originating_peer->get_remote_endpoint())
+                 ("position", i)
+                 ("actual_num", actual_num)
+                 ("expected_num", expected_num));
+            fc::exception error_for_peer(FC_LOG_MESSAGE(error, 
+                                                        "You gave an invalid response to my request for sync blocks.  The list of blocks you provided is not sequential, "
+                                                        "the ${position}th block in their reply was block number ${actual_num}, "
+                                                        "but it should have been number ${expected_num}",
+                                                        ("position", i)
+                                                        ("actual_num", actual_num)
+                                                        ("expected_num", expected_num)));
+            disconnect_from_peer(originating_peer,
+                                 "You gave an invalid response to my request for sync blocks",
+                                 true, error_for_peer);
+            return;
+            }
+          }
+
           const std::vector<item_hash_t>& synopsis_sent_in_request = originating_peer->item_ids_requested_from_peer->get<0>();
           const item_hash_t& first_item_hash = blockchain_item_ids_inventory_message_received.item_hashes_available.front();
 
@@ -2376,15 +2405,12 @@ namespace graphene { namespace net { namespace detail {
                    "but they provided a list of blocks starting with ${first_block}",
                    ("peer_endpoint", originating_peer->get_remote_endpoint())
                    ("first_block", first_item_hash));
-              // TODO: enable these once committed
-              //fc::exception error_for_peer(FC_LOG_MESSAGE(error, "You gave an invalid response for my request for sync blocks.  I asked for blocks starting from the beginning of the chain, "
-              //                                            "but you returned a list of blocks starting with ${first_block}",  
-              //                                            ("first_block", first_item_hash)));
-              //disconnect_from_peer(originating_peer,
-              //                     "You gave an invalid response to my request for sync blocks",
-              //                     true, error_for_peer);
+              fc::exception error_for_peer(FC_LOG_MESSAGE(error, "You gave an invalid response for my request for sync blocks.  I asked for blocks starting from the beginning of the chain, "
+                                                          "but you returned a list of blocks starting with ${first_block}",  
+                                                          ("first_block", first_item_hash)));
               disconnect_from_peer(originating_peer,
-                                   "You gave an invalid response to my request for sync blocks");
+                                   "You gave an invalid response to my request for sync blocks",
+                                   true, error_for_peer);
               return;
             }
           }
@@ -2397,16 +2423,13 @@ namespace graphene { namespace net { namespace detail {
                    ("peer_endpoint", originating_peer->get_remote_endpoint())
                    ("synopsis", synopsis_sent_in_request)
                    ("first_block", first_item_hash));
-              // TODO: enable these once committed
-              //fc::exception error_for_peer(FC_LOG_MESSAGE(error, "You gave an invalid response for my request for sync blocks.  I asked for blocks following something in "
-              //                                            "${synopsis}, but you returned a list of blocks starting with ${first_block} which wasn't one of your choices",  
-              //                                            ("synopsis", synopsis_sent_in_request)
-              //                                            ("first_block", first_item_hash)));
-              //disconnect_from_peer(originating_peer,
-              //                     "You gave an invalid response to my request for sync blocks",
-              //                     true, error_for_peer);
+              fc::exception error_for_peer(FC_LOG_MESSAGE(error, "You gave an invalid response for my request for sync blocks.  I asked for blocks following something in "
+                                                          "${synopsis}, but you returned a list of blocks starting with ${first_block} which wasn't one of your choices",  
+                                                          ("synopsis", synopsis_sent_in_request)
+                                                          ("first_block", first_item_hash)));
               disconnect_from_peer(originating_peer,
-                                   "You gave an invalid response to my request for sync blocks");
+                                   "You gave an invalid response to my request for sync blocks",
+                                   true, error_for_peer);
               return;
             }
           }
@@ -2464,28 +2487,19 @@ namespace graphene { namespace net { namespace detail {
                ("is_first", is_first_item_for_other_peer)("size", item_hashes_received.size()));
           if (!is_first_item_for_other_peer)
           {
-            bool first = true;
             while (!item_hashes_received.empty() &&
                    _delegate->has_item(item_id(blockchain_item_ids_inventory_message_received.item_type,
                                                item_hashes_received.front())))
             {
               assert(item_hashes_received.front() != item_hash_t());
               originating_peer->last_block_delegate_has_seen = item_hashes_received.front();
-              if (first)
-              {
-                // we don't yet know the block number of the first block they sent, so look it up
-                originating_peer->last_block_number_delegate_has_seen = _delegate->get_block_number(item_hashes_received.front());
-                first = false;
-              }
-              else
-                ++originating_peer->last_block_number_delegate_has_seen;  // subsequent blocks will follow in immediate sequence
+              originating_peer->last_block_number_delegate_has_seen = _delegate->get_block_number(item_hashes_received.front());
               originating_peer->last_block_time_delegate_has_seen = _delegate->get_block_time(item_hashes_received.front());
               dlog("popping item because delegate has already seen it.  peer ${peer}'s last block the delegate has seen is now ${block_id} (actual block #${actual_block_num}, tracked block #${tracked_block_num})",
                    ("peer", originating_peer->get_remote_endpoint())
                    ("block_id", originating_peer->last_block_delegate_has_seen)
                    ("actual_block_num", _delegate->get_block_number(item_hashes_received.front()))
                    ("tracked_block_num", originating_peer->last_block_number_delegate_has_seen));
-              assert(originating_peer->last_block_number_delegate_has_seen == _delegate->get_block_number(originating_peer->last_block_delegate_has_seen));
               item_hashes_received.pop_front();
             }
             dlog("after removing all items we have already seen, item_hashes_received.size() = ${size}", ("size", item_hashes_received.size()));
@@ -5311,8 +5325,11 @@ namespace graphene { namespace net { namespace detail {
 
     uint32_t statistics_gathering_node_delegate_wrapper::get_block_number(const item_hash_t& block_id)
     {
-      INVOKE_AND_COLLECT_STATISTICS(get_block_number, block_id);
+      // this function doesn't need to block,
+      ASSERT_TASK_NOT_PREEMPTED();
+      return _node_delegate->get_block_number(block_id);
     }
+
     fc::time_point_sec statistics_gathering_node_delegate_wrapper::get_block_time(const item_hash_t& block_id)
     {
       INVOKE_AND_COLLECT_STATISTICS(get_block_time, block_id);
