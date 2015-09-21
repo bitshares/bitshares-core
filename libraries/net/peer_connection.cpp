@@ -77,7 +77,6 @@ namespace graphene { namespace net
       number_of_unfetched_item_ids(0),
       peer_needs_sync_items_from_us(true),
       we_need_sync_items_from_peer(true),
-      last_block_number_delegate_has_seen(0),
       inhibit_fetching_sync_blocks(false),
       transaction_fetching_inhibited_until(fc::time_point::min()),
       last_known_fork_block_number(0),

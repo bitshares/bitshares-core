@@ -1293,10 +1293,21 @@ namespace graphene { namespace net { namespace detail {
         // timeout for any active peers is two block intervals
         uint32_t active_disconnect_timeout = 10 * current_block_interval_in_seconds;
         uint32_t active_send_keepalive_timeout = active_disconnect_timeout / 2;
-        uint32_t active_ignored_request_timeout = current_block_interval_in_seconds;
+        
+        // set the ignored request time out to 1 second.  When we request a block
+        // or transaction from a peer, this timeout determines how long we wait for them
+        // to reply before we give up and ask another peer for the item.
+        // Ideally this should be significantly shorter than the block interval, because
+        // we'd like to realize the block isn't coming and fetch it from a different 
+        // peer before the next block comes in.  At the current target of 3 second blocks,
+        // 1 second seems reasonable.  When we get closer to our eventual target of 1 second 
+        // blocks, this will need to be re-evaluated (i.e., can we set the timeout to 500ms
+        // and still handle normal network & processing delays without excessive disconnects)
+        fc::microseconds active_ignored_request_timeout = fc::seconds(1);
+
         fc::time_point active_disconnect_threshold = fc::time_point::now() - fc::seconds(active_disconnect_timeout);
         fc::time_point active_send_keepalive_threshold = fc::time_point::now() - fc::seconds(active_send_keepalive_timeout);
-        fc::time_point active_ignored_request_threshold = fc::time_point::now() - fc::seconds(active_ignored_request_timeout);
+        fc::time_point active_ignored_request_threshold = fc::time_point::now() - active_ignored_request_timeout;
         for( const peer_connection_ptr& active_peer : _active_connections )
         {
           if( active_peer->connection_initiation_time < active_disconnect_threshold &&
@@ -2276,14 +2287,14 @@ namespace graphene { namespace net { namespace detail {
     {
       VERIFY_CORRECT_THREAD();
       item_hash_t reference_point = peer->last_block_delegate_has_seen;
-      uint32_t reference_point_block_num = peer->last_block_number_delegate_has_seen;
-      uint32_t number_of_blocks_after_reference_point = (uint32_t)peer->ids_of_items_to_get.size();
+      uint32_t reference_point_block_num = _delegate->get_block_number(peer->last_block_delegate_has_seen);
 
       // when we call _delegate->get_blockchain_synopsis(), we may yield and there's a
       // chance this peer's state will change before we get control back.  Save off
       // the stuff necessary for generating the synopsis.
       // This is pretty expensive, we should find a better way to do this
-      std::unique_ptr<std::vector<item_hash_t> > original_ids_of_items_to_get(new std::vector<item_hash_t>(peer->ids_of_items_to_get.begin(), peer->ids_of_items_to_get.end()));
+      std::vector<item_hash_t> original_ids_of_items_to_get(peer->ids_of_items_to_get.begin(), peer->ids_of_items_to_get.end());
+      uint32_t number_of_blocks_after_reference_point = original_ids_of_items_to_get.size();
 
       std::vector<item_hash_t> synopsis = _delegate->get_blockchain_synopsis(reference_point, number_of_blocks_after_reference_point);
 
@@ -2303,7 +2314,8 @@ namespace graphene { namespace net { namespace detail {
       if( number_of_blocks_after_reference_point )
       {
         // then the synopsis is incomplete, add the missing elements from ids_of_items_to_get
-        uint32_t true_high_block_num = reference_point_block_num + number_of_blocks_after_reference_point;
+        uint32_t first_block_num_in_ids_to_get = _delegate->get_block_number(original_ids_of_items_to_get.front());
+        uint32_t true_high_block_num = first_block_num_in_ids_to_get + original_ids_of_items_to_get.size() - 1;
 
         // in order to generate a seamless synopsis, we need to be using the same low_block_num as the 
         // backend code; the first block in the synopsis will be the low block number it used
@@ -2311,12 +2323,12 @@ namespace graphene { namespace net { namespace detail {
         
         do
         {
-          if( low_block_num > reference_point_block_num )
-            synopsis.push_back((*original_ids_of_items_to_get)[low_block_num - reference_point_block_num - 1]);
+          if( low_block_num >= first_block_num_in_ids_to_get )
+            synopsis.push_back(original_ids_of_items_to_get[low_block_num - first_block_num_in_ids_to_get]);
           low_block_num += (true_high_block_num - low_block_num + 2 ) / 2;
         }
         while ( low_block_num <= true_high_block_num );
-        assert(synopsis.back() == original_ids_of_items_to_get->back());
+        assert(synopsis.back() == original_ids_of_items_to_get.back());
       }
       return synopsis;
     }
@@ -2327,7 +2339,6 @@ namespace graphene { namespace net { namespace detail {
       if( reset_fork_tracking_data_for_peer )
       {
         peer->last_block_delegate_has_seen = item_hash_t();
-        peer->last_block_number_delegate_has_seen = 0;
         peer->last_block_time_delegate_has_seen = _delegate->get_block_time(item_hash_t());
       }
 
@@ -2493,24 +2504,11 @@ namespace graphene { namespace net { namespace detail {
             {
               assert(item_hashes_received.front() != item_hash_t());
               originating_peer->last_block_delegate_has_seen = item_hashes_received.front();
-              originating_peer->last_block_number_delegate_has_seen = _delegate->get_block_number(item_hashes_received.front());
               originating_peer->last_block_time_delegate_has_seen = _delegate->get_block_time(item_hashes_received.front());
-              if( !(originating_peer->last_block_number_delegate_has_seen == _delegate->get_block_number(originating_peer->last_block_delegate_has_seen)) )
-              {
-                 elog("popping item because delegate has already seen it.  peer ${peer}'s last block the delegate has seen is now ${block_id} (actual block #${actual_block_num}, tracked block #${tracked_block_num})",
-                      ("peer", originating_peer->get_remote_endpoint())
-                      ("block_id", originating_peer->last_block_delegate_has_seen)
-                      ("actual_block_num", _delegate->get_block_number(item_hashes_received.front()))
-                      ("tracked_block_num", originating_peer->last_block_number_delegate_has_seen));
-              }
-              else
-              {
-                 dlog("popping item because delegate has already seen it.  peer ${peer}'s last block the delegate has seen is now ${block_id} (actual block #${actual_block_num}, tracked block #${tracked_block_num})",
-                      ("peer", originating_peer->get_remote_endpoint())
-                      ("block_id", originating_peer->last_block_delegate_has_seen)
-                      ("actual_block_num", _delegate->get_block_number(item_hashes_received.front()))
-                      ("tracked_block_num", originating_peer->last_block_number_delegate_has_seen));
-              }
+              dlog("popping item because delegate has already seen it.  peer ${peer}'s last block the delegate has seen is now ${block_id} (actual block #${actual_block_num})",
+                   ("peer", originating_peer->get_remote_endpoint())
+                   ("block_id", originating_peer->last_block_delegate_has_seen)
+                   ("actual_block_num", _delegate->get_block_number(item_hashes_received.front())));
 
               item_hashes_received.pop_front();
             }
@@ -2546,7 +2544,6 @@ namespace graphene { namespace net { namespace detail {
             // blocks we sent in the initial synopsis.
             assert(_delegate->has_item(item_id(_sync_item_type, item_hashes_received.front())));
             originating_peer->last_block_delegate_has_seen = item_hashes_received.front();
-            originating_peer->last_block_number_delegate_has_seen = _delegate->get_block_number(item_hashes_received.front());
             originating_peer->last_block_time_delegate_has_seen = _delegate->get_block_time(item_hashes_received.front());
             item_hashes_received.pop_front();
           }
@@ -2704,7 +2701,6 @@ namespace graphene { namespace net { namespace detail {
       {
         graphene::net::block_message block = last_block_message_sent->as<graphene::net::block_message>();
         originating_peer->last_block_delegate_has_seen = block.block_id;
-        originating_peer->last_block_number_delegate_has_seen = _delegate->get_block_number(block.block_id);
         originating_peer->last_block_time_delegate_has_seen = _delegate->get_block_time(block.block_id);
       }
 
@@ -3026,7 +3022,6 @@ namespace graphene { namespace net { namespace detail {
             if (items_being_processed_iter != peer->ids_of_items_being_processed.end())
             {
               peer->last_block_delegate_has_seen = block_message_to_send.block_id;
-              peer->last_block_number_delegate_has_seen = block_message_to_send.block.block_num();
               peer->last_block_time_delegate_has_seen = block_message_to_send.block.timestamp;
 
               peer->ids_of_items_being_processed.erase(items_being_processed_iter);
@@ -3298,7 +3293,6 @@ namespace graphene { namespace net { namespace detail {
             // For now, it will remain there, which will prevent us from offering the peer this
             // block back when we rebroadcast the block below
             peer->last_block_delegate_has_seen = block_message_to_process.block_id;
-            peer->last_block_number_delegate_has_seen = block_number;
             peer->last_block_time_delegate_has_seen = block_time;
           }
           peer->clear_old_inventory();
@@ -3662,7 +3656,7 @@ namespace graphene { namespace net { namespace detail {
         user_data["user_agent"] = peer->user_agent;
 
         user_data["last_known_block_hash"] = peer->last_block_delegate_has_seen;
-        user_data["last_known_block_number"] = peer->last_block_number_delegate_has_seen;
+        user_data["last_known_block_number"] = _delegate->get_block_number(peer->last_block_delegate_has_seen);
         user_data["last_known_block_time"] = peer->last_block_time_delegate_has_seen;
 
         data_for_this_peer.user_data = user_data;
@@ -3747,7 +3741,6 @@ namespace graphene { namespace net { namespace detail {
       peer->number_of_unfetched_item_ids = 0;
       peer->we_need_sync_items_from_peer = true;
       peer->last_block_delegate_has_seen = item_hash_t();
-      peer->last_block_number_delegate_has_seen = 0;
       peer->last_block_time_delegate_has_seen = _delegate->get_block_time(item_hash_t());
       peer->inhibit_fetching_sync_blocks = false;
       fetch_next_batch_of_item_ids_from_peer( peer.get() );
@@ -4737,8 +4730,8 @@ namespace graphene { namespace net { namespace detail {
         // provide these for debugging
         // warning: these are just approximations, if the peer is "downstream" of us, they may
         // have received blocks from other peers that we are unaware of
-        peer_details["current_head_block_number"] = peer->last_block_number_delegate_has_seen;
         peer_details["current_head_block"] = peer->last_block_delegate_has_seen;
+        peer_details["current_head_block_number"] = _delegate->get_block_number(peer->last_block_delegate_has_seen);
         peer_details["current_head_block_time"] = peer->last_block_time_delegate_has_seen;
 
         this_peer_status.info = peer_details;
