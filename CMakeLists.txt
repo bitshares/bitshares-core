@@ -145,6 +145,7 @@ endif( WIN32 )
 find_package( BerkeleyDB )
 
 set(ENABLE_COVERAGE_TESTING FALSE CACHE BOOL "Build Graphene for code coverage analysis")
+
 if(ENABLE_COVERAGE_TESTING)
     SET(CMAKE_CXX_FLAGS "--coverage ${CMAKE_CXX_FLAGS}")
 endif()
@@ -168,7 +169,7 @@ set(CMAKE_INSTALL_PREFIX ${CMAKE_BINARY_DIR}/install)
 
 SET(CPACK_PACKAGE_DIRECTORY "${CMAKE_INSTALL_PREFIX}")
 set(CPACK_PACKAGE_NAME "graphene")
-set(CPACK_PACKAGE_VENDOR "Graphene Labs, Inc.")
+set(CPACK_PACKAGE_VENDOR "Cryptonomex, Inc.")
 set(CPACK_PACKAGE_VERSION_MAJOR "${VERSION_MAJOR}")
 set(CPACK_PACKAGE_VERSION_MINOR "${VERSION_MINOR}")
 set(CPACK_PACKAGE_VERSION_PATCH "${VERSION_PATCH}")
@@ -188,7 +189,6 @@ if(WIN32)
  # it seems like windows zip files usually don't have a single directory inside them, unix tgz frequently do
  SET(CPACK_INCLUDE_TOPLEVEL_DIRECTORY 0)
 
- include(CPack)
 endif(WIN32)
 
 if(APPLE)
@@ -201,4 +201,5 @@ if(LINUX)
   SET(CPACK_INCLUDE_TOPLEVEL_DIRECTORY 1)
 endif(LINUX)
 
+ include(CPack)
 endif(ENABLE_INSTALLER)
