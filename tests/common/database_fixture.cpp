@@ -413,7 +413,7 @@ const account_object& database_fixture::get_account( const string& name )const
 
 const asset_object& database_fixture::create_bitasset(
    const string& name,
-   account_id_type issuer /* = 1 */,
+   account_id_type issuer /* = GRAPHENE_WITNESS_ACCOUNT */,
    uint16_t market_fee_percent /* = 100 */ /* 1% */,
    uint16_t flags /* = charge_market_fee */
    )
@@ -438,7 +438,7 @@ const asset_object& database_fixture::create_bitasset(
 
 const asset_object& database_fixture::create_prediction_market(
    const string& name,
-   account_id_type issuer /* = 1 */,
+   account_id_type issuer /* = GRAPHENE_WITNESS_ACCOUNT */,
    uint16_t market_fee_percent /* = 100 */ /* 1% */,
    uint16_t flags /* = charge_market_fee */
    )

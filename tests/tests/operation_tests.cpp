@@ -72,7 +72,7 @@ BOOST_AUTO_TEST_CASE( call_order_update_test )
 {
    try {
       ACTORS((dan)(sam));
-      const auto& bitusd = create_bitasset("BITUSD");
+      const auto& bitusd = create_bitasset("BITUSD", sam.id);
       const auto& core   = asset_id_type()(db);
 
       transfer(committee_account, dan_id, asset(10000000));
@@ -160,7 +160,7 @@ BOOST_AUTO_TEST_CASE( margin_call_limit_test )
 { try {
       ACTORS((buyer)(seller)(borrower)(borrower2)(feedproducer));
 
-      const auto& bitusd = create_bitasset("BITUSD");
+      const auto& bitusd = create_bitasset("BITUSD", feedproducer_id);
       const auto& core   = asset_id_type()(db);
 
       int64_t init_balance(1000000);
@@ -219,7 +219,7 @@ BOOST_AUTO_TEST_CASE( black_swan )
 { try {
       ACTORS((buyer)(seller)(borrower)(borrower2)(feedproducer));
 
-      const auto& bitusd = create_bitasset("BITUSD");
+      const auto& bitusd = create_bitasset("BITUSD", feedproducer_id);
       const auto& core   = asset_id_type()(db);
 
       int64_t init_balance(1000000);
@@ -1251,7 +1251,7 @@ BOOST_AUTO_TEST_CASE( reserve_asset_test )
    try
    {
       ACTORS((alice)(bob)(sam)(judge));
-      const auto& basset = create_bitasset("BITUSD");
+      const auto& basset = create_bitasset("BITUSD", judge_id);
       const auto& uasset = create_user_issued_asset("TEST");
       const auto& passet = create_prediction_market("PMARK", judge_id);
       const auto& casset = asset_id_type()(db);
@@ -1336,7 +1336,7 @@ BOOST_AUTO_TEST_CASE( cover_with_collateral_test )
    try
    {
       ACTORS((alice)(bob)(sam));
-      const auto& bitusd = create_bitasset("BITUSD");
+      const auto& bitusd = create_bitasset("BITUSD", sam_id);
       const auto& core   = asset_id_type()(db);
 
       BOOST_TEST_MESSAGE( "Setting price feed to $0.02 / 100" );

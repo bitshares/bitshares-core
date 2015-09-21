@@ -210,11 +210,11 @@ struct database_fixture {
    const asset_object& get_asset( const string& symbol )const;
    const account_object& get_account( const string& name )const;
    const asset_object& create_bitasset(const string& name,
-                                       account_id_type issuer = account_id_type(1),
+                                       account_id_type issuer = GRAPHENE_WITNESS_ACCOUNT,
                                        uint16_t market_fee_percent = 100 /*1%*/,
                                        uint16_t flags = charge_market_fee);
    const asset_object& create_prediction_market(const string& name,
-                                       account_id_type issuer = account_id_type(1),
+                                       account_id_type issuer = GRAPHENE_WITNESS_ACCOUNT,
                                        uint16_t market_fee_percent = 100 /*1%*/,
                                        uint16_t flags = charge_market_fee);
    const asset_object& create_user_issued_asset( const string& name );
