@@ -1029,22 +1029,23 @@ BOOST_FIXTURE_TEST_CASE( rsf_missed_blocks, database_fixture )
    FC_LOG_AND_RETHROW()
 }
 
-/** Disabled until it can be reimplemented 
 BOOST_FIXTURE_TEST_CASE( transaction_invalidated_in_cache, database_fixture )
 {
    try
    {
       ACTORS( (alice)(bob) );
 
-      auto generate_block = [&]( database& d ) -> signed_block
+      auto generate_block = [&]( database& d, uint32_t skip = database::skip_nothing ) -> signed_block
       {
-         return d.generate_block(d.get_slot_time(1), d.get_scheduled_witness(1), init_account_priv_key, database::skip_nothing);
+         return d.generate_block(d.get_slot_time(1), d.get_scheduled_witness(1), init_account_priv_key, skip);
       };
 
       wdump( (db.fetch_block_by_number(1)) );
       wdump( (db.fetch_block_by_id( db.head_block_id() ) ) );
 
-      signed_block b1 = generate_block(db);
+      // tx's created by ACTORS() have bogus authority, so we need to
+      // skip_authority_check in the block where they're included
+      signed_block b1 = generate_block(db, database::skip_authority_check);
       wdump( (db.fetch_block_by_number(1)) );
       wdump( (db.fetch_block_by_id( db.head_block_id() ) ) );
 
@@ -1067,7 +1068,8 @@ BOOST_FIXTURE_TEST_CASE( transaction_invalidated_in_cache, database_fixture )
       db2.push_block(generate_block(db));
       transfer( account_id_type(), alice_id, asset( 1000 ) );
       transfer( account_id_type(),   bob_id, asset( 1000 ) );
-      db2.push_block(generate_block(db));
+      // need to skip authority check here as well for same reason as above
+      db2.push_block(generate_block(db, database::skip_authority_check), database::skip_authority_check);
 
       BOOST_CHECK_EQUAL(db.get_balance(alice_id, asset_id_type()).amount.value, 1000);
       BOOST_CHECK_EQUAL(db.get_balance(  bob_id, asset_id_type()).amount.value, 1000);
@@ -1134,7 +1136,7 @@ BOOST_FIXTURE_TEST_CASE( transaction_invalidated_in_cache, database_fixture )
       // This needs to occur while switching to a fork.
       //
 
-      signed_transaction tx_a = generate_xfer_tx( bob_id, alice_id, 1000, 3 );
+      signed_transaction tx_a = generate_xfer_tx( bob_id, alice_id, 1000, 2 );
       signed_transaction tx_b = generate_xfer_tx( alice_id, bob_id, 2000, 10 );
       signed_transaction tx_c = generate_xfer_tx( alice_id, bob_id,  500, 10 );
 
@@ -1182,7 +1184,6 @@ BOOST_FIXTURE_TEST_CASE( transaction_invalidated_in_cache, database_fixture )
       throw;
    }
 }
-*/
 
 BOOST_AUTO_TEST_CASE( genesis_reserve_ids )
 {
