@@ -74,7 +74,7 @@ struct operation_process_fill_order
 
    void operator()( const fill_order_operation& o )const 
    {
-      ilog( "processing ${o}", ("o",o) );
+      //ilog( "processing ${o}", ("o",o) );
       const auto& buckets = _plugin.tracked_buckets();
       auto& db         = _plugin.database();
       const auto& bucket_idx = db.get_index_type<bucket_index>();
@@ -94,7 +94,7 @@ struct operation_process_fill_order
            */
           if( key.base > key.quote ) 
           {
-             ilog( "     skipping because base > quote" );
+             //ilog( "     skipping because base > quote" );
              continue;
           }
 
@@ -124,7 +124,7 @@ struct operation_process_fill_order
           }
           else
           { // update existing bucket
-             wlog( "    before updating bucket ${b}", ("b",*itr) );
+             //wlog( "    before updating bucket ${b}", ("b",*itr) );
              db.modify( *itr, [&]( bucket_object& b ){
                   b.base_volume += trade_price.base.amount;
                   b.quote_volume += trade_price.quote.amount;
@@ -141,7 +141,7 @@ struct operation_process_fill_order
                       b.low_quote = b.close_quote;
                   }
              });
-             wlog( "    after bucket bucket ${b}", ("b",*itr) );
+             //wlog( "    after bucket bucket ${b}", ("b",*itr) );
           }
 
           if( max_history != 0  )
@@ -155,7 +155,7 @@ struct operation_process_fill_order
                     itr->key.seconds == bucket && 
                     itr->key.open < cutoff )
              {
-                elog( "    removing old bucket ${b}", ("b", *itr) );
+              //  elog( "    removing old bucket ${b}", ("b", *itr) );
                 auto old_itr = itr;
                 ++itr;
                 db.remove( *old_itr );
