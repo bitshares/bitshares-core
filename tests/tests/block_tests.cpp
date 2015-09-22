@@ -138,7 +138,7 @@ BOOST_AUTO_TEST_CASE( generate_empty_blocks )
          for( uint32_t i = 1; i < 200+GRAPHENE_MIN_UNDO_HISTORY+1; ++i )
          {
             BOOST_CHECK( db.head_block_id() == b.id() );
-            witness_id_type prev_witness = b.witness;
+            //witness_id_type prev_witness = b.witness;
             witness_id_type cur_witness = db.get_scheduled_witness(1);
             //BOOST_CHECK( cur_witness != prev_witness );
             b = db.generate_block(db.get_slot_time(1), cur_witness, init_account_priv_key, database::skip_nothing);
@@ -156,7 +156,7 @@ BOOST_AUTO_TEST_CASE( generate_empty_blocks )
          for( uint32_t i = 0; i < 200; ++i )
          {
             BOOST_CHECK( db.head_block_id() == b.id() );
-            witness_id_type prev_witness = b.witness;
+            //witness_id_type prev_witness = b.witness;
             witness_id_type cur_witness = db.get_scheduled_witness(1);
             //BOOST_CHECK( cur_witness != prev_witness );
             b = db.generate_block(db.get_slot_time(1), cur_witness, init_account_priv_key, database::skip_nothing);
@@ -1040,14 +1040,9 @@ BOOST_FIXTURE_TEST_CASE( transaction_invalidated_in_cache, database_fixture )
          return d.generate_block(d.get_slot_time(1), d.get_scheduled_witness(1), init_account_priv_key, skip);
       };
 
-      wdump( (db.fetch_block_by_number(1)) );
-      wdump( (db.fetch_block_by_id( db.head_block_id() ) ) );
-
       // tx's created by ACTORS() have bogus authority, so we need to
       // skip_authority_check in the block where they're included
       signed_block b1 = generate_block(db, database::skip_authority_check);
-      wdump( (db.fetch_block_by_number(1)) );
-      wdump( (db.fetch_block_by_id( db.head_block_id() ) ) );
 
       fc::temp_directory data_dir2( graphene::utilities::temp_directory_path() );
 
@@ -1057,11 +1052,9 @@ BOOST_FIXTURE_TEST_CASE( transaction_invalidated_in_cache, database_fixture )
 
       while( db2.head_block_num() < db.head_block_num() )
       {
-         wdump( (db.head_block_num()) (db2.head_block_num()) );
          optional< signed_block > b = db.fetch_block_by_number( db2.head_block_num()+1 );
          db2.push_block(*b, database::skip_witness_signature);
       }
-      wlog("caught up db2 to db");
       BOOST_CHECK( db2.get( alice_id ).name == "alice" );
       BOOST_CHECK( db2.get( bob_id ).name == "bob" );
 
