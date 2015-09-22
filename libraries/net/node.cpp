@@ -846,7 +846,7 @@ namespace graphene { namespace net { namespace detail {
       }
       catch ( const fc::exception& e )
       {
-        wlog( "unexpected exception on close ${e}", ("e", e.to_detail_string() ) );
+        wlog( "unexpected exception on close ${e}", ("e", e) );
       }
       ilog( "done" );
     }
@@ -965,7 +965,7 @@ namespace graphene { namespace net { namespace detail {
         }
         catch (const fc::exception& e)
         {
-          elog("${e}", ("e", e.to_detail_string()));
+          elog("${e}", ("e", e));
         }
       }// while(!canceled)
     }
@@ -2943,7 +2943,7 @@ namespace graphene { namespace net { namespace detail {
              "allow us to switch to: ${e}",
              ("num", block_message_to_send.block.block_num())
              ("id", block_message_to_send.block_id)
-             ("e", e.to_detail_string()));
+             ("e", (fc::exception)e));
         handle_message_exception = e;
         discontinue_fetching_blocks_from_peer = true;
       }
@@ -3736,7 +3736,7 @@ namespace graphene { namespace net { namespace detail {
         }
         catch ( const fc::exception& e )
         {
-          wlog( "client rejected message sent by peer ${peer}, ${e}", ("peer", originating_peer->get_remote_endpoint() )("e", e.to_string() ) );
+          wlog( "client rejected message sent by peer ${peer}, ${e}", ("peer", originating_peer->get_remote_endpoint() )("e", e) );
           return;
         }
 
@@ -3787,7 +3787,7 @@ namespace graphene { namespace net { namespace detail {
       }
       catch ( const fc::exception& e )
       {
-        wlog( "Exception thrown while closing P2P peer database, ignoring: ${e}", ("e",e) );
+        wlog( "Exception thrown while closing P2P peer database, ignoring: ${e}", ("e", e) );
       }
       catch (...)
       {
@@ -3802,7 +3802,7 @@ namespace graphene { namespace net { namespace detail {
       }
       catch ( const fc::exception& e )
       {
-        wlog( "Exception thrown while closing P2P TCP server, ignoring: ${e}", ("e",e) );
+        wlog( "Exception thrown while closing P2P TCP server, ignoring: ${e}", ("e", e) );
       }
       catch (...)
       {
@@ -3816,7 +3816,7 @@ namespace graphene { namespace net { namespace detail {
       }
       catch ( const fc::exception& e )
       {
-        wlog( "Exception thrown while terminating P2P accept loop, ignoring: ${e}", ("e",e) );
+        wlog( "Exception thrown while terminating P2P accept loop, ignoring: ${e}", ("e", e) );
       }
       catch (...)
       {
@@ -3838,7 +3838,7 @@ namespace graphene { namespace net { namespace detail {
       }
       catch ( const fc::exception& e )
       {
-        wlog( "Exception thrown while terminating P2P connect loop, ignoring: ${e}", ("e",e) );
+        wlog( "Exception thrown while terminating P2P connect loop, ignoring: ${e}", ("e", e) );
       }
       catch (...)
       {
@@ -3856,7 +3856,7 @@ namespace graphene { namespace net { namespace detail {
       }
       catch ( const fc::exception& e )
       {
-        wlog( "Exception thrown while terminating Process backlog of sync items task, ignoring: ${e}", ("e",e) );
+        wlog( "Exception thrown while terminating Process backlog of sync items task, ignoring: ${e}", ("e", e) );
       }
       catch (...)
       {
@@ -3878,7 +3878,7 @@ namespace graphene { namespace net { namespace detail {
         }
         catch ( const fc::exception& e )
         {
-          wlog("Exception thrown while terminating handle_message call #${count} task, ignoring: ${e}", ("e",e)("count", handle_message_call_count));
+          wlog("Exception thrown while terminating handle_message call #${count} task, ignoring: ${e}", ("e", e)("count", handle_message_call_count));
         }
         catch (...)
         {
@@ -3901,7 +3901,7 @@ namespace graphene { namespace net { namespace detail {
       }
       catch ( const fc::exception& e )
       {
-        wlog( "Exception thrown while terminating Fetch sync items loop, ignoring: ${e}", ("e",e) );
+        wlog( "Exception thrown while terminating Fetch sync items loop, ignoring: ${e}", ("e", e) );
       }
       catch (...)
       {
@@ -3922,7 +3922,7 @@ namespace graphene { namespace net { namespace detail {
       }
       catch ( const fc::exception& e )
       {
-        wlog( "Exception thrown while terminating Fetch items loop, ignoring: ${e}", ("e",e) );
+        wlog( "Exception thrown while terminating Fetch items loop, ignoring: ${e}", ("e", e) );
       }
       catch (...)
       {
@@ -3943,7 +3943,7 @@ namespace graphene { namespace net { namespace detail {
       }
       catch ( const fc::exception& e )
       {
-        wlog( "Exception thrown while terminating Advertise inventory loop, ignoring: ${e}", ("e",e) );
+        wlog( "Exception thrown while terminating Advertise inventory loop, ignoring: ${e}", ("e", e) );
       }
       catch (...)
       {
@@ -3969,7 +3969,7 @@ namespace graphene { namespace net { namespace detail {
         }
         catch ( const fc::exception& e )
         {
-          wlog( "Exception thrown while closing peer connection, ignoring: ${e}", ("e",e) );
+          wlog( "Exception thrown while closing peer connection, ignoring: ${e}", ("e", e) );
         }
         catch (...)
         {
@@ -3994,7 +3994,7 @@ namespace graphene { namespace net { namespace detail {
         }
         catch ( const fc::exception& e )
         {
-          wlog( "Exception thrown while terminating Delayed peer deletion task, ignoring: ${e}", ("e",e) );
+          wlog( "Exception thrown while terminating Delayed peer deletion task, ignoring: ${e}", ("e", e) );
         }
         catch (...)
         {
@@ -4013,7 +4013,7 @@ namespace graphene { namespace net { namespace detail {
       }
       catch ( const fc::exception& e )
       {
-        wlog( "Exception thrown while terminating Terminate inactive connections loop, ignoring: ${e}", ("e",e) );
+        wlog( "Exception thrown while terminating Terminate inactive connections loop, ignoring: ${e}", ("e", e) );
       }
       catch (...)
       {
@@ -4027,7 +4027,7 @@ namespace graphene { namespace net { namespace detail {
       }
       catch ( const fc::exception& e )
       {
-        wlog( "Exception thrown while terminating Fetch updated peer lists loop, ignoring: ${e}", ("e",e) );
+        wlog( "Exception thrown while terminating Fetch updated peer lists loop, ignoring: ${e}", ("e", e) );
       }
       catch (...)
       {
@@ -4041,7 +4041,7 @@ namespace graphene { namespace net { namespace detail {
       }
       catch ( const fc::exception& e )
       {
-        wlog( "Exception thrown while terminating Bandwidth monitor loop, ignoring: ${e}", ("e",e) );
+        wlog( "Exception thrown while terminating Bandwidth monitor loop, ignoring: ${e}", ("e", e) );
       }
       catch (...)
       {
@@ -4055,7 +4055,7 @@ namespace graphene { namespace net { namespace detail {
       }
       catch ( const fc::exception& e )
       {
-        wlog( "Exception thrown while terminating Dump node status task, ignoring: ${e}", ("e",e) );
+        wlog( "Exception thrown while terminating Dump node status task, ignoring: ${e}", ("e", e) );
       }
       catch (...)
       {
@@ -5167,7 +5167,7 @@ namespace graphene { namespace net { namespace detail {
       }
       catch ( const fc::exception& e )
       {
-        elog( "${r}", ("r",e.to_detail_string() ) );
+        elog( "${r}", ("r",e) );
       }
       destination_node->messages_to_deliver.pop();
     }
