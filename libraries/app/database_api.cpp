@@ -92,6 +92,7 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       std::string get_transaction_hex(const signed_transaction& trx)const;
       set<public_key_type> get_required_signatures( const signed_transaction& trx, const flat_set<public_key_type>& available_keys )const;
       set<public_key_type> get_potential_signatures( const signed_transaction& trx )const;
+      set<address> get_potential_address_signatures( const signed_transaction& trx )const;
       bool verify_authority( const signed_transaction& trx )const;
       bool verify_account_authority( const string& name_or_id, const flat_set<public_key_type>& signers )const;
       processed_transaction validate_transaction( const signed_transaction& trx )const;
@@ -1213,6 +1214,10 @@ set<public_key_type> database_api::get_potential_signatures( const signed_transa
 {
    return my->get_potential_signatures( trx );
 }
+set<address> database_api::get_potential_address_signatures( const signed_transaction& trx )const
+{
+   return my->get_potential_address_signatures( trx );
+}
 
 set<public_key_type> database_api_impl::get_potential_signatures( const signed_transaction& trx )const
 {
@@ -1239,6 +1244,31 @@ set<public_key_type> database_api_impl::get_potential_signatures( const signed_t
    );
 
    wdump((result));
+   return result;
+}
+
+set<address> database_api_impl::get_potential_address_signatures( const signed_transaction& trx )const
+{
+   set<address> result;
+   trx.get_required_signatures(
+      _db.get_chain_id(),
+      flat_set<public_key_type>(),
+      [&]( account_id_type id )
+      {
+         const auto& auth = id(_db).active;
+         for( const auto& k : auth.get_addresses() )
+            result.insert(k);
+         return &auth;
+      },
+      [&]( account_id_type id )
+      {
+         const auto& auth = id(_db).owner;
+         for( const auto& k : auth.get_addresses() )
+            result.insert(k);
+         return &auth;
+      },
+      _db.get_global_properties().parameters.max_authority_depth
+   );
    return result;
 }
 

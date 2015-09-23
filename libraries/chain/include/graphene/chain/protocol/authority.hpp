@@ -83,6 +83,15 @@ namespace graphene { namespace chain {
             result.push_back(k.first);
          return result;
       }
+      vector<address> get_addresses() const
+      {
+         vector<address> result;
+         result.reserve( address_auths.size() );
+         for( const auto& k : address_auths )
+            result.push_back(k.first);
+         return result;
+      }
+
 
       friend bool operator == ( const authority& a, const authority& b )
       {

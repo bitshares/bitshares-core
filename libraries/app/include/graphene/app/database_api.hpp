@@ -416,6 +416,7 @@ class database_api
        *  to get the minimum subset.
        */
       set<public_key_type> get_potential_signatures( const signed_transaction& trx )const;
+      set<address> get_potential_address_signatures( const signed_transaction& trx )const;
 
       /**
        * @return true of the @ref trx has all of the required signatures, otherwise throws an exception
@@ -536,6 +537,7 @@ FC_API(graphene::app::database_api,
    (get_transaction_hex)
    (get_required_signatures)
    (get_potential_signatures)
+   (get_potential_address_signatures)
    (verify_authority)
    (verify_account_authority)
    (validate_transaction)
