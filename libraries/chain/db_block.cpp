@@ -643,4 +643,9 @@ void database::add_checkpoints( const flat_map<uint32_t,block_id_type>& checkpts
       _checkpoints[i.first] = i.second;
 }
 
+bool database::before_last_checkpoint()const
+{
+   return (_checkpoints.size() > 0) && (_checkpoints.rbegin()->first >= head_block_num());
+}
+
 } }
