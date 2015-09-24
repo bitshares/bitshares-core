@@ -114,6 +114,42 @@ struct sign_state
          return itr->second = true;
       }
 
+      optional<map<address,public_key_type>> available_address_sigs;
+      optional<map<address,public_key_type>> provided_address_sigs;
+
+      bool signed_by( const address& a ) {
+         if( !available_address_sigs ) {
+            available_address_sigs = std::map<address,public_key_type>();
+            provided_address_sigs = std::map<address,public_key_type>();
+            for( auto& item : available_keys ) {
+             (*available_address_sigs)[ address(pts_address(item, false, 56) ) ] = item;
+             (*available_address_sigs)[ address(pts_address(item, true, 56) ) ] = item;
+             (*available_address_sigs)[ address(pts_address(item, false, 0) ) ] = item;
+             (*available_address_sigs)[ address(pts_address(item, true, 0) ) ] = item;
+             (*available_address_sigs)[ address(item) ] = item;
+            }
+            for( auto& item : provided_signatures ) {
+             (*provided_address_sigs)[ address(pts_address(item.first, false, 56) ) ] = item.first;
+             (*provided_address_sigs)[ address(pts_address(item.first, true, 56) ) ] = item.first;
+             (*provided_address_sigs)[ address(pts_address(item.first, false, 0) ) ] = item.first;
+             (*provided_address_sigs)[ address(pts_address(item.first, true, 0) ) ] = item.first;
+             (*provided_address_sigs)[ address(item.first) ] = item.first;
+            }
+         }
+         auto itr = provided_address_sigs->find(a);
+         if( itr == provided_address_sigs->end() )
+         {
+            auto aitr = available_address_sigs->find(a);
+            if( aitr != available_address_sigs->end() ) {
+               auto pk = available_keys.find(aitr->second);
+               if( pk != available_keys.end() )
+                  return provided_signatures[aitr->second] = true;
+               return false;
+            }
+         }
+         return provided_signatures[itr->second] = true;
+      }
+
       bool check_authority( account_id_type id )
       {
          if( approved_by.find(id) != approved_by.end() ) return true;
@@ -131,6 +167,14 @@ struct sign_state
 
          uint32_t total_weight = 0;
          for( const auto& k : auth.key_auths )
+            if( signed_by( k.first ) )
+            {
+               total_weight += k.second;
+               if( total_weight >= auth.weight_threshold )
+                  return true;
+            }
+
+         for( const auto& k : auth.address_auths )
             if( signed_by( k.first ) )
             {
                total_weight += k.second;
