@@ -141,8 +141,7 @@ namespace graphene { namespace chain {
          signed_block _generate_block(
             const fc::time_point_sec when,
             witness_id_type witness_id,
-            const fc::ecc::private_key& block_signing_private_key,
-            bool retry_on_failure
+            const fc::ecc::private_key& block_signing_private_key
             );
 
          void pop_block();

@@ -273,7 +273,7 @@ signed_block database::generate_block(
    signed_block result;
    detail::with_skip_flags( *this, skip, [&]()
    {
-      result = _generate_block( when, witness_id, block_signing_private_key, true );
+      result = _generate_block( when, witness_id, block_signing_private_key );
    } );
    return result;
 }
@@ -281,8 +281,7 @@ signed_block database::generate_block(
 signed_block database::_generate_block(
    fc::time_point_sec when,
    witness_id_type witness_id,
-   const fc::ecc::private_key& block_signing_private_key,
-   bool retry_on_failure
+   const fc::ecc::private_key& block_signing_private_key
    )
 {
    try {
