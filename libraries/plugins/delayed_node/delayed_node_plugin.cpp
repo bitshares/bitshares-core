@@ -49,12 +49,13 @@ delayed_node_plugin::delayed_node_plugin()
 delayed_node_plugin::~delayed_node_plugin()
 {}
 
-void delayed_node_plugin::plugin_set_program_options(bpo::options_description&, bpo::options_description& cfg)
+void delayed_node_plugin::plugin_set_program_options(bpo::options_description& cli, bpo::options_description& cfg)
 {
-   cfg.add_options()
+   cli.add_options()
          ("trusted-node", boost::program_options::value<std::string>()->required(), "RPC endpoint of a trusted validating node (required)")
          ("delay-block-count", boost::program_options::value<int>()->required(), "Number of blocks to delay before advancing chain state (required)")
          ;
+   cfg.add(cli);
 }
 
 void delayed_node_plugin::connect()
