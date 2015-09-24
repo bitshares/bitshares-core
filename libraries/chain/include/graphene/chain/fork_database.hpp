@@ -37,7 +37,7 @@ namespace graphene { namespace chain {
       block_id_type previous_id()const { return data.previous; }
 
       weak_ptr< fork_item > prev;
-      uint32_t              num;
+      uint32_t              num;    // initialized in ctor
       /**
        * Used to flag a block as invalid and prevent other blocks from
        * building on top of it.

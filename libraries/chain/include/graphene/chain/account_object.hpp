@@ -134,7 +134,7 @@ namespace graphene { namespace chain {
          account_id_type lifetime_referrer;
 
          /// Percentage of fee which should go to network.
-         uint16_t network_fee_percentage;
+         uint16_t network_fee_percentage = GRAPHENE_DEFAULT_NETWORK_PERCENT_OF_FEE;
          /// Percentage of fee which should go to lifetime referrer.
          uint16_t lifetime_referrer_fee_percentage = 0;
          /// Percentage of referral rewards (leftover fee after paying network and lifetime referrer) which should go

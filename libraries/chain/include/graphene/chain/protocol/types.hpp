@@ -225,8 +225,8 @@ namespace graphene { namespace chain {
    {
        struct binary_key
        {
-          binary_key():check(0){}
-          uint32_t                 check;
+          binary_key() {}
+          uint32_t                 check = 0;
           fc::ecc::public_key_data data;
        };
        fc::ecc::public_key_data key_data;

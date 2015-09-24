@@ -33,9 +33,9 @@ namespace graphene { namespace chain {
    class node_property_object
    {
       public:
-         node_property_object() : skip_flags(0) {}
+         node_property_object(){}
          ~node_property_object(){}
 
-         uint32_t skip_flags;
+         uint32_t skip_flags = 0;
    };
 } } // graphene::chain

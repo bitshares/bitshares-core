@@ -35,9 +35,9 @@ namespace graphene { namespace chain {
       /// The maximum amount authorized_account is allowed to withdraw in a given withdrawal period
       asset             withdrawal_limit;
       /// Length of the withdrawal period in seconds
-      uint32_t          withdrawal_period_sec;
+      uint32_t          withdrawal_period_sec = 0;
       /// The number of withdrawal periods this permission is valid for
-      uint32_t          periods_until_expiration;
+      uint32_t          periods_until_expiration = 0;
       /// Time at which the first withdrawal period begins; must be in the future
       time_point_sec    period_start_time;
 
@@ -70,11 +70,11 @@ namespace graphene { namespace chain {
       /// New maximum amount the withdrawer is allowed to charge per withdrawal period
       asset                         withdrawal_limit;
       /// New length of the period between withdrawals
-      uint32_t                      withdrawal_period_sec;
+      uint32_t                      withdrawal_period_sec = 0;
       /// New beginning of the next withdrawal period; must be in the future
       time_point_sec                period_start_time;
       /// The new number of withdrawal periods for which this permission will be valid
-      uint32_t                      periods_until_expiration;
+      uint32_t                      periods_until_expiration = 0;
 
       account_id_type fee_payer()const { return withdraw_from_account; }
       void            validate()const;

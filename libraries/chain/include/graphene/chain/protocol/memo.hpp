@@ -29,7 +29,7 @@ namespace graphene { namespace chain {
        * be unique with high probability as long as the generating host has a high-resolution clock OR a strong source
        * of entropy for generating private keys.
        */
-      uint64_t nonce;
+      uint64_t nonce = 0;
       /**
        * This field contains the AES encrypted packed @ref memo_message
        */
