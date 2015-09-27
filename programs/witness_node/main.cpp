@@ -53,7 +53,8 @@ void write_default_logging_config_to_stream(std::ostream& out);
 fc::optional<fc::logging_config> load_logging_config_from_ini_file(const fc::path& config_ini_filename);
 
 int main(int argc, char** argv) {
-      app::application* node = new app::application();
+   app::application* node = new app::application();
+   fc::oexception unhandled_exception;
    try {
       bpo::options_description app_options("Graphene Witness Node");
       bpo::options_description cfg_options("Graphene Witness Node");
@@ -173,7 +174,13 @@ int main(int argc, char** argv) {
       delete node;
       return 0;
    } catch( const fc::exception& e ) {
-      elog("Exiting with error:\n${e}", ("e", e.to_detail_string()));
+      // deleting the node can yield, so do this outside the exception handler
+      unhandled_exception = e;
+   }
+
+   if (unhandled_exception)
+   {
+      elog("Exiting with error:\n${e}", ("e", unhandled_exception->to_detail_string()));
       node->shutdown();
       delete node;
       return 1;
