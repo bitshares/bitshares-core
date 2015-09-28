@@ -67,6 +67,19 @@ namespace graphene { namespace db {
          return a.number < b.number;
       }
 
+      template< typename T >
+      bool is() const
+      {
+         return (number >> 48) == ((T::space_id << 8) | (T::type_id));
+      }
+
+      template< typename T >
+      T as() const
+      {
+         FC_ASSERT( is<T>() );
+         return T( *this );
+      }
+
       uint64_t                   number;
    };
 

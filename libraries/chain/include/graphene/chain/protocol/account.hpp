@@ -141,7 +141,7 @@ namespace graphene { namespace chain {
       account_id_type account_to_list;
       /// The new white and blacklist status of account_to_list, as determined by authorizing_account
       /// This is a bitfield using values defined in the account_listing enum
-      uint8_t new_listing;
+      uint8_t new_listing = no_listing;
       extensions_type extensions;
 
       account_id_type fee_payer()const { return authorizing_account; }

@@ -43,8 +43,8 @@ void database::update_global_dynamic_data( const signed_block& b )
    for( uint32_t i = 0; i < missed_blocks; ++i ) {
       const auto& witness_missed = get_scheduled_witness( i+1 )(*this);
       if(  witness_missed.id != b.witness ) {
-         const auto& witness_account = witness_missed.witness_account(*this); 
          /*
+         const auto& witness_account = witness_missed.witness_account(*this);
          if( (fc::time_point::now() - b.timestamp) < fc::seconds(30) )
             wlog( "Witness ${name} missed block ${n} around ${t}", ("name",witness_account.name)("n",b.block_num())("t",b.timestamp) );
             */

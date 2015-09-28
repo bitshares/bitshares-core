@@ -92,7 +92,7 @@ namespace graphene { namespace chain {
    *  On the @ref settlement_date the @ref balance will be converted to the collateral asset
    *  and paid to @ref owner and then this object will be deleted.
    */
-  class force_settlement_object : public graphene::db::annotated_object<force_settlement_object>
+  class force_settlement_object : public abstract_object<force_settlement_object>
   {
      public:
         static const uint8_t space_id = protocol_ids;

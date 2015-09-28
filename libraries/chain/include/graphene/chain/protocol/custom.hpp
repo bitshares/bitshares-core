@@ -21,7 +21,7 @@ namespace graphene { namespace chain {
       asset                     fee;
       account_id_type           payer;
       flat_set<account_id_type> required_auths;
-      uint16_t                  id;
+      uint16_t                  id = 0;
       vector<char>              data;
 
       account_id_type   fee_payer()const { return payer; }

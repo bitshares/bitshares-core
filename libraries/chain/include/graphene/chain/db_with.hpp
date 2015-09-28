@@ -50,7 +50,7 @@ struct skip_flags_restorer
    }
 
    node_property_object& _npo;
-   uint32_t _old_skip_flags;
+   uint32_t _old_skip_flags;      // initialized in ctor
 };
 
 /**

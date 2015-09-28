@@ -273,7 +273,7 @@ signed_block database::generate_block(
    signed_block result;
    detail::with_skip_flags( *this, skip, [&]()
    {
-      result = _generate_block( when, witness_id, block_signing_private_key, true );
+      result = _generate_block( when, witness_id, block_signing_private_key );
    } );
    return result;
 }
@@ -281,8 +281,7 @@ signed_block database::generate_block(
 signed_block database::_generate_block(
    fc::time_point_sec when,
    witness_id_type witness_id,
-   const fc::ecc::private_key& block_signing_private_key,
-   bool retry_on_failure
+   const fc::ecc::private_key& block_signing_private_key
    )
 {
    try {
@@ -353,7 +352,14 @@ signed_block database::_generate_block(
    {
       wlog( "Postponed ${n} transactions due to block size limit", ("n", postponed_tx_count) );
    }
+
    _pending_tx_session.reset();
+
+   // We have temporarily broken the invariant that
+   // _pending_tx_session is the result of applying _pending_tx, as
+   // _pending_tx now consists of the set of postponed transactions.
+   // However, the push_block() call below will re-create the
+   // _pending_tx_session.
 
    pending_block.previous = head_block_id();
    pending_block.timestamp = when;
@@ -363,6 +369,7 @@ signed_block database::_generate_block(
    if( !(skip & skip_witness_signature) )
       pending_block.sign( block_signing_private_key );
 
+   // TODO:  Move this to _push_block() so session is restored.
    FC_ASSERT( fc::raw::pack_size(pending_block) <= get_global_properties().parameters.maximum_block_size );
 
    push_block( pending_block, skip );
@@ -641,6 +648,11 @@ void database::add_checkpoints( const flat_map<uint32_t,block_id_type>& checkpts
 {
    for( const auto& i : checkpts )
       _checkpoints[i.first] = i.second;
+}
+
+bool database::before_last_checkpoint()const
+{
+   return (_checkpoints.size() > 0) && (_checkpoints.rbegin()->first >= head_block_num());
 }
 
 } }

@@ -122,6 +122,7 @@ namespace graphene { namespace chain {
 
          void                              add_checkpoints( const flat_map<uint32_t,block_id_type>& checkpts );
          const flat_map<uint32_t,block_id_type> get_checkpoints()const { return _checkpoints; }
+         bool before_last_checkpoint()const;
 
          bool push_block( const signed_block& b, uint32_t skip = skip_nothing );
          processed_transaction push_transaction( const signed_transaction& trx, uint32_t skip = skip_nothing );
@@ -140,8 +141,7 @@ namespace graphene { namespace chain {
          signed_block _generate_block(
             const fc::time_point_sec when,
             witness_id_type witness_id,
-            const fc::ecc::private_key& block_signing_private_key,
-            bool retry_on_failure
+            const fc::ecc::private_key& block_signing_private_key
             );
 
          void pop_block();
