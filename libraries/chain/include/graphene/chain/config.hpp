@@ -137,6 +137,8 @@
 #define GRAPHENE_RECENTLY_MISSED_COUNT_INCREMENT             4
 #define GRAPHENE_RECENTLY_MISSED_COUNT_DECREMENT             3
 
+#define GRAPHENE_CURRENT_DB_VERSION                          "test3d"
+
 /**
  *  Reserved Account IDs with special meaning
  */

@@ -68,12 +68,6 @@ database_fixture::database_fixture()
 
    boost::program_options::variables_map options;
 
-   // app.initialize();
-   ahplugin->plugin_set_app(&app);
-   ahplugin->plugin_initialize(options);
-   mhplugin->plugin_set_app(&app);
-   mhplugin->plugin_initialize(options);
-
    genesis_state.initial_timestamp = time_point_sec( GRAPHENE_TESTING_GENESIS_TIMESTAMP );
 
    genesis_state.initial_active_witnesses = 10;
@@ -88,7 +82,14 @@ database_fixture::database_fixture()
       genesis_state.initial_witness_candidates.push_back({name, init_account_priv_key.get_public_key()});
    }
    genesis_state.initial_parameters.current_fees->zero_all_fees();
-   db.init_genesis(genesis_state);
+   open_database();
+
+   // app.initialize();
+   ahplugin->plugin_set_app(&app);
+   ahplugin->plugin_initialize(options);
+   mhplugin->plugin_set_app(&app);
+   mhplugin->plugin_initialize(options);
+
    ahplugin->plugin_startup();
    mhplugin->plugin_startup();
 
@@ -292,8 +293,6 @@ void database_fixture::open_database()
 
 signed_block database_fixture::generate_block(uint32_t skip, const fc::ecc::private_key& key, int miss_blocks)
 {
-   open_database();
-
    skip |= database::skip_undo_history_check;
    // skip == ~0 will skip checks specified in database::validation_steps
    auto block = db.generate_block(db.get_slot_time(miss_blocks + 1),
