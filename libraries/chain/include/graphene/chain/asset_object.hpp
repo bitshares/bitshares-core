@@ -68,7 +68,7 @@ namespace graphene { namespace chain {
     *  All assets have a globally unique symbol name that controls how they are traded and an issuer who
     *  has authority over the parameters of the asset.
     */
-   class asset_object : public graphene::db::annotated_object<asset_object>
+   class asset_object : public graphene::db::abstract_object<asset_object>
    {
       public:
          static const uint8_t space_id = protocol_ids;
@@ -249,8 +249,7 @@ FC_REFLECT_DERIVED( graphene::chain::asset_bitasset_data_object, (graphene::db::
                     (settlement_fund)
                   )
 
-FC_REFLECT_DERIVED( graphene::chain::asset_object,
-                    (graphene::db::annotated_object<graphene::chain::asset_object>),
+FC_REFLECT_DERIVED( graphene::chain::asset_object, (graphene::db::object),
                     (symbol)
                     (precision)
                     (issuer)

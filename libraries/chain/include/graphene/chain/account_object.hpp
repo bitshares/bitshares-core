@@ -41,11 +41,7 @@ namespace graphene { namespace chain {
          account_id_type  owner;
 
          /**
-          * Keep the most recent operation as a root pointer to a linked list of the transaction history. This field is
-          * not required by core validation and could in theory be made an annotation on the account object, but
-          * because transaction history is so common and this object is already cached in the undo buffer (because it
-          * likely affected the balances of this account) it is convienent to simply track this data here. Account
-          * balance objects don't currenty inherit from annotated object.
+          * Keep the most recent operation as a root pointer to a linked list of the transaction history.
           */
          account_transaction_history_id_type most_recent_op;
 
@@ -110,7 +106,7 @@ namespace graphene { namespace chain {
     * Accounts are the primary unit of authority on the graphene system. Users must have an account in order to use
     * assets, trade in the markets, vote for committee_members, etc.
     */
-   class account_object : public graphene::db::annotated_object<account_object>
+   class account_object : public graphene::db::abstract_object<account_object>
    {
       public:
          static const uint8_t space_id = protocol_ids;
@@ -312,7 +308,7 @@ namespace graphene { namespace chain {
 }}
 
 FC_REFLECT_DERIVED( graphene::chain::account_object,
-                    (graphene::db::annotated_object<graphene::chain::account_object>),
+                    (graphene::db::object),
                     (membership_expiration_date)(registrar)(referrer)(lifetime_referrer)
                     (network_fee_percentage)(lifetime_referrer_fee_percentage)(referrer_rewards_percentage)
                     (name)(owner)(active)(options)(statistics)(whitelisting_accounts)(blacklisting_accounts)
@@ -322,7 +318,8 @@ FC_REFLECT_DERIVED( graphene::chain::account_balance_object,
                     (graphene::db::object),
                     (owner)(asset_type)(balance) )
 
-FC_REFLECT_DERIVED( graphene::chain::account_statistics_object, (graphene::chain::object),
+FC_REFLECT_DERIVED( graphene::chain::account_statistics_object,
+                    (graphene::chain::object),
                     (owner)
                     (most_recent_op)
                     (total_core_in_orders)
