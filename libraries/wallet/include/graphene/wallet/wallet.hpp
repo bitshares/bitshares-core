@@ -1267,12 +1267,14 @@ class wallet_api
        * desired.
        *
        * @param proposing_account The account paying the fee to propose the tx
+       * @param expiration_time Timestamp specifying when the proposal will either take effect or expire.
        * @param changed_values The values to change; all other chain parameters are filled in with default values
        * @param broadcast true if you wish to broadcast the transaction
        * @return the signed version of the transaction
        */
       signed_transaction propose_parameter_change(
          const string& proposing_account,
+         fc::time_point_sec expiration_time,
          const variant_object& changed_values,
          bool broadcast = false);
 
