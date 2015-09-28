@@ -132,7 +132,7 @@ namespace graphene { namespace chain {
    {
       impl_global_property_object_type,
       impl_dynamic_global_property_object_type,
-      impl_index_meta_object_type,
+      impl_reserved0_object_type,      // formerly index_meta_object_type, TODO: delete me
       impl_asset_dynamic_data_type,
       impl_asset_bitasset_data_type,
       impl_account_balance_object_type,
@@ -143,12 +143,6 @@ namespace graphene { namespace chain {
       impl_blinded_balance_object_type,
       impl_chain_property_object_type,
       impl_witness_schedule_object_type
-   };
-
-   enum meta_info_object_type
-   {
-      meta_asset_object_type,
-      meta_account_object_type
    };
 
    //typedef fc::unsigned_int            object_id_type;
@@ -186,7 +180,6 @@ namespace graphene { namespace chain {
    // implementation types
    class global_property_object;
    class dynamic_global_property_object;
-   class index_meta_object;
    class asset_dynamic_data_object;
    class asset_bitasset_data_object;
    class account_balance_object;
@@ -277,7 +270,7 @@ FC_REFLECT_ENUM( graphene::chain::object_type,
 FC_REFLECT_ENUM( graphene::chain::impl_object_type,
                  (impl_global_property_object_type)
                  (impl_dynamic_global_property_object_type)
-                 (impl_index_meta_object_type)
+                 (impl_reserved0_object_type)
                  (impl_asset_dynamic_data_type)
                  (impl_asset_bitasset_data_type)
                  (impl_account_balance_object_type)
@@ -289,8 +282,6 @@ FC_REFLECT_ENUM( graphene::chain::impl_object_type,
                  (impl_chain_property_object_type)
                  (impl_witness_schedule_object_type)
                )
-
-FC_REFLECT_ENUM( graphene::chain::meta_info_object_type, (meta_account_object_type)(meta_asset_object_type) )
 
 FC_REFLECT_TYPENAME( graphene::chain::share_type )
 
