@@ -196,6 +196,11 @@ void database::close(uint32_t blocks_to_rewind)
    {
    }
 
+   // Since pop_block() will move tx's in the popped blocks into pending,
+   // we have to clear_pending() after we're done popping to get a clean
+   // DB state (issue #336).
+   clear_pending();
+
    object_database::flush();
    object_database::close();
 
