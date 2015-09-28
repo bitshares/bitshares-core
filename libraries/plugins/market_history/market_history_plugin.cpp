@@ -120,7 +120,7 @@ struct operation_process_fill_order
                  b.low_base = b.close_base;
                  b.low_quote = b.close_quote;
             });
-            wlog( "    creating bucket ${b}", ("b",obj) );
+            //wlog( "    creating bucket ${b}", ("b",obj) );
           }
           else
           { // update existing bucket
