@@ -271,17 +271,25 @@ void database::update_active_committee_members()
    });
 } FC_CAPTURE_AND_RETHROW() }
 
-share_type database::get_max_budget( fc::time_point_sec now )const
+void database::initialize_budget_record( fc::time_point_sec now, budget_record& rec )const
 {
    const dynamic_global_property_object& dpo = get_dynamic_global_properties();
    const asset_object& core = asset_id_type(0)(*this);
    const asset_dynamic_data_object& core_dd = core.dynamic_asset_data_id(*this);
 
+   rec.from_initial_reserve = core.reserved(*this);
+   rec.from_accumulated_fees = core_dd.accumulated_fees;
+   rec.from_unused_witness_budget = dpo.witness_budget;
+
    if(    (dpo.last_budget_time == fc::time_point_sec())
        || (now <= dpo.last_budget_time) )
-      return share_type(0);
+   {
+      rec.time_since_last_budget = 0;
+      return;
+   }
 
    int64_t dt = (now - dpo.last_budget_time).to_seconds();
+   rec.time_since_last_budget = uint64_t( dt );
 
    // We'll consider accumulated_fees to be reserved at the BEGINNING
    // of the maintenance interval.  However, for speed we only
@@ -289,7 +297,7 @@ share_type database::get_max_budget( fc::time_point_sec now )const
    // end of the maintenance interval.  Thus the accumulated_fees
    // are available for the budget at this point, but not included
    // in core.reserved().
-   share_type reserve = core.reserved(*this) + core_dd.accumulated_fees;
+   share_type reserve = rec.from_initial_reserve + core_dd.accumulated_fees;
    // Similarly, we consider leftover witness_budget to be burned
    // at the BEGINNING of the maintenance interval.
    reserve += dpo.witness_budget;
@@ -304,11 +312,11 @@ share_type database::get_max_budget( fc::time_point_sec now )const
    budget_u128 >>= GRAPHENE_CORE_ASSET_CYCLE_RATE_BITS;
    share_type budget;
    if( budget_u128 < reserve.value )
-      budget = share_type(budget_u128.to_uint64());
+      rec.total_budget = share_type(budget_u128.to_uint64());
    else
-      budget = reserve;
+      rec.total_budget = reserve;
 
-   return budget;
+   return;
 }
 
 /**
@@ -342,10 +350,14 @@ void database::process_budget()
       // blocks_to_maint > 0 because time_to_maint > 0,
       // which means numerator is at least equal to block_interval
 
-      share_type available_funds = get_max_budget(now);
+      budget_record rec;
+      initialize_budget_record( now, rec );
+      share_type available_funds = rec.total_budget;
 
       share_type witness_budget = gpo.parameters.witness_pay_per_block.value * blocks_to_maint;
+      rec.requested_witness_budget = witness_budget;
       witness_budget = std::min(witness_budget, available_funds);
+      rec.witness_budget = witness_budget;
       available_funds -= witness_budget;
 
       fc::uint128_t worker_budget_u128 = gpo.parameters.worker_budget_per_day.value;
@@ -357,17 +369,27 @@ void database::process_budget()
          worker_budget = available_funds;
       else
          worker_budget = worker_budget_u128.to_uint64();
+      rec.worker_budget = worker_budget;
       available_funds -= worker_budget;
 
       share_type leftover_worker_funds = worker_budget;
       pay_workers(leftover_worker_funds);
+      rec.leftover_worker_funds = leftover_worker_funds;
       available_funds += leftover_worker_funds;
+
+      rec.supply_delta = rec.witness_budget
+         + rec.worker_budget
+         - rec.leftover_worker_funds
+         - rec.from_accumulated_fees
+         - rec.from_unused_witness_budget;
 
       share_type unused_prev_witness_budget = dpo.witness_budget;
       modify(core, [&]( asset_dynamic_data_object& _core )
       {
-         _core.current_supply = (_core.current_supply
-                                 + witness_budget
+         _core.current_supply = (_core.current_supply + rec.supply_delta );
+
+         assert( rec.supply_delta ==
+                                   witness_budget
                                  + worker_budget
                                  - leftover_worker_funds
                                  - _core.accumulated_fees
@@ -382,6 +404,12 @@ void database::process_budget()
          // instead of adding it.
          _dpo.witness_budget = witness_budget;
          _dpo.last_budget_time = now;
+      });
+
+      create< budget_record_object >( [&]( budget_record_object& _rec )
+      {
+         _rec.time = head_block_time();
+         _rec.record = rec;
       });
 
       // available_funds is money we could spend, but don't want to.

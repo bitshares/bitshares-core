@@ -40,6 +40,8 @@ namespace graphene { namespace chain {
    using graphene::db::abstract_object;
    using graphene::db::object;
 
+   struct budget_record;
+
    /**
     *   @class database
     *   @brief tracks the blockchain state in an extensible manner
@@ -432,7 +434,7 @@ namespace graphene { namespace chain {
 
          //////////////////// db_maint.cpp ////////////////////
 
-         share_type get_max_budget( fc::time_point_sec now )const;
+         void initialize_budget_record( fc::time_point_sec now, budget_record& rec )const;
          void process_budget();
          void pay_workers( share_type& budget );
          void perform_chain_maintenance(const signed_block& next_block, const global_property_object& global_props);
