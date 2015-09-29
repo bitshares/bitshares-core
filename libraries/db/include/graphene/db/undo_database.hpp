@@ -62,32 +62,34 @@ namespace graphene { namespace db {
                      elog( "${e}", ("e",e.to_detail_string() ) );
                      throw; // maybe crash..
                   }
+                  if( _disable_on_exit ) _db.disable();
                }
                void commit() { _apply_undo = false; _db.commit();  }
                void undo()   { if( _apply_undo ) _db.undo(); _apply_undo = false; }
                void merge()  { if( _apply_undo ) _db.merge(); _apply_undo = false; }
 
                session& operator = ( session&& mv )
-               {
+               { try {
                   if( this == &mv ) return *this;
                   if( _apply_undo ) _db.undo();
                   _apply_undo = mv._apply_undo;
                   mv._apply_undo = false;
                   return *this;
-               }
+               } FC_CAPTURE_AND_RETHROW() }
 
             private:
                friend class undo_database;
-               session(undo_database& db): _db(db) {}
+               session(undo_database& db, bool disable_on_exit = false): _db(db),_disable_on_exit(disable_on_exit) {}
                undo_database& _db;
                bool _apply_undo = true;
+               bool _disable_on_exit = false;
          };
 
          void    disable();
          void    enable();
          bool    enabled()const { return !_disabled; }
 
-         session start_undo_session();
+         session start_undo_session( bool force_enable = false );
          /**
           * This should be called just after an object is created
           */

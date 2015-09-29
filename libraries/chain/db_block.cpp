@@ -245,7 +245,7 @@ processed_transaction database::validate_transaction( const signed_transaction& 
 }
 
 processed_transaction database::push_proposal(const proposal_object& proposal)
-{
+{ try {
    transaction_evaluation_state eval_state(this);
    eval_state._is_proposed_trx = true;
 
@@ -253,15 +253,20 @@ processed_transaction database::push_proposal(const proposal_object& proposal)
    processed_transaction ptrx(proposal.proposed_transaction);
    eval_state._trx = &ptrx;
 
-   auto session = _undo_db.start_undo_session();
-   for( auto& op : proposal.proposed_transaction.operations )
-      eval_state.operation_results.emplace_back(apply_operation(eval_state, op));
-   remove(proposal);
-   session.merge();
+   try {
+      auto session = _undo_db.start_undo_session(true);
+      for( auto& op : proposal.proposed_transaction.operations )
+         eval_state.operation_results.emplace_back(apply_operation(eval_state, op));
+      remove(proposal);
+      session.merge();
+   } catch ( const fc::exception& e ) {
+      elog( "e", ("e",e.to_detail_string() ) );
+      throw;
+   }
 
    ptrx.operation_results = std::move(eval_state.operation_results);
    return ptrx;
-}
+} FC_CAPTURE_AND_RETHROW( (proposal) ) }
 
 signed_block database::generate_block(
    fc::time_point_sec when,

@@ -165,7 +165,7 @@ void database::open(
 
       //idump((head_block_id())(head_block_num()));
    }
-   FC_CAPTURE_AND_RETHROW( (data_dir) )
+   FC_CAPTURE_LOG_AND_RETHROW( (data_dir) )
 }
 
 void database::close(uint32_t blocks_to_rewind)

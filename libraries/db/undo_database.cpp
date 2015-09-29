@@ -24,16 +24,19 @@ namespace graphene { namespace db {
 void undo_database::enable()  { _disabled = false; }
 void undo_database::disable() { _disabled = true; }
 
-undo_database::session undo_database::start_undo_session()
+undo_database::session undo_database::start_undo_session( bool force_enable )
 {
-   if( _disabled ) return session(*this);
+   if( _disabled && !force_enable ) return session(*this);
+   bool disable_on_exit = _disabled  && force_enable;
+   if( force_enable ) 
+      _disabled = false;
 
    while( size() > max_size() )
       _stack.pop_front();
 
    _stack.emplace_back();
    ++_active_sessions;
-   return session(*this);
+   return session(*this, disable_on_exit );
 }
 void undo_database::on_create( const object& obj )
 {

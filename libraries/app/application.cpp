@@ -334,7 +334,7 @@ namespace detail {
          reset_p2p_node(_data_dir);
          reset_websocket_server();
          reset_websocket_tls_server();
-      } FC_CAPTURE_AND_RETHROW() }
+      } FC_LOG_AND_RETHROW() }
 
       optional< api_access_info > get_api_access_info(const string& username)const
       {
@@ -859,7 +859,15 @@ void application::initialize(const fc::path& data_dir, const boost::program_opti
 
 void application::startup()
 {
+   try {
    my->startup();
+   } catch ( const fc::exception& e ) {
+      elog( "${e}", ("e",e.to_detail_string()) );
+      throw;
+   } catch ( ... ) {
+      elog( "unexpected exception" );
+      throw;
+   }
 }
 
 std::shared_ptr<abstract_plugin> application::get_plugin(const string& name) const
