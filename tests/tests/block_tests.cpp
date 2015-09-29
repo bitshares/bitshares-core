@@ -1035,7 +1035,7 @@ BOOST_FIXTURE_TEST_CASE( transaction_invalidated_in_cache, database_fixture )
    {
       ACTORS( (alice)(bob) );
 
-      auto generate_block = [&]( database& d, uint32_t skip = database::skip_nothing ) -> signed_block
+      auto generate_block = [&]( database& d, uint32_t skip ) -> signed_block
       {
          return d.generate_block(d.get_slot_time(1), d.get_scheduled_witness(1), init_account_priv_key, skip);
       };
@@ -1058,7 +1058,7 @@ BOOST_FIXTURE_TEST_CASE( transaction_invalidated_in_cache, database_fixture )
       BOOST_CHECK( db2.get( alice_id ).name == "alice" );
       BOOST_CHECK( db2.get( bob_id ).name == "bob" );
 
-      db2.push_block(generate_block(db));
+      db2.push_block(generate_block(db, database::skip_nothing));
       transfer( account_id_type(), alice_id, asset( 1000 ) );
       transfer( account_id_type(),   bob_id, asset( 1000 ) );
       // need to skip authority check here as well for same reason as above
@@ -1073,7 +1073,7 @@ BOOST_FIXTURE_TEST_CASE( transaction_invalidated_in_cache, database_fixture )
       {
          for( int i=0; i<n; i++ )
          {
-            signed_block b = generate_block(db2);
+            signed_block b = generate_block(db2, database::skip_nothing);
             PUSH_BLOCK( db, b );
          }
       };
@@ -1112,7 +1112,7 @@ BOOST_FIXTURE_TEST_CASE( transaction_invalidated_in_cache, database_fixture )
       BOOST_CHECK_EQUAL(db.get_balance(  bob_id, asset_id_type()).amount.value, 1000);
 
       // generate a block with db and ensure we don't somehow apply it
-      PUSH_BLOCK(db2, generate_block(db));
+      PUSH_BLOCK(db2, generate_block(db, database::skip_nothing));
       BOOST_CHECK_EQUAL(db.get_balance(alice_id, asset_id_type()).amount.value, 1000);
       BOOST_CHECK_EQUAL(db.get_balance(  bob_id, asset_id_type()).amount.value, 1000);
 
@@ -1133,7 +1133,7 @@ BOOST_FIXTURE_TEST_CASE( transaction_invalidated_in_cache, database_fixture )
       signed_transaction tx_b = generate_xfer_tx( alice_id, bob_id, 2000, 10 );
       signed_transaction tx_c = generate_xfer_tx( alice_id, bob_id,  500, 10 );
 
-      generate_block( db );
+      generate_block( db, database::skip_nothing );
 
       PUSH_TX( db, tx_a );
       BOOST_CHECK_EQUAL(db.get_balance(alice_id, asset_id_type()).amount.value, 2000);

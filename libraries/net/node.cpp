@@ -1108,39 +1108,81 @@ namespace graphene { namespace net { namespace detail {
 
         fc::time_point next_peer_unblocked_time = fc::time_point::maximum();
 
-        std::forward_list<std::pair<peer_connection_ptr, item_id> > fetch_messages_to_send;
-        std::vector<fc::future<void> >  write_ops;
-        for (auto iter = _items_to_fetch.begin(); iter != _items_to_fetch.end();)
+        // we need to construct a list of items to request from each peer first,
+        // then send the messages (in two steps, to avoid yielding while iterating)
+        // we want to evenly distribute our requests among our peers.
+        struct requested_item_count_index {};
+        struct peer_and_items_to_fetch
         {
+          peer_connection_ptr peer;
+          std::vector<item_id> item_ids;
+          peer_and_items_to_fetch(const peer_connection_ptr& peer) : peer(peer) {}
+          bool operator<(const peer_and_items_to_fetch& rhs) const { return peer < rhs.peer; }
+          size_t number_of_items() const { return item_ids.size(); }
+        };
+        typedef boost::multi_index_container<peer_and_items_to_fetch,
+                                             boost::multi_index::indexed_by<boost::multi_index::ordered_unique<boost::multi_index::member<peer_and_items_to_fetch, peer_connection_ptr, &peer_and_items_to_fetch::peer> >,
+                                                                            boost::multi_index::ordered_non_unique<boost::multi_index::tag<requested_item_count_index>,
+                                                                                                                   boost::multi_index::const_mem_fun<peer_and_items_to_fetch, size_t, &peer_and_items_to_fetch::number_of_items> > > > fetch_messages_to_send_set;
+        fetch_messages_to_send_set items_by_peer;
+
+        // initialize the fetch_messages_to_send with an empty set of items for all idle peers
+        for (const peer_connection_ptr& peer : _active_connections)
+          if (peer->idle())
+            items_by_peer.insert(peer_and_items_to_fetch(peer));
+
+        // now loop over all items we want to fetch
+        for (auto item_iter = _items_to_fetch.begin(); item_iter != _items_to_fetch.end();)
+        {
+          // and find a peer that has it, we'll use the one who has the least requests going to it to load balance
           bool item_fetched = false;
-          for (const peer_connection_ptr& peer : _active_connections)
+          for (auto peer_iter = items_by_peer.get<requested_item_count_index>().begin(); peer_iter != items_by_peer.get<requested_item_count_index>().end(); ++peer_iter)
           {
-            if (peer->idle() &&
-                peer->inventory_peer_advertised_to_us.find(iter->item) != peer->inventory_peer_advertised_to_us.end())
+            const peer_connection_ptr& peer = peer_iter->peer;
+            // if they have the item and we haven't already decided to ask them for too many other items
+            if (peer_iter->item_ids.size() < GRAPHENE_NET_MAX_ITEMS_PER_PEER_DURING_NORMAL_OPERATION &&
+                peer->inventory_peer_advertised_to_us.find(item_iter->item) != peer->inventory_peer_advertised_to_us.end())
             {
-              if (peer->is_transaction_fetching_inhibited() && iter->item.item_type == graphene::net::trx_message_type)
+              if (item_iter->item.item_type == graphene::net::trx_message_type && peer->is_transaction_fetching_inhibited())
                 next_peer_unblocked_time = std::min(peer->transaction_fetching_inhibited_until, next_peer_unblocked_time);
               else
               {
-                dlog("requesting item ${hash} from peer ${endpoint}",
-                     ("hash", iter->item.item_hash)("endpoint", peer->get_remote_endpoint()));
-                peer->items_requested_from_peer.insert(peer_connection::item_to_time_map_type::value_type(iter->item, fc::time_point::now()));
-                item_id item_id_to_fetch = iter->item;
-                iter = _items_to_fetch.erase(iter);
+                //dlog("requesting item ${hash} from peer ${endpoint}",
+                //     ("hash", iter->item.item_hash)("endpoint", peer->get_remote_endpoint()));
+                item_id item_id_to_fetch = item_iter->item;
+                peer->items_requested_from_peer.insert(peer_connection::item_to_time_map_type::value_type(item_id_to_fetch, fc::time_point::now()));
+                item_iter = _items_to_fetch.erase(item_iter);
                 item_fetched = true;
-                fetch_messages_to_send.emplace_front(std::make_pair(peer, item_id_to_fetch));
+                items_by_peer.get<requested_item_count_index>().modify(peer_iter, [&item_id_to_fetch](peer_and_items_to_fetch& peer_and_items) {
+                  peer_and_items.item_ids.push_back(item_id_to_fetch);
+                });
                 break;
               }
-            }
+            }  
           }
           if (!item_fetched)
-            ++iter;
+            ++item_iter;
         }
 
-        for (const auto& peer_and_item : fetch_messages_to_send)
-          peer_and_item.first->send_message(fetch_items_message(peer_and_item.second.item_type,
-                                                                std::vector<item_hash_t>{peer_and_item.second.item_hash}));
-        fetch_messages_to_send.clear();
+        // we've figured out which peer will be providing each item, now send the messages.
+        for (const peer_and_items_to_fetch& peer_and_items : items_by_peer)
+        {
+          // the item lists are heterogenous and
+          // the fetch_items_message can only deal with one item type at a time.  
+          std::map<uint32_t, std::vector<item_hash_t> > items_to_fetch_by_type;
+          for (const item_id& item : peer_and_items.item_ids)
+            items_to_fetch_by_type[item.item_type].push_back(item.item_hash);
+          for (auto& items_by_type : items_to_fetch_by_type)
+          {
+            dlog("requesting ${count} items of type ${type} from peer ${endpoint}: ${hashes}",
+                 ("count", items_by_type.second.size())("type", (uint32_t)items_by_type.first)
+                 ("endpoint", peer_and_items.peer->get_remote_endpoint())
+                 ("hashes", items_by_type.second));
+            peer_and_items.peer->send_message(fetch_items_message(items_by_type.first,
+                                                                  items_by_type.second));
+          }
+        }
+        items_by_peer.clear();
 
         if (!_items_to_fetch_updated)
         {
