@@ -107,7 +107,8 @@ struct operation_process_fill_order
           auto itr = by_key_idx.find( key );
           if( itr == by_key_idx.end() )
           { // create new bucket
-            const auto& obj = db.create<bucket_object>( [&]( bucket_object& b ){
+            /* const auto& obj = */
+            db.create<bucket_object>( [&]( bucket_object& b ){
                  b.key = key;
                  b.quote_volume += trade_price.quote.amount;
                  b.base_volume += trade_price.base.amount;
