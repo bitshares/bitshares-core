@@ -143,6 +143,73 @@ void database::clear_expired_proposals()
    }
 }
 
+/**
+ *  let HB = the highest bid for the collateral  (aka who will pay the most DEBT for the least collateral)
+ *  let SP = current median feed's Settlement Price 
+ *  let LC = the least collateralized call order's swan price (debt/collateral)
+ *
+ *  If there is no valid price feed or no bids then there is no black swan.
+ *
+ *  A black swan occurs if MAX(HB,SP) <= LC
+ */
+bool database::check_for_blackswan( const asset_object& mia, bool enable_black_swan )
+{
+    if( !mia.is_market_issued() ) return false;
+
+    const asset_bitasset_data_object& bitasset = mia.bitasset_data(*this);
+    if( bitasset.has_settlement() ) return true; // already force settled
+
+    const call_order_index& call_index = get_index_type<call_order_index>();
+    const auto& call_price_index = call_index.indices().get<by_price>();
+
+    const limit_order_index& limit_index = get_index_type<limit_order_index>();
+    const auto& limit_price_index = limit_index.indices().get<by_price>();
+
+    // looking for limit orders selling the most USD for the least CORE
+    auto highest_possible_bid = price::max( mia.id, bitasset.options.short_backing_asset );
+    // stop when limit orders are selling too little USD for too much CORE
+    auto lowest_possible_bid  = price::min( mia.id, bitasset.options.short_backing_asset );
+
+    assert( highest_possible_bid.base.asset_id == lowest_possible_bid.base.asset_id );
+    // NOTE limit_price_index is sorted from greatest to least
+    auto limit_itr = limit_price_index.lower_bound( highest_possible_bid );
+    auto limit_end = limit_price_index.upper_bound( lowest_possible_bid );
+
+    auto call_min = price::min( bitasset.options.short_backing_asset, mia.id );
+    auto call_max = price::max( bitasset.options.short_backing_asset, mia.id );
+    auto call_itr = call_price_index.lower_bound( call_min );
+    auto call_end = call_price_index.upper_bound( call_max );
+
+    auto settle_price = bitasset.current_feed.settlement_price;
+
+    if( settle_price.is_null() ) return false; /// no feed;
+    if( call_itr == call_end ) return false;  /// no call orders
+
+    price highest = settle_price;
+    if( limit_itr != limit_end ) {
+       assert( settle_price.base.asset_id == limit_itr->sell_price.base.asset_id );
+       highest = std::max( limit_itr->sell_price, settle_price );
+    }
+
+    auto least_collateral = call_itr->collateralization();
+    if( ~least_collateral >= highest  ) 
+    {
+       elog( "Black Swan detected: \n"
+             "   Least collateralized call: ${lc}  ${~lc}\n"
+           //  "   Highest Bid:               ${hb}  ${~hb}\n"
+             "   Settle Price:              ${sp}  ${~sp}\n"
+             "   Max:                       ${h}   ${~h}\n",
+            ("lc",least_collateral.to_real())("~lc",(~least_collateral).to_real())
+          //  ("hb",limit_itr->sell_price.to_real())("~hb",(~limit_itr->sell_price).to_real())
+            ("sp",settle_price.to_real())("~sp",(~settle_price).to_real())
+            ("h",highest.to_real())("~h",(~highest).to_real()) );
+       FC_ASSERT( enable_black_swan, "Black swan was detected during a margin update which is not allowed to trigger a blackswan" );
+       globally_settle_asset(mia, ~least_collateral );
+       return true;
+    } 
+    return false;
+}
+
 void database::clear_expired_orders()
 {
    detail::with_skip_flags( *this,
@@ -186,6 +253,13 @@ void database::clear_expired_orders()
          current_asset = order.settlement_asset_id();
          const asset_object& mia_object = get(current_asset);
          const asset_bitasset_data_object mia = mia_object.bitasset_data(*this);
+
+         if( mia.has_settlement() )
+         {
+            ilog( "Canceling a force settlement because of black swan" );
+            cancel_order( order );
+            continue;
+         }
 
          // Has this order not reached its settlement date?
          if( order.settlement_date > head_block_time() )
@@ -234,7 +308,15 @@ void database::clear_expired_orders()
             // There should always be a call order, since asset exists!
             assert(itr != call_index.end() && itr->debt_type() == mia_object.get_id());
             asset max_settlement = max_settlement_volume - settled;
-            settled += match(*itr, order, settlement_price, max_settlement);
+
+            try {
+               settled += match(*itr, order, settlement_price, max_settlement);
+            } 
+            catch ( const black_swan_exception& e ) { 
+               wlog( "black swan detected: ${e}", ("e", e.to_detail_string() ) );
+               cancel_order( order );
+               break;
+            }
          }
          modify(mia, [settled](asset_bitasset_data_object& b) {
             b.force_settled_volume = settled.amount;

@@ -107,7 +107,9 @@ void database::cancel_order( const limit_order_object& order, bool create_virtua
 
    modify( order.seller(*this).statistics(*this),[&]( account_statistics_object& obj ){
       if( refunded.asset_id == asset_id_type() )
+      {
          obj.total_core_in_orders -= refunded.amount;
+      }
    });
    adjust_balance(order.seller, refunded);
 
@@ -220,19 +222,30 @@ int database::match( const limit_order_object& bid, const limit_order_object& as
 }
 
 
-asset database::match( const call_order_object& call, const force_settlement_object& settle, const price& match_price,
-                     asset max_settlement )
-{
-   assert(call.get_debt().asset_id == settle.balance.asset_id );
-   assert(call.debt > 0 && call.collateral > 0 && settle.balance.amount > 0);
+asset database::match( const call_order_object& call, 
+                       const force_settlement_object& settle, 
+                       const price& match_price,
+                       asset max_settlement )
+{ try {
+   FC_ASSERT(call.get_debt().asset_id == settle.balance.asset_id );
+   FC_ASSERT(call.debt > 0 && call.collateral > 0 && settle.balance.amount > 0);
 
    auto settle_for_sale = std::min(settle.balance, max_settlement);
    auto call_debt = call.get_debt();
 
-   asset call_receives = std::min(settle_for_sale, call_debt),
-         call_pays = call_receives * match_price,
-         settle_pays = call_receives,
-         settle_receives = call_pays;
+   asset call_receives   = std::min(settle_for_sale, call_debt);
+   asset call_pays       = call_receives * match_price;
+   asset settle_pays     = call_receives;
+   asset settle_receives = call_pays;
+
+   /**
+    *  If the least collateralized call position lacks sufficient
+    *  collateral to cover at the match price then this indicates a black 
+    *  swan event according to the price feed, but only the market 
+    *  can trigger a black swan.  So now we must cancel the forced settlement
+    *  object.
+    */
+   GRAPHENE_ASSERT( call_pays < call.get_collateral(), black_swan_exception, "" );
 
    assert( settle_pays == settle_for_sale || call_receives == call.get_debt() );
 
@@ -240,12 +253,12 @@ asset database::match( const call_order_object& call, const force_settlement_obj
    fill_order(settle, settle_pays, settle_receives);
 
    return call_receives;
-}
+} FC_CAPTURE_AND_RETHROW( (call)(settle)(match_price)(max_settlement) ) }
 
 bool database::fill_order( const limit_order_object& order, const asset& pays, const asset& receives )
-{
-   assert( order.amount_for_sale().asset_id == pays.asset_id );
-   assert( pays.asset_id != receives.asset_id );
+{ try {
+   FC_ASSERT( order.amount_for_sale().asset_id == pays.asset_id );
+   FC_ASSERT( pays.asset_id != receives.asset_id );
 
    const account_object& seller = order.seller(*this);
    const asset_object& recv_asset = receives.asset_id(*this);
@@ -279,15 +292,15 @@ bool database::fill_order( const limit_order_object& order, const asset& pays, c
       }
       return false;
    }
-}
+} FC_CAPTURE_AND_RETHROW( (order)(pays)(receives) ) }
 
 
 bool database::fill_order( const call_order_object& order, const asset& pays, const asset& receives )
 { try {
    //idump((pays)(receives)(order));
-   assert( order.get_debt().asset_id == receives.asset_id );
-   assert( order.get_collateral().asset_id == pays.asset_id );
-   assert( order.get_collateral() >= pays );
+   FC_ASSERT( order.get_debt().asset_id == receives.asset_id );
+   FC_ASSERT( order.get_collateral().asset_id == pays.asset_id );
+   FC_ASSERT( order.get_collateral() >= pays );
 
    optional<asset> collateral_freed;
    modify( order, [&]( call_order_object& o ){
@@ -315,11 +328,13 @@ bool database::fill_order( const call_order_object& order, const asset& pays, co
       const account_statistics_object& borrower_statistics = borrower.statistics(*this);
       if( collateral_freed )
          adjust_balance(borrower.get_id(), *collateral_freed);
+
       modify( borrower_statistics, [&]( account_statistics_object& b ){
               if( collateral_freed && collateral_freed->amount > 0 )
                 b.total_core_in_orders -= collateral_freed->amount;
               if( pays.asset_id == asset_id_type() )
                 b.total_core_in_orders -= pays.amount;
+
               assert( b.total_core_in_orders >= 0 );
            });
    }
@@ -374,6 +389,10 @@ bool database::fill_order(const force_settlement_object& settle, const asset& pa
 bool database::check_call_orders(const asset_object& mia, bool enable_black_swan)
 { try {
     if( !mia.is_market_issued() ) return false;
+
+    if( check_for_blackswan( mia, enable_black_swan ) ) 
+       return false;
+
     const asset_bitasset_data_object& bitasset = mia.bitasset_data(*this);
     if( bitasset.is_prediction_market ) return false;
     if( bitasset.current_feed.settlement_price.is_null() ) return false;
@@ -395,15 +414,23 @@ bool database::check_call_orders(const asset_object& mia, bool enable_black_swan
     auto limit_end = limit_price_index.upper_bound( min_price );
 
     if( limit_itr == limit_end ) {
+       /*
+       if( head_block_num() > 300000 )
+          ilog( "no orders below between: ${p}  and: ${m}", 
+                ("p", bitasset.current_feed.max_short_squeeze_price())
+                ("m", max_price) );
+      */
        return false;
     }
 
-    auto call_itr = call_price_index.lower_bound( price::min( bitasset.options.short_backing_asset, mia.id ) );
-    auto call_end = call_price_index.upper_bound( price::max( bitasset.options.short_backing_asset, mia.id ) );
+    auto call_min = price::min( bitasset.options.short_backing_asset, mia.id );
+    auto call_max = price::max( bitasset.options.short_backing_asset, mia.id );
+    auto call_itr = call_price_index.lower_bound( call_min );
+    auto call_end = call_price_index.upper_bound( call_max );
 
     bool filled_limit = false;
 
-    while( call_itr != call_end )
+    while( !check_for_blackswan( mia, enable_black_swan ) && call_itr != call_end )
     {
        bool  filled_call      = false;
        price match_price;
@@ -419,17 +446,16 @@ bool database::check_call_orders(const asset_object& mia, bool enable_black_swan
        match_price.validate();
 
        if( match_price > ~call_itr->call_price )
-       {
           return filled_limit;
-       }
 
        auto usd_to_buy   = call_itr->get_debt();
 
        if( usd_to_buy * match_price > call_itr->get_collateral() )
        {
+          elog( "black swan detected" ); 
+          edump((enable_black_swan));
           FC_ASSERT( enable_black_swan );
-          //globally_settle_asset(mia, call_itr->get_debt() / call_itr->get_collateral());
-          globally_settle_asset(mia, bitasset.current_feed.settlement_price );// call_itr->get_debt() / call_itr->get_collateral());
+          globally_settle_asset(mia, bitasset.current_feed.settlement_price );
           return true;
        }
 
@@ -458,6 +484,7 @@ bool database::check_call_orders(const asset_object& mia, bool enable_black_swan
 
        auto old_limit_itr = filled_limit ? limit_itr++ : limit_itr;
        fill_order(*old_limit_itr, order_pays, order_receives);
+
     } // whlie call_itr != call_end
 
     return filled_limit;
@@ -468,7 +495,9 @@ void database::pay_order( const account_object& receiver, const asset& receives,
    const auto& balances = receiver.statistics(*this);
    modify( balances, [&]( account_statistics_object& b ){
          if( pays.asset_id == asset_id_type() )
+         {
             b.total_core_in_orders -= pays.amount;
+         }
    });
    adjust_balance(receiver.get_id(), receives);
 }

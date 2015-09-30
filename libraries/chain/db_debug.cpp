@@ -44,12 +44,12 @@ void database::debug_dump()
 
    for( const account_balance_object& a : balance_index )
    {
-      idump(("balance")(a));
+    //  idump(("balance")(a));
       total_balances[a.asset_type] += a.balance;
    }
    for( const account_statistics_object& s : statistics_index )
    {
-      idump(("statistics")(s));
+    //  idump(("statistics")(s));
       reported_core_in_orders += s.total_core_in_orders;
    }
    for( const limit_order_object& o : db.get_index_type<limit_order_index>().indices() )
@@ -71,17 +71,23 @@ void database::debug_dump()
    {
       total_balances[asset_obj.id] += asset_obj.dynamic_asset_data_id(db).accumulated_fees;
       total_balances[asset_id_type()] += asset_obj.dynamic_asset_data_id(db).fee_pool;
+//      edump((total_balances[asset_obj.id])(asset_obj.dynamic_asset_data_id(db).current_supply ) );
    }
+
    if( total_balances[asset_id_type()].value != core_asset_data.current_supply.value )
    {
       edump( (total_balances[asset_id_type()].value)(core_asset_data.current_supply.value ));
    }
 
+   edump((core_in_orders)(reported_core_in_orders));
+
+   /*
    const auto& vbidx = db.get_index_type<simple_index<vesting_balance_object>>();
    for( const auto& s : vbidx )
    {
-      idump(("vesting_balance")(s));
+//      idump(("vesting_balance")(s));
    }
+   */
 }
 
 } }
