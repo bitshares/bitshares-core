@@ -104,7 +104,13 @@ namespace graphene { namespace chain {
       auto scaled = fc::uint128(base_value) * scale;
       scaled /= GRAPHENE_100_PERCENT;
       FC_ASSERT( scaled <= GRAPHENE_MAX_SHARE_SUPPLY );
+      //idump( (base_value)(scaled)(core_exchange_rate) );
       auto result = asset( scaled.to_uint64(), 0 ) * core_exchange_rate;
+      //FC_ASSERT( result * core_exchange_rate >= asset( scaled.to_uint64()) );
+
+      while( result * core_exchange_rate < asset( scaled.to_uint64()) )
+        result.amount++;
+
       FC_ASSERT( result.amount <= GRAPHENE_MAX_SHARE_SUPPLY );
       return result;
    }
