@@ -144,18 +144,34 @@ void database::update_active_witnesses()
 { try {
    assert( _witness_count_histogram_buffer.size() > 0 );
    share_type stake_target = _total_voting_stake / 2;
-   share_type stake_tally = _witness_count_histogram_buffer[0];
+   /// accounts that vote for 0 or 1 witness do not get to express an opinion on
+   /// the number of witnesses to have (they abstain and are non-voting accounts)
+
+   share_type stake_tally = 0; 
+
+ #warning HARDFORK should be removed for real network 
+   if( head_block_num() < 10000 ) /// TODO: for test net only, remove in relese
+      stake_tally = _witness_count_histogram_buffer[0];
+
    size_t witness_count = 0;
    if( stake_target > 0 )
+   {
       while( (witness_count < _witness_count_histogram_buffer.size() - 1)
              && (stake_tally <= stake_target) )
+      {
          stake_tally += _witness_count_histogram_buffer[++witness_count];
+      }
+   }
 
    const chain_property_object& cpo = get_chain_properties();
    auto wits = sort_votable_objects<witness_index>(std::max(witness_count*2+1, (size_t)cpo.immutable_parameters.min_witness_count));
+
+   edump((wits.size())(witness_count*2+1));
    const global_property_object& gpo = get_global_properties();
 
-   for( const witness_object& wit : wits )
+   const auto& all_witnesses = get_index_type<witness_index>().indices();
+
+   for( const witness_object& wit : all_witnesses )
    {
       modify( wit, [&]( witness_object& obj ){
               obj.total_votes = _vote_tally_buffer[wit.vote_id];
@@ -213,7 +229,9 @@ void database::update_active_committee_members()
 { try {
    assert( _committee_count_histogram_buffer.size() > 0 );
    uint64_t stake_target = _total_voting_stake / 2;
-   uint64_t stake_tally = _committee_count_histogram_buffer[0];
+   /// accounts that vote for 0 or 1 witness do not get to express an opinion on
+   /// the number of witnesses to have (they abstain and are non-voting accounts)
+   uint64_t stake_tally = 0; // _committee_count_histogram_buffer[0];
    size_t committee_member_count = 0;
    if( stake_target > 0 )
       while( (committee_member_count < _committee_count_histogram_buffer.size() - 1)
