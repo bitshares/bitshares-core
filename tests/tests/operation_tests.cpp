@@ -262,6 +262,99 @@ BOOST_AUTO_TEST_CASE( black_swan )
    }
 }
 
+/**
+ * Black swan occurs when price feed falls, triggered by settlement
+ * order.
+ */
+BOOST_AUTO_TEST_CASE( black_swan_issue_346 )
+{ try {
+      ACTORS((buyer)(seller)(borrower)(borrower2)(settler)(feeder));
+
+      const asset_object& core = asset_id_type()(db);
+
+      int trial = 0;
+      const int64_t init_balance(1000000);
+
+      vector< const account_object* > actors{ &buyer, &seller, &borrower, &borrower2, &settler, &feeder };
+
+      auto top_up = [&]()
+      {
+         for( const account_object* actor : actors )
+         {
+            int64_t bal = get_balance( *actor, core );
+            if( bal < init_balance )
+               transfer( committee_account, actor->id, asset(init_balance - bal) );
+            else if( bal > init_balance )
+               transfer( actor->id, committee_account, asset(bal - init_balance) );
+         }
+      };
+
+      auto setup_asset = [&]() -> const asset_object&
+      {
+         const asset_object& bitusd = create_bitasset("BITUSD"+trial,
+            feeder_id);
+         update_feed_producers( bitusd, {feeder.id} );
+         BOOST_CHECK( !bitusd.bitasset_data(db).has_settlement() );
+         trial++;
+         return bitusd;
+      };
+
+      /*
+       * GRAPHENE_COLLATERAL_RATIO_DENOM
+      uint16_t maintenance_collateral_ratio = GRAPHENE_DEFAULT_MAINTENANCE_COLLATERAL_RATIO;
+      uint16_t maximum_short_squeeze_ratio = GRAPHENE_DEFAULT_MAX_SHORT_SQUEEZE_RATIO;
+      */
+
+      // situations to test:
+      // 1. minus short squeeze protection would be black swan, otherwise no
+      // 2. issue 346 (price feed drops followed by force settle, drop should trigger BS)
+      // 3. feed price < D/C of least collateralized short < call price < highest bid
+
+      auto set_price = [&](
+         const asset_object& bitusd,
+         const price& settlement_price
+         )
+      {
+         price_feed feed;
+         feed.settlement_price = settlement_price;
+         publish_feed( bitusd, feeder, feed );
+      };
+
+      auto wait_for_settlement = [&]()
+      {
+         const auto& idx = db.get_index_type<force_settlement_index>().indices().get<by_expiration>();
+         const auto& itr = idx.rbegin();
+         if( itr == idx.rend() )
+            return;
+         generate_blocks( itr->settlement_date );
+         BOOST_CHECK( !idx.empty() );
+         generate_block();
+         BOOST_CHECK( idx.empty() );
+      };
+
+      const asset_object& bitusd = setup_asset();
+      top_up();
+      set_price( bitusd, bitusd.amount(1) / core.amount(5) );  // $0.20
+      borrow(borrower, bitusd.amount(100), asset(1000));       // 2x collat
+      transfer( borrower, settler, bitusd.amount(100) );
+
+      // drop to $0.02 and settle
+      BOOST_CHECK( !bitusd.bitasset_data(db).has_settlement() );
+      set_price( bitusd, bitusd.amount(1) / core.amount(50) );
+      BOOST_CHECK( bitusd.bitasset_data(db).has_settlement() );
+      GRAPHENE_REQUIRE_THROW( borrow( borrower2, bitusd.amount(100), asset(10000) ), fc::exception );
+      force_settle( settler, bitusd.amount(100) );
+
+      // wait for forced settlement to execute
+      // this would throw on Sep.18 testnet, see #346
+      wait_for_settlement();
+
+   } catch( const fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
 BOOST_AUTO_TEST_CASE( prediction_market )
 { try {
       ACTORS((judge)(dan)(nathan));
