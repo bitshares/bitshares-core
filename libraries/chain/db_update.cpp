@@ -158,6 +158,8 @@ bool database::check_for_blackswan( const asset_object& mia, bool enable_black_s
 
     const asset_bitasset_data_object& bitasset = mia.bitasset_data(*this);
     if( bitasset.has_settlement() ) return true; // already force settled
+    auto settle_price = bitasset.current_feed.settlement_price;
+    if( settle_price.is_null() ) return false; // no feed
 
     const call_order_index& call_index = get_index_type<call_order_index>();
     const auto& call_price_index = call_index.indices().get<by_price>();
@@ -180,10 +182,7 @@ bool database::check_for_blackswan( const asset_object& mia, bool enable_black_s
     auto call_itr = call_price_index.lower_bound( call_min );
     auto call_end = call_price_index.upper_bound( call_max );
 
-    auto settle_price = bitasset.current_feed.settlement_price;
-
-    if( settle_price.is_null() ) return false; /// no feed;
-    if( call_itr == call_end ) return false;  /// no call orders
+    if( call_itr == call_end ) return false;  // no call orders
 
     price highest = settle_price;
     if( limit_itr != limit_end ) {
