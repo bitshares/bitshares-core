@@ -291,8 +291,7 @@ BOOST_AUTO_TEST_CASE( black_swan_issue_346 )
 
       auto setup_asset = [&]() -> const asset_object&
       {
-         const asset_object& bitusd = create_bitasset("BITUSD"+trial,
-            feeder_id);
+         const asset_object& bitusd = create_bitasset("BITUSD"+fc::to_string(trial), feeder_id);
          update_feed_producers( bitusd, {feeder.id} );
          BOOST_CHECK( !bitusd.bitasset_data(db).has_settlement() );
          trial++;
