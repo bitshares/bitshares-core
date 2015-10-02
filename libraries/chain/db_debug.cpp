@@ -54,14 +54,14 @@ void database::debug_dump()
    }
    for( const limit_order_object& o : db.get_index_type<limit_order_index>().indices() )
    {
-      idump(("limit_order")(o));
+ //     idump(("limit_order")(o));
       auto for_sale = o.amount_for_sale();
       if( for_sale.asset_id == asset_id_type() ) core_in_orders += for_sale.amount;
       total_balances[for_sale.asset_id] += for_sale.amount;
    }
    for( const call_order_object& o : db.get_index_type<call_order_index>().indices() )
    {
-      idump(("call_order")(o));
+//      idump(("call_order")(o));
       auto col = o.get_collateral();
       if( col.asset_id == asset_id_type() ) core_in_orders += col.amount;
       total_balances[col.asset_id] += col.amount;
