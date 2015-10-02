@@ -108,7 +108,43 @@ void database::update_signing_witness(const witness_object& signing_witness, con
    modify( signing_witness, [&]( witness_object& _wit )
    {
       _wit.last_aslot = new_block_aslot;
+      _wit.last_confirmed_block_num = new_block.block_num();
    } );
+}
+
+void database::update_last_irreversible_block()
+{
+   const global_property_object& gpo = get_global_properties();
+   const dynamic_global_property_object& dpo = get_dynamic_global_properties();
+
+   vector< const witness_object* > wit_objs;
+   wit_objs.reserve( gpo.active_witnesses.size() );
+   for( const witness_id_type& wid : gpo.active_witnesses )
+      wit_objs.push_back( &(wid(*this)) );
+
+   static_assert( GRAPHENE_IRREVERSIBLE_THRESHOLD > 0, "irreversible threshold must be nonzero" );
+
+   // 1 1 1 2 2 2 2 2 2 2 -> 2     .7*10 = 7
+   // 1 1 1 1 1 1 1 2 2 2 -> 1
+   // 3 3 3 3 3 3 3 3 3 3 -> 3
+
+   size_t offset = ((GRAPHENE_100_PERCENT - GRAPHENE_IRREVERSIBLE_THRESHOLD) * wit_objs.size() / GRAPHENE_100_PERCENT);
+
+   std::nth_element( wit_objs.begin(), wit_objs.begin() + offset, wit_objs.end(),
+      []( const witness_object* a, const witness_object* b )
+      {
+         return a->last_confirmed_block_num < b->last_confirmed_block_num;
+      } );
+
+   uint32_t new_last_irreversible_block_num = wit_objs[offset]->last_confirmed_block_num;
+
+   if( new_last_irreversible_block_num > dpo.last_irreversible_block_num )
+   {
+      modify( dpo, [&]( dynamic_global_property_object& _dpo )
+      {
+         _dpo.last_irreversible_block_num = new_last_irreversible_block_num;
+      } );
+   }
 }
 
 void database::clear_expired_transactions()

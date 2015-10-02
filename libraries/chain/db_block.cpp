@@ -479,6 +479,7 @@ void database::_apply_block( const signed_block& next_block )
 
    update_global_dynamic_data(next_block);
    update_signing_witness(signing_witness, next_block);
+   update_last_irreversible_block();
 
    // Are we at the maintenance interval?
    if( maint_needed )

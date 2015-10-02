@@ -135,7 +135,9 @@
 #define GRAPHENE_RECENTLY_MISSED_COUNT_INCREMENT             4
 #define GRAPHENE_RECENTLY_MISSED_COUNT_DECREMENT             3
 
-#define GRAPHENE_CURRENT_DB_VERSION                          "test3d"
+#define GRAPHENE_CURRENT_DB_VERSION                          "test5b"
+
+#define GRAPHENE_IRREVERSIBLE_THRESHOLD                      (70 * GRAPHENE_1_PERCENT)
 
 /**
  *  Reserved Account IDs with special meaning
