@@ -386,7 +386,6 @@ void database::process_budget()
          - rec.from_accumulated_fees
          - rec.from_unused_witness_budget;
 
-      share_type unused_prev_witness_budget = dpo.witness_budget;
       modify(core, [&]( asset_dynamic_data_object& _core )
       {
          _core.current_supply = (_core.current_supply + rec.supply_delta );
@@ -396,10 +395,11 @@ void database::process_budget()
                                  + worker_budget
                                  - leftover_worker_funds
                                  - _core.accumulated_fees
-                                 - unused_prev_witness_budget
+                                 - dpo.witness_budget
                                 );
          _core.accumulated_fees = 0;
       });
+
       modify(dpo, [&]( dynamic_global_property_object& _dpo )
       {
          // Since initial witness_budget was rolled into
