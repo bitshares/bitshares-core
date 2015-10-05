@@ -132,6 +132,13 @@ namespace graphene { namespace app {
     {
     }
 
+    fc::variant network_node_api::get_info() const
+    {
+        fc::mutable_variant_object result = _app.p2p_node()->network_get_info();
+        result["connection_count"] = _app.p2p_node()->get_connection_count();
+        return result;
+    }
+
     void network_node_api::add_node(const fc::ip::endpoint& ep)
     {
        _app.p2p_node()->add_node(ep);

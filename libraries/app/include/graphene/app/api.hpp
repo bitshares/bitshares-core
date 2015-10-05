@@ -127,6 +127,11 @@ namespace graphene { namespace app {
          network_node_api(application& a);
 
          /**
+          * @brief Return general network information, such as p2p port
+          */
+         fc::variant get_info() const;
+
+         /**
           * @brief add_node Connect to a new peer
           * @param ep The IP/Port of the peer to connect to
           */
@@ -198,6 +203,7 @@ FC_API(graphene::app::network_broadcast_api,
        (broadcast_block)
      )
 FC_API(graphene::app::network_node_api,
+       (get_info)
        (add_node)
        (get_connected_peers)
      )
