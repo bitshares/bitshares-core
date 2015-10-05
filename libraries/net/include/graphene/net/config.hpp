@@ -71,11 +71,9 @@
  */
 #define GRAPHENE_NET_FUTURE_SYNC_BLOCKS_GRACE_PERIOD_SEC     (60 * 60)
 
-#define GRAPHENE_NET_INSUFFICIENT_RELAY_FEE_PENALTY_SEC      15
-
 #define GRAPHENE_NET_MAX_INVENTORY_SIZE_IN_MINUTES           2
 
-#define GRAPHENE_NET_MAX_BLOCKS_PER_PEER_DURING_SYNCING      100
+#define GRAPHENE_NET_MAX_BLOCKS_PER_PEER_DURING_SYNCING      200
 
 /**
  * During normal operation, how many items will be fetched from each
@@ -88,7 +86,7 @@
  * parameter, so consider increasing or decreasing it if performance
  * during flooding is lacking.
  */
-#define GRAPHENE_NET_MAX_ITEMS_PER_PEER_DURING_NORMAL_OPERATION  50
+#define GRAPHENE_NET_MAX_ITEMS_PER_PEER_DURING_NORMAL_OPERATION  1 
 
 /**
  * Instead of fetching all item IDs from a peer, then fetching all blocks
