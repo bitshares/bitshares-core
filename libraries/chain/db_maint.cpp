@@ -150,7 +150,6 @@ void database::update_active_witnesses()
    const chain_property_object& cpo = get_chain_properties();
    auto wits = sort_votable_objects<witness_index>(std::max(witness_count*2+1, (size_t)cpo.immutable_parameters.min_witness_count));
 
-   edump((wits.size())(witness_count*2+1));
    const global_property_object& gpo = get_global_properties();
 
    const auto& all_witnesses = get_index_type<witness_index>().indices();

@@ -385,7 +385,13 @@ namespace detail {
          {
             const auto& witness = blk_msg.block.witness(*_chain_db);
             const auto& witness_account = witness.witness_account(*_chain_db);
-            ilog("Got block #${n} with time ${t} from network with latency of ${l} ms from ${w}", ("t",blk_msg.block.timestamp)("n", blk_msg.block.block_num())("l", (latency.count()/1000))("w",witness_account.name)   );
+            auto last_irr = _chain_db->get_dynamic_global_properties().last_irreversible_block_num;
+            ilog("Got block: #${n} time: ${t} latency: ${l} ms from: ${w}  irreversible: ${i} (-${d})", 
+                 ("t",blk_msg.block.timestamp)
+                 ("n", blk_msg.block.block_num())
+                 ("l", (latency.count()/1000))
+                 ("w",witness_account.name)
+                 ("i",last_irr)("d",blk_msg.block.block_num()-last_irr) );
          }
 
          try {
@@ -515,7 +521,7 @@ namespace detail {
                elog("Couldn't find block ${id} -- corresponding ID in our chain is ${id2}",
                     ("id", id.item_hash)("id2", _chain_db->get_block_id_for_num(block_header::num_from_id(id.item_hash))));
             FC_ASSERT( opt_block.valid() );
-            ilog("Serving up block #${num}", ("num", opt_block->block_num()));
+            // ilog("Serving up block #${num}", ("num", opt_block->block_num()));
             return block_message(std::move(*opt_block));
          }
          return trx_message( _chain_db->get_recent_transaction( id.item_hash ) );

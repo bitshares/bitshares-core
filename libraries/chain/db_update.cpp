@@ -87,8 +87,8 @@ void database::update_global_dynamic_data( const signed_block& b )
                  ("recently_missed",_dgp.recently_missed_count)("max_undo",GRAPHENE_MAX_UNDO_HISTORY) );
    }
 
-   _undo_db.set_max_size( _dgp.head_block_number - _dgp.last_irreversible_block_num + GRAPHENE_MIN_UNDO_HISTORY );
-   _fork_db.set_max_size( _dgp.head_block_number - _dgp.last_irreversible_block_num + GRAPHENE_MIN_UNDO_HISTORY );
+   _undo_db.set_max_size( _dgp.head_block_number - _dgp.last_irreversible_block_num + 1 );
+   _fork_db.set_max_size( _dgp.head_block_number - _dgp.last_irreversible_block_num + 1 );
 }
 
 void database::update_signing_witness(const witness_object& signing_witness, const signed_block& new_block)
