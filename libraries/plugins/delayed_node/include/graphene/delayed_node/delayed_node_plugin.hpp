@@ -34,11 +34,12 @@ public:
                                            boost::program_options::options_description& cfg) override;
    virtual void plugin_initialize(const boost::program_options::variables_map& options) override;
    virtual void plugin_startup() override;
+   void mainloop();
 
 protected:
    void connection_failed();
    void connect();
-   void sync_with_trusted_node(uint32_t remote_head_block_num);
+   void sync_with_trusted_node();
 };
 
 } } //graphene::account_history
