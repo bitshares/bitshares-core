@@ -141,6 +141,7 @@ bool database::_push_block(const signed_block& new_block)
             // push all blocks on the new fork
             for( auto ritr = branches.first.rbegin(); ritr != branches.first.rend(); ++ritr )
             {
+                ilog( "pushing blocks from fork ${n} ${id}", ("n",(*ritr)->data.block_num())("id",(*ritr)->data.id()) );
                 optional<fc::exception> except;
                 try {
                    undo_database::session session = _undo_db.start_undo_session();
@@ -151,6 +152,7 @@ bool database::_push_block(const signed_block& new_block)
                 catch ( const fc::exception& e ) { except = e; }
                 if( except )
                 {
+                   wlog( "exception thrown while switching forks ${e}", ("e",except->to_detail_string() ) );
                    // remove the rest of branches.first from the fork_db, those blocks are invalid
                    while( ritr != branches.first.rend() )
                    {

@@ -69,7 +69,6 @@ void  fork_database::_push_block(const item_ptr& item)
       FC_ASSERT( item->num > std::max<int64_t>( 0, int64_t(_head->num) - (_max_size) ),
                  "attempting to push a block that is too old", 
                  ("item->num",item->num)("head",_head->num)("max_size",_max_size));
-      FC_ASSERT( item->num <= _head->num + 1, "", ("item->num",item->num)("head+1",_head->num+1) );//MAX_BLOCK_REORDERING );
    }
 
    if( _head && item->previous_id() != block_id_type() )
