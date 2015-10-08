@@ -48,8 +48,19 @@ template<class... Types>
 void database::perform_account_maintenance(std::tuple<Types...> helpers)
 {
    const auto& idx = get_index_type<account_index>().indices();
+   bool is_sorted = true;
+   object_id_type last_id = object_id_type();
    for( const account_object& a : idx )
+   {
+      if( a.id < last_id )
+         is_sorted = false;
+      last_id = a.id;
       detail::for_each(helpers, a, detail::gen_seq<sizeof...(Types)>());
+   }
+   if( !is_sorted )
+   {
+      wlog( "perform_account_maintenance was unsorted" );
+   }
 }
 
 /// @brief A visitor for @ref worker_type which calls pay_worker on the worker within
