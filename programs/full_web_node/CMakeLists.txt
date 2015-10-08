@@ -42,7 +42,7 @@ qt5_add_resources(QML_QRC qml/qml.qrc)
 qt5_add_resources(WEB_QRC web/web.qrc)
 
 
-set( APP_NAME "GrapheneTest3" )
+set( APP_NAME "GrapheneOct5" )
 
 set( CPACK_BUNDLE_NAME ${APP_NAME} )
 set( CPACK_PACKAGE_NAME ${CPACK_BUNDLE_NAME} )

@@ -36,13 +36,14 @@ void BlockChain::start()
    startFuture = chainThread->async([this] {
       try {
          QSettings settings;
-         rpcEndpoint = settings.value( "rpc-endpoint", "127.0.0.1:8091" ).value<QString>();
-         auto seed_node    = settings.value( "seed-node", "104.236.51.238:1776" ).value<QString>().toStdString();
+         rpcEndpoint = settings.value( "rpc-endpoint", "127.0.0.1:8090" ).value<QString>();
+         auto seed_node    = settings.value( "seed-node", "104.236.51.238:2005" ).value<QString>().toStdString();
          grapheneApp->register_plugin<graphene::account_history::account_history_plugin>();
          grapheneApp->register_plugin<graphene::market_history::market_history_plugin>();
 
          QString dataDir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
          QDir(dataDir).mkpath(".");
+         idump((dataDir.toStdString()));
          boost::program_options::variables_map map;
          map.insert({"rpc-endpoint",boost::program_options::variable_value(rpcEndpoint.toStdString(), false)});
          map.insert({"seed-node",boost::program_options::variable_value(std::vector<std::string>{(seed_node)}, false)});
