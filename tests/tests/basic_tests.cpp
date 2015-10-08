@@ -115,7 +115,7 @@ BOOST_AUTO_TEST_CASE( valid_symbol_test )
 
    BOOST_CHECK( is_valid_symbol( "AAA" ) );
    BOOST_CHECK( !is_valid_symbol( "AaA" ) );
-   BOOST_CHECK( !is_valid_symbol( "A0A" ) );
+   BOOST_CHECK( is_valid_symbol( "A0A" ) );
    BOOST_CHECK( is_valid_symbol( "A.A" ) );
 
    BOOST_CHECK( !is_valid_symbol( "A..A" ) );
@@ -126,6 +126,8 @@ BOOST_AUTO_TEST_CASE( valid_symbol_test )
    BOOST_CHECK( !is_valid_symbol( "AAAAAAAAAAAAAAAAA" ) );
    BOOST_CHECK( is_valid_symbol( "A.AAAAAAAAAAAAAA" ) );
    BOOST_CHECK( !is_valid_symbol( "A.AAAAAAAAAAAA.A" ) );
+
+   BOOST_CHECK( is_valid_symbol( "AAA000AAA" ) );
 }
 
 BOOST_AUTO_TEST_CASE( price_test )

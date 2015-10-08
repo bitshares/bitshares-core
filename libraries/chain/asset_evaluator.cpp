@@ -21,13 +21,63 @@
 #include <graphene/chain/market_evaluator.hpp>
 #include <graphene/chain/database.hpp>
 #include <graphene/chain/exceptions.hpp>
+#include <graphene/chain/hardfork.hpp>
 
 #include <functional>
 
 namespace graphene { namespace chain {
+
+/**
+ *  Valid symbols can contain [A-Z0-9], and '.'
+ *  They must start with [A, Z]
+ *  They must end with [A, Z]
+ *  They can contain a maximum of one '.'
+ */
+bool is_valid_symbol_old( const string& symbol )
+{
+    if( symbol.size() < GRAPHENE_MIN_ASSET_SYMBOL_LENGTH )
+        return false;
+
+    if( symbol.size() > GRAPHENE_MAX_ASSET_SYMBOL_LENGTH )
+        return false;
+
+    if( !isalpha( symbol.front() ) )
+        return false;
+
+    if( !isalpha( symbol.back() ) )
+        return false;
+
+    bool dot_already_present = false;
+    for( const auto c : symbol )
+    {
+        if( (isalpha( c ) || isdigit(c)) && isupper( c ) )
+            continue;
+
+        if( c == '.' )
+        {
+            if( dot_already_present )
+                return false;
+
+            dot_already_present = true;
+            continue;
+        }
+
+        return false;
+    }
+
+    return true;
+}
+
 void_result asset_create_evaluator::do_evaluate( const asset_create_operation& op )
 { try {
+
    database& d = db();
+
+#warning HARDFORK remove this check after HARDFORK_359_TIME and rename is_valid_symbol_old -> is_valid_symbol
+   if( d.head_block_time() <= HARDFORK_359_TIME )
+   {
+      FC_ASSERT( is_valid_symbol_old( op.symbol ) );
+   }
 
    const auto& chain_parameters = d.get_global_properties().parameters;
    FC_ASSERT( op.common_options.whitelist_authorities.size() <= chain_parameters.maximum_asset_whitelist_authorities );
