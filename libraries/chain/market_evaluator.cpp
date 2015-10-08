@@ -225,15 +225,16 @@ void_result call_order_update_evaluator::do_apply(const call_order_update_operat
          const auto call_obj  = d.find(call_order_id);
          // if we filled at least one call order, we are OK if we totally filled.
          GRAPHENE_ASSERT(
-            !d.find_object( call_order_id ),
+            !call_obj,
             call_order_update_unfilled_margin_call,
             "Updating call order would trigger a margin call that cannot be fully filled",
-            ("a", call_obj ? ~call_obj->call_price : price())("b", _bitasset_data->current_feed.settlement_price)
+            ("a", ~call_obj->call_price )("b", _bitasset_data->current_feed.settlement_price)
             );
       }
       else
       {
          const auto call_obj  = d.find(call_order_id);
+         FC_ASSERT( call_obj, "no margin call was executed and yet the call object was deleted" );
          //edump( (~call_obj->call_price) ("<")( _bitasset_data->current_feed.settlement_price) );
          // We didn't fill any call orders.  This may be because we
          // aren't in margin call territory, or it may be because there
@@ -242,7 +243,7 @@ void_result call_order_update_evaluator::do_apply(const call_order_update_operat
             ~call_obj->call_price < _bitasset_data->current_feed.settlement_price,
             call_order_update_unfilled_margin_call,
             "Updating call order would trigger a margin call that cannot be fully filled",
-            ("a",call_obj ? ~call_obj->call_price : price())("b", _bitasset_data->current_feed.settlement_price)
+            ("a", ~call_obj->call_price )("b", _bitasset_data->current_feed.settlement_price)
             );
       }
    }
