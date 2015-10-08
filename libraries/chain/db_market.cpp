@@ -427,9 +427,16 @@ bool database::check_call_orders(const asset_object& mia, bool enable_black_swan
     auto call_end = call_price_index.upper_bound( call_max );
 
     bool filled_limit = false;
+    bool margin_called = false;
+
+    if( head_block_num() >= 11510 ) {
+       auto tmp = call_itr;
+       while( tmp != call_end ) { edump( (*tmp) ); ++tmp; }
+    }
 
     while( !check_for_blackswan( mia, enable_black_swan ) && call_itr != call_end )
     {
+       idump((*call_itr));
        bool  filled_call      = false;
        price match_price;
        asset usd_for_sale;
@@ -445,6 +452,9 @@ bool database::check_call_orders(const asset_object& mia, bool enable_black_swan
 
        if( match_price > ~call_itr->call_price )
           return filled_limit;
+       ilog( "match_price <= ~call_itr->call_price  performing a margin call" );
+
+       margin_called = true;
 
        auto usd_to_buy   = call_itr->get_debt();
 
@@ -476,6 +486,8 @@ bool database::check_call_orders(const asset_object& mia, bool enable_black_swan
           filled_call    = true;
        }
 
+       FC_ASSERT( filled_call || filled_limit );
+
        auto old_call_itr = call_itr;
        if( filled_call ) ++call_itr;
        fill_order(*old_call_itr, call_pays, call_receives);
@@ -485,7 +497,7 @@ bool database::check_call_orders(const asset_object& mia, bool enable_black_swan
 
     } // whlie call_itr != call_end
 
-    return filled_limit;
+    return margin_called;
 } FC_CAPTURE_AND_RETHROW() }
 
 void database::pay_order( const account_object& receiver, const asset& receives, const asset& pays )
