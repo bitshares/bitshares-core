@@ -168,32 +168,35 @@ void database::open(
    FC_CAPTURE_LOG_AND_RETHROW( (data_dir) )
 }
 
-void database::close(uint32_t blocks_to_rewind)
+void database::close(bool rewind)
 {
    // TODO:  Save pending tx's on close()
    clear_pending();
 
    // pop all of the blocks that we can given our undo history, this should
    // throw when there is no more undo history to pop
-   try
+   if( rewind )
    {
-      while( true )
+      try
       {
-      //   elog("pop");
-         block_id_type popped_block_id = head_block_id();
-         pop_block();
-         _fork_db.remove(popped_block_id); // doesn't throw on missing
-         try
+         while( true )
          {
-            _block_id_to_block.remove(popped_block_id);
-         }
-         catch (const fc::key_not_found_exception&)
-         {
+         //   elog("pop");
+            block_id_type popped_block_id = head_block_id();
+            pop_block();
+            _fork_db.remove(popped_block_id); // doesn't throw on missing
+            try
+            {
+               _block_id_to_block.remove(popped_block_id);
+            }
+            catch (const fc::key_not_found_exception&)
+            {
+            }
          }
       }
-   }
-   catch (...)
-   {
+      catch (...)
+      {
+      }
    }
 
    // Since pop_block() will move tx's in the popped blocks into pending,
