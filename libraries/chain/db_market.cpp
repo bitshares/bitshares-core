@@ -429,14 +429,16 @@ bool database::check_call_orders(const asset_object& mia, bool enable_black_swan
     bool filled_limit = false;
     bool margin_called = false;
 
-    if( head_block_num() >= 11510 ) {
+    /*
+    if( head_block_num() >= 11510  && head_block_num() <= 11512) {
+       idump(("enter loop") );
        auto tmp = call_itr;
        while( tmp != call_end ) { edump( (*tmp) ); ++tmp; }
     }
+    */
 
     while( !check_for_blackswan( mia, enable_black_swan ) && call_itr != call_end )
     {
-       idump((*call_itr));
        bool  filled_call      = false;
        price match_price;
        asset usd_for_sale;
@@ -446,13 +448,17 @@ bool database::check_call_orders(const asset_object& mia, bool enable_black_swan
           match_price      = limit_itr->sell_price;
           usd_for_sale     = limit_itr->amount_for_sale();
        }
-       else return filled_limit;
+       else return margin_called;
 
        match_price.validate();
 
        if( match_price > ~call_itr->call_price )
-          return filled_limit;
-       ilog( "match_price <= ~call_itr->call_price  performing a margin call" );
+          return margin_called;
+
+     //  idump((*call_itr));
+     //  idump((*limit_itr));
+
+     //  ilog( "match_price <= ~call_itr->call_price  performing a margin call" );
 
        margin_called = true;
 
