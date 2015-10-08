@@ -377,7 +377,10 @@ signed_block database::_generate_block(
       pending_block.sign( block_signing_private_key );
 
    // TODO:  Move this to _push_block() so session is restored.
-   FC_ASSERT( fc::raw::pack_size(pending_block) <= get_global_properties().parameters.maximum_block_size );
+   if( !(skip & skip_block_size_check) )
+   {
+      FC_ASSERT( fc::raw::pack_size(pending_block) <= get_global_properties().parameters.maximum_block_size );
+   }
 
    push_block( pending_block, skip );
 
