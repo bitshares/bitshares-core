@@ -73,7 +73,11 @@ void_result asset_create_evaluator::do_evaluate( const asset_create_operation& o
 
    database& d = db();
 
-#warning HARDFORK remove this check after HARDFORK_359_TIME and rename is_valid_symbol_old -> is_valid_symbol
+#ifdef _MSC_VER
+# pragma message ("WARNING:HARDFORK remove this check after HARDFORK_359_TIME and rename is_valid_symbol_old -> is_valid_symbol")
+#else
+# warning HARDFORK remove this check after HARDFORK_359_TIME and rename is_valid_symbol_old -> is_valid_symbol
+#endif
    if( d.head_block_time() <= HARDFORK_359_TIME )
    {
       FC_ASSERT( is_valid_symbol_old( op.symbol ) );
@@ -507,7 +511,11 @@ void_result asset_publish_feeds_evaluator::do_evaluate(const asset_publish_feed_
    const asset_bitasset_data_object& bitasset = base.bitasset_data(d);
    FC_ASSERT( !bitasset.has_settlement(), "No further feeds may be published after a settlement event" );
 
-#warning Remove this check when starting a new network
+#ifdef _MSC_VER
+# pragma message ("WARNING: Remove this check when starting a new network")
+#else
+# warning Remove this check when starting a new network
+#endif
    if( d.head_block_time() <= HARDFORK_357_TIME )
    {
       FC_ASSERT(o.feed.settlement_price.quote.asset_id == bitasset.options.short_backing_asset);
@@ -564,7 +572,11 @@ void_result asset_publish_feeds_evaluator::do_evaluate(const asset_publish_feed_
          wdump( (e) );
       }
 
-#warning Remove this check when starting a new network
+#ifdef _MSC_VER
+# pragma message ("WARNING: Remove this check when starting a new network")
+#else
+# warning Remove this check when starting a new network
+#endif
       if( d.head_block_num() > 59300 )
       {
          FC_ASSERT(
@@ -612,7 +624,11 @@ void_result asset_publish_feeds_evaluator::do_evaluate(const asset_publish_feed_
 void_result asset_publish_feeds_evaluator::do_apply(const asset_publish_feed_operation& o)
 { try {
 
-#warning Remove this check when preparing for new network release
+#ifdef _MSC_VER
+# pragma message ("WARNING: Remove this check when preparing for new network release")
+#else
+# warning Remove this check when preparing for new network release
+#endif
    if( !o.feed.is_for( o.asset_id ) )
    {
       wlog( "Ignoring bad feed" );
