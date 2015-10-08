@@ -291,7 +291,7 @@ BOOST_AUTO_TEST_CASE( black_swan_issue_346 )
 
       auto setup_asset = [&]() -> const asset_object&
       {
-         const asset_object& bitusd = create_bitasset("BITUSD"+fc::to_string(trial), feeder_id);
+         const asset_object& bitusd = create_bitasset("BITUSD"+fc::to_string(trial)+"X", feeder_id);
          update_feed_producers( bitusd, {feeder.id} );
          BOOST_CHECK( !bitusd.bitasset_data(db).has_settlement() );
          trial++;
@@ -362,7 +362,11 @@ BOOST_AUTO_TEST_CASE( black_swan_issue_346 )
          limit_order_id_type oid_019 = create_sell_order( seller, bitusd.amount(39), core.amount(2000) )->id;   // this order is at $0.019, we should not be able to match against it
          limit_order_id_type oid_020 = create_sell_order( seller, bitusd.amount(40), core.amount(2000) )->id;   // this order is at $0.020, we should be able to match against it
          set_price( bitusd, bitusd.amount(21) / core.amount(1000) ); // $0.021
-         BOOST_CHECK( !bitusd.bitasset_data(db).has_settlement() );
+         //
+         // We attempt to match against $0.019 order and black swan,
+         // and this is intended behavior.  See discussion in ticket.
+         //
+         BOOST_CHECK( bitusd.bitasset_data(db).has_settlement() );
          BOOST_CHECK( db.find_object( oid_019 ) != nullptr );
          BOOST_CHECK( db.find_object( oid_020 ) == nullptr );
       }
