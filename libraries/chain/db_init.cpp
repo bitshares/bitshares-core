@@ -440,16 +440,20 @@ void database::init_genesis(const genesis_state_type& genesis_state)
    };
 
    map<asset_id_type, share_type> total_supplies;
+   map<asset_id_type, share_type> total_debts;
 
    // Create initial assets
    for( const genesis_state_type::initial_asset_type& asset : genesis_state.initial_assets )
    {
       asset_id_type new_asset_id = get_index_type<asset_index>().get_next_id();
+      total_supplies[ new_asset_id ] = 0;
+
       asset_dynamic_data_id_type dynamic_data_id;
       optional<asset_bitasset_data_id_type> bitasset_data_id;
       if( asset.is_bitasset )
       {
          int collateral_holder_number = 0;
+         total_debts[ new_asset_id ] = 0;
          for( const auto& collateral_rec : asset.collateral_records )
          {
             account_create_operation cop;
@@ -474,6 +478,7 @@ void database::init_genesis(const genesis_state_type& genesis_state)
             });
 
             total_supplies[ 0 ] += collateral_rec.collateral;
+            total_debts[ new_asset_id ] += collateral_rec.debt;
             ++collateral_holder_number;
          }
 
@@ -542,6 +547,33 @@ void database::init_genesis(const genesis_state_type& genesis_state)
        total_supplies[ 0 ] = GRAPHENE_MAX_SHARE_SUPPLY;
    }
 
+   const auto& idx = get_index_type<asset_index>().indices().get<by_symbol>();
+   auto it = idx.begin();
+   bool has_imbalanced_assets = false;
+
+   while( it != idx.end() )
+   {
+      if( it->bitasset_data_id.valid() )
+      {
+         auto supply_itr = total_supplies.find( it->id );
+         auto debt_itr = total_debts.find( it->id );
+         FC_ASSERT( supply_itr != total_supplies.end() );
+         FC_ASSERT( debt_itr != total_debts.end() );
+         if( supply_itr->second != debt_itr->second )
+         {
+            has_imbalanced_assets = true;
+            elog( "Genesis for asset ${aname} is not balanced\n"
+                  "   Debt is ${debt}\n"
+                  "   Supply is ${supply}\n",
+                  ("debt", debt_itr->second)
+                  ("supply", supply_itr->second)
+                );
+         }
+      }
+      ++it;
+   }
+   FC_ASSERT( !has_imbalanced_assets );
+
    // Save tallied supplies
    for( const auto& item : total_supplies )
    {
@@ -554,8 +586,6 @@ void database::init_genesis(const genesis_state_type& genesis_state)
            } );
        } );
    }
-
-   // TODO: Assert that bitasset debt = supply
 
    // Create special witness account
    const witness_object& wit = create<witness_object>([&](witness_object& w) {});
