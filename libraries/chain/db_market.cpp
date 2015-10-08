@@ -339,13 +339,11 @@ bool database::fill_order( const call_order_object& order, const asset& pays, co
            });
    }
 
-   if( collateral_freed )
-   {
-      remove( order );
-   }
-
    assert( pays.asset_id != receives.asset_id );
    push_applied_operation( fill_order_operation{ order.id, order.borrower, pays, receives, asset(0, pays.asset_id) } );
+
+   if( collateral_freed )
+      remove( order );
 
    return collateral_freed.valid();
 } FC_CAPTURE_AND_RETHROW( (order)(pays)(receives) ) }
