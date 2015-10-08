@@ -90,8 +90,19 @@ namespace graphene { namespace chain {
 
          const index_type& indices()const { return _indices; }
 
+         virtual fc::uint128 hash()const override {
+            fc::uint128 result;
+            for( const auto& ptr : _indices )
+            {
+               result += ptr.hash();
+            }
+
+            return result;
+         }
+
       private:
-         index_type _indices;
+         fc::uint128 _current_hash;
+         index_type  _indices;
    };
 
    /**
