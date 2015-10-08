@@ -16,18 +16,20 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #include <graphene/chain/protocol/asset.hpp>
-#include <fc/uint128.hpp>
 #include <boost/rational.hpp>
+#include <boost/multiprecision/cpp_int.hpp>
 
 namespace graphene { namespace chain {
+      typedef boost::multiprecision::uint128_t uint128_t;
+      typedef boost::multiprecision::int128_t  int128_t;
 
       bool operator == ( const price& a, const price& b )
       {
          if( std::tie( a.base.asset_id, a.quote.asset_id ) != std::tie( b.base.asset_id, b.quote.asset_id ) )
              return false;
 
-         const auto amult = fc::uint128( b.quote.amount.value ) * a.base.amount.value;
-         const auto bmult = fc::uint128( a.quote.amount.value ) * b.base.amount.value;
+         const auto amult = uint128_t( b.quote.amount.value ) * a.base.amount.value;
+         const auto bmult = uint128_t( a.quote.amount.value ) * b.base.amount.value;
 
          return amult == bmult;
       }
@@ -39,8 +41,8 @@ namespace graphene { namespace chain {
          if( a.quote.asset_id < b.quote.asset_id ) return true;
          if( a.quote.asset_id > b.quote.asset_id ) return false;
 
-         const auto amult = fc::uint128( b.quote.amount.value ) * a.base.amount.value;
-         const auto bmult = fc::uint128( a.quote.amount.value ) * b.base.amount.value;
+         const auto amult = uint128_t( b.quote.amount.value ) * a.base.amount.value;
+         const auto bmult = uint128_t( a.quote.amount.value ) * b.base.amount.value;
 
          return amult < bmult;
       }
@@ -70,16 +72,16 @@ namespace graphene { namespace chain {
          if( a.asset_id == b.base.asset_id )
          {
             FC_ASSERT( b.base.amount.value > 0 );
-            auto result = (fc::uint128(a.amount.value) * b.quote.amount.value)/b.base.amount.value;
+            auto result = (uint128_t(a.amount.value) * b.quote.amount.value)/b.base.amount.value;
             FC_ASSERT( result <= GRAPHENE_MAX_SHARE_SUPPLY );
-            return asset( result.to_uint64(), b.quote.asset_id );
+            return asset( result, b.quote.asset_id );
          }
          else if( a.asset_id == b.quote.asset_id )
          {
             FC_ASSERT( b.quote.amount.value > 0 );
-            auto result = (fc::uint128(a.amount.value) * b.base.amount.value)/b.quote.amount.value;
+            auto result = (uint128_t(a.amount.value) * b.base.amount.value)/b.quote.amount.value;
             FC_ASSERT( result <= GRAPHENE_MAX_SHARE_SUPPLY );
-            return asset( result.to_uint64(), b.base.asset_id );
+            return asset( result, b.base.asset_id );
          }
          FC_THROW_EXCEPTION( fc::assert_exception, "invalid asset * price", ("asset",a)("price",b) );
       }
@@ -112,9 +114,13 @@ namespace graphene { namespace chain {
       price price::call_price( const asset& debt, const asset& collateral, uint16_t collateral_ratio)
       { try {
          //wdump((debt)(collateral)(collateral_ratio));
-         boost::rational<uint64_t> swan(debt.amount.value,collateral.amount.value);
-         boost::rational<uint64_t> ratio( collateral_ratio, GRAPHENE_COLLATERAL_RATIO_DENOM );
+         boost::rational<int128_t> swan(debt.amount.value,collateral.amount.value);
+         boost::rational<int128_t> ratio( collateral_ratio, GRAPHENE_COLLATERAL_RATIO_DENOM );
          auto cp = swan * ratio;
+
+         while( cp.numerator() > GRAPHENE_MAX_SHARE_SUPPLY || cp.denominator() > GRAPHENE_MAX_SHARE_SUPPLY )
+            cp = boost::rational<int128_t>( (cp.numerator() >> 1)+1, (cp.denominator() >> 1)+1 );
+
          return ~(asset( cp.numerator(), debt.asset_id ) / asset( cp.denominator(), collateral.asset_id ));
       } FC_CAPTURE_AND_RETHROW( (debt)(collateral)(collateral_ratio) ) }
 
@@ -135,6 +141,8 @@ namespace graphene { namespace chain {
          FC_ASSERT( maximum_short_squeeze_ratio <= GRAPHENE_MAX_COLLATERAL_RATIO );
          FC_ASSERT( maintenance_collateral_ratio >= GRAPHENE_MIN_COLLATERAL_RATIO );
          FC_ASSERT( maintenance_collateral_ratio <= GRAPHENE_MAX_COLLATERAL_RATIO );
+         max_short_squeeze_price(); // make sure that it doesn't overflow
+
          //FC_ASSERT( maintenance_collateral_ratio >= maximum_short_squeeze_ratio );
       } FC_CAPTURE_AND_RETHROW( (*this) ) }
 
@@ -154,9 +162,13 @@ namespace graphene { namespace chain {
 
       price price_feed::max_short_squeeze_price()const
       {
-         boost::rational<uint64_t> sp( settlement_price.base.amount.value, settlement_price.quote.amount.value ); //debt.amount.value,collateral.amount.value);
-         boost::rational<uint64_t> ratio( GRAPHENE_COLLATERAL_RATIO_DENOM, maximum_short_squeeze_ratio );
+         boost::rational<int128_t> sp( settlement_price.base.amount.value, settlement_price.quote.amount.value ); //debt.amount.value,collateral.amount.value);
+         boost::rational<int128_t> ratio( GRAPHENE_COLLATERAL_RATIO_DENOM, maximum_short_squeeze_ratio );
          auto cp = sp * ratio;
+
+         while( cp.numerator() > GRAPHENE_MAX_SHARE_SUPPLY || cp.denominator() > GRAPHENE_MAX_SHARE_SUPPLY )
+            cp = boost::rational<int128_t>( (cp.numerator() >> 1)+(cp.numerator()&1), (cp.denominator() >> 1)+(cp.denominator()&1) );
+
          return (asset( cp.numerator(), settlement_price.base.asset_id ) / asset( cp.denominator(), settlement_price.quote.asset_id ));
       }
 

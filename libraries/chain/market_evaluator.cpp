@@ -184,7 +184,6 @@ void_result call_order_update_evaluator::do_apply(const call_order_update_operat
          call.call_price = price::call_price(o.delta_debt, o.delta_collateral,
                                              _bitasset_data->current_feed.maintenance_collateral_ratio);
 
-         auto swan_price  =  call.get_debt()/ call.get_collateral();
       });
    }
    else
@@ -196,7 +195,6 @@ void_result call_order_update_evaluator::do_apply(const call_order_update_operat
           call.debt       += o.delta_debt.amount;
           if( call.debt > 0 )
           {
-             auto swan_price  =  call.get_debt()/ call.get_collateral();
              call.call_price  =  price::call_price(call.get_debt(), call.get_collateral(),
                                                    _bitasset_data->current_feed.maintenance_collateral_ratio);
           }
