@@ -138,6 +138,20 @@ namespace graphene { namespace chain {
          //FC_ASSERT( maintenance_collateral_ratio >= maximum_short_squeeze_ratio );
       } FC_CAPTURE_AND_RETHROW( (*this) ) }
 
+      bool price_feed::is_for( asset_id_type asset_id ) const
+      {
+         try
+         {
+            if( !settlement_price.is_null() )
+               return (settlement_price.base.asset_id == asset_id);
+            if( !core_exchange_rate.is_null() )
+               return (core_exchange_rate.base.asset_id == asset_id);
+            // (null, null) is valid for any feed
+            return true;
+         }
+         FC_CAPTURE_AND_RETHROW( (*this) )
+      }
+
       price price_feed::max_short_squeeze_price()const
       {
          boost::rational<uint64_t> sp( settlement_price.base.amount.value, settlement_price.quote.amount.value ); //debt.amount.value,collateral.amount.value);

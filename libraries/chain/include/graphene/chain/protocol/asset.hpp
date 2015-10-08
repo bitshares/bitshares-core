@@ -200,6 +200,7 @@ namespace graphene { namespace chain {
       }
 
       void validate() const;
+      bool is_for( asset_id_type asset_id ) const;
    };
 
 } }

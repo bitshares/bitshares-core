@@ -506,7 +506,96 @@ void_result asset_publish_feeds_evaluator::do_evaluate(const asset_publish_feed_
 
    const asset_bitasset_data_object& bitasset = base.bitasset_data(d);
    FC_ASSERT( !bitasset.has_settlement(), "No further feeds may be published after a settlement event" );
-   FC_ASSERT(o.feed.settlement_price.quote.asset_id == bitasset.options.short_backing_asset);
+
+#warning Remove this check when starting a new network
+   if( d.head_block_time() <= HARDFORK_357_TIME )
+   {
+      FC_ASSERT(o.feed.settlement_price.quote.asset_id == bitasset.options.short_backing_asset);
+
+      bool is_nop = false;
+
+      try
+      {
+         // these two changes should go in price_feed::validate() when creating new network
+         if( !o.feed.core_exchange_rate.is_null() )
+         {
+            o.feed.core_exchange_rate.validate();
+         }
+         if( (!o.feed.settlement_price.is_null()) && (!o.feed.core_exchange_rate.is_null()) )
+         {
+            if( o.feed.settlement_price.base.asset_id == o.feed.core_exchange_rate.base.asset_id )
+            {
+               // uncrossed feed, this is the form we expect
+               FC_ASSERT( o.feed.settlement_price.base.asset_id == o.feed.core_exchange_rate.base.asset_id );
+               FC_ASSERT( o.feed.settlement_price.quote.asset_id == o.feed.core_exchange_rate.quote.asset_id );
+            }
+            else
+            {
+               // crossed feed, your feed script needs to be fixed
+               FC_ASSERT( o.feed.settlement_price.base.asset_id == o.feed.core_exchange_rate.quote.asset_id );
+               FC_ASSERT( o.feed.settlement_price.quote.asset_id == o.feed.core_exchange_rate.base.asset_id );
+               /*
+               wlog( "${aname} feed pub with crossed prices by ${name} in block ${n}",
+                  ("aname", base.symbol)
+                  ("n", d.head_block_num()+1)
+                  ("name", o.publisher(d).name)
+                  );
+               */
+            }
+         }
+
+         if( !o.feed.is_for( o.asset_id ) )
+         {
+            wlog( "${aname} feed pub with wrong asset by ${name} in block ${n}",
+               ("aname", base.symbol)
+               ("n", d.head_block_num()+1)
+               ("name", o.publisher(d).name)
+               );
+            is_nop = true;
+         }
+      }
+      catch( const fc::exception& e )
+      {
+         wlog( "${aname} feed pub with invalid price feed by ${name} in block ${n}",
+               ("aname", base.symbol)
+               ("n", d.head_block_num()+1)
+               ("name", o.publisher(d).name)
+               );
+         wdump( (e) );
+      }
+
+#warning Remove this check when starting a new network
+      if( d.head_block_num() > 59300 )
+      {
+         FC_ASSERT(
+               (base.symbol != "SEK")
+            && (base.symbol != "SILVER")
+            && (base.symbol != "RUB")
+            && (base.symbol != "GBP")
+            );
+      }
+   }
+   else
+   {
+      //
+      // many of these checks should be moved to price_feed.validate()
+      // or the operation validator when new network is started
+      //
+      if( !o.feed.core_exchange_rate.is_null() )
+      {
+         o.feed.core_exchange_rate.validate();
+      }
+      if( (!o.feed.settlement_price.is_null()) && (!o.feed.core_exchange_rate.is_null()) )
+      {
+         FC_ASSERT( o.feed.settlement_price.base.asset_id == o.feed.core_exchange_rate.base.asset_id );
+         FC_ASSERT( o.feed.settlement_price.quote.asset_id == o.feed.core_exchange_rate.quote.asset_id );
+      }
+
+      FC_ASSERT( !o.feed.settlement_price.is_null() );
+      FC_ASSERT( !o.feed.core_exchange_rate.is_null() );
+      FC_ASSERT( o.feed.settlement_price.quote.asset_id == bitasset.options.short_backing_asset );
+      FC_ASSERT( o.feed.is_for( o.asset_id ) );
+   }
    //Verify that the publisher is authoritative to publish a feed
    if( (base.issuer == GRAPHENE_WITNESS_ACCOUNT) || (base.issuer == GRAPHENE_COMMITTEE_ACCOUNT) )
    {
@@ -522,6 +611,14 @@ void_result asset_publish_feeds_evaluator::do_evaluate(const asset_publish_feed_
 
 void_result asset_publish_feeds_evaluator::do_apply(const asset_publish_feed_operation& o)
 { try {
+
+#warning Remove this check when preparing for new network release
+   if( !o.feed.is_for( o.asset_id ) )
+   {
+      wlog( "Ignoring bad feed" );
+      return void_result();
+   }
+
    database& d = db();
 
    const asset_object& base = o.asset_id(d);
