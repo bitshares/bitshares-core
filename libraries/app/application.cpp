@@ -103,6 +103,7 @@ namespace detail {
    public:
       fc::optional<fc::temp_file> _lock_file;
       bool _is_block_producer = false;
+      bool _force_validate = false;
 
       void reset_p2p_node(const fc::path& data_dir)
       { try {
@@ -312,6 +313,12 @@ namespace detail {
             _chain_db->open(_data_dir / "blockchain", initial_state);
          }
 
+         if( _options->count("force-validate") )
+         {
+            ilog( "All transaction signatures will be validated" );
+            _force_validate = true;
+         }
+
          graphene::time::now();
 
          if( _options->count("api-access") )
@@ -399,7 +406,7 @@ namespace detail {
             // you can help the network code out by throwing a block_older_than_undo_history exception.
             // when the net code sees that, it will stop trying to push blocks from that chain, but
             // leave that peer connected so that they can get sync blocks from us
-            bool result = _chain_db->push_block(blk_msg.block, _is_block_producer ? database::skip_nothing : database::skip_transaction_signatures);
+            bool result = _chain_db->push_block(blk_msg.block, (_is_block_producer | _force_validate) ? database::skip_nothing : database::skip_transaction_signatures);
 
             // the block was accepted, so we now know all of the transactions contained in the block
             if (!sync_mode)
@@ -826,6 +833,7 @@ void application::set_program_options(boost::program_options::options_descriptio
           "invalid file is found, it will be replaced with an example Genesis State.")
          ("replay-blockchain", "Rebuild object graph by replaying all blocks")
          ("resync-blockchain", "Delete all blocks and re-sync with network from scratch")
+         ("force-validate", "Force validation of all transactions")
          ("genesis-timestamp", bpo::value<uint32_t>(), "Replace timestamp from genesis.json with current time plus this many seconds (experts only!)")
          ;
    command_line_options.add(_cli_options);

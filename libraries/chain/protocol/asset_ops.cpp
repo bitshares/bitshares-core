@@ -25,7 +25,7 @@ bool is_valid_symbol( const string& symbol )
     bool dot_already_present = false;
     for( const auto c : symbol )
     {
-        if( (isalpha( c ) || isdigit(c)) && isupper( c ) )
+        if( (isalpha( c ) && isupper( c )) || isdigit(c) )
             continue;
 
         if( c == '.' )
@@ -42,6 +42,7 @@ bool is_valid_symbol( const string& symbol )
 
     return true;
 }
+
 share_type asset_issue_operation::calculate_fee(const fee_parameters_type& k)const
 {
    return k.fee + calculate_data_fee( fc::raw::pack_size(memo), k.price_per_kbyte );

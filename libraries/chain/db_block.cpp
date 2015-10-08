@@ -377,7 +377,10 @@ signed_block database::_generate_block(
       pending_block.sign( block_signing_private_key );
 
    // TODO:  Move this to _push_block() so session is restored.
-   FC_ASSERT( fc::raw::pack_size(pending_block) <= get_global_properties().parameters.maximum_block_size );
+   if( !(skip & skip_block_size_check) )
+   {
+      FC_ASSERT( fc::raw::pack_size(pending_block) <= get_global_properties().parameters.maximum_block_size );
+   }
 
    push_block( pending_block, skip );
 
@@ -640,7 +643,11 @@ const witness_object& database::validate_block_header( uint32_t skip, const sign
 
       witness_id_type scheduled_witness = get_scheduled_witness( slot_num );
 
-#warning remove this hardfork check for next release
+#ifdef _MSC_VER
+# pragma message ("WARNING: remove this hardfork check for next release")
+#else
+# warning remove this hardfork check for next release
+#endif
       if( next_block.block_num() > 58500 ) {    
          FC_ASSERT( next_block.witness == scheduled_witness, "Witness produced block at wrong time",
                     ("block witness",next_block.witness)("scheduled",scheduled_witness)("slot_num",slot_num) );
