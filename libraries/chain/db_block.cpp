@@ -640,23 +640,9 @@ const witness_object& database::validate_block_header( uint32_t skip, const sign
 
       witness_id_type scheduled_witness = get_scheduled_witness( slot_num );
 
-#warning REMOVE HARDFORK in final release check
-      if( next_block.block_num() > 58500 ) {
-         FC_ASSERT( next_block.witness == scheduled_witness, "Witness produced block at wrong time",
-                    ("block witness",next_block.witness)("scheduled",scheduled_witness)("slot_num",slot_num) );
-      } 
-   } /*else {
-      uint32_t slot_num = get_slot_at_time( next_block.timestamp );
-      FC_ASSERT( slot_num > 0 );
-
-      const witness_schedule_object& wso = witness_schedule_id_type()(*this);
-      const dynamic_global_property_object& dpo = get_dynamic_global_properties();
-
-      witness_id_type scheduled_witness = get_scheduled_witness( slot_num );
-      if( next_block.witness != scheduled_witness )
-         edump( (next_block.block_num())(next_block.witness)(scheduled_witness)(slot_num)(wso)(dpo.current_aslot) );
+      FC_ASSERT( next_block.witness == scheduled_witness, "Witness produced block at wrong time",
+                 ("block witness",next_block.witness)("scheduled",scheduled_witness)("slot_num",slot_num) );
    }
-   */
 
    return witness;
 }

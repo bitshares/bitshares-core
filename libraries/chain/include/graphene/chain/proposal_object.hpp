@@ -76,7 +76,7 @@ struct by_expiration{};
 typedef boost::multi_index_container<
    proposal_object,
    indexed_by<
-      hashed_unique< tag< by_id >, member< object, object_id_type, &object::id > >,
+      ordered_unique< tag< by_id >, member< object, object_id_type, &object::id > >,
       ordered_non_unique< tag< by_expiration >, member< proposal_object, time_point_sec, &proposal_object::expiration_time > >
    >
 > proposal_multi_index_container;

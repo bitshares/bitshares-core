@@ -33,7 +33,7 @@ namespace graphene { namespace chain {
    using balance_multi_index_type = multi_index_container<
       balance_object,
       indexed_by<
-         hashed_unique< tag<by_id>, member< object, object_id_type, &object::id > >,
+         ordered_unique< tag<by_id>, member< object, object_id_type, &object::id > >,
          ordered_non_unique< tag<by_owner>, composite_key<
             balance_object,
             member<balance_object, address, &balance_object::owner>,

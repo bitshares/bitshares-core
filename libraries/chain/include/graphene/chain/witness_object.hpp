@@ -50,13 +50,13 @@ namespace graphene { namespace chain {
    using witness_multi_index_type = multi_index_container<
       witness_object,
       indexed_by<
-         hashed_unique< tag<by_id>,
+         ordered_unique< tag<by_id>,
             member<object, object_id_type, &object::id>
          >,
-         hashed_unique< tag<by_account>,
+         ordered_unique< tag<by_account>,
             member<witness_object, account_id_type, &witness_object::witness_account>
          >,
-         hashed_unique< tag<by_vote_id>,
+         ordered_unique< tag<by_vote_id>,
             member<witness_object, vote_id_type, &witness_object::vote_id>
          >
       >

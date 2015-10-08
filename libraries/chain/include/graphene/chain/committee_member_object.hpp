@@ -56,10 +56,10 @@ namespace graphene { namespace chain {
          ordered_unique< tag<by_id>,
             member<object, object_id_type, &object::id>
          >,
-         hashed_unique< tag<by_account>,
+         ordered_unique< tag<by_account>,
             member<committee_member_object, account_id_type, &committee_member_object::committee_member_account>
          >,
-         hashed_unique< tag<by_vote_id>,
+         ordered_unique< tag<by_vote_id>,
             member<committee_member_object, vote_id_type, &committee_member_object::vote_id>
          >
       >

@@ -288,7 +288,7 @@ namespace graphene { namespace chain {
       account_balance_object,
       indexed_by<
          ordered_unique< tag<by_id>, member< object, object_id_type, &object::id > >,
-         hashed_unique< tag<by_balance>, composite_key<
+         ordered_unique< tag<by_balance>, composite_key<
             account_balance_object,
             member<account_balance_object, account_id_type, &account_balance_object::owner>,
             member<account_balance_object, asset_id_type, &account_balance_object::asset_type> >
@@ -311,7 +311,7 @@ namespace graphene { namespace chain {
    typedef multi_index_container<
       account_object,
       indexed_by<
-         hashed_unique< tag<by_id>, member< object, object_id_type, &object::id > >,
+         ordered_unique< tag<by_id>, member< object, object_id_type, &object::id > >,
          ordered_unique< tag<by_name>, member<account_object, string, &account_object::name> >
       >
    > account_multi_index_type;

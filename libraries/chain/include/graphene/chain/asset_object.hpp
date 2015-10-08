@@ -215,7 +215,7 @@ namespace graphene { namespace chain {
    typedef multi_index_container<
       asset_bitasset_data_object,
       indexed_by<
-         hashed_unique< tag<by_id>, member< object, object_id_type, &object::id > >,
+         ordered_unique< tag<by_id>, member< object, object_id_type, &object::id > >,
          ordered_non_unique< tag<by_feed_expiration>,
             const_mem_fun< asset_bitasset_data_object, time_point_sec, &asset_bitasset_data_object::feed_expiration_time >
          >
@@ -227,7 +227,7 @@ namespace graphene { namespace chain {
    typedef multi_index_container<
       asset_object,
       indexed_by<
-         hashed_unique< tag<by_id>, member< object, object_id_type, &object::id > >,
+         ordered_unique< tag<by_id>, member< object, object_id_type, &object::id > >,
          ordered_unique< tag<by_symbol>, member<asset_object, string, &asset_object::symbol> >
       >
    > asset_object_multi_index_type;

@@ -45,7 +45,7 @@ namespace graphene { namespace chain {
   typedef multi_index_container<
      limit_order_object,
      indexed_by<
-        hashed_unique< tag<by_id>,
+        ordered_unique< tag<by_id>,
            member< object, object_id_type, &object::id > >,
         ordered_non_unique< tag<by_expiration>, member< limit_order_object, time_point_sec, &limit_order_object::expiration> >,
         ordered_unique< tag<by_price>,
@@ -112,7 +112,7 @@ namespace graphene { namespace chain {
    typedef multi_index_container<
       call_order_object,
       indexed_by<
-         hashed_unique< tag<by_id>,
+         ordered_unique< tag<by_id>,
             member< object, object_id_type, &object::id > >,
          ordered_unique< tag<by_price>,
             composite_key< call_order_object,
@@ -140,7 +140,7 @@ namespace graphene { namespace chain {
    typedef multi_index_container<
       force_settlement_object,
       indexed_by<
-         hashed_unique< tag<by_id>, member< object, object_id_type, &object::id > >,
+         ordered_unique< tag<by_id>, member< object, object_id_type, &object::id > >,
          ordered_non_unique< tag<by_account>,
             member<force_settlement_object, account_id_type, &force_settlement_object::owner>
          >,
