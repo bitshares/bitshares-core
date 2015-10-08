@@ -640,8 +640,11 @@ const witness_object& database::validate_block_header( uint32_t skip, const sign
 
       witness_id_type scheduled_witness = get_scheduled_witness( slot_num );
 
-      FC_ASSERT( next_block.witness == scheduled_witness, "Witness produced block at wrong time",
-                 ("block witness",next_block.witness)("scheduled",scheduled_witness)("slot_num",slot_num) );
+#warning remove this hardfork check for next release
+      if( next_block.block_num() > 58500 ) {    
+         FC_ASSERT( next_block.witness == scheduled_witness, "Witness produced block at wrong time",
+                    ("block witness",next_block.witness)("scheduled",scheduled_witness)("slot_num",slot_num) );
+      }
    }
 
    return witness;
