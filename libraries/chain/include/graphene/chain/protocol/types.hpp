@@ -86,9 +86,12 @@ namespace graphene { namespace chain {
       transfer_restricted  = 0x08, /**< require the issuer to be one party to every transfer */
       disable_force_settle = 0x10, /**< disable force settling */
       global_settle        = 0x20, /**< allow the bitasset issuer to force a global settling -- this may be set in permissions, but not flags */
-      disable_confidential = 0x40  /**< allow the asset to be used with confidential transactions */
+      disable_confidential = 0x40, /**< allow the asset to be used with confidential transactions */
+      witness_fed_asset    = 0x80, /**< allow the asset to be fed by witnesses */
+      committee_fed_asset  = 0x100 /**< allow the asset to be fed by the committee */
    };
-   const static uint32_t ASSET_ISSUER_PERMISSION_MASK = charge_market_fee|white_list|override_authority|transfer_restricted|disable_force_settle|global_settle|disable_confidential;
+   const static uint32_t ASSET_ISSUER_PERMISSION_MASK = charge_market_fee|white_list|override_authority|transfer_restricted|disable_force_settle|global_settle|disable_confidential
+      |witness_fed_asset|committee_fed_asset;
    const static uint32_t UIA_ASSET_ISSUER_PERMISSION_MASK = charge_market_fee|white_list|override_authority|transfer_restricted|disable_confidential;
 
    enum reserved_spaces
@@ -314,4 +317,14 @@ FC_REFLECT_TYPENAME( graphene::chain::account_transaction_history_id_type )
 FC_REFLECT_TYPENAME( graphene::chain::budget_record_id_type )
 FC_REFLECT( graphene::chain::void_t, )
 
-FC_REFLECT_ENUM( graphene::chain::asset_issuer_permission_flags, (charge_market_fee)(white_list)(transfer_restricted)(override_authority)(disable_force_settle)(global_settle)(disable_confidential) )
+FC_REFLECT_ENUM( graphene::chain::asset_issuer_permission_flags,
+   (charge_market_fee)
+   (white_list)
+   (transfer_restricted)
+   (override_authority)
+   (disable_force_settle)
+   (global_settle)
+   (disable_confidential)
+   (witness_fed_asset)
+   (committee_fed_asset)
+   )

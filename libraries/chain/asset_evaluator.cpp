@@ -73,7 +73,11 @@ void_result asset_create_evaluator::do_evaluate( const asset_create_operation& o
 
    database& d = db();
 
-#warning HARDFORK remove this check after HARDFORK_359_TIME and rename is_valid_symbol_old -> is_valid_symbol
+#ifdef _MSC_VER
+# pragma message ("WARNING:HARDFORK remove this check after HARDFORK_359_TIME and rename is_valid_symbol_old -> is_valid_symbol")
+#else
+# warning HARDFORK remove this check after HARDFORK_359_TIME and rename is_valid_symbol_old -> is_valid_symbol
+#endif
    if( d.head_block_time() <= HARDFORK_359_TIME )
    {
       FC_ASSERT( is_valid_symbol_old( op.symbol ) );
@@ -384,8 +388,8 @@ void_result asset_update_feed_producers_evaluator::do_evaluate(const asset_updat
    const asset_object& a = o.asset_to_update(d);
 
    FC_ASSERT(a.is_market_issued(), "Cannot update feed producers on a non-BitAsset.");
-   FC_ASSERT(a.issuer != GRAPHENE_COMMITTEE_ACCOUNT, "Cannot set feed producers on a committee-issued asset.");
-   FC_ASSERT(a.issuer != GRAPHENE_WITNESS_ACCOUNT, "Cannot set feed producers on a witness-issued asset.");
+   FC_ASSERT(!(a.options.flags & committee_fed_asset), "Cannot set feed producers on a committee-fed asset.");
+   FC_ASSERT(!(a.options.flags & witness_fed_asset), "Cannot set feed producers on a witness-fed asset.");
 
    const asset_bitasset_data_object& b = a.bitasset_data(d);
    bitasset_to_update = &b;
@@ -507,7 +511,11 @@ void_result asset_publish_feeds_evaluator::do_evaluate(const asset_publish_feed_
    const asset_bitasset_data_object& bitasset = base.bitasset_data(d);
    FC_ASSERT( !bitasset.has_settlement(), "No further feeds may be published after a settlement event" );
 
-#warning Remove this check when starting a new network
+#ifdef _MSC_VER
+# pragma message ("WARNING: Remove this check when starting a new network")
+#else
+# warning Remove this check when starting a new network
+#endif
    if( d.head_block_time() <= HARDFORK_357_TIME )
    {
       FC_ASSERT(o.feed.settlement_price.quote.asset_id == bitasset.options.short_backing_asset);
@@ -564,7 +572,11 @@ void_result asset_publish_feeds_evaluator::do_evaluate(const asset_publish_feed_
          wdump( (e) );
       }
 
-#warning Remove this check when starting a new network
+#ifdef _MSC_VER
+# pragma message ("WARNING: Remove this check when starting a new network")
+#else
+# warning Remove this check when starting a new network
+#endif
       if( d.head_block_num() > 59300 )
       {
          FC_ASSERT(
@@ -597,9 +609,13 @@ void_result asset_publish_feeds_evaluator::do_evaluate(const asset_publish_feed_
       FC_ASSERT( o.feed.is_for( o.asset_id ) );
    }
    //Verify that the publisher is authoritative to publish a feed
-   if( (base.issuer == GRAPHENE_WITNESS_ACCOUNT) || (base.issuer == GRAPHENE_COMMITTEE_ACCOUNT) )
+   if( base.options.flags & witness_fed_asset )
    {
-      FC_ASSERT( d.get(base.issuer).active.account_auths.count(o.publisher) );
+      FC_ASSERT( d.get(GRAPHENE_WITNESS_ACCOUNT).active.account_auths.count(o.publisher) );
+   }
+   else if( base.options.flags & committee_fed_asset )
+   {
+      FC_ASSERT( d.get(GRAPHENE_COMMITTEE_ACCOUNT).active.account_auths.count(o.publisher) );
    }
    else
    {
@@ -612,7 +628,11 @@ void_result asset_publish_feeds_evaluator::do_evaluate(const asset_publish_feed_
 void_result asset_publish_feeds_evaluator::do_apply(const asset_publish_feed_operation& o)
 { try {
 
-#warning Remove this check when preparing for new network release
+#ifdef _MSC_VER
+# pragma message ("WARNING: Remove this check when preparing for new network release")
+#else
+# warning Remove this check when preparing for new network release
+#endif
    if( !o.feed.is_for( o.asset_id ) )
    {
       wlog( "Ignoring bad feed" );
