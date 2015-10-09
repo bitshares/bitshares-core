@@ -497,9 +497,14 @@ void database::init_genesis(const genesis_state_type& genesis_state)
          a.symbol = asset.symbol;
          a.options.description = asset.description;
          a.precision = asset.precision;
-         a.issuer = get_account_id(asset.issuer_name);
+         string issuer_name = asset.issuer_name;
+#warning Remove this check doing real network, change BitAsset owners to be committee-account in genesis.
+         if( issuer_name == "witness-account" )
+            issuer_name = "committee-account";
+         a.issuer = get_account_id(issuer_name);
          a.options.max_supply = asset.max_supply;
-
+         a.options.flags = witness_fed_asset;
+         a.options.issuer_permissions = charge_market_fee | global_settle | witness_fed_asset | committee_fed_asset;
          a.dynamic_asset_data_id = dynamic_data_id;
          a.bitasset_data_id = bitasset_data_id;
       });

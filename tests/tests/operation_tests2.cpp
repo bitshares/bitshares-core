@@ -319,6 +319,7 @@ BOOST_AUTO_TEST_CASE( mia_feeds )
       op.issuer = obj.issuer;
       op.new_issuer = nathan_id;
       op.new_options = obj.options;
+      op.new_options.flags &= ~witness_fed_asset;
       trx.operations.push_back(op);
       PUSH_TX( db, trx, ~0 );
       generate_block();
