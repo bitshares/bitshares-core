@@ -575,10 +575,10 @@ class wallet_api
       bool import_account_keys( string filename, string password, string src_account_name, string dest_account_name );
 
       /**
-       * This call will construct a transaction that will claim all balances controled
+       * This call will construct transaction(s) that will claim all balances controled
        * by wif_keys and deposit them into the given account.
        */
-      signed_transaction import_balance( string account_name_or_id, const vector<string>& wif_keys, bool broadcast );
+      vector< signed_transaction > import_balance( string account_name_or_id, const vector<string>& wif_keys, bool broadcast );
 
       /** Transforms a brain key to reduce the chance of errors when re-entering the key from memory.
        *

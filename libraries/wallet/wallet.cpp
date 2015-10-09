@@ -624,7 +624,7 @@ public:
    {
       fc::optional<fc::ecc::private_key> optional_private_key = wif_to_key(wif_key);
       if (!optional_private_key)
-         FC_THROW("Invalid private key ${key}", ("key", wif_key));
+         FC_THROW("Invalid private key");
       graphene::chain::public_key_type wif_pub_key = optional_private_key->get_public_key();
       
       account_object account = get_account( account_name_or_id );
@@ -645,6 +645,8 @@ public:
 
       return all_keys_for_account.find(wif_pub_key) != all_keys_for_account.end();
    }
+
+   vector< signed_transaction > import_balance( string name_or_id, const vector<string>& wif_keys, bool broadcast );
 
    bool load_wallet_file(string wallet_filename = "")
    {
@@ -2571,7 +2573,7 @@ bool wallet_api::import_key(string account_name_or_id, string wif_key)
    // backup wallet
    fc::optional<fc::ecc::private_key> optional_private_key = wif_to_key(wif_key);
    if (!optional_private_key)
-      FC_THROW("Invalid private key ${key}", ("key", wif_key));
+      FC_THROW("Invalid private key");
    string shorthash = detail::address_to_shorthash(optional_private_key->get_public_key());
    copy_wallet_file( "before-import-key-" + shorthash );
 
@@ -3119,64 +3121,116 @@ void wallet_api::set_password( string password )
    lock();
 }
 
-signed_transaction wallet_api::import_balance( string name_or_id, const vector<string>& wif_keys, bool broadcast )
+vector< signed_transaction > wallet_api::import_balance( string name_or_id, const vector<string>& wif_keys, bool broadcast )
+{
+   return my->import_balance( name_or_id, wif_keys, broadcast );
+}
+
+namespace detail {
+
+vector< signed_transaction > wallet_api_impl::import_balance( string name_or_id, const vector<string>& wif_keys, bool broadcast )
 { try {
    FC_ASSERT(!is_locked());
+   const dynamic_global_property_object& dpo = _remote_db->get_dynamic_global_properties();
    account_object claimer = get_account( name_or_id );
+   uint32_t max_ops_per_tx = 30;
 
-   vector<address> addrs;
-   map<address,private_key_type> keys;
-   for( auto wif_key : wif_keys )
+   map< address, private_key_type > keys;  // local index of address -> private key
+   vector< address > addrs;
+   bool has_wildcard = false;
+   addrs.reserve( wif_keys.size() );
+   for( const string& wif_key : wif_keys )
    {
-      auto priv_key = wif_to_key(wif_key);
-      FC_ASSERT( priv_key, "Invalid Private Key", ("key",wif_key) );
-      addrs.push_back( priv_key->get_public_key() );
-      keys[addrs.back()] = *priv_key;
+      if( wif_key == "*" )
+      {
+         if( has_wildcard )
+            continue;
+         for( const public_key_type& pub : _wallet.extra_keys[ claimer.id ] )
+         {
+            addrs.push_back( pub );
+            auto it = _keys.find( pub );
+            if( it != _keys.end() )
+            {
+               fc::optional< fc::ecc::private_key > privkey = wif_to_key( it->second );
+               FC_ASSERT( privkey );
+               keys[ addrs.back() ] = *privkey;
+            }
+            else
+            {
+               wlog( "Somehow _keys has no private key for extra_keys public key ${k}", ("k", pub) );
+            }
+         }
+         has_wildcard = true;
+      }
+      else
+      {
+         optional< private_key_type > key = wif_to_key( wif_key );
+         FC_ASSERT( key.valid(), "Invalid private key" );
+         addrs.push_back( key->get_public_key() );
+         keys[addrs.back()] = *key;
+      }
    }
 
-   auto balances = my->_remote_db->get_balance_objects( addrs );
+   vector< balance_object > balances = _remote_db->get_balance_objects( addrs );
    wdump((balances));
    addrs.clear();
 
    set<asset_id_type> bal_types;
    for( auto b : balances ) bal_types.insert( b.balance.asset_id );
 
-   set<address> required_addrs;
-   signed_transaction trx;
-   for( auto a : bal_types )
+   struct claim_tx
+   {
+      vector< balance_claim_operation > ops;
+      set< address > addrs;
+   };
+   vector< claim_tx > claim_txs;
+
+   for( const asset_id_type& a : bal_types )
    {
       balance_claim_operation op;
       op.deposit_to_account = claimer.id;
-      for( const auto& b : balances )
+      for( const balance_object& b : balances )
       {
          if( b.balance.asset_id == a )
          {
-            op.total_claimed = b.vesting_policy.valid()? asset(0, b.balance.asset_id) : b.balance;
+            op.total_claimed = b.available( dpo.time );
+            if( op.total_claimed.amount == 0 )
+               continue;
             op.balance_to_claim = b.id;
             op.balance_owner_key = keys[b.owner].get_public_key();
-            trx.operations.push_back(op);
-            required_addrs.insert(b.owner);
+            if( (claim_txs.empty()) || (claim_txs.back().ops.size() >= max_ops_per_tx) )
+               claim_txs.emplace_back();
+            claim_txs.back().ops.push_back(op);
+            claim_txs.back().addrs.insert(b.owner);
          }
       }
    }
 
-   my->set_operation_fees( trx, my->_remote_db->get_global_properties().parameters.current_fees );
-   trx.validate();
+   vector< signed_transaction > result;
 
-   auto tx = sign_transaction( trx, false );
-
-   for( auto a : required_addrs )
-     tx.sign( keys[a], my->_chain_id );
+   for( const claim_tx& ctx : claim_txs )
+   {
+      signed_transaction tx;
+      tx.operations.reserve( ctx.ops.size() );
+      for( const balance_claim_operation& op : ctx.ops )
+         tx.operations.emplace_back( op );
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees );
+      tx.validate();
+      signed_transaction signed_tx = sign_transaction( tx, false );
+      for( const address& addr : ctx.addrs )
+         signed_tx.sign( keys[addr], _chain_id );
+      // if the key for a balance object was the same as a key for the account we're importing it into,
+      // we may end up with duplicate signatures, so remove those
+      boost::erase(signed_tx.signatures, boost::unique<boost::return_found_end>(boost::sort(signed_tx.signatures)));
+      result.push_back( signed_tx );
+      if( broadcast )
+         _remote_net_broadcast->broadcast_transaction(signed_tx);
+   }
    
-   // if the key for a balance object was the same as a key for the account we're importing it into,
-   // we may end up with duplicate signatures, so remove those
-   boost::erase(tx.signatures, boost::unique<boost::return_found_end>(boost::sort(tx.signatures)));
-   
-   if( broadcast )
-      my->_remote_net_broadcast->broadcast_transaction(tx);
-
-   return tx;
+   return result;
 } FC_CAPTURE_AND_RETHROW( (name_or_id) ) }
+
+}
 
 map<public_key_type, string> wallet_api::dump_private_keys()
 {
