@@ -2628,14 +2628,28 @@ map<string, bool> wallet_api::import_accounts( string filename, string password 
 
        if( should_proceed )
        {
+           uint32_t import_successes = 0;
+           uint32_t import_failures = 0;
            // TODO: First check that all private keys match public keys
            for( const auto& encrypted_key : item.encrypted_private_keys )
            {
-               const auto plain_text = fc::aes_decrypt( password_hash, encrypted_key );
-               const auto private_key = fc::raw::unpack<private_key_type>( plain_text );
+               try
+               {
+                  const auto plain_text = fc::aes_decrypt( password_hash, encrypted_key );
+                  const auto private_key = fc::raw::unpack<private_key_type>( plain_text );
 
-               import_key( item.account_name, string( graphene::utilities::key_to_wif( private_key ) ) );
+                  import_key( item.account_name, string( graphene::utilities::key_to_wif( private_key ) ) );
+                  ++import_successes;
+               }
+               catch( const fc::exception& e )
+               {
+                  elog( "Couldn't import key due to exception ${e}", ("e", e.to_detail_string()) );
+                  ++import_failures;
+               }
            }
+           ilog( "successfully imported ${n} keys for account ${name}", ("n", import_successes)("name", item.account_name) );
+           if( import_failures > 0 )
+              elog( "failed to import ${n} keys for account ${name}", ("n", import_failures)("name", item.account_name) );
        }
    }
 
