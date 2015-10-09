@@ -387,8 +387,6 @@ namespace detail {
       virtual bool handle_block(const graphene::net::block_message& blk_msg, bool sync_mode,
                                 std::vector<fc::uint160_t>& contained_transaction_message_ids) override
       { try {
-         if( !_chain_db->is_open() ) 
-              return false;
 
          auto latency = graphene::time::now() - blk_msg.block.timestamp;
          if (!sync_mode || blk_msg.block.block_num() % 10000 == 0)

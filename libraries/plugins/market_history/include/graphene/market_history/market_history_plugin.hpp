@@ -52,7 +52,7 @@ struct bucket_key
 
    friend bool operator < ( const bucket_key& a, const bucket_key& b )
    {
-      return std::tie( a.base, a.quote, b.seconds, a.open ) < std::tie( b.base, b.quote, b.seconds, b.open );
+      return std::tie( a.base, a.quote, a.seconds, a.open ) < std::tie( b.base, b.quote, b.seconds, b.open );
    }
    friend bool operator == ( const bucket_key& a, const bucket_key& b )
    {

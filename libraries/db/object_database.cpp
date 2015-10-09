@@ -78,19 +78,20 @@ void object_database::flush()
 void object_database::wipe(const fc::path& data_dir)
 {
    close();
-   ilog("Wiping object_database.");
+   ilog("Wiping object database...");
    fc::remove_all(data_dir / "object_database");
-   assert(!fc::exists(data_dir / "object_database"));
+   ilog("Done wiping object databse.");
 }
 
 void object_database::open(const fc::path& data_dir)
 { try {
-//   ilog("Open object_database in ${d}", ("d", data_dir));
+   ilog("Opening object database from ${d} ...", ("d", data_dir));
    _data_dir = data_dir;
    for( uint32_t space = 0; space < _index.size(); ++space )
       for( uint32_t type = 0; type  < _index[space].size(); ++type )
          if( _index[space][type] )
             _index[space][type]->open( _data_dir / "object_database" / fc::to_string(space)/fc::to_string(type) );
+   ilog( "Done opening object database." );
 
 } FC_CAPTURE_AND_RETHROW( (data_dir) ) }
 

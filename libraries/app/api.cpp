@@ -346,7 +346,9 @@ namespace graphene { namespace app {
        while( itr != by_key_idx.end() && itr->key.open <= end && result.size() < 100 )
        {
           if( !(itr->key.base == a && itr->key.quote == b && itr->key.seconds == bucket_seconds) )
+          {
             return result;
+          }
           result.push_back(*itr);
           ++itr;
        }
