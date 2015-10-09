@@ -89,7 +89,6 @@ void database::globally_settle_asset( const asset_object& mia, const price& sett
 void database::cancel_order(const force_settlement_object& order, bool create_virtual_op)
 {
    adjust_balance(order.owner, order.balance);
-   remove(order);
 
    if( create_virtual_op )
    {
@@ -99,6 +98,7 @@ void database::cancel_order(const force_settlement_object& order, bool create_vi
       vop.amount = order.balance;
       push_applied_operation( vop );
    }
+   remove(order);
 }
 
 void database::cancel_order( const limit_order_object& order, bool create_virtual_op  )
@@ -361,13 +361,15 @@ bool database::fill_order(const force_settlement_object& settle, const asset& pa
       });
       filled = false;
    } else {
-      remove(settle);
       filled = true;
    }
    adjust_balance(settle.owner, receives - issuer_fees);
 
    assert( pays.asset_id != receives.asset_id );
    push_applied_operation( fill_order_operation{ settle.id, settle.owner, pays, receives, issuer_fees } );
+
+   if (filled)
+      remove(settle);
 
    return filled;
 } FC_CAPTURE_AND_RETHROW( (settle)(pays)(receives) ) }

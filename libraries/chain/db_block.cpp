@@ -458,6 +458,7 @@ void database::apply_block( const signed_block& next_block, uint32_t skip )
 
 void database::_apply_block( const signed_block& next_block )
 { try {
+   uint32_t next_block_num = next_block.block_num();
    uint32_t skip = get_node_properties().skip_flags;
    _applied_ops.clear();
 
@@ -468,7 +469,7 @@ void database::_apply_block( const signed_block& next_block )
    const auto& dynamic_global_props = get<dynamic_global_property_object>(dynamic_global_property_id_type());
    bool maint_needed = (dynamic_global_props.next_maintenance_time <= next_block.timestamp);
 
-   _current_block_num    = next_block.block_num();
+   _current_block_num    = next_block_num;
    _current_trx_in_block = 0;
 
    for( const auto& trx : next_block.transactions )
