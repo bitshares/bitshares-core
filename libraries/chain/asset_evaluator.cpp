@@ -520,8 +520,6 @@ void_result asset_publish_feeds_evaluator::do_evaluate(const asset_publish_feed_
    {
       FC_ASSERT(o.feed.settlement_price.quote.asset_id == bitasset.options.short_backing_asset);
 
-      bool is_nop = false;
-
       try
       {
          // these two changes should go in price_feed::validate() when creating new network
@@ -559,7 +557,6 @@ void_result asset_publish_feeds_evaluator::do_evaluate(const asset_publish_feed_
                ("n", d.head_block_num()+1)
                ("name", o.publisher(d).name)
                );
-            is_nop = true;
          }
       }
       catch( const fc::exception& e )
