@@ -1716,7 +1716,7 @@ public:
          }
          catch (const fc::exception& e)
          {
-            elog("Caught exception while broadcasting transaction with id ${id}", ("id", tx.id().str()));
+            elog("Caught exception while broadcasting tx ${id}:  ${e}", ("id", tx.id().str())("e", e.to_detail_string()) );
             throw;
          }
       }
