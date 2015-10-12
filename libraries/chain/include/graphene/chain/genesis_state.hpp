@@ -90,6 +90,11 @@ struct genesis_state_type {
    vector<initial_worker_type>              initial_worker_candidates;
 
    /**
+    * Temporary, will be moved elsewhere.
+    */
+   chain_id_type                            initial_chain_id;
+
+   /**
     * Get the chain_id corresponding to this genesis state.
     *
     * This is the SHA256 serialization of the genesis_state.
@@ -123,4 +128,5 @@ FC_REFLECT(graphene::chain::genesis_state_type,
            (initial_timestamp)(max_core_supply)(initial_parameters)(initial_accounts)(initial_assets)(initial_balances)
            (initial_vesting_balances)(initial_active_witnesses)(initial_witness_candidates)
            (initial_committee_candidates)(initial_worker_candidates)
+           (initial_chain_id)
            (immutable_parameters))

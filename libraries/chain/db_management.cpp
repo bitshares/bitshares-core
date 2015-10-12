@@ -104,7 +104,7 @@ void database::wipe(const fc::path& data_dir, bool include_blocks)
 
 void database::open(
    const fc::path& data_dir,
-   std::function<genesis_state_type()> genesis_loader )
+   std::function<genesis_state_type()> genesis_loader)
 {
    try
    {
