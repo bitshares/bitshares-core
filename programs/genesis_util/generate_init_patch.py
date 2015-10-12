@@ -46,8 +46,7 @@ def main():
             "owner_name" : "init"+str(i),
             "block_signing_key" : prod[0]["public_key"],
             })
-        committee.append("init"+str(i))
-
+        committee.append({"owner_name" : "init"+str(i)})
     result = {
        "append" : {
        "initial_accounts" : wit_accounts },
