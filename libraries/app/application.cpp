@@ -103,7 +103,7 @@ namespace detail {
 
       void reset_p2p_node(const fc::path& data_dir)
       { try {
-         _p2p_network = std::make_shared<net::node>("Graphene Reference Implementation");
+         _p2p_network = std::make_shared<net::node>("BitShares Reference Implementation");
 
          _p2p_network->load_configuration(data_dir / "p2p");
          _p2p_network->set_node_delegate(this);
@@ -119,6 +119,50 @@ namespace detail {
                   ilog("Adding seed node ${endpoint}", ("endpoint", endpoint));
                   _p2p_network->add_node(endpoint);
                   _p2p_network->connect_to_endpoint(endpoint);
+               }
+            }
+         }
+
+         if( _options->count("seed-nodes") )
+         {
+            auto seeds_str = _options->at("seed-nodes").as<string>();
+            auto seeds = fc::json::from_string(seeds_str).as<vector<string>>();
+            for( const string& endpoint_string : seeds )
+            {
+               std::vector<fc::ip::endpoint> endpoints = resolve_string_to_ip_endpoints(endpoint_string);
+               for (const fc::ip::endpoint& endpoint : endpoints)
+               {
+                  ilog("Adding seed node ${endpoint}", ("endpoint", endpoint));
+                  _p2p_network->add_node(endpoint);
+                  _p2p_network->connect_to_endpoint(endpoint);
+               }
+            }
+         }
+         else
+         {
+            vector<string> seeds = {
+               "faucet.bitshares.org:1776",
+               "bitshares.openledger.info:1776",
+               "blocktrades.us:1776",
+               "seed04.bitsharesnodes.com:1776", // thom
+               "seed05.bitsharesnodes.com:1776", // thom
+               "seed06.bitsharesnodes.com:1776", // thom
+               "seed07.bitsharesnodes.com:1776", // thom
+               "128.199.131.4:1777", // cube 
+               "54.85.252.77:39705", // lafona
+               "104.236.144.84:1777", // puppies
+               "40.127.190.171:1777", // betax
+               "185.25.22.21:1776", // liondani (greece)
+               "23.95.43.126:50696", // iHashFury
+               "109.73.172.144:50696" // iHashFury
+            };
+            for( const string& endpoint_string : seeds )
+            {
+               std::vector<fc::ip::endpoint> endpoints = resolve_string_to_ip_endpoints(endpoint_string);
+               for (const fc::ip::endpoint& endpoint : endpoints)
+               {
+                  ilog("Adding seed node ${endpoint}", ("endpoint", endpoint));
+                  _p2p_network->add_node(endpoint);
                }
             }
          }
@@ -828,6 +872,7 @@ void application::set_program_options(boost::program_options::options_descriptio
    configuration_file_options.add_options()
          ("p2p-endpoint", bpo::value<string>(), "Endpoint for P2P node to listen on")
          ("seed-node,s", bpo::value<vector<string>>()->composing(), "P2P nodes to connect to on startup (may specify multiple times)")
+         ("seed-nodes", bpo::value<string>()->composing(), "JSON array of P2P nodes to connect to on startup")
          ("checkpoint,c", bpo::value<vector<string>>()->composing(), "Pairs of [BLOCK_NUM,BLOCK_ID] that should be enforced as checkpoints.")
          ("rpc-endpoint", bpo::value<string>()->implicit_value("127.0.0.1:8090"), "Endpoint for websocket RPC to listen on")
          ("rpc-tls-endpoint", bpo::value<string>()->implicit_value("127.0.0.1:8089"), "Endpoint for TLS websocket RPC to listen on")
