@@ -36,6 +36,7 @@
 
 #include <fc/smart_ref_impl.hpp>
 
+#include <fc/io/fstream.hpp>
 #include <fc/rpc/api_connection.hpp>
 #include <fc/rpc/websocket_api.hpp>
 #include <fc/network/resolve.hpp>
@@ -94,6 +95,7 @@ namespace detail {
       initial_state.initial_balances.push_back({nathan_key.get_public_key(),
                                                 GRAPHENE_SYMBOL,
                                                 GRAPHENE_MAX_SHARE_SUPPLY});
+      initial_state.initial_chain_id = fc::sha256::hash( "BOGUS" );
 
       return initial_state;
    }
@@ -243,7 +245,9 @@ namespace detail {
             ilog("Initializing database...");
             if( _options->count("genesis-json") )
             {
-               genesis_state_type genesis = fc::json::from_file(_options->at("genesis-json").as<boost::filesystem::path>()).as<genesis_state_type>();
+               std::string genesis_str;
+               fc::read_file_contents( _options->at("genesis-json").as<boost::filesystem::path>(), genesis_str );
+               genesis_state_type genesis = fc::json::from_string( genesis_str ).as<genesis_state_type>();
                bool modified_genesis = false;
                if( _options->count("genesis-timestamp") )
                {
@@ -263,7 +267,11 @@ namespace detail {
                if( modified_genesis )
                {
                   std::cerr << "WARNING:  GENESIS WAS MODIFIED, YOUR CHAIN ID MAY BE DIFFERENT\n";
+                  genesis_str += "BOGUS";
+                  genesis.initial_chain_id = fc::sha256::hash( genesis_str );
                }
+               else
+                  genesis.initial_chain_id = fc::sha256::hash( genesis_str );
                return genesis;
             }
             else

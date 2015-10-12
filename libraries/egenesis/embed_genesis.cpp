@@ -168,12 +168,12 @@ struct egenesis_info
          std::cerr << "embed_genesis:  Need genesis or genesis_json\n";
          exit(1);
       }
-      // init chain_id from genesis
-      if( !chain_id.valid() )
-         chain_id = genesis->compute_chain_id();
       // init genesis_json_hash from genesis_json
       if( !genesis_json_hash.valid() )
          genesis_json_hash = fc::sha256::hash( *genesis_json );
+      // init chain_id from genesis_json_hash
+      if( !chain_id.valid() )
+         chain_id = genesis_json_hash;
       // init genesis_json_array from genesis_json
       if( !genesis_json_array.valid() )
       {

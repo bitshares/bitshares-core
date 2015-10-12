@@ -9,7 +9,7 @@ namespace graphene { namespace chain {
 
 chain_id_type genesis_state_type::compute_chain_id() const
 {
-   return fc::sha256::hash( *this );
+   return initial_chain_id;
 }
 
 } } // graphene::chain
