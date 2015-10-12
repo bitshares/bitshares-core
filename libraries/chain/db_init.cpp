@@ -478,6 +478,7 @@ void database::init_genesis(const genesis_state_type& genesis_state)
 
          bitasset_data_id = create<asset_bitasset_data_object>([&](asset_bitasset_data_object& b) {
             b.options.short_backing_asset = core_asset.id;
+            b.options.minimum_feeds = GRAPHENE_DEFAULT_MINIMUM_FEEDS;
          }).id;
       }
 
