@@ -134,7 +134,6 @@ namespace detail {
                {
                   ilog("Adding seed node ${endpoint}", ("endpoint", endpoint));
                   _p2p_network->add_node(endpoint);
-                  _p2p_network->connect_to_endpoint(endpoint);
                }
             }
          }
