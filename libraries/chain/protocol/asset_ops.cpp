@@ -24,6 +24,9 @@ bool is_valid_symbol( const string& symbol )
     if( symbol.size() < GRAPHENE_MIN_ASSET_SYMBOL_LENGTH )
         return false;
 
+    if( symbol.substring(0,3) == "BIT" ) 
+       return false;
+
     if( symbol.size() > GRAPHENE_MAX_ASSET_SYMBOL_LENGTH )
         return false;
 
