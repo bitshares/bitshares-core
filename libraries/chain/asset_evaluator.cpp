@@ -30,61 +30,10 @@
 
 namespace graphene { namespace chain {
 
-/**
- *  Valid symbols can contain [A-Z0-9], and '.'
- *  They must start with [A, Z]
- *  They must end with [A, Z]
- *  They can contain a maximum of one '.'
- */
-bool is_valid_symbol_old( const string& symbol )
-{
-    if( symbol.size() < GRAPHENE_MIN_ASSET_SYMBOL_LENGTH )
-        return false;
-
-    if( symbol.size() > GRAPHENE_MAX_ASSET_SYMBOL_LENGTH )
-        return false;
-
-    if( !isalpha( symbol.front() ) )
-        return false;
-
-    if( !isalpha( symbol.back() ) )
-        return false;
-
-    bool dot_already_present = false;
-    for( const auto c : symbol )
-    {
-        if( (isalpha( c ) || isdigit(c)) && isupper( c ) )
-            continue;
-
-        if( c == '.' )
-        {
-            if( dot_already_present )
-                return false;
-
-            dot_already_present = true;
-            continue;
-        }
-
-        return false;
-    }
-
-    return true;
-}
-
 void_result asset_create_evaluator::do_evaluate( const asset_create_operation& op )
 { try {
 
    database& d = db();
-
-#ifdef _MSC_VER
-# pragma message ("WARNING:HARDFORK remove this check after HARDFORK_359_TIME and rename is_valid_symbol_old -> is_valid_symbol")
-#else
-# warning HARDFORK remove this check after HARDFORK_359_TIME and rename is_valid_symbol_old -> is_valid_symbol
-#endif
-   if( d.head_block_time() <= HARDFORK_359_TIME )
-   {
-      FC_ASSERT( is_valid_symbol_old( op.symbol ) );
-   }
 
    const auto& chain_parameters = d.get_global_properties().parameters;
    FC_ASSERT( op.common_options.whitelist_authorities.size() <= chain_parameters.maximum_asset_whitelist_authorities );
@@ -514,100 +463,25 @@ void_result asset_publish_feeds_evaluator::do_evaluate(const asset_publish_feed_
    const asset_bitasset_data_object& bitasset = base.bitasset_data(d);
    FC_ASSERT( !bitasset.has_settlement(), "No further feeds may be published after a settlement event" );
 
-#ifdef _MSC_VER
-# pragma message ("WARNING: Remove this check when starting a new network")
-#else
-# warning Remove this check when starting a new network
-#endif
-   if( d.head_block_time() <= HARDFORK_357_TIME )
+   //
+   // many of these checks should be moved to price_feed.validate()
+   // or the operation validator when new network is started
+   //
+   if( !o.feed.core_exchange_rate.is_null() )
    {
-      FC_ASSERT(o.feed.settlement_price.quote.asset_id == bitasset.options.short_backing_asset);
-
-      try
-      {
-         // these two changes should go in price_feed::validate() when creating new network
-         if( !o.feed.core_exchange_rate.is_null() )
-         {
-            o.feed.core_exchange_rate.validate();
-         }
-         if( (!o.feed.settlement_price.is_null()) && (!o.feed.core_exchange_rate.is_null()) )
-         {
-            if( o.feed.settlement_price.base.asset_id == o.feed.core_exchange_rate.base.asset_id )
-            {
-               // uncrossed feed, this is the form we expect
-               FC_ASSERT( o.feed.settlement_price.base.asset_id == o.feed.core_exchange_rate.base.asset_id );
-               FC_ASSERT( o.feed.settlement_price.quote.asset_id == o.feed.core_exchange_rate.quote.asset_id );
-            }
-            else
-            {
-               // crossed feed, your feed script needs to be fixed
-               FC_ASSERT( o.feed.settlement_price.base.asset_id == o.feed.core_exchange_rate.quote.asset_id );
-               FC_ASSERT( o.feed.settlement_price.quote.asset_id == o.feed.core_exchange_rate.base.asset_id );
-               /*
-               wlog( "${aname} feed pub with crossed prices by ${name} in block ${n}",
-                  ("aname", base.symbol)
-                  ("n", d.head_block_num()+1)
-                  ("name", o.publisher(d).name)
-                  );
-               */
-            }
-         }
-
-         if( !o.feed.is_for( o.asset_id ) )
-         {
-            wlog( "${aname} feed pub with wrong asset by ${name} in block ${n}",
-               ("aname", base.symbol)
-               ("n", d.head_block_num()+1)
-               ("name", o.publisher(d).name)
-               );
-         }
-      }
-      catch( const fc::exception& e )
-      {
-         wlog( "${aname} feed pub with invalid price feed by ${name} in block ${n}",
-               ("aname", base.symbol)
-               ("n", d.head_block_num()+1)
-               ("name", o.publisher(d).name)
-               );
-         wdump( (e) );
-      }
-
-#ifdef _MSC_VER
-# pragma message ("WARNING: Remove this check when starting a new network")
-#else
-# warning Remove this check when starting a new network
-#endif
-      if( d.head_block_num() > 59300 )
-      {
-         FC_ASSERT(
-               (base.symbol != "SEK")
-            && (base.symbol != "SILVER")
-            && (base.symbol != "RUB")
-            && (base.symbol != "GBP")
-            );
-      }
+      o.feed.core_exchange_rate.validate();
    }
-   else
+   if( (!o.feed.settlement_price.is_null()) && (!o.feed.core_exchange_rate.is_null()) )
    {
-      //
-      // many of these checks should be moved to price_feed.validate()
-      // or the operation validator when new network is started
-      //
-      if( !o.feed.core_exchange_rate.is_null() )
-      {
-         o.feed.core_exchange_rate.validate();
-      }
-      if( (!o.feed.settlement_price.is_null()) && (!o.feed.core_exchange_rate.is_null()) )
-      {
-         FC_ASSERT( o.feed.settlement_price.base.asset_id == o.feed.core_exchange_rate.base.asset_id );
-         FC_ASSERT( o.feed.settlement_price.quote.asset_id == o.feed.core_exchange_rate.quote.asset_id );
-      }
-
-      FC_ASSERT( !o.feed.settlement_price.is_null() );
-      FC_ASSERT( !o.feed.core_exchange_rate.is_null() );
-      FC_ASSERT( o.feed.settlement_price.quote.asset_id == bitasset.options.short_backing_asset );
-      FC_ASSERT( o.feed.is_for( o.asset_id ) );
+      FC_ASSERT( o.feed.settlement_price.base.asset_id == o.feed.core_exchange_rate.base.asset_id );
+      FC_ASSERT( o.feed.settlement_price.quote.asset_id == o.feed.core_exchange_rate.quote.asset_id );
    }
+
+   FC_ASSERT( !o.feed.settlement_price.is_null() );
+   FC_ASSERT( !o.feed.core_exchange_rate.is_null() );
+   FC_ASSERT( o.feed.settlement_price.quote.asset_id == bitasset.options.short_backing_asset );
+   FC_ASSERT( o.feed.is_for( o.asset_id ) );
+
    //Verify that the publisher is authoritative to publish a feed
    if( base.options.flags & witness_fed_asset )
    {
@@ -627,17 +501,6 @@ void_result asset_publish_feeds_evaluator::do_evaluate(const asset_publish_feed_
 
 void_result asset_publish_feeds_evaluator::do_apply(const asset_publish_feed_operation& o)
 { try {
-
-#ifdef _MSC_VER
-# pragma message ("WARNING: Remove this check when preparing for new network release")
-#else
-# warning Remove this check when preparing for new network release
-#endif
-   if( !o.feed.is_for( o.asset_id ) )
-   {
-      wlog( "Ignoring bad feed" );
-      return void_result();
-   }
 
    database& d = db();
 
