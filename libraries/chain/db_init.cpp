@@ -493,13 +493,6 @@ void database::init_genesis(const genesis_state_type& genesis_state)
          a.options.description = asset.description;
          a.precision = asset.precision;
          string issuer_name = asset.issuer_name;
-#ifdef _MSC_VER
-# pragma message ("WARNING: Remove this check doing real network, change BitAsset owners to be committee-account in genesis.")
-#else
-# warning Remove this check doing real network, change BitAsset owners to be committee-account in genesis.
-#endif
-         if( issuer_name == "witness-account" )
-            issuer_name = "committee-account";
          a.issuer = get_account_id(issuer_name);
          a.options.max_supply = asset.max_supply;
          a.options.flags = witness_fed_asset;

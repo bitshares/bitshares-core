@@ -54,12 +54,7 @@ vector<std::reference_wrapper<const typename Index::object_type>> database::sort
 template<class... Types>
 void database::perform_account_maintenance(std::tuple<Types...> helpers)
 {
-#ifdef _MSC_VER
-# pragma message ("WARNING: switch to this for next release: const auto& idx = get_index_type<account_index>().indices().get<by_name>();")
-#else
-# warning switch to this for next release: const auto& idx = get_index_type<account_index>().indices().get<by_name>();
-#endif
-   const auto& idx = get_index_type<account_index>().indices();
+   const auto& idx = get_index_type<account_index>().indices().get<by_name>();
    for( const account_object& a : idx )
       detail::for_each(helpers, a, detail::gen_seq<sizeof...(Types)>());
 }
