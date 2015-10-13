@@ -274,8 +274,9 @@ namespace detail {
                graphene::egenesis::compute_egenesis_json( egenesis_json );
                FC_ASSERT( egenesis_json != "" );
                FC_ASSERT( graphene::egenesis::get_egenesis_json_hash() == fc::sha256::hash( egenesis_json ) );
+               auto genesis = fc::json::from_string( egenesis_json ).as<genesis_state_type>();
                genesis.initial_chain_id = fc::sha256::hash( egenesis_json );
-               return fc::json::from_string( egenesis_json ).as<genesis_state_type>();
+               return genesis;
             }
          };
 
