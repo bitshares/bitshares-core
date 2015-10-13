@@ -2685,11 +2685,12 @@ bool wallet_api::import_account_keys( string filename, string password, string s
            const auto plain_text = fc::aes_decrypt( password_hash, encrypted_key );
            const auto private_key = fc::raw::unpack<private_key_type>( plain_text );
 
-           import_key( dest_account_name, string( graphene::utilities::key_to_wif( private_key ) ) );
+           my->import_key( dest_account_name, string( graphene::utilities::key_to_wif( private_key ) ) );
        }
 
        return true;
    }
+   save_wallet_file();
 
    FC_ASSERT( found_account );
 
