@@ -6,8 +6,8 @@ import Graphene.FullNode 1.0
 
 Window {
    id: window
-   width: Screen.width / 2
-   height: Screen.height / 2
+   width: Screen.width *.75
+   height: Screen.height *.75
    visible: true
 
    BlockChain {
