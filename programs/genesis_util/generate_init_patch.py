@@ -13,7 +13,7 @@ def dump_json(obj, out, pretty):
     return
 
 def main():
-    parser = argparse.ArgumentParser(description="Remove entities from snapshot")
+    parser = argparse.ArgumentParser(description="Generate a patch file that adds init accounts")
     parser.add_argument("-o", "--output", metavar="OUT", default="-", help="output filename (default: stdout)")
     parser.add_argument("-n", "--num", metavar="N", default=11, type=int, help="number of init witnesses")
     parser.add_argument("-p", "--pretty", action="store_true", default=False, help="pretty print output")

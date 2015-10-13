@@ -12,30 +12,24 @@ def dump_json(obj, out, pretty):
     return
 
 def main():
-    parser = argparse.ArgumentParser(description="Apply a patch file to a JSON object")
+    parser = argparse.ArgumentParser(description="Set is_prefixed=false for all asset owners")
     parser.add_argument("-o", "--output", metavar="OUT", default="-", help="output filename (default: stdout)")
     parser.add_argument("-i", "--input", metavar="IN", default="-", help="input filename (default: stdin)")
-    parser.add_argument("-d", "--delta", metavar="DELTA", nargs="+", help="list of delta file(s) to apply")
     parser.add_argument("-p", "--pretty", action="store_true", default=False, help="pretty print output")
     opts = parser.parse_args()
 
     if opts.input == "-":
-        genesis = json.load(sys.stdin)        
+        genesis = json.load(sys.stdin)
     else:
         with open(opts.input, "r") as f:
             genesis = json.load(f)
 
-    if opts.delta is None: 
-        opts.delta = []
-    for filename in opts.delta:
-        with open(filename, "r") as f:
-            patch = json.load(f)
-        for k, v in patch.get("append", {}).items():
-            genesis[k].extend(v)
-            sys.stderr.write("appended {n} items to {k}\n".format(n=len(v), k=k))
-        for k, v in patch.get("replace", {}).items():
-            genesis[k] = v
-            sys.stderr.write("replaced item {k}\n".format(k=k))
+    asset_owners = set()
+    for asset in genesis["initial_assets"]:
+        asset_owners.add(asset["issuer_name"])
+    for account in genesis["initial_accounts"]:
+        if account["name"] in asset_owners:
+            account["is_prefixed"] = False
 
     if opts.output == "-":
         dump_json( genesis, sys.stdout, opts.pretty )
