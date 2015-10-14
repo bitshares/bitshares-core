@@ -2,7 +2,6 @@
 
 import argparse
 import json
-import re
 import sys
 
 def dump_json(obj, out, pretty):
@@ -11,8 +10,6 @@ def dump_json(obj, out, pretty):
     else:
         json.dump(obj, out, separators=(",", ":"), sort_keys=True)
     return
-
-re_init = re.compile(r"^init[0-9]+$")
 
 def load_names(infile):
     names = set()
@@ -26,10 +23,10 @@ def load_names(infile):
     return names
 
 def main():
-    parser = argparse.ArgumentParser(description="Upgrade a list of members")
+    parser = argparse.ArgumentParser(description="Set is_prefixed=False for a list of names")
     parser.add_argument("-o", "--output", metavar="OUT", default="-", help="output filename (default: stdout)")
     parser.add_argument("-i", "--input", metavar="IN", default="-", help="input filename (default: stdin)")
-    parser.add_argument("-n", "--names", metavar="NAMES", default="", help="file containing names to upgrade")
+    parser.add_argument("-n", "--names", metavar="NAMES", help="list of names to unprefix")
     parser.add_argument("-p", "--pretty", action="store_true", default=False, help="pretty print output")
     opts = parser.parse_args()
 
@@ -47,7 +44,7 @@ def main():
 
     for account in genesis["initial_accounts"]:
         if account["name"] in names:
-            account["is_lifetime_member"] = True
+            account["is_prefixed"] = False
 
     if opts.output == "-":
         dump_json( genesis, sys.stdout, opts.pretty )
