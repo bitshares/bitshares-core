@@ -1,5 +1,14 @@
 /*
- * Copyright (c) 2015 Cryptonomex, Inc., and contributors.  All rights reserved.
+ * Copyright (c) 2015 Cryptonomex, Inc., and contributors.
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
+ *
+ * 1. Any modified source or binaries are used only with the BitShares network.
+ *
+ * 2. Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
+ *
+ * 3. Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
  * THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR
@@ -21,8 +30,8 @@ namespace graphene {
 
    address::address( const std::string& base58str )
    {
-      FC_ASSERT( is_valid( base58str ) );
       std::string prefix( GRAPHENE_ADDRESS_PREFIX );
+      FC_ASSERT( is_valid( base58str, prefix ), "${str}", ("str",base58str) );
 
       std::vector<char> v = fc::from_base58( base58str.substr( prefix.size() ) );
       memcpy( (char*)addr._hash, v.data(), std::min<size_t>( v.size()-4, sizeof( addr ) ) );
