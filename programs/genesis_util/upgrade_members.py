@@ -26,7 +26,7 @@ def load_names(infile):
     return names
 
 def main():
-    parser = argparse.ArgumentParser(description="Remove entities from snapshot")
+    parser = argparse.ArgumentParser(description="Upgrade a list of members")
     parser.add_argument("-o", "--output", metavar="OUT", default="-", help="output filename (default: stdout)")
     parser.add_argument("-i", "--input", metavar="IN", default="-", help="input filename (default: stdin)")
     parser.add_argument("-n", "--names", metavar="NAMES", default="", help="file containing names to upgrade")

@@ -13,7 +13,7 @@ def dump_json(obj, out, pretty):
     return
 
 def main():
-    parser = argparse.ArgumentParser(description="Remove entities from snapshot")
+    parser = argparse.ArgumentParser(description="Generate a patch file that adds init accounts")
     parser.add_argument("-o", "--output", metavar="OUT", default="-", help="output filename (default: stdout)")
     parser.add_argument("-n", "--num", metavar="N", default=11, type=int, help="number of init witnesses")
     parser.add_argument("-p", "--pretty", action="store_true", default=False, help="pretty print output")
@@ -27,6 +27,7 @@ def main():
 
     wit_accounts = []
     wit_wits = []
+    committee = []
 
     for i in range(opts.num):
         owner_str = subprocess.check_output(["programs/genesis_util/get_dev_key", opts.secret, "wit-owner-"+str(i)]).decode("utf-8")
@@ -45,13 +46,15 @@ def main():
             "owner_name" : "init"+str(i),
             "block_signing_key" : prod[0]["public_key"],
             })
-
+        committee.append({"owner_name" : "init"+str(i)})
     result = {
        "append" : {
        "initial_accounts" : wit_accounts },
        "replace" : {
-       "initial_workers" : [],
-       "initial_witnesses" : wit_wits,
+       "initial_active_witnesses" : opts.num,
+       "initial_worker_candidates" : [],
+       "initial_witness_candidates" : wit_wits,
+       "initial_committee_candidates" : committee,
         }
     }
 
