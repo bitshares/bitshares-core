@@ -2,7 +2,6 @@
 
 import argparse
 import json
-import re
 import sys
 
 def dump_json(obj, out, pretty):
@@ -12,24 +11,10 @@ def dump_json(obj, out, pretty):
         json.dump(obj, out, separators=(",", ":"), sort_keys=True)
     return
 
-re_init = re.compile(r"^init[0-9]+$")
-
-def load_names(infile):
-    names = set()
-    for line in infile:
-        if '#' in line:
-            line = line[:line.index('#')]
-        line = line.strip()
-        if line == "":
-            continue
-        names.add(line)
-    return names
-
 def main():
-    parser = argparse.ArgumentParser(description="Upgrade a list of members")
+    parser = argparse.ArgumentParser(description="Sort initial_accounts and initial_assets by \"id\" member, then remove \"id\" member")
     parser.add_argument("-o", "--output", metavar="OUT", default="-", help="output filename (default: stdout)")
     parser.add_argument("-i", "--input", metavar="IN", default="-", help="input filename (default: stdin)")
-    parser.add_argument("-n", "--names", metavar="NAMES", default="", help="file containing names to upgrade")
     parser.add_argument("-p", "--pretty", action="store_true", default=False, help="pretty print output")
     opts = parser.parse_args()
 
@@ -39,15 +24,13 @@ def main():
         with open(opts.input, "r") as f:
             genesis = json.load(f)
 
-    if opts.names == "-":
-        names = load_names(sys.stdin)
-    else:
-        with open(opts.names, "r") as f:
-            names = load_names(f)
+    genesis["initial_assets"].sort( key=lambda e : e["id"] )
+    genesis["initial_accounts"].sort( key=lambda e : e["id"] )
 
-    for account in genesis["initial_accounts"]:
-        if account["name"] in names:
-            account["is_lifetime_member"] = True
+    for e in genesis["initial_assets"]:
+        del e["id"]
+    for e in genesis["initial_accounts"]:
+        del e["id"]
 
     if opts.output == "-":
         dump_json( genesis, sys.stdout, opts.pretty )
