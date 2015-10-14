@@ -162,10 +162,16 @@ int main(int argc, char** argv) {
       node->startup_plugins();
 
       fc::promise<int>::ptr exit_promise = new fc::promise<int>("UNIX Signal Handler");
+
       fc::set_signal_handler([&exit_promise](int signal) {
-         elog( "Caught ^C attempting to exit cleanly" );
+         elog( "Caught SIGINT attempting to exit cleanly" );
          exit_promise->set_value(signal);
       }, SIGINT);
+
+      fc::set_signal_handler([&exit_promise](int signal) {
+         elog( "Caught SIGTERM attempting to exit cleanly" );
+         exit_promise->set_value(signal);
+      }, SIGTERM);
 
       ilog("Started witness node on a chain with ${h} blocks.", ("h", node->chain_database()->head_block_num()));
       ilog("Chain ID is ${id}", ("id", node->chain_database()->get_chain_id()) );
