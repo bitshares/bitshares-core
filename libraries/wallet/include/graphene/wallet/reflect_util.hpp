@@ -53,16 +53,34 @@ struct static_variant_map_visitor
    int which;
 };
 
+template< typename StaticVariant >
+struct from_which_visitor
+{
+   typedef StaticVariant result_type;
+
+   template< typename Member >   // Member is member of static_variant
+   result_type operator()( const Member& dummy )
+   {
+      Member result;
+      from_variant( v, result );
+      return result;    // converted from StaticVariant to Result automatically due to return type
+   }
+
+   const variant& v;
+
+   from_which_visitor( const variant& _v ) : v(_v) {}
+};
+
 } // namespace impl
 
 template< typename T >
 T from_which_variant( int which, const variant& v )
 {
    // Parse a variant for a known which()
-   T result;
-   result.set_which( which );
-   from_variant( v, result );
-   return result;
+   T dummy;
+   dummy.set_which( which );
+   impl::from_which_visitor< T > vtor(v);
+   return dummy.visit( vtor );
 }
 
 template<typename T>
