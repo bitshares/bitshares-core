@@ -39,10 +39,6 @@ namespace graphene {
 
    bool address::is_valid( const std::string& base58str, const std::string& prefix )
    {
-      // TODO: This is temporary for testing
-      if( prefix == GRAPHENE_ADDRESS_PREFIX && is_valid( base58str, "BTS" ) )
-          return true;
-
       const size_t prefix_len = prefix.size();
       if( base58str.size() <= prefix_len )
           return false;
