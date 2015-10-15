@@ -505,7 +505,8 @@ void database::init_genesis(const genesis_state_type& genesis_state)
          a.issuer = get_account_id(issuer_name);
          a.options.max_supply = asset.max_supply;
          a.options.flags = witness_fed_asset;
-         a.options.issuer_permissions = charge_market_fee | global_settle | witness_fed_asset | committee_fed_asset;
+         a.options.issuer_permissions = charge_market_fee | override_authority | white_list | transfer_restricted | disable_confidential |
+                                       ( asset.is_bitasset ? disable_force_settle | global_settle | witness_fed_asset | committee_fed_asset : 0 );
          a.dynamic_asset_data_id = dynamic_data_id;
          a.bitasset_data_id = bitasset_data_id;
       });
