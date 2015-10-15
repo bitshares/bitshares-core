@@ -1,17 +1,19 @@
+# This will build the witness_node in a docker image. Make sure you've already
+# checked out the submodules before building.
+
 FROM l3iggs/archlinux:latest
 MAINTAINER Nathan Hourt <nathan@followmyvote.com>
 
 RUN pacman -Syu --noconfirm gcc make autoconf automake cmake ninja boost libtool git
 
-RUN git clone https://github.com/bitshares/bitshares-2
+ADD . /bitshares-2
 WORKDIR /bitshares-2
-RUN git submodule update --init --recursive
-RUN cmake -G Ninja .
+RUN cmake -G Ninja -DCMAKE_BUILD_TYPE=Release .
 RUN ninja witness_node
 
 RUN mkdir /data_dir
-ADD default_config.ini /default_config.ini
-ADD launch /launch
+ADD docker/default_config.ini /default_config.ini
+ADD docker/launch /launch
 RUN chmod a+x /launch
 VOLUME /data_dir
 
