@@ -47,9 +47,9 @@ void verify_authority_accounts( const database& db, const authority& a )
 void_result account_create_evaluator::do_evaluate( const account_create_operation& op )
 { try {
    database& d = db();
-   FC_ASSERT( d.find_object(op.options.voting_account) );
-   FC_ASSERT( fee_paying_account->is_lifetime_member() );
-   FC_ASSERT( op.referrer(d).is_member(d.head_block_time()) );
+   FC_ASSERT( d.find_object(op.options.voting_account), "Invalid proxy account specified." );
+   FC_ASSERT( fee_paying_account->is_lifetime_member(), "Only Lifetime members may register an account." );
+   FC_ASSERT( op.referrer(d).is_member(d.head_block_time()), "The referrer must be either a lifetime or annual subscriber." );
 
    const auto& global_props = d.get_global_properties();
    const auto& chain_params = global_props.parameters;
@@ -63,8 +63,13 @@ void_result account_create_evaluator::do_evaluate( const account_create_operatio
    GRAPHENE_RECODE_EXC( internal_verify_auth_account_not_found, account_create_auth_account_not_found )
 
    uint32_t max_vote_id = global_props.next_available_vote_id;
-   FC_ASSERT( op.options.num_witness <= chain_params.maximum_witness_count );
-   FC_ASSERT( op.options.num_committee <= chain_params.maximum_committee_count );
+
+   FC_ASSERT( op.options.num_witness <= chain_params.maximum_witness_count, 
+              "Voted for more witnesses than currently allowed (${c})", ("c", chain_params.maximum_witness_count) );
+
+   FC_ASSERT( op.options.num_committee <= chain_params.maximum_committee_count,
+              "Voted for more committee members than currently allowed (${c})", ("c", chain_params.maximum_committee_count) );
+
    safe<uint32_t> counts[vote_id_type::VOTE_TYPE_COUNT];
    for( auto id : op.options.votes )
    {
