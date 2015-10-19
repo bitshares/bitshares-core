@@ -111,31 +111,6 @@ void database::open(
 {
    try
    {
-      auto is_new = [&]() -> bool
-      {
-         // directory doesn't exist
-         if( !fc::exists( data_dir ) )
-            return true;
-         // if directory exists but is empty, return true; else false.
-         return ( fc::directory_iterator( data_dir ) == fc::directory_iterator() );
-      };
-
-      auto is_outdated = [&]() -> bool
-      {
-         if( !fc::exists( data_dir / "db_version" ) )
-            return true;
-         std::string version_str;
-         fc::read_file_contents( data_dir / "db_version", version_str );
-         return (version_str != GRAPHENE_CURRENT_DB_VERSION);
-      };
-
-      if( (!is_new()) && is_outdated() )
-      {
-         ilog( "Old database version detected, reindex is required" );
-         wipe( data_dir, false );
-         fc::remove_all( data_dir / "db_version" );
-      }
-
       object_database::open(data_dir);
 
       _block_id_to_block.open(data_dir / "database" / "block_num_to_block");
@@ -153,19 +128,6 @@ void database::open(
               FC_ASSERT( head_block_num() == 0, "last block ID does not match current chain state" );
          }
       }
-
-      // doing this down here helps ensure that DB will be wiped
-      // if any of the above steps were interrupted on a previous run
-      if( !fc::exists( data_dir / "db_version" ) )
-      {
-         std::ofstream db_version(
-            (data_dir / "db_version").generic_string().c_str(),
-            std::ios::out | std::ios::binary | std::ios::trunc );
-         std::string version_string = GRAPHENE_CURRENT_DB_VERSION;
-         db_version.write( version_string.c_str(), version_string.size() );
-         db_version.close();
-      }
-
       //idump((head_block_id())(head_block_num()));
    }
    FC_CAPTURE_LOG_AND_RETHROW( (data_dir) )
