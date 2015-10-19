@@ -82,7 +82,6 @@ void database::debug_dump()
       edump( (total_balances[asset_id_type()].value)(core_asset_data.current_supply.value ));
    }
 
-   edump((core_in_orders)(reported_core_in_orders));
 
    /*
    const auto& vbidx = db.get_index_type<simple_index<vesting_balance_object>>();

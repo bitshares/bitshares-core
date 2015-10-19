@@ -398,7 +398,6 @@ void database::pop_block()
 { try {
    _pending_tx_session.reset();
    auto head_id = head_block_id();
-   idump((head_id)(head_block_num()));
    optional<signed_block> head_block = fetch_block_by_id( head_id );
    GRAPHENE_ASSERT( head_block.valid(), pop_empty_chain, "there are no blocks to pop" );
    pop_undo();
