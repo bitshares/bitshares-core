@@ -313,7 +313,7 @@ BOOST_AUTO_TEST_CASE( withdraw_permission_delete )
 BOOST_AUTO_TEST_CASE( mia_feeds )
 { try {
    ACTORS((nathan)(dan)(ben)(vikram));
-   asset_id_type bit_usd_id = create_bitasset("BITUSD").id;
+   asset_id_type bit_usd_id = create_bitasset("USDBIT").id;
 
    {
       asset_update_operation op;
@@ -385,7 +385,7 @@ BOOST_AUTO_TEST_CASE( mia_feeds )
 BOOST_AUTO_TEST_CASE( feed_limit_test )
 { try {
    INVOKE( mia_feeds );
-   const asset_object& bit_usd = get_asset("BITUSD");
+   const asset_object& bit_usd = get_asset("USDBIT");
    const asset_bitasset_data_object& bitasset = bit_usd.bitasset_data(db);
    GET_ACTOR(nathan);
 
@@ -472,7 +472,7 @@ BOOST_AUTO_TEST_CASE( global_settle_test )
 {
    try {
    ACTORS((nathan)(ben)(valentine)(dan));
-   asset_id_type bit_usd_id = create_bitasset("BITUSD", nathan_id, 100, global_settle | charge_market_fee).get_id();
+   asset_id_type bit_usd_id = create_bitasset("USDBIT", nathan_id, 100, global_settle | charge_market_fee).get_id();
 
    update_feed_producers( bit_usd_id(db), { nathan_id } );
 
@@ -829,7 +829,7 @@ BOOST_AUTO_TEST_CASE( force_settle_test )
       transfer(account_id_type()(db), shorter5_id(db), asset(initial_balance));
 
       asset_id_type bitusd_id = create_bitasset(
-         "BITUSD",
+         "USDBIT",
          nathan_id,
          100,
          disable_force_settle
