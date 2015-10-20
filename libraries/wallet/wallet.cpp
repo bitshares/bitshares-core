@@ -3615,10 +3615,11 @@ blind_confirmation wallet_api::blind_transfer_help( string from_key_or_label,
 blind_confirmation wallet_api::transfer_to_blind( string from_account_id_or_name, 
                                                   string asset_symbol,
                                                   /** map from key or label to amount */
-                                                  map<string, string> to_amounts, 
+                                                  vector<pair<string, string>> to_amounts, 
                                                   bool broadcast )
 { try {
    FC_ASSERT( !is_locked() );
+   idump((to_amounts));
 
    blind_confirmation confirm;
    account_object from_account = my->get_account(from_account_id_or_name);
