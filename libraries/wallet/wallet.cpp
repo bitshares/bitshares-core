@@ -1407,6 +1407,122 @@ public:
       return sign_transaction( tx, broadcast );
    } FC_CAPTURE_AND_RETHROW( (witness_name)(url)(block_signing_key)(broadcast) ) }
 
+   template<typename WorkerInit>
+   static WorkerInit _create_worker_initializer( const variant& worker_settings )
+   {
+      WorkerInit result;
+      from_variant( worker_settings, result );
+      return result;
+   }
+
+   signed_transaction create_worker(
+      string owner_account,
+      time_point_sec work_begin_date,
+      time_point_sec work_end_date,
+      share_type daily_pay,
+      string name,
+      string url,
+      variant worker_settings,
+      bool broadcast
+      )
+   {
+      worker_initializer init;
+      std::string wtype = worker_settings["type"].get_string();
+
+      // TODO:  Use introspection to do this dispatch
+      if( wtype == "burn" )
+         init = _create_worker_initializer< burn_worker_initializer >( worker_settings );
+      else if( wtype == "refund" )
+         init = _create_worker_initializer< refund_worker_initializer >( worker_settings );
+      else if( wtype == "vesting" )
+         init = _create_worker_initializer< vesting_balance_worker_initializer >( worker_settings );
+      else
+      {
+         FC_ASSERT( false, "unknown worker[\"type\"] value" );
+      }
+
+      worker_create_operation op;
+      op.owner = get_account( owner_account ).id;
+      op.work_begin_date = work_begin_date;
+      op.work_end_date = work_end_date;
+      op.daily_pay = daily_pay;
+      op.name = name;
+      op.url = url;
+      op.initializer = init;
+
+      signed_transaction tx;
+      tx.operations.push_back( op );
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees );
+      tx.validate();
+
+      return sign_transaction( tx, broadcast );
+   }
+
+   signed_transaction update_worker_votes(
+      string account,
+      worker_vote_delta delta,
+      bool broadcast
+      )
+   {
+      account_object acct = get_account( account );
+      account_update_operation op;
+
+      // you could probably use a faster algorithm for this, but flat_set is fast enough :)
+      flat_set< worker_id_type > merged;
+      merged.reserve( delta.vote_for.size() + delta.vote_against.size() + delta.vote_abstain.size() );
+      for( const worker_id_type& wid : delta.vote_for )
+      {
+         bool inserted = merged.insert( wid ).second;
+         FC_ASSERT( inserted, "worker ${wid} specified multiple times", ("wid", wid) );
+      }
+      for( const worker_id_type& wid : delta.vote_against )
+      {
+         bool inserted = merged.insert( wid ).second;
+         FC_ASSERT( inserted, "worker ${wid} specified multiple times", ("wid", wid) );
+      }
+      for( const worker_id_type& wid : delta.vote_abstain )
+      {
+         bool inserted = merged.insert( wid ).second;
+         FC_ASSERT( inserted, "worker ${wid} specified multiple times", ("wid", wid) );
+      }
+
+      // should be enforced by FC_ASSERT's above
+      assert( merged.size() == delta.vote_for.size() + delta.vote_against.size() + delta.vote_abstain.size() );
+
+      vector< object_id_type > query_ids;
+      for( const worker_id_type& wid : merged )
+         query_ids.push_back( wid );
+
+      flat_set<vote_id_type> new_votes( acct.options.votes );
+
+      fc::variants objects = _remote_db->get_objects( query_ids );
+      for( const variant& obj : objects )
+      {
+         worker_object wo;
+         from_variant( obj, wo );
+         new_votes.erase( wo.vote_for );
+         new_votes.erase( wo.vote_against );
+         if( delta.vote_for.find( wo.id ) != delta.vote_for.end() )
+            new_votes.insert( wo.vote_for );
+         else if( delta.vote_against.find( wo.id ) != delta.vote_against.end() )
+            new_votes.insert( wo.vote_against );
+         else
+            assert( delta.vote_abstain.find( wo.id ) != delta.vote_abstain.end() );
+      }
+
+      account_update_operation update_op;
+      update_op.account = acct.id;
+      update_op.new_options = acct.options;
+      update_op.new_options->votes = new_votes;
+
+      signed_transaction tx;
+      tx.operations.push_back( update_op );
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees );
+      tx.validate();
+
+      return sign_transaction( tx, broadcast );
+   }
+
    vector< vesting_balance_object_with_info > get_vesting_balances( string account_name )
    { try {
       fc::optional<vesting_balance_id_type> vbid = maybe_id<vesting_balance_id_type>( account_name );
@@ -2862,6 +2978,28 @@ signed_transaction wallet_api::create_witness(string owner_account,
                                               bool broadcast /* = false */)
 {
    return my->create_witness(owner_account, url, broadcast);
+}
+
+signed_transaction wallet_api::create_worker(
+   string owner_account,
+   time_point_sec work_begin_date,
+   time_point_sec work_end_date,
+   share_type daily_pay,
+   string name,
+   string url,
+   variant worker_settings,
+   bool broadcast /* = false */)
+{
+   return my->create_worker( owner_account, work_begin_date, work_end_date,
+      daily_pay, name, url, worker_settings, broadcast );
+}
+
+signed_transaction wallet_api::update_worker_votes(
+   string owner_account,
+   worker_vote_delta delta,
+   bool broadcast /* = false */)
+{
+   return my->update_worker_votes( owner_account, delta, broadcast );
 }
 
 signed_transaction wallet_api::update_witness(

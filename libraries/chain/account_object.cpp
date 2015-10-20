@@ -97,17 +97,11 @@ void account_statistics_object::process_fees(const account_object& a, database& 
          assert( referrer_cut + registrar_cut + accumulated + reserveed + lifetime_cut == core_fee_total );
       };
 
-      share_type vesting_fee_subtotal(pending_fees);
-      share_type vested_fee_subtotal(pending_vested_fees);
-      share_type vesting_cashback, vested_cashback;
+      pay_out_fees(a, pending_fees, true);
+      pay_out_fees(a, pending_vested_fees, false);
 
-      pay_out_fees(a, vesting_fee_subtotal, true);
-      d.deposit_cashback(a, vesting_cashback, true);
-      pay_out_fees(a, vested_fee_subtotal, false);
-      d.deposit_cashback(a, vested_cashback, false);
-
-      d.modify(*this, [vested_fee_subtotal, vesting_fee_subtotal](account_statistics_object& s) {
-         s.lifetime_fees_paid += vested_fee_subtotal + vesting_fee_subtotal;
+      d.modify(*this, [&](account_statistics_object& s) {
+         s.lifetime_fees_paid += pending_fees + pending_vested_fees;
          s.pending_fees = 0;
          s.pending_vested_fees = 0;
       });

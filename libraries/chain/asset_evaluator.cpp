@@ -463,24 +463,7 @@ void_result asset_publish_feeds_evaluator::do_evaluate(const asset_publish_feed_
    const asset_bitasset_data_object& bitasset = base.bitasset_data(d);
    FC_ASSERT( !bitasset.has_settlement(), "No further feeds may be published after a settlement event" );
 
-   //
-   // many of these checks should be moved to price_feed.validate()
-   // or the operation validator when new network is started
-   //
-   if( !o.feed.core_exchange_rate.is_null() )
-   {
-      o.feed.core_exchange_rate.validate();
-   }
-   if( (!o.feed.settlement_price.is_null()) && (!o.feed.core_exchange_rate.is_null()) )
-   {
-      FC_ASSERT( o.feed.settlement_price.base.asset_id == o.feed.core_exchange_rate.base.asset_id );
-      FC_ASSERT( o.feed.settlement_price.quote.asset_id == o.feed.core_exchange_rate.quote.asset_id );
-   }
-
-   FC_ASSERT( !o.feed.settlement_price.is_null() );
-   FC_ASSERT( !o.feed.core_exchange_rate.is_null() );
    FC_ASSERT( o.feed.settlement_price.quote.asset_id == bitasset.options.short_backing_asset );
-   FC_ASSERT( o.feed.is_for( o.asset_id ) );
 
    //Verify that the publisher is authoritative to publish a feed
    if( base.options.flags & witness_fed_asset )
