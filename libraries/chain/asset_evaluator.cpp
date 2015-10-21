@@ -50,7 +50,7 @@ void_result asset_create_evaluator::do_evaluate( const asset_create_operation& o
    FC_ASSERT( asset_symbol_itr == asset_indx.end() );
 
    auto dotpos = op.symbol.find( '.' );
-   if( dotpos != std::string::npos ) {
+   if( dotpos != std::string::npos  && d.head_block_time() > HARDFORK_385_TIME ) {
       auto prefix = op.symbol.substr( 0, dotpos );
       auto asset_symbol_itr = asset_indx.find( op.symbol );
       FC_ASSERT( asset_symbol_itr != asset_indx.end(), "Asset ${s} may only be created by issuer of ${p}, but ${p} has not been registered",

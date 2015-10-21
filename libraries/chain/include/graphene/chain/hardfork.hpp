@@ -22,3 +22,4 @@
 
 #define HARDFORK_357_TIME (fc::time_point_sec( 1444416300 ))
 #define HARDFORK_359_TIME (fc::time_point_sec( 1444416300 ))
+#define HARDFORK_385_TIME (fc::time_point_sec( 1445558400 )) // October 23 enforce PARENT.CHILD and allow short names
