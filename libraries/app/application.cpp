@@ -352,9 +352,47 @@ namespace detail {
          {
             ilog("Replaying blockchain on user request.");
             _chain_db->reindex(_data_dir/"blockchain", initial_state());
-         } else if( clean )
-            _chain_db->open(_data_dir / "blockchain", initial_state);
-         else {
+         } else if( clean ) {
+
+            auto is_new = [&]() -> bool
+            {
+               // directory doesn't exist
+               if( !fc::exists( _data_dir ) )
+                  return true;
+               // if directory exists but is empty, return true; else false.
+               return ( fc::directory_iterator( _data_dir ) == fc::directory_iterator() );
+            };
+
+            auto is_outdated = [&]() -> bool
+            {
+               if( !fc::exists( _data_dir / "db_version" ) )
+                  return true;
+               std::string version_str;
+               fc::read_file_contents( _data_dir / "db_version", version_str );
+               return (version_str != GRAPHENE_CURRENT_DB_VERSION);
+            };
+            if( !is_new() && is_outdated() ) 
+            {
+               ilog("Replaying blockchain due to version upgrade");
+
+               fc::remove_all( _data_dir / "db_version" );
+               _chain_db->reindex(_data_dir / "blockchain", initial_state());
+
+               // doing this down here helps ensure that DB will be wiped
+               // if any of the above steps were interrupted on a previous run
+               if( !fc::exists( _data_dir / "db_version" ) )
+               {
+                  std::ofstream db_version(
+                     (_data_dir / "db_version").generic_string().c_str(),
+                     std::ios::out | std::ios::binary | std::ios::trunc );
+                  std::string version_string = GRAPHENE_CURRENT_DB_VERSION;
+                  db_version.write( version_string.c_str(), version_string.size() );
+                  db_version.close();
+               }
+            } else {
+              _chain_db->open(_data_dir / "blockchain", initial_state);
+            }
+         } else {
             wlog("Detected unclean shutdown. Replaying blockchain...");
             _chain_db->reindex(_data_dir / "blockchain", initial_state());
          }

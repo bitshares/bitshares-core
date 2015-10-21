@@ -75,7 +75,7 @@ BOOST_AUTO_TEST_CASE( call_order_update_test )
 {
    try {
       ACTORS((dan)(sam));
-      const auto& bitusd = create_bitasset("BITUSD", sam.id);
+      const auto& bitusd = create_bitasset("USDBIT", sam.id);
       const auto& core   = asset_id_type()(db);
 
       transfer(committee_account, dan_id, asset(10000000));
@@ -163,7 +163,7 @@ BOOST_AUTO_TEST_CASE( margin_call_limit_test )
 { try {
       ACTORS((buyer)(seller)(borrower)(borrower2)(feedproducer));
 
-      const auto& bitusd = create_bitasset("BITUSD", feedproducer_id);
+      const auto& bitusd = create_bitasset("USDBIT", feedproducer_id);
       const auto& core   = asset_id_type()(db);
 
       int64_t init_balance(1000000);
@@ -222,7 +222,7 @@ BOOST_AUTO_TEST_CASE( black_swan )
 { try {
       ACTORS((buyer)(seller)(borrower)(borrower2)(feedproducer));
 
-      const auto& bitusd = create_bitasset("BITUSD", feedproducer_id);
+      const auto& bitusd = create_bitasset("USDBIT", feedproducer_id);
       const auto& core   = asset_id_type()(db);
 
       int64_t init_balance(1000000);
@@ -294,7 +294,7 @@ BOOST_AUTO_TEST_CASE( black_swan_issue_346 )
 
       auto setup_asset = [&]() -> const asset_object&
       {
-         const asset_object& bitusd = create_bitasset("BITUSD"+fc::to_string(trial)+"X", feeder_id);
+         const asset_object& bitusd = create_bitasset("USDBIT"+fc::to_string(trial)+"X", feeder_id);
          update_feed_producers( bitusd, {feeder.id} );
          BOOST_CHECK( !bitusd.bitasset_data(db).has_settlement() );
          trial++;
@@ -319,6 +319,7 @@ BOOST_AUTO_TEST_CASE( black_swan_issue_346 )
       {
          price_feed feed;
          feed.settlement_price = settlement_price;
+         feed.core_exchange_rate = settlement_price;
          wdump( (feed.max_short_squeeze_price()) );
          publish_feed( bitusd, feeder, feed );
       };
@@ -599,11 +600,11 @@ BOOST_AUTO_TEST_CASE( create_committee_member )
 BOOST_AUTO_TEST_CASE( create_mia )
 {
    try {
-      const asset_object& bitusd = create_bitasset( "BITUSD" );
-      BOOST_CHECK(bitusd.symbol == "BITUSD");
+      const asset_object& bitusd = create_bitasset( "USDBIT" );
+      BOOST_CHECK(bitusd.symbol == "USDBIT");
       BOOST_CHECK(bitusd.bitasset_data(db).options.short_backing_asset == asset_id_type());
       BOOST_CHECK(bitusd.dynamic_asset_data_id(db).current_supply == 0);
-      GRAPHENE_REQUIRE_THROW( create_bitasset("BITUSD"), fc::exception);
+      GRAPHENE_REQUIRE_THROW( create_bitasset("USDBIT"), fc::exception);
    } catch ( const fc::exception& e ) {
       elog( "${e}", ("e", e.to_detail_string() ) );
       throw;
@@ -615,7 +616,7 @@ BOOST_AUTO_TEST_CASE( update_mia )
    try {
       INVOKE(create_mia);
       generate_block();
-      const asset_object& bit_usd = get_asset("BITUSD");
+      const asset_object& bit_usd = get_asset("USDBIT");
 
       asset_update_operation op;
       op.issuer = bit_usd.issuer;
@@ -1123,7 +1124,7 @@ BOOST_AUTO_TEST_CASE( witness_feeds )
    try {
       INVOKE( create_mia );
       {
-         auto& current = get_asset( "BITUSD" );
+         auto& current = get_asset( "USDBIT" );
          asset_update_operation uop;
          uop.issuer =  current.issuer;
          uop.asset_to_update = current.id;
@@ -1134,7 +1135,7 @@ BOOST_AUTO_TEST_CASE( witness_feeds )
          trx.clear();
       }
       generate_block();
-      const asset_object& bit_usd = get_asset("BITUSD");
+      const asset_object& bit_usd = get_asset("USDBIT");
       auto& global_props = db.get_global_properties();
       const vector<account_id_type> active_witnesses(global_props.witness_accounts.begin(),
                                                       global_props.witness_accounts.end());
@@ -1369,7 +1370,7 @@ BOOST_AUTO_TEST_CASE( reserve_asset_test )
    try
    {
       ACTORS((alice)(bob)(sam)(judge));
-      const auto& basset = create_bitasset("BITUSD", judge_id);
+      const auto& basset = create_bitasset("USDBIT", judge_id);
       const auto& uasset = create_user_issued_asset("TEST");
       const auto& passet = create_prediction_market("PMARK", judge_id);
       const auto& casset = asset_id_type()(db);
@@ -1454,7 +1455,7 @@ BOOST_AUTO_TEST_CASE( cover_with_collateral_test )
    try
    {
       ACTORS((alice)(bob)(sam));
-      const auto& bitusd = create_bitasset("BITUSD", sam_id);
+      const auto& bitusd = create_bitasset("USDBIT", sam_id);
       const auto& core   = asset_id_type()(db);
 
       BOOST_TEST_MESSAGE( "Setting price feed to $0.02 / 100" );
