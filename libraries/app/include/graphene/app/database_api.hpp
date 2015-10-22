@@ -121,6 +121,13 @@ class database_api
        */
       processed_transaction get_transaction( uint32_t block_num, uint32_t trx_in_block )const;
 
+      /**
+       * If the transaction has not expired, this method will return the transaction for the given ID or
+       * it will return NULL if it is not known.  Just because it is not known does not mean it wasn't
+       * included in the blockchain.
+       */
+      optional<signed_transaction> get_recent_transaction_by_id( const transaction_id_type& id )const;
+
       /////////////
       // Globals //
       /////////////
@@ -480,6 +487,7 @@ FC_API(graphene::app::database_api,
    (get_block_header)
    (get_block)
    (get_transaction)
+   (get_recent_transaction_by_id)
 
    // Globals
    (get_chain_properties)
