@@ -216,6 +216,13 @@ struct approval_delta
    vector<string> key_approvals_to_remove;
 };
 
+struct worker_vote_delta
+{
+   flat_set<worker_id_type> vote_for;
+   flat_set<worker_id_type> vote_against;
+   flat_set<worker_id_type> vote_abstain;
+};
+
 struct signed_block_with_info : public signed_block
 {
    signed_block_with_info( const signed_block& block );
@@ -1124,6 +1131,43 @@ class wallet_api
                                         string block_signing_key,
                                         bool broadcast = false);
 
+
+      /**
+       * Create a worker object.
+       *
+       * @param owner_account The account which owns the worker and will be paid
+       * @param work_begin_date When the work begins
+       * @param work_end_date When the work ends
+       * @param daily_pay Amount of pay per day (NOT per maint interval)
+       * @param name Any text
+       * @param url Any text
+       * @param worker_settings {"type" : "burn"|"refund"|"vesting", "pay_vesting_period_days" : x}
+       * @param broadcast true if you wish to broadcast the transaction.
+       */
+      signed_transaction create_worker(
+         string owner_account,
+         time_point_sec work_begin_date,
+         time_point_sec work_end_date,
+         share_type daily_pay,
+         string name,
+         string url,
+         variant worker_settings,
+         bool broadcast = false
+         );
+
+      /**
+       * Update your votes for a worker
+       *
+       * @param account The account which will pay the fee and update votes.
+       * @param worker_vote_delta {"vote_for" : [...], "vote_against" : [...], "vote_abstain" : [...]}
+       * @param broadcast true if you wish to broadcast the transaction.
+       */
+      signed_transaction update_worker_votes(
+         string account,
+         worker_vote_delta delta,
+         bool broadcast = false
+         );
+
       /**
        * Get information about a vesting balance object.
        *
@@ -1380,6 +1424,12 @@ FC_REFLECT( graphene::wallet::approval_delta,
    (key_approvals_to_remove)
 )
 
+FC_REFLECT( graphene::wallet::worker_vote_delta,
+   (vote_for)
+   (vote_against)
+   (vote_abstain)
+)
+
 FC_REFLECT_DERIVED( graphene::wallet::signed_block_with_info, (graphene::chain::signed_block),
    (block_id)(signing_key) )
 
@@ -1440,6 +1490,8 @@ FC_API( graphene::wallet::wallet_api,
         (list_committee_members)
         (create_witness)
         (update_witness)
+        (create_worker)
+        (update_worker_votes)
         (get_vesting_balances)
         (withdraw_vesting)
         (vote_for_committee_member)

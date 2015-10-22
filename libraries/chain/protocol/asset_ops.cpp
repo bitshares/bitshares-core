@@ -127,6 +127,21 @@ void asset_publish_feed_operation::validate()const
 {
    FC_ASSERT( fee.amount >= 0 );
    feed.validate();
+
+   // maybe some of these could be moved to feed.validate()
+   if( !feed.core_exchange_rate.is_null() )
+   {
+      feed.core_exchange_rate.validate();
+   }
+   if( (!feed.settlement_price.is_null()) && (!feed.core_exchange_rate.is_null()) )
+   {
+      FC_ASSERT( feed.settlement_price.base.asset_id == feed.core_exchange_rate.base.asset_id );
+      FC_ASSERT( feed.settlement_price.quote.asset_id == feed.core_exchange_rate.quote.asset_id );
+   }
+
+   FC_ASSERT( !feed.settlement_price.is_null() );
+   FC_ASSERT( !feed.core_exchange_rate.is_null() );
+   FC_ASSERT( feed.is_for( asset_id ) );
 }
 
 void asset_reserve_operation::validate()const
