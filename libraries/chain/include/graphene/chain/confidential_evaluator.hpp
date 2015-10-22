@@ -88,4 +88,4 @@ class blind_transfer_evaluator : public evaluator<blind_transfer_evaluator>
 
 } } // namespace graphene::chain
 
-FC_REFLECT( graphene::chain::blinded_balance_object, (commitment)(asset_id)(owner) )
+FC_REFLECT_DERIVED( graphene::chain::blinded_balance_object, (graphene::db::object), (commitment)(asset_id)(owner) )
