@@ -331,6 +331,15 @@ processed_transaction database_api::get_transaction( uint32_t block_num, uint32_
    return my->get_transaction( block_num, trx_in_block );
 }
 
+optional<signed_transaction> database_api::get_recent_transaction_by_id( const transaction_id_type& id )const
+{
+   try {
+      return my->_db.get_recent_transaction( id );
+   } catch ( ... ) {
+      return optional<signed_transaction>();
+   }
+}
+
 processed_transaction database_api_impl::get_transaction(uint32_t block_num, uint32_t trx_num)const
 {
    auto opt_block = _db.fetch_block_by_number(block_num);
