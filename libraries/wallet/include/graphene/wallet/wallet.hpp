@@ -686,6 +686,24 @@ class wallet_api
                                   string memo,
                                   bool broadcast = false);
 
+      /**
+       *  This method works just like transfer, except it always broadcasts and
+       *  returns the transaction ID along with the signed transaction.
+       */
+      pair<transaction_id_type,signed_transaction> transfer2(string from,
+                                                             string to,
+                                                             string amount,
+                                                             string asset_symbol,
+                                                             string memo ) {
+         auto trx = transfer( from, to, amount, asset_symbol, memo, true );
+         return std::make_pair(trx.id(),trx);
+      }
+
+
+      /**
+       *  This method is used to convert a JSON transaction to its transactin ID.
+       */
+      transaction_id_type get_transaction_id( const signed_transaction& trx )const { return trx.id(); }
 
 
       /** These methods are used for stealth transfers */
@@ -1470,6 +1488,8 @@ FC_API( graphene::wallet::wallet_api,
         (sell_asset)
         (borrow_asset)
         (transfer)
+        (transfer2)
+        (get_transaction_id)
         (create_asset)
         (update_asset)
         (update_bitasset)
