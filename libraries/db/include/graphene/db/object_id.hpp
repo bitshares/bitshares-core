@@ -83,6 +83,11 @@ namespace graphene { namespace db {
          return T( *this );
       }
 
+      explicit operator std::string() const
+      {
+          return fc::to_string(space()) + "." + fc::to_string(type()) + "." + fc::to_string(instance());
+      }
+
       uint64_t                   number;
    };
 
@@ -173,8 +178,9 @@ struct reflector<graphene::db::object_id<SpaceID,TypeID,T> >
 
  inline void to_variant( const graphene::db::object_id_type& var,  fc::variant& vo )
  {
-    vo = fc::to_string(var.space()) + "." + fc::to_string(var.type()) + "." + fc::to_string(var.instance());
+    vo = std::string( var );
  }
+
  inline void from_variant( const fc::variant& var,  graphene::db::object_id_type& vo )
  { try {
     vo.number = 0;
