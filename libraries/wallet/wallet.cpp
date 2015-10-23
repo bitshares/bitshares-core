@@ -73,6 +73,19 @@ namespace graphene { namespace wallet {
 
 namespace detail {
 
+struct operation_result_printer
+{
+public:
+   operation_result_printer( const wallet_api_impl& w )
+      : _wallet(w) {}
+   const wallet_api_impl& _wallet;
+   typedef std::string result_type;
+
+   std::string operator()(const void_result& x) const;
+   std::string operator()(const object_id_type& oid);
+   std::string operator()(const asset& a);
+};
+
 // BLOCK  TRX  OP  VOP
 struct operation_printer
 {
@@ -2396,7 +2409,13 @@ std::string operation_printer::operator()(const T& op)const
       op_name.erase(0, op_name.find_last_of(':')+1);
    out << op_name <<" ";
   // out << "balance delta: " << fc::json::to_string(acc.balance) <<"   ";
-   out << payer.name << " fee: " << a.amount_to_pretty_string( op.fee ); 
+   out << payer.name << " fee: " << a.amount_to_pretty_string( op.fee );
+   operation_result_printer rprinter(wallet);
+   std::string str_result = result.visit(rprinter);
+   if( str_result != "" )
+   {
+      out << "   result: " << str_result;
+   }
    return "";
 }
 std::string operation_printer::operator()(const transfer_from_blind_operation& op)const
@@ -2468,6 +2487,21 @@ std::string operation_printer::operator()(const asset_create_operation& op) cons
       out << "User-Issue Asset ";
    out << "'" << op.symbol << "' with issuer " << wallet.get_account(op.issuer).name;
    return fee(op.fee);
+}
+
+std::string operation_result_printer::operator()(const void_result& x) const
+{
+   return "";
+}
+
+std::string operation_result_printer::operator()(const object_id_type& oid)
+{
+   return std::string(oid);
+}
+
+std::string operation_result_printer::operator()(const asset& a)
+{
+   return _wallet.get_asset(a.asset_id).amount_to_pretty_string(a);
 }
 
 }}}
@@ -3938,6 +3972,9 @@ signed_block_with_info::signed_block_with_info( const signed_block& block )
 {
    block_id = id();
    signing_key = signee();
+   transaction_ids.reserve( transactions.size() );
+   for( const processed_transaction& tx : transactions )
+      transaction_ids.push_back( tx.id() );
 }
 
 vesting_balance_object_with_info::vesting_balance_object_with_info( const vesting_balance_object& vbo, fc::time_point_sec now )
