@@ -92,12 +92,37 @@ asset limit_order_cancel_evaluator::do_apply(const limit_order_cancel_operation&
    auto quote_asset = _order->sell_price.quote.asset_id;
    auto refunded = _order->amount_for_sale();
 
-   db().cancel_order(*_order, false /* don't create a virtual op*/);
+   if( d.head_block_time() > HARDFORK_393_TIME )
+   {
+      const auto& fees = d.current_fee_schedule();
+      asset create_fee = fees.calculate_fee( limit_order_create_operation() );
+
+      // then the create fee was only the network fee and not the
+      // full create_fee
+      const auto& gprops = d.get_global_properties();
+      auto cashback_percent = GRAPHENE_100_PERCENT - gprops.parameters.network_percent_of_fee;
+      auto cashback_amount = (create_fee.amount * cashback_percent) / GRAPHENE_100_PERCENT;
+      create_fee.amount -= cashback_amount;
+
+      const auto& core_asset_data = asset_id_type(0)(d).dynamic_asset_data_id(d);
+      d.modify( core_asset_data, [&]( asset_dynamic_data_object& addo ) {
+          addo.accumulated_fees -= create_fee.amount;
+      });
+
+      /** NOTE: this will adjust the users account balance in a way that cannot be derived entirely
+       * from the operation history.  Consider paying this into cashback rewards, except not all
+       * accounts have a cashback vesting balance object.
+       */
+      d.adjust_balance( o.fee_paying_account, create_fee );
+   }
+
+
+   d.cancel_order(*_order, false /* don't create a virtual op*/);
 
    // Possible optimization: order can be called by canceling a limit order iff the canceled order was at the top of the book.
    // Do I need to check calls in both assets?
-   db().check_call_orders(base_asset(d));
-   db().check_call_orders(quote_asset(d));
+   d.check_call_orders(base_asset(d));
+   d.check_call_orders(quote_asset(d));
 
    return refunded;
 } FC_CAPTURE_AND_RETHROW( (o) ) }
