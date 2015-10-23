@@ -21,6 +21,9 @@
 #include <graphene/chain/market_evaluator.hpp>
 #include <graphene/chain/account_object.hpp>
 #include <graphene/chain/exceptions.hpp>
+#include <graphene/chain/hardfork.hpp>
+#include <fc/smart_ref_impl.hpp>
+#include <graphene/chain/protocol/fee_schedule.hpp>
 #include <fc/uint128.hpp>
 
 namespace graphene { namespace chain {

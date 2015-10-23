@@ -81,6 +81,41 @@ struct operation_process_fill_order
       const auto& buckets = _plugin.tracked_buckets();
       auto& db         = _plugin.database();
       const auto& bucket_idx = db.get_index_type<bucket_index>();
+      const auto& history_idx = db.get_index_type<history_index>().indices().get<by_key>();
+
+      history_key hkey;
+      hkey.base = o.pays.asset_id;
+      hkey.quote = o.receives.asset_id;
+      if( hkey.base > hkey.quote ) 
+         std::swap( hkey.base, hkey.quote );
+      hkey.sequence = uint64_t(-1);
+
+      auto itr = history_idx.upper_bound( hkey );
+      if( itr != history_idx.begin() )
+         --itr;
+
+      if( itr->key.base == hkey.base && itr->key.quote == hkey.quote )
+         hkey.sequence = itr->key.sequence + 1;
+      else
+         hkey.sequence = 0;
+
+      db.create<order_history_object>( [&]( order_history_object& ho ) {
+         ho.key = hkey;
+         ho.op = o;
+      });
+      if( hkey.sequence > 200 )
+      {
+         auto end = hkey.sequence - 200;
+         itr = history_idx.lower_bound( hkey );
+
+         while( itr != history_idx.end() && itr->key.sequence < end ) 
+         {
+            auto delete_me = itr;
+            ++itr;
+            db.remove( *delete_me );
+         }
+      }
+
 
       auto max_history = _plugin.max_history();
       for( auto bucket : buckets )
@@ -90,6 +125,7 @@ struct operation_process_fill_order
           bucket_key key;
           key.base    = o.pays.asset_id;
           key.quote   = o.receives.asset_id;
+
 
           /** for every matched order there are two fill order operations created, one for
            * each side.  We can filter the duplicates by only considering the fill operations where
@@ -222,6 +258,7 @@ void market_history_plugin::plugin_initialize(const boost::program_options::vari
 { try {
    database().applied_block.connect( [&]( const signed_block& b){ my->update_market_histories(b); } );
    database().add_index< primary_index< bucket_index  > >();
+   database().add_index< primary_index< history_index  > >();
 
    if( options.count( "bucket-size" ) )
    {

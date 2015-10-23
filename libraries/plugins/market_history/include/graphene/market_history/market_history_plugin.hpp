@@ -84,6 +84,24 @@ struct bucket_object : public abstract_object<bucket_object>
    share_type          quote_volume;
 };
 
+struct history_key {
+  asset_id_type        base;
+  asset_id_type        quote;
+  uint64_t             sequence = 0;
+
+  friend bool operator < ( const history_key& a, const history_key& b ) {
+    return std::tie( a.base, a.quote, a.sequence ) < std::tie( b.base, b.quote, b.sequence );
+  }
+  friend bool operator == ( const history_key& a, const history_key& b ) {
+    return std::tie( a.base, a.quote, a.sequence ) == std::tie( b.base, b.quote, b.sequence );
+  }
+};
+struct order_history_object : public abstract_object<order_history_object>
+{
+  history_key          key; 
+  fill_order_operation op;
+};
+
 struct by_key;
 typedef multi_index_container<
    bucket_object,
@@ -93,7 +111,17 @@ typedef multi_index_container<
    >
 > bucket_object_multi_index_type;
 
+typedef multi_index_container<
+   order_history_object,
+   indexed_by<
+      hashed_unique< tag<by_id>, member< object, object_id_type, &object::id > >,
+      ordered_unique< tag<by_key>, member< order_history_object, history_key, &order_history_object::key > >
+   >
+> order_history_multi_index_type;
+
+
 typedef generic_index<bucket_object, bucket_object_multi_index_type> bucket_index;
+typedef generic_index<order_history_object, order_history_multi_index_type> history_index;
 
 
 namespace detail
@@ -130,6 +158,8 @@ class market_history_plugin : public graphene::app::plugin
 
 } } //graphene::market_history
 
+FC_REFLECT( graphene::market_history::history_key, (base)(quote)(sequence) )
+FC_REFLECT_DERIVED( graphene::market_history::order_history_object, (graphene::db::object), (key)(op) )
 FC_REFLECT( graphene::market_history::bucket_key, (base)(quote)(seconds)(open) )
 FC_REFLECT_DERIVED( graphene::market_history::bucket_object, (graphene::db::object), 
                     (key)
