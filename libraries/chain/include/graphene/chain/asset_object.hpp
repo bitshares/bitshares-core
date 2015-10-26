@@ -227,11 +227,13 @@ namespace graphene { namespace chain {
    typedef flat_index<asset_bitasset_data_object> asset_bitasset_data_index;
 
    struct by_symbol;
+   struct by_type;
    typedef multi_index_container<
       asset_object,
       indexed_by<
          ordered_unique< tag<by_id>, member< object, object_id_type, &object::id > >,
-         ordered_unique< tag<by_symbol>, member<asset_object, string, &asset_object::symbol> >
+         ordered_unique< tag<by_symbol>, member<asset_object, string, &asset_object::symbol> >,
+         ordered_non_unique< tag<by_type>, const_mem_fun<asset_object, bool, &asset_object::is_market_issued> >
       >
    > asset_object_multi_index_type;
    typedef generic_index<asset_object, asset_object_multi_index_type> asset_index;

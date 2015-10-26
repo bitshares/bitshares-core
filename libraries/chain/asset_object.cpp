@@ -43,7 +43,19 @@ share_type asset_bitasset_data_object::max_force_settlement_volume(share_type cu
 void graphene::chain::asset_bitasset_data_object::update_median_feeds(time_point_sec current_time)
 {
    current_feed_publication_time = current_time;
+   auto cutoff = current_time - options.feed_lifetime_sec;
+
+   for( auto itr = feeds.begin(); itr != feeds.end(); )
+   {
+      if( itr->second.first < cutoff )
+         itr = feeds.erase(itr);
+      else
+         ++itr;
+   }
+
+
    vector<std::reference_wrapper<const price_feed>> current_feeds;
+   current_feeds.reserve(feeds.size());
    for( const pair<account_id_type, pair<time_point_sec,price_feed>>& f : feeds )
    {
       if( (current_time - f.second.first).to_seconds() < options.feed_lifetime_sec &&
