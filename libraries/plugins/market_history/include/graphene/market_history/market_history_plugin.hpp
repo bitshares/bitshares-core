@@ -87,7 +87,7 @@ struct bucket_object : public abstract_object<bucket_object>
 struct history_key {
   asset_id_type        base;
   asset_id_type        quote;
-  uint64_t             sequence = 0;
+  int64_t              sequence = 0;
 
   friend bool operator < ( const history_key& a, const history_key& b ) {
     return std::tie( a.base, a.quote, a.sequence ) < std::tie( b.base, b.quote, b.sequence );
@@ -99,6 +99,7 @@ struct history_key {
 struct order_history_object : public abstract_object<order_history_object>
 {
   history_key          key; 
+  fc::time_point_sec   time;
   fill_order_operation op;
 };
 
@@ -159,7 +160,7 @@ class market_history_plugin : public graphene::app::plugin
 } } //graphene::market_history
 
 FC_REFLECT( graphene::market_history::history_key, (base)(quote)(sequence) )
-FC_REFLECT_DERIVED( graphene::market_history::order_history_object, (graphene::db::object), (key)(op) )
+FC_REFLECT_DERIVED( graphene::market_history::order_history_object, (graphene::db::object), (key)(time)(op) )
 FC_REFLECT( graphene::market_history::bucket_key, (base)(quote)(seconds)(open) )
 FC_REFLECT_DERIVED( graphene::market_history::bucket_object, (graphene::db::object), 
                     (key)

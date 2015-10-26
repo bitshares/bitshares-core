@@ -83,37 +83,39 @@ struct operation_process_fill_order
       const auto& bucket_idx = db.get_index_type<bucket_index>();
       const auto& history_idx = db.get_index_type<history_index>().indices().get<by_key>();
 
+      auto time = db.head_block_time();
+
       history_key hkey;
       hkey.base = o.pays.asset_id;
       hkey.quote = o.receives.asset_id;
       if( hkey.base > hkey.quote ) 
          std::swap( hkey.base, hkey.quote );
-      hkey.sequence = uint64_t(-1);
+      hkey.sequence = std::numeric_limits<int64_t>::min();
 
-      auto itr = history_idx.upper_bound( hkey );
-      if( itr != history_idx.begin() )
-         --itr;
+      auto itr = history_idx.lower_bound( hkey );
 
       if( itr->key.base == hkey.base && itr->key.quote == hkey.quote )
-         hkey.sequence = itr->key.sequence + 1;
+         hkey.sequence = itr->key.sequence - 1;
       else
          hkey.sequence = 0;
 
       db.create<order_history_object>( [&]( order_history_object& ho ) {
          ho.key = hkey;
+         ho.time = time;
          ho.op = o;
       });
-      if( hkey.sequence > 200 )
-      {
-         auto end = hkey.sequence - 200;
-         itr = history_idx.lower_bound( hkey );
 
-         while( itr != history_idx.end() && itr->key.sequence < end ) 
+      hkey.sequence += 200;
+      itr = history_idx.lower_bound( hkey );
+
+      while( itr != history_idx.end() )
+      {
+         if( itr->key.base == hkey.base && itr->key.quote == hkey.quote )
          {
-            auto delete_me = itr;
-            ++itr;
-            db.remove( *delete_me );
+            db.remove( *itr );
+            itr = history_idx.lower_bound( hkey );
          }
+         else break;
       }
 
 

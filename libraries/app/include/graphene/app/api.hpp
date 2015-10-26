@@ -70,7 +70,7 @@ namespace graphene { namespace app {
                                                               unsigned limit = 100,
                                                               operation_history_id_type start = operation_history_id_type())const;
 
-         vector<fill_order_operation> get_fill_order_history( asset_id_type a, asset_id_type b )const;
+         vector<order_history_object> get_fill_order_history( asset_id_type a, asset_id_type b, uint32_t limit )const;
          vector<bucket_object> get_market_history( asset_id_type a, asset_id_type b, uint32_t bucket_seconds,
                                                    fc::time_point_sec start, fc::time_point_sec end )const;
          flat_set<uint32_t> get_market_history_buckets()const;
