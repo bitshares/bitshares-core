@@ -233,11 +233,13 @@ bool database::check_for_blackswan( const asset_object& mia, bool enable_black_s
     auto least_collateral = call_itr->collateralization();
     if( ~least_collateral >= highest  ) 
     {
-       elog( "Black Swan detected: \n"
+       elog( "Black Swan detected ${s}/${s1}: \n"
              "   Least collateralized call: ${lc}  ${~lc}\n"
            //  "   Highest Bid:               ${hb}  ${~hb}\n"
              "   Settle Price:              ${sp}  ${~sp}\n"
              "   Max:                       ${h}   ${~h}\n",
+             ("s", settle_price.base.asset_id(*this).symbol )
+             ("s1", settle_price.quote.asset_id(*this).symbol )
             ("lc",least_collateral.to_real())("~lc",(~least_collateral).to_real())
           //  ("hb",limit_itr->sell_price.to_real())("~hb",(~limit_itr->sell_price).to_real())
             ("sp",settle_price.to_real())("~sp",(~settle_price).to_real())
@@ -366,11 +368,17 @@ void database::clear_expired_orders()
 
 void database::update_expired_feeds()
 {
-   auto& asset_idx = get_index_type<asset_index>().indices();
-   for( const asset_object& a : asset_idx )
+   auto& asset_idx = get_index_type<asset_index>().indices().get<by_type>();
+   auto itr = asset_idx.lower_bound( true /** market issued */ );
+   //for( const asset_object& a : asset_idx )
+   while( itr != asset_idx.end() )
    {
+      const asset_object& a = *itr;
+      ++itr;
+      /*
       if( !a.is_market_issued() )
          continue;
+      */
 
       const asset_bitasset_data_object& b = a.bitasset_data(*this);
       if( b.feed_is_expired(head_block_time()) )
