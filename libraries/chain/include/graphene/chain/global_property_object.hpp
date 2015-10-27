@@ -128,6 +128,7 @@ FC_REFLECT_DERIVED( graphene::chain::dynamic_global_property_object, (graphene::
                     (time)
                     (current_witness)
                     (next_maintenance_time)
+                    (last_budget_time)
                     (witness_budget)
                     (accounts_registered_this_interval)
                     (recently_missed_count)
