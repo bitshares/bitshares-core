@@ -23,7 +23,6 @@
 #include <boost/multi_index_container.hpp>
 #include <boost/multi_index/member.hpp>
 #include <boost/multi_index/ordered_index.hpp>
-#include <boost/multi_index/hashed_index.hpp>
 #include <boost/multi_index/mem_fun.hpp>
 
 namespace graphene { namespace chain {
@@ -117,7 +116,7 @@ namespace graphene { namespace chain {
    struct sparse_index : public generic_index<T, boost::multi_index_container<
       T,
       indexed_by<
-         hashed_unique<
+         ordered_unique<
             tag<by_id>,
             member<object, object_id_type, &object::id>
          >
