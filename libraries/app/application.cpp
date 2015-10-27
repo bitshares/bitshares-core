@@ -162,7 +162,8 @@ namespace detail {
                "40.127.190.171:1777", // betax
                "185.25.22.21:1776", // liondani (greece)
                "23.95.43.126:50696", // iHashFury
-               "109.73.172.144:50696" // iHashFury
+               "109.73.172.144:50696", // iHashFury
+               "84.238.140.192:42570" // emski
             };
             for( const string& endpoint_string : seeds )
             {
