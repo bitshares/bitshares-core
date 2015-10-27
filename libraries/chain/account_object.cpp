@@ -128,6 +128,8 @@ set<account_id_type> account_member_index::get_account_members(const account_obj
    set<account_id_type> result;
    for( auto auth : a.owner.account_auths )
       result.insert(auth.first);
+   for( auto auth : a.active.account_auths )
+      result.insert(auth.first);
    return result;
 }
 set<public_key_type> account_member_index::get_key_members(const account_object& a)const
@@ -135,6 +137,9 @@ set<public_key_type> account_member_index::get_key_members(const account_object&
    set<public_key_type> result;
    for( auto auth : a.owner.key_auths )
       result.insert(auth.first);
+   for( auto auth : a.active.key_auths )
+      result.insert(auth.first);
+   result.insert( a.options.memo_key );
    return result;
 }
 set<address> account_member_index::get_address_members(const account_object& a)const
@@ -142,6 +147,9 @@ set<address> account_member_index::get_address_members(const account_object& a)c
    set<address> result;
    for( auto auth : a.owner.address_auths )
       result.insert(auth.first);
+   for( auto auth : a.active.address_auths )
+      result.insert(auth.first);
+   result.insert( a.options.memo_key );
    return result;
 }
 
