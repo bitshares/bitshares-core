@@ -733,6 +733,8 @@ void database_fixture::publish_feed( const asset_object& mia, const account_obje
    op.publisher = by.id;
    op.asset_id = mia.id;
    op.feed = f;
+   if( op.feed.core_exchange_rate.is_null() )
+      op.feed.core_exchange_rate = op.feed.settlement_price;
    trx.operations.emplace_back( std::move(op) );
 
    for( auto& op : trx.operations ) db.current_fee_schedule().set_fee(op);
