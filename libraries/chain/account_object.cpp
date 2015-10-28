@@ -38,12 +38,23 @@ share_type cut_fee(share_type a, uint16_t p)
    return r.to_uint64();
 }
 
-bool account_object::is_authorized_asset(const asset_object& asset_obj) const {
+bool account_object::is_authorized_asset(const asset_object& asset_obj) const
+{
    for( const auto id : blacklisting_accounts )
-      if( asset_obj.options.blacklist_authorities.find(id) != asset_obj.options.blacklist_authorities.end() ) return false;
+   {
+      if( asset_obj.options.blacklist_authorities.find(id) != asset_obj.options.blacklist_authorities.end() )
+         return false;
+   }
+
+   if( asset_obj.options.whitelist_authorities.size() == 0 )
+      return true;
 
    for( const auto id : whitelisting_accounts )
-      if( asset_obj.options.whitelist_authorities.find(id) != asset_obj.options.whitelist_authorities.end() ) return true;
+   {
+      if( asset_obj.options.whitelist_authorities.find(id) != asset_obj.options.whitelist_authorities.end() )
+         return true;
+   }
+
    return false;
 }
 
