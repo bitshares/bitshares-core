@@ -144,7 +144,9 @@ void database::close(bool rewind)
    {
       try
       {
-         while( true )
+         uint32_t cutoff = get_dynamic_global_properties().last_irreversible_block_num;
+
+         while( head_block_num() > cutoff )
          {
          //   elog("pop");
             block_id_type popped_block_id = head_block_id();
