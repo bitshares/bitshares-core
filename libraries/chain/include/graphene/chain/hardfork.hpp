@@ -22,4 +22,5 @@
 
 #define HARDFORK_357_TIME (fc::time_point_sec( 1444416300 ))
 #define HARDFORK_359_TIME (fc::time_point_sec( 1444416300 ))
+#define HARDFORK_409_TIME (fc::time_point_sec( 1446652800 ))
 #define HARDFORK_415_TIME (fc::time_point_sec( 1446652800 ))
