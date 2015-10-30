@@ -23,6 +23,7 @@
 
 #include <graphene/chain/database.hpp>
 #include <graphene/chain/exceptions.hpp>
+#include <graphene/chain/hardfork.hpp>
 
 #include <graphene/chain/account_object.hpp>
 #include <graphene/chain/asset_object.hpp>
@@ -134,33 +135,72 @@ BOOST_AUTO_TEST_CASE( override_transfer_test2 )
 BOOST_AUTO_TEST_CASE( issue_whitelist_uia )
 {
    try {
-      INVOKE(create_advanced_uia);
-      const asset_object& advanced = get_asset("ADVANCED");
-      const account_object& nathan = create_account("nathan");
-      upgrade_to_lifetime_member(nathan);
+      account_id_type dan_id = create_account("dan").id;
+      const asset_id_type uia_id = create_user_issued_asset(
+         "WLUIA", dan_id(db), white_list ).id;
+      account_id_type nathan_id = create_account("nathan").id;
+      account_id_type vikram_id = create_account("vikram").id;
       trx.clear();
 
       asset_issue_operation op;
-      op.issuer = advanced.issuer;
-      op.asset_to_issue = advanced.amount(1000);
-      op.issue_to_account = nathan.id; //({asset(), advanced.issuer, advanced.amount(1000), nathan.id});
+      op.issuer = uia_id(db).issuer;
+      op.asset_to_issue = asset(1000, uia_id);
+      op.issue_to_account = nathan_id;
       trx.operations.emplace_back(op);
-      //Fail because nathan is not whitelisted.
+      set_expiration( db, trx );
+      //Fail because nathan is not whitelisted, but only before hardfork time
       GRAPHENE_REQUIRE_THROW(PUSH_TX( db, trx, ~0 ), fc::exception);
+      generate_blocks( HARDFORK_415_TIME );
+      generate_block();
+      set_expiration( db, trx );
+      PUSH_TX( db, trx, ~0 );
+
+      BOOST_CHECK(nathan_id(db).is_authorized_asset(uia_id(db), db));
+      BOOST_CHECK_EQUAL(get_balance(nathan_id, uia_id), 1000);
+
+      // Make a whitelist, now it should fail
+      {
+         BOOST_TEST_MESSAGE( "Changing the whitelist authority" );
+         asset_update_operation uop;
+         uop.issuer = dan_id;
+         uop.asset_to_update = uia_id;
+         uop.new_options = uia_id(db).options;
+         uop.new_options.whitelist_authorities.insert(dan_id);
+         trx.operations.back() = uop;
+         PUSH_TX( db, trx, ~0 );
+         BOOST_CHECK( uia_id(db).options.whitelist_authorities.find(dan_id) != uia_id(db).options.whitelist_authorities.end() );
+      }
+
+      // Fail because there is a whitelist authority and I'm not whitelisted
+      trx.operations.back() = op;
+      GRAPHENE_REQUIRE_THROW( PUSH_TX( db, trx, ~0 ), fc::exception );
 
       account_whitelist_operation wop;
-      wop.authorizing_account = account_id_type();
-      wop.account_to_list = nathan.id;
+      wop.authorizing_account = dan_id;
+      wop.account_to_list = vikram_id;
       wop.new_listing = account_whitelist_operation::white_listed;
 
       trx.operations.back() = wop;
+      // Fail because whitelist function is restricted to members only
+      GRAPHENE_REQUIRE_THROW( PUSH_TX( db, trx, ~0 ), fc::exception );
+      upgrade_to_lifetime_member( dan_id );
+      trx.operations.clear();
+      trx.operations.push_back( wop );
       PUSH_TX( db, trx, ~0 );
 
-      BOOST_CHECK(nathan.is_authorized_asset(advanced, db));
+      // Still fail after an irrelevant account was added
       trx.operations.back() = op;
-      PUSH_TX( db, trx, ~0 );
+      GRAPHENE_REQUIRE_THROW( PUSH_TX( db, trx, ~0 ), fc::exception );
 
-      BOOST_CHECK_EQUAL(get_balance(nathan, advanced), 1000);
+      wop.account_to_list = nathan_id;
+      trx.operations.back() = wop;
+      PUSH_TX( db, trx, ~0 );
+      trx.operations.back() = op;
+      BOOST_CHECK_EQUAL(get_balance(nathan_id, uia_id), 1000);
+      // Finally succeed when we were whitelisted
+      PUSH_TX( db, trx, ~0 );
+      BOOST_CHECK_EQUAL(get_balance(nathan_id, uia_id), 2000);
+
    } catch(fc::exception& e) {
       edump((e.to_detail_string()));
       throw;
