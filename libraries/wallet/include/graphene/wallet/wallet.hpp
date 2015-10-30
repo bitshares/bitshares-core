@@ -847,6 +847,14 @@ class wallet_api
       signed_transaction borrow_asset(string borrower_name, string amount_to_borrow, string asset_symbol,
                                       string amount_of_collateral, bool broadcast = false);
 
+      /** Cancel an existing order
+       *
+       * @param order_id the id of order to be cancelled
+       * @param broadcast true to broadcast the transaction on the network
+       * @returns the signed transaction canceling the order
+       */
+      signed_transaction cancel_order(object_id_type order_id, bool broadcast = false);
+
       /** Creates a new user-issued or market-issued asset.
        *
        * Many options can be changed later using \c update_asset()
@@ -1488,6 +1496,7 @@ FC_API( graphene::wallet::wallet_api,
         (create_account_with_brain_key)
         (sell_asset)
         (borrow_asset)
+        (cancel_order)
         (transfer)
         (transfer2)
         (get_transaction_id)
