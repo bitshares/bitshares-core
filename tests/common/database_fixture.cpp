@@ -46,6 +46,8 @@
 
 using namespace graphene::chain::test;
 
+uint32_t GRAPHENE_TESTING_GENESIS_TIMESTAMP = 1431700000;
+
 namespace graphene { namespace chain {
 
 using std::cout;

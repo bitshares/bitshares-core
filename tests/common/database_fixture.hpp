@@ -29,7 +29,7 @@
 
 using namespace graphene::db;
 
-#define GRAPHENE_TESTING_GENESIS_TIMESTAMP (1431700000)
+extern uint32_t GRAPHENE_TESTING_GENESIS_TIMESTAMP;
 
 #define PUSH_TX \
    graphene::chain::test::_push_transaction
