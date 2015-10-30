@@ -2955,7 +2955,7 @@ signed_transaction wallet_api::reserve_asset(string from,
                                           string symbol,
                                           bool broadcast /* = false */)
 {
-   return my->fund_asset_fee_pool(from, amount, symbol, broadcast);
+   return my->reserve_asset(from, amount, symbol, broadcast);
 }
 
 signed_transaction wallet_api::global_settle_asset(string symbol,
