@@ -366,11 +366,13 @@ void database::clear_expired_orders()
 
 void database::update_expired_feeds()
 {
-   auto& asset_idx = get_index_type<asset_index>().indices();
-   for( const asset_object& a : asset_idx )
+   auto& asset_idx = get_index_type<asset_index>().indices().get<by_type>();
+   auto itr = asset_idx.lower_bound( true /** market issued */ );
+   while( itr != asset_idx.end() )
    {
-      if( !a.is_market_issued() )
-         continue;
+      const asset_object& a = *itr;
+      ++itr;
+      assert( a.is_market_issued() );
 
       const asset_bitasset_data_object& b = a.bitasset_data(*this);
       if( b.feed_is_expired(head_block_time()) )

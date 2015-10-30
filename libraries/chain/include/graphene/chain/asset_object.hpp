@@ -213,7 +213,6 @@ namespace graphene { namespace chain {
          void update_median_feeds(time_point_sec current_time);
    };
 
-
    struct by_feed_expiration;
    typedef multi_index_container<
       asset_bitasset_data_object,
@@ -227,17 +226,19 @@ namespace graphene { namespace chain {
    typedef flat_index<asset_bitasset_data_object> asset_bitasset_data_index;
 
    struct by_symbol;
+   struct by_type;
    typedef multi_index_container<
       asset_object,
       indexed_by<
          ordered_unique< tag<by_id>, member< object, object_id_type, &object::id > >,
-         ordered_unique< tag<by_symbol>, member<asset_object, string, &asset_object::symbol> >
+         ordered_unique< tag<by_symbol>, member<asset_object, string, &asset_object::symbol> >,
+         ordered_non_unique< tag<by_type>, const_mem_fun<asset_object, bool, &asset_object::is_market_issued> >
       >
    > asset_object_multi_index_type;
    typedef generic_index<asset_object, asset_object_multi_index_type> asset_index;
 
-
 } } // graphene::chain
+
 FC_REFLECT_DERIVED( graphene::chain::asset_dynamic_data_object, (graphene::db::object),
                     (current_supply)(confidential_supply)(accumulated_fees)(fee_pool) )
 
@@ -260,4 +261,3 @@ FC_REFLECT_DERIVED( graphene::chain::asset_object, (graphene::db::object),
                     (dynamic_asset_data_id)
                     (bitasset_data_id)
                   )
-
