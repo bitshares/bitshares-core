@@ -21,6 +21,7 @@
 #include <graphene/chain/account_object.hpp>
 #include <graphene/chain/asset_object.hpp>
 #include <graphene/chain/database.hpp>
+#include <graphene/chain/hardfork.hpp>
 #include <fc/uint128.hpp>
 
 namespace graphene { namespace chain {
@@ -38,7 +39,7 @@ share_type cut_fee(share_type a, uint16_t p)
    return r.to_uint64();
 }
 
-bool account_object::is_authorized_asset(const asset_object& asset_obj) const
+bool account_object::is_authorized_asset(const asset_object& asset_obj, const database& d) const
 {
    for( const auto id : blacklisting_accounts )
    {
@@ -46,8 +47,11 @@ bool account_object::is_authorized_asset(const asset_object& asset_obj) const
          return false;
    }
 
-   if( asset_obj.options.whitelist_authorities.size() == 0 )
-      return true;
+   if( d.head_block_time() > HARDFORK_415_TIME )
+   {
+      if( asset_obj.options.whitelist_authorities.size() == 0 )
+         return true;
+   }
 
    for( const auto id : whitelisting_accounts )
    {

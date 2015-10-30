@@ -156,7 +156,7 @@ BOOST_AUTO_TEST_CASE( issue_whitelist_uia )
       trx.operations.back() = wop;
       PUSH_TX( db, trx, ~0 );
 
-      BOOST_CHECK(nathan.is_authorized_asset(advanced));
+      BOOST_CHECK(nathan.is_authorized_asset(advanced, db));
       trx.operations.back() = op;
       PUSH_TX( db, trx, ~0 );
 
@@ -254,7 +254,7 @@ BOOST_AUTO_TEST_CASE( transfer_whitelist_uia )
 
       trx.operations.back() = op;
       //Fail because nathan is blacklisted
-      BOOST_CHECK(!nathan.is_authorized_asset(advanced));
+      BOOST_CHECK(!nathan.is_authorized_asset(advanced, db));
       GRAPHENE_REQUIRE_THROW(PUSH_TX( db, trx, ~0 ), fc::exception);
 
       //Remove nathan from committee's whitelist, add him to dan's. This should not authorize him to hold ADVANCED.
@@ -271,7 +271,7 @@ BOOST_AUTO_TEST_CASE( transfer_whitelist_uia )
 
       trx.operations.back() = op;
       //Fail because nathan is not whitelisted
-      BOOST_CHECK(!nathan.is_authorized_asset(advanced));
+      BOOST_CHECK(!nathan.is_authorized_asset(advanced, db));
       GRAPHENE_REQUIRE_THROW(PUSH_TX( db, trx, ~0 ), fc::exception);
 
       burn.payer = dan.id;
