@@ -20,3 +20,4 @@
  */
 #pragma once
 
+#define HARDFORK_413_TIME (fc::time_point_sec( 1446652800 ))
