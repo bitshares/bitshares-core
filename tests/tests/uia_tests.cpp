@@ -135,9 +135,9 @@ BOOST_AUTO_TEST_CASE( override_transfer_test2 )
 BOOST_AUTO_TEST_CASE( issue_whitelist_uia )
 {
    try {
-      account_id_type dan_id = create_account("dan").id;
+      account_id_type izzy_id = create_account("izzy").id;
       const asset_id_type uia_id = create_user_issued_asset(
-         "WLUIA", dan_id(db), white_list ).id;
+         "ADVANCED", izzy_id(db), white_list ).id;
       account_id_type nathan_id = create_account("nathan").id;
       account_id_type vikram_id = create_account("vikram").id;
       trx.clear();
@@ -162,13 +162,13 @@ BOOST_AUTO_TEST_CASE( issue_whitelist_uia )
       {
          BOOST_TEST_MESSAGE( "Changing the whitelist authority" );
          asset_update_operation uop;
-         uop.issuer = dan_id;
+         uop.issuer = izzy_id;
          uop.asset_to_update = uia_id;
          uop.new_options = uia_id(db).options;
-         uop.new_options.whitelist_authorities.insert(dan_id);
+         uop.new_options.whitelist_authorities.insert(izzy_id);
          trx.operations.back() = uop;
          PUSH_TX( db, trx, ~0 );
-         BOOST_CHECK( uia_id(db).options.whitelist_authorities.find(dan_id) != uia_id(db).options.whitelist_authorities.end() );
+         BOOST_CHECK( uia_id(db).options.whitelist_authorities.find(izzy_id) != uia_id(db).options.whitelist_authorities.end() );
       }
 
       // Fail because there is a whitelist authority and I'm not whitelisted
@@ -176,14 +176,14 @@ BOOST_AUTO_TEST_CASE( issue_whitelist_uia )
       GRAPHENE_REQUIRE_THROW( PUSH_TX( db, trx, ~0 ), fc::exception );
 
       account_whitelist_operation wop;
-      wop.authorizing_account = dan_id;
+      wop.authorizing_account = izzy_id;
       wop.account_to_list = vikram_id;
       wop.new_listing = account_whitelist_operation::white_listed;
 
       trx.operations.back() = wop;
       // Fail because whitelist function is restricted to members only
       GRAPHENE_REQUIRE_THROW( PUSH_TX( db, trx, ~0 ), fc::exception );
-      upgrade_to_lifetime_member( dan_id );
+      upgrade_to_lifetime_member( izzy_id );
       trx.operations.clear();
       trx.operations.push_back( wop );
       PUSH_TX( db, trx, ~0 );
@@ -214,6 +214,7 @@ BOOST_AUTO_TEST_CASE( transfer_whitelist_uia )
       const asset_object& advanced = get_asset("ADVANCED");
       const account_object& nathan = get_account("nathan");
       const account_object& dan = create_account("dan");
+      account_id_type izzy_id = get_account("izzy").id;
       upgrade_to_lifetime_member(dan);
       trx.clear();
 
@@ -229,23 +230,36 @@ BOOST_AUTO_TEST_CASE( transfer_whitelist_uia )
 
       BOOST_TEST_MESSAGE( "Adding dan to whitelist for asset ADVANCED" );
       account_whitelist_operation wop;
-      wop.authorizing_account = account_id_type();
+      wop.authorizing_account = izzy_id;
       wop.account_to_list = dan.id;
       wop.new_listing = account_whitelist_operation::white_listed;
       trx.operations.back() = wop;
       PUSH_TX( db, trx, ~0 );
-      BOOST_TEST_MESSAGE( "Attempting to trnsfer from nathan to dan after whitelisting dan, should succeed" );
+      BOOST_TEST_MESSAGE( "Attempting to transfer from nathan to dan after whitelisting dan, should succeed" );
       trx.operations.back() = op;
       PUSH_TX( db, trx, ~0 );
 
-      BOOST_CHECK_EQUAL(get_balance(nathan, advanced), 900);
+      BOOST_CHECK_EQUAL(get_balance(nathan, advanced), 1900);
       BOOST_CHECK_EQUAL(get_balance(dan, advanced), 100);
 
       BOOST_TEST_MESSAGE( "Attempting to blacklist nathan" );
+      {
+         BOOST_TEST_MESSAGE( "Changing the blacklist authority" );
+         asset_update_operation uop;
+         uop.issuer = izzy_id;
+         uop.asset_to_update = advanced.id;
+         uop.new_options = advanced.options;
+         uop.new_options.blacklist_authorities.insert(izzy_id);
+         trx.operations.back() = uop;
+         PUSH_TX( db, trx, ~0 );
+         BOOST_CHECK( advanced.options.blacklist_authorities.find(izzy_id) != advanced.options.blacklist_authorities.end() );
+      }
+
       wop.new_listing |= account_whitelist_operation::black_listed;
       wop.account_to_list = nathan.id;
       trx.operations.back() = wop;
       PUSH_TX( db, trx, ~0 );
+      BOOST_CHECK( !(nathan.is_authorized_asset(advanced, db)) );
 
       BOOST_TEST_MESSAGE( "Attempting to transfer from nathan after blacklisting, should fail" );
       op.amount = advanced.amount(50);
@@ -270,6 +284,7 @@ BOOST_AUTO_TEST_CASE( transfer_whitelist_uia )
       {
          BOOST_TEST_MESSAGE( "Changing the blacklist authority to dan" );
          asset_update_operation op;
+         op.issuer = izzy_id;
          op.asset_to_update = advanced.id;
          op.new_options = advanced.options;
          op.new_options.blacklist_authorities.clear();
@@ -282,7 +297,7 @@ BOOST_AUTO_TEST_CASE( transfer_whitelist_uia )
       BOOST_TEST_MESSAGE( "Attempting to transfer from dan back to nathan" );
       trx.operations.back() = op;
       PUSH_TX( db, trx, ~0 );
-      BOOST_CHECK_EQUAL(get_balance(nathan, advanced), 950);
+      BOOST_CHECK_EQUAL(get_balance(nathan, advanced), 1950);
       BOOST_CHECK_EQUAL(get_balance(dan, advanced), 50);
 
       BOOST_TEST_MESSAGE( "Blacklisting nathan by dan" );
@@ -298,7 +313,7 @@ BOOST_AUTO_TEST_CASE( transfer_whitelist_uia )
       GRAPHENE_REQUIRE_THROW(PUSH_TX( db, trx, ~0 ), fc::exception);
 
       //Remove nathan from committee's whitelist, add him to dan's. This should not authorize him to hold ADVANCED.
-      wop.authorizing_account = account_id_type();
+      wop.authorizing_account = izzy_id;
       wop.account_to_list = nathan.id;
       wop.new_listing = account_whitelist_operation::no_listing;
       trx.operations.back() = wop;
