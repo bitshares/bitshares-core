@@ -126,7 +126,7 @@ object_id_type asset_create_evaluator::do_apply( const asset_create_operation& o
 
 void_result asset_issue_evaluator::do_evaluate( const asset_issue_operation& o )
 { try {
-   database& d   = db();
+   const database& d = db();
 
    const asset_object& a = o.asset_to_issue.asset_id(d);
    FC_ASSERT( o.issuer == a.issuer );
@@ -136,7 +136,7 @@ void_result asset_issue_evaluator::do_evaluate( const asset_issue_operation& o )
 
    if( a.options.flags & white_list )
    {
-      FC_ASSERT( to_account->is_authorized_asset( a ) );
+      FC_ASSERT( to_account->is_authorized_asset( a, d ) );
    }
 
    asset_dyn_data = &a.dynamic_asset_data_id(d);
@@ -158,7 +158,7 @@ void_result asset_issue_evaluator::do_apply( const asset_issue_operation& o )
 
 void_result asset_reserve_evaluator::do_evaluate( const asset_reserve_operation& o )
 { try {
-   database& d   = db();
+   const database& d = db();
 
    const asset_object& a = o.amount_to_reserve.asset_id(d);
    GRAPHENE_ASSERT(
@@ -172,7 +172,7 @@ void_result asset_reserve_evaluator::do_evaluate( const asset_reserve_operation&
 
    if( a.options.flags & white_list )
    {
-      FC_ASSERT( from_account->is_authorized_asset( a ) );
+      FC_ASSERT( from_account->is_authorized_asset( a, d ) );
    }
 
    asset_dyn_data = &a.dynamic_asset_data_id(d);

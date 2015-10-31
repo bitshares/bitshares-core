@@ -159,7 +159,7 @@ BOOST_AUTO_TEST_CASE( generate_empty_blocks )
       {
          database db;
          db.open(data_dir.path(), []{return genesis_state_type();});
-         BOOST_CHECK_EQUAL( db.head_block_num(), 200 );
+         BOOST_CHECK_EQUAL( db.head_block_num(), cutoff_block.block_num() );
          b = cutoff_block;
          for( uint32_t i = 0; i < 200; ++i )
          {
@@ -169,7 +169,7 @@ BOOST_AUTO_TEST_CASE( generate_empty_blocks )
             //BOOST_CHECK( cur_witness != prev_witness );
             b = db.generate_block(db.get_slot_time(1), cur_witness, init_account_priv_key, database::skip_nothing);
          }
-         BOOST_CHECK_EQUAL( db.head_block_num(), 400 );
+         BOOST_CHECK_EQUAL( db.head_block_num(), cutoff_block.block_num()+200 );
       }
    } catch (fc::exception& e) {
       edump((e.to_detail_string()));
