@@ -133,4 +133,13 @@ namespace graphene { namespace chain {
          std::map<std::pair<asset_id_type,asset_id_type>,price_feed> median_feed_values;
    };
 
+   class asset_claim_fees_evaluator : public evaluator<asset_claim_fees_evaluator>
+   {
+      public:
+         typedef asset_claim_fees_operation operation_type;
+
+         void_result do_evaluate( const asset_claim_fees_operation& o );
+         void_result do_apply( const asset_claim_fees_operation& o );
+   };
+
 } } // graphene::chain

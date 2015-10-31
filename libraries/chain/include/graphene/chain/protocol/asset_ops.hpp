@@ -419,7 +419,29 @@ namespace graphene { namespace chain {
       void            validate()const;
    };
 
+   /**
+    * @brief used to transfer accumulated fees back to the issuer's balance.
+    */
+   struct asset_claim_fees_operation : public base_operation
+   {
+      struct fee_parameters_type {
+         uint64_t fee = 20 * GRAPHENE_BLOCKCHAIN_PRECISION;
+      };
+
+      asset           fee;
+      account_id_type issuer;
+      asset           amount_to_claim; /// amount_to_claim.asset_id->issuer must == issuer
+      extensions_type extensions;
+
+      account_id_type fee_payer()const { return issuer; }
+      void            validate()const;
+   };
+
+
 } } // graphene::chain
+
+FC_REFLECT( graphene::chain::asset_claim_fees_operation, (fee)(issuer)(amount_to_claim)(extensions) )
+FC_REFLECT( graphene::chain::asset_claim_fees_operation::fee_parameters_type, (fee) )
 
 FC_REFLECT( graphene::chain::asset_options,
             (max_supply)

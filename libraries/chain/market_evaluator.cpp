@@ -103,6 +103,7 @@ asset limit_order_cancel_evaluator::do_apply(const limit_order_cancel_operation&
    auto quote_asset = _order->sell_price.quote.asset_id;
    auto refunded = _order->amount_for_sale();
 
+   /// TODO... implement this refund in a better way
    if( true ) // HARD FORK d.head_block_time() > 
    {
       const auto& fees = d.current_fee_schedule();
