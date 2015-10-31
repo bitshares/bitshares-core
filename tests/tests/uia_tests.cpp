@@ -149,10 +149,13 @@ BOOST_AUTO_TEST_CASE( issue_whitelist_uia )
       trx.operations.emplace_back(op);
       set_expiration( db, trx );
       //Fail because nathan is not whitelisted, but only before hardfork time
-      GRAPHENE_REQUIRE_THROW(PUSH_TX( db, trx, ~0 ), fc::exception);
-      generate_blocks( HARDFORK_415_TIME );
-      generate_block();
-      set_expiration( db, trx );
+      if( db.head_block_time() <= HARDFORK_415_TIME )
+      {
+         GRAPHENE_REQUIRE_THROW(PUSH_TX( db, trx, ~0 ), fc::exception);
+         generate_blocks( HARDFORK_415_TIME );
+         generate_block();
+         set_expiration( db, trx );
+      }
       PUSH_TX( db, trx, ~0 );
 
       BOOST_CHECK(nathan_id(db).is_authorized_asset(uia_id(db), db));
