@@ -501,7 +501,9 @@ const asset_object& database_fixture::create_user_issued_asset( const string& na
    creator.common_options.max_supply = GRAPHENE_MAX_SHARE_SUPPLY;
    creator.common_options.flags = flags;
    creator.common_options.issuer_permissions = flags;
+   trx.operations.clear();
    trx.operations.push_back(std::move(creator));
+   set_expiration( db, trx );
    trx.validate();
    processed_transaction ptx = db.push_transaction(trx, ~0);
    trx.operations.clear();

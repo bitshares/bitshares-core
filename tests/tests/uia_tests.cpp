@@ -414,5 +414,52 @@ BOOST_AUTO_TEST_CASE( transfer_restricted_test )
    }
 }
 
+BOOST_AUTO_TEST_CASE( asset_name_test )
+{
+   try
+   {
+      ACTORS( (alice)(bob) );
+
+      auto has_asset = [&]( std::string symbol ) -> bool
+      {
+         const auto& assets_by_symbol = db.get_index_type<asset_index>().indices().get<by_symbol>();
+         return assets_by_symbol.find( symbol ) != assets_by_symbol.end();
+      };
+
+      // Alice creates asset "ALPHA"
+      BOOST_CHECK( !has_asset("ALPHA") );    BOOST_CHECK( !has_asset("ALPHA.ONE") );
+      create_user_issued_asset( "ALPHA", alice_id(db), 0 );
+      BOOST_CHECK(  has_asset("ALPHA") );    BOOST_CHECK( !has_asset("ALPHA.ONE") );
+
+      // Nobody can create another asset named ALPHA
+      GRAPHENE_REQUIRE_THROW( create_user_issued_asset( "ALPHA",   bob_id(db), 0 ), fc::exception );
+      BOOST_CHECK(  has_asset("ALPHA") );    BOOST_CHECK( !has_asset("ALPHA.ONE") );
+      GRAPHENE_REQUIRE_THROW( create_user_issued_asset( "ALPHA", alice_id(db), 0 ), fc::exception );
+      BOOST_CHECK(  has_asset("ALPHA") );    BOOST_CHECK( !has_asset("ALPHA.ONE") );
+
+      // Bob can't create ALPHA.ONE
+      GRAPHENE_REQUIRE_THROW( create_user_issued_asset( "ALPHA.ONE", bob_id(db), 0 ), fc::exception );
+      BOOST_CHECK(  has_asset("ALPHA") );    BOOST_CHECK( !has_asset("ALPHA.ONE") );
+      if( db.head_block_time() <= HARDFORK_409_TIME )
+      {
+         // Alice can't create ALPHA.ONE before hardfork
+         GRAPHENE_REQUIRE_THROW( create_user_issued_asset( "ALPHA.ONE", alice_id(db), 0 ), fc::exception );
+         BOOST_CHECK(  has_asset("ALPHA") );    BOOST_CHECK( !has_asset("ALPHA.ONE") );
+         generate_blocks( HARDFORK_409_TIME );
+         generate_block();
+         // Bob can't create ALPHA.ONE after hardfork
+         GRAPHENE_REQUIRE_THROW( create_user_issued_asset( "ALPHA.ONE", bob_id(db), 0 ), fc::exception );
+         BOOST_CHECK(  has_asset("ALPHA") );    BOOST_CHECK( !has_asset("ALPHA.ONE") );
+      }
+      // Alice can create it
+      create_user_issued_asset( "ALPHA.ONE", alice_id(db), 0 );
+      BOOST_CHECK(  has_asset("ALPHA") );    BOOST_CHECK( has_asset("ALPHA.ONE") );
+   }
+   catch(fc::exception& e)
+   {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
 
 BOOST_AUTO_TEST_SUITE_END()
