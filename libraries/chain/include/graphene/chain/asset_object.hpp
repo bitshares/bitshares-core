@@ -82,8 +82,6 @@ namespace graphene { namespace chain {
          /// @return true if symbol is a valid ticker symbol; false otherwise.
          static bool is_valid_symbol( const string& symbol );
 
-         /// @return true if accounts must be on a whitelist in order to hold this asset; false otherwise.
-         bool enforce_white_list()const { return options.flags & white_list; }
          /// @return true if this is a market-issued asset; false otherwise.
          bool is_market_issued()const { return bitasset_data_id.valid(); }
          /// @return true if users may request force-settlement of this market-issued asset; false otherwise

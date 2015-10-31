@@ -23,6 +23,7 @@
 #include <graphene/chain/account_object.hpp>
 #include <graphene/chain/database.hpp>
 #include <graphene/chain/exceptions.hpp>
+#include <graphene/chain/hardfork.hpp>
 
 namespace graphene { namespace chain {
 
@@ -65,7 +66,17 @@ void_result withdraw_permission_claim_evaluator::do_evaluate(const withdraw_perm
    const asset_object& _asset = op.amount_to_withdraw.asset_id(d);
    if( _asset.is_transfer_restricted() ) FC_ASSERT( _asset.issuer == permit.authorized_account || _asset.issuer == permit.withdraw_from_account );
 
-   if( _asset.enforce_white_list() )
+   if( d.head_block_time() <= HARDFORK_416_TIME )
+   {
+      if( _asset.options.flags & white_list )
+      {
+         const account_object& from  = op.withdraw_to_account(d);
+         const account_object& to    = permit.authorized_account(d);
+         FC_ASSERT( to.is_authorized_asset( _asset, d ) );
+         FC_ASSERT( from.is_authorized_asset( _asset, d ) );
+      }
+   }
+   else
    {
       const account_object& from  = op.withdraw_to_account(d);
       const account_object& to    = permit.authorized_account(d);

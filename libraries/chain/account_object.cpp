@@ -41,6 +41,12 @@ share_type cut_fee(share_type a, uint16_t p)
 
 bool account_object::is_authorized_asset(const asset_object& asset_obj, const database& d) const
 {
+   if( d.head_block_time() > HARDFORK_416_TIME )
+   {
+      if( !(asset_obj.options.flags & white_list) )
+         return true;
+   }
+
    for( const auto id : blacklisting_accounts )
    {
       if( asset_obj.options.blacklist_authorities.find(id) != asset_obj.options.blacklist_authorities.end() )
@@ -67,7 +73,6 @@ void account_balance_object::adjust_balance(const asset& delta)
    assert(delta.asset_id == asset_type);
    balance += delta.amount;
 }
-
 
 void account_statistics_object::process_fees(const account_object& a, database& d) const
 {
