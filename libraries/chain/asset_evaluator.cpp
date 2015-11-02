@@ -45,20 +45,36 @@ void_result asset_create_evaluator::do_evaluate( const asset_create_operation& o
    for( auto id : op.common_options.blacklist_authorities )
       d.get_object(id);
 
-   auto& asset_indx = db().get_index_type<asset_index>().indices().get<by_symbol>();
+   auto& asset_indx = d.get_index_type<asset_index>().indices().get<by_symbol>();
    auto asset_symbol_itr = asset_indx.find( op.symbol );
    FC_ASSERT( asset_symbol_itr == asset_indx.end() );
 
-   auto dotpos = op.symbol.find( '.' );
-   if( dotpos != std::string::npos  && d.head_block_time() > HARDFORK_385_TIME ) {
-      auto prefix = op.symbol.substr( 0, dotpos );
-      auto asset_symbol_itr = asset_indx.find( op.symbol );
-      FC_ASSERT( asset_symbol_itr != asset_indx.end(), "Asset ${s} may only be created by issuer of ${p}, but ${p} has not been registered",
-                 ("s",op.symbol)("p",prefix) );
-      FC_ASSERT( asset_symbol_itr->issuer == op.issuer, "Asset ${s} may only be created by issuer of ${p}, ${i}",
-                 ("s",op.symbol)("p",prefix)("i", op.issuer(d).name) );
+   if( d.head_block_time() <= HARDFORK_409_TIME )
+   {
+      auto dotpos = op.symbol.find( '.' );
+      if( dotpos != std::string::npos )
+      {
+         auto prefix = op.symbol.substr( 0, dotpos );
+         auto asset_symbol_itr = asset_indx.find( op.symbol );
+         FC_ASSERT( asset_symbol_itr != asset_indx.end(), "Asset ${s} may only be created by issuer of ${p}, but ${p} has not been registered",
+                    ("s",op.symbol)("p",prefix) );
+         FC_ASSERT( asset_symbol_itr->issuer == op.issuer, "Asset ${s} may only be created by issuer of ${p}, ${i}",
+                    ("s",op.symbol)("p",prefix)("i", op.issuer(d).name) );
+      }
    }
-
+   else
+   {
+      auto dotpos = op.symbol.rfind( '.' );
+      if( dotpos != std::string::npos )
+      {
+         auto prefix = op.symbol.substr( 0, dotpos );
+         auto asset_symbol_itr = asset_indx.find( prefix );
+         FC_ASSERT( asset_symbol_itr != asset_indx.end(), "Asset ${s} may only be created by issuer of ${p}, but ${p} has not been registered",
+                    ("s",op.symbol)("p",prefix) );
+         FC_ASSERT( asset_symbol_itr->issuer == op.issuer, "Asset ${s} may only be created by issuer of ${p}, ${i}",
+                    ("s",op.symbol)("p",prefix)("i", op.issuer(d).name) );
+      }
+   }
 
    core_fee_paid -= core_fee_paid.value/2;
 
@@ -126,7 +142,7 @@ object_id_type asset_create_evaluator::do_apply( const asset_create_operation& o
 
 void_result asset_issue_evaluator::do_evaluate( const asset_issue_operation& o )
 { try {
-   database& d   = db();
+   const database& d = db();
 
    const asset_object& a = o.asset_to_issue.asset_id(d);
    FC_ASSERT( o.issuer == a.issuer );
@@ -136,7 +152,7 @@ void_result asset_issue_evaluator::do_evaluate( const asset_issue_operation& o )
 
    if( a.options.flags & white_list )
    {
-      FC_ASSERT( to_account->is_authorized_asset( a ) );
+      FC_ASSERT( to_account->is_authorized_asset( a, d ) );
    }
 
    asset_dyn_data = &a.dynamic_asset_data_id(d);
@@ -158,7 +174,7 @@ void_result asset_issue_evaluator::do_apply( const asset_issue_operation& o )
 
 void_result asset_reserve_evaluator::do_evaluate( const asset_reserve_operation& o )
 { try {
-   database& d   = db();
+   const database& d = db();
 
    const asset_object& a = o.amount_to_reserve.asset_id(d);
    GRAPHENE_ASSERT(
@@ -172,7 +188,7 @@ void_result asset_reserve_evaluator::do_evaluate( const asset_reserve_operation&
 
    if( a.options.flags & white_list )
    {
-      FC_ASSERT( from_account->is_authorized_asset( a ) );
+      FC_ASSERT( from_account->is_authorized_asset( a, d ) );
    }
 
    asset_dyn_data = &a.dynamic_asset_data_id(d);
@@ -513,5 +529,33 @@ void_result asset_publish_feeds_evaluator::do_apply(const asset_publish_feed_ope
 
    return void_result();
 } FC_CAPTURE_AND_RETHROW((o)) }
+
+
+
+void_result asset_claim_fees_evaluator::do_evaluate( const asset_claim_fees_operation& o )
+{ try {
+   FC_ASSERT( db().head_block_time() > HARDFORK_413_TIME );
+   FC_ASSERT( o.amount_to_claim.asset_id(db()).issuer == o.issuer, "Asset fees may only be claimed by the issuer" );
+   return void_result();
+} FC_CAPTURE_AND_RETHROW( (o) ) }
+
+
+void_result asset_claim_fees_evaluator::do_apply( const asset_claim_fees_operation& o )
+{ try {
+   database& d = db();
+
+   const asset_object& a = o.amount_to_claim.asset_id(d);
+   const asset_dynamic_data_object& addo = a.dynamic_asset_data_id(d);
+   FC_ASSERT( o.amount_to_claim.amount <= addo.accumulated_fees, "Attempt to claim more fees than have accumulated", ("addo",addo) );
+
+   d.modify( addo, [&]( asset_dynamic_data_object& _addo  ) {
+     _addo.accumulated_fees -= o.amount_to_claim.amount;
+   });
+
+   d.adjust_balance( o.issuer, o.amount_to_claim );
+
+   return void_result();
+} FC_CAPTURE_AND_RETHROW( (o) ) }
+
 
 } } // graphene::chain

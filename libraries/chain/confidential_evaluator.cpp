@@ -32,7 +32,7 @@ void_result transfer_to_blind_evaluator::do_evaluate( const transfer_to_blind_op
    const auto& atype = o.amount.asset_id(db()); 
    FC_ASSERT( atype.allow_confidential() );
    FC_ASSERT( !atype.is_transfer_restricted() );
-   FC_ASSERT( !atype.enforce_white_list() );
+   FC_ASSERT( !(atype.options.flags & white_list) );
 
    for( const auto& out : o.outputs )
    {

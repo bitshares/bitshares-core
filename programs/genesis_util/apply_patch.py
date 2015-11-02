@@ -31,6 +31,9 @@ def main():
         with open(filename, "r") as f:
             patch = json.load(f)
         for k, v in patch.get("append", {}).items():
+            if k not in genesis:
+                genesis[k] = []
+                sys.stderr.write("[WARN]  item {k} was created\n".format(k=k))
             genesis[k].extend(v)
             sys.stderr.write("appended {n} items to {k}\n".format(n=len(v), k=k))
         for k, v in patch.get("replace", {}).items():

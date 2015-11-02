@@ -27,6 +27,7 @@
 #include <graphene/chain/asset_object.hpp>
 #include <graphene/chain/account_object.hpp>
 #include <graphene/chain/balance_object.hpp>
+#include <graphene/chain/budget_record_object.hpp>
 #include <graphene/chain/witness_object.hpp>
 #include <graphene/chain/committee_member_object.hpp>
 #include <graphene/chain/market_evaluator.hpp>
@@ -348,7 +349,8 @@ BOOST_AUTO_TEST_CASE( mia_feeds )
       asset_publish_feed_operation op;
       op.publisher = vikram_id;
       op.asset_id = bit_usd_id;
-      op.feed.settlement_price = ~price(asset(GRAPHENE_BLOCKCHAIN_PRECISION),bit_usd.amount(30));
+      op.feed.settlement_price = op.feed.core_exchange_rate = ~price(asset(GRAPHENE_BLOCKCHAIN_PRECISION),bit_usd.amount(30));
+
       // We'll expire margins after a month
       // Accept defaults for required collateral
       trx.operations.emplace_back(op);
@@ -359,7 +361,7 @@ BOOST_AUTO_TEST_CASE( mia_feeds )
       BOOST_CHECK(bitasset.current_feed.maintenance_collateral_ratio == GRAPHENE_DEFAULT_MAINTENANCE_COLLATERAL_RATIO);
 
       op.publisher = ben_id;
-      op.feed.settlement_price = ~price(asset(GRAPHENE_BLOCKCHAIN_PRECISION),bit_usd.amount(25));
+      op.feed.settlement_price = op.feed.core_exchange_rate = ~price(asset(GRAPHENE_BLOCKCHAIN_PRECISION),bit_usd.amount(25));
       trx.operations.back() = op;
       PUSH_TX( db, trx, ~0 );
 
@@ -367,7 +369,7 @@ BOOST_AUTO_TEST_CASE( mia_feeds )
       BOOST_CHECK(bitasset.current_feed.maintenance_collateral_ratio == GRAPHENE_DEFAULT_MAINTENANCE_COLLATERAL_RATIO);
 
       op.publisher = dan_id;
-      op.feed.settlement_price = ~price(asset(GRAPHENE_BLOCKCHAIN_PRECISION),bit_usd.amount(40));
+      op.feed.settlement_price = op.feed.core_exchange_rate = ~price(asset(GRAPHENE_BLOCKCHAIN_PRECISION),bit_usd.amount(40));
       op.feed.maximum_short_squeeze_ratio = 1001;
       op.feed.maintenance_collateral_ratio = 1001;
       trx.operations.back() = op;
@@ -452,15 +454,16 @@ BOOST_AUTO_TEST_CASE( witness_create )
       generate_block();
 
    int produced = 0;
-   // Make sure we get scheduled exactly once in witnesses.size() blocks
+   // Make sure we get scheduled at least once in witnesses.size()*2 blocks
+   // may take this many unless we measure where in the scheduling round we are
    // TODO:  intense_test that repeats this loop many times
-   for( size_t i=0; i<witnesses.size(); i++ )
+   for( size_t i=0, n=witnesses.size()*2; i<n; i++ )
    {
       signed_block block = generate_block();
       if( block.witness == nathan_witness_id )
          produced++;
    }
-   BOOST_CHECK_EQUAL( produced, 2 );
+   BOOST_CHECK_GE( produced, 1 );
 } FC_LOG_AND_RETHROW() }
 
 /**
@@ -1035,8 +1038,7 @@ BOOST_AUTO_TEST_CASE( balance_object_test )
    fc::temp_directory td( graphene::utilities::temp_directory_path() );
    genesis_state.initial_balances.push_back({generate_private_key("n").get_public_key(), GRAPHENE_SYMBOL, 1});
    genesis_state.initial_balances.push_back({generate_private_key("x").get_public_key(), GRAPHENE_SYMBOL, 1});
-   auto starting_time = time_point_sec((time_point::now().sec_since_epoch() / GRAPHENE_DEFAULT_BLOCK_INTERVAL + 1) *
-         GRAPHENE_DEFAULT_BLOCK_INTERVAL);
+   fc::time_point_sec starting_time = genesis_state.initial_timestamp + 3000;
 
    auto n_key = generate_private_key("n");
    auto x_key = generate_private_key("x");
@@ -1203,6 +1205,121 @@ BOOST_AUTO_TEST_CASE(transfer_with_memo) {
       auto memo = db.get_recent_transaction(trx.id()).operations.front().get<transfer_operation>().memo;
       BOOST_CHECK(memo);
       BOOST_CHECK_EQUAL(memo->get_message(bob_private_key, alice_public_key), "Dear Bob,\n\nMoney!\n\nLove, Alice");
+   } FC_LOG_AND_RETHROW()
+}
+
+BOOST_AUTO_TEST_CASE(zero_second_vbo)
+{
+   try
+   {
+      ACTOR(alice);
+      // don't pay witnesses so we have some worker budget to work with
+
+      transfer(account_id_type(), alice_id, asset(int64_t(100000) * 1100 * 1000 * 1000));
+      {
+         asset_reserve_operation op;
+         op.payer = alice_id;
+         op.amount_to_reserve = asset(int64_t(100000) * 1000 * 1000 * 1000);
+         transaction tx;
+         tx.operations.push_back( op );
+         set_expiration( db, tx );
+         db.push_transaction( tx, database::skip_authority_check | database::skip_tapos_check | database::skip_transaction_signatures );
+      }
+      enable_fees();
+      upgrade_to_lifetime_member(alice_id);
+      generate_block();
+
+      auto check_vesting_1b = [&](vesting_balance_id_type vbid)
+      {
+         // this function checks that Alice can't draw any right now,
+         // but one block later, she can withdraw it all.
+
+         vesting_balance_withdraw_operation withdraw_op;
+         withdraw_op.vesting_balance = vbid;
+         withdraw_op.owner = alice_id;
+         withdraw_op.amount = asset(1);
+
+         signed_transaction withdraw_tx;
+         withdraw_tx.operations.push_back( withdraw_op );
+         sign(withdraw_tx, alice_private_key);
+         GRAPHENE_REQUIRE_THROW( PUSH_TX( db, withdraw_tx ), fc::exception );
+
+         generate_block();
+         withdraw_tx = signed_transaction();
+         withdraw_op.amount = asset(500);
+         withdraw_tx.operations.push_back( withdraw_op );
+         set_expiration( db, withdraw_tx );
+         sign(withdraw_tx, alice_private_key);
+         PUSH_TX( db, withdraw_tx );
+      };
+
+      // This block creates a zero-second VBO with a vesting_balance_create_operation.
+      {
+         cdd_vesting_policy_initializer pinit;
+         pinit.vesting_seconds = 0;
+
+         vesting_balance_create_operation create_op;
+         create_op.creator = alice_id;
+         create_op.owner = alice_id;
+         create_op.amount = asset(500);
+         create_op.policy = pinit;
+
+         signed_transaction create_tx;
+         create_tx.operations.push_back( create_op );
+         set_expiration( db, create_tx );
+         sign(create_tx, alice_private_key);
+
+         processed_transaction ptx = PUSH_TX( db, create_tx );
+         vesting_balance_id_type vbid = ptx.operation_results[0].get<object_id_type>();
+         check_vesting_1b( vbid );
+      }
+
+      // This block creates a zero-second VBO with a worker_create_operation.
+      {
+         worker_create_operation create_op;
+         create_op.owner = alice_id;
+         create_op.work_begin_date = db.head_block_time();
+         create_op.work_end_date = db.head_block_time() + fc::days(1000);
+         create_op.daily_pay = share_type( 10000 );
+         create_op.name = "alice";
+         create_op.url = "";
+         create_op.initializer = vesting_balance_worker_initializer(0);
+         signed_transaction create_tx;
+         create_tx.operations.push_back(create_op);
+         set_expiration( db, create_tx );
+         sign(create_tx, alice_private_key);
+         processed_transaction ptx = PUSH_TX( db, create_tx );
+         worker_id_type wid = ptx.operation_results[0].get<object_id_type>();
+
+         // vote it in
+         account_update_operation vote_op;
+         vote_op.account = alice_id;
+         vote_op.new_options = alice_id(db).options;
+         vote_op.new_options->votes.insert(wid(db).vote_for);
+         signed_transaction vote_tx;
+         vote_tx.operations.push_back(vote_op);
+         set_expiration( db, vote_tx );
+         sign( vote_tx, alice_private_key );
+         PUSH_TX( db, vote_tx );
+
+         // vote it in, wait for one maint. for vote to take effect
+         vesting_balance_id_type vbid = wid(db).worker.get<vesting_balance_worker_type>().balance;
+         generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+         generate_block();
+         // wait for another maint. for worker to be paid
+         generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+         BOOST_CHECK( vbid(db).get_allowed_withdraw(db.head_block_time()) == asset(0) );
+         generate_block();
+         BOOST_CHECK( vbid(db).get_allowed_withdraw(db.head_block_time()) == asset(10000) );
+
+         /*
+         db.get_index_type< simple_index<budget_record_object> >().inspect_all_objects(
+            [&](const object& o)
+            {
+               ilog( "budget: ${brec}", ("brec", static_cast<const budget_record_object&>(o)) );
+            });
+         */
+      }
    } FC_LOG_AND_RETHROW()
 }
 

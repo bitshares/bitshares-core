@@ -21,6 +21,7 @@
 
 #include <fc/smart_ref_impl.hpp>
 #include <fc/uint128.hpp>
+#include <graphene/chain/hardfork.hpp>
 #include <graphene/chain/vesting_balance_object.hpp>
 
 #include <boost/test/unit_test.hpp>
@@ -67,6 +68,138 @@ BOOST_AUTO_TEST_CASE( nonzero_fee_test )
    }
 }
 
+BOOST_AUTO_TEST_CASE(asset_claim_fees_test)
+{
+   try
+   {
+      ACTORS((alice)(bob)(izzy)(jill));
+      // Izzy issues asset to Alice
+      // Jill issues asset to Bob
+      // Alice and Bob trade in the market and pay fees
+      // Verify that Izzy and Jill can claim the fees
+
+      const share_type core_prec = asset::scaled_precision( asset_id_type()(db).precision );
+
+      // Return number of core shares (times precision)
+      auto _core = [&]( int64_t x ) -> asset
+      {  return asset( x*core_prec );    };
+
+      transfer( committee_account, alice_id, _core(1000000) );
+      transfer( committee_account,   bob_id, _core(1000000) );
+      transfer( committee_account,  izzy_id, _core(1000000) );
+      transfer( committee_account,  jill_id, _core(1000000) );
+
+      asset_id_type izzycoin_id = create_bitasset( "IZZYCOIN", izzy_id,   GRAPHENE_1_PERCENT, charge_market_fee ).id;
+      asset_id_type jillcoin_id = create_bitasset( "JILLCOIN", jill_id, 2*GRAPHENE_1_PERCENT, charge_market_fee ).id;
+
+      const share_type izzy_prec = asset::scaled_precision( asset_id_type(izzycoin_id)(db).precision );
+      const share_type jill_prec = asset::scaled_precision( asset_id_type(jillcoin_id)(db).precision );
+
+      auto _izzy = [&]( int64_t x ) -> asset
+      {   return asset( x*izzy_prec, izzycoin_id );   };
+      auto _jill = [&]( int64_t x ) -> asset
+      {   return asset( x*jill_prec, jillcoin_id );   };
+
+      update_feed_producers( izzycoin_id(db), { izzy_id } );
+      update_feed_producers( jillcoin_id(db), { jill_id } );
+
+      const asset izzy_satoshi = asset(1, izzycoin_id);
+      const asset jill_satoshi = asset(1, jillcoin_id);
+
+      // Izzycoin is worth 100 BTS
+      price_feed feed;
+      feed.settlement_price = price( _izzy(1), _core(100) );
+      feed.maintenance_collateral_ratio = 175 * GRAPHENE_COLLATERAL_RATIO_DENOM / 100;
+      feed.maximum_short_squeeze_ratio = 150 * GRAPHENE_COLLATERAL_RATIO_DENOM / 100;
+      publish_feed( izzycoin_id(db), izzy, feed );
+
+      // Jillcoin is worth 30 BTS
+      feed.settlement_price = price( _jill(1), _core(30) );
+      feed.maintenance_collateral_ratio = 175 * GRAPHENE_COLLATERAL_RATIO_DENOM / 100;
+      feed.maximum_short_squeeze_ratio = 150 * GRAPHENE_COLLATERAL_RATIO_DENOM / 100;
+      publish_feed( jillcoin_id(db), jill, feed );
+
+      enable_fees();
+
+      // Alice and Bob create some coins
+      borrow( alice_id, _izzy( 200), _core( 60000) );
+      borrow(   bob_id, _jill(2000), _core(180000) );
+
+      // Alice and Bob place orders which match
+      create_sell_order( alice_id, _izzy(100), _jill(300) );   // Alice is willing to sell her Izzy's for 3 Jill
+      create_sell_order(   bob_id, _jill(700), _izzy(200) );   // Bob is buying up to 200 Izzy's for up to 3.5 Jill
+
+      // 100 Izzys and 300 Jills are matched, so the fees should be
+      //   1 Izzy (1%) and 6 Jill (2%).
+
+      auto claim_fees = [&]( account_id_type issuer, asset amount_to_claim )
+      {
+         asset_claim_fees_operation claim_op;
+         claim_op.issuer = issuer;
+         claim_op.amount_to_claim = amount_to_claim;
+         signed_transaction tx;
+         tx.operations.push_back( claim_op );
+         db.current_fee_schedule().set_fee( tx.operations.back() );
+         set_expiration( db, tx );
+         fc::ecc::private_key   my_pk = (issuer == izzy_id) ? izzy_private_key : jill_private_key;
+         fc::ecc::private_key your_pk = (issuer == izzy_id) ? jill_private_key : izzy_private_key;
+         sign( tx, your_pk );
+         GRAPHENE_REQUIRE_THROW( PUSH_TX( db, tx ), fc::exception );
+         tx.signatures.clear();
+         sign( tx, my_pk );
+         PUSH_TX( db, tx );
+      };
+
+      {
+         const asset_object& izzycoin = izzycoin_id(db);
+         const asset_object& jillcoin = jillcoin_id(db);
+
+         //wdump( (izzycoin)(izzycoin.dynamic_asset_data_id(db))((*izzycoin.bitasset_data_id)(db)) );
+         //wdump( (jillcoin)(jillcoin.dynamic_asset_data_id(db))((*jillcoin.bitasset_data_id)(db)) );
+
+         // check the correct amount of fees has been awarded
+         BOOST_CHECK( izzycoin.dynamic_asset_data_id(db).accumulated_fees == _izzy(1).amount );
+         BOOST_CHECK( jillcoin.dynamic_asset_data_id(db).accumulated_fees == _jill(6).amount );
+
+      }
+
+      {
+         // can't claim before hardfork
+         GRAPHENE_REQUIRE_THROW( claim_fees( izzy_id, _izzy(1) ), fc::exception );
+         generate_blocks( HARDFORK_413_TIME );
+         while( db.head_block_time() <= HARDFORK_413_TIME )
+         {
+            generate_block();
+         }
+      }
+
+      {
+         const asset_object& izzycoin = izzycoin_id(db);
+         const asset_object& jillcoin = jillcoin_id(db);
+
+         // can't claim more than balance
+         GRAPHENE_REQUIRE_THROW( claim_fees( izzy_id, _izzy(1) + izzy_satoshi ), fc::exception );
+         GRAPHENE_REQUIRE_THROW( claim_fees( jill_id, _jill(6) + jill_satoshi ), fc::exception );
+
+         // can't claim asset that doesn't belong to you
+         GRAPHENE_REQUIRE_THROW( claim_fees( jill_id, izzy_satoshi ), fc::exception );
+         GRAPHENE_REQUIRE_THROW( claim_fees( izzy_id, jill_satoshi ), fc::exception );
+
+         // can claim asset in one go
+         claim_fees( izzy_id, _izzy(1) );
+         GRAPHENE_REQUIRE_THROW( claim_fees( izzy_id, izzy_satoshi ), fc::exception );
+         BOOST_CHECK( izzycoin.dynamic_asset_data_id(db).accumulated_fees == _izzy(0).amount );
+
+         // can claim in multiple goes
+         claim_fees( jill_id, _jill(4) );
+         BOOST_CHECK( jillcoin.dynamic_asset_data_id(db).accumulated_fees == _jill(2).amount );
+         GRAPHENE_REQUIRE_THROW( claim_fees( jill_id, _jill(2) + jill_satoshi ), fc::exception );
+         claim_fees( jill_id, _jill(2) );
+         BOOST_CHECK( jillcoin.dynamic_asset_data_id(db).accumulated_fees == _jill(0).amount );
+      }
+   }
+   FC_LOG_AND_RETHROW()
+}
 
 ///////////////////////////////////////////////////////////////
 // cashback_test infrastructure                              //

@@ -21,6 +21,7 @@
 #include <graphene/chain/database.hpp>
 #include <graphene/chain/evaluator.hpp>
 #include <graphene/chain/exceptions.hpp>
+#include <graphene/chain/hardfork.hpp>
 #include <graphene/chain/transaction_evaluation_state.hpp>
 
 #include <graphene/chain/asset_object.hpp>
@@ -46,17 +47,25 @@ database& generic_evaluator::db()const { return trx_state->db(); }
 
    void generic_evaluator::prepare_fee(account_id_type account_id, asset fee)
    {
+      const database& d = db();
       fee_from_account = fee;
       FC_ASSERT( fee.amount >= 0 );
-      fee_paying_account = &account_id(db());
-      fee_paying_account_statistics = &fee_paying_account->statistics(db());
+      fee_paying_account = &account_id(d);
+      fee_paying_account_statistics = &fee_paying_account->statistics(d);
 
-      fee_asset = &fee.asset_id(db());
-      fee_asset_dyn_data = &fee_asset->dynamic_asset_data_id(db());
+      fee_asset = &fee.asset_id(d);
+      fee_asset_dyn_data = &fee_asset->dynamic_asset_data_id(d);
+
+      if( d.head_block_time() > HARDFORK_419_TIME )
+      {
+         FC_ASSERT( fee_paying_account->is_authorized_asset( *fee_asset, d ), "Account ${acct} '${name}' attempted to pay fee by using asset ${a} '${sym}', which is unauthorized due to whitelist / blacklist",
+            ("acct", fee_paying_account->id)("name", fee_paying_account->name)("a", fee_asset->id)("sym", fee_asset->symbol) );
+      }
 
       if( fee_from_account.asset_id == asset_id_type() )
          core_fee_paid = fee_from_account.amount;
-      else {
+      else
+      {
          asset fee_from_pool = fee_from_account * fee_asset->options.core_exchange_rate;
          FC_ASSERT( fee_from_pool.asset_id == asset_id_type() );
          core_fee_paid = fee_from_pool.amount;

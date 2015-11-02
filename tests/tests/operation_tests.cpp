@@ -636,11 +636,11 @@ BOOST_AUTO_TEST_CASE( update_mia )
          pop.asset_id = bit_usd.get_id();
          pop.publisher = get_account("init0").get_id();
          price_feed feed;
-         feed.settlement_price = price(bit_usd.amount(5), bit_usd.amount(5));
+         feed.settlement_price = feed.core_exchange_rate = price(bit_usd.amount(5), bit_usd.amount(5));
          REQUIRE_THROW_WITH_VALUE(pop, feed, feed);
-         feed.settlement_price = ~price(bit_usd.amount(5), asset(5));
+         feed.settlement_price = feed.core_exchange_rate = ~price(bit_usd.amount(5), asset(5));
          REQUIRE_THROW_WITH_VALUE(pop, feed, feed);
-         feed.settlement_price = price(bit_usd.amount(5), asset(5));
+         feed.settlement_price = feed.core_exchange_rate = price(bit_usd.amount(5), asset(5));
          pop.feed = feed;
          REQUIRE_THROW_WITH_VALUE(pop, feed.maintenance_collateral_ratio, 0);
          trx.operations.back() = pop;
@@ -687,7 +687,7 @@ BOOST_AUTO_TEST_CASE( create_uia )
       const asset_object& test_asset = test_asset_id(db);
       BOOST_CHECK(test_asset.symbol == "TEST");
       BOOST_CHECK(asset(1, test_asset_id) * test_asset.options.core_exchange_rate == asset(2));
-      BOOST_CHECK(!test_asset.enforce_white_list());
+      BOOST_CHECK((test_asset.options.flags & white_list) == 0);
       BOOST_CHECK(test_asset.options.max_supply == 100000000);
       BOOST_CHECK(!test_asset.bitasset_data_id.valid());
       BOOST_CHECK(test_asset.options.market_fee_percent == GRAPHENE_MAX_MARKET_FEE_PERCENT/100);
@@ -1144,7 +1144,7 @@ BOOST_AUTO_TEST_CASE( witness_feeds )
       asset_publish_feed_operation op;
       op.publisher = active_witnesses[0];
       op.asset_id = bit_usd.get_id();
-      op.feed.settlement_price = ~price(asset(GRAPHENE_BLOCKCHAIN_PRECISION),bit_usd.amount(30));
+      op.feed.settlement_price = op.feed.core_exchange_rate = ~price(asset(GRAPHENE_BLOCKCHAIN_PRECISION),bit_usd.amount(30));
       // Accept defaults for required collateral
       trx.operations.emplace_back(op);
       PUSH_TX( db, trx, ~0 );
@@ -1154,7 +1154,7 @@ BOOST_AUTO_TEST_CASE( witness_feeds )
       BOOST_CHECK(bitasset.current_feed.maintenance_collateral_ratio == GRAPHENE_DEFAULT_MAINTENANCE_COLLATERAL_RATIO);
 
       op.publisher = active_witnesses[1];
-      op.feed.settlement_price = ~price(asset(GRAPHENE_BLOCKCHAIN_PRECISION),bit_usd.amount(25));
+      op.feed.settlement_price = op.feed.core_exchange_rate = ~price(asset(GRAPHENE_BLOCKCHAIN_PRECISION),bit_usd.amount(25));
       trx.operations.back() = op;
       PUSH_TX( db, trx, ~0 );
 
@@ -1162,7 +1162,7 @@ BOOST_AUTO_TEST_CASE( witness_feeds )
       BOOST_CHECK(bitasset.current_feed.maintenance_collateral_ratio == GRAPHENE_DEFAULT_MAINTENANCE_COLLATERAL_RATIO);
 
       op.publisher = active_witnesses[2];
-      op.feed.settlement_price = ~price(asset(GRAPHENE_BLOCKCHAIN_PRECISION),bit_usd.amount(40));
+      op.feed.settlement_price = op.feed.core_exchange_rate = ~price(asset(GRAPHENE_BLOCKCHAIN_PRECISION),bit_usd.amount(40));
       // But this witness is an idiot.
       op.feed.maintenance_collateral_ratio = 1001;
       trx.operations.back() = op;

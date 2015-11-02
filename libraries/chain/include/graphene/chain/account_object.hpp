@@ -229,7 +229,7 @@ namespace graphene { namespace chain {
           * @return true if this account is whitelisted and not blacklisted to transact in the provided asset; false
           * otherwise.
           */
-         bool is_authorized_asset(const asset_object& asset_obj)const;
+         bool is_authorized_asset(const asset_object& asset_obj, const database& d)const;
 
          account_id_type get_id()const { return id; }
    };

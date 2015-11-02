@@ -53,12 +53,11 @@ namespace graphene { namespace chain {
       /// the core exchange rate.
       price core_exchange_rate;
 
-      /// A set of accounts which maintain whitelists to consult for this asset. If enforce_white_list() returns
-      /// true, an account may only send, receive, trade, etc. in this asset if one of these accounts appears in
-      /// its account_object::whitelisting_accounts field.
+      /// A set of accounts which maintain whitelists to consult for this asset. If whitelist_authorities
+      /// is non-empty, then only accounts in whitelist_authorities are allowed to hold, use, or transfer the asset.
       flat_set<account_id_type> whitelist_authorities;
-      /// A set of accounts which maintain blacklists to consult for this asset. If enforce_white_list() returns
-      /// true, an account may only send, receive, trade, etc. in this asset if none of these accounts appears in
+      /// A set of accounts which maintain blacklists to consult for this asset. If flags & white_list is set,
+      /// an account may only send, receive, trade, etc. in this asset if none of these accounts appears in
       /// its account_object::blacklisting_accounts field. If the account is blacklisted, it may not transact in
       /// this asset even if it is also whitelisted.
       flat_set<account_id_type> blacklist_authorities;
@@ -420,7 +419,29 @@ namespace graphene { namespace chain {
       void            validate()const;
    };
 
+   /**
+    * @brief used to transfer accumulated fees back to the issuer's balance.
+    */
+   struct asset_claim_fees_operation : public base_operation
+   {
+      struct fee_parameters_type {
+         uint64_t fee = 20 * GRAPHENE_BLOCKCHAIN_PRECISION;
+      };
+
+      asset           fee;
+      account_id_type issuer;
+      asset           amount_to_claim; /// amount_to_claim.asset_id->issuer must == issuer
+      extensions_type extensions;
+
+      account_id_type fee_payer()const { return issuer; }
+      void            validate()const;
+   };
+
+
 } } // graphene::chain
+
+FC_REFLECT( graphene::chain::asset_claim_fees_operation, (fee)(issuer)(amount_to_claim)(extensions) )
+FC_REFLECT( graphene::chain::asset_claim_fees_operation::fee_parameters_type, (fee) )
 
 FC_REFLECT( graphene::chain::asset_options,
             (max_supply)

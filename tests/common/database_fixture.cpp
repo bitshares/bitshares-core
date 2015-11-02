@@ -46,6 +46,8 @@
 
 using namespace graphene::chain::test;
 
+uint32_t GRAPHENE_TESTING_GENESIS_TIMESTAMP = 1431700000;
+
 namespace graphene { namespace chain {
 
 using std::cout;
@@ -499,7 +501,9 @@ const asset_object& database_fixture::create_user_issued_asset( const string& na
    creator.common_options.max_supply = GRAPHENE_MAX_SHARE_SUPPLY;
    creator.common_options.flags = flags;
    creator.common_options.issuer_permissions = flags;
+   trx.operations.clear();
    trx.operations.push_back(std::move(creator));
+   set_expiration( db, trx );
    trx.validate();
    processed_transaction ptx = db.push_transaction(trx, ~0);
    trx.operations.clear();
@@ -733,6 +737,8 @@ void database_fixture::publish_feed( const asset_object& mia, const account_obje
    op.publisher = by.id;
    op.asset_id = mia.id;
    op.feed = f;
+   if( op.feed.core_exchange_rate.is_null() )
+      op.feed.core_exchange_rate = op.feed.settlement_price;
    trx.operations.emplace_back( std::move(op) );
 
    for( auto& op : trx.operations ) db.current_fee_schedule().set_fee(op);

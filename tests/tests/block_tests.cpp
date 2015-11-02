@@ -131,14 +131,15 @@ BOOST_AUTO_TEST_CASE( generate_empty_blocks )
 
       // TODO:  Don't generate this here
       auto init_account_priv_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("null_key")) );
-      signed_block b200;
+      signed_block cutoff_block;
       {
          database db;
          db.open(data_dir.path(), make_genesis );
          b = db.generate_block(db.get_slot_time(1), db.get_scheduled_witness(1), init_account_priv_key, database::skip_nothing);
 
+         // TODO:  Change this test when we correct #406
          // n.b. we generate GRAPHENE_MIN_UNDO_HISTORY+1 extra blocks which will be discarded on save
-         for( uint32_t i = 1; i < 200+GRAPHENE_MIN_UNDO_HISTORY+1; ++i )
+         for( uint32_t i = 1; ; ++i )
          {
             BOOST_CHECK( db.head_block_id() == b.id() );
             //witness_id_type prev_witness = b.witness;
@@ -146,16 +147,20 @@ BOOST_AUTO_TEST_CASE( generate_empty_blocks )
             //BOOST_CHECK( cur_witness != prev_witness );
             b = db.generate_block(db.get_slot_time(1), cur_witness, init_account_priv_key, database::skip_nothing);
             BOOST_CHECK( b.witness == cur_witness );
-            if( i == 199 )
-               b200 = b;
+            uint32_t cutoff_height = db.get_dynamic_global_properties().last_irreversible_block_num;
+            if( cutoff_height >= 200 )
+            {
+               cutoff_block = *(db.fetch_block_by_number( cutoff_height ));
+               break;
+            }
          }
          db.close();
       }
       {
          database db;
          db.open(data_dir.path(), []{return genesis_state_type();});
-         BOOST_CHECK_EQUAL( db.head_block_num(), 200 );
-         b = b200;
+         BOOST_CHECK_EQUAL( db.head_block_num(), cutoff_block.block_num() );
+         b = cutoff_block;
          for( uint32_t i = 0; i < 200; ++i )
          {
             BOOST_CHECK( db.head_block_id() == b.id() );
@@ -164,7 +169,7 @@ BOOST_AUTO_TEST_CASE( generate_empty_blocks )
             //BOOST_CHECK( cur_witness != prev_witness );
             b = db.generate_block(db.get_slot_time(1), cur_witness, init_account_priv_key, database::skip_nothing);
          }
-         BOOST_CHECK_EQUAL( db.head_block_num(), 400 );
+         BOOST_CHECK_EQUAL( db.head_block_num(), cutoff_block.block_num()+200 );
       }
    } catch (fc::exception& e) {
       edump((e.to_detail_string()));
