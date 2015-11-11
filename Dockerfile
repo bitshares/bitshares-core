@@ -17,6 +17,6 @@ ADD docker/launch /launch
 RUN chmod a+x /launch
 VOLUME /data_dir
 
-EXPOSE 8091 9090
+EXPOSE 8090 9090
 
 ENTRYPOINT ["/launch"]
