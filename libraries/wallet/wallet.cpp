@@ -849,13 +849,17 @@ public:
                                        public_key_type active,
                                        string  registrar_account,
                                        string  referrer_account,
-                                       uint8_t referrer_percent,
+                                       uint32_t referrer_percent,
                                        bool broadcast = false)
    { try {
       FC_ASSERT( !self.is_locked() );
       FC_ASSERT( is_valid_name(name) );
       account_create_operation account_create_op;
 
+      // #449 referrer_percent is on 0-100 scale, if user has larger
+      // number it means their script is using GRAPHENE_100_PERCENT scale
+      // instead of 0-100 scale.
+      FC_ASSERT( referrer_percent <= 100 );
       // TODO:  process when pay_from_account is ID
 
       account_object registrar_account_object =
@@ -867,7 +871,7 @@ public:
       account_object referrer_account_object =
             this->get_account( referrer_account );
       account_create_op.referrer = referrer_account_object.id;
-      account_create_op.referrer_percent = referrer_percent;
+      account_create_op.referrer_percent = uint16_t( referrer_percent * GRAPHENE_1_PERCENT );
 
       account_create_op.registrar = registrar_account_id;
       account_create_op.name = name;
@@ -2876,7 +2880,7 @@ signed_transaction wallet_api::register_account(string name,
                                                 public_key_type active_pubkey,
                                                 string  registrar_account,
                                                 string  referrer_account,
-                                                uint8_t referrer_percent,
+                                                uint32_t referrer_percent,
                                                 bool broadcast)
 {
    return my->register_account( name, owner_pubkey, active_pubkey, registrar_account, referrer_account, referrer_percent, broadcast );
