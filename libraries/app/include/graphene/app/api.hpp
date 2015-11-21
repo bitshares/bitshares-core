@@ -139,7 +139,7 @@ namespace graphene { namespace app {
          /**
           * @brief Return general network information, such as p2p port
           */
-         fc::variant get_info() const;
+         fc::variant_object get_info() const;
 
          /**
           * @brief add_node Connect to a new peer
