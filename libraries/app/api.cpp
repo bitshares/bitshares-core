@@ -141,11 +141,11 @@ namespace graphene { namespace app {
     {
     }
 
-    fc::variant network_node_api::get_info() const
+    fc::variant_object network_node_api::get_info() const
     {
-        fc::mutable_variant_object result = _app.p2p_node()->network_get_info();
-        result["connection_count"] = _app.p2p_node()->get_connection_count();
-        return result;
+       fc::mutable_variant_object result = _app.p2p_node()->network_get_info();
+       result["connection_count"] = _app.p2p_node()->get_connection_count();
+       return result;
     }
 
     void network_node_api::add_node(const fc::ip::endpoint& ep)
@@ -155,7 +155,22 @@ namespace graphene { namespace app {
 
     std::vector<net::peer_status> network_node_api::get_connected_peers() const
     {
-      return _app.p2p_node()->get_connected_peers();
+       return _app.p2p_node()->get_connected_peers();
+    }
+
+    std::vector<net::potential_peer_record> network_node_api::get_potential_peers() const
+    {
+       return _app.p2p_node()->get_potential_peers();
+    }
+
+    fc::variant_object network_node_api::get_advanced_node_parameters() const
+    {
+       return _app.p2p_node()->get_advanced_node_parameters();
+    }
+
+    void network_node_api::set_advanced_node_parameters(const fc::variant_object& params)
+    {
+       return _app.p2p_node()->set_advanced_node_parameters(params);
     }
 
     fc::api<network_broadcast_api> login_api::network_broadcast()const

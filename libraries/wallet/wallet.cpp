@@ -27,6 +27,10 @@
 #include <string>
 #include <list>
 
+#include <boost/version.hpp>
+#include <boost/lexical_cast.hpp>
+#include <boost/algorithm/string/replace.hpp>
+
 #include <boost/range/adaptor/map.hpp>
 #include <boost/range/algorithm_ext/erase.hpp>
 #include <boost/range/algorithm/unique.hpp>
@@ -41,6 +45,7 @@
 #include <boost/multi_index/sequenced_index.hpp>
 #include <boost/multi_index/hashed_index.hpp>
 
+#include <fc/git_revision.hpp>
 #include <fc/io/fstream.hpp>
 #include <fc/io/json.hpp>
 #include <fc/io/stdio.hpp>
@@ -55,6 +60,7 @@
 #include <graphene/app/api.hpp>
 #include <graphene/chain/asset_object.hpp>
 #include <graphene/chain/protocol/fee_schedule.hpp>
+#include <graphene/utilities/git_revision.hpp>
 #include <graphene/utilities/key_conversion.hpp>
 #include <graphene/utilities/words.hpp>
 #include <graphene/wallet/wallet.hpp>
@@ -506,6 +512,41 @@ public:
       result["active_committee_members"] = global_props.active_committee_members;
       return result;
    }
+
+   variant_object about() const
+   {
+      string client_version( graphene::utilities::git_revision_description );
+      const size_t pos = client_version.find( '/' );
+      if( pos != string::npos && client_version.size() > pos )
+         client_version = client_version.substr( pos + 1 );
+
+      fc::mutable_variant_object result;
+      //result["blockchain_name"]        = BLOCKCHAIN_NAME;
+      //result["blockchain_description"] = BTS_BLOCKCHAIN_DESCRIPTION;
+      result["client_version"]           = client_version;
+      result["graphene_revision"]        = graphene::utilities::git_revision_sha;
+      result["graphene_revision_age"]    = fc::get_approximate_relative_time_string( fc::time_point_sec( graphene::utilities::git_revision_unix_timestamp ) );
+      result["fc_revision"]              = fc::git_revision_sha;
+      result["fc_revision_age"]          = fc::get_approximate_relative_time_string( fc::time_point_sec( fc::git_revision_unix_timestamp ) );
+      result["compile_date"]             = "compiled on " __DATE__ " at " __TIME__;
+      result["boost_version"]            = boost::replace_all_copy(std::string(BOOST_LIB_VERSION), "_", ".");
+      result["openssl_version"]          = OPENSSL_VERSION_TEXT;
+
+      std::string bitness = boost::lexical_cast<std::string>(8 * sizeof(int*)) + "-bit";
+#if defined(__APPLE__)
+      std::string os = "osx";
+#elif defined(__linux__)
+      std::string os = "linux";
+#elif defined(_MSC_VER)
+      std::string os = "win32";
+#else
+      std::string os = "other";
+#endif
+      result["build"] = os + " " + bitness;
+
+      return result;
+   }
+
    chain_property_object get_chain_properties() const
    {
       return _remote_db->get_chain_properties();
@@ -2864,6 +2905,11 @@ string wallet_api::normalize_brain_key(string s) const
 variant wallet_api::info()
 {
    return my->info();
+}
+
+variant_object wallet_api::about() const
+{
+    return my->about();
 }
 
 fc::ecc::private_key wallet_api::derive_private_key(const std::string& prefix_string, int sequence_number) const

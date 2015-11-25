@@ -139,7 +139,7 @@ namespace graphene { namespace app {
          /**
           * @brief Return general network information, such as p2p port
           */
-         fc::variant get_info() const;
+         fc::variant_object get_info() const;
 
          /**
           * @brief add_node Connect to a new peer
@@ -149,8 +149,26 @@ namespace graphene { namespace app {
 
          /**
           * @brief Get status of all current connections to peers
-           */
+          */
          std::vector<net::peer_status> get_connected_peers() const;
+
+         /**
+          * @brief Get advanced node parameters, such as desired and max
+          *        number of connections
+          */
+         fc::variant_object get_advanced_node_parameters() const;
+
+         /**
+          * @brief Set advanced node parameters, such as desired and max
+          *        number of connections
+          * @param params a JSON object containing the name/value pairs for the parameters to set
+          */
+         void set_advanced_node_parameters(const fc::variant_object& params);
+
+         /**
+          * @brief Return list of potential peers
+          */
+         std::vector<net::potential_peer_record> get_potential_peers() const;
 
       private:
          application& _app;
@@ -217,6 +235,9 @@ FC_API(graphene::app::network_node_api,
        (get_info)
        (add_node)
        (get_connected_peers)
+       (get_potential_peers)
+       (get_advanced_node_parameters)
+       (set_advanced_node_parameters)
      )
 FC_API(graphene::app::login_api,
        (login)
