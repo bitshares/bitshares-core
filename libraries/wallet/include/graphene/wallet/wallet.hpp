@@ -274,6 +274,10 @@ class wallet_api
       fc::ecc::private_key derive_private_key(const std::string& prefix_string, int sequence_number) const;
 
       variant                           info();
+      /** Returns info such as client version, git version of graphene/fc, version of boost, openssl.
+       * @returns compile time info and client and dependencies versions
+       */
+      variant_object                    about() const;
       optional<signed_block_with_info>    get_block( uint32_t num );
       /** Returns the number of accounts registered on the blockchain
        * @returns the number of registered accounts
@@ -1462,6 +1466,7 @@ FC_API( graphene::wallet::wallet_api,
         (help)
         (gethelp)
         (info)
+        (about)
         (begin_builder_transaction)
         (add_operation_to_builder_transaction)
         (replace_operation_in_builder_transaction)
