@@ -225,7 +225,7 @@ struct database_fixture {
                                                  const account_object& issuer,
                                                  uint16_t flags );
    void issue_uia( const account_object& recipient, asset amount );
-
+   void issue_uia( account_id_type recipient_id, asset amount );
 
    const account_object& create_account(
       const string& name,
@@ -263,6 +263,7 @@ struct database_fixture {
    void transfer( const account_object& from, const account_object& to, const asset& amount, const asset& fee = asset() );
    void fund_fee_pool( const account_object& from, const asset_object& asset_to_fund, const share_type amount );
    void enable_fees();
+   void change_fees( const flat_set< fee_parameters >& new_params, uint32_t new_scale = 0 );
    void upgrade_to_lifetime_member( account_id_type account );
    void upgrade_to_lifetime_member( const account_object& account );
    void upgrade_to_annual_member( account_id_type account );

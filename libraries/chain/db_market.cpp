@@ -115,6 +115,7 @@ void database::cancel_order( const limit_order_object& order, bool create_virtua
       }
    });
    adjust_balance(order.seller, refunded);
+   adjust_balance(order.seller, order.deferred_fee);
 
    if( create_virtual_op )
    {
@@ -272,6 +273,15 @@ bool database::fill_order( const limit_order_object& order, const asset& pays, c
    assert( pays.asset_id != receives.asset_id );
    push_applied_operation( fill_order_operation( order.id, order.seller, pays, receives, issuer_fees ) );
 
+   // conditional because cheap integer comparison may allow us to avoid two expensive modify() and object lookups
+   if( order.deferred_fee > 0 )
+   {
+      modify( seller.statistics(*this), [&]( account_statistics_object& statistics )
+      {
+         statistics.pay_fee( order.deferred_fee, get_global_properties().parameters.cashback_vesting_threshold );
+      } );
+   }
+
    if( pays == order.amount_for_sale() )
    {
       remove( order );
@@ -281,6 +291,7 @@ bool database::fill_order( const limit_order_object& order, const asset& pays, c
    {
       modify( order, [&]( limit_order_object& b ) {
                              b.for_sale -= pays.amount;
+                             b.deferred_fee = 0;
                           });
       /**
        *  There are times when the AMOUNT_FOR_SALE * SALE_PRICE == 0 which means that we
