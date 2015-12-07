@@ -275,6 +275,7 @@ void_result account_upgrade_evaluator::do_apply(const account_upgrade_evaluator:
          // Upgrade from basic account.
          a.statistics(d).process_fees(a, d);
          assert(a.is_basic_account(d.head_block_time()));
+         a.referrer = a.get_id();
          a.membership_expiration_date = d.head_block_time() + fc::days(365);
       }
    });
