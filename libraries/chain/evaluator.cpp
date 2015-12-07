@@ -74,18 +74,25 @@ database& generic_evaluator::db()const { return trx_state->db(); }
       }
    }
 
-   void generic_evaluator::pay_fee()
-   { try {
+   void generic_evaluator::convert_fee()
+   {
       if( fee_asset->get_id() != asset_id_type() )
+      {
          db().modify(*fee_asset_dyn_data, [this](asset_dynamic_data_object& d) {
             d.accumulated_fees += fee_from_account.amount;
             d.fee_pool -= core_fee_paid;
          });
-      db().modify(*fee_paying_account_statistics, [&](account_statistics_object& s) {
-         if( core_fee_paid > db().get_global_properties().parameters.cashback_vesting_threshold )
-            s.pending_fees += core_fee_paid;
-         else
-            s.pending_vested_fees += core_fee_paid;
+      }
+      return;
+   }
+
+   void generic_evaluator::pay_fee()
+   { try {
+      database& d = db();
+      /// TODO: db().pay_fee( account_id, core_fee );
+      d.modify(*fee_paying_account_statistics, [&](account_statistics_object& s)
+      {
+         s.pay_fee( core_fee_paid, d.get_global_properties().parameters.cashback_vesting_threshold );
       });
    } FC_CAPTURE_AND_RETHROW() }
 

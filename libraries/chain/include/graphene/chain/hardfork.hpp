@@ -28,3 +28,7 @@
 #define HARDFORK_416_TIME (fc::time_point_sec( 1446652800 ))
 #define HARDFORK_419_TIME (fc::time_point_sec( 1446652800 ))
 #define HARDFORK_436_TIME (fc::time_point_sec( 2000000000 ))
+
+// #445 Refund create order fees on cancel
+// 2015-12-02 17:00:00 UTC / 12:00:00 EST
+#define HARDFORK_445_TIME (fc::time_point_sec( 1449075600 ))
