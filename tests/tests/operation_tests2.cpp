@@ -1229,6 +1229,11 @@ BOOST_AUTO_TEST_CASE(zero_second_vbo)
       upgrade_to_lifetime_member(alice_id);
       generate_block();
 
+      // Wait for a maintenance interval to ensure we have a full day's budget to work with.
+      // Otherwise we may not have enough to feed the witnesses and the worker will end up starved if we start late in the day.
+      generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+      generate_block();
+
       auto check_vesting_1b = [&](vesting_balance_id_type vbid)
       {
          // this function checks that Alice can't draw any right now,
@@ -1304,8 +1309,6 @@ BOOST_AUTO_TEST_CASE(zero_second_vbo)
 
          // vote it in, wait for one maint. for vote to take effect
          vesting_balance_id_type vbid = wid(db).worker.get<vesting_balance_worker_type>().balance;
-         generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
-         generate_block();
          // wait for another maint. for worker to be paid
          generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
          BOOST_CHECK( vbid(db).get_allowed_withdraw(db.head_block_time()) == asset(0) );
