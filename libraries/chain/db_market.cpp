@@ -23,6 +23,7 @@
 
 #include <graphene/chain/account_object.hpp>
 #include <graphene/chain/asset_object.hpp>
+#include <graphene/chain/hardfork.hpp>
 #include <graphene/chain/market_evaluator.hpp>
 
 #include <fc/uint128.hpp>
@@ -115,6 +116,7 @@ void database::cancel_order( const limit_order_object& order, bool create_virtua
       }
    });
    adjust_balance(order.seller, refunded);
+   adjust_balance(order.seller, order.deferred_fee);
 
    if( create_virtual_op )
    {
@@ -272,6 +274,15 @@ bool database::fill_order( const limit_order_object& order, const asset& pays, c
    assert( pays.asset_id != receives.asset_id );
    push_applied_operation( fill_order_operation( order.id, order.seller, pays, receives, issuer_fees ) );
 
+   // conditional because cheap integer comparison may allow us to avoid two expensive modify() and object lookups
+   if( order.deferred_fee > 0 )
+   {
+      modify( seller.statistics(*this), [&]( account_statistics_object& statistics )
+      {
+         statistics.pay_fee( order.deferred_fee, get_global_properties().parameters.cashback_vesting_threshold );
+      } );
+   }
+
    if( pays == order.amount_for_sale() )
    {
       remove( order );
@@ -281,6 +292,7 @@ bool database::fill_order( const limit_order_object& order, const asset& pays, c
    {
       modify( order, [&]( limit_order_object& b ) {
                              b.for_sale -= pays.amount;
+                             b.deferred_fee = 0;
                           });
       /**
        *  There are times when the AMOUNT_FOR_SALE * SALE_PRICE == 0 which means that we
@@ -416,15 +428,8 @@ bool database::check_call_orders(const asset_object& mia, bool enable_black_swan
     auto limit_itr = limit_price_index.lower_bound( max_price );
     auto limit_end = limit_price_index.upper_bound( min_price );
 
-    if( limit_itr == limit_end ) {
-       /*
-       if( head_block_num() > 300000 )
-          ilog( "no orders below between: ${p}  and: ${m}", 
-                ("p", bitasset.current_feed.max_short_squeeze_price())
-                ("m", max_price) );
-      */
+    if( limit_itr == limit_end )
        return false;
-    }
 
     auto call_min = price::min( bitasset.options.short_backing_asset, mia.id );
     auto call_max = price::max( bitasset.options.short_backing_asset, mia.id );
@@ -433,14 +438,6 @@ bool database::check_call_orders(const asset_object& mia, bool enable_black_swan
 
     bool filled_limit = false;
     bool margin_called = false;
-
-    /*
-    if( head_block_num() >= 11510  && head_block_num() <= 11512) {
-       idump(("enter loop") );
-       auto tmp = call_itr;
-       while( tmp != call_end ) { edump( (*tmp) ); ++tmp; }
-    }
-    */
 
     while( !check_for_blackswan( mia, enable_black_swan ) && call_itr != call_end )
     {
@@ -457,8 +454,21 @@ bool database::check_call_orders(const asset_object& mia, bool enable_black_swan
 
        match_price.validate();
 
+       // would be margin called, but there is no matching order #436
+       bool feed_protected = ( bitasset.current_feed.settlement_price > ~call_itr->call_price );
+       if( feed_protected && (head_block_time() > HARDFORK_436_TIME) )
+          return margin_called;
+
+       // would be margin called, but there is no matching order
        if( match_price > ~call_itr->call_price )
           return margin_called;
+
+       if( feed_protected )
+       {
+          ilog( "Feed protected margin call executing (HARDFORK_436_TIME not here yet)" );
+          idump( (*call_itr) );
+          idump( (*limit_itr) );
+       }
 
      //  idump((*call_itr));
      //  idump((*limit_itr));

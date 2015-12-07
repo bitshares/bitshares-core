@@ -274,6 +274,10 @@ class wallet_api
       fc::ecc::private_key derive_private_key(const std::string& prefix_string, int sequence_number) const;
 
       variant                           info();
+      /** Returns info such as client version, git version of graphene/fc, version of boost, openssl.
+       * @returns compile time info and client and dependencies versions
+       */
+      variant_object                    about() const;
       optional<signed_block_with_info>    get_block( uint32_t num );
       /** Returns the number of accounts registered on the blockchain
        * @returns the number of registered accounts
@@ -620,8 +624,9 @@ class wallet_api
        *                         portion of the user's transaction fees.  This can be the
        *                         same as the registrar_account if there is no referrer.
        * @param referrer_percent the percentage (0 - 100) of the new user's transaction fees
-       *                         not claimed by the blockchain that will be distributed to the 
-       *                         referrer; the rest will be sent to the registrar
+       *                         not claimed by the blockchain that will be distributed to the
+       *                         referrer; the rest will be sent to the registrar.  Will be
+       *                         multiplied by GRAPHENE_1_PERCENT when constructing the transaction.
        * @param broadcast true to broadcast the transaction on the network
        * @returns the signed transaction registering the account
        */
@@ -630,7 +635,7 @@ class wallet_api
                                           public_key_type active,
                                           string  registrar_account,
                                           string  referrer_account,
-                                          uint8_t referrer_percent,
+                                          uint32_t referrer_percent,
                                           bool broadcast = false);
 
       /**
@@ -846,6 +851,14 @@ class wallet_api
        */
       signed_transaction borrow_asset(string borrower_name, string amount_to_borrow, string asset_symbol,
                                       string amount_of_collateral, bool broadcast = false);
+
+      /** Cancel an existing order
+       *
+       * @param order_id the id of order to be cancelled
+       * @param broadcast true to broadcast the transaction on the network
+       * @returns the signed transaction canceling the order
+       */
+      signed_transaction cancel_order(object_id_type order_id, bool broadcast = false);
 
       /** Creates a new user-issued or market-issued asset.
        *
@@ -1462,6 +1475,7 @@ FC_API( graphene::wallet::wallet_api,
         (help)
         (gethelp)
         (info)
+        (about)
         (begin_builder_transaction)
         (add_operation_to_builder_transaction)
         (replace_operation_in_builder_transaction)
@@ -1488,6 +1502,7 @@ FC_API( graphene::wallet::wallet_api,
         (create_account_with_brain_key)
         (sell_asset)
         (borrow_asset)
+        (cancel_order)
         (transfer)
         (transfer2)
         (get_transaction_id)

@@ -128,6 +128,14 @@ void account_statistics_object::process_fees(const account_object& a, database& 
    }
 }
 
+void account_statistics_object::pay_fee( share_type core_fee, share_type cashback_vesting_threshold )
+{
+   if( core_fee > cashback_vesting_threshold )
+      pending_fees += core_fee;
+   else
+      pending_vested_fees += core_fee;
+}
+
 void account_object::options_type::validate() const
 {
    auto needed_witnesses = num_witness;

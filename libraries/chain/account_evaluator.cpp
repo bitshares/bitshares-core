@@ -20,10 +20,13 @@
  */
 
 #include <fc/smart_ref_impl.hpp>
+
+#include <graphene/chain/account_evaluator.hpp>
 #include <graphene/chain/database.hpp>
 #include <graphene/chain/exceptions.hpp>
+#include <graphene/chain/hardfork.hpp>
 #include <graphene/chain/internal_exceptions.hpp>
-#include <graphene/chain/account_evaluator.hpp>
+
 #include <algorithm>
 
 namespace graphene { namespace chain {
@@ -95,6 +98,26 @@ void_result account_create_evaluator::do_evaluate( const account_create_operatio
 
 object_id_type account_create_evaluator::do_apply( const account_create_operation& o )
 { try {
+
+   uint16_t referrer_percent = o.referrer_percent;
+   bool has_small_percent = (
+         (db().head_block_time() <= HARDFORK_453_TIME)
+      && (o.referrer != o.registrar  )
+      && (o.referrer_percent != 0    )
+      && (o.referrer_percent <= 0x100)
+      );
+
+   if( has_small_percent )
+   {
+      if( referrer_percent >= 100 )
+      {
+         wlog( "between 100% and 0x100%:  ${o}", ("o", o) );
+      }
+      referrer_percent = referrer_percent*100;
+      if( referrer_percent > GRAPHENE_100_PERCENT )
+         referrer_percent = GRAPHENE_100_PERCENT;
+   }
+
    const auto& new_acnt_object = db().create<account_object>( [&]( account_object& obj ){
          obj.registrar = o.registrar;
          obj.referrer = o.referrer;
@@ -103,7 +126,7 @@ object_id_type account_create_evaluator::do_apply( const account_create_operatio
          auto& params = db().get_global_properties().parameters;
          obj.network_fee_percentage = params.network_percent_of_fee;
          obj.lifetime_referrer_fee_percentage = params.lifetime_referrer_percent_of_fee;
-         obj.referrer_rewards_percentage = o.referrer_percent;
+         obj.referrer_rewards_percentage = referrer_percent;
 
          obj.name             = o.name;
          obj.owner            = o.owner;
@@ -111,6 +134,15 @@ object_id_type account_create_evaluator::do_apply( const account_create_operatio
          obj.options          = o.options;
          obj.statistics = db().create<account_statistics_object>([&](account_statistics_object& s){s.owner = obj.id;}).id;
    });
+
+   if( has_small_percent )
+   {
+      wlog( "Account affected by #453 registered in block ${n}:  ${na} reg=${reg} ref=${ref}:${refp} ltr=${ltr}:${ltrp}",
+         ("n", db().head_block_num()) ("na", new_acnt_object.id)
+         ("reg", o.registrar) ("ref", o.referrer) ("ltr", new_acnt_object.lifetime_referrer)
+         ("refp", new_acnt_object.referrer_rewards_percentage) ("ltrp", new_acnt_object.lifetime_referrer_fee_percentage) );
+      wlog( "Affected account object is ${o}", ("o", new_acnt_object) );
+   }
 
    const auto& dynamic_properties = db().get_dynamic_global_properties();
    db().modify(dynamic_properties, [](dynamic_global_property_object& p) {
@@ -243,6 +275,7 @@ void_result account_upgrade_evaluator::do_apply(const account_upgrade_evaluator:
          // Upgrade from basic account.
          a.statistics(d).process_fees(a, d);
          assert(a.is_basic_account(d.head_block_time()));
+         a.referrer = a.get_id();
          a.membership_expiration_date = d.head_block_time() + fc::days(365);
       }
    });

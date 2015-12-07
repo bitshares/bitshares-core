@@ -22,6 +22,7 @@
 #include <fc/smart_ref_impl.hpp>
 #include <fc/uint128.hpp>
 #include <graphene/chain/hardfork.hpp>
+#include <graphene/chain/market_evaluator.hpp>
 #include <graphene/chain/vesting_balance_object.hpp>
 
 #include <boost/test/unit_test.hpp>
@@ -163,6 +164,7 @@ BOOST_AUTO_TEST_CASE(asset_claim_fees_test)
 
       }
 
+      if( db.head_block_time() <= HARDFORK_413_TIME )
       {
          // can't claim before hardfork
          GRAPHENE_REQUIRE_THROW( claim_fees( izzy_id, _izzy(1) ), fc::exception );
@@ -590,5 +592,130 @@ BOOST_AUTO_TEST_CASE( account_create_fee_scaling )
    generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
    BOOST_CHECK_EQUAL(db.get_global_properties().parameters.current_fees->get<account_create_operation>().basic_fee, 1);
 } FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE( fee_refund_test )
+{
+   try
+   {
+      ACTORS((alice)(bob)(izzy));
+
+      int64_t alice_b0 = 1000000, bob_b0 = 1000000;
+
+      transfer( account_id_type(), alice_id, asset(alice_b0) );
+      transfer( account_id_type(), bob_id, asset(bob_b0) );
+
+      asset_id_type core_id = asset_id_type();
+      asset_id_type usd_id = create_user_issued_asset( "IZZYUSD", izzy_id(db), charge_market_fee ).id;
+      issue_uia( alice_id, asset( alice_b0, usd_id ) );
+      issue_uia( bob_id, asset( bob_b0, usd_id ) );
+
+      int64_t order_create_fee = 537;
+      int64_t order_cancel_fee = 129;
+
+      generate_block();
+
+      for( int i=0; i<2; i++ )
+      {
+         if( i == 1 )
+         {
+            generate_blocks( HARDFORK_445_TIME );
+            generate_block();
+         }
+
+         // enable_fees() and change_fees() modifies DB directly, and results will be overwritten by block generation
+         // so we have to do it every time we stop generating/popping blocks and start doing tx's
+         enable_fees();
+         /*
+         change_fees({
+                       limit_order_create_operation::fee_parameters_type { order_create_fee },
+                       limit_order_cancel_operation::fee_parameters_type { order_cancel_fee }
+                     });
+         */
+         // C++ -- The above commented out statement doesn't work, I don't know why
+         // so we will use the following rather lengthy initialization instead
+         {
+            flat_set< fee_parameters > new_fees;
+            {
+               limit_order_create_operation::fee_parameters_type create_fee_params;
+               create_fee_params.fee = order_create_fee;
+               new_fees.insert( create_fee_params );
+            }
+            {
+               limit_order_cancel_operation::fee_parameters_type cancel_fee_params;
+               cancel_fee_params.fee = order_cancel_fee;
+               new_fees.insert( cancel_fee_params );
+            }
+            change_fees( new_fees );
+         }
+
+         // Alice creates order
+         // Bob creates order which doesn't match
+
+         // AAAAGGHH create_sell_order reads trx.expiration #469
+         set_expiration( db, trx );
+
+         // Check non-overlapping
+
+         limit_order_id_type ao1_id = create_sell_order( alice_id, asset(1000), asset(1000, usd_id) )->id;
+         limit_order_id_type bo1_id = create_sell_order(   bob_id, asset(500, usd_id), asset(1000) )->id;
+
+         BOOST_CHECK_EQUAL( get_balance( alice_id, core_id ), alice_b0 - 1000 - order_create_fee );
+         BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_b0 );
+         BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_b0 - order_create_fee );
+         BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_b0 - 500 );
+
+         // Bob cancels order
+         cancel_limit_order( bo1_id(db) );
+
+         int64_t cancel_net_fee;
+         if( db.head_block_time() >= HARDFORK_445_TIME )
+            cancel_net_fee = order_cancel_fee;
+         else
+            cancel_net_fee = order_create_fee + order_cancel_fee;
+
+         BOOST_CHECK_EQUAL( get_balance( alice_id, core_id ), alice_b0 - 1000 - order_create_fee );
+         BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_b0 );
+         BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_b0 - cancel_net_fee );
+         BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_b0 );
+
+         // Alice cancels order
+         cancel_limit_order( ao1_id(db) );
+
+         BOOST_CHECK_EQUAL( get_balance( alice_id, core_id ), alice_b0 - cancel_net_fee );
+         BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_b0 );
+         BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_b0 - cancel_net_fee );
+         BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_b0 );
+
+         // Check partial fill
+         const limit_order_object* ao2 = create_sell_order( alice_id, asset(1000), asset(200, usd_id) );
+         const limit_order_object* bo2 = create_sell_order(   bob_id, asset(100, usd_id), asset(500) );
+
+         BOOST_CHECK( ao2 != nullptr );
+         BOOST_CHECK( bo2 == nullptr );
+
+         BOOST_CHECK_EQUAL( get_balance( alice_id, core_id ), alice_b0 - cancel_net_fee - order_create_fee - 1000 );
+         BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_b0 + 100 );
+         BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ),   bob_b0 - cancel_net_fee - order_create_fee + 500 );
+         BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ),   bob_b0 - 100 );
+
+         // cancel Alice order, show that entire deferred_fee was consumed by partial match
+         cancel_limit_order( *ao2 );
+
+         BOOST_CHECK_EQUAL( get_balance( alice_id, core_id ), alice_b0 - cancel_net_fee - order_create_fee - 500 - order_cancel_fee );
+         BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_b0 + 100 );
+         BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ),   bob_b0 - cancel_net_fee - order_create_fee + 500 );
+         BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ),   bob_b0 - 100 );
+
+         // TODO: Check multiple fill
+         // there really should be a test case involving Alice creating multiple orders matched by single Bob order
+         // but we'll save that for future cleanup
+
+         // undo above tx's and reset
+         generate_block();
+         db.pop_block();
+      }
+   }
+   FC_LOG_AND_RETHROW()
+}
 
 BOOST_AUTO_TEST_SUITE_END()

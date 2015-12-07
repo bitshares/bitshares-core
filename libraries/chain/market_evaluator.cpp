@@ -18,12 +18,14 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  */
-#include <graphene/chain/market_evaluator.hpp>
 #include <graphene/chain/account_object.hpp>
 #include <graphene/chain/exceptions.hpp>
 #include <graphene/chain/hardfork.hpp>
+#include <graphene/chain/market_evaluator.hpp>
+
 #include <fc/smart_ref_impl.hpp>
 #include <graphene/chain/protocol/fee_schedule.hpp>
+
 #include <fc/uint128.hpp>
 
 namespace graphene { namespace chain {
@@ -59,6 +61,14 @@ void_result limit_order_create_evaluator::do_evaluate(const limit_order_create_o
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (op) ) }
 
+void limit_order_create_evaluator::pay_fee()
+{
+   if( db().head_block_time() <= HARDFORK_445_TIME )
+      generic_evaluator::pay_fee();
+   else
+      _deferred_fee = core_fee_paid;
+}
+
 object_id_type limit_order_create_evaluator::do_apply(const limit_order_create_operation& op)
 { try {
    const auto& seller_stats = _seller->statistics(db());
@@ -76,6 +86,7 @@ object_id_type limit_order_create_evaluator::do_apply(const limit_order_create_o
        obj.for_sale = op.amount_to_sell.amount;
        obj.sell_price = op.get_price();
        obj.expiration = op.expiration;
+       obj.deferred_fee = _deferred_fee;
    });
    limit_order_id_type order_id = new_order_object.id; // save this because we may remove the object by filling it
    bool filled = db().apply_order(new_order_object);
@@ -102,31 +113,6 @@ asset limit_order_cancel_evaluator::do_apply(const limit_order_cancel_operation&
    auto base_asset = _order->sell_price.base.asset_id;
    auto quote_asset = _order->sell_price.quote.asset_id;
    auto refunded = _order->amount_for_sale();
-
-   if( d.head_block_time() > HARDFORK_393_TIME )
-   {
-      const auto& fees = d.current_fee_schedule();
-      asset create_fee = fees.calculate_fee( limit_order_create_operation() );
-
-      // then the create fee was only the network fee and not the
-      // full create_fee
-      const auto& gprops = d.get_global_properties();
-      auto cashback_percent = GRAPHENE_100_PERCENT - gprops.parameters.network_percent_of_fee;
-      auto cashback_amount = (create_fee.amount * cashback_percent) / GRAPHENE_100_PERCENT;
-      create_fee.amount -= cashback_amount;
-
-      const auto& core_asset_data = asset_id_type(0)(d).dynamic_asset_data_id(d);
-      d.modify( core_asset_data, [&]( asset_dynamic_data_object& addo ) {
-          addo.accumulated_fees -= create_fee.amount;
-      });
-
-      /** NOTE: this will adjust the users account balance in a way that cannot be derived entirely
-       * from the operation history.  Consider paying this into cashback rewards, except not all
-       * accounts have a cashback vesting balance object.
-       */
-      d.adjust_balance( o.fee_paying_account, create_fee );
-   }
-
 
    d.cancel_order(*_order, false /* don't create a virtual op*/);
 

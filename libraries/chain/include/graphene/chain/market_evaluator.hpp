@@ -45,6 +45,7 @@ namespace graphene { namespace chain {
         account_id_type  seller;
         share_type       for_sale; ///< asset id is sell_price.base.asset_id
         price            sell_price;
+        share_type       deferred_fee;
 
         pair<asset_id_type,asset_id_type> get_market()const
         {
@@ -189,6 +190,12 @@ namespace graphene { namespace chain {
 
          asset calculate_market_fee( const asset_object* aobj, const asset& trade_amount );
 
+         /** override the default behavior defined by generic_evalautor which is to
+          * post the fee to fee_paying_account_stats.pending_fees
+          */
+         virtual void pay_fee() override;
+
+         share_type                          _deferred_fee  = 0;
          const limit_order_create_operation* _op            = nullptr;
          const account_object*               _seller        = nullptr;
          const asset_object*                 _sell_asset    = nullptr;
@@ -225,7 +232,7 @@ namespace graphene { namespace chain {
 
 FC_REFLECT_DERIVED( graphene::chain::limit_order_object,
                     (graphene::db::object),
-                    (expiration)(seller)(for_sale)(sell_price)
+                    (expiration)(seller)(for_sale)(sell_price)(deferred_fee)
                   )
 
 FC_REFLECT_DERIVED( graphene::chain::call_order_object, (graphene::db::object),
