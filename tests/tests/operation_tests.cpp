@@ -23,6 +23,7 @@
 
 #include <graphene/chain/database.hpp>
 #include <graphene/chain/exceptions.hpp>
+#include <graphene/chain/hardfork.hpp>
 
 #include <graphene/chain/account_object.hpp>
 #include <graphene/chain/asset_object.hpp>
@@ -192,14 +193,25 @@ BOOST_AUTO_TEST_CASE( margin_call_limit_test )
       // protection threshold.
       BOOST_TEST_MESSAGE( "Creating a margin call that is NOT protected by the max short squeeze price" );
       auto order = create_sell_order( borrower2, bitusd.amount(1000), core.amount(1400) );
-      BOOST_REQUIRE( order == nullptr );
+      if( db.head_block_time() <= HARDFORK_436_TIME )
+      {
+         BOOST_REQUIRE( order == nullptr );
 
-      BOOST_REQUIRE_EQUAL( get_balance( borrower2, core ), init_balance - 4000 + 1400 );
-      BOOST_REQUIRE_EQUAL( get_balance( borrower2, bitusd ), 0 );
+         BOOST_REQUIRE_EQUAL( get_balance( borrower2, core ), init_balance - 4000 + 1400 );
+         BOOST_REQUIRE_EQUAL( get_balance( borrower2, bitusd ), 0 );
 
-      BOOST_REQUIRE_EQUAL( get_balance( borrower, core ), init_balance - 2000 + 600 );
-      BOOST_REQUIRE_EQUAL( get_balance( borrower, bitusd ), 1000 );
+         BOOST_REQUIRE_EQUAL( get_balance( borrower, core ), init_balance - 2000 + 600 );
+         BOOST_REQUIRE_EQUAL( get_balance( borrower, bitusd ), 1000 );
+      }
+      else
+      {
+         BOOST_REQUIRE( order != nullptr );
 
+         BOOST_REQUIRE_EQUAL( get_balance( borrower, bitusd ), 1000 );
+         BOOST_REQUIRE_EQUAL( get_balance( borrower2, bitusd ), 0 );
+         BOOST_REQUIRE_EQUAL( get_balance( borrower , core ), init_balance - 2000 );
+         BOOST_REQUIRE_EQUAL( get_balance( borrower2, core ), init_balance - 4000 );
+      }
 
       BOOST_TEST_MESSAGE( "Creating a margin call that is protected by the max short squeeze price" );
       borrow( borrower, bitusd.amount(1000), asset(2000) );
