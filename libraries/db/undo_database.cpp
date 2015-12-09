@@ -183,6 +183,8 @@ void undo_database::merge()
          // upd(was=X) + upd(was=Y) -> upd(was=X), type A
          continue;
       }
+      // del+upd -> N/A
+      assert( prev_state.removed.find(obj.second->id) == prev_state.removed.end() );
       // nop+upd(was=Y) -> upd(was=Y), type B
       prev_state.old_values[obj.second->id] = std::move(obj.second);
    }
@@ -217,6 +219,16 @@ void undo_database::merge()
          prev_state.new_ids.erase(obj.second->id);
          continue;
       }
+      auto it = prev_state.old_values.find(obj.second->id);
+      if( it != prev_state.old_values.end() )
+      {
+         // upd(was=X) + del(was=Y) -> del(was=X)
+         prev_state.removed[obj.second->id] = std::move(it->second);
+         prev_state.old_values.erase(obj.second->id);
+         continue;
+      }
+      // del + del -> N/A
+      assert( prev_state.removed.find( obj.second->id ) == prev_state.removed.end() );
       // nop + del(was=Y) -> del(was=Y)
       prev_state.removed[obj.second->id] = std::move(obj.second);
    }
