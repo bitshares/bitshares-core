@@ -105,10 +105,13 @@ void account_history_plugin_impl::update_account_histories( const signed_block& 
             const auto& stats_obj = account_id(db).statistics(db);
             const auto& ath = db.create<account_transaction_history_object>( [&]( account_transaction_history_object& obj ){
                 obj.operation_id = oho.id;
+                obj.account = account_id;
+                obj.sequence = stats_obj.total_ops+1;
                 obj.next = stats_obj.most_recent_op;
             });
             db.modify( stats_obj, [&]( account_statistics_object& obj ){
                 obj.most_recent_op = ath.id;
+                obj.total_ops = ath.sequence;
             });
          }
       }
@@ -133,6 +136,35 @@ void account_history_plugin_impl::update_account_histories( const signed_block& 
    }
 }
 } // end namespace detail
+
+
+struct by_id;
+struct by_seq;
+struct by_op;
+typedef multi_index_container<
+  account_transaction_history_object,
+  indexed_by<
+     ordered_unique< tag<by_id>,
+        member< object, object_id_type, &object::id > >,
+     ordered_unique< tag<by_seq>,
+        composite_key< account_transaction_history_object,
+           member< account_transaction_history_object, account_id_type, &account_transaction_history_object::account>,
+           member< account_transaction_history_object, uint32_t, &account_transaction_history_object::sequence>
+        >
+     >,
+     ordered_unique< tag<by_op>,
+        composite_key< account_transaction_history_object,
+           member< account_transaction_history_object, account_id_type, &account_transaction_history_object::account>,
+           member< account_transaction_history_object, operation_history_id_type, &account_transaction_history_object::operation_id>
+        >
+     >
+  >
+> account_transaction_history_multi_index_type;
+
+typedef generic_index<account_transaction_history_object, account_transaction_history_multi_index_type> account_transaction_history_index;
+
+
+
 
 account_history_plugin::account_history_plugin() :
    my( new detail::account_history_plugin_impl(*this) )
@@ -163,7 +195,7 @@ void account_history_plugin::plugin_initialize(const boost::program_options::var
 {
    database().applied_block.connect( [&]( const signed_block& b){ my->update_account_histories(b); } );
    database().add_index< primary_index< simple_index< operation_history_object > > >();
-   database().add_index< primary_index< simple_index< account_transaction_history_object > > >();
+   database().add_index< primary_index< account_transaction_history_index > >();
 
    LOAD_VALUE_SET(options, "tracked-accounts", my->_tracked_accounts, graphene::chain::account_id_type);
 }

@@ -86,8 +86,13 @@ namespace graphene { namespace chain {
       public:
          static const uint8_t space_id = implementation_ids;
          static const uint8_t type_id  = impl_account_transaction_history_object_type;
+         account_id_type                      account; /// the account this operation applies to
          operation_history_id_type            operation_id;
+         uint32_t                             sequence = 0; /// the operation position within the given account
          account_transaction_history_id_type  next;
+
+         std::pair<account_id_type,operation_history_id_type>  account_op()const  { return std::tie( account, operation_id ); }
+         std::pair<account_id_type,uint32_t>                   account_seq()const { return std::tie( account, sequence );     }
    };
 } } // graphene::chain
 
@@ -95,4 +100,4 @@ FC_REFLECT_DERIVED( graphene::chain::operation_history_object, (graphene::chain:
                     (op)(result)(block_num)(trx_in_block)(op_in_trx)(virtual_op) )
 
 FC_REFLECT_DERIVED( graphene::chain::account_transaction_history_object, (graphene::chain::object),
-                    (operation_id)(next) )
+                    (account)(operation_id)(sequence)(next) )
