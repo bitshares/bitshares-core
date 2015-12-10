@@ -357,6 +357,28 @@ namespace graphene { namespace app {
        }
        return result;
     }
+    
+    vector<operation_history_object> history_api::get_relative_account_history( account_id_type account, uint32_t stop, unsigned limit, uint32_t start) const
+    {
+       FC_ASSERT(_app.chain_database());
+       const auto& db = *_app.chain_database();
+       FC_ASSERT(limit <= 100);
+       vector<operation_history_object> result;
+       if (start == 0)
+         start = account(db).statistics(db).total_ops;
+       const auto& hist_idx = db.get_index_type<account_transaction_history_index>();
+       const auto& by_seq_idx = hist_idx.indices().get<by_seq>();
+       
+       auto itr = by_seq_idx.upper_bound( boost::make_tuple( account, start ) );
+       
+       while ( itr != by_seq_idx.end() && itr->sequence > stop && result.size() < limit )
+       {
+          result.push_back( itr->operation_id(db) );
+          ++itr;
+       }
+       
+       return result;
+    }
 
     flat_set<uint32_t> history_api::get_market_history_buckets()const
     {
