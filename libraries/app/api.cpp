@@ -339,22 +339,24 @@ namespace graphene { namespace app {
     vector<operation_history_object> history_api::get_account_history(account_id_type account, operation_history_id_type stop, unsigned limit, operation_history_id_type start) const
     {
        FC_ASSERT(_app.chain_database());
-       const auto& db = *_app.chain_database();
+       const auto& db = *_app.chain_database();       
        FC_ASSERT(limit <= 100);
        vector<operation_history_object> result;
        const auto& stats = account(db).statistics(db);
        if(stats.most_recent_op == account_transaction_history_id_type()) return result;
        const account_transaction_history_object* node = &stats.most_recent_op(db);
        if(start == operation_history_id_type())
-          start = node->id;
+          start = node->operation_id;
+          
        while(node && node->operation_id.instance.value > stop.instance.value && result.size() < limit)
        {
-          if(node->id.instance() <= start.instance.value)
+          if (node->operation_id.instance.value <= start.instance.value)
              result.push_back(node->operation_id(db));
           if(node->next == account_transaction_history_id_type())
              node = nullptr;
-          else node = db.find(node->next);
+          else node = &node->next(db);
        }
+       
        return result;
     }
     
