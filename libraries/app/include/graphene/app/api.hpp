@@ -69,7 +69,18 @@ namespace graphene { namespace app {
                                                               operation_history_id_type stop = operation_history_id_type(),
                                                               unsigned limit = 100,
                                                               operation_history_id_type start = operation_history_id_type())const;
-
+         /**
+          * @breif Get operations relevant to the specified account referenced
+          * by an event numbering specific to the account. The current number of operations
+          * for the account can be found in the account statistics (or use 0 for start).
+          * @param account The account whose history should be queried
+          * @param stop Sequence number of earliest operation. 0 is default and will
+          * query 'limit' number of operations.
+          * @param limit Maximum number of operations to retrieve (must not exceed 100)
+          * @param start Sequence number of the most recent operation to retrieve.
+          * 0 is default, which will start querying from the most recent operation.
+          * @return A list of operations performed by account, ordered from most recent to oldest.
+          */
          vector<operation_history_object> get_relative_account_history( account_id_type account,
                                                                         uint32_t stop = 0,
                                                                         unsigned limit = 100,
@@ -209,6 +220,7 @@ FC_REFLECT( graphene::app::network_broadcast_api::transaction_confirmation,
 
 FC_API(graphene::app::history_api,
        (get_account_history)
+       (get_relative_account_history)
        (get_fill_order_history)
        (get_market_history)
        (get_market_history_buckets)
