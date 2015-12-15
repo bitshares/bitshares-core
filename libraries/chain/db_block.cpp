@@ -257,6 +257,7 @@ processed_transaction database::push_proposal(const proposal_object& proposal)
    eval_state.operation_results.reserve(proposal.proposed_transaction.operations.size());
    processed_transaction ptrx(proposal.proposed_transaction);
    eval_state._trx = &ptrx;
+   size_t old_applied_ops_size = _applied_ops.size();
 
    try {
       auto session = _undo_db.start_undo_session(true);
@@ -265,6 +266,7 @@ processed_transaction database::push_proposal(const proposal_object& proposal)
       remove(proposal);
       session.merge();
    } catch ( const fc::exception& e ) {
+      _applied_ops.resize( old_applied_ops_size );
       elog( "e", ("e",e.to_detail_string() ) );
       throw;
    }
