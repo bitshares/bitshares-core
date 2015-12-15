@@ -502,6 +502,20 @@ void_result asset_publish_feeds_evaluator::do_evaluate(const asset_publish_feed_
    FC_ASSERT( !bitasset.has_settlement(), "No further feeds may be published after a settlement event" );
 
    FC_ASSERT( o.feed.settlement_price.quote.asset_id == bitasset.options.short_backing_asset );
+   if( d.head_block_time() > HARDFORK_480_TIME )
+   {
+      if( !o.feed.core_exchange_rate.is_null() )
+      {
+         FC_ASSERT( o.feed.core_exchange_rate.quote.asset_id == asset_id_type() );
+      }
+   }
+   else
+   {
+      if( (!o.feed.settlement_price.is_null()) && (!o.feed.core_exchange_rate.is_null()) )
+      {
+         FC_ASSERT( o.feed.settlement_price.quote.asset_id == o.feed.core_exchange_rate.quote.asset_id );
+      }
+   }
 
    //Verify that the publisher is authoritative to publish a feed
    if( base.options.flags & witness_fed_asset )

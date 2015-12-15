@@ -139,7 +139,6 @@ void asset_publish_feed_operation::validate()const
    if( (!feed.settlement_price.is_null()) && (!feed.core_exchange_rate.is_null()) )
    {
       FC_ASSERT( feed.settlement_price.base.asset_id == feed.core_exchange_rate.base.asset_id );
-      FC_ASSERT( feed.settlement_price.quote.asset_id == feed.core_exchange_rate.quote.asset_id );
    }
 
    FC_ASSERT( !feed.settlement_price.is_null() );

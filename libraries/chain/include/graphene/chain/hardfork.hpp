@@ -38,3 +38,6 @@
 
 // #453 Hardfork to retroactively correct referral percentages
 #define HARDFORK_453_TIME (fc::time_point_sec( 1450288800 ))
+
+// #480 Fix non-CORE MIA core_exchange_rate check
+#define HARDFORK_480_TIME (fc::time_point_sec( 1450378800 ))
