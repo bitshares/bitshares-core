@@ -442,7 +442,12 @@ uint32_t database::push_applied_operation( const operation& op )
 void database::set_applied_operation_result( uint32_t op_id, const operation_result& result )
 {
    assert( op_id < _applied_ops.size() );
-   _applied_ops[op_id]->result = result;
+   if( _applied_ops[op_id] )
+      _applied_ops[op_id]->result = result;
+   else
+   {
+      elog( "Could not set operation result (head_block_num=${b})", ("b", head_block_num()) );
+   }
 }
 
 const vector<optional< operation_history_object > >& database::get_applied_operations() const
