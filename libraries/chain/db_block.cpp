@@ -21,6 +21,7 @@
 
 #include <graphene/chain/database.hpp>
 #include <graphene/chain/db_with.hpp>
+#include <graphene/chain/hardfork.hpp>
 
 #include <graphene/chain/block_summary_object.hpp>
 #include <graphene/chain/global_property_object.hpp>
@@ -266,7 +267,18 @@ processed_transaction database::push_proposal(const proposal_object& proposal)
       remove(proposal);
       session.merge();
    } catch ( const fc::exception& e ) {
-      _applied_ops.resize( old_applied_ops_size );
+      if( head_block_time() <= HARDFORK_483_TIME )
+      {
+         for( size_t i=old_applied_ops_size,n=_applied_ops.size(); i<n; i++ )
+         {
+            ilog( "removing failed operation from applied_ops: ${op}", ("op", *(_applied_ops[i])) );
+            _applied_ops[i].reset();
+         }
+      }
+      else
+      {
+         _applied_ops.resize( old_applied_ops_size );
+      }
       elog( "e", ("e",e.to_detail_string() ) );
       throw;
    }
@@ -420,7 +432,7 @@ void database::clear_pending()
 uint32_t database::push_applied_operation( const operation& op )
 {
    _applied_ops.emplace_back(op);
-   auto& oh = _applied_ops.back();
+   operation_history_object& oh = *(_applied_ops.back());
    oh.block_num    = _current_block_num;
    oh.trx_in_block = _current_trx_in_block;
    oh.op_in_trx    = _current_op_in_trx;
@@ -430,10 +442,10 @@ uint32_t database::push_applied_operation( const operation& op )
 void database::set_applied_operation_result( uint32_t op_id, const operation_result& result )
 {
    assert( op_id < _applied_ops.size() );
-   _applied_ops[op_id].result = result;
+   _applied_ops[op_id]->result = result;
 }
 
-const vector<operation_history_object>& database::get_applied_operations() const
+const vector<optional< operation_history_object > >& database::get_applied_operations() const
 {
    return _applied_ops;
 }

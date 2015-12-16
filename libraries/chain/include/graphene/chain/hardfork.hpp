@@ -27,3 +27,6 @@
 #define HARDFORK_415_TIME (fc::time_point_sec( 1446652800 ))
 #define HARDFORK_416_TIME (fc::time_point_sec( 1446652800 ))
 #define HARDFORK_419_TIME (fc::time_point_sec( 1446652800 ))
+
+// #483 Operation history numbering change
+#define HARDFORK_483_TIME (fc::time_point_sec( 1450378800 ))
