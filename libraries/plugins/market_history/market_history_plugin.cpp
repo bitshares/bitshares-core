@@ -216,9 +216,9 @@ void market_history_plugin_impl::update_market_histories( const signed_block& b 
    if( _tracked_buckets.size() == 0 ) return;
 
    graphene::chain::database& db = database();
-   const vector<operation_history_object>& hist = db.get_applied_operations();
-   for( auto op : hist )
-      op.op.visit( operation_process_fill_order( _self, b.timestamp ) );
+   const vector<optional< operation_history_object > >& hist = db.get_applied_operations();
+   for( const optional< operation_history_object >& o_op : hist )
+      o_op->op.visit( operation_process_fill_order( _self, b.timestamp ) );
 }
 
 } // end namespace detail
