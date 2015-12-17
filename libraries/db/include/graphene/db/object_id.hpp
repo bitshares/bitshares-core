@@ -51,12 +51,18 @@ namespace graphene { namespace db {
       uint16_t space_type()const { return number >> 48;              }
       uint64_t instance()const { return number & GRAPHENE_DB_MAX_INSTANCE_ID; }
       bool     is_null()const { return number == 0; }
-      operator uint64_t()const { return number; }
+      explicit operator uint64_t()const { return number; }
 
       friend bool  operator == ( const object_id_type& a, const object_id_type& b )
       {
          return a.number == b.number;
       }
+
+      friend bool  operator != ( const object_id_type& a, const object_id_type& b )
+      {
+         return a.number != b.number;
+      }
+
       object_id_type& operator++(int) { ++number; return *this; }
       object_id_type& operator++()    { ++number; return *this; }
 
@@ -68,9 +74,14 @@ namespace graphene { namespace db {
       }
       friend size_t hash_value( object_id_type v ) { return std::hash<uint64_t>()(v.number); }
 
-      friend bool  operator < ( const object_id_type& a, const object_id_type& b )
+      friend bool operator< ( const object_id_type& a, const object_id_type& b )
       {
          return a.number < b.number;
+      }
+
+      friend bool operator> ( const object_id_type& a, const object_id_type& b )
+      {
+         return a.number > b.number;
       }
 
       template< typename T >
@@ -106,7 +117,7 @@ namespace graphene { namespace db {
 
       object_id(){}
       object_id( unsigned_int i ):instance(i){}
-      object_id( uint64_t i ):instance(i)
+      explicit object_id( uint64_t i ):instance(i)
       {
          FC_ASSERT( (i >> 48) == 0 );
       }
@@ -118,10 +129,24 @@ namespace graphene { namespace db {
       friend object_id operator+(const object_id a, int delta ) { return object_id( uint64_t(a.instance.value+delta) ); }
 
       operator object_id_type()const { return object_id_type( SpaceID, TypeID, instance.value ); }
-      operator uint64_t()const { return object_id_type( *this ).number; }
+      explicit operator uint64_t()const { return object_id_type( *this ).number; }
 
       template<typename DB>
       const T& operator()(const DB& db)const { return db.get(*this); }
+
+      friend bool  operator != ( const object_id& a, const object_id& b )
+      {
+         return a.instance != b.instance;
+      }
+      friend bool  operator != ( const object_id_type& a, const object_id& b )
+      {
+         return a != object_id_type(b);
+      }
+      friend bool  operator != ( const object_id& a, const object_id_type& b )
+      {
+         return object_id_type(a) != b;
+      }
+
 
       friend bool  operator == ( const object_id& a, const object_id& b )
       {
@@ -138,6 +163,10 @@ namespace graphene { namespace db {
       friend bool  operator < ( const object_id& a, const object_id& b )
       {
          return a.instance.value < b.instance.value;
+      }
+      friend bool  operator > ( const object_id& a, const object_id& b )
+      {
+         return a.instance.value > b.instance.value;
       }
       friend size_t hash_value( object_id v ) { return std::hash<uint64_t>()(v.instance.value); }
 

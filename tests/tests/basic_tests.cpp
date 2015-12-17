@@ -138,28 +138,33 @@ BOOST_AUTO_TEST_CASE( valid_symbol_test )
 
 BOOST_AUTO_TEST_CASE( price_test )
 {
-    BOOST_CHECK( price::max(0,1) > price::min(0,1) );
-    BOOST_CHECK( price::max(1,0) > price::min(1,0) );
-    BOOST_CHECK( price::max(0,1) >= price::min(0,1) );
-    BOOST_CHECK( price::max(1,0) >= price::min(1,0) );
-    BOOST_CHECK( price::max(0,1) >= price::max(0,1) );
-    BOOST_CHECK( price::max(1,0) >= price::max(1,0) );
-    BOOST_CHECK( price::min(0,1) < price::max(0,1) );
-    BOOST_CHECK( price::min(1,0) < price::max(1,0) );
-    BOOST_CHECK( price::min(0,1) <= price::max(0,1) );
-    BOOST_CHECK( price::min(1,0) <= price::max(1,0) );
-    BOOST_CHECK( price::min(0,1) <= price::min(0,1) );
-    BOOST_CHECK( price::min(1,0) <= price::min(1,0) );
-    BOOST_CHECK( price::min(1,0) != price::max(1,0) );
-    BOOST_CHECK( ~price::max(0,1) != price::min(0,1) );
-    BOOST_CHECK( ~price::min(0,1) != price::max(0,1) );
-    BOOST_CHECK( ~price::max(0,1) == price::min(1,0) );
-    BOOST_CHECK( ~price::min(0,1) == price::max(1,0) );
-    BOOST_CHECK( ~price::max(0,1) < ~price::min(0,1) );
-    BOOST_CHECK( ~price::max(0,1) <= ~price::min(0,1) );
-    price a(asset(1), asset(2,1));
-    price b(asset(2), asset(2,1));
-    price c(asset(1), asset(2,1));
+    auto price_max = []( uint32_t a, uint32_t b )
+    {   return price::max( asset_id_type(a), asset_id_type(b) );   };
+    auto price_min = []( uint32_t a, uint32_t b )
+    {   return price::min( asset_id_type(a), asset_id_type(b) );   };
+
+    BOOST_CHECK( price_max(0,1) > price_min(0,1) );
+    BOOST_CHECK( price_max(1,0) > price_min(1,0) );
+    BOOST_CHECK( price_max(0,1) >= price_min(0,1) );
+    BOOST_CHECK( price_max(1,0) >= price_min(1,0) );
+    BOOST_CHECK( price_max(0,1) >= price_max(0,1) );
+    BOOST_CHECK( price_max(1,0) >= price_max(1,0) );
+    BOOST_CHECK( price_min(0,1) < price_max(0,1) );
+    BOOST_CHECK( price_min(1,0) < price_max(1,0) );
+    BOOST_CHECK( price_min(0,1) <= price_max(0,1) );
+    BOOST_CHECK( price_min(1,0) <= price_max(1,0) );
+    BOOST_CHECK( price_min(0,1) <= price_min(0,1) );
+    BOOST_CHECK( price_min(1,0) <= price_min(1,0) );
+    BOOST_CHECK( price_min(1,0) != price_max(1,0) );
+    BOOST_CHECK( ~price_max(0,1) != price_min(0,1) );
+    BOOST_CHECK( ~price_min(0,1) != price_max(0,1) );
+    BOOST_CHECK( ~price_max(0,1) == price_min(1,0) );
+    BOOST_CHECK( ~price_min(0,1) == price_max(1,0) );
+    BOOST_CHECK( ~price_max(0,1) < ~price_min(0,1) );
+    BOOST_CHECK( ~price_max(0,1) <= ~price_min(0,1) );
+    price a(asset(1), asset(2,asset_id_type(1)));
+    price b(asset(2), asset(2,asset_id_type(1)));
+    price c(asset(1), asset(2,asset_id_type(1)));
     BOOST_CHECK(a < b);
     BOOST_CHECK(b > a);
     BOOST_CHECK(a == c);
@@ -168,7 +173,7 @@ BOOST_AUTO_TEST_CASE( price_test )
     price_feed dummy;
     dummy.maintenance_collateral_ratio = 1002;
     dummy.maximum_short_squeeze_ratio = 1234;
-    dummy.settlement_price = price(asset(1000), asset(2000, 1));
+    dummy.settlement_price = price(asset(1000), asset(2000, asset_id_type(1)));
     price_feed dummy2 = dummy;
     BOOST_CHECK(dummy == dummy2);
 }

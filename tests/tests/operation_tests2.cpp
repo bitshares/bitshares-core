@@ -74,7 +74,7 @@ BOOST_AUTO_TEST_CASE( withdraw_permission_create )
       REQUIRE_OP_VALIDATION_FAILURE(op, periods_until_expiration, 0);
       REQUIRE_OP_VALIDATION_FAILURE(op, withdraw_from_account, dan_id);
       REQUIRE_OP_VALIDATION_FAILURE(op, withdrawal_period_sec, 0);
-      REQUIRE_THROW_WITH_VALUE(op, withdrawal_limit, asset(10, 10));
+      REQUIRE_THROW_WITH_VALUE(op, withdrawal_limit, asset(10, asset_id_type(10)));
       REQUIRE_THROW_WITH_VALUE(op, authorized_account, account_id_type(1000));
       REQUIRE_THROW_WITH_VALUE(op, period_start_time, fc::time_point_sec(10000));
       REQUIRE_THROW_WITH_VALUE(op, withdrawal_period_sec, 1);
@@ -281,7 +281,7 @@ BOOST_AUTO_TEST_CASE( withdraw_permission_update )
       trx.operations.push_back(op);
       REQUIRE_THROW_WITH_VALUE(op, periods_until_expiration, 0);
       REQUIRE_THROW_WITH_VALUE(op, withdrawal_period_sec, 0);
-      REQUIRE_THROW_WITH_VALUE(op, withdrawal_limit, asset(1, 12));
+      REQUIRE_THROW_WITH_VALUE(op, withdrawal_limit, asset(1, asset_id_type(12)));
       REQUIRE_THROW_WITH_VALUE(op, withdrawal_limit, asset(0));
       REQUIRE_THROW_WITH_VALUE(op, withdraw_from_account, account_id_type(0));
       REQUIRE_THROW_WITH_VALUE(op, authorized_account, account_id_type(0));

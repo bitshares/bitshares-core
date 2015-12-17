@@ -233,7 +233,12 @@ namespace graphene { namespace chain {
       indexed_by<
          ordered_unique< tag<by_id>, member< object, object_id_type, &object::id > >,
          ordered_unique< tag<by_symbol>, member<asset_object, string, &asset_object::symbol> >,
-         ordered_non_unique< tag<by_type>, const_mem_fun<asset_object, bool, &asset_object::is_market_issued> >
+         ordered_unique< tag<by_type>,
+            composite_key< asset_object,
+                const_mem_fun<asset_object, bool, &asset_object::is_market_issued>,
+                member< object, object_id_type, &object::id >
+            >
+         >
       >
    > asset_object_multi_index_type;
    typedef generic_index<asset_object, asset_object_multi_index_type> asset_index;

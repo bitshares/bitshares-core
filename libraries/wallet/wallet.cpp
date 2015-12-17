@@ -2324,7 +2324,7 @@ public:
       asset_options opts;
       opts.flags &= ~(white_list | disable_force_settle | global_settle);
       opts.issuer_permissions = opts.flags;
-      opts.core_exchange_rate = price(asset(1), asset(1,1));
+      opts.core_exchange_rate = price(asset(1), asset(1,asset_id_type(1)));
       create_asset(get_account(creator).name, symbol, 2, opts, {}, true);
    }
 
@@ -2333,7 +2333,7 @@ public:
       asset_options opts;
       opts.flags &= ~white_list;
       opts.issuer_permissions = opts.flags;
-      opts.core_exchange_rate = price(asset(1), asset(1,1));
+      opts.core_exchange_rate = price(asset(1), asset(1,asset_id_type(1)));
       bitasset_options bopts;
       create_asset(get_account(creator).name, symbol, 2, opts, bopts, true);
    }
@@ -3644,8 +3644,8 @@ vector<asset>   wallet_api::get_blind_balances( string key_or_label )
 
    auto pub_key = get_public_key( key_or_label );
    auto& to_asset_used_idx = my->_wallet.blind_receipts.get<by_to_asset_used>();
-   auto start = to_asset_used_idx.lower_bound( std::make_tuple(pub_key,0,false)  );
-   auto end = to_asset_used_idx.lower_bound( std::make_tuple(pub_key,uint32_t(0xffffffff),true)  );
+   auto start = to_asset_used_idx.lower_bound( std::make_tuple(pub_key,asset_id_type(0),false)  );
+   auto end = to_asset_used_idx.lower_bound( std::make_tuple(pub_key,asset_id_type(uint32_t(0xffffffff)),true)  );
    while( start != end )
    {
       if( !start->used  )

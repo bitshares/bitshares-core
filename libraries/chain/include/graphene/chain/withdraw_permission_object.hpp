@@ -24,6 +24,7 @@
 #pragma once
 #include <graphene/chain/protocol/authority.hpp>
 #include <graphene/db/generic_index.hpp>
+#include <boost/multi_index/composite_key.hpp>
 
 namespace graphene { namespace chain {
 
@@ -78,9 +79,24 @@ namespace graphene { namespace chain {
       withdraw_permission_object,
       indexed_by<
          ordered_unique< tag<by_id>, member< object, object_id_type, &object::id > >,
-         ordered_non_unique< tag<by_from>, member<withdraw_permission_object, account_id_type, &withdraw_permission_object::withdraw_from_account> >,
-         ordered_non_unique< tag<by_authorized>, member<withdraw_permission_object, account_id_type, &withdraw_permission_object::authorized_account> >,
-         ordered_non_unique< tag<by_expiration>, member<withdraw_permission_object, time_point_sec, &withdraw_permission_object::expiration> >
+         ordered_unique< tag<by_from>,
+            composite_key< withdraw_permission_object,
+               member<withdraw_permission_object, account_id_type, &withdraw_permission_object::withdraw_from_account>,
+               member< object, object_id_type, &object::id >
+            >
+         >,
+         ordered_unique< tag<by_authorized>,
+            composite_key< withdraw_permission_object,
+               member<withdraw_permission_object, account_id_type, &withdraw_permission_object::authorized_account>,
+               member< object, object_id_type, &object::id >
+            >
+         >,
+         ordered_unique< tag<by_expiration>,
+            composite_key< withdraw_permission_object,
+               member<withdraw_permission_object, time_point_sec, &withdraw_permission_object::expiration>,
+               member< object, object_id_type, &object::id >
+            >
+         >
       >
    > withdraw_permission_object_multi_index_type;
 

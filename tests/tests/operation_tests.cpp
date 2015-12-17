@@ -48,8 +48,8 @@ BOOST_FIXTURE_TEST_SUITE( operation_tests, database_fixture )
 BOOST_AUTO_TEST_CASE( feed_limit_logic_test )
 {
    try {
-      asset usd(1000,1);
-      asset core(1000,0);
+      asset usd(1000,asset_id_type(1));
+      asset core(1000,asset_id_type(0));
       price_feed feed;
       feed.settlement_price = usd / core;
 
@@ -695,7 +695,7 @@ BOOST_AUTO_TEST_CASE( create_uia )
       creator.common_options.market_fee_percent = GRAPHENE_MAX_MARKET_FEE_PERCENT/100; /*1%*/
       creator.common_options.issuer_permissions = UIA_ASSET_ISSUER_PERMISSION_MASK;
       creator.common_options.flags = charge_market_fee;
-      creator.common_options.core_exchange_rate = price({asset(2),asset(1,1)});
+      creator.common_options.core_exchange_rate = price({asset(2),asset(1,asset_id_type(1))});
       trx.operations.push_back(std::move(creator));
       PUSH_TX( db, trx, ~0 );
 

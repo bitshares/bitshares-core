@@ -960,8 +960,8 @@ vector<call_order_object> database_api_impl::get_margin_positions( const account
    {
       const auto& idx = _db.get_index_type<call_order_index>();
       const auto& aidx = idx.indices().get<by_account>();
-      auto start = aidx.lower_bound( boost::make_tuple( id, 0 ) );
-      auto end = aidx.lower_bound( boost::make_tuple( id+1, 0 ) );
+      auto start = aidx.lower_bound( boost::make_tuple( id, asset_id_type(0) ) );
+      auto end = aidx.lower_bound( boost::make_tuple( id+1, asset_id_type(0) ) );
       vector<call_order_object> result;
       while( start != end )
       {
