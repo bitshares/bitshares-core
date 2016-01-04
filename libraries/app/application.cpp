@@ -151,6 +151,7 @@ namespace detail {
             vector<string> seeds = {
                "faucet.bitshares.org:1776",
                "bitshares.openledger.info:1776",
+               "114.92.254.159:62015",
                "seed.blocktrades.us:1776",
                "seed04.bitsharesnodes.com:1776", // thom
                "seed05.bitsharesnodes.com:1776", // thom
@@ -813,7 +814,7 @@ namespace detail {
           }
           while (low_block_num <= high_block_num);
 
-          idump((synopsis));
+          //idump((synopsis));
           return synopsis;
       } FC_CAPTURE_AND_RETHROW() }
 
