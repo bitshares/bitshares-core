@@ -348,6 +348,12 @@ void database::clear_expired_orders()
             assert(itr != call_index.end() && itr->debt_type() == mia_object.get_id());
             asset max_settlement = max_settlement_volume - settled;
 
+            if( order.balance.amount == 0 )
+            {
+               wlog( "0 settlement detected" );
+               cancel_order( order );
+               break;
+            }
             try {
                settled += match(*itr, order, settlement_price, max_settlement);
             } 

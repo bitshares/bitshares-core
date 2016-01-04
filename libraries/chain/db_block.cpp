@@ -548,7 +548,10 @@ processed_transaction database::apply_transaction(const signed_transaction& trx,
 processed_transaction database::_apply_transaction(const signed_transaction& trx)
 { try {
    uint32_t skip = get_node_properties().skip_flags;
-   trx.validate();
+
+   if( !(skip&skip_validate) )
+      trx.validate();
+
    auto& trx_idx = get_mutable_index_type<transaction_index>();
    const chain_id_type& chain_id = get_chain_id();
    auto trx_id = trx.id();

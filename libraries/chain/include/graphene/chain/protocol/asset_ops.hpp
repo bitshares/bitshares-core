@@ -225,7 +225,9 @@ namespace graphene { namespace chain {
       extensions_type extensions;
 
       account_id_type fee_payer()const { return account; }
-      void            validate()const {}
+      void            validate()const {
+         FC_ASSERT( amount.amount > 0, "Must settle at least 1 unit" );
+      }
 
       share_type calculate_fee(const fee_parameters_type& params)const
       { return 0; }
