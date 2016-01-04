@@ -328,9 +328,27 @@ namespace detail {
                fc::read_file_contents( _data_dir / "db_version", version_str );
                return (version_str != GRAPHENE_CURRENT_DB_VERSION);
             };
-            if( !is_new() && is_outdated() ) 
+
+            bool need_reindex = (!is_new() && is_outdated());
+            std::string reindex_reason = "version upgrade";
+
+            if( !need_reindex )
             {
-               ilog("Replaying blockchain due to version upgrade");
+               try
+               {
+                  _chain_db->open(_data_dir / "blockchain", initial_state);
+               }
+               catch( const fc::exception& e )
+               {
+                  ilog( "caught exception ${e} in open()", ("e", e.to_detail_string()) );
+                  need_reindex = true;
+                  reindex_reason = "exception in open()";
+               }
+            }
+
+            if( need_reindex )
+            {
+               ilog("Replaying blockchain due to ${reason}", ("reason", reindex_reason) );
 
                fc::remove_all( _data_dir / "db_version" );
                _chain_db->reindex(_data_dir / "blockchain", initial_state());
@@ -346,8 +364,6 @@ namespace detail {
                   db_version.write( version_string.c_str(), version_string.size() );
                   db_version.close();
                }
-            } else {
-              _chain_db->open(_data_dir / "blockchain", initial_state);
             }
          } else {
             wlog("Detected unclean shutdown. Replaying blockchain...");
