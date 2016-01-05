@@ -157,7 +157,7 @@ namespace detail {
                "seed05.bitsharesnodes.com:1776", // thom
                "seed06.bitsharesnodes.com:1776", // thom
                "seed07.bitsharesnodes.com:1776", // thom
-               "128.199.131.4:1777", // cube 
+               "seed.cubeconnex.com:1777", // cube 
                "54.85.252.77:39705", // lafona
                "104.236.144.84:1777", // puppies
                "40.127.190.171:1777", // betax
