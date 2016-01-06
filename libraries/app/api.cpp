@@ -37,7 +37,7 @@
 #include <fc/smart_ref_impl.hpp>
 
 namespace graphene { namespace app {
-
+     
     login_api::login_api(application& a)
     :_app(a)
     {
@@ -86,6 +86,10 @@ namespace graphene { namespace app {
        else if( api_name == "network_node_api" )
        {
           _network_node_api = std::make_shared< network_node_api >( std::ref(_app) );
+       }
+       else if( api_name == "crypto_api" )
+       {
+          _crypto_api = std::make_shared< crypto_api >( std::ref(_app) );
        }
        return;
     }
@@ -195,6 +199,12 @@ namespace graphene { namespace app {
     {
        FC_ASSERT(_history_api);
        return *_history_api;
+    }
+    
+    fc::api<crypto_api> login_api::crypto() const
+    {
+       FC_ASSERT(_crypto_api);
+       return *_crypto_api;
     }
 
     vector<account_id_type> get_relevant_accounts( const object* obj )
@@ -405,5 +415,67 @@ namespace graphene { namespace app {
        }
        return result;
     } FC_CAPTURE_AND_RETHROW( (a)(b)(bucket_seconds)(start)(end) ) }
+    
+    blind_signature crypto_api::blind_sign( extended_private_key key, const blinded_hash& hash, int i ) const
+    {
+       return key.blind_sign( hash, i );
+    }
+         
+    compact_signature crypto_api::unblind_signature( extended_private_key key,
+                                                     const extended_public_key& bob,
+                                                     const blind_signature& sig,
+                                                     const fc::sha256& hash,
+                                                     int i ) const
+    {
+       return key.unblind_signature( bob, sig, hash, i );
+    }
+                                                               
+    commitment_type crypto_api::blind( const blind_factor_type& blind, uint64_t value )
+    {
+       return fc::ecc::blind( blind, value );
+    }
+   
+    blind_factor_type crypto_api::blind_sum( const std::vector<blind_factor_type>& blinds_in, uint32_t non_neg )
+    {
+       return fc::ecc::blind_sum( blinds_in, non_neg );
+    }
+   
+    bool crypto_api::verify_sum( const std::vector<commitment_type>& commits_in, const std::vector<commitment_type>& neg_commits_in, int64_t excess )
+    {
+       return fc::ecc::verify_sum( commits_in, neg_commits_in, excess );
+    }
+   
+    bool crypto_api::verify_range( uint64_t& min_val, uint64_t& max_val, const commitment_type& commit, const std::vector<char>& proof )
+    {
+       return fc::ecc::verify_range( min_val, max_val, commit, proof );
+    }
+   
+    std::vector<char> crypto_api::range_proof_sign( uint64_t min_value, 
+                                                    const commitment_type& commit, 
+                                                    const blind_factor_type& commit_blind, 
+                                                    const blind_factor_type& nonce,
+                                                    int8_t base10_exp,
+                                                    uint8_t min_bits,
+                                                    uint64_t actual_value )
+    {
+       return fc::ecc::range_proof_sign( min_value, commit, commit_blind, nonce, base10_exp, min_bits, actual_value );
+    }
+                                 
+    bool crypto_api::verify_range_proof_rewind( blind_factor_type& blind_out,
+                                    uint64_t& value_out,
+                                    string& message_out, 
+                                    const blind_factor_type& nonce,
+                                    uint64_t& min_val, 
+                                    uint64_t& max_val, 
+                                    commitment_type commit, 
+                                    const std::vector<char>& proof )
+    {
+       return fc::ecc::verify_range_proof_rewind( blind_out, value_out, message_out, nonce, min_val, max_val, commit, proof );
+    }
+                                    
+    range_proof_info crypto_ap::range_get_info( const std::vector<char>& proof )
+    {
+       return fc::ecc::range_get_info( proof );
+    }
 
 } } // graphene::app
