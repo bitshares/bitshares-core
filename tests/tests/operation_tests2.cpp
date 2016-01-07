@@ -943,6 +943,7 @@ BOOST_AUTO_TEST_CASE( force_settle_test )
       // Wait for settlement to take effect
       generate_blocks(settle_id(db).settlement_date);
       BOOST_CHECK(db.find(settle_id) == nullptr);
+      BOOST_CHECK_EQUAL( bitusd_id(db).bitasset_data(db).force_settled_volume.value, 50 );
       BOOST_CHECK_EQUAL( get_balance(nathan_id, bitusd_id), 14950);
       BOOST_CHECK_EQUAL( get_balance(nathan_id, core_id), 49 );   // 1% force_settlement_offset_percent (rounded unfavorably)
       BOOST_CHECK_EQUAL( call3_id(db).debt.value, 2950 );
