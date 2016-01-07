@@ -38,6 +38,8 @@
 #include <graphene/chain/witness_object.hpp>
 #include <graphene/chain/confidential_evaluator.hpp>
 
+#include <graphene/market_history/market_history_plugin.hpp>
+
 #include <fc/api.hpp>
 #include <fc/optional.hpp>
 #include <fc/variant_object.hpp>
@@ -54,9 +56,46 @@
 namespace graphene { namespace app {
 
 using namespace graphene::chain;
+using namespace graphene::market_history;
 using namespace std;
 
 class database_api_impl;
+
+struct order_book
+{
+  string                        base;
+  string                        quote;
+  vector< pair<double,double> > bids;
+  vector< pair<double,double> > asks;
+};
+
+struct market_ticker
+{
+   string                       base;
+   string                       quote;
+   double                       latest;
+   double                       lowest_ask;
+   double                       highest_bid;
+   double                       percent_change;
+   double                       base_volume;
+   double                       quote_volume;
+};
+
+struct market_volume
+{
+   string                       base;
+   string                       quote;
+   double                       base_volume;
+   double                       quote_volume;
+};
+
+struct market_trade
+{
+   fc::time_point_sec           date;
+   double                       price;
+   double                       amount;
+   double                       value;
+};
 
 /**
  * @brief The database_api class implements the RPC API for the chain database.
@@ -321,7 +360,46 @@ class database_api
        * @param a First asset ID
        * @param b Second asset ID
        */
-      void unsubscribe_from_market(asset_id_type a, asset_id_type b);
+      void unsubscribe_from_market( asset_id_type a, asset_id_type b );
+
+      /**
+       * @brief Returns the ticker for the market assetA:assetB
+       * @param a String name of the first asset
+       * @param b String name of the second asset
+       * @return The market ticker for the past 24 hours.
+       */
+      market_ticker get_ticker( const string& base, const string& quote )const;
+
+      /**
+       * @brief Returns the 24 hour volume for the market assetA:assetB
+       * @param a String name of the first asset
+       * @param b String name of the second asset
+       * @return The market volume over the past 24 hours
+       */
+      market_volume get_24_volume( const string& base, const string& quote )const;
+
+      /**
+       * @brief Returns the order book for the market base:quote
+       * @param base String name of the first asset
+       * @param quote String name of the second asset
+       * @param depth of the order book. Up to depth of each asks and bids, capped at 50. Prioritizes most moderate of each
+       * @return Order book of the market
+       */
+      order_book get_order_book( const string& base, const string& quote, unsigned limit = 50 )const;
+
+      /**
+       * @brief Returns recent trades for the market assetA:assetB
+       * Note: Currentlt, timezone offsets are not supported. The time must be UTC.
+       * @param a String name of the first asset
+       * @param b String name of the second asset
+       * @param stop Stop time as a UNIX timestamp
+       * @param limit Number of trasactions to retrieve, capped at 100
+       * @param start Start time as a UNIX timestamp
+       * @return Recent transactions in the market
+       */
+      vector<market_trade> get_trade_history( const string& base, const string& quote, fc::time_point_sec start, fc::time_point_sec stop, unsigned limit = 100 )const;
+
+
 
       ///////////////
       // Witnesses //
@@ -472,6 +550,10 @@ class database_api
 };
 
 } }
+FC_REFLECT( graphene::app::order_book, (base)(quote)(bids)(asks) );
+FC_REFLECT( graphene::app::market_ticker, (base)(quote)(latest)(lowest_ask)(highest_bid)(percent_change)(base_volume)(quote_volume) );
+FC_REFLECT( graphene::app::market_volume, (base)(quote)(base_volume)(quote_volume) );
+FC_REFLECT( graphene::app::market_trade, (date)(price)(amount)(value) );
 
 FC_API(graphene::app::database_api,
    // Objects
@@ -521,12 +603,16 @@ FC_API(graphene::app::database_api,
    (lookup_asset_symbols)
 
    // Markets / feeds
+   (get_order_book)
    (get_limit_orders)
    (get_call_orders)
    (get_settle_orders)
    (get_margin_positions)
    (subscribe_to_market)
    (unsubscribe_from_market)
+   (get_ticker)
+   (get_24_volume)
+   (get_trade_history)
 
    // Witnesses
    (get_witnesses)

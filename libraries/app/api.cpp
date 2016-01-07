@@ -339,13 +339,12 @@ namespace graphene { namespace app {
        uint32_t count = 0;
        auto itr = history_idx.lower_bound( hkey );
        vector<order_history_object> result;
-       while( itr != history_idx.end() )
+       while( itr != history_idx.end() && count < limit)
        {
           if( itr->key.base != a || itr->key.quote != b ) break;
           result.push_back( *itr );
           ++itr;
           ++count;
-          if( count  > limit ) break;
        }
 
        return result;
@@ -386,7 +385,7 @@ namespace graphene { namespace app {
        FC_ASSERT(_app.chain_database());
        const auto& db = *_app.chain_database();
        vector<bucket_object> result;
-       result.reserve(100);
+       result.reserve(200);
 
        if( a > b ) std::swap(a,b);
 
@@ -394,7 +393,7 @@ namespace graphene { namespace app {
        const auto& by_key_idx = bidx.indices().get<by_key>();
 
        auto itr = by_key_idx.lower_bound( bucket_key( a, b, bucket_seconds, start ) );
-       while( itr != by_key_idx.end() && itr->key.open <= end && result.size() < 100 )
+       while( itr != by_key_idx.end() && itr->key.open <= end && result.size() < 200 )
        {
           if( !(itr->key.base == a && itr->key.quote == b && itr->key.seconds == bucket_seconds) )
           {
