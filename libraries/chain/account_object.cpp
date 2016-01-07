@@ -136,21 +136,6 @@ void account_statistics_object::pay_fee( share_type core_fee, share_type cashbac
       pending_vested_fees += core_fee;
 }
 
-void account_object::options_type::validate() const
-{
-   auto needed_witnesses = num_witness;
-   auto needed_committee = num_committee;
-
-   for( vote_id_type id : votes )
-      if( id.type() == vote_id_type::witness && needed_witnesses )
-         --needed_witnesses;
-      else if ( id.type() == vote_id_type::committee && needed_committee )
-         --needed_committee;
-
-   FC_ASSERT( needed_witnesses == 0 && needed_committee == 0,
-              "May not specify fewer witnesses or committee members than the number voted for.");
-}
-
 set<account_id_type> account_member_index::get_account_members(const account_object& a)const
 {
    set<account_id_type> result;
