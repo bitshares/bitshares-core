@@ -37,3 +37,5 @@
 // #453 Hardfork to retroactively correct referral percentages
 #define HARDFORK_453_TIME (fc::time_point_sec( 1450288800 ))
 #define HARDFORK_480_TIME (fc::time_point_sec( 1450378800 ))
+// #483 Operation history numbering change
+#define HARDFORK_483_TIME (fc::time_point_sec( 1450378800 ))

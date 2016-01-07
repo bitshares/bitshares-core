@@ -1625,8 +1625,12 @@ void database_api_impl::on_applied_block()
 
    const auto& ops = _db.get_applied_operations();
    map< std::pair<asset_id_type,asset_id_type>, vector<pair<operation, operation_result>> > subscribed_markets_ops;
-   for(const auto& op : ops)
+   for(const optional< operation_history_object >& o_op : ops)
    {
+      if( !o_op.valid() )
+         continue;
+      const operation_history_object& op = *o_op;
+
       std::pair<asset_id_type,asset_id_type> market;
       switch(op.op.which())
       {
