@@ -23,6 +23,7 @@
 #include <graphene/app/database_api.hpp>
 
 #include <graphene/chain/protocol/types.hpp>
+#include <graphene/chain/protocol/confidential.hpp>
 
 #include <graphene/market_history/market_history_plugin.hpp>
 
@@ -48,6 +49,22 @@ namespace graphene { namespace app {
 
    class application;
 
+   struct verify_range_result
+   {
+      bool        success;
+      uint64_t    min_val;
+      uint64_t    max_val;
+   };
+   
+   struct verify_range_proof_rewind_result
+   {
+      bool                          success;
+      uint64_t                      min_val;
+      uint64_t                      max_val;
+      uint64_t                      value_out;
+      fc::ecc::blind_factor_type    blind_out;
+      string                        message_out;
+   };
 
    /**
     * @brief The history_api class implements the RPC API for account history
@@ -179,21 +196,23 @@ namespace graphene { namespace app {
    class crypto_api
    {
       public:
-         blind_signature blind_sign( extended_private_key key, const blinded_hash& hash, int i ) const;
+         crypto_api();
          
-         compact_signature unblind_signature( extended_private_key key,
-                                              const extended_public_key& bob,
-                                              const blind_signature& sig,
+         fc::ecc::blind_signature blind_sign( const extended_private_key_type& key, const fc::ecc::blinded_hash& hash, int i );
+         
+         signature_type unblind_signature( const extended_private_key_type& key,
+                                              const extended_public_key_type& bob,
+                                              const fc::ecc::blind_signature& sig,
                                               const fc::sha256& hash,
-                                              int i ) const;
-                                                                    
-         commitment_type blind( const blind_factor_type& blind, uint64_t value );
+                                              int i );
+                                                                  
+         fc::ecc::commitment_type blind( const fc::ecc::blind_factor_type& blind, uint64_t value );
          
-         blind_factor_type blind_sum( const std::vector<blind_factor_type>& blinds_in, uint32_t non_neg );
+         fc::ecc::blind_factor_type blind_sum( const std::vector<blind_factor_type>& blinds_in, uint32_t non_neg );
          
          bool verify_sum( const std::vector<commitment_type>& commits_in, const std::vector<commitment_type>& neg_commits_in, int64_t excess );
          
-         bool verify_range( uint64_t& min_val, uint64_t& max_val, const commitment_type& commit, const std::vector<char>& proof );
+         verify_range_result verify_range( const fc::ecc::commitment_type& commit, const std::vector<char>& proof );
          
          std::vector<char> range_proof_sign( uint64_t min_value, 
                                              const commitment_type& commit, 
@@ -203,14 +222,11 @@ namespace graphene { namespace app {
                                              uint8_t min_bits,
                                              uint64_t actual_value );
                                        
-         bool     verify_range_proof_rewind( blind_factor_type& blind_out,
-                                             uint64_t& value_out,
-                                             string& message_out, 
-                                             const blind_factor_type& nonce,
-                                             uint64_t& min_val, 
-                                             uint64_t& max_val, 
-                                             commitment_type commit, 
-                                             const std::vector<char>& proof );
+         
+         verify_range_proof_rewind_result verify_range_proof_rewind( const blind_factor_type& nonce,
+                                                                     const fc::ecc::commitment_type& commit, 
+                                                                     const std::vector<char>& proof );
+         
                                          
          range_proof_info range_get_info( const std::vector<char>& proof );
    };
@@ -245,7 +261,7 @@ namespace graphene { namespace app {
          /// @brief Retrieve the network node API
          fc::api<network_node_api> network_node()const;
          /// @brief Retrieve the cryptography API
-         fc::api<crypto_apI> crypto()const;
+         fc::api<crypto_api> crypto()const;
 
       private:
          /// @brief Called to enable an API, not reflected.
@@ -256,13 +272,19 @@ namespace graphene { namespace app {
          optional< fc::api<network_broadcast_api> > _network_broadcast_api;
          optional< fc::api<network_node_api> > _network_node_api;
          optional< fc::api<history_api> >  _history_api;
-         optional< fc::api<crypto_api> _crypto_api;
+         optional< fc::api<crypto_api> > _crypto_api;
    };
 
 }}  // graphene::app
 
 FC_REFLECT( graphene::app::network_broadcast_api::transaction_confirmation,
         (id)(block_num)(trx_num)(trx) )
+FC_REFLECT( graphene::app::verify_range_result,
+        (success)(min_val)(max_val) )
+FC_REFLECT( graphene::app::verify_range_proof_rewind_result,
+        (success)(min_val)(max_val)(value_out)(blind_out)(message_out) )
+//FC_REFLECT_TYPENAME( fc::ecc::compact_signature );
+//FC_REFLECT_TYPENAME( fc::ecc::commitment_type );
 
 FC_API(graphene::app::history_api,
        (get_account_history)
@@ -292,7 +314,8 @@ FC_API(graphene::app::crypto_api,
        (verify_range)
        (range_proof_sign)
        (verify_range_proof_rewind)
-       (range_get_info))
+       (range_get_info)
+     )
 FC_API(graphene::app::login_api,
        (login)
        (network_broadcast)
