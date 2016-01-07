@@ -251,16 +251,67 @@ namespace graphene { namespace chain {
        bool is_valid_v1( const std::string& base58str );
    };
 
+   struct extended_public_key_type
+   {
+      struct binary_key
+      {
+         binary_key() {}
+         uint32_t                   check = 0;
+         fc::ecc::extended_key_data data;
+      };
+      
+      fc::ecc::extended_key_data key_data;
+       
+      extended_public_key_type();
+      extended_public_key_type( const fc::ecc::extended_key_data& data );
+      extended_public_key_type( const fc::ecc::extended_public_key& extpubkey );
+      explicit extended_public_key_type( const std::string& base58str );
+      operator fc::ecc::extended_public_key() const;
+      explicit operator std::string() const;
+      friend bool operator == ( const extended_public_key_type& p1, const fc::ecc::extended_public_key& p2);
+      friend bool operator == ( const extended_public_key_type& p1, const extended_public_key_type& p2);
+      friend bool operator != ( const extended_public_key_type& p1, const extended_public_key_type& p2);
+   };
+   
+   struct extended_private_key_type
+   {
+      struct binary_key
+      {
+         binary_key() {}
+         uint32_t                   check = 0;
+         fc::ecc::extended_key_data data;
+      };
+      
+      fc::ecc::extended_key_data key_data;
+       
+      extended_private_key_type();
+      extended_private_key_type( const fc::ecc::extended_key_data& data );
+      extended_private_key_type( const fc::ecc::extended_private_key& extprivkey );
+      explicit extended_private_key_type( const std::string& base58str );
+      operator fc::ecc::extended_private_key() const;
+      explicit operator std::string() const;
+      friend bool operator == ( const extended_private_key_type& p1, const fc::ecc::extended_private_key& p2);
+      friend bool operator == ( const extended_private_key_type& p1, const extended_private_key_type& p2);
+      friend bool operator != ( const extended_private_key_type& p1, const extended_private_key_type& p2);
+   };
 } }  // graphene::chain
 
 namespace fc
 {
     void to_variant( const graphene::chain::public_key_type& var,  fc::variant& vo );
     void from_variant( const fc::variant& var,  graphene::chain::public_key_type& vo );
+    void to_variant( const graphene::chain::extended_public_key_type& var, fc::variant& vo );
+    void from_variant( const fc::variant& var, graphene::chain::extended_public_key_type& vo );
+    void to_variant( const graphene::chain::extended_private_key_type& var, fc::variant& vo );
+    void from_variant( const fc::variant& var, graphene::chain::extended_private_key_type& vo );
 }
 
 FC_REFLECT( graphene::chain::public_key_type, (key_data) )
 FC_REFLECT( graphene::chain::public_key_type::binary_key, (data)(check) )
+FC_REFLECT( graphene::chain::extended_public_key_type, (key_data) )
+FC_REFLECT( graphene::chain::extended_public_key_type::binary_key, (check)(data) )
+FC_REFLECT( graphene::chain::extended_private_key_type, (key_data) )
+FC_REFLECT( graphene::chain::extended_private_key_type::binary_key, (check)(data) )
 
 FC_REFLECT_ENUM( graphene::chain::object_type,
                  (null_object_type)
