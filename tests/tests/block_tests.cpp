@@ -31,7 +31,7 @@
 #include <graphene/chain/asset_object.hpp>
 #include <graphene/chain/committee_member_object.hpp>
 #include <graphene/chain/proposal_object.hpp>
-#include <graphene/chain/market_evaluator.hpp>
+#include <graphene/chain/market_object.hpp>
 
 #include <graphene/utilities/tempdir.hpp>
 

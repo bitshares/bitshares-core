@@ -31,9 +31,10 @@
 #include <graphene/chain/get_config.hpp>
 #include <graphene/utilities/key_conversion.hpp>
 #include <graphene/chain/protocol/fee_schedule.hpp>
+#include <graphene/chain/market_object.hpp>
+#include <graphene/chain/transaction_object.hpp>
 #include <graphene/chain/withdraw_permission_object.hpp>
 #include <graphene/chain/worker_evaluator.hpp>
-#include <graphene/chain/transaction_object.hpp>
 #include <graphene/chain/confidential_evaluator.hpp>
 
 #include <fc/crypto/hex.hpp>
