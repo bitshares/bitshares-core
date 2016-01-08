@@ -1,3 +1,9 @@
+
+add_custom_target( build_hardfork_hpp
+                   COMMAND cat-parts hardfork.d include/graphene/chain/hardfork.hpp )
+
+add_dependencies( build_hardfork_hpp cat-parts )
+
 file(GLOB HEADERS "include/graphene/chain/*.hpp")
 
 if( GRAPHENE_DISABLE_UNITY_BUILD )
@@ -78,8 +84,10 @@ add_library( graphene_chain
              block_database.cpp
 
              ${HEADERS}
+             include/graphene/chain/hardfork.hpp
            )
 
+add_dependencies( graphene_chain build_hardfork_hpp )
 target_link_libraries( graphene_chain fc graphene_db )
 target_include_directories( graphene_chain
                             PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include" )
