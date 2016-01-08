@@ -21,7 +21,6 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-#pragma once
 
 #include <graphene/chain/database.hpp>
 #include <graphene/chain/global_property_object.hpp>

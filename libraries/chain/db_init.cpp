@@ -32,6 +32,8 @@
 #include <graphene/chain/chain_property_object.hpp>
 #include <graphene/chain/committee_member_object.hpp>
 #include <graphene/chain/global_property_object.hpp>
+#include <graphene/chain/market_object.hpp>
+#include <graphene/chain/operation_history_object.hpp>
 #include <graphene/chain/proposal_object.hpp>
 #include <graphene/chain/transaction_object.hpp>
 #include <graphene/chain/vesting_balance_object.hpp>
@@ -56,6 +58,7 @@
 
 #include <graphene/chain/protocol/fee_schedule.hpp>
 
+#include <fc/smart_ref_impl.hpp>
 #include <fc/uint128.hpp>
 #include <fc/crypto/digest.hpp>
 

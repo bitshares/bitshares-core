@@ -31,6 +31,8 @@
 
 #include <graphene/chain/account_object.hpp>
 #include <graphene/chain/asset_object.hpp>
+#include <graphene/chain/budget_record_object.hpp>
+#include <graphene/chain/chain_property_object.hpp>
 #include <graphene/chain/committee_member_object.hpp>
 #include <graphene/chain/global_property_object.hpp>
 #include <graphene/chain/vesting_balance_object.hpp>
