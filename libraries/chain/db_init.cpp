@@ -31,6 +31,7 @@
 #include <graphene/chain/budget_record_object.hpp>
 #include <graphene/chain/chain_property_object.hpp>
 #include <graphene/chain/committee_member_object.hpp>
+#include <graphene/chain/confidential_object.hpp>
 #include <graphene/chain/global_property_object.hpp>
 #include <graphene/chain/market_object.hpp>
 #include <graphene/chain/operation_history_object.hpp>
@@ -45,8 +46,10 @@
 #include <graphene/chain/account_evaluator.hpp>
 #include <graphene/chain/asset_evaluator.hpp>
 #include <graphene/chain/assert_evaluator.hpp>
-#include <graphene/chain/custom_evaluator.hpp>
+#include <graphene/chain/balance_evaluator.hpp>
 #include <graphene/chain/committee_member_evaluator.hpp>
+#include <graphene/chain/confidential_evaluator.hpp>
+#include <graphene/chain/custom_evaluator.hpp>
 #include <graphene/chain/market_evaluator.hpp>
 #include <graphene/chain/proposal_evaluator.hpp>
 #include <graphene/chain/transfer_evaluator.hpp>
@@ -54,8 +57,6 @@
 #include <graphene/chain/withdraw_permission_evaluator.hpp>
 #include <graphene/chain/witness_evaluator.hpp>
 #include <graphene/chain/worker_evaluator.hpp>
-#include <graphene/chain/balance_evaluator.hpp>
-#include <graphene/chain/confidential_evaluator.hpp>
 
 #include <graphene/chain/protocol/fee_schedule.hpp>
 
