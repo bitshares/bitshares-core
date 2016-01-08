@@ -23,8 +23,11 @@
  */
 #include <graphene/chain/database.hpp>
 #include <graphene/chain/worker_evaluator.hpp>
-#include <graphene/chain/vesting_balance_object.hpp>
+
 #include <graphene/chain/account_object.hpp>
+#include <graphene/chain/vesting_balance_object.hpp>
+#include <graphene/chain/worker_object.hpp>
+
 #include <graphene/chain/protocol/vote.hpp>
 
 namespace graphene { namespace chain {
@@ -40,7 +43,7 @@ void_result worker_create_evaluator::do_evaluate(const worker_create_evaluator::
 } FC_CAPTURE_AND_RETHROW( (o) ) }
 
 
-struct worker_init_visitor 
+struct worker_init_visitor
 {
    typedef void result_type;
 

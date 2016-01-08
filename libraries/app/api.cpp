@@ -34,14 +34,14 @@
 #include <graphene/chain/market_object.hpp>
 #include <graphene/chain/transaction_object.hpp>
 #include <graphene/chain/withdraw_permission_object.hpp>
-#include <graphene/chain/worker_evaluator.hpp>
+#include <graphene/chain/worker_object.hpp>
 #include <graphene/chain/confidential_evaluator.hpp>
 
 #include <fc/crypto/hex.hpp>
 #include <fc/smart_ref_impl.hpp>
 
 namespace graphene { namespace app {
-     
+
     login_api::login_api(application& a)
     :_app(a)
     {
