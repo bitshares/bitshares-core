@@ -204,7 +204,7 @@ namespace graphene { namespace app {
        FC_ASSERT(_history_api);
        return *_history_api;
     }
-    
+
     fc::api<crypto_api> login_api::crypto() const
     {
        FC_ASSERT(_crypto_api);
@@ -256,6 +256,7 @@ namespace graphene { namespace app {
                result.push_back( aobj->borrower );
                break;
             } case custom_object_type:{
+              break;
             } case proposal_object_type:{
                const auto& aobj = dynamic_cast<const proposal_object*>(obj);
                assert( aobj != nullptr );
@@ -290,6 +291,7 @@ namespace graphene { namespace app {
                break;
             } case balance_object_type:{
                /** these are free from any accounts */
+               break;
             }
           }
        }
@@ -297,13 +299,17 @@ namespace graphene { namespace app {
        {
           switch( (impl_object_type)obj->id.type() )
           {
-                 case impl_global_property_object_type:{
-               } case impl_dynamic_global_property_object_type:{
-               } case impl_reserved0_object_type:{
-               } case impl_asset_dynamic_data_type:{
-               } case impl_asset_bitasset_data_type:{
+                 case impl_global_property_object_type:
                   break;
-               } case impl_account_balance_object_type:{
+                 case impl_dynamic_global_property_object_type:
+                  break;
+                 case impl_reserved0_object_type:
+                  break;
+                 case impl_asset_dynamic_data_type:
+                  break;
+                 case impl_asset_bitasset_data_type:
+                  break;
+                 case impl_account_balance_object_type:{
                   const auto& aobj = dynamic_cast<const account_balance_object*>(obj);
                   assert( aobj != nullptr );
                   result.push_back( aobj->owner );
@@ -328,12 +334,16 @@ namespace graphene { namespace app {
                   for( const auto& a : aobj->owner.account_auths )
                      result.push_back( a.first );
                   break;
-               } case impl_block_summary_object_type:{
-               } case impl_account_transaction_history_object_type:{
-               } case impl_chain_property_object_type: {
-               } case impl_witness_schedule_object_type: {
-               } case impl_budget_record_object_type: {
-               }
+               } case impl_block_summary_object_type:
+                  break;
+                 case impl_account_transaction_history_object_type:
+                  break;
+                 case impl_chain_property_object_type:
+                  break;
+                 case impl_witness_schedule_object_type:
+                  break;
+                 case impl_budget_record_object_type:
+                  break;
           }
        }
        return result;
