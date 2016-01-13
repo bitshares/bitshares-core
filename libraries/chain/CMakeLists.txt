@@ -1,6 +1,7 @@
 
 add_custom_target( build_hardfork_hpp
-                   COMMAND cat-parts hardfork.d include/graphene/chain/hardfork.hpp )
+                   COMMAND cat-parts hardfork.d "${CMAKE_CURRENT_BINARY_DIR}/include/graphene/chain/hardfork.hpp" )
+set_source_files_properties( "${CMAKE_CURRENT_BINARY_DIR}/include/graphene/chain/hardfork.hpp" PROPERTIES GENERATED TRUE )
 
 add_dependencies( build_hardfork_hpp cat-parts )
 
@@ -84,13 +85,13 @@ add_library( graphene_chain
              block_database.cpp
 
              ${HEADERS}
-             include/graphene/chain/hardfork.hpp
+             "${CMAKE_CURRENT_BINARY_DIR}/include/graphene/chain/hardfork.hpp"
            )
 
 add_dependencies( graphene_chain build_hardfork_hpp )
 target_link_libraries( graphene_chain fc graphene_db )
 target_include_directories( graphene_chain
-                            PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include" )
+                            PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include" "${CMAKE_CURRENT_BINARY_DIR}/include" )
 
 if(MSVC)
   set_source_files_properties( db_init.cpp db_block.cpp database.cpp block_database.cpp PROPERTIES COMPILE_FLAGS "/bigobj" )
