@@ -291,7 +291,7 @@ namespace graphene { namespace chain {
 
    struct by_asset;
    struct by_account;
-   struct by_balance;
+   struct by_account_asset;
    /**
     * @ingroup object_index
     */
@@ -299,7 +299,7 @@ namespace graphene { namespace chain {
       account_balance_object,
       indexed_by<
          ordered_unique< tag<by_id>, member< object, object_id_type, &object::id > >,
-         ordered_unique< tag<by_balance>, composite_key<
+         ordered_unique< tag<by_account_asset>, composite_key<
             account_balance_object,
             member<account_balance_object, account_id_type, &account_balance_object::owner>,
             member<account_balance_object, asset_id_type, &account_balance_object::asset_type> >
