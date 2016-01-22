@@ -189,30 +189,30 @@ void database::update_active_witnesses()
    {
       if( head_block_time() < HARDFORK_533_TIME )
       {
-      uint64_t total_votes = 0;
-      map<account_id_type, uint64_t> weights;
-      a.active.weight_threshold = 0;
-      a.active.clear();
+         uint64_t total_votes = 0;
+         map<account_id_type, uint64_t> weights;
+         a.active.weight_threshold = 0;
+         a.active.clear();
 
-      for( const witness_object& wit : wits )
-      {
-         weights.emplace(wit.witness_account, _vote_tally_buffer[wit.vote_id]);
-         total_votes += _vote_tally_buffer[wit.vote_id];
-      }
+         for( const witness_object& wit : wits )
+         {
+            weights.emplace(wit.witness_account, _vote_tally_buffer[wit.vote_id]);
+            total_votes += _vote_tally_buffer[wit.vote_id];
+         }
 
-      // total_votes is 64 bits. Subtract the number of leading low bits from 64 to get the number of useful bits,
-      // then I want to keep the most significant 16 bits of what's left.
-      int8_t bits_to_drop = std::max(int(boost::multiprecision::detail::find_msb(total_votes)) - 15, 0);
-      for( const auto& weight : weights )
-      {
-         // Ensure that everyone has at least one vote. Zero weights aren't allowed.
-         uint16_t votes = std::max((weight.second >> bits_to_drop), uint64_t(1) );
-         a.active.account_auths[weight.first] += votes;
-         a.active.weight_threshold += votes;
-      }
+         // total_votes is 64 bits. Subtract the number of leading low bits from 64 to get the number of useful bits,
+         // then I want to keep the most significant 16 bits of what's left.
+         int8_t bits_to_drop = std::max(int(boost::multiprecision::detail::find_msb(total_votes)) - 15, 0);
+         for( const auto& weight : weights )
+         {
+            // Ensure that everyone has at least one vote. Zero weights aren't allowed.
+            uint16_t votes = std::max((weight.second >> bits_to_drop), uint64_t(1) );
+            a.active.account_auths[weight.first] += votes;
+            a.active.weight_threshold += votes;
+         }
 
-      a.active.weight_threshold /= 2;
-      a.active.weight_threshold += 1;
+         a.active.weight_threshold /= 2;
+         a.active.weight_threshold += 1;
       }
       else
       {
@@ -273,30 +273,30 @@ void database::update_active_committee_members()
       {
          if( head_block_time() < HARDFORK_533_TIME )
          {
-         uint64_t total_votes = 0;
-         map<account_id_type, uint64_t> weights;
-         a.active.weight_threshold = 0;
-         a.active.clear();
+            uint64_t total_votes = 0;
+            map<account_id_type, uint64_t> weights;
+            a.active.weight_threshold = 0;
+            a.active.clear();
 
-         for( const committee_member_object& del : committee_members )
-         {
-            weights.emplace(del.committee_member_account, _vote_tally_buffer[del.vote_id]);
-            total_votes += _vote_tally_buffer[del.vote_id];
-         }
+            for( const committee_member_object& del : committee_members )
+            {
+               weights.emplace(del.committee_member_account, _vote_tally_buffer[del.vote_id]);
+               total_votes += _vote_tally_buffer[del.vote_id];
+            }
 
-         // total_votes is 64 bits. Subtract the number of leading low bits from 64 to get the number of useful bits,
-         // then I want to keep the most significant 16 bits of what's left.
-         int8_t bits_to_drop = std::max(int(boost::multiprecision::detail::find_msb(total_votes)) - 15, 0);
-         for( const auto& weight : weights )
-         {
-            // Ensure that everyone has at least one vote. Zero weights aren't allowed.
-            uint16_t votes = std::max((weight.second >> bits_to_drop), uint64_t(1) );
-            a.active.account_auths[weight.first] += votes;
-            a.active.weight_threshold += votes;
-         }
+            // total_votes is 64 bits. Subtract the number of leading low bits from 64 to get the number of useful bits,
+            // then I want to keep the most significant 16 bits of what's left.
+            int8_t bits_to_drop = std::max(int(boost::multiprecision::detail::find_msb(total_votes)) - 15, 0);
+            for( const auto& weight : weights )
+            {
+               // Ensure that everyone has at least one vote. Zero weights aren't allowed.
+               uint16_t votes = std::max((weight.second >> bits_to_drop), uint64_t(1) );
+               a.active.account_auths[weight.first] += votes;
+               a.active.weight_threshold += votes;
+            }
 
-         a.active.weight_threshold /= 2;
-         a.active.weight_threshold += 1;
+            a.active.weight_threshold /= 2;
+            a.active.weight_threshold += 1;
          }
          else
          {
