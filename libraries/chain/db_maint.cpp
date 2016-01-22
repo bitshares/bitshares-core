@@ -28,6 +28,7 @@
 #include <fc/uint128.hpp>
 
 #include <graphene/chain/database.hpp>
+#include <graphene/chain/hardfork.hpp>
 
 #include <graphene/chain/account_object.hpp>
 #include <graphene/chain/asset_object.hpp>
@@ -36,6 +37,7 @@
 #include <graphene/chain/committee_member_object.hpp>
 #include <graphene/chain/global_property_object.hpp>
 #include <graphene/chain/vesting_balance_object.hpp>
+#include <graphene/chain/vote_count.hpp>
 #include <graphene/chain/witness_object.hpp>
 #include <graphene/chain/worker_object.hpp>
 
@@ -183,7 +185,10 @@ void database::update_active_witnesses()
    }
 
    // Update witness authority
-   modify( get(GRAPHENE_WITNESS_ACCOUNT), [&]( account_object& a ) {
+   modify( get(GRAPHENE_WITNESS_ACCOUNT), [&]( account_object& a )
+   {
+      if( head_block_time() < HARDFORK_533_TIME )
+      {
       uint64_t total_votes = 0;
       map<account_id_type, uint64_t> weights;
       a.active.weight_threshold = 0;
@@ -208,7 +213,15 @@ void database::update_active_witnesses()
 
       a.active.weight_threshold /= 2;
       a.active.weight_threshold += 1;
-   });
+      }
+      else
+      {
+         vote_counter vc;
+         for( const witness_object& wit : wits )
+            vc.add( wit.witness_account, _vote_tally_buffer[wit.vote_id] );
+         vc.finish( a.active );
+      }
+   } );
 
    modify(gpo, [&]( global_property_object& gp ){
       gp.active_witnesses.clear();
@@ -256,7 +269,10 @@ void database::update_active_committee_members()
    // Update committee authorities
    if( !committee_members.empty() )
    {
-      modify(get(GRAPHENE_COMMITTEE_ACCOUNT), [&](account_object& a) {
+      modify(get(GRAPHENE_COMMITTEE_ACCOUNT), [&](account_object& a)
+      {
+         if( head_block_time() < HARDFORK_533_TIME )
+         {
          uint64_t total_votes = 0;
          map<account_id_type, uint64_t> weights;
          a.active.weight_threshold = 0;
@@ -281,7 +297,15 @@ void database::update_active_committee_members()
 
          a.active.weight_threshold /= 2;
          a.active.weight_threshold += 1;
-      });
+         }
+         else
+         {
+            vote_counter vc;
+            for( const committee_member_object& cm : committee_members )
+               vc.add( cm.committee_member_account, _vote_tally_buffer[cm.vote_id] );
+            vc.finish( a.active );
+         }
+      } );
       modify(get(GRAPHENE_RELAXED_COMMITTEE_ACCOUNT), [&](account_object& a) {
          a.active = get(GRAPHENE_COMMITTEE_ACCOUNT).active;
       });
