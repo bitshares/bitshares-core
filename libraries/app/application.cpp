@@ -134,6 +134,21 @@ namespace detail {
                }
             }
          }
+         else
+         {
+            vector<string> seeds = {
+               "testnet.bitshares.eu:11010",
+            };
+            for( const string& endpoint_string : seeds )
+            {
+               std::vector<fc::ip::endpoint> endpoints = resolve_string_to_ip_endpoints(endpoint_string);
+               for (const fc::ip::endpoint& endpoint : endpoints)
+               {
+                  ilog("Adding seed node ${endpoint}", ("endpoint", endpoint));
+                  _p2p_network->add_node(endpoint);
+               }
+            }
+         }
 
          if( _options->count("p2p-endpoint") )
             _p2p_network->listen_on_endpoint(fc::ip::endpoint::from_string(_options->at("p2p-endpoint").as<string>()), true);
