@@ -26,6 +26,7 @@
 
 #include <graphene/chain/database.hpp>
 #include <graphene/chain/exceptions.hpp>
+#include <graphene/chain/hardfork.hpp>
 
 #include <graphene/chain/asset_object.hpp>
 #include <graphene/chain/account_object.hpp>
@@ -1331,5 +1332,155 @@ BOOST_AUTO_TEST_CASE(zero_second_vbo)
 }
 
 // TODO:  Write linear VBO tests
+
+BOOST_AUTO_TEST_CASE( top_n_special )
+{
+   ACTORS( (alice)(bob)(chloe)(dan)(izzy)(stan) );
+
+   generate_blocks( HARDFORK_516_TIME );
+
+   try
+   {
+      {
+         //
+         // Izzy (issuer)
+         // Stan (special authority)
+         // Alice, Bob, Chloe, Dan (ABCD)
+         //
+
+         asset_id_type topn_id = create_user_issued_asset( "TOPN", izzy_id(db), 0 ).id;
+         authority stan_owner_auth = stan_id(db).owner;
+         authority stan_active_auth = stan_id(db).active;
+
+         // set SA, wait for maint interval
+         // TODO:  account_create_operation
+         // TODO:  multiple accounts with different n for same asset
+
+         {
+            top_holders_special_authority top2, top3;
+
+            top2.num_top_holders = 2;
+            top2.asset = topn_id;
+
+            top3.num_top_holders = 3;
+            top3.asset = topn_id;
+
+            account_update_operation op;
+            op.account = stan_id;
+            op.extensions.value.active_special_authority = top3;
+            op.extensions.value.owner_special_authority = top2;
+
+            signed_transaction tx;
+            tx.operations.push_back( op );
+
+            set_expiration( db, tx );
+            sign( tx, stan_private_key );
+
+            PUSH_TX( db, tx );
+
+            // TODO:  Check special_authority is properly set
+            // TODO:  Do it in steps
+         }
+
+         // wait for maint interval
+         // make sure we don't have any authority as account hasn't gotten distributed yet
+         generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+
+         BOOST_CHECK( stan_id(db).owner  == stan_owner_auth );
+         BOOST_CHECK( stan_id(db).active == stan_active_auth );
+
+         // issue some to Alice, make sure she gets control of Stan
+
+         // we need to set_expiration() before issue_uia() because the latter doens't call it #11
+         set_expiration( db, trx );  // #11
+         issue_uia( alice_id, asset( 1000, topn_id ) );
+
+         BOOST_CHECK( stan_id(db).owner  == stan_owner_auth );
+         BOOST_CHECK( stan_id(db).active == stan_active_auth );
+
+         generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+
+         /*  NOTE - this was an old check from an earlier implementation that only allowed SA for LTM's
+         // no boost yet, we need to upgrade to LTM before mechanics apply to Stan
+         BOOST_CHECK( stan_id(db).owner  == stan_owner_auth );
+         BOOST_CHECK( stan_id(db).active == stan_active_auth );
+
+         set_expiration( db, trx );  // #11
+         upgrade_to_lifetime_member(stan_id);
+         generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+         */
+
+         BOOST_CHECK( stan_id(db).owner  == authority(  501, alice_id, 1000 ) );
+         BOOST_CHECK( stan_id(db).active == authority(  501, alice_id, 1000 ) );
+
+         // give asset to Stan, make sure owner doesn't change at all
+         set_expiration( db, trx );  // #11
+         transfer( alice_id, stan_id, asset( 1000, topn_id ) );
+
+         generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+
+         BOOST_CHECK( stan_id(db).owner  == authority(  501, alice_id, 1000 ) );
+         BOOST_CHECK( stan_id(db).active == authority(  501, alice_id, 1000 ) );
+
+         set_expiration( db, trx );  // #11
+         issue_uia( chloe_id, asset( 131000, topn_id ) );
+
+         // now Chloe has 131,000 and Stan has 1k.  Make sure change occurs at next maintenance interval.
+         // NB, 131072 is a power of 2; the number 131000 was chosen so that we need a bitshift, but
+         // if we put the 1000 from Stan's balance back into play, we need a different bitshift.
+
+         // we use Chloe so she can be displaced by Bob later (showing the tiebreaking logic).
+
+         // Check Alice is still in control, because we're deferred to next maintenance interval
+         BOOST_CHECK( stan_id(db).owner  == authority(  501, alice_id, 1000 ) );
+         BOOST_CHECK( stan_id(db).active == authority(  501, alice_id, 1000 ) );
+
+         generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+
+         BOOST_CHECK( stan_id(db).owner  == authority( 32751, chloe_id, 65500 ) );
+         BOOST_CHECK( stan_id(db).active == authority( 32751, chloe_id, 65500 ) );
+
+         // put Alice's stake back in play
+         set_expiration( db, trx );  // #11
+         transfer( stan_id, alice_id, asset( 1000, topn_id ) );
+
+         generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+
+         BOOST_CHECK( stan_id(db).owner  == authority( 33001, alice_id, 500, chloe_id, 65500 ) );
+         BOOST_CHECK( stan_id(db).active == authority( 33001, alice_id, 500, chloe_id, 65500 ) );
+
+         // issue 200,000 to Dan to cause another bitshift.
+         set_expiration( db, trx );  // #11
+         issue_uia( dan_id, asset( 200000, topn_id ) );
+         generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+
+         // 200000 Dan
+         // 131000 Chloe
+         // 1000 Alice
+
+         BOOST_CHECK( stan_id(db).owner  == authority( 41376,                chloe_id, 32750, dan_id, 50000 ) );
+         BOOST_CHECK( stan_id(db).active == authority( 41501, alice_id, 250, chloe_id, 32750, dan_id, 50000 ) );
+
+         // have Alice send all but 1 back to Stan, verify that we clamp Alice at one vote
+         set_expiration( db, trx );  // #11
+         transfer( alice_id, stan_id, asset( 999, topn_id ) );
+         generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+
+         BOOST_CHECK( stan_id(db).owner  == authority( 41376,                chloe_id, 32750, dan_id, 50000 ) );
+         BOOST_CHECK( stan_id(db).active == authority( 41376, alice_id,   1, chloe_id, 32750, dan_id, 50000 ) );
+
+         // send 131k to Bob so he's tied with Chloe, verify he displaces Chloe in top2
+         set_expiration( db, trx );  // #11
+         issue_uia( bob_id, asset( 131000, topn_id ) );
+         generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+
+         BOOST_CHECK( stan_id(db).owner  == authority( 41376, bob_id, 32750,                  dan_id, 50000 ) );
+         BOOST_CHECK( stan_id(db).active == authority( 57751, bob_id, 32750, chloe_id, 32750, dan_id, 50000 ) );
+
+         // TODO more rounding checks
+      }
+
+   } FC_LOG_AND_RETHROW()
+}
 
 BOOST_AUTO_TEST_SUITE_END()

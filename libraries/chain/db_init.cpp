@@ -36,6 +36,7 @@
 #include <graphene/chain/market_object.hpp>
 #include <graphene/chain/operation_history_object.hpp>
 #include <graphene/chain/proposal_object.hpp>
+#include <graphene/chain/special_authority_object.hpp>
 #include <graphene/chain/transaction_object.hpp>
 #include <graphene/chain/vesting_balance_object.hpp>
 #include <graphene/chain/withdraw_permission_object.hpp>
@@ -208,6 +209,7 @@ void database::initialize_indexes()
    add_index< primary_index<simple_index<chain_property_object          > > >();
    add_index< primary_index<simple_index<witness_schedule_object        > > >();
    add_index< primary_index<simple_index<budget_record_object           > > >();
+   add_index< primary_index< special_authority_index                      > >();
 }
 
 void database::init_genesis(const genesis_state_type& genesis_state)

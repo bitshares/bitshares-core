@@ -344,6 +344,8 @@ namespace graphene { namespace app {
                   break;
                  case impl_budget_record_object_type:
                   break;
+                 case impl_special_authority_object_type:
+                  break;
           }
        }
        return result;

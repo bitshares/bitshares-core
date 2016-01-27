@@ -36,6 +36,8 @@ struct vote_counter
    template< typename Component >
    void add( Component who, uint64_t votes )
    {
+      if( votes == 0 )
+         return;
       assert( votes <= last_votes );
       last_votes = votes;
       if( bitshift == -1 )

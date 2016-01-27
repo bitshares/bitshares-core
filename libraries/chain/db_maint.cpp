@@ -36,6 +36,7 @@
 #include <graphene/chain/chain_property_object.hpp>
 #include <graphene/chain/committee_member_object.hpp>
 #include <graphene/chain/global_property_object.hpp>
+#include <graphene/chain/special_authority_object.hpp>
 #include <graphene/chain/vesting_balance_object.hpp>
 #include <graphene/chain/vote_count.hpp>
 #include <graphene/chain/witness_object.hpp>
@@ -465,6 +466,62 @@ void database::process_budget()
    FC_CAPTURE_AND_RETHROW()
 }
 
+template< typename Visitor >
+void visit_special_authorities( const database& db, Visitor visit )
+{
+   const auto& sa_idx = db.get_index_type< special_authority_index >().indices().get<by_id>();
+
+   for( const special_authority_object& sao : sa_idx )
+   {
+      const account_object& acct = sao.account(db);
+      if( acct.owner_special_authority.which() != special_authority::tag< no_special_authority >::value )
+      {
+         visit( acct, true, acct.owner_special_authority );
+      }
+      if( acct.active_special_authority.which() != special_authority::tag< no_special_authority >::value )
+      {
+         visit( acct, false, acct.active_special_authority );
+      }
+   }
+}
+
+void update_top_n_authorities( database& db )
+{
+   visit_special_authorities( db,
+   [&]( const account_object& acct, bool is_owner, const special_authority& auth )
+   {
+      if( auth.which() == special_authority::tag< top_holders_special_authority >::value )
+      {
+         // use index to grab the top N holders of the asset and vote_counter to obtain the weights
+
+         const top_holders_special_authority& tha = auth.get< top_holders_special_authority >();
+         vote_counter vc;
+         const auto& bal_idx = db.get_index_type< account_balance_index >().indices().get< by_asset_balance >();
+         uint8_t num_needed = tha.num_top_holders;
+         if( num_needed == 0 )
+            return;
+
+         // find accounts
+         const auto range = bal_idx.equal_range( boost::make_tuple( tha.asset ) );
+         for( const account_balance_object& bal : boost::make_iterator_range( range.first, range.second ) )
+         {
+             assert( bal.asset_type == tha.asset );
+             if( bal.owner == acct.id )
+                continue;
+             vc.add( bal.owner, bal.balance.value );
+             --num_needed;
+             if( num_needed == 0 )
+                break;
+         }
+
+         db.modify( acct, [&]( account_object& a )
+         {
+            vc.finish( is_owner ? a.owner : a.active );
+         } );
+      }
+   } );
+}
+
 void database::perform_chain_maintenance(const signed_block& next_block, const global_property_object& global_props)
 {
    const auto& gpo = get_global_properties();
@@ -545,7 +602,10 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
       }
    } fee_helper(*this, gpo);
 
-   perform_account_maintenance(std::tie(tally_helper, fee_helper));
+   perform_account_maintenance(std::tie(
+      tally_helper,
+      fee_helper
+      ));
 
    struct clear_canary {
       clear_canary(vector<uint64_t>& target): target(target){}
@@ -557,6 +617,7 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
                 b(_committee_count_histogram_buffer),
                 c(_vote_tally_buffer);
 
+   update_top_n_authorities(*this);
    update_active_witnesses();
    update_active_committee_members();
    update_worker_votes();
