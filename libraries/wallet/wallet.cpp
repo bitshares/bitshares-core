@@ -1914,8 +1914,8 @@ public:
          limit_order_cancel_operation op;
          op.fee_paying_account = get_object<limit_order_object>(order_id).seller;
          op.order = order_id;
-         set_operation_fees( trx, _remote_db->get_global_properties().parameters.current_fees);
          trx.operations = {op};
+         set_operation_fees( trx, _remote_db->get_global_properties().parameters.current_fees);
 
          trx.validate();
          return sign_transaction(trx, broadcast);
