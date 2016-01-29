@@ -464,6 +464,11 @@ namespace graphene { namespace app {
     {
        return fc::ecc::range_proof_sign( min_value, commit, commit_blind, nonce, base10_exp, min_bits, actual_value );
     }
+    
+    fc::ecc::public_key crypto_api::child(fc::ecc::public_key public_key, fc::sha256 child)
+    {
+        return  public_key_type( public_key.child( child ) );
+    }
                                
     verify_range_proof_rewind_result crypto_api::verify_range_proof_rewind( const blind_factor_type& nonce,
                                                                             const commitment_type& commit, 

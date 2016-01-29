@@ -222,6 +222,7 @@ namespace graphene { namespace app {
                                              uint8_t min_bits,
                                              uint64_t actual_value );
                                        
+         fc::ecc::public_key child(fc::ecc::public_key public_key, fc::sha256 child);
          
          verify_range_proof_rewind_result verify_range_proof_rewind( const blind_factor_type& nonce,
                                                                      const fc::ecc::commitment_type& commit, 
@@ -313,6 +314,7 @@ FC_API(graphene::app::crypto_api,
        (verify_sum)
        (verify_range)
        (range_proof_sign)
+       (child)
        (verify_range_proof_rewind)
        (range_get_info)
      )
