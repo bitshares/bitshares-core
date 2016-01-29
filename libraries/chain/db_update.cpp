@@ -263,7 +263,7 @@ void database::clear_expired_orders()
             const limit_order_object& order = *limit_index.begin();
             canceler.fee_paying_account = order.seller;
             canceler.order = order.id;
-            cancel_context.skip_fee = true;
+            canceler.fee = current_fee_schedule().calculate_fee( canceler );
             apply_operation(cancel_context, canceler);
          }
      });
