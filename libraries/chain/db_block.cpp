@@ -279,14 +279,14 @@ signed_block database::generate_block(
    const fc::ecc::private_key& block_signing_private_key,
    uint32_t skip /* = 0 */
    )
-{
+{ try {
    signed_block result;
    detail::with_skip_flags( *this, skip, [&]()
    {
       result = _generate_block( when, witness_id, block_signing_private_key );
    } );
    return result;
-}
+} FC_CAPTURE_AND_RETHROW() }
 
 signed_block database::_generate_block(
    fc::time_point_sec when,

@@ -152,14 +152,14 @@ void database::update_last_irreversible_block()
 }
 
 void database::clear_expired_transactions()
-{
+{ try {
    //Look for expired transactions in the deduplication list, and remove them.
    //Transactions must have expired by at least two forking windows in order to be removed.
    auto& transaction_idx = static_cast<transaction_index&>(get_mutable_index(implementation_ids, impl_transaction_object_type));
    const auto& dedupe_index = transaction_idx.indices().get<by_expiration>();
    while( (!dedupe_index.empty()) && (head_block_time() > dedupe_index.rbegin()->trx.expiration) )
       transaction_idx.remove(*dedupe_index.rbegin());
-}
+} FC_CAPTURE_AND_RETHROW() }
 
 void database::clear_expired_proposals()
 {
@@ -250,7 +250,7 @@ bool database::check_for_blackswan( const asset_object& mia, bool enable_black_s
 }
 
 void database::clear_expired_orders()
-{
+{ try {
    detail::with_skip_flags( *this,
       get_node_properties().skip_flags | skip_authority_check, [&](){
          transaction_evaluation_state cancel_context(this);
@@ -263,6 +263,7 @@ void database::clear_expired_orders()
             const limit_order_object& order = *limit_index.begin();
             canceler.fee_paying_account = order.seller;
             canceler.order = order.id;
+            cancel_context.skip_fee = true;
             apply_operation(cancel_context, canceler);
          }
      });
@@ -362,7 +363,7 @@ void database::clear_expired_orders()
          });
       }
    }
-}
+} FC_CAPTURE_AND_RETHROW() }
 
 void database::update_expired_feeds()
 {
