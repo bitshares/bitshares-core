@@ -331,7 +331,7 @@ FC_REFLECT_DERIVED( graphene::chain::account_object,
                     (membership_expiration_date)(registrar)(referrer)(lifetime_referrer)
                     (network_fee_percentage)(lifetime_referrer_fee_percentage)(referrer_rewards_percentage)
                     (name)(owner)(active)(options)(statistics)(whitelisting_accounts)(blacklisting_accounts)
-                    (whitelisting_accounts)(blacklisted_accounts)
+                    (whitelisted_accounts)(blacklisted_accounts)
                     (cashback_vb) )
 
 FC_REFLECT_DERIVED( graphene::chain::account_balance_object,
