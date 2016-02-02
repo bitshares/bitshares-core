@@ -130,6 +130,7 @@ void blind_transfer_operation::validate()const
          FC_ASSERT( info.max_value <= GRAPHENE_MAX_SHARE_SUPPLY );
       }
    }
+   FC_ASSERT( fc::ecc::verify_sum( in, out, net_public ), "", ("net_public", net_public) );
 } FC_CAPTURE_AND_RETHROW( (*this) ) }
 
 share_type blind_transfer_operation::calculate_fee( const fee_parameters_type& k )const
