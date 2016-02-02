@@ -20,6 +20,7 @@
  */
 #pragma once
 #include <graphene/chain/exceptions.hpp>
+#include <graphene/chain/transaction_evaluation_state.hpp>
 #include <graphene/chain/protocol/operations.hpp>
 
 namespace graphene { namespace chain {
@@ -224,10 +225,13 @@ namespace graphene { namespace chain {
          const auto& op = o.get<typename DerivedEvaluator::operation_type>();
 
          prepare_fee(op.fee_payer(), op.fee);
-         GRAPHENE_ASSERT( core_fee_paid >= db().current_fee_schedule().calculate_fee( op ).amount,
-                    insufficient_fee,
-                    "Insufficient Fee Paid",
-                    ("core_fee_paid",core_fee_paid)("required",db().current_fee_schedule().calculate_fee( op ).amount) );
+         if( !trx_state->skip_fee_schedule_check )
+         {
+            GRAPHENE_ASSERT( core_fee_paid >= db().current_fee_schedule().calculate_fee( op ).amount,
+                       insufficient_fee,
+                       "Insufficient Fee Paid",
+                       ("core_fee_paid",core_fee_paid)("required",db().current_fee_schedule().calculate_fee( op ).amount) );
+         }
 
          return eval->do_evaluate(op);
       }
