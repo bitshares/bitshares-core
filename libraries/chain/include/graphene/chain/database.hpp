@@ -370,7 +370,7 @@ namespace graphene { namespace chain {
          /**
           * @return true if the order was completely filled and thus freed.
           */
-         bool fill_order( const limit_order_object& order, const asset& pays, const asset& receives );
+         bool fill_order( const limit_order_object& order, const asset& pays, const asset& receives, bool cull_if_small );
          bool fill_order( const call_order_object& order, const asset& pays, const asset& receives );
          bool fill_order( const force_settlement_object& settle, const asset& pays, const asset& receives );
 
