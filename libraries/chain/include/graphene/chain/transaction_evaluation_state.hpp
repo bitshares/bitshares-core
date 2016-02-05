@@ -45,5 +45,7 @@ namespace graphene { namespace chain {
          const signed_transaction*        _trx = nullptr;
          database*                        _db = nullptr;
          bool                             _is_proposed_trx = false;
+         bool                             skip_fee = false;
+         bool                             skip_fee_schedule_check = false;
    };
 } } // namespace graphene::chain
