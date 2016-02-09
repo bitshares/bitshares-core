@@ -1985,8 +1985,8 @@ public:
          limit_order_cancel_operation op;
          op.fee_paying_account = get_object<limit_order_object>(order_id).seller;
          op.order = order_id;
-         set_operation_fees( trx, _remote_db->get_global_properties().parameters.current_fees);
          trx.operations = {op};
+         set_operation_fees( trx, _remote_db->get_global_properties().parameters.current_fees);
 
          trx.validate();
          return sign_transaction(trx, broadcast);
@@ -3446,7 +3446,17 @@ vector< signed_transaction > wallet_api_impl::import_balance( string name_or_id,
       {
          optional< private_key_type > key = wif_to_key( wif_key );
          FC_ASSERT( key.valid(), "Invalid private key" );
-         addrs.push_back( key->get_public_key() );
+         fc::ecc::public_key pk = key->get_public_key();
+         addrs.push_back( pk );
+         keys[addrs.back()] = *key;
+         // see chain/balance_evaluator.cpp
+         addrs.push_back( pts_address( pk, false, 56 ) );
+         keys[addrs.back()] = *key;
+         addrs.push_back( pts_address( pk, true, 56 ) );
+         keys[addrs.back()] = *key;
+         addrs.push_back( pts_address( pk, false, 0 ) );
+         keys[addrs.back()] = *key;
+         addrs.push_back( pts_address( pk, true, 0 ) );
          keys[addrs.back()] = *key;
       }
    }
@@ -3883,7 +3893,7 @@ blind_confirmation wallet_api::blind_transfer_help( string from_key_or_label,
 blind_confirmation wallet_api::transfer_to_blind( string from_account_id_or_name, 
                                                   string asset_symbol,
                                                   /** map from key or label to amount */
-                                                  map<string, string> to_amounts, 
+                                                  vector<pair<string, string>> to_amounts, 
                                                   bool broadcast )
 { try {
    FC_ASSERT( !is_locked() );

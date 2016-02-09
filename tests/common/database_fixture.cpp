@@ -322,8 +322,10 @@ void database_fixture::generate_blocks(fc::time_point_sec timestamp, bool miss_i
    if( miss_intermediate_blocks )
    {
       generate_block();
-      auto slots_to_miss = db.get_slot_at_time(timestamp) - 1;
-      if( slots_to_miss <= 0 ) return;
+      auto slots_to_miss = db.get_slot_at_time(timestamp);
+      if( slots_to_miss <= 1 )
+         return;
+      --slots_to_miss;
       generate_block(~0, init_account_priv_key, slots_to_miss);
       return;
    }

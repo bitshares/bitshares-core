@@ -646,7 +646,6 @@ void database::init_genesis(const genesis_state_type& genesis_state)
       for( uint32_t i = 1; i <= genesis_state.initial_active_witnesses; ++i )
       {
          p.active_witnesses.insert(i);
-         p.witness_accounts.insert(get(witness_id_type(i)).witness_account);
       }
    });
 
