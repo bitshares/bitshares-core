@@ -759,7 +759,7 @@ class wallet_api
       blind_confirmation transfer_to_blind( string from_account_id_or_name, 
                                             string asset_symbol,
                                             /** map from key or label to amount */
-                                            map<string, string> to_amounts, 
+                                            vector<pair<string, string>> to_amounts, 
                                             bool broadcast = false );
 
       /**
