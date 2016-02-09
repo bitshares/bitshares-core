@@ -269,14 +269,6 @@ namespace graphene { namespace chain {
                operation::tag<typename EvaluatorType::operation_type>::value].reset( new op_evaluator_impl<EvaluatorType>() );
          }
 
-         template<typename EvaluatorType>
-         void register_evaluation_observer( evaluation_observer& observer )
-         {
-            unique_ptr<op_evaluator>& op_eval = _operation_evaluators[operation::tag<typename EvaluatorType::operation_type>::value];
-            op_eval->eval_observers.push_back( &observer );
-            return;
-         }
-
          //////////////////// db_balance.cpp ////////////////////
 
          /**
