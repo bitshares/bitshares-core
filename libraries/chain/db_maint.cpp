@@ -213,13 +213,6 @@ void database::update_active_witnesses()
                      [](const witness_object& w) {
          return w.id;
       });
-      gp.witness_accounts.clear();
-      gp.witness_accounts.reserve(wits.size());
-      std::transform(wits.begin(), wits.end(),
-                     std::inserter(gp.witness_accounts, gp.witness_accounts.end()),
-                     [](const witness_object& w) {
-         return w.witness_account;
-      });
    });
 
 } FC_CAPTURE_AND_RETHROW() }

@@ -1137,8 +1137,9 @@ BOOST_AUTO_TEST_CASE( witness_feeds )
       generate_block();
       const asset_object& bit_usd = get_asset("USDBIT");
       auto& global_props = db.get_global_properties();
-      const vector<account_id_type> active_witnesses(global_props.witness_accounts.begin(),
-                                                      global_props.witness_accounts.end());
+      vector<account_id_type> active_witnesses;
+      for( const witness_id_type& wit_id : global_props.active_witnesses )
+         active_witnesses.push_back( wit_id(db).witness_account );
       BOOST_REQUIRE_EQUAL(active_witnesses.size(), 10);
 
       asset_publish_feed_operation op;
