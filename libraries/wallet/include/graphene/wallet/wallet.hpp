@@ -765,10 +765,9 @@ class wallet_api
        *  who sent it.
        *
        *  @param opt_from - if not empty and the sender is a unknown public key, then the unknown public key will be given the label opt_from
-       *  @param owner - optional, when owner is emtpy (owner == authority()) this receipt must be on the blockchain.  Transfers may save their confirmation prior to broadcast. 
        *  @param confirmation_receipt - a base58 encoded stealth confirmation 
        */
-      blind_receipt receive_blind_transfer( string confirmation_receipt, string opt_from, string opt_memo, optional<authority> owner );
+      blind_receipt receive_blind_transfer( string confirmation_receipt, string opt_from, string opt_memo );
 
       /**
        *  Transfers a public balance from @from to one or more blinded balances using a

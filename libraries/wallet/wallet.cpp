@@ -3704,7 +3704,7 @@ blind_confirmation wallet_api::transfer_from_blind( string from_blind_account_ke
        conf_output.confirmation.encrypted_memo = change_output.confirmation.encrypted_memo;
        conf_output.confirmation_receipt = conf_output.confirmation;
        //try { 
-       receive_blind_transfer( conf_output.confirmation_receipt, from_blind_account_key_or_label, "@"+to_account.name, change_output.auth );
+       receive_blind_transfer( conf_output.confirmation_receipt, from_blind_account_key_or_label, "@"+to_account.name );
        //} catch ( ... ){}
    }
    
@@ -3882,7 +3882,7 @@ blind_confirmation wallet_api::blind_transfer_help( string from_key_or_label,
    {
       for( const auto& out : confirm.outputs )
       {
-         try { receive_blind_transfer( out.confirmation_receipt, from_key_or_label, "", optional<authority>() ); } catch ( ... ){}
+         try { receive_blind_transfer( out.confirmation_receipt, from_key_or_label, "" ); } catch ( ... ){}
       }
    }
 
@@ -3971,14 +3971,14 @@ blind_confirmation wallet_api::transfer_to_blind( string from_account_id_or_name
    {
       for( const auto& out : confirm.outputs )
       {
-         try { receive_blind_transfer( out.confirmation_receipt, "@"+from_account.name, "from @"+from_account.name, optional<authority>() ); } catch ( ... ){}
+         try { receive_blind_transfer( out.confirmation_receipt, "@"+from_account.name, "from @"+from_account.name ); } catch ( ... ){}
       }
    }
 
    return confirm;
 } FC_CAPTURE_AND_RETHROW( (from_account_id_or_name)(asset_symbol)(to_amounts) ) }
 
-blind_receipt wallet_api::receive_blind_transfer( string confirmation_receipt, string opt_from, string opt_memo, optional<authority> owner )
+blind_receipt wallet_api::receive_blind_transfer( string confirmation_receipt, string opt_from, string opt_memo )
 {
    FC_ASSERT( !is_locked() );
    stealth_confirmation conf(confirmation_receipt);
@@ -4003,7 +4003,6 @@ blind_receipt wallet_api::receive_blind_transfer( string confirmation_receipt, s
    auto plain_memo = fc::aes_decrypt( secret, conf.encrypted_memo );
    auto memo = fc::raw::unpack<stealth_confirmation::memo_data>( plain_memo );
 
-
    result.to_key   = *conf.to;
    result.to_label = get_key_label( result.to_key );
    if( memo.from ) 
@@ -4027,18 +4026,6 @@ blind_receipt wallet_api::receive_blind_transfer( string confirmation_receipt, s
    auto commtiment_test = fc::ecc::blind( memo.blinding_factor, memo.amount.amount.value );
    FC_ASSERT( fc::ecc::verify_sum( {commtiment_test}, {memo.commitment}, 0 ) );
    
-   vector<blinded_balance_object> bbal;
-   if( owner.valid() )
-   {
-       // When owner is provided, do not require the commitment to be on the blockchain yet... This allows the receipt to be saved before it is broadcasted.
-       blinded_balance_object b;
-       b.owner = *owner;
-       bbal.push_back(b);
-   } else {
-       bbal = my->_remote_db->get_blinded_balances( {memo.commitment} );
-       FC_ASSERT( bbal.size(), "commitment not found in blockchain", ("memo",memo) );
-   }
-
    blind_balance bal;
    bal.amount = memo.amount;
    bal.to     = *conf.to;
@@ -4048,21 +4035,20 @@ blind_receipt wallet_api::receive_blind_transfer( string confirmation_receipt, s
    bal.commitment = memo.commitment;
    bal.used = false;
 
-   result.control_authority = bbal.front().owner;
+   auto child_pubkey = child_priv_key.get_public_key();
+   auto owner = authority(1, public_key_type(child_pubkey), 1);
+   result.control_authority = owner;
    result.data = memo;
 
-
-   auto child_key_itr = bbal.front().owner.key_auths.find( child_priv_key.get_public_key() );
-
-   if( child_key_itr != bbal.front().owner.key_auths.end() )
+   auto child_key_itr = owner.key_auths.find( child_pubkey );
+   if( child_key_itr != owner.key_auths.end() )
       my->_keys[child_key_itr->first] = key_to_wif( child_priv_key );
-
-
+   
    // my->_wallet.blinded_balances[memo.amount.asset_id][bal.to].push_back( bal );
 
    result.date = fc::time_point::now();
    my->_wallet.blind_receipts.insert( result );
-   my->_keys[child_priv_key.get_public_key()] = key_to_wif( child_priv_key );
+   my->_keys[child_pubkey] = key_to_wif( child_priv_key );
 
    save_wallet_file();
 
