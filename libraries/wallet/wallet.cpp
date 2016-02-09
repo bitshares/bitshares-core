@@ -3676,7 +3676,7 @@ blind_confirmation wallet_api::transfer_from_blind( string from_blind_account_ke
 
    auto conf = blind_transfer_help( from_blind_account_key_or_label,
                                from_blind_account_key_or_label, 
-                               blind_in, symbol, false, true );
+                               blind_in, symbol, false, true/*to_temp*/ );
    FC_ASSERT( conf.outputs.size() > 0 );
 
    auto to_account = my->get_account( to_account_id_or_name );
@@ -3690,6 +3690,24 @@ blind_confirmation wallet_api::transfer_from_blind( string from_blind_account_ke
    conf.trx.operations.push_back(from_blind);
    ilog( "about to validate" );
    conf.trx.validate();
+   
+   if( broadcast && conf.outputs.size() == 2 ) {
+       
+       // Save the change
+       blind_confirmation::output conf_output;
+       blind_confirmation::output change_output = conf.outputs[0];
+       
+       // The wallet must have a private key for confirmation.to, this is used to decrypt the memo
+       public_key_type from_key = get_public_key(from_blind_account_key_or_label);
+       conf_output.confirmation.to = from_key;
+       conf_output.confirmation.one_time_key = change_output.confirmation.one_time_key;
+       conf_output.confirmation.encrypted_memo = change_output.confirmation.encrypted_memo;
+       conf_output.confirmation_receipt = conf_output.confirmation;
+       //try { 
+       receive_blind_transfer( conf_output.confirmation_receipt, from_blind_account_key_or_label, "@"+to_account.name, change_output.auth );
+       //} catch ( ... ){}
+   }
+   
    ilog( "about to broadcast" );
    conf.trx = sign_transaction( conf.trx, broadcast );
 
@@ -3864,7 +3882,7 @@ blind_confirmation wallet_api::blind_transfer_help( string from_key_or_label,
    {
       for( const auto& out : confirm.outputs )
       {
-         try { receive_blind_transfer( out.confirmation_receipt, from_key_or_label, "" ); } catch ( ... ){}
+         try { receive_blind_transfer( out.confirmation_receipt, from_key_or_label, "", optional<authority>() ); } catch ( ... ){}
       }
    }
 
@@ -3953,14 +3971,14 @@ blind_confirmation wallet_api::transfer_to_blind( string from_account_id_or_name
    {
       for( const auto& out : confirm.outputs )
       {
-         try { receive_blind_transfer( out.confirmation_receipt, "@"+from_account.name, "from @"+from_account.name ); } catch ( ... ){}
+         try { receive_blind_transfer( out.confirmation_receipt, "@"+from_account.name, "from @"+from_account.name, optional<authority>() ); } catch ( ... ){}
       }
    }
 
    return confirm;
 } FC_CAPTURE_AND_RETHROW( (from_account_id_or_name)(asset_symbol)(to_amounts) ) }
 
-blind_receipt wallet_api::receive_blind_transfer( string confirmation_receipt, string opt_from, string opt_memo )
+blind_receipt wallet_api::receive_blind_transfer( string confirmation_receipt, string opt_from, string opt_memo, optional<authority> owner )
 {
    FC_ASSERT( !is_locked() );
    stealth_confirmation conf(confirmation_receipt);
@@ -4009,8 +4027,17 @@ blind_receipt wallet_api::receive_blind_transfer( string confirmation_receipt, s
    auto commtiment_test = fc::ecc::blind( memo.blinding_factor, memo.amount.amount.value );
    FC_ASSERT( fc::ecc::verify_sum( {commtiment_test}, {memo.commitment}, 0 ) );
    
-   auto bbal = my->_remote_db->get_blinded_balances( {memo.commitment} );
-   FC_ASSERT( bbal.size(), "commitment not found in blockchain", ("memo",memo) );
+   vector<blinded_balance_object> bbal;
+   if( owner.valid() )
+   {
+       // When owner is provided, do not require the commitment to be on the blockchain yet... This allows the receipt to be saved before it is broadcasted.
+       blinded_balance_object b;
+       b.owner = *owner;
+       bbal.push_back(b);
+   } else {
+       bbal = my->_remote_db->get_blinded_balances( {memo.commitment} );
+       FC_ASSERT( bbal.size(), "commitment not found in blockchain", ("memo",memo) );
+   }
 
    blind_balance bal;
    bal.amount = memo.amount;
