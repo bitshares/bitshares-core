@@ -25,6 +25,7 @@
 #include <graphene/chain/evaluator.hpp>
 #include <graphene/chain/exceptions.hpp>
 #include <graphene/chain/hardfork.hpp>
+#include <graphene/chain/is_authorized_asset.hpp>
 #include <graphene/chain/transaction_evaluation_state.hpp>
 
 #include <graphene/chain/asset_object.hpp>
@@ -61,7 +62,7 @@ database& generic_evaluator::db()const { return trx_state->db(); }
 
       if( d.head_block_time() > HARDFORK_419_TIME )
       {
-         FC_ASSERT( fee_paying_account->is_authorized_asset( *fee_asset, d ), "Account ${acct} '${name}' attempted to pay fee by using asset ${a} '${sym}', which is unauthorized due to whitelist / blacklist",
+         FC_ASSERT( is_authorized_asset( d, *fee_paying_account, *fee_asset ), "Account ${acct} '${name}' attempted to pay fee by using asset ${a} '${sym}', which is unauthorized due to whitelist / blacklist",
             ("acct", fee_paying_account->id)("name", fee_paying_account->name)("a", fee_asset->id)("sym", fee_asset->symbol) );
       }
 

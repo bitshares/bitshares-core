@@ -23,11 +23,14 @@
  */
 #include <graphene/chain/account_object.hpp>
 #include <graphene/chain/asset_object.hpp>
+#include <graphene/chain/market_object.hpp>
+
+#include <graphene/chain/market_evaluator.hpp>
+
 #include <graphene/chain/database.hpp>
 #include <graphene/chain/exceptions.hpp>
 #include <graphene/chain/hardfork.hpp>
-#include <graphene/chain/market_evaluator.hpp>
-#include <graphene/chain/market_object.hpp>
+#include <graphene/chain/is_authorized_asset.hpp>
 
 #include <graphene/chain/protocol/market.hpp>
 
@@ -51,13 +54,13 @@ void_result limit_order_create_evaluator::do_evaluate(const limit_order_create_o
 
    if( d.head_block_time() <= HARDFORK_416_TIME )
    {
-      if( _sell_asset->options.flags & white_list ) FC_ASSERT( _seller->is_authorized_asset( *_sell_asset, d ) );
-      if( _receive_asset->options.flags & white_list ) FC_ASSERT( _seller->is_authorized_asset( *_receive_asset, d ) );
+      if( _sell_asset->options.flags & white_list ) FC_ASSERT( is_authorized_asset( d, *_seller, *_sell_asset ) );
+      if( _receive_asset->options.flags & white_list ) FC_ASSERT( is_authorized_asset( d, *_seller, *_receive_asset ) );
    }
    else
    {
-      FC_ASSERT( _seller->is_authorized_asset( *_sell_asset, d ) );
-      FC_ASSERT( _seller->is_authorized_asset( *_receive_asset, d ) );
+      FC_ASSERT( is_authorized_asset( d, *_seller, *_sell_asset ) );
+      FC_ASSERT( is_authorized_asset( d, *_seller, *_receive_asset ) );
    }
 
    FC_ASSERT( d.get_balance( *_seller, *_sell_asset ) >= op.amount_to_sell, "insufficient balance",

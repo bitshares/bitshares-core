@@ -28,6 +28,7 @@
 #include <graphene/chain/database.hpp>
 #include <graphene/chain/exceptions.hpp>
 #include <graphene/chain/hardfork.hpp>
+#include <graphene/chain/is_authorized_asset.hpp>
 
 #include <functional>
 
@@ -155,7 +156,7 @@ void_result asset_issue_evaluator::do_evaluate( const asset_issue_operation& o )
 
    if( a.options.flags & white_list )
    {
-      FC_ASSERT( to_account->is_authorized_asset( a, d ) );
+      FC_ASSERT( is_authorized_asset( d, *to_account, a ) );
    }
 
    asset_dyn_data = &a.dynamic_asset_data_id(d);
@@ -191,7 +192,7 @@ void_result asset_reserve_evaluator::do_evaluate( const asset_reserve_operation&
 
    if( a.options.flags & white_list )
    {
-      FC_ASSERT( from_account->is_authorized_asset( a, d ) );
+      FC_ASSERT( is_authorized_asset( d, *from_account, a ) );
    }
 
    asset_dyn_data = &a.dynamic_asset_data_id(d);

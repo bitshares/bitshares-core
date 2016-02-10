@@ -27,6 +27,7 @@
 #include <graphene/chain/database.hpp>
 #include <graphene/chain/exceptions.hpp>
 #include <graphene/chain/hardfork.hpp>
+#include <graphene/chain/is_authorized_asset.hpp>
 
 namespace graphene { namespace chain {
 
@@ -75,16 +76,16 @@ void_result withdraw_permission_claim_evaluator::do_evaluate(const withdraw_perm
       {
          const account_object& from  = op.withdraw_to_account(d);
          const account_object& to    = permit.authorized_account(d);
-         FC_ASSERT( to.is_authorized_asset( _asset, d ) );
-         FC_ASSERT( from.is_authorized_asset( _asset, d ) );
+         FC_ASSERT( is_authorized_asset( d, to, _asset ) );
+         FC_ASSERT( is_authorized_asset( d, from, _asset ) );
       }
    }
    else
    {
       const account_object& from  = op.withdraw_to_account(d);
       const account_object& to    = permit.authorized_account(d);
-      FC_ASSERT( to.is_authorized_asset( _asset, d ) );
-      FC_ASSERT( from.is_authorized_asset( _asset, d ) );
+      FC_ASSERT( is_authorized_asset( d, to, _asset ) );
+      FC_ASSERT( is_authorized_asset( d, from, _asset ) );
    }
 
    return void_result();
