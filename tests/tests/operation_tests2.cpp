@@ -1483,4 +1483,141 @@ BOOST_AUTO_TEST_CASE( top_n_special )
    } FC_LOG_AND_RETHROW()
 }
 
+BOOST_AUTO_TEST_CASE( buyback )
+{
+   ACTORS( (alice)(bob)(chloe)(dan)(izzy)(philbin) );
+   upgrade_to_lifetime_member(philbin_id);
+
+   generate_blocks( HARDFORK_538_TIME );
+   generate_blocks( HARDFORK_555_TIME );
+
+   try
+   {
+      {
+         //
+         // Izzy (issuer)
+         // Alice, Bob, Chloe, Dan (ABCD)
+         // Rex (recycler -- buyback account)
+         // Philbin (registrar)
+         //
+
+         asset_id_type nono_id = create_user_issued_asset( "NONO", izzy_id(db), 0 ).id;
+         asset_id_type buyme_id = create_user_issued_asset( "BUYME", izzy_id(db), 0 ).id;
+
+         // Create a buyback account
+         account_id_type rex_id;
+         {
+            buyback_account_options bbo;
+            bbo.asset_to_buy = buyme_id;
+            bbo.asset_to_buy_issuer = izzy_id;
+            bbo.markets.emplace( asset_id_type() );
+            account_create_operation create_op = make_account( "rex" );
+            create_op.registrar = philbin_id;
+            create_op.extensions.value.buyback_options = bbo;
+            create_op.owner = authority::null_authority();
+            create_op.active = authority::null_authority();
+
+            // Let's break it...
+
+            signed_transaction tx;
+            tx.operations.push_back( create_op );
+            set_expiration( db, tx );
+
+            tx.operations.back().get< account_create_operation >().extensions.value.buyback_options->asset_to_buy_issuer = alice_id;
+            sign( tx, alice_private_key );
+            sign( tx, philbin_private_key );
+
+            // Alice and Philbin signed, but asset issuer is invalid
+            GRAPHENE_CHECK_THROW( db.push_transaction(tx), account_create_buyback_incorrect_issuer );
+
+            tx.signatures.clear();
+            tx.operations.back().get< account_create_operation >().extensions.value.buyback_options->asset_to_buy_issuer = izzy_id;
+            sign( tx, philbin_private_key );
+
+            // Izzy didn't sign
+            GRAPHENE_CHECK_THROW( db.push_transaction(tx), tx_missing_active_auth );
+            sign( tx, izzy_private_key );
+
+            // OK
+            processed_transaction ptx = db.push_transaction( tx );
+            rex_id = ptx.operation_results.back().get< object_id_type >();
+
+            // Try to create another account rex2 which is bbo on same asset
+            tx.signatures.clear();
+            tx.operations.back().get< account_create_operation >().name = "rex2";
+            sign( tx, izzy_private_key );
+            sign( tx, philbin_private_key );
+            GRAPHENE_CHECK_THROW( db.push_transaction(tx), account_create_buyback_already_exists );
+         }
+
+         // issue some BUYME to Alice
+         // we need to set_expiration() before issue_uia() because the latter doens't call it #11
+         set_expiration( db, trx );  // #11
+         issue_uia( alice_id, asset( 1000, buyme_id ) );
+         issue_uia( alice_id, asset( 1000, nono_id ) );
+
+         // Alice wants to sell 100 BUYME for 1000 BTS, a middle price.
+         limit_order_id_type order_id_mid = create_sell_order( alice_id, asset( 100, buyme_id ), asset( 1000, asset_id_type() ) )->id;
+
+         generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+         generate_block();
+
+         // no success because buyback has none for sale
+         BOOST_CHECK( order_id_mid(db).for_sale == 100 );
+
+         // but we can send some to buyback
+         fund( rex_id(db), asset( 100, asset_id_type() ) );
+         // no action until next maint
+         BOOST_CHECK( order_id_mid(db).for_sale == 100 );
+         generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+         generate_block();
+
+         // partial fill, Alice now sells 90 BUYME for 900 BTS.
+         BOOST_CHECK( order_id_mid(db).for_sale == 90 );
+
+         // TODO check burn amount
+
+         // aagh more state in trx
+         set_expiration( db, trx );  // #11
+
+         // Selling 10 BUYME for 50 BTS, a low price.
+         limit_order_id_type order_id_low  = create_sell_order( alice_id, asset( 10, buyme_id ), asset(  50, asset_id_type() ) )->id;
+         // Selling 10 BUYME for 150 BTS, a high price.
+         limit_order_id_type order_id_high = create_sell_order( alice_id, asset( 10, buyme_id ), asset( 150, asset_id_type() ) )->id;
+
+         fund( rex_id(db), asset( 250, asset_id_type() ) );
+         generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+         generate_block();
+
+         BOOST_CHECK( db.find( order_id_low  ) == nullptr );
+         BOOST_CHECK( db.find( order_id_mid  ) != nullptr );
+         BOOST_CHECK( db.find( order_id_high ) != nullptr );
+
+         // 250 CORE in rex                 90 BUYME in mid order    10 BUYME in low order
+         //  50 CORE goes to low order, buy 10 for 50 CORE
+         // 200 CORE goes to mid order, buy 20 for 200 CORE
+         //                                 70 BUYME in mid order     0 BUYME in low order
+
+         idump( (order_id_mid(db)) );
+         BOOST_CHECK( order_id_mid(db).for_sale == 70 );
+         BOOST_CHECK( order_id_high(db).for_sale == 10 );
+
+         BOOST_CHECK( get_balance( rex_id, asset_id_type() ) == 0 );
+
+         // clear out the books -- 700 left on mid order, 150 left on high order, so 2000 BTS should result in 1150 left over
+
+         fund( rex_id(db), asset( 2000, asset_id_type() ) );
+         generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+
+         idump( (get_balance( rex_id, asset_id_type() )) );
+
+         BOOST_CHECK( get_balance( rex_id, asset_id_type() ) == 1150 );
+
+         GRAPHENE_CHECK_THROW( transfer( alice_id, rex_id, asset( 1, nono_id ) ), fc::exception );
+         // TODO: Check cancellation works for account which is BTS-restricted
+      }
+
+   } FC_LOG_AND_RETHROW()
+}
+
 BOOST_AUTO_TEST_SUITE_END()
