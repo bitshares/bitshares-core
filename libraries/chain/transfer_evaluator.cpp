@@ -25,6 +25,7 @@
 #include <graphene/chain/account_object.hpp>
 #include <graphene/chain/exceptions.hpp>
 #include <graphene/chain/hardfork.hpp>
+#include <graphene/chain/is_authorized_asset.hpp>
 
 namespace graphene { namespace chain {
 void_result transfer_evaluator::do_evaluate( const transfer_operation& op )
@@ -35,34 +36,23 @@ void_result transfer_evaluator::do_evaluate( const transfer_operation& op )
    const account_object& from_account    = op.from(d);
    const account_object& to_account      = op.to(d);
    const asset_object&   asset_type      = op.amount.asset_id(d);
-   const asset_object&   fee_asset_type  = op.fee.asset_id(d);
 
    try {
 
-      if( asset_type.options.flags & white_list )
-      {
-         GRAPHENE_ASSERT(
-            from_account.is_authorized_asset( asset_type, d ),
-            transfer_from_account_not_whitelisted,
-            "'from' account ${from} is not whitelisted for asset ${asset}",
-            ("from",op.from)
-            ("asset",op.amount.asset_id)
-            );
-         GRAPHENE_ASSERT(
-            to_account.is_authorized_asset( asset_type, d ),
-            transfer_to_account_not_whitelisted,
-            "'to' account ${to} is not whitelisted for asset ${asset}",
-            ("to",op.to)
-            ("asset",op.amount.asset_id)
-            );
-      }
-
-      if( d.head_block_time() <= HARDFORK_419_TIME )
-      {
-         if( fee_asset_type.options.flags & white_list )
-            FC_ASSERT( from_account.is_authorized_asset( asset_type, d ) );
-      }
-      // the above becomes no-op after hardfork because this check will then be performed in evaluator
+      GRAPHENE_ASSERT(
+         is_authorized_asset( d, from_account, asset_type ),
+         transfer_from_account_not_whitelisted,
+         "'from' account ${from} is not whitelisted for asset ${asset}",
+         ("from",op.from)
+         ("asset",op.amount.asset_id)
+         );
+      GRAPHENE_ASSERT(
+         is_authorized_asset( d, to_account, asset_type ),
+         transfer_to_account_not_whitelisted,
+         "'to' account ${to} is not whitelisted for asset ${asset}",
+         ("to",op.to)
+         ("asset",op.amount.asset_id)
+         );
 
       if( asset_type.is_transfer_restricted() )
       {
@@ -108,18 +98,13 @@ void_result override_transfer_evaluator::do_evaluate( const override_transfer_op
 
    const account_object& from_account    = op.from(d);
    const account_object& to_account      = op.to(d);
-   const asset_object&   fee_asset_type  = op.fee.asset_id(d);
 
-   if( asset_type.options.flags & white_list )
-   {
-      FC_ASSERT( to_account.is_authorized_asset( asset_type, d ) );
-      FC_ASSERT( from_account.is_authorized_asset( asset_type, d ) );
-   }
+   FC_ASSERT( is_authorized_asset( d, to_account, asset_type ) );
+   FC_ASSERT( is_authorized_asset( d, from_account, asset_type ) );
 
    if( d.head_block_time() <= HARDFORK_419_TIME )
    {
-      if( fee_asset_type.options.flags & white_list )
-         FC_ASSERT( from_account.is_authorized_asset( asset_type, d ) );
+      FC_ASSERT( is_authorized_asset( d, from_account, asset_type ) );
    }
    // the above becomes no-op after hardfork because this check will then be performed in evaluator
 

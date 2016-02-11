@@ -27,6 +27,7 @@
 #include <graphene/chain/database.hpp>
 #include <graphene/chain/exceptions.hpp>
 #include <graphene/chain/hardfork.hpp>
+#include <graphene/chain/is_authorized_asset.hpp>
 
 #include <graphene/chain/account_object.hpp>
 #include <graphene/chain/asset_object.hpp>
@@ -161,7 +162,7 @@ BOOST_AUTO_TEST_CASE( issue_whitelist_uia )
       }
       PUSH_TX( db, trx, ~0 );
 
-      BOOST_CHECK(nathan_id(db).is_authorized_asset(uia_id(db), db));
+      BOOST_CHECK(is_authorized_asset( db, nathan_id(db), uia_id(db) ));
       BOOST_CHECK_EQUAL(get_balance(nathan_id, uia_id), 1000);
 
       // Make a whitelist, now it should fail
@@ -265,7 +266,7 @@ BOOST_AUTO_TEST_CASE( transfer_whitelist_uia )
       wop.account_to_list = nathan.id;
       trx.operations.back() = wop;
       PUSH_TX( db, trx, ~0 );
-      BOOST_CHECK( !(nathan.is_authorized_asset(advanced, db)) );
+      BOOST_CHECK( !(is_authorized_asset( db, nathan, advanced )) );
 
       BOOST_TEST_MESSAGE( "Attempting to transfer from nathan after blacklisting, should fail" );
       op.amount = advanced.amount(50);
@@ -323,7 +324,7 @@ BOOST_AUTO_TEST_CASE( transfer_whitelist_uia )
 
       trx.operations.back() = op;
       //Fail because nathan is blacklisted
-      BOOST_CHECK(!nathan.is_authorized_asset(advanced, db));
+      BOOST_CHECK(!is_authorized_asset( db, nathan, advanced ));
       GRAPHENE_REQUIRE_THROW(PUSH_TX( db, trx, ~0 ), fc::exception);
 
       //Remove nathan from committee's whitelist, add him to dan's. This should not authorize him to hold ADVANCED.
@@ -340,7 +341,7 @@ BOOST_AUTO_TEST_CASE( transfer_whitelist_uia )
 
       trx.operations.back() = op;
       //Fail because nathan is not whitelisted
-      BOOST_CHECK(!nathan.is_authorized_asset(advanced, db));
+      BOOST_CHECK(!is_authorized_asset( db, nathan, advanced ));
       GRAPHENE_REQUIRE_THROW(PUSH_TX( db, trx, ~0 ), fc::exception);
 
       burn.payer = dan.id;

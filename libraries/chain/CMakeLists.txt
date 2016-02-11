@@ -85,6 +85,8 @@ add_library( graphene_chain
 
              block_database.cpp
 
+             is_authorized_asset.cpp
+
              ${HEADERS}
              "${CMAKE_CURRENT_BINARY_DIR}/include/graphene/chain/hardfork.hpp"
            )
