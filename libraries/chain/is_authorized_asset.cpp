@@ -30,7 +30,9 @@
 
 namespace graphene { namespace chain {
 
-bool is_authorized_asset(
+namespace detail {
+
+bool _is_authorized_asset(
    const database& d,
    const account_object& acct,
    const asset_object& asset_obj)
@@ -62,4 +64,6 @@ bool is_authorized_asset(
    return false;
 }
 
-} }
+} // detail
+
+} } // graphene::chain
