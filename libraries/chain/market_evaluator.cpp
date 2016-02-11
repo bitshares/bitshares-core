@@ -52,16 +52,8 @@ void_result limit_order_create_evaluator::do_evaluate(const limit_order_create_o
    if( _sell_asset->options.blacklist_markets.size() )
       FC_ASSERT( _sell_asset->options.blacklist_markets.find(_receive_asset->id) == _sell_asset->options.blacklist_markets.end() );
 
-   if( d.head_block_time() <= HARDFORK_416_TIME )
-   {
-      if( _sell_asset->options.flags & white_list ) FC_ASSERT( is_authorized_asset( d, *_seller, *_sell_asset ) );
-      if( _receive_asset->options.flags & white_list ) FC_ASSERT( is_authorized_asset( d, *_seller, *_receive_asset ) );
-   }
-   else
-   {
-      FC_ASSERT( is_authorized_asset( d, *_seller, *_sell_asset ) );
-      FC_ASSERT( is_authorized_asset( d, *_seller, *_receive_asset ) );
-   }
+   FC_ASSERT( is_authorized_asset( d, *_seller, *_sell_asset ) );
+   FC_ASSERT( is_authorized_asset( d, *_seller, *_receive_asset ) );
 
    FC_ASSERT( d.get_balance( *_seller, *_sell_asset ) >= op.amount_to_sell, "insufficient balance",
               ("balance",d.get_balance(*_seller,*_sell_asset))("amount_to_sell",op.amount_to_sell) );
