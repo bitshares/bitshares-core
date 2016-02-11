@@ -346,6 +346,8 @@ namespace graphene { namespace app {
                   break;
                  case impl_special_authority_object_type:
                   break;
+                 case impl_buyback_object_type:
+                  break;
           }
        }
        return result;

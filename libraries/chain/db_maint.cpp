@@ -33,9 +33,11 @@
 #include <graphene/chain/account_object.hpp>
 #include <graphene/chain/asset_object.hpp>
 #include <graphene/chain/budget_record_object.hpp>
+#include <graphene/chain/buyback_object.hpp>
 #include <graphene/chain/chain_property_object.hpp>
 #include <graphene/chain/committee_member_object.hpp>
 #include <graphene/chain/global_property_object.hpp>
+#include <graphene/chain/market_object.hpp>
 #include <graphene/chain/special_authority_object.hpp>
 #include <graphene/chain/vesting_balance_object.hpp>
 #include <graphene/chain/vote_count.hpp>
@@ -522,9 +524,87 @@ void update_top_n_authorities( database& db )
    } );
 }
 
+void create_buyback_orders( database& db )
+{
+   const auto& bbo_idx = db.get_index_type< buyback_index >().indices().get<by_id>();
+   const auto& bal_idx = db.get_index_type< account_balance_index >().indices().get< by_account_asset >();
+
+   for( const buyback_object& bbo : bbo_idx )
+   {
+      const asset_object& asset_to_buy = bbo.asset_to_buy(db);
+      assert( asset_to_buy.buyback_account.valid() );
+
+      const account_object& buyback_account = (*(asset_to_buy.buyback_account))(db);
+      asset_id_type next_asset = asset_id_type();
+
+      if( !buyback_account.allowed_assets.valid() )
+      {
+         wlog( "skipping buyback account ${b} at block ${n} because allowed_assets does not exist", ("b", buyback_account)("n", db.head_block_num()) );
+         continue;
+      }
+
+      while( true )
+      {
+         auto it = bal_idx.lower_bound( boost::make_tuple( buyback_account.id, next_asset ) );
+         if( it == bal_idx.end() )
+            break;
+         if( it->owner != buyback_account.id )
+            break;
+         asset_id_type asset_to_sell = it->asset_type;
+         share_type amount_to_sell = it->balance;
+         next_asset = asset_to_sell + 1;
+         if( asset_to_sell == asset_to_buy.id )
+            continue;
+         if( amount_to_sell == 0 )
+            continue;
+         if( buyback_account.allowed_assets->find( asset_to_sell ) == buyback_account.allowed_assets->end() )
+         {
+            wlog( "buyback account ${b} not selling disallowed holdings of asset ${a} at block ${n}", ("b", buyback_account)("a", asset_to_sell)("n", db.head_block_num()) );
+            continue;
+         }
+
+         try
+         {
+            transaction_evaluation_state buyback_context(&db);
+            buyback_context.skip_fee_schedule_check = true;
+
+            limit_order_create_operation create_vop;
+            create_vop.fee = asset( 0, asset_id_type() );
+            create_vop.seller = buyback_account.id;
+            create_vop.amount_to_sell = asset( amount_to_sell, asset_to_sell );
+            create_vop.min_to_receive = asset( 1, asset_to_buy.id );
+            create_vop.expiration = time_point_sec::maximum();
+            create_vop.fill_or_kill = false;
+
+            limit_order_id_type order_id = db.apply_operation( buyback_context, create_vop ).get< object_id_type >();
+
+            if( db.find( order_id ) != nullptr )
+            {
+               limit_order_cancel_operation cancel_vop;
+               cancel_vop.fee = asset( 0, asset_id_type() );
+               cancel_vop.order = order_id;
+               cancel_vop.fee_paying_account = buyback_account.id;
+
+               db.apply_operation( buyback_context, cancel_vop );
+            }
+         }
+         catch( const fc::exception& e )
+         {
+            // we can in fact get here, e.g. if asset issuer of buy/sell asset blacklists/whitelists the buyback account
+            wlog( "Skipping buyback processing selling ${as} for ${ab} for buyback account ${b} at block ${n}; exception was ${e}",
+                  ("as", asset_to_sell)("ab", asset_to_buy)("b", buyback_account)("n", db.head_block_num())("e", e.to_detail_string()) );
+            continue;
+         }
+      }
+   }
+   return;
+}
+
 void database::perform_chain_maintenance(const signed_block& next_block, const global_property_object& global_props)
 {
    const auto& gpo = get_global_properties();
+
+   create_buyback_orders(*this);
 
    struct vote_tally_helper {
       database& d;

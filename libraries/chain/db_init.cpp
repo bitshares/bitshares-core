@@ -29,6 +29,7 @@
 #include <graphene/chain/balance_object.hpp>
 #include <graphene/chain/block_summary_object.hpp>
 #include <graphene/chain/budget_record_object.hpp>
+#include <graphene/chain/buyback_object.hpp>
 #include <graphene/chain/chain_property_object.hpp>
 #include <graphene/chain/committee_member_object.hpp>
 #include <graphene/chain/confidential_object.hpp>
@@ -210,6 +211,7 @@ void database::initialize_indexes()
    add_index< primary_index<simple_index<witness_schedule_object        > > >();
    add_index< primary_index<simple_index<budget_record_object           > > >();
    add_index< primary_index< special_authority_index                      > >();
+   add_index< primary_index< buyback_index                                > >();
 }
 
 void database::init_genesis(const genesis_state_type& genesis_state)

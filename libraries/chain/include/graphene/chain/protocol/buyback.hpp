@@ -23,33 +23,30 @@
  */
 #pragma once
 
+#include <graphene/chain/protocol/types.hpp>
+
 namespace graphene { namespace chain {
 
-class account_object;
-class asset_object;
-class database;
-
-namespace detail {
-
-bool _is_authorized_asset(const database& d, const account_object& acct, const asset_object& asset_obj);
-
-}
-
-/**
- * @return true if the account is whitelisted and not blacklisted to transact in the provided asset; false
- * otherwise.
- */
-
-inline bool is_authorized_asset(const database& d, const account_object& acct, const asset_object& asset_obj)
+struct buyback_account_options
 {
-   bool fast_check = !(asset_obj.options.flags & white_list);
-   fast_check &= !(acct.allowed_assets.valid());
+   /**
+    * The asset to buy.
+    */
+   asset_id_type       asset_to_buy;
 
-   if( fast_check )
-      return true;
+   /**
+    * Issuer of the asset.  Must sign the transaction, must match issuer
+    * of specified asset.
+    */
+   account_id_type     asset_to_buy_issuer;
 
-   bool slow_check = detail::_is_authorized_asset( d, acct, asset_obj );
-   return slow_check;
-}
+   /**
+    * What assets the account is willing to buy with.
+    * Other assets will just sit there since the account has null authority.
+    */
+   flat_set< asset_id_type > markets;
+};
 
 } }
+
+FC_REFLECT( graphene::chain::buyback_account_options, (asset_to_buy)(asset_to_buy_issuer)(markets) );
