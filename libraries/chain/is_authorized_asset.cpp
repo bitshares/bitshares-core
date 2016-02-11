@@ -37,12 +37,6 @@ bool _is_authorized_asset(
    const account_object& acct,
    const asset_object& asset_obj)
 {
-   if( d.head_block_time() > HARDFORK_416_TIME )
-   {
-      if( !(asset_obj.options.flags & white_list) )
-         return true;
-   }
-
    for( const auto id : acct.blacklisting_accounts )
    {
       if( asset_obj.options.blacklist_authorities.find(id) != asset_obj.options.blacklist_authorities.end() )
