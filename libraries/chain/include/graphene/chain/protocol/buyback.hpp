@@ -22,30 +22,31 @@
  * THE SOFTWARE.
  */
 #pragma once
-#include <graphene/chain/protocol/operations.hpp>
+
+#include <graphene/chain/protocol/types.hpp>
 
 namespace graphene { namespace chain {
-   class database;
-   struct signed_transaction;
+
+struct buyback_account_options
+{
+   /**
+    * The asset to buy.
+    */
+   asset_id_type       asset_to_buy;
 
    /**
-    *  Place holder for state tracked while processing a transaction. This class provides helper methods that are
-    *  common to many different operations and also tracks which keys have signed the transaction
+    * Issuer of the asset.  Must sign the transaction, must match issuer
+    * of specified asset.
     */
-   class transaction_evaluation_state
-   {
-      public:
-         transaction_evaluation_state( database* db = nullptr )
-         :_db(db){}
+   account_id_type     asset_to_buy_issuer;
 
+   /**
+    * What assets the account is willing to buy with.
+    * Other assets will just sit there since the account has null authority.
+    */
+   flat_set< asset_id_type > markets;
+};
 
-         database& db()const { assert( _db ); return *_db; }
-         vector<operation_result> operation_results;
+} }
 
-         const signed_transaction*        _trx = nullptr;
-         database*                        _db = nullptr;
-         bool                             _is_proposed_trx = false;
-         bool                             skip_fee = false;
-         bool                             skip_fee_schedule_check = false;
-   };
-} } // namespace graphene::chain
+FC_REFLECT( graphene::chain::buyback_account_options, (asset_to_buy)(asset_to_buy_issuer)(markets) );

@@ -130,6 +130,8 @@ namespace graphene { namespace chain {
          /// Extra data associated with BitAssets. This field is non-null if and only if is_market_issued() returns true
          optional<asset_bitasset_data_id_type> bitasset_data_id;
 
+         optional<account_id_type> buyback_account;
+
          asset_id_type get_id()const { return id; }
 
          void validate()const
@@ -266,4 +268,5 @@ FC_REFLECT_DERIVED( graphene::chain::asset_object, (graphene::db::object),
                     (options)
                     (dynamic_asset_data_id)
                     (bitasset_data_id)
+                    (buyback_account)
                   )

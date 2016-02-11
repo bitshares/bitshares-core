@@ -23,6 +23,7 @@
  */
 #pragma once
 #include <graphene/chain/protocol/base.hpp>
+#include <graphene/chain/protocol/buyback.hpp>
 #include <graphene/chain/protocol/ext.hpp>
 #include <graphene/chain/protocol/special_authority.hpp>
 #include <graphene/chain/protocol/types.hpp>
@@ -69,6 +70,7 @@ namespace graphene { namespace chain {
          optional< void_t >            null_ext;
          optional< special_authority > owner_special_authority;
          optional< special_authority > active_special_authority;
+         optional< buyback_account_options > buyback_options;
       };
 
       struct fee_parameters_type
@@ -98,6 +100,14 @@ namespace graphene { namespace chain {
       account_id_type fee_payer()const { return registrar; }
       void            validate()const;
       share_type      calculate_fee(const fee_parameters_type& )const;
+
+      void get_required_active_authorities( flat_set<account_id_type>& a )const
+      {
+         // registrar should be required anyway as it is the fee_payer(), but we insert it here just to be sure
+         a.insert( registrar );
+         if( extensions.value.buyback_options.valid() )
+            a.insert( extensions.value.buyback_options->asset_to_buy_issuer );
+      }
    };
 
    /**
@@ -258,7 +268,7 @@ FC_REFLECT_TYPENAME( graphene::chain::account_whitelist_operation::account_listi
 FC_REFLECT_ENUM( graphene::chain::account_whitelist_operation::account_listing,
                 (no_listing)(white_listed)(black_listed)(white_and_black_listed))
 
-FC_REFLECT(graphene::chain::account_create_operation::ext, (null_ext)(owner_special_authority)(active_special_authority) )
+FC_REFLECT(graphene::chain::account_create_operation::ext, (null_ext)(owner_special_authority)(active_special_authority)(buyback_options) )
 FC_REFLECT( graphene::chain::account_create_operation,
             (fee)(registrar)
             (referrer)(referrer_percent)

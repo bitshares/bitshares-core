@@ -22,30 +22,34 @@
  * THE SOFTWARE.
  */
 #pragma once
-#include <graphene/chain/protocol/operations.hpp>
 
 namespace graphene { namespace chain {
-   class database;
-   struct signed_transaction;
 
-   /**
-    *  Place holder for state tracked while processing a transaction. This class provides helper methods that are
-    *  common to many different operations and also tracks which keys have signed the transaction
-    */
-   class transaction_evaluation_state
-   {
-      public:
-         transaction_evaluation_state( database* db = nullptr )
-         :_db(db){}
+class account_object;
+class asset_object;
+class database;
 
+namespace detail {
 
-         database& db()const { assert( _db ); return *_db; }
-         vector<operation_result> operation_results;
+bool _is_authorized_asset(const database& d, const account_object& acct, const asset_object& asset_obj);
 
-         const signed_transaction*        _trx = nullptr;
-         database*                        _db = nullptr;
-         bool                             _is_proposed_trx = false;
-         bool                             skip_fee = false;
-         bool                             skip_fee_schedule_check = false;
-   };
-} } // namespace graphene::chain
+}
+
+/**
+ * @return true if the account is whitelisted and not blacklisted to transact in the provided asset; false
+ * otherwise.
+ */
+
+inline bool is_authorized_asset(const database& d, const account_object& acct, const asset_object& asset_obj)
+{
+   bool fast_check = !(asset_obj.options.flags & white_list);
+   fast_check &= !(acct.allowed_assets.valid());
+
+   if( fast_check )
+      return true;
+
+   bool slow_check = detail::_is_authorized_asset( d, acct, asset_obj );
+   return slow_check;
+}
+
+} }

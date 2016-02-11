@@ -22,30 +22,13 @@
  * THE SOFTWARE.
  */
 #pragma once
-#include <graphene/chain/protocol/operations.hpp>
+
+#include <graphene/chain/protocol/buyback.hpp>
 
 namespace graphene { namespace chain {
-   class database;
-   struct signed_transaction;
 
-   /**
-    *  Place holder for state tracked while processing a transaction. This class provides helper methods that are
-    *  common to many different operations and also tracks which keys have signed the transaction
-    */
-   class transaction_evaluation_state
-   {
-      public:
-         transaction_evaluation_state( database* db = nullptr )
-         :_db(db){}
+class database;
 
+void evaluate_buyback_account_options( const database& db, const buyback_account_options& auth );
 
-         database& db()const { assert( _db ); return *_db; }
-         vector<operation_result> operation_results;
-
-         const signed_transaction*        _trx = nullptr;
-         database*                        _db = nullptr;
-         bool                             _is_proposed_trx = false;
-         bool                             skip_fee = false;
-         bool                             skip_fee_schedule_check = false;
-   };
-} } // namespace graphene::chain
+} } // graphene::chain

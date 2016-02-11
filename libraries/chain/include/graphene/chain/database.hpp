@@ -370,7 +370,7 @@ namespace graphene { namespace chain {
          /**
           * @return true if the order was completely filled and thus freed.
           */
-         bool fill_order( const limit_order_object& order, const asset& pays, const asset& receives );
+         bool fill_order( const limit_order_object& order, const asset& pays, const asset& receives, bool cull_if_small );
          bool fill_order( const call_order_object& order, const asset& pays, const asset& receives );
          bool fill_order( const force_settlement_object& settle, const asset& pays, const asset& receives );
 
@@ -412,12 +412,14 @@ namespace graphene { namespace chain {
 
          //////////////////// db_block.cpp ////////////////////
 
+       public:
+         // these were formerly private, but they have a fairly well-defined API, so let's make them public
          void                  apply_block( const signed_block& next_block, uint32_t skip = skip_nothing );
          processed_transaction apply_transaction( const signed_transaction& trx, uint32_t skip = skip_nothing );
+         operation_result      apply_operation( transaction_evaluation_state& eval_state, const operation& op );
+      private:
          void                  _apply_block( const signed_block& next_block );
          processed_transaction _apply_transaction( const signed_transaction& trx );
-         operation_result      apply_operation( transaction_evaluation_state& eval_state, const operation& op );
-
 
          ///Steps involved in applying a new block
          ///@{

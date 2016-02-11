@@ -77,6 +77,7 @@ add_library( graphene_chain
              worker_evaluator.cpp
              confidential_evaluator.cpp
              special_authority.cpp
+             buyback.cpp
 
              account_object.cpp
              asset_object.cpp
@@ -84,6 +85,8 @@ add_library( graphene_chain
              vesting_balance_object.cpp
 
              block_database.cpp
+
+             is_authorized_asset.cpp
 
              ${HEADERS}
              "${CMAKE_CURRENT_BINARY_DIR}/include/graphene/chain/hardfork.hpp"

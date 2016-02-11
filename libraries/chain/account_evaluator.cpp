@@ -25,6 +25,8 @@
 #include <fc/smart_ref_impl.hpp>
 
 #include <graphene/chain/account_evaluator.hpp>
+#include <graphene/chain/buyback.hpp>
+#include <graphene/chain/buyback_object.hpp>
 #include <graphene/chain/database.hpp>
 #include <graphene/chain/exceptions.hpp>
 #include <graphene/chain/hardfork.hpp>
@@ -80,6 +82,8 @@ void_result account_create_evaluator::do_evaluate( const account_create_operatio
       evaluate_special_authority( d, *op.extensions.value.owner_special_authority );
    if( op.extensions.value.active_special_authority.valid() )
       evaluate_special_authority( d, *op.extensions.value.active_special_authority );
+   if( op.extensions.value.buyback_options.valid() )
+      evaluate_buyback_account_options( d, *op.extensions.value.buyback_options );
 
    uint32_t max_vote_id = global_props.next_available_vote_id;
 
@@ -115,6 +119,7 @@ void_result account_create_evaluator::do_evaluate( const account_create_operatio
 object_id_type account_create_evaluator::do_apply( const account_create_operation& o )
 { try {
 
+   database& d = db();
    uint16_t referrer_percent = o.referrer_percent;
    bool has_small_percent = (
          (db().head_block_time() <= HARDFORK_453_TIME)
@@ -154,6 +159,11 @@ object_id_type account_create_evaluator::do_apply( const account_create_operatio
             obj.owner_special_authority = *(o.extensions.value.owner_special_authority);
          if( o.extensions.value.active_special_authority.valid() )
             obj.active_special_authority = *(o.extensions.value.active_special_authority);
+         if( o.extensions.value.buyback_options.valid() )
+         {
+            obj.allowed_assets = o.extensions.value.buyback_options->markets;
+            obj.allowed_assets->emplace( o.extensions.value.buyback_options->asset_to_buy );
+         }
    });
 
    if( has_small_percent )
@@ -183,6 +193,21 @@ object_id_type account_create_evaluator::do_apply( const account_create_operatio
       db().create< special_authority_object >( [&]( special_authority_object& sa )
       {
          sa.account = new_acnt_object.id;
+      } );
+   }
+
+   if( o.extensions.value.buyback_options.valid() )
+   {
+      asset_id_type asset_to_buy = o.extensions.value.buyback_options->asset_to_buy;
+
+      d.create< buyback_object >( [&]( buyback_object& bo )
+      {
+         bo.asset_to_buy = asset_to_buy;
+      } );
+
+      d.modify( asset_to_buy(d), [&]( asset_object& a )
+      {
+         a.buyback_account = new_acnt_object.id;
       } );
    }
 
