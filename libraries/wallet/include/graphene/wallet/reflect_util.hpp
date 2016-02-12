@@ -37,6 +37,22 @@ struct static_variant_map
 
 namespace impl {
 
+std::string clean_name( const std::string& name )
+{
+   std::string result;
+   const static std::string prefix = "graphene::chain::";
+   const static std::string suffix = "_operation";
+   // graphene::chain::.*_operation
+   if(    (name.size() >= prefix.size() + suffix.size())
+       && (name.substr( 0, prefix.size() ) == prefix)
+       && (name.substr( name.size()-suffix.size(), suffix.size() ) == suffix )
+     )
+        return name.substr( prefix.size(), name.size() - prefix.size() - suffix.size() );
+
+   wlog( "don't know how to clean name: ${name}", ("name", name) );
+   return name;
+}
+
 struct static_variant_map_visitor
 {
    static_variant_map_visitor() {}
@@ -47,7 +63,7 @@ struct static_variant_map_visitor
    result_type operator()( const T& dummy )
    {
       assert( which == m.which_to_name.size() );
-      std::string name = js_name<T>::name();
+      std::string name = clean_name( fc::get_typename<T>::name() );
       m.name_to_which[ name ] = which;
       m.which_to_name.push_back( name );
    }

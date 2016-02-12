@@ -23,7 +23,6 @@
  */
 #pragma once
 #include <graphene/db/object.hpp>
-#include <graphene/db/type_serializer.hpp>
 #include <fc/interprocess/file_mapping.hpp>
 #include <fc/io/raw.hpp>
 #include <fc/io/json.hpp>
