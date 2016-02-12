@@ -3689,7 +3689,7 @@ blind_confirmation wallet_api::transfer_from_blind( string from_blind_account_ke
 
    auto conf = blind_transfer_help( from_blind_account_key_or_label,
                                from_blind_account_key_or_label, 
-                               blind_in, symbol, false, true );
+                               blind_in, symbol, false, true/*to_temp*/ );
    FC_ASSERT( conf.outputs.size() > 0 );
 
    auto to_account = my->get_account( to_account_id_or_name );
@@ -3703,6 +3703,24 @@ blind_confirmation wallet_api::transfer_from_blind( string from_blind_account_ke
    conf.trx.operations.push_back(from_blind);
    ilog( "about to validate" );
    conf.trx.validate();
+   
+   if( broadcast && conf.outputs.size() == 2 ) {
+       
+       // Save the change
+       blind_confirmation::output conf_output;
+       blind_confirmation::output change_output = conf.outputs[0];
+       
+       // The wallet must have a private key for confirmation.to, this is used to decrypt the memo
+       public_key_type from_key = get_public_key(from_blind_account_key_or_label);
+       conf_output.confirmation.to = from_key;
+       conf_output.confirmation.one_time_key = change_output.confirmation.one_time_key;
+       conf_output.confirmation.encrypted_memo = change_output.confirmation.encrypted_memo;
+       conf_output.confirmation_receipt = conf_output.confirmation;
+       //try { 
+       receive_blind_transfer( conf_output.confirmation_receipt, from_blind_account_key_or_label, "@"+to_account.name );
+       //} catch ( ... ){}
+   }
+   
    ilog( "about to broadcast" );
    conf.trx = sign_transaction( conf.trx, broadcast );
 
@@ -3998,7 +4016,6 @@ blind_receipt wallet_api::receive_blind_transfer( string confirmation_receipt, s
    auto plain_memo = fc::aes_decrypt( secret, conf.encrypted_memo );
    auto memo = fc::raw::unpack<stealth_confirmation::memo_data>( plain_memo );
 
-
    result.to_key   = *conf.to;
    result.to_label = get_key_label( result.to_key );
    if( memo.from ) 
@@ -4022,9 +4039,6 @@ blind_receipt wallet_api::receive_blind_transfer( string confirmation_receipt, s
    auto commtiment_test = fc::ecc::blind( memo.blinding_factor, memo.amount.amount.value );
    FC_ASSERT( fc::ecc::verify_sum( {commtiment_test}, {memo.commitment}, 0 ) );
    
-   auto bbal = my->_remote_db->get_blinded_balances( {memo.commitment} );
-   FC_ASSERT( bbal.size(), "commitment not found in blockchain", ("memo",memo) );
-
    blind_balance bal;
    bal.amount = memo.amount;
    bal.to     = *conf.to;
@@ -4034,21 +4048,20 @@ blind_receipt wallet_api::receive_blind_transfer( string confirmation_receipt, s
    bal.commitment = memo.commitment;
    bal.used = false;
 
-   result.control_authority = bbal.front().owner;
+   auto child_pubkey = child_priv_key.get_public_key();
+   auto owner = authority(1, public_key_type(child_pubkey), 1);
+   result.control_authority = owner;
    result.data = memo;
 
-
-   auto child_key_itr = bbal.front().owner.key_auths.find( child_priv_key.get_public_key() );
-
-   if( child_key_itr != bbal.front().owner.key_auths.end() )
+   auto child_key_itr = owner.key_auths.find( child_pubkey );
+   if( child_key_itr != owner.key_auths.end() )
       my->_keys[child_key_itr->first] = key_to_wif( child_priv_key );
-
-
+   
    // my->_wallet.blinded_balances[memo.amount.asset_id][bal.to].push_back( bal );
 
    result.date = fc::time_point::now();
    my->_wallet.blind_receipts.insert( result );
-   my->_keys[child_priv_key.get_public_key()] = key_to_wif( child_priv_key );
+   my->_keys[child_pubkey] = key_to_wif( child_priv_key );
 
    save_wallet_file();
 
