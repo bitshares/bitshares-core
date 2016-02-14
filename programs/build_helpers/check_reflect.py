@@ -87,6 +87,8 @@ for root, dirs, files in os.walk("."):
                     cname = m.group(1)
                     members = bubble_list(m.group(2))
                     name2members_re[cname] = members
+                    if cname.endswith("_object"):
+                       print("FC_REFLECT on {} should be FC_REFLECT_DERIVED".format(cname))
                 for m in re_reflect_derived.finditer(content):
                     cname = m.group(1)
                     members = bubble_list(m.group(3))
