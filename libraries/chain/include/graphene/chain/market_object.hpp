@@ -206,4 +206,7 @@ FC_REFLECT_DERIVED( graphene::chain::limit_order_object,
 FC_REFLECT_DERIVED( graphene::chain::call_order_object, (graphene::db::object),
                     (borrower)(collateral)(debt)(call_price) )
 
-FC_REFLECT( graphene::chain::force_settlement_object, (owner)(balance)(settlement_date) )
+FC_REFLECT_DERIVED( graphene::chain::force_settlement_object,
+                    (graphene::db::object),
+                    (owner)(balance)(settlement_date)
+                  )
