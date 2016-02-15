@@ -31,9 +31,9 @@ namespace graphene { namespace chain {
    class asset_object;
    class asset_bitasset_data_object;
    class call_order_object;
-   class call_order_update_operation;
-   class limit_order_cancel_operation;
-   class limit_order_create_operation;
+   struct call_order_update_operation;
+   struct limit_order_cancel_operation;
+   struct limit_order_create_operation;
 
    class limit_order_create_evaluator : public evaluator<limit_order_create_evaluator>
    {

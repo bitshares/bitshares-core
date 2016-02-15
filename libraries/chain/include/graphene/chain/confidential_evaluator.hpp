@@ -26,9 +26,9 @@
 
 namespace graphene { namespace chain {
 
-class transfer_to_blind_operation;
-class transfer_from_blind_operation;
-class blind_transfer_operation;
+struct transfer_to_blind_operation;
+struct transfer_from_blind_operation;
+struct blind_transfer_operation;
 
 class transfer_to_blind_evaluator : public evaluator<transfer_to_blind_evaluator>
 {
