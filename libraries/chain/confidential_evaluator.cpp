@@ -26,6 +26,8 @@
 #include <graphene/chain/confidential_evaluator.hpp>
 #include <graphene/chain/confidential_object.hpp>
 #include <graphene/chain/database.hpp>
+#include <graphene/chain/fba_accumulator_id.hpp>
+#include <graphene/chain/hardfork.hpp>
 
 namespace graphene { namespace chain {
 
@@ -67,6 +69,13 @@ void_result transfer_to_blind_evaluator::do_apply( const transfer_to_blind_opera
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }
 
+void transfer_to_blind_evaluator::pay_fee()
+{
+   if( db().head_block_time() >= HARDFORK_563_TIME )
+      pay_fba_fee( fba_accumulator_id_transfer_to_blind );
+   else
+      generic_evaluator::pay_fee();
+}
 
 void_result transfer_from_blind_evaluator::do_evaluate( const transfer_from_blind_operation& o )
 { try {
@@ -104,9 +113,13 @@ void_result transfer_from_blind_evaluator::do_apply( const transfer_from_blind_o
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }
 
-
-
-
+void transfer_from_blind_evaluator::pay_fee()
+{
+   if( db().head_block_time() >= HARDFORK_563_TIME )
+      pay_fba_fee( fba_accumulator_id_transfer_from_blind );
+   else
+      generic_evaluator::pay_fee();
+}
 
 void_result blind_transfer_evaluator::do_evaluate( const blind_transfer_operation& o )
 { try {
@@ -157,5 +170,12 @@ void_result blind_transfer_evaluator::do_apply( const blind_transfer_operation& 
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }
 
+void blind_transfer_evaluator::pay_fee()
+{
+   if( db().head_block_time() >= HARDFORK_563_TIME )
+      pay_fba_fee( fba_accumulator_id_blind_transfer );
+   else
+      generic_evaluator::pay_fee();
+}
 
 } } // graphene::chain

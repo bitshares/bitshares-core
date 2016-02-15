@@ -209,6 +209,14 @@ namespace graphene { namespace chain {
          special_authority active_special_authority = no_special_authority();
 
          /**
+          * This flag is set when the top_n logic sets both authorities,
+          * and gets reset when authority or special_authority is set.
+          */
+         uint8_t top_n_control_flags = 0;
+         static const uint8_t top_n_control_owner  = 1;
+         static const uint8_t top_n_control_active = 2;
+
+         /**
           * This is a set of assets which the account is allowed to have.
           * This is utilized to restrict buyback accounts to the assets that trade in their markets.
           * In the future we may expand this to allow accounts to e.g. voluntarily restrict incoming transfers.
@@ -365,6 +373,7 @@ FC_REFLECT_DERIVED( graphene::chain::account_object,
                     (whitelisting_accounts)(blacklisted_accounts)
                     (cashback_vb)
                     (owner_special_authority)(active_special_authority)
+                    (top_n_control_flags)
                     (allowed_assets)
                     )
 

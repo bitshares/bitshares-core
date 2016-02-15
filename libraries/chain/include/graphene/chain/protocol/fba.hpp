@@ -22,45 +22,26 @@
  * THE SOFTWARE.
  */
 #pragma once
-#include <graphene/chain/evaluator.hpp>
+#include <graphene/chain/protocol/base.hpp>
 
 namespace graphene { namespace chain {
 
-class transfer_to_blind_operation;
-class transfer_from_blind_operation;
-class blind_transfer_operation;
-
-class transfer_to_blind_evaluator : public evaluator<transfer_to_blind_evaluator>
+struct fba_distribute_operation : public base_operation
 {
-   public:
-      typedef transfer_to_blind_operation operation_type;
+   struct fee_parameters_type {};
 
-      void_result do_evaluate( const transfer_to_blind_operation& o );
-      void_result do_apply( const transfer_to_blind_operation& o ) ;
+   asset fee;   // always zero
+   account_id_type account_id;
+   fba_accumulator_id_type fba_id;
+   share_type amount;
 
-      virtual void pay_fee() override;
+   account_id_type fee_payer()const { return account_id; }
+   void validate()const { FC_ASSERT( false ); }
+   share_type calculate_fee(const fee_parameters_type& k)const { return 0; }
 };
 
-class transfer_from_blind_evaluator : public evaluator<transfer_from_blind_evaluator>
-{
-   public:
-      typedef transfer_from_blind_operation operation_type;
+} }
 
-      void_result do_evaluate( const transfer_from_blind_operation& o );
-      void_result do_apply( const transfer_from_blind_operation& o ) ;
+FC_REFLECT( graphene::chain::fba_distribute_operation::fee_parameters_type,  )
 
-      virtual void pay_fee() override;
-};
-
-class blind_transfer_evaluator : public evaluator<blind_transfer_evaluator>
-{
-   public:
-      typedef blind_transfer_operation operation_type;
-
-      void_result do_evaluate( const blind_transfer_operation& o );
-      void_result do_apply( const blind_transfer_operation& o ) ;
-
-      virtual void pay_fee() override;
-};
-
-} } // namespace graphene::chain
+FC_REFLECT( graphene::chain::fba_distribute_operation, (fee)(account_id)(fba_id)(amount) )

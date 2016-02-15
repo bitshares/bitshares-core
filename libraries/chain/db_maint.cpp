@@ -28,6 +28,7 @@
 #include <fc/uint128.hpp>
 
 #include <graphene/chain/database.hpp>
+#include <graphene/chain/fba_accumulator_id.hpp>
 #include <graphene/chain/hardfork.hpp>
 
 #include <graphene/chain/account_object.hpp>
@@ -36,6 +37,7 @@
 #include <graphene/chain/buyback_object.hpp>
 #include <graphene/chain/chain_property_object.hpp>
 #include <graphene/chain/committee_member_object.hpp>
+#include <graphene/chain/fba_object.hpp>
 #include <graphene/chain/global_property_object.hpp>
 #include <graphene/chain/market_object.hpp>
 #include <graphene/chain/special_authority_object.hpp>
@@ -519,9 +521,98 @@ void update_top_n_authorities( database& db )
          db.modify( acct, [&]( account_object& a )
          {
             vc.finish( is_owner ? a.owner : a.active );
+            if( !vc.is_empty() )
+               a.top_n_control_flags |= (is_owner ? account_object::top_n_control_owner : account_object::top_n_control_active);
          } );
       }
    } );
+}
+
+void split_fba_balance(
+   database& db,
+   uint64_t fba_id,
+   uint16_t network_pct,
+   uint16_t designated_asset_buyback_pct,
+   uint16_t designated_asset_issuer_pct
+)
+{
+   FC_ASSERT( uint32_t(network_pct) + uint32_t(designated_asset_buyback_pct) + uint32_t(designated_asset_issuer_pct) == GRAPHENE_100_PERCENT );
+   const fba_accumulator_object& fba = fba_accumulator_id_type( fba_id )(db);
+   if( fba.accumulated_fba_fees == 0 )
+      return;
+
+   const asset_object& core = asset_id_type(0)(db);
+   const asset_dynamic_data_object& core_dd = core.dynamic_asset_data_id(db);
+
+   if( !fba.is_configured(db) )
+   {
+      ilog( "${n} core given to network at block ${b} due to non-configured FBA", ("n", fba.accumulated_fba_fees)("b", db.head_block_time()) );
+      db.modify( core_dd, [&]( asset_dynamic_data_object& _core_dd )
+      {
+         _core_dd.current_supply -= fba.accumulated_fba_fees;
+      } );
+      db.modify( fba, [&]( fba_accumulator_object& _fba )
+      {
+         _fba.accumulated_fba_fees = 0;
+      } );
+      return;
+   }
+
+   fc::uint128_t buyback_amount_128 = fba.accumulated_fba_fees.value;
+   buyback_amount_128 *= designated_asset_buyback_pct;
+   buyback_amount_128 /= GRAPHENE_100_PERCENT;
+   share_type buyback_amount = buyback_amount_128.to_uint64();
+
+   fc::uint128_t issuer_amount_128 = fba.accumulated_fba_fees.value;
+   issuer_amount_128 *= designated_asset_issuer_pct;
+   issuer_amount_128 /= GRAPHENE_100_PERCENT;
+   share_type issuer_amount = issuer_amount_128.to_uint64();
+
+   // this assert should never fail
+   FC_ASSERT( buyback_amount + issuer_amount <= fba.accumulated_fba_fees );
+
+   share_type network_amount = fba.accumulated_fba_fees - (buyback_amount + issuer_amount);
+
+   const asset_object& designated_asset = (*fba.designated_asset)(db);
+
+   if( network_amount != 0 )
+   {
+      db.modify( core_dd, [&]( asset_dynamic_data_object& _core_dd )
+      {
+         _core_dd.current_supply -= network_amount;
+      } );
+   }
+
+   fba_distribute_operation vop;
+   vop.account_id = *designated_asset.buyback_account;
+   vop.fba_id = fba.id;
+   vop.amount = buyback_amount;
+   if( vop.amount != 0 )
+   {
+      db.adjust_balance( *designated_asset.buyback_account, asset(buyback_amount) );
+      db.push_applied_operation(vop);
+   }
+
+   vop.account_id = designated_asset.issuer;
+   vop.fba_id = fba.id;
+   vop.amount = issuer_amount;
+   if( vop.amount != 0 )
+   {
+      db.adjust_balance( designated_asset.issuer, asset(issuer_amount) );
+      db.push_applied_operation(vop);
+   }
+
+   db.modify( fba, [&]( fba_accumulator_object& _fba )
+   {
+      _fba.accumulated_fba_fees = 0;
+   } );
+}
+
+void distribute_fba_balances( database& db )
+{
+   split_fba_balance( db, fba_accumulator_id_transfer_to_blind  , 20*GRAPHENE_1_PERCENT, 60*GRAPHENE_1_PERCENT, 20*GRAPHENE_1_PERCENT );
+   split_fba_balance( db, fba_accumulator_id_blind_transfer     , 20*GRAPHENE_1_PERCENT, 60*GRAPHENE_1_PERCENT, 20*GRAPHENE_1_PERCENT );
+   split_fba_balance( db, fba_accumulator_id_transfer_from_blind, 20*GRAPHENE_1_PERCENT, 60*GRAPHENE_1_PERCENT, 20*GRAPHENE_1_PERCENT );
 }
 
 void create_buyback_orders( database& db )
@@ -604,6 +695,7 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
 {
    const auto& gpo = get_global_properties();
 
+   distribute_fba_balances(*this);
    create_buyback_orders(*this);
 
    struct vote_tally_helper {
