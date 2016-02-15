@@ -167,3 +167,6 @@
 /// Sentinel value used in the scheduler.
 #define GRAPHENE_NULL_WITNESS (graphene::chain::witness_id_type(0))
 ///@}
+
+// hack for unit test
+#define GRAPHENE_FBA_STEALTH_DESIGNATED_ASSET (asset_id_type(1))

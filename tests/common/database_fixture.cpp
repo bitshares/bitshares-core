@@ -32,6 +32,7 @@
 #include <graphene/chain/account_object.hpp>
 #include <graphene/chain/asset_object.hpp>
 #include <graphene/chain/committee_member_object.hpp>
+#include <graphene/chain/fba_object.hpp>
 #include <graphene/chain/market_object.hpp>
 #include <graphene/chain/vesting_balance_object.hpp>
 #include <graphene/chain/witness_object.hpp>
@@ -195,6 +196,8 @@ void database_fixture::verify_asset_supplies( const database& db )
    }
    for( const vesting_balance_object& vbo : db.get_index_type< vesting_balance_index >().indices() )
       total_balances[ vbo.balance.asset_id ] += vbo.balance.amount;
+   for( const fba_accumulator_object& fba : db.get_index_type< simple_index< fba_accumulator_object > >() )
+      total_balances[ asset_id_type() ] += fba.accumulated_fba_fees;
 
    total_balances[asset_id_type()] += db.get_dynamic_global_properties().witness_budget;
 
@@ -1031,6 +1034,24 @@ int64_t database_fixture::get_balance( account_id_type account, asset_id_type a 
 int64_t database_fixture::get_balance( const account_object& account, const asset_object& a )const
 {
   return db.get_balance(account.get_id(), a.get_id()).amount.value;
+}
+
+vector< operation_history_object > database_fixture::get_operation_history( account_id_type account_id )const
+{
+   vector< operation_history_object > result;
+   const auto& stats = account_id(db).statistics(db);
+   if(stats.most_recent_op == account_transaction_history_id_type())
+      return result;
+
+   const account_transaction_history_object* node = &stats.most_recent_op(db);
+   while( true )
+   {
+      result.push_back( node->operation_id(db) );
+      if(node->next == account_transaction_history_id_type())
+         break;
+      node = db.find(node->next);
+   }
+   return result;
 }
 
 namespace test {

@@ -24,7 +24,12 @@
 
 #include <fc/smart_ref_impl.hpp>
 #include <fc/uint128.hpp>
+
 #include <graphene/chain/hardfork.hpp>
+
+#include <graphene/chain/fba_accumulator_id.hpp>
+
+#include <graphene/chain/fba_object.hpp>
 #include <graphene/chain/market_object.hpp>
 #include <graphene/chain/vesting_balance_object.hpp>
 
@@ -719,6 +724,212 @@ BOOST_AUTO_TEST_CASE( fee_refund_test )
       }
    }
    FC_LOG_AND_RETHROW()
+}
+
+BOOST_AUTO_TEST_CASE( stealth_fba_test )
+{
+   try
+   {
+      ACTORS( (alice)(bob)(chloe)(dan)(izzy)(philbin)(tom) );
+      upgrade_to_lifetime_member(philbin_id);
+
+      generate_blocks( HARDFORK_538_TIME );
+      generate_blocks( HARDFORK_555_TIME );
+      generate_blocks( HARDFORK_563_TIME );
+      generate_blocks( HARDFORK_572_TIME );
+
+      // Philbin (registrar who registers Rex)
+
+      // Izzy (initial issuer of stealth asset, will later transfer to Tom)
+      // Alice, Bob, Chloe, Dan (ABCD)
+      // Rex (recycler -- buyback account for stealth asset)
+      // Tom (owner of stealth asset who will be set as top_n authority)
+
+      // Izzy creates STEALTH
+      asset_id_type stealth_id = create_user_issued_asset( "STEALTH", izzy_id(db),
+         disable_confidential | transfer_restricted | override_authority | white_list | charge_market_fee ).id;
+
+      /*
+      // this is disabled because it doesn't work, our modify() is probably being overwritten by undo
+
+      //
+      // Init blockchain with stealth ID's
+      // On a real chain, this would be done with #define GRAPHENE_FBA_STEALTH_DESIGNATED_ASSET
+      // causing the designated_asset fields of these objects to be set at genesis, but for
+      // this test we modify the db directly.
+      //
+      auto set_fba_asset = [&]( uint64_t fba_acc_id, asset_id_type asset_id )
+      {
+         db.modify( fba_accumulator_id_type(fba_acc_id)(db), [&]( fba_accumulator_object& fba )
+         {
+            fba.designated_asset = asset_id;
+         } );
+      };
+
+      set_fba_asset( fba_accumulator_id_transfer_to_blind  , stealth_id );
+      set_fba_asset( fba_accumulator_id_blind_transfer     , stealth_id );
+      set_fba_asset( fba_accumulator_id_transfer_from_blind, stealth_id );
+      */
+
+      // Izzy kills some permission bits (this somehow happened to the real STEALTH in production)
+      {
+         asset_update_operation update_op;
+         update_op.issuer = izzy_id;
+         update_op.asset_to_update = stealth_id;
+         asset_options new_options;
+         new_options = stealth_id(db).options;
+         new_options.issuer_permissions = charge_market_fee;
+         new_options.flags = disable_confidential | transfer_restricted | override_authority | white_list | charge_market_fee;
+         // after fixing #579 you should be able to delete the following line
+         new_options.core_exchange_rate = price( asset( 1, stealth_id ), asset( 1, asset_id_type() ) );
+         update_op.new_options = new_options;
+         signed_transaction tx;
+         tx.operations.push_back( update_op );
+         set_expiration( db, tx );
+         sign( tx, izzy_private_key );
+         PUSH_TX( db, tx );
+      }
+
+      // Izzy transfers issuer duty to Tom
+      {
+         asset_update_operation update_op;
+         update_op.issuer = izzy_id;
+         update_op.asset_to_update = stealth_id;
+         update_op.new_issuer = tom_id;
+         // new_options should be optional, but isn't...the following line should be unnecessary #580
+         update_op.new_options = stealth_id(db).options;
+         signed_transaction tx;
+         tx.operations.push_back( update_op );
+         set_expiration( db, tx );
+         sign( tx, izzy_private_key );
+         PUSH_TX( db, tx );
+      }
+
+      // Tom re-enables the permission bits to clear the flags, then clears them again
+      // Allowed by #572 when current_supply == 0
+      {
+         asset_update_operation update_op;
+         update_op.issuer = tom_id;
+         update_op.asset_to_update = stealth_id;
+         asset_options new_options;
+         new_options = stealth_id(db).options;
+         new_options.issuer_permissions = new_options.flags | charge_market_fee;
+         update_op.new_options = new_options;
+         signed_transaction tx;
+         // enable perms is one op
+         tx.operations.push_back( update_op );
+
+         new_options.issuer_permissions = charge_market_fee;
+         new_options.flags = charge_market_fee;
+         update_op.new_options = new_options;
+         // reset wrongly set flags and reset permissions can be done in a single op
+         tx.operations.push_back( update_op );
+
+         set_expiration( db, tx );
+         sign( tx, tom_private_key );
+         PUSH_TX( db, tx );
+      }
+
+      // Philbin registers Rex who will be the asset's buyback, including sig from the new issuer (Tom)
+      account_id_type rex_id;
+      {
+         buyback_account_options bbo;
+         bbo.asset_to_buy = stealth_id;
+         bbo.asset_to_buy_issuer = tom_id;
+         bbo.markets.emplace( asset_id_type() );
+         account_create_operation create_op = make_account( "rex" );
+         create_op.registrar = philbin_id;
+         create_op.extensions.value.buyback_options = bbo;
+         create_op.owner = authority::null_authority();
+         create_op.active = authority::null_authority();
+
+         signed_transaction tx;
+         tx.operations.push_back( create_op );
+         set_expiration( db, tx );
+         sign( tx, philbin_private_key );
+         sign( tx, tom_private_key );
+
+         processed_transaction ptx = PUSH_TX( db, tx );
+         rex_id = ptx.operation_results.back().get< object_id_type >();
+      }
+
+      // Tom issues some asset to Alice and Bob
+      set_expiration( db, trx );  // #11
+      issue_uia( alice_id, asset( 1000, stealth_id ) );
+      issue_uia(   bob_id, asset( 1000, stealth_id ) );
+
+      // Tom sets his authority to the top_n of the asset
+      {
+         top_holders_special_authority top2;
+         top2.num_top_holders = 2;
+         top2.asset = stealth_id;
+
+         account_update_operation op;
+         op.account = tom_id;
+         op.extensions.value.active_special_authority = top2;
+         op.extensions.value.owner_special_authority = top2;
+
+         signed_transaction tx;
+         tx.operations.push_back( op );
+
+         set_expiration( db, tx );
+         sign( tx, tom_private_key );
+
+         PUSH_TX( db, tx );
+      }
+
+      // Wait until the next maintenance interval for top_n to take effect
+      generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+
+      // Do a blind op to add some fees to the pool.
+      fund( chloe_id(db), asset( 100000, asset_id_type() ) );
+
+      auto create_transfer_to_blind = [&]( account_id_type account, asset amount, const std::string& key ) -> transfer_to_blind_operation
+      {
+         fc::ecc::private_key blind_key = fc::ecc::private_key::regenerate( fc::sha256::hash( key+"-privkey" ) );
+         public_key_type blind_pub = blind_key.get_public_key();
+
+         fc::sha256 secret = fc::sha256::hash( key+"-secret" );
+         fc::sha256 nonce = fc::sha256::hash( key+"-nonce" );
+
+         transfer_to_blind_operation op;
+         blind_output blind_out;
+         blind_out.owner = authority( 1, blind_pub, 1 );
+         blind_out.commitment = fc::ecc::blind( secret, amount.amount.value );
+         blind_out.range_proof = fc::ecc::range_proof_sign( 0, blind_out.commitment, secret, nonce, 0, 0, amount.amount.value );
+
+         op.amount = amount;
+         op.from = account;
+         op.blinding_factor = fc::ecc::blind_sum( {secret}, 1 );
+         op.outputs = {blind_out};
+
+         return op;
+      };
+
+      {
+         transfer_to_blind_operation op = create_transfer_to_blind( chloe_id, asset( 5000, asset_id_type() ), "chloe-key" );
+         op.fee = asset( 1000, asset_id_type() );
+
+         signed_transaction tx;
+         tx.operations.push_back( op );
+         set_expiration( db, tx );
+         sign( tx, chloe_private_key );
+
+         PUSH_TX( db, tx );
+      }
+
+      // wait until next maint interval
+      generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+
+      idump( ( get_operation_history( chloe_id ) ) );
+      idump( ( get_operation_history( rex_id ) ) );
+      idump( ( get_operation_history( tom_id ) ) );
+   }
+   catch( const fc::exception& e )
+   {
+      elog( "caught exception ${e}", ("e", e.to_detail_string()) );
+      throw;
+   }
 }
 
 BOOST_AUTO_TEST_SUITE_END()
