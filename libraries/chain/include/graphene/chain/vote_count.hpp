@@ -63,6 +63,11 @@ struct vote_counter
       out_auth = auth;
    }
 
+   bool is_empty()const
+   {
+      return (total_votes == 0);
+   }
+
    uint64_t last_votes = std::numeric_limits<uint64_t>::max();
    uint64_t total_votes = 0;
    int8_t bitshift = -1;

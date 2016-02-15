@@ -30,6 +30,7 @@
 
 #include <graphene/chain/asset_object.hpp>
 #include <graphene/chain/account_object.hpp>
+#include <graphene/chain/fba_object.hpp>
 #include <graphene/chain/committee_member_object.hpp>
 #include <graphene/chain/market_evaluator.hpp>
 #include <graphene/chain/protocol/fee_schedule.hpp>
@@ -103,4 +104,18 @@ database& generic_evaluator::db()const { return trx_state->db(); }
       }
    } FC_CAPTURE_AND_RETHROW() }
 
+   void generic_evaluator::pay_fba_fee( uint64_t fba_id )
+   {
+      database& d = db();
+      const fba_accumulator_object& fba = d.get< fba_accumulator_object >( fba_accumulator_id_type( fba_id ) );
+      if( !fba.is_configured(d) )
+      {
+         generic_evaluator::pay_fee();
+         return;
+      }
+      d.modify( fba, [&]( fba_accumulator_object& _fba )
+      {
+         _fba.accumulated_fba_fees += core_fee_paid;
+      } );
+   }
 } }

@@ -260,14 +260,28 @@ void_result account_update_evaluator::do_apply( const account_update_operation& 
    database& d = db();
    bool sa_before, sa_after;
    d.modify( *acnt, [&](account_object& a){
-      if( o.owner ) a.owner = *o.owner;
-      if( o.active ) a.active = *o.active;
+      if( o.owner )
+      {
+         a.owner = *o.owner;
+         a.top_n_control_flags = 0;
+      }
+      if( o.active )
+      {
+         a.active = *o.active;
+         a.top_n_control_flags = 0;
+      }
       if( o.new_options ) a.options = *o.new_options;
       sa_before = a.has_special_authority();
       if( o.extensions.value.owner_special_authority.valid() )
+      {
          a.owner_special_authority = *(o.extensions.value.owner_special_authority);
+         a.top_n_control_flags = 0;
+      }
       if( o.extensions.value.active_special_authority.valid() )
+      {
          a.active_special_authority = *(o.extensions.value.active_special_authority);
+         a.top_n_control_flags = 0;
+      }
       sa_after = a.has_special_authority();
    });
 

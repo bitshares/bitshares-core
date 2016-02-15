@@ -138,6 +138,11 @@ namespace graphene { namespace chain {
 
       object_id_type get_relative_id( object_id_type rel_id )const;
 
+      /**
+       * pay_fee() for FBA subclass should simply call this method
+       */
+      void pay_fba_fee( uint64_t fba_id );
+
       asset                            fee_from_account;
       share_type                       core_fee_paid;
       const account_object*            fee_paying_account = nullptr;
