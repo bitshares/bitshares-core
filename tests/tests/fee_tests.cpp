@@ -620,14 +620,23 @@ BOOST_AUTO_TEST_CASE( fee_refund_test )
       int64_t order_create_fee = 537;
       int64_t order_cancel_fee = 129;
 
-      generate_block();
+      uint32_t skip = database::skip_witness_signature
+                    | database::skip_transaction_signatures
+                    | database::skip_transaction_dupe_check
+                    | database::skip_block_size_check
+                    | database::skip_tapos_check
+                    | database::skip_authority_check
+                    | database::skip_merkle_check
+                    ;
+
+      generate_block( skip );
 
       for( int i=0; i<2; i++ )
       {
          if( i == 1 )
          {
-            generate_blocks( HARDFORK_445_TIME );
-            generate_block();
+            generate_blocks( HARDFORK_445_TIME, true, skip );
+            generate_block( skip );
          }
 
          // enable_fees() and change_fees() modifies DB directly, and results will be overwritten by block generation
@@ -719,7 +728,7 @@ BOOST_AUTO_TEST_CASE( fee_refund_test )
          // but we'll save that for future cleanup
 
          // undo above tx's and reset
-         generate_block();
+         generate_block( skip );
          db.pop_block();
       }
    }
