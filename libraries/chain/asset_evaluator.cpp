@@ -259,9 +259,12 @@ void_result asset_update_evaluator::do_evaluate(const asset_update_operation& o)
       }
    }
 
-   // new issuer_permissions must be subset of old issuer permissions
-   FC_ASSERT(!(o.new_options.issuer_permissions & ~a.options.issuer_permissions),
-             "Cannot reinstate previously revoked issuer permissions on an asset.");
+   if( (d.head_block_time() < HARDFORK_572_TIME) || (a.dynamic_asset_data_id(d).current_supply != 0) )
+   {
+      // new issuer_permissions must be subset of old issuer permissions
+      FC_ASSERT(!(o.new_options.issuer_permissions & ~a.options.issuer_permissions),
+                "Cannot reinstate previously revoked issuer permissions on an asset.");
+   }
 
    // changed flags must be subset of old issuer permissions
    FC_ASSERT(!((o.new_options.flags ^ a.options.flags) & ~a.options.issuer_permissions),
