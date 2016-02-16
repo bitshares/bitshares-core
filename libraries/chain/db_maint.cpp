@@ -31,11 +31,13 @@
 
 #include <graphene/chain/account_object.hpp>
 #include <graphene/chain/asset_object.hpp>
+#include <graphene/chain/budget_record_object.hpp>
+#include <graphene/chain/chain_property_object.hpp>
 #include <graphene/chain/committee_member_object.hpp>
 #include <graphene/chain/global_property_object.hpp>
 #include <graphene/chain/vesting_balance_object.hpp>
 #include <graphene/chain/witness_object.hpp>
-#include <graphene/chain/worker_evaluator.hpp>
+#include <graphene/chain/worker_object.hpp>
 
 namespace graphene { namespace chain {
 
@@ -110,15 +112,15 @@ void database::pay_workers( share_type& budget )
    get_index_type<worker_index>().inspect_all_objects([this, &active_workers](const object& o) {
       const worker_object& w = static_cast<const worker_object&>(o);
       auto now = head_block_time();
-      if( w.is_active(now) && w.approving_stake(_vote_tally_buffer) > 0 )
+      if( w.is_active(now) && w.approving_stake() > 0 )
          active_workers.emplace_back(w);
    });
 
    // worker with more votes is preferred
    // if two workers exactly tie for votes, worker with lower ID is preferred
    std::sort(active_workers.begin(), active_workers.end(), [this](const worker_object& wa, const worker_object& wb) {
-      share_type wa_vote = wa.approving_stake(_vote_tally_buffer);
-      share_type wb_vote = wb.approving_stake(_vote_tally_buffer);
+      share_type wa_vote = wa.approving_stake();
+      share_type wb_vote = wb.approving_stake();
       if( wa_vote != wb_vote )
          return wa_vote > wb_vote;
       return wa.id < wb.id;

@@ -33,7 +33,7 @@ namespace graphene { namespace chain {
 
 asset database::get_balance(account_id_type owner, asset_id_type asset_id) const
 {
-   auto& index = get_index_type<account_balance_index>().indices().get<by_balance>();
+   auto& index = get_index_type<account_balance_index>().indices().get<by_account_asset>();
    auto itr = index.find(boost::make_tuple(owner, asset_id));
    if( itr == index.end() )
       return asset(0, asset_id);
@@ -55,7 +55,7 @@ void database::adjust_balance(account_id_type account, asset delta )
    if( delta.amount == 0 )
       return;
 
-   auto& index = get_index_type<account_balance_index>().indices().get<by_balance>();
+   auto& index = get_index_type<account_balance_index>().indices().get<by_account_asset>();
    auto itr = index.find(boost::make_tuple(account, delta.asset_id));
    if(itr == index.end())
    {

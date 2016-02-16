@@ -27,11 +27,12 @@
 
 #include <graphene/chain/asset_object.hpp>
 #include <graphene/chain/global_property_object.hpp>
+#include <graphene/chain/market_object.hpp>
 #include <graphene/chain/proposal_object.hpp>
 #include <graphene/chain/transaction_object.hpp>
-#include <graphene/chain/market_evaluator.hpp>
 #include <graphene/chain/withdraw_permission_object.hpp>
 #include <graphene/chain/witness_object.hpp>
+
 #include <graphene/chain/protocol/fee_schedule.hpp>
 
 #include <fc/uint128.hpp>
@@ -277,25 +278,47 @@ void database::clear_expired_orders()
    {
       asset_id_type current_asset = settlement_index.begin()->settlement_asset_id();
       asset max_settlement_volume;
+      bool extra_dump = false;
 
-      auto next_asset = [&current_asset, &settlement_index] {
+      auto next_asset = [&current_asset, &settlement_index, &extra_dump] {
          auto bound = settlement_index.upper_bound(current_asset);
          if( bound == settlement_index.end() )
+         {
+            if( extra_dump )
+            {
+               ilog( "next_asset() returning false" );
+            }
             return false;
+         }
+         if( extra_dump )
+         {
+            ilog( "next_asset returning true, bound is ${b}", ("b", *bound) );
+         }
          current_asset = bound->settlement_asset_id();
          return true;
       };
+
+      uint32_t count = 0;
 
       // At each iteration, we either consume the current order and remove it, or we move to the next asset
       for( auto itr = settlement_index.lower_bound(current_asset);
            itr != settlement_index.end();
            itr = settlement_index.lower_bound(current_asset) )
       {
+         ++count;
          const force_settlement_object& order = *itr;
          auto order_id = order.id;
          current_asset = order.settlement_asset_id();
          const asset_object& mia_object = get(current_asset);
          const asset_bitasset_data_object& mia = mia_object.bitasset_data(*this);
+
+         extra_dump = ((count >= 1000) && (count <= 1020));
+
+         if( extra_dump )
+         {
+            wlog( "clear_expired_orders() dumping extra data for iteration ${c}", ("c", count) );
+            ilog( "head_block_num is ${hb} current_asset is ${a}", ("hb", head_block_num())("a", current_asset) );
+         }
 
          if( mia.has_settlement() )
          {
@@ -308,7 +331,13 @@ void database::clear_expired_orders()
          if( order.settlement_date > head_block_time() )
          {
             if( next_asset() )
+            {
+               if( extra_dump )
+               {
+                  ilog( "next_asset() returned true when order.settlement_date > head_block_time()" );
+               }
                continue;
+            }
             break;
          }
          // Can we still settle in this asset?
@@ -329,7 +358,13 @@ void database::clear_expired_orders()
                  ("settled_volume", mia.force_settled_volume)("max_volume", max_settlement_volume));
                  */
             if( next_asset() )
+            {
+               if( extra_dump )
+               {
+                  ilog( "next_asset() returned true when mia.force_settled_volume >= max_settlement_volume.amount" );
+               }
                continue;
+            }
             break;
          }
 

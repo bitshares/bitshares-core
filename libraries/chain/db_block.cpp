@@ -571,7 +571,7 @@ processed_transaction database::_apply_transaction(const signed_transaction& trx
 { try {
    uint32_t skip = get_node_properties().skip_flags;
 
-   if( !(skip&skip_validate) )
+   if( true || !(skip&skip_validate) )   /* issue #505 explains why this skip_flag is disabled */
       trx.validate();
 
    auto& trx_idx = get_mutable_index_type<transaction_index>();
@@ -631,8 +631,8 @@ processed_transaction database::_apply_transaction(const signed_transaction& trx
    ptrx.operation_results = std::move(eval_state.operation_results);
 
    //Make sure the temp account has no non-zero balances
-   const auto& index = get_index_type<account_balance_index>().indices().get<by_account>();
-   auto range = index.equal_range(GRAPHENE_TEMP_ACCOUNT);
+   const auto& index = get_index_type<account_balance_index>().indices().get<by_account_asset>();
+   auto range = index.equal_range( boost::make_tuple( GRAPHENE_TEMP_ACCOUNT ) );
    std::for_each(range.first, range.second, [](const account_balance_object& b) { FC_ASSERT(b.balance == 0); });
 
    return ptrx;

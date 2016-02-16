@@ -28,6 +28,8 @@
 #include <graphene/chain/chain_property_object.hpp>
 #include <graphene/chain/global_property_object.hpp>
 
+#include <fc/smart_ref_impl.hpp>
+
 namespace graphene { namespace chain {
 
 const asset_object& database::get_core_asset() const
