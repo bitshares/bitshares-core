@@ -25,10 +25,12 @@
 #include <graphene/chain/evaluator.hpp>
 #include <graphene/chain/exceptions.hpp>
 #include <graphene/chain/hardfork.hpp>
+#include <graphene/chain/is_authorized_asset.hpp>
 #include <graphene/chain/transaction_evaluation_state.hpp>
 
 #include <graphene/chain/asset_object.hpp>
 #include <graphene/chain/account_object.hpp>
+#include <graphene/chain/fba_object.hpp>
 #include <graphene/chain/committee_member_object.hpp>
 #include <graphene/chain/market_evaluator.hpp>
 #include <graphene/chain/protocol/fee_schedule.hpp>
@@ -61,7 +63,7 @@ database& generic_evaluator::db()const { return trx_state->db(); }
 
       if( d.head_block_time() > HARDFORK_419_TIME )
       {
-         FC_ASSERT( fee_paying_account->is_authorized_asset( *fee_asset, d ), "Account ${acct} '${name}' attempted to pay fee by using asset ${a} '${sym}', which is unauthorized due to whitelist / blacklist",
+         FC_ASSERT( is_authorized_asset( d, *fee_paying_account, *fee_asset ), "Account ${acct} '${name}' attempted to pay fee by using asset ${a} '${sym}', which is unauthorized due to whitelist / blacklist",
             ("acct", fee_paying_account->id)("name", fee_paying_account->name)("a", fee_asset->id)("sym", fee_asset->symbol) );
       }
 
@@ -102,4 +104,18 @@ database& generic_evaluator::db()const { return trx_state->db(); }
       }
    } FC_CAPTURE_AND_RETHROW() }
 
+   void generic_evaluator::pay_fba_fee( uint64_t fba_id )
+   {
+      database& d = db();
+      const fba_accumulator_object& fba = d.get< fba_accumulator_object >( fba_accumulator_id_type( fba_id ) );
+      if( !fba.is_configured(d) )
+      {
+         generic_evaluator::pay_fee();
+         return;
+      }
+      d.modify( fba, [&]( fba_accumulator_object& _fba )
+      {
+         _fba.accumulated_fba_fees += core_fee_paid;
+      } );
+   }
 } }

@@ -413,9 +413,12 @@ void database::clear_expired_orders()
                break;
             }
          }
-         modify(mia, [settled](asset_bitasset_data_object& b) {
-            b.force_settled_volume = settled.amount;
-         });
+         if( mia.force_settled_volume != settled.amount )
+         {
+            modify(mia, [settled](asset_bitasset_data_object& b) {
+               b.force_settled_volume = settled.amount;
+            });
+         }
       }
    }
 } FC_CAPTURE_AND_RETHROW() }

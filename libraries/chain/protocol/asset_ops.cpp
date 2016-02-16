@@ -161,7 +161,7 @@ void asset_issue_operation::validate()const
    FC_ASSERT( fee.amount >= 0 );
    FC_ASSERT( asset_to_issue.amount.value <= GRAPHENE_MAX_SHARE_SUPPLY );
    FC_ASSERT( asset_to_issue.amount.value > 0 );
-   FC_ASSERT( asset_to_issue.asset_id != 0 );
+   FC_ASSERT( asset_to_issue.asset_id != asset_id_type(0) );
 }
 
 void asset_fund_fee_pool_operation::validate() const

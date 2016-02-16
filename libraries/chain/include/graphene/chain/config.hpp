@@ -107,6 +107,7 @@
 #define GRAPHENE_DEFAULT_FEE_LIQUIDATION_THRESHOLD            GRAPHENE_BLOCKCHAIN_PRECISION * 100;
 #define GRAPHENE_DEFAULT_ACCOUNTS_PER_FEE_SCALE               1000
 #define GRAPHENE_DEFAULT_ACCOUNT_FEE_SCALE_BITSHIFTS          4
+#define GRAPHENE_DEFAULT_MAX_BUYBACK_MARKETS                  4
 
 #define GRAPHENE_MAX_WORKER_NAME_LENGTH                       63
 
@@ -166,3 +167,6 @@
 /// Sentinel value used in the scheduler.
 #define GRAPHENE_NULL_WITNESS (graphene::chain::witness_id_type(0))
 ///@}
+
+// hack for unit test
+#define GRAPHENE_FBA_STEALTH_DESIGNATED_ASSET (asset_id_type(1))

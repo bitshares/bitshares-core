@@ -38,7 +38,10 @@ void fork_database::reset()
 
 void fork_database::pop_block()
 {
-   if( _head ) _head = _head->prev.lock();
+   FC_ASSERT( _head, "no blocks to pop" );
+   auto prev = _head->prev.lock();
+   FC_ASSERT( prev, "poping block would leave head block null" );
+    _head = prev;
 }
 
 void     fork_database::start_block(signed_block b)

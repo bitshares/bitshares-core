@@ -33,47 +33,6 @@ namespace graphene { namespace chain {
    class generic_evaluator;
    class transaction_evaluation_state;
 
-   /**
-    * Observes evaluation events, providing
-    * pre- and post-evaluation hooks.
-    *
-    * Every call to pre_evaluate() is followed by
-    * a call to either post_evaluate() or evaluation_failed().
-    *
-    * A subclass which needs to do a "diff" can gather some
-    * "before" state into its members in pre_evaluate(),
-    * then post_evaluate() will have both "before"
-    * and "after" state, and will be able to do the diff.
-    *
-    * evaluation_failed() is a cleanup method which notifies
-    * the subclass to "throw away" the diff.
-    */
-   class evaluation_observer
-   {
-   public:
-      virtual ~evaluation_observer(){}
-
-      virtual void pre_evaluate(const transaction_evaluation_state& eval_state,
-                                const operation& op,
-                                bool apply,
-                                generic_evaluator* ge)
-      {}
-
-      virtual void post_evaluate(const transaction_evaluation_state& eval_state,
-                                 const operation& op,
-                                 bool apply,
-                                 generic_evaluator* ge,
-                                 const operation_result& result)
-      {}
-
-      virtual void evaluation_failed(const transaction_evaluation_state& eval_state,
-                                     const operation& op,
-                                     bool apply,
-                                     generic_evaluator* ge,
-                                     const operation_result& result)
-      {}
-   };
-
    class generic_evaluator
    {
    public:
@@ -138,6 +97,11 @@ namespace graphene { namespace chain {
 
       object_id_type get_relative_id( object_id_type rel_id )const;
 
+      /**
+       * pay_fee() for FBA subclass should simply call this method
+       */
+      void pay_fba_fee( uint64_t fba_id );
+
       asset                            fee_from_account;
       share_type                       core_fee_paid;
       const account_object*            fee_paying_account = nullptr;
@@ -152,8 +116,6 @@ namespace graphene { namespace chain {
    public:
       virtual ~op_evaluator(){}
       virtual operation_result evaluate(transaction_evaluation_state& eval_state, const operation& op, bool apply) = 0;
-
-      vector<evaluation_observer*> eval_observers;
    };
 
    template<typename T>
@@ -162,57 +124,8 @@ namespace graphene { namespace chain {
    public:
       virtual operation_result evaluate(transaction_evaluation_state& eval_state, const operation& op, bool apply = true) override
       {
-         // fc::exception from observers are suppressed.
-         // fc::exception from evaluation is deferred (re-thrown
-         // after all observers receive evaluation_failed)
-
          T eval;
-         shared_ptr<fc::exception> evaluation_exception;
-         size_t observer_count = 0;
-         operation_result result;
-
-         for( const auto& obs : eval_observers )
-         {
-            try
-            {
-               obs->pre_evaluate(eval_state, op, apply, &eval);
-            }
-            catch( const fc::exception& e )
-            {
-               elog( "suppressed exception in observer pre method:\n${e}", ( "e", e.to_detail_string() ) );
-            }
-            observer_count++;
-         }
-
-         try
-         {
-            result = eval.start_evaluate(eval_state, op, apply);
-         }
-         catch( const fc::exception& e )
-         {
-            evaluation_exception = e.dynamic_copy_exception();
-         }
-
-         while( observer_count > 0 )
-         {
-            --observer_count;
-            const auto& obs = eval_observers[observer_count];
-            try
-            {
-               if( evaluation_exception )
-                  obs->post_evaluate(eval_state, op, apply, &eval, result);
-               else
-                  obs->evaluation_failed(eval_state, op, apply, &eval, result);
-            }
-            catch( const fc::exception& e )
-            {
-               elog( "suppressed exception in observer post method:\n${e}", ( "e", e.to_detail_string() ) );
-            }
-         }
-
-         if( evaluation_exception )
-            evaluation_exception->dynamic_rethrow_exception();
-         return result;
+         return eval.start_evaluate(eval_state, op, apply);
       }
    };
 

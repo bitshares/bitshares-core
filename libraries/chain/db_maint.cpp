@@ -28,14 +28,21 @@
 #include <fc/uint128.hpp>
 
 #include <graphene/chain/database.hpp>
+#include <graphene/chain/fba_accumulator_id.hpp>
+#include <graphene/chain/hardfork.hpp>
 
 #include <graphene/chain/account_object.hpp>
 #include <graphene/chain/asset_object.hpp>
 #include <graphene/chain/budget_record_object.hpp>
+#include <graphene/chain/buyback_object.hpp>
 #include <graphene/chain/chain_property_object.hpp>
 #include <graphene/chain/committee_member_object.hpp>
+#include <graphene/chain/fba_object.hpp>
 #include <graphene/chain/global_property_object.hpp>
+#include <graphene/chain/market_object.hpp>
+#include <graphene/chain/special_authority_object.hpp>
 #include <graphene/chain/vesting_balance_object.hpp>
+#include <graphene/chain/vote_count.hpp>
 #include <graphene/chain/witness_object.hpp>
 #include <graphene/chain/worker_object.hpp>
 
@@ -183,32 +190,43 @@ void database::update_active_witnesses()
    }
 
    // Update witness authority
-   modify( get(GRAPHENE_WITNESS_ACCOUNT), [&]( account_object& a ) {
-      uint64_t total_votes = 0;
-      map<account_id_type, uint64_t> weights;
-      a.active.weight_threshold = 0;
-      a.active.clear();
-
-      for( const witness_object& wit : wits )
+   modify( get(GRAPHENE_WITNESS_ACCOUNT), [&]( account_object& a )
+   {
+      if( head_block_time() < HARDFORK_533_TIME )
       {
-         weights.emplace(wit.witness_account, _vote_tally_buffer[wit.vote_id]);
-         total_votes += _vote_tally_buffer[wit.vote_id];
-      }
+         uint64_t total_votes = 0;
+         map<account_id_type, uint64_t> weights;
+         a.active.weight_threshold = 0;
+         a.active.clear();
 
-      // total_votes is 64 bits. Subtract the number of leading low bits from 64 to get the number of useful bits,
-      // then I want to keep the most significant 16 bits of what's left.
-      int8_t bits_to_drop = std::max(int(boost::multiprecision::detail::find_msb(total_votes)) - 15, 0);
-      for( const auto& weight : weights )
+         for( const witness_object& wit : wits )
+         {
+            weights.emplace(wit.witness_account, _vote_tally_buffer[wit.vote_id]);
+            total_votes += _vote_tally_buffer[wit.vote_id];
+         }
+
+         // total_votes is 64 bits. Subtract the number of leading low bits from 64 to get the number of useful bits,
+         // then I want to keep the most significant 16 bits of what's left.
+         int8_t bits_to_drop = std::max(int(boost::multiprecision::detail::find_msb(total_votes)) - 15, 0);
+         for( const auto& weight : weights )
+         {
+            // Ensure that everyone has at least one vote. Zero weights aren't allowed.
+            uint16_t votes = std::max((weight.second >> bits_to_drop), uint64_t(1) );
+            a.active.account_auths[weight.first] += votes;
+            a.active.weight_threshold += votes;
+         }
+
+         a.active.weight_threshold /= 2;
+         a.active.weight_threshold += 1;
+      }
+      else
       {
-         // Ensure that everyone has at least one vote. Zero weights aren't allowed.
-         uint16_t votes = std::max((weight.second >> bits_to_drop), uint64_t(1) );
-         a.active.account_auths[weight.first] += votes;
-         a.active.weight_threshold += votes;
+         vote_counter vc;
+         for( const witness_object& wit : wits )
+            vc.add( wit.witness_account, _vote_tally_buffer[wit.vote_id] );
+         vc.finish( a.active );
       }
-
-      a.active.weight_threshold /= 2;
-      a.active.weight_threshold += 1;
-   });
+   } );
 
    modify(gpo, [&]( global_property_object& gp ){
       gp.active_witnesses.clear();
@@ -217,13 +235,6 @@ void database::update_active_witnesses()
                      std::inserter(gp.active_witnesses, gp.active_witnesses.end()),
                      [](const witness_object& w) {
          return w.id;
-      });
-      gp.witness_accounts.clear();
-      gp.witness_accounts.reserve(wits.size());
-      std::transform(wits.begin(), wits.end(),
-                     std::inserter(gp.witness_accounts, gp.witness_accounts.end()),
-                     [](const witness_object& w) {
-         return w.witness_account;
       });
    });
 
@@ -256,32 +267,43 @@ void database::update_active_committee_members()
    // Update committee authorities
    if( !committee_members.empty() )
    {
-      modify(get(GRAPHENE_COMMITTEE_ACCOUNT), [&](account_object& a) {
-         uint64_t total_votes = 0;
-         map<account_id_type, uint64_t> weights;
-         a.active.weight_threshold = 0;
-         a.active.clear();
-
-         for( const committee_member_object& del : committee_members )
+      modify(get(GRAPHENE_COMMITTEE_ACCOUNT), [&](account_object& a)
+      {
+         if( head_block_time() < HARDFORK_533_TIME )
          {
-            weights.emplace(del.committee_member_account, _vote_tally_buffer[del.vote_id]);
-            total_votes += _vote_tally_buffer[del.vote_id];
-         }
+            uint64_t total_votes = 0;
+            map<account_id_type, uint64_t> weights;
+            a.active.weight_threshold = 0;
+            a.active.clear();
 
-         // total_votes is 64 bits. Subtract the number of leading low bits from 64 to get the number of useful bits,
-         // then I want to keep the most significant 16 bits of what's left.
-         int8_t bits_to_drop = std::max(int(boost::multiprecision::detail::find_msb(total_votes)) - 15, 0);
-         for( const auto& weight : weights )
+            for( const committee_member_object& del : committee_members )
+            {
+               weights.emplace(del.committee_member_account, _vote_tally_buffer[del.vote_id]);
+               total_votes += _vote_tally_buffer[del.vote_id];
+            }
+
+            // total_votes is 64 bits. Subtract the number of leading low bits from 64 to get the number of useful bits,
+            // then I want to keep the most significant 16 bits of what's left.
+            int8_t bits_to_drop = std::max(int(boost::multiprecision::detail::find_msb(total_votes)) - 15, 0);
+            for( const auto& weight : weights )
+            {
+               // Ensure that everyone has at least one vote. Zero weights aren't allowed.
+               uint16_t votes = std::max((weight.second >> bits_to_drop), uint64_t(1) );
+               a.active.account_auths[weight.first] += votes;
+               a.active.weight_threshold += votes;
+            }
+
+            a.active.weight_threshold /= 2;
+            a.active.weight_threshold += 1;
+         }
+         else
          {
-            // Ensure that everyone has at least one vote. Zero weights aren't allowed.
-            uint16_t votes = std::max((weight.second >> bits_to_drop), uint64_t(1) );
-            a.active.account_auths[weight.first] += votes;
-            a.active.weight_threshold += votes;
+            vote_counter vc;
+            for( const committee_member_object& cm : committee_members )
+               vc.add( cm.committee_member_account, _vote_tally_buffer[cm.vote_id] );
+            vc.finish( a.active );
          }
-
-         a.active.weight_threshold /= 2;
-         a.active.weight_threshold += 1;
-      });
+      } );
       modify(get(GRAPHENE_RELAXED_COMMITTEE_ACCOUNT), [&](account_object& a) {
          a.active = get(GRAPHENE_COMMITTEE_ACCOUNT).active;
       });
@@ -441,9 +463,233 @@ void database::process_budget()
    FC_CAPTURE_AND_RETHROW()
 }
 
+template< typename Visitor >
+void visit_special_authorities( const database& db, Visitor visit )
+{
+   const auto& sa_idx = db.get_index_type< special_authority_index >().indices().get<by_id>();
+
+   for( const special_authority_object& sao : sa_idx )
+   {
+      const account_object& acct = sao.account(db);
+      if( acct.owner_special_authority.which() != special_authority::tag< no_special_authority >::value )
+      {
+         visit( acct, true, acct.owner_special_authority );
+      }
+      if( acct.active_special_authority.which() != special_authority::tag< no_special_authority >::value )
+      {
+         visit( acct, false, acct.active_special_authority );
+      }
+   }
+}
+
+void update_top_n_authorities( database& db )
+{
+   visit_special_authorities( db,
+   [&]( const account_object& acct, bool is_owner, const special_authority& auth )
+   {
+      if( auth.which() == special_authority::tag< top_holders_special_authority >::value )
+      {
+         // use index to grab the top N holders of the asset and vote_counter to obtain the weights
+
+         const top_holders_special_authority& tha = auth.get< top_holders_special_authority >();
+         vote_counter vc;
+         const auto& bal_idx = db.get_index_type< account_balance_index >().indices().get< by_asset_balance >();
+         uint8_t num_needed = tha.num_top_holders;
+         if( num_needed == 0 )
+            return;
+
+         // find accounts
+         const auto range = bal_idx.equal_range( boost::make_tuple( tha.asset ) );
+         for( const account_balance_object& bal : boost::make_iterator_range( range.first, range.second ) )
+         {
+             assert( bal.asset_type == tha.asset );
+             if( bal.owner == acct.id )
+                continue;
+             vc.add( bal.owner, bal.balance.value );
+             --num_needed;
+             if( num_needed == 0 )
+                break;
+         }
+
+         db.modify( acct, [&]( account_object& a )
+         {
+            vc.finish( is_owner ? a.owner : a.active );
+            if( !vc.is_empty() )
+               a.top_n_control_flags |= (is_owner ? account_object::top_n_control_owner : account_object::top_n_control_active);
+         } );
+      }
+   } );
+}
+
+void split_fba_balance(
+   database& db,
+   uint64_t fba_id,
+   uint16_t network_pct,
+   uint16_t designated_asset_buyback_pct,
+   uint16_t designated_asset_issuer_pct
+)
+{
+   FC_ASSERT( uint32_t(network_pct) + uint32_t(designated_asset_buyback_pct) + uint32_t(designated_asset_issuer_pct) == GRAPHENE_100_PERCENT );
+   const fba_accumulator_object& fba = fba_accumulator_id_type( fba_id )(db);
+   if( fba.accumulated_fba_fees == 0 )
+      return;
+
+   const asset_object& core = asset_id_type(0)(db);
+   const asset_dynamic_data_object& core_dd = core.dynamic_asset_data_id(db);
+
+   if( !fba.is_configured(db) )
+   {
+      ilog( "${n} core given to network at block ${b} due to non-configured FBA", ("n", fba.accumulated_fba_fees)("b", db.head_block_time()) );
+      db.modify( core_dd, [&]( asset_dynamic_data_object& _core_dd )
+      {
+         _core_dd.current_supply -= fba.accumulated_fba_fees;
+      } );
+      db.modify( fba, [&]( fba_accumulator_object& _fba )
+      {
+         _fba.accumulated_fba_fees = 0;
+      } );
+      return;
+   }
+
+   fc::uint128_t buyback_amount_128 = fba.accumulated_fba_fees.value;
+   buyback_amount_128 *= designated_asset_buyback_pct;
+   buyback_amount_128 /= GRAPHENE_100_PERCENT;
+   share_type buyback_amount = buyback_amount_128.to_uint64();
+
+   fc::uint128_t issuer_amount_128 = fba.accumulated_fba_fees.value;
+   issuer_amount_128 *= designated_asset_issuer_pct;
+   issuer_amount_128 /= GRAPHENE_100_PERCENT;
+   share_type issuer_amount = issuer_amount_128.to_uint64();
+
+   // this assert should never fail
+   FC_ASSERT( buyback_amount + issuer_amount <= fba.accumulated_fba_fees );
+
+   share_type network_amount = fba.accumulated_fba_fees - (buyback_amount + issuer_amount);
+
+   const asset_object& designated_asset = (*fba.designated_asset)(db);
+
+   if( network_amount != 0 )
+   {
+      db.modify( core_dd, [&]( asset_dynamic_data_object& _core_dd )
+      {
+         _core_dd.current_supply -= network_amount;
+      } );
+   }
+
+   fba_distribute_operation vop;
+   vop.account_id = *designated_asset.buyback_account;
+   vop.fba_id = fba.id;
+   vop.amount = buyback_amount;
+   if( vop.amount != 0 )
+   {
+      db.adjust_balance( *designated_asset.buyback_account, asset(buyback_amount) );
+      db.push_applied_operation(vop);
+   }
+
+   vop.account_id = designated_asset.issuer;
+   vop.fba_id = fba.id;
+   vop.amount = issuer_amount;
+   if( vop.amount != 0 )
+   {
+      db.adjust_balance( designated_asset.issuer, asset(issuer_amount) );
+      db.push_applied_operation(vop);
+   }
+
+   db.modify( fba, [&]( fba_accumulator_object& _fba )
+   {
+      _fba.accumulated_fba_fees = 0;
+   } );
+}
+
+void distribute_fba_balances( database& db )
+{
+   split_fba_balance( db, fba_accumulator_id_transfer_to_blind  , 20*GRAPHENE_1_PERCENT, 60*GRAPHENE_1_PERCENT, 20*GRAPHENE_1_PERCENT );
+   split_fba_balance( db, fba_accumulator_id_blind_transfer     , 20*GRAPHENE_1_PERCENT, 60*GRAPHENE_1_PERCENT, 20*GRAPHENE_1_PERCENT );
+   split_fba_balance( db, fba_accumulator_id_transfer_from_blind, 20*GRAPHENE_1_PERCENT, 60*GRAPHENE_1_PERCENT, 20*GRAPHENE_1_PERCENT );
+}
+
+void create_buyback_orders( database& db )
+{
+   const auto& bbo_idx = db.get_index_type< buyback_index >().indices().get<by_id>();
+   const auto& bal_idx = db.get_index_type< account_balance_index >().indices().get< by_account_asset >();
+
+   for( const buyback_object& bbo : bbo_idx )
+   {
+      const asset_object& asset_to_buy = bbo.asset_to_buy(db);
+      assert( asset_to_buy.buyback_account.valid() );
+
+      const account_object& buyback_account = (*(asset_to_buy.buyback_account))(db);
+      asset_id_type next_asset = asset_id_type();
+
+      if( !buyback_account.allowed_assets.valid() )
+      {
+         wlog( "skipping buyback account ${b} at block ${n} because allowed_assets does not exist", ("b", buyback_account)("n", db.head_block_num()) );
+         continue;
+      }
+
+      while( true )
+      {
+         auto it = bal_idx.lower_bound( boost::make_tuple( buyback_account.id, next_asset ) );
+         if( it == bal_idx.end() )
+            break;
+         if( it->owner != buyback_account.id )
+            break;
+         asset_id_type asset_to_sell = it->asset_type;
+         share_type amount_to_sell = it->balance;
+         next_asset = asset_to_sell + 1;
+         if( asset_to_sell == asset_to_buy.id )
+            continue;
+         if( amount_to_sell == 0 )
+            continue;
+         if( buyback_account.allowed_assets->find( asset_to_sell ) == buyback_account.allowed_assets->end() )
+         {
+            wlog( "buyback account ${b} not selling disallowed holdings of asset ${a} at block ${n}", ("b", buyback_account)("a", asset_to_sell)("n", db.head_block_num()) );
+            continue;
+         }
+
+         try
+         {
+            transaction_evaluation_state buyback_context(&db);
+            buyback_context.skip_fee_schedule_check = true;
+
+            limit_order_create_operation create_vop;
+            create_vop.fee = asset( 0, asset_id_type() );
+            create_vop.seller = buyback_account.id;
+            create_vop.amount_to_sell = asset( amount_to_sell, asset_to_sell );
+            create_vop.min_to_receive = asset( 1, asset_to_buy.id );
+            create_vop.expiration = time_point_sec::maximum();
+            create_vop.fill_or_kill = false;
+
+            limit_order_id_type order_id = db.apply_operation( buyback_context, create_vop ).get< object_id_type >();
+
+            if( db.find( order_id ) != nullptr )
+            {
+               limit_order_cancel_operation cancel_vop;
+               cancel_vop.fee = asset( 0, asset_id_type() );
+               cancel_vop.order = order_id;
+               cancel_vop.fee_paying_account = buyback_account.id;
+
+               db.apply_operation( buyback_context, cancel_vop );
+            }
+         }
+         catch( const fc::exception& e )
+         {
+            // we can in fact get here, e.g. if asset issuer of buy/sell asset blacklists/whitelists the buyback account
+            wlog( "Skipping buyback processing selling ${as} for ${ab} for buyback account ${b} at block ${n}; exception was ${e}",
+                  ("as", asset_to_sell)("ab", asset_to_buy)("b", buyback_account)("n", db.head_block_num())("e", e.to_detail_string()) );
+            continue;
+         }
+      }
+   }
+   return;
+}
+
 void database::perform_chain_maintenance(const signed_block& next_block, const global_property_object& global_props)
 {
    const auto& gpo = get_global_properties();
+
+   distribute_fba_balances(*this);
+   create_buyback_orders(*this);
 
    struct vote_tally_helper {
       database& d;
@@ -521,7 +767,10 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
       }
    } fee_helper(*this, gpo);
 
-   perform_account_maintenance(std::tie(tally_helper, fee_helper));
+   perform_account_maintenance(std::tie(
+      tally_helper,
+      fee_helper
+      ));
 
    struct clear_canary {
       clear_canary(vector<uint64_t>& target): target(target){}
@@ -533,6 +782,7 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
                 b(_committee_count_histogram_buffer),
                 c(_vote_tally_buffer);
 
+   update_top_n_authorities(*this);
    update_active_witnesses();
    update_active_committee_members();
    update_worker_votes();

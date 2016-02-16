@@ -109,6 +109,11 @@ namespace graphene { namespace chain {
       uint32_t num_auths()const { return account_auths.size() + key_auths.size() + address_auths.size(); }
       void     clear() { account_auths.clear(); key_auths.clear(); }
 
+      static authority null_authority()
+      {
+         return authority( 1, GRAPHENE_NULL_ACCOUNT, 1 );
+      }
+
       uint32_t                              weight_threshold = 0;
       flat_map<account_id_type,weight_type> account_auths;
       flat_map<public_key_type,weight_type> key_auths;

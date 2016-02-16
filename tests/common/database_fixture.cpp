@@ -32,6 +32,7 @@
 #include <graphene/chain/account_object.hpp>
 #include <graphene/chain/asset_object.hpp>
 #include <graphene/chain/committee_member_object.hpp>
+#include <graphene/chain/fba_object.hpp>
 #include <graphene/chain/market_object.hpp>
 #include <graphene/chain/vesting_balance_object.hpp>
 #include <graphene/chain/witness_object.hpp>
@@ -195,6 +196,8 @@ void database_fixture::verify_asset_supplies( const database& db )
    }
    for( const vesting_balance_object& vbo : db.get_index_type< vesting_balance_index >().indices() )
       total_balances[ vbo.balance.asset_id ] += vbo.balance.amount;
+   for( const fba_accumulator_object& fba : db.get_index_type< simple_index< fba_accumulator_object > >() )
+      total_balances[ asset_id_type() ] += fba.accumulated_fba_fees;
 
    total_balances[asset_id_type()] += db.get_dynamic_global_properties().witness_budget;
 
@@ -317,18 +320,20 @@ void database_fixture::generate_blocks( uint32_t block_count )
       generate_block();
 }
 
-void database_fixture::generate_blocks(fc::time_point_sec timestamp, bool miss_intermediate_blocks)
+void database_fixture::generate_blocks(fc::time_point_sec timestamp, bool miss_intermediate_blocks, uint32_t skip)
 {
    if( miss_intermediate_blocks )
    {
-      generate_block();
-      auto slots_to_miss = db.get_slot_at_time(timestamp) - 1;
-      if( slots_to_miss <= 0 ) return;
-      generate_block(~0, init_account_priv_key, slots_to_miss);
+      generate_block(skip);
+      auto slots_to_miss = db.get_slot_at_time(timestamp);
+      if( slots_to_miss <= 1 )
+         return;
+      --slots_to_miss;
+      generate_block(skip, init_account_priv_key, slots_to_miss);
       return;
    }
    while( db.head_block_time() < timestamp )
-      generate_block();
+      generate_block(skip);
 }
 
 account_create_operation database_fixture::make_account(
@@ -437,7 +442,7 @@ const asset_object& database_fixture::create_bitasset(
       flags |= witness_fed_asset;
    creator.common_options.issuer_permissions = flags;
    creator.common_options.flags = flags & ~global_settle;
-   creator.common_options.core_exchange_rate = price({asset(1,1),asset(1)});
+   creator.common_options.core_exchange_rate = price({asset(1,asset_id_type(1)),asset(1)});
    creator.bitasset_opts = bitasset_options();
    trx.operations.push_back(std::move(creator));
    trx.validate();
@@ -464,7 +469,7 @@ const asset_object& database_fixture::create_prediction_market(
    creator.common_options.flags = flags & ~global_settle;
    if( issuer == GRAPHENE_WITNESS_ACCOUNT )
       creator.common_options.flags |= witness_fed_asset;
-   creator.common_options.core_exchange_rate = price({asset(1,1),asset(1)});
+   creator.common_options.core_exchange_rate = price({asset(1,asset_id_type(1)),asset(1)});
    creator.bitasset_opts = bitasset_options();
    creator.is_prediction_market = true;
    trx.operations.push_back(std::move(creator));
@@ -482,7 +487,7 @@ const asset_object& database_fixture::create_user_issued_asset( const string& na
    creator.symbol = name;
    creator.common_options.max_supply = 0;
    creator.precision = 2;
-   creator.common_options.core_exchange_rate = price({asset(1,1),asset(1)});
+   creator.common_options.core_exchange_rate = price({asset(1,asset_id_type(1)),asset(1)});
    creator.common_options.max_supply = GRAPHENE_MAX_SHARE_SUPPLY;
    creator.common_options.flags = charge_market_fee;
    creator.common_options.issuer_permissions = charge_market_fee;
@@ -501,7 +506,7 @@ const asset_object& database_fixture::create_user_issued_asset( const string& na
    creator.symbol = name;
    creator.common_options.max_supply = 0;
    creator.precision = 2;
-   creator.common_options.core_exchange_rate = price({asset(1,1),asset(1)});
+   creator.common_options.core_exchange_rate = price({asset(1,asset_id_type(1)),asset(1)});
    creator.common_options.max_supply = GRAPHENE_MAX_SHARE_SUPPLY;
    creator.common_options.flags = flags;
    creator.common_options.issuer_permissions = flags;
@@ -1029,6 +1034,24 @@ int64_t database_fixture::get_balance( account_id_type account, asset_id_type a 
 int64_t database_fixture::get_balance( const account_object& account, const asset_object& a )const
 {
   return db.get_balance(account.get_id(), a.get_id()).amount.value;
+}
+
+vector< operation_history_object > database_fixture::get_operation_history( account_id_type account_id )const
+{
+   vector< operation_history_object > result;
+   const auto& stats = account_id(db).statistics(db);
+   if(stats.most_recent_op == account_transaction_history_id_type())
+      return result;
+
+   const account_transaction_history_object* node = &stats.most_recent_op(db);
+   while( true )
+   {
+      result.push_back( node->operation_id(db) );
+      if(node->next == account_transaction_history_id_type())
+         break;
+      node = db.find(node->next);
+   }
+   return result;
 }
 
 namespace test {

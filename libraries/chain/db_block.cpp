@@ -417,9 +417,10 @@ void database::pop_block()
    auto head_id = head_block_id();
    optional<signed_block> head_block = fetch_block_by_id( head_id );
    GRAPHENE_ASSERT( head_block.valid(), pop_empty_chain, "there are no blocks to pop" );
-   pop_undo();
-   _block_id_to_block.remove( head_id );
+
    _fork_db.pop_block();
+   _block_id_to_block.remove( head_id );
+   pop_undo();
 
    _popped_tx.insert( _popped_tx.begin(), head_block->transactions.begin(), head_block->transactions.end() );
 

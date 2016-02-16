@@ -203,6 +203,23 @@ void account_create_operation::validate()const
    FC_ASSERT( !owner.is_impossible(), "cannot create an account with an imposible owner authority threshold" );
    FC_ASSERT( !active.is_impossible(), "cannot create an account with an imposible active authority threshold" );
    options.validate();
+   if( extensions.value.owner_special_authority.valid() )
+      validate_special_authority( *extensions.value.owner_special_authority );
+   if( extensions.value.active_special_authority.valid() )
+      validate_special_authority( *extensions.value.active_special_authority );
+   if( extensions.value.buyback_options.valid() )
+   {
+      FC_ASSERT( !(extensions.value.owner_special_authority.valid()) );
+      FC_ASSERT( !(extensions.value.active_special_authority.valid()) );
+      FC_ASSERT( owner == authority::null_authority() );
+      FC_ASSERT( active == authority::null_authority() );
+      size_t n_markets = extensions.value.buyback_options->markets.size();
+      FC_ASSERT( n_markets > 0 );
+      for( const asset_id_type m : extensions.value.buyback_options->markets )
+      {
+         FC_ASSERT( m != extensions.value.buyback_options->asset_to_buy );
+      }
+   }
 }
 
 
@@ -221,7 +238,17 @@ void account_update_operation::validate()const
    FC_ASSERT( account != GRAPHENE_TEMP_ACCOUNT );
    FC_ASSERT( fee.amount >= 0 );
    FC_ASSERT( account != account_id_type() );
-   FC_ASSERT( owner || active || new_options );
+
+   bool has_action = (
+         owner.valid()
+      || active.valid()
+      || new_options.valid()
+      || extensions.value.owner_special_authority.valid()
+      || extensions.value.active_special_authority.valid()
+      );
+
+   FC_ASSERT( has_action );
+
    if( owner )
    {
       FC_ASSERT( owner->num_auths() != 0 );
@@ -237,8 +264,11 @@ void account_update_operation::validate()const
 
    if( new_options )
       new_options->validate();
+   if( extensions.value.owner_special_authority.valid() )
+      validate_special_authority( *extensions.value.owner_special_authority );
+   if( extensions.value.active_special_authority.valid() )
+      validate_special_authority( *extensions.value.active_special_authority );
 }
-
 
 share_type account_upgrade_operation::calculate_fee(const fee_parameters_type& k) const
 {

@@ -204,6 +204,31 @@ namespace graphene { namespace chain {
           * Vesting balance which receives cashback_reward deposits.
           */
          optional<vesting_balance_id_type> cashback_vb;
+
+         special_authority owner_special_authority = no_special_authority();
+         special_authority active_special_authority = no_special_authority();
+
+         /**
+          * This flag is set when the top_n logic sets both authorities,
+          * and gets reset when authority or special_authority is set.
+          */
+         uint8_t top_n_control_flags = 0;
+         static const uint8_t top_n_control_owner  = 1;
+         static const uint8_t top_n_control_active = 2;
+
+         /**
+          * This is a set of assets which the account is allowed to have.
+          * This is utilized to restrict buyback accounts to the assets that trade in their markets.
+          * In the future we may expand this to allow accounts to e.g. voluntarily restrict incoming transfers.
+          */
+         optional< flat_set<asset_id_type> > allowed_assets;
+
+         bool has_special_authority()const
+         {
+            return (owner_special_authority.which() != special_authority::tag< no_special_authority >::value)
+                || (active_special_authority.which() != special_authority::tag< no_special_authority >::value);
+         }
+
          template<typename DB>
          const vesting_balance_object& cashback_balance(const DB& db)const
          {
@@ -232,12 +257,6 @@ namespace graphene { namespace chain {
          {
             return !is_basic_account(now);
          }
-
-         /**
-          * @return true if this account is whitelisted and not blacklisted to transact in the provided asset; false
-          * otherwise.
-          */
-         bool is_authorized_asset(const asset_object& asset_obj, const database& d)const;
 
          account_id_type get_id()const { return id; }
    };
@@ -351,8 +370,12 @@ FC_REFLECT_DERIVED( graphene::chain::account_object,
                     (membership_expiration_date)(registrar)(referrer)(lifetime_referrer)
                     (network_fee_percentage)(lifetime_referrer_fee_percentage)(referrer_rewards_percentage)
                     (name)(owner)(active)(options)(statistics)(whitelisting_accounts)(blacklisting_accounts)
-                    (whitelisting_accounts)(blacklisted_accounts)
-                    (cashback_vb) )
+                    (whitelisted_accounts)(blacklisted_accounts)
+                    (cashback_vb)
+                    (owner_special_authority)(active_special_authority)
+                    (top_n_control_flags)
+                    (allowed_assets)
+                    )
 
 FC_REFLECT_DERIVED( graphene::chain::account_balance_object,
                     (graphene::db::object),

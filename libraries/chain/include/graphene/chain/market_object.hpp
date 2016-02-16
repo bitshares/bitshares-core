@@ -72,9 +72,13 @@ struct by_account;
 typedef multi_index_container<
    limit_order_object,
    indexed_by<
-      ordered_unique< tag<by_id>,
-         member< object, object_id_type, &object::id > >,
-      ordered_non_unique< tag<by_expiration>, member< limit_order_object, time_point_sec, &limit_order_object::expiration> >,
+      ordered_unique< tag<by_id>, member< object, object_id_type, &object::id > >,
+      ordered_unique< tag<by_expiration>,
+         composite_key< limit_order_object,
+            member< limit_order_object, time_point_sec, &limit_order_object::expiration>,
+            member< object, object_id_type, &object::id>
+         >
+      >,
       ordered_unique< tag<by_price>,
          composite_key< limit_order_object,
             member< limit_order_object, price, &limit_order_object::sell_price>,
@@ -82,7 +86,12 @@ typedef multi_index_container<
          >,
          composite_key_compare< std::greater<price>, std::less<object_id_type> >
       >,
-      ordered_non_unique< tag<by_account>, member<limit_order_object, account_id_type, &limit_order_object::seller>>
+      ordered_unique< tag<by_account>,
+         composite_key< limit_order_object,
+            member<limit_order_object, account_id_type, &limit_order_object::seller>,
+            member<object, object_id_type, &object::id>
+         >
+      >
    >
 > limit_order_multi_index_type;
 
@@ -168,18 +177,21 @@ typedef multi_index_container<
    force_settlement_object,
    indexed_by<
       ordered_unique< tag<by_id>, member< object, object_id_type, &object::id > >,
-      ordered_non_unique< tag<by_account>,
-         member<force_settlement_object, account_id_type, &force_settlement_object::owner>
+      ordered_unique< tag<by_account>,
+         composite_key< force_settlement_object,
+            member<force_settlement_object, account_id_type, &force_settlement_object::owner>,
+            member< object, object_id_type, &object::id >
+         >
       >,
-      ordered_non_unique< tag<by_expiration>,
+      ordered_unique< tag<by_expiration>,
          composite_key< force_settlement_object,
             const_mem_fun<force_settlement_object, asset_id_type, &force_settlement_object::settlement_asset_id>,
-            member<force_settlement_object, time_point_sec, &force_settlement_object::settlement_date>
+            member<force_settlement_object, time_point_sec, &force_settlement_object::settlement_date>,
+            member< object, object_id_type, &object::id >
          >
       >
    >
 > force_settlement_object_multi_index_type;
-
 
 typedef generic_index<call_order_object, call_order_multi_index_type>                      call_order_index;
 typedef generic_index<force_settlement_object, force_settlement_object_multi_index_type>   force_settlement_index;
@@ -194,4 +206,7 @@ FC_REFLECT_DERIVED( graphene::chain::limit_order_object,
 FC_REFLECT_DERIVED( graphene::chain::call_order_object, (graphene::db::object),
                     (borrower)(collateral)(debt)(call_price) )
 
-FC_REFLECT( graphene::chain::force_settlement_object, (owner)(balance)(settlement_date) )
+FC_REFLECT_DERIVED( graphene::chain::force_settlement_object,
+                    (graphene::db::object),
+                    (owner)(balance)(settlement_date)
+                  )

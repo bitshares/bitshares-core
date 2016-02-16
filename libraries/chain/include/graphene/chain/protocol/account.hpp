@@ -23,15 +23,19 @@
  */
 #pragma once
 #include <graphene/chain/protocol/base.hpp>
+#include <graphene/chain/protocol/buyback.hpp>
+#include <graphene/chain/protocol/ext.hpp>
+#include <graphene/chain/protocol/special_authority.hpp>
+#include <graphene/chain/protocol/types.hpp>
 #include <graphene/chain/protocol/vote.hpp>
 
-namespace graphene { namespace chain { 
+namespace graphene { namespace chain {
 
    bool is_valid_name( const string& s );
    bool is_cheap_name( const string& n );
 
    /// These are the fields which can be updated by the active authority.
-   struct account_options 
+   struct account_options
    {
       /// The memo key is the key this account will typically use to encrypt/sign transaction memos and other non-
       /// validated account activities. This field is here to prevent confusion if the active authority has zero or
@@ -61,7 +65,16 @@ namespace graphene { namespace chain {
     */
    struct account_create_operation : public base_operation
    {
-      struct fee_parameters_type { 
+      struct ext
+      {
+         optional< void_t >            null_ext;
+         optional< special_authority > owner_special_authority;
+         optional< special_authority > active_special_authority;
+         optional< buyback_account_options > buyback_options;
+      };
+
+      struct fee_parameters_type
+      {
          uint64_t basic_fee      = 5*GRAPHENE_BLOCKCHAIN_PRECISION; ///< the cost to register the cheapest non-free account
          uint64_t premium_fee    = 2000*GRAPHENE_BLOCKCHAIN_PRECISION; ///< the cost to register the cheapest non-free account
          uint32_t price_per_kbyte = GRAPHENE_BLOCKCHAIN_PRECISION;
@@ -82,11 +95,19 @@ namespace graphene { namespace chain {
       authority       active;
 
       account_options options;
-      extensions_type extensions;
+      extension< ext > extensions;
 
       account_id_type fee_payer()const { return registrar; }
       void            validate()const;
       share_type      calculate_fee(const fee_parameters_type& )const;
+
+      void get_required_active_authorities( flat_set<account_id_type>& a )const
+      {
+         // registrar should be required anyway as it is the fee_payer(), but we insert it here just to be sure
+         a.insert( registrar );
+         if( extensions.value.buyback_options.valid() )
+            a.insert( extensions.value.buyback_options->asset_to_buy_issuer );
+      }
    };
 
    /**
@@ -98,8 +119,16 @@ namespace graphene { namespace chain {
     */
    struct account_update_operation : public base_operation
    {
-      struct fee_parameters_type { 
-         share_type fee             = 20 * GRAPHENE_BLOCKCHAIN_PRECISION; 
+      struct ext
+      {
+         optional< void_t >            null_ext;
+         optional< special_authority > owner_special_authority;
+         optional< special_authority > active_special_authority;
+      };
+
+      struct fee_parameters_type
+      {
+         share_type fee             = 20 * GRAPHENE_BLOCKCHAIN_PRECISION;
          uint32_t   price_per_kbyte = GRAPHENE_BLOCKCHAIN_PRECISION;
       };
 
@@ -109,22 +138,25 @@ namespace graphene { namespace chain {
 
       /// New owner authority. If set, this operation requires owner authority to execute.
       optional<authority> owner;
-      /// New active authority. If set, this operation requires owner authority to execute.
+      /// New active authority. This can be updated by the current active authority.
       optional<authority> active;
 
       /// New account options
       optional<account_options> new_options;
-      extensions_type extensions;
+      extension< ext > extensions;
 
       account_id_type fee_payer()const { return account; }
       void       validate()const;
       share_type calculate_fee( const fee_parameters_type& k )const;
 
+      bool is_owner_update()const
+      { return owner || extensions.value.owner_special_authority.valid(); }
+
       void get_required_owner_authorities( flat_set<account_id_type>& a )const
-      { if( owner ) a.insert( account ); }
+      { if( is_owner_update() ) a.insert( account ); }
 
       void get_required_active_authorities( flat_set<account_id_type>& a )const
-      { if( !owner ) a.insert( account ); }
+      { if( !is_owner_update() ) a.insert( account ); }
    };
 
    /**
@@ -236,16 +268,19 @@ FC_REFLECT_TYPENAME( graphene::chain::account_whitelist_operation::account_listi
 FC_REFLECT_ENUM( graphene::chain::account_whitelist_operation::account_listing,
                 (no_listing)(white_listed)(black_listed)(white_and_black_listed))
 
+FC_REFLECT(graphene::chain::account_create_operation::ext, (null_ext)(owner_special_authority)(active_special_authority)(buyback_options) )
 FC_REFLECT( graphene::chain::account_create_operation,
             (fee)(registrar)
             (referrer)(referrer_percent)
             (name)(owner)(active)(options)(extensions)
           )
+
+FC_REFLECT(graphene::chain::account_update_operation::ext, (null_ext)(owner_special_authority)(active_special_authority) )
 FC_REFLECT( graphene::chain::account_update_operation,
             (fee)(account)(owner)(active)(new_options)(extensions)
           )
 
-FC_REFLECT( graphene::chain::account_upgrade_operation, 
+FC_REFLECT( graphene::chain::account_upgrade_operation,
             (fee)(account_to_upgrade)(upgrade_to_lifetime_member)(extensions) )
 
 FC_REFLECT( graphene::chain::account_whitelist_operation, (fee)(authorizing_account)(account_to_list)(new_listing)(extensions))

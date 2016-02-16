@@ -42,35 +42,6 @@ share_type cut_fee(share_type a, uint16_t p)
    return r.to_uint64();
 }
 
-bool account_object::is_authorized_asset(const asset_object& asset_obj, const database& d) const
-{
-   if( d.head_block_time() > HARDFORK_416_TIME )
-   {
-      if( !(asset_obj.options.flags & white_list) )
-         return true;
-   }
-
-   for( const auto id : blacklisting_accounts )
-   {
-      if( asset_obj.options.blacklist_authorities.find(id) != asset_obj.options.blacklist_authorities.end() )
-         return false;
-   }
-
-   if( d.head_block_time() > HARDFORK_415_TIME )
-   {
-      if( asset_obj.options.whitelist_authorities.size() == 0 )
-         return true;
-   }
-
-   for( const auto id : whitelisting_accounts )
-   {
-      if( asset_obj.options.whitelist_authorities.find(id) != asset_obj.options.whitelist_authorities.end() )
-         return true;
-   }
-
-   return false;
-}
-
 void account_balance_object::adjust_balance(const asset& delta)
 {
    assert(delta.asset_id == asset_type);

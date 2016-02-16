@@ -28,6 +28,7 @@
 #include <graphene/chain/database.hpp>
 #include <graphene/chain/exceptions.hpp>
 #include <graphene/chain/hardfork.hpp>
+#include <graphene/chain/is_authorized_asset.hpp>
 
 #include <functional>
 
@@ -163,11 +164,7 @@ void_result asset_issue_evaluator::do_evaluate( const asset_issue_operation& o )
    FC_ASSERT( !a.is_market_issued(), "Cannot manually issue a market-issued asset." );
 
    to_account = &o.issue_to_account(d);
-
-   if( a.options.flags & white_list )
-   {
-      FC_ASSERT( to_account->is_authorized_asset( a, d ) );
-   }
+   FC_ASSERT( is_authorized_asset( d, *to_account, a ) );
 
    asset_dyn_data = &a.dynamic_asset_data_id(d);
    FC_ASSERT( (asset_dyn_data->current_supply + o.asset_to_issue.amount) <= a.options.max_supply );
@@ -199,11 +196,7 @@ void_result asset_reserve_evaluator::do_evaluate( const asset_reserve_operation&
    );
 
    from_account = &o.payer(d);
-
-   if( a.options.flags & white_list )
-   {
-      FC_ASSERT( from_account->is_authorized_asset( a, d ) );
-   }
+   FC_ASSERT( is_authorized_asset( d, *from_account, a ) );
 
    asset_dyn_data = &a.dynamic_asset_data_id(d);
    FC_ASSERT( (asset_dyn_data->current_supply - o.amount_to_reserve.amount) >= 0 );
@@ -270,9 +263,12 @@ void_result asset_update_evaluator::do_evaluate(const asset_update_operation& o)
       }
    }
 
-   // new issuer_permissions must be subset of old issuer permissions
-   FC_ASSERT(!(o.new_options.issuer_permissions & ~a.options.issuer_permissions),
-             "Cannot reinstate previously revoked issuer permissions on an asset.");
+   if( (d.head_block_time() < HARDFORK_572_TIME) || (a.dynamic_asset_data_id(d).current_supply != 0) )
+   {
+      // new issuer_permissions must be subset of old issuer permissions
+      FC_ASSERT(!(o.new_options.issuer_permissions & ~a.options.issuer_permissions),
+                "Cannot reinstate previously revoked issuer permissions on an asset.");
+   }
 
    // changed flags must be subset of old issuer permissions
    FC_ASSERT(!((o.new_options.flags ^ a.options.flags) & ~a.options.issuer_permissions),

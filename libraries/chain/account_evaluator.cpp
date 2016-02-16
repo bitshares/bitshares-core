@@ -25,10 +25,14 @@
 #include <fc/smart_ref_impl.hpp>
 
 #include <graphene/chain/account_evaluator.hpp>
+#include <graphene/chain/buyback.hpp>
+#include <graphene/chain/buyback_object.hpp>
 #include <graphene/chain/database.hpp>
 #include <graphene/chain/exceptions.hpp>
 #include <graphene/chain/hardfork.hpp>
 #include <graphene/chain/internal_exceptions.hpp>
+#include <graphene/chain/special_authority.hpp>
+#include <graphene/chain/special_authority_object.hpp>
 
 #include <algorithm>
 
@@ -53,6 +57,12 @@ void verify_authority_accounts( const database& db, const authority& a )
 void_result account_create_evaluator::do_evaluate( const account_create_operation& op )
 { try {
    database& d = db();
+   if( d.head_block_time() < HARDFORK_516_TIME )
+   {
+      FC_ASSERT( !op.extensions.value.owner_special_authority.valid() );
+      FC_ASSERT( !op.extensions.value.active_special_authority.valid() );
+   }
+
    FC_ASSERT( d.find_object(op.options.voting_account), "Invalid proxy account specified." );
    FC_ASSERT( fee_paying_account->is_lifetime_member(), "Only Lifetime members may register an account." );
    FC_ASSERT( op.referrer(d).is_member(d.head_block_time()), "The referrer must be either a lifetime or annual subscriber." );
@@ -67,6 +77,13 @@ void_result account_create_evaluator::do_evaluate( const account_create_operatio
    }
    GRAPHENE_RECODE_EXC( internal_verify_auth_max_auth_exceeded, account_create_max_auth_exceeded )
    GRAPHENE_RECODE_EXC( internal_verify_auth_account_not_found, account_create_auth_account_not_found )
+
+   if( op.extensions.value.owner_special_authority.valid() )
+      evaluate_special_authority( d, *op.extensions.value.owner_special_authority );
+   if( op.extensions.value.active_special_authority.valid() )
+      evaluate_special_authority( d, *op.extensions.value.active_special_authority );
+   if( op.extensions.value.buyback_options.valid() )
+      evaluate_buyback_account_options( d, *op.extensions.value.buyback_options );
 
    uint32_t max_vote_id = global_props.next_available_vote_id;
 
@@ -102,6 +119,7 @@ void_result account_create_evaluator::do_evaluate( const account_create_operatio
 object_id_type account_create_evaluator::do_apply( const account_create_operation& o )
 { try {
 
+   database& d = db();
    uint16_t referrer_percent = o.referrer_percent;
    bool has_small_percent = (
          (db().head_block_time() <= HARDFORK_453_TIME)
@@ -136,6 +154,16 @@ object_id_type account_create_evaluator::do_apply( const account_create_operatio
          obj.active           = o.active;
          obj.options          = o.options;
          obj.statistics = db().create<account_statistics_object>([&](account_statistics_object& s){s.owner = obj.id;}).id;
+
+         if( o.extensions.value.owner_special_authority.valid() )
+            obj.owner_special_authority = *(o.extensions.value.owner_special_authority);
+         if( o.extensions.value.active_special_authority.valid() )
+            obj.active_special_authority = *(o.extensions.value.active_special_authority);
+         if( o.extensions.value.buyback_options.valid() )
+         {
+            obj.allowed_assets = o.extensions.value.buyback_options->markets;
+            obj.allowed_assets->emplace( o.extensions.value.buyback_options->asset_to_buy );
+         }
    });
 
    if( has_small_percent )
@@ -159,6 +187,30 @@ object_id_type account_create_evaluator::do_apply( const account_create_operatio
          p.parameters.current_fees->get<account_create_operation>().basic_fee <<= p.parameters.account_fee_scale_bitshifts;
       });
 
+   if(    o.extensions.value.owner_special_authority.valid()
+       || o.extensions.value.active_special_authority.valid() )
+   {
+      db().create< special_authority_object >( [&]( special_authority_object& sa )
+      {
+         sa.account = new_acnt_object.id;
+      } );
+   }
+
+   if( o.extensions.value.buyback_options.valid() )
+   {
+      asset_id_type asset_to_buy = o.extensions.value.buyback_options->asset_to_buy;
+
+      d.create< buyback_object >( [&]( buyback_object& bo )
+      {
+         bo.asset_to_buy = asset_to_buy;
+      } );
+
+      d.modify( asset_to_buy(d), [&]( asset_object& a )
+      {
+         a.buyback_account = new_acnt_object.id;
+      } );
+   }
+
    return new_acnt_object.id;
 } FC_CAPTURE_AND_RETHROW((o)) }
 
@@ -166,6 +218,11 @@ object_id_type account_create_evaluator::do_apply( const account_create_operatio
 void_result account_update_evaluator::do_evaluate( const account_update_operation& o )
 { try {
    database& d = db();
+   if( d.head_block_time() < HARDFORK_516_TIME )
+   {
+      FC_ASSERT( !o.extensions.value.owner_special_authority.valid() );
+      FC_ASSERT( !o.extensions.value.active_special_authority.valid() );
+   }
 
    const auto& chain_params = d.get_global_properties().parameters;
 
@@ -176,6 +233,11 @@ void_result account_update_evaluator::do_evaluate( const account_update_operatio
    }
    GRAPHENE_RECODE_EXC( internal_verify_auth_max_auth_exceeded, account_update_max_auth_exceeded )
    GRAPHENE_RECODE_EXC( internal_verify_auth_account_not_found, account_update_auth_account_not_found )
+
+   if( o.extensions.value.owner_special_authority.valid() )
+      evaluate_special_authority( d, *o.extensions.value.owner_special_authority );
+   if( o.extensions.value.active_special_authority.valid() )
+      evaluate_special_authority( d, *o.extensions.value.active_special_authority );
 
    acnt = &o.account(d);
 
@@ -195,11 +257,49 @@ void_result account_update_evaluator::do_evaluate( const account_update_operatio
 
 void_result account_update_evaluator::do_apply( const account_update_operation& o )
 { try {
-   db().modify( *acnt, [&](account_object& a){
-      if( o.owner ) a.owner = *o.owner;
-      if( o.active ) a.active = *o.active;
+   database& d = db();
+   bool sa_before, sa_after;
+   d.modify( *acnt, [&](account_object& a){
+      if( o.owner )
+      {
+         a.owner = *o.owner;
+         a.top_n_control_flags = 0;
+      }
+      if( o.active )
+      {
+         a.active = *o.active;
+         a.top_n_control_flags = 0;
+      }
       if( o.new_options ) a.options = *o.new_options;
+      sa_before = a.has_special_authority();
+      if( o.extensions.value.owner_special_authority.valid() )
+      {
+         a.owner_special_authority = *(o.extensions.value.owner_special_authority);
+         a.top_n_control_flags = 0;
+      }
+      if( o.extensions.value.active_special_authority.valid() )
+      {
+         a.active_special_authority = *(o.extensions.value.active_special_authority);
+         a.top_n_control_flags = 0;
+      }
+      sa_after = a.has_special_authority();
    });
+
+   if( sa_before & (!sa_after) )
+   {
+      const auto& sa_idx = d.get_index_type< special_authority_index >().indices().get<by_account>();
+      auto sa_it = sa_idx.find( o.account );
+      assert( sa_it != sa_idx.end() );
+      d.remove( *sa_it );
+   }
+   else if( (!sa_before) & sa_after )
+   {
+      d.create< special_authority_object >( [&]( special_authority_object& sa )
+      {
+         sa.account = o.account;
+      } );
+   }
+
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }
 

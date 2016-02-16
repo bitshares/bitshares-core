@@ -38,29 +38,6 @@ void balance_claim_operation::validate()const
    FC_ASSERT( balance_owner_key != public_key_type() );
 }
 
-struct required_auth_visitor
-{
-   typedef void result_type;
-
-   vector<authority>& result;
-
-   required_auth_visitor( vector<authority>& r ):result(r){}
-
-   /** for most operations this is a no-op */
-   template<typename T>
-   void operator()(const T& )const {}
-
-   void operator()( const balance_claim_operation& o )const
-   {
-      result.push_back( authority( 1, o.balance_owner_key, 1 ) );
-   }
-};
-
-void operation_get_required_authorities( const operation& op, vector<authority>& result )
-{
-   op.visit( required_auth_visitor( result ) );
-}
-
 /**
  * @brief Used to validate operations in a polymorphic manner
  */

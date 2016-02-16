@@ -28,6 +28,8 @@
 #include <fc/io/json.hpp>
 #include <fc/smart_ref_impl.hpp>
 
+#include <graphene/chain/operation_history_object.hpp>
+
 #include <iostream>
 
 using namespace graphene::db;
@@ -181,7 +183,7 @@ struct database_fixture {
     * @brief Generates blocks until the head block time matches or exceeds timestamp
     * @param timestamp target time to generate blocks until
     */
-   void generate_blocks(fc::time_point_sec timestamp, bool miss_intermediate_blocks = true);
+   void generate_blocks(fc::time_point_sec timestamp, bool miss_intermediate_blocks = true, uint32_t skip = ~0);
 
    account_create_operation make_account(
       const std::string& name = "nathan",
@@ -278,6 +280,7 @@ struct database_fixture {
    void print_joint_market( const string& syma, const string& symb )const;
    int64_t get_balance( account_id_type account, asset_id_type a )const;
    int64_t get_balance( const account_object& account, const asset_object& a )const;
+   vector< operation_history_object > get_operation_history( account_id_type account_id )const;
 };
 
 namespace test {
