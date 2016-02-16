@@ -342,13 +342,12 @@ namespace graphene { namespace app {
        uint32_t count = 0;
        auto itr = history_idx.lower_bound( hkey );
        vector<order_history_object> result;
-       while( itr != history_idx.end() )
+       while( itr != history_idx.end() && count < limit)
        {
           if( itr->key.base != a || itr->key.quote != b ) break;
           result.push_back( *itr );
           ++itr;
           ++count;
-          if( count  > limit ) break;
        }
 
        return result;

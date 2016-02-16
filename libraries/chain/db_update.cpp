@@ -295,7 +295,7 @@ void database::clear_expired_orders()
          auto order_id = order.id;
          current_asset = order.settlement_asset_id();
          const asset_object& mia_object = get(current_asset);
-         const asset_bitasset_data_object mia = mia_object.bitasset_data(*this);
+         const asset_bitasset_data_object& mia = mia_object.bitasset_data(*this);
 
          if( mia.has_settlement() )
          {
