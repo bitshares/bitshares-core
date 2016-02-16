@@ -158,6 +158,21 @@ bool is_cheap_name( const string& n )
    return false;
 }
 
+void account_options::validate() const
+{
+   auto needed_witnesses = num_witness;
+   auto needed_committee = num_committee;
+
+   for( vote_id_type id : votes )
+      if( id.type() == vote_id_type::witness && needed_witnesses )
+         --needed_witnesses;
+      else if ( id.type() == vote_id_type::committee && needed_committee )
+         --needed_committee;
+
+   FC_ASSERT( needed_witnesses == 0 && needed_committee == 0,
+              "May not specify fewer witnesses or committee members than the number voted for.");
+}
+
 share_type account_create_operation::calculate_fee( const fee_parameters_type& k )const
 {
    auto core_fee_required = k.basic_fee;
