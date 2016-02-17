@@ -62,6 +62,7 @@ int main( int argc, char** argv, char** envp )
       }
 
       {
+         boost::filesystem::create_directories(opath.parent_path());
          boost::filesystem::ofstream ofs(opath);
          ofs.write( new_data.c_str(), new_data.length() );
       }
