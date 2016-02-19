@@ -41,6 +41,8 @@ namespace graphene { namespace chain {
 
    typedef fc::smart_ref<fee_schedule> smart_fee_schedule;
 
+   static smart_fee_schedule tmp;
+
    fee_schedule::fee_schedule()
    {
    }
