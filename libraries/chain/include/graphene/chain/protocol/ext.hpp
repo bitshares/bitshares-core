@@ -130,6 +130,7 @@ struct graphene_extension_unpack_visitor
 template< typename Stream, typename T >
 void operator>>( Stream& s, graphene::chain::extension<T>& value )
 {
+   value = graphene::chain::extension<T>();
    graphene_extension_unpack_visitor<Stream, T> vtor( s, value.value );
    fc::reflector<T>::visit( vtor );
    FC_ASSERT( vtor.count_left == 0 ); // unrecognized extension throws here
@@ -168,6 +169,15 @@ struct graphene_extension_from_variant_visitor
 template< typename T >
 void from_variant( const fc::variant& var, graphene::chain::extension<T>& value )
 {
+   value = graphene::chain::extension<T>();
+   if( var.is_null() )
+      return;
+   if( var.is_array() )
+   {
+      FC_ASSERT( var.size() == 0 );
+      return;
+   }
+
    graphene_extension_from_variant_visitor<T> vtor( var.get_object(), value.value );
    fc::reflector<T>::visit( vtor );
    FC_ASSERT( vtor.count_left == 0 );    // unrecognized extension throws here

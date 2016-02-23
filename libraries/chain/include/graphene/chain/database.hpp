@@ -22,7 +22,6 @@
  * THE SOFTWARE.
  */
 #pragma once
-#include <graphene/chain/evaluator.hpp>
 #include <graphene/chain/global_property_object.hpp>
 #include <graphene/chain/node_property_object.hpp>
 #include <graphene/chain/account_object.hpp>
@@ -30,6 +29,7 @@
 #include <graphene/chain/fork_database.hpp>
 #include <graphene/chain/block_database.hpp>
 #include <graphene/chain/genesis_state.hpp>
+#include <graphene/chain/evaluator.hpp>
 
 #include <graphene/db/object_database.hpp>
 #include <graphene/db/object.hpp>
@@ -45,6 +45,8 @@
 namespace graphene { namespace chain {
    using graphene::db::abstract_object;
    using graphene::db::object;
+   class op_evaluator;
+   class transaction_evaluation_state;
 
    struct budget_record;
 

@@ -32,6 +32,7 @@
 #include <graphene/chain/fba_object.hpp>
 #include <graphene/chain/market_object.hpp>
 #include <graphene/chain/vesting_balance_object.hpp>
+#include <graphene/chain/exceptions.hpp>
 
 #include <boost/test/unit_test.hpp>
 
