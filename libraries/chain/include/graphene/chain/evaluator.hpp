@@ -25,7 +25,6 @@
 #include <graphene/chain/exceptions.hpp>
 #include <graphene/chain/transaction_evaluation_state.hpp>
 #include <graphene/chain/protocol/operations.hpp>
-#include <graphene/chain/database.hpp>
 
 namespace graphene { namespace chain {
 
@@ -103,6 +102,12 @@ namespace graphene { namespace chain {
        */
       void pay_fba_fee( uint64_t fba_id );
 
+      // the next two functions are helpers that allow template functions declared in this 
+      // header to call db() without including database.hpp, which would
+      // cause a circular dependency
+      share_type calculate_fee_for_operation(const operation& op) const;
+      void db_adjust_balance(const account_id_type& fee_payer, asset fee_from_account);
+
       asset                            fee_from_account;
       share_type                       core_fee_paid;
       const account_object*            fee_paying_account = nullptr;
@@ -144,10 +149,11 @@ namespace graphene { namespace chain {
          prepare_fee(op.fee_payer(), op.fee);
          if( !trx_state->skip_fee_schedule_check )
          {
-            GRAPHENE_ASSERT( core_fee_paid >= db().current_fee_schedule().calculate_fee( op ).amount,
+            share_type required_fee = calculate_fee_for_operation(op);
+            GRAPHENE_ASSERT( core_fee_paid >= required_fee,
                        insufficient_fee,
                        "Insufficient Fee Paid",
-                       ("core_fee_paid",core_fee_paid)("required",db().current_fee_schedule().calculate_fee( op ).amount) );
+                       ("core_fee_paid",core_fee_paid)("required", required_fee) );
          }
 
          return eval->do_evaluate(op);
@@ -163,7 +169,7 @@ namespace graphene { namespace chain {
 
          auto result = eval->do_apply(op);
 
-         db().adjust_balance(op.fee_payer(), -fee_from_account);
+         db_adjust_balance(op.fee_payer(), -fee_from_account);
 
          return result;
       }

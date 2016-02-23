@@ -29,6 +29,7 @@
 #include <graphene/chain/fork_database.hpp>
 #include <graphene/chain/block_database.hpp>
 #include <graphene/chain/genesis_state.hpp>
+#include <graphene/chain/evaluator.hpp>
 
 #include <graphene/db/object_database.hpp>
 #include <graphene/db/object.hpp>

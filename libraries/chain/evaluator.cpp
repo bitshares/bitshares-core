@@ -118,4 +118,14 @@ database& generic_evaluator::db()const { return trx_state->db(); }
          _fba.accumulated_fba_fees += core_fee_paid;
       } );
    }
+
+   share_type generic_evaluator::calculate_fee_for_operation(const operation& op) const
+   {
+     return db().current_fee_schedule().calculate_fee( op ).amount;
+   }
+   void generic_evaluator::db_adjust_balance(const account_id_type& fee_payer, asset fee_from_account)
+   {
+     db().adjust_balance(fee_payer, fee_from_account);
+   }
+
 } }
