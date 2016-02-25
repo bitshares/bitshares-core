@@ -3952,12 +3952,20 @@ namespace graphene { namespace net { namespace detail {
       }
 
       unsigned handle_message_call_count = 0;
-      for (fc::future<void>& handle_message_call : _handle_message_calls_in_progress)
+      while( true )
       {
+        auto it = _handle_message_calls_in_progress.begin();
+        if( it == _handle_message_calls_in_progress.end() )
+           break;
+        if( it->ready() || it->error() || it->canceled() )
+        {
+           _handle_message_calls_in_progress.erase( it );
+           continue;
+        }
         ++handle_message_call_count;
         try
         {
-          handle_message_call.cancel_and_wait("node_impl::close()");
+          it->cancel_and_wait("node_impl::close()");
           dlog("handle_message call #${count} task terminated", ("count", handle_message_call_count));
         }
         catch ( const fc::canceled_exception& )
@@ -3973,7 +3981,6 @@ namespace graphene { namespace net { namespace detail {
           wlog("Exception thrown while terminating handle_message call #${count} task, ignoring",("count", handle_message_call_count));
         }
       }
-      _handle_message_calls_in_progress.clear();
 
       try
       {
