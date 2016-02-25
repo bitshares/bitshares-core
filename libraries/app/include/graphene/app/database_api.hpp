@@ -64,40 +64,47 @@ using namespace std;
 
 class database_api_impl;
 
+struct order
+{
+   double                     price;
+   double                     quote;
+   double                     base;
+};
+
 struct order_book
 {
-  string                        base;
-  string                        quote;
-  vector< pair<double,double> > bids;
-  vector< pair<double,double> > asks;
+  string                      base;
+  string                      quote;
+  vector< order >             bids;
+  vector< order >             asks;
 };
 
 struct market_ticker
 {
-   string                       base;
-   string                       quote;
-   double                       latest;
-   double                       lowest_ask;
-   double                       highest_bid;
-   double                       percent_change;
-   double                       base_volume;
-   double                       quote_volume;
+   string                     base;
+   string                     quote;
+   double                     latest;
+   double                     lowest_ask;
+   double                     highest_bid;
+   double                     percent_change;
+   double                     base_volume;
+   double                     quote_volume;
 };
 
 struct market_volume
 {
-   string                       base;
-   string                       quote;
-   double                       base_volume;
-   double                       quote_volume;
+   string                     base;
+   string                     quote;
+   double                     base_volume;
+   double                     quote_volume;
 };
 
 struct market_trade
 {
-   fc::time_point_sec           date;
-   double                       price;
-   double                       amount;
-   double                       value;
+   fc::time_point_sec         date;
+   double                     price;
+   double                     amount;
+   double                     value;
 };
 
 /**
@@ -116,7 +123,7 @@ class database_api
       /////////////
       // Objects //
       /////////////
-         
+
       /**
        * @brief Get the objects corresponding to the provided IDs
        * @param ids IDs of the objects to retrieve
@@ -202,7 +209,7 @@ class database_api
       //////////
       // Keys //
       //////////
-         
+
       vector<vector<account_id_type>> get_key_references( vector<public_key_type> key )const;
 
       //////////////
@@ -465,9 +472,9 @@ class database_api
        */
       map<string, committee_member_id_type> lookup_committee_member_accounts(const string& lower_bound_name, uint32_t limit)const;
 
-      
-      /// WORKERS 
-      
+
+      /// WORKERS
+
       /**
        * Return the worker objects associated with this account.
        */
@@ -515,7 +522,7 @@ class database_api
       bool           verify_authority( const signed_transaction& trx )const;
 
       /**
-       * @return true if the signers have enough authority to authorize an account 
+       * @return true if the signers have enough authority to authorize an account
        */
       bool           verify_account_authority( const string& name_or_id, const flat_set<public_key_type>& signers )const;
 
@@ -553,6 +560,8 @@ class database_api
 };
 
 } }
+
+FC_REFLECT( graphene::app::order, (price)(quote)(base) );
 FC_REFLECT( graphene::app::order_book, (base)(quote)(bids)(asks) );
 FC_REFLECT( graphene::app::market_ticker, (base)(quote)(latest)(lowest_ask)(highest_bid)(percent_change)(base_volume)(quote_volume) );
 FC_REFLECT( graphene::app::market_volume, (base)(quote)(base_volume)(quote_volume) );
