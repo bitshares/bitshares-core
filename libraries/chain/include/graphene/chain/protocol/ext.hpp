@@ -82,6 +82,8 @@ void operator<<( Stream& stream, const graphene::chain::extension<T>& value )
    fc::reflector<T>::visit( read_vtor );
 }
 
+
+
 template< typename Stream, typename T >
 struct graphene_extension_unpack_visitor
 {
@@ -108,7 +110,7 @@ struct graphene_extension_unpack_visitor
    {
       if( (count_left > 0) && (which == next_which) )
       {
-         Member temp;
+         typename Member::value_type temp;
          fc::raw::unpack( stream, temp );
          (value.*member) = temp;
          --count_left;
