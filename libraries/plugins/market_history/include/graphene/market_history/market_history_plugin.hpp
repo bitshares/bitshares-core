@@ -127,7 +127,7 @@ struct by_key;
 typedef multi_index_container<
    bucket_object,
    indexed_by<
-      hashed_unique< tag<by_id>, member< object, object_id_type, &object::id > >,
+      ordered_unique< tag<by_id>, member< object, object_id_type, &object::id > >,
       ordered_unique< tag<by_key>, member< bucket_object, bucket_key, &bucket_object::key > >
    >
 > bucket_object_multi_index_type;
@@ -136,7 +136,7 @@ struct by_market_time;
 typedef multi_index_container<
    order_history_object,
    indexed_by<
-      hashed_unique< tag<by_id>, member< object, object_id_type, &object::id > >,
+      ordered_unique< tag<by_id>, member< object, object_id_type, &object::id > >,
       ordered_unique< tag<by_key>, member< order_history_object, history_key, &order_history_object::key > >,
       ordered_unique<
          tag<by_market_time>,
