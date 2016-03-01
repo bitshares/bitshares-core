@@ -77,8 +77,9 @@ int main( int argc, char** argv )
          ("rpc-tls-endpoint,t", bpo::value<string>()->implicit_value("127.0.0.1:8092"), "Endpoint for wallet websocket TLS RPC to listen on")
          ("rpc-tls-certificate,c", bpo::value<string>()->implicit_value("server.pem"), "PEM certificate for wallet websocket TLS RPC")
          ("rpc-http-endpoint,H", bpo::value<string>()->implicit_value("127.0.0.1:8093"), "Endpoint for wallet HTTP RPC to listen on")
+         ("unlock", bpo::value<string>(), "Password to automatically unlock wallet with")
          ("daemon,d", "Run the wallet in daemon mode" )
-         ("wallet-file,w", bpo::value<string>()->implicit_value("wallet.json"), "wallet to load")
+         ("wallet-file,W", bpo::value<string>()->implicit_value("wallet.json"), "wallet to load")
          ("chain-id", bpo::value<string>(), "chain ID to connect to");
 
       bpo::variables_map options;
@@ -253,6 +254,9 @@ int main( int argc, char** argv )
                conn->register_api( wapi );
                conn->on_request( req, resp );
             } );
+      }
+      if( options.count("unlock" ) ) {
+         wapi->unlock( options.at("unlock").as<string>() );
       }
 
       if( !options.count( "daemon" ) )
