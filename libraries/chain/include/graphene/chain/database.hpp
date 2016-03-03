@@ -322,6 +322,8 @@ namespace graphene { namespace chain {
          //////////////////// db_debug.cpp ////////////////////
 
          void debug_dump();
+         void apply_debug_updates();
+         void debug_update( const fc::variant_object& update );
 
          //////////////////// db_market.cpp ////////////////////
 

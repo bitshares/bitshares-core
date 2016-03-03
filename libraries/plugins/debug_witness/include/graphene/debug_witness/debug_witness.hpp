@@ -22,27 +22,38 @@
  * THE SOFTWARE.
  */
 #pragma once
-#include <graphene/db/object.hpp>
 
-namespace graphene { namespace chain {
+#include <graphene/app/plugin.hpp>
+#include <graphene/chain/database.hpp>
 
-   /**
-    * @brief Contains per-node database configuration.
-    *
-    *  Transactions are evaluated differently based on per-node state.
-    *  Settings here may change based on whether the node is syncing or up-to-date.
-    *  Or whether the node is a witness node. Or if we're processing a
-    *  transaction in a witness-signed block vs. a fresh transaction
-    *  from the p2p network.  Or configuration-specified tradeoffs of
-    *  performance/hardfork resilience vs. paranoia.
-    */
-   class node_property_object
-   {
-      public:
-         node_property_object(){}
-         ~node_property_object(){}
+#include <fc/thread/future.hpp>
 
-         uint32_t skip_flags = 0;
-         std::map< block_id_type, std::vector< fc::variant_object > > debug_updates;
-   };
-} } // graphene::chain
+namespace graphene { namespace debug_witness_plugin {
+
+class debug_witness_plugin : public graphene::app::plugin {
+public:
+   ~debug_witness_plugin();
+
+   std::string plugin_name()const override;
+
+   virtual void plugin_set_program_options(
+      boost::program_options::options_description &command_line_options,
+      boost::program_options::options_description &config_file_options
+      ) override;
+
+   virtual void plugin_initialize( const boost::program_options::variables_map& options ) override;
+   virtual void plugin_startup() override;
+   virtual void plugin_shutdown() override;
+
+private:
+
+   void on_changed_objects( const std::vector<graphene::db::object_id_type>& ids );
+   void on_removed_objects( const std::vector<const graphene::db::object*> objs );
+   void on_applied_block( const graphene::chain::signed_block& b );
+
+   boost::program_options::variables_map _options;
+
+   std::map<chain::public_key_type, fc::ecc::private_key> _private_keys;
+};
+
+} } //graphene::debug_witness_plugin

@@ -1404,6 +1404,10 @@ class wallet_api
 
       void dbg_make_uia(string creator, string symbol);
       void dbg_make_mia(string creator, string symbol);
+      void dbg_push_blocks( std::string src_filename, uint32_t count );
+      void dbg_generate_blocks( std::string debug_wif_key, uint32_t count );
+      void dbg_update_object( fc::variant_object update );
+
       void flood_network(string prefix, uint32_t number_of_transactions);
 
       void network_add_nodes( const vector<string>& nodes );
@@ -1574,6 +1578,9 @@ FC_API( graphene::wallet::wallet_api,
         (approve_proposal)
         (dbg_make_uia)
         (dbg_make_mia)
+        (dbg_push_blocks)
+        (dbg_generate_blocks)
+        (dbg_update_object)
         (flood_network)
         (network_add_nodes)
         (network_get_connected_peers)
