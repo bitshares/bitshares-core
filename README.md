@@ -1,3 +1,5 @@
+[![Slack](http://slack.bitshares.org/badge.svg)](http://slack.bitshares.org/)
+
 Intro for new developers
 ------------------------
 
