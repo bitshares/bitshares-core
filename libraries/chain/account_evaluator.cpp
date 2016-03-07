@@ -85,26 +85,16 @@ void_result account_create_evaluator::do_evaluate( const account_create_operatio
    if( op.extensions.value.buyback_options.valid() )
       evaluate_buyback_account_options( d, *op.extensions.value.buyback_options );
 
-   uint32_t max_vote_id = global_props.next_available_vote_id;
-
-   FC_ASSERT( op.options.num_witness <= chain_params.maximum_witness_count, 
+   FC_ASSERT( op.options.num_witness <= chain_params.maximum_witness_count,
               "Voted for more witnesses than currently allowed (${c})", ("c", chain_params.maximum_witness_count) );
-
    FC_ASSERT( op.options.num_committee <= chain_params.maximum_committee_count,
               "Voted for more committee members than currently allowed (${c})", ("c", chain_params.maximum_committee_count) );
 
-   safe<uint32_t> counts[vote_id_type::VOTE_TYPE_COUNT];
+   uint32_t max_vote_id = global_props.next_available_vote_id;
    for( auto id : op.options.votes )
    {
       FC_ASSERT( id < max_vote_id );
-      counts[id.type()]++;
    }
-   FC_ASSERT(counts[vote_id_type::witness] <= op.options.num_witness,
-             "",
-             ("count", counts[vote_id_type::witness])("num", op.options.num_witness));
-   FC_ASSERT(counts[vote_id_type::committee] <= op.options.num_committee,
-             "",
-             ("count", counts[vote_id_type::committee])("num", op.options.num_committee));
 
    auto& acnt_indx = d.get_index_type<account_index>();
    if( op.name.size() )
