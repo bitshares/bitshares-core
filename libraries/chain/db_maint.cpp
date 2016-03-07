@@ -102,11 +102,12 @@ void database::update_worker_votes()
 {
    auto& idx = get_index_type<worker_index>();
    auto itr = idx.indices().get<by_account>().begin();
+   bool allow_negative_votes = (head_block_time() < HARDFORK_607_TIME);
    while( itr != idx.indices().get<by_account>().end() )
    {
       modify( *itr, [&]( worker_object& obj ){
          obj.total_votes_for = _vote_tally_buffer[obj.vote_for];
-         obj.total_votes_against = _vote_tally_buffer[obj.vote_against];
+         obj.total_votes_against = allow_negative_votes ? _vote_tally_buffer[obj.vote_against] : 0;
       });
       ++itr;
    }

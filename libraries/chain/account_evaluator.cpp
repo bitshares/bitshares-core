@@ -33,6 +33,7 @@
 #include <graphene/chain/internal_exceptions.hpp>
 #include <graphene/chain/special_authority.hpp>
 #include <graphene/chain/special_authority_object.hpp>
+#include <graphene/chain/worker_object.hpp>
 
 #include <algorithm>
 
@@ -69,10 +70,25 @@ void verify_account_votes( const database& db, const account_options& options )
               "Voted for more committee members than currently allowed (${c})", ("c", chain_params.maximum_committee_count) );
 
    uint32_t max_vote_id = gpo.next_available_vote_id;
+   bool has_worker_votes = false;
    for( auto id : options.votes )
    {
       FC_ASSERT( id < max_vote_id );
+      has_worker_votes |= (id.type() == vote_id_type::worker);
    }
+
+   if( has_worker_votes && (db.head_block_time() >= HARDFORK_607_TIME) )
+   {
+      const auto& against_worker_idx = db.get_index_type<worker_index>().indices().get<by_vote_against>();
+      for( auto id : options.votes )
+      {
+         if( id.type() == vote_id_type::worker )
+         {
+            FC_ASSERT( against_worker_idx.find( id ) == against_worker_idx.end() );
+         }
+      }
+   }
+
 }
 
 
