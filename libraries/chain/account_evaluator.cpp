@@ -54,6 +54,28 @@ void verify_authority_accounts( const database& db, const authority& a )
    }
 }
 
+void verify_account_votes( const database& db, const account_options& options )
+{
+   // ensure account's votes satisfy requirements
+   // NB only the part of vote checking that requires chain state is here,
+   // the rest occurs in account_options::validate()
+
+   const auto& gpo = db.get_global_properties();
+   const auto& chain_params = gpo.parameters;
+
+   FC_ASSERT( options.num_witness <= chain_params.maximum_witness_count,
+              "Voted for more witnesses than currently allowed (${c})", ("c", chain_params.maximum_witness_count) );
+   FC_ASSERT( options.num_committee <= chain_params.maximum_committee_count,
+              "Voted for more committee members than currently allowed (${c})", ("c", chain_params.maximum_committee_count) );
+
+   uint32_t max_vote_id = gpo.next_available_vote_id;
+   for( auto id : options.votes )
+   {
+      FC_ASSERT( id < max_vote_id );
+   }
+}
+
+
 void_result account_create_evaluator::do_evaluate( const account_create_operation& op )
 { try {
    database& d = db();
@@ -66,9 +88,6 @@ void_result account_create_evaluator::do_evaluate( const account_create_operatio
    FC_ASSERT( d.find_object(op.options.voting_account), "Invalid proxy account specified." );
    FC_ASSERT( fee_paying_account->is_lifetime_member(), "Only Lifetime members may register an account." );
    FC_ASSERT( op.referrer(d).is_member(d.head_block_time()), "The referrer must be either a lifetime or annual subscriber." );
-
-   const auto& global_props = d.get_global_properties();
-   const auto& chain_params = global_props.parameters;
 
    try
    {
@@ -84,17 +103,7 @@ void_result account_create_evaluator::do_evaluate( const account_create_operatio
       evaluate_special_authority( d, *op.extensions.value.active_special_authority );
    if( op.extensions.value.buyback_options.valid() )
       evaluate_buyback_account_options( d, *op.extensions.value.buyback_options );
-
-   FC_ASSERT( op.options.num_witness <= chain_params.maximum_witness_count,
-              "Voted for more witnesses than currently allowed (${c})", ("c", chain_params.maximum_witness_count) );
-   FC_ASSERT( op.options.num_committee <= chain_params.maximum_committee_count,
-              "Voted for more committee members than currently allowed (${c})", ("c", chain_params.maximum_committee_count) );
-
-   uint32_t max_vote_id = global_props.next_available_vote_id;
-   for( auto id : op.options.votes )
-   {
-      FC_ASSERT( id < max_vote_id );
-   }
+   verify_account_votes( d, op.options );
 
    auto& acnt_indx = d.get_index_type<account_index>();
    if( op.name.size() )
@@ -214,8 +223,6 @@ void_result account_update_evaluator::do_evaluate( const account_update_operatio
       FC_ASSERT( !o.extensions.value.active_special_authority.valid() );
    }
 
-   const auto& chain_params = d.get_global_properties().parameters;
-
    try
    {
       if( o.owner )  verify_authority_accounts( d, *o.owner );
@@ -231,16 +238,8 @@ void_result account_update_evaluator::do_evaluate( const account_update_operatio
 
    acnt = &o.account(d);
 
-   if( o.new_options )
-   {
-      FC_ASSERT( o.new_options->num_witness <= chain_params.maximum_witness_count );
-      FC_ASSERT( o.new_options->num_committee <= chain_params.maximum_committee_count );
-      uint32_t max_vote_id = d.get_global_properties().next_available_vote_id;
-      for( auto id : o.new_options->votes )
-      {
-         FC_ASSERT( id < max_vote_id );
-      }
-   }
+   if( o.new_options.valid() )
+      verify_account_votes( d, *o.new_options );
 
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }
