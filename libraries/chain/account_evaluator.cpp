@@ -35,6 +35,7 @@
 #include <graphene/chain/special_authority_object.hpp>
 
 #include <algorithm>
+#include <iostream>
 
 namespace graphene { namespace chain {
 
@@ -367,17 +368,41 @@ void_result account_upgrade_evaluator::do_apply(const account_upgrade_evaluator:
          // Upgrade to lifetime member. I don't care what the account was before.
          a.statistics(d).process_fees(a, d);
          a.membership_expiration_date = time_point_sec::maximum();
+         std::string upgrade_type = "BM->LTM";
+         if( a.is_annual_member(d.head_block_time()) )
+            upgrade_type = "AM->LTM";
+         std::cout << upgrade_type << " upgrade of acct=" << std::string( object_id_type( a.id ) ) << "(" << a.name << ")"
+            "   ref=" << std::string( object_id_type( a.referrer ) ) << "(" << a.referrer(d).name << ")"
+            "   reg=" << std::string( object_id_type( a.registrar ) ) << "(" << a.registrar(d).name << ")"
+            "   ltr=" << std::string( object_id_type( a.lifetime_referrer ) ) << "(" << a.lifetime_referrer(d).name << ")"
+            "   pct=(" << a.network_fee_percentage << "," << a.lifetime_referrer_fee_percentage << "," << a.referrer_rewards_percentage << ")"
+            "   b#=" << d.head_block_num()
+            << std::endl;
          a.referrer = a.registrar = a.lifetime_referrer = a.get_id();
          a.lifetime_referrer_fee_percentage = GRAPHENE_100_PERCENT - a.network_fee_percentage;
       } else if( a.is_annual_member(d.head_block_time()) ) {
          // Renew an annual subscription that's still in effect.
          FC_ASSERT(a.membership_expiration_date - d.head_block_time() < fc::days(3650),
                    "May not extend annual membership more than a decade into the future.");
+         std::cout << " AM renewal of acct=" << std::string( object_id_type( a.id ) ) << "(" << a.name << ")"
+            "   ref=" << std::string( object_id_type( a.referrer ) ) << "(" << a.referrer(d).name << ")"
+            "   reg=" << std::string( object_id_type( a.registrar ) ) << "(" << a.registrar(d).name << ")"
+            "   ltr=" << std::string( object_id_type( a.lifetime_referrer ) ) << "(" << a.lifetime_referrer(d).name << ")"
+            "   pct=(" << a.network_fee_percentage << "," << a.lifetime_referrer_fee_percentage << "," << a.referrer_rewards_percentage << ")"
+            "   b#=" << d.head_block_num()
+            << std::endl;
          a.membership_expiration_date += fc::days(365);
       } else {
          // Upgrade from basic account.
          a.statistics(d).process_fees(a, d);
          assert(a.is_basic_account(d.head_block_time()));
+         std::cout << " AM upgrade of acct=" << std::string( object_id_type( a.id ) ) << "(" << a.name << ")"
+            "   ref=" << std::string( object_id_type( a.referrer ) ) << "(" << a.referrer(d).name << ")"
+            "   reg=" << std::string( object_id_type( a.registrar ) ) << "(" << a.registrar(d).name << ")"
+            "   ltr=" << std::string( object_id_type( a.lifetime_referrer ) ) << "(" << a.lifetime_referrer(d).name << ")"
+            "   pct=(" << a.network_fee_percentage << "," << a.lifetime_referrer_fee_percentage << "," << a.referrer_rewards_percentage << ")"
+            "   b# " << d.head_block_num()
+            << std::endl;
          a.referrer = a.get_id();
          a.membership_expiration_date = d.head_block_time() + fc::days(365);
       }
