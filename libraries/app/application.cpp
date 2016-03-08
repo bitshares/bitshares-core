@@ -165,8 +165,8 @@ namespace detail {
                "104.236.144.84:1777", // puppies
                "40.127.190.171:1777", // betax
                "185.25.22.21:1776", // liondani (greece)
-               "23.95.43.126:50696", // iHashFury
-               "109.73.172.144:50696" // iHashFury
+               "23.95.43.126:50696", // iHashFury (USA)
+               "104.168.154.160:50696" // iHashFury (USA)
             };
             for( const string& endpoint_string : seeds )
             {
