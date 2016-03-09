@@ -434,7 +434,12 @@ void database::update_expired_feeds()
       assert( a.is_market_issued() );
 
       const asset_bitasset_data_object& b = a.bitasset_data(*this);
-      if( b.feed_is_expired(head_block_time()) )
+      bool feed_is_expired;
+      if( head_block_time() < HARDFORK_615_TIME )
+         feed_is_expired = b.feed_is_expired_before_hardfork_615( head_block_time() );
+      else
+         feed_is_expired = b.feed_is_expired( head_block_time() );
+      if( feed_is_expired )
       {
          modify(b, [this](asset_bitasset_data_object& a) {
             a.update_median_feeds(head_block_time());
