@@ -180,7 +180,9 @@ namespace detail {
          if( !_options->count("rpc-endpoint") )
             return;
 
-         _websocket_server = std::make_shared<fc::http::websocket_server>();
+         bool enable_deflate_compression = _options->count("disable-permessage-deflate") == 0;
+
+         _websocket_server = std::make_shared<fc::http::websocket_server>(enable_deflate_compression);
 
          _websocket_server->on_connection([&]( const fc::http::websocket_connection_ptr& c ){
             auto wsc = std::make_shared<fc::rpc::websocket_api_connection>(*c);
@@ -207,7 +209,8 @@ namespace detail {
          }
 
          string password = _options->count("server-pem-password") ? _options->at("server-pem-password").as<string>() : "";
-         _websocket_tls_server = std::make_shared<fc::http::websocket_tls_server>( _options->at("server-pem").as<string>(), password );
+         bool enable_deflate_compression = _options->count("disable-permessage-deflate") == 0;
+         _websocket_tls_server = std::make_shared<fc::http::websocket_tls_server>( _options->at("server-pem").as<string>(), password, enable_deflate_compression );
 
          _websocket_tls_server->on_connection([&]( const fc::http::websocket_connection_ptr& c ){
             auto wsc = std::make_shared<fc::rpc::websocket_api_connection>(*c);
@@ -900,6 +903,8 @@ void application::set_program_options(boost::program_options::options_descriptio
          ("checkpoint,c", bpo::value<vector<string>>()->composing(), "Pairs of [BLOCK_NUM,BLOCK_ID] that should be enforced as checkpoints.")
          ("rpc-endpoint", bpo::value<string>()->implicit_value("127.0.0.1:8090"), "Endpoint for websocket RPC to listen on")
          ("rpc-tls-endpoint", bpo::value<string>()->implicit_value("127.0.0.1:8089"), "Endpoint for TLS websocket RPC to listen on")
+         ("disable-permessage-deflate", "Disable support for per-message deflate compression in the websocket servers "
+                                        "(--rpc-endpoint and --rpc-tls-endpoint), enabled by default")
          ("server-pem,p", bpo::value<string>()->implicit_value("server.pem"), "The TLS certificate file for this server")
          ("server-pem-password,P", bpo::value<string>()->implicit_value(""), "Password for this certificate")
          ("genesis-json", bpo::value<boost::filesystem::path>(), "File to read Genesis State from")
