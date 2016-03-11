@@ -122,30 +122,4 @@ BOOST_AUTO_TEST_CASE( extended_public_key_type_test )
    }
 }
 
-BOOST_AUTO_TEST_CASE( extension_serialization_test )
-{
-   try
-   {
-      buyback_account_options bbo;
-      bbo.asset_to_buy = asset_id_type(1000);
-      bbo.asset_to_buy_issuer = account_id_type(2000);
-      bbo.markets.emplace( asset_id_type() );
-      bbo.markets.emplace( asset_id_type(777) );
-      account_create_operation create_op = make_account( "rex" );
-      create_op.registrar = account_id_type(1234);
-      create_op.extensions.value.buyback_options = bbo;
-
-      auto packed = fc::raw::pack( create_op );
-      account_create_operation unpacked = fc::raw::unpack<account_create_operation>(packed);
-
-      ilog( "original: ${x}", ("x", create_op) );
-      ilog( "unpacked: ${x}", ("x", unpacked) );
-   }
-   catch ( const fc::exception& e )
-   {
-      edump((e.to_detail_string()));
-      throw;
-   }
-}
-
 BOOST_AUTO_TEST_SUITE_END()
