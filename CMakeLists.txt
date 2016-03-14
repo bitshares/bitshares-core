@@ -2,7 +2,8 @@
 project( Graphene )
 cmake_minimum_required( VERSION 2.8.12 )
 
-set( BLOCKCHAIN_NAME "Graphene" )
+set( BLOCKCHAIN_NAME "Testnet" )
+set(GRAPHENE_EGENESIS_JSON "${CMAKE_CURRENT_SOURCE_DIR}/genesis.json" )
 
 set( CLI_CLIENT_EXECUTABLE_NAME graphene_client )
 set( GUI_CLIENT_EXECUTABLE_NAME Graphene )
