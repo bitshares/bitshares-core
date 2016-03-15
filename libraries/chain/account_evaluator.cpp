@@ -371,11 +371,13 @@ void_result account_upgrade_evaluator::do_apply(const account_upgrade_evaluator:
          a.lifetime_referrer_fee_percentage = GRAPHENE_100_PERCENT - a.network_fee_percentage;
       } else if( a.is_annual_member(d.head_block_time()) ) {
          // Renew an annual subscription that's still in effect.
+         FC_ASSERT( d.head_block_time() <= HARDFORK_613_TIME );
          FC_ASSERT(a.membership_expiration_date - d.head_block_time() < fc::days(3650),
                    "May not extend annual membership more than a decade into the future.");
          a.membership_expiration_date += fc::days(365);
       } else {
          // Upgrade from basic account.
+         FC_ASSERT( d.head_block_time() <= HARDFORK_613_TIME );
          a.statistics(d).process_fees(a, d);
          assert(a.is_basic_account(d.head_block_time()));
          a.referrer = a.get_id();
