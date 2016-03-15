@@ -2183,7 +2183,8 @@ public:
             //ss << n;
             if (abs( round( n ) - n ) < 0.00000000001 )
             {
-               ss << setiosflags( !ios::fixed ) << (int) n;
+               //ss << setiosflags( !ios::fixed ) << (int) n;     // doesn't compile on Linux with gcc
+               ss << (int) n;
             }
             else if (n - floor(n) < 0.000001)
             {
