@@ -29,8 +29,8 @@
 #include <fc/api.hpp>
 #include <fc/variant_object.hpp>
 
-namespace graphene { namespace chain {
-class database;
+namespace graphene { namespace app {
+class application;
 } }
 
 namespace graphene { namespace debug_witness {
@@ -42,7 +42,7 @@ class debug_api_impl;
 class debug_api
 {
    public:
-      debug_api( std::shared_ptr<graphene::chain::database> db );
+      debug_api( graphene::app::application& app );
 
       /**
        * Push blocks from existing database.

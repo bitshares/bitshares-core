@@ -99,7 +99,7 @@ namespace graphene { namespace app {
        {
           // can only enable this API if the plugin was loaded
           if( _app.get_plugin( "debug_witness" ) )
-             _debug_api = std::make_shared< graphene::debug_witness::debug_api >( _app.chain_database() );
+             _debug_api = std::make_shared< graphene::debug_witness::debug_api >( std::ref(_app) );
        }
        return;
     }

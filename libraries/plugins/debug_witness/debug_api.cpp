@@ -3,6 +3,8 @@
 #include <fc/optional.hpp>
 #include <fc/variant_object.hpp>
 
+#include <graphene/app/application.hpp>
+
 #include <graphene/chain/block_database.hpp>
 #include <graphene/chain/database.hpp>
 #include <graphene/chain/witness_object.hpp>
@@ -18,17 +20,17 @@ namespace detail {
 class debug_api_impl
 {
    public:
-      debug_api_impl( std::shared_ptr< graphene::chain::database >& _db );
+      debug_api_impl( graphene::app::application& _app );
 
       void debug_push_blocks( const std::string& src_filename, uint32_t count );
       void debug_generate_blocks( const std::string& debug_key, uint32_t count );
       void debug_update_object( const fc::variant_object& update );
       //void debug_save_db( std::string db_path );
 
-      std::shared_ptr< graphene::chain::database > db;
+      graphene::app::application& app;
 };
 
-debug_api_impl::debug_api_impl( std::shared_ptr< graphene::chain::database >& _db ) : db( _db )
+debug_api_impl::debug_api_impl( graphene::app::application& _app ) : app( _app )
 {}
 
 
@@ -37,6 +39,7 @@ void debug_api_impl::debug_push_blocks( const std::string& src_filename, uint32_
    if( count == 0 )
       return;
 
+   std::shared_ptr< graphene::chain::database > db = app.chain_database();
    fc::path src_path = fc::path( src_filename );
    if( fc::is_directory( src_path ) )
    {
@@ -76,6 +79,7 @@ void debug_api_impl::debug_generate_blocks( const std::string& debug_key, uint32
    FC_ASSERT( debug_private_key.valid() );
    graphene::chain::public_key_type debug_public_key = debug_private_key->get_public_key();
 
+   std::shared_ptr< graphene::chain::database > db = app.chain_database();
    for( uint32_t i=0; i<count; i++ )
    {
       graphene::chain::witness_id_type scheduled_witness = db->get_scheduled_witness( 1 );
@@ -94,14 +98,15 @@ void debug_api_impl::debug_generate_blocks( const std::string& debug_key, uint32
 
 void debug_api_impl::debug_update_object( const fc::variant_object& update )
 {
+   std::shared_ptr< graphene::chain::database > db = app.chain_database();
    db->debug_update( update );
 }
 
 } // detail
 
-debug_api::debug_api( std::shared_ptr< graphene::chain::database > db )
+debug_api::debug_api( graphene::app::application& app )
 {
-   my = std::make_shared< detail::debug_api_impl >(db);
+   my = std::make_shared< detail::debug_api_impl >(app);
 }
 
 void debug_api::debug_push_blocks( std::string source_filename, uint32_t count )
