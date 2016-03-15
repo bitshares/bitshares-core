@@ -62,6 +62,13 @@ void_result account_create_evaluator::do_evaluate( const account_create_operatio
       FC_ASSERT( !op.extensions.value.owner_special_authority.valid() );
       FC_ASSERT( !op.extensions.value.active_special_authority.valid() );
    }
+   if( d.head_block_time() < HARDFORK_599_TIME )
+   {
+      FC_ASSERT( !op.extensions.value.null_ext.valid() );
+      FC_ASSERT( !op.extensions.value.owner_special_authority.valid() );
+      FC_ASSERT( !op.extensions.value.active_special_authority.valid() );
+      FC_ASSERT( !op.extensions.value.buyback_options.valid() );
+   }
 
    FC_ASSERT( d.find_object(op.options.voting_account), "Invalid proxy account specified." );
    FC_ASSERT( fee_paying_account->is_lifetime_member(), "Only Lifetime members may register an account." );
@@ -220,6 +227,12 @@ void_result account_update_evaluator::do_evaluate( const account_update_operatio
    database& d = db();
    if( d.head_block_time() < HARDFORK_516_TIME )
    {
+      FC_ASSERT( !o.extensions.value.owner_special_authority.valid() );
+      FC_ASSERT( !o.extensions.value.active_special_authority.valid() );
+   }
+   if( d.head_block_time() < HARDFORK_599_TIME )
+   {
+      FC_ASSERT( !o.extensions.value.null_ext.valid() );
       FC_ASSERT( !o.extensions.value.owner_special_authority.valid() );
       FC_ASSERT( !o.extensions.value.active_special_authority.valid() );
    }
