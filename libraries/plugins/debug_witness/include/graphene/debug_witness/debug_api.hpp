@@ -71,6 +71,17 @@ class debug_api
       // not implemented
       //void save_db( std::string db_path );
 
+      /**
+       * Stream objects to file.  (Hint:  Create with mkfifo and pipe it to a script)
+       */
+
+      void debug_stream_json_objects( std::string filename );
+
+      /**
+       * Flush streaming file.
+       */
+      void debug_stream_json_objects_flush();
+
       std::shared_ptr< detail::debug_api_impl > my;
 };
 
@@ -80,4 +91,6 @@ FC_API(graphene::debug_witness::debug_api,
        (debug_push_blocks)
        (debug_generate_blocks)
        (debug_update_object)
+       (debug_stream_json_objects)
+       (debug_stream_json_objects_flush)
      )

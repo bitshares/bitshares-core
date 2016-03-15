@@ -12,6 +12,7 @@
 #include <graphene/utilities/key_conversion.hpp>
 
 #include <graphene/debug_witness/debug_api.hpp>
+#include <graphene/debug_witness/debug_witness.hpp>
 
 namespace graphene { namespace debug_witness {
 
@@ -26,6 +27,9 @@ class debug_api_impl
       void debug_generate_blocks( const std::string& debug_key, uint32_t count );
       void debug_update_object( const fc::variant_object& update );
       //void debug_save_db( std::string db_path );
+      void debug_stream_json_objects( const std::string& filename );
+      void debug_stream_json_objects_flush();
+      std::shared_ptr< graphene::debug_witness_plugin::debug_witness_plugin > get_plugin();
 
       graphene::app::application& app;
 };
@@ -102,6 +106,21 @@ void debug_api_impl::debug_update_object( const fc::variant_object& update )
    db->debug_update( update );
 }
 
+std::shared_ptr< graphene::debug_witness_plugin::debug_witness_plugin > debug_api_impl::get_plugin()
+{
+   return app.get_plugin< graphene::debug_witness_plugin::debug_witness_plugin >( "debug_witness" );
+}
+
+void debug_api_impl::debug_stream_json_objects( const std::string& filename )
+{
+   get_plugin()->set_json_object_stream( filename );
+}
+
+void debug_api_impl::debug_stream_json_objects_flush()
+{
+   get_plugin()->flush_json_object_stream();
+}
+
 } // detail
 
 debug_api::debug_api( graphene::app::application& app )
@@ -123,5 +142,16 @@ void debug_api::debug_update_object( fc::variant_object update )
 {
    my->debug_update_object( update );
 }
+
+void debug_api::debug_stream_json_objects( std::string filename )
+{
+   my->debug_stream_json_objects( filename );
+}
+
+void debug_api::debug_stream_json_objects_flush()
+{
+   my->debug_stream_json_objects_flush();
+}
+
 
 } } // graphene::debug_witness

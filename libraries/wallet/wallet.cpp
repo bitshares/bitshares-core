@@ -2343,18 +2343,28 @@ public:
    {
       use_debug_api();
       (*_remote_debug)->debug_push_blocks( src_filename, count );
+      (*_remote_debug)->debug_stream_json_objects_flush();
    }
 
    void dbg_generate_blocks( const std::string& debug_wif_key, uint32_t count )
    {
       use_debug_api();
       (*_remote_debug)->debug_generate_blocks( debug_wif_key, count );
+      (*_remote_debug)->debug_stream_json_objects_flush();
+   }
+
+   void dbg_stream_json_objects( const std::string& filename )
+   {
+      use_debug_api();
+      (*_remote_debug)->debug_stream_json_objects( filename );
+      (*_remote_debug)->debug_stream_json_objects_flush();
    }
 
    void dbg_update_object( const fc::variant_object& update )
    {
       use_debug_api();
       (*_remote_debug)->debug_update_object( update );
+      (*_remote_debug)->debug_stream_json_objects_flush();
    }
 
    void use_network_node_api()
@@ -3262,6 +3272,11 @@ void wallet_api::dbg_push_blocks( std::string src_filename, uint32_t count )
 void wallet_api::dbg_generate_blocks( std::string debug_wif_key, uint32_t count )
 {
    my->dbg_generate_blocks( debug_wif_key, count );
+}
+
+void wallet_api::dbg_stream_json_objects( const std::string& filename )
+{
+   my->dbg_stream_json_objects( filename );
 }
 
 void wallet_api::dbg_update_object( fc::variant_object update )

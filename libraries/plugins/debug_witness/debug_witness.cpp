@@ -98,29 +98,76 @@ void debug_witness_plugin::plugin_startup()
 
    // connect needed signals
 
-   db.applied_block.connect([this](const graphene::chain::signed_block& b){ on_applied_block(b); });
-   db.changed_objects.connect([this](const std::vector<graphene::db::object_id_type>& ids){ on_changed_objects(ids); });
-   db.removed_objects.connect([this](const std::vector<const graphene::db::object*>& objs){ on_removed_objects(objs); });
+   _applied_block_conn  = db.applied_block.connect([this](const graphene::chain::signed_block& b){ on_applied_block(b); });
+   _changed_objects_conn = db.changed_objects.connect([this](const std::vector<graphene::db::object_id_type>& ids){ on_changed_objects(ids); });
+   _removed_objects_conn = db.removed_objects.connect([this](const std::vector<const graphene::db::object*>& objs){ on_removed_objects(objs); });
 
    return;
 }
 
 void debug_witness_plugin::on_changed_objects( const std::vector<graphene::db::object_id_type>& ids )
 {
-
+   if( _json_object_stream && (ids.size() > 0) )
+   {
+      const chain::database& db = database();
+      for( const graphene::db::object_id_type& oid : ids )
+      {
+         const graphene::db::object* obj = db.find_object( oid );
+         if( obj == nullptr )
+         {
+            (*_json_object_stream) << "{\"id\":" << fc::json::to_string( oid ) << "}\n";
+         }
+         else
+         {
+            (*_json_object_stream) << fc::json::to_string( obj->to_variant() ) << '\n';
+         }
+      }
+   }
 }
 
 void debug_witness_plugin::on_removed_objects( const std::vector<const graphene::db::object*> objs )
 {
-
+   /*
+   if( _json_object_stream )
+   {
+      for( const graphene::db::object* obj : objs )
+      {
+         (*_json_object_stream) << "{\"id\":" << fc::json::to_string( obj->id ) << "}\n";
+      }
+   }
+   */
 }
 
 void debug_witness_plugin::on_applied_block( const graphene::chain::signed_block& b )
 {
+   if( _json_object_stream )
+   {
+      (*_json_object_stream) << "{\"bn\":" << fc::to_string( b.block_num() ) << "}\n";
+   }
+}
 
+void debug_witness_plugin::set_json_object_stream( const std::string& filename )
+{
+   if( _json_object_stream )
+   {
+      _json_object_stream->close();
+      _json_object_stream.reset();
+   }
+   _json_object_stream = std::make_shared< std::ofstream >( filename );
+}
+
+void debug_witness_plugin::flush_json_object_stream()
+{
+   if( _json_object_stream )
+      _json_object_stream->flush();
 }
 
 void debug_witness_plugin::plugin_shutdown()
 {
+   if( _json_object_stream )
+   {
+      _json_object_stream->close();
+      _json_object_stream.reset();
+   }
    return;
 }

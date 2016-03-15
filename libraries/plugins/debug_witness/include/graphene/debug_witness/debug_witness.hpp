@@ -45,6 +45,9 @@ public:
    virtual void plugin_startup() override;
    virtual void plugin_shutdown() override;
 
+   void set_json_object_stream( const std::string& filename );
+   void flush_json_object_stream();
+
 private:
 
    void on_changed_objects( const std::vector<graphene::db::object_id_type>& ids );
@@ -54,6 +57,11 @@ private:
    boost::program_options::variables_map _options;
 
    std::map<chain::public_key_type, fc::ecc::private_key> _private_keys;
+
+   std::shared_ptr< std::ofstream > _json_object_stream;
+   boost::signals2::scoped_connection _applied_block_conn;
+   boost::signals2::scoped_connection _changed_objects_conn;
+   boost::signals2::scoped_connection _removed_objects_conn;
 };
 
 } } //graphene::debug_witness_plugin
