@@ -534,6 +534,8 @@ void database::_apply_block( const signed_block& next_block )
    // to be called for header validation?
    update_maintenance_flag( maint_needed );
    update_witness_schedule();
+   if( !_node_property_object.debug_updates.empty() )
+      apply_debug_updates();
 
    // notify observers that the block has been applied
    applied_block( next_block ); //emit

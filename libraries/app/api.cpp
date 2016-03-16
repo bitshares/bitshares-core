@@ -95,6 +95,12 @@ namespace graphene { namespace app {
        {
           _crypto_api = std::make_shared< crypto_api >();
        }
+       else if( api_name == "debug_api" )
+       {
+          // can only enable this API if the plugin was loaded
+          if( _app.get_plugin( "debug_witness" ) )
+             _debug_api = std::make_shared< graphene::debug_witness::debug_api >( std::ref(_app) );
+       }
        return;
     }
 
@@ -209,6 +215,12 @@ namespace graphene { namespace app {
     {
        FC_ASSERT(_crypto_api);
        return *_crypto_api;
+    }
+
+    fc::api<graphene::debug_witness::debug_api> login_api::debug() const
+    {
+       FC_ASSERT(_debug_api);
+       return *_debug_api;
     }
 
     vector<account_id_type> get_relevant_accounts( const object* obj )
