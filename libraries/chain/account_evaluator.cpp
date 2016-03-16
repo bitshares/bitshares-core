@@ -33,6 +33,7 @@
 #include <graphene/chain/internal_exceptions.hpp>
 #include <graphene/chain/special_authority.hpp>
 #include <graphene/chain/special_authority_object.hpp>
+#include <graphene/chain/worker_object.hpp>
 
 #include <algorithm>
 
@@ -54,6 +55,43 @@ void verify_authority_accounts( const database& db, const authority& a )
    }
 }
 
+void verify_account_votes( const database& db, const account_options& options )
+{
+   // ensure account's votes satisfy requirements
+   // NB only the part of vote checking that requires chain state is here,
+   // the rest occurs in account_options::validate()
+
+   const auto& gpo = db.get_global_properties();
+   const auto& chain_params = gpo.parameters;
+
+   FC_ASSERT( options.num_witness <= chain_params.maximum_witness_count,
+              "Voted for more witnesses than currently allowed (${c})", ("c", chain_params.maximum_witness_count) );
+   FC_ASSERT( options.num_committee <= chain_params.maximum_committee_count,
+              "Voted for more committee members than currently allowed (${c})", ("c", chain_params.maximum_committee_count) );
+
+   uint32_t max_vote_id = gpo.next_available_vote_id;
+   bool has_worker_votes = false;
+   for( auto id : options.votes )
+   {
+      FC_ASSERT( id < max_vote_id );
+      has_worker_votes |= (id.type() == vote_id_type::worker);
+   }
+
+   if( has_worker_votes && (db.head_block_time() >= HARDFORK_607_TIME) )
+   {
+      const auto& against_worker_idx = db.get_index_type<worker_index>().indices().get<by_vote_against>();
+      for( auto id : options.votes )
+      {
+         if( id.type() == vote_id_type::worker )
+         {
+            FC_ASSERT( against_worker_idx.find( id ) == against_worker_idx.end() );
+         }
+      }
+   }
+
+}
+
+
 void_result account_create_evaluator::do_evaluate( const account_create_operation& op )
 { try {
    database& d = db();
@@ -62,13 +100,17 @@ void_result account_create_evaluator::do_evaluate( const account_create_operatio
       FC_ASSERT( !op.extensions.value.owner_special_authority.valid() );
       FC_ASSERT( !op.extensions.value.active_special_authority.valid() );
    }
+   if( d.head_block_time() < HARDFORK_599_TIME )
+   {
+      FC_ASSERT( !op.extensions.value.null_ext.valid() );
+      FC_ASSERT( !op.extensions.value.owner_special_authority.valid() );
+      FC_ASSERT( !op.extensions.value.active_special_authority.valid() );
+      FC_ASSERT( !op.extensions.value.buyback_options.valid() );
+   }
 
    FC_ASSERT( d.find_object(op.options.voting_account), "Invalid proxy account specified." );
    FC_ASSERT( fee_paying_account->is_lifetime_member(), "Only Lifetime members may register an account." );
    FC_ASSERT( op.referrer(d).is_member(d.head_block_time()), "The referrer must be either a lifetime or annual subscriber." );
-
-   const auto& global_props = d.get_global_properties();
-   const auto& chain_params = global_props.parameters;
 
    try
    {
@@ -84,27 +126,7 @@ void_result account_create_evaluator::do_evaluate( const account_create_operatio
       evaluate_special_authority( d, *op.extensions.value.active_special_authority );
    if( op.extensions.value.buyback_options.valid() )
       evaluate_buyback_account_options( d, *op.extensions.value.buyback_options );
-
-   uint32_t max_vote_id = global_props.next_available_vote_id;
-
-   FC_ASSERT( op.options.num_witness <= chain_params.maximum_witness_count, 
-              "Voted for more witnesses than currently allowed (${c})", ("c", chain_params.maximum_witness_count) );
-
-   FC_ASSERT( op.options.num_committee <= chain_params.maximum_committee_count,
-              "Voted for more committee members than currently allowed (${c})", ("c", chain_params.maximum_committee_count) );
-
-   safe<uint32_t> counts[vote_id_type::VOTE_TYPE_COUNT];
-   for( auto id : op.options.votes )
-   {
-      FC_ASSERT( id < max_vote_id );
-      counts[id.type()]++;
-   }
-   FC_ASSERT(counts[vote_id_type::witness] <= op.options.num_witness,
-             "",
-             ("count", counts[vote_id_type::witness])("num", op.options.num_witness));
-   FC_ASSERT(counts[vote_id_type::committee] <= op.options.num_committee,
-             "",
-             ("count", counts[vote_id_type::committee])("num", op.options.num_committee));
+   verify_account_votes( d, op.options );
 
    auto& acnt_indx = d.get_index_type<account_index>();
    if( op.name.size() )
@@ -223,8 +245,12 @@ void_result account_update_evaluator::do_evaluate( const account_update_operatio
       FC_ASSERT( !o.extensions.value.owner_special_authority.valid() );
       FC_ASSERT( !o.extensions.value.active_special_authority.valid() );
    }
-
-   const auto& chain_params = d.get_global_properties().parameters;
+   if( d.head_block_time() < HARDFORK_599_TIME )
+   {
+      FC_ASSERT( !o.extensions.value.null_ext.valid() );
+      FC_ASSERT( !o.extensions.value.owner_special_authority.valid() );
+      FC_ASSERT( !o.extensions.value.active_special_authority.valid() );
+   }
 
    try
    {
@@ -241,16 +267,8 @@ void_result account_update_evaluator::do_evaluate( const account_update_operatio
 
    acnt = &o.account(d);
 
-   if( o.new_options )
-   {
-      FC_ASSERT( o.new_options->num_witness <= chain_params.maximum_witness_count );
-      FC_ASSERT( o.new_options->num_committee <= chain_params.maximum_committee_count );
-      uint32_t max_vote_id = d.get_global_properties().next_available_vote_id;
-      for( auto id : o.new_options->votes )
-      {
-         FC_ASSERT( id < max_vote_id );
-      }
-   }
+   if( o.new_options.valid() )
+      verify_account_votes( d, *o.new_options );
 
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }
@@ -371,11 +389,13 @@ void_result account_upgrade_evaluator::do_apply(const account_upgrade_evaluator:
          a.lifetime_referrer_fee_percentage = GRAPHENE_100_PERCENT - a.network_fee_percentage;
       } else if( a.is_annual_member(d.head_block_time()) ) {
          // Renew an annual subscription that's still in effect.
+         FC_ASSERT( d.head_block_time() <= HARDFORK_613_TIME );
          FC_ASSERT(a.membership_expiration_date - d.head_block_time() < fc::days(3650),
                    "May not extend annual membership more than a decade into the future.");
          a.membership_expiration_date += fc::days(365);
       } else {
          // Upgrade from basic account.
+         FC_ASSERT( d.head_block_time() <= HARDFORK_613_TIME );
          a.statistics(d).process_fees(a, d);
          assert(a.is_basic_account(d.head_block_time()));
          a.referrer = a.get_id();

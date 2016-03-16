@@ -95,6 +95,12 @@ namespace graphene { namespace app {
        {
           _crypto_api = std::make_shared< crypto_api >();
        }
+       else if( api_name == "debug_api" )
+       {
+          // can only enable this API if the plugin was loaded
+          if( _app.get_plugin( "debug_witness" ) )
+             _debug_api = std::make_shared< graphene::debug_witness::debug_api >( std::ref(_app) );
+       }
        return;
     }
 
@@ -209,6 +215,12 @@ namespace graphene { namespace app {
     {
        FC_ASSERT(_crypto_api);
        return *_crypto_api;
+    }
+
+    fc::api<graphene::debug_witness::debug_api> login_api::debug() const
+    {
+       FC_ASSERT(_debug_api);
+       return *_debug_api;
     }
 
     vector<account_id_type> get_relevant_accounts( const object* obj )
@@ -380,25 +392,58 @@ namespace graphene { namespace app {
        return result;
     }
 
-    vector<operation_history_object> history_api::get_account_history(account_id_type account, operation_history_id_type stop, unsigned limit, operation_history_id_type start) const
+    vector<operation_history_object> history_api::get_account_history( account_id_type account, 
+                                                                       operation_history_id_type stop, 
+                                                                       unsigned limit, 
+                                                                       operation_history_id_type start ) const
     {
-       FC_ASSERT(_app.chain_database());
+       FC_ASSERT( _app.chain_database() );
+       const auto& db = *_app.chain_database();       
+       FC_ASSERT( limit <= 100 );
+       vector<operation_history_object> result;
+       const auto& stats = account(db).statistics(db);
+       if( stats.most_recent_op == account_transaction_history_id_type() ) return result;
+       const account_transaction_history_object* node = &stats.most_recent_op(db);
+       if( start == operation_history_id_type() )
+          start = node->operation_id;
+          
+       while(node && node->operation_id.instance.value > stop.instance.value && result.size() < limit)
+       {
+          if( node->operation_id.instance.value <= start.instance.value )
+             result.push_back( node->operation_id(db) );
+          if( node->next == account_transaction_history_id_type() )
+             node = nullptr;
+          else node = &node->next(db);
+       }
+       
+       return result;
+    }
+    
+    vector<operation_history_object> history_api::get_relative_account_history( account_id_type account, 
+                                                                                uint32_t stop, 
+                                                                                unsigned limit, 
+                                                                                uint32_t start) const
+    {
+       FC_ASSERT( _app.chain_database() );
        const auto& db = *_app.chain_database();
        FC_ASSERT(limit <= 100);
        vector<operation_history_object> result;
-       const auto& stats = account(db).statistics(db);
-       if(stats.most_recent_op == account_transaction_history_id_type()) return result;
-       const account_transaction_history_object* node = &stats.most_recent_op(db);
-       if(start == operation_history_id_type())
-          start = node->id;
-       while(node && node->operation_id.instance.value > stop.instance.value && result.size() < limit)
+       if( start == 0 )
+         start = account(db).statistics(db).total_ops;
+       else start = min( account(db).statistics(db).total_ops, start );
+       const auto& hist_idx = db.get_index_type<account_transaction_history_index>();
+       const auto& by_seq_idx = hist_idx.indices().get<by_seq>();
+       
+       auto itr = by_seq_idx.upper_bound( boost::make_tuple( account, start ) );
+       auto itr_stop = by_seq_idx.lower_bound( boost::make_tuple( account, stop ) );
+       --itr;
+       
+       while ( itr != itr_stop && result.size() < limit )
        {
-          if(node->id.instance() <= start.instance.value)
-             result.push_back(node->operation_id(db));
-          if(node->next == account_transaction_history_id_type())
-             node = nullptr;
-          else node = db.find(node->next);
+          result.push_back( itr->operation_id(db) );
+          --itr;
        }
+       
        return result;
     }
 

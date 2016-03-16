@@ -43,5 +43,6 @@ namespace graphene { namespace chain {
          ~node_property_object(){}
 
          uint32_t skip_flags = 0;
+         std::map< block_id_type, std::vector< fc::variant_object > > debug_updates;
    };
 } } // graphene::chain

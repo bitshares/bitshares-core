@@ -95,4 +95,107 @@ void database::debug_dump()
    */
 }
 
+void debug_apply_update( database& db, const fc::variant_object& vo )
+{
+   static const uint8_t
+      db_action_nil = 0,
+      db_action_create = 1,
+      db_action_write = 2,
+      db_action_update = 3,
+      db_action_delete = 4;
+
+   // "_action" : "create"   object must not exist, unspecified fields take defaults
+   // "_action" : "write"    object may exist, is replaced entirely, unspecified fields take defaults
+   // "_action" : "update"   object must exist, unspecified fields don't change
+   // "_action" : "delete"   object must exist, will be deleted
+
+   // if _action is unspecified:
+   // - delete if object contains only ID field
+   // - otherwise, write
+
+   object_id_type oid;
+   uint8_t action = db_action_nil;
+   auto it_id = vo.find("id");
+   FC_ASSERT( it_id != vo.end() );
+
+   from_variant( it_id->value(), oid );
+   action = ( vo.size() == 1 ) ? db_action_delete : db_action_write;
+
+   from_variant( vo["id"], oid );
+   if( vo.size() == 1 )
+      action = db_action_delete;
+   auto it_action = vo.find("_action" );
+   if( it_action != vo.end() )
+   {
+      const std::string& str_action = it_action->value().get_string();
+      if( str_action == "create" )
+         action = db_action_create;
+      else if( str_action == "write" )
+         action = db_action_write;
+      else if( str_action == "update" )
+         action = db_action_update;
+      else if( str_action == "delete" )
+         action = db_action_delete;
+   }
+
+   auto& idx = db.get_index( oid );
+
+   switch( action )
+   {
+      case db_action_create:
+         /*
+         idx.create( [&]( object& obj )
+         {
+            idx.object_from_variant( vo, obj );
+         } );
+         */
+         FC_ASSERT( false );
+         break;
+      case db_action_write:
+         db.modify( db.get_object( oid ), [&]( object& obj )
+         {
+            idx.object_default( obj );
+            idx.object_from_variant( vo, obj );
+         } );
+         break;
+      case db_action_update:
+         db.modify( db.get_object( oid ), [&]( object& obj )
+         {
+            idx.object_from_variant( vo, obj );
+         } );
+         break;
+      case db_action_delete:
+         db.remove( db.get_object( oid ) );
+         break;
+      default:
+         FC_ASSERT( false );
+   }
+}
+
+void database::apply_debug_updates()
+{
+   block_id_type head_id = head_block_id();
+   auto it = _node_property_object.debug_updates.find( head_id );
+   if( it == _node_property_object.debug_updates.end() )
+      return;
+   for( const fc::variant_object& update : it->second )
+      debug_apply_update( *this, update );
+}
+
+void database::debug_update( const fc::variant_object& update )
+{
+   block_id_type head_id = head_block_id();
+   auto it = _node_property_object.debug_updates.find( head_id );
+   if( it == _node_property_object.debug_updates.end() )
+      it = _node_property_object.debug_updates.emplace( head_id, std::vector< fc::variant_object >() ).first;
+   it->second.emplace_back( update );
+
+   optional<signed_block> head_block = fetch_block_by_id( head_id );
+   FC_ASSERT( head_block.valid() );
+
+   // What the last block does has been changed by adding to node_property_object, so we have to re-apply it
+   pop_block();
+   push_block( *head_block );
+}
+
 } }

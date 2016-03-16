@@ -50,6 +50,7 @@ namespace graphene { namespace chain {
           * Keep the most recent operation as a root pointer to a linked list of the transaction history.
           */
          account_transaction_history_id_type most_recent_op;
+         uint32_t                            total_ops = 0;
 
          /**
           * When calculating votes it is necessary to know how much is stored in orders (and thus unavailable for
@@ -385,6 +386,7 @@ FC_REFLECT_DERIVED( graphene::chain::account_statistics_object,
                     (graphene::chain::object),
                     (owner)
                     (most_recent_op)
+                    (total_ops)
                     (total_core_in_orders)
                     (lifetime_fees_paid)
                     (pending_fees)(pending_vested_fees)

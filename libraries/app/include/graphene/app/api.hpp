@@ -30,6 +30,8 @@
 
 #include <graphene/market_history/market_history_plugin.hpp>
 
+#include <graphene/debug_witness/debug_api.hpp>
+
 #include <graphene/net/node.hpp>
 
 #include <fc/api.hpp>
@@ -91,6 +93,22 @@ namespace graphene { namespace app {
                                                               operation_history_id_type stop = operation_history_id_type(),
                                                               unsigned limit = 100,
                                                               operation_history_id_type start = operation_history_id_type())const;
+         /**
+          * @breif Get operations relevant to the specified account referenced
+          * by an event numbering specific to the account. The current number of operations
+          * for the account can be found in the account statistics (or use 0 for start).
+          * @param account The account whose history should be queried
+          * @param stop Sequence number of earliest operation. 0 is default and will
+          * query 'limit' number of operations.
+          * @param limit Maximum number of operations to retrieve (must not exceed 100)
+          * @param start Sequence number of the most recent operation to retrieve.
+          * 0 is default, which will start querying from the most recent operation.
+          * @return A list of operations performed by account, ordered from most recent to oldest.
+          */
+         vector<operation_history_object> get_relative_account_history( account_id_type account,
+                                                                        uint32_t stop = 0,
+                                                                        unsigned limit = 100,
+                                                                        uint32_t start = 0) const;
 
          vector<order_history_object> get_fill_order_history( asset_id_type a, asset_id_type b, uint32_t limit )const;
          vector<bucket_object> get_market_history( asset_id_type a, asset_id_type b, uint32_t bucket_seconds,
@@ -265,6 +283,8 @@ namespace graphene { namespace app {
          fc::api<network_node_api> network_node()const;
          /// @brief Retrieve the cryptography API
          fc::api<crypto_api> crypto()const;
+         /// @brief Retrieve the debug API (if available)
+         fc::api<graphene::debug_witness::debug_api> debug()const;
 
       private:
          /// @brief Called to enable an API, not reflected.
@@ -276,6 +296,7 @@ namespace graphene { namespace app {
          optional< fc::api<network_node_api> > _network_node_api;
          optional< fc::api<history_api> >  _history_api;
          optional< fc::api<crypto_api> > _crypto_api;
+         optional< fc::api<graphene::debug_witness::debug_api> > _debug_api;
    };
 
 }}  // graphene::app
@@ -291,6 +312,7 @@ FC_REFLECT( graphene::app::verify_range_proof_rewind_result,
 
 FC_API(graphene::app::history_api,
        (get_account_history)
+       (get_relative_account_history)
        (get_fill_order_history)
        (get_market_history)
        (get_market_history_buckets)
@@ -326,4 +348,5 @@ FC_API(graphene::app::login_api,
        (history)
        (network_node)
        (crypto)
+       (debug)
      )

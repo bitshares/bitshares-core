@@ -849,6 +849,51 @@ class wallet_api
                                     uint32_t timeout_sec = 0,
                                     bool     fill_or_kill = false,
                                     bool     broadcast = false);
+                                    
+      /** Place a limit order attempting to sell one asset for another.
+       * 
+       * This API call abstracts away some of the details of the sell_asset call to be more
+       * user friendly. All orders placed with sell never timeout and will not be killed if they
+       * cannot be filled immediately. If you wish for one of these parameters to be different, 
+       * then sell_asset should be used instead.
+       *
+       * @param seller_account the account providing the asset being sold, and which will
+       *                       receive the processed of the sale.
+       * @param base The name or id of the asset to sell.
+       * @param quote The name or id of the asset to recieve.
+       * @param rate The rate in base:quote at which you want to sell.
+       * @param amount The amount of base you want to sell.
+       * @param broadcast true to broadcast the transaction on the network.
+       * @returns The signed transaction selling the funds.                 
+       */
+      signed_transaction sell( string seller_account,
+                               string base,
+                               string quote,
+                               double rate,
+                               double amount,
+                               bool broadcast );
+                               
+      /** Place a limit order attempting to buy one asset with another.
+       *
+       * This API call abstracts away some of the details of the sell_asset call to be more
+       * user friendly. All orders placed with buy never timeout and will not be killed if they
+       * cannot be filled immediately. If you wish for one of these parameters to be different,
+       * then sell_asset should be used instead.
+       *
+       * @param buyer_account The account buying the asset for another asset.
+       * @param base The name or id of the asset to buy.
+       * @param quote The name or id of the assest being offered as payment.
+       * @param rate The rate in base:quote at which you want to buy.
+       * @param amount the amount of base you want to buy.
+       * @param broadcast true to broadcast the transaction on the network.
+       * @param The signed transaction selling the funds.
+       */
+      signed_transaction buy( string buyer_account,
+                              string base,
+                              string quote,
+                              double rate,
+                              double amount,
+                              bool broadcast );
 
       /** Borrow an asset or update the debt/collateral ratio for the loan.
        *
@@ -1401,9 +1446,16 @@ class wallet_api
          const approval_delta& delta,
          bool broadcast /* = false */
          );
+         
+      order_book get_order_book( const string& base, const string& quote, unsigned limit = 50);
 
       void dbg_make_uia(string creator, string symbol);
       void dbg_make_mia(string creator, string symbol);
+      void dbg_push_blocks( std::string src_filename, uint32_t count );
+      void dbg_generate_blocks( std::string debug_wif_key, uint32_t count );
+      void dbg_stream_json_objects( const std::string& filename );
+      void dbg_update_object( fc::variant_object update );
+
       void flood_network(string prefix, uint32_t number_of_transactions);
 
       void network_add_nodes( const vector<string>& nodes );
@@ -1517,6 +1569,8 @@ FC_API( graphene::wallet::wallet_api,
         (upgrade_account)
         (create_account_with_brain_key)
         (sell_asset)
+        (sell)
+        (buy)
         (borrow_asset)
         (cancel_order)
         (transfer)
@@ -1574,6 +1628,10 @@ FC_API( graphene::wallet::wallet_api,
         (approve_proposal)
         (dbg_make_uia)
         (dbg_make_mia)
+        (dbg_push_blocks)
+        (dbg_generate_blocks)
+        (dbg_stream_json_objects)
+        (dbg_update_object)
         (flood_network)
         (network_add_nodes)
         (network_get_connected_peers)
@@ -1589,4 +1647,5 @@ FC_API( graphene::wallet::wallet_api,
         (blind_transfer)
         (blind_history)
         (receive_blind_transfer)
+        (get_order_book)
       )
