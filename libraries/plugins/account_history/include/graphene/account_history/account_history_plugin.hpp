@@ -26,10 +26,15 @@
 #include <graphene/app/plugin.hpp>
 #include <graphene/chain/database.hpp>
 
+#include <graphene/chain/operation_history_object.hpp>
+
 #include <fc/thread/future.hpp>
 
 namespace graphene { namespace account_history {
-using namespace chain;
+   using namespace chain;
+   //using namespace graphene::db;
+   //using boost::multi_index_container;
+   //using namespace boost::multi_index;
 
 //
 // Plugins should #define their SPACE_ID's so plugins with
@@ -78,3 +83,27 @@ class account_history_plugin : public graphene::app::plugin
 
 } } //graphene::account_history
 
+/*struct by_id;
+struct by_seq;
+struct by_op;
+typedef boost::multi_index_container<
+   graphene::chain::account_transaction_history_object,
+   boost::multi_index::indexed_by<
+      boost::multi_index::ordered_unique< tag<by_id>, member< object, object_id_type, &object::id > >,
+      boost::multi_index::ordered_unique< tag<by_seq>,
+         composite_key< account_transaction_history_object,
+            member< account_transaction_history_object, account_id_type, &account_transaction_history_object::account>,
+            member< account_transaction_history_object, uint32_t, &account_transaction_history_object::sequence>
+         >
+      >,
+      boost::multi_index::ordered_unique< tag<by_op>,
+         composite_key< account_transaction_history_object,
+            member< account_transaction_history_object, account_id_type, &account_transaction_history_object::account>,
+            member< account_transaction_history_object, operation_history_id_type, &account_transaction_history_object::operation_id>
+         >
+      >
+   >
+> account_transaction_history_multi_index_type;
+
+typedef graphene::account_history::generic_index<graphene::chain::account_transaction_history_object, account_transaction_history_multi_index_type> account_transaction_history_index;
+*/
