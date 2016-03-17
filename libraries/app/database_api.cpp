@@ -1029,39 +1029,42 @@ market_ticker database_api_impl::get_ticker( const string& base, const string& q
 
       uint32_t day = 86400;
       auto now = fc::time_point_sec( fc::time_point::now() );
-      auto orders = get_order_book( base, quote, 1 );
       auto trades = get_trade_history( base, quote, now, fc::time_point_sec( now.sec_since_epoch() - day ), 100 );
 
-      result.latest = trades[0].price;
-
-      for ( market_trade t: trades )
+      if ( trades.size() )
       {
-         result.base_volume += t.value;
-         result.quote_volume += t.amount;
-      }
-
-      while (trades.size() == 100)
-      {
-         trades = get_trade_history( base, quote, trades[99].date, fc::time_point_sec( now.sec_since_epoch() - day ), 100 );
+         result.latest = trades[0].price;
 
          for ( market_trade t: trades )
          {
             result.base_volume += t.value;
             result.quote_volume += t.amount;
          }
+
+         while (trades.size() == 100)
+         {
+            trades = get_trade_history( base, quote, trades[99].date, fc::time_point_sec( now.sec_since_epoch() - day ), 100 );
+
+            for ( market_trade t: trades )
+            {
+               result.base_volume += t.value;
+               result.quote_volume += t.amount;
+            }
+         }
+
+         trades = get_trade_history( base, quote, trades.back().date, fc::time_point_sec(), 1 );
+         result.percent_change = trades.size() > 0 ? ( ( result.latest / trades.back().price ) - 1 ) * 100 : 0;
       }
 
-      trades = get_trade_history( base, quote, trades.back().date, fc::time_point_sec(), 1 );
-      result.percent_change = trades.size() > 0 ? ( ( result.latest / trades.back().price ) - 1 ) * 100 : 0;
-
-      //if (assets[0]->id == base_id)
-      {
+      auto orders = get_order_book( base, quote, 1 );
+      if( orders.asks.size() )
          result.lowest_ask = orders.asks[0].price;
+      if( orders.bids.size() )
          result.highest_bid = orders.bids[0].price;
-      }
 
-      return result;
    } FC_CAPTURE_AND_RETHROW( (base)(quote) )
+
+   return result;
 }
 
 market_volume database_api::get_24_volume( const string& base, const string& quote )const
