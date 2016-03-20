@@ -193,7 +193,7 @@ struct sign_state
             if( approved_by.find(a.first) == approved_by.end() )
             {
                if( depth == max_recursion )
-                  return false;
+                  continue;
                if( check_authority( get_active( a.first ), depth+1 ) )
                {
                   approved_by.insert( a.first );
