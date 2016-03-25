@@ -184,15 +184,15 @@ void database_fixture::verify_asset_supplies( const database& db )
    }
    for( const asset_object& asset_obj : db.get_index_type<asset_index>().indices() )
    {
-      total_balances[asset_obj.id] += asset_obj.dynamic_asset_data_id(db).accumulated_fees;
-      if( asset_obj.id != asset_id_type() )
-         BOOST_CHECK_EQUAL(total_balances[asset_obj.id].value, asset_obj.dynamic_asset_data_id(db).current_supply.value);
-      total_balances[asset_id_type()] += asset_obj.dynamic_asset_data_id(db).fee_pool;
+      const auto& dasset_obj = asset_obj.dynamic_asset_data_id(db);
+      total_balances[asset_obj.id] += dasset_obj.accumulated_fees;
+      total_balances[asset_id_type()] += dasset_obj.fee_pool;
       if( asset_obj.is_market_issued() )
       {
          const auto& bad = asset_obj.bitasset_data(db);
          total_balances[bad.options.short_backing_asset] += bad.settlement_fund;
       }
+      total_balances[asset_obj.id] += dasset_obj.confidential_supply.value;
    }
    for( const vesting_balance_object& vbo : db.get_index_type< vesting_balance_index >().indices() )
       total_balances[ vbo.balance.asset_id ] += vbo.balance.amount;
@@ -206,8 +206,12 @@ void database_fixture::verify_asset_supplies( const database& db )
       BOOST_CHECK_EQUAL(item.first(db).dynamic_asset_data_id(db).current_supply.value, item.second.value);
    }
 
+   for( const asset_object& asset_obj : db.get_index_type<asset_index>().indices() )
+   {
+      BOOST_CHECK_EQUAL(total_balances[asset_obj.id].value, asset_obj.dynamic_asset_data_id(db).current_supply.value);
+   }
+
    BOOST_CHECK_EQUAL( core_in_orders.value , reported_core_in_orders.value );
-   BOOST_CHECK_EQUAL( total_balances[asset_id_type()].value , core_asset_data.current_supply.value - core_asset_data.confidential_supply.value);
 //   wlog("***  End  asset supply verification ***");
 }
 
