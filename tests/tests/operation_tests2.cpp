@@ -1331,6 +1331,79 @@ BOOST_AUTO_TEST_CASE(zero_second_vbo)
    } FC_LOG_AND_RETHROW()
 }
 
+BOOST_AUTO_TEST_CASE( vbo_withdraw_different )
+{
+   try
+   {
+      ACTORS((alice)(izzy));
+      // don't pay witnesses so we have some worker budget to work with
+
+      // transfer(account_id_type(), alice_id, asset(1000));
+
+      asset_id_type stuff_id = create_user_issued_asset( "STUFF", izzy_id(db), 0 ).id;
+      issue_uia( alice_id, asset( 1000, stuff_id ) );
+
+      // deposit STUFF with linear vesting policy
+      vesting_balance_id_type vbid;
+      {
+         linear_vesting_policy_initializer pinit;
+         pinit.begin_timestamp = db.head_block_time();
+         pinit.vesting_cliff_seconds    = 30;
+         pinit.vesting_duration_seconds = 30;
+
+         vesting_balance_create_operation create_op;
+         create_op.creator = alice_id;
+         create_op.owner = alice_id;
+         create_op.amount = asset(100, stuff_id);
+         create_op.policy = pinit;
+
+         signed_transaction create_tx;
+         create_tx.operations.push_back( create_op );
+         set_expiration( db, create_tx );
+         sign(create_tx, alice_private_key);
+
+         processed_transaction ptx = PUSH_TX( db, create_tx );
+         vbid = ptx.operation_results[0].get<object_id_type>();
+      }
+
+      // wait for VB to mature
+      generate_blocks( 30 );
+
+      BOOST_CHECK( vbid(db).get_allowed_withdraw( db.head_block_time() ) == asset(100, stuff_id) );
+
+      // bad withdrawal op (wrong asset)
+      {
+         vesting_balance_withdraw_operation op;
+
+         op.vesting_balance = vbid;
+         op.amount = asset(100);
+         op.owner = alice_id;
+
+         signed_transaction withdraw_tx;
+         withdraw_tx.operations.push_back(op);
+         set_expiration( db, withdraw_tx );
+         sign( withdraw_tx, alice_private_key );
+         GRAPHENE_CHECK_THROW( PUSH_TX( db, withdraw_tx ), fc::exception );
+      }
+
+      // good withdrawal op
+      {
+         vesting_balance_withdraw_operation op;
+
+         op.vesting_balance = vbid;
+         op.amount = asset(100, stuff_id);
+         op.owner = alice_id;
+
+         signed_transaction withdraw_tx;
+         withdraw_tx.operations.push_back(op);
+         set_expiration( db, withdraw_tx );
+         sign( withdraw_tx, alice_private_key );
+         PUSH_TX( db, withdraw_tx );
+      }
+   }
+   FC_LOG_AND_RETHROW()
+}
+
 // TODO:  Write linear VBO tests
 
 BOOST_AUTO_TEST_CASE( top_n_special )
