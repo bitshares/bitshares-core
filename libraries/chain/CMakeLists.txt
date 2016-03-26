@@ -6,6 +6,7 @@ set_source_files_properties( "${CMAKE_CURRENT_BINARY_DIR}/include/graphene/chain
 add_dependencies( build_hardfork_hpp cat-parts )
 
 file(GLOB HEADERS "include/graphene/chain/*.hpp")
+file(GLOB PROTOCOL_HEADERS "include/graphene/chain/protocol/*.hpp")
 
 if( GRAPHENE_DISABLE_UNITY_BUILD )
    set( GRAPHENE_DB_FILES
@@ -90,6 +91,7 @@ add_library( graphene_chain
              is_authorized_asset.cpp
 
              ${HEADERS}
+             ${PROTOCOL_HEADERS}
              "${CMAKE_CURRENT_BINARY_DIR}/include/graphene/chain/hardfork.hpp"
            )
 
@@ -109,3 +111,5 @@ INSTALL( TARGETS
    LIBRARY DESTINATION lib
    ARCHIVE DESTINATION lib
 )
+INSTALL( FILES ${HEADERS} DESTINATION "include/graphene/chain" )
+INSTALL( FILES ${PROTOCOL_HEADERS} DESTINATION "include/graphene/chain/protocol" )
