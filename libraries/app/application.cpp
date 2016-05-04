@@ -154,7 +154,7 @@ namespace detail {
             vector<string> seeds = {
                "faucet.bitshares.org:1776",
                "bitshares.openledger.info:1776",
-               "114.92.236.175:62015", // abit
+               "bts-seed1.abit-more.com:62015", // abit
                "seed.blocktrades.us:1776",
                "seed04.bitsharesnodes.com:1776", // thom
                "seed05.bitsharesnodes.com:1776", // thom
