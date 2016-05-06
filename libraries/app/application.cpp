@@ -156,6 +156,7 @@ namespace detail {
                "bitshares.openledger.info:1776",
                "bts-seed1.abit-more.com:62015", // abit
                "seed.blocktrades.us:1776",
+               "seed.bitsharesnodes.com:1776", // wackou
                "seed04.bitsharesnodes.com:1776", // thom
                "seed05.bitsharesnodes.com:1776", // thom
                "seed06.bitsharesnodes.com:1776", // thom
