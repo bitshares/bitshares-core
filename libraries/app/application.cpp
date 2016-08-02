@@ -509,6 +509,7 @@ namespace detail {
       { try {
 
          auto latency = graphene::time::now() - blk_msg.block.timestamp;
+         FC_ASSERT( (latency.count()/1000) > -5000, "Rejecting block with timestamp in the future" );
          if (!sync_mode || blk_msg.block.block_num() % 10000 == 0)
          {
             const auto& witness = blk_msg.block.witness(*_chain_db);
