@@ -80,6 +80,8 @@ namespace graphene { namespace chain {
 
          virtual const object* find( object_id_type id )const override
          {
+            static_assert(std::is_same<typename MultiIndexType::key_type, object_id_type>::value,
+                          "First index of MultiIndexType MUST be object_id_type!");
             auto itr = _indices.find( id );
             if( itr == _indices.end() ) return nullptr;
             return &*itr;
