@@ -979,6 +979,7 @@ namespace graphene { namespace net { namespace detail {
         {
           elog("${e}", ("e", e));
         }
+        FC_CAPTURE_AND_LOG( () )
       }// while(!canceled)
     }
 
