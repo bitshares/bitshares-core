@@ -178,7 +178,8 @@ namespace detail {
                "185.25.22.21:1776", // liondani (greece)
                "212.47.249.84:50696", // iHashFury (France)
                "104.168.154.160:50696", // iHashFury (USA)
-               "128.199.143.47:2015" // Harvey
+               "128.199.143.47:2015", // Harvey
+               "seed.roelandp.nl:1776" // @roelandp (canada)
             };
             for( const string& endpoint_string : seeds )
             {
