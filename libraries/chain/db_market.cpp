@@ -146,7 +146,7 @@ bool maybe_cull_small_order( database& db, const limit_order_object& order )
     */
    if( order.amount_to_receive().amount == 0 )
    {
-      ilog( "applied epsilon logic" );
+      //ilog( "applied epsilon logic" );
       db.cancel_order(order);
       return true;
    }
