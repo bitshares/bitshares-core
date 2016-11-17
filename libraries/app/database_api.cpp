@@ -237,10 +237,6 @@ fc::variants database_api_impl::get_objects(const vector<object_id_type>& ids)co
          this->subscribe_to_item( id );
       }
    }
-   else
-   {
-      elog( "getObjects without subscribe callback??" );
-   }
 
    fc::variants result;
    result.reserve(ids.size());
