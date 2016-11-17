@@ -146,7 +146,7 @@ necessary to use the wallet:
        ]
     }
 
-Passwords are stored in `base64` as as salted `sha256` hashes.  A simple Python script, `saltpass.py` is avaliable to obtain hash and salt values from a password.
+Passwords are stored in `base64` as salted `sha256` hashes.  A simple Python script, `saltpass.py` is avaliable to obtain hash and salt values from a password.
 A single asterisk `"*"` may be specified as username or password hash to accept any value.
 
 With the above configuration, here is an example of how to call `add_node` from the `network_node` API:
