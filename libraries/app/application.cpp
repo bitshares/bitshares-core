@@ -169,12 +169,12 @@ namespace detail {
                "bts-seed1.abit-more.com:62015",     // abit
                "seed.bitsharesnodes.com:1776",      // wackou
                "seed.blocktrades.us:1776",          // BlockTrades
-               "seed.roelandp.nl:1776"              // roelandp (Canada)
+               "seed.roelandp.nl:1776",             // roelandp (Canada)
                "seed02.bitsharesnodes.com:1776",
                "seed04.bitsharesnodes.com:1776",    // Thom
                "seed05.bitsharesnodes.com:1776",    // Thom
                "seed06.bitsharesnodes.com:1776",    // Thom
-               "seed07.bitsharesnodes.com:1776",    // Thom
+               "seed07.bitsharesnodes.com:1776"     // Thom
             };
             for( const string& endpoint_string : seeds )
             {
