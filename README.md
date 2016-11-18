@@ -3,9 +3,9 @@
 Intro for new developers
 ------------------------
 
-This is a quick introduction to get new developers up to speed on Graphene.
+This is a quick introduction to get new developers up to speed on BitShares.
 
-Starting Graphene
+Starting BitShares
 -----------------
 
 For Ubuntu 14.04 LTS users, see this link first:
@@ -13,10 +13,10 @@ For Ubuntu 14.04 LTS users, see this link first:
 
 and then proceed with:
 
-    git clone https://github.com/cryptonomex/graphene.git
-    cd graphene
+    git clone https://github.com/bitshares/bitshares-2
+    cd bitshares-2
     git submodule update --init --recursive
-    cmake -DCMAKE_BUILD_TYPE=Debug .
+    cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo .
     make
     ./programs/witness_node/witness_node
 
@@ -42,7 +42,7 @@ To import your initial balance:
 If you send private keys over this connection, `rpc-endpoint` should be bound to localhost for security.
 
 A list of CLI wallet commands is available
-[here](https://github.com/cryptonomex/graphene/blob/master/libraries/wallet/include/graphene/wallet/wallet.hpp).
+[here](https://github.com/bitshares/bitshares-2/blob/bitshares/libraries/wallet/include/graphene/wallet/wallet.hpp).
 
 Code coverage testing
 ---------------------
@@ -209,7 +209,7 @@ Questions
 
     The second number specifies the *type*.  The type of the object determines what fields it has.  For a
     complete list of type ID's, see `enum object_type` and `enum impl_object_type` in
-    [types.hpp](https://github.com/cryptonomex/graphene/blob/master/libraries/chain/include/graphene/chain/protocol/types.hpp).
+    [types.hpp](https://github.com/bitshares/bitshares-2/blob/bitshares/libraries/chain/include/graphene/chain/protocol/types.hpp).
 
     The third number specifies the *instance*.  The instance of the object is different for each individual
     object.
