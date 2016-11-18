@@ -222,7 +222,7 @@ void write_default_logging_config_to_stream(std::ostream& out)
           "appenders=stderr\n\n"
           "# route messages sent to the \"p2p\" logger to the p2p appender declared above\n"
           "[logger.p2p]\n"
-          "level=debug\n"
+          "level=info\n"
           "appenders=p2p\n\n";
 }
 
