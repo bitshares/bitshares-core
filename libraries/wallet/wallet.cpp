@@ -3016,7 +3016,7 @@ map<string, bool> wallet_api::import_accounts( string filename, string password 
                   const auto plain_text = fc::aes_decrypt( password_hash, encrypted_key );
                   const auto private_key = fc::raw::unpack<private_key_type>( plain_text );
 
-                  import_key( item.account_name, string( graphene::utilities::key_to_wif( private_key ) ) );
+                  my->import_key( item.account_name, string( graphene::utilities::key_to_wif( private_key ) ) );
                   ++import_successes;
                }
                catch( const fc::exception& e )
@@ -3025,6 +3025,7 @@ map<string, bool> wallet_api::import_accounts( string filename, string password 
                   ++import_failures;
                }
            }
+           save_wallet_file();
            ilog( "successfully imported ${n} keys for account ${name}", ("n", import_successes)("name", item.account_name) );
            if( import_failures > 0 )
               elog( "failed to import ${n} keys for account ${name}", ("n", import_failures)("name", item.account_name) );
@@ -3072,9 +3073,9 @@ bool wallet_api::import_account_keys( string filename, string password, string s
            my->import_key( dest_account_name, string( graphene::utilities::key_to_wif( private_key ) ) );
        }
 
+       save_wallet_file();
        return true;
    }
-   save_wallet_file();
 
    FC_ASSERT( found_account );
 
