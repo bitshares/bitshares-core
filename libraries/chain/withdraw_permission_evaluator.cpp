@@ -64,6 +64,7 @@ void_result withdraw_permission_claim_evaluator::do_evaluate(const withdraw_perm
    FC_ASSERT(permit.expiration > d.head_block_time() );
    FC_ASSERT(permit.authorized_account == op.withdraw_to_account);
    FC_ASSERT(permit.withdraw_from_account == op.withdraw_from_account);
+   FC_ASSERT(permit.period_start_time <= d.head_block_time());
    FC_ASSERT(op.amount_to_withdraw <= permit.available_this_period( d.head_block_time() ) );
    FC_ASSERT(d.get_balance(op.withdraw_from_account, op.amount_to_withdraw.asset_id) >= op.amount_to_withdraw);
 

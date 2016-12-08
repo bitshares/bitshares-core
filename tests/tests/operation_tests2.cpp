@@ -119,6 +119,7 @@ BOOST_AUTO_TEST_CASE( withdraw_permission_test )
       set_expiration( db, trx );
 
       trx.operations.push_back(op);
+       sign( trx, dan_private_key ); // Transaction should be signed to be valid
       //Throws because we haven't entered the first withdrawal period yet.
       GRAPHENE_REQUIRE_THROW(PUSH_TX( db, trx ), fc::exception);
       //Get to the actual withdrawal period
@@ -230,6 +231,12 @@ BOOST_AUTO_TEST_CASE( withdraw_permission_nominal_case )
    account_id_type dan_id = get_account("dan").id;
    withdraw_permission_id_type permit;
 
+   // Wait until the permission period's start time
+   const withdraw_permission_object& first_permit_object = permit(db);
+   generate_blocks(
+           first_permit_object.period_start_time);
+
+   // Loop through the withdrawal periods and claim a withdrawal
    while(true)
    {
       const withdraw_permission_object& permit_object = permit(db);
