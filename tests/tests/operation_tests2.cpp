@@ -254,6 +254,8 @@ BOOST_AUTO_TEST_CASE( withdraw_permission_nominal_case )
       // if no further withdrawals are possible
       BOOST_CHECK(db.find_object(permit) != nullptr);
       BOOST_CHECK( permit_object.claimed_this_period == 5 );
+      BOOST_CHECK_EQUAL( permit_object.available_this_period(db.head_block_time()).amount.value, 0 );
+      BOOST_CHECK_EQUAL( permit_object.current_period(db.head_block_time()).available_this_period.amount.value, 0 );
       trx.clear();
       generate_blocks(
            permit_object.period_start_time
@@ -264,6 +266,225 @@ BOOST_AUTO_TEST_CASE( withdraw_permission_nominal_case )
 
    BOOST_CHECK_EQUAL(get_balance(nathan_id, asset_id_type()), 975);
    BOOST_CHECK_EQUAL(get_balance(dan_id, asset_id_type()), 25);
+} FC_LOG_AND_RETHROW() }
+
+
+/**
+ * This case checks to see whether the amount claimed within any particular withdrawal period
+ * is properly reflected within the permission object.
+ * The maximum withdrawal per period will be limited to 5 units.
+ * There are a total of 5 withdrawal periods that are permitted.
+ * The test will evaluate the following withdrawal pattern:
+ * (1) during Period 1, a withdrawal of 4 units,
+ * (2) during Period 2, a withdrawal of 1 units,
+ * (3) during Period 3, a withdrawal of 0 units,
+ * (4) during Period 4, a withdrawal of 5 units,
+ * (5) during Period 5, a withdrawal of 3 units.
+ *
+ * Total withdrawal will be 13 units.
+ */
+BOOST_AUTO_TEST_CASE( withdraw_permission_incremental_case )
+{ try {
+    INVOKE(withdraw_permission_create);
+    time_point_sec expected_first_period_start_time = db.head_block_time() + db.get_global_properties().parameters.block_interval*5; // Hard-coded to synchronize with withdraw_permission_create()
+    uint64_t expected_period_duration_seconds = fc::hours(1).to_seconds(); // Hard-coded to synchronize with withdraw_permission_create()
+
+    auto nathan_private_key = generate_private_key("nathan");
+    auto dan_private_key = generate_private_key("dan");
+    account_id_type nathan_id = get_account("nathan").id;
+    account_id_type dan_id = get_account("dan").id;
+    withdraw_permission_id_type permit;
+
+    // Wait until the permission period's start time
+    {
+        const withdraw_permission_object &before_first_permit_object = permit(db);
+        BOOST_CHECK_EQUAL(before_first_permit_object.period_start_time.sec_since_epoch(), expected_first_period_start_time.sec_since_epoch());
+        generate_blocks(
+                before_first_permit_object.period_start_time);
+    }
+    // Before withdrawing, check the period description
+    const withdraw_permission_object &first_permit_object = permit(db);
+    const withdrawal_period_descriptor first_period = first_permit_object.current_period(db.head_block_time());
+    BOOST_CHECK_EQUAL(first_period.period_start_time.sec_since_epoch(), expected_first_period_start_time.sec_since_epoch());
+    BOOST_CHECK_EQUAL(first_period.period_end_time.sec_since_epoch(), expected_first_period_start_time.sec_since_epoch() + expected_period_duration_seconds);
+    BOOST_CHECK_EQUAL(first_period.available_this_period.amount.value, 5);
+
+    // Period 1: Withdraw 4 units
+    {
+        // Before claiming, check the period description
+        const withdraw_permission_object& permit_object = permit(db);
+        BOOST_CHECK(db.find_object(permit) != nullptr);
+        withdrawal_period_descriptor period_descriptor = permit_object.current_period(db.head_block_time());
+        BOOST_CHECK_EQUAL(period_descriptor.available_this_period.amount.value, 5);
+        BOOST_CHECK_EQUAL(period_descriptor.period_start_time.sec_since_epoch(), expected_first_period_start_time.sec_since_epoch() + (expected_period_duration_seconds * 0));
+        BOOST_CHECK_EQUAL(period_descriptor.period_end_time.sec_since_epoch(), expected_first_period_start_time.sec_since_epoch() + (expected_period_duration_seconds * 1));
+
+        // Claim
+        withdraw_permission_claim_operation op;
+        op.withdraw_permission = permit;
+        op.withdraw_from_account = nathan_id;
+        op.withdraw_to_account = dan_id;
+        op.amount_to_withdraw = asset(4);
+        trx.operations.push_back(op);
+        set_expiration( db, trx );
+        sign( trx, dan_private_key );
+        PUSH_TX( db, trx );
+
+        // After claiming, check the period description
+        BOOST_CHECK(db.find_object(permit) != nullptr);
+        BOOST_CHECK( permit_object.claimed_this_period == 4 );
+        BOOST_CHECK_EQUAL( permit_object.claimed_this_period.value, 4 );
+        period_descriptor = permit_object.current_period(db.head_block_time());
+        BOOST_CHECK_EQUAL(period_descriptor.available_this_period.amount.value, 1);
+        BOOST_CHECK_EQUAL(period_descriptor.period_start_time.sec_since_epoch(), expected_first_period_start_time.sec_since_epoch() + (expected_period_duration_seconds * 0));
+        BOOST_CHECK_EQUAL(period_descriptor.period_end_time.sec_since_epoch(), expected_first_period_start_time.sec_since_epoch() + (expected_period_duration_seconds * 1));
+
+        // Advance to next period
+        trx.clear();
+        generate_blocks(
+                permit_object.period_start_time
+                + permit_object.withdrawal_period_sec );
+    }
+
+    // Period 2: Withdraw 1 units
+    {
+        // Before claiming, check the period description
+        const withdraw_permission_object& permit_object = permit(db);
+        BOOST_CHECK(db.find_object(permit) != nullptr);
+        withdrawal_period_descriptor period_descriptor = permit_object.current_period(db.head_block_time());
+        BOOST_CHECK_EQUAL(period_descriptor.available_this_period.amount.value, 5);
+        BOOST_CHECK_EQUAL(period_descriptor.period_start_time.sec_since_epoch(), expected_first_period_start_time.sec_since_epoch() + (expected_period_duration_seconds * 1));
+        BOOST_CHECK_EQUAL(period_descriptor.period_end_time.sec_since_epoch(), expected_first_period_start_time.sec_since_epoch() + (expected_period_duration_seconds * 2));
+
+        // Claim
+        withdraw_permission_claim_operation op;
+        op.withdraw_permission = permit;
+        op.withdraw_from_account = nathan_id;
+        op.withdraw_to_account = dan_id;
+        op.amount_to_withdraw = asset(1);
+        trx.operations.push_back(op);
+        set_expiration( db, trx );
+        sign( trx, dan_private_key );
+        PUSH_TX( db, trx );
+
+        // After claiming, check the period description
+        BOOST_CHECK(db.find_object(permit) != nullptr);
+        BOOST_CHECK( permit_object.claimed_this_period == 1 );
+        BOOST_CHECK_EQUAL( permit_object.claimed_this_period.value, 1 );
+        period_descriptor = permit_object.current_period(db.head_block_time());
+        BOOST_CHECK_EQUAL(period_descriptor.available_this_period.amount.value, 4);
+        BOOST_CHECK_EQUAL(period_descriptor.period_start_time.sec_since_epoch(), expected_first_period_start_time.sec_since_epoch() + (expected_period_duration_seconds * 1));
+        BOOST_CHECK_EQUAL(period_descriptor.period_end_time.sec_since_epoch(), expected_first_period_start_time.sec_since_epoch() + (expected_period_duration_seconds * 2));
+
+        // Advance to next period
+        trx.clear();
+        generate_blocks(
+                permit_object.period_start_time
+                + permit_object.withdrawal_period_sec );
+    }
+
+    // Period 3: Withdraw 0 units
+    {
+        // Before claiming, check the period description
+        const withdraw_permission_object& permit_object = permit(db);
+        BOOST_CHECK(db.find_object(permit) != nullptr);
+        withdrawal_period_descriptor period_descriptor = permit_object.current_period(db.head_block_time());
+        BOOST_CHECK_EQUAL(period_descriptor.available_this_period.amount.value, 5);
+        BOOST_CHECK_EQUAL(period_descriptor.period_start_time.sec_since_epoch(), expected_first_period_start_time.sec_since_epoch() + (expected_period_duration_seconds * 2));
+        BOOST_CHECK_EQUAL(period_descriptor.period_end_time.sec_since_epoch(), expected_first_period_start_time.sec_since_epoch() + (expected_period_duration_seconds * 3));
+
+        // No claim
+
+        // After doing nothing, check the period description
+        period_descriptor = permit_object.current_period(db.head_block_time());
+        BOOST_CHECK_EQUAL(period_descriptor.available_this_period.amount.value, 5);
+        BOOST_CHECK_EQUAL(period_descriptor.period_start_time.sec_since_epoch(), expected_first_period_start_time.sec_since_epoch() + (expected_period_duration_seconds * 2));
+        BOOST_CHECK_EQUAL(period_descriptor.period_end_time.sec_since_epoch(), expected_first_period_start_time.sec_since_epoch() + (expected_period_duration_seconds * 3));
+
+        // Advance to end of Period 3
+        time_point_sec period_end_time = period_descriptor.period_end_time;
+        generate_blocks(period_end_time);
+    }
+
+    // Period 4: Withdraw 10 units
+    {
+        // Before claiming, check the period description
+        const withdraw_permission_object& permit_object = permit(db);
+        BOOST_CHECK(db.find_object(permit) != nullptr);
+        withdrawal_period_descriptor period_descriptor = permit_object.current_period(db.head_block_time());
+        BOOST_CHECK_EQUAL(period_descriptor.available_this_period.amount.value, 5);
+        BOOST_CHECK_EQUAL(period_descriptor.period_start_time.sec_since_epoch(), expected_first_period_start_time.sec_since_epoch() + (expected_period_duration_seconds * 3));
+        BOOST_CHECK_EQUAL(period_descriptor.period_end_time.sec_since_epoch(), expected_first_period_start_time.sec_since_epoch() + (expected_period_duration_seconds * 4));
+
+        // Claim
+        withdraw_permission_claim_operation op;
+        op.withdraw_permission = permit;
+        op.withdraw_from_account = nathan_id;
+        op.withdraw_to_account = dan_id;
+        op.amount_to_withdraw = asset(5);
+        trx.operations.push_back(op);
+        set_expiration( db, trx );
+        sign( trx, dan_private_key );
+        PUSH_TX( db, trx );
+
+        // After claiming, check the period description
+        BOOST_CHECK(db.find_object(permit) != nullptr);
+        BOOST_CHECK( permit_object.claimed_this_period == 5 );
+        BOOST_CHECK_EQUAL( permit_object.claimed_this_period.value, 5 );
+        period_descriptor = permit_object.current_period(db.head_block_time());
+        BOOST_CHECK_EQUAL(period_descriptor.available_this_period.amount.value, 0);
+        BOOST_CHECK_EQUAL(period_descriptor.period_start_time.sec_since_epoch(), expected_first_period_start_time.sec_since_epoch() + (expected_period_duration_seconds * 3));
+        BOOST_CHECK_EQUAL(period_descriptor.period_end_time.sec_since_epoch(), expected_first_period_start_time.sec_since_epoch() + (expected_period_duration_seconds * 4));
+
+        // Advance to next period
+        trx.clear();
+        generate_blocks(
+                permit_object.period_start_time
+                + permit_object.withdrawal_period_sec );
+    }
+
+    // Period 5: Withdraw 7 units
+    {
+        // Before claiming, check the period description
+        const withdraw_permission_object& permit_object = permit(db);
+        BOOST_CHECK(db.find_object(permit) != nullptr);
+        withdrawal_period_descriptor period_descriptor = permit_object.current_period(db.head_block_time());
+        BOOST_CHECK_EQUAL(period_descriptor.available_this_period.amount.value, 5);
+        BOOST_CHECK_EQUAL(period_descriptor.period_start_time.sec_since_epoch(), expected_first_period_start_time.sec_since_epoch() + (expected_period_duration_seconds * 4));
+        BOOST_CHECK_EQUAL(period_descriptor.period_end_time.sec_since_epoch(), expected_first_period_start_time.sec_since_epoch() + (expected_period_duration_seconds * 5));
+
+        // Claim
+        withdraw_permission_claim_operation op;
+        op.withdraw_permission = permit;
+        op.withdraw_from_account = nathan_id;
+        op.withdraw_to_account = dan_id;
+        op.amount_to_withdraw = asset(3);
+        trx.operations.push_back(op);
+        set_expiration( db, trx );
+        sign( trx, dan_private_key );
+        PUSH_TX( db, trx );
+
+        // After claiming, check the period description
+        BOOST_CHECK(db.find_object(permit) != nullptr);
+        BOOST_CHECK( permit_object.claimed_this_period == 3 );
+        BOOST_CHECK_EQUAL( permit_object.claimed_this_period.value, 3 );
+        period_descriptor = permit_object.current_period(db.head_block_time());
+        BOOST_CHECK_EQUAL(period_descriptor.available_this_period.amount.value, 2);
+        BOOST_CHECK_EQUAL(period_descriptor.period_start_time.sec_since_epoch(), expected_first_period_start_time.sec_since_epoch() + (expected_period_duration_seconds * 4));
+        BOOST_CHECK_EQUAL(period_descriptor.period_end_time.sec_since_epoch(), expected_first_period_start_time.sec_since_epoch() + (expected_period_duration_seconds * 5));
+
+        // Advance to next period
+        trx.clear();
+        generate_blocks(
+                permit_object.period_start_time
+                + permit_object.withdrawal_period_sec );
+    }
+
+    // Withdrawal periods completed
+    BOOST_CHECK(db.find_object(permit) == nullptr);
+
+    BOOST_CHECK_EQUAL(get_balance(nathan_id, asset_id_type()), 987);
+    BOOST_CHECK_EQUAL(get_balance(dan_id, asset_id_type()), 13);
 } FC_LOG_AND_RETHROW() }
 
 BOOST_AUTO_TEST_CASE( withdraw_permission_update )
