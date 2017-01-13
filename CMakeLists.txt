@@ -143,8 +143,6 @@ else( WIN32 ) # Apple AND Linux
 
 endif( WIN32 )
 
-find_package( BerkeleyDB )
-
 set(ENABLE_COVERAGE_TESTING FALSE CACHE BOOL "Build BitShares for code coverage analysis")
 
 if(ENABLE_COVERAGE_TESTING)
