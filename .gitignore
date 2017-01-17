@@ -8,6 +8,8 @@ Makefile
 compile_commands.json
 moc_*
 *.moc
+
+genesis.json
 hardfork.hpp
 
 libraries/utilities/git_revision.cpp
