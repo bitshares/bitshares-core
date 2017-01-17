@@ -640,7 +640,7 @@ BOOST_AUTO_TEST_CASE( withdraw_permission_incremental_case )
         generate_blocks(period_end_time);
     }
 
-    // Period 4: Withdraw 10 units
+    // Period 4: Withdraw 5 units
     {
         // Before claiming, check the period description
         const withdraw_permission_object& permit_object = permit(db);
@@ -677,7 +677,7 @@ BOOST_AUTO_TEST_CASE( withdraw_permission_incremental_case )
                 + permit_object.withdrawal_period_sec );
     }
 
-    // Period 5: Withdraw 7 units
+    // Period 5: Withdraw 3 units
     {
         // Before claiming, check the period description
         const withdraw_permission_object& permit_object = permit(db);
