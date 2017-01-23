@@ -95,6 +95,10 @@ namespace graphene { namespace app {
        {
           _crypto_api = std::make_shared< crypto_api >();
        }
+       else if( api_name == "asset_api" )
+       {
+          _asset_api = std::make_shared< asset_api >( std::ref( *_app.chain_database() ) );
+       }
        else if( api_name == "debug_api" )
        {
           // can only enable this API if the plugin was loaded
@@ -215,6 +219,12 @@ namespace graphene { namespace app {
     {
        FC_ASSERT(_crypto_api);
        return *_crypto_api;
+    }
+
+    fc::api<asset_api> login_api::asset() const
+    {
+       FC_ASSERT(_asset_api);
+       return *_asset_api;
     }
 
     fc::api<graphene::debug_witness::debug_api> login_api::debug() const
@@ -549,5 +559,51 @@ namespace graphene { namespace app {
     {
        return fc::ecc::range_get_info( proof );
     }
+
+    // asset_api
+    asset_api::asset_api(graphene::chain::database& db) : _db(db) { }
+    asset_api::~asset_api() { }
+
+    vector<account_asset_balance> asset_api::get_asset_holders( asset_id_type asset_id ) const {
+
+      const auto& bal_idx = _db.get_index_type< account_balance_index >().indices().get< by_asset_balance >();
+      auto range = bal_idx.equal_range( boost::make_tuple( asset_id ) );
+
+      vector<account_asset_balance> result;
+
+      for( const account_balance_object& bal : boost::make_iterator_range( range.first, range.second ) )
+      {
+        if( bal.balance.value == 0 ) continue;
+
+        auto account = _db.find(bal.owner);
+
+        account_asset_balance aab;
+        aab.name       = account->name;
+        aab.account_id = account->id;
+        aab.amount     = bal.balance.value;
+
+        result.push_back(aab);
+      }
+
+      return result;
+    }
+	
+	// get number of asset holders.
+   int asset_api::get_asset_holders_count( asset_id_type asset_id ) const {
+
+      const auto& bal_idx = _db.get_index_type< account_balance_index >().indices().get< by_asset_balance >();
+      auto range = bal_idx.equal_range( boost::make_tuple( asset_id ) );
+
+	  int count = 0;
+
+      for( const account_balance_object& bal : boost::make_iterator_range( range.first, range.second ) )
+      {
+        if( bal.balance.value == 0 ) continue;
+		else count++;
+
+      }
+      return count;
+    }
+	
 
 } } // graphene::app
