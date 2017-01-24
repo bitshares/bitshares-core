@@ -604,6 +604,38 @@ namespace graphene { namespace app {
       }
       return count;
     }
-	
+	// function to get vector of system assets with holders count.
+	vector<asset_holders> asset_api::get_all_asset_holders() const {
+		
+	  vector<asset_holders> result;
+		
+      vector<asset_id_type> total_assets;
+	  for( const asset_object& asset_obj : _db.get_index_type<asset_index>().indices() )
+	  {
+		 const auto& dasset_obj = asset_obj.dynamic_asset_data_id(_db);
+
+		  asset_id_type asset_id;
+		  asset_id = dasset_obj.id;
+
+		  const auto& bal_idx = _db.get_index_type< account_balance_index >().indices().get< by_asset_balance >();
+		  auto range = bal_idx.equal_range( boost::make_tuple( asset_id ) );
+
+		  int count = 0;
+		  for( const account_balance_object& bal : boost::make_iterator_range( range.first, range.second ) )
+		  {
+
+			if( bal.balance.value == 0 ) continue;
+			else count++;
+		  }
+	  
+		  asset_holders ah;
+		  ah.asset_id       = asset_id;
+		  ah.count     = count;
+
+		  result.push_back(ah);
+	  }
+
+      return result;
+    }
 
 } } // graphene::app
