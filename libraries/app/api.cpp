@@ -593,15 +593,9 @@ namespace graphene { namespace app {
 
             const auto& bal_idx = _db.get_index_type< account_balance_index >().indices().get< by_asset_balance >();
             auto range = bal_idx.equal_range( boost::make_tuple( asset_id ) );
+            
+            int count = boost::distance(range) - 1;
 
-            int count = 0;
-
-            for( const account_balance_object& bal : boost::make_iterator_range( range.first, range.second ) )
-            {
-                if( bal.balance.value == 0 ) continue;
-                else count++;
-
-            }
             return count;
         }
         // function to get vector of system assets with holders count.
@@ -620,13 +614,7 @@ namespace graphene { namespace app {
                 const auto& bal_idx = _db.get_index_type< account_balance_index >().indices().get< by_asset_balance >();
                 auto range = bal_idx.equal_range( boost::make_tuple( asset_id ) );
 
-                int count = 0;
-                for( const account_balance_object& bal : boost::make_iterator_range( range.first, range.second ) )
-                {
-
-                    if( bal.balance.value == 0 ) continue;
-                    else count++;
-                }
+                int count = boost::distance(range) - 1;
                 
                 asset_holders ah;
                 ah.asset_id       = asset_id;
