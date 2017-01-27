@@ -119,6 +119,22 @@ namespace graphene { namespace app {
    };
 
    /**
+    * @brief Block api
+    */
+   class block_api
+   {
+   public:
+      block_api(graphene::chain::database& db);
+      ~block_api();
+
+      vector<optional<signed_block>> get_blocks(uint32_t block_num_from, uint32_t block_num_to)const;
+
+   private:
+      graphene::chain::database& _db;
+   };
+
+
+   /**
     * @brief The network_broadcast_api class allows broadcasting of transactions.
     */
    class network_broadcast_api : public std::enable_shared_from_this<network_broadcast_api>
@@ -273,6 +289,8 @@ namespace graphene { namespace app {
           * has sucessfully authenticated.
           */
          bool login(const string& user, const string& password);
+         /// @brief Retrieve the network block API
+         fc::api<block_api> block()const;
          /// @brief Retrieve the network broadcast API
          fc::api<network_broadcast_api> network_broadcast()const;
          /// @brief Retrieve the database API
@@ -291,6 +309,7 @@ namespace graphene { namespace app {
          void enable_api( const string& api_name );
 
          application& _app;
+         optional< fc::api<block_api> > _block_api;
          optional< fc::api<database_api> > _database_api;
          optional< fc::api<network_broadcast_api> > _network_broadcast_api;
          optional< fc::api<network_node_api> > _network_node_api;
@@ -316,6 +335,9 @@ FC_API(graphene::app::history_api,
        (get_fill_order_history)
        (get_market_history)
        (get_market_history_buckets)
+     )
+FC_API(graphene::app::block_api,
+       (get_blocks)
      )
 FC_API(graphene::app::network_broadcast_api,
        (broadcast_transaction)
@@ -343,6 +365,7 @@ FC_API(graphene::app::crypto_api,
      )
 FC_API(graphene::app::login_api,
        (login)
+       (block)
        (network_broadcast)
        (database)
        (history)

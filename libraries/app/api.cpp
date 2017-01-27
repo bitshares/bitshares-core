@@ -79,6 +79,10 @@ namespace graphene { namespace app {
        {
           _database_api = std::make_shared< database_api >( std::ref( *_app.chain_database() ) );
        }
+       else if( api_name == "block_api" )
+       {
+          _block_api = std::make_shared< block_api >( std::ref( *_app.chain_database() ) );
+       }
        else if( api_name == "network_broadcast_api" )
        {
           _network_broadcast_api = std::make_shared< network_broadcast_api >( std::ref( _app ) );
@@ -102,6 +106,20 @@ namespace graphene { namespace app {
              _debug_api = std::make_shared< graphene::debug_witness::debug_api >( std::ref(_app) );
        }
        return;
+    }
+
+    // block_api
+    block_api::block_api(graphene::chain::database& db) : _db(db) { }
+    block_api::~block_api() { }
+
+    vector<optional<signed_block>> block_api::get_blocks(uint32_t block_num_from, uint32_t block_num_to)const
+    {
+       FC_ASSERT( block_num_to >= block_num_from );
+       vector<optional<signed_block>> res;
+       for(uint32_t block_num=block_num_from; block_num<=block_num_to; block_num++) {
+          res.push_back(_db.fetch_block_by_number(block_num));
+       }
+       return res;
     }
 
     network_broadcast_api::network_broadcast_api(application& a):_app(a)
@@ -191,6 +209,12 @@ namespace graphene { namespace app {
     {
        FC_ASSERT(_network_broadcast_api);
        return *_network_broadcast_api;
+    }
+
+    fc::api<block_api> login_api::block()const
+    {
+       FC_ASSERT(_block_api);
+       return *_block_api;
     }
 
     fc::api<network_node_api> login_api::network_node()const
