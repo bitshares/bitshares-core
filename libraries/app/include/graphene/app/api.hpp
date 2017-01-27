@@ -286,9 +286,9 @@ namespace graphene { namespace app {
          /// @brief Retrieve the debug API (if available)
          fc::api<graphene::debug_witness::debug_api> debug()const;
 
-      private:
          /// @brief Called to enable an API, not reflected.
          void enable_api( const string& api_name );
+      private:
 
          application& _app;
          optional< fc::api<database_api> > _database_api;
