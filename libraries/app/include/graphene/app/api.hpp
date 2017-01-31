@@ -71,6 +71,13 @@ namespace graphene { namespace app {
       string                        message_out;
    };
 
+   struct account_asset_balance
+   {
+      string          name;
+      account_id_type account_id;
+      share_type      amount;
+   };
+
    /**
     * @brief The history_api class implements the RPC API for account history
     *
@@ -253,6 +260,21 @@ namespace graphene { namespace app {
    };
 
    /**
+    * @brief
+    */
+   class asset_api
+   {
+      public:
+         asset_api(graphene::chain::database& db);
+         ~asset_api();
+
+         vector<account_asset_balance> get_asset_holders( asset_id_type asset_id )const;
+
+      private:
+         graphene::chain::database& _db;
+   };
+
+   /**
     * @brief The login_api class implements the bottom layer of the RPC API
     *
     * All other APIs must be requested from this API.
@@ -283,6 +305,8 @@ namespace graphene { namespace app {
          fc::api<network_node_api> network_node()const;
          /// @brief Retrieve the cryptography API
          fc::api<crypto_api> crypto()const;
+         /// @brief Retrieve the asset API
+         fc::api<asset_api> asset()const;
          /// @brief Retrieve the debug API (if available)
          fc::api<graphene::debug_witness::debug_api> debug()const;
 
@@ -296,6 +320,7 @@ namespace graphene { namespace app {
          optional< fc::api<network_node_api> > _network_node_api;
          optional< fc::api<history_api> >  _history_api;
          optional< fc::api<crypto_api> > _crypto_api;
+         optional< fc::api<asset_api> > _asset_api;
          optional< fc::api<graphene::debug_witness::debug_api> > _debug_api;
    };
 
@@ -309,6 +334,8 @@ FC_REFLECT( graphene::app::verify_range_proof_rewind_result,
         (success)(min_val)(max_val)(value_out)(blind_out)(message_out) )
 //FC_REFLECT_TYPENAME( fc::ecc::compact_signature );
 //FC_REFLECT_TYPENAME( fc::ecc::commitment_type );
+
+FC_REFLECT( graphene::app::account_asset_balance, (name)(account_id)(amount) );
 
 FC_API(graphene::app::history_api,
        (get_account_history)
@@ -341,6 +368,9 @@ FC_API(graphene::app::crypto_api,
        (verify_range_proof_rewind)
        (range_get_info)
      )
+FC_API(graphene::app::asset_api,
+       (get_asset_holders)
+     )
 FC_API(graphene::app::login_api,
        (login)
        (network_broadcast)
@@ -348,5 +378,6 @@ FC_API(graphene::app::login_api,
        (history)
        (network_node)
        (crypto)
+       (asset)
        (debug)
      )
