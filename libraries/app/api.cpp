@@ -79,6 +79,10 @@ namespace graphene { namespace app {
        {
           _database_api = std::make_shared< database_api >( std::ref( *_app.chain_database() ) );
        }
+       else if( api_name == "block_api" )
+       {
+          _block_api = std::make_shared< block_api >( std::ref( *_app.chain_database() ) );
+       }
        else if( api_name == "network_broadcast_api" )
        {
           _network_broadcast_api = std::make_shared< network_broadcast_api >( std::ref( _app ) );
@@ -106,6 +110,20 @@ namespace graphene { namespace app {
              _debug_api = std::make_shared< graphene::debug_witness::debug_api >( std::ref(_app) );
        }
        return;
+    }
+
+    // block_api
+    block_api::block_api(graphene::chain::database& db) : _db(db) { }
+    block_api::~block_api() { }
+
+    vector<optional<signed_block>> block_api::get_blocks(uint32_t block_num_from, uint32_t block_num_to)const
+    {
+       FC_ASSERT( block_num_to >= block_num_from );
+       vector<optional<signed_block>> res;
+       for(uint32_t block_num=block_num_from; block_num<=block_num_to; block_num++) {
+          res.push_back(_db.fetch_block_by_number(block_num));
+       }
+       return res;
     }
 
     network_broadcast_api::network_broadcast_api(application& a):_app(a)
@@ -195,6 +213,12 @@ namespace graphene { namespace app {
     {
        FC_ASSERT(_network_broadcast_api);
        return *_network_broadcast_api;
+    }
+
+    fc::api<block_api> login_api::block()const
+    {
+       FC_ASSERT(_block_api);
+       return *_block_api;
     }
 
     fc::api<network_node_api> login_api::network_node()const
@@ -590,7 +614,7 @@ namespace graphene { namespace app {
 	
     // get number of asset holders.
     int asset_api::get_asset_holders_count( asset_id_type asset_id ) const {
-
+    
       const auto& bal_idx = _db.get_index_type< account_balance_index >().indices().get< by_asset_balance >();
       auto range = bal_idx.equal_range( boost::make_tuple( asset_id ) );
             
@@ -625,6 +649,6 @@ namespace graphene { namespace app {
 
       return result;
     }
-	
+
 
 } } // graphene::app
