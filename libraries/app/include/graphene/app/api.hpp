@@ -77,6 +77,12 @@ namespace graphene { namespace app {
       account_id_type account_id;
       share_type      amount;
    };
+   
+   struct asset_holders
+   {
+      asset_id_type     asset_id;
+      int 		count;
+   };
 
    /**
     * @brief The history_api class implements the RPC API for account history
@@ -128,20 +134,20 @@ namespace graphene { namespace app {
    /**
     * @brief Block api
     */
-   class block_api
-   {
-   public:
-      block_api(graphene::chain::database& db);
-      ~block_api();
-
-      vector<optional<signed_block>> get_blocks(uint32_t block_num_from, uint32_t block_num_to)const;
-
-   private:
-      graphene::chain::database& _db;
-   };
-
-
-   /**
+    class block_api
+    {
+    public:
+       block_api(graphene::chain::database& db);
+       ~block_api();
+ 
+       vector<optional<signed_block>> get_blocks(uint32_t block_num_from, uint32_t block_num_to)const;
+ 
+    private:
+       graphene::chain::database& _db;
+    };
+ 
+ 
+    /**
     * @brief The network_broadcast_api class allows broadcasting of transactions.
     */
    class network_broadcast_api : public std::enable_shared_from_this<network_broadcast_api>
@@ -285,6 +291,8 @@ namespace graphene { namespace app {
          ~asset_api();
 
          vector<account_asset_balance> get_asset_holders( asset_id_type asset_id )const;
+         int get_asset_holders_count( asset_id_type asset_id )const;
+         vector<asset_holders> get_all_asset_holders() const;
 
       private:
          graphene::chain::database& _db;
@@ -328,9 +336,9 @@ namespace graphene { namespace app {
          /// @brief Retrieve the debug API (if available)
          fc::api<graphene::debug_witness::debug_api> debug()const;
 
+      private:
          /// @brief Called to enable an API, not reflected.
          void enable_api( const string& api_name );
-      private:
 
          application& _app;
          optional< fc::api<block_api> > _block_api;
@@ -355,6 +363,8 @@ FC_REFLECT( graphene::app::verify_range_proof_rewind_result,
 //FC_REFLECT_TYPENAME( fc::ecc::commitment_type );
 
 FC_REFLECT( graphene::app::account_asset_balance, (name)(account_id)(amount) );
+
+FC_REFLECT( graphene::app::asset_holders, (asset_id)(count) )
 
 FC_API(graphene::app::history_api,
        (get_account_history)
@@ -392,6 +402,8 @@ FC_API(graphene::app::crypto_api,
      )
 FC_API(graphene::app::asset_api,
        (get_asset_holders)
+       (get_asset_holders_count)
+       (get_all_asset_holders)
      )
 FC_API(graphene::app::login_api,
        (login)
