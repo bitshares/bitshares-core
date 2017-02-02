@@ -600,6 +600,15 @@ std::map<std::string, full_account> database_api_impl::get_full_accounts( const 
                     [&acnt] (const call_order_object& call) {
                        acnt.call_orders.emplace_back(call);
                     });
+					
+      // get assets issued by user
+      auto asset_range = _db.get_index_type<asset_index>().indices().get<by_issuer>().equal_range(account->id);
+      std::for_each(asset_range.first, asset_range.second,
+                    [&acnt] (const asset_object& asset) {
+                       acnt.assets.emplace_back(asset.id);
+                    });
+	  
+	  
       results[account_name_or_id] = acnt;
    }
    return results;
