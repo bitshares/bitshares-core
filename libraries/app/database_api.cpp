@@ -159,7 +159,7 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       {
          if( !_subscribe_callback )
             return false;
-         return true;
+
          return _subscribe_filter.contains( i );
       }
 
@@ -1788,8 +1788,10 @@ void database_api_impl::on_objects_removed( const vector<const object*>& objs )
       vector<variant>    updates;
       updates.reserve(objs.size());
 
-      for( auto obj : objs )
-         updates.emplace_back( obj->id );
+      for( auto obj : objs ) {
+         if ( is_subscribed_to_item(obj->id) )
+            updates.emplace_back( obj->id );
+      }
       broadcast_updates( updates );
    }
 
@@ -1829,7 +1831,7 @@ void database_api_impl::on_objects_changed(const vector<object_id_type>& ids)
    for(auto id : ids)
    {
       const object* obj = nullptr;
-      if( _subscribe_callback )
+      if( is_subscribed_to_item(id) )
       {
          obj = _db.find_object( id );
          if( obj )
@@ -1844,7 +1846,7 @@ void database_api_impl::on_objects_changed(const vector<object_id_type>& ids)
 
       if( _market_subscriptions.size() )
       {
-         if( !_subscribe_callback )
+         if( !is_subscribed_to_item(id) )
             obj = _db.find_object( id );
          if( obj )
          {
@@ -1865,7 +1867,7 @@ void database_api_impl::on_objects_changed(const vector<object_id_type>& ids)
    /// if a connection hangs then this could get backed up and result in
    /// a failure to exit cleanly.
    fc::async([capture_this,this,updates,market_broadcast_queue](){
-      if( _subscribe_callback ) _subscribe_callback( updates );
+      if( _subscribe_callback && updates.size() ) _subscribe_callback( updates );
 
       for( const auto& item : market_broadcast_queue )
       {
