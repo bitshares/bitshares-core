@@ -137,7 +137,9 @@ namespace detail {
          else
          {
             vector<string> seeds = {
-               "testnet.bitshares.eu:11010",
+               "node.testnet.bitshares.eu:11010",
+               "176.9.148.19:16543",
+               "31.171.251.175:1776",
             };
             for( const string& endpoint_string : seeds )
             {
@@ -915,7 +917,9 @@ void application::set_program_options(boost::program_options::options_descriptio
    configuration_file_options.add_options()
          ("p2p-endpoint", bpo::value<string>(), "Endpoint for P2P node to listen on")
          ("seed-node,s", bpo::value<vector<string>>()->composing(), "P2P nodes to connect to on startup (may specify multiple times)")
-         ("checkpoint,c", bpo::value<vector<string>>()->composing(), "Pairs of [BLOCK_NUM,BLOCK_ID] that should be enforced as checkpoints.")
+         ("checkpoint,c", bpo::value<vector<string>>()->default_value(
+             vector<string>(1, "[\"6188623\", \"005e6e4f7f47ace64ff6f5c83ebddb68ae14f235\"]"), "[\"6188623\", \"005e6e4f7f47ace64ff6f5c83ebddb68ae14f235\"]")->composing(),
+             "Pairs of [BLOCK_NUM,BLOCK_ID] that should be enforced as checkpoints.")
          ("rpc-endpoint", bpo::value<string>()->implicit_value("127.0.0.1:8090"), "Endpoint for websocket RPC to listen on")
          ("rpc-tls-endpoint", bpo::value<string>()->implicit_value("127.0.0.1:8089"), "Endpoint for TLS websocket RPC to listen on")
          ("enable-permessage-deflate", "Enable support for per-message deflate compression in the websocket servers "
