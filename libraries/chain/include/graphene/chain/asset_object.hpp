@@ -232,11 +232,13 @@ namespace graphene { namespace chain {
 
    struct by_symbol;
    struct by_type;
+   struct by_issuer;
    typedef multi_index_container<
       asset_object,
       indexed_by<
          ordered_unique< tag<by_id>, member< object, object_id_type, &object::id > >,
          ordered_unique< tag<by_symbol>, member<asset_object, string, &asset_object::symbol> >,
+         ordered_non_unique< tag<by_issuer>, member<asset_object, account_id_type, &asset_object::issuer > >,
          ordered_unique< tag<by_type>,
             composite_key< asset_object,
                 const_mem_fun<asset_object, bool, &asset_object::is_market_issued>,
