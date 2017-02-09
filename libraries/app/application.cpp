@@ -137,9 +137,9 @@ namespace detail {
          else
          {
             vector<string> seeds = {
-               "node.testnet.bitshares.eu:11010",
-               "176.9.148.19:16543",
-               "31.171.251.175:1776",
+               "node.testnet.bitshares.eu:11010",  // BitShares Europe
+               "176.9.148.19:16543",               // Uptick.rocks
+               "31.171.251.20:1776",               // @Taconator
             };
             for( const string& endpoint_string : seeds )
             {
