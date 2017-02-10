@@ -120,6 +120,13 @@ class call_order_object : public abstract_object<call_order_object>
       share_type       collateral;  ///< call_price.base.asset_id, access via get_collateral
       share_type       debt;        ///< call_price.quote.asset_id, access via get_collateral
       price            call_price;  ///< Debt / Collateral
+
+      pair<asset_id_type,asset_id_type> get_market()const
+      {
+         auto tmp = std::make_pair( call_price.base.asset_id, call_price.quote.asset_id );
+         if( tmp.first > tmp.second ) std::swap( tmp.first, tmp.second );
+         return tmp;
+      }
 };
 
 /**
