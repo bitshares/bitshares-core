@@ -563,7 +563,7 @@ void database::notify_changed_objects()
       changed_objects(changed_ids);
       removed_objects(removed);
    }
-} FC_CAPTURE_AND_RETHROW() }
+} FC_CAPTURE_AND_LOG( () ) }
 
 processed_transaction database::apply_transaction(const signed_transaction& trx, uint32_t skip)
 {
