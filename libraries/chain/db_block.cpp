@@ -241,7 +241,7 @@ processed_transaction database::_push_transaction( const signed_transaction& trx
    auto processed_trx = _apply_transaction( trx );
    _pending_tx.push_back(processed_trx);
 
-   notify_changed_objects();
+   // notify_changed_objects();
    // The transaction applied successfully. Merge its changes into the pending block session.
    temp_session.merge();
 
