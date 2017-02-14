@@ -99,7 +99,7 @@ void debug_witness_plugin::plugin_startup()
 
    _applied_block_conn  = db.applied_block.connect([this](const graphene::chain::signed_block& b){ on_applied_block(b); });
    _changed_objects_conn = db.changed_objects.connect([this](const std::vector<graphene::db::object_id_type>& ids){ on_changed_objects(ids); });
-   _removed_objects_conn = db.removed_objects.connect([this](const std::vector<const graphene::db::object*>& objs){ on_removed_objects(objs); });
+   _removed_objects_conn = db.removed_objects.connect([this](const std::vector<graphene::db::object_id_type>& ids, const std::vector<const graphene::db::object*>& objs){ on_removed_objects(ids, objs); });
 
    return;
 }
@@ -112,11 +112,7 @@ void debug_witness_plugin::on_changed_objects( const std::vector<graphene::db::o
       for( const graphene::db::object_id_type& oid : ids )
       {
          const graphene::db::object* obj = db.find_object( oid );
-         if( obj == nullptr )
-         {
-            (*_json_object_stream) << "{\"id\":" << fc::json::to_string( oid ) << "}\n";
-         }
-         else
+         if( obj != nullptr )
          {
             (*_json_object_stream) << fc::json::to_string( obj->to_variant() ) << '\n';
          }
@@ -124,9 +120,8 @@ void debug_witness_plugin::on_changed_objects( const std::vector<graphene::db::o
    }
 }
 
-void debug_witness_plugin::on_removed_objects( const std::vector<const graphene::db::object*> objs )
+void debug_witness_plugin::on_removed_objects( const std::vector<graphene::db::object_id_type>& ids, const std::vector<const graphene::db::object*> objs )
 {
-   /*
    if( _json_object_stream )
    {
       for( const graphene::db::object* obj : objs )
@@ -134,7 +129,6 @@ void debug_witness_plugin::on_removed_objects( const std::vector<const graphene:
          (*_json_object_stream) << "{\"id\":" << fc::json::to_string( obj->id ) << "}\n";
       }
    }
-   */
 }
 
 void debug_witness_plugin::on_applied_block( const graphene::chain::signed_block& b )
