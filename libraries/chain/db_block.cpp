@@ -556,12 +556,17 @@ void database::notify_changed_objects()
       vector<object_id_type> changed_ids;  changed_ids.reserve(head_undo.old_values.size());
       for( const auto& item : head_undo.old_values ) changed_ids.push_back(item.first);
 
+      vector<object_id_type> removed_ids; removed_ids.reserve( head_undo.removed.size() );
       vector<const object*> removed; removed.reserve( head_undo.removed.size() );
-      for( const auto& item : head_undo.removed ) removed.emplace_back( item.second.get() );
+      for( const auto& item : head_undo.removed )
+      {
+        removed_ids.emplace_back( item.first );
+        removed.emplace_back( item.second.get() );
+      }
 
       new_objects(new_ids);
       changed_objects(changed_ids);
-      removed_objects(removed);
+      removed_objects(removed_ids, removed);
    }
 } FC_CAPTURE_AND_LOG( () ) }
 
