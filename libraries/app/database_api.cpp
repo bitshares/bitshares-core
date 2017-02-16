@@ -295,7 +295,7 @@ void database_api_impl::set_subscribe_callback( std::function<void(const variant
 
    static fc::bloom_parameters param;
    param.projected_element_count    = 10000;
-   param.false_positive_probability = 1.0/10000;
+   param.false_positive_probability = 1.0/100;
    param.maximum_size = 1024*8*8*2;
    param.compute_optimal_parameters();
    _subscribe_filter = fc::bloom_filter(param);
