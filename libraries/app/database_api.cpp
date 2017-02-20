@@ -75,6 +75,7 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
 
       // Keys
       vector<vector<account_id_type>> get_key_references( vector<public_key_type> key )const;
+     bool is_public_key_registered(string public_key) const;
 
       // Accounts
       vector<optional<account_object>> get_accounts(const vector<account_id_type>& account_ids)const;
@@ -483,6 +484,35 @@ vector<vector<account_id_type>> database_api_impl::get_key_references( vector<pu
       subscribe_to_item(i);
 
    return final_result;
+}
+
+bool database_api::is_public_key_registered(string public_key) const
+{
+    return my->is_public_key_registered(public_key);
+}
+
+bool database_api_impl::is_public_key_registered(string public_key) const
+{
+    // Short-circuit
+    if (public_key.empty()) {
+        return false;
+    }
+
+    // Search among all keys using an existing map of *current* account keys
+    public_key_type key;
+    try {
+        key = public_key_type(public_key);
+    } catch ( ... ) {
+        // An invalid public key was detected
+        return false;
+    }
+    const auto& idx = _db.get_index_type<account_index>();
+    const auto& aidx = dynamic_cast<const primary_index<account_index>&>(idx);
+    const auto& refs = aidx.get_secondary_index<graphene::chain::account_member_index>();
+    auto itr = refs.account_to_key_memberships.find(key);
+    bool is_known = itr != refs.account_to_key_memberships.end();
+
+    return is_known;
 }
 
 //////////////////////////////////////////////////////////////////////

@@ -2717,7 +2717,29 @@ std::string operation_result_printer::operator()(const asset& a)
 
 }}}
 
+namespace graphene { namespace wallet {
+   vector<brain_key_info> utility::derive_owner_keys_from_brain_key(string brain_key, int number_of_desired_keys)
+   {
+      // Safety-check
+      FC_ASSERT( number_of_desired_keys >= 1 );
 
+      // Create as many derived owner keys as requested
+      vector<brain_key_info> results;
+      brain_key = graphene::wallet::detail::normalize_brain_key(brain_key);
+      for (int i = 0; i < number_of_desired_keys; ++i) {
+        fc::ecc::private_key priv_key = graphene::wallet::detail::derive_private_key( brain_key, i );
+
+        brain_key_info result;
+        result.brain_priv_key = brain_key;
+        result.wif_priv_key = key_to_wif( priv_key );
+        result.pub_key = priv_key.get_public_key();
+
+        results.push_back(result);
+      }
+
+      return results;
+   }
+}}
 
 namespace graphene { namespace wallet {
 
@@ -2846,6 +2868,18 @@ brain_key_info wallet_api::suggest_brain_key()const
    result.pub_key = priv_key.get_public_key();
    return result;
 }
+
+vector<brain_key_info> wallet_api::derive_owner_keys_from_brain_key(string brain_key, int number_of_desired_keys) const
+{
+   return graphene::wallet::utility::derive_owner_keys_from_brain_key(brain_key, number_of_desired_keys);
+}
+
+bool wallet_api::is_public_key_registered(string public_key) const
+{
+   bool is_known = my->_remote_db->is_public_key_registered(public_key);
+   return is_known;
+}
+
 
 string wallet_api::serialize_transaction( signed_transaction tx )const
 {

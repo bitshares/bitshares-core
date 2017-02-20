@@ -256,6 +256,26 @@ namespace detail {
 class wallet_api_impl;
 }
 
+/***
+ * A utility class for performing various state-less actions that are related to wallets
+ */
+class utility {
+   public:
+      /**
+       * Derive any number of *possible* owner keys from a given brain key.
+       *
+       * NOTE: These keys may or may not match with the owner keys of any account.
+       * This function is merely intended to assist with account or key recovery.
+       *
+       * @see suggest_brain_key()
+       *
+       * @param brain_key    Brain key
+       * @param number_of_desired_keys  Number of desired keys
+       * @return A list of keys that are deterministically derived from the brainkey
+       */
+      static vector<brain_key_info> derive_owner_keys_from_brain_key(string brain_key, int number_of_desired_keys = 1);
+};
+
 struct operation_detail {
    string                   memo;
    string                   description;
@@ -575,6 +595,29 @@ class wallet_api
        * @returns a suggested brain_key
        */
       brain_key_info suggest_brain_key()const;
+
+     /**
+      * Derive any number of *possible* owner keys from a given brain key.
+      *
+      * NOTE: These keys may or may not match with the owner keys of any account.
+      * This function is merely intended to assist with account or key recovery.
+      *
+      * @see suggest_brain_key()
+      *
+      * @param brain_key    Brain key
+      * @param numberOfDesiredKeys  Number of desired keys
+      * @return A list of keys that are deterministically derived from the brainkey
+      */
+     vector<brain_key_info> derive_owner_keys_from_brain_key(string brain_key, int number_of_desired_keys = 1) const;
+
+     /**
+      * Determine whether a textual representation of a public key
+      * (in Base-58 format) is *currently* linked
+      * to any *registered* (i.e. non-stealth) account on the blockchain
+      * @param public_key Public key
+      * @return Whether a public key is known
+      */
+     bool is_public_key_registered(string public_key) const;
 
       /** Converts a signed_transaction in JSON form to its binary representation.
        *
@@ -1565,6 +1608,7 @@ FC_API( graphene::wallet::wallet_api,
         (import_account_keys)
         (import_balance)
         (suggest_brain_key)
+        (derive_owner_keys_from_brain_key)
         (register_account)
         (upgrade_account)
         (create_account_with_brain_key)
@@ -1609,6 +1653,7 @@ FC_API( graphene::wallet::wallet_api,
         (get_block)
         (get_account_count)
         (get_account_history)
+        (is_public_key_registered)
         (get_market_history)
         (get_global_properties)
         (get_dynamic_global_properties)
