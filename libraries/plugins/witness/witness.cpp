@@ -97,6 +97,7 @@ void witness_plugin::plugin_initialize(const boost::program_options::variables_m
       {
          auto key_id_to_wif_pair = graphene::app::dejsonify<std::pair<chain::public_key_type, std::string> >(key_id_to_wif_pair_string);
          //idump((key_id_to_wif_pair));
+         ilog("Public Key: ${public}", ("public", key_id_to_wif_pair.first));
          fc::optional<fc::ecc::private_key> private_key = graphene::utilities::wif_to_key(key_id_to_wif_pair.second);
          if (!private_key)
          {
