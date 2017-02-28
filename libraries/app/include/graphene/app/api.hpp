@@ -105,6 +105,22 @@ namespace graphene { namespace app {
                                                               operation_history_id_type stop = operation_history_id_type(),
                                                               unsigned limit = 100,
                                                               operation_history_id_type start = operation_history_id_type())const;
+
+         /**
+          * @brief Get only asked operations relevant to the specified account
+          * @param account The account whose history should be queried
+          * @param operation_id The ID of the operation we want to get operations in the account( 0 = transfer , 1 = limit order create, ...)
+          * @param stop ID of the earliest operation to retrieve
+          * @param limit Maximum number of operations to retrieve (must not exceed 100)
+          * @param start ID of the most recent operation to retrieve
+          * @return A list of operations performed by account, ordered from most recent to oldest.
+          */
+         vector<operation_history_object> get_account_history_operations(account_id_type account,
+                                                                         int operation_id,
+                                                                         operation_history_id_type start = operation_history_id_type(),
+                                                                         operation_history_id_type stop = operation_history_id_type(),
+                                                                         unsigned limit = 100)const;
+
          /**
           * @breif Get operations relevant to the specified account referenced
           * by an event numbering specific to the account. The current number of operations
@@ -366,6 +382,7 @@ FC_REFLECT( graphene::app::asset_holders, (asset_id)(count) );
 
 FC_API(graphene::app::history_api,
        (get_account_history)
+       (get_account_history_operations)
        (get_relative_account_history)
        (get_fill_order_history)
        (get_market_history)
