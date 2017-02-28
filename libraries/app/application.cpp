@@ -176,7 +176,8 @@ namespace detail {
                "seed04.bitsharesnodes.com:1776",    // Thom
                "seed05.bitsharesnodes.com:1776",    // Thom
                "seed06.bitsharesnodes.com:1776",    // Thom
-               "seed07.bitsharesnodes.com:1776"     // Thom
+               "seed07.bitsharesnodes.com:1776",    // Thom
+               "51.15.61.160:1776"                  // lafona
             };
             for( const string& endpoint_string : seeds )
             {
