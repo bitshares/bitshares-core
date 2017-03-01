@@ -2819,9 +2819,9 @@ vector<operation_detail> wallet_api::get_account_history(string name, int limit)
 }
 
 
-vector<bucket_object> wallet_api::get_market_history( string symbol1, string symbol2, uint32_t bucket )const
+vector<bucket_object> wallet_api::get_market_history( string symbol1, string symbol2, uint32_t bucket , fc::time_point_sec start, fc::time_point_sec end )const
 {
-   return my->_remote_hist->get_market_history( get_asset_id(symbol1), get_asset_id(symbol2), bucket, fc::time_point_sec(), fc::time_point::now() );
+   return my->_remote_hist->get_market_history( get_asset_id(symbol1), get_asset_id(symbol2), bucket, start, end );
 }
 
 vector<limit_order_object> wallet_api::get_limit_orders(string a, string b, uint32_t limit)const
