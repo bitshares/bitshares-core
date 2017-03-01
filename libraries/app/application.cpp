@@ -170,7 +170,7 @@ namespace detail {
                "seed07.bitsharesnodes.com:1776",   // Thom
                "seed.roelandp.nl:1776",            // roelandp (Canada)
                "bts-seed1.abit-more.com:62015",    // abit
-               "seeds.bitshares.eu 1776",          // xeroc
+               "seeds.bitshares.eu:1776",          // xeroc
                "51.15.61.160:1776",                // lafona
                "128.199.143.47:2015"               // Harvey
             };
