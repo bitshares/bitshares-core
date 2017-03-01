@@ -164,20 +164,15 @@ namespace detail {
          else
          {
             vector<string> seeds = {
-               "104.236.144.84:1777",               // puppies
-               "128.199.143.47:2015",               // Harvey
-               "185.25.22.21:1776",                 // liondani (Greece)
-               "bitshares.openledger.info:1776",    // OpenLedger
-               "bts-seed1.abit-more.com:62015",     // abit
-               "seed.bitsharesnodes.com:1776",      // wackou
-               "seed.blocktrades.us:1776",          // BlockTrades
-               "seed.roelandp.nl:1776",             // roelandp (Canada)
-               "seed02.bitsharesnodes.com:1776",
-               "seed04.bitsharesnodes.com:1776",    // Thom
-               "seed05.bitsharesnodes.com:1776",    // Thom
-               "seed06.bitsharesnodes.com:1776",    // Thom
-               "seed07.bitsharesnodes.com:1776",    // Thom
-               "51.15.61.160:1776"                  // lafona
+               "seed01.bitsharesnodes.com:1776",   // wackou
+               "seed05.bitsharesnodes.com:1776",   // Thom
+               "seed06.bitsharesnodes.com:1776",   // Thom
+               "seed07.bitsharesnodes.com:1776",   // Thom
+               "seed.roelandp.nl:1776",            // roelandp (Canada)
+               "bts-seed1.abit-more.com:62015",    // abit
+               "seeds.bitshares.eu:1776",          // xeroc
+               "51.15.61.160:1776",                // lafona
+               "128.199.143.47:2015"               // Harvey
             };
             for( const string& endpoint_string : seeds )
             {
