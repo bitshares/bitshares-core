@@ -163,21 +163,22 @@ namespace detail {
          }
          else
          {
+            // https://bitsharestalk.org/index.php/topic,23715.0.html
             vector<string> seeds = {
-               "104.236.144.84:1777",               // puppies
-               "128.199.143.47:2015",               // Harvey
-               "185.25.22.21:1776",                 // liondani (Greece)
-               "bitshares.openledger.info:1776",    // OpenLedger
-               "bts-seed1.abit-more.com:62015",     // abit
-               "seed.bitsharesnodes.com:1776",      // wackou
-               "seed.blocktrades.us:1776",          // BlockTrades
-               "seed.roelandp.nl:1776",             // roelandp (Canada)
-               "seed02.bitsharesnodes.com:1776",
-               "seed04.bitsharesnodes.com:1776",    // Thom
-               "seed05.bitsharesnodes.com:1776",    // Thom
-               "seed06.bitsharesnodes.com:1776",    // Thom
-               "seed07.bitsharesnodes.com:1776",    // Thom
-               "51.15.61.160:1776"                  // lafona
+               "104.236.144.84:1777",               // puppies      (USA)
+               "128.199.143.47:2015",               // Harvey       (Singapore)
+               "212.47.249.84:50696",               // iHashFury    (France)
+               "51.15.61.160:1776",                 // lafona       (France)
+               "bts-seed1.abit-more.com:62015",     // abit         (China)
+               "seed.bitsharesnodes.com:1776",      // wackou       (Netherlands)
+               "seed.blocktrades.us:1776",          // BlockTrades  (USA)
+               "seed.cubeconnex.com:1777",          // cube         (USA)
+               "seed.roelandp.nl:1776",             // roelandp     (Canada)
+               "seed04.bitsharesnodes.com:1776",    // Thom         (Australia)
+               "seed05.bitsharesnodes.com:1776",    // Thom         (USA)
+               "seed06.bitsharesnodes.com:1776",    // Thom         (USA)
+               "seed07.bitsharesnodes.com:1776",    // Thom         (Singapore)
+               "seeds.bitshares.eu:1776"            // pc           (http://seeds.quisquis.de/bitshares.html)
             };
             for( const string& endpoint_string : seeds )
             {
