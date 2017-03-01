@@ -164,7 +164,6 @@ namespace detail {
          else
          {
             vector<string> seeds = {
-
                "seed01.bitsharesnodes.com:1776",   // wackou
                "seed05.bitsharesnodes.com:1776",   // Thom
                "seed06.bitsharesnodes.com:1776",   // Thom
