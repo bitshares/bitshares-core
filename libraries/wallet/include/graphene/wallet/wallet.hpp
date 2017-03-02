@@ -349,7 +349,7 @@ class wallet_api
        * This returns a list of operation history objects, which describe activity on the account.
        *
        * @param name the name or id of the account
-       * @param limit the number of entries to return (starting from the most recent) (max 100)
+       * @param limit the number of entries to return (starting from the most recent)
        * @returns a list of \c operation_history_objects
        */
       vector<operation_detail>  get_account_history(string name, int limit)const;
