@@ -1,11 +1,16 @@
 BitShares Core
 ==============
+* [Getting Started](#getting-started)
+* [Support](#support)
+* [Using the API](#using-the-api)
+* [Accessing restricted API's](#accessing-restricted-apis)
+* [FAQ](#faq)
+* [License](#license)
+
 BitShares Core is the BitShares blockchain implementation and command-line interface.
 The web wallet is [BitShares UI](https://github.com/bitshares/bitshares-ui).
 
-Visit [BitShares.org](https://bitshares.org/) to learn about BitShares.
-
-Join the community at [BitSharesTalk.org](https://bitsharestalk.org/).
+Visit [BitShares.org](https://bitshares.org/) to learn about BitShares and join the community at [BitSharesTalk.org](https://bitsharestalk.org/).
 
 **NOTE:** The official BitShares git repository location, default branch, and submodule remotes were recently changed. Existing
 repositories can be updated with the following steps:
@@ -36,7 +41,7 @@ be launched with:
 
     ./programs/witness_node/witness_node
 
-The node will automatically create a data directory including a config file. It will take some time to fully synchronize
+The node will automatically create a data directory including a config file. It may take several hours to fully synchronize
 the blockchain. After syncing, you can exit the node using Ctrl+C and setup the command-line wallet by editing
 `witness_node_data_dir/config.ini` as follows:
 
