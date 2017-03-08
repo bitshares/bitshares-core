@@ -193,18 +193,18 @@ namespace graphene { namespace chain {
           *  Emitted After a block has been applied and committed.  The callback
           *  should not yield and should execute quickly.
           */
-         fc::signal<void(const vector<object_id_type>&)> new_objects;
+         fc::signal<void(const vector<object_id_type>&, const flat_set<account_id_type>&)> new_objects;
 
          /**
           *  Emitted After a block has been applied and committed.  The callback
           *  should not yield and should execute quickly.
           */
-         fc::signal<void(const vector<object_id_type>&)> changed_objects;
+         fc::signal<void(const vector<object_id_type>&, const flat_set<account_id_type>&)> changed_objects;
 
          /** this signal is emitted any time an object is removed and contains a
           * pointer to the last value of every object that was removed.
           */
-         fc::signal<void(const vector<object_id_type>&, const vector<const object*>&)>  removed_objects;
+         fc::signal<void(const vector<object_id_type>&, const vector<const object*>&, const flat_set<account_id_type>&)>  removed_objects;
 
          //////////////////// db_witness_schedule.cpp ////////////////////
 
