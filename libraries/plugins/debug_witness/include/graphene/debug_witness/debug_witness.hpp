@@ -25,8 +25,10 @@
 
 #include <graphene/app/plugin.hpp>
 #include <graphene/chain/database.hpp>
+#include <graphene/chain/protocol/types.hpp>
 
 #include <fc/thread/future.hpp>
+#include <fc/container/flat.hpp>
 
 namespace graphene { namespace debug_witness_plugin {
 
@@ -50,8 +52,8 @@ public:
 
 private:
 
-   void on_changed_objects( const std::vector<graphene::db::object_id_type>& ids );
-   void on_removed_objects( const std::vector<graphene::db::object_id_type>& ids, const std::vector<const graphene::db::object*> objs );
+   void on_changed_objects( const std::vector<graphene::db::object_id_type>& ids, const fc::flat_set<graphene::chain::account_id_type>& impacted_accounts );
+   void on_removed_objects( const std::vector<graphene::db::object_id_type>& ids, const std::vector<const graphene::db::object*> objs, const fc::flat_set<graphene::chain::account_id_type>& impacted_accounts );
    void on_applied_block( const graphene::chain::signed_block& b );
 
    boost::program_options::variables_map _options;
