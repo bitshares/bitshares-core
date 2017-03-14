@@ -165,8 +165,9 @@ void database::close(bool rewind)
             }
          }
       }
-      catch (...)
+      catch ( const fc::exception& e )
       {
+         wlog( "Database close unexpected exception: ${e}", ("e", e) );
       }
    }
 
