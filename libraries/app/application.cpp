@@ -336,7 +336,7 @@ namespace detail {
                bool modified_genesis = false;
                if( _options->count("genesis-timestamp") )
                {
-                  genesis.initial_timestamp = fc::time_point_sec( graphene::time::now() ) + genesis.initial_parameters.block_interval + _options->at("genesis-timestamp").as<uint32_t>();
+                  genesis.initial_timestamp = fc::time_point_sec( fc::time_point::now() ) + genesis.initial_parameters.block_interval + _options->at("genesis-timestamp").as<uint32_t>();
                   genesis.initial_timestamp -= genesis.initial_timestamp.sec_since_epoch() % genesis.initial_parameters.block_interval;
                   modified_genesis = true;
                   std::cerr << "Used genesis timestamp:  " << genesis.initial_timestamp.to_iso_string() << " (PLEASE RECORD THIS)\n";
@@ -468,7 +468,7 @@ namespace detail {
             _force_validate = true;
          }
 
-         graphene::time::now();
+         fc::time_point::now();
 
          if( _options->count("api-access") )
             _apiaccess = fc::json::from_file( _options->at("api-access").as<boost::filesystem::path>() )
@@ -538,7 +538,7 @@ namespace detail {
                                 std::vector<fc::uint160_t>& contained_transaction_message_ids) override
       { try {
 
-         auto latency = graphene::time::now() - blk_msg.block.timestamp;
+         auto latency = fc::time_point::now() - blk_msg.block.timestamp;
          FC_ASSERT( (latency.count()/1000) > -5000, "Rejecting block with timestamp in the future" );
          if (!sync_mode || blk_msg.block.block_num() % 10000 == 0)
          {
@@ -910,10 +910,10 @@ namespace detail {
          return fc::time_point_sec::min();
       } FC_CAPTURE_AND_RETHROW( (block_id) ) }
 
-      /** returns graphene::time::now() */
+      /** returns fc::time_point::now() */
       virtual fc::time_point_sec get_blockchain_now() override
       {
-         return graphene::time::now();
+         return fc::time_point::now();
       }
 
       virtual item_hash_t get_head_block_id() const override

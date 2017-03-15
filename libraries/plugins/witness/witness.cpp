@@ -51,7 +51,7 @@ void new_chain_banner( const graphene::chain::database& db )
       "*                              *\n"
       "********************************\n"
       "\n";
-   if( db.get_slot_at_time( graphene::time::now() ) > 200 )
+   if( db.get_slot_at_time( fc::time_point::now() ) > 200 )
    {
       std::cerr << "Your genesis seems to have an old timestamp\n"
          "Please consider using the --genesis-timestamp option to give your genesis a recent timestamp\n"
@@ -123,7 +123,7 @@ void witness_plugin::plugin_startup()
    ilog("witness plugin:  plugin_startup() begin");
    chain::database& d = database();
    //Start NTP time client
-   graphene::time::now();
+   fc::time_point::now();
 
    if( !_witnesses.empty() )
    {
@@ -151,7 +151,7 @@ void witness_plugin::schedule_production_loop()
 {
    //Schedule for the next second's tick regardless of chain state
    // If we would wait less than 50ms, wait for the whole second.
-   fc::time_point ntp_now = graphene::time::now();
+   fc::time_point ntp_now = fc::time_point::now();
    fc::time_point fc_now = fc::time_point::now();
    int64_t time_to_next_second = 1000000 - (ntp_now.time_since_epoch().count() % 1000000);
    if( time_to_next_second < 50000 )      // we must sleep for at least 50ms
@@ -221,7 +221,7 @@ block_production_condition::block_production_condition_enum witness_plugin::bloc
 block_production_condition::block_production_condition_enum witness_plugin::maybe_produce_block( fc::mutable_variant_object& capture )
 {
    chain::database& db = database();
-   fc::time_point now_fine = graphene::time::now();
+   fc::time_point now_fine = fc::time_point::now();
    fc::time_point_sec now = now_fine + fc::microseconds( 500000 );
 
    // If the next block production opportunity is in the present or future, we're synced.
