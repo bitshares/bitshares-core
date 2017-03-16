@@ -4,7 +4,7 @@ add_library( graphene_witness
              witness.cpp
            )
 
-target_link_libraries( graphene_witness graphene_chain graphene_app graphene_time )
+target_link_libraries( graphene_witness graphene_chain graphene_app )
 target_include_directories( graphene_witness
                             PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include" )
 

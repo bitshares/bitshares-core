@@ -26,8 +26,6 @@
 
 #include <graphene/chain/balance_object.hpp>
 
-#include <graphene/time/time.hpp>
-
 #include <graphene/utilities/tempdir.hpp>
 
 #include <graphene/account_history/account_history_plugin.hpp>

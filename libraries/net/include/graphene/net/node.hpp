@@ -158,9 +158,6 @@ namespace graphene { namespace net {
           */
          virtual fc::time_point_sec get_block_time(const item_hash_t& block_id) = 0;
 
-         /** returns graphene::blockchain::now() */
-         virtual fc::time_point_sec get_blockchain_now() = 0;
-
          virtual item_hash_t get_head_block_id() const = 0;
 
          virtual uint32_t estimate_last_known_fork_from_git_revision_timestamp(uint32_t unix_timestamp) const = 0;
