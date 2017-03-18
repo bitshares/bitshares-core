@@ -172,9 +172,9 @@ namespace detail {
                "seed.cubeconnex.com:1777",          // cube         (USA)
                "seed.roelandp.nl:1776",             // roelandp     (Canada)
                "seed04.bts-nodes.net:1776",         // Thom         (Australia)
-               "seed05.bts-nodes.net:1776",	    // Thom         (USA)
-               "seed06.bts-nodes.net:1776",	    // Thom         (USA)
-               "seed07.bts-nodes.net:1776",	    // Thom         (Singapore)
+               "seed05.bts-nodes.net:1776",	        // Thom         (USA)
+               "seed06.bts-nodes.net:1776",	        // Thom         (USA)
+               "seed07.bts-nodes.net:1776",	        // Thom         (Singapore)
                "seeds.bitshares.eu:1776"            // pc           (http://seeds.quisquis.de/bitshares.html)
             };
             for( const string& endpoint_string : seeds )
