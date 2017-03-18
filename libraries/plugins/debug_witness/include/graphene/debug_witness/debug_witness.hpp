@@ -51,7 +51,7 @@ public:
 private:
 
    void on_changed_objects( const std::vector<graphene::db::object_id_type>& ids );
-   void on_removed_objects( const std::vector<const graphene::db::object*> objs );
+   void on_removed_objects( const std::vector<graphene::db::object_id_type>& ids, const std::vector<const graphene::db::object*> objs );
    void on_applied_block( const graphene::chain::signed_block& b );
 
    boost::program_options::variables_map _options;

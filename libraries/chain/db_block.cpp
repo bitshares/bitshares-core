@@ -241,7 +241,7 @@ processed_transaction database::_push_transaction( const signed_transaction& trx
    auto processed_trx = _apply_transaction( trx );
    _pending_tx.push_back(processed_trx);
 
-   notify_changed_objects();
+   // notify_changed_objects();
    // The transaction applied successfully. Merge its changes into the pending block session.
    temp_session.merge();
 
@@ -549,19 +549,26 @@ void database::notify_changed_objects()
    if( _undo_db.enabled() ) 
    {
       const auto& head_undo = _undo_db.head();
+
+      vector<object_id_type> new_ids;  new_ids.reserve(head_undo.new_ids.size());
+      for( const auto& item : head_undo.new_ids ) new_ids.push_back(item);
+
       vector<object_id_type> changed_ids;  changed_ids.reserve(head_undo.old_values.size());
       for( const auto& item : head_undo.old_values ) changed_ids.push_back(item.first);
-      for( const auto& item : head_undo.new_ids ) changed_ids.push_back(item);
-      vector<const object*> removed;
-      removed.reserve( head_undo.removed.size() );
+
+      vector<object_id_type> removed_ids; removed_ids.reserve( head_undo.removed.size() );
+      vector<const object*> removed; removed.reserve( head_undo.removed.size() );
       for( const auto& item : head_undo.removed )
       {
-         changed_ids.push_back( item.first );
-         removed.emplace_back( item.second.get() );
+        removed_ids.emplace_back( item.first );
+        removed.emplace_back( item.second.get() );
       }
+
+      new_objects(new_ids);
       changed_objects(changed_ids);
+      removed_objects(removed_ids, removed);
    }
-} FC_CAPTURE_AND_RETHROW() }
+} FC_CAPTURE_AND_LOG( () ) }
 
 processed_transaction database::apply_transaction(const signed_transaction& trx, uint32_t skip)
 {
