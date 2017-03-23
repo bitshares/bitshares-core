@@ -1112,6 +1112,7 @@ market_ticker database_api_impl::get_ticker( const string& base, const string& q
       if ( trades.size() )
       {
          result.latest = trades[0].price;
+         result.percent_change = trades.size() > 0 ? ((result.latest / trades.back().price) - 1) * 100 : 0;
 
          for ( market_trade t: trades )
          {
@@ -1119,6 +1120,7 @@ market_ticker database_api_impl::get_ticker( const string& base, const string& q
             result.quote_volume += t.amount;
          }
 
+         /* TODO: fix get_trade_history to pull trades beyond 100 */
          while (trades.size() == 100)
          {
             trades = get_trade_history( base, quote, trades[99].date, fc::time_point_sec( now.sec_since_epoch() - day ), 100 );
@@ -1129,9 +1131,12 @@ market_ticker database_api_impl::get_ticker( const string& base, const string& q
                result.quote_volume += t.amount;
             }
          }
-
-         trades = get_trade_history( base, quote, trades.back().date, fc::time_point_sec(), 1 );
-         result.percent_change = trades.size() > 0 ? ( ( result.latest / trades.back().price ) - 1 ) * 100 : 0;
+          /*
+         if (!trades.empty()) {
+            trades = get_trade_history(base, quote, trades.back().date, fc::time_point_sec(), 1);
+            result.percent_change = trades.size() > 0 ? ((result.latest / trades.back().price) - 1) * 100 : 0;
+         }
+           */
       }
 
       auto orders = get_order_book( base, quote, 1 );
@@ -1178,7 +1183,7 @@ market_volume database_api_impl::get_24_volume( const string& base, const string
          result.base_volume += t.value;
          result.quote_volume += t.amount;
       }
-
+      /* TODO: fix get_trade_history to pull trades beyond 100 */
       while (trades.size() == 100)
       {
          trades = get_trade_history( base, quote, trades[99].date, fc::time_point_sec( now.sec_since_epoch() - bucket_size ), 100 );
