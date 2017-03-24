@@ -1078,120 +1078,78 @@ void database_api_impl::unsubscribe_from_market(asset_id_type a, asset_id_type b
 
 market_ticker database_api::get_ticker( const string& base, const string& quote )const
 {
-   return my->get_ticker( base, quote );
+    return my->get_ticker( base, quote );
 }
 
 market_ticker database_api_impl::get_ticker( const string& base, const string& quote )const
 {
-   auto assets = lookup_asset_symbols( {base, quote} );
-   FC_ASSERT( assets[0], "Invalid base asset symbol: ${s}", ("s",base) );
-   FC_ASSERT( assets[1], "Invalid quote asset symbol: ${s}", ("s",quote) );
+    const auto assets = lookup_asset_symbols( {base, quote} );
+    FC_ASSERT( assets[0], "Invalid base asset symbol: ${s}", ("s",base) );
+    FC_ASSERT( assets[1], "Invalid quote asset symbol: ${s}", ("s",quote) );
 
-   auto base_id = assets[0]->id;
-   auto quote_id = assets[1]->id;
+    market_ticker result;
+    result.base = base;
+    result.quote = quote;
+    result.latest = 0;
+    result.lowest_ask = 0;
+    result.highest_bid = 0;
+    result.percent_change = 0;
+    result.base_volume = 0;
+    result.quote_volume = 0;
 
-   market_ticker result;
+    try {
+        const fc::time_point_sec now = fc::time_point::now();
+        const fc::time_point_sec yesterday = fc::time_point_sec( now.sec_since_epoch() - 86400 );
+        const auto batch_size = 1000;
 
-   result.base = base;
-   result.quote = quote;
-   result.base_volume = 0;
-   result.quote_volume = 0;
-   result.percent_change = 0;
-   result.lowest_ask = 0;
-   result.highest_bid = 0;
+        vector<market_trade> trades = get_trade_history( base, quote, now, yesterday, batch_size );
+        if( !trades.empty() )
+        {
+            result.latest = trades[0].price; 
 
-   auto price_to_real = [&]( const share_type a, int p ) { return double( a.value ) / pow( 10, p ); };
-
-   try {
-      if( base_id > quote_id ) std::swap(base_id, quote_id);
-
-      uint32_t day = 86400;
-      auto now = fc::time_point_sec( fc::time_point::now() );
-      auto trades = get_trade_history( base, quote, now, fc::time_point_sec( now.sec_since_epoch() - day ), 100 );
-
-      if ( trades.size() )
-      {
-         result.latest = trades[0].price;
-
-         for ( market_trade t: trades )
-         {
-            result.base_volume += t.value;
-            result.quote_volume += t.amount;
-         }
-
-         while (trades.size() == 100)
-         {
-            trades = get_trade_history( base, quote, trades[99].date, fc::time_point_sec( now.sec_since_epoch() - day ), 100 );
-
-            for ( market_trade t: trades )
+            while( !trades.empty() )
             {
-               result.base_volume += t.value;
-               result.quote_volume += t.amount;
+                for( const market_trade& t: trades )
+                {
+                    result.base_volume += t.value;
+                    result.quote_volume += t.amount;
+                }
+
+                trades = get_trade_history( base, quote, trades.back().date, yesterday, batch_size );
             }
-         }
 
-         trades = get_trade_history( base, quote, trades.back().date, fc::time_point_sec(), 1 );
-         result.percent_change = trades.size() > 0 ? ( ( result.latest / trades.back().price ) - 1 ) * 100 : 0;
-      }
+            const auto last_trade_yesterday = get_trade_history( base, quote, yesterday, fc::time_point_sec(), 1 );
+            if( !last_trade_yesterday.empty())
+            {
+                const auto price_yesterday = last_trade_yesterday[0].price;
+                result.percent_change = ( (result.latest / price_yesterday) - 1 ) * 100;
+            }
+        }
 
-      auto orders = get_order_book( base, quote, 1 );
-      if( orders.asks.size() )
-         result.lowest_ask = orders.asks[0].price;
-      if( orders.bids.size() )
-         result.highest_bid = orders.bids[0].price;
+        const auto orders = get_order_book( base, quote, 1 );
+        if( !orders.asks.empty() ) result.lowest_ask = orders.asks[0].price;
+        if( !orders.bids.empty() ) result.highest_bid = orders.bids[0].price;
+    } FC_CAPTURE_AND_RETHROW( (base)(quote) )
 
-   } FC_CAPTURE_AND_RETHROW( (base)(quote) )
-
-   return result;
+    return result;
 }
 
 market_volume database_api::get_24_volume( const string& base, const string& quote )const
 {
-   return my->get_24_volume( base, quote );
+    return my->get_24_volume( base, quote );
 }
 
 market_volume database_api_impl::get_24_volume( const string& base, const string& quote )const
 {
-   auto assets = lookup_asset_symbols( {base, quote} );
-   FC_ASSERT( assets[0], "Invalid base asset symbol: ${s}", ("s",base) );
-   FC_ASSERT( assets[1], "Invalid quote asset symbol: ${s}", ("s",quote) );
+    const auto ticker = get_ticker( base, quote );
 
-   auto base_id = assets[0]->id;
-   auto quote_id = assets[1]->id;
+    market_volume result;
+    result.base = ticker.base;
+    result.quote = ticker.quote;
+    result.base_volume = ticker.base_volume;
+    result.quote_volume = ticker.quote_volume;
 
-   market_volume result;
-   result.base = base;
-   result.quote = quote;
-   result.base_volume = 0;
-   result.quote_volume = 0;
-
-   try {
-      if( base_id > quote_id ) std::swap(base_id, quote_id);
-
-      uint32_t bucket_size = 86400;
-      auto now = fc::time_point_sec( fc::time_point::now() );
-
-      auto trades = get_trade_history( base, quote, now, fc::time_point_sec( now.sec_since_epoch() - bucket_size ), 100 );
-
-      for ( market_trade t: trades )
-      {
-         result.base_volume += t.value;
-         result.quote_volume += t.amount;
-      }
-
-      while (trades.size() == 100)
-      {
-         trades = get_trade_history( base, quote, trades[99].date, fc::time_point_sec( now.sec_since_epoch() - bucket_size ), 100 );
-
-         for ( market_trade t: trades )
-         {
-            result.base_volume += t.value;
-            result.quote_volume += t.amount;
-         }
-      }
-
-      return result;
-   } FC_CAPTURE_AND_RETHROW( (base)(quote) )
+    return result;
 }
 
 order_book database_api::get_order_book( const string& base, const string& quote, unsigned limit )const
