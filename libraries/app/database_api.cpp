@@ -1100,7 +1100,7 @@ market_ticker database_api_impl::get_ticker( const string& base, const string& q
     try {
         const fc::time_point_sec now = fc::time_point::now();
         const fc::time_point_sec yesterday = fc::time_point_sec( now.sec_since_epoch() - 86400 );
-        const auto batch_size = 1000;
+        const auto batch_size = 100;
 
         vector<market_trade> trades = get_trade_history( base, quote, now, yesterday, batch_size );
         if( !trades.empty() )
