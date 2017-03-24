@@ -193,7 +193,7 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       void broadcast_updates( const vector<variant>& updates );
       void broadcast_market_updates( const market_queue_type& queue);
       void handle_object_changed(bool force_notify, bool full_object, const vector<object_id_type>& ids, const flat_set<account_id_type>& impacted_accounts, std::function<const object*(object_id_type id)> find_object);
-      
+
       /** called every time a block is applied to report the objects that were changed */
       void on_objects_new(const vector<object_id_type>& ids, const flat_set<account_id_type>& impacted_accounts);
       void on_objects_changed(const vector<object_id_type>& ids, const flat_set<account_id_type>& impacted_accounts);
@@ -666,22 +666,22 @@ std::map<std::string, full_account> database_api_impl::get_full_accounts( const 
                     [&acnt] (const call_order_object& call) {
                        acnt.call_orders.emplace_back(call);
                     });
-          
+
       // get assets issued by user
       auto asset_range = _db.get_index_type<asset_index>().indices().get<by_issuer>().equal_range(account->id);
       std::for_each(asset_range.first, asset_range.second,
                     [&acnt] (const asset_object& asset) {
                        acnt.assets.emplace_back(asset.id);
                     });
-					
+
       // get withdraws permissions
       auto withdraw_range = _db.get_index_type<withdraw_permission_index>().indices().get<by_from>().equal_range(account->id);
       std::for_each(withdraw_range.first, withdraw_range.second,
                     [&acnt] (const withdraw_permission_object& withdraw) {
                        acnt.withdraws.emplace_back(withdraw);
                     });
-	  
-	  
+
+
       results[account_name_or_id] = acnt;
    }
    return results;
@@ -1105,7 +1105,7 @@ market_ticker database_api_impl::get_ticker( const string& base, const string& q
         vector<market_trade> trades = get_trade_history( base, quote, now, yesterday, batch_size );
         if( !trades.empty() )
         {
-            result.latest = trades[0].price; 
+            result.latest = trades[0].price;
 
             while( !trades.empty() )
             {
@@ -1119,11 +1119,17 @@ market_ticker database_api_impl::get_ticker( const string& base, const string& q
             }
 
             const auto last_trade_yesterday = get_trade_history( base, quote, yesterday, fc::time_point_sec(), 1 );
-            if( !last_trade_yesterday.empty())
+            if( !last_trade_yesterday.empty() )
             {
                 const auto price_yesterday = last_trade_yesterday[0].price;
                 result.percent_change = ( (result.latest / price_yesterday) - 1 ) * 100;
             }
+        }
+        else
+        {
+            const auto last_trade = get_trade_history( base, quote, now, fc::time_point_sec(), 1 );
+            if( !last_trade.empty() )
+                result.latest = last_trade[0].price;
         }
 
         const auto orders = get_order_book( base, quote, 1 );
@@ -1856,7 +1862,7 @@ void database_api_impl::handle_object_changed(bool force_notify, bool full_objec
    if( _subscribe_callback )
    {
       vector<variant> updates;
-      
+
       for(auto id : ids)
       {
          if( force_notify || is_subscribed_to_item(id) || is_impacted_account(impacted_accounts) )
