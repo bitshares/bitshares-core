@@ -238,6 +238,7 @@ BOOST_AUTO_TEST_CASE( black_swan )
       ACTORS((buyer)(seller)(borrower)(borrower2)(feedproducer));
 
       const auto& bitusd = create_bitasset("USDBIT", feedproducer_id);
+      const asset_id_type bitusd_id = bitusd.id;
       const auto& core   = asset_id_type()(db);
 
       int64_t init_balance(1000000);
@@ -272,8 +273,15 @@ BOOST_AUTO_TEST_CASE( black_swan )
 
       force_settle(borrower, bitusd.amount(100));
 
+      // make sure pricefeeds expire
+      generate_blocks(db.head_block_time() + GRAPHENE_DEFAULT_PRICE_FEED_LIFETIME);
+      generate_blocks(2);
+
+      FC_ASSERT( bitusd_id(db).bitasset_data(db).current_feed.settlement_price.is_null() );
+      force_settle(borrower_id(db), asset(100, bitusd_id));
+
       BOOST_TEST_MESSAGE( "Verify that we cannot borrow after black swan" );
-      GRAPHENE_REQUIRE_THROW( borrow(borrower, bitusd.amount(1000), asset(2000)), fc::exception );
+      GRAPHENE_REQUIRE_THROW( borrow(borrower_id(db), asset(1000, bitusd_id), asset(2000)), fc::exception );
    } catch( const fc::exception& e) {
       edump((e.to_detail_string()));
       throw;
