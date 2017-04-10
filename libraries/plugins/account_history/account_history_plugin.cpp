@@ -139,10 +139,13 @@ void account_history_plugin_impl::update_account_histories( const signed_block& 
                const auto& stats_obj = account_id(db).statistics(db);
                const auto& ath = db.create<account_transaction_history_object>( [&]( account_transaction_history_object& obj ){
                    obj.operation_id = oho.id;
+                   obj.account = account_id;
+                   obj.sequence = stats_obj.total_ops+1;
                    obj.next = stats_obj.most_recent_op;
                });
                db.modify( stats_obj, [&]( account_statistics_object& obj ){
                    obj.most_recent_op = ath.id;
+                   obj.total_ops = ath.sequence;
                });
             }
          }
@@ -187,7 +190,7 @@ void account_history_plugin::plugin_initialize(const boost::program_options::var
    database().add_index< primary_index< simple_index< operation_history_object > > >();
    database().add_index< primary_index< account_transaction_history_index > >();
 
-   LOAD_VALUE_SET(options, "tracked-accounts", my->_tracked_accounts, graphene::chain::account_id_type);
+   LOAD_VALUE_SET(options, "track-account", my->_tracked_accounts, graphene::chain::account_id_type);
 }
 
 void account_history_plugin::plugin_startup()
