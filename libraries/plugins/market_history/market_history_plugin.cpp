@@ -110,7 +110,7 @@ struct operation_process_fill_order
 
       hkey.sequence += 200;
       itr = history_idx.lower_bound( hkey );
-
+      /*
       while( itr != history_idx.end() )
       {
          if( itr->key.base == hkey.base && itr->key.quote == hkey.quote )
@@ -120,6 +120,7 @@ struct operation_process_fill_order
          }
          else break;
       }
+      */
 
 
       auto max_history = _plugin.max_history();
