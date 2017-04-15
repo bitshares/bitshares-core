@@ -666,6 +666,11 @@ std::map<std::string, full_account> database_api_impl::get_full_accounts( const 
                     [&acnt] (const call_order_object& call) {
                        acnt.call_orders.emplace_back(call);
                     });
+      auto settle_range = _db.get_index_type<force_settlement_index>().indices().get<by_account>().equal_range(account->id);
+      std::for_each(settle_range.first, settle_range.second,
+                    [&acnt] (const force_settlement_object& settle) {
+                       acnt.settle_orders.emplace_back(settle);
+                    });
 
       // get assets issued by user
       auto asset_range = _db.get_index_type<asset_index>().indices().get<by_issuer>().equal_range(account->id);
