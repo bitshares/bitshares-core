@@ -4490,7 +4490,8 @@ namespace graphene { namespace net { namespace detail {
                 error_message_stream << "\nStill waiting for port " << listen_endpoint.port() << " to become available\n";
               }
               std::string error_message = error_message_stream.str();
-              ulog(error_message);
+              wlog(error_message);
+              std::cout << "\033[31m" << error_message;  
               _delegate->error_encountered( error_message, fc::oexception() );
               fc::usleep( fc::seconds(5 ) );
             }
