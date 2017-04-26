@@ -27,6 +27,11 @@ Getting Started
 Build instructions and additional documentation are available in the
 [wiki](https://github.com/bitshares/bitshares-core/wiki).
 
+We recommend building on Ubuntu 16.04 LTS, and the build dependencies may be installed with:
+
+    sudo apt-get update
+    sudo apt-get install autoconf cmake git libboost-all-dev libssl-dev
+
 To build after all dependencies are installed:
 
     git clone https://github.com/bitshares/bitshares-core.git
