@@ -163,7 +163,7 @@ class database_api
       * @param block_num vector containing heights of the block whose header should be returned
       * @return array of headers of the referenced blocks, or null if no matching block was found
       */
-      map<uint32_t,block_header> get_block_header_batch(const vector<uint32_t> block_num)const;
+      map<uint32_t, optional<block_header>> get_block_header_batch(const vector<uint32_t> block_nums)const;
 
 
       /**
