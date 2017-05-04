@@ -340,9 +340,14 @@ set<public_key_type> signed_transaction::get_required_signatures(
 
    set<public_key_type> result;
 
-   for( auto& provided_sig : s.provided_signatures )
-      if( available_keys.find( provided_sig.first ) != available_keys.end() )
-         result.insert( provided_sig.first );
+   for(auto a : available_keys) {
+      for(auto sp : s.provided_signatures) {
+         if (a == sp.first)
+            result.erase(sp.first);
+         else
+            result.insert(sp.first);
+      }
+   }
 
    return result;
 }
