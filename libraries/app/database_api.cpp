@@ -385,7 +385,52 @@ optional<signed_block> database_api::get_block(uint32_t block_num)const
 
 optional<signed_block> database_api_impl::get_block(uint32_t block_num)const
 {
-   return _db.fetch_block_by_number(block_num);
+   optional<signed_block> myblock = _db.fetch_block_by_number(block_num);
+   uint32_t i = 0;
+   for(auto t : myblock->transactions) {
+	   uint32_t z = 0;
+	   for(auto o : t.operations) {
+		   
+		  try {
+
+			  auto transfer_op = o.get<graphene::chain::transfer_operation> ();
+
+			  uint32_t start = transfer_op.from(_db).statistics(_db).total_ops;
+			  uint32_t stop = 1;
+			  const auto& hist_idx = _db.get_index_type<account_transaction_history_index>();
+			  const auto& by_seq_idx = hist_idx.indices().get<by_seq>();
+		   
+			  auto itr = by_seq_idx.upper_bound( boost::make_tuple( transfer_op.from, start ) );
+			  auto itr_stop = by_seq_idx.lower_bound( boost::make_tuple( transfer_op.from, stop ) );
+				  
+			  --itr;
+				  
+			  vector<account_transaction_history_object> atho;
+			  vector<operation_history_object> oho;
+		   
+			  while ( itr != itr_stop )
+			  {
+				 atho.push_back( *itr );
+				 oho.push_back( itr->operation_id(_db) );
+				 --itr;
+			  }
+			  uint32_t k = 0;
+			  for (auto o : oho)
+			  {
+				
+				 if(o.block_num == block_num) {
+					myblock->transactions[i].operation_results[z] = atho[k].id;
+					break;
+				 }
+				 k++;
+			  }
+			  z++;
+		  }
+		  catch ( ... ) { }
+	   }
+	   i++;
+   }
+   return myblock;
 }
 
 processed_transaction database_api::get_transaction( uint32_t block_num, uint32_t trx_in_block )const
