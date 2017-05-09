@@ -354,6 +354,15 @@ class wallet_api
        */
       vector<operation_detail>  get_account_history(string name, int limit)const;
 
+      /** Returns the relative operations on the named account from start number.
+       *
+       * @param name the name or id of the account
+       * @param stop Sequence number of earliest operation.
+       * @param limit the number of entries to return
+       * @param start  the sequence number where to start looping back throw the history
+       * @returns a list of \c operation_history_objects
+       */
+     vector<operation_detail>  get_relative_account_history(string name, uint32_t stop, int limit, uint32_t start)const;
 
       vector<bucket_object>             get_market_history(string symbol, string symbol2, uint32_t bucket, fc::time_point_sec start, fc::time_point_sec end)const;
       vector<limit_order_object>        get_limit_orders(string a, string b, uint32_t limit)const;
@@ -1651,6 +1660,7 @@ FC_API( graphene::wallet::wallet_api,
         (get_block)
         (get_account_count)
         (get_account_history)
+        (get_relative_account_history)
         (is_public_key_registered)
         (get_market_history)
         (get_global_properties)
