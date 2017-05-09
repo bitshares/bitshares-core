@@ -494,21 +494,25 @@ namespace graphene { namespace app {
        FC_ASSERT(limit <= 100);
        vector<operation_history_object> result;
        if( start == 0 )
-         start = account(db).statistics(db).total_ops;
-       else start = min( account(db).statistics(db).total_ops, start );
-       const auto& hist_idx = db.get_index_type<account_transaction_history_index>();
-       const auto& by_seq_idx = hist_idx.indices().get<by_seq>();
-       
-       auto itr = by_seq_idx.upper_bound( boost::make_tuple( account, start ) );
-       auto itr_stop = by_seq_idx.lower_bound( boost::make_tuple( account, stop ) );
-       --itr;
-       
-       while ( itr != itr_stop && result.size() < limit )
+          start = account(db).statistics(db).total_ops;
+       else
+          start = min( account(db).statistics(db).total_ops, start );
+
+       if( start >= stop && start > 0 )
        {
-          result.push_back( itr->operation_id(db) );
-          --itr;
+          const auto& hist_idx = db.get_index_type<account_transaction_history_index>();
+          const auto& by_seq_idx = hist_idx.indices().get<by_seq>();
+
+          auto itr = by_seq_idx.upper_bound( boost::make_tuple( account, start ) );
+          auto itr_stop = by_seq_idx.lower_bound( boost::make_tuple( account, stop ) );
+         
+          do
+          {
+             --itr;
+             result.push_back( itr->operation_id(db) );
+          }
+          while ( itr != itr_stop && result.size() < limit );
        }
-       
        return result;
     }
 
