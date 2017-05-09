@@ -2835,24 +2835,26 @@ vector<operation_detail> wallet_api::get_account_history(string name, int limit)
    return result;
 }
 
-vector<operation_detail> wallet_api::get_relative_account_history(string name, int stop, int limit, int start)const
+vector<operation_detail> wallet_api::get_relative_account_history(string name, uint32_t stop, int limit, uint32_t start)const
 {
    vector<operation_detail> result;
    auto account_id = get_account(name).get_id();
 
    while( limit > 0 )
    {
-      vector<operation_history_object> current = my->_remote_hist->get_relative_account_history(account_id, stop, std::min(100,limit), start);
-      for( auto& o : current ) {
-         std::stringstream ss;
-         auto memo = o.op.visit(detail::operation_printer(ss, *my, o.result));
-         result.push_back( operation_detail{ memo, ss.str(), o } );
+      if(stop >= 0 and start >= 0) {
+         vector <operation_history_object> current = my->_remote_hist->get_relative_account_history(account_id, stop, std::min<uint32_t>(100, limit), start);
+         for (auto &o : current) {
+            std::stringstream ss;
+            auto memo = o.op.visit(detail::operation_printer(ss, *my, o.result));
+            result.push_back(operation_detail{memo, ss.str(), o});
+         }
+         if (current.size() < std::min<uint32_t>(100, limit))
+            break;
+         limit -= current.size();
+         start -= 100;
       }
-      if( current.size() < std::min(100,limit) )
-         break;
-      limit -= current.size();
    }
-
    return result;
 }
 
