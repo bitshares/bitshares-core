@@ -509,7 +509,7 @@ void database::_apply_block( const signed_block& next_block )
        * for transactions when validating broadcast transactions or
        * when building a block.
        */
-      apply_transaction( trx, skip | skip_transaction_signatures );
+      apply_transaction( trx, skip );
       ++_current_trx_in_block;
    }
 
