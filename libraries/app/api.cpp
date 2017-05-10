@@ -498,7 +498,8 @@ namespace graphene { namespace app {
        else
           start = min( account(db).statistics(db).total_ops, start );
 
-       if( start >= stop && start > 0 )
+
+       if( start >= stop && start > 0 && limit > 0 )
        {
           const auto& hist_idx = db.get_index_type<account_transaction_history_index>();
           const auto& by_seq_idx = hist_idx.indices().get<by_seq>();
