@@ -164,11 +164,11 @@ namespace detail {
             vector<string> seeds = {
                "104.236.144.84:1777",               // puppies      (USA)
                "128.199.143.47:2015",               // Harvey       (Singapore)
-               "212.47.249.84:50696",               // iHashFury    (France)
                "23.92.53.182:1776",                 // sahkan       (USA)
                "51.15.61.160:1776",                 // lafona       (France)
                "bts-seed1.abit-more.com:62015",     // abit         (China)
                "node.blckchnd.com:4243",            // blckchnd     (Germany)
+               "seed.bitsharesdex.com:50696",       // iHashFury    (Europe)
                "seed.bitsharesnodes.com:1776",      // wackou       (Netherlands)
                "seed.blocktrades.us:1776",          // BlockTrades  (USA)
                "seed.cubeconnex.com:1777",          // cube         (USA)
