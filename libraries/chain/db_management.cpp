@@ -66,7 +66,7 @@ void database::reindex(fc::path data_dir, const genesis_state_type& initial_allo
    _undo_db.disable();
    for( uint32_t i = 1; i <= last_block_num; ++i )
    {
-      if( i % 5000 == 0 ) std::cerr << "   " << double(i*100)/last_block_num << "%   "<<i << " of " <<last_block_num<<"   \n";
+      if( i % 10000 == 0 ) std::cerr << "   " << double(i*100)/last_block_num << "%   "<<i << " of " <<last_block_num<<"   \n";
       fc::optional< signed_block > block = _block_id_to_block.fetch_by_number(i);
       if( !block.valid() )
       {

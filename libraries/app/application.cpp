@@ -386,90 +386,67 @@ namespace detail {
          }
          _chain_db->add_checkpoints( loaded_checkpoints );
 
-         bool need_reindex = false;
-         std::string reindex_reason = "(not needed)";
+         bool replay = false;
+         std::string replay_reason = "reason not provided";
 
-         while( true )
+         // never replay if data dir is empty
+         if( fc::exists( _data_dir ) && fc::directory_iterator( _data_dir ) != fc::directory_iterator() )
          {
-            if( _options->count("replay-blockchain" ) )
+            if( _options->count("replay-blockchain") )
             {
-               need_reindex = true;
-               reindex_reason = "user request";
-               break;
+               replay = true;
+               replay_reason = "replay-blockchain argument specified";
             }
-            if( !clean )
+            else if( !clean )
             {
-               need_reindex = true;
-               reindex_reason = "unclean shutdown";
-               break;
+               replay = true;
+               replay_reason = "unclean shutdown detected";
             }
-
-            auto check_is_new = [&]() -> bool
+            else if( !fc::exists( _data_dir / "db_version" ) )
             {
-               // directory doesn't exist
-               if( !fc::exists( _data_dir ) )
-                  return true;
-               // if directory exists but is empty, return true; else false.
-               return ( fc::directory_iterator( _data_dir ) == fc::directory_iterator() );
-            };
-
-            auto check_is_outdated = [&]() -> bool
-            {
-               if( !fc::exists( _data_dir / "db_version" ) )
-                  return true;
-               std::string version_str;
-               fc::read_file_contents( _data_dir / "db_version", version_str );
-               return (version_str != GRAPHENE_CURRENT_DB_VERSION);
-            };
-
-            bool is_new = check_is_new();
-
-            if( is_new )
-            {
-               need_reindex = false;
-               break;
+               replay = true;
+               replay_reason = "db_version file not found";
             }
-
-            if( is_outdated )
+            else
             {
-               need_reindex = true;
-               reindex_reason = "outdated datadir";
-               break;
+               std::string version_string;
+               fc::read_file_contents( _data_dir / "db_version", version_string );
+
+               if( version_string != GRAPHENE_CURRENT_DB_VERSION )
+               {
+                   replay = true;
+                   replay_reason = "db_version file content mismatch";
+               }
             }
          }
 
-         if( !need_reindex )
+         if( !replay )
          {
             try
             {
-               _chain_db->open(_data_dir / "blockchain", initial_state);
+               _chain_db->open( _data_dir / "blockchain", initial_state );
             }
             catch( const fc::exception& e )
             {
-               ilog( "caught exception ${e} in open()", ("e", e.to_detail_string()) );
-               need_reindex = true;
-               reindex_reason = "exception in open()";
+               ilog( "Caught exception ${e} in open()", ("e", e.to_detail_string()) );
+
+               replay = true;
+               replay_reason = "exception in open()";
             }
          }
 
-         if( need_reindex )
+         if( replay )
          {
-            ilog("Replaying blockchain due to ${reason}", ("reason", reindex_reason) );
+            ilog( "Replaying blockchain due to: ${reason}", ("reason", replay_reason) );
 
             fc::remove_all( _data_dir / "db_version" );
-            _chain_db->reindex(_data_dir / "blockchain", initial_state());
+            _chain_db->reindex( _data_dir / "blockchain", initial_state() );
 
-            // doing this down here helps ensure that DB will be wiped
-            // if any of the above steps were interrupted on a previous run
-            if( !fc::exists( _data_dir / "db_version" ) )
-            {
-               std::ofstream db_version(
-                  (_data_dir / "db_version").generic_string().c_str(),
-                  std::ios::out | std::ios::binary | std::ios::trunc );
-               std::string version_string = GRAPHENE_CURRENT_DB_VERSION;
-               db_version.write( version_string.c_str(), version_string.size() );
-               db_version.close();
-            }
+            const auto mode = std::ios::out | std::ios::binary | std::ios::trunc;
+            std::ofstream db_version( (_data_dir / "db_version").generic_string().c_str(), mode );
+            std::string version_string = GRAPHENE_CURRENT_DB_VERSION;
+            db_version.write( version_string.c_str(), version_string.size() );
+            db_version.close();
          }
 
          if( _options->count("force-validate") )
