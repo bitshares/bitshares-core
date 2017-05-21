@@ -386,13 +386,25 @@ namespace detail {
          }
          _chain_db->add_checkpoints( loaded_checkpoints );
 
-         if( _options->count("replay-blockchain") )
-         {
-            ilog("Replaying blockchain on user request.");
-            _chain_db->reindex(_data_dir/"blockchain", initial_state());
-         } else if( clean ) {
+         bool need_reindex = false;
+         std::string reindex_reason = "(not needed)";
 
-            auto is_new = [&]() -> bool
+         while( true )
+         {
+            if( _options->count("replay-blockchain" ) )
+            {
+               need_reindex = true;
+               reindex_reason = "user request";
+               break;
+            }
+            if( !clean )
+            {
+               need_reindex = true;
+               reindex_reason = "unclean shutdown";
+               break;
+            }
+
+            auto check_is_new = [&]() -> bool
             {
                // directory doesn't exist
                if( !fc::exists( _data_dir ) )
@@ -401,7 +413,7 @@ namespace detail {
                return ( fc::directory_iterator( _data_dir ) == fc::directory_iterator() );
             };
 
-            auto is_outdated = [&]() -> bool
+            auto check_is_outdated = [&]() -> bool
             {
                if( !fc::exists( _data_dir / "db_version" ) )
                   return true;
@@ -410,55 +422,54 @@ namespace detail {
                return (version_str != GRAPHENE_CURRENT_DB_VERSION);
             };
 
-            bool need_reindex = (!is_new() && is_outdated());
-            std::string reindex_reason = "version upgrade";
+            bool is_new = check_is_new();
 
-            if( !need_reindex )
+            if( is_new )
             {
-               try
-               {
-                  _chain_db->open(_data_dir / "blockchain", initial_state);
-               }
-               catch( const fc::exception& e )
-               {
-                  ilog( "caught exception ${e} in open()", ("e", e.to_detail_string()) );
-                  need_reindex = true;
-                  reindex_reason = "exception in open()";
-               }
+               need_reindex = false;
+               break;
             }
 
-            if( need_reindex )
+            if( is_outdated )
             {
-               ilog("Replaying blockchain due to ${reason}", ("reason", reindex_reason) );
-
-               fc::remove_all( _data_dir / "db_version" );
-               _chain_db->reindex(_data_dir / "blockchain", initial_state());
-
-               // doing this down here helps ensure that DB will be wiped
-               // if any of the above steps were interrupted on a previous run
-               if( !fc::exists( _data_dir / "db_version" ) )
-               {
-                  std::ofstream db_version(
-                     (_data_dir / "db_version").generic_string().c_str(),
-                     std::ios::out | std::ios::binary | std::ios::trunc );
-                  std::string version_string = GRAPHENE_CURRENT_DB_VERSION;
-                  db_version.write( version_string.c_str(), version_string.size() );
-                  db_version.close();
-               }
+               need_reindex = true;
+               reindex_reason = "outdated datadir";
+               break;
             }
-         } else {
-            wlog("Detected unclean shutdown. Replaying blockchain...");
-            _chain_db->reindex(_data_dir / "blockchain", initial_state());
          }
 
-         if (!_options->count("genesis-json") &&
-             _chain_db->get_chain_id() != graphene::egenesis::get_egenesis_chain_id()) {
-            elog("Detected old database. Nuking and starting over.");
-            _chain_db->wipe(_data_dir / "blockchain", true);
-            _chain_db.reset();
-            _chain_db = std::make_shared<chain::database>();
-            _chain_db->add_checkpoints(loaded_checkpoints);
-            _chain_db->open(_data_dir / "blockchain", initial_state);
+         if( !need_reindex )
+         {
+            try
+            {
+               _chain_db->open(_data_dir / "blockchain", initial_state);
+            }
+            catch( const fc::exception& e )
+            {
+               ilog( "caught exception ${e} in open()", ("e", e.to_detail_string()) );
+               need_reindex = true;
+               reindex_reason = "exception in open()";
+            }
+         }
+
+         if( need_reindex )
+         {
+            ilog("Replaying blockchain due to ${reason}", ("reason", reindex_reason) );
+
+            fc::remove_all( _data_dir / "db_version" );
+            _chain_db->reindex(_data_dir / "blockchain", initial_state());
+
+            // doing this down here helps ensure that DB will be wiped
+            // if any of the above steps were interrupted on a previous run
+            if( !fc::exists( _data_dir / "db_version" ) )
+            {
+               std::ofstream db_version(
+                  (_data_dir / "db_version").generic_string().c_str(),
+                  std::ios::out | std::ios::binary | std::ios::trunc );
+               std::string version_string = GRAPHENE_CURRENT_DB_VERSION;
+               db_version.write( version_string.c_str(), version_string.size() );
+               db_version.close();
+            }
          }
 
          if( _options->count("force-validate") )
