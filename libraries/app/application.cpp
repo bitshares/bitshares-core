@@ -165,6 +165,7 @@ namespace detail {
                "104.236.144.84:1777",               // puppies      (USA)
                "128.199.143.47:2015",               // Harvey       (Singapore)
                "23.92.53.182:1776",                 // sahkan       (USA)
+               "192.121.166.162:1776",              // sahkan       (UK)
                "51.15.61.160:1776",                 // lafona       (France)
                "bts-seed1.abit-more.com:62015",     // abit         (China)
                "node.blckchnd.com:4243",            // blckchnd     (Germany)
