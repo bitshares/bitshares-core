@@ -64,6 +64,7 @@ class account_history_plugin_impl
 
       account_history_plugin& _self;
       flat_set<account_id_type> _tracked_accounts;
+      bool _partial_operations = false;
 };
 
 account_history_plugin_impl::~account_history_plugin_impl()
@@ -77,18 +78,31 @@ void account_history_plugin_impl::update_account_histories( const signed_block& 
    const vector<optional< operation_history_object > >& hist = db.get_applied_operations();
    for( const optional< operation_history_object >& o_op : hist )
    {
-      // add to the operation history index
-      const auto& oho = db.create<operation_history_object>( [&]( operation_history_object& h )
-      {
-         if( o_op.valid() )
-            h = *o_op;
-      } );
+      optional<operation_history_object> oho;
 
-      if( !o_op.valid() )
+      auto create_oho = [&]() {
+         return optional<operation_history_object>( db.create<operation_history_object>( [&]( operation_history_object& h )
+         {
+            if( o_op.valid() )
+               h = *o_op;
+         } ) );
+      };
+
+      if (_partial_operations)
       {
-         ilog( "removing failed operation with ID: ${id}", ("id", oho.id) );
-         db.remove( oho );
-         continue;
+         if( !o_op.valid() ) continue;
+      }
+      else
+      {
+         // add to the operation history index
+         oho = create_oho();
+
+         if( !o_op.valid() )
+         {
+            ilog( "removing failed operation with ID: ${id}", ("id", oho->id) );
+            db.remove( *oho );
+            continue;
+         }
       }
 
       const operation_history_object& op = *o_op;
@@ -99,7 +113,10 @@ void account_history_plugin_impl::update_account_histories( const signed_block& 
       operation_get_required_authorities( op.op, impacted, impacted, other );
 
       if( op.op.which() == operation::tag< account_create_operation >::value )
-         impacted.insert( oho.result.get<object_id_type>() );
+      {
+         if (!oho.valid()) { oho = create_oho(); }
+         impacted.insert( oho->result.get<object_id_type>() );
+      }
       else
          graphene::app::operation_get_impacted_accounts( op.op, impacted );
 
@@ -110,6 +127,7 @@ void account_history_plugin_impl::update_account_histories( const signed_block& 
       // for each operation this account applies to that is in the config link it into the history
       if( _tracked_accounts.size() == 0 )
       {
+         if (!impacted.empty() && !oho.valid()) { oho = create_oho(); }
          for( auto& account_id : impacted )
          {
             // we don't do index_account_keys here anymore, because
@@ -118,7 +136,7 @@ void account_history_plugin_impl::update_account_histories( const signed_block& 
             // add history
             const auto& stats_obj = account_id(db).statistics(db);
             const auto& ath = db.create<account_transaction_history_object>( [&]( account_transaction_history_object& obj ){
-                obj.operation_id = oho.id;
+                obj.operation_id = oho->id;
                 obj.account = account_id;
                 obj.sequence = stats_obj.total_ops+1;
                 obj.next = stats_obj.most_recent_op;
@@ -135,10 +153,11 @@ void account_history_plugin_impl::update_account_histories( const signed_block& 
          {
             if( impacted.find( account_id ) != impacted.end() )
             {
+               if (!oho.valid()) { oho = create_oho(); }
                // add history
                const auto& stats_obj = account_id(db).statistics(db);
                const auto& ath = db.create<account_transaction_history_object>( [&]( account_transaction_history_object& obj ){
-                   obj.operation_id = oho.id;
+                   obj.operation_id = oho->id;
                    obj.account = account_id;
                    obj.sequence = stats_obj.total_ops+1;
                    obj.next = stats_obj.most_recent_op;
@@ -180,6 +199,7 @@ void account_history_plugin::plugin_set_program_options(
 {
    cli.add_options()
          ("track-account", boost::program_options::value<std::vector<std::string>>()->composing()->multitoken(), "Account ID to track history for (may specify multiple times)")
+         ("partial-operations", boost::program_options::value<bool>(), "Keep only those operations in memory that are related to account history tracking")
          ;
    cfg.add(cli);
 }
@@ -191,6 +211,9 @@ void account_history_plugin::plugin_initialize(const boost::program_options::var
    database().add_index< primary_index< account_transaction_history_index > >();
 
    LOAD_VALUE_SET(options, "track-account", my->_tracked_accounts, graphene::chain::account_id_type);
+   if (options.count("partial-operations")) {
+       my->_partial_operations = options["partial-operations"].as<bool>();
+   }
 }
 
 void account_history_plugin::plugin_startup()
