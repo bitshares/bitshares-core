@@ -65,6 +65,7 @@ class account_history_plugin_impl
       account_history_plugin& _self;
       flat_set<account_id_type> _tracked_accounts;
       bool _partial_operations = false;
+      primary_index< simple_index< operation_history_object > >* _oho_index;
 };
 
 account_history_plugin_impl::~account_history_plugin_impl()
@@ -90,7 +91,11 @@ void account_history_plugin_impl::update_account_histories( const signed_block& 
 
       if (_partial_operations)
       {
-         if( !o_op.valid() ) continue;
+         if( !o_op.valid() )
+         {
+            _oho_index->use_next_id();
+            continue;
+         }
       }
       else
       {
@@ -169,6 +174,8 @@ void account_history_plugin_impl::update_account_histories( const signed_block& 
             }
          }
       }
+      if (_partial_operations && ! oho.valid())
+         _oho_index->use_next_id();
    }
 }
 } // end namespace detail
@@ -207,7 +214,7 @@ void account_history_plugin::plugin_set_program_options(
 void account_history_plugin::plugin_initialize(const boost::program_options::variables_map& options)
 {
    database().applied_block.connect( [&]( const signed_block& b){ my->update_account_histories(b); } );
-   database().add_index< primary_index< simple_index< operation_history_object > > >();
+   my->_oho_index = database().add_index< primary_index< simple_index< operation_history_object > > >();
    database().add_index< primary_index< account_transaction_history_index > >();
 
    LOAD_VALUE_SET(options, "track-account", my->_tracked_accounts, graphene::chain::account_id_type);
