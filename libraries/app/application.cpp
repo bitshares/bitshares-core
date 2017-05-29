@@ -1028,9 +1028,9 @@ void application::initialize(const fc::path& data_dir, const boost::program_opti
       wanted.push_back("account_history");
       wanted.push_back("market_history");
    }
-   for (auto it = wanted.cbegin(); it != wanted.cend(); it++)
+   for (auto& it : wanted)
    {
-      if (!it->empty()) enable_plugin(*it);
+      if (!it.empty()) enable_plugin(it);
    }
 }
 
