@@ -44,6 +44,7 @@
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/algorithm/string/classification.hpp>
 #include <boost/algorithm/string/split.hpp>
+#include <boost/container/flat_set.hpp>
 
 #include <iostream>
 #include <fstream>
@@ -131,6 +132,7 @@ int main(int argc, char** argv) {
          if( !fc::exists(data_dir) )
             fc::create_directories(data_dir);
 
+         boost::container::flat_set<std::string> seen;
          std::ofstream out_cfg(config_ini_path.preferred_string());
          for( const boost::shared_ptr<bpo::option_description> od : cfg_options.options() )
          {
@@ -140,6 +142,9 @@ int main(int argc, char** argv) {
             if( !od->semantic()->apply_default(store) )
                out_cfg << "# " << od->long_name() << " = \n";
             else {
+               const std::string name = od->long_name();
+               if( seen.find(name) != seen.end() ) continue;
+               seen.insert(name);
                auto example = od->format_parameter();
                if( example.empty() )
                   // This is a boolean switch
