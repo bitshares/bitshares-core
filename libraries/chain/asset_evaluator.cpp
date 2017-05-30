@@ -500,7 +500,10 @@ void_result asset_publish_feeds_evaluator::do_evaluate(const asset_publish_feed_
    FC_ASSERT(base.is_market_issued());
 
    const asset_bitasset_data_object& bitasset = base.bitasset_data(d);
-   FC_ASSERT( !bitasset.has_settlement(), "No further feeds may be published after a settlement event" );
+   if( bitasset.is_prediction_market || d.head_block_time() <= HARDFORK_CORE_216_TIME )
+   {
+      FC_ASSERT( !bitasset.has_settlement(), "No further feeds may be published after a settlement event" );
+   }
 
    FC_ASSERT( o.feed.settlement_price.quote.asset_id == bitasset.options.short_backing_asset );
    if( d.head_block_time() > HARDFORK_480_TIME )

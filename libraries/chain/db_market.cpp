@@ -37,7 +37,6 @@ namespace graphene { namespace chain {
  * All margin positions are force closed at the swan price
  * Collateral received goes into a force-settlement fund
  * No new margin positions can be created for this asset
- * No more price feed updates
  * Force settlement happens without delay at the swan price, deducting from force-settlement fund
  * No more asset updates may be issued.
 */

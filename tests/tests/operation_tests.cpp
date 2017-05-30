@@ -281,6 +281,9 @@ BOOST_AUTO_TEST_CASE( black_swan )
       FC_ASSERT( bitusd_id(db).bitasset_data(db).current_feed.settlement_price.is_null() );
       force_settle(borrower_id(db), asset(100, bitusd_id));
 
+      current_feed.settlement_price = bitusd_id(db).amount(100) / asset_id_type()(db).amount(100);
+      publish_feed(bitusd_id(db), feedproducer_id(db), current_feed);
+
       BOOST_TEST_MESSAGE( "Verify that we cannot borrow after black swan" );
       GRAPHENE_REQUIRE_THROW( borrow(borrower_id(db), asset(1000, bitusd_id), asset(2000)), fc::exception );
    } catch( const fc::exception& e) {
