@@ -275,6 +275,7 @@ BOOST_AUTO_TEST_CASE( black_swan )
 
       // make sure pricefeeds expire
       generate_blocks(db.head_block_time() + GRAPHENE_DEFAULT_PRICE_FEED_LIFETIME);
+      generate_blocks( HARDFORK_CORE_216_TIME );
       generate_blocks(2);
 
       FC_ASSERT( bitusd_id(db).bitasset_data(db).current_feed.settlement_price.is_null() );

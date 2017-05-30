@@ -447,7 +447,9 @@ void_result asset_settle_evaluator::do_evaluate(const asset_settle_evaluator::op
    FC_ASSERT(asset_to_settle->can_force_settle() || bitasset.has_settlement() );
    if( bitasset.is_prediction_market )
       FC_ASSERT( bitasset.has_settlement(), "global settlement must occur before force settling a prediction market"  );
-   else if( bitasset.current_feed.settlement_price.is_null() )
+   else if( bitasset.current_feed.settlement_price.is_null()
+            && ( d.head_block_time() <= HARDFORK_CORE_216_TIME
+                 || !bitasset.has_settlement() ) )
       FC_THROW_EXCEPTION(insufficient_feeds, "Cannot force settle with no price feed.");
    FC_ASSERT(d.get_balance(d.get(op.account), *asset_to_settle) >= op.amount);
 
