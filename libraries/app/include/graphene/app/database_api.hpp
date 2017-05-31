@@ -190,6 +190,10 @@ class database_api
       */
       operation_history_id_type get_operation_history_id(uint32_t block_num, uint32_t trx_in_block, uint32_t op_in_trx)const;
 
+      /**
+      * Given a operation_history_id, get the account_transaction_history_id
+      */
+      account_transaction_history_id_type get_account_transaction_history_id(operation_history_id_type operation_id)const;
 
       /////////////
       // Globals //
@@ -607,6 +611,7 @@ FC_API(graphene::app::database_api,
    (get_transaction)
    (get_recent_transaction_by_id)
    (get_operation_history_id)
+   (get_account_transaction_history_id)
 
    // Globals
    (get_chain_properties)
