@@ -185,6 +185,12 @@ class database_api
        */
       optional<signed_transaction> get_recent_transaction_by_id( const transaction_id_type& id )const;
 
+      /**
+      * Given a block, transaction in block position and operation position in transaction, get the operation_history_id
+      */
+      operation_history_id_type get_operation_history_id(uint32_t block_num, uint32_t trx_in_block, uint32_t op_in_trx)const;
+
+
       /////////////
       // Globals //
       /////////////
@@ -600,6 +606,7 @@ FC_API(graphene::app::database_api,
    (get_block)
    (get_transaction)
    (get_recent_transaction_by_id)
+   (get_operation_history_id)
 
    // Globals
    (get_chain_properties)
