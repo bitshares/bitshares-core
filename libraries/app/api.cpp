@@ -493,13 +493,14 @@ namespace graphene { namespace app {
        const auto& db = *_app.chain_database();
        FC_ASSERT(limit <= 100);
        vector<operation_history_object> result;
+       const auto& stats = account(db).statistics(db);
        if( start == 0 )
-          start = account(db).statistics(db).total_ops;
+          start = stats.total_ops;
        else
-          start = min( account(db).statistics(db).total_ops, start );
+          start = min( stats.total_ops, start );
 
 
-       if( start >= stop && start > 0 && limit > 0 )
+       if( start >= stop && start > stats.removed_ops && limit > 0 )
        {
           const auto& hist_idx = db.get_index_type<account_transaction_history_index>();
           const auto& by_seq_idx = hist_idx.indices().get<by_seq>();
