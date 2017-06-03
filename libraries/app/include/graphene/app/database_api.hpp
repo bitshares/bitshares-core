@@ -188,12 +188,12 @@ class database_api
       /**
       * Given a block, transaction in block position and operation position in transaction, get the operation_history_id
       */
-      operation_history_id_type get_operation_history_id(uint32_t block_num, uint32_t trx_in_block, uint32_t op_in_trx)const;
+      optional<operation_history_id_type> get_operation_history_id(uint32_t block_num, uint32_t trx_in_block, uint32_t op_in_trx)const;
 
       /**
       * Given a operation_history_id, get the account_transaction_history_id
       */
-      account_transaction_history_id_type get_account_transaction_history_id(operation_history_id_type operation_id)const;
+      optional<account_transaction_history_id_type> get_account_transaction_history_id(operation_history_id_type operation_id)const;
 
       /////////////
       // Globals //
