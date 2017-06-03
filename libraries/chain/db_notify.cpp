@@ -387,6 +387,6 @@ void database::notify_changed_objects()
         removed_objects(removed_ids, removed, removed_accounts_impacted);
       }
    }
-} FC_CAPTURE_AND_LOG( () ) }
+} FC_CAPTURE_AND_LOG( (0) ) }
 
 } }
