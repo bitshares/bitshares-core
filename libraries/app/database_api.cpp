@@ -68,8 +68,6 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       map<uint32_t, optional<block_header>> get_block_header_batch(const vector<uint32_t> block_nums)const;
       optional<signed_block> get_block(uint32_t block_num)const;
       processed_transaction get_transaction( uint32_t block_num, uint32_t trx_in_block )const;
-      operation_history_id_type get_operation_history_id(uint32_t block_num, uint32_t trx_in_block, uint32_t op_in_trx)const;
-      account_transaction_history_id_type get_account_transaction_history_id(operation_history_id_type operation_id)const;
 
       // Globals
       chain_property_object get_chain_properties()const;
@@ -411,43 +409,6 @@ processed_transaction database_api_impl::get_transaction(uint32_t block_num, uin
    FC_ASSERT( opt_block->transactions.size() > trx_num );
    return opt_block->transactions[trx_num];
 }
-
-operation_history_id_type database_api::get_operation_history_id(uint32_t block_num, uint32_t trx_in_block, uint32_t op_in_trx)const
-{
-   return my->get_operation_history_id( block_num, trx_in_block, op_in_trx );
-}
-
-operation_history_id_type database_api_impl::get_operation_history_id(uint32_t block_num, uint32_t trx_in_block, uint32_t op_in_trx)const
-{
-   const simple_index<operation_history_object>& op_index = _db.get_index_type<simple_index<operation_history_object>>();
-
-   for( const operation_history_object& op : op_index )
-   {
-      if(op.block_num == block_num and op.trx_in_block == trx_in_block and op.op_in_trx == op_in_trx) {
-         return op.id;
-         break;
-      }
-   }
-}
-account_transaction_history_id_type database_api::get_account_transaction_history_id(operation_history_id_type operation_id)const
-{
-   return my->get_account_transaction_history_id( operation_id );
-}
-
-account_transaction_history_id_type database_api_impl::get_account_transaction_history_id(operation_history_id_type operation_id)const
-{
-   const auto& ath_idx = _db.get_index_type<account_transaction_history_index>();
-   const auto& ath_by_seq_idx = ath_idx.indices().get<by_seq>();
-
-   for( const account_transaction_history_object& ath : ath_by_seq_idx )
-   {
-      if(ath.operation_id == operation_id) {
-         return ath.id;
-         break;
-      }
-   }
-}
-
 
 //////////////////////////////////////////////////////////////////////
 //                                                                  //
