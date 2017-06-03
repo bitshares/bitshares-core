@@ -267,9 +267,9 @@ BOOST_AUTO_TEST_CASE( black_swan )
       publish_feed( bitusd, feedproducer, current_feed );
 
       /// this sell order is designed to trigger a black swan
-      create_sell_order( borrower2, bitusd.amount(1000), core.amount(3000) );
+      limit_order_id_type order_id = create_sell_order( borrower2, bitusd.amount(1000), core.amount(3000) )->id;
 
-      FC_ASSERT( bitusd.bitasset_data(db).has_settlement() );
+      BOOST_CHECK( bitusd.bitasset_data(db).has_settlement() );
 
       force_settle(borrower, bitusd.amount(100));
 
@@ -281,12 +281,14 @@ BOOST_AUTO_TEST_CASE( black_swan )
       FC_ASSERT( bitusd_id(db).bitasset_data(db).current_feed.settlement_price.is_null() );
       force_settle(borrower_id(db), asset(100, bitusd_id));
 
-      current_feed.settlement_price = bitusd_id(db).amount(100) / asset_id_type()(db).amount(100);
+      current_feed.settlement_price = bitusd_id(db).amount(100) / asset_id_type()(db).amount(150);
       publish_feed(bitusd_id(db), feedproducer_id(db), current_feed);
 
       BOOST_TEST_MESSAGE( "Verify that we cannot borrow after black swan" );
-      GRAPHENE_REQUIRE_THROW( borrow(borrower_id(db), asset(1000, bitusd_id), asset(2000)), fc::exception );
-   } catch( const fc::exception& e) {
+      GRAPHENE_REQUIRE_THROW( borrow(borrower_id(db), asset(1000, bitusd_id), asset(2000)), fc::exception )
+
+      // TODO: test revive by shorting
+} catch( const fc::exception& e) {
       edump((e.to_detail_string()));
       throw;
    }
