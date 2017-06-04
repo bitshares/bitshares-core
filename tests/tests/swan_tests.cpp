@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015 Cryptonomex, Inc., and contributors.
+ * Copyright (c) 2017 Cryptonomex, Inc., and contributors.
  *
  * The MIT License
  *
@@ -40,7 +40,89 @@
 using namespace graphene::chain;
 using namespace graphene::chain::test;
 
-BOOST_FIXTURE_TEST_SUITE( swan_tests, database_fixture )
+namespace graphene { namespace chain {
+
+struct swan_fixture : database_fixture {
+    limit_order_id_type init_standard_swan(share_type amount = 1000) {
+        standard_users();
+        standard_asset();
+        return trigger_swan(amount, amount);
+    }
+
+    void standard_users() {
+        ACTORS((borrower)(borrower2)(feedproducer));
+        _borrower = borrower_id;
+        _borrower2 = borrower2_id;
+        _feedproducer = feedproducer_id;
+
+        transfer(committee_account, borrower_id, asset(init_balance));
+        transfer(committee_account, borrower2_id, asset(init_balance));
+    }
+
+    void standard_asset() {
+        const auto& bitusd = create_bitasset("USDBIT", _feedproducer);
+        _swan = bitusd.id;
+        _back = asset_id_type();
+        update_feed_producers(swan(), {_feedproducer});
+    }
+
+    limit_order_id_type trigger_swan(share_type amount1, share_type amount2) {
+        // starting out with price 1:1
+        set_feed( 1, 1 );
+        // start out with 2:1 collateral
+        borrow(borrower(), swan().amount(amount1), back().amount(2*amount1));
+        borrow(borrower2(), swan().amount(amount2), back().amount(4*amount2));
+
+        FC_ASSERT( get_balance(borrower(),  swan()) == amount1 );
+        FC_ASSERT( get_balance(borrower2(), swan()) == amount2 );
+        FC_ASSERT( get_balance(borrower() , back()) == init_balance - 2*amount1 );
+        FC_ASSERT( get_balance(borrower2(), back()) == init_balance - 4*amount2 );
+
+        set_feed( 1, 2 );
+        // this sell order is designed to trigger a black swan
+        limit_order_id_type oid = create_sell_order( borrower2(), swan().amount(1), back().amount(3) )->id;
+
+        FC_ASSERT( get_balance(borrower(),  swan()) == amount1 );
+        FC_ASSERT( get_balance(borrower2(), swan()) == amount2 - 1 );
+        FC_ASSERT( get_balance(borrower() , back()) == init_balance - 2*amount1 );
+        FC_ASSERT( get_balance(borrower2(), back()) == init_balance - 2*amount2 );
+
+        BOOST_CHECK( swan().bitasset_data(db).has_settlement() );
+
+        return oid;
+    }
+
+    void set_feed(share_type usd, share_type core) {
+        price_feed feed;
+        feed.settlement_price = swan().amount(usd) / back().amount(core);
+        publish_feed(swan(), feedproducer(), feed);
+    }
+
+    void expire_feed() {
+      generate_blocks(db.head_block_time() + GRAPHENE_DEFAULT_PRICE_FEED_LIFETIME);
+      generate_blocks(2);
+      FC_ASSERT( swan().bitasset_data(db).current_feed.settlement_price.is_null() );
+    }
+
+    void wait_for_hf_core_216() {
+      generate_blocks( HARDFORK_CORE_216_TIME );
+      generate_blocks(2);
+    }
+
+    const account_object& borrower() { return _borrower(db); }
+    const account_object& borrower2() { return _borrower2(db); }
+    const account_object& feedproducer() { return _feedproducer(db); }
+    const asset_object& swan() { return _swan(db); }
+    const asset_object& back() { return _back(db); }
+
+    int64_t init_balance = 1000000;
+    account_id_type _borrower, _borrower2, _feedproducer;
+    asset_id_type _swan, _back;
+};
+
+}}
+
+BOOST_FIXTURE_TEST_SUITE( swan_tests, swan_fixture )
 
 /**
  *  This test sets up the minimum condition for a black swan to occur but does
@@ -48,56 +130,19 @@ BOOST_FIXTURE_TEST_SUITE( swan_tests, database_fixture )
  */
 BOOST_AUTO_TEST_CASE( black_swan )
 { try {
-      ACTORS((borrower)(borrower2)(feedproducer));
+      init_standard_swan();
 
-      const auto& bitusd = create_bitasset("USDBIT", feedproducer_id);
-      const asset_id_type bitusd_id = bitusd.id;
-      const auto& core   = asset_id_type()(db);
+      force_settle( borrower(), swan().amount(100) );
 
-      int64_t init_balance(1000000);
+      expire_feed();
+      wait_for_hf_core_216();
 
-      transfer(committee_account, borrower_id, asset(init_balance));
-      transfer(committee_account, borrower2_id, asset(init_balance));
-      update_feed_producers(bitusd, {feedproducer.id});
+      force_settle( borrower(), swan().amount(100) );
 
-      price_feed current_feed;
-      current_feed.settlement_price = bitusd.amount(100) / core.amount(100);
-
-      // starting out with price 1:1
-      publish_feed(bitusd, feedproducer, current_feed);
-
-      // start out with 2:1 collateral
-      borrow(borrower, bitusd.amount(1000), asset(2000));
-      borrow(borrower2, bitusd.amount(1000), asset(4000));
-
-      BOOST_REQUIRE_EQUAL( get_balance(borrower, bitusd), 1000 );
-      BOOST_REQUIRE_EQUAL( get_balance(borrower2, bitusd), 1000 );
-      BOOST_REQUIRE_EQUAL( get_balance(borrower , core), init_balance - 2000 );
-      BOOST_REQUIRE_EQUAL( get_balance(borrower2, core), init_balance - 4000 );
-
-      current_feed.settlement_price = bitusd.amount( 100 ) / core.amount(200);
-      publish_feed( bitusd, feedproducer, current_feed );
-
-      /// this sell order is designed to trigger a black swan
-      create_sell_order( borrower2, bitusd.amount(1000), core.amount(3000) );
-
-      BOOST_CHECK( bitusd.bitasset_data(db).has_settlement() );
-
-      force_settle(borrower, bitusd.amount(100));
-
-      // make sure pricefeeds expire
-      generate_blocks(db.head_block_time() + GRAPHENE_DEFAULT_PRICE_FEED_LIFETIME);
-      generate_blocks( HARDFORK_CORE_216_TIME );
-      generate_blocks(2);
-
-      FC_ASSERT( bitusd_id(db).bitasset_data(db).current_feed.settlement_price.is_null() );
-      force_settle(borrower_id(db), asset(100, bitusd_id));
-
-      current_feed.settlement_price = bitusd_id(db).amount(100) / asset_id_type()(db).amount(150);
-      publish_feed(bitusd_id(db), feedproducer_id(db), current_feed);
+      set_feed( 100, 150 );
 
       BOOST_TEST_MESSAGE( "Verify that we cannot borrow after black swan" );
-      GRAPHENE_REQUIRE_THROW( borrow(borrower_id(db), asset(1000, bitusd_id), asset(2000)), fc::exception )
+      GRAPHENE_REQUIRE_THROW( borrow(borrower(), swan().amount(1000), back().amount(2000)), fc::exception )
       trx.operations.clear();
 } catch( const fc::exception& e) {
       edump((e.to_detail_string()));
@@ -116,7 +161,6 @@ BOOST_AUTO_TEST_CASE( black_swan_issue_346 )
       const asset_object& core = asset_id_type()(db);
 
       int trial = 0;
-      const int64_t init_balance(1000000);
 
       vector< const account_object* > actors{ &buyer, &seller, &borrower, &borrower2, &settler, &feeder };
 
@@ -225,46 +269,15 @@ BOOST_AUTO_TEST_CASE( black_swan_issue_346 )
  */
 BOOST_AUTO_TEST_CASE( revive_recovered )
 { try {
-      ACTORS((borrower)(borrower2)(feedproducer));
+      init_standard_swan( 700 );
 
-      const auto& bitusd = create_bitasset("USDBIT", feedproducer_id);
-      const asset_id_type bitusd_id = bitusd.id;
-      const auto& core   = asset_id_type()(db);
-
-      int64_t init_balance(1000000);
-
-      transfer(committee_account, borrower_id, asset(init_balance));
-      transfer(committee_account, borrower2_id, asset(init_balance));
-      update_feed_producers(bitusd, {feedproducer.id});
-
-      price_feed current_feed;
-      current_feed.settlement_price = bitusd.amount(100) / core.amount(100);
-
-      // starting out with price 1:1
-      publish_feed(bitusd, feedproducer, current_feed);
-
-      // start out with 2:1 collateral
-      borrow(borrower, bitusd.amount(700), asset(1400));
-      borrow(borrower2, bitusd.amount(700), asset(2800));
-
-      current_feed.settlement_price = bitusd.amount( 100 ) / core.amount(200);
-      publish_feed( bitusd, feedproducer, current_feed );
-
-      /// this sell order is designed to trigger a black swan
-      create_sell_order( borrower2, bitusd.amount(10), core.amount(30) );
-
-      BOOST_CHECK( bitusd.bitasset_data(db).has_settlement() );
-
-      generate_blocks( HARDFORK_CORE_216_TIME );
-      generate_blocks(2);
+      wait_for_hf_core_216();
 
       // revive after price recovers
-      current_feed.settlement_price = asset( 700, bitusd_id ) / asset(800);
-      publish_feed( bitusd_id(db), feedproducer_id(db), current_feed );
-      BOOST_CHECK( bitusd_id(db).bitasset_data(db).has_settlement() );
-      current_feed.settlement_price = asset( 701, bitusd_id ) / asset(800);
-      publish_feed( bitusd_id(db), feedproducer_id(db), current_feed );
-      BOOST_CHECK( !bitusd_id(db).bitasset_data(db).has_settlement() );
+      set_feed( 700, 800 );
+      BOOST_CHECK( swan().bitasset_data(db).has_settlement() );
+      set_feed( 701, 800 );
+      BOOST_CHECK( !swan().bitasset_data(db).has_settlement() );
 } catch( const fc::exception& e) {
       edump((e.to_detail_string()));
       throw;
