@@ -1225,7 +1225,7 @@ order_book database_api_impl::get_order_book( const string& base, const string& 
          order ord;
          ord.price = price_to_real( o.sell_price );
          ord.quote = asset_to_real( o.for_sale, assets[1]->precision );
-         ord.base = asset_to_real( share_type( ( uint64_t( o.for_sale.value ) * o.sell_price.quote.amount.value ) / o.sell_price.base.amount.value ), assets[0]->precision );
+         ord.base = asset_to_real( share_type( ( uint128_t( o.for_sale.value ) * o.sell_price.quote.amount.value ) / o.sell_price.base.amount.value ), assets[0]->precision );
          result.asks.push_back( ord );
       }
    }
