@@ -4390,7 +4390,7 @@ namespace graphene { namespace net { namespace detail {
         _node_configuration = detail::node_configuration();
 
 #ifdef GRAPHENE_TEST_NETWORK
-        uint32_t port = GRAPHENE_NET_TEST_P2P_PORT + GRAPHENE_TEST_NETWORK_VERSION;
+        uint32_t port = GRAPHENE_NET_TEST_P2P_PORT;
 #else
         uint32_t port = GRAPHENE_NET_DEFAULT_P2P_PORT;
 #endif
