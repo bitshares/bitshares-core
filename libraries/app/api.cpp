@@ -39,6 +39,7 @@
 
 #include <fc/crypto/hex.hpp>
 #include <fc/smart_ref_impl.hpp>
+#include <fc/thread/future.hpp>
 
 namespace graphene { namespace app {
 
@@ -157,6 +158,16 @@ namespace graphene { namespace app {
        trx.validate();
        _app.chain_database()->push_transaction(trx);
        _app.p2p_node()->broadcast_transaction(trx);
+    }
+
+    fc::variant network_broadcast_api::broadcast_transaction_synchronous(const signed_transaction& trx)
+    {
+       fc::promise<fc::variant>::ptr prom( new fc::promise<fc::variant>() );
+       broadcast_transaction_with_callback( [=]( const fc::variant& v ){
+        prom->set_value(v);
+       }, trx );
+
+       return fc::future<fc::variant>(prom).wait();
     }
 
     void network_broadcast_api::broadcast_block( const signed_block& b )
