@@ -305,7 +305,7 @@ namespace graphene { namespace app {
          asset_api(graphene::chain::database& db);
          ~asset_api();
 
-         vector<account_asset_balance> get_asset_holders( asset_id_type asset_id )const;
+         vector<account_asset_balance> get_asset_holders( asset_id_type asset_id, uint32_t start, uint32_t limit  )const;
          int get_asset_holders_count( asset_id_type asset_id )const;
          vector<asset_holders> get_all_asset_holders() const;
 

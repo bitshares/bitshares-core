@@ -625,16 +625,25 @@ namespace graphene { namespace app {
     asset_api::asset_api(graphene::chain::database& db) : _db(db) { }
     asset_api::~asset_api() { }
 
-    vector<account_asset_balance> asset_api::get_asset_holders( asset_id_type asset_id ) const {
+    vector<account_asset_balance> asset_api::get_asset_holders( asset_id_type asset_id, uint32_t start, uint32_t limit ) const {
+
+      FC_ASSERT(limit <= 100);
 
       const auto& bal_idx = _db.get_index_type< account_balance_index >().indices().get< by_asset_balance >();
       auto range = bal_idx.equal_range( boost::make_tuple( asset_id ) );
 
       vector<account_asset_balance> result;
 
+      uint32_t total_counter = 0;
+      uint32_t start_counter = 0;
+
       for( const account_balance_object& bal : boost::make_iterator_range( range.first, range.second ) )
       {
+        //wdump((bal));
         if( bal.balance.value == 0 ) continue;
+        
+        start_counter++;
+        if( start >= start_counter ) continue;
 
         auto account = _db.find(bal.owner);
 
@@ -644,6 +653,11 @@ namespace graphene { namespace app {
         aab.amount     = bal.balance.value;
 
         result.push_back(aab);
+
+        if(total_counter >= limit) break;
+
+        total_counter++;
+
       }
 
       return result;
