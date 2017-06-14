@@ -525,7 +525,6 @@ namespace detail {
       { try {
 
          auto latency = fc::time_point::now() - blk_msg.block.timestamp;
-         FC_ASSERT( (latency.count()/1000) > -5000, "Rejecting block with timestamp in the future" );
          if (!sync_mode || blk_msg.block.block_num() % 10000 == 0)
          {
             const auto& witness = blk_msg.block.witness(*_chain_db);
@@ -538,6 +537,7 @@ namespace detail {
                  ("w",witness_account.name)
                  ("i",last_irr)("d",blk_msg.block.block_num()-last_irr) );
          }
+         FC_ASSERT( (latency.count()/1000) > -5000, "Rejecting block with timestamp in the future" );
 
          try {
             // TODO: in the case where this block is valid but on a fork that's too old for us to switch to,

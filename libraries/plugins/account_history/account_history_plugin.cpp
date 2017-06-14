@@ -64,6 +64,13 @@ class account_history_plugin_impl
 
       account_history_plugin& _self;
       flat_set<account_id_type> _tracked_accounts;
+      bool _partial_operations = false;
+      primary_index< simple_index< operation_history_object > >* _oho_index;
+      uint32_t _max_ops_per_account = -1;
+   private:
+      /** add one history record, then check and remove the earliest history record */
+      void add_account_history( const account_id_type account_id, const operation_history_id_type op_id );
+
 };
 
 account_history_plugin_impl::~account_history_plugin_impl()
@@ -77,29 +84,36 @@ void account_history_plugin_impl::update_account_histories( const signed_block& 
    const vector<optional< operation_history_object > >& hist = db.get_applied_operations();
    for( const optional< operation_history_object >& o_op : hist )
    {
-      // add to the operation history index
-      const auto& oho = db.create<operation_history_object>( [&]( operation_history_object& h )
-      {
-         if( o_op.valid() )
-            h = *o_op;
-      } );
+      optional<operation_history_object> oho;
 
-      if( !o_op.valid() )
+      auto create_oho = [&]() {
+         return optional<operation_history_object>( db.create<operation_history_object>( [&]( operation_history_object& h )
+         {
+            if( o_op.valid() )
+               h = *o_op;
+         } ) );
+      };
+
+      if( !o_op.valid() || ( _max_ops_per_account == 0 && _partial_operations ) )
       {
-         ilog( "removing failed operation with ID: ${id}", ("id", oho.id) );
-         db.remove( oho );
+         // Note: the 2nd and 3rd checks above are for better performance, when the db is not clean,
+         //       they will break consistency of account_stats.total_ops and removed_ops and most_recent_op
+         _oho_index->use_next_id();
          continue;
       }
+      else if( !_partial_operations )
+         // add to the operation history index
+         oho = create_oho();
 
       const operation_history_object& op = *o_op;
 
       // get the set of accounts this operation applies to
       flat_set<account_id_type> impacted;
       vector<authority> other;
-      operation_get_required_authorities( op.op, impacted, impacted, other );
+      operation_get_required_authorities( op.op, impacted, impacted, other ); // fee_payer is added here
 
       if( op.op.which() == operation::tag< account_create_operation >::value )
-         impacted.insert( oho.result.get<object_id_type>() );
+         impacted.insert( op.result.get<object_id_type>() );
       else
          graphene::app::operation_get_impacted_accounts( op.op, impacted );
 
@@ -107,51 +121,119 @@ void account_history_plugin_impl::update_account_histories( const signed_block& 
          for( auto& item : a.account_auths )
             impacted.insert( item.first );
 
-      // for each operation this account applies to that is in the config link it into the history
-      if( _tracked_accounts.size() == 0 )
-      {
-         for( auto& account_id : impacted )
-         {
-            // we don't do index_account_keys here anymore, because
-            // that indexing now happens in observers' post_evaluate()
+      // be here, either _max_ops_per_account > 0, or _partial_operations == false, or both
+      // if _partial_operations == false, oho should have been created above
+      // so the only case should be checked here is:
+      //    whether need to create oho if _max_ops_per_account > 0 and _partial_operations == true
 
-            // add history
-            const auto& stats_obj = account_id(db).statistics(db);
-            const auto& ath = db.create<account_transaction_history_object>( [&]( account_transaction_history_object& obj ){
-                obj.operation_id = oho.id;
-                obj.account = account_id;
-                obj.sequence = stats_obj.total_ops+1;
-                obj.next = stats_obj.most_recent_op;
-            });
-            db.modify( stats_obj, [&]( account_statistics_object& obj ){
-                obj.most_recent_op = ath.id;
-                obj.total_ops = ath.sequence;
-            });
+      // for each operation this account applies to that is in the config link it into the history
+      if( _tracked_accounts.size() == 0 ) // tracking all accounts
+      {
+         // if tracking all accounts, when impacted is not empty (although it will always be),
+         //    still need to create oho if _max_ops_per_account > 0 and _partial_operations == true
+         //    so always need to create oho if not done
+         if (!impacted.empty() && !oho.valid()) { oho = create_oho(); }
+
+         if( _max_ops_per_account > 0 )
+         {
+            // Note: the check above is for better performance, when the db is not clean,
+            //       it breaks consistency of account_stats.total_ops and removed_ops and most_recent_op,
+            //       but it ensures it's safe to remove old entries in add_account_history(...)
+            for( auto& account_id : impacted )
+            {
+               // we don't do index_account_keys here anymore, because
+               // that indexing now happens in observers' post_evaluate()
+
+               // add history
+               add_account_history( account_id, oho->id );
+            }
          }
       }
-      else
+      else // tracking a subset of accounts
       {
-         for( auto account_id : _tracked_accounts )
+         // whether need to create oho if _max_ops_per_account > 0 and _partial_operations == true ?
+         // the answer: only need to create oho if a tracked account is impacted and need to save history
+
+         if( _max_ops_per_account > 0 )
          {
-            if( impacted.find( account_id ) != impacted.end() )
+            // Note: the check above is for better performance, when the db is not clean,
+            //       it breaks consistency of account_stats.total_ops and removed_ops and most_recent_op,
+            //       but it ensures it's safe to remove old entries in add_account_history(...)
+            for( auto account_id : _tracked_accounts )
             {
-               // add history
-               const auto& stats_obj = account_id(db).statistics(db);
-               const auto& ath = db.create<account_transaction_history_object>( [&]( account_transaction_history_object& obj ){
-                   obj.operation_id = oho.id;
-                   obj.account = account_id;
-                   obj.sequence = stats_obj.total_ops+1;
-                   obj.next = stats_obj.most_recent_op;
-               });
-               db.modify( stats_obj, [&]( account_statistics_object& obj ){
-                   obj.most_recent_op = ath.id;
-                   obj.total_ops = ath.sequence;
-               });
+               if( impacted.find( account_id ) != impacted.end() )
+               {
+                  if (!oho.valid()) { oho = create_oho(); }
+                  // add history
+                  add_account_history( account_id, oho->id );
+               }
+            }
+         }
+      }
+      if (_partial_operations && ! oho.valid())
+         _oho_index->use_next_id();
+   }
+}
+
+void account_history_plugin_impl::add_account_history( const account_id_type account_id, const operation_history_id_type op_id )
+{
+   graphene::chain::database& db = database();
+   const auto& stats_obj = account_id(db).statistics(db);
+   // add new entry
+   const auto& ath = db.create<account_transaction_history_object>( [&]( account_transaction_history_object& obj ){
+       obj.operation_id = op_id;
+       obj.account = account_id;
+       obj.sequence = stats_obj.total_ops + 1;
+       obj.next = stats_obj.most_recent_op;
+   });
+   db.modify( stats_obj, [&]( account_statistics_object& obj ){
+       obj.most_recent_op = ath.id;
+       obj.total_ops = ath.sequence;
+   });
+   // remove the earliest account history entry if too many
+   // _max_ops_per_account is guaranteed to be non-zero outside
+   if( stats_obj.total_ops - stats_obj.removed_ops > _max_ops_per_account )
+   {
+      // look for the earliest entry
+      const auto& his_idx = db.get_index_type<account_transaction_history_index>();
+      const auto& by_seq_idx = his_idx.indices().get<by_seq>();
+      auto itr = by_seq_idx.lower_bound( boost::make_tuple( account_id, 0 ) );
+      // make sure don't remove the one just added
+      if( itr != by_seq_idx.end() && itr->account == account_id && itr->id != ath.id )
+      {
+         // if found, remove the entry, and adjust account stats object
+         const auto remove_op_id = itr->operation_id;
+         const auto itr_remove = itr;
+         ++itr;
+         db.remove( *itr_remove );
+         db.modify( stats_obj, [&]( account_statistics_object& obj ){
+             obj.removed_ops = obj.removed_ops + 1;
+         });
+         // modify previous node's next pointer
+         // this should be always true, but just have a check here
+         if( itr != by_seq_idx.end() && itr->account == account_id )
+         {
+            db.modify( *itr, [&]( account_transaction_history_object& obj ){
+               obj.next = account_transaction_history_id_type();
+            });
+         }
+         // else need to modify the head pointer, but it shouldn't be true
+
+         // remove the operation history entry (1.11.x) if configured and no reference left
+         if( _partial_operations )
+         {
+            // check for references
+            const auto& by_opid_idx = his_idx.indices().get<by_opid>();
+            if( by_opid_idx.find( remove_op_id ) == by_opid_idx.end() )
+            {
+               // if no reference, remove
+               db.remove( remove_op_id(db) );
             }
          }
       }
    }
 }
+
 } // end namespace detail
 
 
@@ -180,6 +262,8 @@ void account_history_plugin::plugin_set_program_options(
 {
    cli.add_options()
          ("track-account", boost::program_options::value<std::vector<std::string>>()->composing()->multitoken(), "Account ID to track history for (may specify multiple times)")
+         ("partial-operations", boost::program_options::value<bool>(), "Keep only those operations in memory that are related to account history tracking")
+         ("max-ops-per-account", boost::program_options::value<uint32_t>(), "Maximum number of operations per account will be kept in memory")
          ;
    cfg.add(cli);
 }
@@ -187,10 +271,16 @@ void account_history_plugin::plugin_set_program_options(
 void account_history_plugin::plugin_initialize(const boost::program_options::variables_map& options)
 {
    database().applied_block.connect( [&]( const signed_block& b){ my->update_account_histories(b); } );
-   database().add_index< primary_index< simple_index< operation_history_object > > >();
+   my->_oho_index = database().add_index< primary_index< simple_index< operation_history_object > > >();
    database().add_index< primary_index< account_transaction_history_index > >();
 
    LOAD_VALUE_SET(options, "track-account", my->_tracked_accounts, graphene::chain::account_id_type);
+   if (options.count("partial-operations")) {
+       my->_partial_operations = options["partial-operations"].as<bool>();
+   }
+   if (options.count("max-ops-per-account")) {
+       my->_max_ops_per_account = options["max-ops-per-account"].as<uint32_t>();
+   }
 }
 
 void account_history_plugin::plugin_startup()
