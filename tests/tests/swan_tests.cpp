@@ -109,6 +109,11 @@ struct swan_fixture : database_fixture {
       generate_blocks(2);
     }
 
+    void wait_for_maintenance() {
+      generate_blocks( db.get_dynamic_global_properties().next_maintenance_time );
+      generate_blocks( 1 );
+    }
+
     const account_object& borrower() { return _borrower(db); }
     const account_object& borrower2() { return _borrower2(db); }
     const account_object& feedproducer() { return _feedproducer(db); }
@@ -295,7 +300,6 @@ BOOST_AUTO_TEST_CASE( recollateralize )
 
       wait_for_hf_core_216();
 
-      int64_t b_balance  = get_balance( borrower(),  back() );
       int64_t b2_balance = get_balance( borrower2(), back() );
       bid_collateral( borrower2(), back().amount(1000), swan().amount(100) );
       BOOST_CHECK_EQUAL( get_balance( borrower2(), back() ), b2_balance - 1000 );
@@ -326,6 +330,35 @@ BOOST_AUTO_TEST_CASE( recollateralize )
       // can't bid wrong collateral type
       GRAPHENE_REQUIRE_THROW( bid_collateral( borrower2(), bitcny.amount(100), swan().amount(100) ), fc::exception );
 
+      BOOST_CHECK( swan().dynamic_data(db).current_supply == 1400 );
+      BOOST_CHECK( swan().bitasset_data(db).settlement_fund == 2800 );
+      BOOST_CHECK( swan().bitasset_data(db).has_settlement() );
+      BOOST_CHECK( swan().bitasset_data(db).current_feed.settlement_price.is_null() );
+
+      // doesn't happen without price feed
+      bid_collateral( borrower(),  back().amount(1400), swan().amount(700) );
+      bid_collateral( borrower2(), back().amount(1400), swan().amount(700) );
+      wait_for_maintenance();
+      BOOST_CHECK( swan().bitasset_data(db).has_settlement() );
+
+      set_feed(1, 2);
+      // doesn't happen if cover is insufficient
+      bid_collateral( borrower2(), back().amount(1400), swan().amount(600) );
+      wait_for_maintenance();
+      BOOST_CHECK( swan().bitasset_data(db).has_settlement() );
+
+      set_feed(1, 2);
+      // doesn't happen if some bids have a bad swan price
+      bid_collateral( borrower2(), back().amount(1050), swan().amount(700) );
+      wait_for_maintenance();
+      BOOST_CHECK( swan().bitasset_data(db).has_settlement() );
+
+      set_feed(1, 2);
+      // works
+      bid_collateral( borrower(),  back().amount(1051), swan().amount(700) );
+      bid_collateral( borrower2(), back().amount(2100), swan().amount(1399) );
+      wait_for_maintenance();
+      BOOST_CHECK( !swan().bitasset_data(db).has_settlement() );
 } catch( const fc::exception& e) {
       edump((e.to_detail_string()));
       throw;

@@ -339,6 +339,7 @@ namespace graphene { namespace chain {
          void cancel_order(const limit_order_object& order, bool create_virtual_op = true);
          void revive_bitasset( const asset_object& bitasset, const account_id_type& shorter );
          void cancel_bid(const collateral_bid_object& bid, bool create_virtual_op = true);
+         void execute_bid( const collateral_bid_object& bid, share_type debt_covered, share_type collateral_from_fund, const price_feed& current_feed );
 
          /**
           * @brief Process a new limit order through the markets
@@ -456,6 +457,7 @@ namespace graphene { namespace chain {
          void update_active_witnesses();
          void update_active_committee_members();
          void update_worker_votes();
+         void process_bids( const asset_bitasset_data_object& bad );
 
          template<class... Types>
          void perform_account_maintenance(std::tuple<Types...> helpers);

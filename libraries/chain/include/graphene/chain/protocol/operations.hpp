@@ -92,7 +92,8 @@ namespace graphene { namespace chain {
             asset_settle_cancel_operation,  // VIRTUAL
             asset_claim_fees_operation,
             fba_distribute_operation,       // VIRTUAL
-            bid_collateral_operation
+            bid_collateral_operation,
+            execute_bid_operation           // VIRTUAL
          > operation;
 
    /// @} // operations group

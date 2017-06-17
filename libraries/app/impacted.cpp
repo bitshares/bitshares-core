@@ -57,6 +57,10 @@ struct get_impacted_account_visitor
    {
       _impacted.insert( op.account_id );
    }
+   void operator()( const execute_bid_operation& op )
+   {
+      _impacted.insert( op.bidder );
+   }
 
    void operator()( const account_create_operation& op )
    {
