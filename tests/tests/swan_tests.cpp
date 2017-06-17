@@ -284,4 +284,52 @@ BOOST_AUTO_TEST_CASE( revive_recovered )
    }
 }
 
+/** Creates a black swan, recover price feed - asset should be revived
+ */
+BOOST_AUTO_TEST_CASE( recollateralize )
+{ try {
+      init_standard_swan( 700 );
+
+      // no hardfork yet
+      GRAPHENE_REQUIRE_THROW( bid_collateral( borrower2(), back().amount(1000), swan().amount(100) ), fc::exception );
+
+      wait_for_hf_core_216();
+
+      int64_t b_balance  = get_balance( borrower(),  back() );
+      int64_t b2_balance = get_balance( borrower2(), back() );
+      bid_collateral( borrower2(), back().amount(1000), swan().amount(100) );
+      BOOST_CHECK_EQUAL( get_balance( borrower2(), back() ), b2_balance - 1000 );
+      bid_collateral( borrower2(), back().amount(2000), swan().amount(200) );
+      BOOST_CHECK_EQUAL( get_balance( borrower2(), back() ), b2_balance - 2000 );
+      bid_collateral( borrower2(), back().amount(1000), swan().amount(0) );
+      BOOST_CHECK_EQUAL( get_balance( borrower2(), back() ), b2_balance );
+
+      // can't bid for non-bitassets
+      GRAPHENE_REQUIRE_THROW( bid_collateral( borrower2(), swan().amount(100), asset(100) ), fc::exception );
+      // can't cancel a non-existant bid
+      GRAPHENE_REQUIRE_THROW( bid_collateral( borrower2(), back().amount(0), swan().amount(0) ), fc::exception );
+      // can't bid zero collateral
+      GRAPHENE_REQUIRE_THROW( bid_collateral( borrower2(), back().amount(0), swan().amount(100) ), fc::exception );
+      // can't bid more than we have
+      GRAPHENE_REQUIRE_THROW( bid_collateral( borrower2(), back().amount(b2_balance + 100), swan().amount(100) ), fc::exception );
+      trx.operations.clear();
+
+      // can't bid on a live bitasset
+      const asset_object& bitcny = create_bitasset("CNYBIT", _feedproducer);
+      GRAPHENE_REQUIRE_THROW( bid_collateral( borrower2(), asset(100), bitcny.amount(100) ), fc::exception );
+      update_feed_producers(bitcny, {_feedproducer});
+      price_feed feed;
+      feed.settlement_price = bitcny.amount(1) / asset(1);
+      publish_feed( bitcny.id, _feedproducer, feed );
+      borrow( borrower2(), bitcny.amount(100), asset(1000) );
+
+      // can't bid wrong collateral type
+      GRAPHENE_REQUIRE_THROW( bid_collateral( borrower2(), bitcny.amount(100), swan().amount(100) ), fc::exception );
+
+} catch( const fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
 BOOST_AUTO_TEST_SUITE_END()

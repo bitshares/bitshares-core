@@ -154,6 +154,7 @@ void database_fixture::verify_asset_supplies( const database& db )
    const simple_index<account_statistics_object>& statistics_index = db.get_index_type<simple_index<account_statistics_object>>();
    const auto& balance_index = db.get_index_type<account_balance_index>().indices();
    const auto& settle_index = db.get_index_type<force_settlement_index>().indices();
+   const auto& bids = db.get_index_type<collateral_bid_index>().indices();
    map<asset_id_type,share_type> total_balances;
    map<asset_id_type,share_type> total_debts;
    share_type core_in_orders;
@@ -163,6 +164,8 @@ void database_fixture::verify_asset_supplies( const database& db )
       total_balances[b.asset_type] += b.balance;
    for( const force_settlement_object& s : settle_index )
       total_balances[s.balance.asset_id] += s.balance.amount;
+   for( const collateral_bid_object& b : bids )
+      total_balances[b.inv_swan_price.base.asset_id] += b.inv_swan_price.base.amount;
    for( const account_statistics_object& a : statistics_index )
    {
       reported_core_in_orders += a.total_core_in_orders;
@@ -868,6 +871,22 @@ void database_fixture::cover(const account_object& who, asset what, asset collat
    trx.operations.clear();
    verify_asset_supplies(db);
 } FC_CAPTURE_AND_RETHROW( (who.name)(what)(collateral) ) }
+
+void database_fixture::bid_collateral(const account_object& who, const asset& to_bid, const asset& to_cover)
+{ try {
+   set_expiration( db, trx );
+   trx.operations.clear();
+   bid_collateral_operation bid;
+   bid.bidder = who.id;
+   bid.additional_collateral = to_bid;
+   bid.debt_covered = to_cover;
+   trx.operations.push_back(bid);
+   for( auto& op : trx.operations ) db.current_fee_schedule().set_fee(op);
+   trx.validate();
+   db.push_transaction(trx, ~0);
+   trx.operations.clear();
+   verify_asset_supplies(db);
+} FC_CAPTURE_AND_RETHROW( (who.name)(to_bid)(to_cover) ) }
 
 void database_fixture::fund_fee_pool( const account_object& from, const asset_object& asset_to_fund, const share_type amount )
 {

@@ -126,6 +126,21 @@ void database::revive_bitasset( const asset_object& bitasset, const account_id_t
    }
 } FC_CAPTURE_AND_RETHROW( (bitasset)(shorter) ) }
 
+void database::cancel_bid(const collateral_bid_object& bid, bool create_virtual_op)
+{
+   adjust_balance(bid.bidder, bid.inv_swan_price.base);
+
+   if( create_virtual_op )
+   {
+      bid_collateral_operation vop;
+      vop.bidder = bid.bidder;
+      vop.additional_collateral = bid.inv_swan_price.base;
+      vop.debt_covered = asset( 0, bid.inv_swan_price.quote.asset_id );
+      push_applied_operation( vop );
+   }
+   remove(bid);
+}
+
 void database::cancel_order(const force_settlement_object& order, bool create_virtual_op)
 {
    adjust_balance(order.owner, order.balance);

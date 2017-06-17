@@ -275,4 +275,61 @@ void_result call_order_update_evaluator::do_apply(const call_order_update_operat
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }
 
+void_result bid_collateral_evaluator::do_evaluate(const bid_collateral_operation& o)
+{ try {
+   database& d = db();
+
+   FC_ASSERT( d.head_block_time() >= HARDFORK_CORE_216_TIME, "Not yet!" );
+
+   _paying_account = &o.bidder(d);
+   _debt_asset     = &o.debt_covered.asset_id(d);
+   FC_ASSERT( _debt_asset->is_market_issued(), "Unable to cover ${sym} as it is not a collateralized asset.",
+              ("sym", _debt_asset->symbol) );
+
+   _bitasset_data  = &_debt_asset->bitasset_data(d);
+
+   FC_ASSERT( _bitasset_data->has_settlement() );
+
+   FC_ASSERT( o.additional_collateral.asset_id == _bitasset_data->options.short_backing_asset );
+
+   FC_ASSERT( !_bitasset_data->is_prediction_market, "Cannot bid on a prediction market!" );
+
+   if( o.additional_collateral.amount > 0 )
+   {
+      FC_ASSERT( d.get_balance(*_paying_account, _bitasset_data->options.short_backing_asset(d)) >= o.additional_collateral,
+                 "Cannot bid ${c} collateral when payer only has ${b}", ("c", o.additional_collateral.amount)
+                 ("b", d.get_balance(*_paying_account, o.additional_collateral.asset_id(d)).amount) );
+   }
+
+   const collateral_bid_index& bids = d.get_index_type<collateral_bid_index>();
+   const auto& index = bids.indices().get<by_account>();
+   const auto& bid = index.find( boost::make_tuple( o.debt_covered.asset_id, o.bidder ) );
+   if( bid != index.end() )
+      _bid = &(*bid);
+   else
+       FC_ASSERT( o.debt_covered.amount > 0, "Can't find bid to cancel?!");
+
+   return void_result();
+} FC_CAPTURE_AND_RETHROW( (o) ) }
+
+
+void_result bid_collateral_evaluator::do_apply(const bid_collateral_operation& o)
+{ try {
+   database& d = db();
+
+   if( _bid )
+      d.cancel_bid( *_bid, false );
+
+   if( o.debt_covered.amount == 0 ) return void_result();
+
+   d.adjust_balance( o.bidder, -o.additional_collateral  );
+
+   _bid = &d.create<collateral_bid_object>([&]( collateral_bid_object& bid ) {
+      bid.bidder = o.bidder;
+      bid.inv_swan_price = o.additional_collateral / o.debt_covered;
+   });
+
+   return void_result();
+} FC_CAPTURE_AND_RETHROW( (o) ) }
+
 } } // graphene::chain

@@ -338,6 +338,7 @@ namespace graphene { namespace chain {
          void cancel_order(const force_settlement_object& order, bool create_virtual_op = true);
          void cancel_order(const limit_order_object& order, bool create_virtual_op = true);
          void revive_bitasset( const asset_object& bitasset, const account_id_type& shorter );
+         void cancel_bid(const collateral_bid_object& bid, bool create_virtual_op = true);
 
          /**
           * @brief Process a new limit order through the markets
