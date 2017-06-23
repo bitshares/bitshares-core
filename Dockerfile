@@ -6,8 +6,8 @@ MAINTAINER Nathan Hourt <nathan@followmyvote.com>
 
 RUN pacman -Syu --noconfirm gcc make autoconf automake cmake ninja boost libtool git
 
-ADD . /bitshares-2
-WORKDIR /bitshares-2
+ADD . /bitshares-test
+WORKDIR /bitshares-test
 RUN cmake -G Ninja -DCMAKE_BUILD_TYPE=Release .
 RUN ninja witness_node || ninja -j 1 witness_node
 

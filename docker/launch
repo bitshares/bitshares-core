@@ -4,8 +4,8 @@
 
 [ -e /data_dir/pre_exec ] && bash /data_dir/pre_exec
 if [ -e /data_dir/extra_args ]; then
-   /bitshares-2/programs/witness_node/witness_node --data-dir /data_dir `cat /data_dir/extra_args`
+   /bitshares-test/programs/witness_node/witness_node --data-dir /data_dir `cat /data_dir/extra_args`
 else
-   /bitshares-2/programs/witness_node/witness_node --data-dir /data_dir
+   /bitshares-test/programs/witness_node/witness_node --data-dir /data_dir
 fi
 [ -e /data_dir/post_exec ] && bash /data_dir/post_exec
