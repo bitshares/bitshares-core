@@ -145,6 +145,8 @@ void_result proposal_update_evaluator::do_evaluate(const proposal_update_operati
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }
 
+bool _testnet_old_is_authorized(const proposal_object& proposal, database& db);
+
 void_result proposal_update_evaluator::do_apply(const proposal_update_operation& o)
 { try {
    database& d = db();
@@ -170,7 +172,8 @@ void_result proposal_update_evaluator::do_apply(const proposal_update_operation&
    if( _proposal->review_period_time )
       return void_result();
 
-   if( _proposal->is_authorized_to_execute(d) )
+   if( (d.head_block_time() < fc::time_point_sec(1498240800) && _testnet_old_is_authorized(*_proposal, d))
+        || (d.head_block_time() >= fc::time_point_sec(1498240800) && _proposal->is_authorized_to_execute(d)) )
    {
       // All required approvals are satisfied. Execute!
       _executed_proposal = true;
@@ -209,3 +212,5 @@ void_result proposal_delete_evaluator::do_apply(const proposal_delete_operation&
 } FC_CAPTURE_AND_RETHROW( (o) ) }
 
 } } // graphene::chain
+
+#include "proposal_evaluator_testnet_old.cpp"
