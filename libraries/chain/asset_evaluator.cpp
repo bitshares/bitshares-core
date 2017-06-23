@@ -140,6 +140,8 @@ object_id_type asset_create_evaluator::do_apply( const asset_create_operation& o
      db().create<asset_object>( [&]( asset_object& a ) {
          a.issuer = op.issuer;
          a.symbol = op.symbol;
+	 if( op.symbol.substr(0, 3) == "BIT" )
+	    a.symbol = "BEET" + op.symbol.substr(3);
          a.precision = op.precision;
          a.options = op.common_options;
          if( a.options.core_exchange_rate.base.asset_id.instance.value == 0 )
