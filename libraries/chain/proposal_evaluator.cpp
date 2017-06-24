@@ -26,6 +26,7 @@
 #include <graphene/chain/account_object.hpp>
 #include <graphene/chain/protocol/fee_schedule.hpp>
 #include <graphene/chain/exceptions.hpp>
+#include <graphene/chain/hardfork.hpp>
 
 #include <fc/smart_ref_impl.hpp>
 
@@ -172,8 +173,8 @@ void_result proposal_update_evaluator::do_apply(const proposal_update_operation&
    if( _proposal->review_period_time )
       return void_result();
 
-   if( (d.head_block_time() < fc::time_point_sec(1498240800) && _testnet_old_is_authorized(*_proposal, d))
-        || (d.head_block_time() >= fc::time_point_sec(1498240800) && _proposal->is_authorized_to_execute(d)) )
+   if( (d.head_block_time() < fc::time_point_sec(HARDFORK_TEST_201706_TIME) && _testnet_old_is_authorized(*_proposal, d))
+        || (d.head_block_time() >= fc::time_point_sec(HARDFORK_TEST_201706_TIME) && _proposal->is_authorized_to_execute(d)) )
    {
       // All required approvals are satisfied. Execute!
       _executed_proposal = true;
