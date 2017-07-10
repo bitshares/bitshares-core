@@ -228,7 +228,8 @@ namespace graphene { namespace chain {
          >
       >
    > asset_bitasset_data_object_multi_index_type;
-   typedef flat_index<asset_bitasset_data_object> asset_bitasset_data_index;
+   //typedef flat_index<asset_bitasset_data_object> asset_bitasset_data_index;
+   typedef generic_index<asset_bitasset_data_object, asset_bitasset_data_object_multi_index_type> asset_bitasset_data_index;
 
    struct by_symbol;
    struct by_type;
