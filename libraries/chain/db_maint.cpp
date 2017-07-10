@@ -873,8 +873,9 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
    });
 
    // Reset all BitAsset force settlement volumes to zero
-   for( const asset_bitasset_data_object* d : get_index_type<asset_bitasset_data_index>() )
-      modify(*d, [](asset_bitasset_data_object& d) { d.force_settled_volume = 0; });
+   //for( const asset_bitasset_data_object* d : get_index_type<asset_bitasset_data_index>() )
+   for( const auto& d : get_index_type<asset_bitasset_data_index>().indices() )
+      modify( d, [](asset_bitasset_data_object& o) { o.force_settled_volume = 0; });
 
    // process_budget needs to run at the bottom because
    //   it needs to know the next_maintenance_time
