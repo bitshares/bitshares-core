@@ -206,34 +206,41 @@ optional<signed_block> block_database::fetch_by_number( uint32_t block_num )cons
    return optional<signed_block>();
 }
 
-optional<signed_block> block_database::last()const
-{
+optional<index_entry> block_database::last_index_entry()const {
    try
    {
       index_entry e;
+
       _block_num_to_pos.seekg( 0, _block_num_to_pos.end );
+      std::streampos pos = _block_num_to_pos.tellg();
+      if( pos < sizeof(index_entry) )
+         return optional<index_entry>();
 
-      if( _block_num_to_pos.tellp() < sizeof(index_entry) )
-         return optional<signed_block>();
+      if( pos % sizeof(index_entry) != 0 )
+         pos -= pos % sizeof(index_entry);
 
-      _block_num_to_pos.seekg( -sizeof(index_entry), _block_num_to_pos.end );
-      _block_num_to_pos.read( (char*)&e, sizeof(e) );
-      uint64_t pos = _block_num_to_pos.tellg();
       while( e.block_size == 0 && pos > 0 )
       {
          pos -= sizeof(index_entry);
          _block_num_to_pos.seekg( pos );
          _block_num_to_pos.read( (char*)&e, sizeof(e) );
+
+         if( e.block_size > 0 )
+            try
+            {
+               vector<char> data( e.block_size );
+               _blocks.seekg( e.block_pos );
+               _blocks.read( data.data(), e.block_size );
+               auto result = fc::raw::unpack<signed_block>(data);
+               return e;
+            }
+            catch (const fc::exception&)
+            {
+            }
+            catch (const std::exception&)
+            {
+            }
       }
-
-      if( e.block_size == 0 )
-         return optional<signed_block>();
-
-      vector<char> data( e.block_size );
-      _blocks.seekg( e.block_pos );
-      _blocks.read( data.data(), e.block_size );
-      auto result = fc::raw::unpack<signed_block>(data);
-      return result;
    }
    catch (const fc::exception&)
    {
@@ -241,42 +248,21 @@ optional<signed_block> block_database::last()const
    catch (const std::exception&)
    {
    }
+   return optional<index_entry>();
+}
+
+optional<signed_block> block_database::last()const
+{
+   optional<index_entry> entry = last_index_entry();
+   if( entry.valid() ) return fetch_by_number( block_header::num_from_id(entry->block_id) );
    return optional<signed_block>();
 }
 
 optional<block_id_type> block_database::last_id()const
 {
-   try
-   {
-      index_entry e;
-      _block_num_to_pos.seekg( 0, _block_num_to_pos.end );
-
-      if( _block_num_to_pos.tellp() < sizeof(index_entry) )
-         return optional<block_id_type>();
-
-      _block_num_to_pos.seekg( -sizeof(index_entry), _block_num_to_pos.end );
-      _block_num_to_pos.read( (char*)&e, sizeof(e) );
-      uint64_t pos = _block_num_to_pos.tellg();
-      while( e.block_size == 0 && pos > 0 )
-      {
-         pos -= sizeof(index_entry);
-         _block_num_to_pos.seekg( pos );
-         _block_num_to_pos.read( (char*)&e, sizeof(e) );
-      }
-
-      if( e.block_size == 0 )
-         return optional<block_id_type>();
-
-      return e.block_id;
-   }
-   catch (const fc::exception&)
-   {
-   }
-   catch (const std::exception&)
-   {
-   }
+   optional<index_entry> entry = last_index_entry();
+   if( entry.valid() ) return entry->block_id;
    return optional<block_id_type>();
 }
-
 
 } }
