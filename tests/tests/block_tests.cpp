@@ -135,6 +135,7 @@ BOOST_AUTO_TEST_CASE( generate_empty_blocks )
       // TODO:  Don't generate this here
       auto init_account_priv_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("null_key")) );
       signed_block cutoff_block;
+      uint32_t last_block;
       {
          database db;
          db.open(data_dir.path(), make_genesis, "TEST" );
@@ -154,6 +155,7 @@ BOOST_AUTO_TEST_CASE( generate_empty_blocks )
             if( cutoff_height >= 200 )
             {
                cutoff_block = *(db.fetch_block_by_number( cutoff_height ));
+               last_block = db.head_block_num();
                break;
             }
          }
@@ -162,7 +164,9 @@ BOOST_AUTO_TEST_CASE( generate_empty_blocks )
       {
          database db;
          db.open(data_dir.path(), []{return genesis_state_type();}, "TEST");
-         BOOST_CHECK_EQUAL( db.head_block_num(), cutoff_block.block_num() );
+         BOOST_CHECK_EQUAL( db.head_block_num(), last_block );
+         while( db.head_block_num() > cutoff_block.block_num() )
+            db.pop_block();
          b = cutoff_block;
          for( uint32_t i = 0; i < 200; ++i )
          {
