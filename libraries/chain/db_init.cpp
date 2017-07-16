@@ -208,7 +208,19 @@ void database::initialize_indexes()
    add_index< primary_index<simple_index<dynamic_global_property_object  >> >();
    add_index< primary_index<simple_index<account_statistics_object       >> >();
    add_index< primary_index<simple_index<asset_dynamic_data_object       >> >();
-   add_index< primary_index<flat_index<  block_summary_object            >> >();
+   //add_index< primary_index<flat_index<  block_summary_object            >> >();
+
+   //struct by_block_id;
+   //typedef multi_index_container<
+   //   block_summary_object,
+   //   indexed_by<
+   //      ordered_unique< tag<by_id>, member< object, object_id_type, &object::id > >
+         //ordered_unique< tag<by_block_id>, member<block_summary_object, block_id_type, &block_summary_object::block_id> >
+    //  >
+   //> block_summary_object_multi_index_type;
+
+   //add_index< primary_index<generic_index<  block_summary_object, block_summary_object_multi_index_type         >> >();
+   add_index< primary_index<simple_index<  block_summary_object >> >();
    add_index< primary_index<simple_index<chain_property_object          > > >();
    add_index< primary_index<simple_index<witness_schedule_object        > > >();
    add_index< primary_index<simple_index<budget_record_object           > > >();
@@ -241,8 +253,10 @@ void database::init_genesis(const genesis_state_type& genesis_state)
 
    transaction_evaluation_state genesis_eval_state(this);
 
-   flat_index<block_summary_object>& bsi = get_mutable_index_type< flat_index<block_summary_object> >();
-   bsi.resize(0xffff+1);
+   //flat_index<block_summary_object>& bsi = get_mutable_index_type< flat_index<block_summary_object> >();
+   //generic_index<block_summary_object, block_summary_object_multi_index_type>& bsi = get_mutable_index_type< generic_index<block_summary_object, block_summary_object_multi_index_type> >();
+
+   //bsi.resize(0xffff+1);
 
    // Create blockchain accounts
    fc::ecc::private_key null_private_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("null_key")));
@@ -404,7 +418,8 @@ void database::init_genesis(const genesis_state_type& genesis_state)
       p.chain_id = chain_id;
       p.immutable_parameters = genesis_state.immutable_parameters;
    } );
-   create<block_summary_object>([&](block_summary_object&) {});
+   //create<block_summary_object>([&](block_summary_object&) {});
+   create<block_summary_object>( [&]( block_summary_object&) {});
 
    // Create initial accounts
    for( const auto& account : genesis_state.initial_accounts )
