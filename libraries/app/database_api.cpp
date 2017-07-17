@@ -1034,7 +1034,8 @@ vector<call_order_object> database_api_impl::get_call_orders(asset_id_type a, ui
    
    vector< call_order_object> result;
    auto itr_min = call_index.lower_bound(index_price.min());
-   while( itr_min != call_index.lower_bound(index_price.max()) && result.size() < limit ) 
+   auto itr_max = call_index.lower_bound(index_price.max());
+   while( itr_min != itr_max && result.size() < limit ) 
    {
       result.emplace_back(*itr_min);
       ++itr_min;
@@ -1054,7 +1055,8 @@ vector<force_settlement_object> database_api_impl::get_settle_orders(asset_id_ty
 
    vector<force_settlement_object> result;
    auto itr_min = settle_index.lower_bound(mia.get_id());
-   while( itr_min != settle_index.upper_bound(mia.get_id()) && result.size() < limit )
+   auto itr_max = settle_index.upper_bound(mia.get_id());
+   while( itr_min != itr_max && result.size() < limit )
    {
       result.emplace_back(*itr_min);
       ++itr_min;
