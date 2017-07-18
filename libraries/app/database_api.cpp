@@ -1031,9 +1031,16 @@ vector<call_order_object> database_api_impl::get_call_orders(asset_id_type a, ui
    const auto& call_index = _db.get_index_type<call_order_index>().indices().get<by_price>();
    const asset_object& mia = _db.get(a);
    price index_price = price::min(mia.bitasset_data(_db).options.short_backing_asset, mia.get_id());
-
-   return vector<call_order_object>(call_index.lower_bound(index_price.min()),
-                                    call_index.lower_bound(index_price.max()));
+   
+   vector< call_order_object> result;
+   auto itr_min = call_index.lower_bound(index_price.min());
+   auto itr_max = call_index.lower_bound(index_price.max());
+   while( itr_min != itr_max && result.size() < limit ) 
+   {
+      result.emplace_back(*itr_min);
+      ++itr_min;
+   }
+   return result;
 }
 
 vector<force_settlement_object> database_api::get_settle_orders(asset_id_type a, uint32_t limit)const
@@ -1045,8 +1052,16 @@ vector<force_settlement_object> database_api_impl::get_settle_orders(asset_id_ty
 {
    const auto& settle_index = _db.get_index_type<force_settlement_index>().indices().get<by_expiration>();
    const asset_object& mia = _db.get(a);
-   return vector<force_settlement_object>(settle_index.lower_bound(mia.get_id()),
-                                          settle_index.upper_bound(mia.get_id()));
+
+   vector<force_settlement_object> result;
+   auto itr_min = settle_index.lower_bound(mia.get_id());
+   auto itr_max = settle_index.upper_bound(mia.get_id());
+   while( itr_min != itr_max && result.size() < limit )
+   {
+      result.emplace_back(*itr_min);
+      ++itr_min;
+   }
+   return result;
 }
 
 vector<call_order_object> database_api::get_margin_positions( const account_id_type& id )const
