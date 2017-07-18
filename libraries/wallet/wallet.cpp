@@ -2838,7 +2838,7 @@ vector<operation_detail> wallet_api::get_account_history(string name, int limit)
 vector<operation_detail> wallet_api::get_relative_account_history(string name, uint32_t stop, int limit, uint32_t start)const
 {
    
-   FC_ASSERT( start > 0 || limit <= 100 );
+   FC_ASSERT( limit <= 100 );
    
    vector<operation_detail> result;
    auto account_id = get_account(name).get_id();
