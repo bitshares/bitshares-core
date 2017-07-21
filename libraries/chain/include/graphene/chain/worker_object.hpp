@@ -153,7 +153,6 @@ typedef multi_index_container<
    >
 > worker_object_multi_index_type;
 
-//typedef flat_index<worker_object> worker_index;
 using worker_index = generic_index<worker_object, worker_object_multi_index_type>;
 
 } } // graphene::chain
