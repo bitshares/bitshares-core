@@ -33,6 +33,8 @@
 #include <graphene/chain/asset_object.hpp>
 #include <graphene/chain/market_object.hpp>
 
+#include <graphene/app/database_api.hpp>
+
 #include <fc/crypto/digest.hpp>
 
 #include "../common/database_fixture.hpp"
@@ -357,6 +359,22 @@ BOOST_AUTO_TEST_CASE( recollateralize )
       // works
       bid_collateral( borrower(),  back().amount(1051), swan().amount(700) );
       bid_collateral( borrower2(), back().amount(2100), swan().amount(1399) );
+
+      // check get_collateral_bids
+      graphene::app::database_api db_api(db);
+      GRAPHENE_REQUIRE_THROW( db_api.get_collateral_bids(back().id, 100, 0), fc::assert_exception );
+      vector<collateral_bid_object> bids = db_api.get_collateral_bids(_swan, 100, 1);
+      BOOST_CHECK_EQUAL( 1, bids.size() );
+      FC_ASSERT( _borrower2 == bids[0].bidder );
+      bids = db_api.get_collateral_bids(_swan, 1, 0);
+      BOOST_CHECK_EQUAL( 1, bids.size() );
+      FC_ASSERT( _borrower == bids[0].bidder );
+      bids = db_api.get_collateral_bids(_swan, 100, 0);
+      BOOST_CHECK_EQUAL( 2, bids.size() );
+      FC_ASSERT( _borrower == bids[0].bidder );
+      FC_ASSERT( _borrower2 == bids[1].bidder );
+
+      // revive
       wait_for_maintenance();
       BOOST_CHECK( !swan().bitasset_data(db).has_settlement() );
 } catch( const fc::exception& e) {
