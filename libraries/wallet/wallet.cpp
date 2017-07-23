@@ -2843,7 +2843,10 @@ vector<operation_detail> wallet_api::get_relative_account_history(string name, u
    account_object account = my->get_account(account_id);
    auto stats = my->get_object(account.statistics);
 
-   start = std::min<uint32_t>(start, stats.total_ops);
+   if(start == 0)
+       start = stats.total_ops;
+   else
+      start = std::min<uint32_t>(start, stats.total_ops);
 
    while( limit > 0 )
    {
