@@ -77,8 +77,8 @@ struct vote_id_type
    explicit vote_id_type(const std::string& serial)
    {
       auto colon = serial.find(':');
-      if( colon != std::string::npos )
-         *this = vote_id_type(vote_type(std::stoul(serial.substr(0, colon))), std::stoul(serial.substr(colon+1)));
+      FC_ASSERT( colon != std::string::npos );
+      *this = vote_id_type(vote_type(std::stoul(serial.substr(0, colon))), std::stoul(serial.substr(colon+1)));
    }
 
    /// Set the type of this vote_id_type
