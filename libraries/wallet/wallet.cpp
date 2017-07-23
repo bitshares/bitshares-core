@@ -2840,8 +2840,8 @@ vector<operation_detail> wallet_api::get_relative_account_history(string name, u
    vector<operation_detail> result;
    auto account_id = get_account(name).get_id();
 
-   account_object account = my->get_account(account_id);
-   auto stats = my->get_object(account.statistics);
+   const account_object& account = my->get_account(account_id);
+   const account_statistics_object& stats = my->get_object(account.statistics);
 
    if(start == 0)
        start = stats.total_ops;
