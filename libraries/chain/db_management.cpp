@@ -150,6 +150,7 @@ void database::close(bool rewind)
       {
          uint32_t cutoff = get_dynamic_global_properties().last_irreversible_block_num;
 
+         ilog( "Rewinding from ${head} to ${cutoff}", ("head",head_block_num())("cutoff",cutoff) );
          while( head_block_num() > cutoff )
          {
          //   elog("pop");
