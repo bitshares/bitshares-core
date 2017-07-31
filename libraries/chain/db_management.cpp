@@ -62,7 +62,7 @@ void database::reindex( fc::path data_dir )
    uint32_t flush_point = last_block_num - 10000;
    uint32_t undo_point = last_block_num - 50;
 
-   ilog( "Replaying blocks..." );
+   ilog( "Replaying blocks, starting at ${next}...", ("next",head_block_num() + 1) );
    if( head_block_num() >= undo_point )
       _fork_db.start_block( *fetch_block_by_number( head_block_num() ) );
    else
