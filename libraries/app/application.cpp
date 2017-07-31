@@ -456,9 +456,22 @@ namespace detail {
             _force_validate = true;
          }
 
-         if( _options->count("api-access") )
-            _apiaccess = fc::json::from_file( _options->at("api-access").as<boost::filesystem::path>() )
-               .as<api_access>();
+         if( _options->count("api-access") ) {
+
+            if(fc::exists(_options->at("api-access").as<boost::filesystem::path>()))
+            {
+               _apiaccess = fc::json::from_file( _options->at("api-access").as<boost::filesystem::path>() ).as<api_access>();
+               ilog("Using api access file from ${path}",
+                  ("path", _options->at("api-access").as<boost::filesystem::path>().string()));
+            }
+            else
+            {
+               elog("Failed to load file from ${path}",
+                  ("path", _options->at("api-access").as<boost::filesystem::path>().string()));
+               std::exit(EXIT_FAILURE);
+            }
+         }
+
          else
          {
             // TODO:  Remove this generous default access policy
