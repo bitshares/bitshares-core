@@ -59,12 +59,15 @@ void database::reindex( fc::path data_dir )
    ilog( "reindexing blockchain" );
    auto start = fc::time_point::now();
    const auto last_block_num = last_block->block_num();
-   uint32_t flush_point = last_block_num - 10000;
-   uint32_t undo_point = last_block_num - 50;
+   uint32_t flush_point = last_block_num < 10000 ? 0 : last_block_num - 10000;
+   uint32_t undo_point = last_block_num < 50 ? 0 : last_block_num - 50;
 
    ilog( "Replaying blocks, starting at ${next}...", ("next",head_block_num() + 1) );
    if( head_block_num() >= undo_point )
-      _fork_db.start_block( *fetch_block_by_number( head_block_num() ) );
+   {
+      if( head_block_num() > 0 )
+         _fork_db.start_block( *fetch_block_by_number( head_block_num() ) );
+   }
    else
       _undo_db.disable();
    for( uint32_t i = head_block_num() + 1; i <= last_block_num; ++i )
