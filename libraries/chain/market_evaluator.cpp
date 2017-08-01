@@ -279,7 +279,7 @@ void_result bid_collateral_evaluator::do_evaluate(const bid_collateral_operation
 { try {
    database& d = db();
 
-   FC_ASSERT( d.head_block_time() >= HARDFORK_CORE_216_TIME, "Not yet!" );
+   FC_ASSERT( d.head_block_time() > HARDFORK_CORE_216_TIME, "Not yet!" );
 
    _paying_account = &o.bidder(d);
    _debt_asset     = &o.debt_covered.asset_id(d);
