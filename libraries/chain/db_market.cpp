@@ -92,13 +92,12 @@ void database::globally_settle_asset( const asset_object& mia, const price& sett
 
 } FC_CAPTURE_AND_RETHROW( (mia)(settlement_price) ) }
 
-void database::revive_bitasset( const asset_object& bitasset, const account_id_type& shorter )
+void database::revive_bitasset( const asset_object& bitasset )
 { try {
    FC_ASSERT( bitasset.is_market_issued() );
    const asset_bitasset_data_object& bad = bitasset.bitasset_data(*this);
    FC_ASSERT( bad.has_settlement() );
    const asset_dynamic_data_object& bdd = bitasset.dynamic_asset_data_id(*this);
-   FC_ASSERT( shorter != account_id_type() );
    FC_ASSERT( !bad.is_prediction_market );
    FC_ASSERT( !bad.current_feed.settlement_price.is_null() );
    // use settlement_fund to create a call order, adjust supply
@@ -116,7 +115,7 @@ void database::revive_bitasset( const asset_object& bitasset, const account_id_t
               obj.current_supply -= to_short;
               });
       call_order_update_operation call;
-      call.funding_account = shorter;
+      call.funding_account = bitasset.issuer;
       call.delta_collateral = asset( collateral, bad.options.short_backing_asset );
       call.delta_debt = asset( to_short, bitasset.id );
       transaction_evaluation_state eval_state(this);
@@ -124,7 +123,7 @@ void database::revive_bitasset( const asset_object& bitasset, const account_id_t
       apply_operation( eval_state, call );
       adjust_balance( bitasset.issuer, asset( -to_short, bitasset.id ) );
    }
-} FC_CAPTURE_AND_RETHROW( (bitasset)(shorter) ) }
+} FC_CAPTURE_AND_RETHROW( (bitasset) ) }
 
 void database::cancel_bid(const collateral_bid_object& bid, bool create_virtual_op)
 {

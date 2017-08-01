@@ -562,7 +562,7 @@ void_result asset_publish_feeds_evaluator::do_apply(const asset_publish_feed_ope
              && ~price::call_price(asset(mia_dyn.current_supply, o.asset_id),
                                    asset(bad.settlement_fund, bad.options.short_backing_asset),
                                    bad.current_feed.maintenance_collateral_ratio ) < bad.current_feed.settlement_price )
-            d.revive_bitasset(base, base.issuer);
+            d.revive_bitasset(base);
       }
       db().check_call_orders(base);
    }
