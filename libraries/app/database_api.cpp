@@ -1102,7 +1102,7 @@ vector<collateral_bid_object> database_api_impl::get_collateral_bids(const asset
    const asset_object& back = bad.options.short_backing_asset(_db);
    const auto& idx = _db.get_index_type<collateral_bid_index>();
    const auto& aidx = idx.indices().get<by_price>();
-   auto start = aidx.lower_bound( boost::make_tuple( asset_id, price::max(back.id, asset_id), collateral_bid_id_type(GRAPHENE_DB_MAX_INSTANCE_ID) ) );
+   auto start = aidx.lower_bound( boost::make_tuple( asset_id, price::max(back.id, asset_id), collateral_bid_id_type() ) );
    auto end = aidx.lower_bound( boost::make_tuple( asset_id, price::min(back.id, asset_id), collateral_bid_id_type(GRAPHENE_DB_MAX_INSTANCE_ID) ) );
    vector<collateral_bid_object> result;
    while( skip-- > 0 && start != end ) { ++start; }
