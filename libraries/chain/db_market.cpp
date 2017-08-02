@@ -157,7 +157,7 @@ void database::execute_bid( const collateral_bid_object& bid, share_type debt_co
          stats.total_core_in_orders += call_obj.collateral;
       });
 
-   push_applied_operation( execute_bid_operation( bid.bidder, asset( call_obj.collateral, bid.inv_swan_price.quote.asset_id ),
+   push_applied_operation( execute_bid_operation( bid.bidder, asset( call_obj.collateral, bid.inv_swan_price.base.asset_id ),
                                                   asset( debt_covered, bid.inv_swan_price.quote.asset_id ) ) );
 
    remove(bid);
