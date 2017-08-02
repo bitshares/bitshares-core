@@ -36,6 +36,7 @@
 #include <graphene/chain/withdraw_permission_object.hpp>
 #include <graphene/chain/witness_object.hpp>
 
+#include <graphene/market_history/market_history_plugin.hpp>
 #include <fc/crypto/digest.hpp>
 
 #include "../common/database_fixture.hpp"
@@ -1197,13 +1198,14 @@ BOOST_AUTO_TEST_CASE( witness_feeds )
  *  Create an order such that when the trade executes at the
  *  requested price the resulting payout to one party is 0
  *
- * I am unable to actually create such an order; I'm not sure it's possible. What I have done is create an order which
- * broke an assert in the matching algorithm.
  */
 BOOST_AUTO_TEST_CASE( trade_amount_equals_zero )
 {
    try {
       INVOKE(issue_uia);
+      generate_blocks( HARDFORK_555_TIME );
+      set_expiration( db, trx );
+
       const asset_object& test = get_asset( "TEST" );
       const asset_object& core = get_asset( GRAPHENE_SYMBOL );
       const account_object& core_seller = create_account( "shorter1" );
@@ -1216,10 +1218,24 @@ BOOST_AUTO_TEST_CASE( trade_amount_equals_zero )
       BOOST_CHECK_EQUAL(get_balance(core_seller, test), 0);
       BOOST_CHECK_EQUAL(get_balance(core_seller, core), 100000000);
 
-      //ilog( "=================================== START===================================\n\n");
-      create_sell_order(core_seller, core.amount(1), test.amount(900000));
-      //ilog( "=================================== STEP===================================\n\n");
-      create_sell_order(core_buyer, test.amount(900001), core.amount(1));
+      create_sell_order(core_seller, core.amount(1), test.amount(2));
+      create_sell_order(core_seller, core.amount(1), test.amount(2));
+      create_sell_order(core_buyer, test.amount(3), core.amount(1));
+
+      BOOST_CHECK_EQUAL(get_balance(core_buyer, core), 1);
+      BOOST_CHECK_EQUAL(get_balance(core_buyer, test), 9999997);
+      BOOST_CHECK_EQUAL(get_balance(core_seller, core), 99999998);
+      BOOST_CHECK_EQUAL(get_balance(core_seller, test), 3);
+
+      generate_block();
+      fc::usleep(fc::milliseconds(1000));
+
+      auto result = get_market_order_history(core.id, test.id);
+      BOOST_CHECK_EQUAL(result.size(), 4);
+      BOOST_CHECK(result[0].op.pays == core.amount(0));
+      BOOST_CHECK(result[0].op.receives == test.amount(1));
+      BOOST_CHECK(result[1].op.pays == test.amount(1));
+      BOOST_CHECK(result[1].op.receives == core.amount(0));
    } catch( const fc::exception& e) {
       edump((e.to_detail_string()));
       throw;
