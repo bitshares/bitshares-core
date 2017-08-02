@@ -100,29 +100,42 @@ void database::revive_bitasset( const asset_object& bitasset )
    const asset_dynamic_data_object& bdd = bitasset.dynamic_asset_data_id(*this);
    FC_ASSERT( !bad.is_prediction_market );
    FC_ASSERT( !bad.current_feed.settlement_price.is_null() );
-   // use settlement_fund to create a call order, adjust supply
-   auto to_short = bdd.current_supply;
-   auto collateral = bad.settlement_fund;
-   if( collateral > 0 )
-      adjust_balance( bitasset.issuer, asset( collateral, bad.options.short_backing_asset ) );
-   modify( bad, [&]( asset_bitasset_data_object& obj ){
-           obj.settlement_price = price();
-           obj.settlement_fund -= collateral;
-           });
-   if ( to_short > 0 )
+
+   if( bdd.current_supply > 0 )
    {
-      modify( bdd, [&]( asset_dynamic_data_object& obj ){
-              obj.current_supply -= to_short;
-              });
-      call_order_update_operation call;
-      call.funding_account = bitasset.issuer;
-      call.delta_collateral = asset( collateral, bad.options.short_backing_asset );
-      call.delta_debt = asset( to_short, bitasset.id );
-      transaction_evaluation_state eval_state(this);
-      eval_state.skip_fee = eval_state.skip_fee_schedule_check = true;
-      apply_operation( eval_state, call );
-      adjust_balance( bitasset.issuer, asset( -to_short, bitasset.id ) );
+      // Create + execute a "bid" with 0 additional collateral
+      const collateral_bid_object& pseudo_bid = create<collateral_bid_object>([&](collateral_bid_object& bid) {
+         bid.bidder = bitasset.issuer;
+         bid.inv_swan_price = asset(0, bad.options.short_backing_asset)
+                              / asset(bdd.current_supply, bitasset.id);
+      });
+      execute_bid( pseudo_bid, bdd.current_supply, bad.settlement_fund, bad.current_feed );
    }
+
+   _cancel_bids_and_revive_mpa( bitasset, bad );
+} FC_CAPTURE_AND_RETHROW( (bitasset) ) }
+
+void database::_cancel_bids_and_revive_mpa( const asset_object& bitasset, const asset_bitasset_data_object& bad )
+{ try {
+   FC_ASSERT( bitasset.is_market_issued() );
+   FC_ASSERT( bad.has_settlement() );
+   FC_ASSERT( !bad.is_prediction_market );
+
+   // cancel remaining bids
+   const auto& bid_idx = get_index_type< collateral_bid_index >().indices().get<by_price>();
+   auto itr = bid_idx.lower_bound( boost::make_tuple( bitasset.id, price::max( bad.options.short_backing_asset, bitasset.id ), collateral_bid_id_type() ) );
+   while( itr != bid_idx.end() && itr->inv_swan_price.quote.asset_id == bitasset.id )
+   {
+      const collateral_bid_object& bid = *itr;
+      ++itr;
+      cancel_bid( bid );
+   }
+
+   // revive
+   modify( bad, [&]( asset_bitasset_data_object& obj ){
+              obj.settlement_price = price();
+              obj.settlement_fund = 0;
+           });
 } FC_CAPTURE_AND_RETHROW( (bitasset) ) }
 
 void database::cancel_bid(const collateral_bid_object& bid, bool create_virtual_op)
@@ -149,7 +162,6 @@ void database::execute_bid( const collateral_bid_object& bid, share_type debt_co
          call.call_price = price::call_price(asset(debt_covered, bid.inv_swan_price.quote.asset_id),
                                              asset(call.collateral, bid.inv_swan_price.base.asset_id),
                                              current_feed.maintenance_collateral_ratio);
-
       });
 
    if( bid.inv_swan_price.base.asset_id == asset_id_type() )

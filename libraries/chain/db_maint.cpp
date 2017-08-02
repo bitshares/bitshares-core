@@ -760,18 +760,10 @@ void database::process_bids( const asset_bitasset_data_object& bad )
       remaining_fund -= collateral;
       execute_bid( bid, debt, collateral, bad.current_feed );
    }
+   FC_ASSERT( remaining_fund == 0 );
+   FC_ASSERT( to_cover == 0 );
 
-   modify( bad, [&]( asset_bitasset_data_object& obj ){
-           obj.settlement_price = price();
-           obj.settlement_fund = 0;
-           });
-
-   while( itr != bid_idx.end() && itr->inv_swan_price.quote.asset_id == to_revive_id )
-   {
-      const collateral_bid_object& bid = *itr;
-      ++itr;
-      cancel_bid( bid );
-   }
+   _cancel_bids_and_revive_mpa( to_revive, bad );
 }
 
 void database::perform_chain_maintenance(const signed_block& next_block, const global_property_object& global_props)
