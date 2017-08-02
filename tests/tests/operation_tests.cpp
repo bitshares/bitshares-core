@@ -1197,7 +1197,6 @@ BOOST_AUTO_TEST_CASE( witness_feeds )
 /**
  *  Create an order such that when the trade executes at the
  *  requested price the resulting payout to one party is 0
- *
  */
 BOOST_AUTO_TEST_CASE( trade_amount_equals_zero )
 {
@@ -1230,12 +1229,14 @@ BOOST_AUTO_TEST_CASE( trade_amount_equals_zero )
       generate_block();
       fc::usleep(fc::milliseconds(1000));
 
+       //TODO: This will fail because of something-for-nothing bug(#345)
+       // Must be fixed with a hardfork
       auto result = get_market_order_history(core.id, test.id);
-      BOOST_CHECK_EQUAL(result.size(), 4);
-      BOOST_CHECK(result[0].op.pays == core.amount(0));
-      BOOST_CHECK(result[0].op.receives == test.amount(1));
-      BOOST_CHECK(result[1].op.pays == test.amount(1));
-      BOOST_CHECK(result[1].op.receives == core.amount(0));
+      BOOST_CHECK_EQUAL(result.size(), 2);
+      BOOST_CHECK(result[0].op.pays == core.amount(1));
+      BOOST_CHECK(result[0].op.receives == test.amount(2));
+      BOOST_CHECK(result[1].op.pays == test.amount(2));
+      BOOST_CHECK(result[1].op.receives == core.amount(1));
    } catch( const fc::exception& e) {
       edump((e.to_detail_string()));
       throw;
