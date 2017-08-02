@@ -464,16 +464,19 @@ operation_result asset_settle_evaluator::do_apply(const asset_settle_evaluator::
    const auto& bitasset = asset_to_settle->bitasset_data(d);
    if( bitasset.has_settlement() )
    {
+      const auto& mia_dyn = asset_to_settle->dynamic_asset_data_id(d);
+
       auto settled_amount = op.amount * bitasset.settlement_price;
-      FC_ASSERT( settled_amount.amount <= bitasset.settlement_fund );
+      if( op.amount.amount == mia_dyn.current_supply )
+         settled_amount.amount = bitasset.settlement_fund; // avoid rounding problems
+      else
+         FC_ASSERT( settled_amount.amount < bitasset.settlement_fund );
 
       d.modify( bitasset, [&]( asset_bitasset_data_object& obj ){
                 obj.settlement_fund -= settled_amount.amount;
                 });
 
       d.adjust_balance(op.account, settled_amount);
-
-      const auto& mia_dyn = asset_to_settle->dynamic_asset_data_id(d);
 
       d.modify( mia_dyn, [&]( asset_dynamic_data_object& obj ){
                 obj.current_supply -= op.amount.amount;

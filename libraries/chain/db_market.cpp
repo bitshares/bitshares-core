@@ -110,7 +110,8 @@ void database::revive_bitasset( const asset_object& bitasset )
                               / asset(bdd.current_supply, bitasset.id);
       });
       execute_bid( pseudo_bid, bdd.current_supply, bad.settlement_fund, bad.current_feed );
-   }
+   } else
+      FC_ASSERT( bad.settlement_fund == 0 );
 
    _cancel_bids_and_revive_mpa( bitasset, bad );
 } FC_CAPTURE_AND_RETHROW( (bitasset) ) }

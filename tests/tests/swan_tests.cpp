@@ -383,4 +383,91 @@ BOOST_AUTO_TEST_CASE( recollateralize )
    }
 }
 
+/** Creates a black swan, settles all debts, recovers price feed - asset should be revived
+ */
+BOOST_AUTO_TEST_CASE( revive_empty_recovered )
+{ try {
+      limit_order_id_type oid = init_standard_swan( 1000 );
+
+      cancel_limit_order( oid(db) );
+      force_settle( borrower(), swan().amount(1000) );
+      force_settle( borrower2(), swan().amount(1000) );
+      BOOST_CHECK_EQUAL( 0, swan().dynamic_data(db).current_supply.value );
+
+      wait_for_hf_core_216();
+
+      // revive after price recovers
+      set_feed( 1, 1 );
+      BOOST_CHECK( !swan().bitasset_data(db).has_settlement() );
+} catch( const fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
+/** Creates a black swan, settles all debts - asset should be revived in next maintenance
+ */
+BOOST_AUTO_TEST_CASE( revive_empty )
+{ try {
+      wait_for_hf_core_216();
+
+      set_expiration( db, trx );
+      limit_order_id_type oid = init_standard_swan( 1000 );
+
+      cancel_limit_order( oid(db) );
+      force_settle( borrower(), swan().amount(1000) );
+      force_settle( borrower2(), swan().amount(1000) );
+      BOOST_CHECK_EQUAL( 0, swan().dynamic_data(db).current_supply.value );
+
+      BOOST_CHECK( swan().bitasset_data(db).has_settlement() );
+
+      // revive
+      wait_for_maintenance();
+      BOOST_CHECK( !swan().bitasset_data(db).has_settlement() );
+} catch( const fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
+/** Creates a black swan, settles all debts - asset should be revived in next maintenance
+ */
+BOOST_AUTO_TEST_CASE( revive_empty_with_bid )
+{ try {
+      wait_for_hf_core_216();
+
+      set_expiration( db, trx );
+      standard_users();
+      standard_asset();
+
+      set_feed( 1, 1 );
+      borrow(borrower(), swan().amount(1000), back().amount(2000));
+      borrow(borrower2(), swan().amount(1000), back().amount(1967));
+
+      set_feed( 1, 2 );
+      // this sell order is designed to trigger a black swan
+      limit_order_id_type oid = create_sell_order( borrower2(), swan().amount(1), back().amount(3) )->id;
+      BOOST_CHECK( swan().bitasset_data(db).has_settlement() );
+
+      cancel_limit_order( oid(db) );
+      force_settle( borrower(), swan().amount(500) );
+      force_settle( borrower(), swan().amount(500) );
+      force_settle( borrower2(), swan().amount(667) );
+      force_settle( borrower2(), swan().amount(333) );
+      BOOST_CHECK_EQUAL( 0, swan().dynamic_data(db).current_supply.value );
+      BOOST_CHECK_EQUAL( 0, swan().bitasset_data(db).settlement_fund.value );
+
+      bid_collateral( borrower(), back().amount(1051), swan().amount(700) );
+
+      BOOST_CHECK( swan().bitasset_data(db).has_settlement() );
+
+      // revive
+      wait_for_maintenance();
+      BOOST_CHECK( !swan().bitasset_data(db).has_settlement() );
+} catch( const fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
 BOOST_AUTO_TEST_SUITE_END()
