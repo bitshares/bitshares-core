@@ -93,7 +93,7 @@ void object_database::wipe(const fc::path& data_dir)
 
 void object_database::open(const fc::path& data_dir)
 { try {
-   if( fc::exists( _data_dir / "object_database" / "lock" ) )
+   if( fc::exists( data_dir / "object_database" / "lock" ) )
    {
        wlog("Ignoring locked object_database");
        return;
