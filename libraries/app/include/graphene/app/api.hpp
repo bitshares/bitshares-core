@@ -31,6 +31,7 @@
 #include <graphene/market_history/market_history_plugin.hpp>
 
 #include <graphene/debug_witness/debug_api.hpp>
+#include <graphene/hello/hello_api.hpp>
 
 #include <graphene/net/node.hpp>
 
@@ -356,6 +357,8 @@ namespace graphene { namespace app {
          fc::api<asset_api> asset()const;
          /// @brief Retrieve the debug API (if available)
          fc::api<graphene::debug_witness::debug_api> debug()const;
+         /// @brief Retrieve the hello API
+         fc::api<graphene::hello::hello_api> hello()const;
 
          /// @brief Called to enable an API, not reflected.
          void enable_api( const string& api_name );
@@ -370,6 +373,7 @@ namespace graphene { namespace app {
          optional< fc::api<crypto_api> > _crypto_api;
          optional< fc::api<asset_api> > _asset_api;
          optional< fc::api<graphene::debug_witness::debug_api> > _debug_api;
+         optional< fc::api<graphene::hello::hello_api> > _hello_api;
    };
 
 }}  // graphene::app
@@ -437,4 +441,5 @@ FC_API(graphene::app::login_api,
        (crypto)
        (asset)
        (debug)
+       (hello)
      )
