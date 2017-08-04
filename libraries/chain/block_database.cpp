@@ -216,23 +216,28 @@ optional<index_entry> block_database::last_index_entry()const {
       if( pos < sizeof(index_entry) )
          return optional<index_entry>();
 
-      if( pos % sizeof(index_entry) != 0 )
-         pos -= pos % sizeof(index_entry);
+      pos -= pos % sizeof(index_entry);
 
-      while( e.block_size == 0 && pos > 0 )
+      _blocks.seekg( 0, _block_num_to_pos.end );
+      const std::streampos blocks_size = _blocks.tellg();
+      while( pos >= 0 )
       {
          pos -= sizeof(index_entry);
          _block_num_to_pos.seekg( pos );
          _block_num_to_pos.read( (char*)&e, sizeof(e) );
-
-         if( e.block_size > 0 )
+         if( _block_num_to_pos.gcount() == sizeof(e) && e.block_size > 0
+                && e.block_pos + e.block_size <= blocks_size )
             try
             {
                vector<char> data( e.block_size );
                _blocks.seekg( e.block_pos );
                _blocks.read( data.data(), e.block_size );
-               auto result = fc::raw::unpack<signed_block>(data);
-               return e;
+               if( _blocks.gcount() == e.block_size )
+               {
+                  const signed_block block = fc::raw::unpack<signed_block>(data);
+                  if( block.id() == e.block_id )
+                     return e;
+               }
             }
             catch (const fc::exception&)
             {
