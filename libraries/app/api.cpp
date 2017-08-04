@@ -460,7 +460,8 @@ namespace graphene { namespace app {
              node = nullptr;
           else node = &node->next(db);
        }
-
+       if( stop.instance.value == 0 && account_transaction_history_id_type()(db).account == account && result.size() < limit )
+          result.push_back( account_transaction_history_id_type()(db).operation_id(db) );
        return result;
     }
 
@@ -490,6 +491,11 @@ namespace graphene { namespace app {
           if( node->next == account_transaction_history_id_type() )
              node = nullptr;
           else node = &node->next(db);
+       }
+       if( stop.instance.value == 0 && result.size() < limit ) {
+          const account_transaction_history_object head = account_transaction_history_id_type()(db);
+          if( head.account == account && head.operation_id(db).op.which() == operation_id )
+             result.push_back(head.operation_id(db));
        }
        return result;
     }
