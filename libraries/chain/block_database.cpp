@@ -45,14 +45,15 @@ void block_database::open( const fc::path& dbdir )
    _block_num_to_pos.exceptions(std::ios_base::failbit | std::ios_base::badbit);
    _blocks.exceptions(std::ios_base::failbit | std::ios_base::badbit);
 
-   if( !fc::exists( dbdir/"index" ) )
+   _index_filename = dbdir / "index";
+   if( !fc::exists( _index_filename ) )
    {
-     _block_num_to_pos.open( (dbdir/"index").generic_string().c_str(), std::fstream::binary | std::fstream::in | std::fstream::out | std::fstream::trunc);
+     _block_num_to_pos.open( _index_filename.generic_string().c_str(), std::fstream::binary | std::fstream::in | std::fstream::out | std::fstream::trunc);
      _blocks.open( (dbdir/"blocks").generic_string().c_str(), std::fstream::binary | std::fstream::in | std::fstream::out | std::fstream::trunc);
    }
    else
    {
-     _block_num_to_pos.open( (dbdir/"index").generic_string().c_str(), std::fstream::binary | std::fstream::in | std::fstream::out );
+     _block_num_to_pos.open( _index_filename.generic_string().c_str(), std::fstream::binary | std::fstream::in | std::fstream::out );
      _blocks.open( (dbdir/"blocks").generic_string().c_str(), std::fstream::binary | std::fstream::in | std::fstream::out );
    }
 } FC_CAPTURE_AND_RETHROW( (dbdir) ) }
@@ -121,7 +122,7 @@ bool block_database::contains( const block_id_type& id )const
    index_entry e;
    auto index_pos = sizeof(e)*block_header::num_from_id(id);
    _block_num_to_pos.seekg( 0, _block_num_to_pos.end );
-   if ( _block_num_to_pos.tellg() <= index_pos )
+   if ( _block_num_to_pos.tellg() < index_pos + sizeof(e) )
       return false;
    _block_num_to_pos.seekg( index_pos );
    _block_num_to_pos.read( (char*)&e, sizeof(e) );
@@ -220,7 +221,7 @@ optional<index_entry> block_database::last_index_entry()const {
 
       _blocks.seekg( 0, _block_num_to_pos.end );
       const std::streampos blocks_size = _blocks.tellg();
-      while( pos >= 0 )
+      while( pos > 0 )
       {
          pos -= sizeof(index_entry);
          _block_num_to_pos.seekg( pos );
@@ -245,6 +246,7 @@ optional<index_entry> block_database::last_index_entry()const {
             catch (const std::exception&)
             {
             }
+         fc::resize_file( _index_filename, pos );
       }
    }
    catch (const fc::exception&)
