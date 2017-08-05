@@ -1308,6 +1308,12 @@ vector<market_trade> database_api_impl::get_trade_history( const string& base,
          trade.date = itr->time;
          trade.price = trade.value / trade.amount;
 
+         trade.side1_account_id = itr->op.account_id;
+
+         auto next_itr = std::next(itr);
+
+         trade.side2_account_id = next_itr->op.account_id;
+
          result.push_back( trade );
          ++count;
       }
