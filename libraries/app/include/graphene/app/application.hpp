@@ -63,7 +63,7 @@ namespace graphene { namespace app {
             if( !plugin_cfg_options.options().empty() )
                _cfg_options.add(plugin_cfg_options);
 
-            add_plugin( plug->plugin_name(), plug );
+            add_available_plugin( plug );
             return plug;
          }
          std::shared_ptr<abstract_plugin> get_plugin( const string& name )const;
@@ -89,7 +89,8 @@ namespace graphene { namespace app {
          boost::signals2::signal<void()> syncing_finished;
 
       private:
-         void add_plugin( const string& name, std::shared_ptr<abstract_plugin> p );
+         void enable_plugin( const string& name );
+         void add_available_plugin( std::shared_ptr<abstract_plugin> p );
          std::shared_ptr<detail::application_impl> my;
 
          boost::program_options::options_description _cli_options;

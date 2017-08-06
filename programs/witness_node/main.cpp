@@ -24,8 +24,10 @@
 #include <graphene/app/application.hpp>
 
 #include <graphene/witness/witness.hpp>
+#include <graphene/debug_witness/debug_witness.hpp>
 #include <graphene/account_history/account_history_plugin.hpp>
 #include <graphene/market_history/market_history_plugin.hpp>
+#include <graphene/delayed_node/delayed_node_plugin.hpp>
 
 #include <fc/exception/exception.hpp>
 #include <fc/thread/thread.hpp>
@@ -42,6 +44,7 @@
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/algorithm/string/classification.hpp>
 #include <boost/algorithm/string/split.hpp>
+#include <boost/container/flat_set.hpp>
 
 #include <iostream>
 #include <fstream>
@@ -72,8 +75,10 @@ int main(int argc, char** argv) {
       bpo::variables_map options;
 
       auto witness_plug = node->register_plugin<witness_plugin::witness_plugin>();
+      auto debug_witness_plug = node->register_plugin<debug_witness_plugin::debug_witness_plugin>();
       auto history_plug = node->register_plugin<account_history::account_history_plugin>();
       auto market_history_plug = node->register_plugin<market_history::market_history_plugin>();
+      auto delayed_plug = node->register_plugin<delayed_node::delayed_node_plugin>();
 
       try
       {
@@ -127,6 +132,7 @@ int main(int argc, char** argv) {
          if( !fc::exists(data_dir) )
             fc::create_directories(data_dir);
 
+         boost::container::flat_set<std::string> seen;
          std::ofstream out_cfg(config_ini_path.preferred_string());
          for( const boost::shared_ptr<bpo::option_description> od : cfg_options.options() )
          {
@@ -136,6 +142,9 @@ int main(int argc, char** argv) {
             if( !od->semantic()->apply_default(store) )
                out_cfg << "# " << od->long_name() << " = \n";
             else {
+               const std::string name = od->long_name();
+               if( seen.find(name) != seen.end() ) continue;
+               seen.insert(name);
                auto example = od->format_parameter();
                if( example.empty() )
                   // This is a boolean switch
@@ -176,7 +185,7 @@ int main(int argc, char** argv) {
          exit_promise->set_value(signal);
       }, SIGTERM);
 
-      ilog("Started witness node on a chain with ${h} blocks.", ("h", node->chain_database()->head_block_num()));
+      ilog("Started BitShares node on a chain with ${h} blocks.", ("h", node->chain_database()->head_block_num()));
       ilog("Chain ID is ${id}", ("id", node->chain_database()->get_chain_id()) );
 
       int signal = exit_promise->wait();
