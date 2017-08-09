@@ -491,13 +491,45 @@ class database_api
        */
       map<string, committee_member_id_type> lookup_committee_member_accounts(const string& lower_bound_name, uint32_t limit)const;
 
+      /**
+       * @brief Get the total number of committee registered with the blockchain
+      */
+      uint64_t get_committee_count()const;
 
-      /// WORKERS
+
+      ///////////////////////
+      // Worker proposals  //
+      ///////////////////////
 
       /**
-       * Return the worker objects associated with this account.
+       * @brief Get a list of workers by ID
+       * @param witness_ids IDs of the workers to retrieve
+       * @return The workers corresponding to the provided IDs
+       *
+       * This function has semantics identical to @ref get_objects
+      */
+      vector<optional<worker_object>> get_workers(const vector<worker_id_type>& worker_ids)const;
+
+      /**
+       * @brief Get the workers owned by a given account
+       * @param account The ID of the account whose worker should be retrieved
+       * @return The worker object, or null if the account does not have a worker
        */
-      vector<worker_object> get_workers_by_account(account_id_type account)const;
+      vector<optional<worker_object>> get_workers_by_account(account_id_type account)const;
+
+      /**
+       * @brief Get names and IDs for registered workers
+       * @param lower_bound_name Lower bound of the first name to return
+       * @param limit Maximum number of results to return -- must not exceed 1000
+       * @return Map of workers names to corresponding IDs
+      */
+      map<string, worker_id_type> lookup_worker_accounts(const string& lower_bound_name, uint32_t limit)const;
+
+      /**
+       * @brief Get the total number of workers registered with the blockchain
+      */
+      uint64_t get_worker_count()const;
+
 
 
       ///////////
@@ -657,9 +689,14 @@ FC_API(graphene::app::database_api,
    (get_committee_members)
    (get_committee_member_by_account)
    (lookup_committee_member_accounts)
+   (get_committee_count)
 
    // workers
+   (get_workers)
    (get_workers_by_account)
+   (lookup_worker_accounts)
+   (get_worker_count)
+
    // Votes
    (lookup_vote_ids)
 
