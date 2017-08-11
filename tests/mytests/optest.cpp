@@ -310,7 +310,7 @@ BOOST_AUTO_TEST_CASE( taker_buys_small_lot_too_high )
    //print_market( "", "" );
    BOOST_CHECK( db.find( first_id ) );
    if( unmatched ) wdump((*unmatched));
-   BOOST_CHECK( !unmatched );
+   BOOST_CHECK( unmatched );
 
    //APM
    //sell_asset nathan 100 TEST 80 BTS 100000 false true    <-- buyer SELL 100 TEST @ 0.80 (bts)
@@ -318,10 +318,10 @@ BOOST_AUTO_TEST_CASE( taker_buys_small_lot_too_high )
    //expected result: 11 TEST filled @0.80
    // buyer is selling TEST buying CORE
    // seller is buying TEST selling CORE
-   BOOST_CHECK_EQUAL( get_balance( seller_account, test_asset ), 11 );
-   BOOST_CHECK_EQUAL( get_balance( buyer_account, core_asset ), 9 );
+   BOOST_CHECK_EQUAL( get_balance( seller_account, test_asset ), 10 );
+   BOOST_CHECK_EQUAL( get_balance( buyer_account, core_asset ), 8 );
    BOOST_CHECK_EQUAL( core_asset.dynamic_asset_data_id(db).accumulated_fees.value , 0 );
-   BOOST_CHECK_EQUAL( get_balance( seller_account, core_asset ), 9991 );
+   BOOST_CHECK_EQUAL( get_balance( seller_account, core_asset ), 9990 );
    BOOST_CHECK_EQUAL( get_balance( buyer_account, test_asset ), 9900 );
  }
  catch ( const fc::exception& e )
