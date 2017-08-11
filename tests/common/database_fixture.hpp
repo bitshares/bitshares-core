@@ -263,6 +263,7 @@ struct database_fixture {
    void sign( signed_transaction& trx, const fc::ecc::private_key& key );
    const limit_order_object* create_sell_order( account_id_type user, const asset& amount, const asset& recv );
    const limit_order_object* create_sell_order( const account_object& user, const asset& amount, const asset& recv );
+   const limit_order_object* create_sell_order_with_flag( const account_object& user, const asset& amount, const asset& recv, bool above1 );
    asset cancel_limit_order( const limit_order_object& order );
    void transfer( account_id_type from, account_id_type to, const asset& amount, const asset& fee = asset() );
    void transfer( const account_object& from, const account_object& to, const asset& amount, const asset& fee = asset() );
