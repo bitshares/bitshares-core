@@ -709,6 +709,26 @@ const limit_order_object* database_fixture::create_sell_order( const account_obj
    return db.find<limit_order_object>( processed.operation_results[0].get<object_id_type>() );
 }
 
+//APM --> (for TESTS, adds above1 flag via expiration field in order to indicate if expected order price is trading above or below 1
+const limit_order_object* database_fixture::create_sell_order_with_flag( const account_object& user, const asset& amount, const asset& recv, bool above1 )
+{
+   //wdump((amount)(recv));
+   limit_order_create_operation buy_order;
+   buy_order.seller = user.id;
+   buy_order.amount_to_sell = amount;
+   buy_order.min_to_receive = recv;
+   if (above1) buy_order.expiration = buy_order.expiration.maximum()-1000; else 
+		buy_order.expiration = buy_order.expiration.maximum()-1001;
+   trx.operations.push_back(buy_order);
+   for( auto& op : trx.operations ) db.current_fee_schedule().set_fee(op);
+   trx.validate();
+   auto processed = db.push_transaction(trx, ~0);
+   trx.operations.clear();
+   verify_asset_supplies(db);
+   //wdump((processed));
+   return db.find<limit_order_object>( processed.operation_results[0].get<object_id_type>() );
+}
+
 asset database_fixture::cancel_limit_order( const limit_order_object& order )
 {
   limit_order_cancel_operation cancel_order;
