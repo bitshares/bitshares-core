@@ -90,33 +90,26 @@ void verify_account_votes( const database& db, const account_options& options )
          }
       }
    }
-   if (true /* db.head_block_time() >= HARDFORK_NEXT_TIME*/ ) {
-      int voted_committee_count = 0;
-      int voted_witness_count = 0;
+   if ( db.head_block_time() >= HARDFORK_143_2_TIME ) {
       const auto& approve_worker_idx = db.get_index_type<worker_index>().indices().get<by_vote_for>();
       const auto& committee_idx = db.get_index_type<committee_member_index>().indices().get<by_vote_id>();
       const auto& witness_idx = db.get_index_type<witness_index>().indices().get<by_vote_id>();
       for ( auto id : options.votes ) {
-         switch ( id ) {
-            case vote_id_type::worker:
-               FC_ASSERT( approve_worker_idx.find( id ) != approve_worker_idx.end() );
-               break;
+         switch ( id.type() ) {
             case vote_id_type::committee:
-               voted_committee_count++;
                FC_ASSERT( committee_idx.find(id) != committee_idx.end() );
                break;
             case vote_id_type::witness:
-               voted_witness_count++;
                FC_ASSERT( witness_idx.find(id) != witness_idx.end());
                break;
+            case vote_id_type::worker:
+               FC_ASSERT( approve_worker_idx.find( id ) != approve_worker_idx.end() );
+               break;
             default:
-               FC_THROW( "Invalid Vote Type" );
+               FC_THROW( "Invalid Vote Type: ${id}", ("id", id) );
                break;
          }
       }
-      FC_ASSERT( options.num_committee <= voted_committee_count );
-      FC_ASSERT( options.num_witness <= voted_witness_count );
-      //TODO: check all options.votes.id are unique to prevent duplucate votes
    }
 }
 

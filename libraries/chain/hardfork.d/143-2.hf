@@ -1,0 +1,4 @@
+// #143 Require voted entities to exist
+#ifndef HARDFORK_143_2_TIME
+#define HARDFORK_143_2_TIME (fc::time_point_sec( 1503878400 ))
+#endif

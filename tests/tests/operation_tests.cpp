@@ -23,6 +23,7 @@
  */
 
 #include <boost/test/unit_test.hpp>
+#include <boost/assign/list_of.hpp>
 
 #include <graphene/chain/database.hpp>
 #include <graphene/chain/exceptions.hpp>
@@ -441,6 +442,8 @@ BOOST_AUTO_TEST_CASE( prediction_market )
 BOOST_AUTO_TEST_CASE( create_account_test )
 {
    try {
+      generate_blocks( HARDFORK_143_2_TIME );
+      set_expiration( db, trx );
       trx.operations.push_back(make_account());
       account_create_operation op = trx.operations.back().get<account_create_operation>();
 
@@ -457,6 +460,17 @@ BOOST_AUTO_TEST_CASE( create_account_test )
       REQUIRE_THROW_WITH_VALUE(op, name, "aaaa.");
       REQUIRE_THROW_WITH_VALUE(op, name, ".aaaa");
       REQUIRE_THROW_WITH_VALUE(op, options.voting_account, account_id_type(999999999));
+
+      // Not allow voting for non-exist entities.
+      op.options.num_committee = 1;
+      op.options.num_witness = 0;
+      REQUIRE_THROW_WITH_VALUE(op, options.votes, boost::assign::list_of<vote_id_type>(vote_id_type("0:1")).convert_to_container<flat_set<vote_id_type>>());
+      op.options.num_witness = 1;
+      op.options.num_committee = 0;
+      REQUIRE_THROW_WITH_VALUE(op, options.votes, boost::assign::list_of<vote_id_type>(vote_id_type("1:19")).convert_to_container<flat_set<vote_id_type>>());
+      op.options.num_witness = 0;
+      REQUIRE_THROW_WITH_VALUE(op, options.votes, boost::assign::list_of<vote_id_type>(vote_id_type("2:19")).convert_to_container<flat_set<vote_id_type>>());
+      op.options.num_committee = 4;
 
       auto auth_bak = op.owner;
       op.owner.add_authority(account_id_type(9999999999), 10);
