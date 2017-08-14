@@ -471,6 +471,7 @@ namespace detail {
                std::exit(EXIT_FAILURE);
             }
          }
+         
          else
          {
             // TODO:  Remove this generous default access policy
