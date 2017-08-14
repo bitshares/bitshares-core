@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015 Cryptonomex, Inc., and contributors.
+ * Copyright (c) 2017 Cryptonomex, Inc., and contributors.
  *
  * The MIT License
  *
@@ -208,7 +208,7 @@ void database::initialize_indexes()
    add_index< primary_index<simple_index<dynamic_global_property_object  >> >();
    add_index< primary_index<simple_index<account_statistics_object       >> >();
    add_index< primary_index<simple_index<asset_dynamic_data_object       >> >();
-   add_index< primary_index<flat_index<  block_summary_object            >> >();
+   add_index< primary_index<simple_index<block_summary_object            >> >();
    add_index< primary_index<simple_index<chain_property_object          > > >();
    add_index< primary_index<simple_index<witness_schedule_object        > > >();
    add_index< primary_index<simple_index<budget_record_object           > > >();
@@ -240,9 +240,6 @@ void database::init_genesis(const genesis_state_type& genesis_state)
    } inhibitor(*this);
 
    transaction_evaluation_state genesis_eval_state(this);
-
-   flat_index<block_summary_object>& bsi = get_mutable_index_type< flat_index<block_summary_object> >();
-   bsi.resize(0xffff+1);
 
    // Create blockchain accounts
    fc::ecc::private_key null_private_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("null_key")));
@@ -404,7 +401,8 @@ void database::init_genesis(const genesis_state_type& genesis_state)
       p.chain_id = chain_id;
       p.immutable_parameters = genesis_state.immutable_parameters;
    } );
-   create<block_summary_object>([&](block_summary_object&) {});
+   for (uint32_t i = 0; i <= 0x10000; i++)
+      create<block_summary_object>( [&]( block_summary_object&) {});
 
    // Create initial accounts
    for( const auto& account : genesis_state.initial_accounts )

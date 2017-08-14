@@ -124,9 +124,6 @@ database_fixture::~database_fixture()
       verify_account_history_plugin_index();
       BOOST_CHECK( db.get_node_properties().skip_flags == database::skip_nothing );
    }
-
-   if( data_dir )
-      db.close();
    return;
 } FC_CAPTURE_AND_RETHROW() }
 
