@@ -127,9 +127,8 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       uint64_t get_committee_count()const;
 
       // Workers
-      vector<optional<worker_object>> get_workers(const vector<worker_id_type>& worker_ids)const;
+      vector<optional<worker_object>> get_all_workers()const;
       vector<optional<worker_object>> get_workers_by_account(account_id_type account)const;
-      map<string, worker_id_type> lookup_worker_accounts(const string& lower_bound_name, uint32_t limit)const;
       uint64_t get_worker_count()const;
 
       // Votes
@@ -1492,20 +1491,19 @@ uint64_t database_api_impl::get_committee_count()const
 //                                                                  //
 //////////////////////////////////////////////////////////////////////
 
-vector<optional<worker_object>> database_api::get_workers(const vector<worker_id_type>& worker_ids)const
+vector<optional<worker_object>> database_api::get_all_workers()const
 {
-    return my->get_workers( worker_ids );
+    return my->get_all_workers();
 }
 
-vector<optional<worker_object>> database_api_impl::get_workers(const vector<worker_id_type>& worker_ids)const
+vector<optional<worker_object>> database_api_impl::get_all_workers()const
 {
-    vector<optional<worker_object>> result; result.reserve(worker_ids.size());
-    std::transform(worker_ids.begin(), worker_ids.end(), std::back_inserter(result),
-                   [this](worker_id_type id) -> optional<worker_object> {
-                       if(auto o = _db.find(id))
-                           return *o;
-                       return {};
-                   });
+    vector<optional<worker_object>> result;
+    const auto& workers_idx = _db.get_index_type<worker_index>().indices().get<by_id>();
+    for( const auto& w : workers_idx )
+    {
+       result.push_back( w );
+    }
     return result;
 }
 
@@ -1525,34 +1523,6 @@ vector<optional<worker_object>> database_api_impl::get_workers_by_account(accoun
             result.push_back( w );
     }
     return result;
-}
-
-map<string, worker_id_type> database_api::lookup_worker_accounts(const string& lower_bound_name, uint32_t limit)const
-{
-    return my->lookup_worker_accounts( lower_bound_name, limit );
-}
-
-map<string, worker_id_type> database_api_impl::lookup_worker_accounts(const string& lower_bound_name, uint32_t limit)const
-{
-    FC_ASSERT( limit <= 1000 );
-    const auto& workers_by_id = _db.get_index_type<worker_index>().indices().get<by_id>();
-
-    // we want to order workers by account name, but that name is in the account object
-    // so the worker_index doesn't have a quick way to access it.
-    // get all the names and look them all up, sort them, then figure out what
-    // records to return.  This could be optimized, but we expect the
-    // number of workers to be few and the frequency of calls to be rare
-    std::map<std::string, worker_id_type> workers_by_account_name;
-    for (const worker_object& worker : workers_by_id)
-        if (auto account_iter = _db.find(worker.worker_account))
-            if (account_iter->name >= lower_bound_name) // we can ignore anything below lower_bound_name
-                workers_by_account_name.insert(std::make_pair(account_iter->name, worker.id));
-
-    auto end_iter = workers_by_account_name.begin();
-    while (end_iter != workers_by_account_name.end() && limit--)
-        ++end_iter;
-    workers_by_account_name.erase(end_iter, workers_by_account_name.end());
-    return workers_by_account_name;
 }
 
 uint64_t database_api::get_worker_count()const

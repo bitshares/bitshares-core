@@ -502,13 +502,11 @@ class database_api
       ///////////////////////
 
       /**
-       * @brief Get a list of workers by ID
-       * @param witness_ids IDs of the workers to retrieve
-       * @return The workers corresponding to the provided IDs
+       * @brief Get all workers
+       * @return All the workers
        *
-       * This function has semantics identical to @ref get_objects
       */
-      vector<optional<worker_object>> get_workers(const vector<worker_id_type>& worker_ids)const;
+      vector<optional<worker_object>> get_all_workers()const;
 
       /**
        * @brief Get the workers owned by a given account
@@ -516,14 +514,6 @@ class database_api
        * @return The worker object, or null if the account does not have a worker
        */
       vector<optional<worker_object>> get_workers_by_account(account_id_type account)const;
-
-      /**
-       * @brief Get names and IDs for registered workers
-       * @param lower_bound_name Lower bound of the first name to return
-       * @param limit Maximum number of results to return -- must not exceed 1000
-       * @return Map of workers names to corresponding IDs
-      */
-      map<string, worker_id_type> lookup_worker_accounts(const string& lower_bound_name, uint32_t limit)const;
 
       /**
        * @brief Get the total number of workers registered with the blockchain
@@ -692,9 +682,8 @@ FC_API(graphene::app::database_api,
    (get_committee_count)
 
    // workers
-   (get_workers)
+   (get_all_workers)
    (get_workers_by_account)
-   (lookup_worker_accounts)
    (get_worker_count)
 
    // Votes
