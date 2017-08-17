@@ -127,7 +127,7 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       uint64_t get_committee_count()const;
 
       // Workers
-      vector<optional<worker_object>> get_all_workers()const;
+      vector<worker_object> get_all_workers()const;
       vector<optional<worker_object>> get_workers_by_account(account_id_type account)const;
       uint64_t get_worker_count()const;
 
@@ -1491,14 +1491,14 @@ uint64_t database_api_impl::get_committee_count()const
 //                                                                  //
 //////////////////////////////////////////////////////////////////////
 
-vector<optional<worker_object>> database_api::get_all_workers()const
+vector<worker_object> database_api::get_all_workers()const
 {
     return my->get_all_workers();
 }
 
-vector<optional<worker_object>> database_api_impl::get_all_workers()const
+vector<worker_object> database_api_impl::get_all_workers()const
 {
-    vector<optional<worker_object>> result;
+    vector<worker_object> result;
     const auto& workers_idx = _db.get_index_type<worker_index>().indices().get<by_id>();
     for( const auto& w : workers_idx )
     {

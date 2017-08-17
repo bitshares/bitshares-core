@@ -506,7 +506,7 @@ class database_api
        * @return All the workers
        *
       */
-      vector<optional<worker_object>> get_all_workers()const;
+      vector<worker_object> get_all_workers()const;
 
       /**
        * @brief Get the workers owned by a given account
