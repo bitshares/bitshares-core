@@ -111,8 +111,18 @@ int main(int argc, char** argv) {
       fc::path config_ini_path = data_dir / "config.ini";
       if( fc::exists(config_ini_path) )
       {
+         boost::container::flat_set<std::string> seen;
+         bpo::options_description unique_options("Graphene Witness Node");
+         for( const boost::shared_ptr<bpo::option_description> od : cfg_options.options() )
+         {
+            const std::string name = od->long_name();
+            if( seen.find(name) != seen.end() ) continue;
+            seen.insert(name);
+            unique_options.add( od );
+         }
+
          // get the basic options
-         bpo::store(bpo::parse_config_file<char>(config_ini_path.preferred_string().c_str(), cfg_options, true), options);
+         bpo::store(bpo::parse_config_file<char>(config_ini_path.preferred_string().c_str(), unique_options, true), options);
 
          // try to get logging options from the config file.
          try
