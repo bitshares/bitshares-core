@@ -246,7 +246,9 @@ void database::update_active_committee_members()
    assert( _committee_count_histogram_buffer.size() > 0 );
    share_type stake_target = (_total_voting_stake-_committee_count_histogram_buffer[0]) / 2;
    share_type old_stake_target = (_total_voting_stake-_witness_count_histogram_buffer[0]) / 2;
-
+   // TODO
+   // all the stuff about old_stake_target can *hopefully* be removed after the
+   // hardfork date has passed
    if( stake_target != old_stake_target )
        ilog( "Different stake targets: ${old} / ${new}", ("old",old_stake_target)("new",stake_target) );
 
