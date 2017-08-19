@@ -247,8 +247,8 @@ void database::update_active_committee_members()
    share_type stake_target = (_total_voting_stake-_committee_count_histogram_buffer[0]) / 2;
    share_type old_stake_target = (_total_voting_stake-_witness_count_histogram_buffer[0]) / 2;
 
-   if (stake_target != old_stake_target)
-       ilog("Different stake targets: ${old} / ${new}", ("old",old_stake_target)("new",stake_target) );
+   if( stake_target != old_stake_target )
+       ilog( "Different stake targets: ${old} / ${new}", ("old",old_stake_target)("new",stake_target) );
 
    /// accounts that vote for 0 or 1 witness do not get to express an opinion on
    /// the number of witnesses to have (they abstain and are non-voting accounts)
@@ -258,16 +258,16 @@ void database::update_active_committee_members()
       while( (committee_member_count < _committee_count_histogram_buffer.size() - 1)
              && (stake_tally <= stake_target) )
          stake_tally += _committee_count_histogram_buffer[++committee_member_count];
-   if (stake_target != old_stake_target && old_stake_target > 0)
+   if( stake_target != old_stake_target && old_stake_target > 0 && head_block_time() < fc::time_point_sec(HARDFORK_CORE_353_TIME) )
    {
       uint64_t old_stake_tally = 0;
       size_t old_committee_member_count = 0;
       while( (old_committee_member_count < _committee_count_histogram_buffer.size() - 1)
              && (old_stake_tally <= old_stake_target) )
          old_stake_tally += _committee_count_histogram_buffer[++old_committee_member_count];
-      if (old_committee_member_count != committee_member_count)
+      if( old_committee_member_count != committee_member_count )
       {
-          ilog("Committee member count mismatch ${old} / ${new}", ("old",old_committee_member_count)("new", committee_member_count) );
+          ilog( "Committee member count mismatch ${old} / ${new}", ("old",old_committee_member_count)("new", committee_member_count) );
           committee_member_count = old_committee_member_count;
       }
    }
