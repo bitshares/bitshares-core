@@ -618,7 +618,7 @@ std::map<std::string, full_account> database_api_impl::get_full_accounts( const 
 
       if( subscribe )
       {
-         if(_subscribed_accounts.size() <= 100) {
+         if(_subscribed_accounts.size() < 100) {
             _subscribed_accounts.insert( account->get_id() );
             subscribe_to_item( account->id );
          }
