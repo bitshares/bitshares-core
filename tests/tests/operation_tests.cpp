@@ -442,7 +442,7 @@ BOOST_AUTO_TEST_CASE( prediction_market )
 BOOST_AUTO_TEST_CASE( create_account_test )
 {
    try {
-      generate_blocks( HARDFORK_143_2_TIME );
+      generate_blocks( HARDFORK_CORE_143_TIME );
       set_expiration( db, trx );
       trx.operations.push_back(make_account());
       account_create_operation op = trx.operations.back().get<account_create_operation>();

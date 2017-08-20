@@ -90,7 +90,7 @@ void verify_account_votes( const database& db, const account_options& options )
          }
       }
    }
-   if ( db.head_block_time() >= HARDFORK_143_2_TIME ) {
+   if ( db.head_block_time() >= HARDFORK_CORE_143_TIME ) {
       const auto& approve_worker_idx = db.get_index_type<worker_index>().indices().get<by_vote_for>();
       const auto& committee_idx = db.get_index_type<committee_member_index>().indices().get<by_vote_id>();
       const auto& witness_idx = db.get_index_type<witness_index>().indices().get<by_vote_id>();
