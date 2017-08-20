@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015 Cryptonomex, Inc., and contributors.
+ * Copyright (c) 2017 Cryptonomex, Inc., and contributors.
  *
  * The MIT License
  *
@@ -54,6 +54,7 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       database_api_impl( graphene::chain::database& db );
       ~database_api_impl();
 
+
       // Objects
       fc::variants get_objects(const vector<object_id_type>& ids)const;
 
@@ -78,7 +79,7 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
 
       // Keys
       vector<vector<account_id_type>> get_key_references( vector<public_key_type> key )const;
-     bool is_public_key_registered(string public_key) const;
+      bool is_public_key_registered(string public_key) const;
 
       // Accounts
       vector<optional<account_object>> get_accounts(const vector<account_id_type>& account_ids)const;
@@ -123,6 +124,12 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       vector<optional<committee_member_object>> get_committee_members(const vector<committee_member_id_type>& committee_member_ids)const;
       fc::optional<committee_member_object> get_committee_member_by_account(account_id_type account)const;
       map<string, committee_member_id_type> lookup_committee_member_accounts(const string& lower_bound_name, uint32_t limit)const;
+      uint64_t get_committee_count()const;
+
+      // Workers
+      vector<worker_object> get_all_workers()const;
+      vector<optional<worker_object>> get_workers_by_account(account_id_type account)const;
+      uint64_t get_worker_count()const;
 
       // Votes
       vector<variant> lookup_vote_ids( const vector<vote_id_type>& votes )const;
@@ -142,6 +149,7 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
 
       // Blinded balances
       vector<blinded_balance_object> get_blinded_balances( const flat_set<commitment_type>& commitments )const;
+
 
    //private:
       template<typename T>
@@ -1337,22 +1345,6 @@ vector<optional<witness_object>> database_api::get_witnesses(const vector<witnes
    return my->get_witnesses( witness_ids );
 }
 
-vector<worker_object> database_api::get_workers_by_account(account_id_type account)const
-{
-    const auto& idx = my->_db.get_index_type<worker_index>().indices().get<by_account>();
-    auto itr = idx.find(account);
-    vector<worker_object> result;
-
-    if( itr != idx.end() && itr->worker_account == account )
-    {
-       result.emplace_back( *itr );
-       ++itr;
-    }
-
-    return result;
-}
-
-
 vector<optional<witness_object>> database_api_impl::get_witnesses(const vector<witness_id_type>& witness_ids)const
 {
    vector<optional<witness_object>> result; result.reserve(witness_ids.size());
@@ -1481,6 +1473,69 @@ map<string, committee_member_id_type> database_api_impl::lookup_committee_member
    committee_members_by_account_name.erase(end_iter, committee_members_by_account_name.end());
    return committee_members_by_account_name;
 }
+
+uint64_t database_api::get_committee_count()const
+{
+    return my->get_committee_count();
+}
+
+uint64_t database_api_impl::get_committee_count()const
+{
+    return _db.get_index_type<committee_member_index>().indices().size();
+}
+
+
+//////////////////////////////////////////////////////////////////////
+//                                                                  //
+// Workers                                                          //
+//                                                                  //
+//////////////////////////////////////////////////////////////////////
+
+vector<worker_object> database_api::get_all_workers()const
+{
+    return my->get_all_workers();
+}
+
+vector<worker_object> database_api_impl::get_all_workers()const
+{
+    vector<worker_object> result;
+    const auto& workers_idx = _db.get_index_type<worker_index>().indices().get<by_id>();
+    for( const auto& w : workers_idx )
+    {
+       result.push_back( w );
+    }
+    return result;
+}
+
+vector<optional<worker_object>> database_api::get_workers_by_account(account_id_type account)const
+{
+    return my->get_workers_by_account( account );
+}
+
+vector<optional<worker_object>> database_api_impl::get_workers_by_account(account_id_type account)const
+{
+    vector<optional<worker_object>> result;
+    const auto& workers_idx = _db.get_index_type<worker_index>().indices().get<by_account>();
+
+    for( const auto& w : workers_idx )
+    {
+        if( w.worker_account == account )
+            result.push_back( w );
+    }
+    return result;
+}
+
+uint64_t database_api::get_worker_count()const
+{
+    return my->get_worker_count();
+}
+
+uint64_t database_api_impl::get_worker_count()const
+{
+    return _db.get_index_type<worker_index>().indices().size();
+}
+
+
 
 //////////////////////////////////////////////////////////////////////
 //                                                                  //
