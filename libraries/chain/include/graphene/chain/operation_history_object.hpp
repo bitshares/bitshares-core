@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015 Cryptonomex, Inc., and contributors.
+ * Copyright (c) 2017 Cryptonomex, Inc., and contributors.
  *
  * The MIT License
  *
@@ -94,15 +94,17 @@ namespace graphene { namespace chain {
          operation_history_id_type            operation_id;
          uint32_t                             sequence = 0; /// the operation position within the given account
          account_transaction_history_id_type  next;
+         fc::time_point_sec time;
 
          //std::pair<account_id_type,operation_history_id_type>  account_op()const  { return std::tie( account, operation_id ); }
          //std::pair<account_id_type,uint32_t>                   account_seq()const { return std::tie( account, sequence );     }
    };
    
-   struct by_id;
+struct by_id;
 struct by_seq;
 struct by_op;
 struct by_opid;
+struct by_time;
 typedef multi_index_container<
    account_transaction_history_object,
    indexed_by<
@@ -121,6 +123,12 @@ typedef multi_index_container<
       >,
       ordered_non_unique< tag<by_opid>,
          member< account_transaction_history_object, operation_history_id_type, &account_transaction_history_object::operation_id>
+      >,
+      ordered_non_unique< tag<by_time>,
+         composite_key< account_transaction_history_object,
+            member< account_transaction_history_object, account_id_type, &account_transaction_history_object::account>,
+            member< account_transaction_history_object, fc::time_point_sec, &account_transaction_history_object::time>
+         >
       >
    >
 > account_transaction_history_multi_index_type;
@@ -134,4 +142,4 @@ FC_REFLECT_DERIVED( graphene::chain::operation_history_object, (graphene::chain:
                     (op)(result)(block_num)(trx_in_block)(op_in_trx)(virtual_op) )
 
 FC_REFLECT_DERIVED( graphene::chain::account_transaction_history_object, (graphene::chain::object),
-                    (account)(operation_id)(sequence)(next) )
+                    (account)(operation_id)(sequence)(next)(time) )

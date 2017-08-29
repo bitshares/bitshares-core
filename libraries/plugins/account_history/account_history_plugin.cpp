@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015 Cryptonomex, Inc., and contributors.
+ * Copyright (c) 2017 Cryptonomex, Inc., and contributors.
  *
  * The MIT License
  *
@@ -185,6 +185,8 @@ void account_history_plugin_impl::add_account_history( const account_id_type acc
        obj.account = account_id;
        obj.sequence = stats_obj.total_ops + 1;
        obj.next = stats_obj.most_recent_op;
+
+       obj.time = db.head_block_time();
    });
    db.modify( stats_obj, [&]( account_statistics_object& obj ){
        obj.most_recent_op = ath.id;
