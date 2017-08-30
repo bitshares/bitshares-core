@@ -1,0 +1,12 @@
+version: '2'
+
+services:
+  builder:
+    build: .
+    stdin_open: true
+    tty: true
+    entrypoint: /usr/bin/fish
+    user: bitshares-builder
+    working_dir: /bitshares
+    volumes:
+      - ../..:/bitshares
