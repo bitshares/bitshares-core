@@ -27,37 +27,6 @@
 #include <boost/multi_index/composite_key.hpp>
 
 namespace graphene { namespace chain {
-  /***
-   * A descriptor of a particular withdrawal period
-   */
-  struct withdrawal_period_descriptor {
-     withdrawal_period_descriptor(const time_point_sec start, const time_point_sec end, const asset available, const asset claimed)
-             : period_start_time(start), period_end_time(end), available_this_period(available), claimed_this_period(claimed) {}
-
-     // Start of period
-     time_point_sec period_start_time;
-
-     // End of period
-     time_point_sec period_end_time;
-
-     // Quantify how much is still available to be withdrawn during this period
-     asset available_this_period;
-
-     // Quantify how much has already been claimed during this period
-     asset claimed_this_period;
-
-     string const to_string() const {
-         string asset_id = fc::to_string(available_this_period.asset_id.space_id)
-                           + "." + fc::to_string(available_this_period.asset_id.type_id)
-                           + "." + fc::to_string(available_this_period.asset_id.instance.value);
-         string text = fc::to_string(available_this_period.amount.value)
-                       + " " + asset_id
-                       + " is available from " + period_start_time.to_iso_string()
-                       + " to " + period_end_time.to_iso_string();
-         return text;
-     }
-  };
-
   /**
    * @class withdraw_permission_object
    * @brief Grants another account authority to withdraw a limited amount of funds per interval
@@ -85,7 +54,6 @@ namespace graphene { namespace chain {
        /***
         * The beginning of the next withdrawal period
         * WARNING: Due to caching, this value does not always represent the start of the next or current period (because it is only updated after a withdrawal operation such as claim).  For the latest current period, use current_period().
-        * @see current_period()
         */
         time_point_sec     period_start_time;
         /// The time at which this withdraw permission expires
@@ -94,7 +62,6 @@ namespace graphene { namespace chain {
        /***
         * Tracks the total amount
         * WARNING: Due to caching, this value does not always represent the total amount claimed during the current period; it may represent what was claimed during the last claimed period (because it is only updated after a withdrawal operation such as claim).  For the latest current period, use current_period().
-        * @see current_period()
         */
         share_type         claimed_this_period;
 
@@ -110,23 +77,6 @@ namespace graphene { namespace chain {
               ? withdrawal_limit.amount - claimed_this_period
               : 0, withdrawal_limit.asset_id );
         }
-
-       /***
-        * Get a description of the current withdrawal period
-        * @param current_time   Current time
-        * @return A description of the current period
-        */
-       withdrawal_period_descriptor current_period(fc::time_point_sec current_time) const {
-           // @todo [6] Is there a potential race condition where a call to available_this_period might become out of sync with this function's later use of period start time?
-           asset available = available_this_period(current_time);
-           asset claimed = asset(withdrawal_limit.amount - available.amount, withdrawal_limit.asset_id);
-           auto periods = (current_time - period_start_time).to_seconds() / withdrawal_period_sec;
-           time_point_sec current_period_start = period_start_time + (periods * withdrawal_period_sec);
-           time_point_sec current_period_end = current_period_start + withdrawal_period_sec;
-           withdrawal_period_descriptor descriptor = withdrawal_period_descriptor(current_period_start, current_period_end, available, claimed);
-
-           return descriptor;
-       }
    };
 
    struct by_from;

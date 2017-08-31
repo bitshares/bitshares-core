@@ -46,6 +46,55 @@ using namespace graphene::chain::test;
 
 BOOST_FIXTURE_TEST_SUITE( operation_tests, database_fixture )
 
+/***
+ * A descriptor of a particular withdrawal period
+ */
+struct withdrawal_period_descriptor {
+   withdrawal_period_descriptor(const time_point_sec start, const time_point_sec end, const asset available, const asset claimed)
+      : period_start_time(start), period_end_time(end), available_this_period(available), claimed_this_period(claimed) {}
+
+   // Start of period
+   time_point_sec period_start_time;
+
+   // End of period
+   time_point_sec period_end_time;
+
+   // Quantify how much is still available to be withdrawn during this period
+   asset available_this_period;
+
+   // Quantify how much has already been claimed during this period
+   asset claimed_this_period;
+
+   string const to_string() const {
+       string asset_id = fc::to_string(available_this_period.asset_id.space_id)
+                         + "." + fc::to_string(available_this_period.asset_id.type_id)
+                         + "." + fc::to_string(available_this_period.asset_id.instance.value);
+       string text = fc::to_string(available_this_period.amount.value)
+                     + " " + asset_id
+                     + " is available from " + period_start_time.to_iso_string()
+                     + " to " + period_end_time.to_iso_string();
+       return text;
+   }
+};
+
+
+/***
+ * Get a description of the current withdrawal period
+ * @param current_time   Current time
+ * @return A description of the current period
+ */
+withdrawal_period_descriptor current_period(const withdraw_permission_object& permit, fc::time_point_sec current_time) {
+   // @todo [6] Is there a potential race condition where a call to available_this_period might become out of sync with this function's later use of period start time?
+   asset available = permit.available_this_period(current_time);
+   asset claimed = asset(permit.withdrawal_limit.amount - available.amount, permit.withdrawal_limit.asset_id);
+   auto periods = (current_time - permit.period_start_time).to_seconds() / permit.withdrawal_period_sec;
+   time_point_sec current_period_start = permit.period_start_time + (periods * permit.withdrawal_period_sec);
+   time_point_sec current_period_end = current_period_start + permit.withdrawal_period_sec;
+   withdrawal_period_descriptor descriptor = withdrawal_period_descriptor(current_period_start, current_period_end, available, claimed);
+
+   return descriptor;
+}
+
 /**
  * This auxiliary test is used for two purposes:
  * (a) it checks the creation of withdrawal claims,
@@ -489,7 +538,7 @@ BOOST_AUTO_TEST_CASE( withdraw_permission_nominal_case )
       BOOST_CHECK(db.find_object(permit) != nullptr);
       BOOST_CHECK( permit_object.claimed_this_period == 5 );
       BOOST_CHECK_EQUAL( permit_object.available_this_period(db.head_block_time()).amount.value, 0 );
-      BOOST_CHECK_EQUAL( permit_object.current_period(db.head_block_time()).available_this_period.amount.value, 0 );
+      BOOST_CHECK_EQUAL( current_period(permit_object, db.head_block_time()).available_this_period.amount.value, 0 );
       trx.clear();
       generate_blocks(
            permit_object.period_start_time
@@ -538,7 +587,7 @@ BOOST_AUTO_TEST_CASE( withdraw_permission_incremental_case )
     }
     // Before withdrawing, check the period description
     const withdraw_permission_object &first_permit_object = permit(db);
-    const withdrawal_period_descriptor first_period = first_permit_object.current_period(db.head_block_time());
+    const withdrawal_period_descriptor first_period = current_period(first_permit_object, db.head_block_time());
     BOOST_CHECK_EQUAL(first_period.period_start_time.sec_since_epoch(), expected_first_period_start_time.sec_since_epoch());
     BOOST_CHECK_EQUAL(first_period.period_end_time.sec_since_epoch(), expected_first_period_start_time.sec_since_epoch() + expected_period_duration_seconds);
     BOOST_CHECK_EQUAL(first_period.available_this_period.amount.value, 5);
@@ -548,7 +597,7 @@ BOOST_AUTO_TEST_CASE( withdraw_permission_incremental_case )
         // Before claiming, check the period description
         const withdraw_permission_object& permit_object = permit(db);
         BOOST_CHECK(db.find_object(permit) != nullptr);
-        withdrawal_period_descriptor period_descriptor = permit_object.current_period(db.head_block_time());
+        withdrawal_period_descriptor period_descriptor = current_period(permit_object, db.head_block_time());
         BOOST_CHECK_EQUAL(period_descriptor.available_this_period.amount.value, 5);
         BOOST_CHECK_EQUAL(period_descriptor.period_start_time.sec_since_epoch(), expected_first_period_start_time.sec_since_epoch() + (expected_period_duration_seconds * 0));
         BOOST_CHECK_EQUAL(period_descriptor.period_end_time.sec_since_epoch(), expected_first_period_start_time.sec_since_epoch() + (expected_period_duration_seconds * 1));
@@ -568,7 +617,7 @@ BOOST_AUTO_TEST_CASE( withdraw_permission_incremental_case )
         BOOST_CHECK(db.find_object(permit) != nullptr);
         BOOST_CHECK( permit_object.claimed_this_period == 4 );
         BOOST_CHECK_EQUAL( permit_object.claimed_this_period.value, 4 );
-        period_descriptor = permit_object.current_period(db.head_block_time());
+        period_descriptor = current_period(permit_object, db.head_block_time());
         BOOST_CHECK_EQUAL(period_descriptor.available_this_period.amount.value, 1);
         BOOST_CHECK_EQUAL(period_descriptor.period_start_time.sec_since_epoch(), expected_first_period_start_time.sec_since_epoch() + (expected_period_duration_seconds * 0));
         BOOST_CHECK_EQUAL(period_descriptor.period_end_time.sec_since_epoch(), expected_first_period_start_time.sec_since_epoch() + (expected_period_duration_seconds * 1));
@@ -585,7 +634,7 @@ BOOST_AUTO_TEST_CASE( withdraw_permission_incremental_case )
         // Before claiming, check the period description
         const withdraw_permission_object& permit_object = permit(db);
         BOOST_CHECK(db.find_object(permit) != nullptr);
-        withdrawal_period_descriptor period_descriptor = permit_object.current_period(db.head_block_time());
+        withdrawal_period_descriptor period_descriptor = current_period(permit_object, db.head_block_time());
         BOOST_CHECK_EQUAL(period_descriptor.available_this_period.amount.value, 5);
         BOOST_CHECK_EQUAL(period_descriptor.period_start_time.sec_since_epoch(), expected_first_period_start_time.sec_since_epoch() + (expected_period_duration_seconds * 1));
         BOOST_CHECK_EQUAL(period_descriptor.period_end_time.sec_since_epoch(), expected_first_period_start_time.sec_since_epoch() + (expected_period_duration_seconds * 2));
@@ -605,7 +654,7 @@ BOOST_AUTO_TEST_CASE( withdraw_permission_incremental_case )
         BOOST_CHECK(db.find_object(permit) != nullptr);
         BOOST_CHECK( permit_object.claimed_this_period == 1 );
         BOOST_CHECK_EQUAL( permit_object.claimed_this_period.value, 1 );
-        period_descriptor = permit_object.current_period(db.head_block_time());
+        period_descriptor = current_period(permit_object, db.head_block_time());
         BOOST_CHECK_EQUAL(period_descriptor.available_this_period.amount.value, 4);
         BOOST_CHECK_EQUAL(period_descriptor.period_start_time.sec_since_epoch(), expected_first_period_start_time.sec_since_epoch() + (expected_period_duration_seconds * 1));
         BOOST_CHECK_EQUAL(period_descriptor.period_end_time.sec_since_epoch(), expected_first_period_start_time.sec_since_epoch() + (expected_period_duration_seconds * 2));
@@ -622,7 +671,7 @@ BOOST_AUTO_TEST_CASE( withdraw_permission_incremental_case )
         // Before claiming, check the period description
         const withdraw_permission_object& permit_object = permit(db);
         BOOST_CHECK(db.find_object(permit) != nullptr);
-        withdrawal_period_descriptor period_descriptor = permit_object.current_period(db.head_block_time());
+        withdrawal_period_descriptor period_descriptor = current_period(permit_object, db.head_block_time());
         BOOST_CHECK_EQUAL(period_descriptor.available_this_period.amount.value, 5);
         BOOST_CHECK_EQUAL(period_descriptor.period_start_time.sec_since_epoch(), expected_first_period_start_time.sec_since_epoch() + (expected_period_duration_seconds * 2));
         BOOST_CHECK_EQUAL(period_descriptor.period_end_time.sec_since_epoch(), expected_first_period_start_time.sec_since_epoch() + (expected_period_duration_seconds * 3));
@@ -630,7 +679,7 @@ BOOST_AUTO_TEST_CASE( withdraw_permission_incremental_case )
         // No claim
 
         // After doing nothing, check the period description
-        period_descriptor = permit_object.current_period(db.head_block_time());
+        period_descriptor = current_period(permit_object, db.head_block_time());
         BOOST_CHECK_EQUAL(period_descriptor.available_this_period.amount.value, 5);
         BOOST_CHECK_EQUAL(period_descriptor.period_start_time.sec_since_epoch(), expected_first_period_start_time.sec_since_epoch() + (expected_period_duration_seconds * 2));
         BOOST_CHECK_EQUAL(period_descriptor.period_end_time.sec_since_epoch(), expected_first_period_start_time.sec_since_epoch() + (expected_period_duration_seconds * 3));
@@ -645,7 +694,7 @@ BOOST_AUTO_TEST_CASE( withdraw_permission_incremental_case )
         // Before claiming, check the period description
         const withdraw_permission_object& permit_object = permit(db);
         BOOST_CHECK(db.find_object(permit) != nullptr);
-        withdrawal_period_descriptor period_descriptor = permit_object.current_period(db.head_block_time());
+        withdrawal_period_descriptor period_descriptor = current_period(permit_object, db.head_block_time());
         BOOST_CHECK_EQUAL(period_descriptor.available_this_period.amount.value, 5);
         BOOST_CHECK_EQUAL(period_descriptor.period_start_time.sec_since_epoch(), expected_first_period_start_time.sec_since_epoch() + (expected_period_duration_seconds * 3));
         BOOST_CHECK_EQUAL(period_descriptor.period_end_time.sec_since_epoch(), expected_first_period_start_time.sec_since_epoch() + (expected_period_duration_seconds * 4));
@@ -665,7 +714,7 @@ BOOST_AUTO_TEST_CASE( withdraw_permission_incremental_case )
         BOOST_CHECK(db.find_object(permit) != nullptr);
         BOOST_CHECK( permit_object.claimed_this_period == 5 );
         BOOST_CHECK_EQUAL( permit_object.claimed_this_period.value, 5 );
-        period_descriptor = permit_object.current_period(db.head_block_time());
+        period_descriptor = current_period(permit_object, db.head_block_time());
         BOOST_CHECK_EQUAL(period_descriptor.available_this_period.amount.value, 0);
         BOOST_CHECK_EQUAL(period_descriptor.period_start_time.sec_since_epoch(), expected_first_period_start_time.sec_since_epoch() + (expected_period_duration_seconds * 3));
         BOOST_CHECK_EQUAL(period_descriptor.period_end_time.sec_since_epoch(), expected_first_period_start_time.sec_since_epoch() + (expected_period_duration_seconds * 4));
@@ -682,7 +731,7 @@ BOOST_AUTO_TEST_CASE( withdraw_permission_incremental_case )
         // Before claiming, check the period description
         const withdraw_permission_object& permit_object = permit(db);
         BOOST_CHECK(db.find_object(permit) != nullptr);
-        withdrawal_period_descriptor period_descriptor = permit_object.current_period(db.head_block_time());
+        withdrawal_period_descriptor period_descriptor = current_period(permit_object, db.head_block_time());
         BOOST_CHECK_EQUAL(period_descriptor.available_this_period.amount.value, 5);
         BOOST_CHECK_EQUAL(period_descriptor.period_start_time.sec_since_epoch(), expected_first_period_start_time.sec_since_epoch() + (expected_period_duration_seconds * 4));
         BOOST_CHECK_EQUAL(period_descriptor.period_end_time.sec_since_epoch(), expected_first_period_start_time.sec_since_epoch() + (expected_period_duration_seconds * 5));
@@ -702,7 +751,7 @@ BOOST_AUTO_TEST_CASE( withdraw_permission_incremental_case )
         BOOST_CHECK(db.find_object(permit) != nullptr);
         BOOST_CHECK( permit_object.claimed_this_period == 3 );
         BOOST_CHECK_EQUAL( permit_object.claimed_this_period.value, 3 );
-        period_descriptor = permit_object.current_period(db.head_block_time());
+        period_descriptor = current_period(permit_object, db.head_block_time());
         BOOST_CHECK_EQUAL(period_descriptor.available_this_period.amount.value, 2);
         BOOST_CHECK_EQUAL(period_descriptor.period_start_time.sec_since_epoch(), expected_first_period_start_time.sec_since_epoch() + (expected_period_duration_seconds * 4));
         BOOST_CHECK_EQUAL(period_descriptor.period_end_time.sec_since_epoch(), expected_first_period_start_time.sec_since_epoch() + (expected_period_duration_seconds * 5));
