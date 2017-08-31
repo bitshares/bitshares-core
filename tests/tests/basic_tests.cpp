@@ -51,22 +51,22 @@ BOOST_FIXTURE_TEST_SUITE( basic_tests, database_fixture )
  */
 BOOST_AUTO_TEST_CASE( valid_name_test )
 {
-   BOOST_CHECK( !is_valid_name( "a" ) );
+   BOOST_CHECK( is_valid_name( "a" ) );
    BOOST_CHECK( !is_valid_name( "A" ) );
    BOOST_CHECK( !is_valid_name( "0" ) );
    BOOST_CHECK( !is_valid_name( "." ) );
    BOOST_CHECK( !is_valid_name( "-" ) );
 
-   BOOST_CHECK( !is_valid_name( "aa" ) );
+   BOOST_CHECK( is_valid_name( "aa" ) );
    BOOST_CHECK( !is_valid_name( "aA" ) );
-   BOOST_CHECK( !is_valid_name( "a0" ) );
+   BOOST_CHECK( is_valid_name( "a0" ) );
    BOOST_CHECK( !is_valid_name( "a." ) );
    BOOST_CHECK( !is_valid_name( "a-" ) );
 
    BOOST_CHECK( is_valid_name( "aaa" ) );
    BOOST_CHECK( !is_valid_name( "aAa" ) );
    BOOST_CHECK( is_valid_name( "a0a" ) );
-   BOOST_CHECK( !is_valid_name( "a.a" ) );
+   BOOST_CHECK( is_valid_name( "a.a" ) );
    BOOST_CHECK( is_valid_name( "a-a" ) );
 
    BOOST_CHECK( is_valid_name( "aa0" ) );
@@ -97,9 +97,9 @@ BOOST_AUTO_TEST_CASE( valid_name_test )
    BOOST_CHECK( is_valid_name( "aaa.bbb.ccc" ) );
 
    BOOST_CHECK(  is_valid_name( "aaa--bbb--ccc" ) );
-   BOOST_CHECK( !is_valid_name( "xn--sandmnnchen-p8a.de" ) );
+   BOOST_CHECK(  is_valid_name( "xn--sandmnnchen-p8a.de" ) );
    BOOST_CHECK(  is_valid_name( "xn--sandmnnchen-p8a.dex" ) );
-   BOOST_CHECK( !is_valid_name( "xn-sandmnnchen-p8a.de" ) );
+   BOOST_CHECK(  is_valid_name( "xn-sandmnnchen-p8a.de" ) );
    BOOST_CHECK(  is_valid_name( "xn-sandmnnchen-p8a.dex" ) );
 
    BOOST_CHECK(  is_valid_name( "this-label-has-less-than-64-char.acters-63-to-be-really-precise" ) );

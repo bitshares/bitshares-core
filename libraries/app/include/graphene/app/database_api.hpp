@@ -105,6 +105,8 @@ struct market_trade
    double                     price;
    double                     amount;
    double                     value;
+   account_id_type            side1_account_id;
+   account_id_type            side2_account_id;
 };
 
 /**
@@ -489,13 +491,35 @@ class database_api
        */
       map<string, committee_member_id_type> lookup_committee_member_accounts(const string& lower_bound_name, uint32_t limit)const;
 
+      /**
+       * @brief Get the total number of committee registered with the blockchain
+      */
+      uint64_t get_committee_count()const;
 
-      /// WORKERS
+
+      ///////////////////////
+      // Worker proposals  //
+      ///////////////////////
 
       /**
-       * Return the worker objects associated with this account.
+       * @brief Get all workers
+       * @return All the workers
+       *
+      */
+      vector<worker_object> get_all_workers()const;
+
+      /**
+       * @brief Get the workers owned by a given account
+       * @param account The ID of the account whose worker should be retrieved
+       * @return The worker object, or null if the account does not have a worker
        */
-      vector<worker_object> get_workers_by_account(account_id_type account)const;
+      vector<optional<worker_object>> get_workers_by_account(account_id_type account)const;
+
+      /**
+       * @brief Get the total number of workers registered with the blockchain
+      */
+      uint64_t get_worker_count()const;
+
 
 
       ///////////
@@ -582,7 +606,7 @@ FC_REFLECT( graphene::app::order, (price)(quote)(base) );
 FC_REFLECT( graphene::app::order_book, (base)(quote)(bids)(asks) );
 FC_REFLECT( graphene::app::market_ticker, (base)(quote)(latest)(lowest_ask)(highest_bid)(percent_change)(base_volume)(quote_volume) );
 FC_REFLECT( graphene::app::market_volume, (base)(quote)(base_volume)(quote_volume) );
-FC_REFLECT( graphene::app::market_trade, (date)(price)(amount)(value) );
+FC_REFLECT( graphene::app::market_trade, (date)(price)(amount)(value)(side1_account_id)(side2_account_id) );
 
 FC_API(graphene::app::database_api,
    // Objects
@@ -655,9 +679,13 @@ FC_API(graphene::app::database_api,
    (get_committee_members)
    (get_committee_member_by_account)
    (lookup_committee_member_accounts)
+   (get_committee_count)
 
    // workers
+   (get_all_workers)
    (get_workers_by_account)
+   (get_worker_count)
+
    // Votes
    (lookup_vote_ids)
 

@@ -456,9 +456,22 @@ namespace detail {
             _force_validate = true;
          }
 
-         if( _options->count("api-access") )
-            _apiaccess = fc::json::from_file( _options->at("api-access").as<boost::filesystem::path>() )
-               .as<api_access>();
+         if( _options->count("api-access") ) {
+
+            if(fc::exists(_options->at("api-access").as<boost::filesystem::path>()))
+            {
+               _apiaccess = fc::json::from_file( _options->at("api-access").as<boost::filesystem::path>() ).as<api_access>();
+               ilog("Using api access file from ${path}",
+                  ("path", _options->at("api-access").as<boost::filesystem::path>().string()));
+            }
+            else
+            {
+               elog("Failed to load file from ${path}",
+                  ("path", _options->at("api-access").as<boost::filesystem::path>().string()));
+               std::exit(EXIT_FAILURE);
+            }
+         }
+
          else
          {
             // TODO:  Remove this generous default access policy
@@ -930,7 +943,8 @@ namespace detail {
       std::shared_ptr<fc::http::websocket_server>      _websocket_server;
       std::shared_ptr<fc::http::websocket_tls_server>  _websocket_tls_server;
 
-      std::map<string, std::shared_ptr<abstract_plugin>> _plugins;
+      std::map<string, std::shared_ptr<abstract_plugin>> _active_plugins;
+      std::map<string, std::shared_ptr<abstract_plugin>> _available_plugins;
 
       bool _is_finished_syncing = false;
    };
@@ -969,6 +983,7 @@ void application::set_program_options(boost::program_options::options_descriptio
          ("genesis-json", bpo::value<boost::filesystem::path>(), "File to read Genesis State from")
          ("dbg-init-key", bpo::value<string>(), "Block signing key to use for init witnesses, overrides genesis file")
          ("api-access", bpo::value<boost::filesystem::path>(), "JSON file specifying API permissions")
+         ("plugins", bpo::value<string>(), "Space-separated list of plugins to activate")
          ;
    command_line_options.add(configuration_file_options);
    command_line_options.add_options()
@@ -1014,6 +1029,22 @@ void application::initialize(const fc::path& data_dir, const boost::program_opti
 
       std::exit(EXIT_SUCCESS);
    }
+
+   std::vector<string> wanted;
+   if( options.count("plugins") )
+   {
+      boost::split(wanted, options.at("plugins").as<std::string>(), [](char c){return c == ' ';});
+   }
+   else
+   {
+      wanted.push_back("witness");
+      wanted.push_back("account_history");
+      wanted.push_back("market_history");
+   }
+   for (auto& it : wanted)
+   {
+      if (!it.empty()) enable_plugin(it);
+   }
 }
 
 void application::startup()
@@ -1031,7 +1062,7 @@ void application::startup()
 
 std::shared_ptr<abstract_plugin> application::get_plugin(const string& name) const
 {
-   return my->_plugins[name];
+   return my->_active_plugins[name];
 }
 
 net::node_ptr application::p2p_node()
@@ -1064,14 +1095,21 @@ bool application::is_finished_syncing() const
    return my->_is_finished_syncing;
 }
 
-void graphene::app::application::add_plugin(const string& name, std::shared_ptr<graphene::app::abstract_plugin> p)
+void graphene::app::application::enable_plugin(const string& name)
 {
-   my->_plugins[name] = p;
+   FC_ASSERT(my->_available_plugins[name], "Unknown plugin '" + name + "'");
+   my->_active_plugins[name] = my->_available_plugins[name];
+   my->_active_plugins[name]->plugin_set_app(this);
+}
+
+void graphene::app::application::add_available_plugin(std::shared_ptr<graphene::app::abstract_plugin> p)
+{
+   my->_available_plugins[p->plugin_name()] = p;
 }
 
 void application::shutdown_plugins()
 {
-   for( auto& entry : my->_plugins )
+   for( auto& entry : my->_active_plugins )
       entry.second->plugin_shutdown();
    return;
 }
@@ -1080,19 +1118,22 @@ void application::shutdown()
    if( my->_p2p_network )
       my->_p2p_network->close();
    if( my->_chain_db )
+   {
       my->_chain_db->close();
+      my->_chain_db = nullptr;
+   }
 }
 
 void application::initialize_plugins( const boost::program_options::variables_map& options )
 {
-   for( auto& entry : my->_plugins )
+   for( auto& entry : my->_active_plugins )
       entry.second->plugin_initialize( options );
    return;
 }
 
 void application::startup_plugins()
 {
-   for( auto& entry : my->_plugins )
+   for( auto& entry : my->_active_plugins )
       entry.second->plugin_startup();
    return;
 }

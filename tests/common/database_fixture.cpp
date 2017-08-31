@@ -96,6 +96,8 @@ database_fixture::database_fixture()
    // app.initialize();
    ahplugin->plugin_set_app(&app);
    ahplugin->plugin_initialize(options);
+
+   options.insert(std::make_pair("bucket-size", boost::program_options::variable_value(string("[15]"),false)));
    mhplugin->plugin_set_app(&app);
    mhplugin->plugin_initialize(options);
 
@@ -124,9 +126,6 @@ database_fixture::~database_fixture()
       verify_account_history_plugin_index();
       BOOST_CHECK( db.get_node_properties().skip_flags == database::skip_nothing );
    }
-
-   if( data_dir )
-      db.close();
    return;
 } FC_CAPTURE_AND_RETHROW() }
 
@@ -1054,6 +1053,24 @@ vector< operation_history_object > database_fixture::get_operation_history( acco
       if(node->next == account_transaction_history_id_type())
          break;
       node = db.find(node->next);
+   }
+   return result;
+}
+
+vector< graphene::market_history::order_history_object > database_fixture::get_market_order_history( asset_id_type a, asset_id_type b )const
+{
+   const auto& history_idx = db.get_index_type<graphene::market_history::history_index>().indices().get<graphene::market_history::by_key>();
+   graphene::market_history::history_key hkey;
+   if( a > b ) std::swap(a,b);
+   hkey.base = a;
+   hkey.quote = b;
+   hkey.sequence = std::numeric_limits<int64_t>::min();
+   auto itr = history_idx.lower_bound( hkey );
+   vector<graphene::market_history::order_history_object> result;
+   while( itr != history_idx.end())
+   {
+       result.push_back( *itr );
+       ++itr;
    }
    return result;
 }
