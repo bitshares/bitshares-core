@@ -12,13 +12,11 @@ apt-get install -y \
   libreadline6-dev \
   libboost-all-dev \
   libssl-dev \
-  libncurses-dev
+  libncurses-dev \
+  doxygen
 
 RUN \
-apt-get update -y && \
-apt-get install -y fish
+  apt-get update -y && \
+  apt-get install -y fish
 
-RUN apt-get update -y && \
-apt-get install -y doxygen
-
-RUN useradd -m bitshares-builder
+RUN useradd bitshares-builder -md /bitshares
