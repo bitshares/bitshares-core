@@ -1,2 +1,5 @@
 #!/bin/sh
-docker-compose -f docker/builder/docker-compose.yml -p bitshares run --rm builder
+cd ${PWD}/"$(dirname $0)" &&
+exec docker-compose \
+  -p bitshares \
+  run --rm builder
