@@ -32,6 +32,12 @@ We recommend building on Ubuntu 16.04 LTS, and the build dependencies may be ins
     sudo apt-get update
     sudo apt-get install autoconf cmake git libboost-all-dev libssl-dev
 
+If you can't have access to Ubuntu 16.04 you can work in a docker container with:
+
+    ./docker/builder/run.sh
+
+This container is for development, if you need production images, see [crazybits repository](https://github.com/crazybits/docker-compose-files/tree/master/bitshares).
+
 To build after all dependencies are installed:
 
     git clone https://github.com/bitshares/bitshares-core.git
@@ -224,7 +230,7 @@ FAQ
     less fine if your `witness_node` allows the general public to control which p2p nodes it's
     connecting to.  Therefore the API to add p2p connections needs to be set up with proper access
     controls.
- 
+
 License
 -------
 BitShares Core is under the MIT license. See [LICENSE](https://github.com/bitshares/bitshares-core/blob/master/LICENSE.txt)
