@@ -57,7 +57,7 @@ the blockchain. After syncing, you can exit the node using Ctrl+C and setup the 
 
     rpc-endpoint = 127.0.0.1:8090
 
-**NOTE:** To start a node with reduced RAM check the following: [Memory reduction for nodes](https://github.com/bitshares/bitshares-core/wiki/Memory-reduction-for-nodes).
+**NOTE:** Currently a full node requires 40GB of RAM. To start a node with reduced RAM check the following: [Memory reduction for nodes](https://github.com/bitshares/bitshares-core/wiki/Memory-reduction-for-nodes).
 
 After starting the witness node again, in a separate terminal you can run:
 
