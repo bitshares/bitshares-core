@@ -80,12 +80,20 @@ namespace graphene { namespace chain {
       typedef uint64_t result_type;
 
       const fee_schedule& param;
-      calc_fee_visitor( const fee_schedule& p ):param(p){}
+      const int current_op;
+      calc_fee_visitor( const fee_schedule& p, const operation& op ):param(p),current_op(op.which()){}
 
       template<typename OpType>
-      result_type operator()(  const OpType& op )const
+      result_type operator()( const OpType& op )const
       {
-         return op.calculate_fee( param.get<OpType>() ).value;
+         try {
+            return op.calculate_fee( param.get<OpType>() ).value;
+         } catch (fc::assert_exception e) {
+             fee_parameters params; params.set_which(current_op);
+             auto itr = param.parameters.find(params);
+             if( itr != param.parameters.end() ) params = *itr;
+             return op.calculate_fee( params.get<typename OpType::fee_parameters_type>() ).value;
+         }
       }
    };
 
@@ -124,7 +132,7 @@ namespace graphene { namespace chain {
 
    asset fee_schedule::calculate_fee( const operation& op, const price& core_exchange_rate )const
    {
-      auto base_value = op.visit( calc_fee_visitor( *this ) );
+      auto base_value = op.visit( calc_fee_visitor( *this, op ) );
       auto scaled = fc::uint128(base_value) * scale;
       scaled /= GRAPHENE_100_PERCENT;
       FC_ASSERT( scaled <= GRAPHENE_MAX_SHARE_SUPPLY );
