@@ -470,7 +470,7 @@ operation_result asset_settle_evaluator::do_apply(const asset_settle_evaluator::
       if( op.amount.amount == mia_dyn.current_supply )
          settled_amount.amount = bitasset.settlement_fund; // avoid rounding problems
       else
-         FC_ASSERT( settled_amount.amount < bitasset.settlement_fund );
+         FC_ASSERT( settled_amount.amount <= bitasset.settlement_fund ); // should be strictly < except for PM with zero outcome
 
       d.modify( bitasset, [&]( asset_bitasset_data_object& obj ){
                 obj.settlement_fund -= settled_amount.amount;
