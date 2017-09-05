@@ -943,4 +943,44 @@ BOOST_AUTO_TEST_CASE( stealth_fba_test )
    }
 }
 
+BOOST_AUTO_TEST_CASE( defaults_test )
+{ try {
+    fee_schedule schedule;
+    const limit_order_create_operation::fee_parameters_type default_order_fee;
+
+    // no fees set yet -> default
+    asset fee = schedule.calculate_fee( limit_order_create_operation() );
+    BOOST_CHECK_EQUAL( default_order_fee.fee, fee.amount.value );
+
+    limit_order_create_operation::fee_parameters_type new_order_fee; new_order_fee.fee = 123;
+    // set fee + check
+    schedule.parameters.insert( new_order_fee );
+    fee = schedule.calculate_fee( limit_order_create_operation() );
+    BOOST_CHECK_EQUAL( new_order_fee.fee, fee.amount.value );
+
+    // bid_collateral fee defaults to call_order_update fee
+    // call_order_update fee is unset -> default
+    const call_order_update_operation::fee_parameters_type default_short_fee;
+    call_order_update_operation::fee_parameters_type new_short_fee; new_short_fee.fee = 123;
+    fee = schedule.calculate_fee( bid_collateral_operation() );
+    BOOST_CHECK_EQUAL( default_short_fee.fee, fee.amount.value );
+
+    // set call_order_update fee + check bid_collateral fee
+    schedule.parameters.insert( new_short_fee );
+    fee = schedule.calculate_fee( bid_collateral_operation() );
+    BOOST_CHECK_EQUAL( new_short_fee.fee, fee.amount.value );
+
+    // set bid_collateral fee + check
+    bid_collateral_operation::fee_parameters_type new_bid_fee; new_bid_fee.fee = 124;
+    schedule.parameters.insert( new_bid_fee );
+    fee = schedule.calculate_fee( bid_collateral_operation() );
+    BOOST_CHECK_EQUAL( new_bid_fee.fee, fee.amount.value );
+  }
+  catch( const fc::exception& e )
+  {
+     elog( "caught exception ${e}", ("e", e.to_detail_string()) );
+     throw;
+  }
+}
+
 BOOST_AUTO_TEST_SUITE_END()
