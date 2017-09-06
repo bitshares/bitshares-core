@@ -716,6 +716,56 @@ void deprecate_annual_members( database& db )
    return;
 }
 
+void database::process_bids( const asset_bitasset_data_object& bad )
+{
+   if( bad.current_feed.settlement_price.is_null() ) return;
+
+   asset_id_type to_revive_id = (asset( 0, bad.options.short_backing_asset ) * bad.settlement_price).asset_id;
+   const asset_object& to_revive = to_revive_id( *this );
+   const asset_dynamic_data_object& bdd = to_revive.dynamic_data( *this );
+
+   const auto& bid_idx = get_index_type< collateral_bid_index >().indices().get<by_price>();
+   const auto start = bid_idx.lower_bound( boost::make_tuple( to_revive_id, price::max( bad.options.short_backing_asset, to_revive_id ), collateral_bid_id_type() ) );
+
+   share_type covered = 0;
+   auto itr = start;
+   while( itr != bid_idx.end() && itr->inv_swan_price.quote.asset_id == to_revive_id )
+   {
+      const collateral_bid_object& bid = *itr;
+      asset total_collateral = bid.inv_swan_price.quote * bad.settlement_price;
+      total_collateral += bid.inv_swan_price.base;
+      price call_price = price::call_price( bid.inv_swan_price.quote, total_collateral, bad.current_feed.maintenance_collateral_ratio );
+      if( ~call_price >= bad.current_feed.settlement_price ) break;
+      covered += bid.inv_swan_price.quote.amount;
+      ++itr;
+      if( covered >= bdd.current_supply ) break;
+   }
+   if( covered < bdd.current_supply ) return;
+
+   const auto end = itr;
+   share_type to_cover = bdd.current_supply;
+   share_type remaining_fund = bad.settlement_fund;
+   for( itr = start; itr != end; )
+   {
+      const collateral_bid_object& bid = *itr;
+      ++itr;
+      share_type debt = bid.inv_swan_price.quote.amount;
+      share_type collateral = (bid.inv_swan_price.quote * bad.settlement_price).amount;
+      if( bid.inv_swan_price.quote.amount >= to_cover )
+      {
+         debt = to_cover;
+         collateral = remaining_fund;
+      }
+      to_cover -= debt;
+      remaining_fund -= collateral;
+      execute_bid( bid, debt, collateral, bad.current_feed );
+   }
+   FC_ASSERT( remaining_fund == 0 );
+   FC_ASSERT( to_cover == 0 );
+
+   _cancel_bids_and_revive_mpa( to_revive, bad );
+}
+
 void database::perform_chain_maintenance(const signed_block& next_block, const global_property_object& global_props)
 {
    const auto& gpo = get_global_properties();
@@ -873,9 +923,12 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
    });
 
    // Reset all BitAsset force settlement volumes to zero
-   //for( const asset_bitasset_data_object* d : get_index_type<asset_bitasset_data_index>() )
    for( const auto& d : get_index_type<asset_bitasset_data_index>().indices() )
+   {
       modify( d, [](asset_bitasset_data_object& o) { o.force_settled_volume = 0; });
+      if( d.has_settlement() )
+         process_bids(d);
+   }
 
    // process_budget needs to run at the bottom because
    //   it needs to know the next_maintenance_time

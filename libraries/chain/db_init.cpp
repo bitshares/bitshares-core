@@ -150,6 +150,7 @@ void database::initialize_evaluators()
    register_evaluator<limit_order_create_evaluator>();
    register_evaluator<limit_order_cancel_evaluator>();
    register_evaluator<call_order_update_evaluator>();
+   register_evaluator<bid_collateral_evaluator>();
    register_evaluator<transfer_evaluator>();
    register_evaluator<override_transfer_evaluator>();
    register_evaluator<asset_fund_fee_pool_evaluator>();
@@ -214,6 +215,7 @@ void database::initialize_indexes()
    add_index< primary_index<simple_index<budget_record_object           > > >();
    add_index< primary_index< special_authority_index                      > >();
    add_index< primary_index< buyback_index                                > >();
+   add_index< primary_index<collateral_bid_index                          > >();
 
    add_index< primary_index< simple_index< fba_accumulator_object       > > >();
 }

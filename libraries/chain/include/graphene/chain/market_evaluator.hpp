@@ -31,6 +31,7 @@ namespace graphene { namespace chain {
    class asset_object;
    class asset_bitasset_data_object;
    class call_order_object;
+   struct bid_collateral_operation;
    struct call_order_update_operation;
    struct limit_order_cancel_operation;
    struct limit_order_create_operation;
@@ -81,6 +82,20 @@ namespace graphene { namespace chain {
          const account_object* _paying_account = nullptr;
          const call_order_object* _order = nullptr;
          const asset_bitasset_data_object* _bitasset_data = nullptr;
+   };
+
+   class bid_collateral_evaluator : public evaluator<bid_collateral_evaluator>
+   {
+      public:
+         typedef bid_collateral_operation operation_type;
+
+         void_result do_evaluate( const bid_collateral_operation& o );
+         void_result do_apply( const bid_collateral_operation& o );
+
+         const asset_object* _debt_asset = nullptr;
+         const asset_bitasset_data_object* _bitasset_data = nullptr;
+         const account_object* _paying_account = nullptr;
+         const collateral_bid_object* _bid = nullptr;
    };
 
 } } // graphene::chain

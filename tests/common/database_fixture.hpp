@@ -215,6 +215,7 @@ struct database_fixture {
    void cover(account_id_type who, asset what, asset collateral_freed)
    { cover(who(db), what, collateral_freed); }
    void cover(const account_object& who, asset what, asset collateral_freed);
+   void bid_collateral(const account_object& who, const asset& to_bid, const asset& to_cover);
 
    const asset_object& get_asset( const string& symbol )const;
    const account_object& get_account( const string& name )const;

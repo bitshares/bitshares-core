@@ -107,6 +107,7 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       vector<call_order_object>          get_call_orders(asset_id_type a, uint32_t limit)const;
       vector<force_settlement_object>    get_settle_orders(asset_id_type a, uint32_t limit)const;
       vector<call_order_object>          get_margin_positions( const account_id_type& id )const;
+      vector<collateral_bid_object>      get_collateral_bids(const asset_id_type asset, uint32_t limit, uint32_t start)const;
       void subscribe_to_market(std::function<void(const variant&)> callback, asset_id_type a, asset_id_type b);
       void unsubscribe_from_market(asset_id_type a, asset_id_type b);
       market_ticker                      get_ticker( const string& base, const string& quote )const;
@@ -1095,6 +1096,32 @@ vector<call_order_object> database_api_impl::get_margin_positions( const account
       return result;
    } FC_CAPTURE_AND_RETHROW( (id) )
 }
+
+vector<collateral_bid_object> database_api::get_collateral_bids(const asset_id_type asset, uint32_t limit, uint32_t start)const
+{
+   return my->get_collateral_bids( asset, limit, start );
+}
+
+vector<collateral_bid_object> database_api_impl::get_collateral_bids(const asset_id_type asset_id, uint32_t limit, uint32_t skip)const
+{ try {
+   FC_ASSERT( limit <= 100 );
+   const asset_object& swan = asset_id(_db);
+   FC_ASSERT( swan.is_market_issued() );
+   const asset_bitasset_data_object& bad = swan.bitasset_data(_db);
+   const asset_object& back = bad.options.short_backing_asset(_db);
+   const auto& idx = _db.get_index_type<collateral_bid_index>();
+   const auto& aidx = idx.indices().get<by_price>();
+   auto start = aidx.lower_bound( boost::make_tuple( asset_id, price::max(back.id, asset_id), collateral_bid_id_type() ) );
+   auto end = aidx.lower_bound( boost::make_tuple( asset_id, price::min(back.id, asset_id), collateral_bid_id_type(GRAPHENE_DB_MAX_INSTANCE_ID) ) );
+   vector<collateral_bid_object> result;
+   while( skip-- > 0 && start != end ) { ++start; }
+   while( start != end && limit-- > 0)
+   {
+      result.push_back(*start);
+      ++start;
+   }
+   return result;
+} FC_CAPTURE_AND_RETHROW( (asset_id)(limit)(skip) ) }
 
 void database_api::subscribe_to_market(std::function<void(const variant&)> callback, asset_id_type a, asset_id_type b)
 {
