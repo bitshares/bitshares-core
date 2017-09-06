@@ -28,11 +28,13 @@
 #include <graphene/chain/buyback.hpp>
 #include <graphene/chain/buyback_object.hpp>
 #include <graphene/chain/database.hpp>
+#include <graphene/chain/committee_member_object.hpp>
 #include <graphene/chain/exceptions.hpp>
 #include <graphene/chain/hardfork.hpp>
 #include <graphene/chain/internal_exceptions.hpp>
 #include <graphene/chain/special_authority.hpp>
 #include <graphene/chain/special_authority_object.hpp>
+#include <graphene/chain/witness_object.hpp>
 #include <graphene/chain/worker_object.hpp>
 
 #include <algorithm>
@@ -88,7 +90,27 @@ void verify_account_votes( const database& db, const account_options& options )
          }
       }
    }
-
+   if ( db.head_block_time() >= HARDFORK_CORE_143_TIME ) {
+      const auto& approve_worker_idx = db.get_index_type<worker_index>().indices().get<by_vote_for>();
+      const auto& committee_idx = db.get_index_type<committee_member_index>().indices().get<by_vote_id>();
+      const auto& witness_idx = db.get_index_type<witness_index>().indices().get<by_vote_id>();
+      for ( auto id : options.votes ) {
+         switch ( id.type() ) {
+            case vote_id_type::committee:
+               FC_ASSERT( committee_idx.find(id) != committee_idx.end() );
+               break;
+            case vote_id_type::witness:
+               FC_ASSERT( witness_idx.find(id) != witness_idx.end());
+               break;
+            case vote_id_type::worker:
+               FC_ASSERT( approve_worker_idx.find( id ) != approve_worker_idx.end() );
+               break;
+            default:
+               FC_THROW( "Invalid Vote Type: ${id}", ("id", id) );
+               break;
+         }
+      }
+   }
 }
 
 
