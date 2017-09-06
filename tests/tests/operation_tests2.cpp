@@ -25,16 +25,12 @@
 #include <boost/test/unit_test.hpp>
 
 #include <graphene/chain/database.hpp>
-#include <graphene/chain/exceptions.hpp>
 #include <graphene/chain/hardfork.hpp>
 
-#include <graphene/chain/asset_object.hpp>
-#include <graphene/chain/account_object.hpp>
 #include <graphene/chain/balance_object.hpp>
 #include <graphene/chain/budget_record_object.hpp>
 #include <graphene/chain/committee_member_object.hpp>
 #include <graphene/chain/market_object.hpp>
-#include <graphene/chain/vesting_balance_object.hpp>
 #include <graphene/chain/withdraw_permission_object.hpp>
 #include <graphene/chain/witness_object.hpp>
 #include <graphene/chain/worker_object.hpp>
@@ -50,7 +46,67 @@ using namespace graphene::chain::test;
 
 BOOST_FIXTURE_TEST_SUITE( operation_tests, database_fixture )
 
-BOOST_AUTO_TEST_CASE( withdraw_permission_create )
+/***
+ * A descriptor of a particular withdrawal period
+ */
+struct withdrawal_period_descriptor {
+   withdrawal_period_descriptor(const time_point_sec start, const time_point_sec end, const asset available, const asset claimed)
+      : period_start_time(start), period_end_time(end), available_this_period(available), claimed_this_period(claimed) {}
+
+   // Start of period
+   time_point_sec period_start_time;
+
+   // End of period
+   time_point_sec period_end_time;
+
+   // Quantify how much is still available to be withdrawn during this period
+   asset available_this_period;
+
+   // Quantify how much has already been claimed during this period
+   asset claimed_this_period;
+
+   string const to_string() const {
+       string asset_id = fc::to_string(available_this_period.asset_id.space_id)
+                         + "." + fc::to_string(available_this_period.asset_id.type_id)
+                         + "." + fc::to_string(available_this_period.asset_id.instance.value);
+       string text = fc::to_string(available_this_period.amount.value)
+                     + " " + asset_id
+                     + " is available from " + period_start_time.to_iso_string()
+                     + " to " + period_end_time.to_iso_string();
+       return text;
+   }
+};
+
+
+/***
+ * Get a description of the current withdrawal period
+ * @param current_time   Current time
+ * @return A description of the current period
+ */
+withdrawal_period_descriptor current_period(const withdraw_permission_object& permit, fc::time_point_sec current_time) {
+   // @todo [6] Is there a potential race condition where a call to available_this_period might become out of sync with this function's later use of period start time?
+   asset available = permit.available_this_period(current_time);
+   asset claimed = asset(permit.withdrawal_limit.amount - available.amount, permit.withdrawal_limit.asset_id);
+   auto periods = (current_time - permit.period_start_time).to_seconds() / permit.withdrawal_period_sec;
+   time_point_sec current_period_start = permit.period_start_time + (periods * permit.withdrawal_period_sec);
+   time_point_sec current_period_end = current_period_start + permit.withdrawal_period_sec;
+   withdrawal_period_descriptor descriptor = withdrawal_period_descriptor(current_period_start, current_period_end, available, claimed);
+
+   return descriptor;
+}
+
+/**
+ * This auxiliary test is used for two purposes:
+ * (a) it checks the creation of withdrawal claims,
+ * (b) it is used as a precursor for tests that evaluate withdrawal claims.
+ *
+ * NOTE: This test verifies proper withdrawal claim behavior
+ * as it occurred before (for backward compatibility)
+ * Issue #23 was addressed.
+ * That issue is concerned with ensuring that the first claim
+ * can occur before the first withdrawal period.
+ */
+BOOST_AUTO_TEST_CASE( withdraw_permission_create_before_hardfork_23 )
 { try {
    auto nathan_private_key = generate_private_key("nathan");
    auto dan_private_key = generate_private_key("dan");
@@ -68,7 +124,7 @@ BOOST_AUTO_TEST_CASE( withdraw_permission_create )
       op.withdrawal_limit = asset(5);
       op.withdrawal_period_sec = fc::hours(1).to_seconds();
       op.periods_until_expiration = 5;
-      op.period_start_time = db.head_block_time() + db.get_global_properties().parameters.block_interval*5;
+      op.period_start_time = db.head_block_time() + db.get_global_properties().parameters.block_interval*5; // 5 blocks after current blockchain time
       trx.operations.push_back(op);
       REQUIRE_OP_VALIDATION_FAILURE(op, withdrawal_limit, asset());
       REQUIRE_OP_VALIDATION_FAILURE(op, periods_until_expiration, 0);
@@ -85,9 +141,228 @@ BOOST_AUTO_TEST_CASE( withdraw_permission_create )
    trx.clear();
 } FC_LOG_AND_RETHROW() }
 
-BOOST_AUTO_TEST_CASE( withdraw_permission_test )
+/**
+ * This auxiliary test is used for two purposes:
+ * (a) it checks the creation of withdrawal claims,
+ * (b) it is used as a precursor for tests that evaluate withdrawal claims.
+ *
+ * NOTE: This test verifies proper withdrawal claim behavior
+ * as it should occur after Issue #23 is addressed.
+ * That issue is concerned with ensuring that the first claim
+ * can occur before the first withdrawal period.
+ */
+BOOST_AUTO_TEST_CASE( withdraw_permission_create_after_hardfork_23 )
 { try {
-   INVOKE(withdraw_permission_create);
+   auto nathan_private_key = generate_private_key("nathan");
+   auto dan_private_key = generate_private_key("dan");
+   account_id_type nathan_id = create_account("nathan", nathan_private_key.get_public_key()).id;
+   account_id_type dan_id = create_account("dan", dan_private_key.get_public_key()).id;
+
+   transfer(account_id_type(), nathan_id, asset(1000));
+   generate_block();
+   set_expiration( db, trx );
+
+   {
+      withdraw_permission_create_operation op;
+      op.authorized_account = dan_id;
+      op.withdraw_from_account = nathan_id;
+      op.withdrawal_limit = asset(5);
+      op.withdrawal_period_sec = fc::hours(1).to_seconds();
+      op.periods_until_expiration = 5;
+      op.period_start_time = HARDFORK_23_TIME + db.get_global_properties().parameters.block_interval*5; // 5 blocks after fork time
+      trx.operations.push_back(op);
+      REQUIRE_OP_VALIDATION_FAILURE(op, withdrawal_limit, asset());
+      REQUIRE_OP_VALIDATION_FAILURE(op, periods_until_expiration, 0);
+      REQUIRE_OP_VALIDATION_FAILURE(op, withdraw_from_account, dan_id);
+      REQUIRE_OP_VALIDATION_FAILURE(op, withdrawal_period_sec, 0);
+      REQUIRE_THROW_WITH_VALUE(op, withdrawal_limit, asset(10, asset_id_type(10)));
+      REQUIRE_THROW_WITH_VALUE(op, authorized_account, account_id_type(1000));
+      REQUIRE_THROW_WITH_VALUE(op, period_start_time, fc::time_point_sec(10000));
+      REQUIRE_THROW_WITH_VALUE(op, withdrawal_period_sec, 1);
+      trx.operations.back() = op;
+   }
+   sign( trx, nathan_private_key );
+   db.push_transaction( trx );
+   trx.clear();
+} FC_LOG_AND_RETHROW() }
+
+/**
+ * Test the claims of withdrawals both before and during
+ * authorized withdrawal periods.
+ * NOTE: The simulated elapse of blockchain time through the use of
+ * generate_blocks() must be carefully used in order to simulate
+ * this test.
+ * NOTE: This test verifies proper withdrawal claim behavior
+ * as it occurred before (for backward compatibility)
+ * Issue #23 was addressed.
+ * That issue is concerned with ensuring that the first claim
+ * can occur before the first withdrawal period.
+ */
+BOOST_AUTO_TEST_CASE( withdraw_permission_test_before_hardfork_23 )
+{ try {
+      INVOKE(withdraw_permission_create_before_hardfork_23);
+
+      auto nathan_private_key = generate_private_key("nathan");
+      auto dan_private_key = generate_private_key("dan");
+      account_id_type nathan_id = get_account("nathan").id;
+      account_id_type dan_id = get_account("dan").id;
+      withdraw_permission_id_type permit;
+      set_expiration( db, trx );
+
+      fc::time_point_sec first_start_time;
+      {
+          const withdraw_permission_object& permit_object = permit(db);
+          BOOST_CHECK(permit_object.authorized_account == dan_id);
+          BOOST_CHECK(permit_object.withdraw_from_account == nathan_id);
+          BOOST_CHECK(permit_object.period_start_time > db.head_block_time());
+          first_start_time = permit_object.period_start_time;
+          BOOST_CHECK(permit_object.withdrawal_limit == asset(5));
+          BOOST_CHECK(permit_object.withdrawal_period_sec == fc::hours(1).to_seconds());
+          BOOST_CHECK(permit_object.expiration == first_start_time + permit_object.withdrawal_period_sec*5 );
+      }
+
+   generate_blocks(2); // Still before the first period, but BEFORE the real time during which "early" claims are checked
+
+      {
+          withdraw_permission_claim_operation op;
+          op.withdraw_permission = permit;
+          op.withdraw_from_account = nathan_id;
+          op.withdraw_to_account = dan_id;
+          op.amount_to_withdraw = asset(1);
+          set_expiration( db, trx );
+
+          trx.operations.push_back(op);
+          sign( trx, dan_private_key ); // Transaction should be signed to be valid
+
+          // This operation/transaction will be pushed early/before the first
+          // withdrawal period
+          // However, this will not cause an exception prior to HARDFORK_23_TIME
+          // because withdrawaing before that the first period was acceptable
+          // before the fix
+          PUSH_TX( db, trx ); // <-- Claim #1
+
+
+          //Get to the actual withdrawal period
+          bool miss_intermediate_blocks = false; // Required to have generate_blocks() elapse flush to the time of interest
+          generate_blocks(first_start_time, miss_intermediate_blocks);
+          set_expiration( db, trx );
+
+          REQUIRE_THROW_WITH_VALUE(op, withdraw_permission, withdraw_permission_id_type(5));
+          REQUIRE_THROW_WITH_VALUE(op, withdraw_from_account, dan_id);
+          REQUIRE_THROW_WITH_VALUE(op, withdraw_from_account, account_id_type());
+          REQUIRE_THROW_WITH_VALUE(op, withdraw_to_account, nathan_id);
+          REQUIRE_THROW_WITH_VALUE(op, withdraw_to_account, account_id_type());
+          REQUIRE_THROW_WITH_VALUE(op, amount_to_withdraw, asset(10));
+          REQUIRE_THROW_WITH_VALUE(op, amount_to_withdraw, asset(6));
+          set_expiration( db, trx );
+          trx.clear();
+          trx.operations.push_back(op);
+          sign( trx, dan_private_key );
+          PUSH_TX( db, trx ); // <-- Claim #2
+
+          // would be legal on its own, but doesn't work because trx already withdrew
+          REQUIRE_THROW_WITH_VALUE(op, amount_to_withdraw, asset(5));
+
+          // Make sure we can withdraw again this period, as long as we're not exceeding the periodic limit
+          trx.clear();
+          // withdraw 1
+          trx.operations = {op};
+          // make it different from previous trx so it's non-duplicate
+          trx.expiration += fc::seconds(1);
+          sign( trx, dan_private_key );
+          PUSH_TX( db, trx ); // <-- Claim #3
+          trx.clear();
+      }
+
+      // Account for three (3) claims of one (1) unit
+      BOOST_CHECK_EQUAL(get_balance(nathan_id, asset_id_type()), 997);
+      BOOST_CHECK_EQUAL(get_balance(dan_id, asset_id_type()), 3);
+
+      {
+          const withdraw_permission_object& permit_object = permit(db);
+          BOOST_CHECK(permit_object.authorized_account == dan_id);
+          BOOST_CHECK(permit_object.withdraw_from_account == nathan_id);
+          BOOST_CHECK(permit_object.period_start_time == first_start_time);
+          BOOST_CHECK(permit_object.withdrawal_limit == asset(5));
+          BOOST_CHECK(permit_object.withdrawal_period_sec == fc::hours(1).to_seconds());
+          BOOST_CHECK_EQUAL(permit_object.claimed_this_period.value, 3 ); // <-- Account for three (3) claims of one (1) unit
+          BOOST_CHECK(permit_object.expiration == first_start_time + 5*permit_object.withdrawal_period_sec);
+          generate_blocks(first_start_time + permit_object.withdrawal_period_sec);
+          // lazy update:  verify period_start_time isn't updated until new trx occurs
+          BOOST_CHECK(permit_object.period_start_time == first_start_time);
+      }
+
+      {
+          // Leave Nathan with one unit
+          transfer(nathan_id, dan_id, asset(996));
+
+          // Attempt a withdrawal claim for units than available
+          withdraw_permission_claim_operation op;
+          op.withdraw_permission = permit;
+          op.withdraw_from_account = nathan_id;
+          op.withdraw_to_account = dan_id;
+          op.amount_to_withdraw = asset(5);
+          trx.operations.push_back(op);
+          set_expiration( db, trx );
+          sign( trx, dan_private_key );
+          //Throws because nathan doesn't have the money
+          GRAPHENE_CHECK_THROW(PUSH_TX( db, trx ), fc::exception);
+
+          // Attempt a withdrawal claim for which nathan does have sufficient units
+          op.amount_to_withdraw = asset(1);
+          trx.clear();
+          trx.operations = {op};
+          set_expiration( db, trx );
+          sign( trx, dan_private_key );
+          PUSH_TX( db, trx );
+      }
+
+      BOOST_CHECK_EQUAL(get_balance(nathan_id, asset_id_type()), 0);
+      BOOST_CHECK_EQUAL(get_balance(dan_id, asset_id_type()), 1000);
+      trx.clear();
+      transfer(dan_id, nathan_id, asset(1000));
+
+      {
+          const withdraw_permission_object& permit_object = permit(db);
+          BOOST_CHECK(permit_object.authorized_account == dan_id);
+          BOOST_CHECK(permit_object.withdraw_from_account == nathan_id);
+          BOOST_CHECK(permit_object.period_start_time == first_start_time + permit_object.withdrawal_period_sec);
+          BOOST_CHECK(permit_object.expiration == first_start_time + 5*permit_object.withdrawal_period_sec);
+          BOOST_CHECK(permit_object.withdrawal_limit == asset(5));
+          BOOST_CHECK(permit_object.withdrawal_period_sec == fc::hours(1).to_seconds());
+          generate_blocks(permit_object.expiration);
+      }
+      // Ensure the permit object has been garbage collected
+      BOOST_CHECK(db.find_object(permit) == nullptr);
+
+      {
+          withdraw_permission_claim_operation op;
+          op.withdraw_permission = permit;
+          op.withdraw_from_account = nathan_id;
+          op.withdraw_to_account = dan_id;
+          op.amount_to_withdraw = asset(5);
+          trx.operations.push_back(op);
+          set_expiration( db, trx );
+          sign( trx, dan_private_key );
+          //Throws because the permission has expired
+          GRAPHENE_CHECK_THROW(PUSH_TX( db, trx ), fc::exception);
+      }
+  } FC_LOG_AND_RETHROW() }
+
+/**
+ * Test the claims of withdrawals both before and during
+ * authorized withdrawal periods.
+ * NOTE: The simulated elapse of blockchain time through the use of
+ * generate_blocks() must be carefully used in order to simulate
+ * this test.
+ * NOTE: This test verifies proper withdrawal claim behavior
+ * as it should occur after Issue #23 is addressed.
+ * That issue is concerned with ensuring that the first claim
+ * can occur before the first withdrawal period.
+ */
+BOOST_AUTO_TEST_CASE( withdraw_permission_test_after_hardfork_23 )
+{ try {
+   INVOKE(withdraw_permission_create_after_hardfork_23);
 
    auto nathan_private_key = generate_private_key("nathan");
    auto dan_private_key = generate_private_key("dan");
@@ -108,7 +383,7 @@ BOOST_AUTO_TEST_CASE( withdraw_permission_test )
       BOOST_CHECK(permit_object.expiration == first_start_time + permit_object.withdrawal_period_sec*5 );
    }
 
-   generate_blocks(2);
+   generate_blocks(HARDFORK_23_TIME); // Still before the first period, but DURING the real time during which "early" claims are checked
 
    {
       withdraw_permission_claim_operation op;
@@ -119,10 +394,13 @@ BOOST_AUTO_TEST_CASE( withdraw_permission_test )
       set_expiration( db, trx );
 
       trx.operations.push_back(op);
+      sign( trx, dan_private_key ); // Transaction should be signed to be valid
       //Throws because we haven't entered the first withdrawal period yet.
       GRAPHENE_REQUIRE_THROW(PUSH_TX( db, trx ), fc::exception);
       //Get to the actual withdrawal period
-      generate_blocks(permit(db).period_start_time);
+      bool miss_intermediate_blocks = false; // Required to have generate_blocks() elapse flush to the time of interest
+      generate_blocks(first_start_time, miss_intermediate_blocks);
+          set_expiration( db, trx );
 
       REQUIRE_THROW_WITH_VALUE(op, withdraw_permission, withdraw_permission_id_type(5));
       REQUIRE_THROW_WITH_VALUE(op, withdraw_from_account, dan_id);
@@ -135,7 +413,7 @@ BOOST_AUTO_TEST_CASE( withdraw_permission_test )
       trx.clear();
       trx.operations.push_back(op);
       sign( trx, dan_private_key );
-      PUSH_TX( db, trx );
+      PUSH_TX( db, trx ); // <-- Claim #1
 
       // would be legal on its own, but doesn't work because trx already withdrew
       REQUIRE_THROW_WITH_VALUE(op, amount_to_withdraw, asset(5));
@@ -147,10 +425,11 @@ BOOST_AUTO_TEST_CASE( withdraw_permission_test )
       // make it different from previous trx so it's non-duplicate
       trx.expiration += fc::seconds(1);
       sign( trx, dan_private_key );
-      PUSH_TX( db, trx );
+      PUSH_TX( db, trx ); // <-- Claim #2
       trx.clear();
    }
 
+   // Account for two (2) claims of one (1) unit
    BOOST_CHECK_EQUAL(get_balance(nathan_id, asset_id_type()), 998);
    BOOST_CHECK_EQUAL(get_balance(dan_id, asset_id_type()), 2);
 
@@ -161,7 +440,7 @@ BOOST_AUTO_TEST_CASE( withdraw_permission_test )
       BOOST_CHECK(permit_object.period_start_time == first_start_time);
       BOOST_CHECK(permit_object.withdrawal_limit == asset(5));
       BOOST_CHECK(permit_object.withdrawal_period_sec == fc::hours(1).to_seconds());
-      BOOST_CHECK_EQUAL(permit_object.claimed_this_period.value, 2 );
+      BOOST_CHECK_EQUAL(permit_object.claimed_this_period.value, 2 ); // <-- Account for two (2) claims of one (1) unit
       BOOST_CHECK(permit_object.expiration == first_start_time + 5*permit_object.withdrawal_period_sec);
       generate_blocks(first_start_time + permit_object.withdrawal_period_sec);
       // lazy update:  verify period_start_time isn't updated until new trx occurs
@@ -169,7 +448,10 @@ BOOST_AUTO_TEST_CASE( withdraw_permission_test )
    }
 
    {
+      // Leave Nathan with one unit
       transfer(nathan_id, dan_id, asset(997));
+
+      // Attempt a withdrawal claim for units than available
       withdraw_permission_claim_operation op;
       op.withdraw_permission = permit;
       op.withdraw_from_account = nathan_id;
@@ -180,6 +462,8 @@ BOOST_AUTO_TEST_CASE( withdraw_permission_test )
       sign( trx, dan_private_key );
       //Throws because nathan doesn't have the money
       GRAPHENE_CHECK_THROW(PUSH_TX( db, trx ), fc::exception);
+
+      // Attempt a withdrawal claim for which nathan does have sufficient units
       op.amount_to_withdraw = asset(1);
       trx.clear();
       trx.operations = {op};
@@ -222,7 +506,7 @@ BOOST_AUTO_TEST_CASE( withdraw_permission_test )
 
 BOOST_AUTO_TEST_CASE( withdraw_permission_nominal_case )
 { try {
-   INVOKE(withdraw_permission_create);
+   INVOKE(withdraw_permission_create_before_hardfork_23);
 
    auto nathan_private_key = generate_private_key("nathan");
    auto dan_private_key = generate_private_key("dan");
@@ -230,6 +514,12 @@ BOOST_AUTO_TEST_CASE( withdraw_permission_nominal_case )
    account_id_type dan_id = get_account("dan").id;
    withdraw_permission_id_type permit;
 
+   // Wait until the permission period's start time
+   const withdraw_permission_object& first_permit_object = permit(db);
+   generate_blocks(
+           first_permit_object.period_start_time);
+
+   // Loop through the withdrawal periods and claim a withdrawal
    while(true)
    {
       const withdraw_permission_object& permit_object = permit(db);
@@ -247,6 +537,8 @@ BOOST_AUTO_TEST_CASE( withdraw_permission_nominal_case )
       // if no further withdrawals are possible
       BOOST_CHECK(db.find_object(permit) != nullptr);
       BOOST_CHECK( permit_object.claimed_this_period == 5 );
+      BOOST_CHECK_EQUAL( permit_object.available_this_period(db.head_block_time()).amount.value, 0 );
+      BOOST_CHECK_EQUAL( current_period(permit_object, db.head_block_time()).available_this_period.amount.value, 0 );
       trx.clear();
       generate_blocks(
            permit_object.period_start_time
@@ -259,9 +551,228 @@ BOOST_AUTO_TEST_CASE( withdraw_permission_nominal_case )
    BOOST_CHECK_EQUAL(get_balance(dan_id, asset_id_type()), 25);
 } FC_LOG_AND_RETHROW() }
 
+
+/**
+ * This case checks to see whether the amount claimed within any particular withdrawal period
+ * is properly reflected within the permission object.
+ * The maximum withdrawal per period will be limited to 5 units.
+ * There are a total of 5 withdrawal periods that are permitted.
+ * The test will evaluate the following withdrawal pattern:
+ * (1) during Period 1, a withdrawal of 4 units,
+ * (2) during Period 2, a withdrawal of 1 units,
+ * (3) during Period 3, a withdrawal of 0 units,
+ * (4) during Period 4, a withdrawal of 5 units,
+ * (5) during Period 5, a withdrawal of 3 units.
+ *
+ * Total withdrawal will be 13 units.
+ */
+BOOST_AUTO_TEST_CASE( withdraw_permission_incremental_case )
+{ try {
+    INVOKE(withdraw_permission_create_after_hardfork_23);
+    time_point_sec expected_first_period_start_time = HARDFORK_23_TIME + db.get_global_properties().parameters.block_interval*5; // Hard-coded to synchronize with withdraw_permission_create_after_hardfork_23()
+    uint64_t expected_period_duration_seconds = fc::hours(1).to_seconds(); // Hard-coded to synchronize with withdraw_permission_create_after_hardfork_23()
+
+    auto nathan_private_key = generate_private_key("nathan");
+    auto dan_private_key = generate_private_key("dan");
+    account_id_type nathan_id = get_account("nathan").id;
+    account_id_type dan_id = get_account("dan").id;
+    withdraw_permission_id_type permit;
+
+    // Wait until the permission period's start time
+    {
+        const withdraw_permission_object &before_first_permit_object = permit(db);
+        BOOST_CHECK_EQUAL(before_first_permit_object.period_start_time.sec_since_epoch(), expected_first_period_start_time.sec_since_epoch());
+        generate_blocks(
+                before_first_permit_object.period_start_time);
+    }
+    // Before withdrawing, check the period description
+    const withdraw_permission_object &first_permit_object = permit(db);
+    const withdrawal_period_descriptor first_period = current_period(first_permit_object, db.head_block_time());
+    BOOST_CHECK_EQUAL(first_period.period_start_time.sec_since_epoch(), expected_first_period_start_time.sec_since_epoch());
+    BOOST_CHECK_EQUAL(first_period.period_end_time.sec_since_epoch(), expected_first_period_start_time.sec_since_epoch() + expected_period_duration_seconds);
+    BOOST_CHECK_EQUAL(first_period.available_this_period.amount.value, 5);
+
+    // Period 1: Withdraw 4 units
+    {
+        // Before claiming, check the period description
+        const withdraw_permission_object& permit_object = permit(db);
+        BOOST_CHECK(db.find_object(permit) != nullptr);
+        withdrawal_period_descriptor period_descriptor = current_period(permit_object, db.head_block_time());
+        BOOST_CHECK_EQUAL(period_descriptor.available_this_period.amount.value, 5);
+        BOOST_CHECK_EQUAL(period_descriptor.period_start_time.sec_since_epoch(), expected_first_period_start_time.sec_since_epoch() + (expected_period_duration_seconds * 0));
+        BOOST_CHECK_EQUAL(period_descriptor.period_end_time.sec_since_epoch(), expected_first_period_start_time.sec_since_epoch() + (expected_period_duration_seconds * 1));
+
+        // Claim
+        withdraw_permission_claim_operation op;
+        op.withdraw_permission = permit;
+        op.withdraw_from_account = nathan_id;
+        op.withdraw_to_account = dan_id;
+        op.amount_to_withdraw = asset(4);
+        trx.operations.push_back(op);
+        set_expiration( db, trx );
+        sign( trx, dan_private_key );
+        PUSH_TX( db, trx );
+
+        // After claiming, check the period description
+        BOOST_CHECK(db.find_object(permit) != nullptr);
+        BOOST_CHECK( permit_object.claimed_this_period == 4 );
+        BOOST_CHECK_EQUAL( permit_object.claimed_this_period.value, 4 );
+        period_descriptor = current_period(permit_object, db.head_block_time());
+        BOOST_CHECK_EQUAL(period_descriptor.available_this_period.amount.value, 1);
+        BOOST_CHECK_EQUAL(period_descriptor.period_start_time.sec_since_epoch(), expected_first_period_start_time.sec_since_epoch() + (expected_period_duration_seconds * 0));
+        BOOST_CHECK_EQUAL(period_descriptor.period_end_time.sec_since_epoch(), expected_first_period_start_time.sec_since_epoch() + (expected_period_duration_seconds * 1));
+
+        // Advance to next period
+        trx.clear();
+        generate_blocks(
+                permit_object.period_start_time
+                + permit_object.withdrawal_period_sec );
+    }
+
+    // Period 2: Withdraw 1 units
+    {
+        // Before claiming, check the period description
+        const withdraw_permission_object& permit_object = permit(db);
+        BOOST_CHECK(db.find_object(permit) != nullptr);
+        withdrawal_period_descriptor period_descriptor = current_period(permit_object, db.head_block_time());
+        BOOST_CHECK_EQUAL(period_descriptor.available_this_period.amount.value, 5);
+        BOOST_CHECK_EQUAL(period_descriptor.period_start_time.sec_since_epoch(), expected_first_period_start_time.sec_since_epoch() + (expected_period_duration_seconds * 1));
+        BOOST_CHECK_EQUAL(period_descriptor.period_end_time.sec_since_epoch(), expected_first_period_start_time.sec_since_epoch() + (expected_period_duration_seconds * 2));
+
+        // Claim
+        withdraw_permission_claim_operation op;
+        op.withdraw_permission = permit;
+        op.withdraw_from_account = nathan_id;
+        op.withdraw_to_account = dan_id;
+        op.amount_to_withdraw = asset(1);
+        trx.operations.push_back(op);
+        set_expiration( db, trx );
+        sign( trx, dan_private_key );
+        PUSH_TX( db, trx );
+
+        // After claiming, check the period description
+        BOOST_CHECK(db.find_object(permit) != nullptr);
+        BOOST_CHECK( permit_object.claimed_this_period == 1 );
+        BOOST_CHECK_EQUAL( permit_object.claimed_this_period.value, 1 );
+        period_descriptor = current_period(permit_object, db.head_block_time());
+        BOOST_CHECK_EQUAL(period_descriptor.available_this_period.amount.value, 4);
+        BOOST_CHECK_EQUAL(period_descriptor.period_start_time.sec_since_epoch(), expected_first_period_start_time.sec_since_epoch() + (expected_period_duration_seconds * 1));
+        BOOST_CHECK_EQUAL(period_descriptor.period_end_time.sec_since_epoch(), expected_first_period_start_time.sec_since_epoch() + (expected_period_duration_seconds * 2));
+
+        // Advance to next period
+        trx.clear();
+        generate_blocks(
+                permit_object.period_start_time
+                + permit_object.withdrawal_period_sec );
+    }
+
+    // Period 3: Withdraw 0 units
+    {
+        // Before claiming, check the period description
+        const withdraw_permission_object& permit_object = permit(db);
+        BOOST_CHECK(db.find_object(permit) != nullptr);
+        withdrawal_period_descriptor period_descriptor = current_period(permit_object, db.head_block_time());
+        BOOST_CHECK_EQUAL(period_descriptor.available_this_period.amount.value, 5);
+        BOOST_CHECK_EQUAL(period_descriptor.period_start_time.sec_since_epoch(), expected_first_period_start_time.sec_since_epoch() + (expected_period_duration_seconds * 2));
+        BOOST_CHECK_EQUAL(period_descriptor.period_end_time.sec_since_epoch(), expected_first_period_start_time.sec_since_epoch() + (expected_period_duration_seconds * 3));
+
+        // No claim
+
+        // After doing nothing, check the period description
+        period_descriptor = current_period(permit_object, db.head_block_time());
+        BOOST_CHECK_EQUAL(period_descriptor.available_this_period.amount.value, 5);
+        BOOST_CHECK_EQUAL(period_descriptor.period_start_time.sec_since_epoch(), expected_first_period_start_time.sec_since_epoch() + (expected_period_duration_seconds * 2));
+        BOOST_CHECK_EQUAL(period_descriptor.period_end_time.sec_since_epoch(), expected_first_period_start_time.sec_since_epoch() + (expected_period_duration_seconds * 3));
+
+        // Advance to end of Period 3
+        time_point_sec period_end_time = period_descriptor.period_end_time;
+        generate_blocks(period_end_time);
+    }
+
+    // Period 4: Withdraw 5 units
+    {
+        // Before claiming, check the period description
+        const withdraw_permission_object& permit_object = permit(db);
+        BOOST_CHECK(db.find_object(permit) != nullptr);
+        withdrawal_period_descriptor period_descriptor = current_period(permit_object, db.head_block_time());
+        BOOST_CHECK_EQUAL(period_descriptor.available_this_period.amount.value, 5);
+        BOOST_CHECK_EQUAL(period_descriptor.period_start_time.sec_since_epoch(), expected_first_period_start_time.sec_since_epoch() + (expected_period_duration_seconds * 3));
+        BOOST_CHECK_EQUAL(period_descriptor.period_end_time.sec_since_epoch(), expected_first_period_start_time.sec_since_epoch() + (expected_period_duration_seconds * 4));
+
+        // Claim
+        withdraw_permission_claim_operation op;
+        op.withdraw_permission = permit;
+        op.withdraw_from_account = nathan_id;
+        op.withdraw_to_account = dan_id;
+        op.amount_to_withdraw = asset(5);
+        trx.operations.push_back(op);
+        set_expiration( db, trx );
+        sign( trx, dan_private_key );
+        PUSH_TX( db, trx );
+
+        // After claiming, check the period description
+        BOOST_CHECK(db.find_object(permit) != nullptr);
+        BOOST_CHECK( permit_object.claimed_this_period == 5 );
+        BOOST_CHECK_EQUAL( permit_object.claimed_this_period.value, 5 );
+        period_descriptor = current_period(permit_object, db.head_block_time());
+        BOOST_CHECK_EQUAL(period_descriptor.available_this_period.amount.value, 0);
+        BOOST_CHECK_EQUAL(period_descriptor.period_start_time.sec_since_epoch(), expected_first_period_start_time.sec_since_epoch() + (expected_period_duration_seconds * 3));
+        BOOST_CHECK_EQUAL(period_descriptor.period_end_time.sec_since_epoch(), expected_first_period_start_time.sec_since_epoch() + (expected_period_duration_seconds * 4));
+
+        // Advance to next period
+        trx.clear();
+        generate_blocks(
+                permit_object.period_start_time
+                + permit_object.withdrawal_period_sec );
+    }
+
+    // Period 5: Withdraw 3 units
+    {
+        // Before claiming, check the period description
+        const withdraw_permission_object& permit_object = permit(db);
+        BOOST_CHECK(db.find_object(permit) != nullptr);
+        withdrawal_period_descriptor period_descriptor = current_period(permit_object, db.head_block_time());
+        BOOST_CHECK_EQUAL(period_descriptor.available_this_period.amount.value, 5);
+        BOOST_CHECK_EQUAL(period_descriptor.period_start_time.sec_since_epoch(), expected_first_period_start_time.sec_since_epoch() + (expected_period_duration_seconds * 4));
+        BOOST_CHECK_EQUAL(period_descriptor.period_end_time.sec_since_epoch(), expected_first_period_start_time.sec_since_epoch() + (expected_period_duration_seconds * 5));
+
+        // Claim
+        withdraw_permission_claim_operation op;
+        op.withdraw_permission = permit;
+        op.withdraw_from_account = nathan_id;
+        op.withdraw_to_account = dan_id;
+        op.amount_to_withdraw = asset(3);
+        trx.operations.push_back(op);
+        set_expiration( db, trx );
+        sign( trx, dan_private_key );
+        PUSH_TX( db, trx );
+
+        // After claiming, check the period description
+        BOOST_CHECK(db.find_object(permit) != nullptr);
+        BOOST_CHECK( permit_object.claimed_this_period == 3 );
+        BOOST_CHECK_EQUAL( permit_object.claimed_this_period.value, 3 );
+        period_descriptor = current_period(permit_object, db.head_block_time());
+        BOOST_CHECK_EQUAL(period_descriptor.available_this_period.amount.value, 2);
+        BOOST_CHECK_EQUAL(period_descriptor.period_start_time.sec_since_epoch(), expected_first_period_start_time.sec_since_epoch() + (expected_period_duration_seconds * 4));
+        BOOST_CHECK_EQUAL(period_descriptor.period_end_time.sec_since_epoch(), expected_first_period_start_time.sec_since_epoch() + (expected_period_duration_seconds * 5));
+
+        // Advance to next period
+        trx.clear();
+        generate_blocks(
+                permit_object.period_start_time
+                + permit_object.withdrawal_period_sec );
+    }
+
+    // Withdrawal periods completed
+    BOOST_CHECK(db.find_object(permit) == nullptr);
+
+    BOOST_CHECK_EQUAL(get_balance(nathan_id, asset_id_type()), 987);
+    BOOST_CHECK_EQUAL(get_balance(dan_id, asset_id_type()), 13);
+} FC_LOG_AND_RETHROW() }
+
 BOOST_AUTO_TEST_CASE( withdraw_permission_update )
 { try {
-   INVOKE(withdraw_permission_create);
+   INVOKE(withdraw_permission_create_before_hardfork_23);
 
    auto nathan_private_key = generate_private_key("nathan");
    account_id_type nathan_id = get_account("nathan").id;
