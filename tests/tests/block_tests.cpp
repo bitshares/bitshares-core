@@ -135,9 +135,10 @@ BOOST_AUTO_TEST_CASE( generate_empty_blocks )
       // TODO:  Don't generate this here
       auto init_account_priv_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("null_key")) );
       signed_block cutoff_block;
+      uint32_t last_block;
       {
          database db;
-         db.open(data_dir.path(), make_genesis );
+         db.open(data_dir.path(), make_genesis, "TEST" );
          b = db.generate_block(db.get_slot_time(1), db.get_scheduled_witness(1), init_account_priv_key, database::skip_nothing);
 
          // TODO:  Change this test when we correct #406
@@ -154,6 +155,7 @@ BOOST_AUTO_TEST_CASE( generate_empty_blocks )
             if( cutoff_height >= 200 )
             {
                cutoff_block = *(db.fetch_block_by_number( cutoff_height ));
+               last_block = db.head_block_num();
                break;
             }
          }
@@ -161,8 +163,10 @@ BOOST_AUTO_TEST_CASE( generate_empty_blocks )
       }
       {
          database db;
-         db.open(data_dir.path(), []{return genesis_state_type();});
-         BOOST_CHECK_EQUAL( db.head_block_num(), cutoff_block.block_num() );
+         db.open(data_dir.path(), []{return genesis_state_type();}, "TEST");
+         BOOST_CHECK_EQUAL( db.head_block_num(), last_block );
+         while( db.head_block_num() > cutoff_block.block_num() )
+            db.pop_block();
          b = cutoff_block;
          for( uint32_t i = 0; i < 200; ++i )
          {
@@ -186,7 +190,7 @@ BOOST_AUTO_TEST_CASE( undo_block )
       fc::temp_directory data_dir( graphene::utilities::temp_directory_path() );
       {
          database db;
-         db.open(data_dir.path(), make_genesis);
+         db.open(data_dir.path(), make_genesis, "TEST");
          fc::time_point_sec now( GRAPHENE_TESTING_GENESIS_TIMESTAMP );
          std::vector< time_point_sec > time_stack;
 
@@ -235,9 +239,9 @@ BOOST_AUTO_TEST_CASE( fork_blocks )
       fc::temp_directory data_dir2( graphene::utilities::temp_directory_path() );
 
       database db1;
-      db1.open(data_dir1.path(), make_genesis);
+      db1.open(data_dir1.path(), make_genesis, "TEST");
       database db2;
-      db2.open(data_dir2.path(), make_genesis);
+      db2.open(data_dir2.path(), make_genesis, "TEST");
       BOOST_CHECK( db1.get_chain_id() == db2.get_chain_id() );
 
       auto init_account_priv_key  = fc::ecc::private_key::regenerate(fc::sha256::hash(string("null_key")) );
@@ -380,7 +384,7 @@ BOOST_AUTO_TEST_CASE( undo_pending )
       fc::temp_directory data_dir( graphene::utilities::temp_directory_path() );
       {
          database db;
-         db.open(data_dir.path(), make_genesis);
+         db.open(data_dir.path(), make_genesis, "TEST");
 
          auto init_account_priv_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("null_key")) );
          public_key_type init_account_pub_key  = init_account_priv_key.get_public_key();
@@ -445,8 +449,8 @@ BOOST_AUTO_TEST_CASE( switch_forks_undo_create )
                          dir2( graphene::utilities::temp_directory_path() );
       database db1,
                db2;
-      db1.open(dir1.path(), make_genesis);
-      db2.open(dir2.path(), make_genesis);
+      db1.open(dir1.path(), make_genesis, "TEST");
+      db2.open(dir2.path(), make_genesis, "TEST");
       BOOST_CHECK( db1.get_chain_id() == db2.get_chain_id() );
 
       auto init_account_priv_key  = fc::ecc::private_key::regenerate(fc::sha256::hash(string("null_key")) );
@@ -504,8 +508,8 @@ BOOST_AUTO_TEST_CASE( duplicate_transactions )
                          dir2( graphene::utilities::temp_directory_path() );
       database db1,
                db2;
-      db1.open(dir1.path(), make_genesis);
-      db2.open(dir2.path(), make_genesis);
+      db1.open(dir1.path(), make_genesis, "TEST");
+      db2.open(dir2.path(), make_genesis, "TEST");
       BOOST_CHECK( db1.get_chain_id() == db2.get_chain_id() );
 
       auto skip_sigs = database::skip_transaction_signatures | database::skip_authority_check;
@@ -554,7 +558,7 @@ BOOST_AUTO_TEST_CASE( tapos )
    try {
       fc::temp_directory dir1( graphene::utilities::temp_directory_path() );
       database db1;
-      db1.open(dir1.path(), make_genesis);
+      db1.open(dir1.path(), make_genesis, "TEST");
 
       const account_object& init1 = *db1.get_index_type<account_index>().indices().get<by_name>().find("init1");
 
@@ -1058,7 +1062,7 @@ BOOST_FIXTURE_TEST_CASE( transaction_invalidated_in_cache, database_fixture )
       fc::temp_directory data_dir2( graphene::utilities::temp_directory_path() );
 
       database db2;
-      db2.open(data_dir2.path(), make_genesis);
+      db2.open(data_dir2.path(), make_genesis, "TEST");
       BOOST_CHECK( db.get_chain_id() == db2.get_chain_id() );
 
       while( db2.head_block_num() < db.head_block_num() )
@@ -1218,7 +1222,7 @@ BOOST_AUTO_TEST_CASE( genesis_reserve_ids )
          genesis_state.initial_assets.push_back( usd );
 
          return genesis_state;
-      } );
+      }, "TEST" );
 
       const auto& acct_idx = db.get_index_type<account_index>().indices().get<by_name>();
       auto acct_itr = acct_idx.find("init0");

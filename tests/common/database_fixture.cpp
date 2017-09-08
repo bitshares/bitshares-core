@@ -305,7 +305,7 @@ void database_fixture::open_database()
 {
    if( !data_dir ) {
       data_dir = fc::temp_directory( graphene::utilities::temp_directory_path() );
-      db.open(data_dir->path(), [this]{return genesis_state;});
+      db.open(data_dir->path(), [this]{return genesis_state;}, "test");
    }
 }
 

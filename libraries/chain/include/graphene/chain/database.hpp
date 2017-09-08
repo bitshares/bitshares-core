@@ -89,10 +89,12 @@ namespace graphene { namespace chain {
           *
           * @param data_dir Path to open or create database in
           * @param genesis_loader A callable object which returns the genesis state to initialize new databases on
+          * @param db_version a version string that changes when the internal database format and/or logic is modified
           */
           void open(
              const fc::path& data_dir,
-             std::function<genesis_state_type()> genesis_loader );
+             std::function<genesis_state_type()> genesis_loader,
+             const std::string& db_version );
 
          /**
           * @brief Rebuild object graph from block history and open detabase
@@ -100,7 +102,7 @@ namespace graphene { namespace chain {
           * This method may be called after or instead of @ref database::open, and will rebuild the object graph by
           * replaying blockchain history. When this method exits successfully, the database will be open.
           */
-         void reindex(fc::path data_dir, const genesis_state_type& initial_allocation = genesis_state_type());
+         void reindex(fc::path data_dir);
 
          /**
           * @brief wipe Delete database from disk, and potentially the raw chain as well.

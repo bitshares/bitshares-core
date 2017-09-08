@@ -91,4 +91,23 @@ BOOST_AUTO_TEST_CASE( flat_index_test )
    FC_ASSERT( !(*bitusd.bitasset_data_id)(db).current_feed.settlement_price.is_null() );
 }
 
+BOOST_AUTO_TEST_CASE( merge_test )
+{
+   try {
+      database db;
+      auto ses = db._undo_db.start_undo_session();
+      const auto& bal_obj1 = db.create<account_balance_object>( [&]( account_balance_object& obj ){
+          obj.balance = 42;
+      });
+      ses.merge();
+
+      auto balance = db.get_balance( account_id_type(), asset_id_type() );
+      BOOST_CHECK_EQUAL( 42, balance.amount.value );
+   } catch ( const fc::exception& e )
+   {
+      edump( (e.to_detail_string()) );
+      throw;
+   }
+}
+
 BOOST_AUTO_TEST_SUITE_END()
