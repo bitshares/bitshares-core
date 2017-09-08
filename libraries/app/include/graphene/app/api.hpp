@@ -139,28 +139,24 @@ namespace graphene { namespace app {
                                                                         uint32_t start = 0) const;
 
          /**
-          * @breif Get operations from an account using a timerange and additional filters requested at bitshares-core#258
+          * @breif Get operations from an account using a timerange and operation_type filter
           * @param account The account whose history should be queried
           * @param time_start Time to start
           * @param time_start Time to end
           * @param limit Maximum number of operations to retrieve (must not exceed 100)
-          * @param use_market_filter Boolean to turn on market filter and make the next 2 params relevant
-          * @param a Asset A to be looked in when use_market_filter, relevant to trading operations only
-          * @param a Asset B to be looked in when use_market_filter, relevant to trading operations only
+          * @param seconds_seq Paging helper to browse more than @limit(100) ops in the same second
           * @param use_operation_filter Turn on filter by operation id
-          * @param operation type Operation type number to be used when use_operation_filter is on
-          * @return A list of filtered operations performed by account, ordered from most recent to oldest
+          * @param operation_type Operation type number to be used when use_operation_filter is on
+          * @return A list of filtered operations performed by account, ordered from most oldest to recent
           *
           */
-         vector<operation_history_object> fuller_get_relative_account_history( account_id_type account,
-                                                                             fc::time_point_sec time_start,
-                                                                             fc::time_point_sec time_end,
-                                                                             unsigned limit,
-                                                                             bool use_market_filter,
-                                                                             asset_id_type a,
-                                                                             asset_id_type b,
-                                                                             bool use_operation_filter,
-                                                                             int operation_type ) const;
+         map<pair<fc::time_point_sec, uint32_t>, operation_history_object> get_account_history_by_date( account_id_type account,
+                                                                                                        fc::time_point_sec time_start,
+                                                                                                        fc::time_point_sec time_end,
+                                                                                                        unsigned limit,
+                                                                                                        uint32_t seconds_seq,
+                                                                                                        bool use_operation_filter,
+                                                                                                        int operation_type ) const;
 
 
 
@@ -416,7 +412,7 @@ FC_API(graphene::app::history_api,
        (get_account_history)
        (get_account_history_operations)
        (get_relative_account_history)
-       (fuller_get_relative_account_history)
+       (get_account_history_by_date)
        (get_fill_order_history)
        (get_market_history)
        (get_market_history_buckets)
@@ -451,7 +447,7 @@ FC_API(graphene::app::crypto_api,
      )
 FC_API(graphene::app::asset_api,
        (get_asset_holders)
-	   (get_asset_holders_count)
+       (get_asset_holders_count)
        (get_all_asset_holders)
      )
 FC_API(graphene::app::login_api,

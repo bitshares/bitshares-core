@@ -95,6 +95,8 @@ namespace graphene { namespace chain {
          uint32_t                             sequence = 0; /// the operation position within the given account
          account_transaction_history_id_type  next;
          fc::time_point_sec time;
+         int operation_type;
+         uint32_t seconds_seq = 0;
 
          //std::pair<account_id_type,operation_history_id_type>  account_op()const  { return std::tie( account, operation_id ); }
          //std::pair<account_id_type,uint32_t>                   account_seq()const { return std::tie( account, sequence );     }
@@ -124,10 +126,11 @@ typedef multi_index_container<
       ordered_non_unique< tag<by_opid>,
          member< account_transaction_history_object, operation_history_id_type, &account_transaction_history_object::operation_id>
       >,
-      ordered_non_unique< tag<by_time>,
+      ordered_unique< tag<by_time>,
          composite_key< account_transaction_history_object,
             member< account_transaction_history_object, account_id_type, &account_transaction_history_object::account>,
-            member< account_transaction_history_object, fc::time_point_sec, &account_transaction_history_object::time>
+            member< account_transaction_history_object, fc::time_point_sec, &account_transaction_history_object::time>,
+            member< account_transaction_history_object, uint32_t, &account_transaction_history_object::seconds_seq>
          >
       >
    >
@@ -142,4 +145,4 @@ FC_REFLECT_DERIVED( graphene::chain::operation_history_object, (graphene::chain:
                     (op)(result)(block_num)(trx_in_block)(op_in_trx)(virtual_op) )
 
 FC_REFLECT_DERIVED( graphene::chain::account_transaction_history_object, (graphene::chain::object),
-                    (account)(operation_id)(sequence)(next)(time) )
+                    (account)(operation_id)(sequence)(next)(time)(operation_type)(seconds_seq) )

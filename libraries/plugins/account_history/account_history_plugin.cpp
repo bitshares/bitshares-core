@@ -187,6 +187,18 @@ void account_history_plugin_impl::add_account_history( const account_id_type acc
        obj.next = stats_obj.most_recent_op;
 
        obj.time = db.head_block_time();
+       const operation_history_object& op = db.get(op_id);
+       int operation_type = op.op.which();
+       obj.operation_type = operation_type;
+
+       uint32_t seconds_seq = 0;
+       if(stats_obj.total_ops > 0) {
+          const auto &last = db.get(stats_obj.most_recent_op);
+          if(last.time == db.head_block_time())
+             seconds_seq = last.seconds_seq + 1;
+       }
+       obj.seconds_seq = seconds_seq;
+
    });
    db.modify( stats_obj, [&]( account_statistics_object& obj ){
        obj.most_recent_op = ath.id;

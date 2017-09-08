@@ -535,79 +535,43 @@ namespace graphene { namespace app {
        return result;
     }
 
-    vector<operation_history_object> history_api::fuller_get_relative_account_history( account_id_type account,
-                                                                                       fc::time_point_sec time_start,
-                                                                                       fc::time_point_sec time_end,
-                                                                                       unsigned limit,
-                                                                                       bool use_market_filter,
-                                                                                       asset_id_type a,
-                                                                                       asset_id_type b,
-                                                                                       bool use_operation_filter,
-                                                                                       int operation_type )const
+    map<pair<fc::time_point_sec, uint32_t>, operation_history_object> history_api::get_account_history_by_date( account_id_type account,
+                                                                                                                fc::time_point_sec time_start,
+                                                                                                                fc::time_point_sec time_end,
+                                                                                                                unsigned limit,
+                                                                                                                uint32_t seconds_seq,
+                                                                                                                bool use_operation_filter,
+                                                                                                                int operation_type )const
     {
        FC_ASSERT( _app.chain_database() );
        const auto& db = *_app.chain_database();
        FC_ASSERT(limit <= 100);
-       FC_ASSERT(time_start > time_end);
-       vector<operation_history_object> result;
+       FC_ASSERT(time_end > time_start);
+       std::map<std::pair<fc::time_point_sec, uint32_t>, operation_history_object> results;
 
        const auto& hist_idx = db.get_index_type<account_transaction_history_index>();
        const auto& by_seq_idx = hist_idx.indices().get<by_time>();
 
-       auto itr = by_seq_idx.upper_bound(  boost::make_tuple( account, time_start )  );
-       auto itr_stop = by_seq_idx.lower_bound(  boost::make_tuple( account, time_end )  );
-       do {
-          --itr;
+       FC_ASSERT(operation_type < 45);
 
+       auto itr = by_seq_idx.lower_bound(boost::make_tuple(account, time_start, seconds_seq));
+       while( itr != by_seq_idx.end() && itr->time <= time_end && results.size() < limit )
+       {
           if(itr->account != account)
              break;
 
-          //ilog("itr ${itr}", ("itr", *itr));
-
-           try {
-
-              // filter by operation type
-              if (use_operation_filter) {
-                 FC_ASSERT(operation_type < 44); // valid op type number
-                 int op_type = itr->operation_id(db).op.which();
-                 if (operation_type != op_type) continue;
-              }
-
-              // the market filter goes against 3 types of trading operation
-              if (use_market_filter) {
-                 int op_type = itr->operation_id(db).op.which();
-                 if (op_type == 1) { // limit_order_create_operation
-                    auto op = itr->operation_id(db).op.get<graphene::chain::limit_order_create_operation>();
-                    if ((op.amount_to_sell.asset_id != a && op.amount_to_sell.asset_id != b) ||
-                        (op.min_to_receive.asset_id != a && op.min_to_receive.asset_id != b))
-                       continue;
-                 } else if (op_type == 2) { // limit_order_cancel_operation
-                    // i have no way yet to go after what assets where involved in cancel as the limit order object is gone.
-                    continue;
-                 } else if (op_type == 3) { // call_order_update_operation
-                    auto op = itr->operation_id(db).op.get<graphene::chain::call_order_update_operation>();
-                    if ((op.delta_collateral.asset_id != a && op.delta_collateral.asset_id != b) ||
-                        (op.delta_debt.asset_id != a && op.delta_debt.asset_id != b))
-                       continue;
-                 } else if (op_type == 4) { // fill_order_operation
-                    auto op = itr->operation_id(db).op.get<graphene::chain::fill_order_operation>();
-                    if ((op.pays.asset_id != a && op.pays.asset_id != b) ||
-                        (op.receives.asset_id != a && op.receives.asset_id != b))
-                       continue;
-                 } else  // any other op we just skip
-                    continue;
-              }
-              result.push_back(itr->operation_id(db));
-           }
-           catch ( ... ) {
-              // handle error?
-           }
+          if(use_operation_filter) {
+             if(itr->operation_type != operation_type) {
+                ++itr;
+                continue;
+             }
+          }
+          auto key = std::pair<fc::time_point_sec, uint32_t>(itr->time, itr->seconds_seq);
+          results.emplace(make_pair(key, itr->operation_id(db)));
+          ++itr;
        }
-       while ( itr != itr_stop && result.size() < limit );
-
-       return result;
+       return results;
     }
-
 
     flat_set<uint32_t> history_api::get_market_history_buckets()const
     {
