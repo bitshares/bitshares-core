@@ -83,8 +83,7 @@ void block_database::store( const block_id_type& _id, const signed_block& b )
       id = b.id();
       elog( "id argument of block_database::store() was not initialized for block ${id}", ("id", id) );
    }
-   auto num = block_header::num_from_id(id);
-   _block_num_to_pos.seekp( sizeof( index_entry ) * num );
+   _block_num_to_pos.seekp( sizeof( index_entry ) * int64_t(block_header::num_from_id(id)) );
    index_entry e;
    _blocks.seekp( 0, _blocks.end );
    auto vec = fc::raw::pack( b );
@@ -98,7 +97,7 @@ void block_database::store( const block_id_type& _id, const signed_block& b )
 void block_database::remove( const block_id_type& id )
 { try {
    index_entry e;
-   auto index_pos = sizeof(e)*block_header::num_from_id(id);
+   int64_t index_pos = sizeof(e) * int64_t(block_header::num_from_id(id));
    _block_num_to_pos.seekg( 0, _block_num_to_pos.end );
    if ( _block_num_to_pos.tellg() <= index_pos )
       FC_THROW_EXCEPTION(fc::key_not_found_exception, "Block ${id} not contained in block database", ("id", id));
@@ -109,7 +108,7 @@ void block_database::remove( const block_id_type& id )
    if( e.block_id == id )
    {
       e.block_size = 0;
-      _block_num_to_pos.seekp( sizeof(e)*block_header::num_from_id(id) );
+      _block_num_to_pos.seekp( sizeof(e) * int64_t(block_header::num_from_id(id)) );
       _block_num_to_pos.write( (char*)&e, sizeof(e) );
    }
 } FC_CAPTURE_AND_RETHROW( (id) ) }
@@ -120,9 +119,9 @@ bool block_database::contains( const block_id_type& id )const
       return false;
 
    index_entry e;
-   auto index_pos = sizeof(e)*block_header::num_from_id(id);
+   int64_t index_pos = sizeof(e) * int64_t(block_header::num_from_id(id));
    _block_num_to_pos.seekg( 0, _block_num_to_pos.end );
-   if ( _block_num_to_pos.tellg() < index_pos + sizeof(e) )
+   if ( _block_num_to_pos.tellg() < int64_t(index_pos + sizeof(e)) )
       return false;
    _block_num_to_pos.seekg( index_pos );
    _block_num_to_pos.read( (char*)&e, sizeof(e) );
@@ -134,9 +133,9 @@ block_id_type block_database::fetch_block_id( uint32_t block_num )const
 {
    assert( block_num != 0 );
    index_entry e;
-   auto index_pos = sizeof(e)*block_num;
+   int64_t index_pos = sizeof(e) * int64_t(block_num);
    _block_num_to_pos.seekg( 0, _block_num_to_pos.end );
-   if ( _block_num_to_pos.tellg() <= int64_t(index_pos) )
+   if ( _block_num_to_pos.tellg() <= index_pos )
       FC_THROW_EXCEPTION(fc::key_not_found_exception, "Block number ${block_num} not contained in block database", ("block_num", block_num));
 
    _block_num_to_pos.seekg( index_pos );
@@ -151,7 +150,7 @@ optional<signed_block> block_database::fetch_optional( const block_id_type& id )
    try
    {
       index_entry e;
-      auto index_pos = sizeof(e)*block_header::num_from_id(id);
+      int64_t index_pos = sizeof(e) * int64_t(block_header::num_from_id(id));
       _block_num_to_pos.seekg( 0, _block_num_to_pos.end );
       if ( _block_num_to_pos.tellg() <= index_pos )
          return {};
@@ -183,7 +182,7 @@ optional<signed_block> block_database::fetch_by_number( uint32_t block_num )cons
    try
    {
       index_entry e;
-      auto index_pos = sizeof(e)*block_num;
+      int64_t index_pos = sizeof(e) * int64_t(block_num);
       _block_num_to_pos.seekg( 0, _block_num_to_pos.end );
       if ( _block_num_to_pos.tellg() <= index_pos )
          return {};
@@ -214,7 +213,7 @@ optional<index_entry> block_database::last_index_entry()const {
 
       _block_num_to_pos.seekg( 0, _block_num_to_pos.end );
       std::streampos pos = _block_num_to_pos.tellg();
-      if( pos < sizeof(index_entry) )
+      if( pos < long(sizeof(index_entry)) )
          return optional<index_entry>();
 
       pos -= pos % sizeof(index_entry);
@@ -227,13 +226,13 @@ optional<index_entry> block_database::last_index_entry()const {
          _block_num_to_pos.seekg( pos );
          _block_num_to_pos.read( (char*)&e, sizeof(e) );
          if( _block_num_to_pos.gcount() == sizeof(e) && e.block_size > 0
-                && e.block_pos + e.block_size <= blocks_size )
+                && int64_t(e.block_pos + e.block_size) <= blocks_size )
             try
             {
                vector<char> data( e.block_size );
                _blocks.seekg( e.block_pos );
                _blocks.read( data.data(), e.block_size );
-               if( _blocks.gcount() == e.block_size )
+               if( _blocks.gcount() == long(e.block_size) )
                {
                   const signed_block block = fc::raw::unpack<signed_block>(data);
                   if( block.id() == e.block_id )

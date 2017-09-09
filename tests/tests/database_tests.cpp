@@ -96,7 +96,7 @@ BOOST_AUTO_TEST_CASE( merge_test )
    try {
       database db;
       auto ses = db._undo_db.start_undo_session();
-      const auto& bal_obj1 = db.create<account_balance_object>( [&]( account_balance_object& obj ){
+      db.create<account_balance_object>( [&]( account_balance_object& obj ){
           obj.balance = 42;
       });
       ses.merge();
