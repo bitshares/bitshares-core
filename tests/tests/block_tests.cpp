@@ -1068,7 +1068,8 @@ BOOST_FIXTURE_TEST_CASE( transaction_invalidated_in_cache, database_fixture )
       while( db2.head_block_num() < db.head_block_num() )
       {
          optional< signed_block > b = db.fetch_block_by_number( db2.head_block_num()+1 );
-         db2.push_block(*b, database::skip_witness_signature);
+         db2.push_block(*b, database::skip_witness_signature
+                           |database::skip_authority_check );
       }
       BOOST_CHECK( db2.get( alice_id ).name == "alice" );
       BOOST_CHECK( db2.get( bob_id ).name == "bob" );

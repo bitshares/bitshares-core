@@ -66,6 +66,7 @@ BOOST_AUTO_TEST_CASE( flat_index_test )
 {
    ACTORS((sam));
    const auto& bitusd = create_bitasset("USDBIT", sam.id);
+   const asset_id_type bitusd_id = bitusd.id;
    update_feed_producers(bitusd, {sam.id});
    price_feed current_feed;
    current_feed.settlement_price = bitusd.amount(100) / asset(100);
@@ -88,7 +89,7 @@ BOOST_AUTO_TEST_CASE( flat_index_test )
    const auto& dynamic_global_props = db.get<dynamic_global_property_object>(dynamic_global_property_id_type());
    generate_blocks(dynamic_global_props.next_maintenance_time, true);
 
-   FC_ASSERT( !(*bitusd.bitasset_data_id)(db).current_feed.settlement_price.is_null() );
+   FC_ASSERT( !(*bitusd_id(db).bitasset_data_id)(db).current_feed.settlement_price.is_null() );
 }
 
 BOOST_AUTO_TEST_CASE( merge_test )

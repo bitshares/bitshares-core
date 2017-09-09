@@ -320,6 +320,8 @@ BOOST_AUTO_TEST_CASE( create_account_test )
       REQUIRE_THROW_WITH_VALUE(op, options.voting_account, account_id_type(999999999));
 
       // Not allow voting for non-exist entities.
+      auto save_num_committee = op.options.num_committee;
+      auto save_num_witness = op.options.num_witness;
       op.options.num_committee = 1;
       op.options.num_witness = 0;
       REQUIRE_THROW_WITH_VALUE(op, options.votes, boost::assign::list_of<vote_id_type>(vote_id_type("0:1")).convert_to_container<flat_set<vote_id_type>>());
@@ -328,7 +330,8 @@ BOOST_AUTO_TEST_CASE( create_account_test )
       REQUIRE_THROW_WITH_VALUE(op, options.votes, boost::assign::list_of<vote_id_type>(vote_id_type("1:19")).convert_to_container<flat_set<vote_id_type>>());
       op.options.num_witness = 0;
       REQUIRE_THROW_WITH_VALUE(op, options.votes, boost::assign::list_of<vote_id_type>(vote_id_type("2:19")).convert_to_container<flat_set<vote_id_type>>());
-      op.options.num_committee = 4;
+      op.options.num_committee = save_num_committee;
+      op.options.num_witness = save_num_witness;
 
       auto auth_bak = op.owner;
       op.owner.add_authority(account_id_type(9999999999), 10);
@@ -1077,7 +1080,9 @@ BOOST_AUTO_TEST_CASE( trade_amount_equals_zero )
       set_expiration( db, trx );
 
       const asset_object& test = get_asset( "TEST" );
+      const asset_id_type test_id = test.id;
       const asset_object& core = get_asset( GRAPHENE_SYMBOL );
+      const asset_id_type core_id = core.id;
       const account_object& core_seller = create_account( "shorter1" );
       const account_object& core_buyer = get_account("nathan");
 
@@ -1102,7 +1107,7 @@ BOOST_AUTO_TEST_CASE( trade_amount_equals_zero )
 
        //TODO: This will fail because of something-for-nothing bug(#345)
        // Must be fixed with a hardfork
-      auto result = get_market_order_history(core.id, test.id);
+      auto result = get_market_order_history(core_id, test_id);
       BOOST_CHECK_EQUAL(result.size(), 2);
       BOOST_CHECK(result[0].op.pays == core.amount(1));
       BOOST_CHECK(result[0].op.receives == test.amount(2));
