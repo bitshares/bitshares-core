@@ -80,7 +80,7 @@ database_fixture::database_fixture()
    genesis_state.initial_timestamp = time_point_sec( GRAPHENE_TESTING_GENESIS_TIMESTAMP );
 
    genesis_state.initial_active_witnesses = 10;
-   for( int i = 0; i < genesis_state.initial_active_witnesses; ++i )
+   for( unsigned int i = 0; i < genesis_state.initial_active_witnesses; ++i )
    {
       auto name = "init"+fc::to_string(i);
       genesis_state.initial_accounts.emplace_back(name,
@@ -96,6 +96,8 @@ database_fixture::database_fixture()
    // app.initialize();
    ahplugin->plugin_set_app(&app);
    ahplugin->plugin_initialize(options);
+
+   options.insert(std::make_pair("bucket-size", boost::program_options::variable_value(string("[15]"),false)));
    mhplugin->plugin_set_app(&app);
    mhplugin->plugin_initialize(options);
 
@@ -124,9 +126,6 @@ database_fixture::~database_fixture()
       verify_account_history_plugin_index();
       BOOST_CHECK( db.get_node_properties().skip_flags == database::skip_nothing );
    }
-
-   if( data_dir )
-      db.close();
    return;
 } FC_CAPTURE_AND_RETHROW() }
 
@@ -154,6 +153,7 @@ void database_fixture::verify_asset_supplies( const database& db )
    const simple_index<account_statistics_object>& statistics_index = db.get_index_type<simple_index<account_statistics_object>>();
    const auto& balance_index = db.get_index_type<account_balance_index>().indices();
    const auto& settle_index = db.get_index_type<force_settlement_index>().indices();
+   const auto& bids = db.get_index_type<collateral_bid_index>().indices();
    map<asset_id_type,share_type> total_balances;
    map<asset_id_type,share_type> total_debts;
    share_type core_in_orders;
@@ -163,6 +163,8 @@ void database_fixture::verify_asset_supplies( const database& db )
       total_balances[b.asset_type] += b.balance;
    for( const force_settlement_object& s : settle_index )
       total_balances[s.balance.asset_id] += s.balance.amount;
+   for( const collateral_bid_object& b : bids )
+      total_balances[b.inv_swan_price.base.asset_id] += b.inv_swan_price.base.amount;
    for( const account_statistics_object& a : statistics_index )
    {
       reported_core_in_orders += a.total_core_in_orders;
@@ -303,7 +305,7 @@ void database_fixture::open_database()
 {
    if( !data_dir ) {
       data_dir = fc::temp_directory( graphene::utilities::temp_directory_path() );
-      db.open(data_dir->path(), [this]{return genesis_state;});
+      db.open(data_dir->path(), [this]{return genesis_state;}, "test");
    }
 }
 
@@ -869,6 +871,22 @@ void database_fixture::cover(const account_object& who, asset what, asset collat
    verify_asset_supplies(db);
 } FC_CAPTURE_AND_RETHROW( (who.name)(what)(collateral) ) }
 
+void database_fixture::bid_collateral(const account_object& who, const asset& to_bid, const asset& to_cover)
+{ try {
+   set_expiration( db, trx );
+   trx.operations.clear();
+   bid_collateral_operation bid;
+   bid.bidder = who.id;
+   bid.additional_collateral = to_bid;
+   bid.debt_covered = to_cover;
+   trx.operations.push_back(bid);
+   for( auto& op : trx.operations ) db.current_fee_schedule().set_fee(op);
+   trx.validate();
+   db.push_transaction(trx, ~0);
+   trx.operations.clear();
+   verify_asset_supplies(db);
+} FC_CAPTURE_AND_RETHROW( (who.name)(to_bid)(to_cover) ) }
+
 void database_fixture::fund_fee_pool( const account_object& from, const asset_object& asset_to_fund, const share_type amount )
 {
    asset_fund_fee_pool_operation fund;
@@ -1054,6 +1072,24 @@ vector< operation_history_object > database_fixture::get_operation_history( acco
       if(node->next == account_transaction_history_id_type())
          break;
       node = db.find(node->next);
+   }
+   return result;
+}
+
+vector< graphene::market_history::order_history_object > database_fixture::get_market_order_history( asset_id_type a, asset_id_type b )const
+{
+   const auto& history_idx = db.get_index_type<graphene::market_history::history_index>().indices().get<graphene::market_history::by_key>();
+   graphene::market_history::history_key hkey;
+   if( a > b ) std::swap(a,b);
+   hkey.base = a;
+   hkey.quote = b;
+   hkey.sequence = std::numeric_limits<int64_t>::min();
+   auto itr = history_idx.lower_bound( hkey );
+   vector<graphene::market_history::order_history_object> result;
+   while( itr != history_idx.end())
+   {
+       result.push_back( *itr );
+       ++itr;
    }
    return result;
 }

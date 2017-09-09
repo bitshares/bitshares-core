@@ -158,16 +158,64 @@ namespace graphene { namespace chain {
       share_type      calculate_fee(const fee_parameters_type& k)const { return 0; }
    };
 
+   /**
+    *  @ingroup operations
+    *
+    *  This operation can be used after a black swan to bid collateral for
+    *  taking over part of the debt and the settlement_fund (see BSIP-0018).
+    */
+   struct bid_collateral_operation : public base_operation
+   {
+      /** should be equivalent to call_order_update fee */
+      struct fee_parameters_type { uint64_t fee = 20 * GRAPHENE_BLOCKCHAIN_PRECISION; };
+
+      asset               fee;
+      account_id_type     bidder; ///< pays fee and additional collateral
+      asset               additional_collateral; ///< the amount of collateral to bid for the debt
+      asset               debt_covered; ///< the amount of debt to take over
+      extensions_type     extensions;
+
+      account_id_type fee_payer()const { return bidder; }
+      void            validate()const;
+   };
+
+   /**
+    * @ingroup operations
+    *
+    * @note This is a virtual operation that is created while reviving a
+    * bitasset from collateral bids.
+    */
+   struct execute_bid_operation : public base_operation
+   {
+      struct fee_parameters_type {};
+
+      execute_bid_operation(){}
+      execute_bid_operation( account_id_type a, asset d, asset c )
+         : bidder(a), debt(d), collateral(c) {}
+
+      account_id_type     bidder;
+      asset               debt;
+      asset               collateral;
+      asset               fee;
+
+      account_id_type fee_payer()const { return bidder; }
+      void            validate()const { FC_ASSERT( !"virtual operation" ); }
+
+      /// This is a virtual operation; there is no fee
+      share_type      calculate_fee(const fee_parameters_type& k)const { return 0; }
+   };
 } } // graphene::chain
 
 FC_REFLECT( graphene::chain::limit_order_create_operation::fee_parameters_type, (fee) )
 FC_REFLECT( graphene::chain::limit_order_cancel_operation::fee_parameters_type, (fee) )
 FC_REFLECT( graphene::chain::call_order_update_operation::fee_parameters_type, (fee) )
-/// THIS IS THE ONLY VIRTUAL OPERATION THUS FAR... 
-FC_REFLECT( graphene::chain::fill_order_operation::fee_parameters_type,  )
-
+FC_REFLECT( graphene::chain::bid_collateral_operation::fee_parameters_type, (fee) )
+FC_REFLECT( graphene::chain::fill_order_operation::fee_parameters_type,  ) // VIRTUAL
+FC_REFLECT( graphene::chain::execute_bid_operation::fee_parameters_type,  ) // VIRTUAL
 
 FC_REFLECT( graphene::chain::limit_order_create_operation,(fee)(seller)(amount_to_sell)(min_to_receive)(expiration)(fill_or_kill)(extensions))
 FC_REFLECT( graphene::chain::limit_order_cancel_operation,(fee)(fee_paying_account)(order)(extensions) )
 FC_REFLECT( graphene::chain::call_order_update_operation, (fee)(funding_account)(delta_collateral)(delta_debt)(extensions) )
 FC_REFLECT( graphene::chain::fill_order_operation, (fee)(order_id)(account_id)(pays)(receives) )
+FC_REFLECT( graphene::chain::bid_collateral_operation, (fee)(bidder)(additional_collateral)(debt_covered)(extensions) )
+FC_REFLECT( graphene::chain::execute_bid_operation, (fee)(bidder)(debt)(collateral) )

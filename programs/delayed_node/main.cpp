@@ -160,6 +160,9 @@ int main(int argc, char** argv) {
          elog("Error parsing configuration file: ${e}", ("e", e.what()));
          return 1;
       }
+      if( !options.count("plugins") )
+         options.insert( std::make_pair( "plugins", bpo::variable_value(std::string("delayed_node account_history market_history"), true) ) );
+
       node.initialize(data_dir, options);
       node.initialize_plugins( options );
 

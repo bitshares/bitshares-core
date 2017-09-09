@@ -59,12 +59,16 @@ object_id_type withdraw_permission_create_evaluator::do_apply(const operation_ty
 void_result withdraw_permission_claim_evaluator::do_evaluate(const withdraw_permission_claim_evaluator::operation_type& op)
 { try {
    const database& d = db();
+   time_point_sec head_block_time = d.head_block_time();
 
    const withdraw_permission_object& permit = op.withdraw_permission(d);
-   FC_ASSERT(permit.expiration > d.head_block_time() );
+   FC_ASSERT(permit.expiration > head_block_time);
    FC_ASSERT(permit.authorized_account == op.withdraw_to_account);
    FC_ASSERT(permit.withdraw_from_account == op.withdraw_from_account);
-   FC_ASSERT(op.amount_to_withdraw <= permit.available_this_period( d.head_block_time() ) );
+   if (head_block_time >= HARDFORK_23_TIME) {
+      FC_ASSERT(permit.period_start_time <= head_block_time);
+   }
+   FC_ASSERT(op.amount_to_withdraw <= permit.available_this_period( head_block_time ) );
    FC_ASSERT(d.get_balance(op.withdraw_from_account, op.amount_to_withdraw.asset_id) >= op.amount_to_withdraw);
 
    const asset_object& _asset = op.amount_to_withdraw.asset_id(d);

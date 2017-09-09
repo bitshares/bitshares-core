@@ -68,7 +68,7 @@ BOOST_AUTO_TEST_CASE( genesis_and_persistence_bench )
 
       {
          database db;
-         db.open(data_dir.path(), [&]{return genesis_state;});
+         db.open(data_dir.path(), [&]{return genesis_state;}, "test");
 
          for( int i = 11; i < account_count + 11; ++i)
             BOOST_CHECK(db.get_balance(account_id_type(i), asset_id_type()).amount == GRAPHENE_MAX_SHARE_SUPPLY / account_count);
@@ -81,7 +81,7 @@ BOOST_AUTO_TEST_CASE( genesis_and_persistence_bench )
          database db;
 
          fc::time_point start_time = fc::time_point::now();
-         db.open(data_dir.path(), [&]{return genesis_state;});
+         db.open(data_dir.path(), [&]{return genesis_state;}, "test");
          ilog("Opened database in ${t} milliseconds.", ("t", (fc::time_point::now() - start_time).count() / 1000));
 
          for( int i = 11; i < account_count + 11; ++i)
@@ -116,7 +116,7 @@ BOOST_AUTO_TEST_CASE( genesis_and_persistence_bench )
 
          auto start_time = fc::time_point::now();
          wlog( "about to start reindex..." );
-         db.reindex(data_dir.path(), genesis_state);
+         db.open(data_dir.path(), [&]{return genesis_state;}, "force_wipe");
          ilog("Replayed database in ${t} milliseconds.", ("t", (fc::time_point::now() - start_time).count() / 1000));
 
          for( int i = 0; i < blocks_to_produce; ++i )
