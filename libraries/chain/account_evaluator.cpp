@@ -325,14 +325,14 @@ void_result account_update_evaluator::do_apply( const account_update_operation& 
       sa_after = a.has_special_authority();
    });
 
-   if( sa_before & (!sa_after) )
+   if( sa_before && (!sa_after) )
    {
       const auto& sa_idx = d.get_index_type< special_authority_index >().indices().get<by_account>();
       auto sa_it = sa_idx.find( o.account );
       assert( sa_it != sa_idx.end() );
       d.remove( *sa_it );
    }
-   else if( (!sa_before) & sa_after )
+   else if( (!sa_before) && sa_after )
    {
       d.create< special_authority_object >( [&]( special_authority_object& sa )
       {

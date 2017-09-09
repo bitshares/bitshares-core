@@ -2431,7 +2431,7 @@ public:
          "to access the network API on the witness_node you are\n"
          "connecting to.  Please follow the instructions in README.md to set up an apiaccess file.\n"
          "\n";
-         throw(e);
+         throw;
       }
    }
 
