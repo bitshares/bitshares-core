@@ -85,7 +85,7 @@ BOOST_AUTO_TEST_CASE(get_account_history) {
    } catch (fc::exception &e) {
       edump((e.to_detail_string()));
       throw;
-   } FC_LOG_AND_RETHROW()
+   }
 }
 
 BOOST_AUTO_TEST_CASE(get_account_history_operations) {
@@ -131,7 +131,7 @@ BOOST_AUTO_TEST_CASE(get_account_history_operations) {
    } catch (fc::exception &e) {
       edump((e.to_detail_string()));
       throw;
-   } FC_LOG_AND_RETHROW()
+   }
 }
 
 BOOST_AUTO_TEST_SUITE_END()

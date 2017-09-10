@@ -45,6 +45,8 @@
 using namespace graphene::chain;
 using namespace graphene::chain::test;
 
+#define UIA_TEST_SYMBOL "UIATEST"
+
 BOOST_FIXTURE_TEST_SUITE( operation_tests, database_fixture )
 
 BOOST_AUTO_TEST_CASE( feed_limit_logic_test )
@@ -88,6 +90,7 @@ BOOST_AUTO_TEST_CASE( call_order_update_test )
       update_feed_producers( bitusd, {sam.id} );
 
       price_feed current_feed; current_feed.settlement_price = bitusd.amount( 100 ) / core.amount(100);
+      current_feed.maintenance_collateral_ratio = 1750; // need to set this explicitly, testnet has a different default
       publish_feed( bitusd, sam, current_feed );
 
       FC_ASSERT( bitusd.bitasset_data(db).current_feed.settlement_price == current_feed.settlement_price );
@@ -181,6 +184,8 @@ BOOST_AUTO_TEST_CASE( margin_call_limit_test )
 
       price_feed current_feed;
       current_feed.settlement_price = bitusd.amount( 100 ) / core.amount(100);
+      current_feed.maintenance_collateral_ratio = 1750; // need to set this explicitly, testnet has a different default
+      current_feed.maximum_short_squeeze_ratio  = 1500; // need to set this explicitly, testnet has a different default
 
       // starting out with price 1:1
       publish_feed( bitusd, feedproducer, current_feed );
@@ -320,6 +325,8 @@ BOOST_AUTO_TEST_CASE( create_account_test )
       REQUIRE_THROW_WITH_VALUE(op, options.voting_account, account_id_type(999999999));
 
       // Not allow voting for non-exist entities.
+      auto save_num_committee = op.options.num_committee;
+      auto save_num_witness = op.options.num_witness;
       op.options.num_committee = 1;
       op.options.num_witness = 0;
       REQUIRE_THROW_WITH_VALUE(op, options.votes, boost::assign::list_of<vote_id_type>(vote_id_type("0:1")).convert_to_container<flat_set<vote_id_type>>());
@@ -328,7 +335,8 @@ BOOST_AUTO_TEST_CASE( create_account_test )
       REQUIRE_THROW_WITH_VALUE(op, options.votes, boost::assign::list_of<vote_id_type>(vote_id_type("1:19")).convert_to_container<flat_set<vote_id_type>>());
       op.options.num_witness = 0;
       REQUIRE_THROW_WITH_VALUE(op, options.votes, boost::assign::list_of<vote_id_type>(vote_id_type("2:19")).convert_to_container<flat_set<vote_id_type>>());
-      op.options.num_committee = 4;
+      op.options.num_committee = save_num_committee;
+      op.options.num_witness = save_num_witness;
 
       auto auth_bak = op.owner;
       op.owner.add_authority(account_id_type(9999999999), 10);
@@ -561,7 +569,7 @@ BOOST_AUTO_TEST_CASE( create_uia )
       asset_create_operation creator;
       creator.issuer = account_id_type();
       creator.fee = asset();
-      creator.symbol = "TEST";
+      creator.symbol = UIA_TEST_SYMBOL;
       creator.common_options.max_supply = 100000000;
       creator.precision = 2;
       creator.common_options.market_fee_percent = GRAPHENE_MAX_MARKET_FEE_PERCENT/100; /*1%*/
@@ -572,7 +580,7 @@ BOOST_AUTO_TEST_CASE( create_uia )
       PUSH_TX( db, trx, ~0 );
 
       const asset_object& test_asset = test_asset_id(db);
-      BOOST_CHECK(test_asset.symbol == "TEST");
+      BOOST_CHECK(test_asset.symbol == UIA_TEST_SYMBOL);
       BOOST_CHECK(asset(1, test_asset_id) * test_asset.options.core_exchange_rate == asset(2));
       BOOST_CHECK((test_asset.options.flags & white_list) == 0);
       BOOST_CHECK(test_asset.options.max_supply == 100000000);
@@ -610,7 +618,7 @@ BOOST_AUTO_TEST_CASE( update_uia )
    using namespace graphene;
    try {
       INVOKE(create_uia);
-      const auto& test = get_asset("TEST");
+      const auto& test = get_asset(UIA_TEST_SYMBOL);
       const auto& nathan = create_account("nathan");
 
       asset_update_operation op;
@@ -687,7 +695,7 @@ BOOST_AUTO_TEST_CASE( issue_uia )
       INVOKE(create_uia);
       INVOKE(create_account_test);
 
-      const asset_object& test_asset = *db.get_index_type<asset_index>().indices().get<by_symbol>().find("TEST");
+      const asset_object& test_asset = *db.get_index_type<asset_index>().indices().get<by_symbol>().find(UIA_TEST_SYMBOL);
       const account_object& nathan_account = *db.get_index_type<account_index>().indices().get<by_name>().find("nathan");
 
       asset_issue_operation op;
@@ -726,7 +734,7 @@ BOOST_AUTO_TEST_CASE( transfer_uia )
    try {
       INVOKE(issue_uia);
 
-      const asset_object& uia = *db.get_index_type<asset_index>().indices().get<by_symbol>().find("TEST");
+      const asset_object& uia = *db.get_index_type<asset_index>().indices().get<by_symbol>().find(UIA_TEST_SYMBOL);
       const account_object& nathan = *db.get_index_type<account_index>().indices().get<by_name>().find("nathan");
       const account_object& committee = account_id_type()(db);
 
@@ -754,7 +762,7 @@ BOOST_AUTO_TEST_CASE( transfer_uia )
 BOOST_AUTO_TEST_CASE( create_buy_uia_multiple_match_new )
 { try {
    INVOKE( issue_uia );
-   const asset_object&   core_asset     = get_asset( "TEST" );
+   const asset_object&   core_asset     = get_asset( UIA_TEST_SYMBOL );
    const asset_object&   test_asset     = get_asset( GRAPHENE_SYMBOL );
    const account_object& nathan_account = get_account( "nathan" );
    const account_object& buyer_account  = create_account( "buyer" );
@@ -794,7 +802,7 @@ BOOST_AUTO_TEST_CASE( create_buy_uia_multiple_match_new )
 BOOST_AUTO_TEST_CASE( create_buy_exact_match_uia )
 { try {
    INVOKE( issue_uia );
-   const asset_object&   test_asset     = get_asset( "TEST" );
+   const asset_object&   test_asset     = get_asset( UIA_TEST_SYMBOL );
    const asset_object&   core_asset     = get_asset( GRAPHENE_SYMBOL );
    const account_object& nathan_account = get_account( "nathan" );
    const account_object& buyer_account  = create_account( "buyer" );
@@ -835,7 +843,7 @@ BOOST_AUTO_TEST_CASE( create_buy_exact_match_uia )
 BOOST_AUTO_TEST_CASE( create_buy_uia_multiple_match_new_reverse )
 { try {
    INVOKE( issue_uia );
-   const asset_object&   test_asset     = get_asset( "TEST" );
+   const asset_object&   test_asset     = get_asset( UIA_TEST_SYMBOL );
    const asset_object&   core_asset     = get_asset( GRAPHENE_SYMBOL );
    const account_object& nathan_account = get_account( "nathan" );
    const account_object& buyer_account  = create_account( "buyer" );
@@ -875,7 +883,7 @@ BOOST_AUTO_TEST_CASE( create_buy_uia_multiple_match_new_reverse )
 BOOST_AUTO_TEST_CASE( create_buy_uia_multiple_match_new_reverse_fract )
 { try {
    INVOKE( issue_uia );
-   const asset_object&   test_asset     = get_asset( "TEST" );
+   const asset_object&   test_asset     = get_asset( UIA_TEST_SYMBOL );
    const asset_object&   core_asset     = get_asset( GRAPHENE_SYMBOL );
    const account_object& nathan_account = get_account( "nathan" );
    const account_object& buyer_account  = create_account( "buyer" );
@@ -923,7 +931,7 @@ BOOST_AUTO_TEST_CASE( uia_fees )
 
       enable_fees();
 
-      const asset_object& test_asset = get_asset("TEST");
+      const asset_object& test_asset = get_asset(UIA_TEST_SYMBOL);
       const asset_dynamic_data_object& asset_dynamic = test_asset.dynamic_asset_data_id(db);
       const account_object& nathan_account = get_account("nathan");
       const account_object& committee_account = account_id_type()(db);
@@ -986,7 +994,7 @@ BOOST_AUTO_TEST_CASE( uia_fees )
 BOOST_AUTO_TEST_CASE( cancel_limit_order_test )
 { try {
    INVOKE( issue_uia );
-   const asset_object&   test_asset     = get_asset( "TEST" );
+   const asset_object&   test_asset     = get_asset( UIA_TEST_SYMBOL );
    const account_object& buyer_account  = create_account( "buyer" );
 
    transfer( committee_account(db), buyer_account, asset( 10000 ) );
@@ -1076,8 +1084,10 @@ BOOST_AUTO_TEST_CASE( trade_amount_equals_zero )
       generate_blocks( HARDFORK_555_TIME );
       set_expiration( db, trx );
 
-      const asset_object& test = get_asset( "TEST" );
+      const asset_object& test = get_asset( UIA_TEST_SYMBOL );
+      const asset_id_type test_id = test.id;
       const asset_object& core = get_asset( GRAPHENE_SYMBOL );
+      const asset_id_type core_id = core.id;
       const account_object& core_seller = create_account( "shorter1" );
       const account_object& core_buyer = get_account("nathan");
 
@@ -1102,7 +1112,7 @@ BOOST_AUTO_TEST_CASE( trade_amount_equals_zero )
 
        //TODO: This will fail because of something-for-nothing bug(#345)
        // Must be fixed with a hardfork
-      auto result = get_market_order_history(core.id, test.id);
+      auto result = get_market_order_history(core_id, test_id);
       BOOST_CHECK_EQUAL(result.size(), 2);
       BOOST_CHECK(result[0].op.pays == core.amount(1));
       BOOST_CHECK(result[0].op.receives == test.amount(2));
@@ -1123,7 +1133,7 @@ BOOST_AUTO_TEST_CASE( limit_order_fill_or_kill )
 { try {
    INVOKE(issue_uia);
    const account_object& nathan = get_account("nathan");
-   const asset_object& test = get_asset("TEST");
+   const asset_object& test = get_asset(UIA_TEST_SYMBOL);
    const asset_object& core = asset_id_type()(db);
 
    limit_order_create_operation op;
@@ -1275,7 +1285,7 @@ BOOST_AUTO_TEST_CASE( reserve_asset_test )
    {
       ACTORS((alice)(bob)(sam)(judge));
       const auto& basset = create_bitasset("USDBIT", judge_id);
-      const auto& uasset = create_user_issued_asset("TEST");
+      const auto& uasset = create_user_issued_asset(UIA_TEST_SYMBOL);
       const auto& passet = create_prediction_market("PMARK", judge_id);
       const auto& casset = asset_id_type()(db);
 
@@ -1320,6 +1330,7 @@ BOOST_AUTO_TEST_CASE( reserve_asset_test )
       update_feed_producers( basset, {sam.id} );
       price_feed current_feed;
       current_feed.settlement_price = basset.amount( 2 ) / casset.amount(100);
+      current_feed.maintenance_collateral_ratio = 1750; // need to set this explicitly, testnet has a different default
       publish_feed( basset, sam, current_feed );
       borrow( alice_id, basset.amount( init_balance ), casset.amount( 100*init_balance ) );
       BOOST_CHECK_EQUAL( get_balance( alice, basset ), init_balance );
@@ -1438,7 +1449,7 @@ BOOST_AUTO_TEST_CASE( vesting_balance_create_test )
    INVOKE( create_uia );
 
    const asset_object& core = asset_id_type()(db);
-   const asset_object& test_asset = get_asset("TEST");
+   const asset_object& test_asset = get_asset(UIA_TEST_SYMBOL);
 
    vesting_balance_create_operation op;
    op.fee = core.amount( 0 );
@@ -1489,7 +1500,7 @@ BOOST_AUTO_TEST_CASE( vesting_balance_withdraw_test )
    generate_block();
 
    const asset_object& core = asset_id_type()(db);
-   const asset_object& test_asset = get_asset( "TEST" );
+   const asset_object& test_asset = get_asset( UIA_TEST_SYMBOL );
 
    vesting_balance_withdraw_operation op;
    op.fee = core.amount( 0 );

@@ -2431,7 +2431,7 @@ public:
          "to access the network API on the witness_node you are\n"
          "connecting to.  Please follow the instructions in README.md to set up an apiaccess file.\n"
          "\n";
-         throw(e);
+         throw;
       }
    }
 
@@ -2776,7 +2776,7 @@ vector<operation_detail> wallet_api::get_account_history(string name, int limit)
          auto memo = o.op.visit(detail::operation_printer(ss, *my, o.result));
          result.push_back( operation_detail{ memo, ss.str(), o } );
       }
-      if( current.size() < std::min(100,limit) )
+      if( int(current.size()) < std::min(100,limit) )
          break;
       limit -= current.size();
    }

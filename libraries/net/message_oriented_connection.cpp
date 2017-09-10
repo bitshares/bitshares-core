@@ -180,8 +180,8 @@ namespace graphene { namespace net {
             _delegate->on_message(_self, m);
           }
           /// Dedicated catches needed to distinguish from general fc::exception
-          catch ( const fc::canceled_exception& e ) { throw e; }
-          catch ( const fc::eof_exception& e ) { throw e; }
+          catch ( const fc::canceled_exception& e ) { throw; }
+          catch ( const fc::eof_exception& e ) { throw; }
           catch ( const fc::exception& e)
           {
             /// Here loop should be continued so exception should be just caught locally.

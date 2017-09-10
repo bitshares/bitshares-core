@@ -385,9 +385,6 @@ namespace detail {
          }
          _chain_db->add_checkpoints( loaded_checkpoints );
 
-         bool replay = false;
-         std::string replay_reason = "reason not provided";
-
          if( _options->count("replay-blockchain") )
             _chain_db->wipe( _data_dir / "blockchain", false );
 

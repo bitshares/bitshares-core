@@ -96,6 +96,7 @@ struct swan_fixture : database_fixture {
 
     void set_feed(share_type usd, share_type core) {
         price_feed feed;
+        feed.maintenance_collateral_ratio = 1750; // need to set this explicitly, testnet has a different default
         feed.settlement_price = swan().amount(usd) / back().amount(core);
         publish_feed(swan(), feedproducer(), feed);
     }

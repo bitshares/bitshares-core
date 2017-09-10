@@ -49,7 +49,7 @@ genesis_state_type make_genesis() {
 
    auto init_account_priv_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("null_key")));
    genesis_state.initial_active_witnesses = 10;
-   for( int i = 0; i < genesis_state.initial_active_witnesses; ++i )
+   for( unsigned int i = 0; i < genesis_state.initial_active_witnesses; ++i )
    {
       auto name = "init"+fc::to_string(i);
       genesis_state.initial_accounts.emplace_back(name,
@@ -722,7 +722,7 @@ BOOST_FIXTURE_TEST_CASE( limit_order_expiration, database_fixture )
    //Get a sane head block time
    generate_block();
 
-   auto* test = &create_bitasset("TEST");
+   auto* test = &create_bitasset("MIATEST");
    auto* core = &asset_id_type()(db);
    auto* nathan = &create_account("nathan");
    auto* committee = &account_id_type()(db);
@@ -751,7 +751,7 @@ BOOST_FIXTURE_TEST_CASE( limit_order_expiration, database_fixture )
    auto id = limit_itr->id;
 
    generate_blocks(op.expiration, false);
-   test = &get_asset("TEST");
+   test = &get_asset("MIATEST");
    core = &asset_id_type()(db);
    nathan = &get_account("nathan");
    committee = &account_id_type()(db);
@@ -1068,7 +1068,8 @@ BOOST_FIXTURE_TEST_CASE( transaction_invalidated_in_cache, database_fixture )
       while( db2.head_block_num() < db.head_block_num() )
       {
          optional< signed_block > b = db.fetch_block_by_number( db2.head_block_num()+1 );
-         db2.push_block(*b, database::skip_witness_signature);
+         db2.push_block(*b, database::skip_witness_signature
+                           |database::skip_authority_check );
       }
       BOOST_CHECK( db2.get( alice_id ).name == "alice" );
       BOOST_CHECK( db2.get( bob_id ).name == "bob" );
