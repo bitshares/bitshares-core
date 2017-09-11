@@ -13,6 +13,7 @@ endif()
 target_link_libraries(
    witness_node
    PRIVATE graphene_app
+   graphene_delayed_node
    graphene_account_history
    graphene_market_history
    graphene_hello

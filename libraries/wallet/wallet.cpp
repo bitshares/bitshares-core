@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015 Cryptonomex, Inc., and contributors.
+ * Copyright (c) 2017 Cryptonomex, Inc., and contributors.
  *
  * The MIT License
  *
@@ -1333,6 +1333,29 @@ public:
       return sign_transaction( tx, broadcast );
    } FC_CAPTURE_AND_RETHROW( (account_to_settle)(amount_to_settle)(symbol)(broadcast) ) }
 
+   signed_transaction bid_collateral(string bidder_name,
+                                     string debt_amount, string debt_symbol,
+                                     string additional_collateral,
+                                     bool broadcast )
+   { try {
+      optional<asset_object> debt_asset = find_asset(debt_symbol);
+      if (!debt_asset)
+        FC_THROW("No asset with that symbol exists!");
+      const asset_object& collateral = get_asset(get_object(*debt_asset->bitasset_data_id).options.short_backing_asset);
+
+      bid_collateral_operation op;
+      op.bidder = get_account_id(bidder_name);
+      op.debt_covered = debt_asset->amount_from_string(debt_amount);
+      op.additional_collateral = collateral.amount_from_string(additional_collateral);
+
+      signed_transaction tx;
+      tx.operations.push_back( op );
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees);
+      tx.validate();
+
+      return sign_transaction( tx, broadcast );
+   } FC_CAPTURE_AND_RETHROW( (bidder_name)(debt_amount)(debt_symbol)(additional_collateral)(broadcast) ) }
+
    signed_transaction whitelist_account(string authorizing_account,
                                         string account_to_list,
                                         account_whitelist_operation::account_listing new_listing_status,
@@ -1794,74 +1817,12 @@ public:
 
    signed_transaction sign_transaction(signed_transaction tx, bool broadcast = false)
    {
-      flat_set<account_id_type> req_active_approvals;
-      flat_set<account_id_type> req_owner_approvals;
-      vector<authority>         other_auths;
-
-      tx.get_required_authorities( req_active_approvals, req_owner_approvals, other_auths );
-
-      for( const auto& auth : other_auths )
-         for( const auto& a : auth.account_auths )
-            req_active_approvals.insert(a.first);
-
-      // std::merge lets us de-duplicate account_id's that occur in both
-      //   sets, and dump them into a vector (as required by remote_db api)
-      //   at the same time
-      vector<account_id_type> v_approving_account_ids;
-      std::merge(req_active_approvals.begin(), req_active_approvals.end(),
-                 req_owner_approvals.begin() , req_owner_approvals.end(),
-                 std::back_inserter(v_approving_account_ids));
-
-      /// TODO: fetch the accounts specified via other_auths as well.
-
-      vector< optional<account_object> > approving_account_objects =
-            _remote_db->get_accounts( v_approving_account_ids );
-
-      /// TODO: recursively check one layer deeper in the authority tree for keys
-
-      FC_ASSERT( approving_account_objects.size() == v_approving_account_ids.size() );
-
-      flat_map<account_id_type, account_object*> approving_account_lut;
-      size_t i = 0;
-      for( optional<account_object>& approving_acct : approving_account_objects )
-      {
-         if( !approving_acct.valid() )
-         {
-            wlog( "operation_get_required_auths said approval of non-existing account ${id} was needed",
-                  ("id", v_approving_account_ids[i]) );
-            i++;
-            continue;
-         }
-         approving_account_lut[ approving_acct->id ] = &(*approving_acct);
-         i++;
-      }
-
-      flat_set<public_key_type> approving_key_set;
-      for( account_id_type& acct_id : req_active_approvals )
-      {
-         const auto it = approving_account_lut.find( acct_id );
-         if( it == approving_account_lut.end() )
-            continue;
-         const account_object* acct = it->second;
-         vector<public_key_type> v_approving_keys = acct->active.get_keys();
-         for( const public_key_type& approving_key : v_approving_keys )
-            approving_key_set.insert( approving_key );
-      }
-      for( account_id_type& acct_id : req_owner_approvals )
-      {
-         const auto it = approving_account_lut.find( acct_id );
-         if( it == approving_account_lut.end() )
-            continue;
-         const account_object* acct = it->second;
-         vector<public_key_type> v_approving_keys = acct->owner.get_keys();
-         for( const public_key_type& approving_key : v_approving_keys )
-            approving_key_set.insert( approving_key );
-      }
-      for( const authority& a : other_auths )
-      {
-         for( const auto& k : a.key_auths )
-            approving_key_set.insert( k.first );
-      }
+      set<public_key_type> pks = _remote_db->get_potential_signatures( tx );
+      flat_set<public_key_type> owned_keys;
+      owned_keys.reserve( pks.size() );
+      std::copy_if( pks.begin(), pks.end(), std::inserter(owned_keys, owned_keys.end()),
+                    [this](const public_key_type& pk){ return _keys.find(pk) != _keys.end(); } );
+      set<public_key_type> approving_key_set = _remote_db->get_required_signatures( tx, owned_keys );
 
       auto dyn_props = get_dynamic_global_properties();
       tx.set_reference_block( dyn_props.head_block_id );
@@ -1881,20 +1842,8 @@ public:
          tx.set_expiration( dyn_props.time + fc::seconds(30 + expiration_time_offset) );
          tx.signatures.clear();
 
-         for( public_key_type& key : approving_key_set )
-         {
-            auto it = _keys.find(key);
-            if( it != _keys.end() )
-            {
-               fc::optional<fc::ecc::private_key> privkey = wif_to_key( it->second );
-               FC_ASSERT( privkey.valid(), "Malformed private key in _keys" );
-               tx.sign( *privkey, _chain_id );
-            }
-            /// TODO: if transaction has enough signatures to be "valid" don't add any more,
-            /// there are cases where the wallet may have more keys than strictly necessary and
-            /// the transaction will be rejected if the transaction validates without requiring
-            /// all signatures provided
-         }
+         for( const public_key_type& key : approving_key_set )
+            tx.sign( get_private_key(key), _chain_id );
 
          graphene::chain::transaction_id_type this_transaction_id = tx.id();
          auto iter = _recently_generated_transactions.find(this_transaction_id);
@@ -2224,7 +2173,7 @@ public:
             << "\n====================================================================================="
             << "|=====================================================================================\n";
 
-         for (int i = 0; i < bids.size() || i < asks.size() ; i++)
+         for (unsigned int i = 0; i < bids.size() || i < asks.size() ; i++)
          {
             if ( i < bids.size() )
             {
@@ -2482,7 +2431,7 @@ public:
          "to access the network API on the witness_node you are\n"
          "connecting to.  Please follow the instructions in README.md to set up an apiaccess file.\n"
          "\n";
-         throw(e);
+         throw;
       }
    }
 
@@ -2827,7 +2776,7 @@ vector<operation_detail> wallet_api::get_account_history(string name, int limit)
          auto memo = o.op.visit(detail::operation_printer(ss, *my, o.result));
          result.push_back( operation_detail{ memo, ss.str(), o } );
       }
-      if( current.size() < std::min(100,limit) )
+      if( int(current.size()) < std::min(100,limit) )
          break;
       limit -= current.size();
    }
@@ -2837,11 +2786,16 @@ vector<operation_detail> wallet_api::get_account_history(string name, int limit)
 
 vector<operation_detail> wallet_api::get_relative_account_history(string name, uint32_t stop, int limit, uint32_t start)const
 {
-   
-   FC_ASSERT( start > 0 || limit <= 100 );
-   
    vector<operation_detail> result;
    auto account_id = get_account(name).get_id();
+
+   const account_object& account = my->get_account(account_id);
+   const account_statistics_object& stats = my->get_object(account.statistics);
+
+   if(start == 0)
+       start = stats.total_ops;
+   else
+      start = std::min<uint32_t>(start, stats.total_ops);
 
    while( limit > 0 )
    {
@@ -2878,6 +2832,11 @@ vector<call_order_object> wallet_api::get_call_orders(string a, uint32_t limit)c
 vector<force_settlement_object> wallet_api::get_settle_orders(string a, uint32_t limit)const
 {
    return my->_remote_db->get_settle_orders(get_asset(a).id, limit);
+}
+
+vector<collateral_bid_object> wallet_api::get_collateral_bids(string asset, uint32_t limit, uint32_t start)const
+{
+   return my->_remote_db->get_collateral_bids(get_asset(asset).id, limit, start);
 }
 
 brain_key_info wallet_api::suggest_brain_key()const
@@ -3276,6 +3235,14 @@ signed_transaction wallet_api::settle_asset(string account_to_settle,
                                             bool broadcast /* = false */)
 {
    return my->settle_asset(account_to_settle, amount_to_settle, symbol, broadcast);
+}
+
+signed_transaction wallet_api::bid_collateral(string bidder_name,
+                                              string debt_amount, string debt_symbol,
+                                              string additional_collateral,
+                                              bool broadcast )
+{
+   return my->bid_collateral(bidder_name, debt_amount, debt_symbol, additional_collateral, broadcast);
 }
 
 signed_transaction wallet_api::whitelist_account(string authorizing_account,

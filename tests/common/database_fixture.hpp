@@ -29,6 +29,7 @@
 #include <fc/smart_ref_impl.hpp>
 
 #include <graphene/chain/operation_history_object.hpp>
+#include <graphene/market_history/market_history_plugin.hpp>
 
 #include <iostream>
 
@@ -214,6 +215,7 @@ struct database_fixture {
    void cover(account_id_type who, asset what, asset collateral_freed)
    { cover(who(db), what, collateral_freed); }
    void cover(const account_object& who, asset what, asset collateral_freed);
+   void bid_collateral(const account_object& who, const asset& to_bid, const asset& to_cover);
 
    const asset_object& get_asset( const string& symbol )const;
    const account_object& get_account( const string& name )const;
@@ -281,6 +283,7 @@ struct database_fixture {
    int64_t get_balance( account_id_type account, asset_id_type a )const;
    int64_t get_balance( const account_object& account, const asset_object& a )const;
    vector< operation_history_object > get_operation_history( account_id_type account_id )const;
+   vector< graphene::market_history::order_history_object > get_market_order_history( asset_id_type a, asset_id_type b )const;
 };
 
 namespace test {

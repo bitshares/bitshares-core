@@ -58,7 +58,7 @@ delayed_node_plugin::~delayed_node_plugin()
 void delayed_node_plugin::plugin_set_program_options(bpo::options_description& cli, bpo::options_description& cfg)
 {
    cli.add_options()
-         ("trusted-node", boost::program_options::value<std::string>()->required(), "RPC endpoint of a trusted validating node (required)")
+         ("trusted-node", boost::program_options::value<std::string>(), "RPC endpoint of a trusted validating node (required)")
          ;
    cfg.add(cli);
 }
@@ -74,6 +74,7 @@ void delayed_node_plugin::connect()
 
 void delayed_node_plugin::plugin_initialize(const boost::program_options::variables_map& options)
 {
+   FC_ASSERT(options.count("trusted-node") > 0);
    my->remote_endpoint = "ws://" + options.at("trusted-node").as<std::string>();
 }
 
