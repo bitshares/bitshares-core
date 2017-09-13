@@ -316,8 +316,12 @@ namespace graphene { namespace app {
              node = nullptr;
           else node = &node->next(db);
        }
-       if( stop.instance.value == 0 && account_transaction_history_id_type()(db).account == account && result.size() < limit )
-          result.push_back( account_transaction_history_id_type()(db).operation_id(db) );
+       if( stop.instance.value == 0 && result.size() < limit )
+       {
+          node = db.find(account_transaction_history_id_type());
+          if( node )
+             result.push_back( node->operation_id(db) );
+       }
        return result;
     }
 
