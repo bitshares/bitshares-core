@@ -164,6 +164,7 @@ namespace detail {
                "seed.testnet.bitshares.eu:1776",   // BitShares Europe
                "176.9.148.19:16543",               // Uptick.rocks
                "31.171.251.20:1776",               // @Taconator
+               "23.92.53.25:11010",                // sahkan
             };
             for( const string& endpoint_string : seeds )
             {
