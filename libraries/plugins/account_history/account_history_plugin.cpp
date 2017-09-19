@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015 Cryptonomex, Inc., and contributors.
+ * Copyright (c) 2017 Cryptonomex, Inc., and contributors.
  *
  * The MIT License
  *
@@ -36,6 +36,8 @@
 
 #include <fc/smart_ref_impl.hpp>
 #include <fc/thread/thread.hpp>
+
+fc::time_point_sec* ptr = new fc::time_point_sec;
 
 namespace graphene { namespace account_history {
 
@@ -185,6 +187,9 @@ void account_history_plugin_impl::add_account_history( const account_id_type acc
        obj.account = account_id;
        obj.sequence = stats_obj.total_ops + 1;
        obj.next = stats_obj.most_recent_op;
+
+       *ptr = db.head_block_time();
+
    });
    db.modify( stats_obj, [&]( account_statistics_object& obj ){
        obj.most_recent_op = ath.id;
@@ -290,6 +295,10 @@ void account_history_plugin::plugin_startup()
 flat_set<account_id_type> account_history_plugin::tracked_accounts() const
 {
    return my->_tracked_accounts;
+}
+
+fc::time_point_sec get_op_time(const account_transaction_history_object& atho) {
+   return *ptr;
 }
 
 } }
