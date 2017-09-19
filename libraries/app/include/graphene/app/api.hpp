@@ -29,6 +29,7 @@
 #include <graphene/chain/protocol/confidential.hpp>
 
 #include <graphene/market_history/market_history_plugin.hpp>
+#include <graphene/account_history/account_history_plugin.hpp>
 
 #include <graphene/debug_witness/debug_api.hpp>
 
@@ -49,6 +50,7 @@
 namespace graphene { namespace app {
    using namespace graphene::chain;
    using namespace graphene::market_history;
+   using namespace graphene::account_history;
    using namespace fc::ecc;
    using namespace std;
 
@@ -139,24 +141,18 @@ namespace graphene { namespace app {
                                                                         uint32_t start = 0) const;
 
          /**
-          * @breif Get operations from an account using a timerange and operation_type filter
+          * @breif Get operations from an account using a timerange
           * @param account The account whose history should be queried
           * @param time_start Time to start
           * @param time_start Time to end
           * @param limit Maximum number of operations to retrieve (must not exceed 100)
-          * @param seconds_seq Paging helper to browse more than @limit(100) ops in the same second
-          * @param use_operation_filter Turn on filter by operation id
-          * @param operation_type Operation type number to be used when use_operation_filter is on
           * @return A list of filtered operations performed by account, ordered from most oldest to recent
           *
           */
-         map<pair<fc::time_point_sec, uint32_t>, operation_history_object> get_account_history_by_date( account_id_type account,
-                                                                                                        fc::time_point_sec time_start,
-                                                                                                        fc::time_point_sec time_end,
-                                                                                                        unsigned limit,
-                                                                                                        uint32_t seconds_seq,
-                                                                                                        bool use_operation_filter,
-                                                                                                        int operation_type ) const;
+         vector<operation_history_object> get_account_history_by_date( account_id_type account,
+                                                                       fc::time_point_sec time_start,
+                                                                       fc::time_point_sec time_end,
+                                                                       unsigned limit ) const;
 
 
 

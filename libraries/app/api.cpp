@@ -395,39 +395,29 @@ namespace graphene { namespace app {
        return result;
     }
 
-    map<pair<fc::time_point_sec, uint32_t>, operation_history_object> history_api::get_account_history_by_date( account_id_type account,
-                                                                                                                fc::time_point_sec time_start,
-                                                                                                                fc::time_point_sec time_end,
-                                                                                                                unsigned limit,
-                                                                                                                uint32_t seconds_seq,
-                                                                                                                bool use_operation_filter,
-                                                                                                                int operation_type )const
+    vector<operation_history_object> history_api::get_account_history_by_date( account_id_type account,
+                                                                                 fc::time_point_sec time_start,
+                                                                                 fc::time_point_sec time_end,
+                                                                                 unsigned limit )const
     {
        FC_ASSERT( _app.chain_database() );
        const auto& db = *_app.chain_database();
        FC_ASSERT(limit <= 100);
        FC_ASSERT(time_end > time_start);
-       std::map<std::pair<fc::time_point_sec, uint32_t>, operation_history_object> results;
+       vector<operation_history_object> results;
 
        const auto& hist_idx = db.get_index_type<account_transaction_history_index>();
        const auto& by_seq_idx = hist_idx.indices().get<by_time>();
 
-       FC_ASSERT(operation_type < 45);
+       auto itr = by_seq_idx.lower_bound(boost::make_tuple(account, time_start));
 
-       auto itr = by_seq_idx.lower_bound(boost::make_tuple(account, time_start, seconds_seq));
-       while( itr != by_seq_idx.end() && itr->time <= time_end && results.size() < limit )
+       while( itr != by_seq_idx.end() && results.size() < limit && db.fetch_block_by_number(itr->operation_id(db).block_num)->timestamp <= time_end)
        {
-          if(itr->account != account)
-             break;
 
-          if(use_operation_filter) {
-             if(itr->operation_type != operation_type) {
-                ++itr;
-                continue;
-             }
-          }
-          auto key = std::pair<fc::time_point_sec, uint32_t>(itr->time, itr->seconds_seq);
-          results.emplace(make_pair(key, itr->operation_id(db)));
+          if(itr->account != account)
+          break;
+
+          results.push_back( itr->operation_id(db) );
           ++itr;
        }
        return results;

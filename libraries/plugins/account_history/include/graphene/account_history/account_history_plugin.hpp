@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015 Cryptonomex, Inc., and contributors.
+ * Copyright (c) 2017 Cryptonomex, Inc., and contributors.
  *
  * The MIT License
  *
@@ -29,6 +29,10 @@
 #include <graphene/chain/operation_history_object.hpp>
 
 #include <fc/thread/future.hpp>
+
+#include <boost/multi_index/composite_key.hpp>
+#include <boost/multi_index/global_fun.hpp>
+#include <graphene/db/generic_index.hpp>
 
 namespace graphene { namespace account_history {
    using namespace chain;
@@ -81,29 +85,43 @@ class account_history_plugin : public graphene::app::plugin
       std::unique_ptr<detail::account_history_plugin_impl> my;
 };
 
-} } //graphene::account_history
+fc::time_point_sec get_op_time(const account_transaction_history_object& atho);
 
-/*struct by_id;
+struct by_id;
 struct by_seq;
 struct by_op;
-typedef boost::multi_index_container<
-   graphene::chain::account_transaction_history_object,
-   boost::multi_index::indexed_by<
-      boost::multi_index::ordered_unique< tag<by_id>, member< object, object_id_type, &object::id > >,
-      boost::multi_index::ordered_unique< tag<by_seq>,
-         composite_key< account_transaction_history_object,
-            member< account_transaction_history_object, account_id_type, &account_transaction_history_object::account>,
-            member< account_transaction_history_object, uint32_t, &account_transaction_history_object::sequence>
-         >
-      >,
-      boost::multi_index::ordered_unique< tag<by_op>,
-         composite_key< account_transaction_history_object,
-            member< account_transaction_history_object, account_id_type, &account_transaction_history_object::account>,
-            member< account_transaction_history_object, operation_history_id_type, &account_transaction_history_object::operation_id>
-         >
+struct by_opid;
+struct by_time;
+typedef multi_index_container<
+   account_transaction_history_object,
+      indexed_by<
+            ordered_unique< tag<by_id>, member< object, object_id_type, &object::id > >,
+            ordered_unique< tag<by_seq>,
+               composite_key< account_transaction_history_object,
+                  member< account_transaction_history_object, account_id_type, &account_transaction_history_object::account>,
+                  member< account_transaction_history_object, uint32_t, &account_transaction_history_object::sequence>
+               >
+            >,
+            ordered_unique< tag<by_op>,
+               composite_key< account_transaction_history_object,
+                  member< account_transaction_history_object, account_id_type, &account_transaction_history_object::account>,
+                  member< account_transaction_history_object, operation_history_id_type, &account_transaction_history_object::operation_id>
+               >
+            >,
+            ordered_non_unique< tag<by_opid>,
+               member< account_transaction_history_object, operation_history_id_type, &account_transaction_history_object::operation_id>
+            >,
+            ordered_unique< tag<by_time>,
+               composite_key< account_transaction_history_object,
+                  member< account_transaction_history_object, account_id_type, &account_transaction_history_object::account>,
+                  global_fun< const account_transaction_history_object&, fc::time_point_sec, &get_op_time>,
+                  member< account_transaction_history_object, uint32_t, &account_transaction_history_object::sequence>
+               >
+            >
       >
-   >
 > account_transaction_history_multi_index_type;
 
-typedef graphene::account_history::generic_index<graphene::chain::account_transaction_history_object, account_transaction_history_multi_index_type> account_transaction_history_index;
-*/
+typedef generic_index<account_transaction_history_object, account_transaction_history_multi_index_type> account_transaction_history_index;
+
+
+} } //graphene::account_history
