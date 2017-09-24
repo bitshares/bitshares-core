@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015 Cryptonomex, Inc., and contributors.
+ * Copyright (c) 2017 Cryptonomex, Inc., and contributors.
  *
  * The MIT License
  *
@@ -137,6 +137,19 @@ namespace graphene { namespace app {
                                                                         uint32_t stop = 0,
                                                                         unsigned limit = 100,
                                                                         uint32_t start = 0) const;
+
+         /**
+          * @breif Get operations from an account using a timerange
+          * @param account The account whose history should be queried
+          * @param time_start Time to start
+          * @param time_start Time to end
+          * @param limit Maximum number of operations to retrieve (must not exceed 100)
+          * @return A list of filtered operations performed by account, ordered from most oldest to recent
+         */
+         vector<operation_history_object> get_account_history_by_date( account_id_type account,
+                                                                       fc::time_point_sec time_start,
+                                                                       fc::time_point_sec time_end,
+                                                                       unsigned limit ) const;
 
          vector<order_history_object> get_fill_order_history( asset_id_type a, asset_id_type b, uint32_t limit )const;
          vector<bucket_object> get_market_history( asset_id_type a, asset_id_type b, uint32_t bucket_seconds,
@@ -390,6 +403,7 @@ FC_API(graphene::app::history_api,
        (get_account_history)
        (get_account_history_operations)
        (get_relative_account_history)
+       (get_account_history_by_date)
        (get_fill_order_history)
        (get_market_history)
        (get_market_history_buckets)
