@@ -65,6 +65,7 @@ class account_history_plugin_impl
       account_history_plugin& _self;
       flat_set<account_id_type> _tracked_accounts;
       bool _partial_operations = false;
+      bool _notify_all = false;
       primary_index< simple_index< operation_history_object > >* _oho_index;
       uint32_t _max_ops_per_account = -1;
    private:
@@ -112,11 +113,18 @@ void account_history_plugin_impl::update_account_histories( const signed_block& 
       vector<authority> other;
       operation_get_required_authorities( op.op, impacted, impacted, other ); // fee_payer is added here
 
-      if( op.op.which() == operation::tag< account_create_operation >::value )
-         impacted.insert( op.result.get<object_id_type>() );
-      else
-         graphene::app::operation_get_impacted_accounts( op.op, impacted );
-
+      // optional notify all impacted
+      if(_partial_operations) {
+         if( op.op.which() == operation::tag< account_create_operation >::value )
+            impacted.insert(op.result.get<object_id_type>());
+         graphene::app::operation_get_impacted_accounts(op.op, impacted);
+      }
+      else {
+         if (op.op.which() == operation::tag<account_create_operation>::value)
+            impacted.insert(op.result.get<object_id_type>());
+         else
+            graphene::app::operation_get_impacted_accounts(op.op, impacted);
+      }
       for( auto& a : other )
          for( auto& item : a.account_auths )
             impacted.insert( item.first );
@@ -264,6 +272,7 @@ void account_history_plugin::plugin_set_program_options(
          ("track-account", boost::program_options::value<std::vector<std::string>>()->composing()->multitoken(), "Account ID to track history for (may specify multiple times)")
          ("partial-operations", boost::program_options::value<bool>(), "Keep only those operations in memory that are related to account history tracking")
          ("max-ops-per-account", boost::program_options::value<uint32_t>(), "Maximum number of operations per account will be kept in memory")
+         ("notify-all", boost::program_options::value<bool>(), "Notify all the impacted accounts")
          ;
    cfg.add(cli);
 }
@@ -280,6 +289,9 @@ void account_history_plugin::plugin_initialize(const boost::program_options::var
    }
    if (options.count("max-ops-per-account")) {
        my->_max_ops_per_account = options["max-ops-per-account"].as<uint32_t>();
+   }
+   if (options.count("notify-all")) {
+      my->_notify_all = options["notify-all"].as<bool>();
    }
 }
 
