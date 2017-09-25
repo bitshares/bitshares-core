@@ -114,7 +114,7 @@ void account_history_plugin_impl::update_account_histories( const signed_block& 
       operation_get_required_authorities( op.op, impacted, impacted, other ); // fee_payer is added here
 
       // optional notify all impacted
-      if(_partial_operations) {
+      if(_notify_all) {
          if( op.op.which() == operation::tag< account_create_operation >::value )
             impacted.insert(op.result.get<object_id_type>());
          graphene::app::operation_get_impacted_accounts(op.op, impacted);
