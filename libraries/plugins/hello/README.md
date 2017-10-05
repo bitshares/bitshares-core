@@ -2,7 +2,9 @@
 
 This plugin is a template that shows the use of the plugin system to
 create a new API. In this case, it is called `hello` and serves no real reason
-other than demostration of the plugin subsystem.
+other than demonstration of the plugin subsystem.
+
+Demo API call hello will return blockchain current head block number.
 
 # Plugin Source Code
 
@@ -62,6 +64,19 @@ later be called with queries such as:
          "METHOD-TO-CALL",
          ["PARAMETER 1", "PARAMETER 2"]
     ], "json-rpc": 2.0, "id": 0}
+
+
+For our particular example hello() API call can be called as follows with curl:
+
+```
+curl --data '{"jsonrpc": "2.0", "params": ["hello","hello", []], "method": "call", "id": 10}' --silent http://localhost:8090/rpc | jq
+{
+  "id": 10,
+  "jsonrpc": "2.0",
+  "result": 182288
+}
+```
+The result of 182288 is the current block header in a chain that was replaying.
 
 ### `*_api.hpp` and `*_api.cpp`
 
