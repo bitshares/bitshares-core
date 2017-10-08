@@ -226,7 +226,8 @@ namespace graphene { namespace net
       bool peer_needs_sync_items_from_us;
       bool we_need_sync_items_from_peer;
       fc::optional<boost::tuple<std::vector<item_hash_t>, fc::time_point> > item_ids_requested_from_peer; /// we check this to detect a timed-out request and in busy()
-      item_to_time_map_type sync_items_requested_from_peer; /// ids of blocks we've requested from this peer during sync.  fetch from another peer if this peer disconnects
+      fc::time_point last_sync_item_received_time; /// the time we received the last sync item or the time we sent the last batch of sync item requests to this peer
+      std::set<item_hash_t> sync_items_requested_from_peer; /// ids of blocks we've requested from this peer during sync.  fetch from another peer if this peer disconnects
       item_hash_t last_block_delegate_has_seen; /// the hash of the last block  this peer has told us about that the peer knows
       fc::time_point_sec last_block_time_delegate_has_seen;
       bool inhibit_fetching_sync_blocks;
@@ -269,6 +270,7 @@ namespace graphene { namespace net
       fc::thread* _thread;
       unsigned _send_message_queue_tasks_running; // temporary debugging
 #endif
+      bool _currently_handling_message; // true while we're in the middle of handling a message from the remote system
     private:
       peer_connection(peer_connection_delegate* delegate);
       void destroy();
@@ -299,8 +301,9 @@ namespace graphene { namespace net
       fc::ip::endpoint get_local_endpoint();
       void set_remote_endpoint(fc::optional<fc::ip::endpoint> new_remote_endpoint);
 
-      bool busy();
-      bool idle();
+      bool busy() const;
+      bool idle() const;
+      bool is_currently_handling_message() const;
 
       bool is_transaction_fetching_inhibited() const;
       fc::sha512 get_shared_secret() const;
