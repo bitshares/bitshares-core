@@ -59,8 +59,6 @@ using namespace graphene;
 namespace bpo = boost::program_options;
          
 void write_default_logging_config_to_stream(std::ostream& out);
-void write_default_optimization_config_to_stream(std::ostream& out);
-
 fc::optional<fc::logging_config> load_logging_config_from_ini_file(const fc::path& config_ini_filename);
 
 int main(int argc, char** argv) {
@@ -170,7 +168,6 @@ int main(int argc, char** argv) {
             }
             out_cfg << "\n";
          }
-         write_default_optimization_config_to_stream(out_cfg);
          write_default_logging_config_to_stream(out_cfg);
          out_cfg.close(); 
          // read the default logging config we just wrote out to the file and start using it
@@ -246,23 +243,6 @@ void write_default_logging_config_to_stream(std::ostream& out)
           "[logger.p2p]\n"
           "level=info\n"
           "appenders=p2p\n\n";
-}
-
-/*
- * Default optimizations:
- *
- * Instead of setting the default behavior for optimizations, we change the
- * default behavior ONLY when the application is newly installed and no
- * configuration exists, yet. This way, we don't break existing installations
- * even though we set optimization flags for new configs.
- *
- */
-void write_default_optimization_config_to_stream(std::ostream& out)
-{
-   out << "# Keep only those operations in memory that are related to account history tracking (defaults to true)\n"
-          "partial-operations = true\n\n"
-          "# Maximum number of operations per account will be kept in memory (defaults to 1000)\n"
-          "max-ops-per-account = 1000\n\n";
 }
 
 fc::optional<fc::logging_config> load_logging_config_from_ini_file(const fc::path& config_ini_filename)
