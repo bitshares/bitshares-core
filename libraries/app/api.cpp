@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015 Cryptonomex, Inc., and contributors.
+ * Copyright (c) 2017 Cryptonomex, Inc., and contributors.
  *
  * The MIT License
  *
@@ -393,6 +393,60 @@ namespace graphene { namespace app {
           while ( itr != itr_stop && result.size() < limit );
        }
        return result;
+    }
+
+    vector<operation_history_object> history_api::get_account_history_by_date( account_id_type account,
+                                                                               fc::time_point_sec time_start,
+                                                                               fc::time_point_sec time_end,
+                                                                               unsigned limit )const
+    {
+       FC_ASSERT( _app.chain_database() );
+       const auto& db = *_app.chain_database();
+       FC_ASSERT(limit <= 100);
+       FC_ASSERT(time_end > time_start);
+       FC_ASSERT(time_end < db.head_block_time());
+       vector<operation_history_object> results;
+
+       const auto& hist_idx = db.get_index_type<account_transaction_history_index>();
+       const auto& by_seq_idx = hist_idx.indices().get<by_seq>();
+
+       auto itr_upper = by_seq_idx.upper_bound(account);
+       --itr_upper;
+
+       int32_t l = 0;
+       int32_t r = itr_upper->sequence;
+       if(itr_upper->account != account) return {};
+       uint32_t start_seq;
+       int32_t m = 0;
+       while (l <= r)
+       {
+          m = l + (r-l)/2;
+          auto itr_position = by_seq_idx.lower_bound(boost::make_tuple(account, m));
+          auto block_time = db.fetch_block_by_number(itr_position->operation_id(db).block_num)->timestamp;
+          if (block_time == time_start)
+             break;
+
+          if (block_time < time_start)
+             l = m + 1;
+          else
+             r = m - 1;
+       }
+       start_seq = m;
+
+       auto itr = by_seq_idx.lower_bound(boost::make_tuple(account, start_seq));
+       while(itr != by_seq_idx.end() && results.size() < limit && db.fetch_block_by_number(itr->operation_id(db).block_num)->timestamp < time_end)
+       {
+          if(db.fetch_block_by_number(itr->operation_id(db).block_num)->timestamp < time_start) {
+             ++itr;
+             continue;
+          }
+          if(itr->account != account)
+             break;
+
+          results.push_back( itr->operation_id(db) );
+          ++itr;
+       }
+       return results;
     }
 
     flat_set<uint32_t> history_api::get_market_history_buckets()const
