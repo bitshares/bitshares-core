@@ -319,7 +319,7 @@ namespace graphene { namespace app {
        if( stop.instance.value == 0 && result.size() < limit )
        {
           node = db.find(account_transaction_history_id_type());
-          if( node && account_transaction_history_id_type()(db).account == account)
+          if( node && node->account == account)
              result.push_back( node->operation_id(db) );
        }
        return result;
