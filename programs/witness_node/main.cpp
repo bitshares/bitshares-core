@@ -61,6 +61,77 @@ namespace bpo = boost::program_options;
 void write_default_logging_config_to_stream(std::ostream& out);
 fc::optional<fc::logging_config> load_logging_config_from_ini_file(const fc::path& config_ini_filename);
 
+static void load_config_file( const fc::path& config_ini_path, const bpo::options_description& cfg_options,
+                              bpo::variables_map& options )
+{
+   boost::container::flat_set<std::string> seen;
+   bpo::options_description unique_options("Graphene Witness Node");
+   for( const boost::shared_ptr<bpo::option_description> od : cfg_options.options() )
+   {
+      const std::string name = od->long_name();
+      if( seen.find(name) != seen.end() ) continue;
+         seen.insert(name);
+         unique_options.add( od );
+      }
+
+   // get the basic options
+   bpo::store(bpo::parse_config_file<char>(config_ini_path.preferred_string().c_str(),
+              unique_options, true), options);
+
+   // try to get logging options from the config file.
+   try
+   {
+      fc::optional<fc::logging_config> logging_config = load_logging_config_from_ini_file(config_ini_path);
+      if (logging_config)
+         fc::configure_logging(*logging_config);
+   }
+   catch (const fc::exception&)
+   {
+      wlog("Error parsing logging config from config file ${config}, using default config", ("config", config_ini_path.preferred_string()));
+   }
+}
+
+static void create_new_config_file( const fc::path& config_ini_path, const fc::path& data_dir,
+                                    const bpo::options_description& cfg_options )
+{
+   ilog("Writing new config file at ${path}", ("path", config_ini_path));
+   if( !fc::exists(data_dir) )
+      fc::create_directories(data_dir);
+
+   boost::container::flat_set<std::string> seen;
+   std::ofstream out_cfg(config_ini_path.preferred_string());
+   for( const boost::shared_ptr<bpo::option_description> od : cfg_options.options() )
+   {
+      if( !od->description().empty() )
+         out_cfg << "# " << od->description() << "\n";
+      boost::any store;
+      if( !od->semantic()->apply_default(store) )
+         out_cfg << "# " << od->long_name() << " = \n";
+      else {
+         const std::string name = od->long_name();
+         if( seen.find(name) != seen.end() ) continue;
+         seen.insert(name);
+         auto example = od->format_parameter();
+         if( example.empty() )
+            // This is a boolean switch
+            out_cfg << od->long_name() << " = " << "false\n";
+         else {
+            // The string is formatted "arg (=<interesting part>)"
+            example.erase(0, 6);
+            example.erase(example.length()-1);
+            out_cfg << od->long_name() << " = " << example << "\n";
+         }
+      }
+      out_cfg << "\n";
+   }
+   write_default_logging_config_to_stream(out_cfg);
+   out_cfg.close();
+   // read the default logging config we just wrote out to the file and start using it
+   fc::optional<fc::logging_config> logging_config = load_logging_config_from_ini_file(config_ini_path);
+   if (logging_config)
+      fc::configure_logging(*logging_config);
+}
+
 int main(int argc, char** argv) {
    app::application* node = new app::application();
    fc::oexception unhandled_exception;
@@ -110,71 +181,9 @@ int main(int argc, char** argv) {
 
       fc::path config_ini_path = data_dir / "config.ini";
       if( fc::exists(config_ini_path) )
-      {
-         boost::container::flat_set<std::string> seen;
-         bpo::options_description unique_options("Graphene Witness Node");
-         for( const boost::shared_ptr<bpo::option_description> od : cfg_options.options() )
-         {
-            const std::string name = od->long_name();
-            if( seen.find(name) != seen.end() ) continue;
-            seen.insert(name);
-            unique_options.add( od );
-         }
-
-         // get the basic options
-         bpo::store(bpo::parse_config_file<char>(config_ini_path.preferred_string().c_str(), unique_options, true), options);
-
-         // try to get logging options from the config file.
-         try
-         {
-            fc::optional<fc::logging_config> logging_config = load_logging_config_from_ini_file(config_ini_path);
-            if (logging_config)
-               fc::configure_logging(*logging_config);
-         }
-         catch (const fc::exception&)
-         {
-            wlog("Error parsing logging config from config file ${config}, using default config", ("config", config_ini_path.preferred_string()));
-         }
-      }
+         load_config_file( config_ini_path, cfg_options, options );
       else 
-      {
-         ilog("Writing new config file at ${path}", ("path", config_ini_path));
-         if( !fc::exists(data_dir) )
-            fc::create_directories(data_dir);
-
-         boost::container::flat_set<std::string> seen;
-         std::ofstream out_cfg(config_ini_path.preferred_string());
-         for( const boost::shared_ptr<bpo::option_description> od : cfg_options.options() )
-         {
-            if( !od->description().empty() )
-               out_cfg << "# " << od->description() << "\n";
-            boost::any store;
-            if( !od->semantic()->apply_default(store) )
-               out_cfg << "# " << od->long_name() << " = \n";
-            else {
-               const std::string name = od->long_name();
-               if( seen.find(name) != seen.end() ) continue;
-               seen.insert(name);
-               auto example = od->format_parameter();
-               if( example.empty() )
-                  // This is a boolean switch
-                  out_cfg << od->long_name() << " = " << "false\n";
-               else {
-                  // The string is formatted "arg (=<interesting part>)"
-                  example.erase(0, 6);
-                  example.erase(example.length()-1);
-                  out_cfg << od->long_name() << " = " << example << "\n";
-               }
-            }
-            out_cfg << "\n";
-         }
-         write_default_logging_config_to_stream(out_cfg);
-         out_cfg.close(); 
-         // read the default logging config we just wrote out to the file and start using it
-         fc::optional<fc::logging_config> logging_config = load_logging_config_from_ini_file(config_ini_path);
-         if (logging_config)
-            fc::configure_logging(*logging_config);
-      }
+         create_new_config_file( config_ini_path, data_dir, cfg_options );
 
       bpo::notify(options);
       node->initialize(data_dir, options);
