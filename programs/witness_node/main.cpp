@@ -180,10 +180,9 @@ int main(int argc, char** argv) {
       }
 
       fc::path config_ini_path = data_dir / "config.ini";
-      if( fc::exists(config_ini_path) )
-         load_config_file( config_ini_path, cfg_options, options );
-      else 
+      if( !fc::exists(config_ini_path) )
          create_new_config_file( config_ini_path, data_dir, cfg_options );
+      load_config_file( config_ini_path, cfg_options, options );
 
       bpo::notify(options);
       node->initialize(data_dir, options);
