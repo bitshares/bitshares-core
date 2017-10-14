@@ -64,17 +64,23 @@ fc::optional<fc::logging_config> load_logging_config_from_ini_file(const fc::pat
 class deduplicator 
 {
    public:
-      boost::shared_ptr<bpo::option_description> next(const boost::shared_ptr<bpo::option_description>& o)
+      deduplicator() : modifier(nullptr) {}
+
+      deduplicator(const boost::shared_ptr<bpo::option_description> (*mod_fn)(const boost::shared_ptr<bpo::option_description>&))
+              : modifier(mod_fn) {}
+
+      const boost::shared_ptr<bpo::option_description> next(const boost::shared_ptr<bpo::option_description>& o)
       {
          const std::string name = o->long_name();
          if( seen.find( name ) != seen.end() )
             return nullptr;
          seen.insert(name);
-         return o;
+         return modifier ? modifier(o) : o;
       }
 
    private:
       boost::container::flat_set<std::string> seen;
+      const boost::shared_ptr<bpo::option_description> (*modifier)(const boost::shared_ptr<bpo::option_description>&);
 };
 
 static void load_config_file( const fc::path& config_ini_path, const bpo::options_description& cfg_options,
@@ -84,7 +90,7 @@ static void load_config_file( const fc::path& config_ini_path, const bpo::option
    bpo::options_description unique_options("Graphene Witness Node");
    for( const boost::shared_ptr<bpo::option_description> opt : cfg_options.options() )
    {
-      boost::shared_ptr<bpo::option_description> od = dedup.next(opt);
+      const boost::shared_ptr<bpo::option_description> od = dedup.next(opt);
       if( !od ) continue;
       unique_options.add( od );
    }
@@ -106,6 +112,13 @@ static void load_config_file( const fc::path& config_ini_path, const bpo::option
    }
 }
 
+const boost::shared_ptr<bpo::option_description> new_option_description( const std::string& name, const bpo::value_semantic* value, const std::string& description )
+{
+    bpo::options_description helper("");
+    helper.add_options()( name.c_str(), value, description.c_str() );
+    return helper.options()[0];
+}
+
 static void create_new_config_file( const fc::path& config_ini_path, const fc::path& data_dir,
                                     const bpo::options_description& cfg_options )
 {
@@ -113,11 +126,19 @@ static void create_new_config_file( const fc::path& config_ini_path, const fc::p
    if( !fc::exists(data_dir) )
       fc::create_directories(data_dir);
 
-   deduplicator dedup;
+   auto modify_option_defaults = [](const boost::shared_ptr<bpo::option_description>& o) -> const boost::shared_ptr<bpo::option_description> {
+       const std::string& name = o->long_name();
+       if( name == "partial-operations" )
+          return new_option_description( name, bpo::value<bool>()->default_value(true), o->description() );
+       if( name == "max-ops-per-account" )
+          return new_option_description( name, bpo::value<int>()->default_value(1000), o->description() );
+       return o;
+   };
+   deduplicator dedup(modify_option_defaults);
    std::ofstream out_cfg(config_ini_path.preferred_string());
    for( const boost::shared_ptr<bpo::option_description> opt : cfg_options.options() )
    {
-      boost::shared_ptr<bpo::option_description> od = dedup.next(opt);
+      const boost::shared_ptr<bpo::option_description> od = dedup.next(opt);
       if( !od ) continue;
 
       if( !od->description().empty() )
