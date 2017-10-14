@@ -61,18 +61,33 @@ namespace bpo = boost::program_options;
 void write_default_logging_config_to_stream(std::ostream& out);
 fc::optional<fc::logging_config> load_logging_config_from_ini_file(const fc::path& config_ini_filename);
 
+class deduplicator 
+{
+   public:
+      boost::shared_ptr<bpo::option_description> next(const boost::shared_ptr<bpo::option_description>& o)
+      {
+         const std::string name = o->long_name();
+         if( seen.find( name ) != seen.end() )
+            return nullptr;
+         seen.insert(name);
+         return o;
+      }
+
+   private:
+      boost::container::flat_set<std::string> seen;
+};
+
 static void load_config_file( const fc::path& config_ini_path, const bpo::options_description& cfg_options,
                               bpo::variables_map& options )
 {
-   boost::container::flat_set<std::string> seen;
+   deduplicator dedup;
    bpo::options_description unique_options("Graphene Witness Node");
-   for( const boost::shared_ptr<bpo::option_description> od : cfg_options.options() )
+   for( const boost::shared_ptr<bpo::option_description> opt : cfg_options.options() )
    {
-      const std::string name = od->long_name();
-      if( seen.find(name) != seen.end() ) continue;
-         seen.insert(name);
-         unique_options.add( od );
-      }
+      boost::shared_ptr<bpo::option_description> od = dedup.next(opt);
+      if( !od ) continue;
+      unique_options.add( od );
+   }
 
    // get the basic options
    bpo::store(bpo::parse_config_file<char>(config_ini_path.preferred_string().c_str(),
@@ -98,19 +113,19 @@ static void create_new_config_file( const fc::path& config_ini_path, const fc::p
    if( !fc::exists(data_dir) )
       fc::create_directories(data_dir);
 
-   boost::container::flat_set<std::string> seen;
+   deduplicator dedup;
    std::ofstream out_cfg(config_ini_path.preferred_string());
-   for( const boost::shared_ptr<bpo::option_description> od : cfg_options.options() )
+   for( const boost::shared_ptr<bpo::option_description> opt : cfg_options.options() )
    {
+      boost::shared_ptr<bpo::option_description> od = dedup.next(opt);
+      if( !od ) continue;
+
       if( !od->description().empty() )
          out_cfg << "# " << od->description() << "\n";
       boost::any store;
       if( !od->semantic()->apply_default(store) )
          out_cfg << "# " << od->long_name() << " = \n";
       else {
-         const std::string name = od->long_name();
-         if( seen.find(name) != seen.end() ) continue;
-         seen.insert(name);
          auto example = od->format_parameter();
          if( example.empty() )
             // This is a boolean switch
