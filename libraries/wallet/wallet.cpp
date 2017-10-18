@@ -2055,6 +2055,29 @@ public:
          return ss.str();
       };
 
+      m["get_account_history_by_operations"] = [this](variant result, const fc::variants& a) {
+          auto r = result.as<account_history_operation_detail>();
+          std::stringstream ss;
+          ss << "total_count : ";
+          ss << r.total_count;
+          ss << " \n";
+          ss << "result_count : ";
+          ss << r.result_count;
+          ss << " \n";
+          for (operation_detail_ex& d : r.details) {
+              operation_history_object& i = d.op;
+              auto b = _remote_db->get_block_header(i.block_num);
+              FC_ASSERT(b);
+              ss << b->timestamp.to_iso_string() << " ";
+              i.op.visit(operation_printer(ss, *this, i.result));
+              ss << " transaction_id : ";
+              ss << d.transaction_id.str();
+              ss << " \n";
+          }
+
+          return ss.str();
+      };
+
       m["list_account_balances"] = [this](variant result, const fc::variants& a)
       {
          auto r = result.as<vector<asset>>();
@@ -2812,6 +2835,30 @@ vector<operation_detail> wallet_api::get_relative_account_history(string name, u
       if( start == 0 ) break;
    }
    return result;
+}
+
+account_history_operation_detail wallet_api::get_account_history_by_operations(string account_name_or_id, vector<uint16_t> operation_indexs, uint32_t start, int limit)
+{
+    FC_ASSERT(limit <= 100 && limit > 0);
+    account_history_operation_detail result;
+    auto account_id = get_account(account_name_or_id).get_id();
+
+    auto detail = my->_remote_hist->get_account_history_by_operations(account_id, operation_indexs, start, limit);
+    for (auto& obj : detail.operation_history_objs) {
+        std::stringstream ss;
+        auto memo = obj.op.visit(detail::operation_printer(ss, *my, obj.result));
+
+        transaction_id_type transaction_id;
+        auto block = get_block(obj.block_num);
+        if (block.valid() && obj.trx_in_block < block->transaction_ids.size()) {
+            transaction_id = block->transaction_ids[obj.trx_in_block];
+        }
+        result.details.push_back(operation_detail_ex{memo, ss.str(), obj, transaction_id});
+    }
+    result.result_count = result.details.size();
+    result.total_count = detail.total_count;
+
+    return result;
 }
 
 vector<bucket_object> wallet_api::get_market_history( string symbol1, string symbol2, uint32_t bucket , fc::time_point_sec start, fc::time_point_sec end )const

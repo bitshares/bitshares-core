@@ -282,6 +282,19 @@ struct operation_detail {
    operation_history_object op;
 };
 
+struct operation_detail_ex {
+    string                   memo;
+    string                   description;
+    operation_history_object op;
+    transaction_id_type      transaction_id;
+};
+
+struct account_history_operation_detail {
+   uint32_t                     total_count;
+   uint32_t                     result_count;
+   vector<operation_detail_ex>  details;
+};
+
 /**
  * This wallet assumes it is connected to the database server with a high-bandwidth, low-latency connection and
  * performs minimal caching. This API could be provided locally to be used by a web interface.
@@ -369,7 +382,7 @@ class wallet_api
       vector<call_order_object>         get_call_orders(string a, uint32_t limit)const;
       vector<force_settlement_object>   get_settle_orders(string a, uint32_t limit)const;
 
-      /** Returns the collateral_bid object for the given MPA
+       /** Returns the most recent operations on the named account, with transaction id.
        *
        * @param asset the name or id of the asset
        * @param limit the number of entries to return
@@ -386,6 +399,17 @@ class wallet_api
        * @returns the global properties
        */
       global_property_object            get_global_properties() const;
+
+      /**
+       * This returns a list of operation history objects, which describe activity on the account, with transaction id.
+       *
+       * @param name the name or id of the account
+       * @param operations the type of operations
+       * @param start  the sequence number where to start looping back throw the history
+       * @param limit the max number of entries to return (starting from the most recent)
+       * @returns account_history_operation_detail
+       */
+     account_history_operation_detail get_account_history_by_operations(string account_name_or_id, vector<uint16_t> operation_indexs, uint32_t start, int limit);
 
       /** Returns the block chain's rapidly-changing properties.
        * The returned object contains information that changes every block interval
@@ -1616,6 +1640,12 @@ FC_REFLECT_DERIVED( graphene::wallet::vesting_balance_object_with_info, (graphen
 FC_REFLECT( graphene::wallet::operation_detail, 
             (memo)(description)(op) )
 
+FC_REFLECT(graphene::wallet::operation_detail_ex,
+            (memo)(description)(op)(transaction_id))
+
+FC_REFLECT( graphene::wallet::account_history_operation_detail,
+        (total_count)(result_count)(details))
+
 FC_API( graphene::wallet::wallet_api,
         (help)
         (gethelp)
@@ -1690,6 +1720,7 @@ FC_API( graphene::wallet::wallet_api,
         (get_account_count)
         (get_account_history)
         (get_relative_account_history)
+        (get_account_history_by_operations)
         (get_collateral_bids)
         (is_public_key_registered)
         (get_market_history)
