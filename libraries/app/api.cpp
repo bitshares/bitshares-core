@@ -408,7 +408,7 @@ namespace graphene { namespace app {
         history_operation_detail result;
         vector<operation_history_object> objs = get_relative_account_history(account, start, limit, limit + start - 1);
         std::for_each(objs.begin(), objs.end(), [&](const operation_history_object &o) {
-                    if (find(operation_indexs.begin(), operation_indexs.end(), o.op.which()) != operation_indexs.end()) {
+                    if (operation_indexs.empty() || find(operation_indexs.begin(), operation_indexs.end(), o.op.which()) != operation_indexs.end()) {
                         result.operation_history_objs.push_back(o);
                      }
                  });
