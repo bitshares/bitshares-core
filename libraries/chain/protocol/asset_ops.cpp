@@ -95,6 +95,10 @@ share_type asset_create_operation::calculate_fee(const asset_create_operation::f
 
 void  asset_create_operation::validate()const
 {
+   // TODO this line of code is a soft fork, remove it after bitshares-core issue #433 is fixed.
+   //      See https://github.com/bitshares/bitshares-core/issues/433
+   FC_ASSERT( fee.asset_id == asset_id_type(), "Can only pay fee in BTS since block #21040000" );
+
    FC_ASSERT( fee.amount >= 0 );
    FC_ASSERT( is_valid_symbol(symbol) );
    common_options.validate();
