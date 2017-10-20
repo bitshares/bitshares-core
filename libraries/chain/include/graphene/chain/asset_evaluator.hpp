@@ -35,6 +35,11 @@ namespace graphene { namespace chain {
 
          void_result do_evaluate( const asset_create_operation& o );
          object_id_type do_apply( const asset_create_operation& o );
+
+         /** override the default behavior defined by generic_evalautor which is to
+          * post the fee to fee_paying_account_stats.pending_fees
+          */
+         virtual void pay_fee() override;
    };
 
    class asset_issue_evaluator : public evaluator<asset_issue_evaluator>
