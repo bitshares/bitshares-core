@@ -152,4 +152,22 @@ namespace graphene { namespace chain {
          void_result do_apply( const asset_claim_fees_operation& o );
    };
 
+   namespace impl { // TODO: remove after HARDFORK_CORE_429_TIME has passed
+      class hf_429_visitor {
+         public:
+            typedef void result_type;
+
+            template<typename T>
+            void operator()( const T& v )const {}
+
+            void operator()( const graphene::chain::asset_create_operation& v )const {
+               FC_ASSERT( v.fee.asset_id == asset_id_type(), "Can only pay fee in BTS since block #21040000" );
+            }
+
+            void operator()( const graphene::chain::proposal_create_operation& v )const {
+               for( const op_wrapper& op : v.proposed_ops )
+                   op.op.visit( *this );
+            }
+      };
+   }
 } } // graphene::chain

@@ -1077,19 +1077,50 @@ BOOST_AUTO_TEST_CASE( issue_433_test )
       op.symbol = "ALICE";
       op.common_options.core_exchange_rate = asset( 1 ) / asset( 1, asset_id_type( 1 ) );
       op.fee = myusd.amount( ((asset_create_fees.long_symbol + asset_create_fees.price_per_kbyte) & (~1)) );
-      {
-         signed_transaction tx;
-         tx.operations.push_back( op );
-         set_expiration( db, tx );
-         sign( tx, alice_private_key );
-         PUSH_TX( db, tx );
-      }
+      signed_transaction tx;
+      tx.operations.push_back( op );
+      set_expiration( db, tx );
+      sign( tx, alice_private_key );
+      PUSH_TX( db, tx );
 
       verify_asset_supplies( db );
+   }
+   catch( const fc::exception& e )
+   {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
+BOOST_AUTO_TEST_CASE( issue_433_indirect_test )
+{
+   try
+   {
+      ACTORS((alice));
+
+      auto& core = asset_id_type()(db);
+
+      transfer( committee_account, alice_id, asset( 1000000 * asset::scaled_precision( core.precision ) ) );
+
+      const auto& myusd = create_user_issued_asset( "MYUSD", alice, 0 );
+      issue_uia( alice, myusd.amount( 2000000000 ) );
+
+      // make sure the database requires our fee to be nonzero
+      enable_fees();
+
+      const auto& fees = *db.get_global_properties().parameters.current_fees;
+      const auto asset_create_fees = fees.get<asset_create_operation>();
+
+      fund_fee_pool( alice, myusd, 5*asset_create_fees.long_symbol );
+
+      asset_create_operation op;
+      op.issuer = alice_id;
+      op.symbol = "ALICE";
+      op.common_options.core_exchange_rate = asset( 1 ) / asset( 1, asset_id_type( 1 ) );
+      op.fee = myusd.amount( ((asset_create_fees.long_symbol + asset_create_fees.price_per_kbyte) & (~1)) );
 
       const auto proposal_create_fees = fees.get<proposal_create_operation>();
       proposal_create_operation prop;
-      op.symbol = "ALICE.PROP";
       prop.fee_paying_account = alice_id;
       prop.proposed_ops.emplace_back( op );
       prop.expiration_time =  db.head_block_time() + fc::days(1);

@@ -114,6 +114,12 @@ void_result asset_create_evaluator::do_evaluate( const asset_create_operation& o
       FC_ASSERT( op.precision == op.bitasset_opts->short_backing_asset(d).precision );
    }
 
+   if( d.head_block_time() <= HARDFORK_CORE_429_TIME )
+   { // TODO: remove after HARDFORK_CORE_429_TIME has passed
+      graphene::chain::impl::hf_429_visitor hf_429;
+      hf_429( op );
+   }
+
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (op) ) }
 
