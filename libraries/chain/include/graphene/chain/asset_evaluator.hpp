@@ -40,6 +40,8 @@ namespace graphene { namespace chain {
           * post the fee to fee_paying_account_stats.pending_fees
           */
          virtual void pay_fee() override;
+      private:
+         bool fee_is_odd;
    };
 
    class asset_issue_evaluator : public evaluator<asset_issue_evaluator>
