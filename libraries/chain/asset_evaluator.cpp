@@ -42,17 +42,6 @@ void_result asset_create_evaluator::do_evaluate( const asset_create_operation& o
    if( d.head_block_time() >= HARDFORK_TEST_201706_TIME )
        FC_ASSERT( op.symbol.substr(0, 3) != "BIT" );
 
-   // TODO this code block is a soft fork, remove it after bitshares-core issue #433 is fixed.
-   //      See https://github.com/bitshares/bitshares-core/issues/433
-   if( op.fee.asset_id != asset_id_type() )
-   {
-      if( d.head_block_num() < 11848000 )
-         wlog( "At block #${n}, creation fee of asset ${a} is paid with asset ${f}",
-               ("n",d.head_block_num()+1)("a",op.symbol)("f",op.fee.asset_id) );
-      else
-         FC_THROW( "Can only pay fee in ${a} since block #11848000", ("a",GRAPHENE_SYMBOL) );
-   }
-
    const auto& chain_parameters = d.get_global_properties().parameters;
    FC_ASSERT( op.common_options.whitelist_authorities.size() <= chain_parameters.maximum_asset_whitelist_authorities );
    FC_ASSERT( op.common_options.blacklist_authorities.size() <= chain_parameters.maximum_asset_whitelist_authorities );
