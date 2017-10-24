@@ -64,7 +64,6 @@ BOOST_AUTO_TEST_CASE( confidential_test )
 
    auto InB1  = fc::sha256::hash("InB1");
    auto InB2  = fc::sha256::hash("InB2");
-   auto OutB  = fc::sha256::hash("InB2");
    auto nonce1 = fc::sha256::hash("nonce");
    auto nonce2 = fc::sha256::hash("nonce2");
 

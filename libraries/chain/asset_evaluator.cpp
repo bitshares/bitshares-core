@@ -91,8 +91,6 @@ void_result asset_create_evaluator::do_evaluate( const asset_create_operation& o
           wlog( "Asset ${s} has a name which requires hardfork 385", ("s",op.symbol) );
    }
 
-   core_fee_paid -= core_fee_paid.value/2;
-
    if( op.bitasset_opts )
    {
       const asset_object& backing = op.bitasset_opts->short_backing_asset(d);
@@ -116,16 +114,38 @@ void_result asset_create_evaluator::do_evaluate( const asset_create_operation& o
       FC_ASSERT( op.precision == op.bitasset_opts->short_backing_asset(d).precision );
    }
 
+   if( d.head_block_time() <= HARDFORK_CORE_429_TIME )
+   { // TODO: remove after HARDFORK_CORE_429_TIME has passed
+      graphene::chain::impl::hf_429_visitor hf_429;
+      hf_429( op );
+   }
+
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (op) ) }
 
+void asset_create_evaluator::pay_fee()
+{
+   fee_is_odd = core_fee_paid.value & 1;
+   core_fee_paid -= core_fee_paid.value/2;
+   generic_evaluator::pay_fee();
+}
+
 object_id_type asset_create_evaluator::do_apply( const asset_create_operation& op )
 { try {
+   bool hf_429 = fee_is_odd && db().head_block_time() > HARDFORK_CORE_429_TIME;
+
    const asset_dynamic_data_object& dyn_asset =
       db().create<asset_dynamic_data_object>( [&]( asset_dynamic_data_object& a ) {
          a.current_supply = 0;
-         a.fee_pool = core_fee_paid; //op.calculate_fee(db().current_fee_schedule()).value / 2;
+         a.fee_pool = core_fee_paid - (hf_429 ? 1 : 0);
       });
+   if( fee_is_odd && !hf_429 )
+   {
+      const auto& core_dd = db().get<asset_object>( asset_id_type() ).dynamic_data( db() );
+      db().modify( core_dd, [=]( asset_dynamic_data_object& dd ) {
+         dd.current_supply++;
+      });
+   }
 
    asset_bitasset_data_id_type bit_asset_id;
    if( op.bitasset_opts.valid() )
@@ -447,7 +467,9 @@ void_result asset_settle_evaluator::do_evaluate(const asset_settle_evaluator::op
    FC_ASSERT(asset_to_settle->can_force_settle() || bitasset.has_settlement() );
    if( bitasset.is_prediction_market )
       FC_ASSERT( bitasset.has_settlement(), "global settlement must occur before force settling a prediction market"  );
-   else if( bitasset.current_feed.settlement_price.is_null() )
+   else if( bitasset.current_feed.settlement_price.is_null()
+            && ( d.head_block_time() <= HARDFORK_CORE_216_TIME
+                 || !bitasset.has_settlement() ) )
       FC_THROW_EXCEPTION(insufficient_feeds, "Cannot force settle with no price feed.");
    FC_ASSERT(d.get_balance(d.get(op.account), *asset_to_settle) >= op.amount);
 
@@ -462,16 +484,19 @@ operation_result asset_settle_evaluator::do_apply(const asset_settle_evaluator::
    const auto& bitasset = asset_to_settle->bitasset_data(d);
    if( bitasset.has_settlement() )
    {
+      const auto& mia_dyn = asset_to_settle->dynamic_asset_data_id(d);
+
       auto settled_amount = op.amount * bitasset.settlement_price;
-      FC_ASSERT( settled_amount.amount <= bitasset.settlement_fund );
+      if( op.amount.amount == mia_dyn.current_supply )
+         settled_amount.amount = bitasset.settlement_fund; // avoid rounding problems
+      else
+         FC_ASSERT( settled_amount.amount <= bitasset.settlement_fund ); // should be strictly < except for PM with zero outcome
 
       d.modify( bitasset, [&]( asset_bitasset_data_object& obj ){
                 obj.settlement_fund -= settled_amount.amount;
                 });
 
       d.adjust_balance(op.account, settled_amount);
-
-      const auto& mia_dyn = asset_to_settle->dynamic_asset_data_id(d);
 
       d.modify( mia_dyn, [&]( asset_dynamic_data_object& obj ){
                 obj.current_supply -= op.amount.amount;
@@ -498,7 +523,10 @@ void_result asset_publish_feeds_evaluator::do_evaluate(const asset_publish_feed_
    FC_ASSERT(base.is_market_issued());
 
    const asset_bitasset_data_object& bitasset = base.bitasset_data(d);
-   FC_ASSERT( !bitasset.has_settlement(), "No further feeds may be published after a settlement event" );
+   if( bitasset.is_prediction_market || d.head_block_time() <= HARDFORK_CORE_216_TIME )
+   {
+      FC_ASSERT( !bitasset.has_settlement(), "No further feeds may be published after a settlement event" );
+   }
 
    FC_ASSERT( o.feed.settlement_price.quote.asset_id == bitasset.options.short_backing_asset );
    if( d.head_block_time() > HARDFORK_480_TIME )
@@ -549,7 +577,18 @@ void_result asset_publish_feeds_evaluator::do_apply(const asset_publish_feed_ope
    });
 
    if( !(old_feed == bad.current_feed) )
+   {
+      if( bad.has_settlement() ) // implies head_block_time > HARDFORK_CORE_216_TIME
+      {
+         const auto& mia_dyn = base.dynamic_asset_data_id(d);
+         if( !bad.current_feed.settlement_price.is_null()
+             && ~price::call_price(asset(mia_dyn.current_supply, o.asset_id),
+                                   asset(bad.settlement_fund, bad.options.short_backing_asset),
+                                   bad.current_feed.maintenance_collateral_ratio ) < bad.current_feed.settlement_price )
+            d.revive_bitasset(base);
+      }
       db().check_call_orders(base);
+   }
 
    return void_result();
 } FC_CAPTURE_AND_RETHROW((o)) }

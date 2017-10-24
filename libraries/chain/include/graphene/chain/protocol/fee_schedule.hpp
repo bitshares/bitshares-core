@@ -34,6 +34,49 @@ namespace graphene { namespace chain {
    };
    typedef transform_to_fee_parameters<operation>::type fee_parameters;
 
+   template<typename Operation>
+   class fee_helper {
+     public:
+      const typename Operation::fee_parameters_type& cget(const flat_set<fee_parameters>& parameters)const
+      {
+         auto itr = parameters.find( typename Operation::fee_parameters_type() );
+         FC_ASSERT( itr != parameters.end() );
+         return itr->template get<typename Operation::fee_parameters_type>();
+      }
+   };
+
+   template<>
+   class fee_helper<account_create_operation> {
+     public:
+      const account_create_operation::fee_parameters_type& cget(const flat_set<fee_parameters>& parameters)const
+      {
+         auto itr = parameters.find( account_create_operation::fee_parameters_type() );
+         FC_ASSERT( itr != parameters.end() );
+         return itr->get<account_create_operation::fee_parameters_type>();
+      }
+      typename account_create_operation::fee_parameters_type& get(flat_set<fee_parameters>& parameters)const
+      {
+         auto itr = parameters.find( account_create_operation::fee_parameters_type() );
+         FC_ASSERT( itr != parameters.end() );
+         return itr->get<account_create_operation::fee_parameters_type>();
+      }
+   };
+
+   template<>
+   class fee_helper<bid_collateral_operation> {
+     public:
+      const bid_collateral_operation::fee_parameters_type& cget(const flat_set<fee_parameters>& parameters)const
+      {
+         auto itr = parameters.find( bid_collateral_operation::fee_parameters_type() );
+         if ( itr != parameters.end() )
+            return itr->get<bid_collateral_operation::fee_parameters_type>();
+
+         static bid_collateral_operation::fee_parameters_type bid_collateral_dummy;
+         bid_collateral_dummy.fee = fee_helper<call_order_update_operation>().cget(parameters).fee;
+         return bid_collateral_dummy;
+      }
+   };
+
    /**
     *  @brief contains all of the parameters necessary to calculate the fee for any operation
     */
@@ -60,16 +103,12 @@ namespace graphene { namespace chain {
       template<typename Operation>
       const typename Operation::fee_parameters_type& get()const
       {
-         auto itr = parameters.find( typename Operation::fee_parameters_type() );
-         FC_ASSERT( itr != parameters.end() );
-         return itr->template get<typename Operation::fee_parameters_type>();
+         return fee_helper<Operation>().cget(parameters);
       }
       template<typename Operation>
       typename Operation::fee_parameters_type& get()
       {
-         auto itr = parameters.find( typename Operation::fee_parameters_type() );
-         FC_ASSERT( itr != parameters.end() );
-         return itr->template get<typename Operation::fee_parameters_type>();
+         return fee_helper<Operation>().get(parameters);
       }
 
       /**
