@@ -71,7 +71,7 @@ BOOST_AUTO_TEST_CASE( flat_index_test )
    price_feed current_feed;
    current_feed.settlement_price = bitusd.amount(100) / asset(100);
    publish_feed(bitusd, sam, current_feed);
-   FC_ASSERT( bitusd.bitasset_data_id->instance == 0 );
+   FC_ASSERT( (int)bitusd.bitasset_data_id->instance == 0 );
    FC_ASSERT( !(*bitusd.bitasset_data_id)(db).current_feed.settlement_price.is_null() );
    try {
       auto ses = db._undo_db.start_undo_session();
