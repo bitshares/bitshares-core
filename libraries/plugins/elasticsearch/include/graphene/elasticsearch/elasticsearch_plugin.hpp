@@ -327,8 +327,6 @@ struct operation_visitor
       fee_asset = o.fee.asset_id;
       fee_amount = o.fee.amount;
    }
-
 };
-
-
+      
 } } //graphene::elasticsearch

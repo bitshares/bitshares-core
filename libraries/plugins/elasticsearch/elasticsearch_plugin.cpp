@@ -51,7 +51,6 @@ vector <string> bulk; // global vector of op lines
 namespace detail
 {
 
-
 class elasticsearch_plugin_impl
 {
    public:
@@ -166,7 +165,7 @@ void elasticsearch_plugin_impl::add_elasticsearch( const account_id_type account
 
    std::string op = fc::json::to_string(op_id(db).op);
    boost::replace_all(op, "\"", "'");
-   boost::replace_all(op, "'''", "?");
+   boost::replace_all(op, "'", "?");
 
    std::string op_type = "";
    if (!op_id(db).id.is_null())
@@ -175,7 +174,6 @@ void elasticsearch_plugin_impl::add_elasticsearch( const account_id_type account
    std::string operation_history = "{\"trx_in_block\":" + trx_in_block + ",\"op_in_trx\":" + op_in_trx +
                                    ",\"operation_results\":\"" + operation_result + "\",\"virtual_op\":" + virtual_op +
                                    ",\"op\":\"" + op + "\"}";
-
 
    // visitor data
    std::string visitor_data = "";
@@ -194,8 +192,6 @@ void elasticsearch_plugin_impl::add_elasticsearch( const account_id_type account
       boost::replace_all(transfer_amount, "\"", "");
 
       std::string transfer_data = "{\"transfer_asset_id\":" + transfer_asset + ", \"transfer_amount\":\"" + transfer_amount + "\"}";
-
-
       visitor_data = ",\"fee_data\": " + fee_data + ", \"transfer_data\": " + transfer_data;
    }
 
@@ -208,10 +204,8 @@ void elasticsearch_plugin_impl::add_elasticsearch( const account_id_type account
    //if(!block->transactions.empty() && block->transactions[op_id(db).trx_in_block].id().data_size() > 0 && block->block_num() != 261319 ) {
    //   trx_id = block->transactions[op_id(db).trx_in_block].id().str();
    //}
-
    std::string block_data = "{\"block_num\":" + block_num + ",\"block_time\":\"" + block_time +
                              "\",\"trx_id\":\"" + trx_id + "\"}";
-
 
    // check if we are in replay or in sync and change number of bulk documents accordingly
    uint32_t limit_documents = 0;
@@ -226,13 +220,11 @@ void elasticsearch_plugin_impl::add_elasticsearch( const account_id_type account
    //wlog((transfer_data));
    //wlog((block_data));
 
-
    if(bulk.size() < limit_documents) { // we have everything, creating bulk array
 
       // put alltogether in 1 line of bulk
-      std::string alltogether = "{\"account_history\": " + account_transaction + ", \"operation_history_\": " + operation_history +
+      std::string alltogether = "{\"account_history\": " + account_transaction + ", \"operation_history\": " + operation_history +
                          ",\"operation_type\": " + op_type + ", \"block_data\": " + block_data + visitor_data + "}";
-
 
       // bulk header before each line, op_type = create to avoid dups, index id will be ath id(2.9.X).
       std::string _id = fc::json::to_string(ath.id);
@@ -249,11 +241,8 @@ void elasticsearch_plugin_impl::add_elasticsearch( const account_id_type account
       //wlog((bulking));
 
       struct curl_slist *headers = NULL;
-
       curl_slist_append(headers, "Content-Type: application/json");
-
       std::string url = _elasticsearch_node_url + "_bulk";
-
       curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
       curl_easy_setopt(curl, CURLOPT_POST, true);
       curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
@@ -267,10 +256,8 @@ void elasticsearch_plugin_impl::add_elasticsearch( const account_id_type account
       //ilog("log here curl: ${output}", ("output", readBuffer));
       if(_elasticsearch_logs) {
          auto logs = readBuffer;
-
          // do logs
          std::string url_logs = _elasticsearch_node_url + "logs/data/";
-
          curl_easy_setopt(curl, CURLOPT_URL, url_logs.c_str());
          curl_easy_setopt(curl, CURLOPT_POST, true);
          curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
@@ -286,7 +273,6 @@ void elasticsearch_plugin_impl::add_elasticsearch( const account_id_type account
    else {
       //   wdump(("no curl!"));
    }
-
    // remove everything expect this from ath
    const auto &his_idx = db.get_index_type<account_transaction_history_index>();
    const auto &by_seq_idx = his_idx.indices().get<by_seq>();
@@ -310,7 +296,6 @@ void elasticsearch_plugin_impl::add_elasticsearch( const account_id_type account
       if (by_opid_idx.find(remove_op_id) == by_opid_idx.end()) {
          db.remove(remove_op_id(db));
       }
-
    }
 }
 
@@ -372,6 +357,5 @@ void elasticsearch_plugin::plugin_initialize(const boost::program_options::varia
 void elasticsearch_plugin::plugin_startup()
 {
 }
-
 
 } }
