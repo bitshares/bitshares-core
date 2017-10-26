@@ -60,10 +60,6 @@ class elasticsearch_plugin_impl
       { }
       virtual ~elasticsearch_plugin_impl();
 
-
-      /** this method is called as a callback after a block is applied
-       * and will process/index all operations that were applied in the block.
-       */
       void update_account_histories( const signed_block& b );
 
       graphene::chain::database& database()
@@ -72,17 +68,14 @@ class elasticsearch_plugin_impl
       }
 
       elasticsearch_plugin& _self;
-      //flat_set<account_id_type> _tracked_accounts;
-      //bool _partial_operations = false;
       primary_index< simple_index< operation_history_object > >* _oho_index;
-      //uint32_t _max_ops_per_account = -1;
+
       std::string _elasticsearch_node_url = "http://localhost:9200/";
       uint32_t _elasticsearch_bulk_replay = 10000;
       uint32_t _elasticsearch_bulk_sync = 100;
       bool _elasticsearch_logs = true;
       bool _elasticsearch_visitor = false;
    private:
-      /** add one history record, then check and remove the earliest history record */
       void add_elasticsearch( const account_id_type account_id, const operation_history_id_type op_id );
 
 };
@@ -176,13 +169,12 @@ void elasticsearch_plugin_impl::add_elasticsearch( const account_id_type account
    boost::replace_all(op, "'''", "?");
 
    std::string op_type = "";
-   // using the which() segfuault around block 261319 - update it not here
    if (!op_id(db).id.is_null())
       op_type = fc::json::to_string(op_id(db).op.which());
 
    std::string operation_history = "{\"trx_in_block\":" + trx_in_block + ",\"op_in_trx\":" + op_in_trx +
-                            ",\"operation_results\":\"" + operation_result + "\",\"virtual_op\":" + virtual_op +
-                            ",\"op\":\"" + op + "\"}";
+                                   ",\"operation_results\":\"" + operation_result + "\",\"virtual_op\":" + virtual_op +
+                                   ",\"op\":\"" + op + "\"}";
 
 
    // visitor data
