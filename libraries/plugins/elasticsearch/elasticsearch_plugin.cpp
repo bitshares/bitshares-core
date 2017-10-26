@@ -164,8 +164,9 @@ void elasticsearch_plugin_impl::add_elasticsearch( const account_id_type account
    std::string virtual_op = fc::json::to_string(op_id(db).virtual_op);
 
    std::string op = fc::json::to_string(op_id(db).op);
+   boost::replace_all(op, "'", "!");
    boost::replace_all(op, "\"", "'");
-   boost::replace_all(op, "'", "?");
+
 
    std::string op_type = "";
    if (!op_id(db).id.is_null())

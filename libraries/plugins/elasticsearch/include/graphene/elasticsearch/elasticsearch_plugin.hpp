@@ -328,5 +328,5 @@ struct operation_visitor
       fee_amount = o.fee.amount;
    }
 };
-      
+
 } } //graphene::elasticsearch
