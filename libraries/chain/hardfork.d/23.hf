@@ -1,5 +1,4 @@
 // Issue #23: Withdrawal claims made before the first withdrawal period are incorrectly allowed
-// Fork time set to 2017-02-01 00:00:00 UTC
 #ifndef HARDFORK_23_TIME
-#define HARDFORK_23_TIME (fc::time_point_sec( 1485907200 ))
+#define HARDFORK_23_TIME (fc::time_point_sec( 1511793600 ))
 #endif

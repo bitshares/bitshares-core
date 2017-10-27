@@ -409,8 +409,8 @@ namespace detail {
             if(fc::exists(_options->at("api-access").as<boost::filesystem::path>()))
             {
                _apiaccess = fc::json::from_file( _options->at("api-access").as<boost::filesystem::path>() ).as<api_access>();
-               ilog("Using api access file from ${path}",
-                  ("path", _options->at("api-access").as<boost::filesystem::path>().string()));
+               ilog( "Using api access file from ${path}",
+                     ("path", _options->at("api-access").as<boost::filesystem::path>().string()) );
             }
             else
             {
