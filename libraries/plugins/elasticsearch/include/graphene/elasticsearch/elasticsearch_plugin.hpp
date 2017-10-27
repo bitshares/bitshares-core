@@ -26,10 +26,6 @@
 #include <graphene/app/plugin.hpp>
 #include <graphene/chain/database.hpp>
 
-#include <graphene/chain/operation_history_object.hpp>
-
-#include <fc/thread/future.hpp>
-
 namespace graphene { namespace elasticsearch {
    using namespace chain;
    //using namespace graphene::db;
