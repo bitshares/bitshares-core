@@ -75,7 +75,7 @@ class elasticsearch_plugin_impl
       bool _elasticsearch_logs = true;
       bool _elasticsearch_visitor = false;
    private:
-      void add_elasticsearch( const account_id_type account_id, const operation_history_id_type op_id );
+      void add_elasticsearch( const account_id_type account_id, const operation_history_id_type op_id, const signed_block& b );
 
 };
 
@@ -123,12 +123,12 @@ void elasticsearch_plugin_impl::update_account_histories( const signed_block& b 
 
       for( auto& account_id : impacted )
       {
-         add_elasticsearch( account_id, oho->id );
+         add_elasticsearch( account_id, oho->id, b );
       }
    }
 }
 
-void elasticsearch_plugin_impl::add_elasticsearch( const account_id_type account_id, const operation_history_id_type op_id )
+void elasticsearch_plugin_impl::add_elasticsearch( const account_id_type account_id, const operation_history_id_type op_id, const signed_block& b)
 {
    graphene::chain::database& db = database();
    const auto &stats_obj = account_id(db).statistics(db);
@@ -201,9 +201,9 @@ void elasticsearch_plugin_impl::add_elasticsearch( const account_id_type account
    }
 
    // block data
-   auto block = db.fetch_block_by_number(op_id(db).block_num);
-   std::string block_num = std::to_string(block->block_num());
-   std::string block_time = block->timestamp.to_iso_string();
+   //auto block = db.fetch_block_by_number(op_id(db).block_num);
+   std::string block_num = std::to_string(b.block_num());
+   std::string block_time = b.timestamp.to_iso_string();
    std::string trx_id = "";
    // removing by segfault at blok 261319,- static variant wich thing.
    //if(!block->transactions.empty() && block->transactions[op_id(db).trx_in_block].id().data_size() > 0 && block->block_num() != 261319 ) {
@@ -214,7 +214,7 @@ void elasticsearch_plugin_impl::add_elasticsearch( const account_id_type account
 
    // check if we are in replay or in sync and change number of bulk documents accordingly
    uint32_t limit_documents = 0;
-   if((fc::time_point::now() - block->timestamp) < fc::seconds(30))
+   if((fc::time_point::now() - b.timestamp) < fc::seconds(30))
       limit_documents = _elasticsearch_bulk_sync;
    else
       limit_documents = _elasticsearch_bulk_replay;
