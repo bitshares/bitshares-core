@@ -75,7 +75,7 @@ class elasticsearch_plugin_impl
       bool _elasticsearch_logs = true;
       bool _elasticsearch_visitor = false;
    private:
-      void add_elasticsearch( const account_id_type account_id, const operation_history_id_type op_id, const signed_block& b );
+      void add_elasticsearch( const account_id_type account_id, const optional<operation_history_object>& oho, const signed_block& b );
 
 };
 
@@ -123,19 +123,19 @@ void elasticsearch_plugin_impl::update_account_histories( const signed_block& b 
 
       for( auto& account_id : impacted )
       {
-         add_elasticsearch( account_id, oho->id, b );
+         add_elasticsearch( account_id, oho, b );
       }
    }
 }
 
-void elasticsearch_plugin_impl::add_elasticsearch( const account_id_type account_id, const operation_history_id_type op_id, const signed_block& b)
+void elasticsearch_plugin_impl::add_elasticsearch( const account_id_type account_id, const optional <operation_history_object>& oho, const signed_block& b)
 {
    graphene::chain::database& db = database();
    const auto &stats_obj = account_id(db).statistics(db);
 
    // add new entry
    const auto &ath = db.create<account_transaction_history_object>([&](account_transaction_history_object &obj) {
-      obj.operation_id = op_id;
+      obj.operation_id = oho->id;
       obj.account = account_id;
       obj.sequence = stats_obj.total_ops + 1;
       obj.next = stats_obj.most_recent_op;
@@ -155,15 +155,15 @@ void elasticsearch_plugin_impl::add_elasticsearch( const account_id_type account
    std::string account_transaction = fc::json::to_string(ath.to_variant());
 
    // operation history data
-   std::string trx_in_block = fc::json::to_string(op_id(db).trx_in_block);
-   std::string op_in_trx = fc::json::to_string(op_id(db).op_in_trx);
+   std::string trx_in_block = fc::json::to_string(oho->trx_in_block);
+   std::string op_in_trx = fc::json::to_string(oho->op_in_trx);
 
-   std::string operation_result = fc::json::to_string(op_id(db).result);
+   std::string operation_result = fc::json::to_string(oho->result);
    boost::replace_all(operation_result, "\"", "'");
 
-   std::string virtual_op = fc::json::to_string(op_id(db).virtual_op);
+   std::string virtual_op = fc::json::to_string(oho->virtual_op);
 
-   std::string op = fc::json::to_string(op_id(db).op);
+   std::string op = fc::json::to_string(oho->op);
    // escaping some special characters inside op
    boost::replace_all(op, "'", ""); // '
    boost::replace_all(op, "\\'", ""); // \'
@@ -173,8 +173,8 @@ void elasticsearch_plugin_impl::add_elasticsearch( const account_id_type account
 
 
    std::string op_type = "";
-   if (!op_id(db).id.is_null())
-      op_type = fc::json::to_string(op_id(db).op.which());
+   if (!oho->id.is_null())
+      op_type = fc::json::to_string(oho->op.which());
 
    std::string operation_history = "{\"trx_in_block\":" + trx_in_block + ",\"op_in_trx\":" + op_in_trx +
                                    ",\"operation_results\":\"" + operation_result + "\",\"virtual_op\":" + virtual_op +
@@ -184,7 +184,7 @@ void elasticsearch_plugin_impl::add_elasticsearch( const account_id_type account
    std::string visitor_data = "";
    if(_elasticsearch_visitor) {
       operation_visitor o_v;
-      op_id(db).op.visit(o_v);
+      oho->op.visit(o_v);
 
       std::string fee_asset = fc::json::to_string(o_v.fee_asset);
       std::string fee_amount = fc::json::to_string(o_v.fee_amount);
