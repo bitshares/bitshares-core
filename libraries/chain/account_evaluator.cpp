@@ -210,6 +210,7 @@ object_id_type account_create_evaluator::do_apply( const account_create_operatio
          }
    });
 
+   /*
    if( has_small_percent )
    {
       wlog( "Account affected by #453 registered in block ${n}:  ${na} reg=${reg} ref=${ref}:${refp} ltr=${ltr}:${ltrp}",
@@ -218,6 +219,7 @@ object_id_type account_create_evaluator::do_apply( const account_create_operatio
          ("refp", new_acnt_object.referrer_rewards_percentage) ("ltrp", new_acnt_object.lifetime_referrer_fee_percentage) );
       wlog( "Affected account object is ${o}", ("o", new_acnt_object) );
    }
+   */
 
    const auto& dynamic_properties = db().get_dynamic_global_properties();
    db().modify(dynamic_properties, [](dynamic_global_property_object& p) {
