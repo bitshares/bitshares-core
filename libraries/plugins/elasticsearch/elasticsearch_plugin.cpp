@@ -76,6 +76,7 @@ class elasticsearch_plugin_impl
       bool _elasticsearch_visitor = false;
    private:
       void add_elasticsearch( const account_id_type account_id, const optional<operation_history_object>& oho, const signed_block& b );
+      void createBulkLine(account_transaction_history_object ath, operation_history_struct os, int op_type, block_struct bs, visitor_struct vs);
 
 };
 
@@ -151,66 +152,44 @@ void elasticsearch_plugin_impl::add_elasticsearch( const account_id_type account
    std::string readBuffer;
    std::string readBuffer_logs;
 
-   // ath data
-   std::string account_transaction = fc::json::to_string(ath.to_variant());
+   // operation_type
+   int op_type;
+   if (!oho->id.is_null())
+      op_type = oho->op.which();
 
    // operation history data
-   std::string trx_in_block = fc::json::to_string(oho->trx_in_block);
-   std::string op_in_trx = fc::json::to_string(oho->op_in_trx);
-
-   std::string operation_result = fc::json::to_string(oho->result);
-   boost::replace_all(operation_result, "\"", "'");
-
-   std::string virtual_op = fc::json::to_string(oho->virtual_op);
-
-   std::string op = fc::json::to_string(oho->op);
-   // escaping some special characters inside op
-   boost::replace_all(op, "'", ""); // '
-   boost::replace_all(op, "\\'", ""); // \'
-   boost::replace_all(op, "\\\"", ""); // \"
-   boost::replace_all(op, "\"", "'"); // replace all " for '
-
-
-
-   std::string op_type = "";
-   if (!oho->id.is_null())
-      op_type = fc::json::to_string(oho->op.which());
-
-   std::string operation_history = "{\"trx_in_block\":" + trx_in_block + ",\"op_in_trx\":" + op_in_trx +
-                                   ",\"operation_results\":\"" + operation_result + "\",\"virtual_op\":" + virtual_op +
-                                   ",\"op\":\"" + op + "\"}";
+   operation_history_struct os;
+   os.trx_in_block = oho->trx_in_block;
+   os.op_in_trx = oho->op_in_trx;
+   os.operation_result = fc::json::to_string(oho->result);
+   os.virtual_op = oho->virtual_op;
+   os.op = fc::json::to_string(oho->op);
 
    // visitor data
-   std::string visitor_data = "";
+   visitor_struct vs;
    if(_elasticsearch_visitor) {
       operation_visitor o_v;
       oho->op.visit(o_v);
 
-      std::string fee_asset = fc::json::to_string(o_v.fee_asset);
-      std::string fee_amount = fc::json::to_string(o_v.fee_amount);
-      boost::replace_all(fee_amount, "\"", "");
-
-      std::string fee_data = "{\"fee_asset\":" + fee_asset + ", \"fee_amount\":\"" + fee_amount + "\"}";
-
-      std::string transfer_asset = fc::json::to_string(o_v.transfer_asset_id);
-      std::string transfer_amount = fc::json::to_string(o_v.transfer_amount);
-      boost::replace_all(transfer_amount, "\"", "");
-
-      std::string transfer_data = "{\"transfer_asset_id\":" + transfer_asset + ", \"transfer_amount\":\"" + transfer_amount + "\"}";
-      visitor_data = ",\"fee_data\": " + fee_data + ", \"transfer_data\": " + transfer_data;
+      vs.fee_data.asset = o_v.fee_asset;
+      vs.fee_data.amount = o_v.fee_amount;
+      vs.transfer_data.asset = o_v.transfer_asset_id;
+      vs.transfer_data.amount = o_v.transfer_amount;
+      vs.transfer_data.from = o_v.transfer_from;
+      vs.transfer_data.to = o_v.transfer_to;
    }
 
    // block data
-   //auto block = db.fetch_block_by_number(op_id(db).block_num);
-   std::string block_num = std::to_string(b.block_num());
-   std::string block_time = b.timestamp.to_iso_string();
    std::string trx_id = "";
    // removing by segfault at blok 261319,- static variant wich thing.
    //if(!block->transactions.empty() && block->transactions[op_id(db).trx_in_block].id().data_size() > 0 && block->block_num() != 261319 ) {
    //   trx_id = block->transactions[op_id(db).trx_in_block].id().str();
    //}
-   std::string block_data = "{\"block_num\":" + block_num + ",\"block_time\":\"" + block_time +
-                             "\",\"trx_id\":\"" + trx_id + "\"}";
+   block_struct bs;
+   bs.block_num = b.block_num();
+   bs.block_time = b.timestamp;
+   bs.trx_id = trx_id;
+
 
    // check if we are in replay or in sync and change number of bulk documents accordingly
    uint32_t limit_documents = 0;
@@ -219,22 +198,9 @@ void elasticsearch_plugin_impl::add_elasticsearch( const account_id_type account
    else
       limit_documents = _elasticsearch_bulk_replay;
 
-   //wlog((account_transaction));
-   //wlog((operation_history));
-   //wlog((fee_data));
-   //wlog((transfer_data));
-   //wlog((block_data));
 
    if(bulk.size() < limit_documents) { // we have everything, creating bulk array
-
-      // put alltogether in 1 line of bulk
-      std::string alltogether = "{\"account_history\": " + account_transaction + ", \"operation_history\": " + operation_history +
-                         ",\"operation_type\": " + op_type + ", \"block_data\": " + block_data + visitor_data + "}";
-
-      // bulk header before each line, op_type = create to avoid dups, index id will be ath id(2.9.X).
-      std::string _id = fc::json::to_string(ath.id);
-      bulk.push_back("{ \"index\" : { \"_index\" : \"graphene\", \"_type\" : \"data\", \"op_type\" : \"create\", \"_id\" : "+_id+" } }");
-      bulk.push_back(alltogether);
+      createBulkLine(ath, os, op_type, bs, vs);
    }
    std::string bulking = "";
    if (curl && bulk.size() >= limit_documents) { // we are in bulk time, ready to add data to elasticsearech
@@ -302,6 +268,23 @@ void elasticsearch_plugin_impl::add_elasticsearch( const account_id_type account
          db.remove(remove_op_id(db));
       }
    }
+}
+
+void elasticsearch_plugin_impl::createBulkLine(account_transaction_history_object ath, operation_history_struct os, int op_type, block_struct bs, visitor_struct vs)
+{
+   bulk_struct bulks;
+   bulks.account_history = ath;
+   bulks.operation_history = os;
+   bulks.operation_type = op_type;
+   bulks.block_data = bs;
+   bulks.additional_data = vs;
+
+   std::string alltogether = fc::json::to_string(bulks);
+
+   // bulk header before each line, op_type = create to avoid dups, index id will be ath id(2.9.X).
+   std::string _id = fc::json::to_string(ath.id);
+   bulk.push_back("{ \"index\" : { \"_index\" : \"graphene\", \"_type\" : \"data\", \"op_type\" : \"create\", \"_id\" : "+_id+" } }"); // header
+   bulk.push_back(alltogether);
 }
 
 } // end namespace detail

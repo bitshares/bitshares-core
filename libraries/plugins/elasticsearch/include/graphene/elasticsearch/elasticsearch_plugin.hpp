@@ -25,6 +25,7 @@
 
 #include <graphene/app/plugin.hpp>
 #include <graphene/chain/database.hpp>
+#include <graphene/chain/operation_history_object.hpp>
 
 namespace graphene { namespace elasticsearch {
    using namespace chain;
@@ -84,6 +85,8 @@ struct operation_visitor
 
    asset_id_type transfer_asset_id;
    share_type transfer_amount;
+   account_id_type transfer_from;
+   account_id_type transfer_to;
 
    void operator()( const graphene::chain::transfer_operation& o )
    {
@@ -92,6 +95,8 @@ struct operation_visitor
 
       transfer_asset_id = o.amount.asset_id;
       transfer_amount = o.amount.amount;
+      transfer_from = o.from;
+      transfer_to = o.to;
    }
    template<typename T>
    void operator()( const T& o )
@@ -101,4 +106,53 @@ struct operation_visitor
    }
 };
 
+struct operation_history_struct {
+   int trx_in_block;
+   int op_in_trx;
+   std::string operation_result;
+   int virtual_op;
+   std::string op;
+};
+
+struct block_struct {
+   int block_num;
+   fc::time_point_sec block_time;
+   std::string trx_id;
+};
+
+struct fee_struct {
+   asset_id_type asset;
+   share_type amount;
+};
+
+struct transfer_struct {
+   asset_id_type asset;
+   share_type amount;
+   account_id_type from;
+   account_id_type to;
+};
+
+struct visitor_struct {
+   fee_struct fee_data;
+   transfer_struct transfer_data;
+};
+
+struct bulk_struct {
+   account_transaction_history_object account_history;
+   operation_history_struct operation_history;
+   int operation_type;
+   block_struct block_data;
+   visitor_struct additional_data;
+};
+
+
 } } //graphene::elasticsearch
+
+FC_REFLECT( graphene::elasticsearch::operation_history_struct, (trx_in_block)(op_in_trx)(operation_result)(virtual_op)(op) )
+FC_REFLECT( graphene::elasticsearch::block_struct, (block_num)(block_time)(trx_id) )
+FC_REFLECT( graphene::elasticsearch::fee_struct, (asset)(amount) )
+FC_REFLECT( graphene::elasticsearch::transfer_struct, (asset)(amount)(from)(to) )
+FC_REFLECT( graphene::elasticsearch::visitor_struct, (fee_data)(transfer_data) )
+FC_REFLECT( graphene::elasticsearch::bulk_struct, (account_history)(operation_history)(operation_type)(block_data)(additional_data) )
+
+
