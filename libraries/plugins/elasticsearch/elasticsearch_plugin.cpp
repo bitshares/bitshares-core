@@ -77,6 +77,7 @@ class elasticsearch_plugin_impl
    private:
       void add_elasticsearch( const account_id_type account_id, const optional<operation_history_object>& oho, const signed_block& b );
       void createBulkLine(account_transaction_history_object ath, operation_history_struct os, int op_type, block_struct bs, visitor_struct vs);
+      void sendBulk(std::string _elasticsearch_node_url, bool _elasticsearch_logs);
 
 };
 
@@ -148,10 +149,6 @@ void elasticsearch_plugin_impl::add_elasticsearch( const account_id_type account
       obj.total_ops = ath.sequence;
    });
 
-   // curl buffers to read
-   std::string readBuffer;
-   std::string readBuffer_logs;
-
    // operation_type
    int op_type;
    if (!oho->id.is_null())
@@ -190,7 +187,6 @@ void elasticsearch_plugin_impl::add_elasticsearch( const account_id_type account
    bs.block_time = b.timestamp;
    bs.trx_id = trx_id;
 
-
    // check if we are in replay or in sync and change number of bulk documents accordingly
    uint32_t limit_documents = 0;
    if((fc::time_point::now() - b.timestamp) < fc::seconds(30))
@@ -198,48 +194,11 @@ void elasticsearch_plugin_impl::add_elasticsearch( const account_id_type account
    else
       limit_documents = _elasticsearch_bulk_replay;
 
-
    if(bulk.size() < limit_documents) { // we have everything, creating bulk array
       createBulkLine(ath, os, op_type, bs, vs);
    }
-   std::string bulking = "";
    if (curl && bulk.size() >= limit_documents) { // we are in bulk time, ready to add data to elasticsearech
-
-      bulking = boost::algorithm::join(bulk, "\n");
-      bulking = bulking + "\n";
-      bulk.clear();
-
-      //wlog((bulking));
-
-      struct curl_slist *headers = NULL;
-      curl_slist_append(headers, "Content-Type: application/json");
-      std::string url = _elasticsearch_node_url + "_bulk";
-      curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
-      curl_easy_setopt(curl, CURLOPT_POST, true);
-      curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
-      curl_easy_setopt(curl, CURLOPT_POSTFIELDS, bulking.c_str());
-      curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
-      curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)&readBuffer);
-      curl_easy_setopt(curl, CURLOPT_USERAGENT, "libcrp/0.1");
-      //curl_easy_setopt(curl, CURLOPT_VERBOSE, true);
-      curl_easy_perform(curl);
-
-      //ilog("log here curl: ${output}", ("output", readBuffer));
-      if(_elasticsearch_logs) {
-         auto logs = readBuffer;
-         // do logs
-         std::string url_logs = _elasticsearch_node_url + "logs/data/";
-         curl_easy_setopt(curl, CURLOPT_URL, url_logs.c_str());
-         curl_easy_setopt(curl, CURLOPT_POST, true);
-         curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
-         curl_easy_setopt(curl, CURLOPT_POSTFIELDS, logs.c_str());
-         curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
-         curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *) &readBuffer_logs);
-         curl_easy_setopt(curl, CURLOPT_USERAGENT, "libcrp/0.1");
-         //curl_easy_setopt(curl, CURLOPT_VERBOSE, true);
-         //ilog("log here curl: ${output}", ("output", readBuffer_logs));
-         curl_easy_perform(curl);
-      }
+      sendBulk(_elasticsearch_node_url, _elasticsearch_logs);
    }
    else {
       //   wdump(("no curl!"));
@@ -285,6 +244,52 @@ void elasticsearch_plugin_impl::createBulkLine(account_transaction_history_objec
    std::string _id = fc::json::to_string(ath.id);
    bulk.push_back("{ \"index\" : { \"_index\" : \"graphene\", \"_type\" : \"data\", \"op_type\" : \"create\", \"_id\" : "+_id+" } }"); // header
    bulk.push_back(alltogether);
+}
+
+void elasticsearch_plugin_impl::sendBulk(std::string _elasticsearch_node_url, bool _elasticsearch_logs)
+{
+
+   // curl buffers to read
+   std::string readBuffer;
+   std::string readBuffer_logs;
+
+   std::string bulking = "";
+
+   bulking = boost::algorithm::join(bulk, "\n");
+   bulking = bulking + "\n";
+   bulk.clear();
+
+   //wlog((bulking));
+
+   struct curl_slist *headers = NULL;
+   curl_slist_append(headers, "Content-Type: application/json");
+   std::string url = _elasticsearch_node_url + "_bulk";
+   curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+   curl_easy_setopt(curl, CURLOPT_POST, true);
+   curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+   curl_easy_setopt(curl, CURLOPT_POSTFIELDS, bulking.c_str());
+   curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
+   curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)&readBuffer);
+   curl_easy_setopt(curl, CURLOPT_USERAGENT, "libcrp/0.1");
+   //curl_easy_setopt(curl, CURLOPT_VERBOSE, true);
+   curl_easy_perform(curl);
+
+   //ilog("log here curl: ${output}", ("output", readBuffer));
+   if(_elasticsearch_logs) {
+      auto logs = readBuffer;
+      // do logs
+      std::string url_logs = _elasticsearch_node_url + "logs/data/";
+      curl_easy_setopt(curl, CURLOPT_URL, url_logs.c_str());
+      curl_easy_setopt(curl, CURLOPT_POST, true);
+      curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+      curl_easy_setopt(curl, CURLOPT_POSTFIELDS, logs.c_str());
+      curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
+      curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *) &readBuffer_logs);
+      curl_easy_setopt(curl, CURLOPT_USERAGENT, "libcrp/0.1");
+      //curl_easy_setopt(curl, CURLOPT_VERBOSE, true);
+      //ilog("log here curl: ${output}", ("output", readBuffer_logs));
+      curl_easy_perform(curl);
+   }
 }
 
 } // end namespace detail
