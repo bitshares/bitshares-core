@@ -739,6 +739,7 @@ void deprecate_annual_members( database& db )
 
 void database::process_bids( const asset_bitasset_data_object& bad )
 {
+   if( bad.is_prediction_market ) return;
    if( bad.current_feed.settlement_price.is_null() ) return;
 
    asset_id_type to_revive_id = (asset( 0, bad.options.short_backing_asset ) * bad.settlement_price).asset_id;
