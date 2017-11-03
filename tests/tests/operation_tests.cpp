@@ -241,12 +241,18 @@ BOOST_AUTO_TEST_CASE( prediction_market )
       ACTORS((judge)(dan)(nathan));
 
       const auto& pmark = create_prediction_market("PMARK", judge_id);
+      const auto pmark_dd_id = pmark.dynamic_asset_data_id;
       const auto& core  = asset_id_type()(db);
 
       int64_t init_balance(1000000);
       transfer(committee_account, judge_id, asset(init_balance));
       transfer(committee_account, dan_id, asset(init_balance));
       transfer(committee_account, nathan_id, asset(init_balance));
+
+      update_feed_producers( pmark, { judge_id });
+      price_feed feed;
+      feed.settlement_price = asset( 1, pmark.id ) / asset( 1 );
+      publish_feed( pmark, judge, feed );
 
       BOOST_TEST_MESSAGE( "Require throw for mismatch collateral amounts" );
       GRAPHENE_REQUIRE_THROW( borrow( dan, pmark.amount(1000), asset(2000) ), fc::exception );
@@ -271,6 +277,13 @@ BOOST_AUTO_TEST_CASE( prediction_market )
       BOOST_TEST_MESSAGE( "Verify that forced settlment succeedes after global settlement" );
       force_settle( dan, pmark.amount(100) );
 
+      // force settle the rest
+      force_settle( dan, pmark.amount(400) );
+      BOOST_CHECK_EQUAL( 0, pmark_dd_id(db).current_supply.value );
+
+      generate_block(~database::skip_transaction_dupe_check);
+      generate_blocks( db.get_dynamic_global_properties().next_maintenance_time );
+      generate_block();
    } catch( const fc::exception& e) {
       edump((e.to_detail_string()));
       throw;
@@ -282,12 +295,18 @@ BOOST_AUTO_TEST_CASE( prediction_market_resolves_to_0 )
       ACTORS((judge)(dan)(nathan));
 
       const auto& pmark = create_prediction_market("PMARK", judge_id);
+      const auto pmark_dd_id = pmark.dynamic_asset_data_id;
       const auto& core  = asset_id_type()(db);
 
       int64_t init_balance(1000000);
       transfer(committee_account, judge_id, asset(init_balance));
       transfer(committee_account, dan_id, asset(init_balance));
       transfer(committee_account, nathan_id, asset(init_balance));
+
+      update_feed_producers( pmark, { judge_id });
+      price_feed feed;
+      feed.settlement_price = asset( 1, pmark.id ) / asset( 1 );
+      publish_feed( pmark, judge, feed );
 
       borrow( dan, pmark.amount(1000), asset(1000) );
       // force settle with 0 outcome
@@ -296,7 +315,14 @@ BOOST_AUTO_TEST_CASE( prediction_market_resolves_to_0 )
       BOOST_TEST_MESSAGE( "Verify that forced settlment succeedes after global settlement" );
       force_settle( dan, pmark.amount(100) );
 
-   } catch( const fc::exception& e) {
+      // force settle the rest
+      force_settle( dan, pmark.amount(900) );
+      BOOST_CHECK_EQUAL( 0, pmark_dd_id(db).current_supply.value );
+
+      generate_block(~database::skip_transaction_dupe_check);
+      generate_blocks( db.get_dynamic_global_properties().next_maintenance_time );
+      generate_block();
+} catch( const fc::exception& e) {
       edump((e.to_detail_string()));
       throw;
    }
