@@ -751,7 +751,7 @@ void database::process_bids( const asset_bitasset_data_object& bad )
 
    share_type covered = 0;
    auto itr = start;
-   while( itr != bid_idx.end() && itr->inv_swan_price.quote.asset_id == to_revive_id )
+   while( covered < bdd.current_supply && itr != bid_idx.end() && itr->inv_swan_price.quote.asset_id == to_revive_id )
    {
       const collateral_bid_object& bid = *itr;
       asset total_collateral = bid.inv_swan_price.quote * bad.settlement_price;
@@ -760,7 +760,6 @@ void database::process_bids( const asset_bitasset_data_object& bad )
       if( ~call_price >= bad.current_feed.settlement_price ) break;
       covered += bid.inv_swan_price.quote.amount;
       ++itr;
-      if( covered >= bdd.current_supply ) break;
    }
    if( covered < bdd.current_supply ) return;
 
