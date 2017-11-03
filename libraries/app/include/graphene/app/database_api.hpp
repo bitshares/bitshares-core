@@ -105,8 +105,8 @@ struct market_trade
    double                     price;
    double                     amount;
    double                     value;
-   account_id_type            side1_account_id;
-   account_id_type            side2_account_id;
+   account_id_type            side1_account_id = GRAPHENE_NULL_ACCOUNT;
+   account_id_type            side2_account_id = GRAPHENE_NULL_ACCOUNT;
 };
 
 /**

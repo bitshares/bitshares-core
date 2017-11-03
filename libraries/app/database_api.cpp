@@ -1315,7 +1315,14 @@ vector<market_trade> database_api_impl::get_trade_history( const string& base,
    hkey.quote = quote_id;
    hkey.sequence = std::numeric_limits<int64_t>::min();
 
-   auto price_to_real = [&]( const share_type a, int p ) { return double( a.value ) / pow( 10, p ); };
+   auto asset_to_real = [&]( const asset& a, int p ) { return double( a.amount.value ) / pow( 10, p ); };
+   auto price_to_real = [&]( const price& p )
+   {
+      if( p.base.asset_id == base_id )
+         return asset_to_real( p.base, assets[0]->precision ) / asset_to_real( p.quote, assets[1]->precision );
+      else
+         return asset_to_real( p.quote, assets[0]->precision ) / asset_to_real( p.base, assets[1]->precision );
+   };
 
    if ( start.sec_since_epoch() == 0 )
       start = fc::time_point_sec( fc::time_point::now() );
@@ -1332,30 +1339,40 @@ vector<market_trade> database_api_impl::get_trade_history( const string& base,
 
          if( assets[0]->id == itr->op.receives.asset_id )
          {
-            trade.amount = price_to_real( itr->op.pays.amount, assets[1]->precision );
-            trade.value = price_to_real( itr->op.receives.amount, assets[0]->precision );
+            trade.amount = asset_to_real( itr->op.pays, assets[1]->precision );
+            trade.value = asset_to_real( itr->op.receives, assets[0]->precision );
          }
          else
          {
-            trade.amount = price_to_real( itr->op.receives.amount, assets[1]->precision );
-            trade.value = price_to_real( itr->op.pays.amount, assets[0]->precision );
+            trade.amount = asset_to_real( itr->op.receives, assets[1]->precision );
+            trade.value = asset_to_real( itr->op.pays, assets[0]->precision );
          }
 
          trade.date = itr->time;
-         trade.price = trade.value / trade.amount;
+         trade.price = price_to_real( itr->op.fill_price );
 
-         trade.side1_account_id = itr->op.account_id;
+         if( itr->op.is_maker )
+            trade.side1_account_id = itr->op.account_id;
+         else
+            trade.side2_account_id = itr->op.account_id;
 
          auto next_itr = std::next(itr);
-
-         trade.side2_account_id = next_itr->op.account_id;
+         // Trades are usually tracked in each direction, exception: for global settlement only one side is recorded
+         if( next_itr != history_idx.end() && next_itr->key.base == base_id && next_itr->key.quote == quote_id
+             && next_itr->time == itr->time && next_itr->op.is_maker != itr->op.is_maker )
+         {  // next_itr now could be the other direction // FIXME not 100% sure
+            if( next_itr->op.is_maker )
+               trade.side1_account_id = next_itr->op.account_id;
+            else
+               trade.side2_account_id = next_itr->op.account_id;
+            // skip the other direction
+            itr = next_itr;
+         }
 
          result.push_back( trade );
          ++count;
       }
 
-      // Trades are tracked in each direction.
-      ++itr;
       ++itr;
    }
 
