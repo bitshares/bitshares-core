@@ -109,7 +109,7 @@ struct swan_fixture : database_fixture {
 
     void wait_for_hf_core_216() {
       generate_blocks( HARDFORK_CORE_216_TIME );
-      generate_blocks(2);
+      generate_block();
     }
 
     void wait_for_maintenance() {
@@ -394,12 +394,17 @@ BOOST_AUTO_TEST_CASE( revive_empty_recovered )
       force_settle( borrower(), swan().amount(1000) );
       force_settle( borrower2(), swan().amount(1000) );
       BOOST_CHECK_EQUAL( 0, swan().dynamic_data(db).current_supply.value );
+      BOOST_CHECK_EQUAL( 0, swan().bitasset_data(db).settlement_fund.value );
 
       wait_for_hf_core_216();
 
       // revive after price recovers
       set_feed( 1, 1 );
       BOOST_CHECK( !swan().bitasset_data(db).has_settlement() );
+
+      auto& call_idx = db.get_index_type<call_order_index>().indices().get<by_account>();
+      auto itr = call_idx.find( boost::make_tuple(_feedproducer, _swan) );
+      BOOST_CHECK( itr == call_idx.end() );
 } catch( const fc::exception& e) {
       edump((e.to_detail_string()));
       throw;
@@ -458,13 +463,19 @@ BOOST_AUTO_TEST_CASE( revive_empty_with_bid )
       BOOST_CHECK_EQUAL( 0, swan().dynamic_data(db).current_supply.value );
       BOOST_CHECK_EQUAL( 0, swan().bitasset_data(db).settlement_fund.value );
 
-      bid_collateral( borrower(), back().amount(1051), swan().amount(700) );
+      bid_collateral( borrower(), back().amount(3000), swan().amount(700) );
 
       BOOST_CHECK( swan().bitasset_data(db).has_settlement() );
 
       // revive
       wait_for_maintenance();
       BOOST_CHECK( !swan().bitasset_data(db).has_settlement() );
+
+      auto& call_idx = db.get_index_type<call_order_index>().indices().get<by_account>();
+      auto itr = call_idx.find( boost::make_tuple(_borrower, _swan) );
+      BOOST_CHECK( itr == call_idx.end() );
+      itr = call_idx.find( boost::make_tuple(_feedproducer, _swan) );
+      BOOST_CHECK( itr == call_idx.end() );
 } catch( const fc::exception& e) {
       edump((e.to_detail_string()));
       throw;
