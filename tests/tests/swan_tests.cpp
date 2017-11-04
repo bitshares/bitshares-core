@@ -375,9 +375,12 @@ BOOST_AUTO_TEST_CASE( recollateralize )
       FC_ASSERT( _borrower == bids[0].bidder );
       FC_ASSERT( _borrower2 == bids[1].bidder );
 
+      BOOST_CHECK( swan().bitasset_data(db).has_settlement() );
       // revive
       wait_for_maintenance();
       BOOST_CHECK( !swan().bitasset_data(db).has_settlement() );
+      bids = db_api.get_collateral_bids(_swan, 100, 0);
+      BOOST_CHECK( bids.empty() );
 } catch( const fc::exception& e) {
       edump((e.to_detail_string()));
       throw;
@@ -472,6 +475,9 @@ BOOST_AUTO_TEST_CASE( revive_empty_with_bid )
       // revive
       wait_for_maintenance();
       BOOST_CHECK( !swan().bitasset_data(db).has_settlement() );
+      graphene::app::database_api db_api(db);
+      vector<collateral_bid_object> bids = db_api.get_collateral_bids(_swan, 100, 0);
+      BOOST_CHECK( bids.empty() );
 
       auto& call_idx = db.get_index_type<call_order_index>().indices().get<by_account>();
       auto itr = call_idx.find( boost::make_tuple(_borrower, _swan) );
