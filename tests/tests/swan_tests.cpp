@@ -103,7 +103,7 @@ struct swan_fixture : database_fixture {
 
     void expire_feed() {
       generate_blocks(db.head_block_time() + GRAPHENE_DEFAULT_PRICE_FEED_LIFETIME);
-      generate_blocks(2);
+      generate_block();
       FC_ASSERT( swan().bitasset_data(db).current_feed.settlement_price.is_null() );
     }
 
@@ -114,7 +114,7 @@ struct swan_fixture : database_fixture {
 
     void wait_for_maintenance() {
       generate_blocks( db.get_dynamic_global_properties().next_maintenance_time );
-      generate_blocks( 1 );
+      generate_block();
     }
 
     const account_object& borrower() { return _borrower(db); }
@@ -390,13 +390,15 @@ BOOST_AUTO_TEST_CASE( revive_empty_recovered )
 { try {
       limit_order_id_type oid = init_standard_swan( 1000 );
 
+      wait_for_hf_core_216();
+
+      set_expiration( db, trx );
       cancel_limit_order( oid(db) );
       force_settle( borrower(), swan().amount(1000) );
       force_settle( borrower2(), swan().amount(1000) );
       BOOST_CHECK_EQUAL( 0, swan().dynamic_data(db).current_supply.value );
       BOOST_CHECK_EQUAL( 0, swan().bitasset_data(db).settlement_fund.value );
-
-      wait_for_hf_core_216();
+      BOOST_CHECK( swan().bitasset_data(db).has_settlement() );
 
       // revive after price recovers
       set_feed( 1, 1 );
