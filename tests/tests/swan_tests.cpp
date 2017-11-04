@@ -491,10 +491,15 @@ BOOST_AUTO_TEST_CASE( revive_empty_with_bid )
    }
 }
 
-/** Creates a black swan, settles all debts - asset should be revived in next maintenance
+/** Creates a black swan, settles all debts - asset should *not* be revived in maintenance before hardfork
  */
 BOOST_AUTO_TEST_CASE( premature_revival )
 { try {
+   const auto& props = db.get_global_properties();
+   db.modify(props, [] (global_property_object& p) {
+       // Set maintenance to 1 hour to prevent price feed expiry
+       p.parameters.maintenance_interval = 60*60;
+   });
    generate_blocks( HARDFORK_CORE_216_TIME - db.get_global_properties().parameters.maintenance_interval - 1 );
 
    limit_order_id_type oid = init_standard_swan( 1000 );
@@ -509,7 +514,7 @@ BOOST_AUTO_TEST_CASE( premature_revival )
    BOOST_CHECK( swan().bitasset_data(db).has_settlement() );
 
    wait_for_hf_core_216();
-   set_feed( 1, 2 );
+   BOOST_CHECK( swan().bitasset_data(db).has_settlement() );
    wait_for_maintenance();
    BOOST_CHECK( !swan().bitasset_data(db).has_settlement() );
 } catch( const fc::exception& e) {
