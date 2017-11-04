@@ -52,6 +52,7 @@ struct swan_fixture : database_fixture {
     }
 
     void standard_users() {
+        set_expiration( db, trx );
         ACTORS((borrower)(borrower2)(feedproducer));
         _borrower = borrower_id;
         _borrower2 = borrower2_id;
@@ -62,6 +63,7 @@ struct swan_fixture : database_fixture {
     }
 
     void standard_asset() {
+        set_expiration( db, trx );
         const auto& bitusd = create_bitasset("USDBIT", _feedproducer);
         _swan = bitusd.id;
         _back = asset_id_type();
@@ -69,6 +71,7 @@ struct swan_fixture : database_fixture {
     }
 
     limit_order_id_type trigger_swan(share_type amount1, share_type amount2) {
+        set_expiration( db, trx );
         // starting out with price 1:1
         set_feed( 1, 1 );
         // start out with 2:1 collateral
@@ -422,7 +425,6 @@ BOOST_AUTO_TEST_CASE( revive_empty )
 { try {
       wait_for_hf_core_216();
 
-      set_expiration( db, trx );
       limit_order_id_type oid = init_standard_swan( 1000 );
 
       cancel_limit_order( oid(db) );
@@ -447,7 +449,6 @@ BOOST_AUTO_TEST_CASE( revive_empty_with_bid )
 { try {
       wait_for_hf_core_216();
 
-      set_expiration( db, trx );
       standard_users();
       standard_asset();
 
@@ -484,6 +485,33 @@ BOOST_AUTO_TEST_CASE( revive_empty_with_bid )
       BOOST_CHECK( itr == call_idx.end() );
       itr = call_idx.find( boost::make_tuple(_feedproducer, _swan) );
       BOOST_CHECK( itr == call_idx.end() );
+} catch( const fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
+/** Creates a black swan, settles all debts - asset should be revived in next maintenance
+ */
+BOOST_AUTO_TEST_CASE( premature_revival )
+{ try {
+   generate_blocks( HARDFORK_CORE_216_TIME - db.get_global_properties().parameters.maintenance_interval - 1 );
+
+   limit_order_id_type oid = init_standard_swan( 1000 );
+   cancel_limit_order( oid(db) );
+   force_settle( borrower(), swan().amount(1000) );
+   force_settle( borrower2(), swan().amount(1000) );
+   BOOST_CHECK_EQUAL( 0, swan().dynamic_data(db).current_supply.value );
+   BOOST_CHECK_EQUAL( 0, swan().bitasset_data(db).settlement_fund.value );
+   BOOST_CHECK( swan().bitasset_data(db).has_settlement() );
+
+   wait_for_maintenance();
+   BOOST_CHECK( swan().bitasset_data(db).has_settlement() );
+
+   wait_for_hf_core_216();
+   set_feed( 1, 2 );
+   wait_for_maintenance();
+   BOOST_CHECK( !swan().bitasset_data(db).has_settlement() );
 } catch( const fc::exception& e) {
       edump((e.to_detail_string()));
       throw;
