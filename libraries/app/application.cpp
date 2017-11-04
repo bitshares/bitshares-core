@@ -165,6 +165,7 @@ namespace detail {
                "176.9.148.19:16543",               // Uptick.rocks
                "31.171.251.20:1776",               // @Taconator
                "23.92.53.25:11010",                // sahkan
+               "139.162.242.253:1700",             // rnglab
             };
             for( const string& endpoint_string : seeds )
             {
