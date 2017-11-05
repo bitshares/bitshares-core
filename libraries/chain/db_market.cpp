@@ -571,12 +571,14 @@ bool database::check_call_orders(const asset_object& mia, bool enable_black_swan
        if( match_price > ~call_itr->call_price )
           return margin_called;
 
+       /*
        if( feed_protected )
        {
           ilog( "Feed protected margin call executing (HARDFORK_436_TIME not here yet)" );
           idump( (*call_itr) );
           idump( (*limit_itr) );
        }
+       */
 
      //  idump((*call_itr));
      //  idump((*limit_itr));
