@@ -739,7 +739,9 @@ void deprecate_annual_members( database& db )
 
 void database::process_bids( const asset_bitasset_data_object& bad )
 {
+   if( bad.is_prediction_market ) return;
    if( bad.current_feed.settlement_price.is_null() ) return;
+   if( head_block_time() <= HARDFORK_CORE_216_TIME ) return; // remove after HF date
 
    asset_id_type to_revive_id = (asset( 0, bad.options.short_backing_asset ) * bad.settlement_price).asset_id;
    const asset_object& to_revive = to_revive_id( *this );
@@ -750,7 +752,7 @@ void database::process_bids( const asset_bitasset_data_object& bad )
 
    share_type covered = 0;
    auto itr = start;
-   while( itr != bid_idx.end() && itr->inv_swan_price.quote.asset_id == to_revive_id )
+   while( covered < bdd.current_supply && itr != bid_idx.end() && itr->inv_swan_price.quote.asset_id == to_revive_id )
    {
       const collateral_bid_object& bid = *itr;
       asset total_collateral = bid.inv_swan_price.quote * bad.settlement_price;
@@ -759,7 +761,6 @@ void database::process_bids( const asset_bitasset_data_object& bad )
       if( ~call_price >= bad.current_feed.settlement_price ) break;
       covered += bid.inv_swan_price.quote.amount;
       ++itr;
-      if( covered >= bdd.current_supply ) break;
    }
    if( covered < bdd.current_supply ) return;
 

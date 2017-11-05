@@ -52,6 +52,7 @@ struct swan_fixture : database_fixture {
     }
 
     void standard_users() {
+        set_expiration( db, trx );
         ACTORS((borrower)(borrower2)(feedproducer));
         _borrower = borrower_id;
         _borrower2 = borrower2_id;
@@ -62,6 +63,7 @@ struct swan_fixture : database_fixture {
     }
 
     void standard_asset() {
+        set_expiration( db, trx );
         const auto& bitusd = create_bitasset("USDBIT", _feedproducer);
         _swan = bitusd.id;
         _back = asset_id_type();
@@ -69,6 +71,7 @@ struct swan_fixture : database_fixture {
     }
 
     limit_order_id_type trigger_swan(share_type amount1, share_type amount2) {
+        set_expiration( db, trx );
         // starting out with price 1:1
         set_feed( 1, 1 );
         // start out with 2:1 collateral
@@ -103,18 +106,18 @@ struct swan_fixture : database_fixture {
 
     void expire_feed() {
       generate_blocks(db.head_block_time() + GRAPHENE_DEFAULT_PRICE_FEED_LIFETIME);
-      generate_blocks(2);
+      generate_block();
       FC_ASSERT( swan().bitasset_data(db).current_feed.settlement_price.is_null() );
     }
 
     void wait_for_hf_core_216() {
       generate_blocks( HARDFORK_CORE_216_TIME );
-      generate_blocks(2);
+      generate_block();
     }
 
     void wait_for_maintenance() {
       generate_blocks( db.get_dynamic_global_properties().next_maintenance_time );
-      generate_blocks( 1 );
+      generate_block();
     }
 
     const account_object& borrower() { return _borrower(db); }
@@ -375,9 +378,12 @@ BOOST_AUTO_TEST_CASE( recollateralize )
       FC_ASSERT( _borrower == bids[0].bidder );
       FC_ASSERT( _borrower2 == bids[1].bidder );
 
+      BOOST_CHECK( swan().bitasset_data(db).has_settlement() );
       // revive
       wait_for_maintenance();
       BOOST_CHECK( !swan().bitasset_data(db).has_settlement() );
+      bids = db_api.get_collateral_bids(_swan, 100, 0);
+      BOOST_CHECK( bids.empty() );
 } catch( const fc::exception& e) {
       edump((e.to_detail_string()));
       throw;
@@ -390,16 +396,23 @@ BOOST_AUTO_TEST_CASE( revive_empty_recovered )
 { try {
       limit_order_id_type oid = init_standard_swan( 1000 );
 
+      wait_for_hf_core_216();
+
+      set_expiration( db, trx );
       cancel_limit_order( oid(db) );
       force_settle( borrower(), swan().amount(1000) );
       force_settle( borrower2(), swan().amount(1000) );
       BOOST_CHECK_EQUAL( 0, swan().dynamic_data(db).current_supply.value );
-
-      wait_for_hf_core_216();
+      BOOST_CHECK_EQUAL( 0, swan().bitasset_data(db).settlement_fund.value );
+      BOOST_CHECK( swan().bitasset_data(db).has_settlement() );
 
       // revive after price recovers
       set_feed( 1, 1 );
       BOOST_CHECK( !swan().bitasset_data(db).has_settlement() );
+
+      auto& call_idx = db.get_index_type<call_order_index>().indices().get<by_account>();
+      auto itr = call_idx.find( boost::make_tuple(_feedproducer, _swan) );
+      BOOST_CHECK( itr == call_idx.end() );
 } catch( const fc::exception& e) {
       edump((e.to_detail_string()));
       throw;
@@ -412,7 +425,6 @@ BOOST_AUTO_TEST_CASE( revive_empty )
 { try {
       wait_for_hf_core_216();
 
-      set_expiration( db, trx );
       limit_order_id_type oid = init_standard_swan( 1000 );
 
       cancel_limit_order( oid(db) );
@@ -437,7 +449,6 @@ BOOST_AUTO_TEST_CASE( revive_empty_with_bid )
 { try {
       wait_for_hf_core_216();
 
-      set_expiration( db, trx );
       standard_users();
       standard_asset();
 
@@ -458,13 +469,54 @@ BOOST_AUTO_TEST_CASE( revive_empty_with_bid )
       BOOST_CHECK_EQUAL( 0, swan().dynamic_data(db).current_supply.value );
       BOOST_CHECK_EQUAL( 0, swan().bitasset_data(db).settlement_fund.value );
 
-      bid_collateral( borrower(), back().amount(1051), swan().amount(700) );
+      bid_collateral( borrower(), back().amount(3000), swan().amount(700) );
 
       BOOST_CHECK( swan().bitasset_data(db).has_settlement() );
 
       // revive
       wait_for_maintenance();
       BOOST_CHECK( !swan().bitasset_data(db).has_settlement() );
+      graphene::app::database_api db_api(db);
+      vector<collateral_bid_object> bids = db_api.get_collateral_bids(_swan, 100, 0);
+      BOOST_CHECK( bids.empty() );
+
+      auto& call_idx = db.get_index_type<call_order_index>().indices().get<by_account>();
+      auto itr = call_idx.find( boost::make_tuple(_borrower, _swan) );
+      BOOST_CHECK( itr == call_idx.end() );
+      itr = call_idx.find( boost::make_tuple(_feedproducer, _swan) );
+      BOOST_CHECK( itr == call_idx.end() );
+} catch( const fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
+/** Creates a black swan, settles all debts - asset should *not* be revived in maintenance before hardfork
+ */
+BOOST_AUTO_TEST_CASE( premature_revival )
+{ try {
+   const auto& props = db.get_global_properties();
+   db.modify(props, [] (global_property_object& p) {
+       // Set maintenance to 1 hour to prevent price feed expiry
+       p.parameters.maintenance_interval = 60*60;
+   });
+   generate_blocks( HARDFORK_CORE_216_TIME - db.get_global_properties().parameters.maintenance_interval - 1 );
+
+   limit_order_id_type oid = init_standard_swan( 1000 );
+   cancel_limit_order( oid(db) );
+   force_settle( borrower(), swan().amount(1000) );
+   force_settle( borrower2(), swan().amount(1000) );
+   BOOST_CHECK_EQUAL( 0, swan().dynamic_data(db).current_supply.value );
+   BOOST_CHECK_EQUAL( 0, swan().bitasset_data(db).settlement_fund.value );
+   BOOST_CHECK( swan().bitasset_data(db).has_settlement() );
+
+   wait_for_maintenance();
+   BOOST_CHECK( swan().bitasset_data(db).has_settlement() );
+
+   wait_for_hf_core_216();
+   BOOST_CHECK( swan().bitasset_data(db).has_settlement() );
+   wait_for_maintenance();
+   BOOST_CHECK( !swan().bitasset_data(db).has_settlement() );
 } catch( const fc::exception& e) {
       edump((e.to_detail_string()));
       throw;
