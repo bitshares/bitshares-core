@@ -272,7 +272,7 @@ void database::clear_expired_orders()
             if( canceler.fee.amount > order.deferred_fee )
             {
                // Cap auto-cancel fees at deferred_fee; see #549
-               wlog( "At block ${b}, fee for clearing expired order ${oid} was capped at deferred_fee ${fee}", ("b", head_block_num())("oid", order.id)("fee", order.deferred_fee) );
+               //wlog( "At block ${b}, fee for clearing expired order ${oid} was capped at deferred_fee ${fee}", ("b", head_block_num())("oid", order.id)("fee", order.deferred_fee) );
                canceler.fee = asset( order.deferred_fee, asset_id_type() );
             }
             // we know the fee for this op is set correctly since it is set by the chain.
