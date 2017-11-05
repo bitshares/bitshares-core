@@ -178,8 +178,7 @@ void elasticsearch_plugin_impl::add_elasticsearch( const account_id_type account
 
    // block data
    std::string trx_id = "";
-   // removing by segfault at blok 261319,- update: fixed by skipping virtual ops
-   if(!b.transactions.empty() && op_type != 4 && op_type != 40 && op_type != 42 && op_type != 44) {
+   if(!b.transactions.empty() && oho->trx_in_block < b.transactions.size()) {
       trx_id = b.transactions[oho->trx_in_block].id().str();
    }
    block_struct bs;
