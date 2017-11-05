@@ -150,7 +150,7 @@ void elasticsearch_plugin_impl::add_elasticsearch( const account_id_type account
    });
 
    // operation_type
-   int op_type;
+   int op_type = -1;
    if (!oho->id.is_null())
       op_type = oho->op.which();
 
@@ -178,10 +178,10 @@ void elasticsearch_plugin_impl::add_elasticsearch( const account_id_type account
 
    // block data
    std::string trx_id = "";
-   // removing by segfault at blok 261319,- static variant wich thing.
-   //if(!block->transactions.empty() && block->transactions[op_id(db).trx_in_block].id().data_size() > 0 && block->block_num() != 261319 ) {
-   //   trx_id = block->transactions[op_id(db).trx_in_block].id().str();
-   //}
+   // removing by segfault at blok 261319,- update: fixed by skipping virtual ops
+   if(!b.transactions.empty() && op_type != 4 && op_type != 40 && op_type != 42 && op_type != 44) {
+      trx_id = b.transactions[oho->trx_in_block].id().str();
+   }
    block_struct bs;
    bs.block_num = b.block_num();
    bs.block_time = b.timestamp;
@@ -274,7 +274,6 @@ void elasticsearch_plugin_impl::sendBulk(std::string _elasticsearch_node_url, bo
    //curl_easy_setopt(curl, CURLOPT_VERBOSE, true);
    curl_easy_perform(curl);
 
-   //ilog("log here curl: ${output}", ("output", readBuffer));
    if(_elasticsearch_logs) {
       auto logs = readBuffer;
       // do logs
