@@ -273,6 +273,18 @@ void elasticsearch_plugin_impl::sendBulk(std::string _elasticsearch_node_url, bo
    //curl_easy_setopt(curl, CURLOPT_VERBOSE, true);
    curl_easy_perform(curl);
 
+   long http_code = 0;
+   curl_easy_getinfo (curl, CURLINFO_RESPONSE_CODE, &http_code);
+   if(http_code == 200) {
+      // all good, do nothing
+   }
+   else if(http_code == 429) {
+      // repeat request?
+   }
+   else {
+      // exit everything ?
+   }
+
    if(_elasticsearch_logs) {
       auto logs = readBuffer;
       // do logs
@@ -287,6 +299,18 @@ void elasticsearch_plugin_impl::sendBulk(std::string _elasticsearch_node_url, bo
       //curl_easy_setopt(curl, CURLOPT_VERBOSE, true);
       //ilog("log here curl: ${output}", ("output", readBuffer_logs));
       curl_easy_perform(curl);
+
+      http_code = 0;
+      curl_easy_getinfo (curl, CURLINFO_RESPONSE_CODE, &http_code);
+      if(http_code == 200) {
+         // all good, do nothing
+      }
+      else if(http_code == 429) {
+         // repeat request?
+      }
+      else {
+         // exit everything ?
+      }
    }
 }
 
