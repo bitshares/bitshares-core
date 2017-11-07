@@ -193,21 +193,18 @@ void elasticsearch_plugin_impl::add_elasticsearch( const account_id_type account
    else
       limit_documents = _elasticsearch_bulk_replay;
 
-   if(bulk.size() < limit_documents) { // we have everything, creating bulk array
-      createBulkLine(ath, os, op_type, bs, vs);
-   }
+   createBulkLine(ath, os, op_type, bs, vs); // we have everything, creating bulk line
+
    if (curl && bulk.size() >= limit_documents) { // we are in bulk time, ready to add data to elasticsearech
       sendBulk(_elasticsearch_node_url, _elasticsearch_logs);
    }
-   else {
-      //   wdump(("no curl!"));
-   }
-   // remove everything expect this from ath
+
+   // remove everything except current object from ath
    const auto &his_idx = db.get_index_type<account_transaction_history_index>();
    const auto &by_seq_idx = his_idx.indices().get<by_seq>();
    auto itr = by_seq_idx.lower_bound(boost::make_tuple(account_id, 0));
    if (itr != by_seq_idx.end() && itr->account == account_id && itr->id != ath.id) {
-      // if found, remove the entry, and adjust account stats object
+      // if found, remove the entry
       const auto remove_op_id = itr->operation_id;
       const auto itr_remove = itr;
       ++itr;
