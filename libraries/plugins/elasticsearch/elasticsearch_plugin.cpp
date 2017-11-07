@@ -45,9 +45,6 @@
 
 namespace graphene { namespace elasticsearch {
 
-CURL *curl; // global curl handler
-vector <string> bulk; // global vector of op lines
-
 namespace detail
 {
 
@@ -74,6 +71,8 @@ class elasticsearch_plugin_impl
       uint32_t _elasticsearch_bulk_sync = 100;
       bool _elasticsearch_logs = true;
       bool _elasticsearch_visitor = false;
+      CURL *curl; // curl handler
+      vector <string> bulk; //  vector of op lines
    private:
       void add_elasticsearch( const account_id_type account_id, const optional<operation_history_object>& oho, const signed_block& b );
       void createBulkLine(account_transaction_history_object ath, operation_history_struct os, int op_type, block_struct bs, visitor_struct vs);
@@ -316,7 +315,7 @@ void elasticsearch_plugin_impl::sendBulk(std::string _elasticsearch_node_url, bo
 elasticsearch_plugin::elasticsearch_plugin() :
    my( new detail::elasticsearch_plugin_impl(*this) )
 {
-   curl = curl_easy_init();
+   my->curl = curl_easy_init();
 }
 
 elasticsearch_plugin::~elasticsearch_plugin()
