@@ -53,7 +53,7 @@ class elasticsearch_plugin_impl
    public:
       elasticsearch_plugin_impl(elasticsearch_plugin& _plugin)
          : _self( _plugin )
-      { }
+      {  curl = curl_easy_init(); }
       virtual ~elasticsearch_plugin_impl();
 
       void update_account_histories( const signed_block& b );
@@ -315,7 +315,6 @@ void elasticsearch_plugin_impl::sendBulk(std::string _elasticsearch_node_url, bo
 elasticsearch_plugin::elasticsearch_plugin() :
    my( new detail::elasticsearch_plugin_impl(*this) )
 {
-   my->curl = curl_easy_init();
 }
 
 elasticsearch_plugin::~elasticsearch_plugin()
