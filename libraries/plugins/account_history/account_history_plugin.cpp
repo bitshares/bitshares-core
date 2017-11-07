@@ -90,7 +90,14 @@ void account_history_plugin_impl::update_account_histories( const signed_block& 
          return optional<operation_history_object>( db.create<operation_history_object>( [&]( operation_history_object& h )
          {
             if( o_op.valid() )
-               h = *o_op;
+            {
+               h.op           = o_op->op;
+               h.result       = o_op->result;
+               h.block_num    = o_op->block_num;
+               h.trx_in_block = o_op->trx_in_block;
+               h.op_in_trx    = o_op->op_in_trx;
+               h.virtual_op   = o_op->virtual_op;
+            }
          } ) );
       };
 
