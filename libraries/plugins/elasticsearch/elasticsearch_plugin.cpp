@@ -239,7 +239,7 @@ void elasticsearch_plugin_impl::createBulkLine(account_transaction_history_objec
    auto block_date = bulks.block_data.block_time.to_iso_string();
    std::vector<std::string> parts;
    boost::split(parts, block_date, boost::is_any_of("-"));
-   std::string index_name = parts[0] + "-" + parts[1];
+   std::string index_name = "graphene-" + parts[0] + "-" + parts[1];
 
    // bulk header before each line, op_type = create to avoid dups, index id will be ath id(2.9.X).
    std::string _id = fc::json::to_string(ath.id);
