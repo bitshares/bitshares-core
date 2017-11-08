@@ -41,6 +41,7 @@
 #include <boost/algorithm/string/join.hpp>
 #include <boost/algorithm/string/replace.hpp>
 #include <boost/algorithm/string/find.hpp>
+#include <boost/algorithm/string.hpp>
 #include <regex>
 
 namespace graphene { namespace elasticsearch {
@@ -235,9 +236,14 @@ void elasticsearch_plugin_impl::createBulkLine(account_transaction_history_objec
 
    std::string alltogether = fc::json::to_string(bulks);
 
+   auto block_date = bulks.block_data.block_time.to_iso_string();
+   std::vector<std::string> parts;
+   boost::split(parts, block_date, boost::is_any_of("-"));
+   std::string index_name = parts[0] + "-" + parts[1];
+
    // bulk header before each line, op_type = create to avoid dups, index id will be ath id(2.9.X).
    std::string _id = fc::json::to_string(ath.id);
-   bulk.push_back("{ \"index\" : { \"_index\" : \"graphene\", \"_type\" : \"data\", \"op_type\" : \"create\", \"_id\" : "+_id+" } }"); // header
+   bulk.push_back("{ \"index\" : { \"_index\" : \""+index_name+"\", \"_type\" : \"data\", \"op_type\" : \"create\", \"_id\" : "+_id+" } }"); // header
    bulk.push_back(alltogether);
 }
 
