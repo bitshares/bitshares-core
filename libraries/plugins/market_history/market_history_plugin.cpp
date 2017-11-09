@@ -97,7 +97,7 @@ struct operation_process_fill_order
 
       auto itr = history_idx.lower_bound( hkey );
 
-      if( itr->key.base == hkey.base && itr->key.quote == hkey.quote )
+      if( itr != history_idx.end() && itr->key.base == hkey.base && itr->key.quote == hkey.quote )
          hkey.sequence = itr->key.sequence - 1;
       else
          hkey.sequence = 0;
@@ -237,7 +237,12 @@ void market_history_plugin_impl::update_market_histories( const signed_block& b 
    for( const optional< operation_history_object >& o_op : hist )
    {
       if( o_op.valid() )
-         o_op->op.visit( operation_process_fill_order( _self, b.timestamp ) );
+      {
+         try
+         {
+            o_op->op.visit( operation_process_fill_order( _self, b.timestamp ) );
+         } FC_CAPTURE_AND_LOG( (o_op) )
+      }
    }
 }
 
