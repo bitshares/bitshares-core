@@ -428,16 +428,28 @@ class database_api
       order_book get_order_book( const string& base, const string& quote, unsigned limit = 50 )const;
 
       /**
-       * @brief Returns recent trades for the market assetA:assetB
-       * Note: Currentlt, timezone offsets are not supported. The time must be UTC.
+       * @brief Returns recent trades for the market assetA:assetB, ordered by time, most recent first. The range is [stop, start)
+       * Note: Currently, timezone offsets are not supported. The time must be UTC.
        * @param a String name of the first asset
        * @param b String name of the second asset
-       * @param stop Stop time as a UNIX timestamp
+       * @param stop Stop time as a UNIX timestamp, the earliest trade to retrieve
        * @param limit Number of trasactions to retrieve, capped at 100
-       * @param start Start time as a UNIX timestamp
+       * @param start Start time as a UNIX timestamp, the latest trade to retrieve
        * @return Recent transactions in the market
        */
       vector<market_trade> get_trade_history( const string& base, const string& quote, fc::time_point_sec start, fc::time_point_sec stop, unsigned limit = 100 )const;
+
+      /**
+       * @brief Returns trades for the market assetA:assetB, ordered by time, most recent first. The range is [stop, start)
+       * Note: Currently, timezone offsets are not supported. The time must be UTC.
+       * @param a String name of the first asset
+       * @param b String name of the second asset
+       * @param stop Stop time as a UNIX timestamp, the earliest trade to retrieve
+       * @param limit Number of trasactions to retrieve, capped at 100
+       * @param start Start sequence as an Integer, the latest trade to retrieve
+       * @return Transactions in the market
+       */
+      vector<market_trade> get_trade_history_by_sequence( const string& base, const string& quote, int64_t start, fc::time_point_sec stop, unsigned limit = 100 )const;
 
 
 
@@ -681,6 +693,7 @@ FC_API(graphene::app::database_api,
    (get_ticker)
    (get_24_volume)
    (get_trade_history)
+   (get_trade_history_by_sequence)
 
    // Witnesses
    (get_witnesses)

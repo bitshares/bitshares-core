@@ -115,6 +115,7 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       market_volume                      get_24_volume( const string& base, const string& quote )const;
       order_book                         get_order_book( const string& base, const string& quote, unsigned limit = 50 )const;
       vector<market_trade>               get_trade_history( const string& base, const string& quote, fc::time_point_sec start, fc::time_point_sec stop, unsigned limit = 100 )const;
+      vector<market_trade>               get_trade_history_by_sequence( const string& base, const string& quote, int64_t start, fc::time_point_sec stop, unsigned limit = 100 )const;
 
       // Witnesses
       vector<optional<witness_object>> get_witnesses(const vector<witness_id_type>& witness_ids)const;
@@ -1421,6 +1422,118 @@ vector<market_trade> database_api_impl::get_trade_history( const string& base,
          // TODO refuse to execute if need to skip too many entries
          // ++skipped;
          // FC_ASSERT( skipped <= 200 );
+      }
+
+      ++itr;
+   }
+
+   return result;
+}
+
+vector<market_trade> database_api::get_trade_history_by_sequence(
+                                                      const string& base,
+                                                      const string& quote,
+                                                      int64_t start,
+                                                      fc::time_point_sec stop,
+                                                      unsigned limit )const
+{
+   return my->get_trade_history_by_sequence( base, quote, start, stop, limit );
+}
+
+vector<market_trade> database_api_impl::get_trade_history_by_sequence(
+                                                           const string& base,
+                                                           const string& quote,
+                                                           int64_t start,
+                                                           fc::time_point_sec stop,
+                                                           unsigned limit )const
+{
+   FC_ASSERT( limit <= 100 );
+   FC_ASSERT( start >= 0 );
+   int64_t start_seq = -start;
+
+   auto assets = lookup_asset_symbols( {base, quote} );
+   FC_ASSERT( assets[0], "Invalid base asset symbol: ${s}", ("s",base) );
+   FC_ASSERT( assets[1], "Invalid quote asset symbol: ${s}", ("s",quote) );
+
+   auto base_id = assets[0]->id;
+   auto quote_id = assets[1]->id;
+
+   if( base_id > quote_id ) std::swap( base_id, quote_id );
+   const auto& history_idx = _db.get_index_type<graphene::market_history::history_index>().indices().get<by_key>();
+   history_key hkey;
+   hkey.base = base_id;
+   hkey.quote = quote_id;
+   hkey.sequence = start_seq;
+
+   auto asset_to_real = [&]( const asset& a, int p ) { return double( a.amount.value ) / pow( 10, p ); };
+   auto price_to_real = [&]( const price& p )
+   {
+      if( p.base.asset_id == assets[0]->id )
+         return asset_to_real( p.base, assets[0]->precision ) / asset_to_real( p.quote, assets[1]->precision );
+      else
+         return asset_to_real( p.quote, assets[0]->precision ) / asset_to_real( p.base, assets[1]->precision );
+   };
+
+   uint32_t count = 0;
+   auto itr = history_idx.lower_bound( hkey );
+   vector<market_trade> result;
+
+   while( itr != history_idx.end() && count < limit && !( itr->key.base != base_id || itr->key.quote != quote_id || itr->time < stop ) )
+   {
+      if( itr->key.sequence == start_seq ) // found the key, should skip this and the other direction if found
+      {
+         auto next_itr = std::next(itr);
+         if( next_itr != history_idx.end() && next_itr->key.base == base_id && next_itr->key.quote == quote_id
+             && next_itr->time == itr->time && next_itr->op.is_maker != itr->op.is_maker )
+         {  // next_itr now could be the other direction // FIXME not 100% sure
+            // skip the other direction
+            itr = next_itr;
+         }
+      }
+      else
+      {
+         market_trade trade;
+
+         if( assets[0]->id == itr->op.receives.asset_id )
+         {
+            trade.amount = asset_to_real( itr->op.pays, assets[1]->precision );
+            trade.value = asset_to_real( itr->op.receives, assets[0]->precision );
+         }
+         else
+         {
+            trade.amount = asset_to_real( itr->op.receives, assets[1]->precision );
+            trade.value = asset_to_real( itr->op.pays, assets[0]->precision );
+         }
+
+         trade.date = itr->time;
+         trade.price = price_to_real( itr->op.fill_price );
+
+         if( itr->op.is_maker )
+         {
+            trade.sequence = -itr->key.sequence;
+            trade.side1_account_id = itr->op.account_id;
+         }
+         else
+            trade.side2_account_id = itr->op.account_id;
+
+         auto next_itr = std::next(itr);
+         // Trades are usually tracked in each direction, exception: for global settlement only one side is recorded
+         if( next_itr != history_idx.end() && next_itr->key.base == base_id && next_itr->key.quote == quote_id
+             && next_itr->time == itr->time && next_itr->op.is_maker != itr->op.is_maker )
+         {  // next_itr now could be the other direction // FIXME not 100% sure
+            if( next_itr->op.is_maker )
+            {
+               trade.sequence = -next_itr->key.sequence;
+               trade.side1_account_id = next_itr->op.account_id;
+            }
+            else
+               trade.side2_account_id = next_itr->op.account_id;
+            // skip the other direction
+            itr = next_itr;
+         }
+
+         result.push_back( trade );
+         ++count;
       }
 
       ++itr;
