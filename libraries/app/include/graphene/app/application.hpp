@@ -56,7 +56,8 @@ namespace graphene { namespace app {
             auto plug = std::make_shared<PluginType>();
             plug->plugin_set_app(this);
 
-            boost::program_options::options_description plugin_cli_options("Options for plugin " + plug->plugin_name()), plugin_cfg_options;
+            boost::program_options::options_description plugin_cli_options(plug->plugin_name() + " plugin. " + plug->plugin_description() + "\nOptions"), plugin_cfg_options;
+            //boost::program_options::options_description plugin_cli_options("Options for plugin " + plug->plugin_name()), plugin_cfg_options;
             plug->plugin_set_program_options(plugin_cli_options, plugin_cfg_options);
             if( !plugin_cli_options.options().empty() )
                _cli_options.add(plugin_cli_options);
