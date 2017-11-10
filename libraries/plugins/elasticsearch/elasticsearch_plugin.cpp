@@ -338,6 +338,10 @@ std::string elasticsearch_plugin::plugin_name()const
 {
    return "elasticsearch";
 }
+std::string elasticsearch_plugin::plugin_description()const
+{
+   return "Stores account history data in elasticsearch database(EXPERIMENTAL).";
+}
 
 void elasticsearch_plugin::plugin_set_program_options(
    boost::program_options::options_description& cli,
