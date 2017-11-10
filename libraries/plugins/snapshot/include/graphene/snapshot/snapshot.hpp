@@ -35,6 +35,7 @@ class snapshot_plugin : public graphene::app::plugin {
       ~snapshot_plugin() {}
 
       std::string plugin_name()const override;
+      std::string plugin_description()const override;
 
       virtual void plugin_set_program_options(
          boost::program_options::options_description &command_line_options,
