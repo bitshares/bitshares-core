@@ -1163,6 +1163,7 @@ market_ticker database_api_impl::get_ticker( const string& base, const string& q
     const fc::time_point_sec yesterday = fc::time_point_sec( now.sec_since_epoch() - 86400 );
 
     market_ticker result;
+    result.time = now;
     result.base = base;
     result.quote = quote;
     result.latest = 0;
@@ -1364,6 +1365,7 @@ vector<market_trade> database_api_impl::get_trade_history( const string& base,
       start = fc::time_point_sec( fc::time_point::now() );
 
    uint32_t count = 0;
+   uint32_t skipped = 0;
    auto itr = history_idx.lower_bound( hkey );
    vector<market_trade> result;
 
@@ -1388,7 +1390,10 @@ vector<market_trade> database_api_impl::get_trade_history( const string& base,
          trade.price = price_to_real( itr->op.fill_price );
 
          if( itr->op.is_maker )
+         {
+            trade.sequence = -itr->key.sequence;
             trade.side1_account_id = itr->op.account_id;
+         }
          else
             trade.side2_account_id = itr->op.account_id;
 
@@ -1398,7 +1403,10 @@ vector<market_trade> database_api_impl::get_trade_history( const string& base,
              && next_itr->time == itr->time && next_itr->op.is_maker != itr->op.is_maker )
          {  // next_itr now could be the other direction // FIXME not 100% sure
             if( next_itr->op.is_maker )
+            {
+               trade.sequence = -next_itr->key.sequence;
                trade.side1_account_id = next_itr->op.account_id;
+            }
             else
                trade.side2_account_id = next_itr->op.account_id;
             // skip the other direction
@@ -1407,6 +1415,12 @@ vector<market_trade> database_api_impl::get_trade_history( const string& base,
 
          result.push_back( trade );
          ++count;
+      }
+      else // should skip
+      {
+         // TODO refuse to execute if need to skip too many entries
+         // ++skipped;
+         // FC_ASSERT( skipped <= 200 );
       }
 
       ++itr;
