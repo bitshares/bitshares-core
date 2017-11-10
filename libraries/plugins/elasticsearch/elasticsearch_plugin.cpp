@@ -65,7 +65,7 @@ class elasticsearch_plugin_impl
       }
 
       elasticsearch_plugin& _self;
-      primary_index< simple_index< operation_history_object > >* _oho_index;
+      primary_index< operation_history_index >* _oho_index;
 
       std::string _elasticsearch_node_url = "http://localhost:9200/";
       uint32_t _elasticsearch_bulk_replay = 10000;
@@ -97,7 +97,14 @@ void elasticsearch_plugin_impl::update_account_histories( const signed_block& b 
          return optional<operation_history_object>(
                db.create<operation_history_object>([&](operation_history_object &h) {
                   if (o_op.valid())
-                     h = *o_op;
+                  {
+                     h.op           = o_op->op;
+                     h.result       = o_op->result;
+                     h.block_num    = o_op->block_num;
+                     h.trx_in_block = o_op->trx_in_block;
+                     h.op_in_trx    = o_op->op_in_trx;
+                     h.virtual_op   = o_op->virtual_op;
+                  }
                }));
       };
 
@@ -350,7 +357,7 @@ void elasticsearch_plugin::plugin_set_program_options(
 void elasticsearch_plugin::plugin_initialize(const boost::program_options::variables_map& options)
 {
    database().applied_block.connect( [&]( const signed_block& b){ my->update_account_histories(b); } );
-   my->_oho_index = database().add_index< primary_index< simple_index< operation_history_object > > >();
+   my->_oho_index = database().add_index< primary_index< operation_history_index > >();
    database().add_index< primary_index< account_transaction_history_index > >();
 
    if (options.count("elasticsearch-node-url")) {
