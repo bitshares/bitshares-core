@@ -1256,9 +1256,10 @@ market_volume database_api::get_24_volume( const string& base, const string& quo
 
 market_volume database_api_impl::get_24_volume( const string& base, const string& quote )const
 {
-    const auto ticker = get_ticker( base, quote );
+    const auto& ticker = get_ticker( base, quote );
 
     market_volume result;
+    result.time = ticker.time;
     result.base = ticker.base;
     result.quote = ticker.quote;
     result.base_volume = ticker.base_volume;
