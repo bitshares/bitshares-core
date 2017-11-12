@@ -188,8 +188,16 @@ struct operation_process_fill_order
           { // update existing bucket
              //wlog( "    before updating bucket ${b}", ("b",*itr) );
              db.modify( *itr, [&]( bucket_object& b ){
-                  b.base_volume += trade_price.base.amount;
-                  b.quote_volume += trade_price.quote.amount;
+                  try {
+                     b.base_volume += trade_price.base.amount;
+                  } catch( fc::overflow_exception ) {
+                     b.base_volume = std::numeric_limits<int64_t>::max();
+                  }
+                  try {
+                     b.quote_volume += trade_price.quote.amount;
+                  } catch( fc::overflow_exception ) {
+                     b.quote_volume = std::numeric_limits<int64_t>::max();
+                  }
                   b.close_base = fill_price.base.amount;
                   b.close_quote = fill_price.quote.amount;
                   if( b.high() < fill_price )
