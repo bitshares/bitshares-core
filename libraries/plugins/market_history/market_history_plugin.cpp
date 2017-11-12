@@ -156,10 +156,13 @@ struct operation_process_fill_order
       auto max_history = _plugin.max_history();
       for( auto bucket : buckets )
       {
-          auto cutoff      = (fc::time_point() + fc::seconds( bucket * max_history));
+          auto bucket_num = _now.sec_since_epoch() / bucket;
+          auto cutoff = fc::time_point_sec();
+          if( bucket_num > max_history )
+             cutoff = cutoff + fc::seconds( bucket * ( bucket_num - max_history ) );
 
           key.seconds = bucket;
-          key.open    = fc::time_point() + fc::seconds((_now.sec_since_epoch() / key.seconds) * key.seconds);
+          key.open    = fc::time_point_sec() + fc::seconds( bucket_num * bucket );
 
           const auto& by_key_idx = bucket_idx.indices().get<by_key>();
           auto itr = by_key_idx.find( key );
@@ -168,8 +171,8 @@ struct operation_process_fill_order
             /* const auto& obj = */
             db.create<bucket_object>( [&]( bucket_object& b ){
                  b.key = key;
-                 b.quote_volume += trade_price.quote.amount;
-                 b.base_volume += trade_price.base.amount;
+                 b.base_volume = trade_price.base.amount;
+                 b.quote_volume = trade_price.quote.amount;
                  b.open_base = fill_price.base.amount;
                  b.open_quote = fill_price.quote.amount;
                  b.close_base = fill_price.base.amount;
@@ -291,6 +294,7 @@ void market_history_plugin::plugin_initialize(const boost::program_options::vari
    {
       const std::string& buckets = options["bucket-size"].as<string>(); 
       my->_tracked_buckets = fc::json::from_string(buckets).as<flat_set<uint32_t>>();
+      my->_tracked_buckets.erase( 0 );
    }
    if( options.count( "history-per-size" ) )
       my->_maximum_history_per_bucket_size = options["history-per-size"].as<uint32_t>();
