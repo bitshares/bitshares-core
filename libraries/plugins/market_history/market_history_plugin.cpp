@@ -174,17 +174,25 @@ struct operation_process_fill_order
              db.modify( *itr, [&]( bucket_object& b ){
                   b.base_volume += trade_price.base.amount;
                   b.quote_volume += trade_price.quote.amount;
-                  b.close_base = trade_price.base.amount;
-                  b.close_quote = trade_price.quote.amount;
-                  if( b.high() < trade_price ) 
+                  if(trade_price.base.amount >= 100 && trade_price.quote.amount >= 100)
                   {
-                      b.high_base = b.close_base;
-                      b.high_quote = b.close_quote;
-                  }
-                  if( b.low() > trade_price ) 
-                  {
-                      b.low_base = b.close_base;
-                      b.low_quote = b.close_quote;
+                      if(b.open_base < 100 || b.open_quote < 100)
+                      {
+                          b.open_base = trade_price.base.amount;
+                          b.open_quote = trade_price.quote.amount;
+                      }
+                      b.close_base = trade_price.base.amount;
+                      b.close_quote = trade_price.quote.amount;
+                      if( b.high() < trade_price)
+                      {
+                          b.high_base = b.close_base;
+                          b.high_quote = b.close_quote;
+                      }
+                      if( b.low() > trade_price)
+                      {
+                          b.low_base = b.close_base;
+                          b.low_quote = b.close_quote;
+                      }
                   }
              });
              //wlog( "    after bucket bucket ${b}", ("b",*itr) );
