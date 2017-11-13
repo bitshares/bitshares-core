@@ -61,6 +61,8 @@ class market_history_plugin_impl
       market_history_plugin&     _self;
       flat_set<uint32_t>         _tracked_buckets;
       uint32_t                   _maximum_history_per_bucket_size = 1000;
+      uint32_t                   _max_order_his_records_per_market = 1000;
+      uint32_t                   _max_order_his_seconds_per_market = 259200;
 };
 
 
@@ -81,13 +83,12 @@ struct operation_process_fill_order
    void operator()( const fill_order_operation& o )const 
    {
       //ilog( "processing ${o}", ("o",o) );
-      const auto& buckets = _plugin.tracked_buckets();
       auto& db         = _plugin.database();
       const auto& bucket_idx = db.get_index_type<bucket_index>();
       const auto& history_idx = db.get_index_type<history_index>().indices().get<by_key>();
+      const auto& his_time_idx = db.get_index_type<history_index>().indices().get<by_market_time>();
 
-      auto time = db.head_block_time();
-
+      // To save new filled order data
       history_key hkey;
       hkey.base = o.pays.asset_id;
       hkey.quote = o.receives.asset_id;
@@ -104,38 +105,53 @@ struct operation_process_fill_order
 
       db.create<order_history_object>( [&]( order_history_object& ho ) {
          ho.key = hkey;
-         ho.time = time;
+         ho.time = _now;
          ho.op = o;
       });
 
-      /*
-      hkey.sequence += 200;
+      // To remove old filled order data
+      const auto max_records = _plugin.max_order_his_records_per_market();
+      hkey.sequence += max_records;
       itr = history_idx.lower_bound( hkey );
-      while( itr != history_idx.end() )
+      if( itr != history_idx.end() && itr->key.base == hkey.base && itr->key.quote == hkey.quote )
       {
-         if( itr->key.base == hkey.base && itr->key.quote == hkey.quote )
+         const auto max_seconds = _plugin.max_order_his_seconds_per_market();
+         fc::time_point_sec min_time;
+         if( min_time + max_seconds < _now )
+            min_time = _now - max_seconds;
+         auto time_itr = his_time_idx.lower_bound( std::make_tuple( hkey.base, hkey.quote, min_time ) );
+         if( time_itr != his_time_idx.end() && time_itr->key.base == hkey.base && time_itr->key.quote == hkey.quote )
          {
-            db.remove( *itr );
-            itr = history_idx.lower_bound( hkey );
+            if( itr->key.sequence >= time_itr->key.sequence )
+            {
+               while( itr != history_idx.end() && itr->key.base == hkey.base && itr->key.quote == hkey.quote )
+               {
+                  auto old_itr = itr;
+                  ++itr;
+                  db.remove( *old_itr );
+               }
+            }
+            else
+            {
+               while( time_itr != his_time_idx.end() && time_itr->key.base == hkey.base && time_itr->key.quote == hkey.quote )
+               {
+                  auto old_itr = time_itr;
+                  ++time_itr;
+                  db.remove( *old_itr );
+               }
+            }
          }
-         else break;
       }
-      */
 
-      /* Note: below is not true, because global settlement creates only one fill_order_op.
-       * for every matched order there are two fill order operations created, one for
-       * each side.  We can filter the duplicates by only considering the fill operations where
-       * the base > quote
-       */
-      /*
-      if( o.pays.asset_id > o.receives.asset_id )
-      {
-         //ilog( "     skipping because base > quote" );
-         return;
-      }
-      */
+      // To update buckets data, only update for maker orders
       if( !o.is_maker )
          return;
+
+      const auto max_history = _plugin.max_history();
+      if( max_history == 0 ) return;
+
+      const auto& buckets = _plugin.tracked_buckets();
+      if( buckets.size() == 0 ) return;
 
       bucket_key key;
       key.base    = o.pays.asset_id;
@@ -153,20 +169,19 @@ struct operation_process_fill_order
       if( fill_price.base.asset_id > fill_price.quote.asset_id )
          fill_price = ~fill_price;
 
-      auto max_history = _plugin.max_history();
       for( auto bucket : buckets )
       {
           auto bucket_num = _now.sec_since_epoch() / bucket;
-          auto cutoff = fc::time_point_sec();
+          fc::time_point_sec cutoff;
           if( bucket_num > max_history )
-             cutoff = cutoff + fc::seconds( bucket * ( bucket_num - max_history ) );
+             cutoff = cutoff + ( bucket * ( bucket_num - max_history ) );
 
           key.seconds = bucket;
-          key.open    = fc::time_point_sec() + fc::seconds( bucket_num * bucket );
+          key.open    = fc::time_point_sec() + ( bucket_num * bucket );
 
           const auto& by_key_idx = bucket_idx.indices().get<by_key>();
-          auto itr = by_key_idx.find( key );
-          if( itr == by_key_idx.end() )
+          auto bucket_itr = by_key_idx.find( key );
+          if( bucket_itr == by_key_idx.end() )
           { // create new bucket
             /* const auto& obj = */
             db.create<bucket_object>( [&]( bucket_object& b ){
@@ -186,8 +201,8 @@ struct operation_process_fill_order
           }
           else
           { // update existing bucket
-             //wlog( "    before updating bucket ${b}", ("b",*itr) );
-             db.modify( *itr, [&]( bucket_object& b ){
+             //wlog( "    before updating bucket ${b}", ("b",*bucket_itr) );
+             db.modify( *bucket_itr, [&]( bucket_object& b ){
                   try {
                      b.base_volume += trade_price.base.amount;
                   } catch( fc::overflow_exception ) {
@@ -211,24 +226,23 @@ struct operation_process_fill_order
                       b.low_quote = b.close_quote;
                   }
              });
-             //wlog( "    after bucket bucket ${b}", ("b",*itr) );
+             //wlog( "    after bucket bucket ${b}", ("b",*bucket_itr) );
           }
 
-          if( max_history != 0  )
           {
              key.open = fc::time_point_sec();
-             auto itr = by_key_idx.lower_bound( key );
+             bucket_itr = by_key_idx.lower_bound( key );
 
-             while( itr != by_key_idx.end() && 
-                    itr->key.base == key.base && 
-                    itr->key.quote == key.quote && 
-                    itr->key.seconds == bucket && 
-                    itr->key.open < cutoff )
+             while( bucket_itr != by_key_idx.end() &&
+                    bucket_itr->key.base == key.base &&
+                    bucket_itr->key.quote == key.quote &&
+                    bucket_itr->key.seconds == bucket &&
+                    bucket_itr->key.open < cutoff )
              {
-              //  elog( "    removing old bucket ${b}", ("b", *itr) );
-                auto old_itr = itr;
-                ++itr;
-                db.remove( *old_itr );
+              //  elog( "    removing old bucket ${b}", ("b", *bucket_itr) );
+                auto old_bucket_itr = bucket_itr;
+                ++bucket_itr;
+                db.remove( *old_bucket_itr );
              }
           }
       }
@@ -240,9 +254,6 @@ market_history_plugin_impl::~market_history_plugin_impl()
 
 void market_history_plugin_impl::update_market_histories( const signed_block& b )
 {
-   if( _maximum_history_per_bucket_size == 0 ) return;
-   if( _tracked_buckets.size() == 0 ) return;
-
    graphene::chain::database& db = database();
    const vector<optional< operation_history_object > >& hist = db.get_applied_operations();
    for( const optional< operation_history_object >& o_op : hist )
@@ -286,8 +297,12 @@ void market_history_plugin::plugin_set_program_options(
    cli.add_options()
          ("bucket-size", boost::program_options::value<string>()->default_value("[60,300,900,1800,3600,14400,86400]"),
            "Track market history by grouping orders into buckets of equal size measured in seconds specified as a JSON array of numbers")
-         ("history-per-size", boost::program_options::value<uint32_t>()->default_value(1000), 
+         ("history-per-size", boost::program_options::value<uint32_t>()->default_value(1000),
            "How far back in time to track history for each bucket size, measured in the number of buckets (default: 1000)")
+         ("max-order-his-records-per-market", boost::program_options::value<uint32_t>()->default_value(1000),
+           "Will only store this amount of matched orders for each market in order history for querying, or those meet the other option, which has more data (default: 1000)")
+         ("max-order-his-seconds-per-market", boost::program_options::value<uint32_t>()->default_value(259200),
+           "Will only store matched orders in last X seconds for each market in order history for querying, or those meet the other option, which has more data (default: 259200 (3 days))")
          ;
    cfg.add(cli);
 }
@@ -306,6 +321,10 @@ void market_history_plugin::plugin_initialize(const boost::program_options::vari
    }
    if( options.count( "history-per-size" ) )
       my->_maximum_history_per_bucket_size = options["history-per-size"].as<uint32_t>();
+   if( options.count( "max-order-his-records-per-market" ) )
+      my->_max_order_his_records_per_market = options["max-order-his-records-per-market"].as<uint32_t>();
+   if( options.count( "max-order-his-seconds-per-market" ) )
+      my->_max_order_his_seconds_per_market = options["max-order-his-seconds-per-market"].as<uint32_t>();
 } FC_CAPTURE_AND_RETHROW() }
 
 void market_history_plugin::plugin_startup()
@@ -320,6 +339,16 @@ const flat_set<uint32_t>& market_history_plugin::tracked_buckets() const
 uint32_t market_history_plugin::max_history()const
 {
    return my->_maximum_history_per_bucket_size;
+}
+
+uint32_t market_history_plugin::max_order_his_records_per_market()const
+{
+   return my->_max_order_his_records_per_market;
+}
+
+uint32_t market_history_plugin::max_order_his_seconds_per_market()const
+{
+   return my->_max_order_his_seconds_per_market;
 }
 
 } }
