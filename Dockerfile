@@ -12,6 +12,7 @@ RUN \
       libbz2-dev \
       libreadline6-dev \
       libboost-all-dev \
+      libcurl4-openssl-dev \
       libssl-dev \
       libncurses-dev \
       doxygen \
