@@ -70,6 +70,7 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       map<uint32_t, optional<block_header>> get_block_header_batch(const vector<uint32_t> block_nums)const;
       optional<signed_block> get_block(uint32_t block_num)const;
       processed_transaction get_transaction( uint32_t block_num, uint32_t trx_in_block )const;
+      transaction_id_type get_transaction_id( uint32_t block_num, uint32_t trx_in_block )const;
 
       // Globals
       chain_property_object get_chain_properties()const;
@@ -420,6 +421,21 @@ processed_transaction database_api_impl::get_transaction(uint32_t block_num, uin
    FC_ASSERT( opt_block->transactions.size() > trx_num );
    return opt_block->transactions[trx_num];
 }
+
+transaction_id_type database_api::get_transaction_id(uint32_t block_num, uint32_t trx_num)const
+{
+    return my->get_transaction_id( block_num,  trx_num );
+}
+
+transaction_id_type database_api_impl::get_transaction_id(uint32_t block_num, uint32_t trx_num) const
+{
+    auto opt_block = _db.fetch_block_by_number(block_num);
+    FC_ASSERT( opt_block );
+    FC_ASSERT( opt_block->transactions.size() > trx_num );
+    auto trx = opt_block->transactions[trx_num];
+    return trx.id();
+}
+
 
 //////////////////////////////////////////////////////////////////////
 //                                                                  //
