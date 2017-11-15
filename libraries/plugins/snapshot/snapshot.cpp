@@ -54,6 +54,11 @@ std::string snapshot_plugin::plugin_name()const
    return "snapshot";
 }
 
+std::string snapshot_plugin::plugin_description()const
+{
+   return "Create snapshots at a specified time or block number.";
+}
+
 void snapshot_plugin::plugin_initialize(const boost::program_options::variables_map& options)
 { try {
    ilog("snapshot plugin: plugin_initialize() begin");
