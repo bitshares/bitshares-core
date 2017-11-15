@@ -18,7 +18,29 @@ libraries/wallet/Doxyfile
 libraries/wallet/api_documentation.cpp
 libraries/wallet/doxygen
 
+libraries/egenesis/egenesis_brief.cpp
+libraries/egenesis/egenesis_full.cpp
+libraries/egenesis/embed_genesis
+
+libraries/fc/tests/all_tests
+libraries/fc/tests/api
+libraries/fc/tests/bip_lock
+libraries/fc/tests/blind
+libraries/fc/tests/blinding_test
+libraries/fc/tests/bloom_test
+libraries/fc/tests/ecc_test
+libraries/fc/tests/hmac_test
+libraries/fc/tests/log_test
+libraries/fc/tests/real128_test
+
 programs/cli_wallet/cli_wallet
+programs/build_helpers/cat-parts
+programs/build_helpers/member_enumerator
+programs/delayed_node/delayed_node
+programs/genesis_util/convert_address
+programs/genesis_util/genesis_update
+programs/genesis_util/get_dev_key
+programs/size_checker/size_checker
 programs/js_operation_serializer/js_operation_serializer
 programs/witness_node/witness_node
 
@@ -27,6 +49,7 @@ tests/chain_bench
 tests/chain_test
 tests/intense_test
 tests/performance_test
+tests/generate_empty_blocks
 
 doxygen
 
@@ -41,3 +64,6 @@ object_database/*
 
 *.pyc
 *.pyo
+
+#bitshares-builder
+/.config
