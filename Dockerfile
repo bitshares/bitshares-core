@@ -49,9 +49,6 @@ RUN chown bitshares:bitshares -R /var/lib/bitshares
 # Volume
 VOLUME ["/var/lib/bitshares", "/etc/bitshares"]
 
-# default settings
-RUN ln -f -s /etc/bitshares/config.ini /var/lib/bitshares
-
 # rpc service:
 EXPOSE 8090
 # p2p service:
