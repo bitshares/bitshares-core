@@ -18,7 +18,7 @@ VERSION=`cat /etc/bitshares/version`
 
 ## Link the bitshares config file into home
 ## This link has been created in Dockerfile, already
-#ln -f -s /etc/bitshares/config.ini /var/lib/bitshares
+ln -f -s /etc/bitshares/config.ini /var/lib/bitshares
 
 ## get blockchain state from an S3 bucket
 # echo bitsharesd: beginning download and decompress of s3://$S3_BUCKET/blockchain-$VERSION-latest.tar.bz2
