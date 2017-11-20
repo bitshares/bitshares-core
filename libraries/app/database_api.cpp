@@ -1348,11 +1348,6 @@ vector<market_trade> database_api_impl::get_trade_history( const string& base,
    auto quote_id = assets[1]->id;
 
    if( base_id > quote_id ) std::swap( base_id, quote_id );
-   const auto& history_idx = _db.get_index_type<graphene::market_history::history_index>().indices().get<by_key>();
-   history_key hkey;
-   hkey.base = base_id;
-   hkey.quote = quote_id;
-   hkey.sequence = std::numeric_limits<int64_t>::min();
 
    auto asset_to_real = [&]( const asset& a, int p ) { return double( a.amount.value ) / pow( 10, p ); };
    auto price_to_real = [&]( const price& p )
@@ -1367,13 +1362,12 @@ vector<market_trade> database_api_impl::get_trade_history( const string& base,
       start = fc::time_point_sec( fc::time_point::now() );
 
    uint32_t count = 0;
-   uint32_t skipped = 0;
-   auto itr = history_idx.lower_bound( hkey );
+   const auto& history_idx = _db.get_index_type<graphene::market_history::history_index>().indices().get<by_market_time>();
+   auto itr = history_idx.lower_bound( std::make_tuple( base_id, quote_id, start ) );
    vector<market_trade> result;
 
    while( itr != history_idx.end() && count < limit && !( itr->key.base != base_id || itr->key.quote != quote_id || itr->time < stop ) )
    {
-      if( itr->time < start )
       {
          market_trade trade;
 
@@ -1417,12 +1411,6 @@ vector<market_trade> database_api_impl::get_trade_history( const string& base,
 
          result.push_back( trade );
          ++count;
-      }
-      else // should skip
-      {
-         // TODO refuse to execute if need to skip too many entries
-         // ++skipped;
-         // FC_ASSERT( skipped <= 200 );
       }
 
       ++itr;

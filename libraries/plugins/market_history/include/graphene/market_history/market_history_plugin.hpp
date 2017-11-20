@@ -28,6 +28,8 @@
 
 #include <fc/thread/future.hpp>
 
+#include <boost/multi_index/composite_key.hpp>
+
 namespace graphene { namespace market_history {
 using namespace chain;
 
@@ -105,21 +107,53 @@ struct order_history_object : public abstract_object<order_history_object>
   fc::time_point_sec   time;
   fill_order_operation op;
 };
+struct order_history_object_key_base_extractor
+{
+   typedef asset_id_type result_type;
+   result_type operator()(const order_history_object& o)const { return o.key.base; }
+};
+struct order_history_object_key_quote_extractor
+{
+   typedef asset_id_type result_type;
+   result_type operator()(const order_history_object& o)const { return o.key.quote; }
+};
+struct order_history_object_key_sequence_extractor
+{
+   typedef int64_t result_type;
+   result_type operator()(const order_history_object& o)const { return o.key.sequence; }
+};
 
 struct by_key;
 typedef multi_index_container<
    bucket_object,
    indexed_by<
-      hashed_unique< tag<by_id>, member< object, object_id_type, &object::id > >,
+      ordered_unique< tag<by_id>, member< object, object_id_type, &object::id > >,
       ordered_unique< tag<by_key>, member< bucket_object, bucket_key, &bucket_object::key > >
    >
 > bucket_object_multi_index_type;
 
+struct by_market_time;
 typedef multi_index_container<
    order_history_object,
    indexed_by<
-      hashed_unique< tag<by_id>, member< object, object_id_type, &object::id > >,
-      ordered_unique< tag<by_key>, member< order_history_object, history_key, &order_history_object::key > >
+      ordered_unique< tag<by_id>, member< object, object_id_type, &object::id > >,
+      ordered_unique< tag<by_key>, member< order_history_object, history_key, &order_history_object::key > >,
+      ordered_unique<
+         tag<by_market_time>,
+         composite_key<
+            order_history_object,
+            order_history_object_key_base_extractor,
+            order_history_object_key_quote_extractor,
+            member<order_history_object, time_point_sec, &order_history_object::time>,
+            order_history_object_key_sequence_extractor
+         >,
+         composite_key_compare<
+            std::less< asset_id_type >,
+            std::less< asset_id_type >,
+            std::greater< time_point_sec >,
+            std::less< int64_t >
+         >
+      >
    >
 > order_history_multi_index_type;
 
@@ -154,6 +188,8 @@ class market_history_plugin : public graphene::app::plugin
 
       uint32_t                    max_history()const;
       const flat_set<uint32_t>&   tracked_buckets()const;
+      uint32_t                    max_order_his_records_per_market()const;
+      uint32_t                    max_order_his_seconds_per_market()const;
 
    private:
       friend class detail::market_history_plugin_impl;
