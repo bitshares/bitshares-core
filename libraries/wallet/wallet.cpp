@@ -4020,7 +4020,7 @@ blind_confirmation wallet_api::blind_transfer_help( string from_key_or_label,
       my->_wallet.blind_receipts.modify( itr, []( blind_receipt& r ){ r.used = true; } );
    }
 
-   FC_ASSERT( total_amount >= amount+blind_tr.fee, "Insufficent Balance", ("available",total_amount)("amount",amount)("fee",blind_tr.fee) );
+   FC_ASSERT( total_amount >= amount+blind_tr.fee, "Insufficient Balance", ("available",total_amount)("amount",amount)("fee",blind_tr.fee) );
 
    auto one_time_key = fc::ecc::private_key::generate();
    auto secret       = one_time_key.get_shared_secret( to_key );
