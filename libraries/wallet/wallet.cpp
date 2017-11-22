@@ -3928,6 +3928,9 @@ blind_confirmation wallet_api::transfer_from_blind( string from_blind_account_ke
    ilog( "about to validate" );
    conf.trx.validate();
 
+   ilog( "about to broadcast" );
+   conf.trx = sign_transaction( conf.trx, broadcast );
+
    if( broadcast && conf.outputs.size() == 2 ) {
 
        // Save the change
@@ -3944,9 +3947,6 @@ blind_confirmation wallet_api::transfer_from_blind( string from_blind_account_ke
        receive_blind_transfer( conf_output.confirmation_receipt, from_blind_account_key_or_label, "@"+to_account.name );
        //} catch ( ... ){}
    }
-
-   ilog( "about to broadcast" );
-   conf.trx = sign_transaction( conf.trx, broadcast );
 
    return conf;
 } FC_CAPTURE_AND_RETHROW( (from_blind_account_key_or_label)(to_account_id_or_name)(amount_in)(symbol) ) }
