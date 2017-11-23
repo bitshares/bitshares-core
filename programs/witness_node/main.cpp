@@ -30,6 +30,7 @@
 #include <graphene/market_history/market_history_plugin.hpp>
 #include <graphene/delayed_node/delayed_node_plugin.hpp>
 #include <graphene/snapshot/snapshot.hpp>
+#include <graphene/es_objects/es_objects.hpp>
 
 #include <fc/exception/exception.hpp>
 #include <fc/thread/thread.hpp>
@@ -190,6 +191,7 @@ int main(int argc, char** argv) {
       auto market_history_plug = node->register_plugin<market_history::market_history_plugin>();
       auto delayed_plug = node->register_plugin<delayed_node::delayed_node_plugin>();
       auto snapshot_plug = node->register_plugin<snapshot_plugin::snapshot_plugin>();
+      auto es_objects_plug = node->register_plugin<es_objects::es_objects_plugin>();
 
       try
       {
