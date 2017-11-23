@@ -1855,6 +1855,9 @@ set<public_key_type> database_api_impl::get_potential_signatures( const signed_t
          const auto& auth = id(_db).active;
          for( const auto& k : auth.get_keys() )
             result.insert(k);
+         // Also insert owner keys since owner can authorize a trx that requires active only
+         for( const auto& k : id(_db).owner.get_keys() )
+            result.insert(k);
          return &auth;
       },
       [&]( account_id_type id )
@@ -1866,6 +1869,15 @@ set<public_key_type> database_api_impl::get_potential_signatures( const signed_t
       },
       _db.get_global_properties().parameters.max_authority_depth
    );
+
+   // Insert keys in required "other" authories
+   flat_set<account_id_type> required_active;
+   flat_set<account_id_type> required_owner;
+   vector<authority> other;
+   trx.get_required_authorities( required_active, required_owner, other );
+   for( const auto& auth : other )
+      for( const auto& key : auth.get_keys() )
+         result.insert( key );
 
    wdump((result));
    return result;
