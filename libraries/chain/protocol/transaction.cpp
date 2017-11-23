@@ -340,6 +340,13 @@ set<public_key_type> signed_transaction::get_required_signatures(
 
    set<public_key_type> result;
 
+   // force "other" pubkeys in:
+   for( const auto &auth : other )
+   {
+      for( const auto &pk : auth.get_keys() )
+         result.insert( pk );
+   }
+
    for( auto& provided_sig : s.provided_signatures )
       if( available_keys.find( provided_sig.first ) != available_keys.end() )
          result.insert( provided_sig.first );
