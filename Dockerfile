@@ -10,12 +10,13 @@ RUN \
       cmake \
       git \
       libbz2-dev \
-      libreadline6-dev \
+      libreadline-dev \
       libboost-all-dev \
       libcurl4-openssl-dev \
       libssl-dev \
       libncurses-dev \
       doxygen \
+      libcurl4-openssl-dev \
     && \
     apt-get update -y && \
     apt-get install -y fish && \

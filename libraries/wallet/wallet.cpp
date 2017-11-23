@@ -3928,6 +3928,9 @@ blind_confirmation wallet_api::transfer_from_blind( string from_blind_account_ke
    ilog( "about to validate" );
    conf.trx.validate();
 
+   ilog( "about to broadcast" );
+   conf.trx = sign_transaction( conf.trx, broadcast );
+
    if( broadcast && conf.outputs.size() == 2 ) {
 
        // Save the change
@@ -3944,9 +3947,6 @@ blind_confirmation wallet_api::transfer_from_blind( string from_blind_account_ke
        receive_blind_transfer( conf_output.confirmation_receipt, from_blind_account_key_or_label, "@"+to_account.name );
        //} catch ( ... ){}
    }
-
-   ilog( "about to broadcast" );
-   conf.trx = sign_transaction( conf.trx, broadcast );
 
    return conf;
 } FC_CAPTURE_AND_RETHROW( (from_blind_account_key_or_label)(to_account_id_or_name)(amount_in)(symbol) ) }
@@ -4020,7 +4020,7 @@ blind_confirmation wallet_api::blind_transfer_help( string from_key_or_label,
       my->_wallet.blind_receipts.modify( itr, []( blind_receipt& r ){ r.used = true; } );
    }
 
-   FC_ASSERT( total_amount >= amount+blind_tr.fee, "Insufficent Balance", ("available",total_amount)("amount",amount)("fee",blind_tr.fee) );
+   FC_ASSERT( total_amount >= amount+blind_tr.fee, "Insufficient Balance", ("available",total_amount)("amount",amount)("fee",blind_tr.fee) );
 
    auto one_time_key = fc::ecc::private_key::generate();
    auto secret       = one_time_key.get_shared_secret( to_key );
