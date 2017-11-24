@@ -99,22 +99,26 @@ void es_objects_plugin_impl::updateDatabase( const vector<object_id_type>& ids ,
       if(value.is<proposal_object>() && _es_objects_proposals) {
          auto obj = db.find_object(value);
          auto p = static_cast<const proposal_object*>(obj);
-         PrepareProposal(p);
+         if(p != nullptr)
+            PrepareProposal(p);
       }
       else if(value.is<account_object>() && _es_objects_accounts) {
          auto obj = db.find_object(value);
          auto a = static_cast<const account_object*>(obj);
-         PrepareAccount(a);
+         if(a != nullptr)
+            PrepareAccount(a);
       }
       else if(value.is<asset_object>() && _es_objects_assets) {
          auto obj = db.find_object(value);
          auto a = static_cast<const asset_object*>(obj);
-         PrepareAsset(a);
+         if(a != nullptr)
+            PrepareAsset(a);
       }
       else if(value.is<balance_object>() && _es_objects_balances) {
          auto obj = db.find_object(value);
          auto b = static_cast<const balance_object*>(obj);
-         PrepareBalance(b);
+         if(b != nullptr)
+            PrepareBalance(b);
       }
    }
 }
