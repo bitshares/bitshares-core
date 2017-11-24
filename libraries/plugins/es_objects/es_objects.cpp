@@ -24,15 +24,8 @@
 
 #include <graphene/es_objects/es_objects.hpp>
 
-//#include <graphene/app/impacted.hpp>
-
-//#include <graphene/chain/account_evaluator.hpp>
-//#include <graphene/chain/account_object.hpp>
 #include <graphene/chain/config.hpp>
 #include <graphene/chain/database.hpp>
-//#include <graphene/chain/evaluator.hpp>
-//#include <graphene/chain/operation_history_object.hpp>
-//#include <graphene/chain/transaction_evaluation_state.hpp>
 
 #include <fc/smart_ref_impl.hpp>
 #include <fc/thread/thread.hpp>
@@ -103,22 +96,22 @@ void es_objects_plugin_impl::updateDatabase( const vector<object_id_type>& ids ,
    }
 
    for(auto const& value: ids) {
-      if(value.space() == 1 && value.type() == 10 && _es_objects_proposals) {
+      if(value.is<proposal_object>() && _es_objects_proposals) {
          auto obj = db.find_object(value);
          auto p = static_cast<const proposal_object*>(obj);
          PrepareProposal(p);
       }
-      else if(value.space() == 1 && value.type() == 2 && _es_objects_accounts) {
+      else if(value.is<account_object>() && _es_objects_accounts) {
          auto obj = db.find_object(value);
          auto a = static_cast<const account_object*>(obj);
          PrepareAccount(a);
       }
-      else if(value.space() == 1 && value.type() == 3 && _es_objects_assets) {
+      else if(value.is<asset_object>() && _es_objects_assets) {
          auto obj = db.find_object(value);
          auto a = static_cast<const asset_object*>(obj);
          PrepareAsset(a);
       }
-      else if(value.space() == 1 && value.type() == 15 && _es_objects_balances) {
+      else if(value.is<balance_object>() && _es_objects_balances) {
          auto obj = db.find_object(value);
          auto b = static_cast<const balance_object*>(obj);
          PrepareBalance(b);
