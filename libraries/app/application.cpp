@@ -309,7 +309,6 @@ namespace detail {
 
       ~application_impl()
       {
-         fc::remove_all(_data_dir / "blockchain/dblock");
       }
 
       void set_dbg_init_key( genesis_state_type& genesis, const std::string& init_key )
@@ -323,8 +322,7 @@ namespace detail {
 
       void startup()
       { try {
-         bool clean = !fc::exists(_data_dir / "blockchain/dblock");
-         fc::create_directories(_data_dir / "blockchain/dblock");
+         fc::create_directories(_data_dir / "blockchain");
 
          auto initial_state = [&] {
             ilog("Initializing database...");
@@ -387,67 +385,17 @@ namespace detail {
          }
          _chain_db->add_checkpoints( loaded_checkpoints );
 
-         bool replay = false;
-         std::string replay_reason = "reason not provided";
+         if( _options->count("replay-blockchain") )
+            _chain_db->wipe( _data_dir / "blockchain", false );
 
-         // never replay if data dir is empty
-         if( fc::exists( _data_dir ) && fc::directory_iterator( _data_dir ) != fc::directory_iterator() )
+         try
          {
-            if( _options->count("replay-blockchain") )
-            {
-               replay = true;
-               replay_reason = "replay-blockchain argument specified";
-            }
-            else if( !clean )
-            {
-               replay = true;
-               replay_reason = "unclean shutdown detected";
-            }
-            else if( !fc::exists( _data_dir / "db_version" ) )
-            {
-               replay = true;
-               replay_reason = "db_version file not found";
-            }
-            else
-            {
-               std::string version_string;
-               fc::read_file_contents( _data_dir / "db_version", version_string );
-
-               if( version_string != GRAPHENE_CURRENT_DB_VERSION )
-               {
-                   replay = true;
-                   replay_reason = "db_version file content mismatch";
-               }
-            }
+            _chain_db->open( _data_dir / "blockchain", initial_state, GRAPHENE_CURRENT_DB_VERSION );
          }
-
-         if( !replay )
+         catch( const fc::exception& e )
          {
-            try
-            {
-               _chain_db->open( _data_dir / "blockchain", initial_state );
-            }
-            catch( const fc::exception& e )
-            {
-               ilog( "Caught exception ${e} in open()", ("e", e.to_detail_string()) );
-
-               replay = true;
-               replay_reason = "exception in open()";
-            }
-         }
-
-         if( replay )
-         {
-            ilog( "Replaying blockchain due to: ${reason}", ("reason", replay_reason) );
-
-            fc::remove_all( _data_dir / "db_version" );
-            _chain_db->reindex( _data_dir / "blockchain", initial_state() );
-
-            const auto mode = std::ios::out | std::ios::binary | std::ios::trunc;
-            std::ofstream db_version( (_data_dir / "db_version").generic_string().c_str(), mode );
-            std::string version_string = GRAPHENE_CURRENT_DB_VERSION;
-            db_version.write( version_string.c_str(), version_string.size() );
-            db_version.close();
+            elog( "Caught exception ${e} in open(), you might want to force a replay", ("e", e.to_detail_string()) );
+            throw;
          }
 
          if( _options->count("force-validate") )
@@ -456,9 +404,22 @@ namespace detail {
             _force_validate = true;
          }
 
-         if( _options->count("api-access") )
-            _apiaccess = fc::json::from_file( _options->at("api-access").as<boost::filesystem::path>() )
-               .as<api_access>();
+         if( _options->count("api-access") ) {
+
+            if(fc::exists(_options->at("api-access").as<boost::filesystem::path>()))
+            {
+               _apiaccess = fc::json::from_file( _options->at("api-access").as<boost::filesystem::path>() ).as<api_access>();
+               ilog( "Using api access file from ${path}",
+                     ("path", _options->at("api-access").as<boost::filesystem::path>().string()) );
+            }
+            else
+            {
+               elog("Failed to load file from ${path}",
+                  ("path", _options->at("api-access").as<boost::filesystem::path>().string()));
+               std::exit(EXIT_FAILURE);
+            }
+         }
+
          else
          {
             // TODO:  Remove this generous default access policy
@@ -930,7 +891,8 @@ namespace detail {
       std::shared_ptr<fc::http::websocket_server>      _websocket_server;
       std::shared_ptr<fc::http::websocket_tls_server>  _websocket_tls_server;
 
-      std::map<string, std::shared_ptr<abstract_plugin>> _plugins;
+      std::map<string, std::shared_ptr<abstract_plugin>> _active_plugins;
+      std::map<string, std::shared_ptr<abstract_plugin>> _available_plugins;
 
       bool _is_finished_syncing = false;
    };
@@ -969,6 +931,7 @@ void application::set_program_options(boost::program_options::options_descriptio
          ("genesis-json", bpo::value<boost::filesystem::path>(), "File to read Genesis State from")
          ("dbg-init-key", bpo::value<string>(), "Block signing key to use for init witnesses, overrides genesis file")
          ("api-access", bpo::value<boost::filesystem::path>(), "JSON file specifying API permissions")
+         ("plugins", bpo::value<string>(), "Space-separated list of plugins to activate")
          ;
    command_line_options.add(configuration_file_options);
    command_line_options.add_options()
@@ -1014,6 +977,22 @@ void application::initialize(const fc::path& data_dir, const boost::program_opti
 
       std::exit(EXIT_SUCCESS);
    }
+
+   std::vector<string> wanted;
+   if( options.count("plugins") )
+   {
+      boost::split(wanted, options.at("plugins").as<std::string>(), [](char c){return c == ' ';});
+   }
+   else
+   {
+      wanted.push_back("witness");
+      wanted.push_back("account_history");
+      wanted.push_back("market_history");
+   }
+   for (auto& it : wanted)
+   {
+      if (!it.empty()) enable_plugin(it);
+   }
 }
 
 void application::startup()
@@ -1031,7 +1010,7 @@ void application::startup()
 
 std::shared_ptr<abstract_plugin> application::get_plugin(const string& name) const
 {
-   return my->_plugins[name];
+   return my->_active_plugins[name];
 }
 
 net::node_ptr application::p2p_node()
@@ -1064,14 +1043,21 @@ bool application::is_finished_syncing() const
    return my->_is_finished_syncing;
 }
 
-void graphene::app::application::add_plugin(const string& name, std::shared_ptr<graphene::app::abstract_plugin> p)
+void graphene::app::application::enable_plugin(const string& name)
 {
-   my->_plugins[name] = p;
+   FC_ASSERT(my->_available_plugins[name], "Unknown plugin '" + name + "'");
+   my->_active_plugins[name] = my->_available_plugins[name];
+   my->_active_plugins[name]->plugin_set_app(this);
+}
+
+void graphene::app::application::add_available_plugin(std::shared_ptr<graphene::app::abstract_plugin> p)
+{
+   my->_available_plugins[p->plugin_name()] = p;
 }
 
 void application::shutdown_plugins()
 {
-   for( auto& entry : my->_plugins )
+   for( auto& entry : my->_active_plugins )
       entry.second->plugin_shutdown();
    return;
 }
@@ -1080,19 +1066,22 @@ void application::shutdown()
    if( my->_p2p_network )
       my->_p2p_network->close();
    if( my->_chain_db )
+   {
       my->_chain_db->close();
+      my->_chain_db = nullptr;
+   }
 }
 
 void application::initialize_plugins( const boost::program_options::variables_map& options )
 {
-   for( auto& entry : my->_plugins )
+   for( auto& entry : my->_active_plugins )
       entry.second->plugin_initialize( options );
    return;
 }
 
 void application::startup_plugins()
 {
-   for( auto& entry : my->_plugins )
+   for( auto& entry : my->_active_plugins )
       entry.second->plugin_startup();
    return;
 }

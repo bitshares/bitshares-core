@@ -37,7 +37,6 @@ namespace graphene { namespace chain {
  * All margin positions are force closed at the swan price
  * Collateral received goes into a force-settlement fund
  * No new margin positions can be created for this asset
- * No more price feed updates
  * Force settlement happens without delay at the swan price, deducting from force-settlement fund
  * No more asset updates may be issued.
 */
@@ -92,6 +91,90 @@ void database::globally_settle_asset( const asset_object& mia, const price& sett
          });
 
 } FC_CAPTURE_AND_RETHROW( (mia)(settlement_price) ) }
+
+void database::revive_bitasset( const asset_object& bitasset )
+{ try {
+   FC_ASSERT( bitasset.is_market_issued() );
+   const asset_bitasset_data_object& bad = bitasset.bitasset_data(*this);
+   FC_ASSERT( bad.has_settlement() );
+   const asset_dynamic_data_object& bdd = bitasset.dynamic_asset_data_id(*this);
+   FC_ASSERT( !bad.is_prediction_market );
+   FC_ASSERT( !bad.current_feed.settlement_price.is_null() );
+
+   if( bdd.current_supply > 0 )
+   {
+      // Create + execute a "bid" with 0 additional collateral
+      const collateral_bid_object& pseudo_bid = create<collateral_bid_object>([&](collateral_bid_object& bid) {
+         bid.bidder = bitasset.issuer;
+         bid.inv_swan_price = asset(0, bad.options.short_backing_asset)
+                              / asset(bdd.current_supply, bitasset.id);
+      });
+      execute_bid( pseudo_bid, bdd.current_supply, bad.settlement_fund, bad.current_feed );
+   } else
+      FC_ASSERT( bad.settlement_fund == 0 );
+
+   _cancel_bids_and_revive_mpa( bitasset, bad );
+} FC_CAPTURE_AND_RETHROW( (bitasset) ) }
+
+void database::_cancel_bids_and_revive_mpa( const asset_object& bitasset, const asset_bitasset_data_object& bad )
+{ try {
+   FC_ASSERT( bitasset.is_market_issued() );
+   FC_ASSERT( bad.has_settlement() );
+   FC_ASSERT( !bad.is_prediction_market );
+
+   // cancel remaining bids
+   const auto& bid_idx = get_index_type< collateral_bid_index >().indices().get<by_price>();
+   auto itr = bid_idx.lower_bound( boost::make_tuple( bitasset.id, price::max( bad.options.short_backing_asset, bitasset.id ), collateral_bid_id_type() ) );
+   while( itr != bid_idx.end() && itr->inv_swan_price.quote.asset_id == bitasset.id )
+   {
+      const collateral_bid_object& bid = *itr;
+      ++itr;
+      cancel_bid( bid );
+   }
+
+   // revive
+   modify( bad, [&]( asset_bitasset_data_object& obj ){
+              obj.settlement_price = price();
+              obj.settlement_fund = 0;
+           });
+} FC_CAPTURE_AND_RETHROW( (bitasset) ) }
+
+void database::cancel_bid(const collateral_bid_object& bid, bool create_virtual_op)
+{
+   adjust_balance(bid.bidder, bid.inv_swan_price.base);
+
+   if( create_virtual_op )
+   {
+      bid_collateral_operation vop;
+      vop.bidder = bid.bidder;
+      vop.additional_collateral = bid.inv_swan_price.base;
+      vop.debt_covered = asset( 0, bid.inv_swan_price.quote.asset_id );
+      push_applied_operation( vop );
+   }
+   remove(bid);
+}
+
+void database::execute_bid( const collateral_bid_object& bid, share_type debt_covered, share_type collateral_from_fund, const price_feed& current_feed )
+{
+   const call_order_object& call_obj = create<call_order_object>( [&](call_order_object& call ){
+         call.borrower = bid.bidder;
+         call.collateral = bid.inv_swan_price.base.amount + collateral_from_fund;
+         call.debt = debt_covered;
+         call.call_price = price::call_price(asset(debt_covered, bid.inv_swan_price.quote.asset_id),
+                                             asset(call.collateral, bid.inv_swan_price.base.asset_id),
+                                             current_feed.maintenance_collateral_ratio);
+      });
+
+   if( bid.inv_swan_price.base.asset_id == asset_id_type() )
+      modify(bid.bidder(*this).statistics(*this), [&](account_statistics_object& stats) {
+         stats.total_core_in_orders += call_obj.collateral;
+      });
+
+   push_applied_operation( execute_bid_operation( bid.bidder, asset( call_obj.collateral, bid.inv_swan_price.base.asset_id ),
+                                                  asset( debt_covered, bid.inv_swan_price.quote.asset_id ) ) );
+
+   remove(bid);
+}
 
 void database::cancel_order(const force_settlement_object& order, bool create_virtual_op)
 {
@@ -488,12 +571,14 @@ bool database::check_call_orders(const asset_object& mia, bool enable_black_swan
        if( match_price > ~call_itr->call_price )
           return margin_called;
 
+       /*
        if( feed_protected )
        {
           ilog( "Feed protected margin call executing (HARDFORK_436_TIME not here yet)" );
           idump( (*call_itr) );
           idump( (*limit_itr) );
        }
+       */
 
      //  idump((*call_itr));
      //  idump((*limit_itr));

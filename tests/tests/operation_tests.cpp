@@ -23,6 +23,7 @@
  */
 
 #include <boost/test/unit_test.hpp>
+#include <boost/assign/list_of.hpp>
 
 #include <graphene/chain/database.hpp>
 #include <graphene/chain/exceptions.hpp>
@@ -36,12 +37,15 @@
 #include <graphene/chain/withdraw_permission_object.hpp>
 #include <graphene/chain/witness_object.hpp>
 
+#include <graphene/market_history/market_history_plugin.hpp>
 #include <fc/crypto/digest.hpp>
 
 #include "../common/database_fixture.hpp"
 
 using namespace graphene::chain;
 using namespace graphene::chain::test;
+
+#define UIA_TEST_SYMBOL "UIATEST"
 
 BOOST_FIXTURE_TEST_SUITE( operation_tests, database_fixture )
 
@@ -86,6 +90,7 @@ BOOST_AUTO_TEST_CASE( call_order_update_test )
       update_feed_producers( bitusd, {sam.id} );
 
       price_feed current_feed; current_feed.settlement_price = bitusd.amount( 100 ) / core.amount(100);
+      current_feed.maintenance_collateral_ratio = 1750; // need to set this explicitly, testnet has a different default
       publish_feed( bitusd, sam, current_feed );
 
       FC_ASSERT( bitusd.bitasset_data(db).current_feed.settlement_price == current_feed.settlement_price );
@@ -179,6 +184,8 @@ BOOST_AUTO_TEST_CASE( margin_call_limit_test )
 
       price_feed current_feed;
       current_feed.settlement_price = bitusd.amount( 100 ) / core.amount(100);
+      current_feed.maintenance_collateral_ratio = 1750; // need to set this explicitly, testnet has a different default
+      current_feed.maximum_short_squeeze_ratio  = 1500; // need to set this explicitly, testnet has a different default
 
       // starting out with price 1:1
       publish_feed( bitusd, feedproducer, current_feed );
@@ -229,184 +236,23 @@ BOOST_AUTO_TEST_CASE( margin_call_limit_test )
    }
 }
 
-/**
- *  This test sets up the minimum condition for a black swan to occur but does
- *  not test the full range of cases that may be possible during a black swan.
- */
-BOOST_AUTO_TEST_CASE( black_swan )
-{ try {
-      ACTORS((buyer)(seller)(borrower)(borrower2)(feedproducer));
-
-      const auto& bitusd = create_bitasset("USDBIT", feedproducer_id);
-      const auto& core   = asset_id_type()(db);
-
-      int64_t init_balance(1000000);
-
-      transfer(committee_account, buyer_id, asset(init_balance));
-      transfer(committee_account, borrower_id, asset(init_balance));
-      transfer(committee_account, borrower2_id, asset(init_balance));
-      update_feed_producers(bitusd, {feedproducer.id});
-
-      price_feed current_feed;
-      current_feed.settlement_price = bitusd.amount(100) / core.amount(100);
-
-      // starting out with price 1:1
-      publish_feed(bitusd, feedproducer, current_feed);
-
-      // start out with 2:1 collateral
-      borrow(borrower, bitusd.amount(1000), asset(2000));
-      borrow(borrower2, bitusd.amount(1000), asset(4000));
-
-      BOOST_REQUIRE_EQUAL( get_balance(borrower, bitusd), 1000 );
-      BOOST_REQUIRE_EQUAL( get_balance(borrower2, bitusd), 1000 );
-      BOOST_REQUIRE_EQUAL( get_balance(borrower , core), init_balance - 2000 );
-      BOOST_REQUIRE_EQUAL( get_balance(borrower2, core), init_balance - 4000 );
-
-      current_feed.settlement_price = bitusd.amount( 100 ) / core.amount(200);
-      publish_feed( bitusd, feedproducer, current_feed );
-
-      /// this sell order is designed to trigger a black swan
-      create_sell_order( borrower2, bitusd.amount(1000), core.amount(3000) );
-
-      FC_ASSERT( bitusd.bitasset_data(db).has_settlement() );
-
-      force_settle(borrower, bitusd.amount(100));
-
-      BOOST_TEST_MESSAGE( "Verify that we cannot borrow after black swan" );
-      GRAPHENE_REQUIRE_THROW( borrow(borrower, bitusd.amount(1000), asset(2000)), fc::exception );
-   } catch( const fc::exception& e) {
-      edump((e.to_detail_string()));
-      throw;
-   }
-}
-
-/**
- * Black swan occurs when price feed falls, triggered by settlement
- * order.
- */
-BOOST_AUTO_TEST_CASE( black_swan_issue_346 )
-{ try {
-      ACTORS((buyer)(seller)(borrower)(borrower2)(settler)(feeder));
-
-      const asset_object& core = asset_id_type()(db);
-
-      int trial = 0;
-      const int64_t init_balance(1000000);
-
-      vector< const account_object* > actors{ &buyer, &seller, &borrower, &borrower2, &settler, &feeder };
-
-      auto top_up = [&]()
-      {
-         for( const account_object* actor : actors )
-         {
-            int64_t bal = get_balance( *actor, core );
-            if( bal < init_balance )
-               transfer( committee_account, actor->id, asset(init_balance - bal) );
-            else if( bal > init_balance )
-               transfer( actor->id, committee_account, asset(bal - init_balance) );
-         }
-      };
-
-      auto setup_asset = [&]() -> const asset_object&
-      {
-         const asset_object& bitusd = create_bitasset("USDBIT"+fc::to_string(trial)+"X", feeder_id);
-         update_feed_producers( bitusd, {feeder.id} );
-         BOOST_CHECK( !bitusd.bitasset_data(db).has_settlement() );
-         trial++;
-         return bitusd;
-      };
-
-      /*
-       * GRAPHENE_COLLATERAL_RATIO_DENOM
-      uint16_t maintenance_collateral_ratio = GRAPHENE_DEFAULT_MAINTENANCE_COLLATERAL_RATIO;
-      uint16_t maximum_short_squeeze_ratio = GRAPHENE_DEFAULT_MAX_SHORT_SQUEEZE_RATIO;
-      */
-
-      // situations to test:
-      // 1. minus short squeeze protection would be black swan, otherwise no
-      // 2. issue 346 (price feed drops followed by force settle, drop should trigger BS)
-      // 3. feed price < D/C of least collateralized short < call price < highest bid
-
-      auto set_price = [&](
-         const asset_object& bitusd,
-         const price& settlement_price
-         )
-      {
-         price_feed feed;
-         feed.settlement_price = settlement_price;
-         feed.core_exchange_rate = settlement_price;
-         wdump( (feed.max_short_squeeze_price()) );
-         publish_feed( bitusd, feeder, feed );
-      };
-
-      auto wait_for_settlement = [&]()
-      {
-         const auto& idx = db.get_index_type<force_settlement_index>().indices().get<by_expiration>();
-         const auto& itr = idx.rbegin();
-         if( itr == idx.rend() )
-            return;
-         generate_blocks( itr->settlement_date );
-         BOOST_CHECK( !idx.empty() );
-         generate_block();
-         BOOST_CHECK( idx.empty() );
-      };
-
-      {
-         const asset_object& bitusd = setup_asset();
-         top_up();
-         set_price( bitusd, bitusd.amount(1) / core.amount(5) );  // $0.20
-         borrow(borrower, bitusd.amount(100), asset(1000));       // 2x collat
-         transfer( borrower, settler, bitusd.amount(100) );
-
-         // drop to $0.02 and settle
-         BOOST_CHECK( !bitusd.bitasset_data(db).has_settlement() );
-         set_price( bitusd, bitusd.amount(1) / core.amount(50) ); // $0.02
-         BOOST_CHECK( bitusd.bitasset_data(db).has_settlement() );
-         GRAPHENE_REQUIRE_THROW( borrow( borrower2, bitusd.amount(100), asset(10000) ), fc::exception );
-         force_settle( settler, bitusd.amount(100) );
-
-         // wait for forced settlement to execute
-         // this would throw on Sep.18 testnet, see #346
-         wait_for_settlement();
-      }
-
-      // issue 350
-      {
-         // ok, new asset
-         const asset_object& bitusd = setup_asset();
-         top_up();
-         set_price( bitusd, bitusd.amount(40) / core.amount(1000) ); // $0.04
-         borrow( borrower, bitusd.amount(100), asset(5000) );    // 2x collat
-         transfer( borrower, seller, bitusd.amount(100) );
-         limit_order_id_type oid_019 = create_sell_order( seller, bitusd.amount(39), core.amount(2000) )->id;   // this order is at $0.019, we should not be able to match against it
-         limit_order_id_type oid_020 = create_sell_order( seller, bitusd.amount(40), core.amount(2000) )->id;   // this order is at $0.020, we should be able to match against it
-         set_price( bitusd, bitusd.amount(21) / core.amount(1000) ); // $0.021
-         //
-         // We attempt to match against $0.019 order and black swan,
-         // and this is intended behavior.  See discussion in ticket.
-         //
-         BOOST_CHECK( bitusd.bitasset_data(db).has_settlement() );
-         BOOST_CHECK( db.find_object( oid_019 ) != nullptr );
-         BOOST_CHECK( db.find_object( oid_020 ) == nullptr );
-      }
-
-   } catch( const fc::exception& e) {
-      edump((e.to_detail_string()));
-      throw;
-   }
-}
-
 BOOST_AUTO_TEST_CASE( prediction_market )
 { try {
       ACTORS((judge)(dan)(nathan));
 
       const auto& pmark = create_prediction_market("PMARK", judge_id);
+      const auto pmark_dd_id = pmark.dynamic_asset_data_id;
       const auto& core  = asset_id_type()(db);
 
       int64_t init_balance(1000000);
       transfer(committee_account, judge_id, asset(init_balance));
       transfer(committee_account, dan_id, asset(init_balance));
       transfer(committee_account, nathan_id, asset(init_balance));
+
+      update_feed_producers( pmark, { judge_id });
+      price_feed feed;
+      feed.settlement_price = asset( 1, pmark.id ) / asset( 1 );
+      publish_feed( pmark, judge, feed );
 
       BOOST_TEST_MESSAGE( "Require throw for mismatch collateral amounts" );
       GRAPHENE_REQUIRE_THROW( borrow( dan, pmark.amount(1000), asset(2000) ), fc::exception );
@@ -431,16 +277,62 @@ BOOST_AUTO_TEST_CASE( prediction_market )
       BOOST_TEST_MESSAGE( "Verify that forced settlment succeedes after global settlement" );
       force_settle( dan, pmark.amount(100) );
 
+      // force settle the rest
+      force_settle( dan, pmark.amount(400) );
+      BOOST_CHECK_EQUAL( 0, pmark_dd_id(db).current_supply.value );
+
+      generate_block(~database::skip_transaction_dupe_check);
+      generate_blocks( db.get_dynamic_global_properties().next_maintenance_time );
+      generate_block();
    } catch( const fc::exception& e) {
       edump((e.to_detail_string()));
       throw;
    }
 }
 
+BOOST_AUTO_TEST_CASE( prediction_market_resolves_to_0 )
+{ try {
+      ACTORS((judge)(dan)(nathan));
+
+      const auto& pmark = create_prediction_market("PMARK", judge_id);
+      const auto pmark_dd_id = pmark.dynamic_asset_data_id;
+      const auto& core  = asset_id_type()(db);
+
+      int64_t init_balance(1000000);
+      transfer(committee_account, judge_id, asset(init_balance));
+      transfer(committee_account, dan_id, asset(init_balance));
+      transfer(committee_account, nathan_id, asset(init_balance));
+
+      update_feed_producers( pmark, { judge_id });
+      price_feed feed;
+      feed.settlement_price = asset( 1, pmark.id ) / asset( 1 );
+      publish_feed( pmark, judge, feed );
+
+      borrow( dan, pmark.amount(1000), asset(1000) );
+      // force settle with 0 outcome
+      force_global_settle( pmark, pmark.amount(100) / core.amount(0) );
+
+      BOOST_TEST_MESSAGE( "Verify that forced settlment succeedes after global settlement" );
+      force_settle( dan, pmark.amount(100) );
+
+      // force settle the rest
+      force_settle( dan, pmark.amount(900) );
+      BOOST_CHECK_EQUAL( 0, pmark_dd_id(db).current_supply.value );
+
+      generate_block(~database::skip_transaction_dupe_check);
+      generate_blocks( db.get_dynamic_global_properties().next_maintenance_time );
+      generate_block();
+} catch( const fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
 
 BOOST_AUTO_TEST_CASE( create_account_test )
 {
    try {
+      generate_blocks( HARDFORK_CORE_143_TIME );
+      set_expiration( db, trx );
       trx.operations.push_back(make_account());
       account_create_operation op = trx.operations.back().get<account_create_operation>();
 
@@ -457,6 +349,20 @@ BOOST_AUTO_TEST_CASE( create_account_test )
       REQUIRE_THROW_WITH_VALUE(op, name, "aaaa.");
       REQUIRE_THROW_WITH_VALUE(op, name, ".aaaa");
       REQUIRE_THROW_WITH_VALUE(op, options.voting_account, account_id_type(999999999));
+
+      // Not allow voting for non-exist entities.
+      auto save_num_committee = op.options.num_committee;
+      auto save_num_witness = op.options.num_witness;
+      op.options.num_committee = 1;
+      op.options.num_witness = 0;
+      REQUIRE_THROW_WITH_VALUE(op, options.votes, boost::assign::list_of<vote_id_type>(vote_id_type("0:1")).convert_to_container<flat_set<vote_id_type>>());
+      op.options.num_witness = 1;
+      op.options.num_committee = 0;
+      REQUIRE_THROW_WITH_VALUE(op, options.votes, boost::assign::list_of<vote_id_type>(vote_id_type("1:19")).convert_to_container<flat_set<vote_id_type>>());
+      op.options.num_witness = 0;
+      REQUIRE_THROW_WITH_VALUE(op, options.votes, boost::assign::list_of<vote_id_type>(vote_id_type("2:19")).convert_to_container<flat_set<vote_id_type>>());
+      op.options.num_committee = save_num_committee;
+      op.options.num_witness = save_num_witness;
 
       auto auth_bak = op.owner;
       op.owner.add_authority(account_id_type(9999999999), 10);
@@ -689,7 +595,7 @@ BOOST_AUTO_TEST_CASE( create_uia )
       asset_create_operation creator;
       creator.issuer = account_id_type();
       creator.fee = asset();
-      creator.symbol = "TEST";
+      creator.symbol = UIA_TEST_SYMBOL;
       creator.common_options.max_supply = 100000000;
       creator.precision = 2;
       creator.common_options.market_fee_percent = GRAPHENE_MAX_MARKET_FEE_PERCENT/100; /*1%*/
@@ -700,7 +606,7 @@ BOOST_AUTO_TEST_CASE( create_uia )
       PUSH_TX( db, trx, ~0 );
 
       const asset_object& test_asset = test_asset_id(db);
-      BOOST_CHECK(test_asset.symbol == "TEST");
+      BOOST_CHECK(test_asset.symbol == UIA_TEST_SYMBOL);
       BOOST_CHECK(asset(1, test_asset_id) * test_asset.options.core_exchange_rate == asset(2));
       BOOST_CHECK((test_asset.options.flags & white_list) == 0);
       BOOST_CHECK(test_asset.options.max_supply == 100000000);
@@ -738,7 +644,7 @@ BOOST_AUTO_TEST_CASE( update_uia )
    using namespace graphene;
    try {
       INVOKE(create_uia);
-      const auto& test = get_asset("TEST");
+      const auto& test = get_asset(UIA_TEST_SYMBOL);
       const auto& nathan = create_account("nathan");
 
       asset_update_operation op;
@@ -815,7 +721,7 @@ BOOST_AUTO_TEST_CASE( issue_uia )
       INVOKE(create_uia);
       INVOKE(create_account_test);
 
-      const asset_object& test_asset = *db.get_index_type<asset_index>().indices().get<by_symbol>().find("TEST");
+      const asset_object& test_asset = *db.get_index_type<asset_index>().indices().get<by_symbol>().find(UIA_TEST_SYMBOL);
       const account_object& nathan_account = *db.get_index_type<account_index>().indices().get<by_name>().find("nathan");
 
       asset_issue_operation op;
@@ -854,7 +760,7 @@ BOOST_AUTO_TEST_CASE( transfer_uia )
    try {
       INVOKE(issue_uia);
 
-      const asset_object& uia = *db.get_index_type<asset_index>().indices().get<by_symbol>().find("TEST");
+      const asset_object& uia = *db.get_index_type<asset_index>().indices().get<by_symbol>().find(UIA_TEST_SYMBOL);
       const account_object& nathan = *db.get_index_type<account_index>().indices().get<by_name>().find("nathan");
       const account_object& committee = account_id_type()(db);
 
@@ -882,7 +788,7 @@ BOOST_AUTO_TEST_CASE( transfer_uia )
 BOOST_AUTO_TEST_CASE( create_buy_uia_multiple_match_new )
 { try {
    INVOKE( issue_uia );
-   const asset_object&   core_asset     = get_asset( "TEST" );
+   const asset_object&   core_asset     = get_asset( UIA_TEST_SYMBOL );
    const asset_object&   test_asset     = get_asset( GRAPHENE_SYMBOL );
    const account_object& nathan_account = get_account( "nathan" );
    const account_object& buyer_account  = create_account( "buyer" );
@@ -922,7 +828,7 @@ BOOST_AUTO_TEST_CASE( create_buy_uia_multiple_match_new )
 BOOST_AUTO_TEST_CASE( create_buy_exact_match_uia )
 { try {
    INVOKE( issue_uia );
-   const asset_object&   test_asset     = get_asset( "TEST" );
+   const asset_object&   test_asset     = get_asset( UIA_TEST_SYMBOL );
    const asset_object&   core_asset     = get_asset( GRAPHENE_SYMBOL );
    const account_object& nathan_account = get_account( "nathan" );
    const account_object& buyer_account  = create_account( "buyer" );
@@ -963,7 +869,7 @@ BOOST_AUTO_TEST_CASE( create_buy_exact_match_uia )
 BOOST_AUTO_TEST_CASE( create_buy_uia_multiple_match_new_reverse )
 { try {
    INVOKE( issue_uia );
-   const asset_object&   test_asset     = get_asset( "TEST" );
+   const asset_object&   test_asset     = get_asset( UIA_TEST_SYMBOL );
    const asset_object&   core_asset     = get_asset( GRAPHENE_SYMBOL );
    const account_object& nathan_account = get_account( "nathan" );
    const account_object& buyer_account  = create_account( "buyer" );
@@ -1003,7 +909,7 @@ BOOST_AUTO_TEST_CASE( create_buy_uia_multiple_match_new_reverse )
 BOOST_AUTO_TEST_CASE( create_buy_uia_multiple_match_new_reverse_fract )
 { try {
    INVOKE( issue_uia );
-   const asset_object&   test_asset     = get_asset( "TEST" );
+   const asset_object&   test_asset     = get_asset( UIA_TEST_SYMBOL );
    const asset_object&   core_asset     = get_asset( GRAPHENE_SYMBOL );
    const account_object& nathan_account = get_account( "nathan" );
    const account_object& buyer_account  = create_account( "buyer" );
@@ -1051,7 +957,7 @@ BOOST_AUTO_TEST_CASE( uia_fees )
 
       enable_fees();
 
-      const asset_object& test_asset = get_asset("TEST");
+      const asset_object& test_asset = get_asset(UIA_TEST_SYMBOL);
       const asset_dynamic_data_object& asset_dynamic = test_asset.dynamic_asset_data_id(db);
       const account_object& nathan_account = get_account("nathan");
       const account_object& committee_account = account_id_type()(db);
@@ -1114,7 +1020,7 @@ BOOST_AUTO_TEST_CASE( uia_fees )
 BOOST_AUTO_TEST_CASE( cancel_limit_order_test )
 { try {
    INVOKE( issue_uia );
-   const asset_object&   test_asset     = get_asset( "TEST" );
+   const asset_object&   test_asset     = get_asset( UIA_TEST_SYMBOL );
    const account_object& buyer_account  = create_account( "buyer" );
 
    transfer( committee_account(db), buyer_account, asset( 10000 ) );
@@ -1196,16 +1102,18 @@ BOOST_AUTO_TEST_CASE( witness_feeds )
 /**
  *  Create an order such that when the trade executes at the
  *  requested price the resulting payout to one party is 0
- *
- * I am unable to actually create such an order; I'm not sure it's possible. What I have done is create an order which
- * broke an assert in the matching algorithm.
  */
 BOOST_AUTO_TEST_CASE( trade_amount_equals_zero )
 {
    try {
       INVOKE(issue_uia);
-      const asset_object& test = get_asset( "TEST" );
+      generate_blocks( HARDFORK_555_TIME );
+      set_expiration( db, trx );
+
+      const asset_object& test = get_asset( UIA_TEST_SYMBOL );
+      const asset_id_type test_id = test.id;
       const asset_object& core = get_asset( GRAPHENE_SYMBOL );
+      const asset_id_type core_id = core.id;
       const account_object& core_seller = create_account( "shorter1" );
       const account_object& core_buyer = get_account("nathan");
 
@@ -1216,10 +1124,26 @@ BOOST_AUTO_TEST_CASE( trade_amount_equals_zero )
       BOOST_CHECK_EQUAL(get_balance(core_seller, test), 0);
       BOOST_CHECK_EQUAL(get_balance(core_seller, core), 100000000);
 
-      //ilog( "=================================== START===================================\n\n");
-      create_sell_order(core_seller, core.amount(1), test.amount(900000));
-      //ilog( "=================================== STEP===================================\n\n");
-      create_sell_order(core_buyer, test.amount(900001), core.amount(1));
+      create_sell_order(core_seller, core.amount(1), test.amount(2));
+      create_sell_order(core_seller, core.amount(1), test.amount(2));
+      create_sell_order(core_buyer, test.amount(3), core.amount(1));
+
+      BOOST_CHECK_EQUAL(get_balance(core_buyer, core), 1);
+      BOOST_CHECK_EQUAL(get_balance(core_buyer, test), 9999997);
+      BOOST_CHECK_EQUAL(get_balance(core_seller, core), 99999998);
+      BOOST_CHECK_EQUAL(get_balance(core_seller, test), 3);
+
+      generate_block();
+      fc::usleep(fc::milliseconds(1000));
+
+       //TODO: This will fail because of something-for-nothing bug(#345)
+       // Must be fixed with a hardfork
+      auto result = get_market_order_history(core_id, test_id);
+      BOOST_CHECK_EQUAL(result.size(), 2);
+      BOOST_CHECK(result[0].op.pays == core.amount(1));
+      BOOST_CHECK(result[0].op.receives == test.amount(2));
+      BOOST_CHECK(result[1].op.pays == test.amount(2));
+      BOOST_CHECK(result[1].op.receives == core.amount(1));
    } catch( const fc::exception& e) {
       edump((e.to_detail_string()));
       throw;
@@ -1235,7 +1159,7 @@ BOOST_AUTO_TEST_CASE( limit_order_fill_or_kill )
 { try {
    INVOKE(issue_uia);
    const account_object& nathan = get_account("nathan");
-   const asset_object& test = get_asset("TEST");
+   const asset_object& test = get_asset(UIA_TEST_SYMBOL);
    const asset_object& core = asset_id_type()(db);
 
    limit_order_create_operation op;
@@ -1387,7 +1311,7 @@ BOOST_AUTO_TEST_CASE( reserve_asset_test )
    {
       ACTORS((alice)(bob)(sam)(judge));
       const auto& basset = create_bitasset("USDBIT", judge_id);
-      const auto& uasset = create_user_issued_asset("TEST");
+      const auto& uasset = create_user_issued_asset(UIA_TEST_SYMBOL);
       const auto& passet = create_prediction_market("PMARK", judge_id);
       const auto& casset = asset_id_type()(db);
 
@@ -1432,6 +1356,7 @@ BOOST_AUTO_TEST_CASE( reserve_asset_test )
       update_feed_producers( basset, {sam.id} );
       price_feed current_feed;
       current_feed.settlement_price = basset.amount( 2 ) / casset.amount(100);
+      current_feed.maintenance_collateral_ratio = 1750; // need to set this explicitly, testnet has a different default
       publish_feed( basset, sam, current_feed );
       borrow( alice_id, basset.amount( init_balance ), casset.amount( 100*init_balance ) );
       BOOST_CHECK_EQUAL( get_balance( alice, basset ), init_balance );
@@ -1550,7 +1475,7 @@ BOOST_AUTO_TEST_CASE( vesting_balance_create_test )
    INVOKE( create_uia );
 
    const asset_object& core = asset_id_type()(db);
-   const asset_object& test_asset = get_asset("TEST");
+   const asset_object& test_asset = get_asset(UIA_TEST_SYMBOL);
 
    vesting_balance_create_operation op;
    op.fee = core.amount( 0 );
@@ -1601,7 +1526,7 @@ BOOST_AUTO_TEST_CASE( vesting_balance_withdraw_test )
    generate_block();
 
    const asset_object& core = asset_id_type()(db);
-   const asset_object& test_asset = get_asset( "TEST" );
+   const asset_object& test_asset = get_asset( UIA_TEST_SYMBOL );
 
    vesting_balance_withdraw_operation op;
    op.fee = core.amount( 0 );

@@ -30,7 +30,7 @@ Build instructions and additional documentation are available in the
 We recommend building on Ubuntu 16.04 LTS, and the build dependencies may be installed with:
 
     sudo apt-get update
-    sudo apt-get install autoconf cmake git libboost-all-dev libssl-dev
+    sudo apt-get install autoconf cmake git libboost-all-dev libssl-dev g++
 
 To build after all dependencies are installed:
 
@@ -56,6 +56,8 @@ the blockchain. After syncing, you can exit the node using Ctrl+C and setup the 
 `witness_node_data_dir/config.ini` as follows:
 
     rpc-endpoint = 127.0.0.1:8090
+
+**NOTE:** Currently(2017-09-04) a full node need 40GB of RAM to operate and required memory is growing fast. To start a node with reduced RAM check the following: [Memory reduction for nodes](https://github.com/bitshares/bitshares-core/wiki/Memory-reduction-for-nodes).
 
 After starting the witness node again, in a separate terminal you can run:
 
@@ -110,7 +112,7 @@ API 0 is accessible using regular JSON-RPC:
 Accessing restricted API's
 --------------------------
 
-You can restrict API's to particular users by specifying an `apiaccess` file in `config.ini`.  Here is an example `apiaccess` file which allows
+You can restrict API's to particular users by specifying an `api-access` file in `config.ini` or by using the `--api-access /full/path/to/api-access.json` startup node command.  Here is an example `api-access` file which allows
 user `bytemaster` with password `supersecret` to access four different API's, while allowing any other user to access the three public API's
 necessary to use the wallet:
 

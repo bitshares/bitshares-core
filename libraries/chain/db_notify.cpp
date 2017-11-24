@@ -32,9 +32,17 @@ struct get_impacted_account_visitor
       _impacted.insert( op.fee_paying_account );
    }
    void operator()( const call_order_update_operation& op ) {}
+   void operator()( const bid_collateral_operation& op )
+   {
+      _impacted.insert( op.bidder );
+   }
    void operator()( const fill_order_operation& op )
    {
       _impacted.insert( op.account_id );
+   }
+   void operator()( const execute_bid_operation& op )
+   {
+      _impacted.insert( op.bidder );
    }
 
    void operator()( const account_create_operation& op )
@@ -188,19 +196,19 @@ struct get_impacted_account_visitor
 
 };
 
-void operation_get_impacted_accounts( const operation& op, flat_set<account_id_type>& result )
+static void operation_get_impacted_accounts( const operation& op, flat_set<account_id_type>& result )
 {
   get_impacted_account_visitor vtor = get_impacted_account_visitor( result );
   op.visit( vtor );
 }
 
-void transaction_get_impacted_accounts( const transaction& tx, flat_set<account_id_type>& result )
+static void transaction_get_impacted_accounts( const transaction& tx, flat_set<account_id_type>& result )
 {
   for( const auto& op : tx.operations )
     operation_get_impacted_accounts( op, result );
 }
 
-void get_relevant_accounts( const object* obj, flat_set<account_id_type>& accounts )
+static void get_relevant_accounts( const object* obj, flat_set<account_id_type>& accounts )
 {
    if( obj->id.space() == protocol_ids )
    {
@@ -328,6 +336,12 @@ void get_relevant_accounts( const object* obj, flat_set<account_id_type>& accoun
               break;
              case impl_fba_accumulator_object_type:
               break;
+             case impl_collateral_bid_object_type:{
+              const auto& aobj = dynamic_cast<const collateral_bid_object*>(obj);
+              assert( aobj != nullptr );
+              accounts.insert( aobj->bidder );
+              break;
+           }
       }
    }
 } // end get_relevant_accounts( const object* obj, flat_set<account_id_type>& accounts )

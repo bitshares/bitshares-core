@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015 Cryptonomex, Inc., and contributors.
+ * Copyright (c) 2017 Cryptonomex, Inc., and contributors.
  *
  * The MIT License
  *
@@ -54,6 +54,7 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       database_api_impl( graphene::chain::database& db );
       ~database_api_impl();
 
+
       // Objects
       fc::variants get_objects(const vector<object_id_type>& ids)const;
 
@@ -78,7 +79,7 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
 
       // Keys
       vector<vector<account_id_type>> get_key_references( vector<public_key_type> key )const;
-     bool is_public_key_registered(string public_key) const;
+      bool is_public_key_registered(string public_key) const;
 
       // Accounts
       vector<optional<account_object>> get_accounts(const vector<account_id_type>& account_ids)const;
@@ -106,6 +107,7 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       vector<call_order_object>          get_call_orders(asset_id_type a, uint32_t limit)const;
       vector<force_settlement_object>    get_settle_orders(asset_id_type a, uint32_t limit)const;
       vector<call_order_object>          get_margin_positions( const account_id_type& id )const;
+      vector<collateral_bid_object>      get_collateral_bids(const asset_id_type asset, uint32_t limit, uint32_t start)const;
       void subscribe_to_market(std::function<void(const variant&)> callback, asset_id_type a, asset_id_type b);
       void unsubscribe_from_market(asset_id_type a, asset_id_type b);
       market_ticker                      get_ticker( const string& base, const string& quote )const;
@@ -123,6 +125,12 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       vector<optional<committee_member_object>> get_committee_members(const vector<committee_member_id_type>& committee_member_ids)const;
       fc::optional<committee_member_object> get_committee_member_by_account(account_id_type account)const;
       map<string, committee_member_id_type> lookup_committee_member_accounts(const string& lower_bound_name, uint32_t limit)const;
+      uint64_t get_committee_count()const;
+
+      // Workers
+      vector<worker_object> get_all_workers()const;
+      vector<optional<worker_object>> get_workers_by_account(account_id_type account)const;
+      uint64_t get_worker_count()const;
 
       // Votes
       vector<variant> lookup_vote_ids( const vector<vote_id_type>& votes )const;
@@ -142,6 +150,7 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
 
       // Blinded balances
       vector<blinded_balance_object> get_blinded_balances( const flat_set<commitment_type>& commitments )const;
+
 
    //private:
       template<typename T>
@@ -618,9 +627,10 @@ std::map<std::string, full_account> database_api_impl::get_full_accounts( const 
 
       if( subscribe )
       {
-         FC_ASSERT( std::distance(_subscribed_accounts.begin(), _subscribed_accounts.end()) <= 100 );
-         _subscribed_accounts.insert( account->get_id() );
-         subscribe_to_item( account->id );
+         if(_subscribed_accounts.size() < 100) {
+            _subscribed_accounts.insert( account->get_id() );
+            subscribe_to_item( account->id );
+         }
       }
 
       // fc::mutable_variant_object full_account;
@@ -1031,9 +1041,16 @@ vector<call_order_object> database_api_impl::get_call_orders(asset_id_type a, ui
    const auto& call_index = _db.get_index_type<call_order_index>().indices().get<by_price>();
    const asset_object& mia = _db.get(a);
    price index_price = price::min(mia.bitasset_data(_db).options.short_backing_asset, mia.get_id());
-
-   return vector<call_order_object>(call_index.lower_bound(index_price.min()),
-                                    call_index.lower_bound(index_price.max()));
+   
+   vector< call_order_object> result;
+   auto itr_min = call_index.lower_bound(index_price.min());
+   auto itr_max = call_index.lower_bound(index_price.max());
+   while( itr_min != itr_max && result.size() < limit ) 
+   {
+      result.emplace_back(*itr_min);
+      ++itr_min;
+   }
+   return result;
 }
 
 vector<force_settlement_object> database_api::get_settle_orders(asset_id_type a, uint32_t limit)const
@@ -1045,8 +1062,16 @@ vector<force_settlement_object> database_api_impl::get_settle_orders(asset_id_ty
 {
    const auto& settle_index = _db.get_index_type<force_settlement_index>().indices().get<by_expiration>();
    const asset_object& mia = _db.get(a);
-   return vector<force_settlement_object>(settle_index.lower_bound(mia.get_id()),
-                                          settle_index.upper_bound(mia.get_id()));
+
+   vector<force_settlement_object> result;
+   auto itr_min = settle_index.lower_bound(mia.get_id());
+   auto itr_max = settle_index.upper_bound(mia.get_id());
+   while( itr_min != itr_max && result.size() < limit )
+   {
+      result.emplace_back(*itr_min);
+      ++itr_min;
+   }
+   return result;
 }
 
 vector<call_order_object> database_api::get_margin_positions( const account_id_type& id )const
@@ -1071,6 +1096,32 @@ vector<call_order_object> database_api_impl::get_margin_positions( const account
       return result;
    } FC_CAPTURE_AND_RETHROW( (id) )
 }
+
+vector<collateral_bid_object> database_api::get_collateral_bids(const asset_id_type asset, uint32_t limit, uint32_t start)const
+{
+   return my->get_collateral_bids( asset, limit, start );
+}
+
+vector<collateral_bid_object> database_api_impl::get_collateral_bids(const asset_id_type asset_id, uint32_t limit, uint32_t skip)const
+{ try {
+   FC_ASSERT( limit <= 100 );
+   const asset_object& swan = asset_id(_db);
+   FC_ASSERT( swan.is_market_issued() );
+   const asset_bitasset_data_object& bad = swan.bitasset_data(_db);
+   const asset_object& back = bad.options.short_backing_asset(_db);
+   const auto& idx = _db.get_index_type<collateral_bid_index>();
+   const auto& aidx = idx.indices().get<by_price>();
+   auto start = aidx.lower_bound( boost::make_tuple( asset_id, price::max(back.id, asset_id), collateral_bid_id_type() ) );
+   auto end = aidx.lower_bound( boost::make_tuple( asset_id, price::min(back.id, asset_id), collateral_bid_id_type(GRAPHENE_DB_MAX_INSTANCE_ID) ) );
+   vector<collateral_bid_object> result;
+   while( skip-- > 0 && start != end ) { ++start; }
+   while( start != end && limit-- > 0)
+   {
+      result.push_back(*start);
+      ++start;
+   }
+   return result;
+} FC_CAPTURE_AND_RETHROW( (asset_id)(limit)(skip) ) }
 
 void database_api::subscribe_to_market(std::function<void(const variant&)> callback, asset_id_type a, asset_id_type b)
 {
@@ -1293,6 +1344,12 @@ vector<market_trade> database_api_impl::get_trade_history( const string& base,
          trade.date = itr->time;
          trade.price = trade.value / trade.amount;
 
+         trade.side1_account_id = itr->op.account_id;
+
+         auto next_itr = std::next(itr);
+
+         trade.side2_account_id = next_itr->op.account_id;
+
          result.push_back( trade );
          ++count;
       }
@@ -1315,22 +1372,6 @@ vector<optional<witness_object>> database_api::get_witnesses(const vector<witnes
 {
    return my->get_witnesses( witness_ids );
 }
-
-vector<worker_object> database_api::get_workers_by_account(account_id_type account)const
-{
-    const auto& idx = my->_db.get_index_type<worker_index>().indices().get<by_account>();
-    auto itr = idx.find(account);
-    vector<worker_object> result;
-
-    if( itr != idx.end() && itr->worker_account == account )
-    {
-       result.emplace_back( *itr );
-       ++itr;
-    }
-
-    return result;
-}
-
 
 vector<optional<witness_object>> database_api_impl::get_witnesses(const vector<witness_id_type>& witness_ids)const
 {
@@ -1460,6 +1501,69 @@ map<string, committee_member_id_type> database_api_impl::lookup_committee_member
    committee_members_by_account_name.erase(end_iter, committee_members_by_account_name.end());
    return committee_members_by_account_name;
 }
+
+uint64_t database_api::get_committee_count()const
+{
+    return my->get_committee_count();
+}
+
+uint64_t database_api_impl::get_committee_count()const
+{
+    return _db.get_index_type<committee_member_index>().indices().size();
+}
+
+
+//////////////////////////////////////////////////////////////////////
+//                                                                  //
+// Workers                                                          //
+//                                                                  //
+//////////////////////////////////////////////////////////////////////
+
+vector<worker_object> database_api::get_all_workers()const
+{
+    return my->get_all_workers();
+}
+
+vector<worker_object> database_api_impl::get_all_workers()const
+{
+    vector<worker_object> result;
+    const auto& workers_idx = _db.get_index_type<worker_index>().indices().get<by_id>();
+    for( const auto& w : workers_idx )
+    {
+       result.push_back( w );
+    }
+    return result;
+}
+
+vector<optional<worker_object>> database_api::get_workers_by_account(account_id_type account)const
+{
+    return my->get_workers_by_account( account );
+}
+
+vector<optional<worker_object>> database_api_impl::get_workers_by_account(account_id_type account)const
+{
+    vector<optional<worker_object>> result;
+    const auto& workers_idx = _db.get_index_type<worker_index>().indices().get<by_account>();
+
+    for( const auto& w : workers_idx )
+    {
+        if( w.worker_account == account )
+            result.push_back( w );
+    }
+    return result;
+}
+
+uint64_t database_api::get_worker_count()const
+{
+    return my->get_worker_count();
+}
+
+uint64_t database_api_impl::get_worker_count()const
+{
+    return _db.get_index_type<worker_index>().indices().size();
+}
+
+
 
 //////////////////////////////////////////////////////////////////////
 //                                                                  //

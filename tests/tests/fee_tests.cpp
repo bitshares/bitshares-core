@@ -31,6 +31,7 @@
 
 #include <graphene/chain/fba_object.hpp>
 #include <graphene/chain/market_object.hpp>
+#include <graphene/chain/proposal_object.hpp>
 #include <graphene/chain/vesting_balance_object.hpp>
 #include <graphene/chain/exceptions.hpp>
 
@@ -939,6 +940,220 @@ BOOST_AUTO_TEST_CASE( stealth_fba_test )
    catch( const fc::exception& e )
    {
       elog( "caught exception ${e}", ("e", e.to_detail_string()) );
+      throw;
+   }
+}
+
+BOOST_AUTO_TEST_CASE( defaults_test )
+{ try {
+    fee_schedule schedule;
+    const limit_order_create_operation::fee_parameters_type default_order_fee;
+
+    // no fees set yet -> default
+    asset fee = schedule.calculate_fee( limit_order_create_operation() );
+    BOOST_CHECK_EQUAL( default_order_fee.fee, fee.amount.value );
+
+    limit_order_create_operation::fee_parameters_type new_order_fee; new_order_fee.fee = 123;
+    // set fee + check
+    schedule.parameters.insert( new_order_fee );
+    fee = schedule.calculate_fee( limit_order_create_operation() );
+    BOOST_CHECK_EQUAL( new_order_fee.fee, fee.amount.value );
+
+    // bid_collateral fee defaults to call_order_update fee
+    // call_order_update fee is unset -> default
+    const call_order_update_operation::fee_parameters_type default_short_fee;
+    call_order_update_operation::fee_parameters_type new_short_fee; new_short_fee.fee = 123;
+    fee = schedule.calculate_fee( bid_collateral_operation() );
+    BOOST_CHECK_EQUAL( default_short_fee.fee, fee.amount.value );
+
+    // set call_order_update fee + check bid_collateral fee
+    schedule.parameters.insert( new_short_fee );
+    fee = schedule.calculate_fee( bid_collateral_operation() );
+    BOOST_CHECK_EQUAL( new_short_fee.fee, fee.amount.value );
+
+    // set bid_collateral fee + check
+    bid_collateral_operation::fee_parameters_type new_bid_fee; new_bid_fee.fee = 124;
+    schedule.parameters.insert( new_bid_fee );
+    fee = schedule.calculate_fee( bid_collateral_operation() );
+    BOOST_CHECK_EQUAL( new_bid_fee.fee, fee.amount.value );
+  }
+  catch( const fc::exception& e )
+  {
+     elog( "caught exception ${e}", ("e", e.to_detail_string()) );
+     throw;
+  }
+}
+
+BOOST_AUTO_TEST_CASE( issue_429_test )
+{
+   try
+   {
+      ACTORS((alice));
+
+      transfer( committee_account, alice_id, asset( 1000000 * asset::scaled_precision( asset_id_type()(db).precision ) ) );
+
+      // make sure the database requires our fee to be nonzero
+      enable_fees();
+
+      auto fees_to_pay = db.get_global_properties().parameters.current_fees->get<asset_create_operation>();
+
+      {
+         signed_transaction tx;
+         asset_create_operation op;
+         op.issuer = alice_id;
+         op.symbol = "ALICE";
+         op.common_options.core_exchange_rate = asset( 1 ) / asset( 1, asset_id_type( 1 ) );
+         op.fee = asset( (fees_to_pay.long_symbol + fees_to_pay.price_per_kbyte) & (~1) );
+         tx.operations.push_back( op );
+         set_expiration( db, tx );
+         sign( tx, alice_private_key );
+         PUSH_TX( db, tx );
+      }
+
+      verify_asset_supplies( db );
+
+      {
+         signed_transaction tx;
+         asset_create_operation op;
+         op.issuer = alice_id;
+         op.symbol = "ALICE.ODD";
+         op.common_options.core_exchange_rate = asset( 1 ) / asset( 1, asset_id_type( 1 ) );
+         op.fee = asset((fees_to_pay.long_symbol + fees_to_pay.price_per_kbyte) | 1);
+         tx.operations.push_back( op );
+         set_expiration( db, tx );
+         sign( tx, alice_private_key );
+         PUSH_TX( db, tx );
+      }
+
+      verify_asset_supplies( db );
+
+      generate_blocks( HARDFORK_CORE_429_TIME + 10 );
+
+      {
+         signed_transaction tx;
+         asset_create_operation op;
+         op.issuer = alice_id;
+         op.symbol = "ALICE.ODDER";
+         op.common_options.core_exchange_rate = asset( 1 ) / asset( 1, asset_id_type( 1 ) );
+         op.fee = asset((fees_to_pay.long_symbol + fees_to_pay.price_per_kbyte) | 1);
+         tx.operations.push_back( op );
+         set_expiration( db, tx );
+         sign( tx, alice_private_key );
+         PUSH_TX( db, tx );
+      }
+
+      verify_asset_supplies( db );
+   }
+   catch( const fc::exception& e )
+   {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
+BOOST_AUTO_TEST_CASE( issue_433_test )
+{
+   try
+   {
+      ACTORS((alice));
+
+      auto& core = asset_id_type()(db);
+
+      transfer( committee_account, alice_id, asset( 1000000 * asset::scaled_precision( core.precision ) ) );
+
+      const auto& myusd = create_user_issued_asset( "MYUSD", alice, 0 );
+      issue_uia( alice, myusd.amount( 2000000000 ) );
+
+      // make sure the database requires our fee to be nonzero
+      enable_fees();
+
+      const auto& fees = *db.get_global_properties().parameters.current_fees;
+      const auto asset_create_fees = fees.get<asset_create_operation>();
+
+      fund_fee_pool( alice, myusd, 5*asset_create_fees.long_symbol );
+
+      asset_create_operation op;
+      op.issuer = alice_id;
+      op.symbol = "ALICE";
+      op.common_options.core_exchange_rate = asset( 1 ) / asset( 1, asset_id_type( 1 ) );
+      op.fee = myusd.amount( ((asset_create_fees.long_symbol + asset_create_fees.price_per_kbyte) & (~1)) );
+      signed_transaction tx;
+      tx.operations.push_back( op );
+      set_expiration( db, tx );
+      sign( tx, alice_private_key );
+      PUSH_TX( db, tx );
+
+      verify_asset_supplies( db );
+   }
+   catch( const fc::exception& e )
+   {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
+BOOST_AUTO_TEST_CASE( issue_433_indirect_test )
+{
+   try
+   {
+      ACTORS((alice));
+
+      auto& core = asset_id_type()(db);
+
+      transfer( committee_account, alice_id, asset( 1000000 * asset::scaled_precision( core.precision ) ) );
+
+      const auto& myusd = create_user_issued_asset( "MYUSD", alice, 0 );
+      issue_uia( alice, myusd.amount( 2000000000 ) );
+
+      // make sure the database requires our fee to be nonzero
+      enable_fees();
+
+      const auto& fees = *db.get_global_properties().parameters.current_fees;
+      const auto asset_create_fees = fees.get<asset_create_operation>();
+
+      fund_fee_pool( alice, myusd, 5*asset_create_fees.long_symbol );
+
+      asset_create_operation op;
+      op.issuer = alice_id;
+      op.symbol = "ALICE";
+      op.common_options.core_exchange_rate = asset( 1 ) / asset( 1, asset_id_type( 1 ) );
+      op.fee = myusd.amount( ((asset_create_fees.long_symbol + asset_create_fees.price_per_kbyte) & (~1)) );
+
+      const auto proposal_create_fees = fees.get<proposal_create_operation>();
+      proposal_create_operation prop;
+      prop.fee_paying_account = alice_id;
+      prop.proposed_ops.emplace_back( op );
+      prop.expiration_time =  db.head_block_time() + fc::days(1);
+      prop.fee = asset( proposal_create_fees.fee + proposal_create_fees.price_per_kbyte );
+      object_id_type proposal_id;
+      {
+         signed_transaction tx;
+         tx.operations.push_back( prop );
+         set_expiration( db, tx );
+         sign( tx, alice_private_key );
+         proposal_id = PUSH_TX( db, tx ).operation_results.front().get<object_id_type>();
+      }
+      const proposal_object& proposal = db.get<proposal_object>( proposal_id );
+
+      const auto proposal_update_fees = fees.get<proposal_update_operation>();
+      proposal_update_operation pup;
+      pup.proposal = proposal.id;
+      pup.fee_paying_account = alice_id;
+      pup.active_approvals_to_add.insert(alice_id);
+      pup.fee = asset( proposal_update_fees.fee + proposal_update_fees.price_per_kbyte );
+      {
+         signed_transaction tx;
+         tx.operations.push_back( pup );
+         set_expiration( db, tx );
+         sign( tx, alice_private_key );
+         PUSH_TX( db, tx );
+      }
+
+      verify_asset_supplies( db );
+   }
+   catch( const fc::exception& e )
+   {
+      edump((e.to_detail_string()));
       throw;
    }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015 Cryptonomex, Inc., and contributors.
+ * Copyright (c) 2017 Peter Conrad, and contributors.
  *
  * The MIT License
  *
@@ -21,34 +21,36 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-#include <graphene/chain/protocol/market.hpp>
+#pragma once
 
-namespace graphene { namespace chain {
+#include <graphene/app/plugin.hpp>
+#include <graphene/chain/database.hpp>
 
-void limit_order_create_operation::validate()const
-{
-   FC_ASSERT( amount_to_sell.asset_id != min_to_receive.asset_id );
-   FC_ASSERT( fee.amount >= 0 );
-   FC_ASSERT( amount_to_sell.amount > 0 );
-   FC_ASSERT( min_to_receive.amount > 0 );
-}
+#include <fc/time.hpp>
 
-void limit_order_cancel_operation::validate()const
-{
-   FC_ASSERT( fee.amount >= 0 );
-}
+namespace graphene { namespace snapshot_plugin {
 
-void call_order_update_operation::validate()const
-{ try {
-   FC_ASSERT( fee.amount >= 0 );
-   FC_ASSERT( delta_collateral.asset_id != delta_debt.asset_id );
-   FC_ASSERT( delta_collateral.amount != 0 || delta_debt.amount != 0 );
-} FC_CAPTURE_AND_RETHROW((*this)) }
+class snapshot_plugin : public graphene::app::plugin {
+   public:
+      ~snapshot_plugin() {}
 
-void bid_collateral_operation::validate()const
-{ try {
-   FC_ASSERT( fee.amount >= 0 );
-   FC_ASSERT( debt_covered.amount == 0 || (debt_covered.amount > 0 && additional_collateral.amount > 0) );
-} FC_CAPTURE_AND_RETHROW((*this)) }
+      std::string plugin_name()const override;
 
-} } // graphene::chain
+      virtual void plugin_set_program_options(
+         boost::program_options::options_description &command_line_options,
+         boost::program_options::options_description &config_file_options
+      ) override;
+
+      virtual void plugin_initialize( const boost::program_options::variables_map& options ) override;
+      virtual void plugin_startup() override;
+      virtual void plugin_shutdown() override;
+
+   private:
+       void check_snapshot( const graphene::chain::signed_block& b);
+
+       uint32_t           snapshot_block = -1, last_block = 0;
+       fc::time_point_sec snapshot_time = fc::time_point_sec::maximum(), last_time = fc::time_point_sec(1);
+       fc::path           dest;
+};
+
+} } //graphene::snapshot_plugin

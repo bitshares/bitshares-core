@@ -124,7 +124,7 @@ int main( int argc, char** argv )
 
       database db;
       fc::path db_path = data_dir / "db";
-      db.open(db_path, [&]() { return genesis; } );
+      db.open(db_path, [&]() { return genesis; }, "TEST" );
 
       uint32_t slot = 1;
       uint32_t missed = 0;
