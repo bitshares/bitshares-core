@@ -53,6 +53,7 @@ object_id_type withdraw_permission_create_evaluator::do_apply(const operation_ty
       p.withdrawal_period_sec = op.withdrawal_period_sec;
       p.expiration = op.period_start_time + op.periods_until_expiration * op.withdrawal_period_sec;
       p.period_start_time = op.period_start_time;
+      p.claimed_this_period = 0;
    }).id;
 } FC_CAPTURE_AND_RETHROW( (op) ) }
 
