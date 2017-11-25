@@ -27,24 +27,9 @@
 #include <graphene/chain/database.hpp>
 
 namespace graphene { namespace es_objects {
-   using namespace chain;
-   //using namespace graphene::db;
-   //using boost::multi_index_container;
-   //using namespace boost::multi_index;
 
-//
-// Plugins should #define their SPACE_ID's so plugins with
-// conflicting SPACE_ID assignments can be compiled into the
-// same binary (by simply re-assigning some of the conflicting #defined
-// SPACE_ID's in a build script).
-//
-// Assignment of SPACE_ID's cannot be done at run-time because
-// various template automagic depends on them being known at compile
-// time.
-//
-#ifndef PROPOSAL_SPACE_ID
-#define PROPOSAL_SPACE_ID 6
-#endif
+using namespace chain;
+
 
 static size_t WriteCallback(void *contents, size_t size, size_t nmemb, void *userp)
 {
