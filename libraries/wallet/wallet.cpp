@@ -1877,6 +1877,56 @@ public:
       return tx;
    }
 
+   memo_data sign_memo(string from, string to, string memo)
+   {
+      FC_ASSERT( !self.is_locked() );
+
+      memo_data md = memo_data();
+
+      // get account memo key, if that fails, try a pubkey
+      try {
+         account_object from_account = get_account(from);
+         md.from = from_account.options.memo_key;
+      } catch (const fc::exception& e) {
+         md.from =  self.get_public_key( from );
+      }
+      // same as above, for destination key
+      try {
+         account_object to_account = get_account(to);
+         md.to = to_account.options.memo_key;
+      } catch (const fc::exception& e) {
+         md.to = self.get_public_key( to );
+      }
+
+      md.set_message(get_private_key(md.from), md.to, memo);
+      return md;
+   }
+
+   string read_memo(const memo_data& md)
+   {
+      FC_ASSERT(!is_locked());
+      std::string clear_text;
+
+      const memo_data *memo = &md;
+
+      try {
+         FC_ASSERT(_keys.count(memo->to) || _keys.count(memo->from), "Memo is encrypted to a key ${to} or ${from} not in this wallet.", ("to", memo->to)("from",memo->from));
+         if( _keys.count(memo->to) ) {
+            auto my_key = wif_to_key(_keys.at(memo->to));
+            FC_ASSERT(my_key, "Unable to recover private key to decrypt memo. Wallet may be corrupted.");
+            clear_text = memo->get_message(*my_key, memo->from);
+         } else {
+            auto my_key = wif_to_key(_keys.at(memo->from));
+            FC_ASSERT(my_key, "Unable to recover private key to decrypt memo. Wallet may be corrupted.");
+            clear_text = memo->get_message(*my_key, memo->to);
+         }
+      } catch (const fc::exception& e) {
+         elog("Error when decrypting memo: ${e}", ("e", e.to_detail_string()));
+      }
+
+      return clear_text;
+   }
+
    signed_transaction sell_asset(string seller_account,
                                  string amount_to_sell,
                                  string symbol_to_sell,
@@ -3781,6 +3831,18 @@ signed_transaction wallet_api::cancel_order(object_id_type order_id, bool broadc
 {
    FC_ASSERT(!is_locked());
    return my->cancel_order(order_id, broadcast);
+}
+
+memo_data wallet_api::sign_memo(string from, string to, string memo)
+{
+   FC_ASSERT(!is_locked());
+   return my->sign_memo(from, to, memo);
+}
+
+string wallet_api::read_memo(const memo_data& memo)
+{
+   FC_ASSERT(!is_locked());
+   return my->read_memo(memo);
 }
 
 string wallet_api::get_key_label( public_key_type key )const
