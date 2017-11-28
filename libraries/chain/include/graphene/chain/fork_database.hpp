@@ -44,11 +44,6 @@ namespace graphene { namespace chain {
 
       weak_ptr< fork_item > prev;
       uint32_t              num;    // initialized in ctor
-      /**
-       * Used to flag a block as invalid and prevent other blocks from
-       * building on top of it.
-       */
-      bool                  invalid = false;
       block_id_type         id;
       signed_block          data;
    };
