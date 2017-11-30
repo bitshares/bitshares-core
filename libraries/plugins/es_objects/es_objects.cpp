@@ -219,8 +219,12 @@ void es_objects_plugin_impl::PrepareAccount(const account_object* account_object
    acct.lifetime_referrer_fee_percentage = account_object->lifetime_referrer_fee_percentage;
    acct.referrer_rewards_percentage = account_object->referrer_rewards_percentage;
    acct.name = account_object->name;
-   acct.owner = fc::json::to_string(account_object->owner.get_addresses());
-   acct.active = fc::json::to_string(account_object->active.get_addresses());
+   acct.owner_account_auths = fc::json::to_string(account_object->owner.account_auths);
+   acct.owner_key_auths = fc::json::to_string(account_object->owner.key_auths);
+   acct.owner_address_auths = fc::json::to_string(account_object->owner.address_auths);
+   acct.active_account_auths = fc::json::to_string(account_object->active.account_auths);
+   acct.active_key_auths = fc::json::to_string(account_object->active.key_auths);
+   acct.active_address_auths = fc::json::to_string(account_object->active.address_auths);
    acct.voting_account = account_object->options.voting_account;
 
    std::string data = fc::json::to_string(acct);
