@@ -1,4 +1,4 @@
-BitShares Core
+TravelChain Core
 ==============
 * [Getting Started](#getting-started)
 * [Support](#support)
@@ -7,15 +7,15 @@ BitShares Core
 * [FAQ](#faq)
 * [License](#license)
 
-BitShares Core is the BitShares blockchain implementation and command-line interface.
-The web wallet is [BitShares UI](https://github.com/bitshares/bitshares-ui).
+TravelChain Core is the BitShares-based blockchain implementation and command-line interface.
+The web wallet is [TravelChain UI](https://github.com/TravelChain/TravelChain-UI-ALFA).
 
-Visit [BitShares.org](https://bitshares.org/) to learn about BitShares and join the community at [BitSharesTalk.org](https://bitsharestalk.org/).
+Visit [travelchain.io](https://travelchain.io/) to learn about TravelChain and join the community at [Telegram](https://t.me/travelchain). Visit [BitShares.org](https://bitshares.org/) to learn about [BitShares](https://bitsharestalk.org/).
 
 **NOTE:** The official BitShares git repository location, default branch, and submodule remotes were recently changed. Existing
 repositories can be updated with the following steps:
 
-    git remote set-url origin https://github.com/bitshares/bitshares-core.git
+    git remote set-url origin https://github.com/TravelChain/travelchain-core.git
     git checkout master
     git remote set-head origin --auto
     git pull
@@ -34,7 +34,7 @@ We recommend building on Ubuntu 16.04 LTS, and the build dependencies may be ins
 
 To build after all dependencies are installed:
 
-    git clone https://github.com/bitshares/bitshares-core.git
+    git clone https://github.com/TravelChain/travelchain-core.git
     cd bitshares-core
     git checkout <LATEST_RELEASE_TAG>
     git submodule update --init --recursive
@@ -79,11 +79,11 @@ Use `help` to see all available wallet commands. Source definition and listing o
 
 Support
 -------
-Technical support is available in the [BitSharesTalk technical support subforum](https://bitsharestalk.org/index.php?board=45.0).
+Technical support is available in the [Telegram Chain](https://t.me/travelchain).
 
-BitShares Core bugs can be reported directly to the [issue tracker](https://github.com/bitshares/bitshares-core/issues).
+TravelChain Core bugs can be reported directly to the [issue tracker](https://github.com/travelchain/travelchain-core/issues).
 
-BitShares UI bugs should be reported to the [UI issue tracker](https://github.com/bitshares/bitshares-ui/issues)
+TravelChain UI bugs should be reported to the [UI issue tracker](https://github.com/TravelChain/TravelChain-UI-ALFA/issues)
 
 Using the API
 -------------
@@ -229,5 +229,4 @@ FAQ
  
 License
 -------
-BitShares Core is under the MIT license. See [LICENSE](https://github.com/bitshares/bitshares-core/blob/master/LICENSE.txt)
-for more information.
+TravelChain Core is under the MIT license. See [LICENSE](https://github.com/bitshares/bitshares-core/blob/master/LICENSE.txt) for more information.
