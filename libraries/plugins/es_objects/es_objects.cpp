@@ -201,6 +201,10 @@ void es_objects_plugin_impl::PrepareProposal(const proposal_object* proposal_obj
    prop.expiration_time = proposal_object->expiration_time;
    prop.review_period_time = proposal_object->review_period_time;
    prop.proposed_transaction = fc::json::to_string(proposal_object->proposed_transaction);
+   prop.required_owner_approvals = fc::json::to_string(proposal_object->required_owner_approvals);
+   prop.available_owner_approvals = fc::json::to_string(proposal_object->available_owner_approvals);
+   prop.required_active_approvals = fc::json::to_string(proposal_object->required_active_approvals);
+   prop.available_key_approvals = fc::json::to_string(proposal_object->available_key_approvals);
 
    std::string data = fc::json::to_string(prop);
 
