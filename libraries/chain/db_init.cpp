@@ -244,7 +244,6 @@ void database::init_genesis(const genesis_state_type& genesis_state)
    transaction_evaluation_state genesis_eval_state(this);
 
    // Create blockchain accounts
-   fc::ecc::private_key null_private_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("null_key")));
    create<account_balance_object>([](account_balance_object& b) {
       b.balance = GRAPHENE_MAX_SHARE_SUPPLY;
    });

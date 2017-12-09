@@ -1,5 +1,5 @@
 {
-  "initial_timestamp": "2017-11-27T09:36:18",
+  "initial_timestamp": "2017-12-08T21:20:00",
   "max_core_supply": "21000000000000",
   "initial_parameters": {
     "current_fees": {
@@ -194,12 +194,12 @@
           44,{}
         ]
       ],
-      "scale": 1
+      "scale": 10000
     },
     "block_interval": 3,
     "maintenance_interval": 3600,
     "maintenance_skip_slots": 3,
-    "committee_proposal_review_period": 86400,
+    "committee_proposal_review_period": 60,
     "maximum_transaction_size": 2048,
     "maximum_block_size": 1228800000,
     "maximum_time_until_expiration": 60,
@@ -209,14 +209,14 @@
     "maximum_witness_count": 1001,
     "maximum_committee_count": 1001,
     "maximum_authority_membership": 10,
-    "reserve_percent_of_fee": 2000,
+    "reserve_percent_of_fee": 5000,
     "network_percent_of_fee": 2000,
     "lifetime_referrer_percent_of_fee": 3000,
-    "cashback_vesting_period_seconds": 31536000,
+    "cashback_vesting_period_seconds": 2592000,
     "cashback_vesting_threshold": 1000000,
     "count_non_member_votes": true,
     "allow_non_member_whitelists": false,
-    "witness_pay_per_block": 1250,
+    "witness_pay_per_block": 125,
     "worker_budget_per_day": "0",
     "max_predicate_opcode": 1,
     "fee_liquidation_threshold": 1000000,
@@ -227,31 +227,61 @@
   },
   "initial_accounts": [{
       "name": "sysarch",
-      "owner_key": "TTT8MpCTQXQ1NFn8Zj7Ps6QFETWNPdaQdaQetp3MRuU6v7umJMTDr",
-      "active_key": "TTT6DaxXqymswfAxSon1Lj3Fhxb4Lbu3ZNrk1CEASHQCeMrQ43tK4",
+      "owner_key": "TTT7YzyhYzUEmSEtCcDWC3aPBzRZ2QioWHqC94UcTYBAEnUcEbN58",
+      "active_key": "TTT65a86Hg3yruurhGTiULaj5Ck1YEk7hXaWdqHmpPKJSuunX2LLz",
       "is_lifetime_member": true
     },{
       "name": "uralresp",
-      "owner_key": "TTT798dZxf2z2y2xXtnVn5K8XwkqLjx2EMbDmkvs4VDDqQcmjSMcp",
-      "active_key": "TTT8hcEHj9M38YkjinQVqMeCMBb4HH15s9yzh6HspqqHGKAF8dk5z",
+      "owner_key": "TTT6iCehEcja3KemH2VoDDn6gQJyQ7ENWFrqD1nnBiuj3tU4bA2hF",
+      "active_key": "TTT8WA1N6pMGNKJRg9DYM5SXnTkEXjp1pz1oDUbRDTATefeah1xAp",
       "is_lifetime_member": true
     },{
       "name": "lehard",
-      "owner_key": "TTT8Fwkxptkr2xjTSBoQRVmJwGZZKqPync3EsrYCGdMNLjgaM8PCk",
-      "active_key": "TTT8H8Vydqh1xEQhzqgBspHv2p1iRPk7FV9n3ehSXc4RNQ4Wz7Tum",
+      "owner_key": "TTT5fXiMJcB1bx5oWJcxH2oy5HQ4nd5EWEVF6cTfkFo9CG2CRwoqw",
+      "active_key": "TTT56m9XkwbGeGFyFJTdwUKESQfV8TNbt6NcPrBudHJJj1SDmy9fs",
       "is_lifetime_member": true
     },
     {
       "name": "faucet",
-      "owner_key": "TTT6doNTP9wAY9c4tZ529mL8CV3nXXVcT9ievAYZ9HJemsTQvLjwW",
-      "active_key": "TTT8VcEgqUAfGfN5rTvehxmAqCq5SwAE3jnjoBDsUG32w8b36ejZQ",
+      "owner_key": "TTT5vY1S7zKgKErkURC4EwPFZq2mC8R5DrYCs9UQ2BcftuRcf4niR",
+      "active_key": "TTT6ssGh3jt2eTNE9sYHYryErBAJ47tLJ7Vq752PgvxYD9MCAAf3n",
       "is_lifetime_member": true
     },
     {
-      "name": "dacom.gateway",
-      "owner_key": "TTT5hUM79VrsAB4HZkwLPPC71RdceRAxZ7jTnQWvBDukDGjE2wGgS",
-      "active_key": "TTT8Z7UL4XWU5PS5ZPm48CDns2GAzYcRnXvsBXnPDGWpeG9TNezny",
+      "name": "tokensale",
+      "owner_key": "TTT6ze2vTGZx3Yor5DCaomeq2D1JdB2NcaronxSoZ2W1NkcsGmjnp",
+      "active_key": "TTT6BXkpstKLJu2t3szv9uuawB8XYrFqKJtC9pLwJSikXX49rWo1j",
       "is_lifetime_member": true
+    },
+    {
+      "name": "presale1",
+      "owner_key": "TTT6MYdY4MQB5VBudTAYz7mocJA75PzRKXndmi1w9buBKN4ebJeWC",
+      "active_key": "TTT5CAgUfzQsF2tv2Xfwdep6ZmDHWDgshCe8gNyrjdtvK8zoiVCET",
+      "is_lifetime_member": false
+    },
+    {
+      "name": "presale2",
+      "owner_key": "TTT5GRuyuikLR4QDxkLz775LxB7K4DKCcaZ1jZVdP4p1sPbpkRwim",
+      "active_key": "TTT8cqr57iAEhHd93kK7YTzbYpHKJd77VTj2CS28da1EEEKFqhJb4",
+      "is_lifetime_member": false
+    },
+    {
+      "name": "team",
+      "owner_key": "TTT7rQoFMMv4qr1m7XYh2BgKh8u1QNaYrGYdfP58v91kWPBo4GfsN",
+      "active_key": "TTT6jRmwUA9wLsiBmvaCqnupa4Vafpbtyu6dqCLodXGXZDmTVj3LX",
+      "is_lifetime_member": false
+    },
+    {
+      "name": "devfund",
+      "owner_key": "TTT5CGztan5hRsJUtwD8ZRLimXJFE1tP9549HE6QKQVZJ6ZTdyQaw",
+      "active_key": "TTT8FXsRx7DbZo6e1B6G2oYLWV6xgqUekZSPr8d5Rro3Ms1Q5LFmK",
+      "is_lifetime_member": false
+    },
+    {
+      "name": "bounty",
+      "owner_key": "TTT8kx1vEWFTJXJHUZpa1pAFrSchegdFyzLNPMiweEmnCgoYQeHGj",
+      "active_key": "TTT8DvtFJMZYkrhKLtQDzwBVAAeStV1dJEdxYHghFWeihbRN8vr1q",
+      "is_lifetime_member": false
     },
     {
       "name": "nathan",
@@ -259,6 +289,8 @@
       "active_key": "TTT6MRyAjQq8ud7hVNYcfnVPJqcVpscN5So8BhtHuGYqET5GDW5CV",
       "is_lifetime_member": false
     }
+
+
 
   ],
   "initial_assets": [],
@@ -272,13 +304,13 @@
   "initial_active_witnesses": 3,
   "initial_witness_candidates": [{
       "owner_name": "sysarch",
-      "block_signing_key": "TTT6DaxXqymswfAxSon1Lj3Fhxb4Lbu3ZNrk1CEASHQCeMrQ43tK4"
+      "block_signing_key": "TTT65a86Hg3yruurhGTiULaj5Ck1YEk7hXaWdqHmpPKJSuunX2LLz"
     },{
       "owner_name": "uralresp",
-      "block_signing_key": "TTT8hcEHj9M38YkjinQVqMeCMBb4HH15s9yzh6HspqqHGKAF8dk5z"
+      "block_signing_key": "TTT8WA1N6pMGNKJRg9DYM5SXnTkEXjp1pz1oDUbRDTATefeah1xAp"
     },{
       "owner_name": "lehard",
-      "block_signing_key": "TTT8H8Vydqh1xEQhzqgBspHv2p1iRPk7FV9n3ehSXc4RNQ4Wz7Tum"
+      "block_signing_key": "TTT56m9XkwbGeGFyFJTdwUKESQfV8TNbt6NcPrBudHJJj1SDmy9fs"
     }
   ],
   "initial_committee_candidates": [{
@@ -290,7 +322,7 @@
     }
   ],
   "initial_worker_candidates": [],
-  "initial_chain_id": "aa34045518f1469a28fa4578240d5f039afa9959c0b95ce3b39674efa691fb21",
+  "initial_chain_id": "",
   "immutable_parameters": {
     "min_committee_member_count": 3,
     "min_witness_count": 3,
