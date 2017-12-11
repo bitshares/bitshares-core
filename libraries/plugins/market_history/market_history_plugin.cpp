@@ -63,16 +63,19 @@ class market_history_plugin_impl
       uint32_t                   _maximum_history_per_bucket_size = 1000;
       uint32_t                   _max_order_his_records_per_market = 1000;
       uint32_t                   _max_order_his_seconds_per_market = 259200;
+
+      const market_ticker_meta_object* _meta = nullptr;
 };
 
 
 struct operation_process_fill_order
 {
-   market_history_plugin&    _plugin;
-   fc::time_point_sec        _now;
+   market_history_plugin&            _plugin;
+   fc::time_point_sec                _now;
+   const market_ticker_meta_object*& _meta;
 
-   operation_process_fill_order( market_history_plugin& mhp, fc::time_point_sec n )
-   :_plugin(mhp),_now(n) {}
+   operation_process_fill_order( market_history_plugin& mhp, fc::time_point_sec n, const market_ticker_meta_object*& meta )
+   :_plugin(mhp),_now(n),_meta(meta) {}
 
    typedef void result_type;
 
@@ -84,9 +87,9 @@ struct operation_process_fill_order
    {
       //ilog( "processing ${o}", ("o",o) );
       auto& db         = _plugin.database();
-      const auto& bucket_idx = db.get_index_type<bucket_index>();
-      const auto& history_idx = db.get_index_type<history_index>().indices().get<by_key>();
-      const auto& his_time_idx = db.get_index_type<history_index>().indices().get<by_market_time>();
+      const auto& order_his_idx = db.get_index_type<history_index>().indices();
+      const auto& history_idx = order_his_idx.get<by_key>();
+      const auto& his_time_idx = order_his_idx.get<by_market_time>();
 
       // To save new filled order data
       history_key hkey;
@@ -103,11 +106,24 @@ struct operation_process_fill_order
       else
          hkey.sequence = 0;
 
-      db.create<order_history_object>( [&]( order_history_object& ho ) {
+      const auto& new_order_his_obj = db.create<order_history_object>( [&]( order_history_object& ho ) {
          ho.key = hkey;
          ho.time = _now;
          ho.op = o;
       });
+
+      // save a reference to market ticker meta object
+      if( _meta == nullptr )
+      {
+         const auto& meta_idx = db.get_index_type<simple_index<market_ticker_meta_object>>();
+         if( meta_idx.size() == 0 )
+            _meta = &db.create<market_ticker_meta_object>( [&]( market_ticker_meta_object& mtm ) {
+               mtm.rolling_min_order_his_id = new_order_his_obj.id;
+               mtm.skip_min_order_his_id = false;
+            });
+         else
+            _meta = &( *meta_idx.begin() );
+      }
 
       // To remove old filled order data
       const auto max_records = _plugin.max_order_his_records_per_market();
@@ -143,15 +159,9 @@ struct operation_process_fill_order
          }
       }
 
-      // To update buckets data, only update for maker orders
+      // To update ticker data and buckets data, only update for maker orders
       if( !o.is_maker )
          return;
-
-      const auto max_history = _plugin.max_history();
-      if( max_history == 0 ) return;
-
-      const auto& buckets = _plugin.tracked_buckets();
-      if( buckets.size() == 0 ) return;
 
       bucket_key key;
       key.base    = o.pays.asset_id;
@@ -169,6 +179,40 @@ struct operation_process_fill_order
       if( fill_price.base.asset_id > fill_price.quote.asset_id )
          fill_price = ~fill_price;
 
+      // To update ticker data
+      const auto& ticker_idx = db.get_index_type<market_ticker_index>().indices().get<by_market>();
+      auto ticker_itr = ticker_idx.find( std::make_tuple( key.base, key.quote ) );
+      if( ticker_itr == ticker_idx.end() )
+      {
+         db.create<market_ticker_object>( [&]( market_ticker_object& mt ) {
+            mt.base           = key.base;
+            mt.quote          = key.quote;
+            mt.last_day_base  = 0;
+            mt.last_day_quote = 0;
+            mt.latest_base    = fill_price.base.amount;
+            mt.latest_quote   = fill_price.quote.amount;
+            mt.base_volume    = trade_price.base.amount.value;
+            mt.quote_volume   = trade_price.quote.amount.value;
+         });
+      }
+      else
+      {
+         db.modify( *ticker_itr, [&]( market_ticker_object& mt ) {
+            mt.latest_base    = fill_price.base.amount;
+            mt.latest_quote   = fill_price.quote.amount;
+            mt.base_volume    += trade_price.base.amount.value;  // ignore overflow
+            mt.quote_volume   += trade_price.quote.amount.value; // ignore overflow
+         });
+      }
+
+      // To update buckets data
+      const auto max_history = _plugin.max_history();
+      if( max_history == 0 ) return;
+
+      const auto& buckets = _plugin.tracked_buckets();
+      if( buckets.size() == 0 ) return;
+
+      const auto& bucket_idx = db.get_index_type<bucket_index>();
       for( auto bucket : buckets )
       {
           auto bucket_num = _now.sec_since_epoch() / bucket;
@@ -262,8 +306,77 @@ void market_history_plugin_impl::update_market_histories( const signed_block& b 
       {
          try
          {
-            o_op->op.visit( operation_process_fill_order( _self, b.timestamp ) );
+            o_op->op.visit( operation_process_fill_order( _self, b.timestamp, _meta ) );
          } FC_CAPTURE_AND_LOG( (o_op) )
+      }
+   }
+   // roll out expired data from ticker
+   if( _meta != nullptr )
+   {
+      time_point_sec last_day = b.timestamp - 86400;
+      object_id_type last_min_his_id = _meta->rolling_min_order_his_id;
+      bool skip = _meta->skip_min_order_his_id;
+
+      const auto& ticker_idx = db.get_index_type<market_ticker_index>().indices().get<by_market>();
+      const auto& history_idx = db.get_index_type<history_index>().indices().get<by_id>();
+      auto history_itr = history_idx.lower_bound( _meta->rolling_min_order_his_id );
+      while( history_itr != history_idx.end() && history_itr->time < last_day )
+      {
+         const fill_order_operation& o = history_itr->op;
+         if( skip && history_itr->id == _meta->rolling_min_order_his_id )
+            skip = false;
+         else if( o.is_maker )
+         {
+            bucket_key key;
+            key.base    = o.pays.asset_id;
+            key.quote   = o.receives.asset_id;
+
+            price trade_price = o.pays / o.receives;
+
+            if( key.base > key.quote )
+            {
+               std::swap( key.base, key.quote );
+               trade_price = ~trade_price;
+            }
+
+            price fill_price = o.fill_price;
+            if( fill_price.base.asset_id > fill_price.quote.asset_id )
+               fill_price = ~fill_price;
+
+            auto ticker_itr = ticker_idx.find( std::make_tuple( key.base, key.quote ) );
+            if( ticker_itr != ticker_idx.end() ) // should always be true
+            {
+               db.modify( *ticker_itr, [&]( market_ticker_object& mt ) {
+                  mt.last_day_base  = fill_price.base.amount;
+                  mt.last_day_quote = fill_price.quote.amount;
+                  mt.base_volume    -= trade_price.base.amount.value;  // ignore underflow
+                  mt.quote_volume   -= trade_price.quote.amount.value; // ignore underflow
+               });
+            }
+         }
+         last_min_his_id = history_itr->id;
+         ++history_itr;
+      }
+      // update meta
+      if( history_itr != history_idx.end() ) // if still has some data rolling
+      {
+         if( history_itr->id != _meta->rolling_min_order_his_id ) // if rolled out some
+         {
+            db.modify( *_meta, [&]( market_ticker_meta_object& mtm ) {
+               mtm.rolling_min_order_his_id = history_itr->id;
+               mtm.skip_min_order_his_id = false;
+            });
+         }
+      }
+      else // if all data are rolled out
+      {
+         if( last_min_his_id != _meta->rolling_min_order_his_id ) // if rolled out some
+         {
+            db.modify( *_meta, [&]( market_ticker_meta_object& mtm ) {
+               mtm.rolling_min_order_his_id = last_min_his_id;
+               mtm.skip_min_order_his_id = true;
+            });
+         }
       }
    }
 }
@@ -312,6 +425,8 @@ void market_history_plugin::plugin_initialize(const boost::program_options::vari
    database().applied_block.connect( [&]( const signed_block& b){ my->update_market_histories(b); } );
    database().add_index< primary_index< bucket_index  > >();
    database().add_index< primary_index< history_index  > >();
+   database().add_index< primary_index< market_ticker_index  > >();
+   database().add_index< primary_index< simple_index< market_ticker_meta_object > > >();
 
    if( options.count( "bucket-size" ) )
    {
