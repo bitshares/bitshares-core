@@ -50,6 +50,8 @@
 #include <fc/log/logger.hpp>
 #include <fc/log/logger_config.hpp>
 
+#include <graphene/utilities/git_revision.hpp>
+
 #ifdef WIN32
 # include <signal.h>
 #else
@@ -79,7 +81,9 @@ int main( int argc, char** argv )
          ("rpc-http-endpoint,H", bpo::value<string>()->implicit_value("127.0.0.1:8093"), "Endpoint for wallet HTTP RPC to listen on")
          ("daemon,d", "Run the wallet in daemon mode" )
          ("wallet-file,w", bpo::value<string>()->implicit_value("wallet.json"), "wallet to load")
-         ("chain-id", bpo::value<string>(), "chain ID to connect to");
+         ("chain-id", bpo::value<string>(), "chain ID to connect to")
+         ("version,v", "Display version information");
+
 
       bpo::variables_map options;
 
@@ -88,6 +92,13 @@ int main( int argc, char** argv )
       if( options.count("help") )
       {
          std::cout << opts << "\n";
+         return 0;
+      }
+      if( options.count("version") )
+      {
+         std::cout << "Version: " << graphene::utilities::git_revision_description << "\n";
+         std::cout << "SHA: " << graphene::utilities::git_revision_sha << "\n";
+         std::cout << "Timestamp: " << fc::get_approximate_relative_time_string(fc::time_point_sec(graphene::utilities::git_revision_unix_timestamp)) << "\n";
          return 0;
       }
 

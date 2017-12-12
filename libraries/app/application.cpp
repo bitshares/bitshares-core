@@ -945,7 +945,7 @@ void application::set_program_options(boost::program_options::options_descriptio
          ("resync-blockchain", "Delete all blocks and re-sync with network from scratch")
          ("force-validate", "Force validation of all transactions")
          ("genesis-timestamp", bpo::value<uint32_t>(), "Replace timestamp from genesis.json with current time plus this many seconds (experts only!)")
-         ("version", "Display version information")
+         ("version,v", "Display version information")
          ;
    command_line_options.add(_cli_options);
    configuration_file_options.add(_cfg_options);
