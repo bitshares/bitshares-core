@@ -10,12 +10,13 @@ RUN \
       cmake \
       git \
       libbz2-dev \
-      libreadline6-dev \
+      libreadline-dev \
       libboost-all-dev \
       libcurl4-openssl-dev \
       libssl-dev \
       libncurses-dev \
       doxygen \
+      libcurl4-openssl-dev \
     && \
     apt-get update -y && \
     apt-get install -y fish && \
@@ -48,9 +49,6 @@ RUN chown bitshares:bitshares -R /var/lib/bitshares
 
 # Volume
 VOLUME ["/var/lib/bitshares", "/etc/bitshares"]
-
-# default settings
-RUN ln -f -s /etc/bitshares/config.ini /var/lib/bitshares
 
 # rpc service:
 EXPOSE 8090

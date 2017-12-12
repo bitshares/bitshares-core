@@ -4,32 +4,82 @@ BITSHARESD="/usr/local/bin/witness_node"
 # For blockchain download
 VERSION=`cat /etc/bitshares/version`
 
-## seed nodes come from doc/seednodes.txt which is
-## installed by docker into /etc/bitsharesd/seednodes.txt
-# SEED_NODES="$(cat /etc/bitsharesd/seednodes.txt | awk -F' ' '{print $1}')"
+## Supported Environmental Variables
+#
+#   * $BITSHARESD_SEED_NODES
+#   * $BITSHARESD_RPC_ENDPOINT
+#   * $BITSHARESD_PLUGINS
+#   * $BITSHARESD_REPLAY
+#   * $BITSHARESD_RESYNC
+#   * $BITSHARESD_P2P_ENDPOINT
+#   * $BITSHARESD_WITNESS_ID
+#   * $BITSHARESD_PRIVATE_KEY
+#   * $BITSHARESD_TRACK_ACCOUNTS
+#   * $BITSHARESD_PARTIAL_OPERATIONS
+#   * $BITSHARESD_MAX_OPS_PER_ACCOUNT
+#   * $BITSHARESD_ES_NODE_URL
+#   * $BITSHARESD_TRUSTED_NODE
+#
 
-## if user did not pass in any desired
-## seed nodes, use the ones above:
-#if [[ -z "$BITSHARESD_SEED_NODES" ]]; then
-#    for NODE in $SEED_NODES ; do
-#        ARGS+=" --seed-node=$NODE"
-#    done
-#fi
+ARGS=""
+# Translate environmental variables
+if [[ ! -z "$BITSHARESD_SEED_NODES" ]]; then
+    for NODE in $BITSHARESD_SEED_NODES ; do
+        ARGS+=" --seed-node=$NODE"
+    done
+fi
+if [[ ! -z "$BITSHARESD_RPC_ENDPOINT" ]]; then
+    ARGS+=" --rpc-endpoint=${BITSHARESD_RPC_ENDPOINT}"
+fi
+
+if [[ ! -z "$BITSHARESD_PLUGINS" ]]; then
+    ARGS+=" --plugins=\"${BITSHARESD_PLUGINS}\""
+fi
+
+if [[ ! -z "$BITSHARESD_REPLAY" ]]; then
+    ARGS+=" --replay-blockchain"
+fi
+
+if [[ ! -z "$BITSHARESD_RESYNC" ]]; then
+    ARGS+=" --resync-blockchain"
+fi
+
+if [[ ! -z "$BITSHARESD_P2P_ENDPOINT" ]]; then
+    ARGS+=" --p2p-endpoint=${BITSHARESD_P2P_ENDPOINT}"
+fi
+
+if [[ ! -z "$BITSHARESD_WITNESS_ID" ]]; then
+    ARGS+=" --witness-id=$BITSHARESD_WITNESS_ID"
+fi
+
+if [[ ! -z "$BITSHARESD_PRIVATE_KEY" ]]; then
+    ARGS+=" --private-key=$BITSHARESD_PRIVATE_KEY"
+fi
+
+if [[ ! -z "$BITSHARESD_TRACK_ACCOUNTS" ]]; then
+    for ACCOUNT in $BITSHARESD_TRACK_ACCOUNTS ; do
+        ARGS+=" --track-account=$ACCOUNT"
+    done
+fi
+
+if [[ ! -z "$BITSHARESD_PARTIAL_OPERATIONS" ]]; then
+    ARGS+=" --partial-operations=${BITSHARESD_PARTIAL_OPERATIONS}"
+fi
+
+if [[ ! -z "$BITSHARESD_MAX_OPS_PER_ACCOUNT" ]]; then
+    ARGS+=" --max-ops-per-account=${BITSHARESD_MAX_OPS_PER_ACCOUNT}"
+fi
+
+if [[ ! -z "$BITSHARESD_ES_NODE_URL" ]]; then
+    ARGS+=" --elasticsearch-node-url=${BITSHARESD_ES_NODE_URL}"
+fi
+
+if [[ ! -z "$BITSHARESD_TRUSTED_NODE" ]]; then
+    ARGS+=" --trusted-node=${BITSHARESD_TRUSTED_NODE}"
+fi
 
 ## Link the bitshares config file into home
 ## This link has been created in Dockerfile, already
-#ln -f -s /etc/bitshares/config.ini /var/lib/bitshares
-
-## get blockchain state from an S3 bucket
-# echo bitsharesd: beginning download and decompress of s3://$S3_BUCKET/blockchain-$VERSION-latest.tar.bz2
-
-## get blockchain state from an S3 bucket
-#s3cmd get s3://$S3_BUCKET/blockchain-$VERSION-latest.tar.bz2 - | pbzip2 -m2000dc | tar x
-#if [[ $? -ne 0 ]]; then
-#    echo unable to pull blockchain state from S3 - exiting
-#    exit 1
-#fi
-
-## Deploy Healthcheck daemon
+ln -f -s /etc/bitshares/config.ini /var/lib/bitshares
 
 $BITSHARESD --data-dir ${HOME} ${ARGS} ${BITSHARESD_ARGS}

@@ -111,7 +111,7 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       vector<collateral_bid_object>      get_collateral_bids(const asset_id_type asset, uint32_t limit, uint32_t start)const;
       void subscribe_to_market(std::function<void(const variant&)> callback, asset_id_type a, asset_id_type b);
       void unsubscribe_from_market(asset_id_type a, asset_id_type b);
-      market_ticker                      get_ticker( const string& base, const string& quote )const;
+      market_ticker                      get_ticker( const string& base, const string& quote, bool skip_order_book = false )const;
       market_volume                      get_24_volume( const string& base, const string& quote )const;
       order_book                         get_order_book( const string& base, const string& quote, unsigned limit = 50 )const;
       vector<market_trade>               get_trade_history( const string& base, const string& quote, fc::time_point_sec start, fc::time_point_sec stop, unsigned limit = 100 )const;
@@ -1154,7 +1154,7 @@ market_ticker database_api::get_ticker( const string& base, const string& quote 
     return my->get_ticker( base, quote );
 }
 
-market_ticker database_api_impl::get_ticker( const string& base, const string& quote )const
+market_ticker database_api_impl::get_ticker( const string& base, const string& quote, bool skip_order_book )const
 {
     const auto assets = lookup_asset_symbols( {base, quote} );
     FC_ASSERT( assets[0], "Invalid base asset symbol: ${s}", ("s",base) );
@@ -1178,11 +1178,6 @@ market_ticker database_api_impl::get_ticker( const string& base, const string& q
    auto quote_id = assets[1]->id;
    if( base_id > quote_id ) std::swap( base_id, quote_id );
 
-   history_key hkey;
-   hkey.base = base_id;
-   hkey.quote = quote_id;
-   hkey.sequence = std::numeric_limits<int64_t>::min();
-
    // TODO: move following duplicate code out
    // TODO: using pow is a bit inefficient here, optimization is possible
    auto asset_to_real = [&]( const asset& a, int p ) { return double(a.amount.value)/pow( 10, p ); };
@@ -1194,44 +1189,31 @@ market_ticker database_api_impl::get_ticker( const string& base, const string& q
          return asset_to_real( p.quote, assets[0]->precision ) / asset_to_real( p.base, assets[1]->precision );
    };
 
-   const auto& history_idx = _db.get_index_type<graphene::market_history::history_index>().indices().get<by_key>();
-   auto itr = history_idx.lower_bound( hkey );
-
-   bool is_latest = true;
-   price latest_price;
    fc::uint128 base_volume;
    fc::uint128 quote_volume;
-   while( itr != history_idx.end() && itr->key.base == base_id && itr->key.quote == quote_id )
+
+   const auto& ticker_idx = _db.get_index_type<graphene::market_history::market_ticker_index>().indices().get<by_market>();
+   auto itr = ticker_idx.find( std::make_tuple( base_id, quote_id ) );
+   if( itr != ticker_idx.end() )
    {
-      if( is_latest )
+      price latest_price = asset( itr->latest_base, itr->base ) / asset( itr->latest_quote, itr->quote );
+      result.latest = price_to_real( latest_price );
+      if( itr->last_day_base != 0 && itr->last_day_quote != 0 // has trade data before 24 hours
+            && ( itr->last_day_base != itr->latest_base || itr->last_day_quote != itr->latest_quote ) ) // price changed
       {
-         is_latest = false;
-         latest_price = itr->op.fill_price;
-         result.latest = price_to_real( latest_price );
+         price last_day_price = asset( itr->last_day_base, itr->base ) / asset( itr->last_day_quote, itr->quote );
+         result.percent_change = ( result.latest / price_to_real( last_day_price ) - 1 ) * 100;
       }
-
-      if( itr->time < yesterday )
+      if( assets[0]->id == itr->base )
       {
-         if( itr->op.fill_price != latest_price )
-            result.percent_change = ( result.latest / price_to_real( itr->op.fill_price ) - 1 ) * 100;
-         break;
+         base_volume = itr->base_volume;
+         quote_volume = itr->quote_volume;
       }
-
-      if( itr->op.is_maker )
+      else
       {
-         if( assets[0]->id == itr->op.receives.asset_id )
-         {
-            base_volume += itr->op.receives.amount.value;
-            quote_volume += itr->op.pays.amount.value;
-         }
-         else
-         {
-            base_volume += itr->op.pays.amount.value;
-            quote_volume += itr->op.receives.amount.value;
-         }
+         base_volume = itr->quote_volume;
+         quote_volume = itr->base_volume;
       }
-
-      ++itr;
    }
 
    auto uint128_to_double = []( const fc::uint128& n )
@@ -1242,9 +1224,12 @@ market_ticker database_api_impl::get_ticker( const string& base, const string& q
    result.base_volume = uint128_to_double( base_volume ) / pow( 10, assets[0]->precision );
    result.quote_volume = uint128_to_double( quote_volume ) / pow( 10, assets[1]->precision );
 
-   const auto orders = get_order_book( base, quote, 1 );
-   if( !orders.asks.empty() ) result.lowest_ask = orders.asks[0].price;
-   if( !orders.bids.empty() ) result.highest_bid = orders.bids[0].price;
+   if( !skip_order_book )
+   {
+      const auto orders = get_order_book( base, quote, 1 );
+      if( !orders.asks.empty() ) result.lowest_ask = orders.asks[0].price;
+      if( !orders.bids.empty() ) result.highest_bid = orders.bids[0].price;
+   }
 
    return result;
 }
@@ -1256,7 +1241,7 @@ market_volume database_api::get_24_volume( const string& base, const string& quo
 
 market_volume database_api_impl::get_24_volume( const string& base, const string& quote )const
 {
-    const auto& ticker = get_ticker( base, quote );
+    const auto& ticker = get_ticker( base, quote, true );
 
     market_volume result;
     result.time = ticker.time;
@@ -1348,11 +1333,6 @@ vector<market_trade> database_api_impl::get_trade_history( const string& base,
    auto quote_id = assets[1]->id;
 
    if( base_id > quote_id ) std::swap( base_id, quote_id );
-   const auto& history_idx = _db.get_index_type<graphene::market_history::history_index>().indices().get<by_key>();
-   history_key hkey;
-   hkey.base = base_id;
-   hkey.quote = quote_id;
-   hkey.sequence = std::numeric_limits<int64_t>::min();
 
    auto asset_to_real = [&]( const asset& a, int p ) { return double( a.amount.value ) / pow( 10, p ); };
    auto price_to_real = [&]( const price& p )
@@ -1367,13 +1347,12 @@ vector<market_trade> database_api_impl::get_trade_history( const string& base,
       start = fc::time_point_sec( fc::time_point::now() );
 
    uint32_t count = 0;
-   uint32_t skipped = 0;
-   auto itr = history_idx.lower_bound( hkey );
+   const auto& history_idx = _db.get_index_type<graphene::market_history::history_index>().indices().get<by_market_time>();
+   auto itr = history_idx.lower_bound( std::make_tuple( base_id, quote_id, start ) );
    vector<market_trade> result;
 
    while( itr != history_idx.end() && count < limit && !( itr->key.base != base_id || itr->key.quote != quote_id || itr->time < stop ) )
    {
-      if( itr->time < start )
       {
          market_trade trade;
 
@@ -1417,12 +1396,6 @@ vector<market_trade> database_api_impl::get_trade_history( const string& base,
 
          result.push_back( trade );
          ++count;
-      }
-      else // should skip
-      {
-         // TODO refuse to execute if need to skip too many entries
-         // ++skipped;
-         // FC_ASSERT( skipped <= 200 );
       }
 
       ++itr;
@@ -1867,6 +1840,9 @@ set<public_key_type> database_api_impl::get_potential_signatures( const signed_t
          const auto& auth = id(_db).active;
          for( const auto& k : auth.get_keys() )
             result.insert(k);
+         // Also insert owner keys since owner can authorize a trx that requires active only
+         for( const auto& k : id(_db).owner.get_keys() )
+            result.insert(k);
          return &auth;
       },
       [&]( account_id_type id )
@@ -1878,6 +1854,15 @@ set<public_key_type> database_api_impl::get_potential_signatures( const signed_t
       },
       _db.get_global_properties().parameters.max_authority_depth
    );
+
+   // Insert keys in required "other" authories
+   flat_set<account_id_type> required_active;
+   flat_set<account_id_type> required_owner;
+   vector<authority> other;
+   trx.get_required_authorities( required_active, required_owner, other );
+   for( const auto& auth : other )
+      for( const auto& key : auth.get_keys() )
+         result.insert( key );
 
    wdump((result));
    return result;
