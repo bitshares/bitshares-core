@@ -35,6 +35,7 @@ class abstract_plugin
    public:
       virtual ~abstract_plugin(){}
       virtual std::string plugin_name()const = 0;
+      virtual std::string plugin_description()const = 0;
 
       /**
        * @brief Perform early startup routines and register plugin indexes, callbacks, etc.
@@ -100,6 +101,7 @@ class plugin : public abstract_plugin
       virtual ~plugin() override;
 
       virtual std::string plugin_name()const override;
+      virtual std::string plugin_description()const override;
       virtual void plugin_initialize( const boost::program_options::variables_map& options ) override;
       virtual void plugin_startup() override;
       virtual void plugin_shutdown() override;

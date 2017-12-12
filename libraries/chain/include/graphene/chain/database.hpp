@@ -377,11 +377,14 @@ namespace graphene { namespace chain {
          /**
           * @return true if the order was completely filled and thus freed.
           */
-         bool fill_order( const limit_order_object& order, const asset& pays, const asset& receives, bool cull_if_small );
-         bool fill_order( const call_order_object& order, const asset& pays, const asset& receives );
-         bool fill_order( const force_settlement_object& settle, const asset& pays, const asset& receives );
+         bool fill_order( const limit_order_object& order, const asset& pays, const asset& receives, bool cull_if_small,
+                          const price& fill_price, const bool is_maker );
+         bool fill_order( const call_order_object& order, const asset& pays, const asset& receives,
+                          const price& fill_price, const bool is_maker );
+         bool fill_order( const force_settlement_object& settle, const asset& pays, const asset& receives,
+                          const price& fill_price, const bool is_maker );
 
-         bool check_call_orders( const asset_object& mia, bool enable_black_swan = true );
+         bool check_call_orders( const asset_object& mia, bool enable_black_swan = true, bool for_new_limit_order = false );
 
          // helpers to fill_order
          void pay_order( const account_object& receiver, const asset& receives, const asset& pays );

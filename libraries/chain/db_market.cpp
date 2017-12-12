@@ -73,7 +73,7 @@ void database::globally_settle_asset( const asset_object& mia, const price& sett
       collateral_gathered += pays;
       const auto&  order = *call_itr;
       ++call_itr;
-      FC_ASSERT( fill_order( order, pays, order.get_debt() ) );
+      FC_ASSERT( fill_order( order, pays, order.get_debt(), settlement_price, true ) ); // call order is maker
    }
 
    modify( bitasset, [&]( asset_bitasset_data_object& obj ){
@@ -245,8 +245,8 @@ bool database::apply_order(const limit_order_object& new_order_object, bool allo
    // Possible optimization: We only need to check calls if both are true:
    //  - The new order is at the front of the book
    //  - The new order is below the call limit price
-   bool called_some = check_call_orders(sell_asset, allow_black_swan);
-   called_some |= check_call_orders(receive_asset, allow_black_swan);
+   bool called_some = check_call_orders(sell_asset, allow_black_swan, true); // the first time when checking, call order is maker
+   called_some |= check_call_orders(receive_asset, allow_black_swan, true); // the other side, same as above
    if( called_some && !find_object(order_id) ) // then we were filled by call order
       return true;
 
@@ -272,8 +272,9 @@ bool database::apply_order(const limit_order_object& new_order_object, bool allo
 
    //Possible optimization: only check calls if the new order completely filled some old order
    //Do I need to check both assets?
-   check_call_orders(sell_asset, allow_black_swan);
-   check_call_orders(receive_asset, allow_black_swan);
+   check_call_orders(sell_asset, allow_black_swan); // after the new limit order filled some orders on the book,
+                                                    // if a call order matches another order, the call order is taker
+   check_call_orders(receive_asset, allow_black_swan); // the other side, same as above
 
    const limit_order_object* updated_order_object = find< limit_order_object >( order_id );
    if( updated_order_object == nullptr )
@@ -330,8 +331,11 @@ int database::match( const limit_order_object& usd, const OrderType& core, const
            core_pays == core.amount_for_sale() );
 
    int result = 0;
-   result |= fill_order( usd, usd_pays, usd_receives, false );
-   result |= fill_order( core, core_pays, core_receives, true ) << 1;
+   result |= fill_order( usd, usd_pays, usd_receives, false, match_price, false ); // although this function is a template,
+                                                                                   // right now it only matches one limit order
+                                                                                   // with another limit order,
+                                                                                   // the first param is a new order, thus taker
+   result |= fill_order( core, core_pays, core_receives, true, match_price, true ) << 1; // the second param is maker
    assert( result != 0 );
    return result;
 }
@@ -369,13 +373,14 @@ asset database::match( const call_order_object& call,
 
    assert( settle_pays == settle_for_sale || call_receives == call.get_debt() );
 
-   fill_order(call, call_pays, call_receives);
-   fill_order(settle, settle_pays, settle_receives);
+   fill_order( call, call_pays, call_receives, match_price, true ); // call order is maker
+   fill_order( settle, settle_pays, settle_receives, match_price, false ); // force settlement order is taker
 
    return call_receives;
 } FC_CAPTURE_AND_RETHROW( (call)(settle)(match_price)(max_settlement) ) }
 
-bool database::fill_order( const limit_order_object& order, const asset& pays, const asset& receives, bool cull_if_small )
+bool database::fill_order( const limit_order_object& order, const asset& pays, const asset& receives, bool cull_if_small,
+                           const price& fill_price, const bool is_maker )
 { try {
    cull_if_small |= (head_block_time() < HARDFORK_555_TIME);
 
@@ -389,7 +394,7 @@ bool database::fill_order( const limit_order_object& order, const asset& pays, c
    pay_order( seller, receives - issuer_fees, pays );
 
    assert( pays.asset_id != receives.asset_id );
-   push_applied_operation( fill_order_operation( order.id, order.seller, pays, receives, issuer_fees ) );
+   push_applied_operation( fill_order_operation( order.id, order.seller, pays, receives, issuer_fees, fill_price, is_maker ) );
 
    // conditional because cheap integer comparison may allow us to avoid two expensive modify() and object lookups
    if( order.deferred_fee > 0 )
@@ -418,7 +423,8 @@ bool database::fill_order( const limit_order_object& order, const asset& pays, c
 } FC_CAPTURE_AND_RETHROW( (order)(pays)(receives) ) }
 
 
-bool database::fill_order( const call_order_object& order, const asset& pays, const asset& receives )
+bool database::fill_order( const call_order_object& order, const asset& pays, const asset& receives,
+                           const price& fill_price, const bool is_maker )
 { try {
    //idump((pays)(receives)(order));
    FC_ASSERT( order.get_debt().asset_id == receives.asset_id );
@@ -463,7 +469,8 @@ bool database::fill_order( const call_order_object& order, const asset& pays, co
    }
 
    assert( pays.asset_id != receives.asset_id );
-   push_applied_operation( fill_order_operation{ order.id, order.borrower, pays, receives, asset(0, pays.asset_id) } );
+   push_applied_operation( fill_order_operation( order.id, order.borrower, pays, receives,
+                                                 asset(0, pays.asset_id), fill_price, is_maker ) );
 
    if( collateral_freed )
       remove( order );
@@ -471,7 +478,8 @@ bool database::fill_order( const call_order_object& order, const asset& pays, co
    return collateral_freed.valid();
 } FC_CAPTURE_AND_RETHROW( (order)(pays)(receives) ) }
 
-bool database::fill_order(const force_settlement_object& settle, const asset& pays, const asset& receives)
+bool database::fill_order( const force_settlement_object& settle, const asset& pays, const asset& receives,
+                           const price& fill_price, const bool is_maker )
 { try {
    bool filled = false;
 
@@ -489,7 +497,7 @@ bool database::fill_order(const force_settlement_object& settle, const asset& pa
    adjust_balance(settle.owner, receives - issuer_fees);
 
    assert( pays.asset_id != receives.asset_id );
-   push_applied_operation( fill_order_operation{ settle.id, settle.owner, pays, receives, issuer_fees } );
+   push_applied_operation( fill_order_operation( settle.id, settle.owner, pays, receives, issuer_fees, fill_price, is_maker ) );
 
    if (filled)
       remove(settle);
@@ -506,10 +514,11 @@ bool database::fill_order(const force_settlement_object& settle, const asset& pa
  *  @param mia - the market issued asset that should be called.
  *  @param enable_black_swan - when adjusting collateral, triggering a black swan is invalid and will throw
  *                             if enable_black_swan is not set to true.
+ *  @param for_new_limit_order - true if this function is called when matching call orders with a new limit order
  *
  *  @return true if a margin call was executed.
  */
-bool database::check_call_orders(const asset_object& mia, bool enable_black_swan)
+bool database::check_call_orders(const asset_object& mia, bool enable_black_swan, bool for_new_limit_order )
 { try {
     if( !mia.is_market_issued() ) return false;
 
@@ -621,10 +630,13 @@ bool database::check_call_orders(const asset_object& mia, bool enable_black_swan
 
        auto old_call_itr = call_itr;
        if( filled_call ) ++call_itr;
-       fill_order(*old_call_itr, call_pays, call_receives);
+       // when for_new_limit_order is true, the call order is maker, otherwise the call order is taker
+       fill_order(*old_call_itr, call_pays, call_receives, match_price, for_new_limit_order );
 
-       auto old_limit_itr = filled_limit ? limit_itr++ : limit_itr;
-       fill_order(*old_limit_itr, order_pays, order_receives, true);
+       auto old_limit_itr = limit_itr;
+       if( filled_limit ) ++limit_itr;
+       // when for_new_limit_order is true, the limit order is taker, otherwise the limit order is maker
+       fill_order(*old_limit_itr, order_pays, order_receives, true, match_price, !for_new_limit_order );
 
     } // whlie call_itr != call_end
 

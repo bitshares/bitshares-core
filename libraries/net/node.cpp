@@ -4564,7 +4564,7 @@ namespace graphene { namespace net { namespace detail {
                 error_message_stream << "Unable to listen for connections on port " << listen_endpoint.port()
                                      << ", retrying in a few seconds\n";
                 error_message_stream << "You can wait for it to become available, or restart this program using\n";
-                error_message_stream << "the --p2p-port option to specify another port\n";
+                error_message_stream << "the --p2p-endpoint option to specify another port\n";
                 first = false;
               }
               else

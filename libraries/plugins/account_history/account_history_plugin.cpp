@@ -65,7 +65,7 @@ class account_history_plugin_impl
       account_history_plugin& _self;
       flat_set<account_id_type> _tracked_accounts;
       bool _partial_operations = false;
-      primary_index< simple_index< operation_history_object > >* _oho_index;
+      primary_index< operation_history_index >* _oho_index;
       uint32_t _max_ops_per_account = -1;
    private:
       /** add one history record, then check and remove the earliest history record */
@@ -90,7 +90,14 @@ void account_history_plugin_impl::update_account_histories( const signed_block& 
          return optional<operation_history_object>( db.create<operation_history_object>( [&]( operation_history_object& h )
          {
             if( o_op.valid() )
-               h = *o_op;
+            {
+               h.op           = o_op->op;
+               h.result       = o_op->result;
+               h.block_num    = o_op->block_num;
+               h.trx_in_block = o_op->trx_in_block;
+               h.op_in_trx    = o_op->op_in_trx;
+               h.virtual_op   = o_op->virtual_op;
+            }
          } ) );
       };
 
@@ -271,7 +278,7 @@ void account_history_plugin::plugin_set_program_options(
 void account_history_plugin::plugin_initialize(const boost::program_options::variables_map& options)
 {
    database().applied_block.connect( [&]( const signed_block& b){ my->update_account_histories(b); } );
-   my->_oho_index = database().add_index< primary_index< simple_index< operation_history_object > > >();
+   my->_oho_index = database().add_index< primary_index< operation_history_index > >();
    database().add_index< primary_index< account_transaction_history_index > >();
 
    LOAD_VALUE_SET(options, "track-account", my->_tracked_accounts, graphene::chain::account_id_type);

@@ -58,6 +58,8 @@
 
 #include <boost/range/adaptor/reversed.hpp>
 
+#include <graphene/utilities/git_revision.hpp>
+
 namespace graphene { namespace app {
 using net::item_hash_t;
 using net::item_id;
@@ -943,6 +945,7 @@ void application::set_program_options(boost::program_options::options_descriptio
          ("resync-blockchain", "Delete all blocks and re-sync with network from scratch")
          ("force-validate", "Force validation of all transactions")
          ("genesis-timestamp", bpo::value<uint32_t>(), "Replace timestamp from genesis.json with current time plus this many seconds (experts only!)")
+         ("version,v", "Display version information")
          ;
    command_line_options.add(_cli_options);
    configuration_file_options.add(_cfg_options);
@@ -952,6 +955,14 @@ void application::initialize(const fc::path& data_dir, const boost::program_opti
 {
    my->_data_dir = data_dir;
    my->_options = &options;
+
+   if( options.count("version") )
+   {
+      std::cout << "Version: " << graphene::utilities::git_revision_description << "\n";
+      std::cout << "SHA: " << graphene::utilities::git_revision_sha << "\n";
+      std::cout << "Timestamp: " << fc::get_approximate_relative_time_string(fc::time_point_sec(graphene::utilities::git_revision_unix_timestamp)) << "\n";
+      std::exit(EXIT_SUCCESS);
+   }
 
    if( options.count("create-genesis-json") )
    {
@@ -989,8 +1000,18 @@ void application::initialize(const fc::path& data_dir, const boost::program_opti
       wanted.push_back("account_history");
       wanted.push_back("market_history");
    }
+   int es_ah_conflict_counter = 0;
    for (auto& it : wanted)
    {
+      if(it == "account_history")
+         ++es_ah_conflict_counter;
+      if(it == "elasticsearch")
+         ++es_ah_conflict_counter;
+
+      if(es_ah_conflict_counter > 1) {
+         elog("Can't start program with elasticsearch and account_history plugin at the same time");
+         std::exit(EXIT_FAILURE);
+      }
       if (!it.empty()) enable_plugin(it);
    }
 }
