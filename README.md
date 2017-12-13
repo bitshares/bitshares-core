@@ -30,20 +30,21 @@ Build instructions and additional documentation are available in the
 We recommend building on Ubuntu 16.04 LTS, and the build dependencies may be installed with:
 
     sudo apt-get update
-    sudo apt-get install autoconf cmake git libboost-all-dev libssl-dev g++
+    sudo apt-get install cmake make libbz2-dev libdb++-dev libdb-dev libssl-dev openssl libreadline-dev autoconf libtool git ntp libcurl4-openssl-dev g++
+
+    sudo apt-get install libboost-all-dev
 
 To build after all dependencies are installed:
 
     git clone https://github.com/TravelChain/travelchain-core.git
-    cd bitshares-core
-    git checkout <LATEST_RELEASE_TAG>
+    cd travelchain-core
     git submodule update --init --recursive
-    cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo .
+    cmake -DCMAKE_BUILD_TYPE=Release .
     make
 
-**NOTE:** BitShares requires an [OpenSSL](https://www.openssl.org/) version in the 1.0.x series. OpenSSL 1.1.0 and newer are NOT supported. If your system OpenSSL version is newer, then you will need to manually provide an older version of OpenSSL and specify it to CMake using `-DOPENSSL_INCLUDE_DIR`, `-DOPENSSL_SSL_LIBRARY`, and `-DOPENSSL_CRYPTO_LIBRARY`.
+**NOTE:** TravelChain requires an [OpenSSL](https://www.openssl.org/) version in the 1.0.x series. OpenSSL 1.1.0 and newer are NOT supported. If your system OpenSSL version is newer, then you will need to manually provide an older version of OpenSSL and specify it to CMake using `-DOPENSSL_INCLUDE_DIR`, `-DOPENSSL_SSL_LIBRARY`, and `-DOPENSSL_CRYPTO_LIBRARY`.
 
-**NOTE:** BitShares requires a [Boost](http://www.boost.org/) version in the range [1.57, 1.60]. Versions earlier than
+**NOTE:** TravelChain requires a [Boost](http://www.boost.org/) version in the range [1.57, 1.60]. Versions earlier than
 1.57 or newer than 1.60 are NOT supported. If your system Boost version is newer, then you will need to manually build
 an older version of Boost and specify it to CMake using `DBOOST_ROOT`.
 
