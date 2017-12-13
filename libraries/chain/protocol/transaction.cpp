@@ -339,10 +339,11 @@ set<public_key_type> signed_transaction::get_required_signatures(
    s.remove_unused_signatures();
 
    set<public_key_type> result;
-
-   for( auto& provided_sig : s.provided_signatures )
-      if( available_keys.find( provided_sig.first ) != available_keys.end() )
-         result.insert( provided_sig.first );
+   set<public_key_type> provided_signatures;
+   for(auto sp : s.provided_signatures) {
+      provided_signatures.insert(sp.first);
+   }
+   std::set_difference(available_keys.begin(), available_keys.end(), provided_signatures.begin(), provided_signatures.end(), std::inserter(result, result.end()));
 
    return result;
 }
