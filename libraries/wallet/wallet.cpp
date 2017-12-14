@@ -2837,13 +2837,13 @@ vector<operation_detail> wallet_api::get_relative_account_history(string name, u
    return result;
 }
 
-account_history_operation_detail wallet_api::get_account_history_by_operations(string account_name_or_id, vector<uint16_t> operation_indexs, uint32_t start, int limit)
+account_history_operation_detail wallet_api::get_account_history_by_operations(string name, vector<uint16_t> operation_ids, uint32_t start, int limit)
 {
     FC_ASSERT(limit <= 100 && limit > 0);
     account_history_operation_detail result;
-    auto account_id = get_account(account_name_or_id).get_id();
+    auto account_id = get_account(name).get_id();
 
-    auto detail = my->_remote_hist->get_account_history_by_operations(account_id, operation_indexs, start, limit);
+    auto detail = my->_remote_hist->get_account_history_by_operations(account_id, operation_ids, start, limit);
     for (auto& obj : detail.operation_history_objs) {
         std::stringstream ss;
         auto memo = obj.op.visit(detail::operation_printer(ss, *my, obj.result));

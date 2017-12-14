@@ -382,7 +382,7 @@ class wallet_api
       vector<call_order_object>         get_call_orders(string a, uint32_t limit)const;
       vector<force_settlement_object>   get_settle_orders(string a, uint32_t limit)const;
 
-       /** Returns the most recent operations on the named account, with transaction id.
+      /** Returns the collateral_bid object for the given MPA
        *
        * @param asset the name or id of the asset
        * @param limit the number of entries to return
@@ -401,15 +401,15 @@ class wallet_api
       global_property_object            get_global_properties() const;
 
       /**
-       * This returns a list of operation history objects, which describe activity on the account, with transaction id.
+       * This returns a list of operation history objects with transaction id. Only asked operations relevant to the specified account
        *
-       * @param name the name or id of the account
-       * @param operations the type of operations
-       * @param start  the sequence number where to start looping back throw the history
-       * @param limit the max number of entries to return (starting from the most recent)
+       * @param name the name or id of the account, whose history shoulde be queried
+       * @param operation_ids The IDs of the operation we want to get operations in the account( 0 = transfer , 1 = limit order create, ...)
+       * @param start the sequence number where to start looping back throw the history
+       * @param limit the max number of entries to return (from start number)
        * @returns account_history_operation_detail
        */
-     account_history_operation_detail get_account_history_by_operations(string account_name_or_id, vector<uint16_t> operation_indexs, uint32_t start, int limit);
+      account_history_operation_detail get_account_history_by_operations(string name, vector<uint16_t> operation_ids, uint32_t start, int limit);
 
       /** Returns the block chain's rapidly-changing properties.
        * The returned object contains information that changes every block interval
