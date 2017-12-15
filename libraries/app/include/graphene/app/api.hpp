@@ -112,15 +112,15 @@ namespace graphene { namespace app {
                                                               operation_history_id_type start = operation_history_id_type())const;
 
          /**
-          * @brief Get operations relevant to the specificed account, return a list of operation history objects with transaction id
+          * @brief Get operations relevant to the specified account filtering by operation type
           * @param account The account whose history should be queried
-          * @param operation_ids The IDs of the operation we want to get operations in the account( 0 = transfer , 1 = limit order create, ...)
+          * @param operation_types The IDs of the operation we want to get operations in the account( 0 = transfer , 1 = limit order create, ...)
           * @param start the sequence number where to start looping back throw the history
           * @param limit the max number of entries to return (from start number)
           * @return history_operation_detail
           */
           history_operation_detail get_account_history_by_operations(account_id_type account,
-                                                                     vector<uint16_t> operation_ids,
+                                                                     vector<uint16_t> operation_types,
                                                                      uint32_t start,
                                                                      unsigned limit);
 

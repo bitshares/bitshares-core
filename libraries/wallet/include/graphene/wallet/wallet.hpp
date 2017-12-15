@@ -401,15 +401,15 @@ class wallet_api
       global_property_object            get_global_properties() const;
 
       /**
-       * This returns a list of operation history objects with transaction id. Only asked operations relevant to the specified account
+       * Get operations relevant to the specified account filtering by operation type, with transaction id
        *
        * @param name the name or id of the account, whose history shoulde be queried
-       * @param operation_ids The IDs of the operation we want to get operations in the account( 0 = transfer , 1 = limit order create, ...)
+       * @param operation_types The IDs of the operation we want to get operations in the account( 0 = transfer , 1 = limit order create, ...)
        * @param start the sequence number where to start looping back throw the history
        * @param limit the max number of entries to return (from start number)
        * @returns account_history_operation_detail
        */
-      account_history_operation_detail get_account_history_by_operations(string name, vector<uint16_t> operation_ids, uint32_t start, int limit);
+      account_history_operation_detail get_account_history_by_operations(string name, vector<uint16_t> operation_types, uint32_t start, int limit);
 
       /** Returns the block chain's rapidly-changing properties.
        * The returned object contains information that changes every block interval

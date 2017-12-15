@@ -402,13 +402,13 @@ namespace graphene { namespace app {
        return hist->tracked_buckets();
     }
 
-    history_operation_detail history_api::get_account_history_by_operations(account_id_type account, vector<uint16_t> operation_ids, uint32_t start, unsigned limit)
+    history_operation_detail history_api::get_account_history_by_operations(account_id_type account, vector<uint16_t> operation_types, uint32_t start, unsigned limit)
     {
         FC_ASSERT(limit <= 100);
         history_operation_detail result;
         vector<operation_history_object> objs = get_relative_account_history(account, start, limit, limit + start - 1);
         std::for_each(objs.begin(), objs.end(), [&](const operation_history_object &o) {
-                    if (operation_ids.empty() || find(operation_ids.begin(), operation_ids.end(), o.op.which()) != operation_ids.end()) {
+                    if (operation_types.empty() || find(operation_types.begin(), operation_types.end(), o.op.which()) != operation_types.end()) {
                         result.operation_history_objs.push_back(o);
                      }
                  });
