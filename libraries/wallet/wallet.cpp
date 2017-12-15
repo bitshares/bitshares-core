@@ -2846,7 +2846,7 @@ account_history_operation_detail wallet_api::get_account_history_by_operations(s
     const auto& stats = my->get_object(account.statistics);
     start = std::min<uint32_t>(start, stats.total_ops);
 
-    while (limit > 0) {
+    while (limit > 0 && start <= stats.total_ops) {
         auto current = my->_remote_hist->get_account_history_by_operations(account_id, operation_types, start, std::min<uint32_t> (100, limit));
         for (auto& obj : current.operation_history_objs) {
             std::stringstream ss;
@@ -2864,10 +2864,6 @@ account_history_operation_detail wallet_api::get_account_history_by_operations(s
 
         start += std::min<uint32_t>(100, limit);
         limit -= current.operation_history_objs.size();
-
-        if (start > stats.total_ops) {
-            break;
-        }
     }
 
     return result;
