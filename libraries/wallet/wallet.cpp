@@ -2839,24 +2839,36 @@ vector<operation_detail> wallet_api::get_relative_account_history(string name, u
 
 account_history_operation_detail wallet_api::get_account_history_by_operations(string name, vector<uint16_t> operation_types, uint32_t start, int limit)
 {
-    FC_ASSERT(limit <= 100 && limit > 0);
     account_history_operation_detail result;
     auto account_id = get_account(name).get_id();
 
-    auto detail = my->_remote_hist->get_account_history_by_operations(account_id, operation_types, start, limit);
-    for (auto& obj : detail.operation_history_objs) {
-        std::stringstream ss;
-        auto memo = obj.op.visit(detail::operation_printer(ss, *my, obj.result));
+    const auto& account = my->get_account(account_id);
+    const auto& stats = my->get_object(account.statistics);
+    start = std::min<uint32_t>(start, stats.total_ops);
 
-        transaction_id_type transaction_id;
-        auto block = get_block(obj.block_num);
-        if (block.valid() && obj.trx_in_block < block->transaction_ids.size()) {
-            transaction_id = block->transaction_ids[obj.trx_in_block];
+    while (limit > 0) {
+        auto current = my->_remote_hist->get_account_history_by_operations(account_id, operation_types, start, std::min<uint32_t> (100, limit));
+        for (auto& obj : current.operation_history_objs) {
+            std::stringstream ss;
+            auto memo = obj.op.visit(detail::operation_printer(ss, *my, obj.result));
+
+            transaction_id_type transaction_id;
+            auto block = get_block(obj.block_num);
+            if (block.valid() && obj.trx_in_block < block->transaction_ids.size()) {
+                transaction_id = block->transaction_ids[obj.trx_in_block];
+            }
+            result.details.push_back(operation_detail_ex{memo, ss.str(), obj, transaction_id});
         }
-        result.details.push_back(operation_detail_ex{memo, ss.str(), obj, transaction_id});
+        result.result_count += current.operation_history_objs.size();
+        result.total_count += current.total_count;
+
+        start += std::min<uint32_t>(100, limit);
+        limit -= current.operation_history_objs.size();
+
+        if (start > stats.total_ops) {
+            break;
+        }
     }
-    result.result_count = result.details.size();
-    result.total_count = detail.total_count;
 
     return result;
 }

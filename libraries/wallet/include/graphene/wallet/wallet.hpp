@@ -290,8 +290,8 @@ struct operation_detail_ex {
 };
 
 struct account_history_operation_detail {
-   uint32_t                     total_count;
-   uint32_t                     result_count;
+   uint32_t                     total_count = 0;
+   uint32_t                     result_count = 0;
    vector<operation_detail_ex>  details;
 };
 
