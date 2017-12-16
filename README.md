@@ -20,7 +20,7 @@ git submodule update --init --recursive
 ```
 
 ## Getting started
-For OS X
+#### For OS X
 Install XCode and its command line tools by following the instructions here: https://guide.macports.org/#installing.xcode. In OS X 10.11 (El Capitan) and newer, you will be prompted to install developer tools when running a developer command in the terminal. This step may not be needed.
 Install Homebrew by following the instructions here: http://brew.sh/
 Initialize Homebrew:
@@ -65,12 +65,14 @@ cd graphene
 
 ```
 git submodule update --init --recursive
-cmake .
+cmake -DCMAKE_BUILD_TYPE=Release .
 make
 
 ```
 ##### For Ubuntu
 
+
+###### Ubuntu 16.04 LTS
 Ubuntu 14.04 LTS Build and Install Instructions
 The following dependencies were necessary for a clean install of Ubuntu 14.04 LTS:
 
@@ -96,6 +98,15 @@ cd boost_1_57_0/
 
 ```
 
+Ubuntu 16.04 LTS ships with Boost 1.58 libraries, so no need to build from source.
+
+```
+sudo apt-get install libboost-all-dev
+```
+
+Other steps are same to 14.04 LTS.
+
+
 ### Build Travelchain Core
 
 ```
@@ -103,23 +114,12 @@ cd ..
 git clone https://github.com/travelchain/travelchain-core.git
 cd travelchain-core
 git submodule update --init --recursive
-cmake -DBOOST_ROOT="$BOOST_ROOT" -DCMAKE_BUILD_TYPE=Release .
+cmake -DCMAKE_BUILD_TYPE=Release .
 make
 
 ``` 
-
-
-###### Ubuntu 16.04 LTS
-Ubuntu 16.04 LTS ships with Boost 1.58 libraries, so no need to build from source.
-
-```
-sudo apt-get install libboost-all-dev
-
-```
-
-Other steps are same to 14.04 LTS.
  
-Windows - Visual Studio 2013
+###### Windows - Visual Studio 2013
 
 Prerequisites
 Microsoft Visual C++ 2013 Update 1 (the free Express edition will work)
