@@ -1,7 +1,7 @@
 
-TravelChain Github Readme
+# TravelChain Github Readme
 
-Introduction
+## Introduction
 
 TravelChain Core is the BitShares-based blockchain implementation and command-line interface. The web wallet is TravelChain UI.
 
@@ -9,6 +9,7 @@ Visit travelchain.io to learn about TravelChain and join the community at Telegr
 
 Existing repositories can be updated with the following steps:
 
+```
 git remote set-url origin https://github.com/TravelChain/travelchain-core.git
 git checkout master
 git remote set-head origin --auto
@@ -16,48 +17,73 @@ git pull
 git submodule sync --recursive
 git submodule update --init --recursive
 
+```
 
-Getting started
+## Getting started
 For OS X
 Install XCode and its command line tools by following the instructions here: https://guide.macports.org/#installing.xcode. In OS X 10.11 (El Capitan) and newer, you will be prompted to install developer tools when running a developer command in the terminal. This step may not be needed.
 Install Homebrew by following the instructions here: http://brew.sh/
 Initialize Homebrew:
+
+```
 brew doctor
 brew update
 
+```
 
-Install dependencies:
+### Install dependencies:
+
+```
 brew install boost cmake git openssl autoconf automake 
 brew link --force openssl 
 
+```
 
 Optional. To support importing Bitcoin wallet files:
+
+```
 brew install berkeley-db
 
+```
 
 Optional. To use TCMalloc in LevelDB:
+
+```
 brew install google-perftools
 
+```
 
-Clone the Graphene repository:
+#### Clone the Graphene repository:
+
+```
 git clone https://github.com/cryptonomex/graphene.git
 cd graphene
 
+```
 
-Build TravelChain:
+### Build TravelChain:
+
+```
 git submodule update --init --recursive
 cmake .
 make
-For Ubuntu
+
+```
+##### For Ubuntu
 
 Ubuntu 14.04 LTS Build and Install Instructions
 The following dependencies were necessary for a clean install of Ubuntu 14.04 LTS:
+
+```
 sudo apt-get update
 sudo apt-get install cmake make libbz2-dev libdb++-dev libdb-dev libssl-dev openssl libreadline-dev autoconf libtool git ntp libcurl4-openssl-dev g++
 
+```
 
 Build Boost 1.57.0
 The Boost which ships with Ubuntu 14.04 is too old. You need to download the Boost tarball for Boost 1.57.0 (Note, 1.58.0 requires C++14 and will not build on Ubuntu 14.04 LTS; this requirement was an accident, see this mailing list post).
+
+```
 BOOST_ROOT=$HOME/opt/boost_1_57_0
 sudo apt-get update
 sudo apt-get install autotools-dev build-essential libbz2-dev libicu-dev python-dev
@@ -68,20 +94,28 @@ cd boost_1_57_0/
 ./bootstrap.sh "--prefix=$BOOST_ROOT"
 ./b2 install
 
+```
 
-Build Travelchain Core
+### Build Travelchain Core
+
+```
 cd ..
 git clone https://github.com/travelchain/travelchain-core.git
 cd travelchain-core
 git submodule update --init --recursive
 cmake -DBOOST_ROOT="$BOOST_ROOT" -DCMAKE_BUILD_TYPE=Release .
-make 
+make
+
+``` 
 
 
-Ubuntu 16.04 LTS
+###### Ubuntu 16.04 LTS
 Ubuntu 16.04 LTS ships with Boost 1.58 libraries, so no need to build from source.
+
+```
 sudo apt-get install libboost-all-dev
 
+```
 
 Other steps are same to 14.04 LTS.
  
@@ -93,18 +127,24 @@ If you have multiple MSVS installation use MSVS Developer console from target ve
 This build is for 64bit binaries.
 Set up the directory structure
 Create a base directory for all projects. I'm putting everything in D:\travelchain, you can use whatever you like. In several of the batch files and makefiles, this directory will be referred to as GRA_ROOT:
+
+```
 mkdir D:\travelchain
 
+```
 
 Clone the TravelChain Core repository
 D:
+
+```
 cd D:\travelchain
 git clone https://github.com/travelchain/travelchain-core.git
 cd travelchain-core
 git submodule update --init --recursive
 
+```
 
-Download CMake
+###Download CMake
 Download the latest Win32 Zip build CMake fromhttp://cmake.org/cmake/resources/software.html (version 2.8.12.2 as of this writing). Unzip it to your base directory, which will create a directory that looks something like D:\travelchain\cmake-2.8.12.2-win32-x86. Rename this directory to D:\travelchain\CMake.
 If you already have CMake installed elsewhere on your system you can use it, but TravelChain Core has a few batch files that expect it to be in the base directory's CMake subdirectory, so those scripts would need tweaking.
 Boost
@@ -128,11 +168,16 @@ D:\travelchain
 Build the library dependencies
 Set up environment for building:
 D:
+
+```
 cd D:\travelchain
 notepad setenv_x64.bat
 
+```
 
 Put this into the notepad window, then save and quit.
+
+```
 @echo off
 set GRA_ROOT=d:\travelchain
 set OPENSSL_ROOT=%GRA_ROOT%\openssl-1.0.1g
@@ -145,45 +190,63 @@ set PATH=%GRA_ROOT%\CMake\bin;%BOOST_ROOT%\lib;%PATH%
 echo Setting up VS2013 environment...
 call "%VS120COMNTOOLS%\..\..\VC\vcvarsall.bat" x86_amd64
 
+```
 
 Then run
+```
 setenv_x64.bat
 
+```
 
 Build OpenSSL DLLs
 D:
+
+```
 cd D:\travelchain\openssl-1.0.1g
 perl Configure VC-WIN64A --prefix=D:\travelchain\OpenSSL
 ms\do_win64a
 nmake -f ms\ntdll.mak
 nmake -f ms\ntdll.mak install
 
+```
 
 This will create the directory D:\travelchain\OpenSSL with the libraries, DLLs, and header files.
 Build Boost
 D:
+
+```
 cd D:\travelchain\boost_1_57_0
 bootstrap
 .\b2
 
+```
 
 Build project files for TravelChain Core
 Run CMake:
 D:
+
+```
 cd D:\travelchain\travelchain-core
 notepad run_cmake_x64.bat
 
+```
 
 Put this into the notepad window, then save and quit.
 setlocal
+
+```
 call "d:\travelchain\setenv_x64.bat"
 cd %GRA_ROOT%
 cmake-gui -G "Visual Studio 12"
 
+```
 
 Then run
+
+```
 run_cmake_x64.bat
 
+```
 
 This pops up the cmake gui, but if you've used CMake before it will probably be showing the wrong data, so fix that:
 Where is the source code: D:\travelchain\travelchain-core
@@ -206,8 +269,10 @@ To become a witness and be able to produce blocks, you first need to create a wi
 We create a new witness object by issuing::
 
 
+```
 >>> create_witness "http://" true { "ref_block_num": 139, "ref_block_prefix": 3692461913, "relative_expiration": 3, "operations": [[ 21,{ "fee": { "amount": 0, "asset_id": "1.3.0" }, "witness_account": "1.2.16", "url": "url-to-proposal", "block_signing_key": "", "initial_secret": "00000000000000000000000000000000000000000000000000000000" } ] ], "signatures": [ ˓→"1f2ad5597af2ac4bf7a50f1eef2db49c9c0f7616718776624c2c09a2dd72a0c53a26e8c2bc928f783624c4632924330fc03f08345c8f40b9790efa2e4157184a37 ˓→" ] }
 
+```
 
 Our witness is registered, but it can’t produce blocks because nobody has voted it in. You can see the current list of active witnesses with get_global_properties:: >>> get_global_properties { "active_witnesses": [ "1.6.0", "1.6.1", "1.6.2", "1.6.3", "1.6.4", "1.6.5", "1.6.7", "1.6.8", "1.6.9" ], ... Now, we should vote our witness in. Vote all of the shares your account in favor of your new witness.: >>> vote_for_witness true true [a transaction in json format] 
 
@@ -215,7 +280,7 @@ Our witness is registered, but it can’t produce blocks because nobody has vote
 Note: If you want to experiment with things that require voting, be aware that votes are only tallied once per day at the maintenance interval. get_dynamic_global_properties tells us when that will be in next_maintenance_time. Once the next maintenance interval passes, run get_global_properties again and you should see that your new witness has been voted in. Now we wait until the next maintenance interval. 
 
 
-Graphene CLI Wallet Cookbook
+##Graphene CLI Wallet Cookbook
 
 Running a Local Test Network
 Right now, there is no public testnet, so the only way to test is to run your own private network. To do this, launch a witness node to generate blocks. In the directory where you built your graphene distribution:
@@ -248,6 +313,8 @@ TravelChain UI bugs should be reported to the UI issue tracker
 
 API
 You can restrict API's to particular users by specifying an api-access file in config.ini or by using the --api-access /full/path/to/api-access.json startup node command. Here is an example api-access file which allows user bytemasterwith password supersecret to access four different API's, while allowing any other user to access the three public API's necessary to use the wallet:
+
+```
 {
    "permission_map" :
    [
@@ -270,13 +337,18 @@ You can restrict API's to particular users by specifying an api-access file in c
    ]
 }
 
+```
+
 
 Passwords are stored in base64 as salted sha256 hashes. A simple Python script, saltpass.py is avaliable to obtain hash and salt values from a password. A single asterisk "*" may be specified as username or password hash to accept any value.
 With the above configuration, here is an example of how to call add_node from the network_node API:
+
+```
 {"id":1, "method":"call", "params":[1,"login",["bytemaster", "supersecret"]]}
 {"id":2, "method":"call", "params":[1,"network_node",[]]}
 {"id":3, "method":"call", "params":[2,"add_node",["127.0.0.1:9090"]]}
 
+```
 
 Note, the call to network_node is necessary to obtain the correct API identifier for the network API. It is not guaranteed that the network API identifier will always be 2.
 Since the network_node API requires login, it is only accessible over the websocket RPC. Our doxygen documentation contains the most up-to-date information about API's for the witness node and the wallet. If you want information which is not available from an API, it might be available from the database; it is fairly simple to write API methods to expose database methods.
