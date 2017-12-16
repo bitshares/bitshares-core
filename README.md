@@ -144,7 +144,7 @@ git submodule update --init --recursive
 
 ```
 
-###Download CMake
+### Download CMake
 Download the latest Win32 Zip build CMake fromhttp://cmake.org/cmake/resources/software.html (version 2.8.12.2 as of this writing). Unzip it to your base directory, which will create a directory that looks something like D:\travelchain\cmake-2.8.12.2-win32-x86. Rename this directory to D:\travelchain\CMake.
 If you already have CMake installed elsewhere on your system you can use it, but TravelChain Core has a few batch files that expect it to be in the base directory's CMake subdirectory, so those scripts would need tweaking.
 Boost
