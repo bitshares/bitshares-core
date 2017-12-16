@@ -280,25 +280,30 @@ Our witness is registered, but it can’t produce blocks because nobody has vote
 Note: If you want to experiment with things that require voting, be aware that votes are only tallied once per day at the maintenance interval. get_dynamic_global_properties tells us when that will be in next_maintenance_time. Once the next maintenance interval passes, run get_global_properties again and you should see that your new witness has been voted in. Now we wait until the next maintenance interval. 
 
 
-##Graphene CLI Wallet Cookbook
+## Graphene CLI Wallet Cookbook
 
 Running a Local Test Network
 Right now, there is no public testnet, so the only way to test is to run your own private network. To do this, launch a witness node to generate blocks. In the directory where you built your graphene distribution:
 cd programs/witness_node
-# if you have previously run a witness node, you may need to remove the old blockchain.
-# at this early stage, new commits often make it impossible to reuse an old database
-#   rm -r witness_node_data_dir
+* if you have previously run a witness node, you may need to remove the old blockchain.
+* at this early stage, new commits often make it impossible to reuse an old database
+
+```
+ rm -r witness_node_data_dir
 ./witness_node --rpc-endpoint "127.0.0.1:8090" --enable-stale-production -w \""1.6.0"\" \""1.6.1"\" \""1.6.2"\" \""1.6.3"\" \""1.6.4"\"
+
+```
 
 
 The initial genesis state has ten pre-configured delegates (1.6.0-9) that all use the same private key to sign their blocks, and the witness node has the private keys for these initial delegates built in.. Launching witness_node this way allows you to act as all ten delegates.
 Now, in a second window, launch a cli_wallet process to interact with the network.
 cd programs/cli_wallet
-# similarly, if you have previously run a wallet, you may need to wipe out your 
-# old wallet
-#    rm wallet.json
+* similarly, if you have previously run a wallet, you may need to wipe out your 
+* old wallet
+``` rm wallet.json
 ./cli_wallet
 
+```
 
 Before doing anything with the new wallet, set a password and unlock the wallet.
 Warning: your passwords will be displayed on the screen.
@@ -306,12 +311,12 @@ new >>> set_password my_password
 locked >>> unlock my_password
 unlocked >>>
 
-Support 
+#### Support 
 Technical support is available in the Telegram Chain.
 TravelChain Core bugs can be reported directly to the issue tracker.
 TravelChain UI bugs should be reported to the UI issue tracker
 
-API
+#### API
 You can restrict API's to particular users by specifying an api-access file in config.ini or by using the --api-access /full/path/to/api-access.json startup node command. Here is an example api-access file which allows user bytemasterwith password supersecret to access four different API's, while allowing any other user to access the three public API's necessary to use the wallet:
 
 ```
