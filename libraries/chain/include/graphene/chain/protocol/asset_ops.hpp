@@ -442,11 +442,42 @@ namespace graphene { namespace chain {
       void            validate()const;
    };
 
+   /**
+    * @brief Transfers BTS from the fee pool of a specified asset back to the issuer's balance
+    
+    * @param fee Payment for the operation execution
+    * @param issuer Account which will be used for transfering BTS
+    * @param asset_id Id of the asset whose fee pool is going to be drained
+    * @param amount_to_claim Amount of BTS to claim from the fee pool
+    * @param extensions Field for future expansion
+    
+    * @pre @ref fee must be paid in the asset other than the one whose pool is being drained
+    * @pre @ref amount_to_claim should be specified in the core asset
+    * @pre @ref amount_to_claim should be nonnegative
+    */
+   struct asset_claim_pool_operation : public base_operation
+   {
+      struct fee_parameters_type {
+         uint64_t fee = 20 * GRAPHENE_BLOCKCHAIN_PRECISION;
+      };
+        
+      asset           fee;
+      account_id_type issuer;
+      asset_id_type   asset_id;        /// fee.asset_id must != asset_id
+      asset           amount_to_claim; /// core asset
+      extensions_type extensions;
+        
+      account_id_type fee_payer()const { return issuer; }
+      void            validate()const;
+   };
+
 
 } } // graphene::chain
 
 FC_REFLECT( graphene::chain::asset_claim_fees_operation, (fee)(issuer)(amount_to_claim)(extensions) )
 FC_REFLECT( graphene::chain::asset_claim_fees_operation::fee_parameters_type, (fee) )
+FC_REFLECT( graphene::chain::asset_claim_pool_operation, (fee)(issuer)(asset_id)(amount_to_claim)(extensions) )
+FC_REFLECT( graphene::chain::asset_claim_pool_operation::fee_parameters_type, (fee) )
 
 FC_REFLECT( graphene::chain::asset_options,
             (max_supply)
