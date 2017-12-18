@@ -2845,8 +2845,10 @@ account_history_operation_detail wallet_api::get_account_history_by_operations(s
     const auto& account = my->get_account(account_id);
     const auto& stats = my->get_object(account.statistics);
 
-    while (limit > 0 && start <= stats.total_ops) {
-        auto current = my->_remote_hist->get_account_history_by_operations(account_id, operation_types, start, std::min<uint32_t> (100, limit));
+    uint32_t counter = start;
+    while (limit > 0 && counter <= stats.total_ops) {
+        uint32_t min_limit = std::min<uint32_t> (100, limit);
+        auto current = my->_remote_hist->get_account_history_by_operations(account_id, operation_types, start, min_limit);
         for (auto& obj : current.operation_history_objs) {
             std::stringstream ss;
             auto memo = obj.op.visit(detail::operation_printer(ss, *my, obj.result));
@@ -2863,6 +2865,7 @@ account_history_operation_detail wallet_api::get_account_history_by_operations(s
 
         start += current.total_count;
         limit -= current.operation_history_objs.size();
+        counter += min_limit;
     }
 
     return result;
