@@ -53,10 +53,10 @@ brew install google-perftools
 
 ```
 
-#### Clone the Graphene repository:
+#### Clone the TravelChain repository:
 
 ```
-git clone https://github.com/cryptonomex/graphene.git
+git clone https://github.com/travelchain/travelchain-core.git
 cd graphene
 
 ```
@@ -72,8 +72,8 @@ make
 ##### For Ubuntu
 
 
-###### Ubuntu 16.04 LTS
-Ubuntu 14.04 LTS Build and Install Instructions
+###### Ubuntu 14.04 & 16.04
+Ubuntu 14.04 & 16.04 Build and Install Instructions
 The following dependencies were necessary for a clean install of Ubuntu 14.04 LTS:
 
 ```
@@ -82,7 +82,7 @@ sudo apt-get install cmake make libbz2-dev libdb++-dev libdb-dev libssl-dev open
 
 ```
 
-Build Boost 1.57.0
+Build Boost 1.57.0 (for Ubuntu 16.04 this step can be skipped)
 The Boost which ships with Ubuntu 14.04 is too old. You need to download the Boost tarball for Boost 1.57.0 (Note, 1.58.0 requires C++14 and will not build on Ubuntu 14.04 LTS; this requirement was an accident, see this mailing list post).
 
 ```
@@ -103,9 +103,6 @@ Ubuntu 16.04 LTS ships with Boost 1.58 libraries, so no need to build from sourc
 ```
 sudo apt-get install libboost-all-dev
 ```
-
-Other steps are same to 14.04 LTS.
-
 
 ### Build Travelchain Core
 
@@ -132,131 +129,6 @@ Create a base directory for all projects. I'm putting everything in D:\travelcha
 mkdir D:\travelchain
 
 ```
-
-Clone the TravelChain Core repository
-D:
-
-```
-cd D:\travelchain
-git clone https://github.com/travelchain/travelchain-core.git
-cd travelchain-core
-git submodule update --init --recursive
-
-```
-
-### Download CMake
-Download the latest Win32 Zip build CMake fromhttp://cmake.org/cmake/resources/software.html (version 2.8.12.2 as of this writing). Unzip it to your base directory, which will create a directory that looks something like D:\travelchain\cmake-2.8.12.2-win32-x86. Rename this directory to D:\travelchain\CMake.
-If you already have CMake installed elsewhere on your system you can use it, but TravelChain Core has a few batch files that expect it to be in the base directory's CMake subdirectory, so those scripts would need tweaking.
-Boost
-TravelChain Core depends on the Boost libraries version 1.57 ~ 1.60. You can build them from source.
-download boost source from http://www.boost.org/users/download/
-unzip it to the base directory D:\travelchain.
-This will create a directory like D:\travelchain\boost_1_57_0.
-OpenSSL
-TravelChain Core depends on OpenSSL version 1.0.1 or 1.0.2, and you must build this from source.
-download OpenSSL source from http://www.openssl.org/source/
-Untar it to the base directory D:\travelchain
-this will create a directory like D:\travelchain\openssl-1.0.1g.
-At the end of this, your base directory should look like this (directory names will be slightly different for the 64bit versions):
-D:\travelchain
-+- travelchain-core
-+- boost_1_57_0
-+- CMake
-+- openssl-1.0.1g
-
-
-Build the library dependencies
-Set up environment for building:
-D:
-
-```
-cd D:\travelchain
-notepad setenv_x64.bat
-
-```
-
-Put this into the notepad window, then save and quit.
-
-```
-@echo off
-set GRA_ROOT=d:\travelchain
-set OPENSSL_ROOT=%GRA_ROOT%\openssl-1.0.1g
-set OPENSSL_ROOT_DIR=%OPENSSL_ROOT%
-set OPENSSL_INCLUDE_DIR=%OPENSSL_ROOT%\include
-set BOOST_ROOT=%GRA_ROOT%\boost_1_57_0
-
-set PATH=%GRA_ROOT%\CMake\bin;%BOOST_ROOT%\lib;%PATH%
-
-echo Setting up VS2013 environment...
-call "%VS120COMNTOOLS%\..\..\VC\vcvarsall.bat" x86_amd64
-
-```
-
-Then run
-```
-setenv_x64.bat
-
-```
-
-Build OpenSSL DLLs
-D:
-
-```
-cd D:\travelchain\openssl-1.0.1g
-perl Configure VC-WIN64A --prefix=D:\travelchain\OpenSSL
-ms\do_win64a
-nmake -f ms\ntdll.mak
-nmake -f ms\ntdll.mak install
-
-```
-
-This will create the directory D:\travelchain\OpenSSL with the libraries, DLLs, and header files.
-Build Boost
-D:
-
-```
-cd D:\travelchain\boost_1_57_0
-bootstrap
-.\b2
-
-```
-
-Build project files for TravelChain Core
-Run CMake:
-D:
-
-```
-cd D:\travelchain\travelchain-core
-notepad run_cmake_x64.bat
-
-```
-
-Put this into the notepad window, then save and quit.
-setlocal
-
-```
-call "d:\travelchain\setenv_x64.bat"
-cd %GRA_ROOT%
-cmake-gui -G "Visual Studio 12"
-
-```
-
-Then run
-
-```
-run_cmake_x64.bat
-
-```
-
-This pops up the cmake gui, but if you've used CMake before it will probably be showing the wrong data, so fix that:
-Where is the source code: D:\travelchain\travelchain-core
-Where to build the binaries: D:\travelchain\x64
-Then hit Configure. It may ask you to specify a generator for this project; if it does, choose Visual Studio 12 2013 Win64 for 64 bit builds and select Use default native compilers. Look through the output and fix any errors. Then hit Generate.
-Launch Visual Studio and load D:\travelchain\x64\travelchain.sln
-Set Active Configuration to RelWithDebInfo, ensure Active Solution platform is x64 for 64 bit builds
-Build Solution
-Or you can build the INSTALL target in Visual Studio which will copy all of the necessary files into your D:\travelchain\install directory, then copy all of those files to the bin directory.
- 
 How To become an active witness in TravelChain
 
 Set in the config default seed-nodes.txt, then will start the synchronization with the working network
