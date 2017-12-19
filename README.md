@@ -115,21 +115,19 @@ cmake -DCMAKE_BUILD_TYPE=Release .
 make
 
 ``` 
+
+## SEEDS (must be specified on witness_node_data_dir/config.ini)
+#### TESTNET (SANDBOX.TRAVELCHAIN.IO)
+```
+seed-node = 51.254.219.162:4242
+``` 
+#### PRODUCTION (WALLET.TRAVELCHAIN.IO)
+```
+seed-node = 142.44.247.175:4242
+``` 
+
  
-###### Windows - Visual Studio 2013
-
-Prerequisites
-Microsoft Visual C++ 2013 Update 1 (the free Express edition will work)
-If you have multiple MSVS installation use MSVS Developer console from target version.
-This build is for 64bit binaries.
-Set up the directory structure
-Create a base directory for all projects. I'm putting everything in D:\travelchain, you can use whatever you like. In several of the batch files and makefiles, this directory will be referred to as GRA_ROOT:
-
-```
-mkdir D:\travelchain
-
-```
-How To become an active witness in TravelChain
+#### How To become an active witness in TravelChain
 
 Set in the config default seed-nodes.txt, then will start the synchronization with the working network
  
