@@ -2845,8 +2845,17 @@ account_history_operation_detail wallet_api::get_account_history_by_operations(s
     const auto& account = my->get_account(account_id);
     const auto& stats = my->get_object(account.statistics);
 
+    // sequence of account_transaction_history_object start with 1
+    start = start == 0 ? 1 : start;
+
+    if (start <= stats.removed_ops) {
+        start = stats.removed_ops;
+        result.total_count =stats.removed_ops;
+    }
+
     uint32_t counter = start;
     while (limit > 0 && counter <= stats.total_ops) {
+        ilog("counter: ${c}", ("c", counter));
         uint32_t min_limit = std::min<uint32_t> (100, limit);
         auto current = my->_remote_hist->get_account_history_by_operations(account_id, operation_types, start, min_limit);
         for (auto& obj : current.operation_history_objs) {
@@ -2863,7 +2872,7 @@ account_history_operation_detail wallet_api::get_account_history_by_operations(s
         result.result_count += current.operation_history_objs.size();
         result.total_count += current.total_count;
 
-        start += current.total_count;
+        start += current.total_count > 0 ? current.total_count : min_limit;
         limit -= current.operation_history_objs.size();
         counter += min_limit;
     }
