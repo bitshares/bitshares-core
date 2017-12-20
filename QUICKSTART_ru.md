@@ -218,7 +218,7 @@ systemctl restart witness_node
 
 ![](https://raw.githubusercontent.com/TravelChain/travelchain-core/master/misc/vote_table.png)
 
-## Troubleshooting
+## Решение проблем
 
 * Вы можете запустить `witness node` в сессии screen вместо systemd
 ```bash
