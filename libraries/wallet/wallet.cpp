@@ -2855,7 +2855,6 @@ account_history_operation_detail wallet_api::get_account_history_by_operations(s
 
     uint32_t counter = start;
     while (limit > 0 && counter <= stats.total_ops) {
-        ilog("counter: ${c}", ("c", counter));
         uint32_t min_limit = std::min<uint32_t> (100, limit);
         auto current = my->_remote_hist->get_account_history_by_operations(account_id, operation_types, start, min_limit);
         for (auto& obj : current.operation_history_objs) {
