@@ -59,7 +59,7 @@ void_result transfer_evaluator::do_evaluate( const transfer_operation& op )
          GRAPHENE_ASSERT(
             from_account.id == asset_type.issuer || to_account.id == asset_type.issuer,
             transfer_restricted_transfer_asset,
-            "Asset {asset} has transfer_restricted flag enabled",
+            "Asset ${asset} has transfer_restricted flag enabled",
             ("asset", op.amount.asset_id)
           );
       }
