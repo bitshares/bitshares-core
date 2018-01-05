@@ -420,6 +420,15 @@ class database_api
       market_volume get_24_volume( const string& base, const string& quote )const;
 
       /**
+       * @brief Returns vector of 24 hour volume markets sorted by reverse base_volume
+       * @param start Number to start, used for pagination
+       * @param limit Max number of results
+       * @return Desc Sorted volume vector
+      */
+      vector<market_volume> get_top_markets(uint start, uint limit)const;
+
+
+      /**
        * @brief Returns the order book for the market base:quote
        * @param base String name of the first asset
        * @param quote String name of the second asset
@@ -693,6 +702,7 @@ FC_API(graphene::app::database_api,
    (unsubscribe_from_market)
    (get_ticker)
    (get_24_volume)
+   (get_top_markets)
    (get_trade_history)
    (get_trade_history_by_sequence)
 

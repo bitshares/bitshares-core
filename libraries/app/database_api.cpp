@@ -113,6 +113,7 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       void unsubscribe_from_market(asset_id_type a, asset_id_type b);
       market_ticker                      get_ticker( const string& base, const string& quote, bool skip_order_book = false )const;
       market_volume                      get_24_volume( const string& base, const string& quote )const;
+      vector<market_volume>              get_top_markets(uint start, uint limit)const;
       order_book                         get_order_book( const string& base, const string& quote, unsigned limit = 50 )const;
       vector<market_trade>               get_trade_history( const string& base, const string& quote, fc::time_point_sec start, fc::time_point_sec stop, unsigned limit = 100 )const;
       vector<market_trade>               get_trade_history_by_sequence( const string& base, const string& quote, int64_t start, fc::time_point_sec stop, unsigned limit = 100 )const;
@@ -1215,12 +1216,12 @@ market_ticker database_api_impl::get_ticker( const string& base, const string& q
          quote_volume = itr->base_volume;
       }
    }
-
    auto uint128_to_double = []( const fc::uint128& n )
    {
       if( n.hi == 0 ) return double( n.lo );
       return double(n.hi) * (uint64_t(1)<<63) * 2 + n.lo;
    };
+
    result.base_volume = uint128_to_double( base_volume ) / pow( 10, assets[0]->precision );
    result.quote_volume = uint128_to_double( quote_volume ) / pow( 10, assets[1]->precision );
 
@@ -1251,6 +1252,58 @@ market_volume database_api_impl::get_24_volume( const string& base, const string
     result.quote_volume = ticker.quote_volume;
 
     return result;
+}
+
+vector<market_volume> database_api::get_top_markets(uint start, uint limit)const
+{
+   return my->get_top_markets(start, limit);
+}
+
+vector<market_volume> database_api_impl::get_top_markets(uint start, uint limit)const
+{
+   FC_ASSERT( limit <= 100 );
+
+   const auto& volume_idx = _db.get_index_type<graphene::market_history::market_ticker_index>().indices().get<by_volume>();
+   auto itr = volume_idx.rbegin();
+   vector<market_volume> result;
+
+   fc::uint128 base_volume;
+   fc::uint128 quote_volume;
+
+   uint c = 0;
+   const fc::time_point_sec now = fc::time_point::now();
+
+   while( itr != volume_idx.rend())
+   {
+      if(c < start) {
+         ++c;
+         ++itr;
+         continue;
+      }
+      if(result.size() >= limit)
+         break;
+
+      market_volume mv;
+      mv.time = now;
+      auto uint128_to_double = []( const fc::uint128& n )
+      {
+         if( n.hi == 0 ) return double( n.lo );
+         return double(n.hi) * (uint64_t(1)<<63) * 2 + n.lo;
+      };
+      const auto assets = get_assets( { itr->base, itr->quote } );
+
+      mv.base = assets[0]->symbol;
+      mv.quote = assets[1]->symbol;
+
+      mv.base_volume = uint128_to_double( itr->base_volume ) / pow( 10, assets[0]->precision );
+      mv.quote_volume = uint128_to_double( itr->quote_volume ) / pow( 10, assets[1]->precision );
+
+      result.push_back(mv);
+
+      ++c;
+      ++itr;
+   }
+   return result;
 }
 
 order_book database_api::get_order_book( const string& base, const string& quote, unsigned limit )const
