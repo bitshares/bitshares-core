@@ -160,10 +160,6 @@ namespace graphene { namespace chain {
             template<typename T>
             void operator()( const T& v )const {}
 
-            void operator()( const graphene::chain::bid_collateral_operation& v )const {
-               FC_ASSERT( false, "Not allowed until hardfork" );
-            }
-
             void operator()( const graphene::chain::asset_create_operation& v )const {
                FC_ASSERT( v.fee.asset_id == asset_id_type(), "Can only pay fee in BTS since block #21040000" );
             }
