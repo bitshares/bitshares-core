@@ -763,9 +763,6 @@ void database::process_bids( const asset_bitasset_data_object& bad )
    }
    if( covered < bdd.current_supply ) return;
 
-   if( head_block_time() <= HARDFORK_CORE_216_TIME )
-       wlog( "Premature bitasset revival of ${sym} at block ${num}", ("sym",to_revive.symbol)("num",head_block_num()) );
-
    const auto end = itr;
    share_type to_cover = bdd.current_supply;
    share_type remaining_fund = bad.settlement_fund;
