@@ -53,7 +53,7 @@ VOLUME ["/var/lib/bitshares", "/etc/bitshares"]
 # rpc service:
 EXPOSE 8090
 # p2p service:
-EXPOSE 2001
+EXPOSE 9090
 
 # default exec/config files
 ADD docker/default_config.ini /etc/bitshares/config.ini
