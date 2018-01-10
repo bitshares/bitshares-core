@@ -32,7 +32,7 @@ RUN \
     cmake \
         -DCMAKE_BUILD_TYPE=Release \
         . && \
-    make witness_node && \
+    make && \
     make install && \
     #
     # Obtain version
