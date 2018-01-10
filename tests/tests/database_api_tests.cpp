@@ -124,4 +124,44 @@ BOOST_AUTO_TEST_CASE( get_potential_signatures_other ) {
    } FC_LOG_AND_RETHROW()
 }
 
+BOOST_AUTO_TEST_CASE( get_required_signatures_owner_or_active ) {
+   try {
+      fc::ecc::private_key nathan_key1 = fc::ecc::private_key::regenerate(fc::digest("key1"));
+      fc::ecc::private_key nathan_key2 = fc::ecc::private_key::regenerate(fc::digest("key2"));
+      public_key_type pub_key1( nathan_key1.get_public_key() );
+      public_key_type pub_key2( nathan_key2.get_public_key() );
+      const account_object& nathan = create_account("nathan", nathan_key1.get_public_key() );
+
+      try {
+         account_update_operation op;
+         op.account = nathan.id;
+         op.active = authority(1, pub_key1, 1);
+         op.owner = authority(1, pub_key2, 1);
+         trx.operations.push_back(op);
+         sign(trx, nathan_key1);
+         PUSH_TX( db, trx, database::skip_transaction_dupe_check );
+         trx.operations.clear();
+         trx.signatures.clear();
+      } FC_CAPTURE_AND_RETHROW ((nathan.active))
+
+      transfer_operation op;
+      op.from = nathan.id;
+      op.to = account_id_type();
+      trx.operations.push_back(op);
+
+      graphene::app::database_api db_api(db);
+
+      flat_set<public_key_type> avail_keys1;
+      avail_keys1.insert( pub_key1 );
+      set<public_key_type> pub_keys1 = db_api.get_required_signatures( trx, avail_keys1 );
+      BOOST_CHECK( pub_keys1.find( pub_key1 ) != pub_keys1.end() );
+
+      flat_set<public_key_type> avail_keys2;
+      avail_keys2.insert( pub_key2 );
+      set<public_key_type> pub_keys2 = db_api.get_required_signatures( trx, avail_keys2 );
+      BOOST_CHECK( pub_keys2.find( pub_key2 ) != pub_keys2.end() );
+
+   } FC_LOG_AND_RETHROW()
+}
+
 BOOST_AUTO_TEST_SUITE_END()
