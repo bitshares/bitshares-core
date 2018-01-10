@@ -334,7 +334,7 @@ set<public_key_type> signed_transaction::get_required_signatures(
    for( auto& owner : required_owner )
       s.check_authority( get_owner( owner ) );
    for( auto& active : required_active )
-      s.check_authority( active  );
+      s.check_authority( active ) || s.check_authority( get_owner( active ) );
 
    s.remove_unused_signatures();
 
