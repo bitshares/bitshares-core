@@ -32,7 +32,7 @@ RUN \
     cmake \
         -DCMAKE_BUILD_TYPE=Release \
         . && \
-    make && \
+    make witness_node && \
     make install && \
     #
     # Obtain version
@@ -53,7 +53,7 @@ VOLUME ["/var/lib/bitshares", "/etc/bitshares"]
 # rpc service:
 EXPOSE 8090
 # p2p service:
-EXPOSE 9090
+EXPOSE 2001
 
 # default exec/config files
 ADD docker/default_config.ini /etc/bitshares/config.ini
