@@ -262,16 +262,17 @@ void database::update_active_committee_members()
          stake_tally += _committee_count_histogram_buffer[++committee_member_count];
    if( stake_target != old_stake_target && old_stake_target > 0 && head_block_time() < fc::time_point_sec(HARDFORK_CORE_353_TIME) )
    {
+      uint32_t candidates = get_index_type<committee_member_index>().indices().size();
       uint64_t old_stake_tally = 0;
       size_t old_committee_member_count = 0;
       while( (old_committee_member_count < _committee_count_histogram_buffer.size() - 1)
              && (old_stake_tally <= old_stake_target) )
          old_stake_tally += _committee_count_histogram_buffer[++old_committee_member_count];
       if( old_committee_member_count != committee_member_count
-              && (old_committee_member_count > GRAPHENE_DEFAULT_MIN_COMMITTEE_MEMBER_COUNT
-                  || committee_member_count > GRAPHENE_DEFAULT_MIN_COMMITTEE_MEMBER_COUNT) )
+              && (old_committee_member_count*2+1 > GRAPHENE_DEFAULT_MIN_COMMITTEE_MEMBER_COUNT
+                  || committee_member_count*2+1 > GRAPHENE_DEFAULT_MIN_COMMITTEE_MEMBER_COUNT) )
       {
-          ilog( "Committee member count mismatch ${old} / ${new}", ("old",old_committee_member_count)("new", committee_member_count) );
+          ilog( "Committee member count mismatch ${old} / ${new} at block ${num} with ${count} candidates", ("old",old_committee_member_count)("new", committee_member_count)("num",head_block_num())("count",candidates) );
           committee_member_count = old_committee_member_count;
       }
    }
