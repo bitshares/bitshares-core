@@ -161,4 +161,22 @@ namespace graphene { namespace chain {
          void_result do_apply( const asset_claim_pool_operation& o );
    };
 
+   namespace impl { // TODO: remove after HARDFORK_413_TIME has passed
+      class hf_413_visitor {
+         public:
+            typedef void result_type;
+
+            template<typename T>
+            void operator()( const T& v )const {}
+
+            void operator()( const graphene::chain::asset_claim_fees_operation& v )const {
+               FC_ASSERT( false, "Not allowed until hardfork 413" );
+            }
+
+            void operator()( const graphene::chain::proposal_create_operation& v )const {
+               for( const op_wrapper& op : v.proposed_ops )
+                   op.op.visit( *this );
+            }
+      };
+   }
 } } // graphene::chain
