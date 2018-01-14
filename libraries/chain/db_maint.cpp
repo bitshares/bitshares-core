@@ -741,7 +741,6 @@ void database::process_bids( const asset_bitasset_data_object& bad )
 {
    if( bad.is_prediction_market ) return;
    if( bad.current_feed.settlement_price.is_null() ) return;
-   if( head_block_time() <= HARDFORK_CORE_216_TIME ) return; // remove after HF date
 
    asset_id_type to_revive_id = (asset( 0, bad.options.short_backing_asset ) * bad.settlement_price).asset_id;
    const asset_object& to_revive = to_revive_id( *this );
