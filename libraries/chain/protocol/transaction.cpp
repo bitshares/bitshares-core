@@ -97,6 +97,8 @@ void transaction::get_required_authorities( flat_set<account_id_type>& active, f
 {
    for( const auto& op : operations )
       operation_get_required_authorities( op, active, owner, other );
+   for( const auto& account : owner )
+      active.erase( account );
 }
 
 
