@@ -212,4 +212,395 @@ BOOST_AUTO_TEST_CASE( get_required_signatures_owner_or_active ) {
    } FC_LOG_AND_RETHROW()
 }
 
+BOOST_AUTO_TEST_CASE( get_required_signatures_partially_signed_or_not ) {
+   try {
+      fc::ecc::private_key morgan_key = fc::ecc::private_key::regenerate(fc::digest("morgan_key"));
+      fc::ecc::private_key nathan_key = fc::ecc::private_key::regenerate(fc::digest("nathan_key"));
+      fc::ecc::private_key oliver_key = fc::ecc::private_key::regenerate(fc::digest("oliver_key"));
+      public_key_type pub_key_morgan( morgan_key.get_public_key() );
+      public_key_type pub_key_nathan( nathan_key.get_public_key() );
+      public_key_type pub_key_oliver( oliver_key.get_public_key() );
+      const account_object& morgan = create_account("morgan", morgan_key.get_public_key() );
+      const account_object& nathan = create_account("nathan", nathan_key.get_public_key() );
+      const account_object& oliver = create_account("oliver", oliver_key.get_public_key() );
+
+      graphene::app::database_api db_api(db);
+
+      // prepare available keys sets
+      flat_set<public_key_type> avail_keys_empty, avail_keys_m, avail_keys_n, avail_keys_o;
+      flat_set<public_key_type> avail_keys_mn, avail_keys_mo, avail_keys_no, avail_keys_mno;
+      avail_keys_m.insert( pub_key_morgan );
+      avail_keys_mn.insert( pub_key_morgan );
+      avail_keys_mo.insert( pub_key_morgan );
+      avail_keys_mno.insert( pub_key_morgan );
+      avail_keys_n.insert( pub_key_nathan );
+      avail_keys_mn.insert( pub_key_nathan );
+      avail_keys_no.insert( pub_key_nathan );
+      avail_keys_mno.insert( pub_key_nathan );
+      avail_keys_o.insert( pub_key_oliver );
+      avail_keys_mo.insert( pub_key_oliver );
+      avail_keys_no.insert( pub_key_oliver );
+      avail_keys_mno.insert( pub_key_oliver );
+
+      // result set
+      set<public_key_type> pub_keys;
+
+      // make a transaction that require 1 signature (m)
+      transfer_operation op;
+      op.from = morgan.id;
+      op.to = oliver.id;
+      trx.operations.push_back(op);
+
+      // provides [], should return []
+      pub_keys = db_api.get_required_signatures( trx, avail_keys_empty );
+      BOOST_CHECK( pub_keys.size() == 0 );
+
+     // provides [m], should return [m]
+      pub_keys = db_api.get_required_signatures( trx, avail_keys_m );
+      BOOST_CHECK( pub_keys.size() == 1 );
+      BOOST_CHECK( pub_keys.find( pub_key_morgan ) != pub_keys.end() );
+
+      // provides [n], should return []
+      pub_keys = db_api.get_required_signatures( trx, avail_keys_n );
+      BOOST_CHECK( pub_keys.size() == 0 );
+
+       // provides [m,n], should return [m]
+      pub_keys = db_api.get_required_signatures( trx, avail_keys_mn );
+      BOOST_CHECK( pub_keys.size() == 1 );
+      BOOST_CHECK( pub_keys.find( pub_key_morgan ) != pub_keys.end() );
+
+      // sign with n, but actually need m
+      sign(trx, nathan_key);
+
+      // provides [], should return []
+      pub_keys = db_api.get_required_signatures( trx, avail_keys_empty );
+      BOOST_CHECK( pub_keys.size() == 0 );
+
+      // provides [m], should return [m]
+      pub_keys = db_api.get_required_signatures( trx, avail_keys_m );
+      BOOST_CHECK( pub_keys.size() == 1 );
+      BOOST_CHECK( pub_keys.find( pub_key_morgan ) != pub_keys.end() );
+
+      // provides [n], should return []
+      pub_keys = db_api.get_required_signatures( trx, avail_keys_n );
+      BOOST_CHECK( pub_keys.size() == 0 );
+
+      // provides [o], should return []
+      pub_keys = db_api.get_required_signatures( trx, avail_keys_o );
+      BOOST_CHECK( pub_keys.size() == 0 );
+
+      // provides [m,n], should return [m]
+      pub_keys = db_api.get_required_signatures( trx, avail_keys_mn );
+      BOOST_CHECK( pub_keys.size() == 1 );
+      BOOST_CHECK( pub_keys.find( pub_key_morgan ) != pub_keys.end() );
+
+      // provides [m,o], should return [m]
+      pub_keys = db_api.get_required_signatures( trx, avail_keys_mo );
+      BOOST_CHECK( pub_keys.size() == 1 );
+      BOOST_CHECK( pub_keys.find( pub_key_morgan ) != pub_keys.end() );
+
+      // provides [n,o], should return []
+      pub_keys = db_api.get_required_signatures( trx, avail_keys_no );
+      BOOST_CHECK( pub_keys.size() == 0 );
+
+      // provides [m,n,o], should return [m]
+      pub_keys = db_api.get_required_signatures( trx, avail_keys_mno );
+      BOOST_CHECK( pub_keys.size() == 1 );
+      BOOST_CHECK( pub_keys.find( pub_key_morgan ) != pub_keys.end() );
+
+      // sign with m, should be enough
+      trx.signatures.clear();
+      sign(trx, morgan_key);
+
+      // provides [], should return []
+      pub_keys = db_api.get_required_signatures( trx, avail_keys_empty );
+      BOOST_CHECK( pub_keys.size() == 0 );
+
+      // provides [m], should return []
+      pub_keys = db_api.get_required_signatures( trx, avail_keys_m );
+      BOOST_CHECK( pub_keys.size() == 0 );
+
+      // provides [n], should return []
+      pub_keys = db_api.get_required_signatures( trx, avail_keys_n );
+      BOOST_CHECK( pub_keys.size() == 0 );
+
+      // provides [m,n], should return []
+      pub_keys = db_api.get_required_signatures( trx, avail_keys_mn );
+      BOOST_CHECK( pub_keys.size() == 0 );
+
+      // sign with m+n, although m only should be enough, this API won't complain
+      sign(trx, nathan_key);
+
+      // provides [], should return []
+      pub_keys = db_api.get_required_signatures( trx, avail_keys_empty );
+      BOOST_CHECK( pub_keys.size() == 0 );
+
+      // provides [m], should return []
+      pub_keys = db_api.get_required_signatures( trx, avail_keys_m );
+      BOOST_CHECK( pub_keys.size() == 0 );
+
+      // provides [n], should return []
+      pub_keys = db_api.get_required_signatures( trx, avail_keys_n );
+      BOOST_CHECK( pub_keys.size() == 0 );
+
+      // provides [o], should return []
+      pub_keys = db_api.get_required_signatures( trx, avail_keys_o );
+      BOOST_CHECK( pub_keys.size() == 0 );
+
+      // provides [m,n], should return []
+      pub_keys = db_api.get_required_signatures( trx, avail_keys_mn );
+      BOOST_CHECK( pub_keys.size() == 0 );
+
+      // provides [m,o], should return []
+      pub_keys = db_api.get_required_signatures( trx, avail_keys_mo );
+      BOOST_CHECK( pub_keys.size() == 0 );
+
+      // provides [n,o], should return []
+      pub_keys = db_api.get_required_signatures( trx, avail_keys_no );
+      BOOST_CHECK( pub_keys.size() == 0 );
+
+      // provides [m,n,o], should return []
+      pub_keys = db_api.get_required_signatures( trx, avail_keys_mno );
+      BOOST_CHECK( pub_keys.size() == 0 );
+
+      // make a transaction that require 2 signatures (m+n)
+      trx.signatures.clear();
+      op.from = nathan.id;
+      trx.operations.push_back(op);
+
+      // provides [], should return []
+      pub_keys = db_api.get_required_signatures( trx, avail_keys_empty );
+      BOOST_CHECK( pub_keys.size() == 0 );
+
+      // provides [m], should return [m]
+      pub_keys = db_api.get_required_signatures( trx, avail_keys_m );
+      BOOST_CHECK( pub_keys.size() == 1 );
+      BOOST_CHECK( pub_keys.find( pub_key_morgan ) != pub_keys.end() );
+
+      // provides [n], should return [n]
+      pub_keys = db_api.get_required_signatures( trx, avail_keys_n );
+      BOOST_CHECK( pub_keys.size() == 1 );
+      BOOST_CHECK( pub_keys.find( pub_key_nathan ) != pub_keys.end() );
+
+      // provides [o], should return []
+      pub_keys = db_api.get_required_signatures( trx, avail_keys_o );
+      BOOST_CHECK( pub_keys.size() == 0 );
+
+      // provides [m,n], should return [m,n]
+      pub_keys = db_api.get_required_signatures( trx, avail_keys_mn );
+      BOOST_CHECK( pub_keys.size() == 2 );
+      BOOST_CHECK( pub_keys.find( pub_key_morgan ) != pub_keys.end() );
+      BOOST_CHECK( pub_keys.find( pub_key_nathan ) != pub_keys.end() );
+
+      // provides [m,o], should return [m]
+      pub_keys = db_api.get_required_signatures( trx, avail_keys_mo );
+      BOOST_CHECK( pub_keys.size() == 1 );
+      BOOST_CHECK( pub_keys.find( pub_key_morgan ) != pub_keys.end() );
+
+      // provides [n,o], should return [n]
+      pub_keys = db_api.get_required_signatures( trx, avail_keys_no );
+      BOOST_CHECK( pub_keys.size() == 1 );
+      BOOST_CHECK( pub_keys.find( pub_key_nathan ) != pub_keys.end() );
+
+      // provides [m,n,o], should return [m,n]
+      pub_keys = db_api.get_required_signatures( trx, avail_keys_mno );
+      BOOST_CHECK( pub_keys.size() == 2 );
+      BOOST_CHECK( pub_keys.find( pub_key_morgan ) != pub_keys.end() );
+      BOOST_CHECK( pub_keys.find( pub_key_nathan ) != pub_keys.end() );
+
+      // sign with o, but actually need m+n
+      sign(trx, oliver_key);
+
+      // provides [], should return []
+      pub_keys = db_api.get_required_signatures( trx, avail_keys_empty );
+      BOOST_CHECK( pub_keys.size() == 0 );
+
+      // provides [m], should return [m]
+      pub_keys = db_api.get_required_signatures( trx, avail_keys_m );
+      BOOST_CHECK( pub_keys.size() == 1 );
+      BOOST_CHECK( pub_keys.find( pub_key_morgan ) != pub_keys.end() );
+
+      // provides [n], should return [n]
+      pub_keys = db_api.get_required_signatures( trx, avail_keys_n );
+      BOOST_CHECK( pub_keys.size() == 1 );
+      BOOST_CHECK( pub_keys.find( pub_key_nathan ) != pub_keys.end() );
+
+      // provides [o], should return []
+      pub_keys = db_api.get_required_signatures( trx, avail_keys_o );
+      BOOST_CHECK( pub_keys.size() == 0 );
+
+      // provides [m,n], should return [m,n]
+      pub_keys = db_api.get_required_signatures( trx, avail_keys_mn );
+      BOOST_CHECK( pub_keys.size() == 2 );
+      BOOST_CHECK( pub_keys.find( pub_key_morgan ) != pub_keys.end() );
+      BOOST_CHECK( pub_keys.find( pub_key_nathan ) != pub_keys.end() );
+
+      // provides [m,o], should return [m]
+      pub_keys = db_api.get_required_signatures( trx, avail_keys_mo );
+      BOOST_CHECK( pub_keys.size() == 1 );
+      BOOST_CHECK( pub_keys.find( pub_key_morgan ) != pub_keys.end() );
+
+      // provides [n,o], should return [n]
+      pub_keys = db_api.get_required_signatures( trx, avail_keys_no );
+      BOOST_CHECK( pub_keys.size() == 1 );
+      BOOST_CHECK( pub_keys.find( pub_key_nathan ) != pub_keys.end() );
+
+      // provides [m,n,o], should return [m,n]
+      pub_keys = db_api.get_required_signatures( trx, avail_keys_mno );
+      BOOST_CHECK( pub_keys.size() == 2 );
+      BOOST_CHECK( pub_keys.find( pub_key_morgan ) != pub_keys.end() );
+      BOOST_CHECK( pub_keys.find( pub_key_nathan ) != pub_keys.end() );
+
+      // sign with m+o, but actually need m+n
+      sign(trx, morgan_key);
+
+      // provides [], should return []
+      pub_keys = db_api.get_required_signatures( trx, avail_keys_empty );
+      BOOST_CHECK( pub_keys.size() == 0 );
+
+      // provides [m], should return []
+      pub_keys = db_api.get_required_signatures( trx, avail_keys_m );
+      BOOST_CHECK( pub_keys.size() == 0 );
+
+      // provides [n], should return [n]
+      pub_keys = db_api.get_required_signatures( trx, avail_keys_n );
+      BOOST_CHECK( pub_keys.size() == 1 );
+      BOOST_CHECK( pub_keys.find( pub_key_nathan ) != pub_keys.end() );
+
+      // provides [o], should return []
+      pub_keys = db_api.get_required_signatures( trx, avail_keys_o );
+      BOOST_CHECK( pub_keys.size() == 0 );
+
+      // provides [m,n], should return [n]
+      pub_keys = db_api.get_required_signatures( trx, avail_keys_mn );
+      BOOST_CHECK( pub_keys.size() == 1 );
+      BOOST_CHECK( pub_keys.find( pub_key_nathan ) != pub_keys.end() );
+
+      // provides [m,o], should return []
+      pub_keys = db_api.get_required_signatures( trx, avail_keys_mo );
+      BOOST_CHECK( pub_keys.size() == 0 );
+
+      // provides [n,o], should return [n]
+      pub_keys = db_api.get_required_signatures( trx, avail_keys_no );
+      BOOST_CHECK( pub_keys.size() == 1 );
+      BOOST_CHECK( pub_keys.find( pub_key_nathan ) != pub_keys.end() );
+
+      // provides [m,n,o], should return [n]
+      pub_keys = db_api.get_required_signatures( trx, avail_keys_mno );
+      BOOST_CHECK( pub_keys.size() == 1 );
+      BOOST_CHECK( pub_keys.find( pub_key_nathan ) != pub_keys.end() );
+
+      // sign with m, but actually need m+n
+      trx.signatures.clear();
+      sign(trx, morgan_key);
+
+      // provides [], should return []
+      pub_keys = db_api.get_required_signatures( trx, avail_keys_empty );
+      BOOST_CHECK( pub_keys.size() == 0 );
+
+      // provides [m], should return []
+      pub_keys = db_api.get_required_signatures( trx, avail_keys_m );
+      BOOST_CHECK( pub_keys.size() == 0 );
+
+      // provides [n], should return [n]
+      pub_keys = db_api.get_required_signatures( trx, avail_keys_n );
+      BOOST_CHECK( pub_keys.size() == 1 );
+      BOOST_CHECK( pub_keys.find( pub_key_nathan ) != pub_keys.end() );
+
+      // provides [o], should return []
+      pub_keys = db_api.get_required_signatures( trx, avail_keys_o );
+      BOOST_CHECK( pub_keys.size() == 0 );
+
+      // provides [m,n], should return [n]
+      pub_keys = db_api.get_required_signatures( trx, avail_keys_mn );
+      BOOST_CHECK( pub_keys.size() == 1 );
+      BOOST_CHECK( pub_keys.find( pub_key_nathan ) != pub_keys.end() );
+
+      // provides [m,o], should return []
+      pub_keys = db_api.get_required_signatures( trx, avail_keys_mo );
+      BOOST_CHECK( pub_keys.size() == 0 );
+
+      // provides [n,o], should return [n]
+      pub_keys = db_api.get_required_signatures( trx, avail_keys_no );
+      BOOST_CHECK( pub_keys.size() == 1 );
+      BOOST_CHECK( pub_keys.find( pub_key_nathan ) != pub_keys.end() );
+
+      // provides [m,n,o], should return [n]
+      pub_keys = db_api.get_required_signatures( trx, avail_keys_mno );
+      BOOST_CHECK( pub_keys.size() == 1 );
+      BOOST_CHECK( pub_keys.find( pub_key_nathan ) != pub_keys.end() );
+
+      // sign with m+n, should be enough
+      sign(trx, nathan_key);
+
+      // provides [], should return []
+      pub_keys = db_api.get_required_signatures( trx, avail_keys_empty );
+      BOOST_CHECK( pub_keys.size() == 0 );
+
+      // provides [m], should return []
+      pub_keys = db_api.get_required_signatures( trx, avail_keys_m );
+      BOOST_CHECK( pub_keys.size() == 0 );
+
+      // provides [n], should return []
+      pub_keys = db_api.get_required_signatures( trx, avail_keys_n );
+      BOOST_CHECK( pub_keys.size() == 0 );
+
+      // provides [o], should return []
+      pub_keys = db_api.get_required_signatures( trx, avail_keys_o );
+      BOOST_CHECK( pub_keys.size() == 0 );
+
+      // provides [m,n], should return []
+      pub_keys = db_api.get_required_signatures( trx, avail_keys_mn );
+      BOOST_CHECK( pub_keys.size() == 0 );
+
+      // provides [m,o], should return []
+      pub_keys = db_api.get_required_signatures( trx, avail_keys_mo );
+      BOOST_CHECK( pub_keys.size() == 0 );
+
+      // provides [n,o], should return []
+      pub_keys = db_api.get_required_signatures( trx, avail_keys_no );
+      BOOST_CHECK( pub_keys.size() == 0 );
+
+      // provides [m,n,o], should return []
+      pub_keys = db_api.get_required_signatures( trx, avail_keys_mno );
+      BOOST_CHECK( pub_keys.size() == 0 );
+
+      // sign with m+n+o, should be enough as well
+      sign(trx, oliver_key);
+
+      // provides [], should return []
+      pub_keys = db_api.get_required_signatures( trx, avail_keys_empty );
+      BOOST_CHECK( pub_keys.size() == 0 );
+
+      // provides [m], should return []
+      pub_keys = db_api.get_required_signatures( trx, avail_keys_m );
+      BOOST_CHECK( pub_keys.size() == 0 );
+
+      // provides [n], should return []
+      pub_keys = db_api.get_required_signatures( trx, avail_keys_n );
+      BOOST_CHECK( pub_keys.size() == 0 );
+
+      // provides [o], should return []
+      pub_keys = db_api.get_required_signatures( trx, avail_keys_o );
+      BOOST_CHECK( pub_keys.size() == 0 );
+
+      // provides [m,n], should return []
+      pub_keys = db_api.get_required_signatures( trx, avail_keys_mn );
+      BOOST_CHECK( pub_keys.size() == 0 );
+
+      // provides [m,o], should return []
+      pub_keys = db_api.get_required_signatures( trx, avail_keys_mo );
+      BOOST_CHECK( pub_keys.size() == 0 );
+
+      // provides [n,o], should return []
+      pub_keys = db_api.get_required_signatures( trx, avail_keys_no );
+      BOOST_CHECK( pub_keys.size() == 0 );
+
+      // provides [m,n,o], should return []
+      pub_keys = db_api.get_required_signatures( trx, avail_keys_mno );
+      BOOST_CHECK( pub_keys.size() == 0 );
+
+   } FC_LOG_AND_RETHROW()
+}
+
 BOOST_AUTO_TEST_SUITE_END()
