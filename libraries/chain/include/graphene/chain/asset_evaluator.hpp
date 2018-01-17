@@ -151,12 +151,12 @@ namespace graphene { namespace chain {
          void_result do_evaluate( const asset_claim_fees_operation& o );
          void_result do_apply( const asset_claim_fees_operation& o );
    };
-    
+
    class asset_claim_pool_evaluator : public evaluator<asset_claim_pool_evaluator>
    {
       public:
          typedef asset_claim_pool_operation operation_type;
-        
+
          void_result do_evaluate( const asset_claim_pool_operation& o );
          void_result do_apply( const asset_claim_pool_operation& o );
    };

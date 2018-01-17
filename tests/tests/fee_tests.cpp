@@ -221,26 +221,26 @@ BOOST_AUTO_TEST_CASE(asset_claim_pool_test)
         // Alice and Bob create some user issued assets
         // Alice deposits BTS to the fee pool
         // Alice claimes fee pool of her asset and can't claim pool of Bob's asset
-        
+
         const share_type core_prec = asset::scaled_precision( asset_id_type()(db).precision );
-        
+
         // return number of core shares (times precision)
         auto _core = [&core_prec]( int64_t x ) -> asset
         {  return asset( x*core_prec );    };
-        
+
         const asset_object& alicecoin = create_user_issued_asset( "ALICECOIN", alice,  0 );
         const asset_object& aliceusd = create_user_issued_asset( "ALICEUSD", alice, 0 );
         asset_id_type bobcoin_id = create_user_issued_asset( "BOBCOIN", bob, 0).id;
-        
+
         // prepare users' balance
         issue_uia( alice, aliceusd.amount( 20000000 ) );
         issue_uia( alice, alicecoin.amount( 10000000 ) );
-        
+
         transfer( committee_account, alice_id, _core(1000) );
         transfer( committee_account, bob_id, _core(1000) );
-        
+
         enable_fees();
-        
+
         auto claim_pool = [&]( const account_id_type& issuer, const asset_id_type& asset_to_claim,
                               const asset& amount_to_fund, const asset_object& fee_asset  )
         {
@@ -248,7 +248,7 @@ BOOST_AUTO_TEST_CASE(asset_claim_pool_test)
             claim_op.issuer = issuer;
             claim_op.asset_id = asset_to_claim;
             claim_op.amount_to_claim = amount_to_fund;
-            
+
             signed_transaction tx;
             tx.operations.push_back( claim_op );
             db.current_fee_schedule().set_fee( tx.operations.back(), fee_asset.options.core_exchange_rate );
@@ -257,39 +257,39 @@ BOOST_AUTO_TEST_CASE(asset_claim_pool_test)
             PUSH_TX( db, tx );
 
         };
-        
+
         // deposit 300 BTS to the fee pool of ALICECOIN asset
         fund_fee_pool( alice, alicecoin, _core(300).amount );
-        
+
         // deposit 100 BTS to the fee pool of ALICEUSD asset
         fund_fee_pool( alice, aliceusd, _core(100).amount );
 
         BOOST_CHECK( alicecoin.dynamic_asset_data_id(db).fee_pool == _core(300).amount );
-        
+
         const asset_object& core_asset = asset_id_type()(db);
 
         // can't claim pool of an asset that doesn't belong to you
         GRAPHENE_REQUIRE_THROW( claim_pool( alice_id, bobcoin_id, _core(200), core_asset), fc::exception );
-        
+
         // can't claim more than is available in the fee pool
         GRAPHENE_REQUIRE_THROW( claim_pool( alice_id, alicecoin.id, _core(400), core_asset ), fc::exception );
-        
+
         // can't pay fee in the same asset whose pool is being drained
         GRAPHENE_REQUIRE_THROW( claim_pool( alice_id, alicecoin.id, _core(200), alicecoin ), fc::exception );
-        
+
         // can claim BTS back from the fee pool
         claim_pool( alice_id, alicecoin.id, _core(200), core_asset );
         BOOST_CHECK( alicecoin.dynamic_asset_data_id(db).fee_pool == _core(100).amount );
-        
+
         // can pay fee in the asset other than the one whose pool is being drained
         share_type balance_before_claim = get_balance( alice_id, asset_id_type() );
         claim_pool( alice_id, alicecoin.id, _core(100), aliceusd );
         BOOST_CHECK( alicecoin.dynamic_asset_data_id(db).fee_pool == _core(0).amount );
-        
+
         //check balance after claiming pool
         share_type current_balance = get_balance( alice_id, asset_id_type() );
         BOOST_CHECK( balance_before_claim + _core(100).amount == current_balance );
-        
+
     }
     FC_LOG_AND_RETHROW()
 }
