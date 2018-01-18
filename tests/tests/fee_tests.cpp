@@ -174,12 +174,12 @@ BOOST_AUTO_TEST_CASE(asset_claim_fees_test)
 
       }
 
-      if( db.head_block_time() <= HARDFORK_413_TIME )
+      if( db.head_block_time() <= HARDFORK_CORE_188_TIME )
       {
          // can't claim before hardfork
          GRAPHENE_REQUIRE_THROW( claim_fees( izzy_id, _izzy(1) ), fc::exception );
-         generate_blocks( HARDFORK_413_TIME );
-         while( db.head_block_time() <= HARDFORK_413_TIME )
+         generate_blocks( HARDFORK_CORE_188_TIME );
+         while( db.head_block_time() <= HARDFORK_CORE_188_TIME )
          {
             generate_block();
          }
