@@ -1,0 +1,4 @@
+// #413 Add operation to claim asset fees
+#ifndef HARDFORK_CORE_188_TIME
+#define HARDFORK_CORE_188_TIME (fc::time_point_sec( 1446652800 ))
+#endif
