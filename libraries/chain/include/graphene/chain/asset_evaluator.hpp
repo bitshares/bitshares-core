@@ -183,7 +183,8 @@ namespace graphene { namespace chain {
             }
       };
 
-      class hf_413_visitor {
+   namespace impl { // TODO: remove after HARDFORK_CORE_188_TIME has passed
+      class hf_188_visitor {
          public:
             typedef void result_type;
 
@@ -191,7 +192,7 @@ namespace graphene { namespace chain {
             void operator()( const T& v )const {}
 
             void operator()( const graphene::chain::asset_claim_fees_operation& v )const {
-               FC_ASSERT( false, "Not allowed until hardfork 413" );
+               FC_ASSERT( false, "Not allowed until hardfork 188" );
             }
 
             void operator()( const graphene::chain::proposal_create_operation& v )const {
@@ -200,4 +201,5 @@ namespace graphene { namespace chain {
             }
       };
    }
+
 } } // graphene::chain

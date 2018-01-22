@@ -592,7 +592,7 @@ void_result asset_publish_feeds_evaluator::do_apply(const asset_publish_feed_ope
 
 void_result asset_claim_fees_evaluator::do_evaluate( const asset_claim_fees_operation& o )
 { try {
-   FC_ASSERT( db().head_block_time() > HARDFORK_CORE_188_TIME );
+   FC_ASSERT( db().head_block_time() > HARDFORK_413_TIME );
    FC_ASSERT( o.amount_to_claim.asset_id(db()).issuer == o.issuer, "Asset fees may only be claimed by the issuer" );
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }

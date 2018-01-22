@@ -85,7 +85,7 @@ void_result proposal_create_evaluator::do_evaluate(const proposal_create_operati
 
    if( d.head_block_time() <= HARDFORK_CORE_188_TIME )
    { // TODO: remove after HARDFORK_CORE_188_TIME has passed
-      graphene::chain::impl::hf_413_visitor hf_413;
+      graphene::chain::impl::hf_188_visitor hf_413;
       hf_413( o );
    }
 
