@@ -3,12 +3,17 @@
 #include <graphene/chain/protocol/authority.hpp>
 #include <graphene/chain/protocol/operations.hpp>
 #include <graphene/chain/protocol/transaction.hpp>
-#include <graphene/chain/protocol/types.hpp>
 #include <graphene/chain/withdraw_permission_object.hpp>
+#include <graphene/chain/database.hpp>
 #include <graphene/chain/worker_object.hpp>
 #include <graphene/chain/confidential_object.hpp>
 #include <graphene/chain/market_object.hpp>
 #include <graphene/chain/committee_member_object.hpp>
+#include <graphene/chain/witness_object.hpp>
+#include <graphene/chain/proposal_object.hpp>
+#include <graphene/chain/operation_history_object.hpp>
+#include <graphene/chain/vesting_balance_object.hpp>
+#include <graphene/chain/transaction_object.hpp>
 
 using namespace fc;
 using namespace graphene::chain;
