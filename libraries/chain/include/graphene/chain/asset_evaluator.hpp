@@ -191,7 +191,7 @@ namespace graphene { namespace chain {
             template<typename T>
             void operator()( const T& v )const {}
 
-            void operator()( const graphene::chain::asset_claim_fees_operation& v )const {
+            void operator()( const graphene::chain::asset_claim_pool_operation& v )const {
                FC_ASSERT( false, "Not allowed until hardfork 188" );
             }
 

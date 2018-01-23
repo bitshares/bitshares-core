@@ -263,7 +263,7 @@ BOOST_AUTO_TEST_CASE(asset_claim_pool_test)
         if( db.head_block_time() <= HARDFORK_CORE_188_TIME )
         {
            // can't claim pool before hardfork
-           GRAPHENE_REQUIRE_THROW( claim_pool( alice_id, bobcoin_id, _core(200), core_asset), fc::exception );
+           GRAPHENE_REQUIRE_THROW( claim_pool( alice_id, aliceusd.id, _core(200), core_asset), fc::exception );
 
            generate_blocks( HARDFORK_CORE_188_TIME );
            while( db.head_block_time() <= HARDFORK_CORE_188_TIME )
@@ -272,6 +272,8 @@ BOOST_AUTO_TEST_CASE(asset_claim_pool_test)
            }
         }
 
+        // can't claim pool because it is empty
+        GRAPHENE_REQUIRE_THROW( claim_pool( alice_id, aliceusd.id, _core(1), core_asset), fc::exception );
 
         // deposit 300 BTS to the fee pool of ALICECOIN asset
         fund_fee_pool( alice, alicecoin, _core(300).amount );
