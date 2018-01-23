@@ -3868,8 +3868,17 @@ signed_transaction wallet_api::sell( string seller_account,
                                      double amount,
                                      bool broadcast )
 {
-   return my->sell_asset( seller_account, std::to_string( amount ), base,
-                          std::to_string( rate * amount ), quote, 0, false, broadcast );
+   std::ostringstream amount_to_sell;
+   std::ostringstream min_to_receive;
+
+   uint8_t sell_precision = get_asset(base).precision;
+   uint8_t recv_precision = get_asset(quote).precision;
+
+   amount_to_sell << std::fixed << std::setprecision(sell_precision) << amount;
+   min_to_receive << std::fixed << std::setprecision(recv_precision) << rate * amount;
+
+   return my->sell_asset( seller_account, amount_to_sell.str(), base,
+                          min_to_receive.str(), quote, 0, false, broadcast );
 }
 
 signed_transaction wallet_api::buy( string buyer_account,
@@ -3879,8 +3888,17 @@ signed_transaction wallet_api::buy( string buyer_account,
                                     double amount,
                                     bool broadcast )
 {
-   return my->sell_asset( buyer_account, std::to_string( rate * amount ), quote,
-                          std::to_string( amount ), base, 0, false, broadcast );
+   std::ostringstream amount_to_buy;
+   std::ostringstream min_to_receive;
+
+   uint8_t buy_precision  = get_asset(quote).precision;
+   uint8_t recv_precision = get_asset(base).precision;
+
+   amount_to_buy  << std::fixed << std::setprecision(buy_precision) << rate * amount;
+   min_to_receive << std::fixed << std::setprecision(recv_precision) << amount;
+
+   return my->sell_asset( buyer_account, amount_to_buy.str(), quote,
+                          min_to_receive.str(), base, 0, false, broadcast );
 }
 
 signed_transaction wallet_api::borrow_asset(string seller_name, string amount_to_sell,
