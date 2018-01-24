@@ -262,6 +262,8 @@ void_result asset_update_evaluator::do_evaluate(const asset_update_operation& o)
 
    if( o.new_issuer )
    {
+      FC_ASSERT( d.head_block_time() < HARDFORK_CORE_199_TIME,
+                 "Since Hardfork #199, updating issuer requires the use of asset_change_issuer_operation.")
       FC_ASSERT(d.find_object(*o.new_issuer));
       if( a.is_market_issued() && *o.new_issuer == GRAPHENE_COMMITTEE_ACCOUNT )
       {
