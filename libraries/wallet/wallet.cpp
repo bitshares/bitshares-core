@@ -2235,6 +2235,11 @@ public:
                ss << setiosflags( ios::fixed ) << setprecision(6) << n;
             }
          };
+         auto prettify_num_string = [&]( string& num_string )
+         {
+            double n = fc::to_double( num_string );
+            prettify_num( n );
+         };
 
          ss << setprecision( 8 ) << setiosflags( ios::fixed ) << setiosflags( ios::left );
 
@@ -2250,13 +2255,13 @@ public:
          {
             if ( i < bids.size() )
             {
-                bid_sum += bids[i].base;
+                bid_sum += fc::to_double( bids[i].base );
                 ss << ' ' << setw( spacing );
-                prettify_num( bids[i].price );
+                prettify_num_string( bids[i].price );
                 ss << ' ' << setw( spacing );
-                prettify_num( bids[i].quote );
+                prettify_num_string( bids[i].quote );
                 ss << ' ' << setw( spacing );
-                prettify_num( bids[i].base );
+                prettify_num_string( bids[i].base );
                 ss << ' ' << setw( spacing );
                 prettify_num( bid_sum );
                 ss << ' ';
@@ -2270,13 +2275,13 @@ public:
 
             if ( i < asks.size() )
             {
-               ask_sum += asks[i].base;
+               ask_sum += fc::to_double( asks[i].base );
                ss << ' ' << setw( spacing );
-               prettify_num( asks[i].price );
+               prettify_num_string( asks[i].price );
                ss << ' ' << setw( spacing );
-               prettify_num( asks[i].quote );
+               prettify_num_string( asks[i].quote );
                ss << ' ' << setw( spacing );
-               prettify_num( asks[i].base );
+               prettify_num_string( asks[i].base );
                ss << ' ' << setw( spacing );
                prettify_num( ask_sum );
             }
