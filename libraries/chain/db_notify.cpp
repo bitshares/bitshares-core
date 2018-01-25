@@ -84,7 +84,10 @@ struct get_impacted_account_visitor
       if( op.new_issuer )
          _impacted.insert( *(op.new_issuer) );
    }
-
+   void operator()( const asset_update_issuer_operation& op )
+   {
+      _impacted.insert( op.new_issuer );
+   }
    void operator()( const asset_update_bitasset_operation& op ) {}
    void operator()( const asset_update_feed_producers_operation& op ) {}
 
