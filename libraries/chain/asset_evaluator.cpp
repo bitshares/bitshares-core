@@ -355,6 +355,13 @@ void_result asset_update_issuer_evaluator::do_evaluate(const asset_update_issuer
    asset_to_update = &a;
    FC_ASSERT( o.issuer == a.issuer, "", ("o.issuer", o.issuer)("a.issuer", a.issuer) );
 
+   if( d.head_block_time() <= HARDFORK_CORE_199_TIME )
+   { // TODO: remove after HARDFORK_CORE_199_TIME has passed
+      graphene::chain::impl::hf_199_visitor hf_199;
+      hf_199( o );
+   }
+
+
    return void_result();
 } FC_CAPTURE_AND_RETHROW((o)) }
 

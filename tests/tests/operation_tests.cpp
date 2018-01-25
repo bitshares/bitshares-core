@@ -718,6 +718,65 @@ BOOST_AUTO_TEST_CASE( update_uia )
    }
 }
 
+BOOST_AUTO_TEST_CASE( update_uia_issuer )
+{
+   using namespace graphene;
+   using namespace graphene::chain;
+   using namespace graphene::chain::test;
+   try {
+      // committee_account owns the asset UIA_TEST_SYMBOL
+      // alice owns nothing
+      // bob owns nothing
+      INVOKE(create_uia);
+      const auto& test = get_asset(UIA_TEST_SYMBOL);
+      const auto& committee_account = account_id_type()(db);
+      const auto& alice = create_account("alice");
+      const auto& bob = create_account("bob");
+
+      auto update_issuer = [&]( asset_object asset, account_object issuer, account_object new_issuer )
+      {
+         asset_update_issuer_operation op;
+         op.issuer = issuer.id;
+         op.new_issuer = new_issuer.id;
+         op.asset_to_update = asset.id;
+         signed_transaction tx;
+         tx.operations.push_back( op );
+         db.current_fee_schedule().set_fee( tx.operations.back() );
+         set_expiration( db, tx );
+         PUSH_TX( db, tx, ~0 );
+      };
+
+      if( db.head_block_time() <= HARDFORK_CORE_199_TIME )
+      {
+         BOOST_TEST_MESSAGE( "can't use this operation before the hardfork" );
+         GRAPHENE_REQUIRE_THROW( update_issuer( test, committee_account, bob ), fc::exception );
+         generate_blocks( HARDFORK_CORE_199_TIME );
+         while( db.head_block_time() <= HARDFORK_CORE_199_TIME )
+         {
+            generate_block();
+         }
+      }
+
+      BOOST_TEST_MESSAGE( "Can't change issuer if not my asset" );
+      GRAPHENE_REQUIRE_THROW( update_issuer( test, alice, bob ), fc::exception );
+
+      BOOST_TEST_MESSAGE( "Updating issuer to alice" );
+      update_issuer( test, committee_account, alice );
+
+      BOOST_TEST_MESSAGE( "Can't change issuer if not my asset" );
+      GRAPHENE_REQUIRE_THROW( update_issuer( test, committee_account, bob ), fc::exception );
+
+      BOOST_TEST_MESSAGE( "Updating issuer to bob" );
+      update_issuer( test, alice, bob );
+
+   }
+   catch( const fc::exception& e )
+   {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
 BOOST_AUTO_TEST_CASE( issue_uia )
 {
    try {
