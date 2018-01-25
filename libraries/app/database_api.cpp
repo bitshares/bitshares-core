@@ -23,6 +23,7 @@
  */
 
 #include <graphene/app/database_api.hpp>
+#include <graphene/app/util.hpp>
 #include <graphene/chain/get_config.hpp>
 
 #include <fc/bloom_filter.hpp>
@@ -155,10 +156,7 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
 
 
    //private:
-      string uint128_amount_to_string( const fc::uint128& amount, const uint8_t precision )const;
-      string price_to_string( const price& _price, const asset_object& _base, const asset_object& _quote )const;
-      string price_diff_to_string( const price& old_price, const price& new_price,
-                                   const asset_object& _base, const asset_object& _quote )const;
+      static string price_to_string( const price& _price, const asset_object& _base, const asset_object& _quote );
 
       template<typename T>
       void subscribe_to_item( const T& i )const
@@ -1154,63 +1152,15 @@ void database_api_impl::unsubscribe_from_market(asset_id_type a, asset_id_type b
    _market_subscriptions.erase(std::make_pair(a,b));
 }
 
-string database_api_impl::uint128_amount_to_string( const fc::uint128& amount, const uint8_t precision )const
+string database_api_impl::price_to_string( const price& _price, const asset_object& _base, const asset_object& _quote )
 { try {
-   fc::uint128 scaled_precision = 1;
-   for( uint8_t i = 0; i < precision; ++i )
-      scaled_precision *= 10;
-   FC_ASSERT(scaled_precision > 0);
-
-   string result = string( amount / scaled_precision );
-   auto decimals = amount % scaled_precision;
-   if( decimals > 0 )
-      result += "." + string(scaled_precision + decimals).erase(0,1);
-   return result;
-} FC_CAPTURE_AND_RETHROW( (amount)(precision) ) }
-
-string database_api_impl::price_to_string( const price& _price, const asset_object& _base, const asset_object& _quote )const
-{ try {
-   share_type base_amount = _price.base.amount;
-   share_type quote_amount = _price.quote.amount;
-   if( _price.base.asset_id != _base.id )
-      std::swap( base_amount, quote_amount );
-
-   // times (10**18 * 10**3) so won't overflow but always have good accuracy
-   fc::uint128 price128 = fc::uint128( base_amount.value ) * uint64_t(1000000000000000000ll) * uint64_t(1000) / quote_amount.value;
-
-   return uint128_amount_to_string( price128, 21 + _base.precision - _quote.precision );
+   if( _price.base.asset_id == _base.id && _price.quote.asset_id == _quote.id )
+      return graphene::app::price_to_string( _price, _base.precision, _quote.precision );
+   else if( _price.base.asset_id == _quote.id && _price.quote.asset_id == _base.id )
+      return graphene::app::price_to_string( ~_price, _base.precision, _quote.precision );
+   else
+      FC_ASSERT( !"bad parameters" );
 } FC_CAPTURE_AND_RETHROW( (_price)(_base)(_quote) ) }
-
-string database_api_impl::price_diff_to_string( const price& old_price, const price& new_price,
-                                                const asset_object& _base, const asset_object& _quote )const
-{ try {
-   share_type old_base_amount = old_price.base.amount;
-   share_type old_quote_amount = old_price.quote.amount;
-   if( old_price.base.asset_id != _base.id )
-      std::swap( old_base_amount, old_quote_amount );
-
-   share_type new_base_amount = new_price.base.amount;
-   share_type new_quote_amount = new_price.quote.amount;
-   if( new_price.base.asset_id != _base.id )
-      std::swap( new_base_amount, new_quote_amount );
-
-   // change = new/old - 1 = (new_base/new_quote)/(old_base/old_quote) - 1
-   //        = (new_base * old_quote) / (new_quote * old_base) - 1
-   //        = (new_base * old_quote - new_quote * old_base) / (new_quote * old_base)
-   fc::uint128 new128 = fc::uint128( new_base_amount.value ) * old_quote_amount.value;
-   fc::uint128 old128 = fc::uint128( old_base_amount.value ) * new_quote_amount.value;
-   bool non_negative = (new128 >= old128);
-   fc::uint128 diff128;
-   if( non_negative )
-      diff128 = new128 - old128;
-   else
-      diff128 = old128 - new128;
-   string diff_str = uint128_amount_to_string( diff128 * 10000 / old128, 2 );
-   if( non_negative )
-      return diff_str;
-   else
-      return "-" + diff_str;
-} FC_CAPTURE_AND_RETHROW( (old_price)(new_price)(_base)(_quote) ) }
 
 market_ticker database_api::get_ticker( const string& base, const string& quote )const
 {
@@ -1246,12 +1196,16 @@ market_ticker database_api_impl::get_ticker( const string& base, const string& q
    if( itr != ticker_idx.end() )
    {
       price latest_price = asset( itr->latest_base, itr->base ) / asset( itr->latest_quote, itr->quote );
+      if( itr->base != assets[0]->id )
+         latest_price = ~latest_price;
       result.latest = price_to_string( latest_price, *assets[0], *assets[1] );
       if( itr->last_day_base != 0 && itr->last_day_quote != 0 // has trade data before 24 hours
             && ( itr->last_day_base != itr->latest_base || itr->last_day_quote != itr->latest_quote ) ) // price changed
       {
          price last_day_price = asset( itr->last_day_base, itr->base ) / asset( itr->last_day_quote, itr->quote );
-         result.percent_change = price_diff_to_string( last_day_price, latest_price, *assets[0], *assets[1] );
+         if( itr->base != assets[0]->id )
+            last_day_price = ~last_day_price;
+         result.percent_change = price_diff_percent_string( last_day_price, latest_price );
       }
       if( assets[0]->id == itr->base )
       {
