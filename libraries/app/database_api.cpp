@@ -1840,9 +1840,6 @@ set<public_key_type> database_api_impl::get_potential_signatures( const signed_t
          const auto& auth = id(_db).active;
          for( const auto& k : auth.get_keys() )
             result.insert(k);
-         // Also insert owner keys since owner can authorize a trx that requires active only
-         for( const auto& k : id(_db).owner.get_keys() )
-            result.insert(k);
          return &auth;
       },
       [&]( account_id_type id )

@@ -1313,4 +1313,94 @@ BOOST_FIXTURE_TEST_CASE( nonminimal_sig_test, database_fixture )
    }
 }
 
+BOOST_FIXTURE_TEST_CASE( parent_owner_test, database_fixture )
+{
+   try
+   {
+      ACTORS(
+         (alice)(bob)
+         );
+
+      auto set_auth2 = [&](
+         account_id_type aid,
+         const authority& active,
+         const authority& owner
+         )
+      {
+         signed_transaction tx;
+         account_update_operation op;
+         op.account = aid;
+         op.active = active;
+         op.owner = owner;
+         tx.operations.push_back( op );
+         set_expiration( db, tx );
+         PUSH_TX( db, tx, database::skip_transaction_signatures | database::skip_authority_check );
+      } ;
+
+      auto set_auth = [&](
+         account_id_type aid,
+         const authority& auth
+         )
+      {
+         set_auth2( aid, auth, auth );
+      } ;
+
+      auto get_active = [&](
+         account_id_type aid
+         ) -> const authority*
+      {
+         return &(aid(db).active);
+      } ;
+
+      auto get_owner = [&](
+         account_id_type aid
+         ) -> const authority*
+      {
+         return &(aid(db).owner);
+      } ;
+
+      auto chk = [&](
+         const signed_transaction& tx,
+         flat_set<public_key_type> available_keys,
+         set<public_key_type> ref_set
+         ) -> bool
+      {
+         //wdump( (tx)(available_keys) );
+         set<public_key_type> result_set = tx.get_required_signatures( db.get_chain_id(), available_keys, get_active, get_owner );
+         //wdump( (result_set)(ref_set) );
+         return result_set == ref_set;
+      } ;
+
+      fc::ecc::private_key alice_active_key = fc::ecc::private_key::regenerate(fc::digest("alice_active"));
+      fc::ecc::private_key alice_owner_key = fc::ecc::private_key::regenerate(fc::digest("alice_owner"));
+      public_key_type alice_active_pub( alice_active_key.get_public_key() );
+      public_key_type alice_owner_pub( alice_owner_key.get_public_key() );
+      set_auth2( alice_id, authority( 1, alice_active_pub, 1 ), authority( 1, alice_owner_pub, 1 ) );
+      set_auth( bob_id, authority( 1, alice_id, 1 ) );
+
+      signed_transaction tx;
+      transfer_operation op;
+      op.from = bob_id;
+      op.to = alice_id;
+      op.amount = asset(1);
+      tx.operations.push_back( op );
+
+      // https://github.com/bitshares/bitshares-core/issues/584
+      BOOST_CHECK( chk( tx, { alice_owner_pub }, { } ) );
+      BOOST_CHECK( chk( tx, { alice_active_pub, alice_owner_pub }, { alice_active_pub } ) );
+      sign( tx, alice_owner_key );
+      GRAPHENE_REQUIRE_THROW( tx.verify_authority( db.get_chain_id(), get_active, get_owner ), fc::exception );
+
+      tx.signatures.clear();
+      sign( tx, alice_active_key );
+      tx.verify_authority( db.get_chain_id(), get_active, get_owner );
+
+   }
+   catch(fc::exception& e)
+   {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
 BOOST_AUTO_TEST_SUITE_END()
