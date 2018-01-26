@@ -78,7 +78,7 @@ void_result proposal_create_evaluator::do_evaluate(const proposal_create_operati
       _proposed_trx.operations.push_back(op.op);
    _proposed_trx.validate();
 
-   if( d.head_block_time() <= HARDFORK_CORE_199_TIME )
+   if( d.head_block_time() < HARDFORK_CORE_199_TIME )
    { // TODO: remove after HARDFORK_CORE_199_TIME has passed
       graphene::chain::impl::hf_199_visitor hf_199;
       hf_199( o );

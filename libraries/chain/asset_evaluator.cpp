@@ -335,8 +335,6 @@ void_result asset_update_issuer_evaluator::do_evaluate(const asset_update_issuer
    database& d = db();
 
    const asset_object& a = o.asset_to_update(d);
-   auto a_copy = a;
-   a_copy.validate();
 
    FC_ASSERT(d.find_object(o.new_issuer));
    if( a.is_market_issued() && o.new_issuer == GRAPHENE_COMMITTEE_ACCOUNT )
@@ -355,7 +353,7 @@ void_result asset_update_issuer_evaluator::do_evaluate(const asset_update_issuer
    asset_to_update = &a;
    FC_ASSERT( o.issuer == a.issuer, "", ("o.issuer", o.issuer)("a.issuer", a.issuer) );
 
-   if( d.head_block_time() <= HARDFORK_CORE_199_TIME )
+   if( d.head_block_time() < HARDFORK_CORE_199_TIME )
    { // TODO: remove after HARDFORK_CORE_199_TIME has passed
       graphene::chain::impl::hf_199_visitor hf_199;
       hf_199( o );

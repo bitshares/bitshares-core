@@ -469,6 +469,10 @@ namespace graphene { namespace chain {
 
       void get_required_owner_authorities( flat_set<account_id_type>& a )const
       { a.insert( issuer ); }
+
+      void get_required_active_authorities( flat_set<account_id_type>& a )const
+      {  }
+
    };
 
 
