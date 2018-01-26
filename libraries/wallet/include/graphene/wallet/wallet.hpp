@@ -1113,6 +1113,23 @@ class wallet_api
                                              string amount,
                                              bool broadcast = false);
 
+      /** Claim funds from the fee pool for the given asset.
+       *
+       * User-issued assets can optionally have a pool of the core asset which is 
+       * automatically used to pay transaction fees for any transaction using that
+       * asset (using the asset's core exchange rate).
+       *
+       * This command allows the issuer to withdraw those funds from the fee pool.
+       *
+       * @param symbol the name or id of the asset whose fee pool you wish to fund
+       * @param amount the amount of the core asset to withdraw
+       * @param broadcast true to broadcast the transaction on the network
+       * @returns the signed transaction funding the fee pool
+       */
+      signed_transaction claim_asset_fee_pool(string symbol,
+                                              string amount,
+                                              bool broadcast = false);
+
       /** Burns the given user-issued asset.
        *
        * This command burns the user-issued asset to reduce the amount in circulation.
@@ -1663,6 +1680,7 @@ FC_API( graphene::wallet::wallet_api,
         (get_asset)
         (get_bitasset_data)
         (fund_asset_fee_pool)
+        (claim_asset_fee_pool)
         (reserve_asset)
         (global_settle_asset)
         (settle_asset)

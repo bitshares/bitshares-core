@@ -897,6 +897,7 @@ void database_fixture::fund_fee_pool( const account_object& from, const asset_ob
 
    for( auto& op : trx.operations ) db.current_fee_schedule().set_fee(op);
    trx.validate();
+   set_expiration( db, trx );
    db.push_transaction(trx, ~0);
    trx.operations.clear();
    verify_asset_supplies(db);

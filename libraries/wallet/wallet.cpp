@@ -1269,6 +1269,29 @@ public:
       return sign_transaction( tx, broadcast );
    } FC_CAPTURE_AND_RETHROW( (from)(symbol)(amount)(broadcast) ) }
 
+   signed_transaction claim_asset_fee_pool(string symbol,
+                                           string amount,
+                                           bool broadcast /* = false */)
+   { try {
+      optional<asset_object> asset_to_fund = find_asset(symbol);
+      if (!asset_to_fund)
+        FC_THROW("No asset with that symbol exists!");
+      asset_object core_asset = get_asset(asset_id_type());
+
+      asset_claim_pool_operation claim_op;
+      claim_op.issuer = asset_to_fund->issuer;
+      claim_op.asset_id = asset_to_fund->id;
+      claim_op.amount_to_claim = core_asset.amount_from_string(amount).amount;
+
+      signed_transaction tx;
+      tx.operations.push_back( claim_op );
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees);
+      tx.validate();
+
+      return sign_transaction( tx, broadcast );
+   } FC_CAPTURE_AND_RETHROW( (symbol)(amount)(broadcast) ) }
+
+
    signed_transaction reserve_asset(string from,
                                  string amount,
                                  string symbol,
@@ -3330,6 +3353,13 @@ signed_transaction wallet_api::fund_asset_fee_pool(string from,
                                                    bool broadcast /* = false */)
 {
    return my->fund_asset_fee_pool(from, symbol, amount, broadcast);
+}
+
+signed_transaction wallet_api::claim_asset_fee_pool(string symbol,
+                                                    string amount,
+                                                    bool broadcast /* = false */)
+{
+   return my->claim_asset_fee_pool(symbol, amount, broadcast);
 }
 
 signed_transaction wallet_api::reserve_asset(string from,
