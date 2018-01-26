@@ -269,8 +269,8 @@ void account_history_plugin::plugin_set_program_options(
 {
    cli.add_options()
          ("track-account", boost::program_options::value<std::vector<std::string>>()->composing()->multitoken(), "Account ID to track history for (may specify multiple times)")
-         ("partial-operations", boost::program_options::value<bool>(), "Keep only those operations in memory that are related to account history tracking")
-         ("max-ops-per-account", boost::program_options::value<uint32_t>(), "Maximum number of operations per account will be kept in memory")
+         ("partial-operations", boost::program_options::value<bool>()->default_value(true), "Keep only those operations in memory that are related to account history tracking (defaults to true)")
+         ("max-ops-per-account", boost::program_options::value<uint32_t>()->default_value(1000), "Maximum number of operations per account will be kept in memory (defaults to 1000)")
          ;
    cfg.add(cli);
 }

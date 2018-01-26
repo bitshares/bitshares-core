@@ -1,5 +1,7 @@
-BitShares Core
-==============
+BitShares Test Network
+======================
+
+
 * [Getting Started](#getting-started)
 * [Support](#support)
 * [Using the API](#using-the-api)
