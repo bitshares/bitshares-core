@@ -32,10 +32,6 @@ if [[ ! -z "$BITSHARESD_RPC_ENDPOINT" ]]; then
     ARGS+=" --rpc-endpoint=${BITSHARESD_RPC_ENDPOINT}"
 fi
 
-if [[ ! -z "$BITSHARESD_PLUGINS" ]]; then
-    ARGS+=" --plugins=\"${BITSHARESD_PLUGINS}\""
-fi
-
 if [[ ! -z "$BITSHARESD_REPLAY" ]]; then
     ARGS+=" --replay-blockchain"
 fi
@@ -82,4 +78,10 @@ fi
 ## This link has been created in Dockerfile, already
 ln -f -s /etc/bitshares/config.ini /var/lib/bitshares
 
-$BITSHARESD --data-dir ${HOME} ${ARGS} ${BITSHARESD_ARGS}
+# Plugins need to be provided in a space-separated list, which
+# makes it necessary to write it like this
+if [[ ! -z "$BITSHARESD_PLUGINS" ]]; then
+   $BITSHARESD --data-dir ${HOME} ${ARGS} ${BITSHARESD_ARGS} --plugins "${BITSHARESD_PLUGINS}"
+else
+   $BITSHARESD --data-dir ${HOME} ${ARGS} ${BITSHARESD_ARGS}
+fi

@@ -371,7 +371,8 @@ namespace graphene { namespace chain {
          asset match(const call_order_object& call,
                    const force_settlement_object& settle,
                    const price& match_price,
-                   asset max_settlement);
+                   asset max_settlement,
+                   const price& fill_price);
          ///@}
 
          /**
