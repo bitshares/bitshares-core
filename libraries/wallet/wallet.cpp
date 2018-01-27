@@ -2235,6 +2235,11 @@ public:
                ss << setiosflags( ios::fixed ) << setprecision(6) << n;
             }
          };
+         auto prettify_num_string = [&]( string& num_string )
+         {
+            double n = fc::to_double( num_string );
+            prettify_num( n );
+         };
 
          ss << setprecision( 8 ) << setiosflags( ios::fixed ) << setiosflags( ios::left );
 
@@ -2250,13 +2255,13 @@ public:
          {
             if ( i < bids.size() )
             {
-                bid_sum += bids[i].base;
+                bid_sum += fc::to_double( bids[i].base );
                 ss << ' ' << setw( spacing );
-                prettify_num( bids[i].price );
+                prettify_num_string( bids[i].price );
                 ss << ' ' << setw( spacing );
-                prettify_num( bids[i].quote );
+                prettify_num_string( bids[i].quote );
                 ss << ' ' << setw( spacing );
-                prettify_num( bids[i].base );
+                prettify_num_string( bids[i].base );
                 ss << ' ' << setw( spacing );
                 prettify_num( bid_sum );
                 ss << ' ';
@@ -2270,13 +2275,13 @@ public:
 
             if ( i < asks.size() )
             {
-               ask_sum += asks[i].base;
+               ask_sum += fc::to_double( asks[i].base );
                ss << ' ' << setw( spacing );
-               prettify_num( asks[i].price );
+               prettify_num_string( asks[i].price );
                ss << ' ' << setw( spacing );
-               prettify_num( asks[i].quote );
+               prettify_num_string( asks[i].quote );
                ss << ' ' << setw( spacing );
-               prettify_num( asks[i].base );
+               prettify_num_string( asks[i].base );
                ss << ' ' << setw( spacing );
                prettify_num( ask_sum );
             }
@@ -3859,28 +3864,6 @@ signed_transaction wallet_api::sell_asset(string seller_account,
 {
    return my->sell_asset(seller_account, amount_to_sell, symbol_to_sell, min_to_receive,
                          symbol_to_receive, expiration, fill_or_kill, broadcast);
-}
-
-signed_transaction wallet_api::sell( string seller_account,
-                                     string base,
-                                     string quote,
-                                     double rate,
-                                     double amount,
-                                     bool broadcast )
-{
-   return my->sell_asset( seller_account, std::to_string( amount ), base,
-                          std::to_string( rate * amount ), quote, 0, false, broadcast );
-}
-
-signed_transaction wallet_api::buy( string buyer_account,
-                                    string base,
-                                    string quote,
-                                    double rate,
-                                    double amount,
-                                    bool broadcast )
-{
-   return my->sell_asset( buyer_account, std::to_string( rate * amount ), quote,
-                          std::to_string( amount ), base, 0, false, broadcast );
 }
 
 signed_transaction wallet_api::borrow_asset(string seller_name, string amount_to_sell,

@@ -66,9 +66,9 @@ class database_api_impl;
 
 struct order
 {
-   double                     price;
-   double                     quote;
-   double                     base;
+   string                     price;
+   string                     quote;
+   string                     base;
 };
 
 struct order_book
@@ -84,12 +84,12 @@ struct market_ticker
    time_point_sec             time;
    string                     base;
    string                     quote;
-   double                     latest;
-   double                     lowest_ask;
-   double                     highest_bid;
-   double                     percent_change;
-   double                     base_volume;
-   double                     quote_volume;
+   string                     latest;
+   string                     lowest_ask;
+   string                     highest_bid;
+   string                     percent_change;
+   string                     base_volume;
+   string                     quote_volume;
 };
 
 struct market_volume
@@ -97,17 +97,17 @@ struct market_volume
    time_point_sec             time;
    string                     base;
    string                     quote;
-   double                     base_volume;
-   double                     quote_volume;
+   string                     base_volume;
+   string                     quote_volume;
 };
 
 struct market_trade
 {
    int64_t                    sequence = 0;
    fc::time_point_sec         date;
-   double                     price;
-   double                     amount;
-   double                     value;
+   string                     price;
+   string                     amount;
+   string                     value;
    account_id_type            side1_account_id = GRAPHENE_NULL_ACCOUNT;
    account_id_type            side2_account_id = GRAPHENE_NULL_ACCOUNT;
 };
