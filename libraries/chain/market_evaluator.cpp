@@ -146,23 +146,7 @@ void_result call_order_update_evaluator::do_evaluate(const call_order_update_ope
       FC_ASSERT( o.delta_collateral.amount == o.delta_debt.amount );
    else if( _bitasset_data->current_feed.settlement_price.is_null() )
       FC_THROW_EXCEPTION(insufficient_feeds, "Cannot borrow asset with no price feed.");
-
-   /*
-   if( o.delta_debt.amount < 0 )
-   {
-      FC_ASSERT( d.get_balance(*_paying_account, *_debt_asset) >= o.delta_debt,
-                 "Cannot cover by ${c} when payer only has ${b}",
-                 ("c", o.delta_debt.amount)("b", d.get_balance(*_paying_account, *_debt_asset).amount) );
-   }
-
-   if( o.delta_collateral.amount > 0 )
-   {
-      FC_ASSERT( d.get_balance(*_paying_account, _bitasset_data->options.short_backing_asset(d)) >= o.delta_collateral,
-                 "Cannot increase collateral by ${c} when payer only has ${b}", ("c", o.delta_collateral.amount)
-                 ("b", d.get_balance(*_paying_account, o.delta_collateral.asset_id(d)).amount) );
-   }
-   */
-
+      
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }
 
