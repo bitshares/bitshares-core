@@ -150,8 +150,8 @@ void_result call_order_update_evaluator::do_evaluate(const call_order_update_ope
    if( o.delta_collateral.amount > 0 )
    {
       FC_ASSERT( d.get_balance(*_paying_account, _bitasset_data->options.short_backing_asset(d)) >= o.delta_collateral,
-                "Cannot increase collateral by ${c} when payer only has ${b}", ("c", o.delta_collateral.amount)
-                ("b", d.get_balance(*_paying_account, o.delta_collateral.asset_id(d)).amount) );
+                 "Cannot increase collateral by ${c} when payer only has ${b}", ("c", o.delta_collateral.amount)
+                 ("b", d.get_balance(*_paying_account, o.delta_collateral.asset_id(d)).amount) );
    }
 
    return void_result();
