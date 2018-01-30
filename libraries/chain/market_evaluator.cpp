@@ -147,6 +147,13 @@ void_result call_order_update_evaluator::do_evaluate(const call_order_update_ope
    else if( _bitasset_data->current_feed.settlement_price.is_null() )
       FC_THROW_EXCEPTION(insufficient_feeds, "Cannot borrow asset with no price feed.");
 
+   if( o.delta_collateral.amount > 0 )
+   {
+      FC_ASSERT( d.get_balance(*_paying_account, _bitasset_data->options.short_backing_asset(d)) >= o.delta_collateral,
+                "Cannot increase collateral by ${c} when payer only has ${b}", ("c", o.delta_collateral.amount)
+                ("b", d.get_balance(*_paying_account, o.delta_collateral.asset_id(d)).amount) );
+   }
+
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }
 
@@ -175,7 +182,6 @@ void_result call_order_update_evaluator::do_apply(const call_order_update_operat
       {
          d.modify(_paying_account->statistics(d), [&](account_statistics_object& stats) {
                stats.total_core_in_orders += o.delta_collateral.amount;
-               FC_ASSERT(stats.total_core_in_orders >= 0);
          });
       }
    }
