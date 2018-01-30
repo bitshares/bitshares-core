@@ -1038,6 +1038,22 @@ class wallet_api
                                       asset_options new_options,
                                       bool broadcast = false);
 
+      /** Update the issuer of an asset
+       * Since this call requires the owner authority of the current issuer to sign the transaction,
+       * a separated operation is used to change the issuer. This call simplifies the use of this action.
+       *
+       * @note This operation requires the owner key to be available in the wallet.
+       *
+       * @param symbol the name or id of the asset to update
+       * @param new_issuer if changing the asset's issuer, the name or id of the new issuer.
+       *                   null if you wish to remain the issuer of the asset
+       * @param broadcast true to broadcast the transaction on the network
+       * @returns the signed transaction updating the asset
+       */
+      signed_transaction update_asset_issuer(string symbol,
+                                             string new_issuer,
+                                             bool broadcast = false);
+
       /** Update the options specific to a BitAsset.
        *
        * BitAssets have some options which are not relevant to other asset types. This operation is used to update those
@@ -1656,6 +1672,7 @@ FC_API( graphene::wallet::wallet_api,
         (get_transaction_id)
         (create_asset)
         (update_asset)
+        (update_asset_issuer)
         (update_bitasset)
         (update_asset_feed_producers)
         (publish_asset_feed)
