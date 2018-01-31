@@ -68,10 +68,10 @@ ssh travelchain@1.1.1.256
 Входим в систему из-под пользователя `travelchain`, клонируем репозиторий и устанавливаем ПО:
 ```bash
 su - travelchain
-git clone https://github.com/travelchain/travelchain-core.git --recursive
-cd travelchain-core/
+git clone https://github.com/travelchain/travelchain-core.git
+cd travelchain-core/ && git submodule update --init --recursive
 cmake -DCMAKE_BUILD_TYPE=Release .
-make
+make -j$(nproc)
 ```
 
 ## Настройка TravelChain
