@@ -68,10 +68,10 @@ ssh travelchain@1.1.1.256
 Login to system by user `travelchain`, clone repo and install it:
 ```bash
 su - travelchain
-git clone https://github.com/travelchain/travelchain-core.git --recursive
-cd travelchain-core/
+git clone https://github.com/travelchain/travelchain-core.git
+cd travelchain-core/ && git submodule update --init --recursive
 cmake -DCMAKE_BUILD_TYPE=Release .
-make
+make -j$(nproc)
 ```
 
 ## TravelChain setup
