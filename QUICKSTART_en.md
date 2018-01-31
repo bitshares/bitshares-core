@@ -71,7 +71,7 @@ su - travelchain
 git clone https://github.com/travelchain/travelchain-core.git
 cd travelchain-core/ && git submodule update --init --recursive
 cmake -DCMAKE_BUILD_TYPE=Release .
-make
+make -j$(nproc)
 ```
 
 ## TravelChain setup
