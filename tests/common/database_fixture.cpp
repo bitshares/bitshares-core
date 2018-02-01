@@ -687,22 +687,27 @@ digest_type database_fixture::digest( const transaction& tx )
    return tx.digest();
 }
 
-const limit_order_object*database_fixture::create_sell_order(account_id_type user, const asset& amount, const asset& recv)
+const limit_order_object*database_fixture::create_sell_order(account_id_type user, const asset& amount, const asset& recv,
+                                                const time_point_sec order_expiration,
+                                                const price& fee_core_exchange_rate )
 {
-   auto r =  create_sell_order(user(db), amount, recv);
+   auto r =  create_sell_order( user(db), amount, recv, order_expiration, fee_core_exchange_rate );
    verify_asset_supplies(db);
    return r;
 }
 
-const limit_order_object* database_fixture::create_sell_order( const account_object& user, const asset& amount, const asset& recv )
+const limit_order_object* database_fixture::create_sell_order( const account_object& user, const asset& amount, const asset& recv,
+                                                const time_point_sec order_expiration,
+                                                const price& fee_core_exchange_rate )
 {
    //wdump((amount)(recv));
    limit_order_create_operation buy_order;
    buy_order.seller = user.id;
    buy_order.amount_to_sell = amount;
    buy_order.min_to_receive = recv;
+   buy_order.expiration = order_expiration;
    trx.operations.push_back(buy_order);
-   for( auto& op : trx.operations ) db.current_fee_schedule().set_fee(op);
+   for( auto& op : trx.operations ) db.current_fee_schedule().set_fee(op, fee_core_exchange_rate);
    trx.validate();
    auto processed = db.push_transaction(trx, ~0);
    trx.operations.clear();
