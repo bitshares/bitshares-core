@@ -1124,6 +1124,496 @@ BOOST_AUTO_TEST_CASE( non_core_fee_refund_test )
    FC_LOG_AND_RETHROW()
 }
 
+BOOST_AUTO_TEST_CASE( hf445_fee_refund_cross_test )
+{ // create orders before hard fork, cancel them after hard fork
+   try
+   {
+      ACTORS((alice)(bob)(izzy));
+
+      int64_t alice_b0 = 1000000, bob_b0 = 1000000;
+      int64_t pool_0 = 100000, accum_0 = 0;
+
+      transfer( account_id_type(), alice_id, asset(alice_b0) );
+      transfer( account_id_type(), bob_id, asset(bob_b0) );
+
+      asset_id_type core_id = asset_id_type();
+      const auto& usd_obj = create_user_issued_asset( "IZZYUSD", izzy_id(db), charge_market_fee );
+      asset_id_type usd_id = usd_obj.id;
+      issue_uia( alice_id, asset( alice_b0, usd_id ) );
+      issue_uia( bob_id, asset( bob_b0, usd_id ) );
+
+      fund_fee_pool( committee_account( db ), usd_obj, pool_0 );
+
+      int64_t order_create_fee = 537;
+      int64_t order_cancel_fee = 129;
+
+      uint32_t skip = database::skip_witness_signature
+                    | database::skip_transaction_signatures
+                    | database::skip_transaction_dupe_check
+                    | database::skip_block_size_check
+                    | database::skip_tapos_check
+                    | database::skip_authority_check
+                    | database::skip_merkle_check
+                    ;
+
+      generate_block( skip );
+
+      flat_set< fee_parameters > new_fees;
+      {
+         limit_order_create_operation::fee_parameters_type create_fee_params;
+         create_fee_params.fee = order_create_fee;
+         new_fees.insert( create_fee_params );
+      }
+      {
+         limit_order_cancel_operation::fee_parameters_type cancel_fee_params;
+         cancel_fee_params.fee = order_cancel_fee;
+         new_fees.insert( cancel_fee_params );
+      }
+      {
+         transfer_operation::fee_parameters_type transfer_fee_params;
+         transfer_fee_params.fee = 0;
+         transfer_fee_params.price_per_kbyte = 0;
+         new_fees.insert( transfer_fee_params );
+      }
+
+      // enable_fees() and change_fees() modifies DB directly, and results will be overwritten by block generation
+      // so we have to do it every time we stop generating/popping blocks and start doing tx's
+      enable_fees();
+      change_fees( new_fees );
+
+      // AAAAGGHH create_sell_order reads trx.expiration #469
+      set_expiration( db, trx );
+
+      // prepare params
+      const chain_parameters& params = db.get_global_properties().parameters;
+      time_point_sec max_exp = time_point_sec::maximum();
+      time_point_sec exp = HARDFORK_445_TIME + fc::seconds( params.block_interval * (params.maintenance_skip_slots + 1) * 3 );
+      time_point_sec exp2 = HARDFORK_445_TIME + fc::seconds( params.block_interval * (params.maintenance_skip_slots + 1) * 13 );
+      price cer( asset(1), asset(1, usd_id) );
+      const auto* usd_stat = &usd_id( db ).dynamic_asset_data_id( db );
+
+      // balance data
+      int64_t alice_bc = alice_b0, bob_bc = bob_b0; // core balance
+      int64_t alice_bu = alice_b0, bob_bu = bob_b0; // usd balance
+      int64_t pool_b = pool_0, accum_b = accum_0;
+
+      // prepare orders
+      BOOST_TEST_MESSAGE( "Creating orders those will never match: ao1, ao2, bo1, bo2 .." );
+      // ao1: won't expire, won't match, fee in core
+      limit_order_id_type ao1_id = create_sell_order( alice_id, asset(1000), asset(100000, usd_id) )->id;
+      // ao2: will expire, won't match, fee in core
+      limit_order_id_type ao2_id = create_sell_order( alice_id, asset(800), asset(100000, usd_id), exp )->id;
+      // bo1: won't expire, won't match, fee in usd
+      limit_order_id_type bo1_id = create_sell_order(   bob_id, asset(1000, usd_id), asset(100000), max_exp, cer )->id;
+      // bo2: will expire, won't match, fee in usd
+      limit_order_id_type bo2_id = create_sell_order(   bob_id, asset(800, usd_id), asset(100000), exp, cer )->id;
+
+      alice_bc -= order_create_fee * 2;
+      alice_bc -= 1000;
+      alice_bc -= 800;
+      bob_bu -= order_create_fee * 2;
+      bob_bu -= 1000;
+      bob_bu -= 800;
+      pool_b -= order_create_fee * 2;
+      accum_b += order_create_fee * 2;
+      int64_t ao1_remain = 1000;
+      int64_t ao2_remain = 800;
+      int64_t bo1_remain = 1000;
+      int64_t bo2_remain = 800;
+
+      BOOST_CHECK_EQUAL( get_balance( alice_id, core_id ), alice_bc );
+      BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
+      BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
+      BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+
+      // ao3: won't expire, partially match before hard fork 445, fee in core
+      BOOST_TEST_MESSAGE( "Creating order ao3 .." );
+      limit_order_id_type ao3_id = create_sell_order( alice_id, asset(900), asset(2700, usd_id) )->id;
+      create_sell_order( bob_id, asset(600, usd_id), asset(200) );
+
+      alice_bc -= order_create_fee;
+      alice_bc -= 900;
+      alice_bu += 600;
+      bob_bc -= order_create_fee;
+      bob_bu -= 600;
+      bob_bc += 200;
+      int64_t ao3_remain = 900 - 200;
+
+      BOOST_CHECK_EQUAL( get_balance( alice_id, core_id ), alice_bc );
+      BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
+      BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
+      BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+
+      // ao4: will expire, will partially match before hard fork 445, fee in core
+      BOOST_TEST_MESSAGE( "Creating order ao4 .." );
+      limit_order_id_type ao4_id = create_sell_order( alice_id, asset(700), asset(1400, usd_id), exp )->id;
+      create_sell_order( bob_id, asset(200, usd_id), asset(100) );
+
+      alice_bc -= order_create_fee;
+      alice_bc -= 700;
+      alice_bu += 200;
+      bob_bc -= order_create_fee;
+      bob_bu -= 200;
+      bob_bc += 100;
+      int64_t ao4_remain = 700 - 100;
+
+      BOOST_CHECK_EQUAL( get_balance( alice_id, core_id ), alice_bc );
+      BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
+      BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
+      BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+
+      // bo3: won't expire, will partially match before hard fork 445, fee in usd
+      BOOST_TEST_MESSAGE( "Creating order bo3 .." );
+      limit_order_id_type bo3_id = create_sell_order(   bob_id, asset(500, usd_id), asset(1500), max_exp, cer )->id;
+      create_sell_order( alice_id, asset(450), asset(150, usd_id) );
+
+      alice_bc -= order_create_fee;
+      alice_bc -= 450;
+      alice_bu += 150;
+      bob_bu -= order_create_fee;
+      bob_bu -= 500;
+      bob_bc += 450;
+      pool_b -= order_create_fee;
+      accum_b += order_create_fee;
+      int64_t bo3_remain = 500 - 150;
+
+      BOOST_CHECK_EQUAL( get_balance( alice_id, core_id ), alice_bc );
+      BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
+      BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
+      BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+
+      // bo4: will expire, will partially match before hard fork 445, fee in usd
+      BOOST_TEST_MESSAGE( "Creating order bo4 .." );
+      limit_order_id_type bo4_id = create_sell_order(   bob_id, asset(300, usd_id), asset(600), exp, cer )->id;
+      create_sell_order( alice_id, asset(140), asset(70, usd_id) );
+
+      alice_bc -= order_create_fee;
+      alice_bc -= 140;
+      alice_bu += 70;
+      bob_bu -= order_create_fee;
+      bob_bu -= 300;
+      bob_bc += 140;
+      pool_b -= order_create_fee;
+      accum_b += order_create_fee;
+      int64_t bo4_remain = 300 - 70;
+
+      BOOST_CHECK_EQUAL( get_balance( alice_id, core_id ), alice_bc );
+      BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
+      BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
+      BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+
+      // ao5: won't expire, partially match after hard fork 445, fee in core
+      BOOST_TEST_MESSAGE( "Creating order ao5 .." );
+      limit_order_id_type ao5_id = create_sell_order( alice_id, asset(606), asset(909, usd_id) )->id;
+
+      alice_bc -= order_create_fee;
+      alice_bc -= 606;
+      int64_t ao5_remain = 606;
+
+      BOOST_CHECK_EQUAL( get_balance( alice_id, core_id ), alice_bc );
+      BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
+      BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
+      BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+
+      // ao6: will expire, partially match after hard fork 445, fee in core
+      BOOST_TEST_MESSAGE( "Creating order ao6 .." );
+      limit_order_id_type ao6_id = create_sell_order( alice_id, asset(333), asset(444, usd_id), exp2 )->id;
+
+      alice_bc -= order_create_fee;
+      alice_bc -= 333;
+      int64_t ao6_remain = 333;
+
+      BOOST_CHECK_EQUAL( get_balance( alice_id, core_id ), alice_bc );
+      BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
+      BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
+      BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+
+      // bo5: won't expire, partially match after hard fork 445, fee in usd
+      BOOST_TEST_MESSAGE( "Creating order bo5 .." );
+      limit_order_id_type bo5_id = create_sell_order(   bob_id, asset(255, usd_id), asset(408), max_exp, cer )->id;
+
+      bob_bu -= order_create_fee;
+      bob_bu -= 255;
+      pool_b -= order_create_fee;
+      accum_b += order_create_fee;
+      int64_t bo5_remain = 255;
+
+      BOOST_CHECK_EQUAL( get_balance( alice_id, core_id ), alice_bc );
+      BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
+      BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
+      BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+
+      // bo6: will expire, partially match after hard fork 445, fee in usd
+      BOOST_TEST_MESSAGE( "Creating order bo6 .." );
+      limit_order_id_type bo6_id = create_sell_order(   bob_id, asset(127, usd_id), asset(127), exp2, cer )->id;
+
+      bob_bu -= order_create_fee;
+      bob_bu -= 127;
+      pool_b -= order_create_fee;
+      accum_b += order_create_fee;
+      int64_t bo6_remain = 127;
+
+      BOOST_CHECK_EQUAL( get_balance( alice_id, core_id ), alice_bc );
+      BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
+      BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
+      BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+
+      // generate block so the orders will be in db before hard fork
+      BOOST_TEST_MESSAGE( "Generating blocks ..." );
+      generate_block( skip );
+
+      // generate blocks util hard fork 445
+      generate_blocks( HARDFORK_445_TIME, true, skip );
+      generate_block( skip );
+
+      // nothing will change
+      BOOST_CHECK_EQUAL( get_balance( alice_id, core_id ), alice_bc );
+      BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
+      BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
+      BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+
+      // generate more blocks, so some orders will expire
+      generate_blocks( exp, true, skip );
+
+      // no fee refund for orders created before hard fork 445, but remaining funds will be refunded
+      BOOST_TEST_MESSAGE( "Checking expired orders: ao2, ao4, bo2, bo4 .." );
+      alice_bc += ao2_remain;
+      alice_bc += ao4_remain;
+      bob_bu += bo2_remain;
+      bob_bu += bo4_remain;
+
+      BOOST_CHECK_EQUAL( get_balance( alice_id, core_id ), alice_bc );
+      BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
+      BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
+      BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+
+      // prepare for new transactions
+      enable_fees();
+      change_fees( new_fees );
+      usd_stat = &usd_id( db ).dynamic_asset_data_id( db );
+      set_expiration( db, trx );
+
+      // cancel ao1
+      BOOST_TEST_MESSAGE( "Cancel order ao1 .." );
+      cancel_limit_order( ao1_id(db) );
+
+      alice_bc += ao1_remain;
+      alice_bc -= order_cancel_fee;
+
+      BOOST_CHECK_EQUAL( get_balance( alice_id, core_id ), alice_bc );
+      BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
+      BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
+      BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+
+      // cancel ao3
+      BOOST_TEST_MESSAGE( "Cancel order ao3 .." );
+      cancel_limit_order( ao3_id(db) );
+
+      alice_bc += ao3_remain;
+      alice_bc -= order_cancel_fee;
+
+      BOOST_CHECK_EQUAL( get_balance( alice_id, core_id ), alice_bc );
+      BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
+      BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
+      BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+
+      // cancel bo1
+      BOOST_TEST_MESSAGE( "Cancel order bo1 .." );
+      cancel_limit_order( bo1_id(db) );
+
+      bob_bu += bo1_remain;
+      bob_bc -= order_cancel_fee;
+
+      BOOST_CHECK_EQUAL( get_balance( alice_id, core_id ), alice_bc );
+      BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
+      BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
+      BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+
+      // cancel bo3
+      BOOST_TEST_MESSAGE( "Cancel order bo3 .." );
+      cancel_limit_order( bo3_id(db) );
+
+      bob_bu += bo3_remain;
+      bob_bc -= order_cancel_fee;
+
+      BOOST_CHECK_EQUAL( get_balance( alice_id, core_id ), alice_bc );
+      BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
+      BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
+      BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+
+      // partially fill ao6
+      BOOST_TEST_MESSAGE( "Partially fill ao6 .." );
+      create_sell_order( bob_id, asset(88, usd_id), asset(66) );
+
+      alice_bu += 88;
+      bob_bc -= order_create_fee;
+      bob_bu -= 88;
+      bob_bc += 66;
+      ao6_remain -= 66;
+
+      BOOST_CHECK_EQUAL( get_balance( alice_id, core_id ), alice_bc );
+      BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
+      BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
+      BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+
+      // partially fill bo6
+      BOOST_TEST_MESSAGE( "Partially fill bo6 .." );
+      create_sell_order( alice_id, asset(59), asset(59, usd_id) );
+
+      alice_bc -= order_create_fee;
+      alice_bc -= 59;
+      alice_bu += 59;
+      bob_bc += 59;
+      bo6_remain -= 59;
+
+      BOOST_CHECK_EQUAL( get_balance( alice_id, core_id ), alice_bc );
+      BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
+      BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
+      BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+
+      // generate block to save the changes
+      BOOST_TEST_MESSAGE( "Generating blocks ..." );
+      generate_block( skip );
+
+      BOOST_CHECK_EQUAL( get_balance( alice_id, core_id ), alice_bc );
+      BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
+      BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
+      BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+
+      // generate blocks util exp2, so some orders will expire
+      generate_blocks( exp2, true, skip );
+
+      // no fee refund for orders created before hard fork 445, but remaining funds will be refunded
+      BOOST_TEST_MESSAGE( "Checking expired orders: ao6, bo6 .." );
+      alice_bc += ao6_remain;
+      bob_bu += bo6_remain;
+
+      BOOST_CHECK_EQUAL( get_balance( alice_id, core_id ), alice_bc );
+      BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
+      BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
+      BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+
+      // prepare for new transactions
+      enable_fees();
+      change_fees( new_fees );
+      usd_stat = &usd_id( db ).dynamic_asset_data_id( db );
+      set_expiration( db, trx );
+
+      // partially fill ao5
+      BOOST_TEST_MESSAGE( "Partially fill ao5 .." );
+      create_sell_order( bob_id, asset(93, usd_id), asset(62) );
+
+      alice_bu += 93;
+      bob_bc -= order_create_fee;
+      bob_bu -= 93;
+      bob_bc += 62;
+      ao5_remain -= 62;
+
+      BOOST_CHECK_EQUAL( get_balance( alice_id, core_id ), alice_bc );
+      BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
+      BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
+      BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+
+      // partially fill bo5
+      BOOST_TEST_MESSAGE( "Partially fill bo5 .." );
+      create_sell_order( alice_id, asset(24), asset(15, usd_id) );
+
+      alice_bc -= order_create_fee;
+      alice_bc -= 24;
+      alice_bu += 15;
+      bob_bc += 24;
+      bo5_remain -= 15;
+
+      BOOST_CHECK_EQUAL( get_balance( alice_id, core_id ), alice_bc );
+      BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
+      BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
+      BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+
+      // cancel ao5
+      BOOST_TEST_MESSAGE( "Cancel order ao5 .." );
+      cancel_limit_order( ao5_id(db) );
+
+      alice_bc += ao5_remain;
+      alice_bc -= order_cancel_fee;
+
+      BOOST_CHECK_EQUAL( get_balance( alice_id, core_id ), alice_bc );
+      BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
+      BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
+      BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+
+      // cancel bo5
+      BOOST_TEST_MESSAGE( "Cancel order bo5 .." );
+      cancel_limit_order( bo5_id(db) );
+
+      bob_bu += bo5_remain;
+      bob_bc -= order_cancel_fee;
+
+      BOOST_CHECK_EQUAL( get_balance( alice_id, core_id ), alice_bc );
+      BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
+      BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
+      BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+
+      // generate block to save the changes
+      BOOST_TEST_MESSAGE( "Generating blocks ..." );
+      generate_block( skip );
+
+      BOOST_CHECK_EQUAL( get_balance( alice_id, core_id ), alice_bc );
+      BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
+      BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
+      BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
+      BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
+      BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+
+   }
+   FC_LOG_AND_RETHROW()
+}
+
 BOOST_AUTO_TEST_CASE( stealth_fba_test )
 {
    try
