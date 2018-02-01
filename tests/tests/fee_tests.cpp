@@ -737,6 +737,393 @@ BOOST_AUTO_TEST_CASE( fee_refund_test )
    FC_LOG_AND_RETHROW()
 }
 
+BOOST_AUTO_TEST_CASE( non_core_fee_refund_test )
+{
+   try
+   {
+      ACTORS((alice)(bob)(izzy));
+
+      int64_t alice_b0 = 1000000, bob_b0 = 1000000;
+      int64_t pool_0 = 100000, accum_0 = 0;
+
+      transfer( account_id_type(), alice_id, asset(alice_b0) );
+      transfer( account_id_type(), bob_id, asset(bob_b0) );
+
+      asset_id_type core_id = asset_id_type();
+      const auto& usd_obj = create_user_issued_asset( "IZZYUSD", izzy_id(db), charge_market_fee );
+      asset_id_type usd_id = usd_obj.id;
+      issue_uia( alice_id, asset( alice_b0, usd_id ) );
+      issue_uia( bob_id, asset( bob_b0, usd_id ) );
+
+      fund_fee_pool( committee_account( db ), usd_obj, pool_0 );
+
+      int64_t order_create_fee = 537;
+      int64_t order_cancel_fee = 129;
+
+      uint32_t skip = database::skip_witness_signature
+                    | database::skip_transaction_signatures
+                    | database::skip_transaction_dupe_check
+                    | database::skip_block_size_check
+                    | database::skip_tapos_check
+                    | database::skip_authority_check
+                    | database::skip_merkle_check
+                    ;
+
+      generate_block( skip );
+
+      flat_set< fee_parameters > new_fees;
+      {
+         limit_order_create_operation::fee_parameters_type create_fee_params;
+         create_fee_params.fee = order_create_fee;
+         new_fees.insert( create_fee_params );
+      }
+      {
+         limit_order_cancel_operation::fee_parameters_type cancel_fee_params;
+         cancel_fee_params.fee = order_cancel_fee;
+         new_fees.insert( cancel_fee_params );
+      }
+      {
+         transfer_operation::fee_parameters_type transfer_fee_params;
+         transfer_fee_params.fee = 0;
+         transfer_fee_params.price_per_kbyte = 0;
+         new_fees.insert( transfer_fee_params );
+      }
+
+      for( int i=0; i<4; i++ )
+      {
+         bool expire_order = ( i % 2 != 0 );
+         bool before_hardfork_445 = ( i < 2 );
+         if( i == 2 )
+         {
+            generate_blocks( HARDFORK_445_TIME, true, skip );
+            generate_block( skip );
+         }
+
+         // enable_fees() and change_fees() modifies DB directly, and results will be overwritten by block generation
+         // so we have to do it every time we stop generating/popping blocks and start doing tx's
+         enable_fees();
+         change_fees( new_fees );
+
+         // AAAAGGHH create_sell_order reads trx.expiration #469
+         set_expiration( db, trx );
+
+         // prepare params
+         uint32_t blocks_generated = 0;
+         time_point_sec max_exp = time_point_sec::maximum();
+         time_point_sec exp = db.head_block_time(); // order will be accepted when pushing trx then expired at current block
+         price cer( asset(1), asset(1, usd_id) );
+         const auto* usd_stat = &usd_id( db ).dynamic_asset_data_id( db );
+
+         // balance data
+         int64_t alice_bc = alice_b0, bob_bc = bob_b0; // core balance
+         int64_t alice_bu = alice_b0, bob_bu = bob_b0; // usd balance
+         int64_t pool_b = pool_0, accum_b = accum_0;
+
+         // refund data
+         int64_t core_fee_refund_core;
+         int64_t core_fee_refund_usd;
+         int64_t usd_fee_refund_core;
+         int64_t usd_fee_refund_usd;
+         if( db.head_block_time() >= HARDFORK_445_TIME )
+         {
+            core_fee_refund_core = order_create_fee;
+            core_fee_refund_usd = 0;
+            usd_fee_refund_core = order_create_fee;
+            usd_fee_refund_usd = 0;
+         }
+         else
+         {
+            core_fee_refund_core = 0;
+            core_fee_refund_usd = 0;
+            usd_fee_refund_core = 0;
+            usd_fee_refund_usd = 0;
+         }
+
+         // Check non-overlapping
+         // Alice creates order
+         // Bob creates order which doesn't match
+         limit_order_id_type ao1_id = create_sell_order( alice_id, asset(1000), asset(1000, usd_id) )->id;
+         limit_order_id_type bo1_id = create_sell_order(   bob_id, asset(500, usd_id), asset(1000), exp, cer )->id;
+
+         alice_bc -= order_create_fee;
+         alice_bc -= 1000;
+         bob_bu -= order_create_fee;
+         bob_bu -= 500;
+         pool_b -= order_create_fee;
+         accum_b += order_create_fee;
+
+         BOOST_CHECK_EQUAL( get_balance( alice_id, core_id ), alice_bc );
+         BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
+         BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
+         BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
+         BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
+         BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+
+         // Bob cancels order
+         if( !expire_order )
+            cancel_limit_order( bo1_id(db) );
+         else
+         {
+            // empty accounts before generate block, to test if it will fail when charging order cancel fee
+            transfer( alice_id, account_id_type(), asset(alice_bc, core_id) );
+            transfer( alice_id, account_id_type(), asset(alice_bu,  usd_id) );
+            transfer(   bob_id, account_id_type(), asset(  bob_bc, core_id) );
+            transfer(   bob_id, account_id_type(), asset(  bob_bu,  usd_id) );
+            // generate a new block so one or more order will expire
+            generate_block( skip );
+            ++blocks_generated;
+            enable_fees();
+            change_fees( new_fees );
+            set_expiration( db, trx );
+            exp = db.head_block_time();
+            usd_stat = &usd_id( db ).dynamic_asset_data_id( db );
+            // restore account balances
+            transfer( account_id_type(), alice_id, asset(alice_bc, core_id) );
+            transfer( account_id_type(), alice_id, asset(alice_bu,  usd_id) );
+            transfer( account_id_type(),   bob_id, asset(  bob_bc, core_id) );
+            transfer( account_id_type(),   bob_id, asset(  bob_bu,  usd_id) );
+         }
+
+         if( !expire_order || !before_hardfork_445 )
+            bob_bc -= order_cancel_fee;
+         // else do thing: before hard fork 445, no fee on expired order
+         bob_bc += usd_fee_refund_core;
+         bob_bu += 500;
+         bob_bu += usd_fee_refund_usd;
+
+         BOOST_CHECK_EQUAL( get_balance( alice_id, core_id ), alice_bc );
+         BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
+         BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
+         BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
+         BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
+         BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+
+
+         // Alice cancels order
+         cancel_limit_order( ao1_id(db) );
+
+         alice_bc -= order_cancel_fee;
+         alice_bc += 1000;
+         alice_bc += core_fee_refund_core;
+         alice_bu += core_fee_refund_usd;
+
+         BOOST_CHECK_EQUAL( get_balance( alice_id, core_id ), alice_bc );
+         BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
+         BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
+         BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
+         BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
+         BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+
+         // Check partial fill
+         const limit_order_object* ao2 = create_sell_order( alice_id, asset(1000), asset(200, usd_id), exp, cer );
+         const limit_order_id_type ao2id = ao2->id;
+         const limit_order_object* bo2 = create_sell_order(   bob_id, asset(100, usd_id), asset(500) );
+
+         BOOST_CHECK( db.find<limit_order_object>( ao2id ) != nullptr );
+         BOOST_CHECK( bo2 == nullptr );
+
+         // data after order created
+         alice_bc -= 1000;
+         alice_bu -= order_create_fee;
+         pool_b -= order_create_fee;
+         accum_b += order_create_fee;
+         bob_bc -= order_create_fee;
+         bob_bu -= 100;
+
+         // data after order filled
+         alice_bu += 100;
+         bob_bc += 500;
+
+         BOOST_CHECK_EQUAL( get_balance( alice_id, core_id ), alice_bc );
+         BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
+         BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
+         BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
+         BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
+         BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+
+         // cancel Alice order, show that entire deferred_fee was consumed by partial match
+         if( !expire_order )
+            cancel_limit_order( *ao2 );
+         else
+         {
+            // empty accounts before generate block, to test if it will fail when charging order cancel fee
+            transfer( alice_id, account_id_type(), asset(alice_bc, core_id) );
+            transfer( alice_id, account_id_type(), asset(alice_bu,  usd_id) );
+            transfer(   bob_id, account_id_type(), asset(  bob_bc, core_id) );
+            transfer(   bob_id, account_id_type(), asset(  bob_bu,  usd_id) );
+            // generate a new block so one or more order will expire
+            generate_block( skip );
+            ++blocks_generated;
+            enable_fees();
+            change_fees( new_fees );
+            set_expiration( db, trx );
+            exp = db.head_block_time();
+            usd_stat = &usd_id( db ).dynamic_asset_data_id( db );
+            // restore account balances
+            transfer( account_id_type(), alice_id, asset(alice_bc, core_id) );
+            transfer( account_id_type(), alice_id, asset(alice_bu,  usd_id) );
+            transfer( account_id_type(),   bob_id, asset(  bob_bc, core_id) );
+            transfer( account_id_type(),   bob_id, asset(  bob_bu,  usd_id) );
+         }
+
+
+         if( !expire_order )
+            alice_bc -= order_cancel_fee;
+         // else do nothing:
+         //         before hard fork 445, no fee when order is expired;
+         //         after hard fork 445, when partially filled order expired, order cancel fee is capped at 0
+         alice_bc += 500;
+
+         BOOST_CHECK_EQUAL( get_balance( alice_id, core_id ), alice_bc );
+         BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
+         BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
+         BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
+         BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
+         BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+
+         // Check multiple fill
+         // Alice creating multiple orders
+         const limit_order_object* ao31 = create_sell_order( alice_id, asset(1000), asset(200, usd_id), max_exp, cer );
+         const limit_order_object* ao32 = create_sell_order( alice_id, asset(1000), asset(2000, usd_id), max_exp, cer );
+         const limit_order_object* ao33 = create_sell_order( alice_id, asset(1000), asset(200, usd_id), max_exp, cer );
+         const limit_order_object* ao34 = create_sell_order( alice_id, asset(1000), asset(200, usd_id), max_exp, cer );
+         const limit_order_object* ao35 = create_sell_order( alice_id, asset(1000), asset(200, usd_id), max_exp, cer );
+
+         const limit_order_id_type ao31id = ao31->id;
+         const limit_order_id_type ao32id = ao32->id;
+         const limit_order_id_type ao33id = ao33->id;
+         const limit_order_id_type ao34id = ao34->id;
+         const limit_order_id_type ao35id = ao35->id;
+
+         alice_bc -= 1000 * 5;
+         alice_bu -= order_create_fee * 5;
+         pool_b -= order_create_fee * 5;
+         accum_b += order_create_fee * 5;
+
+         BOOST_CHECK_EQUAL( get_balance( alice_id, core_id ), alice_bc );
+         BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
+         BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
+         BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
+         BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
+         BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+
+         // Bob creating an order matching multiple Alice's orders
+         const limit_order_object* bo31 = create_sell_order(   bob_id, asset(500, usd_id), asset(2500), exp );
+
+         BOOST_CHECK( db.find<limit_order_object>( ao31id ) == nullptr );
+         BOOST_CHECK( db.find<limit_order_object>( ao32id ) != nullptr );
+         BOOST_CHECK( db.find<limit_order_object>( ao33id ) == nullptr );
+         BOOST_CHECK( db.find<limit_order_object>( ao34id ) != nullptr );
+         BOOST_CHECK( db.find<limit_order_object>( ao35id ) != nullptr );
+         BOOST_CHECK( bo31 == nullptr );
+
+         // data after order created
+         bob_bc -= order_create_fee;
+         bob_bu -= 500;
+
+         // data after order filled
+         alice_bu += 500;
+         bob_bc += 2500;
+
+         BOOST_CHECK_EQUAL( get_balance( alice_id, core_id ), alice_bc );
+         BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
+         BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
+         BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
+         BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
+         BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+
+         // Bob creating an order matching multiple Alice's orders
+         const limit_order_object* bo32 = create_sell_order(   bob_id, asset(500, usd_id), asset(2500), exp );
+
+         BOOST_CHECK( db.find<limit_order_object>( ao31id ) == nullptr );
+         BOOST_CHECK( db.find<limit_order_object>( ao32id ) != nullptr );
+         BOOST_CHECK( db.find<limit_order_object>( ao33id ) == nullptr );
+         BOOST_CHECK( db.find<limit_order_object>( ao34id ) == nullptr );
+         BOOST_CHECK( db.find<limit_order_object>( ao35id ) == nullptr );
+         BOOST_CHECK( bo32 != nullptr );
+
+         // data after order created
+         bob_bc -= order_create_fee;
+         bob_bu -= 500;
+
+         // data after order filled
+         alice_bu += 300;
+         bob_bc += 1500;
+
+         BOOST_CHECK_EQUAL( get_balance( alice_id, core_id ), alice_bc );
+         BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
+         BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
+         BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
+         BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
+         BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+
+         // cancel Bob order, show that entire deferred_fee was consumed by partial match
+         if( !expire_order )
+            cancel_limit_order( *bo32 );
+         else
+         {
+            // empty accounts before generate block, to test if it will fail when charging order cancel fee
+            transfer( alice_id, account_id_type(), asset(alice_bc, core_id) );
+            transfer( alice_id, account_id_type(), asset(alice_bu,  usd_id) );
+            transfer(   bob_id, account_id_type(), asset(  bob_bc, core_id) );
+            transfer(   bob_id, account_id_type(), asset(  bob_bu,  usd_id) );
+            // generate a new block so one or more order will expire
+            generate_block( skip );
+            ++blocks_generated;
+            enable_fees();
+            change_fees( new_fees );
+            set_expiration( db, trx );
+            exp = db.head_block_time();
+            usd_stat = &usd_id( db ).dynamic_asset_data_id( db );
+            // restore account balances
+            transfer( account_id_type(), alice_id, asset(alice_bc, core_id) );
+            transfer( account_id_type(), alice_id, asset(alice_bu,  usd_id) );
+            transfer( account_id_type(),   bob_id, asset(  bob_bc, core_id) );
+            transfer( account_id_type(),   bob_id, asset(  bob_bu,  usd_id) );
+         }
+
+         if( !expire_order )
+            bob_bc -= order_cancel_fee;
+         // else do nothing:
+         //         before hard fork 445, no fee when order is expired;
+         //         after hard fork 445, when partially filled order expired, order cancel fee is capped at 0
+         bob_bu += 200;
+
+         BOOST_CHECK_EQUAL( get_balance( alice_id, core_id ), alice_bc );
+         BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
+         BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
+         BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
+         BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
+         BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+
+         // cancel Alice order, will refund after hard fork 445
+         cancel_limit_order( ao32id( db ) );
+
+         alice_bc -= order_cancel_fee;
+         alice_bc += 1000;
+         alice_bc += usd_fee_refund_core;
+         alice_bu += usd_fee_refund_usd;
+
+         BOOST_CHECK_EQUAL( get_balance( alice_id, core_id ), alice_bc );
+         BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
+         BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
+         BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
+         BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
+         BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+
+         // undo above tx's and reset
+         generate_block( skip );
+         ++blocks_generated;
+         while( blocks_generated > 0 )
+         {
+            db.pop_block();
+            --blocks_generated;
+         }
+      }
+   }
+   FC_LOG_AND_RETHROW()
+}
+
 BOOST_AUTO_TEST_CASE( stealth_fba_test )
 {
    try
