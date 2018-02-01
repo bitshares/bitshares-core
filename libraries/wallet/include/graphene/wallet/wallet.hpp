@@ -282,6 +282,19 @@ struct operation_detail {
    operation_history_object op;
 };
 
+struct operation_detail_ex {
+    string                   memo;
+    string                   description;
+    operation_history_object op;
+    transaction_id_type      transaction_id;
+};
+
+struct account_history_operation_detail {
+   uint32_t                     total_count = 0;
+   uint32_t                     result_count = 0;
+   vector<operation_detail_ex>  details;
+};
+
 /**
  * This wallet assumes it is connected to the database server with a high-bandwidth, low-latency connection and
  * performs minimal caching. This API could be provided locally to be used by a web interface.
@@ -386,6 +399,17 @@ class wallet_api
        * @returns the global properties
        */
       global_property_object            get_global_properties() const;
+
+      /**
+       * Get operations relevant to the specified account filtering by operation type, with transaction id
+       *
+       * @param name the name or id of the account, whose history shoulde be queried
+       * @param operation_types The IDs of the operation we want to get operations in the account( 0 = transfer , 1 = limit order create, ...)
+       * @param start the sequence number where to start looping back throw the history
+       * @param limit the max number of entries to return (from start number)
+       * @returns account_history_operation_detail
+       */
+      account_history_operation_detail get_account_history_by_operations(string name, vector<uint16_t> operation_types, uint32_t start, int limit);
 
       /** Returns the block chain's rapidly-changing properties.
        * The returned object contains information that changes every block interval
@@ -924,51 +948,6 @@ class wallet_api
                                     uint32_t timeout_sec = 0,
                                     bool     fill_or_kill = false,
                                     bool     broadcast = false);
-                                    
-      /** Place a limit order attempting to sell one asset for another.
-       * 
-       * This API call abstracts away some of the details of the sell_asset call to be more
-       * user friendly. All orders placed with sell never timeout and will not be killed if they
-       * cannot be filled immediately. If you wish for one of these parameters to be different, 
-       * then sell_asset should be used instead.
-       *
-       * @param seller_account the account providing the asset being sold, and which will
-       *                       receive the processed of the sale.
-       * @param base The name or id of the asset to sell.
-       * @param quote The name or id of the asset to recieve.
-       * @param rate The rate in base:quote at which you want to sell.
-       * @param amount The amount of base you want to sell.
-       * @param broadcast true to broadcast the transaction on the network.
-       * @returns The signed transaction selling the funds.                 
-       */
-      signed_transaction sell( string seller_account,
-                               string base,
-                               string quote,
-                               double rate,
-                               double amount,
-                               bool broadcast );
-                               
-      /** Place a limit order attempting to buy one asset with another.
-       *
-       * This API call abstracts away some of the details of the sell_asset call to be more
-       * user friendly. All orders placed with buy never timeout and will not be killed if they
-       * cannot be filled immediately. If you wish for one of these parameters to be different,
-       * then sell_asset should be used instead.
-       *
-       * @param buyer_account The account buying the asset for another asset.
-       * @param base The name or id of the asset to buy.
-       * @param quote The name or id of the assest being offered as payment.
-       * @param rate The rate in base:quote at which you want to buy.
-       * @param amount the amount of base you want to buy.
-       * @param broadcast true to broadcast the transaction on the network.
-       * @param The signed transaction selling the funds.
-       */
-      signed_transaction buy( string buyer_account,
-                              string base,
-                              string quote,
-                              double rate,
-                              double amount,
-                              bool broadcast );
 
       /** Borrow an asset or update the debt/collateral ratio for the loan.
        *
@@ -1632,6 +1611,12 @@ FC_REFLECT_DERIVED( graphene::wallet::vesting_balance_object_with_info, (graphen
 FC_REFLECT( graphene::wallet::operation_detail, 
             (memo)(description)(op) )
 
+FC_REFLECT(graphene::wallet::operation_detail_ex,
+            (memo)(description)(op)(transaction_id))
+
+FC_REFLECT( graphene::wallet::account_history_operation_detail,
+        (total_count)(result_count)(details))
+
 FC_API( graphene::wallet::wallet_api,
         (help)
         (gethelp)
@@ -1664,8 +1649,6 @@ FC_API( graphene::wallet::wallet_api,
         (upgrade_account)
         (create_account_with_brain_key)
         (sell_asset)
-        (sell)
-        (buy)
         (borrow_asset)
         (cancel_order)
         (transfer)
@@ -1706,6 +1689,7 @@ FC_API( graphene::wallet::wallet_api,
         (get_account_count)
         (get_account_history)
         (get_relative_account_history)
+        (get_account_history_by_operations)
         (get_collateral_bids)
         (is_public_key_registered)
         (get_market_history)

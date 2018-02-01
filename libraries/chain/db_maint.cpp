@@ -245,12 +245,6 @@ void database::update_active_committee_members()
 { try {
    assert( _committee_count_histogram_buffer.size() > 0 );
    share_type stake_target = (_total_voting_stake-_committee_count_histogram_buffer[0]) / 2;
-   share_type old_stake_target = (_total_voting_stake-_witness_count_histogram_buffer[0]) / 2;
-   // TODO
-   // all the stuff about old_stake_target can *hopefully* be removed after the
-   // hardfork date has passed
-   //if( stake_target != old_stake_target )
-   //    ilog( "Different stake targets: ${old} / ${new}", ("old",old_stake_target)("new",stake_target) );
 
    /// accounts that vote for 0 or 1 witness do not get to express an opinion on
    /// the number of witnesses to have (they abstain and are non-voting accounts)
@@ -260,21 +254,6 @@ void database::update_active_committee_members()
       while( (committee_member_count < _committee_count_histogram_buffer.size() - 1)
              && (stake_tally <= stake_target) )
          stake_tally += _committee_count_histogram_buffer[++committee_member_count];
-   if( stake_target != old_stake_target && old_stake_target > 0 && head_block_time() < fc::time_point_sec(HARDFORK_CORE_353_TIME) )
-   {
-      uint64_t old_stake_tally = 0;
-      size_t old_committee_member_count = 0;
-      while( (old_committee_member_count < _committee_count_histogram_buffer.size() - 1)
-             && (old_stake_tally <= old_stake_target) )
-         old_stake_tally += _committee_count_histogram_buffer[++old_committee_member_count];
-      if( old_committee_member_count != committee_member_count
-              && (old_committee_member_count > GRAPHENE_DEFAULT_MIN_COMMITTEE_MEMBER_COUNT
-                  || committee_member_count > GRAPHENE_DEFAULT_MIN_COMMITTEE_MEMBER_COUNT) )
-      {
-          ilog( "Committee member count mismatch ${old} / ${new}", ("old",old_committee_member_count)("new", committee_member_count) );
-          committee_member_count = old_committee_member_count;
-      }
-   }
 
    const chain_property_object& cpo = get_chain_properties();
    auto committee_members = sort_votable_objects<committee_member_index>(std::max(committee_member_count*2+1, (size_t)cpo.immutable_parameters.min_committee_member_count));
@@ -741,7 +720,6 @@ void database::process_bids( const asset_bitasset_data_object& bad )
 {
    if( bad.is_prediction_market ) return;
    if( bad.current_feed.settlement_price.is_null() ) return;
-   if( head_block_time() <= HARDFORK_CORE_216_TIME ) return; // remove after HF date
 
    asset_id_type to_revive_id = (asset( 0, bad.options.short_backing_asset ) * bad.settlement_price).asset_id;
    const asset_object& to_revive = to_revive_id( *this );

@@ -20,6 +20,7 @@ if( GRAPHENE_DISABLE_UNITY_BUILD )
         db_market.cpp
         db_update.cpp
         db_witness_schedule.cpp
+        db_notify.cpp
       )
    message( STATUS "Graphene database unity build disabled" )
 else( GRAPHENE_DISABLE_UNITY_BUILD )

@@ -349,7 +349,8 @@ int database::match( const limit_order_object& bid, const limit_order_object& as
 asset database::match( const call_order_object& call, 
                        const force_settlement_object& settle, 
                        const price& match_price,
-                       asset max_settlement )
+                       asset max_settlement,
+                       const price& fill_price )
 { try {
    FC_ASSERT(call.get_debt().asset_id == settle.balance.asset_id );
    FC_ASSERT(call.debt > 0 && call.collateral > 0 && settle.balance.amount > 0);
@@ -373,8 +374,8 @@ asset database::match( const call_order_object& call,
 
    assert( settle_pays == settle_for_sale || call_receives == call.get_debt() );
 
-   fill_order( call, call_pays, call_receives, match_price, true ); // call order is maker
-   fill_order( settle, settle_pays, settle_receives, match_price, false ); // force settlement order is taker
+   fill_order( call, call_pays, call_receives, fill_price, true ); // call order is maker
+   fill_order( settle, settle_pays, settle_receives, fill_price, false ); // force settlement order is taker
 
    return call_receives;
 } FC_CAPTURE_AND_RETHROW( (call)(settle)(match_price)(max_settlement) ) }
@@ -624,6 +625,8 @@ bool database::check_call_orders(const asset_object& mia, bool enable_black_swan
           order_pays     = usd_to_buy;
 
           filled_call    = true;
+          if( filled_limit )
+             wlog( "Multiple limit match problem (issue 338) occurred at block #${block}", ("block",head_block_num()) );
        }
 
        FC_ASSERT( filled_call || filled_limit );
