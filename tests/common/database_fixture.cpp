@@ -176,6 +176,7 @@ void database_fixture::verify_asset_supplies( const database& db )
       if( for_sale.asset_id == asset_id_type() ) core_in_orders += for_sale.amount;
       total_balances[for_sale.asset_id] += for_sale.amount;
       total_balances[asset_id_type()] += o.deferred_fee;
+      total_balances[o.deferred_paid_fee.asset_id] += o.deferred_paid_fee.amount;
    }
    for( const call_order_object& o : db.get_index_type<call_order_index>().indices() )
    {
@@ -504,7 +505,8 @@ const asset_object& database_fixture::create_user_issued_asset( const string& na
    return db.get<asset_object>(ptx.operation_results[0].get<object_id_type>());
 }
 
-const asset_object& database_fixture::create_user_issued_asset( const string& name, const account_object& issuer, uint16_t flags )
+const asset_object& database_fixture::create_user_issued_asset( const string& name, const account_object& issuer, uint16_t flags,
+                                                                const price& core_exchange_rate )
 {
    asset_create_operation creator;
    creator.issuer = issuer.id;
@@ -512,7 +514,7 @@ const asset_object& database_fixture::create_user_issued_asset( const string& na
    creator.symbol = name;
    creator.common_options.max_supply = 0;
    creator.precision = 2;
-   creator.common_options.core_exchange_rate = price({asset(1,asset_id_type(1)),asset(1)});
+   creator.common_options.core_exchange_rate = core_exchange_rate;
    creator.common_options.max_supply = GRAPHENE_MAX_SHARE_SUPPLY;
    creator.common_options.flags = flags;
    creator.common_options.issuer_permissions = flags;
