@@ -2713,7 +2713,6 @@ string operation_printer::operator()(const transfer_operation& op) const
             }
          } catch (const fc::exception& e) {
             out << " -- could not decrypt memo";
-            elog("Error when decrypting memo: ${e}", ("e", e.to_detail_string()));
          }
       }
    }
