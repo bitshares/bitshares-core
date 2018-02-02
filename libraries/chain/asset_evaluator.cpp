@@ -251,6 +251,23 @@ void_result asset_fund_fee_pool_evaluator::do_apply(const asset_fund_fee_pool_op
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }
 
+static void validate_new_issuer( const database& d, const asset_object& a, account_id_type new_issuer )
+{ try {
+   FC_ASSERT(d.find_object(new_issuer));
+   if( a.is_market_issued() && new_issuer == GRAPHENE_COMMITTEE_ACCOUNT )
+   {
+      const asset_object& backing = a.bitasset_data(d).options.short_backing_asset(d);
+      if( backing.is_market_issued() )
+      {
+         const asset_object& backing_backing = backing.bitasset_data(d).options.short_backing_asset(d);
+         FC_ASSERT( backing_backing.get_id() == asset_id_type(),
+                    "May not create a blockchain-controlled market asset which is not backed by CORE.");
+      } else
+         FC_ASSERT( backing.get_id() == asset_id_type(),
+                    "May not create a blockchain-controlled market asset which is not backed by CORE.");
+   }
+} FC_CAPTURE_AND_RETHROW( (a)(new_issuer) ) }
+
 void_result asset_update_evaluator::do_evaluate(const asset_update_operation& o)
 { try {
    database& d = db();
@@ -264,19 +281,7 @@ void_result asset_update_evaluator::do_evaluate(const asset_update_operation& o)
    {
       FC_ASSERT( d.head_block_time() < HARDFORK_CORE_199_TIME,
                  "Since Hardfork #199, updating issuer requires the use of asset_change_issuer_operation.");
-      FC_ASSERT(d.find_object(*o.new_issuer));
-      if( a.is_market_issued() && *o.new_issuer == GRAPHENE_COMMITTEE_ACCOUNT )
-      {
-         const asset_object& backing = a.bitasset_data(d).options.short_backing_asset(d);
-         if( backing.is_market_issued() )
-         {
-            const asset_object& backing_backing = backing.bitasset_data(d).options.short_backing_asset(d);
-            FC_ASSERT( backing_backing.get_id() == asset_id_type(),
-                       "May not create a blockchain-controlled market asset which is not backed by CORE.");
-         } else
-            FC_ASSERT( backing.get_id() == asset_id_type(),
-                       "May not create a blockchain-controlled market asset which is not backed by CORE.");
-      }
+      validate_new_issuer( d, a, *o.new_issuer );
    }
 
    if( (d.head_block_time() < HARDFORK_572_TIME) || (a.dynamic_asset_data_id(d).current_supply != 0) )
@@ -336,19 +341,7 @@ void_result asset_update_issuer_evaluator::do_evaluate(const asset_update_issuer
 
    const asset_object& a = o.asset_to_update(d);
 
-   FC_ASSERT(d.find_object(o.new_issuer));
-   if( a.is_market_issued() && o.new_issuer == GRAPHENE_COMMITTEE_ACCOUNT )
-   {
-      const asset_object& backing = a.bitasset_data(d).options.short_backing_asset(d);
-      if( backing.is_market_issued() )
-      {
-         const asset_object& backing_backing = backing.bitasset_data(d).options.short_backing_asset(d);
-         FC_ASSERT( backing_backing.get_id() == asset_id_type(),
-                    "May not create a blockchain-controlled market asset which is not backed by CORE.");
-      } else
-         FC_ASSERT( backing.get_id() == asset_id_type(),
-                    "May not create a blockchain-controlled market asset which is not backed by CORE.");
-   }
+   validate_new_issuer( d, a, o.new_issuer );
 
    asset_to_update = &a;
    FC_ASSERT( o.issuer == a.issuer, "", ("o.issuer", o.issuer)("a.issuer", a.issuer) );
