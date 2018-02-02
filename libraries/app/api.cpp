@@ -308,19 +308,17 @@ namespace graphene { namespace app {
        if( start == operation_history_id_type() )
           start = node->operation_id;
 
-       while(node && node->operation_id.instance.value > stop.instance.value && result.size() < limit)
-       {
-          if( node->operation_id.instance.value <= start.instance.value )
-             result.push_back( node->operation_id(db) );
-          if( node->next == account_transaction_history_id_type() )
-             node = nullptr;
-          else node = &node->next(db);
-       }
-       if( stop.instance.value == 0 && result.size() < limit )
-       {
-          node = db.find(account_transaction_history_id_type());
-          if( node && node->account == account)
-             result.push_back( node->operation_id(db) );
+       const auto& hist_idx = db.get_index_type<account_transaction_history_index>();
+       const auto& by_op_idx = hist_idx.indices().get<by_op>();
+
+       if( start.instance.value >= stop.instance.value && start.instance.value > stats.removed_ops) {
+          auto itr = by_op_idx.lower_bound(boost::make_tuple(account, start));
+          auto itr_stop = by_op_idx.upper_bound(boost::make_tuple(account, stop));
+
+          do {
+             result.push_back(itr->operation_id(db));
+             --itr;
+          } while (itr != itr_stop && itr->operation_id.instance.value > stop.instance.value && result.size() < limit);
        }
        return result;
     }
