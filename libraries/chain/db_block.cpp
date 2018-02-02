@@ -286,7 +286,7 @@ processed_transaction database::push_proposal(const proposal_object& proposal)
       {
          _applied_ops.resize( old_applied_ops_size );
       }
-      elog( "e", ("e",e.to_detail_string() ) );
+      elog( "${e}", ("e",e.to_detail_string() ) );
       throw;
    }
 
