@@ -176,7 +176,7 @@ void database::execute_bid( const collateral_bid_object& bid, share_type debt_co
    remove(bid);
 }
 
-void database::cancel_order(const force_settlement_object& order, bool create_virtual_op)
+void database::cancel_settle_order(const force_settlement_object& order, bool create_virtual_op)
 {
    adjust_balance(order.owner, order.balance);
 
@@ -191,26 +191,100 @@ void database::cancel_order(const force_settlement_object& order, bool create_vi
    remove(order);
 }
 
-void database::cancel_order( const limit_order_object& order, bool create_virtual_op  )
+void database::cancel_limit_order( const limit_order_object& order, bool create_virtual_op, bool skip_cancel_fee )
 {
-   auto refunded = order.amount_for_sale();
-
-   modify( order.seller(*this).statistics(*this),[&]( account_statistics_object& obj ){
-      if( refunded.asset_id == asset_id_type() )
-      {
-         obj.total_core_in_orders -= refunded.amount;
-      }
-   });
-   adjust_balance(order.seller, refunded);
-   adjust_balance(order.seller, order.deferred_fee);
-
+   // if need to create a virtual op, try deduct a cancellation fee here.
+   // there are two scenarios when order is cancelled and need to create a virtual op:
+   // 1. due to expiration: always deduct a fee if there is any fee deferred
+   // 2. due to cull_small: deduct a fee after hard fork 604, but not before (will set skip_cancel_fee)
+   const account_statistics_object* seller_acc_stats = nullptr;
+   const asset_dynamic_data_object* fee_asset_dyn_data = nullptr;
+   limit_order_cancel_operation vop;
+   share_type deferred_fee = order.deferred_fee;
+   asset deferred_paid_fee = order.deferred_paid_fee;
    if( create_virtual_op )
    {
-      limit_order_cancel_operation vop;
       vop.order = order.id;
       vop.fee_paying_account = order.seller;
-      push_applied_operation( vop );
+      // only deduct fee if not skipping fee, and there is any fee deferred
+      // TODO check if skip_fee is enabled?
+      if( !skip_cancel_fee && deferred_fee > 0 )
+      {
+         asset core_cancel_fee = current_fee_schedule().calculate_fee( vop );
+         // cap the fee
+         if( core_cancel_fee.amount > deferred_fee )
+            core_cancel_fee.amount = deferred_fee;
+         // if there is any CORE fee to deduct, redirect it to referral program
+         if( core_cancel_fee.amount > 0 )
+         {
+            seller_acc_stats = &order.seller( *this ).statistics( *this );
+            modify( *seller_acc_stats, [&]( account_statistics_object& obj ) {
+               obj.pay_fee( core_cancel_fee.amount, get_global_properties().parameters.cashback_vesting_threshold );
+            } );
+            deferred_fee -= core_cancel_fee.amount;
+            // handle originally paid fee if any:
+            //    to_deduct = round_up( paid_fee * core_cancel_fee / deferred_core_fee_before_deduct )
+            if( deferred_paid_fee.amount == 0 )
+            {
+               vop.fee = core_cancel_fee;
+            }
+            else
+            {
+               fc::uint128 fee128( deferred_paid_fee.amount.value );
+               fee128 *= core_cancel_fee.amount.value;
+               // to round up
+               fee128 += order.deferred_fee.value;
+               fee128 -= 1;
+               fee128 /= order.deferred_fee.value;
+               share_type cancel_fee_amount = fee128.to_uint64();
+               // cancel_fee should be positive, pay it to asset's accumulated_fees
+               fee_asset_dyn_data = &deferred_paid_fee.asset_id(*this).dynamic_asset_data_id(*this);
+               modify( *fee_asset_dyn_data, [&](asset_dynamic_data_object& addo) {
+                  addo.accumulated_fees += cancel_fee_amount;
+               });
+               // cancel_fee should be no more than deferred_paid_fee
+               deferred_paid_fee.amount -= cancel_fee_amount;
+               vop.fee = asset( cancel_fee_amount, deferred_paid_fee.asset_id );
+            }
+         }
+      }
    }
+
+   // refund funds in order
+   auto refunded = order.amount_for_sale();
+   if( refunded.asset_id == asset_id_type() )
+   {
+      if( seller_acc_stats == nullptr )
+         seller_acc_stats = &order.seller( *this ).statistics( *this );
+      modify( *seller_acc_stats, [&]( account_statistics_object& obj ) {
+         obj.total_core_in_orders -= refunded.amount;
+      });
+   }
+   adjust_balance(order.seller, refunded);
+
+   // refund fee
+   // could be virtual op or real op here
+   // TODO check if skip_fee is enabled?
+   if( deferred_paid_fee.amount == 0 )
+   {
+      // be here, order.create_time <= HARDFORK_CORE_604_TIME, or fee paid in CORE, or no fee to refund.
+      // if order was created before hard fork 604 then cancelled no matter before or after hard fork 604,
+      //    see it as fee paid in CORE, deferred_fee should be refunded to order owner but not fee pool
+      adjust_balance( order.seller, deferred_fee );
+   }
+   else // need to refund fee in originally paid asset
+   {
+      adjust_balance(order.seller, deferred_paid_fee);
+      // be here, must have: fee_asset != CORE
+      if( fee_asset_dyn_data == nullptr )
+         fee_asset_dyn_data = &deferred_paid_fee.asset_id(*this).dynamic_asset_data_id(*this);
+      modify( *fee_asset_dyn_data, [&](asset_dynamic_data_object& addo) {
+         addo.fee_pool += deferred_fee;
+      });
+   }
+
+   if( create_virtual_op )
+      push_applied_operation( vop );
 
    remove(order);
 }
@@ -229,8 +303,14 @@ bool maybe_cull_small_order( database& db, const limit_order_object& order )
     */
    if( order.amount_to_receive().amount == 0 )
    {
-      //ilog( "applied epsilon logic" );
-      db.cancel_order(order);
+      if( order.deferred_fee > 0 && db.head_block_time() <= HARDFORK_CORE_604_TIME )
+      {
+         wlog( "At block ${n}, cancelling order without charging a fee: ${o}", ("n",db.head_block_num())("o",order) );
+         db.cancel_limit_order( order, true, true );
+      }
+      else
+         db.cancel_limit_order( order );
+      // TODO check call orders here?
       return true;
    }
    return false;
@@ -406,6 +486,14 @@ bool database::fill_order( const limit_order_object& order, const asset& pays, c
       } );
    }
 
+   if( order.deferred_paid_fee.amount > 0 ) // implies head_block_time() > HARDFORK_CORE_604_TIME
+   {
+      const auto& fee_asset_dyn_data = order.deferred_paid_fee.asset_id(*this).dynamic_asset_data_id(*this);
+      modify( fee_asset_dyn_data, [&](asset_dynamic_data_object& addo) {
+         addo.accumulated_fees += order.deferred_paid_fee.amount;
+      });
+   }
+
    if( pays == order.amount_for_sale() )
    {
       remove( order );
@@ -415,7 +503,10 @@ bool database::fill_order( const limit_order_object& order, const asset& pays, c
    {
       modify( order, [&]( limit_order_object& b ) {
                              b.for_sale -= pays.amount;
-                             b.deferred_fee = 0;
+                             if( b.deferred_fee > 0 )
+                                b.deferred_fee = 0;
+                             if( b.deferred_paid_fee.amount > 0 )
+                                b.deferred_paid_fee.amount = 0;
                           });
       if( cull_if_small )
          return maybe_cull_small_order( *this, order );

@@ -62,12 +62,32 @@ void_result limit_order_create_evaluator::do_evaluate(const limit_order_create_o
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (op) ) }
 
+void limit_order_create_evaluator::convert_fee()
+{
+   if( db().head_block_time() <= HARDFORK_CORE_604_TIME )
+      generic_evaluator::convert_fee();
+   else
+      if( !trx_state->skip_fee )
+      {
+         if( fee_asset->get_id() != asset_id_type() )
+         {
+            db().modify(*fee_asset_dyn_data, [this](asset_dynamic_data_object& d) {
+               d.fee_pool -= core_fee_paid;
+            });
+         }
+      }
+}
+
 void limit_order_create_evaluator::pay_fee()
 {
    if( db().head_block_time() <= HARDFORK_445_TIME )
       generic_evaluator::pay_fee();
    else
+   {
       _deferred_fee = core_fee_paid;
+      if( db().head_block_time() > HARDFORK_CORE_604_TIME && fee_asset->get_id() != asset_id_type() )
+         _deferred_paid_fee = fee_from_account;
+   }
 }
 
 object_id_type limit_order_create_evaluator::do_apply(const limit_order_create_operation& op)
@@ -88,6 +108,7 @@ object_id_type limit_order_create_evaluator::do_apply(const limit_order_create_o
        obj.sell_price = op.get_price();
        obj.expiration = op.expiration;
        obj.deferred_fee = _deferred_fee;
+       obj.deferred_paid_fee = _deferred_paid_fee;
    });
    limit_order_id_type order_id = new_order_object.id; // save this because we may remove the object by filling it
    bool filled = db().apply_order(new_order_object);
@@ -115,7 +136,7 @@ asset limit_order_cancel_evaluator::do_apply(const limit_order_cancel_operation&
    auto quote_asset = _order->sell_price.quote.asset_id;
    auto refunded = _order->amount_for_sale();
 
-   d.cancel_order(*_order, false /* don't create a virtual op*/);
+   d.cancel_limit_order(*_order, false /* don't create a virtual op*/);
 
    // Possible optimization: order can be called by canceling a limit order iff the canceled order was at the top of the book.
    // Do I need to check calls in both assets?

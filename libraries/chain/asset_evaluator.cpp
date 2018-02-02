@@ -316,7 +316,7 @@ void_result asset_update_evaluator::do_apply(const asset_update_operation& o)
       for( auto itr = idx.lower_bound(o.asset_to_update);
            itr != idx.end() && itr->settlement_asset_id() == o.asset_to_update;
            itr = idx.lower_bound(o.asset_to_update) )
-         d.cancel_order(*itr);
+         d.cancel_settle_order(*itr);
    }
 
    d.modify(*asset_to_update, [&](asset_object& a) {
