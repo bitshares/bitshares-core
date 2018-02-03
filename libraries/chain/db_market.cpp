@@ -364,6 +364,154 @@ bool database::apply_order(const limit_order_object& new_order_object, bool allo
    return maybe_cull_small_order( *this, *updated_order_object );
 }
 
+bool database::apply_order_hf_201803(const limit_order_object& new_order_object, bool allow_black_swan)
+{
+   auto order_id = new_order_object.id;
+   asset_id_type sell_asset_id = new_order_object.sell_asset_id();
+   asset_id_type recv_asset_id = new_order_object.receive_asset_id();
+
+   // We only need to check if the new order will match with others if it is at the front of the book
+   const auto& limit_price_idx = get_index_type<limit_order_index>().indices().get<by_price>();
+   auto limit_itr = limit_price_idx.lower_bound( boost::make_tuple( new_order_object.sell_price, order_id ) );
+   if( limit_itr != limit_price_idx.begin() )
+   {
+      --limit_itr;
+      if( limit_itr->sell_asset_id() == sell_asset_id && limit_itr->receive_asset_id() == recv_asset_id )
+         return false;
+   }
+
+   // Order matching should be in favor of the taker.
+   // When a new limit order is created, e.g. an ask, need to check if it will match the highest bid.
+   // We were checking call orders first. However, due to MSSR (maximum_short_squeeze_ratio),
+   // effective price of call orders may be lower than limit orders, so we should also check limit orders here.
+
+   // Question: will a new limit order trigger a black swan event?
+   //
+   // 1. as of writing, it's possible due to the call-order-and-limit-order overlapping issue:
+   //       https://github.com/bitshares/bitshares-core/issues/606 .
+   //    when it happens, a call order can be very big but don't match with the opposite,
+   //    even when price feed is too far away, further than swan price,
+   //    if the new limit order is in the same direction with the call orders, it can eat up all the opposite,
+   //    then the call order will lose support and trigger a black swan event.
+   // 2. after issue 606 is fixed, there will be no limit order on the opposite side "supporting" the call order,
+   //    so a new order in the same direction with the call order won't trigger a black swan event.
+   // 3. calling is one direction. if the new limit order is on the opposite direction,
+   //    no matter if matches with the call, it won't trigger a black swan event.
+   //
+   // Since it won't trigger a black swan, no need to check here.
+
+   // currently we don't do cross-market (triangle) matching.
+   // the limit order will only match with a call order if meet all of these:
+   // 1. it's buying collateral, which means sell_asset is the MIA, receive_asset is the backing asset.
+   // 2. sell_asset is not a prediction market
+   // 3. sell_asset is not globally settled
+   // 4. sell_asset has a valid price feed
+   // 5. the call order doesn't have enough collateral
+   // 6. the limit order provided a good price
+   bool to_check_call_orders = false;
+   const asset_object& sell_asset = sell_asset_id( *this );
+   //const asset_object& recv_asset = recv_asset_id( *this );
+   const asset_bitasset_data_object* sell_abd = nullptr;
+   if( sell_asset.is_market_issued() )
+   {
+      sell_abd = &sell_asset.bitasset_data( *this );
+      if( sell_abd->options.short_backing_asset == recv_asset_id
+          && !sell_abd->is_prediction_market
+          && !sell_abd->has_settlement()
+          && !sell_abd->current_feed.settlement_price.is_null() )
+      {
+         to_check_call_orders = true;
+      }
+   }
+
+   // this is the opposite side
+   auto max_price = ~new_order_object.sell_price;
+   limit_itr = limit_price_idx.lower_bound( max_price.max() );
+   auto limit_end = limit_price_idx.upper_bound( max_price );
+   bool to_check_limit_orders = (limit_itr != limit_end);
+
+   if( to_check_call_orders )
+   {
+      // check if there are margin calls
+      const auto& call_price_idx = get_index_type<call_order_index>().indices().get<by_price>();
+      auto call_min = price::min( recv_asset_id, sell_asset_id );
+      price min_call_price = sell_abd->current_feed.max_short_squeeze_price();
+      while( true )
+      {
+         auto call_itr = call_price_idx.lower_bound( call_min );
+         // there is this new limit order means there are short positions, so call_itr might be valid
+         const call_order_object& call_order = *call_itr;
+         price call_order_price = ~call_order.call_price;
+         if( call_order_price >= sell_abd->current_feed.settlement_price ) // has enough collateral
+            to_check_call_orders = false;
+         else
+         {
+            if( call_order_price < min_call_price ) // feed protected https://github.com/cryptonomex/graphene/issues/436
+               call_order_price = min_call_price;
+            if( call_order_price > new_order_object.sell_price ) // new limit order is too far away, can't match
+               to_check_call_orders = false;
+         }
+
+         if( !to_check_call_orders ) // finished checking call orders
+            break;
+
+         if( to_check_limit_orders ) // need to check both calls and limits
+         {
+            // fill as many limit orders as possible
+            bool finished = false;
+            while( !finished && limit_itr != limit_end && call_order_price > ~limit_itr->sell_price )
+            {
+               auto old_limit_itr = limit_itr;
+               ++limit_itr;
+               // match returns 2 when only the old order was fully filled. In this case, we keep matching; otherwise, we stop.
+               finished = ( match( new_order_object, *old_limit_itr, old_limit_itr->sell_price ) != 2 );
+            }
+            if( finished ) // if the new limit order is gone
+            {
+               to_check_limit_orders = false; // no need to check more limit orders as well
+               break;
+            }
+            if( limit_itr == limit_end ) // if no more limit order to check
+               to_check_limit_orders = false; // no need to check more limit orders as well
+         }
+
+         // now fill the call order
+         auto match_result = match( new_order_object, call_order, call_order_price );
+
+         if( match_result != 2 ) // if the new limit order is gone
+         {
+            to_check_limit_orders = false; // no need to check more limit orders as well
+            break;
+         }
+         // else the call order should be gone, do thing here
+
+      } // end while
+
+   } // end check call orders
+
+   if( to_check_limit_orders ) // still and only need to check limit orders
+   {
+      bool finished = false;
+      while( !finished && limit_itr != limit_end )
+      {
+         auto old_limit_itr = limit_itr;
+         ++limit_itr;
+         // match returns 2 when only the old order was fully filled. In this case, we keep matching; otherwise, we stop.
+         finished = ( match( new_order_object, *old_limit_itr, old_limit_itr->sell_price ) != 2 );
+      }
+   }
+
+   // TODO really need to find again?
+   const limit_order_object* updated_order_object = find< limit_order_object >( order_id );
+   if( updated_order_object == nullptr )
+      return true;
+
+   // before #555 we would have done maybe_cull_small_order() logic as a result of fill_order() being called by match() above
+   // however after #555 we need to get rid of small orders -- #555 hardfork defers logic that was done too eagerly before, and
+   // this is the point it's deferred to.
+   return maybe_cull_small_order( *this, *updated_order_object );
+}
+
 /**
  *  Matches the two orders,
  *
@@ -420,6 +568,48 @@ int database::match( const limit_order_object& usd, const OrderType& core, const
 int database::match( const limit_order_object& bid, const limit_order_object& ask, const price& match_price )
 {
    return match<limit_order_object>( bid, ask, match_price );
+}
+
+int database::match( const limit_order_object& bid, const call_order_object& ask, const price& match_price )
+{
+   FC_ASSERT( bid.sell_asset_id() == ask.debt_type() );
+   FC_ASSERT( bid.receive_asset_id() == ask.collateral_type() );
+   FC_ASSERT( bid.for_sale > 0 && ask.debt > 0 && ask.collateral > 0 );
+
+   bool  filled_limit     = false;
+   bool  filled_call      = false;
+
+   asset usd_for_sale = bid.amount_for_sale();
+   asset usd_to_buy   = ask.get_debt();
+
+   asset call_pays, call_receives, order_pays, order_receives;
+   if( usd_to_buy >= usd_for_sale )
+   {  // fill limit order
+      call_receives   = usd_for_sale;
+      order_receives  = usd_for_sale * match_price; // round down here, in favor of call order
+      call_pays       = order_receives;
+      order_pays      = usd_for_sale;
+
+      filled_limit    = true;
+      filled_call     = ( usd_to_buy == usd_for_sale );
+   }
+   else
+   {  // fill call order
+      call_receives  = usd_to_buy;
+      order_receives = usd_to_buy * match_price; // round down here, in favor of call order
+      call_pays      = order_receives;
+      order_pays     = usd_to_buy;
+
+      filled_call    = true;
+   }
+
+   FC_ASSERT( filled_call || filled_limit );
+
+   int result = 0;
+   result |= fill_order( bid, order_pays, order_receives, false, match_price, false ); // the limit order is taker
+   result |= fill_order( ask, call_pays, call_receives, match_price, true ) << 1;      // the call order is maker
+   FC_ASSERT( result != 0 );
+   return result;
 }
 
 
@@ -518,6 +708,11 @@ bool database::fill_order( const call_order_object& order, const asset& pays, co
    FC_ASSERT( order.get_collateral().asset_id == pays.asset_id );
    FC_ASSERT( order.get_collateral() >= pays );
 
+   const asset_object& mia = receives.asset_id(*this);
+   FC_ASSERT( mia.is_market_issued() );
+
+   const auto& mia_bdo = mia.bitasset_data( *this );
+
    optional<asset> collateral_freed;
    modify( order, [&]( call_order_object& o ){
             o.debt       -= receives.amount;
@@ -527,9 +722,10 @@ bool database::fill_order( const call_order_object& order, const asset& pays, co
               collateral_freed = o.get_collateral();
               o.collateral = 0;
             }
+            else if( head_block_time() > HARDFORK_CORE_343_TIME )
+              o.call_price = price::call_price( o.get_debt(), o.get_collateral(),
+                                                mia_bdo.current_feed.maintenance_collateral_ratio );
        });
-   const asset_object& mia = receives.asset_id(*this);
-   assert( mia.is_market_issued() );
 
    const asset_dynamic_data_object& mia_ddo = mia.dynamic_asset_data_id(*this);
 
@@ -643,8 +839,10 @@ bool database::check_call_orders(const asset_object& mia, bool enable_black_swan
     bool filled_limit = false;
     bool margin_called = false;
 
+    auto head_time = head_block_time();
     while( !check_for_blackswan( mia, enable_black_swan ) && call_itr != call_end )
     {
+       bool  filled_limit_in_loop = false;
        bool  filled_call      = false;
        price match_price;
        asset usd_for_sale;
@@ -659,12 +857,12 @@ bool database::check_call_orders(const asset_object& mia, bool enable_black_swan
        match_price.validate();
 
        // would be margin called, but there is no matching order #436
-       bool feed_protected = ( bitasset.current_feed.settlement_price > ~call_itr->call_price );
-       if( feed_protected && (head_block_time() > HARDFORK_436_TIME) )
+       if( ( head_time > HARDFORK_436_TIME )
+             && ( bitasset.current_feed.settlement_price > ~call_itr->call_price ) )
           return margin_called;
 
        // would be margin called, but there is no matching order
-       if( match_price > ~call_itr->call_price )
+       if( head_time <= HARDFORK_CORE_606_TIME && match_price > ~call_itr->call_price )
           return margin_called;
 
        /*
@@ -702,6 +900,7 @@ bool database::check_call_orders(const asset_object& mia, bool enable_black_swan
           call_pays       = order_receives;
           order_pays      = usd_for_sale;
 
+          filled_limit_in_loop = true;
           filled_limit = true;
           filled_call           = (usd_to_buy == usd_for_sale);
        } else { // fill call
@@ -711,20 +910,31 @@ bool database::check_call_orders(const asset_object& mia, bool enable_black_swan
           order_pays     = usd_to_buy;
 
           filled_call    = true;
-          if( filled_limit )
+          if( filled_limit && head_time <= HARDFORK_CORE_453_TIME )
              wlog( "Multiple limit match problem (issue 338) occurred at block #${block}", ("block",head_block_num()) );
        }
 
        FC_ASSERT( filled_call || filled_limit );
+       FC_ASSERT( filled_call || filled_limit_in_loop );
 
        auto old_call_itr = call_itr;
-       if( filled_call ) ++call_itr;
+       if( filled_call && head_time <= HARDFORK_CORE_343_TIME )
+          ++call_itr;
        // when for_new_limit_order is true, the call order is maker, otherwise the call order is taker
        fill_order(*old_call_itr, call_pays, call_receives, match_price, for_new_limit_order );
+       if( head_time > HARDFORK_CORE_343_TIME )
+          call_itr = call_price_index.lower_bound( call_min );
 
        auto old_limit_itr = limit_itr;
        auto next_limit_itr = std::next( limit_itr );
-       if( filled_limit ) ++limit_itr;
+       if( head_time <= HARDFORK_CORE_453_TIME )
+       {
+          if( filled_limit ) ++limit_itr;
+       }
+       else
+       {
+          if( filled_limit_in_loop ) ++limit_itr;
+       }
        // when for_new_limit_order is true, the limit order is taker, otherwise the limit order is maker
        bool really_filled = fill_order(*old_limit_itr, order_pays, order_receives, true, match_price, !for_new_limit_order );
        if( !filled_limit && really_filled )

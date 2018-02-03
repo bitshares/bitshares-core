@@ -64,6 +64,8 @@ class limit_order_object : public abstract_object<limit_order_object>
 
       asset amount_for_sale()const   { return asset( for_sale, sell_price.base.asset_id ); }
       asset amount_to_receive()const { return amount_for_sale() * sell_price; }
+      asset_id_type sell_asset_id()const    { return sell_price.base.asset_id;  }
+      asset_id_type receive_asset_id()const { return sell_price.quote.asset_id; }
 };
 
 struct by_id;
@@ -115,12 +117,13 @@ class call_order_object : public abstract_object<call_order_object>
       asset get_debt()const { return asset( debt, debt_type() ); }
       asset amount_to_receive()const { return get_debt(); }
       asset_id_type debt_type()const { return call_price.quote.asset_id; }
+      asset_id_type collateral_type()const { return call_price.base.asset_id; }
       price collateralization()const { return get_collateral() / get_debt(); }
 
       account_id_type  borrower;
       share_type       collateral;  ///< call_price.base.asset_id, access via get_collateral
-      share_type       debt;        ///< call_price.quote.asset_id, access via get_collateral
-      price            call_price;  ///< Debt / Collateral
+      share_type       debt;        ///< call_price.quote.asset_id, access via get_debt
+      price            call_price;  ///< Collateral / Debt
 
       pair<asset_id_type,asset_id_type> get_market()const
       {
