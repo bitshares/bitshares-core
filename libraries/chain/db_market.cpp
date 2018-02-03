@@ -503,10 +503,8 @@ bool database::fill_order( const limit_order_object& order, const asset& pays, c
    {
       modify( order, [&]( limit_order_object& b ) {
                              b.for_sale -= pays.amount;
-                             if( b.deferred_fee > 0 )
-                                b.deferred_fee = 0;
-                             if( b.deferred_paid_fee.amount > 0 )
-                                b.deferred_paid_fee.amount = 0;
+                             b.deferred_fee = 0;
+                             b.deferred_paid_fee.amount = 0;
                           });
       if( cull_if_small )
          return maybe_cull_small_order( *this, order );
