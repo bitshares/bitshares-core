@@ -1621,24 +1621,26 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_test )
       ACTORS((alice)(bob)(izzy));
 
       int64_t alice_b0 = 1000000, bob_b0 = 1000000;
-      int64_t pool_0 = 100000, accum_0 = 0;
+      int64_t pool_0 = 1000000, accum_0 = 0;
 
       transfer( account_id_type(), alice_id, asset(alice_b0) );
       transfer( account_id_type(), bob_id, asset(bob_b0) );
 
       asset_id_type core_id = asset_id_type();
-      const auto& usd_obj = create_user_issued_asset( "IZZYUSD", izzy_id(db), charge_market_fee );
+      int64_t cer_core_amount = 1801;
+      int64_t cer_usd_amount = 3;
+      price tmp_cer( asset( cer_core_amount ), asset( cer_usd_amount, asset_id_type(1) ) );
+      const auto& usd_obj = create_user_issued_asset( "IZZYUSD", izzy_id(db), charge_market_fee, tmp_cer );
       asset_id_type usd_id = usd_obj.id;
       issue_uia( alice_id, asset( alice_b0, usd_id ) );
       issue_uia( bob_id, asset( bob_b0, usd_id ) );
 
       fund_fee_pool( committee_account( db ), usd_obj, pool_0 );
 
-      int64_t order_create_fee = 537;
+      int64_t order_create_fee = 547;
       int64_t order_cancel_fee;
-      int64_t order_cancel_fee1 = 129;
-      int64_t order_cancel_fee2 = 629;
-      int64_t order_cancel_fee_capped;
+      int64_t order_cancel_fee1 = 139;
+      int64_t order_cancel_fee2 = 829;
 
       uint32_t skip = database::skip_witness_signature
                     | database::skip_transaction_signatures
@@ -1702,14 +1704,20 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_test )
          {
             new_fees = new_fees2;
             order_cancel_fee = order_cancel_fee2;
-            order_cancel_fee_capped = order_create_fee;
          }
          else
          {
             new_fees = new_fees1;
             order_cancel_fee = order_cancel_fee1;
-            order_cancel_fee_capped = order_cancel_fee;
          }
+
+         int64_t usd_create_fee = order_create_fee * cer_usd_amount / cer_core_amount;
+         if( usd_create_fee * cer_core_amount != order_create_fee * cer_usd_amount ) usd_create_fee += 1;
+         int64_t usd_cancel_fee = order_cancel_fee * cer_usd_amount / cer_core_amount;
+         if( usd_cancel_fee * cer_core_amount != order_cancel_fee * cer_usd_amount ) usd_cancel_fee += 1;
+         int64_t core_create_fee = usd_create_fee * cer_core_amount / cer_usd_amount;
+         int64_t core_cancel_fee = usd_cancel_fee * cer_core_amount / cer_usd_amount;
+
 
          BOOST_TEST_MESSAGE( "Start" );
 
@@ -1725,7 +1733,7 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_test )
          uint32_t blocks_generated = 0;
          time_point_sec max_exp = time_point_sec::maximum();
          time_point_sec exp = db.head_block_time(); // order will be accepted when pushing trx then expired at current block
-         price cer( asset(1), asset(1, usd_id) );
+         price cer = usd_id( db ).options.core_exchange_rate;
          const auto* usd_stat = &usd_id( db ).dynamic_asset_data_id( db );
 
          // balance data
@@ -1746,18 +1754,18 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_test )
             core_fee_refund_core = order_create_fee;
             core_fee_refund_usd = 0;
             usd_fee_refund_core = 0;
-            usd_fee_refund_usd = order_create_fee;
+            usd_fee_refund_usd = usd_create_fee;
             accum_on_new = 0;
-            accum_on_fill = order_create_fee;
-            pool_refund = order_create_fee;
+            accum_on_fill = usd_create_fee;
+            pool_refund = core_create_fee;
          }
          else if( db.head_block_time() > HARDFORK_445_TIME )
          {
             core_fee_refund_core = order_create_fee;
             core_fee_refund_usd = 0;
-            usd_fee_refund_core = order_create_fee;
+            usd_fee_refund_core = core_create_fee;
             usd_fee_refund_usd = 0;
-            accum_on_new = order_create_fee;
+            accum_on_new = usd_create_fee;
             accum_on_fill = 0;
             pool_refund = 0;
          }
@@ -1767,7 +1775,7 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_test )
             core_fee_refund_usd = 0;
             usd_fee_refund_core = 0;
             usd_fee_refund_usd = 0;
-            accum_on_new = order_create_fee;
+            accum_on_new = usd_create_fee;
             accum_on_fill = 0;
             pool_refund = 0;
          }
@@ -1775,15 +1783,82 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_test )
          // Check non-overlapping
          // Alice creates order
          // Bob creates order which doesn't match
-         BOOST_TEST_MESSAGE( "Creating non-overlapping orders: ao1, bo1" );
-         limit_order_id_type ao1_id = create_sell_order( alice_id, asset(1000), asset(1000, usd_id) )->id;
-         limit_order_id_type bo1_id = create_sell_order(   bob_id, asset(500, usd_id), asset(1000), exp, cer )->id;
+         BOOST_TEST_MESSAGE( "Creating non-overlapping orders" );
+         BOOST_TEST_MESSAGE( "Creating ao1" );
+         limit_order_id_type ao1_id = create_sell_order( alice_id, asset(1000), asset(1000, usd_id), exp )->id;
 
          alice_bc -= order_create_fee;
          alice_bc -= 1000;
-         bob_bu -= order_create_fee;
+
+         BOOST_CHECK_EQUAL( get_balance( alice_id, core_id ), alice_bc );
+         BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
+         BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
+         BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
+         BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
+         BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+
+         // Alice cancels order
+         if( !expire_order )
+         {
+            BOOST_TEST_MESSAGE( "Cancel order ao1" );
+            cancel_limit_order( ao1_id(db) );
+         }
+         else
+         {
+            BOOST_TEST_MESSAGE( "Order ao1 expired" );
+            // empty accounts before generate block, to test if it will fail when charging order cancel fee
+            transfer( alice_id, account_id_type(), asset(alice_bc, core_id) );
+            transfer( alice_id, account_id_type(), asset(alice_bu,  usd_id) );
+            transfer(   bob_id, account_id_type(), asset(  bob_bc, core_id) );
+            transfer(   bob_id, account_id_type(), asset(  bob_bu,  usd_id) );
+            // generate a new block so one or more order will expire
+            generate_block( skip );
+            ++blocks_generated;
+            enable_fees();
+            change_fees( new_fees );
+            set_expiration( db, trx );
+            exp = db.head_block_time();
+            usd_stat = &usd_id( db ).dynamic_asset_data_id( db );
+            // restore account balances
+            transfer( account_id_type(), alice_id, asset(alice_bc, core_id) );
+            transfer( account_id_type(), alice_id, asset(alice_bu,  usd_id) );
+            transfer( account_id_type(),   bob_id, asset(  bob_bc, core_id) );
+            transfer( account_id_type(),   bob_id, asset(  bob_bu,  usd_id) );
+         }
+
+
+         if( !expire_order )
+            alice_bc -= order_cancel_fee; // manual cancellation always need a fee
+         else if( before_hardfork_445 )
+         {  // do nothing: before hard fork 445, no fee on expired order
+         }
+         else if( !after_bsip26 )
+         {
+            // charge a cancellation fee in core, capped by deffered_fee which is order_create_fee
+            alice_bc -= std::min( order_cancel_fee, order_create_fee );
+         }
+         else // bsip26
+         {
+            // charge a cancellation fee in core, capped by deffered_fee which is order_create_fee
+            alice_bc -= std::min( order_cancel_fee, order_create_fee );
+         }
+         alice_bc += 1000;
+         alice_bc += core_fee_refund_core;
+         alice_bu += core_fee_refund_usd;
+
+         BOOST_CHECK_EQUAL( get_balance( alice_id, core_id ), alice_bc );
+         BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
+         BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
+         BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
+         BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
+         BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
+
+         BOOST_TEST_MESSAGE( "Creating bo1" );
+         limit_order_id_type bo1_id = create_sell_order(   bob_id, asset(500, usd_id), asset(1000), exp, cer )->id;
+
+         bob_bu -= usd_create_fee;
          bob_bu -= 500;
-         pool_b -= order_create_fee;
+         pool_b -= core_create_fee;
          accum_b += accum_on_new;
 
          BOOST_CHECK_EQUAL( get_balance( alice_id, core_id ), alice_bc );
@@ -1828,12 +1903,28 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_test )
          {  // do nothing: before hard fork 445, no fee on expired order
          }
          else if( !after_bsip26 )
-            bob_bc -= order_cancel_fee_capped; // will change a cancellation fee in core
+         {
+            // charge a cancellation fee in core, capped by deffered_fee which is core_create_fee
+            bob_bc -= std::min( order_cancel_fee, core_create_fee );
+         }
          else // bsip26
          {
-            bob_bu -= order_cancel_fee_capped; // will charge a cancellation fee in usd
-            pool_b -= order_cancel_fee_capped; // deduct coresponding fund from pool
-            accum_b += order_cancel_fee_capped; // cancellation fee goes to accumulated fees
+            // when expired, should have core_create_fee in deferred, usd_create_fee in deferred_paid
+
+            // charge a cancellation fee in core from fee_pool, capped by deffered
+            int64_t capped_core_cancel_fee = std::min( order_cancel_fee, core_create_fee );
+            pool_b -= capped_core_cancel_fee;
+
+            // charge a coresponding cancellation fee in usd from deffered_paid, round up, capped
+            int64_t capped_usd_cancel_fee = capped_core_cancel_fee * usd_create_fee / core_create_fee;
+            if( capped_usd_cancel_fee * core_create_fee != capped_core_cancel_fee * usd_create_fee )
+               capped_usd_cancel_fee += 1;
+            if( capped_usd_cancel_fee > usd_create_fee )
+               capped_usd_cancel_fee = usd_create_fee;
+            bob_bu -= capped_usd_cancel_fee;
+
+            // cancellation fee goes to accumulated fees
+            accum_b += capped_usd_cancel_fee;
          }
          bob_bc += usd_fee_refund_core;
          bob_bu += 500;
@@ -1848,22 +1939,6 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_test )
          BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
 
 
-         // Alice cancels order
-         BOOST_TEST_MESSAGE( "Cancel order ao1" );
-         cancel_limit_order( ao1_id(db) );
-
-         alice_bc -= order_cancel_fee;
-         alice_bc += 1000;
-         alice_bc += core_fee_refund_core;
-         alice_bu += core_fee_refund_usd;
-
-         BOOST_CHECK_EQUAL( get_balance( alice_id, core_id ), alice_bc );
-         BOOST_CHECK_EQUAL( get_balance( alice_id,  usd_id ), alice_bu );
-         BOOST_CHECK_EQUAL( get_balance(   bob_id, core_id ), bob_bc );
-         BOOST_CHECK_EQUAL( get_balance(   bob_id,  usd_id ), bob_bu );
-         BOOST_CHECK_EQUAL( usd_stat->fee_pool.value,          pool_b );
-         BOOST_CHECK_EQUAL( usd_stat->accumulated_fees.value,  accum_b );
-
          // Check partial fill
          BOOST_TEST_MESSAGE( "Creating ao2, then be partially filled by bo2" );
          const limit_order_object* ao2 = create_sell_order( alice_id, asset(1000), asset(200, usd_id), exp, cer );
@@ -1875,8 +1950,8 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_test )
 
          // data after order created
          alice_bc -= 1000;
-         alice_bu -= order_create_fee;
-         pool_b -= order_create_fee;
+         alice_bu -= usd_create_fee;
+         pool_b -= core_create_fee;
          accum_b += accum_on_new;
          bob_bc -= order_create_fee;
          bob_bu -= 100;
@@ -1953,8 +2028,8 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_test )
          const limit_order_id_type ao35id = ao35->id;
 
          alice_bc -= 1000 * 5;
-         alice_bu -= order_create_fee * 5;
-         pool_b -= order_create_fee * 5;
+         alice_bu -= usd_create_fee * 5;
+         pool_b -= core_create_fee * 5;
          accum_b += accum_on_new * 5;
 
          BOOST_CHECK_EQUAL( get_balance( alice_id, core_id ), alice_bc );
@@ -2099,13 +2174,15 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_cross_test )
       ACTORS((alice)(bob)(izzy));
 
       int64_t alice_b0 = 1000000, bob_b0 = 1000000;
-      int64_t pool_0 = 100000, accum_0 = 0;
+      int64_t pool_0 = 1000000, accum_0 = 0;
 
       transfer( account_id_type(), alice_id, asset(alice_b0) );
       transfer( account_id_type(), bob_id, asset(bob_b0) );
 
       asset_id_type core_id = asset_id_type();
-      price tmp_cer( asset(7), asset(3, asset_id_type(1)) );
+      int64_t cer_core_amount = 1801;
+      int64_t cer_usd_amount = 3;
+      price tmp_cer( asset( cer_core_amount ), asset( cer_usd_amount, asset_id_type(1) ) );
       const auto& usd_obj = create_user_issued_asset( "IZZYUSD", izzy_id(db), charge_market_fee, tmp_cer );
       asset_id_type usd_id = usd_obj.id;
       issue_uia( alice_id, asset( alice_b0, usd_id ) );
@@ -2115,10 +2192,12 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_cross_test )
 
       int64_t order_create_fee = 547;
       int64_t order_cancel_fee = 139;
-      int64_t usd_create_fee = order_create_fee * 3 / 7 + 1; // 235
-      int64_t usd_cancel_fee = order_cancel_fee * 3 / 7 + 1; // 60
-      int64_t core_create_fee = usd_create_fee * 7 / 3; // 548
-      int64_t core_cancel_fee = usd_cancel_fee * 7 / 3; // 140
+      int64_t usd_create_fee = order_create_fee * cer_usd_amount / cer_core_amount;
+      if( usd_create_fee * cer_core_amount != order_create_fee * cer_usd_amount ) usd_create_fee += 1;
+      int64_t usd_cancel_fee = order_cancel_fee * cer_usd_amount / cer_core_amount;
+      if( usd_cancel_fee * cer_core_amount != order_cancel_fee * cer_usd_amount ) usd_cancel_fee += 1;
+      int64_t core_create_fee = usd_create_fee * cer_core_amount / cer_usd_amount;
+      int64_t core_cancel_fee = usd_cancel_fee * cer_core_amount / cer_usd_amount;
 
       uint32_t skip = database::skip_witness_signature
                     | database::skip_transaction_signatures
