@@ -311,7 +311,7 @@ namespace graphene { namespace app {
        const auto& hist_idx = db.get_index_type<account_transaction_history_index>();
        const auto& by_op_idx = hist_idx.indices().get<by_op>();
 
-       if( start.instance.value >= stop.instance.value && start.instance.value > stats.removed_ops) {
+       if( start.instance.value >= stop.instance.value) {
           auto itr = by_op_idx.lower_bound(boost::make_tuple(account, start));
           auto itr_stop = by_op_idx.upper_bound(boost::make_tuple(account, stop));
 
