@@ -352,6 +352,7 @@ namespace graphene { namespace chain {
           * already on the books.
           */
          bool apply_order(const limit_order_object& new_order_object, bool allow_black_swan = true);
+         bool apply_order_hf_201803(const limit_order_object& new_order_object, bool allow_black_swan = true);
 
          /**
           * Matches the two orders,
@@ -367,6 +368,7 @@ namespace graphene { namespace chain {
          template<typename OrderType>
          int match( const limit_order_object& bid, const OrderType& ask, const price& match_price );
          int match( const limit_order_object& bid, const limit_order_object& ask, const price& trade_price );
+         int match( const limit_order_object& bid, const call_order_object& ask, const price& trade_price );
          /// @return the amount of asset settled
          asset match(const call_order_object& call,
                    const force_settlement_object& settle,

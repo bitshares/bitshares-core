@@ -235,6 +235,9 @@ bool database::check_for_blackswan( const asset_object& mia, bool enable_black_s
        highest = std::max( limit_itr->sell_price, settle_price );
     }
 
+    // FIXME
+    // possible BUG: position with lowest call_price doesn't always have least collateral
+    // related to https://github.com/bitshares/bitshares-core/issues/343
     auto least_collateral = call_itr->collateralization();
     if( ~least_collateral >= highest  ) 
     {
