@@ -316,7 +316,7 @@ bool maybe_cull_small_order( database& db, const limit_order_object& order )
    return false;
 }
 
-bool database::apply_order(const limit_order_object& new_order_object, bool allow_black_swan)
+bool database::apply_order_before_hardfork_625(const limit_order_object& new_order_object, bool allow_black_swan)
 {
    auto order_id = new_order_object.id;
    const asset_object& sell_asset = get(new_order_object.amount_for_sale().asset_id);
@@ -367,7 +367,7 @@ bool database::apply_order(const limit_order_object& new_order_object, bool allo
    return maybe_cull_small_order( *this, *updated_order_object );
 }
 
-bool database::apply_order_hf_201803(const limit_order_object& new_order_object, bool allow_black_swan)
+bool database::apply_order(const limit_order_object& new_order_object, bool allow_black_swan)
 {
    auto order_id = new_order_object.id;
    asset_id_type sell_asset_id = new_order_object.sell_asset_id();
@@ -383,10 +383,15 @@ bool database::apply_order_hf_201803(const limit_order_object& new_order_object,
          return false;
    }
 
+   // this is the opposite side (on the book)
+   auto max_price = ~new_order_object.sell_price;
+   limit_itr = limit_price_idx.lower_bound( max_price.max() );
+   auto limit_end = limit_price_idx.upper_bound( max_price );
+
    // Order matching should be in favor of the taker.
    // When a new limit order is created, e.g. an ask, need to check if it will match the highest bid.
    // We were checking call orders first. However, due to MSSR (maximum_short_squeeze_ratio),
-   // effective price of call orders may be lower than limit orders, so we should also check limit orders here.
+   // effective price of call orders may be worse than limit orders, so we should also check limit orders here.
 
    // Question: will a new limit order trigger a black swan event?
    //
@@ -411,10 +416,11 @@ bool database::apply_order_hf_201803(const limit_order_object& new_order_object,
    // 4. sell_asset has a valid price feed
    // 5. the call order doesn't have enough collateral
    // 6. the limit order provided a good price
+
    bool to_check_call_orders = false;
    const asset_object& sell_asset = sell_asset_id( *this );
-   //const asset_object& recv_asset = recv_asset_id( *this );
    const asset_bitasset_data_object* sell_abd = nullptr;
+   price call_match_price;
    if( sell_asset.is_market_issued() )
    {
       sell_abd = &sell_asset.bitasset_data( *this );
@@ -423,88 +429,51 @@ bool database::apply_order_hf_201803(const limit_order_object& new_order_object,
           && !sell_abd->has_settlement()
           && !sell_abd->current_feed.settlement_price.is_null() )
       {
-         to_check_call_orders = true;
+         call_match_price = ~sell_abd->current_feed.max_short_squeeze_price();
+         if( ~new_order_object.sell_price <= call_match_price ) // new limit order price is good enough to match a call
+            to_check_call_orders = true;
       }
    }
 
-   // this is the opposite side
-   auto max_price = ~new_order_object.sell_price;
-   limit_itr = limit_price_idx.lower_bound( max_price.max() );
-   auto limit_end = limit_price_idx.upper_bound( max_price );
-   bool to_check_limit_orders = (limit_itr != limit_end);
-
+   bool finished = false; // whether the new order is gone
    if( to_check_call_orders )
    {
-      // check if there are margin calls
-      const auto& call_price_idx = get_index_type<call_order_index>().indices().get<by_price>();
-      auto call_min = price::min( recv_asset_id, sell_asset_id );
-      price min_call_price = sell_abd->current_feed.max_short_squeeze_price();
-      while( true )
-      {
-         auto call_itr = call_price_idx.lower_bound( call_min );
-         // there is this new limit order means there are short positions, so call_itr might be valid
-         const call_order_object& call_order = *call_itr;
-         price call_order_price = ~call_order.call_price;
-         if( call_order_price >= sell_abd->current_feed.settlement_price ) // has enough collateral
-            to_check_call_orders = false;
-         else
-         {
-            if( call_order_price < min_call_price ) // feed protected https://github.com/cryptonomex/graphene/issues/436
-               call_order_price = min_call_price;
-            if( call_order_price > new_order_object.sell_price ) // new limit order is too far away, can't match
-               to_check_call_orders = false;
-         }
-
-         if( !to_check_call_orders ) // finished checking call orders
-            break;
-
-         if( to_check_limit_orders ) // need to check both calls and limits
-         {
-            // fill as many limit orders as possible
-            bool finished = false;
-            while( !finished && limit_itr != limit_end && call_order_price > ~limit_itr->sell_price )
-            {
-               auto old_limit_itr = limit_itr;
-               ++limit_itr;
-               // match returns 2 when only the old order was fully filled. In this case, we keep matching; otherwise, we stop.
-               finished = ( match( new_order_object, *old_limit_itr, old_limit_itr->sell_price ) != 2 );
-            }
-            if( finished ) // if the new limit order is gone
-            {
-               to_check_limit_orders = false; // no need to check more limit orders as well
-               break;
-            }
-            if( limit_itr == limit_end ) // if no more limit order to check
-               to_check_limit_orders = false; // no need to check more limit orders as well
-         }
-
-         // now fill the call order
-         auto match_result = match( new_order_object, call_order, call_order_price );
-
-         if( match_result != 2 ) // if the new limit order is gone
-         {
-            to_check_limit_orders = false; // no need to check more limit orders as well
-            break;
-         }
-         // else the call order should be gone, do thing here
-
-      } // end while
-
-   } // end check call orders
-
-   if( to_check_limit_orders ) // still and only need to check limit orders
-   {
-      bool finished = false;
-      while( !finished && limit_itr != limit_end )
+      // check limit orders first, match the ones with better price in comparison to call orders
+      while( !finished && limit_itr != limit_end && limit_itr->sell_price > call_match_price )
       {
          auto old_limit_itr = limit_itr;
          ++limit_itr;
          // match returns 2 when only the old order was fully filled. In this case, we keep matching; otherwise, we stop.
          finished = ( match( new_order_object, *old_limit_itr, old_limit_itr->sell_price ) != 2 );
       }
+
+      if( !finished )
+      {
+         // check if there are margin calls
+         const auto& call_price_idx = get_index_type<call_order_index>().indices().get<by_price>();
+         auto call_min = price::min( recv_asset_id, sell_asset_id );
+         auto call_itr = call_price_idx.lower_bound( call_min );
+         // feed protected https://github.com/cryptonomex/graphene/issues/436
+         auto call_end = call_price_idx.lower_bound( ~sell_abd->current_feed.settlement_price );
+         while( !finished && call_itr != call_end )
+         {
+            auto old_call_itr = call_itr;
+            ++call_itr; // would be safe, since we'll end the loop if a call order is partially matched
+            // match returns 2 when only the old order was fully filled. In this case, we keep matching; otherwise, we stop.
+            finished = ( match( new_order_object, *old_call_itr, call_match_price ) != 2 );
+         }
+      }
    }
 
-   // TODO really need to find again?
+   // still need to check limit orders
+   while( !finished && limit_itr != limit_end )
+   {
+      auto old_limit_itr = limit_itr;
+      ++limit_itr;
+      // match returns 2 when only the old order was fully filled. In this case, we keep matching; otherwise, we stop.
+      finished = ( match( new_order_object, *old_limit_itr, old_limit_itr->sell_price ) != 2 );
+   }
+
    const limit_order_object* updated_order_object = find< limit_order_object >( order_id );
    if( updated_order_object == nullptr )
       return true;
@@ -916,7 +885,7 @@ bool database::check_call_orders(const asset_object& mia, bool enable_black_swan
 
           filled_call    = true;
           if( filled_limit && head_time <= HARDFORK_CORE_453_TIME )
-             wlog( "Multiple limit match problem (issue 338) occurred at block #${block}", ("block",head_block_num()) );
+             wlog( "Multiple limit match problem (issue 453) occurred at block #${block}", ("block",head_block_num()) );
        }
 
        FC_ASSERT( filled_call || filled_limit );

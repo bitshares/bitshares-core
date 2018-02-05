@@ -112,10 +112,10 @@ object_id_type limit_order_create_evaluator::do_apply(const limit_order_create_o
    });
    limit_order_id_type order_id = new_order_object.id; // save this because we may remove the object by filling it
    bool filled;
-   if( db().head_block_time() <= HARDFORK_CORE_338_TIME )
-      filled = db().apply_order( new_order_object );
+   if( db().head_block_time() <= HARDFORK_CORE_625_TIME )
+      filled = db().apply_order_before_hardfork_625( new_order_object );
    else
-      filled = db().apply_order_hf_201803( new_order_object );
+      filled = db().apply_order( new_order_object );
 
    FC_ASSERT( !op.fill_or_kill || filled );
 
