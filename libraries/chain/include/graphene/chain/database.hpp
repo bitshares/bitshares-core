@@ -351,8 +351,8 @@ namespace graphene { namespace chain {
           * This function takes a new limit order, and runs the markets attempting to match it with existing orders
           * already on the books.
           */
+         bool apply_order_before_hardfork_625(const limit_order_object& new_order_object, bool allow_black_swan = true);
          bool apply_order(const limit_order_object& new_order_object, bool allow_black_swan = true);
-         bool apply_order_hf_201803(const limit_order_object& new_order_object, bool allow_black_swan = true);
 
          /**
           * Matches the two orders,
