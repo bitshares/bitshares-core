@@ -316,9 +316,11 @@ namespace graphene { namespace app {
           auto itr_stop = by_op_idx.upper_bound(boost::make_tuple(account, stop));
 
           do {
-             result.push_back(itr->operation_id(db));
              --itr;
-          } while (itr != itr_stop && itr->operation_id.instance.value > stop.instance.value && result.size() < limit);
+             if(itr->account == account)
+               result.push_back(itr->operation_id(db));
+
+          } while (itr != itr_stop && itr->operation_id.instance.value > stop.instance.value && itr->operation_id.instance.value <= start.instance.value && result.size() < limit);
        }
        return result;
     }
