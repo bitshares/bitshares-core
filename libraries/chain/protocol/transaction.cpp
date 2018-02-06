@@ -103,7 +103,7 @@ void transaction::get_required_authorities( flat_set<account_id_type>& active, f
 
 
 
-const fc::flat_set<public_key_type> empty_keyset;
+const flat_set<public_key_type> empty_keyset;
 
 struct sign_state
 {
