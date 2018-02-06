@@ -265,15 +265,12 @@ void database::clear_expired_orders()
             auto quote_asset = order.sell_price.quote.asset_id;
             cancel_limit_order( order );
             // check call orders
-            if( head_block_time() > HARDFORK_CORE_604_TIME )
-            {
-               // Comments below are copied from limit_order_cancel_evaluator::do_apply(...)
-               // Possible optimization: order can be called by cancelling a limit order
-               //   if the canceled order was at the top of the book.
-               // Do I need to check calls in both assets?
-               check_call_orders( base_asset( *this ) );
-               check_call_orders( quote_asset( *this ) );
-            }
+            // Comments below are copied from limit_order_cancel_evaluator::do_apply(...)
+            // Possible optimization: order can be called by cancelling a limit order
+            //   if the canceled order was at the top of the book.
+            // Do I need to check calls in both assets?
+            check_call_orders( base_asset( *this ) );
+            check_call_orders( quote_asset( *this ) );
          }
 
    //Process expired force settlement orders
