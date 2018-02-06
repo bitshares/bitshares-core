@@ -103,6 +103,7 @@ void transaction::get_required_authorities( flat_set<account_id_type>& active, f
 
 
 
+const fc::flat_set<public_key_type> empty_keyset;
 
 struct sign_state
 {
@@ -228,7 +229,7 @@ struct sign_state
 
       sign_state( const flat_set<public_key_type>& sigs,
                   const std::function<const authority*(account_id_type)>& a,
-                  const flat_set<public_key_type>& keys = flat_set<public_key_type>() )
+                  const flat_set<public_key_type>& keys = empty_keyset )
       :get_active(a),available_keys(keys)
       {
          for( const auto& key : sigs )

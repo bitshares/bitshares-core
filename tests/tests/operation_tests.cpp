@@ -510,7 +510,7 @@ BOOST_AUTO_TEST_CASE( create_committee_member )
       REQUIRE_THROW_WITH_VALUE(op, fee, asset(-600));
       trx.operations.back() = op;
 
-      committee_member_id_type committee_member_id = db.get_index_type<primary_index<simple_index<committee_member_object>>>().get_next_id();
+      committee_member_id_type committee_member_id = db.get_index_type<committee_member_index>().get_next_id();
       PUSH_TX( db, trx, ~0 );
       const committee_member_object& d = committee_member_id(db);
 
