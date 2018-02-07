@@ -680,8 +680,6 @@ bool database::fill_order( const call_order_object& order, const asset& pays, co
    const asset_object& mia = receives.asset_id(*this);
    FC_ASSERT( mia.is_market_issued() );
 
-   const auto& mia_bdo = mia.bitasset_data( *this );
-
    optional<asset> collateral_freed;
    modify( order, [&]( call_order_object& o ){
             o.debt       -= receives.amount;
@@ -693,7 +691,7 @@ bool database::fill_order( const call_order_object& order, const asset& pays, co
             }
             else if( head_block_time() > HARDFORK_CORE_343_TIME )
               o.call_price = price::call_price( o.get_debt(), o.get_collateral(),
-                                                mia_bdo.current_feed.maintenance_collateral_ratio );
+                                mia.bitasset_data(*this).current_feed.maintenance_collateral_ratio );
        });
 
    const asset_dynamic_data_object& mia_ddo = mia.dynamic_asset_data_id(*this);
