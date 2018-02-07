@@ -234,8 +234,9 @@ BOOST_AUTO_TEST_CASE(issue_338_etc)
  */
 BOOST_AUTO_TEST_CASE(hardfork_core_338_test)
 { try {
-   generate_blocks(HARDFORK_CORE_343_TIME); // assume all hard forks occur at same time
-   generate_block();
+   auto mi = db.get_global_properties().parameters.maintenance_interval;
+   generate_blocks(HARDFORK_CORE_343_TIME - mi); // assume all hard forks occur at same time
+   generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
 
    set_expiration( db, trx );
 
@@ -287,7 +288,7 @@ BOOST_AUTO_TEST_CASE(hardfork_core_338_test)
    // settlement price = 1/10, mssp = 1/11
 
    // This sell order above MSSP will not be matched with a call
-   limit_order_id_type sell_high = create_sell_order(seller, bitusd.amount(7), core.amount(78))->id;
+   create_sell_order(seller, bitusd.amount(7), core.amount(78))->id;
 
    BOOST_CHECK_EQUAL( 2993, get_balance(seller, bitusd) );
    BOOST_CHECK_EQUAL( 0, get_balance(seller, core) );
@@ -364,11 +365,12 @@ BOOST_AUTO_TEST_CASE(hardfork_core_338_test)
    BOOST_CHECK_EQUAL( 16000, call3.collateral.value );
 
    // generate blocks to let the settle order execute (price feed will expire after it)
-   generate_blocks( HARDFORK_CORE_343_TIME + fc::hours(25) );
+   generate_block();
+   generate_blocks( db.head_block_time() + fc::hours(24) );
 
    // call3 get settled, at settlement price 1/10: #343 fixed
-   BOOST_CHECK_EQUAL( 1583, get_balance(seller, bitusd) );
-   BOOST_CHECK_EQUAL( 15501, get_balance(seller, core) );
+   BOOST_CHECK_EQUAL( 1583, get_balance(seller_id, usd_id) );
+   BOOST_CHECK_EQUAL( 15501, get_balance(seller_id, core_id) );
    BOOST_CHECK_EQUAL( 310, call_id(db).debt.value );
    BOOST_CHECK_EQUAL( 7410, call_id(db).collateral.value );
    BOOST_CHECK_EQUAL( 300, call2_id(db).debt.value );
@@ -406,8 +408,9 @@ BOOST_AUTO_TEST_CASE(hardfork_core_338_test)
  */
 BOOST_AUTO_TEST_CASE(hardfork_core_453_test)
 { try {
-   generate_blocks(HARDFORK_CORE_453_TIME);
-   generate_block();
+   auto mi = db.get_global_properties().parameters.maintenance_interval;
+   generate_blocks(HARDFORK_CORE_453_TIME - mi); // assume all hard forks occur at same time
+   generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
 
    set_expiration( db, trx );
 
@@ -416,7 +419,6 @@ BOOST_AUTO_TEST_CASE(hardfork_core_453_test)
    const auto& bitusd = create_bitasset("USDBIT", feedproducer_id);
    const auto& core   = asset_id_type()(db);
    asset_id_type usd_id = bitusd.id;
-   asset_id_type core_id = core.id;
 
    int64_t init_balance(1000000);
 
