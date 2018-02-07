@@ -234,7 +234,7 @@ BOOST_AUTO_TEST_CASE(issue_338_etc)
  */
 BOOST_AUTO_TEST_CASE(hardfork_core_338_test)
 { try {
-   generate_blocks(HARDFORK_CORE_338_TIME); // assume all hard forks occur at same time
+   generate_blocks(HARDFORK_CORE_343_TIME); // assume all hard forks occur at same time
    generate_block();
 
    set_expiration( db, trx );
@@ -364,7 +364,7 @@ BOOST_AUTO_TEST_CASE(hardfork_core_338_test)
    BOOST_CHECK_EQUAL( 16000, call3.collateral.value );
 
    // generate blocks to let the settle order execute (price feed will expire after it)
-   generate_blocks( HARDFORK_CORE_338_TIME + fc::hours(25) );
+   generate_blocks( HARDFORK_CORE_343_TIME + fc::hours(25) );
 
    // call3 get settled, at settlement price 1/10: #343 fixed
    BOOST_CHECK_EQUAL( 1583, get_balance(seller, bitusd) );
