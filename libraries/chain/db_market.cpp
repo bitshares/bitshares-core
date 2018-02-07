@@ -460,6 +460,7 @@ bool database::apply_order(const limit_order_object& new_order_object, bool allo
             auto old_call_itr = call_itr;
             ++call_itr; // would be safe, since we'll end the loop if a call order is partially matched
             // match returns 2 when only the old order was fully filled. In this case, we keep matching; otherwise, we stop.
+            // assume hard fork core-338 and core-625 will take place at same time, not checking HARDFORK_CORE_338_TIME here.
             finished = ( match( new_order_object, *old_call_itr, call_match_price ) != 2 );
          }
       }
@@ -692,7 +693,7 @@ bool database::fill_order( const call_order_object& order, const asset& pays, co
               collateral_freed = o.get_collateral();
               o.collateral = 0;
             }
-            else if( head_block_time() > HARDFORK_CORE_343_TIME )
+            else if( get_dynamic_global_properties().next_maintenance_time > HARDFORK_CORE_343_TIME )
               o.call_price = price::call_price( o.get_debt(), o.get_collateral(),
                                 mia.bitasset_data(*this).current_feed.maintenance_collateral_ratio );
        });
@@ -810,6 +811,7 @@ bool database::check_call_orders(const asset_object& mia, bool enable_black_swan
     bool margin_called = false;
 
     auto head_time = head_block_time();
+    auto maint_time = get_dynamic_global_properties().next_maintenance_time;
     while( !check_for_blackswan( mia, enable_black_swan ) && call_itr != call_end )
     {
        bool  filled_limit_in_loop = false;
@@ -832,7 +834,7 @@ bool database::check_call_orders(const asset_object& mia, bool enable_black_swan
           return margin_called;
 
        // would be margin called, but there is no matching order
-       if( head_time <= HARDFORK_CORE_606_TIME && match_price > ~call_itr->call_price )
+       if( maint_time <= HARDFORK_CORE_606_TIME && match_price > ~call_itr->call_price )
           return margin_called;
 
        /*
@@ -880,7 +882,7 @@ bool database::check_call_orders(const asset_object& mia, bool enable_black_swan
           order_pays     = usd_to_buy;
 
           filled_call    = true;
-          if( filled_limit && head_time <= HARDFORK_CORE_453_TIME )
+          if( filled_limit && maint_time <= HARDFORK_CORE_453_TIME )
              wlog( "Multiple limit match problem (issue 453) occurred at block #${block}", ("block",head_block_num()) );
        }
 
@@ -888,15 +890,15 @@ bool database::check_call_orders(const asset_object& mia, bool enable_black_swan
        FC_ASSERT( filled_call || filled_limit_in_loop );
 
        auto old_call_itr = call_itr;
-       if( filled_call && head_time <= HARDFORK_CORE_343_TIME )
+       if( filled_call && maint_time <= HARDFORK_CORE_343_TIME )
           ++call_itr;
        // when for_new_limit_order is true, the call order is maker, otherwise the call order is taker
        fill_order(*old_call_itr, call_pays, call_receives, match_price, for_new_limit_order );
-       if( head_time > HARDFORK_CORE_343_TIME )
+       if( maint_time > HARDFORK_CORE_343_TIME )
           call_itr = call_price_index.lower_bound( call_min );
 
        auto old_limit_itr = limit_itr;
-       if( head_time <= HARDFORK_CORE_453_TIME )
+       if( maint_time <= HARDFORK_CORE_453_TIME )
        {
           if( filled_limit ) ++limit_itr;
        }
