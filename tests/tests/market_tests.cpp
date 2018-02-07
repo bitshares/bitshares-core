@@ -43,7 +43,7 @@ BOOST_FIXTURE_TEST_SUITE(market_tests, database_fixture)
  */
 BOOST_AUTO_TEST_CASE(issue_338_etc)
 { try {
-   generate_blocks(HARDFORK_436_TIME);
+   generate_blocks(HARDFORK_615_TIME); // get around Graphene issue #615 feed expiration bug
    generate_block();
 
    set_expiration( db, trx );
@@ -165,8 +165,8 @@ BOOST_AUTO_TEST_CASE(issue_338_etc)
    BOOST_CHECK_EQUAL( 262, call.debt.value );
    BOOST_CHECK_EQUAL( 6923, call.collateral.value );
 
-   // generate blocks to let the settle order execute
-   generate_blocks( HARDFORK_436_TIME + fc::days(2) );
+   // generate blocks to let the settle order execute (price feed will expire after it)
+   generate_blocks( HARDFORK_615_TIME + fc::hours(25) );
    // call2 get settled #343
    BOOST_CHECK_EQUAL( 252, get_balance(seller_id, usd_id) );
    BOOST_CHECK_EQUAL( 8177, get_balance(seller_id, core_id) );
@@ -205,7 +205,7 @@ BOOST_AUTO_TEST_CASE(issue_338_etc)
    transfer(borrower3_id, seller_id, asset(1000, usd_id));
 
    // Re-create sell_low, slightly below the call price, will not be matched, will expire soon
-   sell_low = create_sell_order(seller_id(db), asset(7, usd_id), asset(59), db.head_block_time() )->id;
+   sell_low = create_sell_order(seller_id(db), asset(7, usd_id), asset(59), db.head_block_time()+fc::seconds(300) )->id;
    // This would match but is blocked by sell_low, it has an amount same as call's debt which will be full filled later
    sell_med = create_sell_order(seller_id(db), asset(262, usd_id), asset(2620))->id; // 1/10
    // Another big order above sell_med, blocked
@@ -214,7 +214,8 @@ BOOST_AUTO_TEST_CASE(issue_338_etc)
    limit_order_id_type sell_med3 = create_sell_order(seller_id(db), asset(120, usd_id), asset(1224))->id; // 1/10.2
 
    // generate a block, sell_low will expire
-   generate_block();
+   BOOST_TEST_MESSAGE( "Expire sell_low" );
+   generate_blocks( HARDFORK_615_TIME + fc::hours(26) );
    BOOST_CHECK( db.find<limit_order_object>( sell_low ) == nullptr );
 
    // #453 multiple order matching issue occurs
