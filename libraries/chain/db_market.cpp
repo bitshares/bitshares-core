@@ -265,7 +265,7 @@ void database::cancel_limit_order( const limit_order_object& order, bool create_
    // refund fee
    // could be virtual op or real op here
    // TODO check if skip_fee is enabled?
-   if( deferred_paid_fee.amount == 0 )
+   if( order.deferred_paid_fee.amount == 0 )
    {
       // be here, order.create_time <= HARDFORK_CORE_604_TIME, or fee paid in CORE, or no fee to refund.
       // if order was created before hard fork 604 then cancelled no matter before or after hard fork 604,
@@ -662,10 +662,8 @@ bool database::fill_order( const limit_order_object& order, const asset& pays, c
    {
       modify( order, [&]( limit_order_object& b ) {
                              b.for_sale -= pays.amount;
-                             if( b.deferred_fee > 0 )
-                                b.deferred_fee = 0;
-                             if( b.deferred_paid_fee.amount > 0 )
-                                b.deferred_paid_fee.amount = 0;
+                             b.deferred_fee = 0;
+                             b.deferred_paid_fee.amount = 0;
                           });
       if( cull_if_small )
          return maybe_cull_small_order( *this, order );
