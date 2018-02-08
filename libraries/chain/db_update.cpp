@@ -256,7 +256,7 @@ bool database::check_for_blackswan( const asset_object& mia, bool enable_black_s
             ("h",highest.to_real())("~h",(~highest).to_real()) );
        FC_ASSERT( enable_black_swan, "Black swan was detected during a margin update which is not allowed to trigger a blackswan" );
        if( maint_time > HARDFORK_CORE_338_TIME && ~least_collateral <= settle_price )
-          // globol settle at feed price if possible
+          // global settle at feed price if possible
           globally_settle_asset(mia, settle_price );
        else
           globally_settle_asset(mia, ~least_collateral );
