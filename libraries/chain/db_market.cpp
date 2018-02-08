@@ -207,7 +207,6 @@ void database::cancel_limit_order( const limit_order_object& order, bool create_
       vop.order = order.id;
       vop.fee_paying_account = order.seller;
       // only deduct fee if not skipping fee, and there is any fee deferred
-      // TODO check if skip_fee is enabled?
       if( !skip_cancel_fee && deferred_fee > 0 )
       {
          asset core_cancel_fee = current_fee_schedule().calculate_fee( vop );
@@ -264,7 +263,6 @@ void database::cancel_limit_order( const limit_order_object& order, bool create_
 
    // refund fee
    // could be virtual op or real op here
-   // TODO check if skip_fee is enabled?
    if( order.deferred_paid_fee.amount == 0 )
    {
       // be here, order.create_time <= HARDFORK_CORE_604_TIME, or fee paid in CORE, or no fee to refund.
@@ -310,7 +308,6 @@ bool maybe_cull_small_order( database& db, const limit_order_object& order )
       }
       else
          db.cancel_limit_order( order );
-      // TODO check call orders here?
       return true;
    }
    return false;
