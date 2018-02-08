@@ -270,7 +270,7 @@ void elasticsearch_plugin_impl::sendBulk(std::string _elasticsearch_node_url, bo
    //wlog((bulking));
 
    struct curl_slist *headers = NULL;
-   curl_slist_append(headers, "Content-Type: application/json");
+   headers = curl_slist_append(headers, "Content-Type: application/json");
    std::string url = _elasticsearch_node_url + "_bulk";
    curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
    curl_easy_setopt(curl, CURLOPT_POST, true);
