@@ -71,7 +71,7 @@ BOOST_AUTO_TEST_CASE(issue_338_etc)
    // start out with 300% collateral, call price is 15/1.75 CORE/USD = 60/7
    const call_order_object& call = *borrow( borrower, bitusd.amount(1000), asset(15000));
    call_order_id_type call_id = call.id;
-   // create another position with 310% collateral, call price is 15.5/1.75 CORE/USD = 63/7
+   // create another position with 310% collateral, call price is 15.5/1.75 CORE/USD = 62/7
    const call_order_object& call2 = *borrow( borrower2, bitusd.amount(1000), asset(15500));
    call_order_id_type call2_id = call2.id;
    // create yet another position with 320% collateral, call price is 16/1.75 CORE/USD = 64/7
@@ -263,7 +263,7 @@ BOOST_AUTO_TEST_CASE(hardfork_core_338_test)
    // start out with 300% collateral, call price is 15/1.75 CORE/USD = 60/7
    const call_order_object& call = *borrow( borrower, bitusd.amount(1000), asset(15000));
    call_order_id_type call_id = call.id;
-   // create another position with 310% collateral, call price is 15.5/1.75 CORE/USD = 63/7
+   // create another position with 310% collateral, call price is 15.5/1.75 CORE/USD = 62/7
    const call_order_object& call2 = *borrow( borrower2, bitusd.amount(1000), asset(15500));
    call_order_id_type call2_id = call2.id;
    // create yet another position with 320% collateral, call price is 16/1.75 CORE/USD = 64/7
@@ -386,9 +386,10 @@ BOOST_AUTO_TEST_CASE(hardfork_core_338_test)
    // collateralization of call3 is 15900 / 990 = 16.06
 
    // adjust price feed to get call3 into black swan territory, but not the other call orders
-   current_feed.settlement_price = asset(1, usd_id) / asset(20, core_id);
+   // Note: after hard fork, black swan should occur when callateralization < mssp, but not at < feed
+   current_feed.settlement_price = asset(1, usd_id) / asset(16, core_id);
    publish_feed( usd_id(db), feedproducer_id(db), current_feed );
-   // settlement price = 1/20, mssp = 1/22
+   // settlement price = 1/16, mssp = 10/176
 
    // black swan event will occur: #649 fixed
    BOOST_CHECK( usd_id(db).bitasset_data(db).has_settlement() );
@@ -436,7 +437,7 @@ BOOST_AUTO_TEST_CASE(hardfork_core_453_test)
    // start out with 300% collateral, call price is 15/1.75 CORE/USD = 60/7
    const call_order_object& call = *borrow( borrower, bitusd.amount(1000), asset(15000));
    call_order_id_type call_id = call.id;
-   // create another position with 310% collateral, call price is 15.5/1.75 CORE/USD = 63/7
+   // create another position with 310% collateral, call price is 15.5/1.75 CORE/USD = 62/7
    const call_order_object& call2 = *borrow( borrower2, bitusd.amount(1000), asset(15500));
    call_order_id_type call2_id = call2.id;
    // create yet another position with 320% collateral, call price is 16/1.75 CORE/USD = 64/7
@@ -480,6 +481,414 @@ BOOST_AUTO_TEST_CASE(hardfork_core_453_test)
    // generate a block
    generate_block();
 
+
+} FC_LOG_AND_RETHROW() }
+
+/***
+ * Fixed bitshares-core issue #453 #606: multiple order matching without black swan
+ */
+BOOST_AUTO_TEST_CASE(hard_fork_453_cross_test)
+{ try { // create orders before hard fork, which will be matched on hard fork
+   auto mi = db.get_global_properties().parameters.maintenance_interval;
+   generate_blocks(HARDFORK_CORE_453_TIME - mi); // assume all hard forks occur at same time
+   generate_block();
+
+   set_expiration( db, trx );
+
+   ACTORS((buyer)(seller)(borrower)(borrower2)(borrower3)(feedproducer));
+
+   const auto& bitusd = create_bitasset("USDBIT", feedproducer_id);
+   const auto& core   = asset_id_type()(db);
+   asset_id_type usd_id = bitusd.id;
+   asset_id_type core_id = core.id;
+
+   int64_t init_balance(1000000);
+
+   transfer(committee_account, buyer_id, asset(init_balance));
+   transfer(committee_account, borrower_id, asset(init_balance));
+   transfer(committee_account, borrower2_id, asset(init_balance));
+   transfer(committee_account, borrower3_id, asset(init_balance));
+   update_feed_producers( bitusd, {feedproducer.id} );
+
+   price_feed current_feed;
+   current_feed.maintenance_collateral_ratio = 1750;
+   current_feed.maximum_short_squeeze_ratio = 1100;
+   current_feed.settlement_price = bitusd.amount( 1 ) / core.amount(5);
+   publish_feed( bitusd, feedproducer, current_feed );
+   // start out with 300% collateral, call price is 15/1.75 CORE/USD = 60/7
+   const call_order_object& call = *borrow( borrower, bitusd.amount(1000), asset(15000));
+   call_order_id_type call_id = call.id;
+   // create another position with 310% collateral, call price is 15.5/1.75 CORE/USD = 62/7
+   const call_order_object& call2 = *borrow( borrower2, bitusd.amount(1000), asset(15500));
+   call_order_id_type call2_id = call2.id;
+   // create yet another position with 320% collateral, call price is 16/1.75 CORE/USD = 64/7
+   const call_order_object& call3 = *borrow( borrower3, bitusd.amount(1000), asset(16000));
+   call_order_id_type call3_id = call3.id;
+   transfer(borrower, seller, bitusd.amount(1000));
+   transfer(borrower2, seller, bitusd.amount(1000));
+   transfer(borrower3, seller, bitusd.amount(1000));
+
+   BOOST_CHECK_EQUAL( 1000, call.debt.value );
+   BOOST_CHECK_EQUAL( 15000, call.collateral.value );
+   BOOST_CHECK_EQUAL( 1000, call2.debt.value );
+   BOOST_CHECK_EQUAL( 15500, call2.collateral.value );
+   BOOST_CHECK_EQUAL( 1000, call3.debt.value );
+   BOOST_CHECK_EQUAL( 16000, call3.collateral.value );
+   BOOST_CHECK_EQUAL( 3000, get_balance(seller, bitusd) );
+   BOOST_CHECK_EQUAL( 0, get_balance(seller, core) );
+
+   // adjust price feed to get call_order into margin call territory
+   current_feed.settlement_price = bitusd.amount( 1 ) / core.amount(10);
+   publish_feed( bitusd, feedproducer, current_feed );
+   // settlement price = 1/10, mssp = 1/11
+
+   // This order below the call price will not be matched before hard fork: 1/8 #606
+   limit_order_id_type sell_low = create_sell_order(seller, bitusd.amount(1000), core.amount(7000))->id;
+   // This is a big order, price below the call price will not be matched before hard fork: 1007/9056 = 1/8 #606
+   limit_order_id_type sell_low2 = create_sell_order(seller, bitusd.amount(1007), core.amount(8056))->id;
+   // This order above the MSSP will not be matched before hard fork
+   limit_order_id_type sell_high = create_sell_order(seller, bitusd.amount(7), core.amount(78))->id;
+   // This would match but is blocked by sell_low?! #606
+   limit_order_id_type sell_med = create_sell_order(seller, bitusd.amount(700), core.amount(6400))->id;
+   // This would match but is blocked by sell_low?! #606
+   limit_order_id_type sell_med2 = create_sell_order(seller, bitusd.amount(7), core.amount(65))->id;
+
+   BOOST_CHECK_EQUAL( 3000-1000-1007-7-700-7, get_balance(seller_id, usd_id) );
+   BOOST_CHECK_EQUAL( 0, get_balance(seller, core) );
+
+   // generate a block to include operations above
+   generate_block();
+   // go over the hard fork, make sure feed doesn't expire
+   generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+
+   // sell_low and call should get matched first
+   BOOST_CHECK( !db.find<limit_order_object>( sell_low ) );
+   BOOST_CHECK( !db.find<call_order_object>( call_id ) );
+   // sell_low2 and call2 should get matched
+   BOOST_CHECK( !db.find<call_order_object>( call2_id ) );
+   // sell_low2 and call3 should get matched: fixed #453
+   BOOST_CHECK( !db.find<limit_order_object>( sell_low2 ) );
+   // sell_med and call3 should get matched
+   BOOST_CHECK( !db.find<limit_order_object>( sell_med ) );
+   // call3 now is not at margin call state, so sell_med2 won't get matched
+   BOOST_CHECK_EQUAL( db.find<limit_order_object>( sell_med2 )->for_sale.value, 7 );
+   // sell_high should still be there, didn't match anything
+   BOOST_CHECK_EQUAL( db.find<limit_order_object>( sell_high )->for_sale.value, 7 );
+
+   // all match price would be limit order price
+   BOOST_CHECK_EQUAL( 3000-1000-1007-7-700-7, get_balance(seller_id, usd_id) );
+   BOOST_CHECK_EQUAL( 7000+8056+6400, get_balance(seller_id, core_id) );
+   BOOST_CHECK_EQUAL( 1000-7-700, call3_id(db).debt.value );
+   BOOST_CHECK_EQUAL( 16000-56-6400, call3_id(db).collateral.value );
+   // call3's call_price should be updated: 9544/293/1.75 = 9544*4 / 293*7 = 38176/2051 CORE/USD
+   BOOST_CHECK( price(asset(38176),asset(2051,usd_id)) == call3_id(db).call_price );
+
+   generate_block();
+
+} FC_LOG_AND_RETHROW() }
+
+/***
+ * Fixed bitshares-core issue #338 #453 #606: multiple order matching with black swan
+ */
+BOOST_AUTO_TEST_CASE(hard_fork_338_cross_test)
+{ try { // create orders before hard fork, which will be matched on hard fork
+   auto mi = db.get_global_properties().parameters.maintenance_interval;
+   generate_blocks(HARDFORK_CORE_338_TIME - mi); // assume all hard forks occur at same time
+   generate_block();
+
+   set_expiration( db, trx );
+
+   ACTORS((buyer)(seller)(borrower)(borrower2)(borrower3)(borrower4)(feedproducer));
+
+   const auto& bitusd = create_bitasset("USDBIT", feedproducer_id);
+   const auto& core   = asset_id_type()(db);
+   asset_id_type usd_id = bitusd.id;
+   asset_id_type core_id = core.id;
+
+   int64_t init_balance(1000000);
+
+   transfer(committee_account, buyer_id, asset(init_balance));
+   transfer(committee_account, borrower_id, asset(init_balance));
+   transfer(committee_account, borrower2_id, asset(init_balance));
+   transfer(committee_account, borrower3_id, asset(init_balance));
+   transfer(committee_account, borrower4_id, asset(init_balance));
+   update_feed_producers( bitusd, {feedproducer.id} );
+
+   price_feed current_feed;
+   current_feed.maintenance_collateral_ratio = 1750;
+   current_feed.maximum_short_squeeze_ratio = 1100;
+   current_feed.settlement_price = bitusd.amount( 1 ) / core.amount(5);
+   publish_feed( bitusd, feedproducer, current_feed );
+   // start out with 300% collateral, call price is 15/1.75 CORE/USD = 60/7
+   const call_order_object& call = *borrow( borrower, bitusd.amount(1000), asset(15000));
+   call_order_id_type call_id = call.id;
+   // create another position with 310% collateral, call price is 15.5/1.75 CORE/USD = 62/7
+   const call_order_object& call2 = *borrow( borrower2, bitusd.amount(1000), asset(15500));
+   call_order_id_type call2_id = call2.id;
+   // create yet another position with 320% collateral, call price is 16/1.75 CORE/USD = 64/7
+   const call_order_object& call3 = *borrow( borrower3, bitusd.amount(1000), asset(16000));
+   call_order_id_type call3_id = call3.id;
+   // create yet another position with 400% collateral, call price is 20/1.75 CORE/USD = 80/7
+   const call_order_object& call4 = *borrow( borrower4, bitusd.amount(1000), asset(20000));
+   call_order_id_type call4_id = call4.id;
+   transfer(borrower, seller, bitusd.amount(1000));
+   transfer(borrower2, seller, bitusd.amount(1000));
+   transfer(borrower3, seller, bitusd.amount(1000));
+
+   BOOST_CHECK_EQUAL( 1000, call.debt.value );
+   BOOST_CHECK_EQUAL( 15000, call.collateral.value );
+   BOOST_CHECK_EQUAL( 1000, call2.debt.value );
+   BOOST_CHECK_EQUAL( 15500, call2.collateral.value );
+   BOOST_CHECK_EQUAL( 1000, call3.debt.value );
+   BOOST_CHECK_EQUAL( 16000, call3.collateral.value );
+   BOOST_CHECK_EQUAL( 3000, get_balance(seller, bitusd) );
+   BOOST_CHECK_EQUAL( 0, get_balance(seller, core) );
+
+   // adjust price feed to get call_order into margin call territory
+   current_feed.settlement_price = bitusd.amount( 1 ) / core.amount(10);
+   publish_feed( bitusd, feedproducer, current_feed );
+   // settlement price = 1/10, mssp = 1/11
+
+   // This order below the call price will not be matched before hard fork: 1/8 #606
+   limit_order_id_type sell_low = create_sell_order(seller, bitusd.amount(1000), core.amount(7000))->id;
+   // This is a big order, price below the call price will not be matched before hard fork: 1007/9056 = 1/8 #606
+   limit_order_id_type sell_low2 = create_sell_order(seller, bitusd.amount(1007), core.amount(8056))->id;
+   // This would match but is blocked by sell_low?! #606
+   limit_order_id_type sell_med = create_sell_order(seller, bitusd.amount(7), core.amount(64))->id;
+
+   // adjust price feed to get call_order into black swan territory
+   current_feed.settlement_price = bitusd.amount( 1 ) / core.amount(16);
+   publish_feed( bitusd, feedproducer, current_feed );
+   // settlement price = 1/16, mssp = 10/176
+
+   // due to sell_low, black swan won't occur
+   BOOST_CHECK( !usd_id(db).bitasset_data(db).has_settlement() );
+
+   BOOST_CHECK_EQUAL( 3000-1000-1007-7, get_balance(seller_id, usd_id) );
+   BOOST_CHECK_EQUAL( 0, get_balance(seller, core) );
+
+   // generate a block to include operations above
+   generate_block();
+   // go over the hard fork, make sure feed doesn't expire
+   generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+
+   // sell_low and call should get matched first
+   BOOST_CHECK( !db.find<limit_order_object>( sell_low ) );
+   BOOST_CHECK( !db.find<call_order_object>( call_id ) );
+   // sell_low2 and call2 should get matched
+   BOOST_CHECK( !db.find<call_order_object>( call2_id ) );
+   // sell_low2 and call3 should get matched: fixed #453
+   BOOST_CHECK( !db.find<limit_order_object>( sell_low2 ) );
+   // sell_med and call3 should get matched
+   BOOST_CHECK( !db.find<limit_order_object>( sell_med ) );
+
+   // at this moment,
+   // collateralization of call3 is (16000-56-64) / (1000-7-7) = 15880/986 = 16.1, it's > 16 but < 17.6
+   // although there is no sell order, it should trigger a black swan event right away,
+   // because after hard fork new limit order won't trigger black swan event
+   BOOST_CHECK( usd_id(db).bitasset_data(db).has_settlement() );
+   BOOST_CHECK( !db.find<call_order_object>( call3_id ) );
+   BOOST_CHECK( !db.find<call_order_object>( call4_id ) );
+
+   // global settlement fund should be 15880 + 1000 * 15880 / 986
+   BOOST_CHECK_EQUAL( 15880 + 1000 * 15880 / 986, usd_id(db).bitasset_data(db).settlement_fund.value );
+   // global settlement price should be settlement_fund/(1000+986), but not 15880/986 due to rounding
+   BOOST_CHECK( price(asset(986+1000,usd_id),asset(15880+1000*15880/986) ) == usd_id(db).bitasset_data(db).settlement_price );
+
+   BOOST_CHECK_EQUAL( 3000-1000-1007-7, get_balance(seller_id, usd_id) );
+   BOOST_CHECK_EQUAL( 7000+8056+64, get_balance(seller_id, core_id) );
+   BOOST_CHECK_EQUAL( 1000, get_balance(borrower4_id, usd_id) );
+   BOOST_CHECK_EQUAL( init_balance-1000*15880/986, get_balance(borrower4_id, core_id) );
+
+   generate_block();
+
+} FC_LOG_AND_RETHROW() }
+
+/***
+ * Fixed bitshares-core issue #649: Black swan detection fetch call order by call_price but not collateral ratio
+ */
+BOOST_AUTO_TEST_CASE(hard_fork_649_cross_test)
+{ try { // create orders before hard fork, which will be matched on hard fork
+   auto mi = db.get_global_properties().parameters.maintenance_interval;
+   generate_blocks(HARDFORK_CORE_343_TIME - mi); // assume all hard forks occur at same time
+   generate_block();
+
+   set_expiration( db, trx );
+
+   ACTORS((buyer)(seller)(borrower)(borrower2)(borrower3)(borrower4)(feedproducer));
+
+   const auto& bitusd = create_bitasset("USDBIT", feedproducer_id);
+   const auto& core   = asset_id_type()(db);
+   asset_id_type usd_id = bitusd.id;
+   asset_id_type core_id = core.id;
+
+   int64_t init_balance(1000000);
+
+   transfer(committee_account, buyer_id, asset(init_balance));
+   transfer(committee_account, borrower_id, asset(init_balance));
+   transfer(committee_account, borrower2_id, asset(init_balance));
+   transfer(committee_account, borrower3_id, asset(init_balance));
+   transfer(committee_account, borrower4_id, asset(init_balance));
+   update_feed_producers( bitusd, {feedproducer.id} );
+
+   price_feed current_feed;
+   current_feed.maintenance_collateral_ratio = 1750;
+   current_feed.maximum_short_squeeze_ratio = 1100;
+   current_feed.settlement_price = bitusd.amount( 1 ) / core.amount(5);
+   publish_feed( bitusd, feedproducer, current_feed );
+   // start out with 300% collateral, call price is 15/1.75 CORE/USD = 60/7
+   const call_order_object& call = *borrow( borrower, bitusd.amount(1000), asset(15000));
+   call_order_id_type call_id = call.id;
+   // create another position with 310% collateral, call price is 15.5/1.75 CORE/USD = 62/7
+   const call_order_object& call2 = *borrow( borrower2, bitusd.amount(1000), asset(15500));
+   call_order_id_type call2_id = call2.id;
+   // create yet another position with 320% collateral, call price is 16/1.75 CORE/USD = 64/7
+   const call_order_object& call3 = *borrow( borrower3, bitusd.amount(1000), asset(16000));
+   call_order_id_type call3_id = call3.id;
+   transfer(borrower, seller, bitusd.amount(1000));
+   transfer(borrower2, seller, bitusd.amount(1000));
+   transfer(borrower3, seller, bitusd.amount(1000));
+
+   BOOST_CHECK_EQUAL( 1000, call.debt.value );
+   BOOST_CHECK_EQUAL( 15000, call.collateral.value );
+   BOOST_CHECK_EQUAL( 1000, call2.debt.value );
+   BOOST_CHECK_EQUAL( 15500, call2.collateral.value );
+   BOOST_CHECK_EQUAL( 1000, call3.debt.value );
+   BOOST_CHECK_EQUAL( 16000, call3.collateral.value );
+   BOOST_CHECK_EQUAL( 3000, get_balance(seller, bitusd) );
+   BOOST_CHECK_EQUAL( 0, get_balance(seller, core) );
+
+   // adjust price feed to get call_order into margin call territory
+   current_feed.settlement_price = bitusd.amount( 1 ) / core.amount(10);
+   publish_feed( bitusd, feedproducer, current_feed );
+   // settlement price = 1/10, mssp = 1/11
+
+   // This would match with call at price 700/6400
+   BOOST_CHECK( !create_sell_order(seller, bitusd.amount(700), core.amount(6400)) );
+   BOOST_CHECK_EQUAL( 3000-700, get_balance(seller_id, usd_id) );
+   BOOST_CHECK_EQUAL( 6400, get_balance(seller_id, core_id) );
+   BOOST_CHECK_EQUAL( 300, call.debt.value );
+   BOOST_CHECK_EQUAL( 8600, call.collateral.value );
+
+   // at this moment,
+   // collateralization of call is 8600 / 300 = 28.67
+   // collateralization of call2 is 15500 / 1000 = 15.5
+   // collateralization of call3 is 16000 / 1000 = 16
+
+   // adjust price feed to get call_order into black swan territory
+   current_feed.settlement_price = bitusd.amount( 1 ) / core.amount(20);
+   publish_feed( bitusd, feedproducer, current_feed );
+   // settlement price = 1/20, mssp = 1/22
+
+   // due to #649, black swan won't occur
+   BOOST_CHECK( !usd_id(db).bitasset_data(db).has_settlement() );
+
+   // generate a block to include operations above
+   generate_block();
+   // go over the hard fork, make sure feed doesn't expire
+   generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+
+   // a black swan event should occur
+   BOOST_CHECK( usd_id(db).bitasset_data(db).has_settlement() );
+   BOOST_CHECK( !db.find<call_order_object>( call_id ) );
+   BOOST_CHECK( !db.find<call_order_object>( call2_id ) );
+   BOOST_CHECK( !db.find<call_order_object>( call3_id ) );
+
+   generate_block();
+
+} FC_LOG_AND_RETHROW() }
+
+/***
+ * Fixed bitshares-core issue #343: change sorting of call orders when matching against limit order
+ */
+BOOST_AUTO_TEST_CASE(hard_fork_343_cross_test)
+{ try { // create orders before hard fork, which will be matched on hard fork
+   auto mi = db.get_global_properties().parameters.maintenance_interval;
+   generate_blocks(HARDFORK_CORE_343_TIME - mi); // assume all hard forks occur at same time
+   generate_block();
+
+   set_expiration( db, trx );
+
+   ACTORS((buyer)(seller)(borrower)(borrower2)(borrower3)(borrower4)(feedproducer));
+
+   const auto& bitusd = create_bitasset("USDBIT", feedproducer_id);
+   const auto& core   = asset_id_type()(db);
+   asset_id_type usd_id = bitusd.id;
+   asset_id_type core_id = core.id;
+
+   int64_t init_balance(1000000);
+
+   transfer(committee_account, buyer_id, asset(init_balance));
+   transfer(committee_account, borrower_id, asset(init_balance));
+   transfer(committee_account, borrower2_id, asset(init_balance));
+   transfer(committee_account, borrower3_id, asset(init_balance));
+   transfer(committee_account, borrower4_id, asset(init_balance));
+   update_feed_producers( bitusd, {feedproducer.id} );
+
+   price_feed current_feed;
+   current_feed.maintenance_collateral_ratio = 1750;
+   current_feed.maximum_short_squeeze_ratio = 1100;
+   current_feed.settlement_price = bitusd.amount( 1 ) / core.amount(5);
+   publish_feed( bitusd, feedproducer, current_feed );
+   // start out with 300% collateral, call price is 15/1.75 CORE/USD = 60/7
+   const call_order_object& call = *borrow( borrower, bitusd.amount(1000), asset(15000));
+   call_order_id_type call_id = call.id;
+   // create another position with 310% collateral, call price is 15.5/1.75 CORE/USD = 62/7
+   const call_order_object& call2 = *borrow( borrower2, bitusd.amount(1000), asset(15500));
+   call_order_id_type call2_id = call2.id;
+   // create yet another position with 320% collateral, call price is 16/1.75 CORE/USD = 64/7
+   const call_order_object& call3 = *borrow( borrower3, bitusd.amount(1000), asset(16000));
+   call_order_id_type call3_id = call3.id;
+   transfer(borrower, seller, bitusd.amount(1000));
+   transfer(borrower2, seller, bitusd.amount(1000));
+   transfer(borrower3, seller, bitusd.amount(1000));
+
+   BOOST_CHECK_EQUAL( 1000, call.debt.value );
+   BOOST_CHECK_EQUAL( 15000, call.collateral.value );
+   BOOST_CHECK_EQUAL( 1000, call2.debt.value );
+   BOOST_CHECK_EQUAL( 15500, call2.collateral.value );
+   BOOST_CHECK_EQUAL( 1000, call3.debt.value );
+   BOOST_CHECK_EQUAL( 16000, call3.collateral.value );
+   BOOST_CHECK_EQUAL( 3000, get_balance(seller, bitusd) );
+   BOOST_CHECK_EQUAL( 0, get_balance(seller, core) );
+
+   // adjust price feed to get call_order into margin call territory
+   current_feed.settlement_price = bitusd.amount( 1 ) / core.amount(10);
+   publish_feed( bitusd, feedproducer, current_feed );
+   // settlement price = 1/10, mssp = 1/11
+
+   // This would match with call at price 700/6400
+   BOOST_CHECK( !create_sell_order(seller, bitusd.amount(700), core.amount(6400)) );
+   BOOST_CHECK_EQUAL( 3000-700, get_balance(seller_id, usd_id) );
+   BOOST_CHECK_EQUAL( 6400, get_balance(seller_id, core_id) );
+   BOOST_CHECK_EQUAL( 300, call.debt.value );
+   BOOST_CHECK_EQUAL( 8600, call.collateral.value );
+
+   // at this moment,
+   // collateralization of call is 8600 / 300 = 28.67
+   // collateralization of call2 is 15500 / 1000 = 15.5
+   // collateralization of call3 is 16000 / 1000 = 16
+
+   // generate a block to include operations above
+   generate_block();
+   // go over the hard fork, make sure feed doesn't expire
+   generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+
+   set_expiration( db, trx );
+
+   // This will match with call2 at price 7/77 (#343 fixed)
+   BOOST_CHECK( !create_sell_order(seller_id(db), asset(7,usd_id), asset(65)) );
+   BOOST_CHECK_EQUAL( 3000-700-7, get_balance(seller_id, usd_id) );
+   BOOST_CHECK_EQUAL( 6400+77, get_balance(seller_id, core_id) );
+   BOOST_CHECK_EQUAL( 300, call_id(db).debt.value );
+   BOOST_CHECK_EQUAL( 8600, call_id(db).collateral.value );
+   BOOST_CHECK_EQUAL( 1000-7, call2_id(db).debt.value );
+   BOOST_CHECK_EQUAL( 15500-77, call2_id(db).collateral.value );
+   BOOST_CHECK_EQUAL( 1000, call3_id(db).debt.value );
+   BOOST_CHECK_EQUAL( 16000, call3_id(db).collateral.value );
+
+
+   generate_block();
 
 } FC_LOG_AND_RETHROW() }
 
