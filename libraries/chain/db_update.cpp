@@ -268,20 +268,25 @@ bool database::check_for_blackswan( const asset_object& mia, bool enable_black_s
 void database::clear_expired_orders()
 { try {
          //Cancel expired limit orders
+         auto head_time = head_block_time();
+         auto maint_time = get_dynamic_global_properties().next_maintenance_time;
          auto& limit_index = get_index_type<limit_order_index>().indices().get<by_expiration>();
-         while( !limit_index.empty() && limit_index.begin()->expiration <= head_block_time() )
+         while( !limit_index.empty() && limit_index.begin()->expiration <= head_time )
          {
             const limit_order_object& order = *limit_index.begin();
             auto base_asset = order.sell_price.base.asset_id;
             auto quote_asset = order.sell_price.quote.asset_id;
             cancel_limit_order( order );
-            // check call orders
-            // Comments below are copied from limit_order_cancel_evaluator::do_apply(...)
-            // Possible optimization: order can be called by cancelling a limit order
-            //   if the canceled order was at the top of the book.
-            // Do I need to check calls in both assets?
-            check_call_orders( base_asset( *this ) );
-            check_call_orders( quote_asset( *this ) );
+            if( maint_time <= HARDFORK_CORE_606_TIME )
+            {
+               // check call orders
+               // Comments below are copied from limit_order_cancel_evaluator::do_apply(...)
+               // Possible optimization: order can be called by cancelling a limit order
+               //   if the canceled order was at the top of the book.
+               // Do I need to check calls in both assets?
+               check_call_orders( base_asset( *this ) );
+               check_call_orders( quote_asset( *this ) );
+            }
          }
 
    //Process expired force settlement orders
@@ -341,7 +346,7 @@ void database::clear_expired_orders()
          }
 
          // Has this order not reached its settlement date?
-         if( order.settlement_date > head_block_time() )
+         if( order.settlement_date > head_time )
          {
             if( next_asset() )
             {
