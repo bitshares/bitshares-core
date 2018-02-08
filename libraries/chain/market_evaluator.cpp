@@ -198,6 +198,8 @@ void_result call_order_update_evaluator::do_apply(const call_order_update_operat
    auto itr = call_idx.find( boost::make_tuple(o.funding_account, o.delta_debt.asset_id) );
    const call_order_object* call_obj = nullptr;
 
+   price old_collateralization;
+
    if( itr == call_idx.end() )
    {
       FC_ASSERT( o.delta_collateral.amount > 0 );
@@ -215,6 +217,7 @@ void_result call_order_update_evaluator::do_apply(const call_order_update_operat
    else
    {
       call_obj = &*itr;
+      old_collateralization = call_obj->collateralization();
 
       d.modify( *call_obj, [&]( call_order_object& call ){
           call.collateral += o.delta_collateral.amount;
@@ -244,10 +247,16 @@ void_result call_order_update_evaluator::do_apply(const call_order_update_operat
 
       // check to see if the order needs to be margin called now, but don't allow black swans and require there to be
       // limit orders available that could be used to fill the order.
+      // Note: due to https://github.com/bitshares/bitshares-core/issues/649,
+      //       the first call order may be unable to be updated if the second one is undercollateralized.
       if( d.check_call_orders( *_debt_asset, false ) )
       {
          const auto call_obj  = d.find(call_order_id);
-         // if we filled at least one call order, we are OK if we totally filled.
+         // before hard fork core-583: if we filled at least one call order, we are OK if we totally filled.
+         // after hard fork core-583: we want to allow increasing collateral
+         //   Note: increasing collateral won't get the call order itself matched (instantly margin called)
+         //   if there is at least a call order get matched but didn't cause a black swan event,
+         //   current order must have got matched. in this case, it's OK if it's totally filled.
          GRAPHENE_ASSERT(
             !call_obj,
             call_order_update_unfilled_margin_call,
@@ -258,17 +267,39 @@ void_result call_order_update_evaluator::do_apply(const call_order_update_operat
       else
       {
          const auto call_obj  = d.find(call_order_id);
+         // we know no black swan event has occurred
          FC_ASSERT( call_obj, "no margin call was executed and yet the call object was deleted" );
-         //edump( (~call_obj->call_price) ("<")( _bitasset_data->current_feed.settlement_price) );
-         // We didn't fill any call orders.  This may be because we
-         // aren't in margin call territory, or it may be because there
-         // were no matching orders.  In the latter case, we throw.
-         GRAPHENE_ASSERT(
-            ~call_obj->call_price < _bitasset_data->current_feed.settlement_price,
-            call_order_update_unfilled_margin_call,
-            "Updating call order would trigger a margin call that cannot be fully filled",
-            ("a", ~call_obj->call_price )("b", _bitasset_data->current_feed.settlement_price)
-            );
+         if( d.head_block_time() <= HARDFORK_CORE_583_TIME )
+         {
+            //edump( (~call_obj->call_price) ("<")( _bitasset_data->current_feed.settlement_price) );
+            // We didn't fill any call orders.  This may be because we
+            // aren't in margin call territory, or it may be because there
+            // were no matching orders.  In the latter case, we throw.
+            GRAPHENE_ASSERT(
+               ~call_obj->call_price < _bitasset_data->current_feed.settlement_price,
+               call_order_update_unfilled_margin_call,
+               "Updating call order would trigger a margin call that cannot be fully filled",
+               ("a", ~call_obj->call_price )("b", _bitasset_data->current_feed.settlement_price)
+               );
+         }
+         else // after hard fork, always allow call order to be updated if collateral ratio is increased
+         {
+            // We didn't fill any call orders.  This may be because we
+            // aren't in margin call territory, or it may be because there
+            // were no matching orders.  In the latter case, if collateral ratio is not increased, we throw.
+            bool not_in_margin_call_territory = ~call_obj->call_price < _bitasset_data->current_feed.settlement_price;
+            // be here, we know no margin call was executed,
+            // so call_obj's collateral ratio should be set only by op
+            bool collateral_ratio_increased = !old_collateralization.is_null()
+                                              && call_obj->collateralization() > old_collateralization;
+            FC_ASSERT( not_in_margin_call_territory || collateral_ratio_increased,
+               "Can only update to higher collateral ratio if it would trigger a margin call that cannot be fully filled",
+               ("new_call_price", ~call_obj->call_price )
+               ("settlement_price", _bitasset_data->current_feed.settlement_price)
+               ("old_collateralization", old_collateralization)
+               ("new_collateralization", call_obj->collateralization() )
+               );
+         }
       }
    }
 
