@@ -209,19 +209,6 @@ bool database::check_for_blackswan( const asset_object& mia, bool enable_black_s
     const call_order_index& call_index = get_index_type<call_order_index>();
     const auto& call_price_index = call_index.indices().get<by_price>();
 
-    const limit_order_index& limit_index = get_index_type<limit_order_index>();
-    const auto& limit_price_index = limit_index.indices().get<by_price>();
-
-    // looking for limit orders selling the most USD for the least CORE
-    auto highest_possible_bid = price::max( mia.id, bitasset.options.short_backing_asset );
-    // stop when limit orders are selling too little USD for too much CORE
-    auto lowest_possible_bid  = price::min( mia.id, bitasset.options.short_backing_asset );
-
-    assert( highest_possible_bid.base.asset_id == lowest_possible_bid.base.asset_id );
-    // NOTE limit_price_index is sorted from greatest to least
-    auto limit_itr = limit_price_index.lower_bound( highest_possible_bid );
-    auto limit_end = limit_price_index.upper_bound( lowest_possible_bid );
-
     auto call_min = price::min( bitasset.options.short_backing_asset, mia.id );
     auto call_max = price::max( bitasset.options.short_backing_asset, mia.id );
     auto call_itr = call_price_index.lower_bound( call_min );
@@ -230,28 +217,49 @@ bool database::check_for_blackswan( const asset_object& mia, bool enable_black_s
     if( call_itr == call_end ) return false;  // no call orders
 
     price highest = settle_price;
+
+    auto maint_time = get_dynamic_global_properties().next_maintenance_time;
+    if( maint_time > HARDFORK_CORE_338_TIME )
+       // due to #338, we won't check for black swan on incoming limit order, so need to check with MSSP here
+       highest = bitasset.current_feed.max_short_squeeze_price();
+
+    const limit_order_index& limit_index = get_index_type<limit_order_index>();
+    const auto& limit_price_index = limit_index.indices().get<by_price>();
+
+    // looking for limit orders selling the most USD for the least CORE
+    auto highest_possible_bid = price::max( mia.id, bitasset.options.short_backing_asset );
+    // stop when limit orders are selling too little USD for too much CORE
+    auto lowest_possible_bid  = price::min( mia.id, bitasset.options.short_backing_asset );
+
+    FC_ASSERT( highest_possible_bid.base.asset_id == lowest_possible_bid.base.asset_id );
+    // NOTE limit_price_index is sorted from greatest to least
+    auto limit_itr = limit_price_index.lower_bound( highest_possible_bid );
+    auto limit_end = limit_price_index.upper_bound( lowest_possible_bid );
+
     if( limit_itr != limit_end ) {
-       assert( settle_price.base.asset_id == limit_itr->sell_price.base.asset_id );
-       highest = std::max( limit_itr->sell_price, settle_price );
+       FC_ASSERT( highest.base.asset_id == limit_itr->sell_price.base.asset_id );
+       highest = std::max( limit_itr->sell_price, highest );
     }
 
-    // FIXME
-    // possible BUG: position with lowest call_price doesn't always have least collateral
-    // related to https://github.com/bitshares/bitshares-core/issues/343
     auto least_collateral = call_itr->collateralization();
     if( ~least_collateral >= highest  ) 
     {
+       wdump( (*call_itr) );
        elog( "Black Swan detected: \n"
              "   Least collateralized call: ${lc}  ${~lc}\n"
            //  "   Highest Bid:               ${hb}  ${~hb}\n"
-             "   Settle Price:              ${sp}  ${~sp}\n"
-             "   Max:                       ${h}   ${~h}\n",
+             "   Settle Price:              ${~sp}  ${sp}\n"
+             "   Max:                       ${~h}   ${h}\n",
             ("lc",least_collateral.to_real())("~lc",(~least_collateral).to_real())
           //  ("hb",limit_itr->sell_price.to_real())("~hb",(~limit_itr->sell_price).to_real())
             ("sp",settle_price.to_real())("~sp",(~settle_price).to_real())
             ("h",highest.to_real())("~h",(~highest).to_real()) );
        FC_ASSERT( enable_black_swan, "Black swan was detected during a margin update which is not allowed to trigger a blackswan" );
-       globally_settle_asset(mia, ~least_collateral );
+       if( maint_time > HARDFORK_CORE_338_TIME && ~least_collateral <= settle_price )
+          // globol settle at feed price if possible
+          globally_settle_asset(mia, settle_price );
+       else
+          globally_settle_asset(mia, ~least_collateral );
        return true;
     } 
     return false;
