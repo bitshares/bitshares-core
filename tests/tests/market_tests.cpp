@@ -690,15 +690,18 @@ BOOST_AUTO_TEST_CASE(hard_fork_338_cross_test)
    BOOST_CHECK( !db.find<call_order_object>( call3_id ) );
    BOOST_CHECK( !db.find<call_order_object>( call4_id ) );
 
-   // global settlement fund should be 15880 + 1000 * 15880 / 986
-   BOOST_CHECK_EQUAL( 15880 + 1000 * 15880 / 986, usd_id(db).bitasset_data(db).settlement_fund.value );
-   // global settlement price should be settlement_fund/(1000+986), but not 15880/986 due to rounding
-   BOOST_CHECK( price(asset(986+1000,usd_id),asset(15880+1000*15880/986) ) == usd_id(db).bitasset_data(db).settlement_price );
+   // since 16.1 > 16, global settlement should at feed price 16/1
+   // so settlement fund should be 986*16 + 1000*16
+   BOOST_CHECK_EQUAL( 1986*16, usd_id(db).bitasset_data(db).settlement_fund.value );
+   // global settlement price should be 16/1, since no rounding here
+   BOOST_CHECK( price(asset(1,usd_id),asset(16) ) == usd_id(db).bitasset_data(db).settlement_price );
 
    BOOST_CHECK_EQUAL( 3000-1000-1007-7, get_balance(seller_id, usd_id) );
    BOOST_CHECK_EQUAL( 7000+8056+64, get_balance(seller_id, core_id) );
+   BOOST_CHECK_EQUAL( 0, get_balance(borrower3_id, usd_id) );
+   BOOST_CHECK_EQUAL( init_balance-16000+15880-986*16, get_balance(borrower3_id, core_id) );
    BOOST_CHECK_EQUAL( 1000, get_balance(borrower4_id, usd_id) );
-   BOOST_CHECK_EQUAL( init_balance-1000*15880/986, get_balance(borrower4_id, core_id) );
+   BOOST_CHECK_EQUAL( init_balance-1000*16, get_balance(borrower4_id, core_id) );
 
    generate_block();
 
@@ -763,21 +766,25 @@ BOOST_AUTO_TEST_CASE(hard_fork_649_cross_test)
    publish_feed( bitusd, feedproducer, current_feed );
    // settlement price = 1/10, mssp = 1/11
 
-   // This would match with call at price 700/6400
-   BOOST_CHECK( !create_sell_order(seller, bitusd.amount(700), core.amount(6400)) );
-   BOOST_CHECK_EQUAL( 3000-700, get_balance(seller_id, usd_id) );
-   BOOST_CHECK_EQUAL( 6400, get_balance(seller_id, core_id) );
-   BOOST_CHECK_EQUAL( 300, call.debt.value );
-   BOOST_CHECK_EQUAL( 8600, call.collateral.value );
+   // This would match with call at price 707/6464
+   BOOST_CHECK( !create_sell_order(seller, bitusd.amount(707), core.amount(6464)) );
+   BOOST_CHECK_EQUAL( 3000-707, get_balance(seller_id, usd_id) );
+   BOOST_CHECK_EQUAL( 6464, get_balance(seller_id, core_id) );
+   BOOST_CHECK_EQUAL( 293, call.debt.value );
+   BOOST_CHECK_EQUAL( 8536, call.collateral.value );
 
    // at this moment,
-   // collateralization of call is 8600 / 300 = 28.67
+   // collateralization of call is 8536 / 293 = 29.1
    // collateralization of call2 is 15500 / 1000 = 15.5
    // collateralization of call3 is 16000 / 1000 = 16
 
+   generate_block();
+   set_expiration( db, trx );
+   update_feed_producers( usd_id(db), {feedproducer_id} );
+
    // adjust price feed to get call_order into black swan territory
-   current_feed.settlement_price = bitusd.amount( 1 ) / core.amount(20);
-   publish_feed( bitusd, feedproducer, current_feed );
+   current_feed.settlement_price = price(asset(1,usd_id) / asset(20));
+   publish_feed( usd_id(db), feedproducer_id(db), current_feed );
    // settlement price = 1/20, mssp = 1/22
 
    // due to #649, black swan won't occur
@@ -785,6 +792,7 @@ BOOST_AUTO_TEST_CASE(hard_fork_649_cross_test)
 
    // generate a block to include operations above
    generate_block();
+   BOOST_CHECK( !usd_id(db).bitasset_data(db).has_settlement() );
    // go over the hard fork, make sure feed doesn't expire
    generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
 
@@ -793,6 +801,21 @@ BOOST_AUTO_TEST_CASE(hard_fork_649_cross_test)
    BOOST_CHECK( !db.find<call_order_object>( call_id ) );
    BOOST_CHECK( !db.find<call_order_object>( call2_id ) );
    BOOST_CHECK( !db.find<call_order_object>( call3_id ) );
+
+   // since least collateral ratio 15.5 < 20, global settlement should at least collateral ratio 15.5/1
+   // so settlement fund should be 15500 + 15500 + 15.5 * 293
+   BOOST_CHECK_EQUAL( 15500*2 + 293 * 155 / 10, usd_id(db).bitasset_data(db).settlement_fund.value );
+   // global settlement price should be settlement_fund/(2000+293), but not 15.5/1 due to rounding
+   BOOST_CHECK( price(asset(2293,usd_id),asset(15500*2+293*155/10) ) == usd_id(db).bitasset_data(db).settlement_price );
+
+   BOOST_CHECK_EQUAL( 3000-707, get_balance(seller_id, usd_id) );
+   BOOST_CHECK_EQUAL( 6464, get_balance(seller_id, core_id) );
+   BOOST_CHECK_EQUAL( 0, get_balance(borrower_id, usd_id) );
+   BOOST_CHECK_EQUAL( init_balance-6464-293*155/10, get_balance(borrower_id, core_id) );
+   BOOST_CHECK_EQUAL( 0, get_balance(borrower2_id, usd_id) );
+   BOOST_CHECK_EQUAL( init_balance-15500, get_balance(borrower2_id, core_id) );
+   BOOST_CHECK_EQUAL( 0, get_balance(borrower3_id, usd_id) );
+   BOOST_CHECK_EQUAL( init_balance-15500, get_balance(borrower3_id, core_id) );
 
    generate_block();
 
