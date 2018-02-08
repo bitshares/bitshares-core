@@ -769,6 +769,7 @@ void database::process_bids( const asset_bitasset_data_object& bad )
 void update_and_match_call_orders( database& db )
 {
    // Update call_price
+   wlog( "Updating all call orders for hardfork core-343 at block ${n}", ("n",db.head_block_num()) );
    asset_id_type current_asset;
    const asset_bitasset_data_object* abd = nullptr;
    // by_collateral index won't change after call_price updated, so it's safe to iterate
@@ -796,6 +797,7 @@ void update_and_match_call_orders( database& db )
       // be here, next_maintenance_time should have been updated already
       db.check_call_orders( a, true, false ); // allow black swan, and call orders are taker
    }
+   wlog( "Done updating all call orders for hardfork core-343 at block ${n}", ("n",db.head_block_num()) );
 }
 
 void database::perform_chain_maintenance(const signed_block& next_block, const global_property_object& global_props)

@@ -402,6 +402,8 @@ bool database::apply_order(const limit_order_object& new_order_object, bool allo
    //    so a new order in the same direction with the call order won't trigger a black swan event.
    // 3. calling is one direction. if the new limit order is on the opposite direction,
    //    no matter if matches with the call, it won't trigger a black swan event.
+   //    (if a match at MSSP caused a black swan event, it means the call order is already undercollateralized,
+   //      which should trigger a black swan event earlier.)
    //
    // Since it won't trigger a black swan, no need to check here.
 
