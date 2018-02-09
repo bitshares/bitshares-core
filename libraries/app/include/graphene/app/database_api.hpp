@@ -620,6 +620,29 @@ class database_api
        */
       vector<blinded_balance_object> get_blinded_balances( const flat_set<commitment_type>& commitments )const;
 
+      /////////////////
+      // Withdrawals //
+      /////////////////
+
+      /**
+       *  @brief Get non expired withdraw permission objects for a giver(ex:recurring customer)
+       *  @param account Account to get objects from
+       *  @param start Used for pagination purposes
+       *  @param limit Maximum number of objects to retrieve
+       *  @return Withdraw permission objects for the account
+      */
+      vector<withdraw_permission_object> get_withdrawals_giver(account_id_type account, uint32_t start, uint32_t limit)const;
+
+      /**
+       *  @brief Get non expired withdraw permission objects for a recipient(ex:service provider)
+       *  @param account Account to get objects from
+       *  @param start Used for pagination purposes
+       *  @param limit Maximum number of objects to retrieve
+       *  @return Withdraw permission objects for the account
+      */
+      vector<withdraw_permission_object> get_withdrawals_recipient(account_id_type account, uint32_t start, uint32_t limit)const;
+
+
    private:
       std::shared_ptr< database_api_impl > my;
 };
@@ -731,4 +754,8 @@ FC_API(graphene::app::database_api,
 
    // Blinded balances
    (get_blinded_balances)
+
+   // Withdrawals
+   (get_withdrawals_giver)
+   (get_withdrawals_recipient)
 )

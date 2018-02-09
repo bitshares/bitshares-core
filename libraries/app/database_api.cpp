@@ -154,6 +154,10 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       // Blinded balances
       vector<blinded_balance_object> get_blinded_balances( const flat_set<commitment_type>& commitments )const;
 
+      // Withdrawals
+      vector<withdraw_permission_object> get_withdrawals_giver(account_id_type account, uint32_t start, uint32_t limit)const;
+      vector<withdraw_permission_object> get_withdrawals_recipient(account_id_type account, uint32_t start, uint32_t limit)const;
+
 
    //private:
       static string price_to_string( const price& _price, const asset_object& _base, const asset_object& _quote );
@@ -2048,6 +2052,57 @@ vector<blinded_balance_object> database_api_impl::get_blinded_balances( const fl
       if( itr != by_commitment_idx.end() )
          result.push_back( *itr );
    }
+   return result;
+}
+
+//////////////////////////////////////////////////////////////////////
+//                                                                  //
+//  Withdrawals                                                     //
+//                                                                  //
+//////////////////////////////////////////////////////////////////////
+
+vector<withdraw_permission_object> database_api::get_withdrawals_giver(account_id_type account, uint32_t start, uint32_t limit)const
+{
+   return my->get_withdrawals_giver( account, start, limit );
+}
+
+vector<withdraw_permission_object> database_api_impl::get_withdrawals_giver(account_id_type account, uint32_t start, uint32_t limit)const
+{
+   FC_ASSERT( limit <= 100 );
+   vector<withdraw_permission_object> result;
+
+   auto withdraw_range = _db.get_index_type<withdraw_permission_index>().indices().get<by_from>().equal_range(account);
+   auto total = distance(withdraw_range.first, withdraw_range.second);
+   if(start >= total ) return result;
+   advance(withdraw_range.first, start);
+
+   std::for_each(withdraw_range.first, withdraw_range.second,
+                 [&result] (const withdraw_permission_object& withdraw) {
+                    result.emplace_back(withdraw);
+                 });
+
+   return result;
+}
+
+vector<withdraw_permission_object> database_api::get_withdrawals_recipient(account_id_type account, uint32_t start, uint32_t limit)const
+{
+   return my->get_withdrawals_recipient( account, start, limit );
+}
+
+vector<withdraw_permission_object> database_api_impl::get_withdrawals_recipient(account_id_type account, uint32_t start, uint32_t limit)const
+{
+   FC_ASSERT( limit <= 100 );
+   vector<withdraw_permission_object> result;
+   auto withdraw_range = _db.get_index_type<withdraw_permission_index>().indices().get<by_authorized>().equal_range(account);
+   auto total = distance(withdraw_range.first, withdraw_range.second);
+   if(start >= total ) return result;
+   advance(withdraw_range.first, start);
+
+   std::for_each(withdraw_range.first, withdraw_range.second,
+                 [&result] (const withdraw_permission_object& withdraw) {
+                    result.emplace_back(withdraw);
+                 });
+
    return result;
 }
 
