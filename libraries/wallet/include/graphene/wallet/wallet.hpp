@@ -507,6 +507,12 @@ class wallet_api
        * @ingroup Transaction Builder API
        */
       signed_transaction sign_builder_transaction(transaction_handle_type transaction_handle, bool broadcast = true);
+
+      /**
+       * @ingroup broadcast signed transaction
+       */
+      pair<transaction_id_type,signed_transaction> broadcast_transaction(signed_transaction tx);
+
       /**
        * @ingroup Transaction Builder API
        */
@@ -1628,6 +1634,7 @@ FC_API( graphene::wallet::wallet_api,
         (set_fees_on_builder_transaction)
         (preview_builder_transaction)
         (sign_builder_transaction)
+        (broadcast_transaction)
         (propose_builder_transaction)
         (propose_builder_transaction2)
         (remove_builder_transaction)
