@@ -485,7 +485,7 @@ BOOST_AUTO_TEST_CASE(hardfork_core_453_test)
 } FC_LOG_AND_RETHROW() }
 
 /***
- * Fixed bitshares-core issue #453 #606: multiple order matching without black swan
+ * Fixed bitshares-core issue #453 #606: multiple order matching without black swan, multiple bitassets
  */
 BOOST_AUTO_TEST_CASE(hard_fork_453_cross_test)
 { try { // create orders before hard fork, which will be matched on hard fork
@@ -498,8 +498,12 @@ BOOST_AUTO_TEST_CASE(hard_fork_453_cross_test)
    ACTORS((buyer)(seller)(borrower)(borrower2)(borrower3)(feedproducer));
 
    const auto& bitusd = create_bitasset("USDBIT", feedproducer_id);
+   const auto& biteur = create_bitasset("EURBIT", feedproducer_id);
+   const auto& bitcny = create_bitasset("CNYBIT", feedproducer_id);
    const auto& core   = asset_id_type()(db);
    asset_id_type usd_id = bitusd.id;
+   asset_id_type eur_id = biteur.id;
+   asset_id_type cny_id = bitcny.id;
    asset_id_type core_id = core.id;
 
    int64_t init_balance(1000000);
@@ -509,51 +513,117 @@ BOOST_AUTO_TEST_CASE(hard_fork_453_cross_test)
    transfer(committee_account, borrower2_id, asset(init_balance));
    transfer(committee_account, borrower3_id, asset(init_balance));
    update_feed_producers( bitusd, {feedproducer.id} );
+   update_feed_producers( biteur, {feedproducer.id} );
+   update_feed_producers( bitcny, {feedproducer.id} );
 
    price_feed current_feed;
    current_feed.maintenance_collateral_ratio = 1750;
    current_feed.maximum_short_squeeze_ratio = 1100;
    current_feed.settlement_price = bitusd.amount( 1 ) / core.amount(5);
    publish_feed( bitusd, feedproducer, current_feed );
+   current_feed.settlement_price = biteur.amount( 1 ) / core.amount(5);
+   publish_feed( biteur, feedproducer, current_feed );
+   current_feed.settlement_price = bitcny.amount( 1 ) / core.amount(5);
+   publish_feed( bitcny, feedproducer, current_feed );
    // start out with 300% collateral, call price is 15/1.75 CORE/USD = 60/7
-   const call_order_object& call = *borrow( borrower, bitusd.amount(1000), asset(15000));
-   call_order_id_type call_id = call.id;
+   const call_order_object& call_usd = *borrow( borrower, bitusd.amount(1000), asset(15000));
+   call_order_id_type call_usd_id = call_usd.id;
+   const call_order_object& call_eur = *borrow( borrower, biteur.amount(1000), asset(15000));
+   call_order_id_type call_eur_id = call_eur.id;
+   const call_order_object& call_cny = *borrow( borrower, bitcny.amount(1000), asset(15000));
+   call_order_id_type call_cny_id = call_cny.id;
    // create another position with 310% collateral, call price is 15.5/1.75 CORE/USD = 62/7
-   const call_order_object& call2 = *borrow( borrower2, bitusd.amount(1000), asset(15500));
-   call_order_id_type call2_id = call2.id;
+   const call_order_object& call_usd2 = *borrow( borrower2, bitusd.amount(1000), asset(15500));
+   call_order_id_type call_usd2_id = call_usd2.id;
+   const call_order_object& call_eur2 = *borrow( borrower2, biteur.amount(1000), asset(15500));
+   call_order_id_type call_eur2_id = call_eur2.id;
+   const call_order_object& call_cny2 = *borrow( borrower2, bitcny.amount(1000), asset(15500));
+   call_order_id_type call_cny2_id = call_cny2.id;
    // create yet another position with 320% collateral, call price is 16/1.75 CORE/USD = 64/7
-   const call_order_object& call3 = *borrow( borrower3, bitusd.amount(1000), asset(16000));
-   call_order_id_type call3_id = call3.id;
+   const call_order_object& call_usd3 = *borrow( borrower3, bitusd.amount(1000), asset(16000));
+   call_order_id_type call_usd3_id = call_usd3.id;
+   const call_order_object& call_eur3 = *borrow( borrower3, biteur.amount(1000), asset(16000));
+   call_order_id_type call_eur3_id = call_eur3.id;
+   const call_order_object& call_cny3 = *borrow( borrower3, bitcny.amount(1000), asset(16000));
+   call_order_id_type call_cny3_id = call_cny3.id;
    transfer(borrower, seller, bitusd.amount(1000));
    transfer(borrower2, seller, bitusd.amount(1000));
    transfer(borrower3, seller, bitusd.amount(1000));
+   transfer(borrower, seller, biteur.amount(1000));
+   transfer(borrower2, seller, biteur.amount(1000));
+   transfer(borrower3, seller, biteur.amount(1000));
+   transfer(borrower, seller, bitcny.amount(1000));
+   transfer(borrower2, seller, bitcny.amount(1000));
+   transfer(borrower3, seller, bitcny.amount(1000));
 
-   BOOST_CHECK_EQUAL( 1000, call.debt.value );
-   BOOST_CHECK_EQUAL( 15000, call.collateral.value );
-   BOOST_CHECK_EQUAL( 1000, call2.debt.value );
-   BOOST_CHECK_EQUAL( 15500, call2.collateral.value );
-   BOOST_CHECK_EQUAL( 1000, call3.debt.value );
-   BOOST_CHECK_EQUAL( 16000, call3.collateral.value );
+   BOOST_CHECK_EQUAL( 1000, call_usd.debt.value );
+   BOOST_CHECK_EQUAL( 15000, call_usd.collateral.value );
+   BOOST_CHECK_EQUAL( 1000, call_usd2.debt.value );
+   BOOST_CHECK_EQUAL( 15500, call_usd2.collateral.value );
+   BOOST_CHECK_EQUAL( 1000, call_usd3.debt.value );
+   BOOST_CHECK_EQUAL( 16000, call_usd3.collateral.value );
    BOOST_CHECK_EQUAL( 3000, get_balance(seller, bitusd) );
+   BOOST_CHECK_EQUAL( 1000, call_eur.debt.value );
+   BOOST_CHECK_EQUAL( 15000, call_eur.collateral.value );
+   BOOST_CHECK_EQUAL( 1000, call_eur2.debt.value );
+   BOOST_CHECK_EQUAL( 15500, call_eur2.collateral.value );
+   BOOST_CHECK_EQUAL( 1000, call_eur3.debt.value );
+   BOOST_CHECK_EQUAL( 16000, call_eur3.collateral.value );
+   BOOST_CHECK_EQUAL( 3000, get_balance(seller, biteur) );
+   BOOST_CHECK_EQUAL( 1000, call_cny.debt.value );
+   BOOST_CHECK_EQUAL( 15000, call_cny.collateral.value );
+   BOOST_CHECK_EQUAL( 1000, call_cny2.debt.value );
+   BOOST_CHECK_EQUAL( 15500, call_cny2.collateral.value );
+   BOOST_CHECK_EQUAL( 1000, call_cny3.debt.value );
+   BOOST_CHECK_EQUAL( 16000, call_cny3.collateral.value );
+   BOOST_CHECK_EQUAL( 3000, get_balance(seller, bitcny) );
    BOOST_CHECK_EQUAL( 0, get_balance(seller, core) );
 
    // adjust price feed to get call_order into margin call territory
    current_feed.settlement_price = bitusd.amount( 1 ) / core.amount(10);
    publish_feed( bitusd, feedproducer, current_feed );
+   current_feed.settlement_price = biteur.amount( 1 ) / core.amount(10);
+   publish_feed( biteur, feedproducer, current_feed );
+   current_feed.settlement_price = bitcny.amount( 1 ) / core.amount(10);
+   publish_feed( bitcny, feedproducer, current_feed );
    // settlement price = 1/10, mssp = 1/11
 
    // This order below the call price will not be matched before hard fork: 1/8 #606
-   limit_order_id_type sell_low = create_sell_order(seller, bitusd.amount(1000), core.amount(7000))->id;
+   limit_order_id_type sell_usd_low = create_sell_order(seller, bitusd.amount(1000), core.amount(7000))->id;
    // This is a big order, price below the call price will not be matched before hard fork: 1007/9056 = 1/8 #606
-   limit_order_id_type sell_low2 = create_sell_order(seller, bitusd.amount(1007), core.amount(8056))->id;
+   limit_order_id_type sell_usd_low2 = create_sell_order(seller, bitusd.amount(1007), core.amount(8056))->id;
    // This order above the MSSP will not be matched before hard fork
-   limit_order_id_type sell_high = create_sell_order(seller, bitusd.amount(7), core.amount(78))->id;
+   limit_order_id_type sell_usd_high = create_sell_order(seller, bitusd.amount(7), core.amount(78))->id;
    // This would match but is blocked by sell_low?! #606
-   limit_order_id_type sell_med = create_sell_order(seller, bitusd.amount(700), core.amount(6400))->id;
+   limit_order_id_type sell_usd_med = create_sell_order(seller, bitusd.amount(700), core.amount(6400))->id;
    // This would match but is blocked by sell_low?! #606
-   limit_order_id_type sell_med2 = create_sell_order(seller, bitusd.amount(7), core.amount(65))->id;
+   limit_order_id_type sell_usd_med2 = create_sell_order(seller, bitusd.amount(7), core.amount(65))->id;
+
+   // This order below the call price will not be matched before hard fork: 1/8 #606
+   limit_order_id_type sell_eur_low = create_sell_order(seller, biteur.amount(1000), core.amount(7000))->id;
+   // This is a big order, price below the call price will not be matched before hard fork: 1007/9056 = 1/8 #606
+   limit_order_id_type sell_eur_low2 = create_sell_order(seller, biteur.amount(1007), core.amount(8056))->id;
+   // This order above the MSSP will not be matched before hard fork
+   limit_order_id_type sell_eur_high = create_sell_order(seller, biteur.amount(7), core.amount(78))->id;
+   // This would match but is blocked by sell_low?! #606
+   limit_order_id_type sell_eur_med = create_sell_order(seller, biteur.amount(700), core.amount(6400))->id;
+   // This would match but is blocked by sell_low?! #606
+   limit_order_id_type sell_eur_med2 = create_sell_order(seller, biteur.amount(7), core.amount(65))->id;
+
+   // This order below the call price will not be matched before hard fork: 1/8 #606
+   limit_order_id_type sell_cny_low = create_sell_order(seller, bitcny.amount(1000), core.amount(7000))->id;
+   // This is a big order, price below the call price will not be matched before hard fork: 1007/9056 = 1/8 #606
+   limit_order_id_type sell_cny_low2 = create_sell_order(seller, bitcny.amount(1007), core.amount(8056))->id;
+   // This order above the MSSP will not be matched before hard fork
+   limit_order_id_type sell_cny_high = create_sell_order(seller, bitcny.amount(7), core.amount(78))->id;
+   // This would match but is blocked by sell_low?! #606
+   limit_order_id_type sell_cny_med = create_sell_order(seller, bitcny.amount(700), core.amount(6400))->id;
+   // This would match but is blocked by sell_low?! #606
+   limit_order_id_type sell_cny_med2 = create_sell_order(seller, bitcny.amount(7), core.amount(65))->id;
 
    BOOST_CHECK_EQUAL( 3000-1000-1007-7-700-7, get_balance(seller_id, usd_id) );
+   BOOST_CHECK_EQUAL( 3000-1000-1007-7-700-7, get_balance(seller_id, eur_id) );
+   BOOST_CHECK_EQUAL( 3000-1000-1007-7-700-7, get_balance(seller_id, cny_id) );
    BOOST_CHECK_EQUAL( 0, get_balance(seller, core) );
 
    // generate a block to include operations above
@@ -562,26 +632,62 @@ BOOST_AUTO_TEST_CASE(hard_fork_453_cross_test)
    generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
 
    // sell_low and call should get matched first
-   BOOST_CHECK( !db.find<limit_order_object>( sell_low ) );
-   BOOST_CHECK( !db.find<call_order_object>( call_id ) );
+   BOOST_CHECK( !db.find<limit_order_object>( sell_usd_low ) );
+   BOOST_CHECK( !db.find<call_order_object>( call_usd_id ) );
    // sell_low2 and call2 should get matched
-   BOOST_CHECK( !db.find<call_order_object>( call2_id ) );
+   BOOST_CHECK( !db.find<call_order_object>( call_usd2_id ) );
    // sell_low2 and call3 should get matched: fixed #453
-   BOOST_CHECK( !db.find<limit_order_object>( sell_low2 ) );
+   BOOST_CHECK( !db.find<limit_order_object>( sell_usd_low2 ) );
    // sell_med and call3 should get matched
-   BOOST_CHECK( !db.find<limit_order_object>( sell_med ) );
+   BOOST_CHECK( !db.find<limit_order_object>( sell_usd_med ) );
    // call3 now is not at margin call state, so sell_med2 won't get matched
-   BOOST_CHECK_EQUAL( db.find<limit_order_object>( sell_med2 )->for_sale.value, 7 );
+   BOOST_CHECK_EQUAL( db.find<limit_order_object>( sell_usd_med2 )->for_sale.value, 7 );
    // sell_high should still be there, didn't match anything
-   BOOST_CHECK_EQUAL( db.find<limit_order_object>( sell_high )->for_sale.value, 7 );
+   BOOST_CHECK_EQUAL( db.find<limit_order_object>( sell_usd_high )->for_sale.value, 7 );
+
+   // sell_low and call should get matched first
+   BOOST_CHECK( !db.find<limit_order_object>( sell_eur_low ) );
+   BOOST_CHECK( !db.find<call_order_object>( call_eur_id ) );
+   // sell_low2 and call2 should get matched
+   BOOST_CHECK( !db.find<call_order_object>( call_eur2_id ) );
+   // sell_low2 and call3 should get matched: fixed #453
+   BOOST_CHECK( !db.find<limit_order_object>( sell_eur_low2 ) );
+   // sell_med and call3 should get matched
+   BOOST_CHECK( !db.find<limit_order_object>( sell_eur_med ) );
+   // call3 now is not at margin call state, so sell_med2 won't get matched
+   BOOST_CHECK_EQUAL( db.find<limit_order_object>( sell_eur_med2 )->for_sale.value, 7 );
+   // sell_high should still be there, didn't match anything
+   BOOST_CHECK_EQUAL( db.find<limit_order_object>( sell_eur_high )->for_sale.value, 7 );
+
+   // sell_low and call should get matched first
+   BOOST_CHECK( !db.find<limit_order_object>( sell_cny_low ) );
+   BOOST_CHECK( !db.find<call_order_object>( call_cny_id ) );
+   // sell_low2 and call2 should get matched
+   BOOST_CHECK( !db.find<call_order_object>( call_cny2_id ) );
+   // sell_low2 and call3 should get matched: fixed #453
+   BOOST_CHECK( !db.find<limit_order_object>( sell_cny_low2 ) );
+   // sell_med and call3 should get matched
+   BOOST_CHECK( !db.find<limit_order_object>( sell_cny_med ) );
+   // call3 now is not at margin call state, so sell_med2 won't get matched
+   BOOST_CHECK_EQUAL( db.find<limit_order_object>( sell_cny_med2 )->for_sale.value, 7 );
+   // sell_high should still be there, didn't match anything
+   BOOST_CHECK_EQUAL( db.find<limit_order_object>( sell_cny_high )->for_sale.value, 7 );
 
    // all match price would be limit order price
    BOOST_CHECK_EQUAL( 3000-1000-1007-7-700-7, get_balance(seller_id, usd_id) );
-   BOOST_CHECK_EQUAL( 7000+8056+6400, get_balance(seller_id, core_id) );
-   BOOST_CHECK_EQUAL( 1000-7-700, call3_id(db).debt.value );
-   BOOST_CHECK_EQUAL( 16000-56-6400, call3_id(db).collateral.value );
+   BOOST_CHECK_EQUAL( 3000-1000-1007-7-700-7, get_balance(seller_id, eur_id) );
+   BOOST_CHECK_EQUAL( 3000-1000-1007-7-700-7, get_balance(seller_id, cny_id) );
+   BOOST_CHECK_EQUAL( (7000+8056+6400)*3, get_balance(seller_id, core_id) );
+   BOOST_CHECK_EQUAL( 1000-7-700, call_usd3_id(db).debt.value );
+   BOOST_CHECK_EQUAL( 16000-56-6400, call_usd3_id(db).collateral.value );
+   BOOST_CHECK_EQUAL( 1000-7-700, call_eur3_id(db).debt.value );
+   BOOST_CHECK_EQUAL( 16000-56-6400, call_eur3_id(db).collateral.value );
+   BOOST_CHECK_EQUAL( 1000-7-700, call_cny3_id(db).debt.value );
+   BOOST_CHECK_EQUAL( 16000-56-6400, call_cny3_id(db).collateral.value );
    // call3's call_price should be updated: 9544/293/1.75 = 9544*4 / 293*7 = 38176/2051 CORE/USD
-   BOOST_CHECK( price(asset(38176),asset(2051,usd_id)) == call3_id(db).call_price );
+   BOOST_CHECK( price(asset(38176),asset(2051,usd_id)) == call_usd3_id(db).call_price );
+   BOOST_CHECK( price(asset(38176),asset(2051,eur_id)) == call_eur3_id(db).call_price );
+   BOOST_CHECK( price(asset(38176),asset(2051,cny_id)) == call_cny3_id(db).call_price );
 
    generate_block();
 
