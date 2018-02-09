@@ -280,7 +280,7 @@ void_result asset_update_evaluator::do_evaluate(const asset_update_operation& o)
    if( o.new_issuer )
    {
       FC_ASSERT( d.head_block_time() < HARDFORK_CORE_199_TIME,
-                 "Since Hardfork #199, updating issuer requires the use of asset_change_issuer_operation.");
+                 "Since Hardfork #199, updating issuer requires the use of asset_update_issuer_operation.");
       validate_new_issuer( d, a, *o.new_issuer );
    }
 
