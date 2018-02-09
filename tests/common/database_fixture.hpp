@@ -230,7 +230,8 @@ struct database_fixture {
    const asset_object& create_user_issued_asset( const string& name );
    const asset_object& create_user_issued_asset( const string& name,
                                                  const account_object& issuer,
-                                                 uint16_t flags );
+                                                 uint16_t flags,
+                                                 const price& core_exchange_rate = price(asset(1, asset_id_type(1)), asset(1)) );
    void issue_uia( const account_object& recipient, asset amount );
    void issue_uia( account_id_type recipient_id, asset amount );
 
@@ -263,8 +264,12 @@ struct database_fixture {
    uint64_t fund( const account_object& account, const asset& amount = asset(500000) );
    digest_type digest( const transaction& tx );
    void sign( signed_transaction& trx, const fc::ecc::private_key& key );
-   const limit_order_object* create_sell_order( account_id_type user, const asset& amount, const asset& recv );
-   const limit_order_object* create_sell_order( const account_object& user, const asset& amount, const asset& recv );
+   const limit_order_object* create_sell_order( account_id_type user, const asset& amount, const asset& recv,
+                                                const time_point_sec order_expiration = time_point_sec::maximum(),
+                                                const price& fee_core_exchange_rate = price::unit_price() );
+   const limit_order_object* create_sell_order( const account_object& user, const asset& amount, const asset& recv,
+                                                const time_point_sec order_expiration = time_point_sec::maximum(),
+                                                const price& fee_core_exchange_rate = price::unit_price() );
    asset cancel_limit_order( const limit_order_object& order );
    void transfer( account_id_type from, account_id_type to, const asset& amount, const asset& fee = asset() );
    void transfer( const account_object& from, const account_object& to, const asset& amount, const asset& fee = asset() );
