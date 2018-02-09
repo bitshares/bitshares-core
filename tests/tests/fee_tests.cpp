@@ -223,6 +223,7 @@ BOOST_AUTO_TEST_CASE(asset_claim_pool_test)
         // Alice claimes fee pool of her asset and can't claim pool of Bob's asset
 
         const share_type core_prec = asset::scaled_precision( asset_id_type()(db).precision );
+        const auto& fees = *db.get_global_properties().parameters.current_fees;
 
         // return number of core shares (times precision)
         auto _core = [&core_prec]( int64_t x ) -> asset
@@ -258,6 +259,30 @@ BOOST_AUTO_TEST_CASE(asset_claim_pool_test)
 
         };
 
+        auto claim_pool_proposal = [&]( const account_id_type& issuer, const asset_id_type& asset_to_claim,
+                                        const asset& amount_to_fund, const asset_object& fee_asset  )
+        {
+            asset_claim_pool_operation claim_op;
+            claim_op.issuer = issuer;
+            claim_op.asset_id = asset_to_claim;
+            claim_op.amount_to_claim = amount_to_fund;
+
+            const auto proposal_create_fees = fees.get<proposal_create_operation>();
+            proposal_create_operation prop;
+            prop.fee_paying_account = alice_id;
+            prop.proposed_ops.emplace_back( claim_op );
+            prop.expiration_time =  db.head_block_time() + fc::days(1);
+            prop.fee = asset( proposal_create_fees.fee + proposal_create_fees.price_per_kbyte );
+
+            signed_transaction tx;
+            tx.operations.push_back( prop );
+            db.current_fee_schedule().set_fee( tx.operations.back(), fee_asset.options.core_exchange_rate );
+            set_expiration( db, tx );
+            sign( tx, alice_private_key );
+            PUSH_TX( db, tx );
+
+        };
+
         const asset_object& core_asset = asset_id_type()(db);
 
         // deposit 100 BTS to the fee pool of ALICEUSD asset
@@ -265,6 +290,7 @@ BOOST_AUTO_TEST_CASE(asset_claim_pool_test)
 
         // Unable to claim pool before the hardfork
         GRAPHENE_REQUIRE_THROW( claim_pool( alice_id, aliceusd.id, _core(1), core_asset), fc::exception );
+        GRAPHENE_REQUIRE_THROW( claim_pool_proposal( alice_id, aliceusd.id, _core(1), core_asset), fc::exception );
 
         // Fast forward to hard fork date
         generate_blocks( HARDFORK_CORE_188_TIME );
