@@ -2071,8 +2071,9 @@ vector<withdraw_permission_object> database_api_impl::get_withdrawals_giver(acco
    FC_ASSERT( limit <= 100 );
    vector<withdraw_permission_object> result;
 
+   auto withdraw_index_end = _db.get_index_type<withdraw_permission_index>().indices().get<by_from>().end();
    auto withdraw_itr = _db.get_index_type<withdraw_permission_index>().indices().get<by_from>().lower_bound(boost::make_tuple(account, start));
-   while( withdraw_itr->withdraw_from_account == account && result.size() < limit)
+   while( withdraw_itr->withdraw_from_account == account && result.size() < limit && withdraw_itr != withdraw_index_end)
    {
       result.push_back(*withdraw_itr);
       ++withdraw_itr;
@@ -2090,8 +2091,9 @@ vector<withdraw_permission_object> database_api_impl::get_withdrawals_recipient(
    FC_ASSERT( limit <= 100 );
    vector<withdraw_permission_object> result;
 
+   auto withdraw_index_end = _db.get_index_type<withdraw_permission_index>().indices().get<by_authorized>().end();
    auto withdraw_itr = _db.get_index_type<withdraw_permission_index>().indices().get<by_authorized>().lower_bound(boost::make_tuple(account, start));
-   while( withdraw_itr->authorized_account == account && result.size() < limit)
+   while( withdraw_itr->authorized_account == account && result.size() < limit && withdraw_itr != withdraw_index_end)
    {
       result.push_back(*withdraw_itr);
       ++withdraw_itr;
