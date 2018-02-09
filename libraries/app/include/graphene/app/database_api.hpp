@@ -631,7 +631,7 @@ class database_api
        *  @param limit Maximum number of objects to retrieve
        *  @return Withdraw permission objects for the account
       */
-      vector<withdraw_permission_object> get_withdrawals_giver(account_id_type account, uint32_t start, uint32_t limit)const;
+      vector<withdraw_permission_object> get_withdrawals_giver(account_id_type account, object_id_type start, uint32_t limit)const;
 
       /**
        *  @brief Get non expired withdraw permission objects for a recipient(ex:service provider)
@@ -640,7 +640,7 @@ class database_api
        *  @param limit Maximum number of objects to retrieve
        *  @return Withdraw permission objects for the account
       */
-      vector<withdraw_permission_object> get_withdrawals_recipient(account_id_type account, uint32_t start, uint32_t limit)const;
+      vector<withdraw_permission_object> get_withdrawals_recipient(account_id_type account, object_id_type start, uint32_t limit)const;
 
 
    private:

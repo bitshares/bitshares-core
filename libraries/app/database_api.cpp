@@ -155,8 +155,8 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       vector<blinded_balance_object> get_blinded_balances( const flat_set<commitment_type>& commitments )const;
 
       // Withdrawals
-      vector<withdraw_permission_object> get_withdrawals_giver(account_id_type account, uint32_t start, uint32_t limit)const;
-      vector<withdraw_permission_object> get_withdrawals_recipient(account_id_type account, uint32_t start, uint32_t limit)const;
+      vector<withdraw_permission_object> get_withdrawals_giver(account_id_type account, object_id_type start, uint32_t limit)const;
+      vector<withdraw_permission_object> get_withdrawals_recipient(account_id_type account, object_id_type start, uint32_t limit)const;
 
 
    //private:
@@ -2061,48 +2061,41 @@ vector<blinded_balance_object> database_api_impl::get_blinded_balances( const fl
 //                                                                  //
 //////////////////////////////////////////////////////////////////////
 
-vector<withdraw_permission_object> database_api::get_withdrawals_giver(account_id_type account, uint32_t start, uint32_t limit)const
+vector<withdraw_permission_object> database_api::get_withdrawals_giver(account_id_type account, object_id_type start, uint32_t limit)const
 {
    return my->get_withdrawals_giver( account, start, limit );
 }
 
-vector<withdraw_permission_object> database_api_impl::get_withdrawals_giver(account_id_type account, uint32_t start, uint32_t limit)const
+vector<withdraw_permission_object> database_api_impl::get_withdrawals_giver(account_id_type account, object_id_type start, uint32_t limit)const
 {
    FC_ASSERT( limit <= 100 );
    vector<withdraw_permission_object> result;
 
-   auto withdraw_range = _db.get_index_type<withdraw_permission_index>().indices().get<by_from>().equal_range(account);
-   auto total = distance(withdraw_range.first, withdraw_range.second);
-   if(start >= total ) return result;
-   advance(withdraw_range.first, start);
-
-   std::for_each(withdraw_range.first, withdraw_range.second,
-                 [&result] (const withdraw_permission_object& withdraw) {
-                    result.emplace_back(withdraw);
-                 });
-
+   auto withdraw_itr = _db.get_index_type<withdraw_permission_index>().indices().get<by_from>().lower_bound(boost::make_tuple(account, start));
+   while( withdraw_itr->withdraw_from_account == account && result.size() < limit)
+   {
+      result.push_back(*withdraw_itr);
+      ++withdraw_itr;
+   }
    return result;
 }
 
-vector<withdraw_permission_object> database_api::get_withdrawals_recipient(account_id_type account, uint32_t start, uint32_t limit)const
+vector<withdraw_permission_object> database_api::get_withdrawals_recipient(account_id_type account, object_id_type start, uint32_t limit)const
 {
    return my->get_withdrawals_recipient( account, start, limit );
 }
 
-vector<withdraw_permission_object> database_api_impl::get_withdrawals_recipient(account_id_type account, uint32_t start, uint32_t limit)const
+vector<withdraw_permission_object> database_api_impl::get_withdrawals_recipient(account_id_type account, object_id_type start, uint32_t limit)const
 {
    FC_ASSERT( limit <= 100 );
    vector<withdraw_permission_object> result;
-   auto withdraw_range = _db.get_index_type<withdraw_permission_index>().indices().get<by_authorized>().equal_range(account);
-   auto total = distance(withdraw_range.first, withdraw_range.second);
-   if(start >= total ) return result;
-   advance(withdraw_range.first, start);
 
-   std::for_each(withdraw_range.first, withdraw_range.second,
-                 [&result] (const withdraw_permission_object& withdraw) {
-                    result.emplace_back(withdraw);
-                 });
-
+   auto withdraw_itr = _db.get_index_type<withdraw_permission_index>().indices().get<by_authorized>().lower_bound(boost::make_tuple(account, start));
+   while( withdraw_itr->authorized_account == account && result.size() < limit)
+   {
+      result.push_back(*withdraw_itr);
+      ++withdraw_itr;
+   }
    return result;
 }
 
