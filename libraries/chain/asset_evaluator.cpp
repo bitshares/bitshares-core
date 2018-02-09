@@ -620,7 +620,7 @@ void_result asset_claim_pool_evaluator::do_evaluate( const asset_claim_pool_oper
 { try {
     FC_ASSERT( db().head_block_time() >= HARDFORK_CORE_188_TIME,
          "This operation is only available after Hardfork #188!" );
-    FC_ASSERT( o.asset_id(db()).issuer == o.issuer, "Asset fee pool withdrawal may only be claimed by the issuer" );
+    FC_ASSERT( o.asset_id(db()).issuer == o.issuer, "Asset fee pool may only be claimed by the issuer" );
 
     return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }
