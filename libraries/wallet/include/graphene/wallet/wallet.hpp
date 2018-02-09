@@ -1121,10 +1121,10 @@ class wallet_api
        *
        * This command allows the issuer to withdraw those funds from the fee pool.
        *
-       * @param symbol the name or id of the asset whose fee pool you wish to fund
+       * @param symbol the name or id of the asset whose fee pool you wish to claim
        * @param amount the amount of the core asset to withdraw
        * @param broadcast true to broadcast the transaction on the network
-       * @returns the signed transaction funding the fee pool
+       * @returns the signed transaction claiming from the fee pool
        */
       signed_transaction claim_asset_fee_pool(string symbol,
                                               string amount,
