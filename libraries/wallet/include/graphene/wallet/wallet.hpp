@@ -1046,7 +1046,6 @@ class wallet_api
        *
        * @param symbol the name or id of the asset to update
        * @param new_issuer if changing the asset's issuer, the name or id of the new issuer.
-       *                   null if you wish to remain the issuer of the asset
        * @param broadcast true to broadcast the transaction on the network
        * @returns the signed transaction updating the asset
        */
