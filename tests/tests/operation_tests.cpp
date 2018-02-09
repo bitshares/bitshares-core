@@ -328,6 +328,36 @@ BOOST_AUTO_TEST_CASE( prediction_market_resolves_to_0 )
    }
 }
 
+/**
+ * Reproduces https://github.com/bitshares/bitshares-core/issues/460 : Prediction market can suffer a black swan
+ */
+BOOST_AUTO_TEST_CASE( prediction_market_blackswan_test )
+{ try {
+      ACTORS((judge)(dan));
+
+      const auto& pmark = create_prediction_market("PMARK", judge_id);
+
+      int64_t init_balance(1000000);
+      transfer(committee_account, judge_id, asset(init_balance));
+      transfer(committee_account, dan_id, asset(init_balance));
+
+      BOOST_TEST_MESSAGE( "Open position with equal collateral" );
+      borrow( dan, pmark.amount(1000), asset(1000) );
+
+      update_feed_producers( pmark, { judge_id });
+      price_feed feed;
+      feed.settlement_price = asset( 1, pmark.id ) / asset( 1 );
+      publish_feed( pmark, judge, feed );
+
+      // black swan event occurs
+      BOOST_CHECK( pmark.bitasset_data(db).has_settlement() );
+
+   } catch( const fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
 BOOST_AUTO_TEST_CASE( create_account_test )
 {
    try {
