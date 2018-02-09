@@ -508,8 +508,9 @@ class wallet_api
        */
       signed_transaction sign_builder_transaction(transaction_handle_type transaction_handle, bool broadcast = true);
 
-      /**
-       * @ingroup broadcast signed transaction
+      /** Broadcast signed transaction
+       * @param tx signed transaction
+       * @returns the transaction ID along with the signed transaction.
        */
       pair<transaction_id_type,signed_transaction> broadcast_transaction(signed_transaction tx);
 
