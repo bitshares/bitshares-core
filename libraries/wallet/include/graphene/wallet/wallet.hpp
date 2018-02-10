@@ -668,8 +668,6 @@ class wallet_api
 
       /** Converts a signed_transaction in JSON form to its binary representation.
        *
-       * TODO: I don't see a broadcast_transaction() function, do we need one?
-       *
        * @param tx the transaction to serialize
        * @returns the binary form of the transaction.  It will not be hex encoded, 
        *          this returns a raw string that may have null characters embedded 
