@@ -627,7 +627,7 @@ class database_api
       /**
        *  @brief Get non expired withdraw permission objects for a giver(ex:recurring customer)
        *  @param account Account to get objects from
-       *  @param start Used for pagination purposes
+       *  @param start Withdraw permission objects(1.12.X) before this ID will be skipped in results. Pagination purposes.
        *  @param limit Maximum number of objects to retrieve
        *  @return Withdraw permission objects for the account
       */
@@ -636,7 +636,7 @@ class database_api
       /**
        *  @brief Get non expired withdraw permission objects for a recipient(ex:service provider)
        *  @param account Account to get objects from
-       *  @param start Used for pagination purposes
+       *  @param start Withdraw permission objects(1.12.X) before this ID will be skipped in results. Pagination purposes.
        *  @param limit Maximum number of objects to retrieve
        *  @return Withdraw permission objects for the account
       */

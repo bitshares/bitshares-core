@@ -2068,21 +2068,16 @@ vector<withdraw_permission_object> database_api::get_withdrawals_giver(account_i
 
 vector<withdraw_permission_object> database_api_impl::get_withdrawals_giver(account_id_type account, withdraw_permission_id_type start, uint32_t limit)const
 {
-   FC_ASSERT( limit <= 100 );
+   FC_ASSERT( limit <= 101 );
    vector<withdraw_permission_object> result;
 
    const auto& withdraw_idx = _db.get_index_type<withdraw_permission_index>().indices().get<by_from>();
    auto withdraw_index_end = withdraw_idx.end();
-   auto withdraw_itr = withdraw_idx.upper_bound(boost::make_tuple(account, start));
+   auto withdraw_itr = withdraw_idx.lower_bound(boost::make_tuple(account, start));
    while(withdraw_itr != withdraw_index_end && withdraw_itr->withdraw_from_account == account && result.size() < limit)
    {
       result.push_back(*withdraw_itr);
       ++withdraw_itr;
-   }
-   if(start.instance.value == 0 && result.size() < limit) {
-      auto first = _db.find(withdraw_permission_id_type(0));
-      if( first && first->withdraw_from_account == account)
-         result.insert(result.begin(), *first);
    }
    return result;
 }
@@ -2094,21 +2089,16 @@ vector<withdraw_permission_object> database_api::get_withdrawals_recipient(accou
 
 vector<withdraw_permission_object> database_api_impl::get_withdrawals_recipient(account_id_type account, withdraw_permission_id_type start, uint32_t limit)const
 {
-   FC_ASSERT( limit <= 100 );
+   FC_ASSERT( limit <= 101 );
    vector<withdraw_permission_object> result;
 
    const auto& withdraw_idx = _db.get_index_type<withdraw_permission_index>().indices().get<by_authorized>();
    auto withdraw_index_end = withdraw_idx.end();
-   auto withdraw_itr = withdraw_idx.upper_bound(boost::make_tuple(account, start));
+   auto withdraw_itr = withdraw_idx.lower_bound(boost::make_tuple(account, start));
    while(withdraw_itr != withdraw_index_end && withdraw_itr->authorized_account == account && result.size() < limit)
    {
       result.push_back(*withdraw_itr);
       ++withdraw_itr;
-   }
-   if(start.instance.value == 0 && result.size() < limit) {
-      auto first = _db.find(withdraw_permission_id_type(0));
-      if( first && first->authorized_account == account)
-         result.insert(result.begin(), *first);
    }
    return result;
 }
