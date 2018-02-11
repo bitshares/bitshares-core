@@ -164,6 +164,13 @@ namespace graphene { namespace db {
          /** called just after obj is modified */
          void on_modify( const object& obj );
 
+         template<typename T, typename... Args>
+         T* add_secondary_index(Args... args)
+         {
+            _sindex.emplace_back( new T(args...) );
+            return static_cast<T*>(_sindex.back().get());
+         }
+
          template<typename T>
          T* add_secondary_index()
          {
