@@ -412,6 +412,8 @@ namespace graphene { namespace chain {
    protected:
          //Mark pop_undo() as protected -- we do not want outside calling pop_undo(); it should call pop_block() instead
          void pop_undo() { object_database::pop_undo(); }
+         void notify_applied_block( const signed_block& block );
+         void notify_on_pending_transaction( const signed_transaction& tx );
          void notify_changed_objects();
 
       private:
