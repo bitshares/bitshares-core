@@ -296,7 +296,7 @@ void_result asset_update_evaluator::do_evaluate(const asset_update_operation& o)
              "Flag change is forbidden by issuer permissions");
 
    asset_to_update = &a;
-   FC_ASSERT( o.issuer == a.issuer, "", ("o.issuer", o.issuer)("a.issuer", a.issuer) );
+   FC_ASSERT( o.issuer == a.issuer, "Incorrect issuer for asset! (${o.issuer} != ${a.issuer})", ("o.issuer", o.issuer)("a.issuer", a.issuer) );
 
    const auto& chain_parameters = d.get_global_properties().parameters;
 
@@ -344,7 +344,7 @@ void_result asset_update_issuer_evaluator::do_evaluate(const asset_update_issuer
    validate_new_issuer( d, a, o.new_issuer );
 
    asset_to_update = &a;
-   FC_ASSERT( o.issuer == a.issuer, "", ("o.issuer", o.issuer)("a.issuer", a.issuer) );
+   FC_ASSERT( o.issuer == a.issuer, "Incorrect issuer for asset! (${o.issuer} != ${a.issuer})", ("o.issuer", o.issuer)("a.issuer", a.issuer) );
 
    if( d.head_block_time() < HARDFORK_CORE_199_TIME )
    { // TODO: remove after HARDFORK_CORE_199_TIME has passed
