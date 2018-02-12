@@ -101,6 +101,14 @@ struct balance_struct {
    asset_id_type asset_id;
    share_type amount;
 };
+struct limit_order_struct {
+   limit_order_id_type id;
+   time_point_sec expiration;
+   account_id_type seller;
+   share_type for_sale;
+   price sell_price;
+   share_type deferred_fee;
+};
 
 } } //graphene::es_objects
 
@@ -108,3 +116,4 @@ FC_REFLECT( graphene::es_objects::proposal_struct, (id)(expiration_time)(review_
 FC_REFLECT( graphene::es_objects::account_struct, (id)(membership_expiration_date)(registrar)(referrer)(lifetime_referrer)(network_fee_percentage)(lifetime_referrer_fee_percentage)(referrer_rewards_percentage)(name)(owner_account_auths)(owner_key_auths)(owner_address_auths)(active_account_auths)(active_key_auths)(active_address_auths)(voting_account) )
 FC_REFLECT( graphene::es_objects::asset_struct, (id)(symbol)(issuer) )
 FC_REFLECT( graphene::es_objects::balance_struct, (id)(owner)(asset_id)(amount) )
+FC_REFLECT( graphene::es_objects::limit_order_struct, (id)(expiration)(seller)(for_sale)(sell_price)(deferred_fee) )

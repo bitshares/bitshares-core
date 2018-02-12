@@ -35,6 +35,7 @@
 #include <graphene/chain/proposal_object.hpp>
 #include <boost/algorithm/string/join.hpp>
 #include <graphene/chain/balance_object.hpp>
+#include <graphene/chain/market_object.hpp>
 
 
 namespace graphene { namespace es_objects {
@@ -65,6 +66,7 @@ class es_objects_plugin_impl
       bool _es_objects_accounts = true;
       bool _es_objects_assets = true;
       bool _es_objects_balances = true;
+      bool _es_objects_limit_orders = true;
       bool _es_objects_logs = true;
       CURL *curl; // curl handler
       vector <string> bulk;
@@ -73,6 +75,7 @@ class es_objects_plugin_impl
       void PrepareAccount(const account_object* account_object);
       void PrepareAsset(const asset_object* asset_object);
       void PrepareBalance(const balance_object* balance_object);
+      void PrepareLimit(const limit_order_object* limit_object);
       void SendBulk();
       void createBulk(std::string type, std::string data, std::string id);
 };
@@ -119,6 +122,12 @@ void es_objects_plugin_impl::updateDatabase( const vector<object_id_type>& ids ,
          auto b = static_cast<const balance_object*>(obj);
          if(b != nullptr)
             PrepareBalance(b);
+      }
+      else if(value.is<limit_order_object>() && _es_objects_limit_orders) {
+         auto obj = db.find_object(value);
+         auto l = static_cast<const limit_order_object*>(obj);
+         if(l != nullptr)
+            PrepareLimit(l);
       }
    }
 }
@@ -259,6 +268,19 @@ void es_objects_plugin_impl::PrepareBalance(const balance_object* balance_object
    createBulk("balance", data, fc::json::to_string(balance_object->owner));
 }
 
+void es_objects_plugin_impl::PrepareLimit(const limit_order_object* limit_object)
+{
+   limit_order_struct limit;
+   limit.expiration = limit_object->expiration;
+   limit.seller = limit_object->seller;
+   limit.for_sale = limit_object->for_sale;
+   limit.sell_price = limit_object->sell_price;
+   limit.deferred_fee = limit_object->deferred_fee;
+
+   std::string data = fc::json::to_string(limit);
+   createBulk("limitorder", data, fc::json::to_string(limit_object->id));
+}
+
 es_objects_plugin_impl::~es_objects_plugin_impl()
 {
    return;
@@ -298,7 +320,8 @@ void es_objects_plugin::plugin_set_program_options(
          ("es-objects-proposals", boost::program_options::value<bool>(), "Store proposal objects")
          ("es-objects-accounts", boost::program_options::value<bool>(), "Store account objects")
          ("es-objects-assets", boost::program_options::value<bool>(), "Store asset objects")
-         ("es-objects-balances", boost::program_options::value<bool>(), "Store balances object")
+         ("es-objects-balances", boost::program_options::value<bool>(), "Store balances objects")
+         ("es-objects-limit-orders", boost::program_options::value<bool>(), "Store limit order objects")
 
          ;
    cfg.add(cli);
@@ -332,6 +355,9 @@ void es_objects_plugin::plugin_initialize(const boost::program_options::variable
    }
    if (options.count("es-objects-balances")) {
       my->_es_objects_balances = options["es-objects-balances"].as<bool>();
+   }
+   if (options.count("es-objects-limit-orders")) {
+      my->_es_objects_limit_orders = options["es-objects-limit-orders"].as<bool>();
    }
 }
 
