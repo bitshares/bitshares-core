@@ -73,6 +73,7 @@ database_fixture::database_fixture()
    }
    auto ahplugin = app.register_plugin<graphene::account_history::account_history_plugin>();
    auto mhplugin = app.register_plugin<graphene::market_history::market_history_plugin>();
+   auto goplugin = app.register_plugin<graphene::grouped_orders::grouped_orders_plugin>();
    init_account_pub_key = init_account_priv_key.get_public_key();
 
    boost::program_options::variables_map options;
@@ -101,8 +102,12 @@ database_fixture::database_fixture()
    mhplugin->plugin_set_app(&app);
    mhplugin->plugin_initialize(options);
 
+   goplugin->plugin_set_app(&app);
+   goplugin->plugin_initialize(options);
+
    ahplugin->plugin_startup();
    mhplugin->plugin_startup();
+   goplugin->plugin_startup();
 
    generate_block();
 
