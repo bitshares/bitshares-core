@@ -355,20 +355,18 @@ namespace graphene { namespace chain {
          bool apply_order(const limit_order_object& new_order_object, bool allow_black_swan = true);
 
          /**
-          * Matches the two orders,
+          * Matches the two orders, the first parameter is taker, the second is maker.
           *
           * @return a bit field indicating which orders were filled (and thus removed)
           *
           * 0 - no orders were matched
-          * 1 - bid was filled
-          * 2 - ask was filled
+          * 1 - taker was filled
+          * 2 - maker was filled
           * 3 - both were filled
           */
          ///@{
-         template<typename OrderType>
-         int match( const limit_order_object& bid, const OrderType& ask, const price& match_price );
-         int match( const limit_order_object& bid, const limit_order_object& ask, const price& trade_price );
-         int match( const limit_order_object& bid, const call_order_object& ask, const price& trade_price );
+         int match( const limit_order_object& taker, const limit_order_object& maker, const price& trade_price );
+         int match( const limit_order_object& taker, const call_order_object& maker, const price& trade_price );
          /// @return the amount of asset settled
          asset match(const call_order_object& call,
                    const force_settlement_object& settle,
