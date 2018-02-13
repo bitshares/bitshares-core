@@ -744,8 +744,8 @@ BOOST_AUTO_TEST_CASE( update_uia_issuer )
          return get_account(name);
       };
 
-      auto update_asset_issuer = [&](asset_object current,
-                                     account_object new_issuer) {
+      auto update_asset_issuer = [&](const asset_object& current,
+                                     const account_object& new_issuer) {
          asset_update_operation op;
          op.issuer =  current.issuer;
          op.asset_to_update = current.id;
@@ -759,10 +759,10 @@ BOOST_AUTO_TEST_CASE( update_uia_issuer )
       };
 
       // Lambda for updating the issuer on chain using a particular key
-      auto update_issuer = [&](asset_object asset,
-                               account_object issuer,
-                               account_object new_issuer,
-                               fc::ecc::private_key key)
+      auto update_issuer = [&](const asset_object& asset,
+                               const account_object& issuer,
+                               const account_object& new_issuer,
+                               const fc::ecc::private_key& key)
       {
          asset_update_issuer_operation op;
          op.issuer = issuer.id;
@@ -785,28 +785,30 @@ BOOST_AUTO_TEST_CASE( update_uia_issuer )
       // Create accounts
       const auto& alice = create_account_2_keys("alice", alice_active, alice_owner);
       const auto& bob = create_account_2_keys("bob", bob_active, bob_owner);
+      const account_id_type alice_id = alice.id;
+      const account_id_type bob_id = bob.id;
 
       // Create asset
-      const auto& test = create_user_issued_asset("UPDATEISSUER", alice, 0);
+      const auto& test = create_user_issued_asset("UPDATEISSUER", alice_id(db), 0);
 
       BOOST_TEST_MESSAGE( "can't use this operation before the hardfork" );
-      GRAPHENE_REQUIRE_THROW( update_issuer( test, alice, bob, alice_owner), fc::exception );
+      GRAPHENE_REQUIRE_THROW( update_issuer( test, alice_id(db), bob_id(db), alice_owner), fc::exception );
 
       // Fast Forward to Hardfork time
       generate_blocks( HARDFORK_CORE_199_TIME );
 
       BOOST_TEST_MESSAGE( "Can't change issuer if not my asset" );
-      GRAPHENE_REQUIRE_THROW( update_issuer( test, bob, alice, bob_active ), fc::exception );
-      GRAPHENE_REQUIRE_THROW( update_issuer( test, bob, alice, bob_owner ), fc::exception );
+      GRAPHENE_REQUIRE_THROW( update_issuer( test, bob_id(db), alice_id(db), bob_active ), fc::exception );
+      GRAPHENE_REQUIRE_THROW( update_issuer( test, bob_id(db), alice_id(db), bob_owner ), fc::exception );
 
       BOOST_TEST_MESSAGE( "Can't change issuer with alice's active key" );
-      GRAPHENE_REQUIRE_THROW( update_issuer( test, alice, bob, alice_active ), fc::exception );
+      GRAPHENE_REQUIRE_THROW( update_issuer( test, alice_id(db), bob_id(db), alice_active ), fc::exception );
 
       BOOST_TEST_MESSAGE( "Old method with asset_update needs to fail" );
-      GRAPHENE_REQUIRE_THROW( update_asset_issuer( test, bob  ), fc::exception );
+      GRAPHENE_REQUIRE_THROW( update_asset_issuer( test, bob_id(db)  ), fc::exception );
 
       BOOST_TEST_MESSAGE( "Updating issuer to bob" );
-      update_issuer( test, alice, bob, alice_owner );
+      update_issuer( test, alice_id(db), bob_id(db), alice_owner );
 
    }
    catch( const fc::exception& e )
