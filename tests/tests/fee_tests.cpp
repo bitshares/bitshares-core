@@ -327,6 +327,8 @@ BOOST_AUTO_TEST_CASE(asset_claim_pool_test)
         share_type current_balance = get_balance( alice_id, asset_id_type() );
         BOOST_CHECK( balance_before_claim + _core(100).amount == current_balance );
 
+        // can claim pool with a proposal after hard fork
+        claim_pool_proposal( alice_id, aliceusd.id, _core(1), core_asset);
     }
     FC_LOG_AND_RETHROW()
 }
