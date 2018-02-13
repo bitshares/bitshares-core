@@ -485,17 +485,16 @@ bool database::apply_order(const limit_order_object& new_order_object, bool allo
 }
 
 /**
- *  Matches the two orders,
+ *  Matches the two orders, the first parameter is taker, the second is maker.
  *
  *  @return a bit field indicating which orders were filled (and thus removed)
  *
  *  0 - no orders were matched
- *  1 - bid was filled
- *  2 - ask was filled
+ *  1 - taker was filled
+ *  2 - maker was filled
  *  3 - both were filled
  */
-template<typename OrderType>
-int database::match( const limit_order_object& usd, const OrderType& core, const price& match_price )
+int database::match( const limit_order_object& usd, const limit_order_object& core, const price& match_price )
 {
    assert( usd.sell_price.quote.asset_id == core.sell_price.base.asset_id );
    assert( usd.sell_price.base.asset_id  == core.sell_price.quote.asset_id );
@@ -528,18 +527,10 @@ int database::match( const limit_order_object& usd, const OrderType& core, const
            core_pays == core.amount_for_sale() );
 
    int result = 0;
-   result |= fill_limit_order( usd, usd_pays, usd_receives, false, match_price, false ); // although this function is a template,
-                                                                                   // right now it only matches one limit order
-                                                                                   // with another limit order,
-                                                                                   // the first param is a new order, thus taker
+   result |= fill_limit_order( usd, usd_pays, usd_receives, false, match_price, false ); // the first param is taker
    result |= fill_limit_order( core, core_pays, core_receives, true, match_price, true ) << 1; // the second param is maker
    assert( result != 0 );
    return result;
-}
-
-int database::match( const limit_order_object& bid, const limit_order_object& ask, const price& match_price )
-{
-   return match<limit_order_object>( bid, ask, match_price );
 }
 
 int database::match( const limit_order_object& bid, const call_order_object& ask, const price& match_price )
