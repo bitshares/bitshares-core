@@ -102,6 +102,7 @@ namespace graphene { namespace app {
             max_price( p.second.max_price ),
             total_for_sale( p.second.total_for_sale )
             {}
+      limit_order_group() {}
 
       // TODO remove `group` to save bandwidth?
       uint16_t      group = 0; ///< percentage, 1 means 1 / 10000
