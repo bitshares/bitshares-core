@@ -73,7 +73,7 @@ void database::globally_settle_asset( const asset_object& mia, const price& sett
       collateral_gathered += pays;
       const auto&  order = *call_itr;
       ++call_itr;
-      FC_ASSERT( fill_order( order, pays, order.get_debt(), settlement_price, true ) ); // call order is maker
+      FC_ASSERT( fill_call_order( order, pays, order.get_debt(), settlement_price, true ) ); // call order is maker
    }
 
    modify( bitasset, [&]( asset_bitasset_data_object& obj ){
@@ -528,11 +528,11 @@ int database::match( const limit_order_object& usd, const OrderType& core, const
            core_pays == core.amount_for_sale() );
 
    int result = 0;
-   result |= fill_order( usd, usd_pays, usd_receives, false, match_price, false ); // although this function is a template,
+   result |= fill_limit_order( usd, usd_pays, usd_receives, false, match_price, false ); // although this function is a template,
                                                                                    // right now it only matches one limit order
                                                                                    // with another limit order,
                                                                                    // the first param is a new order, thus taker
-   result |= fill_order( core, core_pays, core_receives, true, match_price, true ) << 1; // the second param is maker
+   result |= fill_limit_order( core, core_pays, core_receives, true, match_price, true ) << 1; // the second param is maker
    assert( result != 0 );
    return result;
 }
@@ -578,8 +578,8 @@ int database::match( const limit_order_object& bid, const call_order_object& ask
    FC_ASSERT( filled_call || filled_limit );
 
    int result = 0;
-   result |= fill_order( bid, order_pays, order_receives, false, match_price, false ); // the limit order is taker
-   result |= fill_order( ask, call_pays, call_receives, match_price, true ) << 1;      // the call order is maker
+   result |= fill_limit_order( bid, order_pays, order_receives, false, match_price, false ); // the limit order is taker
+   result |= fill_call_order( ask, call_pays, call_receives, match_price, true ) << 1;      // the call order is maker
    FC_ASSERT( result != 0 );
    return result;
 }
@@ -613,13 +613,13 @@ asset database::match( const call_order_object& call,
 
    assert( settle_pays == settle_for_sale || call_receives == call.get_debt() );
 
-   fill_order( call, call_pays, call_receives, fill_price, true ); // call order is maker
-   fill_order( settle, settle_pays, settle_receives, fill_price, false ); // force settlement order is taker
+   fill_call_order( call, call_pays, call_receives, fill_price, true ); // call order is maker
+   fill_settle_order( settle, settle_pays, settle_receives, fill_price, false ); // force settlement order is taker
 
    return call_receives;
 } FC_CAPTURE_AND_RETHROW( (call)(settle)(match_price)(max_settlement) ) }
 
-bool database::fill_order( const limit_order_object& order, const asset& pays, const asset& receives, bool cull_if_small,
+bool database::fill_limit_order( const limit_order_object& order, const asset& pays, const asset& receives, bool cull_if_small,
                            const price& fill_price, const bool is_maker )
 { try {
    cull_if_small |= (head_block_time() < HARDFORK_555_TIME);
@@ -672,8 +672,8 @@ bool database::fill_order( const limit_order_object& order, const asset& pays, c
 } FC_CAPTURE_AND_RETHROW( (order)(pays)(receives) ) }
 
 
-bool database::fill_order( const call_order_object& order, const asset& pays, const asset& receives,
-                           const price& fill_price, const bool is_maker )
+bool database::fill_call_order( const call_order_object& order, const asset& pays, const asset& receives,
+                                const price& fill_price, const bool is_maker )
 { try {
    //idump((pays)(receives)(order));
    FC_ASSERT( order.get_debt().asset_id == receives.asset_id );
@@ -731,8 +731,8 @@ bool database::fill_order( const call_order_object& order, const asset& pays, co
    return collateral_freed.valid();
 } FC_CAPTURE_AND_RETHROW( (order)(pays)(receives) ) }
 
-bool database::fill_order( const force_settlement_object& settle, const asset& pays, const asset& receives,
-                           const price& fill_price, const bool is_maker )
+bool database::fill_settle_order( const force_settlement_object& settle, const asset& pays, const asset& receives,
+                                  const price& fill_price, const bool is_maker )
 { try {
    bool filled = false;
 
@@ -892,7 +892,7 @@ bool database::check_call_orders(const asset_object& mia, bool enable_black_swan
        if( filled_call && maint_time <= HARDFORK_CORE_343_TIME )
           ++call_itr;
        // when for_new_limit_order is true, the call order is maker, otherwise the call order is taker
-       fill_order(*old_call_itr, call_pays, call_receives, match_price, for_new_limit_order );
+       fill_call_order(*old_call_itr, call_pays, call_receives, match_price, for_new_limit_order );
        if( maint_time > HARDFORK_CORE_343_TIME )
           call_itr = call_price_index.lower_bound( call_min );
 
@@ -907,7 +907,7 @@ bool database::check_call_orders(const asset_object& mia, bool enable_black_swan
           if( filled_limit_in_loop ) ++limit_itr;
        }
        // when for_new_limit_order is true, the limit order is taker, otherwise the limit order is maker
-       bool really_filled = fill_order(*old_limit_itr, order_pays, order_receives, true, match_price, !for_new_limit_order );
+       bool really_filled = fill_limit_order(*old_limit_itr, order_pays, order_receives, true, match_price, !for_new_limit_order );
        if( !filled_limit && really_filled )
        {
           wlog( "Cull_small issue occurred at block #${block}", ("block",head_block_num()) );
