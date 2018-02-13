@@ -286,7 +286,7 @@ BOOST_AUTO_TEST_CASE(asset_claim_pool_test)
         const asset_object& core_asset = asset_id_type()(db);
 
         // deposit 100 BTS to the fee pool of ALICEUSD asset
-        fund_fee_pool( alice, aliceusd, _core(100).amount );
+        fund_fee_pool( alice_id(db), aliceusd, _core(100).amount );
 
         // Unable to claim pool before the hardfork
         GRAPHENE_REQUIRE_THROW( claim_pool( alice_id, aliceusd.id, _core(1), core_asset), fc::exception );
@@ -299,11 +299,11 @@ BOOST_AUTO_TEST_CASE(asset_claim_pool_test)
         GRAPHENE_REQUIRE_THROW( claim_pool( alice_id, alicecoin.id, _core(1), core_asset), fc::exception );
 
         // deposit 300 BTS to the fee pool of ALICECOIN asset
-        fund_fee_pool( alice, alicecoin, _core(300).amount );
+        fund_fee_pool( alice_id(db), alicecoin, _core(300).amount );
 
         // Test amount of CORE in fee pools
-        BOOST_CHECK( alicecoin.dynamic_asset_data_id(db).fee_pool == _core(300).amount );
-        BOOST_CHECK( aliceusd.dynamic_asset_data_id(db).fee_pool == _core(100).amount );
+        BOOST_CHECK( alicecoin.dynamic_asset_data_id(db).fee_pool.value == _core(300).amount );
+        BOOST_CHECK( aliceusd.dynamic_asset_data_id(db).fee_pool.value == _core(100).amount );
 
         // can't claim pool of an asset that doesn't belong to you
         GRAPHENE_REQUIRE_THROW( claim_pool( alice_id, bobcoin_id, _core(200), core_asset), fc::exception );
