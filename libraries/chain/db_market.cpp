@@ -70,6 +70,15 @@ void database::globally_settle_asset( const asset_object& mia, const price& sett
       if( pays > call_itr->get_collateral() )
          pays = call_itr->get_collateral();
 
+      // Be here, the call order can be paying nothing, in this case, we take at least 1 Satoshi from call order
+      if( pays.amount == 0 )
+      {
+         if( get_dynamic_global_properties().next_maintenance_time > HARDFORK_CORE_184_TIME )
+            pays.amount = 1;
+         else
+            wlog( "Something for nothing issue (#184, variant E) occurred at block #${block}", ("block",head_block_num()) );
+      }
+
       collateral_gathered += pays;
       const auto&  order = *call_itr;
       ++call_itr;
@@ -529,6 +538,17 @@ int database::match( const limit_order_object& usd, const limit_order_object& co
    assert( usd_pays == usd.amount_for_sale() ||
            core_pays == core.amount_for_sale() );
 
+   // Be here, it's possible that taker is paying something for nothing due to partially filled in last loop.
+   // In this case, we see it as filled and cancel it later
+   // The maker won't be paying something for nothing, since if it would, it would have been cancelled already.
+   if( usd_receives.amount == 0 )
+   {
+      if( get_dynamic_global_properties().next_maintenance_time > HARDFORK_CORE_184_TIME )
+         return 1;
+      else
+         wlog( "Something for nothing issue (#184, variant A) occurred at block #${block}", ("block",head_block_num()) );
+   }
+
    int result = 0;
    result |= fill_limit_order( usd, usd_pays, usd_receives, false, match_price, false ); // the first param is taker
    result |= fill_limit_order( core, core_pays, core_receives, true, match_price, true ) << 1; // the second param is maker
@@ -571,6 +591,17 @@ int database::match( const limit_order_object& bid, const call_order_object& ask
 
    FC_ASSERT( filled_call || filled_limit );
 
+   // Be here, it's possible that taker is paying something for nothing due to partially filled in last loop.
+   // In this case, we see it as filled and cancel it later
+   // The maker won't be paying something for nothing according to code above
+   if( order_receives.amount == 0 )
+   {
+      if( get_dynamic_global_properties().next_maintenance_time > HARDFORK_CORE_184_TIME )
+         return 1;
+      else
+         wlog( "Something for nothing issue (#184, variant B) occurred at block #${block}", ("block",head_block_num()) );
+   }
+
    int result = 0;
    result |= fill_limit_order( bid, order_pays, order_receives, false, match_price, false ); // the limit order is taker
    result |= fill_call_order( ask, call_pays, call_receives, match_price, true ) << 1;      // the call order is maker
@@ -592,7 +623,24 @@ asset database::match( const call_order_object& call,
    auto call_debt = call.get_debt();
 
    asset call_receives   = std::min(settle_for_sale, call_debt);
-   asset call_pays       = call_receives * match_price;
+   asset call_pays       = call_receives * match_price; // round down here, in favor of call order
+
+   // Be here, the call order may be paying nothing.
+   // In this case, we favor the settle order after hard fork core-184
+   // This may open a door to certain attacks, but should be fine due to fees
+   bool call_pays_rounded_up = false;
+   if( call_pays.amount == 0 )
+   {
+      if( get_dynamic_global_properties().next_maintenance_time > HARDFORK_CORE_184_TIME )
+      {
+         wlog( "Something for nothing issue (#184, variant C) handled at block #${block}", ("block",head_block_num()) );
+         call_pays.amount = 1; // this can trigger a black swan event, we'll check later
+         call_pays_rounded_up = true;
+      }
+      else
+         wlog( "Something for nothing issue (#184, variant C) occurred at block #${block}", ("block",head_block_num()) );
+   }
+
    asset settle_pays     = call_receives;
    asset settle_receives = call_pays;
 
@@ -609,6 +657,9 @@ asset database::match( const call_order_object& call,
 
    fill_call_order( call, call_pays, call_receives, fill_price, true ); // call order is maker
    fill_settle_order( settle, settle_pays, settle_receives, fill_price, false ); // force settlement order is taker
+
+   if( call_pays_rounded_up ) // implies next_maitenance_time > HARDFORK_CORE_184_TIME
+      GRAPHENE_ASSERT( !check_for_blackswan( settle_pays.asset_id(*this), true ), black_swan_exception, "" );
 
    return call_receives;
 } FC_CAPTURE_AND_RETHROW( (call)(settle)(match_price)(max_settlement) ) }
@@ -882,6 +933,19 @@ bool database::check_call_orders(const asset_object& mia, bool enable_black_swan
        FC_ASSERT( filled_call || filled_limit );
        FC_ASSERT( filled_call || filled_limit_in_loop );
 
+       // Be here, the call order won't be paying something for nothing according to code above.
+       // After hard fork core-625, the limit order will be always a maker if entered this function,
+       //   so it won't be paying something for nothing, since if it would, it would have been cancelled already.
+       //   However, we need to check if it's culled after partially filled.
+       // Before hard fork core-625,
+       //   when the limit order is a taker, it could be paying something for nothing here;
+       //   when the limit order is a maker, it won't be paying something for nothing,
+       //     however, if it's culled after partially filled, `limit_itr` may be invalidated so should not be dereferenced
+       if( order_receives.amount == 0 )
+       {
+          wlog( "Something for nothing issue (#184, variant D) occurred at block #${block}", ("block",head_block_num()) );
+       }
+
        auto old_call_itr = call_itr;
        if( filled_call && maint_time <= HARDFORK_CORE_343_TIME )
           ++call_itr;
@@ -891,16 +955,14 @@ bool database::check_call_orders(const asset_object& mia, bool enable_black_swan
           call_itr = call_price_index.lower_bound( call_min );
 
        auto old_limit_itr = limit_itr;
-       if( maint_time <= HARDFORK_CORE_453_TIME )
-       {
-          if( filled_limit ) ++limit_itr;
-       }
-       else
-       {
-          if( filled_limit_in_loop ) ++limit_itr;
-       }
+       if( filled_limit || maint_time > HARDFORK_CORE_453_TIME )
+          ++limit_itr; // after hard fork core-453, will revert if not really filled
        // when for_new_limit_order is true, the limit order is taker, otherwise the limit order is maker
-       fill_limit_order(*old_limit_itr, order_pays, order_receives, true, match_price, !for_new_limit_order );
+       bool really_filled = fill_limit_order(*old_limit_itr, order_pays, order_receives, true, match_price, !for_new_limit_order );
+       if( !filled_limit && really_filled && maint_time <= HARDFORK_CORE_453_TIME )
+          wlog( "Cull_small issue occurred at block #${block}", ("block",head_block_num()) );
+       if( !really_filled && maint_time > HARDFORK_CORE_453_TIME )
+          limit_itr = old_limit_itr;
 
     } // whlie call_itr != call_end
 
