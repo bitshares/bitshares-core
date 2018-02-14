@@ -75,7 +75,7 @@ void database::globally_settle_asset( const asset_object& mia, const price& sett
       {
          if( get_dynamic_global_properties().next_maintenance_time > HARDFORK_CORE_184_TIME )
             pays.amount = 1;
-         else
+         else // TODO remove this warning after hard fork core-184
             wlog( "Something for nothing issue (#184, variant E) occurred at block #${block}", ("block",head_block_num()) );
       }
 
@@ -313,7 +313,7 @@ bool maybe_cull_small_order( database& db, const limit_order_object& order )
    if( order.amount_to_receive().amount == 0 )
    {
       if( order.deferred_fee > 0 && db.head_block_time() <= HARDFORK_CORE_604_TIME )
-      {
+      { // TODO remove this warning after hard fork core-604
          wlog( "At block ${n}, cancelling order without charging a fee: ${o}", ("n",db.head_block_num())("o",order) );
          db.cancel_limit_order( order, true, true );
       }
@@ -541,13 +541,8 @@ int database::match( const limit_order_object& usd, const limit_order_object& co
    // Be here, it's possible that taker is paying something for nothing due to partially filled in last loop.
    // In this case, we see it as filled and cancel it later
    // The maker won't be paying something for nothing, since if it would, it would have been cancelled already.
-   if( usd_receives.amount == 0 )
-   {
-      if( get_dynamic_global_properties().next_maintenance_time > HARDFORK_CORE_184_TIME )
-         return 1;
-      else
-         wlog( "Something for nothing issue (#184, variant A) occurred at block #${block}", ("block",head_block_num()) );
-   }
+   if( usd_receives.amount == 0 && get_dynamic_global_properties().next_maintenance_time > HARDFORK_CORE_184_TIME )
+      return 1;
 
    int result = 0;
    result |= fill_limit_order( usd, usd_pays, usd_receives, false, match_price, false ); // the first param is taker
@@ -594,13 +589,8 @@ int database::match( const limit_order_object& bid, const call_order_object& ask
    // Be here, it's possible that taker is paying something for nothing due to partially filled in last loop.
    // In this case, we see it as filled and cancel it later
    // The maker won't be paying something for nothing according to code above
-   if( order_receives.amount == 0 )
-   {
-      if( get_dynamic_global_properties().next_maintenance_time > HARDFORK_CORE_184_TIME )
-         return 1;
-      else
-         wlog( "Something for nothing issue (#184, variant B) occurred at block #${block}", ("block",head_block_num()) );
-   }
+   if( order_receives.amount == 0 && get_dynamic_global_properties().next_maintenance_time > HARDFORK_CORE_184_TIME )
+      return 1;
 
    int result = 0;
    result |= fill_limit_order( bid, order_pays, order_receives, false, match_price, false ); // the limit order is taker
@@ -632,12 +622,12 @@ asset database::match( const call_order_object& call,
    if( call_pays.amount == 0 )
    {
       if( get_dynamic_global_properties().next_maintenance_time > HARDFORK_CORE_184_TIME )
-      {
+      {  // TODO remove this warning after hard fork core-184
          wlog( "Something for nothing issue (#184, variant C) handled at block #${block}", ("block",head_block_num()) );
          call_pays.amount = 1; // this can trigger a black swan event, we'll check later
          call_pays_rounded_up = true;
       }
-      else
+      else // TODO remove this warning after hard fork core-184
          wlog( "Something for nothing issue (#184, variant C) occurred at block #${block}", ("block",head_block_num()) );
    }
 
@@ -926,7 +916,7 @@ bool database::check_call_orders(const asset_object& mia, bool enable_black_swan
           order_pays     = usd_to_buy;
 
           filled_call    = true;
-          if( filled_limit && maint_time <= HARDFORK_CORE_453_TIME )
+          if( filled_limit && maint_time <= HARDFORK_CORE_453_TIME ) // TODO remove warning after hard fork core-453
              wlog( "Multiple limit match problem (issue 453) occurred at block #${block}", ("block",head_block_num()) );
        }
 
@@ -942,7 +932,7 @@ bool database::check_call_orders(const asset_object& mia, bool enable_black_swan
        //   when the limit order is a maker, it won't be paying something for nothing,
        //     however, if it's culled after partially filled, `limit_itr` may be invalidated so should not be dereferenced
        if( order_receives.amount == 0 )
-       {
+       {  // TODO remove warning after hard fork core-184
           wlog( "Something for nothing issue (#184, variant D) occurred at block #${block}", ("block",head_block_num()) );
        }
 
@@ -960,6 +950,7 @@ bool database::check_call_orders(const asset_object& mia, bool enable_black_swan
        // when for_new_limit_order is true, the limit order is taker, otherwise the limit order is maker
        bool really_filled = fill_limit_order(*old_limit_itr, order_pays, order_receives, true, match_price, !for_new_limit_order );
        if( !filled_limit && really_filled && maint_time <= HARDFORK_CORE_453_TIME )
+          // TODO remove warning after hard fork core-453
           wlog( "Cull_small issue occurred at block #${block}", ("block",head_block_num()) );
        if( !really_filled && maint_time > HARDFORK_CORE_453_TIME )
           limit_itr = old_limit_itr;
