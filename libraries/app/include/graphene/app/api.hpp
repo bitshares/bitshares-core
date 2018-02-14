@@ -377,7 +377,12 @@ namespace graphene { namespace app {
 
          /// @brief Called to enable an API, not reflected.
          void enable_api( const string& api_name );
-         /// @brief retrieve server information
+         /**
+          * @brief retrieve server information
+          * @note the returned object contains the following keys:
+          * server_version, server_sha_version, server_version_timestamp,
+          * ssl_version, boost_version, websocket_versions
+          */
          fc::mutable_variant_object get_server_information();
       private:
 
