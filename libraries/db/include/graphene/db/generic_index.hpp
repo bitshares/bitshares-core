@@ -48,7 +48,7 @@ namespace graphene { namespace chain {
 
          virtual const object& insert( object&& obj )override
          {
-            assert( nullptr != dynamic_cast<ObjectType*>(&obj) );
+            FC_ASSERT( nullptr != dynamic_cast<ObjectType*>(&obj) );
             auto insert_result = _indices.insert( std::move( static_cast<ObjectType&>(obj) ) );
             FC_ASSERT( insert_result.second, "Could not insert object, most likely a uniqueness constraint was violated" );
             return *insert_result.first;
@@ -67,7 +67,7 @@ namespace graphene { namespace chain {
 
          virtual void modify( const object& obj, const std::function<void(object&)>& m )override
          {
-            assert( nullptr != dynamic_cast<const ObjectType*>(&obj) );
+            FC_ASSERT( nullptr != dynamic_cast<const ObjectType*>(&obj) );
             auto ok = _indices.modify( _indices.iterator_to( static_cast<const ObjectType&>(obj) ),
                                        [&m]( ObjectType& o ){ m(o); } );
             FC_ASSERT( ok, "Could not modify object, most likely a index constraint was violated" );

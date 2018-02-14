@@ -724,7 +724,7 @@ namespace detail {
             {
               // reference_point is a block we know about and is on the main chain
               uint32_t reference_point_block_num = block_header::num_from_id(reference_point);
-              assert(reference_point_block_num > 0);
+              FC_ASSERT(reference_point_block_num > 0);
               high_block_num = reference_point_block_num;
               non_fork_high_block_num = high_block_num;
 
@@ -751,12 +751,12 @@ namespace detail {
                 fork_history = _chain_db->get_block_ids_on_fork(reference_point);
                 // returns a vector where the last element is the common ancestor with the preferred chain,
                 // and the first element is the reference point you passed in
-                assert(fork_history.size() >= 2);
+                FC_ASSERT(fork_history.size() >= 2);
 
                 if( fork_history.front() != reference_point )
                 {
                    edump( (fork_history)(reference_point) );
-                   assert(fork_history.front() == reference_point);
+                   FC_ASSERT(fork_history.front() == reference_point);
                 }
                 block_id_type last_non_fork_block = fork_history.back();
                 fork_history.pop_back();  // remove the common ancestor
@@ -768,7 +768,7 @@ namespace detail {
                   non_fork_high_block_num = block_header::num_from_id(last_non_fork_block);
 
                 high_block_num = non_fork_high_block_num + fork_history.size();
-                assert(high_block_num == block_header::num_from_id(fork_history.back()));
+                FC_ASSERT(high_block_num == block_header::num_from_id(fork_history.back()));
               }
               catch (const fc::exception& e)
               {

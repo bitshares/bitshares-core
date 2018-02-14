@@ -53,7 +53,7 @@ bool proposal_object::is_authorized_to_execute(database& db) const
 
 void required_approval_index::object_inserted( const object& obj )
 {
-    assert( dynamic_cast<const proposal_object*>(&obj) );
+    FC_ASSERT( dynamic_cast<const proposal_object*>(&obj) );
     const proposal_object& p = static_cast<const proposal_object&>(obj);
 
     for( const auto& a : p.required_active_approvals )
@@ -79,7 +79,7 @@ void required_approval_index::remove( account_id_type a, proposal_id_type p )
 
 void required_approval_index::object_removed( const object& obj )
 {
-    assert( dynamic_cast<const proposal_object*>(&obj) );
+    FC_ASSERT( dynamic_cast<const proposal_object*>(&obj) );
     const proposal_object& p = static_cast<const proposal_object&>(obj);
 
     for( const auto& a : p.required_active_approvals )

@@ -87,7 +87,7 @@ void stcp_socket::bind( const fc::ip::endpoint& local_endpoint )
  */
 size_t stcp_socket::readsome( char* buffer, size_t len )
 { try {
-    assert( len > 0 && (len % 16) == 0 );
+    FC_ASSERT( len > 0 && (len % 16) == 0 );
 
 #ifndef NDEBUG
     // This code was written with the assumption that you'd only be making one call to readsome 
@@ -95,8 +95,8 @@ size_t stcp_socket::readsome( char* buffer, size_t len )
     // readsome(), you'll need to prevent reusing _read_buffer here
     struct check_buffer_in_use {
       bool& _buffer_in_use;
-      check_buffer_in_use(bool& buffer_in_use) : _buffer_in_use(buffer_in_use) { assert(!_buffer_in_use); _buffer_in_use = true; }
-      ~check_buffer_in_use() { assert(_buffer_in_use); _buffer_in_use = false; }
+      check_buffer_in_use(bool& buffer_in_use) : _buffer_in_use(buffer_in_use) { FC_ASSERT(!_buffer_in_use); _buffer_in_use = true; }
+      ~check_buffer_in_use() { FC_ASSERT(_buffer_in_use); _buffer_in_use = false; }
     } buffer_in_use_checker(_read_buffer_in_use);
 #endif
 
@@ -128,7 +128,7 @@ bool stcp_socket::eof()const
 
 size_t stcp_socket::writesome( const char* buffer, size_t len )
 { try {
-    assert( len > 0 && (len % 16) == 0 );
+    FC_ASSERT( len > 0 && (len % 16) == 0 );
 
 #ifndef NDEBUG
     // This code was written with the assumption that you'd only be making one call to writesome
@@ -136,8 +136,8 @@ size_t stcp_socket::writesome( const char* buffer, size_t len )
     // writesome(), you'll need to prevent reusing _write_buffer here
     struct check_buffer_in_use {
       bool& _buffer_in_use;
-      check_buffer_in_use(bool& buffer_in_use) : _buffer_in_use(buffer_in_use) { assert(!_buffer_in_use); _buffer_in_use = true; }
-      ~check_buffer_in_use() { assert(_buffer_in_use); _buffer_in_use = false; }
+      check_buffer_in_use(bool& buffer_in_use) : _buffer_in_use(buffer_in_use) { FC_ASSERT(!_buffer_in_use); _buffer_in_use = true; }
+      ~check_buffer_in_use() { FC_ASSERT(_buffer_in_use); _buffer_in_use = false; }
     } buffer_in_use_checker(_write_buffer_in_use);
 #endif
 
@@ -153,7 +153,7 @@ size_t stcp_socket::writesome( const char* buffer, size_t len )
      * better.
      */
     uint32_t ciphertext_len = _send_aes.encode( buffer, len, _write_buffer.get() );
-    assert(ciphertext_len == len);
+    FC_ASSERT(ciphertext_len == len);
     _sock.write( _write_buffer, ciphertext_len );
     return ciphertext_len;
 } FC_RETHROW_EXCEPTIONS( warn, "", ("len",len) ) }

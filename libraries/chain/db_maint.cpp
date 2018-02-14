@@ -158,7 +158,7 @@ void database::pay_workers( share_type& budget )
 
 void database::update_active_witnesses()
 { try {
-   assert( _witness_count_histogram_buffer.size() > 0 );
+   FC_ASSERT( _witness_count_histogram_buffer.size() > 0 );
    share_type stake_target = (_total_voting_stake-_witness_count_histogram_buffer[0]) / 2;
 
    /// accounts that vote for 0 or 1 witness do not get to express an opinion on
@@ -243,7 +243,7 @@ void database::update_active_witnesses()
 
 void database::update_active_committee_members()
 { try {
-   assert( _committee_count_histogram_buffer.size() > 0 );
+   FC_ASSERT( _committee_count_histogram_buffer.size() > 0 );
    share_type stake_target = (_total_voting_stake-_committee_count_histogram_buffer[0]) / 2;
 
    /// accounts that vote for 0 or 1 witness do not get to express an opinion on
@@ -384,13 +384,13 @@ void database::process_budget()
       //    only produce a result in the future.  If this assert
       //    fails, then the next maintenance time algorithm is buggy.
       //
-      assert( time_to_maint > 0 );
+      FC_ASSERT( time_to_maint > 0 );
       //
       // Code for setting chain parameters should validate
       //    block_interval > 0 (as well as the humans proposing /
       //    voting on changes to block interval).
       //
-      assert( gpo.parameters.block_interval > 0 );
+      FC_ASSERT( gpo.parameters.block_interval > 0 );
       uint64_t blocks_to_maint = (uint64_t(time_to_maint) + gpo.parameters.block_interval - 1) / gpo.parameters.block_interval;
 
       // blocks_to_maint > 0 because time_to_maint > 0,
@@ -433,7 +433,7 @@ void database::process_budget()
       {
          _core.current_supply = (_core.current_supply + rec.supply_delta );
 
-         assert( rec.supply_delta ==
+         FC_ASSERT( rec.supply_delta ==
                                    witness_budget
                                  + worker_budget
                                  - leftover_worker_funds
@@ -503,7 +503,7 @@ void update_top_n_authorities( database& db )
          const auto range = bal_idx.equal_range( boost::make_tuple( tha.asset ) );
          for( const account_balance_object& bal : boost::make_iterator_range( range.first, range.second ) )
          {
-             assert( bal.asset_type == tha.asset );
+             FC_ASSERT( bal.asset_type == tha.asset );
              if( bal.owner == acct.id )
                 continue;
              vc.add( bal.owner, bal.balance.value );
@@ -617,7 +617,7 @@ void create_buyback_orders( database& db )
    for( const buyback_object& bbo : bbo_idx )
    {
       const asset_object& asset_to_buy = bbo.asset_to_buy(db);
-      assert( asset_to_buy.buyback_account.valid() );
+      FC_ASSERT( asset_to_buy.buyback_account.valid() );
 
       const account_object& buyback_account = (*(asset_to_buy.buyback_account))(db);
       asset_id_type next_asset = asset_id_type();

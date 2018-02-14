@@ -96,7 +96,7 @@ std::vector<block_id_type> database::get_block_ids_on_fork(block_id_type head_of
             (head_block_id())
             (branches.first.size())
             (branches.second.size()) );
-     assert(branches.first.back()->previous_id() == branches.second.back()->previous_id());
+     FC_ASSERT(branches.first.back()->previous_id() == branches.second.back()->previous_id());
   }
   std::vector<block_id_type> result;
   for (const item_ptr& fork_block : branches.second)
@@ -431,7 +431,7 @@ void database::pop_block()
 
 void database::clear_pending()
 { try {
-   assert( (_pending_tx.size() == 0) || _pending_tx_session.valid() );
+   FC_ASSERT( (_pending_tx.size() == 0) || _pending_tx_session.valid() );
    _pending_tx.clear();
    _pending_tx_session.reset();
 } FC_CAPTURE_AND_RETHROW() }
@@ -448,7 +448,7 @@ uint32_t database::push_applied_operation( const operation& op )
 }
 void database::set_applied_operation_result( uint32_t op_id, const operation_result& result )
 {
-   assert( op_id < _applied_ops.size() );
+   FC_ASSERT( op_id < _applied_ops.size() );
    if( _applied_ops[op_id] )
       _applied_ops[op_id]->result = result;
    else

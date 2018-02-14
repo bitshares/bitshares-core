@@ -38,7 +38,7 @@
 #define DEFAULT_LOGGER "p2p"
 
 #ifndef NDEBUG
-# define VERIFY_CORRECT_THREAD() assert(_thread->is_current())
+# define VERIFY_CORRECT_THREAD() FC_ASSERT(_thread->is_current())
 #else
 # define VERIFY_CORRECT_THREAD() do {} while (0)
 #endif
@@ -119,7 +119,7 @@ namespace graphene { namespace net {
     {
       VERIFY_CORRECT_THREAD();
       _sock.accept();
-      assert(!_read_loop_done.valid()); // check to be sure we never launch two read loops
+      FC_ASSERT(!_read_loop_done.valid()); // check to be sure we never launch two read loops
       _read_loop_done = fc::async([=](){ read_loop(); }, "message read_loop");
     }
 
@@ -127,7 +127,7 @@ namespace graphene { namespace net {
     {
       VERIFY_CORRECT_THREAD();
       _sock.connect_to(remote_endpoint);
-      assert(!_read_loop_done.valid()); // check to be sure we never launch two read loops
+      FC_ASSERT(!_read_loop_done.valid()); // check to be sure we never launch two read loops
       _read_loop_done = fc::async([=](){ read_loop(); }, "message read_loop");
     }
 
@@ -247,7 +247,7 @@ namespace graphene { namespace net {
         {
           if (var)
             elog("Error: two tasks are calling message_oriented_connection::send_message() at the same time");
-          assert(!var);
+          FC_ASSERT(!var);
           var = true;
         }
         ~verify_no_send_in_progress() { var = false; }
@@ -288,7 +288,7 @@ namespace graphene { namespace net {
       if (_send_message_in_progress)
         elog("Error: message_oriented_connection is being destroyed while a send_message is in progress.  "
              "The task calling send_message() should have been canceled already");
-      assert(!_send_message_in_progress);
+      FC_ASSERT(!_send_message_in_progress);
 
       try
       {

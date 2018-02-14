@@ -96,7 +96,7 @@ struct vote_id_type
    /// Set the instance of this vote_id_type
    void set_instance(uint32_t instance)
    {
-      assert(instance < 0x01000000);
+      FC_ASSERT(instance < 0x01000000);
       content &= 0xff;
       content |= instance << 8;
    }

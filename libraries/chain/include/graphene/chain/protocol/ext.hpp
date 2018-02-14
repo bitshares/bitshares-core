@@ -158,7 +158,7 @@ struct graphene_extension_from_variant_visitor
       if( it != vo.end() )
       {
          from_variant( it->value(), (value.*member) );
-         assert( count_left > 0 );    // x.find(k) returns true for n distinct values of k only if x.size() >= n
+         FC_ASSERT( count_left > 0 );    // x.find(k) returns true for n distinct values of k only if x.size() >= n
          --count_left;
       }
    }

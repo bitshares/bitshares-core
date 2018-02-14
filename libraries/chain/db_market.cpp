@@ -77,7 +77,7 @@ void database::globally_settle_asset( const asset_object& mia, const price& sett
    }
 
    modify( bitasset, [&]( asset_bitasset_data_object& obj ){
-           assert( collateral_gathered.asset_id == settlement_price.quote.asset_id );
+           FC_ASSERT( collateral_gathered.asset_id == settlement_price.quote.asset_id );
            obj.settlement_price = mia.amount(original_mia_supply) / collateral_gathered; //settlement_price;
            obj.settlement_fund  = collateral_gathered.amount;
            });
@@ -300,9 +300,9 @@ bool database::apply_order(const limit_order_object& new_order_object, bool allo
 template<typename OrderType>
 int database::match( const limit_order_object& usd, const OrderType& core, const price& match_price )
 {
-   assert( usd.sell_price.quote.asset_id == core.sell_price.base.asset_id );
-   assert( usd.sell_price.base.asset_id  == core.sell_price.quote.asset_id );
-   assert( usd.for_sale > 0 && core.for_sale > 0 );
+   FC_ASSERT( usd.sell_price.quote.asset_id == core.sell_price.base.asset_id );
+   FC_ASSERT( usd.sell_price.base.asset_id  == core.sell_price.quote.asset_id );
+   FC_ASSERT( usd.for_sale > 0 && core.for_sale > 0 );
 
    auto usd_for_sale = usd.amount_for_sale();
    auto core_for_sale = core.amount_for_sale();
@@ -327,8 +327,8 @@ int database::match( const limit_order_object& usd, const OrderType& core, const
    core_pays = usd_receives;
    usd_pays  = core_receives;
 
-   assert( usd_pays == usd.amount_for_sale() ||
-           core_pays == core.amount_for_sale() );
+   FC_ASSERT( usd_pays == usd.amount_for_sale() ||
+              core_pays == core.amount_for_sale() );
 
    int result = 0;
    result |= fill_order( usd, usd_pays, usd_receives, false, match_price, false ); // although this function is a template,
@@ -336,7 +336,7 @@ int database::match( const limit_order_object& usd, const OrderType& core, const
                                                                                    // with another limit order,
                                                                                    // the first param is a new order, thus taker
    result |= fill_order( core, core_pays, core_receives, true, match_price, true ) << 1; // the second param is maker
-   assert( result != 0 );
+   FC_ASSERT( result != 0 );
    return result;
 }
 
@@ -372,7 +372,7 @@ asset database::match( const call_order_object& call,
     */
    GRAPHENE_ASSERT( call_pays < call.get_collateral(), black_swan_exception, "" );
 
-   assert( settle_pays == settle_for_sale || call_receives == call.get_debt() );
+   FC_ASSERT( settle_pays == settle_for_sale || call_receives == call.get_debt() );
 
    fill_order( call, call_pays, call_receives, fill_price, true ); // call order is maker
    fill_order( settle, settle_pays, settle_receives, fill_price, false ); // force settlement order is taker
@@ -394,7 +394,7 @@ bool database::fill_order( const limit_order_object& order, const asset& pays, c
    auto issuer_fees = pay_market_fees( recv_asset, receives );
    pay_order( seller, receives - issuer_fees, pays );
 
-   assert( pays.asset_id != receives.asset_id );
+   FC_ASSERT( pays.asset_id != receives.asset_id );
    push_applied_operation( fill_order_operation( order.id, order.seller, pays, receives, issuer_fees, fill_price, is_maker ) );
 
    // conditional because cheap integer comparison may allow us to avoid two expensive modify() and object lookups
@@ -443,7 +443,7 @@ bool database::fill_order( const call_order_object& order, const asset& pays, co
             }
        });
    const asset_object& mia = receives.asset_id(*this);
-   assert( mia.is_market_issued() );
+   FC_ASSERT( mia.is_market_issued() );
 
    const asset_dynamic_data_object& mia_ddo = mia.dynamic_asset_data_id(*this);
 
@@ -465,11 +465,11 @@ bool database::fill_order( const call_order_object& order, const asset& pays, co
               if( pays.asset_id == asset_id_type() )
                 b.total_core_in_orders -= pays.amount;
 
-              assert( b.total_core_in_orders >= 0 );
+              FC_ASSERT( b.total_core_in_orders >= 0 );
            });
    }
 
-   assert( pays.asset_id != receives.asset_id );
+   FC_ASSERT( pays.asset_id != receives.asset_id );
    push_applied_operation( fill_order_operation( order.id, order.borrower, pays, receives,
                                                  asset(0, pays.asset_id), fill_price, is_maker ) );
 
@@ -497,7 +497,7 @@ bool database::fill_order( const force_settlement_object& settle, const asset& p
    }
    adjust_balance(settle.owner, receives - issuer_fees);
 
-   assert( pays.asset_id != receives.asset_id );
+   FC_ASSERT( pays.asset_id != receives.asset_id );
    push_applied_operation( fill_order_operation( settle.id, settle.owner, pays, receives, issuer_fees, fill_price, is_maker ) );
 
    if (filled)
@@ -541,7 +541,7 @@ bool database::check_call_orders(const asset_object& mia, bool enable_black_swan
     // stop when limit orders are selling too little USD for too much CORE
     auto min_price = bitasset.current_feed.max_short_squeeze_price();
 
-    assert( max_price.base.asset_id == min_price.base.asset_id );
+    FC_ASSERT( max_price.base.asset_id == min_price.base.asset_id );
     // NOTE limit_price_index is sorted from greatest to least
     auto limit_itr = limit_price_index.lower_bound( max_price );
     auto limit_end = limit_price_index.upper_bound( min_price );
@@ -564,7 +564,7 @@ bool database::check_call_orders(const asset_object& mia, bool enable_black_swan
        asset usd_for_sale;
        if( limit_itr != limit_end )
        {
-          assert( limit_itr != limit_price_index.end() );
+          FC_ASSERT( limit_itr != limit_price_index.end() );
           match_price      = limit_itr->sell_price;
           usd_for_sale     = limit_itr->amount_for_sale();
        }
@@ -660,7 +660,7 @@ void database::pay_order( const account_object& receiver, const asset& receives,
 
 asset database::calculate_market_fee( const asset_object& trade_asset, const asset& trade_amount )
 {
-   assert( trade_asset.id == trade_amount.asset_id );
+   FC_ASSERT( trade_asset.id == trade_amount.asset_id );
 
    if( !trade_asset.charges_market_fees() )
       return trade_asset.amount(0);
@@ -681,7 +681,7 @@ asset database::calculate_market_fee( const asset_object& trade_asset, const ass
 asset database::pay_market_fees( const asset_object& recv_asset, const asset& receives )
 {
    auto issuer_fees = calculate_market_fee( recv_asset, receives );
-   assert(issuer_fees <= receives );
+   FC_ASSERT(issuer_fees <= receives );
 
    //Don't dirty undo state if not actually collecting any fees
    if( issuer_fees.amount > 0 )

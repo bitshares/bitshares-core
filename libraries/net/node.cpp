@@ -783,7 +783,7 @@ namespace graphene { namespace net { namespace detail {
     }
 
 #ifdef P2P_IN_DEDICATED_THREAD
-# define VERIFY_CORRECT_THREAD() assert(_thread->is_current())
+# define VERIFY_CORRECT_THREAD() FC_ASSERT(_thread->is_current())
 #else
 # define VERIFY_CORRECT_THREAD() do {} while (0)
 #endif
@@ -1467,7 +1467,7 @@ namespace graphene { namespace net { namespace detail {
         // and that triggers assertions, maybe even errors
         for (const peer_connection_ptr& peer : peers_to_terminate )
         {
-          assert(_terminating_connections.find(peer) != _terminating_connections.end());
+          FC_ASSERT(_terminating_connections.find(peer) != _terminating_connections.end());
           _terminating_connections.erase(peer);
           schedule_peer_for_deletion(peer);
         }
@@ -1621,10 +1621,10 @@ namespace graphene { namespace net { namespace detail {
     {
       VERIFY_CORRECT_THREAD();
 
-      assert(_handshaking_connections.find(peer_to_delete) == _handshaking_connections.end());
-      assert(_active_connections.find(peer_to_delete) == _active_connections.end());
-      assert(_closing_connections.find(peer_to_delete) == _closing_connections.end());
-      assert(_terminating_connections.find(peer_to_delete) == _terminating_connections.end());
+      FC_ASSERT(_handshaking_connections.find(peer_to_delete) == _handshaking_connections.end());
+      FC_ASSERT(_active_connections.find(peer_to_delete) == _active_connections.end());
+      FC_ASSERT(_closing_connections.find(peer_to_delete) == _closing_connections.end());
+      FC_ASSERT(_terminating_connections.find(peer_to_delete) == _terminating_connections.end());
 
 #ifdef USE_PEERS_TO_DELETE_MUTEX
       dlog("scheduling peer for deletion: ${peer} (may block on a mutex here)", ("peer", peer_to_delete->get_remote_endpoint()));
@@ -2409,7 +2409,7 @@ namespace graphene { namespace net { namespace detail {
           low_block_num += (true_high_block_num - low_block_num + 2 ) / 2;
         }
         while ( low_block_num <= true_high_block_num );
-        assert(synopsis.back() == original_ids_of_items_to_get.back());
+        FC_ASSERT(synopsis.back() == original_ids_of_items_to_get.back());
       }
       return synopsis;
     }
@@ -2588,7 +2588,7 @@ namespace graphene { namespace net { namespace detail {
                      _delegate->has_item(item_id(blockchain_item_ids_inventory_message_received.item_type,
                                                  item_hashes_received.front())))
               {
-                assert(item_hashes_received.front() != item_hash_t());
+                FC_ASSERT(item_hashes_received.front() != item_hash_t());
                 originating_peer->last_block_delegate_has_seen = item_hashes_received.front();
                 originating_peer->last_block_time_delegate_has_seen = _delegate->get_block_time(item_hashes_received.front());
                 dlog("popping item because delegate has already seen it.  peer ${peer}'s last block the delegate has seen is now ${block_id} (actual block #${actual_block_num})",
@@ -2628,7 +2628,7 @@ namespace graphene { namespace net { namespace detail {
               // We don't know where in the blockchain the new front() actually falls, all we can
               // expect is that it is a block that we knew about because it should be one of the
               // blocks we sent in the initial synopsis.
-              assert(_delegate->has_item(item_id(_sync_item_type, item_hashes_received.front())));
+              FC_ASSERT(_delegate->has_item(item_id(_sync_item_type, item_hashes_received.front())));
               originating_peer->last_block_delegate_has_seen = item_hashes_received.front();
               originating_peer->last_block_time_delegate_has_seen = _delegate->get_block_time(item_hashes_received.front());
               item_hashes_received.pop_front();
@@ -2641,7 +2641,7 @@ namespace graphene { namespace net { namespace detail {
           }
 
           if (!item_hashes_received.empty() && !originating_peer->ids_of_items_to_get.empty())
-            assert(item_hashes_received.front() != originating_peer->ids_of_items_to_get.back());
+            FC_ASSERT(item_hashes_received.front() != originating_peer->ids_of_items_to_get.back());
 
           // append the remaining items to the peer's list
           boost::push_back(originating_peer->ids_of_items_to_get, item_hashes_received);
@@ -2717,12 +2717,12 @@ namespace graphene { namespace net { namespace detail {
         catch (const fc::exception& e)
         {
           elog("Caught unexpected exception: ${e}", ("e", e));
-          assert(false && "exceptions not expected here");
+          FC_ASSERT(false && "exceptions not expected here");
         }
         catch (const std::exception& e)
         {
           elog("Caught unexpected exception: ${e}", ("e", e.what()));
-          assert(false && "exceptions not expected here");
+          FC_ASSERT(false && "exceptions not expected here");
         }
         catch (...)
         {
@@ -3571,12 +3571,12 @@ namespace graphene { namespace net { namespace detail {
           catch (const fc::exception& e)
           {
             elog("Caught unexpected exception: ${e}", ("e", e));
-            assert(false && "exceptions not expected here");
+            FC_ASSERT(false && "exceptions not expected here");
           }
           catch (const std::exception& e)
           {
             elog("Caught unexpected exception: ${e}", ("e", e.what()));
-            assert(false && "exceptions not expected here");
+            FC_ASSERT(false && "exceptions not expected here");
           }
           catch (...)
           {
@@ -4267,7 +4267,7 @@ namespace graphene { namespace net { namespace detail {
           std::weak_ptr<peer_connection> new_weak_peer(new_peer);
           new_peer->accept_or_connect_task_done = fc::async( [this, new_weak_peer]() {
             peer_connection_ptr new_peer(new_weak_peer.lock());
-            assert(new_peer);
+            FC_ASSERT(new_peer);
             if (!new_peer)
               return;
             accept_connection_task(new_peer);
@@ -4403,9 +4403,9 @@ namespace graphene { namespace net { namespace detail {
         // whether the peer is firewalled, we want to disconnect now.
         _handshaking_connections.erase(new_peer);
         _terminating_connections.erase(new_peer);
-        assert(_active_connections.find(new_peer) == _active_connections.end());
+        FC_ASSERT(_active_connections.find(new_peer) == _active_connections.end());
         _active_connections.erase(new_peer);
-        assert(_closing_connections.find(new_peer) == _closing_connections.end());
+        FC_ASSERT(_closing_connections.find(new_peer) == _closing_connections.end());
         _closing_connections.erase(new_peer);
 
         display_current_connections();
@@ -4523,7 +4523,7 @@ namespace graphene { namespace net { namespace detail {
         return;
       }
 
-      assert(_node_public_key != fc::ecc::public_key_data());
+      FC_ASSERT(_node_public_key != fc::ecc::public_key_data());
 
       fc::ip::endpoint listen_endpoint = _node_configuration.listen_endpoint;
       if( listen_endpoint.port() != 0 )
@@ -4612,17 +4612,17 @@ namespace graphene { namespace net { namespace detail {
     void node_impl::connect_to_p2p_network()
     {
       VERIFY_CORRECT_THREAD();
-      assert(_node_public_key != fc::ecc::public_key_data());
+      FC_ASSERT(_node_public_key != fc::ecc::public_key_data());
 
-      assert(!_accept_loop_complete.valid() &&
-             !_p2p_network_connect_loop_done.valid() &&
-             !_fetch_sync_items_loop_done.valid() &&
-             !_fetch_item_loop_done.valid() &&
-             !_advertise_inventory_loop_done.valid() &&
-             !_terminate_inactive_connections_loop_done.valid() &&
-             !_fetch_updated_peer_lists_loop_done.valid() &&
-             !_bandwidth_monitor_loop_done.valid() &&
-             !_dump_node_status_task_done.valid());
+      FC_ASSERT(!_accept_loop_complete.valid() &&
+                !_p2p_network_connect_loop_done.valid() &&
+                !_fetch_sync_items_loop_done.valid() &&
+                !_fetch_item_loop_done.valid() &&
+                !_advertise_inventory_loop_done.valid() &&
+                !_terminate_inactive_connections_loop_done.valid() &&
+                !_fetch_updated_peer_lists_loop_done.valid() &&
+                !_bandwidth_monitor_loop_done.valid() &&
+                !_dump_node_status_task_done.valid());
       if (_node_configuration.accept_incoming_connections)
         _accept_loop_complete = fc::async( [=](){ accept_loop(); }, "accept_loop");
       _p2p_network_connect_loop_done = fc::async( [=]() { p2p_network_connect_loop(); }, "p2p_network_connect_loop" );
@@ -4664,7 +4664,7 @@ namespace graphene { namespace net { namespace detail {
       std::weak_ptr<peer_connection> new_weak_peer(new_peer);
       new_peer->accept_or_connect_task_done = fc::async([this, new_weak_peer](){
         peer_connection_ptr new_peer(new_weak_peer.lock());
-        assert(new_peer);
+        FC_ASSERT(new_peer);
         if (!new_peer)
           return;
         connect_to_task(new_peer, *new_peer->get_remote_endpoint());

@@ -55,23 +55,23 @@ namespace graphene { namespace db {
 
          virtual void modify( const object& obj, const std::function<void(object&)>& modify_callback ) override
          {
-            assert( obj.id.instance() < _objects.size() );
+            FC_ASSERT( obj.id.instance() < _objects.size() );
             modify_callback( *_objects[obj.id.instance()] );
          }
 
          virtual const object& insert( object&& obj )override
          {
             auto instance = obj.id.instance();
-            assert( nullptr != dynamic_cast<T*>(&obj) );
+            FC_ASSERT( nullptr != dynamic_cast<T*>(&obj) );
             if( _objects.size() <= instance ) _objects.resize( instance+1 );
-            assert( !_objects[instance] );
+            FC_ASSERT( !_objects[instance] );
             _objects[instance].reset( new T( std::move( static_cast<T&>(obj) ) ) );
             return *_objects[instance];
          }
 
          virtual void remove( const object& obj ) override
          {
-            assert( nullptr != dynamic_cast<const T*>(&obj) );
+            FC_ASSERT( nullptr != dynamic_cast<const T*>(&obj) );
             const auto instance = obj.id.instance();
             _objects[instance].reset();
             while( (_objects.size() > 0) && (_objects.back() == nullptr) )
@@ -80,8 +80,8 @@ namespace graphene { namespace db {
 
          virtual const object* find( object_id_type id )const override
          {
-            assert( id.space() == T::space_id );
-            assert( id.type() == T::type_id );
+            FC_ASSERT( id.space() == T::space_id );
+            FC_ASSERT( id.type() == T::type_id );
 
             const auto instance = id.instance();
             if( instance >= _objects.size() ) return nullptr;

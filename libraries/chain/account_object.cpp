@@ -44,7 +44,7 @@ share_type cut_fee(share_type a, uint16_t p)
 
 void account_balance_object::adjust_balance(const asset& delta)
 {
-   assert(delta.asset_id == asset_type);
+   FC_ASSERT(delta.asset_id == asset_type);
    balance += delta.amount;
 }
 
@@ -62,14 +62,14 @@ void account_statistics_object::process_fees(const account_object& a, database& 
             });
 
          share_type network_cut = cut_fee(core_fee_total, account.network_fee_percentage);
-         assert( network_cut <= core_fee_total );
+         FC_ASSERT( network_cut <= core_fee_total );
 
 #ifndef NDEBUG
          const auto& props = d.get_global_properties();
 
          share_type reserveed = cut_fee(network_cut, props.parameters.reserve_percent_of_fee);
          share_type accumulated = network_cut - reserveed;
-         assert( accumulated + reserveed == network_cut );
+         FC_ASSERT( accumulated + reserveed == network_cut );
 #endif
          share_type lifetime_cut = cut_fee(core_fee_total, account.lifetime_referrer_fee_percentage);
          share_type referral = core_fee_total - network_cut - lifetime_cut;
@@ -88,7 +88,7 @@ void account_statistics_object::process_fees(const account_object& a, database& 
          d.deposit_cashback(d.get(account.referrer), referrer_cut, require_vesting);
          d.deposit_cashback(d.get(account.registrar), registrar_cut, require_vesting);
 
-         assert( referrer_cut + registrar_cut + accumulated + reserveed + lifetime_cut == core_fee_total );
+         FC_ASSERT( referrer_cut + registrar_cut + accumulated + reserveed + lifetime_cut == core_fee_total );
       };
 
       pay_out_fees(a, pending_fees, true);
@@ -142,7 +142,7 @@ set<address> account_member_index::get_address_members(const account_object& a)c
 
 void account_member_index::object_inserted(const object& obj)
 {
-    assert( dynamic_cast<const account_object*>(&obj) ); // for debug only
+    FC_ASSERT( dynamic_cast<const account_object*>(&obj) ); // for debug only
     const account_object& a = static_cast<const account_object&>(obj);
 
     auto account_members = get_account_members(a);
@@ -160,7 +160,7 @@ void account_member_index::object_inserted(const object& obj)
 
 void account_member_index::object_removed(const object& obj)
 {
-    assert( dynamic_cast<const account_object*>(&obj) ); // for debug only
+    FC_ASSERT( dynamic_cast<const account_object*>(&obj) ); // for debug only
     const account_object& a = static_cast<const account_object&>(obj);
 
     auto key_members = get_key_members(a);
@@ -180,7 +180,7 @@ void account_member_index::about_to_modify(const object& before)
 {
    before_key_members.clear();
    before_account_members.clear();
-   assert( dynamic_cast<const account_object*>(&before) ); // for debug only
+   FC_ASSERT( dynamic_cast<const account_object*>(&before) ); // for debug only
    const account_object& a = static_cast<const account_object&>(before);
    before_key_members     = get_key_members(a);
    before_address_members = get_address_members(a);
@@ -189,7 +189,7 @@ void account_member_index::about_to_modify(const object& before)
 
 void account_member_index::object_modified(const object& after)
 {
-    assert( dynamic_cast<const account_object*>(&after) ); // for debug only
+    FC_ASSERT( dynamic_cast<const account_object*>(&after) ); // for debug only
     const account_object& a = static_cast<const account_object&>(after);
 
     {

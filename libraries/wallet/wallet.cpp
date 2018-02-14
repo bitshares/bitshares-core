@@ -719,12 +719,12 @@ public:
       for( size_t start=0; start<n; start+=account_pagination )
       {
          size_t end = std::min( start+account_pagination, n );
-         assert( end > start );
+         FC_ASSERT( end > start );
          account_ids_to_send.clear();
          std::vector< account_object > old_accounts;
          for( size_t i=start; i<end; i++ )
          {
-            assert( it != _wallet.my_accounts.end() );
+            FC_ASSERT( it != _wallet.my_accounts.end() );
             old_accounts.push_back( *it );
             account_ids_to_send.push_back( old_accounts.back().id );
             ++it;
@@ -1593,7 +1593,7 @@ public:
       }
 
       // should be enforced by FC_ASSERT's above
-      assert( merged.size() == delta.vote_for.size() + delta.vote_against.size() + delta.vote_abstain.size() );
+      FC_ASSERT( merged.size() == delta.vote_for.size() + delta.vote_against.size() + delta.vote_abstain.size() );
 
       vector< object_id_type > query_ids;
       for( const worker_id_type& wid : merged )
@@ -1613,7 +1613,7 @@ public:
          else if( delta.vote_against.find( wo.id ) != delta.vote_against.end() )
             new_votes.insert( wo.vote_against );
          else
-            assert( delta.vote_abstain.find( wo.id ) != delta.vote_abstain.end() );
+            FC_ASSERT( delta.vote_abstain.find( wo.id ) != delta.vote_abstain.end() );
       }
 
       account_update_operation update_op;
