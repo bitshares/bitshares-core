@@ -38,14 +38,14 @@ struct vote_counter
    {
       if( votes == 0 )
          return;
-      assert( votes <= last_votes );
+      FC_ASSERT( votes <= last_votes );
       last_votes = votes;
       if( bitshift == -1 )
          bitshift = std::max(int(boost::multiprecision::detail::find_msb( votes )) - 15, 0);
       uint64_t scaled_votes = std::max( votes >> bitshift, uint64_t(1) );
-      assert( scaled_votes <= std::numeric_limits<weight_type>::max() );
+      FC_ASSERT( scaled_votes <= std::numeric_limits<weight_type>::max() );
       total_votes += scaled_votes;
-      assert( total_votes <= std::numeric_limits<uint32_t>::max() );
+      FC_ASSERT( total_votes <= std::numeric_limits<uint32_t>::max() );
       auth.add_authority( who, weight_type( scaled_votes ) );
    }
 
@@ -56,7 +56,7 @@ struct vote_counter
    {
       if( total_votes == 0 )
          return;
-      assert( total_votes <= std::numeric_limits<uint32_t>::max() );
+      FC_ASSERT( total_votes <= std::numeric_limits<uint32_t>::max() );
       uint32_t weight = uint32_t( total_votes );
       weight = (weight >> 1)+1;
       auth.weight_threshold = weight;

@@ -37,7 +37,7 @@
 #define DEFAULT_LOGGER "p2p"
 
 #ifndef NDEBUG
-# define VERIFY_CORRECT_THREAD() assert(_thread->is_current())
+# define VERIFY_CORRECT_THREAD() FC_ASSERT(_thread->is_current())
 #else
 # define VERIFY_CORRECT_THREAD() do {} while (0)
 #endif
@@ -51,7 +51,7 @@ namespace graphene { namespace net
         // patch the current time into the message.  Since this operates on the packed version of the structure,
         // it won't work for anything after a variable-length field
         std::vector<char> packed_current_time = fc::raw::pack(fc::time_point::now());
-        assert(message_send_time_field_offset + packed_current_time.size() <= message_to_send.data.size());
+        FC_ASSERT(message_send_time_field_offset + packed_current_time.size() <= message_to_send.data.size());
         memcpy(message_to_send.data.data() + message_send_time_field_offset,
                packed_current_time.data(), packed_current_time.size());
       }
@@ -133,7 +133,7 @@ namespace graphene { namespace net
       }
       catch ( const fc::canceled_exception& )
       {
-        assert(false && "the task that deletes peers should not be canceled because it will prevent us from cleaning up correctly");
+        FC_ASSERT(false && "the task that deletes peers should not be canceled because it will prevent us from cleaning up correctly");
       }
       catch ( ... )
       {
@@ -196,8 +196,8 @@ namespace graphene { namespace net
 
       try
       {
-        assert( our_state == our_connection_state::disconnected &&
-                their_state == their_connection_state::disconnected );
+        FC_ASSERT( our_state == our_connection_state::disconnected &&
+                   their_state == their_connection_state::disconnected );
         direction = peer_connection_direction::inbound;
         negotiation_status = connection_negotiation_status::accepting;
         _message_connection.accept();           // perform key exchange
@@ -227,8 +227,8 @@ namespace graphene { namespace net
       VERIFY_CORRECT_THREAD();
       try
       {
-        assert( our_state == our_connection_state::disconnected &&
-                their_state == their_connection_state::disconnected );
+        FC_ASSERT( our_state == our_connection_state::disconnected &&
+                   their_state == their_connection_state::disconnected );
         direction = peer_connection_direction::outbound;
 
         _remote_endpoint = remote_endpoint;
@@ -288,8 +288,8 @@ namespace graphene { namespace net
 #ifndef NDEBUG
       struct counter {
         unsigned& _send_message_queue_tasks_counter;
-        counter(unsigned& var) : _send_message_queue_tasks_counter(var) { /* dlog("entering peer_connection::send_queued_messages_task()"); */ assert(_send_message_queue_tasks_counter == 0); ++_send_message_queue_tasks_counter; }
-        ~counter() { assert(_send_message_queue_tasks_counter == 1); --_send_message_queue_tasks_counter; /* dlog("leaving peer_connection::send_queued_messages_task()"); */ }
+        counter(unsigned& var) : _send_message_queue_tasks_counter(var) { /* dlog("entering peer_connection::send_queued_messages_task()"); */ FC_ASSERT(_send_message_queue_tasks_counter == 0); ++_send_message_queue_tasks_counter; }
+        ~counter() { FC_ASSERT(_send_message_queue_tasks_counter == 1); --_send_message_queue_tasks_counter; /* dlog("leaving peer_connection::send_queued_messages_task()"); */ }
       } concurrent_invocation_counter(_send_message_queue_tasks_running);
 #endif
       while (!_queued_messages.empty())

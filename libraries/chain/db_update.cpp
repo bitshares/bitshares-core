@@ -46,7 +46,7 @@ void database::update_global_dynamic_data( const signed_block& b )
       dynamic_global_property_id_type(0)(*this);
 
    uint32_t missed_blocks = get_slot_at_time( b.timestamp );
-   assert( missed_blocks != 0 );
+   FC_ASSERT( missed_blocks != 0 );
    missed_blocks--;
    for( uint32_t i = 0; i < missed_blocks; ++i ) {
       const auto& witness_missed = get_scheduled_witness( i+1 )(*this);
@@ -217,7 +217,7 @@ bool database::check_for_blackswan( const asset_object& mia, bool enable_black_s
     // stop when limit orders are selling too little USD for too much CORE
     auto lowest_possible_bid  = price::min( mia.id, bitasset.options.short_backing_asset );
 
-    assert( highest_possible_bid.base.asset_id == lowest_possible_bid.base.asset_id );
+    FC_ASSERT( highest_possible_bid.base.asset_id == lowest_possible_bid.base.asset_id );
     // NOTE limit_price_index is sorted from greatest to least
     auto limit_itr = limit_price_index.lower_bound( highest_possible_bid );
     auto limit_end = limit_price_index.upper_bound( lowest_possible_bid );
@@ -231,7 +231,7 @@ bool database::check_for_blackswan( const asset_object& mia, bool enable_black_s
 
     price highest = settle_price;
     if( limit_itr != limit_end ) {
-       assert( settle_price.base.asset_id == limit_itr->sell_price.base.asset_id );
+       FC_ASSERT( settle_price.base.asset_id == limit_itr->sell_price.base.asset_id );
        highest = std::max( limit_itr->sell_price, settle_price );
     }
 
@@ -385,7 +385,7 @@ void database::clear_expired_orders()
          auto receives = (order.balance * mia.current_feed.settlement_price);
          receives.amount = (fc::uint128_t(receives.amount.value) *
                             (GRAPHENE_100_PERCENT - mia.options.force_settlement_offset_percent) / GRAPHENE_100_PERCENT).to_uint64();
-         assert(receives <= order.balance * mia.current_feed.settlement_price);
+         FC_ASSERT(receives <= order.balance * mia.current_feed.settlement_price);
 
          price settlement_price = pays / receives;
 
@@ -407,7 +407,7 @@ void database::clear_expired_orders()
             auto itr = call_index.lower_bound(boost::make_tuple(price::min(mia_object.bitasset_data(*this).options.short_backing_asset,
                                                                            mia_object.get_id())));
             // There should always be a call order, since asset exists!
-            assert(itr != call_index.end() && itr->debt_type() == mia_object.get_id());
+            FC_ASSERT(itr != call_index.end() && itr->debt_type() == mia_object.get_id());
             asset max_settlement = max_settlement_volume - settled;
 
             if( order.balance.amount == 0 )
@@ -443,7 +443,7 @@ void database::update_expired_feeds()
    {
       const asset_object& a = *itr;
       ++itr;
-      assert( a.is_market_issued() );
+      FC_ASSERT( a.is_market_issued() );
 
       const asset_bitasset_data_object& b = a.bitasset_data(*this);
       bool feed_is_expired;

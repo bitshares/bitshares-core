@@ -112,7 +112,7 @@ class plugin : public abstract_plugin
          ) override;
 
       chain::database& database() { return *app().chain_database(); }
-      application& app()const { assert(_app); return *_app; }
+      application& app()const { FC_ASSERT(_app); return *_app; }
    protected:
       net::node& p2p_node() { return *app().p2p_node(); }
 

@@ -40,7 +40,6 @@ namespace graphene { namespace db {
    {
       object_id_type( uint8_t s, uint8_t t, uint64_t i )
       {
-         assert( i>>48 == 0 );
          FC_ASSERT( i >> 48 == 0, "instance overflow", ("instance",i) );
          number = (uint64_t(s)<<56) | (uint64_t(t)<<48) | i;
       }

@@ -40,27 +40,27 @@ const object* transaction_index::create(const std::function<void (object*)>& con
 void transaction_index::modify(const object* obj,
                                const std::function<void (object*)>& m)
 {
-   assert(obj != nullptr);
+   FC_ASSERT(obj != nullptr);
    FC_ASSERT(obj->id < _index.size());
 
    const transaction_object* t = dynamic_cast<const transaction_object*>(obj);
-   assert(t != nullptr);
+   FC_ASSERT(t != nullptr);
 
    auto itr = _index.find(obj->id.instance());
-   assert(itr != _index.end());
+   FC_ASSERT(itr != _index.end());
    _index.modify(itr, [&m](transaction_object& o) { m(&o); });
 }
 
 void transaction_index::add(unique_ptr<object> o)
 {
-   assert(o);
+   FC_ASSERT(o);
    object_id_type id = o->id;
-   assert(id.space() == transaction_object::space_id);
-   assert(id.type() == transaction_object::type_id);
-   assert(id.instance() == size());
+   FC_ASSERT(id.space() == transaction_object::space_id);
+   FC_ASSERT(id.type() == transaction_object::type_id);
+   FC_ASSERT(id.instance() == size());
 
    auto trx = dynamic_cast<transaction_object*>(o.get());
-   assert(trx != nullptr);
+   FC_ASSERT(trx != nullptr);
    o.release();
 
    auto result = _index.insert(std::move(*trx));
@@ -74,8 +74,8 @@ void transaction_index::remove(object_id_type id)
    if( itr == index.end() )
       return;
 
-   assert(id.space() == transaction_object::space_id);
-   assert(id.type() == transaction_object::type_id);
+   FC_ASSERT(id.space() == transaction_object::space_id);
+   FC_ASSERT(id.type() == transaction_object::type_id);
 
    index.erase(itr);
 }

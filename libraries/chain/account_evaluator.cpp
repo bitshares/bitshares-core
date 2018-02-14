@@ -331,7 +331,7 @@ void_result account_update_evaluator::do_apply( const account_update_operation& 
    {
       const auto& sa_idx = d.get_index_type< special_authority_index >().indices().get<by_account>();
       auto sa_it = sa_idx.find( o.account );
-      assert( sa_it != sa_idx.end() );
+      FC_ASSERT( sa_it != sa_idx.end() );
       d.remove( *sa_it );
    }
    else if( (!sa_before) && sa_after )
@@ -421,7 +421,7 @@ void_result account_upgrade_evaluator::do_apply(const account_upgrade_evaluator:
          // Upgrade from basic account.
          FC_ASSERT( d.head_block_time() <= HARDFORK_613_TIME );
          a.statistics(d).process_fees(a, d);
-         assert(a.is_basic_account(d.head_block_time()));
+         FC_ASSERT(a.is_basic_account(d.head_block_time()));
          a.referrer = a.get_id();
          a.membership_expiration_date = d.head_block_time() + fc::days(365);
       }

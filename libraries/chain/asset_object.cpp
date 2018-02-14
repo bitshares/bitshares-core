@@ -150,7 +150,7 @@ string asset_object::amount_to_string(share_type amount) const
    share_type scaled_precision = 1;
    for( uint8_t i = 0; i < precision; ++i )
       scaled_precision *= 10;
-   assert(scaled_precision > 0);
+   FC_ASSERT(scaled_precision > 0);
 
    string result = fc::to_string(amount.value / scaled_precision.value);
    auto decimals = amount.value % scaled_precision.value;

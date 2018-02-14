@@ -59,7 +59,7 @@ namespace graphene { namespace db {
             auto& idx = get_mutable_index<T>();
             return static_cast<const T&>( idx.create( [&](object& o)
             {
-               assert( dynamic_cast<T*>(&o) );
+               FC_ASSERT( dynamic_cast<T*>(&o) );
                constructor( static_cast<T&>(o) );
             } ));
          }
@@ -96,13 +96,13 @@ namespace graphene { namespace db {
          template<typename T>
          static const T& cast( const object& obj )
          {
-            assert( nullptr != dynamic_cast<const T*>(&obj) );
+            FC_ASSERT( nullptr != dynamic_cast<const T*>(&obj) );
             return static_cast<const T&>(obj);
          }
          template<typename T>
          static T& cast( object& obj )
          {
-            assert( nullptr != dynamic_cast<T*>(&obj) );
+            FC_ASSERT( nullptr != dynamic_cast<T*>(&obj) );
             return static_cast<T&>(obj);
          }
 
@@ -110,14 +110,14 @@ namespace graphene { namespace db {
          const T& get( object_id_type id )const
          {
             const object& obj = get_object( id );
-            assert( nullptr != dynamic_cast<const T*>(&obj) );
+            FC_ASSERT( nullptr != dynamic_cast<const T*>(&obj) );
             return static_cast<const T&>(obj);
          }
          template<typename T>
          const T* find( object_id_type id )const
          {
             const object* obj = find_object( id );
-            assert(  !obj || nullptr != dynamic_cast<const T*>(obj) );
+            FC_ASSERT(  !obj || nullptr != dynamic_cast<const T*>(obj) );
             return static_cast<const T*>(obj);
          }
 
@@ -133,7 +133,7 @@ namespace graphene { namespace db {
             typedef typename IndexType::object_type ObjectType;
             if( _index[ObjectType::space_id].size() <= ObjectType::type_id  )
                 _index[ObjectType::space_id].resize( 255 );
-            assert(!_index[ObjectType::space_id][ObjectType::type_id]);
+            FC_ASSERT(!_index[ObjectType::space_id][ObjectType::type_id]);
             unique_ptr<index> indexptr( new IndexType(*this) );
             _index[ObjectType::space_id][ObjectType::type_id] = std::move(indexptr);
             return static_cast<IndexType*>(_index[ObjectType::space_id][ObjectType::type_id].get());

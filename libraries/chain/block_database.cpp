@@ -131,7 +131,7 @@ bool block_database::contains( const block_id_type& id )const
 
 block_id_type block_database::fetch_block_id( uint32_t block_num )const
 {
-   assert( block_num != 0 );
+   FC_ASSERT( block_num != 0 );
    index_entry e;
    int64_t index_pos = sizeof(e) * int64_t(block_num);
    _block_num_to_pos.seekg( 0, _block_num_to_pos.end );
