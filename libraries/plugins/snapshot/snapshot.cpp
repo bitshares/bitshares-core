@@ -49,6 +49,12 @@ void snapshot_plugin::plugin_set_program_options(
    config_file_options.add(command_line_options);
 }
 
+boost::program_options::variables_map snapshot_plugin::plugin_get_options() {
+	boost::program_options::variables_map map;
+	return map;
+}
+
+
 std::string snapshot_plugin::plugin_name()const
 {
    return "snapshot";

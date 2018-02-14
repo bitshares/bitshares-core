@@ -71,6 +71,8 @@ class elasticsearch_plugin : public graphene::app::plugin
          boost::program_options::options_description& cfg) override;
       virtual void plugin_initialize(const boost::program_options::variables_map& options) override;
       virtual void plugin_startup() override;
+      virtual boost::program_options::variables_map plugin_get_options() override;
+
 
       friend class detail::elasticsearch_plugin_impl;
       std::unique_ptr<detail::elasticsearch_plugin_impl> my;

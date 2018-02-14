@@ -253,11 +253,25 @@ namespace graphene { namespace app {
     			std::stringstream plugin_name;
     			plugin_name << "plugin_" << *it << "_status";
     			ret_val[plugin_name.str()] = "active";
-    			if (*it == "market_history") {
-    				auto plugin = _app.get_plugin<graphene::market_history::market_history_plugin>(*it);
-    				ret_val["market_history_max"] = plugin->max_history();
-    				ret_val["market_history_max_records_per_market"] = plugin->max_order_his_records_per_market();
-    				ret_val["market_history_max_seconds_per_market"] = plugin->max_order_his_seconds_per_market();
+    			boost::program_options::variables_map options = _app.get_plugin(*it)->plugin_get_options();
+    			for(auto opt_it = options.begin(); opt_it != options.end(); ++opt_it) {
+    				std::stringstream opt_param;
+    				opt_param << *it << "->" << opt_it->first;
+    				try {
+    					ret_val[opt_param.str()] = opt_it->second.as<std::string>();
+    				} catch (boost::bad_any_cast &e) {
+    					try {
+    						int temp = opt_it->second.as<int>();
+    						ret_val[opt_param.str()] = std::to_string(temp);
+    					} catch (boost::bad_any_cast &ei) {
+    						try {
+    							double temp = opt_it->second.as<double>();
+    							ret_val[opt_param.str()] = std::to_string(temp);
+    						} catch(boost::bad_any_cast &ed) {
+    							//TODO: Do something intelligent
+    						}
+    					}
+    				}
     			}
     		}
     		ret_val["server_version"] = graphene::utilities::git_revision_description;

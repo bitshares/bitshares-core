@@ -41,6 +41,7 @@ class snapshot_plugin : public graphene::app::plugin {
          boost::program_options::options_description &command_line_options,
          boost::program_options::options_description &config_file_options
       ) override;
+      virtual boost::program_options::variables_map plugin_get_options() override;
 
       virtual void plugin_initialize( const boost::program_options::variables_map& options ) override;
       virtual void plugin_startup() override;

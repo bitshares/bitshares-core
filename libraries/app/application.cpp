@@ -1074,6 +1074,14 @@ std::vector<std::string> graphene::app::application::get_active_plugin_names()
 	return ret_val;
 }
 
+boost::program_options::options_description graphene::app::application::get_cfg_options() {
+	return _cfg_options;
+}
+
+boost::program_options::options_description graphene::app::application::get_cli_options() {
+	return _cli_options;
+}
+
 void application::shutdown_plugins()
 {
    for( auto& entry : my->_active_plugins )
