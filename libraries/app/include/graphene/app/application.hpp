@@ -92,11 +92,6 @@ namespace graphene { namespace app {
          /// @brief get a vector of plugin names that are currently active
          std::vector<std::string> get_active_plugin_names();
 
-         /// @brief get the config options
-         boost::program_options::options_description get_cfg_options();
-         /// @brief get the command line options
-         boost::program_options::options_description get_cli_options();
-
       private:
          void enable_plugin( const string& name );
          void add_available_plugin( std::shared_ptr<abstract_plugin> p );
