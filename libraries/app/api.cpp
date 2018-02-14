@@ -37,6 +37,11 @@
 #include <graphene/chain/withdraw_permission_object.hpp>
 #include <graphene/chain/worker_object.hpp>
 
+#include <graphene/utilities/git_revision.hpp>
+#include <boost/version.hpp>
+#include <boost/algorithm/string/replace.hpp>
+#include <websocketpp/version.hpp>
+
 #include <fc/crypto/hex.hpp>
 #include <fc/smart_ref_impl.hpp>
 #include <fc/thread/future.hpp>
@@ -236,6 +241,21 @@ namespace graphene { namespace app {
     {
        FC_ASSERT(_network_node_api);
        return *_network_node_api;
+    }
+
+    fc::mutable_variant_object login_api::get_server_information()
+    {
+    		fc::mutable_variant_object ret_val;
+    		ret_val["server_version"] = graphene::utilities::git_revision_description;
+    		ret_val["server_sha_version"] = graphene::utilities::git_revision_sha;
+    		ret_val["server_version_timestamp"] = fc::get_approximate_relative_time_string(fc::time_point_sec(graphene::utilities::git_revision_unix_timestamp));
+        ret_val["ssl_version"] = OPENSSL_VERSION_TEXT;
+        ret_val["boost_version"] = boost::replace_all_copy(std::string(BOOST_LIB_VERSION), "_", ".");
+        std::stringstream ss;
+        ss << websocketpp::major_version << "." << websocketpp::minor_version << "." << websocketpp::patch_version;
+        ret_val["websocket_version"] = ss.str().c_str();
+
+    		return ret_val;
     }
 
     fc::api<database_api> login_api::database()const
