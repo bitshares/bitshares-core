@@ -262,7 +262,7 @@ BOOST_AUTO_TEST_CASE(asset_claim_pool_test)
 
         };
 
-        auto claim_pool_proposal = [&]( const account_id_type& issuer, const asset_id_type& asset_to_claim,
+        auto claim_pool_proposal = [&]( const account_id_type issuer, const asset_id_type asset_to_claim,
                                         const asset& amount_to_fund, const asset_object& fee_asset  )
         {
             asset_claim_pool_operation claim_op;
@@ -299,8 +299,11 @@ BOOST_AUTO_TEST_CASE(asset_claim_pool_test)
         // Fast forward to hard fork date
         generate_blocks( HARDFORK_CORE_188_TIME );
 
+        // New reference for core_asset after having produced blocks
+        const asset_object& core_asset_hf = asset_id_type()(db);
+
         // can't claim pool because it is empty
-        GRAPHENE_REQUIRE_THROW( claim_pool( alice_id, alicecoin_id, _core(1), core_asset), fc::exception );
+        GRAPHENE_REQUIRE_THROW( claim_pool( alice_id, alicecoin_id, _core(1), core_asset_hf), fc::exception );
 
         // deposit 300 BTS to the fee pool of ALICECOIN asset
         fund_fee_pool( alice_id(db), alicecoin_id(db), _core(300).amount );
@@ -310,16 +313,16 @@ BOOST_AUTO_TEST_CASE(asset_claim_pool_test)
         BOOST_CHECK( aliceusd_id(db).dynamic_asset_data_id(db).fee_pool == _core(100).amount );
 
         // can't claim pool of an asset that doesn't belong to you
-        GRAPHENE_REQUIRE_THROW( claim_pool( alice_id, bobcoin_id, _core(200), core_asset), fc::exception );
+        GRAPHENE_REQUIRE_THROW( claim_pool( alice_id, bobcoin_id, _core(200), core_asset_hf), fc::exception );
 
         // can't claim more than is available in the fee pool
-        GRAPHENE_REQUIRE_THROW( claim_pool( alice_id, alicecoin_id, _core(400), core_asset ), fc::exception );
+        GRAPHENE_REQUIRE_THROW( claim_pool( alice_id, alicecoin_id, _core(400), core_asset_hf ), fc::exception );
 
         // can't pay fee in the same asset whose pool is being drained
         GRAPHENE_REQUIRE_THROW( claim_pool( alice_id, alicecoin_id, _core(200), alicecoin_id(db) ), fc::exception );
 
         // can claim BTS back from the fee pool
-        claim_pool( alice_id, alicecoin_id, _core(200), core_asset );
+        claim_pool( alice_id, alicecoin_id, _core(200), core_asset_hf );
         BOOST_CHECK( alicecoin_id(db).dynamic_asset_data_id(db).fee_pool == _core(100).amount );
 
         // can pay fee in the asset other than the one whose pool is being drained
@@ -332,7 +335,7 @@ BOOST_AUTO_TEST_CASE(asset_claim_pool_test)
         BOOST_CHECK( balance_before_claim + _core(100).amount == current_balance );
 
         // can create a proposal to claim claim pool after hard fork
-        claim_pool_proposal( alice_id, aliceusd_id, _core(1), core_asset);
+        claim_pool_proposal( alice_id, aliceusd_id, _core(1), core_asset_hf);
     }
     FC_LOG_AND_RETHROW()
 }
