@@ -65,13 +65,13 @@ void database::globally_settle_asset( const asset_object& mia, const price& sett
    auto call_end = call_price_index.upper_bound( price::max( bitasset.options.short_backing_asset, mia.id ) );
    while( call_itr != call_end )
    {
-      auto pays = call_itr->get_debt() * settlement_price;
+      auto pays = call_itr->get_debt() * settlement_price; // round down, in favor of call order
 
       if( pays > call_itr->get_collateral() )
          pays = call_itr->get_collateral();
 
       // Be here, the call order can be paying nothing, in this case, we take at least 1 Satoshi from call order
-      if( pays.amount == 0 )
+      if( pays.amount == 0 && !bitasset.is_prediction_market )
       {
          if( get_dynamic_global_properties().next_maintenance_time > HARDFORK_CORE_184_TIME )
             pays.amount = 1;
@@ -520,7 +520,7 @@ int database::match( const limit_order_object& usd, const limit_order_object& co
    if( usd_for_sale <= core_for_sale * match_price )
    {
       core_receives = usd_for_sale;
-      usd_receives  = usd_for_sale * match_price;
+      usd_receives  = usd_for_sale * match_price; // round down, in favor of bigger order
    }
    else
    {
@@ -529,7 +529,7 @@ int database::match( const limit_order_object& usd, const limit_order_object& co
       //Although usd_for_sale is greater than core_for_sale * match_price, core_for_sale == usd_for_sale * match_price
       //Removing the assert seems to be safe -- apparently no asset is created or destroyed.
       usd_receives = core_for_sale;
-      core_receives = core_for_sale * match_price;
+      core_receives = core_for_sale * match_price; // round down, in favor of bigger order
    }
 
    core_pays = usd_receives;
@@ -912,7 +912,7 @@ bool database::check_call_orders(const asset_object& mia, bool enable_black_swan
        if( usd_to_buy >= usd_for_sale )
        {  // fill order
           call_receives   = usd_for_sale;
-          order_receives  = usd_for_sale * match_price;
+          order_receives  = usd_for_sale * match_price; // round down, in favor of call order
           call_pays       = order_receives;
           order_pays      = usd_for_sale;
 
@@ -921,7 +921,7 @@ bool database::check_call_orders(const asset_object& mia, bool enable_black_swan
           filled_call           = (usd_to_buy == usd_for_sale);
        } else { // fill call
           call_receives  = usd_to_buy;
-          order_receives = usd_to_buy * match_price;
+          order_receives = usd_to_buy * match_price; // round down, in favor of call order
           call_pays      = order_receives;
           order_pays     = usd_to_buy;
 
