@@ -1065,6 +1065,15 @@ void graphene::app::application::add_available_plugin(std::shared_ptr<graphene::
    my->_available_plugins[p->plugin_name()] = p;
 }
 
+std::vector<std::string> graphene::app::application::get_active_plugin_names()
+{
+	std::vector<std::string> ret_val;
+	for(auto it = my->_active_plugins.begin(); it != my->_active_plugins.end(); it++) {
+		ret_val.push_back(it->first);
+	}
+	return ret_val;
+}
+
 void application::shutdown_plugins()
 {
    for( auto& entry : my->_active_plugins )

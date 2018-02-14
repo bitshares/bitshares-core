@@ -106,18 +106,12 @@ BOOST_AUTO_TEST_CASE( cli_connect )
       BOOST_CHECK(remote_api->login( wdata.ws_user, wdata.ws_password ) );
 
       fc::mutable_variant_object settings = remote_api->get_server_information();
-      std::cout << "Server Version: " << settings["server_version"].as<std::string>() << std::endl;
-      std::cout << "Server SHA Version: " << settings["server_sha_version"].as<std::string>() << std::endl;
-      std::cout << "Server Version Timestamp: " << settings["server_version_timestamp"].as<std::string>() << std::endl;
-      std::cout << "SSL Version: " << settings["ssl_version"].as<std::string>() << std::endl;
-      std::cout << "Boost Version: " << settings["boost_version"].as<std::string>() << std::endl;
-      std::cout << "Websocket++ Version: " << settings["websocket_version"].as<std::string>() << std::endl;
+      for(auto it = settings.begin(); it != settings.end(); ++it) {
+    	  	  std::cout << (*it).key() << ": " << (*it).value().as<std::string>() << std::endl;
+      }
       BOOST_CHECK(settings["server_version"].as<std::string>() != "");
       BOOST_CHECK(settings["server_sha_version"].as<std::string>() != "");
       BOOST_CHECK(settings["server_version_timestamp"].as<std::string>() != "");
-      BOOST_CHECK(settings["ssl_version"].as<std::string>() != "");
-      BOOST_CHECK(settings["boost_version"].as<std::string>() != "");
-      BOOST_CHECK(settings["websocket_version"].as<std::string>() != "");
    } catch( fc::exception& e ) {
       edump((e.to_detail_string()));
       throw;

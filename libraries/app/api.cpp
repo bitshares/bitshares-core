@@ -30,6 +30,7 @@
 #include <graphene/chain/database.hpp>
 #include <graphene/chain/get_config.hpp>
 #include <graphene/utilities/key_conversion.hpp>
+#include <graphene/chain/config.hpp>
 #include <graphene/chain/protocol/fee_schedule.hpp>
 #include <graphene/chain/confidential_object.hpp>
 #include <graphene/chain/market_object.hpp>
@@ -246,14 +247,23 @@ namespace graphene { namespace app {
     fc::mutable_variant_object login_api::get_server_information()
     {
     		fc::mutable_variant_object ret_val;
+    		// get plugins and version
+    		std::vector<std::string> plugin_names = _app.get_active_plugin_names();
+    		for(auto it = plugin_names.begin(); it != plugin_names.end(); it++) {
+    			std::stringstream plugin_name;
+    			plugin_name << "plugin_" << *it << "_status";
+    			ret_val[plugin_name.str()] = "active";
+    			if (*it == "market_history") {
+    				auto plugin = _app.get_plugin<graphene::market_history::market_history_plugin>(*it);
+    				ret_val["market_history_max"] = plugin->max_history();
+    				ret_val["market_history_max_records_per_market"] = plugin->max_order_his_records_per_market();
+    				ret_val["market_history_max_seconds_per_market"] = plugin->max_order_his_seconds_per_market();
+    			}
+    		}
     		ret_val["server_version"] = graphene::utilities::git_revision_description;
     		ret_val["server_sha_version"] = graphene::utilities::git_revision_sha;
     		ret_val["server_version_timestamp"] = fc::get_approximate_relative_time_string(fc::time_point_sec(graphene::utilities::git_revision_unix_timestamp));
-        ret_val["ssl_version"] = OPENSSL_VERSION_TEXT;
-        ret_val["boost_version"] = boost::replace_all_copy(std::string(BOOST_LIB_VERSION), "_", ".");
-        std::stringstream ss;
-        ss << websocketpp::major_version << "." << websocketpp::minor_version << "." << websocketpp::patch_version;
-        ret_val["websocket_version"] = ss.str().c_str();
+    		ret_val["graphene_db_version"] = GRAPHENE_CURRENT_DB_VERSION;
 
     		return ret_val;
     }
