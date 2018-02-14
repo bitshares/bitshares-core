@@ -270,7 +270,8 @@ BOOST_AUTO_TEST_CASE(asset_claim_pool_test)
             claim_op.asset_id = asset_to_claim;
             claim_op.amount_to_claim = amount_to_fund;
 
-            const auto proposal_create_fees = fees.get<proposal_create_operation>();
+            const auto& curfees = *db.get_global_properties().parameters.current_fees;
+            const auto& proposal_create_fees = curfees.get<proposal_create_operation>();
             proposal_create_operation prop;
             prop.fee_paying_account = alice_id;
             prop.proposed_ops.emplace_back( claim_op );
@@ -289,7 +290,7 @@ BOOST_AUTO_TEST_CASE(asset_claim_pool_test)
         const asset_object& core_asset = asset_id_type()(db);
 
         // deposit 100 BTS to the fee pool of ALICEUSD asset
-        fund_fee_pool( alice, aliceusd_id(db), _core(100).amount );
+        fund_fee_pool( alice_id(db), aliceusd_id(db), _core(100).amount );
 
         // Unable to claim pool before the hardfork
         GRAPHENE_REQUIRE_THROW( claim_pool( alice_id, aliceusd_id, _core(1), core_asset), fc::exception );
@@ -302,7 +303,7 @@ BOOST_AUTO_TEST_CASE(asset_claim_pool_test)
         GRAPHENE_REQUIRE_THROW( claim_pool( alice_id, alicecoin_id, _core(1), core_asset), fc::exception );
 
         // deposit 300 BTS to the fee pool of ALICECOIN asset
-        fund_fee_pool( alice, alicecoin_id(db), _core(300).amount );
+        fund_fee_pool( alice_id(db), alicecoin_id(db), _core(300).amount );
 
         // Test amount of CORE in fee pools
         BOOST_CHECK( alicecoin_id(db).dynamic_asset_data_id(db).fee_pool == _core(300).amount );
