@@ -776,6 +776,33 @@ BOOST_AUTO_TEST_CASE( update_uia_issuer )
          PUSH_TX( db, tx, database::skip_transaction_dupe_check );
       };
 
+      auto update_issuer_proposal = [&](const asset_id_type asset_id,
+                                        const account_object& issuer,
+                                        const account_object& new_issuer,
+                                        const fc::ecc::private_key& key)
+      {
+          asset_update_issuer_operation op;
+          op.issuer = issuer.id;
+          op.new_issuer = new_issuer.id;
+          op.asset_to_update = asset_id;
+
+          const auto& curfees = *db.get_global_properties().parameters.current_fees;
+          const auto& proposal_create_fees = curfees.get<proposal_create_operation>();
+          proposal_create_operation prop;
+          prop.fee_paying_account = issuer.id;
+          prop.proposed_ops.emplace_back( op );
+          prop.expiration_time =  db.head_block_time() + fc::days(1);
+          prop.fee = asset( proposal_create_fees.fee + proposal_create_fees.price_per_kbyte );
+
+          signed_transaction tx;
+          tx.operations.push_back( prop );
+          db.current_fee_schedule().set_fee( tx.operations.back() );
+          set_expiration( db, tx );
+          sign( tx, key );
+          PUSH_TX( db, tx );
+
+      };
+
       // Create alice account
       fc::ecc::private_key alice_owner  = fc::ecc::private_key::regenerate(fc::digest("key1"));
       fc::ecc::private_key alice_active = fc::ecc::private_key::regenerate(fc::digest("key2"));
@@ -795,8 +822,14 @@ BOOST_AUTO_TEST_CASE( update_uia_issuer )
       BOOST_TEST_MESSAGE( "can't use this operation before the hardfork" );
       GRAPHENE_REQUIRE_THROW( update_issuer( test_id, alice_id(db), bob_id(db), alice_owner), fc::exception );
 
+      BOOST_TEST_MESSAGE( "can't use this operation before the hardfork (even if wrapped into a proposal)" );
+      GRAPHENE_REQUIRE_THROW( update_issuer_proposal( test_id, alice_id(db), bob_id(db), alice_owner), fc::exception );
+
       // Fast Forward to Hardfork time
       generate_blocks( HARDFORK_CORE_199_TIME );
+
+      BOOST_TEST_MESSAGE( "After hardfork time, proposal goes through (but doesn't execute yet)" );
+      update_issuer_proposal( test_id, alice_id(db), bob_id(db), alice_owner);
 
       BOOST_TEST_MESSAGE( "Can't change issuer if not my asset" );
       GRAPHENE_REQUIRE_THROW( update_issuer( test_id, bob_id(db), alice_id(db), bob_active ), fc::exception );
