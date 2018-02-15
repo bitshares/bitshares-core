@@ -965,8 +965,8 @@ BOOST_AUTO_TEST_CASE(hard_fork_343_cross_test)
    // create another position with 310% collateral, call price is 15.5/1.75 CORE/USD = 62/7
    const call_order_object& call2 = *borrow( borrower2, bitusd.amount(1000), asset(15500));
    call_order_id_type call2_id = call2.id;
-   // create yet another position with 320% collateral, call price is 16/1.75 CORE/USD = 64/7
-   const call_order_object& call3 = *borrow( borrower3, bitusd.amount(1000), asset(16000));
+   // create yet another position with 350% collateral, call price is 17.5/1.75 CORE/USD = 77/7
+   const call_order_object& call3 = *borrow( borrower3, bitusd.amount(1000), asset(17500));
    call_order_id_type call3_id = call3.id;
    transfer(borrower, seller, bitusd.amount(1000));
    transfer(borrower2, seller, bitusd.amount(1000));
@@ -977,7 +977,7 @@ BOOST_AUTO_TEST_CASE(hard_fork_343_cross_test)
    BOOST_CHECK_EQUAL( 1000, call2.debt.value );
    BOOST_CHECK_EQUAL( 15500, call2.collateral.value );
    BOOST_CHECK_EQUAL( 1000, call3.debt.value );
-   BOOST_CHECK_EQUAL( 16000, call3.collateral.value );
+   BOOST_CHECK_EQUAL( 17500, call3.collateral.value );
    BOOST_CHECK_EQUAL( 3000, get_balance(seller, bitusd) );
    BOOST_CHECK_EQUAL( 0, get_balance(seller, core) );
 
@@ -996,7 +996,7 @@ BOOST_AUTO_TEST_CASE(hard_fork_343_cross_test)
    // at this moment,
    // collateralization of call is 8600 / 300 = 28.67
    // collateralization of call2 is 15500 / 1000 = 15.5
-   // collateralization of call3 is 16000 / 1000 = 16
+   // collateralization of call3 is 17500 / 1000 = 17.5
 
    // generate a block to include operations above
    generate_block();
@@ -1006,16 +1006,39 @@ BOOST_AUTO_TEST_CASE(hard_fork_343_cross_test)
    set_expiration( db, trx );
 
    // This will match with call2 at price 7/77 (#343 fixed)
-   BOOST_CHECK( !create_sell_order(seller_id(db), asset(7,usd_id), asset(65)) );
-   BOOST_CHECK_EQUAL( 3000-700-7, get_balance(seller_id, usd_id) );
-   BOOST_CHECK_EQUAL( 6400+77, get_balance(seller_id, core_id) );
+   BOOST_CHECK( !create_sell_order(seller_id(db), asset(7*50,usd_id), asset(65*50)) );
+   BOOST_CHECK_EQUAL( 3000-700-7*50, get_balance(seller_id, usd_id) );
+   BOOST_CHECK_EQUAL( 6400+77*50, get_balance(seller_id, core_id) );
    BOOST_CHECK_EQUAL( 300, call_id(db).debt.value );
    BOOST_CHECK_EQUAL( 8600, call_id(db).collateral.value );
-   BOOST_CHECK_EQUAL( 1000-7, call2_id(db).debt.value );
-   BOOST_CHECK_EQUAL( 15500-77, call2_id(db).collateral.value );
+   BOOST_CHECK_EQUAL( 1000-7*50, call2_id(db).debt.value );
+   BOOST_CHECK_EQUAL( 15500-77*50, call2_id(db).collateral.value );
    BOOST_CHECK_EQUAL( 1000, call3_id(db).debt.value );
-   BOOST_CHECK_EQUAL( 16000, call3_id(db).collateral.value );
+   BOOST_CHECK_EQUAL( 17500, call3_id(db).collateral.value );
 
+   // at this moment,
+   // collateralization of call is 8600 / 300 = 28.67
+   // collateralization of call2 is 11650 / 650 = 17.9
+   // collateralization of call3 is 17500 / 1000 = 17.5
+
+   // This will match with call3 at price 7/77 (#343 fixed)
+   BOOST_CHECK( !create_sell_order(seller_id(db), asset(7,usd_id), asset(65)) );
+   BOOST_CHECK_EQUAL( 3000-700-7*50-7, get_balance(seller_id, usd_id) );
+   BOOST_CHECK_EQUAL( 6400+77*50+77, get_balance(seller_id, core_id) );
+   BOOST_CHECK_EQUAL( 300, call_id(db).debt.value );
+   BOOST_CHECK_EQUAL( 8600, call_id(db).collateral.value );
+   BOOST_CHECK_EQUAL( 1000-7*50, call2_id(db).debt.value );
+   BOOST_CHECK_EQUAL( 15500-77*50, call2_id(db).collateral.value );
+   BOOST_CHECK_EQUAL( 1000-7, call3_id(db).debt.value );
+   BOOST_CHECK_EQUAL( 17500-77, call3_id(db).collateral.value );
+
+   // at this moment,
+   // collateralization of call is 8600 / 300 = 28.67
+   // collateralization of call2 is 11650 / 650 = 17.9
+   // collateralization of call3 is 17423 / 993 = 17.55
+
+   // no more margin call now
+   BOOST_CHECK( create_sell_order(seller_id(db), asset(7,usd_id), asset(65)) );
 
    generate_block();
 
