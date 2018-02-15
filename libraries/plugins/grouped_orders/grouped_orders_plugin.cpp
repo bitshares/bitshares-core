@@ -218,15 +218,15 @@ void limit_order_group_index::remove_order( const limit_order_object& o, bool re
             || itr->second.max_price < o.sell_price )
       {
          // can not find corresponding group, should not happen
-         wlog( "can not find the order group containing order for removing: ${o}", ("o",o) );
+         wlog( "can not find the order group containing order for removing (price dismatch): ${o}", ("o",o) );
          continue;
       }
       else // found
       {
          if( itr->second.total_for_sale < o.for_sale )
             // should not happen
-            wlog( "can not find the order group containing order for removing: ${o}", ("o",o) );
-         else if( itr->second.total_for_sale > o.for_sale || !remove_empty )
+            wlog( "can not find the order group containing order for removing (amount dismatch): ${o}", ("o",o) );
+         else if( !remove_empty || itr->second.total_for_sale > o.for_sale )
             itr->second.total_for_sale -= o.for_sale;
          else
             // it's the only order in the group and need to be removed
