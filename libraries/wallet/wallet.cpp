@@ -565,8 +565,6 @@ public:
    }
    account_object get_account(account_id_type id) const
    {
-      if( _wallet.my_accounts.get<by_id>().count(id) )
-         return *_wallet.my_accounts.get<by_id>().find(id);
       auto rec = _remote_db->get_accounts({id}).front();
       FC_ASSERT(rec);
       return *rec;
@@ -580,19 +578,6 @@ public:
          // It's an ID
          return get_account(*id);
       } else {
-         // It's a name
-         if( _wallet.my_accounts.get<by_name>().count(account_name_or_id) )
-         {
-            auto local_account = *_wallet.my_accounts.get<by_name>().find(account_name_or_id);
-            auto blockchain_account = _remote_db->lookup_account_names({account_name_or_id}).front();
-            FC_ASSERT( blockchain_account );
-            if (local_account.id != blockchain_account->id)
-               elog("my account id ${id} different from blockchain id ${id2}", ("id", local_account.id)("id2", blockchain_account->id));
-            if (local_account.name != blockchain_account->name)
-               elog("my account name ${id} different from blockchain name ${id2}", ("id", local_account.name)("id2", blockchain_account->name));
-
-            return *_wallet.my_accounts.get<by_name>().find(account_name_or_id);
-         }
          auto rec = _remote_db->lookup_account_names({account_name_or_id}).front();
          FC_ASSERT( rec && rec->name == account_name_or_id );
          return *rec;
@@ -866,6 +851,19 @@ public:
 
       return _builder_transactions[transaction_handle] = sign_transaction(_builder_transactions[transaction_handle], broadcast);
    }
+
+   pair<transaction_id_type,signed_transaction> broadcast_transaction(signed_transaction tx)
+   {
+       try {
+           _remote_net_broadcast->broadcast_transaction(tx);
+       }
+       catch (const fc::exception& e) {
+           elog("Caught exception while broadcasting tx ${id}:  ${e}", ("id", tx.id().str())("e", e.to_detail_string()));
+           throw;
+       }
+       return std::make_pair(tx.id(),tx);
+   }
+
    signed_transaction propose_builder_transaction(
       transaction_handle_type handle,
       time_point_sec expiration = time_point::now() + fc::minutes(1),
@@ -3041,6 +3039,11 @@ transaction wallet_api::preview_builder_transaction(transaction_handle_type hand
 signed_transaction wallet_api::sign_builder_transaction(transaction_handle_type transaction_handle, bool broadcast)
 {
    return my->sign_builder_transaction(transaction_handle, broadcast);
+}
+
+pair<transaction_id_type,signed_transaction> wallet_api::broadcast_transaction(signed_transaction tx)
+{
+    return my->broadcast_transaction(tx);
 }
 
 signed_transaction wallet_api::propose_builder_transaction(

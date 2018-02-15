@@ -247,7 +247,7 @@ processed_transaction database::_push_transaction( const signed_transaction& trx
    temp_session.merge();
 
    // notify anyone listening to pending transactions
-   on_pending_transaction( trx );
+   notify_on_pending_transaction( trx );
    return processed_trx;
 }
 
@@ -286,7 +286,7 @@ processed_transaction database::push_proposal(const proposal_object& proposal)
       {
          _applied_ops.resize( old_applied_ops_size );
       }
-      elog( "e", ("e",e.to_detail_string() ) );
+      elog( "${e}", ("e",e.to_detail_string() ) );
       throw;
    }
 
@@ -538,7 +538,7 @@ void database::_apply_block( const signed_block& next_block )
       apply_debug_updates();
 
    // notify observers that the block has been applied
-   applied_block( next_block ); //emit
+   notify_applied_block( next_block ); //emit
    _applied_ops.clear();
 
    notify_changed_objects();
