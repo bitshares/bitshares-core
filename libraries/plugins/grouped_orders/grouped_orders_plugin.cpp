@@ -88,14 +88,31 @@ void limit_order_group_index::object_inserted( const object& objct )
          idx[ limit_order_group_key( group, o.sell_price ) ] = limit_order_group_data( o.sell_price, o.for_sale );
       };
       // if idx is empty, insert this order
+      // Note: not capped
       if( idx.empty() )
       {
          create_ogo();
          continue;
       }
 
+      // cap the price
+      price capped_price = o.sell_price;
+      price max = o.sell_price.max();
+      price min = o.sell_price.min();
+      bool capped_max = false;
+      bool capped_min = false;
+      if( o.sell_price > max )
+      {
+         capped_price = max;
+         capped_max = true;
+      }
+      else if( o.sell_price < min )
+      {
+         capped_price = min;
+         capped_min = true;
+      }
       // if idx is not empty, find the group that is next to this order
-      auto itr = idx.lower_bound( limit_order_group_key( group, o.sell_price ) );
+      auto itr = idx.lower_bound( limit_order_group_key( group, capped_price ) );
       bool check_previous = false;
       if( itr == idx.end() || itr->first.group != group
             || itr->first.min_price.base.asset_id != o.sell_price.base.asset_id
@@ -105,18 +122,29 @@ void limit_order_group_index::object_inserted( const object& objct )
       else // same market and group type
       {
          bool update_max = false;
-         if( o.sell_price > itr->second.max_price )
+         if( capped_price > itr->second.max_price ) // implies itr->min_price <= itr->max_price < max
          {
             update_max = true;
             price max_price = itr->first.min_price * ratio_type( GRAPHENE_100_PERCENT + group, GRAPHENE_100_PERCENT );
-            if( o.sell_price > max_price ) // new order is out of range
+            // max_price should have been capped here
+            if( capped_price > max_price ) // new order is out of range
                check_previous = true;
          }
          if( !check_previous ) // new order is within the range
          {
-            if( update_max )
-               itr->second.max_price = o.sell_price;
-            itr->second.total_for_sale += o.for_sale;
+            if( capped_min && o.sell_price < itr->first.min_price )
+            {  // need to update itr->min_price here, if itr is below min, and new order is even lower
+               // TODO improve performance
+               limit_order_group_data data( itr->second.max_price, o.for_sale + itr->second.total_for_sale );
+               idx.erase( itr );
+               idx[ limit_order_group_key( group, o.sell_price ) ] = data;
+            }
+            else
+            {
+               if( update_max || ( capped_max && o.sell_price > itr->second.max_price ) )
+                  itr->second.max_price = o.sell_price; // store real price here, not capped
+               itr->second.total_for_sale += o.for_sale;
+            }
          }
       }
 
@@ -133,12 +161,21 @@ void limit_order_group_index::object_inserted( const object& objct )
                create_ogo();
             else // same market and group type
             {
-               // due to lower_bound, always true: o.sell_price < itr->first.min_price, so no need to check again
+               // due to lower_bound, always true: capped_price < itr->first.min_price, so no need to check again,
+               // if new order is in range of itr group, always need to update itr->first.min_price, unless
+               //   o.sell_price is higher than max
                price min_price = itr->second.max_price / ratio_type( GRAPHENE_100_PERCENT + group, GRAPHENE_100_PERCENT );
-               if( o.sell_price < min_price ) // new order is out of range
+               // min_price should have been capped here
+               if( capped_price < min_price ) // new order is out of range
                   create_ogo();
-               else // new order is within the range
-               {
+               else if( capped_max && o.sell_price >= itr->first.min_price )
+               {  // itr is above max, and price of new order is even higher
+                  if( o.sell_price > itr->second.max_price )
+                     itr->second.max_price = o.sell_price;
+                  itr->second.total_for_sale += o.for_sale;
+               }
+               else
+               {  // new order is within the range
                   // TODO improve performance
                   limit_order_group_data data( itr->second.max_price, o.for_sale + itr->second.total_for_sale );
                   idx.erase( itr );
