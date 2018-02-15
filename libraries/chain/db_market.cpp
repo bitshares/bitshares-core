@@ -413,7 +413,7 @@ bool database::apply_order(const limit_order_object& new_order_object, bool allo
    // 2. sell_asset is not a prediction market
    // 3. sell_asset is not globally settled
    // 4. sell_asset has a valid price feed
-   // 5. the call order's collateral ratio is below MCR
+   // 5. the call order's collateral ratio is below or equals to MCR
    // 6. the limit order provided a good price
 
    bool to_check_call_orders = false;
@@ -453,7 +453,7 @@ bool database::apply_order(const limit_order_object& new_order_object, bool allo
          auto call_min = price::min( recv_asset_id, sell_asset_id );
          auto call_itr = call_price_idx.lower_bound( call_min );
          // feed protected https://github.com/cryptonomex/graphene/issues/436
-         auto call_end = call_price_idx.lower_bound( ~sell_abd->current_feed.settlement_price );
+         auto call_end = call_price_idx.upper_bound( ~sell_abd->current_feed.settlement_price );
          while( !finished && call_itr != call_end )
          {
             auto old_call_itr = call_itr;
