@@ -33,6 +33,7 @@
 #include <graphene/chain/evaluator.hpp>
 #include <graphene/chain/operation_history_object.hpp>
 #include <graphene/chain/transaction_evaluation_state.hpp>
+#include <graphene/db/object_id.hpp>
 
 #include <fc/smart_ref_impl.hpp>
 #include <fc/thread/thread.hpp>
@@ -277,6 +278,21 @@ void account_history_plugin::plugin_set_program_options(
 
 boost::program_options::variables_map account_history_plugin::plugin_get_options() {
 	boost::program_options::variables_map map;
+	std::stringstream tracked_accounts;
+	bool isFirst = true;
+	for(auto acct : my->_tracked_accounts) {
+		if (!isFirst)
+			tracked_accounts << ", ";
+		//fc::variant my_var;
+		//fc::to_variant(acct, my_var);
+		//tracked_accounts << my_var.as<std::string>();
+		tracked_accounts << std::to_string(acct.space_id) << "." << std::to_string(acct.type_id) << "." << acct.instance.value;
+		isFirst = false;
+	}
+	if (!isFirst)
+		map.emplace("tracked-accounts", boost::program_options::variable_value(tracked_accounts.str(), false));
+	map.emplace("partial-operations", boost::program_options::variable_value(my->_partial_operations, false));
+	map.emplace("max-ops-per-account", boost::program_options::variable_value(my->_max_ops_per_account, false));
 	return map;
 }
 

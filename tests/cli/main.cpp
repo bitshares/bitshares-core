@@ -85,6 +85,7 @@ BOOST_AUTO_TEST_CASE( cli_connect )
       boost::program_options::variables_map cfg;
       cfg.emplace("rpc-endpoint", boost::program_options::variable_value(string("127.0.0.1:8090"), false));
       cfg.emplace("genesis-json", boost::program_options::variable_value(create_genesis_file(app_dir), false));
+      cfg.emplace("track-account", boost::program_options::variable_value(std::vector<std::string>{"\"1.2.1\"","\"1.2.2\""}, false));
       app1.initialize(app_dir.path(), cfg);
 
       BOOST_TEST_MESSAGE( "Starting app1 and waiting 500 ms" );
@@ -112,6 +113,7 @@ BOOST_AUTO_TEST_CASE( cli_connect )
       BOOST_CHECK(settings["server_version"].as<std::string>() != "");
       BOOST_CHECK(settings["server_sha_version"].as<std::string>() != "");
       BOOST_CHECK(settings["server_version_timestamp"].as<std::string>() != "");
+      BOOST_CHECK_EQUAL(settings["account_history->tracked-accounts"].as<std::string>(), "1.2.1, 1.2.2");
    } catch( fc::exception& e ) {
       edump((e.to_detail_string()));
       throw;
