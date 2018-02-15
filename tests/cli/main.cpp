@@ -105,6 +105,7 @@ BOOST_AUTO_TEST_CASE( cli_connect )
       auto remote_api = apic->get_remote_api< login_api >(1);
       BOOST_CHECK(remote_api->login( wdata.ws_user, wdata.ws_password ) );
 
+      /*
       fc::mutable_variant_object settings = remote_api->get_server_information();
       std::cout << "Server Version: " << settings["server_version"].as<std::string>() << std::endl;
       std::cout << "Server SHA Version: " << settings["server_sha_version"].as<std::string>() << std::endl;
@@ -118,6 +119,7 @@ BOOST_AUTO_TEST_CASE( cli_connect )
       BOOST_CHECK(settings["ssl_version"].as<std::string>() != "");
       BOOST_CHECK(settings["boost_version"].as<std::string>() != "");
       BOOST_CHECK(settings["websocket_version"].as<std::string>() != "");
+      */
    } catch( fc::exception& e ) {
       edump((e.to_detail_string()));
       throw;
@@ -128,7 +130,7 @@ BOOST_AUTO_TEST_CASE( cli_connect )
 /**
  * Start a server and connect using the same calls as the CLI
  */
-BOOST_AUTO_TEST_CASE( cli_vote )
+BOOST_AUTO_TEST_CASE( cli_set_voting_proxy )
 {
    using namespace graphene::chain;
    using namespace graphene::app;
@@ -147,6 +149,7 @@ BOOST_AUTO_TEST_CASE( cli_vote )
       boost::program_options::variables_map cfg;
       cfg.emplace("rpc-endpoint", boost::program_options::variable_value(string("127.0.0.1:8090"), false));
       cfg.emplace("genesis-json", boost::program_options::variable_value(create_genesis_file(app_dir), false));
+      //cfg.emplace("genesis-json", boost::program_options::variable_value(boost::filesystem::path{"/Users/JohnJones/Development2/cpp/bitshares-core/genesis.json"}, false));
       app1.initialize(app_dir.path(), cfg);
 
       BOOST_TEST_MESSAGE( "Starting app1 and waiting 500 ms" );
@@ -170,8 +173,8 @@ BOOST_AUTO_TEST_CASE( cli_vote )
       auto wapiptr = std::make_shared<graphene::wallet::wallet_api>(wdata, remote_api);
       std::stringstream wallet_filename;
       wallet_filename << app_dir.path().generic_string() << "/wallet.json";
-      //wapiptr->set_wallet_filename(wallet_filename.str());
-      wapiptr->load_wallet_file(wallet_filename.str());
+      wapiptr->set_wallet_filename(wallet_filename.str());
+      //wapiptr->load_wallet_file(wallet_filename.str());
 
       fc::api<graphene::wallet::wallet_api> wapi(wapiptr);
 
@@ -185,16 +188,41 @@ BOOST_AUTO_TEST_CASE( cli_vote )
       }));
       (void)(closed_connection);
 
-      BOOST_CHECK_EQUAL("nathan", wapiptr->get_account("nathan").name);
+      BOOST_TEST_MESSAGE("Setting wallet password");
+      wapiptr->set_password("supersecret");
+      wapiptr->unlock("supersecret");
 
-      fc::api<graphene::account_history::accn> ah = wallet_cli->get_remote_api(api_id);
+      BOOST_TEST_MESSAGE("Importing nathan key");
+      // import Nathan account
+      std::vector<std::string> nathan_keys{"5KQwrPbwdL6PhXujxW37FSSQZ1JiwsST4cqQzDeyXtP79zkvFD3"};
+      BOOST_CHECK_EQUAL(nathan_keys[0], "5KQwrPbwdL6PhXujxW37FSSQZ1JiwsST4cqQzDeyXtP79zkvFD3");
+      BOOST_CHECK(wapiptr->import_key("nathan", nathan_keys[0]));
 
-      /*
+      BOOST_TEST_MESSAGE("Importing nathan's balance");
+      std::vector<signed_transaction> import_txs = wapiptr->import_balance("nathan", nathan_keys, true);
+
+      account_object nathan_acct_before_upgrade = wapiptr->get_account("nathan");
+
+      // upgrade nathan
+      signed_transaction upgrade_tx = wapiptr->upgrade_account("nathan", true);
+
+      account_object nathan_acct_after_upgrade = wapiptr->get_account("nathan");
+
+      BOOST_CHECK_PREDICATE( std::not_equal_to<uint32_t>(), (nathan_acct_before_upgrade.membership_expiration_date.sec_since_epoch())(nathan_acct_after_upgrade.membership_expiration_date.sec_since_epoch()) );
+
+      // create a new account
       graphene::wallet::brain_key_info bki = wapiptr->suggest_brain_key();
       BOOST_CHECK(!bki.brain_priv_key.empty());
+      signed_transaction create_acct_tx = wapiptr->create_account_with_brain_key(bki.brain_priv_key, "jmjatlanta", "nathan", "nathan", true);
 
-      wapiptr->create_account_with_brain_key(bki.brain_priv_key, "jmjatlanta", "nathan", "nathan", true);
-		*/
+      // attempt to give jmjatlanta some bitsahres
+      signed_transaction transfer_tx = wapiptr->transfer("nathan", "jmjatlanta", "10000", "BTS", "Here are some BTS for your new account", true);
+
+      BOOST_TEST_MESSAGE("About to set voting proxy.");
+      // set the voting proxy to nathan
+      signed_transaction voting_tx = wapiptr->set_voting_proxy("jmjatlanta", "nathan", true);
+
+      fc::usleep(fc::milliseconds(1000));
    } catch( fc::exception& e ) {
       edump((e.to_detail_string()));
       throw;
