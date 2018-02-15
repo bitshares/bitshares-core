@@ -413,7 +413,7 @@ bool database::apply_order(const limit_order_object& new_order_object, bool allo
    // 2. sell_asset is not a prediction market
    // 3. sell_asset is not globally settled
    // 4. sell_asset has a valid price feed
-   // 5. the call order doesn't have enough collateral
+   // 5. the call order's collateral ratio is below MCR
    // 6. the limit order provided a good price
 
    bool to_check_call_orders = false;
@@ -818,28 +818,14 @@ bool database::check_call_orders(const asset_object& mia, bool enable_black_swan
 
        match_price.validate();
 
-       // would be margin called, but there is no matching order #436
+       // Feed protected (don't call if CR>MCR) https://github.com/cryptonomex/graphene/issues/436
        if( ( head_time > HARDFORK_436_TIME )
              && ( bitasset.current_feed.settlement_price > ~call_itr->call_price ) )
           return margin_called;
 
-       // would be margin called, but there is no matching order
+       // Old rule: margin calls can only buy high https://github.com/bitshares/bitshares-core/issues/606
        if( maint_time <= HARDFORK_CORE_606_TIME && match_price > ~call_itr->call_price )
           return margin_called;
-
-       /*
-       if( feed_protected )
-       {
-          ilog( "Feed protected margin call executing (HARDFORK_436_TIME not here yet)" );
-          idump( (*call_itr) );
-          idump( (*limit_itr) );
-       }
-       */
-
-     //  idump((*call_itr));
-     //  idump((*limit_itr));
-
-     //  ilog( "match_price <= ~call_itr->call_price  performing a margin call" );
 
        margin_called = true;
 
