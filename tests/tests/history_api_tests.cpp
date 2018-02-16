@@ -91,12 +91,13 @@ BOOST_AUTO_TEST_CASE(get_account_history_additional) {
       // account_id_type() and dan share operation id 1(account create) - share can be also in id 0
 
       // no history at all in the chain
-      GRAPHENE_REQUIRE_THROW(hist_api.get_account_history(account_id_type(), operation_history_id_type(0), 4, operation_history_id_type(0)), fc::exception);
+      vector<operation_history_object> histories = hist_api.get_account_history(account_id_type(), operation_history_id_type(0), 4, operation_history_id_type(0));
+      BOOST_CHECK_EQUAL(histories.size(), 0);
 
       create_bitasset("USD", account_id_type()); // create op 0
       generate_block();
       // what if the account only has one history entry and it is 0?
-      vector<operation_history_object> histories = hist_api.get_account_history(account_id_type(), operation_history_id_type(), 4, operation_history_id_type());
+      histories = hist_api.get_account_history(account_id_type(), operation_history_id_type(), 4, operation_history_id_type());
       BOOST_CHECK_EQUAL(histories.size(), 1);
       BOOST_CHECK_EQUAL(histories[0].id.instance(), 0);
 
@@ -368,7 +369,8 @@ BOOST_AUTO_TEST_CASE(get_account_history_additional) {
       BOOST_CHECK_EQUAL(histories.size(), 0);
 
       // non existent account
-      GRAPHENE_REQUIRE_THROW(hist_api.get_account_history(account_id_type(18), operation_history_id_type(0), 4, operation_history_id_type(0)), fc::exception);
+      histories = hist_api.get_account_history(account_id_type(18), operation_history_id_type(0), 4, operation_history_id_type(0));
+      BOOST_CHECK_EQUAL(histories.size(), 0);
 
       // create a new account C = alice { 7 }
       const account_object& alice = create_account("alice");
