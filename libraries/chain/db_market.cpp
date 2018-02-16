@@ -945,7 +945,7 @@ bool database::check_call_orders(const asset_object& mia, bool enable_black_swan
        if( !really_filled && maint_time > HARDFORK_CORE_453_TIME )
           limit_itr = old_limit_itr;
 
-    } // whlie call_itr != call_end
+    } // while call_itr != call_end
 
     return margin_called;
 } FC_CAPTURE_AND_RETHROW() }
