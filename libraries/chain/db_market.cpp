@@ -931,13 +931,17 @@ bool database::check_call_orders(const asset_object& mia, bool enable_black_swan
           call_itr = call_price_index.lower_bound( call_min );
 
        auto old_limit_itr = limit_itr;
+       auto next_limit_itr = std::next( limit_itr );
        if( filled_limit || maint_time > HARDFORK_CORE_453_TIME )
           ++limit_itr; // after hard fork core-453, will revert if not really filled
        // when for_new_limit_order is true, the limit order is taker, otherwise the limit order is maker
        bool really_filled = fill_limit_order(*old_limit_itr, order_pays, order_receives, true, match_price, !for_new_limit_order );
        if( !filled_limit && really_filled && maint_time <= HARDFORK_CORE_453_TIME )
+       {
           // TODO remove warning after hard fork core-453
           wlog( "Cull_small issue occurred at block #${block}", ("block",head_block_num()) );
+          limit_itr = next_limit_itr;
+       }
        if( !really_filled && maint_time > HARDFORK_CORE_453_TIME )
           limit_itr = old_limit_itr;
 
