@@ -25,16 +25,6 @@
 #include <boost/test/unit_test.hpp>
 
 #include <graphene/app/api.hpp>
-#include <graphene/chain/database.hpp>
-#include <graphene/chain/exceptions.hpp>
-
-#include <graphene/chain/account_object.hpp>
-#include <graphene/chain/asset_object.hpp>
-#include <graphene/chain/committee_member_object.hpp>
-#include <graphene/chain/proposal_object.hpp>
-#include <graphene/chain/market_object.hpp>
-
-#include <graphene/chain/exceptions.hpp>
 
 #include <graphene/utilities/tempdir.hpp>
 
