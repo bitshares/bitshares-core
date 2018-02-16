@@ -304,26 +304,28 @@ namespace graphene { namespace app {
        vector<operation_history_object> result;
        const auto& stats = account(db).statistics(db);
        if( stats.most_recent_op == account_transaction_history_id_type() ) return result;
-       if( start.instance.value < stop.instance.value) return result;
-       if( start.instance.value == stop.instance.value && start != operation_history_id_type()) return result;
        const account_transaction_history_object* node = &stats.most_recent_op(db);
        if( start == operation_history_id_type() )
           start = node->operation_id;
-       if( start > node->operation_id )
+       if( start.instance.value > node->operation_id.instance.value )
           start = node->operation_id;
 
        const auto& hist_idx = db.get_index_type<account_transaction_history_index>();
        const auto& by_op_idx = hist_idx.indices().get<by_op>();
        auto index_end = by_op_idx.end();
+       auto index_start = by_op_idx.begin();
        auto itr = by_op_idx.lower_bound(boost::make_tuple(account, start));
 
-       while(itr != index_end && result.size() < limit)
+       while(itr != index_end && itr != index_start && itr->operation_id.instance.value > stop.instance.value && result.size() < limit)
        {
-          if(itr->account == account)
+          if(itr->account == account && itr->operation_id.instance.value <= start.instance.value)
              result.push_back(itr->operation_id(db));
           --itr;
-          if(itr->operation_id.instance.value <= stop.instance.value && itr->operation_id.instance.value != 0) break;
        }
+       if(stop.instance.value == 0 && result.size() < limit && itr->account == account) {
+         result.push_back(index_start->operation_id(db));
+       }
+
        return result;
     }
 

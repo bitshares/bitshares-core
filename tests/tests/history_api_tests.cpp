@@ -34,6 +34,8 @@
 #include <graphene/chain/proposal_object.hpp>
 #include <graphene/chain/market_object.hpp>
 
+#include <graphene/chain/exceptions.hpp>
+
 #include <graphene/utilities/tempdir.hpp>
 
 #include <fc/crypto/digest.hpp>
@@ -62,6 +64,7 @@ BOOST_AUTO_TEST_CASE(get_account_history) {
 
       //account_id_type() did 3 ops and includes id0
       vector<operation_history_object> histories = hist_api.get_account_history(account_id_type(), operation_history_id_type(), 100, operation_history_id_type());
+
       BOOST_CHECK_EQUAL(histories.size(), 3);
       BOOST_CHECK_EQUAL(histories[2].id.instance(), 0);
       BOOST_CHECK_EQUAL(histories[2].op.which(), asset_create_op_id);
@@ -71,6 +74,7 @@ BOOST_AUTO_TEST_CASE(get_account_history) {
       BOOST_CHECK_EQUAL(histories.size(), 1);
       BOOST_CHECK(histories[0].id.instance() != 0);
       BOOST_CHECK_EQUAL(histories[0].op.which(), account_create_op_id);
+
 
       // Limit 2 returns 2 result
       histories = hist_api.get_account_history(account_id_type(), operation_history_id_type(), 2, operation_history_id_type());
@@ -82,12 +86,323 @@ BOOST_AUTO_TEST_CASE(get_account_history) {
       BOOST_CHECK_EQUAL(histories.size(), 1);
       BOOST_CHECK_EQUAL(histories[0].op.which(), account_create_op_id);
 
+
    } catch (fc::exception &e) {
       edump((e.to_detail_string()));
       throw;
    }
 }
+BOOST_AUTO_TEST_CASE(get_account_history_additional) {
+   try {
+      graphene::app::history_api hist_api(app);
 
+      // A = account_id_type() with records { 5, 3, 1, 0 }, and
+      // B = dan with records { 6, 4, 2, 1 }
+      // account_id_type() and dan share operation id 1(account create) - share can be also in id 0
+
+      create_bitasset("USD", account_id_type()); // create op 0
+      const account_object& dan = create_account("dan"); // create op 1
+      auto dan_id = dan.id;
+
+      create_bitasset("CNY", dan.id); // create op 2
+      create_bitasset("BTC", account_id_type()); // create op 3
+      create_bitasset("XMR", dan.id); // create op 4
+      create_bitasset("EUR", account_id_type()); // create op 5
+      create_bitasset("OIL", dan.id); // create op 6
+
+      generate_block();
+      fc::usleep(fc::milliseconds(2000));
+
+      // f(A, 0, 4, 9) = { 5, 3, 1, 0 }
+      vector<operation_history_object> histories = hist_api.get_account_history(account_id_type(), operation_history_id_type(), 4, operation_history_id_type(9));
+      BOOST_CHECK_EQUAL(histories.size(), 4);
+      BOOST_CHECK_EQUAL(histories[0].id.instance(), 5);
+      BOOST_CHECK_EQUAL(histories[1].id.instance(), 3);
+      BOOST_CHECK_EQUAL(histories[2].id.instance(), 1);
+      BOOST_CHECK_EQUAL(histories[3].id.instance(), 0);
+
+      // f(A, 0, 4, 6) = { 5, 3, 1, 0 }
+      histories = hist_api.get_account_history(account_id_type(), operation_history_id_type(), 4, operation_history_id_type(6));
+      BOOST_CHECK_EQUAL(histories.size(), 4);
+      BOOST_CHECK_EQUAL(histories[0].id.instance(), 5);
+      BOOST_CHECK_EQUAL(histories[1].id.instance(), 3);
+      BOOST_CHECK_EQUAL(histories[2].id.instance(), 1);
+      BOOST_CHECK_EQUAL(histories[3].id.instance(), 0);
+
+      // f(A, 0, 4, 5) = { 5, 3, 1, 0 }
+      histories = hist_api.get_account_history(account_id_type(), operation_history_id_type(), 4, operation_history_id_type(5));
+      BOOST_CHECK_EQUAL(histories.size(), 4);
+      BOOST_CHECK_EQUAL(histories[0].id.instance(), 5);
+      BOOST_CHECK_EQUAL(histories[1].id.instance(), 3);
+      BOOST_CHECK_EQUAL(histories[2].id.instance(), 1);
+      BOOST_CHECK_EQUAL(histories[3].id.instance(), 0);
+
+      // f(A, 0, 4, 4) = { 3, 1, 0 }
+      histories = hist_api.get_account_history(account_id_type(), operation_history_id_type(), 4, operation_history_id_type(4));
+      BOOST_CHECK_EQUAL(histories.size(), 3);
+      BOOST_CHECK_EQUAL(histories[0].id.instance(), 3);
+      BOOST_CHECK_EQUAL(histories[1].id.instance(), 1);
+      BOOST_CHECK_EQUAL(histories[2].id.instance(), 0);
+
+      // f(A, 0, 4, 3) = { 3, 1, 0 }
+      histories = hist_api.get_account_history(account_id_type(), operation_history_id_type(), 4, operation_history_id_type(3));
+      BOOST_CHECK_EQUAL(histories.size(), 3);
+      BOOST_CHECK_EQUAL(histories[0].id.instance(), 3);
+      BOOST_CHECK_EQUAL(histories[1].id.instance(), 1);
+      BOOST_CHECK_EQUAL(histories[2].id.instance(), 0);
+
+      // f(A, 0, 4, 2) = { 1, 0 }
+      histories = hist_api.get_account_history(account_id_type(), operation_history_id_type(), 4, operation_history_id_type(2));
+      BOOST_CHECK_EQUAL(histories.size(), 2);
+      BOOST_CHECK_EQUAL(histories[0].id.instance(), 1);
+      BOOST_CHECK_EQUAL(histories[1].id.instance(), 0);
+
+      // f(A, 0, 4, 1) = { 1, 0 }
+      histories = hist_api.get_account_history(account_id_type(), operation_history_id_type(), 4, operation_history_id_type(1));
+      BOOST_CHECK_EQUAL(histories.size(), 2);
+      BOOST_CHECK_EQUAL(histories[0].id.instance(), 1);
+      BOOST_CHECK_EQUAL(histories[1].id.instance(), 0);
+
+      // f(A, 0, 4, 0) = { 5, 3, 1, 0 }
+      histories = hist_api.get_account_history(account_id_type(), operation_history_id_type(), 4, operation_history_id_type());
+      BOOST_CHECK_EQUAL(histories.size(), 4);
+      BOOST_CHECK_EQUAL(histories[0].id.instance(), 5);
+      BOOST_CHECK_EQUAL(histories[1].id.instance(), 3);
+      BOOST_CHECK_EQUAL(histories[2].id.instance(), 1);
+      BOOST_CHECK_EQUAL(histories[3].id.instance(), 0);
+
+      // f(A, 1, 5, 9) = { 5, 3 }
+      histories = hist_api.get_account_history(account_id_type(), operation_history_id_type(1), 5, operation_history_id_type(9));
+      BOOST_CHECK_EQUAL(histories.size(), 2);
+      BOOST_CHECK_EQUAL(histories[0].id.instance(), 5);
+      BOOST_CHECK_EQUAL(histories[1].id.instance(), 3);
+
+      // f(A, 1, 5, 6) = { 5, 3 }
+      histories = hist_api.get_account_history(account_id_type(), operation_history_id_type(1), 5, operation_history_id_type(6));
+      BOOST_CHECK_EQUAL(histories.size(), 2);
+      BOOST_CHECK_EQUAL(histories[0].id.instance(), 5);
+      BOOST_CHECK_EQUAL(histories[1].id.instance(), 3);
+
+      // f(A, 1, 5, 5) = { 5, 3 }
+      histories = hist_api.get_account_history(account_id_type(), operation_history_id_type(1), 5, operation_history_id_type(5));
+      BOOST_CHECK_EQUAL(histories.size(), 2);
+      BOOST_CHECK_EQUAL(histories[0].id.instance(), 5);
+      BOOST_CHECK_EQUAL(histories[1].id.instance(), 3);
+
+      // f(A, 1, 5, 4) = { 3 }
+      histories = hist_api.get_account_history(account_id_type(), operation_history_id_type(1), 5, operation_history_id_type(4));
+      BOOST_CHECK_EQUAL(histories.size(), 1);
+      BOOST_CHECK_EQUAL(histories[0].id.instance(), 3);
+
+      // f(A, 1, 5, 3) = { 3 }
+      histories = hist_api.get_account_history(account_id_type(), operation_history_id_type(1), 5, operation_history_id_type(3));
+      BOOST_CHECK_EQUAL(histories.size(), 1);
+      BOOST_CHECK_EQUAL(histories[0].id.instance(), 3);
+
+      // f(A, 1, 5, 2) = { }
+      histories = hist_api.get_account_history(account_id_type(), operation_history_id_type(1), 5, operation_history_id_type(2));
+      BOOST_CHECK_EQUAL(histories.size(), 0);
+
+      // f(A, 1, 5, 1) = { }
+      histories = hist_api.get_account_history(account_id_type(), operation_history_id_type(1), 5, operation_history_id_type(1));
+      BOOST_CHECK_EQUAL(histories.size(), 0);
+
+      // f(A, 1, 5, 0) = { 5, 3 }
+      histories = hist_api.get_account_history(account_id_type(), operation_history_id_type(1), 5, operation_history_id_type(0));
+      BOOST_CHECK_EQUAL(histories.size(), 2);
+      BOOST_CHECK_EQUAL(histories[0].id.instance(), 5);
+      BOOST_CHECK_EQUAL(histories[1].id.instance(), 3);
+
+      // f(A, 0, 3, 9) = { 5, 3, 1 }
+      histories = hist_api.get_account_history(account_id_type(), operation_history_id_type(), 3, operation_history_id_type(9));
+      BOOST_CHECK_EQUAL(histories.size(), 3);
+      BOOST_CHECK_EQUAL(histories[0].id.instance(), 5);
+      BOOST_CHECK_EQUAL(histories[1].id.instance(), 3);
+      BOOST_CHECK_EQUAL(histories[2].id.instance(), 1);
+
+      // f(A, 0, 3, 6) = { 5, 3, 1 }
+      histories = hist_api.get_account_history(account_id_type(), operation_history_id_type(), 3, operation_history_id_type(6));
+      BOOST_CHECK_EQUAL(histories.size(), 3);
+      BOOST_CHECK_EQUAL(histories[0].id.instance(), 5);
+      BOOST_CHECK_EQUAL(histories[1].id.instance(), 3);
+      BOOST_CHECK_EQUAL(histories[2].id.instance(), 1);
+
+      // f(A, 0, 3, 5) = { 5, 3, 1 }
+      histories = hist_api.get_account_history(account_id_type(), operation_history_id_type(), 3, operation_history_id_type(5));
+      BOOST_CHECK_EQUAL(histories.size(), 3);
+      BOOST_CHECK_EQUAL(histories[0].id.instance(), 5);
+      BOOST_CHECK_EQUAL(histories[1].id.instance(), 3);
+      BOOST_CHECK_EQUAL(histories[2].id.instance(), 1);
+
+      // f(A, 0, 3, 4) = { 3, 1, 0 }
+      histories = hist_api.get_account_history(account_id_type(), operation_history_id_type(), 3, operation_history_id_type(4));
+      BOOST_CHECK_EQUAL(histories.size(), 3);
+      BOOST_CHECK_EQUAL(histories[0].id.instance(), 3);
+      BOOST_CHECK_EQUAL(histories[1].id.instance(), 1);
+      BOOST_CHECK_EQUAL(histories[2].id.instance(), 0);
+
+      // f(A, 0, 3, 3) = { 3, 1, 0 }
+      histories = hist_api.get_account_history(account_id_type(), operation_history_id_type(), 3, operation_history_id_type(3));
+      BOOST_CHECK_EQUAL(histories.size(), 3);
+      BOOST_CHECK_EQUAL(histories[0].id.instance(), 3);
+      BOOST_CHECK_EQUAL(histories[1].id.instance(), 1);
+      BOOST_CHECK_EQUAL(histories[2].id.instance(), 0);
+
+      // f(A, 0, 3, 2) = { 1, 0 }
+      histories = hist_api.get_account_history(account_id_type(), operation_history_id_type(), 3, operation_history_id_type(2));
+      BOOST_CHECK_EQUAL(histories.size(), 2);
+      BOOST_CHECK_EQUAL(histories[0].id.instance(), 1);
+      BOOST_CHECK_EQUAL(histories[1].id.instance(), 0);
+
+      // f(A, 0, 3, 1) = { 1, 0 }
+      histories = hist_api.get_account_history(account_id_type(), operation_history_id_type(), 3, operation_history_id_type(1));
+      BOOST_CHECK_EQUAL(histories.size(), 2);
+      BOOST_CHECK_EQUAL(histories[0].id.instance(), 1);
+      BOOST_CHECK_EQUAL(histories[1].id.instance(), 0);
+
+      // f(A, 0, 3, 0) = { 5, 3, 1 }
+      histories = hist_api.get_account_history(account_id_type(), operation_history_id_type(), 3, operation_history_id_type());
+      BOOST_CHECK_EQUAL(histories.size(), 3);
+      BOOST_CHECK_EQUAL(histories[0].id.instance(), 5);
+      BOOST_CHECK_EQUAL(histories[1].id.instance(), 3);
+      BOOST_CHECK_EQUAL(histories[2].id.instance(), 1);
+
+      // f(B, 0, 4, 9) = { 6, 4, 2, 1 }
+      histories = hist_api.get_account_history(dan_id, operation_history_id_type(), 4, operation_history_id_type(9));
+      BOOST_CHECK_EQUAL(histories.size(), 4);
+      BOOST_CHECK_EQUAL(histories[0].id.instance(), 6);
+      BOOST_CHECK_EQUAL(histories[1].id.instance(), 4);
+      BOOST_CHECK_EQUAL(histories[2].id.instance(), 2);
+      BOOST_CHECK_EQUAL(histories[3].id.instance(), 1);
+
+      // f(B, 0, 4, 6) = { 6, 4, 2, 1 }
+      histories = hist_api.get_account_history(dan_id, operation_history_id_type(), 4, operation_history_id_type(6));
+      BOOST_CHECK_EQUAL(histories.size(), 4);
+      BOOST_CHECK_EQUAL(histories[0].id.instance(), 6);
+      BOOST_CHECK_EQUAL(histories[1].id.instance(), 4);
+      BOOST_CHECK_EQUAL(histories[2].id.instance(), 2);
+      BOOST_CHECK_EQUAL(histories[3].id.instance(), 1);
+
+      // f(B, 0, 4, 5) = { 4, 2, 1 }
+      histories = hist_api.get_account_history(dan_id, operation_history_id_type(), 4, operation_history_id_type(5));
+      BOOST_CHECK_EQUAL(histories.size(), 3);
+      BOOST_CHECK_EQUAL(histories[0].id.instance(), 4);
+      BOOST_CHECK_EQUAL(histories[1].id.instance(), 2);
+      BOOST_CHECK_EQUAL(histories[2].id.instance(), 1);
+
+      // f(B, 0, 4, 4) = { 4, 2, 1 }
+      histories = hist_api.get_account_history(dan_id, operation_history_id_type(), 4, operation_history_id_type(4));
+      BOOST_CHECK_EQUAL(histories.size(), 3);
+      BOOST_CHECK_EQUAL(histories[0].id.instance(), 4);
+      BOOST_CHECK_EQUAL(histories[1].id.instance(), 2);
+      BOOST_CHECK_EQUAL(histories[2].id.instance(), 1);
+
+      // f(B, 0, 4, 3) = { 2, 1 }
+      histories = hist_api.get_account_history(dan_id, operation_history_id_type(), 4, operation_history_id_type(3));
+      BOOST_CHECK_EQUAL(histories.size(), 2);
+      BOOST_CHECK_EQUAL(histories[0].id.instance(), 2);
+      BOOST_CHECK_EQUAL(histories[1].id.instance(), 1);
+
+      // f(B, 0, 4, 2) = { 2, 1 }
+      histories = hist_api.get_account_history(dan_id, operation_history_id_type(), 4, operation_history_id_type(2));
+      BOOST_CHECK_EQUAL(histories.size(), 2);
+      BOOST_CHECK_EQUAL(histories[0].id.instance(), 2);
+      BOOST_CHECK_EQUAL(histories[1].id.instance(), 1);
+
+      // f(B, 0, 4, 1) = { 1 }
+      histories = hist_api.get_account_history(dan_id, operation_history_id_type(), 4, operation_history_id_type(1));
+      BOOST_CHECK_EQUAL(histories.size(), 1);
+      BOOST_CHECK_EQUAL(histories[0].id.instance(), 1);
+
+      // f(B, 0, 4, 0) = { 6, 4, 2, 1 }
+      histories = hist_api.get_account_history(dan_id, operation_history_id_type(), 4, operation_history_id_type());
+      BOOST_CHECK_EQUAL(histories.size(), 4);
+      BOOST_CHECK_EQUAL(histories[0].id.instance(), 6);
+      BOOST_CHECK_EQUAL(histories[1].id.instance(), 4);
+      BOOST_CHECK_EQUAL(histories[2].id.instance(), 2);
+      BOOST_CHECK_EQUAL(histories[3].id.instance(), 1);
+
+      // f(B, 2, 4, 9) = { 6, 4 }
+      histories = hist_api.get_account_history(dan_id, operation_history_id_type(2), 4, operation_history_id_type(9));
+      BOOST_CHECK_EQUAL(histories.size(), 2);
+      BOOST_CHECK_EQUAL(histories[0].id.instance(), 6);
+      BOOST_CHECK_EQUAL(histories[1].id.instance(), 4);
+
+      // f(B, 2, 4, 6) = { 6, 4 }
+      histories = hist_api.get_account_history(dan_id, operation_history_id_type(2), 4, operation_history_id_type(6));
+      BOOST_CHECK_EQUAL(histories.size(), 2);
+      BOOST_CHECK_EQUAL(histories[0].id.instance(), 6);
+      BOOST_CHECK_EQUAL(histories[1].id.instance(), 4);
+
+      // f(B, 2, 4, 5) = { 4 }
+      histories = hist_api.get_account_history(dan_id, operation_history_id_type(2), 4, operation_history_id_type(5));
+      BOOST_CHECK_EQUAL(histories.size(), 1);
+      BOOST_CHECK_EQUAL(histories[0].id.instance(), 4);
+
+      // f(B, 2, 4, 4) = { 4 }
+      histories = hist_api.get_account_history(dan_id, operation_history_id_type(2), 4, operation_history_id_type(4));
+      BOOST_CHECK_EQUAL(histories.size(), 1);
+      BOOST_CHECK_EQUAL(histories[0].id.instance(), 4);
+
+      // f(B, 2, 4, 3) = { }
+      histories = hist_api.get_account_history(dan_id, operation_history_id_type(2), 4, operation_history_id_type(3));
+      BOOST_CHECK_EQUAL(histories.size(), 0);
+
+      // f(B, 2, 4, 2) = { }
+      histories = hist_api.get_account_history(dan_id, operation_history_id_type(2), 4, operation_history_id_type(2));
+      BOOST_CHECK_EQUAL(histories.size(), 0);
+
+      // f(B, 2, 4, 1) = { }
+      histories = hist_api.get_account_history(dan_id, operation_history_id_type(2), 4, operation_history_id_type(1));
+      BOOST_CHECK_EQUAL(histories.size(), 0);
+
+      // f(B, 2, 4, 0) = { 6, 4 }
+      histories = hist_api.get_account_history(dan_id, operation_history_id_type(2), 4, operation_history_id_type(0));
+      BOOST_CHECK_EQUAL(histories.size(), 2);
+      BOOST_CHECK_EQUAL(histories[0].id.instance(), 6);
+      BOOST_CHECK_EQUAL(histories[1].id.instance(), 4);
+
+      // 0 limits
+      histories = hist_api.get_account_history(dan_id, operation_history_id_type(0), 0, operation_history_id_type(0));
+      BOOST_CHECK_EQUAL(histories.size(), 0);
+      histories = hist_api.get_account_history(account_id_type(), operation_history_id_type(3), 0, operation_history_id_type(9));
+      BOOST_CHECK_EQUAL(histories.size(), 0);
+
+      // non existent account
+      GRAPHENE_REQUIRE_THROW(hist_api.get_account_history(account_id_type(18), operation_history_id_type(0), 4, operation_history_id_type(0)), fc::exception);
+      BOOST_CHECK_EQUAL(histories.size(), 0);
+
+      // create a new account C = alice { 7 }
+      const account_object& alice = create_account("alice");
+      auto alice_id = alice.id;
+
+      generate_block();
+      fc::usleep(fc::milliseconds(2000));
+
+      // f(C, 0, 4, 10) = { 7 }
+      histories = hist_api.get_account_history(alice_id, operation_history_id_type(0), 4, operation_history_id_type(10));
+      BOOST_CHECK_EQUAL(histories.size(), 1);
+      BOOST_CHECK_EQUAL(histories[0].id.instance(), 7);
+
+      // f(C, 8, 4, 10) = { }
+      histories = hist_api.get_account_history(alice_id, operation_history_id_type(8), 4, operation_history_id_type(10));
+      BOOST_CHECK_EQUAL(histories.size(), 0);
+
+      // f(A, 0, 10, 0) = { 7, 5, 3, 1, 0 }
+      histories = hist_api.get_account_history(account_id_type(), operation_history_id_type(0), 10, operation_history_id_type(0));
+      BOOST_CHECK_EQUAL(histories.size(), 5);
+      BOOST_CHECK_EQUAL(histories[0].id.instance(), 7);
+      BOOST_CHECK_EQUAL(histories[1].id.instance(), 5);
+      BOOST_CHECK_EQUAL(histories[2].id.instance(), 3);
+      BOOST_CHECK_EQUAL(histories[3].id.instance(), 1);
+      BOOST_CHECK_EQUAL(histories[4].id.instance(), 0);
+
+   }
+   catch (fc::exception &e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
 BOOST_AUTO_TEST_CASE(get_account_history_operations) {
    try {
       graphene::app::history_api hist_api(app);
