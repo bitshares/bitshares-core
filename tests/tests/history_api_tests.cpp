@@ -100,7 +100,17 @@ BOOST_AUTO_TEST_CASE(get_account_history_additional) {
       // B = dan with records { 6, 4, 2, 1 }
       // account_id_type() and dan share operation id 1(account create) - share can be also in id 0
 
+      // no history at all in the chain
+      GRAPHENE_REQUIRE_THROW(hist_api.get_account_history(account_id_type(), operation_history_id_type(0), 4, operation_history_id_type(0)), fc::exception);
+
       create_bitasset("USD", account_id_type()); // create op 0
+      generate_block();
+      // what if the account only has one history entry and it is 0?
+      vector<operation_history_object> histories = hist_api.get_account_history(account_id_type(), operation_history_id_type(), 4, operation_history_id_type());
+      BOOST_CHECK_EQUAL(histories.size(), 1);
+      BOOST_CHECK_EQUAL(histories[0].id.instance(), 0);
+
+
       const account_object& dan = create_account("dan"); // create op 1
       auto dan_id = dan.id;
 
@@ -111,10 +121,9 @@ BOOST_AUTO_TEST_CASE(get_account_history_additional) {
       create_bitasset("OIL", dan.id); // create op 6
 
       generate_block();
-      fc::usleep(fc::milliseconds(2000));
 
       // f(A, 0, 4, 9) = { 5, 3, 1, 0 }
-      vector<operation_history_object> histories = hist_api.get_account_history(account_id_type(), operation_history_id_type(), 4, operation_history_id_type(9));
+      histories = hist_api.get_account_history(account_id_type(), operation_history_id_type(), 4, operation_history_id_type(9));
       BOOST_CHECK_EQUAL(histories.size(), 4);
       BOOST_CHECK_EQUAL(histories[0].id.instance(), 5);
       BOOST_CHECK_EQUAL(histories[1].id.instance(), 3);
@@ -370,14 +379,12 @@ BOOST_AUTO_TEST_CASE(get_account_history_additional) {
 
       // non existent account
       GRAPHENE_REQUIRE_THROW(hist_api.get_account_history(account_id_type(18), operation_history_id_type(0), 4, operation_history_id_type(0)), fc::exception);
-      BOOST_CHECK_EQUAL(histories.size(), 0);
 
       // create a new account C = alice { 7 }
       const account_object& alice = create_account("alice");
       auto alice_id = alice.id;
 
       generate_block();
-      fc::usleep(fc::milliseconds(2000));
 
       // f(C, 0, 4, 10) = { 7 }
       histories = hist_api.get_account_history(alice_id, operation_history_id_type(0), 4, operation_history_id_type(10));
