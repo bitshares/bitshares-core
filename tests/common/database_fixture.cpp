@@ -24,6 +24,7 @@
 #include <boost/test/unit_test.hpp>
 #include <boost/program_options.hpp>
 
+#
 #include <graphene/account_history/account_history_plugin.hpp>
 #include <graphene/market_history/market_history_plugin.hpp>
 
@@ -93,7 +94,13 @@ database_fixture::database_fixture()
    genesis_state.initial_parameters.current_fees->zero_all_fees();
    open_database();
 
-   // app.initialize();
+   // add account tracking for ahplugin for special test case with track-account enabled
+   if( !options.count("track-account") && boost::unit_test::framework::current_test_case().p_name.value == "track_account") {
+      std::vector<std::string> track_account;
+      std::string track = "\"1.2.17\"";
+      track_account.push_back(track);
+      options.insert(std::make_pair("track-account", boost::program_options::variable_value(track_account, false)));
+   }
    ahplugin->plugin_set_app(&app);
    ahplugin->plugin_initialize(options);
 

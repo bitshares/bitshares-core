@@ -402,6 +402,58 @@ BOOST_AUTO_TEST_CASE(get_account_history_additional) {
       throw;
    }
 }
+
+BOOST_AUTO_TEST_CASE(track_account) {
+   try {
+      graphene::app::history_api hist_api(app);
+
+      // account_id_type() is not tracked
+
+      // account_id_type() creates alice(not tracked account)
+      const account_object& alice = create_account("alice");
+      auto alice_id = alice.id;
+
+      //account_id_type() creates some ops
+      create_bitasset("CNY", account_id_type());
+      create_bitasset("USD", account_id_type());
+
+      // account_id_type() creates dan(account tracked)
+      const account_object& dan = create_account("dan");
+      auto dan_id = dan.id;
+
+      // dan makes 1 op
+      create_bitasset("EUR", dan_id);
+
+      generate_block();
+
+      // anything against account_id_type() should be {}
+      vector<operation_history_object> histories = hist_api.get_account_history(account_id_type(), operation_history_id_type(0), 10, operation_history_id_type(0));
+      BOOST_CHECK_EQUAL(histories.size(), 0);
+      histories = hist_api.get_account_history(account_id_type(), operation_history_id_type(1), 10, operation_history_id_type(0));
+      BOOST_CHECK_EQUAL(histories.size(), 0);
+      histories = hist_api.get_account_history(account_id_type(), operation_history_id_type(1), 1, operation_history_id_type(2));
+      BOOST_CHECK_EQUAL(histories.size(), 0);
+
+      // anything against alice should be {}
+      histories = hist_api.get_account_history(alice_id, operation_history_id_type(0), 10, operation_history_id_type(0));
+      BOOST_CHECK_EQUAL(histories.size(), 0);
+      histories = hist_api.get_account_history(alice_id, operation_history_id_type(1), 10, operation_history_id_type(0));
+      BOOST_CHECK_EQUAL(histories.size(), 0);
+      histories = hist_api.get_account_history(alice_id, operation_history_id_type(1), 1, operation_history_id_type(2));
+      BOOST_CHECK_EQUAL(histories.size(), 0);
+
+      // dan should have history
+      histories = hist_api.get_account_history(dan_id, operation_history_id_type(0), 10, operation_history_id_type(0));
+      BOOST_CHECK_EQUAL(histories.size(), 2);
+      BOOST_CHECK_EQUAL(histories[0].id.instance(), 4);
+      BOOST_CHECK_EQUAL(histories[1].id.instance(), 3);
+
+   } catch (fc::exception &e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
 BOOST_AUTO_TEST_CASE(get_account_history_operations) {
    try {
       graphene::app::history_api hist_api(app);
