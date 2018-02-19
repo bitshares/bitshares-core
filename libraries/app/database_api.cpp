@@ -155,8 +155,8 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       vector<blinded_balance_object> get_blinded_balances( const flat_set<commitment_type>& commitments )const;
 
       // Withdrawals
-      vector<withdraw_permission_object> get_withdrawals_giver(account_id_type account, withdraw_permission_id_type start, uint32_t limit)const;
-      vector<withdraw_permission_object> get_withdrawals_recipient(account_id_type account, withdraw_permission_id_type start, uint32_t limit)const;
+      vector<withdraw_permission_object> get_withdraw_permissions_by_giver(account_id_type account, withdraw_permission_id_type start, uint32_t limit)const;
+      vector<withdraw_permission_object> get_withdraw_permissions_by_recipient(account_id_type account, withdraw_permission_id_type start, uint32_t limit)const;
 
 
    //private:
@@ -2061,12 +2061,12 @@ vector<blinded_balance_object> database_api_impl::get_blinded_balances( const fl
 //                                                                  //
 //////////////////////////////////////////////////////////////////////
 
-vector<withdraw_permission_object> database_api::get_withdrawals_giver(account_id_type account, withdraw_permission_id_type start, uint32_t limit)const
+vector<withdraw_permission_object> database_api::get_withdraw_permissions_by_giver(account_id_type account, withdraw_permission_id_type start, uint32_t limit)const
 {
    return my->get_withdrawals_giver( account, start, limit );
 }
 
-vector<withdraw_permission_object> database_api_impl::get_withdrawals_giver(account_id_type account, withdraw_permission_id_type start, uint32_t limit)const
+vector<withdraw_permission_object> database_api_impl::get_withdraw_permissions_by_giver(account_id_type account, withdraw_permission_id_type start, uint32_t limit)const
 {
    FC_ASSERT( limit <= 101 );
    vector<withdraw_permission_object> result;
@@ -2082,12 +2082,12 @@ vector<withdraw_permission_object> database_api_impl::get_withdrawals_giver(acco
    return result;
 }
 
-vector<withdraw_permission_object> database_api::get_withdrawals_recipient(account_id_type account, withdraw_permission_id_type start, uint32_t limit)const
+vector<withdraw_permission_object> database_api::get_withdraw_permissions_by_recipient(account_id_type account, withdraw_permission_id_type start, uint32_t limit)const
 {
    return my->get_withdrawals_recipient( account, start, limit );
 }
 
-vector<withdraw_permission_object> database_api_impl::get_withdrawals_recipient(account_id_type account, withdraw_permission_id_type start, uint32_t limit)const
+vector<withdraw_permission_object> database_api_impl::get_withdraw_permissions_by_recipient(account_id_type account, withdraw_permission_id_type start, uint32_t limit)const
 {
    FC_ASSERT( limit <= 101 );
    vector<withdraw_permission_object> result;
