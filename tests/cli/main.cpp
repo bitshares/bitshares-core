@@ -130,7 +130,7 @@ BOOST_AUTO_TEST_CASE( cli_connect )
 /**
  * Start a server and connect using the same calls as the CLI
  */
-BOOST_AUTO_TEST_CASE( cli_set_voting_proxy )
+BOOST_AUTO_TEST_CASE( cli_vote_for_2_witnesses )
 {
    using namespace graphene::chain;
    using namespace graphene::app;
@@ -149,7 +149,6 @@ BOOST_AUTO_TEST_CASE( cli_set_voting_proxy )
       boost::program_options::variables_map cfg;
       cfg.emplace("rpc-endpoint", boost::program_options::variable_value(string("127.0.0.1:8090"), false));
       cfg.emplace("genesis-json", boost::program_options::variable_value(create_genesis_file(app_dir), false));
-      //cfg.emplace("genesis-json", boost::program_options::variable_value(boost::filesystem::path{"/Users/JohnJones/Development2/cpp/bitshares-core/genesis.json"}, false));
       app1.initialize(app_dir.path(), cfg);
 
       BOOST_TEST_MESSAGE( "Starting app1 and waiting 500 ms" );
@@ -174,7 +173,6 @@ BOOST_AUTO_TEST_CASE( cli_set_voting_proxy )
       std::stringstream wallet_filename;
       wallet_filename << app_dir.path().generic_string() << "/wallet.json";
       wapiptr->set_wallet_filename(wallet_filename.str());
-      //wapiptr->load_wallet_file(wallet_filename.str());
 
       fc::api<graphene::wallet::wallet_api> wapi(wapiptr);
 
@@ -209,17 +207,45 @@ BOOST_AUTO_TEST_CASE( cli_set_voting_proxy )
       account_object nathan_acct_after_upgrade = wapiptr->get_account("nathan");
 
       BOOST_CHECK_PREDICATE( std::not_equal_to<uint32_t>(), (nathan_acct_before_upgrade.membership_expiration_date.sec_since_epoch())(nathan_acct_after_upgrade.membership_expiration_date.sec_since_epoch()) );
+      BOOST_CHECK(nathan_acct_after_upgrade.is_lifetime_member());
 
       // create a new account
       graphene::wallet::brain_key_info bki = wapiptr->suggest_brain_key();
       BOOST_CHECK(!bki.brain_priv_key.empty());
       signed_transaction create_acct_tx = wapiptr->create_account_with_brain_key(bki.brain_priv_key, "jmjatlanta", "nathan", "nathan", true);
 
+      // save the private key for this new account in the wallet file
+   	  BOOST_CHECK(wapiptr->import_key("jmjatlanta", bki.wif_priv_key));
+      wapiptr->save_wallet_file(wallet_filename.str());
+
       // attempt to give jmjatlanta some bitsahres
       signed_transaction transfer_tx = wapiptr->transfer("nathan", "jmjatlanta", "10000", "BTS", "Here are some BTS for your new account", true);
 
-      BOOST_TEST_MESSAGE("About to set voting proxy.");
+      // get the details for init1
+      witness_object init1_obj = wapiptr->get_witness("init1");
+      int init1_start_votes = init1_obj.total_votes;
+      // Vote for a witness
+      signed_transaction vote_witness1_tx = wapiptr->vote_for_witness("jmjatlanta", "init1", true, true);
+      // wait for a maintenance interval
+      fc::usleep(fc::minutes(3));
+      // Verify that the vote is there
+      init1_obj = wapiptr->get_witness("init1");
+      int init1_middle_votes = init1_obj.total_votes;
+      BOOST_CHECK(init1_middle_votes > init1_start_votes);
+      // Vote for a 2nd witness
+      witness_object init2_obj = wapiptr->get_witness("init2");
+      int init2_start_votes = init2_obj.total_votes;
+      signed_transaction vote_witness2_tx = wapiptr->vote_for_witness("jmjatlanta", "init2", true, true);
+      fc::usleep(fc::minutes(3));
+      // Verify that both the first vote and the 2nd are there
+      init2_obj = wapiptr->get_witness("init2");
+      init1_obj = wapiptr->get_witness("init1");
+      int init2_middle_votes = init2_obj.total_votes;
+      BOOST_CHECK(init2_middle_votes > init2_start_votes);
+      int init1_last_votes = init1_obj.total_votes;
+      BOOST_CHECK(init1_middle_votes == init1_last_votes);
       // set the voting proxy to nathan
+      BOOST_TEST_MESSAGE("About to set voting proxy.");
       signed_transaction voting_tx = wapiptr->set_voting_proxy("jmjatlanta", "nathan", true);
 
       fc::usleep(fc::milliseconds(1000));
