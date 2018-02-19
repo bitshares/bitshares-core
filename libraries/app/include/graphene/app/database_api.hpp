@@ -756,6 +756,6 @@ FC_API(graphene::app::database_api,
    (get_blinded_balances)
 
    // Withdrawals
-   (get_withdrawals_giver)
-   (get_withdrawals_recipient)
+   (get_withdraw_permissions_by_giver)
+   (get_withdraw_permissions_by_recipient)
 )
