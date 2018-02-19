@@ -226,20 +226,49 @@ BOOST_AUTO_TEST_CASE( cli_vote_for_2_witnesses )
       int init1_start_votes = init1_obj.total_votes;
       // Vote for a witness
       signed_transaction vote_witness1_tx = wapiptr->vote_for_witness("jmjatlanta", "init1", true, true);
+      std::cout << "Displaying transaction for initial vote: " << std::endl;
+      //display_account_update_tx(vote_witness1_tx, wapiptr->get_result_formatters());
+      std::cout << fc::json::to_pretty_string( vote_witness1_tx ) << std::endl;
       // wait for a maintenance interval
-      fc::usleep(fc::minutes(3));
+      fc::usleep(fc::seconds(20));
+      // send a block to trigger maintenance interval
+      fc::ecc::private_key committee_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("nathan")));
+      auto db = app1.chain_database();
+      auto block_1 = db->generate_block(
+         db->get_slot_time(1),
+         db->get_scheduled_witness(1),
+         committee_key,
+         database::skip_nothing);
+
       // Verify that the vote is there
       init1_obj = wapiptr->get_witness("init1");
+      witness_object init2_obj = wapiptr->get_witness("init2");
+      std::cout << "After first maintenance, here is the init1 witness: " << std::endl;
+      std::cout << fc::json::to_pretty_string( init1_obj) << std::endl;
+      std::cout << "After first maintenance, here is the init2 witness: " << std::endl;
+      std::cout << fc::json::to_pretty_string( init2_obj) << std::endl;
       int init1_middle_votes = init1_obj.total_votes;
       BOOST_CHECK(init1_middle_votes > init1_start_votes);
       // Vote for a 2nd witness
-      witness_object init2_obj = wapiptr->get_witness("init2");
       int init2_start_votes = init2_obj.total_votes;
       signed_transaction vote_witness2_tx = wapiptr->vote_for_witness("jmjatlanta", "init2", true, true);
-      fc::usleep(fc::minutes(3));
+      std::cout << "Displaying transaction for init2 vote: " << std::endl;
+      //display_account_update_tx(vote_witness2_tx, wapiptr->get_result_formatters());
+      std::cout << fc::json::to_pretty_string( vote_witness2_tx ) << std::endl;
+      fc::usleep(fc::seconds(20));
+      // send anoter block to trigger maintenance interval
+      block_1 = db->generate_block(
+         db->get_slot_time(1),
+         db->get_scheduled_witness(1),
+         committee_key,
+         database::skip_nothing);
       // Verify that both the first vote and the 2nd are there
       init2_obj = wapiptr->get_witness("init2");
       init1_obj = wapiptr->get_witness("init1");
+      std::cout << "After second maintenance, here is the init1 witness: " << std::endl;
+      std::cout << fc::json::to_pretty_string( init1_obj) << std::endl;
+      std::cout << "After second maintenance, here is the init2 witness: " << std::endl;
+      std::cout << fc::json::to_pretty_string( init2_obj) << std::endl;
       int init2_middle_votes = init2_obj.total_votes;
       BOOST_CHECK(init2_middle_votes > init2_start_votes);
       int init1_last_votes = init1_obj.total_votes;
