@@ -583,11 +583,22 @@ int database::match( const limit_order_object& bid, const call_order_object& ask
 
    FC_ASSERT( filled_call || filled_limit );
 
-   // Be here, it's possible that taker is paying something for nothing due to partially filled in last loop.
-   // In this case, we see it as filled and cancel it later
+   // Be here, it's possible that taker is paying something for nothing.
    // The maker won't be paying something for nothing according to code above
    if( order_receives.amount == 0 && get_dynamic_global_properties().next_maintenance_time > HARDFORK_CORE_184_TIME )
-      return 1;
+   {
+      // It's possible that taker is paying something for nothing due to call order too small.
+      // In this case, let the call pay 1 Satoshi
+      if( filled_call )
+      {
+         order_receives.amount = 1;
+         call_pays = order_receives;
+      }
+      else
+         // It's possible that taker is paying something for nothing due to partially filled in last loop.
+         // In this case, we see it as filled and cancel it later
+         return 1;
+   }
 
    int result = 0;
    result |= fill_limit_order( bid, order_pays, order_receives, false, match_price, false ); // the limit order is taker
@@ -915,8 +926,20 @@ bool database::check_call_orders(const asset_object& mia, bool enable_black_swan
        //   when the limit order is a maker, it won't be paying something for nothing,
        //     however, if it's culled after partially filled, `limit_itr` may be invalidated so should not be dereferenced
        if( order_receives.amount == 0 )
-       {  // TODO remove warning after hard fork core-184
-          wlog( "Something for nothing issue (#184, variant D) occurred at block #${block}", ("block",head_block_num()) );
+       {
+          if( maint_time > HARDFORK_CORE_184_TIME )
+          {
+             if( filled_call ) // call would be completely filled // should always be true
+             {
+                order_receives.amount = 1; // round up to 1 Satoshi
+                call_pays = order_receives;
+             }
+             // else do nothing, since the limit order should have already been cancelled elsewhere
+             else // TODO remove warning after confirmed
+                wlog( "Something for nothing issue (#184, variant D-1) occurred at block #${block}", ("block",head_block_num()) );
+          }
+          else // TODO remove warning after hard fork core-184
+             wlog( "Something for nothing issue (#184, variant D) occurred at block #${block}", ("block",head_block_num()) );
        }
 
        auto old_call_itr = call_itr;
