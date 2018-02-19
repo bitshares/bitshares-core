@@ -3784,7 +3784,6 @@ vector< signed_transaction > wallet_api_impl::import_balance( string name_or_id,
    }
 
    vector< balance_object > balances = _remote_db->get_balance_objects( addrs );
-   wdump((balances));
    addrs.clear();
 
    set<asset_id_type> bal_types;
