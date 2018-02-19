@@ -154,6 +154,10 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       // Blinded balances
       vector<blinded_balance_object> get_blinded_balances( const flat_set<commitment_type>& commitments )const;
 
+      // Withdrawals
+      vector<withdraw_permission_object> get_withdraw_permissions_by_giver(account_id_type account, withdraw_permission_id_type start, uint32_t limit)const;
+      vector<withdraw_permission_object> get_withdraw_permissions_by_recipient(account_id_type account, withdraw_permission_id_type start, uint32_t limit)const;
+
 
    //private:
       static string price_to_string( const price& _price, const asset_object& _base, const asset_object& _quote );
@@ -2047,6 +2051,54 @@ vector<blinded_balance_object> database_api_impl::get_blinded_balances( const fl
       auto itr = by_commitment_idx.find( c );
       if( itr != by_commitment_idx.end() )
          result.push_back( *itr );
+   }
+   return result;
+}
+
+//////////////////////////////////////////////////////////////////////
+//                                                                  //
+//  Withdrawals                                                     //
+//                                                                  //
+//////////////////////////////////////////////////////////////////////
+
+vector<withdraw_permission_object> database_api::get_withdraw_permissions_by_giver(account_id_type account, withdraw_permission_id_type start, uint32_t limit)const
+{
+   return my->get_withdrawals_giver( account, start, limit );
+}
+
+vector<withdraw_permission_object> database_api_impl::get_withdraw_permissions_by_giver(account_id_type account, withdraw_permission_id_type start, uint32_t limit)const
+{
+   FC_ASSERT( limit <= 101 );
+   vector<withdraw_permission_object> result;
+
+   const auto& withdraw_idx = _db.get_index_type<withdraw_permission_index>().indices().get<by_from>();
+   auto withdraw_index_end = withdraw_idx.end();
+   auto withdraw_itr = withdraw_idx.lower_bound(boost::make_tuple(account, start));
+   while(withdraw_itr != withdraw_index_end && withdraw_itr->withdraw_from_account == account && result.size() < limit)
+   {
+      result.push_back(*withdraw_itr);
+      ++withdraw_itr;
+   }
+   return result;
+}
+
+vector<withdraw_permission_object> database_api::get_withdraw_permissions_by_recipient(account_id_type account, withdraw_permission_id_type start, uint32_t limit)const
+{
+   return my->get_withdrawals_recipient( account, start, limit );
+}
+
+vector<withdraw_permission_object> database_api_impl::get_withdraw_permissions_by_recipient(account_id_type account, withdraw_permission_id_type start, uint32_t limit)const
+{
+   FC_ASSERT( limit <= 101 );
+   vector<withdraw_permission_object> result;
+
+   const auto& withdraw_idx = _db.get_index_type<withdraw_permission_index>().indices().get<by_authorized>();
+   auto withdraw_index_end = withdraw_idx.end();
+   auto withdraw_itr = withdraw_idx.lower_bound(boost::make_tuple(account, start));
+   while(withdraw_itr != withdraw_index_end && withdraw_itr->authorized_account == account && result.size() < limit)
+   {
+      result.push_back(*withdraw_itr);
+      ++withdraw_itr;
    }
    return result;
 }
