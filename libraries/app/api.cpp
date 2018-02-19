@@ -316,12 +316,11 @@ namespace graphene { namespace app {
        auto index_start = by_op_idx.begin();
        auto itr = by_op_idx.lower_bound(boost::make_tuple(account, start));
 
-       while(itr != index_start && itr->operation_id.instance.value > stop.instance.value && result.size() < limit)
+       while(itr != index_start && itr->account == account && itr->operation_id.instance.value > stop.instance.value && result.size() < limit)
        {
-          if(itr->account == account && itr->operation_id.instance.value <= start.instance.value)
+          if(itr->operation_id.instance.value <= start.instance.value)
              result.push_back(itr->operation_id(db));
           --itr;
-          if(itr->account != account) break;
        }
        if(stop.instance.value == 0 && result.size() < limit && itr->account == account) {
          result.push_back(itr->operation_id(db));
