@@ -303,12 +303,9 @@ namespace graphene { namespace app {
        FC_ASSERT( limit <= 100 );
        vector<operation_history_object> result;
        try {
-          optional<account_statistics_object> stats;
-          optional<account_transaction_history_object> node;
-          stats = account(db).statistics(db);
-          node = stats->most_recent_op(db);
-          if(start == operation_history_id_type() || start.instance.value > node->operation_id.instance.value)
-             start = node->operation_id;
+          const account_transaction_history_object& node = account(db).statistics(db).most_recent_op(db);
+          if(start == operation_history_id_type() || start.instance.value > node.operation_id.instance.value)
+             start = node.operation_id;
        } catch(...) { return result; }
 
        const auto& hist_idx = db.get_index_type<account_transaction_history_index>();
