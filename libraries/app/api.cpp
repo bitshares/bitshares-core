@@ -302,14 +302,14 @@ namespace graphene { namespace app {
        const auto& db = *_app.chain_database();
        FC_ASSERT( limit <= 100 );
        vector<operation_history_object> result;
-       account_statistics_object stats;
-       try { stats = account(db).statistics(db); } catch(...) { return result; }
-       const account_transaction_history_object* node;
-       try { node = &stats.most_recent_op(db); } catch(...) { return result; }
-       if( start == operation_history_id_type() )
-          start = node->operation_id;
-       if( start.instance.value > node->operation_id.instance.value )
-          start = node->operation_id;
+       try {
+          optional<account_statistics_object> stats;
+          optional<account_transaction_history_object> node;
+          stats = account(db).statistics(db);
+          node = stats->most_recent_op(db);
+          if(start == operation_history_id_type() || start.instance.value > node->operation_id.instance.value)
+             start = node->operation_id;
+       } catch(...) { return result; }
 
        const auto& hist_idx = db.get_index_type<account_transaction_history_index>();
        const auto& by_op_idx = hist_idx.indices().get<by_op>();
