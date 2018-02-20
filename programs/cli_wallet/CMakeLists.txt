@@ -9,6 +9,15 @@ if( GPERFTOOLS_FOUND )
     list( APPEND PLATFORM_SPECIFIC_LIBS tcmalloc )
 endif()
 
+find_package( Editline )
+if ( EDITLINE_FOUND )
+	message ( STATUS "Found Editline; compiling cli_wallet with Editline" )
+	list ( APPEND PLATFORM_SPECIFIC_LIBS editline )
+	add_library (editline STATIC IMPORTED )
+	set_target_properties ( editline PROPERTIES IMPORTED_LOCATION ${Editline_LIBRARY} ) 
+endif()
+
+
 target_link_libraries( cli_wallet
                        PRIVATE graphene_app graphene_net graphene_chain graphene_egenesis_brief graphene_utilities graphene_wallet fc ${CMAKE_DL_LIBS} ${PLATFORM_SPECIFIC_LIBS} )
 
