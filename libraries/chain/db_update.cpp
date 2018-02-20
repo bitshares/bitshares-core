@@ -296,9 +296,10 @@ void database::clear_expired_orders()
       asset_id_type current_asset = settlement_index.begin()->settlement_asset_id();
       asset max_settlement_volume;
       price settlement_fill_price;
+      bool current_asset_finished = false;
       bool extra_dump = false;
 
-      auto next_asset = [&current_asset, &settlement_index, &extra_dump] {
+      auto next_asset = [&current_asset, &current_asset_finished, &settlement_index, &extra_dump] {
          auto bound = settlement_index.upper_bound(current_asset);
          if( bound == settlement_index.end() )
          {
@@ -313,6 +314,7 @@ void database::clear_expired_orders()
             ilog( "next_asset returning true, bound is ${b}", ("b", *bound) );
          }
          current_asset = bound->settlement_asset_id();
+         current_asset_finished = false;
          return true;
       };
 
@@ -368,7 +370,9 @@ void database::clear_expired_orders()
          }
          if( max_settlement_volume.asset_id != current_asset )
             max_settlement_volume = mia_object.amount(mia.max_force_settlement_volume(mia_object.dynamic_data(*this).current_supply));
-         if( mia.force_settled_volume >= max_settlement_volume.amount )
+         // When current_asset_finished is true, this would be the 2nd time processing the same order.
+         // In this case, we move to the next asset.
+         if( mia.force_settled_volume >= max_settlement_volume.amount || current_asset_finished )
          {
             /*
             ilog("Skipping force settlement in ${asset}; settled ${settled_volume} / ${max_volume}",
@@ -422,7 +426,14 @@ void database::clear_expired_orders()
                break;
             }
             try {
-               settled += match(*itr, order, settlement_price, max_settlement, settlement_fill_price);
+               asset new_settled = match(*itr, order, settlement_price, max_settlement, settlement_fill_price);
+               if( maint_time > HARDFORK_CORE_184_TIME && new_settled.amount == 0 ) // unable to fill this settle order
+               {
+                  if( find_object( order_id ) ) // the settle order hasn't been cancelled
+                     current_asset_finished = true;
+                  break;
+               }
+               settled += new_settled;
             } 
             catch ( const black_swan_exception& e ) { 
                wlog( "black swan detected: ${e}", ("e", e.to_detail_string() ) );

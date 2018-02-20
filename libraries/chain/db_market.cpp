@@ -627,16 +627,26 @@ asset database::match( const call_order_object& call,
    asset call_pays       = call_receives * match_price; // round down here, in favor of call order
 
    // Be here, the call order may be paying nothing.
-   // In this case, we favor the settle order after hard fork core-184
-   // This may open a door to certain attacks, but should be fine due to fees
-   bool call_pays_rounded_up = false;
    if( call_pays.amount == 0 )
    {
       if( get_dynamic_global_properties().next_maintenance_time > HARDFORK_CORE_184_TIME )
-      {  // TODO remove this warning after hard fork core-184
-         wlog( "Something for nothing issue (#184, variant C) handled at block #${block}", ("block",head_block_num()) );
-         call_pays.amount = 1; // this can trigger a black swan event, we'll check later
-         call_pays_rounded_up = true;
+      {
+         if( call_receives == call_debt ) // the call order is smaller than or equal to the settle order
+         {
+            wlog( "Something for nothing issue (#184, variant C-1) handled at block #${block}", ("block",head_block_num()) );
+            call_pays.amount = 1;
+         }
+         else
+         {
+            if( call_receives == settle.balance ) // the settle order is smaller
+            {
+               wlog( "Something for nothing issue (#184, variant C-2) handled at block #${block}", ("block",head_block_num()) );
+               cancel_settle_order( settle );
+            }
+            else // neither order will be completely filled, perhaps due to max_settlement too small
+               wlog( "Something for nothing issue (#184, variant C-3) handled at block #${block}", ("block",head_block_num()) );
+            return asset( 0, settle.balance.asset_id );
+         }
       }
       else // TODO remove this warning after hard fork core-184
          wlog( "Something for nothing issue (#184, variant C) occurred at block #${block}", ("block",head_block_num()) );
@@ -658,9 +668,6 @@ asset database::match( const call_order_object& call,
 
    fill_call_order( call, call_pays, call_receives, fill_price, true ); // call order is maker
    fill_settle_order( settle, settle_pays, settle_receives, fill_price, false ); // force settlement order is taker
-
-   if( call_pays_rounded_up ) // implies next_maitenance_time > HARDFORK_CORE_184_TIME
-      GRAPHENE_ASSERT( !check_for_blackswan( settle_pays.asset_id(*this), true ), black_swan_exception, "" );
 
    return call_receives;
 } FC_CAPTURE_AND_RETHROW( (call)(settle)(match_price)(max_settlement) ) }
