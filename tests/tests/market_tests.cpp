@@ -97,7 +97,7 @@ BOOST_AUTO_TEST_CASE(issue_338)
    BOOST_CHECK_EQUAL( 993, call.debt.value );
    BOOST_CHECK_EQUAL( 14940, call.collateral.value );
 
-   auto buy_low = create_sell_order(buyer, asset(90), bitusd.amount(10))->id;
+   create_sell_order(buyer, asset(90), bitusd.amount(10))->id;
    // margin call takes precedence
    BOOST_CHECK( !create_sell_order(seller, bitusd.amount(7), core.amount(60)) );
    BOOST_CHECK_EQUAL( 986, get_balance(seller, bitusd) );
@@ -105,7 +105,7 @@ BOOST_AUTO_TEST_CASE(issue_338)
    BOOST_CHECK_EQUAL( 986, call.debt.value );
    BOOST_CHECK_EQUAL( 14880, call.collateral.value );
 
-   auto buy_med = create_sell_order(buyer, asset(105), bitusd.amount(10))->id;
+   create_sell_order(buyer, asset(105), bitusd.amount(10))->id;
    // margin call takes precedence
    BOOST_CHECK( !create_sell_order(seller, bitusd.amount(7), core.amount(70)) );
    BOOST_CHECK_EQUAL( 979, get_balance(seller, bitusd) );
@@ -113,7 +113,7 @@ BOOST_AUTO_TEST_CASE(issue_338)
    BOOST_CHECK_EQUAL( 979, call.debt.value );
    BOOST_CHECK_EQUAL( 14810, call.collateral.value );
 
-   auto buy_high = create_sell_order(buyer, asset(115), bitusd.amount(10))->id;
+   create_sell_order(buyer, asset(115), bitusd.amount(10))->id;
    // margin call still has precedence (!))
    BOOST_CHECK( !create_sell_order(seller, bitusd.amount(7), core.amount(77)) );
    BOOST_CHECK_EQUAL( 972, get_balance(seller, bitusd) );
