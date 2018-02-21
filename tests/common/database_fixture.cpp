@@ -24,7 +24,6 @@
 #include <boost/test/unit_test.hpp>
 #include <boost/program_options.hpp>
 
-#
 #include <graphene/account_history/account_history_plugin.hpp>
 #include <graphene/market_history/market_history_plugin.hpp>
 
