@@ -1273,14 +1273,14 @@ public:
                                            string amount,
                                            bool broadcast /* = false */)
    { try {
-      optional<asset_object> asset_to_fund = find_asset(symbol);
-      if (!asset_to_fund)
+      optional<asset_object> asset_pool_to_claim = find_asset(symbol);
+      if (!asset_pool_to_claim)
         FC_THROW("No asset with that symbol exists!");
       asset_object core_asset = get_asset(asset_id_type());
 
       asset_claim_pool_operation claim_op;
-      claim_op.issuer = asset_to_fund->issuer;
-      claim_op.asset_id = asset_to_fund->id;
+      claim_op.issuer = asset_pool_to_claim->issuer;
+      claim_op.asset_id = asset_pool_to_claim->id;
       claim_op.amount_to_claim = core_asset.amount_from_string(amount).amount;
 
       signed_transaction tx;
