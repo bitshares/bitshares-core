@@ -245,7 +245,7 @@ BOOST_AUTO_TEST_CASE(asset_claim_pool_test)
 
         enable_fees();
 
-        auto claim_pool = [&]( const account_id_type& issuer, const asset_id_type& asset_to_claim,
+        auto claim_pool = [&]( const account_id_type issuer, const asset_id_type asset_to_claim,
                               const asset& amount_to_fund, const asset_object& fee_asset  )
         {
             asset_claim_pool_operation claim_op;
