@@ -633,7 +633,7 @@ void_result asset_claim_pool_evaluator::do_apply( const asset_claim_pool_operati
     const asset_dynamic_data_object& addo = a.dynamic_asset_data_id(d);
     FC_ASSERT( o.amount_to_claim.amount <= addo.fee_pool, "Attempt to claim more fees than is available", ("addo",addo) );
 
-    d.modify( addo, [&]( asset_dynamic_data_object& _addo  ) {
+    d.modify( addo, [&o]( asset_dynamic_data_object& _addo  ) {
         _addo.fee_pool -= o.amount_to_claim.amount;
     });
 
