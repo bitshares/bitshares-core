@@ -537,7 +537,7 @@ namespace detail {
             _is_finished_syncing = true;
             _self->syncing_finished();
          }
-      } FC_CAPTURE_AND_RETHROW( (blk_msg)(sync_mode) ) }
+      } FC_CAPTURE_AND_RETHROW( (blk_msg)(sync_mode) ) return false; }
 
       virtual void handle_transaction(const graphene::net::trx_message& transaction_message) override
       { try {
