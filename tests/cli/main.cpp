@@ -231,6 +231,7 @@ BOOST_AUTO_TEST_CASE( cli_vote_for_2_witnesses )
       // wait for a maintenance interval
       // NOTE: For this to work consistently, your maintenance interval must be less than 20 seconds
       // see libraries/chain/include/graphene/chain/config.hpp:L50 GRAPHENE_DEFAULT_MAINTENANCE_INTERVAL (seconds)
+      BOOST_CHECK(GRAPHENE_DEFAULT_MAINTENANCE_INTERVAL <= 20);
       fc::usleep(fc::seconds(20));
       // send a block to trigger maintenance interval
       BOOST_CHECK(generate_block(*app1.get()));
@@ -257,10 +258,6 @@ BOOST_AUTO_TEST_CASE( cli_vote_for_2_witnesses )
       BOOST_CHECK(init2_middle_votes > init2_start_votes);
       int init1_last_votes = init1_obj.total_votes;
       BOOST_CHECK(init1_last_votes > init1_start_votes);
-
-      // set the voting proxy to nathan
-      BOOST_TEST_MESSAGE("About to set voting proxy.");
-      signed_transaction voting_tx = wapiptr->set_voting_proxy("jmjatlanta", "nathan", true);
 
       // wait for everything to finish up
       fc::usleep(fc::seconds(1));
