@@ -27,6 +27,8 @@
 #include <graphene/chain/evaluator.hpp>
 #include <graphene/chain/database.hpp>
 #include <graphene/chain/transaction_evaluation_state.hpp>
+#include <graphene/chain/asset_evaluator.hpp>
+#include <graphene/chain/hardfork.hpp>
 
 namespace graphene { namespace chain {
 

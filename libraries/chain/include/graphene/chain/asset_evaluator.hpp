@@ -152,4 +152,32 @@ namespace graphene { namespace chain {
          void_result do_apply( const asset_claim_fees_operation& o );
    };
 
+   class asset_claim_pool_evaluator : public evaluator<asset_claim_pool_evaluator>
+   {
+      public:
+         typedef asset_claim_pool_operation operation_type;
+
+         void_result do_evaluate( const asset_claim_pool_operation& o );
+         void_result do_apply( const asset_claim_pool_operation& o );
+   };
+
+   namespace impl { // TODO: remove after HARDFORK_CORE_188_TIME has passed
+      class hf_188_visitor {
+         public:
+            typedef void result_type;
+
+            template<typename T>
+            void operator()( const T& v )const {}
+
+            void operator()( const graphene::chain::asset_claim_pool_operation& v )const {
+               FC_ASSERT( false, "Not allowed until hardfork 188" );
+            }
+
+            void operator()( const graphene::chain::proposal_create_operation& v )const {
+               for( const op_wrapper& op : v.proposed_ops )
+                   op.op.visit( *this );
+            }
+      };
+   }
+
 } } // graphene::chain

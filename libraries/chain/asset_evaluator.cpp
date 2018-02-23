@@ -616,4 +616,31 @@ void_result asset_claim_fees_evaluator::do_apply( const asset_claim_fees_operati
 } FC_CAPTURE_AND_RETHROW( (o) ) }
 
 
+void_result asset_claim_pool_evaluator::do_evaluate( const asset_claim_pool_operation& o )
+{ try {
+    FC_ASSERT( db().head_block_time() >= HARDFORK_CORE_188_TIME,
+         "This operation is only available after Hardfork #188!" );
+    FC_ASSERT( o.asset_id(db()).issuer == o.issuer, "Asset fee pool may only be claimed by the issuer" );
+
+    return void_result();
+} FC_CAPTURE_AND_RETHROW( (o) ) }
+
+void_result asset_claim_pool_evaluator::do_apply( const asset_claim_pool_operation& o )
+{ try {
+    database& d = db();
+
+    const asset_object& a = o.asset_id(d);
+    const asset_dynamic_data_object& addo = a.dynamic_asset_data_id(d);
+    FC_ASSERT( o.amount_to_claim.amount <= addo.fee_pool, "Attempt to claim more fees than is available", ("addo",addo) );
+
+    d.modify( addo, [&o]( asset_dynamic_data_object& _addo  ) {
+        _addo.fee_pool -= o.amount_to_claim.amount;
+    });
+
+    d.adjust_balance( o.issuer, o.amount_to_claim );
+
+    return void_result();
+} FC_CAPTURE_AND_RETHROW( (o) ) }
+
+
 } } // graphene::chain
