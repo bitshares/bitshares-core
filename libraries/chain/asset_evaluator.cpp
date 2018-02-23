@@ -486,6 +486,14 @@ operation_result asset_settle_evaluator::do_apply(const asset_settle_evaluator::
       else
          FC_ASSERT( settled_amount.amount <= bitasset.settlement_fund ); // should be strictly < except for PM with zero outcome
 
+      if( settled_amount.amount == 0 && !bitasset.is_prediction_market )
+      {
+         if( d.get_dynamic_global_properties().next_maintenance_time > HARDFORK_CORE_184_TIME )
+            FC_THROW( "Settle amount is too small to receive anything due to rounding" );
+         else // TODO remove this warning after hard fork core-184
+            wlog( "Something for nothing issue (#184, variant F) occurred at block #${block}", ("block",d.head_block_num()) );
+      }
+
       d.modify( bitasset, [&]( asset_bitasset_data_object& obj ){
                 obj.settlement_fund -= settled_amount.amount;
                 });
