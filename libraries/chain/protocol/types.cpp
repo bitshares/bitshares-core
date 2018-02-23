@@ -49,7 +49,7 @@ namespace graphene { namespace chain {
        try
        {
            if( is_valid_v1( base58str ) )
-               prefix = std::string( "BTS" );
+               prefix = std::string( "RISK" );
        }
        catch( ... )
        {
@@ -67,7 +67,7 @@ namespace graphene { namespace chain {
     // TODO: This is temporary for testing
     bool public_key_type::is_valid_v1( const std::string& base58str )
     {
-       std::string prefix( "BTS" );
+       std::string prefix( "RISK" );
        const size_t prefix_len = prefix.size();
        FC_ASSERT( base58str.size() > prefix_len );
        FC_ASSERT( base58str.substr( 0, prefix_len ) ==  prefix , "", ("base58str", base58str) );
