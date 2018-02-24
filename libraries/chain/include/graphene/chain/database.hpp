@@ -508,6 +508,7 @@ namespace graphene { namespace chain {
          flat_map<uint32_t,block_id_type>  _checkpoints;
 
          node_property_object              _node_property_object;
+         bool                              _opened = false;
    };
 
    namespace detail
