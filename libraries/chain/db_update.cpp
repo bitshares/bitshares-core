@@ -256,33 +256,22 @@ bool database::check_for_blackswan( const asset_object& mia, bool enable_black_s
 
 void database::clear_expired_orders()
 { try {
-   detail::with_skip_flags( *this,
-      get_node_properties().skip_flags | skip_authority_check, [&](){
-         transaction_evaluation_state cancel_context(this);
-
          //Cancel expired limit orders
          auto& limit_index = get_index_type<limit_order_index>().indices().get<by_expiration>();
          while( !limit_index.empty() && limit_index.begin()->expiration <= head_block_time() )
          {
-            limit_order_cancel_operation canceler;
             const limit_order_object& order = *limit_index.begin();
-            canceler.fee_paying_account = order.seller;
-            canceler.order = order.id;
-            canceler.fee = current_fee_schedule().calculate_fee( canceler );
-            if( canceler.fee.amount > order.deferred_fee )
-            {
-               // Cap auto-cancel fees at deferred_fee; see #549
-               //wlog( "At block ${b}, fee for clearing expired order ${oid} was capped at deferred_fee ${fee}", ("b", head_block_num())("oid", order.id)("fee", order.deferred_fee) );
-               canceler.fee = asset( order.deferred_fee, asset_id_type() );
-            }
-            // we know the fee for this op is set correctly since it is set by the chain.
-            // this allows us to avoid a hung chain:
-            // - if #549 case above triggers
-            // - if the fee is incorrect, which may happen due to #435 (although since cancel is a fixed-fee op, it shouldn't)
-            cancel_context.skip_fee_schedule_check = true;
-            apply_operation(cancel_context, canceler);
+            auto base_asset = order.sell_price.base.asset_id;
+            auto quote_asset = order.sell_price.quote.asset_id;
+            cancel_limit_order( order );
+            // check call orders
+            // Comments below are copied from limit_order_cancel_evaluator::do_apply(...)
+            // Possible optimization: order can be called by cancelling a limit order
+            //   if the canceled order was at the top of the book.
+            // Do I need to check calls in both assets?
+            check_call_orders( base_asset( *this ) );
+            check_call_orders( quote_asset( *this ) );
          }
-     });
 
    //Process expired force settlement orders
    auto& settlement_index = get_index_type<force_settlement_index>().indices().get<by_expiration>();
@@ -336,7 +325,7 @@ void database::clear_expired_orders()
          if( mia.has_settlement() )
          {
             ilog( "Canceling a force settlement because of black swan" );
-            cancel_order( order );
+            cancel_settle_order( order );
             continue;
          }
 
@@ -358,7 +347,7 @@ void database::clear_expired_orders()
          {
             ilog("Canceling a force settlement in ${asset} because settlement price is null",
                  ("asset", mia_object.symbol));
-            cancel_order(order);
+            cancel_settle_order(order);
             continue;
          }
          if( max_settlement_volume.asset_id != current_asset )
@@ -413,7 +402,7 @@ void database::clear_expired_orders()
             if( order.balance.amount == 0 )
             {
                wlog( "0 settlement detected" );
-               cancel_order( order );
+               cancel_settle_order( order );
                break;
             }
             try {
@@ -421,7 +410,7 @@ void database::clear_expired_orders()
             } 
             catch ( const black_swan_exception& e ) { 
                wlog( "black swan detected: ${e}", ("e", e.to_detail_string() ) );
-               cancel_order( order );
+               cancel_settle_order( order );
                break;
             }
          }

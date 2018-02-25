@@ -173,6 +173,7 @@ void database::initialize_evaluators()
    register_evaluator<blind_transfer_evaluator>();
    register_evaluator<asset_claim_fees_evaluator>();
    register_evaluator<asset_update_issuer_evaluator>();
+   register_evaluator<asset_claim_pool_evaluator>();
 }
 
 void database::initialize_indexes()
@@ -449,11 +450,6 @@ void database::init_genesis(const genesis_state_type& genesis_state)
    const auto& assets_by_symbol = get_index_type<asset_index>().indices().get<by_symbol>();
    const auto get_asset_id = [&assets_by_symbol](const string& symbol) {
       auto itr = assets_by_symbol.find(symbol);
-
-      // TODO: This is temporary for handling BTS snapshot
-      if( symbol == "BTS" )
-          itr = assets_by_symbol.find(GRAPHENE_SYMBOL);
-
       FC_ASSERT(itr != assets_by_symbol.end(),
                 "Unable to find asset '${sym}'. Did you forget to add a record for it to initial_assets?",
                 ("sym", symbol));
