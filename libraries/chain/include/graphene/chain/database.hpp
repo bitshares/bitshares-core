@@ -513,7 +513,8 @@ namespace graphene { namespace chain {
           * Whether database is successfully opened or not.
           *
           * The database is considered open when there's no exception
-          * or assertion fail during database::open() method.
+          * or assertion fail during database::open() method, and
+          * database::close() has not been called, or failed during execution.
           */
          bool                              _opened = false;
    };
