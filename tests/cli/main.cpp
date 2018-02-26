@@ -166,6 +166,8 @@ BOOST_AUTO_TEST_CASE( cli_connect )
 
 /**
  * Start a server and connect using the same calls as the CLI
+ * Vote for two witnesses, and make sure they both stay there
+ * after a maintenance block
  */
 BOOST_AUTO_TEST_CASE( cli_vote_for_2_witnesses )
 {
@@ -288,6 +290,7 @@ BOOST_AUTO_TEST_CASE( cli_vote_for_2_witnesses )
 
 /**
  * Start a server and connect using the same calls as the CLI
+ * Set a voting proxy and be assured that it sticks
  */
 BOOST_AUTO_TEST_CASE( cli_set_voting_proxy )
 {
@@ -366,9 +369,14 @@ BOOST_AUTO_TEST_CASE( cli_set_voting_proxy )
       BOOST_TEST_MESSAGE("Transferring bitshares from Nathan to jmjatlanta");
       signed_transaction transfer_tx = wapiptr->transfer("nathan", "jmjatlanta", "10000", "BTS", "Here are some BTS for your new account", true);
 
+      // grab account for comparison
+      account_object prior_voting_account = wapiptr->get_account("jmjatlanta");
       // set the voting proxy to nathan
       BOOST_TEST_MESSAGE("About to set voting proxy.");
       signed_transaction voting_tx = wapiptr->set_voting_proxy("jmjatlanta", "nathan", true);
+      account_object after_voting_account = wapiptr->get_account("jmjatlanta");
+      // see if it changed
+      BOOST_CHECK(prior_voting_account.options.voting_account != after_voting_account.options.voting_account);
 
       // wait for everything to finish up
       fc::usleep(fc::seconds(1));
