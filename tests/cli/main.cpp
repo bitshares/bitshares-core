@@ -90,10 +90,10 @@ std::shared_ptr<graphene::app::application> start_application(fc::temp_directory
  * @param app the application
  * @returns true on success
  */
-bool generate_block(graphene::app::application& app) {
+bool generate_block(std::shared_ptr<graphene::app::application> app) {
 	try {
 	    fc::ecc::private_key committee_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("nathan")));
-	    auto db = app.chain_database();
+	    auto db = app->chain_database();
 	    auto block_1 = db->generate_block(
 	       db->get_slot_time(1),
 	       db->get_scheduled_witness(1),
@@ -101,6 +101,28 @@ bool generate_block(graphene::app::application& app) {
 	       database::skip_nothing);
 	    return true;
 	} catch (exception &e) {
+		return false;
+	}
+}
+
+/****
+ * @brief Skip intermediate blocks, and generate a maintenance block
+ * @param app the application
+ * @returns true on success
+ */
+bool generate_maintenance_block(std::shared_ptr<graphene::app::application> app) {
+	try {
+		fc::ecc::private_key committee_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("nathan")));
+		uint32_t skip = ~0;
+		auto db = app->chain_database();
+		auto maint_time = db->get_dynamic_global_properties().next_maintenance_time;
+		auto slots_to_miss = db->get_slot_at_time(maint_time);
+		db->generate_block(db->get_slot_time(slots_to_miss),
+				db->get_scheduled_witness(slots_to_miss),
+				committee_key,
+				skip);
+		return true;
+	} catch (exception& e) {
 		return false;
 	}
 }
@@ -228,13 +250,10 @@ BOOST_AUTO_TEST_CASE( cli_vote_for_2_witnesses )
       // Vote for a witness
       signed_transaction vote_witness1_tx = wapiptr->vote_for_witness("jmjatlanta", "init1", true, true);
 
+      // generate a block to get things started
+      BOOST_CHECK(generate_block(app1));
       // wait for a maintenance interval
-      // NOTE: For this to work consistently, your maintenance interval must be less than 20 seconds
-      // see libraries/chain/include/graphene/chain/config.hpp:L50 GRAPHENE_DEFAULT_MAINTENANCE_INTERVAL (seconds)
-      BOOST_CHECK(GRAPHENE_DEFAULT_MAINTENANCE_INTERVAL <= 20);
-      fc::usleep(fc::seconds(20));
-      // send a block to trigger maintenance interval
-      BOOST_CHECK(generate_block(*app1.get()));
+      BOOST_CHECK(generate_maintenance_block(app1));
 
       // Verify that the vote is there
       init1_obj = wapiptr->get_witness("init1");
@@ -247,8 +266,7 @@ BOOST_AUTO_TEST_CASE( cli_vote_for_2_witnesses )
       signed_transaction vote_witness2_tx = wapiptr->vote_for_witness("jmjatlanta", "init2", true, true);
 
       // send another block to trigger maintenance interval
-      fc::usleep(fc::seconds(20));
-      BOOST_CHECK(generate_block(*app1.get()));
+      BOOST_CHECK(generate_maintenance_block(app1));
 
       // Verify that both the first vote and the 2nd are there
       init2_obj = wapiptr->get_witness("init2");
