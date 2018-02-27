@@ -126,7 +126,7 @@ void asset_update_operation::validate()const
 void asset_update_issuer_operation::validate()const
 {
    FC_ASSERT( fee.amount >= 0 );
-   FC_ASSERT(issuer != new_issuer);
+   FC_ASSERT( issuer != new_issuer );
 }
 
 share_type asset_update_operation::calculate_fee(const asset_update_operation::fee_parameters_type& k)const

@@ -443,7 +443,6 @@ namespace graphene { namespace chain {
    };
 
    /**
-   /**
     * @brief Update issuer of an asset
     * @ingroup operations
     *

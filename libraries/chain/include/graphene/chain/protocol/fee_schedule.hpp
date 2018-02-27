@@ -92,6 +92,7 @@ namespace graphene { namespace chain {
       }
    };
 
+   template<>
    class fee_helper<asset_claim_pool_operation> {
      public:
       const asset_claim_pool_operation::fee_parameters_type& cget(const flat_set<fee_parameters>& parameters)const
