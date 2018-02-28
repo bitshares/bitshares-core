@@ -517,10 +517,31 @@ int database::match( const limit_order_object& usd, const limit_order_object& co
 
    asset usd_pays, usd_receives, core_pays, core_receives;
 
-   if( usd_for_sale <= core_for_sale * match_price )
+   auto maint_time = get_dynamic_global_properties().next_maintenance_time;
+   bool before_hardfork_342 = ( maint_time <= HARDFORK_CORE_342_TIME );
+
+   bool cull_taker = false;
+   if( usd_for_sale <= core_for_sale * match_price ) // rounding down here should be fine
    {
-      core_receives = usd_for_sale;
       usd_receives  = usd_for_sale * match_price; // round down, in favor of bigger order
+
+      // Be here, it's possible that taker is paying something for nothing due to partially filled in last loop.
+      // In this case, we see it as filled and cancel it later
+      // The maker won't be paying something for nothing, since if it would, it would have been cancelled already.
+      if( usd_receives.amount == 0 && maint_time > HARDFORK_CORE_184_TIME )
+         return 1;
+
+      if( before_hardfork_342 )
+         core_receives = usd_for_sale;
+      else
+      {
+         // The remaining amount in order `usd` would be too small,
+         //   so we should cull the order in fill_limit_order() below.
+         // The order would receive 0 even at `match_price`, so it would receive 0 at its own price,
+         //   so calling maybe_cull_small() will always cull it.
+         core_receives = usd_receives ^ match_price;
+         cull_taker = true;
+      }
    }
    else
    {
@@ -528,24 +549,25 @@ int database::match( const limit_order_object& usd, const limit_order_object& co
       //This assert is not always true -- see trade_amount_equals_zero in operation_tests.cpp
       //Although usd_for_sale is greater than core_for_sale * match_price, core_for_sale == usd_for_sale * match_price
       //Removing the assert seems to be safe -- apparently no asset is created or destroyed.
-      usd_receives = core_for_sale;
+
       core_receives = core_for_sale * match_price; // round down, in favor of bigger order
+      if( before_hardfork_342 )
+         usd_receives = core_for_sale;
+      else
+         // The remaining amount in order `core` would be too small,
+         //   so the order will be culled in fill_limit_order() below
+         usd_receives = core_receives ^ match_price;
    }
 
    core_pays = usd_receives;
    usd_pays  = core_receives;
 
-   assert( usd_pays == usd.amount_for_sale() ||
-           core_pays == core.amount_for_sale() );
-
-   // Be here, it's possible that taker is paying something for nothing due to partially filled in last loop.
-   // In this case, we see it as filled and cancel it later
-   // The maker won't be paying something for nothing, since if it would, it would have been cancelled already.
-   if( usd_receives.amount == 0 && get_dynamic_global_properties().next_maintenance_time > HARDFORK_CORE_184_TIME )
-      return 1;
+   if( before_hardfork_342 )
+      assert( usd_pays == usd.amount_for_sale() ||
+              core_pays == core.amount_for_sale() );
 
    int result = 0;
-   result |= fill_limit_order( usd, usd_pays, usd_receives, false, match_price, false ); // the first param is taker
+   result |= fill_limit_order( usd, usd_pays, usd_receives, cull_taker, match_price, false ); // the first param is taker
    result |= fill_limit_order( core, core_pays, core_receives, true, match_price, true ) << 1; // the second param is maker
    assert( result != 0 );
    return result;
