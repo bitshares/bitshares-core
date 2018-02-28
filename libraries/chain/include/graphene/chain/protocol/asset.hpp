@@ -144,7 +144,8 @@ namespace graphene { namespace chain {
    bool  operator >= ( const price& a, const price& b );
    bool  operator == ( const price& a, const price& b );
    bool  operator != ( const price& a, const price& b );
-   asset operator *  ( const asset& a, const price& b );
+   asset operator *  ( const asset& a, const price& b ); ///< Multiply and round down
+   asset operator ^  ( const asset& a, const price& b ); ///< Multiply and round up
 
    price operator *  ( const price& p, const ratio_type& r );
    price operator /  ( const price& p, const ratio_type& r );
