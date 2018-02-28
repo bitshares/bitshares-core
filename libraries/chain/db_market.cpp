@@ -60,24 +60,28 @@ void database::globally_settle_asset( const asset_object& mia, const price& sett
    const call_order_index& call_index = get_index_type<call_order_index>();
    const auto& call_price_index = call_index.indices().get<by_price>();
 
+   auto maint_time = get_dynamic_global_properties().next_maintenance_time;
+   bool before_core_hardfork_342 = ( maint_time <= HARDFORK_CORE_342_TIME ); // better rounding
+
    // cancel all call orders and accumulate it into collateral_gathered
    auto call_itr = call_price_index.lower_bound( price::min( bitasset.options.short_backing_asset, mia.id ) );
    auto call_end = call_price_index.upper_bound( price::max( bitasset.options.short_backing_asset, mia.id ) );
+   asset pays;
    while( call_itr != call_end )
    {
-      auto pays = call_itr->get_debt() * settlement_price; // round down, in favor of call order
+      if( before_core_hardfork_342 )
+      {
+         pays = call_itr->get_debt() * settlement_price; // round down, in favor of call order
+
+         // Be here, the call order can be paying nothing
+         if( pays.amount == 0 && !bitasset.is_prediction_market ) // TODO remove this warning after hard fork core-342
+            wlog( "Something for nothing issue (#184, variant E) occurred at block #${block}", ("block",head_block_num()) );
+      }
+      else
+         pays = call_itr->get_debt() ^ settlement_price; // round up, in favor of global settlement fund
 
       if( pays > call_itr->get_collateral() )
          pays = call_itr->get_collateral();
-
-      // Be here, the call order can be paying nothing, in this case, we take at least 1 Satoshi from call order
-      if( pays.amount == 0 && !bitasset.is_prediction_market )
-      {
-         if( get_dynamic_global_properties().next_maintenance_time > HARDFORK_CORE_184_TIME )
-            pays.amount = 1;
-         else // TODO remove this warning after hard fork core-184
-            wlog( "Something for nothing issue (#184, variant E) occurred at block #${block}", ("block",head_block_num()) );
-      }
 
       collateral_gathered += pays;
       const auto&  order = *call_itr;
