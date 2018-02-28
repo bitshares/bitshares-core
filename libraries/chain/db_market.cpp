@@ -579,9 +579,6 @@ int database::match( const limit_order_object& bid, const call_order_object& ask
    FC_ASSERT( bid.receive_asset_id() == ask.collateral_type() );
    FC_ASSERT( bid.for_sale > 0 && ask.debt > 0 && ask.collateral > 0 );
 
-   bool  filled_limit     = false;
-   bool  filled_call      = false;
-
    auto maint_time = get_dynamic_global_properties().next_maintenance_time;
    // TODO remove when we're sure it's always false
    bool before_core_hardfork_342 = ( maint_time <= HARDFORK_CORE_342_TIME ); // better rounding
@@ -964,7 +961,7 @@ bool database::check_call_orders(const asset_object& mia, bool enable_black_swan
              //   so we should cull the order in fill_limit_order() below.
              // The order would receive 0 even at `match_price`, so it would receive 0 at its own price,
              //   so calling maybe_cull_small() will always cull it.
-             call_receives = usd_receives ^ match_price;
+             call_receives = order_receives ^ match_price;
 
           filled_limit = true;
 
