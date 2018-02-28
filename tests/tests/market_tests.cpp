@@ -908,16 +908,16 @@ BOOST_AUTO_TEST_CASE(hard_fork_649_cross_test)
    BOOST_CHECK( !db.find<call_order_object>( call2_id ) );
    BOOST_CHECK( !db.find<call_order_object>( call3_id ) );
 
-   // since least collateral ratio 15.5 < 20, global settlement should at least collateral ratio 15.5/1
-   // so settlement fund should be 15500 + 15500 + 15.5 * 293
-   BOOST_CHECK_EQUAL( 15500*2 + 293 * 155 / 10, usd_id(db).bitasset_data(db).settlement_fund.value );
+   // since least collateral ratio 15.5 < 20, global settlement should execute at price = least collateral ratio 15.5/1
+   // so settlement fund should be 15500 + 15500 + round_up(15.5 * 293)
+   BOOST_CHECK_EQUAL( 15500*2 + (293 * 155 + 9) / 10, usd_id(db).bitasset_data(db).settlement_fund.value );
    // global settlement price should be settlement_fund/(2000+293), but not 15.5/1 due to rounding
-   BOOST_CHECK( price(asset(2293,usd_id),asset(15500*2+293*155/10) ) == usd_id(db).bitasset_data(db).settlement_price );
+   BOOST_CHECK( price(asset(2293,usd_id),asset(15500*2+(293*155+9)/10) ) == usd_id(db).bitasset_data(db).settlement_price );
 
    BOOST_CHECK_EQUAL( 3000-707, get_balance(seller_id, usd_id) );
    BOOST_CHECK_EQUAL( 6464, get_balance(seller_id, core_id) );
    BOOST_CHECK_EQUAL( 0, get_balance(borrower_id, usd_id) );
-   BOOST_CHECK_EQUAL( init_balance-6464-293*155/10, get_balance(borrower_id, core_id) );
+   BOOST_CHECK_EQUAL( init_balance-6464-(293*155+9)/10, get_balance(borrower_id, core_id) );
    BOOST_CHECK_EQUAL( 0, get_balance(borrower2_id, usd_id) );
    BOOST_CHECK_EQUAL( init_balance-15500, get_balance(borrower2_id, core_id) );
    BOOST_CHECK_EQUAL( 0, get_balance(borrower3_id, usd_id) );
