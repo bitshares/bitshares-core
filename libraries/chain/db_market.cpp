@@ -527,7 +527,6 @@ int database::match( const limit_order_object& usd, const limit_order_object& co
 
       // Be here, it's possible that taker is paying something for nothing due to partially filled in last loop.
       // In this case, we see it as filled and cancel it later
-      // The maker won't be paying something for nothing, since if it would, it would have been cancelled already.
       if( usd_receives.amount == 0 && maint_time > HARDFORK_CORE_184_TIME )
          return 1;
 
@@ -550,6 +549,7 @@ int database::match( const limit_order_object& usd, const limit_order_object& co
       //Although usd_for_sale is greater than core_for_sale * match_price, core_for_sale == usd_for_sale * match_price
       //Removing the assert seems to be safe -- apparently no asset is created or destroyed.
 
+      // The maker won't be paying something for nothing, since if it would, it would have been cancelled already.
       core_receives = core_for_sale * match_price; // round down, in favor of bigger order
       if( before_hardfork_342 )
          usd_receives = core_for_sale;
@@ -582,51 +582,56 @@ int database::match( const limit_order_object& bid, const call_order_object& ask
    bool  filled_limit     = false;
    bool  filled_call      = false;
 
+   auto maint_time = get_dynamic_global_properties().next_maintenance_time;
+   bool before_hardfork_342 = ( maint_time <= HARDFORK_CORE_342_TIME ); // TODO remove when we're sure it's always false
+
+   bool cull_taker = false;
+
    asset usd_for_sale = bid.amount_for_sale();
    asset usd_to_buy   = ask.get_debt();
 
    asset call_pays, call_receives, order_pays, order_receives;
-   if( usd_to_buy >= usd_for_sale )
+   if( usd_to_buy > usd_for_sale )
    {  // fill limit order
-      call_receives   = usd_for_sale;
       order_receives  = usd_for_sale * match_price; // round down here, in favor of call order
-      call_pays       = order_receives;
-      order_pays      = usd_for_sale;
 
-      filled_limit    = true;
-      filled_call     = ( usd_to_buy == usd_for_sale );
+      // Be here, it's possible that taker is paying something for nothing due to partially filled in last loop.
+      // In this case, we see it as filled and cancel it later
+      // TODO remove hardfork check when we're sure it's always true (but keep the zero amount check)
+      if( order_receives.amount == 0 && maint_time > HARDFORK_CORE_184_TIME )
+         return 1;
+
+      if( before_hardfork_342 ) // TODO remove this "if" when we're sure it's always false (keep the code in else)
+         call_receives = usd_for_sale;
+      else
+      {
+         // The remaining amount in the limit order would be too small,
+         //   so we should cull the order in fill_limit_order() below.
+         // The order would receive 0 even at `match_price`, so it would receive 0 at its own price,
+         //   so calling maybe_cull_small() will always cull it.
+         call_receives = order_receives ^ match_price;
+         cull_taker = true;
+      }
    }
    else
    {  // fill call order
       call_receives  = usd_to_buy;
-      order_receives = usd_to_buy * match_price; // round down here, in favor of call order
-      call_pays      = order_receives;
-      order_pays     = usd_to_buy;
-
-      filled_call    = true;
-   }
-
-   FC_ASSERT( filled_call || filled_limit );
-
-   // Be here, it's possible that taker is paying something for nothing.
-   // The maker won't be paying something for nothing according to code above
-   if( order_receives.amount == 0 && get_dynamic_global_properties().next_maintenance_time > HARDFORK_CORE_184_TIME )
-   {
-      // It's possible that taker is paying something for nothing due to call order too small.
-      // In this case, let the call pay 1 Satoshi
-      if( filled_call )
+      if( before_hardfork_342 ) // TODO remove this "if" when we're sure it's always false (keep the code in else)
       {
-         order_receives.amount = 1;
-         call_pays = order_receives;
+         order_receives = usd_to_buy * match_price; // round down here, in favor of call order
+         // TODO remove hardfork check when we're sure it's always true (but keep the zero amount check)
+         if( order_receives.amount == 0 && maint_time > HARDFORK_CORE_184_TIME )
+            return 1;
       }
-      else
-         // It's possible that taker is paying something for nothing due to partially filled in last loop.
-         // In this case, we see it as filled and cancel it later
-         return 1;
+      else // has hardfork core-342
+         order_receives = usd_to_buy ^ match_price; // round up here, in favor of limit order
    }
+
+   call_pays  = order_receives;
+   order_pays = call_receives;
 
    int result = 0;
-   result |= fill_limit_order( bid, order_pays, order_receives, false, match_price, false ); // the limit order is taker
+   result |= fill_limit_order( bid, order_pays, order_receives, cull_taker, match_price, false ); // the limit order is taker
    result |= fill_call_order( ask, call_pays, call_receives, match_price, true ) << 1;      // the call order is maker
    FC_ASSERT( result != 0 );
    return result;
