@@ -518,7 +518,7 @@ int database::match( const limit_order_object& usd, const limit_order_object& co
    asset usd_pays, usd_receives, core_pays, core_receives;
 
    auto maint_time = get_dynamic_global_properties().next_maintenance_time;
-   bool before_hardfork_342 = ( maint_time <= HARDFORK_CORE_342_TIME );
+   bool before_core_hardfork_342 = ( maint_time <= HARDFORK_CORE_342_TIME ); // better rounding
 
    bool cull_taker = false;
    if( usd_for_sale <= core_for_sale * match_price ) // rounding down here should be fine
@@ -530,7 +530,7 @@ int database::match( const limit_order_object& usd, const limit_order_object& co
       if( usd_receives.amount == 0 && maint_time > HARDFORK_CORE_184_TIME )
          return 1;
 
-      if( before_hardfork_342 )
+      if( before_core_hardfork_342 )
          core_receives = usd_for_sale;
       else
       {
@@ -551,7 +551,7 @@ int database::match( const limit_order_object& usd, const limit_order_object& co
 
       // The maker won't be paying something for nothing, since if it would, it would have been cancelled already.
       core_receives = core_for_sale * match_price; // round down, in favor of bigger order
-      if( before_hardfork_342 )
+      if( before_core_hardfork_342 )
          usd_receives = core_for_sale;
       else
          // The remaining amount in order `core` would be too small,
@@ -562,7 +562,7 @@ int database::match( const limit_order_object& usd, const limit_order_object& co
    core_pays = usd_receives;
    usd_pays  = core_receives;
 
-   if( before_hardfork_342 )
+   if( before_core_hardfork_342 )
       assert( usd_pays == usd.amount_for_sale() ||
               core_pays == core.amount_for_sale() );
 
@@ -583,7 +583,8 @@ int database::match( const limit_order_object& bid, const call_order_object& ask
    bool  filled_call      = false;
 
    auto maint_time = get_dynamic_global_properties().next_maintenance_time;
-   bool before_hardfork_342 = ( maint_time <= HARDFORK_CORE_342_TIME ); // TODO remove when we're sure it's always false
+   // TODO remove when we're sure it's always false
+   bool before_core_hardfork_342 = ( maint_time <= HARDFORK_CORE_342_TIME ); // better rounding
 
    bool cull_taker = false;
 
@@ -601,7 +602,7 @@ int database::match( const limit_order_object& bid, const call_order_object& ask
       if( order_receives.amount == 0 && maint_time > HARDFORK_CORE_184_TIME )
          return 1;
 
-      if( before_hardfork_342 ) // TODO remove this "if" when we're sure it's always false (keep the code in else)
+      if( before_core_hardfork_342 ) // TODO remove this "if" when we're sure it's always false (keep the code in else)
          call_receives = usd_for_sale;
       else
       {
@@ -616,7 +617,7 @@ int database::match( const limit_order_object& bid, const call_order_object& ask
    else
    {  // fill call order
       call_receives  = usd_to_buy;
-      if( before_hardfork_342 ) // TODO remove this "if" when we're sure it's always false (keep the code in else)
+      if( before_core_hardfork_342 ) // TODO remove this "if" when we're sure it's always false (keep the code in else)
       {
          order_receives = usd_to_buy * match_price; // round down here, in favor of call order
          // TODO remove hardfork check when we're sure it's always true (but keep the zero amount check)
@@ -891,9 +892,17 @@ bool database::check_call_orders(const asset_object& mia, bool enable_black_swan
 
     auto head_time = head_block_time();
     auto maint_time = get_dynamic_global_properties().next_maintenance_time;
+
+    bool after_hardfork_436 = ( head_time > HARDFORK_436_TIME );
+
+    bool before_core_hardfork_184 = ( maint_time <= HARDFORK_CORE_184_TIME ); // something-for-nothing
+    bool before_core_hardfork_342 = ( maint_time <= HARDFORK_CORE_342_TIME ); // better rounding
+    bool before_core_hardfork_343 = ( maint_time <= HARDFORK_CORE_343_TIME ); // update call_price after partially filled
+    bool before_core_hardfork_453 = ( maint_time <= HARDFORK_CORE_453_TIME ); // multiple matching issue
+    bool before_core_hardfork_606 = ( maint_time <= HARDFORK_CORE_606_TIME ); // feed always trigger call
+
     while( !check_for_blackswan( mia, enable_black_swan ) && call_itr != call_end )
     {
-       bool  filled_limit_in_loop = false;
        bool  filled_call      = false;
        price match_price;
        asset usd_for_sale;
@@ -908,12 +917,11 @@ bool database::check_call_orders(const asset_object& mia, bool enable_black_swan
        match_price.validate();
 
        // Feed protected (don't call if CR>MCR) https://github.com/cryptonomex/graphene/issues/436
-       if( ( head_time > HARDFORK_436_TIME )
-             && ( bitasset.current_feed.settlement_price > ~call_itr->call_price ) )
+       if( after_hardfork_436 && ( bitasset.current_feed.settlement_price > ~call_itr->call_price ) )
           return margin_called;
 
        // Old rule: margin calls can only buy high https://github.com/bitshares/bitshares-core/issues/606
-       if( maint_time <= HARDFORK_CORE_606_TIME && match_price > ~call_itr->call_price )
+       if( before_core_hardfork_606 && match_price > ~call_itr->call_price )
           return margin_called;
 
        margin_called = true;
@@ -930,76 +938,82 @@ bool database::check_call_orders(const asset_object& mia, bool enable_black_swan
        }
 
        asset call_pays, call_receives, order_pays, order_receives;
-       if( usd_to_buy >= usd_for_sale )
+       if( usd_to_buy > usd_for_sale )
        {  // fill order
-          call_receives   = usd_for_sale;
           order_receives  = usd_for_sale * match_price; // round down, in favor of call order
-          call_pays       = order_receives;
-          order_pays      = usd_for_sale;
 
-          filled_limit_in_loop = true;
+          // Be here, the limit order won't be paying something for nothing, since if it would, it would have
+          //   been cancelled elsewhere already (a maker limit order won't be paying something for nothing):
+          // * after hard fork core-625, the limit order will be always a maker if entered this function;
+          // * before hard fork core-625,
+          //   * when the limit order is a taker, it could be paying something for nothing only when
+          //     the call order is smaller and is too small
+          //   * when the limit order is a maker, it won't be paying something for nothing
+          if( order_receives.amount == 0 ) // TODO this should not happen. remove the warning after confirmed
+          {
+             if( before_core_hardfork_184 )
+                wlog( "Something for nothing issue (#184, variant D-1) occurred at block #${block}", ("block",head_block_num()) );
+             else
+                wlog( "Something for nothing issue (#184, variant D-2) occurred at block #${block}", ("block",head_block_num()) );
+          }
+
+          if( before_core_hardfork_342 )
+             call_receives = usd_for_sale;
+          else
+             // The remaining amount in the limit order would be too small,
+             //   so we should cull the order in fill_limit_order() below.
+             // The order would receive 0 even at `match_price`, so it would receive 0 at its own price,
+             //   so calling maybe_cull_small() will always cull it.
+             call_receives = usd_receives ^ match_price;
+
           filled_limit = true;
-          filled_call           = (usd_to_buy == usd_for_sale);
+
        } else { // fill call
           call_receives  = usd_to_buy;
-          order_receives = usd_to_buy * match_price; // round down, in favor of call order
-          call_pays      = order_receives;
-          order_pays     = usd_to_buy;
+
+          if( before_core_hardfork_342 )
+          {
+             order_receives = usd_to_buy * match_price; // round down, in favor of call order
+
+             // Be here, the limit order would be paying something for nothing
+             if( order_receives.amount == 0 ) // TODO remove warning after hard fork core-342
+                wlog( "Something for nothing issue (#184, variant D) occurred at block #${block}", ("block",head_block_num()) );
+          }
+          else
+             order_receives = usd_to_buy ^ match_price; // round up, in favor of limit order
 
           filled_call    = true;
-          if( filled_limit && maint_time <= HARDFORK_CORE_453_TIME ) // TODO remove warning after hard fork core-453
+
+          if( usd_to_buy == usd_for_sale )
+             filled_limit = true;
+          else if( filled_limit && maint_time <= HARDFORK_CORE_453_TIME ) // TODO remove warning after hard fork core-453
              wlog( "Multiple limit match problem (issue 453) occurred at block #${block}", ("block",head_block_num()) );
        }
 
-       FC_ASSERT( filled_call || filled_limit );
-       FC_ASSERT( filled_call || filled_limit_in_loop );
-
-       // Be here, the call order won't be paying something for nothing according to code above.
-       // After hard fork core-625, the limit order will be always a maker if entered this function,
-       //   so it won't be paying something for nothing, since if it would, it would have been cancelled already.
-       //   However, we need to check if it's culled after partially filled.
-       // Before hard fork core-625,
-       //   when the limit order is a taker, it could be paying something for nothing here;
-       //   when the limit order is a maker, it won't be paying something for nothing,
-       //     however, if it's culled after partially filled, `limit_itr` may be invalidated so should not be dereferenced
-       if( order_receives.amount == 0 )
-       {
-          if( maint_time > HARDFORK_CORE_184_TIME )
-          {
-             if( filled_call ) // call would be completely filled // should always be true
-             {
-                order_receives.amount = 1; // round up to 1 Satoshi
-                call_pays = order_receives;
-             }
-             // else do nothing, since the limit order should have already been cancelled elsewhere
-             else // TODO remove warning after confirmed
-                wlog( "Something for nothing issue (#184, variant D-1) occurred at block #${block}", ("block",head_block_num()) );
-          }
-          else // TODO remove warning after hard fork core-184
-             wlog( "Something for nothing issue (#184, variant D) occurred at block #${block}", ("block",head_block_num()) );
-       }
+       call_pays  = order_receives;
+       order_pays = call_receives;
 
        auto old_call_itr = call_itr;
-       if( filled_call && maint_time <= HARDFORK_CORE_343_TIME )
+       if( filled_call && before_core_hardfork_343 )
           ++call_itr;
        // when for_new_limit_order is true, the call order is maker, otherwise the call order is taker
        fill_call_order(*old_call_itr, call_pays, call_receives, match_price, for_new_limit_order );
-       if( maint_time > HARDFORK_CORE_343_TIME )
+       if( !before_core_hardfork_343 )
           call_itr = call_price_index.lower_bound( call_min );
 
        auto old_limit_itr = limit_itr;
        auto next_limit_itr = std::next( limit_itr );
-       if( filled_limit || maint_time > HARDFORK_CORE_453_TIME )
+       if( filled_limit || !before_core_hardfork_453 )
           ++limit_itr; // after hard fork core-453, will revert if not really filled
        // when for_new_limit_order is true, the limit order is taker, otherwise the limit order is maker
        bool really_filled = fill_limit_order(*old_limit_itr, order_pays, order_receives, true, match_price, !for_new_limit_order );
-       if( !filled_limit && really_filled && maint_time <= HARDFORK_CORE_453_TIME )
+       if( !filled_limit && really_filled && before_core_hardfork_453 )
        {
           // TODO remove warning after hard fork core-453
           wlog( "Cull_small issue occurred at block #${block}", ("block",head_block_num()) );
           limit_itr = next_limit_itr;
        }
-       if( !really_filled && maint_time > HARDFORK_CORE_453_TIME )
+       if( !really_filled && !before_core_hardfork_453 )
           limit_itr = old_limit_itr;
 
     } // while call_itr != call_end
