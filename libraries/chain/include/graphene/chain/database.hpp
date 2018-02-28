@@ -508,6 +508,15 @@ namespace graphene { namespace chain {
          flat_map<uint32_t,block_id_type>  _checkpoints;
 
          node_property_object              _node_property_object;
+
+         /**
+          * Whether database is successfully opened or not.
+          *
+          * The database is considered open when there's no exception
+          * or assertion fail during database::open() method, and
+          * database::close() has not been called, or failed during execution.
+          */
+         bool                              _opened = false;
    };
 
    namespace detail
