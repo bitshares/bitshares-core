@@ -627,7 +627,7 @@ namespace graphene { namespace app {
       auto end = limit_groups.upper_bound( limit_order_group_key( group, min_price ) );
       while( itr != end && result.size() < limit )
       {
-         result.emplace_back( limit_order_group( *itr ) );
+         result.emplace_back( *itr );
          ++itr;
       }
       return result;

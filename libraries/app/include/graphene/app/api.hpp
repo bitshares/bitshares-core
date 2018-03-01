@@ -97,15 +97,12 @@ namespace graphene { namespace app {
    struct limit_order_group
    {
       limit_order_group( const std::pair<limit_order_group_key,limit_order_group_data>& p )
-         :  group( p.first.group ),
-            min_price( p.first.min_price ),
+         :  min_price( p.first.min_price ),
             max_price( p.second.max_price ),
             total_for_sale( p.second.total_for_sale )
             {}
       limit_order_group() {}
 
-      // TODO remove `group` to save bandwidth?
-      uint16_t      group = 0; ///< percentage, 1 means 1 / 10000
       price         min_price; ///< possible lowest price in the group
       price         max_price; ///< possible highest price in the group
       share_type    total_for_sale; ///< total amount of asset for sale, asset id is min_price.base.asset_id
@@ -462,7 +459,7 @@ FC_REFLECT( graphene::app::verify_range_proof_rewind_result,
 FC_REFLECT( graphene::app::history_operation_detail,
             (total_count)(operation_history_objs) )
 FC_REFLECT( graphene::app::limit_order_group,
-            (group)(min_price)(max_price)(total_for_sale) )
+            (min_price)(max_price)(total_for_sale) )
 //FC_REFLECT_TYPENAME( fc::ecc::compact_signature );
 //FC_REFLECT_TYPENAME( fc::ecc::commitment_type );
 
