@@ -291,6 +291,7 @@ void es_objects_plugin::plugin_initialize(const boost::program_options::variable
 
 void es_objects_plugin::plugin_startup()
 {
+   ilog("elasticsearch objects: plugin_startup() begin");
 }
 
 } }
