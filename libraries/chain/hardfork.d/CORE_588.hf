@@ -1,0 +1,4 @@
+// Issue #588: Virtual operations should be excluded from transactions
+#ifndef HARDFORK_588_TIME
+#define HARDFORK_588_TIME (fc::time_point_sec( 1600000000 ))
+#endif

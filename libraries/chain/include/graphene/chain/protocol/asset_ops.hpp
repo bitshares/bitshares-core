@@ -229,7 +229,7 @@ namespace graphene { namespace chain {
 
       account_id_type fee_payer()const { return account; }
       void            validate()const {
-         FC_ASSERT( amount.amount > 0, "Must settle at least 1 unit" );
+         FC_ASSERT(!"Virtual operation");
       }
 
       share_type calculate_fee(const fee_parameters_type& params)const
