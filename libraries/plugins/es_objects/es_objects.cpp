@@ -49,11 +49,6 @@ class es_objects_plugin_impl
 
       void updateDatabase( const vector<object_id_type>& ids , bool isNew);
 
-      graphene::chain::database& database()
-      {
-         return _self.database();
-      }
-
       es_objects_plugin& _self;
       std::string _es_objects_elasticsearch_url = "http://localhost:9200/";
       uint32_t _es_objects_bulk_replay = 1000;
@@ -78,7 +73,7 @@ class es_objects_plugin_impl
 void es_objects_plugin_impl::updateDatabase( const vector<object_id_type>& ids , bool isNew)
 {
 
-   graphene::chain::database &db = database();
+   graphene::chain::database &db = _self.database();
 
    auto block_time = db.head_block_time();
 
