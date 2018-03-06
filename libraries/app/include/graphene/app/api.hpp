@@ -190,10 +190,13 @@ namespace graphene { namespace app {
 
          struct transaction_confirmation
          {
+            transaction_confirmation( transaction_id_type txid, int32_t bn, int32_t tn, bool ex )
+                  : id(txid), block_num(bn), trx_num(tn), expired(ex) {}
+
             transaction_id_type   id;
-            uint32_t              block_num;
-            uint32_t              trx_num;
-            processed_transaction trx;
+            int32_t               block_num = 0;
+            int32_t               trx_num   = 0;
+            bool                  expired   = false;
          };
 
          typedef std::function<void(variant/*transaction_confirmation*/)> confirmation_callback;
@@ -233,6 +236,8 @@ namespace graphene { namespace app {
       private:
          boost::signals2::scoped_connection             _applied_block_connection;
          map<transaction_id_type,confirmation_callback> _callbacks;
+         map<time_point_sec, vector<transaction_id_type> >  _callbacks_expirations;
+         map<transaction_id_type,signed_transaction>        _pending_tx;
          application&                                   _app;
    };
 
@@ -393,7 +398,7 @@ namespace graphene { namespace app {
 }}  // graphene::app
 
 FC_REFLECT( graphene::app::network_broadcast_api::transaction_confirmation,
-        (id)(block_num)(trx_num)(trx) )
+        (id)(block_num)(trx_num)(expired) )
 FC_REFLECT( graphene::app::verify_range_result,
         (success)(min_val)(max_val) )
 FC_REFLECT( graphene::app::verify_range_proof_rewind_result,
