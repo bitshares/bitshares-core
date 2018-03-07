@@ -560,27 +560,8 @@ processed_transaction database::_apply_transaction(const signed_transaction& trx
 { try {
    uint32_t skip = get_node_properties().skip_flags;
 
-   if( true || !(skip&skip_validate) ) {  /* issue #505 explains why this skip_flag is disabled */
-       // remove this and keep only the `else` branch after hardfork
-       if (head_block_time() < HARDFORK_588_TIME) {
-           FC_ASSERT( trx.operations.size() > 0, "A transaction must have at least one operation", ("trx",trx) );
-
-           for( const auto& op : trx.operations ) {
-               /* asset_settle_cancel_operation */
-               int tmp_pos = operation::tag<asset_settle_cancel_operation>::value;
-               if (op.which() == tmp_pos) {
-                   // This rule original get from asset_ops.hpp:
-                   // "FC_ASSERT( amount.amount > 0, "Must settle at least 1 unit" );"
-                   asset amount = op.get<asset_settle_cancel_operation>().amount;
-                   FC_ASSERT(amount.amount > 0, "Must settle at least 1 unit");
-               } else {
-                   operation_validate(op);
-               }
-           }
-       } else {
-           trx.validate();
-       }
-   }
+   if( true || !(skip&skip_validate) )   /* issue #505 explains why this skip_flag is disabled */
+      trx.validate();
 
    auto& trx_idx = get_mutable_index_type<transaction_index>();
    const chain_id_type& chain_id = get_chain_id();

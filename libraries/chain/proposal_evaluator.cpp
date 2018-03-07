@@ -75,7 +75,35 @@ void_result proposal_create_evaluator::do_evaluate(const proposal_create_operati
 
    for( const op_wrapper& op : o.proposed_ops )
       _proposed_trx.operations.push_back(op.op);
+
    _proposed_trx.validate();
+
+   // issue #588
+   //
+   // As a virtual operation which has no evaluator `asset_settle_cancel_operation`
+   // originally won't be packed into blocks, yet its loose `validate()` method
+   // make it able to slip into blocks.
+   //
+   // We need to forbid this operation being packed into blocks via proposal but
+   // this will lead to a hardfork (this operation in proposal will denied by new
+   // node while accept by old node), so a hardfork guard code needed and a
+   // consensus upgrade over all nodes needed in future. And because the
+   // `validate()` method not suitable to check database status, so we put the
+   // code here.
+   //
+   // After the hardfork, all nodes will deny packing this operation into a block,
+   // and then we will check whether exists a proposal containing this kind of
+   // operation, if not exists, we can harden the `validate()` method to deny
+   // it in a earlier stage.
+   //
+   if (d.head_block_time() >= HARDFORK_588_TIME) {
+      for( const auto& op : _proposed_trx.operations ) {
+         int tmp_pos = operation::tag<asset_settle_cancel_operation>::value;
+         if (op.which() == tmp_pos) {
+            FC_ASSERT(!"Virtual operation");
+         }
+      }
+   }
 
    if( d.head_block_time() < HARDFORK_CORE_188_TIME )
    { // TODO: remove after HARDFORK_CORE_188_TIME has passed
