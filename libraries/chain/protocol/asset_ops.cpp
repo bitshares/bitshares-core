@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 Cryptonomex, Inc., and contributors.
+ * Copyright (c) 2015-2018 Cryptonomex, Inc., and contributors.
  *
  * The MIT License
  *
