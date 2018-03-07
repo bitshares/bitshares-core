@@ -254,6 +254,23 @@ void_result asset_fund_fee_pool_evaluator::do_apply(const asset_fund_fee_pool_op
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }
 
+static void validate_new_issuer( const database& d, const asset_object& a, account_id_type new_issuer )
+{ try {
+   FC_ASSERT(d.find_object(new_issuer));
+   if( a.is_market_issued() && new_issuer == GRAPHENE_COMMITTEE_ACCOUNT )
+   {
+      const asset_object& backing = a.bitasset_data(d).options.short_backing_asset(d);
+      if( backing.is_market_issued() )
+      {
+         const asset_object& backing_backing = backing.bitasset_data(d).options.short_backing_asset(d);
+         FC_ASSERT( backing_backing.get_id() == asset_id_type(),
+                    "May not create a blockchain-controlled market asset which is not backed by CORE.");
+      } else
+         FC_ASSERT( backing.get_id() == asset_id_type(),
+                    "May not create a blockchain-controlled market asset which is not backed by CORE.");
+   }
+} FC_CAPTURE_AND_RETHROW( (a)(new_issuer) ) }
+
 void_result asset_update_evaluator::do_evaluate(const asset_update_operation& o)
 { try {
    database& d = db();
@@ -265,19 +282,9 @@ void_result asset_update_evaluator::do_evaluate(const asset_update_operation& o)
 
    if( o.new_issuer )
    {
-      FC_ASSERT(d.find_object(*o.new_issuer));
-      if( a.is_market_issued() && *o.new_issuer == GRAPHENE_COMMITTEE_ACCOUNT )
-      {
-         const asset_object& backing = a.bitasset_data(d).options.short_backing_asset(d);
-         if( backing.is_market_issued() )
-         {
-            const asset_object& backing_backing = backing.bitasset_data(d).options.short_backing_asset(d);
-            FC_ASSERT( backing_backing.get_id() == asset_id_type(),
-                       "May not create a blockchain-controlled market asset which is not backed by CORE.");
-         } else
-            FC_ASSERT( backing.get_id() == asset_id_type(),
-                       "May not create a blockchain-controlled market asset which is not backed by CORE.");
-      }
+      FC_ASSERT( d.head_block_time() < HARDFORK_CORE_199_TIME,
+                 "Since Hardfork #199, updating issuer requires the use of asset_update_issuer_operation.");
+      validate_new_issuer( d, a, *o.new_issuer );
    }
 
    if( (d.head_block_time() < HARDFORK_572_TIME) || (a.dynamic_asset_data_id(d).current_supply != 0) )
@@ -292,7 +299,9 @@ void_result asset_update_evaluator::do_evaluate(const asset_update_operation& o)
              "Flag change is forbidden by issuer permissions");
 
    asset_to_update = &a;
-   FC_ASSERT( o.issuer == a.issuer, "", ("o.issuer", o.issuer)("a.issuer", a.issuer) );
+   FC_ASSERT( o.issuer == a.issuer,
+              "Incorrect issuer for asset! (${o.issuer} != ${a.issuer})",
+              ("o.issuer", o.issuer)("a.issuer", a.issuer) );
 
    const auto& chain_parameters = d.get_global_properties().parameters;
 
@@ -326,6 +335,39 @@ void_result asset_update_evaluator::do_apply(const asset_update_operation& o)
       if( o.new_issuer )
          a.issuer = *o.new_issuer;
       a.options = o.new_options;
+   });
+
+   return void_result();
+} FC_CAPTURE_AND_RETHROW( (o) ) }
+
+void_result asset_update_issuer_evaluator::do_evaluate(const asset_update_issuer_operation& o)
+{ try {
+   database& d = db();
+
+   const asset_object& a = o.asset_to_update(d);
+
+   validate_new_issuer( d, a, o.new_issuer );
+
+   asset_to_update = &a;
+   FC_ASSERT( o.issuer == a.issuer,
+              "Incorrect issuer for asset! (${o.issuer} != ${a.issuer})",
+              ("o.issuer", o.issuer)("a.issuer", a.issuer) );
+
+   if( d.head_block_time() < HARDFORK_CORE_199_TIME )
+   { // TODO: remove after HARDFORK_CORE_199_TIME has passed
+      graphene::chain::impl::hf_199_visitor hf_199;
+      hf_199( o );
+   }
+
+
+   return void_result();
+} FC_CAPTURE_AND_RETHROW((o)) }
+
+void_result asset_update_issuer_evaluator::do_apply(const asset_update_issuer_operation& o)
+{ try {
+   database& d = db();
+   d.modify(*asset_to_update, [&](asset_object& a) {
+      a.issuer = o.new_issuer;
    });
 
    return void_result();
@@ -616,6 +658,33 @@ void_result asset_claim_fees_evaluator::do_apply( const asset_claim_fees_operati
    d.adjust_balance( o.issuer, o.amount_to_claim );
 
    return void_result();
+} FC_CAPTURE_AND_RETHROW( (o) ) }
+
+
+void_result asset_claim_pool_evaluator::do_evaluate( const asset_claim_pool_operation& o )
+{ try {
+    FC_ASSERT( db().head_block_time() >= HARDFORK_CORE_188_TIME,
+         "This operation is only available after Hardfork #188!" );
+    FC_ASSERT( o.asset_id(db()).issuer == o.issuer, "Asset fee pool may only be claimed by the issuer" );
+
+    return void_result();
+} FC_CAPTURE_AND_RETHROW( (o) ) }
+
+void_result asset_claim_pool_evaluator::do_apply( const asset_claim_pool_operation& o )
+{ try {
+    database& d = db();
+
+    const asset_object& a = o.asset_id(d);
+    const asset_dynamic_data_object& addo = a.dynamic_asset_data_id(d);
+    FC_ASSERT( o.amount_to_claim.amount <= addo.fee_pool, "Attempt to claim more fees than is available", ("addo",addo) );
+
+    d.modify( addo, [&o]( asset_dynamic_data_object& _addo  ) {
+        _addo.fee_pool -= o.amount_to_claim.amount;
+    });
+
+    d.adjust_balance( o.issuer, o.amount_to_claim );
+
+    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }
 
 

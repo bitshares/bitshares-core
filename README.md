@@ -86,6 +86,8 @@ BitShares Core bugs can be reported directly to the [issue tracker](https://gith
 
 BitShares UI bugs should be reported to the [UI issue tracker](https://github.com/bitshares/bitshares-ui/issues)
 
+Up to date online Doxygen documentation can be found at [Doxygen](https://bitshares.org/doxygen/hierarchy.html)
+
 Using the API
 -------------
 

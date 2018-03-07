@@ -63,6 +63,7 @@
 #include <graphene/app/api.hpp>
 #include <graphene/chain/asset_object.hpp>
 #include <graphene/chain/protocol/fee_schedule.hpp>
+#include <graphene/chain/hardfork.hpp>
 #include <graphene/utilities/git_revision.hpp>
 #include <graphene/utilities/key_conversion.hpp>
 #include <graphene/utilities/words.hpp>
@@ -565,8 +566,6 @@ public:
    }
    account_object get_account(account_id_type id) const
    {
-      if( _wallet.my_accounts.get<by_id>().count(id) )
-         return *_wallet.my_accounts.get<by_id>().find(id);
       auto rec = _remote_db->get_accounts({id}).front();
       FC_ASSERT(rec);
       return *rec;
@@ -580,19 +579,6 @@ public:
          // It's an ID
          return get_account(*id);
       } else {
-         // It's a name
-         if( _wallet.my_accounts.get<by_name>().count(account_name_or_id) )
-         {
-            auto local_account = *_wallet.my_accounts.get<by_name>().find(account_name_or_id);
-            auto blockchain_account = _remote_db->lookup_account_names({account_name_or_id}).front();
-            FC_ASSERT( blockchain_account );
-            if (local_account.id != blockchain_account->id)
-               elog("my account id ${id} different from blockchain id ${id2}", ("id", local_account.id)("id2", blockchain_account->id));
-            if (local_account.name != blockchain_account->name)
-               elog("my account name ${id} different from blockchain name ${id2}", ("id", local_account.name)("id2", blockchain_account->name));
-
-            return *_wallet.my_accounts.get<by_name>().find(account_name_or_id);
-         }
          auto rec = _remote_db->lookup_account_names({account_name_or_id}).front();
          FC_ASSERT( rec && rec->name == account_name_or_id );
          return *rec;
@@ -866,6 +852,19 @@ public:
 
       return _builder_transactions[transaction_handle] = sign_transaction(_builder_transactions[transaction_handle], broadcast);
    }
+
+   pair<transaction_id_type,signed_transaction> broadcast_transaction(signed_transaction tx)
+   {
+       try {
+           _remote_net_broadcast->broadcast_transaction(tx);
+       }
+       catch (const fc::exception& e) {
+           elog("Caught exception while broadcasting tx ${id}:  ${e}", ("id", tx.id().str())("e", e.to_detail_string()));
+           throw;
+       }
+       return std::make_pair(tx.id(),tx);
+   }
+
    signed_transaction propose_builder_transaction(
       transaction_handle_type handle,
       time_point_sec expiration = time_point::now() + fc::minutes(1),
@@ -1160,6 +1159,8 @@ public:
       optional<account_id_type> new_issuer_account_id;
       if (new_issuer)
       {
+        FC_ASSERT( _remote_db->get_dynamic_global_properties().time < HARDFORK_CORE_199_TIME,
+              "The use of 'new_issuer' is no longer supported. Please use `update_asset_issuer' instead!");
         account_object new_issuer_account = get_account(*new_issuer);
         new_issuer_account_id = new_issuer_account.id;
       }
@@ -1177,6 +1178,29 @@ public:
 
       return sign_transaction( tx, broadcast );
    } FC_CAPTURE_AND_RETHROW( (symbol)(new_issuer)(new_options)(broadcast) ) }
+
+   signed_transaction update_asset_issuer(string symbol,
+                                   string new_issuer,
+                                   bool broadcast /* = false */)
+   { try {
+      optional<asset_object> asset_to_update = find_asset(symbol);
+      if (!asset_to_update)
+        FC_THROW("No asset with that symbol exists!");
+
+      account_object new_issuer_account = get_account(new_issuer);
+
+      asset_update_issuer_operation update_issuer;
+      update_issuer.issuer = asset_to_update->issuer;
+      update_issuer.asset_to_update = asset_to_update->id;
+      update_issuer.new_issuer = new_issuer_account.id;
+
+      signed_transaction tx;
+      tx.operations.push_back( update_issuer );
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees);
+      tx.validate();
+
+      return sign_transaction( tx, broadcast );
+   } FC_CAPTURE_AND_RETHROW( (symbol)(new_issuer)(broadcast) ) }
 
    signed_transaction update_bitasset(string symbol,
                                       bitasset_options new_options,
@@ -1268,6 +1292,29 @@ public:
 
       return sign_transaction( tx, broadcast );
    } FC_CAPTURE_AND_RETHROW( (from)(symbol)(amount)(broadcast) ) }
+
+   signed_transaction claim_asset_fee_pool(string symbol,
+                                           string amount,
+                                           bool broadcast /* = false */)
+   { try {
+      optional<asset_object> asset_pool_to_claim = find_asset(symbol);
+      if (!asset_pool_to_claim)
+        FC_THROW("No asset with that symbol exists!");
+      asset_object core_asset = get_asset(asset_id_type());
+
+      asset_claim_pool_operation claim_op;
+      claim_op.issuer = asset_pool_to_claim->issuer;
+      claim_op.asset_id = asset_pool_to_claim->id;
+      claim_op.amount_to_claim = core_asset.amount_from_string(amount).amount;
+
+      signed_transaction tx;
+      tx.operations.push_back( claim_op );
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees);
+      tx.validate();
+
+      return sign_transaction( tx, broadcast );
+   } FC_CAPTURE_AND_RETHROW( (symbol)(amount)(broadcast) ) }
+
 
    signed_transaction reserve_asset(string from,
                                  string amount,
@@ -3043,6 +3090,11 @@ signed_transaction wallet_api::sign_builder_transaction(transaction_handle_type 
    return my->sign_builder_transaction(transaction_handle, broadcast);
 }
 
+pair<transaction_id_type,signed_transaction> wallet_api::broadcast_transaction(signed_transaction tx)
+{
+    return my->broadcast_transaction(tx);
+}
+
 signed_transaction wallet_api::propose_builder_transaction(
    transaction_handle_type handle,
    time_point_sec expiration,
@@ -3301,6 +3353,13 @@ signed_transaction wallet_api::update_asset(string symbol,
    return my->update_asset(symbol, new_issuer, new_options, broadcast);
 }
 
+signed_transaction wallet_api::update_asset_issuer(string symbol,
+                                            string new_issuer,
+                                            bool broadcast /* = false */)
+{
+   return my->update_asset_issuer(symbol, new_issuer, broadcast);
+}
+
 signed_transaction wallet_api::update_bitasset(string symbol,
                                                bitasset_options new_options,
                                                bool broadcast /* = false */)
@@ -3329,6 +3388,13 @@ signed_transaction wallet_api::fund_asset_fee_pool(string from,
                                                    bool broadcast /* = false */)
 {
    return my->fund_asset_fee_pool(from, symbol, amount, broadcast);
+}
+
+signed_transaction wallet_api::claim_asset_fee_pool(string symbol,
+                                                    string amount,
+                                                    bool broadcast /* = false */)
+{
+   return my->claim_asset_fee_pool(symbol, amount, broadcast);
 }
 
 signed_transaction wallet_api::reserve_asset(string from,

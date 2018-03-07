@@ -26,6 +26,9 @@
 #include <graphene/chain/account_object.hpp>
 #include <graphene/chain/protocol/fee_schedule.hpp>
 #include <graphene/chain/exceptions.hpp>
+#include <graphene/chain/asset_evaluator.hpp>
+#include <graphene/chain/hardfork.hpp>
+
 
 #include <fc/smart_ref_impl.hpp>
 
@@ -74,6 +77,18 @@ void_result proposal_create_evaluator::do_evaluate(const proposal_create_operati
    for( const op_wrapper& op : o.proposed_ops )
       _proposed_trx.operations.push_back(op.op);
    _proposed_trx.validate();
+
+   if( d.head_block_time() < HARDFORK_CORE_199_TIME )
+   { // TODO: remove after HARDFORK_CORE_199_TIME has passed
+      graphene::chain::impl::hf_199_visitor hf_199;
+      hf_199( o );
+   }
+
+   if( d.head_block_time() < HARDFORK_CORE_188_TIME )
+   { // TODO: remove after HARDFORK_CORE_188_TIME has passed
+      graphene::chain::impl::hf_188_visitor hf_188;
+      hf_188( o );
+   }
 
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }

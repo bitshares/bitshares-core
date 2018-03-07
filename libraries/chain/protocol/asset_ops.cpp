@@ -126,6 +126,12 @@ void asset_update_operation::validate()const
    FC_ASSERT(dummy.asset_id == asset_id_type());
 }
 
+void asset_update_issuer_operation::validate()const
+{
+   FC_ASSERT( fee.amount >= 0 );
+   FC_ASSERT( issuer != new_issuer );
+}
+
 share_type asset_update_operation::calculate_fee(const asset_update_operation::fee_parameters_type& k)const
 {
    return k.fee + calculate_data_fee( fc::raw::pack_size(*this), k.price_per_kbyte );
@@ -235,6 +241,13 @@ void asset_options::validate()const
 void asset_claim_fees_operation::validate()const {
    FC_ASSERT( fee.amount >= 0 );
    FC_ASSERT( amount_to_claim.amount > 0 );
+}
+
+void asset_claim_pool_operation::validate()const {
+   FC_ASSERT( fee.amount >= 0 );
+   FC_ASSERT( fee.asset_id != asset_id);
+   FC_ASSERT( amount_to_claim.amount > 0 );
+   FC_ASSERT( amount_to_claim.asset_id == asset_id_type());
 }
 
 } } // namespace graphene::chain

@@ -217,14 +217,10 @@ namespace graphene { namespace chain {
          void update_median_feeds(time_point_sec current_time);
    };
 
-   struct by_feed_expiration;
    typedef multi_index_container<
       asset_bitasset_data_object,
       indexed_by<
-         ordered_unique< tag<by_id>, member< object, object_id_type, &object::id > >,
-         ordered_non_unique< tag<by_feed_expiration>,
-            const_mem_fun< asset_bitasset_data_object, time_point_sec, &asset_bitasset_data_object::feed_expiration_time >
-         >
+         ordered_unique< tag<by_id>, member< object, object_id_type, &object::id > >
       >
    > asset_bitasset_data_object_multi_index_type;
    typedef generic_index<asset_bitasset_data_object, asset_bitasset_data_object_multi_index_type> asset_bitasset_data_index;

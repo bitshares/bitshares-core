@@ -213,6 +213,133 @@ BOOST_AUTO_TEST_CASE(asset_claim_fees_test)
    FC_LOG_AND_RETHROW()
 }
 
+BOOST_AUTO_TEST_CASE(asset_claim_pool_test)
+{
+    try
+    {
+        ACTORS((alice)(bob));
+        // Alice and Bob create some user issued assets
+        // Alice deposits BTS to the fee pool
+        // Alice claimes fee pool of her asset and can't claim pool of Bob's asset
+
+        const share_type core_prec = asset::scaled_precision( asset_id_type()(db).precision );
+        const auto& fees = *db.get_global_properties().parameters.current_fees;
+
+        // return number of core shares (times precision)
+        auto _core = [&core_prec]( int64_t x ) -> asset
+        {  return asset( x*core_prec );    };
+
+        const asset_object& alicecoin = create_user_issued_asset( "ALICECOIN", alice,  0 );
+        const asset_object& aliceusd = create_user_issued_asset( "ALICEUSD", alice, 0 );
+
+        asset_id_type alicecoin_id = alicecoin.id;
+        asset_id_type aliceusd_id = aliceusd.id;
+        asset_id_type bobcoin_id = create_user_issued_asset( "BOBCOIN", bob, 0).id;
+
+        // prepare users' balance
+        issue_uia( alice, aliceusd.amount( 20000000 ) );
+        issue_uia( alice, alicecoin.amount( 10000000 ) );
+
+        transfer( committee_account, alice_id, _core(1000) );
+        transfer( committee_account, bob_id, _core(1000) );
+
+        enable_fees();
+
+        auto claim_pool = [&]( const account_id_type issuer, const asset_id_type asset_to_claim,
+                              const asset& amount_to_fund, const asset_object& fee_asset  )
+        {
+            asset_claim_pool_operation claim_op;
+            claim_op.issuer = issuer;
+            claim_op.asset_id = asset_to_claim;
+            claim_op.amount_to_claim = amount_to_fund;
+
+            signed_transaction tx;
+            tx.operations.push_back( claim_op );
+            db.current_fee_schedule().set_fee( tx.operations.back(), fee_asset.options.core_exchange_rate );
+            set_expiration( db, tx );
+            sign( tx, alice_private_key );
+            PUSH_TX( db, tx );
+
+        };
+
+        auto claim_pool_proposal = [&]( const account_id_type issuer, const asset_id_type asset_to_claim,
+                                        const asset& amount_to_fund, const asset_object& fee_asset  )
+        {
+            asset_claim_pool_operation claim_op;
+            claim_op.issuer = issuer;
+            claim_op.asset_id = asset_to_claim;
+            claim_op.amount_to_claim = amount_to_fund;
+
+            const auto& curfees = *db.get_global_properties().parameters.current_fees;
+            const auto& proposal_create_fees = curfees.get<proposal_create_operation>();
+            proposal_create_operation prop;
+            prop.fee_paying_account = alice_id;
+            prop.proposed_ops.emplace_back( claim_op );
+            prop.expiration_time =  db.head_block_time() + fc::days(1);
+            prop.fee = asset( proposal_create_fees.fee + proposal_create_fees.price_per_kbyte );
+
+            signed_transaction tx;
+            tx.operations.push_back( prop );
+            db.current_fee_schedule().set_fee( tx.operations.back(), fee_asset.options.core_exchange_rate );
+            set_expiration( db, tx );
+            sign( tx, alice_private_key );
+            PUSH_TX( db, tx );
+
+        };
+
+        const asset_object& core_asset = asset_id_type()(db);
+
+        // deposit 100 BTS to the fee pool of ALICEUSD asset
+        fund_fee_pool( alice_id(db), aliceusd_id(db), _core(100).amount );
+
+        // Unable to claim pool before the hardfork
+        GRAPHENE_REQUIRE_THROW( claim_pool( alice_id, aliceusd_id, _core(1), core_asset), fc::exception );
+        GRAPHENE_REQUIRE_THROW( claim_pool_proposal( alice_id, aliceusd_id, _core(1), core_asset), fc::exception );
+
+        // Fast forward to hard fork date
+        generate_blocks( HARDFORK_CORE_188_TIME );
+
+        // New reference for core_asset after having produced blocks
+        const asset_object& core_asset_hf = asset_id_type()(db);
+
+        // can't claim pool because it is empty
+        GRAPHENE_REQUIRE_THROW( claim_pool( alice_id, alicecoin_id, _core(1), core_asset_hf), fc::exception );
+
+        // deposit 300 BTS to the fee pool of ALICECOIN asset
+        fund_fee_pool( alice_id(db), alicecoin_id(db), _core(300).amount );
+
+        // Test amount of CORE in fee pools
+        BOOST_CHECK( alicecoin_id(db).dynamic_asset_data_id(db).fee_pool == _core(300).amount );
+        BOOST_CHECK( aliceusd_id(db).dynamic_asset_data_id(db).fee_pool == _core(100).amount );
+
+        // can't claim pool of an asset that doesn't belong to you
+        GRAPHENE_REQUIRE_THROW( claim_pool( alice_id, bobcoin_id, _core(200), core_asset_hf), fc::exception );
+
+        // can't claim more than is available in the fee pool
+        GRAPHENE_REQUIRE_THROW( claim_pool( alice_id, alicecoin_id, _core(400), core_asset_hf ), fc::exception );
+
+        // can't pay fee in the same asset whose pool is being drained
+        GRAPHENE_REQUIRE_THROW( claim_pool( alice_id, alicecoin_id, _core(200), alicecoin_id(db) ), fc::exception );
+
+        // can claim BTS back from the fee pool
+        claim_pool( alice_id, alicecoin_id, _core(200), core_asset_hf );
+        BOOST_CHECK( alicecoin_id(db).dynamic_asset_data_id(db).fee_pool == _core(100).amount );
+
+        // can pay fee in the asset other than the one whose pool is being drained
+        share_type balance_before_claim = get_balance( alice_id, asset_id_type() );
+        claim_pool( alice_id, alicecoin_id, _core(100), aliceusd_id(db) );
+        BOOST_CHECK( alicecoin_id(db).dynamic_asset_data_id(db).fee_pool == _core(0).amount );
+
+        //check balance after claiming pool
+        share_type current_balance = get_balance( alice_id, asset_id_type() );
+        BOOST_CHECK( balance_before_claim + _core(100).amount == current_balance );
+
+        // can create a proposal to claim claim pool after hard fork
+        claim_pool_proposal( alice_id, aliceusd_id, _core(1), core_asset_hf);
+    }
+    FC_LOG_AND_RETHROW()
+}
+
 ///////////////////////////////////////////////////////////////
 // cashback_test infrastructure                              //
 ///////////////////////////////////////////////////////////////
@@ -3478,7 +3605,7 @@ BOOST_AUTO_TEST_CASE( stealth_fba_test )
 BOOST_AUTO_TEST_CASE( defaults_test )
 { try {
     fee_schedule schedule;
-    const limit_order_create_operation::fee_parameters_type default_order_fee;
+    const limit_order_create_operation::fee_parameters_type default_order_fee {};
 
     // no fees set yet -> default
     asset fee = schedule.calculate_fee( limit_order_create_operation() );
@@ -3492,7 +3619,7 @@ BOOST_AUTO_TEST_CASE( defaults_test )
 
     // bid_collateral fee defaults to call_order_update fee
     // call_order_update fee is unset -> default
-    const call_order_update_operation::fee_parameters_type default_short_fee;
+    const call_order_update_operation::fee_parameters_type default_short_fee {};
     call_order_update_operation::fee_parameters_type new_short_fee; new_short_fee.fee = 123;
     fee = schedule.calculate_fee( bid_collateral_operation() );
     BOOST_CHECK_EQUAL( default_short_fee.fee, fee.amount.value );
