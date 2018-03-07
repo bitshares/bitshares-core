@@ -34,6 +34,8 @@
 
 #include <fc/crypto/digest.hpp>
 
+#include <locale>
+
 #include "../common/database_fixture.hpp"
 
 using namespace graphene::chain;
@@ -486,6 +488,18 @@ BOOST_AUTO_TEST_CASE( asset_name_test )
       create_user_issued_asset( "ALPHA2.ONE", alice_id(db), 0 );
       BOOST_CHECK(  has_asset("ALPHA2") );
       BOOST_CHECK( has_asset("ALPHA2.ONE") );
+
+      // locales issue
+      std::locale loc1("en_US.UTF8");
+      std::locale loc2("C");
+      const wchar_t c = L'\u042f';
+      // isalpha will allow non ascii chars if locale is not C
+      BOOST_CHECK_EQUAL( isalpha(c, loc1), true);
+      BOOST_CHECK_EQUAL( isalpha(c, loc2), false);
+
+      // asset_ops->is_valid_symbol will force locale to C in all isX checks
+      GRAPHENE_REQUIRE_THROW( create_user_issued_asset( "ЯAM", sam_id(db), 0 ), fc::exception );
+
    }
    catch(fc::exception& e)
    {
