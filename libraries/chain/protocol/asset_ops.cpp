@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015 Cryptonomex, Inc., and contributors.
+ * Copyright (c) 2018 Cryptonomex, Inc., and contributors.
  *
  * The MIT License
  *
@@ -28,7 +28,7 @@ namespace graphene { namespace chain {
 /**
  *  Valid symbols can contain [A-Z0-9], and '.'
  *  They must start with [A, Z]
- *  They must end with [A, Z]
+ *  They must end with [A, Z] before HF_620 or [A-Z0-9] after it
  *  They can contain a maximum of one '.'
  */
 bool is_valid_symbol( const string& symbol )
@@ -43,9 +43,6 @@ bool is_valid_symbol( const string& symbol )
         return false;
 
     if( !isalpha( symbol.front() ) )
-        return false;
-
-    if( !isalpha( symbol.back() ) )
         return false;
 
     bool dot_already_present = false;

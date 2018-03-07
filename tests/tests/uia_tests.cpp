@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015 Cryptonomex, Inc., and contributors.
+ * Copyright (c) 2018 Cryptonomex, Inc., and contributors.
  *
  * The MIT License
  *
@@ -430,7 +430,7 @@ BOOST_AUTO_TEST_CASE( asset_name_test )
 {
    try
    {
-      ACTORS( (alice)(bob) );
+      ACTORS( (alice)(bob)(sam) );
 
       auto has_asset = [&]( std::string symbol ) -> bool
       {
@@ -469,6 +469,23 @@ BOOST_AUTO_TEST_CASE( asset_name_test )
       // Alice can create it
       create_user_issued_asset( "ALPHA.ONE", alice_id(db), 0 );
       BOOST_CHECK(  has_asset("ALPHA") );    BOOST_CHECK( has_asset("ALPHA.ONE") );
+
+      // Sam tries to create asset ending in a number but fails before hf_620
+      GRAPHENE_REQUIRE_THROW( create_user_issued_asset( "SP500", sam_id(db), 0 ), fc::exception );
+      BOOST_CHECK(  !has_asset("SP500") );
+
+      generate_blocks( HARDFORK_CORE_620_TIME + 1);
+      generate_block();
+
+      // Sam can create asset ending in number after hf_620
+      create_user_issued_asset( "SP500", sam_id(db), 0 );
+      BOOST_CHECK(  has_asset("SP500") );
+
+      // make sure other assets can still be created after hf_620
+      create_user_issued_asset( "ALPHA2", alice_id(db), 0 );
+      create_user_issued_asset( "ALPHA2.ONE", alice_id(db), 0 );
+      BOOST_CHECK(  has_asset("ALPHA2") );
+      BOOST_CHECK( has_asset("ALPHA2.ONE") );
    }
    catch(fc::exception& e)
    {
