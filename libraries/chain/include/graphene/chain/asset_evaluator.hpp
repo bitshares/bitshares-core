@@ -78,6 +78,17 @@ namespace graphene { namespace chain {
          const asset_object* asset_to_update = nullptr;
    };
 
+   class asset_update_issuer_evaluator : public evaluator<asset_update_issuer_evaluator>
+   {
+      public:
+         typedef asset_update_issuer_operation operation_type;
+
+         void_result do_evaluate( const asset_update_issuer_operation& o );
+         void_result do_apply( const asset_update_issuer_operation& o );
+
+         const asset_object* asset_to_update = nullptr;
+   };
+
    class asset_update_bitasset_evaluator : public evaluator<asset_update_bitasset_evaluator>
    {
       public:
@@ -161,8 +172,8 @@ namespace graphene { namespace chain {
          void_result do_apply( const asset_claim_pool_operation& o );
    };
 
-   namespace impl { // TODO: remove after HARDFORK_CORE_188_TIME has passed
-      class hf_188_visitor {
+   namespace impl {
+      class hf_188_visitor { // TODO: remove after HARDFORK_CORE_188_TIME has passed
          public:
             typedef void result_type;
 
@@ -195,6 +206,22 @@ namespace graphene { namespace chain {
                    op.op.visit( *this );
             }
       };
-   }
 
+      class hf_199_visitor {  // TODO: remove after HARDFORK_CORE_199_TIME has passed
+         public:
+            typedef void result_type;
+
+            template<typename T>
+            void operator()( const T& v )const {}
+
+            void operator()( const graphene::chain::asset_update_issuer_operation& v )const {
+               FC_ASSERT( false, "Not allowed until hardfork 199" );
+            }
+
+            void operator()( const graphene::chain::proposal_create_operation& v )const {
+               for( const op_wrapper& op : v.proposed_ops )
+                   op.op.visit( *this );
+            }
+      };
+   }
 } } // graphene::chain

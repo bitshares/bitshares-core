@@ -27,6 +27,7 @@
 #include <graphene/chain/protocol/fee_schedule.hpp>
 #include <graphene/chain/exceptions.hpp>
 #include <graphene/chain/asset_evaluator.hpp>
+#include <graphene/chain/hardfork.hpp>
 
 
 #include <fc/smart_ref_impl.hpp>
@@ -78,6 +79,7 @@ void_result proposal_create_evaluator::do_evaluate(const proposal_create_operati
 
    _proposed_trx.validate();
 
+
    // issue #588
    //
    // As a virtual operation which has no evaluator `asset_settle_cancel_operation`
@@ -101,6 +103,12 @@ void_result proposal_create_evaluator::do_evaluate(const proposal_create_operati
       // kick out the `asset_settle_cancel_operation`
       graphene::chain::impl::hf_588_visitor hf_588;
       hf_588( o );
+   }
+
+   if( d.head_block_time() < HARDFORK_CORE_199_TIME )
+   { // TODO: remove after HARDFORK_CORE_199_TIME has passed
+      graphene::chain::impl::hf_199_visitor hf_199;
+      hf_199( o );
    }
 
    if( d.head_block_time() < HARDFORK_CORE_188_TIME )

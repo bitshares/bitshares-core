@@ -78,6 +78,21 @@ namespace graphene { namespace chain {
    };
 
    template<>
+   class fee_helper<asset_update_issuer_operation> {
+     public:
+      const asset_update_issuer_operation::fee_parameters_type& cget(const flat_set<fee_parameters>& parameters)const
+      {
+         auto itr = parameters.find( asset_update_issuer_operation::fee_parameters_type() );
+         if ( itr != parameters.end() )
+            return itr->get<asset_update_issuer_operation::fee_parameters_type>();
+
+         static asset_update_issuer_operation::fee_parameters_type dummy;
+         dummy.fee = fee_helper<asset_update_operation>().cget(parameters).fee;
+         return dummy;
+      }
+   };
+
+   template<>
    class fee_helper<asset_claim_pool_operation> {
      public:
       const asset_claim_pool_operation::fee_parameters_type& cget(const flat_set<fee_parameters>& parameters)const

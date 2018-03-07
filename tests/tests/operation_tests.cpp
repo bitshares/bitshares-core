@@ -1063,6 +1063,142 @@ BOOST_AUTO_TEST_CASE( update_uia )
    }
 }
 
+BOOST_AUTO_TEST_CASE( update_uia_issuer )
+{
+   using namespace graphene;
+   using namespace graphene::chain;
+   using namespace graphene::chain::test;
+   try {
+
+      // Lambda for creating accounts with 2 different keys
+      auto create_account_2_keys = [&]( const string name,
+           fc::ecc::private_key active,
+           fc::ecc::private_key owner ) {
+
+         trx.operations.push_back(make_account());
+         account_create_operation op = trx.operations.back().get<account_create_operation>();
+         op.name = name;
+         op.active = authority(1, public_key_type(active.get_public_key()), 1);
+         op.owner = authority(1, public_key_type(owner.get_public_key()), 1);
+         signed_transaction trx;
+         trx.operations.push_back(op);
+         db.current_fee_schedule().set_fee( trx.operations.back() );
+         set_expiration( db, trx );
+         PUSH_TX( db, trx, ~0 );
+
+         return get_account(name);
+      };
+
+      auto update_asset_issuer = [&](const asset_object& current,
+                                     const account_object& new_issuer) {
+         asset_update_operation op;
+         op.issuer =  current.issuer;
+         op.asset_to_update = current.id;
+         op.new_options = current.options;
+         op.new_issuer = new_issuer.id;
+         signed_transaction tx;
+         tx.operations.push_back( op );
+         db.current_fee_schedule().set_fee( tx.operations.back() );
+         set_expiration( db, tx );
+         PUSH_TX( db, tx, ~0 );
+      };
+
+      // Lambda for updating the issuer on chain using a particular key
+      auto update_issuer = [&](const asset_id_type asset_id,
+                               const account_object& issuer,
+                               const account_object& new_issuer,
+                               const fc::ecc::private_key& key)
+      {
+         asset_update_issuer_operation op;
+         op.issuer = issuer.id;
+         op.new_issuer = new_issuer.id;
+         op.asset_to_update = asset_id;
+         signed_transaction tx;
+         tx.operations.push_back( op );
+         db.current_fee_schedule().set_fee( tx.operations.back() );
+         set_expiration( db, tx );
+         sign(tx, key);
+         PUSH_TX( db, tx, database::skip_transaction_dupe_check );
+      };
+
+      auto update_issuer_proposal = [&](const asset_id_type asset_id,
+                                        const account_object& issuer,
+                                        const account_object& new_issuer,
+                                        const fc::ecc::private_key& key)
+      {
+          asset_update_issuer_operation op;
+          op.issuer = issuer.id;
+          op.new_issuer = new_issuer.id;
+          op.asset_to_update = asset_id;
+
+          const auto& curfees = *db.get_global_properties().parameters.current_fees;
+          const auto& proposal_create_fees = curfees.get<proposal_create_operation>();
+          proposal_create_operation prop;
+          prop.fee_paying_account = issuer.id;
+          prop.proposed_ops.emplace_back( op );
+          prop.expiration_time =  db.head_block_time() + fc::days(1);
+          prop.fee = asset( proposal_create_fees.fee + proposal_create_fees.price_per_kbyte );
+
+          signed_transaction tx;
+          tx.operations.push_back( prop );
+          db.current_fee_schedule().set_fee( tx.operations.back() );
+          set_expiration( db, tx );
+          sign( tx, key );
+          PUSH_TX( db, tx );
+
+      };
+
+      // Create alice account
+      fc::ecc::private_key alice_owner  = fc::ecc::private_key::regenerate(fc::digest("key1"));
+      fc::ecc::private_key alice_active = fc::ecc::private_key::regenerate(fc::digest("key2"));
+      fc::ecc::private_key bob_owner    = fc::ecc::private_key::regenerate(fc::digest("key3"));
+      fc::ecc::private_key bob_active   = fc::ecc::private_key::regenerate(fc::digest("key4"));
+
+      // Create accounts
+      const auto& alice = create_account_2_keys("alice", alice_active, alice_owner);
+      const auto& bob = create_account_2_keys("bob", bob_active, bob_owner);
+      const account_id_type alice_id = alice.id;
+      const account_id_type bob_id = bob.id;
+
+      // Create asset
+      const auto& test = create_user_issued_asset("UPDATEISSUER", alice_id(db), 0);
+      const asset_id_type test_id = test.id;
+
+      BOOST_TEST_MESSAGE( "can't use this operation before the hardfork" );
+      GRAPHENE_REQUIRE_THROW( update_issuer( test_id, alice_id(db), bob_id(db), alice_owner), fc::exception );
+
+      BOOST_TEST_MESSAGE( "can't use this operation before the hardfork (even if wrapped into a proposal)" );
+      GRAPHENE_REQUIRE_THROW( update_issuer_proposal( test_id, alice_id(db), bob_id(db), alice_owner), fc::exception );
+
+      // Fast Forward to Hardfork time
+      generate_blocks( HARDFORK_CORE_199_TIME );
+
+      BOOST_TEST_MESSAGE( "After hardfork time, proposal goes through (but doesn't execute yet)" );
+      update_issuer_proposal( test_id, alice_id(db), bob_id(db), alice_owner);
+
+      BOOST_TEST_MESSAGE( "Can't change issuer if not my asset" );
+      GRAPHENE_REQUIRE_THROW( update_issuer( test_id, bob_id(db), alice_id(db), bob_active ), fc::exception );
+      GRAPHENE_REQUIRE_THROW( update_issuer( test_id, bob_id(db), alice_id(db), bob_owner ), fc::exception );
+
+      BOOST_TEST_MESSAGE( "Can't change issuer with alice's active key" );
+      GRAPHENE_REQUIRE_THROW( update_issuer( test_id, alice_id(db), bob_id(db), alice_active ), fc::exception );
+
+      BOOST_TEST_MESSAGE( "Old method with asset_update needs to fail" );
+      GRAPHENE_REQUIRE_THROW( update_asset_issuer( test_id(db), bob_id(db)  ), fc::exception );
+
+      BOOST_TEST_MESSAGE( "Updating issuer to bob" );
+      update_issuer( test_id, alice_id(db), bob_id(db), alice_owner );
+
+      BOOST_CHECK(test_id(db).issuer == bob_id);
+
+   }
+   catch( const fc::exception& e )
+   {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
 BOOST_AUTO_TEST_CASE( issue_uia )
 {
    try {

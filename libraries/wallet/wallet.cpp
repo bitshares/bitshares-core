@@ -63,6 +63,7 @@
 #include <graphene/app/api.hpp>
 #include <graphene/chain/asset_object.hpp>
 #include <graphene/chain/protocol/fee_schedule.hpp>
+#include <graphene/chain/hardfork.hpp>
 #include <graphene/utilities/git_revision.hpp>
 #include <graphene/utilities/key_conversion.hpp>
 #include <graphene/utilities/words.hpp>
@@ -1158,6 +1159,8 @@ public:
       optional<account_id_type> new_issuer_account_id;
       if (new_issuer)
       {
+        FC_ASSERT( _remote_db->get_dynamic_global_properties().time < HARDFORK_CORE_199_TIME,
+              "The use of 'new_issuer' is no longer supported. Please use `update_asset_issuer' instead!");
         account_object new_issuer_account = get_account(*new_issuer);
         new_issuer_account_id = new_issuer_account.id;
       }
@@ -1175,6 +1178,29 @@ public:
 
       return sign_transaction( tx, broadcast );
    } FC_CAPTURE_AND_RETHROW( (symbol)(new_issuer)(new_options)(broadcast) ) }
+
+   signed_transaction update_asset_issuer(string symbol,
+                                   string new_issuer,
+                                   bool broadcast /* = false */)
+   { try {
+      optional<asset_object> asset_to_update = find_asset(symbol);
+      if (!asset_to_update)
+        FC_THROW("No asset with that symbol exists!");
+
+      account_object new_issuer_account = get_account(new_issuer);
+
+      asset_update_issuer_operation update_issuer;
+      update_issuer.issuer = asset_to_update->issuer;
+      update_issuer.asset_to_update = asset_to_update->id;
+      update_issuer.new_issuer = new_issuer_account.id;
+
+      signed_transaction tx;
+      tx.operations.push_back( update_issuer );
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees);
+      tx.validate();
+
+      return sign_transaction( tx, broadcast );
+   } FC_CAPTURE_AND_RETHROW( (symbol)(new_issuer)(broadcast) ) }
 
    signed_transaction update_bitasset(string symbol,
                                       bitasset_options new_options,
@@ -3325,6 +3351,13 @@ signed_transaction wallet_api::update_asset(string symbol,
                                             bool broadcast /* = false */)
 {
    return my->update_asset(symbol, new_issuer, new_options, broadcast);
+}
+
+signed_transaction wallet_api::update_asset_issuer(string symbol,
+                                            string new_issuer,
+                                            bool broadcast /* = false */)
+{
+   return my->update_asset_issuer(symbol, new_issuer, broadcast);
 }
 
 signed_transaction wallet_api::update_bitasset(string symbol,
