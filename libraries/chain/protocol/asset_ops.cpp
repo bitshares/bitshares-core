@@ -45,6 +45,9 @@ bool is_valid_symbol( const string& symbol )
     if( !isalpha( symbol.front() ) )
         return false;
 
+    if( !isalnum( symbol.back() ) )
+        return false;
+
     bool dot_already_present = false;
     for( const auto c : symbol )
     {
