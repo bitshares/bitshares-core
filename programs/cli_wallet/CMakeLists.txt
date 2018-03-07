@@ -9,19 +9,15 @@ if( GPERFTOOLS_FOUND )
     list( APPEND PLATFORM_SPECIFIC_LIBS tcmalloc )
 endif()
 
+list(APPEND PLATFORM_SPECIFIC_LIBS editline)
+ExternalProject_Get_Property(project_editline binary_dir)
+add_library(editline STATIC IMPORTED)
+set_property(TARGET editline PROPERTY IMPORTED_LOCATION ${binary_dir}/src/.libs/libeditline${CMAKE_STATIC_LIBRARY_SUFFIX})
+target_link_libraries( cli_wallet
+      PRIVATE graphene_app editline graphene_net graphene_chain graphene_egenesis_brief graphene_utilities graphene_wallet fc ${CMAKE_DL_LIBS} ${PLATFORM_SPECIFIC_LIBS} )
+
 if(MSVC)
-  target_link_libraries( cli_wallet
-         PRIVATE graphene_app graphene_net graphene_chain graphene_egenesis_brief graphene_utilities graphene_wallet fc ${CMAKE_DL_LIBS} ${PLATFORM_SPECIFIC_LIBS} )
   set_source_files_properties( main.cpp PROPERTIES COMPILE_FLAGS "/bigobj" )
-else (MSVC)
-   add_library(editline STATIC IMPORTED)
-   set_target_properties(editline PROPERTIES
-         IMPORTED_LOCATION "${CMAKE_SOURCE_DIR}/libraries/fc/vendor/editline/src/project_editline-build/src/.libs/libeditline.a"
-         INTERFACE_INCLUDE_DIRECTORIES "$(CMAKE_SOURCE_DIR}/libraries/fc/vendor/editline/include")
-
-   target_link_libraries( cli_wallet
-         PRIVATE graphene_app editline graphene_net graphene_chain graphene_egenesis_brief graphene_utilities graphene_wallet fc ${CMAKE_DL_LIBS} ${PLATFORM_SPECIFIC_LIBS} )
-
 endif(MSVC)
 
 install( TARGETS
