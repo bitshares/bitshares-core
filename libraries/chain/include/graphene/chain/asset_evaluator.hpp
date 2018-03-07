@@ -178,6 +178,23 @@ namespace graphene { namespace chain {
                    op.op.visit( *this );
             }
       };
+
+      class hf_588_visitor {
+         public:
+            typedef void result_type;
+
+            template<typename T>
+            void operator()( const T& v )const {}
+
+            void operator()( const graphene::chain::asset_settle_cancel_operation& v )const {
+               FC_ASSERT(!"Virtual operation");
+            }
+
+            void operator()( const graphene::chain::proposal_create_operation& v )const {
+               for( const op_wrapper& op : v.proposed_ops )
+                   op.op.visit( *this );
+            }
+      };
    }
 
 } } // graphene::chain

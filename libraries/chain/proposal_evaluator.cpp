@@ -96,13 +96,11 @@ void_result proposal_create_evaluator::do_evaluate(const proposal_create_operati
    // operation, if not exists, we can harden the `validate()` method to deny
    // it in a earlier stage.
    //
-   if (d.head_block_time() >= HARDFORK_588_TIME) {
-      for( const auto& op : _proposed_trx.operations ) {
-         int tmp_pos = operation::tag<asset_settle_cancel_operation>::value;
-         if (op.which() == tmp_pos) {
-            FC_ASSERT(!"Virtual operation");
-         }
-      }
+   if (d.head_block_time() >= HARDFORK_588_TIME)
+   { 
+      // kick out the `asset_settle_cancel_operation`
+      graphene::chain::impl::hf_588_visitor hf_588;
+      hf_588( o );
    }
 
    if( d.head_block_time() < HARDFORK_CORE_188_TIME )
