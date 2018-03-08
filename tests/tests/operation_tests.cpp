@@ -280,6 +280,66 @@ BOOST_AUTO_TEST_CASE( old_call_order_update_test_after_hardfork_583 )
    }
 }
 
+BOOST_AUTO_TEST_CASE( asset_settle_cancel_operation_test_after_hf588 )
+{
+   // fast jump to hardfork time
+   generate_blocks( HARDFORK_CORE_588_TIME );
+   // one more block to pass hardfork time
+   generate_block();
+   set_expiration( db, trx );
+
+   BOOST_TEST_MESSAGE( "Creating a proposal containing a asset_settle_cancel_operation" );
+   {
+      proposal_create_operation pcop = proposal_create_operation::committee_proposal(
+            db.get_global_properties().parameters, db.head_block_time());
+      pcop.fee_paying_account = GRAPHENE_TEMP_ACCOUNT;
+      pcop.expiration_time = db.head_block_time() + *pcop.review_period_seconds + 10;
+      asset_settle_cancel_operation ascop;
+      ascop.amount.amount = 1;
+      pcop.proposed_ops.emplace_back(ascop);
+      trx.operations.push_back(pcop);
+
+      BOOST_CHECK_EXCEPTION(db.push_transaction(trx), fc::assert_exception,
+            [](fc::assert_exception const &e) -> bool {
+               std::cout << e.to_string() << std::endl;
+               if (e.to_string().find("Virtual operation") != std::string::npos)
+                  return true;
+
+               return false;
+            });
+   }
+
+   BOOST_TEST_MESSAGE( "Creating a recursive proposal containing asset_settle_cancel_operation" );
+   {
+      proposal_create_operation pcop = proposal_create_operation::committee_proposal(
+            db.get_global_properties().parameters, db.head_block_time());
+
+      pcop.fee_paying_account = GRAPHENE_TEMP_ACCOUNT;
+      pcop.expiration_time = db.head_block_time() + *pcop.review_period_seconds + 10;
+      proposal_create_operation inner_pcop = proposal_create_operation::committee_proposal(
+            db.get_global_properties().parameters, db.head_block_time());
+
+      inner_pcop.fee_paying_account = GRAPHENE_TEMP_ACCOUNT;
+      inner_pcop.expiration_time = db.head_block_time() + *inner_pcop.review_period_seconds + 10;
+
+      asset_settle_cancel_operation ascop;
+      ascop.amount.amount = 1;
+      inner_pcop.proposed_ops.emplace_back(ascop);
+      pcop.proposed_ops.emplace_back(inner_pcop);
+
+      trx.operations.push_back(pcop);
+
+      BOOST_CHECK_EXCEPTION(db.push_transaction(trx), fc::assert_exception,
+            [](fc::assert_exception const &e) -> bool {
+               std::cout << e.to_string() << std::endl;
+               if (e.to_string().find("Virtual operation") != std::string::npos)
+                  return true;
+
+               return false;
+            });
+   }
+}
+
 BOOST_AUTO_TEST_CASE( more_call_order_update_test )
 {
    try {

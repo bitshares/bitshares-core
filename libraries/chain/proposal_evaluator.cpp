@@ -98,7 +98,7 @@ void_result proposal_create_evaluator::do_evaluate(const proposal_create_operati
    // operation, if not exists, we can harden the `validate()` method to deny
    // it in a earlier stage.
    //
-   if (d.head_block_time() >= HARDFORK_588_TIME)
+   if (d.head_block_time() > HARDFORK_CORE_588_TIME)
    { 
       // kick out the `asset_settle_cancel_operation`
       graphene::chain::impl::hf_588_visitor hf_588;
