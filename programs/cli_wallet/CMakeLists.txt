@@ -9,7 +9,6 @@ if( GPERFTOOLS_FOUND )
     list( APPEND PLATFORM_SPECIFIC_LIBS tcmalloc )
 endif()
 
-list(APPEND PLATFORM_SPECIFIC_LIBS editline)
 ExternalProject_Get_Property(project_editline binary_dir)
 add_library(editline STATIC IMPORTED)
 set_property(TARGET editline PROPERTY IMPORTED_LOCATION ${binary_dir}/src/.libs/libeditline${CMAKE_STATIC_LIBRARY_SUFFIX})
