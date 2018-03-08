@@ -89,6 +89,11 @@ void_result proposal_create_evaluator::do_evaluate(const proposal_create_operati
       graphene::chain::impl::hf_188_visitor hf_188;
       hf_188( o );
    }
+   if( d.head_block_time() < HARDFORK_CORE_620_TIME )
+   { // TODO: remove after HARDFORK_CORE_620_TIME has passed
+      graphene::chain::impl::hf_620_visitor hf_620;
+      hf_620( o );
+   }
 
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }

@@ -476,12 +476,35 @@ BOOST_AUTO_TEST_CASE( asset_name_test )
       GRAPHENE_REQUIRE_THROW( create_user_issued_asset( "SP500", sam_id(db), 0 ), fc::exception );
       BOOST_CHECK(  !has_asset("SP500") );
 
+      // create a proposal to create asset ending in a number, this will fail before hf_620
+      auto& core = asset_id_type()(db);
+      asset_create_operation op_p;
+      op_p.issuer = alice_id;
+      op_p.symbol = "SP500";
+      op_p.common_options.core_exchange_rate = asset( 1 ) / asset( 1, asset_id_type( 1 ) );
+      op_p.fee = core.amount(0);
+
+      const auto& curfees = *db.get_global_properties().parameters.current_fees;
+      const auto& proposal_create_fees = curfees.get<proposal_create_operation>();
+      proposal_create_operation prop;
+      prop.fee_paying_account = alice_id;
+      prop.proposed_ops.emplace_back( op_p );
+      prop.expiration_time =  db.head_block_time() + fc::days(1);
+      prop.fee = asset( proposal_create_fees.fee + proposal_create_fees.price_per_kbyte );
+
+      signed_transaction tx;
+      tx.operations.push_back( prop );
+      db.current_fee_schedule().set_fee( tx.operations.back() );
+      set_expiration( db, tx );
+      sign( tx, alice_private_key );
+      GRAPHENE_REQUIRE_THROW(PUSH_TX( db, tx ), fc::exception);
+
       generate_blocks( HARDFORK_CORE_620_TIME + 1);
       generate_block();
 
       // Sam can create asset ending in number after hf_620
-      create_user_issued_asset( "SP500", sam_id(db), 0 );
-      BOOST_CHECK(  has_asset("SP500") );
+      create_user_issued_asset( "NIKKEI225", sam_id(db), 0 );
+      BOOST_CHECK(  has_asset("NIKKEI225") );
 
       // make sure other assets can still be created after hf_620
       create_user_issued_asset( "ALPHA2", alice_id(db), 0 );
@@ -497,8 +520,14 @@ BOOST_AUTO_TEST_CASE( asset_name_test )
       BOOST_CHECK_EQUAL( isalpha(c, loc1), true);
       BOOST_CHECK_EQUAL( isalpha(c, loc2), false);
 
-      // asset_ops->is_valid_symbol will force locale to C in all isX checks
-      GRAPHENE_REQUIRE_THROW( create_user_issued_asset( "ЯAM", sam_id(db), 0 ), fc::exception );
+      // proposal to create asset ending in number will now be created successfully as we are in > hf_620 time
+      prop.expiration_time =  db.head_block_time() + fc::days(3);
+      signed_transaction tx_hf620;
+      tx_hf620.operations.push_back( prop );
+      db.current_fee_schedule().set_fee( tx_hf620.operations.back() );
+      set_expiration( db, tx_hf620 );
+      sign( tx_hf620, alice_private_key );
+      PUSH_TX( db, tx_hf620 );
 
    }
    catch(fc::exception& e)
