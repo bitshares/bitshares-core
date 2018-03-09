@@ -170,6 +170,78 @@ BOOST_AUTO_TEST_CASE( price_test )
     BOOST_CHECK(a == c);
     BOOST_CHECK(!(b == c));
 
+    GRAPHENE_REQUIRE_THROW( price(asset(1),  asset(1)) * ratio_type(1,1), fc::exception );
+    GRAPHENE_REQUIRE_THROW( price(asset(0),  asset(1, asset_id_type(1))) * ratio_type(1,1), fc::exception );
+    GRAPHENE_REQUIRE_THROW( price(asset(-1), asset(1, asset_id_type(1))) * ratio_type(1,1), fc::exception );
+    GRAPHENE_REQUIRE_THROW( price(asset(1),  asset(0, asset_id_type(1))) * ratio_type(1,1), fc::exception );
+    GRAPHENE_REQUIRE_THROW( price(asset(1),  asset(-1, asset_id_type(1))) * ratio_type(1,1), fc::exception );
+    GRAPHENE_REQUIRE_THROW( price(asset(1),  asset(1, asset_id_type(1))) * ratio_type(0,1), fc::exception );
+    GRAPHENE_REQUIRE_THROW( price(asset(1),  asset(1, asset_id_type(1))) * ratio_type(-1,1), fc::exception );
+    GRAPHENE_REQUIRE_THROW( price(asset(1),  asset(1, asset_id_type(1))) * ratio_type(1,0), std::domain_error ); // zero denominator
+    GRAPHENE_REQUIRE_THROW( price(asset(1),  asset(1, asset_id_type(1))) * ratio_type(1,-1), fc::exception );
+
+    GRAPHENE_REQUIRE_THROW( price(asset(0),  asset(1, asset_id_type(1))) / ratio_type(1,1), fc::exception );
+    GRAPHENE_REQUIRE_THROW( price(asset(-1), asset(1, asset_id_type(1))) / ratio_type(1,1), fc::exception );
+    GRAPHENE_REQUIRE_THROW( price(asset(1),  asset(0, asset_id_type(1))) / ratio_type(1,1), fc::exception );
+    GRAPHENE_REQUIRE_THROW( price(asset(1),  asset(-1, asset_id_type(1))) / ratio_type(1,1), fc::exception );
+    GRAPHENE_REQUIRE_THROW( price(asset(1),  asset(1, asset_id_type(1))) / ratio_type(0,1), fc::exception );
+    GRAPHENE_REQUIRE_THROW( price(asset(1),  asset(1, asset_id_type(1))) / ratio_type(-1,1), fc::exception );
+    GRAPHENE_REQUIRE_THROW( price(asset(1),  asset(1, asset_id_type(1))) / ratio_type(1,0), std::domain_error ); // zero denominator
+    GRAPHENE_REQUIRE_THROW( price(asset(1),  asset(1, asset_id_type(1))) / ratio_type(1,-1), fc::exception );
+
+    BOOST_CHECK( price(asset(1), asset(1, asset_id_type(1))) * ratio_type(1,1) == price(asset(1), asset(1, asset_id_type(1))) );
+    BOOST_CHECK( price(asset(3), asset(2, asset_id_type(1))) * ratio_type(80,100) == price(asset(12), asset(10, asset_id_type(1))) );
+    BOOST_CHECK( price(asset(3), asset(2, asset_id_type(1))) * ratio_type(120,100) == price(asset(9), asset(5, asset_id_type(1))) );
+
+    BOOST_CHECK( price(asset(1), asset(1, asset_id_type(1))) / ratio_type(1,1) == price(asset(1), asset(1, asset_id_type(1))) );
+    BOOST_CHECK( price(asset(3), asset(2, asset_id_type(1))) / ratio_type(80,100) == price(asset(15), asset(8, asset_id_type(1))) );
+    BOOST_CHECK( price(asset(3), asset(2, asset_id_type(1))) / ratio_type(120,100) == price(asset(30), asset(24, asset_id_type(1))) );
+
+    BOOST_CHECK( price_max(0,1) * ratio_type(2,1) == price_max(0,1) );
+    BOOST_CHECK( price_max(0,1) * ratio_type(125317293,125317292) == price_max(0,1) );
+    BOOST_CHECK( price_max(0,1) * ratio_type(125317293,105317292) == price_max(0,1) );
+    BOOST_CHECK( price_max(0,1) * ratio_type(125317293,25317292) == price_max(0,1) );
+    BOOST_CHECK( price_min(0,1) * ratio_type(1,2) == price_min(0,1) );
+    BOOST_CHECK( price_min(0,1) * ratio_type(98752395,98752396) == price_min(0,1) );
+    BOOST_CHECK( price_min(0,1) * ratio_type(70000000,99999999) == price_min(0,1) );
+    BOOST_CHECK( price_min(0,1) * ratio_type(30000000,99999999) == price_min(0,1) );
+
+    price more_than_max = price_max(0,1);
+    more_than_max.base.amount *= 5;
+    more_than_max.quote.amount *= 3;
+    BOOST_CHECK( more_than_max * ratio_type(125317293,125317292) == more_than_max );
+    BOOST_CHECK( more_than_max * ratio_type(125317293,125317293) == more_than_max );
+    BOOST_CHECK( more_than_max * ratio_type(125317293,125317294) == price_max(0,1) );
+
+    price less_than_min = price_min(0,1);
+    less_than_min.base.amount *= 19;
+    less_than_min.quote.amount *= 47;
+    BOOST_CHECK( less_than_min * ratio_type(125317293,125317292) == price_min(0,1) );
+    BOOST_CHECK( less_than_min * ratio_type(125317293,125317293) == less_than_min );
+    BOOST_CHECK( less_than_min * ratio_type(125317293,125317294) == less_than_min );
+
+    price less_than_max = price_max(0,1);
+    less_than_max.quote.amount = 11;
+    BOOST_CHECK( less_than_max * ratio_type(7,1) == price(asset(less_than_max.base.amount*7/11),asset(1,asset_id_type(1))) );
+    less_than_max.quote.amount = 92131419;
+    BOOST_CHECK( less_than_max * ratio_type(7,1) == price(asset(less_than_max.base.amount*7/92131419),asset(1,asset_id_type(1))) );
+    less_than_max.quote.amount = 192131419;
+    BOOST_CHECK( less_than_max * ratio_type(7,1) == price(asset(less_than_max.base.amount.value*7>>3),asset(192131419>>3,asset_id_type(1))) );
+
+    price more_than_min = price_min(0,1);
+    more_than_min.base.amount = 11;
+    BOOST_CHECK( more_than_min * ratio_type(1,7) == price(asset(1),asset(more_than_min.quote.amount*7/11,asset_id_type(1))) );
+    more_than_min.base.amount = 64823;
+    BOOST_CHECK( more_than_min * ratio_type(31672,102472047) == price(asset(1),asset((fc::uint128(more_than_min.quote.amount.value)*102472047/(64823*31672)).to_uint64(),asset_id_type(1))) );
+    more_than_min.base.amount = 13;
+    BOOST_CHECK( more_than_min * ratio_type(202472059,3) == price(asset((int64_t(13)*202472059)>>1),asset((more_than_min.quote.amount.value*3)>>1,asset_id_type(1))) ); // after >>1, quote = max*1.5, but gcd = 3, so quote/=3 = max/2, less than max
+
+    price less_than_max2 = price_max(0,1);
+    less_than_max2.base.amount *= 2;
+    less_than_max2.quote.amount *= 7;
+    BOOST_CHECK( less_than_max2 * ratio_type(1,1) == less_than_max2 );
+    BOOST_CHECK( less_than_max2 * ratio_type(5,2) == price(asset(less_than_max2.base.amount*5/2/7),asset(1,asset_id_type(1))) );
+
     price_feed dummy;
     dummy.maintenance_collateral_ratio = 1002;
     dummy.maximum_short_squeeze_ratio = 1234;

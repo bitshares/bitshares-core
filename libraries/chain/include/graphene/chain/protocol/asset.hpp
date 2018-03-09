@@ -146,6 +146,14 @@ namespace graphene { namespace chain {
    bool  operator != ( const price& a, const price& b );
    asset operator *  ( const asset& a, const price& b );
 
+   price operator *  ( const price& p, const ratio_type& r );
+   price operator /  ( const price& p, const ratio_type& r );
+
+   inline price& operator *=  ( price& p, const ratio_type& r )
+   { return p = p * r; }
+   inline price& operator /=  ( price& p, const ratio_type& r )
+   { return p = p / r; }
+
    /**
     *  @class price_feed
     *  @brief defines market parameters for margin positions

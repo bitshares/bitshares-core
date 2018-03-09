@@ -104,6 +104,10 @@ namespace graphene { namespace app {
        {
           _asset_api = std::make_shared< asset_api >( std::ref( *_app.chain_database() ) );
        }
+       else if( api_name == "orders_api" )
+       {
+          _orders_api = std::make_shared< orders_api >( std::ref( _app ) );
+       }
        else if( api_name == "debug_api" )
        {
           // can only enable this API if the plugin was loaded
@@ -260,6 +264,12 @@ namespace graphene { namespace app {
     {
        FC_ASSERT(_asset_api);
        return *_asset_api;
+    }
+
+    fc::api<orders_api> login_api::orders() const
+    {
+       FC_ASSERT(_orders_api);
+       return *_orders_api;
     }
 
     fc::api<graphene::debug_witness::debug_api> login_api::debug() const
@@ -587,5 +597,41 @@ namespace graphene { namespace app {
 
       return result;
     }
+
+   // orders_api
+   flat_set<uint16_t> orders_api::get_tracked_groups()const
+   {
+      auto plugin = _app.get_plugin<grouped_orders_plugin>( "grouped_orders" );
+      FC_ASSERT( plugin );
+      return plugin->tracked_groups();
+   }
+
+   vector< limit_order_group > orders_api::get_grouped_limit_orders( asset_id_type base_asset_id,
+                                                               asset_id_type quote_asset_id,
+                                                               uint16_t group,
+                                                               optional<price> start,
+                                                               uint32_t limit )const
+   {
+      FC_ASSERT( limit <= 101 );
+      auto plugin = _app.get_plugin<grouped_orders_plugin>( "grouped_orders" );
+      FC_ASSERT( plugin );
+      const auto& limit_groups = plugin->limit_order_groups();
+      vector< limit_order_group > result;
+
+      price max_price = price::max( base_asset_id, quote_asset_id );
+      price min_price = price::min( base_asset_id, quote_asset_id );
+      if( start.valid() && !start->is_null() )
+         max_price = std::max( std::min( max_price, *start ), min_price );
+
+      auto itr = limit_groups.lower_bound( limit_order_group_key( group, max_price ) );
+      // use an end itrator to try to avoid expensive price comparison
+      auto end = limit_groups.upper_bound( limit_order_group_key( group, min_price ) );
+      while( itr != end && result.size() < limit )
+      {
+         result.emplace_back( *itr );
+         ++itr;
+      }
+      return result;
+   }
 
 } } // graphene::app
