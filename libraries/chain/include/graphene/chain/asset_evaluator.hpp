@@ -26,6 +26,9 @@
 #include <graphene/chain/evaluator.hpp>
 #include <graphene/chain/database.hpp>
 
+#include <graphene/chain/hardfork.hpp>
+
+
 namespace graphene { namespace chain {
 
    class asset_create_evaluator : public evaluator<asset_create_evaluator>
@@ -173,6 +176,7 @@ namespace graphene { namespace chain {
    };
 
    namespace impl {
+      /*
       class hf_188_visitor { // TODO: remove after HARDFORK_CORE_188_TIME has passed
          public:
             typedef void result_type;
@@ -189,7 +193,8 @@ namespace graphene { namespace chain {
                    op.op.visit( *this );
             }
       };
-
+       */
+/*
       class hf_199_visitor {  // TODO: remove after HARDFORK_CORE_199_TIME has passed
          public:
             typedef void result_type;
@@ -206,6 +211,8 @@ namespace graphene { namespace chain {
                    op.op.visit( *this );
             }
       };
+      */
+      /*
       class hf_620_visitor {  // TODO: remove after HARDFORK_CORE_620_TIME has passed
       public:
          typedef void result_type;
@@ -222,5 +229,63 @@ namespace graphene { namespace chain {
                op.op.visit( *this );
          }
       };
+       */
+
+      class hf_visitor {  // generic hardfork visitor
+      public:
+         typedef void result_type;
+
+         template<typename S, typename T>
+         void operator()( const S& s, const T& v )const {}
+
+         // hardfork 620
+         void operator()( const fc::time_point_sec& s, const graphene::chain::asset_create_operation& v )const {
+            if( s < HARDFORK_CORE_620_TIME ) {
+               FC_ASSERT(isalpha(v.symbol.back()), "Asset ${s} must end with alpha character before hardfork 620",
+                         ("s", v.symbol));
+            }
+         }
+
+         // 199
+         void operator()( const fc::time_point_sec& s, const graphene::chain::asset_update_issuer_operation& v )const {
+            if (s < HARDFORK_CORE_199_TIME) {
+               FC_ASSERT(false, "Not allowed until hardfork 199");
+            }
+         }
+         // 188
+         void operator()( const fc::time_point_sec& s, const graphene::chain::asset_claim_pool_operation& v )const {
+            if (s < HARDFORK_CORE_188_TIME) {
+               FC_ASSERT(false, "Not allowed until hardfork 188");
+            }
+         }
+
+         // loop proposal
+         void operator()( const fc::time_point_sec& s, const graphene::chain::proposal_create_operation& v )const {
+            if( s < HARDFORK_CORE_620_TIME || s < HARDFORK_CORE_199_TIME || s < HARDFORK_CORE_188_TIME) {
+               for (const op_wrapper &op : v.proposed_ops)
+                  op.op.visit(*this);
+            }
+         }
+         template<typename T>
+         void operator()( const T& v )const {}
+
+         // 620
+         void operator()( const graphene::chain::asset_create_operation& v )const {
+            FC_ASSERT(isalpha(v.symbol.back()), "Asset ${s} must end with alpha character before hardfork 620",
+                      ("s", v.symbol));
+         }
+
+         // 199
+         void operator()( const graphene::chain::asset_update_issuer_operation& v )const {
+            FC_ASSERT( false, "Not allowed until hardfork 199" );
+         }
+
+         // 188
+         void operator()( const graphene::chain::asset_claim_pool_operation& v )const {
+            FC_ASSERT( false, "Not allowed until hardfork 188" );
+         }
+
+      };
+
    }
 } } // graphene::chain

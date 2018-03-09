@@ -355,8 +355,8 @@ void_result asset_update_issuer_evaluator::do_evaluate(const asset_update_issuer
 
    if( d.head_block_time() < HARDFORK_CORE_199_TIME )
    { // TODO: remove after HARDFORK_CORE_199_TIME has passed
-      graphene::chain::impl::hf_199_visitor hf_199;
-      hf_199( o );
+      graphene::chain::impl::hf_visitor hf_visitor;
+      hf_visitor(d.head_block_time(), o );
    }
 
 
