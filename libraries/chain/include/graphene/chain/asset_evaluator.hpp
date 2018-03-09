@@ -28,7 +28,6 @@
 
 #include <graphene/chain/hardfork.hpp>
 
-
 namespace graphene { namespace chain {
 
    class asset_create_evaluator : public evaluator<asset_create_evaluator>
