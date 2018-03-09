@@ -176,16 +176,16 @@ namespace graphene { namespace chain {
    };
 
    namespace impl {
-      /*
-      class hf_188_visitor { // TODO: remove after HARDFORK_CORE_188_TIME has passed
+
+      class hf_588_visitor {
          public:
             typedef void result_type;
 
             template<typename T>
             void operator()( const T& v )const {}
 
-            void operator()( const graphene::chain::asset_claim_pool_operation& v )const {
-               FC_ASSERT( false, "Not allowed until hardfork 188" );
+            void operator()( const graphene::chain::asset_settle_cancel_operation& v )const {
+               FC_ASSERT(!"Virtual operation");
             }
 
             void operator()( const graphene::chain::proposal_create_operation& v )const {
@@ -193,43 +193,6 @@ namespace graphene { namespace chain {
                    op.op.visit( *this );
             }
       };
-       */
-/*
-      class hf_199_visitor {  // TODO: remove after HARDFORK_CORE_199_TIME has passed
-         public:
-            typedef void result_type;
-
-            template<typename T>
-            void operator()( const T& v )const {}
-
-            void operator()( const graphene::chain::asset_update_issuer_operation& v )const {
-               FC_ASSERT( false, "Not allowed until hardfork 199" );
-            }
-
-            void operator()( const graphene::chain::proposal_create_operation& v )const {
-               for( const op_wrapper& op : v.proposed_ops )
-                   op.op.visit( *this );
-            }
-      };
-      */
-      /*
-      class hf_620_visitor {  // TODO: remove after HARDFORK_CORE_620_TIME has passed
-      public:
-         typedef void result_type;
-
-         template<typename T>
-         void operator()( const T& v )const {}
-
-         void operator()( const graphene::chain::asset_create_operation& v )const {
-            FC_ASSERT(isalpha(v.symbol.back()), "Asset ${s} must end with alpha character before hardfork 620", ("s",v.symbol));
-         }
-
-         void operator()( const graphene::chain::proposal_create_operation& v )const {
-            for( const op_wrapper& op : v.proposed_ops )
-               op.op.visit( *this );
-         }
-      };
-       */
 
       class hf_visitor {  // generic hardfork visitor
       public:
