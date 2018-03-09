@@ -177,78 +177,63 @@ namespace graphene { namespace chain {
 
    namespace impl {
 
-      class hf_588_visitor {
-         public:
-            typedef void result_type;
-
-            template<typename T>
-            void operator()( const T& v )const {}
-
-            void operator()( const graphene::chain::asset_settle_cancel_operation& v )const {
-               FC_ASSERT(!"Virtual operation");
-            }
-
-            void operator()( const graphene::chain::proposal_create_operation& v )const {
-               for( const op_wrapper& op : v.proposed_ops )
-                   op.op.visit( *this );
-            }
-      };
-
       class hf_visitor {  // generic hardfork visitor
       public:
+
          typedef void result_type;
+         fc::time_point_sec block_time;
+         template<typename T>
+         void operator()( const T& v )const {}
 
-         template<typename S, typename T>
-         void operator()( const S& s, const T& v )const {}
-
-         // hardfork 620
-         void operator()( const fc::time_point_sec& s, const graphene::chain::asset_create_operation& v )const {
-            if( s < HARDFORK_CORE_620_TIME ) {
+         // hf_620
+         void operator()( const graphene::chain::asset_create_operation& v )const {
+            if( block_time < HARDFORK_CORE_620_TIME ) {
                FC_ASSERT(isalpha(v.symbol.back()), "Asset ${s} must end with alpha character before hardfork 620",
                          ("s", v.symbol));
             }
          }
-
-         // 199
-         void operator()( const fc::time_point_sec& s, const graphene::chain::asset_update_issuer_operation& v )const {
-            if (s < HARDFORK_CORE_199_TIME) {
+         // hf_199
+         void operator()( const graphene::chain::asset_update_issuer_operation& v )const {
+            if ( block_time < HARDFORK_CORE_199_TIME) {
                FC_ASSERT(false, "Not allowed until hardfork 199");
             }
          }
-         // 188
-         void operator()( const fc::time_point_sec& s, const graphene::chain::asset_claim_pool_operation& v )const {
-            if (s < HARDFORK_CORE_188_TIME) {
+         // hf_188
+         void operator()( const graphene::chain::asset_claim_pool_operation& v )const {
+            if ( block_time < HARDFORK_CORE_188_TIME) {
                FC_ASSERT(false, "Not allowed until hardfork 188");
             }
          }
-
-         // loop proposal
-         void operator()( const fc::time_point_sec& s, const graphene::chain::proposal_create_operation& v )const {
-            if( s < HARDFORK_CORE_620_TIME || s < HARDFORK_CORE_199_TIME || s < HARDFORK_CORE_188_TIME) {
-               for (const op_wrapper &op : v.proposed_ops)
-                  op.op.visit(*this);
+         // hf_588
+         // issue #588
+         //
+         // As a virtual operation which has no evaluator `asset_settle_cancel_operation`
+         // originally won't be packed into blocks, yet its loose `validate()` method
+         // make it able to slip into blocks.
+         //
+         // We need to forbid this operation being packed into blocks via proposal but
+         // this will lead to a hardfork (this operation in proposal will denied by new
+         // node while accept by old node), so a hardfork guard code needed and a
+         // consensus upgrade over all nodes needed in future. And because the
+         // `validate()` method not suitable to check database status, so we put the
+         // code here.
+         //
+         // After the hardfork, all nodes will deny packing this operation into a block,
+         // and then we will check whether exists a proposal containing this kind of
+         // operation, if not exists, we can harden the `validate()` method to deny
+         // it in a earlier stage.
+         //
+         void operator()( const graphene::chain::asset_settle_cancel_operation& v )const {
+            wdump((block_time));
+            if ( block_time > HARDFORK_CORE_588_TIME) {
+               FC_ASSERT(!"Virtual operation");
             }
          }
-         template<typename T>
-         void operator()( const T& v )const {}
-
-         // 620
-         void operator()( const graphene::chain::asset_create_operation& v )const {
-            FC_ASSERT(isalpha(v.symbol.back()), "Asset ${s} must end with alpha character before hardfork 620",
-                      ("s", v.symbol));
+         // loop and self visit in proposals
+         void operator()( const graphene::chain::proposal_create_operation& v )const {
+            for (const op_wrapper &op : v.proposed_ops)
+               op.op.visit(*this);
          }
-
-         // 199
-         void operator()( const graphene::chain::asset_update_issuer_operation& v )const {
-            FC_ASSERT( false, "Not allowed until hardfork 199" );
-         }
-
-         // 188
-         void operator()( const graphene::chain::asset_claim_pool_operation& v )const {
-            FC_ASSERT( false, "Not allowed until hardfork 188" );
-         }
-
       };
-
    }
 } } // graphene::chain
