@@ -27,6 +27,7 @@
 #include <graphene/chain/database.hpp>
 
 #include <graphene/chain/hardfork.hpp>
+#include <locale>
 
 namespace graphene { namespace chain {
 
@@ -187,7 +188,8 @@ namespace graphene { namespace chain {
          // hf_620
          void operator()( const graphene::chain::asset_create_operation& v )const {
             if( block_time < HARDFORK_CORE_620_TIME ) {
-               FC_ASSERT(isalpha(v.symbol.back()), "Asset ${s} must end with alpha character before hardfork 620",
+               std::locale loc("C");
+               FC_ASSERT(isalpha(v.symbol.back(), loc), "Asset ${s} must end with alpha character before hardfork 620",
                          ("s", v.symbol));
             }
          }
