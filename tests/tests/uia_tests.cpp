@@ -457,18 +457,8 @@ BOOST_AUTO_TEST_CASE( asset_name_test )
       // Bob can't create ALPHA.ONE
       GRAPHENE_REQUIRE_THROW( create_user_issued_asset( "ALPHA.ONE", bob_id(db), 0 ), fc::exception );
       BOOST_CHECK(  has_asset("ALPHA") );    BOOST_CHECK( !has_asset("ALPHA.ONE") );
-      if( db.head_block_time() <= HARDFORK_409_TIME )
-      {
-         // Alice can't create ALPHA.ONE before hardfork
-         GRAPHENE_REQUIRE_THROW( create_user_issued_asset( "ALPHA.ONE", alice_id(db), 0 ), fc::exception );
-         BOOST_CHECK(  has_asset("ALPHA") );    BOOST_CHECK( !has_asset("ALPHA.ONE") );
-         generate_blocks( HARDFORK_409_TIME );
-         generate_block();
-         // Bob can't create ALPHA.ONE after hardfork
-         GRAPHENE_REQUIRE_THROW( create_user_issued_asset( "ALPHA.ONE", bob_id(db), 0 ), fc::exception );
-         BOOST_CHECK(  has_asset("ALPHA") );    BOOST_CHECK( !has_asset("ALPHA.ONE") );
-      }
-      // Alice can create it
+
+      // Alice can create ALPHA.ONE
       create_user_issued_asset( "ALPHA.ONE", alice_id(db), 0 );
       BOOST_CHECK(  has_asset("ALPHA") );    BOOST_CHECK( has_asset("ALPHA.ONE") );
 
