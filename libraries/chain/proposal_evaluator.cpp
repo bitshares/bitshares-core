@@ -80,7 +80,7 @@ void_result proposal_create_evaluator::do_evaluate(const proposal_create_operati
    _proposed_trx.validate();
 
    // Calling the generic hardfork visitor
-   fc::time_point_sec block_time = d.get_dynamic_global_properties().next_maintenance_time;
+   fc::time_point_sec block_time = d.head_block_time();
    graphene::chain::impl::operation_hardfork_visitor hf_visitor(block_time);
    hf_visitor( o );
 
