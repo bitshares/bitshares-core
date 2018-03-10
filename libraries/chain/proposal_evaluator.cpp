@@ -80,12 +80,9 @@ void_result proposal_create_evaluator::do_evaluate(const proposal_create_operati
    _proposed_trx.validate();
 
    // Calling the generic hardfork visitor
-   graphene::chain::impl::hf_visitor hf_visitor;
-   hf_visitor.block_time = d.head_block_time();
+   fc::time_point_sec block_time = d.get_dynamic_global_properties().next_maintenance_time;
+   graphene::chain::impl::operation_hardfork_visitor hf_visitor(block_time);
    hf_visitor( o );
-
-
-
 
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }

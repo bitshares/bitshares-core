@@ -357,12 +357,10 @@ void_result asset_update_issuer_evaluator::do_evaluate(const asset_update_issuer
               ("o.issuer", o.issuer)("a.issuer", a.issuer) );
 
    if( d.head_block_time() < HARDFORK_CORE_199_TIME )
-   { // TODO: remove after HARDFORK_CORE_199_TIME has passed
-      graphene::chain::impl::hf_visitor hf_visitor;
-      hf_visitor.block_time = d.head_block_time();
-      hf_visitor( o );
+   {
+      // TODO: remove after HARDFORK_CORE_199_TIME has passed
+      FC_ASSERT(false, "Not allowed until hardfork 199");
    }
-
 
    return void_result();
 } FC_CAPTURE_AND_RETHROW((o)) }
