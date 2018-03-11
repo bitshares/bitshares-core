@@ -41,3 +41,10 @@ object_database/*
 
 *.pyc
 *.pyo
+.idea/.name
+.idea/codeStyles/Project.xml
+.idea/gre-core.iml
+.idea/misc.xml
+.idea/modules.xml
+.idea/vcs.xml
+.idea/workspace.xml
