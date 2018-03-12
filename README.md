@@ -7,7 +7,7 @@ GRE Core
 * [FAQ](#faq)
 * [License](#license)
 
-GRE Core is the GRE blockchain implementation and command-line interface which is based on BitShares(https://github.com/bitshares/bitshares-core/).
+GRE Core is the GRE blockchain implementation and command-line interface which is based on BitShares-core(https://github.com/bitshares/bitshares-core/).
 
 Visit [gref.io](https://www.gref.io/) to learn about GRE.
 
