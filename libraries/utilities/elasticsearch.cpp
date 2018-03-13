@@ -110,13 +110,14 @@ std::vector<std::string> createBulk(std::string index_name, std::string data, st
 {
    std::vector<std::string> bulk;
    std::string create_string = "";
-   if(onlycreate)
-      create_string = "\"op_type\" : \"create\",";
+   if(!onlycreate)
+      create_string = ",\"_id\" : "+id;
 
-   bulk.push_back("{ \"index\" : { \"_index\" : \""+index_name+"\", \"_type\" : \"data\", "+create_string+" \"_id\" : "+id+" } }");
+   bulk.push_back("{ \"index\" : { \"_index\" : \""+index_name+"\", \"_type\" : \"data\" "+create_string+" } }");
    bulk.push_back(data);
 
    return bulk;
 }
+
 
 } } // end namespace graphene::utilities

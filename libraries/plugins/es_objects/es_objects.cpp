@@ -58,16 +58,19 @@ class es_objects_plugin_impl
       bool _es_objects_assets = true;
       bool _es_objects_balances = true;
       bool _es_objects_limit_orders = true;
+      bool _es_objects_asset_bitasset = true;
       bool _es_objects_logs = true;
       CURL *curl; // curl handler
       vector <std::string> bulk;
       vector<std::string> prepare;
+      map<object_id_type, std::string> bitassets;
    private:
       void PrepareProposal(const proposal_object* proposal_object);
       void PrepareAccount(const account_object* account_object);
       void PrepareAsset(const asset_object* asset_object);
       void PrepareBalance(const balance_object* balance_object);
       void PrepareLimit(const limit_order_object* limit_object);
+      void PrepareBitAsset(const asset_bitasset_data_object* bitasset_object);
 };
 
 void es_objects_plugin_impl::updateDatabase( const vector<object_id_type>& ids , bool isNew)
@@ -121,13 +124,18 @@ void es_objects_plugin_impl::updateDatabase( const vector<object_id_type>& ids ,
          if(l != nullptr)
             PrepareLimit(l);
       }
+      else if(value.is<asset_bitasset_data_object>() && _es_objects_asset_bitasset) {
+         auto obj = db.find_object(value);
+         auto ba = static_cast<const asset_bitasset_data_object*>(obj);
+         if(ba != nullptr)
+            PrepareBitAsset(ba);
+      }
    }
 }
 
 void es_objects_plugin_impl::PrepareProposal(const proposal_object* proposal_object)
 {
    proposal_struct prop;
-   prop.id = proposal_object->id;
    prop.expiration_time = proposal_object->expiration_time;
    prop.review_period_time = proposal_object->review_period_time;
    prop.proposed_transaction = fc::json::to_string(proposal_object->proposed_transaction);
@@ -145,7 +153,6 @@ void es_objects_plugin_impl::PrepareProposal(const proposal_object* proposal_obj
 void es_objects_plugin_impl::PrepareAccount(const account_object* account_object)
 {
    account_struct acct;
-   acct.id = account_object->id;
    acct.membership_expiration_date = account_object->membership_expiration_date;
    acct.registrar = account_object->registrar;
    acct.referrer = account_object->referrer;
@@ -171,9 +178,11 @@ void es_objects_plugin_impl::PrepareAccount(const account_object* account_object
 void es_objects_plugin_impl::PrepareAsset(const asset_object* asset_object)
 {
    asset_struct asset;
-   asset.id = asset_object->id;
    asset.symbol = asset_object->symbol;
    asset.issuer = asset_object->issuer;
+   asset.is_market_issued = asset_object->is_market_issued();
+   asset.dynamic_asset_data_id = asset_object->dynamic_asset_data_id;
+   asset.bitasset_data_id = asset_object->bitasset_data_id;
 
    std::string data = fc::json::to_string(asset);
    prepare = graphene::utilities::createBulk("bitshares-asset", data, fc::json::to_string(asset_object->id), 0);
@@ -207,6 +216,32 @@ void es_objects_plugin_impl::PrepareLimit(const limit_order_object* limit_object
    prepare = graphene::utilities::createBulk("bitshares-limitorder", data, fc::json::to_string(limit_object->id), 0);
    bulk.insert(bulk.end(), prepare.begin(), prepare.end());
    prepare.clear();
+}
+
+void es_objects_plugin_impl::PrepareBitAsset(const asset_bitasset_data_object* bitasset_object)
+{
+   if(!bitasset_object->is_prediction_market) {
+
+      auto object_id = bitasset_object->id;
+      auto it = bitassets.find(object_id);
+      if(it == bitassets.end())
+         bitassets[object_id] = fc::json::to_string(bitasset_object->current_feed);
+      else {
+         if(it->second == fc::json::to_string(bitasset_object->current_feed)) return;
+         else bitassets[object_id] = fc::json::to_string(bitasset_object->current_feed);
+      }
+
+      bitasset_struct bitasset;
+
+      bitasset.object_id = bitasset_object->id;
+      bitasset.current_feed = fc::json::to_string(bitasset_object->current_feed);
+      bitasset.current_feed_publication_time = bitasset_object->current_feed_publication_time;
+
+      std::string data = fc::json::to_string(bitasset);
+      prepare = graphene::utilities::createBulk("bitshares-bitasset", data, "", 1);
+      bulk.insert(bulk.end(), prepare.begin(), prepare.end());
+      prepare.clear();
+   }
 }
 
 es_objects_plugin_impl::~es_objects_plugin_impl()
@@ -250,6 +285,7 @@ void es_objects_plugin::plugin_set_program_options(
          ("es-objects-assets", boost::program_options::value<bool>(), "Store asset objects")
          ("es-objects-balances", boost::program_options::value<bool>(), "Store balances objects")
          ("es-objects-limit-orders", boost::program_options::value<bool>(), "Store limit order objects")
+         ("es-objects-asset-bitasset", boost::program_options::value<bool>(), "Store feed data")
 
          ;
    cfg.add(cli);
@@ -286,6 +322,9 @@ void es_objects_plugin::plugin_initialize(const boost::program_options::variable
    }
    if (options.count("es-objects-limit-orders")) {
       my->_es_objects_limit_orders = options["es-objects-limit-orders"].as<bool>();
+   }
+   if (options.count("es-objects-asset-bitasset")) {
+      my->_es_objects_asset_bitasset = options["es-objects-asset-bitasset"].as<bool>();
    }
 }
 
