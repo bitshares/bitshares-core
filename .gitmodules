@@ -1,8 +1,8 @@
 [submodule "docs"]
     path = docs
-    url = https://github.com/bitshares/bitshares-core.wiki.git
+    url = https://github.com/gre-foundation/gre-core.wiki.git
     ignore = dirty
 [submodule "libraries/fc"]
     path = libraries/fc
-    url = https://github.com/bitshares/bitshares-fc.git
+    url = https://github.com/gre-foundation/fc.git
     ignore = dirty
