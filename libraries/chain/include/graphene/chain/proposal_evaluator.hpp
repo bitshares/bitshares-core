@@ -82,7 +82,7 @@ namespace graphene { namespace chain {
          // hf_620
          void operator()( const graphene::chain::asset_create_operation& v )const {
             if( block_time < HARDFORK_CORE_620_TIME ) {
-               std::locale loc("C");
+               static const std::locale& loc = std::locale::classic();
                FC_ASSERT(isalpha(v.symbol.back(), loc), "Asset ${s} must end with alpha character before hardfork 620",
                          ("s", v.symbol));
             }

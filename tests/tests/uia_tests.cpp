@@ -504,7 +504,7 @@ BOOST_AUTO_TEST_CASE( asset_name_test )
 
       // locales issue
       std::locale loc1("en_US.UTF8");
-      std::locale loc2("C");
+      static const std::locale& loc2 = std::locale::classic();
       const wchar_t c = L'\u042f';
       // isalpha will allow non ascii chars if locale is not C
       BOOST_CHECK_EQUAL( isalpha(c, loc1), true);
