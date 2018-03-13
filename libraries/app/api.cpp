@@ -104,6 +104,10 @@ namespace graphene { namespace app {
        {
           _asset_api = std::make_shared< asset_api >( std::ref( *_app.chain_database() ) );
        }
+       else if( api_name == "orders_api" )
+       {
+          _orders_api = std::make_shared< orders_api >( std::ref( _app ) );
+       }
        else if( api_name == "debug_api" )
        {
           // can only enable this API if the plugin was loaded
@@ -262,6 +266,12 @@ namespace graphene { namespace app {
        return *_asset_api;
     }
 
+    fc::api<orders_api> login_api::orders() const
+    {
+       FC_ASSERT(_orders_api);
+       return *_orders_api;
+    }
+
     fc::api<graphene::debug_witness::debug_api> login_api::debug() const
     {
        FC_ASSERT(_debug_api);
@@ -302,26 +312,27 @@ namespace graphene { namespace app {
        const auto& db = *_app.chain_database();
        FC_ASSERT( limit <= 100 );
        vector<operation_history_object> result;
-       const auto& stats = account(db).statistics(db);
-       if( stats.most_recent_op == account_transaction_history_id_type() ) return result;
-       const account_transaction_history_object* node = &stats.most_recent_op(db);
-       if( start == operation_history_id_type() )
-          start = node->operation_id;
+       try {
+          const account_transaction_history_object& node = account(db).statistics(db).most_recent_op(db);
+          if(start == operation_history_id_type() || start.instance.value > node.operation_id.instance.value)
+             start = node.operation_id;
+       } catch(...) { return result; }
 
-       while(node && node->operation_id.instance.value > stop.instance.value && result.size() < limit)
+       const auto& hist_idx = db.get_index_type<account_transaction_history_index>();
+       const auto& by_op_idx = hist_idx.indices().get<by_op>();
+       auto index_start = by_op_idx.begin();
+       auto itr = by_op_idx.lower_bound(boost::make_tuple(account, start));
+
+       while(itr != index_start && itr->account == account && itr->operation_id.instance.value > stop.instance.value && result.size() < limit)
        {
-          if( node->operation_id.instance.value <= start.instance.value )
-             result.push_back( node->operation_id(db) );
-          if( node->next == account_transaction_history_id_type() )
-             node = nullptr;
-          else node = &node->next(db);
+          if(itr->operation_id.instance.value <= start.instance.value)
+             result.push_back(itr->operation_id(db));
+          --itr;
        }
-       if( stop.instance.value == 0 && result.size() < limit )
-       {
-          node = db.find(account_transaction_history_id_type());
-          if( node && node->account == account)
-             result.push_back( node->operation_id(db) );
+       if(stop.instance.value == 0 && result.size() < limit && itr->account == account) {
+         result.push_back(itr->operation_id(db));
        }
+
        return result;
     }
 
@@ -400,6 +411,21 @@ namespace graphene { namespace app {
        auto hist = _app.get_plugin<market_history_plugin>( "market_history" );
        FC_ASSERT( hist );
        return hist->tracked_buckets();
+    }
+
+    history_operation_detail history_api::get_account_history_by_operations(account_id_type account, vector<uint16_t> operation_types, uint32_t start, unsigned limit)
+    {
+        FC_ASSERT(limit <= 100);
+        history_operation_detail result;
+        vector<operation_history_object> objs = get_relative_account_history(account, start, limit, limit + start - 1);
+        std::for_each(objs.begin(), objs.end(), [&](const operation_history_object &o) {
+                    if (operation_types.empty() || find(operation_types.begin(), operation_types.end(), o.op.which()) != operation_types.end()) {
+                        result.operation_history_objs.push_back(o);
+                     }
+                 });
+
+        result.total_count = objs.size();
+        return result;
     }
 
     vector<bucket_object> history_api::get_market_history( asset_id_type a, asset_id_type b,
@@ -571,5 +597,41 @@ namespace graphene { namespace app {
 
       return result;
     }
+
+   // orders_api
+   flat_set<uint16_t> orders_api::get_tracked_groups()const
+   {
+      auto plugin = _app.get_plugin<grouped_orders_plugin>( "grouped_orders" );
+      FC_ASSERT( plugin );
+      return plugin->tracked_groups();
+   }
+
+   vector< limit_order_group > orders_api::get_grouped_limit_orders( asset_id_type base_asset_id,
+                                                               asset_id_type quote_asset_id,
+                                                               uint16_t group,
+                                                               optional<price> start,
+                                                               uint32_t limit )const
+   {
+      FC_ASSERT( limit <= 101 );
+      auto plugin = _app.get_plugin<grouped_orders_plugin>( "grouped_orders" );
+      FC_ASSERT( plugin );
+      const auto& limit_groups = plugin->limit_order_groups();
+      vector< limit_order_group > result;
+
+      price max_price = price::max( base_asset_id, quote_asset_id );
+      price min_price = price::min( base_asset_id, quote_asset_id );
+      if( start.valid() && !start->is_null() )
+         max_price = std::max( std::min( max_price, *start ), min_price );
+
+      auto itr = limit_groups.lower_bound( limit_order_group_key( group, max_price ) );
+      // use an end itrator to try to avoid expensive price comparison
+      auto end = limit_groups.upper_bound( limit_order_group_key( group, min_price ) );
+      while( itr != end && result.size() < limit )
+      {
+         result.emplace_back( *itr );
+         ++itr;
+      }
+      return result;
+   }
 
 } } // graphene::app

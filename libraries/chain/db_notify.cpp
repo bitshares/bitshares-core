@@ -3,12 +3,17 @@
 #include <graphene/chain/protocol/authority.hpp>
 #include <graphene/chain/protocol/operations.hpp>
 #include <graphene/chain/protocol/transaction.hpp>
-#include <graphene/chain/protocol/types.hpp>
 #include <graphene/chain/withdraw_permission_object.hpp>
+#include <graphene/chain/database.hpp>
 #include <graphene/chain/worker_object.hpp>
 #include <graphene/chain/confidential_object.hpp>
 #include <graphene/chain/market_object.hpp>
 #include <graphene/chain/committee_member_object.hpp>
+#include <graphene/chain/witness_object.hpp>
+#include <graphene/chain/proposal_object.hpp>
+#include <graphene/chain/operation_history_object.hpp>
+#include <graphene/chain/vesting_balance_object.hpp>
+#include <graphene/chain/transaction_object.hpp>
 
 using namespace fc;
 using namespace graphene::chain;
@@ -348,6 +353,16 @@ static void get_relevant_accounts( const object* obj, flat_set<account_id_type>&
 
 namespace graphene { namespace chain {
 
+void database::notify_applied_block( const signed_block& block )
+{
+   GRAPHENE_TRY_NOTIFY( applied_block, block )
+}
+
+void database::notify_on_pending_transaction( const signed_transaction& tx )
+{
+   GRAPHENE_TRY_NOTIFY( on_pending_transaction, tx )
+}
+
 void database::notify_changed_objects()
 { try {
    if( _undo_db.enabled() ) 
@@ -367,7 +382,7 @@ void database::notify_changed_objects()
             get_relevant_accounts(obj, new_accounts_impacted);
         }
 
-        new_objects(new_ids, new_accounts_impacted);
+        GRAPHENE_TRY_NOTIFY( new_objects, new_ids, new_accounts_impacted)
       }
 
       // Changed
@@ -381,7 +396,7 @@ void database::notify_changed_objects()
           get_relevant_accounts(item.second.get(), changed_accounts_impacted);
         }
 
-        changed_objects(changed_ids, changed_accounts_impacted);
+        GRAPHENE_TRY_NOTIFY( changed_objects, changed_ids, changed_accounts_impacted)
       }
 
       // Removed
@@ -398,7 +413,7 @@ void database::notify_changed_objects()
           get_relevant_accounts(obj, removed_accounts_impacted);
         }
 
-        removed_objects(removed_ids, removed, removed_accounts_impacted);
+        GRAPHENE_TRY_NOTIFY( removed_objects, removed_ids, removed, removed_accounts_impacted)
       }
    }
 } FC_CAPTURE_AND_LOG( (0) ) }

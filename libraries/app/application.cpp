@@ -432,6 +432,7 @@ namespace detail {
             wild_access.allowed_apis.push_back( "network_broadcast_api" );
             wild_access.allowed_apis.push_back( "history_api" );
             wild_access.allowed_apis.push_back( "crypto_api" );
+            wild_access.allowed_apis.push_back( "orders_api" );
             _apiaccess.permission_map["*"] = wild_access;
          }
 
@@ -537,7 +538,7 @@ namespace detail {
             _is_finished_syncing = true;
             _self->syncing_finished();
          }
-      } FC_CAPTURE_AND_RETHROW( (blk_msg)(sync_mode) ) }
+      } FC_CAPTURE_AND_RETHROW( (blk_msg)(sync_mode) ) return false; }
 
       virtual void handle_transaction(const graphene::net::trx_message& transaction_message) override
       { try {
@@ -988,6 +989,7 @@ void application::initialize(const fc::path& data_dir, const boost::program_opti
       wanted.push_back("witness");
       wanted.push_back("account_history");
       wanted.push_back("market_history");
+      wanted.push_back("grouped_orders");
    }
    int es_ah_conflict_counter = 0;
    for (auto& it : wanted)

@@ -31,6 +31,7 @@
 #include <graphene/delayed_node/delayed_node_plugin.hpp>
 #include <graphene/snapshot/snapshot.hpp>
 #include <graphene/es_objects/es_objects.hpp>
+#include <graphene/grouped_orders/grouped_orders_plugin.hpp>
 
 #include <fc/exception/exception.hpp>
 #include <fc/thread/thread.hpp>
@@ -48,6 +49,11 @@
 #include <boost/algorithm/string/classification.hpp>
 #include <boost/algorithm/string/split.hpp>
 #include <boost/container/flat_set.hpp>
+
+#include <graphene/utilities/git_revision.hpp>
+#include <boost/version.hpp>
+#include <boost/algorithm/string/replace.hpp>
+#include <websocketpp/version.hpp>
 
 #include <iostream>
 #include <fstream>
@@ -180,6 +186,7 @@ int main(int argc, char** argv) {
       app_options.add_options()
             ("help,h", "Print this help message and exit.")
             ("data-dir,d", bpo::value<boost::filesystem::path>()->default_value("witness_node_data_dir"), "Directory containing databases, configuration file, etc.")
+            ("version,v", "Display version information")
             ;
 
       bpo::variables_map options;
@@ -192,6 +199,7 @@ int main(int argc, char** argv) {
       auto delayed_plug = node->register_plugin<delayed_node::delayed_node_plugin>();
       auto snapshot_plug = node->register_plugin<snapshot_plugin::snapshot_plugin>();
       auto es_objects_plug = node->register_plugin<es_objects::es_objects_plugin>();
+      auto grouped_orders_plug = node->register_plugin<grouped_orders::grouped_orders_plugin>();
 
       try
       {
@@ -210,6 +218,16 @@ int main(int argc, char** argv) {
       if( options.count("help") )
       {
          std::cout << app_options << "\n";
+         return 0;
+      }
+      if( options.count("version") )
+      {
+         std::cout << "Version: " << graphene::utilities::git_revision_description << "\n";
+         std::cout << "SHA: " << graphene::utilities::git_revision_sha << "\n";
+         std::cout << "Timestamp: " << fc::get_approximate_relative_time_string(fc::time_point_sec(graphene::utilities::git_revision_unix_timestamp)) << "\n";
+         std::cout << "SSL: " << OPENSSL_VERSION_TEXT << "\n";
+         std::cout << "Boost: " << boost::replace_all_copy(std::string(BOOST_LIB_VERSION), "_", ".") << "\n";
+         std::cout << "Websocket++: " << websocketpp::major_version << "." << websocketpp::minor_version << "." << websocketpp::patch_version << "\n";
          return 0;
       }
 

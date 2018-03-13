@@ -361,6 +361,9 @@ BOOST_AUTO_TEST_CASE( create_account_test )
       REQUIRE_THROW_WITH_VALUE(op, options.votes, boost::assign::list_of<vote_id_type>(vote_id_type("1:19")).convert_to_container<flat_set<vote_id_type>>());
       op.options.num_witness = 0;
       REQUIRE_THROW_WITH_VALUE(op, options.votes, boost::assign::list_of<vote_id_type>(vote_id_type("2:19")).convert_to_container<flat_set<vote_id_type>>());
+      REQUIRE_THROW_WITH_VALUE(op, options.votes, boost::assign::list_of<vote_id_type>(vote_id_type("3:99")).convert_to_container<flat_set<vote_id_type>>());
+      GRAPHENE_REQUIRE_THROW( vote_id_type("2:a"), fc::exception );
+      GRAPHENE_REQUIRE_THROW( vote_id_type(""), fc::exception );
       op.options.num_committee = save_num_committee;
       op.options.num_witness = save_num_witness;
 
@@ -507,7 +510,7 @@ BOOST_AUTO_TEST_CASE( create_committee_member )
       REQUIRE_THROW_WITH_VALUE(op, fee, asset(-600));
       trx.operations.back() = op;
 
-      committee_member_id_type committee_member_id = db.get_index_type<primary_index<simple_index<committee_member_object>>>().get_next_id();
+      committee_member_id_type committee_member_id = db.get_index_type<committee_member_index>().get_next_id();
       PUSH_TX( db, trx, ~0 );
       const committee_member_object& d = committee_member_id(db);
 

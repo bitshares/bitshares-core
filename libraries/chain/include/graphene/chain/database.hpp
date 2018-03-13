@@ -371,7 +371,8 @@ namespace graphene { namespace chain {
          asset match(const call_order_object& call,
                    const force_settlement_object& settle,
                    const price& match_price,
-                   asset max_settlement);
+                   asset max_settlement,
+                   const price& fill_price);
          ///@}
 
          /**
@@ -411,6 +412,8 @@ namespace graphene { namespace chain {
    protected:
          //Mark pop_undo() as protected -- we do not want outside calling pop_undo(); it should call pop_block() instead
          void pop_undo() { object_database::pop_undo(); }
+         void notify_applied_block( const signed_block& block );
+         void notify_on_pending_transaction( const signed_transaction& tx );
          void notify_changed_objects();
 
       private:
@@ -505,6 +508,15 @@ namespace graphene { namespace chain {
          flat_map<uint32_t,block_id_type>  _checkpoints;
 
          node_property_object              _node_property_object;
+
+         /**
+          * Whether database is successfully opened or not.
+          *
+          * The database is considered open when there's no exception
+          * or assertion fail during database::open() method, and
+          * database::close() has not been called, or failed during execution.
+          */
+         bool                              _opened = false;
    };
 
    namespace detail

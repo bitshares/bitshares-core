@@ -247,7 +247,7 @@ processed_transaction database::_push_transaction( const signed_transaction& trx
    temp_session.merge();
 
    // notify anyone listening to pending transactions
-   on_pending_transaction( trx );
+   notify_on_pending_transaction( trx );
    return processed_trx;
 }
 
@@ -286,7 +286,7 @@ processed_transaction database::push_proposal(const proposal_object& proposal)
       {
          _applied_ops.resize( old_applied_ops_size );
       }
-      elog( "e", ("e",e.to_detail_string() ) );
+      elog( "${e}", ("e",e.to_detail_string() ) );
       throw;
    }
 
@@ -538,7 +538,7 @@ void database::_apply_block( const signed_block& next_block )
       apply_debug_updates();
 
    // notify observers that the block has been applied
-   applied_block( next_block ); //emit
+   notify_applied_block( next_block ); //emit
    _applied_ops.clear();
 
    notify_changed_objects();
@@ -631,13 +631,10 @@ operation_result database::apply_operation(transaction_evaluation_state& eval_st
 { try {
    int i_which = op.which();
    uint64_t u_which = uint64_t( i_which );
-   if( i_which < 0 )
-      assert( "Negative operation tag" && false );
-   if( u_which >= _operation_evaluators.size() )
-      assert( "No registered evaluator for this operation" && false );
+   FC_ASSERT( i_which >= 0, "Negative operation tag in operation ${op}", ("op",op) );
+   FC_ASSERT( u_which < _operation_evaluators.size(), "No registered evaluator for operation ${op}", ("op",op) );
    unique_ptr<op_evaluator>& eval = _operation_evaluators[ u_which ];
-   if( !eval )
-      assert( "No registered evaluator for this operation" && false );
+   FC_ASSERT( eval, "No registered evaluator for operation ${op}", ("op",op) );
    auto op_id = push_applied_operation( op );
    auto result = eval->evaluate( eval_state, op, true );
    set_applied_operation_result( op_id, result );

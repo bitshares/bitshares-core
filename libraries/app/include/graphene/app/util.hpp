@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015 Cryptonomex, Inc., and contributors.
+ * Copyright (c) 2018 Abit More, and contributors.
  *
  * The MIT License
  *
@@ -21,23 +21,23 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-#include <fc/io/raw.hpp>
-#include <graphene/chain/index.hpp>
-#include <graphene/chain/database.hpp>
+#pragma once
 
-namespace graphene { namespace chain {
-   void base_primary_index::save_undo( const object& obj )
-   { _db.save_undo( obj ); }
+#include <boost/multiprecision/cpp_int.hpp>
 
-   void base_primary_index::on_add( const object& obj )
-   {
-      _db.save_undo_add( obj );
-      for( auto ob : _observers ) ob->on_add( obj );
-   }
+#include <fc/uint128.hpp>
 
-   void base_primary_index::on_remove( const object& obj )
-   { _db.save_undo_remove( obj ); for( auto ob : _observers ) ob->on_remove( obj ); }
+#include <graphene/chain/protocol/asset.hpp>
 
-   void base_primary_index::on_modify( const object& obj )
-   {for( auto ob : _observers ) ob->on_modify(  obj ); }
-} } // graphene::chain
+namespace graphene { namespace app {
+   using namespace graphene::chain;
+
+   typedef boost::multiprecision::uint256_t u256;
+
+   u256 to256( const fc::uint128& t );
+   fc::uint128 to_capped128( const u256& t );
+   string uint128_amount_to_string( const fc::uint128& amount, const uint8_t precision );
+   string price_to_string( const price& _price, const uint8_t base_precision, const uint8_t quote_precision);
+   string price_diff_percent_string( const price& old_price, const price& new_price );
+
+} }

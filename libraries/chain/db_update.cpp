@@ -290,6 +290,7 @@ void database::clear_expired_orders()
    {
       asset_id_type current_asset = settlement_index.begin()->settlement_asset_id();
       asset max_settlement_volume;
+      price settlement_fill_price;
       bool extra_dump = false;
 
       auto next_asset = [&current_asset, &settlement_index, &extra_dump] {
@@ -388,6 +389,17 @@ void database::clear_expired_orders()
 
          price settlement_price = pays / receives;
 
+         // Calculate fill_price with a bigger volume to reduce impacts of rounding
+         // TODO replace the calculation with new operator*() and/or operator/()
+         if( settlement_fill_price.base.asset_id != current_asset ) // only calculate once per asset
+         {
+            asset tmp_pays = max_settlement_volume;
+            asset tmp_receives = tmp_pays * mia.current_feed.settlement_price;
+            tmp_receives.amount = (fc::uint128_t(tmp_receives.amount.value) *
+                            (GRAPHENE_100_PERCENT - mia.options.force_settlement_offset_percent) / GRAPHENE_100_PERCENT).to_uint64();
+            settlement_fill_price = tmp_pays / tmp_receives;
+         }
+
          auto& call_index = get_index_type<call_order_index>().indices().get<by_collateral>();
          asset settled = mia_object.amount(mia.force_settled_volume);
          // Match against the least collateralized short until the settlement is finished or we reach max settlements
@@ -406,7 +418,7 @@ void database::clear_expired_orders()
                break;
             }
             try {
-               settled += match(*itr, order, settlement_price, max_settlement);
+               settled += match(*itr, order, settlement_price, max_settlement, settlement_fill_price);
             } 
             catch ( const black_swan_exception& e ) { 
                wlog( "black swan detected: ${e}", ("e", e.to_detail_string() ) );

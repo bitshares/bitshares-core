@@ -97,10 +97,13 @@ void transaction::get_required_authorities( flat_set<account_id_type>& active, f
 {
    for( const auto& op : operations )
       operation_get_required_authorities( op, active, owner, other );
+   for( const auto& account : owner )
+      active.erase( account );
 }
 
 
 
+const flat_set<public_key_type> empty_keyset;
 
 struct sign_state
 {
@@ -226,7 +229,7 @@ struct sign_state
 
       sign_state( const flat_set<public_key_type>& sigs,
                   const std::function<const authority*(account_id_type)>& a,
-                  const flat_set<public_key_type>& keys = flat_set<public_key_type>() )
+                  const flat_set<public_key_type>& keys = empty_keyset )
       :get_active(a),available_keys(keys)
       {
          for( const auto& key : sigs )
@@ -325,8 +328,8 @@ set<public_key_type> signed_transaction::get_required_signatures(
    vector<authority> other;
    get_required_authorities( required_active, required_owner, other );
 
-
-   sign_state s(get_signature_keys( chain_id ),get_active,available_keys);
+   flat_set<public_key_type> signature_keys = get_signature_keys( chain_id );
+   sign_state s( signature_keys, get_active, available_keys );
    s.max_recursion = max_recursion_depth;
 
    for( const auto& auth : other )
@@ -334,14 +337,15 @@ set<public_key_type> signed_transaction::get_required_signatures(
    for( auto& owner : required_owner )
       s.check_authority( get_owner( owner ) );
    for( auto& active : required_active )
-      s.check_authority( active  );
+      s.check_authority( active ) || s.check_authority( get_owner( active ) );
 
    s.remove_unused_signatures();
 
    set<public_key_type> result;
 
    for( auto& provided_sig : s.provided_signatures )
-      if( available_keys.find( provided_sig.first ) != available_keys.end() )
+      if( available_keys.find( provided_sig.first ) != available_keys.end()
+            && signature_keys.find( provided_sig.first ) == signature_keys.end() )
          result.insert( provided_sig.first );
 
    return result;

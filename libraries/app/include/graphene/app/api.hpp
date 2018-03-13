@@ -30,6 +30,8 @@
 
 #include <graphene/market_history/market_history_plugin.hpp>
 
+#include <graphene/grouped_orders/grouped_orders_plugin.hpp>
+
 #include <graphene/debug_witness/debug_api.hpp>
 
 #include <graphene/net/node.hpp>
@@ -49,6 +51,7 @@
 namespace graphene { namespace app {
    using namespace graphene::chain;
    using namespace graphene::market_history;
+   using namespace graphene::grouped_orders;
    using namespace fc::ecc;
    using namespace std;
 
@@ -82,6 +85,28 @@ namespace graphene { namespace app {
       asset_id_type   asset_id;
       int             count;
    };
+
+   struct history_operation_detail {
+      uint32_t total_count = 0;
+      vector<operation_history_object> operation_history_objs;
+   };
+
+   /**
+    * @brief summary data of a group of limit orders
+    */
+   struct limit_order_group
+   {
+      limit_order_group( const std::pair<limit_order_group_key,limit_order_group_data>& p )
+         :  min_price( p.first.min_price ),
+            max_price( p.second.max_price ),
+            total_for_sale( p.second.total_for_sale )
+            {}
+      limit_order_group() {}
+
+      price         min_price; ///< possible lowest price in the group
+      price         max_price; ///< possible highest price in the group
+      share_type    total_for_sale; ///< total amount of asset for sale, asset id is min_price.base.asset_id
+   };
    
    /**
     * @brief The history_api class implements the RPC API for account history
@@ -105,6 +130,19 @@ namespace graphene { namespace app {
                                                               operation_history_id_type stop = operation_history_id_type(),
                                                               unsigned limit = 100,
                                                               operation_history_id_type start = operation_history_id_type())const;
+
+         /**
+          * @brief Get operations relevant to the specified account filtering by operation type
+          * @param account The account whose history should be queried
+          * @param operation_types The IDs of the operation we want to get operations in the account( 0 = transfer , 1 = limit order create, ...)
+          * @param start the sequence number where to start looping back throw the history
+          * @param limit the max number of entries to return (from start number)
+          * @return history_operation_detail
+          */
+          history_operation_detail get_account_history_by_operations(account_id_type account,
+                                                                     vector<uint16_t> operation_types,
+                                                                     uint32_t start,
+                                                                     unsigned limit);
 
          /**
           * @brief Get only asked operations relevant to the specified account
@@ -320,6 +358,41 @@ namespace graphene { namespace app {
    };
 
    /**
+    * @brief the orders_api class exposes access to data processed with grouped orders plugin.
+    */
+   class orders_api
+   {
+      public:
+         orders_api(application& app):_app(app){}
+         //virtual ~orders_api() {}
+
+         /**
+          * @breif Get tracked groups configured by the server.
+          * @return A list of numbers which indicate configured groups, of those, 1 means 0.01% diff on price.
+          */
+         flat_set<uint16_t> get_tracked_groups()const;
+
+         /**
+          * @breif Get grouped limit orders in given market.
+          *
+          * @param base_asset_id ID of asset being sold
+          * @param quote_asset_id ID of asset being purchased
+          * @param group Maximum price diff within each order group, have to be one of configured values
+          * @param start Optional price to indicate the first order group to retrieve
+          * @param limit Maximum number of order groups to retrieve (must not exceed 101)
+          * @return The grouped limit orders, ordered from best offered price to worst
+          */
+         vector< limit_order_group > get_grouped_limit_orders( asset_id_type base_asset_id,
+                                                               asset_id_type quote_asset_id,
+                                                               uint16_t group,
+                                                               optional<price> start,
+                                                               uint32_t limit )const;
+
+      private:
+         application& _app;
+   };
+
+   /**
     * @brief The login_api class implements the bottom layer of the RPC API
     *
     * All other APIs must be requested from this API.
@@ -354,6 +427,8 @@ namespace graphene { namespace app {
          fc::api<crypto_api> crypto()const;
          /// @brief Retrieve the asset API
          fc::api<asset_api> asset()const;
+         /// @brief Retrieve the orders API
+         fc::api<orders_api> orders()const;
          /// @brief Retrieve the debug API (if available)
          fc::api<graphene::debug_witness::debug_api> debug()const;
 
@@ -369,6 +444,7 @@ namespace graphene { namespace app {
          optional< fc::api<history_api> >  _history_api;
          optional< fc::api<crypto_api> > _crypto_api;
          optional< fc::api<asset_api> > _asset_api;
+         optional< fc::api<orders_api> > _orders_api;
          optional< fc::api<graphene::debug_witness::debug_api> > _debug_api;
    };
 
@@ -380,6 +456,10 @@ FC_REFLECT( graphene::app::verify_range_result,
         (success)(min_val)(max_val) )
 FC_REFLECT( graphene::app::verify_range_proof_rewind_result,
         (success)(min_val)(max_val)(value_out)(blind_out)(message_out) )
+FC_REFLECT( graphene::app::history_operation_detail,
+            (total_count)(operation_history_objs) )
+FC_REFLECT( graphene::app::limit_order_group,
+            (min_price)(max_price)(total_for_sale) )
 //FC_REFLECT_TYPENAME( fc::ecc::compact_signature );
 //FC_REFLECT_TYPENAME( fc::ecc::commitment_type );
 
@@ -388,6 +468,7 @@ FC_REFLECT( graphene::app::asset_holders, (asset_id)(count) );
 
 FC_API(graphene::app::history_api,
        (get_account_history)
+       (get_account_history_by_operations)
        (get_account_history_operations)
        (get_relative_account_history)
        (get_fill_order_history)
@@ -427,6 +508,10 @@ FC_API(graphene::app::asset_api,
 	   (get_asset_holders_count)
        (get_all_asset_holders)
      )
+FC_API(graphene::app::orders_api,
+       (get_tracked_groups)
+       (get_grouped_limit_orders)
+     )
 FC_API(graphene::app::login_api,
        (login)
        (block)
@@ -436,5 +521,6 @@ FC_API(graphene::app::login_api,
        (network_node)
        (crypto)
        (asset)
+       (orders)
        (debug)
      )

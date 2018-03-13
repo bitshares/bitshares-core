@@ -66,9 +66,9 @@ class database_api_impl;
 
 struct order
 {
-   double                     price;
-   double                     quote;
-   double                     base;
+   string                     price;
+   string                     quote;
+   string                     base;
 };
 
 struct order_book
@@ -84,12 +84,12 @@ struct market_ticker
    time_point_sec             time;
    string                     base;
    string                     quote;
-   double                     latest;
-   double                     lowest_ask;
-   double                     highest_bid;
-   double                     percent_change;
-   double                     base_volume;
-   double                     quote_volume;
+   string                     latest;
+   string                     lowest_ask;
+   string                     highest_bid;
+   string                     percent_change;
+   string                     base_volume;
+   string                     quote_volume;
 };
 
 struct market_volume
@@ -97,17 +97,17 @@ struct market_volume
    time_point_sec             time;
    string                     base;
    string                     quote;
-   double                     base_volume;
-   double                     quote_volume;
+   string                     base_volume;
+   string                     quote_volume;
 };
 
 struct market_trade
 {
    int64_t                    sequence = 0;
    fc::time_point_sec         date;
-   double                     price;
-   double                     amount;
-   double                     value;
+   string                     price;
+   string                     amount;
+   string                     value;
    account_id_type            side1_account_id = GRAPHENE_NULL_ACCOUNT;
    account_id_type            side2_account_id = GRAPHENE_NULL_ACCOUNT;
 };
@@ -620,6 +620,28 @@ class database_api
        */
       vector<blinded_balance_object> get_blinded_balances( const flat_set<commitment_type>& commitments )const;
 
+      /////////////////
+      // Withdrawals //
+      /////////////////
+
+      /**
+       *  @brief Get non expired withdraw permission objects for a giver(ex:recurring customer)
+       *  @param account Account to get objects from
+       *  @param start Withdraw permission objects(1.12.X) before this ID will be skipped in results. Pagination purposes.
+       *  @param limit Maximum number of objects to retrieve
+       *  @return Withdraw permission objects for the account
+       */
+      vector<withdraw_permission_object> get_withdraw_permissions_by_giver(account_id_type account, withdraw_permission_id_type start, uint32_t limit)const;
+
+      /**
+       *  @brief Get non expired withdraw permission objects for a recipient(ex:service provider)
+       *  @param account Account to get objects from
+       *  @param start Withdraw permission objects(1.12.X) before this ID will be skipped in results. Pagination purposes.
+       *  @param limit Maximum number of objects to retrieve
+       *  @return Withdraw permission objects for the account
+       */
+      vector<withdraw_permission_object> get_withdraw_permissions_by_recipient(account_id_type account, withdraw_permission_id_type start, uint32_t limit)const;
+
    private:
       std::shared_ptr< database_api_impl > my;
 };
@@ -731,4 +753,9 @@ FC_API(graphene::app::database_api,
 
    // Blinded balances
    (get_blinded_balances)
+
+   // Withdrawals
+   (get_withdraw_permissions_by_giver)
+   (get_withdraw_permissions_by_recipient)
+
 )
