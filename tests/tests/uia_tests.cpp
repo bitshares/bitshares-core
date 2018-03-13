@@ -463,7 +463,7 @@ BOOST_AUTO_TEST_CASE( asset_name_test )
       BOOST_CHECK(  has_asset("ALPHA") );    BOOST_CHECK( has_asset("ALPHA.ONE") );
 
       // Sam tries to create asset ending in a number but fails before hf_620
-      GRAPHENE_REQUIRE_THROW( create_user_issued_asset( "SP500", sam_id(db), 0 ), fc::exception );
+      GRAPHENE_REQUIRE_THROW( create_user_issued_asset( "SP500", sam_id(db), 0 ), fc::assert_exception );
       BOOST_CHECK(  !has_asset("SP500") );
 
       // create a proposal to create asset ending in a number, this will fail before hf_620
@@ -487,7 +487,7 @@ BOOST_AUTO_TEST_CASE( asset_name_test )
       db.current_fee_schedule().set_fee( tx.operations.back() );
       set_expiration( db, tx );
       sign( tx, alice_private_key );
-      GRAPHENE_REQUIRE_THROW(PUSH_TX( db, tx ), fc::exception);
+      GRAPHENE_REQUIRE_THROW(PUSH_TX( db, tx ), fc::assert_exception);
 
       generate_blocks( HARDFORK_CORE_620_TIME + 1);
       generate_block();
