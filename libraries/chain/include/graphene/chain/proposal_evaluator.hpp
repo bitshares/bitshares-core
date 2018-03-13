@@ -74,8 +74,8 @@ namespace graphene { namespace chain {
       public:
 
          typedef void result_type;
-         fc::time_point_sec block_time;
-         operation_hardfork_visitor(fc::time_point_sec t) { block_time = t; }
+         const fc::time_point_sec& block_time;
+         operation_hardfork_visitor(const fc::time_point_sec t) : block_time(t) {}
          template<typename T>
          void operator()( const T& v )const {}
 

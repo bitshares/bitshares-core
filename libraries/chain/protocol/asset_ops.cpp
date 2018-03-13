@@ -35,7 +35,7 @@ namespace graphene { namespace chain {
  */
 bool is_valid_symbol( const string& symbol )
 {
-   static const std::locale& loc = std::locale::classic();
+    static const std::locale& loc = std::locale::classic();
     if( symbol.size() < GRAPHENE_MIN_ASSET_SYMBOL_LENGTH )
         return false;
 
