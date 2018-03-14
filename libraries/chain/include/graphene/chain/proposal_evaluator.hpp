@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015 Cryptonomex, Inc., and contributors.
+ * Copyright (c) 2015-2018 Cryptonomex, Inc., and contributors.
  *
  * The MIT License
  *
@@ -28,7 +28,6 @@
 #include <graphene/chain/database.hpp>
 #include <graphene/chain/transaction_evaluation_state.hpp>
 #include <graphene/chain/asset_evaluator.hpp>
-#include <graphene/chain/hardfork.hpp>
 
 namespace graphene { namespace chain {
 
@@ -67,68 +66,5 @@ namespace graphene { namespace chain {
 
          const proposal_object* _proposal = nullptr;
    };
-
-   namespace impl {
-
-      class operation_hardfork_visitor {
-      public:
-
-         typedef void result_type;
-         const fc::time_point_sec& block_time;
-         operation_hardfork_visitor(const fc::time_point_sec t) : block_time(t) {}
-         template<typename T>
-         void operator()( const T& v )const {}
-
-         // hf_620
-         void operator()( const graphene::chain::asset_create_operation& v )const {
-            if( block_time < HARDFORK_CORE_620_TIME ) {
-               static const std::locale& loc = std::locale::classic();
-               FC_ASSERT(isalpha(v.symbol.back(), loc), "Asset ${s} must end with alpha character before hardfork 620",
-                         ("s", v.symbol));
-            }
-         }
-         // hf_199
-         void operator()( const graphene::chain::asset_update_issuer_operation& v )const {
-            if ( block_time < HARDFORK_CORE_199_TIME) {
-               FC_ASSERT(false, "Not allowed until hardfork 199");
-            }
-         }
-         // hf_188
-         void operator()( const graphene::chain::asset_claim_pool_operation& v )const {
-            if ( block_time < HARDFORK_CORE_188_TIME) {
-               FC_ASSERT(false, "Not allowed until hardfork 188");
-            }
-         }
-         // hf_588
-         // issue #588
-         //
-         // As a virtual operation which has no evaluator `asset_settle_cancel_operation`
-         // originally won't be packed into blocks, yet its loose `validate()` method
-         // make it able to slip into blocks.
-         //
-         // We need to forbid this operation being packed into blocks via proposal but
-         // this will lead to a hardfork (this operation in proposal will denied by new
-         // node while accept by old node), so a hardfork guard code needed and a
-         // consensus upgrade over all nodes needed in future. And because the
-         // `validate()` method not suitable to check database status, so we put the
-         // code here.
-         //
-         // After the hardfork, all nodes will deny packing this operation into a block,
-         // and then we will check whether exists a proposal containing this kind of
-         // operation, if not exists, we can harden the `validate()` method to deny
-         // it in a earlier stage.
-         //
-         void operator()( const graphene::chain::asset_settle_cancel_operation& v )const {
-            if ( block_time > HARDFORK_CORE_588_TIME) {
-               FC_ASSERT(!"Virtual operation");
-            }
-         }
-         // loop and self visit in proposals
-         void operator()( const graphene::chain::proposal_create_operation& v )const {
-            for (const op_wrapper &op : v.proposed_ops)
-               op.op.visit(*this);
-         }
-      };
-   }
 
 } } // graphene::chain
