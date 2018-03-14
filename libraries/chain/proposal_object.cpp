@@ -23,7 +23,6 @@
  */
 #include <graphene/chain/database.hpp>
 #include <graphene/chain/proposal_object.hpp>
-#include <graphene/chain/hardfork.hpp>
 
 namespace graphene { namespace chain {
 

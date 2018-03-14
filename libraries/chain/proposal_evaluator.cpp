@@ -21,10 +21,10 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
+#include <graphene/chain/database.hpp>
 #include <graphene/chain/proposal_evaluator.hpp>
 #include <graphene/chain/proposal_object.hpp>
-
-#include <fc/smart_ref_impl.hpp>
+#include <graphene/chain/hardfork.hpp>
 
 namespace graphene { namespace chain {
 
@@ -42,9 +42,8 @@ struct proposal_operation_hardfork_visitor
    // hf_620
    void operator()(const graphene::chain::asset_create_operation &v) const {
       if (block_time < HARDFORK_CORE_620_TIME) {
-      static const std::locale &loc = std::locale::classic();
-      FC_ASSERT(isalpha(v.symbol.back(), loc), "Asset ${s} must end with alpha character before hardfork 620",
-                ("s", v.symbol));
+         static const std::locale &loc = std::locale::classic();
+         FC_ASSERT(isalpha(v.symbol.back(), loc), "Asset ${s} must end with alpha character before hardfork 620", ("s", v.symbol));
       }
    }
    // hf_199
