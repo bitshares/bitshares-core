@@ -92,6 +92,12 @@ struct proposal_operation_hardfork_visitor
 void_result proposal_create_evaluator::do_evaluate(const proposal_create_operation& o)
 { try {
    const database& d = db();
+
+   // Calling the proposal hardfork visitor
+   const fc::time_point_sec& block_time = d.head_block_time();
+   proposal_operation_hardfork_visitor vtor(block_time);
+   vtor( o );
+
    const auto& global_parameters = d.get_global_properties().parameters;
 
    FC_ASSERT( o.expiration_time > d.head_block_time(), "Proposal has already expired on creation." );
@@ -133,11 +139,6 @@ void_result proposal_create_evaluator::do_evaluate(const proposal_create_operati
       _proposed_trx.operations.push_back(op.op);
 
    _proposed_trx.validate();
-
-   // Calling the proposal hardfork visitor
-   const fc::time_point_sec& block_time = d.head_block_time();
-   proposal_operation_hardfork_visitor vtor(block_time);
-   vtor( o );
 
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }
