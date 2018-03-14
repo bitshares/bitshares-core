@@ -137,7 +137,7 @@ void_result proposal_create_evaluator::do_evaluate(const proposal_create_operati
 
    // Calling the proposal hardfork visitor
    const fc::time_point_sec& block_time = d.head_block_time();
-   proposal_operation_hardfork_visitor vtor = proposal_operation_hardfork_visitor( block_time );
+   proposal_operation_hardfork_visitor vtor(block_time);
    vtor( o );
 
    return void_result();
