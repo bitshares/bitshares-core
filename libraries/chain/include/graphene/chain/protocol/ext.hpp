@@ -28,6 +28,8 @@
 
 namespace graphene { namespace chain {
 
+using fc::unsigned_int;
+
 template< typename T >
 struct extension
 {
@@ -54,15 +56,19 @@ struct graphene_extension_pack_count_visitor
 template< typename Stream, typename T >
 struct graphene_extension_pack_read_visitor
 {
-   graphene_extension_pack_read_visitor( Stream& s, const T& v ) : stream(s), value(v) {}
+   graphene_extension_pack_read_visitor( Stream& s, const T& v, uint32_t _max_depth )
+   : stream(s), value(v), max_depth(_max_depth - 1)
+   {
+      FC_ASSERT( _max_depth > 0 );
+   }
 
    template<typename Member, class Class, Member (Class::*member)>
    void operator()( const char* name )const
    {
       if( (value.*member).valid() )
       {
-         fc::raw::pack( stream, unsigned_int( which ) );
-         fc::raw::pack( stream, *(value.*member) );
+         fc::raw::pack( stream, unsigned_int( which ), max_depth );
+         fc::raw::pack( stream, *(value.*member), max_depth );
       }
       ++which;
    }
@@ -70,27 +76,19 @@ struct graphene_extension_pack_read_visitor
    Stream& stream;
    const T& value;
    mutable uint32_t which = 0;
+   const uint32_t max_depth;
 };
-
-template< typename Stream, class T >
-void operator<<( Stream& stream, const graphene::chain::extension<T>& value )
-{
-   graphene_extension_pack_count_visitor<T> count_vtor( value.value );
-   fc::reflector<T>::visit( count_vtor );
-   fc::raw::pack( stream, unsigned_int( count_vtor.count ) );
-   graphene_extension_pack_read_visitor<Stream,T> read_vtor( stream, value.value );
-   fc::reflector<T>::visit( read_vtor );
-}
-
 
 
 template< typename Stream, typename T >
 struct graphene_extension_unpack_visitor
 {
-   graphene_extension_unpack_visitor( Stream& s, T& v ) : stream(s), value(v)
+   graphene_extension_unpack_visitor( Stream& s, T& v, uint32_t _max_depth )
+   : stream(s), value(v), max_depth(_max_depth - 1)
    {
+      FC_ASSERT( _max_depth > 0 );
       unsigned_int c;
-      fc::raw::unpack( stream, c );
+      fc::raw::unpack( stream, c, max_depth );
       count_left = c.value;
       maybe_read_next_which();
    }
@@ -100,7 +98,7 @@ struct graphene_extension_unpack_visitor
       if( count_left > 0 )
       {
          unsigned_int w;
-         fc::raw::unpack( stream, w );
+         fc::raw::unpack( stream, w, max_depth );
          next_which = w.value;
       }
    }
@@ -111,7 +109,7 @@ struct graphene_extension_unpack_visitor
       if( (count_left > 0) && (which == next_which) )
       {
          typename Member::value_type temp;
-         fc::raw::unpack( stream, temp );
+         fc::raw::unpack( stream, temp, max_depth );
          (value.*member) = temp;
          --count_left;
          maybe_read_next_which();
@@ -127,16 +125,8 @@ struct graphene_extension_unpack_visitor
 
    Stream& stream;
    T& value;
+   const uint32_t max_depth;
 };
-
-template< typename Stream, typename T >
-void operator>>( Stream& s, graphene::chain::extension<T>& value )
-{
-   value = graphene::chain::extension<T>();
-   graphene_extension_unpack_visitor<Stream, T> vtor( s, value.value );
-   fc::reflector<T>::visit( vtor );
-   FC_ASSERT( vtor.count_left == 0 ); // unrecognized extension throws here
-}
 
 } } // graphene::chain
 
@@ -208,5 +198,33 @@ void to_variant( const graphene::chain::extension<T>& value, fc::variant& var )
    fc::reflector<T>::visit( vtor );
    var = vtor.mvo;
 }
+
+namespace raw {
+
+template< typename Stream, typename T >
+void pack( Stream& stream, const graphene::chain::extension<T>& value, uint32_t _max_depth=FC_PACK_MAX_DEPTH )
+{
+   FC_ASSERT( _max_depth > 0 );
+   --_max_depth;
+   graphene::chain::graphene_extension_pack_count_visitor<T> count_vtor( value.value );
+   fc::reflector<T>::visit( count_vtor );
+   fc::raw::pack( stream, unsigned_int( count_vtor.count ), _max_depth );
+   graphene::chain::graphene_extension_pack_read_visitor<Stream,T> read_vtor( stream, value.value, _max_depth );
+   fc::reflector<T>::visit( read_vtor );
+}
+
+
+template< typename Stream, typename T >
+void unpack( Stream& s, graphene::chain::extension<T>& value, uint32_t _max_depth=FC_PACK_MAX_DEPTH )
+{
+   FC_ASSERT( _max_depth > 0 );
+   --_max_depth;
+   value = graphene::chain::extension<T>();
+   graphene::chain::graphene_extension_unpack_visitor<Stream, T> vtor( s, value.value, _max_depth );
+   fc::reflector<T>::visit( vtor );
+   FC_ASSERT( vtor.count_left == 0 ); // unrecognized extension throws here
+}
+
+} // fc::raw
 
 } // fc
