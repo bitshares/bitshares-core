@@ -164,6 +164,13 @@ namespace graphene { namespace db {
          /** called just after obj is modified */
          void on_modify( const object& obj );
 
+         template<typename T, typename... Args>
+         T* add_secondary_index(Args... args)
+         {
+            _sindex.emplace_back( new T(args...) );
+            return static_cast<T*>(_sindex.back().get());
+         }
+
          template<typename T>
          T* add_secondary_index()
          {
@@ -271,6 +278,15 @@ namespace graphene { namespace db {
          virtual const object&  create(const std::function<void(object&)>& constructor )override
          {
             const auto& result = DerivedIndex::create( constructor );
+            for( const auto& item : _sindex )
+               item->object_inserted( result );
+            on_add( result );
+            return result;
+         }
+
+         virtual const object& insert( object&& obj ) override
+         {
+            const auto& result = DerivedIndex::insert( std::move( obj ) );
             for( const auto& item : _sindex )
                item->object_inserted( result );
             on_add( result );

@@ -169,10 +169,7 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
             return;
 
          if( !is_subscribed_to_item(i) )
-         {
-            idump((i));
             _subscribe_filter.insert( vec.data(), vec.size() );//(vecconst char*)&i, sizeof(i) );
-         }
       }
 
       template<typename T>
@@ -318,7 +315,6 @@ void database_api::set_subscribe_callback( std::function<void(const variant&)> c
 
 void database_api_impl::set_subscribe_callback( std::function<void(const variant&)> cb, bool notify_remove_create )
 {
-   //edump((clear_filter));
    _subscribe_callback = cb;
    _notify_remove_create = notify_remove_create;
    _subscribed_accounts.clear();
@@ -613,7 +609,6 @@ std::map<string,full_account> database_api::get_full_accounts( const vector<stri
 
 std::map<std::string, full_account> database_api_impl::get_full_accounts( const vector<std::string>& names_or_ids, bool subscribe)
 {
-   idump((names_or_ids));
    std::map<std::string, full_account> results;
 
    for (const std::string& account_name_or_id : names_or_ids)
