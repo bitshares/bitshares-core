@@ -51,18 +51,49 @@
  * Helper Methods
  *********************/
 
-// hack:  import create_example_genesis() even though it's a way, way
-// specific internal detail
+/////////
+// @brief forward declaration, using as a hack to generate a genesis.json file
+// for testing
+/////////
 namespace graphene { namespace app { namespace detail {
-	graphene::chain::genesis_state_type create_example_genesis();
+   graphene::chain::genesis_state_type create_example_genesis();
 } } } // graphene::app::detail
 
+/////////
+// @brief create a genesis_json file
+// @param directory the directory to place the file "genesis.json"
+// @returns the full path to the file
+////////
 boost::filesystem::path create_genesis_file(fc::temp_directory& directory) {
-	boost::filesystem::path genesis_path = boost::filesystem::path{directory.path().generic_string()} / "genesis.json";
-    fc::path genesis_out = genesis_path;
-    graphene::chain::genesis_state_type genesis_state = graphene::app::detail::create_example_genesis();
-    fc::json::save_to_file(genesis_state, genesis_out);
-    return genesis_path;
+   boost::filesystem::path genesis_path = boost::filesystem::path{directory.path().generic_string()} / "genesis.json";
+   fc::path genesis_out = genesis_path;
+   graphene::chain::genesis_state_type genesis_state = graphene::app::detail::create_example_genesis();
+
+   /* Work In Progress: Place some accounts in the Genesis file so as to pre-make some accounts to play with
+   std::string test_prefix = "test";
+   // helper lambda
+   auto get_test_key = [&]( std::string prefix, uint32_t i ) -> public_key_type
+   {
+      return fc::ecc::private_key::regenerate( fc::sha256::hash( test_prefix + prefix + std::to_string(i) ) ).get_public_key();
+   };
+
+   // create 2 accounts to use
+   for (int i = 1; i <= 2; ++i )
+   {
+      genesis_state_type::initial_account_type dev_account(
+            test_prefix + std::to_string(i),
+            get_test_key("owner-", i),
+            get_test_key("active-", i),
+            false);
+
+      genesis_state.initial_accounts.push_back(dev_account);
+      // give her some coin
+
+   }
+   */
+
+   fc::json::save_to_file(genesis_state, genesis_out);
+   return genesis_path;
 }
 
 //////
@@ -83,80 +114,86 @@ int get_available_port()
    socklen_t len = sizeof(sin);
    if (getsockname(socket_fd, (struct sockaddr *)&sin, &len) == -1)
       return -1;
-   //return ntohs(sin.sin_port);
    return sin.sin_port;
 }
 
-/***
- * @brief Start the application, listening on port 8090
- * @param app_dir the temporary directory to use
- * @returns the application object
- */
+///////////
+// @brief Start the application
+// @param app_dir the temporary directory to use
+// @param server_port_number to be filled with the rpc endpoint port number
+// @returns the application object
+//////////
 std::shared_ptr<graphene::app::application> start_application(fc::temp_directory& app_dir, int& server_port_number) {
-	std::shared_ptr<graphene::app::application> app1(new graphene::app::application{});
+   std::shared_ptr<graphene::app::application> app1(new graphene::app::application{});
 
-    app1->register_plugin<graphene::account_history::account_history_plugin>();
-    app1->register_plugin< graphene::market_history::market_history_plugin >();
-    app1->register_plugin< graphene::witness_plugin::witness_plugin >();
-    app1->startup_plugins();
-    boost::program_options::variables_map cfg;
-    server_port_number = get_available_port();
-    //server_port_number = 8090;
-    cfg.emplace("rpc-endpoint", boost::program_options::variable_value(string("127.0.0.1:" + std::to_string(server_port_number)), false));
-    cfg.emplace("genesis-json", boost::program_options::variable_value(create_genesis_file(app_dir), false));
-    cfg.emplace("seed-nodes", boost::program_options::variable_value(string("[]"), false));
-    app1->initialize(app_dir.path(), cfg);
+   app1->register_plugin<graphene::account_history::account_history_plugin>();
+   app1->register_plugin< graphene::market_history::market_history_plugin >();
+   app1->register_plugin< graphene::witness_plugin::witness_plugin >();
+   app1->startup_plugins();
+   boost::program_options::variables_map cfg;
+   server_port_number = get_available_port();
+   cfg.emplace("rpc-endpoint", boost::program_options::variable_value(string("127.0.0.1:" + std::to_string(server_port_number)), false));
+   cfg.emplace("genesis-json", boost::program_options::variable_value(create_genesis_file(app_dir), false));
+   cfg.emplace("seed-nodes", boost::program_options::variable_value(string("[]"), false));
+   app1->initialize(app_dir.path(), cfg);
 
-    app1->startup();
-    fc::usleep(fc::milliseconds(500));
+   app1->startup();
+   fc::usleep(fc::milliseconds(500));
 	return app1;
 }
 
-/****
- * Send a block to the db
- * @param app the application
- * @returns true on success
- */
+///////////
+// Send a block to the db
+// @param app the application
+// @returns true on success
+///////////
 bool generate_block(std::shared_ptr<graphene::app::application> app) {
-	try {
-	    fc::ecc::private_key committee_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("nathan")));
-	    auto db = app->chain_database();
-	    auto block_1 = db->generate_block(
-	       db->get_slot_time(1),
-	       db->get_scheduled_witness(1),
-	       committee_key,
-	       database::skip_nothing);
-	    return true;
-	} catch (exception &e) {
-		return false;
-	}
+   try {
+      fc::ecc::private_key committee_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("nathan")));
+	   auto db = app->chain_database();
+	   auto block_1 = db->generate_block(
+	         db->get_slot_time(1),
+	         db->get_scheduled_witness(1),
+	         committee_key,
+	         database::skip_nothing);
+	   return true;
+   } catch (exception &e) {
+      return false;
+   }
 }
 
-/****
- * @brief Skip intermediate blocks, and generate a maintenance block
- * @param app the application
- * @returns true on success
- */
+///////////
+// @brief Skip intermediate blocks, and generate a maintenance block
+// @param app the application
+// @returns true on success
+///////////
 bool generate_maintenance_block(std::shared_ptr<graphene::app::application> app) {
-	try {
-		fc::ecc::private_key committee_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("nathan")));
-		uint32_t skip = ~0;
-		auto db = app->chain_database();
-		auto maint_time = db->get_dynamic_global_properties().next_maintenance_time;
-		auto slots_to_miss = db->get_slot_at_time(maint_time);
-		db->generate_block(db->get_slot_time(slots_to_miss),
-				db->get_scheduled_witness(slots_to_miss),
-				committee_key,
-				skip);
-		return true;
-	} catch (exception& e) {
-		return false;
-	}
+   try {
+      fc::ecc::private_key committee_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("nathan")));
+      uint32_t skip = ~0;
+      auto db = app->chain_database();
+      auto maint_time = db->get_dynamic_global_properties().next_maintenance_time;
+      auto slots_to_miss = db->get_slot_at_time(maint_time);
+      db->generate_block(db->get_slot_time(slots_to_miss),
+            db->get_scheduled_witness(slots_to_miss),
+            committee_key,
+            skip);
+      return true;
+   } catch (exception& e)
+   {
+      return false;
+   }
 }
 
+///////////
+// @brief a class to make connecting to the application server easier
+///////////
 class client_connection
 {
 public:
+   /////////
+   // @brief constructor
+   /////////
    client_connection(std::shared_ptr<graphene::app::application> app, const fc::temp_directory& data_dir, const int server_port_number)
    {
       wallet_data.chain_id = app->chain_database()->get_chain_id();
@@ -198,20 +235,20 @@ public:
    std::string wallet_filename;
 };
 
-/****************************
- * Tests
- ****************************/
+///////////////////////////////
+// Tests
+///////////////////////////////
 
-/**
- * Start a server and connect using the same calls as the CLI
- */
+////////////////
+// Start a server and connect using the same calls as the CLI
+////////////////
 BOOST_AUTO_TEST_CASE( cli_connect )
 {
    using namespace graphene::chain;
    using namespace graphene::app;
    std::shared_ptr<graphene::app::application> app1;
    try {
-	   fc::temp_directory app_dir ( graphene::utilities::temp_directory_path() );
+      fc::temp_directory app_dir ( graphene::utilities::temp_directory_path() );
 
 	   int server_port_number = 0;
 	   app1 = start_application(app_dir, server_port_number);
@@ -226,18 +263,17 @@ BOOST_AUTO_TEST_CASE( cli_connect )
    app1->shutdown();
 }
 
-/**
- * Start a server and connect using the same calls as the CLI
- * Vote for two witnesses, and make sure they both stay there
- * after a maintenance block
- */
+///////////////////////
+// Start a server and connect using the same calls as the CLI
+// Vote for two witnesses, and make sure they both stay there
+// after a maintenance block
+///////////////////////
 BOOST_AUTO_TEST_CASE( cli_vote_for_2_witnesses )
 {
    using namespace graphene::chain;
    using namespace graphene::app;
    std::shared_ptr<graphene::app::application> app1;
    try {
-
       fc::temp_directory app_dir( graphene::utilities::temp_directory_path() );
 
       int server_port_number = 0;
@@ -323,10 +359,10 @@ BOOST_AUTO_TEST_CASE( cli_vote_for_2_witnesses )
    app1->shutdown();
 }
 
-/**
- * Start a server and connect using the same calls as the CLI
- * Set a voting proxy and be assured that it sticks
- */
+///////////////////
+// Start a server and connect using the same calls as the CLI
+// Set a voting proxy and be assured that it sticks
+///////////////////
 BOOST_AUTO_TEST_CASE( cli_set_voting_proxy )
 {
    using namespace graphene::chain;
