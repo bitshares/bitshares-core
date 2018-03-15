@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015 Cryptonomex, Inc., and contributors.
+ * Copyright (c) 2018 John Jones, and contributors.
  *
  * The MIT License
  *
@@ -38,6 +38,10 @@
 #include <fc/rpc/websocket_api.hpp>
 #include <fc/rpc/cli.hpp>
 
+#include <sys/socket.h>
+#include <netinet/ip.h>
+#include <sys/types.h>
+
 #include <boost/filesystem/path.hpp>
 
 #define BOOST_TEST_MODULE Test Application
@@ -57,9 +61,30 @@ boost::filesystem::path create_genesis_file(fc::temp_directory& directory) {
 	boost::filesystem::path genesis_path = boost::filesystem::path{directory.path().generic_string()} / "genesis.json";
     fc::path genesis_out = genesis_path;
     graphene::chain::genesis_state_type genesis_state = graphene::app::detail::create_example_genesis();
-    std::cerr << "Creating example genesis state in file " << genesis_out.generic_string() << "\n";
     fc::json::save_to_file(genesis_state, genesis_out);
     return genesis_path;
+}
+
+//////
+// @brief attempt to find an available port on localhost
+// @returns an available port number, or -1 on error
+/////
+int get_available_port()
+{
+   struct sockaddr_in sin;
+   int socket_fd = socket(AF_INET, SOCK_STREAM, 0);
+   if (socket_fd == -1)
+      return -1;
+   sin.sin_family = AF_INET;
+   sin.sin_port = 0;
+   sin.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+   if (bind(socket_fd, (struct sockaddr*)&sin, sizeof(struct sockaddr_in)) == -1)
+      return -1;
+   socklen_t len = sizeof(sin);
+   if (getsockname(socket_fd, (struct sockaddr *)&sin, &len) == -1)
+      return -1;
+   //return ntohs(sin.sin_port);
+   return sin.sin_port;
 }
 
 /***
@@ -67,7 +92,7 @@ boost::filesystem::path create_genesis_file(fc::temp_directory& directory) {
  * @param app_dir the temporary directory to use
  * @returns the application object
  */
-std::shared_ptr<graphene::app::application> start_application(fc::temp_directory& app_dir) {
+std::shared_ptr<graphene::app::application> start_application(fc::temp_directory& app_dir, int& server_port_number) {
 	std::shared_ptr<graphene::app::application> app1(new graphene::app::application{});
 
     app1->register_plugin<graphene::account_history::account_history_plugin>();
@@ -75,7 +100,9 @@ std::shared_ptr<graphene::app::application> start_application(fc::temp_directory
     app1->register_plugin< graphene::witness_plugin::witness_plugin >();
     app1->startup_plugins();
     boost::program_options::variables_map cfg;
-    cfg.emplace("rpc-endpoint", boost::program_options::variable_value(string("127.0.0.1:8090"), false));
+    server_port_number = get_available_port();
+    //server_port_number = 8090;
+    cfg.emplace("rpc-endpoint", boost::program_options::variable_value(string("127.0.0.1:" + std::to_string(server_port_number)), false));
     cfg.emplace("genesis-json", boost::program_options::variable_value(create_genesis_file(app_dir), false));
     cfg.emplace("seed-nodes", boost::program_options::variable_value(string("[]"), false));
     app1->initialize(app_dir.path(), cfg);
@@ -127,6 +154,50 @@ bool generate_maintenance_block(std::shared_ptr<graphene::app::application> app)
 	}
 }
 
+class client_connection
+{
+public:
+   client_connection(std::shared_ptr<graphene::app::application> app, const fc::temp_directory& data_dir, const int server_port_number)
+   {
+      wallet_data.chain_id = app->chain_database()->get_chain_id();
+      wallet_data.ws_server = "ws://127.0.0.1:" + std::to_string(server_port_number);
+      wallet_data.ws_user = "";
+      wallet_data.ws_password = "";
+      websocket_connection  = websocket_client.connect( wallet_data.ws_server );
+
+      api_connection = std::make_shared<fc::rpc::websocket_api_connection>(*websocket_connection);
+
+      remote_login_api = api_connection->get_remote_api< graphene::app::login_api >(1);
+      BOOST_CHECK(remote_login_api->login( wallet_data.ws_user, wallet_data.ws_password ) );
+
+      wallet_api_ptr = std::make_shared<graphene::wallet::wallet_api>(wallet_data, remote_login_api);
+      wallet_filename = data_dir.path().generic_string() + "/wallet.json";
+      wallet_api_ptr->set_wallet_filename(wallet_filename);
+
+      wallet_api = fc::api<graphene::wallet::wallet_api>(wallet_api_ptr);
+
+      wallet_cli = std::make_shared<fc::rpc::cli>();
+      for( auto& name_formatter : wallet_api_ptr->get_result_formatters() )
+         wallet_cli->format_result( name_formatter.first, name_formatter.second );
+
+      boost::signals2::scoped_connection closed_connection(websocket_connection->closed.connect([=]{
+         cerr << "Server has disconnected us.\n";
+         wallet_cli->stop();
+      }));
+      (void)(closed_connection);
+   }
+public:
+   fc::http::websocket_client websocket_client;
+   graphene::wallet::wallet_data wallet_data;
+   fc::http::websocket_connection_ptr websocket_connection;
+   std::shared_ptr<fc::rpc::websocket_api_connection> api_connection;
+   fc::api<login_api> remote_login_api;
+   std::shared_ptr<graphene::wallet::wallet_api> wallet_api_ptr;
+   fc::api<graphene::wallet::wallet_api> wallet_api;
+   std::shared_ptr<fc::rpc::cli> wallet_cli;
+   std::string wallet_filename;
+};
+
 /****************************
  * Tests
  ****************************/
@@ -142,20 +213,11 @@ BOOST_AUTO_TEST_CASE( cli_connect )
    try {
 	   fc::temp_directory app_dir ( graphene::utilities::temp_directory_path() );
 
-	   app1 = start_application(app_dir);
+	   int server_port_number = 0;
+	   app1 = start_application(app_dir, server_port_number);
 
       // connect to the server
-      graphene::wallet::wallet_data wdata;
-      wdata.chain_id = app1->chain_database()->get_chain_id();
-      wdata.ws_server = "ws://127.0.0.1:8090";
-      wdata.ws_user = "";
-      wdata.ws_password = "";
-      fc::http::websocket_client client;
-
-      auto apic = std::make_shared<fc::rpc::websocket_api_connection>(*(client.connect(wdata.ws_server)));
-
-      auto remote_api = apic->get_remote_api< login_api >(1);
-      BOOST_CHECK(remote_api->login( wdata.ws_user, wdata.ws_password ) );
+	   client_connection con(app1, app_dir, server_port_number);
 
    } catch( fc::exception& e ) {
       edump((e.to_detail_string()));
@@ -178,79 +240,52 @@ BOOST_AUTO_TEST_CASE( cli_vote_for_2_witnesses )
 
       fc::temp_directory app_dir( graphene::utilities::temp_directory_path() );
 
-      app1 = start_application(app_dir);
+      int server_port_number = 0;
+      app1 = start_application(app_dir, server_port_number);
 
       // connect to the server
-      graphene::wallet::wallet_data wdata;
-      wdata.chain_id = app1->chain_database()->get_chain_id();
-      wdata.ws_server = "ws://127.0.0.1:8090";
-      wdata.ws_user = "";
-      wdata.ws_password = "";
-      fc::http::websocket_client client;
-      auto con  = client.connect( wdata.ws_server );
-
-      auto apic = std::make_shared<fc::rpc::websocket_api_connection>(*con);
-
-      auto remote_api = apic->get_remote_api< login_api >(1);
-      BOOST_CHECK(remote_api->login( wdata.ws_user, wdata.ws_password ) );
-
-      auto wapiptr = std::make_shared<graphene::wallet::wallet_api>(wdata, remote_api);
-      std::stringstream wallet_filename;
-      wallet_filename << app_dir.path().generic_string() << "/wallet.json";
-      wapiptr->set_wallet_filename(wallet_filename.str());
-
-      fc::api<graphene::wallet::wallet_api> wapi(wapiptr);
-
-      auto wallet_cli = std::make_shared<fc::rpc::cli>();
-      for( auto& name_formatter : wapiptr->get_result_formatters() )
-         wallet_cli->format_result( name_formatter.first, name_formatter.second );
-
-      boost::signals2::scoped_connection closed_connection(con->closed.connect([=]{
-         cerr << "Server has disconnected us.\n";
-         wallet_cli->stop();
-      }));
-      (void)(closed_connection);
+      client_connection con(app1, app_dir, server_port_number);
 
       BOOST_TEST_MESSAGE("Setting wallet password");
-      wapiptr->set_password("supersecret");
-      wapiptr->unlock("supersecret");
+      con.wallet_api_ptr->set_password("supersecret");
+      con.wallet_api_ptr->unlock("supersecret");
 
       // import Nathan account
       BOOST_TEST_MESSAGE("Importing nathan key");
       std::vector<std::string> nathan_keys{"5KQwrPbwdL6PhXujxW37FSSQZ1JiwsST4cqQzDeyXtP79zkvFD3"};
       BOOST_CHECK_EQUAL(nathan_keys[0], "5KQwrPbwdL6PhXujxW37FSSQZ1JiwsST4cqQzDeyXtP79zkvFD3");
-      BOOST_CHECK(wapiptr->import_key("nathan", nathan_keys[0]));
+      BOOST_CHECK(con.wallet_api_ptr->import_key("nathan", nathan_keys[0]));
 
       BOOST_TEST_MESSAGE("Importing nathan's balance");
-      std::vector<signed_transaction> import_txs = wapiptr->import_balance("nathan", nathan_keys, true);
-      account_object nathan_acct_before_upgrade = wapiptr->get_account("nathan");
+      std::vector<signed_transaction> import_txs = con.wallet_api_ptr->import_balance("nathan", nathan_keys, true);
+      account_object nathan_acct_before_upgrade = con.wallet_api_ptr->get_account("nathan");
 
       // upgrade nathan
       BOOST_TEST_MESSAGE("Upgrading Nathan to LTM");
-      signed_transaction upgrade_tx = wapiptr->upgrade_account("nathan", true);
-      account_object nathan_acct_after_upgrade = wapiptr->get_account("nathan");
+      signed_transaction upgrade_tx = con.wallet_api_ptr->upgrade_account("nathan", true);
+      account_object nathan_acct_after_upgrade = con.wallet_api_ptr->get_account("nathan");
 
       // verify that the upgrade was successful
       BOOST_CHECK_PREDICATE( std::not_equal_to<uint32_t>(), (nathan_acct_before_upgrade.membership_expiration_date.sec_since_epoch())(nathan_acct_after_upgrade.membership_expiration_date.sec_since_epoch()) );
       BOOST_CHECK(nathan_acct_after_upgrade.is_lifetime_member());
 
       // create a new account
-      graphene::wallet::brain_key_info bki = wapiptr->suggest_brain_key();
+      graphene::wallet::brain_key_info bki = con.wallet_api_ptr->suggest_brain_key();
       BOOST_CHECK(!bki.brain_priv_key.empty());
-      signed_transaction create_acct_tx = wapiptr->create_account_with_brain_key(bki.brain_priv_key, "jmjatlanta", "nathan", "nathan", true);
+      signed_transaction create_acct_tx = con.wallet_api_ptr->create_account_with_brain_key(bki.brain_priv_key, "jmjatlanta", "nathan", "nathan", true);
       // save the private key for this new account in the wallet file
-   	  BOOST_CHECK(wapiptr->import_key("jmjatlanta", bki.wif_priv_key));
-      wapiptr->save_wallet_file(wallet_filename.str());
+   	BOOST_CHECK(con.wallet_api_ptr->import_key("jmjatlanta", bki.wif_priv_key));
+      con.wallet_api_ptr->save_wallet_file(con.wallet_filename);
 
       // attempt to give jmjatlanta some bitsahres
       BOOST_TEST_MESSAGE("Transferring bitshares from Nathan to jmjatlanta");
-      signed_transaction transfer_tx = wapiptr->transfer("nathan", "jmjatlanta", "10000", "BTS", "Here are some BTS for your new account", true);
+      signed_transaction transfer_tx = con.wallet_api_ptr->transfer("nathan", "jmjatlanta", "10000", "BTS", "Here are some BTS for your new account", true);
 
       // get the details for init1
-      witness_object init1_obj = wapiptr->get_witness("init1");
+      witness_object init1_obj = con.wallet_api_ptr->get_witness("init1");
       int init1_start_votes = init1_obj.total_votes;
       // Vote for a witness
-      signed_transaction vote_witness1_tx = wapiptr->vote_for_witness("jmjatlanta", "init1", true, true);
+      signed_transaction vote_witness1_tx = con.wallet_api_ptr->vote_for_witness("jmjatlanta", "init1", true, true);
 
       // generate a block to get things started
       BOOST_CHECK(generate_block(app1));
@@ -258,21 +293,21 @@ BOOST_AUTO_TEST_CASE( cli_vote_for_2_witnesses )
       BOOST_CHECK(generate_maintenance_block(app1));
 
       // Verify that the vote is there
-      init1_obj = wapiptr->get_witness("init1");
-      witness_object init2_obj = wapiptr->get_witness("init2");
+      init1_obj = con.wallet_api_ptr->get_witness("init1");
+      witness_object init2_obj = con.wallet_api_ptr->get_witness("init2");
       int init1_middle_votes = init1_obj.total_votes;
       BOOST_CHECK(init1_middle_votes > init1_start_votes);
 
       // Vote for a 2nd witness
       int init2_start_votes = init2_obj.total_votes;
-      signed_transaction vote_witness2_tx = wapiptr->vote_for_witness("jmjatlanta", "init2", true, true);
+      signed_transaction vote_witness2_tx = con.wallet_api_ptr->vote_for_witness("jmjatlanta", "init2", true, true);
 
       // send another block to trigger maintenance interval
       BOOST_CHECK(generate_maintenance_block(app1));
 
       // Verify that both the first vote and the 2nd are there
-      init2_obj = wapiptr->get_witness("init2");
-      init1_obj = wapiptr->get_witness("init1");
+      init2_obj = con.wallet_api_ptr->get_witness("init2");
+      init1_obj = con.wallet_api_ptr->get_witness("init1");
 
       int init2_middle_votes = init2_obj.total_votes;
       BOOST_CHECK(init2_middle_votes > init2_start_votes);
@@ -301,80 +336,53 @@ BOOST_AUTO_TEST_CASE( cli_set_voting_proxy )
 
       fc::temp_directory app_dir( graphene::utilities::temp_directory_path() );
 
-      app1 = start_application(app_dir);
+      int server_port_number;
+      app1 = start_application(app_dir, server_port_number);
 
       // connect to the server
-      graphene::wallet::wallet_data wdata;
-      wdata.chain_id = app1->chain_database()->get_chain_id();
-      wdata.ws_server = "ws://127.0.0.1:8090";
-      wdata.ws_user = "";
-      wdata.ws_password = "";
-      fc::http::websocket_client client;
-      auto con  = client.connect( wdata.ws_server );
-
-      auto apic = std::make_shared<fc::rpc::websocket_api_connection>(*con);
-
-      auto remote_api = apic->get_remote_api< login_api >(1);
-      BOOST_CHECK(remote_api->login( wdata.ws_user, wdata.ws_password ) );
-
-      auto wapiptr = std::make_shared<graphene::wallet::wallet_api>(wdata, remote_api);
-      std::stringstream wallet_filename;
-      wallet_filename << app_dir.path().generic_string() << "/wallet.json";
-      wapiptr->set_wallet_filename(wallet_filename.str());
-
-      fc::api<graphene::wallet::wallet_api> wapi(wapiptr);
-
-      auto wallet_cli = std::make_shared<fc::rpc::cli>();
-      for( auto& name_formatter : wapiptr->get_result_formatters() )
-         wallet_cli->format_result( name_formatter.first, name_formatter.second );
-
-      boost::signals2::scoped_connection closed_connection(con->closed.connect([=]{
-         cerr << "Server has disconnected us.\n";
-         wallet_cli->stop();
-      }));
-      (void)(closed_connection);
+      client_connection con(app1, app_dir, server_port_number);
 
       BOOST_TEST_MESSAGE("Setting wallet password");
-      wapiptr->set_password("supersecret");
-      wapiptr->unlock("supersecret");
+      con.wallet_api_ptr->set_password("supersecret");
+      con.wallet_api_ptr->unlock("supersecret");
 
       // import Nathan account
       BOOST_TEST_MESSAGE("Importing nathan key");
       std::vector<std::string> nathan_keys{"5KQwrPbwdL6PhXujxW37FSSQZ1JiwsST4cqQzDeyXtP79zkvFD3"};
       BOOST_CHECK_EQUAL(nathan_keys[0], "5KQwrPbwdL6PhXujxW37FSSQZ1JiwsST4cqQzDeyXtP79zkvFD3");
-      BOOST_CHECK(wapiptr->import_key("nathan", nathan_keys[0]));
+      BOOST_CHECK(con.wallet_api_ptr->import_key("nathan", nathan_keys[0]));
 
       BOOST_TEST_MESSAGE("Importing nathan's balance");
-      std::vector<signed_transaction> import_txs = wapiptr->import_balance("nathan", nathan_keys, true);
-      account_object nathan_acct_before_upgrade = wapiptr->get_account("nathan");
+      std::vector<signed_transaction> import_txs = con.wallet_api_ptr->import_balance("nathan", nathan_keys, true);
+      account_object nathan_acct_before_upgrade = con.wallet_api_ptr->get_account("nathan");
 
       // upgrade nathan
       BOOST_TEST_MESSAGE("Upgrading Nathan to LTM");
-      signed_transaction upgrade_tx = wapiptr->upgrade_account("nathan", true);
-      account_object nathan_acct_after_upgrade = wapiptr->get_account("nathan");
+      signed_transaction upgrade_tx = con.wallet_api_ptr->upgrade_account("nathan", true);
+      account_object nathan_acct_after_upgrade = con.wallet_api_ptr->get_account("nathan");
 
       // verify that the upgrade was successful
       BOOST_CHECK_PREDICATE( std::not_equal_to<uint32_t>(), (nathan_acct_before_upgrade.membership_expiration_date.sec_since_epoch())(nathan_acct_after_upgrade.membership_expiration_date.sec_since_epoch()) );
       BOOST_CHECK(nathan_acct_after_upgrade.is_lifetime_member());
 
       // create a new account
-      graphene::wallet::brain_key_info bki = wapiptr->suggest_brain_key();
+      graphene::wallet::brain_key_info bki = con.wallet_api_ptr->suggest_brain_key();
       BOOST_CHECK(!bki.brain_priv_key.empty());
-      signed_transaction create_acct_tx = wapiptr->create_account_with_brain_key(bki.brain_priv_key, "jmjatlanta", "nathan", "nathan", true);
+      signed_transaction create_acct_tx = con.wallet_api_ptr->create_account_with_brain_key(bki.brain_priv_key, "jmjatlanta", "nathan", "nathan", true);
       // save the private key for this new account in the wallet file
-   	  BOOST_CHECK(wapiptr->import_key("jmjatlanta", bki.wif_priv_key));
-      wapiptr->save_wallet_file(wallet_filename.str());
+   	  BOOST_CHECK(con.wallet_api_ptr->import_key("jmjatlanta", bki.wif_priv_key));
+      con.wallet_api_ptr->save_wallet_file(con.wallet_filename);
 
       // attempt to give jmjatlanta some bitsahres
       BOOST_TEST_MESSAGE("Transferring bitshares from Nathan to jmjatlanta");
-      signed_transaction transfer_tx = wapiptr->transfer("nathan", "jmjatlanta", "10000", "BTS", "Here are some BTS for your new account", true);
+      signed_transaction transfer_tx = con.wallet_api_ptr->transfer("nathan", "jmjatlanta", "10000", "BTS", "Here are some BTS for your new account", true);
 
       // grab account for comparison
-      account_object prior_voting_account = wapiptr->get_account("jmjatlanta");
+      account_object prior_voting_account = con.wallet_api_ptr->get_account("jmjatlanta");
       // set the voting proxy to nathan
       BOOST_TEST_MESSAGE("About to set voting proxy.");
-      signed_transaction voting_tx = wapiptr->set_voting_proxy("jmjatlanta", "nathan", true);
-      account_object after_voting_account = wapiptr->get_account("jmjatlanta");
+      signed_transaction voting_tx = con.wallet_api_ptr->set_voting_proxy("jmjatlanta", "nathan", true);
+      account_object after_voting_account = con.wallet_api_ptr->get_account("jmjatlanta");
       // see if it changed
       BOOST_CHECK(prior_voting_account.options.voting_account != after_voting_account.options.voting_account);
 
