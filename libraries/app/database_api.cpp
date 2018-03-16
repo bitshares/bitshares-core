@@ -115,7 +115,7 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       market_ticker                      get_ticker( const string& base, const string& quote, bool skip_order_book = false )const;
       market_volume                      get_24_volume( const string& base, const string& quote )const;
       order_book                         get_order_book( const string& base, const string& quote, unsigned limit = 50 )const;
-      vector<market_volume>              get_top_markets(uint limit)const;
+      vector<market_volume>              get_top_markets(uint32_t limit)const;
       vector<market_trade>               get_trade_history( const string& base, const string& quote, fc::time_point_sec start, fc::time_point_sec stop, unsigned limit = 100 )const;
       vector<market_trade>               get_trade_history_by_sequence( const string& base, const string& quote, int64_t start, fc::time_point_sec stop, unsigned limit = 100 )const;
 
@@ -1293,12 +1293,12 @@ order_book database_api_impl::get_order_book( const string& base, const string& 
    return result;
 }
 
-vector<market_volume> database_api::get_top_markets(uint limit)const
+vector<market_volume> database_api::get_top_markets(uint32_t limit)const
 {
    return my->get_top_markets(limit);
 }
 
-vector<market_volume> database_api_impl::get_top_markets(uint limit)const
+vector<market_volume> database_api_impl::get_top_markets(uint32_t limit)const
 {
    FC_ASSERT( limit <= 100 );
 
@@ -1306,10 +1306,6 @@ vector<market_volume> database_api_impl::get_top_markets(uint limit)const
    auto itr = volume_idx.rbegin();
    vector<market_volume> result;
 
-   fc::uint128 base_volume;
-   fc::uint128 quote_volume;
-
-   uint c = 0;
    const fc::time_point_sec now = fc::time_point::now();
 
    while( itr != volume_idx.rend() && result.size() < limit)

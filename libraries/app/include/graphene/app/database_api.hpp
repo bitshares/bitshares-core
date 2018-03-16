@@ -433,7 +433,7 @@ class database_api
        * @param limit Max number of results
        * @return Desc Sorted volume vector
        */
-      vector<market_volume> get_top_markets(uint limit)const;
+      vector<market_volume> get_top_markets(uint32_t limit)const;
 
       /**
        * @brief Returns recent trades for the market assetA:assetB, ordered by time, most recent first. The range is [stop, start)
