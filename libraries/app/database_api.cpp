@@ -2187,7 +2187,8 @@ void database_api_impl::handle_object_changed(bool force_notify, bool full_objec
          }
       }
 
-      broadcast_updates(updates);
+      if( updates.size() )
+         broadcast_updates(updates);
    }
 
    if( _market_subscriptions.size() )
@@ -2206,7 +2207,8 @@ void database_api_impl::handle_object_changed(bool force_notify, bool full_objec
          }
       }
 
-      broadcast_market_updates(broadcast_queue);
+      if( broadcast_queue.size() )
+         broadcast_market_updates(broadcast_queue);
    }
 }
 

@@ -382,7 +382,8 @@ void database::notify_changed_objects()
             get_relevant_accounts(obj, new_accounts_impacted);
         }
 
-        GRAPHENE_TRY_NOTIFY( new_objects, new_ids, new_accounts_impacted)
+        if( new_ids.size() )
+           GRAPHENE_TRY_NOTIFY( new_objects, new_ids, new_accounts_impacted)
       }
 
       // Changed
@@ -396,7 +397,8 @@ void database::notify_changed_objects()
           get_relevant_accounts(item.second.get(), changed_accounts_impacted);
         }
 
-        GRAPHENE_TRY_NOTIFY( changed_objects, changed_ids, changed_accounts_impacted)
+        if( changed_ids.size() )
+           GRAPHENE_TRY_NOTIFY( changed_objects, changed_ids, changed_accounts_impacted)
       }
 
       // Removed
@@ -413,7 +415,8 @@ void database::notify_changed_objects()
           get_relevant_accounts(obj, removed_accounts_impacted);
         }
 
-        GRAPHENE_TRY_NOTIFY( removed_objects, removed_ids, removed, removed_accounts_impacted)
+        if( removed_ids.size() )
+           GRAPHENE_TRY_NOTIFY( removed_objects, removed_ids, removed, removed_accounts_impacted)
       }
    }
 } FC_CAPTURE_AND_LOG( (0) ) }
