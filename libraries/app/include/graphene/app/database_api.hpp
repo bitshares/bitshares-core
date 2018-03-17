@@ -429,6 +429,14 @@ class database_api
       order_book get_order_book( const string& base, const string& quote, unsigned limit = 50 )const;
 
       /**
+       * @brief Returns vector of 24 hour volume markets sorted by reverse base_volume
+       * Note: this API is experimental and subject to change in next releases
+       * @param limit Max number of results
+       * @return Desc Sorted volume vector
+       */
+      vector<market_volume> get_top_markets(uint32_t limit)const;
+
+      /**
        * @brief Returns recent trades for the market assetA:assetB, ordered by time, most recent first. The range is [stop, start)
        * Note: Currently, timezone offsets are not supported. The time must be UTC.
        * @param a String name of the first asset
@@ -715,6 +723,7 @@ FC_API(graphene::app::database_api,
    (unsubscribe_from_market)
    (get_ticker)
    (get_24_volume)
+   (get_top_markets)
    (get_trade_history)
    (get_trade_history_by_sequence)
 
