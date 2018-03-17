@@ -430,6 +430,7 @@ class database_api
 
       /**
        * @brief Returns vector of 24 hour volume markets sorted by reverse base_volume
+       * Note: this API is experimental and subject to change in next releases
        * @param limit Max number of results
        * @return Desc Sorted volume vector
        */
