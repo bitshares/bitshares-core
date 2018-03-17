@@ -1305,6 +1305,7 @@ vector<market_volume> database_api_impl::get_top_markets(uint32_t limit)const
    const auto& volume_idx = _db.get_index_type<graphene::market_history::market_ticker_index>().indices().get<by_volume>();
    auto itr = volume_idx.rbegin();
    vector<market_volume> result;
+   result.reserve(limit);
 
    const fc::time_point_sec now = fc::time_point::now();
 
@@ -1317,7 +1318,7 @@ vector<market_volume> database_api_impl::get_top_markets(uint32_t limit)const
       mv.quote = assets[1]->symbol;
       mv.base_volume = uint128_amount_to_string( itr->base_volume, assets[0]->precision );
       mv.quote_volume = uint128_amount_to_string( itr->quote_volume, assets[1]->precision );
-      result.push_back(mv);
+      result.emplace_back( std::move(mv) );
       ++itr;
    }
    return result;
