@@ -53,7 +53,7 @@ class database_api_impl;
 class database_api_impl : public std::enable_shared_from_this<database_api_impl>
 {
    public:
-      database_api_impl( graphene::chain::database& db );
+      database_api_impl( graphene::chain::database& db, const application_options* app_options );
       ~database_api_impl();
 
 
@@ -229,6 +229,7 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       boost::signals2::scoped_connection                                                                                           _pending_trx_connection;
       map< pair<asset_id_type,asset_id_type>, std::function<void(const variant&)> >      _market_subscriptions;
       graphene::chain::database&                                                                                                            _db;
+      const application_options* _app_options = nullptr;
 };
 
 //////////////////////////////////////////////////////////////////////
@@ -237,12 +238,13 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
 //                                                                  //
 //////////////////////////////////////////////////////////////////////
 
-database_api::database_api( graphene::chain::database& db )
-   : my( new database_api_impl( db ) ) {}
+database_api::database_api( graphene::chain::database& db, const application_options* app_options )
+   : my( new database_api_impl( db, app_options ) ) {}
 
 database_api::~database_api() {}
 
-database_api_impl::database_api_impl( graphene::chain::database& db ):_db(db)
+database_api_impl::database_api_impl( graphene::chain::database& db, const application_options* app_options )
+:_db(db), _app_options(app_options)
 {
    wlog("creating database api ${x}", ("x",int64_t(this)) );
    _new_connection = _db.new_objects.connect([this](const vector<object_id_type>& ids, const flat_set<account_id_type>& impacted_accounts) {
@@ -315,6 +317,12 @@ void database_api::set_subscribe_callback( std::function<void(const variant&)> c
 
 void database_api_impl::set_subscribe_callback( std::function<void(const variant&)> cb, bool notify_remove_create )
 {
+   if( notify_remove_create )
+   {
+      FC_ASSERT( _app_options && _app_options->enable_subscribe_to_all,
+                 "Subscribing to universal object creation and removal is disallowed in this server." );
+   }
+
    _subscribe_callback = cb;
    _notify_remove_create = notify_remove_create;
    _subscribed_accounts.clear();

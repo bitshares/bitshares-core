@@ -35,6 +35,12 @@ namespace graphene { namespace app {
 
    class abstract_plugin;
 
+   class application_options
+   {
+      public:
+         bool enable_subscribe_to_all = false;
+   };
+
    class application
    {
       public:
@@ -88,6 +94,8 @@ namespace graphene { namespace app {
          bool is_finished_syncing()const;
          /// Emitted when syncing finishes (is_finished_syncing will return true)
          boost::signals2::signal<void()> syncing_finished;
+
+         const application_options& get_options();
 
       private:
          void enable_plugin( const string& name );

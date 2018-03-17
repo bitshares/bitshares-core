@@ -122,7 +122,7 @@ struct market_trade
 class database_api
 {
    public:
-      database_api(graphene::chain::database& db);
+      database_api(graphene::chain::database& db, const application_options* app_options = nullptr );
       ~database_api();
 
       /////////////

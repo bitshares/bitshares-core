@@ -111,6 +111,7 @@ namespace detail {
       fc::optional<fc::temp_file> _lock_file;
       bool _is_block_producer = false;
       bool _force_validate = false;
+      application_options _app_options;
 
       void reset_p2p_node(const fc::path& data_dir)
       { try {
@@ -404,6 +405,9 @@ namespace detail {
             _force_validate = true;
          }
 
+         if( _options->count("enable-subscribe-to-all") )
+            _app_options.enable_subscribe_to_all = _options->at("enable-subscribe-to-all").as<bool>();
+
          if( _options->count("api-access") ) {
 
             if(fc::exists(_options->at("api-access").as<boost::filesystem::path>()))
@@ -419,7 +423,6 @@ namespace detail {
                std::exit(EXIT_FAILURE);
             }
          }
-
          else
          {
             // TODO:  Remove this generous default access policy
@@ -933,6 +936,7 @@ void application::set_program_options(boost::program_options::options_descriptio
          ("dbg-init-key", bpo::value<string>(), "Block signing key to use for init witnesses, overrides genesis file")
          ("api-access", bpo::value<boost::filesystem::path>(), "JSON file specifying API permissions")
          ("plugins", bpo::value<string>(), "Space-separated list of plugins to activate")
+         ("enable-subscribe-to-all", bpo::value<bool>()->implicit_value(false), "Whether allow API clients to subscribe to universal object creation and removal events")
          ;
    command_line_options.add(configuration_file_options);
    command_line_options.add_options()
@@ -1096,6 +1100,11 @@ void application::startup_plugins()
    for( auto& entry : my->_active_plugins )
       entry.second->plugin_startup();
    return;
+}
+
+const application_options& application::get_options()
+{
+   return my->_app_options;
 }
 
 // namespace detail
