@@ -226,7 +226,9 @@ namespace detail {
                std::string hostname = endpoint_string.substr(0, colon_pos);
                std::vector<fc::ip::endpoint> endpoints = fc::resolve(hostname, port);
                if (endpoints.empty())
-                  FC_THROW_EXCEPTION(fc::unknown_host_exception, "The host name can not be resolved: ${hostname}", ("hostname", hostname));
+                  FC_THROW_EXCEPTION( fc::unknown_host_exception,
+                                      "The host name can not be resolved: ${hostname}",
+                                      ("hostname", hostname) );
                return endpoints;
             }
             catch (const boost::bad_lexical_cast&)
@@ -335,10 +337,14 @@ namespace detail {
                bool modified_genesis = false;
                if( _options->count("genesis-timestamp") )
                {
-                  genesis.initial_timestamp = fc::time_point_sec( fc::time_point::now() ) + genesis.initial_parameters.block_interval + _options->at("genesis-timestamp").as<uint32_t>();
-                  genesis.initial_timestamp -= genesis.initial_timestamp.sec_since_epoch() % genesis.initial_parameters.block_interval;
+                  genesis.initial_timestamp = fc::time_point_sec( fc::time_point::now() )
+                                            + genesis.initial_parameters.block_interval
+                                            + _options->at("genesis-timestamp").as<uint32_t>();
+                  genesis.initial_timestamp -= ( genesis.initial_timestamp.sec_since_epoch()
+                                                 % genesis.initial_parameters.block_interval );
                   modified_genesis = true;
-                  std::cerr << "Used genesis timestamp:  " << genesis.initial_timestamp.to_iso_string() << " (PLEASE RECORD THIS)\n";
+                  std::cerr << "Used genesis timestamp:  " << genesis.initial_timestamp.to_iso_string()
+                            << " (PLEASE RECORD THIS)\n";
                }
                if( _options->count("dbg-init-key") )
                {
@@ -509,7 +515,9 @@ namespace detail {
             // you can help the network code out by throwing a block_older_than_undo_history exception.
             // when the net code sees that, it will stop trying to push blocks from that chain, but
             // leave that peer connected so that they can get sync blocks from us
-            bool result = _chain_db->push_block(blk_msg.block, (_is_block_producer | _force_validate) ? database::skip_nothing : database::skip_transaction_signatures);
+            bool result = _chain_db->push_block( blk_msg.block,
+                                                 (_is_block_producer | _force_validate) ?
+                                                    database::skip_nothing : database::skip_transaction_signatures );
 
             // the block was accepted, so we now know all of the transactions contained in the block
             if (!sync_mode)
@@ -530,7 +538,9 @@ namespace detail {
          } catch ( const graphene::chain::unlinkable_block_exception& e ) {
             // translate to a graphene::net exception
             elog("Error when pushing block:\n${e}", ("e", e.to_detail_string()));
-            FC_THROW_EXCEPTION(graphene::net::unlinkable_block_exception, "Error when pushing block:\n${e}", ("e", e.to_detail_string()));
+            FC_THROW_EXCEPTION( graphene::net::unlinkable_block_exception,
+                                "Error when pushing block:\n${e}",
+                                ("e", e.to_detail_string()) );
          } catch( const fc::exception& e ) {
             elog("Error when pushing block:\n${e}", ("e", e.to_detail_string()));
             throw;
@@ -613,7 +623,8 @@ namespace detail {
                break;
              }
            if (!found_a_block_in_synopsis)
-             FC_THROW_EXCEPTION(graphene::net::peer_is_on_an_unreachable_fork, "Unable to provide a list of blocks starting at any of the blocks in peer's synopsis");
+             FC_THROW_EXCEPTION( graphene::net::peer_is_on_an_unreachable_fork,
+                                 "Unable to provide a list of blocks starting at any of the blocks in peer's synopsis" );
          }
          for( uint32_t num = block_header::num_from_id(last_known_block_id);
               num <= _chain_db->head_block_num() && result.size() < limit;
@@ -778,7 +789,8 @@ namespace detail {
               {
                 // unable to get fork history for some reason.  maybe not linked?
                 // we can't return a synopsis of its chain
-                elog("Unable to construct a blockchain synopsis for reference hash ${hash}: ${exception}", ("hash", reference_point)("exception", e));
+                elog( "Unable to construct a blockchain synopsis for reference hash ${hash}: ${exception}",
+                      ("hash", reference_point)("exception", e) );
                 throw;
               }
               if (non_fork_high_block_num < low_block_num)
@@ -925,18 +937,24 @@ void application::set_program_options(boost::program_options::options_descriptio
 {
    configuration_file_options.add_options()
          ("p2p-endpoint", bpo::value<string>(), "Endpoint for P2P node to listen on")
-         ("seed-node,s", bpo::value<vector<string>>()->composing(), "P2P nodes to connect to on startup (may specify multiple times)")
-         ("seed-nodes", bpo::value<string>()->composing(), "JSON array of P2P nodes to connect to on startup")
-         ("checkpoint,c", bpo::value<vector<string>>()->composing(), "Pairs of [BLOCK_NUM,BLOCK_ID] that should be enforced as checkpoints.")
-         ("rpc-endpoint", bpo::value<string>()->implicit_value("127.0.0.1:8090"), "Endpoint for websocket RPC to listen on")
-         ("rpc-tls-endpoint", bpo::value<string>()->implicit_value("127.0.0.1:8089"), "Endpoint for TLS websocket RPC to listen on")
+         ("seed-node,s", bpo::value<vector<string>>()->composing(),
+          "P2P nodes to connect to on startup (may specify multiple times)")
+         ("seed-nodes", bpo::value<string>()->composing(),
+          "JSON array of P2P nodes to connect to on startup")
+         ("checkpoint,c", bpo::value<vector<string>>()->composing(),
+          "Pairs of [BLOCK_NUM,BLOCK_ID] that should be enforced as checkpoints.")
+         ("rpc-endpoint", bpo::value<string>()->implicit_value("127.0.0.1:8090"),
+          "Endpoint for websocket RPC to listen on")
+         ("rpc-tls-endpoint", bpo::value<string>()->implicit_value("127.0.0.1:8089"),
+          "Endpoint for TLS websocket RPC to listen on")
          ("server-pem,p", bpo::value<string>()->implicit_value("server.pem"), "The TLS certificate file for this server")
          ("server-pem-password,P", bpo::value<string>()->implicit_value(""), "Password for this certificate")
          ("genesis-json", bpo::value<boost::filesystem::path>(), "File to read Genesis State from")
          ("dbg-init-key", bpo::value<string>(), "Block signing key to use for init witnesses, overrides genesis file")
          ("api-access", bpo::value<boost::filesystem::path>(), "JSON file specifying API permissions")
          ("plugins", bpo::value<string>(), "Space-separated list of plugins to activate")
-         ("enable-subscribe-to-all", bpo::value<bool>()->implicit_value(false), "Whether allow API clients to subscribe to universal object creation and removal events")
+         ("enable-subscribe-to-all", bpo::value<bool>()->implicit_value(false),
+          "Whether allow API clients to subscribe to universal object creation and removal events")
          ;
    command_line_options.add(configuration_file_options);
    command_line_options.add_options()
@@ -947,7 +965,8 @@ void application::set_program_options(boost::program_options::options_descriptio
          ("replay-blockchain", "Rebuild object graph by replaying all blocks")
          ("resync-blockchain", "Delete all blocks and re-sync with network from scratch")
          ("force-validate", "Force validation of all transactions")
-         ("genesis-timestamp", bpo::value<uint32_t>(), "Replace timestamp from genesis.json with current time plus this many seconds (experts only!)")
+         ("genesis-timestamp", bpo::value<uint32_t>(),
+          "Replace timestamp from genesis.json with current time plus this many seconds (experts only!)")
          ;
    command_line_options.add(_cli_options);
    configuration_file_options.add(_cfg_options);
