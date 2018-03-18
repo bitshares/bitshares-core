@@ -1174,20 +1174,22 @@ market_ticker database_api::get_ticker( const string& base, const string& quote 
 
 market_ticker database_api_impl::get_ticker( const string& base, const string& quote, bool skip_order_book )const
 {
-    const auto assets = lookup_asset_symbols( {base, quote} );
-    FC_ASSERT( assets[0], "Invalid base asset symbol: ${s}", ("s",base) );
-    FC_ASSERT( assets[1], "Invalid quote asset symbol: ${s}", ("s",quote) );
+   FC_ASSERT( _app_options && _app_options->has_market_history_plugin, "Market history plugin is not enabled." );
 
-    const fc::time_point_sec now = fc::time_point::now();
+   const auto assets = lookup_asset_symbols( {base, quote} );
+   FC_ASSERT( assets[0], "Invalid base asset symbol: ${s}", ("s",base) );
+   FC_ASSERT( assets[1], "Invalid quote asset symbol: ${s}", ("s",quote) );
 
-    market_ticker result;
-    result.time = now;
-    result.base = base;
-    result.quote = quote;
-    result.latest = "0";
-    result.lowest_ask = "0";
-    result.highest_bid = "0";
-    result.percent_change = "0";
+   const fc::time_point_sec now = fc::time_point::now();
+
+   market_ticker result;
+   result.time = now;
+   result.base = base;
+   result.quote = quote;
+   result.latest = "0";
+   result.lowest_ask = "0";
+   result.highest_bid = "0";
+   result.percent_change = "0";
 
    auto base_id = assets[0]->id;
    auto quote_id = assets[1]->id;
@@ -1244,16 +1246,16 @@ market_volume database_api::get_24_volume( const string& base, const string& quo
 
 market_volume database_api_impl::get_24_volume( const string& base, const string& quote )const
 {
-    const auto& ticker = get_ticker( base, quote, true );
+   const auto& ticker = get_ticker( base, quote, true );
 
-    market_volume result;
-    result.time = ticker.time;
-    result.base = ticker.base;
-    result.quote = ticker.quote;
-    result.base_volume = ticker.base_volume;
-    result.quote_volume = ticker.quote_volume;
+   market_volume result;
+   result.time = ticker.time;
+   result.base = ticker.base;
+   result.quote = ticker.quote;
+   result.base_volume = ticker.base_volume;
+   result.quote_volume = ticker.quote_volume;
 
-    return result;
+   return result;
 }
 
 order_book database_api::get_order_book( const string& base, const string& quote, unsigned limit )const
@@ -1308,6 +1310,8 @@ vector<market_volume> database_api::get_top_markets(uint32_t limit)const
 
 vector<market_volume> database_api_impl::get_top_markets(uint32_t limit)const
 {
+   FC_ASSERT( _app_options && _app_options->has_market_history_plugin, "Market history plugin is not enabled." );
+
    FC_ASSERT( limit <= 100 );
 
    const auto& volume_idx = _db.get_index_type<graphene::market_history::market_ticker_index>().indices().get<by_volume>();
@@ -1347,6 +1351,8 @@ vector<market_trade> database_api_impl::get_trade_history( const string& base,
                                                            fc::time_point_sec stop,
                                                            unsigned limit )const
 {
+   FC_ASSERT( _app_options && _app_options->has_market_history_plugin, "Market history plugin is not enabled." );
+
    FC_ASSERT( limit <= 100 );
 
    auto assets = lookup_asset_symbols( {base, quote} );
@@ -1436,6 +1442,8 @@ vector<market_trade> database_api_impl::get_trade_history_by_sequence(
                                                            fc::time_point_sec stop,
                                                            unsigned limit )const
 {
+   FC_ASSERT( _app_options && _app_options->has_market_history_plugin, "Market history plugin is not enabled." );
+
    FC_ASSERT( limit <= 100 );
    FC_ASSERT( start >= 0 );
    int64_t start_seq = -start;

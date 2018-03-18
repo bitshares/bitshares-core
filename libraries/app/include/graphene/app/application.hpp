@@ -39,6 +39,7 @@ namespace graphene { namespace app {
    {
       public:
          bool enable_subscribe_to_all = false;
+         bool has_market_history_plugin = false;
    };
 
    class application

@@ -414,6 +414,9 @@ namespace detail {
          if( _options->count("enable-subscribe-to-all") )
             _app_options.enable_subscribe_to_all = _options->at("enable-subscribe-to-all").as<bool>();
 
+         if( _active_plugins.find( "market_history" ) != _active_plugins.end() )
+            _app_options.has_market_history_plugin = true;
+
          if( _options->count("api-access") ) {
 
             if(fc::exists(_options->at("api-access").as<boost::filesystem::path>()))
