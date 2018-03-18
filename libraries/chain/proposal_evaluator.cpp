@@ -32,7 +32,7 @@ namespace graphene { namespace chain {
 struct proposal_operation_hardfork_visitor
 {
    typedef void result_type;
-   const fc::time_point_sec &block_time;
+   const fc::time_point_sec block_time;
 
    proposal_operation_hardfork_visitor(const fc::time_point_sec t) : block_time(t) {}
 
@@ -94,16 +94,16 @@ void_result proposal_create_evaluator::do_evaluate(const proposal_create_operati
    const database& d = db();
 
    // Calling the proposal hardfork visitor
-   const fc::time_point_sec& block_time = d.head_block_time();
+   const fc::time_point_sec block_time = d.head_block_time();
    proposal_operation_hardfork_visitor vtor(block_time);
    vtor( o );
 
    const auto& global_parameters = d.get_global_properties().parameters;
 
-   FC_ASSERT( o.expiration_time > d.head_block_time(), "Proposal has already expired on creation." );
-   FC_ASSERT( o.expiration_time <= d.head_block_time() + global_parameters.maximum_proposal_lifetime,
+   FC_ASSERT( o.expiration_time > block_time, "Proposal has already expired on creation." );
+   FC_ASSERT( o.expiration_time <= block_time + global_parameters.maximum_proposal_lifetime,
               "Proposal expiration time is too far in the future.");
-   FC_ASSERT( !o.review_period_seconds || fc::seconds(*o.review_period_seconds) < (o.expiration_time - d.head_block_time()),
+   FC_ASSERT( !o.review_period_seconds || fc::seconds(*o.review_period_seconds) < (o.expiration_time - block_time),
               "Proposal review period must be less than its overall lifetime." );
 
    {
