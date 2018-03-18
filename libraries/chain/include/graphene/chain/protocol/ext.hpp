@@ -145,9 +145,10 @@ namespace fc {
 template< typename T >
 struct graphene_extension_from_variant_visitor
 {
-   graphene_extension_from_variant_visitor( const variant_object& v, T& val )
-      : vo( v ), value( val )
+   graphene_extension_from_variant_visitor( const variant_object& v, T& val, uint32_t max_depth )
+      : vo( v ), value( val ), _max_depth(max_depth - 1)
    {
+      FC_ASSERT( max_depth > 0, "Recursion depth exceeded!" );
       count_left = vo.size();
    }
 
@@ -157,7 +158,7 @@ struct graphene_extension_from_variant_visitor
       auto it = vo.find(name);
       if( it != vo.end() )
       {
-         from_variant( it->value(), (value.*member) );
+         from_variant( it->value(), (value.*member), _max_depth );
          assert( count_left > 0 );    // x.find(k) returns true for n distinct values of k only if x.size() >= n
          --count_left;
       }
@@ -165,11 +166,12 @@ struct graphene_extension_from_variant_visitor
 
    const variant_object& vo;
    T& value;
+   const uint32_t _max_depth;
    mutable uint32_t count_left = 0;
 };
 
 template< typename T >
-void from_variant( const fc::variant& var, graphene::chain::extension<T>& value )
+void from_variant( const fc::variant& var, graphene::chain::extension<T>& value, uint32_t max_depth )
 {
    value = graphene::chain::extension<T>();
    if( var.is_null() )
@@ -180,7 +182,7 @@ void from_variant( const fc::variant& var, graphene::chain::extension<T>& value 
       return;
    }
 
-   graphene_extension_from_variant_visitor<T> vtor( var.get_object(), value.value );
+   graphene_extension_from_variant_visitor<T> vtor( var.get_object(), value.value, max_depth );
    fc::reflector<T>::visit( vtor );
    FC_ASSERT( vtor.count_left == 0 );    // unrecognized extension throws here
 }
@@ -188,23 +190,23 @@ void from_variant( const fc::variant& var, graphene::chain::extension<T>& value 
 template< typename T >
 struct graphene_extension_to_variant_visitor
 {
-   graphene_extension_to_variant_visitor( const T& v ) : value(v) {}
+   graphene_extension_to_variant_visitor( const T& v, uint32_t max_depth ) : value(v), mvo(max_depth) {}
 
    template<typename Member, class Class, Member (Class::*member)>
    void operator()( const char* name )const
    {
       if( (value.*member).valid() )
-         mvo[ name ] = (value.*member);
+         mvo( name, value.*member );
    }
 
    const T& value;
-   mutable mutable_variant_object mvo;
+   mutable limited_mutable_variant_object mvo;
 };
 
 template< typename T >
-void to_variant( const graphene::chain::extension<T>& value, fc::variant& var )
+void to_variant( const graphene::chain::extension<T>& value, fc::variant& var, uint32_t max_depth )
 {
-   graphene_extension_to_variant_visitor<T> vtor( value.value );
+   graphene_extension_to_variant_visitor<T> vtor( value.value, max_depth );
    fc::reflector<T>::visit( vtor );
    var = vtor.mvo;
 }

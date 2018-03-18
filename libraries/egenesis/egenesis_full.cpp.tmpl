@@ -49,7 +49,6 @@ void compute_egenesis_json( std::string& result )
       result.append( genesis_json_array[i], ${genesis_json_array_width} );
    }
    result.append( std::string( genesis_json_array[ ${genesis_json_array_height}-1 ] ) );
-   return;
 }
 
 fc::sha256 get_egenesis_json_hash()
