@@ -78,7 +78,7 @@ namespace graphene { namespace app {
     {
        if( api_name == "database_api" )
        {
-          _database_api = std::make_shared< database_api >( std::ref( *_app.chain_database() ) );
+          _database_api = std::make_shared< database_api >( std::ref( *_app.chain_database() ), &( _app.get_options() ) );
        }
        else if( api_name == "block_api" )
        {

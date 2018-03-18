@@ -53,7 +53,7 @@ class database_api_impl;
 class database_api_impl : public std::enable_shared_from_this<database_api_impl>
 {
    public:
-      database_api_impl( graphene::chain::database& db );
+      database_api_impl( graphene::chain::database& db, const application_options* app_options );
       ~database_api_impl();
 
 
@@ -230,6 +230,7 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       boost::signals2::scoped_connection                                                                                           _pending_trx_connection;
       map< pair<asset_id_type,asset_id_type>, std::function<void(const variant&)> >      _market_subscriptions;
       graphene::chain::database&                                                                                                            _db;
+      const application_options* _app_options = nullptr;
 };
 
 //////////////////////////////////////////////////////////////////////
@@ -238,12 +239,13 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
 //                                                                  //
 //////////////////////////////////////////////////////////////////////
 
-database_api::database_api( graphene::chain::database& db )
-   : my( new database_api_impl( db ) ) {}
+database_api::database_api( graphene::chain::database& db, const application_options* app_options )
+   : my( new database_api_impl( db, app_options ) ) {}
 
 database_api::~database_api() {}
 
-database_api_impl::database_api_impl( graphene::chain::database& db ):_db(db)
+database_api_impl::database_api_impl( graphene::chain::database& db, const application_options* app_options )
+:_db(db), _app_options(app_options)
 {
    wlog("creating database api ${x}", ("x",int64_t(this)) );
    _new_connection = _db.new_objects.connect([this](const vector<object_id_type>& ids, const flat_set<account_id_type>& impacted_accounts) {
@@ -316,6 +318,12 @@ void database_api::set_subscribe_callback( std::function<void(const variant&)> c
 
 void database_api_impl::set_subscribe_callback( std::function<void(const variant&)> cb, bool notify_remove_create )
 {
+   if( notify_remove_create )
+   {
+      FC_ASSERT( _app_options && _app_options->enable_subscribe_to_all,
+                 "Subscribing to universal object creation and removal is disallowed in this server." );
+   }
+
    _subscribe_callback = cb;
    _notify_remove_create = notify_remove_create;
    _subscribed_accounts.clear();
@@ -1166,20 +1174,22 @@ market_ticker database_api::get_ticker( const string& base, const string& quote 
 
 market_ticker database_api_impl::get_ticker( const string& base, const string& quote, bool skip_order_book )const
 {
-    const auto assets = lookup_asset_symbols( {base, quote} );
-    FC_ASSERT( assets[0], "Invalid base asset symbol: ${s}", ("s",base) );
-    FC_ASSERT( assets[1], "Invalid quote asset symbol: ${s}", ("s",quote) );
+   FC_ASSERT( _app_options && _app_options->has_market_history_plugin, "Market history plugin is not enabled." );
 
-    const fc::time_point_sec now = fc::time_point::now();
+   const auto assets = lookup_asset_symbols( {base, quote} );
+   FC_ASSERT( assets[0], "Invalid base asset symbol: ${s}", ("s",base) );
+   FC_ASSERT( assets[1], "Invalid quote asset symbol: ${s}", ("s",quote) );
 
-    market_ticker result;
-    result.time = now;
-    result.base = base;
-    result.quote = quote;
-    result.latest = "0";
-    result.lowest_ask = "0";
-    result.highest_bid = "0";
-    result.percent_change = "0";
+   const fc::time_point_sec now = fc::time_point::now();
+
+   market_ticker result;
+   result.time = now;
+   result.base = base;
+   result.quote = quote;
+   result.latest = "0";
+   result.lowest_ask = "0";
+   result.highest_bid = "0";
+   result.percent_change = "0";
 
    auto base_id = assets[0]->id;
    auto quote_id = assets[1]->id;
@@ -1236,16 +1246,16 @@ market_volume database_api::get_24_volume( const string& base, const string& quo
 
 market_volume database_api_impl::get_24_volume( const string& base, const string& quote )const
 {
-    const auto& ticker = get_ticker( base, quote, true );
+   const auto& ticker = get_ticker( base, quote, true );
 
-    market_volume result;
-    result.time = ticker.time;
-    result.base = ticker.base;
-    result.quote = ticker.quote;
-    result.base_volume = ticker.base_volume;
-    result.quote_volume = ticker.quote_volume;
+   market_volume result;
+   result.time = ticker.time;
+   result.base = ticker.base;
+   result.quote = ticker.quote;
+   result.base_volume = ticker.base_volume;
+   result.quote_volume = ticker.quote_volume;
 
-    return result;
+   return result;
 }
 
 order_book database_api::get_order_book( const string& base, const string& quote, unsigned limit )const
@@ -1300,6 +1310,8 @@ vector<market_volume> database_api::get_top_markets(uint32_t limit)const
 
 vector<market_volume> database_api_impl::get_top_markets(uint32_t limit)const
 {
+   FC_ASSERT( _app_options && _app_options->has_market_history_plugin, "Market history plugin is not enabled." );
+
    FC_ASSERT( limit <= 100 );
 
    const auto& volume_idx = _db.get_index_type<graphene::market_history::market_ticker_index>().indices().get<by_volume>();
@@ -1339,6 +1351,8 @@ vector<market_trade> database_api_impl::get_trade_history( const string& base,
                                                            fc::time_point_sec stop,
                                                            unsigned limit )const
 {
+   FC_ASSERT( _app_options && _app_options->has_market_history_plugin, "Market history plugin is not enabled." );
+
    FC_ASSERT( limit <= 100 );
 
    auto assets = lookup_asset_symbols( {base, quote} );
@@ -1428,6 +1442,8 @@ vector<market_trade> database_api_impl::get_trade_history_by_sequence(
                                                            fc::time_point_sec stop,
                                                            unsigned limit )const
 {
+   FC_ASSERT( _app_options && _app_options->has_market_history_plugin, "Market history plugin is not enabled." );
+
    FC_ASSERT( limit <= 100 );
    FC_ASSERT( start >= 0 );
    int64_t start_seq = -start;
@@ -2211,7 +2227,8 @@ void database_api_impl::handle_object_changed(bool force_notify, bool full_objec
          }
       }
 
-      broadcast_updates(updates);
+      if( updates.size() )
+         broadcast_updates(updates);
    }
 
    if( _market_subscriptions.size() )
@@ -2230,7 +2247,8 @@ void database_api_impl::handle_object_changed(bool force_notify, bool full_objec
          }
       }
 
-      broadcast_market_updates(broadcast_queue);
+      if( broadcast_queue.size() )
+         broadcast_market_updates(broadcast_queue);
    }
 }
 
