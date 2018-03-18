@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015 Cryptonomex, Inc., and contributors.
+ * Copyright (c) 2015-2018 Cryptonomex, Inc., and contributors.
  *
  * The MIT License
  *
@@ -23,35 +23,38 @@
  */
 #include <graphene/chain/protocol/asset_ops.hpp>
 
+#include <locale>
+
 namespace graphene { namespace chain {
 
 /**
  *  Valid symbols can contain [A-Z0-9], and '.'
  *  They must start with [A, Z]
- *  They must end with [A, Z]
+ *  They must end with [A, Z] before HF_620 or [A-Z0-9] after it
  *  They can contain a maximum of one '.'
  */
 bool is_valid_symbol( const string& symbol )
 {
+    static const std::locale& loc = std::locale::classic();
     if( symbol.size() < GRAPHENE_MIN_ASSET_SYMBOL_LENGTH )
         return false;
 
     if( symbol.substr(0,3) == "BIT" ) 
-       return false;
+        return false;
 
     if( symbol.size() > GRAPHENE_MAX_ASSET_SYMBOL_LENGTH )
         return false;
 
-    if( !isalpha( symbol.front() ) )
+    if( !isalpha( symbol.front(), loc ) )
         return false;
 
-    if( !isalpha( symbol.back() ) )
+    if( !isalnum( symbol.back(), loc ) )
         return false;
 
     bool dot_already_present = false;
     for( const auto c : symbol )
     {
-        if( (isalpha( c ) && isupper( c )) || isdigit(c) )
+        if( (isalpha( c, loc ) && isupper( c, loc )) || isdigit( c, loc ) )
             continue;
 
         if( c == '.' )

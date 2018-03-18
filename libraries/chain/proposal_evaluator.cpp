@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015 Cryptonomex, Inc., and contributors.
+ * Copyright (c) 2015-2018 Cryptonomex, Inc., and contributors.
  *
  * The MIT License
  *
@@ -21,28 +21,89 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
+#include <graphene/chain/database.hpp>
 #include <graphene/chain/proposal_evaluator.hpp>
 #include <graphene/chain/proposal_object.hpp>
-#include <graphene/chain/account_object.hpp>
-#include <graphene/chain/protocol/fee_schedule.hpp>
-#include <graphene/chain/exceptions.hpp>
-#include <graphene/chain/asset_evaluator.hpp>
 #include <graphene/chain/hardfork.hpp>
 
-
-#include <fc/smart_ref_impl.hpp>
-
 namespace graphene { namespace chain {
+
+
+struct proposal_operation_hardfork_visitor
+{
+   typedef void result_type;
+   const fc::time_point_sec block_time;
+
+   proposal_operation_hardfork_visitor(const fc::time_point_sec t) : block_time(t) {}
+
+   template<typename T>
+   void operator()(const T &v) const {}
+
+   // hf_620
+   void operator()(const graphene::chain::asset_create_operation &v) const {
+      if (block_time < HARDFORK_CORE_620_TIME) {
+         static const std::locale &loc = std::locale::classic();
+         FC_ASSERT(isalpha(v.symbol.back(), loc), "Asset ${s} must end with alpha character before hardfork 620", ("s", v.symbol));
+      }
+   }
+   // hf_199
+   void operator()(const graphene::chain::asset_update_issuer_operation &v) const {
+      if (block_time < HARDFORK_CORE_199_TIME) {
+         FC_ASSERT(false, "Not allowed until hardfork 199");
+      }
+   }
+   // hf_188
+   void operator()(const graphene::chain::asset_claim_pool_operation &v) const {
+      if (block_time < HARDFORK_CORE_188_TIME) {
+         FC_ASSERT(false, "Not allowed until hardfork 188");
+      }
+   }
+   // hf_588
+   // issue #588
+   //
+   // As a virtual operation which has no evaluator `asset_settle_cancel_operation`
+   // originally won't be packed into blocks, yet its loose `validate()` method
+   // make it able to slip into blocks.
+   //
+   // We need to forbid this operation being packed into blocks via proposal but
+   // this will lead to a hardfork (this operation in proposal will denied by new
+   // node while accept by old node), so a hardfork guard code needed and a
+   // consensus upgrade over all nodes needed in future. And because the
+   // `validate()` method not suitable to check database status, so we put the
+   // code here.
+   //
+   // After the hardfork, all nodes will deny packing this operation into a block,
+   // and then we will check whether exists a proposal containing this kind of
+   // operation, if not exists, we can harden the `validate()` method to deny
+   // it in a earlier stage.
+   //
+   void operator()(const graphene::chain::asset_settle_cancel_operation &v) const {
+      if (block_time > HARDFORK_CORE_588_TIME) {
+         FC_ASSERT(!"Virtual operation");
+      }
+   }
+   // loop and self visit in proposals
+   void operator()(const graphene::chain::proposal_create_operation &v) const {
+      for (const op_wrapper &op : v.proposed_ops)
+         op.op.visit(*this);
+   }
+};
 
 void_result proposal_create_evaluator::do_evaluate(const proposal_create_operation& o)
 { try {
    const database& d = db();
+
+   // Calling the proposal hardfork visitor
+   const fc::time_point_sec block_time = d.head_block_time();
+   proposal_operation_hardfork_visitor vtor(block_time);
+   vtor( o );
+
    const auto& global_parameters = d.get_global_properties().parameters;
 
-   FC_ASSERT( o.expiration_time > d.head_block_time(), "Proposal has already expired on creation." );
-   FC_ASSERT( o.expiration_time <= d.head_block_time() + global_parameters.maximum_proposal_lifetime,
+   FC_ASSERT( o.expiration_time > block_time, "Proposal has already expired on creation." );
+   FC_ASSERT( o.expiration_time <= block_time + global_parameters.maximum_proposal_lifetime,
               "Proposal expiration time is too far in the future.");
-   FC_ASSERT( !o.review_period_seconds || fc::seconds(*o.review_period_seconds) < (o.expiration_time - d.head_block_time()),
+   FC_ASSERT( !o.review_period_seconds || fc::seconds(*o.review_period_seconds) < (o.expiration_time - block_time),
               "Proposal review period must be less than its overall lifetime." );
 
    {
@@ -78,44 +139,6 @@ void_result proposal_create_evaluator::do_evaluate(const proposal_create_operati
       _proposed_trx.operations.push_back(op.op);
 
    _proposed_trx.validate();
-
-
-   // issue #588
-   //
-   // As a virtual operation which has no evaluator `asset_settle_cancel_operation`
-   // originally won't be packed into blocks, yet its loose `validate()` method
-   // make it able to slip into blocks.
-   //
-   // We need to forbid this operation being packed into blocks via proposal but
-   // this will lead to a hardfork (this operation in proposal will denied by new
-   // node while accept by old node), so a hardfork guard code needed and a
-   // consensus upgrade over all nodes needed in future. And because the
-   // `validate()` method not suitable to check database status, so we put the
-   // code here.
-   //
-   // After the hardfork, all nodes will deny packing this operation into a block,
-   // and then we will check whether exists a proposal containing this kind of
-   // operation, if not exists, we can harden the `validate()` method to deny
-   // it in a earlier stage.
-   //
-   if (d.head_block_time() > HARDFORK_CORE_588_TIME)
-   { 
-      // kick out the `asset_settle_cancel_operation`
-      graphene::chain::impl::hf_588_visitor hf_588;
-      hf_588( o );
-   }
-
-   if( d.head_block_time() < HARDFORK_CORE_199_TIME )
-   { // TODO: remove after HARDFORK_CORE_199_TIME has passed
-      graphene::chain::impl::hf_199_visitor hf_199;
-      hf_199( o );
-   }
-
-   if( d.head_block_time() < HARDFORK_CORE_188_TIME )
-   { // TODO: remove after HARDFORK_CORE_188_TIME has passed
-      graphene::chain::impl::hf_188_visitor hf_188;
-      hf_188( o );
-   }
 
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }
@@ -250,5 +273,6 @@ void_result proposal_delete_evaluator::do_apply(const proposal_delete_operation&
 
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }
+
 
 } } // graphene::chain

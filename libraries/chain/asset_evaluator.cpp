@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015 Cryptonomex, Inc., and contributors.
+ * Copyright (c) 2015-2018 Cryptonomex, Inc., and contributors.
  *
  * The MIT License
  *
@@ -32,6 +32,8 @@
 
 #include <functional>
 
+#include <locale>
+
 namespace graphene { namespace chain {
 
 void_result asset_create_evaluator::do_evaluate( const asset_create_operation& op )
@@ -55,22 +57,6 @@ void_result asset_create_evaluator::do_evaluate( const asset_create_operation& o
 
    if( d.head_block_time() > HARDFORK_385_TIME )
    {
-
-   if( d.head_block_time() <= HARDFORK_409_TIME )
-   {
-      auto dotpos = op.symbol.find( '.' );
-      if( dotpos != std::string::npos )
-      {
-         auto prefix = op.symbol.substr( 0, dotpos );
-         auto asset_symbol_itr = asset_indx.find( op.symbol );
-         FC_ASSERT( asset_symbol_itr != asset_indx.end(), "Asset ${s} may only be created by issuer of ${p}, but ${p} has not been registered",
-                    ("s",op.symbol)("p",prefix) );
-         FC_ASSERT( asset_symbol_itr->issuer == op.issuer, "Asset ${s} may only be created by issuer of ${p}, ${i}",
-                    ("s",op.symbol)("p",prefix)("i", op.issuer(d).name) );
-      }
-   }
-   else
-   {
       auto dotpos = op.symbol.rfind( '.' );
       if( dotpos != std::string::npos )
       {
@@ -81,8 +67,11 @@ void_result asset_create_evaluator::do_evaluate( const asset_create_operation& o
          FC_ASSERT( asset_symbol_itr->issuer == op.issuer, "Asset ${s} may only be created by issuer of ${p}, ${i}",
                     ("s",op.symbol)("p",prefix)("i", op.issuer(d).name) );
       }
-   }
 
+      if(d.head_block_time() <= HARDFORK_CORE_620_TIME ) { // TODO: remove this check after hf_620
+         static const std::locale& loc = std::locale::classic();
+         FC_ASSERT(isalpha(op.symbol.back(), loc), "Asset ${s} must end with alpha character before hardfork 620", ("s",op.symbol));
+      }
    }
    else
    {
@@ -351,11 +340,10 @@ void_result asset_update_issuer_evaluator::do_evaluate(const asset_update_issuer
               ("o.issuer", o.issuer)("a.issuer", a.issuer) );
 
    if( d.head_block_time() < HARDFORK_CORE_199_TIME )
-   { // TODO: remove after HARDFORK_CORE_199_TIME has passed
-      graphene::chain::impl::hf_199_visitor hf_199;
-      hf_199( o );
+   {
+      // TODO: remove after HARDFORK_CORE_199_TIME has passed
+      FC_ASSERT(false, "Not allowed until hardfork 199");
    }
-
 
    return void_result();
 } FC_CAPTURE_AND_RETHROW((o)) }
