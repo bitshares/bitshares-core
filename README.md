@@ -1,6 +1,6 @@
 BitShares Core
 ==============
-[![Build Status](https://travis-ci.org/ryanrfox/bitshares-core.svg?branch=travis-ci)](https://travis-ci.org/bitshares/bitshares-core)
+[![Build Status](https://travis-ci.org/bitshares/bitshares-core.svg?branch=travis-ci)](https://travis-ci.org/bitshares/bitshares-core)
 
 * [Getting Started](#getting-started)
 * [Support](#support)
