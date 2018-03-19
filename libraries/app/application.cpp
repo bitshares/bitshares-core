@@ -410,8 +410,9 @@ namespace detail {
             _force_validate = true;
          }
 
-         if( _options->count("enable-subscribe-to-all") )
-            _app_options.enable_subscribe_to_all = _options->at("enable-subscribe-to-all").as<bool>();
+         // TODO uncomment this when GUI is ready
+         //if( _options->count("enable-subscribe-to-all") )
+         //   _app_options.enable_subscribe_to_all = _options->at("enable-subscribe-to-all").as<bool>();
 
          if( _active_plugins.find( "market_history" ) != _active_plugins.end() )
             _app_options.has_market_history_plugin = true;
@@ -955,8 +956,9 @@ void application::set_program_options(boost::program_options::options_descriptio
          ("dbg-init-key", bpo::value<string>(), "Block signing key to use for init witnesses, overrides genesis file")
          ("api-access", bpo::value<boost::filesystem::path>(), "JSON file specifying API permissions")
          ("plugins", bpo::value<string>(), "Space-separated list of plugins to activate")
-         ("enable-subscribe-to-all", bpo::value<bool>()->implicit_value(false),
-          "Whether allow API clients to subscribe to universal object creation and removal events")
+         // TODO uncomment this when GUI is ready
+         //("enable-subscribe-to-all", bpo::value<bool>()->implicit_value(false),
+         // "Whether allow API clients to subscribe to universal object creation and removal events")
          ;
    command_line_options.add(configuration_file_options);
    command_line_options.add_options()
