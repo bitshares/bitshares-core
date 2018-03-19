@@ -1001,7 +1001,35 @@ class wallet_api
                                       uint8_t precision,
                                       asset_options common,
                                       fc::optional<bitasset_options> bitasset_opts,
-                                      bool is_prediction_market,
+                                      bool broadcast = false);
+
+    /** Creates a new prediction market asset.
+       *
+       * Many options can be changed later using \c update_asset()
+       *
+       * Right now this function is difficult to use because you must provide raw JSON data
+       * structures for the options objects, and those include prices and asset ids.
+       *
+       * @param issuer the name or id of the account who will pay the fee and become the
+       *               issuer of the new asset.  This can be updated later
+       * @param symbol the ticker symbol of the new asset
+       * @param precision the number of digits of precision to the right of the decimal point,
+       *                  must be less than or equal to 12
+       * @param common asset options required for all new assets.
+       *               Note that core_exchange_rate technically needs to store the asset ID of
+       *               this new asset. Since this ID is not known at the time this operation is
+       *               created, create this price as though the new asset has instance ID 1, and
+       *               the chain will overwrite it with the new asset's ID.
+       * @param bitasset_opts options specific to BitAssets.  This may be null unless the
+       *               \c market_issued flag is set in common.flags
+       * @param broadcast true to broadcast the transaction on the network
+       * @returns the signed transaction creating a new asset
+       */
+      signed_transaction create_prediction_market(string issuer,
+                                      string symbol,
+                                      uint8_t precision,
+                                      asset_options common,
+                                      fc::optional<bitasset_options> bitasset_opts,
                                       bool broadcast = false);
 
       /** Issue new shares of an asset.
@@ -1656,6 +1684,7 @@ FC_API( graphene::wallet::wallet_api,
         (transfer2)
         (get_transaction_id)
         (create_asset)
+        (create_prediction_market)
         (update_asset)
         (update_bitasset)
         (update_asset_feed_producers)
