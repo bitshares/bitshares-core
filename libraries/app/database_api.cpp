@@ -47,13 +47,10 @@ typedef std::map< std::pair<graphene::chain::asset_id_type, graphene::chain::ass
 
 namespace graphene { namespace app {
 
-class database_api_impl;
-
-
 class database_api_impl : public std::enable_shared_from_this<database_api_impl>
 {
    public:
-      database_api_impl( graphene::chain::database& db, const application_options* app_options );
+      explicit database_api_impl( graphene::chain::database& db, const application_options* app_options );
       ~database_api_impl();
 
 
@@ -170,7 +167,7 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
             return;
 
          if( !is_subscribed_to_item(i) )
-            _subscribe_filter.insert( vec.data(), vec.size() );//(vecconst char*)&i, sizeof(i) );
+            _subscribe_filter.insert( vec.data(), vec.size() );
       }
 
       template<typename T>
@@ -202,7 +199,7 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
 
          auto sub = _market_subscriptions.find( market );
          if( sub != _market_subscriptions.end() ) {
-            queue[market].emplace_back( full_object ? obj->to_variant() : fc::variant(obj->id) );
+            queue[market].emplace_back( full_object ? obj->to_variant() : fc::variant(obj->id, 1) );
          }
       }
 
@@ -260,7 +257,7 @@ database_api_impl::database_api_impl( graphene::chain::database& db, const appli
    _applied_block_connection = _db.applied_block.connect([this](const signed_block&){ on_applied_block(); });
 
    _pending_trx_connection = _db.on_pending_transaction.connect([this](const signed_transaction& trx ){
-                         if( _pending_trx_callback ) _pending_trx_callback( fc::variant(trx) );
+                         if( _pending_trx_callback ) _pending_trx_callback( fc::variant(trx, GRAPHENE_MAX_NESTED_OBJECTS) );
                       });
 }
 
@@ -624,7 +621,7 @@ std::map<std::string, full_account> database_api_impl::get_full_accounts( const 
    {
       const account_object* account = nullptr;
       if (std::isdigit(account_name_or_id[0]))
-         account = _db.find(fc::variant(account_name_or_id).as<account_id_type>());
+         account = _db.find(fc::variant(account_name_or_id, 1).as<account_id_type>(1));
       else
       {
          const auto& idx = _db.get_index_type<account_index>().indices().get<by_name>();
@@ -643,7 +640,6 @@ std::map<std::string, full_account> database_api_impl::get_full_accounts( const 
          }
       }
 
-      // fc::mutable_variant_object full_account;
       full_account acnt;
       acnt.account = *account;
       acnt.statistics = account->statistics(_db);
@@ -652,12 +648,6 @@ std::map<std::string, full_account> database_api_impl::get_full_accounts( const 
       acnt.lifetime_referrer_name = account->lifetime_referrer(_db).name;
       acnt.votes = lookup_vote_ids( vector<vote_id_type>(account->options.votes.begin(),account->options.votes.end()) );
 
-      // Add the account itself, its statistics object, cashback balance, and referral account names
-      /*
-      full_account("account", *account)("statistics", account->statistics(_db))
-            ("registrar_name", account->registrar(_db).name)("referrer_name", account->referrer(_db).name)
-            ("lifetime_referrer_name", account->lifetime_referrer(_db).name);
-            */
       if (account->cashback_vb)
       {
          acnt.cashback_balance = account->cashback_balance(_db);
@@ -677,7 +667,6 @@ std::map<std::string, full_account> database_api_impl::get_full_accounts( const 
 
       // Add the account's balances
       auto balance_range = _db.get_index_type<account_balance_index>().indices().get<by_account_asset>().equal_range(boost::make_tuple(account->id));
-      //vector<account_balance_object> balances;
       std::for_each(balance_range.first, balance_range.second,
                     [&acnt](const account_balance_object& balance) {
                        acnt.balances.emplace_back(balance);
@@ -989,7 +978,7 @@ vector<optional<asset_object>> database_api_impl::lookup_asset_symbols(const vec
                   [this, &assets_by_symbol](const string& symbol_or_id) -> optional<asset_object> {
       if( !symbol_or_id.empty() && std::isdigit(symbol_or_id[0]) )
       {
-         auto ptr = _db.find(variant(symbol_or_id).as<asset_id_type>());
+         auto ptr = _db.find(variant(symbol_or_id, 1).as<asset_id_type>(1));
          return ptr == nullptr? optional<asset_object>() : *ptr;
       }
       auto itr = assets_by_symbol.find(symbol_or_id);
@@ -1763,7 +1752,7 @@ vector<variant> database_api_impl::lookup_vote_ids( const vector<vote_id_type>& 
          {
             auto itr = committee_idx.find( id );
             if( itr != committee_idx.end() )
-               result.emplace_back( variant( *itr ) );
+               result.emplace_back( variant( *itr, 1 ) );
             else
                result.emplace_back( variant() );
             break;
@@ -1772,7 +1761,7 @@ vector<variant> database_api_impl::lookup_vote_ids( const vector<vote_id_type>& 
          {
             auto itr = witness_idx.find( id );
             if( itr != witness_idx.end() )
-               result.emplace_back( variant( *itr ) );
+               result.emplace_back( variant( *itr, 1 ) );
             else
                result.emplace_back( variant() );
             break;
@@ -1781,12 +1770,12 @@ vector<variant> database_api_impl::lookup_vote_ids( const vector<vote_id_type>& 
          {
             auto itr = for_worker_idx.find( id );
             if( itr != for_worker_idx.end() ) {
-               result.emplace_back( variant( *itr ) );
+               result.emplace_back( variant( *itr, 1 ) );
             }
             else {
                auto itr = against_worker_idx.find( id );
                if( itr != against_worker_idx.end() ) {
-                  result.emplace_back( variant( *itr ) );
+                  result.emplace_back( variant( *itr, 1 ) );
                }
                else {
                   result.emplace_back( variant() );
@@ -1795,6 +1784,8 @@ vector<variant> database_api_impl::lookup_vote_ids( const vector<vote_id_type>& 
             break;
          }
          case vote_id_type::VOTE_TYPE_COUNT: break; // supress unused enum value warnings
+         default:
+            FC_CAPTURE_AND_THROW( fc::out_of_range_exception, (id) );
       }
    }
    return result;
@@ -1908,8 +1899,8 @@ bool database_api::verify_authority( const signed_transaction& trx )const
 bool database_api_impl::verify_authority( const signed_transaction& trx )const
 {
    trx.verify_authority( _db.get_chain_id(),
-                         [&]( account_id_type id ){ return &id(_db).active; },
-                         [&]( account_id_type id ){ return &id(_db).owner; },
+                         [this]( account_id_type id ){ return &id(_db).active; },
+                         [this]( account_id_type id ){ return &id(_db).owner; },
                           _db.get_global_properties().parameters.max_authority_depth );
    return true;
 }
@@ -1924,7 +1915,7 @@ bool database_api_impl::verify_account_authority( const string& name_or_id, cons
    FC_ASSERT( name_or_id.size() > 0);
    const account_object* account = nullptr;
    if (std::isdigit(name_or_id[0]))
-      account = _db.find(fc::variant(name_or_id).as<account_id_type>());
+      account = _db.find(fc::variant(name_or_id, 1).as<account_id_type>(1));
    else
    {
       const auto& idx = _db.get_index_type<account_index>().indices().get<by_name>();
@@ -1985,7 +1976,7 @@ struct get_required_fees_helper
       {
          asset fee = current_fee_schedule.set_fee( op, core_exchange_rate );
          fc::variant result;
-         fc::to_variant( fee, result );
+         fc::to_variant( fee, result, GRAPHENE_NET_MAX_NESTED_OBJECTS );
          return result;
       }
    }
@@ -2005,7 +1996,7 @@ struct get_required_fees_helper
       // two mutually recursive functions instead of a visitor
       result.first = current_fee_schedule.set_fee( proposal_create_op, core_exchange_rate );
       fc::variant vresult;
-      fc::to_variant( result, vresult );
+      fc::to_variant( result, vresult, GRAPHENE_NET_MAX_NESTED_OBJECTS );
       return vresult;
    }
 
@@ -2222,7 +2213,7 @@ void database_api_impl::handle_object_changed(bool force_notify, bool full_objec
             }
             else
             {
-               updates.emplace_back( id );
+               updates.emplace_back( fc::variant( id, 1 ) );
             }
          }
       }
@@ -2262,7 +2253,7 @@ void database_api_impl::on_applied_block()
       auto capture_this = shared_from_this();
       block_id_type block_id = _db.head_block_id();
       fc::async([this,capture_this,block_id](){
-         _block_applied_callback(fc::variant(block_id));
+         _block_applied_callback(fc::variant(block_id, 1));
       });
    }
 
@@ -2303,7 +2294,7 @@ void database_api_impl::on_applied_block()
       {
          auto itr = _market_subscriptions.find(item.first);
          if(itr != _market_subscriptions.end())
-            itr->second(fc::variant(item.second));
+            itr->second(fc::variant(item.second, GRAPHENE_NET_MAX_NESTED_OBJECTS));
       }
    });
 }

@@ -34,8 +34,7 @@
 #include <fc/io/json.hpp>
 
 #include <graphene/net/peer_database.hpp>
-
-
+#include <graphene/net/config.hpp>
 
 namespace graphene { namespace net {
   namespace detail
@@ -81,7 +80,7 @@ namespace graphene { namespace net {
     public:
       typedef peer_database_impl::potential_peer_set::index<peer_database_impl::last_seen_time_index>::type::iterator last_seen_time_index_iterator;
       last_seen_time_index_iterator _iterator;
-      peer_database_iterator_impl(const last_seen_time_index_iterator& iterator) :
+      explicit peer_database_iterator_impl(const last_seen_time_index_iterator& iterator) :
         _iterator(iterator)
       {}
     };
@@ -95,9 +94,8 @@ namespace graphene { namespace net {
       {
         try
         {
-          std::vector<potential_peer_record> peer_records = fc::json::from_file(_peer_database_filename).as<std::vector<potential_peer_record> >();
+          std::vector<potential_peer_record> peer_records = fc::json::from_file(_peer_database_filename).as<std::vector<potential_peer_record> >( GRAPHENE_NET_MAX_NESTED_OBJECTS );
           std::copy(peer_records.begin(), peer_records.end(), std::inserter(_potential_peer_set, _potential_peer_set.end()));
-#define MAXIMUM_PEERDB_SIZE 1000
           if (_potential_peer_set.size() > MAXIMUM_PEERDB_SIZE)
           {
             // prune database to a reasonable size
@@ -125,7 +123,7 @@ namespace graphene { namespace net {
         fc::path peer_database_filename_dir = _peer_database_filename.parent_path();
         if (!fc::exists(peer_database_filename_dir))
           fc::create_directories(peer_database_filename_dir);
-        fc::json::save_to_file(peer_records, _peer_database_filename);
+        fc::json::save_to_file( peer_records, _peer_database_filename, GRAPHENE_NET_MAX_NESTED_OBJECTS );
       }
       catch (const fc::exception& e)
       {
