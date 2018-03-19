@@ -1001,6 +1001,7 @@ class wallet_api
                                       uint8_t precision,
                                       asset_options common,
                                       fc::optional<bitasset_options> bitasset_opts,
+                                      bool is_prediction_market,
                                       bool broadcast = false);
 
       /** Issue new shares of an asset.

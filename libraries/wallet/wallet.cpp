@@ -1129,6 +1129,7 @@ public:
                                    uint8_t precision,
                                    asset_options common,
                                    fc::optional<bitasset_options> bitasset_opts,
+                                   bool is_prediction_market,
                                    bool broadcast = false)
    { try {
       account_object issuer_account = get_account( issuer );
@@ -1140,6 +1141,7 @@ public:
       create_op.precision = precision;
       create_op.common_options = common;
       create_op.bitasset_opts = bitasset_opts;
+      create_op.is_prediction_market = is_prediction_market;
 
       signed_transaction tx;
       tx.operations.push_back( create_op );
@@ -2454,7 +2456,7 @@ public:
       opts.flags &= ~(white_list | disable_force_settle | global_settle);
       opts.issuer_permissions = opts.flags;
       opts.core_exchange_rate = price(asset(1), asset(1,asset_id_type(1)));
-      create_asset(get_account(creator).name, symbol, 2, opts, {}, true);
+      create_asset(get_account(creator).name, symbol, 2, opts, {}, false, true);
    }
 
    void dbg_make_mia(string creator, string symbol)
@@ -2464,7 +2466,7 @@ public:
       opts.issuer_permissions = opts.flags;
       opts.core_exchange_rate = price(asset(1), asset(1,asset_id_type(1)));
       bitasset_options bopts;
-      create_asset(get_account(creator).name, symbol, 2, opts, bopts, true);
+      create_asset(get_account(creator).name, symbol, 2, opts, bopts, false, true);
    }
 
    void dbg_push_blocks( const std::string& src_filename, uint32_t count )
@@ -3288,10 +3290,11 @@ signed_transaction wallet_api::create_asset(string issuer,
                                             uint8_t precision,
                                             asset_options common,
                                             fc::optional<bitasset_options> bitasset_opts,
+                                            bool is_prediction_market,
                                             bool broadcast)
 
 {
-   return my->create_asset(issuer, symbol, precision, common, bitasset_opts, broadcast);
+   return my->create_asset(issuer, symbol, precision, common, bitasset_opts, is_prediction_market, broadcast);
 }
 
 signed_transaction wallet_api::update_asset(string symbol,
