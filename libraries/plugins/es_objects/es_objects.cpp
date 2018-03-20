@@ -64,13 +64,14 @@ class es_objects_plugin_impl
       vector <std::string> bulk;
       vector<std::string> prepare;
       map<object_id_type, std::string> bitassets;
+      //uint32_t bitasset_seq;
    private:
-      void PrepareProposal(const proposal_object* proposal_object);
-      void PrepareAccount(const account_object* account_object);
-      void PrepareAsset(const asset_object* asset_object);
-      void PrepareBalance(const balance_object* balance_object);
-      void PrepareLimit(const limit_order_object* limit_object);
-      void PrepareBitAsset(const asset_bitasset_data_object* bitasset_object);
+      void PrepareProposal(const proposal_object* proposal_object, const fc::time_point_sec block_time, uint32_t block_number);
+      void PrepareAccount(const account_object* account_object, const fc::time_point_sec block_time, uint32_t block_number);
+      void PrepareAsset(const asset_object* asset_object, const fc::time_point_sec block_time, uint32_t block_number);
+      void PrepareBalance(const balance_object* balance_object, const fc::time_point_sec block_time, uint32_t block_number);
+      void PrepareLimit(const limit_order_object* limit_object, const fc::time_point_sec block_time, uint32_t block_number);
+      void PrepareBitAsset(const asset_bitasset_data_object* bitasset_object, const fc::time_point_sec block_time, uint32_t block_number);
 };
 
 void es_objects_plugin_impl::updateDatabase( const vector<object_id_type>& ids , bool isNew)
@@ -79,6 +80,7 @@ void es_objects_plugin_impl::updateDatabase( const vector<object_id_type>& ids ,
    graphene::chain::database &db = _self.database();
 
    const fc::time_point_sec block_time = db.head_block_time();
+   const uint32_t block_number = db.head_block_num();
 
    // check if we are in replay or in sync and change number of bulk documents accordingly
    uint32_t limit_documents = 0;
@@ -98,44 +100,47 @@ void es_objects_plugin_impl::updateDatabase( const vector<object_id_type>& ids ,
          auto obj = db.find_object(value);
          auto p = static_cast<const proposal_object*>(obj);
          if(p != nullptr)
-            PrepareProposal(p);
+            PrepareProposal(p, block_time, block_number);
       }
       else if(value.is<account_object>() && _es_objects_accounts) {
          auto obj = db.find_object(value);
          auto a = static_cast<const account_object*>(obj);
          if(a != nullptr)
-            PrepareAccount(a);
+            PrepareAccount(a, block_time, block_number);
       }
       else if(value.is<asset_object>() && _es_objects_assets) {
          auto obj = db.find_object(value);
          auto a = static_cast<const asset_object*>(obj);
          if(a != nullptr)
-            PrepareAsset(a);
+            PrepareAsset(a, block_time, block_number);
       }
       else if(value.is<balance_object>() && _es_objects_balances) {
          auto obj = db.find_object(value);
          auto b = static_cast<const balance_object*>(obj);
          if(b != nullptr)
-            PrepareBalance(b);
+            PrepareBalance(b, block_time, block_number);
       }
       else if(value.is<limit_order_object>() && _es_objects_limit_orders) {
          auto obj = db.find_object(value);
          auto l = static_cast<const limit_order_object*>(obj);
          if(l != nullptr)
-            PrepareLimit(l);
+            PrepareLimit(l, block_time, block_number);
       }
       else if(value.is<asset_bitasset_data_object>() && _es_objects_asset_bitasset) {
          auto obj = db.find_object(value);
          auto ba = static_cast<const asset_bitasset_data_object*>(obj);
          if(ba != nullptr)
-            PrepareBitAsset(ba);
+            PrepareBitAsset(ba, block_time, block_number);
       }
    }
 }
 
-void es_objects_plugin_impl::PrepareProposal(const proposal_object* proposal_object)
+void es_objects_plugin_impl::PrepareProposal(const proposal_object* proposal_object, const fc::time_point_sec block_time, uint32_t block_number)
 {
    proposal_struct prop;
+   prop.object_id = proposal_object->id;
+   prop.block_time = block_time;
+   prop.block_number = block_number;
    prop.expiration_time = proposal_object->expiration_time;
    prop.review_period_time = proposal_object->review_period_time;
    prop.proposed_transaction = fc::json::to_string(proposal_object->proposed_transaction);
@@ -146,14 +151,17 @@ void es_objects_plugin_impl::PrepareProposal(const proposal_object* proposal_obj
    prop.proposer = proposal_object->proposer;
 
    std::string data = fc::json::to_string(prop);
-   prepare = graphene::utilities::createBulk("bitshares-proposal", data, fc::json::to_string(proposal_object->id), 0);
+   prepare = graphene::utilities::createBulk("bitshares-proposal", data, "", 1);
    bulk.insert(bulk.end(), prepare.begin(), prepare.end());
    prepare.clear();
 }
 
-void es_objects_plugin_impl::PrepareAccount(const account_object* account_object)
+void es_objects_plugin_impl::PrepareAccount(const account_object* account_object, const fc::time_point_sec block_time, uint32_t block_number)
 {
    account_struct acct;
+   acct.object_id = account_object->id;
+   acct.block_time = block_time;
+   acct.block_number = block_number;
    acct.membership_expiration_date = account_object->membership_expiration_date;
    acct.registrar = account_object->registrar;
    acct.referrer = account_object->referrer;
@@ -171,14 +179,17 @@ void es_objects_plugin_impl::PrepareAccount(const account_object* account_object
    acct.voting_account = account_object->options.voting_account;
 
    std::string data = fc::json::to_string(acct);
-   prepare = graphene::utilities::createBulk("bitshares-account", data, fc::json::to_string(account_object->id), 0);
+   prepare = graphene::utilities::createBulk("bitshares-account", data, "", 1);
    bulk.insert(bulk.end(), prepare.begin(), prepare.end());
    prepare.clear();
 }
 
-void es_objects_plugin_impl::PrepareAsset(const asset_object* asset_object)
+void es_objects_plugin_impl::PrepareAsset(const asset_object* asset_object, const fc::time_point_sec block_time, uint32_t block_number)
 {
    asset_struct _asset;
+   _asset.object_id = asset_object->id;
+   _asset.block_time = block_time;
+   _asset.block_number = block_number;
    _asset.symbol = asset_object->symbol;
    _asset.issuer = asset_object->issuer;
    _asset.is_market_issued = asset_object->is_market_issued();
@@ -191,22 +202,27 @@ void es_objects_plugin_impl::PrepareAsset(const asset_object* asset_object)
    prepare.clear();
 }
 
-void es_objects_plugin_impl::PrepareBalance(const balance_object* balance_object)
+void es_objects_plugin_impl::PrepareBalance(const balance_object* balance_object, const fc::time_point_sec block_time, uint32_t block_number)
 {
    balance_struct balance;
-   balance.owner = balance_object->owner;
+   balance.object_id = balance_object->id;
+   balance.block_time = block_time;
+   balance.block_number = block_number;balance.owner = balance_object->owner;
    balance.asset_id = balance_object->balance.asset_id;
    balance.amount = balance_object->balance.amount;
 
    std::string data = fc::json::to_string(balance);
-   prepare = graphene::utilities::createBulk("bitshares-balance", data, fc::json::to_string(balance_object->owner), 0);
+   prepare = graphene::utilities::createBulk("bitshares-balance", data, "", 1);
    bulk.insert(bulk.end(), prepare.begin(), prepare.end());
    prepare.clear();
 }
 
-void es_objects_plugin_impl::PrepareLimit(const limit_order_object* limit_object)
+void es_objects_plugin_impl::PrepareLimit(const limit_order_object* limit_object, const fc::time_point_sec block_time, uint32_t block_number)
 {
    limit_order_struct limit;
+   limit.object_id = limit_object->id;
+   limit.block_time = block_time;
+   limit.block_number = block_number;
    limit.expiration = limit_object->expiration;
    limit.seller = limit_object->seller;
    limit.for_sale = limit_object->for_sale;
@@ -214,12 +230,12 @@ void es_objects_plugin_impl::PrepareLimit(const limit_order_object* limit_object
    limit.deferred_fee = limit_object->deferred_fee;
 
    std::string data = fc::json::to_string(limit);
-   prepare = graphene::utilities::createBulk("bitshares-limitorder", data, fc::json::to_string(limit_object->id), 0);
+   prepare = graphene::utilities::createBulk("bitshares-limitorder", data, "", 1);
    bulk.insert(bulk.end(), prepare.begin(), prepare.end());
    prepare.clear();
 }
 
-void es_objects_plugin_impl::PrepareBitAsset(const asset_bitasset_data_object* bitasset_object)
+void es_objects_plugin_impl::PrepareBitAsset(const asset_bitasset_data_object* bitasset_object, const fc::time_point_sec block_time, uint32_t block_number)
 {
    if(!bitasset_object->is_prediction_market) {
 
@@ -235,6 +251,8 @@ void es_objects_plugin_impl::PrepareBitAsset(const asset_bitasset_data_object* b
       bitasset_struct bitasset;
 
       bitasset.object_id = bitasset_object->id;
+      bitasset.block_time = block_time;
+      bitasset.block_number = block_number;
       bitasset.current_feed = fc::json::to_string(bitasset_object->current_feed);
       bitasset.current_feed_publication_time = bitasset_object->current_feed_publication_time;
 

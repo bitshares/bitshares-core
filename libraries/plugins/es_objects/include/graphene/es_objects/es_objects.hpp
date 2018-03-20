@@ -55,6 +55,9 @@ class es_objects_plugin : public graphene::app::plugin
 };
 
 struct proposal_struct {
+   object_id_type object_id;
+   fc::time_point_sec block_time;
+   uint32_t block_number;
    time_point_sec expiration_time;
    optional<time_point_sec> review_period_time;
    string proposed_transaction;
@@ -67,6 +70,9 @@ struct proposal_struct {
 
 };
 struct account_struct {
+   object_id_type object_id;
+   fc::time_point_sec block_time;
+   uint32_t block_number;
    time_point_sec membership_expiration_date;
    account_id_type registrar;
    account_id_type referrer;
@@ -84,6 +90,9 @@ struct account_struct {
    account_id_type voting_account;
 };
 struct asset_struct {
+   object_id_type object_id;
+   fc::time_point_sec block_time;
+   uint32_t block_number;
    string symbol;
    account_id_type issuer;
    bool is_market_issued;
@@ -92,11 +101,17 @@ struct asset_struct {
 
 };
 struct balance_struct {
+   object_id_type object_id;
+   fc::time_point_sec block_time;
+   uint32_t block_number;
    address owner;
    asset_id_type asset_id;
    share_type amount;
 };
 struct limit_order_struct {
+   object_id_type object_id;
+   fc::time_point_sec block_time;
+   uint32_t block_number;
    time_point_sec expiration;
    account_id_type seller;
    share_type for_sale;
@@ -105,6 +120,8 @@ struct limit_order_struct {
 };
 struct bitasset_struct {
    object_id_type object_id;
+   fc::time_point_sec block_time;
+   uint32_t block_number;
    string current_feed;
    time_point_sec current_feed_publication_time;
    time_point_sec feed_expiration_time;
@@ -112,9 +129,9 @@ struct bitasset_struct {
 
 } } //graphene::es_objects
 
-FC_REFLECT( graphene::es_objects::proposal_struct, (expiration_time)(review_period_time)(proposed_transaction)(required_active_approvals)(available_active_approvals)(required_owner_approvals)(available_owner_approvals)(available_key_approvals)(proposer) )
-FC_REFLECT( graphene::es_objects::account_struct, (membership_expiration_date)(registrar)(referrer)(lifetime_referrer)(network_fee_percentage)(lifetime_referrer_fee_percentage)(referrer_rewards_percentage)(name)(owner_account_auths)(owner_key_auths)(owner_address_auths)(active_account_auths)(active_key_auths)(active_address_auths)(voting_account) )
-FC_REFLECT( graphene::es_objects::asset_struct, (symbol)(issuer)(is_market_issued)(dynamic_asset_data_id)(bitasset_data_id) )
-FC_REFLECT( graphene::es_objects::balance_struct, (owner)(asset_id)(amount) )
-FC_REFLECT( graphene::es_objects::limit_order_struct, (expiration)(seller)(for_sale)(sell_price)(deferred_fee) )
-FC_REFLECT( graphene::es_objects::bitasset_struct, (object_id)(current_feed)(current_feed_publication_time) )
+FC_REFLECT( graphene::es_objects::proposal_struct, (object_id)(block_time)(block_number)(expiration_time)(review_period_time)(proposed_transaction)(required_active_approvals)(available_active_approvals)(required_owner_approvals)(available_owner_approvals)(available_key_approvals)(proposer) )
+FC_REFLECT( graphene::es_objects::account_struct, (object_id)(block_time)(block_number)(membership_expiration_date)(registrar)(referrer)(lifetime_referrer)(network_fee_percentage)(lifetime_referrer_fee_percentage)(referrer_rewards_percentage)(name)(owner_account_auths)(owner_key_auths)(owner_address_auths)(active_account_auths)(active_key_auths)(active_address_auths)(voting_account) )
+FC_REFLECT( graphene::es_objects::asset_struct, (object_id)(block_time)(block_number)(symbol)(issuer)(is_market_issued)(dynamic_asset_data_id)(bitasset_data_id) )
+FC_REFLECT( graphene::es_objects::balance_struct, (object_id)(block_time)(block_number)(block_time)(owner)(asset_id)(amount) )
+FC_REFLECT( graphene::es_objects::limit_order_struct, (object_id)(block_time)(block_number)(expiration)(seller)(for_sale)(sell_price)(deferred_fee) )
+FC_REFLECT( graphene::es_objects::bitasset_struct, (object_id)(block_time)(block_number)(current_feed)(current_feed_publication_time) )
