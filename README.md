@@ -1,5 +1,10 @@
 BitShares Test Network
-======================
+==============
+* [Build Status](https://travis-ci.org/bitshares/bitshares-core)
+  * `master` branch: ![](https://travis-ci.org/bitshares/bitshares-core.svg?branch=master)
+  * `develop` branch: ![](https://travis-ci.org/bitshares/bitshares-core.svg?branch=develop)
+  * `hardfork` branch: ![](https://travis-ci.org/bitshares/bitshares-core.svg?branch=hardfork)
+  * `testnet` branch: ![](https://travis-ci.org/bitshares/bitshares-core.svg?branch=testnet)
 
 
 * [Getting Started](#getting-started)
@@ -87,6 +92,8 @@ Technical support is available in the [BitSharesTalk technical support subforum]
 BitShares Core bugs can be reported directly to the [issue tracker](https://github.com/bitshares/bitshares-core/issues).
 
 BitShares UI bugs should be reported to the [UI issue tracker](https://github.com/bitshares/bitshares-ui/issues)
+
+Up to date online Doxygen documentation can be found at [Doxygen](https://bitshares.org/doxygen/hierarchy.html)
 
 Using the API
 -------------

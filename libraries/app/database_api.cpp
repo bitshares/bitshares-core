@@ -47,13 +47,10 @@ typedef std::map< std::pair<graphene::chain::asset_id_type, graphene::chain::ass
 
 namespace graphene { namespace app {
 
-class database_api_impl;
-
-
 class database_api_impl : public std::enable_shared_from_this<database_api_impl>
 {
    public:
-      database_api_impl( graphene::chain::database& db );
+      explicit database_api_impl( graphene::chain::database& db, const application_options* app_options );
       ~database_api_impl();
 
 
@@ -115,6 +112,7 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       market_ticker                      get_ticker( const string& base, const string& quote, bool skip_order_book = false )const;
       market_volume                      get_24_volume( const string& base, const string& quote )const;
       order_book                         get_order_book( const string& base, const string& quote, unsigned limit = 50 )const;
+      vector<market_volume>              get_top_markets(uint32_t limit)const;
       vector<market_trade>               get_trade_history( const string& base, const string& quote, fc::time_point_sec start, fc::time_point_sec stop, unsigned limit = 100 )const;
       vector<market_trade>               get_trade_history_by_sequence( const string& base, const string& quote, int64_t start, fc::time_point_sec stop, unsigned limit = 100 )const;
 
@@ -154,6 +152,9 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       // Blinded balances
       vector<blinded_balance_object> get_blinded_balances( const flat_set<commitment_type>& commitments )const;
 
+      // Withdrawals
+      vector<withdraw_permission_object> get_withdraw_permissions_by_giver(account_id_type account, withdraw_permission_id_type start, uint32_t limit)const;
+      vector<withdraw_permission_object> get_withdraw_permissions_by_recipient(account_id_type account, withdraw_permission_id_type start, uint32_t limit)const;
 
    //private:
       static string price_to_string( const price& _price, const asset_object& _base, const asset_object& _quote );
@@ -166,10 +167,7 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
             return;
 
          if( !is_subscribed_to_item(i) )
-         {
-            idump((i));
-            _subscribe_filter.insert( vec.data(), vec.size() );//(vecconst char*)&i, sizeof(i) );
-         }
+            _subscribe_filter.insert( vec.data(), vec.size() );
       }
 
       template<typename T>
@@ -191,17 +189,32 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
          });
       }
 
+      const std::pair<asset_id_type,asset_id_type> get_order_market( const force_settlement_object& order )
+      {
+         // TODO cache the result to avoid repeatly fetching from db
+         asset_id_type backing_id = order.balance.asset_id( _db ).bitasset_data( _db ).options.short_backing_asset;
+         auto tmp = std::make_pair( order.balance.asset_id, backing_id );
+         if( tmp.first > tmp.second ) std::swap( tmp.first, tmp.second );
+         return tmp;
+      }
+
+      template<typename T>
+      const std::pair<asset_id_type,asset_id_type> get_order_market( const T& order )
+      {
+         return order.get_market();
+      }
+
       template<typename T>
       void enqueue_if_subscribed_to_market(const object* obj, market_queue_type& queue, bool full_object=true)
       {
          const T* order = dynamic_cast<const T*>(obj);
          FC_ASSERT( order != nullptr);
 
-         auto market = order->get_market();
+         const auto& market = get_order_market( *order );
 
          auto sub = _market_subscriptions.find( market );
          if( sub != _market_subscriptions.end() ) {
-            queue[market].emplace_back( full_object ? obj->to_variant() : fc::variant(obj->id) );
+            queue[market].emplace_back( full_object ? obj->to_variant() : fc::variant(obj->id, 1) );
          }
       }
 
@@ -229,6 +242,8 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       boost::signals2::scoped_connection                                                                                           _pending_trx_connection;
       map< pair<asset_id_type,asset_id_type>, std::function<void(const variant&)> >      _market_subscriptions;
       graphene::chain::database&                                                                                                            _db;
+      const application_options* _app_options = nullptr;
+
 };
 
 //////////////////////////////////////////////////////////////////////
@@ -237,12 +252,13 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
 //                                                                  //
 //////////////////////////////////////////////////////////////////////
 
-database_api::database_api( graphene::chain::database& db )
-   : my( new database_api_impl( db ) ) {}
+database_api::database_api( graphene::chain::database& db, const application_options* app_options )
+   : my( new database_api_impl( db, app_options ) ) {}
 
 database_api::~database_api() {}
 
-database_api_impl::database_api_impl( graphene::chain::database& db ):_db(db)
+database_api_impl::database_api_impl( graphene::chain::database& db, const application_options* app_options )
+:_db(db), _app_options(app_options)
 {
    wlog("creating database api ${x}", ("x",int64_t(this)) );
    _new_connection = _db.new_objects.connect([this](const vector<object_id_type>& ids, const flat_set<account_id_type>& impacted_accounts) {
@@ -257,7 +273,7 @@ database_api_impl::database_api_impl( graphene::chain::database& db ):_db(db)
    _applied_block_connection = _db.applied_block.connect([this](const signed_block&){ on_applied_block(); });
 
    _pending_trx_connection = _db.on_pending_transaction.connect([this](const signed_transaction& trx ){
-                         if( _pending_trx_callback ) _pending_trx_callback( fc::variant(trx) );
+                         if( _pending_trx_callback ) _pending_trx_callback( fc::variant(trx, GRAPHENE_MAX_NESTED_OBJECTS) );
                       });
 }
 
@@ -315,7 +331,12 @@ void database_api::set_subscribe_callback( std::function<void(const variant&)> c
 
 void database_api_impl::set_subscribe_callback( std::function<void(const variant&)> cb, bool notify_remove_create )
 {
-   //edump((clear_filter));
+   if( notify_remove_create )
+   {
+      FC_ASSERT( _app_options && _app_options->enable_subscribe_to_all,
+                 "Subscribing to universal object creation and removal is disallowed in this server." );
+   }
+
    _subscribe_callback = cb;
    _notify_remove_create = notify_remove_create;
    _subscribed_accounts.clear();
@@ -496,7 +517,6 @@ vector<vector<account_id_type>> database_api::get_key_references( vector<public_
  */
 vector<vector<account_id_type>> database_api_impl::get_key_references( vector<public_key_type> keys )const
 {
-   wdump( (keys) );
    vector< vector<account_id_type> > final_result;
    final_result.reserve(keys.size());
 
@@ -530,7 +550,6 @@ vector<vector<account_id_type>> database_api_impl::get_key_references( vector<pu
              result.reserve( itr->second.size() );
              for( auto item : itr->second )
              {
-                wdump((a)(item)(item(_db).name));
                 result.push_back(item);
              }
           }
@@ -612,14 +631,13 @@ std::map<string,full_account> database_api::get_full_accounts( const vector<stri
 
 std::map<std::string, full_account> database_api_impl::get_full_accounts( const vector<std::string>& names_or_ids, bool subscribe)
 {
-   idump((names_or_ids));
    std::map<std::string, full_account> results;
 
    for (const std::string& account_name_or_id : names_or_ids)
    {
       const account_object* account = nullptr;
       if (std::isdigit(account_name_or_id[0]))
-         account = _db.find(fc::variant(account_name_or_id).as<account_id_type>());
+         account = _db.find(fc::variant(account_name_or_id, 1).as<account_id_type>(1));
       else
       {
          const auto& idx = _db.get_index_type<account_index>().indices().get<by_name>();
@@ -638,7 +656,6 @@ std::map<std::string, full_account> database_api_impl::get_full_accounts( const 
          }
       }
 
-      // fc::mutable_variant_object full_account;
       full_account acnt;
       acnt.account = *account;
       acnt.statistics = account->statistics(_db);
@@ -647,12 +664,6 @@ std::map<std::string, full_account> database_api_impl::get_full_accounts( const 
       acnt.lifetime_referrer_name = account->lifetime_referrer(_db).name;
       acnt.votes = lookup_vote_ids( vector<vote_id_type>(account->options.votes.begin(),account->options.votes.end()) );
 
-      // Add the account itself, its statistics object, cashback balance, and referral account names
-      /*
-      full_account("account", *account)("statistics", account->statistics(_db))
-            ("registrar_name", account->registrar(_db).name)("referrer_name", account->referrer(_db).name)
-            ("lifetime_referrer_name", account->lifetime_referrer(_db).name);
-            */
       if (account->cashback_vb)
       {
          acnt.cashback_balance = account->cashback_balance(_db);
@@ -672,7 +683,6 @@ std::map<std::string, full_account> database_api_impl::get_full_accounts( const 
 
       // Add the account's balances
       auto balance_range = _db.get_index_type<account_balance_index>().indices().get<by_account_asset>().equal_range(boost::make_tuple(account->id));
-      //vector<account_balance_object> balances;
       std::for_each(balance_range.first, balance_range.second,
                     [&acnt](const account_balance_object& balance) {
                        acnt.balances.emplace_back(balance);
@@ -984,7 +994,7 @@ vector<optional<asset_object>> database_api_impl::lookup_asset_symbols(const vec
                   [this, &assets_by_symbol](const string& symbol_or_id) -> optional<asset_object> {
       if( !symbol_or_id.empty() && std::isdigit(symbol_or_id[0]) )
       {
-         auto ptr = _db.find(variant(symbol_or_id).as<asset_id_type>());
+         auto ptr = _db.find(variant(symbol_or_id, 1).as<asset_id_type>(1));
          return ptr == nullptr? optional<asset_object>() : *ptr;
       }
       auto itr = assets_by_symbol.find(symbol_or_id);
@@ -1169,20 +1179,22 @@ market_ticker database_api::get_ticker( const string& base, const string& quote 
 
 market_ticker database_api_impl::get_ticker( const string& base, const string& quote, bool skip_order_book )const
 {
-    const auto assets = lookup_asset_symbols( {base, quote} );
-    FC_ASSERT( assets[0], "Invalid base asset symbol: ${s}", ("s",base) );
-    FC_ASSERT( assets[1], "Invalid quote asset symbol: ${s}", ("s",quote) );
+   FC_ASSERT( _app_options && _app_options->has_market_history_plugin, "Market history plugin is not enabled." );
 
-    const fc::time_point_sec now = fc::time_point::now();
+   const auto assets = lookup_asset_symbols( {base, quote} );
+   FC_ASSERT( assets[0], "Invalid base asset symbol: ${s}", ("s",base) );
+   FC_ASSERT( assets[1], "Invalid quote asset symbol: ${s}", ("s",quote) );
 
-    market_ticker result;
-    result.time = now;
-    result.base = base;
-    result.quote = quote;
-    result.latest = "0";
-    result.lowest_ask = "0";
-    result.highest_bid = "0";
-    result.percent_change = "0";
+   const fc::time_point_sec now = fc::time_point::now();
+
+   market_ticker result;
+   result.time = now;
+   result.base = base;
+   result.quote = quote;
+   result.latest = "0";
+   result.lowest_ask = "0";
+   result.highest_bid = "0";
+   result.percent_change = "0";
 
    auto base_id = assets[0]->id;
    auto quote_id = assets[1]->id;
@@ -1239,16 +1251,16 @@ market_volume database_api::get_24_volume( const string& base, const string& quo
 
 market_volume database_api_impl::get_24_volume( const string& base, const string& quote )const
 {
-    const auto& ticker = get_ticker( base, quote, true );
+   const auto& ticker = get_ticker( base, quote, true );
 
-    market_volume result;
-    result.time = ticker.time;
-    result.base = ticker.base;
-    result.quote = ticker.quote;
-    result.base_volume = ticker.base_volume;
-    result.quote_volume = ticker.quote_volume;
+   market_volume result;
+   result.time = ticker.time;
+   result.base = ticker.base;
+   result.quote = ticker.quote;
+   result.base_volume = ticker.base_volume;
+   result.quote_volume = ticker.quote_volume;
 
-    return result;
+   return result;
 }
 
 order_book database_api::get_order_book( const string& base, const string& quote, unsigned limit )const
@@ -1296,6 +1308,39 @@ order_book database_api_impl::get_order_book( const string& base, const string& 
    return result;
 }
 
+vector<market_volume> database_api::get_top_markets(uint32_t limit)const
+{
+   return my->get_top_markets(limit);
+}
+
+vector<market_volume> database_api_impl::get_top_markets(uint32_t limit)const
+{
+   FC_ASSERT( _app_options && _app_options->has_market_history_plugin, "Market history plugin is not enabled." );
+
+   FC_ASSERT( limit <= 100 );
+
+   const auto& volume_idx = _db.get_index_type<graphene::market_history::market_ticker_index>().indices().get<by_volume>();
+   auto itr = volume_idx.rbegin();
+   vector<market_volume> result;
+   result.reserve(limit);
+
+   const fc::time_point_sec now = fc::time_point::now();
+
+   while( itr != volume_idx.rend() && result.size() < limit)
+   {
+      market_volume mv;
+      mv.time = now;
+      const auto assets = get_assets( { itr->base, itr->quote } );
+      mv.base = assets[0]->symbol;
+      mv.quote = assets[1]->symbol;
+      mv.base_volume = uint128_amount_to_string( itr->base_volume, assets[0]->precision );
+      mv.quote_volume = uint128_amount_to_string( itr->quote_volume, assets[1]->precision );
+      result.emplace_back( std::move(mv) );
+      ++itr;
+   }
+   return result;
+}
+
 vector<market_trade> database_api::get_trade_history( const string& base,
                                                       const string& quote,
                                                       fc::time_point_sec start,
@@ -1311,6 +1356,8 @@ vector<market_trade> database_api_impl::get_trade_history( const string& base,
                                                            fc::time_point_sec stop,
                                                            unsigned limit )const
 {
+   FC_ASSERT( _app_options && _app_options->has_market_history_plugin, "Market history plugin is not enabled." );
+
    FC_ASSERT( limit <= 100 );
 
    auto assets = lookup_asset_symbols( {base, quote} );
@@ -1400,6 +1447,8 @@ vector<market_trade> database_api_impl::get_trade_history_by_sequence(
                                                            fc::time_point_sec stop,
                                                            unsigned limit )const
 {
+   FC_ASSERT( _app_options && _app_options->has_market_history_plugin, "Market history plugin is not enabled." );
+
    FC_ASSERT( limit <= 100 );
    FC_ASSERT( start >= 0 );
    int64_t start_seq = -start;
@@ -1719,7 +1768,7 @@ vector<variant> database_api_impl::lookup_vote_ids( const vector<vote_id_type>& 
          {
             auto itr = committee_idx.find( id );
             if( itr != committee_idx.end() )
-               result.emplace_back( variant( *itr ) );
+               result.emplace_back( variant( *itr, 1 ) );
             else
                result.emplace_back( variant() );
             break;
@@ -1728,7 +1777,7 @@ vector<variant> database_api_impl::lookup_vote_ids( const vector<vote_id_type>& 
          {
             auto itr = witness_idx.find( id );
             if( itr != witness_idx.end() )
-               result.emplace_back( variant( *itr ) );
+               result.emplace_back( variant( *itr, 1 ) );
             else
                result.emplace_back( variant() );
             break;
@@ -1737,12 +1786,12 @@ vector<variant> database_api_impl::lookup_vote_ids( const vector<vote_id_type>& 
          {
             auto itr = for_worker_idx.find( id );
             if( itr != for_worker_idx.end() ) {
-               result.emplace_back( variant( *itr ) );
+               result.emplace_back( variant( *itr, 1 ) );
             }
             else {
                auto itr = against_worker_idx.find( id );
                if( itr != against_worker_idx.end() ) {
-                  result.emplace_back( variant( *itr ) );
+                  result.emplace_back( variant( *itr, 1 ) );
                }
                else {
                   result.emplace_back( variant() );
@@ -1751,6 +1800,8 @@ vector<variant> database_api_impl::lookup_vote_ids( const vector<vote_id_type>& 
             break;
          }
          case vote_id_type::VOTE_TYPE_COUNT: break; // supress unused enum value warnings
+         default:
+            FC_CAPTURE_AND_THROW( fc::out_of_range_exception, (id) );
       }
    }
    return result;
@@ -1779,13 +1830,11 @@ set<public_key_type> database_api::get_required_signatures( const signed_transac
 
 set<public_key_type> database_api_impl::get_required_signatures( const signed_transaction& trx, const flat_set<public_key_type>& available_keys )const
 {
-   wdump((trx)(available_keys));
    auto result = trx.get_required_signatures( _db.get_chain_id(),
                                        available_keys,
                                        [&]( account_id_type id ){ return &id(_db).active; },
                                        [&]( account_id_type id ){ return &id(_db).owner; },
                                        _db.get_global_properties().parameters.max_authority_depth );
-   wdump((result));
    return result;
 }
 
@@ -1800,7 +1849,6 @@ set<address> database_api::get_potential_address_signatures( const signed_transa
 
 set<public_key_type> database_api_impl::get_potential_signatures( const signed_transaction& trx )const
 {
-   wdump((trx));
    set<public_key_type> result;
    trx.get_required_signatures(
       _db.get_chain_id(),
@@ -1831,7 +1879,6 @@ set<public_key_type> database_api_impl::get_potential_signatures( const signed_t
       for( const auto& key : auth.get_keys() )
          result.insert( key );
 
-   wdump((result));
    return result;
 }
 
@@ -1868,8 +1915,8 @@ bool database_api::verify_authority( const signed_transaction& trx )const
 bool database_api_impl::verify_authority( const signed_transaction& trx )const
 {
    trx.verify_authority( _db.get_chain_id(),
-                         [&]( account_id_type id ){ return &id(_db).active; },
-                         [&]( account_id_type id ){ return &id(_db).owner; },
+                         [this]( account_id_type id ){ return &id(_db).active; },
+                         [this]( account_id_type id ){ return &id(_db).owner; },
                           _db.get_global_properties().parameters.max_authority_depth );
    return true;
 }
@@ -1884,7 +1931,7 @@ bool database_api_impl::verify_account_authority( const string& name_or_id, cons
    FC_ASSERT( name_or_id.size() > 0);
    const account_object* account = nullptr;
    if (std::isdigit(name_or_id[0]))
-      account = _db.find(fc::variant(name_or_id).as<account_id_type>());
+      account = _db.find(fc::variant(name_or_id, 1).as<account_id_type>(1));
    else
    {
       const auto& idx = _db.get_index_type<account_index>().indices().get<by_name>();
@@ -1945,7 +1992,7 @@ struct get_required_fees_helper
       {
          asset fee = current_fee_schedule.set_fee( op, core_exchange_rate );
          fc::variant result;
-         fc::to_variant( fee, result );
+         fc::to_variant( fee, result, GRAPHENE_NET_MAX_NESTED_OBJECTS );
          return result;
       }
    }
@@ -1965,7 +2012,7 @@ struct get_required_fees_helper
       // two mutually recursive functions instead of a visitor
       result.first = current_fee_schedule.set_fee( proposal_create_op, core_exchange_rate );
       fc::variant vresult;
-      fc::to_variant( result, vresult );
+      fc::to_variant( result, vresult, GRAPHENE_NET_MAX_NESTED_OBJECTS );
       return vresult;
    }
 
@@ -2053,6 +2100,54 @@ vector<blinded_balance_object> database_api_impl::get_blinded_balances( const fl
 
 //////////////////////////////////////////////////////////////////////
 //                                                                  //
+//  Withdrawals                                                     //
+//                                                                  //
+//////////////////////////////////////////////////////////////////////
+
+vector<withdraw_permission_object> database_api::get_withdraw_permissions_by_giver(account_id_type account, withdraw_permission_id_type start, uint32_t limit)const
+{
+   return my->get_withdraw_permissions_by_giver( account, start, limit );
+}
+
+vector<withdraw_permission_object> database_api_impl::get_withdraw_permissions_by_giver(account_id_type account, withdraw_permission_id_type start, uint32_t limit)const
+{
+   FC_ASSERT( limit <= 101 );
+   vector<withdraw_permission_object> result;
+
+   const auto& withdraw_idx = _db.get_index_type<withdraw_permission_index>().indices().get<by_from>();
+   auto withdraw_index_end = withdraw_idx.end();
+   auto withdraw_itr = withdraw_idx.lower_bound(boost::make_tuple(account, start));
+   while(withdraw_itr != withdraw_index_end && withdraw_itr->withdraw_from_account == account && result.size() < limit)
+   {
+      result.push_back(*withdraw_itr);
+      ++withdraw_itr;
+   }
+   return result;
+}
+
+vector<withdraw_permission_object> database_api::get_withdraw_permissions_by_recipient(account_id_type account, withdraw_permission_id_type start, uint32_t limit)const
+{
+   return my->get_withdraw_permissions_by_recipient( account, start, limit );
+}
+
+vector<withdraw_permission_object> database_api_impl::get_withdraw_permissions_by_recipient(account_id_type account, withdraw_permission_id_type start, uint32_t limit)const
+{
+   FC_ASSERT( limit <= 101 );
+   vector<withdraw_permission_object> result;
+
+   const auto& withdraw_idx = _db.get_index_type<withdraw_permission_index>().indices().get<by_authorized>();
+   auto withdraw_index_end = withdraw_idx.end();
+   auto withdraw_itr = withdraw_idx.lower_bound(boost::make_tuple(account, start));
+   while(withdraw_itr != withdraw_index_end && withdraw_itr->authorized_account == account && result.size() < limit)
+   {
+      result.push_back(*withdraw_itr);
+      ++withdraw_itr;
+   }
+   return result;
+}
+
+//////////////////////////////////////////////////////////////////////
+//                                                                  //
 // Private methods                                                  //
 //                                                                  //
 //////////////////////////////////////////////////////////////////////
@@ -2134,12 +2229,13 @@ void database_api_impl::handle_object_changed(bool force_notify, bool full_objec
             }
             else
             {
-               updates.emplace_back( id );
+               updates.emplace_back( fc::variant( id, 1 ) );
             }
          }
       }
 
-      broadcast_updates(updates);
+      if( updates.size() )
+         broadcast_updates(updates);
    }
 
    if( _market_subscriptions.size() )
@@ -2156,9 +2252,14 @@ void database_api_impl::handle_object_changed(bool force_notify, bool full_objec
          {
             enqueue_if_subscribed_to_market<limit_order_object>( find_object(id), broadcast_queue, full_object );
          }
+         else if( id.is<force_settlement_object>() )
+         {
+            enqueue_if_subscribed_to_market<force_settlement_object>( find_object(id), broadcast_queue, full_object );
+         }
       }
 
-      broadcast_market_updates(broadcast_queue);
+      if( broadcast_queue.size() )
+         broadcast_market_updates(broadcast_queue);
    }
 }
 
@@ -2172,7 +2273,7 @@ void database_api_impl::on_applied_block()
       auto capture_this = shared_from_this();
       block_id_type block_id = _db.head_block_id();
       fc::async([this,capture_this,block_id](){
-         _block_applied_callback(fc::variant(block_id));
+         _block_applied_callback(fc::variant(block_id, 1));
       });
    }
 
@@ -2187,7 +2288,7 @@ void database_api_impl::on_applied_block()
          continue;
       const operation_history_object& op = *o_op;
 
-      std::pair<asset_id_type,asset_id_type> market;
+      optional< std::pair<asset_id_type,asset_id_type> > market;
       switch(op.op.which())
       {
          /*  This is sent via the object_changed callback
@@ -2203,8 +2304,9 @@ void database_api_impl::on_applied_block()
          */
          default: break;
       }
-      if(_market_subscriptions.count(market))
-         subscribed_markets_ops[market].push_back(std::make_pair(op.op, op.result));
+      if( market.valid() && _market_subscriptions.count(*market) )
+         // FIXME this may cause fill_order_operation be pushed before order creation
+         subscribed_markets_ops[*market].emplace_back( std::move( std::make_pair( op.op, op.result ) ) );
    }
    /// we need to ensure the database_api is not deleted for the life of the async operation
    auto capture_this = shared_from_this();
@@ -2213,7 +2315,7 @@ void database_api_impl::on_applied_block()
       {
          auto itr = _market_subscriptions.find(item.first);
          if(itr != _market_subscriptions.end())
-            itr->second(fc::variant(item.second));
+            itr->second(fc::variant(item.second, GRAPHENE_NET_MAX_NESTED_OBJECTS));
       }
    });
 }
