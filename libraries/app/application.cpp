@@ -933,8 +933,8 @@ void application::set_program_options(boost::program_options::options_descriptio
           "JSON array of P2P nodes to connect to on startup")
          ("checkpoint,c", bpo::value<vector<string>>()->default_value(
              vector<string>(1, "[\"12204000\", \"00ba37e095ab9f3fa752f812591213a75ffc2087\"]"), "[\"12204000\", \"00ba37e095ab9f3fa752f812591213a75ffc2087\"]")->composing(),
-             "Pairs of [BLOCK_NUM,BLOCK_ID] that should be enforced as checkpoints.")         
-	 ("rpc-endpoint", bpo::value<string>()->implicit_value("127.0.0.1:8090"),
+             "Pairs of [BLOCK_NUM,BLOCK_ID] that should be enforced as checkpoints.")
+         ("rpc-endpoint", bpo::value<string>()->implicit_value("127.0.0.1:8090"),
           "Endpoint for websocket RPC to listen on")
          ("rpc-tls-endpoint", bpo::value<string>()->implicit_value("127.0.0.1:8089"),
           "Endpoint for TLS websocket RPC to listen on")
