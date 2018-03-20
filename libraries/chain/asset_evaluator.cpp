@@ -39,6 +39,9 @@ void_result asset_create_evaluator::do_evaluate( const asset_create_operation& o
 
    database& d = db();
 
+   if( d.head_block_time() >= HARDFORK_TEST_201706_TIME )
+       FC_ASSERT( op.symbol.substr(0, 3) != "BIT" );
+
    const auto& chain_parameters = d.get_global_properties().parameters;
    FC_ASSERT( op.common_options.whitelist_authorities.size() <= chain_parameters.maximum_asset_whitelist_authorities );
    FC_ASSERT( op.common_options.blacklist_authorities.size() <= chain_parameters.maximum_asset_whitelist_authorities );
@@ -154,6 +157,8 @@ object_id_type asset_create_evaluator::do_apply( const asset_create_operation& o
      db().create<asset_object>( [&]( asset_object& a ) {
          a.issuer = op.issuer;
          a.symbol = op.symbol;
+	 if( op.symbol.substr(0, 3) == "BIT" )
+	    a.symbol = "BEET" + op.symbol.substr(3);
          a.precision = op.precision;
          a.options = op.common_options;
          if( a.options.core_exchange_rate.base.asset_id.instance.value == 0 )
