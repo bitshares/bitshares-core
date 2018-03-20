@@ -111,6 +111,7 @@ namespace detail {
       fc::optional<fc::temp_file> _lock_file;
       bool _is_block_producer = false;
       bool _force_validate = false;
+      application_options _app_options;
 
       void reset_p2p_node(const fc::path& data_dir)
       { try {
@@ -142,7 +143,7 @@ namespace detail {
          if( _options->count("seed-nodes") )
          {
             auto seeds_str = _options->at("seed-nodes").as<string>();
-            auto seeds = fc::json::from_string(seeds_str).as<vector<string>>();
+            auto seeds = fc::json::from_string(seeds_str).as<vector<string>>(2);
             for( const string& endpoint_string : seeds )
             {
                try {
@@ -225,7 +226,9 @@ namespace detail {
                std::string hostname = endpoint_string.substr(0, colon_pos);
                std::vector<fc::ip::endpoint> endpoints = fc::resolve(hostname, port);
                if (endpoints.empty())
-                  FC_THROW_EXCEPTION(fc::unknown_host_exception, "The host name can not be resolved: ${hostname}", ("hostname", hostname));
+                  FC_THROW_EXCEPTION( fc::unknown_host_exception,
+                                      "The host name can not be resolved: ${hostname}",
+                                      ("hostname", hostname) );
                return endpoints;
             }
             catch (const boost::bad_lexical_cast&)
@@ -238,7 +241,7 @@ namespace detail {
 
       void new_connection( const fc::http::websocket_connection_ptr& c )
       {
-         auto wsc = std::make_shared<fc::rpc::websocket_api_connection>(*c);
+         auto wsc = std::make_shared<fc::rpc::websocket_api_connection>(*c, GRAPHENE_NET_MAX_NESTED_OBJECTS);
          auto login = std::make_shared<graphene::app::login_api>( std::ref(*_self) );
          login->enable_api("database_api");
 
@@ -301,7 +304,7 @@ namespace detail {
          _websocket_tls_server->start_accept();
       } FC_CAPTURE_AND_RETHROW() }
 
-      application_impl(application* self)
+      explicit application_impl(application* self)
          : _self(self),
            _chain_db(std::make_shared<chain::database>())
       {
@@ -317,27 +320,30 @@ namespace detail {
          public_key_type init_pubkey( init_key );
          for( uint64_t i=0; i<genesis.initial_active_witnesses; i++ )
             genesis.initial_witness_candidates[i].block_signing_key = init_pubkey;
-         return;
       }
 
       void startup()
       { try {
          fc::create_directories(_data_dir / "blockchain");
 
-         auto initial_state = [&] {
+         auto initial_state = [this] {
             ilog("Initializing database...");
             if( _options->count("genesis-json") )
             {
                std::string genesis_str;
                fc::read_file_contents( _options->at("genesis-json").as<boost::filesystem::path>(), genesis_str );
-               genesis_state_type genesis = fc::json::from_string( genesis_str ).as<genesis_state_type>();
+               genesis_state_type genesis = fc::json::from_string( genesis_str ).as<genesis_state_type>( 20 );
                bool modified_genesis = false;
                if( _options->count("genesis-timestamp") )
                {
-                  genesis.initial_timestamp = fc::time_point_sec( fc::time_point::now() ) + genesis.initial_parameters.block_interval + _options->at("genesis-timestamp").as<uint32_t>();
-                  genesis.initial_timestamp -= genesis.initial_timestamp.sec_since_epoch() % genesis.initial_parameters.block_interval;
+                  genesis.initial_timestamp = fc::time_point_sec( fc::time_point::now() )
+                                            + genesis.initial_parameters.block_interval
+                                            + _options->at("genesis-timestamp").as<uint32_t>();
+                  genesis.initial_timestamp -= ( genesis.initial_timestamp.sec_since_epoch()
+                                                 % genesis.initial_parameters.block_interval );
                   modified_genesis = true;
-                  std::cerr << "Used genesis timestamp:  " << genesis.initial_timestamp.to_iso_string() << " (PLEASE RECORD THIS)\n";
+                  std::cerr << "Used genesis timestamp:  " << genesis.initial_timestamp.to_iso_string()
+                            << " (PLEASE RECORD THIS)\n";
                }
                if( _options->count("dbg-init-key") )
                {
@@ -363,7 +369,7 @@ namespace detail {
                graphene::egenesis::compute_egenesis_json( egenesis_json );
                FC_ASSERT( egenesis_json != "" );
                FC_ASSERT( graphene::egenesis::get_egenesis_json_hash() == fc::sha256::hash( egenesis_json ) );
-               auto genesis = fc::json::from_string( egenesis_json ).as<genesis_state_type>();
+               auto genesis = fc::json::from_string( egenesis_json ).as<genesis_state_type>( 20 );
                genesis.initial_chain_id = fc::sha256::hash( egenesis_json );
                return genesis;
             }
@@ -379,7 +385,7 @@ namespace detail {
             loaded_checkpoints.reserve( cps.size() );
             for( auto cp : cps )
             {
-               auto item = fc::json::from_string(cp).as<std::pair<uint32_t,block_id_type> >();
+               auto item = fc::json::from_string(cp).as<std::pair<uint32_t,block_id_type> >( 2 );
                loaded_checkpoints[item.first] = item.second;
             }
          }
@@ -404,11 +410,17 @@ namespace detail {
             _force_validate = true;
          }
 
+         if( _options->count("enable-subscribe-to-all") )
+            _app_options.enable_subscribe_to_all = _options->at("enable-subscribe-to-all").as<bool>();
+
+         if( _active_plugins.find( "market_history" ) != _active_plugins.end() )
+            _app_options.has_market_history_plugin = true;
+
          if( _options->count("api-access") ) {
 
             if(fc::exists(_options->at("api-access").as<boost::filesystem::path>()))
             {
-               _apiaccess = fc::json::from_file( _options->at("api-access").as<boost::filesystem::path>() ).as<api_access>();
+               _apiaccess = fc::json::from_file( _options->at("api-access").as<boost::filesystem::path>() ).as<api_access>( 20 );
                ilog( "Using api access file from ${path}",
                      ("path", _options->at("api-access").as<boost::filesystem::path>().string()) );
             }
@@ -419,7 +431,6 @@ namespace detail {
                std::exit(EXIT_FAILURE);
             }
          }
-
          else
          {
             // TODO:  Remove this generous default access policy
@@ -506,7 +517,9 @@ namespace detail {
             // you can help the network code out by throwing a block_older_than_undo_history exception.
             // when the net code sees that, it will stop trying to push blocks from that chain, but
             // leave that peer connected so that they can get sync blocks from us
-            bool result = _chain_db->push_block(blk_msg.block, (_is_block_producer | _force_validate) ? database::skip_nothing : database::skip_transaction_signatures);
+            bool result = _chain_db->push_block( blk_msg.block,
+                                                 (_is_block_producer | _force_validate) ?
+                                                    database::skip_nothing : database::skip_transaction_signatures );
 
             // the block was accepted, so we now know all of the transactions contained in the block
             if (!sync_mode)
@@ -527,7 +540,9 @@ namespace detail {
          } catch ( const graphene::chain::unlinkable_block_exception& e ) {
             // translate to a graphene::net exception
             elog("Error when pushing block:\n${e}", ("e", e.to_detail_string()));
-            FC_THROW_EXCEPTION(graphene::net::unlinkable_block_exception, "Error when pushing block:\n${e}", ("e", e.to_detail_string()));
+            FC_THROW_EXCEPTION( graphene::net::unlinkable_block_exception,
+                                "Error when pushing block:\n${e}",
+                                ("e", e.to_detail_string()) );
          } catch( const fc::exception& e ) {
             elog("Error when pushing block:\n${e}", ("e", e.to_detail_string()));
             throw;
@@ -610,7 +625,8 @@ namespace detail {
                break;
              }
            if (!found_a_block_in_synopsis)
-             FC_THROW_EXCEPTION(graphene::net::peer_is_on_an_unreachable_fork, "Unable to provide a list of blocks starting at any of the blocks in peer's synopsis");
+             FC_THROW_EXCEPTION( graphene::net::peer_is_on_an_unreachable_fork,
+                                 "Unable to provide a list of blocks starting at any of the blocks in peer's synopsis" );
          }
          for( uint32_t num = block_header::num_from_id(last_known_block_id);
               num <= _chain_db->head_block_num() && result.size() < limit;
@@ -775,7 +791,8 @@ namespace detail {
               {
                 // unable to get fork history for some reason.  maybe not linked?
                 // we can't return a synopsis of its chain
-                elog("Unable to construct a blockchain synopsis for reference hash ${hash}: ${exception}", ("hash", reference_point)("exception", e));
+                elog( "Unable to construct a blockchain synopsis for reference hash ${hash}: ${exception}",
+                      ("hash", reference_point)("exception", e) );
                 throw;
               }
               if (non_fork_high_block_num < low_block_num)
@@ -922,17 +939,24 @@ void application::set_program_options(boost::program_options::options_descriptio
 {
    configuration_file_options.add_options()
          ("p2p-endpoint", bpo::value<string>(), "Endpoint for P2P node to listen on")
-         ("seed-node,s", bpo::value<vector<string>>()->composing(), "P2P nodes to connect to on startup (may specify multiple times)")
-         ("seed-nodes", bpo::value<string>()->composing(), "JSON array of P2P nodes to connect to on startup")
-         ("checkpoint,c", bpo::value<vector<string>>()->composing(), "Pairs of [BLOCK_NUM,BLOCK_ID] that should be enforced as checkpoints.")
-         ("rpc-endpoint", bpo::value<string>()->implicit_value("127.0.0.1:8090"), "Endpoint for websocket RPC to listen on")
-         ("rpc-tls-endpoint", bpo::value<string>()->implicit_value("127.0.0.1:8089"), "Endpoint for TLS websocket RPC to listen on")
+         ("seed-node,s", bpo::value<vector<string>>()->composing(),
+          "P2P nodes to connect to on startup (may specify multiple times)")
+         ("seed-nodes", bpo::value<string>()->composing(),
+          "JSON array of P2P nodes to connect to on startup")
+         ("checkpoint,c", bpo::value<vector<string>>()->composing(),
+          "Pairs of [BLOCK_NUM,BLOCK_ID] that should be enforced as checkpoints.")
+         ("rpc-endpoint", bpo::value<string>()->implicit_value("127.0.0.1:8090"),
+          "Endpoint for websocket RPC to listen on")
+         ("rpc-tls-endpoint", bpo::value<string>()->implicit_value("127.0.0.1:8089"),
+          "Endpoint for TLS websocket RPC to listen on")
          ("server-pem,p", bpo::value<string>()->implicit_value("server.pem"), "The TLS certificate file for this server")
          ("server-pem-password,P", bpo::value<string>()->implicit_value(""), "Password for this certificate")
          ("genesis-json", bpo::value<boost::filesystem::path>(), "File to read Genesis State from")
          ("dbg-init-key", bpo::value<string>(), "Block signing key to use for init witnesses, overrides genesis file")
          ("api-access", bpo::value<boost::filesystem::path>(), "JSON file specifying API permissions")
          ("plugins", bpo::value<string>(), "Space-separated list of plugins to activate")
+         ("enable-subscribe-to-all", bpo::value<bool>()->implicit_value(false),
+          "Whether allow API clients to subscribe to universal object creation and removal events")
          ;
    command_line_options.add(configuration_file_options);
    command_line_options.add_options()
@@ -943,7 +967,8 @@ void application::set_program_options(boost::program_options::options_descriptio
          ("replay-blockchain", "Rebuild object graph by replaying all blocks")
          ("resync-blockchain", "Delete all blocks and re-sync with network from scratch")
          ("force-validate", "Force validation of all transactions")
-         ("genesis-timestamp", bpo::value<uint32_t>(), "Replace timestamp from genesis.json with current time plus this many seconds (experts only!)")
+         ("genesis-timestamp", bpo::value<uint32_t>(),
+          "Replace timestamp from genesis.json with current time plus this many seconds (experts only!)")
          ;
    command_line_options.add(_cli_options);
    configuration_file_options.add(_cfg_options);
@@ -961,7 +986,7 @@ void application::initialize(const fc::path& data_dir, const boost::program_opti
       if( fc::exists(genesis_out) )
       {
          try {
-            genesis_state = fc::json::from_file(genesis_out).as<genesis_state_type>();
+            genesis_state = fc::json::from_file(genesis_out).as<genesis_state_type>( 20 );
          } catch(const fc::exception& e) {
             std::cerr << "Unable to parse existing genesis file:\n" << e.to_string()
                       << "\nWould you like to replace it? [y/N] ";
@@ -1096,6 +1121,11 @@ void application::startup_plugins()
    for( auto& entry : my->_active_plugins )
       entry.second->plugin_startup();
    return;
+}
+
+const application_options& application::get_options()
+{
+   return my->_app_options;
 }
 
 // namespace detail

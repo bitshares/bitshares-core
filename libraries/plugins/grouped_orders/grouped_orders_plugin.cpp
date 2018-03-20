@@ -273,11 +273,11 @@ void grouped_orders_plugin::plugin_initialize(const boost::program_options::vari
    if( options.count( "tracked-groups" ) )
    {
       const std::string& groups = options["tracked-groups"].as<string>();
-      my->_tracked_groups = fc::json::from_string(groups).as<flat_set<uint16_t>>();
+      my->_tracked_groups = fc::json::from_string(groups).as<flat_set<uint16_t>>( 2 );
       my->_tracked_groups.erase( 0 );
    }
    else
-      my->_tracked_groups = fc::json::from_string("[10,100]").as<flat_set<uint16_t>>();
+      my->_tracked_groups = fc::json::from_string("[10,100]").as<flat_set<uint16_t>>(2);
 
    database().add_secondary_index< primary_index<limit_order_index>, detail::limit_order_group_index >( my->_tracked_groups );
 

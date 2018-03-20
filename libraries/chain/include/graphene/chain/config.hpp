@@ -169,3 +169,5 @@
 ///@}
 
 #define GRAPHENE_FBA_STEALTH_DESIGNATED_ASSET (asset_id_type(743))
+
+#define GRAPHENE_MAX_NESTED_OBJECTS (200)

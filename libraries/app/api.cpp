@@ -78,7 +78,7 @@ namespace graphene { namespace app {
     {
        if( api_name == "database_api" )
        {
-          _database_api = std::make_shared< database_api >( std::ref( *_app.chain_database() ) );
+          _database_api = std::make_shared< database_api >( std::ref( *_app.chain_database() ), &( _app.get_options() ) );
        }
        else if( api_name == "block_api" )
        {
@@ -151,7 +151,7 @@ namespace graphene { namespace app {
              {
                 auto block_num = b.block_num();
                 auto& callback = _callbacks.find(id)->second;
-                fc::async( [capture_this,this,id,block_num,trx_num,trx,callback](){ callback( fc::variant(transaction_confirmation{ id, block_num, trx_num, trx}) ); } );
+                fc::async( [capture_this,this,id,block_num,trx_num,trx,callback](){ callback( fc::variant(transaction_confirmation{ id, block_num, trx_num, trx}, 5) ); } );
              }
           }
        }
