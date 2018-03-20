@@ -2288,7 +2288,7 @@ void database_api_impl::on_applied_block()
          continue;
       const operation_history_object& op = *o_op;
 
-      std::pair<asset_id_type,asset_id_type> market;
+      optional< std::pair<asset_id_type,asset_id_type> > market;
       switch(op.op.which())
       {
          /*  This is sent via the object_changed callback
@@ -2304,8 +2304,9 @@ void database_api_impl::on_applied_block()
          */
          default: break;
       }
-      if(_market_subscriptions.count(market))
-         subscribed_markets_ops[market].push_back(std::make_pair(op.op, op.result));
+      if( market.valid() && _market_subscriptions.count(*market) )
+         // FIXME this may cause fill_order_operation be pushed before order creation
+         subscribed_markets_ops[*market].emplace_back( std::move( std::make_pair( op.op, op.result ) ) );
    }
    /// we need to ensure the database_api is not deleted for the life of the async operation
    auto capture_this = shared_from_this();
