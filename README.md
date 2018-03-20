@@ -1,5 +1,9 @@
 BitShares Core
 ==============
+* [Build Status](https://travis-ci.org/bitshares/bitshares-core)
+  * `master` branch: ![](https://travis-ci.org/bitshares/bitshares-core.svg?branch=master)
+  * `develop` branch: ![](https://travis-ci.org/bitshares/bitshares-core.svg?branch=develop)
+  * `hardfork` branch: ![](https://travis-ci.org/bitshares/bitshares-core.svg?branch=hardfork)
 * [Getting Started](#getting-started)
 * [Support](#support)
 * [Using the API](#using-the-api)
