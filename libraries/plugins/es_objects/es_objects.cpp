@@ -51,8 +51,8 @@ class es_objects_plugin_impl
 
       es_objects_plugin& _self;
       std::string _es_objects_elasticsearch_url = "http://localhost:9200/";
-      uint32_t _es_objects_bulk_replay = 1000;
-      uint32_t _es_objects_bulk_sync = 2;
+      uint32_t _es_objects_bulk_replay = 5000;
+      uint32_t _es_objects_bulk_sync = 10;
       bool _es_objects_proposals = true;
       bool _es_objects_accounts = true;
       bool _es_objects_assets = true;
@@ -78,7 +78,7 @@ void es_objects_plugin_impl::updateDatabase( const vector<object_id_type>& ids ,
 
    graphene::chain::database &db = _self.database();
 
-   auto block_time = db.head_block_time();
+   const fc::time_point_sec block_time = db.head_block_time();
 
    // check if we are in replay or in sync and change number of bulk documents accordingly
    uint32_t limit_documents = 0;
@@ -143,6 +143,7 @@ void es_objects_plugin_impl::PrepareProposal(const proposal_object* proposal_obj
    prop.available_owner_approvals = fc::json::to_string(proposal_object->available_owner_approvals);
    prop.required_active_approvals = fc::json::to_string(proposal_object->required_active_approvals);
    prop.available_key_approvals = fc::json::to_string(proposal_object->available_key_approvals);
+   prop.proposer = proposal_object->proposer;
 
    std::string data = fc::json::to_string(prop);
    prepare = graphene::utilities::createBulk("bitshares-proposal", data, fc::json::to_string(proposal_object->id), 0);
@@ -177,14 +178,14 @@ void es_objects_plugin_impl::PrepareAccount(const account_object* account_object
 
 void es_objects_plugin_impl::PrepareAsset(const asset_object* asset_object)
 {
-   asset_struct asset;
-   asset.symbol = asset_object->symbol;
-   asset.issuer = asset_object->issuer;
-   asset.is_market_issued = asset_object->is_market_issued();
-   asset.dynamic_asset_data_id = asset_object->dynamic_asset_data_id;
-   asset.bitasset_data_id = asset_object->bitasset_data_id;
+   asset_struct _asset;
+   _asset.symbol = asset_object->symbol;
+   _asset.issuer = asset_object->issuer;
+   _asset.is_market_issued = asset_object->is_market_issued();
+   _asset.dynamic_asset_data_id = asset_object->dynamic_asset_data_id;
+   _asset.bitasset_data_id = asset_object->bitasset_data_id;
 
-   std::string data = fc::json::to_string(asset);
+   std::string data = fc::json::to_string(_asset);
    prepare = graphene::utilities::createBulk("bitshares-asset", data, fc::json::to_string(asset_object->id), 0);
    bulk.insert(bulk.end(), prepare.begin(), prepare.end());
    prepare.clear();
@@ -267,7 +268,7 @@ std::string es_objects_plugin::plugin_name()const
 }
 std::string es_objects_plugin::plugin_description()const
 {
-   return "Stores blockchain objects in ES database.";
+   return "Stores blockchain objects in ES database. Experimental.";
 }
 
 void es_objects_plugin::plugin_set_program_options(
@@ -278,8 +279,8 @@ void es_objects_plugin::plugin_set_program_options(
    cli.add_options()
          ("es-objects-elasticsearch-url", boost::program_options::value<std::string>(), "Elasticsearch node url")
          ("es-objects-logs", boost::program_options::value<bool>(), "Log bulk events to database")
-         ("es-objects-bulk-replay", boost::program_options::value<uint32_t>(), "Number of bulk documents to index on replay(1000)")
-         ("es-objects-bulk-sync", boost::program_options::value<uint32_t>(), "Number of bulk documents to index on a syncronied chain(2)")
+         ("es-objects-bulk-replay", boost::program_options::value<uint32_t>(), "Number of bulk documents to index on replay(5000)")
+         ("es-objects-bulk-sync", boost::program_options::value<uint32_t>(), "Number of bulk documents to index on a syncronied chain(10)")
          ("es-objects-proposals", boost::program_options::value<bool>(), "Store proposal objects")
          ("es-objects-accounts", boost::program_options::value<bool>(), "Store account objects")
          ("es-objects-assets", boost::program_options::value<bool>(), "Store asset objects")

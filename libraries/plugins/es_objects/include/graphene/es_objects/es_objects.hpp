@@ -63,6 +63,7 @@ struct proposal_struct {
    string required_owner_approvals;
    string available_owner_approvals;
    string available_key_approvals;
+   account_id_type proposer;
 
 };
 struct account_struct {
@@ -111,7 +112,7 @@ struct bitasset_struct {
 
 } } //graphene::es_objects
 
-FC_REFLECT( graphene::es_objects::proposal_struct, (expiration_time)(review_period_time)(proposed_transaction)(required_active_approvals)(available_active_approvals)(required_owner_approvals)(available_owner_approvals)(available_key_approvals) )
+FC_REFLECT( graphene::es_objects::proposal_struct, (expiration_time)(review_period_time)(proposed_transaction)(required_active_approvals)(available_active_approvals)(required_owner_approvals)(available_owner_approvals)(available_key_approvals)(proposer) )
 FC_REFLECT( graphene::es_objects::account_struct, (membership_expiration_date)(registrar)(referrer)(lifetime_referrer)(network_fee_percentage)(lifetime_referrer_fee_percentage)(referrer_rewards_percentage)(name)(owner_account_auths)(owner_key_auths)(owner_address_auths)(active_account_auths)(active_key_auths)(active_address_auths)(voting_account) )
 FC_REFLECT( graphene::es_objects::asset_struct, (symbol)(issuer)(is_market_issued)(dynamic_asset_data_id)(bitasset_data_id) )
 FC_REFLECT( graphene::es_objects::balance_struct, (owner)(asset_id)(amount) )
