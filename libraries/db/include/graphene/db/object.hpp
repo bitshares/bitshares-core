@@ -27,6 +27,8 @@
 #include <fc/crypto/city.hpp>
 #include <fc/uint128.hpp>
 
+#define MAX_NESTING (200)
+
 namespace graphene { namespace db {
 
    /**
@@ -98,7 +100,7 @@ namespace graphene { namespace db {
          {
             static_cast<DerivedClass&>(*this) = std::move( static_cast<DerivedClass&>(obj) );
          }
-         virtual variant to_variant()const { return variant( static_cast<const DerivedClass&>(*this) ); }
+         virtual variant to_variant()const { return variant( static_cast<const DerivedClass&>(*this), MAX_NESTING ); }
          virtual vector<char> pack()const  { return fc::raw::pack( static_cast<const DerivedClass&>(*this) ); }
          virtual fc::uint128  hash()const  {  
              auto tmp = this->pack();

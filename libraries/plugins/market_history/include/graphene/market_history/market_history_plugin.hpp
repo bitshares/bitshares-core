@@ -194,10 +194,12 @@ typedef multi_index_container<
 > order_history_multi_index_type;
 
 struct by_market;
+struct by_volume;
 typedef multi_index_container<
    market_ticker_object,
    indexed_by<
       ordered_unique< tag<by_id>, member< object, object_id_type, &object::id > >,
+      ordered_non_unique< tag<by_volume>, member< market_ticker_object, fc::uint128, &market_ticker_object::base_volume > >,
       ordered_unique<
          tag<by_market>,
          composite_key<
