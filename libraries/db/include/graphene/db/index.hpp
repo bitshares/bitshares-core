@@ -172,13 +172,6 @@ namespace graphene { namespace db {
          }
 
          template<typename T>
-         T* add_secondary_index()
-         {
-            _sindex.emplace_back( new T() );
-            return static_cast<T*>(_sindex.back().get());
-         }
-
-         template<typename T>
          const T& get_secondary_index()const
          {
             for( const auto& item : _sindex )
