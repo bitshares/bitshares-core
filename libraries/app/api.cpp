@@ -108,6 +108,12 @@ namespace graphene { namespace app {
        {
           _orders_api = std::make_shared< orders_api >( std::ref( _app ) );
        }
+       else if( api_name == "persistent_proposals_api" )
+       {
+          // can only enable this API if the plugin was loaded
+          if( _app.get_plugin( "persistent_proposals" ) )
+             _persistent_proposals_api = std::make_shared< graphene::persistent_proposals::persistent_proposals_api >( std::ref( _app ) );
+       }
        else if( api_name == "debug_api" )
        {
           // can only enable this API if the plugin was loaded
@@ -270,6 +276,12 @@ namespace graphene { namespace app {
     {
        FC_ASSERT(_orders_api);
        return *_orders_api;
+    }
+
+    fc::api<graphene::persistent_proposals::persistent_proposals_api> login_api::persistent_proposals() const
+    {
+       FC_ASSERT(_persistent_proposals_api);
+       return *_persistent_proposals_api;
     }
 
     fc::api<graphene::debug_witness::debug_api> login_api::debug() const
