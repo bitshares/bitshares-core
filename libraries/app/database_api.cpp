@@ -189,13 +189,28 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
          });
       }
 
+      const std::pair<asset_id_type,asset_id_type> get_order_market( const force_settlement_object& order )
+      {
+         // TODO cache the result to avoid repeatly fetching from db
+         asset_id_type backing_id = order.balance.asset_id( _db ).bitasset_data( _db ).options.short_backing_asset;
+         auto tmp = std::make_pair( order.balance.asset_id, backing_id );
+         if( tmp.first > tmp.second ) std::swap( tmp.first, tmp.second );
+         return tmp;
+      }
+
+      template<typename T>
+      const std::pair<asset_id_type,asset_id_type> get_order_market( const T& order )
+      {
+         return order.get_market();
+      }
+
       template<typename T>
       void enqueue_if_subscribed_to_market(const object* obj, market_queue_type& queue, bool full_object=true)
       {
          const T* order = dynamic_cast<const T*>(obj);
          FC_ASSERT( order != nullptr);
 
-         auto market = order->get_market();
+         const auto& market = get_order_market( *order );
 
          auto sub = _market_subscriptions.find( market );
          if( sub != _market_subscriptions.end() ) {
@@ -228,6 +243,7 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       map< pair<asset_id_type,asset_id_type>, std::function<void(const variant&)> >      _market_subscriptions;
       graphene::chain::database&                                                                                                            _db;
       const application_options* _app_options = nullptr;
+
 };
 
 //////////////////////////////////////////////////////////////////////
@@ -2236,6 +2252,10 @@ void database_api_impl::handle_object_changed(bool force_notify, bool full_objec
          {
             enqueue_if_subscribed_to_market<limit_order_object>( find_object(id), broadcast_queue, full_object );
          }
+         else if( id.is<force_settlement_object>() )
+         {
+            enqueue_if_subscribed_to_market<force_settlement_object>( find_object(id), broadcast_queue, full_object );
+         }
       }
 
       if( broadcast_queue.size() )
@@ -2268,7 +2288,7 @@ void database_api_impl::on_applied_block()
          continue;
       const operation_history_object& op = *o_op;
 
-      std::pair<asset_id_type,asset_id_type> market;
+      optional< std::pair<asset_id_type,asset_id_type> > market;
       switch(op.op.which())
       {
          /*  This is sent via the object_changed callback
@@ -2284,8 +2304,9 @@ void database_api_impl::on_applied_block()
          */
          default: break;
       }
-      if(_market_subscriptions.count(market))
-         subscribed_markets_ops[market].push_back(std::make_pair(op.op, op.result));
+      if( market.valid() && _market_subscriptions.count(*market) )
+         // FIXME this may cause fill_order_operation be pushed before order creation
+         subscribed_markets_ops[*market].emplace_back( std::move( std::make_pair( op.op, op.result ) ) );
    }
    /// we need to ensure the database_api is not deleted for the life of the async operation
    auto capture_this = shared_from_this();
