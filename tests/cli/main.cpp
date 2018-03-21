@@ -52,17 +52,17 @@
  *********************/
 
 /////////
-// @brief forward declaration, using as a hack to generate a genesis.json file
-// for testing
+/// @brief forward declaration, using as a hack to generate a genesis.json file
+/// for testing
 /////////
 namespace graphene { namespace app { namespace detail {
    graphene::chain::genesis_state_type create_example_genesis();
 } } } // graphene::app::detail
 
 /////////
-// @brief create a genesis_json file
-// @param directory the directory to place the file "genesis.json"
-// @returns the full path to the file
+/// @brief create a genesis_json file
+/// @param directory the directory to place the file "genesis.json"
+/// @returns the full path to the file
 ////////
 boost::filesystem::path create_genesis_file(fc::temp_directory& directory) {
    boost::filesystem::path genesis_path = boost::filesystem::path{directory.path().generic_string()} / "genesis.json";
@@ -97,8 +97,8 @@ boost::filesystem::path create_genesis_file(fc::temp_directory& directory) {
 }
 
 //////
-// @brief attempt to find an available port on localhost
-// @returns an available port number, or -1 on error
+/// @brief attempt to find an available port on localhost
+/// @returns an available port number, or -1 on error
 /////
 int get_available_port()
 {
@@ -118,10 +118,10 @@ int get_available_port()
 }
 
 ///////////
-// @brief Start the application
-// @param app_dir the temporary directory to use
-// @param server_port_number to be filled with the rpc endpoint port number
-// @returns the application object
+/// @brief Start the application
+/// @param app_dir the temporary directory to use
+/// @param server_port_number to be filled with the rpc endpoint port number
+/// @returns the application object
 //////////
 std::shared_ptr<graphene::app::application> start_application(fc::temp_directory& app_dir, int& server_port_number) {
    std::shared_ptr<graphene::app::application> app1(new graphene::app::application{});
@@ -143,9 +143,9 @@ std::shared_ptr<graphene::app::application> start_application(fc::temp_directory
 }
 
 ///////////
-// Send a block to the db
-// @param app the application
-// @returns true on success
+/// Send a block to the db
+/// @param app the application
+/// @returns true on success
 ///////////
 bool generate_block(std::shared_ptr<graphene::app::application> app) {
    try {
@@ -163,9 +163,9 @@ bool generate_block(std::shared_ptr<graphene::app::application> app) {
 }
 
 ///////////
-// @brief Skip intermediate blocks, and generate a maintenance block
-// @param app the application
-// @returns true on success
+/// @brief Skip intermediate blocks, and generate a maintenance block
+/// @param app the application
+/// @returns true on success
 ///////////
 bool generate_maintenance_block(std::shared_ptr<graphene::app::application> app) {
    try {
@@ -186,13 +186,13 @@ bool generate_maintenance_block(std::shared_ptr<graphene::app::application> app)
 }
 
 ///////////
-// @brief a class to make connecting to the application server easier
+/// @brief a class to make connecting to the application server easier
 ///////////
 class client_connection
 {
 public:
    /////////
-   // @brief constructor
+   // constructor
    /////////
    client_connection(std::shared_ptr<graphene::app::application> app, const fc::temp_directory& data_dir, const int server_port_number)
    {
