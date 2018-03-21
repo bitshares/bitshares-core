@@ -1768,7 +1768,7 @@ vector<variant> database_api_impl::lookup_vote_ids( const vector<vote_id_type>& 
          {
             auto itr = committee_idx.find( id );
             if( itr != committee_idx.end() )
-               result.emplace_back( variant( *itr, 1 ) );
+               result.emplace_back( variant( *itr, 2 ) ); // Depth of committee_member_object is 1, add 1 here to be safe
             else
                result.emplace_back( variant() );
             break;
@@ -1777,7 +1777,7 @@ vector<variant> database_api_impl::lookup_vote_ids( const vector<vote_id_type>& 
          {
             auto itr = witness_idx.find( id );
             if( itr != witness_idx.end() )
-               result.emplace_back( variant( *itr, 1 ) );
+               result.emplace_back( variant( *itr, 2 ) ); // Depth of witness_object is 1, add 1 here to be safe
             else
                result.emplace_back( variant() );
             break;
@@ -1786,12 +1786,16 @@ vector<variant> database_api_impl::lookup_vote_ids( const vector<vote_id_type>& 
          {
             auto itr = for_worker_idx.find( id );
             if( itr != for_worker_idx.end() ) {
-               result.emplace_back( variant( *itr, 1 ) );
+               result.emplace_back( variant( *itr, 4 ) ); // Depth of worker_object is 3, add 1 here to be safe.
+                                                          // If we want to extract the balance object inside,
+                                                          //   need to increase this value
             }
             else {
                auto itr = against_worker_idx.find( id );
                if( itr != against_worker_idx.end() ) {
-                  result.emplace_back( variant( *itr, 1 ) );
+                  result.emplace_back( variant( *itr, 4 ) ); // Depth of worker_object is 3, add 1 here to be safe.
+                                                             // If we want to extract the balance object inside,
+                                                             //   need to increase this value
                }
                else {
                   result.emplace_back( variant() );
