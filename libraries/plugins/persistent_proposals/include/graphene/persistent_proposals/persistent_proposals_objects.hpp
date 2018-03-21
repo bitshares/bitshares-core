@@ -79,7 +79,7 @@ class persistent_proposal_object: public proposal_object
 {
 public:
     static const uint8_t space_id = persistent_proposal_objects;
-    static const uint8_t type_id = persistent_proposal_object_type::persistent_proposal_object_type;
+    static const uint8_t type_id = persistent_proposal_object_type;
 
     object_id_type original_id;
 };
@@ -97,7 +97,7 @@ class proposal_update_base_object: public proposal_object
 {
 public:
     static const uint8_t space_id = persistent_proposal_objects;
-    static const uint8_t type_id = persistent_proposal_object_type::proposal_update_base_object_type;
+    static const uint8_t type_id = proposal_update_base_object_type;
 
     object_id_type original_id;
 };
