@@ -260,6 +260,7 @@ struct database_fixture {
                                         const fc::ecc::private_key& signing_private_key = generate_private_key("null_key"));
    const witness_object& create_witness(const account_object& owner,
                                         const fc::ecc::private_key& signing_private_key = generate_private_key("null_key"));
+   const worker_object& create_worker(account_id_type owner, const share_type daily_pay = 1000, const fc::microseconds& duration = fc::days(2));
    uint64_t fund( const account_object& account, const asset& amount = asset(500000) );
    digest_type digest( const transaction& tx );
    void sign( signed_transaction& trx, const fc::ecc::private_key& key );

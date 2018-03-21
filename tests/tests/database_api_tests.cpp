@@ -666,4 +666,30 @@ BOOST_AUTO_TEST_CASE( set_subscribe_callback_disable_notify_all_test ) {
    } FC_LOG_AND_RETHROW()
 }
 
+BOOST_AUTO_TEST_CASE( lookup_vote_ids )
+{ try {
+   ACTORS( (connie)(whitney)(wolverine) );
+
+   fund(connie);
+   upgrade_to_lifetime_member(connie);
+   fund(whitney);
+   upgrade_to_lifetime_member(whitney);
+   fund(wolverine);
+   upgrade_to_lifetime_member(wolverine);
+
+   const auto& committee = create_committee_member( connie );
+   const auto& witness = create_witness( whitney );
+   const auto& worker = create_worker( wolverine_id );
+
+   graphene::app::database_api db_api(db);
+
+   std::vector<vote_id_type> votes;
+   votes.push_back( committee.vote_id );
+   votes.push_back( witness.vote_id );
+   votes.push_back( worker.vote_for );
+
+   const auto results = db_api.lookup_vote_ids( votes );
+
+} FC_LOG_AND_RETHROW() }
+
 BOOST_AUTO_TEST_SUITE_END()
