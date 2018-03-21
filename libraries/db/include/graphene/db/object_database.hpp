@@ -142,7 +142,7 @@ namespace graphene { namespace db {
          template<typename IndexType, typename SecondaryIndexType, typename... Args>
          SecondaryIndexType* add_secondary_index( Args... args )
          {
-            return get_mutable_index_type<IndexType>().add_secondary_index<SecondaryIndexType, Args...>(args...);
+            return get_mutable_index_type<IndexType>().template add_secondary_index<SecondaryIndexType, Args...>(args...);
          }
 
          void pop_undo();
