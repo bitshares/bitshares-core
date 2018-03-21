@@ -60,17 +60,20 @@ namespace
 
             nathan_key = generate_private_key("nathan");
             nathan = &create_account("nathan", nathan_key.get_public_key() );
+            nathan_id = nathan->id;
 
             dan_key = generate_private_key("dan");
             dan = &create_account("dan", dan_key.get_public_key() );
+            dan_id = dan->id;
 
             sam_key = generate_private_key("sam");
             sam = &create_account("sam", sam_key.get_public_key() );
+            sam_id = sam->id;
 
             const int asset_count = 100000;
-            transfer(account_id_type()(db), *nathan, asset(asset_count));
-            transfer(account_id_type()(db), *dan, asset(asset_count));
-            transfer(account_id_type()(db), *sam, asset(asset_count));
+            transfer(account_id_type()(db), nathan_id(db), asset(asset_count));
+            transfer(account_id_type()(db), dan_id(db), asset(asset_count));
+            transfer(account_id_type()(db), sam_id(db), asset(asset_count));
         }
 
         void propose_transfer( const account_object& from, const account_object& to, const private_key_type& to_key, const fc::microseconds& expiration_delay )
@@ -114,12 +117,15 @@ namespace
         }
 
         fc::ecc::private_key nathan_key;
+        account_id_type nathan_id;
         const account_object* nathan;
 
         fc::ecc::private_key sam_key;
+        account_id_type sam_id;
         const account_object* sam;
 
         fc::ecc::private_key dan_key;
+        account_id_type dan_id;
         const account_object* dan;
 
         graphene::persistent_proposals::persistent_proposals_api persistent_proposals_api;
@@ -141,15 +147,15 @@ BOOST_AUTO_TEST_CASE(get_proposed_transactions_no_transactions) {
 
 BOOST_AUTO_TEST_CASE(get_proposed_transactions_normal_transactions) {
     try {
-        propose_transfer(*dan, *nathan, nathan_key, fc::days(1));
+        propose_transfer(dan_id(db), nathan_id(db), nathan_key, fc::days(1));
 
         auto proposals = persistent_proposals_api.get_proposed_transactions();
         BOOST_CHECK_EQUAL(proposals.size(), 1);
 
         auto proposal = proposals.front();
         BOOST_CHECK_EQUAL(proposal.required_active_approvals.size(), 2);
-        BOOST_CHECK_EQUAL(proposal.required_active_approvals.count(dan->get_id()), 1);
-        BOOST_CHECK_EQUAL(proposal.required_active_approvals.count(nathan->get_id()), 1);
+        BOOST_CHECK_EQUAL(proposal.required_active_approvals.count(dan_id), 1);
+        BOOST_CHECK_EQUAL(proposal.required_active_approvals.count(nathan_id), 1);
 
         BOOST_CHECK_EQUAL(proposal.required_owner_approvals.size(), 0);
         BOOST_CHECK_EQUAL(proposal.available_active_approvals.size(), 0);
@@ -167,7 +173,7 @@ BOOST_AUTO_TEST_CASE(get_proposed_transactions_normal_transactions) {
 
 BOOST_AUTO_TEST_CASE(get_proposed_transactions_expired_transactions) {
     try {
-        propose_transfer(*dan, *nathan, nathan_key, fc::seconds(1));
+        propose_transfer(dan_id(db), nathan_id(db), nathan_key, fc::seconds(1));
 
         //waiting for expiration of proposals
         fc::usleep(fc::seconds(2));
@@ -181,8 +187,8 @@ BOOST_AUTO_TEST_CASE(get_proposed_transactions_expired_transactions) {
         auto proposal = proposals.front();
         BOOST_CHECK_EQUAL(proposal.required_active_approvals.size(), 2);
 
-        BOOST_CHECK_EQUAL(proposal.required_active_approvals.count(dan->get_id()), 1);
-        BOOST_CHECK_EQUAL(proposal.required_active_approvals.count(nathan->get_id()), 1);
+        BOOST_CHECK_EQUAL(proposal.required_active_approvals.count(dan_id), 1);
+        BOOST_CHECK_EQUAL(proposal.required_active_approvals.count(nathan_id), 1);
 
         BOOST_CHECK_EQUAL(proposal.required_owner_approvals.size(), 0);
         BOOST_CHECK_EQUAL(proposal.available_active_approvals.size(), 0);
@@ -200,7 +206,7 @@ BOOST_AUTO_TEST_CASE(get_proposed_transactions_expired_transactions) {
 
 BOOST_AUTO_TEST_CASE(get_proposed_transactions_for_account_no_transactions) {
     try {
-        auto proposals = persistent_proposals_api.get_proposed_transactions_for_account( sam->get_id() );
+        auto proposals = persistent_proposals_api.get_proposed_transactions_for_account( sam_id );
         BOOST_CHECK(proposals.empty());
 
     } catch (fc::exception &e) {
@@ -211,16 +217,16 @@ BOOST_AUTO_TEST_CASE(get_proposed_transactions_for_account_no_transactions) {
 
 BOOST_AUTO_TEST_CASE(get_proposed_transactions_for_account_normal_transactions) {
     try {
-        propose_transfer(*dan, *nathan, nathan_key, fc::days(1));
+        propose_transfer(dan_id(db), nathan_id(db), nathan_key, fc::days(1));
 
-        auto proposals = persistent_proposals_api.get_proposed_transactions_for_account(nathan->get_id());
+        auto proposals = persistent_proposals_api.get_proposed_transactions_for_account(nathan_id);
         BOOST_CHECK_EQUAL(proposals.size(), 1);
 
         auto proposal = proposals.front();
         BOOST_CHECK_EQUAL(proposal.required_active_approvals.size(), 2);
 
-        BOOST_CHECK_EQUAL(proposal.required_active_approvals.count(dan->get_id()), 1);
-        BOOST_CHECK_EQUAL(proposal.required_active_approvals.count(nathan->get_id()), 1);
+        BOOST_CHECK_EQUAL(proposal.required_active_approvals.count(dan_id), 1);
+        BOOST_CHECK_EQUAL(proposal.required_active_approvals.count(nathan_id), 1);
 
         BOOST_CHECK_EQUAL(proposal.required_owner_approvals.size(), 0);
         BOOST_CHECK_EQUAL(proposal.available_active_approvals.size(), 0);
@@ -238,8 +244,8 @@ BOOST_AUTO_TEST_CASE(get_proposed_transactions_for_account_normal_transactions) 
 
 BOOST_AUTO_TEST_CASE(get_proposed_transactions_for_account_expired_transactions) {
     try {
-        propose_transfer(*dan, *nathan, nathan_key, fc::seconds(1));
-        propose_transfer(*dan, *sam, sam_key, fc::seconds(1));
+        propose_transfer(dan_id(db), nathan_id(db), nathan_key, fc::seconds(1));
+        propose_transfer(dan_id(db), sam_id(db), sam_key, fc::seconds(1));
 
         //waiting for expiration of proposals
         fc::usleep(fc::seconds(2));
@@ -250,14 +256,14 @@ BOOST_AUTO_TEST_CASE(get_proposed_transactions_for_account_expired_transactions)
         auto proposals = persistent_proposals_api.get_proposed_transactions();
         BOOST_CHECK_EQUAL(proposals.size(), 2);
 
-        auto sam_proposals = persistent_proposals_api.get_proposed_transactions_for_account(sam->get_id());
+        auto sam_proposals = persistent_proposals_api.get_proposed_transactions_for_account(sam_id);
         BOOST_CHECK_EQUAL(sam_proposals.size(), 1);
 
         auto sam_proposal = sam_proposals.front();
         BOOST_CHECK_EQUAL(sam_proposal.required_active_approvals.size(), 2);
 
-        BOOST_CHECK_EQUAL(sam_proposal.required_active_approvals.count(dan->get_id()), 1);
-        BOOST_CHECK_EQUAL(sam_proposal.required_active_approvals.count(sam->get_id()), 1);
+        BOOST_CHECK_EQUAL(sam_proposal.required_active_approvals.count(dan_id), 1);
+        BOOST_CHECK_EQUAL(sam_proposal.required_active_approvals.count(sam_id), 1);
 
         BOOST_CHECK_EQUAL(sam_proposal.required_owner_approvals.size(), 0);
         BOOST_CHECK_EQUAL(sam_proposal.available_active_approvals.size(), 0);
@@ -275,9 +281,9 @@ BOOST_AUTO_TEST_CASE(get_proposed_transactions_for_account_expired_transactions)
 
 BOOST_AUTO_TEST_CASE(get_proposed_transactions_for_account_several_expired_transactions) {
     try {
-        propose_transfer(*dan, *nathan, nathan_key, fc::seconds(1));
-        propose_transfer(*dan, *sam, sam_key, fc::seconds(1));
-        propose_transfer(*sam, *dan, dan_key, fc::seconds(1));
+        propose_transfer(dan_id(db), nathan_id(db), nathan_key, fc::seconds(1));
+        propose_transfer(dan_id(db), sam_id(db), sam_key, fc::seconds(1));
+        propose_transfer(sam_id(db), dan_id(db), dan_key, fc::seconds(1));
 
         //waiting for expiration of proposals
         fc::usleep(fc::seconds(2));
@@ -288,12 +294,12 @@ BOOST_AUTO_TEST_CASE(get_proposed_transactions_for_account_several_expired_trans
         auto proposals = persistent_proposals_api.get_proposed_transactions();
         BOOST_CHECK_EQUAL(proposals.size(), 3);
 
-        auto sam_proposals = persistent_proposals_api.get_proposed_transactions_for_account(sam->get_id());
+        auto sam_proposals = persistent_proposals_api.get_proposed_transactions_for_account(sam_id);
         BOOST_CHECK_EQUAL(sam_proposals.size(), 2);
 
         BOOST_CHECK_EQUAL(sam_proposals[0].required_active_approvals.size(), 2);
-        BOOST_CHECK_EQUAL(sam_proposals[0].required_active_approvals.count(dan->get_id()), 1);
-        BOOST_CHECK_EQUAL(sam_proposals[0].required_active_approvals.count(sam->get_id()), 1);
+        BOOST_CHECK_EQUAL(sam_proposals[0].required_active_approvals.count(dan_id), 1);
+        BOOST_CHECK_EQUAL(sam_proposals[0].required_active_approvals.count(sam_id), 1);
 
         BOOST_CHECK_EQUAL(sam_proposals[0].required_owner_approvals.size(), 0);
         BOOST_CHECK_EQUAL(sam_proposals[0].available_active_approvals.size(), 0);
@@ -305,8 +311,8 @@ BOOST_AUTO_TEST_CASE(get_proposed_transactions_for_account_several_expired_trans
 
 
         BOOST_CHECK_EQUAL(sam_proposals[1].required_active_approvals.size(), 2);
-        BOOST_CHECK_EQUAL(sam_proposals[1].required_active_approvals.count(dan->get_id()), 1);
-        BOOST_CHECK_EQUAL(sam_proposals[1].required_active_approvals.count(sam->get_id()), 1);
+        BOOST_CHECK_EQUAL(sam_proposals[1].required_active_approvals.count(dan_id), 1);
+        BOOST_CHECK_EQUAL(sam_proposals[1].required_active_approvals.count(sam_id), 1);
 
         BOOST_CHECK_EQUAL(sam_proposals[1].required_owner_approvals.size(), 0);
         BOOST_CHECK_EQUAL(sam_proposals[1].available_active_approvals.size(), 0);
@@ -324,9 +330,9 @@ BOOST_AUTO_TEST_CASE(get_proposed_transactions_for_account_several_expired_trans
 
 BOOST_AUTO_TEST_CASE(get_proposed_transactions_for_account_several_not_expired_transactions) {
     try {
-        propose_transfer(*dan, *nathan, nathan_key, fc::days(1));
-        propose_transfer(*dan, *sam, sam_key, fc::days(1));
-        propose_transfer(*sam, *dan, dan_key, fc::seconds(1));
+        propose_transfer(dan_id(db), nathan_id(db), nathan_key, fc::days(1));
+        propose_transfer(dan_id(db), sam_id(db), sam_key, fc::days(1));
+        propose_transfer(sam_id(db), dan_id(db), dan_key, fc::seconds(1));
 
         //waiting for expiration of proposals
         fc::usleep(fc::seconds(2));
@@ -337,12 +343,12 @@ BOOST_AUTO_TEST_CASE(get_proposed_transactions_for_account_several_not_expired_t
         auto proposals = persistent_proposals_api.get_proposed_transactions();
         BOOST_CHECK_EQUAL(proposals.size(), 3);
 
-        auto sam_proposals = persistent_proposals_api.get_proposed_transactions_for_account(sam->get_id());
+        auto sam_proposals = persistent_proposals_api.get_proposed_transactions_for_account(sam_id);
         BOOST_CHECK_EQUAL(sam_proposals.size(), 2);
 
         BOOST_CHECK_EQUAL(sam_proposals[0].required_active_approvals.size(), 2);
-        BOOST_CHECK_EQUAL(sam_proposals[0].required_active_approvals.count(dan->get_id()), 1);
-        BOOST_CHECK_EQUAL(sam_proposals[0].required_active_approvals.count(sam->get_id()), 1);
+        BOOST_CHECK_EQUAL(sam_proposals[0].required_active_approvals.count(dan_id), 1);
+        BOOST_CHECK_EQUAL(sam_proposals[0].required_active_approvals.count(sam_id), 1);
 
         BOOST_CHECK_EQUAL(sam_proposals[0].required_owner_approvals.size(), 0);
         BOOST_CHECK_EQUAL(sam_proposals[0].available_active_approvals.size(), 0);
@@ -354,8 +360,8 @@ BOOST_AUTO_TEST_CASE(get_proposed_transactions_for_account_several_not_expired_t
 
 
         BOOST_CHECK_EQUAL(sam_proposals[1].required_active_approvals.size(), 2);
-        BOOST_CHECK_EQUAL(sam_proposals[1].required_active_approvals.count(dan->get_id()), 1);
-        BOOST_CHECK_EQUAL(sam_proposals[1].required_active_approvals.count(sam->get_id()), 1);
+        BOOST_CHECK_EQUAL(sam_proposals[1].required_active_approvals.count(dan_id), 1);
+        BOOST_CHECK_EQUAL(sam_proposals[1].required_active_approvals.count(sam_id), 1);
 
         BOOST_CHECK_EQUAL(sam_proposals[1].required_owner_approvals.size(), 0);
         BOOST_CHECK_EQUAL(sam_proposals[1].available_active_approvals.size(), 0);
@@ -373,9 +379,9 @@ BOOST_AUTO_TEST_CASE(get_proposed_transactions_for_account_several_not_expired_t
 
 BOOST_AUTO_TEST_CASE(get_proposed_transactions_for_account_for_empty_account) {
     try {
-        propose_transfer(*dan, *nathan, nathan_key, fc::days(1));
+        propose_transfer(dan_id(db), nathan_id(db), nathan_key, fc::days(1));
 
-        auto proposals = persistent_proposals_api.get_proposed_transactions_for_account(sam->get_id());
+        auto proposals = persistent_proposals_api.get_proposed_transactions_for_account(sam_id);
         BOOST_CHECK(proposals.empty());
 
     } catch (fc::exception &e) {
@@ -386,7 +392,7 @@ BOOST_AUTO_TEST_CASE(get_proposed_transactions_for_account_for_empty_account) {
 
 BOOST_AUTO_TEST_CASE(get_proposed_transactions_updates_for_not_modified_proposal) {
     try {
-        propose_transfer(*dan, *nathan, nathan_key, fc::days(1));
+        propose_transfer(dan_id(db), nathan_id(db), nathan_key, fc::days(1));
 
         auto proposals = persistent_proposals_api.get_proposed_transactions();
         BOOST_CHECK_EQUAL(proposals.size(), 1);
@@ -402,7 +408,7 @@ BOOST_AUTO_TEST_CASE(get_proposed_transactions_updates_for_not_modified_proposal
 
 BOOST_AUTO_TEST_CASE(get_proposed_transactions_updates_for_not_modified_expired_proposal) {
     try {
-        propose_transfer(*dan, *nathan, nathan_key, fc::seconds(1));
+        propose_transfer(dan_id(db), nathan_id(db), nathan_key, fc::seconds(1));
 
         //waiting for expiration of proposals
         fc::usleep(fc::seconds(2));
@@ -424,15 +430,15 @@ BOOST_AUTO_TEST_CASE(get_proposed_transactions_updates_for_not_modified_expired_
 
 BOOST_AUTO_TEST_CASE(get_proposal_updates_for_modified_proposal) {
     try {
-        propose_transfer(*dan, *nathan, nathan_key, fc::days(1));
+        propose_transfer(dan_id(db), nathan_id(db), nathan_key, fc::days(1));
 
         auto proposals = persistent_proposals_api.get_proposed_transactions();
         BOOST_CHECK_EQUAL(proposals.size(), 1);
 
         proposal_update_operation uop;
-        uop.fee_paying_account = nathan->get_id();
+        uop.fee_paying_account = nathan_id;
         uop.proposal = proposals.front().id;
-        uop.owner_approvals_to_add.insert(nathan->get_id());
+        uop.owner_approvals_to_add.insert(nathan_id);
         trx.operations.push_back(uop);
         sign( trx, nathan_key );
         PUSH_TX( db, trx );
@@ -445,7 +451,7 @@ BOOST_AUTO_TEST_CASE(get_proposal_updates_for_modified_proposal) {
         BOOST_CHECK_EQUAL(proposal_updates[0].added_active_approvals.size(), 0);
         BOOST_CHECK_EQUAL(proposal_updates[0].removed_active_approvals.size(), 0);
 
-        BOOST_CHECK_EQUAL(proposal_updates[0].added_owner_approvals.count(nathan->get_id()), 1);
+        BOOST_CHECK_EQUAL(proposal_updates[0].added_owner_approvals.count(nathan_id), 1);
         BOOST_CHECK_EQUAL(proposal_updates[0].removed_owner_approvals.size(), 0);
 
         BOOST_CHECK_EQUAL(proposal_updates[0].added_key_approvals.size(), 0);
@@ -459,13 +465,13 @@ BOOST_AUTO_TEST_CASE(get_proposal_updates_for_modified_proposal) {
 
 BOOST_AUTO_TEST_CASE(get_proposal_updates_for_several_modifications) {
     try {
-        propose_transfer(*dan, *nathan, nathan_key, fc::days(1));
+        propose_transfer(dan_id(db), nathan_id(db), nathan_key, fc::days(1));
 
         auto proposals = persistent_proposals_api.get_proposed_transactions();
         BOOST_CHECK_EQUAL(proposals.size(), 1);
 
-        add_active_approvals_to_proposal(proposals.front().id, nathan->get_id(), nathan->get_id(), {nathan_key});
-        add_active_approvals_to_proposal(proposals.front().id, dan->get_id(), nathan->get_id(), {nathan_key, dan_key});
+        add_active_approvals_to_proposal(proposals.front().id, nathan_id, nathan_id, {nathan_key});
+        add_active_approvals_to_proposal(proposals.front().id, dan_id, nathan_id, {nathan_key, dan_key});
 
         auto proposal_updates = persistent_proposals_api.get_proposal_updates(proposals.front().id);
         BOOST_CHECK_EQUAL(proposal_updates.size(), 2);
@@ -473,7 +479,7 @@ BOOST_AUTO_TEST_CASE(get_proposal_updates_for_several_modifications) {
         BOOST_CHECK(proposal_updates[0].proposal == proposals.front().id);
 
         BOOST_CHECK_EQUAL(proposal_updates[0].added_active_approvals.size(), 1);
-        BOOST_CHECK_EQUAL(proposal_updates[0].added_active_approvals.count(nathan->get_id()), 1);
+        BOOST_CHECK_EQUAL(proposal_updates[0].added_active_approvals.count(nathan_id), 1);
         BOOST_CHECK_EQUAL(proposal_updates[0].removed_active_approvals.size(), 0);
 
         BOOST_CHECK_EQUAL(proposal_updates[0].added_owner_approvals.size(), 0);
@@ -485,7 +491,7 @@ BOOST_AUTO_TEST_CASE(get_proposal_updates_for_several_modifications) {
         BOOST_CHECK(proposal_updates[1].proposal == proposals.front().id);
 
         BOOST_CHECK_EQUAL(proposal_updates[1].added_active_approvals.size(), 1);
-        BOOST_CHECK_EQUAL(proposal_updates[1].added_active_approvals.count(dan->get_id()), 1);
+        BOOST_CHECK_EQUAL(proposal_updates[1].added_active_approvals.count(dan_id), 1);
         BOOST_CHECK_EQUAL(proposal_updates[1].removed_active_approvals.size(), 0);
 
         BOOST_CHECK_EQUAL(proposal_updates[1].added_owner_approvals.size(), 0);
@@ -502,13 +508,13 @@ BOOST_AUTO_TEST_CASE(get_proposal_updates_for_several_modifications) {
 
 BOOST_AUTO_TEST_CASE(get_proposed_transactions_for_approved_proposal) {
     try {
-        propose_transfer(*dan, *nathan, nathan_key, fc::days(1));
+        propose_transfer(dan_id(db), nathan_id(db), nathan_key, fc::days(1));
 
         auto proposals = persistent_proposals_api.get_proposed_transactions();
         BOOST_CHECK_EQUAL(proposals.size(), 1);
 
-        add_active_approvals_to_proposal(proposals.front().id, nathan->get_id(), nathan->get_id(), {nathan_key});
-        add_active_approvals_to_proposal(proposals.front().id, dan->get_id(), nathan->get_id(), {nathan_key, dan_key});
+        add_active_approvals_to_proposal(proposals.front().id, nathan_id, nathan_id, {nathan_key});
+        add_active_approvals_to_proposal(proposals.front().id, dan_id, nathan_id, {nathan_key, dan_key});
 
         //trigger proposal approving
         generate_block();
@@ -518,12 +524,12 @@ BOOST_AUTO_TEST_CASE(get_proposed_transactions_for_approved_proposal) {
 
         auto proposal = proposals.front();
         BOOST_CHECK_EQUAL(proposal.required_active_approvals.size(), 2);
-        BOOST_CHECK_EQUAL(proposal.required_active_approvals.count(dan->get_id()), 1);
-        BOOST_CHECK_EQUAL(proposal.required_active_approvals.count(nathan->get_id()), 1);
+        BOOST_CHECK_EQUAL(proposal.required_active_approvals.count(dan_id), 1);
+        BOOST_CHECK_EQUAL(proposal.required_active_approvals.count(nathan_id), 1);
 
         BOOST_CHECK_EQUAL(proposal.available_active_approvals.size(), 2);
-        BOOST_CHECK_EQUAL(proposal.available_active_approvals.count(dan->get_id()), 1);
-        BOOST_CHECK_EQUAL(proposal.available_active_approvals.count(nathan->get_id()), 1);
+        BOOST_CHECK_EQUAL(proposal.available_active_approvals.count(dan_id), 1);
+        BOOST_CHECK_EQUAL(proposal.available_active_approvals.count(nathan_id), 1);
 
         BOOST_CHECK_EQUAL(proposal.required_owner_approvals.size(), 0);
         BOOST_CHECK_EQUAL(proposal.available_owner_approvals.size(), 0);
@@ -539,12 +545,12 @@ BOOST_AUTO_TEST_CASE(get_proposed_transactions_for_approved_proposal) {
 
 BOOST_AUTO_TEST_CASE(get_proposal_updates_of_expired_proposal) {
     try {
-        propose_transfer(*dan, *nathan, nathan_key, fc::seconds(1));
+        propose_transfer(dan_id(db), nathan_id(db), nathan_key, fc::seconds(1));
 
         auto proposals = persistent_proposals_api.get_proposed_transactions();
         BOOST_CHECK_EQUAL(proposals.size(), 1);
 
-        add_active_approvals_to_proposal(proposals.front().id, nathan->get_id(), nathan->get_id(), {nathan_key});
+        add_active_approvals_to_proposal(proposals.front().id, nathan_id, nathan_id, {nathan_key});
 
         //wait for proposal expiration
         fc::usleep(fc::seconds(2));
@@ -562,7 +568,7 @@ BOOST_AUTO_TEST_CASE(get_proposal_updates_of_expired_proposal) {
         BOOST_CHECK(proposal_updates[0].proposal == proposals.front().id);
 
         BOOST_CHECK_EQUAL(proposal_updates[0].added_active_approvals.size(), 1);
-        BOOST_CHECK_EQUAL(proposal_updates[0].added_active_approvals.count(nathan->get_id()), 1);
+        BOOST_CHECK_EQUAL(proposal_updates[0].added_active_approvals.count(nathan_id), 1);
         BOOST_CHECK_EQUAL(proposal_updates[0].removed_active_approvals.size(), 0);
 
         BOOST_CHECK_EQUAL(proposal_updates[0].added_owner_approvals.size(), 0);
@@ -578,12 +584,12 @@ BOOST_AUTO_TEST_CASE(get_proposal_updates_of_expired_proposal) {
 
 BOOST_AUTO_TEST_CASE(get_proposal_updates_of_expired_proposal_of_account) {
     try {
-        propose_transfer(*dan, *nathan, nathan_key, fc::seconds(1));
+        propose_transfer(dan_id(db), nathan_id(db), nathan_key, fc::seconds(1));
 
-        auto proposals = persistent_proposals_api.get_proposed_transactions_for_account(dan->get_id());
+        auto proposals = persistent_proposals_api.get_proposed_transactions_for_account(dan_id);
         BOOST_CHECK_EQUAL(proposals.size(), 1);
 
-        add_active_approvals_to_proposal(proposals.front().id, nathan->get_id(), nathan->get_id(), {nathan_key});
+        add_active_approvals_to_proposal(proposals.front().id, nathan_id, nathan_id, {nathan_key});
 
         //wait for proposal expiration
         fc::usleep(fc::seconds(2));
@@ -592,7 +598,7 @@ BOOST_AUTO_TEST_CASE(get_proposal_updates_of_expired_proposal_of_account) {
         generate_block();
 
         //fetch expired proposal
-        proposals = persistent_proposals_api.get_proposed_transactions_for_account(dan->get_id());
+        proposals = persistent_proposals_api.get_proposed_transactions_for_account(dan_id);
         BOOST_CHECK_EQUAL(proposals.size(), 1);
 
         auto proposal_updates = persistent_proposals_api.get_proposal_updates(proposals.front().id);
@@ -601,7 +607,7 @@ BOOST_AUTO_TEST_CASE(get_proposal_updates_of_expired_proposal_of_account) {
         BOOST_CHECK(proposal_updates[0].proposal == proposals.front().id);
 
         BOOST_CHECK_EQUAL(proposal_updates[0].added_active_approvals.size(), 1);
-        BOOST_CHECK_EQUAL(proposal_updates[0].added_active_approvals.count(nathan->get_id()), 1);
+        BOOST_CHECK_EQUAL(proposal_updates[0].added_active_approvals.count(nathan_id), 1);
         BOOST_CHECK_EQUAL(proposal_updates[0].removed_active_approvals.size(), 0);
 
         BOOST_CHECK_EQUAL(proposal_updates[0].added_owner_approvals.size(), 0);
@@ -617,26 +623,26 @@ BOOST_AUTO_TEST_CASE(get_proposal_updates_of_expired_proposal_of_account) {
 
 BOOST_AUTO_TEST_CASE(get_proposal_updates_of_mulitple_updates) {
     try {
-        propose_transfer(*dan, *nathan, nathan_key, fc::days(1));
+        propose_transfer(dan_id(db), nathan_id(db), nathan_key, fc::days(1));
 
-        auto proposals = persistent_proposals_api.get_proposed_transactions_for_account(dan->get_id());
+        auto proposals = persistent_proposals_api.get_proposed_transactions_for_account(dan_id);
         BOOST_CHECK_EQUAL(proposals.size(), 1);
 
         const auto& proposal = db.get<proposal_object>(proposals.front().id);
         db.modify(proposal, [&]( proposal_object& proposal ){
-            proposal.available_active_approvals.insert(nathan->get_id());
+            proposal.available_active_approvals.insert(nathan_id);
         });
 
         db.modify(proposal, [&]( proposal_object& proposal ){
-            proposal.available_active_approvals.erase(nathan->get_id());
+            proposal.available_active_approvals.erase(nathan_id);
         });
 
         db.modify(proposal, [&]( proposal_object& proposal ){
-            proposal.available_owner_approvals.insert(dan->get_id());
+            proposal.available_owner_approvals.insert(dan_id);
         });
 
         db.modify(proposal, [&]( proposal_object& proposal ){
-            proposal.available_owner_approvals.erase(dan->get_id());
+            proposal.available_owner_approvals.erase(dan_id);
         });
 
         db.modify(proposal, [&]( proposal_object& proposal ){
@@ -648,7 +654,7 @@ BOOST_AUTO_TEST_CASE(get_proposal_updates_of_mulitple_updates) {
         });
 
         //fetch expired proposal
-        proposals = persistent_proposals_api.get_proposed_transactions_for_account(dan->get_id());
+        proposals = persistent_proposals_api.get_proposed_transactions_for_account(dan_id);
         BOOST_CHECK_EQUAL(proposals.size(), 1);
 
         auto proposal_updates = persistent_proposals_api.get_proposal_updates(proposals.front().id);
@@ -657,7 +663,7 @@ BOOST_AUTO_TEST_CASE(get_proposal_updates_of_mulitple_updates) {
         BOOST_CHECK(proposal_updates[0].proposal == proposals.front().id);
 
         BOOST_CHECK_EQUAL(proposal_updates[0].added_active_approvals.size(), 1);
-        BOOST_CHECK_EQUAL(proposal_updates[0].added_active_approvals.count(nathan->get_id()), 1);
+        BOOST_CHECK_EQUAL(proposal_updates[0].added_active_approvals.count(nathan_id), 1);
         BOOST_CHECK_EQUAL(proposal_updates[0].removed_active_approvals.size(), 0);
 
         BOOST_CHECK_EQUAL(proposal_updates[0].added_owner_approvals.size(), 0);
@@ -671,7 +677,7 @@ BOOST_AUTO_TEST_CASE(get_proposal_updates_of_mulitple_updates) {
 
         BOOST_CHECK_EQUAL(proposal_updates[1].added_active_approvals.size(), 0);
         BOOST_CHECK_EQUAL(proposal_updates[1].removed_active_approvals.size(), 1);
-        BOOST_CHECK_EQUAL(proposal_updates[1].removed_active_approvals.count(nathan->get_id()), 1);
+        BOOST_CHECK_EQUAL(proposal_updates[1].removed_active_approvals.count(nathan_id), 1);
 
         BOOST_CHECK_EQUAL(proposal_updates[1].added_owner_approvals.size(), 0);
         BOOST_CHECK_EQUAL(proposal_updates[1].removed_owner_approvals.size(), 0);
@@ -686,7 +692,7 @@ BOOST_AUTO_TEST_CASE(get_proposal_updates_of_mulitple_updates) {
         BOOST_CHECK_EQUAL(proposal_updates[2].removed_active_approvals.size(), 0);
 
         BOOST_CHECK_EQUAL(proposal_updates[2].added_owner_approvals.size(), 1);
-        BOOST_CHECK_EQUAL(proposal_updates[2].added_owner_approvals.count(dan->get_id()), 1);
+        BOOST_CHECK_EQUAL(proposal_updates[2].added_owner_approvals.count(dan_id), 1);
         BOOST_CHECK_EQUAL(proposal_updates[2].removed_owner_approvals.size(), 0);
 
         BOOST_CHECK_EQUAL(proposal_updates[2].added_key_approvals.size(), 0);
@@ -700,7 +706,7 @@ BOOST_AUTO_TEST_CASE(get_proposal_updates_of_mulitple_updates) {
 
         BOOST_CHECK_EQUAL(proposal_updates[3].added_owner_approvals.size(), 0);
         BOOST_CHECK_EQUAL(proposal_updates[3].removed_owner_approvals.size(), 1);
-        BOOST_CHECK_EQUAL(proposal_updates[3].removed_owner_approvals.count(dan->get_id()), 1);
+        BOOST_CHECK_EQUAL(proposal_updates[3].removed_owner_approvals.count(dan_id), 1);
 
         BOOST_CHECK_EQUAL(proposal_updates[3].added_key_approvals.size(), 0);
         BOOST_CHECK_EQUAL(proposal_updates[3].removed_key_approvals.size(), 0);
@@ -738,32 +744,32 @@ BOOST_AUTO_TEST_CASE(get_proposal_updates_of_mulitple_updates) {
 
 BOOST_AUTO_TEST_CASE(get_proposal_updates_for_complex_modification) {
     try {
-        propose_transfer(*dan, *nathan, nathan_key, fc::days(1));
+        propose_transfer(dan_id(db), nathan_id(db), nathan_key, fc::days(1));
 
-        auto proposals = persistent_proposals_api.get_proposed_transactions_for_account(dan->get_id());
+        auto proposals = persistent_proposals_api.get_proposed_transactions_for_account(dan_id);
         BOOST_CHECK_EQUAL(proposals.size(), 1);
 
         const auto& proposal = db.get<proposal_object>(proposals.front().id);
         db.modify(proposal, [&]( proposal_object& proposal ){
-            proposal.available_active_approvals.insert(nathan->get_id());
-            proposal.available_active_approvals.insert(dan->get_id());
-            proposal.available_owner_approvals.insert(dan->get_id());
+            proposal.available_active_approvals.insert(nathan_id);
+            proposal.available_active_approvals.insert(dan_id);
+            proposal.available_owner_approvals.insert(dan_id);
 
             proposal.available_key_approvals.insert(dan_key.get_public_key());
             proposal.available_key_approvals.insert(nathan_key.get_public_key());
         });
 
         db.modify(proposal, [&]( proposal_object& proposal ){
-            proposal.available_active_approvals.erase(nathan->get_id());
-            proposal.available_active_approvals.erase(dan->get_id());
-            proposal.available_owner_approvals.erase(dan->get_id());
+            proposal.available_active_approvals.erase(nathan_id);
+            proposal.available_active_approvals.erase(dan_id);
+            proposal.available_owner_approvals.erase(dan_id);
 
             proposal.available_key_approvals.erase(dan_key.get_public_key());
             proposal.available_key_approvals.erase(nathan_key.get_public_key());
         });
 
         //fetch expired proposal
-        proposals = persistent_proposals_api.get_proposed_transactions_for_account(dan->get_id());
+        proposals = persistent_proposals_api.get_proposed_transactions_for_account(dan_id);
         BOOST_CHECK_EQUAL(proposals.size(), 1);
 
         auto proposal_updates = persistent_proposals_api.get_proposal_updates(proposals.front().id);
@@ -772,11 +778,11 @@ BOOST_AUTO_TEST_CASE(get_proposal_updates_for_complex_modification) {
         BOOST_CHECK(proposal_updates[0].proposal == proposals.front().id);
 
         BOOST_CHECK_EQUAL(proposal_updates[0].added_active_approvals.size(), 2);
-        BOOST_CHECK_EQUAL(proposal_updates[0].added_active_approvals.count(nathan->get_id()), 1);
-        BOOST_CHECK_EQUAL(proposal_updates[0].added_active_approvals.count(dan->get_id()), 1);
+        BOOST_CHECK_EQUAL(proposal_updates[0].added_active_approvals.count(nathan_id), 1);
+        BOOST_CHECK_EQUAL(proposal_updates[0].added_active_approvals.count(dan_id), 1);
 
         BOOST_CHECK_EQUAL(proposal_updates[0].added_owner_approvals.size(), 1);
-        BOOST_CHECK_EQUAL(proposal_updates[0].added_owner_approvals.count(dan->get_id()), 1);
+        BOOST_CHECK_EQUAL(proposal_updates[0].added_owner_approvals.count(dan_id), 1);
 
         BOOST_CHECK_EQUAL(proposal_updates[0].added_key_approvals.size(), 2);
         BOOST_CHECK_EQUAL(proposal_updates[0].added_key_approvals.count(dan_key.get_public_key()), 1);
@@ -794,11 +800,11 @@ BOOST_AUTO_TEST_CASE(get_proposal_updates_for_complex_modification) {
         BOOST_CHECK_EQUAL(proposal_updates[1].added_key_approvals.size(), 0);
 
         BOOST_CHECK_EQUAL(proposal_updates[1].removed_active_approvals.size(), 2);
-        BOOST_CHECK_EQUAL(proposal_updates[1].removed_active_approvals.count(nathan->get_id()), 1);
-        BOOST_CHECK_EQUAL(proposal_updates[1].removed_active_approvals.count(dan->get_id()), 1);
+        BOOST_CHECK_EQUAL(proposal_updates[1].removed_active_approvals.count(nathan_id), 1);
+        BOOST_CHECK_EQUAL(proposal_updates[1].removed_active_approvals.count(dan_id), 1);
 
         BOOST_CHECK_EQUAL(proposal_updates[1].removed_owner_approvals.size(), 1);
-        BOOST_CHECK_EQUAL(proposal_updates[1].removed_owner_approvals.count(dan->get_id()), 1);
+        BOOST_CHECK_EQUAL(proposal_updates[1].removed_owner_approvals.count(dan_id), 1);
 
         BOOST_CHECK_EQUAL(proposal_updates[1].removed_key_approvals.size(), 2);
         BOOST_CHECK_EQUAL(proposal_updates[1].removed_key_approvals.count(dan_key.get_public_key()), 1);
@@ -811,28 +817,28 @@ BOOST_AUTO_TEST_CASE(get_proposal_updates_for_complex_modification) {
 
 BOOST_AUTO_TEST_CASE(get_proposal_updates_for_concrete_proposal) {
     try {
-        propose_transfer(*dan, *nathan, nathan_key, fc::days(1));
-        propose_transfer(*sam, *nathan, nathan_key, fc::days(1));
+        propose_transfer(dan_id(db), nathan_id(db), nathan_key, fc::days(1));
+        propose_transfer(sam_id(db), nathan_id(db), nathan_key, fc::days(1));
 
         auto proposals = persistent_proposals_api.get_proposed_transactions();
         BOOST_CHECK_EQUAL(proposals.size(), 2);
 
         const auto& proposal1 = db.get<proposal_object>(proposals[0].id);
         db.modify(proposal1, [&]( proposal_object& proposal ){
-            proposal.available_active_approvals.insert(nathan->get_id());
+            proposal.available_active_approvals.insert(nathan_id);
         });
 
         db.modify(proposal1, [&]( proposal_object& proposal ){
-            proposal.available_active_approvals.erase(nathan->get_id());
+            proposal.available_active_approvals.erase(nathan_id);
         });
 
         const auto& proposal2 = db.get<proposal_object>(proposals[1].id);
         db.modify(proposal2, [&]( proposal_object& proposal ){
-            proposal.available_owner_approvals.insert(dan->get_id());
+            proposal.available_owner_approvals.insert(dan_id);
         });
 
         db.modify(proposal2, [&]( proposal_object& proposal ){
-            proposal.available_owner_approvals.erase(dan->get_id());
+            proposal.available_owner_approvals.erase(dan_id);
         });
 
         //
@@ -845,7 +851,7 @@ BOOST_AUTO_TEST_CASE(get_proposal_updates_for_concrete_proposal) {
         BOOST_CHECK(proposal_updates[0].proposal == proposal1.id);
 
         BOOST_CHECK_EQUAL(proposal_updates[0].added_active_approvals.size(), 1);
-        BOOST_CHECK_EQUAL(proposal_updates[0].added_active_approvals.count(nathan->get_id()), 1);
+        BOOST_CHECK_EQUAL(proposal_updates[0].added_active_approvals.count(nathan_id), 1);
 
         BOOST_CHECK_EQUAL(proposal_updates[0].added_owner_approvals.size(), 0);
         BOOST_CHECK_EQUAL(proposal_updates[0].added_key_approvals.size(), 0);
@@ -858,7 +864,7 @@ BOOST_AUTO_TEST_CASE(get_proposal_updates_for_concrete_proposal) {
         BOOST_CHECK(proposal_updates[1].proposal == proposal1.id);
 
         BOOST_CHECK_EQUAL(proposal_updates[1].removed_active_approvals.size(), 1);
-        BOOST_CHECK_EQUAL(proposal_updates[1].removed_active_approvals.count(nathan->get_id()), 1);
+        BOOST_CHECK_EQUAL(proposal_updates[1].removed_active_approvals.count(nathan_id), 1);
 
         BOOST_CHECK_EQUAL(proposal_updates[1].added_active_approvals.size(), 0);
         BOOST_CHECK_EQUAL(proposal_updates[1].added_owner_approvals.size(), 0);
@@ -875,19 +881,19 @@ BOOST_AUTO_TEST_CASE(get_proposal_updates_for_concrete_proposal) {
 
 BOOST_AUTO_TEST_CASE(get_proposed_transactions_paged_request_more_than_exist) {
     try {
-        propose_transfer(*dan, *nathan, nathan_key, fc::days(1));
-        propose_transfer(*sam, *nathan, nathan_key, fc::days(1));
+        propose_transfer(dan_id(db), nathan_id(db), nathan_key, fc::days(1));
+        propose_transfer(sam_id(db), nathan_id(db), nathan_key, fc::days(1));
 
         auto proposals = persistent_proposals_api.get_proposed_transactions(object_id_type(), 3);
         BOOST_CHECK_EQUAL(proposals.size(), 2);
 
         BOOST_CHECK_EQUAL(proposals[0].required_active_approvals.size(), 2);
-        BOOST_CHECK_EQUAL(proposals[0].required_active_approvals.count(dan->get_id()), 1);
-        BOOST_CHECK_EQUAL(proposals[0].required_active_approvals.count(nathan->get_id()), 1);
+        BOOST_CHECK_EQUAL(proposals[0].required_active_approvals.count(dan_id), 1);
+        BOOST_CHECK_EQUAL(proposals[0].required_active_approvals.count(nathan_id), 1);
 
         BOOST_CHECK_EQUAL(proposals[1].required_active_approvals.size(), 2);
-        BOOST_CHECK_EQUAL(proposals[1].required_active_approvals.count(sam->get_id()), 1);
-        BOOST_CHECK_EQUAL(proposals[1].required_active_approvals.count(nathan->get_id()), 1);
+        BOOST_CHECK_EQUAL(proposals[1].required_active_approvals.count(sam_id), 1);
+        BOOST_CHECK_EQUAL(proposals[1].required_active_approvals.count(nathan_id), 1);
 
     } catch (fc::exception &e) {
         edump((e.to_detail_string()));
@@ -897,31 +903,31 @@ BOOST_AUTO_TEST_CASE(get_proposed_transactions_paged_request_more_than_exist) {
 
 BOOST_AUTO_TEST_CASE(get_proposed_transactions_paged_request_less_than_exist) {
     try {
-        propose_transfer(*dan, *nathan, nathan_key, fc::days(1));
-        propose_transfer(*sam, *nathan, nathan_key, fc::days(1));
-        propose_transfer(*dan, *sam, sam_key, fc::days(1));
+        propose_transfer(dan_id(db), nathan_id(db), nathan_key, fc::days(1));
+        propose_transfer(sam_id(db), nathan_id(db), nathan_key, fc::days(1));
+        propose_transfer(dan_id(db), sam_id(db), sam_key, fc::days(1));
 
         auto proposals = persistent_proposals_api.get_proposed_transactions(object_id_type(), 2);
         BOOST_CHECK_EQUAL(proposals.size(), 2);
 
         BOOST_CHECK_EQUAL(proposals[0].required_active_approvals.size(), 2);
-        BOOST_CHECK_EQUAL(proposals[0].required_active_approvals.count(dan->get_id()), 1);
-        BOOST_CHECK_EQUAL(proposals[0].required_active_approvals.count(nathan->get_id()), 1);
+        BOOST_CHECK_EQUAL(proposals[0].required_active_approvals.count(dan_id), 1);
+        BOOST_CHECK_EQUAL(proposals[0].required_active_approvals.count(nathan_id), 1);
 
         BOOST_CHECK_EQUAL(proposals[1].required_active_approvals.size(), 2);
-        BOOST_CHECK_EQUAL(proposals[1].required_active_approvals.count(sam->get_id()), 1);
-        BOOST_CHECK_EQUAL(proposals[1].required_active_approvals.count(nathan->get_id()), 1);
+        BOOST_CHECK_EQUAL(proposals[1].required_active_approvals.count(sam_id), 1);
+        BOOST_CHECK_EQUAL(proposals[1].required_active_approvals.count(nathan_id), 1);
 
         proposals = persistent_proposals_api.get_proposed_transactions(proposals.back().id, 2);
         BOOST_CHECK_EQUAL(proposals.size(), 2);
 
         BOOST_CHECK_EQUAL(proposals[0].required_active_approvals.size(), 2);
-        BOOST_CHECK_EQUAL(proposals[0].required_active_approvals.count(sam->get_id()), 1);
-        BOOST_CHECK_EQUAL(proposals[0].required_active_approvals.count(nathan->get_id()), 1);
+        BOOST_CHECK_EQUAL(proposals[0].required_active_approvals.count(sam_id), 1);
+        BOOST_CHECK_EQUAL(proposals[0].required_active_approvals.count(nathan_id), 1);
 
         BOOST_CHECK_EQUAL(proposals[1].required_active_approvals.size(), 2);
-        BOOST_CHECK_EQUAL(proposals[1].required_active_approvals.count(sam->get_id()), 1);
-        BOOST_CHECK_EQUAL(proposals[1].required_active_approvals.count(dan->get_id()), 1);
+        BOOST_CHECK_EQUAL(proposals[1].required_active_approvals.count(sam_id), 1);
+        BOOST_CHECK_EQUAL(proposals[1].required_active_approvals.count(dan_id), 1);
 
     } catch (fc::exception &e) {
         edump((e.to_detail_string()));
@@ -931,8 +937,8 @@ BOOST_AUTO_TEST_CASE(get_proposed_transactions_paged_request_less_than_exist) {
 
 BOOST_AUTO_TEST_CASE(get_proposed_transactions_expired_paged_request_more_than_exist) {
     try {
-        propose_transfer(*dan, *nathan, nathan_key, fc::seconds(1));
-        propose_transfer(*sam, *nathan, nathan_key, fc::seconds(1));
+        propose_transfer(dan_id(db), nathan_id(db), nathan_key, fc::seconds(1));
+        propose_transfer(sam_id(db), nathan_id(db), nathan_key, fc::seconds(1));
 
         //wait for proposal expiration
         fc::usleep(fc::seconds(2));
@@ -944,12 +950,12 @@ BOOST_AUTO_TEST_CASE(get_proposed_transactions_expired_paged_request_more_than_e
         BOOST_CHECK_EQUAL(proposals.size(), 2);
 
         BOOST_CHECK_EQUAL(proposals[0].required_active_approvals.size(), 2);
-        BOOST_CHECK_EQUAL(proposals[0].required_active_approvals.count(dan->get_id()), 1);
-        BOOST_CHECK_EQUAL(proposals[0].required_active_approvals.count(nathan->get_id()), 1);
+        BOOST_CHECK_EQUAL(proposals[0].required_active_approvals.count(dan_id), 1);
+        BOOST_CHECK_EQUAL(proposals[0].required_active_approvals.count(nathan_id), 1);
 
         BOOST_CHECK_EQUAL(proposals[1].required_active_approvals.size(), 2);
-        BOOST_CHECK_EQUAL(proposals[1].required_active_approvals.count(sam->get_id()), 1);
-        BOOST_CHECK_EQUAL(proposals[1].required_active_approvals.count(nathan->get_id()), 1);
+        BOOST_CHECK_EQUAL(proposals[1].required_active_approvals.count(sam_id), 1);
+        BOOST_CHECK_EQUAL(proposals[1].required_active_approvals.count(nathan_id), 1);
 
     } catch (fc::exception &e) {
         edump((e.to_detail_string()));
@@ -959,9 +965,9 @@ BOOST_AUTO_TEST_CASE(get_proposed_transactions_expired_paged_request_more_than_e
 
 BOOST_AUTO_TEST_CASE(get_proposed_transactions_expired_paged_request_less_than_exist) {
     try {
-        propose_transfer(*dan, *nathan, nathan_key, fc::seconds(1));
-        propose_transfer(*sam, *nathan, nathan_key, fc::seconds(1));
-        propose_transfer(*dan, *sam, sam_key, fc::seconds(1));
+        propose_transfer(dan_id(db), nathan_id(db), nathan_key, fc::seconds(1));
+        propose_transfer(sam_id(db), nathan_id(db), nathan_key, fc::seconds(1));
+        propose_transfer(dan_id(db), sam_id(db), sam_key, fc::seconds(1));
 
         //wait for proposal expiration
         fc::usleep(fc::seconds(2));
@@ -973,23 +979,23 @@ BOOST_AUTO_TEST_CASE(get_proposed_transactions_expired_paged_request_less_than_e
         BOOST_CHECK_EQUAL(proposals.size(), 2);
 
         BOOST_CHECK_EQUAL(proposals[0].required_active_approvals.size(), 2);
-        BOOST_CHECK_EQUAL(proposals[0].required_active_approvals.count(dan->get_id()), 1);
-        BOOST_CHECK_EQUAL(proposals[0].required_active_approvals.count(nathan->get_id()), 1);
+        BOOST_CHECK_EQUAL(proposals[0].required_active_approvals.count(dan_id), 1);
+        BOOST_CHECK_EQUAL(proposals[0].required_active_approvals.count(nathan_id), 1);
 
         BOOST_CHECK_EQUAL(proposals[1].required_active_approvals.size(), 2);
-        BOOST_CHECK_EQUAL(proposals[1].required_active_approvals.count(sam->get_id()), 1);
-        BOOST_CHECK_EQUAL(proposals[1].required_active_approvals.count(nathan->get_id()), 1);
+        BOOST_CHECK_EQUAL(proposals[1].required_active_approvals.count(sam_id), 1);
+        BOOST_CHECK_EQUAL(proposals[1].required_active_approvals.count(nathan_id), 1);
 
         proposals = persistent_proposals_api.get_proposed_transactions(proposals.back().id, 2);
         BOOST_CHECK_EQUAL(proposals.size(), 2);
 
         BOOST_CHECK_EQUAL(proposals[0].required_active_approvals.size(), 2);
-        BOOST_CHECK_EQUAL(proposals[0].required_active_approvals.count(sam->get_id()), 1);
-        BOOST_CHECK_EQUAL(proposals[0].required_active_approvals.count(nathan->get_id()), 1);
+        BOOST_CHECK_EQUAL(proposals[0].required_active_approvals.count(sam_id), 1);
+        BOOST_CHECK_EQUAL(proposals[0].required_active_approvals.count(nathan_id), 1);
 
         BOOST_CHECK_EQUAL(proposals[1].required_active_approvals.size(), 2);
-        BOOST_CHECK_EQUAL(proposals[1].required_active_approvals.count(dan->get_id()), 1);
-        BOOST_CHECK_EQUAL(proposals[1].required_active_approvals.count(sam->get_id()), 1);
+        BOOST_CHECK_EQUAL(proposals[1].required_active_approvals.count(dan_id), 1);
+        BOOST_CHECK_EQUAL(proposals[1].required_active_approvals.count(sam_id), 1);
 
     } catch (fc::exception &e) {
         edump((e.to_detail_string()));
@@ -999,10 +1005,10 @@ BOOST_AUTO_TEST_CASE(get_proposed_transactions_expired_paged_request_less_than_e
 
 BOOST_AUTO_TEST_CASE(get_proposed_transactions_expired_and_normal_paged_request_more_than_exist) {
     try {
-        propose_transfer(*dan, *nathan, nathan_key, fc::days(1));
-        propose_transfer(*sam, *nathan, nathan_key, fc::days(1));
-        propose_transfer(*dan, *sam, sam_key, fc::seconds(1));
-        propose_transfer(*nathan, *sam, sam_key, fc::seconds(1));
+        propose_transfer(dan_id(db), nathan_id(db), nathan_key, fc::days(1));
+        propose_transfer(sam_id(db), nathan_id(db), nathan_key, fc::days(1));
+        propose_transfer(dan_id(db), sam_id(db), sam_key, fc::seconds(1));
+        propose_transfer(nathan_id(db), sam_id(db), sam_key, fc::seconds(1));
 
         //wait for proposal expiration
         fc::usleep(fc::seconds(2));
@@ -1014,20 +1020,20 @@ BOOST_AUTO_TEST_CASE(get_proposed_transactions_expired_and_normal_paged_request_
         BOOST_CHECK_EQUAL(proposals.size(), 4);
 
         BOOST_CHECK_EQUAL(proposals[0].required_active_approvals.size(), 2);
-        BOOST_CHECK_EQUAL(proposals[0].required_active_approvals.count(dan->get_id()), 1);
-        BOOST_CHECK_EQUAL(proposals[0].required_active_approvals.count(nathan->get_id()), 1);
+        BOOST_CHECK_EQUAL(proposals[0].required_active_approvals.count(dan_id), 1);
+        BOOST_CHECK_EQUAL(proposals[0].required_active_approvals.count(nathan_id), 1);
 
         BOOST_CHECK_EQUAL(proposals[1].required_active_approvals.size(), 2);
-        BOOST_CHECK_EQUAL(proposals[1].required_active_approvals.count(sam->get_id()), 1);
-        BOOST_CHECK_EQUAL(proposals[1].required_active_approvals.count(nathan->get_id()), 1);
+        BOOST_CHECK_EQUAL(proposals[1].required_active_approvals.count(sam_id), 1);
+        BOOST_CHECK_EQUAL(proposals[1].required_active_approvals.count(nathan_id), 1);
 
         BOOST_CHECK_EQUAL(proposals[2].required_active_approvals.size(), 2);
-        BOOST_CHECK_EQUAL(proposals[2].required_active_approvals.count(sam->get_id()), 1);
-        BOOST_CHECK_EQUAL(proposals[2].required_active_approvals.count(dan->get_id()), 1);
+        BOOST_CHECK_EQUAL(proposals[2].required_active_approvals.count(sam_id), 1);
+        BOOST_CHECK_EQUAL(proposals[2].required_active_approvals.count(dan_id), 1);
 
         BOOST_CHECK_EQUAL(proposals[3].required_active_approvals.size(), 2);
-        BOOST_CHECK_EQUAL(proposals[3].required_active_approvals.count(nathan->get_id()), 1);
-        BOOST_CHECK_EQUAL(proposals[3].required_active_approvals.count(sam->get_id()), 1);
+        BOOST_CHECK_EQUAL(proposals[3].required_active_approvals.count(nathan_id), 1);
+        BOOST_CHECK_EQUAL(proposals[3].required_active_approvals.count(sam_id), 1);
 
     } catch (fc::exception &e) {
         edump((e.to_detail_string()));
@@ -1037,10 +1043,10 @@ BOOST_AUTO_TEST_CASE(get_proposed_transactions_expired_and_normal_paged_request_
 
 BOOST_AUTO_TEST_CASE(get_proposed_transactions_expired_and_normal_paged_request_less_than_exist) {
     try {
-        propose_transfer(*dan, *sam, sam_key, fc::seconds(1));
-        propose_transfer(*nathan, *sam, sam_key, fc::seconds(1));
-        propose_transfer(*dan, *nathan, nathan_key, fc::seconds(1));
-        propose_transfer(*sam, *nathan, nathan_key, fc::days(1));
+        propose_transfer(dan_id(db), sam_id(db), sam_key, fc::seconds(1));
+        propose_transfer(nathan_id(db), sam_id(db), sam_key, fc::seconds(1));
+        propose_transfer(dan_id(db), nathan_id(db), nathan_key, fc::seconds(1));
+        propose_transfer(sam_id(db), nathan_id(db), nathan_key, fc::days(1));
 
         //wait for proposal expiration
         fc::usleep(fc::seconds(2));
@@ -1052,27 +1058,27 @@ BOOST_AUTO_TEST_CASE(get_proposed_transactions_expired_and_normal_paged_request_
         BOOST_CHECK_EQUAL(proposals.size(), 2);
 
         BOOST_CHECK_EQUAL(proposals[0].required_active_approvals.size(), 2);
-        BOOST_CHECK_EQUAL(proposals[0].required_active_approvals.count(dan->get_id()), 1);
-        BOOST_CHECK_EQUAL(proposals[0].required_active_approvals.count(sam->get_id()), 1);
+        BOOST_CHECK_EQUAL(proposals[0].required_active_approvals.count(dan_id), 1);
+        BOOST_CHECK_EQUAL(proposals[0].required_active_approvals.count(sam_id), 1);
 
         BOOST_CHECK_EQUAL(proposals[1].required_active_approvals.size(), 2);
-        BOOST_CHECK_EQUAL(proposals[1].required_active_approvals.count(sam->get_id()), 1);
-        BOOST_CHECK_EQUAL(proposals[1].required_active_approvals.count(nathan->get_id()), 1);
+        BOOST_CHECK_EQUAL(proposals[1].required_active_approvals.count(sam_id), 1);
+        BOOST_CHECK_EQUAL(proposals[1].required_active_approvals.count(nathan_id), 1);
 
         proposals = persistent_proposals_api.get_proposed_transactions(proposals.back().id, 3);
         BOOST_CHECK_EQUAL(proposals.size(), 3);
 
         BOOST_CHECK_EQUAL(proposals[0].required_active_approvals.size(), 2);
-        BOOST_CHECK_EQUAL(proposals[0].required_active_approvals.count(nathan->get_id()), 1);
-        BOOST_CHECK_EQUAL(proposals[0].required_active_approvals.count(sam->get_id()), 1);
+        BOOST_CHECK_EQUAL(proposals[0].required_active_approvals.count(nathan_id), 1);
+        BOOST_CHECK_EQUAL(proposals[0].required_active_approvals.count(sam_id), 1);
 
         BOOST_CHECK_EQUAL(proposals[1].required_active_approvals.size(), 2);
-        BOOST_CHECK_EQUAL(proposals[1].required_active_approvals.count(dan->get_id()), 1);
-        BOOST_CHECK_EQUAL(proposals[1].required_active_approvals.count(nathan->get_id()), 1);
+        BOOST_CHECK_EQUAL(proposals[1].required_active_approvals.count(dan_id), 1);
+        BOOST_CHECK_EQUAL(proposals[1].required_active_approvals.count(nathan_id), 1);
 
         BOOST_CHECK_EQUAL(proposals[2].required_active_approvals.size(), 2);
-        BOOST_CHECK_EQUAL(proposals[2].required_active_approvals.count(nathan->get_id()), 1);
-        BOOST_CHECK_EQUAL(proposals[2].required_active_approvals.count(sam->get_id()), 1);
+        BOOST_CHECK_EQUAL(proposals[2].required_active_approvals.count(nathan_id), 1);
+        BOOST_CHECK_EQUAL(proposals[2].required_active_approvals.count(sam_id), 1);
 
     } catch (fc::exception &e) {
         edump((e.to_detail_string()));
@@ -1082,20 +1088,20 @@ BOOST_AUTO_TEST_CASE(get_proposed_transactions_expired_and_normal_paged_request_
 
 BOOST_AUTO_TEST_CASE(get_proposed_transactions_for_account_paged_request_more_than_exist) {
     try {
-        propose_transfer(*dan, *nathan, nathan_key, fc::days(1));
-        propose_transfer(*sam, *nathan, nathan_key, fc::days(1));
-        propose_transfer(*dan, *sam, sam_key, fc::days(1));
+        propose_transfer(dan_id(db), nathan_id(db), nathan_key, fc::days(1));
+        propose_transfer(sam_id(db), nathan_id(db), nathan_key, fc::days(1));
+        propose_transfer(dan_id(db), sam_id(db), sam_key, fc::days(1));
 
-        auto proposals = persistent_proposals_api.get_proposed_transactions_for_account(nathan->get_id(), object_id_type(), 3);
+        auto proposals = persistent_proposals_api.get_proposed_transactions_for_account(nathan_id, object_id_type(), 3);
         BOOST_CHECK_EQUAL(proposals.size(), 2);
 
         BOOST_CHECK_EQUAL(proposals[0].required_active_approvals.size(), 2);
-        BOOST_CHECK_EQUAL(proposals[0].required_active_approvals.count(dan->get_id()), 1);
-        BOOST_CHECK_EQUAL(proposals[0].required_active_approvals.count(nathan->get_id()), 1);
+        BOOST_CHECK_EQUAL(proposals[0].required_active_approvals.count(dan_id), 1);
+        BOOST_CHECK_EQUAL(proposals[0].required_active_approvals.count(nathan_id), 1);
 
         BOOST_CHECK_EQUAL(proposals[1].required_active_approvals.size(), 2);
-        BOOST_CHECK_EQUAL(proposals[1].required_active_approvals.count(sam->get_id()), 1);
-        BOOST_CHECK_EQUAL(proposals[1].required_active_approvals.count(nathan->get_id()), 1);
+        BOOST_CHECK_EQUAL(proposals[1].required_active_approvals.count(sam_id), 1);
+        BOOST_CHECK_EQUAL(proposals[1].required_active_approvals.count(nathan_id), 1);
 
     } catch (fc::exception &e) {
         edump((e.to_detail_string()));
@@ -1105,32 +1111,32 @@ BOOST_AUTO_TEST_CASE(get_proposed_transactions_for_account_paged_request_more_th
 
 BOOST_AUTO_TEST_CASE(get_proposed_transactions_for_account_paged_request_less_than_exist) {
     try {
-        propose_transfer(*dan, *nathan, nathan_key, fc::days(1));
-        propose_transfer(*sam, *nathan, nathan_key, fc::days(1));
-        propose_transfer(*nathan, *sam, sam_key, fc::days(1));
-        propose_transfer(*dan, *sam, sam_key, fc::days(1));
+        propose_transfer(dan_id(db), nathan_id(db), nathan_key, fc::days(1));
+        propose_transfer(sam_id(db), nathan_id(db), nathan_key, fc::days(1));
+        propose_transfer(nathan_id(db), sam_id(db), sam_key, fc::days(1));
+        propose_transfer(dan_id(db), sam_id(db), sam_key, fc::days(1));
 
-        auto proposals = persistent_proposals_api.get_proposed_transactions_for_account(nathan->get_id(), object_id_type(), 2);
+        auto proposals = persistent_proposals_api.get_proposed_transactions_for_account(nathan_id, object_id_type(), 2);
         BOOST_CHECK_EQUAL(proposals.size(), 2);
 
         BOOST_CHECK_EQUAL(proposals[0].required_active_approvals.size(), 2);
-        BOOST_CHECK_EQUAL(proposals[0].required_active_approvals.count(dan->get_id()), 1);
-        BOOST_CHECK_EQUAL(proposals[0].required_active_approvals.count(nathan->get_id()), 1);
+        BOOST_CHECK_EQUAL(proposals[0].required_active_approvals.count(dan_id), 1);
+        BOOST_CHECK_EQUAL(proposals[0].required_active_approvals.count(nathan_id), 1);
 
         BOOST_CHECK_EQUAL(proposals[1].required_active_approvals.size(), 2);
-        BOOST_CHECK_EQUAL(proposals[1].required_active_approvals.count(sam->get_id()), 1);
-        BOOST_CHECK_EQUAL(proposals[1].required_active_approvals.count(nathan->get_id()), 1);
+        BOOST_CHECK_EQUAL(proposals[1].required_active_approvals.count(sam_id), 1);
+        BOOST_CHECK_EQUAL(proposals[1].required_active_approvals.count(nathan_id), 1);
 
-        proposals = persistent_proposals_api.get_proposed_transactions_for_account(nathan->get_id(), proposals.back().id, 2);
+        proposals = persistent_proposals_api.get_proposed_transactions_for_account(nathan_id, proposals.back().id, 2);
         BOOST_CHECK_EQUAL(proposals.size(), 2);
 
         BOOST_CHECK_EQUAL(proposals[0].required_active_approvals.size(), 2);
-        BOOST_CHECK_EQUAL(proposals[0].required_active_approvals.count(sam->get_id()), 1);
-        BOOST_CHECK_EQUAL(proposals[0].required_active_approvals.count(nathan->get_id()), 1);
+        BOOST_CHECK_EQUAL(proposals[0].required_active_approvals.count(sam_id), 1);
+        BOOST_CHECK_EQUAL(proposals[0].required_active_approvals.count(nathan_id), 1);
 
         BOOST_CHECK_EQUAL(proposals[1].required_active_approvals.size(), 2);
-        BOOST_CHECK_EQUAL(proposals[1].required_active_approvals.count(sam->get_id()), 1);
-        BOOST_CHECK_EQUAL(proposals[1].required_active_approvals.count(nathan->get_id()), 1);
+        BOOST_CHECK_EQUAL(proposals[1].required_active_approvals.count(sam_id), 1);
+        BOOST_CHECK_EQUAL(proposals[1].required_active_approvals.count(nathan_id), 1);
 
     } catch (fc::exception &e) {
         edump((e.to_detail_string()));
@@ -1140,9 +1146,9 @@ BOOST_AUTO_TEST_CASE(get_proposed_transactions_for_account_paged_request_less_th
 
 BOOST_AUTO_TEST_CASE(get_proposed_transactions_for_account_expired_paged_request_more_than_exist) {
     try {
-        propose_transfer(*dan, *nathan, nathan_key, fc::seconds(1));
-        propose_transfer(*sam, *nathan, nathan_key, fc::seconds(1));
-        propose_transfer(*dan, *sam, sam_key, fc::seconds(1));
+        propose_transfer(dan_id(db), nathan_id(db), nathan_key, fc::seconds(1));
+        propose_transfer(sam_id(db), nathan_id(db), nathan_key, fc::seconds(1));
+        propose_transfer(dan_id(db), sam_id(db), sam_key, fc::seconds(1));
 
         //wait for proposal expiration
         fc::usleep(fc::seconds(2));
@@ -1150,16 +1156,16 @@ BOOST_AUTO_TEST_CASE(get_proposed_transactions_for_account_expired_paged_request
         //trigger transactions clearing
         generate_block();
 
-        auto proposals = persistent_proposals_api.get_proposed_transactions_for_account(nathan->get_id(), object_id_type(), 3);
+        auto proposals = persistent_proposals_api.get_proposed_transactions_for_account(nathan_id, object_id_type(), 3);
         BOOST_CHECK_EQUAL(proposals.size(), 2);
 
         BOOST_CHECK_EQUAL(proposals[0].required_active_approvals.size(), 2);
-        BOOST_CHECK_EQUAL(proposals[0].required_active_approvals.count(dan->get_id()), 1);
-        BOOST_CHECK_EQUAL(proposals[0].required_active_approvals.count(nathan->get_id()), 1);
+        BOOST_CHECK_EQUAL(proposals[0].required_active_approvals.count(dan_id), 1);
+        BOOST_CHECK_EQUAL(proposals[0].required_active_approvals.count(nathan_id), 1);
 
         BOOST_CHECK_EQUAL(proposals[1].required_active_approvals.size(), 2);
-        BOOST_CHECK_EQUAL(proposals[1].required_active_approvals.count(sam->get_id()), 1);
-        BOOST_CHECK_EQUAL(proposals[1].required_active_approvals.count(nathan->get_id()), 1);
+        BOOST_CHECK_EQUAL(proposals[1].required_active_approvals.count(sam_id), 1);
+        BOOST_CHECK_EQUAL(proposals[1].required_active_approvals.count(nathan_id), 1);
 
     } catch (fc::exception &e) {
         edump((e.to_detail_string()));
@@ -1169,10 +1175,10 @@ BOOST_AUTO_TEST_CASE(get_proposed_transactions_for_account_expired_paged_request
 
 BOOST_AUTO_TEST_CASE(get_proposed_transactions_for_account_expired_paged_request_less_than_exist) {
     try {
-        propose_transfer(*dan, *nathan, nathan_key, fc::seconds(1));
-        propose_transfer(*sam, *nathan, nathan_key, fc::seconds(1));
-        propose_transfer(*nathan, *sam, sam_key, fc::seconds(1));
-        propose_transfer(*dan, *sam, sam_key, fc::seconds(1));
+        propose_transfer(dan_id(db), nathan_id(db), nathan_key, fc::seconds(1));
+        propose_transfer(sam_id(db), nathan_id(db), nathan_key, fc::seconds(1));
+        propose_transfer(nathan_id(db), sam_id(db), sam_key, fc::seconds(1));
+        propose_transfer(dan_id(db), sam_id(db), sam_key, fc::seconds(1));
 
         //wait for proposal expiration
         fc::usleep(fc::seconds(2));
@@ -1180,27 +1186,27 @@ BOOST_AUTO_TEST_CASE(get_proposed_transactions_for_account_expired_paged_request
         //trigger transactions clearing
         generate_block();
 
-        auto proposals = persistent_proposals_api.get_proposed_transactions_for_account(nathan->get_id(), object_id_type(), 2);
+        auto proposals = persistent_proposals_api.get_proposed_transactions_for_account(nathan_id, object_id_type(), 2);
         BOOST_CHECK_EQUAL(proposals.size(), 2);
 
         BOOST_CHECK_EQUAL(proposals[0].required_active_approvals.size(), 2);
-        BOOST_CHECK_EQUAL(proposals[0].required_active_approvals.count(dan->get_id()), 1);
-        BOOST_CHECK_EQUAL(proposals[0].required_active_approvals.count(nathan->get_id()), 1);
+        BOOST_CHECK_EQUAL(proposals[0].required_active_approvals.count(dan_id), 1);
+        BOOST_CHECK_EQUAL(proposals[0].required_active_approvals.count(nathan_id), 1);
 
         BOOST_CHECK_EQUAL(proposals[1].required_active_approvals.size(), 2);
-        BOOST_CHECK_EQUAL(proposals[1].required_active_approvals.count(sam->get_id()), 1);
-        BOOST_CHECK_EQUAL(proposals[1].required_active_approvals.count(nathan->get_id()), 1);
+        BOOST_CHECK_EQUAL(proposals[1].required_active_approvals.count(sam_id), 1);
+        BOOST_CHECK_EQUAL(proposals[1].required_active_approvals.count(nathan_id), 1);
 
-        proposals = persistent_proposals_api.get_proposed_transactions_for_account(nathan->get_id(), proposals.back().id, 2);
+        proposals = persistent_proposals_api.get_proposed_transactions_for_account(nathan_id, proposals.back().id, 2);
         BOOST_CHECK_EQUAL(proposals.size(), 2);
 
         BOOST_CHECK_EQUAL(proposals[0].required_active_approvals.size(), 2);
-        BOOST_CHECK_EQUAL(proposals[0].required_active_approvals.count(sam->get_id()), 1);
-        BOOST_CHECK_EQUAL(proposals[0].required_active_approvals.count(nathan->get_id()), 1);
+        BOOST_CHECK_EQUAL(proposals[0].required_active_approvals.count(sam_id), 1);
+        BOOST_CHECK_EQUAL(proposals[0].required_active_approvals.count(nathan_id), 1);
 
         BOOST_CHECK_EQUAL(proposals[1].required_active_approvals.size(), 2);
-        BOOST_CHECK_EQUAL(proposals[1].required_active_approvals.count(sam->get_id()), 1);
-        BOOST_CHECK_EQUAL(proposals[1].required_active_approvals.count(nathan->get_id()), 1);
+        BOOST_CHECK_EQUAL(proposals[1].required_active_approvals.count(sam_id), 1);
+        BOOST_CHECK_EQUAL(proposals[1].required_active_approvals.count(nathan_id), 1);
 
     } catch (fc::exception &e) {
         edump((e.to_detail_string()));
@@ -1210,12 +1216,12 @@ BOOST_AUTO_TEST_CASE(get_proposed_transactions_for_account_expired_paged_request
 
 BOOST_AUTO_TEST_CASE(get_proposed_transactions_for_account_expired_n_normal_paged_request_less_than_exist) {
     try {
-        propose_transfer(*dan, *nathan, nathan_key, fc::seconds(1));
-        propose_transfer(*dan, *sam, sam_key, fc::seconds(1));
-        propose_transfer(*sam, *nathan, nathan_key, fc::seconds(1));
-        propose_transfer(*sam, *dan, dan_key, fc::days(1));
-        propose_transfer(*nathan, *sam, sam_key, fc::days(1));
-        propose_transfer(*nathan, *dan, dan_key, fc::days(1));
+        propose_transfer(dan_id(db), nathan_id(db), nathan_key, fc::seconds(1));
+        propose_transfer(dan_id(db), sam_id(db), sam_key, fc::seconds(1));
+        propose_transfer(sam_id(db), nathan_id(db), nathan_key, fc::seconds(1));
+        propose_transfer(sam_id(db), dan_id(db), dan_key, fc::days(1));
+        propose_transfer(nathan_id(db), sam_id(db), sam_key, fc::days(1));
+        propose_transfer(nathan_id(db), dan_id(db), dan_key, fc::days(1));
 
         //wait for proposal expiration
         fc::usleep(fc::seconds(2));
@@ -1223,31 +1229,31 @@ BOOST_AUTO_TEST_CASE(get_proposed_transactions_for_account_expired_n_normal_page
         //trigger transactions clearing
         generate_block();
 
-        auto proposals = persistent_proposals_api.get_proposed_transactions_for_account(nathan->get_id(), object_id_type(), 2);
+        auto proposals = persistent_proposals_api.get_proposed_transactions_for_account(nathan_id, object_id_type(), 2);
         BOOST_CHECK_EQUAL(proposals.size(), 2);
 
         BOOST_CHECK_EQUAL(proposals[0].required_active_approvals.size(), 2);
-        BOOST_CHECK_EQUAL(proposals[0].required_active_approvals.count(dan->get_id()), 1);
-        BOOST_CHECK_EQUAL(proposals[0].required_active_approvals.count(nathan->get_id()), 1);
+        BOOST_CHECK_EQUAL(proposals[0].required_active_approvals.count(dan_id), 1);
+        BOOST_CHECK_EQUAL(proposals[0].required_active_approvals.count(nathan_id), 1);
 
         BOOST_CHECK_EQUAL(proposals[1].required_active_approvals.size(), 2);
-        BOOST_CHECK_EQUAL(proposals[1].required_active_approvals.count(sam->get_id()), 1);
-        BOOST_CHECK_EQUAL(proposals[1].required_active_approvals.count(nathan->get_id()), 1);
+        BOOST_CHECK_EQUAL(proposals[1].required_active_approvals.count(sam_id), 1);
+        BOOST_CHECK_EQUAL(proposals[1].required_active_approvals.count(nathan_id), 1);
 
-        proposals = persistent_proposals_api.get_proposed_transactions_for_account(nathan->get_id(), proposals.back().id, 3);
+        proposals = persistent_proposals_api.get_proposed_transactions_for_account(nathan_id, proposals.back().id, 3);
         BOOST_CHECK_EQUAL(proposals.size(), 3);
 
         BOOST_CHECK_EQUAL(proposals[0].required_active_approvals.size(), 2);
-        BOOST_CHECK_EQUAL(proposals[0].required_active_approvals.count(nathan->get_id()), 1);
-        BOOST_CHECK_EQUAL(proposals[0].required_active_approvals.count(sam->get_id()), 1);
+        BOOST_CHECK_EQUAL(proposals[0].required_active_approvals.count(nathan_id), 1);
+        BOOST_CHECK_EQUAL(proposals[0].required_active_approvals.count(sam_id), 1);
 
         BOOST_CHECK_EQUAL(proposals[1].required_active_approvals.size(), 2);
-        BOOST_CHECK_EQUAL(proposals[1].required_active_approvals.count(sam->get_id()), 1);
-        BOOST_CHECK_EQUAL(proposals[1].required_active_approvals.count(nathan->get_id()), 1);
+        BOOST_CHECK_EQUAL(proposals[1].required_active_approvals.count(sam_id), 1);
+        BOOST_CHECK_EQUAL(proposals[1].required_active_approvals.count(nathan_id), 1);
 
         BOOST_CHECK_EQUAL(proposals[2].required_active_approvals.size(), 2);
-        BOOST_CHECK_EQUAL(proposals[2].required_active_approvals.count(nathan->get_id()), 1);
-        BOOST_CHECK_EQUAL(proposals[2].required_active_approvals.count(dan->get_id()), 1);
+        BOOST_CHECK_EQUAL(proposals[2].required_active_approvals.count(nathan_id), 1);
+        BOOST_CHECK_EQUAL(proposals[2].required_active_approvals.count(dan_id), 1);
 
     } catch (fc::exception &e) {
         edump((e.to_detail_string()));
@@ -1257,12 +1263,12 @@ BOOST_AUTO_TEST_CASE(get_proposed_transactions_for_account_expired_n_normal_page
 
 BOOST_AUTO_TEST_CASE(get_proposed_transactions_for_account_expired_n_normal_paged_request_more_than_exist) {
     try {
-        propose_transfer(*dan, *nathan, nathan_key, fc::seconds(1));
-        propose_transfer(*dan, *sam, sam_key, fc::seconds(1));
-        propose_transfer(*sam, *nathan, nathan_key, fc::seconds(1));
-        propose_transfer(*sam, *dan, dan_key, fc::days(1));
-        propose_transfer(*nathan, *sam, sam_key, fc::days(1));
-        propose_transfer(*nathan, *dan, dan_key, fc::days(1));
+        propose_transfer(dan_id(db), nathan_id(db), nathan_key, fc::seconds(1));
+        propose_transfer(dan_id(db), sam_id(db), sam_key, fc::seconds(1));
+        propose_transfer(sam_id(db), nathan_id(db), nathan_key, fc::seconds(1));
+        propose_transfer(sam_id(db), dan_id(db), dan_key, fc::days(1));
+        propose_transfer(nathan_id(db), sam_id(db), sam_key, fc::days(1));
+        propose_transfer(nathan_id(db), dan_id(db), dan_key, fc::days(1));
 
         //wait for proposal expiration
         fc::usleep(fc::seconds(2));
@@ -1270,24 +1276,24 @@ BOOST_AUTO_TEST_CASE(get_proposed_transactions_for_account_expired_n_normal_page
         //trigger transactions clearing
         generate_block();
 
-        auto proposals = persistent_proposals_api.get_proposed_transactions_for_account(nathan->get_id(), object_id_type(), 10);
+        auto proposals = persistent_proposals_api.get_proposed_transactions_for_account(nathan_id, object_id_type(), 10);
         BOOST_CHECK_EQUAL(proposals.size(), 4);
 
         BOOST_CHECK_EQUAL(proposals[0].required_active_approvals.size(), 2);
-        BOOST_CHECK_EQUAL(proposals[0].required_active_approvals.count(dan->get_id()), 1);
-        BOOST_CHECK_EQUAL(proposals[0].required_active_approvals.count(nathan->get_id()), 1);
+        BOOST_CHECK_EQUAL(proposals[0].required_active_approvals.count(dan_id), 1);
+        BOOST_CHECK_EQUAL(proposals[0].required_active_approvals.count(nathan_id), 1);
 
         BOOST_CHECK_EQUAL(proposals[1].required_active_approvals.size(), 2);
-        BOOST_CHECK_EQUAL(proposals[1].required_active_approvals.count(sam->get_id()), 1);
-        BOOST_CHECK_EQUAL(proposals[1].required_active_approvals.count(nathan->get_id()), 1);
+        BOOST_CHECK_EQUAL(proposals[1].required_active_approvals.count(sam_id), 1);
+        BOOST_CHECK_EQUAL(proposals[1].required_active_approvals.count(nathan_id), 1);
 
         BOOST_CHECK_EQUAL(proposals[2].required_active_approvals.size(), 2);
-        BOOST_CHECK_EQUAL(proposals[2].required_active_approvals.count(sam->get_id()), 1);
-        BOOST_CHECK_EQUAL(proposals[2].required_active_approvals.count(nathan->get_id()), 1);
+        BOOST_CHECK_EQUAL(proposals[2].required_active_approvals.count(sam_id), 1);
+        BOOST_CHECK_EQUAL(proposals[2].required_active_approvals.count(nathan_id), 1);
 
         BOOST_CHECK_EQUAL(proposals[3].required_active_approvals.size(), 2);
-        BOOST_CHECK_EQUAL(proposals[3].required_active_approvals.count(nathan->get_id()), 1);
-        BOOST_CHECK_EQUAL(proposals[3].required_active_approvals.count(dan->get_id()), 1);
+        BOOST_CHECK_EQUAL(proposals[3].required_active_approvals.count(nathan_id), 1);
+        BOOST_CHECK_EQUAL(proposals[3].required_active_approvals.count(dan_id), 1);
 
     } catch (fc::exception &e) {
         edump((e.to_detail_string()));
@@ -1297,18 +1303,18 @@ BOOST_AUTO_TEST_CASE(get_proposed_transactions_for_account_expired_n_normal_page
 
 BOOST_AUTO_TEST_CASE(get_proposal_updates_paged_request_more_than_exist) {
     try {
-        propose_transfer(*dan, *nathan, nathan_key, fc::days(1));
+        propose_transfer(dan_id(db), nathan_id(db), nathan_key, fc::days(1));
 
         auto proposals = persistent_proposals_api.get_proposed_transactions();
         BOOST_CHECK_EQUAL(proposals.size(), 1);
 
         const auto& proposal1 = db.get<proposal_object>(proposals[0].id);
         db.modify(proposal1, [&]( proposal_object& proposal ){
-            proposal.available_active_approvals.insert(nathan->get_id());
+            proposal.available_active_approvals.insert(nathan_id);
         });
 
         db.modify(proposal1, [&]( proposal_object& proposal ){
-            proposal.available_active_approvals.erase(nathan->get_id());
+            proposal.available_active_approvals.erase(nathan_id);
         });
 
         //
@@ -1321,7 +1327,7 @@ BOOST_AUTO_TEST_CASE(get_proposal_updates_paged_request_more_than_exist) {
         BOOST_CHECK(proposal_updates[0].proposal == proposal1.id);
 
         BOOST_CHECK_EQUAL(proposal_updates[0].added_active_approvals.size(), 1);
-        BOOST_CHECK_EQUAL(proposal_updates[0].added_active_approvals.count(nathan->get_id()), 1);
+        BOOST_CHECK_EQUAL(proposal_updates[0].added_active_approvals.count(nathan_id), 1);
 
         BOOST_CHECK_EQUAL(proposal_updates[0].added_owner_approvals.size(), 0);
         BOOST_CHECK_EQUAL(proposal_updates[0].added_key_approvals.size(), 0);
@@ -1334,7 +1340,7 @@ BOOST_AUTO_TEST_CASE(get_proposal_updates_paged_request_more_than_exist) {
         BOOST_CHECK(proposal_updates[1].proposal == proposal1.id);
 
         BOOST_CHECK_EQUAL(proposal_updates[1].removed_active_approvals.size(), 1);
-        BOOST_CHECK_EQUAL(proposal_updates[1].removed_active_approvals.count(nathan->get_id()), 1);
+        BOOST_CHECK_EQUAL(proposal_updates[1].removed_active_approvals.count(nathan_id), 1);
 
         BOOST_CHECK_EQUAL(proposal_updates[1].added_active_approvals.size(), 0);
         BOOST_CHECK_EQUAL(proposal_updates[1].added_owner_approvals.size(), 0);
@@ -1350,26 +1356,26 @@ BOOST_AUTO_TEST_CASE(get_proposal_updates_paged_request_more_than_exist) {
 
 BOOST_AUTO_TEST_CASE(get_proposal_updates_paged_request_less_than_exist) {
     try {
-        propose_transfer(*dan, *nathan, nathan_key, fc::days(1));
+        propose_transfer(dan_id(db), nathan_id(db), nathan_key, fc::days(1));
 
         auto proposals = persistent_proposals_api.get_proposed_transactions();
         BOOST_CHECK_EQUAL(proposals.size(), 1);
 
         const auto& proposal1 = db.get<proposal_object>(proposals[0].id);
         db.modify(proposal1, [&]( proposal_object& proposal ){
-            proposal.available_active_approvals.insert(nathan->get_id());
+            proposal.available_active_approvals.insert(nathan_id);
         });
 
         db.modify(proposal1, [&]( proposal_object& proposal ){
-            proposal.available_active_approvals.erase(nathan->get_id());
+            proposal.available_active_approvals.erase(nathan_id);
         });
 
         db.modify(proposal1, [&]( proposal_object& proposal ){
-            proposal.available_active_approvals.insert(dan->get_id());
+            proposal.available_active_approvals.insert(dan_id);
         });
 
         db.modify(proposal1, [&]( proposal_object& proposal ){
-            proposal.available_active_approvals.erase(dan->get_id());
+            proposal.available_active_approvals.erase(dan_id);
         });
 
         auto proposal_updates = persistent_proposals_api.get_proposal_updates(proposal1.id, object_id_type(), 2);
@@ -1378,7 +1384,7 @@ BOOST_AUTO_TEST_CASE(get_proposal_updates_paged_request_less_than_exist) {
         BOOST_CHECK(proposal_updates[0].proposal == proposal1.id);
 
         BOOST_CHECK_EQUAL(proposal_updates[0].added_active_approvals.size(), 1);
-        BOOST_CHECK_EQUAL(proposal_updates[0].added_active_approvals.count(nathan->get_id()), 1);
+        BOOST_CHECK_EQUAL(proposal_updates[0].added_active_approvals.count(nathan_id), 1);
 
         BOOST_CHECK_EQUAL(proposal_updates[0].added_owner_approvals.size(), 0);
         BOOST_CHECK_EQUAL(proposal_updates[0].added_key_approvals.size(), 0);
@@ -1391,7 +1397,7 @@ BOOST_AUTO_TEST_CASE(get_proposal_updates_paged_request_less_than_exist) {
         BOOST_CHECK(proposal_updates[1].proposal == proposal1.id);
 
         BOOST_CHECK_EQUAL(proposal_updates[1].removed_active_approvals.size(), 1);
-        BOOST_CHECK_EQUAL(proposal_updates[1].removed_active_approvals.count(nathan->get_id()), 1);
+        BOOST_CHECK_EQUAL(proposal_updates[1].removed_active_approvals.count(nathan_id), 1);
 
         BOOST_CHECK_EQUAL(proposal_updates[1].added_active_approvals.size(), 0);
         BOOST_CHECK_EQUAL(proposal_updates[1].added_owner_approvals.size(), 0);
@@ -1406,7 +1412,7 @@ BOOST_AUTO_TEST_CASE(get_proposal_updates_paged_request_less_than_exist) {
         BOOST_CHECK(proposal_updates[0].proposal == proposal1.id);
 
         BOOST_CHECK_EQUAL(proposal_updates[0].removed_active_approvals.size(), 1);
-        BOOST_CHECK_EQUAL(proposal_updates[0].removed_active_approvals.count(nathan->get_id()), 1);
+        BOOST_CHECK_EQUAL(proposal_updates[0].removed_active_approvals.count(nathan_id), 1);
 
         BOOST_CHECK_EQUAL(proposal_updates[0].added_active_approvals.size(), 0);
         BOOST_CHECK_EQUAL(proposal_updates[0].added_owner_approvals.size(), 0);
@@ -1418,7 +1424,7 @@ BOOST_AUTO_TEST_CASE(get_proposal_updates_paged_request_less_than_exist) {
         BOOST_CHECK(proposal_updates[1].proposal == proposal1.id);
 
         BOOST_CHECK_EQUAL(proposal_updates[1].added_active_approvals.size(), 1);
-        BOOST_CHECK_EQUAL(proposal_updates[1].added_active_approvals.count(dan->get_id()), 1);
+        BOOST_CHECK_EQUAL(proposal_updates[1].added_active_approvals.count(dan_id), 1);
 
         BOOST_CHECK_EQUAL(proposal_updates[1].added_owner_approvals.size(), 0);
         BOOST_CHECK_EQUAL(proposal_updates[1].added_key_approvals.size(), 0);
@@ -1431,7 +1437,7 @@ BOOST_AUTO_TEST_CASE(get_proposal_updates_paged_request_less_than_exist) {
         BOOST_CHECK(proposal_updates[2].proposal == proposal1.id);
 
         BOOST_CHECK_EQUAL(proposal_updates[2].removed_active_approvals.size(), 1);
-        BOOST_CHECK_EQUAL(proposal_updates[2].removed_active_approvals.count(dan->get_id()), 1);
+        BOOST_CHECK_EQUAL(proposal_updates[2].removed_active_approvals.count(dan_id), 1);
 
         BOOST_CHECK_EQUAL(proposal_updates[2].added_active_approvals.size(), 0);
         BOOST_CHECK_EQUAL(proposal_updates[2].added_owner_approvals.size(), 0);
