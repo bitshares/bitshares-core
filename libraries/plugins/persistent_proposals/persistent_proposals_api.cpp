@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015 Blockchain Projects BV, and contributors.
+ * Copyright (c) 2018 Blockchain BV
  *
  * The MIT License
  *
@@ -134,13 +134,8 @@ private:
             proposal_it = proposals_by_id.lower_bound(start);
         }
 
-        while (result.size() < limit)
+        while (result.size() < limit && proposal_it != proposals_by_id.end())
         {
-            if (proposal_it == proposals_by_id.end())
-            {
-                break;
-            }
-
             if (can_proposal_be_saved(*proposal_it))
             {
                 result.insert(result.end(), *proposal_it);

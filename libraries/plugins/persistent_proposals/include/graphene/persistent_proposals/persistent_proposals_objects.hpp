@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015 Blockchain Projects BV, and contributors.
+ * Copyright (c) 2018 Blockchain BV
  *
  * The MIT License
  *
@@ -63,15 +63,15 @@ public:
 struct by_proposal_id{};
 
 typedef boost::multi_index_container< proposal_update_object,
-                                      indexed_by< ordered_unique< tag< by_id >, member< object, object_id_type, &object::id >>,
-                                                  ordered_unique< tag< by_proposal_id >,
-                                                                  composite_key< proposal_update_object,
-                                                                                 member< proposal_update_object, proposal_id_type, &proposal_update_object::proposal >,
-                                                                                 member< object, object_id_type, &object::id > >,
-                                                                  composite_key_compare< std::less<proposal_id_type>,
-                                                                                         std::less<object_id_type>
-                                                                                       >>>>
-                    proposal_update_multi_index_container;
+  indexed_by< ordered_unique< tag< by_id >, member< object, object_id_type, &object::id >>,
+    ordered_unique< tag< by_proposal_id >,
+      composite_key< proposal_update_object,
+         member< proposal_update_object, proposal_id_type, &proposal_update_object::proposal >,
+         member< object, object_id_type, &object::id > >,
+      composite_key_compare< std::less<proposal_id_type>,
+        std::less<object_id_type>
+      >>>>
+  proposal_update_multi_index_container;
 
 typedef generic_index<proposal_update_object, proposal_update_multi_index_container> proposal_update_index;
 

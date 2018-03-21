@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015 Blockchain Projects BV, and contributors.
+ * Copyright (c) 2018 Blockchain BV
  *
  * The MIT License
  *
