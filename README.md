@@ -1,10 +1,13 @@
 BitShares Core
 ==============
-* [Build Status](https://travis-ci.org/bitshares/bitshares-core/branches)
-  * `master` branch: [![](https://travis-ci.org/bitshares/bitshares-core.svg?branch=master)](https://travis-ci.org/bitshares/bitshares-core)
-  * `develop` branch: [![](https://travis-ci.org/bitshares/bitshares-core.svg?branch=develop)](https://travis-ci.org/bitshares/bitshares-core)
-  * `hardfork` branch: [![](https://travis-ci.org/bitshares/bitshares-core.svg?branch=hardfork)](https://travis-ci.org/bitshares/bitshares-core)
-  * `testnet` branch: [![](https://travis-ci.org/bitshares/bitshares-core.svg?branch=testnet)](https://travis-ci.org/bitshares/bitshares-core)
+
+[Build Status](https://travis-ci.org/bitshares/bitshares-core/branches):
+
+`master` | `develop` | `hardfork` | `testnet` 
+ --- | --- | --- | --- 
+ [![](https://travis-ci.org/bitshares/bitshares-core.svg?branch=master)](https://travis-ci.org/bitshares/bitshares-core) | [![](https://travis-ci.org/bitshares/bitshares-core.svg?branch=develop)](https://travis-ci.org/bitshares/bitshares-core) | [![](https://travis-ci.org/bitshares/bitshares-core.svg?branch=hardfork)](https://travis-ci.org/bitshares/bitshares-core) | [![](https://travis-ci.org/bitshares/bitshares-core.svg?branch=testnet)](https://travis-ci.org/bitshares/bitshares-core) 
+
+
 * [Getting Started](#getting-started)
 * [Support](#support)
 * [Using the API](#using-the-api)
