@@ -284,9 +284,7 @@ void es_objects_plugin_impl::PrepareBitAsset(const asset_bitasset_data_object* b
 {
    if(!bitasset_object->is_prediction_market) {
 
-      auto object_id = bitasset_object->id;
       bitasset_struct bitasset;
-
       bitasset.object_id = bitasset_object->id;
       bitasset.block_time = block_time;
       bitasset.block_number = block_number;
