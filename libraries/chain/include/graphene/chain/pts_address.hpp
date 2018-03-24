@@ -73,6 +73,6 @@ FC_REFLECT( graphene::chain::pts_address, (addr) )
 
 namespace fc 
 { 
-   void to_variant( const graphene::chain::pts_address& var,  fc::variant& vo );
-   void from_variant( const fc::variant& var,  graphene::chain::pts_address& vo );
+   void to_variant( const graphene::chain::pts_address& var,  fc::variant& vo, uint32_t max_depth = 1 );
+   void from_variant( const fc::variant& var,  graphene::chain::pts_address& vo, uint32_t max_depth = 1 );
 }

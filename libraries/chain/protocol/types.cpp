@@ -200,32 +200,32 @@ namespace graphene { namespace chain {
 namespace fc
 {
     using namespace std;
-    void to_variant( const graphene::chain::public_key_type& var,  fc::variant& vo )
+    void to_variant( const graphene::chain::public_key_type& var,  fc::variant& vo, uint32_t max_depth )
     {
         vo = std::string( var );
     }
 
-    void from_variant( const fc::variant& var,  graphene::chain::public_key_type& vo )
+    void from_variant( const fc::variant& var,  graphene::chain::public_key_type& vo, uint32_t max_depth )
     {
         vo = graphene::chain::public_key_type( var.as_string() );
     }
     
-    void to_variant( const graphene::chain::extended_public_key_type& var, fc::variant& vo )
+    void to_variant( const graphene::chain::extended_public_key_type& var, fc::variant& vo, uint32_t max_depth )
     {
        vo = std::string( var );
     }
     
-    void from_variant( const fc::variant& var, graphene::chain::extended_public_key_type& vo )
+    void from_variant( const fc::variant& var, graphene::chain::extended_public_key_type& vo, uint32_t max_depth )
     {
        vo = graphene::chain::extended_public_key_type( var.as_string() );
     }
 
-    void to_variant( const graphene::chain::extended_private_key_type& var, fc::variant& vo )
+    void to_variant( const graphene::chain::extended_private_key_type& var, fc::variant& vo, uint32_t max_depth )
     {
        vo = std::string( var );
     }
     
-    void from_variant( const fc::variant& var, graphene::chain::extended_private_key_type& vo )
+    void from_variant( const fc::variant& var, graphene::chain::extended_private_key_type& vo, uint32_t max_depth )
     {
        vo = graphene::chain::extended_private_key_type( var.as_string() );
     }

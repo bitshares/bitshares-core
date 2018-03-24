@@ -122,7 +122,7 @@ struct market_trade
 class database_api
 {
    public:
-      database_api(graphene::chain::database& db);
+      database_api(graphene::chain::database& db, const application_options* app_options = nullptr );
       ~database_api();
 
       /////////////
@@ -142,8 +142,29 @@ class database_api
       // Subscriptions //
       ///////////////////
 
-      void set_subscribe_callback( std::function<void(const variant&)> cb, bool clear_filter );
-      void set_pending_transaction_callback( std::function<void(const variant&)> cb );
+      /**
+       * @brief Register a callback handle which then can be used to subscribe to object database changes
+       * @param cb The callback handle to register
+       * @param nofity_remove_create Whether subscribe to universal object creation and removal events.
+       *        If this is set to true, the API server will notify all newly created objects and ID of all
+       *        newly removed objects to the client, no matter whether client subscribed to the objects.
+       *        By default, API servers don't allow subscribing to universal events, which can be changed
+       *        on server startup.
+       */
+      void set_subscribe_callback( std::function<void(const variant&)> cb, bool notify_remove_create );
+      /**
+       * @brief Register a callback handle which will get notified when a transaction is pushed to database
+       * @param cb The callback handle to register
+       *
+       * Note: a transaction can be pushed to database and be popped from database several times while
+       *   processing, before and after included in a block. Everytime when a push is done, the client will
+       *   be notified.
+       */
+      void set_pending_transaction_callback( std::function<void(const variant& signed_transaction_object)> cb );
+      /**
+       * @brief Register a callback handle which will get notified when a block is pushed to database
+       * @param cb The callback handle to register
+       */
       void set_block_applied_callback( std::function<void(const variant& block_id)> cb );
       /**
        * @brief Stop receiving any notifications
@@ -429,6 +450,14 @@ class database_api
       order_book get_order_book( const string& base, const string& quote, unsigned limit = 50 )const;
 
       /**
+       * @brief Returns vector of 24 hour volume markets sorted by reverse base_volume
+       * Note: this API is experimental and subject to change in next releases
+       * @param limit Max number of results
+       * @return Desc Sorted volume vector
+       */
+      vector<market_volume> get_top_markets(uint32_t limit)const;
+
+      /**
        * @brief Returns recent trades for the market assetA:assetB, ordered by time, most recent first. The range is [stop, start)
        * Note: Currently, timezone offsets are not supported. The time must be UTC.
        * @param a String name of the first asset
@@ -620,6 +649,28 @@ class database_api
        */
       vector<blinded_balance_object> get_blinded_balances( const flat_set<commitment_type>& commitments )const;
 
+      /////////////////
+      // Withdrawals //
+      /////////////////
+
+      /**
+       *  @brief Get non expired withdraw permission objects for a giver(ex:recurring customer)
+       *  @param account Account to get objects from
+       *  @param start Withdraw permission objects(1.12.X) before this ID will be skipped in results. Pagination purposes.
+       *  @param limit Maximum number of objects to retrieve
+       *  @return Withdraw permission objects for the account
+       */
+      vector<withdraw_permission_object> get_withdraw_permissions_by_giver(account_id_type account, withdraw_permission_id_type start, uint32_t limit)const;
+
+      /**
+       *  @brief Get non expired withdraw permission objects for a recipient(ex:service provider)
+       *  @param account Account to get objects from
+       *  @param start Withdraw permission objects(1.12.X) before this ID will be skipped in results. Pagination purposes.
+       *  @param limit Maximum number of objects to retrieve
+       *  @return Withdraw permission objects for the account
+       */
+      vector<withdraw_permission_object> get_withdraw_permissions_by_recipient(account_id_type account, withdraw_permission_id_type start, uint32_t limit)const;
+
    private:
       std::shared_ptr< database_api_impl > my;
 };
@@ -693,6 +744,7 @@ FC_API(graphene::app::database_api,
    (unsubscribe_from_market)
    (get_ticker)
    (get_24_volume)
+   (get_top_markets)
    (get_trade_history)
    (get_trade_history_by_sequence)
 
@@ -731,4 +783,9 @@ FC_API(graphene::app::database_api,
 
    // Blinded balances
    (get_blinded_balances)
+
+   // Withdrawals
+   (get_withdraw_permissions_by_giver)
+   (get_withdraw_permissions_by_recipient)
+
 )

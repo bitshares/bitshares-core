@@ -106,3 +106,7 @@
 #define GRAPHENE_NET_MIN_BLOCK_IDS_TO_PREFETCH               10000
 
 #define GRAPHENE_NET_MAX_TRX_PER_SECOND                      1000
+
+#define GRAPHENE_NET_MAX_NESTED_OBJECTS                      (250)
+
+#define MAXIMUM_PEERDB_SIZE 1000
