@@ -272,7 +272,11 @@ BOOST_AUTO_TEST_CASE( prediction_market )
       BOOST_TEST_MESSAGE( "Shouldn't be allowed to force settle at more than 1 collateral per debt" );
       GRAPHENE_REQUIRE_THROW( force_global_settle( pmark, pmark.amount(100) / core.amount(105) ), fc::exception );
 
+      BOOST_TEST_MESSAGE( "Globally settling" );
       force_global_settle( pmark, pmark.amount(100) / core.amount(95) );
+
+      BOOST_TEST_MESSAGE( "Can not globally settle again" );
+      GRAPHENE_REQUIRE_THROW( force_global_settle( pmark, pmark.amount(100) / core.amount(95) ), fc::exception );
 
       BOOST_TEST_MESSAGE( "Verify that forced settlment succeedes after global settlement" );
       force_settle( dan, pmark.amount(100) );
