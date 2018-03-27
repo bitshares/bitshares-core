@@ -637,9 +637,15 @@ bool database::check_call_orders(const asset_object& mia, bool enable_black_swan
        fill_order(*old_call_itr, call_pays, call_receives, match_price, for_new_limit_order );
 
        auto old_limit_itr = limit_itr;
+       auto next_limit_itr = std::next( limit_itr );
        if( filled_limit ) ++limit_itr;
        // when for_new_limit_order is true, the limit order is taker, otherwise the limit order is maker
-       fill_order(*old_limit_itr, order_pays, order_receives, true, match_price, !for_new_limit_order );
+       bool really_filled = fill_order(*old_limit_itr, order_pays, order_receives, true, match_price, !for_new_limit_order );
+       if( !filled_limit && really_filled )
+       {
+          wlog( "Cull_small issue occurred at block #${block}", ("block",head_block_num()) );
+          limit_itr = next_limit_itr;
+       }
 
     } // whlie call_itr != call_end
 

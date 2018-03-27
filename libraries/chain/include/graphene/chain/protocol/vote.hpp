@@ -141,8 +141,8 @@ namespace fc
 
 class variant;
 
-void to_variant( const graphene::chain::vote_id_type& var, fc::variant& vo );
-void from_variant( const fc::variant& var, graphene::chain::vote_id_type& vo );
+void to_variant( const graphene::chain::vote_id_type& var, fc::variant& vo, uint32_t max_depth = 1 );
+void from_variant( const fc::variant& var, graphene::chain::vote_id_type& vo, uint32_t max_depth = 1 );
 
 } // fc
 

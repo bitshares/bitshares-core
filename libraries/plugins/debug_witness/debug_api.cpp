@@ -22,12 +22,11 @@ namespace detail {
 class debug_api_impl
 {
    public:
-      debug_api_impl( graphene::app::application& _app );
+      explicit debug_api_impl( graphene::app::application& _app );
 
       void debug_push_blocks( const std::string& src_filename, uint32_t count );
       void debug_generate_blocks( const std::string& debug_key, uint32_t count );
       void debug_update_object( const fc::variant_object& update );
-      //void debug_save_db( std::string db_path );
       void debug_stream_json_objects( const std::string& filename );
       void debug_stream_json_objects_flush();
       std::shared_ptr< graphene::debug_witness_plugin::debug_witness_plugin > get_plugin();
@@ -71,7 +70,6 @@ void debug_api_impl::debug_push_blocks( const std::string& src_filename, uint32_
          }
       }
       ilog( "Completed loading block_database successfully" );
-      return;
    }
 }
 
@@ -93,7 +91,7 @@ void debug_api_impl::debug_generate_blocks( const std::string& debug_key, uint32
       if( scheduled_key != debug_public_key )
       {
          ilog( "Modified key for witness ${w}", ("w", scheduled_witness) );
-         fc::mutable_variant_object update;
+         fc::limited_mutable_variant_object update( GRAPHENE_MAX_NESTED_OBJECTS );
          update("_action", "update")("id", scheduled_witness)("signing_key", debug_public_key);
          db->debug_update( update );
       }

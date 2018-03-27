@@ -108,7 +108,7 @@ int main( int argc, char** argv )
          std::cerr << "update_genesis:  Reading genesis from file " << genesis_json_filename.preferred_string() << "\n";
          std::string genesis_json;
          read_file_contents( genesis_json_filename, genesis_json );
-         genesis = fc::json::from_string( genesis_json ).as< genesis_state_type >();
+         genesis = fc::json::from_string( genesis_json ).as< genesis_state_type >(20);
       }
       else
       {
@@ -116,9 +116,9 @@ int main( int argc, char** argv )
          genesis = graphene::app::detail::create_example_genesis();
       }
 
-      std::string dev_key_prefix = options["dev-key-prefix"].as<std::string>();
+      const std::string dev_key_prefix = options["dev-key-prefix"].as<std::string>();
 
-      auto get_dev_key = [&]( std::string prefix, uint32_t i ) -> public_key_type
+      auto get_dev_key = [&dev_key_prefix]( std::string prefix, uint32_t i )
       {
          return fc::ecc::private_key::regenerate( fc::sha256::hash( dev_key_prefix + prefix + std::to_string(i) ) ).get_public_key();
       };

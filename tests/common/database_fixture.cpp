@@ -26,6 +26,7 @@
 
 #include <graphene/account_history/account_history_plugin.hpp>
 #include <graphene/market_history/market_history_plugin.hpp>
+#include <graphene/grouped_orders/grouped_orders_plugin.hpp>
 
 #include <graphene/db/simple_index.hpp>
 
@@ -36,6 +37,7 @@
 #include <graphene/chain/market_object.hpp>
 #include <graphene/chain/vesting_balance_object.hpp>
 #include <graphene/chain/witness_object.hpp>
+#include <graphene/chain/worker_object.hpp>
 
 #include <graphene/utilities/tempdir.hpp>
 
@@ -73,6 +75,7 @@ database_fixture::database_fixture()
    }
    auto ahplugin = app.register_plugin<graphene::account_history::account_history_plugin>();
    auto mhplugin = app.register_plugin<graphene::market_history::market_history_plugin>();
+   auto goplugin = app.register_plugin<graphene::grouped_orders::grouped_orders_plugin>();
    init_account_pub_key = init_account_priv_key.get_public_key();
 
    boost::program_options::variables_map options;
@@ -93,7 +96,23 @@ database_fixture::database_fixture()
    genesis_state.initial_parameters.current_fees->zero_all_fees();
    open_database();
 
-   // app.initialize();
+   // add account tracking for ahplugin for special test case with track-account enabled
+   if( !options.count("track-account") && boost::unit_test::framework::current_test_case().p_name.value == "track_account") {
+      std::vector<std::string> track_account;
+      std::string track = "\"1.2.17\"";
+      track_account.push_back(track);
+      options.insert(std::make_pair("track-account", boost::program_options::variable_value(track_account, false)));
+   }
+   // account tracking 2 accounts
+   if( !options.count("track-account") && boost::unit_test::framework::current_test_case().p_name.value == "track_account2") {
+      std::vector<std::string> track_account;
+      std::string track = "\"1.2.0\"";
+      track_account.push_back(track);
+      track = "\"1.2.16\"";
+      track_account.push_back(track);
+      options.insert(std::make_pair("track-account", boost::program_options::variable_value(track_account, false)));
+   }
+
    ahplugin->plugin_set_app(&app);
    ahplugin->plugin_initialize(options);
 
@@ -101,8 +120,12 @@ database_fixture::database_fixture()
    mhplugin->plugin_set_app(&app);
    mhplugin->plugin_initialize(options);
 
+   goplugin->plugin_set_app(&app);
+   goplugin->plugin_initialize(options);
+
    ahplugin->plugin_startup();
    mhplugin->plugin_startup();
+   goplugin->plugin_startup();
 
    generate_block();
 
@@ -666,6 +689,21 @@ const witness_object& database_fixture::create_witness( const account_object& ow
    processed_transaction ptx = db.push_transaction(trx, ~0);
    trx.clear();
    return db.get<witness_object>(ptx.operation_results[0].get<object_id_type>());
+} FC_CAPTURE_AND_RETHROW() }
+
+const worker_object& database_fixture::create_worker( const account_id_type owner, const share_type daily_pay, const fc::microseconds& duration )
+{ try {
+   worker_create_operation op;
+   op.owner = owner;
+   op.daily_pay = daily_pay;
+   op.initializer = burn_worker_initializer();
+   op.work_begin_date = db.head_block_time();
+   op.work_end_date = op.work_begin_date + duration;
+   trx.operations.push_back(op);
+   trx.validate();
+   processed_transaction ptx = db.push_transaction(trx, ~0);
+   trx.clear();
+   return db.get<worker_object>(ptx.operation_results[0].get<object_id_type>());
 } FC_CAPTURE_AND_RETHROW() }
 
 uint64_t database_fixture::fund(

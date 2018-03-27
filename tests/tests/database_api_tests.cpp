@@ -603,4 +603,93 @@ BOOST_AUTO_TEST_CASE( get_required_signatures_partially_signed_or_not ) {
    } FC_LOG_AND_RETHROW()
 }
 
+BOOST_AUTO_TEST_CASE( set_subscribe_callback_disable_notify_all_test ) {
+   try {
+      ACTORS( (alice) );
+
+      uint32_t objects_changed1 = 0;
+      uint32_t objects_changed2 = 0;
+      uint32_t objects_changed3 = 0;
+      auto callback1 = [&]( const variant& v )
+      {
+         ++objects_changed1;
+      };
+      auto callback2 = [&]( const variant& v )
+      {
+         ++objects_changed2;
+      };
+      auto callback3 = [&]( const variant& v )
+      {
+         ++objects_changed3;
+      };
+
+      uint32_t expected_objects_changed1 = 0;
+      uint32_t expected_objects_changed2 = 0;
+      uint32_t expected_objects_changed3 = 0;
+
+      graphene::app::database_api db_api1(db);
+
+      // subscribing to all should fail
+      BOOST_CHECK_THROW( db_api1.set_subscribe_callback( callback1, true ), fc::exception );
+
+      db_api1.set_subscribe_callback( callback1, false );
+
+      graphene::app::application_options opt;
+      opt.enable_subscribe_to_all = true;
+
+      graphene::app::database_api db_api2( db, &opt );
+      db_api2.set_subscribe_callback( callback2, true );
+
+      graphene::app::database_api db_api3( db, &opt );
+      db_api3.set_subscribe_callback( callback3, false );
+
+      vector<object_id_type> ids;
+      ids.push_back( alice_id );
+
+      db_api1.get_objects( ids ); // db_api1 subscribe to Alice
+      db_api2.get_objects( ids ); // db_api2 subscribe to Alice
+
+      generate_block();
+      ++expected_objects_changed2; // subscribed to all, notify block changes
+
+      transfer( account_id_type(), alice_id, asset(1) );
+      generate_block();
+      ++expected_objects_changed1; // subscribed to Alice, notify Alice balance change
+      ++expected_objects_changed2; // subscribed to all, notify block changes
+
+      fc::usleep(fc::milliseconds(200)); // sleep a while to execute callback in another thread
+
+      BOOST_CHECK_EQUAL( expected_objects_changed1, objects_changed1 );
+      BOOST_CHECK_EQUAL( expected_objects_changed2, objects_changed2 );
+      BOOST_CHECK_EQUAL( expected_objects_changed3, objects_changed3 );
+
+   } FC_LOG_AND_RETHROW()
+}
+
+BOOST_AUTO_TEST_CASE( lookup_vote_ids )
+{ try {
+   ACTORS( (connie)(whitney)(wolverine) );
+
+   fund(connie);
+   upgrade_to_lifetime_member(connie);
+   fund(whitney);
+   upgrade_to_lifetime_member(whitney);
+   fund(wolverine);
+   upgrade_to_lifetime_member(wolverine);
+
+   const auto& committee = create_committee_member( connie );
+   const auto& witness = create_witness( whitney );
+   const auto& worker = create_worker( wolverine_id );
+
+   graphene::app::database_api db_api(db);
+
+   std::vector<vote_id_type> votes;
+   votes.push_back( committee.vote_id );
+   votes.push_back( witness.vote_id );
+   votes.push_back( worker.vote_for );
+
+   const auto results = db_api.lookup_vote_ids( votes );
+
+} FC_LOG_AND_RETHROW() }
+
 BOOST_AUTO_TEST_SUITE_END()
