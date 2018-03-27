@@ -68,6 +68,9 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       map<uint32_t, optional<block_header>> get_block_header_batch(const vector<uint32_t> block_nums)const;
       optional<signed_block> get_block(uint32_t block_num)const;
       processed_transaction get_transaction( uint32_t block_num, uint32_t trx_in_block )const;
+      map<transaction_id_type, signed_transaction> list_pending_transactions() const;
+      void subscribe_to_pending_transactions(std::function<void(const variant&)> callback);
+      void unsubscribe_from_pending_transactions();
 
       // Globals
       chain_property_object get_chain_properties()const;
@@ -244,6 +247,10 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       graphene::chain::database&                                                                                                            _db;
       const application_options* _app_options = nullptr;
 
+      /* Pending transactions */
+      map<transaction_id_type, signed_transaction> _pending_transactions;
+      std::function<void(const variant&)> _on_pending_transaction;
+
 };
 
 //////////////////////////////////////////////////////////////////////
@@ -273,8 +280,45 @@ database_api_impl::database_api_impl( graphene::chain::database& db, const appli
    _applied_block_connection = _db.applied_block.connect([this](const signed_block&){ on_applied_block(); });
 
    _pending_trx_connection = _db.on_pending_transaction.connect([this](const signed_transaction& trx ){
-                         if( _pending_trx_callback ) _pending_trx_callback( fc::variant(trx, GRAPHENE_MAX_NESTED_OBJECTS) );
-                      });
+       if( _pending_trx_callback )
+           _pending_trx_callback( fc::variant(trx, GRAPHENE_MAX_NESTED_OBJECTS) );
+       auto transaction_it = _pending_transactions.find(trx.id());
+       if (_pending_transactions.end() == transaction_it)
+       {
+           _pending_transactions[trx.id()] = trx;
+       }
+
+       if (_on_pending_transaction)
+       {
+           _on_pending_transaction(fc::variant(trx, GRAPHENE_MAX_NESTED_OBJECTS));
+       }
+   });
+
+   _applied_block_connection = _db.applied_block.connect([this]( const signed_block& block ){
+       for (const auto& transaction: block.transactions)
+       {
+           auto transaction_it = _pending_transactions.find(transaction.id());
+           if (_pending_transactions.end() != transaction_it)
+           {
+               _pending_transactions.erase(transaction_it);
+           }
+       }
+
+       /*
+        * Remove expired transactions from pending_transactions
+        */
+       for (const auto& transaction: _pending_transactions)
+       {
+          if (transaction.second.expiration < block.timestamp)
+          {
+             auto transaction_it = _pending_transactions.find(transaction.second.id());
+             if (_pending_transactions.end() != transaction_it)
+             {
+                _pending_transactions.erase(transaction_it);
+             }
+          }
+       }
+   });
 }
 
 database_api_impl::~database_api_impl()
@@ -444,6 +488,37 @@ processed_transaction database_api_impl::get_transaction(uint32_t block_num, uin
    FC_ASSERT( opt_block->transactions.size() > trx_num );
    return opt_block->transactions[trx_num];
 }
+
+void database_api::subscribe_to_pending_transactions( std::function<void(const variant&)> callback )
+{
+   return my->subscribe_to_pending_transactions( callback );
+}
+
+void database_api_impl::subscribe_to_pending_transactions( std::function<void(const variant&)> callback )
+{
+  _on_pending_transaction = callback;
+}
+
+void database_api::unsubscribe_from_pending_transactions()
+{
+   return my->unsubscribe_from_pending_transactions();
+}
+
+void database_api_impl::unsubscribe_from_pending_transactions()
+{
+  _on_pending_transaction = std::function<void(const variant&)>();
+}
+
+map<transaction_id_type, signed_transaction> database_api::list_pending_transactions() const
+{
+   return my->list_pending_transactions();
+}
+
+map<transaction_id_type, signed_transaction> database_api_impl::list_pending_transactions() const
+{
+  return _pending_transactions;
+}
+
 
 //////////////////////////////////////////////////////////////////////
 //                                                                  //

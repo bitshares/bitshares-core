@@ -211,6 +211,23 @@ class database_api
        */
       optional<signed_transaction> get_recent_transaction_by_id( const transaction_id_type& id )const;
 
+      /**
+       * @brief Return list of pending transactions.
+       */
+      map<transaction_id_type, signed_transaction> list_pending_transactions() const;
+
+      /**
+       * @brief Subscribes caller for notifications about pending transactions.
+       * @param callback a functional object which will be called when new transaction is created.
+       */
+      void subscribe_to_pending_transactions(std::function<void(const variant&)> callback);
+
+      /**
+       * @brief Unsubscribes caller from notifications about pending transactions.
+       */
+      void unsubscribe_from_pending_transactions();
+
+
       /////////////
       // Globals //
       /////////////
@@ -700,6 +717,9 @@ FC_API(graphene::app::database_api,
    (get_block)
    (get_transaction)
    (get_recent_transaction_by_id)
+   (list_pending_transactions)
+   (subscribe_to_pending_transactions)
+   (unsubscribe_from_pending_transactions)
 
    // Globals
    (get_chain_properties)
