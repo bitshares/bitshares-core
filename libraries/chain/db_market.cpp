@@ -460,7 +460,7 @@ bool database::fill_order( const call_order_object& order, const asset& pays, co
          adjust_balance(borrower.get_id(), *collateral_freed);
 
       modify( borrower_statistics, [&]( account_statistics_object& b ){
-              if( collateral_freed && collateral_freed->amount > 0 )
+              if( collateral_freed && collateral_freed->amount > 0 && collateral_freed->asset_id == asset_id_type())
                 b.total_core_in_orders -= collateral_freed->amount;
               if( pays.asset_id == asset_id_type() )
                 b.total_core_in_orders -= pays.amount;
