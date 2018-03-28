@@ -139,6 +139,12 @@ namespace graphene { namespace db {
             return static_cast<IndexType*>(_index[ObjectType::space_id][ObjectType::type_id].get());
          }
 
+         template<typename IndexType, typename SecondaryIndexType, typename... Args>
+         SecondaryIndexType* add_secondary_index( Args... args )
+         {
+            return get_mutable_index_type<IndexType>().template add_secondary_index<SecondaryIndexType, Args...>(args...);
+         }
+
          void pop_undo();
 
          fc::path get_data_dir()const { return _data_dir; }

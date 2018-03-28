@@ -27,12 +27,6 @@
 #include <fc/smart_ref_fwd.hpp>
 
 namespace graphene { namespace chain { struct fee_schedule; } }
-/*
-namespace fc {
-   template<typename Stream, typename T> inline void pack( Stream& s, const graphene::chain::fee_schedule& value );
-   template<typename Stream, typename T> inline void unpack( Stream& s, graphene::chain::fee_schedule& value );
-} // namespace fc
-*/
 
 namespace graphene { namespace chain {
 

@@ -75,7 +75,7 @@ void verify_account_votes( const database& db, const account_options& options )
    bool has_worker_votes = false;
    for( auto id : options.votes )
    {
-      FC_ASSERT( id < max_vote_id );
+      FC_ASSERT( id < max_vote_id, "Can not vote for ${id} which does not exist.", ("id",id) );
       has_worker_votes |= (id.type() == vote_id_type::worker);
    }
 
@@ -86,7 +86,8 @@ void verify_account_votes( const database& db, const account_options& options )
       {
          if( id.type() == vote_id_type::worker )
          {
-            FC_ASSERT( against_worker_idx.find( id ) == against_worker_idx.end() );
+            FC_ASSERT( against_worker_idx.find( id ) == against_worker_idx.end(),
+                       "Can no longer vote against a worker." );
          }
       }
    }
@@ -97,13 +98,16 @@ void verify_account_votes( const database& db, const account_options& options )
       for ( auto id : options.votes ) {
          switch ( id.type() ) {
             case vote_id_type::committee:
-               FC_ASSERT( committee_idx.find(id) != committee_idx.end() );
+               FC_ASSERT( committee_idx.find(id) != committee_idx.end(),
+                          "Can not vote for ${id} which does not exist.", ("id",id) );
                break;
             case vote_id_type::witness:
-               FC_ASSERT( witness_idx.find(id) != witness_idx.end());
+               FC_ASSERT( witness_idx.find(id) != witness_idx.end(),
+                          "Can not vote for ${id} which does not exist.", ("id",id) );
                break;
             case vote_id_type::worker:
-               FC_ASSERT( approve_worker_idx.find( id ) != approve_worker_idx.end() );
+               FC_ASSERT( approve_worker_idx.find( id ) != approve_worker_idx.end(),
+                          "Can not vote for ${id} which does not exist.", ("id",id) );
                break;
             default:
                FC_THROW( "Invalid Vote Type: ${id}", ("id", id) );
@@ -154,7 +158,8 @@ void_result account_create_evaluator::do_evaluate( const account_create_operatio
    if( op.name.size() )
    {
       auto current_account_itr = acnt_indx.indices().get<by_name>().find( op.name );
-      FC_ASSERT( current_account_itr == acnt_indx.indices().get<by_name>().end() );
+      FC_ASSERT( current_account_itr == acnt_indx.indices().get<by_name>().end(),
+                 "Account '${a}' already exists.", ("a",op.name) );
    }
 
    return void_result();
@@ -351,7 +356,7 @@ void_result account_whitelist_evaluator::do_evaluate(const account_whitelist_ope
 
    listed_account = &o.account_to_list(d);
    if( !d.get_global_properties().parameters.allow_non_member_whitelists )
-      FC_ASSERT(o.authorizing_account(d).is_lifetime_member());
+      FC_ASSERT( o.authorizing_account(d).is_lifetime_member(), "The authorizing account must be a lifetime member." );
 
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }

@@ -78,8 +78,8 @@ namespace graphene { namespace chain {
 
 namespace fc
 {
-   void to_variant( const graphene::chain::address& var,  fc::variant& vo );
-   void from_variant( const fc::variant& var,  graphene::chain::address& vo );
+   void to_variant( const graphene::chain::address& var,  fc::variant& vo, uint32_t max_depth = 1 );
+   void from_variant( const fc::variant& var,  graphene::chain::address& vo, uint32_t max_depth = 1 );
 }
 
 namespace std

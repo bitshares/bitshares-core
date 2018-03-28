@@ -86,6 +86,7 @@ object_id_type proposal_create_evaluator::do_apply(const proposal_create_operati
       _proposed_trx.expiration = o.expiration_time;
       proposal.proposed_transaction = _proposed_trx;
       proposal.expiration_time = o.expiration_time;
+      proposal.proposer = o.fee_paying_account;
       if( o.review_period_seconds )
          proposal.review_period_time = o.expiration_time - *o.review_period_seconds;
 
