@@ -109,7 +109,7 @@ int get_available_port()
    sin.sin_family = AF_INET;
    sin.sin_port = 0;
    sin.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-   if (bind(socket_fd, (struct sockaddr*)&sin, sizeof(struct sockaddr_in)) == -1)
+   if (::bind(socket_fd, (struct sockaddr*)&sin, sizeof(struct sockaddr_in)) == -1)
       return -1;
    socklen_t len = sizeof(sin);
    if (getsockname(socket_fd, (struct sockaddr *)&sin, &len) == -1)
