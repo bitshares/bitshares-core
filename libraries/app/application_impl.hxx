@@ -1,8 +1,11 @@
 #pragma once
 
+#include <fc/network/http/websocket.hpp>
 #include <graphene/app/application.hpp>
 #include <graphene/app/api_access.hpp>
 #include <graphene/chain/genesis_state.hpp>
+#include <graphene/chain/protocol/types.hpp>
+#include <graphene/net/message.hpp>
 
 namespace graphene { namespace app { namespace detail {
 
@@ -61,9 +64,9 @@ class application_impl : public net::node_delegate
 
       virtual void handle_transaction(const graphene::net::trx_message& transaction_message) override;
 
-      void handle_message(const message& message_to_process);
+      void handle_message(const graphene::net::message& message_to_process);
 
-      bool is_included_block(const block_id_type& block_id);
+      bool is_included_block(const graphene::chain::block_id_type& block_id);
 
       /**
        * Assuming all data elements are ordered in some way, this method should
@@ -74,14 +77,14 @@ class application_impl : public net::node_delegate
        * in our blockchain after the last item returned in the result,
        * or 0 if the result contains the last item in the blockchain
        */
-      virtual std::vector<item_hash_t> get_block_ids(const std::vector<item_hash_t>& blockchain_synopsis,
+      virtual std::vector<graphene::net::item_hash_t> get_block_ids(const std::vector<graphene::net::item_hash_t>& blockchain_synopsis,
                                                      uint32_t& remaining_item_count,
                                                      uint32_t limit) override;
 
       /**
        * Given the hash of the requested data, fetch the body.
        */
-      virtual message get_item(const item_id& id) override;
+      virtual graphene::net::message get_item(const graphene::net::item_id& id) override;
 
       virtual graphene::chain::chain_id_type get_chain_id()const override;
 
@@ -143,7 +146,7 @@ class application_impl : public net::node_delegate
        * successfully pushed to the blockchain, so that tells us whether the peer is on a fork or on
        * the main chain.
        */
-      virtual std::vector<item_hash_t> get_blockchain_synopsis(const item_hash_t& reference_point,
+      virtual std::vector<graphene::net::item_hash_t> get_blockchain_synopsis(const graphene::net::item_hash_t& reference_point,
                                                                uint32_t number_of_blocks_after_reference_point) override;
 
       /**
@@ -160,15 +163,15 @@ class application_impl : public net::node_delegate
        */
       virtual void connection_count_changed(uint32_t c) override;
 
-      virtual uint32_t get_block_number(const item_hash_t& block_id) override;
+      virtual uint32_t get_block_number(const graphene::net::item_hash_t& block_id) override;
 
       /**
        * Returns the time a block was produced (if block_id = 0, returns genesis time).
        * If we don't know about the block, returns time_point_sec::min()
        */
-      virtual fc::time_point_sec get_block_time(const item_hash_t& block_id) override;
+      virtual fc::time_point_sec get_block_time(const graphene::net::item_hash_t& block_id) override;
 
-      virtual item_hash_t get_head_block_id() const override;
+      virtual graphene::net::item_hash_t get_head_block_id() const override;
 
       virtual uint32_t estimate_last_known_fork_from_git_revision_timestamp(uint32_t unix_timestamp) const override;
 
@@ -179,7 +182,7 @@ class application_impl : public net::node_delegate
       application* _self;
 
       fc::path _data_dir;
-      const bpo::variables_map* _options = nullptr;
+      const boost::program_options::variables_map* _options = nullptr;
       api_access _apiaccess;
 
       std::shared_ptr<graphene::chain::database>            _chain_db;
