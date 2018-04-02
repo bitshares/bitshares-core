@@ -1,6 +1,7 @@
 #pragma once
 
 #include <graphene/app/application.hpp>
+#include <graphene/app/api_access.hpp>
 #include <graphene/chain/genesis_state.hpp>
 
 namespace graphene { namespace app { namespace detail {
@@ -38,7 +39,7 @@ class application_impl : public net::node_delegate
 
       void startup();
 
-      optional< api_access_info > get_api_access_info(const string& username)const;
+      fc::optional< api_access_info > get_api_access_info(const string& username)const;
 
       void set_api_access_info(const string& username, api_access_info&& permissions);
 
@@ -82,7 +83,7 @@ class application_impl : public net::node_delegate
        */
       virtual message get_item(const item_id& id) override;
 
-      virtual chain_id_type get_chain_id()const override;
+      virtual graphene::chain::chain_id_type get_chain_id()const override;
 
       /**
        * Returns a synopsis of the blockchain used for syncing.  This consists of a list of

@@ -1,9 +1,13 @@
 #pragma once
 #include <memory>
 #include <fc/thread/thread.hpp>
-#include <graphene/net/core_messages.hpp>
+#include <fc/log/logger.hpp>
+#include <fc/network/tcp_socket.hpp>
 #include <graphene/chain/config.hpp>
 #include <graphene/chain/protocol/types.hpp>
+#include <graphene/net/node.hpp>
+#include <graphene/net/core_messages.hpp>
+#include <graphene/net/peer_connection.hpp>
 
 namespace graphene { namespace net { namespace detail {
 
@@ -268,13 +272,13 @@ class node_impl : public peer_connection_delegate
 
       /** Stores all connections which have not yet finished key exchange or are still sending initial handshaking messages
        * back and forth (not yet ready to initiate syncing) */
-      std::unordered_set<peer_connection_ptr>                     _handshaking_connections;
+      std::unordered_set<graphene::net::peer_connection_ptr>                     _handshaking_connections;
       /** stores fully established connections we're either syncing with or in normal operation with */
-      std::unordered_set<peer_connection_ptr>                     _active_connections;
+      std::unordered_set<graphene::net::peer_connection_ptr>                     _active_connections;
       /** stores connections we've closed (sent closing message, not actually closed), but are still waiting for the remote end to close before we delete them */
-      std::unordered_set<peer_connection_ptr>                     _closing_connections;
+      std::unordered_set<graphene::net::peer_connection_ptr>                     _closing_connections;
       /** stores connections we've closed, but are still waiting for the OS to notify us that the socket is really closed */
-      std::unordered_set<peer_connection_ptr>                     _terminating_connections;
+      std::unordered_set<graphene::net::peer_connection_ptr>                     _terminating_connections;
 
       boost::circular_buffer<item_hash_t> _most_recent_blocks_accepted; // the /n/ most recent blocks we've accepted (currently tuned to the max number of connections)
 
