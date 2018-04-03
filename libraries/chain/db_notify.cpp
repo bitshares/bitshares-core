@@ -31,6 +31,7 @@ struct get_impacted_account_visitor
    }
 
    void operator()( const asset_claim_fees_operation& op ){}
+   void operator()( const asset_claim_pool_operation& op ){}
    void operator()( const limit_order_create_operation& op ) {}
    void operator()( const limit_order_cancel_operation& op )
    {
@@ -84,7 +85,10 @@ struct get_impacted_account_visitor
       if( op.new_issuer )
          _impacted.insert( *(op.new_issuer) );
    }
-
+   void operator()( const asset_update_issuer_operation& op )
+   {
+      _impacted.insert( op.new_issuer );
+   }
    void operator()( const asset_update_bitasset_operation& op ) {}
    void operator()( const asset_update_feed_producers_operation& op ) {}
 
@@ -353,6 +357,16 @@ static void get_relevant_accounts( const object* obj, flat_set<account_id_type>&
 
 namespace graphene { namespace chain {
 
+void database::notify_applied_block( const signed_block& block )
+{
+   GRAPHENE_TRY_NOTIFY( applied_block, block )
+}
+
+void database::notify_on_pending_transaction( const signed_transaction& tx )
+{
+   GRAPHENE_TRY_NOTIFY( on_pending_transaction, tx )
+}
+
 void database::notify_changed_objects()
 { try {
    if( _undo_db.enabled() ) 
@@ -372,7 +386,8 @@ void database::notify_changed_objects()
             get_relevant_accounts(obj, new_accounts_impacted);
         }
 
-        new_objects(new_ids, new_accounts_impacted);
+        if( new_ids.size() )
+           GRAPHENE_TRY_NOTIFY( new_objects, new_ids, new_accounts_impacted)
       }
 
       // Changed
@@ -386,7 +401,8 @@ void database::notify_changed_objects()
           get_relevant_accounts(item.second.get(), changed_accounts_impacted);
         }
 
-        changed_objects(changed_ids, changed_accounts_impacted);
+        if( changed_ids.size() )
+           GRAPHENE_TRY_NOTIFY( changed_objects, changed_ids, changed_accounts_impacted)
       }
 
       // Removed
@@ -403,7 +419,8 @@ void database::notify_changed_objects()
           get_relevant_accounts(obj, removed_accounts_impacted);
         }
 
-        removed_objects(removed_ids, removed, removed_accounts_impacted);
+        if( removed_ids.size() )
+           GRAPHENE_TRY_NOTIFY( removed_objects, removed_ids, removed, removed_accounts_impacted)
       }
    }
 } FC_CAPTURE_AND_LOG( (0) ) }

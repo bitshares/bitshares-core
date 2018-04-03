@@ -130,7 +130,7 @@ namespace graphene { namespace db {
          virtual fc::uint128        hash()const = 0;
          virtual void               add_observer( const shared_ptr<index_observer>& ) = 0;
 
-         virtual void               object_from_variant( const fc::variant& var, object& obj )const = 0;
+         virtual void               object_from_variant( const fc::variant& var, object& obj, uint32_t max_depth )const = 0;
          virtual void               object_default( object& obj )const = 0;
    };
 
@@ -164,10 +164,10 @@ namespace graphene { namespace db {
          /** called just after obj is modified */
          void on_modify( const object& obj );
 
-         template<typename T>
-         T* add_secondary_index()
+         template<typename T, typename... Args>
+         T* add_secondary_index(Args... args)
          {
-            _sindex.emplace_back( new T() );
+            _sindex.emplace_back( new T(args...) );
             return static_cast<T*>(_sindex.back().get());
          }
 
@@ -277,6 +277,15 @@ namespace graphene { namespace db {
             return result;
          }
 
+         virtual const object& insert( object&& obj ) override
+         {
+            const auto& result = DerivedIndex::insert( std::move( obj ) );
+            for( const auto& item : _sindex )
+               item->object_inserted( result );
+            on_add( result );
+            return result;
+         }
+
          virtual void  remove( const object& obj ) override
          {
             for( const auto& item : _sindex )
@@ -301,12 +310,12 @@ namespace graphene { namespace db {
             _observers.emplace_back( o );
          }
 
-         virtual void object_from_variant( const fc::variant& var, object& obj )const override
+         virtual void object_from_variant( const fc::variant& var, object& obj, uint32_t max_depth )const override
          {
             object_id_type id = obj.id;
             object_type* result = dynamic_cast<object_type*>( &obj );
             FC_ASSERT( result != nullptr );
-            fc::from_variant( var, *result );
+            fc::from_variant( var, *result, max_depth );
             obj.id = id;
          }
 

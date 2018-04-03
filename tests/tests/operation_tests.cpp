@@ -79,14 +79,17 @@ BOOST_AUTO_TEST_CASE( feed_limit_logic_test )
       throw;
    }
 }
+
 BOOST_AUTO_TEST_CASE( call_order_update_test )
 {
    try {
+
       ACTORS((dan)(sam));
       const auto& bitusd = create_bitasset("USDBIT", sam.id);
       const auto& core   = asset_id_type()(db);
 
       transfer(committee_account, dan_id, asset(10000000));
+      transfer(committee_account, sam_id, asset(10000000));
       update_feed_producers( bitusd, {sam.id} );
 
       price_feed current_feed; current_feed.settlement_price = bitusd.amount( 100 ) / core.amount(100);
@@ -142,11 +145,413 @@ BOOST_AUTO_TEST_CASE( call_order_update_test )
       GRAPHENE_REQUIRE_THROW( borrow( dan, bitusd.amount(80000), asset(0)), fc::exception );
       BOOST_TEST_MESSAGE( "attempting to claim all collateral without paying off debt" );
       GRAPHENE_REQUIRE_THROW( cover( dan, bitusd.amount(0), asset(20000)), fc::exception );
+
+      borrow( sam, bitusd.amount(1000), asset(10000));
+      transfer( sam, dan, bitusd.amount(1000) );
+
+      BOOST_TEST_MESSAGE( "attempting to claim more collateral than available" );
+      GRAPHENE_REQUIRE_THROW( cover( dan, bitusd.amount(4000), asset(20001)), fc::exception );
+      GRAPHENE_REQUIRE_THROW( cover( dan, bitusd.amount(4000), asset(20100)), fc::exception );
+      GRAPHENE_REQUIRE_THROW( cover( dan, bitusd.amount(4000), asset(30000)), fc::exception );
+
+      GRAPHENE_REQUIRE_THROW( cover( dan, bitusd.amount(5000), asset(20001)), fc::exception );
+      GRAPHENE_REQUIRE_THROW( cover( dan, bitusd.amount(5000), asset(20100)), fc::exception );
+      GRAPHENE_REQUIRE_THROW( cover( dan, bitusd.amount(5000), asset(30000)), fc::exception );
+
+      BOOST_TEST_MESSAGE( "attempting to pay more debt than required" );
+      GRAPHENE_REQUIRE_THROW( cover( dan, bitusd.amount(6000), asset(15000)), fc::exception );
+      GRAPHENE_REQUIRE_THROW( cover( dan, bitusd.amount(6000), asset(20000)), fc::exception );
+
+      BOOST_TEST_MESSAGE( "attempting to pay more debt than required, and claim more collateral than available" );
+      GRAPHENE_REQUIRE_THROW( cover( dan, bitusd.amount(6000), asset(20001)), fc::exception );
+      GRAPHENE_REQUIRE_THROW( cover( dan, bitusd.amount(6000), asset(40000)), fc::exception );
+
       BOOST_TEST_MESSAGE( "attempting reduce collateral without paying off any debt" );
       cover( dan, bitusd.amount(0), asset(1000));
 
       BOOST_TEST_MESSAGE( "attempting change call price to be below minimum for debt/collateral ratio" );
       GRAPHENE_REQUIRE_THROW( cover( dan, bitusd.amount(0), asset(0)), fc::exception );
+
+   } catch (fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
+BOOST_AUTO_TEST_CASE( old_call_order_update_test_after_hardfork_583 )
+{
+   try {
+
+      generate_blocks( HARDFORK_CORE_583_TIME );
+      generate_block();
+      set_expiration( db, trx );
+
+      ACTORS((dan)(sam));
+      const auto& bitusd = create_bitasset("USDBIT", sam.id);
+      const auto& core   = asset_id_type()(db);
+
+      transfer(committee_account, dan_id, asset(10000000));
+      transfer(committee_account, sam_id, asset(10000000));
+      update_feed_producers( bitusd, {sam.id} );
+
+      price_feed current_feed; current_feed.settlement_price = bitusd.amount( 100 ) / core.amount(100);
+      current_feed.maintenance_collateral_ratio = 1750; // need to set this explicitly, testnet has a different default
+      publish_feed( bitusd, sam, current_feed );
+
+      FC_ASSERT( bitusd.bitasset_data(db).current_feed.settlement_price == current_feed.settlement_price );
+
+      BOOST_TEST_MESSAGE( "attempting to borrow using 2x collateral at 1:1 price now that there is a valid order" );
+      borrow( dan, bitusd.amount(5000), asset(10000));
+      BOOST_REQUIRE_EQUAL( get_balance( dan, bitusd ), 5000 );
+      BOOST_REQUIRE_EQUAL( get_balance( dan, core ), 10000000 - 10000 );
+
+      BOOST_TEST_MESSAGE( "covering 2500 usd and freeing 5000 core..." );
+      cover( dan, bitusd.amount(2500), asset(5000));
+      BOOST_REQUIRE_EQUAL( get_balance( dan, bitusd ), 2500 );
+      BOOST_REQUIRE_EQUAL( get_balance( dan, core ), 10000000 - 10000 + 5000  );
+
+      BOOST_TEST_MESSAGE( "verifying that attempting to cover the full amount without claiming the collateral fails" );
+      GRAPHENE_REQUIRE_THROW( cover( dan, bitusd.amount(2500), core.amount(0)  ), fc::exception );
+
+      cover( dan, bitusd.amount(2500), core.amount(5000));
+
+      BOOST_REQUIRE_EQUAL( get_balance( dan, bitusd ), 0 );
+      BOOST_REQUIRE_EQUAL( get_balance( dan, core ), 10000000  );
+
+      borrow( dan, bitusd.amount(5000), asset(10000));
+      BOOST_REQUIRE_EQUAL( get_balance( dan, bitusd ), 5000 );
+      BOOST_REQUIRE_EQUAL( get_balance( dan, core ), 10000000 - 10000  );
+
+
+      // test just increasing collateral
+      BOOST_TEST_MESSAGE( "increasing collateral" );
+      borrow( dan, bitusd.amount(0), asset(10000));
+
+      BOOST_REQUIRE_EQUAL( get_balance( dan, bitusd ), 5000 );
+      BOOST_REQUIRE_EQUAL( get_balance( dan, core ), 10000000 - 20000  );
+
+      // test just decreasing debt
+      BOOST_TEST_MESSAGE( "decreasing debt" );
+      cover( dan, bitusd.amount(1000), asset(0));
+
+      BOOST_REQUIRE_EQUAL( get_balance( dan, bitusd ), 4000 );
+      BOOST_REQUIRE_EQUAL( get_balance( dan, core ), 10000000 - 20000  );
+
+      BOOST_TEST_MESSAGE( "increasing debt without increasing collateral" );
+      borrow( dan, bitusd.amount(1000), asset(0));
+
+      BOOST_REQUIRE_EQUAL( get_balance( dan, bitusd ), 5000 );
+      BOOST_REQUIRE_EQUAL( get_balance( dan, core ), 10000000 - 20000  );
+
+      BOOST_TEST_MESSAGE( "increasing debt without increasing collateral again" );
+      GRAPHENE_REQUIRE_THROW( borrow( dan, bitusd.amount(80000), asset(0)), fc::exception );
+      BOOST_TEST_MESSAGE( "attempting to claim all collateral without paying off debt" );
+      GRAPHENE_REQUIRE_THROW( cover( dan, bitusd.amount(0), asset(20000)), fc::exception );
+
+      borrow( sam, bitusd.amount(1000), asset(10000));
+      transfer( sam, dan, bitusd.amount(1000) );
+
+      BOOST_TEST_MESSAGE( "attempting to claim more collateral than available" );
+      GRAPHENE_REQUIRE_THROW( cover( dan, bitusd.amount(4000), asset(20001)), fc::exception );
+      GRAPHENE_REQUIRE_THROW( cover( dan, bitusd.amount(4000), asset(20100)), fc::exception );
+      GRAPHENE_REQUIRE_THROW( cover( dan, bitusd.amount(4000), asset(30000)), fc::exception );
+
+      GRAPHENE_REQUIRE_THROW( cover( dan, bitusd.amount(5000), asset(20001)), fc::exception );
+      GRAPHENE_REQUIRE_THROW( cover( dan, bitusd.amount(5000), asset(20100)), fc::exception );
+      GRAPHENE_REQUIRE_THROW( cover( dan, bitusd.amount(5000), asset(30000)), fc::exception );
+
+      BOOST_TEST_MESSAGE( "attempting to pay more debt than required" );
+      GRAPHENE_REQUIRE_THROW( cover( dan, bitusd.amount(6000), asset(15000)), fc::exception );
+      GRAPHENE_REQUIRE_THROW( cover( dan, bitusd.amount(6000), asset(20000)), fc::exception );
+
+      BOOST_TEST_MESSAGE( "attempting to pay more debt than required, and claim more collateral than available" );
+      GRAPHENE_REQUIRE_THROW( cover( dan, bitusd.amount(6000), asset(20001)), fc::exception );
+      GRAPHENE_REQUIRE_THROW( cover( dan, bitusd.amount(6000), asset(40000)), fc::exception );
+
+      BOOST_TEST_MESSAGE( "attempting reduce collateral without paying off any debt" );
+      cover( dan, bitusd.amount(0), asset(1000));
+
+      BOOST_TEST_MESSAGE( "attempting change call price to be below minimum for debt/collateral ratio" );
+      GRAPHENE_REQUIRE_THROW( cover( dan, bitusd.amount(0), asset(0)), fc::exception );
+
+   } catch (fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
+BOOST_AUTO_TEST_CASE( asset_settle_cancel_operation_test_after_hf588 )
+{
+   // fast jump to hardfork time
+   generate_blocks( HARDFORK_CORE_588_TIME );
+   // one more block to pass hardfork time
+   generate_block();
+   set_expiration( db, trx );
+
+   BOOST_TEST_MESSAGE( "Creating a proposal containing a asset_settle_cancel_operation" );
+   {
+      proposal_create_operation pcop = proposal_create_operation::committee_proposal(
+            db.get_global_properties().parameters, db.head_block_time());
+      pcop.fee_paying_account = GRAPHENE_TEMP_ACCOUNT;
+      pcop.expiration_time = db.head_block_time() + *pcop.review_period_seconds + 10;
+      asset_settle_cancel_operation ascop;
+      ascop.amount.amount = 1;
+      pcop.proposed_ops.emplace_back(ascop);
+      trx.operations.push_back(pcop);
+
+      BOOST_CHECK_EXCEPTION(db.push_transaction(trx), fc::assert_exception,
+            [](fc::assert_exception const &e) -> bool {
+               std::cout << e.to_string() << std::endl;
+               if (e.to_string().find("Virtual operation") != std::string::npos)
+                  return true;
+
+               return false;
+            });
+   }
+
+   BOOST_TEST_MESSAGE( "Creating a recursive proposal containing asset_settle_cancel_operation" );
+   {
+      proposal_create_operation pcop = proposal_create_operation::committee_proposal(
+            db.get_global_properties().parameters, db.head_block_time());
+
+      pcop.fee_paying_account = GRAPHENE_TEMP_ACCOUNT;
+      pcop.expiration_time = db.head_block_time() + *pcop.review_period_seconds + 10;
+      proposal_create_operation inner_pcop = proposal_create_operation::committee_proposal(
+            db.get_global_properties().parameters, db.head_block_time());
+
+      inner_pcop.fee_paying_account = GRAPHENE_TEMP_ACCOUNT;
+      inner_pcop.expiration_time = db.head_block_time() + *inner_pcop.review_period_seconds + 10;
+
+      asset_settle_cancel_operation ascop;
+      ascop.amount.amount = 1;
+      inner_pcop.proposed_ops.emplace_back(ascop);
+      pcop.proposed_ops.emplace_back(inner_pcop);
+
+      trx.operations.push_back(pcop);
+
+      BOOST_CHECK_EXCEPTION(db.push_transaction(trx), fc::assert_exception,
+            [](fc::assert_exception const &e) -> bool {
+               std::cout << e.to_string() << std::endl;
+               if (e.to_string().find("Virtual operation") != std::string::npos)
+                  return true;
+
+               return false;
+            });
+   }
+}
+
+BOOST_AUTO_TEST_CASE( more_call_order_update_test )
+{
+   try {
+
+      ACTORS((dan)(sam)(alice)(bob));
+      const auto& bitusd = create_bitasset("USDBIT", sam.id);
+      const auto& core   = asset_id_type()(db);
+
+      transfer(committee_account, dan_id, asset(10000000));
+      transfer(committee_account, sam_id, asset(10000000));
+      transfer(committee_account, alice_id, asset(10000000));
+      transfer(committee_account, bob_id, asset(10000000));
+      update_feed_producers( bitusd, {sam.id} );
+
+      price_feed current_feed; current_feed.settlement_price = bitusd.amount( 100 ) / core.amount(100);
+      current_feed.maintenance_collateral_ratio = 1750; // need to set this explicitly, testnet has a different default
+      current_feed.maximum_short_squeeze_ratio = 1100; // need to set this explicitly, testnet has a different default
+      publish_feed( bitusd, sam, current_feed );
+
+      FC_ASSERT( bitusd.bitasset_data(db).current_feed.settlement_price == current_feed.settlement_price );
+
+      BOOST_TEST_MESSAGE( "attempting to borrow using 1.75x collateral at 1:1 price should not be allowed" );
+      GRAPHENE_REQUIRE_THROW( borrow( bob, bitusd.amount(10000), core.amount(17500) ), fc::exception );
+
+      BOOST_TEST_MESSAGE( "alice borrow using 4x collateral at 1:1 price" );
+      borrow( alice, bitusd.amount(100000), core.amount(400000) )->id;
+      BOOST_REQUIRE_EQUAL( get_balance( alice, bitusd ), 100000 );
+      BOOST_REQUIRE_EQUAL( get_balance( alice, core ), 10000000 - 400000 );
+
+      BOOST_TEST_MESSAGE( "alice place an order to sell usd at 1.05" );
+      const limit_order_id_type alice_sell_id = create_sell_order( alice, bitusd.amount(1000), core.amount(1050) )->id;
+      BOOST_REQUIRE_EQUAL( get_balance( alice, bitusd ), 100000 - 1000 );
+      BOOST_REQUIRE_EQUAL( get_balance( alice, core ), 10000000 - 400000 );
+
+      BOOST_TEST_MESSAGE( "bob attempting to borrow too much using 1.75x collateral at 1:1 price should not be allowed" );
+      GRAPHENE_REQUIRE_THROW( borrow( bob, bitusd.amount(10000), core.amount(17500) ), fc::exception );
+
+      BOOST_TEST_MESSAGE( "bob attempting to borrow less using 1.75x collateral at 1:1 price should be allowed and margin called" );
+      BOOST_CHECK( !borrow( bob, bitusd.amount(100), core.amount(175) ) );
+      BOOST_REQUIRE_EQUAL( get_balance( bob, bitusd ), 100 );
+      BOOST_REQUIRE_EQUAL( get_balance( bob, core ), 10000000 - 105 );
+      BOOST_REQUIRE_EQUAL( get_balance( alice, bitusd ), 100000 - 1000 );
+      BOOST_REQUIRE_EQUAL( get_balance( alice, core ), 10000000 - 400000 + 105 );
+
+      BOOST_TEST_MESSAGE( "bob attempting to borrow using 2x collateral at 1:1 price now that there is a valid order" );
+      const call_order_id_type bob_call_id = borrow( bob, bitusd.amount(100), asset(200))->id;
+      BOOST_REQUIRE_EQUAL( get_balance( bob, bitusd ), 100 + 100 );
+      BOOST_REQUIRE_EQUAL( get_balance( bob, core ), 10000000 - 105 - 200 );
+
+      BOOST_TEST_MESSAGE( "bob attempting to borrow too much more using 1.75x collateral at 1:1 price should not be allowed" );
+      GRAPHENE_REQUIRE_THROW( borrow( bob, bitusd.amount(10000-100), core.amount(17500-200) ), fc::exception );
+
+      BOOST_TEST_MESSAGE( "bob attempting to reduce collateral to 1.75x at 1:1 price should be allowed and margin called" );
+      BOOST_CHECK( !borrow( bob, bitusd.amount(0), core.amount(175-200) ) );
+      BOOST_REQUIRE_EQUAL( get_balance( bob, bitusd ), 100 + 100 );
+      BOOST_REQUIRE_EQUAL( get_balance( bob, core ), 10000000 - 105 - 105 );
+      BOOST_REQUIRE_EQUAL( get_balance( alice, bitusd ), 100000 - 1000 );
+      BOOST_REQUIRE_EQUAL( get_balance( alice, core ), 10000000 - 400000 + 105 + 105 );
+      BOOST_CHECK( !db.find<call_order_object>( bob_call_id ) );
+
+      BOOST_TEST_MESSAGE( "alice cancel sell order" );
+      cancel_limit_order( alice_sell_id(db) );
+
+      BOOST_TEST_MESSAGE( "dan attempting to borrow using 2x collateral at 1:1 price now that there is a valid order" );
+      borrow( dan, bitusd.amount(5000), asset(10000));
+      BOOST_REQUIRE_EQUAL( get_balance( dan, bitusd ), 5000 );
+      BOOST_REQUIRE_EQUAL( get_balance( dan, core ), 10000000 - 10000 );
+
+      BOOST_TEST_MESSAGE( "sam update price feed so dan's position will enter margin call territory." );
+      current_feed.settlement_price = bitusd.amount( 100 ) / core.amount(180);
+      publish_feed( bitusd, sam, current_feed );
+
+      BOOST_TEST_MESSAGE( "dan covering 2500 usd and freeing 5000 core should not be allowed..." );
+      GRAPHENE_REQUIRE_THROW( cover( dan, bitusd.amount(2500), core.amount(5000)  ), fc::exception );
+
+      BOOST_TEST_MESSAGE( "dan covering 2500 usd and freeing 5001 core should not be allowed..." );
+      GRAPHENE_REQUIRE_THROW( cover( dan, bitusd.amount(2500), core.amount(5001)  ), fc::exception );
+
+      BOOST_TEST_MESSAGE( "dan covering 2500 usd and freeing 4999 core should not be allowed..." );
+      GRAPHENE_REQUIRE_THROW( cover( dan, bitusd.amount(2500), core.amount(4999)  ), fc::exception );
+
+      BOOST_TEST_MESSAGE( "dan borrow 2500 more usd wth 5000 more core should not be allowed..." );
+      GRAPHENE_REQUIRE_THROW( borrow( dan, bitusd.amount(2500), core.amount(5000)  ), fc::exception );
+
+      BOOST_TEST_MESSAGE( "dan borrow 2500 more usd wth 4999 more core should not be allowed..." );
+      GRAPHENE_REQUIRE_THROW( borrow( dan, bitusd.amount(2500), core.amount(4999)  ), fc::exception );
+
+      BOOST_TEST_MESSAGE( "dan borrow 2500 more usd wth 5001 more core should not be allowed..." );
+      GRAPHENE_REQUIRE_THROW( borrow( dan, bitusd.amount(2500), core.amount(5001)  ), fc::exception );
+
+      BOOST_TEST_MESSAGE( "dan covering 0 usd and freeing 1 core should not be allowed..." );
+      GRAPHENE_REQUIRE_THROW( cover( dan, bitusd.amount(0), core.amount(1)  ), fc::exception );
+
+      BOOST_TEST_MESSAGE( "dan adding 1 core as collateral should not be allowed..." );
+      GRAPHENE_REQUIRE_THROW( borrow( dan, bitusd.amount(0), core.amount(1)  ), fc::exception );
+
+
+   } catch (fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
+BOOST_AUTO_TEST_CASE( more_call_order_update_test_after_hardfork_583 )
+{
+   try {
+
+      generate_blocks( HARDFORK_CORE_583_TIME );
+      generate_block();
+      set_expiration( db, trx );
+
+      ACTORS((dan)(sam)(alice)(bob));
+      const auto& bitusd = create_bitasset("USDBIT", sam.id);
+      const auto& core   = asset_id_type()(db);
+
+      transfer(committee_account, dan_id, asset(10000000));
+      transfer(committee_account, sam_id, asset(10000000));
+      transfer(committee_account, alice_id, asset(10000000));
+      transfer(committee_account, bob_id, asset(10000000));
+      update_feed_producers( bitusd, {sam.id} );
+
+      price_feed current_feed; current_feed.settlement_price = bitusd.amount( 100 ) / core.amount(100);
+      current_feed.maintenance_collateral_ratio = 1750; // need to set this explicitly, testnet has a different default
+      current_feed.maximum_short_squeeze_ratio = 1100; // need to set this explicitly, testnet has a different default
+      publish_feed( bitusd, sam, current_feed );
+
+      FC_ASSERT( bitusd.bitasset_data(db).current_feed.settlement_price == current_feed.settlement_price );
+
+      BOOST_TEST_MESSAGE( "attempting to borrow using 1.75x collateral at 1:1 price should not be allowed" );
+      GRAPHENE_REQUIRE_THROW( borrow( bob, bitusd.amount(10000), core.amount(17500) ), fc::exception );
+
+      BOOST_TEST_MESSAGE( "alice borrow using 4x collateral at 1:1 price" );
+      borrow( alice, bitusd.amount(100000), core.amount(400000) )->id;
+      BOOST_REQUIRE_EQUAL( get_balance( alice, bitusd ), 100000 );
+      BOOST_REQUIRE_EQUAL( get_balance( alice, core ), 10000000 - 400000 );
+
+      BOOST_TEST_MESSAGE( "alice place an order to sell usd at 1.05" );
+      const limit_order_id_type alice_sell_id = create_sell_order( alice, bitusd.amount(1000), core.amount(1050) )->id;
+      BOOST_REQUIRE_EQUAL( get_balance( alice, bitusd ), 100000 - 1000 );
+      BOOST_REQUIRE_EQUAL( get_balance( alice, core ), 10000000 - 400000 );
+
+      BOOST_TEST_MESSAGE( "bob attempting to borrow too much using 1.75x collateral at 1:1 price should not be allowed" );
+      GRAPHENE_REQUIRE_THROW( borrow( bob, bitusd.amount(10000), core.amount(17500) ), fc::exception );
+
+      BOOST_TEST_MESSAGE( "bob attempting to borrow less using 1.75x collateral at 1:1 price should be allowed and margin called" );
+      BOOST_CHECK( !borrow( bob, bitusd.amount(100), core.amount(175) ) );
+      BOOST_REQUIRE_EQUAL( get_balance( bob, bitusd ), 100 );
+      BOOST_REQUIRE_EQUAL( get_balance( bob, core ), 10000000 - 105 );
+      BOOST_REQUIRE_EQUAL( get_balance( alice, bitusd ), 100000 - 1000 );
+      BOOST_REQUIRE_EQUAL( get_balance( alice, core ), 10000000 - 400000 + 105 );
+
+      BOOST_TEST_MESSAGE( "bob attempting to borrow using 2x collateral at 1:1 price now that there is a valid order" );
+      const call_order_id_type bob_call_id = borrow( bob, bitusd.amount(100), asset(200))->id;
+      BOOST_REQUIRE_EQUAL( get_balance( bob, bitusd ), 100 + 100 );
+      BOOST_REQUIRE_EQUAL( get_balance( bob, core ), 10000000 - 105 - 200 );
+
+      BOOST_TEST_MESSAGE( "bob attempting to borrow too much more using 1.75x collateral at 1:1 price should not be allowed" );
+      GRAPHENE_REQUIRE_THROW( borrow( bob, bitusd.amount(10000-100), core.amount(17500-200) ), fc::exception );
+
+      BOOST_TEST_MESSAGE( "bob attempting to reduce collateral to 1.75x at 1:1 price should be allowed and margin called" );
+      BOOST_CHECK( !borrow( bob, bitusd.amount(0), core.amount(175-200) ) );
+      BOOST_REQUIRE_EQUAL( get_balance( bob, bitusd ), 100 + 100 );
+      BOOST_REQUIRE_EQUAL( get_balance( bob, core ), 10000000 - 105 - 105 );
+      BOOST_REQUIRE_EQUAL( get_balance( alice, bitusd ), 100000 - 1000 );
+      BOOST_REQUIRE_EQUAL( get_balance( alice, core ), 10000000 - 400000 + 105 + 105 );
+      BOOST_CHECK( !db.find<call_order_object>( bob_call_id ) );
+
+      BOOST_TEST_MESSAGE( "alice cancel sell order" );
+      cancel_limit_order( alice_sell_id(db) );
+
+      BOOST_TEST_MESSAGE( "dan attempting to borrow using 2x collateral at 1:1 price now that there is a valid order" );
+      borrow( dan, bitusd.amount(5000), asset(10000));
+      BOOST_REQUIRE_EQUAL( get_balance( dan, bitusd ), 5000 );
+      BOOST_REQUIRE_EQUAL( get_balance( dan, core ), 10000000 - 10000 );
+
+      BOOST_TEST_MESSAGE( "sam update price feed so dan's position will enter margin call territory." );
+      current_feed.settlement_price = bitusd.amount( 100 ) / core.amount(180);
+      publish_feed( bitusd, sam, current_feed );
+
+      BOOST_TEST_MESSAGE( "dan covering 2500 usd and freeing 5000 core should not be allowed..." );
+      GRAPHENE_REQUIRE_THROW( cover( dan, bitusd.amount(2500), core.amount(5000)  ), fc::exception );
+
+      BOOST_TEST_MESSAGE( "dan covering 2500 usd and freeing 5001 core should not be allowed..." );
+      GRAPHENE_REQUIRE_THROW( cover( dan, bitusd.amount(2500), core.amount(5001)  ), fc::exception );
+
+      BOOST_TEST_MESSAGE( "dan borrow 2500 more usd wth 5000 more core should not be allowed..." );
+      GRAPHENE_REQUIRE_THROW( borrow( dan, bitusd.amount(2500), core.amount(5000)  ), fc::exception );
+
+      BOOST_TEST_MESSAGE( "dan borrow 2500 more usd wth 4999 more core should not be allowed..." );
+      GRAPHENE_REQUIRE_THROW( borrow( dan, bitusd.amount(2500), core.amount(4999)  ), fc::exception );
+
+      BOOST_TEST_MESSAGE( "dan covering 2500 usd and freeing 4999 core should be allowed..." );
+      cover( dan, bitusd.amount(2500), asset(4999));
+      BOOST_REQUIRE_EQUAL( get_balance( dan, bitusd ), 2500 );
+      BOOST_REQUIRE_EQUAL( get_balance( dan, core ), 10000000 - 10000 + 4999  );
+
+      BOOST_TEST_MESSAGE( "dan covering 0 usd and freeing 1 core should not be allowed..." );
+      GRAPHENE_REQUIRE_THROW( cover( dan, bitusd.amount(0), core.amount(1)  ), fc::exception );
+
+      BOOST_TEST_MESSAGE( "dan adding 1 core as collateral should be allowed..." );
+      borrow( dan, bitusd.amount(0), asset(1));
+      BOOST_REQUIRE_EQUAL( get_balance( dan, bitusd ), 2500 );
+      BOOST_REQUIRE_EQUAL( get_balance( dan, core ), 10000000 - 10000 + 4999 - 1  );
+
+      BOOST_TEST_MESSAGE( "dan borrow 2500 more usd wth 5002 more core should not be allowed..." );
+      GRAPHENE_REQUIRE_THROW( borrow( dan, bitusd.amount(2500), core.amount(5002)  ), fc::exception );
+
+      BOOST_TEST_MESSAGE( "dan borrow 2500 more usd wth 5003 more core should be allowed..." );
+      borrow( dan, bitusd.amount(2500), asset(5003));
+      BOOST_REQUIRE_EQUAL( get_balance( dan, bitusd ), 5000 );
+      BOOST_REQUIRE_EQUAL( get_balance( dan, core ), 10000000 - 10000 + 4999 - 1 - 5003 );
+
 
    } catch (fc::exception& e) {
       edump((e.to_detail_string()));
@@ -272,7 +677,11 @@ BOOST_AUTO_TEST_CASE( prediction_market )
       BOOST_TEST_MESSAGE( "Shouldn't be allowed to force settle at more than 1 collateral per debt" );
       GRAPHENE_REQUIRE_THROW( force_global_settle( pmark, pmark.amount(100) / core.amount(105) ), fc::exception );
 
+      BOOST_TEST_MESSAGE( "Globally settling" );
       force_global_settle( pmark, pmark.amount(100) / core.amount(95) );
+
+      BOOST_TEST_MESSAGE( "Can not globally settle again" );
+      GRAPHENE_REQUIRE_THROW( force_global_settle( pmark, pmark.amount(100) / core.amount(95) ), fc::exception );
 
       BOOST_TEST_MESSAGE( "Verify that forced settlment succeedes after global settlement" );
       force_settle( dan, pmark.amount(100) );
@@ -510,7 +919,7 @@ BOOST_AUTO_TEST_CASE( create_committee_member )
       REQUIRE_THROW_WITH_VALUE(op, fee, asset(-600));
       trx.operations.back() = op;
 
-      committee_member_id_type committee_member_id = db.get_index_type<primary_index<simple_index<committee_member_object>>>().get_next_id();
+      committee_member_id_type committee_member_id = db.get_index_type<committee_member_index>().get_next_id();
       PUSH_TX( db, trx, ~0 );
       const committee_member_object& d = committee_member_id(db);
 
@@ -713,6 +1122,142 @@ BOOST_AUTO_TEST_CASE( update_uia )
       GRAPHENE_REQUIRE_THROW(PUSH_TX( db, trx, ~0 ), fc::exception);
       op.new_issuer.reset();
    } catch(fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
+BOOST_AUTO_TEST_CASE( update_uia_issuer )
+{
+   using namespace graphene;
+   using namespace graphene::chain;
+   using namespace graphene::chain::test;
+   try {
+
+      // Lambda for creating accounts with 2 different keys
+      auto create_account_2_keys = [&]( const string name,
+           fc::ecc::private_key active,
+           fc::ecc::private_key owner ) {
+
+         trx.operations.push_back(make_account());
+         account_create_operation op = trx.operations.back().get<account_create_operation>();
+         op.name = name;
+         op.active = authority(1, public_key_type(active.get_public_key()), 1);
+         op.owner = authority(1, public_key_type(owner.get_public_key()), 1);
+         signed_transaction trx;
+         trx.operations.push_back(op);
+         db.current_fee_schedule().set_fee( trx.operations.back() );
+         set_expiration( db, trx );
+         PUSH_TX( db, trx, ~0 );
+
+         return get_account(name);
+      };
+
+      auto update_asset_issuer = [&](const asset_object& current,
+                                     const account_object& new_issuer) {
+         asset_update_operation op;
+         op.issuer =  current.issuer;
+         op.asset_to_update = current.id;
+         op.new_options = current.options;
+         op.new_issuer = new_issuer.id;
+         signed_transaction tx;
+         tx.operations.push_back( op );
+         db.current_fee_schedule().set_fee( tx.operations.back() );
+         set_expiration( db, tx );
+         PUSH_TX( db, tx, ~0 );
+      };
+
+      // Lambda for updating the issuer on chain using a particular key
+      auto update_issuer = [&](const asset_id_type asset_id,
+                               const account_object& issuer,
+                               const account_object& new_issuer,
+                               const fc::ecc::private_key& key)
+      {
+         asset_update_issuer_operation op;
+         op.issuer = issuer.id;
+         op.new_issuer = new_issuer.id;
+         op.asset_to_update = asset_id;
+         signed_transaction tx;
+         tx.operations.push_back( op );
+         db.current_fee_schedule().set_fee( tx.operations.back() );
+         set_expiration( db, tx );
+         sign(tx, key);
+         PUSH_TX( db, tx, database::skip_transaction_dupe_check );
+      };
+
+      auto update_issuer_proposal = [&](const asset_id_type asset_id,
+                                        const account_object& issuer,
+                                        const account_object& new_issuer,
+                                        const fc::ecc::private_key& key)
+      {
+          asset_update_issuer_operation op;
+          op.issuer = issuer.id;
+          op.new_issuer = new_issuer.id;
+          op.asset_to_update = asset_id;
+
+          const auto& curfees = *db.get_global_properties().parameters.current_fees;
+          const auto& proposal_create_fees = curfees.get<proposal_create_operation>();
+          proposal_create_operation prop;
+          prop.fee_paying_account = issuer.id;
+          prop.proposed_ops.emplace_back( op );
+          prop.expiration_time =  db.head_block_time() + fc::days(1);
+          prop.fee = asset( proposal_create_fees.fee + proposal_create_fees.price_per_kbyte );
+
+          signed_transaction tx;
+          tx.operations.push_back( prop );
+          db.current_fee_schedule().set_fee( tx.operations.back() );
+          set_expiration( db, tx );
+          sign( tx, key );
+          PUSH_TX( db, tx );
+
+      };
+
+      // Create alice account
+      fc::ecc::private_key alice_owner  = fc::ecc::private_key::regenerate(fc::digest("key1"));
+      fc::ecc::private_key alice_active = fc::ecc::private_key::regenerate(fc::digest("key2"));
+      fc::ecc::private_key bob_owner    = fc::ecc::private_key::regenerate(fc::digest("key3"));
+      fc::ecc::private_key bob_active   = fc::ecc::private_key::regenerate(fc::digest("key4"));
+
+      // Create accounts
+      const auto& alice = create_account_2_keys("alice", alice_active, alice_owner);
+      const auto& bob = create_account_2_keys("bob", bob_active, bob_owner);
+      const account_id_type alice_id = alice.id;
+      const account_id_type bob_id = bob.id;
+
+      // Create asset
+      const auto& test = create_user_issued_asset("UPDATEISSUER", alice_id(db), 0);
+      const asset_id_type test_id = test.id;
+
+      BOOST_TEST_MESSAGE( "can't use this operation before the hardfork" );
+      GRAPHENE_REQUIRE_THROW( update_issuer( test_id, alice_id(db), bob_id(db), alice_owner), fc::exception );
+
+      BOOST_TEST_MESSAGE( "can't use this operation before the hardfork (even if wrapped into a proposal)" );
+      GRAPHENE_REQUIRE_THROW( update_issuer_proposal( test_id, alice_id(db), bob_id(db), alice_owner), fc::exception );
+
+      // Fast Forward to Hardfork time
+      generate_blocks( HARDFORK_CORE_199_TIME );
+
+      BOOST_TEST_MESSAGE( "After hardfork time, proposal goes through (but doesn't execute yet)" );
+      update_issuer_proposal( test_id, alice_id(db), bob_id(db), alice_owner);
+
+      BOOST_TEST_MESSAGE( "Can't change issuer if not my asset" );
+      GRAPHENE_REQUIRE_THROW( update_issuer( test_id, bob_id(db), alice_id(db), bob_active ), fc::exception );
+      GRAPHENE_REQUIRE_THROW( update_issuer( test_id, bob_id(db), alice_id(db), bob_owner ), fc::exception );
+
+      BOOST_TEST_MESSAGE( "Can't change issuer with alice's active key" );
+      GRAPHENE_REQUIRE_THROW( update_issuer( test_id, alice_id(db), bob_id(db), alice_active ), fc::exception );
+
+      BOOST_TEST_MESSAGE( "Old method with asset_update needs to fail" );
+      GRAPHENE_REQUIRE_THROW( update_asset_issuer( test_id(db), bob_id(db)  ), fc::exception );
+
+      BOOST_TEST_MESSAGE( "Updating issuer to bob" );
+      update_issuer( test_id, alice_id(db), bob_id(db), alice_owner );
+
+      BOOST_CHECK(test_id(db).issuer == bob_id);
+
+   }
+   catch( const fc::exception& e )
+   {
       edump((e.to_detail_string()));
       throw;
    }

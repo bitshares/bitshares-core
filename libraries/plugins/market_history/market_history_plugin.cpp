@@ -424,7 +424,7 @@ void market_history_plugin::plugin_set_program_options(
 
 void market_history_plugin::plugin_initialize(const boost::program_options::variables_map& options)
 { try {
-   database().applied_block.connect( [&]( const signed_block& b){ my->update_market_histories(b); } );
+   database().applied_block.connect( [this]( const signed_block& b){ my->update_market_histories(b); } );
    database().add_index< primary_index< bucket_index  > >();
    database().add_index< primary_index< history_index  > >();
    database().add_index< primary_index< market_ticker_index  > >();
@@ -432,8 +432,8 @@ void market_history_plugin::plugin_initialize(const boost::program_options::vari
 
    if( options.count( "bucket-size" ) )
    {
-      const std::string& buckets = options["bucket-size"].as<string>(); 
-      my->_tracked_buckets = fc::json::from_string(buckets).as<flat_set<uint32_t>>();
+      const std::string& buckets = options["bucket-size"].as<string>();
+      my->_tracked_buckets = fc::json::from_string(buckets).as<flat_set<uint32_t>>(2);
       my->_tracked_buckets.erase( 0 );
    }
    if( options.count( "history-per-size" ) )

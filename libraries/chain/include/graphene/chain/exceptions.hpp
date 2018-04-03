@@ -65,6 +65,21 @@
       msg                                                             \
       )
 
+#define GRAPHENE_TRY_NOTIFY( signal, ... )                                    \
+   try                                                                        \
+   {                                                                          \
+      signal( __VA_ARGS__ );                                                  \
+   }                                                                          \
+   catch( const graphene::chain::plugin_exception& e )                        \
+   {                                                                          \
+      elog( "Caught plugin exception: ${e}", ("e", e.to_detail_string() ) );  \
+      throw;                                                                  \
+   }                                                                          \
+   catch( ... )                                                               \
+   {                                                                          \
+      wlog( "Caught unexpected exception in plugin" );                        \
+   }
+
 namespace graphene { namespace chain {
 
    FC_DECLARE_EXCEPTION( chain_exception, 3000000, "blockchain exception" )
@@ -77,6 +92,7 @@ namespace graphene { namespace chain {
    FC_DECLARE_DERIVED_EXCEPTION( undo_database_exception,           graphene::chain::chain_exception, 3070000, "undo database exception" )
    FC_DECLARE_DERIVED_EXCEPTION( unlinkable_block_exception,        graphene::chain::chain_exception, 3080000, "unlinkable block" )
    FC_DECLARE_DERIVED_EXCEPTION( black_swan_exception,              graphene::chain::chain_exception, 3090000, "black swan" )
+   FC_DECLARE_DERIVED_EXCEPTION( plugin_exception,                  graphene::chain::chain_exception, 3100000, "plugin exception" )
 
    FC_DECLARE_DERIVED_EXCEPTION( tx_missing_active_auth,            graphene::chain::transaction_exception, 3030001, "missing required active authority" )
    FC_DECLARE_DERIVED_EXCEPTION( tx_missing_owner_auth,             graphene::chain::transaction_exception, 3030002, "missing required owner authority" )

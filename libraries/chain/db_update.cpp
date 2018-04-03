@@ -399,6 +399,7 @@ void database::clear_expired_orders()
          price settlement_price = pays / receives;
 
          // Calculate fill_price with a bigger volume to reduce impacts of rounding
+         // TODO replace the calculation with new operator*() and/or operator/()
          if( settlement_fill_price.base.asset_id != current_asset ) // only calculate once per asset
          {
             asset tmp_pays = max_settlement_volume;

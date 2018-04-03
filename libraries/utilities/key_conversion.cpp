@@ -58,7 +58,7 @@ fc::optional<fc::ecc::private_key> wif_to_key( const std::string& wif_key )
   if (wif_bytes.size() < 5)
     return fc::optional<fc::ecc::private_key>();
   std::vector<char> key_bytes(wif_bytes.begin() + 1, wif_bytes.end() - 4);
-  fc::ecc::private_key key = fc::variant(key_bytes).as<fc::ecc::private_key>();
+  fc::ecc::private_key key = fc::variant( key_bytes, 1 ).as<fc::ecc::private_key>( 1 );
   fc::sha256 check = fc::sha256::hash(wif_bytes.data(), wif_bytes.size() - 4);
   fc::sha256 check2 = fc::sha256::hash(check);
     

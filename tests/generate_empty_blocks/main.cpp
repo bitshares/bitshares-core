@@ -102,7 +102,7 @@ int main( int argc, char** argv )
          std::cerr << "embed_genesis:  Reading genesis from file " << genesis_json_filename.preferred_string() << "\n";
          std::string genesis_json;
          read_file_contents( genesis_json_filename, genesis_json );
-         genesis = fc::json::from_string( genesis_json ).as< genesis_state_type >();
+         genesis = fc::json::from_string( genesis_json ).as< genesis_state_type >(20);
       }
       else
          genesis = graphene::app::detail::create_example_genesis();
@@ -119,7 +119,6 @@ int main( int argc, char** argv )
       uint32_t num_blocks = options["num-blocks"].as<uint32_t>();
       uint32_t miss_rate = options["miss-rate"].as<uint32_t>();
 
-      fc::ecc::private_key init_account_priv_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("null_key")) );
       fc::ecc::private_key nathan_priv_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("nathan")));
 
       database db;

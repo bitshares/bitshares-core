@@ -37,6 +37,7 @@
 #include <fc/smart_ref_impl.hpp>
 
 #include <graphene/app/api.hpp>
+#include <graphene/chain/config.hpp>
 #include <graphene/chain/protocol/protocol.hpp>
 #include <graphene/egenesis/egenesis.hpp>
 #include <graphene/utilities/key_conversion.hpp>
@@ -51,6 +52,9 @@
 #include <fc/log/logger_config.hpp>
 
 #include <graphene/utilities/git_revision.hpp>
+#include <boost/version.hpp>
+#include <boost/algorithm/string/replace.hpp>
+#include <websocketpp/version.hpp>
 
 #ifdef WIN32
 # include <signal.h>
@@ -99,6 +103,9 @@ int main( int argc, char** argv )
          std::cout << "Version: " << graphene::utilities::git_revision_description << "\n";
          std::cout << "SHA: " << graphene::utilities::git_revision_sha << "\n";
          std::cout << "Timestamp: " << fc::get_approximate_relative_time_string(fc::time_point_sec(graphene::utilities::git_revision_unix_timestamp)) << "\n";
+         std::cout << "SSL: " << OPENSSL_VERSION_TEXT << "\n";
+         std::cout << "Boost: " << boost::replace_all_copy(std::string(BOOST_LIB_VERSION), "_", ".") << "\n";
+         std::cout << "Websocket++: " << websocketpp::major_version << "." << websocketpp::minor_version << "." << websocketpp::patch_version << "\n";
          return 0;
       }
 
@@ -115,16 +122,14 @@ int main( int argc, char** argv )
 
       std::cout << "Logging RPC to file: " << (data_dir / ac.filename).preferred_string() << "\n";
 
-      cfg.appenders.push_back(fc::appender_config( "default", "console", fc::variant(fc::console_appender::config())));
-      cfg.appenders.push_back(fc::appender_config( "rpc", "file", fc::variant(ac)));
+      cfg.appenders.push_back(fc::appender_config( "default", "console", fc::variant(fc::console_appender::config(), 20)));
+      cfg.appenders.push_back(fc::appender_config( "rpc", "file", fc::variant(ac, 5)));
 
       cfg.loggers = { fc::logger_config("default"), fc::logger_config( "rpc") };
       cfg.loggers.front().level = fc::log_level::info;
       cfg.loggers.front().appenders = {"default"};
       cfg.loggers.back().level = fc::log_level::debug;
       cfg.loggers.back().appenders = {"rpc"};
-
-      //fc::configure_logging( cfg );
 
       fc::ecc::private_key committee_private_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("null_key")));
 
@@ -146,7 +151,7 @@ int main( int argc, char** argv )
       fc::path wallet_file( options.count("wallet-file") ? options.at("wallet-file").as<string>() : "wallet.json");
       if( fc::exists( wallet_file ) )
       {
-         wdata = fc::json::from_file( wallet_file ).as<wallet_data>();
+         wdata = fc::json::from_file( wallet_file ).as<wallet_data>( GRAPHENE_MAX_NESTED_OBJECTS );
          if( options.count("chain-id") )
          {
             // the --chain-id on the CLI must match the chain ID embedded in the wallet file
@@ -182,12 +187,11 @@ int main( int argc, char** argv )
       fc::http::websocket_client client;
       idump((wdata.ws_server));
       auto con  = client.connect( wdata.ws_server );
-      auto apic = std::make_shared<fc::rpc::websocket_api_connection>(*con);
+      auto apic = std::make_shared<fc::rpc::websocket_api_connection>(*con, GRAPHENE_MAX_NESTED_OBJECTS);
 
       auto remote_api = apic->get_remote_api< login_api >(1);
       edump((wdata.ws_user)(wdata.ws_password) );
-      // TODO:  Error message here
-      FC_ASSERT( remote_api->login( wdata.ws_user, wdata.ws_password ) );
+      FC_ASSERT( remote_api->login( wdata.ws_user, wdata.ws_password ), "Failed to log in to API server" );
 
       auto wapiptr = std::make_shared<wallet_api>( wdata, remote_api );
       wapiptr->set_wallet_filename( wallet_file.generic_string() );
@@ -195,11 +199,11 @@ int main( int argc, char** argv )
 
       fc::api<wallet_api> wapi(wapiptr);
 
-      auto wallet_cli = std::make_shared<fc::rpc::cli>();
+      auto wallet_cli = std::make_shared<fc::rpc::cli>( GRAPHENE_MAX_NESTED_OBJECTS );
       for( auto& name_formatter : wapiptr->get_result_formatters() )
          wallet_cli->format_result( name_formatter.first, name_formatter.second );
 
-      boost::signals2::scoped_connection closed_connection(con->closed.connect([=]{
+      boost::signals2::scoped_connection closed_connection(con->closed.connect([wallet_cli]{
          cerr << "Server has disconnected us.\n";
          wallet_cli->stop();
       }));
@@ -219,8 +223,8 @@ int main( int argc, char** argv )
       auto _websocket_server = std::make_shared<fc::http::websocket_server>();
       if( options.count("rpc-endpoint") )
       {
-         _websocket_server->on_connection([&]( const fc::http::websocket_connection_ptr& c ){
-            auto wsc = std::make_shared<fc::rpc::websocket_api_connection>(*c);
+         _websocket_server->on_connection([&wapi]( const fc::http::websocket_connection_ptr& c ){
+            auto wsc = std::make_shared<fc::rpc::websocket_api_connection>(*c, GRAPHENE_MAX_NESTED_OBJECTS);
             wsc->register_api(wapi);
             c->set_session_data( wsc );
          });
@@ -236,8 +240,8 @@ int main( int argc, char** argv )
       auto _websocket_tls_server = std::make_shared<fc::http::websocket_tls_server>(cert_pem);
       if( options.count("rpc-tls-endpoint") )
       {
-         _websocket_tls_server->on_connection([&]( const fc::http::websocket_connection_ptr& c ){
-            auto wsc = std::make_shared<fc::rpc::websocket_api_connection>(*c);
+         _websocket_tls_server->on_connection([&wapi]( const fc::http::websocket_connection_ptr& c ){
+            auto wsc = std::make_shared<fc::rpc::websocket_api_connection>(*c, GRAPHENE_MAX_NESTED_OBJECTS);
             wsc->register_api(wapi);
             c->set_session_data( wsc );
          });
@@ -255,10 +259,10 @@ int main( int argc, char** argv )
          // due to implementation, on_request() must come AFTER listen()
          //
          _http_server->on_request(
-            [&]( const fc::http::request& req, const fc::http::server::response& resp )
+            [&wapi]( const fc::http::request& req, const fc::http::server::response& resp )
             {
                std::shared_ptr< fc::rpc::http_api_connection > conn =
-                  std::make_shared< fc::rpc::http_api_connection>();
+                  std::make_shared< fc::rpc::http_api_connection >( GRAPHENE_MAX_NESTED_OBJECTS );
                conn->register_api( wapi );
                conn->on_request( req, resp );
             } );
