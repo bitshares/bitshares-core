@@ -87,7 +87,6 @@ namespace fc {
 
 namespace graphene { namespace wallet {
 
-
 namespace detail {
 
 struct operation_result_printer
