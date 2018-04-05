@@ -435,6 +435,16 @@ void database::clear_expired_orders()
                   break;
                }
                settled += new_settled;
+               // before hard fork core-342, if new_settled > 0, we'll have:
+               // * call order is completely filled (thus itr will change in next loop), or
+               // * settle order is completely filled (thus find_object(order_id) will be false so will break out), or
+               // * reached max_settlement_volume limit (thus new_settled == max_settlement so will break out).
+               //
+               // after hard fork core-342, if new_settled > 0, we'll have:
+               // * call order is completely filled (thus itr will change in next loop), or
+               // * settle order is completely filled (thus find_object(order_id) will be false so will break out), or
+               // * reached max_settlement_volume limit, but it's possible that new_settled < max_settlement,
+               //   in this case, new_settled will be zero in next iteration of the loop, so no need to check here.
             } 
             catch ( const black_swan_exception& e ) { 
                wlog( "black swan detected: ${e}", ("e", e.to_detail_string() ) );

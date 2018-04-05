@@ -646,16 +646,21 @@ asset database::match( const call_order_object& call,
    FC_ASSERT(call.get_debt().asset_id == settle.balance.asset_id );
    FC_ASSERT(call.debt > 0 && call.collateral > 0 && settle.balance.amount > 0);
 
+   auto maint_time = get_dynamic_global_properties().next_maintenance_time;
+   bool before_core_hardfork_342 = ( maint_time <= HARDFORK_CORE_342_TIME ); // better rounding
+
    auto settle_for_sale = std::min(settle.balance, max_settlement);
    auto call_debt = call.get_debt();
 
    asset call_receives   = std::min(settle_for_sale, call_debt);
-   asset call_pays       = call_receives * match_price; // round down here, in favor of call order
+   asset call_pays       = call_receives * match_price; // round down here, in favor of call order, for first check
+                                                        // TODO possible optimization: check need to round up or down first
 
    // Be here, the call order may be paying nothing.
+   bool cull_settle_order = false; // whether need to cancel dust settle order
    if( call_pays.amount == 0 )
    {
-      if( get_dynamic_global_properties().next_maintenance_time > HARDFORK_CORE_184_TIME )
+      if( maint_time > HARDFORK_CORE_184_TIME )
       {
          if( call_receives == call_debt ) // the call order is smaller than or equal to the settle order
          {
@@ -677,6 +682,33 @@ asset database::match( const call_order_object& call,
       else // TODO remove this warning after hard fork core-184
          wlog( "Something for nothing issue (#184, variant C) occurred at block #${block}", ("block",head_block_num()) );
    }
+   else // the call order is not paying nothing, but still possible it's paying more than minimum required due to rounding
+   {
+      if( !before_core_hardfork_342 )
+      {
+         if( call_receives == call_debt ) // the call order is smaller than or equal to the settle order
+         {
+            call_pays = call_receives ^ match_price; // round up here, in favor of settle order
+            // be here, we should have: call_pays <= call_collateral
+         }
+         else
+         {
+            // be here, call_pays has been rounded down
+
+            // be here, we should have: call_pays <= call_collateral
+
+            if( call_receives == settle.balance ) // the settle order will be completely filled, assuming we need to cull it
+               cull_settle_order = true;
+            // else do nothing, since we can't cull the settle order
+
+            call_receives = call_pays ^ match_price; // round up here to mitigate rouding issue (core-342)
+
+            if( call_receives == settle.balance ) // the settle order will be completely filled, no need to cull
+               cull_settle_order = false;
+            // else do nothing, since we still need to cull the settle order or still can't cull the settle order
+         }
+      }
+   }
 
    asset settle_pays     = call_receives;
    asset settle_receives = call_pays;
@@ -688,12 +720,22 @@ asset database::match( const call_order_object& call,
     *  can trigger a black swan.  So now we must cancel the forced settlement
     *  object.
     */
-   GRAPHENE_ASSERT( call_pays < call.get_collateral(), black_swan_exception, "" );
+   if( before_core_hardfork_342 )
+   {
+      auto call_collateral = call.get_collateral();
+      if( call_pays == call_collateral )
+         wlog( "Incorrectly captured black swan event at block #${block}", ("block",head_block_num()) );
+      GRAPHENE_ASSERT( call_pays < call_collateral, black_swan_exception, "" );
 
-   assert( settle_pays == settle_for_sale || call_receives == call.get_debt() );
+      assert( settle_pays == settle_for_sale || call_receives == call.get_debt() );
+   }
+   // else do nothing, since black swan event won't happen, and the assertion is no longer true
 
    fill_call_order( call, call_pays, call_receives, fill_price, true ); // call order is maker
    fill_settle_order( settle, settle_pays, settle_receives, fill_price, false ); // force settlement order is taker
+
+   if( cull_settle_order )
+      cancel_settle_order( settle );
 
    return call_receives;
 } FC_CAPTURE_AND_RETHROW( (call)(settle)(match_price)(max_settlement) ) }
