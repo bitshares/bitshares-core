@@ -331,9 +331,12 @@ static void get_relevant_accounts( const object* obj, flat_set<account_id_type>&
               break;
            } case impl_block_summary_object_type:
               break;
-             case impl_account_transaction_history_object_type:
+             case impl_account_transaction_history_object_type: {
+              const auto& aobj = dynamic_cast<const account_transaction_history_object*>(obj);
+              assert( aobj != nullptr );
+              accounts.insert( aobj->account );
               break;
-             case impl_chain_property_object_type:
+           } case impl_chain_property_object_type:
               break;
              case impl_witness_schedule_object_type:
               break;
