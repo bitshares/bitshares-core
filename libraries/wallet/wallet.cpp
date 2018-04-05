@@ -59,6 +59,7 @@
 #include <fc/crypto/hex.hpp>
 #include <fc/thread/mutex.hpp>
 #include <fc/thread/scoped_lock.hpp>
+#include <fc/rpc/api_connection.hpp>
 
 #include <graphene/app/api.hpp>
 #include <graphene/chain/asset_object.hpp>
@@ -77,9 +78,15 @@
 # include <sys/stat.h>
 #endif
 
+// explicit instantiation for later use
+namespace fc {
+	template class api<graphene::wallet::wallet_api, identity_member>;
+}
+
 #define BRAIN_KEY_WORD_COUNT 16
 
 namespace graphene { namespace wallet {
+
 
 namespace detail {
 
