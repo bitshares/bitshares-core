@@ -242,6 +242,49 @@ BOOST_AUTO_TEST_CASE( price_test )
     BOOST_CHECK( less_than_max2 * ratio_type(1,1) == less_than_max2 );
     BOOST_CHECK( less_than_max2 * ratio_type(5,2) == price(asset(less_than_max2.base.amount*5/2/7),asset(1,asset_id_type(1))) );
 
+    BOOST_CHECK( ( asset(1) * price( asset(1), asset(1, asset_id_type(1)) ) ) == asset(1, asset_id_type(1)) );
+    BOOST_CHECK( ( asset(1) * price( asset(1, asset_id_type(1)), asset(1) ) ) == asset(1, asset_id_type(1)) );
+    BOOST_CHECK( ( asset(1, asset_id_type(1)) * price( asset(1), asset(1, asset_id_type(1)) ) ) == asset(1) );
+    BOOST_CHECK( ( asset(1, asset_id_type(1)) * price( asset(1, asset_id_type(1)), asset(1) ) ) == asset(1) );
+
+    BOOST_CHECK( ( asset(3) * price( asset(3), asset(5, asset_id_type(1)) ) ) == asset(5, asset_id_type(1)) ); // round_down(3*5/3)
+    BOOST_CHECK( ( asset(5) * price( asset(2, asset_id_type(1)), asset(7) ) ) == asset(1, asset_id_type(1)) ); // round_down(5*2/7)
+    BOOST_CHECK( ( asset(7, asset_id_type(1)) * price( asset(2), asset(3, asset_id_type(1)) ) ) == asset(4) ); // round_down(7*2/3)
+    BOOST_CHECK( ( asset(9, asset_id_type(1)) * price( asset(8, asset_id_type(1)), asset(7) ) ) == asset(7) ); // round_down(9*7/8)
+
+    // asset and price doesn't match
+    BOOST_CHECK_THROW( asset(1) * price( asset(1, asset_id_type(2)), asset(1, asset_id_type(1)) ), fc::assert_exception );
+    // divide by zero
+    BOOST_CHECK_THROW( asset(1) * price( asset(0), asset(1, asset_id_type(1)) ), fc::assert_exception );
+    BOOST_CHECK_THROW( asset(1) * price( asset(1, asset_id_type(1)), asset(0) ), fc::assert_exception );
+    // overflow
+    BOOST_CHECK_THROW( asset(GRAPHENE_MAX_SHARE_SUPPLY/2+1) * price( asset(1), asset(2, asset_id_type(1)) ), fc::assert_exception );
+    BOOST_CHECK_THROW( asset(2) * price( asset(GRAPHENE_MAX_SHARE_SUPPLY/2+1, asset_id_type(1)), asset(1) ), fc::assert_exception );
+
+    // Note: `==` executes before `^`, so need `( a ^ b ) == c`
+    BOOST_CHECK( ( asset(1) ^ price( asset(1), asset(1, asset_id_type(1)) ) ) == asset(1, asset_id_type(1)) );
+    BOOST_CHECK( ( asset(1) ^ price( asset(1, asset_id_type(1)), asset(1) ) ) == asset(1, asset_id_type(1)) );
+    BOOST_CHECK( ( asset(1, asset_id_type(1)) ^ price( asset(1), asset(1, asset_id_type(1)) ) ) == asset(1) );
+    BOOST_CHECK( ( asset(1, asset_id_type(1)) ^ price( asset(1, asset_id_type(1)), asset(1) ) ) == asset(1) );
+
+    BOOST_CHECK( ( asset(3) ^ price( asset(3), asset(5, asset_id_type(1)) ) ) == asset(5, asset_id_type(1)) ); // round_up(3*5/3)
+    BOOST_CHECK( ( asset(5) ^ price( asset(2, asset_id_type(1)), asset(7) ) ) == asset(2, asset_id_type(1)) ); // round_up(5*2/7)
+    BOOST_CHECK( ( asset(7, asset_id_type(1)) ^ price( asset(2), asset(3, asset_id_type(1)) ) ) == asset(5) ); // round_up(7*2/3)
+    BOOST_CHECK( ( asset(9, asset_id_type(1)) ^ price( asset(8, asset_id_type(1)), asset(7) ) ) == asset(8) ); // round_up(9*7/8)
+
+    // asset and price doesn't match
+    BOOST_CHECK_THROW( asset(1, asset_id_type(3)) ^ price( asset(1, asset_id_type(2)), asset(1) ), fc::assert_exception );
+    // divide by zero
+    BOOST_CHECK_THROW( asset(1) ^ price( asset(0), asset(1, asset_id_type(1)) ), fc::assert_exception );
+    BOOST_CHECK_THROW( asset(1) ^ price( asset(1, asset_id_type(1)), asset(0) ), fc::assert_exception );
+    // overflow
+    BOOST_CHECK_THROW( asset(GRAPHENE_MAX_SHARE_SUPPLY/2+1) ^ price( asset(1), asset(2, asset_id_type(1)) ), fc::assert_exception );
+    BOOST_CHECK_THROW( asset(2) ^ price( asset(GRAPHENE_MAX_SHARE_SUPPLY/2+1, asset_id_type(1)), asset(1) ), fc::assert_exception );
+
+    // checks that operator^() executes before operator=()
+    auto x = asset(3) ^ price( asset(6), asset(10, asset_id_type(1)) );
+    BOOST_CHECK( x == asset(5, asset_id_type(1)) );
+
     price_feed dummy;
     dummy.maintenance_collateral_ratio = 1002;
     dummy.maximum_short_squeeze_ratio = 1234;

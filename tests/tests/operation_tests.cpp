@@ -547,11 +547,8 @@ BOOST_AUTO_TEST_CASE( more_call_order_update_test_after_hardfork_583 )
       BOOST_TEST_MESSAGE( "dan borrow 2500 more usd wth 5002 more core should not be allowed..." );
       GRAPHENE_REQUIRE_THROW( borrow( dan, bitusd.amount(2500), core.amount(5002)  ), fc::exception );
 
-      BOOST_TEST_MESSAGE( "dan borrow 2500 more usd wth 5003 more core should be allowed..." );
-      borrow( dan, bitusd.amount(2500), asset(5003));
-      BOOST_REQUIRE_EQUAL( get_balance( dan, bitusd ), 5000 );
-      BOOST_REQUIRE_EQUAL( get_balance( dan, core ), 10000000 - 10000 + 4999 - 1 - 5003 );
-
+      BOOST_TEST_MESSAGE( "dan borrow 2500 more usd wth 5003 more core should not be allowed..." );
+      GRAPHENE_REQUIRE_THROW( borrow( dan, bitusd.amount(2500), asset(5003) ), fc::exception );
 
    } catch (fc::exception& e) {
       edump((e.to_detail_string()));
@@ -1650,6 +1647,7 @@ BOOST_AUTO_TEST_CASE( witness_feeds )
 /**
  *  Create an order such that when the trade executes at the
  *  requested price the resulting payout to one party is 0
+ *  ( Reproduces https://github.com/bitshares/bitshares-core/issues/184 )
  */
 BOOST_AUTO_TEST_CASE( trade_amount_equals_zero )
 {
@@ -1682,26 +1680,69 @@ BOOST_AUTO_TEST_CASE( trade_amount_equals_zero )
       BOOST_CHECK_EQUAL(get_balance(core_seller, test), 3);
 
       generate_block();
-      fc::usleep(fc::milliseconds(1000));
 
-       //TODO: This will fail because of something-for-nothing bug(#345)
-       // Must be fixed with a hardfork
-/**
-*  TODO: Remove this comment block when #345 is resolved.
-*  Added comment block to allow Travis-CI to pass by ignoring this test
-*      auto result = get_market_order_history(core_id, test_id);
-*      BOOST_CHECK_EQUAL(result.size(), 2);
-*      BOOST_CHECK(result[0].op.pays == core.amount(1));
-*      BOOST_CHECK(result[0].op.receives == test.amount(2));
-*      BOOST_CHECK(result[1].op.pays == test.amount(2));
-*      BOOST_CHECK(result[1].op.receives == core.amount(1));
-*/
+      auto result = get_market_order_history(core_id, test_id);
+      BOOST_CHECK_EQUAL(result.size(), 4);
+      BOOST_CHECK(result[0].op.pays == core.amount(0));
+      BOOST_CHECK(result[0].op.receives == test.amount(1));
+      BOOST_CHECK(result[1].op.pays == test.amount(1));
+      BOOST_CHECK(result[1].op.receives == core.amount(0));
+      BOOST_CHECK(result[2].op.pays == core.amount(1));
+      BOOST_CHECK(result[2].op.receives == test.amount(2));
+      BOOST_CHECK(result[3].op.pays == test.amount(2));
+      BOOST_CHECK(result[3].op.receives == core.amount(1));
    } catch( const fc::exception& e) {
       edump((e.to_detail_string()));
       throw;
    }
 }
 
+/**
+ *  The something-for-nothing bug should be fixed https://github.com/bitshares/bitshares-core/issues/184
+ */
+BOOST_AUTO_TEST_CASE( trade_amount_equals_zero_after_hf_184 )
+{
+   try {
+      INVOKE(issue_uia);
+      generate_blocks( HARDFORK_CORE_184_TIME );
+      set_expiration( db, trx );
+
+      const asset_object& test = get_asset( UIA_TEST_SYMBOL );
+      const asset_id_type test_id = test.id;
+      const asset_object& core = get_asset( GRAPHENE_SYMBOL );
+      const asset_id_type core_id = core.id;
+      const account_object& core_seller = create_account( "shorter1" );
+      const account_object& core_buyer = get_account("nathan");
+
+      transfer( committee_account(db), core_seller, asset( 100000000 ) );
+
+      BOOST_CHECK_EQUAL(get_balance(core_buyer, core), 0);
+      BOOST_CHECK_EQUAL(get_balance(core_buyer, test), 10000000);
+      BOOST_CHECK_EQUAL(get_balance(core_seller, test), 0);
+      BOOST_CHECK_EQUAL(get_balance(core_seller, core), 100000000);
+
+      create_sell_order(core_seller, core.amount(1), test.amount(2));
+      create_sell_order(core_seller, core.amount(1), test.amount(2));
+      create_sell_order(core_buyer, test.amount(3), core.amount(1));
+
+      BOOST_CHECK_EQUAL(get_balance(core_buyer, core), 1);
+      BOOST_CHECK_EQUAL(get_balance(core_buyer, test), 9999998);
+      BOOST_CHECK_EQUAL(get_balance(core_seller, core), 99999998);
+      BOOST_CHECK_EQUAL(get_balance(core_seller, test), 2);
+
+      generate_block();
+
+      auto result = get_market_order_history(core_id, test_id);
+      BOOST_CHECK_EQUAL(result.size(), 2);
+      BOOST_CHECK(result[0].op.pays == core.amount(1));
+      BOOST_CHECK(result[0].op.receives == test.amount(2));
+      BOOST_CHECK(result[1].op.pays == test.amount(2));
+      BOOST_CHECK(result[1].op.receives == core.amount(1));
+   } catch( const fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
 
 /**
  *  Create an order that cannot be filled immediately and have the

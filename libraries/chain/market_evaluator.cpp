@@ -111,7 +111,11 @@ object_id_type limit_order_create_evaluator::do_apply(const limit_order_create_o
        obj.deferred_paid_fee = _deferred_paid_fee;
    });
    limit_order_id_type order_id = new_order_object.id; // save this because we may remove the object by filling it
-   bool filled = db().apply_order(new_order_object);
+   bool filled;
+   if( db().get_dynamic_global_properties().next_maintenance_time <= HARDFORK_CORE_625_TIME )
+      filled = db().apply_order_before_hardfork_625( new_order_object );
+   else
+      filled = db().apply_order( new_order_object );
 
    FC_ASSERT( !op.fill_or_kill || filled );
 
@@ -138,10 +142,13 @@ asset limit_order_cancel_evaluator::do_apply(const limit_order_cancel_operation&
 
    d.cancel_limit_order(*_order, false /* don't create a virtual op*/);
 
-   // Possible optimization: order can be called by canceling a limit order iff the canceled order was at the top of the book.
-   // Do I need to check calls in both assets?
-   d.check_call_orders(base_asset(d));
-   d.check_call_orders(quote_asset(d));
+   if( d.get_dynamic_global_properties().next_maintenance_time <= HARDFORK_CORE_606_TIME )
+   {
+      // Possible optimization: order can be called by canceling a limit order iff the canceled order was at the top of the book.
+      // Do I need to check calls in both assets?
+      d.check_call_orders(base_asset(d));
+      d.check_call_orders(quote_asset(d));
+   }
 
    return refunded;
 } FC_CAPTURE_AND_RETHROW( (o) ) }
@@ -213,6 +220,7 @@ void_result call_order_update_evaluator::do_apply(const call_order_update_operat
    const call_order_object* call_obj = nullptr;
 
    optional<price> old_collateralization;
+   optional<share_type> old_debt;
 
    if( itr == call_idx.end() )
    {
@@ -232,6 +240,7 @@ void_result call_order_update_evaluator::do_apply(const call_order_update_operat
    {
       call_obj = &*itr;
       old_collateralization = call_obj->collateralization();
+      old_debt = call_obj->debt;
 
       d.modify( *call_obj, [&]( call_order_object& call ){
           call.collateral += o.delta_collateral.amount;
@@ -244,8 +253,7 @@ void_result call_order_update_evaluator::do_apply(const call_order_update_operat
       });
    }
 
-   auto debt = call_obj->get_debt();
-   if( debt.amount == 0 )
+   if( call_obj->debt == 0 )
    {
       FC_ASSERT( call_obj->collateral == 0 );
       d.remove( *call_obj );
@@ -295,19 +303,22 @@ void_result call_order_update_evaluator::do_apply(const call_order_update_operat
                ("a", ~call_obj->call_price )("b", _bitasset_data->current_feed.settlement_price)
                );
          }
-         else // after hard fork, always allow call order to be updated if collateral ratio is increased
+         else // after hard fork, always allow call order to be updated if collateral ratio is increased and debt is not increased
          {
             // We didn't fill any call orders.  This may be because we
             // aren't in margin call territory, or it may be because there
             // were no matching orders. In the latter case,
-            // if collateral ratio is not increased, we throw.
+            // if collateral ratio is not increased or debt is increased, we throw.
             // be here, we know no margin call was executed,
             // so call_obj's collateral ratio should be set only by op
-            FC_ASSERT( ( old_collateralization.valid() && call_obj->collateralization() > *old_collateralization )
+            FC_ASSERT( ( old_collateralization.valid() && call_obj->debt <= *old_debt
+                                                       && call_obj->collateralization() > *old_collateralization )
                        || ~call_obj->call_price < _bitasset_data->current_feed.settlement_price,
-               "Can only update to higher collateral ratio if it would trigger a margin call that cannot be fully filled",
+               "Can only increase collateral ratio without increasing debt if would trigger a margin call that cannot be fully filled",
                ("new_call_price", ~call_obj->call_price )
                ("settlement_price", _bitasset_data->current_feed.settlement_price)
+               ("old_debt", old_debt)
+               ("new_debt", call_obj->debt)
                ("old_collateralization", old_collateralization)
                ("new_collateralization", call_obj->collateralization() )
                );

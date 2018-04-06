@@ -508,33 +508,54 @@ void_result asset_settle_evaluator::do_evaluate(const asset_settle_evaluator::op
 operation_result asset_settle_evaluator::do_apply(const asset_settle_evaluator::operation_type& op)
 { try {
    database& d = db();
-   d.adjust_balance(op.account, -op.amount);
 
    const auto& bitasset = asset_to_settle->bitasset_data(d);
    if( bitasset.has_settlement() )
    {
       const auto& mia_dyn = asset_to_settle->dynamic_asset_data_id(d);
 
-      auto settled_amount = op.amount * bitasset.settlement_price;
+      auto settled_amount = op.amount * bitasset.settlement_price; // round down, in favor of global settlement fund
       if( op.amount.amount == mia_dyn.current_supply )
          settled_amount.amount = bitasset.settlement_fund; // avoid rounding problems
       else
          FC_ASSERT( settled_amount.amount <= bitasset.settlement_fund ); // should be strictly < except for PM with zero outcome
 
-      d.modify( bitasset, [&]( asset_bitasset_data_object& obj ){
-                obj.settlement_fund -= settled_amount.amount;
-                });
+      if( settled_amount.amount == 0 && !bitasset.is_prediction_market )
+      {
+         if( d.get_dynamic_global_properties().next_maintenance_time > HARDFORK_CORE_184_TIME )
+            FC_THROW( "Settle amount is too small to receive anything due to rounding" );
+         else // TODO remove this warning after hard fork core-184
+            wlog( "Something for nothing issue (#184, variant F) occurred at block #${block}", ("block",d.head_block_num()) );
+      }
 
-      d.adjust_balance(op.account, settled_amount);
+      asset pays = op.amount;
+      if( op.amount.amount != mia_dyn.current_supply
+            && settled_amount.amount != 0
+            && d.get_dynamic_global_properties().next_maintenance_time > HARDFORK_CORE_342_TIME )
+      {
+         pays = settled_amount ^ bitasset.settlement_price;
+      }
+
+      d.adjust_balance( op.account, -pays );
+
+      if( settled_amount.amount > 0 )
+      {
+         d.modify( bitasset, [&]( asset_bitasset_data_object& obj ){
+            obj.settlement_fund -= settled_amount.amount;
+         });
+
+         d.adjust_balance( op.account, settled_amount );
+      }
 
       d.modify( mia_dyn, [&]( asset_dynamic_data_object& obj ){
-                obj.current_supply -= op.amount.amount;
-                });
+         obj.current_supply -= pays.amount;
+      });
 
       return settled_amount;
    }
    else
    {
+      d.adjust_balance( op.account, -op.amount );
       return d.create<force_settlement_object>([&](force_settlement_object& s) {
          s.owner = op.account;
          s.balance = op.amount;
