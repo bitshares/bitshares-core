@@ -970,7 +970,8 @@ bool database::check_call_orders(const asset_object& mia, bool enable_black_swan
 
        if( usd_to_buy * match_price > call_itr->get_collateral() )
        {
-          elog( "black swan detected" ); 
+          elog( "black swan detected on asset ${symbol} (${id}) at block ${b}",
+                ("id",mia.id)("symbol",mia.symbol)("b",head_block_num()) );
           edump((enable_black_swan));
           FC_ASSERT( enable_black_swan );
           globally_settle_asset(mia, bitasset.current_feed.settlement_price );

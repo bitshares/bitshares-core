@@ -245,15 +245,17 @@ bool database::check_for_blackswan( const asset_object& mia, bool enable_black_s
     if( ~least_collateral >= highest  ) 
     {
        wdump( (*call_itr) );
-       elog( "Black Swan detected: \n"
+       elog( "Black Swan detected on asset ${symbol} (${id}) at block ${b}: \n"
              "   Least collateralized call: ${lc}  ${~lc}\n"
            //  "   Highest Bid:               ${hb}  ${~hb}\n"
              "   Settle Price:              ${~sp}  ${sp}\n"
              "   Max:                       ${~h}   ${h}\n",
+            ("id",mia.id)("symbol",mia.symbol)("b",head_block_num())
             ("lc",least_collateral.to_real())("~lc",(~least_collateral).to_real())
           //  ("hb",limit_itr->sell_price.to_real())("~hb",(~limit_itr->sell_price).to_real())
             ("sp",settle_price.to_real())("~sp",(~settle_price).to_real())
             ("h",highest.to_real())("~h",(~highest).to_real()) );
+       edump((enable_black_swan));
        FC_ASSERT( enable_black_swan, "Black swan was detected during a margin update which is not allowed to trigger a blackswan" );
        if( maint_time > HARDFORK_CORE_338_TIME && ~least_collateral <= settle_price )
           // global settle at feed price if possible
@@ -447,7 +449,8 @@ void database::clear_expired_orders()
                //   in this case, new_settled will be zero in next iteration of the loop, so no need to check here.
             } 
             catch ( const black_swan_exception& e ) { 
-               wlog( "black swan detected: ${e}", ("e", e.to_detail_string() ) );
+               wlog( "Cancelling a settle_order since it may trigger a black swan: ${o}, ${e}",
+                     ("o", order)("e", e.to_detail_string()) );
                cancel_settle_order( order );
                break;
             }
