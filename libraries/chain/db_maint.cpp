@@ -923,11 +923,26 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
    });
 
    // Reset all BitAsset force settlement volumes to zero
+
    for( const auto& d : get_index_type<asset_bitasset_data_index>().indices() )
    {
-      modify( d, [](asset_bitasset_data_object& o) { o.force_settled_volume = 0; });
+      modify( d, [this](asset_bitasset_data_object& o) {
+         o.force_settled_volume = 0;
+
+         // Remove all expired feeds
+         for( auto itr = o.feeds.begin(); itr != o.feeds.end();)
+         {
+            auto feed_time = itr[1].second.first;
+            if( feed_time + (o.options.feed_lifetime_sec) < head_block_time() && o.feeds.size() > o.options.minimum_feeds)
+               itr = o.feeds.erase(itr);
+            else
+               ++itr;
+         }
+         //o.update_median_feeds(head_block_time());
+      });
       if( d.has_settlement() )
          process_bids(d);
+
    }
 
    // process_budget needs to run at the bottom because
