@@ -885,11 +885,8 @@ bool database::check_call_orders(const asset_object& mia, bool enable_black_swan
        }
        // when for_new_limit_order is true, the limit order is taker, otherwise the limit order is maker
        bool really_filled = fill_limit_order(*old_limit_itr, order_pays, order_receives, true, match_price, !for_new_limit_order );
-       if( !filled_limit && really_filled )
-       {
-          wlog( "Cull_small issue occurred at block #${block}", ("block",head_block_num()) );
+       if( really_filled )
           limit_itr = next_limit_itr;
-       }
 
     } // whlie call_itr != call_end
 
