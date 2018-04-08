@@ -14,6 +14,7 @@
 #include <graphene/chain/operation_history_object.hpp>
 #include <graphene/chain/vesting_balance_object.hpp>
 #include <graphene/chain/transaction_object.hpp>
+#include <graphene/chain/escrow_object.hpp>
 
 using namespace fc;
 using namespace graphene::chain;
@@ -202,6 +203,26 @@ struct get_impacted_account_visitor
    {
       _impacted.insert( op.account_id );
    }
+
+   void operator()( const escrow_transfer_operation& op )
+   {
+      _impacted.insert( op.from );
+      _impacted.insert( op.to );
+      _impacted.insert( op.agent );
+   }
+   void operator()( const escrow_dispute_operation& op )
+   {
+      _impacted.insert( op.from );
+      _impacted.insert( op.to );
+      _impacted.insert( op.who );
+   }
+   void operator()( const escrow_release_operation& op )
+   {
+      _impacted.insert( op.from );
+      _impacted.insert( op.to );
+      _impacted.insert( op.who );
+   }
+
 
 };
 
