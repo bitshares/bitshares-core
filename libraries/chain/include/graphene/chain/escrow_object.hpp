@@ -49,9 +49,9 @@ namespace graphene { namespace chain {
             static const uint8_t type_id  = impl_escrow_object_type;
 
             uint32_t       escrow_id;
-            string         from;
-            string         to;
-            string         agent;
+            account_id_type         from;
+            account_id_type         to;
+            account_id_type         agent;
             time_point_sec expiration;
             asset          balance;
             bool           disputed = false;
@@ -66,19 +66,19 @@ namespace graphene { namespace chain {
             ordered_unique< tag< by_id >, member< object, object_id_type, &object::id > >,
       ordered_unique< tag< by_from_id >,
       composite_key< escrow_object,
-            member< escrow_object, string,  &escrow_object::from >,
+            member< escrow_object, account_id_type,  &escrow_object::from >,
       member< escrow_object, uint32_t, &escrow_object::escrow_id >
       >
       >,
       ordered_unique< tag< by_to >,
       composite_key< escrow_object,
-            member< escrow_object, string,  &escrow_object::to >,
+            member< escrow_object, account_id_type,  &escrow_object::to >,
       member< object, object_id_type, &object::id >
       >
       >,
       ordered_unique< tag< by_agent >,
       composite_key< escrow_object,
-            member< escrow_object, string,  &escrow_object::agent >,
+            member< escrow_object, account_id_type,  &escrow_object::agent >,
       member< object, object_id_type, &object::id >
       >
       >
