@@ -125,12 +125,20 @@ class call_order_object : public abstract_object<call_order_object>
       share_type       debt;        ///< call_price.quote.asset_id, access via get_debt
       price            call_price;  ///< Collateral / Debt
 
+      optional<uint16_t> target_collateral_ratio; ///< maximum CR to maintain when selling collateral on margin call
+
       pair<asset_id_type,asset_id_type> get_market()const
       {
          auto tmp = std::make_pair( call_price.base.asset_id, call_price.quote.asset_id );
          if( tmp.first > tmp.second ) std::swap( tmp.first, tmp.second );
          return tmp;
       }
+
+      /// Calculate maximum quantity of collateral to sell and debt to cover to meet @ref target_collateral_ratio.
+      /// @return a pair of assets, the first item is collateral to sell, the second is debt to cover
+      pair<asset, asset> get_max_sell_receive_pair( const price& match_price,
+                                                    const price& feed_price,
+                                                    const uint16_t maintenance_collateral_ratio )const;
 };
 
 /**
@@ -259,7 +267,7 @@ FC_REFLECT_DERIVED( graphene::chain::limit_order_object,
                   )
 
 FC_REFLECT_DERIVED( graphene::chain::call_order_object, (graphene::db::object),
-                    (borrower)(collateral)(debt)(call_price) )
+                    (borrower)(collateral)(debt)(call_price)(target_collateral_ratio) )
 
 FC_REFLECT_DERIVED( graphene::chain::force_settlement_object,
                     (graphene::db::object),
