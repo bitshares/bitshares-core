@@ -111,10 +111,14 @@ namespace graphene { namespace chain {
             FC_ASSERT( e.balance >= o.amount && e.balance.asset_id == o.amount.asset_id );
             /// TODO assert o.amount > 0
 
-            if( o.who == e.from )    FC_ASSERT( o.to == e.to );
-            else if( o.who == e.to ) FC_ASSERT( o.to == e.from );
-            else {
-               FC_ASSERT( e.disputed && o.who == e.agent );
+            if( e.expiration > db().head_block_time() ) {
+               if( o.who == e.from )    FC_ASSERT( o.to == e.to );
+               else if( o.who == e.to ) FC_ASSERT( o.to == e.from );
+               else {
+                  FC_ASSERT( e.disputed && o.who == e.agent );
+               }
+               } else {
+                  FC_ASSERT( o.who == e.to || o.who == e.from );
             }
 
             db().adjust_balance( o.to, o.amount );
