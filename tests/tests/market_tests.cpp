@@ -405,7 +405,7 @@ BOOST_AUTO_TEST_CASE(hardfork_core_338_test)
 } FC_LOG_AND_RETHROW() }
 
 /***
- * Fixed bitshares-core issue #453
+ * Fixed bitshares-core issue #453: multiple limit order filling issue
  */
 BOOST_AUTO_TEST_CASE(hardfork_core_453_test)
 { try {
@@ -481,6 +481,155 @@ BOOST_AUTO_TEST_CASE(hardfork_core_453_test)
    // generate a block
    generate_block();
 
+
+} FC_LOG_AND_RETHROW() }
+
+/***
+ * Tests (big) limit order matching logic after #625 got fixed
+ */
+BOOST_AUTO_TEST_CASE(hardfork_core_625_big_limit_order_test)
+{ try {
+   auto mi = db.get_global_properties().parameters.maintenance_interval;
+   generate_blocks(HARDFORK_CORE_625_TIME - mi); // assume all hard forks occur at same time
+   generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+
+   set_expiration( db, trx );
+
+   ACTORS((buyer)(buyer2)(buyer3)(seller)(borrower)(borrower2)(borrower3)(feedproducer));
+
+   const auto& bitusd = create_bitasset("USDBIT", feedproducer_id);
+   const auto& core   = asset_id_type()(db);
+
+   int64_t init_balance(1000000);
+
+   transfer(committee_account, buyer_id, asset(init_balance));
+   transfer(committee_account, buyer2_id, asset(init_balance));
+   transfer(committee_account, buyer3_id, asset(init_balance));
+   transfer(committee_account, borrower_id, asset(init_balance));
+   transfer(committee_account, borrower2_id, asset(init_balance));
+   transfer(committee_account, borrower3_id, asset(init_balance));
+   update_feed_producers( bitusd, {feedproducer.id} );
+
+   price_feed current_feed;
+   current_feed.maintenance_collateral_ratio = 1750;
+   current_feed.maximum_short_squeeze_ratio = 1100;
+   current_feed.settlement_price = bitusd.amount( 1 ) / core.amount(5);
+   publish_feed( bitusd, feedproducer, current_feed );
+   // start out with 300% collateral, call price is 15/1.75 CORE/USD = 60/7
+   const call_order_object& call = *borrow( borrower, bitusd.amount(1000), asset(15000));
+   call_order_id_type call_id = call.id;
+   // create another position with 310% collateral, call price is 15.5/1.75 CORE/USD = 62/7
+   const call_order_object& call2 = *borrow( borrower2, bitusd.amount(1000), asset(15500));
+   call_order_id_type call2_id = call2.id;
+   // create yet another position with 500% collateral, call price is 25/1.75 CORE/USD = 100/7
+   const call_order_object& call3 = *borrow( borrower3, bitusd.amount(1000), asset(25000));
+   transfer(borrower, seller, bitusd.amount(1000));
+   transfer(borrower2, seller, bitusd.amount(1000));
+   transfer(borrower3, seller, bitusd.amount(1000));
+
+   BOOST_CHECK_EQUAL( 1000, call.debt.value );
+   BOOST_CHECK_EQUAL( 15000, call.collateral.value );
+   BOOST_CHECK_EQUAL( 1000, call2.debt.value );
+   BOOST_CHECK_EQUAL( 15500, call2.collateral.value );
+   BOOST_CHECK_EQUAL( 1000, call3.debt.value );
+   BOOST_CHECK_EQUAL( 25000, call3.collateral.value );
+   BOOST_CHECK_EQUAL( 3000, get_balance(seller, bitusd) );
+   BOOST_CHECK_EQUAL( 0, get_balance(seller, core) );
+   BOOST_CHECK_EQUAL( 3000, get_balance(seller, bitusd) );
+   BOOST_CHECK_EQUAL( init_balance - 15000, get_balance(borrower, core) );
+   BOOST_CHECK_EQUAL( init_balance - 15500, get_balance(borrower2, core) );
+   BOOST_CHECK_EQUAL( init_balance - 25000, get_balance(borrower3, core) );
+   BOOST_CHECK_EQUAL( 0, get_balance(borrower, bitusd) );
+   BOOST_CHECK_EQUAL( 0, get_balance(borrower2, bitusd) );
+   BOOST_CHECK_EQUAL( 0, get_balance(borrower3, bitusd) );
+
+   // adjust price feed to get call and call2 (but not call3) into margin call territory
+   current_feed.settlement_price = bitusd.amount( 1 ) / core.amount(10);
+   publish_feed( bitusd, feedproducer, current_feed );
+   // settlement price = 1/10, mssp = 1/11
+
+   // This sell order above MSSP will not be matched with a call
+   limit_order_id_type sell_high = create_sell_order(seller, bitusd.amount(7), core.amount(78))->id;
+   BOOST_CHECK_EQUAL( db.find<limit_order_object>( sell_high )->for_sale.value, 7 );
+
+   BOOST_CHECK_EQUAL( 2993, get_balance(seller, bitusd) );
+   BOOST_CHECK_EQUAL( 0, get_balance(seller, core) );
+
+   // This buy order is too low will not be matched with a sell order
+   limit_order_id_type buy_low = create_sell_order(buyer, asset(80), bitusd.amount(10))->id;
+   // This buy order at MSSP will be matched only if no margin call (margin call takes precedence)
+   limit_order_id_type buy_med = create_sell_order(buyer2, asset(11000), bitusd.amount(1000))->id;
+   // This buy order above MSSP will be matched with a sell order (limit order with better price takes precedence)
+   limit_order_id_type buy_high = create_sell_order(buyer3, asset(111), bitusd.amount(10))->id;
+
+   BOOST_CHECK_EQUAL( 0, get_balance(buyer, bitusd) );
+   BOOST_CHECK_EQUAL( 0, get_balance(buyer2, bitusd) );
+   BOOST_CHECK_EQUAL( 0, get_balance(buyer3, bitusd) );
+   BOOST_CHECK_EQUAL( init_balance - 80, get_balance(buyer, core) );
+   BOOST_CHECK_EQUAL( init_balance - 11000, get_balance(buyer2, core) );
+   BOOST_CHECK_EQUAL( init_balance - 111, get_balance(buyer3, core) );
+
+   // Create a big sell order slightly below the call price, will be matched with several orders
+   BOOST_CHECK( !create_sell_order(seller, bitusd.amount(700*4), core.amount(5900*4) ) );
+
+   // firstly it will match with buy_high, at buy_high's price
+   BOOST_CHECK( !db.find<limit_order_object>( buy_high ) );
+   // buy_high pays 111 CORE, receives 10 USD goes to buyer3's balance
+   BOOST_CHECK_EQUAL( 10, get_balance(buyer3, bitusd) );
+   BOOST_CHECK_EQUAL( init_balance - 111, get_balance(buyer3, core) );
+
+   // then it will match with call, at mssp: 1/11 = 1000/11000
+   BOOST_CHECK( !db.find<call_order_object>( call_id ) );
+   // call pays 11000 CORE, receives 1000 USD to cover borrower's position, remaining CORE goes to borrower's balance
+   BOOST_CHECK_EQUAL( init_balance - 11000, get_balance(borrower, core) );
+   BOOST_CHECK_EQUAL( 0, get_balance(borrower, bitusd) );
+
+   // then it will match with call2, at mssp: 1/11 = 1000/11000
+   BOOST_CHECK( !db.find<call_order_object>( call2_id ) );
+   // call2 pays 11000 CORE, receives 1000 USD to cover borrower2's position, remaining CORE goes to borrower2's balance
+   BOOST_CHECK_EQUAL( init_balance - 11000, get_balance(borrower2, core) );
+   BOOST_CHECK_EQUAL( 0, get_balance(borrower2, bitusd) );
+
+   // then it will match with buy_med, at buy_med's price. Since buy_med is too big, it's partially filled.
+   // buy_med receives the remaining USD of sell order, minus market fees, goes to buyer2's balance
+   BOOST_CHECK_EQUAL( 783, get_balance(buyer2, bitusd) ); // 700*4-10-1000-1000=790, minus 1% market fee 790*100/10000=7
+   BOOST_CHECK_EQUAL( init_balance - 11000, get_balance(buyer2, core) );
+   // buy_med pays at 1/11 = 790/8690
+   BOOST_CHECK_EQUAL( db.find<limit_order_object>( buy_med )->for_sale.value, 11000-8690 );
+
+   // call3 is not in margin call territory so won't be matched
+   BOOST_CHECK_EQUAL( 1000, call3.debt.value );
+   BOOST_CHECK_EQUAL( 25000, call3.collateral.value );
+
+   // buy_low's price is too low that won't be matched
+   BOOST_CHECK_EQUAL( db.find<limit_order_object>( buy_low )->for_sale.value, 80 );
+
+   // check seller balance
+   BOOST_CHECK_EQUAL( 193, get_balance(seller, bitusd) ); // 3000 - 7 - 700*4
+   BOOST_CHECK_EQUAL( 30801, get_balance(seller, core) ); // 111 + 11000 + 11000 + 8690
+
+   // Cancel buy_med
+   cancel_limit_order( buy_med(db) );
+   BOOST_CHECK( !db.find<limit_order_object>( buy_med ) );
+   BOOST_CHECK_EQUAL( 783, get_balance(buyer2, bitusd) );
+   BOOST_CHECK_EQUAL( init_balance - 8690, get_balance(buyer2, core) );
+
+   // Create another sell order slightly below the call price, won't fill
+   limit_order_id_type sell_med = create_sell_order( seller, bitusd.amount(7), core.amount(59) )->id;
+   BOOST_CHECK_EQUAL( db.find<limit_order_object>( sell_med )->for_sale.value, 7 );
+   // check seller balance
+   BOOST_CHECK_EQUAL( 193-7, get_balance(seller, bitusd) );
+   BOOST_CHECK_EQUAL( 30801, get_balance(seller, core) );
+
+   // call3 is not in margin call territory so won't be matched
+   BOOST_CHECK_EQUAL( 1000, call3.debt.value );
+   BOOST_CHECK_EQUAL( 25000, call3.collateral.value );
+
+   // buy_low's price is too low that won't be matched
+   BOOST_CHECK_EQUAL( db.find<limit_order_object>( buy_low )->for_sale.value, 80 );
+
+   // generate a block
+   generate_block();
 
 } FC_LOG_AND_RETHROW() }
 
@@ -1057,8 +1206,6 @@ BOOST_AUTO_TEST_CASE( check_call_order_cull_small_test )
 
    const auto& bitusd = create_bitasset("USDBIT", feedproducer_id);
    const auto& core   = asset_id_type()(db);
-   asset_id_type usd_id = bitusd.id;
-   asset_id_type core_id = core.id;
 
    int64_t init_balance(1000000);
 
@@ -1079,10 +1226,8 @@ BOOST_AUTO_TEST_CASE( check_call_order_cull_small_test )
    call_order_id_type call_id = call.id;
    // create another position with 310% collateral, call price is 15.5/175 CORE/USD = 62/700
    const call_order_object& call2 = *borrow( borrower2, bitusd.amount(100000), asset(15500));
-   call_order_id_type call2_id = call2.id;
    // create yet another position with 350% collateral, call price is 17.5/175 CORE/USD = 77/700
    const call_order_object& call3 = *borrow( borrower3, bitusd.amount(100000), asset(17500));
-   call_order_id_type call3_id = call3.id;
    transfer(borrower, seller, bitusd.amount(10));
    transfer(borrower2, seller, bitusd.amount(100000));
    transfer(borrower3, seller, bitusd.amount(100000));
