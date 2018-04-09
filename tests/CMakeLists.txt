@@ -23,7 +23,7 @@ target_link_libraries( chain_bench graphene_chain graphene_app graphene_account_
 
 file(GLOB APP_SOURCES "app/*.cpp")
 add_executable( app_test ${APP_SOURCES} )
-target_link_libraries( app_test graphene_app graphene_account_history graphene_net graphene_chain graphene_egenesis_none fc ${PLATFORM_SPECIFIC_LIBS} )
+target_link_libraries( app_test graphene_app graphene_account_history graphene_net graphene_witness graphene_chain graphene_egenesis_none fc ${PLATFORM_SPECIFIC_LIBS} )
 
 file(GLOB CLI_SOURCES "cli/*.cpp")
 add_executable( cli_test ${CLI_SOURCES} )
