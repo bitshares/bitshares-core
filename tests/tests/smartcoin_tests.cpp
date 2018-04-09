@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 oxarbitrage, and other contributors.
+ * Copyright (c) 2018 oxarbitrage, and contributors.
  *
  * The MIT License
  *
@@ -352,4 +352,99 @@ BOOST_AUTO_TEST_CASE(bsip36)
 
    } FC_LOG_AND_RETHROW()
 }
+
+BOOST_AUTO_TEST_CASE(bsip36_update_feed_producers)
+{
+   try
+   {
+      /* For MPA feeded by non witnesses feeds can always be cleaned with asset_update_feed_producers_operation */
+      /* Still, if the op is never executed, the fix after HF will delete expired not needed feeds at maint time */
+      ACTORS( (sam)(alice)(paul)(bob) );
+
+      // Create the asset
+      const asset_id_type bit_usd_id = create_bitasset("USDBIT").id;
+
+      // Update asset issuer
+      const asset_object &asset_obj = bit_usd_id(db);
+      {
+         asset_update_operation op;
+         op.asset_to_update = bit_usd_id;
+         op.issuer = asset_obj.issuer;
+         op.new_issuer = bob_id;
+         op.new_options = asset_obj.options;
+         op.new_options.flags &= ~witness_fed_asset;
+         trx.operations.push_back(op);
+         PUSH_TX(db, trx, ~0);
+         generate_block();
+         trx.clear();
+      }
+
+      // Add 3 feed producers for asset
+      {
+         asset_update_feed_producers_operation op;
+         op.asset_to_update = bit_usd_id;
+         op.issuer = bob_id;
+         op.new_feed_producers = {sam_id, alice_id, paul_id};
+         trx.operations.push_back(op);
+         sign(trx, bob_private_key);
+         PUSH_TX(db, trx);
+         generate_block();
+         trx.clear();
+      }
+
+      // Bitshares will create entiries in the field feed after feed producer
+      auto bitasset_data = bit_usd_id(db).bitasset_data(db);
+
+      BOOST_CHECK_EQUAL(bitasset_data.feeds.size(), 3);
+      auto itr = bitasset_data.feeds.begin();
+      BOOST_CHECK_EQUAL(itr[0].first.instance.value, 16);
+      BOOST_CHECK_EQUAL(itr[1].first.instance.value, 17);
+      BOOST_CHECK_EQUAL(itr[2].first.instance.value, 18);
+
+      // Removing a feed producer
+      {
+         asset_update_feed_producers_operation op;
+         op.asset_to_update = bit_usd_id;
+         op.issuer = bob_id;
+         op.new_feed_producers = {alice_id, paul_id};
+         trx.operations.push_back(op);
+         sign(trx, bob_private_key);
+         PUSH_TX(db, trx);
+         generate_block();
+         trx.clear();
+      }
+
+      // Feed for removed producer is removed
+      bitasset_data = bit_usd_id(db).bitasset_data(db);
+      BOOST_CHECK_EQUAL(bitasset_data.feeds.size(), 2);
+      itr = bitasset_data.feeds.begin();
+      BOOST_CHECK_EQUAL(itr[0].first.instance.value, 17);
+      BOOST_CHECK_EQUAL(itr[1].first.instance.value, 18);
+
+      // Feed persist after expiration
+      const auto feed_lifetime = bit_usd_id(db).bitasset_data(db).options.feed_lifetime_sec;
+      generate_blocks(db.head_block_time() + feed_lifetime + 1);
+      bitasset_data = bit_usd_id(db).bitasset_data(db);
+      itr = bitasset_data.feeds.begin();
+      BOOST_CHECK_EQUAL(bitasset_data.feeds.size(), 2);
+      BOOST_CHECK_EQUAL(itr[0].first.instance.value, 17);
+      BOOST_CHECK_EQUAL(itr[1].first.instance.value, 18);
+
+      // Advancing into HF time
+      generate_blocks(HARDFORK_CORE_518_TIME);
+
+      // Advancing to next maint
+      generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+
+      // Expired feed is deleted, only 1(min_feeds) is kept
+      bitasset_data = bit_usd_id(db).bitasset_data(db);
+      itr = bitasset_data.feeds.begin();
+
+      BOOST_CHECK_EQUAL(bitasset_data.feeds.size(), 1);
+      BOOST_CHECK_EQUAL(itr[0].first.instance.value, 18);
+
+   } FC_LOG_AND_RETHROW()
+}
+
+
 BOOST_AUTO_TEST_SUITE_END()
