@@ -249,7 +249,7 @@ bool database::check_for_blackswan( const asset_object& mia, bool enable_black_s
              "   Least collateralized call: ${lc}  ${~lc}\n"
            //  "   Highest Bid:               ${hb}  ${~hb}\n"
              "   Settle Price:              ${~sp}  ${sp}\n"
-             "   Max:                       ${~h}   ${h}\n",
+             "   Max:                       ${~h}  ${h}\n",
             ("id",mia.id)("symbol",mia.symbol)("b",head_block_num())
             ("lc",least_collateral.to_real())("~lc",(~least_collateral).to_real())
           //  ("hb",limit_itr->sell_price.to_real())("~hb",(~limit_itr->sell_price).to_real())

@@ -782,7 +782,7 @@ void update_and_match_call_orders( database& db )
       }
       if( !abd || abd->is_prediction_market ) // nothing to do with PM's; check !abd just to be safe
          continue;
-      db.modify( call_obj, [&]( call_order_object& call ) {
+      db.modify( call_obj, [abd]( call_order_object& call ) {
          call.call_price  =  price::call_price( call.get_debt(), call.get_collateral(),
                                                 abd->current_feed.maintenance_collateral_ratio );
       });
