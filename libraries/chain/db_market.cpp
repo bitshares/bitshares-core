@@ -957,6 +957,7 @@ bool database::check_call_orders(const asset_object& mia, bool enable_black_swan
     bool before_core_hardfork_343 = ( maint_time <= HARDFORK_CORE_343_TIME ); // update call_price after partially filled
     bool before_core_hardfork_453 = ( maint_time <= HARDFORK_CORE_453_TIME ); // multiple matching issue
     bool before_core_hardfork_606 = ( maint_time <= HARDFORK_CORE_606_TIME ); // feed always trigger call
+    bool before_core_hardfork_834 = ( maint_time <= HARDFORK_CORE_834_TIME ); // target collateral ratio option
 
     while( !check_for_blackswan( mia, enable_black_swan ) && call_itr != call_end )
     {
@@ -993,6 +994,15 @@ bool database::check_call_orders(const asset_object& mia, bool enable_black_swan
           FC_ASSERT( enable_black_swan );
           globally_settle_asset(mia, bitasset.current_feed.settlement_price );
           return true;
+       }
+
+       optional<pair<asset,asset>> call_max_sell_receive_pair; // (collateral, debt)
+       if( !before_core_hardfork_834 )
+       {
+          call_max_sell_receive_pair = call_itr->get_max_sell_receive_pair( match_price,
+                                                                            bitasset.current_feed.settlement_price,
+                                                                            bitasset.current_feed.maintenance_collateral_ratio );
+          usd_to_buy = call_max_sell_receive_pair->second;
        }
 
        asset call_pays, call_receives, order_pays, order_receives;
@@ -1040,7 +1050,7 @@ bool database::check_call_orders(const asset_object& mia, bool enable_black_swan
           else
              order_receives = usd_to_buy ^ match_price; // round up, in favor of limit order
 
-          filled_call    = true;
+          filled_call    = true; // this is safe, since BSIP38 (hard fork core-834) depends on BSIP31 (hard fork core-343)
 
           if( usd_to_buy == usd_for_sale )
              filled_limit = true;
