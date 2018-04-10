@@ -219,6 +219,9 @@ struct get_impacted_account_visitor
    void operator()( const escrow_transfer_operation& op ) {
       _impacted.insert( op.from );
    }
+   void operator()( const escrow_approve_operation& op ) {
+      _impacted.insert( op.from );
+   }
    void operator()( const escrow_dispute_operation& op ) {
       _impacted.insert( op.from );
    }

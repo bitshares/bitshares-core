@@ -180,6 +180,7 @@ void database::initialize_evaluators()
    register_evaluator<asset_update_issuer_evaluator>();
    register_evaluator<asset_claim_pool_evaluator>();
    register_evaluator<escrow_transfer_evaluator>();
+   register_evaluator<escrow_approve_evaluator>();
    register_evaluator<escrow_dispute_evaluator>();
    register_evaluator<escrow_release_evaluator>();
 }

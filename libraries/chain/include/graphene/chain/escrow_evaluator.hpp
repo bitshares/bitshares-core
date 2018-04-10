@@ -35,6 +35,15 @@ namespace graphene { namespace chain {
          object_id_type do_apply( const escrow_transfer_operation& o );
       };
 
+      class escrow_approve_evaluator : public evaluator<escrow_approve_evaluator>
+      {
+      public:
+         typedef escrow_approve_operation operation_type;
+
+         void_result do_evaluate( const escrow_approve_operation& o );
+         object_id_type do_apply( const escrow_approve_operation& o );
+      };
+
       class escrow_dispute_evaluator : public evaluator<escrow_dispute_evaluator>
       {
       public:

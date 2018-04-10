@@ -53,7 +53,12 @@ namespace graphene { namespace chain {
             account_id_type         to;
             account_id_type         agent;
             time_point_sec expiration;
-            asset          balance;
+            asset          amount;
+            time_point_sec ratification_deadline;
+            time_point_sec escrow_expiration;
+            asset          pending_fee;
+            bool           to_approved = false;
+            bool           agent_approved = false;
             bool           disputed = false;
       };
 
@@ -91,4 +96,4 @@ namespace graphene { namespace chain {
    } }
 
 FC_REFLECT_DERIVED( graphene::chain::escrow_object, (graphene::db::object),
-(escrow_id)(from)(to)(agent)(expiration)(balance)(disputed) );
+(escrow_id)(from)(to)(agent)(ratification_deadline)(escrow_expiration)(pending_fee)(amount)(disputed) );
