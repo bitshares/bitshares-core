@@ -33,7 +33,7 @@ RUN \
     cmake \
         -DCMAKE_BUILD_TYPE=Release \
         . && \
-    make witness_node && \
+    make witness_node cli_wallet delayed_node && \
     make install && \
     #
     # Obtain version
