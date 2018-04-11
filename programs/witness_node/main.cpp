@@ -117,7 +117,7 @@ static void load_config_file( const fc::path& config_ini_path, const bpo::option
    }
    catch (const fc::exception&)
    {
-      wlog("Error parsing logging config from config file ${config}, using default config", ("config", config_ini_path.preferred_string()));
+      FC_THROW_EXCEPTION(fc::parse_error_exception, "Error parsing logging config from config file ${config}", ("config", config_ini_path.preferred_string()));
    }
 }
 
@@ -300,8 +300,12 @@ void write_default_logging_config_to_stream(std::ostream& out)
           "stream=std_error\n\n"
           "# declare an appender named \"p2p\" that writes messages to p2p.log\n"
           "[log.file_appender.p2p]\n"
+          "# filename can be absolute or relative to this config file\n"
           "filename=logs/p2p/p2p.log\n"
-          "# filename can be absolute or relative to this config file\n\n"
+          "# Rotate log every ? minutes, if leave out default to 60\n"
+          "rotation_interval=60\n"
+          "# how long will logs be kept (in days), if leave out default to 7\n"
+          "rotation_limit=7\n\n"
           "# route any messages logged to the default logger to the \"stderr\" logger we\n"
           "# declared above, if they are info level are higher\n"
           "[logger.default]\n"
@@ -358,7 +362,8 @@ fc::optional<fc::logging_config> load_logging_config_from_ini_file(const fc::pat
             fc::path file_name = section_tree.get<std::string>("filename");
             if (file_name.is_relative())
                file_name = fc::absolute(config_ini_filename).parent_path() / file_name;
-            
+            int interval = section_tree.get_optional<int>("rotation_interval").get_value_or(60);
+            int limit = section_tree.get_optional<int>("rotation_limit").get_value_or(7);
 
             // construct a default file appender config here
             // filename will be taken from ini file, everything else hard-coded here
@@ -366,8 +371,8 @@ fc::optional<fc::logging_config> load_logging_config_from_ini_file(const fc::pat
             file_appender_config.filename = file_name;
             file_appender_config.flush = true;
             file_appender_config.rotate = true;
-            file_appender_config.rotation_interval = fc::hours(1);
-            file_appender_config.rotation_limit = fc::days(1);
+            file_appender_config.rotation_interval = fc::minutes(interval);
+            file_appender_config.rotation_limit = fc::days(limit);
             logging_config.appenders.push_back(fc::appender_config(file_appender_name, "file", fc::variant(file_appender_config, GRAPHENE_MAX_NESTED_OBJECTS)));
             found_logging_config = true;
          }
