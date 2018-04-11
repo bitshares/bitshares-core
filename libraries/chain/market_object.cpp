@@ -90,12 +90,10 @@ pair<asset, asset> call_order_object::get_max_sell_receive_pair( const price& ma
    i256 denominator = fp_coll_amt * mp_debt_amt * tcr - fp_debt_amt * mp_coll_amt * GRAPHENE_COLLATERAL_RATIO_DENOM;
    FC_ASSERT( denominator > 0 );
 
-   i256 to_cover_i256 = ( numerator + denominator - 1 ) / denominator; // aka round_up( numerator / denominator )
-   share_type to_cover_amt = static_cast< int64_t >( to_cover_i256 );
-   FC_ASSERT( to_cover_amt >= 0 );
-
-   if( to_cover_amt >= debt )
+   i256 to_cover_i256 = ( numerator / denominator ) + 1;
+   if( to_cover_i256 >= debt.value )
       return make_pair( get_collateral(), get_debt() );
+   share_type to_cover_amt = static_cast< int64_t >( to_cover_i256 );
 
    // calculate paying collateral (round up), then re-calculate amount of debt would cover (round down)
    asset to_pay = asset( to_cover_amt, debt_type() ) ^ match_price;
