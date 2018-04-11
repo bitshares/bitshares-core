@@ -16,7 +16,7 @@ RUN \
       libssl-dev \
       libncurses-dev \
       doxygen \
-      libcurl4-openssl-dev \
+      ca-certificates \
     && \
     apt-get update -y && \
     apt-get install -y fish && \
