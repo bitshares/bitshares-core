@@ -117,7 +117,7 @@ static void load_config_file( const fc::path& config_ini_path, const bpo::option
    }
    catch (const fc::exception&)
    {
-      FC_THROW_EXCEPTION(fc::parse_error_exception, "Error parsing logging config from config file ${config}", ("config", config_ini_path.preferred_string()));
+      wlog("Error parsing logging config from config file ${config}, using default config", ("config", config_ini_path.preferred_string()));
    }
 }
 
