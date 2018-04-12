@@ -51,13 +51,13 @@ pair<asset, asset> call_order_object::get_max_sell_receive_pair( const price& ma
                                                                  const price& feed_price,
                                                                  const uint16_t maintenance_collateral_ratio )const
 {
-   if( !target_collateral_ratio.valid() )
-      return make_pair( get_collateral(), get_debt() );
-
    if( call_price > feed_price ) // feed protected
       return make_pair( asset( 0, collateral_type() ), asset( 0, debt_type() ) );
 
-   uint16_t tcr = std::max( *target_collateral_ratio, maintenance_collateral_ratio );
+   if( !target_collateral_ratio.valid() ) // target cr is not set
+      return make_pair( get_collateral(), get_debt() );
+
+   uint16_t tcr = std::max( *target_collateral_ratio, maintenance_collateral_ratio ); // use mcr if target cr is too small
 
    typedef boost::multiprecision::int256_t i256;
    i256 mp_debt_amt, mp_coll_amt, fp_debt_amt, fp_coll_amt;
@@ -85,13 +85,15 @@ pair<asset, asset> call_order_object::get_max_sell_receive_pair( const price& ma
 
    i256 numerator = fp_coll_amt * mp_debt_amt * debt.value * tcr
                   - fp_debt_amt * mp_debt_amt * collateral.value * GRAPHENE_COLLATERAL_RATIO_DENOM;
-   FC_ASSERT( numerator >= 0 );
+   if( numerator < 0 ) // black swan
+      return make_pair( get_collateral(), get_debt() );
 
    i256 denominator = fp_coll_amt * mp_debt_amt * tcr - fp_debt_amt * mp_coll_amt * GRAPHENE_COLLATERAL_RATIO_DENOM;
-   FC_ASSERT( denominator > 0 );
+   if( denominator <= 0 ) // black swan
+      return make_pair( get_collateral(), get_debt() );
 
    i256 to_cover_i256 = ( numerator / denominator ) + 1;
-   if( to_cover_i256 >= debt.value )
+   if( to_cover_i256 >= debt.value ) // avoid possible overflow
       return make_pair( get_collateral(), get_debt() );
    share_type to_cover_amt = static_cast< int64_t >( to_cover_i256 );
 
@@ -99,11 +101,11 @@ pair<asset, asset> call_order_object::get_max_sell_receive_pair( const price& ma
    asset to_pay = asset( to_cover_amt, debt_type() ) ^ match_price;
    asset to_cover = to_pay * match_price;
 
-   if( to_cover.amount >= debt || to_pay.amount >= collateral )
+   if( to_cover.amount >= debt || to_pay.amount >= collateral ) // to be safe
       return make_pair( get_collateral(), get_debt() );
 
    // check collateral ratio after filled
-   if( ( get_collateral() / get_debt() ) <= ( to_pay / to_cover ) )
+   if( ( get_collateral() / get_debt() ) <= ( to_pay / to_cover ) ) // edge case: rounding up paid collateral leads to decrease in CR
       return make_pair( get_collateral(), get_debt() );
 
    return make_pair( std::move(to_pay), std::move(to_cover) );
