@@ -1412,6 +1412,7 @@ BOOST_AUTO_TEST_CASE( issue_214 )
    generate_blocks( HARDFORK_CORE_214_TIME - fc::hours(1) );
    set_expiration( db, trx );
 
+   // Bob proposes that Alice transfer 500 CORE to himself
    transfer_operation top;
    top.from = alice_id;
    top.to = bob_id;
@@ -1425,6 +1426,7 @@ BOOST_AUTO_TEST_CASE( issue_214 )
    const proposal_id_type pid1 = PUSH_TX( db, trx ).operation_results[0].get<object_id_type>();
    trx.clear();
 
+   // Bob wants to propose that Alice confirm the first proposal
    proposal_update_operation pup;
    pup.fee_paying_account = alice_id;
    pup.proposal = pid1;
@@ -1433,21 +1435,26 @@ BOOST_AUTO_TEST_CASE( issue_214 )
    pop.proposed_ops.emplace_back( pup );
    trx.operations.push_back(pop);
    sign( trx, bob_private_key );
+   // before HF_CORE_214, Bob can't do that
    BOOST_REQUIRE_THROW( PUSH_TX( db, trx ), fc::assert_exception );
    trx.signatures.clear();
 
    generate_blocks( HARDFORK_CORE_214_TIME + fc::hours(1) );
    set_expiration( db, trx );
    sign( trx, bob_private_key );
+   // after the HF it works
    const proposal_id_type pid2 = PUSH_TX( db, trx ).operation_results[0].get<object_id_type>();
    trx.clear();
 
+   // For completeness, Alice confirms Bob's second proposal
    pup.proposal = pid2;
    trx.operations.push_back(pup);
    sign( trx, alice_private_key );
    PUSH_TX( db, trx );
    trx.clear();
 
+   // Execution of the second proposal should have confirmed the first,
+   // which should have been executed by now.
    BOOST_CHECK_THROW( db.get<proposal_object>(pid1), fc::assert_exception );
    BOOST_CHECK_THROW( db.get<proposal_object>(pid2), fc::assert_exception );
    BOOST_CHECK_EQUAL( top.amount.amount.value, get_balance( bob_id, top.amount.asset_id ) );
