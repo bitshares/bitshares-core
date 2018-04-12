@@ -723,7 +723,7 @@ asset database::match( const call_order_object& call,
    if( before_core_hardfork_342 )
    {
       auto call_collateral = call.get_collateral();
-      if( call_pays == call_collateral )
+      if( call_pays == call_collateral ) // TODO remove warning after hard fork core-342
          wlog( "Incorrectly captured black swan event at block #${block}", ("block",head_block_num()) );
       GRAPHENE_ASSERT( call_pays < call_collateral, black_swan_exception, "" );
 
