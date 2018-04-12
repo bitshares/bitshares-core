@@ -362,8 +362,9 @@ fc::optional<fc::logging_config> load_logging_config_from_ini_file(const fc::pat
             fc::path file_name = section_tree.get<std::string>("filename");
             if (file_name.is_relative())
                file_name = fc::absolute(config_ini_filename).parent_path() / file_name;
+
             int interval = section_tree.get_optional<int>("rotation_interval").get_value_or(60);
-            int limit = section_tree.get_optional<int>("rotation_limit").get_value_or(7);
+            int limit = section_tree.get_optional<int>("rotation_limit").get_value_or(1);
 
             // construct a default file appender config here
             // filename will be taken from ini file, everything else hard-coded here
