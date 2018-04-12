@@ -209,12 +209,17 @@ struct database_fixture {
    void publish_feed(asset_id_type mia, account_id_type by, const price_feed& f)
    { publish_feed(mia(db), by(db), f); }
    void publish_feed(const asset_object& mia, const account_object& by, const price_feed& f);
-   const call_order_object* borrow(account_id_type who, asset what, asset collateral)
-   { return borrow(who(db), what, collateral); }
-   const call_order_object* borrow(const account_object& who, asset what, asset collateral);
-   void cover(account_id_type who, asset what, asset collateral_freed)
-   { cover(who(db), what, collateral_freed); }
-   void cover(const account_object& who, asset what, asset collateral_freed);
+
+   const call_order_object* borrow( account_id_type who, asset what, asset collateral,
+                                    optional<uint16_t> target_cr = {} )
+   { return borrow(who(db), what, collateral, target_cr); }
+   const call_order_object* borrow( const account_object& who, asset what, asset collateral,
+                                    optional<uint16_t> target_cr = {} );
+   void cover(account_id_type who, asset what, asset collateral_freed,
+                                    optional<uint16_t> target_cr = {} )
+   { cover(who(db), what, collateral_freed, target_cr); }
+   void cover(const account_object& who, asset what, asset collateral_freed,
+                                    optional<uint16_t> target_cr = {} );
    void bid_collateral(const account_object& who, const asset& to_bid, const asset& to_cover);
 
    const asset_object& get_asset( const string& symbol )const;
