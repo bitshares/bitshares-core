@@ -496,9 +496,9 @@ bool database::apply_order(const limit_order_object& new_order_object, bool allo
  */
 int database::match( const limit_order_object& usd, const limit_order_object& core, const price& match_price )
 {
-   assert( usd.sell_price.quote.asset_id == core.sell_price.base.asset_id );
-   assert( usd.sell_price.base.asset_id  == core.sell_price.quote.asset_id );
-   assert( usd.for_sale > 0 && core.for_sale > 0 );
+   FC_ASSERT( usd.sell_price.quote.asset_id == core.sell_price.base.asset_id );
+   FC_ASSERT( usd.sell_price.base.asset_id  == core.sell_price.quote.asset_id );
+   FC_ASSERT( usd.for_sale > 0 && core.for_sale > 0 );
 
    auto usd_for_sale = usd.amount_for_sale();
    auto core_for_sale = core.amount_for_sale();
@@ -523,13 +523,13 @@ int database::match( const limit_order_object& usd, const limit_order_object& co
    core_pays = usd_receives;
    usd_pays  = core_receives;
 
-   assert( usd_pays == usd.amount_for_sale() ||
-           core_pays == core.amount_for_sale() );
+   FC_ASSERT( usd_pays == usd.amount_for_sale() ||
+              core_pays == core.amount_for_sale() );
 
    int result = 0;
    result |= fill_limit_order( usd, usd_pays, usd_receives, false, match_price, false ); // the first param is taker
    result |= fill_limit_order( core, core_pays, core_receives, true, match_price, true ) << 1; // the second param is maker
-   assert( result != 0 );
+   FC_ASSERT( result != 0 );
    return result;
 }
 
@@ -773,6 +773,11 @@ bool database::check_call_orders(const asset_object& mia, bool enable_black_swan
     if( bitasset.is_prediction_market ) return false;
     if( bitasset.current_feed.settlement_price.is_null() ) return false;
 
+    auto head_time = head_block_time();
+    auto maint_time = get_dynamic_global_properties().next_maintenance_time;
+    if( for_new_limit_order )
+       FC_ASSERT( maint_time <= HARDFORK_CORE_625_TIME ); // `for_new_limit_order` is only true before HF 338 / 625
+
     const call_order_index& call_index = get_index_type<call_order_index>();
     const auto& call_price_index = call_index.indices().get<by_price>();
 
@@ -800,8 +805,6 @@ bool database::check_call_orders(const asset_object& mia, bool enable_black_swan
     bool filled_limit = false;
     bool margin_called = false;
 
-    auto head_time = head_block_time();
-    auto maint_time = get_dynamic_global_properties().next_maintenance_time;
     while( !check_for_blackswan( mia, enable_black_swan ) && call_itr != call_end )
     {
        bool  filled_limit_in_loop = false;
