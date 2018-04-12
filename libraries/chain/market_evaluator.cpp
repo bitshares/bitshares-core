@@ -111,7 +111,11 @@ object_id_type limit_order_create_evaluator::do_apply(const limit_order_create_o
        obj.deferred_paid_fee = _deferred_paid_fee;
    });
    limit_order_id_type order_id = new_order_object.id; // save this because we may remove the object by filling it
-   bool filled = db().apply_order(new_order_object);
+   bool filled;
+   if( db().get_dynamic_global_properties().next_maintenance_time <= HARDFORK_CORE_625_TIME )
+      filled = db().apply_order_before_hardfork_625( new_order_object );
+   else
+      filled = db().apply_order( new_order_object );
 
    FC_ASSERT( !op.fill_or_kill || filled );
 
@@ -138,10 +142,13 @@ asset limit_order_cancel_evaluator::do_apply(const limit_order_cancel_operation&
 
    d.cancel_limit_order(*_order, false /* don't create a virtual op*/);
 
-   // Possible optimization: order can be called by canceling a limit order iff the canceled order was at the top of the book.
-   // Do I need to check calls in both assets?
-   d.check_call_orders(base_asset(d));
-   d.check_call_orders(quote_asset(d));
+   if( d.get_dynamic_global_properties().next_maintenance_time <= HARDFORK_CORE_606_TIME )
+   {
+      // Possible optimization: order can be called by canceling a limit order iff the canceled order was at the top of the book.
+      // Do I need to check calls in both assets?
+      d.check_call_orders(base_asset(d));
+      d.check_call_orders(quote_asset(d));
+   }
 
    return refunded;
 } FC_CAPTURE_AND_RETHROW( (o) ) }
