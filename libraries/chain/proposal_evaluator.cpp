@@ -58,6 +58,12 @@ struct proposal_operation_hardfork_visitor
          FC_ASSERT(false, "Not allowed until hardfork 188");
       }
    }
+   // hf_214
+   void operator()(const graphene::chain::proposal_update_operation &v) const {
+      if (block_time < HARDFORK_CORE_214_TIME) {
+         FC_ASSERT(false, "Not allowed until hardfork 214");
+      }
+   }
    // hf_588
    // issue #588
    //
