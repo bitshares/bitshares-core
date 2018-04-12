@@ -559,6 +559,151 @@ BOOST_AUTO_TEST_CASE( more_call_order_update_test_after_hardfork_583 )
    }
 }
 
+BOOST_AUTO_TEST_CASE( call_order_object_test )
+{ try {
+   auto new_call_obj = []( const share_type c, const share_type d, uint16_t mcr, optional<uint16_t> tcr = {} ) {
+      call_order_object o;
+      o.collateral = c;
+      o.debt = d;
+      o.call_price = ( asset( c ) / asset( d, asset_id_type(1) ) ) / ratio_type(mcr,1000); // call_price: collateral / debt
+      o.target_collateral_ratio = tcr;
+      return o;
+   };
+
+   uint16_t mcr = 1750;
+   price mp, fp;
+   call_order_object obj;
+   pair<asset, asset> expected, result;
+
+   mp = price( asset(1100), asset(1000, asset_id_type(1)) ); // match_price
+   fp = price( asset(1000), asset(1000, asset_id_type(1)) ); // feed_price
+
+   obj = new_call_obj( 1751, 1000, mcr ); // order is not in margin call territory
+   expected = std::make_pair( asset(0), asset(0, asset_id_type(1)) );
+   result = obj.get_max_sell_receive_pair( mp, fp, mcr );
+   BOOST_CHECK( result == expected );
+
+   obj = new_call_obj( 1751, 1000, mcr, 10000 ); // order is not in margin call territory
+   expected = std::make_pair( asset(0), asset(0, asset_id_type(1)) );
+   result = obj.get_max_sell_receive_pair( mp, fp, mcr );
+   BOOST_CHECK( result == expected );
+
+   obj = new_call_obj( 160, 100, mcr ); // target_cr is not set
+   expected = std::make_pair( asset(160), asset(100, asset_id_type(1)) );
+   result = obj.get_max_sell_receive_pair( mp, fp, mcr );
+   BOOST_CHECK( result == expected );
+
+   obj = new_call_obj( 1009, 1000, mcr, 200 ); // target_cr set, but order is in black swan territory
+   expected = std::make_pair( asset(1009), asset(1000, asset_id_type(1)) );
+   result = obj.get_max_sell_receive_pair( mp, fp, mcr );
+   BOOST_CHECK( result == expected );
+
+   obj = new_call_obj( 1499,  999, mcr, 1600 ); // target_cr is 160%, less than 175%, so use 175%
+   expected = std::make_pair( asset(423), asset(384, asset_id_type(1)) );
+   result = obj.get_max_sell_receive_pair( mp, fp, mcr );
+   BOOST_CHECK( result == expected );
+
+   obj = new_call_obj( 1500, 1000, mcr, 1800 ); // target_cr is 180%
+   expected = std::make_pair( asset(472), asset(429, asset_id_type(1)) );
+   result = obj.get_max_sell_receive_pair( mp, fp, mcr );
+   BOOST_CHECK( result == expected );
+
+   obj = new_call_obj( 1501, 1001, mcr, 2000 ); // target_cr is 200%
+   expected = std::make_pair( asset(613), asset(557, asset_id_type(1)) );
+   result = obj.get_max_sell_receive_pair( mp, fp, mcr );
+   BOOST_CHECK( result == expected );
+
+   obj = new_call_obj( 1502, 1002, mcr, 3000 ); // target_cr is 300%
+   expected = std::make_pair( asset(872), asset(792, asset_id_type(1)) );
+   result = obj.get_max_sell_receive_pair( mp, fp, mcr );
+   BOOST_CHECK( result == expected );
+
+} FC_CAPTURE_LOG_AND_RETHROW( (0) ) }
+
+BOOST_AUTO_TEST_CASE( call_order_update_validation_test )
+{
+   call_order_update_operation op;
+
+   // throw on default values
+   BOOST_CHECK_THROW( op.validate(), fc::assert_exception );
+
+   // minimum changes to make it valid
+   op.delta_debt = asset( 1, asset_id_type(1) );
+   op.validate(); // won't throw if has a non-zero debt with different asset_id_type than collateral
+
+   // throw on negative fee
+   op.fee = asset( -1 );
+   BOOST_CHECK_THROW( op.validate(), fc::assert_exception );
+   op.fee = asset( 0 );
+
+   // throw on identical debt and collateral asset id
+   op.delta_collateral = asset( 0, asset_id_type(1) );
+   BOOST_CHECK_THROW( op.validate(), fc::assert_exception );
+
+   // throw on zero debt and collateral amount
+   op.delta_debt = asset( 0, asset_id_type(0) );
+   BOOST_CHECK_THROW( op.validate(), fc::assert_exception );
+   op.delta_debt = asset( -1, asset_id_type(0) );
+
+   op.validate(); // valid now
+
+   // throw on empty object in extensions
+   extension<call_order_update_operation::options_type> ext;
+   op.extensions.emplace_back( ext );
+   BOOST_CHECK_THROW( op.validate(), fc::assert_exception );
+   op.extensions.clear();
+
+   ext.value.target_collateral_ratio = 0;
+   op.extensions.emplace_back( ext );
+   op.validate(); // valid now
+
+   // throw on more than one object in extensions
+   ext.value.target_collateral_ratio = 1;
+   op.extensions.emplace_back( ext );
+   BOOST_CHECK_THROW( op.validate(), fc::assert_exception );
+}
+
+// Tests that target_cr option can't be set before hard fork core-834
+// TODO: remove this test case after hard fork
+BOOST_AUTO_TEST_CASE( call_order_update_target_cr_hardfork_time_test )
+{
+   try {
+      auto mi = db.get_global_properties().parameters.maintenance_interval;
+      generate_blocks(HARDFORK_CORE_834_TIME - mi);
+
+      set_expiration( db, trx );
+
+      ACTORS((dan)(sam)(alice)(bob));
+      const auto& bitusd = create_bitasset("USDBIT", sam.id);
+      const auto& core   = asset_id_type()(db);
+
+      transfer(committee_account, dan_id, asset(10000000));
+      transfer(committee_account, sam_id, asset(10000000));
+      transfer(committee_account, alice_id, asset(10000000));
+      transfer(committee_account, bob_id, asset(10000000));
+      update_feed_producers( bitusd, {sam.id} );
+
+      price_feed current_feed; current_feed.settlement_price = bitusd.amount( 100 ) / core.amount(100);
+      current_feed.maintenance_collateral_ratio = 1750; // need to set this explicitly, testnet has a different default
+      current_feed.maximum_short_squeeze_ratio = 1100; // need to set this explicitly, testnet has a different default
+      publish_feed( bitusd, sam, current_feed );
+
+      FC_ASSERT( bitusd.bitasset_data(db).current_feed.settlement_price == current_feed.settlement_price );
+
+      BOOST_TEST_MESSAGE( "alice tries to borrow using 4x collateral at 1:1 price, will fail before hard fork time" );
+      GRAPHENE_REQUIRE_THROW( borrow( alice, bitusd.amount(100000), core.amount(400000), 0 ), fc::exception );
+      GRAPHENE_REQUIRE_THROW( borrow( alice, bitusd.amount(100000), core.amount(400000), 1 ), fc::exception );
+      GRAPHENE_REQUIRE_THROW( borrow( alice, bitusd.amount(100000), core.amount(400000), 1749 ), fc::exception );
+      GRAPHENE_REQUIRE_THROW( borrow( alice, bitusd.amount(100000), core.amount(400000), 1750 ), fc::exception );
+      GRAPHENE_REQUIRE_THROW( borrow( alice, bitusd.amount(100000), core.amount(400000), 1751 ), fc::exception );
+      GRAPHENE_REQUIRE_THROW( borrow( alice, bitusd.amount(100000), core.amount(400000), 65535 ), fc::exception );
+
+   } catch (fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
 /**
  *  This test sets up a situation where a margin call will be executed and ensures that
  *  it is properly filled.
