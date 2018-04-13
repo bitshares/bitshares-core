@@ -34,17 +34,24 @@ target_CR = new_collateral / ( new_debt / feed_price )
           = ( collateral - max_amount_to_sell ) * feed_price
             / ( debt - amount_to_get )
           = ( collateral - max_amount_to_sell ) * feed_price
-            / ( debt - max_amount_to_sell * match_price )
+            / ( debt - round_down(max_amount_to_sell * match_price ) )
+          = ( collateral - max_amount_to_sell ) * feed_price
+            / ( debt - (max_amount_to_sell * match_price - x) )
+
+Note: x is the fraction, 0 <= x < 1
+
 =>
-max_amount_to_sell = (debt * target_CR - collateral * feed_price)
+
+max_amount_to_sell = ( (debt + x) * target_CR - collateral * feed_price )
                      / (target_CR * match_price - feed_price)
-                   = (debt * tCR / DENOM - collateral * fp_debt_amt / fp_coll_amt)
+                   = ( (debt + x) * tCR / DENOM - collateral * fp_debt_amt / fp_coll_amt + target_CR * x )
                      / ( (tCR / DENOM) * (mp_debt_amt / mp_coll_amt) - fp_debt_amt / fp_coll_amt )
-                   = (debt * tCR * fp_coll_amt * mp_coll_amt - collateral * fp_debt_amt * DENOM * mp_coll_amt)
+                   = ( (debt + x) * tCR * fp_coll_amt * mp_coll_amt - collateral * fp_debt_amt * DENOM * mp_coll_amt)
                      / ( tCR * mp_debt_amt * fp_coll_amt - fp_debt_amt * DENOM * mp_coll_amt )
+
 max_debt_to_cover = max_amount_to_sell * match_price
                   = max_amount_to_sell * mp_debt_amt / mp_coll_amt
-                  = (debt * tCR * fp_coll_amt * mp_debt_amt - collateral * fp_debt_amt * DENOM * mp_debt_amt)
+                  = ( (debt + x) * tCR * fp_coll_amt * mp_debt_amt - collateral * fp_debt_amt * DENOM * mp_debt_amt)
                     / (tCR * mp_debt_amt * fp_coll_amt - fp_debt_amt * DENOM * mp_coll_amt)
 */
 pair<asset, asset> call_order_object::get_max_sell_receive_pair( const price& match_price,
@@ -83,6 +90,7 @@ pair<asset, asset> call_order_object::get_max_sell_receive_pair( const price& ma
       fp_coll_amt = feed_price.quote.amount.value;
    }
 
+   // firstly we calculate without the fraction (x), the result could be a bit too small
    i256 numerator = fp_coll_amt * mp_debt_amt * debt.value * tcr
                   - fp_debt_amt * mp_debt_amt * collateral.value * GRAPHENE_COLLATERAL_RATIO_DENOM;
    if( numerator < 0 ) // black swan
@@ -98,15 +106,77 @@ pair<asset, asset> call_order_object::get_max_sell_receive_pair( const price& ma
    share_type to_cover_amt = static_cast< int64_t >( to_cover_i256 );
 
    // calculate paying collateral (round up), then re-calculate amount of debt would cover (round down)
-   asset to_pay = asset( to_cover_amt, debt_type() ) ^ match_price;
+   asset to_pay = asset( to_cover_amt, debt_type() ) * match_price;
    asset to_cover = to_pay * match_price;
+   to_pay = to_cover ^ match_price;
 
    if( to_cover.amount >= debt || to_pay.amount >= collateral ) // to be safe
       return make_pair( get_collateral(), get_debt() );
 
-   // check collateral ratio after filled
-   if( ( get_collateral() / get_debt() ) <= ( to_pay / to_cover ) ) // edge case: rounding up paid collateral leads to decrease in CR
-      return make_pair( get_collateral(), get_debt() );
+   // check collateral ratio after filled, if it's OK, we return
+   price fp = asset( fp_coll_amt, collateral_type() ) / asset( fp_debt_amt, debt_type() );
+   price new_call_price = price::call_price( get_debt() - to_cover, get_collateral() - to_pay, tcr );
+   if( new_call_price > fp )
+      return make_pair( std::move(to_pay), std::move(to_cover) );
 
-   return make_pair( std::move(to_pay), std::move(to_cover) );
+   // be here, to_cover is too small due to rounding. deal with the fraction
+   numerator += fp_coll_amt * mp_debt_amt * tcr; // plus the fraction
+   to_cover_i256 = ( numerator / denominator ) + 1;
+   if( to_cover_i256 >= debt.value ) // avoid possible overflow
+      to_cover_i256 = debt.value;
+   to_cover_amt = static_cast< int64_t >( to_cover_i256 );
+
+   asset max_to_pay = ( to_cover_amt == debt.value ) ? get_collateral() : ( asset( to_cover_amt, debt_type() ) ^ match_price );
+   asset max_to_cover = ( to_cover_amt == debt.value ) ? get_debt() : ( max_to_pay * match_price );
+
+   asset min_to_pay = to_pay;
+   asset min_to_cover = to_cover;
+
+   // try with binary search to find a good value
+   share_type delta_to_pay = max_to_pay.amount - min_to_pay.amount;
+   share_type delta_to_cover = max_to_cover.amount - min_to_cover.amount;
+   bool delta_to_pay_is_smaller = ( delta_to_pay < delta_to_cover );
+   bool max_is_ok = false;
+   while( true )
+   {
+      // get the mean
+      if( delta_to_pay_is_smaller )
+      {
+         to_pay.amount = ( min_to_pay.amount + max_to_pay.amount + 1 ) / 2; // round up; should not overflow
+         if( to_pay.amount == max_to_pay.amount )
+            to_cover.amount = max_to_cover.amount;
+         else
+            to_cover = to_pay * match_price;
+      }
+      else
+      {
+         to_cover.amount = ( min_to_cover.amount + max_to_cover.amount + 1 ) / 2; // round up; should not overflow
+         if( to_cover.amount == max_to_cover.amount )
+            to_pay.amount = max_to_pay.amount;
+         else
+            to_pay = to_cover ^ match_price;
+      }
+
+      // check the mean
+      if( to_pay.amount == max_to_pay.amount && max_is_ok )
+         return make_pair( std::move(to_pay), std::move(to_cover) );
+
+      new_call_price = price::call_price( get_debt() - to_cover, get_collateral() - to_pay, tcr );
+      if( new_call_price > fp ) // good
+      {
+         if( to_pay.amount == max_to_pay.amount )
+            return make_pair( std::move(to_pay), std::move(to_cover) );
+         max_to_pay.amount = to_pay.amount;
+         max_to_cover.amount = to_cover.amount;
+         max_is_ok = true;
+      }
+      else // not good
+      {
+         if( to_pay.amount == max_to_pay.amount )
+            return make_pair( get_collateral(), get_debt() );
+         min_to_pay.amount = to_pay.amount;
+         min_to_cover.amount = to_cover.amount;
+      }
+   }
+
 }
