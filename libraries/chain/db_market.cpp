@@ -894,6 +894,11 @@ bool database::fill_settle_order( const force_settlement_object& settle, const a
  */
 bool database::check_call_orders(const asset_object& mia, bool enable_black_swan, bool for_new_limit_order )
 { try {
+    auto head_time = head_block_time();
+    auto maint_time = get_dynamic_global_properties().next_maintenance_time;
+    if( for_new_limit_order )
+       FC_ASSERT( maint_time <= HARDFORK_CORE_625_TIME ); // `for_new_limit_order` is only true before HF 338 / 625
+
     if( !mia.is_market_issued() ) return false;
 
     if( check_for_blackswan( mia, enable_black_swan ) ) 
@@ -902,11 +907,6 @@ bool database::check_call_orders(const asset_object& mia, bool enable_black_swan
     const asset_bitasset_data_object& bitasset = mia.bitasset_data(*this);
     if( bitasset.is_prediction_market ) return false;
     if( bitasset.current_feed.settlement_price.is_null() ) return false;
-
-    auto head_time = head_block_time();
-    auto maint_time = get_dynamic_global_properties().next_maintenance_time;
-    if( for_new_limit_order )
-       FC_ASSERT( maint_time <= HARDFORK_CORE_625_TIME ); // `for_new_limit_order` is only true before HF 338 / 625
 
     const call_order_index& call_index = get_index_type<call_order_index>();
     const auto& call_price_index = call_index.indices().get<by_price>();
