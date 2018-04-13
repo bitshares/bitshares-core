@@ -256,11 +256,11 @@ int main( int argc, char** argv )
       ;
    if( info.genesis_json.valid() )
    {
-      template_context["genesis_json_length"] = info.genesis_json->length();
+      template_context["genesis_json_length"] = (uint32_t)info.genesis_json->length();
       template_context["genesis_json_array"] = (*info.genesis_json_array);
       template_context["genesis_json_hash"] = (*info.genesis_json_hash).str();
-      template_context["genesis_json_array_width"] = info.genesis_json_array_width;
-      template_context["genesis_json_array_height"] = info.genesis_json_array_height;
+      template_context["genesis_json_array_width"] = (uint32_t)info.genesis_json_array_width;
+      template_context["genesis_json_array_height"] = (uint32_t)info.genesis_json_array_height;
    }
 
    for( const std::string& src_dest : options["tmplsub"].as< std::vector< std::string > >() )

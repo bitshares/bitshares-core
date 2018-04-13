@@ -12,8 +12,8 @@ my $outFile = new IO::File($outputFileName, "w")
 
 my $fileHeader = <<'END';
 #include <set>
-#include <graphene/wallet/api_documentation.hpp>
 #include <graphene/wallet/wallet.hpp>
+#include <graphene/wallet/api_documentation.hpp>
 
 namespace graphene { namespace wallet {
    namespace detail 
@@ -75,7 +75,9 @@ END
 my $fileFooter = <<'END';
       fc::api<wallet_api> tmp;
       detail::api_method_name_collector_visitor visitor;
+#if __clang__ != 1
       tmp->visit(visitor);
+#endif
       for (auto iter = method_descriptions.begin(); iter != method_descriptions.end();)
         if (visitor.method_names.find(iter->method_name) == visitor.method_names.end())
           iter = method_descriptions.erase(iter);

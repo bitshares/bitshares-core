@@ -21,6 +21,9 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
+#include <sys/socket.h>
+#include <netinet/ip.h>
+#include <sys/types.h>
 #include <graphene/app/application.hpp>
 #include <graphene/app/plugin.hpp>
 
@@ -38,9 +41,6 @@
 #include <fc/rpc/websocket_api.hpp>
 #include <fc/rpc/cli.hpp>
 
-#include <sys/socket.h>
-#include <netinet/ip.h>
-#include <sys/types.h>
 
 #include <boost/filesystem/path.hpp>
 
@@ -109,7 +109,7 @@ int get_available_port()
    sin.sin_family = AF_INET;
    sin.sin_port = 0;
    sin.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-   if (bind(socket_fd, (struct sockaddr*)&sin, sizeof(struct sockaddr_in)) == -1)
+   if (::bind(socket_fd, (struct sockaddr*)&sin, sizeof(struct sockaddr_in)) == -1)
       return -1;
    socklen_t len = sizeof(sin);
    if (getsockname(socket_fd, (struct sockaddr *)&sin, &len) == -1)

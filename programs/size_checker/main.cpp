@@ -58,7 +58,7 @@ struct size_check_type_visitor
    {
       fc::mutable_variant_object vo;
       vo["name"] = fc::get_typename<Type>::name();
-      vo["mem_size"] = sizeof( Type );
+      vo["mem_size"] = (uint32_t)sizeof( Type );
       vo["wire_size"] = get_wire_size<Type>();
       g_op_types.push_back( vo );
    }
