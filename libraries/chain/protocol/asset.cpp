@@ -96,15 +96,19 @@ namespace graphene { namespace chain {
       {
          if( a.asset_id == b.base.asset_id )
          {
+            // TODO replace exception type with price_multiplication_undefined?
             FC_ASSERT( b.base.amount.value > 0 );
             uint128_t result = (uint128_t(a.amount.value) * b.quote.amount.value + b.base.amount.value - 1)/b.base.amount.value;
+            // TODO replace exception type with price_multiplication_overflow?
             FC_ASSERT( result <= GRAPHENE_MAX_SHARE_SUPPLY );
             return asset( result.convert_to<int64_t>(), b.quote.asset_id );
          }
          else if( a.asset_id == b.quote.asset_id )
          {
+            // TODO replace exception type with price_multiplication_undefined?
             FC_ASSERT( b.quote.amount.value > 0 );
             uint128_t result = (uint128_t(a.amount.value) * b.base.amount.value + b.quote.amount.value - 1)/b.quote.amount.value;
+            // TODO replace exception type with price_multiplication_overflow?
             FC_ASSERT( result <= GRAPHENE_MAX_SHARE_SUPPLY );
             return asset( result.convert_to<int64_t>(), b.base.asset_id );
          }

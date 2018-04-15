@@ -293,6 +293,64 @@ BOOST_AUTO_TEST_CASE( price_test )
     BOOST_CHECK(dummy == dummy2);
 }
 
+BOOST_AUTO_TEST_CASE( price_multiplication_test )
+{ try {
+   // random test
+   std::mt19937_64 gen( time(NULL) );
+   std::uniform_int_distribution<int64_t> amt_uid(1, GRAPHENE_MAX_SHARE_SUPPLY);
+   std::uniform_int_distribution<int64_t> amt_uid2(1, 1000*1000*1000);
+   std::uniform_int_distribution<int64_t> amt_uid3(1, 1000*1000);
+   std::uniform_int_distribution<int64_t> amt_uid4(1, 1000);
+   asset a;
+   price p;
+   for( int i = 1*1000*1000; i > 0; --i )
+   {
+      if( i <= 30 )
+         a = asset( 0 );
+      else if( i % 4 == 0 )
+         a = asset( amt_uid(gen) );
+      else if( i % 4 == 1 )
+         a = asset( amt_uid2(gen) );
+      else if( i % 4 == 2 )
+         a = asset( amt_uid3(gen) );
+      else // if( i % 4 == 3 )
+         a = asset( amt_uid4(gen) );
+
+      if( i % 7 == 0 )
+         p = price( asset(amt_uid(gen)), asset(amt_uid(gen), asset_id_type(1)) );
+      else if( i % 7 == 1 )
+         p = price( asset(amt_uid2(gen)), asset(amt_uid2(gen), asset_id_type(1)) );
+      else if( i % 7 == 2 )
+         p = price( asset(amt_uid3(gen)), asset(amt_uid3(gen), asset_id_type(1)) );
+      else if( i % 7 == 3 )
+         p = price( asset(amt_uid4(gen)), asset(amt_uid4(gen), asset_id_type(1)) );
+      else if( i % 7 == 4 )
+         p = price( asset(amt_uid(gen)), asset(amt_uid(gen), asset_id_type(1)) );
+      else if( i % 7 == 5 )
+         p = price( asset(amt_uid4(gen)), asset(amt_uid2(gen), asset_id_type(1)) );
+      else // if( i % 7 == 6 )
+         p = price( asset(amt_uid2(gen)), asset(amt_uid4(gen), asset_id_type(1)) );
+
+      try
+      {
+         asset b = a * p;
+         asset a1 = b ^ p;
+         BOOST_CHECK( a1 <= a );
+         BOOST_CHECK( (a1 * p) == b );
+
+         b = a ^ p;
+         a1 = b * p;
+         BOOST_CHECK( a1 >= a );
+         BOOST_CHECK( (a1 ^ p) == b );
+      }
+      catch( fc::assert_exception& e )
+      {
+         // TODO replace with price_multiplication_overflow?
+         BOOST_CHECK( e.to_detail_string().find( "result <= GRAPHENE_MAX_SHARE_SUPPLY" ) != string::npos );
+      }
+   }
+} FC_LOG_AND_RETHROW() }
+
 BOOST_AUTO_TEST_CASE( memo_test )
 { try {
    memo_data m;
