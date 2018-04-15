@@ -82,6 +82,7 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
 
       // Accounts
       vector<optional<account_object>> get_accounts(const vector<account_id_type>& account_ids)const;
+      std::map<string,account_orders> get_account_orders( const vector<string>& names_or_ids, bool subscribe);
       std::map<string,full_account> get_full_accounts( const vector<string>& names_or_ids, bool subscribe );
       optional<account_object> get_account_by_name( string name )const;
       vector<account_id_type> get_account_references( account_id_type account_id )const;
@@ -622,6 +623,62 @@ vector<optional<account_object>> database_api_impl::get_accounts(const vector<ac
       return {};
    });
    return result;
+}
+
+std::map<string,account_orders> database_api::get_account_orders( const vector<string>& names_or_ids, bool subscribe )
+{
+   return my->get_account_orders( names_or_ids, subscribe );
+}
+
+std::map<std::string, account_orders> database_api_impl::get_account_orders( const vector<std::string>& names_or_ids, bool subscribe)
+{
+   std::map<std::string, account_orders> results;
+
+   for (const std::string& account_name_or_id : names_or_ids)
+   {
+      const account_object* account = nullptr;
+      if (std::isdigit(account_name_or_id[0]))
+         account = _db.find(fc::variant(account_name_or_id, 1).as<account_id_type>(1));
+      else
+      {
+         const auto& idx = _db.get_index_type<account_index>().indices().get<by_name>();
+         auto itr = idx.find(account_name_or_id);
+         if (itr != idx.end())
+            account = &*itr;
+      }
+      if (account == nullptr)
+         continue;
+
+      if( subscribe )
+      {
+         if(_subscribed_accounts.size() < 100) {
+            _subscribed_accounts.insert( account->get_id() );
+            subscribe_to_item( account->id );
+         }
+      }
+
+      account_orders acnt;
+
+      // Add the account's orders
+      auto order_range = _db.get_index_type<limit_order_index>().indices().get<by_account>().equal_range(account->id);
+      std::for_each(order_range.first, order_range.second,
+                    [&acnt] (const limit_order_object& order) {
+                       acnt.limit_orders.emplace_back(order);
+                    });
+      auto call_range = _db.get_index_type<call_order_index>().indices().get<by_account>().equal_range(account->id);
+      std::for_each(call_range.first, call_range.second,
+                    [&acnt] (const call_order_object& call) {
+                       acnt.call_orders.emplace_back(call);
+                    });
+      auto settle_range = _db.get_index_type<force_settlement_index>().indices().get<by_account>().equal_range(account->id);
+      std::for_each(settle_range.first, settle_range.second,
+                    [&acnt] (const force_settlement_object& settle) {
+                       acnt.settle_orders.emplace_back(settle);
+                    });
+
+      results[account_name_or_id] = acnt;
+   }
+   return results;
 }
 
 std::map<string,full_account> database_api::get_full_accounts( const vector<string>& names_or_ids, bool subscribe )

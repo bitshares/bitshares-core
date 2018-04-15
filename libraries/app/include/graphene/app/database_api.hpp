@@ -23,6 +23,7 @@
  */
 #pragma once
 
+#include <graphene/app/account_orders.hpp>
 #include <graphene/app/full_account.hpp>
 
 #include <graphene/chain/protocol/types.hpp>
@@ -267,6 +268,20 @@ class database_api
        * This function has semantics identical to @ref get_objects
        */
       vector<optional<account_object>> get_accounts(const vector<account_id_type>& account_ids)const;
+
+      /**
+       * @brief Fetch all orders relevant to the specified accounts and subscribe to updates
+       * @param names_or_ids Each item must be the name or ID of an account to retrieve
+       * @param subscribe Wether subscribe to future updates
+       *
+       * @return Map of string from @ref names_or_ids to the corresponding account
+       *
+       * This function fetches all relevant orders for the given accounts, and subscribes to updates to the given
+       * accounts. If any of the strings in @ref names_or_ids cannot be tied to an account, that input will be
+       * ignored. All other accounts will be retrieved and subscribed.
+       *
+       */
+      std::map<string,account_orders> get_account_orders( const vector<string>& names_or_ids, bool subscribe );
 
       /**
        * @brief Fetch all objects relevant to the specified accounts and subscribe to updates
@@ -714,6 +729,7 @@ FC_API(graphene::app::database_api,
 
    // Accounts
    (get_accounts)
+   (get_account_orders)
    (get_full_accounts)
    (get_account_by_name)
    (get_account_references)

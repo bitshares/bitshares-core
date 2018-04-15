@@ -2935,6 +2935,11 @@ vector<bucket_object> wallet_api::get_market_history( string symbol1, string sym
    return my->_remote_hist->get_market_history( get_asset_id(symbol1), get_asset_id(symbol2), bucket, start, end );
 }
 
+std::map<string,account_orders> wallet_api::get_account_orders( const vector<string>& names_or_ids, bool subscribe)
+{
+   return my->_remote_db->get_account_orders(names_or_ids, false);
+}
+
 vector<limit_order_object> wallet_api::get_limit_orders(string a, string b, uint32_t limit)const
 {
    return my->_remote_db->get_limit_orders(get_asset(a).id, get_asset(b).id, limit);
