@@ -577,22 +577,24 @@ BOOST_AUTO_TEST_CASE( call_order_object_test )
    // function to validate result of call_order_object::get_max_sell_receive_pair(...)
    auto validate_result = []( const call_order_object& o, const price& match_price, const price& feed_price,
                               int16_t mcr, const pair<asset,asset>& result ) {
-      BOOST_CHECK( result.first.asset_id == o.collateral_type() );
-      BOOST_CHECK( result.second.asset_id == o.debt_type() );
-      BOOST_CHECK( result.first.amount >= 0 );
-      BOOST_CHECK( result.second.amount >= 0 );
+      BOOST_REQUIRE( result.first.asset_id == o.collateral_type() );
+      BOOST_REQUIRE( result.second.asset_id == o.debt_type() );
+      BOOST_REQUIRE( result.first.amount >= 0 );
+      BOOST_REQUIRE( result.second.amount >= 0 );
       if( result.first.amount == 0 )
-         BOOST_CHECK_EQUAL( result.second.amount.value, 0 );
+         BOOST_REQUIRE_EQUAL( result.second.amount.value, 0 );
       if( result.second.amount == 0 )
-         BOOST_CHECK_EQUAL( result.first.amount.value, 0 );
+         BOOST_REQUIRE_EQUAL( result.first.amount.value, 0 );
       if( result.first.amount == o.collateral )
-         BOOST_CHECK_EQUAL( result.second.amount.value, o.debt.value );
+         BOOST_REQUIRE_EQUAL( result.second.amount.value, o.debt.value );
       if( result.second.amount == o.debt )
-         BOOST_CHECK_EQUAL( result.first.amount.value, o.collateral.value );
+         BOOST_REQUIRE_EQUAL( result.first.amount.value, o.collateral.value );
 
-      if( result.first.amount > 0 and result.first.amount < o.collateral ) // should have target_cr set and in margin call territory
+      if( result.first.amount > 0 && result.first.amount < o.collateral ) // should have target_cr set and in margin call territory
       {
-         BOOST_CHECK( result.first * match_price == result.second ); // round down debt to cover
+         BOOST_REQUIRE_LT( result.second.amount.value, o.debt.value );
+         BOOST_CHECK( ( result.first * match_price ) == result.second ); // round down debt to cover
+         BOOST_CHECK( ( result.second ^ match_price ) == result.first ); // round up paying collateral is not too much
 
          // after sold some collateral, the collateral ratio will be higher than expected
          auto tcr = *o.target_collateral_ratio;
@@ -682,16 +684,62 @@ BOOST_AUTO_TEST_CASE( call_order_object_test )
    // random tests
    std::mt19937_64 gen( time(NULL) );
    std::uniform_int_distribution<int64_t> amt_uid(1, GRAPHENE_MAX_SHARE_SUPPLY);
+   std::uniform_int_distribution<int64_t> amt_uid2(1, 1000*1000*1000);
+   std::uniform_int_distribution<int64_t> amt_uid3(1, 1000*1000);
+   std::uniform_int_distribution<int64_t> amt_uid4(1, 300);
+   std::uniform_int_distribution<int64_t> mp_num_uid(800, 1100);
    std::uniform_int_distribution<int16_t> mcr_uid(1001, 32767);
-   std::uniform_int_distribution<uint16_t> tcr_uid;
+   std::uniform_int_distribution<int16_t> mcr_uid2(1001, 3000);
+   std::uniform_int_distribution<uint16_t> tcr_uid(0, 65535);
+   std::uniform_int_distribution<uint16_t> tcr_uid2(0, 3000);
    int count2 = 0;
    int count3 = 0;
-   for( int i = 1000*1000; i > 0; --i )
+   for( int i = 10*1000*1000; i > 0; --i )
    {
-      mcr = mcr_uid(gen);
-      mp = price( asset(amt_uid(gen)), asset(amt_uid(gen), asset_id_type(1)) ); // match_price
-      fp = price( asset(amt_uid(gen)), asset(amt_uid(gen), asset_id_type(1)) ); // feed_price
-      obj = new_call_obj( amt_uid(gen), amt_uid(gen), mcr, tcr_uid(gen) );
+      if( i % 3 == 0 )
+         mcr = 1750;
+      else if( i % 3 == 1 )
+         mcr = mcr_uid(gen);
+      else // if( i % 3 == 2 )
+         mcr = mcr_uid2(gen);
+
+      // feed_price
+      if( i % 5 == 0 )
+         fp = price( asset(amt_uid(gen)), asset(amt_uid(gen), asset_id_type(1)) );
+      else if( i % 5 == 1 )
+         fp = price( asset(amt_uid2(gen)), asset(amt_uid2(gen), asset_id_type(1)) );
+      else if( i % 5 == 2 )
+         fp = price( asset(amt_uid3(gen)), asset(amt_uid3(gen), asset_id_type(1)) );
+      else if( i % 5 == 3 )
+         fp = price( asset(amt_uid4(gen)), asset(amt_uid3(gen), asset_id_type(1)) );
+      else // if( i % 5 == 4 )
+         fp = price( asset(amt_uid2(gen)), asset(amt_uid3(gen), asset_id_type(1)) );
+
+      // match_price
+      if( i % 4 == 0 )
+         mp = fp * ratio_type( 1100, 1000 );
+      else if( i % 4 == 1 )
+         mp = fp * ratio_type( mp_num_uid(gen) , 1000 );
+      else if( i % 4 == 2 )
+         mp = price( asset(amt_uid2(gen)), asset(amt_uid3(gen), asset_id_type(1)) );
+      else // if( i % 4 == 3 )
+         mp = price( asset(amt_uid(gen)), asset(amt_uid(gen), asset_id_type(1)) );
+
+      if( i % 7 == 0 )
+         obj = new_call_obj( amt_uid(gen), amt_uid(gen), mcr, tcr_uid(gen) );
+      else if( i % 7 == 1 )
+         obj = new_call_obj( amt_uid2(gen), amt_uid2(gen), mcr, tcr_uid(gen) );
+      else if( i % 7 == 2 )
+         obj = new_call_obj( amt_uid3(gen), amt_uid3(gen), mcr, tcr_uid(gen) );
+      else if( i % 7 == 3 )
+         obj = new_call_obj( amt_uid4(gen), amt_uid4(gen), mcr, tcr_uid(gen) );
+      else if( i % 7 == 4 )
+         obj = new_call_obj( amt_uid(gen), amt_uid(gen), mcr, tcr_uid2(gen) );
+      else if( i % 7 == 5 )
+         obj = new_call_obj( amt_uid2(gen), amt_uid4(gen), mcr, tcr_uid2(gen) );
+      else // if( i % 7 == 6 )
+         obj = new_call_obj( amt_uid4(gen), amt_uid2(gen), mcr, tcr_uid2(gen) );
+
       result = obj.get_max_sell_receive_pair( mp, fp, mcr );
       auto vr = validate_result( obj, mp, fp, mcr, result );
       if( vr == 2 )
