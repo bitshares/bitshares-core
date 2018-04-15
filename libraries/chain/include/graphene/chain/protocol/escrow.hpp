@@ -47,7 +47,7 @@ namespace graphene { namespace chain {
       struct escrow_transfer_operation : public base_operation {
 
          struct fee_parameters_type {
-            uint64_t fee            = 20 * GRAPHENE_BLOCKCHAIN_PRECISION;
+            uint64_t fee            = 1 * GRAPHENE_BLOCKCHAIN_PRECISION;
          };
          asset           fee;
 
@@ -76,7 +76,7 @@ namespace graphene { namespace chain {
       struct escrow_approve_operation : public base_operation
       {
          struct fee_parameters_type {
-            uint64_t fee            = 20 * GRAPHENE_BLOCKCHAIN_PRECISION;
+            uint64_t fee            = 1 * GRAPHENE_BLOCKCHAIN_PRECISION;
          };
          asset           fee;
 
@@ -89,7 +89,7 @@ namespace graphene { namespace chain {
 
          void validate()const;
          void get_required_active_authorities( flat_set<account_id_type>& a )const{ a.insert(who); }
-         account_id_type fee_payer()const { return from; }
+         account_id_type fee_payer()const { return who; }
       };
 
 
@@ -102,7 +102,7 @@ namespace graphene { namespace chain {
       struct escrow_dispute_operation : public base_operation {
 
          struct fee_parameters_type {
-            uint64_t fee            = 20 * GRAPHENE_BLOCKCHAIN_PRECISION;
+            uint64_t fee            = 1 * GRAPHENE_BLOCKCHAIN_PRECISION;
          };
          asset           fee;
 
@@ -113,7 +113,7 @@ namespace graphene { namespace chain {
 
          void validate()const;
          void get_required_active_authorities( flat_set<account_id_type>& a )const{ a.insert(who); }
-         account_id_type fee_payer()const { return from; }
+         account_id_type fee_payer()const { return who; }
       };
 
       /**
@@ -129,7 +129,7 @@ namespace graphene { namespace chain {
       struct escrow_release_operation : public base_operation {
 
          struct fee_parameters_type {
-            uint64_t fee            = 20 * GRAPHENE_BLOCKCHAIN_PRECISION;
+            uint64_t fee            = 1 * GRAPHENE_BLOCKCHAIN_PRECISION;
          };
          asset           fee;
 
@@ -141,7 +141,7 @@ namespace graphene { namespace chain {
 
          void validate()const;
          void get_required_active_authorities( flat_set<account_id_type>& a )const{ a.insert(who); }
-         account_id_type fee_payer()const { return from; }
+         account_id_type fee_payer()const { return who; }
       };
 
    } }
