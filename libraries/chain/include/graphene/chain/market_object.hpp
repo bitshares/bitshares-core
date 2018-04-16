@@ -136,8 +136,8 @@ class call_order_object : public abstract_object<call_order_object>
 
       /// Calculate maximum quantity of collateral to sell and debt to cover to meet @ref target_collateral_ratio.
       /// @return a pair of assets, the first item is collateral to sell, the second is debt to cover
-      pair<asset, asset> get_max_sell_receive_pair( const price& match_price,
-                                                    const price& feed_price,
+      pair<asset, asset> get_max_sell_receive_pair( price match_price,
+                                                    price feed_price,
                                                     const uint16_t maintenance_collateral_ratio )const;
 };
 

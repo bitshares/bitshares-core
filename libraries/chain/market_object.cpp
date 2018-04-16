@@ -54,10 +54,17 @@ max_debt_to_cover = max_amount_to_sell * match_price
                   = ( (debt + x) * tCR * fp_coll_amt * mp_debt_amt - collateral * fp_debt_amt * DENOM * mp_debt_amt)
                     / (tCR * mp_debt_amt * fp_coll_amt - fp_debt_amt * DENOM * mp_coll_amt)
 */
-pair<asset, asset> call_order_object::get_max_sell_receive_pair( const price& match_price,
-                                                                 const price& feed_price,
+pair<asset, asset> call_order_object::get_max_sell_receive_pair( price match_price,
+                                                                 price feed_price,
                                                                  const uint16_t maintenance_collateral_ratio )const
-{
+{ try {
+   // make sure feed_price is in collateral / debt format
+   if( feed_price.base.asset_id != call_price.base.asset_id )
+      feed_price = ~feed_price;
+
+   FC_ASSERT( feed_price.base.asset_id == call_price.base.asset_id
+              && feed_price.quote.asset_id == call_price.quote.asset_id );
+
    if( call_price > feed_price ) // feed protected
       return make_pair( asset( 0, collateral_type() ), asset( 0, debt_type() ) );
 
@@ -66,52 +73,45 @@ pair<asset, asset> call_order_object::get_max_sell_receive_pair( const price& ma
 
    uint16_t tcr = std::max( *target_collateral_ratio, maintenance_collateral_ratio ); // use mcr if target cr is too small
 
-   typedef boost::multiprecision::int256_t i256;
-   i256 mp_debt_amt, mp_coll_amt, fp_debt_amt, fp_coll_amt;
+   // make sure match_price is in collateral / debt format
+   if( match_price.base.asset_id != call_price.base.asset_id )
+      match_price = ~match_price;
 
-   if( match_price.base.asset_id == call_price.base.asset_id )
-   {
-      mp_debt_amt = match_price.quote.amount.value;
-      mp_coll_amt = match_price.base.amount.value;
-   }
-   else
-   {
-      mp_debt_amt = match_price.base.amount.value;
-      mp_coll_amt = match_price.quote.amount.value;
-   }
-   if( feed_price.base.asset_id == call_price.base.asset_id )
-   {
-      fp_debt_amt = feed_price.quote.amount.value;
-      fp_coll_amt = feed_price.base.amount.value;
-   }
-   else
-   {
-      fp_debt_amt = feed_price.base.amount.value;
-      fp_coll_amt = feed_price.quote.amount.value;
-   }
+   FC_ASSERT( match_price.base.asset_id == call_price.base.asset_id
+              && match_price.quote.asset_id == call_price.quote.asset_id );
+
+   typedef boost::multiprecision::int256_t i256;
+   i256 mp_debt_amt = match_price.quote.amount.value;
+   i256 mp_coll_amt = match_price.base.amount.value;
+   i256 fp_debt_amt = feed_price.quote.amount.value;
+   i256 fp_coll_amt = feed_price.base.amount.value;
 
    // firstly we calculate without the fraction (x), the result could be a bit too small
    i256 numerator = fp_coll_amt * mp_debt_amt * debt.value * tcr
                   - fp_debt_amt * mp_debt_amt * collateral.value * GRAPHENE_COLLATERAL_RATIO_DENOM;
-   if( numerator < 0 ) // black swan
-      return make_pair( get_collateral(), get_debt() );
+   if( numerator < 0 ) // feed protected, actually should not be true here, just check to be safe
+      return make_pair( asset( 0, collateral_type() ), asset( 0, debt_type() ) );
 
    i256 denominator = fp_coll_amt * mp_debt_amt * tcr - fp_debt_amt * mp_coll_amt * GRAPHENE_COLLATERAL_RATIO_DENOM;
    if( denominator <= 0 ) // black swan
       return make_pair( get_collateral(), get_debt() );
 
-   i256 to_cover_i256 = ( numerator / denominator ) + 1;
+   // note: if add 1 here, will result in 1.5x imperfection rate;
+   //       however, due to rounding, the result could still be a bit too big, thus imperfect.
+   i256 to_cover_i256 = ( numerator / denominator );
    if( to_cover_i256 >= debt.value ) // avoid possible overflow
       return make_pair( get_collateral(), get_debt() );
    share_type to_cover_amt = static_cast< int64_t >( to_cover_i256 );
 
-   // calculate paying collateral (round up), then re-calculate amount of debt would cover (round down)
+   // stabilize
+   // note: rounding up-down results in 3x imperfection rate in comparison to down-down-up
    asset to_pay = asset( to_cover_amt, debt_type() ) * match_price;
    asset to_cover = to_pay * match_price;
    to_pay = to_cover ^ match_price;
 
    if( to_cover.amount >= debt || to_pay.amount >= collateral ) // to be safe
       return make_pair( get_collateral(), get_debt() );
+   FC_ASSERT( to_pay.amount < collateral && to_cover.amount < debt );
 
    // check collateral ratio after filled, if it's OK, we return
    price fp = asset( fp_coll_amt, collateral_type() ) / asset( fp_debt_amt, debt_type() );
@@ -127,39 +127,87 @@ pair<asset, asset> call_order_object::get_max_sell_receive_pair( const price& ma
    to_cover_amt = static_cast< int64_t >( to_cover_i256 );
 
    asset max_to_pay = ( to_cover_amt == debt.value ) ? get_collateral() : ( asset( to_cover_amt, debt_type() ) ^ match_price );
-   asset max_to_cover = ( to_cover_amt == debt.value ) ? get_debt() : ( max_to_pay * match_price );
+   if( max_to_pay.amount > collateral )
+      max_to_pay.amount = collateral;
+
+   asset max_to_cover = ( max_to_pay.amount == collateral ) ? get_debt() : ( max_to_pay * match_price );
+   if( max_to_cover.amount >= debt ) // to be safe
+   {
+      max_to_pay.amount = collateral;
+      max_to_cover.amount = debt;
+   }
+
+   if( max_to_pay <= to_pay || max_to_cover <= to_cover ) // strange data. should skip binary search and go on, but doesn't help much
+      return make_pair( get_collateral(), get_debt() );
+   FC_ASSERT( max_to_pay > to_pay && max_to_cover > to_cover );
 
    asset min_to_pay = to_pay;
    asset min_to_cover = to_cover;
 
    // try with binary search to find a good value
-   share_type delta_to_pay = max_to_pay.amount - min_to_pay.amount;
-   share_type delta_to_cover = max_to_cover.amount - min_to_cover.amount;
-   bool delta_to_pay_is_smaller = ( delta_to_pay < delta_to_cover );
+   // note: actually binary search can not always provide perfect result here,
+   //       due to rounding, collateral ratio is not always increasing while to_pay or to_cover is increasing
    bool max_is_ok = false;
    while( true )
    {
       // get the mean
-      if( delta_to_pay_is_smaller )
+      if( match_price.base.amount < match_price.quote.amount ) // step of collateral is smaller
       {
-         to_pay.amount = ( min_to_pay.amount + max_to_pay.amount + 1 ) / 2; // round up; should not overflow
+         to_pay.amount = ( min_to_pay.amount + max_to_pay.amount + 1 ) / 2; // should not overflow. round up here
          if( to_pay.amount == max_to_pay.amount )
             to_cover.amount = max_to_cover.amount;
          else
+         {
             to_cover = to_pay * match_price;
+            if( to_cover.amount >= max_to_cover.amount ) // can be true when max_is_ok is false
+            {
+               to_pay.amount = max_to_pay.amount;
+               to_cover.amount = max_to_cover.amount;
+            }
+            else
+            {
+               to_pay = to_cover ^ match_price; // stabilization, no change or become smaller
+               FC_ASSERT( to_pay.amount < max_to_pay.amount );
+            }
+         }
       }
-      else
+      else // step of debt is smaller or equal
       {
-         to_cover.amount = ( min_to_cover.amount + max_to_cover.amount + 1 ) / 2; // round up; should not overflow
+         to_cover.amount = ( min_to_cover.amount + max_to_cover.amount ) / 2; // should not overflow. round down here
          if( to_cover.amount == max_to_cover.amount )
             to_pay.amount = max_to_pay.amount;
          else
+         {
             to_pay = to_cover ^ match_price;
+            if( to_pay.amount >= max_to_pay.amount ) // can be true when max_is_ok is false
+            {
+               to_pay.amount = max_to_pay.amount;
+               to_cover.amount = max_to_cover.amount;
+            }
+            else
+            {
+               to_cover = to_pay * match_price; // stabilization, to_cover should have increased
+               if( to_cover.amount >= max_to_cover.amount ) // to be safe
+               {
+                  to_pay.amount = max_to_pay.amount;
+                  to_cover.amount = max_to_cover.amount;
+               }
+            }
+         }
+      }
+
+      // check again to see if we've moved away from the minimums, if not, use the maximums directly
+      if( to_pay.amount <= min_to_pay.amount || to_cover.amount <= min_to_cover.amount
+            || to_pay.amount > max_to_pay.amount || to_cover.amount > max_to_cover.amount )
+      {
+         to_pay.amount = max_to_pay.amount;
+         to_cover.amount = max_to_cover.amount;
       }
 
       // check the mean
-      if( to_pay.amount == max_to_pay.amount && max_is_ok )
+      if( to_pay.amount == max_to_pay.amount && ( max_is_ok || to_pay.amount == collateral ) )
          return make_pair( std::move(to_pay), std::move(to_cover) );
+      FC_ASSERT( to_pay.amount < collateral && to_cover.amount < debt );
 
       new_call_price = price::call_price( get_debt() - to_cover, get_collateral() - to_pay, tcr );
       if( new_call_price > fp ) // good
@@ -173,10 +221,46 @@ pair<asset, asset> call_order_object::get_max_sell_receive_pair( const price& ma
       else // not good
       {
          if( to_pay.amount == max_to_pay.amount )
-            return make_pair( get_collateral(), get_debt() );
+            break;
          min_to_pay.amount = to_pay.amount;
          min_to_cover.amount = to_cover.amount;
       }
    }
 
-}
+   // be here, max_to_cover is too small due to rounding. search forward
+   for( uint64_t d1 = 0, d2 = 1, d3 = 1; ; d1 = d2, d2 = d3, d3 = d1 + d2 ) // 1,1,2,3,5,8,...
+   {
+      if( match_price.base.amount > match_price.quote.amount ) // step of debt is smaller
+      {
+         to_pay.amount += d2;
+         if( to_pay.amount >= collateral )
+            return make_pair( get_collateral(), get_debt() );
+         to_cover = to_pay * match_price;
+         if( to_cover.amount >= debt )
+            return make_pair( get_collateral(), get_debt() );
+         to_pay = to_cover ^ match_price; // stabilization
+         if( to_pay.amount >= collateral )
+            return make_pair( get_collateral(), get_debt() );
+      }
+      else // step of collateral is smaller or equal
+      {
+         to_cover.amount += d2;
+         if( to_cover.amount >= debt )
+            return make_pair( get_collateral(), get_debt() );
+         to_pay = to_cover ^ match_price;
+         if( to_pay.amount >= collateral )
+            return make_pair( get_collateral(), get_debt() );
+         to_cover = to_pay * match_price; // stabilization
+         if( to_cover.amount >= debt )
+            return make_pair( get_collateral(), get_debt() );
+      }
+
+      // check
+      FC_ASSERT( to_pay.amount < collateral && to_cover.amount < debt );
+
+      new_call_price = price::call_price( get_debt() - to_cover, get_collateral() - to_pay, tcr );
+      if( new_call_price > fp ) // good
+         return make_pair( std::move(to_pay), std::move(to_cover) );
+   }
+
+} FC_CAPTURE_AND_RETHROW( (*this)(feed_price)(match_price)(maintenance_collateral_ratio) ) }
