@@ -590,8 +590,6 @@ public:
    optional<asset_object> find_asset(asset_id_type id)const
    {
       auto rec = _remote_db->get_assets({id}).front();
-      if( rec )
-         _asset_cache[id] = *rec;
       return rec;
    }
    optional<asset_object> find_asset(string asset_symbol_or_id)const
@@ -609,8 +607,6 @@ public:
          {
             if( rec->symbol != asset_symbol_or_id )
                return optional<asset_object>();
-
-            _asset_cache[rec->get_id()] = *rec;
          }
          return rec;
       }
@@ -2634,8 +2630,6 @@ public:
    mode_t                  _old_umask;
 #endif
    const string _wallet_filename_extension = ".wallet";
-
-   mutable map<asset_id_type, asset_object> _asset_cache;
 };
 
 std::string operation_printer::fee(const asset& a)const {
