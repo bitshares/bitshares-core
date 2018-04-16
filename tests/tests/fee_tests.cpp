@@ -310,6 +310,12 @@ BOOST_AUTO_TEST_CASE( cashback_test )
    PREP_ACTOR(dumy);
    PREP_ACTOR(stud);
    PREP_ACTOR(pleb);
+   // use ##_public_key vars to silence unused variable warning
+   BOOST_CHECK_GT(ann_public_key.key_data.size(), 0);
+   BOOST_CHECK_GT(scud_public_key.key_data.size(), 0);
+   BOOST_CHECK_GT(dumy_public_key.key_data.size(), 0);
+   BOOST_CHECK_GT(stud_public_key.key_data.size(), 0);
+   BOOST_CHECK_GT(pleb_public_key.key_data.size(), 0);
 
    account_id_type ann_id, scud_id, dumy_id, stud_id, pleb_id;
    actor_audit alife, arog, aann, ascud, adumy, astud, apleb;
