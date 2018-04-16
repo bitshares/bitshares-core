@@ -26,39 +26,21 @@
 namespace graphene { namespace chain {
 
       void escrow_transfer_operation::validate()const {
-         //FC_ASSERT( is_valid_account_name( from ) );
-         //FC_ASSERT( is_valid_account_name( to ) );
-         //FC_ASSERT( is_valid_account_name( agent ) );
-         //FC_ASSERT( fee.amount >= 0 );
-         //FC_ASSERT( amount.amount >= 0 );
-         //FC_ASSERT( from != agent && to != agent );
-         //FC_ASSERT( fee.symbol == amount.symbol );
-         //FC_ASSERT( amount.symbol != VESTS_SYMBOL );
+         FC_ASSERT( agent_fee.amount >= 0 );
+         FC_ASSERT( amount.amount > 0 );
+         FC_ASSERT( from != agent && to != agent );
+         FC_ASSERT( agent_fee.asset_id == amount.asset_id ); // agent fee only in bts
+         FC_ASSERT( amount.asset_id == asset_id_type()); // only bts is allowed by now
       }
       void escrow_approve_operation::validate()const {
+         FC_ASSERT( who == to || who == agent );
       }
       void escrow_dispute_operation::validate()const {
-         //FC_ASSERT( is_valid_account_name( from ) );
-         //FC_ASSERT( is_valid_account_name( to ) );
-         //FC_ASSERT( is_valid_account_name( who ) );
-         //FC_ASSERT( who == from || who == to );
+         FC_ASSERT( who == from || who == to );
       }
       void escrow_release_operation::validate()const {
-         //FC_ASSERT( is_valid_account_name( from ) );
-         //FC_ASSERT( is_valid_account_name( to ) );
-         //FC_ASSERT( is_valid_account_name( who ) );
-         //FC_ASSERT( who != to );
-         //FC_ASSERT( amount.amount > 0 );
-         //FC_ASSERT( amount.symbol != VESTS_SYMBOL );
+         FC_ASSERT( who != to );
+         FC_ASSERT( amount.amount > 0 );
+         FC_ASSERT( amount.asset_id == asset_id_type()); // only bts is allowed by now
       }
-      /*
-      void escrow_transfer_operation::get_required_active_authorities( flat_set<account_id_type>& a )const
-      { a.insert( from ); }
-
-      void escrow_dispute_operation::get_required_owner_authorities( flat_set<account_id_type>& a )const
-      { a.insert( from ); }
-
-      void escrow_release_operation::get_required_active_authorities( flat_set<account_id_type>& a )const
-      { a.insert( from ); }
-*/
    } }
