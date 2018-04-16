@@ -45,7 +45,6 @@ BOOST_AUTO_TEST_CASE( escrow_transfer )
       {
          ACTORS( (alice)(bob)(sam) );
 
-         //enable_fees();
          transfer(committee_account, alice_id, asset(100000000));
 
          BOOST_REQUIRE_EQUAL(get_balance(alice_id, asset_id_type()), 100000000);
@@ -62,10 +61,9 @@ BOOST_AUTO_TEST_CASE( escrow_transfer )
             op.amount = core.amount(1000);
             op.escrow_id = 0;
             op.agent = sam_id;
-            op.fee = asset( 100, asset_id_type() );
             op.json_meta = "";
-            //op.ratification_deadline = db.head_block_time() + 100;
-            //op.escrow_expiration = db.head_block_time() + 200;
+            op.ratification_deadline = db.head_block_time() + 100;
+            op.escrow_expiration = db.head_block_time() + 200;
             trx.operations.push_back(op);
             sign(trx, alice_private_key);
             PUSH_TX(db, trx);
@@ -83,10 +81,9 @@ BOOST_AUTO_TEST_CASE( escrow_transfer )
          BOOST_REQUIRE( escrow.to_approved == false );
          BOOST_REQUIRE( escrow.agent_approved == false );
 
-         BOOST_REQUIRE_EQUAL(get_balance(alice_id, asset_id_type()), 99998900);
+         BOOST_REQUIRE_EQUAL(get_balance(alice_id, asset_id_type()), 99999000);
          BOOST_REQUIRE_EQUAL(get_balance(bob_id, asset_id_type()), 0);
          BOOST_REQUIRE_EQUAL(get_balance(sam_id, asset_id_type()), 0);
-
 
          // agent approves
          BOOST_TEST_MESSAGE( "Testing: escrow release" );
@@ -100,13 +97,12 @@ BOOST_AUTO_TEST_CASE( escrow_transfer )
             op.approve = true;
             trx.operations.push_back(op);
             sign(trx, sam_private_key);
-            //sign(trx, alice_private_key);
             PUSH_TX(db, trx);
             generate_block();
             trx.clear();
          }
 
-         BOOST_REQUIRE_EQUAL(get_balance(alice_id, asset_id_type()), 99998900);
+         BOOST_REQUIRE_EQUAL(get_balance(alice_id, asset_id_type()), 99999000);
          BOOST_REQUIRE_EQUAL(get_balance(bob_id, asset_id_type()), 0);
          BOOST_REQUIRE_EQUAL(get_balance(sam_id, asset_id_type()), 0);
 
@@ -136,7 +132,7 @@ BOOST_AUTO_TEST_CASE( escrow_transfer )
             generate_block();
             trx.clear();
          }
-         BOOST_REQUIRE_EQUAL(get_balance(alice_id, asset_id_type()), 99998900);
+         BOOST_REQUIRE_EQUAL(get_balance(alice_id, asset_id_type()), 99999000);
          BOOST_REQUIRE_EQUAL(get_balance(bob_id, asset_id_type()), 0);
          BOOST_REQUIRE_EQUAL(get_balance(sam_id, asset_id_type()), 0);
 
@@ -164,7 +160,7 @@ BOOST_AUTO_TEST_CASE( escrow_transfer )
             generate_block();
             trx.clear();
          }
-         BOOST_REQUIRE_EQUAL(get_balance(alice_id, asset_id_type()), 99998900);
+         BOOST_REQUIRE_EQUAL(get_balance(alice_id, asset_id_type()), 99999000);
          BOOST_REQUIRE_EQUAL(get_balance(bob_id, asset_id_type()), 1000);
          BOOST_REQUIRE_EQUAL(get_balance(sam_id, asset_id_type()), 0);
 
@@ -183,7 +179,6 @@ BOOST_AUTO_TEST_CASE( escrow_dispute )
    {
       ACTORS( (alice)(bob)(sam) );
 
-      //enable_fees();
       transfer(committee_account, alice_id, asset(100000000));
 
       BOOST_REQUIRE_EQUAL(get_balance(alice_id, asset_id_type()), 100000000);
@@ -200,7 +195,7 @@ BOOST_AUTO_TEST_CASE( escrow_dispute )
          op.amount = core.amount(1000);
          op.escrow_id = 0;
          op.agent = sam_id;
-         op.fee = asset( 100, asset_id_type() );
+         //op.fee = asset( 100, asset_id_type() );
          op.json_meta = "";
          op.ratification_deadline = db.head_block_time() + 100;
          op.escrow_expiration = db.head_block_time() + 200;
@@ -221,7 +216,7 @@ BOOST_AUTO_TEST_CASE( escrow_dispute )
       BOOST_REQUIRE( escrow.to_approved == false );
       BOOST_REQUIRE( escrow.agent_approved == false );
 
-      BOOST_REQUIRE_EQUAL(get_balance(alice_id, asset_id_type()), 99998900);
+      BOOST_REQUIRE_EQUAL(get_balance(alice_id, asset_id_type()), 99999000);
       BOOST_REQUIRE_EQUAL(get_balance(bob_id, asset_id_type()), 0);
       BOOST_REQUIRE_EQUAL(get_balance(sam_id, asset_id_type()), 0);
 
@@ -250,29 +245,9 @@ BOOST_AUTO_TEST_CASE( escrow_dispute )
       BOOST_REQUIRE( escrow.to_approved == false );
       BOOST_REQUIRE( escrow.agent_approved == false );
 
-      wdump((escrow.escrow_expiration));
+      //wdump((escrow.escrow_expiration));
 
       // now the agent is in control and can send money back to alice
-
-      // first make the agent aprove the op in dispute
-      /*
-      {
-         escrow_approve_operation op;
-         op.from = alice_id;
-         op.to = bob_id;
-         op.who = sam_id;
-         op.escrow_id = 0;
-         op.agent = sam_id;
-         op.approve = true;
-         trx.operations.push_back(op);
-         sign(trx, sam_private_key);
-         //sign(trx, alice_private_key);
-         PUSH_TX(db, trx);
-         generate_block();
-         trx.clear();
-      }
-       */
-
 
       // now release back to alice with alice
       {
@@ -289,7 +264,7 @@ BOOST_AUTO_TEST_CASE( escrow_dispute )
          generate_block();
          trx.clear();
       }
-      BOOST_REQUIRE_EQUAL(get_balance(alice_id, asset_id_type()), 99999900);
+      BOOST_REQUIRE_EQUAL(get_balance(alice_id, asset_id_type()), 100000000);
       BOOST_REQUIRE_EQUAL(get_balance(bob_id, asset_id_type()), 0);
       BOOST_REQUIRE_EQUAL(get_balance(sam_id, asset_id_type()), 0);
 
@@ -297,12 +272,38 @@ BOOST_AUTO_TEST_CASE( escrow_dispute )
 
 }
 
-BOOST_AUTO_TEST_CASE( escrow_uia )
+BOOST_AUTO_TEST_CASE( escrow_validations )
 {
    try {
 
-      //INVOKE(create_uia);
+      ACTORS( (alice)(bob)(sam)(paul) );
 
+      //enable_fees();
+      transfer(committee_account, alice_id, asset(100000000));
+
+      BOOST_REQUIRE_EQUAL(get_balance(alice_id, asset_id_type()), 100000000);
+      BOOST_REQUIRE_EQUAL(get_balance(bob_id, asset_id_type()), 0);
+      BOOST_REQUIRE_EQUAL(get_balance(sam_id, asset_id_type()), 0);
+
+      const asset_object &core = asset_id_type()(db);
+      const auto& bitusd = create_bitasset("USDBIT", paul_id);
+
+      BOOST_TEST_MESSAGE( "create escrow with non core will fail" );
+
+      escrow_transfer_operation op;
+      op.from = alice_id;
+      op.to = bob_id;
+      op.amount = bitusd.amount(1000);
+      op.escrow_id = 0;
+      op.agent = sam_id;
+      op.json_meta = "";
+      op.ratification_deadline = db.head_block_time() + 100;
+      op.escrow_expiration = db.head_block_time() + 200;
+      trx.operations.push_back(op);
+      sign(trx, alice_private_key);
+      PUSH_TX(db, trx);
+      generate_block();
+      trx.clear();
 
    } FC_LOG_AND_RETHROW()
 }

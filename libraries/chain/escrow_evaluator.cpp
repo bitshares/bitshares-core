@@ -33,16 +33,11 @@ namespace graphene { namespace chain {
          return void_result();
       }
 
-
       void_result escrow_transfer_evaluator::do_apply(const escrow_transfer_operation& o)
       {
 
          try {
             //FC_ASSERT( db().has_hardfork( STEEMIT_HARDFORK_0_9 ) ); /// TODO: remove this after HF9
-
-            //const auto& from_account = o.from(db());
-            //const auto& to_account = o.to(db());
-            //const auto& agent_account = o.agent(db());
 
             if( o.agent_fee.amount > 0 ) {
                db().adjust_balance( o.from, -o.agent_fee );
@@ -73,7 +68,6 @@ namespace graphene { namespace chain {
          FC_ASSERT( escrow.agent == o.agent, "op 'agent' does not match escrow 'agent'" );
          return void_result();
       }
-
 
       void_result escrow_approve_evaluator::do_apply(const escrow_approve_operation& o)
       {
@@ -119,9 +113,6 @@ namespace graphene { namespace chain {
 
             if( reject_escrow )
             {
-               //const auto& from_account = db().get_account( o.from );
-               //db().adjust_balance( from_account, escrow.steem_balance );
-               //db().adjust_balance( from_account, escrow.sbd_balance );
                db().adjust_balance( o.from, escrow.amount );
                db().adjust_balance( o.from, escrow.pending_fee );
 
@@ -129,7 +120,6 @@ namespace graphene { namespace chain {
             }
             else if( escrow.to_approved && escrow.agent_approved )
             {
-               //const auto& agent_account = db().get_account( o.agent );
                db().adjust_balance( o.agent, escrow.pending_fee );
 
                db().modify( escrow, [&]( escrow_object& esc )
@@ -144,8 +134,6 @@ namespace graphene { namespace chain {
 
       }
 
-
-
       void_result escrow_dispute_evaluator::do_evaluate(const escrow_dispute_operation& o)
       {
          const auto& e = db().get_escrow( o.from, o.escrow_id );
@@ -156,17 +144,13 @@ namespace graphene { namespace chain {
 
       }
 
-
       void_result escrow_dispute_evaluator::do_apply(const escrow_dispute_operation& o)
       {
 
          try {
             //FC_ASSERT( db().has_hardfork( STEEMIT_HARDFORK_0_9 ) ); /// TODO: remove this after HF9
-            //const auto& from_account = db().get_account(o.from);
 
             const auto& e = db().get_escrow( o.from, o.escrow_id );
-            //FC_ASSERT( !e.disputed );
-            //FC_ASSERT( e.to == o.to );
 
             db().modify( e, [&]( escrow_object& esc ){
                esc.disputed = true;
@@ -177,15 +161,13 @@ namespace graphene { namespace chain {
          } FC_CAPTURE_AND_RETHROW( (o) )
       }
 
-
       void_result escrow_release_evaluator::do_evaluate(const escrow_release_operation& o)
       {
          const auto& e = db().get_escrow( o.from, o.escrow_id );
 
-         //FC_ASSERT( e.balance >= o.amount && e.balance.asset_id == o.amount.asset_id );
          FC_ASSERT( e.amount >= o.amount && e.amount.asset_id == o.amount.asset_id );
 
-         /// TODO assert o.amount > 0
+         FC_ASSERT( o.amount.amount > 0 && e.amount.amount > 0);
 
          if( e.escrow_expiration > db().head_block_time() ) {
             if( o.who == e.from )    FC_ASSERT( o.to == e.to );
@@ -200,34 +182,12 @@ namespace graphene { namespace chain {
 
       }
 
-
       void_result escrow_release_evaluator::do_apply(const escrow_release_operation& o)
       {
-
          try {
             //FC_ASSERT( db().has_hardfork( STEEMIT_HARDFORK_0_9 ) ); /// TODO: remove this after HF9
 
-            //const auto& from_account = db().get_account(o.from);
-            //const auto& to_account = db().get_account(o.to);
-            //const auto& who_account = db().get_account(o.who);
-
             const auto& e = db().get_escrow( o.from, o.escrow_id );
-/*
-            //FC_ASSERT( e.balance >= o.amount && e.balance.asset_id == o.amount.asset_id );
-            FC_ASSERT( e.amount >= o.amount && e.amount.asset_id == o.amount.asset_id );
-
-            /// TODO assert o.amount > 0
-
-            if( e.escrow_expiration > db().head_block_time() ) {
-               if( o.who == e.from )    FC_ASSERT( o.to == e.to );
-               else if( o.who == e.to ) FC_ASSERT( o.to == e.from );
-               else {
-                  FC_ASSERT( e.disputed && o.who == e.agent );
-               }
-               } else {
-                  FC_ASSERT( o.who == e.to || o.who == e.from );
-            }
-*/
             db().adjust_balance( o.to, o.amount );
             if( e.amount == o.amount )
                db().remove( e );
@@ -243,4 +203,3 @@ namespace graphene { namespace chain {
       }
 
 } } // graphene::chain
-

@@ -22,26 +22,15 @@
  * THE SOFTWARE.
  */
 #pragma once
-//#include <fc/io/raw.hpp>
 
 #include <graphene/chain/protocol/types.hpp>
 #include <graphene/db/object.hpp>
-//#include <graphene/db/index.hpp>
 #include <graphene/db/generic_index.hpp>
-//#include <fc/uint128.hpp>
-
-//#include <boost/multi_index_container.hpp>
-//#include <boost/multi_index/member.hpp>
-//#include <boost/multi_index/ordered_index.hpp>
-//#include <boost/multi_index/hashed_index.hpp>
-//#include <boost/multi_index/mem_fun.hpp>
 
 namespace graphene { namespace chain {
-      //using namespace graphene::db;
-      //using boost::multi_index_container;
-      //using namespace boost::multi_index;
+
       /**
-       * Explain WTF the object is for.
+       * Explain what the object is for.
        */
       class escrow_object : public graphene::db::abstract_object<escrow_object> {
          public:

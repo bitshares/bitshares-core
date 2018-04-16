@@ -54,7 +54,6 @@ namespace graphene { namespace chain {
          account_id_type         from;
          account_id_type         to;
          asset          amount;
-         //string         memo;
 
          uint32_t        escrow_id=0;
          account_id_type         agent;
@@ -91,8 +90,6 @@ namespace graphene { namespace chain {
          void get_required_active_authorities( flat_set<account_id_type>& a )const{ a.insert(who); }
          account_id_type fee_payer()const { return who; }
       };
-
-
 
       /**
        *  If either the sender or receiver of an escrow payment has an issue, they can
