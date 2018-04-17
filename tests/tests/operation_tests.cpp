@@ -2406,7 +2406,7 @@ BOOST_AUTO_TEST_CASE( trade_amount_equals_zero_settle )
       current_feed.maintenance_collateral_ratio = 1750;
       current_feed.maximum_short_squeeze_ratio = 1100;
       current_feed.settlement_price = bitusd_id(db).amount( 100 ) / core_id(db).amount(5);
-      publish_feed( bitusd_id(db), paul_id(db), current_feed );
+      publish_feed( bitusd_id(db), alice_id(db), current_feed );
 
       // now yes expire settlement
       generate_blocks( db.head_block_time() + fc::hours(6) );
@@ -2497,7 +2497,7 @@ BOOST_AUTO_TEST_CASE( trade_amount_equals_zero_settle_after_hf_184 )
       current_feed.maintenance_collateral_ratio = 1750;
       current_feed.maximum_short_squeeze_ratio = 1100;
       current_feed.settlement_price = bitusd_id(db).amount( 100 ) / core_id(db).amount(5);
-      publish_feed( bitusd_id(db), paul_id(db), current_feed );
+      publish_feed( bitusd_id(db), alice_id(db), current_feed );
 
       // now yes expire settlement
       generate_blocks( db.head_block_time() + fc::hours(6) );
