@@ -1118,7 +1118,9 @@ BOOST_AUTO_TEST_CASE( trade_amount_equals_zero )
       set_expiration( db, trx );
 
       const asset_object& test = get_asset( UIA_TEST_SYMBOL );
+      const asset_id_type test_id = test.id;
       const asset_object& core = get_asset( GRAPHENE_SYMBOL );
+      const asset_id_type core_id = core.id;
       const account_object& core_seller = create_account( "shorter1" );
       const account_object& core_buyer = get_account("nathan");
 

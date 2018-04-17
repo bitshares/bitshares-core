@@ -97,6 +97,7 @@ BOOST_AUTO_TEST_CASE(issue_338)
    BOOST_CHECK_EQUAL( 993, call.debt.value );
    BOOST_CHECK_EQUAL( 14940, call.collateral.value );
 
+   auto buy_low = create_sell_order(buyer, asset(90), bitusd.amount(10))->id;
    // margin call takes precedence
    BOOST_CHECK( !create_sell_order(seller, bitusd.amount(7), core.amount(60)) );
    BOOST_CHECK_EQUAL( 986, get_balance(seller, bitusd) );
@@ -104,6 +105,7 @@ BOOST_AUTO_TEST_CASE(issue_338)
    BOOST_CHECK_EQUAL( 986, call.debt.value );
    BOOST_CHECK_EQUAL( 14880, call.collateral.value );
 
+   auto buy_med = create_sell_order(buyer, asset(105), bitusd.amount(10))->id;
    // margin call takes precedence
    BOOST_CHECK( !create_sell_order(seller, bitusd.amount(7), core.amount(70)) );
    BOOST_CHECK_EQUAL( 979, get_balance(seller, bitusd) );
@@ -111,6 +113,7 @@ BOOST_AUTO_TEST_CASE(issue_338)
    BOOST_CHECK_EQUAL( 979, call.debt.value );
    BOOST_CHECK_EQUAL( 14810, call.collateral.value );
 
+   auto buy_high = create_sell_order(buyer, asset(115), bitusd.amount(10))->id;
    // margin call still has precedence (!))
    BOOST_CHECK( !create_sell_order(seller, bitusd.amount(7), core.amount(77)) );
    BOOST_CHECK_EQUAL( 972, get_balance(seller, bitusd) );
@@ -132,6 +135,8 @@ BOOST_AUTO_TEST_CASE( check_call_order_cull_small_test )
 
    const auto& bitusd = create_bitasset("USDBIT", feedproducer_id);
    const auto& core   = asset_id_type()(db);
+   asset_id_type usd_id = bitusd.id;
+   asset_id_type core_id = core.id;
 
    int64_t init_balance(1000000);
 
@@ -152,8 +157,10 @@ BOOST_AUTO_TEST_CASE( check_call_order_cull_small_test )
    call_order_id_type call_id = call.id;
    // create another position with 310% collateral, call price is 15.5/175 CORE/USD = 62/700
    const call_order_object& call2 = *borrow( borrower2, bitusd.amount(100000), asset(15500));
+   call_order_id_type call2_id = call2.id;
    // create yet another position with 350% collateral, call price is 17.5/175 CORE/USD = 77/700
    const call_order_object& call3 = *borrow( borrower3, bitusd.amount(100000), asset(17500));
+   call_order_id_type call3_id = call3.id;
    transfer(borrower, seller, bitusd.amount(10));
    transfer(borrower2, seller, bitusd.amount(100000));
    transfer(borrower3, seller, bitusd.amount(100000));
