@@ -2366,7 +2366,7 @@ BOOST_AUTO_TEST_CASE( trade_amount_equals_zero_settle )
       publish_feed( bitusd, paul, current_feed );
 
       // paul gets some bitusd
-      auto call_paul = *borrow( paul, bitusd.amount(1000), asset(100));
+      const call_order_object& call_paul = *borrow( paul, bitusd.amount(1000), asset(100));
       call_order_id_type call_paul_id = call_paul.id;
       BOOST_REQUIRE_EQUAL( get_balance( paul, bitusd ), 1000 );
 
@@ -2379,7 +2379,7 @@ BOOST_AUTO_TEST_CASE( trade_amount_equals_zero_settle )
       BOOST_CHECK_EQUAL(get_balance(michael, core), 100000000);
 
       // michael selling core
-      auto call_michael = *borrow(michael, bitusd.amount(6), core.amount(8));
+      const call_order_object& call_michael = *borrow(michael, bitusd.amount(6), core.amount(8));
       call_order_id_type call_michael_id = call_michael.id;
 
       // add settle order and check rounding issue
@@ -2457,7 +2457,7 @@ BOOST_AUTO_TEST_CASE( trade_amount_equals_zero_settle_after_hf_184 )
       publish_feed( bitusd, paul, current_feed );
 
       // paul gets some bitusd
-      auto call_paul = *borrow( paul, bitusd.amount(1000), asset(100));
+      const call_order_object& call_paul = *borrow( paul, bitusd.amount(1000), asset(100));
       call_order_id_type call_paul_id = call_paul.id;
       BOOST_REQUIRE_EQUAL( get_balance( paul, bitusd ), 1000 );
 
@@ -2470,7 +2470,7 @@ BOOST_AUTO_TEST_CASE( trade_amount_equals_zero_settle_after_hf_184 )
       BOOST_CHECK_EQUAL(get_balance(michael, core), 100000000);
 
       // michael selling core
-      auto call_michael = *borrow(michael, bitusd.amount(6), core.amount(8));
+      const call_order_object& call_michael = *borrow(michael, bitusd.amount(6), core.amount(8));
       call_order_id_type call_michael_id = call_michael.id;
 
       // add settle order and check rounding issue
@@ -2563,7 +2563,7 @@ BOOST_AUTO_TEST_CASE( trade_amount_equals_zero_global_settle )
       BOOST_CHECK_EQUAL(get_balance(paul_id(db), core), 10000000);
 
       // paul gets some bitusd
-      auto call_paul = *borrow( paul_id(db), bitusd_id(db).amount(1000), core_id(db).amount(100));
+      const call_order_object& call_paul = *borrow( paul_id(db), bitusd_id(db).amount(1000), core_id(db).amount(100));
       call_order_id_type call_paul_id = call_paul.id;
       BOOST_REQUIRE_EQUAL( get_balance( paul_id(db), bitusd_id(db) ), 1000 );
 
@@ -2576,7 +2576,7 @@ BOOST_AUTO_TEST_CASE( trade_amount_equals_zero_global_settle )
       BOOST_CHECK_EQUAL(get_balance(michael_id(db), core_id(db)), 100000000);
 
       // michael selling core
-      auto call_michael = *borrow(michael_id(db), bitusd_id(db).amount(6), core_id(db).amount(8));
+      const call_order_object& call_michael = *borrow(michael_id(db), bitusd_id(db).amount(6), core_id(db).amount(8));
       call_order_id_type call_michael_id = call_michael.id;
 
       // add global settle
@@ -2643,7 +2643,7 @@ BOOST_AUTO_TEST_CASE( trade_amount_equals_zero_global_settle_after_hf_184 )
       BOOST_CHECK_EQUAL(get_balance(paul_id(db), core), 10000000);
 
       // paul gets some bitusd
-      auto call_paul = *borrow( paul_id(db), bitusd_id(db).amount(1000), core_id(db).amount(100));
+      const call_order_object& call_paul = *borrow( paul_id(db), bitusd_id(db).amount(1000), core_id(db).amount(100));
       call_order_id_type call_paul_id = call_paul.id;
       BOOST_REQUIRE_EQUAL( get_balance( paul_id(db), bitusd_id(db) ), 1000 );
 
@@ -2656,7 +2656,7 @@ BOOST_AUTO_TEST_CASE( trade_amount_equals_zero_global_settle_after_hf_184 )
       BOOST_CHECK_EQUAL(get_balance(michael_id(db), core_id(db)), 100000000);
 
       // michael selling core
-      auto call_michael = *borrow(michael_id(db), bitusd_id(db).amount(6), core_id(db).amount(8));
+      const call_order_object& call_michael = *borrow(michael_id(db), bitusd_id(db).amount(6), core_id(db).amount(8));
       call_order_id_type call_michael_id = call_michael.id;
 
       // add global settle
