@@ -92,8 +92,9 @@ namespace graphene { namespace chain {
          FC_THROW_EXCEPTION( fc::assert_exception, "invalid asset * price", ("asset",a)("price",b) );
       }
 
-      asset operator ^ ( const asset& a, const price& b )
+      asset asset::multiply_and_round_up( const price& b )const
       {
+         const asset& a = *this;
          if( a.asset_id == b.base.asset_id )
          {
             FC_ASSERT( b.base.amount.value > 0 );
@@ -108,7 +109,7 @@ namespace graphene { namespace chain {
             FC_ASSERT( result <= GRAPHENE_MAX_SHARE_SUPPLY );
             return asset( result.convert_to<int64_t>(), b.base.asset_id );
          }
-         FC_THROW_EXCEPTION( fc::assert_exception, "invalid asset * price", ("asset",a)("price",b) );
+         FC_THROW_EXCEPTION( fc::assert_exception, "invalid asset::multiply_and_round_up(price)", ("asset",a)("price",b) );
       }
 
       price operator / ( const asset& base, const asset& quote )

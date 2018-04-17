@@ -533,7 +533,7 @@ operation_result asset_settle_evaluator::do_apply(const asset_settle_evaluator::
             && settled_amount.amount != 0
             && d.get_dynamic_global_properties().next_maintenance_time > HARDFORK_CORE_342_TIME )
       {
-         pays = settled_amount ^ bitasset.settlement_price;
+         pays = settled_amount.multiply_and_round_up( bitasset.settlement_price );
       }
 
       d.adjust_balance( op.account, -pays );
