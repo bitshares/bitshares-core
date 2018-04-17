@@ -2591,8 +2591,8 @@ BOOST_AUTO_TEST_CASE( trade_amount_equals_zero_global_settle )
       BOOST_CHECK_EQUAL(get_balance(paul_id(db), bitusd_id(db)), 800);
 
       // all call orders are gone after global settle
-      BOOST_CHECK( db.find_object(call_paul_id) == nullptr);
-      BOOST_CHECK( db.find_object(call_michael_id) == nullptr);
+      BOOST_CHECK( !db.find_object(call_paul_id));
+      BOOST_CHECK( !db.find_object(call_michael_id));
 
 
    } FC_LOG_AND_RETHROW()
@@ -2671,8 +2671,8 @@ BOOST_AUTO_TEST_CASE( trade_amount_equals_zero_global_settle_after_hf_184 )
       BOOST_CHECK_EQUAL(get_balance(paul_id(db), bitusd_id(db)), 800);
 
       // all call orders are gone after global settle
-      BOOST_CHECK( db.find_object(call_paul_id) == nullptr);
-      BOOST_CHECK( db.find_object(call_michael_id) == nullptr);
+      BOOST_CHECK( !db.find_object(call_paul_id));
+      BOOST_CHECK( !db.find_object(call_michael_id));
 
    } FC_LOG_AND_RETHROW()
 }
