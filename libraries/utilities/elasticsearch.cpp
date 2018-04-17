@@ -63,7 +63,7 @@ bool SendBulk(CURL *curl, std::vector<std::string>& bulk, std::string elasticsea
       return 0;
    }
    else {
-      elog(http_code + "error: Unknown error");
+      elog(std::to_string(http_code) + " error: Unknown error");
       return 0;
    }
 
@@ -99,7 +99,7 @@ bool SendBulk(CURL *curl, std::vector<std::string>& bulk, std::string elasticsea
        return 0;
     }
     else {
-       elog(http_code + "error: Unknown error");
+       elog(std::to_string(http_code) + " error: Unknown error");
        return 0;
     }
   }
