@@ -107,7 +107,7 @@ pair<asset, asset> call_order_object::get_max_sell_receive_pair( price match_pri
    // note: rounding up-down results in 3x imperfection rate in comparison to down-down-up
    asset to_pay = asset( to_cover_amt, debt_type() ) * match_price;
    asset to_cover = to_pay * match_price;
-   to_pay = to_cover ^ match_price;
+   to_pay = to_cover.multiply_and_round_up( match_price );
 
    if( to_cover.amount >= debt || to_pay.amount >= collateral ) // to be safe
       return make_pair( get_collateral(), get_debt() );
@@ -126,11 +126,12 @@ pair<asset, asset> call_order_object::get_max_sell_receive_pair( price match_pri
       to_cover_i256 = debt.value;
    to_cover_amt = static_cast< int64_t >( to_cover_i256 );
 
-   asset max_to_pay = ( to_cover_amt == debt.value ) ? get_collateral() : ( asset( to_cover_amt, debt_type() ) ^ match_price );
+   asset max_to_pay = ( ( to_cover_amt == debt.value ) ? get_collateral()
+                        : asset( to_cover_amt, debt_type() ).multiply_and_round_up( match_price ) );
    if( max_to_pay.amount > collateral )
       max_to_pay.amount = collateral;
 
-   asset max_to_cover = ( max_to_pay.amount == collateral ) ? get_debt() : ( max_to_pay * match_price );
+   asset max_to_cover = ( ( max_to_pay.amount == collateral ) ? get_debt() : ( max_to_pay * match_price ) );
    if( max_to_cover.amount >= debt ) // to be safe
    {
       max_to_pay.amount = collateral;
@@ -166,7 +167,7 @@ pair<asset, asset> call_order_object::get_max_sell_receive_pair( price match_pri
             }
             else
             {
-               to_pay = to_cover ^ match_price; // stabilization, no change or become smaller
+               to_pay = to_cover.multiply_and_round_up( match_price ); // stabilization, no change or become smaller
                FC_ASSERT( to_pay.amount < max_to_pay.amount );
             }
          }
@@ -178,7 +179,7 @@ pair<asset, asset> call_order_object::get_max_sell_receive_pair( price match_pri
             to_pay.amount = max_to_pay.amount;
          else
          {
-            to_pay = to_cover ^ match_price;
+            to_pay = to_cover.multiply_and_round_up( match_price );
             if( to_pay.amount >= max_to_pay.amount ) // can be true when max_is_ok is false
             {
                to_pay.amount = max_to_pay.amount;
@@ -238,7 +239,7 @@ pair<asset, asset> call_order_object::get_max_sell_receive_pair( price match_pri
          to_cover = to_pay * match_price;
          if( to_cover.amount >= debt )
             return make_pair( get_collateral(), get_debt() );
-         to_pay = to_cover ^ match_price; // stabilization
+         to_pay = to_cover.multiply_and_round_up( match_price ); // stabilization
          if( to_pay.amount >= collateral )
             return make_pair( get_collateral(), get_debt() );
       }
@@ -247,7 +248,7 @@ pair<asset, asset> call_order_object::get_max_sell_receive_pair( price match_pri
          to_cover.amount += d2;
          if( to_cover.amount >= debt )
             return make_pair( get_collateral(), get_debt() );
-         to_pay = to_cover ^ match_price;
+         to_pay = to_cover.multiply_and_round_up( match_price );
          if( to_pay.amount >= collateral )
             return make_pair( get_collateral(), get_debt() );
          to_cover = to_pay * match_price; // stabilization

@@ -336,14 +336,14 @@ BOOST_AUTO_TEST_CASE( price_multiplication_test )
       try
       {
          asset b = a * p;
-         asset a1 = b ^ p;
+         asset a1 = b.multiply_and_round_up( p );
          BOOST_CHECK( a1 <= a );
          BOOST_CHECK( (a1 * p) == b );
 
-         b = a ^ p;
+         b = a.multiply_and_round_up( p );
          a1 = b * p;
          BOOST_CHECK( a1 >= a );
-         BOOST_CHECK( (a1 ^ p) == b );
+         BOOST_CHECK( a1.multiply_and_round_up( p ) == b );
       }
       catch( fc::assert_exception& e )
       {

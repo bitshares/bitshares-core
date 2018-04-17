@@ -83,8 +83,9 @@ BOOST_AUTO_TEST_CASE( call_order_object_test )
       {
          // should have target_cr set and in margin call territory
          BOOST_REQUIRE_LT( result.second.amount.value, o.debt.value );
-         BOOST_CHECK( ( result.first * match_price ) == result.second ); // round down debt to cover
-         BOOST_CHECK( ( result.second ^ match_price ) == result.first ); // round up paying collateral is not too much
+         BOOST_CHECK( result.first * match_price == result.second ); // round down debt to cover
+         BOOST_CHECK( result.second.multiply_and_round_up( match_price ) == result.first );
+                                                                         // round up paying collateral is not too much
 
          // after sold some collateral, the collateral ratio will be higher than expected
          price new_tcr_call_price = price::call_price( o.get_debt() - result.second, o.get_collateral() - result.first, tcr );
@@ -116,7 +117,7 @@ BOOST_AUTO_TEST_CASE( call_order_object_test )
                   sell_less = cover_less * match_price; // round down collateral
                   cover_less = sell_less * match_price; // round down debt to cover
                }
-               sell_less = cover_less ^ match_price; // round up to get collateral to sell
+               sell_less = cover_less.multiply_and_round_up( match_price ); // round up to get collateral to sell
                if( sell_less.amount <= 0 || cover_less.amount <= 0 ) // unable to sell or cover less, we return
                {
                   if( result.first.amount == o.collateral )
