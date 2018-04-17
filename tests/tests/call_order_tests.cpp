@@ -239,7 +239,7 @@ BOOST_AUTO_TEST_CASE( call_order_object_test )
    std::uniform_int_distribution<uint16_t> tcr_uid2(0, 3000);
 
    vector<int> count(20,0);
-   int total = 1000*2000;
+   int total = 500*1000;
    for( int i = total; i > 0; --i )
    {
       if( i % 3 == 0 )
