@@ -701,7 +701,10 @@ asset database::match( const call_order_object& call,
                cull_settle_order = true;
             // else do nothing, since we can't cull the settle order
 
-            call_receives = call_pays.multiply_and_round_up( match_price ); // round up here to mitigate rounding issue (core-342)
+            call_receives = call_pays.multiply_and_round_up( match_price ); // round up here to mitigate rounding issue (core-342).
+                                                                            // It is important to understand here that the newly
+                                                                            // rounded up call_receives won't be greater than the
+                                                                            // old call_receives.
 
             if( call_receives == settle.balance ) // the settle order will be completely filled, no need to cull
                cull_settle_order = false;

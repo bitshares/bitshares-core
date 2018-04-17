@@ -437,7 +437,7 @@ void database::clear_expired_orders()
                   break;
                }
                settled += new_settled;
-               // before hard fork core-342, if new_settled > 0, we'll have:
+               // before hard fork core-342, `new_settled > 0` is always true, we'll have:
                // * call order is completely filled (thus itr will change in next loop), or
                // * settle order is completely filled (thus find_object(order_id) will be false so will break out), or
                // * reached max_settlement_volume limit (thus new_settled == max_settlement so will break out).
