@@ -29,6 +29,8 @@ namespace graphene { namespace chain {
 
    extern const int64_t scaled_precision_lut[];
 
+   struct price;
+
    struct asset
    {
       asset( share_type a = 0, asset_id_type id = asset_id_type() )
@@ -94,6 +96,8 @@ namespace graphene { namespace chain {
          FC_ASSERT( precision < 19 );
          return scaled_precision_lut[ precision ];
       }
+
+      asset multiply_and_round_up( const price& p )const; ///< Multiply and round up
    };
 
    /**
@@ -145,7 +149,6 @@ namespace graphene { namespace chain {
    bool  operator == ( const price& a, const price& b );
    bool  operator != ( const price& a, const price& b );
    asset operator *  ( const asset& a, const price& b ); ///< Multiply and round down
-   asset operator ^  ( const asset& a, const price& b ); ///< Multiply and round up
 
    price operator *  ( const price& p, const ratio_type& r );
    price operator /  ( const price& p, const ratio_type& r );
