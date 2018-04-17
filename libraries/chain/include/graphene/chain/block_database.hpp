@@ -26,7 +26,7 @@
 #include <graphene/chain/protocol/block.hpp>
 
 namespace graphene { namespace chain {
-   class index_entry;
+   struct index_entry;
 
    class block_database 
    {
