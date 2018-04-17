@@ -2253,7 +2253,7 @@ public:
          }
          return ss.str();
       };
-      m["get_order_book"] = [this](variant result, const fc::variants& a)
+      m["get_order_book"] = [](variant result, const fc::variants& a)
       {
          auto orders = result.as<order_book>( GRAPHENE_MAX_NESTED_OBJECTS );
          auto bids = orders.bids;

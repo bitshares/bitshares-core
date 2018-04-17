@@ -126,7 +126,7 @@ void database::pay_workers( share_type& budget )
 
    // worker with more votes is preferred
    // if two workers exactly tie for votes, worker with lower ID is preferred
-   std::sort(active_workers.begin(), active_workers.end(), [this](const worker_object& wa, const worker_object& wb) {
+   std::sort(active_workers.begin(), active_workers.end(), [](const worker_object& wa, const worker_object& wb) {
       share_type wa_vote = wa.approving_stake();
       share_type wb_vote = wb.approving_stake();
       if( wa_vote != wb_vote )
