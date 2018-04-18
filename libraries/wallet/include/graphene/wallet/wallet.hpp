@@ -377,6 +377,7 @@ class wallet_api
        */
      vector<operation_detail>  get_relative_account_history(string name, uint32_t stop, int limit, uint32_t start)const;
 
+      std::map<string,full_account>     get_full_accounts( const vector<string>& names_or_ids, bool subscribe);
       vector<bucket_object>             get_market_history(string symbol, string symbol2, uint32_t bucket, fc::time_point_sec start, fc::time_point_sec end)const;
       vector<limit_order_object>        get_limit_orders(string a, string b, uint32_t limit)const;
       vector<call_order_object>         get_call_orders(string a, uint32_t limit)const;
@@ -1698,6 +1699,7 @@ FC_API( graphene::wallet::wallet_api,
         (get_account_history_by_operations)
         (get_collateral_bids)
         (is_public_key_registered)
+        (get_full_accounts)
         (get_market_history)
         (get_global_properties)
         (get_dynamic_global_properties)
