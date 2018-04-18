@@ -2368,7 +2368,7 @@ BOOST_AUTO_TEST_CASE( trade_amount_equals_zero_settle )
       publish_feed( bitusd, paul, current_feed );
 
       // paul gets some bitusd
-      const call_order_object& call_paul = *borrow( paul, bitusd.amount(1000), asset(100));
+      const call_order_object& call_paul = *borrow( paul, bitusd.amount(1000), core.amount(100) );
       call_order_id_type call_paul_id = call_paul.id;
       BOOST_REQUIRE_EQUAL( get_balance( paul, bitusd ), 1000 );
 
@@ -2459,7 +2459,7 @@ BOOST_AUTO_TEST_CASE( trade_amount_equals_zero_settle_after_hf_184 )
       publish_feed( bitusd, paul, current_feed );
 
       // paul gets some bitusd
-      const call_order_object& call_paul = *borrow( paul, bitusd.amount(1000), asset(100));
+      const call_order_object& call_paul = *borrow( paul, bitusd.amount(1000), core.amount(100) );
       call_order_id_type call_paul_id = call_paul.id;
       BOOST_REQUIRE_EQUAL( get_balance( paul, bitusd ), 1000 );
 
@@ -2547,7 +2547,7 @@ BOOST_AUTO_TEST_CASE( trade_amount_equals_zero_global_settle )
       op.asset_to_update = bitusd.id;
       op.new_options.issuer_permissions = global_settle;
       op.new_options.flags = bitusd.options.flags;
-      op.new_options.core_exchange_rate = price({asset(1,asset_id_type(1)),asset(1)});
+      op.new_options.core_exchange_rate = price( asset(1,bitusd_id), asset(1,core_id) );
       trx.operations.push_back(op);
       sign(trx, paul_private_key);
       PUSH_TX(db, trx);
@@ -2555,14 +2555,14 @@ BOOST_AUTO_TEST_CASE( trade_amount_equals_zero_global_settle )
       trx.clear();
 
       // add a feed to asset
-      update_feed_producers( bitusd, {paul.id} );
+      update_feed_producers( bitusd_id(db), {paul_id} );
       price_feed current_feed;
       current_feed.maintenance_collateral_ratio = 1750;
       current_feed.maximum_short_squeeze_ratio = 1100;
-      current_feed.settlement_price = bitusd.amount( 100 ) / core.amount(5);
-      publish_feed( bitusd, paul, current_feed );
+      current_feed.settlement_price = bitusd_id(db).amount( 100 ) / core_id(db).amount(5);
+      publish_feed( bitusd_id(db), paul_id(db), current_feed );
 
-      BOOST_CHECK_EQUAL(get_balance(paul_id(db), core), 10000000);
+      BOOST_CHECK_EQUAL(get_balance(paul_id(db), core_id(db)), 10000000);
 
       // paul gets some bitusd
       const call_order_object& call_paul = *borrow( paul_id(db), bitusd_id(db).amount(1000), core_id(db).amount(100));
@@ -2593,8 +2593,8 @@ BOOST_AUTO_TEST_CASE( trade_amount_equals_zero_global_settle )
       BOOST_CHECK_EQUAL(get_balance(paul_id(db), bitusd_id(db)), 800);
 
       // all call orders are gone after global settle
-      BOOST_CHECK( !db.find_object(call_paul_id));
-      BOOST_CHECK( !db.find_object(call_michael_id));
+      BOOST_CHECK( !db.find_object(call_paul_id) );
+      BOOST_CHECK( !db.find_object(call_michael_id) );
 
 
    } FC_LOG_AND_RETHROW()
@@ -2627,7 +2627,7 @@ BOOST_AUTO_TEST_CASE( trade_amount_equals_zero_global_settle_after_hf_184 )
       op.asset_to_update = bitusd_id;
       op.new_options.issuer_permissions = global_settle;
       op.new_options.flags = bitusd.options.flags;
-      op.new_options.core_exchange_rate = price({asset(1,asset_id_type(1)),asset(1)});
+      op.new_options.core_exchange_rate = price( asset(1,bitusd_id), asset(1,core_id) );
       trx.operations.push_back(op);
       sign(trx, paul_private_key);
       PUSH_TX(db, trx);
@@ -2635,14 +2635,14 @@ BOOST_AUTO_TEST_CASE( trade_amount_equals_zero_global_settle_after_hf_184 )
       trx.clear();
 
       // add a feed to asset
-      update_feed_producers( bitusd_id(db), {paul.id} );
+      update_feed_producers( bitusd_id(db), {paul_id} );
       price_feed current_feed;
       current_feed.maintenance_collateral_ratio = 1750;
       current_feed.maximum_short_squeeze_ratio = 1100;
       current_feed.settlement_price = bitusd_id(db).amount( 100 ) / core_id(db).amount(5);
-      publish_feed( bitusd_id(db), paul, current_feed );
+      publish_feed( bitusd_id(db), paul_id(db), current_feed );
 
-      BOOST_CHECK_EQUAL(get_balance(paul_id(db), core), 10000000);
+      BOOST_CHECK_EQUAL(get_balance(paul_id(db), core_id(db)), 10000000);
 
       // paul gets some bitusd
       const call_order_object& call_paul = *borrow( paul_id(db), bitusd_id(db).amount(1000), core_id(db).amount(100));
@@ -2695,6 +2695,13 @@ BOOST_AUTO_TEST_CASE( trade_amount_equals_zero_settle_after_global_settle )
       const account_object& michael = *db.get_index_type<account_index>().indices().get<by_name>().find("michael");
       account_id_type michael_id = michael.id;
 
+      BOOST_CHECK_EQUAL(get_balance(rachel_id(db), core_id(db)), 0);
+      BOOST_CHECK_EQUAL(get_balance(rachel_id(db), bitusd_id(db)), 200);
+      BOOST_CHECK_EQUAL(get_balance(michael_id(db), bitusd_id(db)), 6);
+      BOOST_CHECK_EQUAL(get_balance(michael_id(db), core_id(db)), 100000000);
+      BOOST_CHECK_EQUAL(get_balance(paul_id(db), core_id(db)), 9999900);
+      BOOST_CHECK_EQUAL(get_balance(paul_id(db), bitusd_id(db)), 800);
+
       // add settle order and check rounding issue
       force_settle(rachel, bitusd.amount(4));
       generate_block();
@@ -2724,6 +2731,13 @@ BOOST_AUTO_TEST_CASE( trade_amount_equals_zero_settle_after_global_settle_after_
       const account_object& michael = *db.get_index_type<account_index>().indices().get<by_name>().find("michael");
       account_id_type michael_id = michael.id;
 
+      BOOST_CHECK_EQUAL(get_balance(rachel_id(db), core_id(db)), 0);
+      BOOST_CHECK_EQUAL(get_balance(rachel_id(db), bitusd_id(db)), 200);
+      BOOST_CHECK_EQUAL(get_balance(michael_id(db), bitusd_id(db)), 6);
+      BOOST_CHECK_EQUAL(get_balance(michael_id(db), core_id(db)), 99999999);
+      BOOST_CHECK_EQUAL(get_balance(paul_id(db), core_id(db)), 9999900);
+      BOOST_CHECK_EQUAL(get_balance(paul_id(db), bitusd_id(db)), 800);
+
       // settle order will not execute after HF
       GRAPHENE_REQUIRE_THROW( force_settle(rachel, bitusd.amount(4)), fc::exception );
 
@@ -2733,7 +2747,7 @@ BOOST_AUTO_TEST_CASE( trade_amount_equals_zero_settle_after_global_settle_after_
       BOOST_CHECK_EQUAL(get_balance(rachel_id(db), core_id(db)), 0);
       BOOST_CHECK_EQUAL(get_balance(rachel_id(db), bitusd_id(db)), 200);
       BOOST_CHECK_EQUAL(get_balance(michael_id(db), bitusd_id(db)), 6);
-      BOOST_CHECK_EQUAL(get_balance(michael_id(db), core_id(db)), 100000000); // failing here: 99999999
+      BOOST_CHECK_EQUAL(get_balance(michael_id(db), core_id(db)), 99999999);
       BOOST_CHECK_EQUAL(get_balance(paul_id(db), core_id(db)), 9999900);
       BOOST_CHECK_EQUAL(get_balance(paul_id(db), bitusd_id(db)), 800);
 
