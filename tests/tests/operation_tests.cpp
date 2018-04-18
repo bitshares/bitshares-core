@@ -2677,6 +2677,67 @@ BOOST_AUTO_TEST_CASE( trade_amount_equals_zero_global_settle_after_hf_184 )
    } FC_LOG_AND_RETHROW()
 }
 
+BOOST_AUTO_TEST_CASE( trade_amount_equals_zero_settle_after_global_settle )
+{
+   try {
+
+      // caal global settle test
+      INVOKE(trade_amount_equals_zero_global_settle);
+      const asset_object& bitusd = *db.get_index_type<asset_index>().indices().get<by_symbol>().find("USDBIT");
+      asset_id_type bitusd_id = bitusd.id;
+      asset_id_type core_id = asset_id_type();
+      const account_object& rachel = *db.get_index_type<account_index>().indices().get<by_name>().find("rachel");
+      account_id_type rachel_id = rachel.id;
+      const account_object& paul = *db.get_index_type<account_index>().indices().get<by_name>().find("paul");
+      account_id_type paul_id = paul.id;
+      const account_object& michael = *db.get_index_type<account_index>().indices().get<by_name>().find("michael");
+      account_id_type michael_id = michael.id;
+
+      // add settle order and check rounding issue
+      force_settle(rachel, bitusd.amount(4));
+      generate_block();
+
+      BOOST_CHECK_EQUAL(get_balance(rachel_id(db), core_id(db)), 0);
+      BOOST_CHECK_EQUAL(get_balance(rachel_id(db), bitusd_id(db)), 196);
+      BOOST_CHECK_EQUAL(get_balance(michael_id(db), bitusd_id(db)), 6);
+      BOOST_CHECK_EQUAL(get_balance(michael_id(db), core_id(db)), 100000000);
+      BOOST_CHECK_EQUAL(get_balance(paul_id(db), core_id(db)), 9999900);
+      BOOST_CHECK_EQUAL(get_balance(paul_id(db), bitusd_id(db)), 800);
+
+   } FC_LOG_AND_RETHROW()
+}
+
+BOOST_AUTO_TEST_CASE( trade_amount_equals_zero_settle_after_global_settle_after_hf_184 )
+{
+   try {
+      // call global settle after hardfork 184
+      INVOKE(trade_amount_equals_zero_global_settle_after_hf_184);
+      const asset_object& bitusd = *db.get_index_type<asset_index>().indices().get<by_symbol>().find("USDBIT");
+      asset_id_type bitusd_id = bitusd.id;
+      asset_id_type core_id = asset_id_type();
+      const account_object& rachel = *db.get_index_type<account_index>().indices().get<by_name>().find("rachel");
+      account_id_type rachel_id = rachel.id;
+      const account_object& paul = *db.get_index_type<account_index>().indices().get<by_name>().find("paul");
+      account_id_type paul_id = paul.id;
+      const account_object& michael = *db.get_index_type<account_index>().indices().get<by_name>().find("michael");
+      account_id_type michael_id = michael.id;
+
+      // settle order will not execute after HF
+      GRAPHENE_REQUIRE_THROW( force_settle(rachel, bitusd.amount(4)), fc::exception );
+
+      generate_block();
+
+      // balances unchanged
+      BOOST_CHECK_EQUAL(get_balance(rachel_id(db), core_id(db)), 0);
+      BOOST_CHECK_EQUAL(get_balance(rachel_id(db), bitusd_id(db)), 200);
+      BOOST_CHECK_EQUAL(get_balance(michael_id(db), bitusd_id(db)), 6);
+      BOOST_CHECK_EQUAL(get_balance(michael_id(db), core_id(db)), 100000000); // failing here: 99999999
+      BOOST_CHECK_EQUAL(get_balance(paul_id(db), core_id(db)), 9999900);
+      BOOST_CHECK_EQUAL(get_balance(paul_id(db), bitusd_id(db)), 800);
+
+   } FC_LOG_AND_RETHROW()
+}
+
 // TODO:  Write linear VBO tests
 
 BOOST_AUTO_TEST_SUITE_END()
