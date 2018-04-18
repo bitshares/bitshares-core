@@ -23,7 +23,6 @@
  */
 #pragma once
 
-#include <graphene/app/account_orders.hpp>
 #include <graphene/app/full_account.hpp>
 
 #include <graphene/chain/protocol/types.hpp>
@@ -271,17 +270,20 @@ class database_api
 
       /**
        * @brief Fetch all orders relevant to the specified accounts and subscribe to updates
-       * @param names_or_ids Each item must be the name or ID of an account to retrieve
-       * @param subscribe Wether subscribe to future updates
+       * @param name_or_id Each item must be the name or ID of an account to retrieve
+       * @param base
+       * @param quote
+       * @param expire Only fetch orders before expiration time
+       * @param limit  Max items to fetch
        *
-       * @return Map of string from @ref names_or_ids to the corresponding account
+       * @return List of orders from @ref name_or_id to the corresponding account
        *
        * This function fetches all relevant orders for the given accounts, and subscribes to updates to the given
-       * accounts. If any of the strings in @ref names_or_ids cannot be tied to an account, that input will be
-       * ignored. All other accounts will be retrieved and subscribed.
+       * accounts. If @ref name_or_id cannot be tied to an account, empty results will
+       * be returned
        *
        */
-      std::map<string,account_orders> get_account_orders( const vector<string>& names_or_ids, bool subscribe );
+      vector<limit_order_object> get_account_limit_orders( const string& name_or_id, const string& base, const string& quote, fc::time_point_sec expire, uint32_t limit = 100);
 
       /**
        * @brief Fetch all objects relevant to the specified accounts and subscribe to updates
@@ -729,7 +731,7 @@ FC_API(graphene::app::database_api,
 
    // Accounts
    (get_accounts)
-   (get_account_orders)
+   (get_account_limit_orders)
    (get_full_accounts)
    (get_account_by_name)
    (get_account_references)
