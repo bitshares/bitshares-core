@@ -53,7 +53,7 @@ BOOST_AUTO_TEST_CASE( escrow_transfer )
 
          const asset_object &core = asset_id_type()(db);
 
-         BOOST_TEST_MESSAGE( "Testing: escrow_transfer creating object" );
+         // creating the escrow transfer
          {
             escrow_transfer_operation op;
             op.from = alice_id;
@@ -61,6 +61,7 @@ BOOST_AUTO_TEST_CASE( escrow_transfer )
             op.amount = core.amount(1000);
             op.escrow_id = 0;
             op.agent = sam_id;
+            op.agent_fee = core.amount(0);
             op.json_meta = "";
             op.ratification_deadline = db.head_block_time() + 100;
             op.escrow_expiration = db.head_block_time() + 200;
@@ -86,7 +87,6 @@ BOOST_AUTO_TEST_CASE( escrow_transfer )
          BOOST_REQUIRE_EQUAL(get_balance(sam_id, asset_id_type()), 0);
 
          // agent approves
-         BOOST_TEST_MESSAGE( "Testing: escrow release" );
          {
             escrow_approve_operation op;
             op.from = alice_id;
@@ -187,7 +187,7 @@ BOOST_AUTO_TEST_CASE( escrow_dispute )
 
       const asset_object &core = asset_id_type()(db);
 
-      BOOST_TEST_MESSAGE( "escrow is created" );
+      // escrow is created
       {
          escrow_transfer_operation op;
          op.from = alice_id;
@@ -195,7 +195,7 @@ BOOST_AUTO_TEST_CASE( escrow_dispute )
          op.amount = core.amount(1000);
          op.escrow_id = 0;
          op.agent = sam_id;
-         //op.fee = asset( 100, asset_id_type() );
+         op.agent_fee = core.amount(0);
          op.json_meta = "";
          op.ratification_deadline = db.head_block_time() + 100;
          op.escrow_expiration = db.head_block_time() + 200;
@@ -220,7 +220,7 @@ BOOST_AUTO_TEST_CASE( escrow_dispute )
       BOOST_REQUIRE_EQUAL(get_balance(bob_id, asset_id_type()), 0);
       BOOST_REQUIRE_EQUAL(get_balance(sam_id, asset_id_type()), 0);
 
-      BOOST_TEST_MESSAGE( "to never send payment to from so from opens a dispute to get money back" );
+      // "to" never send payment to from so from opens a dispute to get money back
       {
          escrow_dispute_operation op;
          op.from = alice_id;
@@ -234,9 +234,8 @@ BOOST_AUTO_TEST_CASE( escrow_dispute )
          trx.clear();
       }
 
-      // check how is the object now(dispute flag should be on and such)
+      // check how is the object now(dispute flag should be on)
       escrow = db.get_escrow( alice_id, 0 );
-      //wdump((escrow));
       BOOST_REQUIRE( escrow.from == alice_id );
       BOOST_REQUIRE( escrow.to == bob_id );
       BOOST_REQUIRE( escrow.escrow_id == 0 );
@@ -245,11 +244,7 @@ BOOST_AUTO_TEST_CASE( escrow_dispute )
       BOOST_REQUIRE( escrow.to_approved == false );
       BOOST_REQUIRE( escrow.agent_approved == false );
 
-      //wdump((escrow.escrow_expiration));
-
-      // now the agent is in control and can send money back to alice
-
-      // now release back to alice with alice
+      // now the agent is in control of he funds, send money back to alice
       {
          escrow_release_operation op;
 
@@ -286,24 +281,253 @@ BOOST_AUTO_TEST_CASE( escrow_validations )
       BOOST_REQUIRE_EQUAL(get_balance(sam_id, asset_id_type()), 0);
 
       const asset_object &core = asset_id_type()(db);
+      asset_id_type core_id = core.id;
       const auto& bitusd = create_bitasset("USDBIT", paul_id);
+      asset_id_type bitusd_id = bitusd.id;
 
-      BOOST_TEST_MESSAGE( "create escrow with non core will fail" );
 
+      //create escrow with non core will fail
       escrow_transfer_operation op;
       op.from = alice_id;
       op.to = bob_id;
       op.amount = bitusd.amount(1000);
       op.escrow_id = 0;
       op.agent = sam_id;
+      op.agent_fee = bitusd.amount(0);
       op.json_meta = "";
       op.ratification_deadline = db.head_block_time() + 100;
       op.escrow_expiration = db.head_block_time() + 200;
       trx.operations.push_back(op);
       sign(trx, alice_private_key);
+      //PUSH_TX(db, trx);
+      GRAPHENE_REQUIRE_THROW(PUSH_TX( db, trx), fc::assert_exception); // amount.asset_id == asset_id_type():
+      generate_block();
+      trx.clear();
+
+
+      // agent fee need to be of the same type as amount
+      op.amount = core_id(db).amount(1000);
+      op.agent_fee = bitusd_id(db).amount(0);
+      trx.operations.push_back(op);
+      sign(trx, alice_private_key);
+      GRAPHENE_REQUIRE_THROW(PUSH_TX( db, trx), fc::assert_exception); // agent_fee.asset_id == amount.asset_id
+      generate_block();
+      trx.clear();
+
+      // from and to are the same
+      op.to = alice_id;
+      op.amount = core_id(db).amount(1000);
+      op.agent_fee = core_id(db).amount(0);
+      trx.operations.push_back(op);
+      sign(trx, alice_private_key);
+      GRAPHENE_REQUIRE_THROW(PUSH_TX( db, trx), fc::assert_exception); // from != to
+      generate_block();
+      trx.clear();
+
+      // agent cant be from
+      op.to = bob_id;
+      op.agent = alice_id;
+      trx.operations.push_back(op);
+      sign(trx, alice_private_key);
+      GRAPHENE_REQUIRE_THROW(PUSH_TX( db, trx), fc::assert_exception); // from != agent && to != agent
+      generate_block();
+      trx.clear();
+
+      // agent cant be to
+      op.agent = bob_id;
+      trx.operations.push_back(op);
+      sign(trx, alice_private_key);
+      GRAPHENE_REQUIRE_THROW(PUSH_TX( db, trx), fc::assert_exception); // from != agent && to != agent
+      generate_block();
+      trx.clear();
+
+      // aratification deadline in the past not allowed
+      op.agent = sam_id;
+      op.ratification_deadline = db.head_block_time() - 1;
+      op.escrow_expiration = db.head_block_time() + 200;
+      trx.operations.push_back(op);
+      sign(trx, alice_private_key);
+      //PUSH_TX( db, trx);
+      GRAPHENE_REQUIRE_THROW(PUSH_TX( db, trx), fc::assert_exception); // o.ratification_deadline > db().head_block_time():
+      generate_block();
+      trx.clear();
+
+      // aratification deadline in the past not allowed
+      op.ratification_deadline = db.head_block_time() + 1;
+      op.escrow_expiration = db.head_block_time() - 1;
+      trx.operations.push_back(op);
+      sign(trx, alice_private_key);
+      //PUSH_TX( db, trx);
+      GRAPHENE_REQUIRE_THROW(PUSH_TX( db, trx), fc::assert_exception); // o.escrow_expiration > db().head_block_time():
+      generate_block();
+      trx.clear();
+
+      // give paul some bts
+      transfer(committee_account, alice_id, asset(100));
+
+      // buyt not enough to make requested escrow
+      op.ratification_deadline = db.head_block_time() + 100;
+      op.escrow_expiration = db.head_block_time() + 100;
+      op.from = paul_id;
+      op.amount = core_id(db).amount(1000);
+      trx.operations.push_back(op);
+      sign(trx, paul_private_key);
+      //PUSH_TX( db, trx);
+      GRAPHENE_REQUIRE_THROW(PUSH_TX( db, trx), fc::assert_exception); // db().get_balance( o.from, o.amount.asset_id ) >= (o.amount + o.fee + o.agent_fee):
+      generate_block();
+      trx.clear();
+
+      // passing an escrow create op so we can start testing validation in approve
+      // escrow is created
+      {
+         escrow_transfer_operation op;
+         op.from = alice_id;
+         op.to = bob_id;
+         op.amount = core.amount(1000);
+         op.escrow_id = 0;
+         op.agent = sam_id;
+         op.agent_fee = core.amount(0);
+         op.json_meta = "";
+         op.ratification_deadline = db.head_block_time() + 100;
+         op.escrow_expiration = db.head_block_time() + 200;
+         trx.operations.push_back(op);
+         sign(trx, alice_private_key);
+         PUSH_TX(db, trx);
+         generate_block();
+         trx.clear();
+      }
+      escrow_object escrow = db.get_escrow( alice_id, 0 );
+      BOOST_REQUIRE( escrow.from == alice_id );
+      BOOST_REQUIRE( escrow.to == bob_id );
+      BOOST_REQUIRE( escrow.escrow_id == 0 );
+      BOOST_REQUIRE( escrow.agent == sam_id );
+      BOOST_REQUIRE( escrow.disputed == false );
+      BOOST_REQUIRE( escrow.to_approved == false );
+      BOOST_REQUIRE( escrow.agent_approved == false );
+
+      // who need to be to or agent, alice cant approve
+      escrow_approve_operation op_approve;
+      op_approve.from = alice_id;
+      op_approve.to = bob_id;
+      op_approve.who = alice_id;
+      op_approve.escrow_id = 0;
+      op_approve.agent = sam_id;
+      //op_approve.approve = true;
+      trx.operations.push_back(op_approve);
+      sign(trx, alice_private_key);
+      //sign(trx, alice_private_key);
+      //PUSH_TX(db, trx);
+      GRAPHENE_REQUIRE_THROW(PUSH_TX( db, trx), fc::assert_exception); // who == to || who == agent:
+      generate_block();
+      trx.clear();
+
+      // other account not involved in the escrow is not valid either
+      op_approve.who = paul_id;
+      trx.operations.push_back(op_approve);
+      sign(trx, paul_private_key);
+      //sign(trx, alice_private_key);
+      //PUSH_TX(db, trx);
+      GRAPHENE_REQUIRE_THROW(PUSH_TX( db, trx), fc::assert_exception); // who == to || who == agent:
+      generate_block();
+      trx.clear();
+
+      // any of the involved parties can remove the escrow by using approve = false
+      // bob(to) deletes escrow
+      op_approve.who = bob_id;
+      op_approve.approve = false;
+      trx.operations.push_back(op_approve);
+      sign(trx, bob_private_key);
       PUSH_TX(db, trx);
       generate_block();
       trx.clear();
+
+      GRAPHENE_REQUIRE_THROW(db.get_escrow( alice_id, 0 ), fc::assert_exception); // escrow not found
+
+      // cretae the escrow again
+      {
+         escrow_transfer_operation op;
+         op.from = alice_id;
+         op.to = bob_id;
+         op.amount = core.amount(1000);
+         op.escrow_id = 1;
+         op.agent = sam_id;
+         op.agent_fee = core.amount(0);
+         op.json_meta = "";
+         op.ratification_deadline = db.head_block_time() + 100;
+         op.escrow_expiration = db.head_block_time() + 200;
+         trx.operations.push_back(op);
+         sign(trx, alice_private_key);
+         PUSH_TX(db, trx);
+         generate_block();
+         trx.clear();
+      }
+
+      escrow = db.get_escrow( alice_id, 1 );
+      BOOST_REQUIRE( escrow.from == alice_id );
+      BOOST_REQUIRE( escrow.to == bob_id );
+      BOOST_REQUIRE( escrow.escrow_id == 1 );
+      BOOST_REQUIRE( escrow.agent == sam_id );
+      BOOST_REQUIRE( escrow.disputed == false );
+      BOOST_REQUIRE( escrow.to_approved == false );
+      BOOST_REQUIRE( escrow.agent_approved == false );
+
+
+      // bob(to) approves
+      //op_approve.who = bob_id;
+      op_approve.approve = true;
+      op_approve.escrow_id = 1;
+      wdump((op_approve));
+      trx.operations.push_back(op_approve);
+      sign(trx, bob_private_key);
+      PUSH_TX(db, trx);
+      //GRAPHENE_REQUIRE_THROW(PUSH_TX( db, trx), fc::assert_exception); // who == to || who == agent:
+      generate_block();
+      trx.clear();
+
+      escrow = db.get_escrow( alice_id, 1 );
+      BOOST_REQUIRE( escrow.from == alice_id );
+      BOOST_REQUIRE( escrow.to == bob_id );
+      BOOST_REQUIRE( escrow.escrow_id == 1 );
+      BOOST_REQUIRE( escrow.agent == sam_id );
+      BOOST_REQUIRE( escrow.disputed == false );
+      BOOST_REQUIRE( escrow.to_approved == true );
+      BOOST_REQUIRE( escrow.agent_approved == false );
+
+      // bob tries to approve again
+      trx.operations.push_back(op_approve);
+      sign(trx, bob_private_key);
+      //sign(trx, alice_private_key);
+      //PUSH_TX(db, trx);
+      GRAPHENE_REQUIRE_THROW(PUSH_TX( db, trx), fc::assert_exception); // !escrow.to_approved: 'to' has already approved the escrow
+      generate_block();
+      trx.clear();
+
+      // alice tries to release funds but agent has not approved yet!
+      {
+         escrow_release_operation op;
+
+         op.from = alice_id;
+         op.to = bob_id;
+         op.who = alice_id;
+         op.escrow_id = 1;
+         op.amount = core.amount(1000);
+         trx.operations.push_back(op);
+         sign(trx, alice_private_key);
+         PUSH_TX(db, trx);
+         generate_block();
+         trx.clear();
+      }
+
+      BOOST_REQUIRE_EQUAL(get_balance(alice_id, asset_id_type()), 100000000);
+      BOOST_REQUIRE_EQUAL(get_balance(bob_id, asset_id_type()), 0);
+      BOOST_REQUIRE_EQUAL(get_balance(sam_id, asset_id_type()), 0);
+
+
+
+
+
+
+
 
    } FC_LOG_AND_RETHROW()
 }

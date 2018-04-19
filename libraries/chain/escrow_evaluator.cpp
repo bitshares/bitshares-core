@@ -29,6 +29,8 @@ namespace graphene { namespace chain {
 
       void_result escrow_transfer_evaluator::do_evaluate(const escrow_transfer_operation& o)
       {
+         FC_ASSERT( o.ratification_deadline > db().head_block_time() );
+         FC_ASSERT( o.escrow_expiration > db().head_block_time() );
          FC_ASSERT( db().get_balance( o.from, o.amount.asset_id ) >= (o.amount + o.fee + o.agent_fee) );
          return void_result();
       }

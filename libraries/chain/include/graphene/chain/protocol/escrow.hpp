@@ -49,18 +49,18 @@ namespace graphene { namespace chain {
          struct fee_parameters_type {
             uint64_t fee            = 1 * GRAPHENE_BLOCKCHAIN_PRECISION;
          };
-         asset           fee;
+         asset                   fee;
 
          account_id_type         from;
          account_id_type         to;
-         asset          amount;
+         asset                   amount;
 
-         uint32_t        escrow_id=0;
+         uint32_t                escrow_id=0;
          account_id_type         agent;
-         asset          agent_fee;
-         string         json_meta;
-         time_point_sec ratification_deadline;
-         time_point_sec escrow_expiration;
+         asset                   agent_fee;
+         string                  json_meta;
+         time_point_sec          ratification_deadline;
+         time_point_sec          escrow_expiration;
 
          void validate()const;
          void get_required_active_authorities( flat_set<account_id_type>& a )const{ a.insert(from); }
