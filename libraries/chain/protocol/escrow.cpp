@@ -45,4 +45,4 @@ namespace graphene { namespace chain {
          FC_ASSERT( amount.amount > 0 );
          FC_ASSERT( amount.asset_id == asset_id_type()); // only bts is allowed by now
       }
-   } }
+} }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015 Cryptonomex, Inc., and contributors.
+ * Copyright (c) 2018 oxarbitrage and contributors.
  *
  * The MIT License
  *
@@ -155,4 +155,3 @@ FC_REFLECT( graphene::chain::escrow_transfer_operation, (from)(to)(agent)(amount
 FC_REFLECT( graphene::chain::escrow_approve_operation, (from)(to)(agent)(who)(escrow_id)(approve) );
 FC_REFLECT( graphene::chain::escrow_dispute_operation, (from)(to)(agent)(who)(escrow_id) );
 FC_REFLECT( graphene::chain::escrow_release_operation, (from)(to)(agent)(who)(receiver)(escrow_id)(amount) );
-

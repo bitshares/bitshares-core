@@ -74,14 +74,11 @@ namespace graphene { namespace chain {
 
       void_result escrow_approve_evaluator::do_apply(const escrow_approve_operation& o)
       {
-
          try
          {
             //FC_ASSERT( db().has_hardfork( STEEMIT_HARDFORK_0_14__143 ) ); /// TODO: remove this after HF14
 
             const auto& escrow = db().get_escrow( o.from, o.escrow_id );
-            // changing this to match
-            //const auto& escrow = db().get_escrow( o.to, o.escrow_id );
 
             bool reject_escrow = !o.approve;
 
@@ -133,8 +130,6 @@ namespace graphene { namespace chain {
             return void_result();
          }
          FC_CAPTURE_AND_RETHROW( (o) )
-
-
       }
 
       void_result escrow_dispute_evaluator::do_evaluate(const escrow_dispute_operation& o)
@@ -147,12 +142,10 @@ namespace graphene { namespace chain {
          FC_ASSERT( e.agent == o.agent, "op 'agent' does not match escrow 'agent'" );
 
          return void_result();
-
       }
 
       void_result escrow_dispute_evaluator::do_apply(const escrow_dispute_operation& o)
       {
-
          try {
             //FC_ASSERT( db().has_hardfork( STEEMIT_HARDFORK_0_9 ) ); /// TODO: remove this after HF9
 
@@ -172,13 +165,10 @@ namespace graphene { namespace chain {
          const auto& e = db().get_escrow( o.from, o.escrow_id );
 
          FC_ASSERT( e.amount >= o.amount && e.amount.asset_id == o.amount.asset_id );
-
          FC_ASSERT( o.amount.amount > 0 && e.amount.amount > 0);
-
          FC_ASSERT( e.to == o.to, "op 'to' does not match escrow 'to'");
          FC_ASSERT( e.agent == o.agent, "op 'agent' does not match escrow 'agent'" );
          FC_ASSERT( o.receiver == e.from || o.receiver == e.to, "Funds must be released to 'from' or 'to'" );
-
          FC_ASSERT( e.to_approved && e.agent_approved, "Funds cannot be released prior to escrow approval." );
 
          // If there is a dispute regardless of expiration, the agent can release funds to either party
@@ -205,7 +195,6 @@ namespace graphene { namespace chain {
          }
 
          return void_result();
-
       }
 
       void_result escrow_release_evaluator::do_apply(const escrow_release_operation& o)
