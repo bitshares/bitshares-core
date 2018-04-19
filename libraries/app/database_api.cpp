@@ -632,6 +632,8 @@ vector<limit_order_object> database_api::get_account_limit_orders( const string&
 
 vector<limit_order_object> database_api_impl::get_account_limit_orders( const string& name_or_id, const string& base, const string& quote, fc::time_point_sec expire, uint32_t limit)
 {
+   FC_ASSERT( limit <= 100 );
+
    vector<limit_order_object>   results;
    const account_object*        account = nullptr;
    uint32_t                     count = 0;
