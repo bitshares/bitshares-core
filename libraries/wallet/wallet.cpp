@@ -2926,7 +2926,7 @@ account_history_operation_detail wallet_api::get_account_history_by_operations(s
 
 std::map<string,full_account> wallet_api::get_full_accounts( const vector<string>& names_or_ids, bool subscribe)
 {
-    return my->_remote_db->get_full_accounts(names_or_ids, false);
+    return my->_remote_db->get_full_accounts(names_or_ids, subscribe);
 }
 
 vector<bucket_object> wallet_api::get_market_history( string symbol1, string symbol2, uint32_t bucket , fc::time_point_sec start, fc::time_point_sec end )const
