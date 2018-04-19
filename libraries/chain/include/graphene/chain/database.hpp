@@ -327,8 +327,8 @@ namespace graphene { namespace chain {
          // helper to handle witness pay
          void deposit_witness_pay(const witness_object& wit, share_type amount);
 
-         // testing the escrow call here
-         const escrow_object&   get_escrow( account_id_type account, uint32_t escrowid )const;
+         // escrow call here
+         const escrow_object&   get_escrow( account_id_type account, uint32_t escrow_id )const;
 
          //////////////////// db_debug.cpp ////////////////////
 

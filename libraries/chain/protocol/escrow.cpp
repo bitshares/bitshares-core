@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015 Cryptonomex, Inc., and contributors.
+ * Copyright (c) 2018 oxarbitrage and contributors.
  *
  * The MIT License
  *
@@ -40,7 +40,8 @@ namespace graphene { namespace chain {
          FC_ASSERT( who == from || who == to );
       }
       void escrow_release_operation::validate()const {
-         FC_ASSERT( who != to );
+         FC_ASSERT( who == from || who == to || who == agent, "who must be from or to or agent" );
+         FC_ASSERT( receiver == from || receiver == to, "receiver must be from or to" );
          FC_ASSERT( amount.amount > 0 );
          FC_ASSERT( amount.asset_id == asset_id_type()); // only bts is allowed by now
       }

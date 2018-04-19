@@ -29,7 +29,7 @@ namespace graphene { namespace chain {
       /**
        *  The purpose of this operation is to enable someone to send money contingently to
        *  another individual. The funds leave the *from* account and go into a temporary balance
-       *  where they are held until *from* releases it to *to*   or *to* refunds it to *from*.
+       *  where they are held until *from* releases it to *to* or *to* refunds it to *from*.
        *
        *  In the event of a dispute the *agent* can divide the funds between the to/from account.
        *  Disputes can be raised any time before or on the dispute deadline time, after the escrow
@@ -71,20 +71,20 @@ namespace graphene { namespace chain {
        *  The agent and to accounts must approve an escrow transaction for it to be valid on
        *  the blockchain. Once a part approves the escrow, the cannot revoke their approval.
        *  Subsequent escrow approve operations, regardless of the approval, will be rejected.
-      */
+       */
       struct escrow_approve_operation : public base_operation
       {
          struct fee_parameters_type {
             uint64_t fee            = 1 * GRAPHENE_BLOCKCHAIN_PRECISION;
          };
-         asset           fee;
+         asset                   fee;
 
          account_id_type         from;
          account_id_type         to;
          account_id_type         agent;
          account_id_type         who; // Either to or agent
-         uint32_t       escrow_id;
-         bool           approve;
+         uint32_t                escrow_id;
+         bool                    approve;
 
          void validate()const;
          void get_required_active_authorities( flat_set<account_id_type>& a )const{ a.insert(who); }
@@ -101,12 +101,13 @@ namespace graphene { namespace chain {
          struct fee_parameters_type {
             uint64_t fee            = 1 * GRAPHENE_BLOCKCHAIN_PRECISION;
          };
-         asset           fee;
+         asset                   fee;
 
-         account_id_type   from;
-         account_id_type   to;
-         uint32_t escrow_id;
-         account_id_type   who;
+         account_id_type         from;
+         account_id_type         to;
+         account_id_type         agent;
+         uint32_t                escrow_id;
+         account_id_type         who;
 
          void validate()const;
          void get_required_active_authorities( flat_set<account_id_type>& a )const{ a.insert(who); }
@@ -128,13 +129,15 @@ namespace graphene { namespace chain {
          struct fee_parameters_type {
             uint64_t fee            = 1 * GRAPHENE_BLOCKCHAIN_PRECISION;
          };
-         asset           fee;
+         asset                   fee;
 
-         account_id_type    from;
-         uint32_t  escrow_id;
-         account_id_type    to; ///< the account that should receive funds (might be from, might be to
-         account_id_type    who; ///< the account that is attempting to release the funds, determines valid 'to'
-         asset     amount; ///< the amount of funds to release
+         account_id_type         from;
+         account_id_type         to; ///< the original 'to'
+         account_id_type         agent;
+         account_id_type         who; ///< the account that is attempting to release the funds, determines valid 'receiver'
+         account_id_type         receiver; ///< the account that should receive funds (might be from, might be to)
+         uint32_t                escrow_id;
+         asset                   amount; ///< the amount of funds to release
 
          void validate()const;
          void get_required_active_authorities( flat_set<account_id_type>& a )const{ a.insert(who); }
@@ -148,8 +151,8 @@ FC_REFLECT( graphene::chain::escrow_approve_operation::fee_parameters_type, (fee
 FC_REFLECT( graphene::chain::escrow_dispute_operation::fee_parameters_type, (fee) )
 FC_REFLECT( graphene::chain::escrow_release_operation::fee_parameters_type, (fee) )
 
-FC_REFLECT( graphene::chain::escrow_transfer_operation, (from)(to)(amount)(escrow_id)(agent)(agent_fee)(json_meta)(ratification_deadline)(escrow_expiration) );
+FC_REFLECT( graphene::chain::escrow_transfer_operation, (from)(to)(agent)(amount)(escrow_id)(agent_fee)(json_meta)(ratification_deadline)(escrow_expiration) );
 FC_REFLECT( graphene::chain::escrow_approve_operation, (from)(to)(agent)(who)(escrow_id)(approve) );
-FC_REFLECT( graphene::chain::escrow_dispute_operation, (from)(to)(escrow_id)(who) );
-FC_REFLECT( graphene::chain::escrow_release_operation, (from)(to)(escrow_id)(who)(amount) );
+FC_REFLECT( graphene::chain::escrow_dispute_operation, (from)(to)(agent)(who)(escrow_id) );
+FC_REFLECT( graphene::chain::escrow_release_operation, (from)(to)(agent)(who)(receiver)(escrow_id)(amount) );
 

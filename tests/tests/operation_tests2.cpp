@@ -34,7 +34,6 @@
 #include <graphene/chain/withdraw_permission_object.hpp>
 #include <graphene/chain/witness_object.hpp>
 #include <graphene/chain/worker_object.hpp>
-#include <graphene/chain/escrow_object.hpp>
 
 #include <graphene/utilities/tempdir.hpp>
 

@@ -68,6 +68,7 @@ namespace graphene { namespace chain {
          const auto& escrow = db().get_escrow( o.from, o.escrow_id );
          FC_ASSERT( escrow.to == o.to, "op 'to' does not match escrow 'to'" );
          FC_ASSERT( escrow.agent == o.agent, "op 'agent' does not match escrow 'agent'" );
+         FC_ASSERT( escrow.ratification_deadline >= db().head_block_time(), "escrow ratification deadline is before head block time" );
          return void_result();
       }
 
@@ -139,8 +140,11 @@ namespace graphene { namespace chain {
       void_result escrow_dispute_evaluator::do_evaluate(const escrow_dispute_operation& o)
       {
          const auto& e = db().get_escrow( o.from, o.escrow_id );
-         FC_ASSERT( !e.disputed );
-         FC_ASSERT( e.to == o.to );
+
+         FC_ASSERT( e.to_approved && e.agent_approved, "escrow must be approved by all parties before a dispute can be raised" );
+         FC_ASSERT( !e.disputed , "escrow is already under dispute");
+         FC_ASSERT( e.to == o.to , "op 'to' does not match escrow 'to'");
+         FC_ASSERT( e.agent == o.agent, "op 'agent' does not match escrow 'agent'" );
 
          return void_result();
 
@@ -171,15 +175,35 @@ namespace graphene { namespace chain {
 
          FC_ASSERT( o.amount.amount > 0 && e.amount.amount > 0);
 
-         if( e.escrow_expiration > db().head_block_time() ) {
-            if( o.who == e.from )    FC_ASSERT( o.to == e.to );
-            else if( o.who == e.to ) FC_ASSERT( o.to == e.from );
-            else {
-               FC_ASSERT( e.disputed && o.who == e.agent );
-            }
-         } else {
-            FC_ASSERT( o.who == e.to || o.who == e.from );
+         FC_ASSERT( e.to == o.to, "op 'to' does not match escrow 'to'");
+         FC_ASSERT( e.agent == o.agent, "op 'agent' does not match escrow 'agent'" );
+         FC_ASSERT( o.receiver == e.from || o.receiver == e.to, "Funds must be released to 'from' or 'to'" );
+
+         FC_ASSERT( e.to_approved && e.agent_approved, "Funds cannot be released prior to escrow approval." );
+
+         // If there is a dispute regardless of expiration, the agent can release funds to either party
+         if( e.disputed )
+         {
+            FC_ASSERT( o.who == e.agent, "'agent' must release funds for a disputed escrow" );
          }
+         else
+         {
+            FC_ASSERT( o.who == e.from || o.who == e.to, "Only 'from' and 'to' can release from a non-disputed escrow" );
+
+            if( e.escrow_expiration > db().head_block_time() )
+            {
+               // If there is no dispute and escrow has not expired, either party can release funds to the other.
+               if( o.who == e.from )
+               {
+                  FC_ASSERT( o.receiver == e.to, "'from' must release funds to 'to'" );
+               }
+               else if( o.who == e.to )
+               {
+                  FC_ASSERT( o.receiver == e.from, "'to' must release funds to 'from'" );
+               }
+            }
+         }
+
          return void_result();
 
       }
@@ -190,13 +214,16 @@ namespace graphene { namespace chain {
             //FC_ASSERT( db().has_hardfork( STEEMIT_HARDFORK_0_9 ) ); /// TODO: remove this after HF9
 
             const auto& e = db().get_escrow( o.from, o.escrow_id );
-            db().adjust_balance( o.to, o.amount );
-            if( e.amount == o.amount )
+
+            db().adjust_balance( o.receiver, o.amount );
+            db().modify( e, [&]( escrow_object& esc )
+            {
+               esc.amount -= o.amount;
+            });
+
+            if( e.amount.amount == 0)
+            {
                db().remove( e );
-            else {
-               db().modify( e, [&]( escrow_object& esc ) {
-                  esc.amount -= o.amount;
-               });
             }
 
             return void_result();

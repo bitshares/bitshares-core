@@ -215,22 +215,19 @@ struct get_impacted_account_visitor
       _impacted.insert( op.from );
       _impacted.insert( op.to );
       _impacted.insert( op.agent );
-      _impacted.insert( op.who );
    }
    void operator()( const escrow_dispute_operation& op )
    {
       _impacted.insert( op.from );
       _impacted.insert( op.to );
-      _impacted.insert( op.who );
+      _impacted.insert( op.agent );
    }
    void operator()( const escrow_release_operation& op )
    {
       _impacted.insert( op.from );
       _impacted.insert( op.to );
-      _impacted.insert( op.who );
+      _impacted.insert( op.agent );
    }
-
-
 };
 
 static void operation_get_impacted_accounts( const operation& op, flat_set<account_id_type>& result )
@@ -379,6 +376,8 @@ static void get_relevant_accounts( const object* obj, flat_set<account_id_type>&
               accounts.insert( aobj->bidder );
               break;
            }
+           case impl_escrow_object_type:
+            break;
       }
    }
 } // end get_relevant_accounts( const object* obj, flat_set<account_id_type>& accounts )

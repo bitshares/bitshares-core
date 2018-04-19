@@ -153,6 +153,8 @@ BOOST_AUTO_TEST_CASE( escrow_transfer )
             op.to = bob_id;
             op.who = alice_id;
             op.escrow_id = 0;
+            op.receiver = bob_id;
+            op.agent = sam_id;
             op.amount = core.amount(1000);
             trx.operations.push_back(op);
             sign(trx, alice_private_key);
@@ -220,13 +222,50 @@ BOOST_AUTO_TEST_CASE( escrow_dispute )
       BOOST_REQUIRE_EQUAL(get_balance(bob_id, asset_id_type()), 0);
       BOOST_REQUIRE_EQUAL(get_balance(sam_id, asset_id_type()), 0);
 
-      // "to" never send payment to from so from opens a dispute to get money back
+
+      // escrow need to be approved by agent and to before a dispute can be raised.
+      // aporving
+      // bob(to) approves.
+      {
+         escrow_approve_operation op;
+         op.from = alice_id;
+         op.to = bob_id;
+         op.who = bob_id;
+         op.escrow_id = 0;
+         op.agent = sam_id;
+         op.approve = true;
+         trx.operations.push_back(op);
+         sign(trx, bob_private_key);
+         //sign(trx, alice_private_key);
+         PUSH_TX(db, trx);
+         generate_block();
+         trx.clear();
+      }
+      // agent aproves
+      {
+         escrow_approve_operation op;
+         op.from = alice_id;
+         op.to = bob_id;
+         op.who = sam_id;
+         op.escrow_id = 0;
+         op.agent = sam_id;
+         op.approve = true;
+         trx.operations.push_back(op);
+         sign(trx, sam_private_key);
+         PUSH_TX(db, trx);
+         generate_block();
+         trx.clear();
+      }
+
+
+      // "to" never send payment offchain to from so from opens a dispute to get money back
       {
          escrow_dispute_operation op;
          op.from = alice_id;
          op.to = bob_id;
          op.escrow_id = 0;
          op.who = alice_id;
+         op.agent = sam_id;
          trx.operations.push_back(op);
          sign(trx, alice_private_key);
          PUSH_TX(db, trx);
@@ -241,16 +280,18 @@ BOOST_AUTO_TEST_CASE( escrow_dispute )
       BOOST_REQUIRE( escrow.escrow_id == 0 );
       BOOST_REQUIRE( escrow.agent == sam_id );
       BOOST_REQUIRE( escrow.disputed == true );
-      BOOST_REQUIRE( escrow.to_approved == false );
-      BOOST_REQUIRE( escrow.agent_approved == false );
+      BOOST_REQUIRE( escrow.to_approved == true );
+      BOOST_REQUIRE( escrow.agent_approved == true );
 
       // now the agent is in control of he funds, send money back to alice
       {
          escrow_release_operation op;
 
          op.from = alice_id;
-         op.to = alice_id;
+         op.to = bob_id;
          op.who = sam_id;
+         op.receiver = alice_id;
+         op.agent = sam_id;
          op.escrow_id = 0;
          op.amount = core.amount(1000);
          trx.operations.push_back(op);
@@ -513,14 +554,16 @@ BOOST_AUTO_TEST_CASE( escrow_validations )
          op.amount = core.amount(1000);
          trx.operations.push_back(op);
          sign(trx, alice_private_key);
-         PUSH_TX(db, trx);
+         GRAPHENE_REQUIRE_THROW(PUSH_TX( db, trx), fc::assert_exception); // e.to_approved && e.agent_approved: Funds cannot be released prior to escrow approval.
          generate_block();
          trx.clear();
       }
 
-      BOOST_REQUIRE_EQUAL(get_balance(alice_id, asset_id_type()), 100000000);
+      BOOST_REQUIRE_EQUAL(get_balance(alice_id, asset_id_type()), 99999100); // the 1000 of alice are not in her account at this point.
       BOOST_REQUIRE_EQUAL(get_balance(bob_id, asset_id_type()), 0);
       BOOST_REQUIRE_EQUAL(get_balance(sam_id, asset_id_type()), 0);
+
+
 
 
 

@@ -226,18 +226,17 @@ struct get_impacted_account_visitor
       _impacted.insert( op.from );
       _impacted.insert( op.to );
       _impacted.insert( op.agent );
-      _impacted.insert( op.who );
 
    }
    void operator()( const escrow_dispute_operation& op ) {
       _impacted.insert( op.from );
       _impacted.insert( op.to );
-      _impacted.insert( op.who );
+      _impacted.insert( op.agent );
    }
    void operator()( const escrow_release_operation& op ) {
       _impacted.insert( op.from );
       _impacted.insert( op.to );
-      _impacted.insert( op.who );
+      _impacted.insert( op.agent );
    }
 
 
