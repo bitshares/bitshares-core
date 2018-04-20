@@ -1869,6 +1869,7 @@ public:
       owned_keys.reserve( pks.size() );
       std::copy_if( pks.begin(), pks.end(), std::inserter(owned_keys, owned_keys.end()),
                     [this](const public_key_type& pk){ return _keys.find(pk) != _keys.end(); } );
+      tx.signatures.clear();
       set<public_key_type> approving_key_set = _remote_db->get_required_signatures( tx, owned_keys );
 
       auto dyn_props = get_dynamic_global_properties();
