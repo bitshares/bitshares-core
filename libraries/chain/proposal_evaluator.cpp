@@ -58,12 +58,6 @@ struct proposal_operation_hardfork_visitor
          FC_ASSERT(false, "Not allowed until hardfork 188");
       }
    }
-   // hf_214
-   void operator()(const graphene::chain::proposal_update_operation &v) const {
-      if (block_time < HARDFORK_CORE_214_TIME) {
-         FC_ASSERT(false, "Not allowed until hardfork 214");
-      }
-   }
    // hf_588
    // issue #588
    //
@@ -95,6 +89,18 @@ struct proposal_operation_hardfork_visitor
    }
 };
 
+struct hardfork_visitor_214 // non-recursive proposal visitor
+{
+   typedef void result_type;
+
+   template<typename T>
+   void operator()(const T &v) const {}
+
+   void operator()(const proposal_update_operation &v) const {
+      FC_ASSERT(false, "Not allowed until hardfork 214");
+   }
+};
+
 void_result proposal_create_evaluator::do_evaluate(const proposal_create_operation& o)
 { try {
    const database& d = db();
@@ -103,6 +109,12 @@ void_result proposal_create_evaluator::do_evaluate(const proposal_create_operati
    const fc::time_point_sec block_time = d.head_block_time();
    proposal_operation_hardfork_visitor vtor(block_time);
    vtor( o );
+   if( block_time < HARDFORK_CORE_214_TIME )
+   { // cannot be removed after hf, unfortunately
+      hardfork_visitor_214 hf214;
+      for (const op_wrapper &op : o.proposed_ops)
+         op.op.visit( hf214 );
+   }
 
    const auto& global_parameters = d.get_global_properties().parameters;
 
