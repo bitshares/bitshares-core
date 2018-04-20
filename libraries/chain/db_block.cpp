@@ -292,7 +292,7 @@ processed_transaction database::push_proposal(const proposal_object& proposal)
 
    ptrx.operation_results = std::move(eval_state.operation_results);
    return ptrx;
-} FC_CAPTURE_AND_RETHROW( (proposal) ) }
+} FC_CAPTURE_AND_RETHROW() }
 
 signed_block database::generate_block(
    fc::time_point_sec when,
