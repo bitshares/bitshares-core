@@ -24,11 +24,15 @@
 #include <graphene/chain/database.hpp>
 #include <graphene/chain/escrow_evaluator.hpp>
 #include <graphene/chain/escrow_object.hpp>
+#include <graphene/chain/hardfork.hpp>
 
 namespace graphene { namespace chain {
 
       void_result escrow_transfer_evaluator::do_evaluate(const escrow_transfer_operation& o)
       {
+         FC_ASSERT( db().head_block_time() > HARDFORK_ESCROW_TIME,
+                    "Operation not allowed before HARDFORK_ESCROW_TIME."); // remove after HARDFORK_ESCROW_TIME
+
          FC_ASSERT( o.ratification_deadline > db().head_block_time() );
          FC_ASSERT( o.escrow_expiration > db().head_block_time() );
          FC_ASSERT( db().get_balance( o.from, o.amount.asset_id ) >= (o.amount + o.fee + o.agent_fee) );
@@ -39,7 +43,8 @@ namespace graphene { namespace chain {
       {
 
          try {
-            //FC_ASSERT( db().has_hardfork( STEEMIT_HARDFORK_0_9 ) ); /// TODO: remove this after HF9
+            FC_ASSERT( db().head_block_time() > HARDFORK_ESCROW_TIME,
+                       "Operation not allowed before HARDFORK_ESCROW_TIME."); // remove after HARDFORK_ESCROW_TIME
 
             if( o.agent_fee.amount > 0 ) {
                db().adjust_balance( o.from, -o.agent_fee );
@@ -65,6 +70,9 @@ namespace graphene { namespace chain {
 
       void_result escrow_approve_evaluator::do_evaluate(const escrow_approve_operation& o)
       {
+         FC_ASSERT( db().head_block_time() > HARDFORK_ESCROW_TIME,
+                    "Operation not allowed before HARDFORK_ESCROW_TIME."); // remove after HARDFORK_ESCROW_TIME
+
          const auto& escrow = db().get_escrow( o.from, o.escrow_id );
          FC_ASSERT( escrow.to == o.to, "op 'to' does not match escrow 'to'" );
          FC_ASSERT( escrow.agent == o.agent, "op 'agent' does not match escrow 'agent'" );
@@ -76,7 +84,8 @@ namespace graphene { namespace chain {
       {
          try
          {
-            //FC_ASSERT( db().has_hardfork( STEEMIT_HARDFORK_0_14__143 ) ); /// TODO: remove this after HF14
+            FC_ASSERT( db().head_block_time() > HARDFORK_ESCROW_TIME,
+                       "Operation not allowed before HARDFORK_ESCROW_TIME."); // remove after HARDFORK_ESCROW_TIME
 
             const auto& escrow = db().get_escrow( o.from, o.escrow_id );
 
@@ -134,6 +143,9 @@ namespace graphene { namespace chain {
 
       void_result escrow_dispute_evaluator::do_evaluate(const escrow_dispute_operation& o)
       {
+         FC_ASSERT( db().head_block_time() > HARDFORK_ESCROW_TIME,
+                    "Operation not allowed before HARDFORK_ESCROW_TIME."); // remove after HARDFORK_ESCROW_TIME
+
          const auto& e = db().get_escrow( o.from, o.escrow_id );
 
          FC_ASSERT( e.to_approved && e.agent_approved, "escrow must be approved by all parties before a dispute can be raised" );
@@ -147,7 +159,8 @@ namespace graphene { namespace chain {
       void_result escrow_dispute_evaluator::do_apply(const escrow_dispute_operation& o)
       {
          try {
-            //FC_ASSERT( db().has_hardfork( STEEMIT_HARDFORK_0_9 ) ); /// TODO: remove this after HF9
+            FC_ASSERT( db().head_block_time() > HARDFORK_ESCROW_TIME,
+                       "Operation not allowed before HARDFORK_ESCROW_TIME."); // remove after HARDFORK_ESCROW_TIME
 
             const auto& e = db().get_escrow( o.from, o.escrow_id );
 
@@ -162,6 +175,9 @@ namespace graphene { namespace chain {
 
       void_result escrow_release_evaluator::do_evaluate(const escrow_release_operation& o)
       {
+         FC_ASSERT( db().head_block_time() > HARDFORK_ESCROW_TIME,
+                    "Operation not allowed before HARDFORK_ESCROW_TIME."); // remove after HARDFORK_ESCROW_TIME
+
          const auto& e = db().get_escrow( o.from, o.escrow_id );
 
          FC_ASSERT( e.amount >= o.amount && e.amount.asset_id == o.amount.asset_id );
@@ -200,7 +216,8 @@ namespace graphene { namespace chain {
       void_result escrow_release_evaluator::do_apply(const escrow_release_operation& o)
       {
          try {
-            //FC_ASSERT( db().has_hardfork( STEEMIT_HARDFORK_0_9 ) ); /// TODO: remove this after HF9
+            FC_ASSERT( db().head_block_time() > HARDFORK_ESCROW_TIME,
+                       "Operation not allowed before HARDFORK_ESCROW_TIME."); // remove after HARDFORK_ESCROW_TIME
 
             const auto& e = db().get_escrow( o.from, o.escrow_id );
 

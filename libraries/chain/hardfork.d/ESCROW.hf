@@ -1,0 +1,4 @@
+// escrow support for the bitshares core
+#ifndef HARDFORK_ESCROW_TIME
+#define HARDFORK_ESCROW_TIME (fc::time_point_sec( 1600000000 ))
+#endif

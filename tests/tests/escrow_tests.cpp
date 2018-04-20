@@ -43,6 +43,9 @@ BOOST_AUTO_TEST_CASE( escrow_transfer )
 {
       try
       {
+         generate_blocks( HARDFORK_ESCROW_TIME );
+         set_expiration( db, trx );
+
          ACTORS( (alice)(bob)(sam) );
 
          transfer(committee_account, alice_id, asset(100000000));
@@ -179,6 +182,9 @@ BOOST_AUTO_TEST_CASE( escrow_dispute )
 {
    try
    {
+      generate_blocks( HARDFORK_ESCROW_TIME );
+      set_expiration( db, trx );
+
       ACTORS( (alice)(bob)(sam) );
 
       transfer(committee_account, alice_id, asset(100000000));
@@ -311,6 +317,9 @@ BOOST_AUTO_TEST_CASE( escrow_dispute )
 BOOST_AUTO_TEST_CASE( escrow_validations )
 {
    try {
+
+      generate_blocks( HARDFORK_ESCROW_TIME );
+      set_expiration( db, trx );
 
       ACTORS( (alice)(bob)(sam)(paul) );
 
