@@ -91,6 +91,8 @@ add_library( graphene_chain
 
              is_authorized_asset.cpp
 
+             cybex/vesting_ops.cpp
+             cybex/vesting_evaluator.cpp
              ${HEADERS}
              ${PROTOCOL_HEADERS}
              "${CMAKE_CURRENT_BINARY_DIR}/include/graphene/chain/hardfork.hpp"

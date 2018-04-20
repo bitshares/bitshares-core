@@ -29,7 +29,7 @@
 #include <graphene/chain/exceptions.hpp>
 #include <graphene/chain/hardfork.hpp>
 #include <graphene/chain/is_authorized_asset.hpp>
-
+#include <graphene/chain/vesting_balance_object.hpp>
 #include <functional>
 
 namespace graphene { namespace chain {
@@ -188,8 +188,50 @@ void_result asset_issue_evaluator::do_evaluate( const asset_issue_operation& o )
 
 void_result asset_issue_evaluator::do_apply( const asset_issue_operation& o )
 { try {
-   db().adjust_balance( o.issue_to_account, o.asset_to_issue );
+    asset delta = o.asset_to_issue;
+//
+// common_options.extensins
+//
+    fc::time_point_sec now = db().head_block_time();
+    struct linear_vesting_policy vp;
 
+
+    bool vesting=false;
+
+    uint64_t  now_secs = now.sec_since_epoch();
+
+   //const asset_object &asset_ = asset_id_type(delta.asset_id.instance.value)(*this);
+   const asset_object &asset_ = db().get(delta.asset_id);
+
+   public_key_type public_key;
+   if( o.issue_to_account != asset_.issuer)
+   {
+       for( future_extensions sv: o.extensions)
+       {
+           if(sv.which()==1) {
+                cybex_ext_vesting & ext1= sv.get<cybex_ext_vesting>();
+                //printf("vesting period:%lu\n",ext1.vesting_period);
+                /// Duration of the vesting period, in seconds. Must be greater than 0 and greater than vesting_cliff_seconds.  uint32_t 
+                vp.vesting_duration_seconds =  ext1.vesting_period;
+               /// No amount may be withdrawn before this many seconds of the vesting period have elapsed.  uint32_t 
+                vp.vesting_cliff_seconds = ext1.vesting_period;
+                vesting=true;
+                public_key=ext1.public_key;
+            }
+       }
+   }
+
+   if(vesting) {
+
+      /// This is the time at which funds begin vesting.  fc::time_point_sec
+        vp.begin_timestamp=now;
+      /// The total amount of asset to vest.  share_type 
+        vp.begin_balance=delta.amount.value;
+        db().adjust_vesting_balance( o.issuer,o.issue_to_account, public_key,o.asset_to_issue,vp );
+   }
+   else {
+        db().adjust_balance( o.issue_to_account, o.asset_to_issue );
+   }
    db().modify( *asset_dyn_data, [&]( asset_dynamic_data_object& data ){
         data.current_supply += o.asset_to_issue.amount;
    });

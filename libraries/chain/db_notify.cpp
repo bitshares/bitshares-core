@@ -14,6 +14,7 @@
 #include <graphene/chain/operation_history_object.hpp>
 #include <graphene/chain/vesting_balance_object.hpp>
 #include <graphene/chain/transaction_object.hpp>
+#include <cybex/vesting_ops.hpp>
 
 using namespace fc;
 using namespace graphene::chain;
@@ -198,6 +199,8 @@ struct get_impacted_account_visitor
    {
       _impacted.insert( op.account_id );
    }
+
+   db_notify_cancel_vesting
 
 };
 

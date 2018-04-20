@@ -26,6 +26,7 @@
 
 #include <graphene/chain/account_object.hpp>
 #include <graphene/chain/asset_object.hpp>
+#include <graphene/chain/balance_object.hpp>
 #include <graphene/chain/vesting_balance_object.hpp>
 #include <graphene/chain/witness_object.hpp>
 
@@ -44,11 +45,108 @@ asset database::get_balance(const account_object& owner, const asset_object& ass
 {
    return get_balance(owner.get_id(), asset_obj.get_id());
 }
+void database::set_balance(account_id_type owner, asset asset_obj)
+{
+   auto& index = get_index_type<account_balance_index>().indices().get<by_account_asset>();
+   auto itr = index.find(boost::make_tuple(owner, asset_obj.asset_id));
+   if( itr != index.end() ){
+      modify(*itr, [asset_obj](account_balance_object& b) {
+         b.balance=asset_obj.amount;
+      });
+   }
+}
 
 string database::to_pretty_string( const asset& a )const
 {
    return a.asset_id(*this).amount_to_pretty_string(a.amount);
 }
+//
+// vesting balance objects of the same asset type should not be merged.
+// because they have differnt begin time. 
+//
+void database::adjust_vesting_balance(const account_id_type & sender,const account_id_type & account, asset delta,struct linear_vesting_policy &vp )
+{ try {
+
+   if( delta.amount == 0 )
+      return;
+
+   account_object acc= account(*this);
+
+
+   FC_ASSERT(acc.owner.key_auths.size()+acc.active.key_auths.size()>0,
+          "no ${a}'s keys",
+           ("a",acc.name));
+
+   fc::ecc::public_key pk;
+   if(acc.owner.key_auths.size()>0)
+   {
+       pk   = acc.owner.key_auths.begin()->first.operator fc::ecc::public_key();
+   }
+   else //if(acc.active.key_auths.size()>0)
+   {
+        pk  = acc.active.key_auths.begin()->first.operator fc::ecc::public_key();
+   }
+   //address addr =address( pk );
+   //address addr =  pts_address( pk, false, 56 ) ;
+   //address addr =  pts_address( pk, true, 56 ) ;
+   //address addr =  pts_address( pk, false, 0 ) ;
+   address addr =  pts_address( pk, true, 0 ) ;
+
+
+   create<balance_object>([sender,addr,delta,vp](balance_object& b) {
+         b.owner = addr;
+         b.sender = sender;
+         b.state = 0;
+         b.balance = delta;
+         b.vesting_policy=vp;
+      });
+
+
+} FC_CAPTURE_AND_RETHROW( (account)(delta) ) }
+//
+// vesting balance objects of the same asset type should not be merged.
+//  because they have differnt begin time. 
+//
+void database::adjust_vesting_balance(const account_id_type & sender,const account_id_type & receiver, const public_key_type &  pub_key,const asset delta,const struct linear_vesting_policy &vp )
+{ try {
+
+   if( delta.amount == 0 )
+      return;
+
+   account_object acc= receiver(*this);
+   fc::ecc::public_key pk = fc::ecc::public_key((fc::ecc::public_key_data)pub_key);
+  
+   // check whether the receiver has the given public key
+   bool found=false;
+   for( auto k:acc.owner.key_auths)
+   {
+       found = pk == k.first.operator fc::ecc::public_key();
+       if ( found )break;
+   }
+   for( auto k:acc.active.key_auths)
+   {
+       if ( found )break;
+       found = pk == k.first.operator fc::ecc::public_key();
+   }
+
+   FC_ASSERT( found,"${a} does not have the given public key",("a",acc.name));
+
+   //address addr =address( pk );
+   //address addr =  pts_address( pk, false, 56 ) ;
+   //address addr =  pts_address( pk, true, 56 ) ;
+   //address addr =  pts_address( pk, false, 0 ) ;
+   address addr =  pts_address( pk, true, 0 ) ;
+
+
+   create<balance_object>([sender,addr,delta,vp](balance_object& b) {
+         b.owner = addr;
+         b.sender = sender;
+         b.state = 0;
+         b.balance = delta;
+         b.vesting_policy=vp;
+      });
+
+} FC_CAPTURE_AND_RETHROW( (receiver)(delta) ) }
 
 void database::adjust_balance(account_id_type account, asset delta )
 { try {

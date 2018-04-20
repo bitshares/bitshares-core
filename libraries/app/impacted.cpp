@@ -24,6 +24,7 @@
 
 #include <graphene/chain/protocol/authority.hpp>
 #include <graphene/app/impacted.hpp>
+#include <cybex/vesting_ops.hpp>
 
 namespace graphene { namespace app {
 
@@ -211,6 +212,7 @@ struct get_impacted_account_visitor
       _impacted.insert( op.account_id );
    }
 
+   impact_visit_cancel_vesting  
 };
 
 void operation_get_impacted_accounts( const operation& op, flat_set<account_id_type>& result )

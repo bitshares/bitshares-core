@@ -26,6 +26,7 @@
 #include <graphene/chain/exceptions.hpp>
 #include <graphene/chain/hardfork.hpp>
 #include <graphene/chain/is_authorized_asset.hpp>
+#include <graphene/chain/vesting_balance_object.hpp>
 
 namespace graphene { namespace chain {
 void_result transfer_evaluator::do_evaluate( const transfer_operation& op )
@@ -37,6 +38,26 @@ void_result transfer_evaluator::do_evaluate( const transfer_operation& op )
    const account_object& to_account      = op.to(d);
    const asset_object&   asset_type      = op.amount.asset_id(d);
 
+   for ( auto ext: op.extensions)
+   {
+      if(ext.which()==4)
+      {
+                cybex_ext_xfer_to_name & ext1= ext.get<cybex_ext_xfer_to_name>();
+                FC_ASSERT(to_account.name==ext1.name,"${id} is ${to}.it does not match ${name}",
+                     ("id",op.to)
+                     ("to",to_account.name)
+                     ("name",ext1.name) );
+                FC_ASSERT(asset_type.symbol==ext1.asset_sym,"asset ${id} is ${asset}.it does not match ${sym}",
+                     ("id",op.amount.asset_id)
+                     ("asset",asset_type.symbol)
+                     ("sym",ext1.asset_sym) );
+                const asset_object&   fee_asset_type      = op.fee.asset_id(d);
+                FC_ASSERT(fee_asset_type.symbol==ext1.fee_asset_sym,"fee asset ${id} is ${asset}.it does not match ${sym}",
+                     ("id",op.fee.asset_id)
+                     ("asset",fee_asset_type.symbol)
+                     ("sym",ext1.fee_asset_sym) );
+      }
+   }
    try {
 
       GRAPHENE_ASSERT(
@@ -59,7 +80,7 @@ void_result transfer_evaluator::do_evaluate( const transfer_operation& op )
          GRAPHENE_ASSERT(
             from_account.id == asset_type.issuer || to_account.id == asset_type.issuer,
             transfer_restricted_transfer_asset,
-            "Asset ${asset} has transfer_restricted flag enabled",
+            "Asset {asset} has transfer_restricted flag enabled",
             ("asset", op.amount.asset_id)
           );
       }
@@ -76,8 +97,43 @@ void_result transfer_evaluator::do_evaluate( const transfer_operation& op )
 
 void_result transfer_evaluator::do_apply( const transfer_operation& o )
 { try {
-   db().adjust_balance( o.from, -o.amount );
-   db().adjust_balance( o.to, o.amount );
+//
+// common_options.extensins
+//
+    fc::time_point_sec now = db().head_block_time();
+    struct linear_vesting_policy vp;
+
+    bool vesting=false;
+
+    public_key_type public_key;
+    for( future_extensions sv: o.extensions)
+    {
+           if(sv.which()==1) {
+                cybex_ext_vesting & ext1= sv.get<cybex_ext_vesting>();
+                //printf("vesting period:%lu\n",ext1.vesting_period);
+                /// Duration of the vesting period, in seconds. Must be greater than 0 and greater than vesting_cliff_seconds.  uint32_t 
+                vp.vesting_duration_seconds =  ext1.vesting_period;
+               /// No amount may be withdrawn before this many seconds of the vesting period have elapsed.  uint32_t 
+                vp.vesting_cliff_seconds = ext1.vesting_period;
+                vesting=true;
+                public_key= ext1.public_key;
+            }
+   }
+
+   if(vesting)
+   {
+      /// This is the time at which funds begin vesting.  fc::time_point_sec
+        vp.begin_timestamp=now;
+      /// The total amount of asset to vest.  share_type 
+        vp.begin_balance=o.amount.amount.value;
+        db().adjust_vesting_balance( o.from,o.to,public_key, o.amount,vp );
+        db().adjust_balance( o.from, -o.amount );
+   }
+   else
+   {
+      db().adjust_balance( o.from, -o.amount );
+      db().adjust_balance( o.to, o.amount );
+   }
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }
 
