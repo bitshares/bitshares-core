@@ -24,17 +24,14 @@
 
 #include <boost/test/unit_test.hpp>
 
-#include <graphene/app/database_api.hpp>
 #include <graphene/chain/hardfork.hpp>
-#include <graphene/wallet/wallet.hpp>
 
-#include <iostream>
+#include <graphene/chain/market_object.hpp>
 
 #include "../common/database_fixture.hpp"
 
 using namespace graphene::chain;
 using namespace graphene::chain::test;
-using namespace graphene::wallet;
 
 BOOST_FIXTURE_TEST_SUITE(market_tests, database_fixture)
 
