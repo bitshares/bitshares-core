@@ -76,8 +76,7 @@ namespace graphene { namespace chain {
          const auto& escrow = db().get_escrow( o.from, o.escrow_id );
          FC_ASSERT( escrow.to == o.to, "op 'to' does not match escrow 'to'" );
          FC_ASSERT( escrow.agent == o.agent, "op 'agent' does not match escrow 'agent'" );
-         FC_ASSERT( escrow.ratification_deadline >= db().head_block_time(), "escrow ratification deadline is before head block time" );
-         return void_result();
+         FC_ASSERT( escrow.ratification_deadline >= db().head_block_time(), "The escrow ratification deadline has passed. Escrow can no longer be ratified." );         return void_result();
       }
 
       void_result escrow_approve_evaluator::do_apply(const escrow_approve_operation& o)
