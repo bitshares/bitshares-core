@@ -143,6 +143,261 @@ BOOST_AUTO_TEST_CASE( trade_amount_equals_zero_after_hf_184 )
 }
 
 /***
+ * This test case reproduces one of the scenarios described in bitshares-core issue #342:
+ *   when matching a limit order with another limit order, a small taker order will pay more than minimum required.
+ */
+BOOST_AUTO_TEST_CASE( limit_limit_rounding_test1 )
+{
+   try {
+      generate_blocks( HARDFORK_555_TIME );
+      set_expiration( db, trx );
+
+      ACTORS( (seller)(buyer) );
+
+      const asset_object& test = create_user_issued_asset( "UIATEST" );
+      const asset_id_type test_id = test.id;
+      const asset_object& core = get_asset( GRAPHENE_SYMBOL );
+      const asset_id_type core_id = core.id;
+
+      transfer( committee_account(db), seller, asset( 100000000 ) );
+
+      issue_uia( buyer, asset( 10000000, test_id ) );
+
+      BOOST_CHECK_EQUAL(get_balance(buyer, core), 0);
+      BOOST_CHECK_EQUAL(get_balance(buyer, test), 10000000);
+      BOOST_CHECK_EQUAL(get_balance(seller, test), 0);
+      BOOST_CHECK_EQUAL(get_balance(seller, core), 100000000);
+
+      // seller sells 3 core for 31 test, price 10.33 test per core
+      limit_order_id_type sell_id = create_sell_order( seller, core.amount(3), test.amount(31) )->id;
+
+      // buyer buys 2 core with 25 test, price 12.5 test per core
+      // the order is filled immediately
+      BOOST_CHECK( !create_sell_order( buyer, test.amount(25), core.amount(2) ) );
+
+      BOOST_CHECK_EQUAL( sell_id(db).for_sale.value, 1 ); // 2 core sold, 1 remaining
+
+      BOOST_CHECK_EQUAL(get_balance(seller, core), 99999997);
+      BOOST_CHECK_EQUAL(get_balance(seller, test), 25); // seller got 25 test
+      BOOST_CHECK_EQUAL(get_balance(buyer, core), 2); // buyer got 2 core
+      BOOST_CHECK_EQUAL(get_balance(buyer, test), 9999975); // buyer paid 25 test
+
+      generate_block();
+
+      // buyer buys 2 core with 25 test, price 12.5 test per core
+      limit_order_id_type buy_id = create_sell_order( buyer_id, asset(25,test_id), asset(2,core_id) )->id;
+
+      generate_block();
+
+      BOOST_CHECK( !db.find_object( sell_id ) ); // sell order is filled
+      BOOST_CHECK_EQUAL( buy_id(db).for_sale.value, 15 ); // 10 test sold, 15 remaining
+
+      BOOST_CHECK_EQUAL(get_balance(seller_id, core_id), 99999997);
+      BOOST_CHECK_EQUAL(get_balance(seller_id, test_id), 35); // seller got 10 more test
+      BOOST_CHECK_EQUAL(get_balance(buyer_id, core_id), 3); // buyer got 1 more core
+      BOOST_CHECK_EQUAL(get_balance(buyer_id, test_id), 9999950);
+
+   } catch( const fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
+/***
+ * This test case tests one of the scenarios described in bitshares-core issue #342 after hard fork:
+ *   when matching a limit order with another limit order,
+ *   a small taker order will only pay minimum required amount, and the rest will be returned.
+ */
+BOOST_AUTO_TEST_CASE( limit_limit_rounding_test1_after_hf_342 )
+{
+   try {
+      auto mi = db.get_global_properties().parameters.maintenance_interval;
+      generate_blocks(HARDFORK_CORE_342_TIME - mi);
+      generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+
+      set_expiration( db, trx );
+
+      ACTORS( (seller)(buyer) );
+
+      const asset_object& test = create_user_issued_asset( "UIATEST" );
+      const asset_id_type test_id = test.id;
+      const asset_object& core = get_asset( GRAPHENE_SYMBOL );
+      const asset_id_type core_id = core.id;
+
+      transfer( committee_account(db), seller, asset( 100000000 ) );
+
+      issue_uia( buyer, asset( 10000000, test_id ) );
+
+      BOOST_CHECK_EQUAL(get_balance(buyer, core), 0);
+      BOOST_CHECK_EQUAL(get_balance(buyer, test), 10000000);
+      BOOST_CHECK_EQUAL(get_balance(seller, test), 0);
+      BOOST_CHECK_EQUAL(get_balance(seller, core), 100000000);
+
+      // seller sells 3 core for 31 test, price 10.33 test per core
+      limit_order_id_type sell_id = create_sell_order( seller, core.amount(3), test.amount(31) )->id;
+
+      // buyer buys 2 core with 25 test, price 12.5 test per core
+      // the order is filled immediately
+      BOOST_CHECK( !create_sell_order( buyer, test.amount(25), core.amount(2) ) );
+
+      BOOST_CHECK_EQUAL( sell_id(db).for_sale.value, 1 ); // 2 core sold, 1 remaining
+
+      BOOST_CHECK_EQUAL(get_balance(seller, core), 99999997);
+      BOOST_CHECK_EQUAL(get_balance(seller, test), 21); // seller got 21 test: round_up(2*31/3)=round_up(20.67)
+      BOOST_CHECK_EQUAL(get_balance(buyer, core), 2); // buyer got 2 core
+      BOOST_CHECK_EQUAL(get_balance(buyer, test), 9999979); // buyer paid 21 test but not 25
+
+      generate_block();
+      set_expiration( db, trx );
+
+      // buyer buys 2 core with 25 test, price 12.5 test per core
+      limit_order_id_type buy_id = create_sell_order( buyer_id, asset(25,test_id), asset(2,core_id) )->id;
+
+      generate_block();
+
+      BOOST_CHECK( !db.find_object( sell_id ) ); // sell order is filled
+      BOOST_CHECK_EQUAL( buy_id(db).for_sale.value, 15 ); // 10 test sold, 15 remaining
+
+      BOOST_CHECK_EQUAL(get_balance(seller_id, core_id), 99999997);
+      BOOST_CHECK_EQUAL(get_balance(seller_id, test_id), 31); // seller got 10 more test, in total 31 as expected
+      BOOST_CHECK_EQUAL(get_balance(buyer_id, core_id), 3); // buyer got 1 more core
+      BOOST_CHECK_EQUAL(get_balance(buyer_id, test_id), 9999954);
+
+   } catch( const fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
+/***
+ * This test case reproduces one of the scenarios described in bitshares-core issue #342:
+ *   when matching a limit order with another limit order, a small maker order will pay more than minimum required.
+ */
+BOOST_AUTO_TEST_CASE( limit_limit_rounding_test2 )
+{
+   try {
+      generate_blocks( HARDFORK_555_TIME );
+      set_expiration( db, trx );
+
+      ACTORS( (seller)(buyer) );
+
+      const asset_object& test = create_user_issued_asset( "UIATEST" );
+      const asset_id_type test_id = test.id;
+      const asset_object& core = get_asset( GRAPHENE_SYMBOL );
+      const asset_id_type core_id = core.id;
+
+      transfer( committee_account(db), seller, asset( 100000000 ) );
+
+      issue_uia( buyer, asset( 10000000, test_id ) );
+
+      BOOST_CHECK_EQUAL(get_balance(buyer, core), 0);
+      BOOST_CHECK_EQUAL(get_balance(buyer, test), 10000000);
+      BOOST_CHECK_EQUAL(get_balance(seller, test), 0);
+      BOOST_CHECK_EQUAL(get_balance(seller, core), 100000000);
+
+      // buyer buys 17 core with 3 test, price 3/17 = 0.176 test per core
+      limit_order_id_type tmp_buy_id = create_sell_order( buyer, test.amount(3), core.amount(17) )->id;
+      // seller sells 33 core for 5 test, price 5/33 = 0.1515 test per core
+      limit_order_id_type sell_id = create_sell_order( seller, core.amount(33), test.amount(5) )->id;
+
+      BOOST_CHECK( !db.find_object( tmp_buy_id ) ); // buy order is filled
+      BOOST_CHECK_EQUAL( sell_id(db).for_sale.value, 16 ); // 17 core sold, 16 remaining
+
+      BOOST_CHECK_EQUAL(get_balance(seller, core), 99999967);
+      BOOST_CHECK_EQUAL(get_balance(seller, test), 3); // seller got 3 test
+      BOOST_CHECK_EQUAL(get_balance(buyer, core), 17); // buyer got 17 core
+      BOOST_CHECK_EQUAL(get_balance(buyer, test), 9999997); // buyer paid 3 test
+
+      generate_block();
+      set_expiration( db, trx );
+
+      // buyer buys 15 core with 3 test, price 3/15 = 0.2 test per core
+      // even 15 < 16, since it's taker, we'll check with maker's price, then turns out the buy order is bigger
+      limit_order_id_type buy_id = create_sell_order( buyer_id, asset(3,test_id), asset(15,core_id) )->id;
+
+      generate_block();
+
+      BOOST_CHECK( !db.find_object( sell_id ) ); // sell order is filled
+      BOOST_CHECK_EQUAL( buy_id(db).for_sale.value, 1 ); // 2 test sold, 1 remaining
+
+      BOOST_CHECK_EQUAL(get_balance(seller_id, core_id), 99999967); // seller paid the 16 core which was remaining in the order
+      BOOST_CHECK_EQUAL(get_balance(seller_id, test_id), 5); // seller got 2 more test
+      BOOST_CHECK_EQUAL(get_balance(buyer_id, core_id), 33); // buyer got 16 more core
+      BOOST_CHECK_EQUAL(get_balance(buyer_id, test_id), 9999994);
+
+   } catch( const fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
+/***
+ * This test case tests one of the scenarios described in bitshares-core issue #342 after hard fork:
+ *   when matching a limit order with another limit order,
+ *   a small maker order will only pay minimum required amount, and the rest will be returned.
+ */
+BOOST_AUTO_TEST_CASE( limit_limit_rounding_test2_after_hf_342 )
+{
+   try {
+      auto mi = db.get_global_properties().parameters.maintenance_interval;
+      generate_blocks(HARDFORK_CORE_342_TIME - mi);
+      generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+
+      set_expiration( db, trx );
+
+      ACTORS( (seller)(buyer) );
+
+      const asset_object& test = create_user_issued_asset( "UIATEST" );
+      const asset_id_type test_id = test.id;
+      const asset_object& core = get_asset( GRAPHENE_SYMBOL );
+      const asset_id_type core_id = core.id;
+
+      transfer( committee_account(db), seller, asset( 100000000 ) );
+
+      issue_uia( buyer, asset( 10000000, test_id ) );
+
+      BOOST_CHECK_EQUAL(get_balance(buyer, core), 0);
+      BOOST_CHECK_EQUAL(get_balance(buyer, test), 10000000);
+      BOOST_CHECK_EQUAL(get_balance(seller, test), 0);
+      BOOST_CHECK_EQUAL(get_balance(seller, core), 100000000);
+
+      // buyer buys 17 core with 3 test, price 3/17 = 0.176 test per core
+      limit_order_id_type tmp_buy_id = create_sell_order( buyer, test.amount(3), core.amount(17) )->id;
+      // seller sells 33 core for 5 test, price 5/33 = 0.1515 test per core
+      limit_order_id_type sell_id = create_sell_order( seller, core.amount(33), test.amount(5) )->id;
+
+      BOOST_CHECK( !db.find_object( tmp_buy_id ) ); // buy order is filled
+      BOOST_CHECK_EQUAL( sell_id(db).for_sale.value, 16 ); // 17 core sold, 16 remaining
+
+      BOOST_CHECK_EQUAL(get_balance(seller, core), 99999967);
+      BOOST_CHECK_EQUAL(get_balance(seller, test), 3); // seller got 3 test
+      BOOST_CHECK_EQUAL(get_balance(buyer, core), 17); // buyer got 17 core
+      BOOST_CHECK_EQUAL(get_balance(buyer, test), 9999997); // buyer paid 3 test
+
+      generate_block();
+      set_expiration( db, trx );
+
+      // buyer buys 15 core with 3 test, price 3/15 = 0.2 test per core
+      // even 15 < 16, since it's taker, we'll check with maker's price, then turns out the buy order is bigger
+      limit_order_id_type buy_id = create_sell_order( buyer_id, asset(3,test_id), asset(15,core_id) )->id;
+
+      generate_block();
+
+      BOOST_CHECK( !db.find_object( sell_id ) ); // sell order is filled
+      BOOST_CHECK_EQUAL( buy_id(db).for_sale.value, 1 ); // 2 test sold, 1 remaining
+
+      BOOST_CHECK_EQUAL(get_balance(seller_id, core_id), 99999967+16-14); // seller got refunded 2 core
+      BOOST_CHECK_EQUAL(get_balance(seller_id, test_id), 5); // seller got 2 more test
+      BOOST_CHECK_EQUAL(get_balance(buyer_id, core_id), 31); // buyer got 14 more core: round_up(2*33/5)=round_up(13.2)
+      BOOST_CHECK_EQUAL(get_balance(buyer_id, test_id), 9999994);
+
+   } catch( const fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
+/***
  * Reproduces bitshares-core issue #132: something for nothing when matching a limit order with a call order.
  * Also detects the cull_small issue in check_call_orders.
  */
