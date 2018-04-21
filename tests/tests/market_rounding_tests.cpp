@@ -485,8 +485,6 @@ BOOST_AUTO_TEST_CASE( issue_132_limit_and_call_test2 )
 
    const auto& bitusd = create_bitasset("USDBIT", feedproducer_id);
    const auto& core   = asset_id_type()(db);
-   asset_id_type usd_id = bitusd.id;
-   asset_id_type core_id = core.id;
 
    int64_t init_balance(1000000);
 
@@ -507,7 +505,6 @@ BOOST_AUTO_TEST_CASE( issue_132_limit_and_call_test2 )
    call_order_id_type call_id = call.id;
    // create yet another position with 350% collateral, call price is 17.5/175 CORE/USD = 77/700
    const call_order_object& call3 = *borrow( borrower3, bitusd.amount(100000), asset(17500));
-   call_order_id_type call3_id = call3.id;
    transfer(borrower, seller, bitusd.amount(10));
    transfer(borrower3, seller, bitusd.amount(100000));
 
@@ -558,8 +555,6 @@ BOOST_AUTO_TEST_CASE( issue_132_limit_and_call_test3 )
 
    const auto& bitusd = create_bitasset("USDBIT", feedproducer_id);
    const auto& core   = asset_id_type()(db);
-   asset_id_type usd_id = bitusd.id;
-   asset_id_type core_id = core.id;
 
    int64_t init_balance(1000000);
 
@@ -580,7 +575,6 @@ BOOST_AUTO_TEST_CASE( issue_132_limit_and_call_test3 )
    call_order_id_type call_id = call.id;
    // create yet another position with 350% collateral, call price is 17.5/175 CORE/USD = 77/700
    const call_order_object& call3 = *borrow( borrower3, bitusd.amount(100000), asset(17500));
-   call_order_id_type call3_id = call3.id;
    transfer(borrower, seller, bitusd.amount(10));
    transfer(borrower3, seller, bitusd.amount(100000));
 
@@ -634,8 +628,6 @@ BOOST_AUTO_TEST_CASE( issue_132_limit_and_call_test1_after_hardfork )
 
    const auto& bitusd = create_bitasset("USDBIT", feedproducer_id);
    const auto& core   = asset_id_type()(db);
-   asset_id_type usd_id = bitusd.id;
-   asset_id_type core_id = core.id;
 
    int64_t init_balance(1000000);
 
@@ -656,10 +648,8 @@ BOOST_AUTO_TEST_CASE( issue_132_limit_and_call_test1_after_hardfork )
    call_order_id_type call_id = call.id;
    // create another position with 310% collateral, call price is 15.5/175 CORE/USD = 62/700
    const call_order_object& call2 = *borrow( borrower2, bitusd.amount(100000), asset(15500));
-   call_order_id_type call2_id = call2.id;
    // create yet another position with 350% collateral, call price is 17.5/175 CORE/USD = 77/700
    const call_order_object& call3 = *borrow( borrower3, bitusd.amount(100000), asset(17500));
-   call_order_id_type call3_id = call3.id;
    transfer(borrower, seller, bitusd.amount(10));
    transfer(borrower2, seller, bitusd.amount(100000));
    transfer(borrower3, seller, bitusd.amount(100000));
@@ -713,8 +703,6 @@ BOOST_AUTO_TEST_CASE( issue_132_limit_and_call_test2_after_hardfork )
 
    const auto& bitusd = create_bitasset("USDBIT", feedproducer_id);
    const auto& core   = asset_id_type()(db);
-   asset_id_type usd_id = bitusd.id;
-   asset_id_type core_id = core.id;
 
    int64_t init_balance(1000000);
 
@@ -735,7 +723,6 @@ BOOST_AUTO_TEST_CASE( issue_132_limit_and_call_test2_after_hardfork )
    call_order_id_type call_id = call.id;
    // create yet another position with 350% collateral, call price is 17.5/175 CORE/USD = 77/700
    const call_order_object& call3 = *borrow( borrower3, bitusd.amount(100000), asset(17500));
-   call_order_id_type call3_id = call3.id;
    transfer(borrower, seller, bitusd.amount(10));
    transfer(borrower3, seller, bitusd.amount(100000));
 
@@ -788,8 +775,6 @@ BOOST_AUTO_TEST_CASE( issue_132_limit_and_call_test3_after_hardfork )
 
    const auto& bitusd = create_bitasset("USDBIT", feedproducer_id);
    const auto& core   = asset_id_type()(db);
-   asset_id_type usd_id = bitusd.id;
-   asset_id_type core_id = core.id;
 
    int64_t init_balance(1000000);
 
@@ -810,7 +795,6 @@ BOOST_AUTO_TEST_CASE( issue_132_limit_and_call_test3_after_hardfork )
    call_order_id_type call_id = call.id;
    // create yet another position with 350% collateral, call price is 17.5/175 CORE/USD = 77/700
    const call_order_object& call3 = *borrow( borrower3, bitusd.amount(100000), asset(17500));
-   call_order_id_type call3_id = call3.id;
    transfer(borrower, seller, bitusd.amount(10));
    transfer(borrower3, seller, bitusd.amount(100000));
 
