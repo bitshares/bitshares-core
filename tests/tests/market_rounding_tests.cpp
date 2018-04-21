@@ -44,6 +44,7 @@ BOOST_AUTO_TEST_CASE( trade_amount_equals_zero )
 {
    try {
       generate_blocks( HARDFORK_555_TIME );
+      generate_block();
       set_expiration( db, trx );
 
       const asset_object& test = create_user_issued_asset( "UIATEST" );
@@ -150,6 +151,7 @@ BOOST_AUTO_TEST_CASE( limit_limit_rounding_test1 )
 {
    try {
       generate_blocks( HARDFORK_555_TIME );
+      generate_block();
       set_expiration( db, trx );
 
       ACTORS( (seller)(buyer) );
@@ -180,7 +182,8 @@ BOOST_AUTO_TEST_CASE( limit_limit_rounding_test1 )
       BOOST_CHECK_EQUAL(get_balance(seller, core), 99999997);
       BOOST_CHECK_EQUAL(get_balance(seller, test), 25); // seller got 25 test
       BOOST_CHECK_EQUAL(get_balance(buyer, core), 2); // buyer got 2 core
-      BOOST_CHECK_EQUAL(get_balance(buyer, test), 9999975); // buyer paid 25 test
+      BOOST_CHECK_EQUAL(get_balance(buyer, test), 9999975); // buyer paid 25 test,
+                                                            // effective price is 25/2 which is much higher than 31/3
 
       generate_block();
 
@@ -242,10 +245,10 @@ BOOST_AUTO_TEST_CASE( limit_limit_rounding_test1_after_hf_342 )
 
       BOOST_CHECK_EQUAL( sell_id(db).for_sale.value, 1 ); // 2 core sold, 1 remaining
 
-      BOOST_CHECK_EQUAL(get_balance(seller, core), 99999997);
-      BOOST_CHECK_EQUAL(get_balance(seller, test), 21); // seller got 21 test: round_up(2*31/3)=round_up(20.67)
       BOOST_CHECK_EQUAL(get_balance(buyer, core), 2); // buyer got 2 core
-      BOOST_CHECK_EQUAL(get_balance(buyer, test), 9999979); // buyer paid 21 test but not 25
+      BOOST_CHECK_EQUAL(get_balance(buyer, test), 9999979); // buyer actually paid 21 test according to price 10.33
+      BOOST_CHECK_EQUAL(get_balance(seller, core), 99999997);
+      BOOST_CHECK_EQUAL(get_balance(seller, test), 21); // seller got 21 test
 
       generate_block();
       set_expiration( db, trx );
@@ -256,12 +259,12 @@ BOOST_AUTO_TEST_CASE( limit_limit_rounding_test1_after_hf_342 )
       generate_block();
 
       BOOST_CHECK( !db.find_object( sell_id ) ); // sell order is filled
-      BOOST_CHECK_EQUAL( buy_id(db).for_sale.value, 15 ); // 10 test sold, 15 remaining
+      BOOST_CHECK_EQUAL( buy_id(db).for_sale.value, 15 ); // 10 test sold according to price 10.33, and 15 remaining
 
-      BOOST_CHECK_EQUAL(get_balance(seller_id, core_id), 99999997);
-      BOOST_CHECK_EQUAL(get_balance(seller_id, test_id), 31); // seller got 10 more test, in total 31 as expected
       BOOST_CHECK_EQUAL(get_balance(buyer_id, core_id), 3); // buyer got 1 more core
       BOOST_CHECK_EQUAL(get_balance(buyer_id, test_id), 9999954);
+      BOOST_CHECK_EQUAL(get_balance(seller_id, core_id), 99999997);
+      BOOST_CHECK_EQUAL(get_balance(seller_id, test_id), 31); // seller got 10 more test, in total 31 as expected
 
    } catch( const fc::exception& e) {
       edump((e.to_detail_string()));
@@ -277,6 +280,7 @@ BOOST_AUTO_TEST_CASE( limit_limit_rounding_test2 )
 {
    try {
       generate_blocks( HARDFORK_555_TIME );
+      generate_block();
       set_expiration( db, trx );
 
       ACTORS( (seller)(buyer) );
@@ -322,6 +326,7 @@ BOOST_AUTO_TEST_CASE( limit_limit_rounding_test2 )
 
       BOOST_CHECK_EQUAL(get_balance(seller_id, core_id), 99999967); // seller paid the 16 core which was remaining in the order
       BOOST_CHECK_EQUAL(get_balance(seller_id, test_id), 5); // seller got 2 more test
+                                                             // effective price 16/2 which is much higher than 33/5
       BOOST_CHECK_EQUAL(get_balance(buyer_id, core_id), 33); // buyer got 16 more core
       BOOST_CHECK_EQUAL(get_balance(buyer_id, test_id), 9999994);
 
@@ -386,10 +391,10 @@ BOOST_AUTO_TEST_CASE( limit_limit_rounding_test2_after_hf_342 )
       BOOST_CHECK( !db.find_object( sell_id ) ); // sell order is filled
       BOOST_CHECK_EQUAL( buy_id(db).for_sale.value, 1 ); // 2 test sold, 1 remaining
 
-      BOOST_CHECK_EQUAL(get_balance(seller_id, core_id), 99999967+16-14); // seller got refunded 2 core
-      BOOST_CHECK_EQUAL(get_balance(seller_id, test_id), 5); // seller got 2 more test
-      BOOST_CHECK_EQUAL(get_balance(buyer_id, core_id), 31); // buyer got 14 more core: round_up(2*33/5)=round_up(13.2)
+      BOOST_CHECK_EQUAL(get_balance(buyer_id, core_id), 31); // buyer got 14 more core according to price 0.1515
       BOOST_CHECK_EQUAL(get_balance(buyer_id, test_id), 9999994);
+      BOOST_CHECK_EQUAL(get_balance(seller_id, core_id), 99999967+16-14); // seller got refunded 2 core
+      BOOST_CHECK_EQUAL(get_balance(seller_id, test_id), 5); // seller got 2 more test, effective price 14/2 which is close to 33/5
 
    } catch( const fc::exception& e) {
       edump((e.to_detail_string()));
@@ -403,6 +408,7 @@ BOOST_AUTO_TEST_CASE( limit_limit_rounding_test2_after_hf_342 )
  */
 BOOST_AUTO_TEST_CASE( issue_132_limit_and_call_test1 )
 { try { // matching a limit order with call order
+   generate_blocks( HARDFORK_555_TIME );
    generate_block();
 
    set_expiration( db, trx );
@@ -477,6 +483,7 @@ BOOST_AUTO_TEST_CASE( issue_132_limit_and_call_test1 )
  */
 BOOST_AUTO_TEST_CASE( issue_132_limit_and_call_test2 )
 { try {
+   generate_blocks( HARDFORK_555_TIME );
    generate_block();
 
    set_expiration( db, trx );
@@ -547,6 +554,7 @@ BOOST_AUTO_TEST_CASE( issue_132_limit_and_call_test2 )
  */
 BOOST_AUTO_TEST_CASE( issue_132_limit_and_call_test3 )
 { try {
+   generate_blocks( HARDFORK_555_TIME );
    generate_block();
 
    set_expiration( db, trx );
@@ -555,6 +563,8 @@ BOOST_AUTO_TEST_CASE( issue_132_limit_and_call_test3 )
 
    const auto& bitusd = create_bitasset("USDBIT", feedproducer_id);
    const auto& core   = asset_id_type()(db);
+   const asset_id_type bitusd_id = bitusd.id;
+   const asset_id_type core_id = core.id;
 
    int64_t init_balance(1000000);
 
@@ -594,20 +604,22 @@ BOOST_AUTO_TEST_CASE( issue_132_limit_and_call_test3 )
    BOOST_CHECK_EQUAL( 100010-33, get_balance(seller, bitusd) );
    BOOST_CHECK_EQUAL( 0, get_balance(seller, core) );
 
+   generate_block();
+
    // adjust price feed to get call_order into margin call territory
-   current_feed.settlement_price = bitusd.amount( 120 ) / core.amount(10);
-   publish_feed( bitusd, feedproducer, current_feed );
+   current_feed.settlement_price = bitusd_id(db).amount( 120 ) / core_id(db).amount(10);
+   publish_feed( bitusd_id(db), feedproducer_id(db), current_feed );
    // settlement price = 120 USD / 10 CORE, mssp = 120/11 USD/CORE
 
    // the limit order will match with call at price 33 USD / 3 CORE, but call only owes 10 USD,
    //   so the seller will pay 10 USD but get nothing.
    // The remaining USD will be in the order on the market
    BOOST_CHECK( !db.find<call_order_object>( call_id ) ); // the first call order get filled
-   BOOST_CHECK_EQUAL( 100010-33, get_balance(seller, bitusd) ); // the seller paid 33 USD
-   BOOST_CHECK_EQUAL( 0, get_balance(seller, core) ); // the seller got nothing
+   BOOST_CHECK_EQUAL( 100010-33, get_balance(seller_id, bitusd_id) ); // the seller paid 33 USD
+   BOOST_CHECK_EQUAL( 0, get_balance(seller_id, core_id) ); // the seller got nothing
    BOOST_CHECK_EQUAL( 33-10, sell_id(db).for_sale.value ); // the sell order has some USD left
-   BOOST_CHECK_EQUAL( 0, get_balance(borrower, bitusd) );
-   BOOST_CHECK_EQUAL( init_balance, get_balance(borrower, core) );
+   BOOST_CHECK_EQUAL( 0, get_balance(borrower_id, bitusd_id) );
+   BOOST_CHECK_EQUAL( init_balance, get_balance(borrower_id, core_id) );
 
    generate_block();
 
@@ -777,6 +789,8 @@ BOOST_AUTO_TEST_CASE( issue_132_limit_and_call_test3_after_hardfork )
 
    const auto& bitusd = create_bitasset("USDBIT", feedproducer_id);
    const auto& core   = asset_id_type()(db);
+   const asset_id_type bitusd_id = bitusd.id;
+   const asset_id_type core_id = core.id;
 
    int64_t init_balance(1000000);
 
@@ -816,20 +830,22 @@ BOOST_AUTO_TEST_CASE( issue_132_limit_and_call_test3_after_hardfork )
    BOOST_CHECK_EQUAL( 100010-33, get_balance(seller, bitusd) );
    BOOST_CHECK_EQUAL( 0, get_balance(seller, core) );
 
+   generate_block();
+
    // adjust price feed to get call_order into margin call territory
-   current_feed.settlement_price = bitusd.amount( 120 ) / core.amount(10);
-   publish_feed( bitusd, feedproducer, current_feed );
+   current_feed.settlement_price = bitusd_id(db).amount( 120 ) / core_id(db).amount(10);
+   publish_feed( bitusd_id(db), feedproducer_id(db), current_feed );
    // settlement price = 120 USD / 10 CORE, mssp = 120/11 USD/CORE
 
    // the limit order will match with call at price 33 USD / 3 CORE, but call only owes 10 USD,
    // Since the call would pay off all debt, let it pay 1 CORE from collateral
    // The remaining USD will be in the order on the market
    BOOST_CHECK( !db.find<call_order_object>( call_id ) ); // the first call order get filled
-   BOOST_CHECK_EQUAL( 100010-33, get_balance(seller, bitusd) ); // the seller paid 33 USD
-   BOOST_CHECK_EQUAL( 1, get_balance(seller, core) ); // the seller got 1 CORE
+   BOOST_CHECK_EQUAL( 100010-33, get_balance(seller_id, bitusd_id) ); // the seller paid 33 USD
+   BOOST_CHECK_EQUAL( 1, get_balance(seller_id, core_id) ); // the seller got 1 CORE
    BOOST_CHECK_EQUAL( 33-10, sell_id(db).for_sale.value ); // the sell order has some USD left
-   BOOST_CHECK_EQUAL( 0, get_balance(borrower, bitusd) );
-   BOOST_CHECK_EQUAL( init_balance-1, get_balance(borrower, core) );
+   BOOST_CHECK_EQUAL( 0, get_balance(borrower_id, bitusd_id) );
+   BOOST_CHECK_EQUAL( init_balance-1, get_balance(borrower_id, core_id) );
 
    generate_block();
 
@@ -842,6 +858,7 @@ BOOST_AUTO_TEST_CASE( issue_132_limit_and_call_test3_after_hardfork )
  */
 BOOST_AUTO_TEST_CASE( limit_call_rounding_test1 )
 { try {
+   generate_blocks( HARDFORK_555_TIME );
    generate_block();
 
    set_expiration( db, trx );
@@ -889,7 +906,8 @@ BOOST_AUTO_TEST_CASE( limit_call_rounding_test1 )
    // settlement price = 120 USD / 10 CORE, mssp = 120/11 USD/CORE
 
    // This would match with call at limit order's price 33 USD / 3 CORE, but call only owes 20 USD,
-   //   so the seller will pay 20 USD but get 1 CORE, since round_down(20*3/33) = 1
+   //   so the seller will pay the whole 20 USD and get 1 CORE, since 20 USD doesn't worth 2 CORE according to price 33/3,
+   //   effective price is 20/1 which is worse than the limit order's desired 33/3.
    // The remaining USD will be left in the order on the market
    limit_order_id_type sell_id = create_sell_order(seller, bitusd.amount(33), core.amount(3))->id;
    BOOST_CHECK( !db.find<call_order_object>( call_id ) ); // the first call order get filled
@@ -960,7 +978,8 @@ BOOST_AUTO_TEST_CASE( limit_call_rounding_test1_after_hf_342 )
 
    // This would match with call at price 120 USD / 11 CORE (assume hard fork core-342 and hard fork core-338 occur at same time),
    //   but call only owes 20 USD,
-   //   so the seller will pay 20 USD and get 2 CORE, since round_up(20*11/120) = 2
+   //   so the seller will pay 20 USD and get 2 CORE, since 20 USD worths a little more than 1 CORE according to price 120/11,
+   //   effective price is 20/2 which is not worse than the limit order's desired 33/3.
    // The remaining USD will be left in the order on the market
    limit_order_id_type sell_id = create_sell_order(seller, bitusd.amount(33), core.amount(3))->id;
    BOOST_CHECK( !db.find<call_order_object>( call_id ) ); // the first call order get filled
@@ -984,6 +1003,7 @@ BOOST_AUTO_TEST_CASE( limit_call_rounding_test1_after_hf_342 )
  */
 BOOST_AUTO_TEST_CASE( limit_call_rounding_test2 )
 { try {
+   generate_blocks( HARDFORK_555_TIME );
    generate_block();
 
    set_expiration( db, trx );
@@ -1031,7 +1051,8 @@ BOOST_AUTO_TEST_CASE( limit_call_rounding_test2 )
    // settlement price = 120 USD / 10 CORE, mssp = 120/11 USD/CORE
 
    // This would match with call at limit order's price 15 USD / 1 CORE,
-   //   so the seller will pay 15 USD and get 1 CORE
+   //   so the seller will pay 15 USD and get 1 CORE,
+   //   effective price is 15/1.
    BOOST_CHECK( !create_sell_order(seller, bitusd.amount(15), core.amount(1)) ); // the sell order is filled
    BOOST_CHECK( db.find<call_order_object>( call_id ) != nullptr ); // the first call order did not get filled
    BOOST_CHECK_EQUAL( 20-15, call.debt.value ); // call paid 15 USD
@@ -1102,7 +1123,9 @@ BOOST_AUTO_TEST_CASE( limit_call_rounding_test2_after_hf_342 )
    // settlement price = 120 USD / 10 CORE, mssp = 120/11 USD/CORE
 
    // This would match with call at price 120 USD / 11 CORE (assume hard fork core-342 and hard fork core-338 occur at same time),
-   //   so the seller will get 1 CORE, and pay round_up(1*120/11) = 11 USD, the extra 4 USD will be returned
+   //   so the seller will get 1 CORE, and pay 11 USD since 1 CORE worths a little more than 10 USD according to price 120/11,
+   //     and the extra 4 USD will be returned but not overpaid,
+   //     effective price is 11/1 which is close to 120/11.
    BOOST_CHECK( !create_sell_order(seller, bitusd.amount(15), core.amount(1)) ); // the sell order is filled
    BOOST_CHECK( db.find<call_order_object>( call_id ) != nullptr ); // the first call order did not get filled
    BOOST_CHECK_EQUAL( 20-11, call.debt.value ); // call paid 11 USD
