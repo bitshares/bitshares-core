@@ -267,8 +267,9 @@ namespace graphene { namespace chain {
 
          node_property_object& node_properties();
 
-
          uint32_t last_non_undoable_block_num() const;
+
+         const escrow_object&   get_escrow( account_id_type account, uint32_t escrow_id )const;
          //////////////////// db_init.cpp ////////////////////
 
          void initialize_evaluators();
@@ -326,9 +327,6 @@ namespace graphene { namespace chain {
          void deposit_cashback(const account_object& acct, share_type amount, bool require_vesting = true);
          // helper to handle witness pay
          void deposit_witness_pay(const witness_object& wit, share_type amount);
-
-         // escrow call here
-         const escrow_object&   get_escrow( account_id_type account, uint32_t escrow_id )const;
 
          //////////////////// db_debug.cpp ////////////////////
 
