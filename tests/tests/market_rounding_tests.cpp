@@ -143,7 +143,7 @@ BOOST_AUTO_TEST_CASE( trade_amount_equals_zero_after_hf_184 )
 }
 
 /***
- * Reproduces bitshares-core issue #132: something for nothing when maching a limit order with a call order.
+ * Reproduces bitshares-core issue #132: something for nothing when matching a limit order with a call order.
  * Also detects the cull_small issue in check_call_orders.
  */
 BOOST_AUTO_TEST_CASE( issue_132_limit_and_call_test1 )
@@ -215,8 +215,10 @@ BOOST_AUTO_TEST_CASE( issue_132_limit_and_call_test1 )
 
 /***
  * Another test case
- * reproduces bitshares-core issue #132: something for nothing when maching a limit order with a call order.
+ * reproduces bitshares-core issue #132: something for nothing when matching a limit order with a call order.
  * Also detects the cull_small issue in check_call_orders.
+ *
+ * In this test case, the limit order is taker.
  */
 BOOST_AUTO_TEST_CASE( issue_132_limit_and_call_test2 )
 { try {
@@ -286,8 +288,10 @@ BOOST_AUTO_TEST_CASE( issue_132_limit_and_call_test2 )
 
 /***
  * Yet another test case
- * reproduces bitshares-core issue #132: something for nothing when maching a limit order with a call order.
+ * reproduces bitshares-core issue #132: something for nothing when matching a limit order with a call order.
  * Also detects the cull_small issue in check_call_orders.
+ *
+ * In this test case, the limit order is maker.
  */
 BOOST_AUTO_TEST_CASE( issue_132_limit_and_call_test3 )
 { try {
@@ -361,7 +365,7 @@ BOOST_AUTO_TEST_CASE( issue_132_limit_and_call_test3 )
 } FC_LOG_AND_RETHROW() }
 
 /***
- * Fixed bitshares-core issue #132: something for nothing when maching a limit order with a call order.
+ * Fixed bitshares-core issue #132: something for nothing when matching a limit order with a call order.
  */
 BOOST_AUTO_TEST_CASE( issue_132_limit_and_call_test1_after_hardfork )
 { try {
@@ -438,7 +442,9 @@ BOOST_AUTO_TEST_CASE( issue_132_limit_and_call_test1_after_hardfork )
 
 /***
  * Another test case
- * for fixed bitshares-core issue #132: something for nothing when maching a limit order with a call order.
+ * for fixed bitshares-core issue #132: something for nothing when matching a limit order with a call order.
+ *
+ * In this test case, the limit order is taker.
  */
 BOOST_AUTO_TEST_CASE( issue_132_limit_and_call_test2_after_hardfork )
 { try {
@@ -510,8 +516,10 @@ BOOST_AUTO_TEST_CASE( issue_132_limit_and_call_test2_after_hardfork )
 
 /***
  * Yet another test case
- * for fixed bitshares-core issue #132: something for nothing when maching a limit order with a call order.
+ * for fixed bitshares-core issue #132: something for nothing when matching a limit order with a call order.
  * Also detects the cull_small issue in check_call_orders.
+ *
+ * In this test case, the limit order is maker.
  */
 BOOST_AUTO_TEST_CASE( issue_132_limit_and_call_test3_after_hardfork )
 { try {
