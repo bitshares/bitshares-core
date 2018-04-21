@@ -671,7 +671,8 @@ BOOST_AUTO_TEST_CASE( issue_132_limit_and_call_test1_after_hardfork )
    publish_feed( bitusd, feedproducer, current_feed );
    // settlement price = 120 USD / 10 CORE, mssp = 120/11 USD/CORE
 
-   // This would match with call at price 11 USD / 1 CORE, but call only owes 10 USD,
+   // This would match with call at price 120 USD / 11 CORE (assume hard fork core-342 and hard fork core-338 occur at same time),
+   //   but call only owes 10 USD,
    // Since the call would pay off all debt, let it pay 1 CORE from collateral
    // The remaining 1 USD is too little to get any CORE, so the limit order will be cancelled
    BOOST_CHECK( !create_sell_order(seller, bitusd.amount(11), core.amount(1)) );
@@ -741,7 +742,8 @@ BOOST_AUTO_TEST_CASE( issue_132_limit_and_call_test2_after_hardfork )
    publish_feed( bitusd, feedproducer, current_feed );
    // settlement price = 120 USD / 10 CORE, mssp = 120/11 USD/CORE
 
-   // This would match with call at price 33 USD / 3 CORE, but call only owes 10 USD,
+   // This would match with call at price 120 USD / 11 CORE (assume hard fork core-342 and hard fork core-338 occur at same time),
+   //   but call only owes 10 USD,
    // Since the call would pay off all debt, let it pay 1 CORE from collateral
    // The remaining USD will be left in the order on the market
    limit_order_id_type sell_id = create_sell_order(seller, bitusd.amount(33), core.amount(3))->id;
@@ -828,6 +830,287 @@ BOOST_AUTO_TEST_CASE( issue_132_limit_and_call_test3_after_hardfork )
    BOOST_CHECK_EQUAL( 33-10, sell_id(db).for_sale.value ); // the sell order has some USD left
    BOOST_CHECK_EQUAL( 0, get_balance(borrower, bitusd) );
    BOOST_CHECK_EQUAL( init_balance-1, get_balance(borrower, core) );
+
+   generate_block();
+
+} FC_LOG_AND_RETHROW() }
+
+/***
+ * This test case reproduces one of the scenarios described in bitshares-core issue #342:
+ *   when matching a big taker limit order with a small maker call order,
+ *   rounding was in favor of the small call order.
+ */
+BOOST_AUTO_TEST_CASE( limit_call_rounding_test1 )
+{ try {
+   generate_block();
+
+   set_expiration( db, trx );
+
+   ACTORS((buyer)(seller)(borrower)(borrower2)(borrower3)(borrower4)(feedproducer));
+
+   const auto& bitusd = create_bitasset("USDBIT", feedproducer_id);
+   const auto& core   = asset_id_type()(db);
+
+   int64_t init_balance(1000000);
+
+   transfer(committee_account, buyer_id, asset(init_balance));
+   transfer(committee_account, borrower_id, asset(init_balance));
+   transfer(committee_account, borrower2_id, asset(init_balance));
+   transfer(committee_account, borrower3_id, asset(init_balance));
+   transfer(committee_account, borrower4_id, asset(init_balance));
+   update_feed_producers( bitusd, {feedproducer.id} );
+
+   price_feed current_feed;
+   current_feed.maintenance_collateral_ratio = 1750;
+   current_feed.maximum_short_squeeze_ratio = 1100;
+   current_feed.settlement_price = bitusd.amount( 100 ) / core.amount( 5 );
+   publish_feed( bitusd, feedproducer, current_feed );
+   // start out with 200% collateral, call price is 10/175 CORE/USD = 40/700
+   const call_order_object& call = *borrow( borrower, bitusd.amount(20), asset(2));
+   call_order_id_type call_id = call.id;
+   // create yet another position with 350% collateral, call price is 17.5/175 CORE/USD = 77/700
+   const call_order_object& call3 = *borrow( borrower3, bitusd.amount(100000), asset(17500));
+   transfer(borrower, seller, bitusd.amount(20));
+   transfer(borrower3, seller, bitusd.amount(100000));
+
+   BOOST_CHECK_EQUAL( 20, call.debt.value );
+   BOOST_CHECK_EQUAL( 2, call.collateral.value );
+   BOOST_CHECK_EQUAL( 100000, call3.debt.value );
+   BOOST_CHECK_EQUAL( 17500, call3.collateral.value );
+
+   BOOST_CHECK_EQUAL( 100020, get_balance(seller, bitusd) );
+   BOOST_CHECK_EQUAL( 0, get_balance(seller, core) );
+   BOOST_CHECK_EQUAL( 0, get_balance(borrower, bitusd) );
+   BOOST_CHECK_EQUAL( init_balance-2, get_balance(borrower, core) );
+
+   // adjust price feed to get call_order into margin call territory
+   current_feed.settlement_price = bitusd.amount( 120 ) / core.amount(10);
+   publish_feed( bitusd, feedproducer, current_feed );
+   // settlement price = 120 USD / 10 CORE, mssp = 120/11 USD/CORE
+
+   // This would match with call at limit order's price 33 USD / 3 CORE, but call only owes 20 USD,
+   //   so the seller will pay 20 USD but get 1 CORE, since round_down(20*3/33) = 1
+   // The remaining USD will be left in the order on the market
+   limit_order_id_type sell_id = create_sell_order(seller, bitusd.amount(33), core.amount(3))->id;
+   BOOST_CHECK( !db.find<call_order_object>( call_id ) ); // the first call order get filled
+   BOOST_CHECK_EQUAL( 100020-33, get_balance(seller, bitusd) ); // the seller paid 33 USD
+   BOOST_CHECK_EQUAL( 1, get_balance(seller, core) ); // the seller got 1 CORE
+   BOOST_CHECK_EQUAL( 33-20, sell_id(db).for_sale.value ); // the sell order has some USD left
+   BOOST_CHECK_EQUAL( 0, get_balance(borrower, bitusd) );
+   BOOST_CHECK_EQUAL( init_balance-1, get_balance(borrower, core) );
+
+   generate_block();
+
+} FC_LOG_AND_RETHROW() }
+
+/***
+ * This test case tests one of the scenarios described in bitshares-core issue #342 after hard fork:
+ *   when matching a big taker limit order with a small maker call order,
+ *   rounding in favor of the big limit order.
+ */
+BOOST_AUTO_TEST_CASE( limit_call_rounding_test1_after_hf_342 )
+{ try {
+   auto mi = db.get_global_properties().parameters.maintenance_interval;
+   generate_blocks(HARDFORK_CORE_342_TIME - mi);
+   generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+
+   set_expiration( db, trx );
+
+   ACTORS((buyer)(seller)(borrower)(borrower2)(borrower3)(borrower4)(feedproducer));
+
+   const auto& bitusd = create_bitasset("USDBIT", feedproducer_id);
+   const auto& core   = asset_id_type()(db);
+
+   int64_t init_balance(1000000);
+
+   transfer(committee_account, buyer_id, asset(init_balance));
+   transfer(committee_account, borrower_id, asset(init_balance));
+   transfer(committee_account, borrower2_id, asset(init_balance));
+   transfer(committee_account, borrower3_id, asset(init_balance));
+   transfer(committee_account, borrower4_id, asset(init_balance));
+   update_feed_producers( bitusd, {feedproducer.id} );
+
+   price_feed current_feed;
+   current_feed.maintenance_collateral_ratio = 1750;
+   current_feed.maximum_short_squeeze_ratio = 1100;
+   current_feed.settlement_price = bitusd.amount( 100 ) / core.amount( 5 );
+   publish_feed( bitusd, feedproducer, current_feed );
+   // start out with 200% collateral, call price is 10/175 CORE/USD = 40/700
+   const call_order_object& call = *borrow( borrower, bitusd.amount(20), asset(2));
+   call_order_id_type call_id = call.id;
+   // create yet another position with 350% collateral, call price is 17.5/175 CORE/USD = 77/700
+   const call_order_object& call3 = *borrow( borrower3, bitusd.amount(100000), asset(17500));
+   transfer(borrower, seller, bitusd.amount(20));
+   transfer(borrower3, seller, bitusd.amount(100000));
+
+   BOOST_CHECK_EQUAL( 20, call.debt.value );
+   BOOST_CHECK_EQUAL( 2, call.collateral.value );
+   BOOST_CHECK_EQUAL( 100000, call3.debt.value );
+   BOOST_CHECK_EQUAL( 17500, call3.collateral.value );
+
+   BOOST_CHECK_EQUAL( 100020, get_balance(seller, bitusd) );
+   BOOST_CHECK_EQUAL( 0, get_balance(seller, core) );
+   BOOST_CHECK_EQUAL( 0, get_balance(borrower, bitusd) );
+   BOOST_CHECK_EQUAL( init_balance-2, get_balance(borrower, core) );
+
+   // adjust price feed to get call_order into margin call territory
+   current_feed.settlement_price = bitusd.amount( 120 ) / core.amount(10);
+   publish_feed( bitusd, feedproducer, current_feed );
+   // settlement price = 120 USD / 10 CORE, mssp = 120/11 USD/CORE
+
+   // This would match with call at price 120 USD / 11 CORE (assume hard fork core-342 and hard fork core-338 occur at same time),
+   //   but call only owes 20 USD,
+   //   so the seller will pay 20 USD and get 2 CORE, since round_up(20*11/120) = 2
+   // The remaining USD will be left in the order on the market
+   limit_order_id_type sell_id = create_sell_order(seller, bitusd.amount(33), core.amount(3))->id;
+   BOOST_CHECK( !db.find<call_order_object>( call_id ) ); // the first call order get filled
+   BOOST_CHECK_EQUAL( 100020-33, get_balance(seller, bitusd) ); // the seller paid 33 USD
+   BOOST_CHECK_EQUAL( 2, get_balance(seller, core) ); // the seller got 2 CORE
+   BOOST_CHECK_EQUAL( 33-20, sell_id(db).for_sale.value ); // the sell order has some USD left
+   BOOST_CHECK_EQUAL( 0, get_balance(borrower, bitusd) );
+   BOOST_CHECK_EQUAL( init_balance-2, get_balance(borrower, core) );
+
+   generate_block();
+
+} FC_LOG_AND_RETHROW() }
+
+/***
+ * Due to #338, when matching a smaller taker limit order with a big maker call order,
+ *   the small order will be filled at its own price.
+ * So unable or no need to reproduce one of the scenarios described in bitshares-core issue #342:
+ *   when matching a small taker limit order with a big maker call order,
+ *   the small limit order would be paying too much.
+ * But we'll just write the test case for #338 here.
+ */
+BOOST_AUTO_TEST_CASE( limit_call_rounding_test2 )
+{ try {
+   generate_block();
+
+   set_expiration( db, trx );
+
+   ACTORS((buyer)(seller)(borrower)(borrower2)(borrower3)(borrower4)(feedproducer));
+
+   const auto& bitusd = create_bitasset("USDBIT", feedproducer_id);
+   const auto& core   = asset_id_type()(db);
+
+   int64_t init_balance(1000000);
+
+   transfer(committee_account, buyer_id, asset(init_balance));
+   transfer(committee_account, borrower_id, asset(init_balance));
+   transfer(committee_account, borrower2_id, asset(init_balance));
+   transfer(committee_account, borrower3_id, asset(init_balance));
+   transfer(committee_account, borrower4_id, asset(init_balance));
+   update_feed_producers( bitusd, {feedproducer.id} );
+
+   price_feed current_feed;
+   current_feed.maintenance_collateral_ratio = 1750;
+   current_feed.maximum_short_squeeze_ratio = 1100;
+   current_feed.settlement_price = bitusd.amount( 100 ) / core.amount( 5 );
+   publish_feed( bitusd, feedproducer, current_feed );
+   // start out with 200% collateral, call price is 10/175 CORE/USD = 40/700
+   const call_order_object& call = *borrow( borrower, bitusd.amount(20), asset(2));
+   call_order_id_type call_id = call.id;
+   // create yet another position with 350% collateral, call price is 17.5/175 CORE/USD = 77/700
+   const call_order_object& call3 = *borrow( borrower3, bitusd.amount(100000), asset(17500));
+   transfer(borrower, seller, bitusd.amount(20));
+   transfer(borrower3, seller, bitusd.amount(100000));
+
+   BOOST_CHECK_EQUAL( 20, call.debt.value );
+   BOOST_CHECK_EQUAL( 2, call.collateral.value );
+   BOOST_CHECK_EQUAL( 100000, call3.debt.value );
+   BOOST_CHECK_EQUAL( 17500, call3.collateral.value );
+
+   BOOST_CHECK_EQUAL( 100020, get_balance(seller, bitusd) );
+   BOOST_CHECK_EQUAL( 0, get_balance(seller, core) );
+   BOOST_CHECK_EQUAL( 0, get_balance(borrower, bitusd) );
+   BOOST_CHECK_EQUAL( init_balance-2, get_balance(borrower, core) );
+
+   // adjust price feed to get call_order into margin call territory
+   current_feed.settlement_price = bitusd.amount( 120 ) / core.amount(10);
+   publish_feed( bitusd, feedproducer, current_feed );
+   // settlement price = 120 USD / 10 CORE, mssp = 120/11 USD/CORE
+
+   // This would match with call at limit order's price 15 USD / 1 CORE,
+   //   so the seller will pay 15 USD and get 1 CORE
+   BOOST_CHECK( !create_sell_order(seller, bitusd.amount(15), core.amount(1)) ); // the sell order is filled
+   BOOST_CHECK( db.find<call_order_object>( call_id ) != nullptr ); // the first call order did not get filled
+   BOOST_CHECK_EQUAL( 20-15, call.debt.value ); // call paid 15 USD
+   BOOST_CHECK_EQUAL( 2-1, call.collateral.value ); // call got 1 CORE
+   BOOST_CHECK_EQUAL( 100020-15, get_balance(seller, bitusd) ); // the seller paid 15 USD
+   BOOST_CHECK_EQUAL( 1, get_balance(seller, core) ); // the seller got 1 CORE
+   BOOST_CHECK_EQUAL( 0, get_balance(borrower, bitusd) );
+   BOOST_CHECK_EQUAL( init_balance-2, get_balance(borrower, core) );
+
+   generate_block();
+
+} FC_LOG_AND_RETHROW() }
+
+
+/***
+ * This test case tests one of the scenarios described in bitshares-core issue #342 after hard fork:
+ *   when matching a small taker limit order with a big maker call order,
+ *   the small limit order would be paying minimum required.
+ */
+BOOST_AUTO_TEST_CASE( limit_call_rounding_test2_after_hf_342 )
+{ try {
+   auto mi = db.get_global_properties().parameters.maintenance_interval;
+   generate_blocks(HARDFORK_CORE_342_TIME - mi);
+   generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+
+   set_expiration( db, trx );
+
+   ACTORS((buyer)(seller)(borrower)(borrower2)(borrower3)(borrower4)(feedproducer));
+
+   const auto& bitusd = create_bitasset("USDBIT", feedproducer_id);
+   const auto& core   = asset_id_type()(db);
+
+   int64_t init_balance(1000000);
+
+   transfer(committee_account, buyer_id, asset(init_balance));
+   transfer(committee_account, borrower_id, asset(init_balance));
+   transfer(committee_account, borrower2_id, asset(init_balance));
+   transfer(committee_account, borrower3_id, asset(init_balance));
+   transfer(committee_account, borrower4_id, asset(init_balance));
+   update_feed_producers( bitusd, {feedproducer.id} );
+
+   price_feed current_feed;
+   current_feed.maintenance_collateral_ratio = 1750;
+   current_feed.maximum_short_squeeze_ratio = 1100;
+   current_feed.settlement_price = bitusd.amount( 100 ) / core.amount( 5 );
+   publish_feed( bitusd, feedproducer, current_feed );
+   // start out with 200% collateral, call price is 10/175 CORE/USD = 40/700
+   const call_order_object& call = *borrow( borrower, bitusd.amount(20), asset(2));
+   call_order_id_type call_id = call.id;
+   // create yet another position with 350% collateral, call price is 17.5/175 CORE/USD = 77/700
+   const call_order_object& call3 = *borrow( borrower3, bitusd.amount(100000), asset(17500));
+   transfer(borrower, seller, bitusd.amount(20));
+   transfer(borrower3, seller, bitusd.amount(100000));
+
+   BOOST_CHECK_EQUAL( 20, call.debt.value );
+   BOOST_CHECK_EQUAL( 2, call.collateral.value );
+   BOOST_CHECK_EQUAL( 100000, call3.debt.value );
+   BOOST_CHECK_EQUAL( 17500, call3.collateral.value );
+
+   BOOST_CHECK_EQUAL( 100020, get_balance(seller, bitusd) );
+   BOOST_CHECK_EQUAL( 0, get_balance(seller, core) );
+   BOOST_CHECK_EQUAL( 0, get_balance(borrower, bitusd) );
+   BOOST_CHECK_EQUAL( init_balance-2, get_balance(borrower, core) );
+
+   // adjust price feed to get call_order into margin call territory
+   current_feed.settlement_price = bitusd.amount( 120 ) / core.amount(10);
+   publish_feed( bitusd, feedproducer, current_feed );
+   // settlement price = 120 USD / 10 CORE, mssp = 120/11 USD/CORE
+
+   // This would match with call at price 120 USD / 11 CORE (assume hard fork core-342 and hard fork core-338 occur at same time),
+   //   so the seller will get 1 CORE, and pay round_up(1*120/11) = 11 USD, the extra 4 USD will be returned
+   BOOST_CHECK( !create_sell_order(seller, bitusd.amount(15), core.amount(1)) ); // the sell order is filled
+   BOOST_CHECK( db.find<call_order_object>( call_id ) != nullptr ); // the first call order did not get filled
+   BOOST_CHECK_EQUAL( 20-11, call.debt.value ); // call paid 11 USD
+   BOOST_CHECK_EQUAL( 2-1, call.collateral.value ); // call got 1 CORE
+   BOOST_CHECK_EQUAL( 100020-11, get_balance(seller, bitusd) ); // the seller paid 11 USD
+   BOOST_CHECK_EQUAL( 1, get_balance(seller, core) ); // the seller got 1 CORE
+   BOOST_CHECK_EQUAL( 0, get_balance(borrower, bitusd) );
+   BOOST_CHECK_EQUAL( init_balance-2, get_balance(borrower, core) );
 
    generate_block();
 
