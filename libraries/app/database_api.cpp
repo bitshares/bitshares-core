@@ -630,7 +630,7 @@ vector<limit_order_object> database_api::get_account_limit_orders( const string&
    return my->get_account_limit_orders( name_or_id, base, quote, expire, limit );
 }
 
-vector<limit_order_object> database_api_impl::get_account_limit_orders( const string& name_or_id, const string& base, const string& quote, fc::time_point_sec expire, uint32_t limit)
+vector<limit_order_object> database_api_impl::get_account_limit_orders( const string& name_or_id, const string& base, const string& quote, object_id_type start_id, uint32_t limit)
 {
    FC_ASSERT( limit <= 100 );
 
@@ -655,13 +655,11 @@ vector<limit_order_object> database_api_impl::get_account_limit_orders( const st
    auto quote_id = assets[1]->id;
 
    // Add the account's orders
-   auto order_range = _db.get_index_type<limit_order_index>().indices().get<by_account>().equal_range(account->id);
-   for (auto itr = order_range.first; itr != order_range.second; ++itr) {
-      const limit_order_object &order = *itr;
+   auto lower_itr = _db.get_index_type<limit_order_index>().indices().get<by_account>().lower_bound(std::make_tuple(account->id, price::max(base_id, quote_id)));
+   auto upper_itr = _db.get_index_type<limit_order_index>().indices().get<by_account>().upper_bound(std::make_tuple(account->id, price::min(base_id, quote_id)));
 
-      if (order.sell_price.base.asset_id != base_id
-              || order.sell_price.quote.asset_id != quote_id)
-         continue;
+   for ( ; lower_itr != upper_itr ; ++lower_itr) {
+      const limit_order_object &order = *lower_itr;
 
       if (order.expiration > expire)
          continue;
