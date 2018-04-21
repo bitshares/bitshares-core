@@ -39,7 +39,7 @@ namespace graphene { namespace chain {
          return void_result();
       }
 
-      void_result escrow_transfer_evaluator::do_apply(const escrow_transfer_operation& o)
+      object_id_type escrow_transfer_evaluator::do_apply(const escrow_transfer_operation& o)
       {
 
          try {
@@ -53,7 +53,7 @@ namespace graphene { namespace chain {
 
             db().adjust_balance( o.from, -o.amount );
 
-            db().create<escrow_object>([&]( escrow_object& esc ) {
+            const escrow_object& esc = db().create<escrow_object>([&]( escrow_object& esc ) {
                esc.escrow_id              = o.escrow_id;
                esc.from                   = o.from;
                esc.to                     = o.to;
@@ -63,7 +63,7 @@ namespace graphene { namespace chain {
                esc.ratification_deadline  = o.ratification_deadline;
                esc.escrow_expiration      = o.escrow_expiration;
             });
-            return void_result();
+            return  esc.id;
 
          } FC_CAPTURE_AND_RETHROW( (o) )
       }
