@@ -377,7 +377,17 @@ class wallet_api
        */
      vector<operation_detail>  get_relative_account_history(string name, uint32_t stop, int limit, uint32_t start)const;
 
-      std::map<string,full_account>     get_full_accounts( const vector<string>& names_or_ids, bool subscribe);
+      /**
+       * @brief Fetch all objects relevant to the specified accounts and subscribe to updates
+       * @param names_or_ids Each item must be the name or ID of an account to retrieve
+       * @return Map of string from @ref names_or_ids to the corresponding account
+       *
+       * This function fetches all relevant objects for the given accounts, and subscribes to updates to the given
+       * accounts. If any of the strings in @ref names_or_ids cannot be tied to an account, that input will be
+       * ignored. All other accounts will be retrieved and subscribed.
+       *
+       */
+      std::map<string,full_account>     get_full_accounts( const vector<string>& names_or_ids);
       vector<bucket_object>             get_market_history(string symbol, string symbol2, uint32_t bucket, fc::time_point_sec start, fc::time_point_sec end)const;
       vector<limit_order_object>        get_limit_orders(string a, string b, uint32_t limit)const;
       vector<call_order_object>         get_call_orders(string a, uint32_t limit)const;
