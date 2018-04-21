@@ -35,6 +35,113 @@ using namespace graphene::chain::test;
 
 BOOST_FIXTURE_TEST_SUITE(market_rounding_tests, database_fixture)
 
+/**
+ *  Create an order such that when the trade executes at the
+ *  requested price the resulting payout to one party is 0
+ *  ( Reproduces https://github.com/bitshares/bitshares-core/issues/184 )
+ */
+BOOST_AUTO_TEST_CASE( trade_amount_equals_zero )
+{
+   try {
+      generate_blocks( HARDFORK_555_TIME );
+      set_expiration( db, trx );
+
+      const asset_object& test = create_user_issued_asset( "UIATEST" );
+      const asset_id_type test_id = test.id;
+      const asset_object& core = get_asset( GRAPHENE_SYMBOL );
+      const asset_id_type core_id = core.id;
+      const account_object& core_seller = create_account( "seller1" );
+      const account_object& core_buyer = create_account("buyer1");
+
+      transfer( committee_account(db), core_seller, asset( 100000000 ) );
+
+      issue_uia( core_buyer, asset( 10000000, test_id ) );
+
+      BOOST_CHECK_EQUAL(get_balance(core_buyer, core), 0);
+      BOOST_CHECK_EQUAL(get_balance(core_buyer, test), 10000000);
+      BOOST_CHECK_EQUAL(get_balance(core_seller, test), 0);
+      BOOST_CHECK_EQUAL(get_balance(core_seller, core), 100000000);
+
+      create_sell_order(core_seller, core.amount(1), test.amount(2));
+      create_sell_order(core_seller, core.amount(1), test.amount(2));
+      create_sell_order(core_buyer, test.amount(3), core.amount(1));
+
+      BOOST_CHECK_EQUAL(get_balance(core_buyer, core), 1);
+      BOOST_CHECK_EQUAL(get_balance(core_buyer, test), 9999997);
+      BOOST_CHECK_EQUAL(get_balance(core_seller, core), 99999998);
+      BOOST_CHECK_EQUAL(get_balance(core_seller, test), 3);
+
+      generate_block();
+      fc::usleep(fc::milliseconds(200)); // sleep a while to execute callback in another thread
+
+      auto result = get_market_order_history(core_id, test_id);
+      BOOST_CHECK_EQUAL(result.size(), 4);
+      BOOST_CHECK(result[0].op.pays == core_id(db).amount(0));
+      BOOST_CHECK(result[0].op.receives == test_id(db).amount(1));
+      BOOST_CHECK(result[1].op.pays == test_id(db).amount(1));
+      BOOST_CHECK(result[1].op.receives == core_id(db).amount(0));
+      BOOST_CHECK(result[2].op.pays == core_id(db).amount(1));
+      BOOST_CHECK(result[2].op.receives == test_id(db).amount(2));
+      BOOST_CHECK(result[3].op.pays == test_id(db).amount(2));
+      BOOST_CHECK(result[3].op.receives == core_id(db).amount(1));
+   } catch( const fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
+/**
+ *  The something-for-nothing bug should be fixed https://github.com/bitshares/bitshares-core/issues/184
+ */
+BOOST_AUTO_TEST_CASE( trade_amount_equals_zero_after_hf_184 )
+{
+   try {
+      auto mi = db.get_global_properties().parameters.maintenance_interval;
+      generate_blocks(HARDFORK_CORE_184_TIME - mi);
+      generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+
+      set_expiration( db, trx );
+
+      const asset_object& test = create_user_issued_asset( "UIATEST" );
+      const asset_id_type test_id = test.id;
+      const asset_object& core = get_asset( GRAPHENE_SYMBOL );
+      const asset_id_type core_id = core.id;
+      const account_object& core_seller = create_account( "seller1" );
+      const account_object& core_buyer = create_account("buyer1");
+
+      transfer( committee_account(db), core_seller, asset( 100000000 ) );
+
+      issue_uia( core_buyer, asset( 10000000, test_id ) );
+
+      BOOST_CHECK_EQUAL(get_balance(core_buyer, core), 0);
+      BOOST_CHECK_EQUAL(get_balance(core_buyer, test), 10000000);
+      BOOST_CHECK_EQUAL(get_balance(core_seller, test), 0);
+      BOOST_CHECK_EQUAL(get_balance(core_seller, core), 100000000);
+
+      create_sell_order(core_seller, core.amount(1), test.amount(2));
+      create_sell_order(core_seller, core.amount(1), test.amount(2));
+      create_sell_order(core_buyer, test.amount(3), core.amount(1));
+
+      BOOST_CHECK_EQUAL(get_balance(core_buyer, core), 1);
+      BOOST_CHECK_EQUAL(get_balance(core_buyer, test), 9999998);
+      BOOST_CHECK_EQUAL(get_balance(core_seller, core), 99999998);
+      BOOST_CHECK_EQUAL(get_balance(core_seller, test), 2);
+
+      generate_block();
+      fc::usleep(fc::milliseconds(200)); // sleep a while to execute callback in another thread
+
+      auto result = get_market_order_history(core_id, test_id);
+      BOOST_CHECK_EQUAL(result.size(), 2);
+      BOOST_CHECK(result[0].op.pays == core_id(db).amount(1));
+      BOOST_CHECK(result[0].op.receives == test_id(db).amount(2));
+      BOOST_CHECK(result[1].op.pays == test_id(db).amount(2));
+      BOOST_CHECK(result[1].op.receives == core_id(db).amount(1));
+   } catch( const fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
 /***
  * Reproduces bitshares-core issue #132: something for nothing when maching a limit order with a call order.
  * Also detects the cull_small issue in check_call_orders.
