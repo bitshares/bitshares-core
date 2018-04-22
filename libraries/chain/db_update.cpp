@@ -272,6 +272,11 @@ void database::clear_expired_orders()
          //Cancel expired limit orders
          auto head_time = head_block_time();
          auto maint_time = get_dynamic_global_properties().next_maintenance_time;
+
+         bool before_core_hardfork_184 = ( maint_time <= HARDFORK_CORE_184_TIME ); // something-for-nothing
+         bool before_core_hardfork_342 = ( maint_time <= HARDFORK_CORE_342_TIME ); // better rounding
+         bool before_core_hardfork_606 = ( maint_time <= HARDFORK_CORE_606_TIME ); // feed always trigger call
+
          auto& limit_index = get_index_type<limit_order_index>().indices().get<by_expiration>();
          while( !limit_index.empty() && limit_index.begin()->expiration <= head_time )
          {
@@ -279,7 +284,7 @@ void database::clear_expired_orders()
             auto base_asset = order.sell_price.base.asset_id;
             auto quote_asset = order.sell_price.quote.asset_id;
             cancel_limit_order( order );
-            if( maint_time <= HARDFORK_CORE_606_TIME )
+            if( before_core_hardfork_606 )
             {
                // check call orders
                // Comments below are copied from limit_order_cancel_evaluator::do_apply(...)
@@ -298,6 +303,7 @@ void database::clear_expired_orders()
       asset_id_type current_asset = settlement_index.begin()->settlement_asset_id();
       asset max_settlement_volume;
       price settlement_fill_price;
+      price settlement_price;
       bool current_asset_finished = false;
       bool extra_dump = false;
 
@@ -392,24 +398,23 @@ void database::clear_expired_orders()
             break;
          }
 
-         auto& pays = order.balance;
-         auto receives = (order.balance * mia.current_feed.settlement_price);
-         receives.amount = (fc::uint128_t(receives.amount.value) *
-                            (GRAPHENE_100_PERCENT - mia.options.force_settlement_offset_percent) / GRAPHENE_100_PERCENT).to_uint64();
-         assert(receives <= order.balance * mia.current_feed.settlement_price);
-
-         price settlement_price = pays / receives;
-
-         // Calculate fill_price with a bigger volume to reduce impacts of rounding
-         // TODO replace the calculation with new operator*() and/or operator/()
          if( settlement_fill_price.base.asset_id != current_asset ) // only calculate once per asset
+            settlement_fill_price = mia.current_feed.settlement_price
+                                    / ratio_type( GRAPHENE_100_PERCENT - mia.options.force_settlement_offset_percent,
+                                                  GRAPHENE_100_PERCENT );
+
+         if( before_core_hardfork_342 )
          {
-            asset tmp_pays = max_settlement_volume;
-            asset tmp_receives = tmp_pays * mia.current_feed.settlement_price;
-            tmp_receives.amount = (fc::uint128_t(tmp_receives.amount.value) *
-                            (GRAPHENE_100_PERCENT - mia.options.force_settlement_offset_percent) / GRAPHENE_100_PERCENT).to_uint64();
-            settlement_fill_price = tmp_pays / tmp_receives;
+            auto& pays = order.balance;
+            auto receives = (order.balance * mia.current_feed.settlement_price);
+            receives.amount = ( fc::uint128_t(receives.amount.value) *
+                                (GRAPHENE_100_PERCENT - mia.options.force_settlement_offset_percent) /
+                                GRAPHENE_100_PERCENT ).to_uint64();
+            assert(receives <= order.balance * mia.current_feed.settlement_price);
+            settlement_price = pays / receives;
          }
+         else if( settlement_price.base.asset_id != current_asset ) // only calculate once per asset
+            settlement_price = settlement_fill_price;
 
          auto& call_index = get_index_type<call_order_index>().indices().get<by_collateral>();
          asset settled = mia_object.amount(mia.force_settled_volume);
@@ -430,7 +435,7 @@ void database::clear_expired_orders()
             }
             try {
                asset new_settled = match(*itr, order, settlement_price, max_settlement, settlement_fill_price);
-               if( maint_time > HARDFORK_CORE_184_TIME && new_settled.amount == 0 ) // unable to fill this settle order
+               if( !before_core_hardfork_184 && new_settled.amount == 0 ) // unable to fill this settle order
                {
                   if( find_object( order_id ) ) // the settle order hasn't been cancelled
                      current_asset_finished = true;
