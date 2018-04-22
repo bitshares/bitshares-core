@@ -378,7 +378,7 @@ class wallet_api
      vector<operation_detail>  get_relative_account_history(string name, uint32_t stop, int limit, uint32_t start)const;
 
       /**
-       * @brief Fetch all objects relevant to the specified accounts to updates
+       * @brief Fetch all objects relevant to the specified accounts
        * @param names_or_ids Each item must be the name or ID of an account to retrieve
        * @return Map of string from @ref names_or_ids to the corresponding account
        *
