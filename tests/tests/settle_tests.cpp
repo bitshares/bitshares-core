@@ -35,7 +35,7 @@ using namespace graphene::chain::test;
 
 BOOST_FIXTURE_TEST_SUITE( settle_tests, database_fixture )
 
-BOOST_AUTO_TEST_CASE( trade_amount_equals_zero_settle )
+BOOST_AUTO_TEST_CASE( settle_rounding_test )
 {
    try {
       // get around Graphene issue #615 feed expiration bug
@@ -77,12 +77,15 @@ BOOST_AUTO_TEST_CASE( trade_amount_equals_zero_settle )
       BOOST_CHECK_EQUAL(get_balance(michael, bitusd), 0);
       BOOST_CHECK_EQUAL(get_balance(michael, core), 100000000);
 
-      // michael selling core
+      // michael gets some bitusd
       const call_order_object& call_michael = *borrow(michael, bitusd.amount(6), core.amount(8));
       call_order_id_type call_michael_id = call_michael.id;
 
       // add settle order and check rounding issue
-      force_settle(rachel, bitusd.amount(4));
+      operation_result result = force_settle(rachel, bitusd.amount(4));
+
+      force_settlement_id_type settle_id = result.get<object_id_type>();
+      BOOST_CHECK_EQUAL( settle_id(db).balance.amount.value, 4 );
 
       BOOST_CHECK_EQUAL(get_balance(rachel, core), 0);
       BOOST_CHECK_EQUAL(get_balance(rachel, bitusd), 196);
@@ -111,7 +114,8 @@ BOOST_AUTO_TEST_CASE( trade_amount_equals_zero_settle )
       generate_blocks( db.head_block_time() + fc::hours(6) );
 
       // final checks
-      BOOST_CHECK_EQUAL(get_balance(rachel_id(db), core_id(db)), 0);
+      BOOST_CHECK( !db.find( settle_id ) );
+      BOOST_CHECK_EQUAL(get_balance(rachel_id(db), core_id(db)), 0); // rachel paid 4 usd and got nothing
       BOOST_CHECK_EQUAL(get_balance(rachel_id(db), bitusd_id(db)), 196);
       BOOST_CHECK_EQUAL(get_balance(michael_id(db), bitusd_id(db)), 6);
       BOOST_CHECK_EQUAL(get_balance(michael_id(db), core_id(db)), 99999992);
@@ -123,10 +127,58 @@ BOOST_AUTO_TEST_CASE( trade_amount_equals_zero_settle )
       BOOST_CHECK_EQUAL( 6, call_michael_id(db).debt.value );
       BOOST_CHECK_EQUAL( 8, call_michael_id(db).collateral.value );
 
+      // settle more and check rounding issue
+      // by default 20% of total supply can be settled per maintenance interval
+      set_expiration( db, trx );
+      operation_result result2 = force_settle(rachel_id(db), bitusd_id(db).amount(34));
+
+      force_settlement_id_type settle_id2 = result2.get<object_id_type>();
+      BOOST_CHECK_EQUAL( settle_id2(db).balance.amount.value, 34 );
+
+      BOOST_CHECK_EQUAL(get_balance(rachel_id(db), core_id(db)), 0);
+      BOOST_CHECK_EQUAL(get_balance(rachel_id(db), bitusd_id(db)), 162); // 196-34
+      BOOST_CHECK_EQUAL(get_balance(michael_id(db), bitusd_id(db)), 6);
+      BOOST_CHECK_EQUAL(get_balance(michael_id(db), core_id(db)), 99999992);
+      BOOST_CHECK_EQUAL(get_balance(paul_id(db), core_id(db)), 9999900);
+      BOOST_CHECK_EQUAL(get_balance(paul_id(db), bitusd_id(db)), 800);
+
+      BOOST_CHECK_EQUAL( 996, call_paul_id(db).debt.value );
+      BOOST_CHECK_EQUAL( 100, call_paul_id(db).collateral.value );
+      BOOST_CHECK_EQUAL( 6, call_michael_id(db).debt.value );
+      BOOST_CHECK_EQUAL( 8, call_michael_id(db).collateral.value );
+
+      generate_blocks( db.head_block_time() + fc::hours(10) );
+      set_expiration( db, trx );
+
+      // adding new feed so we have valid price to exit
+      update_feed_producers( bitusd_id(db), {alice_id} );
+      current_feed.maintenance_collateral_ratio = 1750;
+      current_feed.maximum_short_squeeze_ratio = 1100;
+      current_feed.settlement_price = bitusd_id(db).amount( 100 ) / core_id(db).amount(5);
+      publish_feed( bitusd_id(db), alice_id(db), current_feed );
+
+      // now yes expire settlement
+      generate_blocks( db.head_block_time() + fc::hours(16) );
+      set_expiration( db, trx );
+
+      // final checks
+      BOOST_CHECK( !db.find( settle_id2 ) );
+      BOOST_CHECK_EQUAL(get_balance(rachel_id(db), core_id(db)), 1); // rachel got 1 core and paid 34 usd
+      BOOST_CHECK_EQUAL(get_balance(rachel_id(db), bitusd_id(db)), 162);
+      BOOST_CHECK_EQUAL(get_balance(michael_id(db), bitusd_id(db)), 6);
+      BOOST_CHECK_EQUAL(get_balance(michael_id(db), core_id(db)), 99999992);
+      BOOST_CHECK_EQUAL(get_balance(paul_id(db), core_id(db)), 9999900);
+      BOOST_CHECK_EQUAL(get_balance(paul_id(db), bitusd_id(db)), 800);
+
+      BOOST_CHECK_EQUAL( 996-34, call_paul_id(db).debt.value );
+      BOOST_CHECK_EQUAL( 100-1, call_paul_id(db).collateral.value );
+      BOOST_CHECK_EQUAL( 6, call_michael_id(db).debt.value );
+      BOOST_CHECK_EQUAL( 8, call_michael_id(db).collateral.value );
+
    } FC_LOG_AND_RETHROW()
 }
 
-BOOST_AUTO_TEST_CASE( trade_amount_equals_zero_settle_after_hf_184 )
+BOOST_AUTO_TEST_CASE( settle_rounding_test_after_hf_184 )
 {
    try {
       auto mi = db.get_global_properties().parameters.maintenance_interval;
@@ -168,12 +220,15 @@ BOOST_AUTO_TEST_CASE( trade_amount_equals_zero_settle_after_hf_184 )
       BOOST_CHECK_EQUAL(get_balance(michael, bitusd), 0);
       BOOST_CHECK_EQUAL(get_balance(michael, core), 100000000);
 
-      // michael selling core
+      // michael gets some bitusd
       const call_order_object& call_michael = *borrow(michael, bitusd.amount(6), core.amount(8));
       call_order_id_type call_michael_id = call_michael.id;
 
       // add settle order and check rounding issue
-      force_settle(rachel, bitusd.amount(4));
+      const operation_result result = force_settle(rachel, bitusd.amount(4));
+
+      force_settlement_id_type settle_id = result.get<object_id_type>();
+      BOOST_CHECK_EQUAL( settle_id(db).balance.amount.value, 4 );
 
       BOOST_CHECK_EQUAL(get_balance(rachel, core), 0);
       BOOST_CHECK_EQUAL(get_balance(rachel, bitusd), 196);
@@ -195,15 +250,16 @@ BOOST_AUTO_TEST_CASE( trade_amount_equals_zero_settle_after_hf_184 )
       update_feed_producers( bitusd_id(db), {alice_id} );
       current_feed.maintenance_collateral_ratio = 1750;
       current_feed.maximum_short_squeeze_ratio = 1100;
-      current_feed.settlement_price = bitusd_id(db).amount( 100 ) / core_id(db).amount(5);
+      current_feed.settlement_price = bitusd_id(db).amount( 101 ) / core_id(db).amount(5);
       publish_feed( bitusd_id(db), alice_id(db), current_feed );
 
       // now yes expire settlement
       generate_blocks( db.head_block_time() + fc::hours(6) );
 
       // final checks
+      BOOST_CHECK( !db.find( settle_id ) );
       BOOST_CHECK_EQUAL(get_balance(rachel_id(db), core_id(db)), 0);
-      BOOST_CHECK_EQUAL(get_balance(rachel_id(db), bitusd_id(db)), 200);
+      BOOST_CHECK_EQUAL(get_balance(rachel_id(db), bitusd_id(db)), 200); // rachel's settle order is cancelled and he get refunded
       BOOST_CHECK_EQUAL(get_balance(michael_id(db), bitusd_id(db)), 6);
       BOOST_CHECK_EQUAL(get_balance(michael_id(db), core_id(db)), 99999992);
       BOOST_CHECK_EQUAL(get_balance(paul_id(db), core_id(db)), 9999900);
@@ -214,6 +270,53 @@ BOOST_AUTO_TEST_CASE( trade_amount_equals_zero_settle_after_hf_184 )
       BOOST_CHECK_EQUAL( 6, call_michael_id(db).debt.value );
       BOOST_CHECK_EQUAL( 8, call_michael_id(db).collateral.value );
 
+      // settle more and check rounding issue
+      // by default 20% of total supply can be settled per maintenance interval
+      set_expiration( db, trx );
+      const operation_result result2 = force_settle(rachel_id(db), bitusd_id(db).amount(34));
+
+      force_settlement_id_type settle_id2 = result2.get<object_id_type>();
+      BOOST_CHECK_EQUAL( settle_id2(db).balance.amount.value, 34 );
+
+      BOOST_CHECK_EQUAL(get_balance(rachel_id(db), core_id(db)), 0);
+      BOOST_CHECK_EQUAL(get_balance(rachel_id(db), bitusd_id(db)), 166); // 200-34
+      BOOST_CHECK_EQUAL(get_balance(michael_id(db), bitusd_id(db)), 6);
+      BOOST_CHECK_EQUAL(get_balance(michael_id(db), core_id(db)), 99999992);
+      BOOST_CHECK_EQUAL(get_balance(paul_id(db), core_id(db)), 9999900);
+      BOOST_CHECK_EQUAL(get_balance(paul_id(db), bitusd_id(db)), 800);
+
+      BOOST_CHECK_EQUAL( 1000, call_paul_id(db).debt.value );
+      BOOST_CHECK_EQUAL( 100, call_paul_id(db).collateral.value );
+      BOOST_CHECK_EQUAL( 6, call_michael_id(db).debt.value );
+      BOOST_CHECK_EQUAL( 8, call_michael_id(db).collateral.value );
+
+      generate_blocks( db.head_block_time() + fc::hours(10) );
+      set_expiration( db, trx );
+
+      // adding new feed so we have valid price to exit
+      update_feed_producers( bitusd_id(db), {alice_id} );
+      current_feed.maintenance_collateral_ratio = 1750;
+      current_feed.maximum_short_squeeze_ratio = 1100;
+      current_feed.settlement_price = bitusd_id(db).amount( 101 ) / core_id(db).amount(5);
+      publish_feed( bitusd_id(db), alice_id(db), current_feed );
+
+      // now yes expire settlement
+      generate_blocks( db.head_block_time() + fc::hours(16) );
+      set_expiration( db, trx );
+
+      // final checks
+      BOOST_CHECK( !db.find( settle_id2 ) );
+      BOOST_CHECK_EQUAL(get_balance(rachel_id(db), core_id(db)), 1); // rachel got 1 core
+      BOOST_CHECK_EQUAL(get_balance(rachel_id(db), bitusd_id(db)), 179); // paid 21 usd since 1 core worths a little more than 20 usd
+      BOOST_CHECK_EQUAL(get_balance(michael_id(db), bitusd_id(db)), 6);
+      BOOST_CHECK_EQUAL(get_balance(michael_id(db), core_id(db)), 99999992);
+      BOOST_CHECK_EQUAL(get_balance(paul_id(db), core_id(db)), 9999900);
+      BOOST_CHECK_EQUAL(get_balance(paul_id(db), bitusd_id(db)), 800);
+
+      BOOST_CHECK_EQUAL( 1000-21, call_paul_id(db).debt.value );
+      BOOST_CHECK_EQUAL( 100-1, call_paul_id(db).collateral.value );
+      BOOST_CHECK_EQUAL( 6, call_michael_id(db).debt.value );
+      BOOST_CHECK_EQUAL( 8, call_michael_id(db).collateral.value );
    } FC_LOG_AND_RETHROW()
 }
 
