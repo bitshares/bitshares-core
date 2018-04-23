@@ -674,8 +674,8 @@ asset database::match( const call_order_object& call,
                wlog( "Something for nothing issue (#184, variant C-2) handled at block #${block}", ("block",head_block_num()) );
                cancel_settle_order( settle );
             }
-            else // neither order will be completely filled, perhaps due to max_settlement too small
-               wlog( "Something for nothing issue (#184, variant C-3) handled at block #${block}", ("block",head_block_num()) );
+            // else do nothing: neither order will be completely filled, perhaps due to max_settlement too small
+
             return asset( 0, settle.balance.asset_id );
          }
       }
