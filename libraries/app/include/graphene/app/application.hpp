@@ -82,7 +82,7 @@ namespace graphene { namespace app {
          {
             std::shared_ptr<abstract_plugin> abs_plugin = get_plugin( name );
             std::shared_ptr<PluginType> result = std::dynamic_pointer_cast<PluginType>( abs_plugin );
-            FC_ASSERT( result != std::shared_ptr<PluginType>() );
+            FC_ASSERT( result != std::shared_ptr<PluginType>(), "Unable to load plugin '${p}'", ("p",name) );
             return result;
          }
 
