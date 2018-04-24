@@ -39,6 +39,7 @@
 #include <graphene/chain/protocol/witness.hpp>
 #include <graphene/chain/protocol/worker.hpp>
 #include <cybex/vesting_ops.hpp>
+#include <cybex/reserved_ops.hpp>
 
 namespace graphene { namespace chain {
 
@@ -95,6 +96,59 @@ namespace graphene { namespace chain {
             fba_distribute_operation,       // VIRTUAL
             bid_collateral_operation,
             execute_bid_operation,          // VIRTUAL
+            reserved_operation_47,
+            reserved_operation_48,
+            reserved_operation_49,
+            reserved_operation_50,
+            reserved_operation_51,
+            reserved_operation_52,
+            reserved_operation_53,
+            reserved_operation_54,
+            reserved_operation_55,
+            reserved_operation_56,
+            reserved_operation_57,
+            reserved_operation_58,
+            reserved_operation_59,
+            reserved_operation_60,
+            reserved_operation_61,
+            reserved_operation_62,
+            reserved_operation_63,
+            reserved_operation_64,
+            reserved_operation_65,
+            reserved_operation_66,
+            reserved_operation_67,
+            reserved_operation_68,
+            reserved_operation_69,
+            reserved_operation_70,
+            reserved_operation_71,
+            reserved_operation_72,
+            reserved_operation_73,
+            reserved_operation_74,
+            reserved_operation_75,
+            reserved_operation_76,
+            reserved_operation_77,
+            reserved_operation_78,
+            reserved_operation_79,
+            reserved_operation_80,
+            reserved_operation_81,
+            reserved_operation_82,
+            reserved_operation_83,
+            reserved_operation_84,
+            reserved_operation_85,
+            reserved_operation_86,
+            reserved_operation_87,
+            reserved_operation_88,
+            reserved_operation_89,
+            reserved_operation_90,
+            reserved_operation_91,
+            reserved_operation_92,
+            reserved_operation_93,
+            reserved_operation_94,
+            reserved_operation_95,
+            reserved_operation_96,
+            reserved_operation_97,
+            reserved_operation_98,
+            reserved_operation_99,
             cancel_vesting_operation
          > operation;
 
