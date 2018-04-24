@@ -375,9 +375,15 @@ static void get_relevant_accounts( const object* obj, flat_set<account_id_type>&
               assert( aobj != nullptr );
               accounts.insert( aobj->bidder );
               break;
-           }
-           case impl_escrow_object_type:
-            break;
+             }
+             case impl_escrow_object_type:{
+              const auto& aobj = dynamic_cast<const escrow_object*>(obj);
+              assert( aobj != nullptr );
+              accounts.insert( aobj->from );
+              accounts.insert( aobj->to );
+              accounts.insert( aobj->agent );
+              break;
+             }
       }
    }
 } // end get_relevant_accounts( const object* obj, flat_set<account_id_type>& accounts )
