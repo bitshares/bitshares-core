@@ -44,7 +44,7 @@ Note: x is the fraction, 0 <= x < 1
 
 max_amount_to_sell = ( (debt + x) * target_CR - collateral * feed_price )
                      / (target_CR * match_price - feed_price)
-                   = ( (debt + x) * tCR / DENOM - collateral * fp_debt_amt / fp_coll_amt + target_CR * x )
+                   = ( (debt + x) * tCR / DENOM - collateral * fp_debt_amt / fp_coll_amt )
                      / ( (tCR / DENOM) * (mp_debt_amt / mp_coll_amt) - fp_debt_amt / fp_coll_amt )
                    = ( (debt + x) * tCR * fp_coll_amt * mp_coll_amt - collateral * fp_debt_amt * DENOM * mp_coll_amt)
                      / ( tCR * mp_debt_amt * fp_coll_amt - fp_debt_amt * DENOM * mp_coll_amt )
@@ -58,14 +58,14 @@ pair<asset, asset> call_order_object::get_max_sell_receive_pair( price match_pri
                                                                  price feed_price,
                                                                  const uint16_t maintenance_collateral_ratio )const
 { try {
-   // make sure feed_price is in collateral / debt format
+   // be defensive here, make sure feed_price is in collateral / debt format
    if( feed_price.base.asset_id != call_price.base.asset_id )
       feed_price = ~feed_price;
 
    FC_ASSERT( feed_price.base.asset_id == call_price.base.asset_id
               && feed_price.quote.asset_id == call_price.quote.asset_id );
 
-   if( call_price > feed_price ) // feed protected
+   if( call_price > feed_price ) // feed protected. be defensive here, although this should be guaranteed by caller
       return make_pair( asset( 0, collateral_type() ), asset( 0, debt_type() ) );
 
    if( !target_collateral_ratio.valid() ) // target cr is not set
@@ -73,7 +73,7 @@ pair<asset, asset> call_order_object::get_max_sell_receive_pair( price match_pri
 
    uint16_t tcr = std::max( *target_collateral_ratio, maintenance_collateral_ratio ); // use mcr if target cr is too small
 
-   // make sure match_price is in collateral / debt format
+   // be defensive here, make sure match_price is in collateral / debt format
    if( match_price.base.asset_id != call_price.base.asset_id )
       match_price = ~match_price;
 
@@ -114,9 +114,8 @@ pair<asset, asset> call_order_object::get_max_sell_receive_pair( price match_pri
    FC_ASSERT( to_pay.amount < collateral && to_cover.amount < debt );
 
    // check collateral ratio after filled, if it's OK, we return
-   price fp = asset( fp_coll_amt, collateral_type() ) / asset( fp_debt_amt, debt_type() );
    price new_call_price = price::call_price( get_debt() - to_cover, get_collateral() - to_pay, tcr );
-   if( new_call_price > fp )
+   if( new_call_price > feed_price )
       return make_pair( std::move(to_pay), std::move(to_cover) );
 
    // be here, to_cover is too small due to rounding. deal with the fraction
@@ -211,7 +210,7 @@ pair<asset, asset> call_order_object::get_max_sell_receive_pair( price match_pri
       FC_ASSERT( to_pay.amount < collateral && to_cover.amount < debt );
 
       new_call_price = price::call_price( get_debt() - to_cover, get_collateral() - to_pay, tcr );
-      if( new_call_price > fp ) // good
+      if( new_call_price > feed_price ) // good
       {
          if( to_pay.amount == max_to_pay.amount )
             return make_pair( std::move(to_pay), std::move(to_cover) );
@@ -260,7 +259,7 @@ pair<asset, asset> call_order_object::get_max_sell_receive_pair( price match_pri
       FC_ASSERT( to_pay.amount < collateral && to_cover.amount < debt );
 
       new_call_price = price::call_price( get_debt() - to_cover, get_collateral() - to_pay, tcr );
-      if( new_call_price > fp ) // good
+      if( new_call_price > feed_price ) // good
          return make_pair( std::move(to_pay), std::move(to_cover) );
    }
 

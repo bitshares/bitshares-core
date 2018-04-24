@@ -329,7 +329,6 @@ BOOST_AUTO_TEST_CASE( call_order_object_test )
       }
       catch( fc::assert_exception& e )
       {
-         // TODO replace with price_multiplication_overflow?
          BOOST_CHECK( e.to_detail_string().find( "result <= GRAPHENE_MAX_SHARE_SUPPLY" ) != string::npos );
          ++count[0];
       }
