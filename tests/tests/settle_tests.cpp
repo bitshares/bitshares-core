@@ -43,7 +43,7 @@ BOOST_AUTO_TEST_CASE( settle_rounding_test )
       generate_block();
       set_expiration( db, trx );
 
-      ACTORS((paul)(michael)(rachel)(alice));
+      ACTORS((paul)(michael)(rachel)(alice)(bob)(ted));
 
       // create assets
       const auto& bitusd = create_bitasset("USDBIT", paul_id);
@@ -55,6 +55,7 @@ BOOST_AUTO_TEST_CASE( settle_rounding_test )
       transfer(committee_account, michael_id, asset( 100000000 ) );
       transfer(committee_account, paul_id, asset(10000000));
       transfer(committee_account, alice_id, asset(10000000));
+      transfer(committee_account, bob_id, asset(10000000));
 
       // add a feed to asset
       update_feed_producers( bitusd, {paul.id} );
@@ -344,6 +345,32 @@ BOOST_AUTO_TEST_CASE( settle_rounding_test )
 
       generate_block();
 
+      // give ted some usd
+      transfer(paul_id, ted_id, asset(100, bitusd_id));
+      BOOST_CHECK_EQUAL(get_balance(ted_id(db), core_id(db)), 0);
+      BOOST_CHECK_EQUAL(get_balance(ted_id(db), bitusd_id(db)), 100); // new: 100
+      BOOST_CHECK_EQUAL(get_balance(paul_id(db), core_id(db)), 9999900);
+      BOOST_CHECK_EQUAL(get_balance(paul_id(db), bitusd_id(db)), 400); // 500 - 100
+
+      // ted settle
+      const operation_result result6 = force_settle(ted_id(db), bitusd_id(db).amount(20));
+      const operation_result result7 = force_settle(ted_id(db), bitusd_id(db).amount(21));
+      const operation_result result8 = force_settle(ted_id(db), bitusd_id(db).amount(22));
+
+      force_settlement_id_type settle_id6 = result6.get<object_id_type>();
+      BOOST_CHECK_EQUAL( settle_id6(db).balance.amount.value, 20 );
+
+      force_settlement_id_type settle_id7 = result7.get<object_id_type>();
+      BOOST_CHECK_EQUAL( settle_id7(db).balance.amount.value, 21 );
+
+      force_settlement_id_type settle_id8 = result8.get<object_id_type>();
+      BOOST_CHECK_EQUAL( settle_id8(db).balance.amount.value, 22 );
+
+      BOOST_CHECK_EQUAL(get_balance(ted_id(db), core_id(db)), 0);
+      BOOST_CHECK_EQUAL(get_balance(ted_id(db), bitusd_id(db)), 37); // 100 - 20 - 21 - 22
+
+      generate_block();
+
       // adding new feed so we have valid price to exit
       update_feed_producers( bitusd_id(db), {alice_id} );
       current_feed.maintenance_collateral_ratio = 1750;
@@ -359,13 +386,18 @@ BOOST_AUTO_TEST_CASE( settle_rounding_test )
       // settle_id4 will pay 161 usd, will get round_down(161*5/101) = 7 core
       BOOST_CHECK_EQUAL( settle_id4(db).balance.amount.value, 75 ); // 236 - 161
       BOOST_CHECK_EQUAL( settle_id5(db).balance.amount.value, 5 ); // no change, since it's after settle_id4
+      BOOST_CHECK_EQUAL( settle_id6(db).balance.amount.value, 20 ); // no change since not expired
+      BOOST_CHECK_EQUAL( settle_id7(db).balance.amount.value, 21 ); // no change since not expired
+      BOOST_CHECK_EQUAL( settle_id8(db).balance.amount.value, 22 ); // no change since not expired
 
       BOOST_CHECK_EQUAL(get_balance(rachel_id(db), core_id(db)), 17); // 10 + 7
       BOOST_CHECK_EQUAL(get_balance(rachel_id(db), bitusd_id(db)), 20); // no change
       BOOST_CHECK_EQUAL(get_balance(michael_id(db), bitusd_id(db)), 46);
       BOOST_CHECK_EQUAL(get_balance(michael_id(db), core_id(db)), 99999769);
       BOOST_CHECK_EQUAL(get_balance(paul_id(db), core_id(db)), 9999900);
-      BOOST_CHECK_EQUAL(get_balance(paul_id(db), bitusd_id(db)), 500);
+      BOOST_CHECK_EQUAL(get_balance(paul_id(db), bitusd_id(db)), 400);
+      BOOST_CHECK_EQUAL(get_balance(ted_id(db), core_id(db)), 0);
+      BOOST_CHECK_EQUAL(get_balance(ted_id(db), bitusd_id(db)), 37);
 
       BOOST_CHECK_EQUAL( 600, call_paul_id(db).debt.value ); // 761 - 161
       BOOST_CHECK_EQUAL( 83, call_paul_id(db).collateral.value ); // 90 - 7
@@ -374,6 +406,51 @@ BOOST_AUTO_TEST_CASE( settle_rounding_test )
 
       BOOST_CHECK_EQUAL( bitusd_id(db).dynamic_data(db).current_supply.value, 646 ); // 807 - 161
       BOOST_CHECK_EQUAL( bitusd_id(db).bitasset_data(db).force_settled_volume.value, 161 ); // reset to 0, then 161 more
+
+      // bob borrow some
+      const call_order_object& call_bob = *borrow( bob_id(db), bitusd_id(db).amount(19), core_id(db).amount(2) );
+      call_order_id_type call_bob_id = call_bob.id;
+
+      BOOST_CHECK_EQUAL(get_balance(bob_id(db), core_id(db)), 9999998); // 10000000 - 2
+      BOOST_CHECK_EQUAL(get_balance(bob_id(db), bitusd_id(db)), 19); // new
+
+      BOOST_CHECK_EQUAL( 19, call_bob_id(db).debt.value );
+      BOOST_CHECK_EQUAL( 2, call_bob_id(db).collateral.value );
+
+      BOOST_CHECK_EQUAL( bitusd_id(db).dynamic_data(db).current_supply.value, 665 ); // 646 + 19
+      BOOST_CHECK_EQUAL( bitusd_id(db).bitasset_data(db).force_settled_volume.value, 161 );
+
+      generate_block();
+
+      // maximum amount that can be settled now is round_down((665+161) * 20%) = 165,
+      // settle_id4 will pay 165-161=4 usd, will get nothing
+      // bob's call order will get partially settled since its collateral ratio is the lowest
+      BOOST_CHECK_EQUAL( settle_id4(db).balance.amount.value, 71 ); // 75 - 4
+      BOOST_CHECK_EQUAL( settle_id5(db).balance.amount.value, 5 ); // no change, since it's after settle_id4
+      BOOST_CHECK_EQUAL( settle_id6(db).balance.amount.value, 20 ); // no change since not expired
+      BOOST_CHECK_EQUAL( settle_id7(db).balance.amount.value, 21 ); // no change since not expired
+      BOOST_CHECK_EQUAL( settle_id8(db).balance.amount.value, 22 ); // no change since not expired
+
+      BOOST_CHECK_EQUAL(get_balance(bob_id(db), core_id(db)), 9999998);
+      BOOST_CHECK_EQUAL(get_balance(bob_id(db), bitusd_id(db)), 19);
+      BOOST_CHECK_EQUAL(get_balance(rachel_id(db), core_id(db)), 17); // no change
+      BOOST_CHECK_EQUAL(get_balance(rachel_id(db), bitusd_id(db)), 20); // no change
+      BOOST_CHECK_EQUAL(get_balance(michael_id(db), bitusd_id(db)), 46);
+      BOOST_CHECK_EQUAL(get_balance(michael_id(db), core_id(db)), 99999769);
+      BOOST_CHECK_EQUAL(get_balance(paul_id(db), core_id(db)), 9999900);
+      BOOST_CHECK_EQUAL(get_balance(paul_id(db), bitusd_id(db)), 400);
+      BOOST_CHECK_EQUAL(get_balance(ted_id(db), core_id(db)), 0);
+      BOOST_CHECK_EQUAL(get_balance(ted_id(db), bitusd_id(db)), 37);
+
+      BOOST_CHECK_EQUAL( 15, call_bob_id(db).debt.value ); // 19 - 4
+      BOOST_CHECK_EQUAL( 2, call_bob_id(db).collateral.value ); // no change
+      BOOST_CHECK_EQUAL( 600, call_paul_id(db).debt.value );
+      BOOST_CHECK_EQUAL( 83, call_paul_id(db).collateral.value );
+      BOOST_CHECK_EQUAL( 46, call_michael_id(db).debt.value );
+      BOOST_CHECK_EQUAL( 231, call_michael_id(db).collateral.value );
+
+      BOOST_CHECK_EQUAL( bitusd_id(db).dynamic_data(db).current_supply.value, 661 ); // 665 - 4
+      BOOST_CHECK_EQUAL( bitusd_id(db).bitasset_data(db).force_settled_volume.value, 165 ); // 161 + 4
 
       // adding new feed so we have valid price to exit
       update_feed_producers( bitusd_id(db), {alice_id} );
@@ -397,27 +474,40 @@ BOOST_AUTO_TEST_CASE( settle_rounding_test )
       generate_blocks( db.head_block_time() + fc::hours(14) );
       set_expiration( db, trx );
 
-      // maximum amount that can be settled now is round_down(646 * 20%) = 129,
-      //   but remaining amount in settle_id4 is only 75,
-      //   and settle_id4 will pay 75 usd and get round_down(75*5/101) = 3 core,
-      //   and settle_id5 (only has 5 usd) will pay 5 usd and get nothing.
+      // maximum amount that can be settled now is round_down(661 * 20%) = 132,
+      //   settle_id4's remaining amount is 71,
+      //      firstly it will pay 15 usd to call_bob and get nothing,
+      //        call_bob will pay off all debt, so it will be closed and remaining collateral (2 core) will be returned;
+      //      then it will pay 71-15=56 usd to call_paul and get round_down(56*5/101) = 2 core;
+      //   settle_id5 (has 5 usd) will pay 5 usd and get nothing;
+      //   settle_id6 (has 20 usd) will pay 20 usd and get nothing;
+      //   settle_id7 (has 21 usd) will pay 21 usd and get 1 core;
+      //   settle_id8 (has 22 usd) will pay 15 usd and get nothing, since reached 132
       BOOST_CHECK( !db.find( settle_id4 ) );
       BOOST_CHECK( !db.find( settle_id5 ) );
+      BOOST_CHECK( !db.find( settle_id6 ) );
+      BOOST_CHECK( !db.find( settle_id7 ) );
+      BOOST_CHECK_EQUAL( settle_id8(db).balance.amount.value, 7 ); // 22 - 15
 
-      BOOST_CHECK_EQUAL(get_balance(rachel_id(db), core_id(db)), 20); // 17 + 3
+      BOOST_CHECK_EQUAL(get_balance(bob_id(db), core_id(db)), 10000000); // 9999998 + 2
+      BOOST_CHECK_EQUAL(get_balance(bob_id(db), bitusd_id(db)), 19);
+      BOOST_CHECK_EQUAL(get_balance(rachel_id(db), core_id(db)), 19); // 17 + 2
       BOOST_CHECK_EQUAL(get_balance(rachel_id(db), bitusd_id(db)), 20);
       BOOST_CHECK_EQUAL(get_balance(michael_id(db), bitusd_id(db)), 46);
       BOOST_CHECK_EQUAL(get_balance(michael_id(db), core_id(db)), 99999769);
       BOOST_CHECK_EQUAL(get_balance(paul_id(db), core_id(db)), 9999900);
-      BOOST_CHECK_EQUAL(get_balance(paul_id(db), bitusd_id(db)), 500);
+      BOOST_CHECK_EQUAL(get_balance(paul_id(db), bitusd_id(db)), 400);
+      BOOST_CHECK_EQUAL(get_balance(ted_id(db), core_id(db)), 1); // 0 + 1
+      BOOST_CHECK_EQUAL(get_balance(ted_id(db), bitusd_id(db)), 37);
 
-      BOOST_CHECK_EQUAL( 520, call_paul_id(db).debt.value ); // 600 - 75 - 5
-      BOOST_CHECK_EQUAL( 80, call_paul_id(db).collateral.value ); // 83 - 3
+      BOOST_CHECK( !db.find( call_bob_id ) );
+      BOOST_CHECK_EQUAL( 483, call_paul_id(db).debt.value ); // 600 - 56 - 5 - 20 - 21 - 15
+      BOOST_CHECK_EQUAL( 80, call_paul_id(db).collateral.value ); // 83 - 2 - 1
       BOOST_CHECK_EQUAL( 46, call_michael_id(db).debt.value );
       BOOST_CHECK_EQUAL( 231, call_michael_id(db).collateral.value );
 
-      BOOST_CHECK_EQUAL( bitusd_id(db).dynamic_data(db).current_supply.value, 566 ); // 646 - 75 - 5
-      BOOST_CHECK_EQUAL( bitusd_id(db).bitasset_data(db).force_settled_volume.value, 80 ); // reset to 0, then 75 + 5 more
+      BOOST_CHECK_EQUAL( bitusd_id(db).dynamic_data(db).current_supply.value, 529 ); // 661 - 132
+      BOOST_CHECK_EQUAL( bitusd_id(db).bitasset_data(db).force_settled_volume.value, 132 ); // reset to 0, then 132 more
 
       generate_block();
 
@@ -436,7 +526,7 @@ BOOST_AUTO_TEST_CASE( settle_rounding_test_after_hf_184 )
       generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
       set_expiration( db, trx );
 
-      ACTORS((paul)(michael)(rachel)(alice));
+      ACTORS((paul)(michael)(rachel)(alice)(bob)(ted));
 
       // create assets
       const auto& bitusd = create_bitasset("USDBIT", paul_id);
@@ -448,6 +538,7 @@ BOOST_AUTO_TEST_CASE( settle_rounding_test_after_hf_184 )
       transfer(committee_account, michael_id, asset( 100000000 ) );
       transfer(committee_account, paul_id, asset(10000000));
       transfer(committee_account, alice_id, asset(10000000));
+      transfer(committee_account, bob_id, asset(10000000));
 
       // add a feed to asset
       update_feed_producers( bitusd, {paul.id} );
@@ -741,6 +832,32 @@ BOOST_AUTO_TEST_CASE( settle_rounding_test_after_hf_184 )
 
       generate_block();
 
+      // give ted some usd
+      transfer(paul_id, ted_id, asset(100, bitusd_id));
+      BOOST_CHECK_EQUAL(get_balance(ted_id(db), core_id(db)), 0);
+      BOOST_CHECK_EQUAL(get_balance(ted_id(db), bitusd_id(db)), 100); // new: 100
+      BOOST_CHECK_EQUAL(get_balance(paul_id(db), core_id(db)), 9999900);
+      BOOST_CHECK_EQUAL(get_balance(paul_id(db), bitusd_id(db)), 400); // 500 - 100
+
+      // ted settle
+      const operation_result result6 = force_settle(ted_id(db), bitusd_id(db).amount(20));
+      const operation_result result7 = force_settle(ted_id(db), bitusd_id(db).amount(21));
+      const operation_result result8 = force_settle(ted_id(db), bitusd_id(db).amount(22));
+
+      force_settlement_id_type settle_id6 = result6.get<object_id_type>();
+      BOOST_CHECK_EQUAL( settle_id6(db).balance.amount.value, 20 );
+
+      force_settlement_id_type settle_id7 = result7.get<object_id_type>();
+      BOOST_CHECK_EQUAL( settle_id7(db).balance.amount.value, 21 );
+
+      force_settlement_id_type settle_id8 = result8.get<object_id_type>();
+      BOOST_CHECK_EQUAL( settle_id8(db).balance.amount.value, 22 );
+
+      BOOST_CHECK_EQUAL(get_balance(ted_id(db), core_id(db)), 0);
+      BOOST_CHECK_EQUAL(get_balance(ted_id(db), bitusd_id(db)), 37); // 100 - 20 - 21 - 22
+
+      generate_block();
+
       // adding new feed so we have valid price to exit
       update_feed_producers( bitusd_id(db), {alice_id} );
       current_feed.maintenance_collateral_ratio = 1750;
@@ -758,13 +875,18 @@ BOOST_AUTO_TEST_CASE( settle_rounding_test_after_hf_184 )
       //   so rachel will pay 162 usd and get 8 core
       BOOST_CHECK_EQUAL( settle_id4(db).balance.amount.value, 69 ); // 231 - 162
       BOOST_CHECK_EQUAL( settle_id5(db).balance.amount.value, 5 ); // no change, since it's after settle_id4
+      BOOST_CHECK_EQUAL( settle_id6(db).balance.amount.value, 20 ); // no change since not expired
+      BOOST_CHECK_EQUAL( settle_id7(db).balance.amount.value, 21 ); // no change since not expired
+      BOOST_CHECK_EQUAL( settle_id8(db).balance.amount.value, 22 ); // no change since not expired
 
       BOOST_CHECK_EQUAL(get_balance(rachel_id(db), core_id(db)), 19); // 11 + 8
       BOOST_CHECK_EQUAL(get_balance(rachel_id(db), bitusd_id(db)), 40); // no change
       BOOST_CHECK_EQUAL(get_balance(michael_id(db), bitusd_id(db)), 46);
       BOOST_CHECK_EQUAL(get_balance(michael_id(db), core_id(db)), 99999769);
       BOOST_CHECK_EQUAL(get_balance(paul_id(db), core_id(db)), 9999900);
-      BOOST_CHECK_EQUAL(get_balance(paul_id(db), bitusd_id(db)), 500);
+      BOOST_CHECK_EQUAL(get_balance(paul_id(db), bitusd_id(db)), 400);
+      BOOST_CHECK_EQUAL(get_balance(ted_id(db), core_id(db)), 0);
+      BOOST_CHECK_EQUAL(get_balance(ted_id(db), bitusd_id(db)), 37);
 
       BOOST_CHECK_EQUAL( 614, call_paul_id(db).debt.value ); // 776 - 162
       BOOST_CHECK_EQUAL( 81, call_paul_id(db).collateral.value ); // 89 - 8
@@ -773,6 +895,52 @@ BOOST_AUTO_TEST_CASE( settle_rounding_test_after_hf_184 )
 
       BOOST_CHECK_EQUAL( bitusd_id(db).dynamic_data(db).current_supply.value, 660 ); // 822 - 162
       BOOST_CHECK_EQUAL( bitusd_id(db).bitasset_data(db).force_settled_volume.value, 162 ); // reset to 0, then 162 more
+
+      // bob borrow some
+      const call_order_object& call_bob = *borrow( bob_id(db), bitusd_id(db).amount(19), core_id(db).amount(2) );
+      call_order_id_type call_bob_id = call_bob.id;
+
+      BOOST_CHECK_EQUAL(get_balance(bob_id(db), core_id(db)), 9999998); // 10000000 - 2
+      BOOST_CHECK_EQUAL(get_balance(bob_id(db), bitusd_id(db)), 19); // new
+
+      BOOST_CHECK_EQUAL( 19, call_bob_id(db).debt.value );
+      BOOST_CHECK_EQUAL( 2, call_bob_id(db).collateral.value );
+
+      BOOST_CHECK_EQUAL( bitusd_id(db).dynamic_data(db).current_supply.value, 679 ); // 660 + 19
+      BOOST_CHECK_EQUAL( bitusd_id(db).bitasset_data(db).force_settled_volume.value, 162 );
+
+      generate_block();
+
+      // maximum amount that can be settled now is round_down((679+162) * 20%) = 168,
+      //   already settled 162, so 168 - 162 = 6 more usd can be settled,
+      //   according to price (101/5), the amount worths less than 1 core,
+      //   so nothing will happen.
+      BOOST_CHECK_EQUAL( settle_id4(db).balance.amount.value, 69 );
+      BOOST_CHECK_EQUAL( settle_id5(db).balance.amount.value, 5 );
+      BOOST_CHECK_EQUAL( settle_id6(db).balance.amount.value, 20 );
+      BOOST_CHECK_EQUAL( settle_id7(db).balance.amount.value, 21 );
+      BOOST_CHECK_EQUAL( settle_id8(db).balance.amount.value, 22 );
+
+      BOOST_CHECK_EQUAL(get_balance(bob_id(db), core_id(db)), 9999998);
+      BOOST_CHECK_EQUAL(get_balance(bob_id(db), bitusd_id(db)), 19);
+      BOOST_CHECK_EQUAL(get_balance(rachel_id(db), core_id(db)), 19);
+      BOOST_CHECK_EQUAL(get_balance(rachel_id(db), bitusd_id(db)), 40);
+      BOOST_CHECK_EQUAL(get_balance(michael_id(db), bitusd_id(db)), 46);
+      BOOST_CHECK_EQUAL(get_balance(michael_id(db), core_id(db)), 99999769);
+      BOOST_CHECK_EQUAL(get_balance(paul_id(db), core_id(db)), 9999900);
+      BOOST_CHECK_EQUAL(get_balance(paul_id(db), bitusd_id(db)), 400);
+      BOOST_CHECK_EQUAL(get_balance(ted_id(db), core_id(db)), 0);
+      BOOST_CHECK_EQUAL(get_balance(ted_id(db), bitusd_id(db)), 37);
+
+      BOOST_CHECK_EQUAL( 19, call_bob_id(db).debt.value );
+      BOOST_CHECK_EQUAL( 2, call_bob_id(db).collateral.value );
+      BOOST_CHECK_EQUAL( 614, call_paul_id(db).debt.value );
+      BOOST_CHECK_EQUAL( 81, call_paul_id(db).collateral.value );
+      BOOST_CHECK_EQUAL( 46, call_michael_id(db).debt.value );
+      BOOST_CHECK_EQUAL( 231, call_michael_id(db).collateral.value );
+
+      BOOST_CHECK_EQUAL( bitusd_id(db).dynamic_data(db).current_supply.value, 679 );
+      BOOST_CHECK_EQUAL( bitusd_id(db).bitasset_data(db).force_settled_volume.value, 162 );
 
       // adding new feed so we have valid price to exit
       update_feed_producers( bitusd_id(db), {alice_id} );
@@ -796,29 +964,43 @@ BOOST_AUTO_TEST_CASE( settle_rounding_test_after_hf_184 )
       generate_blocks( db.head_block_time() + fc::hours(14) );
       set_expiration( db, trx );
 
-      // maximum amount that can be settled now is round_down(660 * 20%) = 132,
-      //   but remaining amount in settle_id4 is only 69,
-      //     according to price (101/5), the amount (69 usd) worths more than 3 core but less than 4 core,
-      //     so settle order will fill 3 more core, since 3 core worth more than 60 usd but less than 61 usd,
-      //     so rachel will pay 61 usd and get 3 core, the rest (69-61=8 usd) will be returned due to too small.
-      //   and settle_id5 (only has 5 usd) will be cancelled as well.
+      // maximum amount that can be settled now is round_down(679 * 20%) = 135,
+      //   settle_id4's remaining amount is 69, so it can be fully processed:
+      //     firstly call_bob will be matched, since it owes only 19 usd which worths less than 1 core,
+      //       it will pay 1 core, and the rest (2-1=1 core) will be returned, short position will be closed;
+      //     then call_paul will be matched,
+      //       according to price (101/5), the amount (69-19=50 usd) worths more than 2 core but less than 3 core,
+      //       so settle_id4 will get 2 more core, since 2 core worth more than 40 usd but less than 41 usd,
+      //       call_rachel will pay 41 usd and get 2 core, the rest (50-41=9 usd) will be returned due to too small.
+      //   settle_id5 (has 5 usd) will be cancelled due to too small;
+      //   settle_id6 (has 20 usd) will be cancelled as well due to too small;
+      //   settle_id7 (has 21 usd) will be filled and get 1 core, since it worths more than 1 core; but no more fund can be returned;
+      //   settle_id8 (has 22 usd) will be filled and get 1 core, and 1 usd will be returned.
       BOOST_CHECK( !db.find( settle_id4 ) );
       BOOST_CHECK( !db.find( settle_id5 ) );
+      BOOST_CHECK( !db.find( settle_id6 ) );
+      BOOST_CHECK( !db.find( settle_id7 ) );
+      BOOST_CHECK( !db.find( settle_id8 ) );
 
-      BOOST_CHECK_EQUAL(get_balance(rachel_id(db), core_id(db)), 22); // 19 + 3
-      BOOST_CHECK_EQUAL(get_balance(rachel_id(db), bitusd_id(db)), 53); // 40 + 8 + 5
+      BOOST_CHECK_EQUAL(get_balance(bob_id(db), core_id(db)), 9999999); // 9999998 + 1
+      BOOST_CHECK_EQUAL(get_balance(bob_id(db), bitusd_id(db)), 19);
+      BOOST_CHECK_EQUAL(get_balance(rachel_id(db), core_id(db)), 22); // 19 + 1 + 2
+      BOOST_CHECK_EQUAL(get_balance(rachel_id(db), bitusd_id(db)), 54); // 40 + 9 + 5
       BOOST_CHECK_EQUAL(get_balance(michael_id(db), bitusd_id(db)), 46);
       BOOST_CHECK_EQUAL(get_balance(michael_id(db), core_id(db)), 99999769);
       BOOST_CHECK_EQUAL(get_balance(paul_id(db), core_id(db)), 9999900);
-      BOOST_CHECK_EQUAL(get_balance(paul_id(db), bitusd_id(db)), 500);
+      BOOST_CHECK_EQUAL(get_balance(paul_id(db), bitusd_id(db)), 400);
+      BOOST_CHECK_EQUAL(get_balance(ted_id(db), core_id(db)), 2); // 0 + 1 + 1
+      BOOST_CHECK_EQUAL(get_balance(ted_id(db), bitusd_id(db)), 58); // 37 + 20 + 1
 
-      BOOST_CHECK_EQUAL( 553, call_paul_id(db).debt.value ); // 614 - 61
-      BOOST_CHECK_EQUAL( 78, call_paul_id(db).collateral.value ); // 81 - 3
+      BOOST_CHECK( !db.find( call_bob_id ) );
+      BOOST_CHECK_EQUAL( 531, call_paul_id(db).debt.value ); // 614 - 41 - 21 - 21
+      BOOST_CHECK_EQUAL( 77, call_paul_id(db).collateral.value ); // 81 - 2 - 1 - 1
       BOOST_CHECK_EQUAL( 46, call_michael_id(db).debt.value );
       BOOST_CHECK_EQUAL( 231, call_michael_id(db).collateral.value );
 
-      BOOST_CHECK_EQUAL( bitusd_id(db).dynamic_data(db).current_supply.value, 599 ); // 660 - 61
-      BOOST_CHECK_EQUAL( bitusd_id(db).bitasset_data(db).force_settled_volume.value, 61 ); // reset to 0, then 61 more
+      BOOST_CHECK_EQUAL( bitusd_id(db).dynamic_data(db).current_supply.value, 577 ); // 679 - 19 - 41 - 21 - 21
+      BOOST_CHECK_EQUAL( bitusd_id(db).bitasset_data(db).force_settled_volume.value, 102 ); // reset to 0, then 19 + 41 + 21 + 21
 
       generate_block();
 
