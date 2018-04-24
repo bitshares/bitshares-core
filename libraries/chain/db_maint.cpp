@@ -224,7 +224,7 @@ void database::update_active_witnesses()
       {
          vote_counter vc;
          for( const witness_object& wit : wits )
-            vc.add( wit.witness_account, _vote_tally_buffer[wit.vote_id] );
+            vc.add( wit.witness_account, std::max(_vote_tally_buffer[wit.vote_id], UINT64_C(1)) );
          vc.finish( a.active );
       }
    } );
@@ -301,7 +301,7 @@ void database::update_active_committee_members()
          {
             vote_counter vc;
             for( const committee_member_object& cm : committee_members )
-               vc.add( cm.committee_member_account, _vote_tally_buffer[cm.vote_id] );
+               vc.add( cm.committee_member_account, std::max(_vote_tally_buffer[cm.vote_id], UINT64_C(1)) );
             vc.finish( a.active );
          }
       } );
