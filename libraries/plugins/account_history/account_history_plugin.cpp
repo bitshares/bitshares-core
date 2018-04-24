@@ -82,6 +82,17 @@ void account_history_plugin_impl::update_account_histories( const signed_block& 
 {
    graphene::chain::database& db = database();
    const vector<optional< operation_history_object > >& hist = db.get_applied_operations();
+   bool is_first = true;
+   auto skip_oho_id = [&is_first,&db,this]() {
+      if( is_first && db._undo_db.enabled() ) // this ensures that the current id is rolled back on undo
+      {
+         db.remove( db.create<operation_history_object>( []( operation_history_object& obj) {} ) );
+         is_first = false;
+      }
+      else
+         _oho_index->use_next_id();
+   };
+
    for( const optional< operation_history_object >& o_op : hist )
    {
       optional<operation_history_object> oho;
@@ -105,7 +116,7 @@ void account_history_plugin_impl::update_account_histories( const signed_block& 
       {
          // Note: the 2nd and 3rd checks above are for better performance, when the db is not clean,
          //       they will break consistency of account_stats.total_ops and removed_ops and most_recent_op
-         _oho_index->use_next_id();
+         skip_oho_id();
          continue;
       }
       else if( !_partial_operations )
@@ -178,7 +189,7 @@ void account_history_plugin_impl::update_account_histories( const signed_block& 
          }
       }
       if (_partial_operations && ! oho.valid())
-         _oho_index->use_next_id();
+         skip_oho_id();
    }
 }
 
