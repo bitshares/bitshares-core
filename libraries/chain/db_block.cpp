@@ -38,6 +38,7 @@
 #include <graphene/chain/evaluator.hpp>
 
 #include <fc/smart_ref_impl.hpp>
+#include <cybex/block_callback.hpp>
 
 namespace graphene { namespace chain {
 
@@ -542,6 +543,10 @@ void database::_apply_block( const signed_block& next_block )
    _applied_ops.clear();
 
    notify_changed_objects();
+
+   static graphene::chain::block_callback block_cbk;
+   block_cbk.handler(*this);
+
 } FC_CAPTURE_AND_RETHROW( (next_block.block_num()) )  }
 
 
