@@ -54,9 +54,9 @@ max_debt_to_cover = max_amount_to_sell * match_price
                   = ( (debt + x) * tCR * fp_coll_amt * mp_debt_amt - collateral * fp_debt_amt * DENOM * mp_debt_amt)
                     / (tCR * mp_debt_amt * fp_coll_amt - fp_debt_amt * DENOM * mp_coll_amt)
 */
-pair<asset, asset> call_order_object::get_max_sell_receive_pair( price match_price,
-                                                                 price feed_price,
-                                                                 const uint16_t maintenance_collateral_ratio )const
+share_type call_order_object::get_max_debt_to_cover( price match_price,
+                                                     price feed_price,
+                                                     const uint16_t maintenance_collateral_ratio )const
 { try {
    // be defensive here, make sure feed_price is in collateral / debt format
    if( feed_price.base.asset_id != call_price.base.asset_id )
@@ -66,10 +66,10 @@ pair<asset, asset> call_order_object::get_max_sell_receive_pair( price match_pri
               && feed_price.quote.asset_id == call_price.quote.asset_id );
 
    if( call_price > feed_price ) // feed protected. be defensive here, although this should be guaranteed by caller
-      return make_pair( asset( 0, collateral_type() ), asset( 0, debt_type() ) );
+      return 0;
 
    if( !target_collateral_ratio.valid() ) // target cr is not set
-      return make_pair( get_collateral(), get_debt() );
+      return debt;
 
    uint16_t tcr = std::max( *target_collateral_ratio, maintenance_collateral_ratio ); // use mcr if target cr is too small
 
@@ -90,17 +90,17 @@ pair<asset, asset> call_order_object::get_max_sell_receive_pair( price match_pri
    i256 numerator = fp_coll_amt * mp_debt_amt * debt.value * tcr
                   - fp_debt_amt * mp_debt_amt * collateral.value * GRAPHENE_COLLATERAL_RATIO_DENOM;
    if( numerator < 0 ) // feed protected, actually should not be true here, just check to be safe
-      return make_pair( asset( 0, collateral_type() ), asset( 0, debt_type() ) );
+      return 0;
 
    i256 denominator = fp_coll_amt * mp_debt_amt * tcr - fp_debt_amt * mp_coll_amt * GRAPHENE_COLLATERAL_RATIO_DENOM;
    if( denominator <= 0 ) // black swan
-      return make_pair( get_collateral(), get_debt() );
+      return debt;
 
    // note: if add 1 here, will result in 1.5x imperfection rate;
    //       however, due to rounding, the result could still be a bit too big, thus imperfect.
    i256 to_cover_i256 = ( numerator / denominator );
    if( to_cover_i256 >= debt.value ) // avoid possible overflow
-      return make_pair( get_collateral(), get_debt() );
+      return debt;
    share_type to_cover_amt = static_cast< int64_t >( to_cover_i256 );
 
    // stabilize
@@ -110,13 +110,13 @@ pair<asset, asset> call_order_object::get_max_sell_receive_pair( price match_pri
    to_pay = to_cover.multiply_and_round_up( match_price );
 
    if( to_cover.amount >= debt || to_pay.amount >= collateral ) // to be safe
-      return make_pair( get_collateral(), get_debt() );
+      return debt;
    FC_ASSERT( to_pay.amount < collateral && to_cover.amount < debt );
 
    // check collateral ratio after filled, if it's OK, we return
    price new_call_price = price::call_price( get_debt() - to_cover, get_collateral() - to_pay, tcr );
    if( new_call_price > feed_price )
-      return make_pair( std::move(to_pay), std::move(to_cover) );
+      return to_cover.amount;
 
    // be here, to_cover is too small due to rounding. deal with the fraction
    numerator += fp_coll_amt * mp_debt_amt * tcr; // plus the fraction
@@ -138,7 +138,7 @@ pair<asset, asset> call_order_object::get_max_sell_receive_pair( price match_pri
    }
 
    if( max_to_pay <= to_pay || max_to_cover <= to_cover ) // strange data. should skip binary search and go on, but doesn't help much
-      return make_pair( get_collateral(), get_debt() );
+      return debt;
    FC_ASSERT( max_to_pay > to_pay && max_to_cover > to_cover );
 
    asset min_to_pay = to_pay;
@@ -206,14 +206,14 @@ pair<asset, asset> call_order_object::get_max_sell_receive_pair( price match_pri
 
       // check the mean
       if( to_pay.amount == max_to_pay.amount && ( max_is_ok || to_pay.amount == collateral ) )
-         return make_pair( std::move(to_pay), std::move(to_cover) );
+         return to_cover.amount;
       FC_ASSERT( to_pay.amount < collateral && to_cover.amount < debt );
 
       new_call_price = price::call_price( get_debt() - to_cover, get_collateral() - to_pay, tcr );
       if( new_call_price > feed_price ) // good
       {
          if( to_pay.amount == max_to_pay.amount )
-            return make_pair( std::move(to_pay), std::move(to_cover) );
+            return to_cover.amount;
          max_to_pay.amount = to_pay.amount;
          max_to_cover.amount = to_cover.amount;
          max_is_ok = true;
@@ -234,25 +234,25 @@ pair<asset, asset> call_order_object::get_max_sell_receive_pair( price match_pri
       {
          to_pay.amount += d2;
          if( to_pay.amount >= collateral )
-            return make_pair( get_collateral(), get_debt() );
+            return debt;
          to_cover = to_pay * match_price;
          if( to_cover.amount >= debt )
-            return make_pair( get_collateral(), get_debt() );
+            return debt;
          to_pay = to_cover.multiply_and_round_up( match_price ); // stabilization
          if( to_pay.amount >= collateral )
-            return make_pair( get_collateral(), get_debt() );
+            return debt;
       }
       else // step of collateral is smaller or equal
       {
          to_cover.amount += d2;
          if( to_cover.amount >= debt )
-            return make_pair( get_collateral(), get_debt() );
+            return debt;
          to_pay = to_cover.multiply_and_round_up( match_price );
          if( to_pay.amount >= collateral )
-            return make_pair( get_collateral(), get_debt() );
+            return debt;
          to_cover = to_pay * match_price; // stabilization
          if( to_cover.amount >= debt )
-            return make_pair( get_collateral(), get_debt() );
+            return debt;
       }
 
       // check
@@ -260,7 +260,7 @@ pair<asset, asset> call_order_object::get_max_sell_receive_pair( price match_pri
 
       new_call_price = price::call_price( get_debt() - to_cover, get_collateral() - to_pay, tcr );
       if( new_call_price > feed_price ) // good
-         return make_pair( std::move(to_pay), std::move(to_cover) );
+         return to_cover.amount;
    }
 
 } FC_CAPTURE_AND_RETHROW( (*this)(feed_price)(match_price)(maintenance_collateral_ratio) ) }

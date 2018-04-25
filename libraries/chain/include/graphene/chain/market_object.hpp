@@ -134,11 +134,8 @@ class call_order_object : public abstract_object<call_order_object>
          return tmp;
       }
 
-      /// Calculate maximum quantity of collateral to sell and debt to cover to meet @ref target_collateral_ratio.
-      /// @return a pair of assets, the first item is collateral to sell, the second is debt to cover
-      pair<asset, asset> get_max_sell_receive_pair( price match_price,
-                                                    price feed_price,
-                                                    const uint16_t maintenance_collateral_ratio )const;
+      /// Calculate maximum quantity of debt to cover to satisfy @ref target_collateral_ratio.
+      share_type get_max_debt_to_cover( price match_price, price feed_price, const uint16_t maintenance_collateral_ratio )const;
 };
 
 /**

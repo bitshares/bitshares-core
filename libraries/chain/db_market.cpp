@@ -596,14 +596,12 @@ int database::match( const limit_order_object& bid, const call_order_object& ask
 
    bool cull_taker = false;
 
-   // TODO if we're sure `before_core_hardfork_834` is always false, remove optional and remove check, always initialize
-   optional<pair<asset,asset>> call_max_sell_receive_pair; // (collateral, debt)
-   if( !before_core_hardfork_834 )
-      call_max_sell_receive_pair = ask.get_max_sell_receive_pair( match_price, feed_price, maintenance_collateral_ratio );
-
    asset usd_for_sale = bid.amount_for_sale();
    // TODO if we're sure `before_core_hardfork_834` is always false, remove the check
-   asset usd_to_buy   = ( before_core_hardfork_834 ? ask.get_debt() : call_max_sell_receive_pair->second );
+   asset usd_to_buy   = ( before_core_hardfork_834 ?
+                          ask.get_debt() :
+                          asset( ask.get_max_debt_to_cover( match_price, feed_price, maintenance_collateral_ratio ),
+                                 ask.debt_type() ) );
 
    asset call_pays, call_receives, order_pays, order_receives;
    if( usd_to_buy > usd_for_sale )
@@ -1001,14 +999,10 @@ bool database::check_call_orders(const asset_object& mia, bool enable_black_swan
           return true;
        }
 
-       optional<pair<asset,asset>> call_max_sell_receive_pair; // (collateral, debt)
        if( !before_core_hardfork_834 )
-       {
-          call_max_sell_receive_pair = call_itr->get_max_sell_receive_pair( match_price,
-                                                                            bitasset.current_feed.settlement_price,
-                                                                            bitasset.current_feed.maintenance_collateral_ratio );
-          usd_to_buy = call_max_sell_receive_pair->second;
-       }
+          usd_to_buy.amount = call_itr->get_max_debt_to_cover( match_price,
+                                                               bitasset.current_feed.settlement_price,
+                                                               bitasset.current_feed.maintenance_collateral_ratio );
 
        asset call_pays, call_receives, order_pays, order_receives;
        if( usd_to_buy > usd_for_sale )
