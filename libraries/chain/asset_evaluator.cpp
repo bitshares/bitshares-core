@@ -306,7 +306,7 @@ void_result asset_update_evaluator::do_apply(const asset_update_operation& o)
    database& d = db();
 
    // If we are now disabling force settlements, cancel all open force settlement orders
-   if( o.new_options.flags & disable_force_settle && asset_to_update->can_force_settle() )
+   if( (o.new_options.flags & disable_force_settle) && asset_to_update->can_force_settle() )
    {
       const auto& idx = d.get_index_type<force_settlement_index>().indices().get<by_expiration>();
       // Funky iteration code because we're removing objects as we go. We have to re-initialize itr every loop instead
@@ -393,22 +393,50 @@ void_result asset_update_bitasset_evaluator::do_evaluate(const asset_update_bita
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }
 
-void_result asset_update_bitasset_evaluator::do_apply(const asset_update_bitasset_operation& o)
-{ try {
-   bool should_update_feeds = false;
-   // If the minimum number of feeds to calculate a median has changed, we need to recalculate the median
-   if( o.new_options.minimum_feeds != bitasset_to_update->options.minimum_feeds )
-      should_update_feeds = true;
+void_result asset_update_bitasset_evaluator::do_apply(const asset_update_bitasset_operation& op)
+{
+   try {
+      // If the minimum number of feeds to calculate a median has changed, we need to recalculate the median
+      bool should_update_feeds = false;
+      if( op.new_options.minimum_feeds != bitasset_to_update->options.minimum_feeds )
+         should_update_feeds = true;
 
-   db().modify(*bitasset_to_update, [&](asset_bitasset_data_object& b) {
-      b.options = o.new_options;
+      // feeds must be reset if the backing asset is changed
+      bool backing_asset_changed = false;
+      bool is_witness_or_committee_fed = false;
+      if (op.new_options.short_backing_asset != bitasset_to_update->options.short_backing_asset)
+      {
+         backing_asset_changed = true;
+         const asset_object& base_asset = op.asset_to_update(db());
+         if ( (base_asset.options.flags & witness_fed_asset)  || (base_asset.options.flags & committee_fed_asset) )
+            is_witness_or_committee_fed = true;
+      }
 
-      if( should_update_feeds )
-         b.update_median_feeds(db().head_block_time());
-   });
+      // now do the actual modifications to the database object
+      db().modify(*bitasset_to_update, [&](asset_bitasset_data_object& bdo) {
+         bdo.options = op.new_options;
 
-   return void_result();
-} FC_CAPTURE_AND_RETHROW( (o) ) }
+         // are we modifying the underlying? If so, reset the feeds
+         if (backing_asset_changed) {
+            if ( is_witness_or_committee_fed ) {
+               bdo.feeds.clear();
+            } else {
+               // for non-witness-feeding and non-committe-feeding assets, modify all feeds
+               // published by producers to null, since we can't simply remove them. For more information:
+               // https://github.com/bitshares/bitshares-core/pull/832#issuecomment-384112633
+               for(auto itr = bdo.feeds.rbegin(); itr != bdo.feeds.rend(); ++itr) {
+                  //TODO: how do we "nullify" the price feeds?
+               }
+            }
+         }
+
+         if( should_update_feeds )
+            bdo.update_median_feeds(db().head_block_time());
+      });
+
+      return void_result();
+   } FC_CAPTURE_AND_RETHROW( (op) )
+}
 
 void_result asset_update_feed_producers_evaluator::do_evaluate(const asset_update_feed_producers_evaluator::operation_type& o)
 { try {
