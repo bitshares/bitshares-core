@@ -736,8 +736,11 @@ BOOST_AUTO_TEST_CASE( fee_refund_test )
          // but we'll save that for future cleanup
 
          // undo above tx's and reset
-         generate_block( skip );
-         db.pop_block();
+         if (i == 0)
+         {
+            generate_block( skip );
+            db.pop_block();
+         }
       }
    }
    FC_LOG_AND_RETHROW()
