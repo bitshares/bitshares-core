@@ -45,8 +45,8 @@ struct proposal_operation_hardfork_visitor
    // hf_834
    void operator()(const graphene::chain::call_order_update_operation &v) const {
       if (next_maintenance_time <= HARDFORK_CORE_834_TIME) {
-         FC_ASSERT( v.extensions.empty(),
-                    "Can not specify non-empty extensions in call_order_update_operation before hardfork 834." );
+         FC_ASSERT( !v.extensions.value.target_collateral_ratio.valid(),
+                    "Can not set target_collateral_ratio in call_order_update_operation before hardfork 834." );
       }
    }
    // hf_620

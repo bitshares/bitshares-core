@@ -44,15 +44,7 @@ void call_order_update_operation::validate()const
    FC_ASSERT( delta_collateral.asset_id != delta_debt.asset_id );
    FC_ASSERT( delta_collateral.amount != 0 || delta_debt.amount != 0 );
 
-   FC_ASSERT( extensions.size() <= 1, "At most one object is allowed in extensions of call_order_update_operation" );
-   if( extensions.size() > 0 )
-   {
-      const auto& options = extensions.front().value;
-      size_t count = 0; // use a count variable for future expansions
-      if( options.target_collateral_ratio.valid() )
-         ++count;
-      FC_ASSERT( count > 0, "Empty object is not allowed in extensions of call_order_update_operation" );
-   }
+   // note: no validation is needed for extensions so far: the only attribute inside is target_collateral_ratio
 
 } FC_CAPTURE_AND_RETHROW((*this)) }
 

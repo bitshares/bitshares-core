@@ -127,8 +127,8 @@ namespace graphene { namespace chain {
       asset               delta_collateral; ///< the amount of collateral to add to the margin position
       asset               delta_debt; ///< the amount of the debt to be paid off, may be negative to issue new debt
 
-      typedef vector<extension<options_type>> extension_type; // use a vector here to be compatible with old JSON
-      extension_type      extensions;
+      typedef extension<options_type> extensions_type; // note: this will be jsonified to {...} but no longer [...]
+      extensions_type     extensions;
 
       account_id_type fee_payer()const { return funding_account; }
       void            validate()const;
@@ -227,7 +227,7 @@ FC_REFLECT( graphene::chain::execute_bid_operation::fee_parameters_type,  ) // V
 
 FC_REFLECT( graphene::chain::call_order_update_operation::options_type, (target_collateral_ratio) )
 
-FC_REFLECT_TYPENAME( graphene::chain::call_order_update_operation::extension_type )
+FC_REFLECT_TYPENAME( graphene::chain::call_order_update_operation::extensions_type )
 
 FC_REFLECT( graphene::chain::limit_order_create_operation,(fee)(seller)(amount_to_sell)(min_to_receive)(expiration)(fill_or_kill)(extensions))
 FC_REFLECT( graphene::chain::limit_order_cancel_operation,(fee)(fee_paying_account)(order)(extensions) )

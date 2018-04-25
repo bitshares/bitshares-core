@@ -2023,7 +2023,7 @@ public:
 
    signed_transaction borrow_asset_ext( string seller_name, string amount_to_borrow, string asset_symbol,
                                         string amount_of_collateral,
-                                        call_order_update_operation::extension_type extensions,
+                                        call_order_update_operation::extensions_type extensions,
                                         bool broadcast = false)
    {
       account_object seller = get_account(seller_name);
@@ -3959,7 +3959,7 @@ signed_transaction wallet_api::borrow_asset(string seller_name, string amount_to
 
 signed_transaction wallet_api::borrow_asset_ext( string seller_name, string amount_to_sell,
                                                  string asset_symbol, string amount_of_collateral,
-                                                 call_order_update_operation::extension_type extensions,
+                                                 call_order_update_operation::extensions_type extensions,
                                                  bool broadcast)
 {
    FC_ASSERT(!is_locked());

@@ -159,8 +159,8 @@ void_result call_order_update_evaluator::do_evaluate(const call_order_update_ope
 
    // TODO: remove this check and the assertion after hf_834
    if( d.get_dynamic_global_properties().next_maintenance_time <= HARDFORK_CORE_834_TIME )
-      FC_ASSERT( o.extensions.empty(),
-                 "Can not specify non-empty extensions in call_order_update_operation before hardfork 834." );
+      FC_ASSERT( !o.extensions.value.target_collateral_ratio.valid(),
+                 "Can not set target_collateral_ratio in call_order_update_operation before hardfork 834." );
 
    _paying_account = &o.funding_account(d);
    _debt_asset     = &o.delta_debt.asset_id(d);
@@ -226,9 +226,7 @@ void_result call_order_update_evaluator::do_apply(const call_order_update_operat
 
    optional<price> old_collateralization;
 
-   optional<uint16_t> new_target_cr; // new target collateral ratio
-   if( o.extensions.size() > 0 )
-      new_target_cr = o.extensions.front().value.target_collateral_ratio;
+   optional<uint16_t> new_target_cr = o.extensions.value.target_collateral_ratio;
 
    if( itr == call_idx.end() )
    {

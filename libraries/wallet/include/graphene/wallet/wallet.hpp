@@ -988,7 +988,7 @@ class wallet_api
        */
       signed_transaction borrow_asset_ext( string borrower_name, string amount_to_borrow, string asset_symbol,
                                            string amount_of_collateral,
-                                           call_order_update_operation::extension_type extensions,
+                                           call_order_update_operation::extensions_type extensions,
                                            bool broadcast = false );
 
       /** Cancel an existing order

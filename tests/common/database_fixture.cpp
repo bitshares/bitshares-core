@@ -885,12 +885,7 @@ const call_order_object* database_fixture::borrow( const account_object& who, as
    update.funding_account = who.id;
    update.delta_collateral = collateral;
    update.delta_debt = what;
-   if( target_cr.valid() )
-   {
-      extension<call_order_update_operation::options_type> ext;
-      ext.value.target_collateral_ratio = target_cr;
-      update.extensions.emplace_back( std::move(ext) );
-   }
+   update.extensions.value.target_collateral_ratio = target_cr;
    trx.operations.push_back(update);
    for( auto& op : trx.operations ) db.current_fee_schedule().set_fee(op);
    trx.validate();
@@ -915,12 +910,7 @@ void database_fixture::cover(const account_object& who, asset what, asset collat
    update.funding_account = who.id;
    update.delta_collateral = -collateral;
    update.delta_debt = -what;
-   if( target_cr.valid() )
-   {
-      extension<call_order_update_operation::options_type> ext;
-      ext.value.target_collateral_ratio = target_cr;
-      update.extensions.emplace_back( std::move(ext) );
-   }
+   update.extensions.value.target_collateral_ratio = target_cr;
    trx.operations.push_back(update);
    for( auto& op : trx.operations ) db.current_fee_schedule().set_fee(op);
    trx.validate();
