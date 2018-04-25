@@ -102,6 +102,7 @@ database_fixture::database_fixture()
       std::string track = "\"1.2.17\"";
       track_account.push_back(track);
       options.insert(std::make_pair("track-account", boost::program_options::variable_value(track_account, false)));
+      options.insert(std::make_pair("partial-operations", boost::program_options::variable_value(true, false)));
    }
    // account tracking 2 accounts
    if( !options.count("track-account") && boost::unit_test::framework::current_test_case().p_name.value == "track_account2") {
