@@ -424,7 +424,7 @@ BOOST_AUTO_TEST_CASE(track_account) {
       // dan makes 1 op
       create_bitasset("EUR", dan_id);
 
-      generate_block();
+      generate_block( ~database::skip_fork_db );
 
       // anything against account_id_type() should be {}
       vector<operation_history_object> histories = hist_api.get_account_history(account_id_type(), operation_history_id_type(0), 10, operation_history_id_type(0));
@@ -448,6 +448,31 @@ BOOST_AUTO_TEST_CASE(track_account) {
       BOOST_CHECK_EQUAL(histories[0].id.instance(), 4);
       BOOST_CHECK_EQUAL(histories[1].id.instance(), 3);
 
+      // create more ops, starting with an untracked account
+      create_bitasset( "BTC", account_id_type() );
+      create_bitasset( "GBP", dan_id );
+
+      generate_block( ~database::skip_fork_db );
+
+      histories = hist_api.get_account_history(dan_id, operation_history_id_type(0), 10, operation_history_id_type(0));
+      BOOST_CHECK_EQUAL(histories.size(), 3);
+      BOOST_CHECK_EQUAL(histories[0].id.instance(), 6);
+      BOOST_CHECK_EQUAL(histories[1].id.instance(), 4);
+      BOOST_CHECK_EQUAL(histories[2].id.instance(), 3);
+
+      db.pop_block();
+
+      // Try again, should result in same object IDs
+      create_bitasset( "BTC", account_id_type() );
+      create_bitasset( "GBP", dan_id );
+
+      generate_block();
+
+      histories = hist_api.get_account_history(dan_id, operation_history_id_type(0), 10, operation_history_id_type(0));
+      BOOST_CHECK_EQUAL(histories.size(), 3);
+      BOOST_CHECK_EQUAL(histories[0].id.instance(), 6);
+      BOOST_CHECK_EQUAL(histories[1].id.instance(), 4);
+      BOOST_CHECK_EQUAL(histories[2].id.instance(), 3);
    } catch (fc::exception &e) {
       edump((e.to_detail_string()));
       throw;
