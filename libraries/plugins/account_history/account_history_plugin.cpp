@@ -98,6 +98,7 @@ void account_history_plugin_impl::update_account_histories( const signed_block& 
       optional<operation_history_object> oho;
 
       auto create_oho = [&]() {
+         is_first = false;
          return optional<operation_history_object>( db.create<operation_history_object>( [&]( operation_history_object& h )
          {
             if( o_op.valid() )
