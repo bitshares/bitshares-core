@@ -1185,7 +1185,7 @@ market_ticker database_api_impl::get_ticker( const string& base, const string& q
    FC_ASSERT( assets[0], "Invalid base asset symbol: ${s}", ("s",base) );
    FC_ASSERT( assets[1], "Invalid quote asset symbol: ${s}", ("s",quote) );
 
-   const fc::time_point_sec now = fc::time_point::now();
+   const fc::time_point_sec now = _db.head_block_time();
 
    market_ticker result;
    result.time = now;
