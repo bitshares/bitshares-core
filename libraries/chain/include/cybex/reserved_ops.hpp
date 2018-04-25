@@ -30,7 +30,7 @@ namespace graphene { namespace chain {
    void assert_reserved();
 
 #define RESERVED_OPERATION(x)                               \
-   struct reserved_operation_##x : public base_operation    \
+   struct reserved##x##_operation : public base_operation    \
    {                                                        \
       struct fee_parameters_type {                          \
          uint64_t fee = GRAPHENE_BLOCKCHAIN_PRECISION;      \
@@ -102,8 +102,8 @@ RESERVED_OPERATION(99)
 
 
 #define fc_reflect(x) \
-FC_REFLECT( graphene::chain::reserved_operation_##x::fee_parameters_type,(fee) ) \
-FC_REFLECT( graphene::chain::reserved_operation_##x,(fee) )
+FC_REFLECT( graphene::chain::reserved##x##_operation::fee_parameters_type,(fee) ) \
+FC_REFLECT( graphene::chain::reserved##x##_operation,(fee) )
 
 
 fc_reflect(47)
@@ -161,7 +161,7 @@ fc_reflect(98)
 fc_reflect(99)
 
 #define  _db_notify_reserved(x)                         \
-   void operator()( const reserved_operation_##x& op )  \
+   void operator()( const reserved##x##_operation& op )  \
    {                                                    \
    }                                                    \
 
