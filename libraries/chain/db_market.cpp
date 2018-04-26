@@ -590,9 +590,17 @@ int database::match( const limit_order_object& bid, const call_order_object& ask
 
    auto maint_time = get_dynamic_global_properties().next_maintenance_time;
    // TODO remove when we're sure it's always false
+   bool before_core_hardfork_184 = ( maint_time <= HARDFORK_CORE_184_TIME ); // something-for-nothing
+   // TODO remove when we're sure it's always false
    bool before_core_hardfork_342 = ( maint_time <= HARDFORK_CORE_342_TIME ); // better rounding
    // TODO remove when we're sure it's always false
    bool before_core_hardfork_834 = ( maint_time <= HARDFORK_CORE_834_TIME ); // target collateral ratio option
+   if( before_core_hardfork_184 )
+      ilog( "match(limit,call) is called before hardfork core-184 at block #${block}", ("block",head_block_num()) );
+   if( before_core_hardfork_342 )
+      ilog( "match(limit,call) is called before hardfork core-342 at block #${block}", ("block",head_block_num()) );
+   if( before_core_hardfork_834 )
+      ilog( "match(limit,call) is called before hardfork core-834 at block #${block}", ("block",head_block_num()) );
 
    bool cull_taker = false;
 
@@ -610,8 +618,8 @@ int database::match( const limit_order_object& bid, const call_order_object& ask
 
       // Be here, it's possible that taker is paying something for nothing due to partially filled in last loop.
       // In this case, we see it as filled and cancel it later
-      // TODO remove hardfork check when we're sure it's always true (but keep the zero amount check)
-      if( order_receives.amount == 0 && maint_time > HARDFORK_CORE_184_TIME )
+      // TODO remove hardfork check when we're sure it's always after hard fork (but keep the zero amount check)
+      if( order_receives.amount == 0 && !before_core_hardfork_184 )
          return 1;
 
       if( before_core_hardfork_342 ) // TODO remove this "if" when we're sure it's always false (keep the code in else)
@@ -632,8 +640,8 @@ int database::match( const limit_order_object& bid, const call_order_object& ask
       if( before_core_hardfork_342 ) // TODO remove this "if" when we're sure it's always false (keep the code in else)
       {
          order_receives = usd_to_buy * match_price; // round down here, in favor of call order
-         // TODO remove hardfork check when we're sure it's always true (but keep the zero amount check)
-         if( order_receives.amount == 0 && maint_time > HARDFORK_CORE_184_TIME )
+         // TODO remove hardfork check when we're sure it's always after hard fork (but keep the zero amount check)
+         if( order_receives.amount == 0 && !before_core_hardfork_184 )
             return 1;
       }
       else // has hardfork core-342
@@ -851,7 +859,7 @@ bool database::fill_call_order( const call_order_object& order, const asset& pay
          adjust_balance(borrower.get_id(), *collateral_freed);
 
       modify( borrower_statistics, [&]( account_statistics_object& b ){
-              if( collateral_freed.valid() && collateral_freed->amount > 0 )
+              if( collateral_freed.valid() && collateral_freed->amount > 0 && collateral_freed->asset_id == asset_id_type() )
                 b.total_core_in_orders -= collateral_freed->amount;
               if( pays.asset_id == asset_id_type() )
                 b.total_core_in_orders -= pays.amount;

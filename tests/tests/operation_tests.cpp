@@ -547,11 +547,8 @@ BOOST_AUTO_TEST_CASE( more_call_order_update_test_after_hardfork_583 )
       BOOST_TEST_MESSAGE( "dan borrow 2500 more usd wth 5002 more core should not be allowed..." );
       GRAPHENE_REQUIRE_THROW( borrow( dan, bitusd.amount(2500), core.amount(5002)  ), fc::exception );
 
-      BOOST_TEST_MESSAGE( "dan borrow 2500 more usd wth 5003 more core should be allowed..." );
-      borrow( dan, bitusd.amount(2500), asset(5003));
-      BOOST_REQUIRE_EQUAL( get_balance( dan, bitusd ), 5000 );
-      BOOST_REQUIRE_EQUAL( get_balance( dan, core ), 10000000 - 10000 + 4999 - 1 - 5003 );
-
+      BOOST_TEST_MESSAGE( "dan borrow 2500 more usd wth 5003 more core should not be allowed..." );
+      GRAPHENE_REQUIRE_THROW( borrow( dan, bitusd.amount(2500), asset(5003) ), fc::exception );
 
    } catch (fc::exception& e) {
       edump((e.to_detail_string()));
