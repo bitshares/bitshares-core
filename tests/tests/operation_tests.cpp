@@ -604,6 +604,8 @@ BOOST_AUTO_TEST_CASE( call_order_update_target_cr_hardfork_time_test )
       ACTORS((sam)(alice)(bob));
       const auto& bitusd = create_bitasset("USDBIT", sam.id);
       const auto& core   = asset_id_type()(db);
+      asset_id_type bitusd_id = bitusd.id;
+      asset_id_type core_id = core.id;
 
       transfer(committee_account, sam_id, asset(10000000));
       transfer(committee_account, alice_id, asset(10000000));
@@ -653,11 +655,21 @@ BOOST_AUTO_TEST_CASE( call_order_update_target_cr_hardfork_time_test )
          db.push_transaction(trx, ~0);
       };
 
-      BOOST_TEST_MESSAGE( "alice tries to propose a proposal with target_cr set, "
+      BOOST_TEST_MESSAGE( "bob tries to propose a proposal with target_cr set, "
                           "will fail before hard fork time" );
       GRAPHENE_REQUIRE_THROW( call_update_proposal( bob, alice, bitusd.amount(10), core.amount(40), 0 ), fc::assert_exception );
       GRAPHENE_REQUIRE_THROW( call_update_proposal( bob, alice, bitusd.amount(10), core.amount(40), 1750 ), fc::assert_exception );
       GRAPHENE_REQUIRE_THROW( call_update_proposal( bob, alice, bitusd.amount(10), core.amount(40), 65535 ), fc::assert_exception );
+
+      generate_blocks( db.get_dynamic_global_properties().next_maintenance_time );
+      set_expiration( db, trx );
+
+      BOOST_TEST_MESSAGE( "bob tries to propose a proposal with target_cr set, "
+                          "will success after hard fork time" );
+      // now able to propose
+      call_update_proposal( bob_id(db), alice_id(db), bitusd_id(db).amount(10), core_id(db).amount(40), 65535 );
+
+      generate_block();
 
    } catch (fc::exception& e) {
       edump((e.to_detail_string()));
