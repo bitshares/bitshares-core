@@ -1643,63 +1643,6 @@ BOOST_AUTO_TEST_CASE( witness_feeds )
    }
 }
 
-
-/**
- *  Create an order such that when the trade executes at the
- *  requested price the resulting payout to one party is 0
- */
-BOOST_AUTO_TEST_CASE( trade_amount_equals_zero )
-{
-   try {
-      INVOKE(issue_uia);
-      generate_blocks( HARDFORK_555_TIME );
-      set_expiration( db, trx );
-
-      const asset_object& test = get_asset( UIA_TEST_SYMBOL );
-      const asset_id_type test_id = test.id;
-      const asset_object& core = get_asset( GRAPHENE_SYMBOL );
-      const asset_id_type core_id = core.id;
-      const account_object& core_seller = create_account( "shorter1" );
-      const account_object& core_buyer = get_account("nathan");
-
-      transfer( committee_account(db), core_seller, asset( 100000000 ) );
-
-      BOOST_CHECK_EQUAL(get_balance(core_buyer, core), 0);
-      BOOST_CHECK_EQUAL(get_balance(core_buyer, test), 10000000);
-      BOOST_CHECK_EQUAL(get_balance(core_seller, test), 0);
-      BOOST_CHECK_EQUAL(get_balance(core_seller, core), 100000000);
-
-      create_sell_order(core_seller, core.amount(1), test.amount(2));
-      create_sell_order(core_seller, core.amount(1), test.amount(2));
-      create_sell_order(core_buyer, test.amount(3), core.amount(1));
-
-      BOOST_CHECK_EQUAL(get_balance(core_buyer, core), 1);
-      BOOST_CHECK_EQUAL(get_balance(core_buyer, test), 9999997);
-      BOOST_CHECK_EQUAL(get_balance(core_seller, core), 99999998);
-      BOOST_CHECK_EQUAL(get_balance(core_seller, test), 3);
-
-      generate_block();
-      fc::usleep(fc::milliseconds(1000));
-
-       //TODO: This will fail because of something-for-nothing bug(#345)
-       // Must be fixed with a hardfork
-/**
-*  TODO: Remove this comment block when #345 is resolved.
-*  Added comment block to allow Travis-CI to pass by ignoring this test
-*      auto result = get_market_order_history(core_id, test_id);
-*      BOOST_CHECK_EQUAL(result.size(), 2);
-*      BOOST_CHECK(result[0].op.pays == core.amount(1));
-*      BOOST_CHECK(result[0].op.receives == test.amount(2));
-*      BOOST_CHECK(result[1].op.pays == test.amount(2));
-*      BOOST_CHECK(result[1].op.receives == core.amount(1));
-*/
-   } catch( const fc::exception& e) {
-      edump((e.to_detail_string()));
-      throw;
-   }
-}
-
-
 /**
  *  Create an order that cannot be filled immediately and have the
  *  transaction fail.
