@@ -987,8 +987,28 @@ BOOST_AUTO_TEST_CASE( witness_create )
  *  issuer and only if the global settle bit is set.
  */
 BOOST_AUTO_TEST_CASE( global_settle_test )
-{
-   try {
+{ try {
+   uint32_t skip = database::skip_witness_signature
+                 | database::skip_transaction_signatures
+                 | database::skip_transaction_dupe_check
+                 | database::skip_block_size_check
+                 | database::skip_tapos_check
+                 | database::skip_authority_check
+                 | database::skip_merkle_check
+                 ;
+
+   generate_block( skip );
+
+  for( int i=0; i<2; i++ )
+  {
+   if( i == 1 )
+   {
+      auto mi = db.get_global_properties().parameters.maintenance_interval;
+      generate_blocks(HARDFORK_CORE_342_TIME - mi, true, skip);
+      generate_blocks(db.get_dynamic_global_properties().next_maintenance_time, true, skip);
+   }
+   set_expiration( db, trx );
+
    ACTORS((nathan)(ben)(valentine)(dan));
    asset_id_type bit_usd_id = create_bitasset("USDBIT", nathan_id, 100, global_settle | charge_market_fee).get_id();
 
@@ -1059,11 +1079,23 @@ BOOST_AUTO_TEST_CASE( global_settle_test )
    BOOST_CHECK_EQUAL(get_balance(valentine_id, bit_usd_id), 0);
    BOOST_CHECK_EQUAL(get_balance(valentine_id, asset_id_type()), 10045);
    BOOST_CHECK_EQUAL(get_balance(ben_id, bit_usd_id), 0);
-   BOOST_CHECK_EQUAL(get_balance(ben_id, asset_id_type()), 10091);
+   if( i == 1 ) // BSIP35: better rounding
+   {
+      BOOST_CHECK_EQUAL(get_balance(ben_id, asset_id_type()), 10090);
+      BOOST_CHECK_EQUAL(get_balance(dan_id, asset_id_type()), 9850);
+   }
+   else
+   {
+      BOOST_CHECK_EQUAL(get_balance(ben_id, asset_id_type()), 10091);
+      BOOST_CHECK_EQUAL(get_balance(dan_id, asset_id_type()), 9849);
+   }
    BOOST_CHECK_EQUAL(get_balance(dan_id, bit_usd_id), 0);
-   BOOST_CHECK_EQUAL(get_balance(dan_id, asset_id_type()), 9849);
-} FC_LOG_AND_RETHROW()
-}
+
+   // undo above tx's and reset
+   generate_block( skip );
+   db.pop_block();
+  }
+} FC_LOG_AND_RETHROW() }
 
 BOOST_AUTO_TEST_CASE( worker_create_test )
 { try {
@@ -1334,6 +1366,28 @@ BOOST_AUTO_TEST_CASE( burn_worker_test )
 
 BOOST_AUTO_TEST_CASE( force_settle_test )
 {
+   uint32_t skip = database::skip_witness_signature
+                 | database::skip_transaction_signatures
+                 | database::skip_transaction_dupe_check
+                 | database::skip_block_size_check
+                 | database::skip_tapos_check
+                 | database::skip_authority_check
+                 | database::skip_merkle_check
+                 ;
+
+   generate_block( skip );
+
+  for( int i=0; i<2; i++ )
+  {
+   if( i == 1 )
+   {
+      auto mi = db.get_global_properties().parameters.maintenance_interval;
+      generate_blocks(HARDFORK_CORE_342_TIME - mi, true, skip);
+      generate_blocks(db.get_dynamic_global_properties().next_maintenance_time, true, skip);
+   }
+   set_expiration( db, trx );
+
+   int blocks = 0;
    try
    {
       ACTORS( (nathan)(shorter1)(shorter2)(shorter3)(shorter4)(shorter5) );
@@ -1453,7 +1507,9 @@ BOOST_AUTO_TEST_CASE( force_settle_test )
       BOOST_CHECK( settle_id(db).owner == nathan_id );
 
       // Wait for settlement to take effect
-      generate_blocks(settle_id(db).settlement_date);
+      generate_blocks( settle_id(db).settlement_date, true, skip );
+      blocks += 2;
+
       BOOST_CHECK(db.find(settle_id) == nullptr);
       BOOST_CHECK_EQUAL( bitusd_id(db).bitasset_data(db).force_settled_volume.value, 50 );
       BOOST_CHECK_EQUAL( get_balance(nathan_id, bitusd_id), 14950);
@@ -1483,13 +1539,21 @@ BOOST_AUTO_TEST_CASE( force_settle_test )
       // c2 2000 : 3998   1.9990   550 settled
       // c1 1000 : 2000   2.0000
 
-      generate_blocks( settle_id(db).settlement_date );
+      generate_blocks( settle_id(db).settlement_date, true, skip );
+      blocks += 2;
 
       int64_t call1_payout =                0;
       int64_t call2_payout =       550*99/100;
       int64_t call3_payout = 49 + 2950*99/100;
       int64_t call4_payout =      4000*99/100;
       int64_t call5_payout =      5000*99/100;
+
+      if( i == 1 ) // BSIP35: better rounding
+      {
+         call3_payout = 49 + (2950*99+100-1)/100; // round up
+         call4_payout =      (4000*99+100-1)/100; // round up
+         call5_payout =      (5000*99+100-1)/100; // round up
+      }
 
       BOOST_CHECK_EQUAL( get_balance(shorter1_id, core_id), initial_balance-2*1000 );  // full collat still tied up
       BOOST_CHECK_EQUAL( get_balance(shorter2_id, core_id), initial_balance-2*1999 );  // full collat still tied up
@@ -1518,6 +1582,16 @@ BOOST_AUTO_TEST_CASE( force_settle_test )
       edump((e.to_detail_string()));
       throw;
    }
+
+   // undo above tx's and reset
+   generate_block( skip );
+   ++blocks;
+   while( blocks > 0 )
+   {
+      db.pop_block();
+      --blocks;
+   }
+  }
 }
 
 BOOST_AUTO_TEST_CASE( assert_op_test )

@@ -766,6 +766,40 @@ void database::process_bids( const asset_bitasset_data_object& bad )
    _cancel_bids_and_revive_mpa( to_revive, bad );
 }
 
+void update_and_match_call_orders( database& db )
+{
+   // Update call_price
+   wlog( "Updating all call orders for hardfork core-343 at block ${n}", ("n",db.head_block_num()) );
+   asset_id_type current_asset;
+   const asset_bitasset_data_object* abd = nullptr;
+   // by_collateral index won't change after call_price updated, so it's safe to iterate
+   for( const auto& call_obj : db.get_index_type<call_order_index>().indices().get<by_collateral>() )
+   {
+      if( current_asset != call_obj.debt_type() ) // debt type won't be asset_id_type(), abd will always get initialized
+      {
+         current_asset = call_obj.debt_type();
+         abd = &current_asset(db).bitasset_data(db);
+      }
+      if( !abd || abd->is_prediction_market ) // nothing to do with PM's; check !abd just to be safe
+         continue;
+      db.modify( call_obj, [abd]( call_order_object& call ) {
+         call.call_price  =  price::call_price( call.get_debt(), call.get_collateral(),
+                                                abd->current_feed.maintenance_collateral_ratio );
+      });
+   }
+   // Match call orders
+   const auto& asset_idx = db.get_index_type<asset_index>().indices().get<by_type>();
+   auto itr = asset_idx.lower_bound( true /** market issued */ );
+   while( itr != asset_idx.end() )
+   {
+      const asset_object& a = *itr;
+      ++itr;
+      // be here, next_maintenance_time should have been updated already
+      db.check_call_orders( a, true, false ); // allow black swan, and call orders are taker
+   }
+   wlog( "Done updating all call orders for hardfork core-343 at block ${n}", ("n",db.head_block_num()) );
+}
+
 void database::perform_chain_maintenance(const signed_block& next_block, const global_property_object& global_props)
 {
    const auto& gpo = get_global_properties();
@@ -917,10 +951,19 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
    if( (dgpo.next_maintenance_time < HARDFORK_613_TIME) && (next_maintenance_time >= HARDFORK_613_TIME) )
       deprecate_annual_members(*this);
 
+   // To reset call_price of all call orders, then match by new rule
+   bool to_update_and_match_call_orders = false;
+   if( (dgpo.next_maintenance_time <= HARDFORK_CORE_343_TIME) && (next_maintenance_time > HARDFORK_CORE_343_TIME) )
+      to_update_and_match_call_orders = true;
+
    modify(dgpo, [next_maintenance_time](dynamic_global_property_object& d) {
       d.next_maintenance_time = next_maintenance_time;
       d.accounts_registered_this_interval = 0;
    });
+
+   // We need to do it after updated next_maintenance_time, to apply new rules here
+   if( to_update_and_match_call_orders )
+      update_and_match_call_orders(*this);
 
    // Reset all BitAsset force settlement volumes to zero
    for( const auto& d : get_index_type<asset_bitasset_data_index>().indices() )

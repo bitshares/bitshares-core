@@ -93,7 +93,7 @@ namespace graphene { namespace chain {
        *
        * Rather than returning a value, this method fills in core_fee_paid field.
        */
-      void convert_fee();
+      virtual void convert_fee();
 
       object_id_type get_relative_id( object_id_type rel_id )const;
 

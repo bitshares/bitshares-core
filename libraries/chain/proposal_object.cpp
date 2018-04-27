@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015 Cryptonomex, Inc., and contributors.
+ * Copyright (c) 2015-2018 Cryptonomex, Inc., and contributors.
  *
  * The MIT License
  *
@@ -22,7 +22,6 @@
  * THE SOFTWARE.
  */
 #include <graphene/chain/database.hpp>
-#include <graphene/chain/account_object.hpp>
 #include <graphene/chain/proposal_object.hpp>
 
 namespace graphene { namespace chain {
