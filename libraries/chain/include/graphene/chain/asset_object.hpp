@@ -228,13 +228,11 @@ namespace graphene { namespace chain {
    struct by_symbol;
    struct by_type;
    struct by_issuer;
-   struct by_bitasset_id;
    typedef multi_index_container<
       asset_object,
       indexed_by<
          ordered_unique< tag<by_id>, member< object, object_id_type, &object::id > >,
          ordered_unique< tag<by_symbol>, member<asset_object, string, &asset_object::symbol> >,
-         ordered_unique< tag<by_bitasset_id>, member<asset_object, optional<asset_bitasset_data_id_type>, &asset_object::bitasset_data_id> >,
          ordered_non_unique< tag<by_issuer>, member<asset_object, account_id_type, &asset_object::issuer > >,
          ordered_unique< tag<by_type>,
             composite_key< asset_object,

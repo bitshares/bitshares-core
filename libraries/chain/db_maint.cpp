@@ -932,17 +932,18 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
             o.force_settled_volume = 0;
 
             // Check if asset is smartcoin
-            const auto& idx = get_index_type<asset_index>().indices().get<by_bitasset_id>();
-            auto itr = idx.find(o.id);
-            auto flags = itr->options.flags;
-
-            if((flags & witness_fed_asset) || (flags & committee_fed_asset)) { // if smartcoin
-               for (auto itr = o.feeds.begin(); itr != o.feeds.end();) { // loop feeds
-                  auto feed_time = itr->second.first;
-                  if (feed_time + (o.options.feed_lifetime_sec) < head_block_time())
-                     itr = o.feeds.erase(itr); // delete expired feed
-                  else
-                     ++itr;
+            const auto& settlement_price = o.feeds.begin()->second.second.settlement_price;
+            if(!settlement_price.is_null()) {
+               const auto &asset = get(settlement_price.base.asset_id);
+               auto flags = asset.options.flags;
+               if ((flags & witness_fed_asset) || (flags & committee_fed_asset)) { // if smartcoin
+                  for (auto itr = o.feeds.begin(); itr != o.feeds.end();) { // loop feeds
+                     auto feed_time = itr->second.first;
+                     if (feed_time + (o.options.feed_lifetime_sec) < head_block_time())
+                        itr = o.feeds.erase(itr); // delete expired feed
+                     else
+                        ++itr;
+                  }
                }
             }
          });
