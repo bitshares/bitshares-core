@@ -597,8 +597,6 @@ public:
    optional<asset_object> find_asset(asset_id_type id)const
    {
       auto rec = _remote_db->get_assets({id}).front();
-      if( rec )
-         _asset_cache[id] = *rec;
       return rec;
    }
    optional<asset_object> find_asset(string asset_symbol_or_id)const
@@ -616,8 +614,6 @@ public:
          {
             if( rec->symbol != asset_symbol_or_id )
                return optional<asset_object>();
-
-            _asset_cache[rec->get_id()] = *rec;
          }
          return rec;
       }
@@ -1873,6 +1869,7 @@ public:
       owned_keys.reserve( pks.size() );
       std::copy_if( pks.begin(), pks.end(), std::inserter(owned_keys, owned_keys.end()),
                     [this](const public_key_type& pk){ return _keys.find(pk) != _keys.end(); } );
+      tx.signatures.clear();
       set<public_key_type> approving_key_set = _remote_db->get_required_signatures( tx, owned_keys );
 
       auto dyn_props = get_dynamic_global_properties();
@@ -2257,7 +2254,7 @@ public:
          }
          return ss.str();
       };
-      m["get_order_book"] = [this](variant result, const fc::variants& a)
+      m["get_order_book"] = [](variant result, const fc::variants& a)
       {
          auto orders = result.as<order_book>( GRAPHENE_MAX_NESTED_OBJECTS );
          auto bids = orders.bids;
@@ -2684,8 +2681,6 @@ public:
    mode_t                  _old_umask;
 #endif
    const string _wallet_filename_extension = ".wallet";
-
-   mutable map<asset_id_type, asset_object> _asset_cache;
 };
 
 std::string operation_printer::fee(const asset& a)const {

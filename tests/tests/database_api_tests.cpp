@@ -53,8 +53,8 @@ BOOST_AUTO_TEST_CASE(is_registered) {
       /***
        * Act
        */
-      create_account("dan", dan_private_key.get_public_key()).id;
-      create_account("nathan", nathan_private_key.get_public_key()).id;
+      create_account("dan", dan_private_key.get_public_key());
+      create_account("nathan", nathan_private_key.get_public_key());
       // Unregistered key will not be registered with any account
 
 
