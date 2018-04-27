@@ -424,8 +424,8 @@ void_result asset_update_bitasset_evaluator::do_apply(const asset_update_bitasse
                // for non-witness-feeding and non-committe-feeding assets, modify all feeds
                // published by producers to nothing, since we can't simply remove them. For more information:
                // https://github.com/bitshares/bitshares-core/pull/832#issuecomment-384112633
-               for(auto current_feed : bdo.feeds) {
-                  //TODO: verify that this truly "nullifies" the price feed and maybe move this logic to the feed_price class
+               for(auto& current_feed : bdo.feeds) {
+                  // If this logic grows, it may be good to move it to a reset method in price_feed
                   current_feed.second.second.settlement_price = price();
                }
             }
