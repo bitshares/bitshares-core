@@ -408,7 +408,7 @@ void_result asset_update_bitasset_evaluator::do_apply(const asset_update_bitasse
       {
          backing_asset_changed = true;
          const asset_object& base_asset = op.asset_to_update(db());
-         if ( (base_asset.options.flags & witness_fed_asset)  || (base_asset.options.flags & committee_fed_asset) )
+         if ( base_asset.options.flags & (witness_fed_asset | committee_fed_asset) )
             is_witness_or_committee_fed = true;
       }
 
@@ -424,7 +424,7 @@ void_result asset_update_bitasset_evaluator::do_apply(const asset_update_bitasse
                // for non-witness-feeding and non-committe-feeding assets, modify all feeds
                // published by producers to null, since we can't simply remove them. For more information:
                // https://github.com/bitshares/bitshares-core/pull/832#issuecomment-384112633
-               for(auto itr = bdo.feeds.rbegin(); itr != bdo.feeds.rend(); ++itr) {
+               for(auto current_feed : bdo.feeds) {
                   //TODO: how do we "nullify" the price feeds?
                }
             }
