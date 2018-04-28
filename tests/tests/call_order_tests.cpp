@@ -242,7 +242,9 @@ BOOST_AUTO_TEST_CASE( call_order_object_test )
    int total = 500*1000;
    for( int i = total; i > 0; --i )
    {
-      if( i % 3 == 0 )
+      if( i % 9 == 0 )
+         mcr = 1002;
+      else if( i % 3 == 0 )
          mcr = 1750;
       else if( i % 3 == 1 )
          mcr = mcr_uid(gen);
@@ -309,7 +311,9 @@ BOOST_AUTO_TEST_CASE( call_order_object_test )
       } while( retry > 0 && ( cp > fp || cp < ( fp / ratio_type( mcr, 1000 ) ) ) );
 
       // match_price
-      if( i % 4 == 0 )
+      if( i % 16 == 0 )
+         mp = fp * ratio_type( 1001, 1000 );
+      else if( i % 4 == 0 )
          mp = fp * ratio_type( 1100, 1000 );
       else if( i % 4 == 1 )
          mp = fp * ratio_type( mp_num_uid(gen) , 1000 );
