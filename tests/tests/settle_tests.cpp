@@ -40,15 +40,17 @@ BOOST_AUTO_TEST_CASE( settle_rounding_test )
    try {
       // get around Graphene issue #615 feed expiration bug
       generate_blocks(HARDFORK_615_TIME);
-      generate_block();
+      generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
       set_expiration( db, trx );
 
-      ACTORS((paul)(michael)(rachel)(alice)(bob)(ted));
+      ACTORS((paul)(michael)(rachel)(alice)(bob)(ted)(joe)(jim));
 
       // create assets
       const auto& bitusd = create_bitasset("USDBIT", paul_id);
+      const auto& bitcny = create_bitasset("CNYBIT", paul_id);
       const auto& core   = asset_id_type()(db);
       asset_id_type bitusd_id = bitusd.id;
+      asset_id_type bitcny_id = bitcny.id;
       asset_id_type core_id = core.id;
 
       // fund accounts
@@ -56,6 +58,7 @@ BOOST_AUTO_TEST_CASE( settle_rounding_test )
       transfer(committee_account, paul_id, asset(10000000));
       transfer(committee_account, alice_id, asset(10000000));
       transfer(committee_account, bob_id, asset(10000000));
+      transfer(committee_account, jim_id, asset(10000000));
 
       // add a feed to asset
       update_feed_producers( bitusd, {paul.id} );
@@ -223,6 +226,12 @@ BOOST_AUTO_TEST_CASE( settle_rounding_test )
       current_feed.settlement_price = bitusd_id(db).amount( 101 ) / core_id(db).amount(5);
       publish_feed( bitusd_id(db), alice_id(db), current_feed );
 
+      update_feed_producers( bitcny_id(db), {alice_id} );
+      current_feed.maintenance_collateral_ratio = 1750;
+      current_feed.maximum_short_squeeze_ratio = 1100;
+      current_feed.settlement_price = bitcny_id(db).amount( 101 ) / core_id(db).amount(50);
+      publish_feed( bitcny_id(db), alice_id(db), current_feed );
+
       // now yes expire settlement
       generate_blocks( db.head_block_time() + fc::hours(22) );
       set_expiration( db, trx );
@@ -345,6 +354,25 @@ BOOST_AUTO_TEST_CASE( settle_rounding_test )
 
       generate_block();
 
+      // jim borrow some cny
+      call_order_id_type call_jim_id = borrow(jim_id(db), bitcny_id(db).amount(2000), core_id(db).amount(2000))->id;
+
+      BOOST_CHECK_EQUAL( 2000, call_jim_id(db).debt.value );
+      BOOST_CHECK_EQUAL( 2000, call_jim_id(db).collateral.value );
+
+      BOOST_CHECK_EQUAL(get_balance(jim_id(db), core_id(db)), 9998000);
+      BOOST_CHECK_EQUAL(get_balance(jim_id(db), bitcny_id(db)), 2000);
+
+      // jim transfer some cny to joe
+      transfer(jim_id, joe_id, asset(1500, bitcny_id));
+
+      BOOST_CHECK_EQUAL(get_balance(jim_id(db), core_id(db)), 9998000);
+      BOOST_CHECK_EQUAL(get_balance(jim_id(db), bitcny_id(db)), 500);
+      BOOST_CHECK_EQUAL(get_balance(joe_id(db), core_id(db)), 0);
+      BOOST_CHECK_EQUAL(get_balance(joe_id(db), bitcny_id(db)), 1500);
+
+      generate_block();
+
       // give ted some usd
       transfer(paul_id, ted_id, asset(100, bitusd_id));
       BOOST_CHECK_EQUAL(get_balance(ted_id(db), core_id(db)), 0);
@@ -369,6 +397,23 @@ BOOST_AUTO_TEST_CASE( settle_rounding_test )
       BOOST_CHECK_EQUAL(get_balance(ted_id(db), core_id(db)), 0);
       BOOST_CHECK_EQUAL(get_balance(ted_id(db), bitusd_id(db)), 37); // 100 - 20 - 21 - 22
 
+      // joe settle
+      const operation_result result101 = force_settle(joe_id(db), bitcny_id(db).amount(100));
+      const operation_result result102 = force_settle(joe_id(db), bitcny_id(db).amount(1000));
+      const operation_result result103 = force_settle(joe_id(db), bitcny_id(db).amount(300));
+
+      force_settlement_id_type settle_id101 = result101.get<object_id_type>();
+      BOOST_CHECK_EQUAL( settle_id101(db).balance.amount.value, 100 );
+
+      force_settlement_id_type settle_id102 = result102.get<object_id_type>();
+      BOOST_CHECK_EQUAL( settle_id102(db).balance.amount.value, 1000 );
+
+      force_settlement_id_type settle_id103 = result103.get<object_id_type>();
+      BOOST_CHECK_EQUAL( settle_id103(db).balance.amount.value, 300 );
+
+      BOOST_CHECK_EQUAL(get_balance(joe_id(db), core_id(db)), 0);
+      BOOST_CHECK_EQUAL(get_balance(joe_id(db), bitcny_id(db)), 100); // 1500 - 100 - 1000 - 300
+
       generate_block();
 
       // adding new feed so we have valid price to exit
@@ -377,6 +422,12 @@ BOOST_AUTO_TEST_CASE( settle_rounding_test )
       current_feed.maximum_short_squeeze_ratio = 1100;
       current_feed.settlement_price = bitusd_id(db).amount( 101 ) / core_id(db).amount(5);
       publish_feed( bitusd_id(db), alice_id(db), current_feed );
+
+      update_feed_producers( bitcny_id(db), {alice_id} );
+      current_feed.maintenance_collateral_ratio = 1750;
+      current_feed.maximum_short_squeeze_ratio = 1100;
+      current_feed.settlement_price = bitcny_id(db).amount( 101 ) / core_id(db).amount(50);
+      publish_feed( bitcny_id(db), alice_id(db), current_feed );
 
       // get to another maintenance interval
       generate_blocks( db.head_block_time() + fc::hours(22) );
@@ -406,6 +457,22 @@ BOOST_AUTO_TEST_CASE( settle_rounding_test )
 
       BOOST_CHECK_EQUAL( bitusd_id(db).dynamic_data(db).current_supply.value, 646 ); // 807 - 161
       BOOST_CHECK_EQUAL( bitusd_id(db).bitasset_data(db).force_settled_volume.value, 161 ); // reset to 0, then 161 more
+
+      // current cny data
+      BOOST_CHECK_EQUAL( settle_id101(db).balance.amount.value, 100 ); // no change since not expired
+      BOOST_CHECK_EQUAL( settle_id102(db).balance.amount.value, 1000 ); // no change since not expired
+      BOOST_CHECK_EQUAL( settle_id103(db).balance.amount.value, 300 ); // no change since not expired
+
+      BOOST_CHECK_EQUAL(get_balance(jim_id(db), core_id(db)), 9998000);
+      BOOST_CHECK_EQUAL(get_balance(jim_id(db), bitcny_id(db)), 500);
+      BOOST_CHECK_EQUAL(get_balance(joe_id(db), core_id(db)), 0);
+      BOOST_CHECK_EQUAL(get_balance(joe_id(db), bitcny_id(db)), 100); // 1500 - 100 - 1000 - 300
+
+      BOOST_CHECK_EQUAL( 2000, call_jim_id(db).debt.value );
+      BOOST_CHECK_EQUAL( 2000, call_jim_id(db).collateral.value );
+
+      BOOST_CHECK_EQUAL( bitcny_id(db).dynamic_data(db).current_supply.value, 2000 );
+      BOOST_CHECK_EQUAL( bitcny_id(db).bitasset_data(db).force_settled_volume.value, 0 );
 
       // bob borrow some
       const call_order_object& call_bob = *borrow( bob_id(db), bitusd_id(db).amount(19), core_id(db).amount(2) );
@@ -459,9 +526,37 @@ BOOST_AUTO_TEST_CASE( settle_rounding_test )
       current_feed.settlement_price = bitusd_id(db).amount( 101 ) / core_id(db).amount(5);
       publish_feed( bitusd_id(db), alice_id(db), current_feed );
 
+      update_feed_producers( bitcny_id(db), {alice_id} );
+      current_feed.maintenance_collateral_ratio = 1750;
+      current_feed.maximum_short_squeeze_ratio = 1100;
+      current_feed.settlement_price = bitcny_id(db).amount( 101 ) / core_id(db).amount(50);
+      publish_feed( bitcny_id(db), alice_id(db), current_feed );
+
       // generate some blocks
       generate_blocks( db.head_block_time() + fc::hours(10) );
       set_expiration( db, trx );
+
+      // check cny
+      // maximum amount that can be settled now is round_down(2000 * 20%) = 400,
+      //   settle_id101's remaining amount is 100, so it can be fully processed,
+      //      according to price 50 core / 101 cny, it will get 49 core and pay 100 cny;
+      //   settle_id102's remaining amount is 1000, so 400-100=300 cny will be processed,
+      //      according to price 50 core / 101 cny, it will get 148 core and pay 300 cny;
+      //   settle_id103 won't be processed since it's after settle_id102
+      BOOST_CHECK( !db.find( settle_id101 ) );
+      BOOST_CHECK_EQUAL( settle_id102(db).balance.amount.value, 700 ); // 1000 - 300
+      BOOST_CHECK_EQUAL( settle_id103(db).balance.amount.value, 300 ); // no change since it's after settle_id102
+
+      BOOST_CHECK_EQUAL(get_balance(jim_id(db), core_id(db)), 9998000);
+      BOOST_CHECK_EQUAL(get_balance(jim_id(db), bitcny_id(db)), 500);
+      BOOST_CHECK_EQUAL(get_balance(joe_id(db), core_id(db)), 197); // 49 + 148
+      BOOST_CHECK_EQUAL(get_balance(joe_id(db), bitcny_id(db)), 100);
+
+      BOOST_CHECK_EQUAL( 1600, call_jim_id(db).debt.value ); // 2000 - 100 - 300
+      BOOST_CHECK_EQUAL( 1803, call_jim_id(db).collateral.value ); // 2000 - 49 - 148
+
+      BOOST_CHECK_EQUAL( bitcny_id(db).dynamic_data(db).current_supply.value, 1600 );
+      BOOST_CHECK_EQUAL( bitcny_id(db).bitasset_data(db).force_settled_volume.value, 400 ); // 100 + 300
 
       // adding new feed so we have valid price to exit
       update_feed_producers( bitusd_id(db), {alice_id} );
@@ -469,6 +564,12 @@ BOOST_AUTO_TEST_CASE( settle_rounding_test )
       current_feed.maximum_short_squeeze_ratio = 1100;
       current_feed.settlement_price = bitusd_id(db).amount( 101 ) / core_id(db).amount(5);
       publish_feed( bitusd_id(db), alice_id(db), current_feed );
+
+      update_feed_producers( bitcny_id(db), {alice_id} );
+      current_feed.maintenance_collateral_ratio = 1750;
+      current_feed.maximum_short_squeeze_ratio = 1100;
+      current_feed.settlement_price = bitcny_id(db).amount( 101 ) / core_id(db).amount(50);
+      publish_feed( bitcny_id(db), alice_id(db), current_feed );
 
       // get to another maintenance interval
       generate_blocks( db.head_block_time() + fc::hours(14) );
@@ -509,6 +610,26 @@ BOOST_AUTO_TEST_CASE( settle_rounding_test )
       BOOST_CHECK_EQUAL( bitusd_id(db).dynamic_data(db).current_supply.value, 529 ); // 661 - 132
       BOOST_CHECK_EQUAL( bitusd_id(db).bitasset_data(db).force_settled_volume.value, 132 ); // reset to 0, then 132 more
 
+      // check cny
+      // maximum amount that can be settled now is round_down(1600 * 20%) = 320,
+      //   settle_id102's remaining amount is 700, so 320 cny will be processed,
+      //      according to price 50 core / 101 cny, it will get 158 core and pay 320 cny;
+      //   settle_id103 won't be processed since it's after settle_id102
+      BOOST_CHECK( !db.find( settle_id101 ) );
+      BOOST_CHECK_EQUAL( settle_id102(db).balance.amount.value, 380 ); // 700 - 320
+      BOOST_CHECK_EQUAL( settle_id103(db).balance.amount.value, 300 ); // no change since it's after settle_id102
+
+      BOOST_CHECK_EQUAL(get_balance(jim_id(db), core_id(db)), 9998000);
+      BOOST_CHECK_EQUAL(get_balance(jim_id(db), bitcny_id(db)), 500);
+      BOOST_CHECK_EQUAL(get_balance(joe_id(db), core_id(db)), 355); // 197 + 158
+      BOOST_CHECK_EQUAL(get_balance(joe_id(db), bitcny_id(db)), 100);
+
+      BOOST_CHECK_EQUAL( 1280, call_jim_id(db).debt.value ); // 1600 - 320
+      BOOST_CHECK_EQUAL( 1645, call_jim_id(db).collateral.value ); // 1803 - 158
+
+      BOOST_CHECK_EQUAL( bitcny_id(db).dynamic_data(db).current_supply.value, 1280 );
+      BOOST_CHECK_EQUAL( bitcny_id(db).bitasset_data(db).force_settled_volume.value, 320 ); // reset to 0, then 320
+
       generate_block();
 
       // Note: the scenario that a big settle order matching several smaller call orders,
@@ -526,12 +647,14 @@ BOOST_AUTO_TEST_CASE( settle_rounding_test_after_hf_184 )
       generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
       set_expiration( db, trx );
 
-      ACTORS((paul)(michael)(rachel)(alice)(bob)(ted));
+      ACTORS((paul)(michael)(rachel)(alice)(bob)(ted)(joe)(jim));
 
       // create assets
       const auto& bitusd = create_bitasset("USDBIT", paul_id);
+      const auto& bitcny = create_bitasset("CNYBIT", paul_id);
       const auto& core   = asset_id_type()(db);
       asset_id_type bitusd_id = bitusd.id;
+      asset_id_type bitcny_id = bitcny.id;
       asset_id_type core_id = core.id;
 
       // fund accounts
@@ -539,6 +662,7 @@ BOOST_AUTO_TEST_CASE( settle_rounding_test_after_hf_184 )
       transfer(committee_account, paul_id, asset(10000000));
       transfer(committee_account, alice_id, asset(10000000));
       transfer(committee_account, bob_id, asset(10000000));
+      transfer(committee_account, jim_id, asset(10000000));
 
       // add a feed to asset
       update_feed_producers( bitusd, {paul.id} );
@@ -706,6 +830,12 @@ BOOST_AUTO_TEST_CASE( settle_rounding_test_after_hf_184 )
       current_feed.settlement_price = bitusd_id(db).amount( 101 ) / core_id(db).amount(5);
       publish_feed( bitusd_id(db), alice_id(db), current_feed );
 
+      update_feed_producers( bitcny_id(db), {alice_id} );
+      current_feed.maintenance_collateral_ratio = 1750;
+      current_feed.maximum_short_squeeze_ratio = 1100;
+      current_feed.settlement_price = bitcny_id(db).amount( 101 ) / core_id(db).amount(50);
+      publish_feed( bitcny_id(db), alice_id(db), current_feed );
+
       // now yes expire settlement
       generate_blocks( db.head_block_time() + fc::hours(22) );
       set_expiration( db, trx );
@@ -830,6 +960,23 @@ BOOST_AUTO_TEST_CASE( settle_rounding_test_after_hf_184 )
       BOOST_CHECK_EQUAL( bitusd_id(db).dynamic_data(db).current_supply.value, 822 ); // 843 - 21
       BOOST_CHECK_EQUAL( bitusd_id(db).bitasset_data(db).force_settled_volume.value, 203 ); // 182 + 21
 
+      // jim borrow some cny
+      call_order_id_type call_jim_id = borrow(jim_id(db), bitcny_id(db).amount(2000), core_id(db).amount(2000))->id;
+
+      BOOST_CHECK_EQUAL( 2000, call_jim_id(db).debt.value );
+      BOOST_CHECK_EQUAL( 2000, call_jim_id(db).collateral.value );
+
+      BOOST_CHECK_EQUAL(get_balance(jim_id(db), core_id(db)), 9998000);
+      BOOST_CHECK_EQUAL(get_balance(jim_id(db), bitcny_id(db)), 2000);
+
+      // jim transfer some cny to joe
+      transfer(jim_id, joe_id, asset(1500, bitcny_id));
+
+      BOOST_CHECK_EQUAL(get_balance(jim_id(db), core_id(db)), 9998000);
+      BOOST_CHECK_EQUAL(get_balance(jim_id(db), bitcny_id(db)), 500);
+      BOOST_CHECK_EQUAL(get_balance(joe_id(db), core_id(db)), 0);
+      BOOST_CHECK_EQUAL(get_balance(joe_id(db), bitcny_id(db)), 1500);
+
       generate_block();
 
       // give ted some usd
@@ -856,6 +1003,23 @@ BOOST_AUTO_TEST_CASE( settle_rounding_test_after_hf_184 )
       BOOST_CHECK_EQUAL(get_balance(ted_id(db), core_id(db)), 0);
       BOOST_CHECK_EQUAL(get_balance(ted_id(db), bitusd_id(db)), 37); // 100 - 20 - 21 - 22
 
+      // joe settle
+      const operation_result result101 = force_settle(joe_id(db), bitcny_id(db).amount(100));
+      const operation_result result102 = force_settle(joe_id(db), bitcny_id(db).amount(1000));
+      const operation_result result103 = force_settle(joe_id(db), bitcny_id(db).amount(300));
+
+      force_settlement_id_type settle_id101 = result101.get<object_id_type>();
+      BOOST_CHECK_EQUAL( settle_id101(db).balance.amount.value, 100 );
+
+      force_settlement_id_type settle_id102 = result102.get<object_id_type>();
+      BOOST_CHECK_EQUAL( settle_id102(db).balance.amount.value, 1000 );
+
+      force_settlement_id_type settle_id103 = result103.get<object_id_type>();
+      BOOST_CHECK_EQUAL( settle_id103(db).balance.amount.value, 300 );
+
+      BOOST_CHECK_EQUAL(get_balance(joe_id(db), core_id(db)), 0);
+      BOOST_CHECK_EQUAL(get_balance(joe_id(db), bitcny_id(db)), 100); // 1500 - 100 - 1000 - 300
+
       generate_block();
 
       // adding new feed so we have valid price to exit
@@ -864,6 +1028,12 @@ BOOST_AUTO_TEST_CASE( settle_rounding_test_after_hf_184 )
       current_feed.maximum_short_squeeze_ratio = 1100;
       current_feed.settlement_price = bitusd_id(db).amount( 101 ) / core_id(db).amount(5);
       publish_feed( bitusd_id(db), alice_id(db), current_feed );
+
+      update_feed_producers( bitcny_id(db), {alice_id} );
+      current_feed.maintenance_collateral_ratio = 1750;
+      current_feed.maximum_short_squeeze_ratio = 1100;
+      current_feed.settlement_price = bitcny_id(db).amount( 101 ) / core_id(db).amount(50);
+      publish_feed( bitcny_id(db), alice_id(db), current_feed );
 
       // get to another maintenance interval
       generate_blocks( db.head_block_time() + fc::hours(22) );
@@ -895,6 +1065,22 @@ BOOST_AUTO_TEST_CASE( settle_rounding_test_after_hf_184 )
 
       BOOST_CHECK_EQUAL( bitusd_id(db).dynamic_data(db).current_supply.value, 660 ); // 822 - 162
       BOOST_CHECK_EQUAL( bitusd_id(db).bitasset_data(db).force_settled_volume.value, 162 ); // reset to 0, then 162 more
+
+      // current cny data
+      BOOST_CHECK_EQUAL( settle_id101(db).balance.amount.value, 100 ); // no change since not expired
+      BOOST_CHECK_EQUAL( settle_id102(db).balance.amount.value, 1000 ); // no change since not expired
+      BOOST_CHECK_EQUAL( settle_id103(db).balance.amount.value, 300 ); // no change since not expired
+
+      BOOST_CHECK_EQUAL(get_balance(jim_id(db), core_id(db)), 9998000);
+      BOOST_CHECK_EQUAL(get_balance(jim_id(db), bitcny_id(db)), 500);
+      BOOST_CHECK_EQUAL(get_balance(joe_id(db), core_id(db)), 0);
+      BOOST_CHECK_EQUAL(get_balance(joe_id(db), bitcny_id(db)), 100); // 1500 - 100 - 1000 - 300
+
+      BOOST_CHECK_EQUAL( 2000, call_jim_id(db).debt.value );
+      BOOST_CHECK_EQUAL( 2000, call_jim_id(db).collateral.value );
+
+      BOOST_CHECK_EQUAL( bitcny_id(db).dynamic_data(db).current_supply.value, 2000 );
+      BOOST_CHECK_EQUAL( bitcny_id(db).bitasset_data(db).force_settled_volume.value, 0 );
 
       // bob borrow some
       const call_order_object& call_bob = *borrow( bob_id(db), bitusd_id(db).amount(19), core_id(db).amount(2) );
@@ -949,9 +1135,37 @@ BOOST_AUTO_TEST_CASE( settle_rounding_test_after_hf_184 )
       current_feed.settlement_price = bitusd_id(db).amount( 101 ) / core_id(db).amount(5);
       publish_feed( bitusd_id(db), alice_id(db), current_feed );
 
+      update_feed_producers( bitcny_id(db), {alice_id} );
+      current_feed.maintenance_collateral_ratio = 1750;
+      current_feed.maximum_short_squeeze_ratio = 1100;
+      current_feed.settlement_price = bitcny_id(db).amount( 101 ) / core_id(db).amount(50);
+      publish_feed( bitcny_id(db), alice_id(db), current_feed );
+
       // generate some blocks
       generate_blocks( db.head_block_time() + fc::hours(10) );
       set_expiration( db, trx );
+
+      // check cny
+      // maximum amount that can be settled now is round_down(2000 * 20%) = 400,
+      //   settle_id101's remaining amount is 100, so it can be fully processed,
+      //      according to price 50 core / 101 cny, it will get 49 core and pay 99 cny, the rest (1 cny) will be refunded;
+      //   settle_id102's remaining amount is 1000, so 400-99=301 cny will be processed,
+      //      according to price 50 core / 101 cny, it will get 149 core and pay 301 cny;
+      //   settle_id103 won't be processed since it's after settle_id102
+      BOOST_CHECK( !db.find( settle_id101 ) );
+      BOOST_CHECK_EQUAL( settle_id102(db).balance.amount.value, 699 ); // 1000 - 301
+      BOOST_CHECK_EQUAL( settle_id103(db).balance.amount.value, 300 ); // no change since it's after settle_id102
+
+      BOOST_CHECK_EQUAL(get_balance(jim_id(db), core_id(db)), 9998000);
+      BOOST_CHECK_EQUAL(get_balance(jim_id(db), bitcny_id(db)), 500);
+      BOOST_CHECK_EQUAL(get_balance(joe_id(db), core_id(db)), 198); // 49 + 149
+      BOOST_CHECK_EQUAL(get_balance(joe_id(db), bitcny_id(db)), 101); // 100 + 1
+
+      BOOST_CHECK_EQUAL( 1600, call_jim_id(db).debt.value ); // 2000 - 99 - 301
+      BOOST_CHECK_EQUAL( 1802, call_jim_id(db).collateral.value ); // 2000 - 49 - 149
+
+      BOOST_CHECK_EQUAL( bitcny_id(db).dynamic_data(db).current_supply.value, 1600 );
+      BOOST_CHECK_EQUAL( bitcny_id(db).bitasset_data(db).force_settled_volume.value, 400 ); // 99 + 301
 
       // adding new feed so we have valid price to exit
       update_feed_producers( bitusd_id(db), {alice_id} );
@@ -959,6 +1173,12 @@ BOOST_AUTO_TEST_CASE( settle_rounding_test_after_hf_184 )
       current_feed.maximum_short_squeeze_ratio = 1100;
       current_feed.settlement_price = bitusd_id(db).amount( 101 ) / core_id(db).amount(5);
       publish_feed( bitusd_id(db), alice_id(db), current_feed );
+
+      update_feed_producers( bitcny_id(db), {alice_id} );
+      current_feed.maintenance_collateral_ratio = 1750;
+      current_feed.maximum_short_squeeze_ratio = 1100;
+      current_feed.settlement_price = bitcny_id(db).amount( 101 ) / core_id(db).amount(50);
+      publish_feed( bitcny_id(db), alice_id(db), current_feed );
 
       // get to another maintenance interval
       generate_blocks( db.head_block_time() + fc::hours(14) );
@@ -1001,6 +1221,26 @@ BOOST_AUTO_TEST_CASE( settle_rounding_test_after_hf_184 )
 
       BOOST_CHECK_EQUAL( bitusd_id(db).dynamic_data(db).current_supply.value, 577 ); // 679 - 19 - 41 - 21 - 21
       BOOST_CHECK_EQUAL( bitusd_id(db).bitasset_data(db).force_settled_volume.value, 102 ); // reset to 0, then 19 + 41 + 21 + 21
+
+      // check cny
+      // maximum amount that can be settled now is round_down(1600 * 20%) = 320,
+      //   settle_id102's remaining amount is 699, so 320 cny will be processed,
+      //      according to price 50 core / 101 cny, it will get 158 core and pay 320 cny;
+      //   settle_id103 won't be processed since it's after settle_id102
+      BOOST_CHECK( !db.find( settle_id101 ) );
+      BOOST_CHECK_EQUAL( settle_id102(db).balance.amount.value, 379 ); // 699 - 320
+      BOOST_CHECK_EQUAL( settle_id103(db).balance.amount.value, 300 ); // no change since it's after settle_id102
+
+      BOOST_CHECK_EQUAL(get_balance(jim_id(db), core_id(db)), 9998000);
+      BOOST_CHECK_EQUAL(get_balance(jim_id(db), bitcny_id(db)), 500);
+      BOOST_CHECK_EQUAL(get_balance(joe_id(db), core_id(db)), 356); // 198 + 158
+      BOOST_CHECK_EQUAL(get_balance(joe_id(db), bitcny_id(db)), 101);
+
+      BOOST_CHECK_EQUAL( 1280, call_jim_id(db).debt.value ); // 1600 - 320
+      BOOST_CHECK_EQUAL( 1644, call_jim_id(db).collateral.value ); // 1802 - 158
+
+      BOOST_CHECK_EQUAL( bitcny_id(db).dynamic_data(db).current_supply.value, 1280 );
+      BOOST_CHECK_EQUAL( bitcny_id(db).bitasset_data(db).force_settled_volume.value, 320 ); // reset to 0, then 320
 
       generate_block();
 
