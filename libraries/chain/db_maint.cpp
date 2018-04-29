@@ -773,22 +773,17 @@ void database::process_bitassets()
          modify(d, [this](asset_bitasset_data_object &o) {
             o.force_settled_volume = 0; // Reset all BitAsset force settlement volumes to zero
             // Check if asset is smartcoin
-            if (o.feeds.size() > 0) {
-               const auto &settlement_price = o.feeds.begin()->second.second.settlement_price;
-               if (!settlement_price.is_null()) {
-                  const auto &asset = get(settlement_price.base.asset_id);
-                  auto flags = asset.options.flags;
-                  if ((flags & witness_fed_asset) || (flags & committee_fed_asset)) { // if smartcoin
-                     // check overflow
-                     if (std::numeric_limits<uint32_t>::max() - o.options.feed_lifetime_sec > head_block_time().sec_since_epoch()) {
-                        fc::time_point_sec calculate = head_block_time() - o.options.feed_lifetime_sec;
-                         for (auto itr = o.feeds.rbegin(); itr != o.feeds.rend();) { // loop feeds
-                            auto feed_time = itr->second.first;
-                            std::advance(itr, 1);
-                            if (feed_time < calculate)
-                               o.feeds.erase(itr.base()); // delete expired feed
-                         }
-                     }
+            const auto &asset = get(o.asset_id);
+            auto flags = asset.options.flags;
+            if ((flags & witness_fed_asset) || (flags & committee_fed_asset)) { // if smartcoin
+               // check overflow
+               if (std::numeric_limits<uint32_t>::max() - o.options.feed_lifetime_sec > head_block_time().sec_since_epoch()) {
+                  fc::time_point_sec calculate = head_block_time() - o.options.feed_lifetime_sec;
+                  for (auto itr = o.feeds.rbegin(); itr != o.feeds.rend();) { // loop feeds
+                     auto feed_time = itr->second.first;
+                     std::advance(itr, 1);
+                     if (feed_time < calculate)
+                        o.feeds.erase(itr.base()); // delete expired feed
                   }
                }
             }
