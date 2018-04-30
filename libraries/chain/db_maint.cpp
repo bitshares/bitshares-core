@@ -768,18 +768,24 @@ void database::process_bids( const asset_bitasset_data_object& bad )
 
 void database::process_bitassets()
 {
-   if(head_block_time() >= HARDFORK_CORE_518_TIME) {
-      for( const auto& d : get_index_type<asset_bitasset_data_index>().indices() ) {
-         modify(d, [this](asset_bitasset_data_object &o) {
+   if(head_block_time() >= HARDFORK_CORE_518_TIME)
+   {
+      for( const auto& d : get_index_type<asset_bitasset_data_index>().indices() )
+      {
+         modify(d, [this](asset_bitasset_data_object &o)
+         {
             o.force_settled_volume = 0; // Reset all BitAsset force settlement volumes to zero
-            // Check if asset is smartcoin
+
             const auto &asset = get(o.asset_id);
             auto flags = asset.options.flags;
-            if ((flags & witness_fed_asset) || (flags & committee_fed_asset)) { // if smartcoin
+            if ((flags & witness_fed_asset) || (flags & committee_fed_asset)) // if smartcoin
+            {
                // check overflow
-               if (std::numeric_limits<uint32_t>::max() - o.options.feed_lifetime_sec > head_block_time().sec_since_epoch()) {
+               if (std::numeric_limits<uint32_t>::max() - o.options.feed_lifetime_sec > head_block_time().sec_since_epoch())
+               {
                   fc::time_point_sec calculate = head_block_time() - o.options.feed_lifetime_sec;
-                  for (auto itr = o.feeds.rbegin(); itr != o.feeds.rend();) { // loop feeds
+                  for (auto itr = o.feeds.rbegin(); itr != o.feeds.rend();) // loop feeds
+                  {
                      auto feed_time = itr->second.first;
                      std::advance(itr, 1);
                      if (feed_time < calculate)
@@ -793,7 +799,8 @@ void database::process_bitassets()
       }
    }
    else {
-      for( const auto& d : get_index_type<asset_bitasset_data_index>().indices() ) {
+      for( const auto& d : get_index_type<asset_bitasset_data_index>().indices() )
+      {
          // Reset all BitAsset force settlement volumes to zero
          modify(d, [](asset_bitasset_data_object &o) { o.force_settled_volume = 0; });
          if (d.has_settlement())
