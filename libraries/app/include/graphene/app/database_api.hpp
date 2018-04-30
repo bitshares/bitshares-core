@@ -269,19 +269,23 @@ class database_api
       vector<optional<account_object>> get_accounts(const vector<account_id_type>& account_ids)const;
 
       /**
-       * @brief Fetch all orders relevant to the specified accounts and subscribe to updates
-       * @param name_or_id Each item must be the name or ID of an account to retrieve
-       * @param start_id Only fetch orders with id before this
+       * @brief Fetch all orders relevant to the specified accounts sorted descendingly by price
+       *
+       * @param name_or_id  Each item must be the name or ID of an account to retrieve
+       * @param base  Base asset
+       * @param quote  Quote asset
        * @param limit  Max items to fetch
+       * @param start_id  Start order id, fetch orders which price lower than this order
+       * @param start_price  Fetch orders with price lower than this price
        *
        * @return List of orders from @ref name_or_id to the corresponding account
        *
-       * This function fetches all relevant orders for the given accounts, and subscribes to updates to the given
-       * accounts. If @ref name_or_id cannot be tied to an account, empty results will
-       * be returned
-       *
+       * @note
+       * 1. if @ref name_or_id cannot be tied to an account, empty results will be returned
+       * 2. @ref start_id and @ref start_price can be empty, if so the api will return the "first page" of orders;
+       *    if start_id is specified and valid, its price will be used to do page quer preferentially, otherwise the start_price will be used 
        */
-      vector<limit_order_object> get_account_limit_orders( const string& name_or_id, limit_order_id_type start_id, uint32_t limit = 100);
+      vector<limit_order_object> get_account_limit_orders( const string& name_or_id, const string &base, const string &quote, uint32_t limit = 100, limit_order_id_type start_id = limit_order_id_type(), price start_price = price());
 
       /**
        * @brief Fetch all objects relevant to the specified accounts and subscribe to updates

@@ -388,7 +388,7 @@ class wallet_api
        */
       full_account                      get_full_account( const string& name_or_id);
       vector<bucket_object>             get_market_history(string symbol, string symbol2, uint32_t bucket, fc::time_point_sec start, fc::time_point_sec end)const;
-      vector<limit_order_object>        get_account_limit_orders( const string& name_or_id, limit_order_id_type start_id, uint32_t limit);
+      vector<limit_order_object>        get_account_limit_orders( const string& name_or_id, const string &base, const string &quote, uint32_t limit = 100, limit_order_id_type start_id = limit_order_id_type(), price start_price = price());
       vector<limit_order_object>        get_limit_orders(string a, string b, uint32_t limit)const;
       vector<call_order_object>         get_call_orders(string a, uint32_t limit)const;
       vector<force_settlement_object>   get_settle_orders(string a, uint32_t limit)const;

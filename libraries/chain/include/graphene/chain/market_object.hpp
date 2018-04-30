@@ -89,10 +89,10 @@ typedef multi_index_container<
       ordered_unique< tag<by_account>,
          composite_key< limit_order_object,
             member<limit_order_object, account_id_type, &limit_order_object::seller>,
-            member<object, object_id_type, &object::id>,
-            member<limit_order_object, price, &limit_order_object::sell_price>
+            member<limit_order_object, price, &limit_order_object::sell_price>,
+            member<object, object_id_type, &object::id>
          >,
-         composite_key_compare<std::less<account_id_type>, std::less<object_id_type>, std::greater<price>>
+         composite_key_compare<std::less<account_id_type>, std::greater<price>, std::less<object_id_type>>
       >
    >
 > limit_order_multi_index_type;
