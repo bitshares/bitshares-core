@@ -271,9 +271,7 @@ class database_api
       /**
        * @brief Fetch all orders relevant to the specified accounts and subscribe to updates
        * @param name_or_id Each item must be the name or ID of an account to retrieve
-       * @param base
-       * @param quote
-       * @param expire Only fetch orders before expiration time
+       * @param start_id Only fetch orders with id before this
        * @param limit  Max items to fetch
        *
        * @return List of orders from @ref name_or_id to the corresponding account
@@ -283,7 +281,7 @@ class database_api
        * be returned
        *
        */
-      vector<limit_order_object> get_account_limit_orders( const string& name_or_id, const string& base, const string& quote, fc::time_point_sec expire, uint32_t limit = 100);
+      vector<limit_order_object> get_account_limit_orders( const string& name_or_id, limit_order_id_type start_id, uint32_t limit = 100);
 
       /**
        * @brief Fetch all objects relevant to the specified accounts and subscribe to updates

@@ -82,7 +82,7 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
 
       // Accounts
       vector<optional<account_object>> get_accounts(const vector<account_id_type>& account_ids)const;
-      vector<limit_order_object> get_account_limit_orders( const string& name_or_id, const string& base, const string& quote, fc::time_point_sec expire, uint32_t limit);
+      vector<limit_order_object> get_account_limit_orders( const string& name_or_id, limit_order_id_type start_id, uint32_t limit);
       std::map<string,full_account> get_full_accounts( const vector<string>& names_or_ids, bool subscribe );
       optional<account_object> get_account_by_name( string name )const;
       vector<account_id_type> get_account_references( account_id_type account_id )const;
@@ -625,12 +625,12 @@ vector<optional<account_object>> database_api_impl::get_accounts(const vector<ac
    return result;
 }
 
-vector<limit_order_object> database_api::get_account_limit_orders( const string& name_or_id, const string& base, const string& quote, fc::time_point_sec expire, uint32_t limit)
+vector<limit_order_object> database_api::get_account_limit_orders( const string& name_or_id, limit_order_id_type start_id, uint32_t limit)
 {
-   return my->get_account_limit_orders( name_or_id, base, quote, expire, limit );
+   return my->get_account_limit_orders( name_or_id, start_id, limit );
 }
 
-vector<limit_order_object> database_api_impl::get_account_limit_orders( const string& name_or_id, const string& base, const string& quote, object_id_type start_id, uint32_t limit)
+vector<limit_order_object> database_api_impl::get_account_limit_orders( const string& name_or_id, limit_order_id_type start_id, uint32_t limit)
 {
    FC_ASSERT( limit <= 100 );
 
@@ -650,19 +650,14 @@ vector<limit_order_object> database_api_impl::get_account_limit_orders( const st
    if (account == nullptr)
        return results;
 
-   auto assets = lookup_asset_symbols( {base, quote} );
-   auto base_id = assets[0]->id;
-   auto quote_id = assets[1]->id;
+   const limit_order_object &loo = _db.get(start_id);
 
    // Add the account's orders
-   auto lower_itr = _db.get_index_type<limit_order_index>().indices().get<by_account>().lower_bound(std::make_tuple(account->id, price::max(base_id, quote_id)));
-   auto upper_itr = _db.get_index_type<limit_order_index>().indices().get<by_account>().upper_bound(std::make_tuple(account->id, price::min(base_id, quote_id)));
+   auto lower_itr = _db.get_index_type<limit_order_index>().indices().get<by_account>().lower_bound(std::make_tuple(account->id, loo.id, loo.sell_price.max()));
+   auto upper_itr = _db.get_index_type<limit_order_index>().indices().get<by_account>().upper_bound(std::make_tuple(account->id, loo.id, loo.sell_price.min()));
 
    for ( ; lower_itr != upper_itr ; ++lower_itr) {
       const limit_order_object &order = *lower_itr;
-
-      if (order.expiration > expire)
-         continue;
 
       if (count++ >= limit)
          break;
