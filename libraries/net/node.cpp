@@ -58,6 +58,7 @@
 #include <boost/preprocessor/cat.hpp>
 #include <boost/preprocessor/stringize.hpp>
 
+#include <fc/asio.hpp>
 #include <fc/thread/thread.hpp>
 #include <fc/thread/future.hpp>
 #include <fc/thread/non_preemptable_scope_check.hpp>
@@ -90,7 +91,7 @@
 #endif
 #define DEFAULT_LOGGER "p2p"
 
-#define P2P_IN_DEDICATED_THREAD 1
+//#define P2P_IN_DEDICATED_THREAD 1
 
 #define INVOCATION_COUNTER(name) \
     static unsigned total_ ## name ## _counter = 0; \
@@ -4114,7 +4115,8 @@ namespace graphene { namespace net { namespace detail {
              !_dump_node_status_task_done.valid());
       if (_node_configuration.accept_incoming_connections)
         _accept_loop_complete = fc::async( [=](){ accept_loop(); }, "accept_loop");
-      _p2p_network_connect_loop_done = fc::async( [=]() { p2p_network_connect_loop(); }, "p2p_network_connect_loop" );
+      //_p2p_network_connect_loop_done = fc::async( [=]() { p2p_network_connect_loop(); }, "p2p_network_connect_loop" );
+      fc::asio::default_io_service().post([=]() { p2p_network_connect_loop(); });
       _fetch_sync_items_loop_done = fc::async( [=]() { fetch_sync_items_loop(); }, "fetch_sync_items_loop" );
       _fetch_item_loop_done = fc::async( [=]() { fetch_items_loop(); }, "fetch_items_loop" );
       _advertise_inventory_loop_done = fc::async( [=]() { advertise_inventory_loop(); }, "advertise_inventory_loop" );
