@@ -404,7 +404,7 @@ void_result asset_update_bitasset_evaluator::do_apply(const asset_update_bitasse
       // feeds must be reset if the backing asset is changed
       bool backing_asset_changed = false;
       bool is_witness_or_committee_fed = false;
-      if (op.new_options.short_backing_asset != bitasset_to_update->options.short_backing_asset)
+      if (db().head_block_time() >= HARDFORK_CORE_868_TIME && op.new_options.short_backing_asset != bitasset_to_update->options.short_backing_asset)
       {
          backing_asset_changed = true;
          const asset_object& base_asset = op.asset_to_update(db());
@@ -607,12 +607,20 @@ void_result asset_publish_feeds_evaluator::do_evaluate(const asset_publish_feed_
       FC_ASSERT( !bitasset.has_settlement(), "No further feeds may be published after a settlement event" );
    }
 
+   // the settlement price must be quoted in terms of the backing asset
    FC_ASSERT( o.feed.settlement_price.quote.asset_id == bitasset.options.short_backing_asset );
+
    if( d.head_block_time() > HARDFORK_480_TIME )
    {
       if( !o.feed.core_exchange_rate.is_null() )
       {
-         FC_ASSERT( o.feed.core_exchange_rate.quote.asset_id == asset_id_type() );
+         if (bitasset.options.short_backing_asset != asset_id_type()) {
+            // on a non-CORE backed asset, the quote asset cannot be null
+            FC_ASSERT( o.feed.core_exchange_rate.quote.asset_id != asset_id_type() );
+         } else {
+            // on a CORE backed asset, the quote should not have an asset.
+            FC_ASSERT( o.feed.core_exchange_rate.quote.asset_id == asset_id_type() );
+         }
       }
    }
    else

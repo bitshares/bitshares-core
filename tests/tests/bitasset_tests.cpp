@@ -47,9 +47,20 @@ using namespace graphene::chain::test;
 
 BOOST_FIXTURE_TEST_SUITE( bitasset_tests, database_fixture )
 
-BOOST_AUTO_TEST_CASE( reset_backing_asset_on_witness_asset )
+BOOST_AUTO_TEST_CASE( reset_backing_asset_on_witness_asset)
 {
    ACTORS((nathan));
+
+   /*
+       // do a maintenance block
+      generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+      // generate blocks until close to hard fork
+      generate_blocks( HARDFORK_CORE_868_TIME - fc::hours(1) );
+    */
+
+   BOOST_TEST_MESSAGE("Advance to near hard fork");
+   generate_blocks( HARDFORK_CORE_868_TIME - fc::days(1));
+   trx.set_expiration(HARDFORK_CORE_868_TIME - fc::seconds(1));
 
    BOOST_TEST_MESSAGE("Create USDBIT");
    asset_id_type bit_usd_id = create_bitasset("USDBIT").id;
@@ -167,9 +178,9 @@ BOOST_AUTO_TEST_CASE( reset_backing_asset_on_witness_asset )
       generate_block();
       trx.clear();
 
-      BOOST_TEST_MESSAGE("Verify feed producers have been reset");
+      BOOST_TEST_MESSAGE("Verify feed producers have not been reset");
       const asset_bitasset_data_object& jmj_obj = bit_jmj_id(db).bitasset_data(db);
-      BOOST_CHECK_EQUAL(jmj_obj.feeds.size(), 0);
+      BOOST_CHECK_EQUAL(jmj_obj.feeds.size(), 3);
    }
    {
       BOOST_TEST_MESSAGE("With underlying bitasset changed from one to another, price feeds should still be publish-able");
@@ -184,15 +195,61 @@ BOOST_AUTO_TEST_CASE( reset_backing_asset_on_witness_asset )
       PUSH_TX( db, trx, ~0 );
 
       const asset_bitasset_data_object& bitasset = bit_jmj_id(db).bitasset_data(db);
+      BOOST_CHECK_EQUAL(bitasset.current_feed.settlement_price.to_real(), 1);
+      BOOST_CHECK(bitasset.current_feed.maintenance_collateral_ratio == GRAPHENE_DEFAULT_MAINTENANCE_COLLATERAL_RATIO);
+
+      BOOST_CHECK(bitasset.current_feed.core_exchange_rate.base.asset_id != bitasset.current_feed.core_exchange_rate.quote.asset_id);
+   }
+
+   BOOST_TEST_MESSAGE("Advance to after hard fork");
+   generate_blocks( HARDFORK_CORE_868_TIME + fc::days(1));
+   trx.set_expiration(HARDFORK_CORE_868_TIME + fc::hours(46));
+
+   {
+      BOOST_TEST_MESSAGE("After hardfork, change underlying asset of bit_jmj from core to bit_usd");
+      asset_update_bitasset_operation ba_op;
+      const asset_object& obj = bit_jmj_id(db);
+      ba_op.asset_to_update = bit_jmj_id;
+      ba_op.issuer = obj.issuer;
+      ba_op.new_options.short_backing_asset = bit_usd_id;
+      trx.operations.push_back(ba_op);
+      sign(trx, nathan_private_key);
+      PUSH_TX(db, trx, ~0);
+      generate_block();
+      trx.clear();
+
+      BOOST_TEST_MESSAGE("Verify feed producers have been reset");
+      const asset_bitasset_data_object& jmj_obj = bit_jmj_id(db).bitasset_data(db);
+      BOOST_CHECK_EQUAL(jmj_obj.feeds.size(), 0);
+   }
+   {
+      BOOST_TEST_MESSAGE("With underlying bitasset changed from one to another, price feeds should still be publish-able");
+      BOOST_TEST_MESSAGE("Re-Adding Witness 1 price feed");
+      const asset_object& bit_jmj = bit_jmj_id(db);
+      const asset_object& bit_usd = bit_usd_id(db);
+      asset_publish_feed_operation op;
+      op.publisher = active_witnesses[0];
+      op.asset_id = bit_jmj_id;
+      op.feed.settlement_price = op.feed.core_exchange_rate = ~price(bit_usd.amount(1),bit_jmj.amount(30));
+      trx.operations.push_back(op);
+      PUSH_TX( db, trx, ~0 );
+
+      const asset_bitasset_data_object& bitasset = bit_jmj_id(db).bitasset_data(db);
       BOOST_CHECK_EQUAL(bitasset.current_feed.settlement_price.to_real(), 30);
       BOOST_CHECK(bitasset.current_feed.maintenance_collateral_ratio == GRAPHENE_DEFAULT_MAINTENANCE_COLLATERAL_RATIO);
 
       BOOST_CHECK(bitasset.current_feed.core_exchange_rate.base.asset_id != bitasset.current_feed.core_exchange_rate.quote.asset_id);
-   }}
+   }
+}
 
-BOOST_AUTO_TEST_CASE( reset_backing_asset_on_non_witness_asset )
+BOOST_AUTO_TEST_CASE( reset_backing_asset_on_non_witness_asset)
 {
    ACTORS((nathan)(dan)(ben)(vikram));
+
+   BOOST_TEST_MESSAGE("Advance to near hard fork");
+   generate_blocks( HARDFORK_CORE_868_TIME - fc::days(1));
+   trx.set_expiration(HARDFORK_CORE_868_TIME - fc::seconds(1));
+
 
    BOOST_TEST_MESSAGE("Create USDBIT");
    asset_id_type bit_usd_id = create_bitasset("USDBIT").id;
@@ -333,6 +390,30 @@ BOOST_AUTO_TEST_CASE( reset_backing_asset_on_non_witness_asset )
       generate_block();
       trx.clear();
 
+      BOOST_TEST_MESSAGE("Verify feed producers have not been reset");
+      const asset_bitasset_data_object& jmj_obj = bit_jmj_id(db).bitasset_data(db);
+      BOOST_CHECK_EQUAL(jmj_obj.feeds.size(), 3);
+      for(auto feed : jmj_obj.feeds) {
+         BOOST_CHECK(!std::isnan(feed.second.second.settlement_price.to_real()));
+      }
+   }
+   {
+      BOOST_TEST_MESSAGE("Advance to past hard fork");
+      generate_blocks( HARDFORK_CORE_868_TIME + fc::days(1));
+      trx.set_expiration(HARDFORK_CORE_868_TIME + fc::hours(48));
+
+      BOOST_TEST_MESSAGE("After hardfork, change underlying asset of bit_jmj from core to bit_usd");
+      asset_update_bitasset_operation ba_op;
+      const asset_object& obj = bit_jmj_id(db);
+      ba_op.asset_to_update = bit_jmj_id;
+      ba_op.issuer = obj.issuer;
+      ba_op.new_options.short_backing_asset = bit_usd_id;
+      trx.operations.push_back(ba_op);
+      sign(trx, nathan_private_key);
+      PUSH_TX(db, trx, ~0);
+      generate_block();
+      trx.clear();
+
       BOOST_TEST_MESSAGE("Verify feed producers have been reset");
       const asset_bitasset_data_object& jmj_obj = bit_jmj_id(db).bitasset_data(db);
       BOOST_CHECK_EQUAL(jmj_obj.feeds.size(), 3);
@@ -344,34 +425,34 @@ BOOST_AUTO_TEST_CASE( reset_backing_asset_on_non_witness_asset )
       BOOST_TEST_MESSAGE("With underlying bitasset changed from one to another, price feeds should still be publish-able");
       BOOST_TEST_MESSAGE("Adding Vikram's price feed");
       const asset_object& bit_jmj = bit_jmj_id(db);
-      const asset_object& core = core_id(db);
+      const asset_object& bit_usd = bit_usd_id(db);
       asset_publish_feed_operation op;
       op.publisher = vikram_id;
       op.asset_id = bit_jmj_id;
-      op.feed.settlement_price = op.feed.core_exchange_rate = ~price(core.amount(1),bit_jmj.amount(30));
+      op.feed.settlement_price = op.feed.core_exchange_rate = ~price(bit_usd.amount(1),bit_jmj.amount(30));
       trx.operations.push_back(op);
       PUSH_TX( db, trx, ~0 );
 
       const asset_bitasset_data_object& bitasset = bit_jmj_id(db).bitasset_data(db);
-      BOOST_CHECK(std::isnan(bitasset.current_feed.settlement_price.to_real()));
+      BOOST_CHECK_EQUAL(bitasset.current_feed.settlement_price.to_real(), 30);
       BOOST_CHECK(bitasset.current_feed.maintenance_collateral_ratio == GRAPHENE_DEFAULT_MAINTENANCE_COLLATERAL_RATIO);
 
       BOOST_TEST_MESSAGE("Adding Ben's pricing to JMJBIT");
       op.publisher = ben_id;
-      op.feed.settlement_price = op.feed.core_exchange_rate = ~price(core.amount(1),bit_jmj.amount(25));
-      trx.operations.push_back(op);
-      PUSH_TX( db, trx, ~0 );
-
-      BOOST_CHECK_EQUAL(bitasset.current_feed.settlement_price.to_real(), 25);
-      BOOST_CHECK(bitasset.current_feed.maintenance_collateral_ratio == GRAPHENE_DEFAULT_MAINTENANCE_COLLATERAL_RATIO);
-
-      BOOST_TEST_MESSAGE("Adding Dan's pricing to JMJBIT");
-      op.publisher = dan_id;
-      op.feed.settlement_price = op.feed.core_exchange_rate = ~price(core.amount(1),bit_jmj.amount(100));
+      op.feed.settlement_price = op.feed.core_exchange_rate = ~price(bit_usd.amount(1),bit_jmj.amount(25));
       trx.operations.push_back(op);
       PUSH_TX( db, trx, ~0 );
 
       BOOST_CHECK_EQUAL(bitasset.current_feed.settlement_price.to_real(), 30);
+      BOOST_CHECK(bitasset.current_feed.maintenance_collateral_ratio == GRAPHENE_DEFAULT_MAINTENANCE_COLLATERAL_RATIO);
+
+      BOOST_TEST_MESSAGE("Adding Dan's pricing to JMJBIT");
+      op.publisher = dan_id;
+      op.feed.settlement_price = op.feed.core_exchange_rate = ~price(bit_usd.amount(1),bit_jmj.amount(10));
+      trx.operations.push_back(op);
+      PUSH_TX( db, trx, ~0 );
+
+      BOOST_CHECK_EQUAL(bitasset.current_feed.settlement_price.to_real(), 25);
       BOOST_CHECK(bitasset.current_feed.maintenance_collateral_ratio == GRAPHENE_DEFAULT_MAINTENANCE_COLLATERAL_RATIO);
       generate_block();
       trx.clear();
