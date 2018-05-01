@@ -628,7 +628,7 @@ BOOST_AUTO_TEST_CASE( call_order_update_target_cr_hardfork_time_test )
       GRAPHENE_REQUIRE_THROW( borrow( alice, bitusd.amount(100000), core.amount(400000), 1751 ), fc::assert_exception );
       GRAPHENE_REQUIRE_THROW( borrow( alice, bitusd.amount(100000), core.amount(400000), 65535 ), fc::assert_exception );
 
-      auto call_update_proposal = [&]( const account_object& proposer,
+      auto call_update_proposal = [this]( const account_object& proposer,
                                        const account_object& updater,
                                        const asset& delta_collateral,
                                        const asset& delta_debt,
@@ -652,7 +652,7 @@ BOOST_AUTO_TEST_CASE( call_order_update_target_cr_hardfork_time_test )
          tx.operations.push_back( prop );
          db.current_fee_schedule().set_fee( tx.operations.back() );
          set_expiration( db, tx );
-         db.push_transaction(trx, ~0);
+         db.push_transaction( tx, ~0 );
       };
 
       BOOST_TEST_MESSAGE( "bob tries to propose a proposal with target_cr set, "
