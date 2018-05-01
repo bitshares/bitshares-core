@@ -285,7 +285,7 @@ class database_api
        * 2. @ref start_id and @ref start_price can be empty, if so the api will return the "first page" of orders;
        *    if start_id is specified and valid, its price will be used to do page quer preferentially, otherwise the start_price will be used 
        */
-      vector<limit_order_object> get_account_limit_orders( const string& name_or_id, const string &base, const string &quote, uint32_t limit = 100, limit_order_id_type start_id = limit_order_id_type(), price start_price = price());
+      vector<limit_order_object> get_account_limit_orders( const string& name_or_id, const string &base, const string &quote, uint32_t limit = 100, optional<limit_order_id_type> ostart_id = optional<limit_order_id_type>(), optional<price> ostart_price = optional<price>());
 
       /**
        * @brief Fetch all objects relevant to the specified accounts and subscribe to updates
