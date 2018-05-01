@@ -388,7 +388,31 @@ class wallet_api
        */
       full_account                      get_full_account( const string& name_or_id);
       vector<bucket_object>             get_market_history(string symbol, string symbol2, uint32_t bucket, fc::time_point_sec start, fc::time_point_sec end)const;
-      vector<limit_order_object>        get_account_limit_orders( const string& name_or_id, const string &base, const string &quote, uint32_t limit = 100, optional<limit_order_id_type> ostart_id = optional<limit_order_id_type>(), optional<price> ostart_price = optional<price>());
+
+      /**
+       * @brief Fetch all orders relevant to the specified account sorted descendingly by price
+       *
+       * @param name_or_id  The name or ID of an account to retrieve
+       * @param base  Base asset
+       * @param quote  Quote asset
+       * @param limit  The limitation of items each query can fetch, currently 101
+       * @param start_id  Start order id, fetch orders which price are lower than or equal to this order
+       * @param start_price  Fetch orders with price lower than or equal to this price
+       *
+       * @return List of orders from @ref name_or_id to the corresponding account
+       *
+       * @note
+       * 1. if @ref name_or_id cannot be tied to an account, empty result will be returned
+       * 2. @ref start_id and @ref start_price can be empty, if so the api will return the "first page" of orders;
+       *    if start_id is specified and valid, its price will be used to do page query preferentially, otherwise the start_price will be used 
+       */
+      vector<limit_order_object>        get_account_limit_orders( const string& name_or_id,
+                                            const string &base,
+                                            const string &quote,
+                                            uint32_t limit = 100,
+                                            optional<limit_order_id_type> ostart_id = optional<limit_order_id_type>(),
+                                            optional<price> ostart_price = optional<price>());
+
       vector<limit_order_object>        get_limit_orders(string a, string b, uint32_t limit)const;
       vector<call_order_object>         get_call_orders(string a, uint32_t limit)const;
       vector<force_settlement_object>   get_settle_orders(string a, uint32_t limit)const;
