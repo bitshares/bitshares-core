@@ -409,7 +409,7 @@ class wallet_api
       vector<limit_order_object>        get_account_limit_orders( const string& name_or_id,
                                             const string &base,
                                             const string &quote,
-                                            uint32_t limit = 100,
+                                            uint32_t limit = 101,
                                             optional<limit_order_id_type> ostart_id = optional<limit_order_id_type>(),
                                             optional<price> ostart_price = optional<price>());
 

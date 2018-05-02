@@ -2935,7 +2935,12 @@ vector<bucket_object> wallet_api::get_market_history( string symbol1, string sym
    return my->_remote_hist->get_market_history( get_asset_id(symbol1), get_asset_id(symbol2), bucket, start, end );
 }
 
-vector<limit_order_object> wallet_api::get_account_limit_orders( const string& name_or_id, const string &base, const string &quote, uint32_t limit, optional<limit_order_id_type> ostart_id, optional<price> ostart_price)
+vector<limit_order_object> wallet_api::get_account_limit_orders( const string& name_or_id,
+                                                                const string &base,
+                                                                const string &quote,
+                                                                uint32_t limit,
+                                                                optional<limit_order_id_type> ostart_id,
+                                                                optional<price> ostart_price)
 {
    return my->_remote_db->get_account_limit_orders(name_or_id, base, quote, limit, ostart_id, ostart_price);
 }

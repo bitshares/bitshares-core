@@ -637,8 +637,6 @@ vector<limit_order_object> database_api_impl::get_account_limit_orders( const st
    vector<limit_order_object>   results;
    const account_object*        account = nullptr;
    uint32_t                     count = 0;
-   limit_order_id_type          start_id;
-   price                        start_price;
 
    if (std::isdigit(name_or_id[0]))
       account = _db.find(fc::variant(name_or_id, 1).as<account_id_type>(1));
@@ -674,12 +672,11 @@ vector<limit_order_object> database_api_impl::get_account_limit_orders( const st
        upper_itr = index_by_account.upper_bound(std::make_tuple(account->id, price::min(base_id, quote_id)));
    } else if (ostart_id.valid()) {
        // in case of the order been deleted during page querying
-       const limit_order_object *p_loo = nullptr;
-
-       if (!(p_loo = static_cast<const limit_order_object *>(_db.find_object(*ostart_id)))) {
+       const limit_order_object *p_loo = static_cast<const limit_order_object *>(_db.find_object(*ostart_id));
+       if (!p_loo) {
            if (ostart_price.valid()) {
                lower_itr = index_by_account.lower_bound(std::make_tuple(account->id, *ostart_price, *ostart_id));
-               upper_itr = index_by_account.upper_bound(std::make_tuple(account->id, (*ostart_price).min()));
+               upper_itr = index_by_account.upper_bound(std::make_tuple(account->id, ostart_price->min()));
            } else {
                // start order id been deleted, yet not provided price either
                FC_THROW("Order id invalid (maybe just been canceled?), and start price not provided");
@@ -697,7 +694,7 @@ vector<limit_order_object> database_api_impl::get_account_limit_orders( const st
        }
   } else { // if reach here start_price must be valid
       lower_itr = index_by_account.lower_bound(std::make_tuple(account->id, *ostart_price));
-      upper_itr = index_by_account.upper_bound(std::make_tuple(account->id, (*ostart_price).min()));
+      upper_itr = index_by_account.upper_bound(std::make_tuple(account->id, ostart_price->min()));
   }
 
    // Add the account's orders
