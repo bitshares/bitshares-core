@@ -59,7 +59,8 @@ BOOST_AUTO_TEST_CASE( reset_backing_asset_on_witness_asset )
     */
 
    BOOST_TEST_MESSAGE("Advance to near hard fork");
-   generate_blocks( HARDFORK_CORE_868_TIME - fc::days(1));
+   auto maint_interval = db.get_global_properties().parameters.maintenance_interval;
+   generate_blocks( HARDFORK_CORE_868_TIME - maint_interval);
    trx.set_expiration(HARDFORK_CORE_868_TIME - fc::seconds(1));
 
    BOOST_TEST_MESSAGE("Create USDBIT");
@@ -206,10 +207,15 @@ BOOST_AUTO_TEST_CASE( reset_backing_asset_on_witness_asset )
       BOOST_CHECK(bitasset.current_feed.core_exchange_rate.base.asset_id != bitasset.current_feed.core_exchange_rate.quote.asset_id);
    }
 
-   BOOST_TEST_MESSAGE("Advance to after hard fork");
-   generate_blocks( HARDFORK_CORE_868_TIME + fc::days(1));
-   trx.set_expiration(HARDFORK_CORE_868_TIME + fc::hours(46));
+   {
+      BOOST_TEST_MESSAGE("Advance to after hard fork");
+      generate_blocks( HARDFORK_CORE_868_TIME + maint_interval);
+      trx.set_expiration(HARDFORK_CORE_868_TIME + fc::hours(46));
 
+      BOOST_TEST_MESSAGE("After hardfork, 2 feeds should have been erased");
+      const asset_bitasset_data_object& jmj_obj = bit_jmj_id(db).bitasset_data(db);
+      BOOST_CHECK_EQUAL(jmj_obj.feeds.size(), 1);
+   }
    {
       BOOST_TEST_MESSAGE("After hardfork, change underlying asset of bit_jmj from core to bit_usd");
       asset_update_bitasset_operation ba_op;
@@ -253,7 +259,8 @@ BOOST_AUTO_TEST_CASE( reset_backing_asset_on_non_witness_asset )
    ACTORS((nathan)(dan)(ben)(vikram));
 
    BOOST_TEST_MESSAGE("Advance to near hard fork");
-   generate_blocks( HARDFORK_CORE_868_TIME - fc::days(1));
+   auto maint_interval = db.get_global_properties().parameters.maintenance_interval;
+   generate_blocks( HARDFORK_CORE_868_TIME - maint_interval);
    trx.set_expiration(HARDFORK_CORE_868_TIME - fc::seconds(1));
 
 
@@ -409,10 +416,32 @@ BOOST_AUTO_TEST_CASE( reset_backing_asset_on_non_witness_asset )
       }
    }
    {
+      BOOST_TEST_MESSAGE("Add a new (and correct) feed price for 1 feed producer");
+      const asset_object& bit_jmj = bit_jmj_id(db);
+      asset_publish_feed_operation op;
+      op.publisher = vikram_id;
+      op.asset_id = bit_jmj_id;
+      op.feed.settlement_price = ~price(core.amount(1), bit_jmj.amount(300));
+      op.feed.core_exchange_rate = ~price(core.amount(1), bit_jmj.amount(300));
+      trx.operations.push_back(std::move(op));
+      PUSH_TX( db, trx, ~0);
+   }
+   {
       BOOST_TEST_MESSAGE("Advance to past hard fork");
-      generate_blocks( HARDFORK_CORE_868_TIME + fc::days(1));
+      generate_blocks( HARDFORK_CORE_868_TIME + maint_interval);
       trx.set_expiration(HARDFORK_CORE_868_TIME + fc::hours(48));
 
+      BOOST_TEST_MESSAGE("Verify that the incorrect feeds have been corrected");
+      const asset_bitasset_data_object& jmj_obj = bit_jmj_id(db).bitasset_data(db);
+      BOOST_CHECK_EQUAL(jmj_obj.feeds.size(), 3);
+      int nan_count = 0;
+      for(auto feed : jmj_obj.feeds) {
+         if (std::isnan(feed.second.second.settlement_price.to_real()))
+         nan_count++;
+      }
+      BOOST_CHECK_EQUAL(nan_count, 2);
+   }
+   {
       BOOST_TEST_MESSAGE("After hardfork, change underlying asset of bit_jmj from core to bit_usd");
       asset_update_bitasset_operation ba_op;
       const asset_object& obj = bit_jmj_id(db);

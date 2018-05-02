@@ -401,10 +401,10 @@ void_result asset_update_bitasset_evaluator::do_apply(const asset_update_bitasse
       if( op.new_options.minimum_feeds != bitasset_to_update->options.minimum_feeds )
          should_update_feeds = true;
 
-      // feeds must be reset if the backing asset is changed
+      // feeds must be reset if the backing asset is changed after hardfork 868
       bool backing_asset_changed = false;
       bool is_witness_or_committee_fed = false;
-      if (db().head_block_time() >= HARDFORK_CORE_868_TIME
+      if (db().get_dynamic_global_properties().next_maintenance_time > HARDFORK_CORE_868_TIME
             && op.new_options.short_backing_asset != bitasset_to_update->options.short_backing_asset)
       {
          backing_asset_changed = true;
@@ -423,7 +423,7 @@ void_result asset_update_bitasset_evaluator::do_apply(const asset_update_bitasse
             if ( is_witness_or_committee_fed ) {
                bdo.feeds.clear();
             } else {
-               // for non-witness-feeding and non-committe-feeding assets, modify all feeds
+               // for non-witness-feeding and non-committee-feeding assets, modify all feeds
                // published by producers to nothing, since we can't simply remove them. For more information:
                // https://github.com/bitshares/bitshares-core/pull/832#issuecomment-384112633
                for(auto& current_feed : bdo.feeds) {
