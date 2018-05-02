@@ -971,6 +971,26 @@ class wallet_api
       signed_transaction borrow_asset(string borrower_name, string amount_to_borrow, string asset_symbol,
                                       string amount_of_collateral, bool broadcast = false);
 
+      /** Borrow an asset or update the debt/collateral ratio for the loan, with additional options.
+       *
+       * This is the first step in shorting an asset.  Call \c sell_asset() to complete the short.
+       *
+       * @param borrower_name the name or id of the account associated with the transaction.
+       * @param amount_to_borrow the amount of the asset being borrowed.  Make this value
+       *                         negative to pay back debt.
+       * @param asset_symbol the symbol or id of the asset being borrowed.
+       * @param amount_of_collateral the amount of the backing asset to add to your collateral
+       *        position.  Make this negative to claim back some of your collateral.
+       *        The backing asset is defined in the \c bitasset_options for the asset being borrowed.
+       * @param extensions additional options
+       * @param broadcast true to broadcast the transaction on the network
+       * @returns the signed transaction borrowing the asset
+       */
+      signed_transaction borrow_asset_ext( string borrower_name, string amount_to_borrow, string asset_symbol,
+                                           string amount_of_collateral,
+                                           call_order_update_operation::extensions_type extensions,
+                                           bool broadcast = false );
+
       /** Cancel an existing order
        *
        * @param order_id the id of order to be cancelled
@@ -1688,6 +1708,7 @@ FC_API( graphene::wallet::wallet_api,
         (create_account_with_brain_key)
         (sell_asset)
         (borrow_asset)
+        (borrow_asset_ext)
         (cancel_order)
         (transfer)
         (transfer2)

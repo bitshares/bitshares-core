@@ -157,6 +157,11 @@ void_result call_order_update_evaluator::do_evaluate(const call_order_update_ope
 { try {
    database& d = db();
 
+   // TODO: remove this check and the assertion after hf_834
+   if( d.get_dynamic_global_properties().next_maintenance_time <= HARDFORK_CORE_834_TIME )
+      FC_ASSERT( !o.extensions.value.target_collateral_ratio.valid(),
+                 "Can not set target_collateral_ratio in call_order_update_operation before hardfork 834." );
+
    _paying_account = &o.funding_account(d);
    _debt_asset     = &o.delta_debt.asset_id(d);
    FC_ASSERT( _debt_asset->is_market_issued(), "Unable to cover ${sym} as it is not a collateralized asset.",
@@ -222,6 +227,8 @@ void_result call_order_update_evaluator::do_apply(const call_order_update_operat
    optional<price> old_collateralization;
    optional<share_type> old_debt;
 
+   optional<uint16_t> new_target_cr = o.extensions.value.target_collateral_ratio;
+
    if( itr == call_idx.end() )
    {
       FC_ASSERT( o.delta_collateral.amount > 0 );
@@ -233,7 +240,7 @@ void_result call_order_update_evaluator::do_apply(const call_order_update_operat
          call.debt = o.delta_debt.amount;
          call.call_price = price::call_price(o.delta_debt, o.delta_collateral,
                                              _bitasset_data->current_feed.maintenance_collateral_ratio);
-
+         call.target_collateral_ratio = new_target_cr;
       });
    }
    else
@@ -243,13 +250,14 @@ void_result call_order_update_evaluator::do_apply(const call_order_update_operat
       old_debt = call_obj->debt;
 
       d.modify( *call_obj, [&]( call_order_object& call ){
-          call.collateral += o.delta_collateral.amount;
-          call.debt       += o.delta_debt.amount;
-          if( call.debt > 0 )
-          {
-             call.call_price  =  price::call_price(call.get_debt(), call.get_collateral(),
-                                                   _bitasset_data->current_feed.maintenance_collateral_ratio);
-          }
+         call.collateral += o.delta_collateral.amount;
+         call.debt       += o.delta_debt.amount;
+         if( call.debt > 0 )
+         {
+            call.call_price  =  price::call_price(call.get_debt(), call.get_collateral(),
+                                                  _bitasset_data->current_feed.maintenance_collateral_ratio);
+         }
+         call.target_collateral_ratio = new_target_cr;
       });
    }
 

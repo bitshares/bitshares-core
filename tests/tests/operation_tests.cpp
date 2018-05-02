@@ -556,6 +556,127 @@ BOOST_AUTO_TEST_CASE( more_call_order_update_test_after_hardfork_583 )
    }
 }
 
+BOOST_AUTO_TEST_CASE( call_order_update_validation_test )
+{
+   call_order_update_operation op;
+
+   // throw on default values
+   BOOST_CHECK_THROW( op.validate(), fc::assert_exception );
+
+   // minimum changes to make it valid
+   op.delta_debt = asset( 1, asset_id_type(1) );
+   op.validate(); // won't throw if has a non-zero debt with different asset_id_type than collateral
+
+   // throw on negative fee
+   op.fee = asset( -1 );
+   BOOST_CHECK_THROW( op.validate(), fc::assert_exception );
+   op.fee = asset( 0 );
+
+   // throw on identical debt and collateral asset id
+   op.delta_collateral = asset( 0, asset_id_type(1) );
+   BOOST_CHECK_THROW( op.validate(), fc::assert_exception );
+
+   // throw on zero debt and collateral amount
+   op.delta_debt = asset( 0, asset_id_type(0) );
+   BOOST_CHECK_THROW( op.validate(), fc::assert_exception );
+   op.delta_debt = asset( -1, asset_id_type(0) );
+
+   op.validate(); // valid now
+
+   op.extensions.value.target_collateral_ratio = 0;
+   op.validate(); // still valid
+
+   op.extensions.value.target_collateral_ratio = 65535;
+   op.validate(); // still valid
+
+}
+
+// Tests that target_cr option can't be set before hard fork core-834
+// TODO: remove this test case after hard fork
+BOOST_AUTO_TEST_CASE( call_order_update_target_cr_hardfork_time_test )
+{
+   try {
+      auto mi = db.get_global_properties().parameters.maintenance_interval;
+      generate_blocks(HARDFORK_CORE_834_TIME - mi);
+
+      set_expiration( db, trx );
+
+      ACTORS((sam)(alice)(bob));
+      const auto& bitusd = create_bitasset("USDBIT", sam.id);
+      const auto& core   = asset_id_type()(db);
+      asset_id_type bitusd_id = bitusd.id;
+      asset_id_type core_id = core.id;
+
+      transfer(committee_account, sam_id, asset(10000000));
+      transfer(committee_account, alice_id, asset(10000000));
+      transfer(committee_account, bob_id, asset(10000000));
+      update_feed_producers( bitusd, {sam.id} );
+
+      price_feed current_feed; current_feed.settlement_price = bitusd.amount( 100 ) / core.amount(100);
+      current_feed.maintenance_collateral_ratio = 1750; // need to set this explicitly, testnet has a different default
+      current_feed.maximum_short_squeeze_ratio = 1100; // need to set this explicitly, testnet has a different default
+      publish_feed( bitusd, sam, current_feed );
+
+      FC_ASSERT( bitusd.bitasset_data(db).current_feed.settlement_price == current_feed.settlement_price );
+
+      BOOST_TEST_MESSAGE( "alice tries to borrow using 4x collateral at 1:1 price with target_cr set, "
+                          "will fail before hard fork time" );
+      GRAPHENE_REQUIRE_THROW( borrow( alice, bitusd.amount(100000), core.amount(400000), 0 ), fc::assert_exception );
+      GRAPHENE_REQUIRE_THROW( borrow( alice, bitusd.amount(100000), core.amount(400000), 1 ), fc::assert_exception );
+      GRAPHENE_REQUIRE_THROW( borrow( alice, bitusd.amount(100000), core.amount(400000), 1749 ), fc::assert_exception );
+      GRAPHENE_REQUIRE_THROW( borrow( alice, bitusd.amount(100000), core.amount(400000), 1750 ), fc::assert_exception );
+      GRAPHENE_REQUIRE_THROW( borrow( alice, bitusd.amount(100000), core.amount(400000), 1751 ), fc::assert_exception );
+      GRAPHENE_REQUIRE_THROW( borrow( alice, bitusd.amount(100000), core.amount(400000), 65535 ), fc::assert_exception );
+
+      auto call_update_proposal = [this]( const account_object& proposer,
+                                       const account_object& updater,
+                                       const asset& delta_collateral,
+                                       const asset& delta_debt,
+                                       const optional<uint16_t> target_cr )
+      {
+         call_order_update_operation op;
+         op.funding_account = updater.id;
+         op.delta_collateral = delta_collateral;
+         op.delta_debt = delta_debt;
+         op.extensions.value.target_collateral_ratio = target_cr;
+
+         const auto& curfees = *db.get_global_properties().parameters.current_fees;
+         const auto& proposal_create_fees = curfees.get<proposal_create_operation>();
+         proposal_create_operation prop;
+         prop.fee_paying_account = proposer.id;
+         prop.proposed_ops.emplace_back( op );
+         prop.expiration_time =  db.head_block_time() + fc::days(1);
+         prop.fee = asset( proposal_create_fees.fee + proposal_create_fees.price_per_kbyte );
+
+         signed_transaction tx;
+         tx.operations.push_back( prop );
+         db.current_fee_schedule().set_fee( tx.operations.back() );
+         set_expiration( db, tx );
+         db.push_transaction( tx, ~0 );
+      };
+
+      BOOST_TEST_MESSAGE( "bob tries to propose a proposal with target_cr set, "
+                          "will fail before hard fork time" );
+      GRAPHENE_REQUIRE_THROW( call_update_proposal( bob, alice, bitusd.amount(10), core.amount(40), 0 ), fc::assert_exception );
+      GRAPHENE_REQUIRE_THROW( call_update_proposal( bob, alice, bitusd.amount(10), core.amount(40), 1750 ), fc::assert_exception );
+      GRAPHENE_REQUIRE_THROW( call_update_proposal( bob, alice, bitusd.amount(10), core.amount(40), 65535 ), fc::assert_exception );
+
+      generate_blocks( db.get_dynamic_global_properties().next_maintenance_time );
+      set_expiration( db, trx );
+
+      BOOST_TEST_MESSAGE( "bob tries to propose a proposal with target_cr set, "
+                          "will success after hard fork time" );
+      // now able to propose
+      call_update_proposal( bob_id(db), alice_id(db), bitusd_id(db).amount(10), core_id(db).amount(40), 65535 );
+
+      generate_block();
+
+   } catch (fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
 /**
  *  This test sets up a situation where a margin call will be executed and ensures that
  *  it is properly filled.
