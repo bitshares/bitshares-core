@@ -408,6 +408,7 @@ void_result asset_update_bitasset_evaluator::do_apply(const asset_update_bitasse
             && op.new_options.short_backing_asset != bitasset_to_update->options.short_backing_asset)
       {
          backing_asset_changed = true;
+         should_update_feeds = true;
          const asset_object& base_asset = op.asset_to_update(db());
          if ( base_asset.options.flags & (witness_fed_asset | committee_fed_asset) )
             is_witness_or_committee_fed = true;
