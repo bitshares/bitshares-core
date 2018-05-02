@@ -778,20 +778,19 @@ void database::process_bitassets()
 
             const auto &asset = get(o.asset_id);
             auto flags = asset.options.flags;
-            if ((flags & witness_fed_asset) || (flags & committee_fed_asset)) // if smartcoin
+            if ( (flags & witness_fed_asset || flags & committee_fed_asset) &&
+                 (o.options.feed_lifetime_sec < head_block_time().sec_since_epoch()) ) // if smartcoin && check overflow
             {
-               // check overflow
-               if (std::numeric_limits<uint32_t>::max() - o.options.feed_lifetime_sec > head_block_time().sec_since_epoch())
+
+               fc::time_point_sec calculate = head_block_time() - o.options.feed_lifetime_sec;
+               for (auto itr = o.feeds.rbegin(); itr != o.feeds.rend();) // loop feeds
                {
-                  fc::time_point_sec calculate = head_block_time() - o.options.feed_lifetime_sec;
-                  for (auto itr = o.feeds.rbegin(); itr != o.feeds.rend();) // loop feeds
-                  {
-                     auto feed_time = itr->second.first;
-                     std::advance(itr, 1);
-                     if (feed_time < calculate)
-                        o.feeds.erase(itr.base()); // delete expired feed
-                  }
+                  auto feed_time = itr->second.first;
+                  std::advance(itr, 1);
+                  if (feed_time < calculate)
+                     o.feeds.erase(itr.base()); // delete expired feed
                }
+
             }
          });
          if (d.has_settlement())
