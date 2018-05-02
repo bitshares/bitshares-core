@@ -43,7 +43,7 @@ BOOST_AUTO_TEST_CASE(bsip36)
 {
    try
    {
-      /* Bug affects only smartcoions(market pegged assets feeded by active witnesses or committee members).
+      /* Issue affects only smartcoins(market pegged assets feeded by active witnesses or committee members).
        * Test case reproduces, advance to hardfork and check if solved after it.
        */
 
