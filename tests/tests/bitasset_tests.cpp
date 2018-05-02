@@ -47,7 +47,7 @@ using namespace graphene::chain::test;
 
 BOOST_FIXTURE_TEST_SUITE( bitasset_tests, database_fixture )
 
-BOOST_AUTO_TEST_CASE( reset_backing_asset_on_witness_asset)
+BOOST_AUTO_TEST_CASE( reset_backing_asset_on_witness_asset )
 {
    ACTORS((nathan));
 
@@ -65,6 +65,8 @@ BOOST_AUTO_TEST_CASE( reset_backing_asset_on_witness_asset)
    BOOST_TEST_MESSAGE("Create USDBIT");
    asset_id_type bit_usd_id = create_bitasset("USDBIT").id;
    asset_id_type core_id = bit_usd_id(db).bitasset_data(db).options.short_backing_asset;
+   const asset_object& core = core_id(db);
+
    {
       BOOST_TEST_MESSAGE("Update the USDBIT asset options");
       asset_update_operation op;
@@ -127,7 +129,8 @@ BOOST_AUTO_TEST_CASE( reset_backing_asset_on_witness_asset)
       asset_publish_feed_operation op;
       op.publisher = active_witnesses[0];
       op.asset_id = bit_jmj_id;
-      op.feed.settlement_price = op.feed.core_exchange_rate = ~price(bit_usd.amount(1),bit_jmj.amount(300));
+      op.feed.settlement_price = ~price(bit_usd.amount(1),bit_jmj.amount(300));
+      op.feed.core_exchange_rate = ~price(core.amount(1), bit_jmj.amount(300));
       trx.operations.push_back(std::move(op));
       PUSH_TX( db, trx, ~0);
 
@@ -142,7 +145,8 @@ BOOST_AUTO_TEST_CASE( reset_backing_asset_on_witness_asset)
       asset_publish_feed_operation op;
       op.publisher = active_witnesses[1];
       op.asset_id = bit_jmj_id;
-      op.feed.settlement_price = op.feed.core_exchange_rate = ~price(bit_usd.amount(1),bit_jmj.amount(100));
+      op.feed.settlement_price = ~price(bit_usd.amount(1),bit_jmj.amount(100));
+      op.feed.core_exchange_rate = ~price(core.amount(1), bit_jmj.amount(100));
       trx.operations.push_back(std::move(op));
       PUSH_TX( db, trx, ~0);
 
@@ -157,7 +161,8 @@ BOOST_AUTO_TEST_CASE( reset_backing_asset_on_witness_asset)
       asset_publish_feed_operation op;
       op.publisher = active_witnesses[2];
       op.asset_id = bit_jmj_id;
-      op.feed.settlement_price = op.feed.core_exchange_rate = ~price(bit_usd.amount(1),bit_jmj.amount(1));
+      op.feed.settlement_price = ~price(bit_usd.amount(1),bit_jmj.amount(1));
+      op.feed.core_exchange_rate = ~price(core.amount(1), bit_jmj.amount(1));
       trx.operations.push_back(std::move(op));
       PUSH_TX( db, trx, ~0);
 
@@ -230,7 +235,8 @@ BOOST_AUTO_TEST_CASE( reset_backing_asset_on_witness_asset)
       asset_publish_feed_operation op;
       op.publisher = active_witnesses[0];
       op.asset_id = bit_jmj_id;
-      op.feed.settlement_price = op.feed.core_exchange_rate = ~price(bit_usd.amount(1),bit_jmj.amount(30));
+      op.feed.settlement_price = ~price(bit_usd.amount(1),bit_jmj.amount(30));
+      op.feed.core_exchange_rate = ~price(core.amount(1), bit_jmj.amount(30));
       trx.operations.push_back(op);
       PUSH_TX( db, trx, ~0 );
 
@@ -242,7 +248,7 @@ BOOST_AUTO_TEST_CASE( reset_backing_asset_on_witness_asset)
    }
 }
 
-BOOST_AUTO_TEST_CASE( reset_backing_asset_on_non_witness_asset)
+BOOST_AUTO_TEST_CASE( reset_backing_asset_on_non_witness_asset )
 {
    ACTORS((nathan)(dan)(ben)(vikram));
 
@@ -254,6 +260,8 @@ BOOST_AUTO_TEST_CASE( reset_backing_asset_on_non_witness_asset)
    BOOST_TEST_MESSAGE("Create USDBIT");
    asset_id_type bit_usd_id = create_bitasset("USDBIT").id;
    asset_id_type core_id = bit_usd_id(db).bitasset_data(db).options.short_backing_asset;
+   const asset_object core = core_id(db);
+
    {
       BOOST_TEST_MESSAGE("Update the USDBIT asset options");
       asset_update_operation op;
@@ -335,7 +343,8 @@ BOOST_AUTO_TEST_CASE( reset_backing_asset_on_non_witness_asset)
       asset_publish_feed_operation op;
       op.publisher = vikram_id;
       op.asset_id = bit_jmj_id;
-      op.feed.settlement_price = op.feed.core_exchange_rate = ~price(bit_usd.amount(1),bit_jmj.amount(300));
+      op.feed.settlement_price = ~price(bit_usd.amount(1),bit_jmj.amount(300));
+      op.feed.core_exchange_rate = ~price(core.amount(1), bit_jmj.amount(300));
       trx.operations.push_back(std::move(op));
       PUSH_TX( db, trx, ~0);
 
@@ -350,7 +359,8 @@ BOOST_AUTO_TEST_CASE( reset_backing_asset_on_non_witness_asset)
       asset_publish_feed_operation op;
       op.publisher = ben_id;
       op.asset_id = bit_jmj_id;
-      op.feed.settlement_price = op.feed.core_exchange_rate = ~price(bit_usd.amount(1),bit_jmj.amount(100));
+      op.feed.settlement_price = ~price(bit_usd.amount(1),bit_jmj.amount(100));
+      op.feed.core_exchange_rate = ~price(core.amount(1), bit_jmj.amount(100));
       trx.operations.push_back(std::move(op));
       PUSH_TX( db, trx, ~0);
 
@@ -365,7 +375,8 @@ BOOST_AUTO_TEST_CASE( reset_backing_asset_on_non_witness_asset)
       asset_publish_feed_operation op;
       op.publisher = dan_id;
       op.asset_id = bit_jmj_id;
-      op.feed.settlement_price = op.feed.core_exchange_rate = ~price(bit_usd.amount(1),bit_jmj.amount(1));
+      op.feed.settlement_price = ~price(bit_usd.amount(1),bit_jmj.amount(1));
+      op.feed.core_exchange_rate = ~price(core.amount(1), bit_jmj.amount(1));
       trx.operations.push_back(std::move(op));
       PUSH_TX( db, trx, ~0);
 
@@ -429,7 +440,8 @@ BOOST_AUTO_TEST_CASE( reset_backing_asset_on_non_witness_asset)
       asset_publish_feed_operation op;
       op.publisher = vikram_id;
       op.asset_id = bit_jmj_id;
-      op.feed.settlement_price = op.feed.core_exchange_rate = ~price(bit_usd.amount(1),bit_jmj.amount(30));
+      op.feed.settlement_price = ~price(bit_usd.amount(1),bit_jmj.amount(30));
+      op.feed.core_exchange_rate = ~price(core.amount(1), bit_jmj.amount(30));
       trx.operations.push_back(op);
       PUSH_TX( db, trx, ~0 );
 
@@ -439,7 +451,8 @@ BOOST_AUTO_TEST_CASE( reset_backing_asset_on_non_witness_asset)
 
       BOOST_TEST_MESSAGE("Adding Ben's pricing to JMJBIT");
       op.publisher = ben_id;
-      op.feed.settlement_price = op.feed.core_exchange_rate = ~price(bit_usd.amount(1),bit_jmj.amount(25));
+      op.feed.settlement_price = ~price(bit_usd.amount(1),bit_jmj.amount(25));
+      op.feed.core_exchange_rate = ~price(core.amount(1), bit_jmj.amount(25));
       trx.operations.push_back(op);
       PUSH_TX( db, trx, ~0 );
 
@@ -448,7 +461,8 @@ BOOST_AUTO_TEST_CASE( reset_backing_asset_on_non_witness_asset)
 
       BOOST_TEST_MESSAGE("Adding Dan's pricing to JMJBIT");
       op.publisher = dan_id;
-      op.feed.settlement_price = op.feed.core_exchange_rate = ~price(bit_usd.amount(1),bit_jmj.amount(10));
+      op.feed.settlement_price = ~price(bit_usd.amount(1),bit_jmj.amount(10));
+      op.feed.core_exchange_rate = ~price(core.amount(1), bit_jmj.amount(10));
       trx.operations.push_back(op);
       PUSH_TX( db, trx, ~0 );
 
