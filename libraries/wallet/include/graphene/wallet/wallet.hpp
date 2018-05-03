@@ -378,15 +378,15 @@ class wallet_api
      vector<operation_detail>  get_relative_account_history(string name, uint32_t stop, int limit, uint32_t start)const;
 
       /**
-       * @brief Fetch all objects relevant to the specified accounts
-       * @param names_or_ids Each item must be the name or ID of an account to retrieve
-       * @return Map of string from @ref names_or_ids to the corresponding account
+       * @brief Fetch all objects relevant to the specified account
+       * @param name_or_id Must be the name or ID of an account to retrieve
+       * @return All info about the specified account
        *
-       * This function fetches all relevant objects for the given accounts. If any of the strings
-       * in @ref names_or_ids cannot be tied to an account, that input will be ignored.
+       * This function fetches all relevant objects for the given account. If the string
+       * of @ref name_or_id cannot be tied to an account, that input will be ignored.
        *
        */
-      std::map<string,full_account>     get_full_accounts( const vector<string>& names_or_ids);
+      full_account                      get_full_account( const string& name_or_id);
       vector<bucket_object>             get_market_history(string symbol, string symbol2, uint32_t bucket, fc::time_point_sec start, fc::time_point_sec end)const;
       vector<limit_order_object>        get_limit_orders(string a, string b, uint32_t limit)const;
       vector<call_order_object>         get_call_orders(string a, uint32_t limit)const;
@@ -1708,7 +1708,7 @@ FC_API( graphene::wallet::wallet_api,
         (get_account_history_by_operations)
         (get_collateral_bids)
         (is_public_key_registered)
-        (get_full_accounts)
+        (get_full_account)
         (get_market_history)
         (get_global_properties)
         (get_dynamic_global_properties)
