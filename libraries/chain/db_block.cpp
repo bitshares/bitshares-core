@@ -134,14 +134,14 @@ bool database::_push_block(const signed_block& new_block)
 
       // If the block is greater than the head block and before the next maintenance interval
       if (new_block.block_num() > head_block_num()
-            && new_block.timestamp <  get<dynamic_global_property_object>(dynamic_global_property_id_type()).next_maintenance_time )
+            && new_block.timestamp < get_dynamic_global_properties().next_maintenance_time )
       {
          // make sure the block signer is in the current set of active witnesses
-         //TODO: Do we need to validate signature, or has this already been done?
-         auto witnesses = get_global_properties().active_witnesses;
-         if (std::find(witnesses.begin(), witnesses.end(), new_block.witness ) == witnesses.end())
+         const auto& witnesses = get_global_properties().active_witnesses;
+         witnesses.find(new_block.witness);
+         if ( witnesses.find(new_block.witness) == witnesses.end() )
          {
-            return false;
+            FC_THROW_EXCEPTION(fc::assert_exception, "database::_push_block: Block witness not in list of active witnesses.");
          }
       }
 
