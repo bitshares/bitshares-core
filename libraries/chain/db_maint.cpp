@@ -815,18 +815,23 @@ void cleanup_invalid_feeds_hf_868( database& db )
    const auto& asset_idx = db.get_index_type<asset_index>().indices().get<by_type>();
    for(auto asset_itr = asset_idx.lower_bound(true); asset_itr != asset_idx.end(); ++asset_itr)
    {
-      const auto& asset = *asset_itr;
+      const auto& current_asset = *asset_itr;
       // Incorrect witness & committee feeds can simply be removed.
       // For non-witness-fed and non-committee-fed assets, set incorrect
       // feeds to price(), since we can't simply remove them. For more information:
       // https://github.com/bitshares/bitshares-core/pull/832#issuecomment-384112633
       bool is_witness_or_committee_fed = false;
-      if ( asset.options.flags & (witness_fed_asset | committee_fed_asset) )
+      if ( current_asset.options.flags & (witness_fed_asset | committee_fed_asset) )
          is_witness_or_committee_fed = true;
 
       // for each feed
-      const asset_bitasset_data_object& bitasset_data = asset.bitasset_data(db);
-      bool feeds_changed = false;
+      const asset_bitasset_data_object& bitasset_data = current_asset.bitasset_data(db);
+      // NOTE: If HF343 and HF868 roll out at the same time
+      // you can remove this double, and the check_call_orders()
+      // below that relies on it. HF343 will take care of the issue
+      // and there is no need for the extra check_call_orders() call
+      double old_price = bitasset_data.settlement_price.to_real();
+      bool feeds_changed = false; // did any feed change
       auto itr = bitasset_data.feeds.begin();
       while (itr != bitasset_data.feeds.end())
       {
@@ -853,12 +858,19 @@ void cleanup_invalid_feeds_hf_868( database& db )
             // Feed is valid. Skip it.
             ++itr;
          }
-      }
+      } // end loop of each feed
+
       // if the feeds were modified, update the median feed
       if (feeds_changed) {
          db.modify(bitasset_data, [&db](asset_bitasset_data_object &obj) {
             obj.update_median_feeds( db.head_block_time() );
          });
+      }
+
+      if ( HARDFORK_CORE_343_TIME != HARDFORK_CORE_868_TIME
+            && old_price != bitasset_data.settlement_price.to_real() )
+      {
+         db.check_call_orders(current_asset);
       }
    }
 
