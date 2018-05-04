@@ -435,11 +435,14 @@ BOOST_AUTO_TEST_CASE( reset_backing_asset_on_non_witness_asset )
       const asset_bitasset_data_object& jmj_obj = bit_jmj_id(db).bitasset_data(db);
       BOOST_CHECK_EQUAL(jmj_obj.feeds.size(), 3);
       int nan_count = 0;
-      for(auto feed : jmj_obj.feeds) {
+      for(auto feed : jmj_obj.feeds)
+      {
          if (std::isnan(feed.second.second.settlement_price.to_real()))
-         nan_count++;
+            nan_count++;
       }
       BOOST_CHECK_EQUAL(nan_count, 2);
+      // the settlement price will be NaN until 50% of price feeds are valid
+      //BOOST_CHECK_EQUAL(jmj_obj.current_feed.settlement_price.to_real(), 300);
    }
    {
       BOOST_TEST_MESSAGE("After hardfork, change underlying asset of bit_jmj from core to bit_usd");

@@ -826,11 +826,14 @@ void cleanup_invalid_feeds_hf_868( database& db )
 
       // for each feed
       const asset_bitasset_data_object& bitasset_data = asset.bitasset_data(db);
+      bool feeds_changed = false;
       auto itr = bitasset_data.feeds.begin();
       while (itr != bitasset_data.feeds.end())
       {
          // If the feed is invalid
-         if ( (*itr).second.second.settlement_price.quote.asset_id != bitasset_data.options.short_backing_asset) {
+         if ( (*itr).second.second.settlement_price.quote.asset_id != bitasset_data.options.short_backing_asset
+               && (is_witness_or_committee_fed || (*itr).second.second.settlement_price != price() ) ) {
+            feeds_changed = true;
             db.modify(bitasset_data, [&itr, is_witness_or_committee_fed](asset_bitasset_data_object& obj) {
                if (is_witness_or_committee_fed)
                {
@@ -850,6 +853,12 @@ void cleanup_invalid_feeds_hf_868( database& db )
             // Feed is valid. Skip it.
             ++itr;
          }
+      }
+      // if the feeds were modified, update the median feed
+      if (feeds_changed) {
+         db.modify(bitasset_data, [&db](asset_bitasset_data_object &obj) {
+            obj.update_median_feeds( db.head_block_time() );
+         });
       }
    }
 
