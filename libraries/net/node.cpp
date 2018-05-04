@@ -4803,6 +4803,17 @@ namespace graphene { namespace net { namespace detail {
     INVOKE_IN_IMPL(close);
   }
 
+  /******
+   * @brief provides access to the node implementation's thread
+   *
+   * This should only be used for testing
+   * @returns the thread that the node_impl is on
+   */
+  std::shared_ptr<fc::thread> node::get_thread()
+  {
+     return my->_thread;
+  }
+
   struct simulated_network::node_info
   {
     node_delegate* delegate;

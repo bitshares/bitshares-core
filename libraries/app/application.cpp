@@ -208,6 +208,12 @@ void application_impl::reset_p2p_node(const fc::path& data_dir)
    _p2p_network->listen_to_p2p_network();
    ilog("Configured p2p node to listen on ${ip}", ("ip", _p2p_network->get_actual_listening_endpoint()));
 
+   if (_options->count("disable-peer-advertising") && _options->at("disable-peer-advertising").as<bool>() )
+      _p2p_network->disable_peer_advertising();
+
+   if (_options->count("accept-incoming-connections") )
+      _p2p_network->accept_incoming_connections( _options->at("accept-incoming-connections").as<bool>() );
+
    _p2p_network->connect_to_p2p_network();
    _p2p_network->sync_from(net::item_id(net::core_message_type_enum::block_message_type,
                                         _chain_db->head_block_id()),
@@ -1029,6 +1035,8 @@ void application::set_program_options(boost::program_options::options_descriptio
          ("force-validate", "Force validation of all transactions during normal operation")
          ("genesis-timestamp", bpo::value<uint32_t>(),
           "Replace timestamp from genesis.json with current time plus this many seconds (experts only!)")
+         ("disable-peer-advertising", bpo::value<bool>()->implicit_value(false), "Disable peer advertising")
+         ("accept-incoming-connections", bpo::value<bool>()->implicit_value(true), "Accept incoming connections")
          ;
    command_line_options.add(_cli_options);
    configuration_file_options.add(_cfg_options);

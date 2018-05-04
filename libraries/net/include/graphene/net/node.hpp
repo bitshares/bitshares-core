@@ -23,6 +23,7 @@
  */
 #pragma once
 
+#include <fc/thread/thread.hpp>
 #include <graphene/net/core_messages.hpp>
 #include <graphene/net/message.hpp>
 #include <graphene/net/peer_database.hpp>
@@ -292,8 +293,11 @@ namespace graphene { namespace net {
 
         void disable_peer_advertising();
         fc::variant_object get_call_statistics() const;
-      private:
+      protected:
         std::unique_ptr<detail::node_impl, detail::node_impl_deleter> my;
+      protected:
+        // This should only be used for testing
+        std::shared_ptr<fc::thread> get_thread();
    };
 
     class simulated_network : public node
