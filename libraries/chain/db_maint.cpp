@@ -802,43 +802,39 @@ void update_and_match_call_orders( database& db )
 
 void database::process_bitassets()
 {
-   if(head_block_time() >= HARDFORK_CORE_518_TIME)
-   {
-      for( const auto& d : get_index_type<asset_bitasset_data_index>().indices() )
-      {
-         modify(d, [this](asset_bitasset_data_object &o)
-         {
-            o.force_settled_volume = 0; // Reset all BitAsset force settlement volumes to zero
+   time_point_sec head_time = head_block_time();
+   uint32_t head_epoch_seconds = head_time.sec_since_epoch();
+   bool after_hf_core_518 = ( head_time >= HARDFORK_CORE_518_TIME ); // clear expired feeds
 
-            const auto &asset = get(o.asset_id);
+   for( const auto& d : get_index_type<asset_bitasset_data_index>().indices() )
+   {
+      modify( d, [this,head_time,head_epoch_seconds,after_hf_core_518]( asset_bitasset_data_object &o )
+      {
+         o.force_settled_volume = 0; // Reset all BitAsset force settlement volumes to zero
+
+         // clear expired feeds
+         if( after_hf_core_518 )
+         {
+            const auto &asset = get( o.asset_id );
             auto flags = asset.options.flags;
-            if ( (flags & witness_fed_asset || flags & committee_fed_asset) &&
-                 (o.options.feed_lifetime_sec < head_block_time().sec_since_epoch()) ) // if smartcoin && check overflow
+            if ( ( flags & ( witness_fed_asset | committee_fed_asset ) ) &&
+                 o.options.feed_lifetime_sec < head_epoch_seconds ) // if smartcoin && check overflow
             {
 
-               fc::time_point_sec calculate = head_block_time() - o.options.feed_lifetime_sec;
-               for (auto itr = o.feeds.rbegin(); itr != o.feeds.rend();) // loop feeds
+               fc::time_point_sec calculated = head_time - o.options.feed_lifetime_sec;
+               for( auto itr = o.feeds.rbegin(); itr != o.feeds.rend(); ) // loop feeds
                {
                   auto feed_time = itr->second.first;
-                  std::advance(itr, 1);
-                  if (feed_time < calculate)
-                     o.feeds.erase(itr.base()); // delete expired feed
+                  std::advance( itr, 1 );
+                  if( feed_time < calculated )
+                     o.feeds.erase( itr.base() ); // delete expired feed
                }
 
             }
-         });
-         if (d.has_settlement())
-            process_bids(d);
-      }
-   }
-   else {
-      for( const auto& d : get_index_type<asset_bitasset_data_index>().indices() )
-      {
-         // Reset all BitAsset force settlement volumes to zero
-         modify(d, [](asset_bitasset_data_object &o) { o.force_settled_volume = 0; });
-         if (d.has_settlement())
-            process_bids(d);
-      }
+         }
+      });
+      if( d.has_settlement() )
+         process_bids(d);
    }
 }
 
