@@ -58,8 +58,8 @@ BOOST_FIXTURE_TEST_SUITE( bitasset_tests, database_fixture )
  * @param core_id id of core (helps with core_exchange_rate)
  */
 void add_price_feed(database_fixture& fixture, const account_id_type& publisher,
-      const asset_id_type& asset1, int amount1,
-      const asset_id_type& asset2, int amount2,
+      const asset_id_type& asset1, int64_t amount1,
+      const asset_id_type& asset2, int64_t amount2,
       const asset_id_type& core_id)
 {
    const asset_object& a1 = asset1(fixture.db);
