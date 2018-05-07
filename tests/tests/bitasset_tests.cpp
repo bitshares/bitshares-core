@@ -47,35 +47,6 @@ using namespace graphene::chain::test;
 
 BOOST_FIXTURE_TEST_SUITE( bitasset_tests, database_fixture )
 
-/***
- * @brief helper method to add a price feed
- * @param fixture the database_fixture
- * @param publisher who is publishing the feed
- * @param asset1 the base asset
- * @param amount1 the amount of the base asset
- * @param asset2 the quote asset
- * @param amount2 the amount of the quote asset
- * @param core_id id of core (helps with core_exchange_rate)
- */
-void add_price_feed(database_fixture& fixture, const account_id_type& publisher,
-      const asset_id_type& asset1, int64_t amount1,
-      const asset_id_type& asset2, int64_t amount2,
-      const asset_id_type& core_id)
-{
-   const asset_object& a1 = asset1(fixture.db);
-   const asset_object& a2 = asset2(fixture.db);
-   const asset_object& core = core_id(fixture.db);
-   asset_publish_feed_operation op;
-   op.publisher = publisher;
-   op.asset_id = asset2;
-   op.feed.settlement_price = ~price(a1.amount(amount1),a2.amount(amount2));
-   op.feed.core_exchange_rate = ~price(core.amount(amount1), a2.amount(amount2));
-   fixture.trx.operations.push_back(std::move(op));
-   PUSH_TX( fixture.db, fixture.trx, ~0);
-   fixture.generate_block();
-   fixture.trx.clear();
-}
-
 /*****
  * @brief helper method to change a backing asset to a new one
  * @param fixture the database_fixture
@@ -192,7 +163,7 @@ BOOST_AUTO_TEST_CASE( reset_backing_asset_on_witness_asset )
 
    {
       BOOST_TEST_MESSAGE("Adding price feed 1");
-      add_price_feed(*this, active_witnesses[0], bit_usd_id, 1, bit_jmj_id, 300, core_id);
+      publish_feed(active_witnesses[0], bit_usd_id, 1, bit_jmj_id, 300, core_id);
 
       const asset_bitasset_data_object& bitasset = bit_jmj_id(db).bitasset_data(db);
       BOOST_CHECK_EQUAL(bitasset.current_feed.settlement_price.to_real(), 300.0);
@@ -200,7 +171,7 @@ BOOST_AUTO_TEST_CASE( reset_backing_asset_on_witness_asset )
    }
    {
       BOOST_TEST_MESSAGE("Adding price feed 2");
-      add_price_feed(*this, active_witnesses[1], bit_usd_id, 1, bit_jmj_id, 100, core_id);
+      publish_feed(active_witnesses[1], bit_usd_id, 1, bit_jmj_id, 100, core_id);
 
       const asset_bitasset_data_object& bitasset = bit_jmj_id(db).bitasset_data(db);
       BOOST_CHECK_EQUAL(bitasset.current_feed.settlement_price.to_real(), 300.0);
@@ -208,7 +179,7 @@ BOOST_AUTO_TEST_CASE( reset_backing_asset_on_witness_asset )
    }
    {
       BOOST_TEST_MESSAGE("Adding price feed 3");
-      add_price_feed(*this, active_witnesses[2], bit_usd_id, 1, bit_jmj_id, 1, core_id);
+      publish_feed(active_witnesses[2], bit_usd_id, 1, bit_jmj_id, 1, core_id);
 
       const asset_bitasset_data_object& bitasset = bit_jmj_id(db).bitasset_data(db);
       BOOST_CHECK_EQUAL(bitasset.current_feed.settlement_price.to_real(), 100.0);
@@ -225,7 +196,7 @@ BOOST_AUTO_TEST_CASE( reset_backing_asset_on_witness_asset )
    {
       BOOST_TEST_MESSAGE("With underlying bitasset changed from one to another, price feeds should still be publish-able");
       BOOST_TEST_MESSAGE("Re-Adding Witness 1 price feed");
-      add_price_feed(*this, active_witnesses[0], core_id, 1, bit_jmj_id, 30, core_id);
+      publish_feed(active_witnesses[0], core_id, 1, bit_jmj_id, 30, core_id);
 
       const asset_bitasset_data_object& bitasset = bit_jmj_id(db).bitasset_data(db);
       BOOST_CHECK_EQUAL(bitasset.current_feed.settlement_price.to_real(), 1);
@@ -235,7 +206,7 @@ BOOST_AUTO_TEST_CASE( reset_backing_asset_on_witness_asset )
    }
    {
       BOOST_TEST_MESSAGE("Re-Adding Witness 2 price feed");
-      add_price_feed(*this, active_witnesses[1], core_id, 1, bit_jmj_id, 100, core_id);
+      publish_feed(active_witnesses[1], core_id, 1, bit_jmj_id, 100, core_id);
 
       const asset_bitasset_data_object& bitasset = bit_jmj_id(db).bitasset_data(db);
       BOOST_CHECK_EQUAL(bitasset.current_feed.settlement_price.to_real(), 100);
@@ -261,7 +232,7 @@ BOOST_AUTO_TEST_CASE( reset_backing_asset_on_witness_asset )
    {
       BOOST_TEST_MESSAGE("With underlying bitasset changed from one to another, price feeds should still be publish-able");
       BOOST_TEST_MESSAGE("Re-Adding Witness 1 price feed");
-      add_price_feed(*this, active_witnesses[0], bit_usd_id, 1, bit_jmj_id, 30, core_id);
+      publish_feed(active_witnesses[0], bit_usd_id, 1, bit_jmj_id, 30, core_id);
 
       const asset_bitasset_data_object& bitasset = bit_jmj_id(db).bitasset_data(db);
       BOOST_CHECK_EQUAL(bitasset.current_feed.settlement_price.to_real(), 30);
@@ -342,7 +313,7 @@ BOOST_AUTO_TEST_CASE( reset_backing_asset_on_non_witness_asset )
    }
    {
       BOOST_TEST_MESSAGE("Adding Vikram's price feed");
-      add_price_feed(*this, vikram_id, bit_usd_id, 1, bit_jmj_id, 300, core_id);
+      publish_feed(vikram_id, bit_usd_id, 1, bit_jmj_id, 300, core_id);
 
       const asset_bitasset_data_object& bitasset = bit_jmj_id(db).bitasset_data(db);
       BOOST_CHECK_EQUAL(bitasset.current_feed.settlement_price.to_real(), 300.0);
@@ -350,7 +321,7 @@ BOOST_AUTO_TEST_CASE( reset_backing_asset_on_non_witness_asset )
    }
    {
       BOOST_TEST_MESSAGE("Adding Ben's pricing to JMJBIT");
-      add_price_feed(*this, ben_id, bit_usd_id, 1, bit_jmj_id, 100, core_id);
+      publish_feed(ben_id, bit_usd_id, 1, bit_jmj_id, 100, core_id);
 
       const asset_bitasset_data_object& bitasset = bit_jmj_id(db).bitasset_data(db);
       BOOST_CHECK_EQUAL(bitasset.current_feed.settlement_price.to_real(), 300);
@@ -358,7 +329,7 @@ BOOST_AUTO_TEST_CASE( reset_backing_asset_on_non_witness_asset )
    }
    {
       BOOST_TEST_MESSAGE("Adding Dan's pricing to JMJBIT");
-      add_price_feed(*this, dan_id, bit_usd_id, 1, bit_jmj_id, 1, core_id);
+      publish_feed(dan_id, bit_usd_id, 1, bit_jmj_id, 1, core_id);
 
       const asset_bitasset_data_object& bitasset = bit_jmj_id(db).bitasset_data(db);
       BOOST_CHECK_EQUAL(bitasset.current_feed.settlement_price.to_real(), 100);
@@ -381,7 +352,7 @@ BOOST_AUTO_TEST_CASE( reset_backing_asset_on_non_witness_asset )
    }
    {
       BOOST_TEST_MESSAGE("Add a new (and correct) feed price for 1 feed producer");
-      add_price_feed(*this, vikram_id, core_id, 1, bit_jmj_id, 300, core_id);
+      publish_feed(vikram_id, core_id, 1, bit_jmj_id, 300, core_id);
    }
    {
       BOOST_TEST_MESSAGE("Advance to past hard fork");
@@ -416,20 +387,20 @@ BOOST_AUTO_TEST_CASE( reset_backing_asset_on_non_witness_asset )
    {
       BOOST_TEST_MESSAGE("With underlying bitasset changed from one to another, price feeds should still be publish-able");
       BOOST_TEST_MESSAGE("Adding Vikram's price feed");
-      add_price_feed(*this, vikram_id, bit_usd_id, 1, bit_jmj_id, 30, core_id);
+      publish_feed(vikram_id, bit_usd_id, 1, bit_jmj_id, 30, core_id);
 
       const asset_bitasset_data_object& bitasset = bit_jmj_id(db).bitasset_data(db);
       BOOST_CHECK_EQUAL(bitasset.current_feed.settlement_price.to_real(), 30);
       BOOST_CHECK(bitasset.current_feed.maintenance_collateral_ratio == GRAPHENE_DEFAULT_MAINTENANCE_COLLATERAL_RATIO);
 
       BOOST_TEST_MESSAGE("Adding Ben's pricing to JMJBIT");
-      add_price_feed(*this, ben_id, bit_usd_id, 1, bit_jmj_id, 25, core_id);
+      publish_feed(ben_id, bit_usd_id, 1, bit_jmj_id, 25, core_id);
 
       BOOST_CHECK_EQUAL(bitasset.current_feed.settlement_price.to_real(), 30);
       BOOST_CHECK(bitasset.current_feed.maintenance_collateral_ratio == GRAPHENE_DEFAULT_MAINTENANCE_COLLATERAL_RATIO);
 
       BOOST_TEST_MESSAGE("Adding Dan's pricing to JMJBIT");
-      add_price_feed(*this, dan_id, bit_usd_id, 1, bit_jmj_id, 10, core_id);
+      publish_feed(dan_id, bit_usd_id, 1, bit_jmj_id, 10, core_id);
 
       BOOST_CHECK_EQUAL(bitasset.current_feed.settlement_price.to_real(), 25);
       BOOST_CHECK(bitasset.current_feed.maintenance_collateral_ratio == GRAPHENE_DEFAULT_MAINTENANCE_COLLATERAL_RATIO);
