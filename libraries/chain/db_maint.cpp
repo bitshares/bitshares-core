@@ -869,7 +869,7 @@ void cleanup_invalid_feeds_hf_868( database& db )
       }
 
       if ( HARDFORK_CORE_343_TIME != HARDFORK_CORE_868_TIME
-            && old_price != bitasset_data.settlement_price )
+            && old_price != bitasset_data.current_feed.settlement_price )
       {
          db.check_call_orders(current_asset);
       }
