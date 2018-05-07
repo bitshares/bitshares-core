@@ -800,6 +800,48 @@ void update_and_match_call_orders( database& db )
    wlog( "Done updating all call orders for hardfork core-343 at block ${n}", ("n",db.head_block_num()) );
 }
 
+void database::process_bitassets()
+{
+   if(head_block_time() >= HARDFORK_CORE_518_TIME)
+   {
+      for( const auto& d : get_index_type<asset_bitasset_data_index>().indices() )
+      {
+         modify(d, [this](asset_bitasset_data_object &o)
+         {
+            o.force_settled_volume = 0; // Reset all BitAsset force settlement volumes to zero
+
+            const auto &asset = get(o.asset_id);
+            auto flags = asset.options.flags;
+            if ( (flags & witness_fed_asset || flags & committee_fed_asset) &&
+                 (o.options.feed_lifetime_sec < head_block_time().sec_since_epoch()) ) // if smartcoin && check overflow
+            {
+
+               fc::time_point_sec calculate = head_block_time() - o.options.feed_lifetime_sec;
+               for (auto itr = o.feeds.rbegin(); itr != o.feeds.rend();) // loop feeds
+               {
+                  auto feed_time = itr->second.first;
+                  std::advance(itr, 1);
+                  if (feed_time < calculate)
+                     o.feeds.erase(itr.base()); // delete expired feed
+               }
+
+            }
+         });
+         if (d.has_settlement())
+            process_bids(d);
+      }
+   }
+   else {
+      for( const auto& d : get_index_type<asset_bitasset_data_index>().indices() )
+      {
+         // Reset all BitAsset force settlement volumes to zero
+         modify(d, [](asset_bitasset_data_object &o) { o.force_settled_volume = 0; });
+         if (d.has_settlement())
+            process_bids(d);
+      }
+   }
+}
+
 void database::perform_chain_maintenance(const signed_block& next_block, const global_property_object& global_props)
 {
    const auto& gpo = get_global_properties();
@@ -965,13 +1007,7 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
    if( to_update_and_match_call_orders )
       update_and_match_call_orders(*this);
 
-   // Reset all BitAsset force settlement volumes to zero
-   for( const auto& d : get_index_type<asset_bitasset_data_index>().indices() )
-   {
-      modify( d, [](asset_bitasset_data_object& o) { o.force_settled_volume = 0; });
-      if( d.has_settlement() )
-         process_bids(d);
-   }
+   process_bitassets();
 
    // process_budget needs to run at the bottom because
    //   it needs to know the next_maintenance_time
