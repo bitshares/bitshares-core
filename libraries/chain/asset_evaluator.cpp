@@ -395,10 +395,21 @@ void_result asset_update_bitasset_evaluator::do_evaluate(const asset_update_bita
 
 void_result asset_update_bitasset_evaluator::do_apply(const asset_update_bitasset_operation& o)
 { try {
+   // If the minimum number of feeds to calculate a median has changed,
+   // we need to recalculate the median
    bool should_update_feeds = false;
-   // If the minimum number of feeds to calculate a median has changed, we need to recalculate the median
    if( o.new_options.minimum_feeds != bitasset_to_update->options.minimum_feeds )
       should_update_feeds = true;
+
+   // We also need to update median feeds, as well as check call orders
+   // if the feed_lifetime_sec changed (after Hardfork core 890)
+   bool after_hardfork_890 = false;
+   if (db().head_block_time() >= HARDFORK_CORE_890_TIME
+         && o.new_options.feed_lifetime_sec != bitasset_to_update->options.feed_lifetime_sec)
+   {
+      should_update_feeds = true;
+      after_hardfork_890 = true;
+   }
 
    db().modify(*bitasset_to_update, [&](asset_bitasset_data_object& b) {
       b.options = o.new_options;
@@ -406,6 +417,11 @@ void_result asset_update_bitasset_evaluator::do_apply(const asset_update_bitasse
       if( should_update_feeds )
          b.update_median_feeds(db().head_block_time());
    });
+
+   if (after_hardfork_890)
+   {
+      db().check_call_orders(o.asset_to_update(db()));
+   }
 
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }
