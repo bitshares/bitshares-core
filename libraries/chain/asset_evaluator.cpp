@@ -397,6 +397,7 @@ void_result asset_update_bitasset_evaluator::do_apply(const asset_update_bitasse
 {
    try
    {
+      auto& db_conn = db();
       // If the minimum number of feeds to calculate a median has changed, we need to recalculate the median
       bool should_update_feeds = false;
       if( op.new_options.minimum_feeds != bitasset_to_update->options.minimum_feeds )
@@ -405,18 +406,18 @@ void_result asset_update_bitasset_evaluator::do_apply(const asset_update_bitasse
       // feeds must be reset if the backing asset is changed after hardfork 868
       bool backing_asset_changed = false;
       bool is_witness_or_committee_fed = false;
-      if (db().get_dynamic_global_properties().next_maintenance_time > HARDFORK_CORE_868_TIME
+      if (db_conn.get_dynamic_global_properties().next_maintenance_time > HARDFORK_CORE_868_TIME
             && op.new_options.short_backing_asset != bitasset_to_update->options.short_backing_asset)
       {
          backing_asset_changed = true;
          should_update_feeds = true;
-         const asset_object& base_asset = op.asset_to_update(db());
+         const asset_object& base_asset = op.asset_to_update(db_conn);
          if ( base_asset.options.flags & (witness_fed_asset | committee_fed_asset) )
             is_witness_or_committee_fed = true;
       }
 
       // now do the actual modifications to the database object
-      db().modify(*bitasset_to_update, [&](asset_bitasset_data_object& bdo) {
+      db().modify(*bitasset_to_update, [op, backing_asset_changed, is_witness_or_committee_fed, should_update_feeds, &db_conn](asset_bitasset_data_object& bdo) {
          bdo.options = op.new_options;
 
          // are we modifying the underlying? If so, reset the feeds
@@ -435,7 +436,7 @@ void_result asset_update_bitasset_evaluator::do_apply(const asset_update_bitasse
          }
 
          if( should_update_feeds )
-            bdo.update_median_feeds(db().head_block_time());
+            bdo.update_median_feeds(db_conn.head_block_time());
       });
 
       return void_result();
