@@ -435,9 +435,6 @@ void_result asset_update_bitasset_evaluator::do_apply(const asset_update_bitasse
 
          if( should_update_feeds )
             bdo.update_median_feeds(db().head_block_time());
-
-         if ( backing_asset_changed )
-            db().check_call_orders(op.asset_to_update(db()));
       });
 
       return void_result();
