@@ -408,7 +408,8 @@ BOOST_AUTO_TEST_CASE( reset_backing_asset_on_non_witness_asset )
       BOOST_TEST_MESSAGE("Verify feed producers have been reset");
       const asset_bitasset_data_object& jmj_obj = bit_jmj_id(db).bitasset_data(db);
       BOOST_CHECK_EQUAL(jmj_obj.feeds.size(), 3ul);
-      for(const auto& feed : jmj_obj.feeds) {
+      for(const auto& feed : jmj_obj.feeds)
+      {
          BOOST_CHECK(feed.second.second.settlement_price.is_null());
       }
    }

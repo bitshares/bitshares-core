@@ -395,7 +395,8 @@ void_result asset_update_bitasset_evaluator::do_evaluate(const asset_update_bita
 
 void_result asset_update_bitasset_evaluator::do_apply(const asset_update_bitasset_operation& op)
 {
-   try {
+   try
+   {
       // If the minimum number of feeds to calculate a median has changed, we need to recalculate the median
       bool should_update_feeds = false;
       if( op.new_options.minimum_feeds != bitasset_to_update->options.minimum_feeds )

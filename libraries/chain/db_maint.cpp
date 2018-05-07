@@ -809,7 +809,7 @@ void update_and_match_call_orders( database& db )
  *
  * @param db the database
  */
-void cleanup_invalid_feeds_hf_868( database& db )
+void cleanup_invalid_feeds_hf_868( database& db, bool update_and_match_call_orders )
 {
    // for each market issued asset
    const auto& asset_idx = db.get_index_type<asset_index>().indices().get<by_type>();
@@ -826,10 +826,7 @@ void cleanup_invalid_feeds_hf_868( database& db )
 
       // for each feed
       const asset_bitasset_data_object& bitasset_data = current_asset.bitasset_data(db);
-      // NOTE: If HF343 and HF868 roll out at the same time
-      // you can remove this double, and the check_call_orders()
-      // below that relies on it. HF343 will take care of the issue
-      // and there is no need for the extra check_call_orders() call
+      // NOTE: We'll only need old_price if HF343 hasn't rolled out yet
       auto old_price = bitasset_data.settlement_price;
       bool feeds_changed = false; // did any feed change
       auto itr = bitasset_data.feeds.begin();
@@ -837,7 +834,8 @@ void cleanup_invalid_feeds_hf_868( database& db )
       {
          // If the feed is invalid
          if ( (*itr).second.second.settlement_price.quote.asset_id != bitasset_data.options.short_backing_asset
-               && (is_witness_or_committee_fed || (*itr).second.second.settlement_price != price() ) ) {
+               && (is_witness_or_committee_fed || (*itr).second.second.settlement_price != price() ) )
+         {
             feeds_changed = true;
             db.modify(bitasset_data, [&itr, is_witness_or_committee_fed](asset_bitasset_data_object& obj) {
                if (is_witness_or_committee_fed)
@@ -861,14 +859,15 @@ void cleanup_invalid_feeds_hf_868( database& db )
       } // end loop of each feed
 
       // if the feeds were modified, update the median feed
-      if (feeds_changed) {
+      if (feeds_changed)
+      {
          wlog("Found invalid feed for asset ${asset_id} during hardfork core-868", ("asset_id", current_asset));
          db.modify(bitasset_data, [&db](asset_bitasset_data_object &obj) {
             obj.update_median_feeds( db.head_block_time() );
          });
       }
 
-      if ( HARDFORK_CORE_343_TIME != HARDFORK_CORE_868_TIME
+      if ( (!update_and_match_call_orders)
             && old_price != bitasset_data.current_feed.settlement_price )
       {
          db.check_call_orders(current_asset);
@@ -1034,7 +1033,7 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
       to_update_and_match_call_orders = true;
 
    if ( (dgpo.next_maintenance_time <= HARDFORK_CORE_868_TIME) && (next_maintenance_time > HARDFORK_CORE_868_TIME) )
-      cleanup_invalid_feeds_hf_868(*this);
+      cleanup_invalid_feeds_hf_868(*this, to_update_and_match_call_orders);
 
    modify(dgpo, [next_maintenance_time](dynamic_global_property_object& d) {
       d.next_maintenance_time = next_maintenance_time;
