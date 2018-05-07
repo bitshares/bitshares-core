@@ -806,31 +806,33 @@ void database::process_bitassets()
    uint32_t head_epoch_seconds = head_time.sec_since_epoch();
    bool after_hf_core_518 = ( head_time >= HARDFORK_CORE_518_TIME ); // clear expired feeds
 
-   for( const auto& d : get_index_type<asset_bitasset_data_index>().indices() )
+   const auto update_bitasset = [this,head_time,head_epoch_seconds,after_hf_core_518]( asset_bitasset_data_object &o )
    {
-      modify( d, [this,head_time,head_epoch_seconds,after_hf_core_518]( asset_bitasset_data_object &o )
-      {
-         o.force_settled_volume = 0; // Reset all BitAsset force settlement volumes to zero
+      o.force_settled_volume = 0; // Reset all BitAsset force settlement volumes to zero
 
-         // clear expired feeds
-         if( after_hf_core_518 )
+      // clear expired feeds
+      if( after_hf_core_518 )
+      {
+         const auto &asset = get( o.asset_id );
+         auto flags = asset.options.flags;
+         if ( ( flags & ( witness_fed_asset | committee_fed_asset ) ) &&
+              o.options.feed_lifetime_sec < head_epoch_seconds ) // if smartcoin && check overflow
          {
-            const auto &asset = get( o.asset_id );
-            auto flags = asset.options.flags;
-            if ( ( flags & ( witness_fed_asset | committee_fed_asset ) ) &&
-                 o.options.feed_lifetime_sec < head_epoch_seconds ) // if smartcoin && check overflow
+            fc::time_point_sec calculated = head_time - o.options.feed_lifetime_sec;
+            for( auto itr = o.feeds.rbegin(); itr != o.feeds.rend(); ) // loop feeds
             {
-               fc::time_point_sec calculated = head_time - o.options.feed_lifetime_sec;
-               for( auto itr = o.feeds.rbegin(); itr != o.feeds.rend(); ) // loop feeds
-               {
-                  auto feed_time = itr->second.first;
-                  std::advance( itr, 1 );
-                  if( feed_time < calculated )
-                     o.feeds.erase( itr.base() ); // delete expired feed
-               }
+               auto feed_time = itr->second.first;
+               std::advance( itr, 1 );
+               if( feed_time < calculated )
+                  o.feeds.erase( itr.base() ); // delete expired feed
             }
          }
-      });
+      }
+   };
+
+   for( const auto& d : get_index_type<asset_bitasset_data_index>().indices() )
+   {
+      modify( d, update_bitasset );
       if( d.has_settlement() )
          process_bids(d);
    }
