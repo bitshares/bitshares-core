@@ -830,7 +830,7 @@ void cleanup_invalid_feeds_hf_868( database& db )
       // you can remove this double, and the check_call_orders()
       // below that relies on it. HF343 will take care of the issue
       // and there is no need for the extra check_call_orders() call
-      const auto& old_price = bitasset_data.settlement_price;
+      auto old_price = bitasset_data.settlement_price;
       bool feeds_changed = false; // did any feed change
       auto itr = bitasset_data.feeds.begin();
       while (itr != bitasset_data.feeds.end())
