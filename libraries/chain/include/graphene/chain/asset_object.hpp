@@ -216,12 +216,31 @@ namespace graphene { namespace chain {
          share_type settlement_fund;
          ///@}
 
+         /// The time when @ref current_feed would expire
          time_point_sec feed_expiration_time()const
+         {
+            uint32_t current_feed_seconds = current_feed_publication_time.sec_since_epoch();
+            if( std::numeric_limits<uint32_t>::max() - current_feed_seconds <= options.feed_lifetime_sec )
+               return time_point_sec::maximum();
+            else
+               return current_feed_publication_time + options.feed_lifetime_sec;
+         }
+
+         /// The time when @ref current_feed would expire
+         /// @note this implementation suffers integer overflow issue https://github.com/bitshares/bitshares-core/issues/888
+         time_point_sec feed_expiration_time_unsafe()const
          { return current_feed_publication_time + options.feed_lifetime_sec; }
+
          bool feed_is_expired_before_hardfork_615(time_point_sec current_time)const
-         { return feed_expiration_time() >= current_time; }
+         { return feed_expiration_time_unsafe() >= current_time; }
+
+         bool feed_is_expired_before_hardfork_core_888(time_point_sec current_time)const
+         { return feed_expiration_time_unsafe() <= current_time; }
+
+         /// Whether @ref current_feed is expired according to specified time
          bool feed_is_expired(time_point_sec current_time)const
          { return feed_expiration_time() <= current_time; }
+
          void update_median_feeds(time_point_sec current_time);
    };
 

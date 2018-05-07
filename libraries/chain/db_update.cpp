@@ -472,6 +472,13 @@ void database::clear_expired_orders()
 
 void database::update_expired_feeds()
 {
+   auto head_time = head_block_time();
+   auto maint_time = get_dynamic_global_properties().next_maintenance_time;
+
+   bool before_hf_615 = ( head_time < HARDFORK_615_TIME ); // fix feed expiration
+
+   bool after_hf_core_888 = ( maint_time > HARDFORK_CORE_888_TIME ); // fix feed expiration overflow
+
    auto& asset_idx = get_index_type<asset_index>().indices().get<by_type>();
    auto itr = asset_idx.lower_bound( true /** market issued */ );
    while( itr != asset_idx.end() )
@@ -481,22 +488,26 @@ void database::update_expired_feeds()
       assert( a.is_market_issued() );
 
       const asset_bitasset_data_object& b = a.bitasset_data(*this);
+
       bool feed_is_expired;
-      if( head_block_time() < HARDFORK_615_TIME )
-         feed_is_expired = b.feed_is_expired_before_hardfork_615( head_block_time() );
+      if( after_hf_core_888 )
+         feed_is_expired = b.feed_is_expired( head_time );
+      else if( before_hf_615 )
+         feed_is_expired = b.feed_is_expired_before_hardfork_615( head_time );
       else
-         feed_is_expired = b.feed_is_expired( head_block_time() );
+         feed_is_expired = b.feed_is_expired_before_hardfork_core_888( head_time );
+
       if( feed_is_expired )
       {
-         modify(b, [this](asset_bitasset_data_object& a) {
-            a.update_median_feeds(head_block_time());
+         modify(b, [this,head_time](asset_bitasset_data_object& abdo) {
+            abdo.update_median_feeds( head_time );
          });
          check_call_orders(b.current_feed.settlement_price.base.asset_id(*this));
       }
       if( !b.current_feed.core_exchange_rate.is_null() &&
           a.options.core_exchange_rate != b.current_feed.core_exchange_rate )
-         modify(a, [&b](asset_object& a) {
-            a.options.core_exchange_rate = b.current_feed.core_exchange_rate;
+         modify(a, [&b](asset_object& ao) {
+            ao.options.core_exchange_rate = b.current_feed.core_exchange_rate;
          });
    }
 }

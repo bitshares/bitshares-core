@@ -1,0 +1,4 @@
+// bitshares-core issue #888 fix "Possible integer overflow when calculating feed expiration"
+#ifndef HARDFORK_CORE_888_TIME
+#define HARDFORK_CORE_888_TIME (fc::time_point_sec( 1600000000 ))
+#endif
