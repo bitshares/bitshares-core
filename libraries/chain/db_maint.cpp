@@ -820,7 +820,6 @@ void database::process_bitassets()
             if ( ( flags & ( witness_fed_asset | committee_fed_asset ) ) &&
                  o.options.feed_lifetime_sec < head_epoch_seconds ) // if smartcoin && check overflow
             {
-
                fc::time_point_sec calculated = head_time - o.options.feed_lifetime_sec;
                for( auto itr = o.feeds.rbegin(); itr != o.feeds.rend(); ) // loop feeds
                {
@@ -829,7 +828,6 @@ void database::process_bitassets()
                   if( feed_time < calculated )
                      o.feeds.erase( itr.base() ); // delete expired feed
                }
-
             }
          }
       });
