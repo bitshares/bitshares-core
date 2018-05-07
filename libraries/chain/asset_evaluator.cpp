@@ -396,24 +396,24 @@ void_result asset_update_bitasset_evaluator::do_evaluate(const asset_update_bita
 void_result asset_update_bitasset_evaluator::do_apply(const asset_update_bitasset_operation& o)
 { try {
    auto& db_conn = db();
-   // If the minimum number of feeds to calculate a median has changed,
-   // we need to recalculate the median
-   bool should_update_feeds = false;
-   if( o.new_options.minimum_feeds != bitasset_to_update->options.minimum_feeds )
-      should_update_feeds = true;
 
-   // We also need to update median feeds, as well as check call orders
-   // if the feed_lifetime_sec changed (after Hardfork core 890)
-   bool after_hardfork_890 = false;
-   if (db_conn.get_dynamic_global_properties().next_maintenance_time > HARDFORK_CORE_890_TIME
-         && o.new_options.feed_lifetime_sec != bitasset_to_update->options.feed_lifetime_sec)
-   {
-      should_update_feeds = true;
-      after_hardfork_890 = true;
-   }
-
-   db().modify(*bitasset_to_update, [ &o, should_update_feeds, after_hardfork_890, &db_conn ](asset_bitasset_data_object& b) {
+   db_conn.modify(*bitasset_to_update, [ &o, &db_conn ](asset_bitasset_data_object& b) {
       b.options = o.new_options;
+
+      // If the minimum number of feeds to calculate a median has changed,
+      // we need to recalculate the median
+      bool should_update_feeds = false;
+      if( o.new_options.minimum_feeds != bitasset_to_update->options.minimum_feeds )
+         should_update_feeds = true;
+
+      // We also need to update median feeds, as well as check call orders
+      // if the feed_lifetime_sec changed (after Hardfork core 890)
+      bool after_hardfork_890 = false;
+      if (db_conn.get_dynamic_global_properties().next_maintenance_time > HARDFORK_CORE_890_TIME )
+      {
+         should_update_feeds = true;
+         after_hardfork_890 = true;
+      }
 
       if( should_update_feeds )
       {
