@@ -397,17 +397,39 @@ void_result asset_update_bitasset_evaluator::do_evaluate(const asset_update_bita
 
 void_result asset_update_bitasset_evaluator::do_apply(const asset_update_bitasset_operation& o)
 { try {
-   bool should_update_feeds = false;
-   // If the minimum number of feeds to calculate a median has changed, we need to recalculate the median
-   if( o.new_options.minimum_feeds != bitasset_to_update->options.minimum_feeds )
-      should_update_feeds = true;
+   auto& db_conn = db();
 
-   db().modify(*bitasset_to_update, [&](asset_bitasset_data_object& b) {
+   db_conn.modify(*bitasset_to_update, [ &o, &db_conn ](asset_bitasset_data_object& b) {
+
+      // If the minimum number of feeds to calculate a median has changed,
+      // we need to recalculate the median
+      bool should_update_feeds = false;
+      if( o.new_options.minimum_feeds != b.options.minimum_feeds )
+         should_update_feeds = true;
+
+      // We also need to update median feeds, as well as check call orders
+      // if the feed_lifetime_sec changed (after Hardfork core 890)
+      bool after_hardfork_890 = false;
+      if (db_conn.get_dynamic_global_properties().next_maintenance_time > HARDFORK_CORE_890_TIME )
+      {
+         should_update_feeds = true;
+         after_hardfork_890 = true;
+      }
+
       b.options = o.new_options;
 
       if( should_update_feeds )
-         b.update_median_feeds(db().head_block_time());
+      {
+         auto old_feed_price = b.current_feed.settlement_price;
+         b.update_median_feeds(db_conn.head_block_time());
+         if (after_hardfork_890
+               && old_feed_price != b.current_feed.settlement_price)
+         {
+            db_conn.check_call_orders(o.asset_to_update(db_conn));
+         }
+      }
    });
+
 
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }
