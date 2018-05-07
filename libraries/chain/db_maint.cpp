@@ -807,9 +807,12 @@ void update_and_match_call_orders( database& db )
  * feeds. This method will run at the hardfork time, and erase (or nullify) feeds
  * that have incorrect backing assets.
  *
+ * TODO: Remove if not triggered at hf time
+ *
  * @param db the database
+ * @param skip_check_call_orders true if check_call_orders() should not be called
  */
-void cleanup_invalid_feeds_hf_868( database& db, bool update_and_match_call_orders )
+void cleanup_invalid_feeds_hf_868( database& db, bool skip_check_call_orders )
 {
    // for each market issued asset
    const auto& asset_idx = db.get_index_type<asset_index>().indices().get<by_type>();
@@ -827,7 +830,7 @@ void cleanup_invalid_feeds_hf_868( database& db, bool update_and_match_call_orde
       // for each feed
       const asset_bitasset_data_object& bitasset_data = current_asset.bitasset_data(db);
       // NOTE: We'll only need old_price if HF343 hasn't rolled out yet
-      auto old_price = bitasset_data.settlement_price;
+      auto old_price = bitasset_data.current_feed.settlement_price;
       bool feeds_changed = false; // did any feed change
       auto itr = bitasset_data.feeds.begin();
       while (itr != bitasset_data.feeds.end())
@@ -867,7 +870,7 @@ void cleanup_invalid_feeds_hf_868( database& db, bool update_and_match_call_orde
          });
       }
 
-      if ( (!update_and_match_call_orders)
+      if ( (!skip_check_call_orders)
             && old_price != bitasset_data.current_feed.settlement_price )
       {
          db.check_call_orders(current_asset);
