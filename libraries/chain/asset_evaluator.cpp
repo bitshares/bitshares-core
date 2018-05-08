@@ -308,7 +308,7 @@ void_result asset_update_evaluator::do_apply(const asset_update_operation& o)
    database& d = db();
 
    // If we are now disabling force settlements, cancel all open force settlement orders
-   if( o.new_options.flags & disable_force_settle && asset_to_update->can_force_settle() )
+   if( (o.new_options.flags & disable_force_settle) && asset_to_update->can_force_settle() )
    {
       const auto& idx = d.get_index_type<force_settlement_index>().indices().get<by_expiration>();
       // Funky iteration code because we're removing objects as we go. We have to re-initialize itr every loop instead
@@ -390,27 +390,66 @@ void_result asset_update_bitasset_evaluator::do_evaluate(const asset_update_bita
    }
 
    bitasset_to_update = &b;
+
    FC_ASSERT( o.issuer == a.issuer, "", ("o.issuer", o.issuer)("a.issuer", a.issuer) );
 
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }
 
-void_result asset_update_bitasset_evaluator::do_apply(const asset_update_bitasset_operation& o)
-{ try {
-   bool should_update_feeds = false;
-   // If the minimum number of feeds to calculate a median has changed, we need to recalculate the median
-   if( o.new_options.minimum_feeds != bitasset_to_update->options.minimum_feeds )
-      should_update_feeds = true;
+void_result asset_update_bitasset_evaluator::do_apply(const asset_update_bitasset_operation& op)
+{
+   try
+   {
+      auto& db_conn = db();
 
-   db().modify(*bitasset_to_update, [&](asset_bitasset_data_object& b) {
-      b.options = o.new_options;
+      // now do the actual modifications to the database object
+      db().modify(*bitasset_to_update, [&op, &db_conn](asset_bitasset_data_object& bdo) {
 
-      if( should_update_feeds )
-         b.update_median_feeds(db().head_block_time());
-   });
+         // If the minimum number of feeds to calculate a median has changed, we need to recalculate the median
+         bool should_update_feeds = false;
+         if( op.new_options.minimum_feeds != bdo.options.minimum_feeds )
+            should_update_feeds = true;
 
-   return void_result();
-} FC_CAPTURE_AND_RETHROW( (o) ) }
+         // feeds must be reset if the backing asset is changed after hardfork 868
+         bool backing_asset_changed = false;
+         bool is_witness_or_committee_fed = false;
+         if (db_conn.get_dynamic_global_properties().next_maintenance_time > HARDFORK_CORE_868_TIME
+               && op.new_options.short_backing_asset != bdo.options.short_backing_asset)
+         {
+            backing_asset_changed = true;
+            should_update_feeds = true;
+            if ( op.asset_to_update(db_conn).options.flags & (witness_fed_asset | committee_fed_asset) )
+               is_witness_or_committee_fed = true;
+         }
+
+         bdo.options = op.new_options;
+
+         // are we modifying the underlying? If so, reset the feeds
+         if (backing_asset_changed) {
+            if ( is_witness_or_committee_fed )
+            {
+               bdo.feeds.clear();
+            }
+            else
+            {
+               // for non-witness-feeding and non-committee-feeding assets, modify all feeds
+               // published by producers to nothing, since we can't simply remove them. For more information:
+               // https://github.com/bitshares/bitshares-core/pull/832#issuecomment-384112633
+               for(auto& current_feed : bdo.feeds)
+               {
+                  // If this logic grows, it may be good to move it to a reset method in price_feed
+                  current_feed.second.second.settlement_price = price();
+               }
+            }
+         }
+
+         if( should_update_feeds )
+            bdo.update_median_feeds(db_conn.head_block_time());
+      });
+
+      return void_result();
+   } FC_CAPTURE_AND_RETHROW( (op) )
+}
 
 void_result asset_update_feed_producers_evaluator::do_evaluate(const asset_update_feed_producers_evaluator::operation_type& o)
 { try {
@@ -580,7 +619,9 @@ void_result asset_publish_feeds_evaluator::do_evaluate(const asset_publish_feed_
       FC_ASSERT( !bitasset.has_settlement(), "No further feeds may be published after a settlement event" );
    }
 
+   // the settlement price must be quoted in terms of the backing asset
    FC_ASSERT( o.feed.settlement_price.quote.asset_id == bitasset.options.short_backing_asset );
+
    if( d.head_block_time() > HARDFORK_480_TIME )
    {
       if( !o.feed.core_exchange_rate.is_null() )

@@ -838,6 +838,84 @@ void database::process_bitassets()
    }
 }
 
+/******
+ * @brief cleanup feeds with wrong assets
+ *
+ * Prior to hardfork 868, switching a bitasset's shorting asset would not reset its
+ * feeds. This method will run at the hardfork time, and erase (or nullify) feeds
+ * that have incorrect backing assets.
+ *
+ * TODO: Remove if not triggered at hf time
+ *
+ * @param db the database
+ * @param skip_check_call_orders true if check_call_orders() should not be called
+ */
+void cleanup_invalid_feeds_hf_868( database& db, bool skip_check_call_orders )
+{
+   // for each market issued asset
+   const auto& asset_idx = db.get_index_type<asset_index>().indices().get<by_type>();
+   for(auto asset_itr = asset_idx.lower_bound(true); asset_itr != asset_idx.end(); ++asset_itr)
+   {
+      const auto& current_asset = *asset_itr;
+      // Incorrect witness & committee feeds can simply be removed.
+      // For non-witness-fed and non-committee-fed assets, set incorrect
+      // feeds to price(), since we can't simply remove them. For more information:
+      // https://github.com/bitshares/bitshares-core/pull/832#issuecomment-384112633
+      bool is_witness_or_committee_fed = false;
+      if ( current_asset.options.flags & (witness_fed_asset | committee_fed_asset) )
+         is_witness_or_committee_fed = true;
+
+      // for each feed
+      const asset_bitasset_data_object& bitasset_data = current_asset.bitasset_data(db);
+      // NOTE: We'll only need old_price if HF343 hasn't rolled out yet
+      auto old_price = bitasset_data.current_feed.settlement_price;
+      bool feeds_changed = false; // did any feed change
+      auto itr = bitasset_data.feeds.begin();
+      while (itr != bitasset_data.feeds.end())
+      {
+         // If the feed is invalid
+         if ( (*itr).second.second.settlement_price.quote.asset_id != bitasset_data.options.short_backing_asset
+               && (is_witness_or_committee_fed || (*itr).second.second.settlement_price != price() ) )
+         {
+            feeds_changed = true;
+            db.modify(bitasset_data, [&itr, is_witness_or_committee_fed](asset_bitasset_data_object& obj) {
+               if (is_witness_or_committee_fed)
+               {
+                  // erase the invalid feed
+                  itr = obj.feeds.erase(itr);
+               }
+               else
+               {
+                  // nullify the invalid feed
+                  (*obj.feeds.find( (*itr).first )).second.second.settlement_price = price();
+                  ++itr;
+               }
+            });
+         }
+         else
+         {
+            // Feed is valid. Skip it.
+            ++itr;
+         }
+      } // end loop of each feed
+
+      // if the feeds were modified, update the median feed
+      if (feeds_changed)
+      {
+         wlog("Found invalid feed for asset ${asset_id} during hardfork core-868", ("asset_id", current_asset));
+         db.modify(bitasset_data, [&db](asset_bitasset_data_object &obj) {
+            obj.update_median_feeds( db.head_block_time() );
+         });
+
+         if ( (!skip_check_call_orders)
+               && old_price != bitasset_data.current_feed.settlement_price )
+         {
+            db.check_call_orders(current_asset);
+         } // checl_call_orders should be called
+      } // feeds changed
+   } // for every asset
+}
+
 void database::perform_chain_maintenance(const signed_block& next_block, const global_property_object& global_props)
 {
    const auto& gpo = get_global_properties();
@@ -993,6 +1071,9 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
    bool to_update_and_match_call_orders = false;
    if( (dgpo.next_maintenance_time <= HARDFORK_CORE_343_TIME) && (next_maintenance_time > HARDFORK_CORE_343_TIME) )
       to_update_and_match_call_orders = true;
+
+   if ( (dgpo.next_maintenance_time <= HARDFORK_CORE_868_TIME) && (next_maintenance_time > HARDFORK_CORE_868_TIME) )
+      cleanup_invalid_feeds_hf_868(*this, to_update_and_match_call_orders);
 
    modify(dgpo, [next_maintenance_time](dynamic_global_property_object& d) {
       d.next_maintenance_time = next_maintenance_time;
