@@ -868,15 +868,14 @@ void cleanup_invalid_feeds_hf_868( database& db, bool skip_check_call_orders )
          db.modify(bitasset_data, [&db](asset_bitasset_data_object &obj) {
             obj.update_median_feeds( db.head_block_time() );
          });
-      }
 
-      if ( (!skip_check_call_orders)
-            && old_price != bitasset_data.current_feed.settlement_price )
-      {
-         db.check_call_orders(current_asset);
-      }
-   }
-
+         if ( (!skip_check_call_orders)
+               && old_price != bitasset_data.current_feed.settlement_price )
+         {
+            db.check_call_orders(current_asset);
+         } // checl_call_orders should be called
+      } // feeds changed
+   } // for every asset
 }
 
 void database::perform_chain_maintenance(const signed_block& next_block, const global_property_object& global_props)

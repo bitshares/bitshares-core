@@ -388,6 +388,7 @@ void_result asset_update_bitasset_evaluator::do_evaluate(const asset_update_bita
    }
 
    bitasset_to_update = &b;
+
    FC_ASSERT( o.issuer == a.issuer, "", ("o.issuer", o.issuer)("a.issuer", a.issuer) );
 
    return void_result();
@@ -400,7 +401,7 @@ void_result asset_update_bitasset_evaluator::do_apply(const asset_update_bitasse
       auto& db_conn = db();
 
       // now do the actual modifications to the database object
-      db().modify(*bitasset_to_update, [op, &db_conn](asset_bitasset_data_object& bdo) {
+      db().modify(*bitasset_to_update, [&op, &db_conn](asset_bitasset_data_object& bdo) {
 
          // If the minimum number of feeds to calculate a median has changed, we need to recalculate the median
          bool should_update_feeds = false;
@@ -415,8 +416,7 @@ void_result asset_update_bitasset_evaluator::do_apply(const asset_update_bitasse
          {
             backing_asset_changed = true;
             should_update_feeds = true;
-            const asset_object& base_asset = op.asset_to_update(db_conn);
-            if ( base_asset.options.flags & (witness_fed_asset | committee_fed_asset) )
+            if ( op.asset_to_update(db_conn).options.flags & (witness_fed_asset | committee_fed_asset) )
                is_witness_or_committee_fed = true;
          }
 
