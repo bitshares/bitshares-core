@@ -366,7 +366,8 @@ namespace graphene { namespace chain {
           */
          ///@{
          int match( const limit_order_object& taker, const limit_order_object& maker, const price& trade_price );
-         int match( const limit_order_object& taker, const call_order_object& maker, const price& trade_price );
+         int match( const limit_order_object& taker, const call_order_object& maker, const price& trade_price,
+                    const price& feed_price, const uint16_t maintenance_collateral_ratio );
          /// @return the amount of asset settled
          asset match(const call_order_object& call,
                    const force_settlement_object& settle,
@@ -467,6 +468,7 @@ namespace graphene { namespace chain {
          void update_active_committee_members();
          void update_worker_votes();
          void process_bids( const asset_bitasset_data_object& bad );
+         void process_bitassets();
 
          template<class... Types>
          void perform_account_maintenance(std::tuple<Types...> helpers);

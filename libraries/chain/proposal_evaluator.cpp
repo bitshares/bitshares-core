@@ -26,6 +26,8 @@
 #include <graphene/chain/proposal_object.hpp>
 #include <graphene/chain/hardfork.hpp>
 
+#include <fc/smart_ref_impl.hpp>
+
 namespace graphene { namespace chain {
 
 
@@ -33,12 +35,22 @@ struct proposal_operation_hardfork_visitor
 {
    typedef void result_type;
    const fc::time_point_sec block_time;
+   const fc::time_point_sec next_maintenance_time;
 
-   proposal_operation_hardfork_visitor(const fc::time_point_sec t) : block_time(t) {}
+   proposal_operation_hardfork_visitor( const fc::time_point_sec bt, const fc::time_point_sec nmt )
+   : block_time(bt), next_maintenance_time(nmt) {}
 
    template<typename T>
    void operator()(const T &v) const {}
 
+   // TODO review and cleanup code below after hard fork
+   // hf_834
+   void operator()(const graphene::chain::call_order_update_operation &v) const {
+      if (next_maintenance_time <= HARDFORK_CORE_834_TIME) {
+         FC_ASSERT( !v.extensions.value.target_collateral_ratio.valid(),
+                    "Can not set target_collateral_ratio in call_order_update_operation before hardfork 834." );
+      }
+   }
    // hf_620
    void operator()(const graphene::chain::asset_create_operation &v) const {
       if (block_time < HARDFORK_CORE_620_TIME) {
@@ -107,7 +119,8 @@ void_result proposal_create_evaluator::do_evaluate(const proposal_create_operati
 
    // Calling the proposal hardfork visitor
    const fc::time_point_sec block_time = d.head_block_time();
-   proposal_operation_hardfork_visitor vtor(block_time);
+   const fc::time_point_sec next_maint_time = d.get_dynamic_global_properties().next_maintenance_time;
+   proposal_operation_hardfork_visitor vtor( block_time, next_maint_time );
    vtor( o );
    if( block_time < HARDFORK_CORE_214_TIME )
    { // cannot be removed after hf, unfortunately

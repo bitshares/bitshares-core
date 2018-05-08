@@ -908,7 +908,8 @@ operation_result database_fixture::force_settle( const account_object& who, asse
    return op_result;
 } FC_CAPTURE_AND_RETHROW( (who)(what) ) }
 
-const call_order_object* database_fixture::borrow(const account_object& who, asset what, asset collateral)
+const call_order_object* database_fixture::borrow( const account_object& who, asset what, asset collateral,
+                                                   optional<uint16_t> target_cr )
 { try {
    set_expiration( db, trx );
    trx.operations.clear();
@@ -916,6 +917,7 @@ const call_order_object* database_fixture::borrow(const account_object& who, ass
    update.funding_account = who.id;
    update.delta_collateral = collateral;
    update.delta_debt = what;
+   update.extensions.value.target_collateral_ratio = target_cr;
    trx.operations.push_back(update);
    for( auto& op : trx.operations ) db.current_fee_schedule().set_fee(op);
    trx.validate();
@@ -930,9 +932,9 @@ const call_order_object* database_fixture::borrow(const account_object& who, ass
    if( itr != call_idx.end() )
       call_obj = &*itr;
    return call_obj;
-} FC_CAPTURE_AND_RETHROW( (who.name)(what)(collateral) ) }
+} FC_CAPTURE_AND_RETHROW( (who.name)(what)(collateral)(target_cr) ) }
 
-void database_fixture::cover(const account_object& who, asset what, asset collateral)
+void database_fixture::cover(const account_object& who, asset what, asset collateral, optional<uint16_t> target_cr)
 { try {
    set_expiration( db, trx );
    trx.operations.clear();
@@ -940,13 +942,14 @@ void database_fixture::cover(const account_object& who, asset what, asset collat
    update.funding_account = who.id;
    update.delta_collateral = -collateral;
    update.delta_debt = -what;
+   update.extensions.value.target_collateral_ratio = target_cr;
    trx.operations.push_back(update);
    for( auto& op : trx.operations ) db.current_fee_schedule().set_fee(op);
    trx.validate();
    db.push_transaction(trx, ~0);
    trx.operations.clear();
    verify_asset_supplies(db);
-} FC_CAPTURE_AND_RETHROW( (who.name)(what)(collateral) ) }
+} FC_CAPTURE_AND_RETHROW( (who.name)(what)(collateral)(target_cr) ) }
 
 void database_fixture::bid_collateral(const account_object& who, const asset& to_bid, const asset& to_cover)
 { try {
