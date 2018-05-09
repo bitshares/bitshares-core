@@ -348,7 +348,7 @@ class database_api
       /**
        * @brief Get assets alphabetically by symbol name
        * @param lower_bound_symbol Lower bound of symbol names to retrieve
-       * @param limit Maximum number of assets to fetch (must not exceed 100)
+       * @param limit Maximum number of assets to fetch (must not exceed 101)
        * @return The assets found
        */
       vector<asset_object> list_assets(const string& lower_bound_symbol, uint32_t limit)const;
