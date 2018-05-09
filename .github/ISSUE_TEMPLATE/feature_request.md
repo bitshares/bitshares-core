@@ -4,6 +4,14 @@ about: Suggest an idea for the BitShares Core Team to evaluate and prioritize fo
 
 ---
 
+**Instructions**
+Pleaae include a detailed Title above. Next, please complete the following sections below:
+* User Story
+* Impacts
+* Aditional Context (optional)
+
+Finally, press the 'Submit new issue' button. The Core Team will evaluate and prioritize your Feature Request for future development. 
+
 **User Story**
 Please tell us about your feature request using the User Story format:
 As a `<persona>` I want `<some functionality>` so that `<some benefit is realized>`.
