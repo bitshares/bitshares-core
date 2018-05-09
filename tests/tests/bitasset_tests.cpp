@@ -489,7 +489,9 @@ BOOST_AUTO_TEST_CASE( hf_890_test )
    generate_blocks(HARDFORK_CORE_890_TIME + maint_interval);
    set_expiration( db, trx );
 
-   // change feed lifetime
+   // change feed lifetime so that some feeds expire,
+   // thereby moving the median feed and causing call orders
+   // to execute
    {
       BOOST_TEST_MESSAGE("Adjust feed lifetime again.");
       asset_update_bitasset_operation ba_op;
