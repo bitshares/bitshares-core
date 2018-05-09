@@ -462,11 +462,17 @@ static bool update_bitasset_object_options(
       }
    }
 
-   const auto old_feed_price = bdo.current_feed.settlement_price;
    if( should_update_feeds )
+   {
+      const auto old_feed_price = bdo.current_feed.settlement_price;
       bdo.update_median_feeds(db.head_block_time());
 
-   return next_maint_time > HARDFORK_CORE_890_TIME && old_feed_price != bdo.current_feed.settlement_price;
+      return next_maint_time > HARDFORK_CORE_890_TIME && old_feed_price != bdo.current_feed.settlement_price;
+   }
+   else
+   {
+      return false;
+   }
 }
 
 void_result asset_update_bitasset_evaluator::do_apply(const asset_update_bitasset_operation& op)
