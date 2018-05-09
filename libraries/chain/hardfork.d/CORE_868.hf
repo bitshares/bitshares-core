@@ -1,0 +1,4 @@
+// bitshares-core issue #868 Fix "Clear price feed data after updated a bitAsset's backing asset ID"
+#ifndef HARDFORK_CORE_868_TIME
+#define HARDFORK_CORE_868_TIME (fc::time_point_sec( 1535625300 ))
+#endif

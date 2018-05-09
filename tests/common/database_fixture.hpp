@@ -209,6 +209,24 @@ struct database_fixture {
    void update_feed_producers(const asset_object& mia, flat_set<account_id_type> producers);
    void publish_feed(asset_id_type mia, account_id_type by, const price_feed& f)
    { publish_feed(mia(db), by(db), f); }
+
+   /***
+    * @brief helper method to add a price feed
+    *
+    * Adds a price feed for asset2, pushes the transaction, and generates the block
+    *
+    * @param publisher who is publishing the feed
+    * @param asset1 the base asset
+    * @param amount1 the amount of the base asset
+    * @param asset2 the quote asset
+    * @param amount2 the amount of the quote asset
+    * @param core_id id of core (helps with core_exchange_rate)
+    */
+   void publish_feed(const account_id_type& publisher,
+         const asset_id_type& asset1, int64_t amount1,
+         const asset_id_type& asset2, int64_t amount2,
+         const asset_id_type& core_id);
+
    void publish_feed(const asset_object& mia, const account_object& by, const price_feed& f);
 
    const call_order_object* borrow( account_id_type who, asset what, asset collateral,

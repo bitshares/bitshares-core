@@ -843,6 +843,38 @@ void database_fixture::publish_feed( const asset_object& mia, const account_obje
    verify_asset_supplies(db);
 }
 
+/***
+ * @brief helper method to add a price feed
+ *
+ * Adds a price feed for asset2, pushes the transaction, and generates the block
+ *
+ * @param fixture the database_fixture
+ * @param publisher who is publishing the feed
+ * @param asset1 the base asset
+ * @param amount1 the amount of the base asset
+ * @param asset2 the quote asset
+ * @param amount2 the amount of the quote asset
+ * @param core_id id of core (helps with core_exchange_rate)
+ */
+void database_fixture::publish_feed(const account_id_type& publisher,
+      const asset_id_type& asset1, int64_t amount1,
+      const asset_id_type& asset2, int64_t amount2,
+      const asset_id_type& core_id)
+{
+   const asset_object& a1 = asset1(db);
+   const asset_object& a2 = asset2(db);
+   const asset_object& core = core_id(db);
+   asset_publish_feed_operation op;
+   op.publisher = publisher;
+   op.asset_id = asset2;
+   op.feed.settlement_price = ~price(a1.amount(amount1),a2.amount(amount2));
+   op.feed.core_exchange_rate = ~price(core.amount(amount1), a2.amount(amount2));
+   trx.operations.push_back(std::move(op));
+   PUSH_TX( db, trx, ~0);
+   generate_block();
+   trx.clear();
+}
+
 void database_fixture::force_global_settle( const asset_object& what, const price& p )
 { try {
    set_expiration( db, trx );
