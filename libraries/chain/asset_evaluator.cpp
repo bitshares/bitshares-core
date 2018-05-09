@@ -408,7 +408,9 @@ void_result asset_update_bitasset_evaluator::do_evaluate(const asset_update_bita
  * @param bdo the actual database object
  * @param asset_to_update the asset_object related to this bitasset_data_object
  */
-static void update_bitasset_object_options(const asset_update_bitasset_operation& op, database& db, asset_bitasset_data_object& bdo, const asset_object& asset_to_update )
+static void update_bitasset_object_options(
+      const asset_update_bitasset_operation& op, database& db,
+      asset_bitasset_data_object& bdo, const asset_object& asset_to_update )
 {
    // If the minimum number of feeds to calculate a median has changed, we need to recalculate the median
    bool should_update_feeds = false;
@@ -430,7 +432,8 @@ static void update_bitasset_object_options(const asset_update_bitasset_operation
    bdo.options = op.new_options;
 
    // are we modifying the underlying? If so, reset the feeds
-   if (backing_asset_changed) {
+   if (backing_asset_changed)
+   {
       if ( is_witness_or_committee_fed )
       {
          bdo.feeds.clear();
@@ -458,7 +461,7 @@ void_result asset_update_bitasset_evaluator::do_apply(const asset_update_bitasse
       auto& db_conn = db();
       const auto& asset_being_updated = (*asset_to_update);
 
-      db().modify(*bitasset_to_update, [&op, &asset_being_updated, &db_conn](asset_bitasset_data_object& bdo) {
+      db_conn.modify(*bitasset_to_update, [&op, &asset_being_updated, &db_conn](asset_bitasset_data_object& bdo) {
          update_bitasset_object_options(op, db_conn, bdo, asset_being_updated);
       });
 
