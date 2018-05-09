@@ -422,7 +422,8 @@ static bool update_bitasset_object_options(
       should_update_feeds = true;
 
    // We need to call check_call_orders if the settlement price changes after hardfork 890
-   if (next_maint_time > HARDFORK_CORE_890_TIME) {
+   if (next_maint_time > HARDFORK_CORE_890_TIME)
+   {
       // after hardfork 890, we also should call update_median_feeds
       // if the feed_lifetime_sec changed
       if (op.new_options.feed_lifetime_sec != bdo.options.feed_lifetime_sec)
