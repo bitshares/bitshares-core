@@ -144,7 +144,7 @@
 #define GRAPHENE_RECENTLY_MISSED_COUNT_INCREMENT             4
 #define GRAPHENE_RECENTLY_MISSED_COUNT_DECREMENT             3
 
-#define GRAPHENE_CURRENT_DB_VERSION                          "BTS2.11"
+#define GRAPHENE_CURRENT_DB_VERSION                          "BTS2.13"
 
 #define GRAPHENE_IRREVERSIBLE_THRESHOLD                      (70 * GRAPHENE_1_PERCENT)
 
@@ -169,3 +169,5 @@
 ///@}
 
 #define GRAPHENE_FBA_STEALTH_DESIGNATED_ASSET (asset_id_type(743))
+
+#define GRAPHENE_MAX_NESTED_OBJECTS (200)

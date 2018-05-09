@@ -72,4 +72,4 @@ for pid in child_procs:
 
 time.sleep(2)
 for pid in child_procs:
-    os.kill(pid, signal.SIGKILL)
+os.kill(pid, signal.SIGKILL)

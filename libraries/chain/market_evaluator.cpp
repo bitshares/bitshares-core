@@ -147,13 +147,6 @@ void_result call_order_update_evaluator::do_evaluate(const call_order_update_ope
    else if( _bitasset_data->current_feed.settlement_price.is_null() )
       FC_THROW_EXCEPTION(insufficient_feeds, "Cannot borrow asset with no price feed.");
 
-   if( o.delta_debt.amount < 0 )
-   {
-      FC_ASSERT( d.get_balance(*_paying_account, *_debt_asset) >= o.delta_debt,
-                 "Cannot cover by ${c} when payer only has ${b}",
-                 ("c", o.delta_debt.amount)("b", d.get_balance(*_paying_account, *_debt_asset).amount) );
-   }
-
    if( o.delta_collateral.amount > 0 )
    {
       FC_ASSERT( d.get_balance(*_paying_account, _bitasset_data->options.short_backing_asset(d)) >= o.delta_collateral,
@@ -176,7 +169,7 @@ void_result call_order_update_evaluator::do_apply(const call_order_update_operat
       // Deduct the debt paid from the total supply of the debt asset.
       d.modify(_debt_asset->dynamic_asset_data_id(d), [&](asset_dynamic_data_object& dynamic_asset) {
          dynamic_asset.current_supply += o.delta_debt.amount;
-         assert(dynamic_asset.current_supply >= 0);
+         FC_ASSERT(dynamic_asset.current_supply >= 0);
       });
    }
 

@@ -1388,7 +1388,6 @@ namespace graphene { namespace net { namespace detail {
               wlog("Disconnecting peer ${peer} because they haven't made any progress on my remaining ${count} sync item requests",
                    ("peer", active_peer->get_remote_endpoint())("count", active_peer->sync_items_requested_from_peer.size()));
               disconnect_due_to_request_timeout = true;
-              break;
             }
             if (!disconnect_due_to_request_timeout &&
                 active_peer->item_ids_requested_from_peer &&
@@ -1853,10 +1852,10 @@ namespace graphene { namespace net { namespace detail {
 #endif
       user_data["bitness"] = sizeof(void*) * 8;
 
-      user_data["node_id"] = _node_id;
+      user_data["node_id"] = fc::variant( _node_id, 1 );
 
       item_hash_t head_block_id = _delegate->get_head_block_id();
-      user_data["last_known_block_hash"] = head_block_id;
+      user_data["last_known_block_hash"] = fc::variant( head_block_id, 1 );
       user_data["last_known_block_number"] = _delegate->get_block_number(head_block_id);
       user_data["last_known_block_time"] = _delegate->get_block_time(head_block_id);
 
@@ -1872,19 +1871,19 @@ namespace graphene { namespace net { namespace detail {
       if (user_data.contains("graphene_git_revision_sha"))
         originating_peer->graphene_git_revision_sha = user_data["graphene_git_revision_sha"].as_string();
       if (user_data.contains("graphene_git_revision_unix_timestamp"))
-        originating_peer->graphene_git_revision_unix_timestamp = fc::time_point_sec(user_data["graphene_git_revision_unix_timestamp"].as<uint32_t>());
+        originating_peer->graphene_git_revision_unix_timestamp = fc::time_point_sec(user_data["graphene_git_revision_unix_timestamp"].as<uint32_t>(1));
       if (user_data.contains("fc_git_revision_sha"))
         originating_peer->fc_git_revision_sha = user_data["fc_git_revision_sha"].as_string();
       if (user_data.contains("fc_git_revision_unix_timestamp"))
-        originating_peer->fc_git_revision_unix_timestamp = fc::time_point_sec(user_data["fc_git_revision_unix_timestamp"].as<uint32_t>());
+        originating_peer->fc_git_revision_unix_timestamp = fc::time_point_sec(user_data["fc_git_revision_unix_timestamp"].as<uint32_t>(1));
       if (user_data.contains("platform"))
         originating_peer->platform = user_data["platform"].as_string();
       if (user_data.contains("bitness"))
-        originating_peer->bitness = user_data["bitness"].as<uint32_t>();
+        originating_peer->bitness = user_data["bitness"].as<uint32_t>(1);
       if (user_data.contains("node_id"))
-        originating_peer->node_id = user_data["node_id"].as<node_id_t>();
+        originating_peer->node_id = user_data["node_id"].as<node_id_t>(1);
       if (user_data.contains("last_known_fork_block_number"))
-        originating_peer->last_known_fork_block_number = user_data["last_known_fork_block_number"].as<uint32_t>();
+        originating_peer->last_known_fork_block_number = user_data["last_known_fork_block_number"].as<uint32_t>(1);
     }
 
     void node_impl::on_hello_message( peer_connection* originating_peer, const hello_message& hello_message_received )
@@ -1894,7 +1893,7 @@ namespace graphene { namespace net { namespace detail {
       node_id_t peer_node_id = hello_message_received.node_public_key;
       try
       {
-        peer_node_id = hello_message_received.user_data["node_id"].as<node_id_t>();
+        peer_node_id = hello_message_received.user_data["node_id"].as<node_id_t>(1);
       }
       catch (const fc::exception&)
       {
@@ -2934,7 +2933,7 @@ namespace graphene { namespace net { namespace detail {
              ( "msg", closing_connection_message_received.reason_for_closing )
              ( "error", closing_connection_message_received.error ) );
         std::ostringstream message;
-        message << "Peer " << fc::variant( originating_peer->get_remote_endpoint() ).as_string() <<
+        message << "Peer " << fc::variant( originating_peer->get_remote_endpoint(), GRAPHENE_NET_MAX_NESTED_OBJECTS ).as_string() <<
                   " disconnected us: " << closing_connection_message_received.reason_for_closing;
         fc::exception detailed_error(FC_LOG_MESSAGE(warn, "Peer ${peer} is disconnecting us because of an error: ${msg}, exception: ${error}",
                                                     ( "peer", originating_peer->get_remote_endpoint() )
@@ -3840,7 +3839,7 @@ namespace graphene { namespace net { namespace detail {
           user_data["bitness"] = *peer->bitness;
         user_data["user_agent"] = peer->user_agent;
 
-        user_data["last_known_block_hash"] = peer->last_block_delegate_has_seen;
+        user_data["last_known_block_hash"] = fc::variant( peer->last_block_delegate_has_seen, 1 );
         user_data["last_known_block_number"] = _delegate->get_block_number(peer->last_block_delegate_has_seen);
         user_data["last_known_block_time"] = peer->last_block_time_delegate_has_seen;
 
@@ -4451,7 +4450,7 @@ namespace graphene { namespace net { namespace detail {
       {
         try
         {
-          _node_configuration = fc::json::from_file( configuration_file_name ).as<detail::node_configuration>();
+          _node_configuration = fc::json::from_file( configuration_file_name ).as<detail::node_configuration>(GRAPHENE_NET_MAX_NESTED_OBJECTS);
           ilog( "Loaded configuration from file ${filename}", ("filename", configuration_file_name ) );
 
           if( _node_configuration.private_key == fc::ecc::private_key() )
@@ -4815,20 +4814,19 @@ namespace graphene { namespace net { namespace detail {
         peer_to_disconnect->send_message( closing_message );
       }
 
-      // notify the user.  This will be useful in testing, but we might want to remove it later;
-      // it makes good sense to notify the user if other nodes think she is behaving badly, but
+      // notify the user.  This will be useful in testing, but we might want to remove it later.
+      // It makes good sense to notify the user if other nodes think she is behaving badly, but
       // if we're just detecting and dissconnecting other badly-behaving nodes, they don't really care.
       if (caused_by_error)
       {
         std::ostringstream error_message;
-        error_message << "I am disconnecting peer " << fc::variant( peer_to_disconnect->get_remote_endpoint() ).as_string() <<
+        error_message << "I am disconnecting peer " << fc::variant( peer_to_disconnect->get_remote_endpoint(), GRAPHENE_NET_MAX_NESTED_OBJECTS ).as_string() <<
                          " for reason: " << reason_for_disconnect;
         _delegate->error_encountered(error_message.str(), fc::oexception());
         dlog(error_message.str());
       }
       else
         dlog("Disconnecting from ${peer} for ${reason}", ("peer",peer_to_disconnect->get_remote_endpoint()) ("reason",reason_for_disconnect));
-      // peer_to_disconnect->close_connection();
     }
 
     void node_impl::listen_on_endpoint( const fc::ip::endpoint& ep, bool wait_if_not_available )
@@ -4887,7 +4885,7 @@ namespace graphene { namespace net { namespace detail {
         peer_details["version"] = "";
         peer_details["subver"] = peer->user_agent;
         peer_details["inbound"] = peer->direction == peer_connection_direction::inbound;
-        peer_details["firewall_status"] = peer->is_firewalled;
+        peer_details["firewall_status"] = fc::variant( peer->is_firewalled, 1 );
         peer_details["startingheight"] = "";
         peer_details["banscore"] = "";
         peer_details["syncnode"] = "";
@@ -4921,7 +4919,7 @@ namespace graphene { namespace net { namespace detail {
         // provide these for debugging
         // warning: these are just approximations, if the peer is "downstream" of us, they may
         // have received blocks from other peers that we are unaware of
-        peer_details["current_head_block"] = peer->last_block_delegate_has_seen;
+        peer_details["current_head_block"] = fc::variant( peer->last_block_delegate_has_seen, 1 );
         peer_details["current_head_block_number"] = _delegate->get_block_number(peer->last_block_delegate_has_seen);
         peer_details["current_head_block_time"] = peer->last_block_time_delegate_has_seen;
 
@@ -4997,17 +4995,17 @@ namespace graphene { namespace net { namespace detail {
     {
       VERIFY_CORRECT_THREAD();
       if (params.contains("peer_connection_retry_timeout"))
-        _peer_connection_retry_timeout = params["peer_connection_retry_timeout"].as<uint32_t>();
+        _peer_connection_retry_timeout = params["peer_connection_retry_timeout"].as<uint32_t>(1);
       if (params.contains("desired_number_of_connections"))
-        _desired_number_of_connections = params["desired_number_of_connections"].as<uint32_t>();
+        _desired_number_of_connections = params["desired_number_of_connections"].as<uint32_t>(1);
       if (params.contains("maximum_number_of_connections"))
-        _maximum_number_of_connections = params["maximum_number_of_connections"].as<uint32_t>();
+        _maximum_number_of_connections = params["maximum_number_of_connections"].as<uint32_t>(1);
       if (params.contains("maximum_number_of_blocks_to_handle_at_one_time"))
-        _maximum_number_of_blocks_to_handle_at_one_time = params["maximum_number_of_blocks_to_handle_at_one_time"].as<uint32_t>();
+        _maximum_number_of_blocks_to_handle_at_one_time = params["maximum_number_of_blocks_to_handle_at_one_time"].as<uint32_t>(1);
       if (params.contains("maximum_number_of_sync_blocks_to_prefetch"))
-        _maximum_number_of_sync_blocks_to_prefetch = params["maximum_number_of_sync_blocks_to_prefetch"].as<uint32_t>();
+        _maximum_number_of_sync_blocks_to_prefetch = params["maximum_number_of_sync_blocks_to_prefetch"].as<uint32_t>(1);
       if (params.contains("maximum_blocks_per_peer_during_syncing"))
-        _maximum_blocks_per_peer_during_syncing = params["maximum_blocks_per_peer_during_syncing"].as<uint32_t>();
+        _maximum_blocks_per_peer_during_syncing = params["maximum_blocks_per_peer_during_syncing"].as<uint32_t>(1);
 
       _desired_number_of_connections = std::min(_desired_number_of_connections, _maximum_number_of_connections);
 
@@ -5092,9 +5090,9 @@ namespace graphene { namespace net { namespace detail {
       VERIFY_CORRECT_THREAD();
       fc::mutable_variant_object info;
       info["listening_on"] = _actual_listening_endpoint;
-      info["node_public_key"] = _node_public_key;
-      info["node_id"] = _node_id;
-      info["firewalled"] = _is_firewalled;
+      info["node_public_key"] = fc::variant( _node_public_key, 1 );
+      info["node_id"] = fc::variant( _node_id, 1 );
+      info["firewalled"] = fc::variant( _is_firewalled, 1 );
       return info;
     }
     fc::variant_object node_impl::network_get_usage_stats() const
@@ -5122,9 +5120,9 @@ namespace graphene { namespace net { namespace detail {
                      std::plus<uint32_t>());
 
       fc::mutable_variant_object result;
-      result["usage_by_second"] = network_usage_by_second;
-      result["usage_by_minute"] = network_usage_by_minute;
-      result["usage_by_hour"] = network_usage_by_hour;
+      result["usage_by_second"] = fc::variant( network_usage_by_second, 2 );
+      result["usage_by_minute"] = fc::variant( network_usage_by_minute, 2 );
+      result["usage_by_hour"]   = fc::variant( network_usage_by_hour, 2 );
       return result;
     }
 

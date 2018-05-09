@@ -78,7 +78,7 @@ namespace graphene { namespace app {
     {
        if( api_name == "database_api" )
        {
-          _database_api = std::make_shared< database_api >( std::ref( *_app.chain_database() ) );
+          _database_api = std::make_shared< database_api >( std::ref( *_app.chain_database() ), &( _app.get_options() ) );
        }
        else if( api_name == "block_api" )
        {
@@ -103,6 +103,10 @@ namespace graphene { namespace app {
        else if( api_name == "asset_api" )
        {
           _asset_api = std::make_shared< asset_api >( std::ref( *_app.chain_database() ) );
+       }
+       else if( api_name == "orders_api" )
+       {
+          _orders_api = std::make_shared< orders_api >( std::ref( _app ) );
        }
        else if( api_name == "debug_api" )
        {
@@ -147,7 +151,10 @@ namespace graphene { namespace app {
              {
                 auto block_num = b.block_num();
                 auto& callback = _callbacks.find(id)->second;
-                fc::async( [capture_this,this,id,block_num,trx_num,trx,callback](){ callback( fc::variant(transaction_confirmation{ id, block_num, trx_num, trx}) ); } );
+                fc::async( [capture_this,this,id,block_num,trx_num,trx,callback]() {
+                   callback( fc::variant( transaction_confirmation{ id, block_num, trx_num, trx },
+                                          GRAPHENE_MAX_NESTED_OBJECTS ) );
+                } );
              }
           }
        }
@@ -157,7 +164,8 @@ namespace graphene { namespace app {
     {
        trx.validate();
        _app.chain_database()->push_transaction(trx);
-       _app.p2p_node()->broadcast_transaction(trx);
+       if( _app.p2p_node() != nullptr )
+          _app.p2p_node()->broadcast_transaction(trx);
     }
 
     fc::variant network_broadcast_api::broadcast_transaction_synchronous(const signed_transaction& trx)
@@ -173,7 +181,8 @@ namespace graphene { namespace app {
     void network_broadcast_api::broadcast_block( const signed_block& b )
     {
        _app.chain_database()->push_block(b);
-       _app.p2p_node()->broadcast( net::block_message( b ));
+       if( _app.p2p_node() != nullptr )
+          _app.p2p_node()->broadcast( net::block_message( b ));
     }
 
     void network_broadcast_api::broadcast_transaction_with_callback(confirmation_callback cb, const signed_transaction& trx)
@@ -181,7 +190,8 @@ namespace graphene { namespace app {
        trx.validate();
        _callbacks[trx.id()] = cb;
        _app.chain_database()->push_transaction(trx);
-       _app.p2p_node()->broadcast_transaction(trx);
+       if( _app.p2p_node() != nullptr )
+          _app.p2p_node()->broadcast_transaction(trx);
     }
 
     network_node_api::network_node_api( application& a ) : _app( a )
@@ -262,6 +272,12 @@ namespace graphene { namespace app {
        return *_asset_api;
     }
 
+    fc::api<orders_api> login_api::orders() const
+    {
+       FC_ASSERT(_orders_api);
+       return *_orders_api;
+    }
+
     fc::api<graphene::debug_witness::debug_api> login_api::debug() const
     {
        FC_ASSERT(_debug_api);
@@ -302,26 +318,27 @@ namespace graphene { namespace app {
        const auto& db = *_app.chain_database();
        FC_ASSERT( limit <= 100 );
        vector<operation_history_object> result;
-       const auto& stats = account(db).statistics(db);
-       if( stats.most_recent_op == account_transaction_history_id_type() ) return result;
-       const account_transaction_history_object* node = &stats.most_recent_op(db);
-       if( start == operation_history_id_type() )
-          start = node->operation_id;
+       try {
+          const account_transaction_history_object& node = account(db).statistics(db).most_recent_op(db);
+          if(start == operation_history_id_type() || start.instance.value > node.operation_id.instance.value)
+             start = node.operation_id;
+       } catch(...) { return result; }
 
-       while(node && node->operation_id.instance.value > stop.instance.value && result.size() < limit)
+       const auto& hist_idx = db.get_index_type<account_transaction_history_index>();
+       const auto& by_op_idx = hist_idx.indices().get<by_op>();
+       auto index_start = by_op_idx.begin();
+       auto itr = by_op_idx.lower_bound(boost::make_tuple(account, start));
+
+       while(itr != index_start && itr->account == account && itr->operation_id.instance.value > stop.instance.value && result.size() < limit)
        {
-          if( node->operation_id.instance.value <= start.instance.value )
-             result.push_back( node->operation_id(db) );
-          if( node->next == account_transaction_history_id_type() )
-             node = nullptr;
-          else node = &node->next(db);
+          if(itr->operation_id.instance.value <= start.instance.value)
+             result.push_back(itr->operation_id(db));
+          --itr;
        }
-       if( stop.instance.value == 0 && result.size() < limit )
-       {
-          node = db.find(account_transaction_history_id_type());
-          if( node && node->account == account)
-             result.push_back( node->operation_id(db) );
+       if(stop.instance.value == 0 && result.size() < limit && itr->account == account) {
+         result.push_back(itr->operation_id(db));
        }
+
        return result;
     }
 
@@ -586,5 +603,41 @@ namespace graphene { namespace app {
 
       return result;
     }
+
+   // orders_api
+   flat_set<uint16_t> orders_api::get_tracked_groups()const
+   {
+      auto plugin = _app.get_plugin<grouped_orders_plugin>( "grouped_orders" );
+      FC_ASSERT( plugin );
+      return plugin->tracked_groups();
+   }
+
+   vector< limit_order_group > orders_api::get_grouped_limit_orders( asset_id_type base_asset_id,
+                                                               asset_id_type quote_asset_id,
+                                                               uint16_t group,
+                                                               optional<price> start,
+                                                               uint32_t limit )const
+   {
+      FC_ASSERT( limit <= 101 );
+      auto plugin = _app.get_plugin<grouped_orders_plugin>( "grouped_orders" );
+      FC_ASSERT( plugin );
+      const auto& limit_groups = plugin->limit_order_groups();
+      vector< limit_order_group > result;
+
+      price max_price = price::max( base_asset_id, quote_asset_id );
+      price min_price = price::min( base_asset_id, quote_asset_id );
+      if( start.valid() && !start->is_null() )
+         max_price = std::max( std::min( max_price, *start ), min_price );
+
+      auto itr = limit_groups.lower_bound( limit_order_group_key( group, max_price ) );
+      // use an end itrator to try to avoid expensive price comparison
+      auto end = limit_groups.upper_bound( limit_order_group_key( group, min_price ) );
+      while( itr != end && result.size() < limit )
+      {
+         result.emplace_back( *itr );
+         ++itr;
+      }
+      return result;
+   }
 
 } } // graphene::app

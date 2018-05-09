@@ -33,8 +33,8 @@ using namespace std;
 
 namespace fc
 {
-   void to_variant(const account_multi_index_type& accts, variant& vo);
-   void from_variant(const variant &var, account_multi_index_type &vo);
+   void to_variant( const account_multi_index_type& accts, variant& vo, uint32_t max_depth );
+   void from_variant( const variant &var, account_multi_index_type &vo, uint32_t max_depth );
 }
 
 namespace graphene { namespace wallet {
@@ -507,6 +507,13 @@ class wallet_api
        * @ingroup Transaction Builder API
        */
       signed_transaction sign_builder_transaction(transaction_handle_type transaction_handle, bool broadcast = true);
+
+      /** Broadcast signed transaction
+       * @param tx signed transaction
+       * @returns the transaction ID along with the signed transaction.
+       */
+      pair<transaction_id_type,signed_transaction> broadcast_transaction(signed_transaction tx);
+
       /**
        * @ingroup Transaction Builder API
        */
@@ -660,8 +667,6 @@ class wallet_api
      bool is_public_key_registered(string public_key) const;
 
       /** Converts a signed_transaction in JSON form to its binary representation.
-       *
-       * TODO: I don't see a broadcast_transaction() function, do we need one?
        *
        * @param tx the transaction to serialize
        * @returns the binary form of the transaction.  It will not be hex encoded, 
@@ -1628,6 +1633,7 @@ FC_API( graphene::wallet::wallet_api,
         (set_fees_on_builder_transaction)
         (preview_builder_transaction)
         (sign_builder_transaction)
+        (broadcast_transaction)
         (propose_builder_transaction)
         (propose_builder_transaction2)
         (remove_builder_transaction)

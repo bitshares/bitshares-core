@@ -25,8 +25,8 @@ file(GLOB APP_SOURCES "app/*.cpp")
 add_executable( app_test ${APP_SOURCES} )
 target_link_libraries( app_test graphene_app graphene_account_history graphene_net graphene_chain graphene_egenesis_none fc ${PLATFORM_SPECIFIC_LIBS} )
 
-file(GLOB INTENSE_SOURCES "intense/*.cpp")
-add_executable( intense_test ${INTENSE_SOURCES} ${COMMON_SOURCES} )
-target_link_libraries( intense_test graphene_chain graphene_app graphene_account_history graphene_egenesis_none fc ${PLATFORM_SPECIFIC_LIBS} )
+file(GLOB CLI_SOURCES "cli/*.cpp")
+add_executable( cli_test ${CLI_SOURCES} )
+target_link_libraries( cli_test graphene_app graphene_wallet graphene_witness graphene_account_history graphene_net graphene_chain graphene_egenesis_none fc ${PLATFORM_SPECIFIC_LIBS} )
 
 add_subdirectory( generate_empty_blocks )

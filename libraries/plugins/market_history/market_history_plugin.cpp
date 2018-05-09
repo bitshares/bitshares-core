@@ -63,8 +63,6 @@ class market_history_plugin_impl
       uint32_t                   _maximum_history_per_bucket_size = 1000;
       uint32_t                   _max_order_his_records_per_market = 1000;
       uint32_t                   _max_order_his_seconds_per_market = 259200;
-
-      const market_ticker_meta_object* _meta = nullptr;
 };
 
 
@@ -299,6 +297,10 @@ market_history_plugin_impl::~market_history_plugin_impl()
 void market_history_plugin_impl::update_market_histories( const signed_block& b )
 {
    graphene::chain::database& db = database();
+   const market_ticker_meta_object* _meta = nullptr;
+   const auto& meta_idx = db.get_index_type<simple_index<market_ticker_meta_object>>();
+   if( meta_idx.size() > 0 )
+      _meta = &( *meta_idx.begin() );
    const vector<optional< operation_history_object > >& hist = db.get_applied_operations();
    for( const optional< operation_history_object >& o_op : hist )
    {
@@ -422,7 +424,7 @@ void market_history_plugin::plugin_set_program_options(
 
 void market_history_plugin::plugin_initialize(const boost::program_options::variables_map& options)
 { try {
-   database().applied_block.connect( [&]( const signed_block& b){ my->update_market_histories(b); } );
+   database().applied_block.connect( [this]( const signed_block& b){ my->update_market_histories(b); } );
    database().add_index< primary_index< bucket_index  > >();
    database().add_index< primary_index< history_index  > >();
    database().add_index< primary_index< market_ticker_index  > >();
@@ -430,8 +432,8 @@ void market_history_plugin::plugin_initialize(const boost::program_options::vari
 
    if( options.count( "bucket-size" ) )
    {
-      const std::string& buckets = options["bucket-size"].as<string>(); 
-      my->_tracked_buckets = fc::json::from_string(buckets).as<flat_set<uint32_t>>();
+      const std::string& buckets = options["bucket-size"].as<string>();
+      my->_tracked_buckets = fc::json::from_string(buckets).as<flat_set<uint32_t>>(2);
       my->_tracked_buckets.erase( 0 );
    }
    if( options.count( "history-per-size" ) )

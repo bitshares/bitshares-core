@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015 Cryptonomex, Inc., and contributors.
+ * Copyright (c) 2018 oxarbitrage, and contributors.
  *
  * The MIT License
  *
@@ -21,23 +21,22 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-#include <fc/io/raw.hpp>
-#include <graphene/chain/index.hpp>
-#include <graphene/chain/database.hpp>
+#pragma once
+#include <cstddef>
+#include <string>
+#include <vector>
 
-namespace graphene { namespace chain {
-   void base_primary_index::save_undo( const object& obj )
-   { _db.save_undo( obj ); }
+#include <curl/curl.h>
 
-   void base_primary_index::on_add( const object& obj )
-   {
-      _db.save_undo_add( obj );
-      for( auto ob : _observers ) ob->on_add( obj );
-   }
+static size_t WriteCallback(void *contents, size_t size, size_t nmemb, void *userp)
+{
+   ((std::string*)userp)->append((char*)contents, size * nmemb);
+   return size * nmemb;
+}
 
-   void base_primary_index::on_remove( const object& obj )
-   { _db.save_undo_remove( obj ); for( auto ob : _observers ) ob->on_remove( obj ); }
+namespace graphene { namespace utilities {
 
-   void base_primary_index::on_modify( const object& obj )
-   {for( auto ob : _observers ) ob->on_modify(  obj ); }
-} } // graphene::chain
+   bool SendBulk(CURL *curl, std::vector <std::string>& bulk, std::string elasticsearch_url, bool do_logs, std::string logs_index);
+   std::vector<std::string> createBulk(std::string type, std::string data, std::string id, bool onlycreate);
+
+} } // end namespace graphene::utilities
