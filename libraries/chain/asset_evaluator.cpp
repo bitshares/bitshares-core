@@ -410,10 +410,21 @@ void_result asset_update_bitasset_evaluator::do_evaluate(const asset_update_bita
  */
 static void update_bitasset_object_options(const asset_update_bitasset_operation& op, database& db, asset_bitasset_data_object& bdo, const asset_object& asset_to_update )
 {
-   // If the minimum number of feeds to calculate a median has changed, we need to recalculate the median
+   // If the minimum number of feeds to calculate a median has changed
+   // we need to recalculate the median
    bool should_update_feeds = false;
-   if( op.new_options.minimum_feeds != bdo.options.minimum_feeds )
+   if( op.new_options.minimum_feeds != bdo.options.minimum_feeds)
       should_update_feeds = true;
+
+   // We need to call check_call_orders if the settlement price changes after hardfork 890
+   bool after_hardfork_890 = false;
+   if (db.get_dynamic_global_properties().next_maintenance_time > HARDFORK_CORE_890_TIME) {
+      after_hardfork_890 = true;
+      // after hardfork 890, we also should call update_median_feeds
+      // if the feed_lifetime_sec changed
+      if (op.new_options.feed_lifetime_sec != bdo.options.feed_lifetime_sec)
+         should_update_feeds = true;
+   }
 
    // feeds must be reset if the backing asset is changed after hardfork 868
    bool backing_asset_changed = false;
@@ -447,8 +458,12 @@ static void update_bitasset_object_options(const asset_update_bitasset_operation
       }
    }
 
+   const auto old_feed_price = bdo.current_feed.settlement_price;
    if( should_update_feeds )
       bdo.update_median_feeds(db.head_block_time());
+
+   if (after_hardfork_890 && old_feed_price != bdo.current_feed.settlement_price)
+      db.check_call_orders(asset_to_update);
 }
 
 void_result asset_update_bitasset_evaluator::do_apply(const asset_update_bitasset_operation& op)
