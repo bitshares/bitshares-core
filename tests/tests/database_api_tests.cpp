@@ -743,9 +743,9 @@ BOOST_AUTO_TEST_CASE(get_account_limit_orders)
 
    // query with specified order id and limit, expected:
    // same as before, but also the first order's id equal to specified
-   results = db_api.get_account_limit_orders(seller.name, "BTS", "CNY", 100,
+   results = db_api.get_account_limit_orders(seller.name, "BTS", "CNY", 80,
        limit_order_id_type(o.id));
-   BOOST_CHECK(results.size() == 100);
+   BOOST_CHECK(results.size() == 80);
    BOOST_CHECK(results.front().id == o.id);
    for (int i = 0 ; i < results.size() - 1 ; ++i) {
      BOOST_CHECK(results[i].sell_price >= results[i+1].sell_price);
@@ -761,15 +761,31 @@ BOOST_AUTO_TEST_CASE(get_account_limit_orders)
    // 3. the first order's sell price equal to specified
    cancel_limit_order(o); // NOTE 1: this canceled order was in scope of the
                           // first created 50 orders, so with price 2.5 BTS/CNY
-   results = db_api.get_account_limit_orders(seller.name, "BTS", "CNY", 101,
+   results = db_api.get_account_limit_orders(seller.name, "BTS", "CNY", 50,
        limit_order_id_type(o.id), o.sell_price);
-   BOOST_CHECK(results.size() <= 101);
+   BOOST_CHECK(results.size() == 50);
    BOOST_CHECK(results.front().id > o.id);
    // NOTE 2: because of NOTE 1, here should be equal
    BOOST_CHECK(results.front().sell_price == o.sell_price);
    for (int i = 0 ; i < results.size() - 1 ; ++i) {
      BOOST_CHECK(results[i].sell_price >= results[i+1].sell_price);
    }
+
+   o = results.back();
+   results.clear();
+
+   cancel_limit_order(o); // NOTE 3: this time the canceled order was in scope
+                          // of the lowest price 150 orders
+   results = db_api.get_account_limit_orders(seller.name, "BTS", "CNY", 101,
+       limit_order_id_type(o.id), o.sell_price);
+   BOOST_CHECK(results.size() <= 101);
+   BOOST_CHECK(results.front().id > o.id);
+   // NOTE 3: because of NOTE 1, here should be little than 
+   BOOST_CHECK(results.front().sell_price < o.sell_price);
+   for (int i = 0 ; i < results.size() - 1 ; ++i) {
+     BOOST_CHECK(results[i].sell_price >= results[i+1].sell_price);
+   }
+
 
 } FC_LOG_AND_RETHROW() }
 
