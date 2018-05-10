@@ -43,6 +43,9 @@ void call_order_update_operation::validate()const
    FC_ASSERT( fee.amount >= 0 );
    FC_ASSERT( delta_collateral.asset_id != delta_debt.asset_id );
    FC_ASSERT( delta_collateral.amount != 0 || delta_debt.amount != 0 );
+
+   // note: no validation is needed for extensions so far: the only attribute inside is target_collateral_ratio
+
 } FC_CAPTURE_AND_RETHROW((*this)) }
 
 void bid_collateral_operation::validate()const

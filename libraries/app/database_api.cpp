@@ -964,7 +964,7 @@ vector<asset_object> database_api::list_assets(const string& lower_bound_symbol,
 
 vector<asset_object> database_api_impl::list_assets(const string& lower_bound_symbol, uint32_t limit)const
 {
-   FC_ASSERT( limit <= 100 );
+   FC_ASSERT( limit <= 101 );
    const auto& assets_by_symbol = _db.get_index_type<asset_index>().indices().get<by_symbol>();
    vector<asset_object> result;
    result.reserve(limit);
@@ -1185,7 +1185,7 @@ market_ticker database_api_impl::get_ticker( const string& base, const string& q
    FC_ASSERT( assets[0], "Invalid base asset symbol: ${s}", ("s",base) );
    FC_ASSERT( assets[1], "Invalid quote asset symbol: ${s}", ("s",quote) );
 
-   const fc::time_point_sec now = fc::time_point::now();
+   const fc::time_point_sec now = _db.head_block_time();
 
    market_ticker result;
    result.time = now;

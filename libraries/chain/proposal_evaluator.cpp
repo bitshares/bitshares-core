@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015 Cryptonomex, Inc., and contributors.
+ * Copyright (c) 2015-2018 Cryptonomex, Inc., and contributors.
  *
  * The MIT License
  *
@@ -21,25 +21,120 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
+#include <graphene/chain/database.hpp>
 #include <graphene/chain/proposal_evaluator.hpp>
 #include <graphene/chain/proposal_object.hpp>
-#include <graphene/chain/account_object.hpp>
-#include <graphene/chain/protocol/fee_schedule.hpp>
-#include <graphene/chain/exceptions.hpp>
+#include <graphene/chain/hardfork.hpp>
 
 #include <fc/smart_ref_impl.hpp>
 
 namespace graphene { namespace chain {
 
+
+struct proposal_operation_hardfork_visitor
+{
+   typedef void result_type;
+   const fc::time_point_sec block_time;
+   const fc::time_point_sec next_maintenance_time;
+
+   proposal_operation_hardfork_visitor( const fc::time_point_sec bt, const fc::time_point_sec nmt )
+   : block_time(bt), next_maintenance_time(nmt) {}
+
+   template<typename T>
+   void operator()(const T &v) const {}
+
+   // TODO review and cleanup code below after hard fork
+   // hf_834
+   void operator()(const graphene::chain::call_order_update_operation &v) const {
+      if (next_maintenance_time <= HARDFORK_CORE_834_TIME) {
+         FC_ASSERT( !v.extensions.value.target_collateral_ratio.valid(),
+                    "Can not set target_collateral_ratio in call_order_update_operation before hardfork 834." );
+      }
+   }
+   // hf_620
+   void operator()(const graphene::chain::asset_create_operation &v) const {
+      if (block_time < HARDFORK_CORE_620_TIME) {
+         static const std::locale &loc = std::locale::classic();
+         FC_ASSERT(isalpha(v.symbol.back(), loc), "Asset ${s} must end with alpha character before hardfork 620", ("s", v.symbol));
+      }
+   }
+   // hf_199
+   void operator()(const graphene::chain::asset_update_issuer_operation &v) const {
+      if (block_time < HARDFORK_CORE_199_TIME) {
+         FC_ASSERT(false, "Not allowed until hardfork 199");
+      }
+   }
+   // hf_188
+   void operator()(const graphene::chain::asset_claim_pool_operation &v) const {
+      if (block_time < HARDFORK_CORE_188_TIME) {
+         FC_ASSERT(false, "Not allowed until hardfork 188");
+      }
+   }
+   // hf_588
+   // issue #588
+   //
+   // As a virtual operation which has no evaluator `asset_settle_cancel_operation`
+   // originally won't be packed into blocks, yet its loose `validate()` method
+   // make it able to slip into blocks.
+   //
+   // We need to forbid this operation being packed into blocks via proposal but
+   // this will lead to a hardfork (this operation in proposal will denied by new
+   // node while accept by old node), so a hardfork guard code needed and a
+   // consensus upgrade over all nodes needed in future. And because the
+   // `validate()` method not suitable to check database status, so we put the
+   // code here.
+   //
+   // After the hardfork, all nodes will deny packing this operation into a block,
+   // and then we will check whether exists a proposal containing this kind of
+   // operation, if not exists, we can harden the `validate()` method to deny
+   // it in a earlier stage.
+   //
+   void operator()(const graphene::chain::asset_settle_cancel_operation &v) const {
+      if (block_time > HARDFORK_CORE_588_TIME) {
+         FC_ASSERT(!"Virtual operation");
+      }
+   }
+   // loop and self visit in proposals
+   void operator()(const graphene::chain::proposal_create_operation &v) const {
+      for (const op_wrapper &op : v.proposed_ops)
+         op.op.visit(*this);
+   }
+};
+
+struct hardfork_visitor_214 // non-recursive proposal visitor
+{
+   typedef void result_type;
+
+   template<typename T>
+   void operator()(const T &v) const {}
+
+   void operator()(const proposal_update_operation &v) const {
+      FC_ASSERT(false, "Not allowed until hardfork 214");
+   }
+};
+
 void_result proposal_create_evaluator::do_evaluate(const proposal_create_operation& o)
 { try {
    const database& d = db();
+
+   // Calling the proposal hardfork visitor
+   const fc::time_point_sec block_time = d.head_block_time();
+   const fc::time_point_sec next_maint_time = d.get_dynamic_global_properties().next_maintenance_time;
+   proposal_operation_hardfork_visitor vtor( block_time, next_maint_time );
+   vtor( o );
+   if( block_time < HARDFORK_CORE_214_TIME )
+   { // cannot be removed after hf, unfortunately
+      hardfork_visitor_214 hf214;
+      for (const op_wrapper &op : o.proposed_ops)
+         op.op.visit( hf214 );
+   }
+
    const auto& global_parameters = d.get_global_properties().parameters;
 
-   FC_ASSERT( o.expiration_time > d.head_block_time(), "Proposal has already expired on creation." );
-   FC_ASSERT( o.expiration_time <= d.head_block_time() + global_parameters.maximum_proposal_lifetime,
+   FC_ASSERT( o.expiration_time > block_time, "Proposal has already expired on creation." );
+   FC_ASSERT( o.expiration_time <= block_time + global_parameters.maximum_proposal_lifetime,
               "Proposal expiration time is too far in the future.");
-   FC_ASSERT( !o.review_period_seconds || fc::seconds(*o.review_period_seconds) < (o.expiration_time - d.head_block_time()),
+   FC_ASSERT( !o.review_period_seconds || fc::seconds(*o.review_period_seconds) < (o.expiration_time - block_time),
               "Proposal review period must be less than its overall lifetime." );
 
    {
@@ -73,6 +168,7 @@ void_result proposal_create_evaluator::do_evaluate(const proposal_create_operati
 
    for( const op_wrapper& op : o.proposed_ops )
       _proposed_trx.operations.push_back(op.op);
+
    _proposed_trx.validate();
 
    return void_result();
@@ -153,7 +249,7 @@ void_result proposal_update_evaluator::do_apply(const proposal_update_operation&
    // Potential optimization: if _executed_proposal is true, we can skip the modify step and make push_proposal skip
    // signature checks. This isn't done now because I just wrote all the proposals code, and I'm not yet 100% sure the
    // required approvals are sufficient to authorize the transaction.
-   d.modify(*_proposal, [&o, &d](proposal_object& p) {
+   d.modify(*_proposal, [&o](proposal_object& p) {
       p.available_active_approvals.insert(o.active_approvals_to_add.begin(), o.active_approvals_to_add.end());
       p.available_owner_approvals.insert(o.owner_approvals_to_add.begin(), o.owner_approvals_to_add.end());
       for( account_id_type id : o.active_approvals_to_remove )
@@ -208,5 +304,6 @@ void_result proposal_delete_evaluator::do_apply(const proposal_delete_operation&
 
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }
+
 
 } } // graphene::chain
