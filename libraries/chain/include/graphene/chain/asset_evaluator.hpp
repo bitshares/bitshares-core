@@ -26,6 +26,9 @@
 #include <graphene/chain/evaluator.hpp>
 #include <graphene/chain/database.hpp>
 
+#include <graphene/chain/hardfork.hpp>
+#include <locale>
+
 namespace graphene { namespace chain {
 
    class asset_create_evaluator : public evaluator<asset_create_evaluator>
@@ -78,6 +81,17 @@ namespace graphene { namespace chain {
          const asset_object* asset_to_update = nullptr;
    };
 
+   class asset_update_issuer_evaluator : public evaluator<asset_update_issuer_evaluator>
+   {
+      public:
+         typedef asset_update_issuer_operation operation_type;
+
+         void_result do_evaluate( const asset_update_issuer_operation& o );
+         void_result do_apply( const asset_update_issuer_operation& o );
+
+         const asset_object* asset_to_update = nullptr;
+   };
+
    class asset_update_bitasset_evaluator : public evaluator<asset_update_bitasset_evaluator>
    {
       public:
@@ -87,6 +101,7 @@ namespace graphene { namespace chain {
          void_result do_apply( const asset_update_bitasset_operation& o );
 
          const asset_bitasset_data_object* bitasset_to_update = nullptr;
+         const asset_object* asset_to_update = nullptr;
    };
 
    class asset_update_feed_producers_evaluator : public evaluator<asset_update_feed_producers_evaluator>
@@ -150,6 +165,15 @@ namespace graphene { namespace chain {
 
          void_result do_evaluate( const asset_claim_fees_operation& o );
          void_result do_apply( const asset_claim_fees_operation& o );
+   };
+
+   class asset_claim_pool_evaluator : public evaluator<asset_claim_pool_evaluator>
+   {
+      public:
+         typedef asset_claim_pool_operation operation_type;
+
+         void_result do_evaluate( const asset_claim_pool_operation& o );
+         void_result do_apply( const asset_claim_pool_operation& o );
    };
 
 } } // graphene::chain
