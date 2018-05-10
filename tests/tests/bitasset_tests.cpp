@@ -116,13 +116,13 @@ BOOST_AUTO_TEST_CASE( reset_backing_asset_on_witness_asset )
        // do a maintenance block
       generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
       // generate blocks until close to hard fork
-      generate_blocks( HARDFORK_CORE_868_TIME - fc::hours(1) );
+      generate_blocks( HARDFORK_CORE_868_890_TIME - fc::hours(1) );
     */
 
    BOOST_TEST_MESSAGE("Advance to near hard fork");
    auto maint_interval = db.get_global_properties().parameters.maintenance_interval;
-   generate_blocks( HARDFORK_CORE_868_TIME - maint_interval);
-   trx.set_expiration(HARDFORK_CORE_868_TIME - fc::seconds(1));
+   generate_blocks( HARDFORK_CORE_868_890_TIME - maint_interval);
+   trx.set_expiration(HARDFORK_CORE_868_890_TIME - fc::seconds(1));
 
    BOOST_TEST_MESSAGE("Create USDBIT");
    asset_id_type bit_usd_id = create_bitasset("USDBIT").id;
@@ -214,8 +214,8 @@ BOOST_AUTO_TEST_CASE( reset_backing_asset_on_witness_asset )
    }
    {
       BOOST_TEST_MESSAGE("Advance to after hard fork");
-      generate_blocks( HARDFORK_CORE_868_TIME + maint_interval);
-      trx.set_expiration(HARDFORK_CORE_868_TIME + fc::hours(46));
+      generate_blocks( HARDFORK_CORE_868_890_TIME + maint_interval);
+      trx.set_expiration(HARDFORK_CORE_868_890_TIME + fc::hours(46));
 
       BOOST_TEST_MESSAGE("After hardfork, 1 feed should have been erased");
       const asset_bitasset_data_object& jmj_obj = bit_jmj_id(db).bitasset_data(db);
@@ -251,8 +251,8 @@ BOOST_AUTO_TEST_CASE( reset_backing_asset_on_non_witness_asset )
 
    BOOST_TEST_MESSAGE("Advance to near hard fork");
    auto maint_interval = db.get_global_properties().parameters.maintenance_interval;
-   generate_blocks( HARDFORK_CORE_868_TIME - maint_interval);
-   trx.set_expiration(HARDFORK_CORE_868_TIME - fc::seconds(1));
+   generate_blocks( HARDFORK_CORE_868_890_TIME - maint_interval);
+   trx.set_expiration(HARDFORK_CORE_868_890_TIME - fc::seconds(1));
 
 
    BOOST_TEST_MESSAGE("Create USDBIT");
@@ -356,8 +356,8 @@ BOOST_AUTO_TEST_CASE( reset_backing_asset_on_non_witness_asset )
    }
    {
       BOOST_TEST_MESSAGE("Advance to past hard fork");
-      generate_blocks( HARDFORK_CORE_868_TIME + maint_interval);
-      trx.set_expiration(HARDFORK_CORE_868_TIME + fc::hours(48));
+      generate_blocks( HARDFORK_CORE_868_890_TIME + maint_interval);
+      trx.set_expiration(HARDFORK_CORE_868_890_TIME + fc::hours(48));
 
       BOOST_TEST_MESSAGE("Verify that the incorrect feeds have been corrected");
       const asset_bitasset_data_object& jmj_obj = bit_jmj_id(db).bitasset_data(db);
@@ -469,7 +469,7 @@ BOOST_AUTO_TEST_CASE( hf_890_test )
       const asset_object& asset_to_update = bitusd;
       ba_op.asset_to_update = bitusd.get_id();
       ba_op.issuer = asset_to_update.issuer;
-      ba_op.new_options.feed_lifetime_sec = HARDFORK_CORE_890_TIME.sec_since_epoch() + 10;
+      ba_op.new_options.feed_lifetime_sec = HARDFORK_CORE_868_890_TIME.sec_since_epoch() + 10;
       trx.operations.push_back(ba_op);
       sign(trx, feedproducer_private_key);
       PUSH_TX(db, trx, ~0);
@@ -486,7 +486,7 @@ BOOST_AUTO_TEST_CASE( hf_890_test )
 
    // go beyond hardfork
    BOOST_TEST_MESSAGE("Moving beyond hardfork 890");
-   generate_blocks(HARDFORK_CORE_890_TIME + maint_interval);
+   generate_blocks(HARDFORK_CORE_868_890_TIME + maint_interval);
    set_expiration( db, trx );
 
    // change feed lifetime so that some feeds expire,
@@ -498,7 +498,7 @@ BOOST_AUTO_TEST_CASE( hf_890_test )
       const asset_object& asset_to_update = bitusd;
       ba_op.asset_to_update = bitusd.get_id();
       ba_op.issuer = asset_to_update.issuer;
-      ba_op.new_options.feed_lifetime_sec = HARDFORK_CORE_890_TIME.sec_since_epoch() + 20;
+      ba_op.new_options.feed_lifetime_sec = HARDFORK_CORE_868_890_TIME.sec_since_epoch() + 20;
       trx.operations.push_back(ba_op);
       sign(trx, feedproducer_private_key);
       PUSH_TX(db, trx, ~0);
@@ -527,8 +527,8 @@ BOOST_AUTO_TEST_CASE( reset_backing_asset_switching_to_witness_fed )
 
    BOOST_TEST_MESSAGE("Advance to near hard fork");
    auto maint_interval = db.get_global_properties().parameters.maintenance_interval;
-   generate_blocks( HARDFORK_CORE_868_TIME - maint_interval);
-   trx.set_expiration(HARDFORK_CORE_868_TIME - fc::seconds(1));
+   generate_blocks( HARDFORK_CORE_868_890_TIME - maint_interval);
+   trx.set_expiration(HARDFORK_CORE_868_890_TIME - fc::seconds(1));
 
 
    BOOST_TEST_MESSAGE("Create USDBIT");
@@ -634,8 +634,8 @@ BOOST_AUTO_TEST_CASE( reset_backing_asset_switching_to_witness_fed )
    }
    {
       BOOST_TEST_MESSAGE("Advance to past hard fork");
-      generate_blocks( HARDFORK_CORE_868_TIME + maint_interval);
-      trx.set_expiration(HARDFORK_CORE_868_TIME + fc::hours(48));
+      generate_blocks( HARDFORK_CORE_868_890_TIME + maint_interval);
+      trx.set_expiration(HARDFORK_CORE_868_890_TIME + fc::hours(48));
 
       BOOST_TEST_MESSAGE("Verify that the incorrect feeds have been removed");
       const asset_bitasset_data_object& jmj_obj = bit_jmj_id(db).bitasset_data(db);

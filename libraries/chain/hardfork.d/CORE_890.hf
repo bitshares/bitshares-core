@@ -1,4 +1,0 @@
-// bitshares-core issue #890 Update median feeds after feed_lifetime_sec changed
-#ifndef HARDFORK_CORE_890_TIME
-#define HARDFORK_CORE_890_TIME (fc::time_point_sec( 1600000000 ))
-#endif

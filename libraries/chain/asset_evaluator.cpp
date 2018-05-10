@@ -407,30 +407,31 @@ void_result asset_update_bitasset_evaluator::do_evaluate(const asset_update_bita
  * @param db the database
  * @param bdo the actual database object
  * @param asset_to_update the asset_object related to this bitasset_data_object
- * @returns true if the feed price is changed, and after hf core-890
+ * @returns true if the feed price is changed, and after hf core-868-890
  */
 static bool update_bitasset_object_options(
       const asset_update_bitasset_operation& op, database& db,
       asset_bitasset_data_object& bdo, const asset_object& asset_to_update )
 {
    const fc::time_point_sec& next_maint_time = db.get_dynamic_global_properties().next_maintenance_time;
+   bool after_hf_core_868_890 = ( next_maint_time > HARDFORK_CORE_868_890_TIME );
 
    // If the minimum number of feeds to calculate a median has changed, we need to recalculate the median
    bool should_update_feeds = false;
    if( op.new_options.minimum_feeds != bdo.options.minimum_feeds )
       should_update_feeds = true;
 
-   // after hardfork 890, we also should call update_median_feeds if the feed_lifetime_sec changed
-   if( next_maint_time > HARDFORK_CORE_890_TIME
+   // after hardfork core-868-890, we also should call update_median_feeds if the feed_lifetime_sec changed
+   if( after_hf_core_868_890
          && op.new_options.feed_lifetime_sec != bdo.options.feed_lifetime_sec )
    {
       should_update_feeds = true;
    }
 
-   // feeds must be reset if the backing asset is changed after hardfork 868
+   // feeds must be reset if the backing asset is changed after hardfork core-868-890
    bool backing_asset_changed = false;
    bool is_witness_or_committee_fed = false;
-   if( next_maint_time > HARDFORK_CORE_868_TIME
+   if( after_hf_core_868_890
          && op.new_options.short_backing_asset != bdo.options.short_backing_asset )
    {
       backing_asset_changed = true;
@@ -465,8 +466,8 @@ static bool update_bitasset_object_options(
       const auto old_feed_price = bdo.current_feed.settlement_price;
       bdo.update_median_feeds( db.head_block_time() );
 
-      // We need to call check_call_orders if the settlement price changes after hardfork core-890
-      return next_maint_time > HARDFORK_CORE_890_TIME && old_feed_price != bdo.current_feed.settlement_price;
+      // We need to call check_call_orders if the settlement price changes after hardfork core-868-890
+      return after_hf_core_868_890 && old_feed_price != bdo.current_feed.settlement_price;
    }
 
    return false;
