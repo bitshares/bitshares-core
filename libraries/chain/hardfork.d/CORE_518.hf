@@ -1,4 +1,4 @@
 // bitshares-core issue #518 Clean up bitasset_data during maintenance
 #ifndef HARDFORK_CORE_518_TIME
-#define HARDFORK_CORE_518_TIME (fc::time_point_sec( 1600000000 ))
+#define HARDFORK_CORE_518_TIME (fc::time_point_sec( 1526738280 )) // Sat, 19 May 2018 13:58:00 UTC
 #endif
