@@ -481,7 +481,7 @@ void_result asset_update_bitasset_evaluator::do_apply(const asset_update_bitasse
       bool to_check_call_orders = false;
 
       db_conn.modify( *bitasset_to_update,
-                      [&op, &asset_being_updated, &price_changed, &db_conn]( asset_bitasset_data_object& bdo )
+                      [&op, &asset_being_updated, &to_check_call_orders, &db_conn]( asset_bitasset_data_object& bdo )
       {
          to_check_call_orders = update_bitasset_object_options( op, db_conn, bdo, asset_being_updated );
       });
