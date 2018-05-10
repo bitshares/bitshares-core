@@ -62,12 +62,32 @@ void_result limit_order_create_evaluator::do_evaluate(const limit_order_create_o
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (op) ) }
 
+void limit_order_create_evaluator::convert_fee()
+{
+   if( db().head_block_time() <= HARDFORK_CORE_604_TIME )
+      generic_evaluator::convert_fee();
+   else
+      if( !trx_state->skip_fee )
+      {
+         if( fee_asset->get_id() != asset_id_type() )
+         {
+            db().modify(*fee_asset_dyn_data, [this](asset_dynamic_data_object& d) {
+               d.fee_pool -= core_fee_paid;
+            });
+         }
+      }
+}
+
 void limit_order_create_evaluator::pay_fee()
 {
    if( db().head_block_time() <= HARDFORK_445_TIME )
       generic_evaluator::pay_fee();
    else
+   {
       _deferred_fee = core_fee_paid;
+      if( db().head_block_time() > HARDFORK_CORE_604_TIME && fee_asset->get_id() != asset_id_type() )
+         _deferred_paid_fee = fee_from_account;
+   }
 }
 
 object_id_type limit_order_create_evaluator::do_apply(const limit_order_create_operation& op)
@@ -88,9 +108,14 @@ object_id_type limit_order_create_evaluator::do_apply(const limit_order_create_o
        obj.sell_price = op.get_price();
        obj.expiration = op.expiration;
        obj.deferred_fee = _deferred_fee;
+       obj.deferred_paid_fee = _deferred_paid_fee;
    });
    limit_order_id_type order_id = new_order_object.id; // save this because we may remove the object by filling it
-   bool filled = db().apply_order(new_order_object);
+   bool filled;
+   if( db().get_dynamic_global_properties().next_maintenance_time <= HARDFORK_CORE_625_TIME )
+      filled = db().apply_order_before_hardfork_625( new_order_object );
+   else
+      filled = db().apply_order( new_order_object );
 
    FC_ASSERT( !op.fill_or_kill || filled );
 
@@ -115,12 +140,15 @@ asset limit_order_cancel_evaluator::do_apply(const limit_order_cancel_operation&
    auto quote_asset = _order->sell_price.quote.asset_id;
    auto refunded = _order->amount_for_sale();
 
-   d.cancel_order(*_order, false /* don't create a virtual op*/);
+   d.cancel_limit_order(*_order, false /* don't create a virtual op*/);
 
-   // Possible optimization: order can be called by canceling a limit order iff the canceled order was at the top of the book.
-   // Do I need to check calls in both assets?
-   d.check_call_orders(base_asset(d));
-   d.check_call_orders(quote_asset(d));
+   if( d.get_dynamic_global_properties().next_maintenance_time <= HARDFORK_CORE_606_TIME )
+   {
+      // Possible optimization: order can be called by canceling a limit order iff the canceled order was at the top of the book.
+      // Do I need to check calls in both assets?
+      d.check_call_orders(base_asset(d));
+      d.check_call_orders(quote_asset(d));
+   }
 
    return refunded;
 } FC_CAPTURE_AND_RETHROW( (o) ) }
@@ -128,6 +156,11 @@ asset limit_order_cancel_evaluator::do_apply(const limit_order_cancel_operation&
 void_result call_order_update_evaluator::do_evaluate(const call_order_update_operation& o)
 { try {
    database& d = db();
+
+   // TODO: remove this check and the assertion after hf_834
+   if( d.get_dynamic_global_properties().next_maintenance_time <= HARDFORK_CORE_834_TIME )
+      FC_ASSERT( !o.extensions.value.target_collateral_ratio.valid(),
+                 "Can not set target_collateral_ratio in call_order_update_operation before hardfork 834." );
 
    _paying_account = &o.funding_account(d);
    _debt_asset     = &o.delta_debt.asset_id(d);
@@ -191,6 +224,11 @@ void_result call_order_update_evaluator::do_apply(const call_order_update_operat
    auto itr = call_idx.find( boost::make_tuple(o.funding_account, o.delta_debt.asset_id) );
    const call_order_object* call_obj = nullptr;
 
+   optional<price> old_collateralization;
+   optional<share_type> old_debt;
+
+   optional<uint16_t> new_target_cr = o.extensions.value.target_collateral_ratio;
+
    if( itr == call_idx.end() )
    {
       FC_ASSERT( o.delta_collateral.amount > 0 );
@@ -202,26 +240,28 @@ void_result call_order_update_evaluator::do_apply(const call_order_update_operat
          call.debt = o.delta_debt.amount;
          call.call_price = price::call_price(o.delta_debt, o.delta_collateral,
                                              _bitasset_data->current_feed.maintenance_collateral_ratio);
-
+         call.target_collateral_ratio = new_target_cr;
       });
    }
    else
    {
       call_obj = &*itr;
+      old_collateralization = call_obj->collateralization();
+      old_debt = call_obj->debt;
 
       d.modify( *call_obj, [&]( call_order_object& call ){
-          call.collateral += o.delta_collateral.amount;
-          call.debt       += o.delta_debt.amount;
-          if( call.debt > 0 )
-          {
-             call.call_price  =  price::call_price(call.get_debt(), call.get_collateral(),
-                                                   _bitasset_data->current_feed.maintenance_collateral_ratio);
-          }
+         call.collateral += o.delta_collateral.amount;
+         call.debt       += o.delta_debt.amount;
+         if( call.debt > 0 )
+         {
+            call.call_price  =  price::call_price(call.get_debt(), call.get_collateral(),
+                                                  _bitasset_data->current_feed.maintenance_collateral_ratio);
+         }
+         call.target_collateral_ratio = new_target_cr;
       });
    }
 
-   auto debt = call_obj->get_debt();
-   if( debt.amount == 0 )
+   if( call_obj->debt == 0 )
    {
       FC_ASSERT( call_obj->collateral == 0 );
       d.remove( *call_obj );
@@ -237,10 +277,16 @@ void_result call_order_update_evaluator::do_apply(const call_order_update_operat
 
       // check to see if the order needs to be margin called now, but don't allow black swans and require there to be
       // limit orders available that could be used to fill the order.
+      // Note: due to https://github.com/bitshares/bitshares-core/issues/649,
+      //       the first call order may be unable to be updated if the second one is undercollateralized.
       if( d.check_call_orders( *_debt_asset, false ) )
       {
          const auto call_obj  = d.find(call_order_id);
-         // if we filled at least one call order, we are OK if we totally filled.
+         // before hard fork core-583: if we filled at least one call order, we are OK if we totally filled.
+         // after hard fork core-583: we want to allow increasing collateral
+         //   Note: increasing collateral won't get the call order itself matched (instantly margin called)
+         //   if there is at least a call order get matched but didn't cause a black swan event,
+         //   current order must have got matched. in this case, it's OK if it's totally filled.
          GRAPHENE_ASSERT(
             !call_obj,
             call_order_update_unfilled_margin_call,
@@ -251,17 +297,40 @@ void_result call_order_update_evaluator::do_apply(const call_order_update_operat
       else
       {
          const auto call_obj  = d.find(call_order_id);
+         // we know no black swan event has occurred
          FC_ASSERT( call_obj, "no margin call was executed and yet the call object was deleted" );
-         //edump( (~call_obj->call_price) ("<")( _bitasset_data->current_feed.settlement_price) );
-         // We didn't fill any call orders.  This may be because we
-         // aren't in margin call territory, or it may be because there
-         // were no matching orders.  In the latter case, we throw.
-         GRAPHENE_ASSERT(
-            ~call_obj->call_price < _bitasset_data->current_feed.settlement_price,
-            call_order_update_unfilled_margin_call,
-            "Updating call order would trigger a margin call that cannot be fully filled",
-            ("a", ~call_obj->call_price )("b", _bitasset_data->current_feed.settlement_price)
-            );
+         if( d.head_block_time() <= HARDFORK_CORE_583_TIME ) // TODO remove after hard fork core-583
+         {
+            // We didn't fill any call orders.  This may be because we
+            // aren't in margin call territory, or it may be because there
+            // were no matching orders.  In the latter case, we throw.
+            GRAPHENE_ASSERT(
+               ~call_obj->call_price < _bitasset_data->current_feed.settlement_price,
+               call_order_update_unfilled_margin_call,
+               "Updating call order would trigger a margin call that cannot be fully filled",
+               ("a", ~call_obj->call_price )("b", _bitasset_data->current_feed.settlement_price)
+               );
+         }
+         else // after hard fork, always allow call order to be updated if collateral ratio is increased and debt is not increased
+         {
+            // We didn't fill any call orders.  This may be because we
+            // aren't in margin call territory, or it may be because there
+            // were no matching orders. In the latter case,
+            // if collateral ratio is not increased or debt is increased, we throw.
+            // be here, we know no margin call was executed,
+            // so call_obj's collateral ratio should be set only by op
+            FC_ASSERT( ( old_collateralization.valid() && call_obj->debt <= *old_debt
+                                                       && call_obj->collateralization() > *old_collateralization )
+                       || ~call_obj->call_price < _bitasset_data->current_feed.settlement_price,
+               "Can only increase collateral ratio without increasing debt if would trigger a margin call that cannot be fully filled",
+               ("new_call_price", ~call_obj->call_price )
+               ("settlement_price", _bitasset_data->current_feed.settlement_price)
+               ("old_debt", old_debt)
+               ("new_debt", call_obj->debt)
+               ("old_collateralization", old_collateralization)
+               ("new_collateralization", call_obj->collateralization() )
+               );
+         }
       }
    }
 

@@ -31,6 +31,7 @@ struct get_impacted_account_visitor
    }
 
    void operator()( const asset_claim_fees_operation& op ){}
+   void operator()( const asset_claim_pool_operation& op ){}
    void operator()( const limit_order_create_operation& op ) {}
    void operator()( const limit_order_cancel_operation& op )
    {
@@ -84,7 +85,10 @@ struct get_impacted_account_visitor
       if( op.new_issuer )
          _impacted.insert( *(op.new_issuer) );
    }
-
+   void operator()( const asset_update_issuer_operation& op )
+   {
+      _impacted.insert( op.new_issuer );
+   }
    void operator()( const asset_update_bitasset_operation& op ) {}
    void operator()( const asset_update_feed_producers_operation& op ) {}
 
@@ -228,60 +232,60 @@ static void get_relevant_accounts( const object* obj, flat_set<account_id_type>&
            break;
         } case asset_object_type:{
            const auto& aobj = dynamic_cast<const asset_object*>(obj);
-           assert( aobj != nullptr );
+           FC_ASSERT( aobj != nullptr );
            accounts.insert( aobj->issuer );
            break;
         } case force_settlement_object_type:{
            const auto& aobj = dynamic_cast<const force_settlement_object*>(obj);
-           assert( aobj != nullptr );
+           FC_ASSERT( aobj != nullptr );
            accounts.insert( aobj->owner );
            break;
         } case committee_member_object_type:{
            const auto& aobj = dynamic_cast<const committee_member_object*>(obj);
-           assert( aobj != nullptr );
+           FC_ASSERT( aobj != nullptr );
            accounts.insert( aobj->committee_member_account );
            break;
         } case witness_object_type:{
            const auto& aobj = dynamic_cast<const witness_object*>(obj);
-           assert( aobj != nullptr );
+           FC_ASSERT( aobj != nullptr );
            accounts.insert( aobj->witness_account );
            break;
         } case limit_order_object_type:{
            const auto& aobj = dynamic_cast<const limit_order_object*>(obj);
-           assert( aobj != nullptr );
+           FC_ASSERT( aobj != nullptr );
            accounts.insert( aobj->seller );
            break;
         } case call_order_object_type:{
            const auto& aobj = dynamic_cast<const call_order_object*>(obj);
-           assert( aobj != nullptr );
+           FC_ASSERT( aobj != nullptr );
            accounts.insert( aobj->borrower );
            break;
         } case custom_object_type:{
           break;
         } case proposal_object_type:{
            const auto& aobj = dynamic_cast<const proposal_object*>(obj);
-           assert( aobj != nullptr );
+           FC_ASSERT( aobj != nullptr );
            transaction_get_impacted_accounts( aobj->proposed_transaction, accounts );
            break;
         } case operation_history_object_type:{
            const auto& aobj = dynamic_cast<const operation_history_object*>(obj);
-           assert( aobj != nullptr );
+           FC_ASSERT( aobj != nullptr );
            operation_get_impacted_accounts( aobj->op, accounts );
            break;
         } case withdraw_permission_object_type:{
            const auto& aobj = dynamic_cast<const withdraw_permission_object*>(obj);
-           assert( aobj != nullptr );
+           FC_ASSERT( aobj != nullptr );
            accounts.insert( aobj->withdraw_from_account );
            accounts.insert( aobj->authorized_account );
            break;
         } case vesting_balance_object_type:{
            const auto& aobj = dynamic_cast<const vesting_balance_object*>(obj);
-           assert( aobj != nullptr );
+           FC_ASSERT( aobj != nullptr );
            accounts.insert( aobj->owner );
            break;
         } case worker_object_type:{
            const auto& aobj = dynamic_cast<const worker_object*>(obj);
-           assert( aobj != nullptr );
+           FC_ASSERT( aobj != nullptr );
            accounts.insert( aobj->worker_account );
            break;
         } case balance_object_type:{
@@ -306,30 +310,33 @@ static void get_relevant_accounts( const object* obj, flat_set<account_id_type>&
               break;
              case impl_account_balance_object_type:{
               const auto& aobj = dynamic_cast<const account_balance_object*>(obj);
-              assert( aobj != nullptr );
+              FC_ASSERT( aobj != nullptr );
               accounts.insert( aobj->owner );
               break;
            } case impl_account_statistics_object_type:{
               const auto& aobj = dynamic_cast<const account_statistics_object*>(obj);
-              assert( aobj != nullptr );
+              FC_ASSERT( aobj != nullptr );
               accounts.insert( aobj->owner );
               break;
            } case impl_transaction_object_type:{
               const auto& aobj = dynamic_cast<const transaction_object*>(obj);
-              assert( aobj != nullptr );
+              FC_ASSERT( aobj != nullptr );
               transaction_get_impacted_accounts( aobj->trx, accounts );
               break;
            } case impl_blinded_balance_object_type:{
               const auto& aobj = dynamic_cast<const blinded_balance_object*>(obj);
-              assert( aobj != nullptr );
+              FC_ASSERT( aobj != nullptr );
               for( const auto& a : aobj->owner.account_auths )
                 accounts.insert( a.first );
               break;
            } case impl_block_summary_object_type:
               break;
-             case impl_account_transaction_history_object_type:
+             case impl_account_transaction_history_object_type: {
+              const auto& aobj = dynamic_cast<const account_transaction_history_object*>(obj);
+              FC_ASSERT( aobj != nullptr );
+              accounts.insert( aobj->account );
               break;
-             case impl_chain_property_object_type:
+           } case impl_chain_property_object_type:
               break;
              case impl_witness_schedule_object_type:
               break;
@@ -343,7 +350,7 @@ static void get_relevant_accounts( const object* obj, flat_set<account_id_type>&
               break;
              case impl_collateral_bid_object_type:{
               const auto& aobj = dynamic_cast<const collateral_bid_object*>(obj);
-              assert( aobj != nullptr );
+              FC_ASSERT( aobj != nullptr );
               accounts.insert( aobj->bidder );
               break;
            }

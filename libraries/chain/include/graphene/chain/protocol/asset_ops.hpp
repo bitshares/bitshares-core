@@ -442,11 +442,74 @@ namespace graphene { namespace chain {
       void            validate()const;
    };
 
+   /**
+    * @brief Update issuer of an asset
+    * @ingroup operations
+    *
+    * An issuer has general administrative power of an asset and in some cases
+    * also its shares issued to individuals. Thus, changing the issuer today
+    * requires the use of a separate operation that needs to be signed by the
+    * owner authority.
+    *
+    */
+   struct asset_update_issuer_operation : public base_operation
+   {
+      struct fee_parameters_type {
+         uint64_t fee            = 20 * GRAPHENE_BLOCKCHAIN_PRECISION;
+      };
+
+      asset           fee;
+      account_id_type issuer;
+      asset_id_type   asset_to_update;
+      account_id_type new_issuer;
+      extensions_type extensions;
+
+      account_id_type fee_payer()const { return issuer; }
+      void            validate()const;
+
+      void get_required_owner_authorities( flat_set<account_id_type>& a )const
+      { a.insert( issuer ); }
+
+      void get_required_active_authorities( flat_set<account_id_type>& a )const
+      {  }
+
+   };
+
+   /**
+    * @brief Transfers BTS from the fee pool of a specified asset back to the issuer's balance
+
+    * @param fee Payment for the operation execution
+    * @param issuer Account which will be used for transfering BTS
+    * @param asset_id Id of the asset whose fee pool is going to be drained
+    * @param amount_to_claim Amount of BTS to claim from the fee pool
+    * @param extensions Field for future expansion
+
+    * @pre @ref fee must be paid in the asset other than the one whose pool is being drained
+    * @pre @ref amount_to_claim should be specified in the core asset
+    * @pre @ref amount_to_claim should be nonnegative
+    */
+   struct asset_claim_pool_operation : public base_operation
+   {
+      struct fee_parameters_type {
+         uint64_t fee = 20 * GRAPHENE_BLOCKCHAIN_PRECISION;
+      };
+
+      asset           fee;
+      account_id_type issuer;
+      asset_id_type   asset_id;        /// fee.asset_id must != asset_id
+      asset           amount_to_claim; /// core asset
+      extensions_type extensions;
+
+      account_id_type fee_payer()const { return issuer; }
+      void            validate()const;
+   };
 
 } } // graphene::chain
 
 FC_REFLECT( graphene::chain::asset_claim_fees_operation, (fee)(issuer)(amount_to_claim)(extensions) )
 FC_REFLECT( graphene::chain::asset_claim_fees_operation::fee_parameters_type, (fee) )
+FC_REFLECT( graphene::chain::asset_claim_pool_operation, (fee)(issuer)(asset_id)(amount_to_claim)(extensions) )
+FC_REFLECT( graphene::chain::asset_claim_pool_operation::fee_parameters_type, (fee) )
 
 FC_REFLECT( graphene::chain::asset_options,
             (max_supply)
@@ -479,6 +542,7 @@ FC_REFLECT( graphene::chain::asset_settle_operation::fee_parameters_type, (fee) 
 FC_REFLECT( graphene::chain::asset_settle_cancel_operation::fee_parameters_type, )
 FC_REFLECT( graphene::chain::asset_fund_fee_pool_operation::fee_parameters_type, (fee) )
 FC_REFLECT( graphene::chain::asset_update_operation::fee_parameters_type, (fee)(price_per_kbyte) )
+FC_REFLECT( graphene::chain::asset_update_issuer_operation::fee_parameters_type, (fee) )
 FC_REFLECT( graphene::chain::asset_update_bitasset_operation::fee_parameters_type, (fee) )
 FC_REFLECT( graphene::chain::asset_update_feed_producers_operation::fee_parameters_type, (fee) )
 FC_REFLECT( graphene::chain::asset_publish_feed_operation::fee_parameters_type, (fee) )
@@ -502,6 +566,13 @@ FC_REFLECT( graphene::chain::asset_update_operation,
             (asset_to_update)
             (new_issuer)
             (new_options)
+            (extensions)
+          )
+FC_REFLECT( graphene::chain::asset_update_issuer_operation,
+            (fee)
+            (issuer)
+            (asset_to_update)
+            (new_issuer)
             (extensions)
           )
 FC_REFLECT( graphene::chain::asset_update_bitasset_operation,
