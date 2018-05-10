@@ -436,7 +436,7 @@ static bool update_bitasset_object_options(
    {
       backing_asset_changed = true;
       should_update_feeds = true;
-      if( asset_to_update.options.flags & (witness_fed_asset | committee_fed_asset) )
+      if( asset_to_update.options.flags & ( witness_fed_asset | committee_fed_asset ) )
          is_witness_or_committee_fed = true;
    }
 

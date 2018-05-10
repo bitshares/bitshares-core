@@ -862,7 +862,7 @@ void process_hf_868_890( database& db, bool skip_check_call_orders )
    auto head_time = db.head_block_time();
    // for each market issued asset
    const auto& asset_idx = db.get_index_type<asset_index>().indices().get<by_type>();
-   for(auto asset_itr = asset_idx.lower_bound(true); asset_itr != asset_idx.end(); ++asset_itr)
+   for( auto asset_itr = asset_idx.lower_bound(true); asset_itr != asset_idx.end(); ++asset_itr )
    {
       const auto& current_asset = *asset_itr;
       // Incorrect witness & committee feeds can simply be removed.
@@ -870,7 +870,7 @@ void process_hf_868_890( database& db, bool skip_check_call_orders )
       // feeds to price(), since we can't simply remove them. For more information:
       // https://github.com/bitshares/bitshares-core/pull/832#issuecomment-384112633
       bool is_witness_or_committee_fed = false;
-      if ( current_asset.options.flags & (witness_fed_asset | committee_fed_asset) )
+      if ( current_asset.options.flags & ( witness_fed_asset | committee_fed_asset ) )
          is_witness_or_committee_fed = true;
 
       // for each feed
@@ -879,15 +879,16 @@ void process_hf_868_890( database& db, bool skip_check_call_orders )
       auto old_price = bitasset_data.current_feed.settlement_price;
       bool feeds_changed = false; // did any feed change
       auto itr = bitasset_data.feeds.begin();
-      while (itr != bitasset_data.feeds.end())
+      while( itr != bitasset_data.feeds.end() )
       {
          // If the feed is invalid
-         if ( (*itr).second.second.settlement_price.quote.asset_id != bitasset_data.options.short_backing_asset
-               && (is_witness_or_committee_fed || (*itr).second.second.settlement_price != price() ) )
+         if ( itr->second.second.settlement_price.quote.asset_id != bitasset_data.options.short_backing_asset
+               && ( is_witness_or_committee_fed || itr->second.second.settlement_price != price() ) )
          {
             feeds_changed = true;
-            db.modify(bitasset_data, [&itr, is_witness_or_committee_fed](asset_bitasset_data_object& obj) {
-               if (is_witness_or_committee_fed)
+            db.modify( bitasset_data, [&itr, is_witness_or_committee_fed]( asset_bitasset_data_object& obj )
+            {
+               if( is_witness_or_committee_fed )
                {
                   // erase the invalid feed
                   itr = obj.feeds.erase(itr);
@@ -895,7 +896,7 @@ void process_hf_868_890( database& db, bool skip_check_call_orders )
                else
                {
                   // nullify the invalid feed
-                  (*obj.feeds.find( (*itr).first )).second.second.settlement_price = price();
+                  obj.feeds[itr->first].second.settlement_price = price();
                   ++itr;
                }
             });
@@ -908,8 +909,11 @@ void process_hf_868_890( database& db, bool skip_check_call_orders )
       } // end loop of each feed
 
       // if any feed was modified, print a warning message
-      if (feeds_changed)
-         wlog("Found invalid feed for asset ${asset_id} during hardfork core-868-890", ("asset_id", current_asset));
+      if( feeds_changed )
+      {
+         wlog( "Found invalid feed for asset ${asset_sym} (${asset_id}) during hardfork core-868-890",
+               ("asset_sym", current_asset.symbol)("asset_id", current_asset.id) );
+      }
 
       // always update the median feed due to https://github.com/bitshares/bitshares-core/issues/890
       db.modify( bitasset_data, [&head_time]( asset_bitasset_data_object &obj ) {
@@ -918,12 +922,15 @@ void process_hf_868_890( database& db, bool skip_check_call_orders )
 
       bool median_changed = ( old_price != bitasset_data.current_feed.settlement_price );
       if( median_changed )
-         wlog( "Median feed for asset ${asset_id} changed during hardfork core-868-890", ("asset_id", current_asset) );
-
-      if( !skip_check_call_orders && median_changed )
       {
-         db.check_call_orders(current_asset);
-      } // check_call_orders should be called
+         wlog( "Median feed for asset ${asset_sym} (${asset_id}) changed during hardfork core-868-890",
+               ("asset_sym", current_asset.symbol)("asset_id", current_asset.id) );
+      }
+
+      if( !skip_check_call_orders && median_changed ) // check_call_orders should be called
+      {
+         db.check_call_orders( current_asset );
+      }
    } // for each market issued asset
 }
 
@@ -1083,7 +1090,8 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
    if( (dgpo.next_maintenance_time <= HARDFORK_CORE_343_TIME) && (next_maintenance_time > HARDFORK_CORE_343_TIME) )
       to_update_and_match_call_orders = true;
 
-   if ( (dgpo.next_maintenance_time <= HARDFORK_CORE_868_890_TIME) && (next_maintenance_time > HARDFORK_CORE_868_890_TIME) )
+   // Process inconsistent price feeds
+   if( (dgpo.next_maintenance_time <= HARDFORK_CORE_868_890_TIME) && (next_maintenance_time > HARDFORK_CORE_868_890_TIME) )
       process_hf_868_890( *this, to_update_and_match_call_orders );
 
    modify(dgpo, [next_maintenance_time](dynamic_global_property_object& d) {
