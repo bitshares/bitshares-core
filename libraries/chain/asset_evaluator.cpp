@@ -407,47 +407,44 @@ void_result asset_update_bitasset_evaluator::do_evaluate(const asset_update_bita
  * @param db the database
  * @param bdo the actual database object
  * @param asset_to_update the asset_object related to this bitasset_data_object
- * @returns true if the feed price is changed, and after hf 890
+ * @returns true if the feed price is changed, and after hf core-890
  */
 static bool update_bitasset_object_options(
       const asset_update_bitasset_operation& op, database& db,
-      asset_bitasset_data_object& bdo, const asset_object& asset_to_update)
+      asset_bitasset_data_object& bdo, const asset_object& asset_to_update )
 {
    const fc::time_point_sec& next_maint_time = db.get_dynamic_global_properties().next_maintenance_time;
 
-   // If the minimum number of feeds to calculate a median has changed
-   // we need to recalculate the median
+   // If the minimum number of feeds to calculate a median has changed, we need to recalculate the median
    bool should_update_feeds = false;
-   if( op.new_options.minimum_feeds != bdo.options.minimum_feeds)
+   if( op.new_options.minimum_feeds != bdo.options.minimum_feeds )
       should_update_feeds = true;
 
-   // We need to call check_call_orders if the settlement price changes after hardfork 890
-   if (next_maint_time > HARDFORK_CORE_890_TIME)
+   // after hardfork 890, we also should call update_median_feeds if the feed_lifetime_sec changed
+   if( next_maint_time > HARDFORK_CORE_890_TIME
+         && op.new_options.feed_lifetime_sec != bdo.options.feed_lifetime_sec )
    {
-      // after hardfork 890, we also should call update_median_feeds
-      // if the feed_lifetime_sec changed
-      if (op.new_options.feed_lifetime_sec != bdo.options.feed_lifetime_sec)
-         should_update_feeds = true;
+      should_update_feeds = true;
    }
 
    // feeds must be reset if the backing asset is changed after hardfork 868
    bool backing_asset_changed = false;
    bool is_witness_or_committee_fed = false;
-   if (next_maint_time > HARDFORK_CORE_868_TIME
-         && op.new_options.short_backing_asset != bdo.options.short_backing_asset)
+   if( next_maint_time > HARDFORK_CORE_868_TIME
+         && op.new_options.short_backing_asset != bdo.options.short_backing_asset )
    {
       backing_asset_changed = true;
       should_update_feeds = true;
-      if ( asset_to_update.options.flags & (witness_fed_asset | committee_fed_asset) )
+      if( asset_to_update.options.flags & (witness_fed_asset | committee_fed_asset) )
          is_witness_or_committee_fed = true;
    }
 
    bdo.options = op.new_options;
 
    // are we modifying the underlying? If so, reset the feeds
-   if (backing_asset_changed)
+   if( backing_asset_changed )
    {
-      if ( is_witness_or_committee_fed )
+      if( is_witness_or_committee_fed )
       {
          bdo.feeds.clear();
       }
@@ -456,7 +453,7 @@ static bool update_bitasset_object_options(
          // for non-witness-feeding and non-committee-feeding assets, modify all feeds
          // published by producers to nothing, since we can't simply remove them. For more information:
          // https://github.com/bitshares/bitshares-core/pull/832#issuecomment-384112633
-         for(auto& current_feed : bdo.feeds)
+         for( auto& current_feed : bdo.feeds )
          {
             current_feed.second.second.settlement_price = price();
          }
@@ -466,14 +463,13 @@ static bool update_bitasset_object_options(
    if( should_update_feeds )
    {
       const auto old_feed_price = bdo.current_feed.settlement_price;
-      bdo.update_median_feeds(db.head_block_time());
+      bdo.update_median_feeds( db.head_block_time() );
 
+      // We need to call check_call_orders if the settlement price changes after hardfork core-890
       return next_maint_time > HARDFORK_CORE_890_TIME && old_feed_price != bdo.current_feed.settlement_price;
    }
-   else
-   {
-      return false;
-   }
+
+   return false;
 }
 
 void_result asset_update_bitasset_evaluator::do_apply(const asset_update_bitasset_operation& op)
@@ -482,16 +478,19 @@ void_result asset_update_bitasset_evaluator::do_apply(const asset_update_bitasse
    {
       auto& db_conn = db();
       const auto& asset_being_updated = (*asset_to_update);
-      bool price_changed = false;
+      bool to_check_call_orders = false;
 
-      db_conn.modify(*bitasset_to_update, [&op, &asset_being_updated, &price_changed, &db_conn](asset_bitasset_data_object& bdo) {
-         price_changed = update_bitasset_object_options(op, db_conn, bdo, asset_being_updated);
+      db_conn.modify( *bitasset_to_update,
+                      [&op, &asset_being_updated, &price_changed, &db_conn]( asset_bitasset_data_object& bdo )
+      {
+         to_check_call_orders = update_bitasset_object_options( op, db_conn, bdo, asset_being_updated );
       });
 
-      if (price_changed)
-         db_conn.check_call_orders(asset_being_updated);
+      if( to_check_call_orders )
+         db_conn.check_call_orders( asset_being_updated );
 
       return void_result();
+
    } FC_CAPTURE_AND_RETHROW( (op) )
 }
 
