@@ -116,13 +116,13 @@ BOOST_AUTO_TEST_CASE( reset_backing_asset_on_witness_asset )
        // do a maintenance block
       generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
       // generate blocks until close to hard fork
-      generate_blocks( HARDFORK_CORE_868_TIME - fc::hours(1) );
+      generate_blocks( HARDFORK_CORE_868_890_TIME - fc::hours(1) );
     */
 
    BOOST_TEST_MESSAGE("Advance to near hard fork");
    auto maint_interval = db.get_global_properties().parameters.maintenance_interval;
-   generate_blocks( HARDFORK_CORE_868_TIME - maint_interval);
-   trx.set_expiration(HARDFORK_CORE_868_TIME - fc::seconds(1));
+   generate_blocks( HARDFORK_CORE_868_890_TIME - maint_interval);
+   trx.set_expiration(HARDFORK_CORE_868_890_TIME - fc::seconds(1));
 
    BOOST_TEST_MESSAGE("Create USDBIT");
    asset_id_type bit_usd_id = create_bitasset("USDBIT").id;
@@ -214,8 +214,8 @@ BOOST_AUTO_TEST_CASE( reset_backing_asset_on_witness_asset )
    }
    {
       BOOST_TEST_MESSAGE("Advance to after hard fork");
-      generate_blocks( HARDFORK_CORE_868_TIME + maint_interval);
-      trx.set_expiration(HARDFORK_CORE_868_TIME + fc::hours(46));
+      generate_blocks( HARDFORK_CORE_868_890_TIME + maint_interval);
+      trx.set_expiration(HARDFORK_CORE_868_890_TIME + fc::hours(46));
 
       BOOST_TEST_MESSAGE("After hardfork, 1 feed should have been erased");
       const asset_bitasset_data_object& jmj_obj = bit_jmj_id(db).bitasset_data(db);
@@ -251,8 +251,8 @@ BOOST_AUTO_TEST_CASE( reset_backing_asset_on_non_witness_asset )
 
    BOOST_TEST_MESSAGE("Advance to near hard fork");
    auto maint_interval = db.get_global_properties().parameters.maintenance_interval;
-   generate_blocks( HARDFORK_CORE_868_TIME - maint_interval);
-   trx.set_expiration(HARDFORK_CORE_868_TIME - fc::seconds(1));
+   generate_blocks( HARDFORK_CORE_868_890_TIME - maint_interval);
+   trx.set_expiration(HARDFORK_CORE_868_890_TIME - fc::seconds(1));
 
 
    BOOST_TEST_MESSAGE("Create USDBIT");
@@ -356,8 +356,8 @@ BOOST_AUTO_TEST_CASE( reset_backing_asset_on_non_witness_asset )
    }
    {
       BOOST_TEST_MESSAGE("Advance to past hard fork");
-      generate_blocks( HARDFORK_CORE_868_TIME + maint_interval);
-      trx.set_expiration(HARDFORK_CORE_868_TIME + fc::hours(48));
+      generate_blocks( HARDFORK_CORE_868_890_TIME + maint_interval);
+      trx.set_expiration(HARDFORK_CORE_868_890_TIME + fc::hours(48));
 
       BOOST_TEST_MESSAGE("Verify that the incorrect feeds have been corrected");
       const asset_bitasset_data_object& jmj_obj = bit_jmj_id(db).bitasset_data(db);
@@ -411,6 +411,137 @@ BOOST_AUTO_TEST_CASE( reset_backing_asset_on_non_witness_asset )
    }
 }
 
+/*********
+ * @brief Update median feeds after feed_lifetime_sec changed
+ */
+BOOST_AUTO_TEST_CASE( hf_890_test )
+{
+   uint32_t skip = database::skip_witness_signature
+                 | database::skip_transaction_signatures
+                 | database::skip_transaction_dupe_check
+                 | database::skip_block_size_check
+                 | database::skip_tapos_check
+                 | database::skip_authority_check
+                 | database::skip_merkle_check
+                 ;
+   generate_blocks(HARDFORK_615_TIME, true, skip); // get around Graphene issue #615 feed expiration bug
+   generate_blocks(db.get_dynamic_global_properties().next_maintenance_time, true, skip);
+
+   for( int i=0; i<2; ++i )
+   {
+      int blocks = 0;
+      auto mi = db.get_global_properties().parameters.maintenance_interval;
+
+      if( i == 1 ) // go beyond hard fork
+      {
+         generate_blocks(HARDFORK_CORE_868_890_TIME - mi, true, skip);
+         blocks += 2;
+         generate_blocks(db.get_dynamic_global_properties().next_maintenance_time, true, skip);
+         blocks += 2;
+      }
+      set_expiration( db, trx );
+
+      ACTORS((buyer)(seller)(borrower)(feedproducer));
+
+      int64_t init_balance(1000000);
+
+      transfer(committee_account, buyer_id, asset(init_balance));
+      transfer(committee_account, borrower_id, asset(init_balance));
+
+      const auto& bitusd = create_bitasset("USDBIT", feedproducer_id);
+      asset_id_type usd_id = bitusd.id;
+
+      {
+         // change feed lifetime
+         const asset_object& asset_to_update = usd_id(db);
+         asset_update_bitasset_operation ba_op;
+         ba_op.asset_to_update = usd_id;
+         ba_op.issuer = asset_to_update.issuer;
+         ba_op.new_options = asset_to_update.bitasset_data(db).options;
+         ba_op.new_options.feed_lifetime_sec = 600;
+         trx.operations.push_back(ba_op);
+         PUSH_TX(db, trx, ~0);
+         trx.clear();
+      }
+
+      // prepare feed data
+      price_feed current_feed;
+      current_feed.maintenance_collateral_ratio = 1750;
+      current_feed.maximum_short_squeeze_ratio = 1100;
+
+      // set price feed
+      update_feed_producers( usd_id(db), {feedproducer_id} );
+      current_feed.settlement_price = asset(100, usd_id) / asset(5);
+      publish_feed( usd_id, feedproducer_id, current_feed );
+
+      // Place some collateralized orders
+      // start out with 300% collateral, call price is 15/175 CORE/USD = 60/700
+      borrow( borrower_id, asset(100, usd_id), asset(15) );
+
+      transfer( borrower_id, seller_id, asset(100, usd_id) );
+
+      // Adjust price feed to get call order into margin call territory
+      current_feed.settlement_price = asset(100, usd_id) / asset(10);
+      publish_feed( usd_id, feedproducer_id, current_feed );
+      // settlement price = 100 USD / 10 CORE, mssp = 100/11 USD/CORE
+
+      // let the feed expire
+      generate_blocks( db.head_block_time() + 1200, true, skip );
+      blocks += 2;
+      set_expiration( db, trx );
+
+      // check: median feed should be null
+      BOOST_CHECK( usd_id(db).bitasset_data(db).current_feed.settlement_price.is_null() );
+
+      // place a sell order, it won't be matched with the call order
+      limit_order_id_type sell_id = create_sell_order(seller_id, asset(10, usd_id), asset(1))->id;
+
+      {
+         // change feed lifetime to longer
+         const asset_object& asset_to_update = usd_id(db);
+         asset_update_bitasset_operation ba_op;
+         ba_op.asset_to_update = usd_id;
+         ba_op.issuer = asset_to_update.issuer;
+         ba_op.new_options = asset_to_update.bitasset_data(db).options;
+         ba_op.new_options.feed_lifetime_sec = HARDFORK_CORE_868_890_TIME.sec_since_epoch()
+                                             - db.head_block_time().sec_since_epoch()
+                                             + mi
+                                             + 1800;
+         trx.operations.push_back(ba_op);
+         PUSH_TX(db, trx, ~0);
+         trx.clear();
+      }
+
+      // check
+      if( i == 0 ) // before hard fork, median feed is still null, and limit order is still there
+      {
+         BOOST_CHECK( usd_id(db).bitasset_data(db).current_feed.settlement_price.is_null() );
+         BOOST_CHECK( db.find<limit_order_object>( sell_id ) );
+
+         // go beyond hard fork
+         generate_blocks(HARDFORK_CORE_868_890_TIME - mi, true, skip);
+         blocks += 2;
+         generate_blocks(db.get_dynamic_global_properties().next_maintenance_time, true, skip);
+         blocks += 2;
+      }
+
+      // after hard fork, median feed should become valid, and the limit order should be filled
+      {
+         BOOST_CHECK( usd_id(db).bitasset_data(db).current_feed.settlement_price == current_feed.settlement_price );
+         BOOST_CHECK( !db.find<limit_order_object>( sell_id ) );
+      }
+
+      // undo above tx's and reset
+      generate_block( skip );
+      ++blocks;
+      while( blocks > 0 )
+      {
+         db.pop_block();
+         --blocks;
+      }
+   }
+}
+
 /*****
  * @brief make sure feeds work correctly after changing from non-witness-fed to witness-fed before the 868 fork
  * NOTE: This test case is a different issue than what is currently being worked on, and fails. Hopefully it
@@ -423,8 +554,8 @@ BOOST_AUTO_TEST_CASE( reset_backing_asset_switching_to_witness_fed )
 
    BOOST_TEST_MESSAGE("Advance to near hard fork");
    auto maint_interval = db.get_global_properties().parameters.maintenance_interval;
-   generate_blocks( HARDFORK_CORE_868_TIME - maint_interval);
-   trx.set_expiration(HARDFORK_CORE_868_TIME - fc::seconds(1));
+   generate_blocks( HARDFORK_CORE_868_890_TIME - maint_interval);
+   trx.set_expiration(HARDFORK_CORE_868_890_TIME - fc::seconds(1));
 
 
    BOOST_TEST_MESSAGE("Create USDBIT");
@@ -530,8 +661,8 @@ BOOST_AUTO_TEST_CASE( reset_backing_asset_switching_to_witness_fed )
    }
    {
       BOOST_TEST_MESSAGE("Advance to past hard fork");
-      generate_blocks( HARDFORK_CORE_868_TIME + maint_interval);
-      trx.set_expiration(HARDFORK_CORE_868_TIME + fc::hours(48));
+      generate_blocks( HARDFORK_CORE_868_890_TIME + maint_interval);
+      trx.set_expiration(HARDFORK_CORE_868_890_TIME + fc::hours(48));
 
       BOOST_TEST_MESSAGE("Verify that the incorrect feeds have been removed");
       const asset_bitasset_data_object& jmj_obj = bit_jmj_id(db).bitasset_data(db);
