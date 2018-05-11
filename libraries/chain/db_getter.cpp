@@ -97,7 +97,8 @@ uint32_t database::last_non_undoable_block_num() const
    return head_block_num() - _undo_db.size();
 }
 
-const escrow_object& database::get_escrow( account_id_type account, uint32_t escrow_id )const {
+const escrow_object& database::get_escrow( account_id_type account, uint32_t escrow_id )const
+{
    const auto& escrow_idx = get_index_type<escrow_index>().indices().get<by_from_id>();
    auto itr = escrow_idx.find( boost::make_tuple(account,escrow_id) );
    FC_ASSERT( itr != escrow_idx.end() );

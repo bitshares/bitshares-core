@@ -475,4 +475,15 @@ void database::update_withdraw_permissions()
       remove(*permit_index.begin());
 }
 
+void database::remove_expired_escrows( )
+{
+   const auto& escrow_idx = get_index_type<escrow_index>().indices().get<by_expiration>();
+   while( !escrow_idx.empty() && escrow_idx.begin() != escrow_idx.end()
+          && escrow_idx.begin()->escrow_expiration <= head_block_time() && !escrow_idx.begin()->disputed )
+   {
+      adjust_balance( escrow_idx.begin()->from, escrow_idx.begin()->amount );
+      remove(*escrow_idx.begin());
+   }
+}
+
 } }

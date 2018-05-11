@@ -212,7 +212,6 @@ BOOST_AUTO_TEST_CASE( escrow_transfer )
    } FC_LOG_AND_RETHROW()
 }
 
-
 BOOST_AUTO_TEST_CASE( escrow_dispute )
 {
    try
@@ -1124,6 +1123,23 @@ BOOST_AUTO_TEST_CASE( escrow_authorities )
       trx.clear();
 
       // escrow approve
+      escrow_approve_operation op_a;
+      op_a.from = alice_id;
+      op_a.to = bob_id;
+      op_a.who = sam_id;
+      op_a.escrow_id = 0;
+      op_a.agent = sam_id;
+      op_a.approve = true;
+
+      op_a.get_required_active_authorities( auths );
+      expected.insert( alice_id );
+      BOOST_REQUIRE( auths == expected );
+      //trx.operations.push_back(op);
+      //sign(trx, sam_private_key);
+      //PUSH_TX(db, trx);
+      //generate_block();
+      //trx.clear();
+
 
       // escrow dispute
 
@@ -1131,5 +1147,62 @@ BOOST_AUTO_TEST_CASE( escrow_authorities )
 
    } FC_LOG_AND_RETHROW()
 }
+
+
+BOOST_AUTO_TEST_CASE( escrow_expire_auto )
+{
+   try
+   {
+      generate_blocks( HARDFORK_ESCROW_TIME );
+      generate_block();
+      set_expiration( db, trx );
+
+      ACTORS( (alice)(bob)(sam) );
+      const auto& core   = asset_id_type()(db);
+
+      transfer(committee_account, alice_id, asset(100000000));
+
+      // escrow transfer create
+      escrow_transfer_operation op;
+      op.from = alice_id;
+      op.to = bob_id;
+      op.amount = core.amount(1000);
+      op.escrow_id = 0;
+      op.agent = sam_id;
+      op.agent_fee = core.amount(0);
+      op.json_meta = "";
+      op.ratification_deadline = db.head_block_time() + 100;
+      op.escrow_expiration = db.head_block_time() + 200;
+
+      trx.operations.push_back(op);
+      sign(trx, alice_private_key);
+      PUSH_TX(db, trx);
+      generate_block();
+      trx.clear();
+
+      auto escrow = db.get_escrow( alice_id, 0 );
+      BOOST_REQUIRE( escrow.from == alice_id );
+      BOOST_REQUIRE( escrow.to == bob_id );
+      BOOST_REQUIRE( escrow.escrow_id == 0 );
+      BOOST_REQUIRE( escrow.agent == sam_id );
+      BOOST_REQUIRE( escrow.disputed == false );
+      BOOST_REQUIRE( escrow.to_approved == false );
+      BOOST_REQUIRE( escrow.agent_approved == false );
+
+      // escrow expires
+      generate_blocks(db.head_block_time() + 201);
+      set_expiration( db, trx );
+
+      generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+
+      GRAPHENE_CHECK_THROW(db.get_escrow( alice_id, 0 ), fc::assert_exception);
+
+      // money is returned automatically to alice at expiration
+      BOOST_REQUIRE_EQUAL(get_balance(alice_id, asset_id_type()), 100000000);
+
+
+   } FC_LOG_AND_RETHROW()
+}
+
 
 BOOST_AUTO_TEST_SUITE_END()

@@ -270,6 +270,7 @@ namespace graphene { namespace chain {
          uint32_t last_non_undoable_block_num() const;
 
          const escrow_object&   get_escrow( account_id_type account, uint32_t escrow_id )const;
+         //const vector<escrow_object> get_expired_escrows( )const;
          //////////////////// db_init.cpp ////////////////////
 
          void initialize_evaluators();
@@ -454,6 +455,8 @@ namespace graphene { namespace chain {
          void update_maintenance_flag( bool new_maintenance_flag );
          void update_withdraw_permissions();
          bool check_for_blackswan( const asset_object& mia, bool enable_black_swan = true );
+
+         void remove_expired_escrows( );
 
          ///Steps performed only at maintenance intervals
          ///@{

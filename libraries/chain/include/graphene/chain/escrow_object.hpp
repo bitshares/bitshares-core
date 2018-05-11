@@ -54,10 +54,13 @@ namespace graphene { namespace chain {
 
       struct by_from_id;
       struct by_ratification_deadline;
+      struct by_expiration;
       typedef multi_index_container<
          escrow_object,
          indexed_by<
             ordered_unique< tag< by_id >, member< object, object_id_type, &object::id > >,
+
+            ordered_non_unique< tag< by_expiration >, member< escrow_object, time_point_sec, &escrow_object::escrow_expiration > >,
 
             ordered_unique< tag< by_from_id >,
                composite_key< escrow_object,
@@ -74,6 +77,7 @@ namespace graphene { namespace chain {
                composite_key_compare< std::less< bool >, std::less< time_point_sec >, std::less< uint32_t > >
             >
          >
+
       > escrow_object_index_type;
 
       typedef generic_index< escrow_object, escrow_object_index_type > escrow_index;
