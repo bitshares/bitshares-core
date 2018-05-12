@@ -2925,6 +2925,11 @@ account_history_operation_detail wallet_api::get_account_history_by_operations(s
     return result;
 }
 
+full_account wallet_api::get_full_account( const string& name_or_id)
+{
+    return my->_remote_db->get_full_accounts({name_or_id}, false)[name_or_id];
+}
+
 vector<bucket_object> wallet_api::get_market_history( string symbol1, string symbol2, uint32_t bucket , fc::time_point_sec start, fc::time_point_sec end )const
 {
    return my->_remote_hist->get_market_history( get_asset_id(symbol1), get_asset_id(symbol2), bucket, start, end );
