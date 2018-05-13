@@ -82,6 +82,29 @@ struct proposal_operation_hardfork_visitor
          FC_ASSERT(!"Virtual operation");
       }
    }
+
+   // ESCROW ops
+   void operator()(const graphene::chain::escrow_transfer_operation &v) const {
+      if (block_time < HARDFORK_ESCROW_TIME) {
+         FC_ASSERT(false, "Not allowed until HARDFORK_ESCROW");
+      }
+   }
+   void operator()(const graphene::chain::escrow_approve_operation &v) const {
+      if (block_time < HARDFORK_ESCROW_TIME) {
+         FC_ASSERT(false, "Not allowed until HARDFORK_ESCROW");
+      }
+   }
+   void operator()(const graphene::chain::escrow_dispute_operation &v) const {
+      if (block_time < HARDFORK_ESCROW_TIME) {
+         FC_ASSERT(false, "Not allowed until HARDFORK_ESCROW");
+      }
+   }
+   void operator()(const graphene::chain::escrow_release_operation &v) const {
+      if (block_time < HARDFORK_ESCROW_TIME) {
+         FC_ASSERT(false, "Not allowed until HARDFORK_ESCROW");
+      }
+   }
+
    // loop and self visit in proposals
    void operator()(const graphene::chain::proposal_create_operation &v) const {
       for (const op_wrapper &op : v.proposed_ops)
