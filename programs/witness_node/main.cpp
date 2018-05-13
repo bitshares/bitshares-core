@@ -298,6 +298,14 @@ void write_default_logging_config_to_stream(std::ostream& out)
    out << "# declare an appender named \"stderr\" that writes messages to the console\n"
           "[log.console_appender.stderr]\n"
           "stream=std_error\n\n"
+          "# declare an appender named \"default\" that writes messages to default.log\n"
+          "[log.file_appender.default]\n"
+          "# filename can be absolute or relative to this config file\n"
+          "filename=logs/default/default.log\n"
+          "# Rotate log every ? minutes, if leave out default to 60\n"
+          "rotation_interval=60\n"
+          "# how long will logs be kept (in days), if leave out default to 7\n"
+          "rotation_limit=7\n\n"
           "# declare an appender named \"p2p\" that writes messages to p2p.log\n"
           "[log.file_appender.p2p]\n"
           "# filename can be absolute or relative to this config file\n"
@@ -310,10 +318,10 @@ void write_default_logging_config_to_stream(std::ostream& out)
           "# declared above, if they are info level are higher\n"
           "[logger.default]\n"
           "level=info\n"
-          "appenders=stderr\n\n"
+          "appenders=stderr,default\n\n"
           "# route messages sent to the \"p2p\" logger to the p2p appender declared above\n"
           "[logger.p2p]\n"
-          "level=info\n"
+          "level=warn\n"
           "appenders=p2p\n\n";
 }
 
