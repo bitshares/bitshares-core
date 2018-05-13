@@ -1450,7 +1450,8 @@ class wallet_api
        * set, your preferences will be ignored.
        *
        * @param account_to_modify the name or id of the account to update
-       * @param number_of_committee_members the number 
+       * @param desired_number_of_witnesses desired number of active witnesses
+       * @param desired_number_of_committee_members desired number of active committee members
        *
        * @param broadcast true if you wish to broadcast the transaction
        * @return the signed transaction changing your vote proxy settings
