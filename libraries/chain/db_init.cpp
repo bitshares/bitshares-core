@@ -62,6 +62,9 @@
 #include <graphene/chain/witness_evaluator.hpp>
 #include <graphene/chain/worker_evaluator.hpp>
 #include <cybex/vesting_evaluator.hpp>
+#include <cybex/crowdfund_evaluator.hpp>
+#include <cybex/crowdfund.hpp>
+#include <cybex/crowdfund_contract.hpp>
 
 #include <graphene/chain/protocol/fee_schedule.hpp>
 
@@ -127,6 +130,10 @@ const uint8_t witness_object::type_id;
 const uint8_t worker_object::space_id;
 const uint8_t worker_object::type_id;
 
+const uint8_t crowdfund_contract_object::space_id;
+const uint8_t crowdfund_contract_object::type_id;
+const uint8_t crowdfund_object::space_id;
+const uint8_t crowdfund_object::type_id;
 
 void database::initialize_evaluators()
 {
@@ -173,6 +180,9 @@ void database::initialize_evaluators()
    register_evaluator<transfer_from_blind_evaluator>();
    register_evaluator<blind_transfer_evaluator>();
    register_evaluator<asset_claim_fees_evaluator>();
+   register_evaluator<initiate_crowdfund_evaluator>();
+   register_evaluator<participate_crowdfund_evaluator>();
+   register_evaluator<withdraw_crowdfund_evaluator>();
    register_evaluator<cancel_vesting_evaluator>();
 }
 

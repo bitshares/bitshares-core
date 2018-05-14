@@ -39,7 +39,7 @@
 #include <graphene/chain/protocol/witness.hpp>
 #include <graphene/chain/protocol/worker.hpp>
 #include <cybex/vesting_ops.hpp>
-#include <cybex/reserved_ops.hpp>
+#include <cybex/crowdfund_ops.hpp>
 
 namespace graphene { namespace chain {
 
@@ -94,62 +94,12 @@ namespace graphene { namespace chain {
             asset_settle_cancel_operation,  // VIRTUAL
             asset_claim_fees_operation,
             fba_distribute_operation,       // VIRTUAL
+            initiate_crowdfund_operation,
+            participate_crowdfund_operation,
+            withdraw_crowdfund_operation,
+            cancel_vesting_operation,
             bid_collateral_operation,
-            execute_bid_operation,          // VIRTUAL
-            reserved47_operation,
-            reserved48_operation,
-            reserved49_operation,
-            reserved50_operation,
-            reserved51_operation,
-            reserved52_operation,
-            reserved53_operation,
-            reserved54_operation,
-            reserved55_operation,
-            reserved56_operation,
-            reserved57_operation,
-            reserved58_operation,
-            reserved59_operation,
-            reserved60_operation,
-            reserved61_operation,
-            reserved62_operation,
-            reserved63_operation,
-            reserved64_operation,
-            reserved65_operation,
-            reserved66_operation,
-            reserved67_operation,
-            reserved68_operation,
-            reserved69_operation,
-            reserved70_operation,
-            reserved71_operation,
-            reserved72_operation,
-            reserved73_operation,
-            reserved74_operation,
-            reserved75_operation,
-            reserved76_operation,
-            reserved77_operation,
-            reserved78_operation,
-            reserved79_operation,
-            reserved80_operation,
-            reserved81_operation,
-            reserved82_operation,
-            reserved83_operation,
-            reserved84_operation,
-            reserved85_operation,
-            reserved86_operation,
-            reserved87_operation,
-            reserved88_operation,
-            reserved89_operation,
-            reserved90_operation,
-            reserved91_operation,
-            reserved92_operation,
-            reserved93_operation,
-            reserved94_operation,
-            reserved95_operation,
-            reserved96_operation,
-            reserved97_operation,
-            reserved98_operation,
-            reserved99_operation,
-            cancel_vesting_operation
+            execute_bid_operation           // VIRTUAL
          > operation;
 
    /// @} // operations group

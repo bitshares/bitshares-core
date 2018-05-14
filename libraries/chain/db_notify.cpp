@@ -14,6 +14,8 @@
 #include <graphene/chain/operation_history_object.hpp>
 #include <graphene/chain/vesting_balance_object.hpp>
 #include <graphene/chain/transaction_object.hpp>
+#include <cybex/crowdfund.hpp>
+#include <cybex/crowdfund_contract.hpp>
 #include <cybex/vesting_ops.hpp>
 #include <cybex/reserved_ops.hpp>
 
@@ -202,7 +204,7 @@ struct get_impacted_account_visitor
    }
 
    db_notify_cancel_vesting
-   db_notify_reserved
+   db_notify_crowdfund
 
 };
 
@@ -293,6 +295,7 @@ static void get_relevant_accounts( const object* obj, flat_set<account_id_type>&
            /** these are free from any accounts */
            break;
         }
+        crowdfund_object_type_to_accounts
       }
    }
    else if( obj->id.space() == implementation_ids )
