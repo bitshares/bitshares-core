@@ -671,6 +671,7 @@ class database_api
        */
       vector<withdraw_permission_object> get_withdraw_permissions_by_recipient(account_id_type account, withdraw_permission_id_type start, uint32_t limit)const;
 
+#include <cybex/database_api.hpp>
    private:
       std::shared_ptr< database_api_impl > my;
 };
@@ -787,5 +788,6 @@ FC_API(graphene::app::database_api,
    // Withdrawals
    (get_withdraw_permissions_by_giver)
    (get_withdraw_permissions_by_recipient)
-
+   CYBEX_DATABASE_API
+   
 )

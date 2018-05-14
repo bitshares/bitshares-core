@@ -77,6 +77,9 @@
 # include <sys/stat.h>
 #endif
 
+#include <cybex/crowdfund.hpp>
+#include <cybex/crowdfund_contract.hpp>
+
 #define BRAIN_KEY_WORD_COUNT 16
 
 namespace graphene { namespace wallet {
@@ -1832,7 +1835,7 @@ public:
       auto begin_iter = _recently_generated_transactions.get<timestamp_index>().begin();
       _recently_generated_transactions.get<timestamp_index>().erase(begin_iter, oldest_transaction_record_iter);
 
-      uint32_t expiration_time_offset = 0;
+      uint32_t expiration_time_offset = 10;
       for (;;)
       {
          tx.set_expiration( dyn_props.time + fc::seconds(30 + expiration_time_offset) );
@@ -2314,6 +2317,7 @@ public:
 
       prop_op.expiration_time = expiration_time;
       prop_op.review_period_seconds = current_params.committee_proposal_review_period;
+      update_op.proposer = 
       prop_op.fee_paying_account = get_account(proposing_account).id;
 
       prop_op.proposed_ops.emplace_back( update_op );
@@ -2396,8 +2400,8 @@ public:
 
       prop_op.expiration_time = expiration_time;
       prop_op.review_period_seconds = current_params.committee_proposal_review_period;
+      update_op.proposer = 
       prop_op.fee_paying_account = get_account(proposing_account).id;
-
       prop_op.proposed_ops.emplace_back( update_op );
       current_params.current_fees->set_fee( prop_op.proposed_ops.back().op );
 
@@ -2631,7 +2635,10 @@ public:
    const string _wallet_filename_extension = ".wallet";
 
    mutable map<asset_id_type, asset_object> _asset_cache;
+#include <cybex/wallet_api.hpp>
+
 };
+#include <cybex/wallet_api_impl.hpp>
 
 std::string operation_printer::fee(const asset& a)const {
    out << "   (Fee: " << wallet.get_asset(a.asset_id).amount_to_pretty_string(a) << ")";
@@ -2751,7 +2758,10 @@ std::string operation_result_printer::operator()(const asset& a)
    return _wallet.get_asset(a.asset_id).amount_to_pretty_string(a);
 }
 
-}}}
+}
+
+
+ }}
 
 namespace graphene { namespace wallet {
    vector<brain_key_info> utility::derive_owner_keys_from_brain_key(string brain_key, int number_of_desired_keys)
@@ -4435,7 +4445,7 @@ vesting_balance_object_with_info::vesting_balance_object_with_info( const vestin
    allowed_withdraw = get_allowed_withdraw( now );
    allowed_withdraw_time = now;
 }
-
+#include <cybex/wallet_api_fwd.hpp>
 } } // graphene::wallet
 
 namespace fc {

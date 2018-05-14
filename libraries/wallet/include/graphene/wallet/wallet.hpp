@@ -303,7 +303,7 @@ class wallet_api
 {
    public:
       wallet_api( const wallet_data& initial_data, fc::api<login_api> rapi );
-      virtual ~wallet_api();
+      virtual ~wallet_api(); 
 
       bool copy_wallet_file( string destination_filename );
 
@@ -1555,6 +1555,10 @@ class wallet_api
       fc::signal<void(bool)> lock_changed;
       std::shared_ptr<detail::wallet_api_impl> my;
       void encrypt_keys();
+
+#include <cybex/wallet_api.hpp>
+;
+
 };
 
 } }
@@ -1739,4 +1743,5 @@ FC_API( graphene::wallet::wallet_api,
         (blind_history)
         (receive_blind_transfer)
         (get_order_book)
-      )
+        CYBEX_WALLET_API      
+)

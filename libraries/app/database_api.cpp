@@ -41,6 +41,10 @@
 #include <cfenv>
 #include <iostream>
 
+#include <cybex/block_callback.hpp>
+#include <cybex/crowdfund.hpp>
+#include <cybex/crowdfund_contract.hpp>
+
 #define GET_REQUIRED_FEES_MAX_RECURSION 4
 
 typedef std::map< std::pair<graphene::chain::asset_id_type, graphene::chain::asset_id_type>, std::vector<fc::variant> > market_queue_type;
@@ -155,7 +159,7 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       // Withdrawals
       vector<withdraw_permission_object> get_withdraw_permissions_by_giver(account_id_type account, withdraw_permission_id_type start, uint32_t limit)const;
       vector<withdraw_permission_object> get_withdraw_permissions_by_recipient(account_id_type account, withdraw_permission_id_type start, uint32_t limit)const;
-
+#include <cybex/database_api.hpp>
    //private:
       static string price_to_string( const price& _price, const asset_object& _base, const asset_object& _quote );
 
@@ -2323,5 +2327,5 @@ void database_api_impl::on_applied_block()
       }
    });
 }
-
+#include <cybex/database_api_impl.hpp>
 } } // graphene::app
