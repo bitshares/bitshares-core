@@ -32,6 +32,7 @@ struct cybex_ext_xfer_to_many {
 };
 
 
+void cybex_ext_vesting_check(const account_object & to_account, const cybex_ext_vesting & ext1);
 
 } }
 

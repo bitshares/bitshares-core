@@ -183,6 +183,14 @@ void_result asset_issue_evaluator::do_evaluate( const asset_issue_operation& o )
    asset_dyn_data = &a.dynamic_asset_data_id(d);
    FC_ASSERT( (asset_dyn_data->current_supply + o.asset_to_issue.amount) <= a.options.max_supply );
 
+   for( future_extensions sv: o.extensions)
+   {
+           if(sv.which()==1) {
+                cybex_ext_vesting & ext1= sv.get<cybex_ext_vesting>();
+                cybex_ext_vesting_check(*to_account,ext1);
+           }
+   }
+
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }
 

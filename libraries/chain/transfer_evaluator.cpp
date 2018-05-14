@@ -43,6 +43,7 @@ void_result transfer_evaluator::do_evaluate( const transfer_operation& op )
       if(ext.which()==4)
       {
                 cybex_ext_xfer_to_name & ext1= ext.get<cybex_ext_xfer_to_name>();
+
                 FC_ASSERT(to_account.name==ext1.name,"${id} is ${to}.it does not match ${name}",
                      ("id",op.to)
                      ("to",to_account.name)
@@ -56,6 +57,11 @@ void_result transfer_evaluator::do_evaluate( const transfer_operation& op )
                      ("id",op.fee.asset_id)
                      ("asset",fee_asset_type.symbol)
                      ("sym",ext1.fee_asset_sym) );
+      }
+      else if(ext.which()==1)
+      {
+               cybex_ext_vesting & ext1= ext.get<cybex_ext_vesting>();
+               cybex_ext_vesting_check(to_account,ext1);
       }
    }
    try {
