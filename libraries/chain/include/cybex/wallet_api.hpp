@@ -38,9 +38,11 @@
        */
       vector< balance_object > list_balances( string account_name_or_id);
       signed_transaction cancel_vesting(string name_or_id, string id, bool broadcast);
+
+
 #ifndef CYBEX_WALLET_API
 
-#define CYBEX_WALLET_API (cancel_vesting)(get_crowdfunds)(get_crowdfund_contracts)(list_crowdfunds)(initiate_crowdfund)(participate_crowdfund)(withdraw_crowdfund)(snapshot)
+#define CYBEX_WALLET_API (list_balances)(cancel_vesting)(get_crowdfunds)(get_crowdfund_contracts)(list_crowdfunds)(initiate_crowdfund)(participate_crowdfund)(withdraw_crowdfund)(snapshot)
 
 #endif
 
