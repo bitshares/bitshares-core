@@ -64,6 +64,8 @@
 # include <csignal>
 #endif
 
+#include <cybex/common.hpp>
+
 using namespace graphene;
 namespace bpo = boost::program_options;
          
@@ -225,6 +227,7 @@ int main(int argc, char** argv) {
          std::cout << "Version: " << graphene::utilities::git_revision_description << "\n";
          std::cout << "SHA: " << graphene::utilities::git_revision_sha << "\n";
          std::cout << "Timestamp: " << fc::get_approximate_relative_time_string(fc::time_point_sec(graphene::utilities::git_revision_unix_timestamp)) << "\n";
+         std::cout << "Compile time: "  << __DATE__ << " " << __TIME__ << "\n";
          std::cout << "SSL: " << OPENSSL_VERSION_TEXT << "\n";
          std::cout << "Boost: " << boost::replace_all_copy(std::string(BOOST_LIB_VERSION), "_", ".") << "\n";
          std::cout << "Websocket++: " << websocketpp::major_version << "." << websocketpp::minor_version << "." << websocketpp::patch_version << "\n";
@@ -247,6 +250,8 @@ int main(int argc, char** argv) {
       bpo::notify(options);
       node->initialize(data_dir, options);
       node->initialize_plugins( options );
+
+      graphene::chain::cybex::init(node->chain_database().get());
 
       node->startup();
       node->startup_plugins();
