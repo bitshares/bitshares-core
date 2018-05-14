@@ -36,6 +36,9 @@
 #include <graphene/db/simple_index.hpp>
 #include <fc/signals.hpp>
 
+#include <cybex/crowdfund.hpp>
+#include <cybex/crowdfund_contract.hpp>
+
 #include <graphene/chain/protocol/protocol.hpp>
 
 #include <fc/log/logger.hpp>
