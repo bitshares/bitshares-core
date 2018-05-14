@@ -5,7 +5,14 @@ set_source_files_properties( "${CMAKE_CURRENT_BINARY_DIR}/include/graphene/chain
 
 add_dependencies( build_hardfork_hpp cat-parts )
 
+add_custom_target( build_cybex_hardfork_hpp
+                   COMMAND cat-parts "${CMAKE_CURRENT_SOURCE_DIR}/cybex/hardfork.d" "${CMAKE_CURRENT_BINARY_DIR}/include/cybex/hardfork.hpp" )
+set_source_files_properties( "${CMAKE_CURRENT_BINARY_DIR}/include//cybex/hardfork.hpp" PROPERTIES GENERATED TRUE )
+
+add_dependencies( build_cybex_hardfork_hpp cat-parts )
+
 file(GLOB HEADERS "include/graphene/chain/*.hpp")
+file(GLOB CYBEX_HEADERS "include/cybex/*.hpp")
 file(GLOB PROTOCOL_HEADERS "include/graphene/chain/protocol/*.hpp")
 
 if( GRAPHENE_DISABLE_UNITY_BUILD )
@@ -91,11 +98,11 @@ add_library( graphene_chain
 
              is_authorized_asset.cpp
 
-             cybex/reserved_ops.cpp
              cybex/vesting_ops.cpp
              cybex/vesting_evaluator.cpp
              cybex/block_callback.cpp
              cybex/snapshot.cpp
+             cybex/common.cpp
 
              ${HEADERS}
              ${PROTOCOL_HEADERS}
@@ -103,6 +110,7 @@ add_library( graphene_chain
            )
 
 add_dependencies( graphene_chain build_hardfork_hpp )
+add_dependencies( graphene_chain build_cybex_hardfork_hpp )
 target_link_libraries( graphene_chain fc graphene_db )
 target_include_directories( graphene_chain
                             PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include" "${CMAKE_CURRENT_BINARY_DIR}/include" )
@@ -119,4 +127,5 @@ INSTALL( TARGETS
    ARCHIVE DESTINATION lib
 )
 INSTALL( FILES ${HEADERS} DESTINATION "include/graphene/chain" )
+INSTALL( FILES ${CYBEX_HEADERS} DESTINATION "include/cybex" )
 INSTALL( FILES ${PROTOCOL_HEADERS} DESTINATION "include/graphene/chain/protocol" )
