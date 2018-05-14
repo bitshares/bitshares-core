@@ -450,12 +450,12 @@ class database_api
       order_book get_order_book( const string& base, const string& quote, unsigned limit = 50 )const;
 
       /**
-       * @brief Returns vector of 24 hour volume markets sorted by reverse base_volume
+       * @brief Returns vector of markets sorted by reverse base_volume
        * Note: this API is experimental and subject to change in next releases
        * @param limit Max number of results
        * @return Desc Sorted volume vector
        */
-      vector<market_volume> get_top_markets(uint32_t limit)const;
+      vector<market_ticker> get_top_markets(uint32_t limit)const;
 
       /**
        * @brief Returns recent trades for the market assetA:assetB, ordered by time, most recent first. The range is [stop, start)
