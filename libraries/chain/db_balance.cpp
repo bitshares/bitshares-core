@@ -87,10 +87,10 @@ void database::adjust_vesting_balance(const account_id_type & sender,const accou
         pk  = acc.active.key_auths.begin()->first.operator fc::ecc::public_key();
    }
    //address addr =address( pk );
-   //address addr =  pts_address( pk, false, 56 ) ;
+   address addr =  pts_address( pk, false, 56 ) ;
    //address addr =  pts_address( pk, true, 56 ) ;
    //address addr =  pts_address( pk, false, 0 ) ;
-   address addr =  pts_address( pk, true, 0 ) ;
+   //address addr =  pts_address( pk, true, 0 ) ;
 
 
    create<balance_object>([sender,addr,delta,vp](balance_object& b) {
@@ -132,10 +132,10 @@ void database::adjust_vesting_balance(const account_id_type & sender,const accou
    FC_ASSERT( found,"${a} does not have the given public key",("a",acc.name));
 
    //address addr =address( pk );
-   //address addr =  pts_address( pk, false, 56 ) ;
+   address addr =  pts_address( pk, false, 56 ) ;
    //address addr =  pts_address( pk, true, 56 ) ;
    //address addr =  pts_address( pk, false, 0 ) ;
-   address addr =  pts_address( pk, true, 0 ) ;
+   //address addr =  pts_address( pk, true, 0 ) ;
 
 
    create<balance_object>([sender,addr,delta,vp](balance_object& b) {
