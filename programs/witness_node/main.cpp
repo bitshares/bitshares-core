@@ -192,6 +192,16 @@ int main(int argc, char** argv) {
 
       bpo::variables_map options;
 
+      auto witness_plug = node->register_plugin<witness_plugin::witness_plugin>();
+      auto debug_witness_plug = node->register_plugin<debug_witness_plugin::debug_witness_plugin>();
+      auto history_plug = node->register_plugin<account_history::account_history_plugin>();
+      auto elasticsearch_plug = node->register_plugin<elasticsearch::elasticsearch_plugin>();
+      auto market_history_plug = node->register_plugin<market_history::market_history_plugin>();
+      auto delayed_plug = node->register_plugin<delayed_node::delayed_node_plugin>();
+      auto snapshot_plug = node->register_plugin<snapshot_plugin::snapshot_plugin>();
+      auto es_objects_plug = node->register_plugin<es_objects::es_objects_plugin>();
+      auto grouped_orders_plug = node->register_plugin<grouped_orders::grouped_orders_plugin>();
+
       try
       {
          bpo::options_description cli, cfg;
@@ -241,16 +251,6 @@ int main(int argc, char** argv) {
          if ( fc::asio::default_io_service_scope::set_default_num_threads(num_threads) != 0 )
             FC_THROW("Attempt to set number of IO threads after thread pool started.");
       }
-
-      auto witness_plug = node->register_plugin<witness_plugin::witness_plugin>();
-      auto debug_witness_plug = node->register_plugin<debug_witness_plugin::debug_witness_plugin>();
-      auto history_plug = node->register_plugin<account_history::account_history_plugin>();
-      auto elasticsearch_plug = node->register_plugin<elasticsearch::elasticsearch_plugin>();
-      auto market_history_plug = node->register_plugin<market_history::market_history_plugin>();
-      auto delayed_plug = node->register_plugin<delayed_node::delayed_node_plugin>();
-      auto snapshot_plug = node->register_plugin<snapshot_plugin::snapshot_plugin>();
-      auto es_objects_plug = node->register_plugin<es_objects::es_objects_plugin>();
-      auto grouped_orders_plug = node->register_plugin<grouped_orders::grouped_orders_plugin>();
 
       bpo::notify(options);
       node->initialize(data_dir, options);
