@@ -22,6 +22,8 @@
  * THE SOFTWARE.
  */
 #include <graphene/chain/protocol/asset_ops.hpp>
+#include <cybex/common.hpp>
+#include <cybex/hardfork.hpp>
 
 namespace graphene { namespace chain {
 
@@ -89,6 +91,15 @@ share_type asset_create_operation::calculate_fee(const asset_create_operation::f
 
    // common_options contains several lists and a string. Charge fees for its size
    core_fee_required += calculate_data_fee( fc::raw::pack_size(*this), param.price_per_kbyte );
+
+   database& d=cybex::database();
+   if( NULL==&d || d.head_block_time() > HARDFORK_CYBEX_1_TIME )
+   {
+      if(symbol.find('.') != symbol.npos)
+      {
+        core_fee_required /= 100;
+      }
+   }
 
    return core_fee_required;
 }
