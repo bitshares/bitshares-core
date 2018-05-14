@@ -86,8 +86,13 @@ namespace graphene { namespace chain {
 
       asset             fee;
       chain_parameters  new_parameters;
+///////BEGIN cybex BUG: REMOVE for non cybex chain//////
+      account_id_type   proposer;
+      account_id_type fee_payer()const ; 
+///////END  cybex BUG: REMOVE for non cybex chain///////
+///////uncomment the line for non cybex chain///////////
+      //account_id_type fee_payer()const { return account_id_type(); }
 
-      account_id_type fee_payer()const { return account_id_type(); }
       void            validate()const;
    };
 
@@ -103,4 +108,6 @@ FC_REFLECT( graphene::chain::committee_member_create_operation,
             (fee)(committee_member_account)(url) )
 FC_REFLECT( graphene::chain::committee_member_update_operation,
             (fee)(committee_member)(committee_member_account)(new_url) )
-FC_REFLECT( graphene::chain::committee_member_update_global_parameters_operation, (fee)(new_parameters) );
+///////BEGIN cybex BUG: REMOVE "(proposer)" for non cybex chain//////
+FC_REFLECT( graphene::chain::committee_member_update_global_parameters_operation, (fee)(new_parameters)(proposer) );
+///////END  cybex BUG: REMOVE "(proposer)" for non cybex chain///////

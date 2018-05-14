@@ -695,6 +695,33 @@ void database::init_genesis(const genesis_state_type& genesis_state)
 
    FC_ASSERT( get_index<fba_accumulator_object>().get_next_id() == fba_accumulator_id_type( fba_accumulator_id_count ) );
 
+///////BEGIN cybex BUG: REMOVE for non cybex chain//////
+//
+//  bug fix:hard code committe-account active permission
+//  set weight to 16K for each initail committee member
+ 
+   if( !genesis_state.initial_committee_candidates.empty() )
+   {
+      modify(get(GRAPHENE_COMMITTEE_ACCOUNT), [&](account_object& a)
+      {
+            a.active.weight_threshold = 0;
+            a.active.clear();
+
+            std::for_each(genesis_state.initial_committee_candidates.begin(), genesis_state.initial_committee_candidates.end(),
+                 [&](const genesis_state_type::initial_committee_member_type& member) {
+               auto committee_member_account = get_account_id(member.owner_name);
+               // Ensure that everyone has at least one vote. Zero weights aren't allowed.
+               a.active.account_auths[committee_member_account] += 16000;
+               a.active.weight_threshold += 16000;
+            });
+
+            a.active.weight_threshold /= 2;
+            a.active.weight_threshold += 1;
+      });
+   }
+
+///////END   cybex BUG: REMOVE for non cybex chain//////
+
    debug_dump();
 
    _undo_db.enable();
