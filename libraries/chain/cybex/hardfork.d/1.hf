@@ -1,0 +1,4 @@
+// #1 add public key check in vesting extension
+#ifndef HARDFORK_CYBEX_1_TIME
+#define HARDFORK_CYBEX_1_TIME (fc::time_point_sec( 1525752215 ))
+#endif
