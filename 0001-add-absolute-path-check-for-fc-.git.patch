@@ -1,0 +1,26 @@
+---
+ libraries/fc/GitVersionGen/GetGitRevisionDescription.cmake | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
+
+diff --git a/libraries/fc/GitVersionGen/GetGitRevisionDescription.cmake b/libraries/fc/GitVersionGen/GetGitRevisionDescription.cmake
+index 00f8727..54eb9c0 100644
+--- a/libraries/fc/GitVersionGen/GetGitRevisionDescription.cmake
++++ b/libraries/fc/GitVersionGen/GetGitRevisionDescription.cmake
+@@ -57,8 +57,12 @@ function(get_git_head_revision _refspecvar _hashvar)
+ 	if(NOT IS_DIRECTORY ${GIT_DIR})
+ 		file(READ ${GIT_DIR} submodule)
+ 		string(REGEX REPLACE "gitdir: (.*)\n$" "\\1" GIT_DIR_RELATIVE ${submodule})
+-		get_filename_component(SUBMODULE_DIR ${GIT_DIR} PATH)
+-		get_filename_component(GIT_DIR ${SUBMODULE_DIR}/${GIT_DIR_RELATIVE} ABSOLUTE)
++                if(${GIT_DIR_RELATIVE} MATCHES "^/.*$")
++                     get_filename_component(GIT_DIR ${GIT_DIR_RELATIVE} ABSOLUTE)
++                else()
++		     get_filename_component(SUBMODULE_DIR ${GIT_DIR} PATH)
++		     get_filename_component(GIT_DIR ${SUBMODULE_DIR}/${GIT_DIR_RELATIVE} ABSOLUTE)
++                endif()
+ 	endif()
+ 	set(GIT_DATA "${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/git-data")
+ 	if(NOT EXISTS "${GIT_DATA}")
+-- 
+2.7.4
+
