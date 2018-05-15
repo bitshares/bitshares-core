@@ -244,6 +244,57 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       graphene::chain::database&                                                                                                            _db;
       const application_options* _app_options = nullptr;
 
+      static market_ticker get_ticker_data(const market_ticker_object mto,
+                                           const fc::time_point_sec now,
+                                           const asset_object asset_base,
+                                           const asset_object asset_quote,
+                                           const order_book orders)
+      {
+         market_ticker mt;
+         mt.time = now;
+         mt.base = asset_base.symbol;
+         mt.quote = asset_quote.symbol;
+         mt.latest = "0";
+         mt.lowest_ask = "0";
+         mt.highest_bid = "0";
+         mt.percent_change = "0";
+
+         fc::uint128 base_volume;
+         fc::uint128 quote_volume;
+
+         price latest_price = asset( mto.latest_base, mto.base ) / asset( mto.latest_quote, mto.quote );
+         if( mto.base != asset_base.id )
+            latest_price = ~latest_price;
+         mt.latest = price_to_string( latest_price, asset_base, asset_quote );
+         if( mto.last_day_base != 0 && mto.last_day_quote != 0 // has trade data before 24 hours
+             && ( mto.last_day_base != mto.latest_base || mto.last_day_quote != mto.latest_quote ) ) // price changed
+         {
+            price last_day_price = asset( mto.last_day_base, mto.base ) / asset( mto.last_day_quote, mto.quote );
+            if( mto.base != asset_base.id )
+               last_day_price = ~last_day_price;
+            mt.percent_change = price_diff_percent_string( last_day_price, latest_price );
+         }
+         if( asset_base.id == mto.base )
+         {
+            base_volume = mto.base_volume;
+            quote_volume = mto.quote_volume;
+         }
+         else
+         {
+            base_volume = mto.quote_volume;
+            quote_volume = mto.base_volume;
+         }
+
+         mt.base_volume = uint128_amount_to_string( base_volume, asset_base.precision );
+         mt.quote_volume = uint128_amount_to_string( quote_volume, asset_quote.precision );
+
+         if( !orders.asks.empty() ) mt.lowest_ask = orders.asks[0].price;
+         if( !orders.bids.empty() ) mt.highest_bid = orders.bids[0].price;
+
+         return mt;
+
+      }
+
 };
 
 //////////////////////////////////////////////////////////////////////
@@ -1186,62 +1237,24 @@ market_ticker database_api_impl::get_ticker( const string& base, const string& q
    FC_ASSERT( assets[1], "Invalid quote asset symbol: ${s}", ("s",quote) );
 
    const fc::time_point_sec now = _db.head_block_time();
-
-   market_ticker result;
-   result.time = now;
-   result.base = base;
-   result.quote = quote;
-   result.latest = "0";
-   result.lowest_ask = "0";
-   result.highest_bid = "0";
-   result.percent_change = "0";
+   market_ticker mt;
 
    auto base_id = assets[0]->id;
    auto quote_id = assets[1]->id;
    if( base_id > quote_id ) std::swap( base_id, quote_id );
 
-   fc::uint128 base_volume;
-   fc::uint128 quote_volume;
-
    const auto& ticker_idx = _db.get_index_type<graphene::market_history::market_ticker_index>().indices().get<by_market>();
    auto itr = ticker_idx.find( std::make_tuple( base_id, quote_id ) );
    if( itr != ticker_idx.end() )
    {
-      price latest_price = asset( itr->latest_base, itr->base ) / asset( itr->latest_quote, itr->quote );
-      if( itr->base != assets[0]->id )
-         latest_price = ~latest_price;
-      result.latest = price_to_string( latest_price, *assets[0], *assets[1] );
-      if( itr->last_day_base != 0 && itr->last_day_quote != 0 // has trade data before 24 hours
-            && ( itr->last_day_base != itr->latest_base || itr->last_day_quote != itr->latest_quote ) ) // price changed
+      order_book orders;
+      if( !skip_order_book )
       {
-         price last_day_price = asset( itr->last_day_base, itr->base ) / asset( itr->last_day_quote, itr->quote );
-         if( itr->base != assets[0]->id )
-            last_day_price = ~last_day_price;
-         result.percent_change = price_diff_percent_string( last_day_price, latest_price );
+         orders = get_order_book(assets[0]->symbol, assets[1]->symbol, 1);
       }
-      if( assets[0]->id == itr->base )
-      {
-         base_volume = itr->base_volume;
-         quote_volume = itr->quote_volume;
-      }
-      else
-      {
-         base_volume = itr->quote_volume;
-         quote_volume = itr->base_volume;
-      }
+      mt = get_ticker_data(*itr, now, *assets[0], *assets[1], orders);
    }
-
-   result.base_volume = uint128_amount_to_string( base_volume, assets[0]->precision );
-   result.quote_volume = uint128_amount_to_string( quote_volume, assets[1]->precision );
-
-   if( !skip_order_book )
-   {
-      const auto orders = get_order_book( base, quote, 1 );
-      if( !orders.asks.empty() ) result.lowest_ask = orders.asks[0].price;
-      if( !orders.bids.empty() ) result.highest_bid = orders.bids[0].price;
-   }
-
-   return result;
+   return mt;
 }
 
 market_volume database_api::get_24_volume( const string& base, const string& quote )const
@@ -1321,6 +1334,7 @@ vector<market_ticker> database_api_impl::get_top_markets(uint32_t limit)const
 
    const auto& volume_idx = _db.get_index_type<graphene::market_history::market_ticker_index>().indices().get<by_volume>();
    auto itr = volume_idx.rbegin();
+
    vector<market_ticker> result;
    result.reserve(limit);
 
@@ -1329,8 +1343,8 @@ vector<market_ticker> database_api_impl::get_top_markets(uint32_t limit)const
    while( itr != volume_idx.rend() && result.size() < limit)
    {
       const auto assets = get_assets( { itr->base, itr->quote } );
-      market_ticker mt = get_ticker( assets[0]->symbol, assets[1]->symbol, true );
-
+      order_book orders = get_order_book(assets[0]->symbol, assets[1]->symbol, 1);
+      market_ticker mt = get_ticker_data(*itr, now, *assets[0], *assets[1], orders);
       result.emplace_back( std::move(mt) );
       ++itr;
    }
