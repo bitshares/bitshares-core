@@ -260,7 +260,7 @@ namespace graphene { namespace net
       }
       catch ( fc::exception& e )
       {
-        wlog( "fatal: error connecting to peer ${remote_endpoint}: ${e}", ("remote_endpoint", remote_endpoint )("e", e.to_detail_string() ) );
+        wlog( "error connecting to peer ${remote_endpoint}: ${e}", ("remote_endpoint", remote_endpoint )("e", e.to_detail_string() ) );
         throw;
       }
     } // connect_to()
