@@ -29,6 +29,7 @@
 #include <graphene/chain/market_object.hpp>
 #include <graphene/chain/vesting_balance_object.hpp>
 #include <graphene/chain/witness_object.hpp>
+#include <graphene/chain/fba_object.hpp>
 
 namespace graphene { namespace chain {
 
@@ -36,7 +37,7 @@ namespace graphene { namespace chain {
  *  This method dumps the state of the blockchain in a semi-human readable form for the
  *  purpose of tracking down funds and mismatches in currency allocation
  */
-void database::debug_dump()
+void database::debug_dump(const genesis_state_type& genesis_state)
 {
    const auto& db = *this;
    const asset_dynamic_data_object& core_asset_data = db.get_core_asset().dynamic_asset_data_id(db);
@@ -44,6 +45,7 @@ void database::debug_dump()
    const auto& balance_index = db.get_index_type<account_balance_index>().indices();
    const simple_index<account_statistics_object>& statistics_index = db.get_index_type<simple_index<account_statistics_object>>();
    const auto& bids = db.get_index_type<collateral_bid_index>().indices();
+   const auto& settle_index = db.get_index_type<force_settlement_index>().indices();
    map<asset_id_type,share_type> total_balances;
    map<asset_id_type,share_type> total_debts;
    share_type core_in_orders;
@@ -54,6 +56,14 @@ void database::debug_dump()
     //  idump(("balance")(a));
       total_balances[a.asset_type] += a.balance;
    }
+   for( const force_settlement_object& s : settle_index )
+   {
+      total_balances[s.balance.asset_id] += s.balance.amount;
+   }
+   for( const vesting_balance_object& vbo : db.get_index_type< vesting_balance_index >().indices() )
+      total_balances[ vbo.balance.asset_id ] += vbo.balance.amount;
+   for( const fba_accumulator_object& fba : db.get_index_type< simple_index< fba_accumulator_object > >() )
+      total_balances[ asset_id_type() ] += fba.accumulated_fba_fees;
    for( const account_statistics_object& s : statistics_index )
    {
     //  idump(("statistics")(s));
@@ -81,6 +91,18 @@ void database::debug_dump()
       total_balances[asset_obj.id] += asset_obj.dynamic_asset_data_id(db).accumulated_fees;
       total_balances[asset_id_type()] += asset_obj.dynamic_asset_data_id(db).fee_pool;
 //      edump((total_balances[asset_obj.id])(asset_obj.dynamic_asset_data_id(db).current_supply ) );
+   }
+
+   // Initial balances
+   for( const auto& ib : genesis_state.initial_balances )
+   {
+      total_balances[asset_id_type()] += ib.amount;
+   }
+
+   // Initial vesting balances
+   for( const auto& iv : genesis_state.initial_vesting_balances )
+   {
+      total_balances[asset_id_type()] += iv.amount;
    }
 
    if( total_balances[asset_id_type()].value != core_asset_data.current_supply.value )
