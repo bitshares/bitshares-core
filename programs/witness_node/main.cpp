@@ -331,8 +331,7 @@ void write_default_logging_config_to_stream(std::ostream& out)
           "[logger.p2p]\n"
           "level=warn\n"
           "appenders=p2p\n\n"
-          "# route messages sent to the \"rpc\" logger to the \"rpc\" appender declared above,\n"
-          "# \"level\": \"error\" for errors only, \"warn\" for requests, \"info\" for responses.\n"
+          "# route messages sent to the \"rpc\" logger to the \"rpc\" appender declared above\n"
           "[logger.rpc]\n"
           "level=error\n"
           "appenders=rpc\n\n";
