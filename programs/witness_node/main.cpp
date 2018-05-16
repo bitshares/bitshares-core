@@ -40,7 +40,6 @@
 #include <fc/log/file_appender.hpp>
 #include <fc/log/logger.hpp>
 #include <fc/log/logger_config.hpp>
-#include <fc/asio.hpp>
 
 #include <boost/filesystem.hpp>
 
@@ -244,13 +243,6 @@ int main(int argc, char** argv) {
       if( !fc::exists(config_ini_path) )
          create_new_config_file( config_ini_path, data_dir, cfg_options );
       load_config_file( config_ini_path, cfg_options, options );
-
-      if ( options.count("io-threads") )
-      {
-         const int16_t num_threads = options["io-threads"].as<int16_t>();
-         if ( fc::asio::default_io_service_scope::set_default_num_threads(num_threads) != 0 )
-            FC_THROW("Attempt to set number of IO threads after thread pool started.");
-      }
 
       bpo::notify(options);
       node->initialize(data_dir, options);
