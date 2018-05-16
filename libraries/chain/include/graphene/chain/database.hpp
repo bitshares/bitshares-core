@@ -329,7 +329,7 @@ namespace graphene { namespace chain {
 
          //////////////////// db_debug.cpp ////////////////////
 
-         void debug_dump(const genesis_state_type& genesis_state);
+         void debug_dump();
          void apply_debug_updates();
          void debug_update( const fc::variant_object& update );
 

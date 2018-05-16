@@ -693,7 +693,7 @@ void database::init_genesis(const genesis_state_type& genesis_state)
 
    FC_ASSERT( get_index<fba_accumulator_object>().get_next_id() == fba_accumulator_id_type( fba_accumulator_id_count ) );
 
-   debug_dump(genesis_state);
+   //debug_dump();
 
    _undo_db.enable();
 } FC_CAPTURE_AND_RETHROW() }

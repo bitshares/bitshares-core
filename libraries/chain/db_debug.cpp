@@ -37,7 +37,7 @@ namespace graphene { namespace chain {
  *  This method dumps the state of the blockchain in a semi-human readable form for the
  *  purpose of tracking down funds and mismatches in currency allocation
  */
-void database::debug_dump(const genesis_state_type& genesis_state)
+void database::debug_dump()
 {
    const auto& db = *this;
    const asset_dynamic_data_object& core_asset_data = db.get_core_asset().dynamic_asset_data_id(db);
@@ -93,21 +93,10 @@ void database::debug_dump(const genesis_state_type& genesis_state)
 //      edump((total_balances[asset_obj.id])(asset_obj.dynamic_asset_data_id(db).current_supply ) );
    }
 
-   // Initial balances
-   for( const auto& ib : genesis_state.initial_balances )
-   {
-      total_balances[asset_id_type()] += ib.amount;
-   }
-
-   // Initial vesting balances
-   for( const auto& iv : genesis_state.initial_vesting_balances )
-   {
-      total_balances[asset_id_type()] += iv.amount;
-   }
-
    if( total_balances[asset_id_type()].value != core_asset_data.current_supply.value )
    {
       edump( (total_balances[asset_id_type()].value)(core_asset_data.current_supply.value ));
+      exit(0);
    }
 
 
