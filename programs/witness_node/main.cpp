@@ -314,15 +314,28 @@ void write_default_logging_config_to_stream(std::ostream& out)
           "rotation_interval=60\n"
           "# how long will logs be kept (in days), if leave out default to 1\n"
           "rotation_limit=7\n\n"
-          "# route any messages logged to the default logger to the \"stderr\" logger we\n"
-          "# declared above, if they are info level are higher\n"
+          "# declare an appender named \"rpc\" that writes messages to rpc.log\n"
+          "[log.file_appender.rpc]\n"
+          "# filename can be absolute or relative to this config file\n"
+          "filename=logs/rpc/rpc.log\n"
+          "# Rotate log every ? minutes, if leave out default to 60\n"
+          "rotation_interval=60\n"
+          "# how long will logs be kept (in days), if leave out default to 1\n"
+          "rotation_limit=7\n\n"
+          "# route any messages logged to the default logger to the \"stderr\" appender and\n"
+          "# \"default\" appender we declared above, if they are info level or higher\n"
           "[logger.default]\n"
           "level=info\n"
           "appenders=stderr,default\n\n"
-          "# route messages sent to the \"p2p\" logger to the p2p appender declared above\n"
+          "# route messages sent to the \"p2p\" logger to the \"p2p\" appender declared above\n"
           "[logger.p2p]\n"
           "level=warn\n"
-          "appenders=p2p\n\n";
+          "appenders=p2p\n\n"
+          "# route messages sent to the \"rpc\" logger to the \"rpc\" appender declared above,\n"
+          "# \"level\": \"error\" for errors only, \"warn\" for requests, \"info\" for responses.\n"
+          "[logger.rpc]\n"
+          "level=error\n"
+          "appenders=rpc\n\n";
 }
 
 fc::optional<fc::logging_config> load_logging_config_from_ini_file(const fc::path& config_ini_filename)
