@@ -214,8 +214,8 @@ BOOST_AUTO_TEST_CASE( reset_backing_asset_on_witness_asset )
    }
    {
       BOOST_TEST_MESSAGE("Advance to after hard fork");
-      generate_blocks( HARDFORK_CORE_868_890_TIME + maint_interval);
-      trx.set_expiration(HARDFORK_CORE_868_890_TIME + fc::hours(46));
+      generate_blocks( HARDFORK_CORE_868_890_TIME + fc::seconds(1));
+      trx.set_expiration(HARDFORK_CORE_868_890_TIME + fc::hours(2));
 
       BOOST_TEST_MESSAGE("After hardfork, 1 feed should have been erased");
       const asset_bitasset_data_object& jmj_obj = bit_jmj_id(db).bitasset_data(db);
