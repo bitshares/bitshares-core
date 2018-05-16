@@ -95,8 +95,9 @@ void database::debug_dump()
 
    if( total_balances[asset_id_type()].value != core_asset_data.current_supply.value )
    {
-      edump( (total_balances[asset_id_type()].value)(core_asset_data.current_supply.value ));
-      throw;
+      FC_THROW( "computed balance of CORE mismatch",
+                ("computed value",total_balances[asset_id_type()].value)
+                ("current supply",core_asset_data.current_supply.value) );
    }
 
 
