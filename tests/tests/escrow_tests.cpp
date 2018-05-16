@@ -31,6 +31,8 @@
 #include <graphene/chain/escrow_object.hpp>
 #include <graphene/chain/market_object.hpp>
 
+#include <graphene/app/api.hpp>
+
 #include "../common/database_fixture.hpp"
 
 using namespace graphene::chain;
@@ -1200,6 +1202,77 @@ BOOST_AUTO_TEST_CASE( escrow_expire_auto )
       // money is returned automatically to alice at expiration
       BOOST_REQUIRE_EQUAL(get_balance(alice_id, asset_id_type()), 100000000);
 
+
+   } FC_LOG_AND_RETHROW()
+}
+
+
+BOOST_AUTO_TEST_CASE( escrow_api )
+{
+   try
+   {
+
+      graphene::app::escrow_api escrow_api(db);
+
+      generate_blocks( HARDFORK_ESCROW_TIME );
+      generate_block();
+      set_expiration( db, trx );
+
+      ACTORS( (alice)(bob)(sam) );
+
+      transfer(committee_account, alice_id, asset(100000000));
+
+      BOOST_REQUIRE_EQUAL(get_balance(alice_id, asset_id_type()), 100000000);
+      BOOST_REQUIRE_EQUAL(get_balance(bob_id, asset_id_type()), 0);
+      BOOST_REQUIRE_EQUAL(get_balance(sam_id, asset_id_type()), 0);
+
+      const asset_object &core = asset_id_type()(db);
+
+      // creating the escrow transfer
+      {
+         escrow_transfer_operation op;
+         op.from = alice_id;
+         op.to = bob_id;
+         op.amount = core.amount(1000);
+         op.escrow_id = 0;
+         op.agent = sam_id;
+         op.agent_fee = core.amount(0);
+         op.json_meta = "";
+         op.ratification_deadline = db.head_block_time() + 100;
+         op.escrow_expiration = db.head_block_time() + 200;
+         trx.operations.push_back(op);
+         sign(trx, alice_private_key);
+         PUSH_TX(db, trx);
+         generate_block();
+         trx.clear();
+      }
+
+      escrow_object escrow = db.get_escrow( alice_id, 0 );
+
+      BOOST_REQUIRE( escrow.from == alice_id );
+      BOOST_REQUIRE( escrow.to == bob_id );
+      BOOST_REQUIRE( escrow.escrow_id == 0 );
+      BOOST_REQUIRE( escrow.agent == sam_id );
+      BOOST_REQUIRE( escrow.disputed == false );
+      BOOST_REQUIRE( escrow.to_approved == false );
+      BOOST_REQUIRE( escrow.agent_approved == false );
+
+      BOOST_REQUIRE_EQUAL(get_balance(alice_id, asset_id_type()), 99999000);
+      BOOST_REQUIRE_EQUAL(get_balance(bob_id, asset_id_type()), 0);
+      BOOST_REQUIRE_EQUAL(get_balance(sam_id, asset_id_type()), 0);
+
+      optional<escrow_object> e = escrow_api.get_escrow(alice_id, 0);
+
+      if(e.valid())
+      {
+         BOOST_REQUIRE(e->from == alice_id);
+         BOOST_REQUIRE(e->to == bob_id);
+         BOOST_REQUIRE(e->escrow_id == 0);
+         BOOST_REQUIRE(e->agent == sam_id);
+         BOOST_REQUIRE(e->disputed == false);
+         BOOST_REQUIRE(e->to_approved == false);
+         BOOST_REQUIRE(e->agent_approved == false);
+      }
 
    } FC_LOG_AND_RETHROW()
 }

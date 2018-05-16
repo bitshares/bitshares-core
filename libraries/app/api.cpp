@@ -108,6 +108,10 @@ namespace graphene { namespace app {
        {
           _orders_api = std::make_shared< orders_api >( std::ref( _app ) );
        }
+       else if( api_name == "escrow_api" )
+       {
+          _escrow_api = std::make_shared< escrow_api >( std::ref( *_app.chain_database() ) );
+       }
        else if( api_name == "debug_api" )
        {
           // can only enable this API if the plugin was loaded
@@ -270,6 +274,11 @@ namespace graphene { namespace app {
     {
        FC_ASSERT(_orders_api);
        return *_orders_api;
+    }
+    fc::api<escrow_api> login_api::escrow() const
+    {
+       FC_ASSERT(_escrow_api);
+       return *_escrow_api;
     }
 
     fc::api<graphene::debug_witness::debug_api> login_api::debug() const
@@ -632,6 +641,23 @@ namespace graphene { namespace app {
          ++itr;
       }
       return result;
+   }
+
+   // escrow api
+   escrow_api::escrow_api(graphene::chain::database& db) : _db(db) { }
+   escrow_api::~escrow_api() { }
+   optional<escrow_object> escrow_api::get_escrow( account_id_type from, uint32_t escrow_id )const
+   {
+      optional< escrow_object > result;
+
+      try
+      {
+         result = _db.get_escrow( from, escrow_id );
+      }
+      catch ( ... ) {}
+
+      return result;
+
    }
 
 } } // graphene::app

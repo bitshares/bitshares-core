@@ -31,6 +31,7 @@
 #include <graphene/market_history/market_history_plugin.hpp>
 
 #include <graphene/grouped_orders/grouped_orders_plugin.hpp>
+#include <graphene/chain/escrow_object.hpp>
 
 #include <graphene/debug_witness/debug_api.hpp>
 
@@ -393,6 +394,26 @@ namespace graphene { namespace app {
    };
 
    /**
+    * @brief the escrow_api class exposes access to data related to escrow operations.
+    */
+   class escrow_api
+   {
+      public:
+         escrow_api(graphene::chain::database& db);
+         ~escrow_api();
+
+      /* explain */
+         optional<escrow_object>  get_escrow( account_id_type from, uint32_t escrow_id )const;
+
+      private:
+         graphene::chain::database& _db;
+      };
+
+
+
+
+
+      /**
     * @brief The login_api class implements the bottom layer of the RPC API
     *
     * All other APIs must be requested from this API.
@@ -429,6 +450,8 @@ namespace graphene { namespace app {
          fc::api<asset_api> asset()const;
          /// @brief Retrieve the orders API
          fc::api<orders_api> orders()const;
+         /// @brief Retrieve the escrow API
+         fc::api<escrow_api> escrow()const;
          /// @brief Retrieve the debug API (if available)
          fc::api<graphene::debug_witness::debug_api> debug()const;
 
@@ -445,6 +468,7 @@ namespace graphene { namespace app {
          optional< fc::api<crypto_api> > _crypto_api;
          optional< fc::api<asset_api> > _asset_api;
          optional< fc::api<orders_api> > _orders_api;
+         optional< fc::api<escrow_api> > _escrow_api;
          optional< fc::api<graphene::debug_witness::debug_api> > _debug_api;
    };
 
@@ -505,12 +529,15 @@ FC_API(graphene::app::crypto_api,
      )
 FC_API(graphene::app::asset_api,
        (get_asset_holders)
-	   (get_asset_holders_count)
+       (get_asset_holders_count)
        (get_all_asset_holders)
      )
 FC_API(graphene::app::orders_api,
        (get_tracked_groups)
        (get_grouped_limit_orders)
+     )
+FC_API(graphene::app::escrow_api,
+       (get_escrow)
      )
 FC_API(graphene::app::login_api,
        (login)
@@ -522,5 +549,6 @@ FC_API(graphene::app::login_api,
        (crypto)
        (asset)
        (orders)
+       (escrow)
        (debug)
      )
