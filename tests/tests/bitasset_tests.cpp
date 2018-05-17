@@ -560,15 +560,16 @@ BOOST_AUTO_TEST_CASE( bitasset_evaluator_test_before_922_931 )
 {
    // set up the basics for the test
    fc::log_level log_level_all(fc::log_level::all);
-   ACTORS((nathan)(john));
 
    BOOST_TEST_MESSAGE("Advance to near hard fork 922 / 931");
    auto maint_interval = db.get_global_properties().parameters.maintenance_interval;
    generate_blocks( HARDFORK_CORE_922_931_TIME - maint_interval);
    trx.set_expiration( HARDFORK_CORE_922_931_TIME - maint_interval + fc::hours(1));
 
+   ACTORS((nathan)(john));
+
    BOOST_TEST_MESSAGE("Create USDBIT");
-   const asset_object& bit_usd = create_bitasset("USDBIT");
+   const asset_object& bit_usd = create_bitasset("USDBIT", GRAPHENE_COMMITTEE_ACCOUNT);
    asset_id_type bit_usd_id = bit_usd.id;
 
    BOOST_TEST_MESSAGE( "Create market issued BLAH" );
@@ -600,7 +601,7 @@ BOOST_AUTO_TEST_CASE( bitasset_evaluator_test_before_922_931 )
       BOOST_FAIL(ex.to_string(log_level_all));
    }
 
-   BOOST_TEST_MESSAGE( "Create Prediction market coin with precision of 6" );
+   BOOST_TEST_MESSAGE( "Create Prediction market coin with precision of 6, backed by SIXBIT" );
    const asset_object* prediction = nullptr;
    try
    {
@@ -652,14 +653,14 @@ BOOST_AUTO_TEST_CASE( bitasset_evaluator_test_before_922_931 )
    }
    catch (fc::exception& ex)
    {
-      BOOST_CHECK( ex.to_string(log_level_all) == "Assert Exception: asset_obj.is_market_issued(): Cannot update BitAsset-specific settings on a non-BitAsset." );
+      BOOST_CHECK_EQUAL( ex.to_string(log_level_all), "Assert Exception: asset_obj.is_market_issued(): Cannot update BitAsset-specific settings on a non-BitAsset." );
    }
    op.asset_to_update = bit_usd_id;
 
    // test changing issuer
    BOOST_TEST_MESSAGE( "Test changing issuer." );
    account_id_type original_issuer = op.issuer;
-   op.issuer = john.id;
+   op.issuer = john_id;
    try
    {
       evaluator.evaluate(op);
@@ -667,7 +668,7 @@ BOOST_AUTO_TEST_CASE( bitasset_evaluator_test_before_922_931 )
    }
    catch (fc::exception& ex )
    {
-      BOOST_CHECK( ex.to_string(log_level_all) == "Assert Exception: op.issuer == asset_obj.issuer: Only asset issuer can update bitasset_data of the asset." );
+      BOOST_CHECK_EQUAL( ex.to_string(log_level_all), "Assert Exception: op.issuer == asset_obj.issuer: Only asset issuer can update bitasset_data of the asset." );
    }
    op.issuer = original_issuer;
 
@@ -683,16 +684,52 @@ BOOST_AUTO_TEST_CASE( bitasset_evaluator_test_before_922_931 )
    }
    catch (fc::exception &ex)
    {
-      BOOST_CHECK( ex.to_string(log_level_all) == "Assert Exception: d.find_object(op.new_options.short_backing_asset): " );
+      BOOST_CHECK_EQUAL( ex.to_string(log_level_all), "Assert Exception: maybe_found != nullptr: Unable to find Object" );
    }
    op.new_options.short_backing_asset = correct_asset_id;
 
    // now check the things that are wrong, but still pass before HF 922 / 931
+   BOOST_TEST_MESSAGE( "Now check the things that are wrong, but still pass before HF 922 / 931" );
+
+   // back by self
+   BOOST_TEST_MESSAGE( "Back by itself" );
+   op.new_options.short_backing_asset = bit_usd_id;
+   BOOST_CHECK(evaluator.evaluate(op) == void_result());
+   op.new_options.short_backing_asset = correct_asset_id;
 
    // prediction market with different precision
    BOOST_TEST_MESSAGE( "Prediction market with different precision" );
    op.asset_to_update = prediction->get_id();
+   op.issuer = prediction->issuer;
    BOOST_CHECK(evaluator.evaluate(op) == void_result());
+   op.asset_to_update = bit_usd_id;
+   op.issuer = bit_usd.issuer;
+
+   // checking old backing asset instead of new backing asset
+   BOOST_TEST_MESSAGE( "Was checking old backing asset instead of new backing asset" );
+   op.new_options.short_backing_asset = sixbit->get_id();
+   BOOST_CHECK(evaluator.evaluate(op) == void_result());
+   op.new_options.short_backing_asset = prediction->get_id();
+   BOOST_CHECK(evaluator.evaluate(op) == void_result());
+   op.new_options.short_backing_asset = correct_asset_id;
+
+   // Feed lifetime must exceed block interval
+   BOOST_TEST_MESSAGE( "Feed lifetime less than or equal to block interval" );
+   const auto good_feed_lifetime = op.new_options.feed_lifetime_sec;
+   op.new_options.feed_lifetime_sec = db.get_global_properties().parameters.block_interval;
+   BOOST_CHECK(evaluator.evaluate(op) == void_result());
+   op.new_options.feed_lifetime_sec = db.get_global_properties().parameters.block_interval - 1; // default interval > 1
+   BOOST_CHECK(evaluator.evaluate(op) == void_result());
+   op.new_options.feed_lifetime_sec = good_feed_lifetime;
+
+   // Force settlement delay must exceed block interval.
+   BOOST_TEST_MESSAGE( "Force settlement delay less than or equal to block interval" );
+   const auto good_force_settlement_delay_sec = op.new_options.force_settlement_delay_sec;
+   op.new_options.force_settlement_delay_sec = db.get_global_properties().parameters.block_interval;
+   BOOST_CHECK(evaluator.evaluate(op) == void_result());
+   op.new_options.force_settlement_delay_sec = db.get_global_properties().parameters.block_interval - 1; // default interval > 1
+   BOOST_CHECK(evaluator.evaluate(op) == void_result());
+   op.new_options.force_settlement_delay_sec = good_force_settlement_delay_sec;
 
    // this should pass
    BOOST_TEST_MESSAGE("We should be all good again.");
@@ -706,19 +743,20 @@ BOOST_AUTO_TEST_CASE( bitasset_evaluator_test_after_922_931 )
 {
    // set up the basics for the test
    fc::log_level log_level_all(fc::log_level::all);
-   ACTORS((nathan)(john));
 
    BOOST_TEST_MESSAGE("Advance to after hard fork 922 / 931");
    auto maint_interval = db.get_global_properties().parameters.maintenance_interval;
    generate_blocks( HARDFORK_CORE_922_931_TIME + maint_interval);
    trx.set_expiration( HARDFORK_CORE_922_931_TIME + maint_interval + fc::hours(1));
 
+   ACTORS((nathan)(john));
+
    BOOST_TEST_MESSAGE("Create USDBIT");
-   const asset_object& bit_usd = create_bitasset("USDBIT");
+   const asset_object& bit_usd = create_bitasset("USDBIT", GRAPHENE_COMMITTEE_ACCOUNT);
    asset_id_type bit_usd_id = bit_usd.id;
 
    BOOST_TEST_MESSAGE( "Create market issued BLAH" );
-   const asset_object& blah = create_user_issued_asset( "USERCOIN" );
+   const asset_object& blah = create_user_issued_asset( "BLAH" );
 
    BOOST_TEST_MESSAGE( "Create a bitasset with a precision of 6" );
    const asset_object* sixbit = nullptr;
@@ -746,7 +784,7 @@ BOOST_AUTO_TEST_CASE( bitasset_evaluator_test_after_922_931 )
       BOOST_FAIL(ex.to_string(log_level_all));
    }
 
-   BOOST_TEST_MESSAGE( "Create Prediction market coin with precision of 6" );
+   BOOST_TEST_MESSAGE( "Create Prediction market coin with precision of 6, backed by SIXBIT" );
    const asset_object* prediction = nullptr;
    try
    {
@@ -798,14 +836,14 @@ BOOST_AUTO_TEST_CASE( bitasset_evaluator_test_after_922_931 )
    }
    catch (fc::exception& ex)
    {
-      BOOST_CHECK( ex.to_string(log_level_all) == "Assert Exception: asset_obj.is_market_issued(): Cannot update BitAsset-specific settings on a non-BitAsset." );
+      BOOST_CHECK_EQUAL( ex.to_string(log_level_all), "Assert Exception: asset_obj.is_market_issued(): Cannot update BitAsset-specific settings on a non-BitAsset." );
    }
    op.asset_to_update = bit_usd_id;
 
    // test changing issuer
    BOOST_TEST_MESSAGE( "Test changing issuer." );
    account_id_type original_issuer = op.issuer;
-   op.issuer = john.id;
+   op.issuer = john_id;
    try
    {
       evaluator.evaluate(op);
@@ -813,7 +851,7 @@ BOOST_AUTO_TEST_CASE( bitasset_evaluator_test_after_922_931 )
    }
    catch (fc::exception& ex )
    {
-      BOOST_CHECK( ex.to_string(log_level_all) == "Assert Exception: op.issuer == asset_obj.issuer: Only asset issuer can update bitasset_data of the asset." );
+      BOOST_CHECK_EQUAL( ex.to_string(log_level_all), "Assert Exception: op.issuer == asset_obj.issuer: Only asset issuer can update bitasset_data of the asset." );
    }
    op.issuer = original_issuer;
 
@@ -829,13 +867,32 @@ BOOST_AUTO_TEST_CASE( bitasset_evaluator_test_after_922_931 )
    }
    catch (fc::exception &ex)
    {
-      BOOST_CHECK( ex.to_string(log_level_all) == "Assert Exception: maybe_found != nullptr: Unable to find Object" );
+      BOOST_CHECK_EQUAL( ex.to_string(log_level_all), "Assert Exception: maybe_found != nullptr: Unable to find Object" );
+   }
+   op.new_options.short_backing_asset = correct_asset_id;
+
+   // now check the things that are wrong and won't pass after HF 922 / 931
+   BOOST_TEST_MESSAGE( "Now check the things that are wrong and won't pass after HF 922 / 931" );
+
+   // back by self
+   BOOST_TEST_MESSAGE( "Back by itself" );
+   op.new_options.short_backing_asset = bit_usd_id;
+   try
+   {
+      evaluator.evaluate(op);
+      BOOST_FAIL("Backing by self should have failed.");
+   }
+   catch (fc::exception &ex)
+   {
+      BOOST_CHECK_EQUAL( ex.to_string(log_level_all),
+            "Assert Exception: op.new_options.short_backing_asset != asset_obj.get_id(): Cannot update an asset to be backed by itself." );
    }
    op.new_options.short_backing_asset = correct_asset_id;
 
    // prediction market with different precision
    BOOST_TEST_MESSAGE( "Prediction market with different precision" );
    op.asset_to_update = prediction->get_id();
+   op.issuer = prediction->issuer;
    try
    {
       evaluator.evaluate(op);
@@ -843,10 +900,91 @@ BOOST_AUTO_TEST_CASE( bitasset_evaluator_test_after_922_931 )
    }
    catch (fc::exception &ex)
    {
-      BOOST_CHECK( ex.to_string(log_level_all)
-            == "Assert Exception: asset_obj.precision == new_backing_asset.precision: The precision of the asset and backing asset must be equal." );
+      BOOST_CHECK_EQUAL( ex.to_string(log_level_all),
+            "Assert Exception: asset_obj.precision == new_backing_asset.precision: The precision of the asset and backing asset must be equal." );
    }
    op.asset_to_update = bit_usd_id;
+   op.issuer = bit_usd.issuer;
+
+   // checking old backing asset instead of new backing asset
+   BOOST_TEST_MESSAGE( "Correctly checking new backing asset rather than old backing asset" );
+   op.new_options.short_backing_asset = sixbit->get_id();
+   try
+   {
+      evaluator.evaluate(op);
+      BOOST_FAIL("Changing committee controlled MPA to be backed by UIA should have failed.");
+   }
+   catch (fc::exception &ex)
+   {
+      BOOST_CHECK_EQUAL( ex.to_string(log_level_all),
+            "Assert Exception: new_backing_asset.get_id() == asset_id_type(): May not modify a blockchain-controlled market asset to be backed by an asset which is not market issued asset nor CORE." );
+   }
+   op.new_options.short_backing_asset = prediction->get_id();
+   try
+   {
+      evaluator.evaluate(op);
+      BOOST_FAIL("Changing committee controlled MPA to be backed by a MPA which is backed by UIA should have failed.");
+   }
+   catch (fc::exception &ex)
+   {
+      BOOST_CHECK_EQUAL( ex.to_string(log_level_all),
+            "Assert Exception: new_backing_asset.bitasset_data(d).options.short_backing_asset == asset_id_type(): May not modify a blockchain-controlled market asset to be backed by an asset which is not backed by CORE." );
+   }
+   op.new_options.short_backing_asset = correct_asset_id;
+
+   // Feed lifetime must exceed block interval
+   BOOST_TEST_MESSAGE( "Feed lifetime less than or equal to block interval" );
+   const auto good_feed_lifetime = op.new_options.feed_lifetime_sec;
+   op.new_options.feed_lifetime_sec = db.get_global_properties().parameters.block_interval;
+   try
+   {
+      evaluator.evaluate(op);
+      BOOST_FAIL("Changing feed lifetime to be equal to block interval should have failed.");
+   }
+   catch (fc::exception &ex)
+   {
+      BOOST_CHECK_EQUAL( ex.to_string(log_level_all),
+            "Assert Exception: op.new_options.feed_lifetime_sec > chain_parameters.block_interval: Feed lifetime must exceed block interval." );
+   }
+   op.new_options.feed_lifetime_sec = db.get_global_properties().parameters.block_interval - 1; // default interval > 1
+   try
+   {
+      evaluator.evaluate(op);
+      BOOST_FAIL("Changing feed lifetime to be equal to block interval should have failed.");
+   }
+   catch (fc::exception &ex)
+   {
+      BOOST_CHECK_EQUAL( ex.to_string(log_level_all),
+            "Assert Exception: op.new_options.feed_lifetime_sec > chain_parameters.block_interval: Feed lifetime must exceed block interval." );
+   }
+   op.new_options.feed_lifetime_sec = good_feed_lifetime;
+
+   // Force settlement delay must exceed block interval.
+   BOOST_TEST_MESSAGE( "Force settlement delay less than or equal to block interval" );
+   const auto good_force_settlement_delay_sec = op.new_options.force_settlement_delay_sec;
+   op.new_options.force_settlement_delay_sec = db.get_global_properties().parameters.block_interval;
+   try
+   {
+      evaluator.evaluate(op);
+      BOOST_FAIL("Changing feed lifetime to be equal to block interval should have failed.");
+   }
+   catch (fc::exception &ex)
+   {
+      BOOST_CHECK_EQUAL( ex.to_string(log_level_all),
+            "Assert Exception: op.new_options.force_settlement_delay_sec > chain_parameters.block_interval: Force settlement delay must exceed block interval." );
+   }
+   op.new_options.force_settlement_delay_sec = db.get_global_properties().parameters.block_interval - 1; // default interval > 1
+   try
+   {
+      evaluator.evaluate(op);
+      BOOST_FAIL("Changing feed lifetime to be equal to block interval should have failed.");
+   }
+   catch (fc::exception &ex)
+   {
+      BOOST_CHECK_EQUAL( ex.to_string(log_level_all),
+            "Assert Exception: op.new_options.force_settlement_delay_sec > chain_parameters.block_interval: Force settlement delay must exceed block interval." );
+   }
+   op.new_options.force_settlement_delay_sec = good_force_settlement_delay_sec;
 
    // this should pass
    BOOST_TEST_MESSAGE("We should be all good again.");
