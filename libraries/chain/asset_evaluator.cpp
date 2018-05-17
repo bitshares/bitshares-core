@@ -377,28 +377,49 @@ void_result asset_update_bitasset_evaluator::do_evaluate(const asset_update_bita
    {
       FC_ASSERT(asset_obj.dynamic_asset_data_id(d).current_supply == 0,
             "Cannot update a bitasset if there is already a current supply.");
-      FC_ASSERT(d.find_object(op.new_options.short_backing_asset),
-            "The short backing asset could not be found");
 
-      const asset_object& new_backing_asset = op.new_options.short_backing_asset(d);
-
-      if( current_bitasset_data.is_prediction_market )
+      if (d.get_dynamic_global_properties().next_maintenance_time > HARDFORK_CORE_922_931_TIME)
       {
-         FC_ASSERT( asset_obj.precision == new_backing_asset.precision,
-               "The precision of the asset and backing asset must be equal." );
-      }
+         const asset_object& new_backing_asset = op.new_options.short_backing_asset(d);
 
-      if( asset_obj.issuer == GRAPHENE_COMMITTEE_ACCOUNT )
-      {
-         if( new_backing_asset.is_market_issued() )
+         if( current_bitasset_data.is_prediction_market )
          {
-            const asset_object& backing_backing = new_backing_asset.bitasset_data(d).options.short_backing_asset(d);
-            FC_ASSERT( backing_backing.get_id() == asset_id_type(),
-                       "May not modify a blockchain-controlled market asset to one which is not backed by CORE.");
-         } else
-            FC_ASSERT( new_backing_asset.get_id() == asset_id_type(),
-                       "May not modify a blockchain-controlled market asset to one which is not backed by CORE.");
+            FC_ASSERT( asset_obj.precision == new_backing_asset.precision,
+                  "The precision of the asset and backing asset must be equal." );
+         }
+
+         if( asset_obj.issuer == GRAPHENE_COMMITTEE_ACCOUNT )
+         {
+            if( new_backing_asset.is_market_issued() )
+            {
+               FC_ASSERT( new_backing_asset.bitasset_data(d).options.short_backing_asset == asset_id_type(),
+                     "May not modify a blockchain-controlled market asset to be backed by an asset which is not backed by CORE.");
+            } else
+               FC_ASSERT( new_backing_asset.get_id() == asset_id_type(),
+                     "May not modify a blockchain-controlled market asset to be backed by an asset which is not market issued asset nor CORE.");
+         }
       }
+      else
+      {
+         // prior to HF 922 / 931
+
+         FC_ASSERT( d.find_object(op.new_options.short_backing_asset) );
+
+         if( asset_obj.issuer == GRAPHENE_COMMITTEE_ACCOUNT )
+         {
+            //prior to HF 922_931, these checks were mistakenly using the old backing_asset
+            const asset_object& old_backing_asset = asset_obj.bitasset_data(d).options.short_backing_asset(d);
+
+            if( old_backing_asset.is_market_issued() )
+            {
+               FC_ASSERT( old_backing_asset.bitasset_data(d).options.short_backing_asset == asset_id_type(),
+                     "May not modify a blockchain-controlled market asset to be backed by an asset which is not backed by CORE.");
+            } else
+               FC_ASSERT( old_backing_asset.get_id() == asset_id_type(),
+                     "May not modify a blockchain-controlled market asset to be backed by an asset which is not market issued asset nor CORE.");
+         }
+      }
+
    }
 
    const auto& chain_parameters = d.get_global_properties().parameters;
@@ -407,7 +428,7 @@ void_result asset_update_bitasset_evaluator::do_evaluate(const asset_update_bita
    FC_ASSERT( op.new_options.force_settlement_delay_sec > chain_parameters.block_interval,
          "Force settlement delay must exceed block interval.");
    FC_ASSERT( op.issuer == asset_obj.issuer,
-         "Cannot change the asset issuer. Unable to change from ${a.issuer} to ${op.issuer}.", ("op.issuer", op.issuer)("a.issuer", asset_obj.issuer) );
+         "Only asset issuer can update bitasset_data of the asset." );
 
    bitasset_to_update = &current_bitasset_data;
    asset_to_update = &asset_obj;

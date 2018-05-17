@@ -35,10 +35,12 @@
 #include <graphene/chain/withdraw_permission_object.hpp>
 #include <graphene/chain/witness_object.hpp>
 #include <graphene/chain/worker_object.hpp>
+#include <graphene/chain/asset_evaluator.hpp>
 
 #include <graphene/utilities/tempdir.hpp>
 
 #include <fc/crypto/digest.hpp>
+#include <fc/log/log_message.hpp>
 
 #include "../common/database_fixture.hpp"
 
@@ -541,6 +543,317 @@ BOOST_AUTO_TEST_CASE( hf_890_test )
       }
    }
 }
+
+class bitasset_evaluator_wrapper : public asset_update_bitasset_evaluator
+{
+public:
+   void set_db(database& db)
+   {
+      this->trx_state = new transaction_evaluation_state(&db);
+   }
+};
+
+/******
+ * @brief Test various bitasset asserts within the asset_evaluator before the HF 922 / 931
+ */
+BOOST_AUTO_TEST_CASE( bitasset_evaluator_test_before_922_931 )
+{
+   // set up the basics for the test
+   fc::log_level log_level_all(fc::log_level::all);
+   ACTORS((nathan)(john));
+
+   BOOST_TEST_MESSAGE("Advance to near hard fork 922 / 931");
+   auto maint_interval = db.get_global_properties().parameters.maintenance_interval;
+   generate_blocks( HARDFORK_CORE_922_931_TIME - maint_interval);
+   trx.set_expiration( HARDFORK_CORE_922_931_TIME - maint_interval + fc::hours(1));
+
+   BOOST_TEST_MESSAGE("Create USDBIT");
+   const asset_object& bit_usd = create_bitasset("USDBIT");
+   asset_id_type bit_usd_id = bit_usd.id;
+
+   BOOST_TEST_MESSAGE( "Create market issued BLAH" );
+   const asset_object& blah = create_user_issued_asset( "BLAH" );
+
+   BOOST_TEST_MESSAGE( "Create a bitasset with a precision of 6" );
+   const asset_object* sixbit = nullptr;
+   try
+   {
+      asset_create_operation creator;
+      creator.issuer = account_id_type();
+      creator.fee = asset();
+      creator.symbol = "SIXBIT";
+      creator.common_options.max_supply = 0;
+      creator.precision = 6;
+      creator.common_options.core_exchange_rate = price({asset(1,asset_id_type(1)),asset(1)});
+      creator.common_options.max_supply = GRAPHENE_MAX_SHARE_SUPPLY;
+      creator.common_options.flags = charge_market_fee;
+      creator.common_options.issuer_permissions = charge_market_fee;
+      trx.operations.push_back(std::move(creator));
+      trx.validate();
+      processed_transaction ptx = db.push_transaction(trx, ~0);
+      trx.operations.clear();
+      const asset_object& six = db.get<asset_object>(ptx.operation_results[0].get<object_id_type>());
+      sixbit = &six;
+   }
+   catch( fc::exception& ex )
+   {
+      BOOST_FAIL(ex.to_string(log_level_all));
+   }
+
+   BOOST_TEST_MESSAGE( "Create Prediction market coin with precision of 6" );
+   const asset_object* prediction = nullptr;
+   try
+   {
+      asset_create_operation creator;
+      creator.issuer = GRAPHENE_WITNESS_ACCOUNT;
+      creator.fee = asset();
+      creator.symbol = "PREDICTION";
+      creator.common_options.max_supply = GRAPHENE_MAX_SHARE_SUPPLY;
+      creator.precision = 6;
+      creator.common_options.market_fee_percent = 100;
+      creator.common_options.issuer_permissions = charge_market_fee | global_settle;
+      creator.common_options.flags = charge_market_fee & ~global_settle;
+      creator.common_options.flags |= witness_fed_asset;
+      creator.common_options.core_exchange_rate = price({asset(1,asset_id_type(1)),asset(1)});
+      creator.bitasset_opts = bitasset_options();
+      creator.bitasset_opts->short_backing_asset = sixbit->get_id();
+      creator.is_prediction_market = true;
+      trx.operations.push_back(std::move(creator));
+      trx.validate();
+      processed_transaction ptx = db.push_transaction(trx, ~0);
+      trx.operations.clear();
+      const asset_object& pred = db.get<asset_object>(ptx.operation_results[0].get<object_id_type>());
+      prediction = &pred;
+   }
+   catch (fc::exception& ex)
+   {
+      BOOST_FAIL(ex.to_string(log_level_all));
+   }
+
+   // make a generic operation
+   bitasset_evaluator_wrapper evaluator;
+   evaluator.set_db(db);
+   asset_update_bitasset_operation op;
+   op.asset_to_update = bit_usd_id;
+   op.issuer = bit_usd.issuer;
+   op.new_options = bit_usd.bitasset_data(db).options;
+
+   // this should pass
+   BOOST_TEST_MESSAGE("Evaluating a good operation");
+   BOOST_CHECK( evaluator.evaluate(op) == void_result() );
+
+   // test with a market issued asset
+   BOOST_TEST_MESSAGE( "Sending a non-bitasset." );
+   op.asset_to_update = blah.get_id();
+   try
+   {
+      evaluator.evaluate(op);
+      BOOST_FAIL("Sending a non-bitasset should have failed.");
+   }
+   catch (fc::exception& ex)
+   {
+      BOOST_CHECK( ex.to_string(log_level_all) == "Assert Exception: asset_obj.is_market_issued(): Cannot update BitAsset-specific settings on a non-BitAsset." );
+   }
+   op.asset_to_update = bit_usd_id;
+
+   // test changing issuer
+   BOOST_TEST_MESSAGE( "Test changing issuer." );
+   account_id_type original_issuer = op.issuer;
+   op.issuer = john.id;
+   try
+   {
+      evaluator.evaluate(op);
+      BOOST_FAIL("Changing issuer should have failed");
+   }
+   catch (fc::exception& ex )
+   {
+      BOOST_CHECK( ex.to_string(log_level_all) == "Assert Exception: op.issuer == asset_obj.issuer: Only asset issuer can update bitasset_data of the asset." );
+   }
+   op.issuer = original_issuer;
+
+   // bad backing_asset
+   BOOST_TEST_MESSAGE( "Non-existent backing asset." );
+   asset_id_type correct_asset_id = op.new_options.short_backing_asset;
+   op.new_options.short_backing_asset = asset_id_type();
+   op.new_options.short_backing_asset.instance = 123;
+   try
+   {
+      evaluator.evaluate(op);
+      BOOST_FAIL("Non-existent backing asset should have failed.");
+   }
+   catch (fc::exception &ex)
+   {
+      BOOST_CHECK( ex.to_string(log_level_all) == "Assert Exception: d.find_object(op.new_options.short_backing_asset): " );
+   }
+   op.new_options.short_backing_asset = correct_asset_id;
+
+   // now check the things that are wrong, but still pass before HF 922 / 931
+
+   // prediction market with different precision
+   BOOST_TEST_MESSAGE( "Prediction market with different precision" );
+   op.asset_to_update = prediction->get_id();
+   BOOST_CHECK(evaluator.evaluate(op) == void_result());
+
+   // this should pass
+   BOOST_TEST_MESSAGE("We should be all good again.");
+   BOOST_CHECK( evaluator.evaluate(op) == void_result() );
+}
+
+/******
+ * @brief Test various bitasset asserts within the asset_evaluator before the HF 922 / 931
+ */
+BOOST_AUTO_TEST_CASE( bitasset_evaluator_test_after_922_931 )
+{
+   // set up the basics for the test
+   fc::log_level log_level_all(fc::log_level::all);
+   ACTORS((nathan)(john));
+
+   BOOST_TEST_MESSAGE("Advance to after hard fork 922 / 931");
+   auto maint_interval = db.get_global_properties().parameters.maintenance_interval;
+   generate_blocks( HARDFORK_CORE_922_931_TIME + maint_interval);
+   trx.set_expiration( HARDFORK_CORE_922_931_TIME + maint_interval + fc::hours(1));
+
+   BOOST_TEST_MESSAGE("Create USDBIT");
+   const asset_object& bit_usd = create_bitasset("USDBIT");
+   asset_id_type bit_usd_id = bit_usd.id;
+
+   BOOST_TEST_MESSAGE( "Create market issued BLAH" );
+   const asset_object& blah = create_user_issued_asset( "USERCOIN" );
+
+   BOOST_TEST_MESSAGE( "Create a bitasset with a precision of 6" );
+   const asset_object* sixbit = nullptr;
+   try
+   {
+      asset_create_operation creator;
+      creator.issuer = account_id_type();
+      creator.fee = asset();
+      creator.symbol = "SIXBIT";
+      creator.common_options.max_supply = 0;
+      creator.precision = 6;
+      creator.common_options.core_exchange_rate = price({asset(1,asset_id_type(1)),asset(1)});
+      creator.common_options.max_supply = GRAPHENE_MAX_SHARE_SUPPLY;
+      creator.common_options.flags = charge_market_fee;
+      creator.common_options.issuer_permissions = charge_market_fee;
+      trx.operations.push_back(std::move(creator));
+      trx.validate();
+      processed_transaction ptx = db.push_transaction(trx, ~0);
+      trx.operations.clear();
+      const asset_object& six = db.get<asset_object>(ptx.operation_results[0].get<object_id_type>());
+      sixbit = &six;
+   }
+   catch( fc::exception& ex )
+   {
+      BOOST_FAIL(ex.to_string(log_level_all));
+   }
+
+   BOOST_TEST_MESSAGE( "Create Prediction market coin with precision of 6" );
+   const asset_object* prediction = nullptr;
+   try
+   {
+      asset_create_operation creator;
+      creator.issuer = GRAPHENE_WITNESS_ACCOUNT;
+      creator.fee = asset();
+      creator.symbol = "PREDICTION";
+      creator.common_options.max_supply = GRAPHENE_MAX_SHARE_SUPPLY;
+      creator.precision = 6;
+      creator.common_options.market_fee_percent = 100;
+      creator.common_options.issuer_permissions = charge_market_fee | global_settle;
+      creator.common_options.flags = charge_market_fee & ~global_settle;
+      creator.common_options.flags |= witness_fed_asset;
+      creator.common_options.core_exchange_rate = price({asset(1,asset_id_type(1)),asset(1)});
+      creator.bitasset_opts = bitasset_options();
+      creator.bitasset_opts->short_backing_asset = sixbit->get_id();
+      creator.is_prediction_market = true;
+      trx.operations.push_back(std::move(creator));
+      trx.validate();
+      processed_transaction ptx = db.push_transaction(trx, ~0);
+      trx.operations.clear();
+      const asset_object& pred = db.get<asset_object>(ptx.operation_results[0].get<object_id_type>());
+      prediction = &pred;
+   }
+   catch (fc::exception& ex)
+   {
+      BOOST_FAIL(ex.to_string(log_level_all));
+   }
+
+   // make a generic operation
+   bitasset_evaluator_wrapper evaluator;
+   evaluator.set_db(db);
+   asset_update_bitasset_operation op;
+   op.asset_to_update = bit_usd_id;
+   op.issuer = bit_usd.issuer;
+   op.new_options = bit_usd.bitasset_data(db).options;
+
+   // this should pass
+   BOOST_TEST_MESSAGE("Evaluating a good operation");
+   BOOST_CHECK( evaluator.evaluate(op) == void_result() );
+
+   // test with a market issued asset
+   BOOST_TEST_MESSAGE( "Sending a non-bitasset." );
+   op.asset_to_update = blah.get_id();
+   try
+   {
+      evaluator.evaluate(op);
+      BOOST_FAIL("Sending a non-bitasset should have failed.");
+   }
+   catch (fc::exception& ex)
+   {
+      BOOST_CHECK( ex.to_string(log_level_all) == "Assert Exception: asset_obj.is_market_issued(): Cannot update BitAsset-specific settings on a non-BitAsset." );
+   }
+   op.asset_to_update = bit_usd_id;
+
+   // test changing issuer
+   BOOST_TEST_MESSAGE( "Test changing issuer." );
+   account_id_type original_issuer = op.issuer;
+   op.issuer = john.id;
+   try
+   {
+      evaluator.evaluate(op);
+      BOOST_FAIL("Changing issuer should have failed");
+   }
+   catch (fc::exception& ex )
+   {
+      BOOST_CHECK( ex.to_string(log_level_all) == "Assert Exception: op.issuer == asset_obj.issuer: Only asset issuer can update bitasset_data of the asset." );
+   }
+   op.issuer = original_issuer;
+
+   // bad backing_asset
+   BOOST_TEST_MESSAGE( "Non-existent backing asset." );
+   asset_id_type correct_asset_id = op.new_options.short_backing_asset;
+   op.new_options.short_backing_asset = asset_id_type();
+   op.new_options.short_backing_asset.instance = 123;
+   try
+   {
+      evaluator.evaluate(op);
+      BOOST_FAIL("Non-existent backing asset should have failed.");
+   }
+   catch (fc::exception &ex)
+   {
+      BOOST_CHECK( ex.to_string(log_level_all) == "Assert Exception: maybe_found != nullptr: Unable to find Object" );
+   }
+   op.new_options.short_backing_asset = correct_asset_id;
+
+   // prediction market with different precision
+   BOOST_TEST_MESSAGE( "Prediction market with different precision" );
+   op.asset_to_update = prediction->get_id();
+   try
+   {
+      evaluator.evaluate(op);
+      BOOST_FAIL("precision difference should have failed.");
+   }
+   catch (fc::exception &ex)
+   {
+      BOOST_CHECK( ex.to_string(log_level_all)
+            == "Assert Exception: asset_obj.precision == new_backing_asset.precision: The precision of the asset and backing asset must be equal." );
+   }
+   op.asset_to_update = bit_usd_id;
+
+   // this should pass
+   BOOST_TEST_MESSAGE("We should be all good again.");
+   BOOST_CHECK( evaluator.evaluate(op) == void_result() );
+
+}
+
 
 /*****
  * @brief make sure feeds work correctly after changing from non-witness-fed to witness-fed before the 868 fork
