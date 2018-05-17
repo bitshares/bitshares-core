@@ -366,7 +366,7 @@ void_result asset_update_bitasset_evaluator::do_evaluate(const asset_update_bita
 
    const asset_object& asset_obj = op.asset_to_update(d);
 
-   FC_ASSERT(asset_obj.is_market_issued(), "Cannot update BitAsset-specific settings on a non-BitAsset.");
+   FC_ASSERT( asset_obj.is_market_issued(), "Cannot update BitAsset-specific settings on a non-BitAsset." );
 
    const asset_bitasset_data_object& current_bitasset_data = asset_obj.bitasset_data(d);
 
@@ -375,10 +375,10 @@ void_result asset_update_bitasset_evaluator::do_evaluate(const asset_update_bita
    // Are we changing the backing asset?
    if( op.new_options.short_backing_asset != current_bitasset_data.options.short_backing_asset )
    {
-      FC_ASSERT(asset_obj.dynamic_asset_data_id(d).current_supply == 0,
-            "Cannot update a bitasset if there is already a current supply.");
+      FC_ASSERT( asset_obj.dynamic_asset_data_id(d).current_supply == 0,
+            "Cannot update a bitasset if there is already a current supply." );
 
-      if (d.get_dynamic_global_properties().next_maintenance_time > HARDFORK_CORE_922_931_TIME)
+      if( d.get_dynamic_global_properties().next_maintenance_time > HARDFORK_CORE_922_931_TIME )
       {
          const asset_object& new_backing_asset = op.new_options.short_backing_asset(d);
 
@@ -394,16 +394,19 @@ void_result asset_update_bitasset_evaluator::do_evaluate(const asset_update_bita
             {
                FC_ASSERT( new_backing_asset.bitasset_data(d).options.short_backing_asset == asset_id_type(),
                      "May not modify a blockchain-controlled market asset to be backed by an asset which is not backed by CORE.");
-            } else
+            }
+            else
+            {
                FC_ASSERT( new_backing_asset.get_id() == asset_id_type(),
                      "May not modify a blockchain-controlled market asset to be backed by an asset which is not market issued asset nor CORE.");
+            }
          }
       }
       else
       {
          // prior to HF 922 / 931
 
-         FC_ASSERT( d.find_object(op.new_options.short_backing_asset) );
+         FC_ASSERT( d.find_object( op.new_options.short_backing_asset ) );
 
          if( asset_obj.issuer == GRAPHENE_COMMITTEE_ACCOUNT )
          {
@@ -414,19 +417,21 @@ void_result asset_update_bitasset_evaluator::do_evaluate(const asset_update_bita
             {
                FC_ASSERT( old_backing_asset.bitasset_data(d).options.short_backing_asset == asset_id_type(),
                      "May not modify a blockchain-controlled market asset to be backed by an asset which is not backed by CORE.");
-            } else
+            }
+            else
+            {
                FC_ASSERT( old_backing_asset.get_id() == asset_id_type(),
                      "May not modify a blockchain-controlled market asset to be backed by an asset which is not market issued asset nor CORE.");
+            }
          }
       }
-
    }
 
    const auto& chain_parameters = d.get_global_properties().parameters;
    FC_ASSERT( op.new_options.feed_lifetime_sec > chain_parameters.block_interval,
          "Feed lifetime must exceed block interval." );
    FC_ASSERT( op.new_options.force_settlement_delay_sec > chain_parameters.block_interval,
-         "Force settlement delay must exceed block interval.");
+         "Force settlement delay must exceed block interval." );
    FC_ASSERT( op.issuer == asset_obj.issuer,
          "Only asset issuer can update bitasset_data of the asset." );
 
