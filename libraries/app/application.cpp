@@ -936,7 +936,7 @@ void application::set_program_options(boost::program_options::options_descriptio
          ("dbg-init-key", bpo::value<string>(), "Block signing key to use for init witnesses, overrides genesis file")
          ("api-access", bpo::value<boost::filesystem::path>(), "JSON file specifying API permissions")
          ("plugins", bpo::value<string>(), "Space-separated list of plugins to activate")
-         ("io-threads", bpo::value<uint16_t>()->implicit_value(0), "Number of IO threads")
+         ("io-threads", bpo::value<uint16_t>()->implicit_value(0), "Number of IO threads, default to 0 for auto-configuration")
          // TODO uncomment this when GUI is ready
          //("enable-subscribe-to-all", bpo::value<bool>()->implicit_value(false),
          // "Whether allow API clients to subscribe to universal object creation and removal events")
