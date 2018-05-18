@@ -410,6 +410,35 @@ void_result asset_update_bitasset_evaluator::do_evaluate(const asset_update_bita
                           "market issued asset nor CORE." );
             }
          }
+         else
+         {
+            // not a committee issued asset
+
+            // If we're changing to a backing_asset that is not CORE, we need to look at any
+            // asset ( "CHILD" ) that has this one as a backing asset. If CHILD is committee-owned,
+            // the change is not allowed. If CHILD is user-owned, then this asset's backing
+            // asset must be either CORE or a UIA.
+            if ( new_backing_asset.get_id() != asset_id_type() ) // not backed by CORE
+            {
+               // loop through all assets that have this asset as a backing asset
+               const auto& idx = db().get_index_type<asset_index>().indices().get<by_type>();
+
+               for( auto child : idx )
+               {
+                  if ( child.is_market_issued()
+                        && child.bitasset_data(d).options.short_backing_asset == asset_obj.get_id() )
+                  {
+                     FC_ASSERT( child.issuer != GRAPHENE_COMMITTEE_ACCOUNT,
+                           "A committee-issued BitAsset would be invalidated by changing this backing asset." );
+
+                     FC_ASSERT( child.issuer != GRAPHENE_COMMITTEE_ACCOUNT &&
+                           new_backing_asset.issuer != GRAPHENE_COMMITTEE_ACCOUNT,
+                           "A user-issued BitAsset would be invalidated by changing this backing asset.");
+                  }
+               }
+            }
+
+         }
       }
       else // prior to HF 922 / 931
       {
@@ -455,6 +484,43 @@ void_result asset_update_bitasset_evaluator::do_evaluate(const asset_update_bita
                           "market issued asset nor CORE." );
             }
          }
+         else
+         {
+            // not a committee issued asset
+
+            // If we're changing to a backing_asset that is not CORE, we need to look at any
+            // asset ( "CHILD" ) that has this one as a backing asset. If CHILD is committee-owned,
+            // the change is not allowed. If CHILD is user-owned, then this asset's backing
+            // asset must be either CORE or a UIA.
+            if ( new_backing_asset.get_id() != asset_id_type() ) // not backed by CORE
+            {
+               // loop through all assets that have this asset as a backing asset
+               const auto& idx = db().get_index_type<asset_index>().indices().get<by_type>();
+
+               for( auto child : idx )
+               {
+                  if ( child.is_market_issued()
+                        && child.bitasset_data(d).options.short_backing_asset == asset_obj.get_id() )
+                  {
+                     if( child.issuer == GRAPHENE_COMMITTEE_ACCOUNT )
+                     {
+                        wlog( "before hf-922-931, modified an asset to be backed by a non-CORE, but this asset is a backing asset for "
+                                 "a committee-issued asset. This occurred at block ${b}",
+                                 ("b", d.head_block_num()));
+                     }
+                     else
+                     {
+                        if ( new_backing_asset.issuer == GRAPHENE_COMMITTEE_ACCOUNT )
+                           wlog( "before hf-922-931, modified an asset to be backed by a non-CORE, but this asset is a backing asset for "
+                                 "a user-issued asset, and the new non-CORE asset is not user-issued. This occurred at block ${b}",
+                                 ("b", d.head_block_num()));
+                     }
+                  }
+               }
+            }
+
+         }
+
       }
    }
 

@@ -557,7 +557,10 @@ struct assets_922_931
 {
    const asset_object* bit_usd;
    const asset_object* bit_usdbacked;
-   const asset_object* blah;
+   const asset_object* bit_usdbacked2;
+   const asset_object* bit_child_user_issued;
+   const asset_object* bit_parent;
+   const asset_object* user_issued;
    const asset_object* sixbit;
    const asset_object* prediction;
 };
@@ -565,20 +568,34 @@ struct assets_922_931
 assets_922_931 create_assets_922_931(database_fixture* fixture)
 {
    assets_922_931 asset_objs;
-   BOOST_TEST_MESSAGE("Create USDBIT");
-   asset_objs.bit_usd = &fixture->create_bitasset("USDBIT", GRAPHENE_COMMITTEE_ACCOUNT);
+   BOOST_TEST_MESSAGE( "Create USDBIT" );
+   asset_objs.bit_usd = &fixture->create_bitasset( "USDBIT", GRAPHENE_COMMITTEE_ACCOUNT );
 
-   BOOST_TEST_MESSAGE("Create USDBACKEDBIT");
-   asset_objs.bit_usdbacked = &fixture->create_bitasset("USDBACKEDBIT", GRAPHENE_COMMITTEE_ACCOUNT, 100, charge_market_fee, 2, asset_objs.bit_usd->get_id());
+   BOOST_TEST_MESSAGE( "Create USDBACKEDBIT" );
+   asset_objs.bit_usdbacked = &fixture->create_bitasset( "USDBACKEDBIT", GRAPHENE_COMMITTEE_ACCOUNT,
+         100, charge_market_fee, 2, asset_objs.bit_usd->get_id() );
 
-   BOOST_TEST_MESSAGE( "Create user issued BLAH" );
-   asset_objs.blah = &fixture->create_user_issued_asset( "BLAH" );
+   BOOST_TEST_MESSAGE( "Create USDBACKEDII" );
+   asset_objs.bit_usdbacked2 = &fixture->create_bitasset( "USDBACKEDII", GRAPHENE_WITNESS_ACCOUNT,
+         100, charge_market_fee, 2, asset_objs.bit_usd->get_id() );
+
+   BOOST_TEST_MESSAGE( "Create PARENT" );
+   asset_objs.bit_parent = &fixture->create_bitasset( "PARENT", GRAPHENE_WITNESS_ACCOUNT);
+
+   BOOST_TEST_MESSAGE( "Create CHILDUSER" );
+   asset_objs.bit_child_user_issued = &fixture->create_bitasset( "CHILDUSER", GRAPHENE_WITNESS_ACCOUNT,
+         100, charge_market_fee, 2, asset_objs.bit_parent->get_id() );
+
+   BOOST_TEST_MESSAGE( "Create user issued USERISSUED" );
+   asset_objs.user_issued = &fixture->create_user_issued_asset( "USERISSUED", GRAPHENE_WITNESS_ACCOUNT(fixture->db), charge_market_fee );
 
    BOOST_TEST_MESSAGE( "Create a bitasset with a precision of 6" );
-   asset_objs.sixbit = &fixture->create_bitasset("SIXBIT", GRAPHENE_WITNESS_ACCOUNT, 100, charge_market_fee, 6);
+   asset_objs.sixbit = &fixture->create_bitasset( "SIXBIT", GRAPHENE_WITNESS_ACCOUNT, 100, charge_market_fee, 6 );
 
-   BOOST_TEST_MESSAGE( "Create Prediction market coin with precision of 6, backed by SIXBIT" );
-   asset_objs.prediction = &fixture->create_prediction_market("PREDICTION", GRAPHENE_WITNESS_ACCOUNT, 100, charge_market_fee, 6, asset_objs.sixbit->get_id());
+   BOOST_TEST_MESSAGE( "Create Prediction market with precision of 6, backed by SIXBIT" );
+   asset_objs.prediction = &fixture->create_prediction_market( "PREDICTION", GRAPHENE_WITNESS_ACCOUNT,
+         100, charge_market_fee, 6, asset_objs.sixbit->get_id() );
+
    return asset_objs;
 }
 /******
@@ -586,17 +603,14 @@ assets_922_931 create_assets_922_931(database_fixture* fixture)
  */
 BOOST_AUTO_TEST_CASE( bitasset_evaluator_test_before_922_931 )
 {
-   // set up the basics for the test
-   fc::log_level log_level_all(fc::log_level::all);
-
    BOOST_TEST_MESSAGE("Advance to near hard fork 922 / 931");
    auto global_params = db.get_global_properties().parameters;
-   generate_blocks( HARDFORK_CORE_922_931_TIME - global_params.maintenance_interval);
-   trx.set_expiration( HARDFORK_CORE_922_931_TIME - global_params.maintenance_interval + global_params.maximum_time_until_expiration);
+   generate_blocks( HARDFORK_CORE_922_931_TIME - global_params.maintenance_interval );
+   trx.set_expiration( HARDFORK_CORE_922_931_TIME - global_params.maintenance_interval + global_params.maximum_time_until_expiration );
 
-   ACTORS((nathan)(john));
+   ACTORS( (nathan) (john) );
 
-   assets_922_931 asset_objs = create_assets_922_931(this);
+   assets_922_931 asset_objs = create_assets_922_931( this );
    const asset_id_type bit_usd_id = asset_objs.bit_usd->get_id();
 
    // make a generic operation
@@ -608,20 +622,20 @@ BOOST_AUTO_TEST_CASE( bitasset_evaluator_test_before_922_931 )
    op.new_options = asset_objs.bit_usd->bitasset_data(db).options;
 
    // this should pass
-   BOOST_TEST_MESSAGE("Evaluating a good operation");
+   BOOST_TEST_MESSAGE( "Evaluating a good operation" );
    BOOST_CHECK( evaluator.evaluate(op) == void_result() );
 
    // test with a market issued asset
    BOOST_TEST_MESSAGE( "Sending a non-bitasset." );
-   op.asset_to_update = asset_objs.blah->get_id();
-   REQUIRE_EXCEPTION_WITH_TEXT(evaluator.evaluate(op), "on a non-BitAsset.");
+   op.asset_to_update = asset_objs.user_issued->get_id();
+   REQUIRE_EXCEPTION_WITH_TEXT( evaluator.evaluate(op), "on a non-BitAsset." );
    op.asset_to_update = bit_usd_id;
 
    // test changing issuer
    BOOST_TEST_MESSAGE( "Test changing issuer." );
    account_id_type original_issuer = op.issuer;
    op.issuer = john_id;
-   REQUIRE_EXCEPTION_WITH_TEXT(evaluator.evaluate(op), "Only asset issuer can update");
+   REQUIRE_EXCEPTION_WITH_TEXT( evaluator.evaluate(op), "Only asset issuer can update" );
    op.issuer = original_issuer;
 
    // bad backing_asset
@@ -629,7 +643,7 @@ BOOST_AUTO_TEST_CASE( bitasset_evaluator_test_before_922_931 )
    asset_id_type correct_asset_id = op.new_options.short_backing_asset;
    op.new_options.short_backing_asset = asset_id_type();
    op.new_options.short_backing_asset.instance = 123;
-   REQUIRE_EXCEPTION_WITH_TEXT(evaluator.evaluate(op), "Unable to find Object");
+   REQUIRE_EXCEPTION_WITH_TEXT( evaluator.evaluate(op), "Unable to find Object" );
    op.new_options.short_backing_asset = correct_asset_id;
 
    // now check the things that are wrong, but still pass before HF 922 / 931
@@ -638,45 +652,70 @@ BOOST_AUTO_TEST_CASE( bitasset_evaluator_test_before_922_931 )
    // back by self
    BOOST_TEST_MESSAGE( "Back by itself" );
    op.new_options.short_backing_asset = bit_usd_id;
-   BOOST_CHECK(evaluator.evaluate(op) == void_result());
+   BOOST_CHECK( evaluator.evaluate(op) == void_result() );
    op.new_options.short_backing_asset = correct_asset_id;
 
    // prediction market with different precision
    BOOST_TEST_MESSAGE( "Prediction market with different precision" );
    op.asset_to_update = asset_objs.prediction->get_id();
    op.issuer = asset_objs.prediction->issuer;
-   BOOST_CHECK(evaluator.evaluate(op) == void_result());
+   BOOST_CHECK( evaluator.evaluate(op) == void_result() );
    op.asset_to_update = bit_usd_id;
    op.issuer = asset_objs.bit_usd->issuer;
 
    // checking old backing asset instead of new backing asset
    BOOST_TEST_MESSAGE( "Was checking old backing asset instead of new backing asset" );
    op.new_options.short_backing_asset = asset_objs.sixbit->get_id();
-   BOOST_CHECK(evaluator.evaluate(op) == void_result());
+   BOOST_CHECK( evaluator.evaluate(op) == void_result() );
    op.new_options.short_backing_asset = asset_objs.prediction->get_id();
-   BOOST_CHECK(evaluator.evaluate(op) == void_result());
+   BOOST_CHECK( evaluator.evaluate(op) == void_result() );
+   op.new_options.short_backing_asset = correct_asset_id;
+
+   // CHILDUSER is a non-committee asset backed by PARENT which is backed by CORE
+   // Cannot change PARENT's backing asset from CORE to something that is not [CORE | UIA]
+   // because that will make CHILD be backed by an asset that is not itself backed by CORE or a UIA.
+   BOOST_TEST_MESSAGE( "Pre hardfork: Attempting to change PARENT to be backed by a non-core and non-user-issued asset. This should put an error in the log." );
+   op.asset_to_update = asset_objs.bit_parent->get_id();
+   op.issuer = asset_objs.bit_parent->issuer;
+   op.new_options.short_backing_asset = asset_objs.bit_usdbacked->get_id();
+   // this should generate a warning in the log, but not fail.
+   BOOST_CHECK( evaluator.evaluate(op) == void_result() );
+   // changing the backing asset to a UIA should work
+   BOOST_TEST_MESSAGE( "Switching to a backing asset that is a UIA should work. No error in the log." );
+   op.new_options.short_backing_asset = asset_objs.user_issued->get_id();
+   BOOST_CHECK( evaluator.evaluate(op) == void_result() );
+   BOOST_TEST_MESSAGE( "Pre hardfork: Adding a committee-issued asset. This should generate another message in the log" );
+   // CHILDCOMMITTEE is a committee asset backed by PARENT which is backed by CORE
+   // Cannot change PARENT's backing asset from CORE to something else because that will make CHILD be backed by
+   // an asset that is not itself backed by CORE
+   create_user_issued_asset( "CHILDCOMMITTEE", GRAPHENE_COMMITTEE_ACCOUNT(db), charge_market_fee,
+         price(asset(1, asset_id_type(1)), asset(1)), asset_objs.bit_parent->get_id() );
+   // it should again work, generating 2 warnings in the log. 1 for the above, and 1 new one.
+   BOOST_CHECK( evaluator.evaluate(op) == void_result() );
+   op.asset_to_update = asset_objs.bit_usd->get_id();
+   op.issuer = asset_objs.bit_usd->issuer;
    op.new_options.short_backing_asset = correct_asset_id;
 
    // Feed lifetime must exceed block interval
    BOOST_TEST_MESSAGE( "Feed lifetime less than or equal to block interval" );
    const auto good_feed_lifetime = op.new_options.feed_lifetime_sec;
    op.new_options.feed_lifetime_sec = db.get_global_properties().parameters.block_interval;
-   BOOST_CHECK(evaluator.evaluate(op) == void_result());
+   BOOST_CHECK( evaluator.evaluate(op) == void_result() );
    op.new_options.feed_lifetime_sec = db.get_global_properties().parameters.block_interval - 1; // default interval > 1
-   BOOST_CHECK(evaluator.evaluate(op) == void_result());
+   BOOST_CHECK( evaluator.evaluate(op) == void_result() );
    op.new_options.feed_lifetime_sec = good_feed_lifetime;
 
    // Force settlement delay must exceed block interval.
    BOOST_TEST_MESSAGE( "Force settlement delay less than or equal to block interval" );
    const auto good_force_settlement_delay_sec = op.new_options.force_settlement_delay_sec;
    op.new_options.force_settlement_delay_sec = db.get_global_properties().parameters.block_interval;
-   BOOST_CHECK(evaluator.evaluate(op) == void_result());
+   BOOST_CHECK( evaluator.evaluate(op) == void_result() );
    op.new_options.force_settlement_delay_sec = db.get_global_properties().parameters.block_interval - 1; // default interval > 1
-   BOOST_CHECK(evaluator.evaluate(op) == void_result());
+   BOOST_CHECK( evaluator.evaluate(op) == void_result() );
    op.new_options.force_settlement_delay_sec = good_force_settlement_delay_sec;
 
    // this should pass
-   BOOST_TEST_MESSAGE("We should be all good again.");
+   BOOST_TEST_MESSAGE( "We should be all good again." );
    BOOST_CHECK( evaluator.evaluate(op) == void_result() );
 }
 
@@ -685,42 +724,39 @@ BOOST_AUTO_TEST_CASE( bitasset_evaluator_test_before_922_931 )
  */
 BOOST_AUTO_TEST_CASE( bitasset_evaluator_test_after_922_931 )
 {
-   // set up the basics for the test
-   fc::log_level log_level_all(fc::log_level::all);
-
    BOOST_TEST_MESSAGE("Advance to after hard fork 922 / 931");
    auto global_params = db.get_global_properties().parameters;
-   generate_blocks( HARDFORK_CORE_922_931_TIME + global_params.maintenance_interval);
-   trx.set_expiration( HARDFORK_CORE_922_931_TIME + global_params.maintenance_interval + global_params.maximum_time_until_expiration);
+   generate_blocks( HARDFORK_CORE_922_931_TIME + global_params.maintenance_interval );
+   trx.set_expiration( HARDFORK_CORE_922_931_TIME + global_params.maintenance_interval + global_params.maximum_time_until_expiration );
 
-   ACTORS((nathan)(john));
+   ACTORS( (nathan) (john) );
 
-   assets_922_931 asset_objs = create_assets_922_931(this);
+   assets_922_931 asset_objs = create_assets_922_931( this );
    const asset_id_type& bit_usd_id = asset_objs.bit_usd->get_id();
 
    // make a generic operation
    bitasset_evaluator_wrapper evaluator;
-   evaluator.set_db(db);
+   evaluator.set_db( db );
    asset_update_bitasset_operation op;
    op.asset_to_update = bit_usd_id;
    op.issuer = asset_objs.bit_usd->issuer;
    op.new_options = asset_objs.bit_usd->bitasset_data(db).options;
 
    // this should pass
-   BOOST_TEST_MESSAGE("Evaluating a good operation");
+   BOOST_TEST_MESSAGE( "Evaluating a good operation" );
    BOOST_CHECK( evaluator.evaluate(op) == void_result() );
 
    // test with a market issued asset
    BOOST_TEST_MESSAGE( "Sending a non-bitasset." );
-   op.asset_to_update = asset_objs.blah->get_id();
-   REQUIRE_EXCEPTION_WITH_TEXT(evaluator.evaluate(op), "Cannot update BitAsset-specific settings on a non-BitAsset");
+   op.asset_to_update = asset_objs.user_issued->get_id();
+   REQUIRE_EXCEPTION_WITH_TEXT( evaluator.evaluate(op), "Cannot update BitAsset-specific settings on a non-BitAsset" );
    op.asset_to_update = bit_usd_id;
 
    // test changing issuer
    BOOST_TEST_MESSAGE( "Test changing issuer." );
    account_id_type original_issuer = op.issuer;
    op.issuer = john_id;
-   REQUIRE_EXCEPTION_WITH_TEXT(evaluator.evaluate(op), "Only asset issuer can update");
+   REQUIRE_EXCEPTION_WITH_TEXT( evaluator.evaluate(op), "Only asset issuer can update" );
    op.issuer = original_issuer;
 
    // bad backing_asset
@@ -728,7 +764,7 @@ BOOST_AUTO_TEST_CASE( bitasset_evaluator_test_after_922_931 )
    asset_id_type correct_asset_id = op.new_options.short_backing_asset;
    op.new_options.short_backing_asset = asset_id_type();
    op.new_options.short_backing_asset.instance = 123;
-   REQUIRE_EXCEPTION_WITH_TEXT(evaluator.evaluate(op), "Unable to find");
+   REQUIRE_EXCEPTION_WITH_TEXT( evaluator.evaluate(op), "Unable to find" );
    op.new_options.short_backing_asset = correct_asset_id;
 
    // now check the things that are wrong and won't pass after HF 922 / 931
@@ -737,45 +773,69 @@ BOOST_AUTO_TEST_CASE( bitasset_evaluator_test_after_922_931 )
    // back by self
    BOOST_TEST_MESSAGE( "Back by itself" );
    op.new_options.short_backing_asset = bit_usd_id;
-   REQUIRE_EXCEPTION_WITH_TEXT(evaluator.evaluate(op), "Cannot update an asset to be backed by itself");
+   REQUIRE_EXCEPTION_WITH_TEXT( evaluator.evaluate(op), "Cannot update an asset to be backed by itself" );
    op.new_options.short_backing_asset = correct_asset_id;
 
    // prediction market with different precision
    BOOST_TEST_MESSAGE( "Prediction market with different precision" );
    op.asset_to_update = asset_objs.prediction->get_id();
    op.issuer = asset_objs.prediction->issuer;
-   REQUIRE_EXCEPTION_WITH_TEXT(evaluator.evaluate(op), "The precision of the asset and backing asset must");
+   REQUIRE_EXCEPTION_WITH_TEXT( evaluator.evaluate(op), "The precision of the asset and backing asset must" );
    op.asset_to_update = bit_usd_id;
    op.issuer = asset_objs.bit_usd->issuer;
 
    // checking old backing asset instead of new backing asset
    BOOST_TEST_MESSAGE( "Correctly checking new backing asset rather than old backing asset" );
    op.new_options.short_backing_asset = asset_objs.bit_usdbacked->get_id();
-   REQUIRE_EXCEPTION_WITH_TEXT(evaluator.evaluate(op), "May not modify a blockchain-controlled market asset to");
+   REQUIRE_EXCEPTION_WITH_TEXT( evaluator.evaluate(op), "May not modify a blockchain-controlled market asset to" );
    op.new_options.short_backing_asset = asset_objs.prediction->get_id();
-   REQUIRE_EXCEPTION_WITH_TEXT(evaluator.evaluate(op), "which is not backed by CORE")
+   REQUIRE_EXCEPTION_WITH_TEXT( evaluator.evaluate(op), "which is not backed by CORE" );
+   op.new_options.short_backing_asset = correct_asset_id;
+
+   // CHILD is a non-committee asset backed by PARENT which is backed by CORE
+   // Cannot change PARENT's backing asset from CORE to something that is not [CORE | UIA]
+   // because that will make CHILD be backed by an asset that is not itself backed by CORE or a UIA.
+   BOOST_TEST_MESSAGE( "Attempting to change PARENT to be backed by a non-core and non-user-issued asset" );
+   op.asset_to_update = asset_objs.bit_parent->get_id();
+   op.issuer = asset_objs.bit_parent->issuer;
+   op.new_options.short_backing_asset = asset_objs.bit_usdbacked->get_id();
+   REQUIRE_EXCEPTION_WITH_TEXT( evaluator.evaluate(op), "A user-issued BitAsset" );
+   // changing the backing asset to a UIA should work
+   BOOST_TEST_MESSAGE( "Switching to a backing asset that is a UIA should work." );
+   op.new_options.short_backing_asset = asset_objs.user_issued->get_id();
+   BOOST_CHECK( evaluator.evaluate(op) == void_result() );
+   BOOST_TEST_MESSAGE( "Creating CHILDCOMMITTEE" );
+   // CHILDCOMMITTEE is a committee asset backed by PARENT which is backed by CORE
+   // Cannot change PARENT's backing asset from CORE to something else because that will make CHILD be backed by
+   // an asset that is not itself backed by CORE
+   create_user_issued_asset( "CHILDCOMMITTEE", GRAPHENE_COMMITTEE_ACCOUNT(db), charge_market_fee,
+         price(asset(1, asset_id_type(1)), asset(1)), asset_objs.bit_parent->get_id() );
+   // it should again not work
+   REQUIRE_EXCEPTION_WITH_TEXT( evaluator.evaluate(op), "A committee-issued BitAsset" );
+   op.asset_to_update = asset_objs.bit_usd->get_id();
+   op.issuer = asset_objs.bit_usd->issuer;
    op.new_options.short_backing_asset = correct_asset_id;
 
    // Feed lifetime must exceed block interval
    BOOST_TEST_MESSAGE( "Feed lifetime less than or equal to block interval" );
    const auto good_feed_lifetime = op.new_options.feed_lifetime_sec;
    op.new_options.feed_lifetime_sec = db.get_global_properties().parameters.block_interval;
-   REQUIRE_EXCEPTION_WITH_TEXT(evaluator.evaluate(op), "Feed lifetime must exceed block");
+   REQUIRE_EXCEPTION_WITH_TEXT( evaluator.evaluate(op), "Feed lifetime must exceed block" );
    op.new_options.feed_lifetime_sec = db.get_global_properties().parameters.block_interval - 1; // default interval > 1
-   REQUIRE_EXCEPTION_WITH_TEXT(evaluator.evaluate(op), "Feed lifetime must exceed block");
+   REQUIRE_EXCEPTION_WITH_TEXT( evaluator.evaluate(op), "Feed lifetime must exceed block" );
    op.new_options.feed_lifetime_sec = good_feed_lifetime;
 
    // Force settlement delay must exceed block interval.
    BOOST_TEST_MESSAGE( "Force settlement delay less than or equal to block interval" );
    const auto good_force_settlement_delay_sec = op.new_options.force_settlement_delay_sec;
    op.new_options.force_settlement_delay_sec = db.get_global_properties().parameters.block_interval;
-   REQUIRE_EXCEPTION_WITH_TEXT(evaluator.evaluate(op), "Force settlement delay must");
+   REQUIRE_EXCEPTION_WITH_TEXT( evaluator.evaluate(op), "Force settlement delay must" );
    op.new_options.force_settlement_delay_sec = db.get_global_properties().parameters.block_interval - 1; // default interval > 1
-   REQUIRE_EXCEPTION_WITH_TEXT(evaluator.evaluate(op), "Force settlement delay must");
+   REQUIRE_EXCEPTION_WITH_TEXT( evaluator.evaluate(op), "Force settlement delay must" );
    op.new_options.force_settlement_delay_sec = good_force_settlement_delay_sec;
 
    // this should pass
-   BOOST_TEST_MESSAGE("We should be all good again.");
+   BOOST_TEST_MESSAGE( "We should be all good again." );
    BOOST_CHECK( evaluator.evaluate(op) == void_result() );
 
 }

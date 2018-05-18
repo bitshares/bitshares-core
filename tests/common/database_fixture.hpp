@@ -108,17 +108,18 @@ extern uint32_t GRAPHENE_TESTING_GENESIS_TIMESTAMP;
 
 #define REQUIRE_EXCEPTION_WITH_TEXT(op, exc_text)                 \
 {                                                                 \
-   fc::log_level ll(fc::log_level::all);                          \
    try                                                            \
    {                                                              \
       op;                                                         \
-      BOOST_FAIL(std::string("Expected an exception with ") +     \
-         std::string(exc_text));                                  \
+      BOOST_FAIL(std::string("Expected an exception with \"") +   \
+         std::string(exc_text) + std::string("\""));              \
    }                                                              \
    catch (fc::exception& ex)                                      \
    {                                                              \
-      std::string what = ex.to_string(log_level_all);             \
-      BOOST_CHECK(what.find(exc_text) != std::string::npos);      \
+      std::string what = ex.to_string(                            \
+            fc::log_level(fc::log_level::all));                   \
+      BOOST_CHECK_MESSAGE(what.find(exc_text)                     \
+            != std::string::npos, what);                          \
    }                                                              \
 }                                                                 \
 
@@ -275,7 +276,8 @@ struct database_fixture {
    const asset_object& create_user_issued_asset( const string& name,
                                                  const account_object& issuer,
                                                  uint16_t flags,
-                                                 const price& core_exchange_rate = price(asset(1, asset_id_type(1)), asset(1)) );
+                                                 const price& core_exchange_rate = price(asset(1, asset_id_type(1)), asset(1)),
+                                                 asset_id_type backing_asset = {});
    void issue_uia( const account_object& recipient, asset amount );
    void issue_uia( account_id_type recipient_id, asset amount );
 
