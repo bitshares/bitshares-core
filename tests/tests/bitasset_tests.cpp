@@ -572,7 +572,7 @@ BOOST_AUTO_TEST_CASE( bitasset_evaluator_test_before_922_931 )
    const asset_object& bit_usd = create_bitasset("USDBIT", GRAPHENE_COMMITTEE_ACCOUNT);
    asset_id_type bit_usd_id = bit_usd.id;
 
-   BOOST_TEST_MESSAGE( "Create market issued BLAH" );
+   BOOST_TEST_MESSAGE( "Create user issued BLAH" );
    const asset_object& blah = create_user_issued_asset( "BLAH" );
 
    BOOST_TEST_MESSAGE( "Create a bitasset with a precision of 6" );
@@ -755,7 +755,7 @@ BOOST_AUTO_TEST_CASE( bitasset_evaluator_test_after_922_931 )
    const asset_object& bit_usd = create_bitasset("USDBIT", GRAPHENE_COMMITTEE_ACCOUNT);
    asset_id_type bit_usd_id = bit_usd.id;
 
-   BOOST_TEST_MESSAGE( "Create market issued BLAH" );
+   BOOST_TEST_MESSAGE( "Create user issued BLAH" );
    const asset_object& blah = create_user_issued_asset( "BLAH" );
 
    BOOST_TEST_MESSAGE( "Create a bitasset with a precision of 6" );
