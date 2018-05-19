@@ -707,13 +707,13 @@ BOOST_AUTO_TEST_CASE(get_account_limit_orders)
    /// Create 250 versatile orders
    for (int i = 0 ; i < 50 ; ++i)
    {
-     BOOST_CHECK(create_sell_order(seller, core.amount(100), bitcny.amount(250)));
+      BOOST_CHECK(create_sell_order(seller, core.amount(100), bitcny.amount(250)));
    }
 
    for (int i = 1 ; i < 101 ; ++i)
    {
-     BOOST_CHECK(create_sell_order(seller, core.amount(100), bitcny.amount(250 + i)));
-     BOOST_CHECK(create_sell_order(seller, core.amount(100), bitcny.amount(250 - i)));
+      BOOST_CHECK(create_sell_order(seller, core.amount(100), bitcny.amount(250 + i)));
+      BOOST_CHECK(create_sell_order(seller, core.amount(100), bitcny.amount(250 - i)));
    }
 
    graphene::app::database_api db_api(db);
@@ -727,7 +727,7 @@ BOOST_AUTO_TEST_CASE(get_account_limit_orders)
    BOOST_CHECK(results.size() == 101);
    for (int i = 0 ; i < results.size() - 1 ; ++i)
    {
-     BOOST_CHECK(results[i].sell_price >= results[i+1].sell_price);
+      BOOST_CHECK(results[i].sell_price >= results[i+1].sell_price);
    }
    BOOST_CHECK(results.front().sell_price == price(core.amount(100), bitcny.amount(150)));
    BOOST_CHECK(results.back().sell_price == price(core.amount(100), bitcny.amount(250)));
@@ -740,7 +740,7 @@ BOOST_AUTO_TEST_CASE(get_account_limit_orders)
    BOOST_CHECK(results.size() == 50);
    for (int i = 0 ; i < results.size() - 1 ; ++i)
    {
-     BOOST_CHECK(results[i].sell_price >= results[i+1].sell_price);
+      BOOST_CHECK(results[i].sell_price >= results[i+1].sell_price);
    }
    BOOST_CHECK(results.front().sell_price == price(core.amount(100), bitcny.amount(150)));
    BOOST_CHECK(results.back().sell_price == price(core.amount(100), bitcny.amount(199)));
@@ -756,7 +756,7 @@ BOOST_AUTO_TEST_CASE(get_account_limit_orders)
    BOOST_CHECK(results.front().id == o.id);
    for (int i = 0 ; i < results.size() - 1 ; ++i)
    {
-     BOOST_CHECK(results[i].sell_price >= results[i+1].sell_price);
+      BOOST_CHECK(results[i].sell_price >= results[i+1].sell_price);
    }
    BOOST_CHECK(results.front().sell_price == price(core.amount(100), bitcny.amount(199)));
    BOOST_CHECK(results.back().sell_price == price(core.amount(100), bitcny.amount(250)));
@@ -779,7 +779,7 @@ BOOST_AUTO_TEST_CASE(get_account_limit_orders)
    BOOST_CHECK(results.front().sell_price == o.sell_price);
    for (int i = 0 ; i < results.size() - 1 ; ++i)
    {
-     BOOST_CHECK(results[i].sell_price >= results[i+1].sell_price);
+      BOOST_CHECK(results[i].sell_price >= results[i+1].sell_price);
    }
    BOOST_CHECK(results.front().sell_price == price(core.amount(100), bitcny.amount(250)));
    BOOST_CHECK(results.back().sell_price == price(core.amount(100), bitcny.amount(279)));
@@ -797,7 +797,7 @@ BOOST_AUTO_TEST_CASE(get_account_limit_orders)
    BOOST_CHECK(results.front().sell_price < o.sell_price);
    for (int i = 0 ; i < results.size() - 1 ; ++i)
    {
-     BOOST_CHECK(results[i].sell_price >= results[i+1].sell_price);
+      BOOST_CHECK(results[i].sell_price >= results[i+1].sell_price);
    }
    BOOST_CHECK(results.front().sell_price == price(core.amount(100), bitcny.amount(280)));
    BOOST_CHECK(results.back().sell_price == price(core.amount(100), bitcny.amount(350)));
