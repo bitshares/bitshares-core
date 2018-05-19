@@ -285,9 +285,10 @@ class database_api
        * @note
        * 1. if @ref name_or_id cannot be tied to an account, empty result will be returned
        * 2. @ref start_id and @ref start_price can be empty, if so the api will return the "first page" of orders;
-       *    if start_id is specified, its price will be used to do page query preferentially, otherwise the start_price will be used;
-       *    start_id and start_price may be used cooperatively in case of the order specified by start_id was just canceled
-       *    accidentally, in such case, the result orders' price may lower or equal to start_price, but orders' id greater than start_id
+       *    if start_id is specified, its price will be used to do page query preferentially, otherwise the start_price
+       *    will be used; start_id and start_price may be used cooperatively in case of the order specified by start_id
+       *    was just canceled accidentally, in such case, the result orders' price may lower or equal to start_price,
+       *    but orders' id greater than start_id
        */
       vector<limit_order_object> get_account_limit_orders( const string& name_or_id,
                                                   const string &base,

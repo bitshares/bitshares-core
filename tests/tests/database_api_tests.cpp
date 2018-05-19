@@ -721,35 +721,40 @@ BOOST_AUTO_TEST_CASE(get_account_limit_orders)
    // query with no constraint, expected:
    // 1. up to 101 orders returned
    // 2. orders were sorted by price desendingly
-   results = db_api.get_account_limit_orders(seller.name, "BTS", "CNY");
+   results = db_api.get_account_limit_orders(seller.name, GRAPHENE_SYMBOL, "CNY");
    BOOST_CHECK(results.size() == 101);
    for (int i = 0 ; i < results.size() - 1 ; ++i) {
      BOOST_CHECK(results[i].sell_price >= results[i+1].sell_price);
    }
+   BOOST_CHECK(results.front().sell_price == price(core.amount(100), bitcny.amount(150)));
+   BOOST_CHECK(results.back().sell_price == price(core.amount(100), bitcny.amount(250)));
    results.clear();
 
    // query with specified limit, expected:
    // 1. up to specified amount of orders returned
    // 2. orders were sorted by price desendingly
-   results = db_api.get_account_limit_orders(seller.name, "BTS", "CNY", 50);
-   results = db_api.get_account_limit_orders(seller.name, "BTS", "CNY", 50);
+   results = db_api.get_account_limit_orders(seller.name, GRAPHENE_SYMBOL, "CNY", 50);
    BOOST_CHECK(results.size() == 50);
    for (int i = 0 ; i < results.size() - 1 ; ++i) {
      BOOST_CHECK(results[i].sell_price >= results[i+1].sell_price);
    }
+   BOOST_CHECK(results.front().sell_price == price(core.amount(100), bitcny.amount(150)));
+   BOOST_CHECK(results.back().sell_price == price(core.amount(100), bitcny.amount(199)));
 
    o = results.back();
    results.clear();
 
    // query with specified order id and limit, expected:
    // same as before, but also the first order's id equal to specified
-   results = db_api.get_account_limit_orders(seller.name, "BTS", "CNY", 80,
+   results = db_api.get_account_limit_orders(seller.name, GRAPHENE_SYMBOL, "CNY", 80,
        limit_order_id_type(o.id));
    BOOST_CHECK(results.size() == 80);
    BOOST_CHECK(results.front().id == o.id);
    for (int i = 0 ; i < results.size() - 1 ; ++i) {
      BOOST_CHECK(results[i].sell_price >= results[i+1].sell_price);
    }
+   BOOST_CHECK(results.front().sell_price == price(core.amount(100), bitcny.amount(199)));
+   BOOST_CHECK(results.back().sell_price == price(core.amount(100), bitcny.amount(250)));
 
    o = results.back();
    results.clear();
@@ -761,7 +766,7 @@ BOOST_AUTO_TEST_CASE(get_account_limit_orders)
    // 3. the first order's sell price equal to specified
    cancel_limit_order(o); // NOTE 1: this canceled order was in scope of the
                           // first created 50 orders, so with price 2.5 BTS/CNY
-   results = db_api.get_account_limit_orders(seller.name, "BTS", "CNY", 50,
+   results = db_api.get_account_limit_orders(seller.name, GRAPHENE_SYMBOL, "CNY", 50,
        limit_order_id_type(o.id), o.sell_price);
    BOOST_CHECK(results.size() == 50);
    BOOST_CHECK(results.front().id > o.id);
@@ -770,22 +775,28 @@ BOOST_AUTO_TEST_CASE(get_account_limit_orders)
    for (int i = 0 ; i < results.size() - 1 ; ++i) {
      BOOST_CHECK(results[i].sell_price >= results[i+1].sell_price);
    }
+   BOOST_CHECK(results.front().sell_price == price(core.amount(100), bitcny.amount(250)));
+   BOOST_CHECK(results.back().sell_price == price(core.amount(100), bitcny.amount(279)));
 
    o = results.back();
    results.clear();
 
    cancel_limit_order(o); // NOTE 3: this time the canceled order was in scope
                           // of the lowest price 150 orders
-   results = db_api.get_account_limit_orders(seller.name, "BTS", "CNY", 101,
+   results = db_api.get_account_limit_orders(seller.name, GRAPHENE_SYMBOL, "CNY", 101,
        limit_order_id_type(o.id), o.sell_price);
-   BOOST_CHECK(results.size() <= 101);
+   BOOST_CHECK(results.size() == 71);
    BOOST_CHECK(results.front().id > o.id);
    // NOTE 3: because of NOTE 1, here should be little than 
    BOOST_CHECK(results.front().sell_price < o.sell_price);
    for (int i = 0 ; i < results.size() - 1 ; ++i) {
      BOOST_CHECK(results[i].sell_price >= results[i+1].sell_price);
    }
+   BOOST_CHECK(results.front().sell_price == price(core.amount(100), bitcny.amount(280)));
+   BOOST_CHECK(results.back().sell_price == price(core.amount(100), bitcny.amount(350)));
 
+   BOOST_CHECK_THROW(db_api.get_account_limit_orders(seller.name, GRAPHENE_SYMBOL, "CNY", 101,
+               limit_order_id_type(o.id)), fc::exception);
 
 } FC_LOG_AND_RETHROW() }
 

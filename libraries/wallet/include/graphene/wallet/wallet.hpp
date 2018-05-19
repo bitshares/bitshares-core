@@ -404,7 +404,8 @@ class wallet_api
        * @note
        * 1. if @ref name_or_id cannot be tied to an account, empty result will be returned
        * 2. @ref start_id and @ref start_price can be empty, if so the api will return the "first page" of orders;
-       *    if start_id is specified and valid, its price will be used to do page query preferentially, otherwise the start_price will be used 
+       *    if start_id is specified and valid, its price will be used to do page query preferentially,
+       *    otherwise the start_price will be used 
        */
       vector<limit_order_object>        get_account_limit_orders( const string& name_or_id,
                                             const string &base,

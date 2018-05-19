@@ -82,7 +82,9 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
 
       // Accounts
       vector<optional<account_object>> get_accounts(const vector<account_id_type>& account_ids)const;
-      vector<limit_order_object> get_account_limit_orders( const string& name_or_id, const string &base, const string &quote, uint32_t limit, optional<limit_order_id_type> ostart_id, optional<price> ostart_price);
+      vector<limit_order_object> get_account_limit_orders( const string& name_or_id, const string &base,
+              const string &quote, uint32_t limit,
+              optional<limit_order_id_type> ostart_id, optional<price> ostart_price);
       std::map<string,full_account> get_full_accounts( const vector<string>& names_or_ids, bool subscribe );
       optional<account_object> get_account_by_name( string name )const;
       vector<account_id_type> get_account_references( account_id_type account_id )const;
@@ -625,12 +627,14 @@ vector<optional<account_object>> database_api_impl::get_accounts(const vector<ac
    return result;
 }
 
-vector<limit_order_object> database_api::get_account_limit_orders( const string& name_or_id, const string &base, const string &quote, uint32_t limit, optional<limit_order_id_type> ostart_id, optional<price> ostart_price)
+vector<limit_order_object> database_api::get_account_limit_orders( const string& name_or_id, const string &base,
+        const string &quote, uint32_t limit, optional<limit_order_id_type> ostart_id, optional<price> ostart_price)
 {
    return my->get_account_limit_orders( name_or_id, base, quote, limit, ostart_id, ostart_price );
 }
 
-vector<limit_order_object> database_api_impl::get_account_limit_orders( const string& name_or_id, const string &base, const string &quote, uint32_t limit, optional<limit_order_id_type> ostart_id, optional<price> ostart_price)
+vector<limit_order_object> database_api_impl::get_account_limit_orders( const string& name_or_id, const string &base,
+        const string &quote, uint32_t limit, optional<limit_order_id_type> ostart_id, optional<price> ostart_price)
 {
    FC_ASSERT( limit <= 101 );
 
@@ -667,38 +671,51 @@ vector<limit_order_object> database_api_impl::get_account_limit_orders( const st
    limit_order_multi_index_type::index<by_account>::type::const_iterator upper_itr;
 
    // if both order_id and price are invalid, query the first page
-   if (!ostart_id.valid() && !ostart_price.valid()) {
-       lower_itr = index_by_account.lower_bound(std::make_tuple(account->id, price::max(base_id, quote_id)));
-       upper_itr = index_by_account.upper_bound(std::make_tuple(account->id, price::min(base_id, quote_id)));
-   } else if (ostart_id.valid()) {
-       // in case of the order been deleted during page querying
-       const limit_order_object *p_loo = _db.find(*ostart_id);
-       if (!p_loo) {
-           if (ostart_price.valid()) {
-               lower_itr = index_by_account.lower_bound(std::make_tuple(account->id, *ostart_price, *ostart_id));
-               upper_itr = index_by_account.upper_bound(std::make_tuple(account->id, ostart_price->min()));
-           } else {
-               // start order id been deleted, yet not provided price either
-               FC_THROW("Order id invalid (maybe just been canceled?), and start price not provided");
-           }
-       } else {
-           const limit_order_object &loo = *p_loo;
+   if ( !ostart_id.valid() && !ostart_price.valid() )
+   {
+      lower_itr = index_by_account.lower_bound(std::make_tuple(account->id, price::max(base_id, quote_id)));
+      upper_itr = index_by_account.upper_bound(std::make_tuple(account->id, price::min(base_id, quote_id)));
+   }
+   else if ( ostart_id.valid() )
+   {
+      // in case of the order been deleted during page querying
+      const limit_order_object *p_loo = _db.find(*ostart_id);
+      if ( !p_loo )
+      {
+         if ( ostart_price.valid() )
+         {
+            lower_itr = index_by_account.lower_bound(std::make_tuple(account->id, *ostart_price, *ostart_id));
+            upper_itr = index_by_account.upper_bound(std::make_tuple(account->id, ostart_price->min()));
+         }
+         else
+         {
+            // start order id been deleted, yet not provided price either
+            FC_THROW("Order id invalid (maybe just been canceled?), and start price not provided");
+         }
+      }
+      else
+      {
+         const limit_order_object &loo = *p_loo;
 
-           // in case of the order not belongs to specified account or market
-           FC_ASSERT(loo.sell_price.base.asset_id == base_id, "Order base asset inconsistent");
-           FC_ASSERT(loo.sell_price.quote.asset_id == quote_id, "Order quote asset inconsistent with order");
-           FC_ASSERT(loo.seller == account->get_id(), "Order not owned by specified account");
+         // in case of the order not belongs to specified account or market
+         FC_ASSERT(loo.sell_price.base.asset_id == base_id, "Order base asset inconsistent");
+         FC_ASSERT(loo.sell_price.quote.asset_id == quote_id, "Order quote asset inconsistent with order");
+         FC_ASSERT(loo.seller == account->get_id(), "Order not owned by specified account");
 
-           lower_itr = index_by_account.lower_bound(std::make_tuple(account->id, loo.sell_price, *ostart_id));
-           upper_itr = index_by_account.upper_bound(std::make_tuple(account->id, loo.sell_price.min()));
-       }
-  } else { // if reach here start_price must be valid
+         lower_itr = index_by_account.lower_bound(std::make_tuple(account->id, loo.sell_price, *ostart_id));
+         upper_itr = index_by_account.upper_bound(std::make_tuple(account->id, loo.sell_price.min()));
+      }
+   }
+   else
+   { 
+      // if reach here start_price must be valid
       lower_itr = index_by_account.lower_bound(std::make_tuple(account->id, *ostart_price));
       upper_itr = index_by_account.upper_bound(std::make_tuple(account->id, ostart_price->min()));
-  }
+   }
 
    // Add the account's orders
-   for ( ; lower_itr != upper_itr && count < limit; ++lower_itr, ++count) {
+   for ( ; lower_itr != upper_itr && count < limit; ++lower_itr, ++count)
+   {
       const limit_order_object &order = *lower_itr;
       results.emplace_back(order);
    }
