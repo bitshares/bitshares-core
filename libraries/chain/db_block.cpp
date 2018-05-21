@@ -181,7 +181,7 @@ bool database::_push_block(const signed_block& new_block)
                    {
                       auto session = _undo_db.start_undo_session();
                       apply_block( (*ritr)->data, skip );
-                      _block_id_to_block.store( new_block.id(), (*ritr)->data );
+                      _block_id_to_block.store( (*ritr)->id, (*ritr)->data );
                       session.commit();
                    }
                    throw *except;
