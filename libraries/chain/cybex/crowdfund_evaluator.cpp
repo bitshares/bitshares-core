@@ -40,6 +40,8 @@ void_result initiate_crowdfund_evaluator::do_evaluate( const initiate_crowdfund_
    FC_ASSERT( o.owner == a.issuer,"only asset issuer can initiate crownfund" );
    FC_ASSERT( !a.is_market_issued(), "Cannot manually issue a market-issued asset." );
 
+   auto const & asset_dyn_data = a.dynamic_asset_data_id(d);
+   FC_ASSERT( (0==asset_dyn_data.current_supply),"asset is already issued" );
 
    auto &crowdfund_idx = d.get_index_type<crowdfund_index>().indices().get<by_owner>();
    auto itr = crowdfund_idx.find(boost::make_tuple(o.owner, o.asset_id));
@@ -140,10 +142,26 @@ object_id_type  participate_crowdfund_evaluator::do_apply(const participate_crow
 
 void_result withdraw_crowdfund_evaluator::do_evaluate(const withdraw_crowdfund_operation& o)
 { try {
-   const crowdfund_contract_object &c = db().get(o.crowdfund_contract);
 
-   FC_ASSERT( c.owner == o.buyer  );
-   FC_ASSERT( c.state == CROWDFUND_STATE_ACTIVE );
+
+   contract  = &db().get(o.crowdfund_contract);
+   FC_ASSERT(contract!=NULL,"crowdfund contract ${id}not exists.",("id",o.crowdfund_contract));
+   FC_ASSERT( contract->owner == o.buyer,"only owner can withdraw."  );
+   FC_ASSERT( contract->state == CROWDFUND_STATE_ACTIVE );
+   crowdfund = &db().get(contract->crowdfund);
+   FC_ASSERT(crowdfund!=NULL,"crowdfund ${id} not exists.",("id",contract->crowdfund));
+   owner = &db().get(contract->owner);
+   FC_ASSERT(owner!=NULL,"contract owner ${id} not exists.",("id",contract->owner));
+ 
+   fc::time_point_sec now = db().head_block_time();
+   FC_ASSERT( now>crowdfund->begin);
+
+   uint64_t s = (now-crowdfund->begin).to_seconds();
+   uint64_t t = crowdfund->t;
+   uint64_t u = crowdfund->u;
+   FC_ASSERT( s<crowdfund->t, "time is over.");
+   FC_ASSERT( s<crowdfund->u, "internal error.");
+   FC_ASSERT( contract->state !=CROWDFUND_STATE_PERM,"can not be withdrawn again.");
 
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }
@@ -152,43 +170,31 @@ void_result withdraw_crowdfund_evaluator::do_apply(const withdraw_crowdfund_oper
 { try {
    database& d = db();
 
-   const crowdfund_contract_object &contract  =  d.get(o.crowdfund_contract);
-   const crowdfund_object  & crowdfund = d.get(contract.crowdfund);
-   const account_object &owner = db().get(contract.owner);
-   fc::time_point_sec now = db().head_block_time();
-   FC_ASSERT( now>crowdfund.begin);
-
-   uint64_t s = (now-crowdfund.begin).to_seconds();
-   uint64_t t = crowdfund.t;
-   uint64_t u = crowdfund.u;
-   FC_ASSERT( s<crowdfund.t, "time is over.");
-   FC_ASSERT( s<crowdfund.u, "internal error.");
-   FC_ASSERT( contract.state !=CROWDFUND_STATE_PERM,"can not be withdrawn again.");
 
     
    asset cyb_amount,b_A_amount;
 
    //refunds v(A)·(t−s)/t native tokens back to A
-   share_type refund_amount =  contract.valuation.value*(t-s)/t;
+   share_type refund_amount =  contract->valuation.value*(t-s)/t;
    cyb_amount.asset_id = asset_id_type(0);
    cyb_amount.amount = refund_amount;
 
    //b(A)=v(A)·s/t·p(s + (u−s)/3), 
-   share_type b_A = contract.valuation.value*s/t*(2*crowdfund.p(s)-1)/3;  
-   b_A_amount.asset_id= crowdfund.asset_id;
+   share_type b_A = contract->valuation.value*s/t*(2*crowdfund->p(s)-1)/3;  
+   b_A_amount.asset_id= crowdfund->asset_id;
    b_A_amount.amount.value= b_A.value;
 
    // delta of total asset issued.
    // share_type delta = b_A.value - d.get_balance( creator, crowdfund.asset_id ).amount;  
 
     
-   db().adjust_balance( owner.get_id(), cyb_amount );
-   db().set_balance( owner.get_id(), b_A_amount );
+   db().adjust_balance( owner->get_id(), cyb_amount );
+   db().set_balance( owner->get_id(), b_A_amount );
    
-   db().modify(contract, [&](crowdfund_contract_object& c) {
+   db().modify(*contract, [&](crowdfund_contract_object& c) {
          c.state = CROWDFUND_STATE_PERM;
-      } );
-   db().modify( crowdfund,[&](crowdfund_object &c) {
+   });
+   db().modify( *crowdfund,[&](crowdfund_object &c) {
          c.V -=  refund_amount.value;
    });
    

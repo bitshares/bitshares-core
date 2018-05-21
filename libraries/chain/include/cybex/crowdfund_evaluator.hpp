@@ -53,6 +53,11 @@ namespace graphene { namespace chain {
 
          void_result do_evaluate( const withdraw_crowdfund_operation& o );
          void_result do_apply( const withdraw_crowdfund_operation& o );
+
+         const crowdfund_contract_object *contract;
+         const crowdfund_object  * crowdfund;
+         const account_object *owner;
+         uint64_t u,t,s;
    };
 
 } } // graphene::chain

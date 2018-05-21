@@ -105,6 +105,7 @@ add_library( graphene_chain
              cybex/extension_check.cpp
              cybex/crowdfund_ops.cpp
              cybex/crowdfund_evaluator.cpp
+             cybex/process_crowdfund.cpp
              cybex/common.cpp
 
              ${HEADERS}
