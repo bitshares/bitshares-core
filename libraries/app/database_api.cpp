@@ -646,13 +646,13 @@ vector<limit_order_object> database_api_impl::get_account_limit_orders( const st
       account = _db.find(fc::variant(name_or_id, 1).as<account_id_type>(1));
    else
    {
-       const auto& idx = _db.get_index_type<account_index>().indices().get<by_name>();
-       auto itr = idx.find(name_or_id);
-       if (itr != idx.end())
-           account = &*itr;
+      const auto& idx = _db.get_index_type<account_index>().indices().get<by_name>();
+      auto itr = idx.find(name_or_id);
+      if (itr != idx.end())
+         account = &*itr;
    }
    if (account == nullptr)
-       return results;
+      return results;
 
    auto assets = lookup_asset_symbols( {base, quote} );
    FC_ASSERT( assets[0], "Invalid base asset symbol: ${s}", ("s",base) );
@@ -662,8 +662,8 @@ vector<limit_order_object> database_api_impl::get_account_limit_orders( const st
    auto quote_id = assets[1]->id;
 
    if (ostart_price.valid()) {
-       FC_ASSERT(ostart_price->base.asset_id == base_id, "Base asset inconsistent with start price");
-       FC_ASSERT(ostart_price->quote.asset_id == quote_id, "Quote asset inconsistent with start price");
+      FC_ASSERT(ostart_price->base.asset_id == base_id, "Base asset inconsistent with start price");
+      FC_ASSERT(ostart_price->quote.asset_id == quote_id, "Quote asset inconsistent with start price");
    }
 
    const auto& index_by_account = _db.get_index_type<limit_order_index>().indices().get<by_account>();
@@ -680,12 +680,13 @@ vector<limit_order_object> database_api_impl::get_account_limit_orders( const st
    {
       // in case of the order been deleted during page querying
       const limit_order_object *p_loo = _db.find(*ostart_id);
+      upper_itr = index_by_account.upper_bound(std::make_tuple(account->id, price::min(base_id, quote_id)));
+
       if ( !p_loo )
       {
          if ( ostart_price.valid() )
          {
             lower_itr = index_by_account.lower_bound(std::make_tuple(account->id, *ostart_price, *ostart_id));
-            upper_itr = index_by_account.upper_bound(std::make_tuple(account->id, ostart_price->min()));
          }
          else
          {
@@ -703,7 +704,6 @@ vector<limit_order_object> database_api_impl::get_account_limit_orders( const st
          FC_ASSERT(loo.seller == account->get_id(), "Order not owned by specified account");
 
          lower_itr = index_by_account.lower_bound(std::make_tuple(account->id, loo.sell_price, *ostart_id));
-         upper_itr = index_by_account.upper_bound(std::make_tuple(account->id, loo.sell_price.min()));
       }
    }
    else
