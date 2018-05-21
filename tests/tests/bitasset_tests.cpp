@@ -561,7 +561,7 @@ struct assets_922_931
    const asset_object* bit_child_user_issued;
    const asset_object* bit_parent;
    const asset_object* user_issued;
-   const asset_object* sixbit;
+   const asset_object* six_precision;
    const asset_object* prediction;
 };
 
@@ -571,8 +571,8 @@ assets_922_931 create_assets_922_931(database_fixture* fixture)
    BOOST_TEST_MESSAGE( "Create USDBIT" );
    asset_objs.bit_usd = &fixture->create_bitasset( "USDBIT", GRAPHENE_COMMITTEE_ACCOUNT );
 
-   BOOST_TEST_MESSAGE( "Create USDBACKEDBIT" );
-   asset_objs.bit_usdbacked = &fixture->create_bitasset( "USDBACKEDBIT", GRAPHENE_COMMITTEE_ACCOUNT,
+   BOOST_TEST_MESSAGE( "Create USDBACKED" );
+   asset_objs.bit_usdbacked = &fixture->create_bitasset( "USDBACKED", GRAPHENE_COMMITTEE_ACCOUNT,
          100, charge_market_fee, 2, asset_objs.bit_usd->get_id() );
 
    BOOST_TEST_MESSAGE( "Create USDBACKEDII" );
@@ -589,12 +589,13 @@ assets_922_931 create_assets_922_931(database_fixture* fixture)
    BOOST_TEST_MESSAGE( "Create user issued USERISSUED" );
    asset_objs.user_issued = &fixture->create_user_issued_asset( "USERISSUED", GRAPHENE_WITNESS_ACCOUNT(fixture->db), charge_market_fee );
 
-   BOOST_TEST_MESSAGE( "Create a bitasset with a precision of 6" );
-   asset_objs.sixbit = &fixture->create_bitasset( "SIXBIT", GRAPHENE_WITNESS_ACCOUNT, 100, charge_market_fee, 6 );
+   BOOST_TEST_MESSAGE( "Create a user-issued asset with a precision of 6" );
+   asset_objs.six_precision = &fixture->create_user_issued_asset( "SIXPRECISION", GRAPHENE_WITNESS_ACCOUNT(fixture->db),
+         charge_market_fee, price(asset(1, asset_id_type(1)), asset(1)), 6 );
 
-   BOOST_TEST_MESSAGE( "Create Prediction market with precision of 6, backed by SIXBIT" );
+   BOOST_TEST_MESSAGE( "Create Prediction market with precision of 6, backed by SIXPRECISION" );
    asset_objs.prediction = &fixture->create_prediction_market( "PREDICTION", GRAPHENE_WITNESS_ACCOUNT,
-         100, charge_market_fee, 6, asset_objs.sixbit->get_id() );
+         100, charge_market_fee, 6, asset_objs.six_precision->get_id() );
 
    return asset_objs;
 }
@@ -665,7 +666,7 @@ BOOST_AUTO_TEST_CASE( bitasset_evaluator_test_before_922_931 )
 
    // checking old backing asset instead of new backing asset
    BOOST_TEST_MESSAGE( "Was checking old backing asset instead of new backing asset" );
-   op.new_options.short_backing_asset = asset_objs.sixbit->get_id();
+   op.new_options.short_backing_asset = asset_objs.six_precision->get_id();
    BOOST_CHECK( evaluator.evaluate(op) == void_result() );
    op.new_options.short_backing_asset = asset_objs.prediction->get_id();
    BOOST_CHECK( evaluator.evaluate(op) == void_result() );
@@ -688,8 +689,8 @@ BOOST_AUTO_TEST_CASE( bitasset_evaluator_test_before_922_931 )
    // CHILDCOMMITTEE is a committee asset backed by PARENT which is backed by CORE
    // Cannot change PARENT's backing asset from CORE to something else because that will make CHILD be backed by
    // an asset that is not itself backed by CORE
-   create_user_issued_asset( "CHILDCOMMITTEE", GRAPHENE_COMMITTEE_ACCOUNT(db), charge_market_fee,
-         price(asset(1, asset_id_type(1)), asset(1)), asset_objs.bit_parent->get_id() );
+   create_bitasset( "CHILDCOMMITTEE", GRAPHENE_COMMITTEE_ACCOUNT, 100, charge_market_fee, 2,
+         asset_objs.bit_parent->get_id() );
    // it should again work, generating 2 warnings in the log. 1 for the above, and 1 new one.
    BOOST_CHECK( evaluator.evaluate(op) == void_result() );
    op.asset_to_update = asset_objs.bit_usd->get_id();
@@ -786,8 +787,8 @@ BOOST_AUTO_TEST_CASE( bitasset_evaluator_test_after_922_931 )
 
    // checking old backing asset instead of new backing asset
    BOOST_TEST_MESSAGE( "Correctly checking new backing asset rather than old backing asset" );
-   op.new_options.short_backing_asset = asset_objs.bit_usdbacked->get_id();
-   REQUIRE_EXCEPTION_WITH_TEXT( evaluator.evaluate(op), "May not modify a blockchain-controlled market asset to" );
+   op.new_options.short_backing_asset = asset_objs.six_precision->get_id();
+   REQUIRE_EXCEPTION_WITH_TEXT( evaluator.evaluate(op), "which is not market issued asset nor CORE." );
    op.new_options.short_backing_asset = asset_objs.prediction->get_id();
    REQUIRE_EXCEPTION_WITH_TEXT( evaluator.evaluate(op), "which is not backed by CORE" );
    op.new_options.short_backing_asset = correct_asset_id;
@@ -799,7 +800,7 @@ BOOST_AUTO_TEST_CASE( bitasset_evaluator_test_after_922_931 )
    op.asset_to_update = asset_objs.bit_parent->get_id();
    op.issuer = asset_objs.bit_parent->issuer;
    op.new_options.short_backing_asset = asset_objs.bit_usdbacked->get_id();
-   REQUIRE_EXCEPTION_WITH_TEXT( evaluator.evaluate(op), "A user-issued BitAsset" );
+   REQUIRE_EXCEPTION_WITH_TEXT( evaluator.evaluate(op), "A non-blockchain controlled BitAsset would be invalidated" );
    // changing the backing asset to a UIA should work
    BOOST_TEST_MESSAGE( "Switching to a backing asset that is a UIA should work." );
    op.new_options.short_backing_asset = asset_objs.user_issued->get_id();
@@ -808,10 +809,10 @@ BOOST_AUTO_TEST_CASE( bitasset_evaluator_test_after_922_931 )
    // CHILDCOMMITTEE is a committee asset backed by PARENT which is backed by CORE
    // Cannot change PARENT's backing asset from CORE to something else because that will make CHILD be backed by
    // an asset that is not itself backed by CORE
-   create_user_issued_asset( "CHILDCOMMITTEE", GRAPHENE_COMMITTEE_ACCOUNT(db), charge_market_fee,
-         price(asset(1, asset_id_type(1)), asset(1)), asset_objs.bit_parent->get_id() );
+   create_bitasset( "CHILDCOMMITTEE", GRAPHENE_COMMITTEE_ACCOUNT, 100, charge_market_fee, 2,
+         asset_objs.bit_parent->get_id() );
    // it should again not work
-   REQUIRE_EXCEPTION_WITH_TEXT( evaluator.evaluate(op), "A committee-issued BitAsset" );
+   REQUIRE_EXCEPTION_WITH_TEXT( evaluator.evaluate(op), "A blockchain-controlled market asset would be invalidated" );
    op.asset_to_update = asset_objs.bit_usd->get_id();
    op.issuer = asset_objs.bit_usd->issuer;
    op.new_options.short_backing_asset = correct_asset_id;

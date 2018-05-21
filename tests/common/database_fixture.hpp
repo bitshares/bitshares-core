@@ -277,7 +277,7 @@ struct database_fixture {
                                                  const account_object& issuer,
                                                  uint16_t flags,
                                                  const price& core_exchange_rate = price(asset(1, asset_id_type(1)), asset(1)),
-                                                 asset_id_type backing_asset = {});
+                                                 uint16_t precision = 2 /* traditional precision for tests */);
    void issue_uia( const account_object& recipient, asset amount );
    void issue_uia( account_id_type recipient_id, asset amount );
 

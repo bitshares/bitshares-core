@@ -423,17 +423,17 @@ void_result asset_update_bitasset_evaluator::do_evaluate(const asset_update_bita
                // loop through all assets that have this asset as a backing asset
                const auto& idx = db().get_index_type<asset_index>().indices().get<by_type>();
 
-               for( auto child : idx )
+               for( auto itr = idx.lower_bound(true); itr != idx.end(); ++itr )
                {
+                  auto child = *itr;
                   if ( child.is_market_issued()
                         && child.bitasset_data(d).options.short_backing_asset == asset_obj.get_id() )
                   {
                      FC_ASSERT( child.issuer != GRAPHENE_COMMITTEE_ACCOUNT,
-                           "A committee-issued BitAsset would be invalidated by changing this backing asset." );
+                           "A blockchain-controlled market asset would be invalidated by changing this backing asset." );
 
-                     FC_ASSERT( child.issuer != GRAPHENE_COMMITTEE_ACCOUNT &&
-                           new_backing_asset.issuer != GRAPHENE_COMMITTEE_ACCOUNT,
-                           "A user-issued BitAsset would be invalidated by changing this backing asset.");
+                     FC_ASSERT( !new_backing_asset.is_market_issued(),
+                           "A non-blockchain controlled BitAsset would be invalidated by changing this backing asset.");
                   }
                }
             }
@@ -497,8 +497,9 @@ void_result asset_update_bitasset_evaluator::do_evaluate(const asset_update_bita
                // loop through all assets that have this asset as a backing asset
                const auto& idx = db().get_index_type<asset_index>().indices().get<by_type>();
 
-               for( auto child : idx )
+               for( auto itr = idx.lower_bound(true); itr != idx.end(); ++itr)
                {
+                  auto child = *itr;
                   if ( child.is_market_issued()
                         && child.bitasset_data(d).options.short_backing_asset == asset_obj.get_id() )
                   {
