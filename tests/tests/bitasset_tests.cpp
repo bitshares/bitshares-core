@@ -685,6 +685,11 @@ BOOST_AUTO_TEST_CASE( bitasset_evaluator_test_before_922_931 )
    BOOST_TEST_MESSAGE( "Switching to a backing asset that is a UIA should work. No error in the log." );
    op.new_options.short_backing_asset = asset_objs.user_issued->get_id();
    BOOST_CHECK( evaluator.evaluate(op) == void_result() );
+   // A -> B -> C, change B to be backed by A (circular backing)
+   BOOST_TEST_MESSAGE( "Check for circular backing. This should generate a warning" );
+   op.new_options.short_backing_asset = asset_objs.bit_child_user_issued->get_id();
+   BOOST_CHECK( evaluator.evaluate(op) == void_result() );
+   op.new_options.short_backing_asset = asset_objs.user_issued->get_id();
    BOOST_TEST_MESSAGE( "Pre hardfork: Adding a committee-issued asset. This should generate another message in the log" );
    // CHILDCOMMITTEE is a committee asset backed by PARENT which is backed by CORE
    // Cannot change PARENT's backing asset from CORE to something else because that will make CHILD be backed by
@@ -696,6 +701,7 @@ BOOST_AUTO_TEST_CASE( bitasset_evaluator_test_before_922_931 )
    op.asset_to_update = asset_objs.bit_usd->get_id();
    op.issuer = asset_objs.bit_usd->issuer;
    op.new_options.short_backing_asset = correct_asset_id;
+
 
    // Feed lifetime must exceed block interval
    BOOST_TEST_MESSAGE( "Feed lifetime less than or equal to block interval" );
@@ -805,6 +811,11 @@ BOOST_AUTO_TEST_CASE( bitasset_evaluator_test_after_922_931 )
    BOOST_TEST_MESSAGE( "Switching to a backing asset that is a UIA should work." );
    op.new_options.short_backing_asset = asset_objs.user_issued->get_id();
    BOOST_CHECK( evaluator.evaluate(op) == void_result() );
+   // A -> B -> C, change B to be backed by A (circular backing)
+   BOOST_TEST_MESSAGE( "Check for circular backing. This should generate an exception" );
+   op.new_options.short_backing_asset = asset_objs.bit_child_user_issued->get_id();
+   REQUIRE_EXCEPTION_WITH_TEXT( evaluator.evaluate(op), "'A' backed by 'B' backed by 'A'" );
+   op.new_options.short_backing_asset = asset_objs.user_issued->get_id();
    BOOST_TEST_MESSAGE( "Creating CHILDCOMMITTEE" );
    // CHILDCOMMITTEE is a committee asset backed by PARENT which is backed by CORE
    // Cannot change PARENT's backing asset from CORE to something else because that will make CHILD be backed by

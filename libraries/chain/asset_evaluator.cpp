@@ -360,6 +360,63 @@ void_result asset_update_issuer_evaluator::do_apply(const asset_update_issuer_op
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }
 
+/****************
+ * Loop through assets, looking for ones that are backed by the asset being changed. When found,
+ * perform checks to verify validity
+ *
+ * @param d the database
+ * @param op the bitasset update operation being performed
+ * @param true if after hf 922/931 (if nothing triggers, this and the logic that depends on it
+ *    should be removed).
+ */
+void check_children_of_bitasset(database& d, const asset_update_bitasset_operation& op, bool after_hf_922_931)
+{
+   // loop through all assets that have this asset as a backing asset
+   const auto& idx = d.get_index_type<asset_index>().indices().get<by_type>();
+
+   const asset_object& new_backing_asset = op.new_options.short_backing_asset(d);
+
+   for( auto itr = idx.lower_bound(true); itr != idx.end(); ++itr )
+   {
+      const auto& child = *itr;
+      if ( child.bitasset_data(d).options.short_backing_asset == op.asset_to_update )
+      {
+         if ( after_hf_922_931 )
+         {
+            FC_ASSERT( child.get_id() != op.new_options.short_backing_asset,
+                  "A BitAsset would be invalidated by changing this backing asset ('A' backed by 'B' backed by 'A')." );
+
+            FC_ASSERT( child.issuer != GRAPHENE_COMMITTEE_ACCOUNT,
+                  "A blockchain-controlled market asset would be invalidated by changing this backing asset." );
+
+            FC_ASSERT( !new_backing_asset.is_market_issued(),
+                  "A non-blockchain controlled BitAsset would be invalidated by changing this backing asset.");
+         }
+         else
+         {
+            if( child.get_id() == op.new_options.short_backing_asset )
+               wlog( "Before hf-922-931, modified an asset to be backed by another, but would cause a continuous "
+                     "loop. A cannot be backed by B which is backed by A." );
+
+            if( child.issuer == GRAPHENE_COMMITTEE_ACCOUNT )
+            {
+               wlog( "before hf-922-931, modified an asset to be backed by a non-CORE, but this asset "
+                        "is a backing asset for a committee-issued asset. This occurred at block ${b}",
+                        ("b", d.head_block_num()));
+            }
+            else
+            {
+               if ( new_backing_asset.issuer == GRAPHENE_COMMITTEE_ACCOUNT )
+                  wlog( "before hf-922-931, modified an asset to be backed by a non-CORE, but this asset "
+                        "is a backing asset for a user-issued asset, and the new non-CORE asset is not "
+                        "user-issued. This occurred at block ${b}",
+                        ("b", d.head_block_num()));
+            } // if child.issuer
+         } // if hf 922/931
+      } // if this child is backed by the asset being adjusted
+   } // for each asset
+} // check_children_of_bitasset
+
 void_result asset_update_bitasset_evaluator::do_evaluate(const asset_update_bitasset_operation& op)
 { try {
    database& d = db();
@@ -420,22 +477,7 @@ void_result asset_update_bitasset_evaluator::do_evaluate(const asset_update_bita
             // asset must be either CORE or a UIA.
             if ( new_backing_asset.get_id() != asset_id_type() ) // not backed by CORE
             {
-               // loop through all assets that have this asset as a backing asset
-               const auto& idx = db().get_index_type<asset_index>().indices().get<by_type>();
-
-               for( auto itr = idx.lower_bound(true); itr != idx.end(); ++itr )
-               {
-                  auto child = *itr;
-                  if ( child.is_market_issued()
-                        && child.bitasset_data(d).options.short_backing_asset == asset_obj.get_id() )
-                  {
-                     FC_ASSERT( child.issuer != GRAPHENE_COMMITTEE_ACCOUNT,
-                           "A blockchain-controlled market asset would be invalidated by changing this backing asset." );
-
-                     FC_ASSERT( !new_backing_asset.is_market_issued(),
-                           "A non-blockchain controlled BitAsset would be invalidated by changing this backing asset.");
-                  }
-               }
+               check_children_of_bitasset( d, op, after_hf_core_922_931 );
             }
 
          }
@@ -494,34 +536,9 @@ void_result asset_update_bitasset_evaluator::do_evaluate(const asset_update_bita
             // asset must be either CORE or a UIA.
             if ( new_backing_asset.get_id() != asset_id_type() ) // not backed by CORE
             {
-               // loop through all assets that have this asset as a backing asset
-               const auto& idx = db().get_index_type<asset_index>().indices().get<by_type>();
-
-               for( auto itr = idx.lower_bound(true); itr != idx.end(); ++itr)
-               {
-                  auto child = *itr;
-                  if ( child.is_market_issued()
-                        && child.bitasset_data(d).options.short_backing_asset == asset_obj.get_id() )
-                  {
-                     if( child.issuer == GRAPHENE_COMMITTEE_ACCOUNT )
-                     {
-                        wlog( "before hf-922-931, modified an asset to be backed by a non-CORE, but this asset is a backing asset for "
-                                 "a committee-issued asset. This occurred at block ${b}",
-                                 ("b", d.head_block_num()));
-                     }
-                     else
-                     {
-                        if ( new_backing_asset.issuer == GRAPHENE_COMMITTEE_ACCOUNT )
-                           wlog( "before hf-922-931, modified an asset to be backed by a non-CORE, but this asset is a backing asset for "
-                                 "a user-issued asset, and the new non-CORE asset is not user-issued. This occurred at block ${b}",
-                                 ("b", d.head_block_num()));
-                     }
-                  }
-               }
+               check_children_of_bitasset( d, op, after_hf_core_922_931 );
             }
-
          }
-
       }
    }
 
