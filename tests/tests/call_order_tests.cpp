@@ -22,6 +22,7 @@
  * THE SOFTWARE.
  */
 
+#include <random>
 #include <boost/test/unit_test.hpp>
 #include <boost/multiprecision/cpp_int.hpp>
 
