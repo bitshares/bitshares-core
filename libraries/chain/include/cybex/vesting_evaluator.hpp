@@ -36,6 +36,7 @@ namespace graphene { namespace chain {
 
          void_result do_evaluate( const cancel_vesting_operation& o );
          void_result do_apply( const cancel_vesting_operation& o );
+         const balance_object * obj ;
    };
 
 } } // graphene::chain
