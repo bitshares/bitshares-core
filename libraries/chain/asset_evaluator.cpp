@@ -373,6 +373,10 @@ void_result asset_update_issuer_evaluator::do_apply(const asset_update_issuer_op
 void check_children_of_bitasset(database& d, const asset_update_bitasset_operation& op,
       const asset_object& new_backing_asset, bool after_hf_922_931)
 {
+   // no need to do these checks if the new backing asset is CORE
+   if ( new_backing_asset.get_id() == asset_id_type() )
+      return;
+
    // loop through all assets that have this asset as a backing asset
    const auto& idx = d.get_index_type<asset_index>().indices().get<by_type>();
 
@@ -392,16 +396,6 @@ void check_children_of_bitasset(database& d, const asset_update_bitasset_operati
             FC_ASSERT( !new_backing_asset.is_market_issued(),
                   "A non-blockchain controlled BitAsset would be invalidated by changing this backing asset.");
 
-            // Check if the new backing asset is itself backed by something. It must be CORE or a UIA
-            if ( new_backing_asset.is_market_issued() )
-            {
-               const asset_object& backing_backing_asset = new_backing_asset.bitasset_data(d).asset_id(d);
-               if ( backing_backing_asset.get_id() != asset_id_type() )
-               {
-                  FC_ASSERT( !backing_backing_asset.is_market_issued(), "A BitAsset cannot be backed by a BitAsset that itself "
-                        "is backed by a BitAsset.");
-               }
-            }
          }
          else
          {
@@ -429,23 +423,6 @@ void check_children_of_bitasset(database& d, const asset_update_bitasset_operati
                   return;
                }
             } // if child.issuer
-
-            // if the new backing asset is backed by something which is not CORE and not a UIA, this is not allowed
-            // Check if the new backing asset is itself backed by something. It must be CORE or a UIA
-            if ( new_backing_asset.is_market_issued() )
-            {
-               const asset_object& backing_backing_asset = new_backing_asset.bitasset_data(d).asset_id(d);
-               if ( backing_backing_asset.get_id() != asset_id_type() )
-               {
-                  if ( backing_backing_asset.is_market_issued() )
-                  {
-                     wlog( "before hf-922-931, a BitAsset cannot be backed by a BitAsset that itself "
-                           "is backed by a BitAsset. This occurred at block ${b}",
-                           ("b", d.head_block_num() ) );
-                     return;
-                  }
-               } // not core
-            } // if market issued
          } // if hf 922/931
       } // if this child is backed by the asset being adjusted
    } // for each asset
@@ -517,6 +494,17 @@ void_result asset_update_bitasset_evaluator::do_evaluate(const asset_update_bita
             }
 
          }
+
+         // Check if the new backing asset is itself backed by something. It must be CORE or a UIA
+         if ( new_backing_asset.is_market_issued() )
+         {
+            const asset_object& backing_backing_asset = new_backing_asset.bitasset_data(d).asset_id(d);
+            if ( backing_backing_asset.get_id() != asset_id_type() )
+            {
+               FC_ASSERT( !backing_backing_asset.is_market_issued(), "A BitAsset cannot be backed by a BitAsset that itself "
+                     "is backed by a BitAsset.");
+            }
+         }
       }
       else // prior to HF 922 / 931
       {
@@ -581,6 +569,21 @@ void_result asset_update_bitasset_evaluator::do_evaluate(const asset_update_bita
                check_children_of_bitasset( d, op, new_backing_asset, after_hf_core_922_931 );
             }
          }
+         // if the new backing asset is backed by something which is not CORE and not a UIA, this is not allowed
+         // Check if the new backing asset is itself backed by something. It must be CORE or a UIA
+         if ( new_backing_asset.is_market_issued() )
+         {
+            const asset_object& backing_backing_asset = new_backing_asset.bitasset_data(d).asset_id(d);
+            if ( backing_backing_asset.get_id() != asset_id_type() )
+            {
+               if ( backing_backing_asset.is_market_issued() )
+               {
+                  wlog( "before hf-922-931, a BitAsset cannot be backed by a BitAsset that itself "
+                        "is backed by a BitAsset. This occurred at block ${b}",
+                        ("b", d.head_block_num() ) );
+               }
+            } // not core
+         } // if market issued
       }
    }
 
