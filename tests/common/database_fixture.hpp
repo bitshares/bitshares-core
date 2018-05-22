@@ -112,14 +112,20 @@ extern uint32_t GRAPHENE_TESTING_GENESIS_TIMESTAMP;
    {                                                              \
       op;                                                         \
       BOOST_FAIL(std::string("Expected an exception with \"") +   \
-         std::string(exc_text) + std::string("\""));              \
+         std::string(exc_text) +                                  \
+         std::string("\" but none thrown"));                      \
    }                                                              \
    catch (fc::exception& ex)                                      \
    {                                                              \
       std::string what = ex.to_string(                            \
             fc::log_level(fc::log_level::all));                   \
-      BOOST_CHECK_MESSAGE(what.find(exc_text)                     \
-            != std::string::npos, what);                          \
+      if (what.find(exc_text) == std::string::npos)               \
+      {                                                           \
+         BOOST_FAIL( std::string("Expected \"") +                 \
+            std::string(exc_text) +                               \
+            std::string("\" but got \"") +                        \
+            std::string(what) );                                  \
+      }                                                           \
    }                                                              \
 }                                                                 \
 

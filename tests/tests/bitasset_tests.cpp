@@ -558,7 +558,7 @@ struct assets_922_931
    const asset_object* bit_usd;
    const asset_object* bit_usdbacked;
    const asset_object* bit_usdbacked2;
-   const asset_object* bit_child_user_issued;
+   const asset_object* bit_child_bitasset;
    const asset_object* bit_parent;
    const asset_object* user_issued;
    const asset_object* six_precision;
@@ -583,11 +583,12 @@ assets_922_931 create_assets_922_931(database_fixture* fixture)
    asset_objs.bit_parent = &fixture->create_bitasset( "PARENT", GRAPHENE_WITNESS_ACCOUNT);
 
    BOOST_TEST_MESSAGE( "Create CHILDUSER" );
-   asset_objs.bit_child_user_issued = &fixture->create_bitasset( "CHILDUSER", GRAPHENE_WITNESS_ACCOUNT,
+   asset_objs.bit_child_bitasset = &fixture->create_bitasset( "CHILDUSER", GRAPHENE_WITNESS_ACCOUNT,
          100, charge_market_fee, 2, asset_objs.bit_parent->get_id() );
 
    BOOST_TEST_MESSAGE( "Create user issued USERISSUED" );
-   asset_objs.user_issued = &fixture->create_user_issued_asset( "USERISSUED", GRAPHENE_WITNESS_ACCOUNT(fixture->db), charge_market_fee );
+   asset_objs.user_issued = &fixture->create_user_issued_asset( "USERISSUED",
+         GRAPHENE_WITNESS_ACCOUNT(fixture->db), charge_market_fee );
 
    BOOST_TEST_MESSAGE( "Create a user-issued asset with a precision of 6" );
    asset_objs.six_precision = &fixture->create_user_issued_asset( "SIXPRECISION", GRAPHENE_WITNESS_ACCOUNT(fixture->db),
@@ -690,7 +691,7 @@ BOOST_AUTO_TEST_CASE( bitasset_evaluator_test_before_922_931 )
    BOOST_CHECK( evaluator.evaluate(op) == void_result() );
    // A -> B -> C, change B to be backed by A (circular backing)
    BOOST_TEST_MESSAGE( "Message should contain: A cannot be backed by B which is backed by A." );
-   op.new_options.short_backing_asset = asset_objs.bit_child_user_issued->get_id();
+   op.new_options.short_backing_asset = asset_objs.bit_child_bitasset->get_id();
    BOOST_CHECK( evaluator.evaluate(op) == void_result() );
    op.new_options.short_backing_asset = asset_objs.user_issued->get_id();
    BOOST_TEST_MESSAGE( "Message should contain: but this asset is a backing asset for a committee-issued asset." );
@@ -704,6 +705,21 @@ BOOST_AUTO_TEST_CASE( bitasset_evaluator_test_before_922_931 )
    op.asset_to_update = asset_objs.bit_usd->get_id();
    op.issuer = asset_objs.bit_usd->issuer;
    op.new_options.short_backing_asset = correct_asset_id;
+
+   // USDBACKED is backed by USDBIT (which is backed by CORE)
+   // USDBACKEDII is backed by USDBIT
+   // We should not be able to make USDBACKEDII be backed by USDBACKED
+   // because that would be a MPA backed by MPA backed by MPA.
+   BOOST_TEST_MESSAGE( "Message should contain: a BitAsset cannot be backed by a BitAsset that "
+         "itself is backed by a BitAsset." );
+   op.asset_to_update = asset_objs.bit_usdbacked2->get_id();
+   op.issuer = asset_objs.bit_usdbacked2->issuer;
+   op.new_options.short_backing_asset = asset_objs.bit_usdbacked->get_id();
+   BOOST_CHECK( evaluator.evaluate(op) == void_result() );
+   // set everything to a more normal state
+   op.asset_to_update = asset_objs.bit_usdbacked->get_id();
+   op.issuer = asset_objs.bit_usd->issuer;
+   op.new_options.short_backing_asset = asset_id_type();
 
    // Feed lifetime must exceed block interval
    BOOST_TEST_MESSAGE( "Message should contain: op.new_options.feed_lifetime_sec <= chain_parameters.block_interval" );
@@ -817,7 +833,7 @@ BOOST_AUTO_TEST_CASE( bitasset_evaluator_test_after_922_931 )
    BOOST_CHECK( evaluator.evaluate(op) == void_result() );
    // A -> B -> C, change B to be backed by A (circular backing)
    BOOST_TEST_MESSAGE( "Check for circular backing. This should generate an exception" );
-   op.new_options.short_backing_asset = asset_objs.bit_child_user_issued->get_id();
+   op.new_options.short_backing_asset = asset_objs.bit_child_bitasset->get_id();
    REQUIRE_EXCEPTION_WITH_TEXT( evaluator.evaluate(op), "'A' backed by 'B' backed by 'A'" );
    op.new_options.short_backing_asset = asset_objs.user_issued->get_id();
    BOOST_TEST_MESSAGE( "Creating CHILDCOMMITTEE" );
@@ -831,6 +847,21 @@ BOOST_AUTO_TEST_CASE( bitasset_evaluator_test_after_922_931 )
    op.asset_to_update = asset_objs.bit_usd->get_id();
    op.issuer = asset_objs.bit_usd->issuer;
    op.new_options.short_backing_asset = correct_asset_id;
+
+   // USDBACKED is backed by USDBIT (which is backed by CORE)
+   // USDBACKEDII is backed by USDBIT
+   // We should not be able to make USDBACKEDII be backed by USDBACKED
+   // because that would be a MPA backed by MPA backed by MPA.
+   BOOST_TEST_MESSAGE( "MPA -> MPA -> MPA not allowed" );
+   op.asset_to_update = asset_objs.bit_usdbacked2->get_id();
+   op.issuer = asset_objs.bit_usdbacked2->issuer;
+   op.new_options.short_backing_asset = asset_objs.bit_usdbacked->get_id();
+   REQUIRE_EXCEPTION_WITH_TEXT( evaluator.evaluate(op),
+         "A BitAsset cannot be backed by a BitAsset that itself is backed by a BitAsset" );
+   // set everything to a more normal state
+   op.asset_to_update = asset_objs.bit_usdbacked->get_id();
+   op.issuer = asset_objs.bit_usd->issuer;
+   op.new_options.short_backing_asset = asset_id_type();
 
    // Feed lifetime must exceed block interval
    BOOST_TEST_MESSAGE( "Feed lifetime less than or equal to block interval" );
