@@ -674,13 +674,11 @@ vector<limit_order_object> database_api_impl::get_account_limit_orders( const st
    if ( !ostart_id.valid() && !ostart_price.valid() )
    {
       lower_itr = index_by_account.lower_bound(std::make_tuple(account->id, price::max(base_id, quote_id)));
-      upper_itr = index_by_account.upper_bound(std::make_tuple(account->id, price::min(base_id, quote_id)));
    }
    else if ( ostart_id.valid() )
    {
       // in case of the order been deleted during page querying
       const limit_order_object *p_loo = _db.find(*ostart_id);
-      upper_itr = index_by_account.upper_bound(std::make_tuple(account->id, price::min(base_id, quote_id)));
 
       if ( !p_loo )
       {
@@ -710,8 +708,9 @@ vector<limit_order_object> database_api_impl::get_account_limit_orders( const st
    { 
       // if reach here start_price must be valid
       lower_itr = index_by_account.lower_bound(std::make_tuple(account->id, *ostart_price));
-      upper_itr = index_by_account.upper_bound(std::make_tuple(account->id, ostart_price->min()));
    }
+
+   upper_itr = index_by_account.upper_bound(std::make_tuple(account->id, price::min(base_id, quote_id)));
 
    // Add the account's orders
    for ( ; lower_itr != upper_itr && count < limit; ++lower_itr, ++count)
