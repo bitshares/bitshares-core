@@ -1,4 +1,5 @@
-// bitshares-core issue #942 Incorrectly checking authorized asset for withdraw_to_account in withdraw_permission_claim_evaluator
+// bitshares-core issue #942
+//   Incorrectly checking asset authorization for withdraw_from_account in withdraw_permission_claim_evaluator
 #ifndef HARDFORK_CORE_942_TIME
 #define HARDFORK_CORE_942_TIME (fc::time_point_sec( 1540000000 ))
 #endif
