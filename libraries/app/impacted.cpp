@@ -115,6 +115,7 @@ struct get_impacted_account_visitor
    void operator()( const asset_update_issuer_operation& op )
    {
       _impacted.insert( op.fee_payer() ); // issuer
+      _impacted.insert( op.new_issuer );
    }
    void operator()( const asset_update_bitasset_operation& op )
    {
