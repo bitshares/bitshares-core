@@ -766,38 +766,79 @@ void database::process_bids( const asset_bitasset_data_object& bad )
    _cancel_bids_and_revive_mpa( to_revive, bad );
 }
 
-void update_and_match_call_orders( database& db )
+/**
+ * @brief Update and match call orders
+ * @param db The database
+ * @param bitasset set to `nullptr` to update all call orders, otherwise only update call orders of this asset
+ */
+void update_and_match_call_orders( database& db, const asset_bitasset_data_object* bitasset = nullptr )
 {
+   if( !bitasset )
+      wlog( "Updating all call orders for hardfork core-343/935 at block ${n}", ("n",db.head_block_num()) );
+
    // Update call_price
-   wlog( "Updating all call orders for hardfork core-343 at block ${n}", ("n",db.head_block_num()) );
-   asset_id_type current_asset;
-   const asset_bitasset_data_object* abd = nullptr;
+   asset_id_type current_asset = bitasset ? bitasset->asset_id : asset_id_type();
+   const asset_bitasset_data_object* abd = bitasset;
+
    // by_collateral index won't change after call_price updated, so it's safe to iterate
-   for( const auto& call_obj : db.get_index_type<call_order_index>().indices().get<by_collateral>() )
+   const auto& call_idx = db.get_index_type<call_order_index>().indices().get<by_collateral>();
+   auto citr = abd ? call_idx.lower_bound( price::min( abd->options.short_backing_asset, current_asset ) )
+                   : call_idx.begin();
+   auto cend = abd ? call_idx.upper_bound( price::max( abd->options.short_backing_asset, current_asset ) )
+                   : call_idx.end();
+   while( citr != cend )
    {
-      if( current_asset != call_obj.debt_type() ) // debt type won't be asset_id_type(), abd will always get initialized
-      {
+      const call_order_object& call_obj = *citr;
+      ++citr;
+      if( !bitasset && current_asset != call_obj.debt_type() ) // only do this when updating all call orders
+      { // debt type won't be asset_id_type(), so abd will always get initialized
          current_asset = call_obj.debt_type();
          abd = &current_asset(db).bitasset_data(db);
       }
-      if( !abd || abd->is_prediction_market ) // nothing to do with PM's; check !abd just to be safe
-         continue;
+      // note: to be consistent with `call_order_update_evaluator::do_apply()`, process prediction markets as well
       db.modify( call_obj, [abd]( call_order_object& call ) {
          call.call_price  =  price::call_price( call.get_debt(), call.get_collateral(),
                                                 abd->current_feed.maintenance_collateral_ratio );
       });
    }
+
    // Match call orders
-   const auto& asset_idx = db.get_index_type<asset_index>().indices().get<by_type>();
-   auto itr = asset_idx.lower_bound( true /** market issued */ );
-   while( itr != asset_idx.end() )
+   if( bitasset )
+      db.check_call_orders( current_asset(db), true, false ); // allow black swan, and call orders are taker
+   else
    {
-      const asset_object& a = *itr;
-      ++itr;
-      // be here, next_maintenance_time should have been updated already
-      db.check_call_orders( a, true, false ); // allow black swan, and call orders are taker
+      const auto& asset_idx = db.get_index_type<asset_index>().indices().get<by_type>();
+      auto itr = asset_idx.lower_bound( true /** market issued */ );
+      while( itr != asset_idx.end() )
+      {
+         const asset_object& a = *itr;
+         ++itr;
+         // be here, next_maintenance_time should have been updated already
+         db.check_call_orders( a, true, false ); // allow black swan, and call orders are taker
+      }
+      wlog( "Done updating all call orders for hardfork core-343/935 at block ${n}", ("n",db.head_block_num()) );
    }
-   wlog( "Done updating all call orders for hardfork core-343 at block ${n}", ("n",db.head_block_num()) );
+}
+
+/**
+ * @brief Process pending_maintenance_collateral_ratio data for all MPA's
+ * @param db The database
+ */
+void process_pending_mcr( database& db )
+{
+   const auto& bitasset_idx = db.get_index_type<asset_bitasset_data_index>().indices().get<by_pending_mcr>();
+   auto ba_itr = bitasset_idx.upper_bound( optional<uint16_t>() ); // has something pending
+   while( ba_itr != bitasset_idx.end() )
+   {
+      const asset_bitasset_data_object& abd = *ba_itr;
+      ++ba_itr;
+      db.modify( abd, []( asset_bitasset_data_object& abdo )
+      {
+         abdo.current_feed.maintenance_collateral_ratio = *abdo.pending_maintenance_collateral_ratio;
+         abdo.pending_maintenance_collateral_ratio.reset();
+      });
+      update_and_match_call_orders( db, &abd );
+   }
 }
 
 void database::process_bitassets()
@@ -853,11 +894,12 @@ void database::process_bitassets()
  *
  * @param db the database
  * @param skip_check_call_orders true if check_call_orders() should not be called
+ * @param next_maintenance_time the next maintenance time
  */
 // TODO: for better performance, this function can be removed if it actually updated nothing at hf time.
 //       * Also need to update related test cases
 //       * NOTE: the removal can't be applied to testnet
-void process_hf_868_890( database& db, bool skip_check_call_orders )
+void process_hf_868_890( database& db, bool skip_check_call_orders, time_point_sec next_maintenance_time )
 {
    auto head_time = db.head_block_time();
    // for each market issued asset
@@ -916,8 +958,8 @@ void process_hf_868_890( database& db, bool skip_check_call_orders )
       }
 
       // always update the median feed due to https://github.com/bitshares/bitshares-core/issues/890
-      db.modify( bitasset_data, [&head_time]( asset_bitasset_data_object &obj ) {
-         obj.update_median_feeds( head_time );
+      db.modify( bitasset_data, [head_time,next_maintenance_time]( asset_bitasset_data_object &obj ) {
+         obj.update_median_feeds( head_time, next_maintenance_time );
       });
 
       bool median_changed = ( old_feed.settlement_price != bitasset_data.current_feed.settlement_price );
@@ -937,52 +979,6 @@ void process_hf_868_890( database& db, bool skip_check_call_orders )
          db.check_call_orders( current_asset );
       }
    } // for each market issued asset
-}
-
-/******
- * @brief one-time data process for hard fork core-935
- *
- * Prior to hardfork 935, `check_call_orders` may be unintendedly skipped when
- * median price feed has changed. This method will run at the hardfork time, and
- * call `check_call_orders` for all markets.
- * https://github.com/bitshares/bitshares-core/issues/935
- *
- * @param db the database
- */
-// TODO: for better performance, this function can be removed if it actually updated nothing at hf time.
-//       * Also need to update related test cases
-//       * NOTE: perhaps the removal can't be applied to testnet
-void process_hf_935( database& db )
-{
-   bool changed_something = false;
-   const asset_bitasset_data_object* bitasset = nullptr;
-   bool settled_before_check_call;
-   bool settled_after_check_call;
-   // for each market issued asset
-   const auto& asset_idx = db.get_index_type<asset_index>().indices().get<by_type>();
-   for( auto asset_itr = asset_idx.lower_bound(true); asset_itr != asset_idx.end(); ++asset_itr )
-   {
-      const auto& current_asset = *asset_itr;
-
-      if( !changed_something )
-      {
-         bitasset = &current_asset.bitasset_data( db );
-         settled_before_check_call = bitasset->has_settlement(); // whether already force settled
-      }
-
-      bool called_some = db.check_call_orders( current_asset );
-
-      if( !changed_something )
-      {
-         settled_after_check_call = bitasset->has_settlement(); // whether already force settled
-
-         if( settled_before_check_call != settled_after_check_call || called_some )
-         {
-            changed_something = true;
-            wlog( "process_hf_935 changed something" );
-         }
-      }
-   }
 }
 
 void database::perform_chain_maintenance(const signed_block& next_block, const global_property_object& global_props)
@@ -1138,17 +1134,17 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
 
    // To reset call_price of all call orders, then match by new rule
    bool to_update_and_match_call_orders = false;
-   if( (dgpo.next_maintenance_time <= HARDFORK_CORE_343_TIME) && (next_maintenance_time > HARDFORK_CORE_343_TIME) )
+   if( ( dgpo.next_maintenance_time <= HARDFORK_CORE_343_TIME && next_maintenance_time > HARDFORK_CORE_343_TIME )
+         || ( dgpo.next_maintenance_time <= HARDFORK_CORE_935_TIME && next_maintenance_time > HARDFORK_CORE_935_TIME ) )
       to_update_and_match_call_orders = true;
 
    // Process inconsistent price feeds
    if( (dgpo.next_maintenance_time <= HARDFORK_CORE_868_890_TIME) && (next_maintenance_time > HARDFORK_CORE_868_890_TIME) )
-      process_hf_868_890( *this, to_update_and_match_call_orders );
+      process_hf_868_890( *this, to_update_and_match_call_orders, next_maintenance_time );
 
-   // Explicitly call check_call_orders of all markets
-   if( (dgpo.next_maintenance_time <= HARDFORK_CORE_935_TIME) && (next_maintenance_time > HARDFORK_CORE_935_TIME)
-         && !to_update_and_match_call_orders )
-      process_hf_935( *this );
+   // Process pending_maitenance_collateral_ratio data for all MPA's
+   if( dgpo.next_maintenance_time > HARDFORK_CORE_935_TIME )
+      process_pending_mcr( *this );
 
    modify(dgpo, [next_maintenance_time](dynamic_global_property_object& d) {
       d.next_maintenance_time = next_maintenance_time;

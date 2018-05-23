@@ -413,7 +413,7 @@ static bool update_bitasset_object_options(
       const asset_update_bitasset_operation& op, database& db,
       asset_bitasset_data_object& bdo, const asset_object& asset_to_update )
 {
-   const fc::time_point_sec& next_maint_time = db.get_dynamic_global_properties().next_maintenance_time;
+   fc::time_point_sec next_maint_time = db.get_dynamic_global_properties().next_maintenance_time;
    bool after_hf_core_868_890 = ( next_maint_time > HARDFORK_CORE_868_890_TIME );
 
    // If the minimum number of feeds to calculate a median has changed, we need to recalculate the median
@@ -464,7 +464,7 @@ static bool update_bitasset_object_options(
    if( should_update_feeds )
    {
       const auto old_feed = bdo.current_feed;
-      bdo.update_median_feeds( db.head_block_time() );
+      bdo.update_median_feeds( db.head_block_time(), next_maint_time );
 
       // TODO review and refactor / cleanup after hard fork:
       //      1. if hf_core_868_890 and core-935 occurred at same time
@@ -534,7 +534,8 @@ void_result asset_update_feed_producers_evaluator::do_evaluate(const asset_updat
 
 void_result asset_update_feed_producers_evaluator::do_apply(const asset_update_feed_producers_evaluator::operation_type& o)
 { try {
-   db().modify(*bitasset_to_update, [&](asset_bitasset_data_object& a) {
+   database& d = db();
+   d.modify(*bitasset_to_update, [&d, &o](asset_bitasset_data_object& a) {
       //This is tricky because I have a set of publishers coming in, but a map of publisher to feed is stored.
       //I need to update the map such that the keys match the new publishers, but not munge the old price feeds from
       //publishers who are being kept.
@@ -550,9 +551,9 @@ void_result asset_update_feed_producers_evaluator::do_apply(const asset_update_f
       for( auto itr = o.new_feed_producers.begin(); itr != o.new_feed_producers.end(); ++itr )
          if( !a.feeds.count(*itr) )
             a.feeds[*itr];
-      a.update_median_feeds(db().head_block_time());
+      a.update_median_feeds( d.head_block_time(), d.get_dynamic_global_properties().next_maintenance_time );
    });
-   db().check_call_orders( o.asset_to_update(db()) );
+   d.check_call_orders( o.asset_to_update(d) );
 
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }
@@ -727,7 +728,7 @@ void_result asset_publish_feeds_evaluator::do_apply(const asset_publish_feed_ope
    // Store medians for this asset
    d.modify(bad , [&o,&d](asset_bitasset_data_object& a) {
       a.feeds[o.publisher] = make_pair(d.head_block_time(), o.feed);
-      a.update_median_feeds(d.head_block_time());
+      a.update_median_feeds( d.head_block_time(), d.get_dynamic_global_properties().next_maintenance_time );
    });
 
    if( !(old_feed == bad.current_feed) )

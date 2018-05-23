@@ -192,6 +192,10 @@ namespace graphene { namespace chain {
          /// This is the publication time of the oldest feed which was factored into current_feed.
          time_point_sec current_feed_publication_time;
 
+         /// Change on current_feed.maintenance_collateral_ratio will be pending here until next maintenance interval
+         /// (since hard fork core-935)
+         optional<uint16_t> pending_maintenance_collateral_ratio;
+
          /// True if this asset implements a @ref prediction_market
          bool is_prediction_market = false;
 
@@ -222,13 +226,42 @@ namespace graphene { namespace chain {
          { return feed_expiration_time() >= current_time; }
          bool feed_is_expired(time_point_sec current_time)const
          { return feed_expiration_time() <= current_time; }
-         void update_median_feeds(time_point_sec current_time);
+
+         /**
+          * @brief calculate the median feed
+          *
+          * This calculates the median feed. It sets the @ref current_feed_publication_time,
+          * @ref pending_maintenance_collateral_ratio and @ref current_feed member variables.
+          *
+          * @param current_time the time to use in the calculations
+          * @param next_maintenance_time The time to use to check if need to apply pending logic
+          */
+         void update_median_feeds( time_point_sec current_time, time_point_sec next_maintenance_time );
+      private:
+         /**
+          * Update @ref current_feed and @ref pending_maintenance_collateral_ratio with given parameters.
+          * @param new_feed New feed
+          * @param next_maintenance_time The time to use to check if need to apply pending logic
+          * @note this funtion will only be called by @update_median_feeds; @ref new_feed will be "moved" after called.
+          */
+         void update_current_feed( price_feed& new_feed, time_point_sec next_maintenance_time );
+
    };
+
+   struct by_pending_mcr;
 
    typedef multi_index_container<
       asset_bitasset_data_object,
       indexed_by<
-         ordered_unique< tag<by_id>, member< object, object_id_type, &object::id > >
+         ordered_unique< tag<by_id>, member< object, object_id_type, &object::id > >,
+         ordered_unique< tag<by_pending_mcr>,
+            composite_key< asset_bitasset_data_object,
+                member< asset_bitasset_data_object,
+                        optional<uint16_t>,
+                        &asset_bitasset_data_object::pending_maintenance_collateral_ratio >,
+                member< object, object_id_type, &object::id >
+            >
+         >
       >
    > asset_bitasset_data_object_multi_index_type;
    typedef generic_index<asset_bitasset_data_object, asset_bitasset_data_object_multi_index_type> asset_bitasset_data_index;
@@ -262,6 +295,7 @@ FC_REFLECT_DERIVED( graphene::chain::asset_bitasset_data_object, (graphene::db::
                     (feeds)
                     (current_feed)
                     (current_feed_publication_time)
+                    (pending_maintenance_collateral_ratio)
                     (options)
                     (force_settled_volume)
                     (is_prediction_market)
