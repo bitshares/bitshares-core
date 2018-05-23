@@ -482,4 +482,19 @@ BOOST_AUTO_TEST_CASE( merkle_root )
    BOOST_CHECK( block.calculate_merkle_root() == c(dO) );
 }
 
+/**
+ * Reproduces https://github.com/bitshares/bitshares-core/issues/888 and tests fix for it.
+ */
+BOOST_AUTO_TEST_CASE( bitasset_feed_expiration_test )
+{
+   time_point_sec now = fc::time_point::now();
+
+   asset_bitasset_data_object o;
+
+   o.current_feed_publication_time = now - fc::hours(1);
+   o.options.feed_lifetime_sec = std::numeric_limits<uint32_t>::max() - 1;
+
+   BOOST_CHECK( !o.feed_is_expired( now ) );
+}
+
 BOOST_AUTO_TEST_SUITE_END()
