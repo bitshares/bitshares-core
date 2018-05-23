@@ -245,20 +245,27 @@ BOOST_AUTO_TEST_CASE( fork_blocks )
       BOOST_CHECK( db1.get_chain_id() == db2.get_chain_id() );
 
       auto init_account_priv_key  = fc::ecc::private_key::regenerate(fc::sha256::hash(string("null_key")) );
-      for( uint32_t i = 0; i < 10; ++i )
+
+      BOOST_TEST_MESSAGE( "Adding blocks 1 through 10" );
+      for( uint32_t i = 1; i <= 10; ++i )
       {
          auto b = db1.generate_block(db1.get_slot_time(1), db1.get_scheduled_witness(1), init_account_priv_key, database::skip_nothing);
          try {
             PUSH_BLOCK( db2, b );
          } FC_CAPTURE_AND_RETHROW( ("db2") );
       }
-      for( uint32_t i = 10; i < 13; ++i )
+
+      BOOST_TEST_MESSAGE( "Adding blocks 11 through 13 to db1 only" );
+      for( uint32_t i = 11; i <= 13; ++i )
       {
-         auto b =  db1.generate_block(db1.get_slot_time(1), db1.get_scheduled_witness(1), init_account_priv_key, database::skip_nothing);
+         auto b = db1.generate_block(db1.get_slot_time(1), db1.get_scheduled_witness(1), init_account_priv_key, database::skip_nothing);
       }
       string db1_tip = db1.head_block_id().str();
+
+      // add blocks 14 and 15 to db2 only, leaving space for 11 through 13
+      BOOST_TEST_MESSAGE( "Add blocks 14 through 16 to db2 only" );
       uint32_t next_slot = 3;
-      for( uint32_t i = 13; i < 16; ++i )
+      for( uint32_t i = 14; i <= 16; ++i )
       {
          auto b =  db2.generate_block(db2.get_slot_time(next_slot), db2.get_scheduled_witness(next_slot), init_account_priv_key, database::skip_nothing);
          next_slot = 1;
@@ -269,25 +276,36 @@ BOOST_AUTO_TEST_CASE( fork_blocks )
          BOOST_CHECK_EQUAL(db2.head_block_id().str(), b.id().str());
       }
 
-      //The two databases are on distinct forks now, but at the same height. Make a block on db2, make it invalid, then
+      //The two databases are on distinct forks now, but at the same height.
+      BOOST_CHECK_EQUAL(db1.head_block_num(), 13u);
+      BOOST_CHECK_EQUAL(db2.head_block_num(), 13u);
+      //Make a block on db2, make it invalid, then
       //pass it to db1 and assert that db1 doesn't switch to the new fork.
       signed_block good_block;
-      BOOST_CHECK_EQUAL(db1.head_block_num(), 13);
-      BOOST_CHECK_EQUAL(db2.head_block_num(), 13);
       {
          auto b = db2.generate_block(db2.get_slot_time(1), db2.get_scheduled_witness(1), init_account_priv_key, database::skip_nothing);
          good_block = b;
          b.transactions.emplace_back(signed_transaction());
          b.transactions.back().operations.emplace_back(transfer_operation());
          b.sign( init_account_priv_key );
-         BOOST_CHECK_EQUAL(b.block_num(), 14);
+         BOOST_CHECK_EQUAL(b.block_num(), 14u);
          GRAPHENE_CHECK_THROW(PUSH_BLOCK( db1, b ), fc::exception);
+         // Issue #938 make sure db is in a good state
+         fc::optional<signed_block> previous_block = db1.fetch_block_by_number(1);
+         BOOST_CHECK ( previous_block.valid() );
+         for( uint32_t curr_block_num = 2; curr_block_num <= 13; ++curr_block_num )
+         {
+            fc::optional<signed_block> curr_block = db1.fetch_block_by_number( curr_block_num );
+            BOOST_CHECK( curr_block.valid() );
+            BOOST_CHECK_EQUAL( curr_block->previous, previous_block->id() );
+            previous_block = curr_block;
+         }
       }
-      BOOST_CHECK_EQUAL(db1.head_block_num(), 13);
+      BOOST_CHECK_EQUAL(db1.head_block_num(), 13u);
       BOOST_CHECK_EQUAL(db1.head_block_id().str(), db1_tip);
 
       // assert that db1 switches to new fork with good block
-      BOOST_CHECK_EQUAL(db2.head_block_num(), 14);
+      BOOST_CHECK_EQUAL(db2.head_block_num(), 14u);
       PUSH_BLOCK( db1, good_block );
       BOOST_CHECK_EQUAL(db1.head_block_id().str(), db2.head_block_id().str());
    } catch (fc::exception& e) {
