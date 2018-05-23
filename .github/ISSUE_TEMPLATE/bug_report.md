@@ -5,17 +5,13 @@ about: Create a detailed report about a deficiency in the BitShares Core impleme
 ---
 
 **Instructions**
-<<<<<<< HEAD
 Please include a detailed Title above. Next, please complete the following sections below:
-=======
-Pleaae include a detailed Title above. Next, please complete the following sections below:
->>>>>>> d11cd3cc703585c08c4bcee1eb84fc7ecedcc84b
 * Bug Description
 * Steps To Reproduce
 * Expected Behavior
 * Screenshots (optional)
 * witness_node --version (optional)
-* Aditional Context (optional)
+* Additional Context (optional)
 
 Finally, press the 'Submit new issue' button. The Core Team will evaluate and prioritize your Bug Report for future development. 
 
