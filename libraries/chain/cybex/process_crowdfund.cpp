@@ -1,5 +1,5 @@
+#include <graphene/chain/asset_object.hpp>
 #include <cybex/block_callback.hpp>
-
 #include <cybex/crowdfund.hpp>
 #include <cybex/crowdfund_contract.hpp>
 
@@ -25,12 +25,15 @@ void block_callback::process_crowdfund(database &db) const
           {
             uint64_t s = ( now-itr->begin).to_seconds();
            
-            if(s >= itr->u)
+            if(s >= itr->t)
             {
                   auto_withdraw(db,*itr);
-                  db.modify( *itr,[&](crowdfund_object &c ){
-                       c.state=1;
-                  });
+                  if(s>=itr->u)
+                  {
+                      db.modify( *itr,[&](crowdfund_object &c ){
+                           c.state=1;
+                      });
+                  }
             }
            }
           itr++;                        
@@ -41,6 +44,9 @@ void block_callback::process_crowdfund(database &db) const
 
 void block_callback::auto_withdraw(database &db,const crowdfund_object & crowdfund) const
 {
+      const auto & crowdfund_asset = db.get(crowdfund.asset_id);  
+      auto const & dyn_data = crowdfund_asset.dynamic_asset_data_id(db);
+
       const auto id = crowdfund.id;
       const auto& crowdfund_contract_idx = db.get_index_type<crowdfund_contract_index>();
       const auto& by_crowdfund_idx = crowdfund_contract_idx.indices().get<by_crowdfund>();
@@ -104,6 +110,10 @@ void block_callback::auto_withdraw(database &db,const crowdfund_object & crowdfu
                        c.state=CROWDFUND_STATE_USED;
                        c.V -= S;
               });
+              //update asset dynamic data current_supply
+              db.modify( dyn_data,[&](asset_dynamic_data_object &dyn_data) {
+                     dyn_data.current_supply -= S;
+              });
          } 
          //
          // refund q *V(Bi)  
@@ -136,6 +146,11 @@ void block_callback::auto_withdraw(database &db,const crowdfund_object & crowdfu
               db.modify( crowdfund ,[&](crowdfund_object &c ){
                        c.V -= total_refund;
               });
+              //update asset dynamic data current_supply
+              db.modify( dyn_data,[&](asset_dynamic_data_object &dyn_data) {
+                     dyn_data.current_supply -= total_refund;
+              });
+           
            }
            else
            {

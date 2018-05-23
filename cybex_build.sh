@@ -13,7 +13,7 @@ then
    source build_number
    build=$(( ${BUILD} +1 ))
 
-   install_tag=$(date "+%Y%m%d%H%M%S")."${build}"
+   install_tag=-$(date "+%Y%m%d%H%M%S")."${build}"
    echo "BUILD=${build}">build_number
 else
    install_tag=
@@ -38,10 +38,10 @@ cd ${BUILD_DIR}
 
 if [ "${ARCH}" == "Darwin" ];
     then
-        cmake -G"Unix Makefiles"  -DCMAKE_INSTALL_PREFIX="$PWD/install-${install_tag}" -DGRAPHENE_EGENESIS_JSON=genesis.json -DOPENSSL_ROOT_DIR=/usr/local/Cellar/openssl/1.0.2o_1  -DBOOST_ROOT=/usr/local/Cellar/boost@1.57/1.57.0/ .. -B.
+        cmake -G"Unix Makefiles"  -DCMAKE_INSTALL_PREFIX="$PWD/install${install_tag}" -DGRAPHENE_EGENESIS_JSON=genesis.json -DOPENSSL_ROOT_DIR=/usr/local/Cellar/openssl/1.0.2o_1  -DBOOST_ROOT=/usr/local/Cellar/boost@1.57/1.57.0/ .. -B.
         N_CPU=$(sysctl -i machdep.cpu.thread_count | awk '{print $2}')
     else
-        cmake -G"Unix Makefiles"  -DCMAKE_INSTALL_PREFIX="$PWD/install-${install_tag}" -DGRAPHENE_EGENESIS_JSON=genesis.json .. -B.
+        cmake -G"Unix Makefiles"  -DCMAKE_INSTALL_PREFIX="$PWD/install${install_tag}" -DGRAPHENE_EGENESIS_JSON=genesis.json .. -B.
         N_CPU=$(cat /proc/cpuinfo | grep -c  '^processor')
 
 fi

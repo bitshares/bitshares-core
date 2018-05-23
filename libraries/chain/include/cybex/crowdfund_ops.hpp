@@ -53,8 +53,8 @@ namespace graphene { namespace chain {
 
       asset                     fee;
       account_id_type           buyer;
-      int64_t                valuation;
-      int64_t                cap;
+      int64_t                   valuation;
+      int64_t                   cap;
       crowdfund_id_type         crowdfund;
       //address                   pubkey;
 
