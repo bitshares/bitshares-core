@@ -5,10 +5,17 @@ about: Suggest an idea for the BitShares Core Team to evaluate and prioritize fo
 ---
 
 **Instructions**
+<<<<<<< HEAD
 Please include a detailed Title above. Next, please complete the following sections below:
 * User Story
 * Impacts
 * Additional Context (optional)
+=======
+Pleaae include a detailed Title above. Next, please complete the following sections below:
+* User Story
+* Impacts
+* Aditional Context (optional)
+>>>>>>> d11cd3cc703585c08c4bcee1eb84fc7ecedcc84b
 
 Finally, press the 'Submit new issue' button. The Core Team will evaluate and prioritize your Feature Request for future development. 
 
