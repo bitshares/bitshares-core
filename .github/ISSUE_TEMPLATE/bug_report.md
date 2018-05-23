@@ -13,7 +13,7 @@ Pleaae include a detailed Title above. Next, please complete the following secti
 * witness_node --version (optional)
 * Aditional Context (optional)
 
-Finally, press the 'submit issue' button. The Core Team will evaluate and prioritize your Bug Report for future development. 
+Finally, press the 'Submit new issue' button. The Core Team will evaluate and prioritize your Bug Report for future development. 
 
 **Bug Description**
 A clear and concise description of what the bug is.
