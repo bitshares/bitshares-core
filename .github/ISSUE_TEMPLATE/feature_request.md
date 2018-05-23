@@ -5,10 +5,10 @@ about: Suggest an idea for the BitShares Core Team to evaluate and prioritize fo
 ---
 
 **Instructions**
-Pleaae include a detailed Title above. Next, please complete the following sections below:
+Please include a detailed Title above. Next, please complete the following sections below:
 * User Story
 * Impacts
-* Aditional Context (optional)
+* Additional Context (optional)
 
 Finally, press the 'Submit new issue' button. The Core Team will evaluate and prioritize your Feature Request for future development. 
 
@@ -23,11 +23,13 @@ Describe which portion(s) of BitShares Core may be impacted by your request. Ple
 - [ ] API (the application programming interface)
 - [ ] Build (the build process or something prior to compiled code)
 - [ ] CLI (the command line wallet)
-- [ ] Consensus (the validation or commitment of data)
 - [ ] Deployment (the deployment process after building such as Docker, Travis, etc.)
+- [ ] DEX (the Decentralized EXchange, market engine, etc.)
 - [ ] P2P (the peer-to-peer network for transaction/block propagation)
-- [ ] Performance (system or user efficiency, performance, etc.)
-- [ ] Security (system or user security)
+- [ ] Performance (system or user efficiency, etc.)
+- [ ] Protocol (the blockchain logic, consensus, validation, etc.)
+- [ ] Security (the security of system or user data, etc.)
+- [ ] UX (the User Experience)
 - [ ] Other (please add below)
 
 **Additional Context (optional)**
