@@ -10,7 +10,7 @@ Pleaae include a detailed Title above. Next, please complete the following secti
 * Impacts
 * Aditional Context (optional)
 
-Finally, press the 'submit issue' button. The Core Team will evaluate and prioritize your Feature Request for future development. 
+Finally, press the 'Submit new issue' button. The Core Team will evaluate and prioritize your Feature Request for future development. 
 
 **User Story**
 Please tell us about your feature request using the User Story format:
