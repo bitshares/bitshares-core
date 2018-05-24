@@ -459,7 +459,9 @@ const asset_object& database_fixture::create_bitasset(
    const string& name,
    account_id_type issuer /* = GRAPHENE_WITNESS_ACCOUNT */,
    uint16_t market_fee_percent /* = 100 */ /* 1% */,
-   uint16_t flags /* = charge_market_fee */
+   uint16_t flags /* = charge_market_fee */,
+   uint16_t precision /* = GRAPHENE_BLOCKCHAIN_PRECISION_DIGITS */,
+   asset_id_type backing_asset /* = CORE */
    )
 { try {
    asset_create_operation creator;
@@ -467,7 +469,7 @@ const asset_object& database_fixture::create_bitasset(
    creator.fee = asset();
    creator.symbol = name;
    creator.common_options.max_supply = GRAPHENE_MAX_SHARE_SUPPLY;
-   creator.precision = 2;
+   creator.precision = precision;
    creator.common_options.market_fee_percent = market_fee_percent;
    if( issuer == GRAPHENE_WITNESS_ACCOUNT )
       flags |= witness_fed_asset;
@@ -475,6 +477,7 @@ const asset_object& database_fixture::create_bitasset(
    creator.common_options.flags = flags & ~global_settle;
    creator.common_options.core_exchange_rate = price({asset(1,asset_id_type(1)),asset(1)});
    creator.bitasset_opts = bitasset_options();
+   creator.bitasset_opts->short_backing_asset = backing_asset;
    trx.operations.push_back(std::move(creator));
    trx.validate();
    processed_transaction ptx = db.push_transaction(trx, ~0);
@@ -486,7 +489,9 @@ const asset_object& database_fixture::create_prediction_market(
    const string& name,
    account_id_type issuer /* = GRAPHENE_WITNESS_ACCOUNT */,
    uint16_t market_fee_percent /* = 100 */ /* 1% */,
-   uint16_t flags /* = charge_market_fee */
+   uint16_t flags /* = charge_market_fee */,
+   uint16_t precision /* = 2, which seems arbitrary, but historically chosen */,
+   asset_id_type backing_asset /* = CORE */
    )
 { try {
    asset_create_operation creator;
@@ -494,7 +499,7 @@ const asset_object& database_fixture::create_prediction_market(
    creator.fee = asset();
    creator.symbol = name;
    creator.common_options.max_supply = GRAPHENE_MAX_SHARE_SUPPLY;
-   creator.precision = GRAPHENE_BLOCKCHAIN_PRECISION_DIGITS;
+   creator.precision = precision;
    creator.common_options.market_fee_percent = market_fee_percent;
    creator.common_options.issuer_permissions = flags | global_settle;
    creator.common_options.flags = flags & ~global_settle;
@@ -502,6 +507,7 @@ const asset_object& database_fixture::create_prediction_market(
       creator.common_options.flags |= witness_fed_asset;
    creator.common_options.core_exchange_rate = price({asset(1,asset_id_type(1)),asset(1)});
    creator.bitasset_opts = bitasset_options();
+   creator.bitasset_opts->short_backing_asset = backing_asset;
    creator.is_prediction_market = true;
    trx.operations.push_back(std::move(creator));
    trx.validate();
@@ -509,6 +515,7 @@ const asset_object& database_fixture::create_prediction_market(
    trx.operations.clear();
    return db.get<asset_object>(ptx.operation_results[0].get<object_id_type>());
 } FC_CAPTURE_AND_RETHROW( (name)(flags) ) }
+
 
 const asset_object& database_fixture::create_user_issued_asset( const string& name )
 {
@@ -530,14 +537,14 @@ const asset_object& database_fixture::create_user_issued_asset( const string& na
 }
 
 const asset_object& database_fixture::create_user_issued_asset( const string& name, const account_object& issuer, uint16_t flags,
-                                                                const price& core_exchange_rate )
+                                                                const price& core_exchange_rate, uint16_t precision)
 {
    asset_create_operation creator;
    creator.issuer = issuer.id;
    creator.fee = asset();
    creator.symbol = name;
    creator.common_options.max_supply = 0;
-   creator.precision = 2;
+   creator.precision = precision;
    creator.common_options.core_exchange_rate = core_exchange_rate;
    creator.common_options.max_supply = GRAPHENE_MAX_SHARE_SUPPLY;
    creator.common_options.flags = flags;

@@ -106,6 +106,29 @@ extern uint32_t GRAPHENE_TESTING_GENESIS_TIMESTAMP;
 #define REQUIRE_OP_VALIDATION_FAILURE( op, field, value ) \
    REQUIRE_OP_VALIDATION_FAILURE_2( op, field, value, fc::exception )
 
+#define REQUIRE_EXCEPTION_WITH_TEXT(op, exc_text)                 \
+{                                                                 \
+   try                                                            \
+   {                                                              \
+      op;                                                         \
+      BOOST_FAIL(std::string("Expected an exception with \"") +   \
+         std::string(exc_text) +                                  \
+         std::string("\" but none thrown"));                      \
+   }                                                              \
+   catch (fc::exception& ex)                                      \
+   {                                                              \
+      std::string what = ex.to_string(                            \
+            fc::log_level(fc::log_level::all));                   \
+      if (what.find(exc_text) == std::string::npos)               \
+      {                                                           \
+         BOOST_FAIL( std::string("Expected \"") +                 \
+            std::string(exc_text) +                               \
+            std::string("\" but got \"") +                        \
+            std::string(what) );                                  \
+      }                                                           \
+   }                                                              \
+}                                                                 \
+
 #define REQUIRE_THROW_WITH_VALUE_2(op, field, value, exc_type) \
 { \
    auto bak = op.field; \
@@ -246,16 +269,21 @@ struct database_fixture {
    const asset_object& create_bitasset(const string& name,
                                        account_id_type issuer = GRAPHENE_WITNESS_ACCOUNT,
                                        uint16_t market_fee_percent = 100 /*1%*/,
-                                       uint16_t flags = charge_market_fee);
+                                       uint16_t flags = charge_market_fee,
+                                       uint16_t precision = 2,
+                                       asset_id_type backing_asset = {});
    const asset_object& create_prediction_market(const string& name,
                                        account_id_type issuer = GRAPHENE_WITNESS_ACCOUNT,
                                        uint16_t market_fee_percent = 100 /*1%*/,
-                                       uint16_t flags = charge_market_fee);
+                                       uint16_t flags = charge_market_fee,
+                                       uint16_t precision = GRAPHENE_BLOCKCHAIN_PRECISION_DIGITS,
+                                       asset_id_type backing_asset = {});
    const asset_object& create_user_issued_asset( const string& name );
    const asset_object& create_user_issued_asset( const string& name,
                                                  const account_object& issuer,
                                                  uint16_t flags,
-                                                 const price& core_exchange_rate = price(asset(1, asset_id_type(1)), asset(1)) );
+                                                 const price& core_exchange_rate = price(asset(1, asset_id_type(1)), asset(1)),
+                                                 uint16_t precision = 2 /* traditional precision for tests */);
    void issue_uia( const account_object& recipient, asset amount );
    void issue_uia( account_id_type recipient_id, asset amount );
 
