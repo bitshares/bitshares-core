@@ -773,8 +773,16 @@ void database::process_bids( const asset_bitasset_data_object& bad )
  */
 void update_and_match_call_orders( database& db, const asset_bitasset_data_object* bitasset = nullptr )
 {
+   const auto head_num = db.head_block_num();
+   const asset_object* asset_obj;
    if( !bitasset )
-      wlog( "Updating all call orders for hardfork core-343/935 at block ${n}", ("n",db.head_block_num()) );
+      wlog( "Updating all call orders for hardfork core-343/935 at block ${n}", ("n",head_num) );
+   else
+   {
+      asset_obj = &bitasset->asset_id(db);
+      wlog( "Updating all call orders for asset ${sym} (${aid}) due to MCR change at block ${n}",
+            ("aid",asset_obj->get_id())("sym",asset_obj->symbol)("n",head_num) );
+   }
 
    // Update call_price
    asset_id_type current_asset = bitasset ? bitasset->asset_id : asset_id_type();
@@ -804,7 +812,11 @@ void update_and_match_call_orders( database& db, const asset_bitasset_data_objec
 
    // Match call orders
    if( bitasset )
-      db.check_call_orders( current_asset(db), true, false ); // allow black swan, and call orders are taker
+   {
+      db.check_call_orders( *asset_obj, true, false ); // allow black swan, and call orders are taker
+      wlog( "Done updating all call orders for asset ${sym} (${aid}) due to MCR change at block ${n}",
+            ("aid",asset_obj->get_id())("sym",asset_obj->symbol)("n",head_num) );
+   }
    else
    {
       const auto& asset_idx = db.get_index_type<asset_index>().indices().get<by_type>();
@@ -816,7 +828,7 @@ void update_and_match_call_orders( database& db, const asset_bitasset_data_objec
          // be here, next_maintenance_time should have been updated already
          db.check_call_orders( a, true, false ); // allow black swan, and call orders are taker
       }
-      wlog( "Done updating all call orders for hardfork core-343/935 at block ${n}", ("n",db.head_block_num()) );
+      wlog( "Done updating all call orders for hardfork core-343/935 at block ${n}", ("n",head_num) );
    }
 }
 
@@ -826,11 +838,16 @@ void update_and_match_call_orders( database& db, const asset_bitasset_data_objec
  */
 void process_pending_mcr( database& db )
 {
+   const auto head_num = db.head_block_num();
    const auto& bitasset_idx = db.get_index_type<asset_bitasset_data_index>().indices().get<by_pending_mcr>();
    auto ba_itr = bitasset_idx.upper_bound( optional<uint16_t>() ); // has something pending
    while( ba_itr != bitasset_idx.end() )
    {
       const asset_bitasset_data_object& abd = *ba_itr;
+      wlog( "Updating MCR from ${old} to ${new} for bitasset ${bid} / asset ${aid} at block ${n}",
+            ("old",abd.current_feed.maintenance_collateral_ratio)
+            ("new",abd.pending_maintenance_collateral_ratio)
+            ("bid",ba_itr->id)("aid",abd.asset_id)("n",head_num) );
       ++ba_itr;
       db.modify( abd, []( asset_bitasset_data_object& abdo )
       {
