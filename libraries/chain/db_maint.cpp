@@ -958,8 +958,10 @@ void process_hf_868_890( database& db, bool skip_check_call_orders, time_point_s
       }
 
       // always update the median feed due to https://github.com/bitshares/bitshares-core/issues/890
-      db.modify( bitasset_data, [head_time,next_maintenance_time]( asset_bitasset_data_object &obj ) {
-         obj.update_median_feeds( head_time, next_maintenance_time );
+      bool defer_mcr_update = ( next_maintenance_time > HARDFORK_CORE_935_TIME
+                                  && current_asset.dynamic_data(db).current_supply > 0 );
+      db.modify( bitasset_data, [head_time,defer_mcr_update]( asset_bitasset_data_object &obj ) {
+         obj.update_median_feeds( head_time, defer_mcr_update );
       });
 
       bool median_changed = ( old_feed.settlement_price != bitasset_data.current_feed.settlement_price );

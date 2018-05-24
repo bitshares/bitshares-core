@@ -234,17 +234,17 @@ namespace graphene { namespace chain {
           * @ref pending_maintenance_collateral_ratio and @ref current_feed member variables.
           *
           * @param current_time the time to use in the calculations
-          * @param next_maintenance_time The time to use to check if need to apply pending logic
+          * @param defer_mcr_update set to true to defer MCR update to next maintenance interval
           */
-         void update_median_feeds( time_point_sec current_time, time_point_sec next_maintenance_time );
+         void update_median_feeds( time_point_sec current_time, bool defer_mcr_update );
       private:
          /**
           * Update @ref current_feed and @ref pending_maintenance_collateral_ratio with given parameters.
           * @param new_feed New feed
-          * @param next_maintenance_time The time to use to check if need to apply pending logic
+          * @param defer_mcr_update set to true to defer MCR update to next maintenance interval
           * @note this funtion will only be called by @update_median_feeds; @ref new_feed will be "moved" after called.
           */
-         void update_current_feed( price_feed& new_feed, time_point_sec next_maintenance_time );
+         void update_current_feed( price_feed& new_feed, bool defer_mcr_update );
 
    };
 

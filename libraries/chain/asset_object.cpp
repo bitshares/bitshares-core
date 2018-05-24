@@ -44,8 +44,7 @@ share_type asset_bitasset_data_object::max_force_settlement_volume(share_type cu
    return volume.to_uint64();
 }
 
-void graphene::chain::asset_bitasset_data_object::update_median_feeds( time_point_sec current_time,
-                                                                       time_point_sec next_maintenance_time )
+void graphene::chain::asset_bitasset_data_object::update_median_feeds( time_point_sec current_time, bool defer_mcr_update )
 {
    current_feed_publication_time = current_time;
    vector<std::reference_wrapper<const price_feed>> current_feeds;
@@ -67,13 +66,13 @@ void graphene::chain::asset_bitasset_data_object::update_median_feeds( time_poin
       current_feed_publication_time = current_time;
       price_feed null_feed;
       null_feed.maintenance_collateral_ratio = current_feed.maintenance_collateral_ratio; // keep old MCR
-      update_current_feed( null_feed, next_maintenance_time );
+      update_current_feed( null_feed, defer_mcr_update );
       return;
    }
    if( current_feeds.size() == 1 )
    {
       price_feed only_feed = std::move( current_feeds.front() );
-      update_current_feed( only_feed, next_maintenance_time );
+      update_current_feed( only_feed, defer_mcr_update );
       return;
    }
 
@@ -91,13 +90,12 @@ void graphene::chain::asset_bitasset_data_object::update_median_feeds( time_poin
 #undef CALCULATE_MEDIAN_VALUE
    // *** End Median Calculations ***
 
-   update_current_feed( median_feed, next_maintenance_time );
+   update_current_feed( median_feed, defer_mcr_update );
 }
 
-void graphene::chain::asset_bitasset_data_object::update_current_feed( price_feed& new_feed,
-                                                                       time_point_sec next_maintenance_time )
+void graphene::chain::asset_bitasset_data_object::update_current_feed( price_feed& new_feed, bool defer_mcr_update )
 {
-   if( next_maintenance_time > HARDFORK_CORE_935_TIME )
+   if( defer_mcr_update )
    {
       if( current_feed.maintenance_collateral_ratio == new_feed.maintenance_collateral_ratio )
          pending_maintenance_collateral_ratio.reset();

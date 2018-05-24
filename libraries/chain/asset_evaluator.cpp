@@ -464,7 +464,9 @@ static bool update_bitasset_object_options(
    if( should_update_feeds )
    {
       const auto old_feed = bdo.current_feed;
-      bdo.update_median_feeds( db.head_block_time(), next_maint_time );
+      bool defer_mcr_update = ( next_maint_time > HARDFORK_CORE_935_TIME
+                                  && asset_to_update.dynamic_data(db).current_supply > 0 );
+      bdo.update_median_feeds( db.head_block_time(), defer_mcr_update );
 
       // TODO review and refactor / cleanup after hard fork:
       //      1. if hf_core_868_890 and core-935 occurred at same time
@@ -528,6 +530,7 @@ void_result asset_update_feed_producers_evaluator::do_evaluate(const asset_updat
 
    const asset_bitasset_data_object& b = a.bitasset_data(d);
    bitasset_to_update = &b;
+   asset_to_update = &a;
    FC_ASSERT( a.issuer == o.issuer );
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }
@@ -535,7 +538,9 @@ void_result asset_update_feed_producers_evaluator::do_evaluate(const asset_updat
 void_result asset_update_feed_producers_evaluator::do_apply(const asset_update_feed_producers_evaluator::operation_type& o)
 { try {
    database& d = db();
-   d.modify(*bitasset_to_update, [&d, &o](asset_bitasset_data_object& a) {
+   bool defer_mcr_update = ( d.get_dynamic_global_properties().next_maintenance_time > HARDFORK_CORE_935_TIME
+                               && asset_to_update->dynamic_data(d).current_supply > 0 );
+   d.modify(*bitasset_to_update, [&d, &o, defer_mcr_update](asset_bitasset_data_object& a) {
       //This is tricky because I have a set of publishers coming in, but a map of publisher to feed is stored.
       //I need to update the map such that the keys match the new publishers, but not munge the old price feeds from
       //publishers who are being kept.
@@ -551,9 +556,9 @@ void_result asset_update_feed_producers_evaluator::do_apply(const asset_update_f
       for( auto itr = o.new_feed_producers.begin(); itr != o.new_feed_producers.end(); ++itr )
          if( !a.feeds.count(*itr) )
             a.feeds[*itr];
-      a.update_median_feeds( d.head_block_time(), d.get_dynamic_global_properties().next_maintenance_time );
+      a.update_median_feeds( d.head_block_time(), defer_mcr_update );
    });
-   d.check_call_orders( o.asset_to_update(d) );
+   d.check_call_orders( *asset_to_update );
 
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }
@@ -713,6 +718,9 @@ void_result asset_publish_feeds_evaluator::do_evaluate(const asset_publish_feed_
       FC_ASSERT(bitasset.feeds.count(o.publisher));
    }
 
+   asset_to_update = &base;
+   bitasset_to_update = &bitasset;
+
    return void_result();
 } FC_CAPTURE_AND_RETHROW((o)) }
 
@@ -721,14 +729,16 @@ void_result asset_publish_feeds_evaluator::do_apply(const asset_publish_feed_ope
 
    database& d = db();
 
-   const asset_object& base = o.asset_id(d);
-   const asset_bitasset_data_object& bad = base.bitasset_data(d);
+   const asset_object& base = *asset_to_update;
+   const asset_bitasset_data_object& bad = *bitasset_to_update;
+   bool defer_mcr_update = ( d.get_dynamic_global_properties().next_maintenance_time > HARDFORK_CORE_935_TIME
+                               && base.dynamic_data(d).current_supply > 0 );
 
    auto old_feed =  bad.current_feed;
    // Store medians for this asset
-   d.modify(bad , [&o,&d](asset_bitasset_data_object& a) {
+   d.modify(bad , [&o, &d, defer_mcr_update](asset_bitasset_data_object& a) {
       a.feeds[o.publisher] = make_pair(d.head_block_time(), o.feed);
-      a.update_median_feeds( d.head_block_time(), d.get_dynamic_global_properties().next_maintenance_time );
+      a.update_median_feeds( d.head_block_time(), defer_mcr_update );
    });
 
    if( !(old_feed == bad.current_feed) )

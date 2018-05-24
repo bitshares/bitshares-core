@@ -616,14 +616,8 @@ BOOST_AUTO_TEST_CASE( hf_935_test )
 
       // check median
       BOOST_CHECK( usd_id(db).bitasset_data(db).current_feed.settlement_price == current_feed.settlement_price );
-      if( i < 2 ) // before hf 935, MCR should be 350%
-         BOOST_CHECK_EQUAL( usd_id(db).bitasset_data(db).current_feed.maintenance_collateral_ratio, 3500 );
-      else // after hf 935, MCR should be default_mcr, pending MCR should be 350%
-      {
-         BOOST_CHECK_EQUAL( usd_id(db).bitasset_data(db).current_feed.maintenance_collateral_ratio, default_mcr );
-         BOOST_CHECK( usd_id(db).bitasset_data(db).pending_maintenance_collateral_ratio.valid() );
-         BOOST_CHECK_EQUAL( *usd_id(db).bitasset_data(db).pending_maintenance_collateral_ratio, 3500 );
-      }
+      BOOST_CHECK_EQUAL( usd_id(db).bitasset_data(db).current_feed.maintenance_collateral_ratio, 3500 );
+      BOOST_CHECK( !usd_id(db).bitasset_data(db).pending_maintenance_collateral_ratio.valid() );
 
       // generate some blocks, let the feeds expire
       blocks += generate_blocks( db.head_block_time() + 90, true, skip );
@@ -632,43 +626,12 @@ BOOST_AUTO_TEST_CASE( hf_935_test )
       // check median, settlement_price should be null
       BOOST_CHECK( usd_id(db).bitasset_data(db).current_feed.settlement_price.is_null() );
       // MCR should not change
-      if( i < 2 )
-         BOOST_CHECK_EQUAL( usd_id(db).bitasset_data(db).current_feed.maintenance_collateral_ratio, 3500 );
-      else
-         BOOST_CHECK_EQUAL( usd_id(db).bitasset_data(db).current_feed.maintenance_collateral_ratio, default_mcr );
-      // pending MCR got reset
+      BOOST_CHECK_EQUAL( usd_id(db).bitasset_data(db).current_feed.maintenance_collateral_ratio, 3500 );
       BOOST_CHECK( !usd_id(db).bitasset_data(db).pending_maintenance_collateral_ratio.valid() );
-
-      if( i == 2 )
-      {
-         // generate some blocks to near next maintenance interval
-         blocks += generate_blocks( db.get_dynamic_global_properties().next_maintenance_time - 15, true, skip );
-         set_expiration( db, trx );
-      }
 
       // publish a new feed with 175% MCR, new median MCR would be 175% when in effect
       current_feed.maintenance_collateral_ratio = 1750;
       publish_feed( usd_id, feedproducer3_id, current_feed );
-
-      // check median
-      BOOST_CHECK( usd_id(db).bitasset_data(db).current_feed.settlement_price == current_feed.settlement_price );
-      if( i < 2 ) // before hf 935, MCR should be 175%
-         BOOST_CHECK_EQUAL( usd_id(db).bitasset_data(db).current_feed.maintenance_collateral_ratio, 1750 );
-      else // after hf 935, MCR should be default_mcr, pending MCR should be 175% if default is not 175%
-      {
-         BOOST_CHECK_EQUAL( usd_id(db).bitasset_data(db).current_feed.maintenance_collateral_ratio, default_mcr );
-         if( default_mcr != 1750 )
-         {
-            BOOST_CHECK( usd_id(db).bitasset_data(db).pending_maintenance_collateral_ratio.valid() );
-            BOOST_CHECK_EQUAL( *usd_id(db).bitasset_data(db).pending_maintenance_collateral_ratio, 1750 );
-         }
-         else
-            BOOST_CHECK( !usd_id(db).bitasset_data(db).pending_maintenance_collateral_ratio.valid() );
-
-         // go to next maintenance interval
-         blocks += generate_blocks( db.get_dynamic_global_properties().next_maintenance_time, true, skip );
-         set_expiration( db, trx );
-      }
 
       // check median, median MCR should be 175%
       BOOST_CHECK( usd_id(db).bitasset_data(db).current_feed.settlement_price == current_feed.settlement_price );
@@ -764,6 +727,30 @@ BOOST_AUTO_TEST_CASE( hf_935_test )
             BOOST_CHECK( !usd_id(db).bitasset_data(db).pending_maintenance_collateral_ratio.valid() );
             // the limit order should have been filled
             BOOST_CHECK( !db.find<limit_order_object>( sell_id ) );
+
+            // publish a new feed with feedproducer2 at 175% MCR
+            publish_feed( usd_id, feedproducer2_id, current_feed );
+            // median MCR should be 350%, pending 175%
+            BOOST_CHECK( usd_id(db).bitasset_data(db).current_feed.settlement_price == current_feed.settlement_price );
+            BOOST_CHECK_EQUAL( usd_id(db).bitasset_data(db).current_feed.maintenance_collateral_ratio, 3500 );
+            BOOST_CHECK( usd_id(db).bitasset_data(db).pending_maintenance_collateral_ratio.valid() );
+            BOOST_CHECK_EQUAL( *usd_id(db).bitasset_data(db).pending_maintenance_collateral_ratio, 1750 );
+
+            // publish a new feed with feedproducer2 at 350% MCR
+            current_feed.maintenance_collateral_ratio = 3500;
+            publish_feed( usd_id, feedproducer2_id, current_feed );
+            // median MCR should be 350%, no pending
+            BOOST_CHECK( usd_id(db).bitasset_data(db).current_feed.settlement_price == current_feed.settlement_price );
+            BOOST_CHECK_EQUAL( usd_id(db).bitasset_data(db).current_feed.maintenance_collateral_ratio, 3500 );
+            BOOST_CHECK( !usd_id(db).bitasset_data(db).pending_maintenance_collateral_ratio.valid() );
+
+            // generate more blocks, pass one more maintenance interval
+            blocks += generate_blocks(db.get_dynamic_global_properties().next_maintenance_time, true, skip);
+            // median MCR should be 350%, no pending
+            BOOST_CHECK( usd_id(db).bitasset_data(db).current_feed.settlement_price == current_feed.settlement_price );
+            BOOST_CHECK_EQUAL( usd_id(db).bitasset_data(db).current_feed.maintenance_collateral_ratio, 3500 );
+            BOOST_CHECK( !usd_id(db).bitasset_data(db).pending_maintenance_collateral_ratio.valid() );
+
          }
       }
 

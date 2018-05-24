@@ -490,15 +490,17 @@ void database::update_expired_feeds()
          feed_is_expired = b.feed_is_expired( head_time );
       if( feed_is_expired )
       {
-         modify(b, [head_time,next_maint_time](asset_bitasset_data_object& a) {
-            a.update_median_feeds( head_time, next_maint_time );
+         bool defer_mcr_update = ( next_maint_time > HARDFORK_CORE_935_TIME
+                                     && a.dynamic_data(*this).current_supply > 0 );
+         modify(b, [head_time,defer_mcr_update](asset_bitasset_data_object& abdo) {
+            abdo.update_median_feeds( head_time, defer_mcr_update );
          });
          check_call_orders(b.current_feed.settlement_price.base.asset_id(*this));
       }
       if( !b.current_feed.core_exchange_rate.is_null() &&
           a.options.core_exchange_rate != b.current_feed.core_exchange_rate )
-         modify(a, [&b](asset_object& a) {
-            a.options.core_exchange_rate = b.current_feed.core_exchange_rate;
+         modify(a, [&b](asset_object& ao) {
+            ao.options.core_exchange_rate = b.current_feed.core_exchange_rate;
          });
    }
 }
