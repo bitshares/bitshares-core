@@ -774,7 +774,7 @@ void database::process_bids( const asset_bitasset_data_object& bad )
 void update_and_match_call_orders( database& db, const asset_bitasset_data_object* bitasset = nullptr )
 {
    const auto head_num = db.head_block_num();
-   const asset_object* asset_obj;
+   const asset_object* asset_obj = nullptr;
    if( !bitasset )
       wlog( "Updating all call orders for hardfork core-343/935 at block ${n}", ("n",head_num) );
    else
@@ -813,6 +813,7 @@ void update_and_match_call_orders( database& db, const asset_bitasset_data_objec
    // Match call orders
    if( bitasset )
    {
+      // Note: asset_obj should have been updated earlier, so will be valid
       db.check_call_orders( *asset_obj, true, false ); // allow black swan, and call orders are taker
       wlog( "Done updating all call orders for asset ${sym} (${aid}) due to MCR change at block ${n}",
             ("aid",asset_obj->get_id())("sym",asset_obj->symbol)("n",head_num) );
