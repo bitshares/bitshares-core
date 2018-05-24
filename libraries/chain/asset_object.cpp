@@ -66,6 +66,7 @@ void graphene::chain::asset_bitasset_data_object::update_median_feeds( time_poin
       //... don't calculate a median, and set a null feed
       current_feed_publication_time = current_time;
       price_feed null_feed;
+      null_feed.maintenance_collateral_ratio = current_feed.maintenance_collateral_ratio; // keep old MCR
       update_current_feed( null_feed, next_maintenance_time );
       return;
    }

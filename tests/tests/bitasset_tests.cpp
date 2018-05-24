@@ -629,9 +629,14 @@ BOOST_AUTO_TEST_CASE( hf_935_test )
       blocks += generate_blocks( db.head_block_time() + 90, true, skip );
       set_expiration( db, trx );
 
-      // check median, should be null
+      // check median, settlement_price should be null
       BOOST_CHECK( usd_id(db).bitasset_data(db).current_feed.settlement_price.is_null() );
-      BOOST_CHECK_EQUAL( usd_id(db).bitasset_data(db).current_feed.maintenance_collateral_ratio, default_mcr );
+      // MCR should not change
+      if( i < 2 )
+         BOOST_CHECK_EQUAL( usd_id(db).bitasset_data(db).current_feed.maintenance_collateral_ratio, 3500 );
+      else
+         BOOST_CHECK_EQUAL( usd_id(db).bitasset_data(db).current_feed.maintenance_collateral_ratio, default_mcr );
+      // pending MCR got reset
       BOOST_CHECK( !usd_id(db).bitasset_data(db).pending_maintenance_collateral_ratio.valid() );
 
       if( i == 2 )
