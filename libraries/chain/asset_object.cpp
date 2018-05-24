@@ -23,7 +23,6 @@
  */
 #include <graphene/chain/asset_object.hpp>
 #include <graphene/chain/database.hpp>
-#include <graphene/chain/hardfork.hpp>
 
 #include <fc/uint128.hpp>
 
