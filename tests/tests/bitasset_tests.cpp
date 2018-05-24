@@ -1052,6 +1052,7 @@ BOOST_AUTO_TEST_CASE( hf_935_test )
          BOOST_CHECK( usd_id(db).bitasset_data(db).current_feed.settlement_price == current_feed.settlement_price );
          BOOST_CHECK_EQUAL( usd_id(db).bitasset_data(db).current_feed.maintenance_collateral_ratio, 3500 );
          // the limit order should have been filled
+         // TODO FIXME this test case is failing, because call_order's call_price didn't get updated after MCR changed
          BOOST_CHECK( !db.find<limit_order_object>( sell_id ) );
          if( db.find<limit_order_object>( sell_id ) )
          {
