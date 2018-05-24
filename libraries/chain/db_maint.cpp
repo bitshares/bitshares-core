@@ -769,7 +769,7 @@ void database::process_bids( const asset_bitasset_data_object& bad )
 /**
  * @brief Update and match call orders
  * @param db The database
- * @param bitasset set to `nullptr` to update all call orders, otherwise only update call orders of this asset
+ * @param bitasset set to `nullptr` to update call orders of all assets, otherwise only update call orders of this asset
  */
 void update_and_match_call_orders( database& db, const asset_bitasset_data_object* bitasset = nullptr )
 {
@@ -785,6 +785,8 @@ void update_and_match_call_orders( database& db, const asset_bitasset_data_objec
    }
 
    // Update call_price
+
+   // Save variables outside of the iteration for better performance
    asset_id_type current_asset = bitasset ? bitasset->asset_id : asset_id_type();
    const asset_bitasset_data_object* abd = bitasset;
 
@@ -798,7 +800,7 @@ void update_and_match_call_orders( database& db, const asset_bitasset_data_objec
    {
       const call_order_object& call_obj = *citr;
       ++citr;
-      if( !bitasset && current_asset != call_obj.debt_type() ) // only do this when updating all call orders
+      if( !bitasset && current_asset != call_obj.debt_type() ) // only do this when updating call orders of all assets
       { // debt type won't be asset_id_type(), so abd will always get initialized
          current_asset = call_obj.debt_type();
          abd = &current_asset(db).bitasset_data(db);
