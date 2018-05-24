@@ -989,13 +989,19 @@ void process_hf_868_890( database& db, bool skip_check_call_orders, time_point_s
                ("asset_sym", current_asset.symbol)("asset_id", current_asset.id) );
       }
 
-      // Note: due to bitshares-core issue #935, this check below (using median_changed) is incorrect.
+      // Note: due to bitshares-core issue #935, the check below (using median_changed) is incorrect.
       //       However, `skip_check_call_orders` will likely be true in both testnet and mainnet,
       //         so effectively the incorrect code won't make a difference.
+      //       Additionally, we have code to update all call orders again during hardfork core-935
       // TODO cleanup after hard fork
       if( !skip_check_call_orders && median_changed ) // check_call_orders should be called
       {
          db.check_call_orders( current_asset );
+      }
+      else if( !skip_check_call_orders && median_feed_changed )
+      {
+         wlog( "Incorrectly skipped check_call_orders for asset ${asset_sym} (${asset_id}) during hardfork core-868-890",
+               ("asset_sym", current_asset.symbol)("asset_id", current_asset.id) );
       }
    } // for each market issued asset
 }
