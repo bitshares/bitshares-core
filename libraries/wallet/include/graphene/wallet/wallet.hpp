@@ -377,6 +377,16 @@ class wallet_api
        */
      vector<operation_detail>  get_relative_account_history(string name, uint32_t stop, int limit, uint32_t start)const;
 
+      /**
+       * @brief Fetch all objects relevant to the specified account
+       * @param name_or_id Must be the name or ID of an account to retrieve
+       * @return All info about the specified account
+       *
+       * This function fetches all relevant objects for the given account. If the string
+       * of @ref name_or_id cannot be tied to an account, that input will be ignored.
+       *
+       */
+      full_account                      get_full_account( const string& name_or_id);
       vector<bucket_object>             get_market_history(string symbol, string symbol2, uint32_t bucket, fc::time_point_sec start, fc::time_point_sec end)const;
       vector<limit_order_object>        get_limit_orders(string a, string b, uint32_t limit)const;
       vector<call_order_object>         get_call_orders(string a, uint32_t limit)const;
@@ -1492,7 +1502,8 @@ class wallet_api
        * set, your preferences will be ignored.
        *
        * @param account_to_modify the name or id of the account to update
-       * @param number_of_committee_members the number 
+       * @param desired_number_of_witnesses desired number of active witnesses
+       * @param desired_number_of_committee_members desired number of active committee members
        *
        * @param broadcast true if you wish to broadcast the transaction
        * @return the signed transaction changing your vote proxy settings
@@ -1753,6 +1764,7 @@ FC_API( graphene::wallet::wallet_api,
         (get_account_history_by_operations)
         (get_collateral_bids)
         (is_public_key_registered)
+        (get_full_account)
         (get_market_history)
         (get_global_properties)
         (get_dynamic_global_properties)

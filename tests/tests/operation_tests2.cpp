@@ -551,6 +551,117 @@ BOOST_AUTO_TEST_CASE( withdraw_permission_nominal_case )
    BOOST_CHECK_EQUAL(get_balance(dan_id, asset_id_type()), 25);
 } FC_LOG_AND_RETHROW() }
 
+/**
+ * Test asset whitelisting feature for withdrawals.
+ * Reproduces https://github.com/bitshares/bitshares-core/issues/942 and tests the fix for it.
+ */
+BOOST_AUTO_TEST_CASE( withdraw_permission_whitelist_asset_test )
+{ try {
+
+   uint32_t skip = database::skip_witness_signature
+                 | database::skip_transaction_signatures
+                 | database::skip_transaction_dupe_check
+                 | database::skip_block_size_check
+                 | database::skip_tapos_check
+                 | database::skip_authority_check
+                 | database::skip_merkle_check
+                 ;
+
+   generate_blocks( HARDFORK_415_TIME, true, skip ); // get over Graphene 415 asset whitelisting bug
+   generate_block( skip );
+
+   for( int i=0; i<2; i++ )
+   {
+      if( i == 1 )
+      {
+         generate_blocks( HARDFORK_CORE_942_TIME, true, skip );
+         generate_block( skip );
+      }
+
+      int blocks = 0;
+      set_expiration( db, trx );
+
+      ACTORS( (nathan)(dan)(izzy) );
+
+      const asset_id_type uia_id = create_user_issued_asset( "ADVANCED", izzy_id(db), white_list ).id;
+
+      issue_uia( nathan_id, asset(1000, uia_id) );
+
+      // Make a whitelist authority
+      {
+         BOOST_TEST_MESSAGE( "Changing the whitelist authority" );
+         asset_update_operation uop;
+         uop.issuer = izzy_id;
+         uop.asset_to_update = uia_id;
+         uop.new_options = uia_id(db).options;
+         uop.new_options.whitelist_authorities.insert(izzy_id);
+         trx.operations.push_back(uop);
+         PUSH_TX( db, trx, ~0 );
+         trx.operations.clear();
+      }
+
+      // Add dan to whitelist
+      {
+         upgrade_to_lifetime_member( izzy_id );
+
+         account_whitelist_operation wop;
+         wop.authorizing_account = izzy_id;
+         wop.account_to_list = dan_id;
+         wop.new_listing = account_whitelist_operation::white_listed;
+         trx.operations.push_back( wop );
+         PUSH_TX( db, trx, ~0 );
+         trx.operations.clear();
+      }
+
+      // create withdraw permission
+      {
+         withdraw_permission_create_operation op;
+         op.authorized_account = dan_id;
+         op.withdraw_from_account = nathan_id;
+         op.withdrawal_limit = asset(5, uia_id);
+         op.withdrawal_period_sec = fc::hours(1).to_seconds();
+         op.periods_until_expiration = 5;
+         op.period_start_time = db.head_block_time() + 1;
+         trx.operations.push_back(op);
+         PUSH_TX( db, trx, ~0 );
+         trx.operations.clear();
+      }
+
+      withdraw_permission_id_type first_permit_id; // first object must have id 0
+
+      generate_block( skip ); // get to the time point that able to withdraw
+      ++blocks;
+      set_expiration( db, trx );
+
+      // try claim a withdrawal
+      {
+         withdraw_permission_claim_operation op;
+         op.withdraw_permission = first_permit_id;
+         op.withdraw_from_account = nathan_id;
+         op.withdraw_to_account = dan_id;
+         op.amount_to_withdraw = asset(5, uia_id);
+         trx.operations.push_back(op);
+         if( i == 0 ) // before hard fork, should pass
+            PUSH_TX( db, trx, ~0 );
+         else // after hard fork, should throw
+            GRAPHENE_CHECK_THROW( PUSH_TX( db, trx, ~0 ), fc::assert_exception );
+         trx.operations.clear();
+      }
+
+      // TODO add test cases for other white-listing features
+
+      // undo above tx's and reset
+      generate_block( skip );
+      ++blocks;
+      while( blocks > 0 )
+      {
+         db.pop_block();
+         --blocks;
+      }
+   }
+
+} FC_LOG_AND_RETHROW() }
+
 
 /**
  * This case checks to see whether the amount claimed within any particular withdrawal period
