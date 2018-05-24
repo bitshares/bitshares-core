@@ -918,7 +918,9 @@ void database::process_bitassets()
 //       * NOTE: the removal can't be applied to testnet
 void process_hf_868_890( database& db, bool skip_check_call_orders, time_point_sec next_maintenance_time )
 {
-   auto head_time = db.head_block_time();
+   const auto head_time = db.head_block_time();
+   const auto head_num = db.head_block_num();
+   wlog( "Processing hard fork core-868-890 at block ${n}", ("n",head_num) );
    // for each market issued asset
    const auto& asset_idx = db.get_index_type<asset_index>().indices().get<by_type>();
    for( auto asset_itr = asset_idx.lower_bound(true); asset_itr != asset_idx.end(); ++asset_itr )
@@ -1004,6 +1006,7 @@ void process_hf_868_890( database& db, bool skip_check_call_orders, time_point_s
                ("asset_sym", current_asset.symbol)("asset_id", current_asset.id) );
       }
    } // for each market issued asset
+   wlog( "Done processing hard fork core-868-890 at block ${n}", ("n",head_num) );
 }
 
 void database::perform_chain_maintenance(const signed_block& next_block, const global_property_object& global_props)
