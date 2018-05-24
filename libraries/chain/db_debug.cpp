@@ -29,6 +29,7 @@
 #include <graphene/chain/market_object.hpp>
 #include <graphene/chain/vesting_balance_object.hpp>
 #include <graphene/chain/witness_object.hpp>
+#include <graphene/chain/fba_object.hpp>
 
 namespace graphene { namespace chain {
 
@@ -44,6 +45,7 @@ void database::debug_dump()
    const auto& balance_index = db.get_index_type<account_balance_index>().indices();
    const simple_index<account_statistics_object>& statistics_index = db.get_index_type<simple_index<account_statistics_object>>();
    const auto& bids = db.get_index_type<collateral_bid_index>().indices();
+   const auto& settle_index = db.get_index_type<force_settlement_index>().indices();
    map<asset_id_type,share_type> total_balances;
    map<asset_id_type,share_type> total_debts;
    share_type core_in_orders;
@@ -54,6 +56,14 @@ void database::debug_dump()
     //  idump(("balance")(a));
       total_balances[a.asset_type] += a.balance;
    }
+   for( const force_settlement_object& s : settle_index )
+   {
+      total_balances[s.balance.asset_id] += s.balance.amount;
+   }
+   for( const vesting_balance_object& vbo : db.get_index_type< vesting_balance_index >().indices() )
+      total_balances[ vbo.balance.asset_id ] += vbo.balance.amount;
+   for( const fba_accumulator_object& fba : db.get_index_type< simple_index< fba_accumulator_object > >() )
+      total_balances[ asset_id_type() ] += fba.accumulated_fba_fees;
    for( const account_statistics_object& s : statistics_index )
    {
     //  idump(("statistics")(s));
@@ -85,7 +95,9 @@ void database::debug_dump()
 
    if( total_balances[asset_id_type()].value != core_asset_data.current_supply.value )
    {
-      edump( (total_balances[asset_id_type()].value)(core_asset_data.current_supply.value ));
+      FC_THROW( "computed balance of CORE mismatch",
+                ("computed value",total_balances[asset_id_type()].value)
+                ("current supply",core_asset_data.current_supply.value) );
    }
 
 
