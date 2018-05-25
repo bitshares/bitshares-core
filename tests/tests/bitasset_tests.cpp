@@ -1036,8 +1036,8 @@ BOOST_AUTO_TEST_CASE( hf_935_test )
          ba_op.issuer = asset_to_update.issuer;
          ba_op.new_options = asset_to_update.bitasset_data(db).options;
          ba_op.new_options.feed_lifetime_sec = HARDFORK_CORE_935_TIME.sec_since_epoch()
-                                             - db.head_block_time().sec_since_epoch()
-                                             + mi * 3;
+                                             + mi * 3 + 86400 * 2
+                                             - db.head_block_time().sec_since_epoch();
          trx.operations.push_back(ba_op);
          PUSH_TX(db, trx, ~0);
          trx.clear();
