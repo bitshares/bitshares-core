@@ -43,15 +43,7 @@ share_type asset_bitasset_data_object::max_force_settlement_volume(share_type cu
    return volume.to_uint64();
 }
 
-/******
- * @brief calculate the median feed
- *
- * This calculates the median feed. It sets the current_feed_publication_time
- * and current_feed member variables
- *
- * @param current_time the time to use in the calculations
- */
-void graphene::chain::asset_bitasset_data_object::update_median_feeds(time_point_sec current_time)
+void graphene::chain::asset_bitasset_data_object::update_median_feeds( time_point_sec current_time, bool defer_mcr_update )
 {
    current_feed_publication_time = current_time;
    vector<std::reference_wrapper<const price_feed>> current_feeds;
@@ -71,12 +63,15 @@ void graphene::chain::asset_bitasset_data_object::update_median_feeds(time_point
    {
       //... don't calculate a median, and set a null feed
       current_feed_publication_time = current_time;
-      current_feed = price_feed();
+      price_feed null_feed;
+      null_feed.maintenance_collateral_ratio = current_feed.maintenance_collateral_ratio; // keep old MCR
+      update_current_feed( null_feed, defer_mcr_update );
       return;
    }
    if( current_feeds.size() == 1 )
    {
-      current_feed = std::move(current_feeds.front());
+      price_feed only_feed = std::move( current_feeds.front() );
+      update_current_feed( only_feed, defer_mcr_update );
       return;
    }
 
@@ -94,7 +89,20 @@ void graphene::chain::asset_bitasset_data_object::update_median_feeds(time_point
 #undef CALCULATE_MEDIAN_VALUE
    // *** End Median Calculations ***
 
-   current_feed = median_feed;
+   update_current_feed( median_feed, defer_mcr_update );
+}
+
+void graphene::chain::asset_bitasset_data_object::update_current_feed( price_feed& new_feed, bool defer_mcr_update )
+{
+   if( defer_mcr_update )
+   {
+      if( current_feed.maintenance_collateral_ratio == new_feed.maintenance_collateral_ratio )
+         pending_maintenance_collateral_ratio.reset();
+      else
+         pending_maintenance_collateral_ratio = new_feed.maintenance_collateral_ratio;
+      new_feed.maintenance_collateral_ratio = current_feed.maintenance_collateral_ratio;
+   }
+   current_feed = std::move( new_feed );
 }
 
 

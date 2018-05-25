@@ -113,6 +113,7 @@ namespace graphene { namespace chain {
          void_result do_apply( const operation_type& o );
 
          const asset_bitasset_data_object* bitasset_to_update = nullptr;
+         const asset_object* asset_to_update = nullptr;
    };
 
    class asset_fund_fee_pool_evaluator : public evaluator<asset_fund_fee_pool_evaluator>
@@ -156,6 +157,9 @@ namespace graphene { namespace chain {
          void_result do_apply( const asset_publish_feed_operation& o );
 
          std::map<std::pair<asset_id_type,asset_id_type>,price_feed> median_feed_values;
+
+         const asset_bitasset_data_object* bitasset_to_update = nullptr;
+         const asset_object* asset_to_update = nullptr;
    };
 
    class asset_claim_fees_evaluator : public evaluator<asset_claim_fees_evaluator>

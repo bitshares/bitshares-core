@@ -472,6 +472,8 @@ void database::clear_expired_orders()
 
 void database::update_expired_feeds()
 {
+   auto head_time = head_block_time();
+   auto next_maint_time = get_dynamic_global_properties().next_maintenance_time;
    auto& asset_idx = get_index_type<asset_index>().indices().get<by_type>();
    auto itr = asset_idx.lower_bound( true /** market issued */ );
    while( itr != asset_idx.end() )
@@ -482,21 +484,23 @@ void database::update_expired_feeds()
 
       const asset_bitasset_data_object& b = a.bitasset_data(*this);
       bool feed_is_expired;
-      if( head_block_time() < HARDFORK_615_TIME )
-         feed_is_expired = b.feed_is_expired_before_hardfork_615( head_block_time() );
+      if( head_time < HARDFORK_615_TIME )
+         feed_is_expired = b.feed_is_expired_before_hardfork_615( head_time );
       else
-         feed_is_expired = b.feed_is_expired( head_block_time() );
+         feed_is_expired = b.feed_is_expired( head_time );
       if( feed_is_expired )
       {
-         modify(b, [this](asset_bitasset_data_object& a) {
-            a.update_median_feeds(head_block_time());
+         bool defer_mcr_update = ( next_maint_time > HARDFORK_CORE_935_TIME
+                                     && a.dynamic_data(*this).current_supply > 0 );
+         modify(b, [head_time,defer_mcr_update](asset_bitasset_data_object& abdo) {
+            abdo.update_median_feeds( head_time, defer_mcr_update );
          });
          check_call_orders(b.current_feed.settlement_price.base.asset_id(*this));
       }
       if( !b.current_feed.core_exchange_rate.is_null() &&
           a.options.core_exchange_rate != b.current_feed.core_exchange_rate )
-         modify(a, [&b](asset_object& a) {
-            a.options.core_exchange_rate = b.current_feed.core_exchange_rate;
+         modify(a, [&b](asset_object& ao) {
+            ao.options.core_exchange_rate = b.current_feed.core_exchange_rate;
          });
    }
 }
