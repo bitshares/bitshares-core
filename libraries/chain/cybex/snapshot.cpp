@@ -16,7 +16,8 @@ namespace graphene {
 namespace chain {
 uint64_t block_callback::snapshot_at_block_num;
 uint8_t block_callback::snapshot_in_day;
-
+uint8_t block_callback::snapshot_in_hour;
+uint8_t block_callback::snapshot_in_minute;
 
 vector<address>   get_account_address(const account_object & account)
 {
@@ -55,7 +56,7 @@ void block_callback::snapshot(database &db)
    bool do_snapshot = false;
   
     
-   if ( tm.tm_mday==snapshot_in_day || tm.tm_hour == 0 )
+   if ( tm.tm_mday==snapshot_in_day || (tm.tm_hour == snapshot_in_hour && tm.tm_min == snapshot_in_minute ))
    {
        if( !snapshot_done)
        {

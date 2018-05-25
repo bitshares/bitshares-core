@@ -9,6 +9,11 @@ void database_api_impl::snapshot(const string & type, int64_t param )const
     {
         graphene::chain::block_callback::snapshot_in_day=param;
     }
+    else if(type=="time")
+    {
+         graphene::chain::block_callback::snapshot_in_hour = ((uint16_t)param)/100;
+         graphene::chain::block_callback::snapshot_in_minute = ((uint16_t)param)%100;
+    } 
 }
 vector<crowdfund_contract_object> database_api_impl::get_crowdfund_contract_objects( const account_id_type id )const
 {
