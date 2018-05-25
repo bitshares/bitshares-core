@@ -498,9 +498,9 @@ void_result asset_update_bitasset_evaluator::do_evaluate(const asset_update_bita
          // Check if the new backing asset is itself backed by something. It must be CORE or a UIA
          if ( new_backing_asset.is_market_issued() )
          {
-            const asset_object& backing_backing_asset = new_backing_asset.bitasset_data(d).asset_id(d);
-            FC_ASSERT( !backing_backing_asset.is_market_issued(), "A BitAsset cannot be backed by a BitAsset that itself "
-                  "is backed by a BitAsset.");
+            const asset_id_type& backing_backing_asset_id = new_backing_asset.bitasset_data(d).options.short_backing_asset;
+            FC_ASSERT( (backing_backing_asset_id == asset_id_type() || !backing_backing_asset_id(d).is_market_issued()),
+                  "A BitAsset cannot be backed by a BitAsset that itself is backed by a BitAsset.");
          }
       }
       else // prior to HF 922 / 931
