@@ -671,11 +671,28 @@ static bool update_bitasset_object_options(
 
    if( should_update_feeds )
    {
-      const auto old_feed_price = bdo.current_feed.settlement_price;
+      const auto old_feed = bdo.current_feed;
       bdo.update_median_feeds( db.head_block_time() );
 
+      // TODO review and refactor / cleanup after hard fork:
+      //      1. if hf_core_868_890 and core-935 occurred at same time
+      //      2. if wlog did not actually get called
+
+      // We need to call check_call_orders if the price feed changes after hardfork core-935
+      if( next_maint_time > HARDFORK_CORE_935_TIME )
+         return ( !( old_feed == bdo.current_feed ) );
+
       // We need to call check_call_orders if the settlement price changes after hardfork core-868-890
-      return after_hf_core_868_890 && old_feed_price != bdo.current_feed.settlement_price;
+      if( after_hf_core_868_890 )
+      {
+         if( old_feed.settlement_price != bdo.current_feed.settlement_price )
+            return true;
+         else
+         {
+            if( !( old_feed == bdo.current_feed ) )
+               wlog( "Settlement price did not change but current_feed changed at block ${b}", ("b",db.head_block_num()) );
+         }
+      }
    }
 
    return false;

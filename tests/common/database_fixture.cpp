@@ -351,20 +351,25 @@ void database_fixture::generate_blocks( uint32_t block_count )
       generate_block();
 }
 
-void database_fixture::generate_blocks(fc::time_point_sec timestamp, bool miss_intermediate_blocks, uint32_t skip)
+uint32_t database_fixture::generate_blocks(fc::time_point_sec timestamp, bool miss_intermediate_blocks, uint32_t skip)
 {
    if( miss_intermediate_blocks )
    {
       generate_block(skip);
       auto slots_to_miss = db.get_slot_at_time(timestamp);
       if( slots_to_miss <= 1 )
-         return;
+         return 1;
       --slots_to_miss;
       generate_block(skip, init_account_priv_key, slots_to_miss);
-      return;
+      return 2;
    }
+   uint32_t blocks = 0;
    while( db.head_block_time() < timestamp )
+   {
       generate_block(skip);
+      ++blocks;
+   }
+   return blocks;
 }
 
 account_create_operation database_fixture::make_account(
