@@ -40,6 +40,7 @@
 
 #include <fc/smart_ref_impl.hpp>
 
+#include <fc/asio.hpp>
 #include <fc/io/fstream.hpp>
 #include <fc/rpc/api_connection.hpp>
 #include <fc/rpc/websocket_api.hpp>
@@ -483,9 +484,10 @@ bool application_impl::handle_block(const graphene::net::block_message& blk_msg,
       const auto& witness = blk_msg.block.witness(*_chain_db);
       const auto& witness_account = witness.witness_account(*_chain_db);
       auto last_irr = _chain_db->get_dynamic_global_properties().last_irreversible_block_num;
-      ilog("Got block: #${n} time: ${t} latency: ${l} ms from: ${w}  irreversible: ${i} (-${d})",
+      ilog("Got block: #${n} ${bid} time: ${t} latency: ${l} ms from: ${w}  irreversible: ${i} (-${d})",
            ("t",blk_msg.block.timestamp)
            ("n", blk_msg.block.block_num())
+           ("bid", blk_msg.block.id())
            ("l", (latency.count()/1000))
            ("w",witness_account.name)
            ("i",last_irr)("d",blk_msg.block.block_num()-last_irr) );
@@ -923,6 +925,7 @@ void application::set_program_options(boost::program_options::options_descriptio
          ("dbg-init-key", bpo::value<string>(), "Block signing key to use for init witnesses, overrides genesis file")
          ("api-access", bpo::value<boost::filesystem::path>(), "JSON file specifying API permissions")
          ("plugins", bpo::value<string>(), "Space-separated list of plugins to activate")
+         ("io-threads", bpo::value<uint16_t>()->implicit_value(0), "Number of IO threads, default to 0 for auto-configuration")
          // TODO uncomment this when GUI is ready
          //("enable-subscribe-to-all", bpo::value<bool>()->implicit_value(false),
          // "Whether allow API clients to subscribe to universal object creation and removal events")
@@ -971,6 +974,12 @@ void application::initialize(const fc::path& data_dir, const boost::program_opti
       fc::json::save_to_file(genesis_state, genesis_out);
 
       std::exit(EXIT_SUCCESS);
+   }
+
+   if ( options.count("io-threads") )
+   {
+      const uint16_t num_threads = options["io-threads"].as<uint16_t>();
+      fc::asio::default_io_service_scope::set_num_threads(num_threads);
    }
 
    std::vector<string> wanted;

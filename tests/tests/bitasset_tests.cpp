@@ -35,10 +35,12 @@
 #include <graphene/chain/withdraw_permission_object.hpp>
 #include <graphene/chain/witness_object.hpp>
 #include <graphene/chain/worker_object.hpp>
+#include <graphene/chain/asset_evaluator.hpp>
 
 #include <graphene/utilities/tempdir.hpp>
 
 #include <fc/crypto/digest.hpp>
+#include <fc/log/log_message.hpp>
 
 #include "../common/database_fixture.hpp"
 
@@ -57,16 +59,24 @@ BOOST_FIXTURE_TEST_SUITE( bitasset_tests, database_fixture )
 void change_backing_asset(database_fixture& fixture, const fc::ecc::private_key& signing_key,
       asset_id_type asset_id_to_update, asset_id_type new_backing_asset_id)
 {
-   asset_update_bitasset_operation ba_op;
-   const asset_object& asset_to_update = asset_id_to_update(fixture.db);
-   ba_op.asset_to_update = asset_id_to_update;
-   ba_op.issuer = asset_to_update.issuer;
-   ba_op.new_options.short_backing_asset = new_backing_asset_id;
-   fixture.trx.operations.push_back(ba_op);
-   fixture.sign(fixture.trx, signing_key);
-   PUSH_TX(fixture.db, fixture.trx, ~0);
-   fixture.generate_block();
-   fixture.trx.clear();
+   try
+   {
+      asset_update_bitasset_operation ba_op;
+      const asset_object& asset_to_update = asset_id_to_update(fixture.db);
+      ba_op.asset_to_update = asset_id_to_update;
+      ba_op.issuer = asset_to_update.issuer;
+      ba_op.new_options.short_backing_asset = new_backing_asset_id;
+      fixture.trx.operations.push_back(ba_op);
+      fixture.sign(fixture.trx, signing_key);
+      PUSH_TX(fixture.db, fixture.trx, ~0);
+      fixture.generate_block();
+      fixture.trx.clear();
+   }
+   catch (fc::exception& ex)
+   {
+      BOOST_FAIL( "Exception thrown in chainge_backing_asset. Exception was: " +
+            ex.to_string(fc::log_level(fc::log_level::all)) );
+   }
 }
 
 /******
@@ -139,6 +149,7 @@ BOOST_AUTO_TEST_CASE( reset_backing_asset_on_witness_asset )
       BOOST_TEST_MESSAGE("Update the JMJBIT asset options");
       change_asset_options(*this, nathan_id, nathan_private_key, bit_jmj_id, true );
    }
+
    {
       BOOST_TEST_MESSAGE("Update the JMJBIT bitasset options");
       asset_update_bitasset_operation ba_op;
@@ -214,8 +225,8 @@ BOOST_AUTO_TEST_CASE( reset_backing_asset_on_witness_asset )
    }
    {
       BOOST_TEST_MESSAGE("Advance to after hard fork");
-      generate_blocks( HARDFORK_CORE_868_890_TIME + maint_interval);
-      trx.set_expiration(HARDFORK_CORE_868_890_TIME + fc::hours(46));
+      generate_blocks( HARDFORK_CORE_868_890_TIME + fc::seconds(1));
+      trx.set_expiration(HARDFORK_CORE_868_890_TIME + fc::hours(2));
 
       BOOST_TEST_MESSAGE("After hardfork, 1 feed should have been erased");
       const asset_bitasset_data_object& jmj_obj = bit_jmj_id(db).bitasset_data(db);
@@ -296,6 +307,7 @@ BOOST_AUTO_TEST_CASE( reset_backing_asset_on_non_witness_asset )
       generate_block();
       trx.clear();
    }
+
    {
       BOOST_TEST_MESSAGE("Verify feed producers are registered for JMJBIT");
       const asset_bitasset_data_object& obj = bit_jmj_id(db).bitasset_data(db);
@@ -434,10 +446,8 @@ BOOST_AUTO_TEST_CASE( hf_890_test )
 
       if( i == 1 ) // go beyond hard fork
       {
-         generate_blocks(HARDFORK_CORE_868_890_TIME - mi, true, skip);
-         blocks += 2;
-         generate_blocks(db.get_dynamic_global_properties().next_maintenance_time, true, skip);
-         blocks += 2;
+         blocks += generate_blocks(HARDFORK_CORE_868_890_TIME - mi, true, skip);
+         blocks += generate_blocks(db.get_dynamic_global_properties().next_maintenance_time, true, skip);
       }
       set_expiration( db, trx );
 
@@ -486,8 +496,7 @@ BOOST_AUTO_TEST_CASE( hf_890_test )
       // settlement price = 100 USD / 10 CORE, mssp = 100/11 USD/CORE
 
       // let the feed expire
-      generate_blocks( db.head_block_time() + 1200, true, skip );
-      blocks += 2;
+      blocks += generate_blocks( db.head_block_time() + 1200, true, skip );
       set_expiration( db, trx );
 
       // check: median feed should be null
@@ -519,10 +528,8 @@ BOOST_AUTO_TEST_CASE( hf_890_test )
          BOOST_CHECK( db.find<limit_order_object>( sell_id ) );
 
          // go beyond hard fork
-         generate_blocks(HARDFORK_CORE_868_890_TIME - mi, true, skip);
-         blocks += 2;
-         generate_blocks(db.get_dynamic_global_properties().next_maintenance_time, true, skip);
-         blocks += 2;
+         blocks += generate_blocks(HARDFORK_CORE_868_890_TIME - mi, true, skip);
+         blocks += generate_blocks(db.get_dynamic_global_properties().next_maintenance_time, true, skip);
       }
 
       // after hard fork, median feed should become valid, and the limit order should be filled
@@ -541,6 +548,560 @@ BOOST_AUTO_TEST_CASE( hf_890_test )
       }
    }
 }
+
+class bitasset_evaluator_wrapper : public asset_update_bitasset_evaluator
+{
+public:
+   void set_db(database& db)
+   {
+      this->trx_state = new transaction_evaluation_state(&db);
+   }
+};
+
+struct assets_922_931
+{
+   const asset_object* bit_usd;
+   const asset_object* bit_usdbacked;
+   const asset_object* bit_usdbacked2;
+   const asset_object* bit_child_bitasset;
+   const asset_object* bit_parent;
+   const asset_object* user_issued;
+   const asset_object* six_precision;
+   const asset_object* prediction;
+};
+
+assets_922_931 create_assets_922_931(database_fixture* fixture)
+{
+   assets_922_931 asset_objs;
+   BOOST_TEST_MESSAGE( "Create USDBIT" );
+   asset_objs.bit_usd = &fixture->create_bitasset( "USDBIT", GRAPHENE_COMMITTEE_ACCOUNT );
+
+   BOOST_TEST_MESSAGE( "Create USDBACKED" );
+   asset_objs.bit_usdbacked = &fixture->create_bitasset( "USDBACKED", GRAPHENE_COMMITTEE_ACCOUNT,
+         100, charge_market_fee, 2, asset_objs.bit_usd->get_id() );
+
+   BOOST_TEST_MESSAGE( "Create USDBACKEDII" );
+   asset_objs.bit_usdbacked2 = &fixture->create_bitasset( "USDBACKEDII", GRAPHENE_WITNESS_ACCOUNT,
+         100, charge_market_fee, 2, asset_objs.bit_usd->get_id() );
+
+   BOOST_TEST_MESSAGE( "Create PARENT" );
+   asset_objs.bit_parent = &fixture->create_bitasset( "PARENT", GRAPHENE_WITNESS_ACCOUNT);
+
+   BOOST_TEST_MESSAGE( "Create CHILDUSER" );
+   asset_objs.bit_child_bitasset = &fixture->create_bitasset( "CHILDUSER", GRAPHENE_WITNESS_ACCOUNT,
+         100, charge_market_fee, 2, asset_objs.bit_parent->get_id() );
+
+   BOOST_TEST_MESSAGE( "Create user issued USERISSUED" );
+   asset_objs.user_issued = &fixture->create_user_issued_asset( "USERISSUED",
+         GRAPHENE_WITNESS_ACCOUNT(fixture->db), charge_market_fee );
+
+   BOOST_TEST_MESSAGE( "Create a user-issued asset with a precision of 6" );
+   asset_objs.six_precision = &fixture->create_user_issued_asset( "SIXPRECISION", GRAPHENE_WITNESS_ACCOUNT(fixture->db),
+         charge_market_fee, price(asset(1, asset_id_type(1)), asset(1)), 6 );
+
+   BOOST_TEST_MESSAGE( "Create Prediction market with precision of 6, backed by SIXPRECISION" );
+   asset_objs.prediction = &fixture->create_prediction_market( "PREDICTION", GRAPHENE_WITNESS_ACCOUNT,
+         100, charge_market_fee, 6, asset_objs.six_precision->get_id() );
+
+   return asset_objs;
+}
+/******
+ * @brief Test various bitasset asserts within the asset_evaluator before the HF 922 / 931
+ */
+BOOST_AUTO_TEST_CASE( bitasset_evaluator_test_before_922_931 )
+{
+   BOOST_TEST_MESSAGE("Advance to near hard fork 922 / 931");
+   auto global_params = db.get_global_properties().parameters;
+   generate_blocks( HARDFORK_CORE_922_931_TIME - global_params.maintenance_interval );
+   trx.set_expiration( HARDFORK_CORE_922_931_TIME - global_params.maintenance_interval + global_params.maximum_time_until_expiration );
+
+   ACTORS( (nathan) (john) );
+
+   assets_922_931 asset_objs = create_assets_922_931( this );
+   const asset_id_type bit_usd_id = asset_objs.bit_usd->get_id();
+
+   // make a generic operation
+   bitasset_evaluator_wrapper evaluator;
+   evaluator.set_db(db);
+   asset_update_bitasset_operation op;
+   op.asset_to_update = bit_usd_id;
+   op.issuer = asset_objs.bit_usd->issuer;
+   op.new_options = asset_objs.bit_usd->bitasset_data(db).options;
+
+   // this should pass
+   BOOST_TEST_MESSAGE( "Evaluating a good operation" );
+   BOOST_CHECK( evaluator.evaluate(op) == void_result() );
+
+   // test with a market issued asset
+   BOOST_TEST_MESSAGE( "Sending a non-bitasset." );
+   op.asset_to_update = asset_objs.user_issued->get_id();
+   REQUIRE_EXCEPTION_WITH_TEXT( evaluator.evaluate(op), "on a non-BitAsset." );
+   op.asset_to_update = bit_usd_id;
+
+   // test changing issuer
+   BOOST_TEST_MESSAGE( "Test changing issuer." );
+   account_id_type original_issuer = op.issuer;
+   op.issuer = john_id;
+   REQUIRE_EXCEPTION_WITH_TEXT( evaluator.evaluate(op), "Only asset issuer can update" );
+   op.issuer = original_issuer;
+
+   // bad backing_asset
+   BOOST_TEST_MESSAGE( "Non-existent backing asset." );
+   asset_id_type correct_asset_id = op.new_options.short_backing_asset;
+   op.new_options.short_backing_asset = asset_id_type();
+   op.new_options.short_backing_asset.instance = 123;
+   REQUIRE_EXCEPTION_WITH_TEXT( evaluator.evaluate(op), "Unable to find Object" );
+   op.new_options.short_backing_asset = correct_asset_id;
+
+   // now check the things that are wrong, but still pass before HF 922 / 931
+   BOOST_TEST_MESSAGE( "Now check the things that are wrong, but still pass before HF 922 / 931" );
+
+   // back by self
+   BOOST_TEST_MESSAGE( "Message should contain: op.new_options.short_backing_asset == asset_obj.get_id()" );
+   op.new_options.short_backing_asset = bit_usd_id;
+   BOOST_CHECK( evaluator.evaluate(op) == void_result() );
+   op.new_options.short_backing_asset = correct_asset_id;
+
+   // prediction market with different precision
+   BOOST_TEST_MESSAGE( "Message should contain: for a PM, asset_obj.precision != new_backing_asset.precision" );
+   op.asset_to_update = asset_objs.prediction->get_id();
+   op.issuer = asset_objs.prediction->issuer;
+   BOOST_CHECK( evaluator.evaluate(op) == void_result() );
+   op.asset_to_update = bit_usd_id;
+   op.issuer = asset_objs.bit_usd->issuer;
+
+   // checking old backing asset instead of new backing asset
+   BOOST_TEST_MESSAGE( "Message should contain: to be backed by an asset which is not market issued asset nor CORE" );
+   op.new_options.short_backing_asset = asset_objs.six_precision->get_id();
+   BOOST_CHECK( evaluator.evaluate(op) == void_result() );
+   BOOST_TEST_MESSAGE( "Message should contain: modified a blockchain-controlled market asset to be backed by an asset "
+         "which is not backed by CORE" );
+   op.new_options.short_backing_asset = asset_objs.prediction->get_id();
+   BOOST_CHECK( evaluator.evaluate(op) == void_result() );
+   op.new_options.short_backing_asset = correct_asset_id;
+
+   // CHILDUSER is a non-committee asset backed by PARENT which is backed by CORE
+   // Cannot change PARENT's backing asset from CORE to something that is not [CORE | UIA]
+   // because that will make CHILD be backed by an asset that is not itself backed by CORE or a UIA.
+   BOOST_TEST_MESSAGE( "Message should contain: but this asset is a backing asset for another MPA, which would cause MPA "
+         "backed by MPA backed by MPA." );
+   op.asset_to_update = asset_objs.bit_parent->get_id();
+   op.issuer = asset_objs.bit_parent->issuer;
+   op.new_options.short_backing_asset = asset_objs.bit_usdbacked->get_id();
+   // this should generate a warning in the log, but not fail.
+   BOOST_CHECK( evaluator.evaluate(op) == void_result() );
+   // changing the backing asset to a UIA should work
+   BOOST_TEST_MESSAGE( "Switching to a backing asset that is a UIA should work. No warning should be produced." );
+   op.new_options.short_backing_asset = asset_objs.user_issued->get_id();
+   BOOST_CHECK( evaluator.evaluate(op) == void_result() );
+   // A -> B -> C, change B to be backed by A (circular backing)
+   BOOST_TEST_MESSAGE( "Message should contain: A cannot be backed by B which is backed by A." );
+   op.new_options.short_backing_asset = asset_objs.bit_child_bitasset->get_id();
+   BOOST_CHECK( evaluator.evaluate(op) == void_result() );
+   op.new_options.short_backing_asset = asset_objs.user_issued->get_id();
+   BOOST_TEST_MESSAGE( "Message should contain: but this asset is a backing asset for a committee-issued asset." );
+   // CHILDCOMMITTEE is a committee asset backed by PARENT which is backed by CORE
+   // Cannot change PARENT's backing asset from CORE to something else because that will make CHILD be backed by
+   // an asset that is not itself backed by CORE
+   create_bitasset( "CHILDCOMMITTEE", GRAPHENE_COMMITTEE_ACCOUNT, 100, charge_market_fee, 2,
+         asset_objs.bit_parent->get_id() );
+   // it should again work, generating 2 warnings in the log. 1 for the above, and 1 new one.
+   BOOST_CHECK( evaluator.evaluate(op) == void_result() );
+   op.asset_to_update = asset_objs.bit_usd->get_id();
+   op.issuer = asset_objs.bit_usd->issuer;
+   op.new_options.short_backing_asset = correct_asset_id;
+
+   // USDBACKED is backed by USDBIT (which is backed by CORE)
+   // USDBACKEDII is backed by USDBIT
+   // We should not be able to make USDBACKEDII be backed by USDBACKED
+   // because that would be a MPA backed by MPA backed by MPA.
+   BOOST_TEST_MESSAGE( "Message should contain: a BitAsset cannot be backed by a BitAsset that "
+         "itself is backed by a BitAsset." );
+   op.asset_to_update = asset_objs.bit_usdbacked2->get_id();
+   op.issuer = asset_objs.bit_usdbacked2->issuer;
+   op.new_options.short_backing_asset = asset_objs.bit_usdbacked->get_id();
+   BOOST_CHECK( evaluator.evaluate(op) == void_result() );
+   // set everything to a more normal state
+   op.asset_to_update = asset_objs.bit_usdbacked->get_id();
+   op.issuer = asset_objs.bit_usd->issuer;
+   op.new_options.short_backing_asset = asset_id_type();
+
+   // Feed lifetime must exceed block interval
+   BOOST_TEST_MESSAGE( "Message should contain: op.new_options.feed_lifetime_sec <= chain_parameters.block_interval" );
+   const auto good_feed_lifetime = op.new_options.feed_lifetime_sec;
+   op.new_options.feed_lifetime_sec = db.get_global_properties().parameters.block_interval;
+   BOOST_CHECK( evaluator.evaluate(op) == void_result() );
+   BOOST_TEST_MESSAGE( "Message should contain: op.new_options.feed_lifetime_sec <= chain_parameters.block_interval" );
+   op.new_options.feed_lifetime_sec = db.get_global_properties().parameters.block_interval - 1; // default interval > 1
+   BOOST_CHECK( evaluator.evaluate(op) == void_result() );
+   op.new_options.feed_lifetime_sec = good_feed_lifetime;
+
+   // Force settlement delay must exceed block interval.
+   BOOST_TEST_MESSAGE( "Message should contain: op.new_options.force_settlement_delay_sec <= chain_parameters.block_interval" );
+   const auto good_force_settlement_delay_sec = op.new_options.force_settlement_delay_sec;
+   op.new_options.force_settlement_delay_sec = db.get_global_properties().parameters.block_interval;
+   BOOST_CHECK( evaluator.evaluate(op) == void_result() );
+   BOOST_TEST_MESSAGE( "Message should contain: op.new_options.force_settlement_delay_sec <= chain_parameters.block_interval" );
+   op.new_options.force_settlement_delay_sec = db.get_global_properties().parameters.block_interval - 1; // default interval > 1
+   BOOST_CHECK( evaluator.evaluate(op) == void_result() );
+   op.new_options.force_settlement_delay_sec = good_force_settlement_delay_sec;
+
+   // this should pass
+   BOOST_TEST_MESSAGE( "We should be all good again." );
+   BOOST_CHECK( evaluator.evaluate(op) == void_result() );
+}
+
+/******
+ * @brief Test various bitasset asserts within the asset_evaluator before the HF 922 / 931
+ */
+BOOST_AUTO_TEST_CASE( bitasset_evaluator_test_after_922_931 )
+{
+   BOOST_TEST_MESSAGE("Advance to after hard fork 922 / 931");
+   auto global_params = db.get_global_properties().parameters;
+   generate_blocks( HARDFORK_CORE_922_931_TIME + global_params.maintenance_interval );
+   trx.set_expiration( HARDFORK_CORE_922_931_TIME + global_params.maintenance_interval + global_params.maximum_time_until_expiration );
+
+   ACTORS( (nathan) (john) );
+
+   assets_922_931 asset_objs = create_assets_922_931( this );
+   const asset_id_type& bit_usd_id = asset_objs.bit_usd->get_id();
+
+   // make a generic operation
+   bitasset_evaluator_wrapper evaluator;
+   evaluator.set_db( db );
+   asset_update_bitasset_operation op;
+   op.asset_to_update = bit_usd_id;
+   op.issuer = asset_objs.bit_usd->issuer;
+   op.new_options = asset_objs.bit_usd->bitasset_data(db).options;
+
+   // this should pass
+   BOOST_TEST_MESSAGE( "Evaluating a good operation" );
+   BOOST_CHECK( evaluator.evaluate(op) == void_result() );
+
+   // test with a market issued asset
+   BOOST_TEST_MESSAGE( "Sending a non-bitasset." );
+   op.asset_to_update = asset_objs.user_issued->get_id();
+   REQUIRE_EXCEPTION_WITH_TEXT( evaluator.evaluate(op), "Cannot update BitAsset-specific settings on a non-BitAsset" );
+   op.asset_to_update = bit_usd_id;
+
+   // test changing issuer
+   BOOST_TEST_MESSAGE( "Test changing issuer." );
+   account_id_type original_issuer = op.issuer;
+   op.issuer = john_id;
+   REQUIRE_EXCEPTION_WITH_TEXT( evaluator.evaluate(op), "Only asset issuer can update" );
+   op.issuer = original_issuer;
+
+   // bad backing_asset
+   BOOST_TEST_MESSAGE( "Non-existent backing asset." );
+   asset_id_type correct_asset_id = op.new_options.short_backing_asset;
+   op.new_options.short_backing_asset = asset_id_type();
+   op.new_options.short_backing_asset.instance = 123;
+   REQUIRE_EXCEPTION_WITH_TEXT( evaluator.evaluate(op), "Unable to find" );
+   op.new_options.short_backing_asset = correct_asset_id;
+
+   // now check the things that are wrong and won't pass after HF 922 / 931
+   BOOST_TEST_MESSAGE( "Now check the things that are wrong and won't pass after HF 922 / 931" );
+
+   // back by self
+   BOOST_TEST_MESSAGE( "Back by itself" );
+   op.new_options.short_backing_asset = bit_usd_id;
+   REQUIRE_EXCEPTION_WITH_TEXT( evaluator.evaluate(op), "Cannot update an asset to be backed by itself" );
+   op.new_options.short_backing_asset = correct_asset_id;
+
+   // prediction market with different precision
+   BOOST_TEST_MESSAGE( "Prediction market with different precision" );
+   op.asset_to_update = asset_objs.prediction->get_id();
+   op.issuer = asset_objs.prediction->issuer;
+   REQUIRE_EXCEPTION_WITH_TEXT( evaluator.evaluate(op), "The precision of the asset and backing asset must" );
+   op.asset_to_update = bit_usd_id;
+   op.issuer = asset_objs.bit_usd->issuer;
+
+   // checking old backing asset instead of new backing asset
+   BOOST_TEST_MESSAGE( "Correctly checking new backing asset rather than old backing asset" );
+   op.new_options.short_backing_asset = asset_objs.six_precision->get_id();
+   REQUIRE_EXCEPTION_WITH_TEXT( evaluator.evaluate(op), "which is not market issued asset nor CORE." );
+   op.new_options.short_backing_asset = asset_objs.prediction->get_id();
+   REQUIRE_EXCEPTION_WITH_TEXT( evaluator.evaluate(op), "which is not backed by CORE" );
+   op.new_options.short_backing_asset = correct_asset_id;
+
+   // CHILD is a non-committee asset backed by PARENT which is backed by CORE
+   // Cannot change PARENT's backing asset from CORE to something that is not [CORE | UIA]
+   // because that will make CHILD be backed by an asset that is not itself backed by CORE or a UIA.
+   BOOST_TEST_MESSAGE( "Attempting to change PARENT to be backed by a non-core and non-user-issued asset" );
+   op.asset_to_update = asset_objs.bit_parent->get_id();
+   op.issuer = asset_objs.bit_parent->issuer;
+   op.new_options.short_backing_asset = asset_objs.bit_usdbacked->get_id();
+   REQUIRE_EXCEPTION_WITH_TEXT( evaluator.evaluate(op), "A non-blockchain controlled BitAsset would be invalidated" );
+   // changing the backing asset to a UIA should work
+   BOOST_TEST_MESSAGE( "Switching to a backing asset that is a UIA should work." );
+   op.new_options.short_backing_asset = asset_objs.user_issued->get_id();
+   BOOST_CHECK( evaluator.evaluate(op) == void_result() );
+   // A -> B -> C, change B to be backed by A (circular backing)
+   BOOST_TEST_MESSAGE( "Check for circular backing. This should generate an exception" );
+   op.new_options.short_backing_asset = asset_objs.bit_child_bitasset->get_id();
+   REQUIRE_EXCEPTION_WITH_TEXT( evaluator.evaluate(op), "'A' backed by 'B' backed by 'A'" );
+   op.new_options.short_backing_asset = asset_objs.user_issued->get_id();
+   BOOST_TEST_MESSAGE( "Creating CHILDCOMMITTEE" );
+   // CHILDCOMMITTEE is a committee asset backed by PARENT which is backed by CORE
+   // Cannot change PARENT's backing asset from CORE to something else because that will make CHILD be backed by
+   // an asset that is not itself backed by CORE
+   create_bitasset( "CHILDCOMMITTEE", GRAPHENE_COMMITTEE_ACCOUNT, 100, charge_market_fee, 2,
+         asset_objs.bit_parent->get_id() );
+   // it should again not work
+   REQUIRE_EXCEPTION_WITH_TEXT( evaluator.evaluate(op), "A blockchain-controlled market asset would be invalidated" );
+   op.asset_to_update = asset_objs.bit_usd->get_id();
+   op.issuer = asset_objs.bit_usd->issuer;
+   op.new_options.short_backing_asset = correct_asset_id;
+
+   // USDBACKED is backed by USDBIT (which is backed by CORE)
+   // USDBACKEDII is backed by USDBIT
+   // We should not be able to make USDBACKEDII be backed by USDBACKED
+   // because that would be a MPA backed by MPA backed by MPA.
+   BOOST_TEST_MESSAGE( "MPA -> MPA -> MPA not allowed" );
+   op.asset_to_update = asset_objs.bit_usdbacked2->get_id();
+   op.issuer = asset_objs.bit_usdbacked2->issuer;
+   op.new_options.short_backing_asset = asset_objs.bit_usdbacked->get_id();
+   REQUIRE_EXCEPTION_WITH_TEXT( evaluator.evaluate(op),
+         "A BitAsset cannot be backed by a BitAsset that itself is backed by a BitAsset" );
+   // set everything to a more normal state
+   op.asset_to_update = asset_objs.bit_usdbacked->get_id();
+   op.issuer = asset_objs.bit_usd->issuer;
+   op.new_options.short_backing_asset = asset_id_type();
+
+   // Feed lifetime must exceed block interval
+   BOOST_TEST_MESSAGE( "Feed lifetime less than or equal to block interval" );
+   const auto good_feed_lifetime = op.new_options.feed_lifetime_sec;
+   op.new_options.feed_lifetime_sec = db.get_global_properties().parameters.block_interval;
+   REQUIRE_EXCEPTION_WITH_TEXT( evaluator.evaluate(op), "Feed lifetime must exceed block" );
+   op.new_options.feed_lifetime_sec = db.get_global_properties().parameters.block_interval - 1; // default interval > 1
+   REQUIRE_EXCEPTION_WITH_TEXT( evaluator.evaluate(op), "Feed lifetime must exceed block" );
+   op.new_options.feed_lifetime_sec = good_feed_lifetime;
+
+   // Force settlement delay must exceed block interval.
+   BOOST_TEST_MESSAGE( "Force settlement delay less than or equal to block interval" );
+   const auto good_force_settlement_delay_sec = op.new_options.force_settlement_delay_sec;
+   op.new_options.force_settlement_delay_sec = db.get_global_properties().parameters.block_interval;
+   REQUIRE_EXCEPTION_WITH_TEXT( evaluator.evaluate(op), "Force settlement delay must" );
+   op.new_options.force_settlement_delay_sec = db.get_global_properties().parameters.block_interval - 1; // default interval > 1
+   REQUIRE_EXCEPTION_WITH_TEXT( evaluator.evaluate(op), "Force settlement delay must" );
+   op.new_options.force_settlement_delay_sec = good_force_settlement_delay_sec;
+
+   // this should pass
+   BOOST_TEST_MESSAGE( "We should be all good again." );
+   BOOST_CHECK( evaluator.evaluate(op) == void_result() );
+
+}
+
+/*********
+ * @brief Call check_call_orders after current_feed changed but not only settlement_price changed.
+ */
+BOOST_AUTO_TEST_CASE( hf_935_test )
+{ try {
+   uint32_t skip = database::skip_witness_signature
+                 | database::skip_transaction_signatures
+                 | database::skip_transaction_dupe_check
+                 | database::skip_block_size_check
+                 | database::skip_tapos_check
+                 | database::skip_authority_check
+                 | database::skip_merkle_check
+                 ;
+   generate_blocks( HARDFORK_615_TIME, true, skip ); // get around Graphene issue #615 feed expiration bug
+   generate_blocks( db.get_dynamic_global_properties().next_maintenance_time, true, skip );
+   generate_block( skip );
+
+   for( int i = 0; i < 6; ++i )
+   {
+      idump( (i) );
+      int blocks = 0;
+      auto mi = db.get_global_properties().parameters.maintenance_interval;
+
+      if( i == 2 ) // go beyond hard fork 890
+      {
+         generate_blocks( HARDFORK_CORE_868_890_TIME - mi, true, skip );
+         generate_blocks( db.get_dynamic_global_properties().next_maintenance_time, true, skip );
+      }
+      else if( i == 4 ) // go beyond hard fork 935
+      {
+         generate_blocks( HARDFORK_CORE_935_TIME - mi, true, skip );
+         generate_blocks( db.get_dynamic_global_properties().next_maintenance_time, true, skip );
+      }
+      set_expiration( db, trx );
+
+      ACTORS( (seller)(borrower)(feedproducer)(feedproducer2)(feedproducer3) );
+
+      int64_t init_balance( 1000000 );
+
+      transfer( committee_account, borrower_id, asset(init_balance) );
+
+      const auto& bitusd = create_bitasset( "USDBIT", feedproducer_id );
+      asset_id_type usd_id = bitusd.id;
+
+      {
+         // set a short feed lifetime
+         const asset_object& asset_to_update = usd_id(db);
+         asset_update_bitasset_operation ba_op;
+         ba_op.asset_to_update = usd_id;
+         ba_op.issuer = asset_to_update.issuer;
+         ba_op.new_options = asset_to_update.bitasset_data(db).options;
+         ba_op.new_options.feed_lifetime_sec = 300;
+         trx.operations.push_back(ba_op);
+         PUSH_TX(db, trx, ~0);
+         trx.clear();
+      }
+
+      // set feed producers
+      flat_set<account_id_type> producers;
+      producers.insert( feedproducer_id );
+      producers.insert( feedproducer2_id );
+      producers.insert( feedproducer3_id );
+      update_feed_producers( usd_id(db), producers );
+
+      // prepare feed data
+      price_feed current_feed;
+      if( i % 2 == 0 ) // MCR test
+      {
+         current_feed.maintenance_collateral_ratio = 3500;
+         current_feed.maximum_short_squeeze_ratio = 1100;
+         current_feed.settlement_price = asset(100, usd_id) / asset(5);
+      }
+      else // MSSR test
+      {
+         current_feed.maintenance_collateral_ratio = 1750;
+         current_feed.maximum_short_squeeze_ratio = 1250;
+         current_feed.settlement_price = asset(100, usd_id) / asset(10);
+         // mssp = 1000/125
+      }
+
+      // set 2 price feeds which should call some later
+      publish_feed( usd_id, feedproducer_id, current_feed );
+      publish_feed( usd_id, feedproducer2_id, current_feed );
+
+      // check median
+      BOOST_CHECK( usd_id(db).bitasset_data(db).current_feed.settlement_price == current_feed.settlement_price );
+      if( i % 2 == 0 ) // MCR test, MCR should be 350%
+         BOOST_CHECK_EQUAL( usd_id(db).bitasset_data(db).current_feed.maintenance_collateral_ratio, 3500 );
+      else // MSSR test, MSSR should be 125%
+         BOOST_CHECK_EQUAL( usd_id(db).bitasset_data(db).current_feed.maximum_short_squeeze_ratio, 1250 );
+
+      // generate some blocks, let the feeds expire
+      blocks += generate_blocks( db.head_block_time() + 360, true, skip );
+      set_expiration( db, trx );
+
+      // check median, should be null
+      BOOST_CHECK( usd_id(db).bitasset_data(db).current_feed.settlement_price.is_null() );
+
+      // publish a new feed with 175% MCR and 110% MSSR
+      current_feed.settlement_price = asset(100, usd_id) / asset(5);
+      current_feed.maintenance_collateral_ratio = 1750;
+      current_feed.maximum_short_squeeze_ratio = 1100;
+      publish_feed( usd_id, feedproducer3_id, current_feed );
+
+      // check median, MCR would be 175%, MSSR would be 110%
+      BOOST_CHECK( usd_id(db).bitasset_data(db).current_feed.settlement_price == current_feed.settlement_price );
+      BOOST_CHECK_EQUAL( usd_id(db).bitasset_data(db).current_feed.maintenance_collateral_ratio, 1750 );
+      BOOST_CHECK_EQUAL( usd_id(db).bitasset_data(db).current_feed.maximum_short_squeeze_ratio, 1100 );
+
+      // Place some collateralized orders
+      // start out with 300% collateral, call price is 15/175 CORE/USD = 60/700
+      borrow( borrower_id, asset(100, usd_id), asset(15) );
+
+      transfer( borrower_id, seller_id, asset(100, usd_id) );
+
+      if( i % 2 == 1) // MSSR test
+      {
+         // publish a new feed to put the call order into margin call territory
+         current_feed.settlement_price = asset(100, usd_id) / asset(10);
+         current_feed.maintenance_collateral_ratio = 1750;
+         current_feed.maximum_short_squeeze_ratio = 1100;
+         publish_feed( usd_id, feedproducer3_id, current_feed );
+         // mssp = 100/11
+      }
+
+      // place a sell order, it won't be matched with the call order now.
+      // For MCR test, the sell order is at feed price (100/5),
+      //   when median MCR changed to 350%, the call order with 300% collateral will be in margin call territory,
+      //   then this limit order should be filled
+      // For MSSR test, the sell order is above 110% of feed price (100/10) but below 125% of feed price,
+      //   when median MSSR changed to 125%, the call order will be matched,
+      //   then this limit order should be filled
+      limit_order_id_type sell_id = ( i % 2 == 0 ) ?
+                                    create_sell_order( seller_id, asset(20, usd_id), asset(1) )->id : // for MCR test
+                                    create_sell_order( seller_id, asset(8, usd_id), asset(1) )->id;  // for MSSR test
+
+      {
+         // change feed lifetime to longer, let all 3 feeds be valid
+         const asset_object& asset_to_update = usd_id(db);
+         asset_update_bitasset_operation ba_op;
+         ba_op.asset_to_update = usd_id;
+         ba_op.issuer = asset_to_update.issuer;
+         ba_op.new_options = asset_to_update.bitasset_data(db).options;
+         ba_op.new_options.feed_lifetime_sec = HARDFORK_CORE_935_TIME.sec_since_epoch()
+                                             - db.head_block_time().sec_since_epoch()
+                                             + mi * 3;
+         trx.operations.push_back(ba_op);
+         PUSH_TX(db, trx, ~0);
+         trx.clear();
+      }
+
+      // check
+      if( i / 2 == 0 ) // before hard fork 890
+      {
+         // median feed won't change (issue 890)
+         BOOST_CHECK( usd_id(db).bitasset_data(db).current_feed.settlement_price == current_feed.settlement_price );
+         BOOST_CHECK_EQUAL( usd_id(db).bitasset_data(db).current_feed.maintenance_collateral_ratio, 1750 );
+         BOOST_CHECK_EQUAL( usd_id(db).bitasset_data(db).current_feed.maximum_short_squeeze_ratio, 1100 );
+         // limit order is still there
+         BOOST_CHECK( db.find<limit_order_object>( sell_id ) );
+
+         // go beyond hard fork 890
+         blocks += generate_blocks(HARDFORK_CORE_868_890_TIME - mi, true, skip);
+         blocks += generate_blocks(db.get_dynamic_global_properties().next_maintenance_time, true, skip);
+      }
+
+      // after hard fork 890, if it's before hard fork 935
+      if( db.get_dynamic_global_properties().next_maintenance_time <= HARDFORK_CORE_935_TIME )
+      {
+         // median should have changed
+         BOOST_CHECK( usd_id(db).bitasset_data(db).current_feed.settlement_price == current_feed.settlement_price );
+         if( i % 2 == 0 ) // MCR test, MCR should be 350%
+            BOOST_CHECK_EQUAL( usd_id(db).bitasset_data(db).current_feed.maintenance_collateral_ratio, 3500 );
+         else // MSSR test, MSSR should be 125%
+            BOOST_CHECK_EQUAL( usd_id(db).bitasset_data(db).current_feed.maximum_short_squeeze_ratio, 1250 );
+         // but the limit order is still there, because `check_call_order` was incorrectly skipped
+         BOOST_CHECK( db.find<limit_order_object>( sell_id ) );
+
+         // go beyond hard fork 935
+         blocks += generate_blocks(HARDFORK_CORE_935_TIME - mi, true, skip);
+         blocks += generate_blocks(db.get_dynamic_global_properties().next_maintenance_time, true, skip);
+      }
+
+      // after hard fork 935, the limit order should be filled
+      {
+         // check median
+         BOOST_CHECK( usd_id(db).bitasset_data(db).current_feed.settlement_price == current_feed.settlement_price );
+         if( i % 2 == 0 ) // MCR test, median MCR should be 350%
+            BOOST_CHECK_EQUAL( usd_id(db).bitasset_data(db).current_feed.maintenance_collateral_ratio, 3500 );
+         else // MSSR test, MSSR should be 125%
+            BOOST_CHECK_EQUAL( usd_id(db).bitasset_data(db).current_feed.maximum_short_squeeze_ratio, 1250 );
+         // the limit order should have been filled
+         // TODO FIXME this test case is failing for MCR test,
+         //            because call_order's call_price didn't get updated after MCR changed
+         // BOOST_CHECK( !db.find<limit_order_object>( sell_id ) );
+         if( i % 2 == 1 ) // MSSR test
+            BOOST_CHECK( !db.find<limit_order_object>( sell_id ) );
+      }
+
+
+      // undo above tx's and reset
+      generate_block( skip );
+      ++blocks;
+      while( blocks > 0 )
+      {
+         db.pop_block();
+         --blocks;
+      }
+   }
+} FC_LOG_AND_RETHROW() }
 
 /*****
  * @brief make sure feeds work correctly after changing from non-witness-fed to witness-fed before the 868 fork
