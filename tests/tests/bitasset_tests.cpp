@@ -983,11 +983,11 @@ BOOST_AUTO_TEST_CASE( hf_935_test )
       publish_feed( usd_id, feedproducer_id, current_feed );
       publish_feed( usd_id, feedproducer2_id, current_feed );
 
-      // check median, MCR should be 350%
+      // check median
       BOOST_CHECK( usd_id(db).bitasset_data(db).current_feed.settlement_price == current_feed.settlement_price );
-      if( i % 2 == 0 ) // MCR test
+      if( i % 2 == 0 ) // MCR test, MCR should be 350%
          BOOST_CHECK_EQUAL( usd_id(db).bitasset_data(db).current_feed.maintenance_collateral_ratio, 3500 );
-      else // MSSR test
+      else // MSSR test, MSSR should be 125%
          BOOST_CHECK_EQUAL( usd_id(db).bitasset_data(db).current_feed.maximum_short_squeeze_ratio, 1250 );
 
       // generate some blocks, let the feeds expire
@@ -1056,6 +1056,7 @@ BOOST_AUTO_TEST_CASE( hf_935_test )
          // median feed won't change (issue 890)
          BOOST_CHECK( usd_id(db).bitasset_data(db).current_feed.settlement_price == current_feed.settlement_price );
          BOOST_CHECK_EQUAL( usd_id(db).bitasset_data(db).current_feed.maintenance_collateral_ratio, 1750 );
+         BOOST_CHECK_EQUAL( usd_id(db).bitasset_data(db).current_feed.maximum_short_squeeze_ratio, 1100 );
          // limit order is still there
          BOOST_CHECK( db.find<limit_order_object>( sell_id ) );
 
@@ -1069,9 +1070,9 @@ BOOST_AUTO_TEST_CASE( hf_935_test )
       {
          // median should have changed
          BOOST_CHECK( usd_id(db).bitasset_data(db).current_feed.settlement_price == current_feed.settlement_price );
-         if( i % 2 == 0 ) // MCR test
+         if( i % 2 == 0 ) // MCR test, MCR should be 350%
             BOOST_CHECK_EQUAL( usd_id(db).bitasset_data(db).current_feed.maintenance_collateral_ratio, 3500 );
-         else // MSSR test
+         else // MSSR test, MSSR should be 125%
             BOOST_CHECK_EQUAL( usd_id(db).bitasset_data(db).current_feed.maximum_short_squeeze_ratio, 1250 );
          // but the limit order is still there, because `check_call_order` was incorrectly skipped
          BOOST_CHECK( db.find<limit_order_object>( sell_id ) );
@@ -1083,11 +1084,11 @@ BOOST_AUTO_TEST_CASE( hf_935_test )
 
       // after hard fork 935, the limit order should be filled
       {
-         // median MCR should be 350%
+         // check median
          BOOST_CHECK( usd_id(db).bitasset_data(db).current_feed.settlement_price == current_feed.settlement_price );
-         if( i % 2 == 0 )
+         if( i % 2 == 0 ) // MCR test, median MCR should be 350%
             BOOST_CHECK_EQUAL( usd_id(db).bitasset_data(db).current_feed.maintenance_collateral_ratio, 3500 );
-         else // MSSR test
+         else // MSSR test, MSSR should be 125%
             BOOST_CHECK_EQUAL( usd_id(db).bitasset_data(db).current_feed.maximum_short_squeeze_ratio, 1250 );
          // the limit order should have been filled
          // TODO FIXME this test case is failing for MCR test,
