@@ -37,8 +37,8 @@ namespace graphene { namespace chain {
       asset                     fee;
       account_id_type           owner;
       asset_id_type             asset_id;
-      uint64_t                  t;
-      uint64_t                  u;
+      uint32_t                  t;
+      uint32_t                  u;
 
       account_id_type   fee_payer()const { return owner; }
       void              validate()const;

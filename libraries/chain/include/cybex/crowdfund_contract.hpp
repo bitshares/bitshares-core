@@ -47,6 +47,7 @@ namespace graphene { namespace chain {
          share_type cap;
          fc::time_point_sec when; 
          //address    A;
+         asset      balance;
          int        state;// used?
          crowdfund_id_type crowdfund_type()const { return crowdfund; }
    };
@@ -64,11 +65,11 @@ namespace graphene { namespace chain {
          ordered_non_unique< tag<by_owner>, composite_key<
             crowdfund_contract_object,
             member<crowdfund_contract_object, account_id_type, &crowdfund_contract_object::owner>,
-            const_mem_fun<crowdfund_contract_object, crowdfund_id_type, &crowdfund_contract_object::crowdfund_type>
+            member<crowdfund_contract_object, crowdfund_id_type, &crowdfund_contract_object::crowdfund>
          > >,
          ordered_non_unique< tag<by_crowdfund>, composite_key< 
             crowdfund_contract_object,
-            const_mem_fun<crowdfund_contract_object, crowdfund_id_type, &crowdfund_contract_object::crowdfund_type>,
+            member<crowdfund_contract_object, crowdfund_id_type, &crowdfund_contract_object::crowdfund>,
             member<crowdfund_contract_object, share_type, &crowdfund_contract_object::cap>
          > >
 
@@ -82,7 +83,7 @@ namespace graphene { namespace chain {
 } }
 
 FC_REFLECT_DERIVED( graphene::chain::crowdfund_contract_object, (graphene::db::object),
-                    (owner)(crowdfund)(valuation)(cap)(when)(state) )
+                    (owner)(crowdfund)(valuation)(cap)(when)(state)(balance) )
 
 FC_REFLECT_ENUM(graphene::chain::crowdfund_contract_state,
                     (CROWDFUND_STATE_INACTIVE)(CROWDFUND_STATE_ACTIVE)

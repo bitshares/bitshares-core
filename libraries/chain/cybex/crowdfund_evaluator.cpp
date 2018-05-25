@@ -32,7 +32,6 @@
 
 namespace graphene { namespace chain {
 
-
 void_result initiate_crowdfund_evaluator::do_evaluate( const initiate_crowdfund_operation& o )
 { try {
    const database& d = db();
@@ -46,6 +45,9 @@ void_result initiate_crowdfund_evaluator::do_evaluate( const initiate_crowdfund_
    auto &crowdfund_idx = d.get_index_type<crowdfund_index>().indices().get<by_owner>();
    auto itr = crowdfund_idx.find(boost::make_tuple(o.owner, o.asset_id));
    FC_ASSERT( itr == crowdfund_idx.end(),"asset is already on crowd sale." );
+
+   auto native_token=asset_id_type(0);
+   FC_ASSERT( a.precision == native_token(d).precision );
    
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }
@@ -64,7 +66,6 @@ object_id_type  initiate_crowdfund_evaluator::do_apply( const initiate_crowdfund
          a.asset_id = op.asset_id;
          a.begin = now; 
          a.V=0;
-         a.state=0; 
       });
    assert( new_crowdfund.id == next_crowdfund_id );
 
@@ -81,10 +82,13 @@ void_result participate_crowdfund_evaluator::do_evaluate(const participate_crowd
    crowdfund         = &d.get(op.crowdfund);
    crowdfund_asset   = &d.get(crowdfund->asset_id);
  
-   const asset_object & cyb_asset = d.get(asset_id_type(0)); 
-   
+  
+   FC_ASSERT(from_account!=NULL,""); 
+   FC_ASSERT(crowdfund!=NULL,"crowdfund not found"); 
+   FC_ASSERT(crowdfund_asset!=NULL,"invalid crowdfund"); 
    FC_ASSERT( op.buyer != crowdfund_asset->issuer,"asset issuer can not participate crownfund" );
 
+   const asset_object & cyb_asset = d.get(asset_id_type(0)); 
    bool insufficient_balance = d.get_balance( *from_account, cyb_asset ).amount >= op.valuation;
    FC_ASSERT( insufficient_balance,
                  "Insufficient Balance: ${balance}, '${a}' is unable to buy '${total_buy}'  '${t}'",
@@ -118,35 +122,38 @@ object_id_type  participate_crowdfund_evaluator::do_apply(const participate_crow
    fc::time_point_sec now = d.head_block_time();
    auto next_crowdfund_contract_id = d.get_index_type<crowdfund_contract_index>().get_next_id();
 
+   double p_s=crowdfund->p(s);  // p(0)=1.2,p(t)=1.1,p(u)=1
+
+   asset b_A;
+   b_A.asset_id      = crowdfund->asset_id;
+   b_A.amount.value  = op.valuation*p_s;
+
+   //ilog("b_A:${a} s:${s} v:${v} p:${p}",("a",b_A)("s",s)("v",op.valuation)("p",p_s));
+
    const crowdfund_contract_object& new_crowdfund_contract =
      d.create<crowdfund_contract_object>( [&]( crowdfund_contract_object& a ) {
          a.owner     = op.buyer;
          a.valuation = op.valuation;
          a.cap       = op.cap;
          a.crowdfund = op.crowdfund;
-         a.when      = now;  
+         a.when      = now;
+         a.balance   = b_A;  
          a.state     = CROWDFUND_STATE_ACTIVE;  
       });
    assert( new_crowdfund_contract.id == next_crowdfund_contract_id );
 
-   asset cyb_amount,b_A_amount;
-   cyb_amount.asset_id     = asset_id_type(0);
-   cyb_amount.amount       = op.valuation; 
-   b_A_amount.asset_id     = crowdfund->asset_id;
-   b_A_amount.amount       = op.valuation*crowdfund->p(s);  //v(A)*(1+20%)
+   asset native_token;
+   native_token.asset_id      = asset_id_type(0);
+   native_token.amount.value  = op.valuation; 
 
-   d.adjust_balance( from_account->get_id(), -cyb_amount );
-   d.adjust_balance( from_account->get_id(), b_A_amount );
+   d.adjust_balance( from_account->get_id(), -native_token );
 
    d.modify( *crowdfund,[&](crowdfund_object &c) {
          c.V+= op.valuation;
    });
 
-   //update asset dynamic data current_supply
-   auto const & asset_dyn_data = crowdfund_asset->dynamic_asset_data_id(d);
-   d.modify( asset_dyn_data,[&](asset_dynamic_data_object &dyn_data) {
-          dyn_data.current_supply += op.valuation;
-   });
+   ilog("V:${v}",("v",crowdfund->V));
+
 
    return (object_id_type)new_crowdfund_contract.id;
 
@@ -169,9 +176,10 @@ void_result withdraw_crowdfund_evaluator::do_evaluate(const withdraw_crowdfund_o
    fc::time_point_sec now = d.head_block_time();
    FC_ASSERT( now>crowdfund->begin);
 
-   uint64_t s = (now-crowdfund->begin).to_seconds();
-   t = crowdfund->t;
-   u = crowdfund->u;
+   uint32_t t = crowdfund->t;
+   uint32_t u = crowdfund->u;
+
+   s = (now-crowdfund->begin).to_seconds();
    FC_ASSERT( s<t, "time is over.");
    FC_ASSERT( s<u, "has ended.");
    FC_ASSERT( contract->state !=CROWDFUND_STATE_PERM,"can not be withdrawn again.");
@@ -182,41 +190,33 @@ void_result withdraw_crowdfund_evaluator::do_evaluate(const withdraw_crowdfund_o
 void_result withdraw_crowdfund_evaluator::do_apply(const withdraw_crowdfund_operation& o)
 { try {
    database& d = db();
-
-
     
-   asset cyb_amount,b_A_amount;
+   uint32_t t = crowdfund->t;
+
+   asset native_token;
 
    //refunds v(A)·(t−s)/t native tokens back to A
-   share_type refund_amount =  contract->valuation.value*(t-s)/t;
-   cyb_amount.asset_id = asset_id_type(0);
-   cyb_amount.amount = refund_amount;
+   share_type refund_amount  = contract->valuation.value*(t-s)/t;
+   native_token.asset_id     = asset_id_type(0);
+   native_token.amount       = refund_amount;
 
-   //b(A)=v(A)·s/t·p(s + (u−s)/3), 
-   share_type b_A = contract->valuation.value*s/t*(2*crowdfund->p(s)-1)/3;  
-   b_A_amount.asset_id= crowdfund->asset_id;
-   b_A_amount.amount.value= b_A.value;
+   //b(A)=v(A)·s/t·{p(s) - [p(s)-p(u)]/3},p(0)=1.2, p(t)=1.1,p(u)=1 
+   share_type b_A = contract->valuation.value*s/t*(2*crowdfund->p(s)+1)/3;  
 
-   // delta of total asset issued.
-   // share_type delta = b_A.value - d.get_balance( creator, crowdfund.asset_id ).amount;  
-
+   ilog("b_A:${a} s:${s} t:${t} v:${v}",("a",b_A)("s",s)("t",t)("v",contract->valuation));
     
-   db().adjust_balance( owner->get_id(), cyb_amount );
-   db().set_balance( owner->get_id(), b_A_amount );
+   db().adjust_balance( owner->get_id(), native_token );
    
    db().modify(*contract, [&](crowdfund_contract_object& c) {
-         c.state = CROWDFUND_STATE_PERM;
+         c.state                = CROWDFUND_STATE_PERM;
+         c.balance.amount.value = b_A.value;
    });
    db().modify( *crowdfund,[&](crowdfund_object &c) {
          c.V -=  refund_amount.value;
    });
-   //update asset dynamic data current_supply
-   const auto & crowdfund_asset = d.get(crowdfund->asset_id); 
-   auto const & asset_dyn_data = crowdfund_asset.dynamic_asset_data_id(d);
-   d.modify( asset_dyn_data,[&](asset_dynamic_data_object &dyn_data) {
-          dyn_data.current_supply -= refund_amount.value;
-   });
-   
+
+   ilog("V:${v}",("v",crowdfund->V));
+
 
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }

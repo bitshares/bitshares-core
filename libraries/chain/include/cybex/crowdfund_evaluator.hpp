@@ -46,7 +46,7 @@ namespace graphene { namespace chain {
          const account_object * from_account;
          const crowdfund_object * crowdfund;
          const asset_object * crowdfund_asset;
-         uint64_t s;  
+         uint32_t s;  
    };
 
    class withdraw_crowdfund_evaluator : public evaluator<withdraw_crowdfund_evaluator>
@@ -60,7 +60,7 @@ namespace graphene { namespace chain {
          const crowdfund_contract_object *contract;
          const crowdfund_object  * crowdfund;
          const account_object *owner;
-         uint64_t u,t,s;
+         uint32_t s;
    };
 
 } } // graphene::chain

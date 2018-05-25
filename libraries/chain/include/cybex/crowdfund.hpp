@@ -22,7 +22,7 @@
  * THE SOFTWARE.
  */
 #pragma once
-
+#include <graphene/chain/database.hpp>
 #include <graphene/chain/protocol/base.hpp>
 
 namespace graphene { namespace chain {
@@ -37,12 +37,11 @@ namespace graphene { namespace chain {
          account_id_type owner;
          asset_id_type   asset_id;
          time_point_sec  begin;
-         uint64_t        t;
-         uint64_t        u;
+         uint32_t        t;
+         uint32_t        u;
          share_type      V;
-         int             state;
-         float p(int64_t s) const {return 1+(u-s)*0.2/u;}
 
+         double  p(uint32_t s) const;
          asset_id_type asset_type()const { return asset_id; }
    };
 
@@ -70,4 +69,4 @@ namespace graphene { namespace chain {
 } }
 
 FC_REFLECT_DERIVED( graphene::chain::crowdfund_object, (graphene::db::object),
-                    (owner)(asset_id)(begin)(t) (u)(V)(state))
+                    (owner)(asset_id)(begin)(t) (u)(V))
