@@ -1248,7 +1248,7 @@ market_ticker database_api_impl::get_ticker( const string& base, const string& q
    auto itr = ticker_idx.find( std::make_tuple( base_id, quote_id ) );
    if( itr == ticker_idx.end() ) return mt;
 
-   order_book orders;
+   optional<order_book> orders;
    if( !skip_order_book )
    {
       orders = get_order_book(assets[0]->symbol, assets[1]->symbol, 1);
