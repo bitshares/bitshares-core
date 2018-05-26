@@ -94,6 +94,18 @@ database_fixture::database_fixture()
       genesis_state.initial_witness_candidates.push_back({name, init_account_priv_key.get_public_key()});
    }
    genesis_state.initial_parameters.current_fees->zero_all_fees();
+
+   genesis_state_type::initial_asset_type init_mpa1;
+   init_mpa1.symbol = "INITMPA";
+   init_mpa1.issuer_name = "committee-account";
+   init_mpa1.description = "Initial MPA";
+   init_mpa1.precision = 4;
+   init_mpa1.max_supply = GRAPHENE_MAX_SHARE_SUPPLY;
+   init_mpa1.accumulated_fees = 0;
+   init_mpa1.is_bitasset = true;
+   // TODO add initial UIA's; add initial short positions; test non-zero accumulated_fees
+   genesis_state.initial_assets.push_back( init_mpa1 );
+
    open_database();
 
    // add account tracking for ahplugin for special test case with track-account enabled
@@ -129,6 +141,10 @@ database_fixture::database_fixture()
    goplugin->plugin_startup();
 
    generate_block();
+
+   asset_id_type mpa1_id(1);
+   BOOST_REQUIRE( mpa1_id(db).is_market_issued() );
+   BOOST_CHECK( mpa1_id(db).bitasset_data(db).asset_id == mpa1_id );
 
    set_expiration( db, trx );
    } catch ( const fc::exception& e )

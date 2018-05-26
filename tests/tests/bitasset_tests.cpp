@@ -314,14 +314,7 @@ BOOST_AUTO_TEST_CASE( reset_backing_asset_on_non_witness_asset )
       BOOST_CHECK_EQUAL(obj.feeds.size(), 3ul);
       BOOST_CHECK(obj.current_feed == price_feed());
 
-
-      BOOST_CHECK_EQUAL("1", std::to_string(obj.options.short_backing_asset.space_id));
-      BOOST_CHECK_EQUAL("3", std::to_string(obj.options.short_backing_asset.type_id));
-      BOOST_CHECK_EQUAL("1", std::to_string(obj.options.short_backing_asset.instance.value));
-
-      BOOST_CHECK_EQUAL("1", std::to_string(bit_jmj_id.space_id));
-      BOOST_CHECK_EQUAL("3", std::to_string(bit_jmj_id.type_id));
-      BOOST_CHECK_EQUAL("2", std::to_string(bit_jmj_id.instance.value));
+      BOOST_CHECK( bit_usd_id == obj.options.short_backing_asset );
    }
    {
       BOOST_TEST_MESSAGE("Adding Vikram's price feed");
