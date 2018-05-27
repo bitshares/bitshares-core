@@ -109,8 +109,8 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       vector<collateral_bid_object>      get_collateral_bids(const asset_id_type asset, uint32_t limit, uint32_t start)const;
       void subscribe_to_market(std::function<void(const variant&)> callback, asset_id_type a, asset_id_type b);
       void unsubscribe_from_market(asset_id_type a, asset_id_type b);
-      optional<market_ticker>            get_ticker( const string& base, const string& quote, bool skip_order_book = false )const;
-      optional<market_volume>            get_24_volume( const string& base, const string& quote )const;
+      market_ticker                      get_ticker( const string& base, const string& quote, bool skip_order_book = false )const;
+      market_volume                      get_24_volume( const string& base, const string& quote )const;
       order_book                         get_order_book( const string& base, const string& quote, unsigned limit = 50 )const;
       vector<market_ticker>              get_top_markets(uint32_t limit)const;
       vector<market_trade>               get_trade_history( const string& base, const string& quote, fc::time_point_sec start, fc::time_point_sec stop, unsigned limit = 100 )const;
@@ -1224,12 +1224,12 @@ string database_api_impl::price_to_string( const price& _price, const asset_obje
       FC_ASSERT( !"bad parameters" );
 } FC_CAPTURE_AND_RETHROW( (_price)(_base)(_quote) ) }
 
-optional<market_ticker> database_api::get_ticker( const string& base, const string& quote )const
+market_ticker database_api::get_ticker( const string& base, const string& quote )const
 {
     return my->get_ticker( base, quote );
 }
 
-optional<market_ticker> database_api_impl::get_ticker( const string& base, const string& quote, bool skip_order_book )const
+market_ticker database_api_impl::get_ticker( const string& base, const string& quote, bool skip_order_book )const
 {
    FC_ASSERT( _app_options && _app_options->has_market_history_plugin, "Market history plugin is not enabled." );
 
@@ -1238,7 +1238,7 @@ optional<market_ticker> database_api_impl::get_ticker( const string& base, const
    FC_ASSERT( assets[1], "Invalid quote asset symbol: ${s}", ("s",quote) );
 
    const fc::time_point_sec now = _db.head_block_time();
-   optional<market_ticker> mt;
+   market_ticker mt;
 
    auto base_id = assets[0]->id;
    auto quote_id = assets[1]->id;
@@ -1248,36 +1248,31 @@ optional<market_ticker> database_api_impl::get_ticker( const string& base, const
    auto itr = ticker_idx.find( std::make_tuple( base_id, quote_id ) );
    if( itr != ticker_idx.end() )
    {
-      optional <order_book> orders;
+      optional<order_book> orders;
       if (!skip_order_book) {
          orders = get_order_book(assets[0]->symbol, assets[1]->symbol, 1);
       }
       mt = market_ticker(*itr, now, *assets[0], *assets[1], orders);
-
       return mt;
    }
-   return {};
+   return mt;
 }
 
-optional<market_volume> database_api::get_24_volume( const string& base, const string& quote )const
+market_volume database_api::get_24_volume( const string& base, const string& quote )const
 {
     return my->get_24_volume( base, quote );
 }
 
-optional<market_volume> database_api_impl::get_24_volume( const string& base, const string& quote )const
+market_volume database_api_impl::get_24_volume( const string& base, const string& quote )const
 {
    const auto& ticker = get_ticker( base, quote, true );
-   if(ticker.valid())
-   {
-      market_volume result;
-      result.time = ticker->time;
-      result.base = ticker->base;
-      result.quote = ticker->quote;
-      result.base_volume = ticker->base_volume;
-      result.quote_volume = ticker->quote_volume;
-      return result;
-   }
-   return {};
+   market_volume result;
+   result.time = ticker.time;
+   result.base = ticker.base;
+   result.quote = ticker.quote;
+   result.base_volume = ticker.base_volume;
+   result.quote_volume = ticker.quote_volume;
+   return result;
 }
 
 order_book database_api::get_order_book( const string& base, const string& quote, unsigned limit )const
