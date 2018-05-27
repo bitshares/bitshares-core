@@ -151,7 +151,7 @@ FC_REFLECT( graphene::chain::escrow_approve_operation::fee_parameters_type, (fee
 FC_REFLECT( graphene::chain::escrow_dispute_operation::fee_parameters_type, (fee) )
 FC_REFLECT( graphene::chain::escrow_release_operation::fee_parameters_type, (fee) )
 
-FC_REFLECT( graphene::chain::escrow_transfer_operation, (from)(to)(agent)(amount)(escrow_id)(agent_fee)(json_meta)(ratification_deadline)(escrow_expiration) );
-FC_REFLECT( graphene::chain::escrow_approve_operation, (from)(to)(agent)(who)(escrow_id)(approve) );
-FC_REFLECT( graphene::chain::escrow_dispute_operation, (from)(to)(agent)(who)(escrow_id) );
-FC_REFLECT( graphene::chain::escrow_release_operation, (from)(to)(agent)(who)(receiver)(escrow_id)(amount) );
+FC_REFLECT( graphene::chain::escrow_transfer_operation, (fee)(from)(to)(agent)(amount)(escrow_id)(agent_fee)(json_meta)(ratification_deadline)(escrow_expiration) );
+FC_REFLECT( graphene::chain::escrow_approve_operation, (fee)(from)(to)(agent)(who)(escrow_id)(approve) );
+FC_REFLECT( graphene::chain::escrow_dispute_operation, (fee)(from)(to)(agent)(who)(escrow_id) );
+FC_REFLECT( graphene::chain::escrow_release_operation, (fee)(from)(to)(agent)(who)(receiver)(escrow_id)(amount) );

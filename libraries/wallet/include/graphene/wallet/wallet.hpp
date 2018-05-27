@@ -1587,6 +1587,109 @@ class wallet_api
       fc::signal<void(bool)> lock_changed;
       std::shared_ptr<detail::wallet_api_impl> my;
       void encrypt_keys();
+
+      /**
+       * Get escrow object having account from and escrow id
+       *
+       * @param from The account to search escrow
+       * @param escrow_id The escrow id
+       * @return Escrow object if found
+       */
+      optional<escrow_object> get_escrow( string from, uint32_t escrow_id );
+
+      /**
+       * Initialize an escrow transfer.
+       *
+       * @param from The account the funds are coming from
+       * @param to The account the funds are going to
+       * @param agent The account acting as the agent in case of dispute
+       * @param escrow_id A unique id for the escrow transfer. (from, escrow_id) must be a unique pair
+       * @param symbol The currency symbol to be in escrow(BTS only by now)
+       * @param amount The amount of asset to escrow
+       * @param agent_fee_symbol Currency of the agent fee(BTS only by now)
+       * @param agent_fee_amount The amount of fee for the agent
+       * @param ratification_deadline The deadline for 'to' and 'agent' to approve the escrow transfer
+       * @param escrow_expiration The expiration of the escrow transfer, after which either party can claim the funds
+       * @param json_meta JSON encoded meta data
+       * @param broadcast true if you wish to broadcast the transaction
+       */
+      signed_transaction escrow_transfer(
+            string from,
+            string to,
+            string agent,
+            uint32_t escrow_id,
+            string symbol,
+            string amount,
+            string agent_fee_symbol,
+            string agent_fee_amount,
+            time_point_sec ratification_deadline,
+            time_point_sec escrow_expiration,
+            string json_meta,
+            bool broadcast = false
+      );
+
+      /**
+       * Approve a proposed escrow transfer. Funds cannot be released until after approval. This is in lieu of requiring
+       * multi-sig on escrow_transfer
+       *
+       * @param from The account that funded the escrow
+       * @param to The destination of the escrow
+       * @param agent The account acting as the agent in case of dispute
+       * @param who The account approving the escrow transfer (either 'to' or 'agent)
+       * @param escrow_id A unique id for the escrow transfer
+       * @param approve true to approve the escrow transfer, otherwise cancels it and refunds 'from'
+       * @param broadcast true if you wish to broadcast the transaction
+       */
+      signed_transaction escrow_approve(
+            string from,
+            string to,
+            string agent,
+            string who,
+            uint32_t escrow_id,
+            bool approve,
+            bool broadcast = false
+      );
+
+      /**
+       * Raise a dispute on the escrow transfer before it expires
+       *
+       * @param from The account that funded the escrow
+       * @param to The destination of the escrow
+       * @param who The account raising the dispute (either 'from' or 'to')
+       * @param escrow_id A unique id for the escrow transfer
+       * @param broadcast true if you wish to broadcast the transaction
+       */
+      signed_transaction escrow_dispute(
+            string from,
+            string to,
+            string who,
+            uint32_t escrow_id,
+            bool broadcast = false
+      );
+
+      /**
+       * Release funds in escrow
+       *
+       * @param from The account that funded the escrow
+       * @param to The account that will receive funds being released
+       * @param who The account authorizing the release
+       * @param receiver The account receiving the escrowed funds
+       * @param escrow_id A unique id for the escrow transfer
+       * @param symbol The currency symbol
+       * @param steem_amount The amount of currency that will be released
+       * @param broadcast true if you wish to broadcast the transaction
+       */
+      signed_transaction escrow_release(
+            string from,
+            string to,
+            string agent,
+            string who,
+            string receiver,
+            uint32_t escrow_id,
+            string symbol,
+            string amount,
+            bool broadcast = false
+      );
 };
 
 } }
@@ -1773,4 +1876,9 @@ FC_API( graphene::wallet::wallet_api,
         (blind_history)
         (receive_blind_transfer)
         (get_order_book)
+        (get_escrow)
+        (escrow_transfer)
+        (escrow_approve)
+        (escrow_dispute)
+        (escrow_release)
       )

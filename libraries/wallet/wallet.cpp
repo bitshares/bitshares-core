@@ -394,7 +394,8 @@ public:
         _remote_api(rapi),
         _remote_db(rapi->database()),
         _remote_net_broadcast(rapi->network_broadcast()),
-        _remote_hist(rapi->history())
+        _remote_hist(rapi->history()),
+        _remote_escrow(rapi->escrow())
    {
       chain_id_type remote_chain_id = _remote_db->get_chain_id();
       if( remote_chain_id != _chain_id )
@@ -2102,6 +2103,185 @@ public:
       return sign_transaction(tx, broadcast);
    }
 
+   // escrow calls
+
+   optional<escrow_object> get_escrow( string from, uint32_t escrow_id)
+   {
+      account_object from_account = get_account(from);
+      return _remote_escrow->get_escrow(from_account.id, escrow_id);
+   }
+
+   signed_transaction escrow_transfer(
+         string from,
+         string to,
+         string agent,
+         uint32_t escrow_id,
+         string symbol,
+         string amount,
+         string agent_fee_symbol,
+         string agent_fee_amount,
+         time_point_sec ratification_deadline,
+         time_point_sec escrow_expiration,
+         string json_meta,
+         bool broadcast
+   )
+   {
+      FC_ASSERT( !is_locked() );
+
+      account_object from_account = get_account(from);
+      account_object to_account = get_account(to);
+      account_object agent_account = get_account(agent);
+      account_id_type from_id = from_account.id;
+      account_id_type to_id = to_account.id;
+      account_id_type agent_id = agent_account.id;
+
+      optional<asset_object> asset_o = find_asset(symbol);
+      asset f_amount;
+      escrow_transfer_operation op;
+      if(asset_o.valid()) {
+         asset f_amount = asset_o->amount_from_string(amount);
+         op.amount = f_amount;
+      }
+
+      optional<asset_object> asset_af = find_asset(agent_fee_symbol);
+      asset aff_amount;
+      if(asset_o.valid()) {
+         asset aff_amount = asset_af->amount_from_string(agent_fee_amount);
+         op.agent_fee = aff_amount;
+      }
+
+      op.from = from_id;
+      op.to = to_id;
+      op.agent = agent_id;
+      op.escrow_id = escrow_id;
+      op.ratification_deadline = ratification_deadline;
+      op.escrow_expiration = escrow_expiration;
+      op.json_meta = json_meta;
+
+      signed_transaction tx;
+      tx.operations.push_back( op );
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees);
+      tx.validate();
+
+      return sign_transaction( tx, broadcast );
+   }
+
+   signed_transaction escrow_approve(
+         string from,
+         string to,
+         string agent,
+         string who,
+         uint32_t escrow_id,
+         bool approve,
+         bool broadcast
+   )
+   {
+      FC_ASSERT( !is_locked() );
+
+      account_object from_account = get_account(from);
+      account_object to_account = get_account(to);
+      account_object agent_account = get_account(agent);
+      account_object who_account = get_account(who);
+      account_id_type from_id = from_account.id;
+      account_id_type to_id = to_account.id;
+      account_id_type agent_id = agent_account.id;
+      account_id_type who_id = who_account.id;
+
+      escrow_approve_operation op;
+      op.from = from_id;
+      op.to = to_id;
+      op.agent = agent_id;
+      op.who = who_id;
+      op.escrow_id = escrow_id;
+      op.approve = approve;
+
+      signed_transaction tx;
+      tx.operations.push_back( op );
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees);
+      tx.validate();
+
+      return sign_transaction( tx, broadcast );
+   }
+
+   signed_transaction escrow_dispute(
+         string from,
+         string to,
+         string who,
+         uint32_t escrow_id,
+         bool broadcast
+   )
+   {
+      FC_ASSERT( !is_locked() );
+
+      account_object from_account = get_account(from);
+      account_object to_account = get_account(to);
+      account_object who_account = get_account(who);
+      account_id_type from_id = from_account.id;
+      account_id_type to_id = to_account.id;
+      account_id_type who_id = who_account.id;
+
+      escrow_dispute_operation op;
+      op.from = from_id;
+      op.to = to_id;
+      op.who = who_id;
+      op.escrow_id = escrow_id;
+
+      signed_transaction tx;
+      tx.operations.push_back( op );
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees);
+      tx.validate();
+
+      return sign_transaction( tx, broadcast );
+   }
+
+   signed_transaction escrow_release(
+         string from,
+         string to,
+         string agent,
+         string who,
+         string receiver,
+         uint32_t escrow_id,
+         string symbol,
+         string amount,
+         bool broadcast
+   )
+   {
+      FC_ASSERT( !is_locked() );
+
+      account_object from_account = get_account(from);
+      account_object to_account = get_account(to);
+      account_object agent_account = get_account(agent);
+      account_object who_account = get_account(who);
+      account_object receiver_account = get_account(receiver);
+      account_id_type from_id = from_account.id;
+      account_id_type to_id = to_account.id;
+      account_id_type agent_id = agent_account.id;
+      account_id_type who_id = who_account.id;
+      account_id_type receiver_id = receiver_account.id;
+
+      optional<asset_object> asset_o = find_asset(symbol);
+      asset f_amount;
+
+      escrow_release_operation op;
+      if(asset_o.valid()) {
+         asset f_amount = asset_o->amount_from_string(amount);
+         op.amount = f_amount;
+      }
+      op.from = from_id;
+      op.to = to_id;
+      op.agent = agent_id;
+      op.who = who_id;
+      op.receiver = receiver_id;
+      op.escrow_id = escrow_id;
+
+      signed_transaction tx;
+      tx.operations.push_back( op );
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees);
+      tx.validate();
+
+      return sign_transaction( tx, broadcast );
+   }
+
    std::map<string,std::function<string(fc::variant,const fc::variants&)>> get_result_formatters() const
    {
       std::map<string,std::function<string(fc::variant,const fc::variants&)> > m;
@@ -2667,6 +2847,7 @@ public:
    fc::api<database_api>   _remote_db;
    fc::api<network_broadcast_api>   _remote_net_broadcast;
    fc::api<history_api>    _remote_hist;
+   fc::api<escrow_api>     _remote_escrow;
    optional< fc::api<network_node_api> > _remote_net_node;
    optional< fc::api<graphene::debug_witness::debug_api> > _remote_debug;
 
@@ -3329,6 +3510,38 @@ signed_transaction wallet_api::transfer(string from, string to, string amount,
 {
    return my->transfer(from, to, amount, asset_symbol, memo, broadcast);
 }
+
+optional<escrow_object> wallet_api::get_escrow(string from, uint32_t num)
+{
+   return my->get_escrow(from, num);
+}
+
+signed_transaction wallet_api::escrow_transfer(string from, string to, string agent, uint32_t escrow_id,
+                                               string symbol, string amount, string agent_fee_symbol,
+                                               string agent_fee_amount, time_point_sec ratification_deadline,
+                                               time_point_sec escrow_expiration, string json_meta, bool broadcast)
+{
+   return my->escrow_transfer(from, to, agent, escrow_id, symbol, amount, agent_fee_symbol, agent_fee_amount,
+                              ratification_deadline, escrow_expiration, json_meta, broadcast);
+}
+
+signed_transaction wallet_api::escrow_approve(string from, string to, string agent, string who,
+                                              uint32_t escrow_id, bool approve, bool broadcast)
+{
+   return my->escrow_approve(from, to, agent, who, escrow_id, approve, broadcast);
+}
+
+signed_transaction wallet_api::escrow_dispute(string from, string to, string who, uint32_t escrow_id, bool broadcast)
+{
+   return my->escrow_dispute(from, to, who, escrow_id, broadcast);
+}
+
+signed_transaction wallet_api::escrow_release(string from, string to, string agent, string who, string receiver,
+                                              uint32_t escrow_id, string symbol, string amount, bool broadcast)
+{
+   return my->escrow_release(from, to, agent, who, receiver, escrow_id, symbol, amount, broadcast);
+}
+
 signed_transaction wallet_api::create_asset(string issuer,
                                             string symbol,
                                             uint8_t precision,
