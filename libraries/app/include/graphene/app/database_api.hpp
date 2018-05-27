@@ -437,7 +437,7 @@ class database_api
        * @param b String name of the second asset
        * @return The market ticker for the past 24 hours.
        */
-      market_ticker get_ticker( const string& base, const string& quote )const;
+      optional<market_ticker> get_ticker( const string& base, const string& quote )const;
 
       /**
        * @brief Returns the 24 hour volume for the market assetA:assetB
@@ -445,7 +445,7 @@ class database_api
        * @param b String name of the second asset
        * @return The market volume over the past 24 hours
        */
-      market_volume get_24_volume( const string& base, const string& quote )const;
+      optional<market_volume> get_24_volume( const string& base, const string& quote )const;
 
       /**
        * @brief Returns the order book for the market base:quote

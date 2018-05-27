@@ -109,8 +109,8 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       vector<collateral_bid_object>      get_collateral_bids(const asset_id_type asset, uint32_t limit, uint32_t start)const;
       void subscribe_to_market(std::function<void(const variant&)> callback, asset_id_type a, asset_id_type b);
       void unsubscribe_from_market(asset_id_type a, asset_id_type b);
-      market_ticker                      get_ticker( const string& base, const string& quote, bool skip_order_book = false )const;
-      market_volume                      get_24_volume( const string& base, const string& quote )const;
+      optional<market_ticker>            get_ticker( const string& base, const string& quote, bool skip_order_book = false )const;
+      optional<market_volume>            get_24_volume( const string& base, const string& quote )const;
       order_book                         get_order_book( const string& base, const string& quote, unsigned limit = 50 )const;
       vector<market_ticker>              get_top_markets(uint32_t limit)const;
       vector<market_trade>               get_trade_history( const string& base, const string& quote, fc::time_point_sec start, fc::time_point_sec stop, unsigned limit = 100 )const;
@@ -298,8 +298,8 @@ market_ticker::market_ticker(const market_ticker_object& mto,
    base = asset_base.symbol;
    quote = asset_quote.symbol;
 
-   fc::uint128 base_volume;
-   fc::uint128 quote_volume;
+   fc::uint128 bv;
+   fc::uint128 qv;
 
    price latest_price = asset( mto.latest_base, mto.base ) / asset( mto.latest_quote, mto.quote );
    if( mto.base != asset_base.id )
@@ -316,16 +316,16 @@ market_ticker::market_ticker(const market_ticker_object& mto,
 
    if( asset_base.id == mto.base )
    {
-      base_volume = mto.base_volume;
-      quote_volume = mto.quote_volume;
+      bv = mto.base_volume;
+      qv = mto.quote_volume;
    }
    else
    {
-      base_volume = mto.quote_volume;
-      quote_volume = mto.base_volume;
+      bv = mto.quote_volume;
+      qv = mto.base_volume;
    }
-   base_volume = uint128_amount_to_string( base_volume, asset_base.precision );
-   quote_volume = uint128_amount_to_string( quote_volume, asset_quote.precision );
+   base_volume = uint128_amount_to_string( bv, asset_base.precision );
+   quote_volume = uint128_amount_to_string( qv, asset_quote.precision );
 
    if( orders.valid())
    {
@@ -1224,12 +1224,12 @@ string database_api_impl::price_to_string( const price& _price, const asset_obje
       FC_ASSERT( !"bad parameters" );
 } FC_CAPTURE_AND_RETHROW( (_price)(_base)(_quote) ) }
 
-market_ticker database_api::get_ticker( const string& base, const string& quote )const
+optional<market_ticker> database_api::get_ticker( const string& base, const string& quote )const
 {
     return my->get_ticker( base, quote );
 }
 
-market_ticker database_api_impl::get_ticker( const string& base, const string& quote, bool skip_order_book )const
+optional<market_ticker> database_api_impl::get_ticker( const string& base, const string& quote, bool skip_order_book )const
 {
    FC_ASSERT( _app_options && _app_options->has_market_history_plugin, "Market history plugin is not enabled." );
 
@@ -1238,7 +1238,7 @@ market_ticker database_api_impl::get_ticker( const string& base, const string& q
    FC_ASSERT( assets[1], "Invalid quote asset symbol: ${s}", ("s",quote) );
 
    const fc::time_point_sec now = _db.head_block_time();
-   market_ticker mt;
+   optional<market_ticker> mt;
 
    auto base_id = assets[0]->id;
    auto quote_id = assets[1]->id;
@@ -1246,35 +1246,38 @@ market_ticker database_api_impl::get_ticker( const string& base, const string& q
 
    const auto& ticker_idx = _db.get_index_type<graphene::market_history::market_ticker_index>().indices().get<by_market>();
    auto itr = ticker_idx.find( std::make_tuple( base_id, quote_id ) );
-   if( itr == ticker_idx.end() ) return mt;
-
-   optional<order_book> orders;
-   if( !skip_order_book )
+   if( itr != ticker_idx.end() )
    {
-      orders = get_order_book(assets[0]->symbol, assets[1]->symbol, 1);
-   }
-   mt = market_ticker(*itr, now, *assets[0], *assets[1], orders);
+      optional <order_book> orders;
+      if (!skip_order_book) {
+         orders = get_order_book(assets[0]->symbol, assets[1]->symbol, 1);
+      }
+      mt = market_ticker(*itr, now, *assets[0], *assets[1], orders);
 
-   return mt;
+      return mt;
+   }
+   return {};
 }
 
-market_volume database_api::get_24_volume( const string& base, const string& quote )const
+optional<market_volume> database_api::get_24_volume( const string& base, const string& quote )const
 {
     return my->get_24_volume( base, quote );
 }
 
-market_volume database_api_impl::get_24_volume( const string& base, const string& quote )const
+optional<market_volume> database_api_impl::get_24_volume( const string& base, const string& quote )const
 {
    const auto& ticker = get_ticker( base, quote, true );
-
-   market_volume result;
-   result.time = ticker.time;
-   result.base = ticker.base;
-   result.quote = ticker.quote;
-   result.base_volume = ticker.base_volume;
-   result.quote_volume = ticker.quote_volume;
-
-   return result;
+   if(ticker.valid())
+   {
+      market_volume result;
+      result.time = ticker->time;
+      result.base = ticker->base;
+      result.quote = ticker->quote;
+      result.base_volume = ticker->base_volume;
+      result.quote_volume = ticker->quote_volume;
+      return result;
+   }
+   return {};
 }
 
 order_book database_api::get_order_book( const string& base, const string& quote, unsigned limit )const
@@ -1344,7 +1347,7 @@ vector<market_ticker> database_api_impl::get_top_markets(uint32_t limit)const
    while( itr != volume_idx.rend() && result.size() < limit)
    {
       const auto assets = get_assets( { itr->base, itr->quote } );
-      order_book orders = get_order_book(assets[0]->symbol, assets[1]->symbol, 1);
+      optional<order_book> orders = get_order_book(assets[0]->symbol, assets[1]->symbol, 1);
       market_ticker mt(*itr, now, *assets[0], *assets[1], orders);
       result.emplace_back( std::move(mt) );
       ++itr;
