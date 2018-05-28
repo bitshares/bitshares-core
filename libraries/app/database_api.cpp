@@ -61,7 +61,7 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       void set_subscribe_callback( std::function<void(const variant&)> cb, bool notify_remove_create );
       void set_pending_transaction_callback( std::function<void(const variant&)> cb );
       void set_block_applied_callback( std::function<void(const variant& block_id)> cb );
-      void cancel_all_subscriptions();
+      void cancel_all_subscriptions(bool reset_callback);
 
       // Blocks and transactions
       optional<block_header> get_block_header(uint32_t block_num)const;
@@ -337,16 +337,10 @@ void database_api_impl::set_subscribe_callback( std::function<void(const variant
                  "Subscribing to universal object creation and removal is disallowed in this server." );
    }
 
+   cancel_all_subscriptions(false);
+
    _subscribe_callback = cb;
    _notify_remove_create = notify_remove_create;
-   _subscribed_accounts.clear();
-
-   static fc::bloom_parameters param;
-   param.projected_element_count    = 10000;
-   param.false_positive_probability = 1.0/100;
-   param.maximum_size = 1024*8*8*2;
-   param.compute_optimal_parameters();
-   _subscribe_filter = fc::bloom_filter(param);
 }
 
 void database_api::set_pending_transaction_callback( std::function<void(const variant&)> cb )
@@ -371,13 +365,19 @@ void database_api_impl::set_block_applied_callback( std::function<void(const var
 
 void database_api::cancel_all_subscriptions()
 {
-   my->cancel_all_subscriptions();
+   my->cancel_all_subscriptions(true);
 }
 
-void database_api_impl::cancel_all_subscriptions()
+void database_api_impl::cancel_all_subscriptions(bool reset_callback)
 {
-   set_subscribe_callback( std::function<void(const fc::variant&)>(), true);
+   if (reset_callback)
+      _subscribe_callback = std::function<void(const fc::variant&)>();
+
+   _notify_remove_create = false;
    _market_subscriptions.clear();
+   _subscribed_accounts.clear();
+   static fc::bloom_parameters param(10000, 1.0/100, 1024*8*8*2);
+   _subscribe_filter = fc::bloom_filter(param);
 }
 
 //////////////////////////////////////////////////////////////////////
