@@ -90,7 +90,7 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       uint64_t get_account_count()const;
 
       // Balances
-      vector<asset> get_account_balances(account_id_type id, const flat_set<asset_id_type>& assets)const;
+      vector<asset> get_account_balances(const std::string& account_name_or_id, const flat_set<asset_id_type>& assets);
       vector<asset> get_named_account_balances(const std::string& name, const flat_set<asset_id_type>& assets)const;
       vector<balance_object> get_balance_objects( const vector<address>& addrs )const;
       vector<asset> get_vested_balances( const vector<balance_id_type>& objs )const;
@@ -142,7 +142,7 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       set<public_key_type> get_potential_signatures( const signed_transaction& trx )const;
       set<address> get_potential_address_signatures( const signed_transaction& trx )const;
       bool verify_authority( const signed_transaction& trx )const;
-      bool verify_account_authority( const string& name_or_id, const flat_set<public_key_type>& signers )const;
+      bool verify_account_authority( const string& account_name_or_id, const flat_set<public_key_type>& signers );
       processed_transaction validate_transaction( const signed_transaction& trx )const;
       vector< fc::variant > get_required_fees( const vector<operation>& ops, asset_id_type id )const;
 
@@ -196,6 +196,24 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
          auto tmp = std::make_pair( order.balance.asset_id, backing_id );
          if( tmp.first > tmp.second ) std::swap( tmp.first, tmp.second );
          return tmp;
+      }
+
+      const account_object* get_account_from_string( const std::string& name_or_id  )
+      {
+         // TODO cache the result to avoid repeatly fetching from db
+         FC_ASSERT( name_or_id.size() > 0);
+         const account_object* account = nullptr;
+         if (std::isdigit(name_or_id[0]))
+            account = _db.find(fc::variant(name_or_id, 1).as<account_id_type>(1));
+         else
+         {
+            const auto& idx = _db.get_index_type<account_index>().indices().get<by_name>();
+            auto itr = idx.find(name_or_id);
+            if (itr != idx.end())
+               account = &*itr;
+         }
+         FC_ASSERT( account, "no such account" );
+         return account;
       }
 
       template<typename T>
@@ -635,16 +653,7 @@ std::map<std::string, full_account> database_api_impl::get_full_accounts( const 
 
    for (const std::string& account_name_or_id : names_or_ids)
    {
-      const account_object* account = nullptr;
-      if (std::isdigit(account_name_or_id[0]))
-         account = _db.find(fc::variant(account_name_or_id, 1).as<account_id_type>(1));
-      else
-      {
-         const auto& idx = _db.get_index_type<account_index>().indices().get<by_name>();
-         auto itr = idx.find(account_name_or_id);
-         if (itr != idx.end())
-            account = &*itr;
-      }
+      const account_object* account = get_account_from_string(account_name_or_id);
       if (account == nullptr)
          continue;
 
@@ -824,13 +833,15 @@ uint64_t database_api_impl::get_account_count()const
 //                                                                  //
 //////////////////////////////////////////////////////////////////////
 
-vector<asset> database_api::get_account_balances(account_id_type id, const flat_set<asset_id_type>& assets)const
+vector<asset> database_api::get_account_balances(const std::string& account_name_or_id, const flat_set<asset_id_type>& assets)
 {
-   return my->get_account_balances( id, assets );
+   return my->get_account_balances( account_name_or_id, assets );
 }
 
-vector<asset> database_api_impl::get_account_balances(account_id_type acnt, const flat_set<asset_id_type>& assets)const
+vector<asset> database_api_impl::get_account_balances(const std::string& account_name_or_id, const flat_set<asset_id_type>& assets)
 {
+   const account_object* account = get_account_from_string(account_name_or_id);
+   account_id_type acnt = account->id;
    vector<asset> result;
    if (assets.empty())
    {
@@ -853,9 +864,10 @@ vector<asset> database_api_impl::get_account_balances(account_id_type acnt, cons
 
 vector<asset> database_api::get_named_account_balances(const std::string& name, const flat_set<asset_id_type>& assets)const
 {
-   return my->get_named_account_balances( name, assets );
+   return my->get_account_balances( name, assets );
 }
 
+/*
 vector<asset> database_api_impl::get_named_account_balances(const std::string& name, const flat_set<asset_id_type>& assets) const
 {
    const auto& accounts_by_name = _db.get_index_type<account_index>().indices().get<by_name>();
@@ -863,6 +875,7 @@ vector<asset> database_api_impl::get_named_account_balances(const std::string& n
    FC_ASSERT( itr != accounts_by_name.end() );
    return get_account_balances(itr->get_id(), assets);
 }
+*/
 
 vector<balance_object> database_api::get_balance_objects( const vector<address>& addrs )const
 {
@@ -1925,26 +1938,14 @@ bool database_api_impl::verify_authority( const signed_transaction& trx )const
    return true;
 }
 
-bool database_api::verify_account_authority( const string& name_or_id, const flat_set<public_key_type>& signers )const
+bool database_api::verify_account_authority( const string& account_name_or_id, const flat_set<public_key_type>& signers )
 {
-   return my->verify_account_authority( name_or_id, signers );
+   return my->verify_account_authority( account_name_or_id, signers );
 }
 
-bool database_api_impl::verify_account_authority( const string& name_or_id, const flat_set<public_key_type>& keys )const
+bool database_api_impl::verify_account_authority( const string& account_name_or_id, const flat_set<public_key_type>& keys )
 {
-   FC_ASSERT( name_or_id.size() > 0);
-   const account_object* account = nullptr;
-   if (std::isdigit(name_or_id[0]))
-      account = _db.find(fc::variant(name_or_id, 1).as<account_id_type>(1));
-   else
-   {
-      const auto& idx = _db.get_index_type<account_index>().indices().get<by_name>();
-      auto itr = idx.find(name_or_id);
-      if (itr != idx.end())
-         account = &*itr;
-   }
-   FC_ASSERT( account, "no such account" );
-
+   const account_object* account = get_account_from_string(account_name_or_id);
 
    /// reuse trx.verify_authority by creating a dummy transfer
    signed_transaction trx;
