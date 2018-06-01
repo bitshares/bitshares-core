@@ -315,7 +315,7 @@ class database_api
        * @param assets IDs of the assets to get balances of; if empty, get all assets account has a balance in
        * @return Balances of the account
        */
-      vector<asset> get_account_balances(const std::string& get_account_balances, const flat_set<asset_id_type>& assets);
+      vector<asset> get_account_balances(const std::string& get_account_balances, const flat_set<asset_id_type>& assets)const;
 
       /// Semantically equivalent to @ref get_account_balances, but takes a name instead of an ID.
       vector<asset> get_named_account_balances(const std::string& name, const flat_set<asset_id_type>& assets)const;
@@ -618,7 +618,7 @@ class database_api
       /**
        * @return true if the signers have enough authority to authorize an account
        */
-      bool           verify_account_authority( const string& account_name_or_id, const flat_set<public_key_type>& signers );
+      bool           verify_account_authority( const string& account_name_or_id, const flat_set<public_key_type>& signers )const;
 
       /**
        *  Validates a transaction against the current state without broadcasting it on the network.

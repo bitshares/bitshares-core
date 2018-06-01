@@ -90,7 +90,7 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       uint64_t get_account_count()const;
 
       // Balances
-      vector<asset> get_account_balances(const std::string& account_name_or_id, const flat_set<asset_id_type>& assets);
+      vector<asset> get_account_balances(const std::string& account_name_or_id, const flat_set<asset_id_type>& assets)const;
       vector<asset> get_named_account_balances(const std::string& name, const flat_set<asset_id_type>& assets)const;
       vector<balance_object> get_balance_objects( const vector<address>& addrs )const;
       vector<asset> get_vested_balances( const vector<balance_id_type>& objs )const;
@@ -142,7 +142,7 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       set<public_key_type> get_potential_signatures( const signed_transaction& trx )const;
       set<address> get_potential_address_signatures( const signed_transaction& trx )const;
       bool verify_authority( const signed_transaction& trx )const;
-      bool verify_account_authority( const string& account_name_or_id, const flat_set<public_key_type>& signers );
+      bool verify_account_authority( const string& account_name_or_id, const flat_set<public_key_type>& signers )const;
       processed_transaction validate_transaction( const signed_transaction& trx )const;
       vector< fc::variant > get_required_fees( const vector<operation>& ops, asset_id_type id )const;
 
@@ -198,7 +198,7 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
          return tmp;
       }
 
-      const account_object* get_account_from_string( const std::string& name_or_id  )
+      const account_object* get_account_from_string( const std::string& name_or_id  ) const
       {
          // TODO cache the result to avoid repeatly fetching from db
          FC_ASSERT( name_or_id.size() > 0);
@@ -833,12 +833,12 @@ uint64_t database_api_impl::get_account_count()const
 //                                                                  //
 //////////////////////////////////////////////////////////////////////
 
-vector<asset> database_api::get_account_balances(const std::string& account_name_or_id, const flat_set<asset_id_type>& assets)
+vector<asset> database_api::get_account_balances(const std::string& account_name_or_id, const flat_set<asset_id_type>& assets)const
 {
    return my->get_account_balances( account_name_or_id, assets );
 }
 
-vector<asset> database_api_impl::get_account_balances(const std::string& account_name_or_id, const flat_set<asset_id_type>& assets)
+vector<asset> database_api_impl::get_account_balances(const std::string& account_name_or_id, const flat_set<asset_id_type>& assets)const
 {
    const account_object* account = get_account_from_string(account_name_or_id);
    account_id_type acnt = account->id;
@@ -1938,12 +1938,12 @@ bool database_api_impl::verify_authority( const signed_transaction& trx )const
    return true;
 }
 
-bool database_api::verify_account_authority( const string& account_name_or_id, const flat_set<public_key_type>& signers )
+bool database_api::verify_account_authority( const string& account_name_or_id, const flat_set<public_key_type>& signers )const
 {
    return my->verify_account_authority( account_name_or_id, signers );
 }
 
-bool database_api_impl::verify_account_authority( const string& account_name_or_id, const flat_set<public_key_type>& keys )
+bool database_api_impl::verify_account_authority( const string& account_name_or_id, const flat_set<public_key_type>& keys )const
 {
    const account_object* account = get_account_from_string(account_name_or_id);
 
