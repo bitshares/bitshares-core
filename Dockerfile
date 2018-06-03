@@ -24,10 +24,10 @@ RUN \
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 ADD . /bitshares-core
-WORKDIR /bitshares-core
 
 # Compile
 RUN \
+    cd /bitshares-core && \
     git submodule update --init --recursive && \
     cmake \
         -DCMAKE_BUILD_TYPE=Release \
