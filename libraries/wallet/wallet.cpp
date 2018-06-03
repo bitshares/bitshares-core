@@ -1925,19 +1925,11 @@ public:
       return tx;
    }
 
-   signed_transaction sign_transaction2(singed_transaction &tx, bool broadcast = false)
+   signed_transaction sign_transaction_offline(signed_transaction& tx, public_key_type& key)
    {
-      set<public_key_type> pks = _remote_db->get_potential_signatures(tx);
-      flat_set<public_key_type> owned_keys;
-      owned_keys.reserve(pks.size());
-      std::copy_if(pks.begin(), pks.end(),
-                   std::inserter(owned_keys, owned_keys.end()),
-                   [this](const public_key_type &pk) {
-                      return _keys.find(pk) != _keys.end();
-                   });
-
-      set<public_key_type> approving_key_set =
-         _remote_db->get_required_signatures(tx, owned_keys);
+      FC_ASSERT((tx.ref_block_num && tx.ref_block_prefix) &&
+                   (tx.expiration != fc::time_point_sec()),
+                "Must first set TaPOS and expiration field");
 
       // The first sign should also set TaPoS field. In general, cold wallet
       // won't be first sign since it has no idea of the head block id
@@ -1995,20 +1987,6 @@ public:
       {
          for (const public_key_type &key : approving_key_set)
             tx.sign(get_private_key(key), _chain_id);
-      }
-
-      if (broadcast)
-      {
-         try
-         {
-            _remote_net_broadcast->broadcast_transaction(tx);
-         }
-         catch (const fc::exception &e)
-         {
-            elog("Caught exception while broadcasting tx ${id}:  ${e}",
-                 ("id", tx.id().str())("e", e.to_detail_string()));
-            throw;
-         }
       }
 
       return tx;
