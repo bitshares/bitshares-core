@@ -1,6 +1,8 @@
 [submodule "docs"]
     path = docs
     url = https://github.com/bitshares/bitshares-core.wiki.git
+    ignore = all 
 [submodule "libraries/fc"]
     path = libraries/fc
     url = https://github.com/bitshares/bitshares-fc.git
+    ignore = dirty 
