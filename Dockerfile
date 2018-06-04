@@ -27,8 +27,10 @@ ADD . /bitshares-core
 WORKDIR /bitshares-core
 
 # Compile
+RUN git submodule update --init --recursive; exit 0
 RUN \
-    git submodule foreach --recursive git pull && \
+    git submodule sync --recursive && \
+    git submodule update --init --recursive && \
     cmake \
         -DCMAKE_BUILD_TYPE=Release \
         . && \
