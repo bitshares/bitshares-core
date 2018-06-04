@@ -28,8 +28,6 @@ WORKDIR /bitshares-core
 
 # Compile
 RUN \
-    git config submodule.docs.update none && \
-    git submodule update --init --recursive && \
     cmake \
         -DCMAKE_BUILD_TYPE=Release \
         . && \
