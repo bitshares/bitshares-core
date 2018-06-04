@@ -28,8 +28,7 @@ WORKDIR /bitshares-core
 
 # Compile
 RUN \
-    git submodule sync --recursive && \
-    git submodule update --init --recursive && \
+    git submodule foreach git pull && \
     cmake \
         -DCMAKE_BUILD_TYPE=Release \
         . && \
