@@ -1277,5 +1277,44 @@ BOOST_AUTO_TEST_CASE( escrow_api )
    } FC_LOG_AND_RETHROW()
 }
 
+BOOST_AUTO_TEST_CASE( escrow_uia )
+{
+   try
+   {
+      generate_blocks( HARDFORK_ESCROW_TIME );
+      generate_block();
+      set_expiration( db, trx );
+
+      ACTORS( (alice)(bob)(sam)(jim) );
+
+      transfer(committee_account, alice_id, asset(100000000));
+
+      const auto& bitusd = create_user_issued_asset("MOONASSET");
+      const auto& core   = asset_id_type()(db);
+
+      issue_uia( alice, bitusd.amount( 10000000 ) );
+      // creating the escrow transfer
+      {
+         escrow_transfer_operation op;
+         op.from = alice_id;
+         op.to = bob_id;
+         op.amount = bitusd.amount(1000);
+         op.escrow_id = 0;
+         op.agent = sam_id;
+         op.agent_fee = bitusd.amount(0);
+         op.json_meta = "";
+         op.ratification_deadline = db.head_block_time() + 100;
+         op.escrow_expiration = db.head_block_time() + 200;
+         trx.operations.push_back(op);
+         sign(trx, alice_private_key);
+         PUSH_TX(db, trx);
+         generate_block();
+         trx.clear();
+      }
+
+   } FC_LOG_AND_RETHROW()
+}
+
+
 
 BOOST_AUTO_TEST_SUITE_END()
