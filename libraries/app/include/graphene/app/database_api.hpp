@@ -286,7 +286,7 @@ class database_api
       /**
        *  @return all accounts that referr to the key or account id in their owner or active authorities.
        */
-      vector<account_id_type> get_account_references( account_id_type account_id )const;
+      vector<account_id_type> get_account_references( std::string account_id_or_name )const;
 
       /**
        * @brief Get a list of accounts by name

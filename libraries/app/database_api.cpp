@@ -84,7 +84,7 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       vector<optional<account_object>> get_accounts(const vector<std::string>& account_names_or_ids)const;
       std::map<string,full_account> get_full_accounts( const vector<string>& names_or_ids, bool subscribe );
       optional<account_object> get_account_by_name( string name )const;
-      vector<account_id_type> get_account_references( account_id_type account_id )const;
+      vector<account_id_type> get_account_references( std::string account_id_or_name )const;
       vector<optional<account_object>> lookup_account_names(const vector<string>& account_names)const;
       map<string,account_id_type> lookup_accounts(const string& lower_bound_name, uint32_t limit)const;
       uint64_t get_account_count()const;
@@ -758,16 +758,17 @@ optional<account_object> database_api_impl::get_account_by_name( string name )co
    return optional<account_object>();
 }
 
-vector<account_id_type> database_api::get_account_references( account_id_type account_id )const
+vector<account_id_type> database_api::get_account_references( std::string account_id_or_name )const
 {
-   return my->get_account_references( account_id );
+   return my->get_account_references( account_id_or_name );
 }
 
-vector<account_id_type> database_api_impl::get_account_references( account_id_type account_id )const
+vector<account_id_type> database_api_impl::get_account_references( std::string account_id_or_name )const
 {
    const auto& idx = _db.get_index_type<account_index>();
    const auto& aidx = dynamic_cast<const primary_index<account_index>&>(idx);
    const auto& refs = aidx.get_secondary_index<graphene::chain::account_member_index>();
+   const account_id_type account_id = get_account_from_string(account_id_or_name)->id;
    auto itr = refs.account_to_account_memberships.find(account_id);
    vector<account_id_type> result;
 
