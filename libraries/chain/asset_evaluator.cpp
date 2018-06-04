@@ -31,6 +31,7 @@
 #include <graphene/chain/is_authorized_asset.hpp>
 #include <graphene/chain/vesting_balance_object.hpp>
 #include <functional>
+#include <cybex/hardfork.hpp>
 
 namespace graphene { namespace chain {
 
@@ -120,8 +121,18 @@ void_result asset_create_evaluator::do_evaluate( const asset_create_operation& o
 void asset_create_evaluator::pay_fee()
 {
    fee_is_odd = core_fee_paid.value & 1;
-   core_fee_paid -= core_fee_paid.value/2;
-   generic_evaluator::pay_fee();
+   if(  db().head_block_time() > HARDFORK_CYBEX_1_TIME )
+   {
+      auto core_fee_paid_for_fee_pool = core_fee_paid.value/10;
+      core_fee_paid -= core_fee_paid_for_fee_pool;
+      generic_evaluator::pay_fee();
+      core_fee_paid = core_fee_paid_for_fee_pool;
+   } 
+   else
+   {
+      core_fee_paid -= core_fee_paid.value/2;
+      generic_evaluator::pay_fee();
+   }
 }
 
 object_id_type asset_create_evaluator::do_apply( const asset_create_operation& op )
