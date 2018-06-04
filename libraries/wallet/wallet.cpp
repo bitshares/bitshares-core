@@ -569,9 +569,18 @@ public:
    {
       return _remote_db->get_dynamic_global_properties();
    }
+   std::string account_id_to_string(account_id_type id) const
+   {
+      std::string account_id = fc::to_string(id.space_id)
+                               + "." + fc::to_string(id.type_id)
+                               + "." + fc::to_string(id.instance.value);
+      return account_id;
+   }
    account_object get_account(account_id_type id) const
    {
-      auto rec = _remote_db->get_accounts({id}).front();
+      std::string account_id = account_id_to_string(id);
+
+      auto rec = _remote_db->get_accounts({account_id}).front();
       FC_ASSERT(rec);
       return *rec;
    }
@@ -713,7 +722,7 @@ public:
             ("chain_id", _chain_id) );
 
       size_t account_pagination = 100;
-      vector< account_id_type > account_ids_to_send;
+      vector< std::string > account_ids_to_send;
       size_t n = _wallet.my_accounts.size();
       account_ids_to_send.reserve( std::min( account_pagination, n ) );
       auto it = _wallet.my_accounts.begin();
@@ -728,7 +737,8 @@ public:
          {
             assert( it != _wallet.my_accounts.end() );
             old_accounts.push_back( *it );
-            account_ids_to_send.push_back( old_accounts.back().id );
+            std::string account_id = account_id_to_string(old_accounts.back().id);
+            account_ids_to_send.push_back( account_id );
             ++it;
          }
          std::vector< optional< account_object > > accounts = _remote_db->get_accounts(account_ids_to_send);

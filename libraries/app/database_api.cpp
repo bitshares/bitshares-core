@@ -81,7 +81,7 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       bool is_public_key_registered(string public_key) const;
 
       // Accounts
-      vector<optional<account_object>> get_accounts(const vector<account_id_type>& account_ids)const;
+      vector<optional<account_object>> get_accounts(const vector<std::string>& account_names_or_ids)const;
       std::map<string,full_account> get_full_accounts( const vector<string>& names_or_ids, bool subscribe );
       optional<account_object> get_account_by_name( string name )const;
       vector<account_id_type> get_account_references( account_id_type account_id )const;
@@ -622,16 +622,19 @@ bool database_api_impl::is_public_key_registered(string public_key) const
 //                                                                  //
 //////////////////////////////////////////////////////////////////////
 
-vector<optional<account_object>> database_api::get_accounts(const vector<account_id_type>& account_ids)const
+vector<optional<account_object>> database_api::get_accounts(const vector<std::string>& account_names_or_ids)const
 {
-   return my->get_accounts( account_ids );
+   return my->get_accounts( account_names_or_ids );
 }
 
-vector<optional<account_object>> database_api_impl::get_accounts(const vector<account_id_type>& account_ids)const
+vector<optional<account_object>> database_api_impl::get_accounts(const vector<std::string>& account_names_or_ids)const
 {
-   vector<optional<account_object>> result; result.reserve(account_ids.size());
-   std::transform(account_ids.begin(), account_ids.end(), std::back_inserter(result),
-                  [this](account_id_type id) -> optional<account_object> {
+   vector<optional<account_object>> result; result.reserve(account_names_or_ids.size());
+   std::transform(account_names_or_ids.begin(), account_names_or_ids.end(), std::back_inserter(result),
+                  [this](std::string id_or_name) -> optional<account_object> {
+
+      const account_object* account = get_account_from_string(id_or_name);
+      account_id_type id = account->id;
       if(auto o = _db.find(id))
       {
          subscribe_to_item( id );

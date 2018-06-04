@@ -261,12 +261,12 @@ class database_api
 
       /**
        * @brief Get a list of accounts by ID
-       * @param account_ids IDs of the accounts to retrieve
+       * @param account_names_or_ids IDs or names of the accounts to retrieve
        * @return The accounts corresponding to the provided IDs
        *
        * This function has semantics identical to @ref get_objects
        */
-      vector<optional<account_object>> get_accounts(const vector<account_id_type>& account_ids)const;
+      vector<optional<account_object>> get_accounts(const vector<std::string>& account_names_or_ids)const;
 
       /**
        * @brief Fetch all objects relevant to the specified accounts and subscribe to updates
