@@ -531,10 +531,10 @@ class database_api
 
       /**
        * @brief Get the committee_member owned by a given account
-       * @param account The ID of the account whose committee_member should be retrieved
+       * @param account The ID or name of the account whose committee_member should be retrieved
        * @return The committee_member object, or null if the account does not have a committee_member
        */
-      fc::optional<committee_member_object> get_committee_member_by_account(account_id_type account)const;
+      fc::optional<committee_member_object> get_committee_member_by_account(const std::string account_id_or_name)const;
 
       /**
        * @brief Get names and IDs for registered committee_members

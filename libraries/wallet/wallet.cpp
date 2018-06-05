@@ -1392,7 +1392,7 @@ public:
       committee_member_create_operation committee_member_create_op;
       committee_member_create_op.committee_member_account = get_account_id(owner_account);
       committee_member_create_op.url = url;
-      if (_remote_db->get_committee_member_by_account(committee_member_create_op.committee_member_account))
+      if (_remote_db->get_committee_member_by_account(owner_account))
          FC_THROW("Account ${owner_account} is already a committee_member", ("owner_account", owner_account));
 
       signed_transaction tx;
@@ -1457,8 +1457,7 @@ public:
             // then maybe it's the owner account
             try
             {
-               account_id_type owner_account_id = get_account_id(owner_account);
-               fc::optional<committee_member_object> committee_member = _remote_db->get_committee_member_by_account(owner_account_id);
+               fc::optional<committee_member_object> committee_member = _remote_db->get_committee_member_by_account(owner_account);
                if (committee_member)
                   return *committee_member;
                else
@@ -1700,8 +1699,7 @@ public:
                                         bool broadcast /* = false */)
    { try {
       account_object voting_account_object = get_account(voting_account);
-      account_id_type committee_member_owner_account_id = get_account_id(committee_member);
-      fc::optional<committee_member_object> committee_member_obj = _remote_db->get_committee_member_by_account(committee_member_owner_account_id);
+      fc::optional<committee_member_object> committee_member_obj = _remote_db->get_committee_member_by_account(committee_member);
       if (!committee_member_obj)
          FC_THROW("Account ${committee_member} is not registered as a committee_member", ("committee_member", committee_member));
       if (approve)
@@ -1734,9 +1732,8 @@ public:
                                         bool broadcast /* = false */)
    { try {
       account_object voting_account_object = get_account(voting_account);
-      std::string witness_owner_account_id = account_id_to_string(get_account_id(witness));
 
-      fc::optional<witness_object> witness_obj = _remote_db->get_witness_by_account(witness_owner_account_id);
+      fc::optional<witness_object> witness_obj = _remote_db->get_witness_by_account(voting_account);
       if (!witness_obj)
          FC_THROW("Account ${witness} is not registered as a witness", ("witness", witness));
       if (approve)
