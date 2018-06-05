@@ -401,9 +401,9 @@ class database_api
       vector<collateral_bid_object> get_collateral_bids(const asset_id_type asset, uint32_t limit, uint32_t start)const;
 
       /**
-       *  @return all open margin positions for a given account id.
+       *  @return all open margin positions for a given account id or name.
        */
-      vector<call_order_object> get_margin_positions( const account_id_type& id )const;
+      vector<call_order_object> get_margin_positions( const std::string account_id_or_name )const;
 
       /**
        * @brief Request notification when the active orders in the market between two assets changes

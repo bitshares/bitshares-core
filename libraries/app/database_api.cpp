@@ -105,7 +105,7 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       vector<limit_order_object>         get_limit_orders(asset_id_type a, asset_id_type b, uint32_t limit)const;
       vector<call_order_object>          get_call_orders(asset_id_type a, uint32_t limit)const;
       vector<force_settlement_object>    get_settle_orders(asset_id_type a, uint32_t limit)const;
-      vector<call_order_object>          get_margin_positions( const account_id_type& id )const;
+      vector<call_order_object>          get_margin_positions( const std::string account_id_or_name )const;
       vector<collateral_bid_object>      get_collateral_bids(const asset_id_type asset, uint32_t limit, uint32_t start)const;
       void subscribe_to_market(std::function<void(const variant&)> callback, asset_id_type a, asset_id_type b);
       void unsubscribe_from_market(asset_id_type a, asset_id_type b);
@@ -1107,17 +1107,18 @@ vector<force_settlement_object> database_api_impl::get_settle_orders(asset_id_ty
    return result;
 }
 
-vector<call_order_object> database_api::get_margin_positions( const account_id_type& id )const
+vector<call_order_object> database_api::get_margin_positions( const std::string account_id_or_name )const
 {
-   return my->get_margin_positions( id );
+   return my->get_margin_positions( account_id_or_name );
 }
 
-vector<call_order_object> database_api_impl::get_margin_positions( const account_id_type& id )const
+vector<call_order_object> database_api_impl::get_margin_positions( const std::string account_id_or_name )const
 {
    try
    {
       const auto& idx = _db.get_index_type<call_order_index>();
       const auto& aidx = idx.indices().get<by_account>();
+      const account_id_type id = get_account_from_string(account_id_or_name)->id; // ask this, maybe not safe
       auto start = aidx.lower_bound( boost::make_tuple( id, asset_id_type(0) ) );
       auto end = aidx.lower_bound( boost::make_tuple( id+1, asset_id_type(0) ) );
       vector<call_order_object> result;
@@ -1127,7 +1128,7 @@ vector<call_order_object> database_api_impl::get_margin_positions( const account
          ++start;
       }
       return result;
-   } FC_CAPTURE_AND_RETHROW( (id) )
+   } FC_CAPTURE_AND_RETHROW( (account_id_or_name) )
 }
 
 vector<collateral_bid_object> database_api::get_collateral_bids(const asset_id_type asset, uint32_t limit, uint32_t start)const
