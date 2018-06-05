@@ -28,10 +28,12 @@ WORKDIR /bitshares-core
 
 # Compile
 RUN \
-    env && \
-    git worktree list && \
     ( git submodule sync --recursive || \
-      find . -name .git -type f | xargs sed -i 's=: .*/.git/=: /bitshares-core/.git/=g' && \
+      find `pwd`  -type f -name .git | \
+	while read f; do \
+	  rel="$(echo "${f#$PWD/}" | sed 's=[^/]*/=../=g')"; \
+	  sed -i "s=: .*/.git/=: $rel/=" "$f"; \
+	done && \
       git submodule sync --recursive ) && \
     git submodule update --init --recursive && \
     cmake \
