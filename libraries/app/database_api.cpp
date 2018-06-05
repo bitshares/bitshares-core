@@ -130,7 +130,7 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
 
       // Workers
       vector<worker_object> get_all_workers()const;
-      vector<optional<worker_object>> get_workers_by_account(account_id_type account)const;
+      vector<optional<worker_object>> get_workers_by_account(const std::string account_id_or_name)const;
       uint64_t get_worker_count()const;
 
       // Votes
@@ -1729,17 +1729,18 @@ vector<worker_object> database_api_impl::get_all_workers()const
     return result;
 }
 
-vector<optional<worker_object>> database_api::get_workers_by_account(account_id_type account)const
+vector<optional<worker_object>> database_api::get_workers_by_account(const std::string account_id_or_name)const
 {
-    return my->get_workers_by_account( account );
+    return my->get_workers_by_account( account_id_or_name );
 }
 
-vector<optional<worker_object>> database_api_impl::get_workers_by_account(account_id_type account)const
+vector<optional<worker_object>> database_api_impl::get_workers_by_account(const std::string account_id_or_name)const
 {
-    vector<optional<worker_object>> result;
-    const auto& workers_idx = _db.get_index_type<worker_index>().indices().get<by_account>();
+   vector<optional<worker_object>> result;
+   const auto& workers_idx = _db.get_index_type<worker_index>().indices().get<by_account>();
 
-    for( const auto& w : workers_idx )
+   const account_id_type account = get_account_from_string(account_id_or_name)->id; // ask this, maybe not safe
+   for( const auto& w : workers_idx )
     {
         if( w.worker_account == account )
             result.push_back( w );
