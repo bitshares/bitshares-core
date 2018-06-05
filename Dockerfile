@@ -29,7 +29,8 @@ WORKDIR /bitshares-core
 # Compile
 RUN \
     ( git submodule sync --recursive || \
-      rm -rf .git/modules docs libraries/fc ) && \
+      find . -name .git -type f | xargs sed -i 's=^.*/.git/=/bitshares-core/.git/=g' && \
+      git submodule sync --recursive ) && \
     git submodule update --init --recursive && \
     cmake \
         -DCMAKE_BUILD_TYPE=Release \
