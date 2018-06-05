@@ -29,7 +29,7 @@ WORKDIR /bitshares-core
 # Compile
 RUN \
     ( git submodule sync --recursive || \
-      find . -name .git -type f | xargs sed -i 's=^.*/.git/=/bitshares-core/.git/=g' && \
+      find . -name .git -type f | xargs sed -i 's=: .*/.git/=: /bitshares-core/.git/=g' && \
       git submodule sync --recursive ) && \
     git submodule update --init --recursive && \
     cmake \
