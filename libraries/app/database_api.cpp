@@ -118,7 +118,7 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
 
       // Witnesses
       vector<optional<witness_object>> get_witnesses(const vector<witness_id_type>& witness_ids)const;
-      fc::optional<witness_object> get_witness_by_account(account_id_type account)const;
+      fc::optional<witness_object> get_witness_by_account(const std::string account_id_or_name)const;
       map<string, witness_id_type> lookup_witness_accounts(const string& lower_bound_name, uint32_t limit)const;
       uint64_t get_witness_count()const;
 
@@ -1577,14 +1577,15 @@ vector<optional<witness_object>> database_api_impl::get_witnesses(const vector<w
    return result;
 }
 
-fc::optional<witness_object> database_api::get_witness_by_account(account_id_type account)const
+fc::optional<witness_object> database_api::get_witness_by_account(const std::string account_id_or_name)const
 {
-   return my->get_witness_by_account( account );
+   return my->get_witness_by_account( account_id_or_name );
 }
 
-fc::optional<witness_object> database_api_impl::get_witness_by_account(account_id_type account) const
+fc::optional<witness_object> database_api_impl::get_witness_by_account(const std::string account_id_or_name) const
 {
    const auto& idx = _db.get_index_type<witness_index>().indices().get<by_account>();
+   const account_id_type account = get_account_from_string(account_id_or_name)->id; // ask this, maybe not safe
    auto itr = idx.find(account);
    if( itr != idx.end() )
       return *itr;

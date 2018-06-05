@@ -498,10 +498,10 @@ class database_api
 
       /**
        * @brief Get the witness owned by a given account
-       * @param account The ID of the account whose witness should be retrieved
+       * @param account_id_or_name The ID of the account whose witness should be retrieved
        * @return The witness object, or null if the account does not have a witness
        */
-      fc::optional<witness_object> get_witness_by_account(account_id_type account)const;
+      fc::optional<witness_object> get_witness_by_account(const std::string account_id_or_name)const;
 
       /**
        * @brief Get names and IDs for registered witnesses
