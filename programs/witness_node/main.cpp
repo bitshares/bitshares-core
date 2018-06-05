@@ -106,8 +106,14 @@ static void load_config_file( const fc::path& config_ini_path, const bpo::option
 
    // get the basic options
    bpo::store(bpo::parse_config_file<char>(config_ini_path.preferred_string().c_str(),
-              unique_options, true), options);
+                                           unique_options, true), options);
+}
 
+static void load_logging_config_file
+(
+   const fc::path& config_ini_path
+)
+{
    // try to get logging options from the config file.
    try
    {
@@ -115,9 +121,9 @@ static void load_config_file( const fc::path& config_ini_path, const bpo::option
       if (logging_config)
          fc::configure_logging(*logging_config);
    }
-   catch (const fc::exception&)
+   catch (const fc::exception& ex)
    {
-      wlog("Error parsing logging config from config file ${config}, using default config", ("config", config_ini_path.preferred_string()));
+      wlog("Error parsing logging config from logging config file ${config}, using default config", ("config", config_ini_path.preferred_string()));
    }
 }
 
@@ -169,12 +175,25 @@ static void create_new_config_file( const fc::path& config_ini_path, const fc::p
       }
       out_cfg << "\n";
    }
+
+   out_cfg.close();
+}
+
+static void create_logging_config_file
+(
+   const fc::path& config_ini_path,
+   const fc::path& data_dir
+)
+{
+   ilog("Writing new config file at ${path}", ("path", config_ini_path));
+   if (!exists(data_dir))
+   {
+      create_directories(data_dir);
+   }
+
+   std::ofstream out_cfg(config_ini_path.preferred_string());
    write_default_logging_config_to_stream(out_cfg);
    out_cfg.close();
-   // read the default logging config we just wrote out to the file and start using it
-   fc::optional<fc::logging_config> logging_config = load_logging_config_from_ini_file(config_ini_path);
-   if (logging_config)
-      fc::configure_logging(*logging_config);
 }
 
 int main(int argc, char** argv) {
@@ -239,10 +258,20 @@ int main(int argc, char** argv) {
             data_dir = fc::current_path() / data_dir;
       }
 
+      // load witness node initial configuration
       fc::path config_ini_path = data_dir / "config.ini";
       if( !fc::exists(config_ini_path) )
          create_new_config_file( config_ini_path, data_dir, cfg_options );
       load_config_file( config_ini_path, cfg_options, options );
+
+      // load witness node logging configuration
+      const auto logging_ini_path = data_dir / "logging.ini";
+      if (!exists(logging_ini_path))
+      {
+         create_logging_config_file (logging_ini_path, data_dir);
+      }
+
+      load_logging_config_file( logging_ini_path );
 
       bpo::notify(options);
       node->initialize(data_dir, options);
