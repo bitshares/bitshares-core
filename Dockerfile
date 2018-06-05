@@ -1,4 +1,4 @@
-FROM phusion/baseimage:0.9.19
+FROM phusion/baseimage:0.10.1
 MAINTAINER The bitshares decentralized organisation
 
 ENV LANG=en_US.UTF-8
