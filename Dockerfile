@@ -28,6 +28,8 @@ WORKDIR /bitshares-core
 
 # Compile
 RUN \
+    env && \
+    git worktree list && \
     ( git submodule sync --recursive || \
       find . -name .git -type f | xargs sed -i 's=: .*/.git/=: /bitshares-core/.git/=g' && \
       git submodule sync --recursive ) && \
