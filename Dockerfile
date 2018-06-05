@@ -28,6 +28,7 @@ WORKDIR /bitshares-core
 
 # Compile
 RUN \
+    git config -l && pwd && ls -al - -git .git/modules && \
     git submodule sync --recursive && \
     git submodule update --init --recursive && \
     cmake \
