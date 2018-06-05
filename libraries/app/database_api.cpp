@@ -94,7 +94,7 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       vector<asset> get_named_account_balances(const std::string& name, const flat_set<asset_id_type>& assets)const;
       vector<balance_object> get_balance_objects( const vector<address>& addrs )const;
       vector<asset> get_vested_balances( const vector<balance_id_type>& objs )const;
-      vector<vesting_balance_object> get_vesting_balances( account_id_type account_id )const;
+      vector<vesting_balance_object> get_vesting_balances( std::string account_id_or_name )const;
 
       // Assets
       vector<optional<asset_object>> get_assets(const vector<asset_id_type>& asset_ids)const;
@@ -768,7 +768,7 @@ vector<account_id_type> database_api_impl::get_account_references( std::string a
    const auto& idx = _db.get_index_type<account_index>();
    const auto& aidx = dynamic_cast<const primary_index<account_index>&>(idx);
    const auto& refs = aidx.get_secondary_index<graphene::chain::account_member_index>();
-   const account_id_type account_id = get_account_from_string(account_id_or_name)->id;
+   const account_id_type account_id = get_account_from_string(account_id_or_name)->id; // ask this, maybe not safe
    auto itr = refs.account_to_account_memberships.find(account_id);
    vector<account_id_type> result;
 
@@ -928,15 +928,16 @@ vector<asset> database_api_impl::get_vested_balances( const vector<balance_id_ty
    } FC_CAPTURE_AND_RETHROW( (objs) )
 }
 
-vector<vesting_balance_object> database_api::get_vesting_balances( account_id_type account_id )const
+vector<vesting_balance_object> database_api::get_vesting_balances( std::string account_id_or_name )const
 {
-   return my->get_vesting_balances( account_id );
+   return my->get_vesting_balances( account_id_or_name );
 }
 
-vector<vesting_balance_object> database_api_impl::get_vesting_balances( account_id_type account_id )const
+vector<vesting_balance_object> database_api_impl::get_vesting_balances( std::string account_id_or_name )const
 {
    try
    {
+      const account_id_type account_id = get_account_from_string(account_id_or_name)->id; // ask this, maybe not safe
       vector<vesting_balance_object> result;
       auto vesting_range = _db.get_index_type<vesting_balance_index>().indices().get<by_account>().equal_range(account_id);
       std::for_each(vesting_range.first, vesting_range.second,
@@ -945,7 +946,7 @@ vector<vesting_balance_object> database_api_impl::get_vesting_balances( account_
                     });
       return result;
    }
-   FC_CAPTURE_AND_RETHROW( (account_id) );
+   FC_CAPTURE_AND_RETHROW( (account_id_or_name) );
 }
 
 //////////////////////////////////////////////////////////////////////

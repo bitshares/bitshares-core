@@ -1650,13 +1650,8 @@ public:
          result.emplace_back( get_object<vesting_balance_object>(*vbid), now );
          return result;
       }
-
-      // try casting to avoid a round-trip if we were given an account ID
-      fc::optional<account_id_type> acct_id = maybe_id<account_id_type>( account_name );
-      if( !acct_id )
-         acct_id = get_account( account_name ).id;
-
-      vector< vesting_balance_object > vbos = _remote_db->get_vesting_balances( *acct_id );
+         
+      vector< vesting_balance_object > vbos = _remote_db->get_vesting_balances( account_name );
       if( vbos.size() == 0 )
          return result;
 
