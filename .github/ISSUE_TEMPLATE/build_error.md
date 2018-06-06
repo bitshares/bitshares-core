@@ -1,6 +1,6 @@
 ---
 name: Build Error
-about: Create a detailed report about an error during in the BitShares Core build process.
+about: Create a detailed report about an error encountered during the BitShares Core build process.
 
 ---
 
@@ -17,7 +17,7 @@ Finally, press the 'Submit new issue' button. The Core Team will evaluate and pr
 A clear and concise description of what the build error is.
 
 **Build Environment**
-Please provide details about the build environment, including the relevant required libraries. Much of this information can be found in the `CMakeFiles/CMakeOutput.log`. 
+Details about the build environment, including the relevant required libraries. Much of this information can be found in the `CMakeFiles/CMakeOutput.log`. 
  - Host OS:             [e.g. Ubuntu 18.04 LTS]
  - Host Physical RAM    [e.g. 4GB]
  - Source Branch/Tag:   [e.g. master or 2.0.180425]
