@@ -655,21 +655,21 @@ class database_api
 
       /**
        *  @brief Get non expired withdraw permission objects for a giver(ex:recurring customer)
-       *  @param account Account to get objects from
+       *  @param account Account ID or name to get objects from
        *  @param start Withdraw permission objects(1.12.X) before this ID will be skipped in results. Pagination purposes.
        *  @param limit Maximum number of objects to retrieve
        *  @return Withdraw permission objects for the account
        */
-      vector<withdraw_permission_object> get_withdraw_permissions_by_giver(account_id_type account, withdraw_permission_id_type start, uint32_t limit)const;
+      vector<withdraw_permission_object> get_withdraw_permissions_by_giver(const std::string account_id_or_name, withdraw_permission_id_type start, uint32_t limit)const;
 
       /**
        *  @brief Get non expired withdraw permission objects for a recipient(ex:service provider)
-       *  @param account Account to get objects from
+       *  @param account Account ID or name to get objects from
        *  @param start Withdraw permission objects(1.12.X) before this ID will be skipped in results. Pagination purposes.
        *  @param limit Maximum number of objects to retrieve
        *  @return Withdraw permission objects for the account
        */
-      vector<withdraw_permission_object> get_withdraw_permissions_by_recipient(account_id_type account, withdraw_permission_id_type start, uint32_t limit)const;
+      vector<withdraw_permission_object> get_withdraw_permissions_by_recipient(const std::string account_id_or_name, withdraw_permission_id_type start, uint32_t limit)const;
 
    private:
       std::shared_ptr< database_api_impl > my;
