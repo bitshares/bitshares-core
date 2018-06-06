@@ -1,0 +1,42 @@
+---
+name: Build Error
+about: Create a detailed report about an error during in the BitShares Core build process.
+
+---
+
+**Instructions**
+Please include a detailed Title above. Next, please complete the following sections below:
+* Build Error
+* Build Environment
+* Steps To Reproduce
+* Screenshots (optional)
+
+Finally, press the 'Submit new issue' button. The Core Team will evaluate and prioritize your Bug Report for future development. 
+
+**Build Error Description**
+A clear and concise description of what the build error is.
+
+**Build Environment**
+Please provide details about the build environment, including the relevant required libraries. Much of this information can be found in the `CMakeFiles/CMakeOutput.log`. 
+ - Host OS:             [e.g. Ubuntu 18.04 LTS]
+ - Host Physical RAM    [e.g. 4GB]
+ - Source Branch/Tag:   [e.g. master or 2.0.180425]
+ - OpenSSL Version:     [e.g. 1.1.0g]
+ - Boost Version:       [e.g. 1.65.1]
+ - C++ Compiler:        [e.g. gcc version 4.8.5]
+
+**Steps To Reproduce**
+Steps to reproduce the behavior (example outlined below):
+1. Using installation guide from this URL...
+2. This is my complete build script...
+3. It fails at this step...
+4. Here is the error output...
+5. See the error in the screenshot below...
+
+**Screenshots (optional)**
+If applicable, add screenshots to demonstrate the build process and error output.
+
+## CORE TEAM TASK LIST
+- [ ] Evaluate `Build Error`
+- [ ] Provide build guidance
+- [ ] <OR> Create `Bug Report`
