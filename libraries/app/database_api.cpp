@@ -84,7 +84,7 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       vector<optional<account_object>> get_accounts(const vector<std::string>& account_names_or_ids)const;
       std::map<string,full_account> get_full_accounts( const vector<string>& names_or_ids, bool subscribe );
       optional<account_object> get_account_by_name( string name )const;
-      vector<account_id_type> get_account_references( std::string account_id_or_name )const;
+      vector<account_id_type> get_account_references( const std::string account_id_or_name )const;
       vector<optional<account_object>> lookup_account_names(const vector<string>& account_names)const;
       map<string,account_id_type> lookup_accounts(const string& lower_bound_name, uint32_t limit)const;
       uint64_t get_account_count()const;
@@ -94,7 +94,7 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       vector<asset> get_named_account_balances(const std::string& name, const flat_set<asset_id_type>& assets)const;
       vector<balance_object> get_balance_objects( const vector<address>& addrs )const;
       vector<asset> get_vested_balances( const vector<balance_id_type>& objs )const;
-      vector<vesting_balance_object> get_vesting_balances( std::string account_id_or_name )const;
+      vector<vesting_balance_object> get_vesting_balances( const std::string account_id_or_name )const;
 
       // Assets
       vector<optional<asset_object>> get_assets(const vector<asset_id_type>& asset_ids)const;
@@ -147,7 +147,7 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       vector< fc::variant > get_required_fees( const vector<operation>& ops, asset_id_type id )const;
 
       // Proposed transactions
-      vector<proposal_object> get_proposed_transactions( account_id_type id )const;
+      vector<proposal_object> get_proposed_transactions( const std::string account_id_or_name )const;
 
       // Blinded balances
       vector<blinded_balance_object> get_blinded_balances( const flat_set<commitment_type>& commitments )const;
@@ -758,12 +758,12 @@ optional<account_object> database_api_impl::get_account_by_name( string name )co
    return optional<account_object>();
 }
 
-vector<account_id_type> database_api::get_account_references( std::string account_id_or_name )const
+vector<account_id_type> database_api::get_account_references( const std::string account_id_or_name )const
 {
    return my->get_account_references( account_id_or_name );
 }
 
-vector<account_id_type> database_api_impl::get_account_references( std::string account_id_or_name )const
+vector<account_id_type> database_api_impl::get_account_references( const std::string account_id_or_name )const
 {
    const auto& idx = _db.get_index_type<account_index>();
    const auto& aidx = dynamic_cast<const primary_index<account_index>&>(idx);
@@ -928,12 +928,12 @@ vector<asset> database_api_impl::get_vested_balances( const vector<balance_id_ty
    } FC_CAPTURE_AND_RETHROW( (objs) )
 }
 
-vector<vesting_balance_object> database_api::get_vesting_balances( std::string account_id_or_name )const
+vector<vesting_balance_object> database_api::get_vesting_balances( const std::string account_id_or_name )const
 {
    return my->get_vesting_balances( account_id_or_name );
 }
 
-vector<vesting_balance_object> database_api_impl::get_vesting_balances( std::string account_id_or_name )const
+vector<vesting_balance_object> database_api_impl::get_vesting_balances( const std::string account_id_or_name )const
 {
    try
    {
@@ -2064,16 +2064,17 @@ vector< fc::variant > database_api_impl::get_required_fees( const vector<operati
 //                                                                  //
 //////////////////////////////////////////////////////////////////////
 
-vector<proposal_object> database_api::get_proposed_transactions( account_id_type id )const
+vector<proposal_object> database_api::get_proposed_transactions( const std::string account_id_or_name )const
 {
-   return my->get_proposed_transactions( id );
+   return my->get_proposed_transactions( account_id_or_name );
 }
 
 /** TODO: add secondary index that will accelerate this process */
-vector<proposal_object> database_api_impl::get_proposed_transactions( account_id_type id )const
+vector<proposal_object> database_api_impl::get_proposed_transactions( const std::string account_id_or_name )const
 {
    const auto& idx = _db.get_index_type<proposal_index>();
    vector<proposal_object> result;
+   const account_id_type id = get_account_from_string(account_id_or_name)->id; // ask this, maybe not safe
 
    idx.inspect_all_objects( [&](const object& obj){
            const proposal_object& p = static_cast<const proposal_object&>(obj);

@@ -286,7 +286,7 @@ class database_api
       /**
        *  @return all accounts that referr to the key or account id in their owner or active authorities.
        */
-      vector<account_id_type> get_account_references( std::string account_id_or_name )const;
+      vector<account_id_type> get_account_references( const std::string account_id_or_name )const;
 
       /**
        * @brief Get a list of accounts by name
@@ -325,7 +325,7 @@ class database_api
 
       vector<asset> get_vested_balances( const vector<balance_id_type>& objs )const;
 
-      vector<vesting_balance_object> get_vesting_balances( std::string account_id_or_name )const;
+      vector<vesting_balance_object> get_vesting_balances( const std::string account_id_or_name )const;
 
       /**
        * @brief Get the total number of accounts registered with the blockchain
@@ -638,7 +638,7 @@ class database_api
       /**
        *  @return the set of proposed transactions relevant to the specified account id.
        */
-      vector<proposal_object> get_proposed_transactions( account_id_type id )const;
+      vector<proposal_object> get_proposed_transactions( const std::string account_id_or_name )const;
 
       //////////////////////
       // Blinded balances //
