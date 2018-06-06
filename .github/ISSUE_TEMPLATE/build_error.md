@@ -9,7 +9,7 @@ Please include a detailed Title above. Next, please complete the following secti
 * Build Error
 * Build Environment
 * Steps To Reproduce
-* Screenshots (optional)
+* Console Logs (optional)
 
 Finally, press the 'Submit new issue' button. The Core Team will evaluate and prioritize your Bug Report for future development. 
 
@@ -33,8 +33,8 @@ Steps to reproduce the behavior (example outlined below):
 4. Here is the error output...
 5. See the error in the screenshot below...
 
-**Screenshots (optional)**
-If applicable, add screenshots to demonstrate the build process and error output.
+**Console Logs (optional)**
+Please provide the full console log, including all commands entered and their output. This will allow detailed troubleshooting.
 
 ## CORE TEAM TASK LIST
 - [ ] Evaluate `Build Error`
