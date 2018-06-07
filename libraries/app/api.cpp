@@ -318,8 +318,9 @@ namespace graphene { namespace app {
        const auto& db = *_app.chain_database();
        FC_ASSERT( limit <= 100 );
        vector<operation_history_object> result;
-       account_id_type account = database_api.get_account_id_from_string(account_id_or_name); // ask this, maybe not safe
+       account_id_type account;
        try {
+          account = database_api.get_account_id_from_string(account_id_or_name);
           const account_transaction_history_object& node = account(db).statistics(db).most_recent_op(db);
           if(start == operation_history_id_type() || start.instance.value > node.operation_id.instance.value)
              start = node.operation_id;
@@ -353,7 +354,10 @@ namespace graphene { namespace app {
        const auto& db = *_app.chain_database();
        FC_ASSERT( limit <= 100 );
        vector<operation_history_object> result;
-       const account_id_type account = database_api.get_account_id_from_string(account_id_or_name); // ask this, maybe not safe
+       account_id_type account;
+       try {
+          account = database_api.get_account_id_from_string(account_id_or_name);
+       } catch(...) { return result; }
        const auto& stats = account(db).statistics(db);
        if( stats.most_recent_op == account_transaction_history_id_type() ) return result;
        const account_transaction_history_object* node = &stats.most_recent_op(db);
@@ -389,7 +393,10 @@ namespace graphene { namespace app {
        const auto& db = *_app.chain_database();
        FC_ASSERT(limit <= 100);
        vector<operation_history_object> result;
-       const account_id_type account = database_api.get_account_id_from_string(account_id_or_name); // ask this, maybe not safe
+       account_id_type account;
+       try {
+          account = database_api.get_account_id_from_string(account_id_or_name);
+       } catch(...) { return result; }
        const auto& stats = account(db).statistics(db);
        if( start == 0 )
           start = stats.total_ops;
