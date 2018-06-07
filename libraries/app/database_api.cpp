@@ -774,7 +774,7 @@ vector<account_id_type> database_api_impl::get_account_references( const std::st
    const auto& idx = _db.get_index_type<account_index>();
    const auto& aidx = dynamic_cast<const primary_index<account_index>&>(idx);
    const auto& refs = aidx.get_secondary_index<graphene::chain::account_member_index>();
-   const account_id_type account_id = get_account_from_string(account_id_or_name)->id; // ask this, maybe not safe
+   const account_id_type account_id = get_account_from_string(account_id_or_name)->id;
    auto itr = refs.account_to_account_memberships.find(account_id);
    vector<account_id_type> result;
 
@@ -943,7 +943,7 @@ vector<vesting_balance_object> database_api_impl::get_vesting_balances( const st
 {
    try
    {
-      const account_id_type account_id = get_account_from_string(account_id_or_name)->id; // ask this, maybe not safe
+      const account_id_type account_id = get_account_from_string(account_id_or_name)->id;
       vector<vesting_balance_object> result;
       auto vesting_range = _db.get_index_type<vesting_balance_index>().indices().get<by_account>().equal_range(account_id);
       std::for_each(vesting_range.first, vesting_range.second,
@@ -1124,7 +1124,7 @@ vector<call_order_object> database_api_impl::get_margin_positions( const std::st
    {
       const auto& idx = _db.get_index_type<call_order_index>();
       const auto& aidx = idx.indices().get<by_account>();
-      const account_id_type id = get_account_from_string(account_id_or_name)->id; // ask this, maybe not safe
+      const account_id_type id = get_account_from_string(account_id_or_name)->id;
       auto start = aidx.lower_bound( boost::make_tuple( id, asset_id_type(0) ) );
       auto end = aidx.lower_bound( boost::make_tuple( id+1, asset_id_type(0) ) );
       vector<call_order_object> result;
@@ -1591,7 +1591,7 @@ fc::optional<witness_object> database_api::get_witness_by_account(const std::str
 fc::optional<witness_object> database_api_impl::get_witness_by_account(const std::string account_id_or_name) const
 {
    const auto& idx = _db.get_index_type<witness_index>().indices().get<by_account>();
-   const account_id_type account = get_account_from_string(account_id_or_name)->id; // ask this, maybe not safe
+   const account_id_type account = get_account_from_string(account_id_or_name)->id;
    auto itr = idx.find(account);
    if( itr != idx.end() )
       return *itr;
@@ -1667,7 +1667,7 @@ fc::optional<committee_member_object> database_api::get_committee_member_by_acco
 fc::optional<committee_member_object> database_api_impl::get_committee_member_by_account(const std::string account_id_or_name) const
 {
    const auto& idx = _db.get_index_type<committee_member_index>().indices().get<by_account>();
-   const account_id_type account = get_account_from_string(account_id_or_name)->id; // ask this, maybe not safe
+   const account_id_type account = get_account_from_string(account_id_or_name)->id;
    auto itr = idx.find(account);
    if( itr != idx.end() )
       return *itr;
@@ -1745,7 +1745,7 @@ vector<optional<worker_object>> database_api_impl::get_workers_by_account(const 
    vector<optional<worker_object>> result;
    const auto& workers_idx = _db.get_index_type<worker_index>().indices().get<by_account>();
 
-   const account_id_type account = get_account_from_string(account_id_or_name)->id; // ask this, maybe not safe
+   const account_id_type account = get_account_from_string(account_id_or_name)->id;
    for( const auto& w : workers_idx )
     {
         if( w.worker_account == account )
@@ -2080,7 +2080,7 @@ vector<proposal_object> database_api_impl::get_proposed_transactions( const std:
 {
    const auto& idx = _db.get_index_type<proposal_index>();
    vector<proposal_object> result;
-   const account_id_type id = get_account_from_string(account_id_or_name)->id; // ask this, maybe not safe
+   const account_id_type id = get_account_from_string(account_id_or_name)->id;
 
    idx.inspect_all_objects( [&](const object& obj){
            const proposal_object& p = static_cast<const proposal_object&>(obj);
@@ -2137,7 +2137,7 @@ vector<withdraw_permission_object> database_api_impl::get_withdraw_permissions_b
 
    const auto& withdraw_idx = _db.get_index_type<withdraw_permission_index>().indices().get<by_from>();
    auto withdraw_index_end = withdraw_idx.end();
-   const account_id_type account = get_account_from_string(account_id_or_name)->id; // ask this, maybe not safe
+   const account_id_type account = get_account_from_string(account_id_or_name)->id;
    auto withdraw_itr = withdraw_idx.lower_bound(boost::make_tuple(account, start));
    while(withdraw_itr != withdraw_index_end && withdraw_itr->withdraw_from_account == account && result.size() < limit)
    {
@@ -2159,7 +2159,7 @@ vector<withdraw_permission_object> database_api_impl::get_withdraw_permissions_b
 
    const auto& withdraw_idx = _db.get_index_type<withdraw_permission_index>().indices().get<by_authorized>();
    auto withdraw_index_end = withdraw_idx.end();
-   const account_id_type account = get_account_from_string(account_id_or_name)->id; // ask this, maybe not safe
+   const account_id_type account = get_account_from_string(account_id_or_name)->id;
    auto withdraw_itr = withdraw_idx.lower_bound(boost::make_tuple(account, start));
    while(withdraw_itr != withdraw_index_end && withdraw_itr->authorized_account == account && result.size() < limit)
    {
