@@ -1545,7 +1545,7 @@ class wallet_api
          
       order_book get_order_book( const string& base, const string& quote, unsigned limit = 50);
 
-      bool multisig_mode(string on_or_off, string tx_filename = "");
+      bool multisig_mode(string on_or_off, fc::optional<string> tx_filename);
       multisig_trx_data
       multisig_import_transaction(string tx_filename);
       multisig_trx_data
