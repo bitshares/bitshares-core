@@ -760,14 +760,14 @@ public:
       return true;
    }
 
-   bool multisig_mode(string on_or_off, string tx_filename)
+   bool multisig_mode(string on_or_off, fc::optional<string> tx_filename)
    {
       if (on_or_off == "on")
       {
-         if (tx_filename == "")
+         if (! tx_filename)
             FC_THROW("Must provide transaction file name");
          else
-            _tx_filename = tx_filename;
+            _tx_filename = *tx_filename;
 
          _multisig_mode = true;
       }
@@ -3803,7 +3803,7 @@ dynamic_global_property_object wallet_api::get_dynamic_global_properties() const
    return my->get_dynamic_global_properties();
 }
 
-bool wallet_api::multisig_mode(string on_or_off, string tx_filename)
+bool wallet_api::multisig_mode(string on_or_off, fc::optional<string> tx_filename)
 {
    return my->multisig_mode(on_or_off, tx_filename);
 }
