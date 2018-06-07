@@ -259,6 +259,14 @@ class database_api
       // Accounts //
       //////////////
 
+     /**
+      * @brief Get account object from a name or ID
+      * @param account_name_or_id ID or name of the accounts
+      * @return Account ID
+      *
+      */
+      account_id_type get_account_id_from_string(const std::string& name_or_id) const;
+
       /**
        * @brief Get a list of accounts by ID
        * @param account_names_or_ids IDs or names of the accounts to retrieve
@@ -713,6 +721,7 @@ FC_API(graphene::app::database_api,
    (is_public_key_registered)
 
    // Accounts
+   (get_account_id_from_string)
    (get_accounts)
    (get_full_accounts)
    (get_account_by_name)

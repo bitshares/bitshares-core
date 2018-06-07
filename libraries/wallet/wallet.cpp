@@ -2831,7 +2831,6 @@ vector<asset_object> wallet_api::list_assets(const string& lowerbound, uint32_t 
 vector<operation_detail> wallet_api::get_account_history(string name, int limit)const
 {
    vector<operation_detail> result;
-   auto account_id = get_account(name).get_id();
 
    while( limit > 0 )
    {
@@ -2843,7 +2842,7 @@ vector<operation_detail> wallet_api::get_account_history(string name, int limit)
       }
 
 
-      vector<operation_history_object> current = my->_remote_hist->get_account_history(account_id, operation_history_id_type(), std::min(100,limit), start);
+      vector<operation_history_object> current = my->_remote_hist->get_account_history(name, operation_history_id_type(), std::min(100,limit), start);
       for( auto& o : current ) {
          std::stringstream ss;
          auto memo = o.op.visit(detail::operation_printer(ss, *my, o.result));
@@ -2872,7 +2871,7 @@ vector<operation_detail> wallet_api::get_relative_account_history(string name, u
 
    while( limit > 0 )
    {
-      vector <operation_history_object> current = my->_remote_hist->get_relative_account_history(account_id, stop, std::min<uint32_t>(100, limit), start);
+      vector <operation_history_object> current = my->_remote_hist->get_relative_account_history(name, stop, std::min<uint32_t>(100, limit), start);
       for (auto &o : current) {
          std::stringstream ss;
          auto memo = o.op.visit(detail::operation_printer(ss, *my, o.result));
@@ -2905,7 +2904,7 @@ account_history_operation_detail wallet_api::get_account_history_by_operations(s
 
     while (limit > 0 && start <= stats.total_ops) {
         uint32_t min_limit = std::min<uint32_t> (100, limit);
-        auto current = my->_remote_hist->get_account_history_by_operations(account_id, operation_types, start, min_limit);
+        auto current = my->_remote_hist->get_account_history_by_operations(name, operation_types, start, min_limit);
         for (auto& obj : current.operation_history_objs) {
             std::stringstream ss;
             auto memo = obj.op.visit(detail::operation_printer(ss, *my, obj.result));

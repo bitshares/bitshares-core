@@ -81,6 +81,7 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       bool is_public_key_registered(string public_key) const;
 
       // Accounts
+      account_id_type get_account_id_from_string(const std::string& name_or_id)const;
       vector<optional<account_object>> get_accounts(const vector<std::string>& account_names_or_ids)const;
       std::map<string,full_account> get_full_accounts( const vector<string>& names_or_ids, bool subscribe );
       optional<account_object> get_account_by_name( string name )const;
@@ -198,7 +199,7 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
          return tmp;
       }
 
-      const account_object* get_account_from_string( const std::string& name_or_id  ) const
+      const account_object* get_account_from_string( const std::string& name_or_id ) const
       {
          // TODO cache the result to avoid repeatly fetching from db
          FC_ASSERT( name_or_id.size() > 0);
@@ -621,6 +622,11 @@ bool database_api_impl::is_public_key_registered(string public_key) const
 // Accounts                                                         //
 //                                                                  //
 //////////////////////////////////////////////////////////////////////
+
+account_id_type database_api::get_account_id_from_string(const std::string& name_or_id)const
+{
+   return my->get_account_from_string( name_or_id )->id; // safe?
+}
 
 vector<optional<account_object>> database_api::get_accounts(const vector<std::string>& account_names_or_ids)const
 {
