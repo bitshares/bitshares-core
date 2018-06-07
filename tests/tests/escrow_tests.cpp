@@ -1312,6 +1312,86 @@ BOOST_AUTO_TEST_CASE( escrow_uia )
          trx.clear();
       }
 
+      escrow_object escrow = db.get_escrow( alice_id, 0 );
+
+      BOOST_REQUIRE( escrow.from == alice_id );
+      BOOST_REQUIRE( escrow.to == bob_id );
+      BOOST_REQUIRE( escrow.escrow_id == 0 );
+      BOOST_REQUIRE( escrow.agent == sam_id );
+      BOOST_REQUIRE( escrow.disputed == false );
+      BOOST_REQUIRE( escrow.to_approved == false );
+      BOOST_REQUIRE( escrow.agent_approved == false );
+
+      BOOST_REQUIRE_EQUAL(get_balance(alice_id, bitusd.id), 9999000);
+      BOOST_REQUIRE_EQUAL(get_balance(bob_id, bitusd.id), 0);
+      BOOST_REQUIRE_EQUAL(get_balance(sam_id, bitusd.id), 0);
+
+      // agent approves
+      {
+         escrow_approve_operation op;
+         op.from = alice_id;
+         op.to = bob_id;
+         op.who = sam_id;
+         op.escrow_id = 0;
+         op.agent = sam_id;
+         op.approve = true;
+         trx.operations.push_back(op);
+         sign(trx, sam_private_key);
+         PUSH_TX(db, trx);
+         generate_block();
+         trx.clear();
+      }
+
+      // bob(to) approves.
+      {
+         escrow_approve_operation op;
+         op.from = alice_id;
+         op.to = bob_id;
+         op.who = bob_id;
+         op.escrow_id = 0;
+         op.agent = sam_id;
+         op.approve = true;
+         trx.operations.push_back(op);
+         sign(trx, bob_private_key);
+         PUSH_TX(db, trx);
+         generate_block();
+         trx.clear();
+      }
+      BOOST_REQUIRE_EQUAL(get_balance(alice_id, bitusd.id), 9999000);
+      BOOST_REQUIRE_EQUAL(get_balance(bob_id, bitusd.id), 0);
+      BOOST_REQUIRE_EQUAL(get_balance(sam_id, bitusd.id), 0);
+
+      escrow = db.get_escrow( alice_id, 0 );
+      BOOST_REQUIRE( escrow.from == alice_id );
+      BOOST_REQUIRE( escrow.to == bob_id );
+      BOOST_REQUIRE( escrow.escrow_id == 0 );
+      BOOST_REQUIRE( escrow.agent == sam_id );
+      BOOST_REQUIRE( escrow.disputed == false );
+      BOOST_REQUIRE( escrow.to_approved == true );
+      BOOST_REQUIRE( escrow.agent_approved == true );
+
+      // now the escrow haves all the needed aprovals release the funds with alice(bob cant release to himself)
+      {
+         escrow_release_operation op;
+
+         op.from = alice_id;
+         op.to = bob_id;
+         op.who = alice_id;
+         op.escrow_id = 0;
+         op.receiver = bob_id;
+         op.agent = sam_id;
+         op.amount = bitusd.amount(1000);
+         trx.operations.push_back(op);
+         sign(trx, alice_private_key);
+         PUSH_TX(db, trx);
+         generate_block();
+         trx.clear();
+      }
+      BOOST_REQUIRE_EQUAL(get_balance(alice_id, bitusd.id), 9999000);
+      BOOST_REQUIRE_EQUAL(get_balance(bob_id, bitusd.id), 1000);
+      BOOST_REQUIRE_EQUAL(get_balance(sam_id, bitusd.id), 0);
+
+
    } FC_LOG_AND_RETHROW()
 }
 

@@ -35,7 +35,9 @@ namespace graphene { namespace chain {
 
          FC_ASSERT( o.ratification_deadline > db().head_block_time() );
          FC_ASSERT( o.escrow_expiration > db().head_block_time() );
-         FC_ASSERT( db().get_balance( o.from, o.amount.asset_id ) >= (o.amount + o.fee + o.agent_fee) );
+         if(o.amount.asset_id == asset_id_type())
+            FC_ASSERT( db().get_balance( o.from, o.amount.asset_id ) >= (o.amount + o.fee + o.agent_fee) );
+         // Todo: add assert for different than core asset
          return void_result();
       }
 
