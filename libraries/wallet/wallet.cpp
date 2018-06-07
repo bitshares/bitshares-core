@@ -758,6 +758,120 @@ public:
 
       return true;
    }
+
+   bool multisig_mode(string on_or_off, string tx_filename)
+   {
+      if (on_or_off == "on")
+      {
+         if (tx_filename == "")
+            FC_THROW("Must provide transaction file name");
+         else
+            _tx_filename = tx_filename;
+
+         _multisig_mode = true;
+      }
+      else
+         _multisig_mode = false;
+
+      return _multisig_mode;
+   }
+
+   multisig_trx_data multisig_import_transaction(string tx_filename)
+   {
+      if (!fc::exists(tx_filename))
+         return _trx_data;
+
+      _trx_data = fc::json::from_file(tx_filename)
+                     .as<multisig_trx_data>(2 * GRAPHENE_MAX_NESTED_OBJECTS);
+
+      return _trx_data;
+   }
+
+   multisig_trx_data multisig_sign_transaction(const vector<string>& wif_keys, bool broadcast)
+   {
+      // TODO 
+      // 1. show which key was signed, which was not
+
+      // use const reference to call the const variant of `sign()`
+      const signed_transaction& trx = _trx_data.tx;
+
+      for (const string &wif_key : wif_keys)
+      {
+         fc::optional<fc::ecc::private_key> optional_private_key =
+            wif_to_key(wif_key);
+
+         if (!optional_private_key)
+            FC_THROW("Invalid private key: ${i}", ("i", wif_key));
+
+         signature_type sig =
+            optional_private_key->sign_compact(trx.sig_digest(_chain_id));
+         const vector<signature_type> &sigs = trx.signatures;
+         if (std::find(sigs.begin(), sigs.end(), sig) != sigs.end())
+         {
+            wlog( "signature of ${fn} had already exist, skip", ("fn", wif_key) );
+         }
+         else
+         {
+            _trx_data.tx.sign(*optional_private_key, _chain_id);
+         }
+      }
+
+      if (broadcast)
+      {
+         try
+         {
+            _remote_net_broadcast->broadcast_transaction(_trx_data.tx);
+         }
+         catch (const fc::exception &e)
+         {
+            elog("Caught exception while broadcasting tx ${id}:  ${e}",
+                 ("id", _trx_data.tx.id().str())("e", e.to_detail_string()));
+            throw;
+         }
+      }
+
+      return _trx_data;
+   }
+
+   void save_transaction_to_file(signed_transaction& tx, set<public_key_type> required_keys)
+   {
+      //
+      // Serialize in memory, then save to disk
+      //
+      // This approach lessens the risk of a partially written wallet
+      // if exceptions are thrown in serialization
+      //
+
+      //encrypt_keys();
+      //
+      _trx_data.tx = tx;
+      _trx_data.required_keys = required_keys;
+
+      ilog( "saving wallet to file ${fn}", ("fn", _tx_filename) );
+
+      string tx_data = fc::json::to_pretty_string( _trx_data );
+      try
+      {
+         enable_umask_protection();
+         //
+         // Parentheses on the following declaration fails to compile,
+         // due to the Most Vexing Parse.  Thanks, C++
+         //
+         // http://en.wikipedia.org/wiki/Most_vexing_parse
+         //
+         fc::ofstream outfile{ fc::path( _tx_filename ) };
+         outfile.write( tx_data.c_str(), tx_data.length() );
+         outfile.flush();
+         outfile.close();
+         disable_umask_protection();
+      }
+      catch(...)
+      {
+         disable_umask_protection();
+         throw;
+      }
+   }
+
    void save_wallet_file(string wallet_filename = "")
    {
       //
@@ -1860,6 +1974,11 @@ public:
          ++expiration_time_offset;
       }
 
+      if (_multisig_mode)
+      {
+         save_transaction_to_file(tx, pks);
+      }
+
       if( broadcast )
       {
          try
@@ -1871,73 +1990,6 @@ public:
             elog("Caught exception while broadcasting tx ${id}:  ${e}", ("id", tx.id().str())("e", e.to_detail_string()) );
             throw;
          }
-      }
-
-      return tx;
-   }
-
-   signed_transaction sign_transaction_offline(signed_transaction& tx, public_key_type& key)
-   {
-      FC_ASSERT((tx.ref_block_num && tx.ref_block_prefix) &&
-                   (tx.expiration != fc::time_point_sec()),
-                "Must first set TaPOS and expiration field");
-
-      // The first sign should also set TaPoS field. In general, cold wallet
-      // won't be first sign since it has no idea of the head block id
-      if (tx.signatures.empty())
-      {
-         auto dyn_props = get_dynamic_global_properties();
-
-         tx.set_reference_block(dyn_props.head_block_id);
-
-         // first, some bookkeeping, expire old items from
-         // _recently_generated_transactions since transactions include the head
-         // block id, we just need the index for keeping transactions unique
-         // when there are multiple transactions in the same block.  choose a
-         // time period that should be at least one block long, even in the
-         // worst case. 2 minutes ought to be plenty.
-         fc::time_point_sec oldest_transaction_ids_to_track(dyn_props.time -
-                                                            fc::minutes(2));
-         auto oldest_transaction_record_iter =
-            _recently_generated_transactions.get<timestamp_index>().lower_bound(
-               oldest_transaction_ids_to_track);
-         auto begin_iter =
-            _recently_generated_transactions.get<timestamp_index>().begin();
-         _recently_generated_transactions.get<timestamp_index>().erase(
-            begin_iter, oldest_transaction_record_iter);
-
-         uint32_t expiration_time_offset = 0;
-         for (;;)
-         {
-            tx.set_expiration(dyn_props.time +
-                              fc::seconds(30 + expiration_time_offset));
-            tx.signatures.clear();
-
-            for (const public_key_type &key : approving_key_set)
-               tx.sign(get_private_key(key), _chain_id);
-
-            graphene::chain::transaction_id_type this_transaction_id = tx.id();
-            auto iter =
-               _recently_generated_transactions.find(this_transaction_id);
-            if (iter == _recently_generated_transactions.end())
-            {
-               // we haven't generated this transaction before, the usual case
-               recently_generated_transaction_record this_transaction_record;
-               this_transaction_record.generation_time = dyn_props.time;
-               this_transaction_record.transaction_id = this_transaction_id;
-               _recently_generated_transactions.insert(this_transaction_record);
-               break;
-            }
-
-            // else we've generated a dupe, increment expiration time and
-            // re-sign it
-            ++expiration_time_offset;
-         }
-      }
-      else
-      {
-         for (const public_key_type &key : approving_key_set)
-            tx.sign(get_private_key(key), _chain_id);
       }
 
       return tx;
@@ -2676,6 +2728,10 @@ public:
          FC_THROW("Unsupported operation: \"${operation_name}\"", ("operation_name", operation_name));
       return it->second;
    }
+
+   bool                    _multisig_mode = false;
+   multisig_trx_data       _trx_data;
+   string                  _tx_filename;
 
    string                  _wallet_filename;
    wallet_data             _wallet;
@@ -3652,6 +3708,23 @@ global_property_object wallet_api::get_global_properties() const
 dynamic_global_property_object wallet_api::get_dynamic_global_properties() const
 {
    return my->get_dynamic_global_properties();
+}
+
+bool wallet_api::multisig_mode(string on_or_off, string tx_filename)
+{
+   return my->multisig_mode(on_or_off, tx_filename);
+}
+
+multisig_trx_data wallet_api::multisig_import_transaction(string tx_filename)
+{
+   return my->multisig_import_transaction(tx_filename);
+}
+
+multisig_trx_data
+wallet_api::multisig_sign_transaction(const vector<string> &wif_keys,
+                                      bool broadcast)
+{
+   return my->multisig_sign_transaction(wif_keys, broadcast);
 }
 
 string wallet_api::help()const
