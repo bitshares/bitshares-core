@@ -102,9 +102,7 @@ BOOST_AUTO_TEST_CASE(get_account_history_additional) {
       BOOST_CHECK_EQUAL(histories.size(), 1);
       BOOST_CHECK_EQUAL(histories[0].id.instance(), 0);
 
-
       const account_object& dan = create_account("dan"); // create op 1
-      auto dan_id = dan.id;
 
       create_bitasset("CNY", dan.id); // create op 2
       create_bitasset("BTC", account_id_type()); // create op 3
@@ -374,8 +372,7 @@ BOOST_AUTO_TEST_CASE(get_account_history_additional) {
       BOOST_CHECK_EQUAL(histories.size(), 0);
 
       // create a new account C = alice { 7 }
-      const account_object& alice = create_account("alice");
-      auto alice_id = alice.id;
+      create_account("alice");
 
       generate_block();
 
@@ -411,8 +408,7 @@ BOOST_AUTO_TEST_CASE(track_account) {
       // account_id_type() is not tracked
 
       // account_id_type() creates alice(not tracked account)
-      const account_object& alice = create_account("alice");
-      auto alice_id = alice.id;
+      create_account("alice");
 
       //account_id_type() creates some ops
       create_bitasset("CNY", account_id_type());
@@ -497,8 +493,7 @@ BOOST_AUTO_TEST_CASE(track_account2) {
       create_bitasset("EUR", alice_id);
 
       // account_id_type() creates dan(account not tracked)
-      const account_object& dan = create_account("dan");
-      auto dan_id = dan.id;
+      create_account("dan");
 
       generate_block();
 
@@ -527,11 +522,11 @@ BOOST_AUTO_TEST_CASE(track_account2) {
       BOOST_CHECK_EQUAL(histories[0].id.instance(), 3);
 
       // anything against dan should be {}
-      histories = hist_api.get_account_history("alice", operation_history_id_type(0), 10, operation_history_id_type(0));
+      histories = hist_api.get_account_history("dan", operation_history_id_type(0), 10, operation_history_id_type(0));
       BOOST_CHECK_EQUAL(histories.size(), 0);
-      histories = hist_api.get_account_history("alice", operation_history_id_type(1), 10, operation_history_id_type(0));
+      histories = hist_api.get_account_history("dan", operation_history_id_type(1), 10, operation_history_id_type(0));
       BOOST_CHECK_EQUAL(histories.size(), 0);
-      histories = hist_api.get_account_history("alice", operation_history_id_type(1), 1, operation_history_id_type(2));
+      histories = hist_api.get_account_history("dan", operation_history_id_type(1), 1, operation_history_id_type(2));
       BOOST_CHECK_EQUAL(histories.size(), 0);
 
    } catch (fc::exception &e) {

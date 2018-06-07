@@ -116,9 +116,10 @@ namespace graphene { namespace app {
    class history_api
    {
       public:
-         history_api(application& app):_app(app){}
+         history_api(application& app)
+               :_app(app), database_api( std::ref(*app.chain_database()), &(app.get_options())) {}
 
-         /**
+      /**
           * @brief Get operations relevant to the specificed account
           * @param account_id_or_name The account ID or name whose history should be queried
           * @param stop ID of the earliest operation to retrieve
@@ -182,6 +183,7 @@ namespace graphene { namespace app {
          flat_set<uint32_t> get_market_history_buckets()const;
       private:
            application& _app;
+           graphene::app::database_api database_api;
    };
 
    /**
