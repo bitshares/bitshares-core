@@ -778,11 +778,23 @@ public:
 
    multisig_trx_data multisig_import_transaction(string tx_filename)
    {
-      if (!fc::exists(tx_filename))
-         return _trx_data;
+      multisig_trx_data tmp;
 
-      _trx_data = fc::json::from_file(tx_filename)
+      if (!fc::exists(tx_filename))
+         return tmp;
+
+      tmp = fc::json::from_file(tx_filename)
                      .as<multisig_trx_data>(2 * GRAPHENE_MAX_NESTED_OBJECTS);
+
+      if (!tmp.tx.ref_block_num || !tmp.tx.ref_block_prefix ||
+          tmp.tx.expiration == fc::time_point_sec())
+      {
+         elog("Must fill TaPoS and expiration field in online machine!");
+      }
+      else
+      {
+         _trx_data = tmp;
+      }
 
       return _trx_data;
    }
