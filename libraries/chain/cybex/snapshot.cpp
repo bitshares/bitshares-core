@@ -136,13 +136,17 @@ void block_callback::snapshot(database &db)
                     << " " << policy.start_claim.to_iso_string() 
                     << " " << policy.vesting_seconds; 
             }  
-            else{
+            else if (vb_itr->policy.which()==0 ) {
                 linear_vesting_policy policy=vb_itr->policy.get<linear_vesting_policy>();
                 out << " 0" 
                     << " " << policy.begin_timestamp.to_iso_string() 
                     << " " << policy.vesting_cliff_seconds
                     << " " << policy.vesting_duration_seconds; 
             }  
+            else
+            {
+                out << " " << vb_itr->policy.which(); 
+            }
             out << "\"";
             vb_itr++;
           }
@@ -165,10 +169,13 @@ void block_callback::snapshot(database &db)
             while(itr !=bal_obj_index.end()&&itr->owner==addr)
             {
                if(!line_first){ out <<","; } else line_first=false;
-               out  << "\n\"" << db.to_pretty_string(itr->balance) 
-                    << " "    << itr->vesting_policy->begin_timestamp.to_iso_string()  
-                    << " "    <<itr->vesting_policy->vesting_cliff_seconds
-                    << "\""; 
+               out  << "\n\"" << db.to_pretty_string(itr->balance);
+               if(itr->vesting_policy.valid()) 
+               { 
+                  out  << " "    << itr->vesting_policy->begin_timestamp.to_iso_string()  
+                       << " "    << itr->vesting_policy->vesting_cliff_seconds;
+               }
+               out     << "\""; 
               itr++;
             }
             out <<"]\n}";
