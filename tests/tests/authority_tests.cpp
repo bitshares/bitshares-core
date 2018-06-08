@@ -447,6 +447,7 @@ BOOST_AUTO_TEST_CASE( committee_authority )
 
    BOOST_TEST_MESSAGE( "Checking that the proposal is not authorized to execute" );
    BOOST_REQUIRE(!db.get<proposal_object>(prop.id).is_authorized_to_execute(db));
+   BOOST_CHECK_EQUAL( db.get<proposal_object>(prop.id).fail_reason, "missing required active authority: Missing Active Authority 1.2.0");
    trx.operations.clear();
    trx.signatures.clear();
    proposal_update_operation uop;
@@ -470,6 +471,8 @@ BOOST_AUTO_TEST_CASE( committee_authority )
 
    trx.signatures.clear();
    generate_blocks(*prop.review_period_time);
+   // check the latest proposal object
+   BOOST_CHECK_EQUAL(db.get<proposal_object>(prop.id).fail_reason, "missing required active authority: Missing Active Authority 1.2.0");
    uop.key_approvals_to_add.clear();
    uop.key_approvals_to_add.insert(committee_key.get_public_key()); // was 7
    trx.operations.back() = uop;
@@ -479,6 +482,8 @@ BOOST_AUTO_TEST_CASE( committee_authority )
 
    generate_blocks(prop.expiration_time);
    BOOST_CHECK_EQUAL(get_balance(nathan, asset_id_type()(db)), 100000);
+   // proposal deleted
+   BOOST_CHECK_THROW( db.get<proposal_object>(prop.id), fc::exception );
 } FC_LOG_AND_RETHROW() }
 
 BOOST_FIXTURE_TEST_CASE( fired_committee_members, database_fixture )

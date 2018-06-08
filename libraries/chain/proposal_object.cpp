@@ -29,6 +29,12 @@ namespace graphene { namespace chain {
 
 bool proposal_object::is_authorized_to_execute(database& db) const
 {
+   std::string reason;
+   return is_authorized_to_execute(db, reason);
+}
+
+bool proposal_object::is_authorized_to_execute( database& db, std::string& fail_reason ) const
+{
    transaction_evaluation_state dry_run_eval(&db);
 
    try {
@@ -43,8 +49,7 @@ bool proposal_object::is_authorized_to_execute(database& db) const
    } 
    catch ( const fc::exception& e )
    {
-      //idump((available_active_approvals));
-      //wlog((e.to_detail_string()));
+      fail_reason = e.to_string(fc::log_level(fc::log_level::all));
       return false;
    }
    return true;

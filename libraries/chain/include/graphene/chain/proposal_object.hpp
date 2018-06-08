@@ -52,8 +52,10 @@ class proposal_object : public abstract_object<proposal_object>
       flat_set<account_id_type>     available_owner_approvals;
       flat_set<public_key_type>     available_key_approvals;
       account_id_type               proposer;
+      std::string                   fail_reason;
 
-      bool is_authorized_to_execute(database& db)const;
+      bool is_authorized_to_execute(database& db) const;
+      bool is_authorized_to_execute(database& db, std::string& fail_reason) const;
 };
 
 /**
