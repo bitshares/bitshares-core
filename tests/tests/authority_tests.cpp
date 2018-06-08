@@ -59,7 +59,7 @@ BOOST_AUTO_TEST_CASE( simple_single_signature )
       sign(trx, nathan_key);
       PUSH_TX( db, trx, database::skip_transaction_dupe_check );
 
-      BOOST_CHECK_EQUAL(get_balance(nathan, core), old_balance - 500);
+      BOOST_CHECK_EQUAL(get_balance(nathan, core), static_cast<int64_t>(old_balance - 500));
    } catch (fc::exception& e) {
       edump((e.to_detail_string()));
       throw;
@@ -97,25 +97,25 @@ BOOST_AUTO_TEST_CASE( any_two_of_three )
       GRAPHENE_CHECK_THROW(PUSH_TX( db, trx, database::skip_transaction_dupe_check ), fc::exception);
       sign(trx, nathan_key2);
       PUSH_TX( db, trx, database::skip_transaction_dupe_check );
-      BOOST_CHECK_EQUAL(get_balance(nathan, core), old_balance - 500);
+      BOOST_CHECK_EQUAL(get_balance(nathan, core), static_cast<int64_t>(old_balance - 500));
 
       trx.signatures.clear();
       sign(trx, nathan_key2);
       sign(trx, nathan_key3);
       PUSH_TX( db, trx, database::skip_transaction_dupe_check );
-      BOOST_CHECK_EQUAL(get_balance(nathan, core), old_balance - 1000);
+      BOOST_CHECK_EQUAL(get_balance(nathan, core), static_cast<int64_t>(old_balance - 1000));
 
       trx.signatures.clear();
       sign(trx, nathan_key1);
       sign(trx, nathan_key3);
       PUSH_TX( db, trx, database::skip_transaction_dupe_check );
-      BOOST_CHECK_EQUAL(get_balance(nathan, core), old_balance - 1500);
+      BOOST_CHECK_EQUAL(get_balance(nathan, core), static_cast<int64_t>(old_balance - 1500));
 
       trx.signatures.clear();
       //sign(trx, fc::ecc::private_key::generate());
       sign(trx,nathan_key3);
       GRAPHENE_CHECK_THROW(PUSH_TX( db, trx, database::skip_transaction_dupe_check ), fc::exception);
-      BOOST_CHECK_EQUAL(get_balance(nathan, core), old_balance - 1500);
+      BOOST_CHECK_EQUAL(get_balance(nathan, core), static_cast<int64_t>(old_balance - 1500));
    } catch (fc::exception& e) {
       edump((e.to_detail_string()));
       throw;
@@ -165,7 +165,7 @@ BOOST_AUTO_TEST_CASE( recursive_accounts )
       BOOST_TEST_MESSAGE( "Attempting to transfer with parent1 and parent2 signature, should succeed" );
       sign(trx,parent1_key);
       PUSH_TX( db, trx, database::skip_transaction_dupe_check );
-      BOOST_CHECK_EQUAL(get_balance(child, core), old_balance - 500);
+      BOOST_CHECK_EQUAL(get_balance(child, core), static_cast<int64_t>(old_balance - 500));
       trx.operations.clear();
       trx.signatures.clear();
 
@@ -180,7 +180,7 @@ BOOST_AUTO_TEST_CASE( recursive_accounts )
          sign(trx,parent1_key);
          sign(trx,parent2_key);
          PUSH_TX( db, trx, database::skip_transaction_dupe_check );
-         BOOST_REQUIRE_EQUAL(child.active.num_auths(), 3);
+         BOOST_REQUIRE_EQUAL(child.active.num_auths(), 3u);
          trx.operations.clear();
          trx.signatures.clear();
       }
@@ -203,13 +203,13 @@ BOOST_AUTO_TEST_CASE( recursive_accounts )
       BOOST_TEST_MESSAGE( "Attempting transfer both parents, should succeed" );
       sign(trx,  parent1_key);
       PUSH_TX( db, trx, database::skip_transaction_dupe_check );
-      BOOST_CHECK_EQUAL(get_balance(child, core), old_balance - 1000);
+      BOOST_CHECK_EQUAL(get_balance(child, core), static_cast<int64_t>(old_balance - 1000));
       trx.signatures.clear();
 
       BOOST_TEST_MESSAGE( "Attempting transfer with just child key, should succeed" );
       sign(trx, child_key);
       PUSH_TX( db, trx, database::skip_transaction_dupe_check );
-      BOOST_CHECK_EQUAL(get_balance(child, core), old_balance - 1500);
+      BOOST_CHECK_EQUAL(get_balance(child, core), static_cast<int64_t>(old_balance - 1500));
       trx.operations.clear();
       trx.signatures.clear();
 
@@ -242,7 +242,7 @@ BOOST_AUTO_TEST_CASE( recursive_accounts )
 
       BOOST_TEST_MESSAGE( "Attempt to transfer using parent2_key and grandparent_key" );
       PUSH_TX( db, trx, database::skip_transaction_dupe_check );
-      BOOST_CHECK_EQUAL(get_balance(child, core), old_balance - 2000);
+      BOOST_CHECK_EQUAL(get_balance(child, core), static_cast<int64_t>(old_balance - 2000));
       trx.clear();
 
       BOOST_TEST_MESSAGE( "Update grandparent account authority to be committee account" );
@@ -268,7 +268,7 @@ BOOST_AUTO_TEST_CASE( recursive_accounts )
       trx.signatures.clear();
       sign(trx,  child_key);
       PUSH_TX( db, trx, database::skip_transaction_dupe_check );
-      BOOST_CHECK_EQUAL(get_balance(child, core), old_balance - 2500);
+      BOOST_CHECK_EQUAL(get_balance(child, core), static_cast<int64_t>(old_balance - 2500));
       trx.operations.clear();
       trx.signatures.clear();
 
@@ -329,17 +329,17 @@ BOOST_AUTO_TEST_CASE( proposed_single_account )
          vector<authority> other;
          flat_set<account_id_type> active_set, owner_set;
          operation_get_required_authorities(op,active_set,owner_set,other);
-         BOOST_CHECK_EQUAL(active_set.size(), 1);
-         BOOST_CHECK_EQUAL(owner_set.size(), 0);
-         BOOST_CHECK_EQUAL(other.size(), 0);
+         BOOST_CHECK_EQUAL(active_set.size(), 1lu);
+         BOOST_CHECK_EQUAL(owner_set.size(), 0lu);
+         BOOST_CHECK_EQUAL(other.size(), 0lu);
          BOOST_CHECK(*active_set.begin() == moneyman.get_id());
 
          active_set.clear();
          other.clear();
          operation_get_required_authorities(op.proposed_ops.front().op,active_set,owner_set,other);
-         BOOST_CHECK_EQUAL(active_set.size(), 1);
-         BOOST_CHECK_EQUAL(owner_set.size(), 0);
-         BOOST_CHECK_EQUAL(other.size(), 0);
+         BOOST_CHECK_EQUAL(active_set.size(), 1lu);
+         BOOST_CHECK_EQUAL(owner_set.size(), 0lu);
+         BOOST_CHECK_EQUAL(other.size(), 0lu);
          BOOST_CHECK(*active_set.begin() == nathan.id);
       }
 
@@ -349,10 +349,10 @@ BOOST_AUTO_TEST_CASE( proposed_single_account )
       sign( trx,  init_account_priv_key  );
       const proposal_object& proposal = db.get<proposal_object>(PUSH_TX( db, trx ).operation_results.front().get<object_id_type>());
 
-      BOOST_CHECK_EQUAL(proposal.required_active_approvals.size(), 1);
-      BOOST_CHECK_EQUAL(proposal.available_active_approvals.size(), 0);
-      BOOST_CHECK_EQUAL(proposal.required_owner_approvals.size(), 0);
-      BOOST_CHECK_EQUAL(proposal.available_owner_approvals.size(), 0);
+      BOOST_CHECK_EQUAL(proposal.required_active_approvals.size(), 1lu);
+      BOOST_CHECK_EQUAL(proposal.available_active_approvals.size(), 0lu);
+      BOOST_CHECK_EQUAL(proposal.required_owner_approvals.size(), 0lu);
+      BOOST_CHECK_EQUAL(proposal.available_owner_approvals.size(), 0lu);
       BOOST_CHECK(*proposal.required_active_approvals.begin() == nathan.id);
 
       proposal_update_operation pup;
@@ -698,7 +698,7 @@ BOOST_FIXTURE_TEST_CASE( proposal_delete, database_fixture )
       PUSH_TX( db, trx );
       trx.clear();
       BOOST_CHECK(!prop.is_authorized_to_execute(db));
-      BOOST_CHECK_EQUAL(prop.available_active_approvals.size(), 1);
+      BOOST_CHECK_EQUAL(prop.available_active_approvals.size(), 1lu);
 
       std::swap(uop.active_approvals_to_add, uop.active_approvals_to_remove);
       trx.operations.push_back(uop);
@@ -706,7 +706,7 @@ BOOST_FIXTURE_TEST_CASE( proposal_delete, database_fixture )
       PUSH_TX( db, trx );
       trx.clear();
       BOOST_CHECK(!prop.is_authorized_to_execute(db));
-      BOOST_CHECK_EQUAL(prop.available_active_approvals.size(), 0);
+      BOOST_CHECK_EQUAL(prop.available_active_approvals.size(), 0lu);
    }
 
    {
@@ -760,8 +760,8 @@ BOOST_FIXTURE_TEST_CASE( proposal_owner_authority_delete, database_fixture )
    }
 
    const proposal_object& prop = *db.get_index_type<proposal_index>().indices().begin();
-   BOOST_CHECK_EQUAL(prop.required_active_approvals.size(), 1);
-   BOOST_CHECK_EQUAL(prop.required_owner_approvals.size(), 1);
+   BOOST_CHECK_EQUAL(prop.required_active_approvals.size(), 1lu);
+   BOOST_CHECK_EQUAL(prop.required_owner_approvals.size(), 1lu);
    BOOST_CHECK(!prop.is_authorized_to_execute(db));
 
    {
@@ -774,7 +774,7 @@ BOOST_FIXTURE_TEST_CASE( proposal_owner_authority_delete, database_fixture )
       PUSH_TX( db, trx );
       trx.clear();
       BOOST_CHECK(!prop.is_authorized_to_execute(db));
-      BOOST_CHECK_EQUAL(prop.available_owner_approvals.size(), 1);
+      BOOST_CHECK_EQUAL(prop.available_owner_approvals.size(), 1lu);
 
       std::swap(uop.owner_approvals_to_add, uop.owner_approvals_to_remove);
       trx.operations.push_back(uop);
@@ -782,7 +782,7 @@ BOOST_FIXTURE_TEST_CASE( proposal_owner_authority_delete, database_fixture )
       PUSH_TX( db, trx );
       trx.clear();
       BOOST_CHECK(!prop.is_authorized_to_execute(db));
-      BOOST_CHECK_EQUAL(prop.available_owner_approvals.size(), 0);
+      BOOST_CHECK_EQUAL(prop.available_owner_approvals.size(), 0lu);
    }
 
    {
@@ -837,8 +837,8 @@ BOOST_FIXTURE_TEST_CASE( proposal_owner_authority_complete, database_fixture )
    }
 
    const proposal_object& prop = *db.get_index_type<proposal_index>().indices().begin();
-   BOOST_CHECK_EQUAL(prop.required_active_approvals.size(), 1);
-   BOOST_CHECK_EQUAL(prop.required_owner_approvals.size(), 1);
+   BOOST_CHECK_EQUAL(prop.required_active_approvals.size(), 1lu);
+   BOOST_CHECK_EQUAL(prop.required_owner_approvals.size(), 1lu);
    BOOST_CHECK(!prop.is_authorized_to_execute(db));
 
    {
@@ -854,7 +854,7 @@ BOOST_FIXTURE_TEST_CASE( proposal_owner_authority_complete, database_fixture )
       PUSH_TX( db, trx );
       trx.clear();
       BOOST_CHECK(!prop.is_authorized_to_execute(db));
-      BOOST_CHECK_EQUAL(prop.available_key_approvals.size(), 1);
+      BOOST_CHECK_EQUAL(prop.available_key_approvals.size(), 1lu);
 
       std::swap(uop.key_approvals_to_add, uop.key_approvals_to_remove);
       trx.operations.push_back(uop);
@@ -864,7 +864,7 @@ BOOST_FIXTURE_TEST_CASE( proposal_owner_authority_complete, database_fixture )
       PUSH_TX( db, trx );
       trx.clear();
       BOOST_CHECK(!prop.is_authorized_to_execute(db));
-      BOOST_CHECK_EQUAL(prop.available_key_approvals.size(), 0);
+      BOOST_CHECK_EQUAL(prop.available_key_approvals.size(), 0lu);
 
       std::swap(uop.key_approvals_to_add, uop.key_approvals_to_remove);
       trx.operations.push_back(uop);
@@ -874,7 +874,7 @@ BOOST_FIXTURE_TEST_CASE( proposal_owner_authority_complete, database_fixture )
       PUSH_TX( db, trx );
       trx.clear();
       BOOST_CHECK(!prop.is_authorized_to_execute(db));
-      BOOST_CHECK_EQUAL(prop.available_key_approvals.size(), 1);
+      BOOST_CHECK_EQUAL(prop.available_key_approvals.size(), 1lu);
 
       uop.key_approvals_to_add.clear();
       uop.owner_approvals_to_add.insert(nathan.get_id());
