@@ -109,10 +109,7 @@ static void load_config_file( const fc::path& config_ini_path, const bpo::option
                                            unique_options, true), options);
 }
 
-static void load_logging_config_file
-(
-   const fc::path& config_ini_path
-)
+static void load_logging_config_file(const fc::path& config_ini_path)
 {
    // try to get logging options from the config file.
    try
@@ -179,11 +176,7 @@ static void create_new_config_file( const fc::path& config_ini_path, const fc::p
    out_cfg.close();
 }
 
-static void create_logging_config_file
-(
-   const fc::path& config_ini_path,
-   const fc::path& data_dir
-)
+static void create_logging_config_file(const fc::path& config_ini_path, const fc::path& data_dir)
 {
    ilog("Writing new config file at ${path}", ("path", config_ini_path));
    if (!exists(data_dir))
