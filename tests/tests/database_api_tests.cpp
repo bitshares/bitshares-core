@@ -28,6 +28,7 @@
 
 #include <fc/crypto/digest.hpp>
 
+#include <fc/crypto/hex.hpp>
 #include "../common/database_fixture.hpp"
 
 using namespace graphene::chain;
@@ -689,6 +690,22 @@ BOOST_AUTO_TEST_CASE( lookup_vote_ids )
    votes.push_back( worker.vote_for );
 
    const auto results = db_api.lookup_vote_ids( votes );
+
+} FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE( get_transaction_hex )
+{ try {
+   graphene::app::database_api db_api(db);
+   auto test_private_key = generate_private_key("testaccount");
+   public_key_type test_public = test_private_key.get_public_key();
+
+   trx.operations.push_back(make_account("testaccount", test_public));
+   trx.validate();
+
+   std::string hex_str = fc::to_hex(fc::raw::pack(trx));
+
+   BOOST_CHECK(db_api.get_transaction_hex(trx) == hex_str);
+   BOOST_CHECK(db_api.get_transaction_hex_without_sig(trx) + "00" == hex_str);
 
 } FC_LOG_AND_RETHROW() }
 

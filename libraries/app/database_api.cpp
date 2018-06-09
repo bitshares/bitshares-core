@@ -138,6 +138,8 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
 
       // Authority / validation
       std::string get_transaction_hex(const signed_transaction& trx)const;
+      std::string get_transaction_hex_without_sig(const signed_transaction& trx)const;
+
       set<public_key_type> get_required_signatures( const signed_transaction& trx, const flat_set<public_key_type>& available_keys )const;
       set<public_key_type> get_potential_signatures( const signed_transaction& trx )const;
       set<address> get_potential_address_signatures( const signed_transaction& trx )const;
@@ -1825,6 +1827,18 @@ std::string database_api::get_transaction_hex(const signed_transaction& trx)cons
 std::string database_api_impl::get_transaction_hex(const signed_transaction& trx)const
 {
    return fc::to_hex(fc::raw::pack(trx));
+}
+
+std::string database_api::get_transaction_hex_without_sig(
+   const signed_transaction &trx) const
+{
+   return my->get_transaction_hex_without_sig(trx);
+}
+
+std::string database_api_impl::get_transaction_hex_without_sig(
+   const signed_transaction &trx) const
+{
+   return fc::to_hex(fc::raw::pack(static_cast<transaction>(trx)));
 }
 
 set<public_key_type> database_api::get_required_signatures( const signed_transaction& trx, const flat_set<public_key_type>& available_keys )const
