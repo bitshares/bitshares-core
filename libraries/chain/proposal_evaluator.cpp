@@ -129,8 +129,6 @@ void_result proposal_update_evaluator::do_evaluate(const proposal_update_operati
                  "", ("id", id)("available", _proposal->available_owner_approvals) );
    }
 
-   // NOTE:  All authority checks happen outside of evaluators
-
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }
 

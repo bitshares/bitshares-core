@@ -389,6 +389,49 @@ BOOST_AUTO_TEST_CASE( proposed_single_account )
    }
 }
 
+BOOST_AUTO_TEST_CASE( proposal_failure )
+{
+   try
+   {
+      ACTORS( (bob) (alice) );
+
+      fund( bob,   asset(1000000) );
+      fund( alice, asset(1000000) );
+
+      // create proposal that will eventually fail due to lack of funds
+      transfer_operation top;
+      top.to = alice_id;
+      top.from = bob_id;
+      top.amount = asset(2000000);
+      proposal_create_operation pop;
+      pop.proposed_ops.push_back( { top } );
+      pop.expiration_time = db.head_block_time() + fc::days(1);
+      pop.fee_paying_account = bob_id;
+      trx.operations.push_back( pop );
+      trx.signatures.clear();
+      sign( trx, bob_private_key );
+      processed_transaction processed = PUSH_TX( db, trx );
+      proposal_object prop = db.get<proposal_object>(processed.operation_results.front().get<object_id_type>());
+      trx.clear();
+      generate_block();
+      // add signature
+      proposal_update_operation up_op;
+      up_op.proposal = prop.id;
+      up_op.fee_paying_account = bob_id;
+      up_op.active_approvals_to_add.emplace( bob_id );
+      trx.operations.push_back( up_op );
+      sign( trx, bob_private_key );
+      PUSH_TX( db, trx );
+      trx.clear();
+
+      // check fail reason
+      const proposal_object& result = db.get<proposal_object>(prop.id);
+      BOOST_CHECK(!result.fail_reason.empty());
+      BOOST_CHECK_EQUAL( result.fail_reason.substr(0, 16), "Assert Exception");
+   }
+   FC_LOG_AND_RETHROW()
+}
+
 /// Verify that committee authority cannot be invoked in a normal transaction
 BOOST_AUTO_TEST_CASE( committee_authority )
 { try {
