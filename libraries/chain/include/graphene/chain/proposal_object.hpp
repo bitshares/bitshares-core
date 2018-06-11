@@ -55,7 +55,6 @@ class proposal_object : public abstract_object<proposal_object>
       std::string                   fail_reason;
 
       bool is_authorized_to_execute(database& db) const;
-      bool is_authorized_to_execute(database& db, std::string& fail_reason) const;
 };
 
 /**

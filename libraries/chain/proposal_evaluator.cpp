@@ -103,11 +103,6 @@ object_id_type proposal_create_evaluator::do_apply(const proposal_create_operati
       std::set_difference(required_active.begin(), required_active.end(),
                           proposal.required_owner_approvals.begin(), proposal.required_owner_approvals.end(),
                           std::inserter(proposal.required_active_approvals, proposal.required_active_approvals.begin()));
-      if ( proposal.is_authorized_to_execute(d, proposal.fail_reason)
-            && proposal.review_period_time && proposal.fail_reason.empty() )
-      {
-         proposal.fail_reason = "Awaiting expiration of review period";
-      }
    });
 
    return proposal.id;
@@ -143,12 +138,10 @@ void_result proposal_update_evaluator::do_apply(const proposal_update_operation&
 { try {
    database& d = db();
 
-   bool execution_authorized = false;
-
    // Potential optimization: if _executed_proposal is true, we can skip the modify step and make push_proposal skip
    // signature checks. This isn't done now because I just wrote all the proposals code, and I'm not yet 100% sure the
    // required approvals are sufficient to authorize the transaction.
-   d.modify(*_proposal, [&o, &d, &execution_authorized](proposal_object& p) {
+   d.modify(*_proposal, [&o](proposal_object& p) {
       p.available_active_approvals.insert(o.active_approvals_to_add.begin(), o.active_approvals_to_add.end());
       p.available_owner_approvals.insert(o.owner_approvals_to_add.begin(), o.owner_approvals_to_add.end());
       for( account_id_type id : o.active_approvals_to_remove )
@@ -159,22 +152,6 @@ void_result proposal_update_evaluator::do_apply(const proposal_update_operation&
          p.available_key_approvals.insert(id);
       for( const auto& id : o.key_approvals_to_remove )
          p.available_key_approvals.erase(id);
-      try
-      {
-         // first check authorization
-         execution_authorized = p.is_authorized_to_execute(d, p.fail_reason);
-         // now check to see if there is a review period
-         if (p.review_period_time)
-         {
-            execution_authorized = false;
-            if(p.fail_reason.empty())
-               p.fail_reason = "Awaiting expiration of review period";
-         }
-      }
-      catch (fc::exception& ex)
-      {
-         p.fail_reason = ex.to_string(fc::log_level(fc::log_level::all));
-      }
    });
 
    // If the proposal has a review period, don't bother attempting to authorize/execute it.
@@ -182,13 +159,16 @@ void_result proposal_update_evaluator::do_apply(const proposal_update_operation&
    if( _proposal->review_period_time )
       return void_result();
 
-   if( execution_authorized )
+   if( _proposal->is_authorized_to_execute(d) )
    {
       // All required approvals are satisfied. Execute!
       _executed_proposal = true;
       try {
          _processed_transaction = d.push_proposal(*_proposal);
       } catch(fc::exception& e) {
+         d.modify(*_proposal, [&e](proposal_object& p) {
+            p.fail_reason = e.to_string(fc::log_level(fc::log_level::all));
+         });
          wlog("Proposed transaction ${id} failed to apply once approved with exception:\n----\n${reason}\n----\nWill try again when it expires.",
               ("id", o.proposal)("reason", e.to_detail_string()));
          _proposal_failed = true;
