@@ -99,18 +99,22 @@ void block_callback::snapshot(database &db)
         auto& vb_obj_index = db.get_index_type<vesting_balance_index>().indices().get<by_account>();
         auto asset_id = asset_id_type(0);
 
-         bool first = true;
-         strftime(buffer, sizeof(buffer)-1, "%Y %m %d %H:%M:%S", &tm);
+        bool first = true;
+        strftime(buffer, sizeof(buffer)-1, "%Y %m %d %H:%M:%S", &tm);
          
-         out << "{\"timestamp\":\"" << std::string(buffer)<<"\",\n";
-         out << "\"block\":" << block_num <<",\n";
-         out << "\"data\":[";
+        out << "{\"timestamp\":\"" << std::string(buffer)<<"\",\n";
+        out << "\"block\":" << block_num <<",\n";
+        out << "\"data\":[";
         for( const account_object& acct : account_idx )
         {
           if(acct.get_id().instance<6) continue;
 
           if(!first){ out <<","; } else first=false;
-          out << "\n{ \"account\": \"" << acct.name << "\",\n \"account-balance-objects\":["; 
+          out << "\n{ \"account\": \"" << acct.name << "\""
+              << ",\n\"owner\":" << fc::json::to_pretty_string(acct.owner)
+              << ",\n\"active\":" << fc::json::to_pretty_string(acct.active)
+              << ",\n\"cashback_vb\":" << fc::json::to_pretty_string(acct.cashback_vb)
+              << ",\n\"account-balance-objects\":["; 
           auto itr = bal_index.lower_bound(boost::make_tuple(acct.get_id(), asset_id));
           bool first_line=true;
           while(itr !=bal_index.end()&&itr->owner==acct.get_id())
