@@ -777,76 +777,78 @@ public:
       return _multisig_mode;
    }
 
-   multisig_trx_data multisig_import_transaction(string tx_filename)
+   optional<signed_transaction> multisig_import_transaction(string tx_filename)
    {
-      multisig_trx_data tmp;
+      signed_transaction tmp;
 
-      if (!fc::exists(tx_filename))
-         return tmp;
-
-      tmp = fc::json::from_file(tx_filename)
-                     .as<multisig_trx_data>(2 * GRAPHENE_MAX_NESTED_OBJECTS);
-
-      if (!tmp.tx.ref_block_num || !tmp.tx.ref_block_prefix ||
-          tmp.tx.expiration == fc::time_point_sec())
+      if ( !fc::exists( tx_filename ) )
       {
-         elog("Must fill TaPoS and expiration field in online machine!");
+         elog( "Transaction file not exists" );
+         return optional<signed_transaction>();
+      }
+
+      tmp = fc::json::from_file( tx_filename )
+               .as<signed_transaction>( 2 * GRAPHENE_MAX_NESTED_OBJECTS );
+
+      if ( !tmp.ref_block_num || !tmp.ref_block_prefix || tmp.expiration == fc::time_point_sec() )
+      {
+         elog( "Must fill TaPoS and expiration field in online machine" );
+         return optional<signed_transaction>();
       }
       else
       {
-         _trx_data = tmp;
+         _multisig_trx = tmp;
+         return _multisig_trx;
       }
-
-      return _trx_data;
    }
 
-   multisig_trx_data multisig_sign_transaction(const vector<string>& wif_keys, bool broadcast)
+   signed_transaction multisig_sign_transaction( const vector<string> &wif_keys, bool broadcast )
    {
-      // TODO 
-      // 1. show which key was signed, which was not
-
       // use const reference to call the const variant of `sign()`
-      const signed_transaction& trx = _trx_data.tx;
+      vector<fc::ecc::private_key> private_keys;
 
-      for (const string &wif_key : wif_keys)
+      for ( const string &wif_key : wif_keys )
       {
-         fc::optional<fc::ecc::private_key> optional_private_key =
-            wif_to_key(wif_key);
+         fc::optional<fc::ecc::private_key> optional_private_key = wif_to_key( wif_key );
 
-         if (!optional_private_key)
-            FC_THROW("Invalid private key: ${i}", ("i", wif_key));
+         if ( !optional_private_key )
+            FC_THROW( "Invalid private key: ${i}", ( "i", wif_key ) );
 
-         signature_type sig =
-            optional_private_key->sign_compact(trx.sig_digest(_chain_id));
-         const vector<signature_type> &sigs = trx.signatures;
-         if (std::find(sigs.begin(), sigs.end(), sig) != sigs.end())
+         private_keys.push_back(*optional_private_key);
+      }
+
+      for ( const fc::ecc::private_key& privkey : private_keys)
+      {
+         signature_type sig = privkey.sign_compact( _multisig_trx.sig_digest( _chain_id ) );
+         const vector<signature_type> &sigs = _multisig_trx.signatures;
+         if ( std::find( sigs.begin(), sigs.end(), sig ) != sigs.end() )
          {
-            wlog( "signature of ${fn} had already exist, skip", ("fn", wif_key) );
+            wlog( "signature of ${fn} had already exist, skip", ( "fn", key_to_wif( privkey ) ) );
          }
          else
          {
-            _trx_data.tx.sign(*optional_private_key, _chain_id);
+            _multisig_trx.sign( privkey, _chain_id );
          }
       }
 
-      if (broadcast)
+      if ( broadcast )
       {
          try
          {
-            _remote_net_broadcast->broadcast_transaction(_trx_data.tx);
+            _remote_net_broadcast->broadcast_transaction( _multisig_trx );
          }
-         catch (const fc::exception &e)
+         catch ( const fc::exception &e )
          {
-            elog("Caught exception while broadcasting tx ${id}:  ${e}",
-                 ("id", _trx_data.tx.id().str())("e", e.to_detail_string()));
+            elog( "Caught exception while broadcasting tx ${id}:  ${e}",
+                  ( "id", _multisig_trx.id().str() )( "e", e.to_detail_string() ) );
             throw;
          }
       }
 
-      return _trx_data;
+      return _multisig_trx;
    }
 
-   void save_transaction_to_file(signed_transaction& tx, set<public_key_type> required_keys)
+   void save_transaction_to_file(signed_transaction& tx)
    {
       //
       // Serialize in memory, then save to disk
@@ -855,14 +857,9 @@ public:
       // if exceptions are thrown in serialization
       //
 
-      //encrypt_keys();
-      //
-      _trx_data.tx = tx;
-      _trx_data.required_keys = required_keys;
-
       ilog( "saving wallet to file ${fn}", ("fn", _tx_filename) );
 
-      string tx_data = fc::json::to_pretty_string( _trx_data );
+      string tx_data = fc::json::to_pretty_string( tx );
       try
       {
          enable_umask_protection();
@@ -883,6 +880,8 @@ public:
          disable_umask_protection();
          throw;
       }
+
+      _multisig_trx = tx;
    }
 
    void save_wallet_file(string wallet_filename = "")
@@ -2037,7 +2036,7 @@ public:
 
       if (_multisig_mode)
       {
-         save_transaction_to_file(tx, pks);
+         save_transaction_to_file(tx);
       }
 
       if( broadcast )
@@ -2816,7 +2815,7 @@ public:
    }
 
    bool                    _multisig_mode = false;
-   multisig_trx_data       _trx_data;
+   signed_transaction      _multisig_trx;
    string                  _tx_filename;
 
    string                  _wallet_filename;
@@ -3820,16 +3819,15 @@ bool wallet_api::multisig_mode(string on_or_off, fc::optional<string> tx_filenam
    return my->multisig_mode(on_or_off, tx_filename);
 }
 
-multisig_trx_data wallet_api::multisig_import_transaction(string tx_filename)
+optional<signed_transaction> wallet_api::multisig_import_transaction( string tx_filename )
 {
-   return my->multisig_import_transaction(tx_filename);
+   return my->multisig_import_transaction( tx_filename );
 }
 
-multisig_trx_data
-wallet_api::multisig_sign_transaction(const vector<string> &wif_keys,
-                                      bool broadcast)
+signed_transaction wallet_api::multisig_sign_transaction( const vector<string> &wif_keys,
+                                                          bool broadcast )
 {
-   return my->multisig_sign_transaction(wif_keys, broadcast);
+   return my->multisig_sign_transaction( wif_keys, broadcast );
 }
 
 string wallet_api::help()const

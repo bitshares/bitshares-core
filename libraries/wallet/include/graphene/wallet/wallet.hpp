@@ -252,12 +252,6 @@ struct vesting_balance_object_with_info : public vesting_balance_object
    fc::time_point_sec allowed_withdraw_time;
 };
 
-struct multisig_trx_data
-{
-   signed_transaction tx;
-   set<public_key_type> required_keys;
-};
-
 namespace detail
 {
    class wallet_api_impl;
@@ -1607,11 +1601,9 @@ class wallet_api
       order_book get_order_book( const string& base, const string& quote, unsigned limit = 50);
 
       bool multisig_mode(string on_or_off, fc::optional<string> tx_filename);
-      multisig_trx_data
-      multisig_import_transaction(string tx_filename);
-      multisig_trx_data
-      multisig_sign_transaction(const vector<string>& wif_keys,
-                                bool broadcast = false);
+      optional<signed_transaction> multisig_import_transaction( string tx_filename );
+      signed_transaction multisig_sign_transaction( const vector<string> &wif_keys,
+                                                   bool broadcast = false );
 
       void dbg_make_uia(string creator, string symbol);
       void dbg_make_mia(string creator, string symbol);
@@ -1707,9 +1699,6 @@ FC_REFLECT(graphene::wallet::operation_detail_ex,
 
 FC_REFLECT( graphene::wallet::account_history_operation_detail,
         (total_count)(result_count)(details))
-
-FC_REFLECT( graphene::wallet::multisig_trx_data,
-        (tx)(required_keys))
 
 FC_API( graphene::wallet::wallet_api,
         (help)
