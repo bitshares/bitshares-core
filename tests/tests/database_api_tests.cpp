@@ -702,11 +702,19 @@ BOOST_AUTO_TEST_CASE( get_transaction_hex )
    trx.operations.push_back(make_account("testaccount", test_public));
    trx.validate();
 
-   std::string hex_str = fc::to_hex(fc::raw::pack(trx));
+   // case1: not signed, get hex
+   std::string hex_str = fc::to_hex( fc::raw::pack( trx ) );
 
-   BOOST_CHECK(db_api.get_transaction_hex(trx) == hex_str);
-   BOOST_CHECK(db_api.get_transaction_hex_without_sig(trx) + "00" == hex_str);
+   BOOST_CHECK( db_api.get_transaction_hex( trx ) == hex_str );
+   BOOST_CHECK( db_api.get_transaction_hex_without_sig( trx ) + "00" == hex_str );
 
+   // case2: signed, get hex
+   sign( trx, test_private_key );
+   hex_str = fc::to_hex( fc::raw::pack( trx ) );
+
+   BOOST_CHECK( db_api.get_transaction_hex( trx ) == hex_str );
+   BOOST_CHECK( db_api.get_transaction_hex_without_sig( trx ) +
+                   fc::to_hex( fc::raw::pack( trx.signatures ) ) == hex_str );
 } FC_LOG_AND_RETHROW() }
 
 BOOST_AUTO_TEST_SUITE_END()

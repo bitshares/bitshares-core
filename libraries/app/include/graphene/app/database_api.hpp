@@ -598,8 +598,7 @@ class database_api
 
       /// @brief Get a hexdump of the serialized binary form of a
       /// signatures-stripped transaction
-      std::string
-      get_transaction_hex_without_sig(const signed_transaction &trx) const;
+      std::string get_transaction_hex_without_sig( const signed_transaction &trx ) const;
 
       /**
        *  This API will take a partially signed transaction and a set of public keys that the owner has the ability to sign for
