@@ -107,7 +107,7 @@ void block_callback::snapshot(database &db)
         out << "\"data\":[";
         for( const account_object& acct : account_idx )
         {
-          if(acct.get_id().instance<6) continue;
+          if(acct.get_id().instance<(unsigned)6) continue;
 
           if(!first){ out <<","; } else first=false;
           out << "\n{ \"account\": \"" << acct.name << "\""
