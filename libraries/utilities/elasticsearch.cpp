@@ -25,8 +25,45 @@
 
 #include <boost/algorithm/string/join.hpp>
 #include <fc/log/logger.hpp>
+#include <fc/io/json.hpp>
 
 namespace graphene { namespace utilities {
+
+
+bool checkES(CURL *curl, std::string elasticsearch_url)
+{
+   std::string readBuffer;
+   std::string url = elasticsearch_url + "_nodes";
+   curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+   curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
+   curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)&readBuffer);
+   curl_easy_setopt(curl, CURLOPT_USERAGENT, "libcrp/0.1");
+   curl_easy_perform(curl);
+   if(readBuffer.empty())
+      return false;
+   else
+      return true;
+}
+std::string simpleQuery(CURL *curl, std::string elasticsearch_url, std::string endpoint, std::string query)
+{
+   std::string readBuffer;
+   struct curl_slist *headers = NULL;
+   headers = curl_slist_append(headers, "Content-Type: application/json");
+   std::string url = elasticsearch_url + endpoint;
+   curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+   curl_easy_setopt(curl, CURLOPT_POST, true);
+   curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+   curl_easy_setopt(curl, CURLOPT_POSTFIELDS, query.c_str());
+   curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
+   curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)&readBuffer);
+   curl_easy_setopt(curl, CURLOPT_USERAGENT, "libcrp/0.1");
+   curl_easy_perform(curl);
+
+   if(!readBuffer.empty())
+      return readBuffer;
+   return "";
+
+}
 
 bool SendBulk(CURL *curl, std::vector<std::string>& bulk, std::string elasticsearch_url, bool do_logs, std::string logs_index)
 {

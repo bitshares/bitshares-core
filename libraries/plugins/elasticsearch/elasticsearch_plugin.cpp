@@ -44,6 +44,8 @@
 #include <boost/algorithm/string.hpp>
 #include <regex>
 
+#include <graphene/utilities/elasticsearch.hpp>
+
 namespace graphene { namespace elasticsearch {
 
 namespace detail
@@ -74,10 +76,9 @@ class elasticsearch_plugin_impl
       bool _elasticsearch_visitor = false;
       CURL *curl; // curl handler
       vector <string> bulk; //  vector of op lines
-   private:
+      vector<std::string> prepare;
+private:
       void add_elasticsearch( const account_id_type account_id, const optional<operation_history_object>& oho, const signed_block& b );
-      void createBulkLine(account_transaction_history_object ath, operation_history_struct os, int op_type, block_struct bs, visitor_struct vs);
-      void sendBulk(std::string _elasticsearch_node_url, bool _elasticsearch_logs);
 
 };
 
@@ -211,10 +212,28 @@ void elasticsearch_plugin_impl::add_elasticsearch( const account_id_type account
    else
       limit_documents = _elasticsearch_bulk_replay;
 
-   createBulkLine(ath, os, op_type, bs, vs); // we have everything, creating bulk line
+   // we have everything, creating bulk line
+   bulk_struct bulks;
+   bulks.account_history = ath;
+   bulks.operation_history = os;
+   bulks.operation_type = op_type;
+   bulks.block_data = bs;
+   bulks.additional_data = vs;
+
+   std::string data = fc::json::to_string(bulks);
+
+   auto block_date = bulks.block_data.block_time.to_iso_string();
+   std::vector<std::string> parts;
+   boost::split(parts, block_date, boost::is_any_of("-"));
+   std::string index_name = "graphene-" + parts[0] + "-" + parts[1]; // index name
+   std::string _id = fc::json::to_string(ath.id);
+
+   prepare = graphene::utilities::createBulk(index_name, data, _id, 0);
+   bulk.insert(bulk.end(), prepare.begin(), prepare.end());
 
    if (curl && bulk.size() >= limit_documents) { // we are in bulk time, ready to add data to elasticsearech
-      sendBulk(_elasticsearch_node_url, _elasticsearch_logs);
+      prepare.clear();
+      graphene::utilities::SendBulk(curl, bulk, _elasticsearch_node_url, _elasticsearch_logs, "logs-account-history");
    }
 
    // remove everything except current object from ath
@@ -239,97 +258,6 @@ void elasticsearch_plugin_impl::add_elasticsearch( const account_id_type account
       const auto &by_opid_idx = his_idx.indices().get<by_opid>();
       if (by_opid_idx.find(remove_op_id) == by_opid_idx.end()) {
          db.remove(remove_op_id(db));
-      }
-   }
-}
-
-void elasticsearch_plugin_impl::createBulkLine(account_transaction_history_object ath, operation_history_struct os, int op_type, block_struct bs, visitor_struct vs)
-{
-   bulk_struct bulks;
-   bulks.account_history = ath;
-   bulks.operation_history = os;
-   bulks.operation_type = op_type;
-   bulks.block_data = bs;
-   bulks.additional_data = vs;
-
-   std::string alltogether = fc::json::to_string(bulks);
-
-   auto block_date = bulks.block_data.block_time.to_iso_string();
-   std::vector<std::string> parts;
-   boost::split(parts, block_date, boost::is_any_of("-"));
-   std::string index_name = "graphene-" + parts[0] + "-" + parts[1];
-
-   // bulk header before each line, op_type = create to avoid dups, index id will be ath id(2.9.X).
-   std::string _id = fc::json::to_string(ath.id);
-   bulk.push_back("{ \"index\" : { \"_index\" : \""+index_name+"\", \"_type\" : \"data\", \"op_type\" : \"create\", \"_id\" : "+_id+" } }"); // header
-   bulk.push_back(alltogether);
-}
-
-void elasticsearch_plugin_impl::sendBulk(std::string _elasticsearch_node_url, bool _elasticsearch_logs)
-{
-
-   // curl buffers to read
-   std::string readBuffer;
-   std::string readBuffer_logs;
-
-   std::string bulking = "";
-
-   bulking = boost::algorithm::join(bulk, "\n");
-   bulking = bulking + "\n";
-   bulk.clear();
-
-   //wlog((bulking));
-
-   struct curl_slist *headers = NULL;
-   headers = curl_slist_append(headers, "Content-Type: application/json");
-   std::string url = _elasticsearch_node_url + "_bulk";
-   curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
-   curl_easy_setopt(curl, CURLOPT_POST, true);
-   curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
-   curl_easy_setopt(curl, CURLOPT_POSTFIELDS, bulking.c_str());
-   curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
-   curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)&readBuffer);
-   curl_easy_setopt(curl, CURLOPT_USERAGENT, "libcrp/0.1");
-   //curl_easy_setopt(curl, CURLOPT_VERBOSE, true);
-   curl_easy_perform(curl);
-
-   long http_code = 0;
-   curl_easy_getinfo (curl, CURLINFO_RESPONSE_CODE, &http_code);
-   if(http_code == 200) {
-      // all good, do nothing
-   }
-   else if(http_code == 429) {
-      // repeat request?
-   }
-   else {
-      // exit everything ?
-   }
-
-   if(_elasticsearch_logs) {
-      auto logs = readBuffer;
-      // do logs
-      std::string url_logs = _elasticsearch_node_url + "logs/data/";
-      curl_easy_setopt(curl, CURLOPT_URL, url_logs.c_str());
-      curl_easy_setopt(curl, CURLOPT_POST, true);
-      curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
-      curl_easy_setopt(curl, CURLOPT_POSTFIELDS, logs.c_str());
-      curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
-      curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *) &readBuffer_logs);
-      curl_easy_setopt(curl, CURLOPT_USERAGENT, "libcrp/0.1");
-      //curl_easy_setopt(curl, CURLOPT_VERBOSE, true);
-      //ilog("log here curl: ${output}", ("output", readBuffer_logs));
-      curl_easy_perform(curl);
-
-      http_code = 0;
-      curl_easy_getinfo (curl, CURLINFO_RESPONSE_CODE, &http_code);
-      if(http_code == 200) {
-         // all good, do nothing
-      }
-      else if(http_code == 429) {
-         // repeat request?
-      }
-      else {
-         // exit everything ?
       }
    }
 }
@@ -394,6 +322,9 @@ void elasticsearch_plugin::plugin_initialize(const boost::program_options::varia
 
 void elasticsearch_plugin::plugin_startup()
 {
+   if(!graphene::utilities::checkES(my->curl, my->_elasticsearch_node_url))
+      FC_THROW_EXCEPTION(fc::exception, "ES database is not up in url ${url}", ("url", my->_elasticsearch_node_url));
+   ilog("elasticsearch ACCOUNT HISTORY: plugin_startup() begin");
 }
 
 } }
