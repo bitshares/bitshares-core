@@ -1,4 +1,4 @@
-FROM phusion/baseimage:0.9.19
+FROM phusion/baseimage:0.10.1
 MAINTAINER The bitshares decentralized organisation
 
 ENV LANG=en_US.UTF-8
@@ -16,7 +16,7 @@ RUN \
       libssl-dev \
       libncurses-dev \
       doxygen \
-      libcurl4-openssl-dev \
+      ca-certificates \
     && \
     apt-get update -y && \
     apt-get install -y fish && \
@@ -28,12 +28,18 @@ WORKDIR /bitshares-core
 
 # Compile
 RUN \
-    git submodule sync --recursive && \
+    ( git submodule sync --recursive || \
+      find `pwd`  -type f -name .git | \
+	while read f; do \
+	  rel="$(echo "${f#$PWD/}" | sed 's=[^/]*/=../=g')"; \
+	  sed -i "s=: .*/.git/=: $rel/=" "$f"; \
+	done && \
+      git submodule sync --recursive ) && \
     git submodule update --init --recursive && \
     cmake \
         -DCMAKE_BUILD_TYPE=Release \
         . && \
-    make witness_node && \
+    make witness_node cli_wallet && \
     make install && \
     #
     # Obtain version

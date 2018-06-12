@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015 Cryptonomex, Inc., and contributors.
+ * Copyright (c) 2015-2018 Cryptonomex, Inc., and contributors.
  *
  * The MIT License
  *
@@ -23,35 +23,38 @@
  */
 #include <graphene/chain/protocol/asset_ops.hpp>
 
+#include <locale>
+
 namespace graphene { namespace chain {
 
 /**
  *  Valid symbols can contain [A-Z0-9], and '.'
  *  They must start with [A, Z]
- *  They must end with [A, Z]
+ *  They must end with [A, Z] before HF_620 or [A-Z0-9] after it
  *  They can contain a maximum of one '.'
  */
 bool is_valid_symbol( const string& symbol )
 {
+    static const std::locale& loc = std::locale::classic();
     if( symbol.size() < GRAPHENE_MIN_ASSET_SYMBOL_LENGTH )
         return false;
 
     if( symbol.substr(0,3) == "BIT" ) 
-       return false;
+        return false;
 
     if( symbol.size() > GRAPHENE_MAX_ASSET_SYMBOL_LENGTH )
         return false;
 
-    if( !isalpha( symbol.front() ) )
+    if( !isalpha( symbol.front(), loc ) )
         return false;
 
-    if( !isalpha( symbol.back() ) )
+    if( !isalnum( symbol.back(), loc ) )
         return false;
 
     bool dot_already_present = false;
     for( const auto c : symbol )
     {
-        if( (isalpha( c ) && isupper( c )) || isdigit(c) )
+        if( (isalpha( c, loc ) && isupper( c, loc )) || isdigit( c, loc ) )
             continue;
 
         if( c == '.' )
@@ -121,6 +124,12 @@ void asset_update_operation::validate()const
 
    asset dummy = asset(1, asset_to_update) * new_options.core_exchange_rate;
    FC_ASSERT(dummy.asset_id == asset_id_type());
+}
+
+void asset_update_issuer_operation::validate()const
+{
+   FC_ASSERT( fee.amount >= 0 );
+   FC_ASSERT( issuer != new_issuer );
 }
 
 share_type asset_update_operation::calculate_fee(const asset_update_operation::fee_parameters_type& k)const
@@ -232,6 +241,13 @@ void asset_options::validate()const
 void asset_claim_fees_operation::validate()const {
    FC_ASSERT( fee.amount >= 0 );
    FC_ASSERT( amount_to_claim.amount > 0 );
+}
+
+void asset_claim_pool_operation::validate()const {
+   FC_ASSERT( fee.amount >= 0 );
+   FC_ASSERT( fee.asset_id != asset_id);
+   FC_ASSERT( amount_to_claim.amount > 0 );
+   FC_ASSERT( amount_to_claim.asset_id == asset_id_type());
 }
 
 } } // namespace graphene::chain

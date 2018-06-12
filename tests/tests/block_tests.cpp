@@ -32,6 +32,7 @@
 #include <graphene/chain/committee_member_object.hpp>
 #include <graphene/chain/proposal_object.hpp>
 #include <graphene/chain/market_object.hpp>
+#include <graphene/chain/hardfork.hpp>
 
 #include <graphene/utilities/tempdir.hpp>
 
@@ -245,51 +246,106 @@ BOOST_AUTO_TEST_CASE( fork_blocks )
       BOOST_CHECK( db1.get_chain_id() == db2.get_chain_id() );
 
       auto init_account_priv_key  = fc::ecc::private_key::regenerate(fc::sha256::hash(string("null_key")) );
-      for( uint32_t i = 0; i < 10; ++i )
+
+      BOOST_TEST_MESSAGE( "Adding blocks 1 through 10" );
+      for( uint32_t i = 1; i <= 10; ++i )
       {
          auto b = db1.generate_block(db1.get_slot_time(1), db1.get_scheduled_witness(1), init_account_priv_key, database::skip_nothing);
          try {
             PUSH_BLOCK( db2, b );
          } FC_CAPTURE_AND_RETHROW( ("db2") );
       }
-      for( uint32_t i = 10; i < 13; ++i )
+
+      for( uint32_t j = 0; j <= 4; j += 4 )
       {
-         auto b =  db1.generate_block(db1.get_slot_time(1), db1.get_scheduled_witness(1), init_account_priv_key, database::skip_nothing);
-      }
-      string db1_tip = db1.head_block_id().str();
-      uint32_t next_slot = 3;
-      for( uint32_t i = 13; i < 16; ++i )
-      {
-         auto b =  db2.generate_block(db2.get_slot_time(next_slot), db2.get_scheduled_witness(next_slot), init_account_priv_key, database::skip_nothing);
-         next_slot = 1;
-         // notify both databases of the new block.
-         // only db2 should switch to the new fork, db1 should not
-         PUSH_BLOCK( db1, b );
+         // add blocks 11 through 13 to db1 only
+         BOOST_TEST_MESSAGE( "Adding 3 blocks to db1 only" );
+         for( uint32_t i = 11 + j; i <= 13 + j; ++i )
+         {
+            BOOST_TEST_MESSAGE( i );
+            auto b = db1.generate_block(db1.get_slot_time(1), db1.get_scheduled_witness(1), init_account_priv_key, database::skip_nothing);
+         }
+         string db1_tip = db1.head_block_id().str();
+
+         // add different blocks 11 through 13 to db2 only
+         BOOST_TEST_MESSAGE( "Add 3 different blocks to db2 only" );
+         uint32_t next_slot = 3;
+         for( uint32_t i = 11 + j; i <= 13 + j; ++i )
+         {
+            BOOST_TEST_MESSAGE( i );
+            auto b =  db2.generate_block(db2.get_slot_time(next_slot), db2.get_scheduled_witness(next_slot), init_account_priv_key, database::skip_nothing);
+            next_slot = 1;
+            // notify both databases of the new block.
+            // only db2 should switch to the new fork, db1 should not
+            PUSH_BLOCK( db1, b );
+            BOOST_CHECK_EQUAL(db1.head_block_id().str(), db1_tip);
+            BOOST_CHECK_EQUAL(db2.head_block_id().str(), b.id().str());
+         }
+
+         //The two databases are on distinct forks now, but at the same height.
+         BOOST_CHECK_EQUAL(db1.head_block_num(), 13u + j);
+         BOOST_CHECK_EQUAL(db2.head_block_num(), 13u + j);
+         BOOST_CHECK( db1.head_block_id() != db2.head_block_id() );
+
+         //Make a block on db2, make it invalid, then
+         //pass it to db1 and assert that db1 doesn't switch to the new fork.
+         signed_block good_block;
+         {
+            auto b = db2.generate_block(db2.get_slot_time(1), db2.get_scheduled_witness(1), init_account_priv_key, database::skip_nothing);
+            good_block = b;
+            b.transactions.emplace_back(signed_transaction());
+            b.transactions.back().operations.emplace_back(transfer_operation());
+            b.sign( init_account_priv_key );
+            BOOST_CHECK_EQUAL(b.block_num(), 14u + j);
+            GRAPHENE_CHECK_THROW(PUSH_BLOCK( db1, b ), fc::exception);
+
+            // At this point, `fetch_block_by_number` will fetch block from fork_db,
+            //    so unable to reproduce the issue which is fixed in PR #938
+            //    https://github.com/bitshares/bitshares-core/pull/938
+            fc::optional<signed_block> previous_block = db1.fetch_block_by_number(1);
+            BOOST_CHECK ( previous_block.valid() );
+            uint32_t db1_blocks = db1.head_block_num();
+            for( uint32_t curr_block_num = 2; curr_block_num <= db1_blocks; ++curr_block_num )
+            {
+               fc::optional<signed_block> curr_block = db1.fetch_block_by_number( curr_block_num );
+               BOOST_CHECK( curr_block.valid() );
+               BOOST_CHECK_EQUAL( curr_block->previous.str(), previous_block->id().str() );
+               previous_block = curr_block;
+            }
+         }
+         BOOST_CHECK_EQUAL(db1.head_block_num(), 13u + j);
          BOOST_CHECK_EQUAL(db1.head_block_id().str(), db1_tip);
-         BOOST_CHECK_EQUAL(db2.head_block_id().str(), b.id().str());
+
+         if( j == 0 )
+         {
+            // assert that db1 switches to new fork with good block
+            BOOST_CHECK_EQUAL(db2.head_block_num(), 14u + j);
+            PUSH_BLOCK( db1, good_block );
+            BOOST_CHECK_EQUAL(db1.head_block_id().str(), db2.head_block_id().str());
+         }
       }
 
-      //The two databases are on distinct forks now, but at the same height. Make a block on db2, make it invalid, then
-      //pass it to db1 and assert that db1 doesn't switch to the new fork.
-      signed_block good_block;
-      BOOST_CHECK_EQUAL(db1.head_block_num(), 13);
-      BOOST_CHECK_EQUAL(db2.head_block_num(), 13);
+      // generate more blocks to push the forked blocks out of fork_db
+      BOOST_TEST_MESSAGE( "Adding more blocks to db1, push the forked blocks out of fork_db" );
+      for( uint32_t i = 1; i <= 50; ++i )
       {
-         auto b = db2.generate_block(db2.get_slot_time(1), db2.get_scheduled_witness(1), init_account_priv_key, database::skip_nothing);
-         good_block = b;
-         b.transactions.emplace_back(signed_transaction());
-         b.transactions.back().operations.emplace_back(transfer_operation());
-         b.sign( init_account_priv_key );
-         BOOST_CHECK_EQUAL(b.block_num(), 14);
-         GRAPHENE_CHECK_THROW(PUSH_BLOCK( db1, b ), fc::exception);
+         db1.generate_block(db1.get_slot_time(1), db1.get_scheduled_witness(1), init_account_priv_key, database::skip_nothing);
       }
-      BOOST_CHECK_EQUAL(db1.head_block_num(), 13);
-      BOOST_CHECK_EQUAL(db1.head_block_id().str(), db1_tip);
 
-      // assert that db1 switches to new fork with good block
-      BOOST_CHECK_EQUAL(db2.head_block_num(), 14);
-      PUSH_BLOCK( db1, good_block );
-      BOOST_CHECK_EQUAL(db1.head_block_id().str(), db2.head_block_id().str());
+      {
+         // PR #938 make sure db is in a good state https://github.com/bitshares/bitshares-core/pull/938
+         BOOST_TEST_MESSAGE( "Checking whether all blocks on disk are good" );
+         fc::optional<signed_block> previous_block = db1.fetch_block_by_number(1);
+         BOOST_CHECK ( previous_block.valid() );
+         uint32_t db1_blocks = db1.head_block_num();
+         for( uint32_t curr_block_num = 2; curr_block_num <= db1_blocks; ++curr_block_num )
+         {
+            fc::optional<signed_block> curr_block = db1.fetch_block_by_number( curr_block_num );
+            BOOST_CHECK( curr_block.valid() );
+            BOOST_CHECK_EQUAL( curr_block->previous.str(), previous_block->id().str() );
+            previous_block = curr_block;
+         }
+      }
    } catch (fc::exception& e) {
       edump((e.to_detail_string()));
       throw;
@@ -1595,5 +1651,49 @@ BOOST_FIXTURE_TEST_CASE( tapos_rollover, database_fixture )
       throw;
    }
 }
+
+BOOST_FIXTURE_TEST_CASE( temp_account_balance, database_fixture )
+{ try {
+   ACTORS( (alice) );
+   fund( alice );
+   create_user_issued_asset( "UIA" );
+
+   generate_block();
+   set_expiration( db, trx );
+
+   transfer_operation top;
+   top.amount = asset( 1000 );
+   top.from = alice_id;
+   top.to   = GRAPHENE_TEMP_ACCOUNT;
+   trx.operations.push_back( top );
+
+   limit_order_create_operation loc;
+   loc.amount_to_sell = top.amount;
+   loc.expiration = db.head_block_time() + 1;
+   loc.seller = GRAPHENE_TEMP_ACCOUNT;
+   loc.min_to_receive = asset( 1000, asset_id_type(1) );
+   trx.operations.push_back( loc );
+   sign( trx, alice_private_key );
+   PUSH_TX( db, trx );
+   trx.clear();
+
+   generate_block();
+   generate_block();
+   generate_block();
+
+   top.to = GRAPHENE_COMMITTEE_ACCOUNT;
+   trx.operations.push_back( top );
+   sign( trx, alice_private_key );
+   BOOST_CHECK_THROW( PUSH_TX( db, trx ), fc::assert_exception );
+
+   generate_blocks( HARDFORK_CORE_1040_TIME );
+
+   set_expiration( db, trx );
+   trx.signatures.clear();
+   sign( trx, alice_private_key );
+   PUSH_TX( db, trx );
+
+   BOOST_CHECK( get_balance( GRAPHENE_TEMP_ACCOUNT, asset_id_type() ) > 0 );
+} FC_LOG_AND_RETHROW() }
 
 BOOST_AUTO_TEST_SUITE_END()

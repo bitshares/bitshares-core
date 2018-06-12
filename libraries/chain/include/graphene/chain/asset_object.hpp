@@ -145,7 +145,12 @@ namespace graphene { namespace chain {
 
          template<class DB>
          const asset_bitasset_data_object& bitasset_data(const DB& db)const
-         { assert(bitasset_data_id); return db.get(*bitasset_data_id); }
+         {
+            FC_ASSERT( bitasset_data_id.valid(),
+                       "Asset ${a} (${id}) is not a market issued asset.",
+                       ("a",this->symbol)("id",this->id) );
+            return db.get( *bitasset_data_id );
+         }
 
          template<class DB>
          const asset_dynamic_data_object& dynamic_data(const DB& db)const
@@ -170,6 +175,9 @@ namespace graphene { namespace chain {
       public:
          static const uint8_t space_id = implementation_ids;
          static const uint8_t type_id  = impl_asset_bitasset_data_type;
+
+         /// The asset this object belong to
+         asset_id_type asset_id;
 
          /// The tunable options for BitAssets are stored in this field.
          bitasset_options options;
@@ -208,8 +216,15 @@ namespace graphene { namespace chain {
          share_type settlement_fund;
          ///@}
 
+         /// The time when @ref current_feed would expire
          time_point_sec feed_expiration_time()const
-         { return current_feed_publication_time + options.feed_lifetime_sec; }
+         {
+            uint32_t current_feed_seconds = current_feed_publication_time.sec_since_epoch();
+            if( std::numeric_limits<uint32_t>::max() - current_feed_seconds <= options.feed_lifetime_sec )
+               return time_point_sec::maximum();
+            else
+               return current_feed_publication_time + options.feed_lifetime_sec;
+         }
          bool feed_is_expired_before_hardfork_615(time_point_sec current_time)const
          { return feed_expiration_time() >= current_time; }
          bool feed_is_expired(time_point_sec current_time)const
@@ -250,6 +265,7 @@ FC_REFLECT_DERIVED( graphene::chain::asset_dynamic_data_object, (graphene::db::o
                     (current_supply)(confidential_supply)(accumulated_fees)(fee_pool) )
 
 FC_REFLECT_DERIVED( graphene::chain::asset_bitasset_data_object, (graphene::db::object),
+                    (asset_id)
                     (feeds)
                     (current_feed)
                     (current_feed_publication_time)

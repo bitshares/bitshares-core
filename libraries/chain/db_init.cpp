@@ -172,6 +172,8 @@ void database::initialize_evaluators()
    register_evaluator<transfer_from_blind_evaluator>();
    register_evaluator<blind_transfer_evaluator>();
    register_evaluator<asset_claim_fees_evaluator>();
+   register_evaluator<asset_update_issuer_evaluator>();
+   register_evaluator<asset_claim_pool_evaluator>();
 }
 
 void database::initialize_indexes()
@@ -497,13 +499,14 @@ void database::init_genesis(const genesis_state_type& genesis_state)
             ++collateral_holder_number;
          }
 
-         bitasset_data_id = create<asset_bitasset_data_object>([&](asset_bitasset_data_object& b) {
+         bitasset_data_id = create<asset_bitasset_data_object>([&core_asset,new_asset_id](asset_bitasset_data_object& b) {
             b.options.short_backing_asset = core_asset.id;
             b.options.minimum_feeds = GRAPHENE_DEFAULT_MINIMUM_FEEDS;
+            b.asset_id = new_asset_id;
          }).id;
       }
 
-      dynamic_data_id = create<asset_dynamic_data_object>([&](asset_dynamic_data_object& d) {
+      dynamic_data_id = create<asset_dynamic_data_object>([&asset](asset_dynamic_data_object& d) {
          d.accumulated_fees = asset.accumulated_fees;
       }).id;
 
@@ -529,7 +532,7 @@ void database::init_genesis(const genesis_state_type& genesis_state)
    for( const auto& handout : genesis_state.initial_balances )
    {
       const auto asset_id = get_asset_id(handout.asset_symbol);
-      create<balance_object>([&handout,&get_asset_id,total_allocation,asset_id](balance_object& b) {
+      create<balance_object>([&handout,total_allocation,asset_id](balance_object& b) {
          b.balance = asset(handout.amount, asset_id);
          b.owner = handout.owner;
       });
@@ -584,6 +587,7 @@ void database::init_genesis(const genesis_state_type& genesis_state)
             elog( "Genesis for asset ${aname} is not balanced\n"
                   "   Debt is ${debt}\n"
                   "   Supply is ${supply}\n",
+                  ("aname", it->symbol)
                   ("debt", debt_itr->second)
                   ("supply", supply_itr->second)
                 );
@@ -693,7 +697,7 @@ void database::init_genesis(const genesis_state_type& genesis_state)
 
    FC_ASSERT( get_index<fba_accumulator_object>().get_next_id() == fba_accumulator_id_type( fba_accumulator_id_count ) );
 
-   debug_dump();
+   //debug_dump();
 
    _undo_db.enable();
 } FC_CAPTURE_AND_RETHROW() }
