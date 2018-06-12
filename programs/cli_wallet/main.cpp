@@ -86,7 +86,7 @@ int main( int argc, char** argv )
          ("daemon,d", "Run the wallet in daemon mode" )
          ("wallet-file,w", bpo::value<string>()->implicit_value("wallet.json"), "wallet to load")
          ("chain-id", bpo::value<string>(), "chain ID to connect to")
-         ("suggest-brain-key", "Suggest a safe brain key to use for craeting your account")
+         ("suggest-brain-key", "Suggest a safe brain key to use for creating your account")
          ("version,v", "Display version information");
 
 
