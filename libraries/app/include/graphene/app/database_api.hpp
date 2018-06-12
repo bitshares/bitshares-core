@@ -596,6 +596,10 @@ class database_api
       /// @brief Get a hexdump of the serialized binary form of a transaction
       std::string get_transaction_hex(const signed_transaction& trx)const;
 
+      /// @brief Get a hexdump of the serialized binary form of a
+      /// signatures-stripped transaction
+      std::string get_transaction_hex_without_sig( const signed_transaction &trx ) const;
+
       /**
        *  This API will take a partially signed transaction and a set of public keys that the owner has the ability to sign for
        *  and return the minimal subset of public keys that should add signatures to the transaction.
@@ -770,6 +774,7 @@ FC_API(graphene::app::database_api,
 
    // Authority / validation
    (get_transaction_hex)
+   (get_transaction_hex_without_sig)
    (get_required_signatures)
    (get_potential_signatures)
    (get_potential_address_signatures)
