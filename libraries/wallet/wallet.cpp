@@ -765,12 +765,21 @@ public:
    {
       vector<fc::ecc::private_key> private_keys;
 
+      if ( !tx.ref_block_num || !tx.ref_block_prefix || tx.expiration == fc::time_point_sec() )
+      {
+         elog( "Must fill TaPoS and expiration field in an online machine" );
+         FC_THROW("");
+      }
+
       for ( const string &wif_key : wif_keys )
       {
          fc::optional<fc::ecc::private_key> optional_private_key = wif_to_key( wif_key );
 
          if ( !optional_private_key )
-            FC_THROW( "Invalid private key: ${i}", ( "i", wif_key ) );
+         {
+            elog( "Invalid private key: ${i}", ( "i", wif_key ) );
+            FC_THROW("");
+         }
 
          private_keys.push_back( *optional_private_key );
       }
@@ -799,7 +808,7 @@ public:
          {
             elog( "Caught exception while broadcasting tx ${id}:  ${e}",
                   ( "id", tx.id().str() )( "e", e.to_detail_string() ) );
-            throw;
+            FC_THROW("");
          }
       }
 
