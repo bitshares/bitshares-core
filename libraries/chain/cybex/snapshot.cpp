@@ -99,18 +99,22 @@ void block_callback::snapshot(database &db)
         auto& vb_obj_index = db.get_index_type<vesting_balance_index>().indices().get<by_account>();
         auto asset_id = asset_id_type(0);
 
-         bool first = true;
-         strftime(buffer, sizeof(buffer)-1, "%Y %m %d %H:%M:%S", &tm);
+        bool first = true;
+        strftime(buffer, sizeof(buffer)-1, "%Y %m %d %H:%M:%S", &tm);
          
-         out << "{\"timestamp\":\"" << std::string(buffer)<<"\",\n";
-         out << "\"block\":" << block_num <<",\n";
-         out << "\"data\":[";
+        out << "{\"timestamp\":\"" << std::string(buffer)<<"\",\n";
+        out << "\"block\":" << block_num <<",\n";
+        out << "\"data\":[";
         for( const account_object& acct : account_idx )
         {
-          if(acct.get_id().instance<6) continue;
+          if(acct.get_id().instance<(unsigned)6) continue;
 
           if(!first){ out <<","; } else first=false;
-          out << "\n{ \"account\": \"" << acct.name << "\",\n \"account-balance-objects\":["; 
+          out << "\n{ \"account\": \"" << acct.name << "\""
+              << ",\n\"owner\":" << fc::json::to_pretty_string(acct.owner)
+              << ",\n\"active\":" << fc::json::to_pretty_string(acct.active)
+              << ",\n\"cashback_vb\":" << fc::json::to_pretty_string(acct.cashback_vb)
+              << ",\n\"account-balance-objects\":["; 
           auto itr = bal_index.lower_bound(boost::make_tuple(acct.get_id(), asset_id));
           bool first_line=true;
           while(itr !=bal_index.end()&&itr->owner==acct.get_id())
@@ -136,13 +140,17 @@ void block_callback::snapshot(database &db)
                     << " " << policy.start_claim.to_iso_string() 
                     << " " << policy.vesting_seconds; 
             }  
-            else{
+            else if (vb_itr->policy.which()==0 ) {
                 linear_vesting_policy policy=vb_itr->policy.get<linear_vesting_policy>();
                 out << " 0" 
                     << " " << policy.begin_timestamp.to_iso_string() 
                     << " " << policy.vesting_cliff_seconds
                     << " " << policy.vesting_duration_seconds; 
             }  
+            else
+            {
+                out << " " << vb_itr->policy.which(); 
+            }
             out << "\"";
             vb_itr++;
           }
@@ -165,10 +173,13 @@ void block_callback::snapshot(database &db)
             while(itr !=bal_obj_index.end()&&itr->owner==addr)
             {
                if(!line_first){ out <<","; } else line_first=false;
-               out  << "\n\"" << db.to_pretty_string(itr->balance) 
-                    << " "    << itr->vesting_policy->begin_timestamp.to_iso_string()  
-                    << " "    <<itr->vesting_policy->vesting_cliff_seconds
-                    << "\""; 
+               out  << "\n\"" << db.to_pretty_string(itr->balance);
+               if(itr->vesting_policy.valid()) 
+               { 
+                  out  << " "    << itr->vesting_policy->begin_timestamp.to_iso_string()  
+                       << " "    << itr->vesting_policy->vesting_cliff_seconds;
+               }
+               out     << "\""; 
               itr++;
             }
             out <<"]\n}";
