@@ -767,7 +767,7 @@ public:
          if (! tx_filename)
             FC_THROW("Must provide transaction file name");
          else
-            _tx_filename = *tx_filename;
+            _multisig_trx_file = *tx_filename;
 
          _multisig_mode = true;
       }
@@ -798,6 +798,7 @@ public:
       else
       {
          _multisig_trx = tmp;
+         _multisig_trx_file = tx_filename;
          return _multisig_trx;
       }
    }
@@ -857,7 +858,7 @@ public:
       // if exceptions are thrown in serialization
       //
 
-      ilog( "saving wallet to file ${fn}", ("fn", _tx_filename) );
+      ilog( "saving wallet to file ${fn}", ("fn", _multisig_trx_file) );
 
       string tx_data = fc::json::to_pretty_string( tx );
       try
@@ -869,7 +870,7 @@ public:
          //
          // http://en.wikipedia.org/wiki/Most_vexing_parse
          //
-         fc::ofstream outfile{ fc::path( _tx_filename ) };
+         fc::ofstream outfile{ fc::path( _multisig_trx_file ) };
          outfile.write( tx_data.c_str(), tx_data.length() );
          outfile.flush();
          outfile.close();
@@ -2816,7 +2817,7 @@ public:
 
    bool                    _multisig_mode = false;
    signed_transaction      _multisig_trx;
-   string                  _tx_filename;
+   string                  _multisig_trx_file;
 
    string                  _wallet_filename;
    wallet_data             _wallet;
