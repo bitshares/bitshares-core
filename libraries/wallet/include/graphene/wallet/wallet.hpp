@@ -252,9 +252,8 @@ struct vesting_balance_object_with_info : public vesting_balance_object
    fc::time_point_sec allowed_withdraw_time;
 };
 
-namespace detail
-{
-   class wallet_api_impl;
+namespace detail {
+class wallet_api_impl;
 }
 
 /***
