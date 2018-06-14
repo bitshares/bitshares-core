@@ -10,14 +10,14 @@ ULF Core
 * [License](#license)
 
 ULF-CORE Core is the ULF blockchain implementation and command-line interface.
-The web wallet is [ULF-UI](https://github.com/bitshares/bitshares-ui).
+The web wallet is [ULF-Web](https://github.com/UL-F/ULF-Web).
 
 Visit [ulurs.com](https://ulurs.com/) to learn about ULF and join the community.
 
 **NOTE:** The official ULF git repository location, default branch, and submodule remotes were recently changed. Existing
 repositories can be updated with the following steps:
 
-    git remote set-url origin https://github.com/bitshares/bitshares-core.git
+    git remote set-url origin https://github.com/UL-F/ULF-URS.git
     git checkout master
     git remote set-head origin --auto
     git pull
@@ -27,7 +27,7 @@ repositories can be updated with the following steps:
 Getting Started
 ---------------
 Build instructions and additional documentation are available in the
-[wiki](https://github.com/bitshares/bitshares-core/wiki).
+[wiki](https://github.com/UL-F/ULF-URS/wiki).
 
 We recommend building on Ubuntu 16.04 LTS, and the build dependencies may be installed with:
 
@@ -36,7 +36,7 @@ We recommend building on Ubuntu 16.04 LTS, and the build dependencies may be ins
 
 To build after all dependencies are installed:
 
-    git clone https://github.com/bitshares/bitshares-core.git
+    git clone https://github.com/UL-F/ULF-URS.git
     cd bitshares-core
     git checkout <LATEST_RELEASE_TAG>
     git submodule update --init --recursive
