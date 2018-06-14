@@ -280,7 +280,7 @@
   "initial_balances": [{
       "owner": "ULF7Pei4GmJbV1YUWnXBt88gG2iHHD4g9dZv",
       "asset_symbol": "URS",
-      "amount": "999999999999999999"
+      "amount": "99999999999999999"
     }
   ],
   "initial_vesting_balances": [],
