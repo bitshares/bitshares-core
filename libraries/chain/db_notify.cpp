@@ -15,6 +15,8 @@
 #include <graphene/chain/vesting_balance_object.hpp>
 #include <graphene/chain/transaction_object.hpp>
 
+#include <graphene/chain/impacted.hpp>
+
 using namespace fc;
 using namespace graphene::chain;
 
@@ -257,19 +259,19 @@ struct get_impacted_account_visitor
    }
 };
 
-static void operation_get_impacted_accounts( const operation& op, flat_set<account_id_type>& result )
+void graphene::chain::operation_get_impacted_accounts( const operation& op, flat_set<account_id_type>& result )
 {
   get_impacted_account_visitor vtor = get_impacted_account_visitor( result );
   op.visit( vtor );
 }
 
-static void transaction_get_impacted_accounts( const transaction& tx, flat_set<account_id_type>& result )
+void graphene::chain::transaction_get_impacted_accounts( const transaction& tx, flat_set<account_id_type>& result )
 {
   for( const auto& op : tx.operations )
     operation_get_impacted_accounts( op, result );
 }
 
-static void get_relevant_accounts( const object* obj, flat_set<account_id_type>& accounts )
+void get_relevant_accounts( const object* obj, flat_set<account_id_type>& accounts )
 {
    if( obj->id.space() == protocol_ids )
    {
