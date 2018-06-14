@@ -30,11 +30,7 @@ namespace graphene { namespace chain {
 
 void cancel_vesting_operation::validate()const
 {
-   //FC_ASSERT( fee );
-   // balance object id is valid
-   //FC_ASSERT( u>t,"balance object is found.");
-   // owner check
-   //FC_ASSERT( u>t,"balance object owner.");
+   FC_ASSERT( 0 );
 }
 
 } } // namespace graphene::chain

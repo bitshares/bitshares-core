@@ -28,19 +28,19 @@ namespace graphene { namespace chain {
 
 void initiate_crowdfund_operation::validate()const
 {
+   FC_ASSERT( 0 );
    FC_ASSERT( t>0,"time lock can not be 0." );
    FC_ASSERT( u>t,"time lock is bigger than crowd sale duration.");
 }
 void participate_crowdfund_operation::validate()const
 {
-   //FC_ASSERT( fee  );
+   FC_ASSERT( 0 );
    FC_ASSERT(valuation>0,"valuation can not be 0." );
    FC_ASSERT(cap>valuation,"cap must be greater than valuation," );
 }
 void withdraw_crowdfund_operation::validate()const
 {
-   //FC_ASSERT( fee  );
-   //FC_ASSERT( );
+   FC_ASSERT( 0 );
 }
 #if 0
 share_type initiate_crowdfund_operation::calculate_fee(fee_parameters_type const&f)const
