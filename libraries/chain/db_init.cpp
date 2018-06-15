@@ -448,11 +448,6 @@ void database::init_genesis(const genesis_state_type& genesis_state)
    const auto& assets_by_symbol = get_index_type<asset_index>().indices().get<by_symbol>();
    const auto get_asset_id = [&assets_by_symbol](const string& symbol) {
       auto itr = assets_by_symbol.find(symbol);
-
-      // TODO: This is temporary for handling BTS snapshot
-      if( symbol == "BTS" )
-          itr = assets_by_symbol.find(GRAPHENE_SYMBOL);
-
       FC_ASSERT(itr != assets_by_symbol.end(),
                 "Unable to find asset '${sym}'. Did you forget to add a record for it to initial_assets?",
                 ("sym", symbol));
@@ -534,7 +529,7 @@ void database::init_genesis(const genesis_state_type& genesis_state)
    for( const auto& handout : genesis_state.initial_balances )
    {
       const auto asset_id = get_asset_id(handout.asset_symbol);
-      create<balance_object>([&handout,&get_asset_id,total_allocation,asset_id](balance_object& b) {
+      create<balance_object>([&handout,total_allocation,asset_id](balance_object& b) {
          b.balance = asset(handout.amount, asset_id);
          b.owner = handout.owner;
       });
@@ -698,7 +693,7 @@ void database::init_genesis(const genesis_state_type& genesis_state)
 
    FC_ASSERT( get_index<fba_accumulator_object>().get_next_id() == fba_accumulator_id_type( fba_accumulator_id_count ) );
 
-   debug_dump();
+   //debug_dump();
 
    _undo_db.enable();
 } FC_CAPTURE_AND_RETHROW() }

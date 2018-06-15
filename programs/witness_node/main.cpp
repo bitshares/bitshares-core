@@ -30,6 +30,8 @@
 #include <graphene/market_history/market_history_plugin.hpp>
 #include <graphene/delayed_node/delayed_node_plugin.hpp>
 #include <graphene/snapshot/snapshot.hpp>
+#include <graphene/es_objects/es_objects.hpp>
+#include <graphene/grouped_orders/grouped_orders_plugin.hpp>
 
 #include <fc/exception/exception.hpp>
 #include <fc/thread/thread.hpp>
@@ -196,6 +198,8 @@ int main(int argc, char** argv) {
       auto market_history_plug = node->register_plugin<market_history::market_history_plugin>();
       auto delayed_plug = node->register_plugin<delayed_node::delayed_node_plugin>();
       auto snapshot_plug = node->register_plugin<snapshot_plugin::snapshot_plugin>();
+      auto es_objects_plug = node->register_plugin<es_objects::es_objects_plugin>();
+      auto grouped_orders_plug = node->register_plugin<grouped_orders::grouped_orders_plugin>();
 
       try
       {
@@ -294,19 +298,43 @@ void write_default_logging_config_to_stream(std::ostream& out)
    out << "# declare an appender named \"stderr\" that writes messages to the console\n"
           "[log.console_appender.stderr]\n"
           "stream=std_error\n\n"
+          "# declare an appender named \"default\" that writes messages to default.log\n"
+          "[log.file_appender.default]\n"
+          "# filename can be absolute or relative to this config file\n"
+          "filename=logs/default/default.log\n"
+          "# Rotate log every ? minutes, if leave out default to 60\n"
+          "rotation_interval=60\n"
+          "# how long will logs be kept (in days), if leave out default to 1\n"
+          "rotation_limit=7\n\n"
           "# declare an appender named \"p2p\" that writes messages to p2p.log\n"
           "[log.file_appender.p2p]\n"
+          "# filename can be absolute or relative to this config file\n"
           "filename=logs/p2p/p2p.log\n"
-          "# filename can be absolute or relative to this config file\n\n"
-          "# route any messages logged to the default logger to the \"stderr\" logger we\n"
-          "# declared above, if they are info level are higher\n"
+          "# Rotate log every ? minutes, if leave out default to 60\n"
+          "rotation_interval=60\n"
+          "# how long will logs be kept (in days), if leave out default to 1\n"
+          "rotation_limit=7\n\n"
+          "# declare an appender named \"rpc\" that writes messages to rpc.log\n"
+          "[log.file_appender.rpc]\n"
+          "# filename can be absolute or relative to this config file\n"
+          "filename=logs/rpc/rpc.log\n"
+          "# Rotate log every ? minutes, if leave out default to 60\n"
+          "rotation_interval=60\n"
+          "# how long will logs be kept (in days), if leave out default to 1\n"
+          "rotation_limit=7\n\n"
+          "# route any messages logged to the default logger to the \"stderr\" appender and\n"
+          "# \"default\" appender we declared above, if they are info level or higher\n"
           "[logger.default]\n"
           "level=info\n"
-          "appenders=stderr\n\n"
-          "# route messages sent to the \"p2p\" logger to the p2p appender declared above\n"
+          "appenders=stderr,default\n\n"
+          "# route messages sent to the \"p2p\" logger to the \"p2p\" appender declared above\n"
           "[logger.p2p]\n"
-          "level=info\n"
-          "appenders=p2p\n\n";
+          "level=warn\n"
+          "appenders=p2p\n\n"
+          "# route messages sent to the \"rpc\" logger to the \"rpc\" appender declared above\n"
+          "[logger.rpc]\n"
+          "level=error\n"
+          "appenders=rpc\n\n";
 }
 
 fc::optional<fc::logging_config> load_logging_config_from_ini_file(const fc::path& config_ini_filename)
@@ -344,8 +372,8 @@ fc::optional<fc::logging_config> load_logging_config_from_ini_file(const fc::pat
             console_appender_config.level_colors.emplace_back(
                fc::console_appender::level_color(fc::log_level::error, 
                                                  fc::console_appender::color::cyan));
-            console_appender_config.stream = fc::variant(stream_name).as<fc::console_appender::stream::type>();
-            logging_config.appenders.push_back(fc::appender_config(console_appender_name, "console", fc::variant(console_appender_config)));
+            console_appender_config.stream = fc::variant(stream_name).as<fc::console_appender::stream::type>(GRAPHENE_MAX_NESTED_OBJECTS);
+            logging_config.appenders.push_back(fc::appender_config(console_appender_name, "console", fc::variant(console_appender_config, GRAPHENE_MAX_NESTED_OBJECTS)));
             found_logging_config = true;
          }
          else if (boost::starts_with(section_name, file_appender_section_prefix))
@@ -354,7 +382,9 @@ fc::optional<fc::logging_config> load_logging_config_from_ini_file(const fc::pat
             fc::path file_name = section_tree.get<std::string>("filename");
             if (file_name.is_relative())
                file_name = fc::absolute(config_ini_filename).parent_path() / file_name;
-            
+
+            int interval = section_tree.get_optional<int>("rotation_interval").get_value_or(60);
+            int limit = section_tree.get_optional<int>("rotation_limit").get_value_or(1);
 
             // construct a default file appender config here
             // filename will be taken from ini file, everything else hard-coded here
@@ -362,9 +392,9 @@ fc::optional<fc::logging_config> load_logging_config_from_ini_file(const fc::pat
             file_appender_config.filename = file_name;
             file_appender_config.flush = true;
             file_appender_config.rotate = true;
-            file_appender_config.rotation_interval = fc::hours(1);
-            file_appender_config.rotation_limit = fc::days(1);
-            logging_config.appenders.push_back(fc::appender_config(file_appender_name, "file", fc::variant(file_appender_config)));
+            file_appender_config.rotation_interval = fc::minutes(interval);
+            file_appender_config.rotation_limit = fc::days(limit);
+            logging_config.appenders.push_back(fc::appender_config(file_appender_name, "file", fc::variant(file_appender_config, GRAPHENE_MAX_NESTED_OBJECTS)));
             found_logging_config = true;
          }
          else if (boost::starts_with(section_name, logger_section_prefix))
@@ -373,7 +403,7 @@ fc::optional<fc::logging_config> load_logging_config_from_ini_file(const fc::pat
             std::string level_string = section_tree.get<std::string>("level");
             std::string appenders_string = section_tree.get<std::string>("appenders");
             fc::logger_config logger_config(logger_name);
-            logger_config.level = fc::variant(level_string).as<fc::log_level>();
+            logger_config.level = fc::variant(level_string).as<fc::log_level>(5);
             boost::split(logger_config.appenders, appenders_string, 
                          boost::is_any_of(" ,"), 
                          boost::token_compress_on);

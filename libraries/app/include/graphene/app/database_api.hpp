@@ -122,7 +122,7 @@ struct market_trade
 class database_api
 {
    public:
-      database_api(graphene::chain::database& db);
+      database_api(graphene::chain::database& db, const application_options* app_options = nullptr );
       ~database_api();
 
       /////////////
@@ -142,8 +142,29 @@ class database_api
       // Subscriptions //
       ///////////////////
 
-      void set_subscribe_callback( std::function<void(const variant&)> cb, bool clear_filter );
-      void set_pending_transaction_callback( std::function<void(const variant&)> cb );
+      /**
+       * @brief Register a callback handle which then can be used to subscribe to object database changes
+       * @param cb The callback handle to register
+       * @param nofity_remove_create Whether subscribe to universal object creation and removal events.
+       *        If this is set to true, the API server will notify all newly created objects and ID of all
+       *        newly removed objects to the client, no matter whether client subscribed to the objects.
+       *        By default, API servers don't allow subscribing to universal events, which can be changed
+       *        on server startup.
+       */
+      void set_subscribe_callback( std::function<void(const variant&)> cb, bool notify_remove_create );
+      /**
+       * @brief Register a callback handle which will get notified when a transaction is pushed to database
+       * @param cb The callback handle to register
+       *
+       * Note: a transaction can be pushed to database and be popped from database several times while
+       *   processing, before and after included in a block. Everytime when a push is done, the client will
+       *   be notified.
+       */
+      void set_pending_transaction_callback( std::function<void(const variant& signed_transaction_object)> cb );
+      /**
+       * @brief Register a callback handle which will get notified when a block is pushed to database
+       * @param cb The callback handle to register
+       */
       void set_block_applied_callback( std::function<void(const variant& block_id)> cb );
       /**
        * @brief Stop receiving any notifications
@@ -327,7 +348,7 @@ class database_api
       /**
        * @brief Get assets alphabetically by symbol name
        * @param lower_bound_symbol Lower bound of symbol names to retrieve
-       * @param limit Maximum number of assets to fetch (must not exceed 100)
+       * @param limit Maximum number of assets to fetch (must not exceed 101)
        * @return The assets found
        */
       vector<asset_object> list_assets(const string& lower_bound_symbol, uint32_t limit)const;
@@ -427,6 +448,14 @@ class database_api
        * @return Order book of the market
        */
       order_book get_order_book( const string& base, const string& quote, unsigned limit = 50 )const;
+
+      /**
+       * @brief Returns vector of 24 hour volume markets sorted by reverse base_volume
+       * Note: this API is experimental and subject to change in next releases
+       * @param limit Max number of results
+       * @return Desc Sorted volume vector
+       */
+      vector<market_volume> get_top_markets(uint32_t limit)const;
 
       /**
        * @brief Returns recent trades for the market assetA:assetB, ordered by time, most recent first. The range is [stop, start)
@@ -567,6 +596,10 @@ class database_api
       /// @brief Get a hexdump of the serialized binary form of a transaction
       std::string get_transaction_hex(const signed_transaction& trx)const;
 
+      /// @brief Get a hexdump of the serialized binary form of a
+      /// signatures-stripped transaction
+      std::string get_transaction_hex_without_sig( const signed_transaction &trx ) const;
+
       /**
        *  This API will take a partially signed transaction and a set of public keys that the owner has the ability to sign for
        *  and return the minimal subset of public keys that should add signatures to the transaction.
@@ -619,6 +652,28 @@ class database_api
        *  @return the set of blinded balance objects by commitment ID
        */
       vector<blinded_balance_object> get_blinded_balances( const flat_set<commitment_type>& commitments )const;
+
+      /////////////////
+      // Withdrawals //
+      /////////////////
+
+      /**
+       *  @brief Get non expired withdraw permission objects for a giver(ex:recurring customer)
+       *  @param account Account to get objects from
+       *  @param start Withdraw permission objects(1.12.X) before this ID will be skipped in results. Pagination purposes.
+       *  @param limit Maximum number of objects to retrieve
+       *  @return Withdraw permission objects for the account
+       */
+      vector<withdraw_permission_object> get_withdraw_permissions_by_giver(account_id_type account, withdraw_permission_id_type start, uint32_t limit)const;
+
+      /**
+       *  @brief Get non expired withdraw permission objects for a recipient(ex:service provider)
+       *  @param account Account to get objects from
+       *  @param start Withdraw permission objects(1.12.X) before this ID will be skipped in results. Pagination purposes.
+       *  @param limit Maximum number of objects to retrieve
+       *  @return Withdraw permission objects for the account
+       */
+      vector<withdraw_permission_object> get_withdraw_permissions_by_recipient(account_id_type account, withdraw_permission_id_type start, uint32_t limit)const;
 
    private:
       std::shared_ptr< database_api_impl > my;
@@ -693,6 +748,7 @@ FC_API(graphene::app::database_api,
    (unsubscribe_from_market)
    (get_ticker)
    (get_24_volume)
+   (get_top_markets)
    (get_trade_history)
    (get_trade_history_by_sequence)
 
@@ -718,6 +774,7 @@ FC_API(graphene::app::database_api,
 
    // Authority / validation
    (get_transaction_hex)
+   (get_transaction_hex_without_sig)
    (get_required_signatures)
    (get_potential_signatures)
    (get_potential_address_signatures)
@@ -731,4 +788,9 @@ FC_API(graphene::app::database_api,
 
    // Blinded balances
    (get_blinded_balances)
+
+   // Withdrawals
+   (get_withdraw_permissions_by_giver)
+   (get_withdraw_permissions_by_recipient)
+
 )

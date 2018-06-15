@@ -64,8 +64,8 @@ BOOST_AUTO_TEST_CASE( serialization_json_test )
       op.to = account_id_type(2);
       op.amount = asset(100);
       trx.operations.push_back( op );
-      fc::variant packed(trx);
-      signed_transaction unpacked = packed.as<signed_transaction>();
+      fc::variant packed(trx, GRAPHENE_MAX_NESTED_OBJECTS);
+      signed_transaction unpacked = packed.as<signed_transaction>( GRAPHENE_MAX_NESTED_OBJECTS );
       unpacked.validate();
       BOOST_CHECK( digest(trx) == digest(unpacked) );
    } catch (fc::exception& e) {

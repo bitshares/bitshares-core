@@ -208,8 +208,15 @@ namespace graphene { namespace chain {
          share_type settlement_fund;
          ///@}
 
+         /// The time when @ref current_feed would expire
          time_point_sec feed_expiration_time()const
-         { return current_feed_publication_time + options.feed_lifetime_sec; }
+         {
+            uint32_t current_feed_seconds = current_feed_publication_time.sec_since_epoch();
+            if( std::numeric_limits<uint32_t>::max() - current_feed_seconds <= options.feed_lifetime_sec )
+               return time_point_sec::maximum();
+            else
+               return current_feed_publication_time + options.feed_lifetime_sec;
+         }
          bool feed_is_expired_before_hardfork_615(time_point_sec current_time)const
          { return feed_expiration_time() >= current_time; }
          bool feed_is_expired(time_point_sec current_time)const
@@ -217,14 +224,10 @@ namespace graphene { namespace chain {
          void update_median_feeds(time_point_sec current_time);
    };
 
-   struct by_feed_expiration;
    typedef multi_index_container<
       asset_bitasset_data_object,
       indexed_by<
-         ordered_unique< tag<by_id>, member< object, object_id_type, &object::id > >,
-         ordered_non_unique< tag<by_feed_expiration>,
-            const_mem_fun< asset_bitasset_data_object, time_point_sec, &asset_bitasset_data_object::feed_expiration_time >
-         >
+         ordered_unique< tag<by_id>, member< object, object_id_type, &object::id > >
       >
    > asset_bitasset_data_object_multi_index_type;
    typedef generic_index<asset_bitasset_data_object, asset_bitasset_data_object_multi_index_type> asset_bitasset_data_index;
