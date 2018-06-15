@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015 Cryptonomex, Inc., and contributors.
+ * Copyright (c) 2015-2018 Cryptonomex, Inc., and contributors.
  *
  * The MIT License
  *
@@ -32,6 +32,8 @@
 
 #include <functional>
 
+#include <locale>
+
 namespace graphene { namespace chain {
 
 void_result asset_create_evaluator::do_evaluate( const asset_create_operation& op )
@@ -55,22 +57,6 @@ void_result asset_create_evaluator::do_evaluate( const asset_create_operation& o
 
    if( d.head_block_time() > HARDFORK_385_TIME )
    {
-
-   if( d.head_block_time() <= HARDFORK_409_TIME )
-   {
-      auto dotpos = op.symbol.find( '.' );
-      if( dotpos != std::string::npos )
-      {
-         auto prefix = op.symbol.substr( 0, dotpos );
-         auto asset_symbol_itr = asset_indx.find( op.symbol );
-         FC_ASSERT( asset_symbol_itr != asset_indx.end(), "Asset ${s} may only be created by issuer of ${p}, but ${p} has not been registered",
-                    ("s",op.symbol)("p",prefix) );
-         FC_ASSERT( asset_symbol_itr->issuer == op.issuer, "Asset ${s} may only be created by issuer of ${p}, ${i}",
-                    ("s",op.symbol)("p",prefix)("i", op.issuer(d).name) );
-      }
-   }
-   else
-   {
       auto dotpos = op.symbol.rfind( '.' );
       if( dotpos != std::string::npos )
       {
@@ -81,8 +67,11 @@ void_result asset_create_evaluator::do_evaluate( const asset_create_operation& o
          FC_ASSERT( asset_symbol_itr->issuer == op.issuer, "Asset ${s} may only be created by issuer of ${p}, ${i}",
                     ("s",op.symbol)("p",prefix)("i", op.issuer(d).name) );
       }
-   }
 
+      if(d.head_block_time() <= HARDFORK_CORE_620_TIME ) { // TODO: remove this check after hf_620
+         static const std::locale& loc = std::locale::classic();
+         FC_ASSERT(isalpha(op.symbol.back(), loc), "Asset ${s} must end with alpha character before hardfork 620", ("s",op.symbol));
+      }
    }
    else
    {
@@ -142,13 +131,15 @@ object_id_type asset_create_evaluator::do_apply( const asset_create_operation& o
    }
 
    asset_bitasset_data_id_type bit_asset_id;
+
+   auto next_asset_id = db().get_index_type<asset_index>().get_next_id();
+
    if( op.bitasset_opts.valid() )
       bit_asset_id = db().create<asset_bitasset_data_object>( [&]( asset_bitasset_data_object& a ) {
             a.options = *op.bitasset_opts;
             a.is_prediction_market = op.is_prediction_market;
+            a.asset_id = next_asset_id;
          }).id;
-
-   auto next_asset_id = db().get_index_type<asset_index>().get_next_id();
 
    const asset_object& new_asset =
      db().create<asset_object>( [&]( asset_object& a ) {
@@ -251,6 +242,23 @@ void_result asset_fund_fee_pool_evaluator::do_apply(const asset_fund_fee_pool_op
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }
 
+static void validate_new_issuer( const database& d, const asset_object& a, account_id_type new_issuer )
+{ try {
+   FC_ASSERT(d.find_object(new_issuer));
+   if( a.is_market_issued() && new_issuer == GRAPHENE_COMMITTEE_ACCOUNT )
+   {
+      const asset_object& backing = a.bitasset_data(d).options.short_backing_asset(d);
+      if( backing.is_market_issued() )
+      {
+         const asset_object& backing_backing = backing.bitasset_data(d).options.short_backing_asset(d);
+         FC_ASSERT( backing_backing.get_id() == asset_id_type(),
+                    "May not create a blockchain-controlled market asset which is not backed by CORE.");
+      } else
+         FC_ASSERT( backing.get_id() == asset_id_type(),
+                    "May not create a blockchain-controlled market asset which is not backed by CORE.");
+   }
+} FC_CAPTURE_AND_RETHROW( (a)(new_issuer) ) }
+
 void_result asset_update_evaluator::do_evaluate(const asset_update_operation& o)
 { try {
    database& d = db();
@@ -262,19 +270,9 @@ void_result asset_update_evaluator::do_evaluate(const asset_update_operation& o)
 
    if( o.new_issuer )
    {
-      FC_ASSERT(d.find_object(*o.new_issuer));
-      if( a.is_market_issued() && *o.new_issuer == GRAPHENE_COMMITTEE_ACCOUNT )
-      {
-         const asset_object& backing = a.bitasset_data(d).options.short_backing_asset(d);
-         if( backing.is_market_issued() )
-         {
-            const asset_object& backing_backing = backing.bitasset_data(d).options.short_backing_asset(d);
-            FC_ASSERT( backing_backing.get_id() == asset_id_type(),
-                       "May not create a blockchain-controlled market asset which is not backed by CORE.");
-         } else
-            FC_ASSERT( backing.get_id() == asset_id_type(),
-                       "May not create a blockchain-controlled market asset which is not backed by CORE.");
-      }
+      FC_ASSERT( d.head_block_time() < HARDFORK_CORE_199_TIME,
+                 "Since Hardfork #199, updating issuer requires the use of asset_update_issuer_operation.");
+      validate_new_issuer( d, a, *o.new_issuer );
    }
 
    if( (d.head_block_time() < HARDFORK_572_TIME) || (a.dynamic_asset_data_id(d).current_supply != 0) )
@@ -289,7 +287,9 @@ void_result asset_update_evaluator::do_evaluate(const asset_update_operation& o)
              "Flag change is forbidden by issuer permissions");
 
    asset_to_update = &a;
-   FC_ASSERT( o.issuer == a.issuer, "", ("o.issuer", o.issuer)("a.issuer", a.issuer) );
+   FC_ASSERT( o.issuer == a.issuer,
+              "Incorrect issuer for asset! (${o.issuer} != ${a.issuer})",
+              ("o.issuer", o.issuer)("a.issuer", a.issuer) );
 
    const auto& chain_parameters = d.get_global_properties().parameters;
 
@@ -308,7 +308,7 @@ void_result asset_update_evaluator::do_apply(const asset_update_operation& o)
    database& d = db();
 
    // If we are now disabling force settlements, cancel all open force settlement orders
-   if( o.new_options.flags & disable_force_settle && asset_to_update->can_force_settle() )
+   if( (o.new_options.flags & disable_force_settle) && asset_to_update->can_force_settle() )
    {
       const auto& idx = d.get_index_type<force_settlement_index>().indices().get<by_expiration>();
       // Funky iteration code because we're removing objects as we go. We have to re-initialize itr every loop instead
@@ -316,7 +316,7 @@ void_result asset_update_evaluator::do_apply(const asset_update_operation& o)
       for( auto itr = idx.lower_bound(o.asset_to_update);
            itr != idx.end() && itr->settlement_asset_id() == o.asset_to_update;
            itr = idx.lower_bound(o.asset_to_update) )
-         d.cancel_order(*itr);
+         d.cancel_settle_order(*itr);
    }
 
    d.modify(*asset_to_update, [&](asset_object& a) {
@@ -328,57 +328,397 @@ void_result asset_update_evaluator::do_apply(const asset_update_operation& o)
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }
 
-void_result asset_update_bitasset_evaluator::do_evaluate(const asset_update_bitasset_operation& o)
+void_result asset_update_issuer_evaluator::do_evaluate(const asset_update_issuer_operation& o)
 { try {
    database& d = db();
 
    const asset_object& a = o.asset_to_update(d);
 
-   FC_ASSERT(a.is_market_issued(), "Cannot update BitAsset-specific settings on a non-BitAsset.");
+   validate_new_issuer( d, a, o.new_issuer );
 
-   const asset_bitasset_data_object& b = a.bitasset_data(d);
-   FC_ASSERT( !b.has_settlement(), "Cannot update a bitasset after a settlement has executed" );
-   if( o.new_options.short_backing_asset != b.options.short_backing_asset )
+   asset_to_update = &a;
+   FC_ASSERT( o.issuer == a.issuer,
+              "Incorrect issuer for asset! (${o.issuer} != ${a.issuer})",
+              ("o.issuer", o.issuer)("a.issuer", a.issuer) );
+
+   if( d.head_block_time() < HARDFORK_CORE_199_TIME )
    {
-      FC_ASSERT(a.dynamic_asset_data_id(d).current_supply == 0);
-      FC_ASSERT(d.find_object(o.new_options.short_backing_asset));
-
-      if( a.issuer == GRAPHENE_COMMITTEE_ACCOUNT )
-      {
-         const asset_object& backing = a.bitasset_data(d).options.short_backing_asset(d);
-         if( backing.is_market_issued() )
-         {
-            const asset_object& backing_backing = backing.bitasset_data(d).options.short_backing_asset(d);
-            FC_ASSERT( backing_backing.get_id() == asset_id_type(),
-                       "May not create a blockchain-controlled market asset which is not backed by CORE.");
-         } else
-            FC_ASSERT( backing.get_id() == asset_id_type(),
-                       "May not create a blockchain-controlled market asset which is not backed by CORE.");
-      }
+      // TODO: remove after HARDFORK_CORE_199_TIME has passed
+      FC_ASSERT(false, "Not allowed until hardfork 199");
    }
 
-   bitasset_to_update = &b;
-   FC_ASSERT( o.issuer == a.issuer, "", ("o.issuer", o.issuer)("a.issuer", a.issuer) );
-
    return void_result();
-} FC_CAPTURE_AND_RETHROW( (o) ) }
+} FC_CAPTURE_AND_RETHROW((o)) }
 
-void_result asset_update_bitasset_evaluator::do_apply(const asset_update_bitasset_operation& o)
+void_result asset_update_issuer_evaluator::do_apply(const asset_update_issuer_operation& o)
 { try {
-   bool should_update_feeds = false;
-   // If the minimum number of feeds to calculate a median has changed, we need to recalculate the median
-   if( o.new_options.minimum_feeds != bitasset_to_update->options.minimum_feeds )
-      should_update_feeds = true;
-
-   db().modify(*bitasset_to_update, [&](asset_bitasset_data_object& b) {
-      b.options = o.new_options;
-
-      if( should_update_feeds )
-         b.update_median_feeds(db().head_block_time());
+   database& d = db();
+   d.modify(*asset_to_update, [&](asset_object& a) {
+      a.issuer = o.new_issuer;
    });
 
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }
+
+/****************
+ * Loop through assets, looking for ones that are backed by the asset being changed. When found,
+ * perform checks to verify validity
+ *
+ * @param d the database
+ * @param op the bitasset update operation being performed
+ * @param new_backing_asset
+ * @param true if after hf 922/931 (if nothing triggers, this and the logic that depends on it
+ *    should be removed).
+ */
+void check_children_of_bitasset(database& d, const asset_update_bitasset_operation& op,
+      const asset_object& new_backing_asset, bool after_hf_922_931)
+{
+   // no need to do these checks if the new backing asset is CORE
+   if ( new_backing_asset.get_id() == asset_id_type() )
+      return;
+
+   // loop through all assets that have this asset as a backing asset
+   const auto& idx = d.get_index_type<asset_index>().indices().get<by_type>();
+
+   for( auto itr = idx.lower_bound(true); itr != idx.end(); ++itr )
+   {
+      const auto& child = *itr;
+      if ( child.bitasset_data(d).options.short_backing_asset == op.asset_to_update )
+      {
+         if ( after_hf_922_931 )
+         {
+            FC_ASSERT( child.get_id() != op.new_options.short_backing_asset,
+                  "A BitAsset would be invalidated by changing this backing asset ('A' backed by 'B' backed by 'A')." );
+
+            FC_ASSERT( child.issuer != GRAPHENE_COMMITTEE_ACCOUNT,
+                  "A blockchain-controlled market asset would be invalidated by changing this backing asset." );
+
+            FC_ASSERT( !new_backing_asset.is_market_issued(),
+                  "A non-blockchain controlled BitAsset would be invalidated by changing this backing asset.");
+
+         }
+         else
+         {
+            if( child.get_id() == op.new_options.short_backing_asset )
+            {
+               wlog( "Before hf-922-931, modified an asset to be backed by another, but would cause a continuous "
+                     "loop. A cannot be backed by B which is backed by A." );
+               return;
+            }
+
+            if( child.issuer == GRAPHENE_COMMITTEE_ACCOUNT )
+            {
+               wlog( "before hf-922-931, modified an asset to be backed by a non-CORE, but this asset "
+                        "is a backing asset for a committee-issued asset. This occurred at block ${b}",
+                        ("b", d.head_block_num()));
+               return;
+            }
+            else
+            {
+               if ( new_backing_asset.is_market_issued() ) { // a.k.a. !UIA
+                  wlog( "before hf-922-931, modified an asset to be backed by an MPA, but this asset "
+                        "is a backing asset for another MPA, which would cause MPA backed by MPA backed by MPA. "
+                        "This occurred at block ${b}",
+                        ("b", d.head_block_num()));
+                  return;
+               }
+            } // if child.issuer
+         } // if hf 922/931
+      } // if this child is backed by the asset being adjusted
+   } // for each asset
+} // check_children_of_bitasset
+
+void_result asset_update_bitasset_evaluator::do_evaluate(const asset_update_bitasset_operation& op)
+{ try {
+   database& d = db();
+
+   const asset_object& asset_obj = op.asset_to_update(d);
+
+   FC_ASSERT( asset_obj.is_market_issued(), "Cannot update BitAsset-specific settings on a non-BitAsset." );
+
+   FC_ASSERT( op.issuer == asset_obj.issuer, "Only asset issuer can update bitasset_data of the asset." );
+
+   const asset_bitasset_data_object& current_bitasset_data = asset_obj.bitasset_data(d);
+
+   FC_ASSERT( !current_bitasset_data.has_settlement(), "Cannot update a bitasset after a global settlement has executed" );
+
+   bool after_hf_core_922_931 = ( d.get_dynamic_global_properties().next_maintenance_time > HARDFORK_CORE_922_931_TIME );
+
+   // Are we changing the backing asset?
+   if( op.new_options.short_backing_asset != current_bitasset_data.options.short_backing_asset )
+   {
+      FC_ASSERT( asset_obj.dynamic_asset_data_id(d).current_supply == 0,
+                 "Cannot update a bitasset if there is already a current supply." );
+
+      const asset_object& new_backing_asset = op.new_options.short_backing_asset(d); // check if the asset exists
+
+      if( after_hf_core_922_931 ) // TODO remove this check after hard fork if things in `else` did not occur
+      {
+         FC_ASSERT( op.new_options.short_backing_asset != asset_obj.get_id(),
+                    "Cannot update an asset to be backed by itself." );
+
+         if( current_bitasset_data.is_prediction_market )
+         {
+            FC_ASSERT( asset_obj.precision == new_backing_asset.precision,
+                       "The precision of the asset and backing asset must be equal." );
+         }
+
+         if( asset_obj.issuer == GRAPHENE_COMMITTEE_ACCOUNT )
+         {
+            if( new_backing_asset.is_market_issued() )
+            {
+               FC_ASSERT( new_backing_asset.bitasset_data(d).options.short_backing_asset == asset_id_type(),
+                          "May not modify a blockchain-controlled market asset to be backed by an asset which is not "
+                          "backed by CORE." );
+
+               check_children_of_bitasset( d, op, new_backing_asset, after_hf_core_922_931 );
+            }
+            else
+            {
+               FC_ASSERT( new_backing_asset.get_id() == asset_id_type(),
+                          "May not modify a blockchain-controlled market asset to be backed by an asset which is not "
+                          "market issued asset nor CORE." );
+            }
+         }
+         else
+         {
+            // not a committee issued asset
+
+            // If we're changing to a backing_asset that is not CORE, we need to look at any
+            // asset ( "CHILD" ) that has this one as a backing asset. If CHILD is committee-owned,
+            // the change is not allowed. If CHILD is user-owned, then this asset's backing
+            // asset must be either CORE or a UIA.
+            if ( new_backing_asset.get_id() != asset_id_type() ) // not backed by CORE
+            {
+               check_children_of_bitasset( d, op, new_backing_asset, after_hf_core_922_931 );
+            }
+
+         }
+
+         // Check if the new backing asset is itself backed by something. It must be CORE or a UIA
+         if ( new_backing_asset.is_market_issued() )
+         {
+            asset_id_type backing_backing_asset_id = new_backing_asset.bitasset_data(d).options.short_backing_asset;
+            FC_ASSERT( (backing_backing_asset_id == asset_id_type() || !backing_backing_asset_id(d).is_market_issued()),
+                  "A BitAsset cannot be backed by a BitAsset that itself is backed by a BitAsset.");
+         }
+      }
+      else // prior to HF 922 / 931
+      {
+         // code to check if issues occurred before hard fork. TODO cleanup after hard fork
+         if( op.new_options.short_backing_asset == asset_obj.get_id() )
+         {
+            wlog( "before hf-922-931, op.new_options.short_backing_asset == asset_obj.get_id() at block ${b}",
+                  ("b",d.head_block_num()) );
+         }
+         if( current_bitasset_data.is_prediction_market && asset_obj.precision != new_backing_asset.precision )
+         {
+            wlog( "before hf-922-931, for a PM, asset_obj.precision != new_backing_asset.precision at block ${b}",
+                  ("b",d.head_block_num()) );
+         }
+
+         if( asset_obj.issuer == GRAPHENE_COMMITTEE_ACCOUNT )
+         {
+            // code to check if issues occurred before hard fork. TODO cleanup after hard fork
+            if( new_backing_asset.is_market_issued() )
+            {
+               if( new_backing_asset.bitasset_data(d).options.short_backing_asset != asset_id_type() )
+                  wlog( "before hf-922-931, modified a blockchain-controlled market asset to be backed by an asset "
+                        "which is not backed by CORE at block ${b}",
+                        ("b",d.head_block_num()) );
+
+               check_children_of_bitasset( d, op, new_backing_asset, after_hf_core_922_931 );
+            }
+            else
+            {
+               if( new_backing_asset.get_id() != asset_id_type() )
+                  wlog( "before hf-922-931, modified a blockchain-controlled market asset to be backed by an asset "
+                        "which is not market issued asset nor CORE at block ${b}",
+                        ("b",d.head_block_num()) );
+            }
+
+            //prior to HF 922_931, these checks were mistakenly using the old backing_asset
+            const asset_object& old_backing_asset = current_bitasset_data.options.short_backing_asset(d);
+
+            if( old_backing_asset.is_market_issued() )
+            {
+               FC_ASSERT( old_backing_asset.bitasset_data(d).options.short_backing_asset == asset_id_type(),
+                          "May not modify a blockchain-controlled market asset to be backed by an asset which is not "
+                          "backed by CORE." );
+            }
+            else
+            {
+               FC_ASSERT( old_backing_asset.get_id() == asset_id_type(),
+                          "May not modify a blockchain-controlled market asset to be backed by an asset which is not "
+                          "market issued asset nor CORE." );
+            }
+         }
+         else
+         {
+            // not a committee issued asset
+
+            // If we're changing to a backing_asset that is not CORE, we need to look at any
+            // asset ( "CHILD" ) that has this one as a backing asset. If CHILD is committee-owned,
+            // the change is not allowed. If CHILD is user-owned, then this asset's backing
+            // asset must be either CORE or a UIA.
+            if ( new_backing_asset.get_id() != asset_id_type() ) // not backed by CORE
+            {
+               check_children_of_bitasset( d, op, new_backing_asset, after_hf_core_922_931 );
+            }
+         }
+         // if the new backing asset is backed by something which is not CORE and not a UIA, this is not allowed
+         // Check if the new backing asset is itself backed by something. It must be CORE or a UIA
+         if ( new_backing_asset.is_market_issued() )
+         {
+            asset_id_type backing_backing_asset_id = new_backing_asset.bitasset_data(d).options.short_backing_asset;
+            if ( backing_backing_asset_id != asset_id_type() && backing_backing_asset_id(d).is_market_issued() )
+            {
+               wlog( "before hf-922-931, a BitAsset cannot be backed by a BitAsset that itself "
+                     "is backed by a BitAsset. This occurred at block ${b}",
+                     ("b", d.head_block_num() ) );
+            } // not core, not UIA
+         } // if market issued
+      }
+   }
+
+   const auto& chain_parameters = d.get_global_properties().parameters;
+   if( after_hf_core_922_931 ) // TODO remove this check after hard fork if things in `else` did not occur
+   {
+      FC_ASSERT( op.new_options.feed_lifetime_sec > chain_parameters.block_interval,
+            "Feed lifetime must exceed block interval." );
+      FC_ASSERT( op.new_options.force_settlement_delay_sec > chain_parameters.block_interval,
+            "Force settlement delay must exceed block interval." );
+   }
+   else // code to check if issues occurred before hard fork. TODO cleanup after hard fork
+   {
+      if( op.new_options.feed_lifetime_sec <= chain_parameters.block_interval )
+         wlog( "before hf-922-931, op.new_options.feed_lifetime_sec <= chain_parameters.block_interval at block ${b}",
+               ("b",d.head_block_num()) );
+      if( op.new_options.force_settlement_delay_sec <= chain_parameters.block_interval )
+         wlog( "before hf-922-931, op.new_options.force_settlement_delay_sec <= chain_parameters.block_interval at block ${b}",
+               ("b",d.head_block_num()) );
+   }
+
+   bitasset_to_update = &current_bitasset_data;
+   asset_to_update = &asset_obj;
+
+   return void_result();
+} FC_CAPTURE_AND_RETHROW( (op) ) }
+
+/*******
+ * @brief Apply requested changes to bitasset options
+ *
+ * This applies the requested changes to the bitasset object. It also cleans up the
+ * releated feeds
+ *
+ * @param op the requested operation
+ * @param db the database
+ * @param bdo the actual database object
+ * @param asset_to_update the asset_object related to this bitasset_data_object
+ * @returns true if the feed price is changed, and after hf core-868-890
+ */
+static bool update_bitasset_object_options(
+      const asset_update_bitasset_operation& op, database& db,
+      asset_bitasset_data_object& bdo, const asset_object& asset_to_update )
+{
+   const fc::time_point_sec& next_maint_time = db.get_dynamic_global_properties().next_maintenance_time;
+   bool after_hf_core_868_890 = ( next_maint_time > HARDFORK_CORE_868_890_TIME );
+
+   // If the minimum number of feeds to calculate a median has changed, we need to recalculate the median
+   bool should_update_feeds = false;
+   if( op.new_options.minimum_feeds != bdo.options.minimum_feeds )
+      should_update_feeds = true;
+
+   // after hardfork core-868-890, we also should call update_median_feeds if the feed_lifetime_sec changed
+   if( after_hf_core_868_890
+         && op.new_options.feed_lifetime_sec != bdo.options.feed_lifetime_sec )
+   {
+      should_update_feeds = true;
+   }
+
+   // feeds must be reset if the backing asset is changed after hardfork core-868-890
+   bool backing_asset_changed = false;
+   bool is_witness_or_committee_fed = false;
+   if( after_hf_core_868_890
+         && op.new_options.short_backing_asset != bdo.options.short_backing_asset )
+   {
+      backing_asset_changed = true;
+      should_update_feeds = true;
+      if( asset_to_update.options.flags & ( witness_fed_asset | committee_fed_asset ) )
+         is_witness_or_committee_fed = true;
+   }
+
+   bdo.options = op.new_options;
+
+   // are we modifying the underlying? If so, reset the feeds
+   if( backing_asset_changed )
+   {
+      if( is_witness_or_committee_fed )
+      {
+         bdo.feeds.clear();
+      }
+      else
+      {
+         // for non-witness-feeding and non-committee-feeding assets, modify all feeds
+         // published by producers to nothing, since we can't simply remove them. For more information:
+         // https://github.com/bitshares/bitshares-core/pull/832#issuecomment-384112633
+         for( auto& current_feed : bdo.feeds )
+         {
+            current_feed.second.second.settlement_price = price();
+         }
+      }
+   }
+
+   if( should_update_feeds )
+   {
+      const auto old_feed = bdo.current_feed;
+      bdo.update_median_feeds( db.head_block_time() );
+
+      // TODO review and refactor / cleanup after hard fork:
+      //      1. if hf_core_868_890 and core-935 occurred at same time
+      //      2. if wlog did not actually get called
+
+      // We need to call check_call_orders if the price feed changes after hardfork core-935
+      if( next_maint_time > HARDFORK_CORE_935_TIME )
+         return ( !( old_feed == bdo.current_feed ) );
+
+      // We need to call check_call_orders if the settlement price changes after hardfork core-868-890
+      if( after_hf_core_868_890 )
+      {
+         if( old_feed.settlement_price != bdo.current_feed.settlement_price )
+            return true;
+         else
+         {
+            if( !( old_feed == bdo.current_feed ) )
+               wlog( "Settlement price did not change but current_feed changed at block ${b}", ("b",db.head_block_num()) );
+         }
+      }
+   }
+
+   return false;
+}
+
+void_result asset_update_bitasset_evaluator::do_apply(const asset_update_bitasset_operation& op)
+{
+   try
+   {
+      auto& db_conn = db();
+      const auto& asset_being_updated = (*asset_to_update);
+      bool to_check_call_orders = false;
+
+      db_conn.modify( *bitasset_to_update,
+                      [&op, &asset_being_updated, &to_check_call_orders, &db_conn]( asset_bitasset_data_object& bdo )
+      {
+         to_check_call_orders = update_bitasset_object_options( op, db_conn, bdo, asset_being_updated );
+      });
+
+      if( to_check_call_orders )
+         db_conn.check_call_orders( asset_being_updated );
+
+      return void_result();
+
+   } FC_CAPTURE_AND_RETHROW( (op) )
+}
 
 void_result asset_update_feed_producers_evaluator::do_evaluate(const asset_update_feed_producers_evaluator::operation_type& o)
 { try {
@@ -478,33 +818,54 @@ void_result asset_settle_evaluator::do_evaluate(const asset_settle_evaluator::op
 operation_result asset_settle_evaluator::do_apply(const asset_settle_evaluator::operation_type& op)
 { try {
    database& d = db();
-   d.adjust_balance(op.account, -op.amount);
 
    const auto& bitasset = asset_to_settle->bitasset_data(d);
    if( bitasset.has_settlement() )
    {
       const auto& mia_dyn = asset_to_settle->dynamic_asset_data_id(d);
 
-      auto settled_amount = op.amount * bitasset.settlement_price;
+      auto settled_amount = op.amount * bitasset.settlement_price; // round down, in favor of global settlement fund
       if( op.amount.amount == mia_dyn.current_supply )
          settled_amount.amount = bitasset.settlement_fund; // avoid rounding problems
       else
          FC_ASSERT( settled_amount.amount <= bitasset.settlement_fund ); // should be strictly < except for PM with zero outcome
 
-      d.modify( bitasset, [&]( asset_bitasset_data_object& obj ){
-                obj.settlement_fund -= settled_amount.amount;
-                });
+      if( settled_amount.amount == 0 && !bitasset.is_prediction_market )
+      {
+         if( d.get_dynamic_global_properties().next_maintenance_time > HARDFORK_CORE_184_TIME )
+            FC_THROW( "Settle amount is too small to receive anything due to rounding" );
+         else // TODO remove this warning after hard fork core-184
+            wlog( "Something for nothing issue (#184, variant F) occurred at block #${block}", ("block",d.head_block_num()) );
+      }
 
-      d.adjust_balance(op.account, settled_amount);
+      asset pays = op.amount;
+      if( op.amount.amount != mia_dyn.current_supply
+            && settled_amount.amount != 0
+            && d.get_dynamic_global_properties().next_maintenance_time > HARDFORK_CORE_342_TIME )
+      {
+         pays = settled_amount.multiply_and_round_up( bitasset.settlement_price );
+      }
+
+      d.adjust_balance( op.account, -pays );
+
+      if( settled_amount.amount > 0 )
+      {
+         d.modify( bitasset, [&]( asset_bitasset_data_object& obj ){
+            obj.settlement_fund -= settled_amount.amount;
+         });
+
+         d.adjust_balance( op.account, settled_amount );
+      }
 
       d.modify( mia_dyn, [&]( asset_dynamic_data_object& obj ){
-                obj.current_supply -= op.amount.amount;
-                });
+         obj.current_supply -= pays.amount;
+      });
 
       return settled_amount;
    }
    else
    {
+      d.adjust_balance( op.account, -op.amount );
       return d.create<force_settlement_object>([&](force_settlement_object& s) {
          s.owner = op.account;
          s.balance = op.amount;
@@ -527,7 +888,9 @@ void_result asset_publish_feeds_evaluator::do_evaluate(const asset_publish_feed_
       FC_ASSERT( !bitasset.has_settlement(), "No further feeds may be published after a settlement event" );
    }
 
+   // the settlement price must be quoted in terms of the backing asset
    FC_ASSERT( o.feed.settlement_price.quote.asset_id == bitasset.options.short_backing_asset );
+
    if( d.head_block_time() > HARDFORK_480_TIME )
    {
       if( !o.feed.core_exchange_rate.is_null() )
@@ -618,6 +981,33 @@ void_result asset_claim_fees_evaluator::do_apply( const asset_claim_fees_operati
    d.adjust_balance( o.issuer, o.amount_to_claim );
 
    return void_result();
+} FC_CAPTURE_AND_RETHROW( (o) ) }
+
+
+void_result asset_claim_pool_evaluator::do_evaluate( const asset_claim_pool_operation& o )
+{ try {
+    FC_ASSERT( db().head_block_time() >= HARDFORK_CORE_188_TIME,
+         "This operation is only available after Hardfork #188!" );
+    FC_ASSERT( o.asset_id(db()).issuer == o.issuer, "Asset fee pool may only be claimed by the issuer" );
+
+    return void_result();
+} FC_CAPTURE_AND_RETHROW( (o) ) }
+
+void_result asset_claim_pool_evaluator::do_apply( const asset_claim_pool_operation& o )
+{ try {
+    database& d = db();
+
+    const asset_object& a = o.asset_id(d);
+    const asset_dynamic_data_object& addo = a.dynamic_asset_data_id(d);
+    FC_ASSERT( o.amount_to_claim.amount <= addo.fee_pool, "Attempt to claim more fees than is available", ("addo",addo) );
+
+    d.modify( addo, [&o]( asset_dynamic_data_object& _addo  ) {
+        _addo.fee_pool -= o.amount_to_claim.amount;
+    });
+
+    d.adjust_balance( o.issuer, o.amount_to_claim );
+
+    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }
 
 

@@ -1,0 +1,5 @@
+// bitshares-core issue #343
+// Fix "Inconsistent sorting of call orders between matching against a limit order and a force settle order"
+#ifndef HARDFORK_CORE_343_TIME
+#define HARDFORK_CORE_343_TIME (fc::time_point_sec( 1532008920 )) // Thu, 19 Jul 2018 14:02:00 UTC
+#endif
