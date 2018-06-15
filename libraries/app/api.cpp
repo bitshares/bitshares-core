@@ -461,20 +461,6 @@ namespace graphene { namespace app {
 
     crypto_api::crypto_api(){};
 
-    blind_signature crypto_api::blind_sign( const extended_private_key_type& key, const blinded_hash& hash, int i )
-    {
-       return fc::ecc::extended_private_key( key ).blind_sign( hash, i );
-    }
-
-    signature_type crypto_api::unblind_signature( const extended_private_key_type& key,
-                                                     const extended_public_key_type& bob,
-                                                     const blind_signature& sig,
-                                                     const fc::sha256& hash,
-                                                     int i )
-    {
-       return fc::ecc::extended_private_key( key ).unblind_signature( extended_public_key( bob ), sig, hash, i );
-    }
-
     commitment_type crypto_api::blind( const blind_factor_type& blind, uint64_t value )
     {
        return fc::ecc::blind( blind, value );

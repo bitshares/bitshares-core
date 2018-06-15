@@ -383,7 +383,7 @@ class wallet_api
        * @return All info about the specified account
        *
        * This function fetches all relevant objects for the given account. If the string
-       * of @ref name_or_id cannot be tied to an account, that input will be ignored.
+       * of \c name_or_id cannot be tied to an account, that input will be ignored.
        *
        */
       full_account                      get_full_account( const string& name_or_id);
@@ -662,7 +662,7 @@ class wallet_api
       * @see suggest_brain_key()
       *
       * @param brain_key    Brain key
-      * @param numberOfDesiredKeys  Number of desired keys
+      * @param number_of_desired_keys  Number of desired keys
       * @return A list of keys that are deterministically derived from the brainkey
       */
      vector<brain_key_info> derive_owner_keys_from_brain_key(string brain_key, int number_of_desired_keys = 1) const;
@@ -887,7 +887,7 @@ class wallet_api
       blind_receipt receive_blind_transfer( string confirmation_receipt, string opt_from, string opt_memo );
 
       /**
-       *  Transfers a public balance from @from to one or more blinded balances using a
+       *  Transfers a public balance from \c from_account_id_or_name to one or more blinded balances using a
        *  stealth transfer.
        */
       blind_confirmation transfer_to_blind( string from_account_id_or_name, 
@@ -1353,7 +1353,7 @@ class wallet_api
       /**
        * Update a witness object owned by the given account.
        *
-       * @param witness The name of the witness's owner account.  Also accepts the ID of the owner account or the ID of the witness.
+       * @param witness_name The name of the witness's owner account.  Also accepts the ID of the owner account or the ID of the witness.
        * @param url Same as for create_witness.  The empty string makes it remain the same.
        * @param block_signing_key The new block signing public key.  The empty string makes it remain the same.
        * @param broadcast true if you wish to broadcast the transaction.
@@ -1391,7 +1391,7 @@ class wallet_api
        * Update your votes for a worker
        *
        * @param account The account which will pay the fee and update votes.
-       * @param worker_vote_delta {"vote_for" : [...], "vote_against" : [...], "vote_abstain" : [...]}
+       * @param delta {"vote_for" : [...], "vote_against" : [...], "vote_abstain" : [...]}
        * @param broadcast true if you wish to broadcast the transaction.
        */
       signed_transaction update_worker_votes(
