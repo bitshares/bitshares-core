@@ -106,6 +106,29 @@ extern uint32_t GRAPHENE_TESTING_GENESIS_TIMESTAMP;
 #define REQUIRE_OP_VALIDATION_FAILURE( op, field, value ) \
    REQUIRE_OP_VALIDATION_FAILURE_2( op, field, value, fc::exception )
 
+#define REQUIRE_EXCEPTION_WITH_TEXT(op, exc_text)                 \
+{                                                                 \
+   try                                                            \
+   {                                                              \
+      op;                                                         \
+      BOOST_FAIL(std::string("Expected an exception with \"") +   \
+         std::string(exc_text) +                                  \
+         std::string("\" but none thrown"));                      \
+   }                                                              \
+   catch (fc::exception& ex)                                      \
+   {                                                              \
+      std::string what = ex.to_string(                            \
+            fc::log_level(fc::log_level::all));                   \
+      if (what.find(exc_text) == std::string::npos)               \
+      {                                                           \
+         BOOST_FAIL( std::string("Expected \"") +                 \
+            std::string(exc_text) +                               \
+            std::string("\" but got \"") +                        \
+            std::string(what) );                                  \
+      }                                                           \
+   }                                                              \
+}                                                                 \
+
 #define REQUIRE_THROW_WITH_VALUE_2(op, field, value, exc_type) \
 { \
    auto bak = op.field; \
@@ -127,7 +150,8 @@ extern uint32_t GRAPHENE_TESTING_GENESIS_TIMESTAMP;
 
 #define PREP_ACTOR(name) \
    fc::ecc::private_key name ## _private_key = generate_private_key(BOOST_PP_STRINGIZE(name));   \
-   public_key_type name ## _public_key = name ## _private_key.get_public_key();
+   public_key_type name ## _public_key = name ## _private_key.get_public_key(); \
+   BOOST_CHECK( name ## _public_key != public_key_type() );
 
 #define ACTOR(name) \
    PREP_ACTOR(name) \
@@ -183,8 +207,9 @@ struct database_fixture {
    /**
     * @brief Generates blocks until the head block time matches or exceeds timestamp
     * @param timestamp target time to generate blocks until
+    * @return number of blocks generated
     */
-   void generate_blocks(fc::time_point_sec timestamp, bool miss_intermediate_blocks = true, uint32_t skip = ~0);
+   uint32_t generate_blocks(fc::time_point_sec timestamp, bool miss_intermediate_blocks = true, uint32_t skip = ~0);
 
    account_create_operation make_account(
       const std::string& name = "nathan",
@@ -208,13 +233,36 @@ struct database_fixture {
    void update_feed_producers(const asset_object& mia, flat_set<account_id_type> producers);
    void publish_feed(asset_id_type mia, account_id_type by, const price_feed& f)
    { publish_feed(mia(db), by(db), f); }
+
+   /***
+    * @brief helper method to add a price feed
+    *
+    * Adds a price feed for asset2, pushes the transaction, and generates the block
+    *
+    * @param publisher who is publishing the feed
+    * @param asset1 the base asset
+    * @param amount1 the amount of the base asset
+    * @param asset2 the quote asset
+    * @param amount2 the amount of the quote asset
+    * @param core_id id of core (helps with core_exchange_rate)
+    */
+   void publish_feed(const account_id_type& publisher,
+         const asset_id_type& asset1, int64_t amount1,
+         const asset_id_type& asset2, int64_t amount2,
+         const asset_id_type& core_id);
+
    void publish_feed(const asset_object& mia, const account_object& by, const price_feed& f);
-   const call_order_object* borrow(account_id_type who, asset what, asset collateral)
-   { return borrow(who(db), what, collateral); }
-   const call_order_object* borrow(const account_object& who, asset what, asset collateral);
-   void cover(account_id_type who, asset what, asset collateral_freed)
-   { cover(who(db), what, collateral_freed); }
-   void cover(const account_object& who, asset what, asset collateral_freed);
+
+   const call_order_object* borrow( account_id_type who, asset what, asset collateral,
+                                    optional<uint16_t> target_cr = {} )
+   { return borrow(who(db), what, collateral, target_cr); }
+   const call_order_object* borrow( const account_object& who, asset what, asset collateral,
+                                    optional<uint16_t> target_cr = {} );
+   void cover(account_id_type who, asset what, asset collateral_freed,
+                                    optional<uint16_t> target_cr = {} )
+   { cover(who(db), what, collateral_freed, target_cr); }
+   void cover(const account_object& who, asset what, asset collateral_freed,
+                                    optional<uint16_t> target_cr = {} );
    void bid_collateral(const account_object& who, const asset& to_bid, const asset& to_cover);
 
    const asset_object& get_asset( const string& symbol )const;
@@ -222,15 +270,21 @@ struct database_fixture {
    const asset_object& create_bitasset(const string& name,
                                        account_id_type issuer = GRAPHENE_WITNESS_ACCOUNT,
                                        uint16_t market_fee_percent = 100 /*1%*/,
-                                       uint16_t flags = charge_market_fee);
+                                       uint16_t flags = charge_market_fee,
+                                       uint16_t precision = 2,
+                                       asset_id_type backing_asset = {});
    const asset_object& create_prediction_market(const string& name,
                                        account_id_type issuer = GRAPHENE_WITNESS_ACCOUNT,
                                        uint16_t market_fee_percent = 100 /*1%*/,
-                                       uint16_t flags = charge_market_fee);
+                                       uint16_t flags = charge_market_fee,
+                                       uint16_t precision = GRAPHENE_BLOCKCHAIN_PRECISION_DIGITS,
+                                       asset_id_type backing_asset = {});
    const asset_object& create_user_issued_asset( const string& name );
    const asset_object& create_user_issued_asset( const string& name,
                                                  const account_object& issuer,
-                                                 uint16_t flags );
+                                                 uint16_t flags,
+                                                 const price& core_exchange_rate = price(asset(1, asset_id_type(1)), asset(1)),
+                                                 uint16_t precision = 2 /* traditional precision for tests */);
    void issue_uia( const account_object& recipient, asset amount );
    void issue_uia( account_id_type recipient_id, asset amount );
 
@@ -264,8 +318,12 @@ struct database_fixture {
    uint64_t fund( const account_object& account, const asset& amount = asset(500000) );
    digest_type digest( const transaction& tx );
    void sign( signed_transaction& trx, const fc::ecc::private_key& key );
-   const limit_order_object* create_sell_order( account_id_type user, const asset& amount, const asset& recv );
-   const limit_order_object* create_sell_order( const account_object& user, const asset& amount, const asset& recv );
+   const limit_order_object* create_sell_order( account_id_type user, const asset& amount, const asset& recv,
+                                                const time_point_sec order_expiration = time_point_sec::maximum(),
+                                                const price& fee_core_exchange_rate = price::unit_price() );
+   const limit_order_object* create_sell_order( const account_object& user, const asset& amount, const asset& recv,
+                                                const time_point_sec order_expiration = time_point_sec::maximum(),
+                                                const price& fee_core_exchange_rate = price::unit_price() );
    asset cancel_limit_order( const limit_order_object& order );
    void transfer( account_id_type from, account_id_type to, const asset& amount, const asset& fee = asset() );
    void transfer( const account_object& from, const account_object& to, const asset& amount, const asset& fee = asset() );

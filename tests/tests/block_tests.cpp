@@ -32,6 +32,7 @@
 #include <graphene/chain/committee_member_object.hpp>
 #include <graphene/chain/proposal_object.hpp>
 #include <graphene/chain/market_object.hpp>
+#include <graphene/chain/hardfork.hpp>
 
 #include <graphene/utilities/tempdir.hpp>
 
@@ -1650,5 +1651,49 @@ BOOST_FIXTURE_TEST_CASE( tapos_rollover, database_fixture )
       throw;
    }
 }
+
+BOOST_FIXTURE_TEST_CASE( temp_account_balance, database_fixture )
+{ try {
+   ACTORS( (alice) );
+   fund( alice );
+   create_user_issued_asset( "UIA" );
+
+   generate_block();
+   set_expiration( db, trx );
+
+   transfer_operation top;
+   top.amount = asset( 1000 );
+   top.from = alice_id;
+   top.to   = GRAPHENE_TEMP_ACCOUNT;
+   trx.operations.push_back( top );
+
+   limit_order_create_operation loc;
+   loc.amount_to_sell = top.amount;
+   loc.expiration = db.head_block_time() + 1;
+   loc.seller = GRAPHENE_TEMP_ACCOUNT;
+   loc.min_to_receive = asset( 1000, asset_id_type(1) );
+   trx.operations.push_back( loc );
+   sign( trx, alice_private_key );
+   PUSH_TX( db, trx );
+   trx.clear();
+
+   generate_block();
+   generate_block();
+   generate_block();
+
+   top.to = GRAPHENE_COMMITTEE_ACCOUNT;
+   trx.operations.push_back( top );
+   sign( trx, alice_private_key );
+   BOOST_CHECK_THROW( PUSH_TX( db, trx ), fc::assert_exception );
+
+   generate_blocks( HARDFORK_CORE_1040_TIME );
+
+   set_expiration( db, trx );
+   trx.signatures.clear();
+   sign( trx, alice_private_key );
+   PUSH_TX( db, trx );
+
+   BOOST_CHECK( get_balance( GRAPHENE_TEMP_ACCOUNT, asset_id_type() ) > 0 );
+} FC_LOG_AND_RETHROW() }
 
 BOOST_AUTO_TEST_SUITE_END()
