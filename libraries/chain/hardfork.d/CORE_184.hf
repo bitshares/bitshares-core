@@ -1,0 +1,4 @@
+// bitshares-core issue #184 Fix "Potential something-for-nothing fill bug"
+#ifndef HARDFORK_CORE_184_TIME
+#define HARDFORK_CORE_184_TIME (fc::time_point_sec( 1532008920 )) // Thu, 19 Jul 2018 14:02:00 UTC
+#endif

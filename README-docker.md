@@ -7,7 +7,7 @@ containers. This README serves as documentation.
 
 The `Dockerfile` performs the following steps:
 
-1. Obtain base image (phusion/baseimage:0.9.19)
+1. Obtain base image (phusion/baseimage:0.10.1)
 2. Install required dependencies using `apt-get`
 3. Add bitshares-core source code into container
 4. Update git submodules

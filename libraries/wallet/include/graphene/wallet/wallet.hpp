@@ -981,6 +981,26 @@ class wallet_api
       signed_transaction borrow_asset(string borrower_name, string amount_to_borrow, string asset_symbol,
                                       string amount_of_collateral, bool broadcast = false);
 
+      /** Borrow an asset or update the debt/collateral ratio for the loan, with additional options.
+       *
+       * This is the first step in shorting an asset.  Call \c sell_asset() to complete the short.
+       *
+       * @param borrower_name the name or id of the account associated with the transaction.
+       * @param amount_to_borrow the amount of the asset being borrowed.  Make this value
+       *                         negative to pay back debt.
+       * @param asset_symbol the symbol or id of the asset being borrowed.
+       * @param amount_of_collateral the amount of the backing asset to add to your collateral
+       *        position.  Make this negative to claim back some of your collateral.
+       *        The backing asset is defined in the \c bitasset_options for the asset being borrowed.
+       * @param extensions additional options
+       * @param broadcast true to broadcast the transaction on the network
+       * @returns the signed transaction borrowing the asset
+       */
+      signed_transaction borrow_asset_ext( string borrower_name, string amount_to_borrow, string asset_symbol,
+                                           string amount_of_collateral,
+                                           call_order_update_operation::extensions_type extensions,
+                                           bool broadcast = false );
+
       /** Cancel an existing order
        *
        * @param order_id the id of order to be cancelled
@@ -1052,6 +1072,21 @@ class wallet_api
                                       optional<string> new_issuer,
                                       asset_options new_options,
                                       bool broadcast = false);
+
+      /** Update the issuer of an asset
+       * Since this call requires the owner authority of the current issuer to sign the transaction,
+       * a separated operation is used to change the issuer. This call simplifies the use of this action.
+       *
+       * @note This operation requires the owner key to be available in the wallet.
+       *
+       * @param symbol the name or id of the asset to update
+       * @param new_issuer if changing the asset's issuer, the name or id of the new issuer.
+       * @param broadcast true to broadcast the transaction on the network
+       * @returns the signed transaction updating the asset
+       */
+      signed_transaction update_asset_issuer(string symbol,
+                                             string new_issuer,
+                                             bool broadcast = false);
 
       /** Update the options specific to a BitAsset.
        *
@@ -1127,6 +1162,23 @@ class wallet_api
                                              string symbol,
                                              string amount,
                                              bool broadcast = false);
+
+      /** Claim funds from the fee pool for the given asset.
+       *
+       * User-issued assets can optionally have a pool of the core asset which is 
+       * automatically used to pay transaction fees for any transaction using that
+       * asset (using the asset's core exchange rate).
+       *
+       * This command allows the issuer to withdraw those funds from the fee pool.
+       *
+       * @param symbol the name or id of the asset whose fee pool you wish to claim
+       * @param amount the amount of the core asset to withdraw
+       * @param broadcast true to broadcast the transaction on the network
+       * @returns the signed transaction claiming from the fee pool
+       */
+      signed_transaction claim_asset_fee_pool(string symbol,
+                                              string amount,
+                                              bool broadcast = false);
 
       /** Burns the given user-issued asset.
        *
@@ -1667,12 +1719,14 @@ FC_API( graphene::wallet::wallet_api,
         (create_account_with_brain_key)
         (sell_asset)
         (borrow_asset)
+        (borrow_asset_ext)
         (cancel_order)
         (transfer)
         (transfer2)
         (get_transaction_id)
         (create_asset)
         (update_asset)
+        (update_asset_issuer)
         (update_bitasset)
         (update_asset_feed_producers)
         (publish_asset_feed)
@@ -1680,6 +1734,7 @@ FC_API( graphene::wallet::wallet_api,
         (get_asset)
         (get_bitasset_data)
         (fund_asset_fee_pool)
+        (claim_asset_fee_pool)
         (reserve_asset)
         (global_settle_asset)
         (settle_asset)

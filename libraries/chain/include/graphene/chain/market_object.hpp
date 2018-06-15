@@ -52,7 +52,8 @@ class limit_order_object : public abstract_object<limit_order_object>
       account_id_type  seller;
       share_type       for_sale; ///< asset id is sell_price.base.asset_id
       price            sell_price;
-      share_type       deferred_fee;
+      share_type       deferred_fee; ///< fee converted to CORE
+      asset            deferred_paid_fee; ///< originally paid fee
 
       pair<asset_id_type,asset_id_type> get_market()const
       {
@@ -63,6 +64,8 @@ class limit_order_object : public abstract_object<limit_order_object>
 
       asset amount_for_sale()const   { return asset( for_sale, sell_price.base.asset_id ); }
       asset amount_to_receive()const { return amount_for_sale() * sell_price; }
+      asset_id_type sell_asset_id()const    { return sell_price.base.asset_id;  }
+      asset_id_type receive_asset_id()const { return sell_price.quote.asset_id; }
 };
 
 struct by_id;
@@ -114,12 +117,15 @@ class call_order_object : public abstract_object<call_order_object>
       asset get_debt()const { return asset( debt, debt_type() ); }
       asset amount_to_receive()const { return get_debt(); }
       asset_id_type debt_type()const { return call_price.quote.asset_id; }
+      asset_id_type collateral_type()const { return call_price.base.asset_id; }
       price collateralization()const { return get_collateral() / get_debt(); }
 
       account_id_type  borrower;
       share_type       collateral;  ///< call_price.base.asset_id, access via get_collateral
-      share_type       debt;        ///< call_price.quote.asset_id, access via get_collateral
-      price            call_price;  ///< Debt / Collateral
+      share_type       debt;        ///< call_price.quote.asset_id, access via get_debt
+      price            call_price;  ///< Collateral / Debt
+
+      optional<uint16_t> target_collateral_ratio; ///< maximum CR to maintain when selling collateral on margin call
 
       pair<asset_id_type,asset_id_type> get_market()const
       {
@@ -127,6 +133,9 @@ class call_order_object : public abstract_object<call_order_object>
          if( tmp.first > tmp.second ) std::swap( tmp.first, tmp.second );
          return tmp;
       }
+
+      /// Calculate maximum quantity of debt to cover to satisfy @ref target_collateral_ratio.
+      share_type get_max_debt_to_cover( price match_price, price feed_price, const uint16_t maintenance_collateral_ratio )const;
 };
 
 /**
@@ -251,11 +260,11 @@ typedef generic_index<collateral_bid_object, collateral_bid_object_multi_index_t
 
 FC_REFLECT_DERIVED( graphene::chain::limit_order_object,
                     (graphene::db::object),
-                    (expiration)(seller)(for_sale)(sell_price)(deferred_fee)
+                    (expiration)(seller)(for_sale)(sell_price)(deferred_fee)(deferred_paid_fee)
                   )
 
 FC_REFLECT_DERIVED( graphene::chain::call_order_object, (graphene::db::object),
-                    (borrower)(collateral)(debt)(call_price) )
+                    (borrower)(collateral)(debt)(call_price)(target_collateral_ratio) )
 
 FC_REFLECT_DERIVED( graphene::chain::force_settlement_object,
                     (graphene::db::object),
