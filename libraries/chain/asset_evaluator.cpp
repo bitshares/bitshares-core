@@ -378,12 +378,15 @@ void check_children_of_bitasset(database& d, const asset_update_bitasset_operati
       return;
 
    // loop through all assets that have this asset as a backing asset
-   const auto& idx = d.get_index_type<asset_index>().indices().get<by_type>();
+   const auto& idx = d.get_index_type<graphene::chain::asset_bitasset_data_index>().indices().get<by_short_backing_asset>();
+   auto backed_by_itr = idx.find( new_backing_asset.get_id() );
+   auto backed_end = idx.upper_bound( new_backing_asset.get_id() );
 
-   for( auto itr = idx.lower_bound(true); itr != idx.end(); ++itr )
+   for( ; backed_by_itr != backed_end; ++backed_by_itr )
    {
-      const auto& child = *itr;
-      if ( child.bitasset_data(d).options.short_backing_asset == op.asset_to_update )
+      const auto& bitasset_data = *backed_by_itr;
+      const auto& child = bitasset_data.asset_id(d);
+      if ( bitasset_data.options.short_backing_asset == op.asset_to_update )
       {
          if ( after_hf_922_931 )
          {
