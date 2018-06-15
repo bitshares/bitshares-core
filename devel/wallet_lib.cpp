@@ -1,0 +1,249 @@
+/*
+ * Copyright (c) 2015 Cryptonomex, Inc., and contributors.
+ *
+ * The MIT License
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
+ */
+
+#include <algorithm>
+#include <iomanip>
+#include <iostream>
+#include <iterator>
+
+#include <fc/io/json.hpp>
+#include <fc/io/stdio.hpp>
+#include <fc/network/http/server.hpp>
+#include <fc/network/http/websocket.hpp>
+#include <fc/rpc/http_api.hpp>
+#include <fc/rpc/websocket_api.hpp>
+#include <fc/smart_ref_impl.hpp>
+
+#include <graphene/app/api.hpp>
+#include <graphene/chain/config.hpp>
+#include <graphene/chain/protocol/protocol.hpp>
+#include <graphene/egenesis/egenesis.hpp>
+#include <graphene/utilities/key_conversion.hpp>
+#include <graphene/wallet/wallet.hpp>
+
+#include <fc/interprocess/signals.hpp>
+#include <boost/program_options.hpp>
+
+#include <fc/log/console_appender.hpp>
+#include <fc/log/file_appender.hpp>
+#include <fc/log/logger.hpp>
+#include <fc/log/logger_config.hpp>
+
+#include <graphene/utilities/git_revision.hpp>
+#include <boost/version.hpp>
+#include <boost/algorithm/string/replace.hpp>
+#include <websocketpp/version.hpp>
+
+#ifdef WIN32
+# include <signal.h>
+#else
+# include <csignal>
+#endif
+#include <api_wrapper.hpp>
+#include <wallet_lib.hpp>
+
+using namespace graphene::app;
+using namespace graphene::chain;
+using namespace graphene::utilities;
+using namespace graphene::wallet;
+using namespace std;
+namespace bpo = boost::program_options;
+
+namespace cybex { namespace wallet {
+
+wallet_data wdata;
+fc::http::websocket_client client;
+fc::http::websocket_connection_ptr con;
+fc::path wallet_file;
+
+std::shared_ptr<fc::rpc::websocket_api_connection> apic;
+fc::api< login_api > remote_api;
+std::shared_ptr<wallet_api> wapiptr;
+fc::api< wallet_api> wapi;
+
+std::shared_ptr<cybex::api_wrapper>  api_wrapper;
+
+int init( int argc, char** argv )
+{
+   try {
+
+      boost::program_options::options_description opts;
+         opts.add_options()
+         ("help,h", "Print this help message and exit.")
+         ("server-rpc-endpoint,s", bpo::value<string>()->implicit_value("ws://127.0.0.1:8090"), "Server websocket RPC endpoint")
+         ("server-rpc-user,u", bpo::value<string>(), "Server Username")
+         ("server-rpc-password,p", bpo::value<string>(), "Server Password")
+         ("rpc-endpoint,r", bpo::value<string>()->implicit_value("127.0.0.1:8091"), "Endpoint for wallet websocket RPC to listen on")
+         ("rpc-tls-endpoint,t", bpo::value<string>()->implicit_value("127.0.0.1:8092"), "Endpoint for wallet websocket TLS RPC to listen on")
+         ("rpc-tls-certificate,c", bpo::value<string>()->implicit_value("server.pem"), "PEM certificate for wallet websocket TLS RPC")
+         ("rpc-http-endpoint,H", bpo::value<string>()->implicit_value("127.0.0.1:8093"), "Endpoint for wallet HTTP RPC to listen on")
+         ("daemon,d", "Run the wallet in daemon mode" )
+         ("wallet-file,w", bpo::value<string>()->implicit_value("wallet.json"), "wallet to load")
+         ("chain-id", bpo::value<string>(), "chain ID to connect to")
+         ("version,v", "Display version information");
+
+
+      bpo::variables_map options;
+
+      bpo::store( bpo::parse_command_line(argc, argv, opts), options );
+
+      if( options.count("help") )
+      {
+         std::cout << opts << "\n";
+         return 0;
+      }
+      if( options.count("version") )
+      {
+         std::cout << "Version: " << graphene::utilities::git_revision_description << "\n";
+         std::cout << "SHA: " << graphene::utilities::git_revision_sha << "\n";
+         std::cout << "Timestamp: " << fc::get_approximate_relative_time_string(fc::time_point_sec(graphene::utilities::git_revision_unix_timestamp)) << "\n";
+         std::cout << "Compile time: "  << __DATE__ << " " << __TIME__ << "\n";
+         std::cout << "SSL: " << OPENSSL_VERSION_TEXT << "\n";
+         std::cout << "Boost: " << boost::replace_all_copy(std::string(BOOST_LIB_VERSION), "_", ".") << "\n";
+         std::cout << "Websocket++: " << websocketpp::major_version << "." << websocketpp::minor_version << "." << websocketpp::patch_version << "\n";
+         return 0;
+      }
+
+      fc::path data_dir;
+      fc::logging_config cfg;
+      fc::path log_dir = data_dir / "logs";
+
+      fc::file_appender::config ac;
+      ac.filename             = log_dir / "rpc" / "rpc.log";
+      ac.flush                = true;
+      ac.rotate               = true;
+      ac.rotation_interval    = fc::hours( 1 );
+      ac.rotation_limit       = fc::days( 1 );
+
+      std::cout << "Logging RPC to file: " << (data_dir / ac.filename).preferred_string() << "\n";
+
+      cfg.appenders.push_back(fc::appender_config( "default", "console", fc::variant(fc::console_appender::config(), 20)));
+      cfg.appenders.push_back(fc::appender_config( "rpc", "file", fc::variant(ac, 5)));
+
+      cfg.loggers = { fc::logger_config("default"), fc::logger_config( "rpc") };
+      cfg.loggers.front().level = fc::log_level::info;
+      cfg.loggers.front().appenders = {"default"};
+      cfg.loggers.back().level = fc::log_level::debug;
+      cfg.loggers.back().appenders = {"rpc"};
+
+      fc::ecc::private_key committee_private_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("null_key")));
+
+      idump( (key_to_wif( committee_private_key ) ) );
+
+      fc::ecc::private_key nathan_private_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("nathan")));
+      public_key_type nathan_pub_key = nathan_private_key.get_public_key();
+      idump( (nathan_pub_key) );
+      idump( (key_to_wif( nathan_private_key ) ) );
+
+      //
+      // TODO:  We read wallet_data twice, once in main() to grab the
+      //    socket info, again in wallet_api when we do
+      //    load_wallet_file().  Seems like this could be better
+      //    designed.
+      //
+
+      wallet_file=  options.count("wallet-file") ? options.at("wallet-file").as<string>() : "wallet.json";
+      if( fc::exists( wallet_file ) )
+      {
+         wdata = fc::json::from_file( wallet_file ).as<wallet_data>( GRAPHENE_MAX_NESTED_OBJECTS );
+         if( options.count("chain-id") )
+         {
+            // the --chain-id on the CLI must match the chain ID embedded in the wallet file
+            if( chain_id_type(options.at("chain-id").as<std::string>()) != wdata.chain_id )
+            {
+               std::cout << "Chain ID in wallet file does not match specified chain ID\n";
+               return -1;
+            }
+         }
+      }
+      else
+      {
+         if( options.count("chain-id") )
+         {
+            wdata.chain_id = chain_id_type(options.at("chain-id").as<std::string>());
+            std::cout << "Starting a new wallet with chain ID " << wdata.chain_id.str() << " (from CLI)\n";
+         }
+         else
+         {
+            wdata.chain_id = graphene::egenesis::get_egenesis_chain_id();
+            std::cout << "Starting a new wallet with chain ID " << wdata.chain_id.str() << " (from egenesis)\n";
+         }
+      }
+
+      // but allow CLI to override
+      if( options.count("server-rpc-endpoint") )
+         wdata.ws_server = options.at("server-rpc-endpoint").as<std::string>();
+      if( options.count("server-rpc-user") )
+         wdata.ws_user = options.at("server-rpc-user").as<std::string>();
+      if( options.count("server-rpc-password") )
+         wdata.ws_password = options.at("server-rpc-password").as<std::string>();
+
+      idump((wdata.ws_server));
+      con  = client.connect( wdata.ws_server );
+      apic = std::make_shared<fc::rpc::websocket_api_connection>(*con, GRAPHENE_MAX_NESTED_OBJECTS);
+
+      remote_api = apic->get_remote_api< login_api >(1);
+      edump((wdata.ws_user)(wdata.ws_password) );
+      FC_ASSERT( remote_api->login( wdata.ws_user, wdata.ws_password ), "Failed to log in to API server" );
+
+      wapiptr = std::make_shared<wallet_api>( wdata, remote_api );
+      wapiptr->set_wallet_filename( wallet_file.generic_string() );
+      wapiptr->load_wallet_file();
+
+      wapi=wapiptr;
+      api_wrapper=std::make_shared<cybex::api_wrapper>(GRAPHENE_MAX_NESTED_OBJECTS);
+
+
+      for( auto& name_formatter : wapiptr->get_result_formatters() )
+         api_wrapper->format_result( name_formatter.first, name_formatter.second );
+
+      api_wrapper->register_api(wapi);
+
+      //if wapiptr->is_new(),locked ?
+
+
+
+   }
+   catch ( const fc::exception& e )
+   {
+      std::cout << e.to_detail_string() << "\n";
+      return -1;
+   }
+   return 1;
+}
+
+int exit()
+{
+   wapi->save_wallet_file(wallet_file.generic_string());
+   return 0;
+}
+
+
+
+int exec(const std::string & line,std::string & result)
+{
+   return api_wrapper->exec(line,result);
+}
+
+}}
