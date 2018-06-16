@@ -388,3 +388,130 @@ BOOST_AUTO_TEST_CASE( cli_set_voting_proxy )
    }
    app1->shutdown();
 }
+
+///////////////////////
+// Create a multi-sig account and verify that only when all signatures are
+// signed, the transaction could be broadcast
+///////////////////////
+BOOST_AUTO_TEST_CASE( cli_multisig_transaction )
+{
+   using namespace graphene::chain;
+   using namespace graphene::app;
+   std::shared_ptr<graphene::app::application> app1;
+   try {
+      fc::temp_directory app_dir( graphene::utilities::temp_directory_path() );
+
+      int server_port_number = 0;
+      app1 = start_application(app_dir, server_port_number);
+
+      // connect to the server
+      client_connection con(app1, app_dir, server_port_number);
+
+      BOOST_TEST_MESSAGE("Setting wallet password");
+      con.wallet_api_ptr->set_password("supersecret");
+      con.wallet_api_ptr->unlock("supersecret");
+
+      // import Nathan account
+      BOOST_TEST_MESSAGE("Importing nathan key");
+      std::vector<std::string> nathan_keys{"5KQwrPbwdL6PhXujxW37FSSQZ1JiwsST4cqQzDeyXtP79zkvFD3"};
+      BOOST_CHECK_EQUAL(nathan_keys[0], "5KQwrPbwdL6PhXujxW37FSSQZ1JiwsST4cqQzDeyXtP79zkvFD3");
+      BOOST_CHECK(con.wallet_api_ptr->import_key("nathan", nathan_keys[0]));
+
+      BOOST_TEST_MESSAGE("Importing nathan's balance");
+      std::vector<signed_transaction> import_txs = con.wallet_api_ptr->import_balance("nathan", nathan_keys, true);
+      account_object nathan_acct_before_upgrade = con.wallet_api_ptr->get_account("nathan");
+
+      // upgrade nathan
+      BOOST_TEST_MESSAGE("Upgrading Nathan to LTM");
+      signed_transaction upgrade_tx = con.wallet_api_ptr->upgrade_account("nathan", true);
+      account_object nathan_acct_after_upgrade = con.wallet_api_ptr->get_account("nathan");
+
+      // verify that the upgrade was successful
+      BOOST_CHECK_PREDICATE( std::not_equal_to<uint32_t>(), (nathan_acct_before_upgrade.membership_expiration_date.sec_since_epoch())(nathan_acct_after_upgrade.membership_expiration_date.sec_since_epoch()) );
+      BOOST_CHECK(nathan_acct_after_upgrade.is_lifetime_member());
+
+      // create a new multisig account
+      graphene::wallet::brain_key_info bki1 = con.wallet_api_ptr->suggest_brain_key();
+      graphene::wallet::brain_key_info bki2 = con.wallet_api_ptr->suggest_brain_key();
+      graphene::wallet::brain_key_info bki3 = con.wallet_api_ptr->suggest_brain_key();
+      graphene::wallet::brain_key_info bki4 = con.wallet_api_ptr->suggest_brain_key();
+      BOOST_CHECK(!bki1.brain_priv_key.empty());
+      BOOST_CHECK(!bki2.brain_priv_key.empty());
+      BOOST_CHECK(!bki3.brain_priv_key.empty());
+      BOOST_CHECK(!bki4.brain_priv_key.empty());
+
+      signed_transaction create_multisig_acct_tx;
+      account_create_operation account_create_op;
+
+      account_create_op.referrer = nathan_acct_after_upgrade.id;
+      account_create_op.referrer_percent = nathan_acct_after_upgrade.referrer_rewards_percentage;
+      account_create_op.registrar = nathan_acct_after_upgrade.id;
+      account_create_op.name = "cifer.test";
+      account_create_op.owner = authority(1, bki1.pub_key, 1);
+      account_create_op.active = authority(2, bki2.pub_key, 1, bki3.pub_key, 1);
+      account_create_op.options.memo_key = bki4.pub_key;
+      account_create_op.fee = asset(1000000);  // should be enough for creating account
+
+      create_multisig_acct_tx.operations.push_back(account_create_op);
+      con.wallet_api_ptr->sign_transaction(create_multisig_acct_tx, true);
+
+      // save the private key for this new account in the wallet file
+      BOOST_CHECK(con.wallet_api_ptr->import_key("cifer.test", bki2.wif_priv_key));
+      con.wallet_api_ptr->save_wallet_file(con.wallet_filename);
+
+      // attempt to give cifer.test some bitsahres
+      BOOST_TEST_MESSAGE("Transferring bitshares from Nathan to cifer.test");
+      signed_transaction transfer_tx1 = con.wallet_api_ptr->transfer("nathan", "cifer.test", "10000", "1.3.0", "Here are some BTS for your new account", true);
+
+      // transfer bts from cifer.test to nathan
+      BOOST_TEST_MESSAGE("Transferring bitshares from cifer.test to nathan");
+      auto dyn_props = app1->chain_database()->get_dynamic_global_properties();
+      account_object cifer_test = con.wallet_api_ptr->get_account("cifer.test");
+
+      // construct a transfer transaction
+      signed_transaction transfer_tx2;
+      transfer_operation xfer_op;
+      xfer_op.from = cifer_test.id;
+      xfer_op.to = nathan_acct_after_upgrade.id;
+      xfer_op.amount = asset(100000000);
+      xfer_op.fee = asset(3000000);  // should be enough for transfer
+      transfer_tx2.operations.push_back(xfer_op);
+      transfer_tx2.set_reference_block(dyn_props.head_block_id);
+      transfer_tx2.set_expiration(dyn_props.time + fc::seconds(30));
+
+      // case1: broadcast without signature
+      // expect: exception with missing active authority
+      BOOST_CHECK_THROW(con.wallet_api_ptr->broadcast_transaction(transfer_tx2), fc::exception);
+
+      // case2: sign with invalid private key
+      // expect: exception with invaid private key
+      BOOST_CHECK_THROW(con.wallet_api_ptr->multisig_sign_transaction(transfer_tx2, {"invalid private key"}), fc::exception);
+
+      // case3: broadcast with partial signatures
+      // expect: exception with missing active authority
+      transfer_tx2 = con.wallet_api_ptr->multisig_sign_transaction(transfer_tx2, {bki2.wif_priv_key});
+      BOOST_CHECK_THROW(con.wallet_api_ptr->broadcast_transaction(transfer_tx2), fc::exception);
+
+      // case4: sign with duplicated private key
+      // expect: num of signatures not increase
+      transfer_tx2 = con.wallet_api_ptr->multisig_sign_transaction(transfer_tx2, {bki2.wif_priv_key});
+      BOOST_CHECK_EQUAL(transfer_tx2.signatures.size(), 1);
+
+      // case5: broadcast without full signatures
+      // expect: transaction broadcast successfully
+      con.wallet_api_ptr->multisig_sign_transaction(transfer_tx2, {bki3.wif_priv_key}, true);
+      auto balances = con.wallet_api_ptr->list_account_balances( "cifer.test" );
+      for (auto b : balances) {
+         if (b.asset_id == asset_id_type()) {
+            BOOST_ASSERT(b == asset(900000000 - 3000000));
+         }
+      }
+
+      // wait for everything to finish up
+      fc::usleep(fc::seconds(1));
+   } catch( fc::exception& e ) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+   app1->shutdown();
+}

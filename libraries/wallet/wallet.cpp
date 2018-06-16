@@ -765,12 +765,6 @@ public:
    {
       vector<fc::ecc::private_key> private_keys;
 
-      if ( !tx.ref_block_num || !tx.ref_block_prefix || tx.expiration == fc::time_point_sec() )
-      {
-         elog( "Must fill TaPoS and expiration field in an online machine" );
-         FC_THROW("");
-      }
-
       for ( const string &wif_key : wif_keys )
       {
          fc::optional<fc::ecc::private_key> optional_private_key = wif_to_key( wif_key );
@@ -968,7 +962,6 @@ public:
       _builder_transactions.erase(handle);
    }
 
-
    signed_transaction register_account(string name,
                                        public_key_type owner,
                                        public_key_type active,
@@ -1037,7 +1030,6 @@ public:
       return tx;
    } FC_CAPTURE_AND_RETHROW( (name)(owner)(active)(registrar_account)(referrer_account)(referrer_percent)(broadcast) ) }
 
-
    signed_transaction upgrade_account(string name, bool broadcast)
    { try {
       FC_ASSERT( !self.is_locked() );
@@ -1054,7 +1046,6 @@ public:
 
       return sign_transaction( tx, broadcast );
    } FC_CAPTURE_AND_RETHROW( (name) ) }
-
 
    // This function generates derived keys starting with index 0 and keeps incrementing
    // the index until it finds a key that isn't registered in the block chain.  To be
