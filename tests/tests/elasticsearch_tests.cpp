@@ -26,15 +26,14 @@
 #include <graphene/app/api.hpp>
 #include <graphene/utilities/tempdir.hpp>
 #include <fc/crypto/digest.hpp>
+#include <fc/io/json.hpp>
 #include "../common/database_fixture.hpp"
-#include "../common/json.hpp"
 
 #include <graphene/utilities/elasticsearch.hpp>
 
 using namespace graphene::chain;
 using namespace graphene::chain::test;
 using namespace graphene::app;
-using json = nlohmann::json;
 BOOST_FIXTURE_TEST_SUITE( elasticsearch_tests, database_fixture )
 
 BOOST_AUTO_TEST_CASE(es1) {
@@ -59,15 +58,15 @@ BOOST_AUTO_TEST_CASE(es1) {
       CURL *curl; // curl handler
       curl = curl_easy_init();
       auto res = graphene::utilities::simpleQuery(curl, "http://localhost:9200/", "graphene-*/data/_count", query);
-      auto j = json::parse(res);
+      variant j = fc::json::from_string(res);
 
-      auto total = j["_shards"]["total"].dump();
+      auto total = j["_shards"]["total"].as_string();
       BOOST_CHECK_EQUAL(total, "5");
 
       res = graphene::utilities::simpleQuery(curl, "http://localhost:9200/", "graphene-*/data/_search", query);
-      j = json::parse(res);
+      j = fc::json::from_string(res);
 
-      auto first_id = j["hits"]["hits"][0]["_id"].get<std::string>() ;
+      auto first_id = j["hits"]["hits"][size_t(0)]["_id"].as_string() ;
       BOOST_CHECK_EQUAL(first_id, "2.9.1"); // this should be 0? are they inserted in the right order?
 
    }
