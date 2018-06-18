@@ -145,7 +145,7 @@ asset asset_object::amount_from_string(string amount_string) const
    return amount(satoshis);
    } FC_CAPTURE_AND_RETHROW( (amount_string) ) }
 
-string asset_object::amount_to_string(share_type amount) const
+string asset_object::amount_to_string(const share_type& amount) const
 {
    share_type scaled_precision = asset::scaled_precision( precision );
 
