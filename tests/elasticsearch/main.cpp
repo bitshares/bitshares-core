@@ -22,8 +22,6 @@
  * THE SOFTWARE.
  */
 
-//#include <boost/test/unit_test.hpp>
-//#include <boost/test/auto_unit_test.hpp>
 #include <graphene/app/api.hpp>
 #include <graphene/utilities/tempdir.hpp>
 #include <fc/crypto/digest.hpp>
