@@ -9,13 +9,11 @@ ULF Core
 * [FAQ](#faq)
 * [License](#license)
 
-ULF-CORE Core is the ULF blockchain implementation and command-line interface.
+ULF-CORE is the ULF blockchain implementation and command-line interface.
 The web wallet is [ULF-Web](https://github.com/UL-F/ULF-Web).
 
 Visit [ulurs.com](https://ulurs.com/) to learn about ULF and join the community.
 
-**NOTE:** The official ULF git repository location, default branch, and submodule remotes were recently changed. Existing
-repositories can be updated with the following steps:
 
     git remote set-url origin https://github.com/UL-F/ULF-URS.git
     git checkout master
