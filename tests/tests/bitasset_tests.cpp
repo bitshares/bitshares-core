@@ -845,7 +845,7 @@ BOOST_AUTO_TEST_CASE( bitasset_evaluator_test_after_922_931 )
    op.asset_to_update = asset_objs.bit_parent;
    op.issuer = asset_objs.bit_parent(db).issuer;
    op.new_options.short_backing_asset = asset_objs.bit_usdbacked;
-   REQUIRE_EXCEPTION_WITH_TEXT( evaluator.evaluate(op), "cannot be backed by a BitAsset that itself is backed by a BitAsset." );
+   REQUIRE_EXCEPTION_WITH_TEXT( evaluator.evaluate(op), "A non-blockchain controlled BitAsset would be invalidated" );
    // changing the backing asset to a UIA should work
    BOOST_TEST_MESSAGE( "Switching to a backing asset that is a UIA should work." );
    op.new_options.short_backing_asset = asset_objs.user_issued;
