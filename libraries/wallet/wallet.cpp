@@ -784,7 +784,7 @@ public:
          const vector<signature_type> &sigs = tx.signatures;
          if ( std::find( sigs.begin(), sigs.end(), sig ) != sigs.end() )
          {
-            wlog( "signature of ${fn} had already exist, skipping", ( "fn", key_to_wif( privkey ) ) );
+            wlog( "signature of ${fn} already exist, skipping", ( "fn", public_key_type( privkey.get_public_key() ) ) );
          }
          else
          {

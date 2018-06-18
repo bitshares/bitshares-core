@@ -1599,6 +1599,18 @@ class wallet_api
          
       order_book get_order_book( const string& base, const string& quote, unsigned limit = 50);
 
+      /** Signs a transaction.
+       *
+       * Given a fully-formed transaction with or without signatures, this signs
+       * the transaction with the provided keys and optionally broadcasts the
+       * transaction
+       *
+       * @param tx the unsigned transaction
+       * @param wif_keys private keys to be used to sign the transaction
+       * @param broadcast true if you wish to broadcast the transaction
+       *
+       * @return the signed version of the transaction
+       */
       signed_transaction multisig_sign_transaction( signed_transaction tx,
                                                     const vector<string> &wif_keys,
                                                     bool broadcast = false );
