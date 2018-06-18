@@ -426,6 +426,12 @@ namespace graphene { namespace app {
 
          /// @brief Called to enable an API, not reflected.
          void enable_api( const string& api_name );
+
+         /***
+          * @brief retrieve server information
+          */
+         fc::mutable_variant_object get_server_information();
+
       private:
 
          application& _app;
@@ -513,4 +519,5 @@ FC_API(graphene::app::login_api,
        (asset)
        (orders)
        (debug)
+       (get_server_information)
      )

@@ -29,6 +29,7 @@
 #include <graphene/app/impacted.hpp>
 #include <graphene/chain/database.hpp>
 #include <graphene/chain/get_config.hpp>
+#include <graphene/chain/config.hpp>
 #include <graphene/utilities/key_conversion.hpp>
 #include <graphene/chain/protocol/fee_schedule.hpp>
 #include <graphene/chain/confidential_object.hpp>
@@ -282,6 +283,11 @@ namespace graphene { namespace app {
     {
        FC_ASSERT(_debug_api);
        return *_debug_api;
+    }
+
+    fc::mutable_variant_object login_api::get_server_information()
+    {
+       return this->_app.get_server_information();
     }
 
     vector<order_history_object> history_api::get_fill_order_history( asset_id_type a, asset_id_type b, uint32_t limit  )const
