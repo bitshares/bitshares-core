@@ -56,21 +56,19 @@ BOOST_AUTO_TEST_CASE( asset_to_from_string )
    {
       negative_results[i] = "-" + positive_results[i];
    }
-   graphene::chain::share_type amt_result[19];
-   amt_result[0] = 12345;
-   graphene::chain::asset_object obj1;
+   graphene::chain::asset_object test_obj;
    graphene::chain::share_type amt12345 = 12345;
    BOOST_TEST_MESSAGE( "Testing positive numbers" );
    for (int i = 0; i < 19; i++)
    {
-      obj1.precision = i;
-      BOOST_CHECK_EQUAL(positive_results[i], obj1.amount_to_string(amt12345));
+      test_obj.precision = i;
+      BOOST_CHECK_EQUAL(positive_results[i], test_obj.amount_to_string(amt12345));
    }
    BOOST_TEST_MESSAGE( "Testing negative numbers" );
    for (int i = 0; i < 19; i++)
    {
-      obj1.precision = i;
-      BOOST_CHECK_EQUAL(negative_results[i], obj1.amount_to_string(amt12345 * -1));
+      test_obj.precision = i;
+      BOOST_CHECK_EQUAL(negative_results[i], test_obj.amount_to_string(amt12345 * -1));
    }
 }
 
