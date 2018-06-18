@@ -943,6 +943,8 @@ void application::set_program_options(boost::program_options::options_descriptio
          ("api-access", bpo::value<boost::filesystem::path>(), "JSON file specifying API permissions")
          ("plugins", bpo::value<string>(), "Space-separated list of plugins to activate")
          ("io-threads", bpo::value<uint16_t>()->implicit_value(0), "Number of IO threads, default to 0 for auto-configuration")
+         ("share-version-info", bpo::value<bool>()->implicit_value(false), "Share version information with API clients")
+         ("share-plugin-info", bpo::value<bool>()->implicit_value(false), "Share plugin information with API clients")
          // TODO uncomment this when GUI is ready
          //("enable-subscribe-to-all", bpo::value<bool>()->implicit_value(false),
          // "Whether allow API clients to subscribe to universal object creation and removal events")
@@ -1100,8 +1102,10 @@ std::vector<std::string> graphene::app::application::get_active_plugin_names()
 fc::mutable_variant_object graphene::app::application::get_server_information()
 {
    fc::mutable_variant_object ret_val;
+   const boost::program_options::variables_map& options = *(my->_options);
+
    // check parameters to see what we should return
-   if ( my->_options->count("share-plugin-info") )
+   if ( options.count("share-plugin-info") && options["share-plugin-info"].as<bool>() )
    {
       // get plugins and version
       std::vector<std::string> plugin_names = get_active_plugin_names();
@@ -1132,7 +1136,7 @@ fc::mutable_variant_object graphene::app::application::get_server_information()
       }
     }
 
-   if ( my->_options->count( "share-version-info" ) )
+   if ( options.count( "share-version-info" ) && options["share-version-info"].as<bool>() )
    {
       ret_val["server_version"] = graphene::utilities::git_revision_description;
       ret_val["server_sha_version"] = graphene::utilities::git_revision_sha;

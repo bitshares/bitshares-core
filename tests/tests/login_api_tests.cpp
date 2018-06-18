@@ -66,6 +66,36 @@ BOOST_AUTO_TEST_CASE(get_parameters_default) {
 
 }
 
+BOOST_AUTO_TEST_CASE(get_parameters_false) {
+
+   BOOST_TEST_MESSAGE( "get_parameters_false" );
+
+   fc::temp_directory app_dir( graphene::utilities::temp_directory_path() );
+
+   graphene::app::application app1;
+   app1.register_plugin< graphene::account_history::account_history_plugin>();
+   app1.register_plugin< graphene::market_history::market_history_plugin >();
+   app1.register_plugin< graphene::witness_plugin::witness_plugin >();
+   app1.register_plugin< graphene::grouped_orders::grouped_orders_plugin>();
+   app1.startup_plugins();
+   boost::program_options::variables_map cfg;
+   cfg.emplace("p2p-endpoint", boost::program_options::variable_value(std::string("127.0.0.1:3939"), false));
+   cfg.emplace("genesis-json", boost::program_options::variable_value(create_genesis_file(app_dir), false));
+   cfg.emplace("seed-nodes", boost::program_options::variable_value(std::string("[]"), false));
+   cfg.emplace("share-plugin-info", boost::program_options::variable_value(false, false));
+   cfg.emplace("share-version-info", boost::program_options::variable_value(false, false));
+   app1.initialize(app_dir.path(), cfg);
+   BOOST_TEST_MESSAGE( "Starting app and waiting 500 ms" );
+   app1.startup();
+   fc::usleep(fc::milliseconds(500));
+
+   graphene::app::login_api login_api(app1);
+
+   fc::mutable_variant_object server_info = login_api.get_server_information();
+   BOOST_CHECK( server_info.size() == 0ul );
+
+}
+
 BOOST_AUTO_TEST_CASE(get_parameters_basic) {
 
    BOOST_TEST_MESSAGE( "get_parameters_basic" );
@@ -82,7 +112,7 @@ BOOST_AUTO_TEST_CASE(get_parameters_basic) {
    cfg.emplace("p2p-endpoint", boost::program_options::variable_value(std::string("127.0.0.1:3939"), false));
    cfg.emplace("genesis-json", boost::program_options::variable_value(create_genesis_file(app_dir), false));
    cfg.emplace("seed-nodes", boost::program_options::variable_value(std::string("[]"), false));
-   cfg.emplace("share-version-info", boost::program_options::variable_value(std::string("true"), false));
+   cfg.emplace("share-version-info", boost::program_options::variable_value(true, false));
    app1.initialize(app_dir.path(), cfg);
    BOOST_TEST_MESSAGE( "Starting app and waiting 500 ms" );
    app1.startup();
@@ -113,7 +143,7 @@ BOOST_AUTO_TEST_CASE(get_parameters_plugins) {
    cfg.emplace("p2p-endpoint", boost::program_options::variable_value(std::string("127.0.0.1:3939"), false));
    cfg.emplace("genesis-json", boost::program_options::variable_value(create_genesis_file(app_dir), false));
    cfg.emplace("seed-nodes", boost::program_options::variable_value(std::string("[]"), false));
-   cfg.emplace("share-plugin-info", boost::program_options::variable_value(std::string("true"), false));
+   cfg.emplace("share-plugin-info", boost::program_options::variable_value(true, false));
    app1.initialize(app_dir.path(), cfg);
    BOOST_TEST_MESSAGE( "Starting app and waiting 500 ms" );
    app1.startup();
@@ -144,8 +174,8 @@ BOOST_AUTO_TEST_CASE(get_parameters_all) {
    cfg.emplace("p2p-endpoint", boost::program_options::variable_value(std::string("127.0.0.1:3939"), false));
    cfg.emplace("genesis-json", boost::program_options::variable_value(create_genesis_file(app_dir), false));
    cfg.emplace("seed-nodes", boost::program_options::variable_value(std::string("[]"), false));
-   cfg.emplace("share-plugin-info", boost::program_options::variable_value(std::string("true"), false));
-   cfg.emplace("share-version-info", boost::program_options::variable_value(std::string("true"), false));
+   cfg.emplace("share-plugin-info", boost::program_options::variable_value(true, false));
+   cfg.emplace("share-version-info", boost::program_options::variable_value(true, false));
    app1.initialize(app_dir.path(), cfg);
    BOOST_TEST_MESSAGE( "Starting app and waiting 500 ms" );
    app1.startup();
