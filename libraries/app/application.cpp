@@ -167,13 +167,13 @@ void application_impl::reset_p2p_node(const fc::path& data_dir)
       // https://ulurs.com
       vector<string> seeds = {
          "104.236.144.84:1777",               // puppies      (USA)
-         "ulf-nam.seed.ulurs.com:2023",
-         "ulf-sam.seed.ulurs.com:2023",
-         "ulf-as.seed.ulurs.com:2023",
-         "ulf-au.seed.ulurs.com:2023",
-         "ulf-eu.seed.ulurs.com:2023",
-         "ulf-af.seed.ulurs.com:2023",
-         "ulf.seed.ulurs.com:2023"
+         "ulf-nam-seed.ulurs.com:2023",
+         "ulf-sam-seed.ulurs.com:2023",
+         "ulf-as-seed.ulurs.com:2023",
+         "ulf-au-seed.ulurs.com:2023",
+         "ulf-eu-seed.ulurs.com:2023",
+         "ulf-af-seed.ulurs.com:2023",
+         "ulf-seed.ulurs.com:2023"
       };
       for( const string& endpoint_string : seeds )
       {
