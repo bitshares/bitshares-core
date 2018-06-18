@@ -369,6 +369,11 @@ void elasticsearch_plugin::plugin_set_program_options(
    cfg.add(cli);
 }
 
+boost::program_options::variables_map elasticsearch_plugin::plugin_get_options() {
+	boost::program_options::variables_map map;
+	return map;
+}
+
 void elasticsearch_plugin::plugin_initialize(const boost::program_options::variables_map& options)
 {
    database().applied_block.connect( [&]( const signed_block& b){ my->update_account_histories(b); } );

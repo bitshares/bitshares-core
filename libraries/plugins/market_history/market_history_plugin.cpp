@@ -444,6 +444,14 @@ void market_history_plugin::plugin_initialize(const boost::program_options::vari
       my->_max_order_his_seconds_per_market = options["max-order-his-seconds-per-market"].as<uint32_t>();
 } FC_CAPTURE_AND_RETHROW() }
 
+boost::program_options::variables_map market_history_plugin::plugin_get_options() {
+	boost::program_options::variables_map map;
+	map.emplace("bucket-size", boost::program_options::variable_value(std::to_string(my->_tracked_buckets.size()), false));
+	map.emplace("max_order_history_records_per_market", boost::program_options::variable_value(std::to_string(my->_max_order_his_records_per_market), false));
+	map.emplace("max_order_history_seconds_per_market", boost::program_options::variable_value(std::to_string(my->_max_order_his_seconds_per_market), false));
+	return map;
+}
+
 void market_history_plugin::plugin_startup()
 {
 }

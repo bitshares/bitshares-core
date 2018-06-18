@@ -71,6 +71,7 @@ public:
    virtual void plugin_initialize( const boost::program_options::variables_map& options ) override;
    virtual void plugin_startup() override;
    virtual void plugin_shutdown() override;
+   virtual boost::program_options::variables_map plugin_get_options() override;
 
 private:
    void schedule_production_loop();

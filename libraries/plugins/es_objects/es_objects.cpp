@@ -332,6 +332,12 @@ std::string es_objects_plugin::plugin_description()const
    return "Stores blockchain objects in ES database. Experimental.";
 }
 
+boost::program_options::variables_map es_objects_plugin::plugin_get_options()
+{
+   boost::program_options::variables_map map;
+   return map;
+}
+
 void es_objects_plugin::plugin_set_program_options(
    boost::program_options::options_description& cli,
    boost::program_options::options_description& cfg

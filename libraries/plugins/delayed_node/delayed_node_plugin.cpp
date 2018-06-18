@@ -63,6 +63,11 @@ void delayed_node_plugin::plugin_set_program_options(bpo::options_description& c
    cfg.add(cli);
 }
 
+boost::program_options::variables_map delayed_node_plugin::plugin_get_options() {
+	boost::program_options::variables_map map;
+	return map;
+}
+
 void delayed_node_plugin::connect()
 {
    my->client_connection = std::make_shared<fc::rpc::websocket_api_connection>(*my->client.connect(my->remote_endpoint), GRAPHENE_NET_MAX_NESTED_OBJECTS);

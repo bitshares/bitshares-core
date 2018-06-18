@@ -47,6 +47,7 @@ class es_objects_plugin : public graphene::app::plugin
       virtual void plugin_set_program_options(
          boost::program_options::options_description& cli,
          boost::program_options::options_description& cfg) override;
+      virtual boost::program_options::variables_map plugin_get_options() override;
       virtual void plugin_initialize(const boost::program_options::variables_map& options) override;
       virtual void plugin_startup() override;
 

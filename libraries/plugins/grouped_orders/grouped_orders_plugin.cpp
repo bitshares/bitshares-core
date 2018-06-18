@@ -267,6 +267,12 @@ void grouped_orders_plugin::plugin_set_program_options(
    cfg.add(cli);
 }
 
+boost::program_options::variables_map grouped_orders_plugin::plugin_get_options()
+{
+   boost::program_options::variables_map map;
+   return map;
+}
+
 void grouped_orders_plugin::plugin_initialize(const boost::program_options::variables_map& options)
 { try {
 

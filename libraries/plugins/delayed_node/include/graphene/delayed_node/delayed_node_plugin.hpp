@@ -40,6 +40,7 @@ public:
                                            boost::program_options::options_description& cfg) override;
    virtual void plugin_initialize(const boost::program_options::variables_map& options) override;
    virtual void plugin_startup() override;
+   virtual boost::program_options::variables_map plugin_get_options() override;
    void mainloop();
 
 protected:

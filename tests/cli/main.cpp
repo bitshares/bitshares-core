@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 John Jones, and contributors.
+ * Copyright (c) 2018 Bitshares Foundation, and contributors.
  *
  * The MIT License
  *

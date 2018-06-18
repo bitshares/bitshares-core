@@ -88,6 +88,14 @@ class abstract_plugin
          boost::program_options::options_description& command_line_options,
          boost::program_options::options_description& config_file_options
          ) = 0;
+
+      /***
+       * @brief Retrieve the options used by the plugin
+       *
+       * This method returns a selection of options used by this plugin, and its current value
+       */
+      virtual boost::program_options::variables_map plugin_get_options() = 0;
+
 };
 
 /**

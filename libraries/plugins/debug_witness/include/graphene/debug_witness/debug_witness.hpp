@@ -50,6 +50,8 @@ public:
    void set_json_object_stream( const std::string& filename );
    void flush_json_object_stream();
 
+   boost::program_options::variables_map plugin_get_options() override;
+
 private:
 
    void on_changed_objects( const std::vector<graphene::db::object_id_type>& ids, const fc::flat_set<graphene::chain::account_id_type>& impacted_accounts );

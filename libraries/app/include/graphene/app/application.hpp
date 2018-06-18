@@ -97,6 +97,9 @@ namespace graphene { namespace app {
          /// Emitted when syncing finishes (is_finished_syncing will return true)
          boost::signals2::signal<void()> syncing_finished;
 
+         /// @brief get a vector of plugin names that are currently active
+         std::vector<std::string> get_active_plugin_names();
+
          const application_options& get_options();
 
       private:
