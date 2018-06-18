@@ -145,12 +145,19 @@ asset asset_object::amount_from_string(string amount_string) const
    return amount(satoshis);
    } FC_CAPTURE_AND_RETHROW( (amount_string) ) }
 
-string asset_object::amount_to_string(share_type amount) const
+string asset_object::amount_to_string(const share_type& amount) const
 {
    share_type scaled_precision = asset::scaled_precision( precision );
 
-   string result = fc::to_string(amount.value / scaled_precision.value);
-   auto decimals = amount.value % scaled_precision.value;
+   share_type amt_copy = amount;
+   string result = "";
+   if ( amount.value < 0 )
+   {
+      amt_copy = amount * -1;
+      result = "-";
+   }
+   result += fc::to_string(amt_copy.value / scaled_precision.value);
+   auto decimals = amt_copy.value % scaled_precision.value;
    if( decimals )
       result += "." + fc::to_string(scaled_precision.value + decimals).erase(0,1);
    return result;

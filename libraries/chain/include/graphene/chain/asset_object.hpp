@@ -103,7 +103,7 @@ namespace graphene { namespace chain {
          /// The string may have a decimal and/or a negative sign.
          asset amount_from_string(string amount_string)const;
          /// Convert an asset to a textual representation, i.e. "123.45"
-         string amount_to_string(share_type amount)const;
+         string amount_to_string(const share_type& amount)const;
          /// Convert an asset to a textual representation, i.e. "123.45"
          string amount_to_string(const asset& amount)const
          { FC_ASSERT(amount.asset_id == id); return amount_to_string(amount.amount); }
