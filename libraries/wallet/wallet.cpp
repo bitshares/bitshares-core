@@ -778,13 +778,13 @@ public:
          private_keys.push_back( *optional_private_key );
       }
 
+      const flat_set<public_key_type> &sig_keys = tx.get_signature_keys( _chain_id );
       for ( const fc::ecc::private_key &privkey : private_keys )
       {
-         signature_type sig = privkey.sign_compact( tx.sig_digest( _chain_id ) );
-         const vector<signature_type> &sigs = tx.signatures;
-         if ( std::find( sigs.begin(), sigs.end(), sig ) != sigs.end() )
+         public_key_type pubkey = privkey.get_public_key();
+         if ( std::find( sig_keys.begin(), sig_keys.end(), pubkey ) != sig_keys.end() )
          {
-            wlog( "signature of ${fn} already exist, skipping", ( "fn", public_key_type( privkey.get_public_key() ) ) );
+            wlog( "signature of ${fn} already exist, skipping", ( "fn", pubkey ) );
          }
          else
          {
