@@ -150,8 +150,12 @@ string asset_object::amount_to_string(share_type amount) const
    share_type scaled_precision = asset::scaled_precision( precision );
 
    string result = fc::to_string(amount.value / scaled_precision.value);
-   auto decimals = amount.value % scaled_precision.value;
+   auto decimals = abs( amount.value % scaled_precision.value );
    if( decimals )
+   {
+      if( amount < 0 && result == "0" )
+         result = "-0";
       result += "." + fc::to_string(scaled_precision.value + decimals).erase(0,1);
+   }
    return result;
 }
