@@ -1,4 +1,4 @@
-ULF Core
+ULF-CLI
 ==============
 
 
@@ -9,13 +9,13 @@ ULF Core
 * [FAQ](#faq)
 * [License](#license)
 
-ULF-CORE is the ULF blockchain implementation and command-line interface.
+ULF-CLI is the ULF blockchain implementation and command-line interface.
 The web wallet is [ULF-Web](https://github.com/UL-F/ULF-Web).
 
 Visit [ulurs.com](https://ulurs.com/) to learn about ULF and join the community.
 
 
-    git remote set-url origin https://github.com/UL-F/ULF-URS.git
+    git remote set-url origin https://github.com/UL-F/ULF-CLI.git
     git checkout master
     git remote set-head origin --auto
     git pull
@@ -25,7 +25,7 @@ Visit [ulurs.com](https://ulurs.com/) to learn about ULF and join the community.
 Getting Started
 ---------------
 Build instructions and additional documentation are available in the
-[wiki](https://github.com/UL-F/ULF-URS/wiki).
+[wiki](https://github.com/UL-F/ULF-CLI/wiki).
 
 We recommend building on Ubuntu 16.04 LTS, and the build dependencies may be installed with:
 
@@ -34,7 +34,7 @@ We recommend building on Ubuntu 16.04 LTS, and the build dependencies may be ins
 
 To build after all dependencies are installed:
 
-    git clone https://github.com/UL-F/ULF-URS.git
+    git clone https://github.com/UL-F/ULF-CLI.git
     cd bitshares-core
     git checkout <LATEST_RELEASE_TAG>
     git submodule update --init --recursive
@@ -82,7 +82,7 @@ Support
 -------
 Technical support is available in the [ULF technical support subforum](https://ulurs.com).
 
-ULF Core bugs can be reported directly to the [issue tracker](https://github.com/UL-F/ULF-URS/issues).
+ULF Core bugs can be reported directly to the [issue tracker](https://github.com/UL-F/ULF-CLI/issues).
 
 ULF UI bugs should be reported to the [UI issue tracker](https://github.com/UL-F/ULF-UI/issues)
 
