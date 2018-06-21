@@ -388,3 +388,193 @@ BOOST_AUTO_TEST_CASE( cli_set_voting_proxy )
    }
    app1->shutdown();
 }
+BOOST_AUTO_TEST_CASE( update_authorities )
+{
+   using namespace graphene::chain;
+   using namespace graphene::app;
+   std::shared_ptr<graphene::app::application> app1;
+   try {
+
+      fc::temp_directory app_dir( graphene::utilities::temp_directory_path() );
+
+      int server_port_number;
+      app1 = start_application(app_dir, server_port_number);
+
+      // connect to the server
+      client_connection con(app1, app_dir, server_port_number);
+
+      // Setting wallet password
+      con.wallet_api_ptr->set_password("supersecret");
+      con.wallet_api_ptr->unlock("supersecret");
+
+      //// Todo: put account creation and funding in separated test case an INVOKE or in function, pass con as param
+
+      // import Nathan account
+      std::vector<std::string> nathan_keys{"5KQwrPbwdL6PhXujxW37FSSQZ1JiwsST4cqQzDeyXtP79zkvFD3"};
+      BOOST_CHECK_EQUAL(nathan_keys[0], "5KQwrPbwdL6PhXujxW37FSSQZ1JiwsST4cqQzDeyXtP79zkvFD3");
+      BOOST_CHECK(con.wallet_api_ptr->import_key("nathan", nathan_keys[0]));
+
+      // import Nathan balance
+      std::vector<signed_transaction> import_txs = con.wallet_api_ptr->import_balance("nathan", nathan_keys, true);
+      account_object nathan_acct_before_upgrade = con.wallet_api_ptr->get_account("nathan");
+
+      // upgrade nathan
+      signed_transaction upgrade_tx = con.wallet_api_ptr->upgrade_account("nathan", true);
+      account_object nathan_acct_after_upgrade = con.wallet_api_ptr->get_account("nathan");
+
+      // verify that the upgrade was successful
+      BOOST_CHECK_PREDICATE( std::not_equal_to<uint32_t>(), (nathan_acct_before_upgrade.membership_expiration_date.sec_since_epoch())(nathan_acct_after_upgrade.membership_expiration_date.sec_since_epoch()) );
+      BOOST_CHECK(nathan_acct_after_upgrade.is_lifetime_member());
+
+      // create a new sender account
+      graphene::wallet::brain_key_info bki = con.wallet_api_ptr->suggest_brain_key();
+      BOOST_CHECK(!bki.brain_priv_key.empty());
+      signed_transaction create_acct_tx = con.wallet_api_ptr->create_account_with_brain_key(bki.brain_priv_key, "jmjatlanta", "nathan", "nathan", true);
+      // save the private key for this new account in the wallet file
+      BOOST_CHECK(con.wallet_api_ptr->import_key("jmjatlanta", bki.wif_priv_key));
+      con.wallet_api_ptr->save_wallet_file(con.wallet_filename);
+
+      // attempt to give jmjatlanta some bitsahres
+      signed_transaction transfer_tx = con.wallet_api_ptr->transfer("nathan", "jmjatlanta", "10000", "1.3.0", "Here are some BTS for your new account", true);
+
+      //// End Todo
+
+      pair<weight_type, flat_map<std::string, uint16_t>> owner;
+      pair<weight_type, flat_map<std::string, uint16_t>> active;
+
+      flat_map<std::string, uint16_t> auth;
+
+      auth.emplace("1.2.0", 1);
+
+      owner = make_pair(1, auth);
+
+      signed_transaction update = con.wallet_api_ptr->update_authorities("jmjatlanta", owner, active, "", true);
+      BOOST_CHECK(generate_block(app1));
+
+      account_object account = con.wallet_api_ptr->get_account("jmjatlanta");
+      BOOST_CHECK_EQUAL(fc::json::to_string(account.owner.account_auths.begin()->first), fc::json::to_string(account_id_type(0)));
+
+      // add 2 more accounts to owner and 2 to active
+      auth.clear();
+      auth.emplace("1.2.1", 1);
+      auth.emplace("1.2.3", 1);
+
+      owner = make_pair(1, auth);
+      active = make_pair(1, auth);
+
+      update = con.wallet_api_ptr->update_authorities("jmjatlanta", owner, active, "", true);
+      BOOST_CHECK(generate_block(app1));
+
+      // after op check owner
+      account = con.wallet_api_ptr->get_account("jmjatlanta");
+      auto itr = account.owner.account_auths.begin();
+      BOOST_CHECK_EQUAL(fc::json::to_string(itr->first), fc::json::to_string(account_id_type(0)));
+      BOOST_CHECK_EQUAL(itr->second, 1);
+      ++itr;
+      BOOST_CHECK_EQUAL(fc::json::to_string(itr->first), fc::json::to_string(account_id_type(1)));
+      BOOST_CHECK_EQUAL(itr->second, 1);
+      ++itr;
+      BOOST_CHECK_EQUAL(fc::json::to_string(itr->first), fc::json::to_string(account_id_type(3)));
+      BOOST_CHECK_EQUAL(itr->second, 1);
+
+      // after op check active
+      itr = account.active.account_auths.begin();
+      BOOST_CHECK_EQUAL(fc::json::to_string(itr->first), fc::json::to_string(account_id_type(1)));
+      BOOST_CHECK_EQUAL(itr->second, 1);
+      ++itr;
+      BOOST_CHECK_EQUAL(fc::json::to_string(itr->first), fc::json::to_string(account_id_type(3)));
+      BOOST_CHECK_EQUAL(itr->second, 1);
+
+      // empty account or key will fail
+      auth.clear();
+      auth.emplace("", 1);
+      owner = make_pair(1, auth);
+      BOOST_CHECK_THROW(con.wallet_api_ptr->update_authorities("jmjatlanta", owner, active, "", true), fc::assert_exception);
+      BOOST_CHECK(generate_block(app1));
+
+      // invalid account or key will fail
+      auth.clear();
+      auth.emplace("whatever", 1);
+      owner = make_pair(1, auth);
+      BOOST_CHECK_THROW(con.wallet_api_ptr->update_authorities("jmjatlanta", owner, active, "", true), fc::assert_exception);
+      BOOST_CHECK(generate_block(app1));
+
+      // invalid account or key will fail
+      auth.clear();
+      auth.emplace("1.2.999", 1);
+      owner = make_pair(1, auth);
+      BOOST_CHECK_THROW(con.wallet_api_ptr->update_authorities("jmjatlanta", owner, active, "", true), fc::assert_exception);
+      BOOST_CHECK(generate_block(app1));
+
+      // delete 2 accounts from owner
+      auth.clear();
+      auth.emplace("1.2.1", 0);
+      auth.emplace("1.2.0", 0);
+      owner = make_pair(1, auth);
+
+      // delete 2 different accounts from active
+      auth.clear();
+      auth.emplace("1.2.3", 0);
+      active = make_pair(1, auth);
+
+      update = con.wallet_api_ptr->update_authorities("jmjatlanta", owner, active, "", true);
+      BOOST_CHECK(generate_block(app1));
+
+      // after op check owner
+      account = con.wallet_api_ptr->get_account("jmjatlanta");
+      itr = account.owner.account_auths.begin();
+      BOOST_CHECK_EQUAL(fc::json::to_string(itr->first), fc::json::to_string(account_id_type(3)));
+      BOOST_CHECK_EQUAL(itr->second, 1);
+      itr = account.active.account_auths.begin();
+      BOOST_CHECK_EQUAL(fc::json::to_string(itr->first), fc::json::to_string(account_id_type(1)));
+      BOOST_CHECK_EQUAL(itr->second, 1);
+
+      // increase thershold to 3 will fail(impossible)
+      auth.clear();
+      active = make_pair(3, auth);
+
+      BOOST_CHECK_THROW(con.wallet_api_ptr->update_authorities("jmjatlanta", owner, active, "", true), fc::assert_exception);
+      BOOST_CHECK(generate_block(app1));
+
+      // set a new account to owner and increase thereshold to 2
+      auth.clear();
+      auth.emplace("1.2.4", 1);
+      active = make_pair(2, auth);
+
+      update = con.wallet_api_ptr->update_authorities("jmjatlanta", owner, active, "", true);
+      BOOST_CHECK(generate_block(app1));
+
+      account = con.wallet_api_ptr->get_account("jmjatlanta");
+      BOOST_CHECK_EQUAL(account.active.weight_threshold, 2);
+
+      // get a public key
+      fc::optional<fc::ecc::private_key> optional_private_key = wif_to_key(bki.wif_priv_key);
+      graphene::chain::public_key_type wif_pub_key = optional_private_key->get_public_key();
+
+      // add an owner key to owner auths
+      auth.clear();
+      auth.emplace(wif_pub_key, 1);
+      owner = make_pair(1, auth);
+
+      update = con.wallet_api_ptr->update_authorities("jmjatlanta", owner, active, "", true);
+      BOOST_CHECK(generate_block(app1));
+
+      auto key_itr = account.owner.key_auths.begin();
+      BOOST_CHECK_EQUAL(fc::json::to_string(key_itr->first), fc::json::to_string(wif_pub_key));
+      BOOST_CHECK_EQUAL(key_itr->second, 1);
+
+      // change the memo
+      update = con.wallet_api_ptr->update_authorities("jmjatlanta", owner, active, "BTS1111111111111111111111111111111114T1Anm", true);
+      BOOST_CHECK(generate_block(app1));
+
+      account = con.wallet_api_ptr->get_account("jmjatlanta");
+      BOOST_CHECK_EQUAL(fc::json::to_string(account.options.memo_key), fc::json::to_string("BTS1111111111111111111111111111111114T1Anm"));
+
+      BOOST_CHECK(generate_block(app1));
+      fc::usleep(fc::seconds(1));
+   } catch( fc::exception& e ) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+   app1->shutdown();
+}

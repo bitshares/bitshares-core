@@ -1566,6 +1566,29 @@ class wallet_api
       fc::signal<void(bool)> lock_changed;
       std::shared_ptr<detail::wallet_api_impl> my;
       void encrypt_keys();
+
+
+      /** Update account authorities
+       *
+       * @param account_name The account to be updated.
+       * @param owner_auths map with public key or account and weight for instance [["1.2.1",1],["1.2.3",1]]
+       * @param active_auths map with public key or account and weight
+       * @param memo_key string with new memo key
+       * @param broadcast true if you wish to broadcast the transaction
+       * @return the signed version of the transaction
+       */
+      signed_transaction update_authorities( string account_name,
+                                             pair<uint16_t, flat_map<std::string, uint16_t>> owner,
+                                             pair<uint16_t, flat_map<std::string, uint16_t>> active,
+                                             std::string memo_key,
+                                             bool broadcast );
+
+      authority delete_authority(authority auth, std::string key);
+      authority insert_authority(authority auth, std::string key, uint16_t w);
+
+
+
+
 };
 
 } }
@@ -1751,4 +1774,5 @@ FC_API( graphene::wallet::wallet_api,
         (blind_history)
         (receive_blind_transfer)
         (get_order_book)
+        (update_authorities)
       )
