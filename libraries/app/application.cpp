@@ -52,6 +52,11 @@
 #include <boost/range/algorithm/reverse.hpp>
 #include <boost/algorithm/string.hpp>
 
+#include <graphene/utilities/git_revision.hpp>
+#include <boost/version.hpp>
+#include <boost/algorithm/string/replace.hpp>
+#include <websocketpp/version.hpp>
+
 #include <iostream>
 
 #include <fc/log/file_appender.hpp>
@@ -938,6 +943,8 @@ void application::set_program_options(boost::program_options::options_descriptio
          ("api-access", bpo::value<boost::filesystem::path>(), "JSON file specifying API permissions")
          ("plugins", bpo::value<string>(), "Space-separated list of plugins to activate")
          ("io-threads", bpo::value<uint16_t>()->implicit_value(0), "Number of IO threads, default to 0 for auto-configuration")
+         ("share-version-info", bpo::value<bool>()->implicit_value(false), "Share version information with API clients")
+         ("share-plugin-info", bpo::value<bool>()->implicit_value(false), "Share plugin information with API clients")
          // TODO uncomment this when GUI is ready
          //("enable-subscribe-to-all", bpo::value<bool>()->implicit_value(false),
          // "Whether allow API clients to subscribe to universal object creation and removal events")
@@ -1080,6 +1087,64 @@ void graphene::app::application::enable_plugin(const string& name)
 void graphene::app::application::add_available_plugin(std::shared_ptr<graphene::app::abstract_plugin> p)
 {
    my->_available_plugins[p->plugin_name()] = p;
+}
+
+std::vector<std::string> graphene::app::application::get_active_plugin_names()
+{
+   std::vector<std::string> ret_val;
+   for( auto it = my->_active_plugins.begin(); it != my->_active_plugins.end(); it++ )
+   {
+      ret_val.push_back( it->first );
+   }
+   return ret_val;
+}
+
+fc::mutable_variant_object graphene::app::application::get_server_information()
+{
+   fc::mutable_variant_object ret_val;
+   const boost::program_options::variables_map& options = *(my->_options);
+
+   // check parameters to see what we should return
+   if ( options.count("share-plugin-info") && options["share-plugin-info"].as<bool>() )
+   {
+      // get plugins and version
+      std::vector<std::string> plugin_names = get_active_plugin_names();
+      for(auto it = plugin_names.begin(); it != plugin_names.end(); it++) {
+         std::stringstream plugin_name;
+         plugin_name << "plugin_" << *it << "_status";
+         ret_val[plugin_name.str()] = "active";
+         boost::program_options::variables_map options = get_plugin(*it)->plugin_get_program_options();
+         for(auto opt_it = options.begin(); opt_it != options.end(); ++opt_it) {
+            std::stringstream opt_param;
+            opt_param << *it << "->" << opt_it->first;
+            try {
+               ret_val[opt_param.str()] = opt_it->second.as<std::string>();
+            } catch (boost::bad_any_cast &e) {
+               try {
+                  int temp = opt_it->second.as<int>();
+                  ret_val[opt_param.str()] = std::to_string(temp);
+               } catch (boost::bad_any_cast &ei) {
+                  try {
+                     double temp = opt_it->second.as<double>();
+                     ret_val[opt_param.str()] = std::to_string(temp);
+                  } catch(boost::bad_any_cast &ed) {
+                     //TODO: Do something intelligent
+                  }
+               }
+            }
+         }
+      }
+    }
+
+   if ( options.count( "share-version-info" ) && options["share-version-info"].as<bool>() )
+   {
+      ret_val["server_version"] = graphene::utilities::git_revision_description;
+      ret_val["server_sha_version"] = graphene::utilities::git_revision_sha;
+      ret_val["server_version_timestamp"] = fc::get_approximate_relative_time_string(fc::time_point_sec(graphene::utilities::git_revision_unix_timestamp));
+      ret_val["graphene_db_version"] = GRAPHENE_CURRENT_DB_VERSION;
+   }
+
+   return ret_val;
 }
 
 void application::shutdown_plugins()

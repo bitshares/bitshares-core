@@ -88,6 +88,8 @@ class abstract_plugin
          boost::program_options::options_description& command_line_options,
          boost::program_options::options_description& config_file_options
          ) = 0;
+
+      virtual boost::program_options::variables_map plugin_get_program_options() = 0;
 };
 
 /**
@@ -110,6 +112,11 @@ class plugin : public abstract_plugin
          boost::program_options::options_description& command_line_options,
          boost::program_options::options_description& config_file_options
          ) override;
+     virtual boost::program_options::variables_map plugin_get_program_options() override
+     {
+        boost::program_options::variables_map map;
+        return map;
+     }
 
       chain::database& database() { return *app().chain_database(); }
       application& app()const { assert(_app); return *_app; }
