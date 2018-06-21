@@ -337,7 +337,8 @@ private:
          for( const fc::optional<graphene::chain::account_object>& optional_account : owner_account_objects )
             if (optional_account)
             {
-               fc::optional<witness_object> witness_obj = _remote_db->get_witness_by_account(optional_account->id);
+               std::string account_id = account_id_to_string(optional_account->id);
+               fc::optional<witness_object> witness_obj = _remote_db->get_witness_by_account(account_id);
                if (witness_obj)
                   claim_registered_witness(optional_account->name);
             }
@@ -570,9 +571,18 @@ public:
    {
       return _remote_db->get_dynamic_global_properties();
    }
+   std::string account_id_to_string(account_id_type id) const
+   {
+      std::string account_id = fc::to_string(id.space_id)
+                               + "." + fc::to_string(id.type_id)
+                               + "." + fc::to_string(id.instance.value);
+      return account_id;
+   }
    account_object get_account(account_id_type id) const
    {
-      auto rec = _remote_db->get_accounts({id}).front();
+      std::string account_id = account_id_to_string(id);
+
+      auto rec = _remote_db->get_accounts({account_id}).front();
       FC_ASSERT(rec);
       return *rec;
    }
@@ -714,7 +724,7 @@ public:
             ("chain_id", _chain_id) );
 
       size_t account_pagination = 100;
-      vector< account_id_type > account_ids_to_send;
+      vector< std::string > account_ids_to_send;
       size_t n = _wallet.my_accounts.size();
       account_ids_to_send.reserve( std::min( account_pagination, n ) );
       auto it = _wallet.my_accounts.begin();
@@ -729,7 +739,8 @@ public:
          {
             assert( it != _wallet.my_accounts.end() );
             old_accounts.push_back( *it );
-            account_ids_to_send.push_back( old_accounts.back().id );
+            std::string account_id = account_id_to_string(old_accounts.back().id);
+            account_ids_to_send.push_back( account_id );
             ++it;
          }
          std::vector< optional< account_object > > accounts = _remote_db->get_accounts(account_ids_to_send);
@@ -1430,7 +1441,7 @@ public:
       committee_member_create_operation committee_member_create_op;
       committee_member_create_op.committee_member_account = get_account_id(owner_account);
       committee_member_create_op.url = url;
-      if (_remote_db->get_committee_member_by_account(committee_member_create_op.committee_member_account))
+      if (_remote_db->get_committee_member_by_account(owner_account))
          FC_THROW("Account ${owner_account} is already a committee_member", ("owner_account", owner_account));
 
       signed_transaction tx;
@@ -1460,7 +1471,7 @@ public:
             // then maybe it's the owner account
             try
             {
-               account_id_type owner_account_id = get_account_id(owner_account);
+               std::string owner_account_id = account_id_to_string(get_account_id(owner_account));
                fc::optional<witness_object> witness = _remote_db->get_witness_by_account(owner_account_id);
                if (witness)
                   return *witness;
@@ -1495,8 +1506,7 @@ public:
             // then maybe it's the owner account
             try
             {
-               account_id_type owner_account_id = get_account_id(owner_account);
-               fc::optional<committee_member_object> committee_member = _remote_db->get_committee_member_by_account(owner_account_id);
+               fc::optional<committee_member_object> committee_member = _remote_db->get_committee_member_by_account(owner_account);
                if (committee_member)
                   return *committee_member;
                else
@@ -1526,7 +1536,7 @@ public:
       witness_create_op.block_signing_key = witness_public_key;
       witness_create_op.url = url;
 
-      if (_remote_db->get_witness_by_account(witness_create_op.witness_account))
+      if (_remote_db->get_witness_by_account(account_id_to_string(witness_create_op.witness_account)))
          FC_THROW("Account ${owner_account} is already a witness", ("owner_account", owner_account));
 
       signed_transaction tx;
@@ -1690,12 +1700,7 @@ public:
          return result;
       }
 
-      // try casting to avoid a round-trip if we were given an account ID
-      fc::optional<account_id_type> acct_id = maybe_id<account_id_type>( account_name );
-      if( !acct_id )
-         acct_id = get_account( account_name ).id;
-
-      vector< vesting_balance_object > vbos = _remote_db->get_vesting_balances( *acct_id );
+      vector< vesting_balance_object > vbos = _remote_db->get_vesting_balances( account_name );
       if( vbos.size() == 0 )
          return result;
 
@@ -1743,8 +1748,7 @@ public:
                                         bool broadcast /* = false */)
    { try {
       account_object voting_account_object = get_account(voting_account);
-      account_id_type committee_member_owner_account_id = get_account_id(committee_member);
-      fc::optional<committee_member_object> committee_member_obj = _remote_db->get_committee_member_by_account(committee_member_owner_account_id);
+      fc::optional<committee_member_object> committee_member_obj = _remote_db->get_committee_member_by_account(committee_member);
       if (!committee_member_obj)
          FC_THROW("Account ${committee_member} is not registered as a committee_member", ("committee_member", committee_member));
       if (approve)
@@ -1777,8 +1781,8 @@ public:
                                         bool broadcast /* = false */)
    { try {
       account_object voting_account_object = get_account(voting_account);
-      account_id_type witness_owner_account_id = get_account_id(witness);
-      fc::optional<witness_object> witness_obj = _remote_db->get_witness_by_account(witness_owner_account_id);
+
+      fc::optional<witness_object> witness_obj = _remote_db->get_witness_by_account(voting_account);
       if (!witness_obj)
          FC_THROW("Account ${witness} is not registered as a witness", ("witness", witness));
       if (approve)
@@ -2920,9 +2924,7 @@ map<string,account_id_type> wallet_api::list_accounts(const string& lowerbound, 
 
 vector<asset> wallet_api::list_account_balances(const string& id)
 {
-   if( auto real_id = detail::maybe_id<account_id_type>(id) )
-      return my->_remote_db->get_account_balances(*real_id, flat_set<asset_id_type>());
-   return my->_remote_db->get_account_balances(get_account(id).id, flat_set<asset_id_type>());
+   return my->_remote_db->get_account_balances(id, flat_set<asset_id_type>());
 }
 
 vector<asset_object> wallet_api::list_assets(const string& lowerbound, uint32_t limit)const
@@ -2933,7 +2935,6 @@ vector<asset_object> wallet_api::list_assets(const string& lowerbound, uint32_t 
 vector<operation_detail> wallet_api::get_account_history(string name, int limit)const
 {
    vector<operation_detail> result;
-   auto account_id = get_account(name).get_id();
 
    while( limit > 0 )
    {
@@ -2945,7 +2946,7 @@ vector<operation_detail> wallet_api::get_account_history(string name, int limit)
       }
 
 
-      vector<operation_history_object> current = my->_remote_hist->get_account_history(account_id, operation_history_id_type(), std::min(100,limit), start);
+      vector<operation_history_object> current = my->_remote_hist->get_account_history(name, operation_history_id_type(), std::min(100,limit), start);
       for( auto& o : current ) {
          std::stringstream ss;
          auto memo = o.op.visit(detail::operation_printer(ss, *my, o.result));
@@ -2974,7 +2975,7 @@ vector<operation_detail> wallet_api::get_relative_account_history(string name, u
 
    while( limit > 0 )
    {
-      vector <operation_history_object> current = my->_remote_hist->get_relative_account_history(account_id, stop, std::min<uint32_t>(100, limit), start);
+      vector <operation_history_object> current = my->_remote_hist->get_relative_account_history(name, stop, std::min<uint32_t>(100, limit), start);
       for (auto &o : current) {
          std::stringstream ss;
          auto memo = o.op.visit(detail::operation_printer(ss, *my, o.result));
@@ -3007,7 +3008,7 @@ account_history_operation_detail wallet_api::get_account_history_by_operations(s
 
     while (limit > 0 && start <= stats.total_ops) {
         uint32_t min_limit = std::min<uint32_t> (100, limit);
-        auto current = my->_remote_hist->get_account_history_by_operations(account_id, operation_types, start, min_limit);
+        auto current = my->_remote_hist->get_account_history_by_operations(name, operation_types, start, min_limit);
         for (auto& obj : current.operation_history_objs) {
             std::stringstream ss;
             auto memo = obj.op.visit(detail::operation_printer(ss, *my, obj.result));
