@@ -64,6 +64,7 @@
 #include <graphene/app/api.hpp>
 #include <graphene/chain/asset_object.hpp>
 #include <graphene/chain/protocol/fee_schedule.hpp>
+#include <graphene/chain/hardfork.hpp>
 #include <graphene/utilities/git_revision.hpp>
 #include <graphene/utilities/key_conversion.hpp>
 #include <graphene/utilities/words.hpp>
@@ -1160,6 +1161,8 @@ public:
       optional<account_id_type> new_issuer_account_id;
       if (new_issuer)
       {
+        FC_ASSERT( _remote_db->get_dynamic_global_properties().time < HARDFORK_CORE_199_TIME,
+              "The use of 'new_issuer' is no longer supported. Please use `update_asset_issuer' instead!");
         account_object new_issuer_account = get_account(*new_issuer);
         new_issuer_account_id = new_issuer_account.id;
       }
@@ -1177,6 +1180,29 @@ public:
 
       return sign_transaction( tx, broadcast );
    } FC_CAPTURE_AND_RETHROW( (symbol)(new_issuer)(new_options)(broadcast) ) }
+
+   signed_transaction update_asset_issuer(string symbol,
+                                   string new_issuer,
+                                   bool broadcast /* = false */)
+   { try {
+      optional<asset_object> asset_to_update = find_asset(symbol);
+      if (!asset_to_update)
+        FC_THROW("No asset with that symbol exists!");
+
+      account_object new_issuer_account = get_account(new_issuer);
+
+      asset_update_issuer_operation update_issuer;
+      update_issuer.issuer = asset_to_update->issuer;
+      update_issuer.asset_to_update = asset_to_update->id;
+      update_issuer.new_issuer = new_issuer_account.id;
+
+      signed_transaction tx;
+      tx.operations.push_back( update_issuer );
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees);
+      tx.validate();
+
+      return sign_transaction( tx, broadcast );
+   } FC_CAPTURE_AND_RETHROW( (symbol)(new_issuer)(broadcast) ) }
 
    signed_transaction update_bitasset(string symbol,
                                       bitasset_options new_options,
@@ -1268,6 +1294,29 @@ public:
 
       return sign_transaction( tx, broadcast );
    } FC_CAPTURE_AND_RETHROW( (from)(symbol)(amount)(broadcast) ) }
+
+   signed_transaction claim_asset_fee_pool(string symbol,
+                                           string amount,
+                                           bool broadcast /* = false */)
+   { try {
+      optional<asset_object> asset_pool_to_claim = find_asset(symbol);
+      if (!asset_pool_to_claim)
+        FC_THROW("No asset with that symbol exists!");
+      asset_object core_asset = get_asset(asset_id_type());
+
+      asset_claim_pool_operation claim_op;
+      claim_op.issuer = asset_pool_to_claim->issuer;
+      claim_op.asset_id = asset_pool_to_claim->id;
+      claim_op.amount_to_claim = core_asset.amount_from_string(amount).amount;
+
+      signed_transaction tx;
+      tx.operations.push_back( claim_op );
+      set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees);
+      tx.validate();
+
+      return sign_transaction( tx, broadcast );
+   } FC_CAPTURE_AND_RETHROW( (symbol)(amount)(broadcast) ) }
+
 
    signed_transaction reserve_asset(string from,
                                  string amount,
@@ -1965,6 +2014,31 @@ public:
       op.funding_account = seller.id;
       op.delta_debt   = mia.amount_from_string(amount_to_borrow);
       op.delta_collateral = collateral.amount_from_string(amount_of_collateral);
+
+      signed_transaction trx;
+      trx.operations = {op};
+      set_operation_fees( trx, _remote_db->get_global_properties().parameters.current_fees);
+      trx.validate();
+      idump((broadcast));
+
+      return sign_transaction(trx, broadcast);
+   }
+
+   signed_transaction borrow_asset_ext( string seller_name, string amount_to_borrow, string asset_symbol,
+                                        string amount_of_collateral,
+                                        call_order_update_operation::extensions_type extensions,
+                                        bool broadcast = false)
+   {
+      account_object seller = get_account(seller_name);
+      asset_object mia = get_asset(asset_symbol);
+      FC_ASSERT(mia.is_market_issued());
+      asset_object collateral = get_asset(get_object(*mia.bitasset_data_id).options.short_backing_asset);
+
+      call_order_update_operation op;
+      op.funding_account = seller.id;
+      op.delta_debt   = mia.amount_from_string(amount_to_borrow);
+      op.delta_collateral = collateral.amount_from_string(amount_of_collateral);
+      op.extensions = extensions;
 
       signed_transaction trx;
       trx.operations = {op};
@@ -2776,6 +2850,36 @@ namespace graphene { namespace wallet {
 
       return results;
    }
+
+   brain_key_info utility::suggest_brain_key()
+   {
+      brain_key_info result;
+      // create a private key for secure entropy
+      fc::sha256 sha_entropy1 = fc::ecc::private_key::generate().get_secret();
+      fc::sha256 sha_entropy2 = fc::ecc::private_key::generate().get_secret();
+      fc::bigint entropy1(sha_entropy1.data(), sha_entropy1.data_size());
+      fc::bigint entropy2(sha_entropy2.data(), sha_entropy2.data_size());
+      fc::bigint entropy(entropy1);
+      entropy <<= 8 * sha_entropy1.data_size();
+      entropy += entropy2;
+      string brain_key = "";
+
+      for (int i = 0; i < BRAIN_KEY_WORD_COUNT; i++)
+      {
+         fc::bigint choice = entropy % graphene::words::word_list_size;
+         entropy /= graphene::words::word_list_size;
+         if (i > 0)
+            brain_key += " ";
+         brain_key += graphene::words::word_list[choice.to_int64()];
+      }
+
+      brain_key = detail::normalize_brain_key(brain_key);
+      fc::ecc::private_key priv_key = detail::derive_private_key(brain_key, 0);
+      result.brain_priv_key = brain_key;
+      result.wif_priv_key = key_to_wif(priv_key);
+      result.pub_key = priv_key.get_public_key();
+      return result;
+   }
 }}
 
 namespace graphene { namespace wallet {
@@ -2957,32 +3061,7 @@ vector<collateral_bid_object> wallet_api::get_collateral_bids(string asset, uint
 
 brain_key_info wallet_api::suggest_brain_key()const
 {
-   brain_key_info result;
-   // create a private key for secure entropy
-   fc::sha256 sha_entropy1 = fc::ecc::private_key::generate().get_secret();
-   fc::sha256 sha_entropy2 = fc::ecc::private_key::generate().get_secret();
-   fc::bigint entropy1( sha_entropy1.data(), sha_entropy1.data_size() );
-   fc::bigint entropy2( sha_entropy2.data(), sha_entropy2.data_size() );
-   fc::bigint entropy(entropy1);
-   entropy <<= 8*sha_entropy1.data_size();
-   entropy += entropy2;
-   string brain_key = "";
-
-   for( int i=0; i<BRAIN_KEY_WORD_COUNT; i++ )
-   {
-      fc::bigint choice = entropy % graphene::words::word_list_size;
-      entropy /= graphene::words::word_list_size;
-      if( i > 0 )
-         brain_key += " ";
-      brain_key += graphene::words::word_list[ choice.to_int64() ];
-   }
-
-   brain_key = normalize_brain_key(brain_key);
-   fc::ecc::private_key priv_key = derive_private_key( brain_key, 0 );
-   result.brain_priv_key = brain_key;
-   result.wif_priv_key = key_to_wif( priv_key );
-   result.pub_key = priv_key.get_public_key();
-   return result;
+   return graphene::wallet::utility::suggest_brain_key();
 }
 
 vector<brain_key_info> wallet_api::derive_owner_keys_from_brain_key(string brain_key, int number_of_desired_keys) const
@@ -3305,6 +3384,13 @@ signed_transaction wallet_api::update_asset(string symbol,
    return my->update_asset(symbol, new_issuer, new_options, broadcast);
 }
 
+signed_transaction wallet_api::update_asset_issuer(string symbol,
+                                            string new_issuer,
+                                            bool broadcast /* = false */)
+{
+   return my->update_asset_issuer(symbol, new_issuer, broadcast);
+}
+
 signed_transaction wallet_api::update_bitasset(string symbol,
                                                bitasset_options new_options,
                                                bool broadcast /* = false */)
@@ -3333,6 +3419,13 @@ signed_transaction wallet_api::fund_asset_fee_pool(string from,
                                                    bool broadcast /* = false */)
 {
    return my->fund_asset_fee_pool(from, symbol, amount, broadcast);
+}
+
+signed_transaction wallet_api::claim_asset_fee_pool(string symbol,
+                                                    string amount,
+                                                    bool broadcast /* = false */)
+{
+   return my->claim_asset_fee_pool(symbol, amount, broadcast);
 }
 
 signed_transaction wallet_api::reserve_asset(string from,
@@ -3873,6 +3966,15 @@ signed_transaction wallet_api::borrow_asset(string seller_name, string amount_to
 {
    FC_ASSERT(!is_locked());
    return my->borrow_asset(seller_name, amount_to_sell, asset_symbol, amount_of_collateral, broadcast);
+}
+
+signed_transaction wallet_api::borrow_asset_ext( string seller_name, string amount_to_sell,
+                                                 string asset_symbol, string amount_of_collateral,
+                                                 call_order_update_operation::extensions_type extensions,
+                                                 bool broadcast)
+{
+   FC_ASSERT(!is_locked());
+   return my->borrow_asset_ext(seller_name, amount_to_sell, asset_symbol, amount_of_collateral, extensions, broadcast);
 }
 
 signed_transaction wallet_api::cancel_order(object_id_type order_id, bool broadcast)

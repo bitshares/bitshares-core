@@ -24,7 +24,7 @@
 
 #include <graphene/elasticsearch/elasticsearch_plugin.hpp>
 
-#include <graphene/app/impacted.hpp>
+#include <graphene/chain/impacted.hpp>
 
 #include <graphene/chain/account_evaluator.hpp>
 #include <graphene/chain/account_object.hpp>
@@ -136,7 +136,7 @@ void elasticsearch_plugin_impl::update_account_histories( const signed_block& b 
       if( op.op.which() == operation::tag< account_create_operation >::value )
          impacted.insert( op.result.get<object_id_type>() );
       else
-         graphene::app::operation_get_impacted_accounts( op.op, impacted );
+         graphene::chain::operation_get_impacted_accounts( op.op, impacted );
 
       for( auto& a : other )
          for( auto& item : a.account_auths )

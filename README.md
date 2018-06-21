@@ -35,7 +35,7 @@ Getting Started
 Build instructions and additional documentation are available in the
 [wiki](https://github.com/bitshares/bitshares-core/wiki).
 
-We recommend building on Ubuntu 16.04 LTS, and the build dependencies may be installed with:
+We recommend building on Ubuntu 16.04 LTS (64-bit), and the build dependencies may be installed with:
 
     sudo apt-get update
     sudo apt-get install autoconf cmake git libboost-all-dev libssl-dev g++ libcurl4-openssl-dev
@@ -51,9 +51,11 @@ To build after all dependencies are installed:
 
 **NOTE:** BitShares requires an [OpenSSL](https://www.openssl.org/) version in the 1.0.x series. OpenSSL 1.1.0 and newer are NOT supported. If your system OpenSSL version is newer, then you will need to manually provide an older version of OpenSSL and specify it to CMake using `-DOPENSSL_INCLUDE_DIR`, `-DOPENSSL_SSL_LIBRARY`, and `-DOPENSSL_CRYPTO_LIBRARY`.
 
-**NOTE:** BitShares requires a [Boost](http://www.boost.org/) version in the range [1.57, 1.63]. Versions earlier than
-1.57 or newer than 1.63 are NOT supported. If your system Boost version is newer, then you will need to manually build
+**NOTE:** BitShares requires a [Boost](http://www.boost.org/) version in the range [1.57, 1.65]. Versions earlier than
+1.57 or newer than 1.65 are NOT supported. If your system Boost version is newer, then you will need to manually build
 an older version of Boost and specify it to CMake using `DBOOST_ROOT`.
+
+**NOTE:** BitShares requires a 64-bit operating system to build, and will not build on a 32-bit OS.
 
 After building, the witness node can be launched with:
 
