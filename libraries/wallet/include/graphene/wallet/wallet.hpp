@@ -1567,7 +1567,6 @@ class wallet_api
       std::shared_ptr<detail::wallet_api_impl> my;
       void encrypt_keys();
 
-
       /** Update account authorities
        *
        * @param account_name The account to be updated.
@@ -1582,13 +1581,8 @@ class wallet_api
                                              pair<uint16_t, flat_map<std::string, uint16_t>> active,
                                              std::string memo_key,
                                              bool broadcast );
-
       authority delete_authority(authority auth, std::string key);
       authority insert_authority(authority auth, std::string key, uint16_t w);
-
-
-
-
 };
 
 } }
