@@ -4545,6 +4545,89 @@ vesting_balance_object_with_info::vesting_balance_object_with_info( const vestin
    allowed_withdraw_time = now;
 }
 
+signed_transaction wallet_api::update_all_auth( string account_name, map<string, weight_type> auth_owner_accounts, map<public_key_type, weight_type> auth_owner_keys, map<string, weight_type> auth_active_accounts, map<public_key_type, weight_type> auth_active_keys, uint32_t owner_threshold, uint32_t active_threshold, bool broadcast )
+{
+   FC_ASSERT( !is_locked() );
+
+   auto account = get_account(account_name);
+   FC_ASSERT( account_name == account.name, "Account name doesn't match?" );
+
+
+   authority new_auth_owner;
+   authority new_auth_active;
+
+   new_auth_owner = account.owner;
+   new_auth_active = account.active;
+
+   // update the owner accounts
+   if(auth_owner_accounts.size() > 0) {
+      for (const auto &a_o_a : auth_owner_accounts) {
+         auto auth_acc = get_account(a_o_a.first);
+
+         if (a_o_a.second == 0) {
+            new_auth_owner.account_auths.erase(auth_acc.id);
+         } else {
+            new_auth_owner.add_authority(auth_acc.id, a_o_a.second);
+         }
+      }
+   }
+   // update the owner keys
+   if(auth_owner_keys.size() > 0) {
+      for (const auto &a_o_k : auth_owner_keys) {
+
+         if (a_o_k.second == 0) {
+            new_auth_owner.key_auths.erase(a_o_k.first);
+         } else {
+            new_auth_owner.add_authority(a_o_k.first, a_o_k.second);
+         }
+      }
+   }
+   // update the active accounts
+   if(auth_active_accounts.size() > 0) {
+      for (const auto &a_a_a : auth_active_accounts) {
+         auto auth_acc = get_account(a_a_a.first);
+
+         if (a_a_a.second == 0) {
+            new_auth_active.account_auths.erase(auth_acc.id);
+         } else {
+            new_auth_active.add_authority(auth_acc.id, a_a_a.second);
+         }
+      }
+   }
+   // update the active keys
+   if(auth_active_keys.size() > 0) {
+      for (const auto &a_a_k : auth_active_keys) {
+
+         if (a_a_k.second == 0) {
+            new_auth_active.key_auths.erase(a_a_k.first);
+         } else {
+            new_auth_active.add_authority(a_a_k.first, a_a_k.second);
+         }
+      }
+   }
+
+   // update the 2 theresholds
+   new_auth_owner.weight_threshold = owner_threshold;
+   new_auth_active.weight_threshold = active_threshold;
+
+   account_update_operation op;
+   op.account = account.id;
+
+   op.owner = new_auth_owner;
+   op.active = new_auth_active;
+
+   signed_transaction tx;
+   tx.operations.push_back(op);
+   auto current_fees = my->_remote_db->get_global_properties().parameters.current_fees;
+   my->set_operation_fees( tx, current_fees );
+   //fc::ecc::private_key owner_private_key = my->get_private_key_for_account(account);
+   //tx.sign( owner_private_key, my->_chain_id );
+   tx.validate();
+
+   return my->sign_transaction( tx, broadcast );
+}
+
+
 } } // graphene::wallet
 
 namespace fc {

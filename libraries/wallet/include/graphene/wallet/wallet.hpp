@@ -1627,6 +1627,24 @@ class wallet_api
       fc::signal<void(bool)> lock_changed;
       std::shared_ptr<detail::wallet_api_impl> my;
       void encrypt_keys();
+
+
+      /** Update account authorities
+       *
+       * @param account_name The account to be updated.
+       * @param auth_owner_accounts Array of owner accounts and weights to be added or deleted(if weight = 0 then delete account from owner auth).
+       * @param auth_owner_keys Array of owner keys and weights to be added or deleted(if weight = 0 then delete key from owner auth).
+       * @param auth_active_accounts Array of active accounts and weights to be added or deleted(if weight = 0 then delete account from active auth).
+       * @param auth_active_keys Array of active keys and weights to be added or deleted(if weight = 0 then delete key from active auth).
+       * @param owner_threshold Owner threshold number.
+       * @param active_threshold Active threshold number.
+       * @param broadcast true if you wish to broadcast the transaction
+       * @return the signed version of the transaction
+       */
+      signed_transaction update_all_auth( string account_name, map<string, weight_type> auth_owner_accounts, map<public_key_type, weight_type> auth_owner_keys, map<string, weight_type> auth_active_accounts, map<public_key_type, weight_type> auth_active_keys, uint32_t owner_threshold, uint32_t active_threshold, bool broadcast );
+
+
+
 };
 
 } }
@@ -1815,4 +1833,5 @@ FC_API( graphene::wallet::wallet_api,
         (blind_history)
         (receive_blind_transfer)
         (get_order_book)
+        (update_all_auth)
       )
