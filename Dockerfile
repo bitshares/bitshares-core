@@ -1,5 +1,5 @@
 FROM phusion/baseimage:0.10.1
-MAINTAINER The bitshares decentralized organisation
+MAINTAINER The ULF decentralized financial services
 
 ENV LANG=en_US.UTF-8
 RUN \
@@ -23,8 +23,8 @@ RUN \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
-ADD . /bitshares-core
-WORKDIR /bitshares-core
+ADD . /ULF-CLI
+WORKDIR /ULF-CLI
 
 # Compile
 RUN \
@@ -43,19 +43,19 @@ RUN \
     make install && \
     #
     # Obtain version
-    mkdir /etc/bitshares && \
-    git rev-parse --short HEAD > /etc/bitshares/version && \
+    mkdir /etc/ULF && \
+    git rev-parse --short HEAD > /etc/ULF/version && \
     cd / && \
-    rm -rf /bitshares-core
+    rm -rf /ULF-CLI
 
 # Home directory $HOME
 WORKDIR /
-RUN useradd -s /bin/bash -m -d /var/lib/bitshares bitshares
-ENV HOME /var/lib/bitshares
-RUN chown bitshares:bitshares -R /var/lib/bitshares
+RUN useradd -s /bin/bash -m -d /var/lib/ULF ULF
+ENV HOME /var/lib/ULF
+RUN chown ULF:ULF -R /var/lib/ULF
 
 # Volume
-VOLUME ["/var/lib/bitshares", "/etc/bitshares"]
+VOLUME ["/var/lib/ULF", "/etc/ULF"]
 
 # rpc service:
 EXPOSE 8090
@@ -63,9 +63,9 @@ EXPOSE 8090
 EXPOSE 2001
 
 # default exec/config files
-ADD docker/default_config.ini /etc/bitshares/config.ini
-ADD docker/bitsharesentry.sh /usr/local/bin/bitsharesentry.sh
-RUN chmod a+x /usr/local/bin/bitsharesentry.sh
+ADD docker/default_config.ini /etc/ULF/config.ini
+ADD docker/ULFentry.sh /usr/local/bin/ULFentry.sh
+RUN chmod a+x /usr/local/bin/ULFentry.sh
 
 # default execute entry
-CMD /usr/local/bin/bitsharesentry.sh
+CMD /usr/local/bin/ULFentry.sh
