@@ -30,6 +30,7 @@
 #include <iostream>
 #include <algorithm>
 #include <tuple>
+#include <string>
 #include <boost/tuple/tuple.hpp>
 #include <boost/circular_buffer.hpp>
 
@@ -69,6 +70,8 @@
 #include <fc/crypto/rand.hpp>
 #include <fc/network/rate_limiting.hpp>
 #include <fc/network/ip.hpp>
+#include <fc/network/resolve.hpp>
+#include <fc/smart_ref_impl.hpp>
 
 #include <graphene/net/node.hpp>
 #include <graphene/net/peer_database.hpp>
@@ -301,10 +304,10 @@ namespace graphene { namespace net { namespace detail {
       _peer_connection_retry_timeout(GRAPHENE_NET_DEFAULT_PEER_CONNECTION_RETRY_TIME),
       _peer_inactivity_timeout(GRAPHENE_NET_PEER_HANDSHAKE_INACTIVITY_TIMEOUT),
       _most_recent_blocks_accepted(_maximum_number_of_connections),
+      _sync_item_type(0),
       _total_number_of_unfetched_items(0),
       _rate_limiter(0, 0),
       _last_reported_number_of_connections(0),
-      _peer_advertising_disabled(false),
       _average_network_read_speed_seconds(60),
       _average_network_write_speed_seconds(60),
       _average_network_read_speed_minutes(60),
@@ -316,7 +319,8 @@ namespace graphene { namespace net { namespace detail {
       _node_is_shutting_down(false),
       _maximum_number_of_blocks_to_handle_at_one_time(MAXIMUM_NUMBER_OF_BLOCKS_TO_HANDLE_AT_ONE_TIME),
       _maximum_number_of_sync_blocks_to_prefetch(MAXIMUM_NUMBER_OF_BLOCKS_TO_PREFETCH),
-      _maximum_blocks_per_peer_during_syncing(GRAPHENE_NET_MAX_BLOCKS_PER_PEER_DURING_SYNCING)
+      _maximum_blocks_per_peer_during_syncing(GRAPHENE_NET_MAX_BLOCKS_PER_PEER_DURING_SYNCING),
+       _address_builder(nullptr)
     {
       _rate_limiter.set_actual_rate_time_constant(fc::seconds(2));
       fc::rand_bytes(&_node_id.data[0], (int)_node_id.size());
@@ -1654,32 +1658,83 @@ namespace graphene { namespace net { namespace detail {
         FC_THROW( "unexpected connection_rejected_message from peer" );
     }
 
-    void node_impl::on_address_request_message(peer_connection* originating_peer, const address_request_message& address_request_message_received)
+    address_info node_impl::address_builder::update_address_record( node_impl* impl, const peer_connection_ptr& active_peer)
+    {
+       fc::optional<potential_peer_record> updated_peer_record =
+             impl->_potential_peer_db.lookup_entry_for_endpoint(*active_peer->get_remote_endpoint());
+
+       if (updated_peer_record)
+       {
+         updated_peer_record->last_seen_time = fc::time_point::now();
+         impl->_potential_peer_db.update_entry(*updated_peer_record);
+       }
+
+       return address_info(*active_peer->get_remote_endpoint(),
+                                                 fc::time_point::now(),
+                                                 active_peer->round_trip_delay,
+                                                 active_peer->node_id,
+                                                 active_peer->direction,
+                                                 active_peer->is_firewalled);
+
+    }
+
+    class random_address_builder : public node_impl::address_builder
+    {
+       void build(node_impl* impl, address_message& reply )
+       {
+          // return a random list of nodes
+          srand( time( NULL ) );
+          for (const peer_connection_ptr& active_peer : impl->_active_connections)
+          {
+             // should we add this one?
+             if ( rand () % 2 == 1)
+             {
+                reply.addresses.emplace_back(update_address_record(impl, active_peer));
+             } // randomness
+          } // each active peer
+       }
+    };
+
+    class list_address_builder : public node_impl::address_builder
+    {
+       void build(node_impl* impl, address_message& reply)
+       {
+          for (const peer_connection_ptr& active_peer : impl->_active_connections)
+          {
+             //TODO: is this connection in the seed list?
+             reply.addresses.emplace_back(update_address_record(impl, active_peer));
+          }
+       }
+    };
+
+    class all_address_builder : public node_impl::address_builder
+    {
+       void build( node_impl* impl, address_message& reply )
+       {
+          reply.addresses.reserve(impl->_active_connections.size());
+          for (const peer_connection_ptr& active_peer : impl->_active_connections)
+          {
+             reply.addresses.emplace_back(update_address_record(impl, active_peer));
+          }
+       }
+    };
+
+    /***
+     * Handle an incoming request for our list of peers
+     * @param originating_peer who requested it
+     * @param address_request_message the message
+     */
+    void node_impl::on_address_request_message(peer_connection* originating_peer,
+          const address_request_message& address_request_message_received)
     {
       VERIFY_CORRECT_THREAD();
       dlog("Received an address request message");
 
       address_message reply;
-      if (!_peer_advertising_disabled)
-      {
-        reply.addresses.reserve(_active_connections.size());
-        for (const peer_connection_ptr& active_peer : _active_connections)
-        {
-          fc::optional<potential_peer_record> updated_peer_record = _potential_peer_db.lookup_entry_for_endpoint(*active_peer->get_remote_endpoint());
-          if (updated_peer_record)
-          {
-            updated_peer_record->last_seen_time = fc::time_point::now();
-            _potential_peer_db.update_entry(*updated_peer_record);
-          }
 
-          reply.addresses.emplace_back(address_info(*active_peer->get_remote_endpoint(),
-                                                    fc::time_point::now(),
-                                                    active_peer->round_trip_delay,
-                                                    active_peer->node_id,
-                                                    active_peer->direction,
-                                                    active_peer->is_firewalled));
-        }
-      }
+      if (_address_builder)
+         _address_builder->build(this, reply );
+
       originating_peer->send_message(reply);
     }
 
@@ -4144,6 +4199,19 @@ namespace graphene { namespace net { namespace detail {
       trigger_p2p_network_connect_loop();
     }
 
+    void node_impl::add_seed_node(std::string endpoint_string, bool connect_immediately)
+    {
+       VERIFY_CORRECT_THREAD();
+       std::vector<fc::ip::endpoint> endpoints = graphene::net::node::resolve_string_to_ip_endpoints(endpoint_string);
+       for (const fc::ip::endpoint& endpoint : endpoints)
+       {
+          ilog("Adding seed node ${endpoint}", ("endpoint", endpoint));
+          add_node(endpoint);
+          if (connect_immediately)
+             connect_to_endpoint(endpoint);
+       }
+    }
+
     void node_impl::initiate_connect_to(const peer_connection_ptr& new_peer)
     {
       new_peer->get_socket().open();
@@ -4571,7 +4639,7 @@ namespace graphene { namespace net { namespace detail {
     void node_impl::disable_peer_advertising()
     {
       VERIFY_CORRECT_THREAD();
-      _peer_advertising_disabled = true;
+      _address_builder = nullptr;
     }
 
     fc::variant_object node_impl::get_call_statistics() const
@@ -5060,5 +5128,48 @@ namespace graphene { namespace net { namespace detail {
 #undef INVOKE_AND_COLLECT_STATISTICS
 
   } // end namespace detail
+
+  /***
+   * @brief Helper to convert a string to a collection of endpoints
+   *
+   * This converts a string (i.e. "bitshares.eu:665535" to a collection of endpoints.
+   * NOTE: Throws an exception if not in correct format or was unable to resolve URL.
+   *
+   * @param in the incoming string
+   * @returns a vector of endpoints
+   */
+  std::vector<fc::ip::endpoint> node::resolve_string_to_ip_endpoints(std::string in)
+  {
+     try
+     {
+        std::string::size_type colon_pos = in.find(':');
+        if (colon_pos == std::string::npos)
+           FC_THROW("Missing required port number in endpoint string \"${endpoint_string}\"",
+                    ("endpoint_string", in));
+        std::string port_string = in.substr(colon_pos + 1);
+        try
+        {
+           uint16_t port = boost::lexical_cast<uint16_t>(port_string);
+
+           std::string hostname = in.substr(0, colon_pos);
+           std::vector<fc::ip::endpoint> endpoints = fc::resolve(hostname, port);
+           if (endpoints.empty())
+              FC_THROW_EXCEPTION( fc::unknown_host_exception,
+                                  "The host name can not be resolved: ${hostname}",
+                                  ("hostname", hostname) );
+           return endpoints;
+        }
+        catch (const boost::bad_lexical_cast&)
+        {
+           FC_THROW("Bad port: ${port}", ("port", port_string));
+        }
+     }
+     FC_CAPTURE_AND_RETHROW((in))
+  }
+
+  void node::add_seed_node(std::string endpoint_string, bool connect_immediately)
+  {
+     INVOKE_IN_IMPL(add_seed_node, endpoint_string, connect_immediately);
+  }
 
 } } // end namespace graphene::net

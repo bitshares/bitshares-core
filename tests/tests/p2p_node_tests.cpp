@@ -38,10 +38,11 @@ namespace net
 {
 namespace detail
 {
+
 class node_impl : public graphene::net::peer_connection_delegate
 {
 public:
-   void on_message( peer_connection* originating_peer,
+   void on_message( graphene::net::peer_connection* originating_peer,
                     const message& received_message );
    void on_connection_closed(peer_connection* originating_peer);
    message get_message_for_item(const item_id& item);
@@ -74,14 +75,28 @@ public:
 
 };
 
+BOOST_AUTO_TEST_SUITE( p2p_node_tests )
+
 BOOST_AUTO_TEST_CASE( p2p_disable_peer_advertising )
 {
+   // set up my node
    test_node my_node("Hello");
    graphene::net::detail::node_impl del;
+   // a fake peer
    std::shared_ptr<test_peer> my_peer(new test_peer{&del});
+
+   // act like my_node received an address_request message from my_peer
    graphene::net::address_request_message address_request_message_received;
-   my_node.on_message(my_peer, address_request_message_received);
-   BOOST_CHECK(my_peer->message_received != nullptr);
+   my_node.on_message( my_peer, address_request_message_received );
+
+   // check the results
+   std::shared_ptr<graphene::net::message> msg = my_peer->message_received;
+   BOOST_CHECK( msg != nullptr);
+   BOOST_CHECK( msg->data.size() == 0 );
    // now try with "disable_peer_advertising" set
    my_node.disable_peer_advertising();
+   BOOST_CHECK( msg != nullptr );
+   BOOST_CHECK( msg->data.size() == 0 );
 }
+
+BOOST_AUTO_TEST_SUITE_END()

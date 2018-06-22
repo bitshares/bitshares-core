@@ -212,6 +212,14 @@ namespace graphene { namespace net {
          */
         void      add_node( const fc::ip::endpoint& ep );
 
+        /****
+         * @brief Add an endpoint as a seed to the p2p network
+         *
+         * @param seed_string the url
+         * @param connect_immediately will start the connection process immediately
+         */
+        void add_seed_node(std::string seed_string, bool connect_immediately);
+
         /**
          *  Attempt to connect to the specified endpoint immediately.
          */
@@ -222,6 +230,17 @@ namespace graphene { namespace net {
          *  connections should be accepted.
          */
         void      listen_on_endpoint( const fc::ip::endpoint& ep, bool wait_if_not_available );
+
+        /***
+         * @brief Helper to convert a string to a collection of endpoints
+         *
+         * This converts a string (i.e. "bitshares.eu:665535" to a collection of endpoints.
+         * NOTE: Throws an exception if not in correct format or was unable to resolve URL.
+         *
+         * @param in the incoming string
+         * @returns a vector of endpoints
+         */
+        static std::vector<fc::ip::endpoint> resolve_string_to_ip_endpoints(std::string in);
 
         /**
          *  Call with true to enable listening for incoming connections

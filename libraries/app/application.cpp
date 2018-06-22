@@ -43,7 +43,6 @@
 #include <fc/io/fstream.hpp>
 #include <fc/rpc/api_connection.hpp>
 #include <fc/rpc/websocket_api.hpp>
-#include <fc/network/resolve.hpp>
 #include <fc/crypto/base64.hpp>
 
 #include <boost/filesystem/path.hpp>
@@ -128,13 +127,7 @@ void application_impl::reset_p2p_node(const fc::path& data_dir)
       for( const string& endpoint_string : seeds )
       {
          try {
-            std::vector<fc::ip::endpoint> endpoints = resolve_string_to_ip_endpoints(endpoint_string);
-            for (const fc::ip::endpoint& endpoint : endpoints)
-            {
-               ilog("Adding seed node ${endpoint}", ("endpoint", endpoint));
-               _p2p_network->add_node(endpoint);
-               _p2p_network->connect_to_endpoint(endpoint);
-            }
+            _p2p_network->add_seed_node(endpoint_string, true);
          } catch( const fc::exception& e ) {
             wlog( "caught exception ${e} while adding seed node ${endpoint}",
                      ("e", e.to_detail_string())("endpoint", endpoint_string) );
@@ -149,12 +142,7 @@ void application_impl::reset_p2p_node(const fc::path& data_dir)
       for( const string& endpoint_string : seeds )
       {
          try {
-            std::vector<fc::ip::endpoint> endpoints = resolve_string_to_ip_endpoints(endpoint_string);
-            for (const fc::ip::endpoint& endpoint : endpoints)
-            {
-               ilog("Adding seed node ${endpoint}", ("endpoint", endpoint));
-               _p2p_network->add_node(endpoint);
-            }
+            _p2p_network->add_seed_node(endpoint_string, false);
          } catch( const fc::exception& e ) {
             wlog( "caught exception ${e} while adding seed node ${endpoint}",
                      ("e", e.to_detail_string())("endpoint", endpoint_string) );
@@ -188,12 +176,7 @@ void application_impl::reset_p2p_node(const fc::path& data_dir)
       for( const string& endpoint_string : seeds )
       {
          try {
-            std::vector<fc::ip::endpoint> endpoints = resolve_string_to_ip_endpoints(endpoint_string);
-            for (const fc::ip::endpoint& endpoint : endpoints)
-            {
-               ilog("Adding seed node ${endpoint}", ("endpoint", endpoint));
-               _p2p_network->add_node(endpoint);
-            }
+            _p2p_network->add_seed_node(endpoint_string, false);
          } catch( const fc::exception& e ) {
             wlog( "caught exception ${e} while adding seed node ${endpoint}",
                      ("e", e.to_detail_string())("endpoint", endpoint_string) );
@@ -208,7 +191,7 @@ void application_impl::reset_p2p_node(const fc::path& data_dir)
    _p2p_network->listen_to_p2p_network();
    ilog("Configured p2p node to listen on ${ip}", ("ip", _p2p_network->get_actual_listening_endpoint()));
 
-   if (_options->count("disable-peer-advertising") && _options->at("disable-peer-advertising").as<bool>() )
+   if (_options->count("advertise-peer-algorithm") && _options->at("advertise-peer-algorithm").as<string>() == "nothing" )
       _p2p_network->disable_peer_advertising();
 
    if (_options->count("accept-incoming-connections") )
@@ -219,36 +202,6 @@ void application_impl::reset_p2p_node(const fc::path& data_dir)
                                         _chain_db->head_block_id()),
                            std::vector<uint32_t>());
 } FC_CAPTURE_AND_RETHROW() }
-
-std::vector<fc::ip::endpoint> application_impl::resolve_string_to_ip_endpoints(const std::string& endpoint_string)
-{
-   try
-   {
-      string::size_type colon_pos = endpoint_string.find(':');
-      if (colon_pos == std::string::npos)
-         FC_THROW("Missing required port number in endpoint string \"${endpoint_string}\"",
-                  ("endpoint_string", endpoint_string));
-      std::string port_string = endpoint_string.substr(colon_pos + 1);
-      try
-      {
-         uint16_t port = boost::lexical_cast<uint16_t>(port_string);
-
-         std::string hostname = endpoint_string.substr(0, colon_pos);
-         std::vector<fc::ip::endpoint> endpoints = fc::resolve(hostname, port);
-         if (endpoints.empty())
-            FC_THROW_EXCEPTION( fc::unknown_host_exception,
-                                "The host name can not be resolved: ${hostname}",
-                                ("hostname", hostname) );
-         return endpoints;
-      }
-      catch (const boost::bad_lexical_cast&)
-      {
-         FC_THROW("Bad port: ${port}", ("port", port_string));
-      }
-   }
-   FC_CAPTURE_AND_RETHROW((endpoint_string))
-}
-
 
 void application_impl::new_connection( const fc::http::websocket_connection_ptr& c )
 {
@@ -1026,6 +979,9 @@ void application::set_program_options(boost::program_options::options_descriptio
           "For asset_api::get_asset_holders to set its default limit value as 100")
 		   ("api-limit-get-key-references",boost::program_options::value<uint64_t>()->default_value(100),
 		    "For database_api_impl::get_key_references to set its default limit value as 100")
+         ("plugins", bpo::value<string>(), "Space-separated list of plugins to activate")
+         ("accept-incoming-connections", bpo::value<bool>()->implicit_value(true), "Accept incoming connections")
+         ("advertise-peer-algorithm", bpo::value<string>()->implicit_value("all"), "Determines which peers are advertised")
          ;
    command_line_options.add(configuration_file_options);
    command_line_options.add_options()
@@ -1035,8 +991,6 @@ void application::set_program_options(boost::program_options::options_descriptio
          ("force-validate", "Force validation of all transactions during normal operation")
          ("genesis-timestamp", bpo::value<uint32_t>(),
           "Replace timestamp from genesis.json with current time plus this many seconds (experts only!)")
-         ("disable-peer-advertising", bpo::value<bool>()->implicit_value(false), "Disable peer advertising")
-         ("accept-incoming-connections", bpo::value<bool>()->implicit_value(true), "Accept incoming connections")
          ;
    command_line_options.add(_cli_options);
    configuration_file_options.add(_cfg_options);

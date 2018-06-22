@@ -165,6 +165,14 @@ private:
 
 class node_impl : public peer_connection_delegate
 {
+   public:
+      class address_builder
+      {
+      public:
+         virtual void build( node_impl* impl, address_message& ) = 0;
+      protected:
+         address_info update_address_record( node_impl* impl, const peer_connection_ptr& active_peer);
+      };
     public:
 #ifdef P2P_IN_DEDICATED_THREAD
       std::shared_ptr<fc::thread> _thread;
@@ -292,8 +300,6 @@ class node_impl : public peer_connection_delegate
 
       uint32_t _last_reported_number_of_connections; // number of connections last reported to the client (to avoid sending duplicate messages)
 
-      bool _peer_advertising_disabled;
-
       fc::future<void> _fetch_updated_peer_lists_loop_done;
 
       boost::circular_buffer<uint32_t> _average_network_read_speed_seconds;
@@ -395,6 +401,8 @@ class node_impl : public peer_connection_delegate
       void on_address_request_message( peer_connection* originating_peer,
                                        const address_request_message& address_request_message_received );
 
+      address_builder* _address_builder;
+
       void on_address_message( peer_connection* originating_peer,
                                const address_message& address_message_received );
 
@@ -482,6 +490,13 @@ class node_impl : public peer_connection_delegate
       void listen_to_p2p_network();
       void connect_to_p2p_network();
       void add_node( const fc::ip::endpoint& ep );
+      /****
+       * @brief Add an endpoint as a seed to the p2p network
+       *
+       * @param seed_string the url
+       * @param connect_immediately will start the connection process immediately
+       */
+      void add_seed_node(std::string seed_string, bool connect_immediately);
       void initiate_connect_to(const peer_connection_ptr& peer);
       void connect_to_endpoint(const fc::ip::endpoint& ep);
       void listen_on_endpoint(const fc::ip::endpoint& ep , bool wait_if_not_available);
