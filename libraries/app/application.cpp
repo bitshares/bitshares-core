@@ -191,8 +191,8 @@ void application_impl::reset_p2p_node(const fc::path& data_dir)
    _p2p_network->listen_to_p2p_network();
    ilog("Configured p2p node to listen on ${ip}", ("ip", _p2p_network->get_actual_listening_endpoint()));
 
-   if (_options->count("advertise-peer-algorithm") && _options->at("advertise-peer-algorithm").as<string>() == "nothing" )
-      _p2p_network->disable_peer_advertising();
+   if (_options->count("advertise-peer-algorithm") )
+      _p2p_network->set_advertise_algorithm( _options->at("advertise-peer-algorithm").as<string>() );
 
    if (_options->count("accept-incoming-connections") )
       _p2p_network->accept_incoming_connections( _options->at("accept-incoming-connections").as<bool>() );

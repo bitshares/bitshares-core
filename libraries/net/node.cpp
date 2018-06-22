@@ -286,6 +286,49 @@ namespace graphene { namespace net { namespace detail {
 #define MAXIMUM_NUMBER_OF_BLOCKS_TO_HANDLE_AT_ONE_TIME 200
 #define MAXIMUM_NUMBER_OF_BLOCKS_TO_PREFETCH (10 * MAXIMUM_NUMBER_OF_BLOCKS_TO_HANDLE_AT_ONE_TIME)
 
+    class random_address_builder : public node_impl::address_builder
+    {
+       void build(node_impl* impl, address_message& reply )
+       {
+          // return a random list of nodes
+          srand( time( NULL ) );
+          for (const peer_connection_ptr& active_peer : impl->_active_connections)
+          {
+             // should we add this one?
+             if ( rand () % 2 == 1)
+             {
+                reply.addresses.emplace_back(update_address_record(impl, active_peer));
+             } // randomness
+          } // each active peer
+       }
+    };
+
+    class list_address_builder : public node_impl::address_builder
+    {
+       void build(node_impl* impl, address_message& reply)
+       {
+          for (const peer_connection_ptr& active_peer : impl->_active_connections)
+          {
+             //TODO: is this connection in the seed list?
+             reply.addresses.emplace_back(update_address_record(impl, active_peer));
+          }
+       }
+    };
+
+    class all_address_builder : public node_impl::address_builder
+    {
+       void build( node_impl* impl, address_message& reply )
+       {
+          reply.addresses.reserve(impl->_active_connections.size());
+          for (const peer_connection_ptr& active_peer : impl->_active_connections)
+          {
+             reply.addresses.emplace_back(update_address_record(impl, active_peer));
+          }
+       }
+    };
+
+
+
     node_impl::node_impl(const std::string& user_agent) :
 #ifdef P2P_IN_DEDICATED_THREAD
       _thread(std::make_shared<fc::thread>("p2p")),
@@ -319,9 +362,9 @@ namespace graphene { namespace net { namespace detail {
       _node_is_shutting_down(false),
       _maximum_number_of_blocks_to_handle_at_one_time(MAXIMUM_NUMBER_OF_BLOCKS_TO_HANDLE_AT_ONE_TIME),
       _maximum_number_of_sync_blocks_to_prefetch(MAXIMUM_NUMBER_OF_BLOCKS_TO_PREFETCH),
-      _maximum_blocks_per_peer_during_syncing(GRAPHENE_NET_MAX_BLOCKS_PER_PEER_DURING_SYNCING),
-       _address_builder(nullptr)
+      _maximum_blocks_per_peer_during_syncing(GRAPHENE_NET_MAX_BLOCKS_PER_PEER_DURING_SYNCING)
     {
+       _address_builder = std::make_shared<all_address_builder>();
       _rate_limiter.set_actual_rate_time_constant(fc::seconds(2));
       fc::rand_bytes(&_node_id.data[0], (int)_node_id.size());
     }
@@ -1678,47 +1721,6 @@ namespace graphene { namespace net { namespace detail {
 
     }
 
-    class random_address_builder : public node_impl::address_builder
-    {
-       void build(node_impl* impl, address_message& reply )
-       {
-          // return a random list of nodes
-          srand( time( NULL ) );
-          for (const peer_connection_ptr& active_peer : impl->_active_connections)
-          {
-             // should we add this one?
-             if ( rand () % 2 == 1)
-             {
-                reply.addresses.emplace_back(update_address_record(impl, active_peer));
-             } // randomness
-          } // each active peer
-       }
-    };
-
-    class list_address_builder : public node_impl::address_builder
-    {
-       void build(node_impl* impl, address_message& reply)
-       {
-          for (const peer_connection_ptr& active_peer : impl->_active_connections)
-          {
-             //TODO: is this connection in the seed list?
-             reply.addresses.emplace_back(update_address_record(impl, active_peer));
-          }
-       }
-    };
-
-    class all_address_builder : public node_impl::address_builder
-    {
-       void build( node_impl* impl, address_message& reply )
-       {
-          reply.addresses.reserve(impl->_active_connections.size());
-          for (const peer_connection_ptr& active_peer : impl->_active_connections)
-          {
-             reply.addresses.emplace_back(update_address_record(impl, active_peer));
-          }
-       }
-    };
-
     /***
      * Handle an incoming request for our list of peers
      * @param originating_peer who requested it
@@ -1732,10 +1734,28 @@ namespace graphene { namespace net { namespace detail {
 
       address_message reply;
 
-      if (_address_builder)
+      if (_address_builder != nullptr)
          _address_builder->build(this, reply );
 
       originating_peer->send_message(reply);
+    }
+
+    void node_impl::set_advertise_algorithm( std::string algo )
+    {
+       if (algo == "random")
+       {
+          _address_builder = std::make_shared<random_address_builder>();
+       }
+       else if (algo == "list")
+       {
+          _address_builder = std::make_shared<list_address_builder>();
+       }
+       else if (algo == "nothing")
+       {
+          _address_builder = nullptr;
+       }
+       else
+          _address_builder = std::make_shared<all_address_builder>();
     }
 
     void node_impl::on_address_message(peer_connection* originating_peer, const address_message& address_message_received)
@@ -5169,7 +5189,12 @@ namespace graphene { namespace net { namespace detail {
 
   void node::add_seed_node(std::string endpoint_string, bool connect_immediately)
   {
-     INVOKE_IN_IMPL(add_seed_node, endpoint_string, connect_immediately);
+     my->add_seed_node(endpoint_string, connect_immediately);
+  }
+
+  void node::set_advertise_algorithm( std::string algo )
+  {
+     my->set_advertise_algorithm( algo );
   }
 
 } } // end namespace graphene::net

@@ -199,7 +199,6 @@ class node_impl : public peer_connection_delegate
       /// used by the task that manages connecting to peers
       // @{
       std::list<potential_peer_record> _add_once_node_list; /// list of peers we want to connect to as soon as possible
-
       peer_database             _potential_peer_db;
       fc::promise<void>::ptr    _retrigger_connect_loop_promise;
       bool                      _potential_peer_database_updated;
@@ -401,7 +400,7 @@ class node_impl : public peer_connection_delegate
       void on_address_request_message( peer_connection* originating_peer,
                                        const address_request_message& address_request_message_received );
 
-      address_builder* _address_builder;
+      std::shared_ptr<address_builder> _address_builder;
 
       void on_address_message( peer_connection* originating_peer,
                                const address_message& address_message_received );
@@ -490,6 +489,7 @@ class node_impl : public peer_connection_delegate
       void listen_to_p2p_network();
       void connect_to_p2p_network();
       void add_node( const fc::ip::endpoint& ep );
+      void set_advertise_algorithm( std::string algo );
       /****
        * @brief Add an endpoint as a seed to the p2p network
        *
