@@ -121,33 +121,19 @@ void application_impl::reset_p2p_node(const fc::path& data_dir)
    _p2p_network->load_configuration(data_dir / "p2p");
    _p2p_network->set_node_delegate(this);
 
+   // passed as one URL per parameter
    if( _options->count("seed-node") )
    {
       auto seeds = _options->at("seed-node").as<vector<string>>();
-      for( const string& endpoint_string : seeds )
-      {
-         try {
-            _p2p_network->add_seed_node(endpoint_string, true);
-         } catch( const fc::exception& e ) {
-            wlog( "caught exception ${e} while adding seed node ${endpoint}",
-                     ("e", e.to_detail_string())("endpoint", endpoint_string) );
-         }
-      }
+      _p2p_network->add_seed_nodes(seeds, true);
    }
 
+   // passed as a collection of URLs in a string
    if( _options->count("seed-nodes") )
    {
       auto seeds_str = _options->at("seed-nodes").as<string>();
       auto seeds = fc::json::from_string(seeds_str).as<vector<string>>(2);
-      for( const string& endpoint_string : seeds )
-      {
-         try {
-            _p2p_network->add_seed_node(endpoint_string, false);
-         } catch( const fc::exception& e ) {
-            wlog( "caught exception ${e} while adding seed node ${endpoint}",
-                     ("e", e.to_detail_string())("endpoint", endpoint_string) );
-         }
-      }
+      _p2p_network->add_seed_nodes(seeds, false);
    }
    else
    {
@@ -173,15 +159,7 @@ void application_impl::reset_p2p_node(const fc::path& data_dir)
          "seed.bts.bangzi.info:55501",        // Bangzi       (Germany)
          "seeds.bitshares.eu:1776"            // pc           (http://seeds.quisquis.de/bitshares.html)
       };
-      for( const string& endpoint_string : seeds )
-      {
-         try {
-            _p2p_network->add_seed_node(endpoint_string, false);
-         } catch( const fc::exception& e ) {
-            wlog( "caught exception ${e} while adding seed node ${endpoint}",
-                     ("e", e.to_detail_string())("endpoint", endpoint_string) );
-         }
-      }
+      _p2p_network->add_seed_nodes(seeds, false);
    }
 
    if( _options->count("p2p-endpoint") )

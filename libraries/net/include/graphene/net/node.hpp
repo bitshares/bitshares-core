@@ -219,7 +219,13 @@ namespace graphene { namespace net {
          * @param seed_string the url
          * @param connect_immediately will start the connection process immediately
          */
-        void add_seed_node(std::string seed_string, bool connect_immediately);
+        void add_seed_node(const std::string& seed_string, bool connect_immediately);
+        /*****
+         * @brief add a list of nodes to seed the p2p network
+         * @param seeds a vector of url strings
+         * @param connect_immediately attempt a connection immediately
+         */
+        void add_seed_nodes(std::vector<std::string> seeds, bool connect_immediately);
 
         /**
          *  Attempt to connect to the specified endpoint immediately.
@@ -241,7 +247,7 @@ namespace graphene { namespace net {
          * @param in the incoming string
          * @returns a vector of endpoints
          */
-        static std::vector<fc::ip::endpoint> resolve_string_to_ip_endpoints(std::string in);
+        static std::vector<fc::ip::endpoint> resolve_string_to_ip_endpoints(const std::string& in);
 
         /**
          *  Call with true to enable listening for incoming connections

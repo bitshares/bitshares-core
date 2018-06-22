@@ -4219,7 +4219,7 @@ namespace graphene { namespace net { namespace detail {
       trigger_p2p_network_connect_loop();
     }
 
-    void node_impl::add_seed_node(std::string endpoint_string, bool connect_immediately)
+    void node_impl::add_seed_node(const std::string& endpoint_string, bool connect_immediately)
     {
        VERIFY_CORRECT_THREAD();
        std::vector<fc::ip::endpoint> endpoints = graphene::net::node::resolve_string_to_ip_endpoints(endpoint_string);
@@ -5158,7 +5158,7 @@ namespace graphene { namespace net { namespace detail {
    * @param in the incoming string
    * @returns a vector of endpoints
    */
-  std::vector<fc::ip::endpoint> node::resolve_string_to_ip_endpoints(std::string in)
+  std::vector<fc::ip::endpoint> node::resolve_string_to_ip_endpoints(const std::string& in)
   {
      try
      {
@@ -5187,9 +5187,28 @@ namespace graphene { namespace net { namespace detail {
      FC_CAPTURE_AND_RETHROW((in))
   }
 
-  void node::add_seed_node(std::string endpoint_string, bool connect_immediately)
+  void node::add_seed_node(const std::string& endpoint_string, bool connect_immediately)
   {
      my->add_seed_node(endpoint_string, connect_immediately);
+  }
+
+  /*****
+   * @brief add a list of nodes to seed the p2p network
+   * @param seeds a vector of url strings
+   * @param connect_immediately attempt a connection immediately
+   */
+  void node::add_seed_nodes(std::vector<std::string> seeds, bool connect_immediately)
+  {
+     for(const std::string& endpoint_string : seeds )
+     {
+        try {
+           my->add_seed_node(endpoint_string, connect_immediately);
+        } catch( const fc::exception& e ) {
+           wlog( "caught exception ${e} while adding seed node ${endpoint}",
+                    ("e", e.to_detail_string())("endpoint", endpoint_string) );
+        }
+     }
+
   }
 
   void node::set_advertise_algorithm( std::string algo )
