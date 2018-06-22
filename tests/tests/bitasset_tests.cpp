@@ -25,6 +25,7 @@
 #include <vector>
 #include <boost/test/unit_test.hpp>
 
+
 #include <graphene/chain/database.hpp>
 #include <graphene/chain/hardfork.hpp>
 
@@ -43,6 +44,9 @@
 #include <fc/log/log_message.hpp>
 
 #include "../common/database_fixture.hpp"
+
+#include <boost/type_traits/ice.hpp> // to fix the lack of an include before 1.62
+#include <boost/lambda/lambda.hpp>
 
 using namespace graphene::chain;
 using namespace graphene::chain::test;
@@ -1166,34 +1170,32 @@ BOOST_AUTO_TEST_CASE( bitasset_secondary_index )
 
       BOOST_TEST_MESSAGE("Searching for all coins backed by CORE");
       const auto& idx = db.get_index_type<graphene::chain::asset_bitasset_data_index>().indices().get<graphene::chain::by_short_backing_asset>();
-      auto core_itr = idx.find( core_id );
-      auto core_end = idx.upper_bound(core_id);
+      auto core_itr = idx.range( core_id == boost::lambda::_1, core_id == boost::lambda::_1);
       BOOST_TEST_MESSAGE("Searching for all coins backed by COIN1");
-      auto coin1_itr = idx.find( coin1_id );
-      auto coin1_end = idx.upper_bound( coin1_id );
+      auto coin1_itr = idx.range( coin1_id == boost::lambda::_1, coin1_id == boost::lambda::_1);
       BOOST_TEST_MESSAGE("Searching for all coins backed by COIN2");
-      auto coin2_itr = idx.find( coin2_id );
+      auto coin2_itr = idx.range( coin2_id == boost::lambda::_1, coin2_id == boost::lambda::_1);
 
       int core_count = 0, coin1_count = 0, coin2_count = 0;
 
       BOOST_TEST_MESSAGE("Counting coins in each category");
 
-      for( ; core_itr != core_end; ++core_itr)
+      for( auto itr = core_itr.first ; itr != core_itr.second; ++itr)
       {
-         BOOST_CHECK(core_itr->options.short_backing_asset == core_id);
-         BOOST_TEST_MESSAGE( fc::json::to_pretty_string(core_itr->asset_id) + " is backed by CORE" );
+         BOOST_CHECK(itr->options.short_backing_asset == core_id);
+         BOOST_TEST_MESSAGE( fc::json::to_pretty_string(itr->asset_id) + " is backed by CORE" );
          core_count++;
       }
-      for( ; coin1_itr != coin1_end; ++coin1_itr )
+      for( auto itr = coin1_itr.first ; itr != coin1_itr.second; ++itr )
       {
-         BOOST_CHECK(coin1_itr->options.short_backing_asset == coin1_id);
-         BOOST_TEST_MESSAGE( fc::json::to_pretty_string( coin1_itr->asset_id) + " is backed by COIN1TEST" );
+         BOOST_CHECK(itr->options.short_backing_asset == coin1_id);
+         BOOST_TEST_MESSAGE( fc::json::to_pretty_string( itr->asset_id) + " is backed by COIN1TEST" );
          coin1_count++;
       }
-      for( ; coin2_itr != idx.end(); ++coin2_itr )
+      for( auto itr = coin2_itr.first; itr != coin2_itr.second; ++itr )
       {
-         BOOST_CHECK(coin2_itr->options.short_backing_asset == coin2_id);
-         BOOST_TEST_MESSAGE( fc::json::to_pretty_string( coin2_itr->asset_id) + " is backed by COIN2TEST" );
+         BOOST_CHECK(itr->options.short_backing_asset == coin2_id);
+         BOOST_TEST_MESSAGE( fc::json::to_pretty_string( itr->asset_id) + " is backed by COIN2TEST" );
          coin2_count++;
       }
 
