@@ -455,10 +455,6 @@ BOOST_AUTO_TEST_CASE( cli_multisig_transaction )
       create_multisig_acct_tx.operations.push_back(account_create_op);
       con.wallet_api_ptr->sign_transaction(create_multisig_acct_tx, true);
 
-      // save the private key for this new account in the wallet file
-      BOOST_CHECK(con.wallet_api_ptr->import_key("cifer.test", bki2.wif_priv_key));
-      con.wallet_api_ptr->save_wallet_file(con.wallet_filename);
-
       // attempt to give cifer.test some bitsahres
       BOOST_TEST_MESSAGE("Transferring bitshares from Nathan to cifer.test");
       signed_transaction transfer_tx1 = con.wallet_api_ptr->transfer("nathan", "cifer.test", "10000", "1.3.0", "Here are some BTS for your new account", true);
@@ -476,30 +472,38 @@ BOOST_AUTO_TEST_CASE( cli_multisig_transaction )
       xfer_op.amount = asset(100000000);
       xfer_op.fee = asset(3000000);  // should be enough for transfer
       transfer_tx2.operations.push_back(xfer_op);
-      transfer_tx2.set_reference_block(dyn_props.head_block_id);
-      transfer_tx2.set_expiration(dyn_props.time + fc::seconds(30));
 
-      // case1: broadcast without signature
+      // case1: sign a transaction without TaPoS and expiration fields
+      // expect: return a transaction with TaPoS and expiration filled
+      transfer_tx2 =
+         con.wallet_api_ptr->multisig_sign_transaction( transfer_tx2, false );
+      BOOST_CHECK( ( transfer_tx2.ref_block_num != 0 &&
+                     transfer_tx2.ref_block_prefix != 0 ) ||
+                   ( transfer_tx2.expiration != fc::time_point_sec() ) );
+
+      // case2: broadcast without signature
       // expect: exception with missing active authority
       BOOST_CHECK_THROW(con.wallet_api_ptr->broadcast_transaction(transfer_tx2), fc::exception);
 
-      // case2: sign with invalid private key
-      // expect: exception with invaid private key
-      BOOST_CHECK_THROW(con.wallet_api_ptr->multisig_sign_transaction(transfer_tx2, {"invalid private key"}), fc::exception);
-
-      // case3: broadcast with partial signatures
+      // case3:
+      // import one of the private keys for this new account in the wallet file,
+      // sign and broadcast with partial signatures
+      //
       // expect: exception with missing active authority
-      transfer_tx2 = con.wallet_api_ptr->multisig_sign_transaction(transfer_tx2, {bki2.wif_priv_key});
-      BOOST_CHECK_THROW(con.wallet_api_ptr->broadcast_transaction(transfer_tx2), fc::exception);
+      BOOST_CHECK(con.wallet_api_ptr->import_key("cifer.test", bki2.wif_priv_key));
+      BOOST_CHECK_THROW(con.wallet_api_ptr->multisig_sign_transaction(transfer_tx2, true), fc::exception);
 
-      // case4: sign with duplicated private key
+      // case4: sign again as signature exists
       // expect: num of signatures not increase
-      transfer_tx2 = con.wallet_api_ptr->multisig_sign_transaction(transfer_tx2, {bki2.wif_priv_key});
+      transfer_tx2 = con.wallet_api_ptr->multisig_sign_transaction(transfer_tx2, false);
       BOOST_CHECK_EQUAL(transfer_tx2.signatures.size(), 1);
 
-      // case5: broadcast without full signatures
+      // case5:
+      // import another private key, sign and broadcast without full signatures
+      //
       // expect: transaction broadcast successfully
-      con.wallet_api_ptr->multisig_sign_transaction(transfer_tx2, {bki3.wif_priv_key}, true);
+      BOOST_CHECK(con.wallet_api_ptr->import_key("cifer.test", bki3.wif_priv_key));
+      con.wallet_api_ptr->multisig_sign_transaction(transfer_tx2, true);
       auto balances = con.wallet_api_ptr->list_account_balances( "cifer.test" );
       for (auto b : balances) {
          if (b.asset_id == asset_id_type()) {

@@ -760,36 +760,76 @@ public:
       return true;
    }
 
-   signed_transaction multisig_sign_transaction( signed_transaction tx,
-                                                 const vector<string> &wif_keys, bool broadcast )
+   signed_transaction multisig_sign_transaction( signed_transaction tx, bool broadcast )
    {
-      vector<fc::ecc::private_key> private_keys;
+      set<public_key_type> pks = _remote_db->get_potential_signatures( tx );
+      flat_set<public_key_type> owned_keys;
+      owned_keys.reserve( pks.size() );
+      std::copy_if( pks.begin(), pks.end(),
+                    std::inserter( owned_keys, owned_keys.end() ),
+                    [this]( const public_key_type &pk ) {
+                       return _keys.find( pk ) != _keys.end();
+                    } );
 
-      for ( const string &wif_key : wif_keys )
+      set<public_key_type> approving_key_set =
+         _remote_db->get_required_signatures( tx, owned_keys );
+
+      if ( ( ( tx.ref_block_num == 0 && tx.ref_block_prefix == 0 ) ||
+             tx.expiration == fc::time_point_sec() ) &&
+           tx.signatures.empty() )
       {
-         fc::optional<fc::ecc::private_key> optional_private_key = wif_to_key( wif_key );
+         auto dyn_props = get_dynamic_global_properties();
+         tx.set_reference_block( dyn_props.head_block_id );
 
-         if ( !optional_private_key )
+         // first, some bookkeeping, expire old items from
+         // _recently_generated_transactions since transactions include the head
+         // block id, we just need the index for keeping transactions unique
+         // when there are multiple transactions in the same block.  choose a
+         // time period that should be at least one block long, even in the
+         // worst case.  2 minutes ought to be plenty.
+         fc::time_point_sec oldest_transaction_ids_to_track( dyn_props.time -
+                                                             fc::minutes( 2 ) );
+         auto oldest_transaction_record_iter =
+            _recently_generated_transactions.get<timestamp_index>().lower_bound(
+               oldest_transaction_ids_to_track );
+         auto begin_iter =
+            _recently_generated_transactions.get<timestamp_index>().begin();
+         _recently_generated_transactions.get<timestamp_index>().erase(
+            begin_iter, oldest_transaction_record_iter );
+
+         uint32_t expiration_time_offset = 0;
+         for ( ;; )
          {
-            elog( "Invalid private key: ${i}", ( "i", wif_key ) );
-            FC_THROW("");
-         }
+            tx.set_expiration( dyn_props.time +
+                               fc::seconds( 30 + expiration_time_offset ) );
+            tx.signatures.clear();
 
-         private_keys.push_back( *optional_private_key );
+            for ( const public_key_type &key : approving_key_set )
+               tx.sign( get_private_key( key ), _chain_id );
+
+            graphene::chain::transaction_id_type this_transaction_id = tx.id();
+            auto iter =
+               _recently_generated_transactions.find( this_transaction_id );
+            if ( iter == _recently_generated_transactions.end() )
+            {
+               // we haven't generated this transaction before, the usual case
+               recently_generated_transaction_record this_transaction_record;
+               this_transaction_record.generation_time = dyn_props.time;
+               this_transaction_record.transaction_id = this_transaction_id;
+               _recently_generated_transactions.insert(
+                  this_transaction_record );
+               break;
+            }
+
+            // else we've generated a dupe, increment expiration time and
+            // re-sign it
+            ++expiration_time_offset;
+         }
       }
-
-      const flat_set<public_key_type> &sig_keys = tx.get_signature_keys( _chain_id );
-      for ( const fc::ecc::private_key &privkey : private_keys )
+      else
       {
-         public_key_type pubkey = privkey.get_public_key();
-         if ( std::find( sig_keys.begin(), sig_keys.end(), pubkey ) != sig_keys.end() )
-         {
-            wlog( "signature of ${fn} already exist, skipping", ( "fn", pubkey ) );
-         }
-         else
-         {
-            tx.sign( privkey, _chain_id );
-         }
+         for ( const public_key_type &key : approving_key_set )
+            tx.sign( get_private_key( key ), _chain_id );
       }
 
       if ( broadcast )
@@ -3728,10 +3768,9 @@ dynamic_global_property_object wallet_api::get_dynamic_global_properties() const
 }
 
 signed_transaction wallet_api::multisig_sign_transaction( signed_transaction tx,
-                                                          const vector<string> &wif_keys,
                                                           bool broadcast )
 {
-   return my->multisig_sign_transaction( tx, wif_keys, broadcast );
+   return my->multisig_sign_transaction( tx, broadcast );
 }
 
 string wallet_api::help()const

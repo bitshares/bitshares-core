@@ -1601,18 +1601,16 @@ class wallet_api
 
       /** Signs a transaction.
        *
-       * Given a fully-formed transaction with or without signatures, this signs
-       * the transaction with the provided keys and optionally broadcasts the
-       * transaction
+       * Given a fully-formed transaction with or without signatures, signs
+       * the transaction with the owned keys and optionally broadcasts the
+       * transaction.
        *
        * @param tx the unsigned transaction
-       * @param wif_keys private keys to be used to sign the transaction
        * @param broadcast true if you wish to broadcast the transaction
        *
-       * @return the signed version of the transaction
+       * @return the signed transaction
        */
       signed_transaction multisig_sign_transaction( signed_transaction tx,
-                                                    const vector<string> &wif_keys,
                                                     bool broadcast = false );
 
       void dbg_make_uia(string creator, string symbol);
