@@ -380,6 +380,7 @@ void check_children_of_bitasset(database& d, const asset_update_bitasset_operati
    // loop through all assets that have this asset as a backing asset
    const auto& idx = d.get_index_type<graphene::chain::asset_bitasset_data_index>().indices().get<by_short_backing_asset>();
    auto backed_by_itr = idx.find( op.asset_to_update );
+
    if ( backed_by_itr != idx.end() ) // if we found at least 1
    {
       auto backed_end = idx.upper_bound( op.asset_to_update );
@@ -427,7 +428,7 @@ void check_children_of_bitasset(database& d, const asset_update_bitasset_operati
                }
             } // if child.issuer
          } // if hf 922/931
-      } // for each asset
+      } // for each asset backed by asset_to_update
    } // if this asset is backing another asset
 } // check_children_of_bitasset
 
