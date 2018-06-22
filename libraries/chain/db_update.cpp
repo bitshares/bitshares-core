@@ -33,6 +33,7 @@
 #include <graphene/chain/transaction_object.hpp>
 #include <graphene/chain/withdraw_permission_object.hpp>
 #include <graphene/chain/witness_object.hpp>
+#include <graphene/chain/witness_schedule_object.hpp>
 
 #include <graphene/chain/protocol/fee_schedule.hpp>
 
@@ -46,21 +47,23 @@ void database::update_global_dynamic_data( const signed_block& b )
       dynamic_global_property_id_type(0)(*this);
 
    uint32_t missed_blocks = get_slot_at_time( b.timestamp );
-   assert( missed_blocks != 0 );
+   FC_ASSERT( missed_blocks != 0, "Trying to push double-produced block onto current block?!" );
    missed_blocks--;
-   for( uint32_t i = 0; i < missed_blocks; ++i ) {
-      const auto& witness_missed = get_scheduled_witness( i+1 )(*this);
-      if(  witness_missed.id != b.witness ) {
-         /*
-         const auto& witness_account = witness_missed.witness_account(*this);
-         if( (fc::time_point::now() - b.timestamp) < fc::seconds(30) )
-            wlog( "Witness ${name} missed block ${n} around ${t}", ("name",witness_account.name)("n",b.block_num())("t",b.timestamp) );
-            */
-
-         modify( witness_missed, [&]( witness_object& w ) {
-           w.total_missed++;
-         });
-      } 
+   const auto& witnesses = witness_schedule_id_type()(*this).current_shuffled_witnesses;
+   uint64_t current_slot = get_dynamic_global_properties().current_aslot % witnesses.size();
+   const uint32_t missed_rounds = missed_blocks / witnesses.size();
+   if( missed_rounds > 0 )
+       for( const auto& witness : witnesses )
+          modify( witness(*this), [missed_rounds]( witness_object& w ) {
+             w.total_missed += missed_rounds;
+          });
+   for( uint32_t i = missed_rounds * witnesses.size(); i < missed_blocks; ++i ) {
+      if( ++current_slot == witnesses.size() )
+         current_slot = 0;
+      const auto& witness_missed = witnesses[current_slot](*this);
+      modify( witness_missed, []( witness_object& w ) {
+         w.total_missed++;
+      });
    }
 
    // dynamic global properties updating
