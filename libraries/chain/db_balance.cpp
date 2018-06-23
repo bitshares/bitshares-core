@@ -156,11 +156,11 @@ void database::deposit_cashback(const account_object& acct, share_type amount, b
 
    if( new_vbid.valid() )
    {
-      modify( acct, [&]( account_object& _acct )
+      modify( acct, [&new_vbid]( account_object& _acct )
       {
          _acct.cashback_vb = *new_vbid;
       } );
-      modify( acct.statistics( *this ), [&]( account_statistics_object& aso )
+      modify( acct.statistics( *this ), []( account_statistics_object& aso )
       {
          aso.has_cashback_vb = true;
       } );
