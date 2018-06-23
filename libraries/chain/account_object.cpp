@@ -46,6 +46,8 @@ void account_balance_object::adjust_balance(const asset& delta)
 {
    assert(delta.asset_id == asset_type);
    balance += delta.amount;
+   if( asset_type == asset_id_type() ) // CORE asset
+      maintenance_flag = true;
 }
 
 void account_statistics_object::process_fees(const account_object& a, database& d) const
