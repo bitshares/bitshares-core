@@ -68,8 +68,13 @@ namespace graphene { namespace chain {
 
          bool has_cashback_vb = false; ///< redundantly store this for better maintenance performance
 
-         /// Whether this account owns some CORE asset
-         inline bool has_some_core() const { return total_core_in_orders > 0 || core_in_balance > 0 || has_cashback_vb; }
+         bool is_voting = false; ///< redundately store whether this account is voting for better maintenance performance
+
+         /// Whether this account owns some CORE asset and is voting
+         inline bool has_some_core_voting() const
+         {
+            return is_voting && ( total_core_in_orders > 0 || core_in_balance > 0 || has_cashback_vb );
+         }
 
          /**
           * Tracks the total fees paid by this account for the purpose of calculating bulk discounts.
@@ -95,7 +100,7 @@ namespace graphene { namespace chain {
          inline bool has_pending_fees() const { return pending_fees > 0 || pending_vested_fees > 0; }
 
          /// Whether need to process this account during the maintenance interval
-         inline bool need_maintenance() const { return has_some_core() || has_pending_fees(); }
+         inline bool need_maintenance() const { return has_some_core_voting() || has_pending_fees(); }
 
          /// @brief Split up and pay out @ref pending_fees and @ref pending_vested_fees
          void process_fees(const account_object& a, database& d) const;
@@ -439,6 +444,7 @@ FC_REFLECT_DERIVED( graphene::chain::account_statistics_object,
                     (total_core_in_orders)
                     (core_in_balance)
                     (has_cashback_vb)
+                    (is_voting)
                     (lifetime_fees_paid)
                     (pending_fees)(pending_vested_fees)
                   )

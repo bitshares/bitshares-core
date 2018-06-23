@@ -104,7 +104,7 @@ void database::perform_account_maintenance(Type tally_helper)
       const account_object& acc_obj = acc_stat.owner( *this );
       ++stats_itr;
 
-      if( acc_stat.has_some_core() )
+      if( acc_stat.has_some_core_voting() )
          tally_helper( acc_obj, acc_stat );
 
       if( acc_stat.has_pending_fees() )
