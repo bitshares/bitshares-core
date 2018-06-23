@@ -45,9 +45,6 @@
 
 #include "../common/database_fixture.hpp"
 
-#include <boost/type_traits/ice.hpp> // to fix the lack of an include before 1.62
-#include <boost/lambda/lambda.hpp>
-
 using namespace graphene::chain;
 using namespace graphene::chain::test;
 
@@ -1170,11 +1167,11 @@ BOOST_AUTO_TEST_CASE( bitasset_secondary_index )
 
       BOOST_TEST_MESSAGE("Searching for all coins backed by CORE");
       const auto& idx = db.get_index_type<graphene::chain::asset_bitasset_data_index>().indices().get<graphene::chain::by_short_backing_asset>();
-      auto core_itr = idx.range( core_id == boost::lambda::_1, core_id == boost::lambda::_1);
+      auto core_itr = idx.equal_range( core_id );
       BOOST_TEST_MESSAGE("Searching for all coins backed by COIN1");
-      auto coin1_itr = idx.range( coin1_id == boost::lambda::_1, coin1_id == boost::lambda::_1);
+      auto coin1_itr = idx.equal_range( coin1_id );
       BOOST_TEST_MESSAGE("Searching for all coins backed by COIN2");
-      auto coin2_itr = idx.range( coin2_id == boost::lambda::_1, coin2_id == boost::lambda::_1);
+      auto coin2_itr = idx.equal_range( coin2_id );
 
       int core_count = 0, coin1_count = 0, coin2_count = 0;
 
