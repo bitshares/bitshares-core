@@ -29,9 +29,6 @@
 
 namespace graphene { namespace elasticsearch {
    using namespace chain;
-   //using namespace graphene::db;
-   //using boost::multi_index_container;
-   //using namespace boost::multi_index;
 
 //
 // Plugins should #define their SPACE_ID's so plugins with
@@ -46,12 +43,6 @@ namespace graphene { namespace elasticsearch {
 #ifndef ELASTICSEARCH_SPACE_ID
 #define ELASTICSEARCH_SPACE_ID 6
 #endif
-
-static size_t WriteCallback(void *contents, size_t size, size_t nmemb, void *userp)
-{
-   ((std::string*)userp)->append((char*)contents, size * nmemb);
-   return size * nmemb;
-}
 
 namespace detail
 {
@@ -75,7 +66,6 @@ class elasticsearch_plugin : public graphene::app::plugin
       friend class detail::elasticsearch_plugin_impl;
       std::unique_ptr<detail::elasticsearch_plugin_impl> my;
 };
-
 
 struct operation_visitor
 {
@@ -145,7 +135,6 @@ struct bulk_struct {
    block_struct block_data;
    visitor_struct additional_data;
 };
-
 
 } } //graphene::elasticsearch
 
