@@ -28,6 +28,7 @@
 
 #include <graphene/chain/protocol/fee_schedule.hpp>
 #include <graphene/chain/protocol/types.hpp>
+#include <graphene/chain/protocol/block.hpp>
 
 #include <graphene/egenesis/egenesis.hpp>
 
@@ -451,6 +452,37 @@ namespace detail {
          reset_p2p_node(_data_dir);
          reset_websocket_server();
          reset_websocket_tls_server();
+
+         //
+         // rexcovery
+         //
+         if (_options->count("recovery-path"))
+         {
+                fc::path recovery_path = _options->at("recovery-path").as<boost::filesystem::path>();
+
+                block_database db;
+                db.open(recovery_path);
+                optional<block_id_type>  id = db.last_id();
+                FC_ASSERT( id.valid(),"block database corrupted." );
+
+                auto last_blk=graphene::chain::block_header::num_from_id(*id);
+                ilog("last block:${a}",("a",last_blk));
+                for(int32_t i=1;i<=last_blk;i++)
+                {
+                    optional<signed_block>  blk= db.fetch_by_number(i);
+                    FC_ASSERT( blk.valid(),"block database corrupted.block:${n}",("n",i) );
+                    // push_block returns true if this message caused the blockchain to switch forks, false if it did not
+                    bool result = _chain_db->push_block( *blk, database::skip_nothing );
+                    // FIXME: what to do if forked.
+                    //FC_ASSERT(result);
+
+                    if((i%10000)==0)
+                    {
+                       ilog("recover:${n}",("n",i));
+                    }
+                }
+
+         }
       } FC_LOG_AND_RETHROW() }
 
       optional< api_access_info > get_api_access_info(const string& username)const
@@ -969,6 +1001,7 @@ void application::set_program_options(boost::program_options::options_descriptio
          ("replay-blockchain", "Rebuild object graph by replaying all blocks")
          ("resync-blockchain", "Delete all blocks and re-sync with network from scratch")
          ("force-validate", "Force validation of all transactions")
+         ("recovery-path",bpo::value<boost::filesystem::path>(), "recovery database path.")
          ("genesis-timestamp", bpo::value<uint32_t>(),
           "Replace timestamp from genesis.json with current time plus this many seconds (experts only!)")
          ;
