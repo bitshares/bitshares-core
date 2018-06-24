@@ -232,10 +232,22 @@ namespace graphene { namespace chain {
          void update_median_feeds(time_point_sec current_time);
    };
 
+   // key extractor for short backing asset
+   struct bitasset_short_backing_asset_extractor
+   {
+      typedef asset_id_type result_type;
+      result_type operator() (const asset_bitasset_data_object& obj) const
+      {
+         return obj.options.short_backing_asset;
+      }
+   };
+
+   struct by_short_backing_asset;
    typedef multi_index_container<
       asset_bitasset_data_object,
       indexed_by<
-         ordered_unique< tag<by_id>, member< object, object_id_type, &object::id > >
+         ordered_unique< tag<by_id>, member< object, object_id_type, &object::id > >,
+         ordered_non_unique< tag<by_short_backing_asset>, bitasset_short_backing_asset_extractor >
       >
    > asset_bitasset_data_object_multi_index_type;
    typedef generic_index<asset_bitasset_data_object, asset_bitasset_data_object_multi_index_type> asset_bitasset_data_index;
