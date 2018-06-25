@@ -257,6 +257,7 @@ namespace graphene { namespace chain {
          const dynamic_global_property_object&  get_dynamic_global_properties()const;
          const node_property_object&            get_node_properties()const;
          const fee_schedule&                    current_fee_schedule()const;
+         const account_statistics_object&       get_account_stats_by_owner( account_id_type owner )const;
 
          time_point_sec   head_block_time()const;
          uint32_t         head_block_num()const;
@@ -470,8 +471,8 @@ namespace graphene { namespace chain {
          void process_bids( const asset_bitasset_data_object& bad );
          void process_bitassets();
 
-         template<class... Types>
-         void perform_account_maintenance(std::tuple<Types...> helpers);
+         template<class Type>
+         void perform_account_maintenance( Type tally_helper );
          ///@}
          ///@}
 

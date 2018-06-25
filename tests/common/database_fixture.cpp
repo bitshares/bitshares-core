@@ -204,7 +204,7 @@ void database_fixture::verify_asset_supplies( const database& db )
    const asset_dynamic_data_object& core_asset_data = db.get_core_asset().dynamic_asset_data_id(db);
    BOOST_CHECK(core_asset_data.fee_pool == 0);
 
-   const simple_index<account_statistics_object>& statistics_index = db.get_index_type<simple_index<account_statistics_object>>();
+   const auto& statistics_index = db.get_index_type<account_stats_index>().indices();
    const auto& balance_index = db.get_index_type<account_balance_index>().indices();
    const auto& settle_index = db.get_index_type<force_settlement_index>().indices();
    const auto& bids = db.get_index_type<collateral_bid_index>().indices();
