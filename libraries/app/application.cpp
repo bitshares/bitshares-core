@@ -481,6 +481,7 @@ namespace detail {
                        ilog("recover:${n}",("n",i));
                     }
                 }
+                db.close();
 
          }
       } FC_LOG_AND_RETHROW() }

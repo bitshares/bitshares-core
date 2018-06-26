@@ -198,6 +198,7 @@ bool database::_push_block(const signed_block& new_block)
       auto session = _undo_db.start_undo_session();
       apply_block(new_block, skip);
       _block_id_to_block.store(new_block.id(), new_block);
+      _block_id_to_block.flush();
       session.commit();
    } catch ( const fc::exception& e ) {
       elog("Failed to push new block:\n${e}", ("e", e.to_detail_string()));
