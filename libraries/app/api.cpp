@@ -531,8 +531,8 @@ namespace graphene { namespace app {
     vector<account_asset_balance> asset_api::get_asset_holders( asset_id_type asset_id, uint32_t start, uint32_t limit ) const {
       FC_ASSERT(limit <= 100);
 
-      const auto& bal_idx = _db.get_index_type< account_balance_index >().indices().get< by_asset_balance >();
-      auto range = bal_idx.equal_range( boost::make_tuple( asset_id ) );
+      const auto& bal_idx = _db.get_index_type< account_balance_index >().indices().get< by_asset >();
+      auto range = bal_idx.equal_range( asset_id );
 
       vector<account_asset_balance> result;
 
@@ -563,8 +563,8 @@ namespace graphene { namespace app {
     // get number of asset holders.
     int asset_api::get_asset_holders_count( asset_id_type asset_id ) const {
 
-      const auto& bal_idx = _db.get_index_type< account_balance_index >().indices().get< by_asset_balance >();
-      auto range = bal_idx.equal_range( boost::make_tuple( asset_id ) );
+      const auto& bal_idx = _db.get_index_type< account_balance_index >().indices().get< by_asset >();
+      auto range = bal_idx.equal_range( asset_id );
 
       int count = boost::distance(range) - 1;
 
@@ -583,8 +583,8 @@ namespace graphene { namespace app {
         asset_id_type asset_id;
         asset_id = dasset_obj.id;
 
-        const auto& bal_idx = _db.get_index_type< account_balance_index >().indices().get< by_asset_balance >();
-        auto range = bal_idx.equal_range( boost::make_tuple( asset_id ) );
+        const auto& bal_idx = _db.get_index_type< account_balance_index >().indices().get< by_asset >();
+        auto range = bal_idx.equal_range( asset_id );
 
         int count = boost::distance(range) - 1;
 

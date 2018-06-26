@@ -72,20 +72,92 @@ vector<std::reference_wrapper<const typename Index::object_type>> database::sort
    return refs;
 }
 
-template<class Type>
-void database::perform_account_maintenance(Type tally_helper)
+void database::perform_special_assets_maintenance()
 {
+   const auto& special_meta = get_special_assets_meta_object();
+
+   // removed special assets
+   const auto& spec_idx = get_index_type< account_special_balance_index >().indices().get<by_asset_balance>();
+   for( asset_id_type a : special_meta.special_assets_removed_this_interval )
+   {
+      auto spec_itr = spec_idx.lower_bound( a );
+      auto spec_end = spec_idx.upper_bound( a );
+      while( spec_itr != spec_end )
+      {
+         auto old_itr = spec_itr;
+         ++spec_itr;
+         remove( *old_itr );
+      }
+   }
+
+   // new special assets
+   const auto& bal_idx = get_index_type< account_balance_index >().indices().get<by_asset>();
+   for( asset_id_type a : special_meta.special_assets_added_this_interval )
+   {
+      auto asset_range = bal_idx.equal_range( a );
+      std::for_each( asset_range.first, asset_range.second, [this]( const account_balance_object& bal_obj )
+      {
+         create<account_special_balance_object>( [&bal_obj]( account_special_balance_object& sp_bal ) {
+            sp_bal.owner = bal_obj.owner;
+            sp_bal.asset_type = bal_obj.asset_type;
+            sp_bal.balance = bal_obj.balance;
+         });
+      });
+   }
+
+   // update global data
+   modify( special_meta, [](special_assets_meta_object& dp) {
+      for( asset_id_type a : dp.special_assets_removed_this_interval )
+         dp.special_assets.erase( a );
+      for( asset_id_type a : dp.special_assets_added_this_interval )
+         dp.special_assets.insert( a );
+      dp.special_assets_removed_this_interval.clear();
+      dp.special_assets_added_this_interval.clear();
+   });
+
+}
+
+void database::perform_balance_maintenance()
+{
+   const auto& special_assets = get_special_assets_meta_object().special_assets;
+
+   bool core_is_special = ( special_assets.find( asset_id_type() ) != special_assets.end() );
+
    const auto& bal_idx = get_index_type< account_balance_index >().indices().get< by_maintenance_flag >();
    if( bal_idx.begin() != bal_idx.end() )
    {
+      const auto& spec_idx = get_index_type< account_special_balance_index >().indices().get<by_account_asset>();
+
       auto bal_itr = bal_idx.rbegin();
       while( bal_itr->maintenance_flag )
       {
          const account_balance_object& bal_obj = *bal_itr;
 
-         modify( get_account_stats_by_owner( bal_obj.owner ), [&bal_obj](account_statistics_object& aso) {
-            aso.core_in_balance = bal_obj.balance;
-         });
+         if( bal_obj.asset_type == asset_id_type() ) // CORE asset
+         {
+            modify( get_account_stats_by_owner( bal_obj.owner ), [&bal_obj](account_statistics_object& aso) {
+               aso.core_in_balance = bal_obj.balance;
+            });
+         }
+
+         if( core_is_special || bal_obj.asset_type != asset_id_type() ) // special asset, can also be CORE
+         {
+            auto spec_itr = spec_idx.find( boost::make_tuple(bal_obj.owner, bal_obj.asset_type) );
+            if( spec_itr == spec_idx.end() ) // new balance
+            {
+               create<account_special_balance_object>( [&bal_obj]( account_special_balance_object& sp_bal ) {
+                  sp_bal.owner = bal_obj.owner;
+                  sp_bal.asset_type = bal_obj.asset_type;
+                  sp_bal.balance = bal_obj.balance;
+               });
+            }
+            else // existing balance
+            {
+               modify( *spec_itr, [&bal_obj]( account_special_balance_object& sp_bal ) {
+                  sp_bal.balance = bal_obj.balance;
+               });
+            }
+         }
 
          modify( bal_obj, []( account_balance_object& abo ) {
             abo.maintenance_flag = false;
@@ -94,7 +166,11 @@ void database::perform_account_maintenance(Type tally_helper)
          bal_itr = bal_idx.rbegin();
       }
    }
+}
 
+template<class Type>
+void database::perform_account_maintenance(Type tally_helper)
+{
    const auto& stats_idx = get_index_type< account_stats_index >().indices().get< by_maintenance_seq >();
    auto stats_itr = stats_idx.lower_bound( true );
 
@@ -526,15 +602,15 @@ void update_top_n_authorities( database& db )
          // use index to grab the top N holders of the asset and vote_counter to obtain the weights
 
          const top_holders_special_authority& tha = auth.get< top_holders_special_authority >();
-         vote_counter vc;
-         const auto& bal_idx = db.get_index_type< account_balance_index >().indices().get< by_asset_balance >();
          uint8_t num_needed = tha.num_top_holders;
          if( num_needed == 0 )
             return;
 
          // find accounts
-         const auto range = bal_idx.equal_range( boost::make_tuple( tha.asset ) );
-         for( const account_balance_object& bal : boost::make_iterator_range( range.first, range.second ) )
+         vote_counter vc;
+         const auto& bal_idx = db.get_index_type< account_special_balance_index >().indices().get< by_asset_balance >();
+         const auto range = bal_idx.equal_range( tha.asset );
+         for( const account_special_balance_object& bal : boost::make_iterator_range( range.first, range.second ) )
          {
              assert( bal.asset_type == tha.asset );
              if( bal.owner == acct.id )
@@ -1099,7 +1175,9 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
       }
    } tally_helper(*this, gpo);
 
+   perform_balance_maintenance();
    perform_account_maintenance( tally_helper );
+   perform_special_assets_maintenance();
 
    struct clear_canary {
       clear_canary(vector<uint64_t>& target): target(target){}

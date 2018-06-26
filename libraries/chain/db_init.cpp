@@ -206,9 +206,11 @@ void database::initialize_indexes()
    //Implementation object indexes
    add_index< primary_index<transaction_index                             > >();
    add_index< primary_index<account_balance_index                         > >();
+   add_index< primary_index<account_special_balance_index                 > >();
    add_index< primary_index<asset_bitasset_data_index                     > >();
    add_index< primary_index<simple_index<global_property_object          >> >();
    add_index< primary_index<simple_index<dynamic_global_property_object  >> >();
+   add_index< primary_index<simple_index<special_assets_meta_object      >> >();
    add_index< primary_index<account_stats_index                           > >();
    add_index< primary_index<simple_index<asset_dynamic_data_object       >> >();
    add_index< primary_index<simple_index<block_summary_object            >> >();
@@ -548,6 +550,10 @@ void database::init_genesis(const genesis_state_type& genesis_state)
          a.bitasset_data_id = bitasset_data_id;
       });
    }
+
+   // Create special assets meta object
+   create<special_assets_meta_object>([&](special_assets_meta_object& p) {
+   });
 
    // Create initial balances
    share_type total_allocation;

@@ -355,11 +355,13 @@ void get_relevant_accounts( const object* obj, flat_set<account_id_type>& accoun
               break;
              case impl_dynamic_global_property_object_type:
               break;
-             case impl_reserved0_object_type:
+             case impl_special_assets_meta_object_type:
               break;
              case impl_asset_dynamic_data_type:
               break;
              case impl_asset_bitasset_data_type:
+              break;
+             case impl_account_special_balance_object_type:
               break;
              case impl_account_balance_object_type:{
               const auto& aobj = dynamic_cast<const account_balance_object*>(obj);
