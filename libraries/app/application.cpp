@@ -79,7 +79,7 @@ namespace bpo = boost::program_options;
 namespace detail {
 
    graphene::chain::genesis_state_type create_example_genesis() {
-      auto nathan_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("nathan")));
+      auto nathan_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("ULF")));
       dlog("Allocating all stake to ${key}", ("key", utilities::key_to_wif(nathan_key)));
       graphene::chain::genesis_state_type initial_state;
       initial_state.initial_parameters.current_fees = fee_schedule::get_default();//->set_all_fees(GRAPHENE_BLOCKCHAIN_PRECISION);
@@ -98,7 +98,7 @@ namespace detail {
          initial_state.initial_witness_candidates.push_back({name, nathan_key.get_public_key()});
       }
 
-      initial_state.initial_accounts.emplace_back("nathan", nathan_key.get_public_key());
+      initial_state.initial_accounts.emplace_back("ULF", nathan_key.get_public_key());
       initial_state.initial_balances.push_back({nathan_key.get_public_key(),
                                                 GRAPHENE_SYMBOL,
                                                 GRAPHENE_MAX_SHARE_SUPPLY});
@@ -118,7 +118,7 @@ namespace graphene { namespace app { namespace detail {
 
 void application_impl::reset_p2p_node(const fc::path& data_dir)
 { try {
-   _p2p_network = std::make_shared<net::node>("BitShares Reference Implementation");
+   _p2p_network = std::make_shared<net::node>("ULF Reference Implementation");
 
    _p2p_network->load_configuration(data_dir / "p2p");
    _p2p_network->set_node_delegate(this);
@@ -164,25 +164,16 @@ void application_impl::reset_p2p_node(const fc::path& data_dir)
    }
    else
    {
-      // https://bitsharestalk.org/index.php/topic,23715.0.html
+      // https://ulurs.com
       vector<string> seeds = {
          "104.236.144.84:1777",               // puppies      (USA)
-         "128.199.143.47:2015",               // Harvey       (Singapore)
-         "23.92.53.182:1776",                 // sahkan       (USA)
-         "192.121.166.162:1776",              // sahkan       (UK)
-         "51.15.61.160:1776",                 // lafona       (France)
-         "bts-seed1.abit-more.com:62015",     // abit         (China)
-         "node.blckchnd.com:4243",            // blckchnd     (Germany)
-         "seed.bitsharesdex.com:50696",       // iHashFury    (Europe)
-         "seed.bitsharesnodes.com:1776",      // wackou       (Netherlands)
-         "seed.blocktrades.us:1776",          // BlockTrades  (USA)
-         "seed.cubeconnex.com:1777",          // cube         (USA)
-         "seed.roelandp.nl:1776",             // roelandp     (Canada)
-         "seed04.bts-nodes.net:1776",         // Thom         (Australia)
-         "seed05.bts-nodes.net:1776",          // Thom         (USA)
-         "seed06.bts-nodes.net:1776",          // Thom         (USA)
-         "seed07.bts-nodes.net:1776",          // Thom         (Singapore)
-         "seeds.bitshares.eu:1776"            // pc           (http://seeds.quisquis.de/bitshares.html)
+         "ulf-nam-seed.ulurs.com:2023",
+         "ulf-sam-seed.ulurs.com:2023",
+         "ulf-as-seed.ulurs.com:2023",
+         "ulf-au-seed.ulurs.com:2023",
+         "ulf-eu-seed.ulurs.com:2023",
+         "ulf-af-seed.ulurs.com:2023",
+         "ulf-seed.ulurs.com:2023"
       };
       for( const string& endpoint_string : seeds )
       {

@@ -23,8 +23,8 @@
  */
 #pragma once
 
-#define GRAPHENE_SYMBOL "BTS"
-#define GRAPHENE_ADDRESS_PREFIX "BTS"
+#define GRAPHENE_SYMBOL "URS"
+#define GRAPHENE_ADDRESS_PREFIX "ULF"
 
 #define GRAPHENE_MIN_ACCOUNT_NAME_LENGTH 1
 #define GRAPHENE_MAX_ACCOUNT_NAME_LENGTH 63
@@ -32,7 +32,7 @@
 #define GRAPHENE_MIN_ASSET_SYMBOL_LENGTH 3
 #define GRAPHENE_MAX_ASSET_SYMBOL_LENGTH 16
 
-#define GRAPHENE_MAX_SHARE_SUPPLY int64_t(1000000000000000ll)
+#define GRAPHENE_MAX_SHARE_SUPPLY int64_t(99999999999999999ll)
 #define GRAPHENE_MAX_PAY_RATE 10000 /* 100% */
 #define GRAPHENE_MAX_SIG_CHECK_DEPTH 2
 /**
@@ -53,15 +53,15 @@
 #define GRAPHENE_MIN_UNDO_HISTORY 10
 #define GRAPHENE_MAX_UNDO_HISTORY 10000
 
-#define GRAPHENE_MIN_BLOCK_SIZE_LIMIT (GRAPHENE_MIN_TRANSACTION_SIZE_LIMIT*5) // 5 transactions per block
-#define GRAPHENE_MIN_TRANSACTION_EXPIRATION_LIMIT (GRAPHENE_MAX_BLOCK_INTERVAL * 5) // 5 transactions per block
-#define GRAPHENE_BLOCKCHAIN_PRECISION                           uint64_t( 100000 )
+#define GRAPHENE_MIN_BLOCK_SIZE_LIMIT (GRAPHENE_MIN_TRANSACTION_SIZE_LIMIT*1) // 1 transactions per block
+#define GRAPHENE_MIN_TRANSACTION_EXPIRATION_LIMIT (GRAPHENE_MAX_BLOCK_INTERVAL * 1) // 1 transactions per block
+#define GRAPHENE_BLOCKCHAIN_PRECISION                           uint64_t( 1 )
 
-#define GRAPHENE_BLOCKCHAIN_PRECISION_DIGITS                    5
+#define GRAPHENE_BLOCKCHAIN_PRECISION_DIGITS                    1
 #define GRAPHENE_DEFAULT_TRANSFER_FEE                           (1*GRAPHENE_BLOCKCHAIN_PRECISION)
 #define GRAPHENE_MAX_INSTANCE_ID                                (uint64_t(-1)>>16)
 /** percentage fields are fixed point with a denominator of 10,000 */
-#define GRAPHENE_100_PERCENT                                    10000
+#define GRAPHENE_100_PERCENT                                    100
 #define GRAPHENE_1_PERCENT                                      (GRAPHENE_100_PERCENT/100)
 /** NOTE: making this a power of 2 (say 2^15) would greatly accelerate fee calcs */
 #define GRAPHENE_MAX_MARKET_FEE_PERCENT                         GRAPHENE_100_PERCENT
@@ -88,8 +88,8 @@
 ///@}
 #define GRAPHENE_DEFAULT_MARGIN_PERIOD_SEC              (30*60*60*24)
 
-#define GRAPHENE_DEFAULT_MIN_WITNESS_COUNT                    (11)
-#define GRAPHENE_DEFAULT_MIN_COMMITTEE_MEMBER_COUNT           (11)
+#define GRAPHENE_DEFAULT_MIN_WITNESS_COUNT                    (7)
+#define GRAPHENE_DEFAULT_MIN_COMMITTEE_MEMBER_COUNT           (7)
 #define GRAPHENE_DEFAULT_MAX_WITNESSES                        (1001) // SHOULD BE ODD
 #define GRAPHENE_DEFAULT_MAX_COMMITTEE                        (1001) // SHOULD BE ODD
 #define GRAPHENE_DEFAULT_MAX_PROPOSAL_LIFETIME_SEC            (60*60*24*7*4) // Four weeks
@@ -102,7 +102,7 @@
 #define GRAPHENE_DEFAULT_CASHBACK_VESTING_PERIOD_SEC          (60*60*24*365) ///< 1 year
 #define GRAPHENE_DEFAULT_CASHBACK_VESTING_THRESHOLD           (GRAPHENE_BLOCKCHAIN_PRECISION*int64_t(100))
 #define GRAPHENE_DEFAULT_BURN_PERCENT_OF_FEE                  (20*GRAPHENE_1_PERCENT)
-#define GRAPHENE_WITNESS_PAY_PERCENT_PRECISION                (1000000000)
+#define GRAPHENE_WITNESS_PAY_PERCENT_PRECISION                (1000)
 #define GRAPHENE_DEFAULT_MAX_ASSERT_OPCODE                    1
 #define GRAPHENE_DEFAULT_FEE_LIQUIDATION_THRESHOLD            GRAPHENE_BLOCKCHAIN_PRECISION * 100;
 #define GRAPHENE_DEFAULT_ACCOUNTS_PER_FEE_SCALE               1000
@@ -135,18 +135,18 @@
 
 #define GRAPHENE_DEFAULT_WITNESS_PAY_PER_BLOCK            (GRAPHENE_BLOCKCHAIN_PRECISION * int64_t( 10) )
 #define GRAPHENE_DEFAULT_WITNESS_PAY_VESTING_SECONDS      (60*60*24)
-#define GRAPHENE_DEFAULT_WORKER_BUDGET_PER_DAY            (GRAPHENE_BLOCKCHAIN_PRECISION * int64_t(500) * 1000 )
+#define GRAPHENE_DEFAULT_WORKER_BUDGET_PER_DAY            (GRAPHENE_BLOCKCHAIN_PRECISION * int64_t(500) * 100 )
 
 #define GRAPHENE_DEFAULT_MINIMUM_FEEDS                       7
 
-#define GRAPHENE_MAX_INTEREST_APR                            uint16_t( 10000 )
+#define GRAPHENE_MAX_INTEREST_APR                            uint16_t( 1000 )
 
 #define GRAPHENE_RECENTLY_MISSED_COUNT_INCREMENT             4
 #define GRAPHENE_RECENTLY_MISSED_COUNT_DECREMENT             3
 
-#define GRAPHENE_CURRENT_DB_VERSION                          "BTS2.15"
+#define GRAPHENE_CURRENT_DB_VERSION                          "ULF2.15"
 
-#define GRAPHENE_IRREVERSIBLE_THRESHOLD                      (70 * GRAPHENE_1_PERCENT)
+#define GRAPHENE_IRREVERSIBLE_THRESHOLD                      (40 * GRAPHENE_1_PERCENT)
 
 /**
  *  Reserved Account IDs with special meaning
