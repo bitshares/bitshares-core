@@ -33,7 +33,6 @@
 #include <graphene/chain/transaction_object.hpp>
 #include <graphene/chain/withdraw_permission_object.hpp>
 #include <graphene/chain/witness_object.hpp>
-#include <graphene/chain/witness_schedule_object.hpp>
 
 #include <graphene/chain/protocol/fee_schedule.hpp>
 
@@ -41,25 +40,13 @@
 
 namespace graphene { namespace chain {
 
-void database::update_global_dynamic_data( const signed_block& b )
+void database::update_global_dynamic_data( const signed_block& b, const uint32_t missed_blocks )
 {
    const dynamic_global_property_object& _dgp =
       dynamic_global_property_id_type(0)(*this);
 
-   uint32_t missed_blocks = get_slot_at_time( b.timestamp );
-   FC_ASSERT( missed_blocks != 0, "Trying to push double-produced block onto current block?!" );
-   missed_blocks--;
-   const auto& witnesses = witness_schedule_id_type()(*this).current_shuffled_witnesses;
-   if( missed_blocks < witnesses.size() )
-      for( uint32_t i = 0; i < missed_blocks; ++i ) {
-         const auto& witness_missed = get_scheduled_witness( i+1 )(*this);
-         modify( witness_missed, []( witness_object& w ) {
-            w.total_missed++;
-         });
-      }
-
    // dynamic global properties updating
-   modify( _dgp, [&]( dynamic_global_property_object& dgp ){
+   modify( _dgp, [&b,this,missed_blocks]( dynamic_global_property_object& dgp ){
       if( BOOST_UNLIKELY( b.block_num() == 1 ) )
          dgp.recently_missed_count = 0;
          else if( _checkpoints.size() && _checkpoints.rbegin()->first >= b.block_num() )
