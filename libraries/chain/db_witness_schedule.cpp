@@ -77,7 +77,7 @@ uint32_t database::get_slot_at_time(fc::time_point_sec when)const
    return (when - first_slot_time).to_seconds() / block_interval() + 1;
 }
 
-uint32_t database::count_missed_blocks( const signed_block& b )
+uint32_t database::update_witness_missed_blocks( const signed_block& b )
 {
    uint32_t missed_blocks = get_slot_at_time( b.timestamp );
    FC_ASSERT( missed_blocks != 0, "Trying to push double-produced block onto current block?!" );

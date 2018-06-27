@@ -445,7 +445,7 @@ namespace graphene { namespace chain {
 
          //////////////////// db_witness_schedule.cpp ////////////////////
 
-         uint32_t count_missed_blocks( const signed_block& b );
+         uint32_t update_witness_missed_blocks( const signed_block& b );
 
          //////////////////// db_update.cpp ////////////////////
          void update_global_dynamic_data( const signed_block& b, const uint32_t missed_blocks );
