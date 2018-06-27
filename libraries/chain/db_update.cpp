@@ -50,21 +50,13 @@ void database::update_global_dynamic_data( const signed_block& b )
    FC_ASSERT( missed_blocks != 0, "Trying to push double-produced block onto current block?!" );
    missed_blocks--;
    const auto& witnesses = witness_schedule_id_type()(*this).current_shuffled_witnesses;
-   uint64_t current_slot = get_dynamic_global_properties().current_aslot % witnesses.size();
-   const uint32_t missed_rounds = missed_blocks / witnesses.size();
-   if( missed_rounds > 0 )
-       for( const auto& witness : witnesses )
-          modify( witness(*this), [missed_rounds]( witness_object& w ) {
-             w.total_missed += missed_rounds;
-          });
-   for( uint32_t i = missed_rounds * witnesses.size(); i < missed_blocks; ++i ) {
-      if( ++current_slot == witnesses.size() )
-         current_slot = 0;
-      const auto& witness_missed = witnesses[current_slot](*this);
-      modify( witness_missed, []( witness_object& w ) {
-         w.total_missed++;
-      });
-   }
+   if( missed_blocks < witnesses.size() )
+      for( uint32_t i = 0; i < missed_blocks; ++i ) {
+         const auto& witness_missed = get_scheduled_witness( i+1 )(*this);
+         modify( witness_missed, []( witness_object& w ) {
+            w.total_missed++;
+         });
+      }
 
    // dynamic global properties updating
    modify( _dgp, [&]( dynamic_global_property_object& dgp ){
