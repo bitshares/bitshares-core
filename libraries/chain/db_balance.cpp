@@ -57,9 +57,13 @@ void database::adjust_balance(account_id_type account, asset delta )
    if( delta.amount == 0 )
       return;
 
+#ifndef ASSET_BALANCE_SORTED
    const auto& special_assets = get_special_assets_meta_object().special_assets;
    bool maint_flag = ( delta.asset_id == asset_id_type() // CORE asset
                        || special_assets.find( delta.asset_id ) != special_assets.end() ); // special asset
+#else
+   bool maint_flag = ( delta.asset_id == asset_id_type() ); // CORE asset
+#endif
 
    const auto& index = get_index_type<account_balance_index>().indices().get<by_account_asset>();
    auto itr = index.find(boost::make_tuple(account, delta.asset_id));

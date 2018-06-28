@@ -316,7 +316,9 @@ void_result account_update_evaluator::do_apply( const account_update_operation& 
 
    bool sa_before = acnt->has_special_authority();
 
+#ifndef ASSET_BALANCE_SORTED
    flat_set<asset_id_type> assets_before = acnt->get_top_n_control_assets();
+#endif
 
    // update account statistics
    if( o.new_options.valid() && o.new_options->is_voting() != acnt->options.is_voting() )
@@ -354,15 +356,19 @@ void_result account_update_evaluator::do_apply( const account_update_operation& 
 
    bool sa_after = acnt->has_special_authority();
 
+#ifndef ASSET_BALANCE_SORTED
    flat_set<asset_id_type> assets_after = acnt->get_top_n_control_assets();
 
    const auto& special_meta = d.get_special_assets_meta_object();
+#endif
+
    if( sa_before && (!sa_after) )
    {
       const auto& sa_idx = d.get_index_type< special_authority_index >().indices().get<by_account>();
       auto sa_it = sa_idx.find( o.account );
       assert( sa_it != sa_idx.end() );
       d.remove( *sa_it );
+#ifndef ASSET_BALANCE_SORTED
       // From next maintenance interval, need to stop updating this account's active/owner.
       // Here we check if each asset is added earlier in this maintenance interval,
       //   if yes, remove it from "added"; otherwise, add it to "removed".
@@ -374,6 +380,7 @@ void_result account_update_evaluator::do_apply( const account_update_operation& 
                p.special_assets_removed_this_interval.insert( a );
          }
       });
+#endif
    }
    else if( (!sa_before) && sa_after )
    {
@@ -381,6 +388,7 @@ void_result account_update_evaluator::do_apply( const account_update_operation& 
       {
          sa.account = o.account;
       } );
+#ifndef ASSET_BALANCE_SORTED
       // From next maintenance interval, need to update this account's active/owner, so need to get top n asset holders.
       // Here we check if each asset is removed earlier in this maintenance interval,
       //   if yes, remove it from "removed"; otherwise, add it to "added".
@@ -392,6 +400,7 @@ void_result account_update_evaluator::do_apply( const account_update_operation& 
                p.special_assets_added_this_interval.insert( a );
          }
       });
+#endif
    }
 
    return void_result();

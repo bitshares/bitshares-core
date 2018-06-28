@@ -354,9 +354,25 @@ namespace graphene { namespace chain {
                member<account_balance_object, asset_id_type, &account_balance_object::asset_type>
             >
          >,
+#ifdef ASSET_BALANCE_SORTED
+         ordered_unique< tag<by_asset>,
+            composite_key<
+               account_balance_object,
+               member<account_balance_object, asset_id_type, &account_balance_object::asset_type>,
+               member<account_balance_object, share_type, &account_balance_object::balance>,
+               member<account_balance_object, account_id_type, &account_balance_object::owner>
+            >,
+            composite_key_compare<
+               std::less< asset_id_type >,
+               std::greater< share_type >,
+               std::less< account_id_type >
+            >
+         >
+#else
          ordered_non_unique< tag<by_asset>,
                member<account_balance_object, asset_id_type, &account_balance_object::asset_type>
          >
+#endif
       >
    > account_balance_object_multi_index_type;
 

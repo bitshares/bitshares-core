@@ -72,6 +72,7 @@ vector<std::reference_wrapper<const typename Index::object_type>> database::sort
    return refs;
 }
 
+#ifndef ASSET_BALANCE_SORTED
 void database::perform_special_assets_maintenance()
 {
    const auto& special_meta = get_special_assets_meta_object();
@@ -116,28 +117,35 @@ void database::perform_special_assets_maintenance()
    });
 
 }
+#endif
 
 void database::perform_balance_maintenance()
 {
+#ifndef ASSET_BALANCE_SORTED
    const auto& special_assets = get_special_assets_meta_object().special_assets;
 
    bool core_is_special = ( special_assets.find( asset_id_type() ) != special_assets.end() );
+#endif
 
    const auto& bal_idx = get_index_type< account_balance_index >().indices().get< by_maintenance_flag >();
    if( bal_idx.begin() != bal_idx.end() )
    {
+#ifndef ASSET_BALANCE_SORTED
       const auto& spec_idx = get_index_type< account_special_balance_index >().indices().get<by_account_asset>();
+#endif
 
-      auto bal_itr = bal_idx.rbegin();
-      while( bal_itr->maintenance_flag )
+      for( auto bal_itr = bal_idx.rbegin(); bal_itr->maintenance_flag; bal_itr = bal_idx.rbegin() )
       {
          const account_balance_object& bal_obj = *bal_itr;
 
+#ifndef ASSET_BALANCE_SORTED
          if( bal_obj.asset_type == asset_id_type() ) // CORE asset
          {
+#endif
             modify( get_account_stats_by_owner( bal_obj.owner ), [&bal_obj](account_statistics_object& aso) {
                aso.core_in_balance = bal_obj.balance;
             });
+#ifndef ASSET_BALANCE_SORTED
          }
 
          if( core_is_special || bal_obj.asset_type != asset_id_type() ) // special asset, can also be CORE
@@ -158,12 +166,12 @@ void database::perform_balance_maintenance()
                });
             }
          }
+#endif
 
          modify( bal_obj, []( account_balance_object& abo ) {
             abo.maintenance_flag = false;
          });
 
-         bal_itr = bal_idx.rbegin();
       }
    }
 }
@@ -608,11 +616,14 @@ void update_top_n_authorities( database& db )
 
          // find accounts
          vote_counter vc;
+#ifdef ASSET_BALANCE_SORTED
+         const auto& bal_idx = db.get_index_type< account_balance_index >().indices().get< by_asset >();
+#else
          const auto& bal_idx = db.get_index_type< account_special_balance_index >().indices().get< by_asset_balance >();
+#endif
          const auto range = bal_idx.equal_range( tha.asset );
-         for( const account_special_balance_object& bal : boost::make_iterator_range( range.first, range.second ) )
+         for( const auto& bal : boost::make_iterator_range( range.first, range.second ) )
          {
-             assert( bal.asset_type == tha.asset );
              if( bal.owner == acct.id )
                 continue;
              vc.add( bal.owner, bal.balance.value );
@@ -1177,7 +1188,10 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
 
    perform_balance_maintenance();
    perform_account_maintenance( tally_helper );
+
+#ifndef ASSET_BALANCE_SORTED
    perform_special_assets_maintenance();
+#endif
 
    struct clear_canary {
       clear_canary(vector<uint64_t>& target): target(target){}

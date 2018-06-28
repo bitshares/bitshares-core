@@ -476,7 +476,9 @@ namespace graphene { namespace chain {
          void perform_account_maintenance( Type tally_helper );
 
          void perform_balance_maintenance();
+#ifndef ASSET_BALANCE_SORTED
          void perform_special_assets_maintenance();
+#endif
          ///@}
          ///@}
 
