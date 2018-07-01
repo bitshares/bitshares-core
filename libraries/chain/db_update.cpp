@@ -455,6 +455,9 @@ void database::clear_expired_orders()
 
 void database::update_expired_feeds()
 {
+   const auto head_num = head_block_num();
+   const auto head_time = head_block_time();
+   bool before_hf_615 = ( head_time < HARDFORK_615_TIME );
    auto& asset_idx = get_index_type<asset_index>().indices().get<by_type>();
    auto itr = asset_idx.lower_bound( true /** market issued */ );
    while( itr != asset_idx.end() )
@@ -465,16 +468,21 @@ void database::update_expired_feeds()
 
       const asset_bitasset_data_object& b = a.bitasset_data(*this);
       bool feed_is_expired;
-      if( head_block_time() < HARDFORK_615_TIME )
-         feed_is_expired = b.feed_is_expired_before_hardfork_615( head_block_time() );
+      if( before_hf_615 )
+         feed_is_expired = b.feed_is_expired_before_hardfork_615( head_time );
       else
-         feed_is_expired = b.feed_is_expired( head_block_time() );
+         feed_is_expired = b.feed_is_expired( head_time );
       if( feed_is_expired )
       {
-         modify(b, [this](asset_bitasset_data_object& a) {
-            a.update_median_feeds(head_block_time());
+         modify(b, [head_time](asset_bitasset_data_object& a) {
+            a.update_median_feeds(head_time);
          });
-         check_call_orders(b.current_feed.settlement_price.base.asset_id(*this));
+         bool called_some = check_call_orders(b.current_feed.settlement_price.base.asset_id(*this));
+         if( called_some && before_hf_615 )
+         {
+            wlog( "Graphene issue #615: called some for asset ${a} on block #${b}, feed really expired: ${f}",
+                  ("a", a.symbol) ("b", head_num) ("f", b.feed_is_expired(head_time)) );
+         }
       }
       if( !b.current_feed.core_exchange_rate.is_null() &&
           a.options.core_exchange_rate != b.current_feed.core_exchange_rate )
