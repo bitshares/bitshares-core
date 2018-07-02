@@ -85,6 +85,10 @@ namespace fc {
 }
 
 #define BRAIN_KEY_WORD_COUNT 16
+#define RANGE_PROOF_MANTISSA 49 // Minimum mantissa bits to "hide" in the range proof.
+                                // If this number is set too low, then for large value
+                                // commitments the length of the range proof will hint
+                                // strongly at the value amount that is being hidden.
 
 namespace graphene { namespace wallet {
 
@@ -4274,12 +4278,12 @@ blind_confirmation wallet_api::blind_transfer_help( string from_key_or_label,
 
    if( blind_tr.outputs.size() > 1 )
    {
-      to_out.range_proof = fc::ecc::range_proof_sign( 0, to_out.commitment, blind_factor, nonce,  0, 0, amount.amount.value );
+      to_out.range_proof = fc::ecc::range_proof_sign( 0, to_out.commitment, blind_factor, nonce,  0, RANGE_PROOF_MANTISSA, amount.amount.value );
 
       blind_output change_out;
       change_out.owner       = authority( 1, public_key_type( from_pub_key.child( from_child ) ), 1 );
       change_out.commitment  = fc::ecc::blind( change_blind_factor, change.amount.value );
-      change_out.range_proof = fc::ecc::range_proof_sign( 0, change_out.commitment, change_blind_factor, from_nonce,  0, 0, change.amount.value );
+      change_out.range_proof = fc::ecc::range_proof_sign( 0, change_out.commitment, change_blind_factor, from_nonce,  0, RANGE_PROOF_MANTISSA, change.amount.value );
       blind_tr.outputs[1] = change_out;
 
 
@@ -4387,7 +4391,7 @@ blind_confirmation wallet_api::transfer_to_blind( string from_account_id_or_name
       out.owner       = authority( 1, public_key_type( to_pub_key.child( child ) ), 1 );
       out.commitment  = fc::ecc::blind( blind_factor, amount.amount.value );
       if( to_amounts.size() > 1 )
-         out.range_proof = fc::ecc::range_proof_sign( 0, out.commitment, blind_factor, nonce,  0, 0, amount.amount.value );
+         out.range_proof = fc::ecc::range_proof_sign( 0, out.commitment, blind_factor, nonce,  0, RANGE_PROOF_MANTISSA, amount.amount.value );
 
 
       blind_confirmation::output conf_output;
