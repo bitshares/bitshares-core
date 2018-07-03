@@ -460,12 +460,12 @@ namespace graphene { namespace chain {
          void update_withdraw_permissions();
          bool check_for_blackswan( const asset_object& mia, bool enable_black_swan = true );
 
+         ///Steps performed only at maintenance intervals
+         ///@{
+
          // populated in db_main.cpp and used in db_update.cpp
          vector<const witness_object *> wit_objs;
          void populate_witness(const global_property_object& gpo);
-
-         ///Steps performed only at maintenance intervals
-         ///@{
 
          //////////////////// db_maint.cpp ////////////////////
 
