@@ -34,22 +34,26 @@ namespace graphene { namespace chain {
 
 const asset_object& database::get_core_asset() const
 {
-   return get(asset_id_type());
+   static const asset_object& obj = get(asset_id_type());
+   return obj;
 }
 
 const global_property_object& database::get_global_properties()const
 {
-   return get( global_property_id_type() );
+   static const global_property_object& obj = get( global_property_id_type() );
+   return obj;
 }
 
 const chain_property_object& database::get_chain_properties()const
 {
-   return get( chain_property_id_type() );
+   static const chain_property_object& obj = get( chain_property_id_type() );
+   return obj;
 }
 
-const dynamic_global_property_object&database::get_dynamic_global_properties() const
+const dynamic_global_property_object& database::get_dynamic_global_properties() const
 {
-   return get( dynamic_global_property_id_type() );
+   static const dynamic_global_property_object& obj = get( dynamic_global_property_id_type() );
+   return obj;
 }
 
 const fee_schedule&  database::current_fee_schedule()const
@@ -59,17 +63,17 @@ const fee_schedule&  database::current_fee_schedule()const
 
 time_point_sec database::head_block_time()const
 {
-   return get( dynamic_global_property_id_type() ).time;
+   return get_dynamic_global_properties().time;
 }
 
 uint32_t database::head_block_num()const
 {
-   return get( dynamic_global_property_id_type() ).head_block_number;
+   return get_dynamic_global_properties().head_block_number;
 }
 
 block_id_type database::head_block_id()const
 {
-   return get( dynamic_global_property_id_type() ).head_block_id;
+   return get_dynamic_global_properties().head_block_id;
 }
 
 decltype( chain_parameters::block_interval ) database::block_interval( )const
