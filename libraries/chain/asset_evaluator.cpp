@@ -118,14 +118,14 @@ object_id_type asset_create_evaluator::do_apply( const asset_create_operation& o
    bool hf_429 = fee_is_odd && db().head_block_time() > HARDFORK_CORE_429_TIME;
 
    const asset_dynamic_data_object& dyn_asset =
-      db().create<asset_dynamic_data_object>( [&]( asset_dynamic_data_object& a ) {
+      db().create<asset_dynamic_data_object>( [hf_429,this]( asset_dynamic_data_object& a ) {
          a.current_supply = 0;
          a.fee_pool = core_fee_paid - (hf_429 ? 1 : 0);
       });
    if( fee_is_odd && !hf_429 )
    {
-      const auto& core_dd = db().get<asset_object>( asset_id_type() ).dynamic_data( db() );
-      db().modify( core_dd, [=]( asset_dynamic_data_object& dd ) {
+      const auto& core_dd = db().get_core_asset().dynamic_data( db() );
+      db().modify( core_dd, []( asset_dynamic_data_object& dd ) {
          dd.current_supply++;
       });
    }
@@ -135,14 +135,14 @@ object_id_type asset_create_evaluator::do_apply( const asset_create_operation& o
    auto next_asset_id = db().get_index_type<asset_index>().get_next_id();
 
    if( op.bitasset_opts.valid() )
-      bit_asset_id = db().create<asset_bitasset_data_object>( [&]( asset_bitasset_data_object& a ) {
+      bit_asset_id = db().create<asset_bitasset_data_object>( [&op,next_asset_id]( asset_bitasset_data_object& a ) {
             a.options = *op.bitasset_opts;
             a.is_prediction_market = op.is_prediction_market;
             a.asset_id = next_asset_id;
          }).id;
 
    const asset_object& new_asset =
-     db().create<asset_object>( [&]( asset_object& a ) {
+     db().create<asset_object>( [&op,next_asset_id,&dyn_asset,bit_asset_id]( asset_object& a ) {
          a.issuer = op.issuer;
          a.symbol = op.symbol;
          a.precision = op.precision;
@@ -155,7 +155,7 @@ object_id_type asset_create_evaluator::do_apply( const asset_create_operation& o
          if( op.bitasset_opts.valid() )
             a.bitasset_data_id = bit_asset_id;
       });
-   assert( new_asset.id == next_asset_id );
+   FC_ASSERT( new_asset.id == next_asset_id );
 
    return new_asset.id;
 } FC_CAPTURE_AND_RETHROW( (op) ) }
@@ -181,7 +181,7 @@ void_result asset_issue_evaluator::do_apply( const asset_issue_operation& o )
 { try {
    db().adjust_balance( o.issue_to_account, o.asset_to_issue );
 
-   db().modify( *asset_dyn_data, [&]( asset_dynamic_data_object& data ){
+   db().modify( *asset_dyn_data, [&o]( asset_dynamic_data_object& data ){
         data.current_supply += o.asset_to_issue.amount;
    });
 
@@ -213,7 +213,7 @@ void_result asset_reserve_evaluator::do_apply( const asset_reserve_operation& o 
 { try {
    db().adjust_balance( o.payer, -o.amount_to_reserve );
 
-   db().modify( *asset_dyn_data, [&]( asset_dynamic_data_object& data ){
+   db().modify( *asset_dyn_data, [&o]( asset_dynamic_data_object& data ){
         data.current_supply -= o.amount_to_reserve.amount;
    });
 
@@ -235,7 +235,7 @@ void_result asset_fund_fee_pool_evaluator::do_apply(const asset_fund_fee_pool_op
 { try {
    db().adjust_balance(o.from_account, -o.amount);
 
-   db().modify( *asset_dyn_data, [&]( asset_dynamic_data_object& data ) {
+   db().modify( *asset_dyn_data, [&o]( asset_dynamic_data_object& data ) {
       data.fee_pool += o.amount;
    });
 
@@ -319,7 +319,7 @@ void_result asset_update_evaluator::do_apply(const asset_update_operation& o)
          d.cancel_settle_order(*itr);
    }
 
-   d.modify(*asset_to_update, [&](asset_object& a) {
+   d.modify(*asset_to_update, [&o](asset_object& a) {
       if( o.new_issuer )
          a.issuer = *o.new_issuer;
       a.options = o.new_options;
