@@ -34,26 +34,22 @@ namespace graphene { namespace chain {
 
 const asset_object& database::get_core_asset() const
 {
-   static const asset_object& obj = get(asset_id_type());
-   return obj;
+   return *_p_core_asset_obj;
 }
 
 const global_property_object& database::get_global_properties()const
 {
-   static const global_property_object& obj = get( global_property_id_type() );
-   return obj;
+   return *_p_global_prop_obj;
 }
 
 const chain_property_object& database::get_chain_properties()const
 {
-   static const chain_property_object& obj = get( chain_property_id_type() );
-   return obj;
+   return *_p_chain_property_obj;
 }
 
 const dynamic_global_property_object& database::get_dynamic_global_properties() const
 {
-   static const dynamic_global_property_object& obj = get( dynamic_global_property_id_type() );
-   return obj;
+   return *_p_dyn_global_prop_obj;
 }
 
 const fee_schedule&  database::current_fee_schedule()const

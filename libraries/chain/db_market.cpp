@@ -921,7 +921,7 @@ bool database::fill_settle_order( const force_settlement_object& settle, const a
 bool database::check_call_orders( const asset_object& mia, bool enable_black_swan, bool for_new_limit_order,
                                   const asset_bitasset_data_object* bitasset_ptr )
 { try {
-    static const auto& dyn_prop = get_dynamic_global_properties();
+    const auto& dyn_prop = get_dynamic_global_properties();
     auto maint_time = dyn_prop.next_maintenance_time;
     if( for_new_limit_order )
        FC_ASSERT( maint_time <= HARDFORK_CORE_625_TIME ); // `for_new_limit_order` is only true before HF 338 / 625

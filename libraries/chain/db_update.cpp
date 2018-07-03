@@ -203,7 +203,7 @@ bool database::check_for_blackswan( const asset_object& mia, bool enable_black_s
 
     price highest = settle_price;
 
-    static const auto& dyn_prop = get_dynamic_global_properties();
+    const auto& dyn_prop = get_dynamic_global_properties();
     auto maint_time = dyn_prop.next_maintenance_time;
     if( maint_time > HARDFORK_CORE_338_TIME )
        // due to #338, we won't check for black swan on incoming limit order, so need to check with MSSP here

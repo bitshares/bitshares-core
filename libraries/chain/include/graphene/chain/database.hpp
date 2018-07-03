@@ -397,7 +397,7 @@ namespace graphene { namespace chain {
          asset pay_market_fees( const asset_object& recv_asset, const asset& receives );
 
 
-         ///@}
+         ///@{
          /**
           *  This method validates transactions without adding it to the pending state.
           *  @return true if the transaction would validate
@@ -530,6 +530,14 @@ namespace graphene { namespace chain {
 
          /// Tracks assets affected by bitshares-core issue #453 before hard fork #615 in one block
          flat_set<asset_id_type>           _issue_453_affected_assets;
+
+         /// Pointers to core asset object and global objects who will have immutable addresses after created
+         ///@{
+         const asset_object*                    _p_core_asset_obj          = nullptr;
+         const global_property_object*          _p_global_prop_obj         = nullptr;
+         const dynamic_global_property_object*  _p_dyn_global_prop_obj     = nullptr;
+         const chain_property_object*           _p_chain_property_obj      = nullptr;
+         ///@}
    };
 
    namespace detail

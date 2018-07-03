@@ -164,6 +164,13 @@ void database::open(
 
       if( !find(global_property_id_type()) )
          init_genesis(genesis_loader());
+      else
+      {
+         _p_core_asset_obj = &get( asset_id_type() );
+         _p_global_prop_obj = &get( global_property_id_type() );
+         _p_chain_property_obj = &get( chain_property_id_type() );
+         _p_dyn_global_prop_obj = &get( dynamic_global_property_id_type() );
+      }
 
       fc::optional<block_id_type> last_block = _block_id_to_block.last_id();
       if( last_block.valid() )
