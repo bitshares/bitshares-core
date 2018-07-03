@@ -375,8 +375,9 @@ void database::init_genesis(const genesis_state_type& genesis_state)
          a.options.core_exchange_rate.quote.asset_id = asset_id_type(0);
          a.dynamic_asset_data_id = dyn_asset.id;
       });
-   assert( asset_id_type(core_asset.id) == asset().asset_id );
-   assert( get_balance(account_id_type(), asset_id_type()) == asset(dyn_asset.current_supply) );
+   FC_ASSERT( asset_id_type(core_asset.id) == asset().asset_id );
+   FC_ASSERT( get_balance(account_id_type(), asset_id_type()) == asset(dyn_asset.current_supply) );
+   _p_core_asset_obj = &core_asset;
    // Create more special assets
    while( true )
    {
@@ -407,14 +408,14 @@ void database::init_genesis(const genesis_state_type& genesis_state)
    chain_id_type chain_id = genesis_state.compute_chain_id();
 
    // Create global properties
-   create<global_property_object>([&](global_property_object& p) {
+   _p_global_prop_obj = & create<global_property_object>([&genesis_state](global_property_object& p) {
        p.parameters = genesis_state.initial_parameters;
        // Set fees to zero initially, so that genesis initialization needs not pay them
        // We'll fix it at the end of the function
        p.parameters.current_fees->zero_all_fees();
 
    });
-   create<dynamic_global_property_object>([&](dynamic_global_property_object& p) {
+   _p_dyn_global_prop_obj = & create<dynamic_global_property_object>([&genesis_state](dynamic_global_property_object& p) {
       p.time = genesis_state.initial_timestamp;
       p.dynamic_flags = 0;
       p.witness_budget = 0;
@@ -424,7 +425,7 @@ void database::init_genesis(const genesis_state_type& genesis_state)
    FC_ASSERT( (genesis_state.immutable_parameters.min_witness_count & 1) == 1, "min_witness_count must be odd" );
    FC_ASSERT( (genesis_state.immutable_parameters.min_committee_member_count & 1) == 1, "min_committee_member_count must be odd" );
 
-   create<chain_property_object>([&](chain_property_object& p)
+   _p_chain_property_obj = & create<chain_property_object>([chain_id,&genesis_state](chain_property_object& p)
    {
       p.chain_id = chain_id;
       p.immutable_parameters = genesis_state.immutable_parameters;
@@ -552,7 +553,7 @@ void database::init_genesis(const genesis_state_type& genesis_state)
    }
 
    // Create special assets meta object
-   create<special_assets_meta_object>([&](special_assets_meta_object& p) {
+   _p_special_assets_meta_obj = & create<special_assets_meta_object>([](special_assets_meta_object& p) {
    });
 
    // Create initial balances
