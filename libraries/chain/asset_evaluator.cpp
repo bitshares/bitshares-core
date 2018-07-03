@@ -319,6 +319,20 @@ void_result asset_update_evaluator::do_apply(const asset_update_operation& o)
          d.cancel_settle_order(*itr);
    }
 
+   // For market-issued assets, if core change rate changed, update flag in bitasset data
+   if( asset_to_update->is_market_issued()
+          && asset_to_update->options.core_exchange_rate != o.new_options.core_exchange_rate )
+   {
+      const auto& bitasset = asset_to_update->bitasset_data(d);
+      if( !bitasset.asset_cer_updated )
+      {
+         d.modify( bitasset, [](asset_bitasset_data_object& b)
+         {
+            b.asset_cer_updated = true;
+         });
+      }
+   }
+
    d.modify(*asset_to_update, [&o](asset_object& a) {
       if( o.new_issuer )
          a.issuer = *o.new_issuer;

@@ -503,11 +503,13 @@ void database::_apply_block( const signed_block& next_block )
 
    const witness_object& signing_witness = validate_block_header(skip, next_block);
    const auto& global_props = get_global_properties();
-   const auto& dynamic_global_props = get<dynamic_global_property_object>(dynamic_global_property_id_type());
+   const auto& dynamic_global_props = get_dynamic_global_properties();
    bool maint_needed = (dynamic_global_props.next_maintenance_time <= next_block.timestamp);
 
    _current_block_num    = next_block_num;
    _current_trx_in_block = 0;
+
+   _issue_453_affected_assets.clear();
 
    for( const auto& trx : next_block.transactions )
    {
@@ -535,6 +537,7 @@ void database::_apply_block( const signed_block& next_block )
    clear_expired_proposals();
    clear_expired_orders();
    update_expired_feeds();
+   update_core_exchange_rates();
    update_withdraw_permissions();
 
    // n.b., update_maintenance_flag() happens this late
