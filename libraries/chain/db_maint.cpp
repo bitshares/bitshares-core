@@ -272,7 +272,18 @@ void database::update_active_witnesses()
       });
    });
 
+   populate_witness(gpo);
+
+
 } FC_CAPTURE_AND_RETHROW() }
+
+void database::populate_witness(const global_property_object& gpo)
+{
+   wit_objs.clear();
+   wit_objs.reserve(gpo.active_witnesses.size());
+   for (const witness_id_type &wid : gpo.active_witnesses)
+      wit_objs.push_back(&(wid(*this)));
+}
 
 void database::update_active_committee_members()
 { try {

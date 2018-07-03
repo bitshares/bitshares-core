@@ -109,10 +109,8 @@ void database::update_last_irreversible_block()
    const global_property_object& gpo = get_global_properties();
    const dynamic_global_property_object& dpo = get_dynamic_global_properties();
 
-   vector< const witness_object* > wit_objs;
-   wit_objs.reserve( gpo.active_witnesses.size() );
-   for( const witness_id_type& wid : gpo.active_witnesses )
-      wit_objs.push_back( &(wid(*this)) );
+   if(wit_objs.empty())
+      populate_witness(gpo);
 
    static_assert( GRAPHENE_IRREVERSIBLE_THRESHOLD > 0, "irreversible threshold must be nonzero" );
 
