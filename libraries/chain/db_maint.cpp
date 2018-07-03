@@ -273,8 +273,7 @@ void database::update_active_witnesses()
    });
 
    populate_witness(gpo);
-
-
+      
 } FC_CAPTURE_AND_RETHROW() }
 
 void database::populate_witness(const global_property_object& gpo)
