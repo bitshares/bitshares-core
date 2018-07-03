@@ -388,7 +388,8 @@ namespace graphene { namespace chain {
          bool fill_settle_order( const force_settlement_object& settle, const asset& pays, const asset& receives,
                                  const price& fill_price, const bool is_maker );
 
-         bool check_call_orders( const asset_object& mia, bool enable_black_swan = true, bool for_new_limit_order = false );
+         bool check_call_orders( const asset_object& mia, bool enable_black_swan = true, bool for_new_limit_order = false,
+                                 const asset_bitasset_data_object* bitasset_ptr = nullptr );
 
          // helpers to fill_order
          void pay_order( const account_object& receiver, const asset& receives, const asset& pays );
@@ -453,9 +454,11 @@ namespace graphene { namespace chain {
          void clear_expired_proposals();
          void clear_expired_orders();
          void update_expired_feeds();
+         void update_core_exchange_rates();
          void update_maintenance_flag( bool new_maintenance_flag );
          void update_withdraw_permissions();
-         bool check_for_blackswan( const asset_object& mia, bool enable_black_swan = true );
+         bool check_for_blackswan( const asset_object& mia, bool enable_black_swan = true,
+                                   const asset_bitasset_data_object* bitasset_ptr = nullptr );
 
          ///Steps performed only at maintenance intervals
          ///@{
@@ -526,6 +529,9 @@ namespace graphene { namespace chain {
           * database::close() has not been called, or failed during execution.
           */
          bool                              _opened = false;
+
+         /// Tracks assets affected by bitshares-core issue #453 before hard fork #615 in one block
+         flat_set<asset_id_type>           _issue_453_affected_assets;
    };
 
    namespace detail

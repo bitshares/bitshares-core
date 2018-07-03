@@ -126,6 +126,7 @@ void database::update_last_irreversible_block()
    const global_property_object& gpo = get_global_properties();
    const dynamic_global_property_object& dpo = get_dynamic_global_properties();
 
+   // TODO for better performance, move this to db_maint, because only need to do it once per maintenance interval
    vector< const witness_object* > wit_objs;
    wit_objs.reserve( gpo.active_witnesses.size() );
    for( const witness_id_type& wid : gpo.active_witnesses )
@@ -197,11 +198,12 @@ void database::clear_expired_proposals()
  *
  *  A black swan occurs if MAX(HB,SP) <= LC
  */
-bool database::check_for_blackswan( const asset_object& mia, bool enable_black_swan )
+bool database::check_for_blackswan( const asset_object& mia, bool enable_black_swan,
+                                    const asset_bitasset_data_object* bitasset_ptr )
 {
     if( !mia.is_market_issued() ) return false;
 
-    const asset_bitasset_data_object& bitasset = mia.bitasset_data(*this);
+    const asset_bitasset_data_object& bitasset = ( bitasset_ptr ? *bitasset_ptr : mia.bitasset_data(*this) );
     if( bitasset.has_settlement() ) return true; // already force settled
     auto settle_price = bitasset.current_feed.settlement_price;
     if( settle_price.is_null() ) return false; // no feed
@@ -218,7 +220,8 @@ bool database::check_for_blackswan( const asset_object& mia, bool enable_black_s
 
     price highest = settle_price;
 
-    auto maint_time = get_dynamic_global_properties().next_maintenance_time;
+    static const auto& dyn_prop = get_dynamic_global_properties();
+    auto maint_time = dyn_prop.next_maintenance_time;
     if( maint_time > HARDFORK_CORE_338_TIME )
        // due to #338, we won't check for black swan on incoming limit order, so need to check with MSSP here
        highest = bitasset.current_feed.max_short_squeeze_price();
@@ -472,40 +475,84 @@ void database::clear_expired_orders()
 
 void database::update_expired_feeds()
 {
-   const auto head_num = head_block_num();
    const auto head_time = head_block_time();
-   bool before_hf_615 = ( head_time < HARDFORK_615_TIME );
-   auto& asset_idx = get_index_type<asset_index>().indices().get<by_type>();
-   auto itr = asset_idx.lower_bound( true /** market issued */ );
-   while( itr != asset_idx.end() )
-   {
-      const asset_object& a = *itr;
-      ++itr;
-      assert( a.is_market_issued() );
+   bool after_hardfork_615 = ( head_time >= HARDFORK_615_TIME );
 
-      const asset_bitasset_data_object& b = a.bitasset_data(*this);
-      bool feed_is_expired;
-      if( before_hf_615 )
-         feed_is_expired = b.feed_is_expired_before_hardfork_615( head_time );
-      else
-         feed_is_expired = b.feed_is_expired( head_time );
-      if( feed_is_expired )
+   const auto& idx = get_index_type<asset_bitasset_data_index>().indices().get<by_feed_expiration>();
+   auto itr = idx.begin();
+   while( itr != idx.end() && itr->feed_is_expired( head_time ) )
+   {
+      const asset_bitasset_data_object& b = *itr;
+      ++itr; // not always process begin() because old code skipped updating some assets before hf 615
+      bool update_cer = false; // for better performance, to only update bitasset once, also check CER in this function
+      const asset_object* asset_ptr = nullptr;
+      // update feeds, check margin calls
+      if( after_hardfork_615 || b.feed_is_expired_before_hardfork_615( head_time ) )
       {
-         modify(b, [head_time](asset_bitasset_data_object& a) {
-            a.update_median_feeds(head_time);
-         });
-         bool called_some = check_call_orders(b.current_feed.settlement_price.base.asset_id(*this));
-         if( called_some && before_hf_615 )
+         auto old_median_feed = b.current_feed;
+         modify( b, [head_time,&update_cer]( asset_bitasset_data_object& abdo )
          {
-            wlog( "Graphene issue #615: called some for asset ${a} on block #${b}, feed really expired: ${f}",
-                  ("a", a.symbol) ("b", head_num) ("f", b.feed_is_expired(head_time)) );
+            abdo.update_median_feeds( head_time );
+            if( abdo.need_to_update_cer() )
+            {
+               update_cer = true;
+               abdo.asset_cer_updated = false;
+               abdo.feed_cer_updated = false;
+            }
+         });
+         if( !b.current_feed.settlement_price.is_null() && !( b.current_feed == old_median_feed ) ) // `==` check is safe here
+         {
+            asset_ptr = &b.asset_id( *this );
+            check_call_orders( *asset_ptr, true, false, &b );
          }
       }
-      if( !b.current_feed.core_exchange_rate.is_null() &&
-          a.options.core_exchange_rate != b.current_feed.core_exchange_rate )
-         modify(a, [&b](asset_object& a) {
-            a.options.core_exchange_rate = b.current_feed.core_exchange_rate;
+      // update CER
+      if( update_cer )
+      {
+         if( !asset_ptr )
+            asset_ptr = &b.asset_id( *this );
+         if( asset_ptr->options.core_exchange_rate != b.current_feed.core_exchange_rate )
+         {
+            modify( *asset_ptr, [&b]( asset_object& ao )
+            {
+               ao.options.core_exchange_rate = b.current_feed.core_exchange_rate;
+            });
+         }
+      }
+   } // for each asset whose feed is expired
+
+   // process assets affected by bitshares-core issue 453 before hard fork 615
+   if( !after_hardfork_615 )
+   {
+      for( asset_id_type a : _issue_453_affected_assets )
+      {
+         check_call_orders( a(*this) );
+      }
+   }
+}
+
+void database::update_core_exchange_rates()
+{
+   const auto& idx = get_index_type<asset_bitasset_data_index>().indices().get<by_cer_update>();
+   if( idx.begin() != idx.end() )
+   {
+      for( auto itr = idx.rbegin(); itr->need_to_update_cer(); itr = idx.rbegin() )
+      {
+         const asset_bitasset_data_object& b = *itr;
+         const asset_object& a = b.asset_id( *this );
+         if( a.options.core_exchange_rate != b.current_feed.core_exchange_rate )
+         {
+            modify( a, [&b]( asset_object& ao )
+            {
+               ao.options.core_exchange_rate = b.current_feed.core_exchange_rate;
+            });
+         }
+         modify( b, []( asset_bitasset_data_object& abdo )
+         {
+            abdo.asset_cer_updated = false;
+            abdo.feed_cer_updated = false;
          });
+      }
    }
 }
 
