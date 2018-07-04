@@ -68,4 +68,4 @@ ADD docker/bitsharesentry.sh /usr/local/bin/bitsharesentry.sh
 RUN chmod a+x /usr/local/bin/bitsharesentry.sh
 
 # default execute entry
-CMD /usr/local/bin/bitsharesentry.sh
+CMD ["/usr/local/bin/bitsharesentry.sh"]
