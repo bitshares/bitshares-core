@@ -36,9 +36,21 @@ static size_t WriteCallback(void *contents, size_t size, size_t nmemb, void *use
 
 namespace graphene { namespace utilities {
 
-   bool SendBulk(CURL *curl, std::vector <std::string>& bulk, std::string elasticsearch_url, bool do_logs, std::string logs_index);
+   class ES {
+      public:
+         CURL *curl;
+         std::vector <std::string> bulk;
+         std::string elasticsearch_url;
+         std::string index_name;
+         std::string auth;
+         std::string endpoint;
+         std::string query;
+   };
+
+   bool SendBulk(ES& es);
    std::vector<std::string> createBulk(std::string type, std::string data, std::string id, bool onlycreate);
-   bool checkES(CURL *curl, std::string elasticsearch_url);
-   std::string simpleQuery(CURL *curl, std::string elasticsearch_url, std::string endpoint, std::string query);
+   bool checkES(ES& es);
+   std::string simpleQuery(ES& es);
+   bool deleteAll(ES& es);
 
 } } // end namespace graphene::utilities

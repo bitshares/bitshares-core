@@ -51,6 +51,7 @@ class es_objects_plugin_impl
 
       es_objects_plugin& _self;
       std::string _es_objects_elasticsearch_url = "http://localhost:9200/";
+      std::string _es_objects_auth = "";
       uint32_t _es_objects_bulk_replay = 5000;
       uint32_t _es_objects_bulk_sync = 10;
       bool _es_objects_proposals = true;
@@ -59,7 +60,6 @@ class es_objects_plugin_impl
       bool _es_objects_balances = true;
       bool _es_objects_limit_orders = true;
       bool _es_objects_asset_bitasset = true;
-      bool _es_objects_logs = true;
       CURL *curl; // curl handler
       vector <std::string> bulk;
       vector<std::string> prepare;
@@ -81,7 +81,6 @@ class es_objects_plugin_impl
 
 void es_objects_plugin_impl::updateDatabase( const vector<object_id_type>& ids , bool isNew)
 {
-
    graphene::chain::database &db = _self.database();
 
    const fc::time_point_sec block_time = db.head_block_time();
@@ -95,8 +94,16 @@ void es_objects_plugin_impl::updateDatabase( const vector<object_id_type>& ids ,
       limit_documents = _es_objects_bulk_replay;
 
    if (curl && bulk.size() >= limit_documents) { // we are in bulk time, ready to add data to elasticsearech
-      if(!graphene::utilities::SendBulk(curl, bulk, _es_objects_elasticsearch_url, _es_objects_logs, "objects_logs"))
+
+      graphene::utilities::ES es;
+      es.curl = curl;
+      es.bulk = bulk;
+      es.elasticsearch_url = _es_objects_elasticsearch_url;
+      es.auth = _es_objects_auth;
+
+      if(!graphene::utilities::SendBulk(es))
          elog("Error sending data to database");
+         //return false;
       bulk.clear();
    }
 
@@ -311,7 +318,6 @@ es_objects_plugin_impl::~es_objects_plugin_impl()
    return;
 }
 
-
 } // end namespace detail
 
 es_objects_plugin::es_objects_plugin() :
@@ -339,7 +345,7 @@ void es_objects_plugin::plugin_set_program_options(
 {
    cli.add_options()
          ("es-objects-elasticsearch-url", boost::program_options::value<std::string>(), "Elasticsearch node url")
-         ("es-objects-logs", boost::program_options::value<bool>(), "Log bulk events to database")
+         ("es-objects-auth", boost::program_options::value<std::string>(), "Basic auth username:password")
          ("es-objects-bulk-replay", boost::program_options::value<uint32_t>(), "Number of bulk documents to index on replay(5000)")
          ("es-objects-bulk-sync", boost::program_options::value<uint32_t>(), "Number of bulk documents to index on a syncronied chain(10)")
          ("es-objects-proposals", boost::program_options::value<bool>(), "Store proposal objects")
@@ -361,8 +367,8 @@ void es_objects_plugin::plugin_initialize(const boost::program_options::variable
    if (options.count("es-objects-elasticsearch-url")) {
       my->_es_objects_elasticsearch_url = options["es-objects-elasticsearch-url"].as<std::string>();
    }
-   if (options.count("es-objects-logs")) {
-      my->_es_objects_logs = options["es-objects-logs"].as<bool>();
+   if (options.count("es-objects-auth")) {
+      my->_es_objects_auth = options["es-objects-auth"].as<std::string>();
    }
    if (options.count("es-objects-bulk-replay")) {
       my->_es_objects_bulk_replay = options["es-objects-bulk-replay"].as<uint32_t>();
@@ -392,7 +398,12 @@ void es_objects_plugin::plugin_initialize(const boost::program_options::variable
 
 void es_objects_plugin::plugin_startup()
 {
-   if(!graphene::utilities::checkES(my->curl, my->_es_objects_elasticsearch_url))
+   graphene::utilities::ES es;
+   es.curl = my->curl;
+   es.elasticsearch_url = my->_es_objects_elasticsearch_url;
+   es.auth = my->_es_objects_auth;
+
+   if(!graphene::utilities::checkES(es))
       FC_THROW_EXCEPTION(fc::exception, "ES database is not up in url ${url}", ("url", my->_es_objects_elasticsearch_url));
    ilog("elasticsearch OBJECTS: plugin_startup() begin");
 }

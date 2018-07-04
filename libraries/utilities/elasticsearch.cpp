@@ -29,118 +29,109 @@
 
 namespace graphene { namespace utilities {
 
-
-bool checkES(CURL *curl, std::string elasticsearch_url)
+bool checkES(ES& es)
 {
-   std::string readBuffer;
+   CURL *curl = es.curl;
+   std::string elasticsearch_url = es.elasticsearch_url;
+   std::string auth = es.auth;
+
+   std::string CurlReadBuffer;
    std::string url = elasticsearch_url + "_nodes";
+   curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "GET");
    curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
-   curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)&readBuffer);
+   curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)&CurlReadBuffer);
    curl_easy_setopt(curl, CURLOPT_USERAGENT, "libcrp/0.1");
+   if(!auth.empty())
+      curl_easy_setopt(curl, CURLOPT_USERPWD, auth.c_str());
    curl_easy_perform(curl);
-   if(readBuffer.empty())
+   if(CurlReadBuffer.empty())
       return false;
    else
       return true;
 }
-std::string simpleQuery(CURL *curl, std::string elasticsearch_url, std::string endpoint, std::string query)
+std::string simpleQuery(ES& es)
 {
-   std::string readBuffer;
+   CURL *curl = es.curl;
+   std::string elasticsearch_url = es.elasticsearch_url;
+   std::string endpoint = es.endpoint;
+   std::string query = es.query;
+   std::string auth = es.auth;
+
+   std::string CurlReadBuffer;
    struct curl_slist *headers = NULL;
    headers = curl_slist_append(headers, "Content-Type: application/json");
    std::string url = elasticsearch_url + endpoint;
    curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
    curl_easy_setopt(curl, CURLOPT_POST, true);
+   curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "POST");
    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, query.c_str());
    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
-   curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)&readBuffer);
+   curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)&CurlReadBuffer);
    curl_easy_setopt(curl, CURLOPT_USERAGENT, "libcrp/0.1");
+   if(!auth.empty())
+      curl_easy_setopt(curl, CURLOPT_USERPWD, auth.c_str());
    curl_easy_perform(curl);
 
-   if(!readBuffer.empty())
-      return readBuffer;
+   if(!CurlReadBuffer.empty())
+      return CurlReadBuffer;
    return "";
-
 }
 
-bool SendBulk(CURL *curl, std::vector<std::string>& bulk, std::string elasticsearch_url, bool do_logs, std::string logs_index)
+bool SendBulk(ES& es)
 {
-  // curl buffers to read
-  std::string readBuffer;
-  std::string readBuffer_logs;
+   CURL *curl = es.curl;
+   std::vector<std::string>& bulk = es.bulk;
+   std::string elasticsearch_url = es.elasticsearch_url;
+   std::string auth = es.auth;
 
-  std::string bulking = "";
+   std::string CurlReadBuffer;
 
-  bulking = boost::algorithm::join(bulk, "\n");
-  bulking = bulking + "\n";
-  bulk.clear();
+   std::string bulking = "";
+   bulking = boost::algorithm::join(bulk, "\n");
+   bulking = bulking + "\n";
+   bulk.clear();
 
-  struct curl_slist *headers = NULL;
-  headers = curl_slist_append(headers, "Content-Type: application/json");
-  std::string url = elasticsearch_url + "_bulk";
-  curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
-  curl_easy_setopt(curl, CURLOPT_POST, true);
-  curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
-  curl_easy_setopt(curl, CURLOPT_POSTFIELDS, bulking.c_str());
-  curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
-  curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)&readBuffer);
-  curl_easy_setopt(curl, CURLOPT_USERAGENT, "libcrp/0.1");
-  //curl_easy_setopt(curl, CURLOPT_VERBOSE, true);
-  curl_easy_perform(curl);
-
-  long http_code = 0;
-  curl_easy_getinfo (curl, CURLINFO_RESPONSE_CODE, &http_code);
-   if(http_code == 200) {
-      // all good, do nothing
+   struct curl_slist *headers = NULL;
+   headers = curl_slist_append(headers, "Content-Type: application/json");
+   std::string url = elasticsearch_url + "_bulk";
+   curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+   curl_easy_setopt(curl, CURLOPT_POST, true);
+   curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "POST");
+   curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+   curl_easy_setopt(curl, CURLOPT_POSTFIELDS, bulking.c_str());
+   curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
+   curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)&CurlReadBuffer);
+   curl_easy_setopt(curl, CURLOPT_USERAGENT, "libcrp/0.1");
+   if(!auth.empty()) {
+      curl_easy_setopt(curl, CURLOPT_USERPWD, auth.c_str());
    }
-   else if(http_code == 413) {
-      elog("413 error: Can be low space disk");
-      return 0;
+   curl_easy_perform(curl);
+
+   long http_code = 0;
+   curl_easy_getinfo (curl, CURLINFO_RESPONSE_CODE, &http_code);
+   if(http_code == 200) {
+      // all good, but check errors in response
+      fc::variant j = fc::json::from_string(CurlReadBuffer);
+      bool errors = j["errors"].as_bool();
+      if(errors == true) {
+         return false;
+      }
    }
    else {
-      elog(std::to_string(http_code) + " error: Unknown error");
-      return 0;
+      if(http_code == 413) {
+         elog( "413 error: Can be low disk space" );
+      }
+      else if(http_code == 401) {
+         elog( "401 error: Unauthorized" );
+      }
+      else {
+         elog( std::to_string(http_code) + " error: Unknown error" );
+      }
+      return false;
    }
-
-  if(do_logs) {
-    auto logs = readBuffer;
-    // do logs
-    std::string url_logs = elasticsearch_url + logs_index + "/data/";
-    curl_easy_setopt(curl, CURLOPT_URL, url_logs.c_str());
-    curl_easy_setopt(curl, CURLOPT_POST, true);
-    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
-    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, logs.c_str());
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
-    curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *) &readBuffer_logs);
-    curl_easy_setopt(curl, CURLOPT_USERAGENT, "libcrp/0.1");
-    curl_easy_perform(curl);
-
-    http_code = 0;
-    curl_easy_getinfo (curl, CURLINFO_RESPONSE_CODE, &http_code);
-    if(http_code == 200) {
-      // all good, do nothing
-       return 1;
-    }
-    else if(http_code == 201) {
-       // 201 is ok
-       return 1;
-    }
-    else if(http_code == 409) {
-       // 409 for record already exist is ok
-       return 1;
-    }
-    else if(http_code == 413) {
-       elog("413 error: Can be low space disk");
-       return 0;
-    }
-    else {
-       elog(std::to_string(http_code) + " error: Unknown error");
-       return 0;
-    }
-  }
-  return 0;
+   return true;
 }
 
 std::vector<std::string> createBulk(std::string index_name, std::string data, std::string id, bool onlycreate)
@@ -152,9 +143,30 @@ std::vector<std::string> createBulk(std::string index_name, std::string data, st
 
    bulk.push_back("{ \"index\" : { \"_index\" : \""+index_name+"\", \"_type\" : \"data\" "+create_string+" } }");
    bulk.push_back(data);
-
    return bulk;
 }
 
+bool deleteAll(ES& es)
+{
+   CURL *curl = es.curl;
+   std::string elasticsearch_url = es.elasticsearch_url;
+   std::string auth = es.auth;
+
+   std::string CurlReadBuffer;
+
+   std::string url = elasticsearch_url + "graphene-*";
+   curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+   curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "DELETE");
+   curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
+   curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)&CurlReadBuffer);
+   curl_easy_setopt(curl, CURLOPT_USERAGENT, "libcrp/0.1");
+   if(!auth.empty())
+      curl_easy_setopt(curl, CURLOPT_USERPWD, auth.c_str());
+   curl_easy_perform(curl);
+   if(CurlReadBuffer.empty())
+      return false;
+   else
+      return true;
+}
 
 } } // end namespace graphene::utilities
