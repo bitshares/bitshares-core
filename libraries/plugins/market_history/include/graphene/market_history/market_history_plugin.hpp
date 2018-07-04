@@ -28,6 +28,7 @@
 
 #include <fc/thread/future.hpp>
 #include <fc/uint128.hpp>
+#include <fc/io/fstream.hpp>
 
 #include <boost/multi_index/composite_key.hpp>
 
@@ -240,6 +241,8 @@ class market_history_plugin : public graphene::app::plugin
          const boost::program_options::variables_map& options) override;
       virtual void plugin_startup() override;
 
+      bool                        save_history() const;
+      void                        write_history(fc::string &) const;
       uint32_t                    max_history()const;
       const flat_set<uint32_t>&   tracked_buckets()const;
       uint32_t                    max_order_his_records_per_market()const;
