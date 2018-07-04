@@ -35,6 +35,8 @@
 
 #include <fc/thread/thread.hpp>
 #include <fc/smart_ref_impl.hpp>
+#include <fc/io/sstream.hpp>
+#include <fc/io/json.hpp>
 
 namespace graphene { namespace market_history {
 
@@ -58,11 +60,55 @@ class market_history_plugin_impl
          return _self.database();
       }
 
+      void check_open_file()
+      {
+             auto & db=_self.database();
+
+            fc::time_point_sec now = db.head_block_time();
+
+            time_t t = (time_t) now.sec_since_epoch();
+
+            struct tm tm = *localtime(&t);
+
+            if (tm.tm_yday !=_day_of_ofs)
+            {
+               if(!_first) 
+               {
+                 _ofs << "]";
+                 _ofs.close();
+               }
+
+               char buffer[32];
+
+               snprintf(buffer,sizeof(buffer),"history-%d-%02d-%02d.json", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday);
+               auto path = db.get_data_dir().parent_path()/string(buffer);
+
+               _ofs.open( path, fc::ofstream::out );
+
+               _day_of_ofs = tm.tm_yday;
+
+               _ofs << "[ ";
+               _first = true;
+            }
+      }
+      void write_history(fc::string &s)
+      {
+            check_open_file();
+
+            if(_first) _first=false;
+            else _ofs << ",";
+
+            _ofs << s;
+      }
       market_history_plugin&     _self;
       flat_set<uint32_t>         _tracked_buckets;
       uint32_t                   _maximum_history_per_bucket_size = 1000;
       uint32_t                   _max_order_his_records_per_market = 1000;
       uint32_t                   _max_order_his_seconds_per_market = 259200;
+      fc::ofstream               _ofs;
+      uint16_t                   _day_of_ofs;
+      bool                       _save_history;
+      bool                       _first;
 };
 
 
@@ -110,6 +156,15 @@ struct operation_process_fill_order
          ho.op = o;
       });
 
+      if(_plugin.save_history())
+      {
+         //fc::stringstream ss;
+         //ss << fc::json::to_string(new_order_his_obj);
+         
+         fc::string s = fc::json::to_string(new_order_his_obj);//ss.str();
+         _plugin.write_history(s);
+          
+      }
       // save a reference to market ticker meta object
       if( _meta == nullptr )
       {
@@ -418,6 +473,7 @@ void market_history_plugin::plugin_set_program_options(
            "Will only store this amount of matched orders for each market in order history for querying, or those meet the other option, which has more data (default: 1000)")
          ("max-order-his-seconds-per-market", boost::program_options::value<uint32_t>()->default_value(259200),
            "Will only store matched orders in last X seconds for each market in order history for querying, or those meet the other option, which has more data (default: 259200 (3 days))")
+         ("save-history",boost::program_options::value<bool>()->default_value(false),"save history.")
          ;
    cfg.add(cli);
 }
@@ -442,6 +498,10 @@ void market_history_plugin::plugin_initialize(const boost::program_options::vari
       my->_max_order_his_records_per_market = options["max-order-his-records-per-market"].as<uint32_t>();
    if( options.count( "max-order-his-seconds-per-market" ) )
       my->_max_order_his_seconds_per_market = options["max-order-his-seconds-per-market"].as<uint32_t>();
+   if( options.count( "keep-history" ) )
+   {
+      my->_save_history = options["save-history"].as<bool>();
+   }
 } FC_CAPTURE_AND_RETHROW() }
 
 void market_history_plugin::plugin_startup()
@@ -466,6 +526,15 @@ uint32_t market_history_plugin::max_order_his_records_per_market()const
 uint32_t market_history_plugin::max_order_his_seconds_per_market()const
 {
    return my->_max_order_his_seconds_per_market;
+}
+
+bool                        market_history_plugin::save_history() const
+{
+   return my->_save_history;
+}
+void                        market_history_plugin::write_history(fc::string &s) const
+{
+    my->write_history(s);
 }
 
 } }
