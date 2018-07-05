@@ -42,8 +42,7 @@ namespace graphene { namespace chain {
 
 void database::update_global_dynamic_data( const signed_block& b, const uint32_t missed_blocks )
 {
-   const dynamic_global_property_object& _dgp =
-      dynamic_global_property_id_type(0)(*this);
+   const dynamic_global_property_object& _dgp = get_dynamic_global_properties();
 
    // dynamic global properties updating
    modify( _dgp, [&b,this,missed_blocks]( dynamic_global_property_object& dgp ){

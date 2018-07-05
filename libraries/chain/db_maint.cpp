@@ -360,8 +360,8 @@ void database::update_active_committee_members()
 void database::initialize_budget_record( fc::time_point_sec now, budget_record& rec )const
 {
    const dynamic_global_property_object& dpo = get_dynamic_global_properties();
-   const asset_object& core = asset_id_type(0)(*this);
-   const asset_dynamic_data_object& core_dd = core.dynamic_asset_data_id(*this);
+   const asset_object& core = get_core_asset();
+   const asset_dynamic_data_object& core_dd = get_core_dynamic_data();
 
    rec.from_initial_reserve = core.reserved(*this);
    rec.from_accumulated_fees = core_dd.accumulated_fees;
@@ -414,8 +414,7 @@ void database::process_budget()
    {
       const global_property_object& gpo = get_global_properties();
       const dynamic_global_property_object& dpo = get_dynamic_global_properties();
-      const asset_dynamic_data_object& core =
-         asset_id_type(0)(*this).dynamic_asset_data_id(*this);
+      const asset_dynamic_data_object& core = get_core_dynamic_data();
       fc::time_point_sec now = head_block_time();
 
       int64_t time_to_maint = (dpo.next_maintenance_time - now).to_seconds();
@@ -575,8 +574,8 @@ void split_fba_balance(
    if( fba.accumulated_fba_fees == 0 )
       return;
 
-   const asset_object& core = asset_id_type(0)(db);
-   const asset_dynamic_data_object& core_dd = core.dynamic_asset_data_id(db);
+   const asset_object& core = db.get_core_asset();
+   const asset_dynamic_data_object& core_dd = db.get_core_dynamic_data();
 
    if( !fba.is_configured(db) )
    {
