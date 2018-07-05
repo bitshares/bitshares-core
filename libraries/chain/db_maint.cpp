@@ -661,7 +661,6 @@ void split_fba_balance(
    if( fba.accumulated_fba_fees == 0 )
       return;
 
-   const asset_object& core = db.get_core_asset();
    const asset_dynamic_data_object& core_dd = db.get_core_dynamic_data();
 
    if( !fba.is_configured(db) )
