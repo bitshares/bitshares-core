@@ -49,6 +49,7 @@ BOOST_AUTO_TEST_CASE(es1) {
       graphene::utilities::ES es;
       es.curl = curl;
       es.elasticsearch_url = "http://localhost:9200/";
+      es.index_prefix = "bitshares-";
       //es.auth = "elastic:changeme";
 
       // delete all first
@@ -73,7 +74,7 @@ BOOST_AUTO_TEST_CASE(es1) {
 
          curl = curl_easy_init();
          string query = "{ \"query\" : { \"bool\" : { \"must\" : [{\"match_all\": {}}] } } }";
-         es.endpoint = "graphene-*/data/_count";
+         es.endpoint = es.index_prefix + "*/data/_count";
          es.query = query;
 
          auto res = graphene::utilities::simpleQuery(es);
@@ -82,7 +83,7 @@ BOOST_AUTO_TEST_CASE(es1) {
          BOOST_CHECK_EQUAL(total, "5");
 
          curl = curl_easy_init();
-         es.endpoint = "graphene-*/data/_search";
+         es.endpoint = es.index_prefix + "*/data/_search";
          res = graphene::utilities::simpleQuery(es);
          j = fc::json::from_string(res);
          auto first_id = j["hits"]["hits"][size_t(0)]["_id"].as_string();
@@ -95,7 +96,7 @@ BOOST_AUTO_TEST_CASE(es1) {
          fc::usleep(fc::milliseconds(1000)); // index.refresh_interval
 
          curl = curl_easy_init();
-         es.endpoint = "graphene-*/data/_count";
+         es.endpoint = es.index_prefix + "*/data/_count";
          res = graphene::utilities::simpleQuery(es);
          j = fc::json::from_string(res);
 

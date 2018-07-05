@@ -97,7 +97,7 @@ void es_objects_plugin_impl::updateDatabase( const vector<object_id_type>& ids ,
 
       graphene::utilities::ES es;
       es.curl = curl;
-      es.bulk = bulk;
+      es.bulk_lines = bulk;
       es.elasticsearch_url = _es_objects_elasticsearch_url;
       es.auth = _es_objects_auth;
 

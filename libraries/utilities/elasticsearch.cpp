@@ -82,7 +82,7 @@ std::string simpleQuery(ES& es)
 bool SendBulk(ES& es)
 {
    CURL *curl = es.curl;
-   std::vector<std::string>& bulk = es.bulk;
+   std::vector<std::string>& bulk = es.bulk_lines;
    std::string elasticsearch_url = es.elasticsearch_url;
    std::string auth = es.auth;
 
@@ -151,10 +151,11 @@ bool deleteAll(ES& es)
    CURL *curl = es.curl;
    std::string elasticsearch_url = es.elasticsearch_url;
    std::string auth = es.auth;
+   std::string index_prefix = es.index_prefix;
 
    std::string CurlReadBuffer;
 
-   std::string url = elasticsearch_url + "graphene-*";
+   std::string url = elasticsearch_url + index_prefix + "*";
    curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
    curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "DELETE");
    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);

@@ -39,9 +39,9 @@ namespace graphene { namespace utilities {
    class ES {
       public:
          CURL *curl;
-         std::vector <std::string> bulk;
+         std::vector <std::string> bulk_lines;
          std::string elasticsearch_url;
-         std::string index_name;
+         std::string index_prefix;
          std::string auth;
          std::string endpoint;
          std::string query;

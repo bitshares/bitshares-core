@@ -74,8 +74,9 @@ class elasticsearch_plugin_impl
       uint32_t _elasticsearch_bulk_sync = 100;
       bool _elasticsearch_visitor = false;
       std::string _elasticsearch_basic_auth = "";
+      std::string _elasticsearch_index_prefix = "bitshares-";
       CURL *curl; // curl handler
-      vector <string> bulk; //  vector of op lines
+      vector <string> bulk_lines; //  vector of op lines
       vector<std::string> prepare;
 private:
       bool add_elasticsearch( const account_id_type account_id, const optional<operation_history_object>& oho, const signed_block& b );
@@ -227,23 +228,25 @@ bool elasticsearch_plugin_impl::add_elasticsearch( const account_id_type account
    auto block_date = bulk_line_struct.block_data.block_time.to_iso_string();
    std::vector<std::string> parts;
    boost::split(parts, block_date, boost::is_any_of("-"));
-   std::string index_name = "graphene-" + parts[0] + "-" + parts[1]; // index name
+   std::string index_name = _elasticsearch_index_prefix + parts[0] + "-" + parts[1]; // index name
    std::string _id = fc::json::to_string(ath.id);
 
    prepare = graphene::utilities::createBulk(index_name, bulk_line, _id, 0);
-   bulk.insert(bulk.end(), prepare.begin(), prepare.end());
+   bulk_lines.insert(bulk_lines.end(), prepare.begin(), prepare.end());
 
-   if (curl && bulk.size() >= limit_documents) { // we are in bulk time, ready to add data to elasticsearech
+   if (curl && bulk_lines.size() >= limit_documents) { // we are in bulk time, ready to add data to elasticsearech
       prepare.clear();
 
       graphene::utilities::ES es;
       es.curl = curl;
-      es.bulk = bulk;
+      es.bulk_lines = bulk_lines;
       es.elasticsearch_url = _elasticsearch_node_url;
       es.auth = _elasticsearch_basic_auth;
 
       if(!graphene::utilities::SendBulk(es))
          return false;
+      else
+         bulk_lines.clear();
    }
 
    // remove everything except current object from ath
@@ -304,6 +307,7 @@ void elasticsearch_plugin::plugin_set_program_options(
          ("elasticsearch-bulk-sync", boost::program_options::value<uint32_t>(), "Number of bulk documents to index on a syncronied chain(10)")
          ("elasticsearch-visitor", boost::program_options::value<bool>(), "Use visitor to index additional data(slows down the replay)")
          ("elasticsearch-basic-auth", boost::program_options::value<std::string>(), "Pass basic auth to elasticsearch database ")
+         ("elasticsearch-index-prefix", boost::program_options::value<std::string>(), "Add a prefix to the index(bitshares-)")
          ;
    cfg.add(cli);
 }
@@ -334,6 +338,9 @@ void elasticsearch_plugin::plugin_initialize(const boost::program_options::varia
    }
    if (options.count("elasticsearch-basic-auth")) {
       my->_elasticsearch_basic_auth = options["elasticsearch-basic-auth"].as<std::string>();
+   }
+   if (options.count("elasticsearch-index-prefix")) {
+      my->_elasticsearch_index_prefix = options["elasticsearch-index-prefix"].as<std::string>();
    }
 }
 
