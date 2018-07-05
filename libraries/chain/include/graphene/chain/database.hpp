@@ -258,6 +258,7 @@ namespace graphene { namespace chain {
          const node_property_object&            get_node_properties()const;
          const fee_schedule&                    current_fee_schedule()const;
          const account_statistics_object&       get_account_stats_by_owner( account_id_type owner )const;
+         const witness_schedule_object&         get_witness_schedule_object()const;
 
          time_point_sec   head_block_time()const;
          uint32_t         head_block_num()const;
@@ -537,6 +538,7 @@ namespace graphene { namespace chain {
          const global_property_object*          _p_global_prop_obj         = nullptr;
          const dynamic_global_property_object*  _p_dyn_global_prop_obj     = nullptr;
          const chain_property_object*           _p_chain_property_obj      = nullptr;
+         const witness_schedule_object*         _p_witness_schedule_obj    = nullptr;
          ///@}
    };
 

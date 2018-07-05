@@ -105,4 +105,9 @@ const account_statistics_object& database::get_account_stats_by_owner( account_i
    return *itr;
 }
 
+const witness_schedule_object& database::get_witness_schedule_object()const
+{
+   return *_p_witness_schedule_obj;
+}
+
 } }
