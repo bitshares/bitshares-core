@@ -677,7 +677,7 @@ void database::init_genesis(const genesis_state_type& genesis_state)
    });
 
    // Set active witnesses
-   modify(get_global_properties(), [&](global_property_object& p) {
+   modify(get_global_properties(), [&genesis_state](global_property_object& p) {
       for( uint32_t i = 1; i <= genesis_state.initial_active_witnesses; ++i )
       {
          p.active_witnesses.insert(witness_id_type(i));
@@ -690,7 +690,7 @@ void database::init_genesis(const genesis_state_type& genesis_state)
    });
 
    // Create witness scheduler
-   create<witness_schedule_object>([&]( witness_schedule_object& wso )
+   _p_witness_schedule_obj = & create<witness_schedule_object>([this]( witness_schedule_object& wso )
    {
       for( const witness_id_type& wid : get_global_properties().active_witnesses )
          wso.current_shuffled_witnesses.push_back( wid );

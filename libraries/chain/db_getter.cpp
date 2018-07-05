@@ -110,4 +110,9 @@ const special_assets_meta_object& database::get_special_assets_meta_object()cons
    return *_p_special_assets_meta_obj;
 }
 
+const witness_schedule_object& database::get_witness_schedule_object()const
+{
+   return *_p_witness_schedule_obj;
+}
+
 } }
