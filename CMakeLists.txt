@@ -32,6 +32,8 @@ if (USE_PCH)
   include (cotire)
 endif(USE_PCH)
 
+option(USE_PROFILER "Build with GPROF support(Linux)." OFF)
+
 IF( NOT WIN32 )
   list( APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/libraries/fc/CMakeModules" )
 ENDIF( NOT WIN32 )
@@ -111,7 +113,11 @@ else( WIN32 ) # Apple AND Linux
     else( APPLE )
         # Linux Specific Options Here
         message( STATUS "Configuring BitShares on Linux" )
-        set( CMAKE_CXX_FLAGS "${CMAKE_C_FLAGS} -std=c++11 -Wall" )
+        if(USE_PROFILER)
+            set( CMAKE_CXX_FLAGS "${CMAKE_C_FLAGS} -std=c++11 -Wall -pg" )
+        else(USE_PROFILER)
+            set( CMAKE_CXX_FLAGS "${CMAKE_C_FLAGS} -std=c++11 -Wall" )
+        endif( USE_PROFILER )
         set( rt_library rt )
         set( pthread_library pthread)
         if ( NOT DEFINED crypto_library )
