@@ -376,6 +376,7 @@ void database::init_genesis(const genesis_state_type& genesis_state)
    FC_ASSERT( asset_id_type(core_asset.id) == asset().asset_id );
    FC_ASSERT( get_balance(account_id_type(), asset_id_type()) == asset(dyn_asset.current_supply) );
    _p_core_asset_obj = &core_asset;
+   _p_core_dynamic_data_obj = &dyn_asset;
    // Create more special assets
    while( true )
    {
