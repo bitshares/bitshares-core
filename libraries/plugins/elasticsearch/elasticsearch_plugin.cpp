@@ -215,22 +215,22 @@ bool elasticsearch_plugin_impl::add_elasticsearch( const account_id_type account
       limit_documents = _elasticsearch_bulk_replay;
 
    // we have everything, creating bulk line
-   bulk_struct bulks;
-   bulks.account_history = ath;
-   bulks.operation_history = os;
-   bulks.operation_type = op_type;
-   bulks.block_data = bs;
-   bulks.additional_data = vs;
+   bulk_struct bulk_line_struct;
+   bulk_line_struct.account_history = ath;
+   bulk_line_struct.operation_history = os;
+   bulk_line_struct.operation_type = op_type;
+   bulk_line_struct.block_data = bs;
+   bulk_line_struct.additional_data = vs;
 
-   std::string data = fc::json::to_string(bulks);
+   std::string bulk_line = fc::json::to_string(bulk_line_struct);
 
-   auto block_date = bulks.block_data.block_time.to_iso_string();
+   auto block_date = bulk_line_struct.block_data.block_time.to_iso_string();
    std::vector<std::string> parts;
    boost::split(parts, block_date, boost::is_any_of("-"));
    std::string index_name = "graphene-" + parts[0] + "-" + parts[1]; // index name
    std::string _id = fc::json::to_string(ath.id);
 
-   prepare = graphene::utilities::createBulk(index_name, data, _id, 0);
+   prepare = graphene::utilities::createBulk(index_name, bulk_line, _id, 0);
    bulk.insert(bulk.end(), prepare.begin(), prepare.end());
 
    if (curl && bulk.size() >= limit_documents) { // we are in bulk time, ready to add data to elasticsearech
