@@ -111,6 +111,14 @@ bool SendBulk(ES& es)
 
    long http_code = 0;
    curl_easy_getinfo (curl, CURLINFO_RESPONSE_CODE, &http_code);
+
+   if(handleBulkResponse(http_code, CurlReadBuffer))
+      return true;
+   return false;
+}
+
+bool handleBulkResponse(long http_code, std::string CurlReadBuffer)
+{
    if(http_code == 200) {
       // all good, but check errors in response
       fc::variant j = fc::json::from_string(CurlReadBuffer);

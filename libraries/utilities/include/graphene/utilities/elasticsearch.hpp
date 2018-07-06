@@ -52,5 +52,6 @@ namespace graphene { namespace utilities {
    bool checkES(ES& es);
    std::string simpleQuery(ES& es);
    bool deleteAll(ES& es);
+   bool handleBulkResponse(long http_code, std::string CurlReadBuffer);
 
 } } // end namespace graphene::utilities
