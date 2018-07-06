@@ -32,7 +32,7 @@ namespace graphene { namespace chain {
       bool operator == ( const price& a, const price& b )
       {
          if( std::tie( a.base.asset_id, a.quote.asset_id ) != std::tie( b.base.asset_id, b.quote.asset_id ) )
-             return false;
+            return false;
 
          const auto amult = uint128_t( b.quote.amount.value ) * a.base.amount.value;
          const auto bmult = uint128_t( a.quote.amount.value ) * b.base.amount.value;
@@ -55,7 +55,7 @@ namespace graphene { namespace chain {
 
       bool operator <= ( const price& a, const price& b )
       {
-         return (a == b) || (a < b);
+         return !(b < a);
       }
 
       bool operator != ( const price& a, const price& b )
@@ -65,7 +65,7 @@ namespace graphene { namespace chain {
 
       bool operator > ( const price& a, const price& b )
       {
-         return !(a <= b);
+         return (b < a);
       }
 
       bool operator >= ( const price& a, const price& b )
