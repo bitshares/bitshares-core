@@ -220,6 +220,7 @@ bool elasticsearch_plugin_impl::add_elasticsearch( const account_id_type account
    bulk_line_struct.account_history = ath;
    bulk_line_struct.operation_history = os;
    bulk_line_struct.operation_type = op_type;
+   bulk_line_struct.operation_id_num = ath.operation_id.instance.value;
    bulk_line_struct.block_data = bs;
    bulk_line_struct.additional_data = vs;
 

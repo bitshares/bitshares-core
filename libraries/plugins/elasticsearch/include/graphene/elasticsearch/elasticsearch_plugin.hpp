@@ -132,6 +132,7 @@ struct bulk_struct {
    account_transaction_history_object account_history;
    operation_history_struct operation_history;
    int operation_type;
+   int operation_id_num;
    block_struct block_data;
    visitor_struct additional_data;
 };
@@ -143,6 +144,6 @@ FC_REFLECT( graphene::elasticsearch::block_struct, (block_num)(block_time)(trx_i
 FC_REFLECT( graphene::elasticsearch::fee_struct, (asset)(amount) )
 FC_REFLECT( graphene::elasticsearch::transfer_struct, (asset)(amount)(from)(to) )
 FC_REFLECT( graphene::elasticsearch::visitor_struct, (fee_data)(transfer_data) )
-FC_REFLECT( graphene::elasticsearch::bulk_struct, (account_history)(operation_history)(operation_type)(block_data)(additional_data) )
+FC_REFLECT( graphene::elasticsearch::bulk_struct, (account_history)(operation_history)(operation_type)(operation_id_num)(block_data)(additional_data) )
 
 
