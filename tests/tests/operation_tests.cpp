@@ -1131,7 +1131,7 @@ BOOST_AUTO_TEST_CASE( create_uia )
       creator.common_options.market_fee_percent = GRAPHENE_MAX_MARKET_FEE_PERCENT/100; /*1%*/
       creator.common_options.issuer_permissions = UIA_ASSET_ISSUER_PERMISSION_MASK;
       creator.common_options.flags = charge_market_fee;
-      creator.common_options.core_exchange_rate = price({asset(2),asset(1,asset_id_type(1))});
+      creator.common_options.core_exchange_rate = price(asset(2),asset(1,asset_id_type(1)));
       trx.operations.push_back(std::move(creator));
       PUSH_TX( db, trx, ~0 );
 
@@ -1161,8 +1161,8 @@ BOOST_AUTO_TEST_CASE( create_uia )
       REQUIRE_THROW_WITH_VALUE(op, symbol, "AAA.");
       REQUIRE_THROW_WITH_VALUE(op, symbol, "AB CD");
       REQUIRE_THROW_WITH_VALUE(op, symbol, "ABCDEFGHIJKLMNOPQRSTUVWXYZ");
-      REQUIRE_THROW_WITH_VALUE(op, common_options.core_exchange_rate, price({asset(-100), asset(1)}));
-      REQUIRE_THROW_WITH_VALUE(op, common_options.core_exchange_rate, price({asset(100),asset(-1)}));
+      REQUIRE_THROW_WITH_VALUE(op, common_options.core_exchange_rate, price(asset(-100), asset(1)));
+      REQUIRE_THROW_WITH_VALUE(op, common_options.core_exchange_rate, price(asset(100),asset(-1)));
    } catch(fc::exception& e) {
       edump((e.to_detail_string()));
       throw;

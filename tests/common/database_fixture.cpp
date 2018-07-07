@@ -510,7 +510,7 @@ const asset_object& database_fixture::create_bitasset(
       flags |= witness_fed_asset;
    creator.common_options.issuer_permissions = flags;
    creator.common_options.flags = flags & ~global_settle;
-   creator.common_options.core_exchange_rate = price({asset(1,asset_id_type(1)),asset(1)});
+   creator.common_options.core_exchange_rate = price(asset(1,asset_id_type(1)),asset(1));
    creator.bitasset_opts = bitasset_options();
    creator.bitasset_opts->short_backing_asset = backing_asset;
    trx.operations.push_back(std::move(creator));
@@ -540,7 +540,7 @@ const asset_object& database_fixture::create_prediction_market(
    creator.common_options.flags = flags & ~global_settle;
    if( issuer == GRAPHENE_WITNESS_ACCOUNT )
       creator.common_options.flags |= witness_fed_asset;
-   creator.common_options.core_exchange_rate = price({asset(1,asset_id_type(1)),asset(1)});
+   creator.common_options.core_exchange_rate = price(asset(1,asset_id_type(1)),asset(1));
    creator.bitasset_opts = bitasset_options();
    creator.bitasset_opts->short_backing_asset = backing_asset;
    creator.is_prediction_market = true;
@@ -560,7 +560,7 @@ const asset_object& database_fixture::create_user_issued_asset( const string& na
    creator.symbol = name;
    creator.common_options.max_supply = 0;
    creator.precision = 2;
-   creator.common_options.core_exchange_rate = price({asset(1,asset_id_type(1)),asset(1)});
+   creator.common_options.core_exchange_rate = price(asset(1,asset_id_type(1)),asset(1));
    creator.common_options.max_supply = GRAPHENE_MAX_SHARE_SUPPLY;
    creator.common_options.flags = charge_market_fee;
    creator.common_options.issuer_permissions = charge_market_fee;

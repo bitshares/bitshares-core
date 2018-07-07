@@ -56,7 +56,7 @@ BOOST_AUTO_TEST_CASE( create_advanced_uia )
       creator.common_options.market_fee_percent = GRAPHENE_MAX_MARKET_FEE_PERCENT/100; /*1%*/
       creator.common_options.issuer_permissions = charge_market_fee|white_list|override_authority|transfer_restricted|disable_confidential;
       creator.common_options.flags = charge_market_fee|white_list|override_authority|disable_confidential;
-      creator.common_options.core_exchange_rate = price({asset(2),asset(1,asset_id_type(1))});
+      creator.common_options.core_exchange_rate = price(asset(2),asset(1,asset_id_type(1)));
       creator.common_options.whitelist_authorities = creator.common_options.blacklist_authorities = {account_id_type()};
       trx.operations.push_back(std::move(creator));
       PUSH_TX( db, trx, ~0 );
