@@ -152,7 +152,9 @@ bool elasticsearch_plugin_impl::update_account_histories( const signed_block& b 
    return true;
 }
 
-bool elasticsearch_plugin_impl::add_elasticsearch( const account_id_type account_id, const optional <operation_history_object>& oho, const signed_block& b)
+bool elasticsearch_plugin_impl::add_elasticsearch( const account_id_type account_id,
+                                                   const optional <operation_history_object>& oho,
+                                                   const signed_block& b)
 {
    graphene::chain::database& db = database();
    const auto &stats_obj = account_id(db).statistics(db);
@@ -192,10 +194,20 @@ bool elasticsearch_plugin_impl::add_elasticsearch( const account_id_type account
 
       vs.fee_data.asset = o_v.fee_asset;
       vs.fee_data.amount = o_v.fee_amount;
+
       vs.transfer_data.asset = o_v.transfer_asset_id;
       vs.transfer_data.amount = o_v.transfer_amount;
       vs.transfer_data.from = o_v.transfer_from;
       vs.transfer_data.to = o_v.transfer_to;
+
+      vs.fill_data.order_id = o_v.fill_order_id;
+      vs.fill_data.account_id = o_v.fill_account_id;
+      vs.fill_data.pays_asset_id = o_v.fill_pays_asset_id;
+      vs.fill_data.pays_amount = o_v.fill_pays_amount;
+      vs.fill_data.receives_asset_id = o_v.fill_receives_asset_id;
+      vs.fill_data.receives_amount = o_v.fill_receives_amount;
+      vs.fill_data.fill_price = o_v.fill_fill_price;
+      vs.fill_data.is_maker = o_v.fill_is_maker;
    }
 
    // block data

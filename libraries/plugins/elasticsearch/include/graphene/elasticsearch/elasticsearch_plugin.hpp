@@ -89,6 +89,31 @@ struct operation_visitor
       transfer_from = o.from;
       transfer_to = o.to;
    }
+
+   object_id_type      fill_order_id;
+   account_id_type     fill_account_id;
+   asset_id_type       fill_pays_asset_id;
+   share_type          fill_pays_amount;
+   asset_id_type       fill_receives_asset_id;
+   share_type          fill_receives_amount;
+   double              fill_fill_price;
+   bool                fill_is_maker;
+
+   void operator()( const graphene::chain::fill_order_operation& o )
+   {
+      fee_asset = o.fee.asset_id;
+      fee_amount = o.fee.amount;
+
+      fill_order_id = o.order_id;
+      fill_account_id = o.account_id;
+      fill_pays_asset_id = o.pays.asset_id;
+      fill_pays_amount = o.pays.amount;
+      fill_receives_asset_id = o.receives.asset_id;
+      fill_receives_amount = o.receives.amount;
+      fill_fill_price = o.fill_price.to_real();
+      fill_is_maker = o.is_maker;
+   }
+
    template<typename T>
    void operator()( const T& o )
    {
@@ -123,9 +148,21 @@ struct transfer_struct {
    account_id_type to;
 };
 
+struct fill_struct {
+   object_id_type order_id;
+   account_id_type account_id;
+   asset_id_type pays_asset_id;
+   share_type pays_amount;
+   asset_id_type receives_asset_id;
+   share_type receives_amount;
+   double fill_price;
+   bool is_maker;
+};
+
 struct visitor_struct {
    fee_struct fee_data;
    transfer_struct transfer_data;
+   fill_struct fill_data;
 };
 
 struct bulk_struct {
@@ -143,7 +180,8 @@ FC_REFLECT( graphene::elasticsearch::operation_history_struct, (trx_in_block)(op
 FC_REFLECT( graphene::elasticsearch::block_struct, (block_num)(block_time)(trx_id) )
 FC_REFLECT( graphene::elasticsearch::fee_struct, (asset)(amount) )
 FC_REFLECT( graphene::elasticsearch::transfer_struct, (asset)(amount)(from)(to) )
-FC_REFLECT( graphene::elasticsearch::visitor_struct, (fee_data)(transfer_data) )
+FC_REFLECT( graphene::elasticsearch::fill_struct, (order_id)(account_id)(pays_asset_id)(pays_amount)(receives_asset_id)(receives_amount)(fill_price)(is_maker))
+FC_REFLECT( graphene::elasticsearch::visitor_struct, (fee_data)(transfer_data)(fill_data) )
 FC_REFLECT( graphene::elasticsearch::bulk_struct, (account_history)(operation_history)(operation_type)(operation_id_num)(block_data)(additional_data) )
 
 
