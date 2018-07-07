@@ -145,6 +145,7 @@ BOOST_AUTO_TEST_CASE( call_order_update_test )
       GRAPHENE_REQUIRE_THROW( borrow( dan, bitusd.amount(80000), asset(0)), fc::exception );
       BOOST_TEST_MESSAGE( "attempting to claim all collateral without paying off debt" );
       GRAPHENE_REQUIRE_THROW( cover( dan, bitusd.amount(0), asset(20000)), fc::exception );
+      GRAPHENE_REQUIRE_THROW( cover( dan, bitusd.amount(0), asset(20000-1)), fc::exception );
 
       borrow( sam, bitusd.amount(1000), asset(10000));
       transfer( sam, dan, bitusd.amount(1000) );
