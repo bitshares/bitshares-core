@@ -124,6 +124,8 @@ template<> struct js_name<fc::sha256>          { static std::string name(){ retu
 template<> struct js_name<fc::unsigned_int>    { static std::string name(){ return "varuint32";  } };
 template<> struct js_name<fc::signed_int>      { static std::string name(){ return "varint32";   } };
 template<> struct js_name< vote_id_type >      { static std::string name(){ return "vote_id";    } };
+template<> struct js_name< graphene::chain::extension<account_create_operation::ext> >      { static std::string name(){ return "ext"; } };
+template<> struct js_name< graphene::chain::extension<account_update_operation::ext> >      { static std::string name(){ return "ext"; } };
 template<> struct js_name< time_point_sec >    { static std::string name(){ return "time_point_sec"; } };
 
 template<uint8_t S, uint8_t T, typename O>
