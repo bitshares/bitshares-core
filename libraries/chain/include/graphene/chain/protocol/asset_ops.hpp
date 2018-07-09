@@ -54,7 +54,7 @@ namespace graphene { namespace chain {
       /// order to accept the fee. If this asset's fee pool is funded, the chain will automatically deposite fees
       /// in this asset to its accumulated fees, and withdraw from the fee pool the same amount as converted at
       /// the core exchange rate.
-      price core_exchange_rate;
+      price core_exchange_rate = price(asset(), asset(0, asset_id_type(1)));
 
       /// A set of accounts which maintain whitelists to consult for this asset. If whitelist_authorities
       /// is non-empty, then only accounts in whitelist_authorities are allowed to hold, use, or transfer the asset.
