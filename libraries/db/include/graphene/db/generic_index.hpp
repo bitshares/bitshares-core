@@ -68,22 +68,23 @@ namespace graphene { namespace chain {
          virtual void modify( const object& obj, const std::function<void(object&)>& m )override
          {
             assert(nullptr != dynamic_cast<const ObjectType*>(&obj));
-            bool exception = false;
+            std::exception_ptr exc;
             auto ok = _indices.modify(_indices.iterator_to(static_cast<const ObjectType&>(obj)),
-                                       [&m, &exception](ObjectType& o) {
+                                       [&m, &exc](ObjectType& o) mutable {
                                           try {
                                              m(o);
                                           } catch (fc::exception e) {
-                                             exception = true;
+                                             exc = std::current_exception();
                                              elog("Exception while modifying object: ${e} -- object may be corrupted",
                                                   ("e", e));
                                           } catch (...) {
-                                             exception = true;
+                                             exc = std::current_exception();
                                              elog("Unknown exception while modifying object");
                                           }
                                        }
                       );
-            FC_ASSERT(!exception, "Aborting for exception while modifying object");
+            if (exc)
+                std::rethrow_exception(exc);
             FC_ASSERT(ok, "Could not modify object, most likely a index constraint was violated");
          }
 

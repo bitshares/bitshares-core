@@ -84,7 +84,7 @@ BOOST_AUTO_TEST_CASE(failed_modify_test)
    // Throw exception when modifying object, check that object still exists after
    BOOST_CHECK_THROW(db.modify(obj, [](account_balance_object& obj) {
       throw 5;
-   }), fc::assert_exception);
+   }), int);
    BOOST_CHECK_NE(db.find_object(obj_id), nullptr);
 } FC_LOG_AND_RETHROW() }
 
