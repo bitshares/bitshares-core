@@ -182,6 +182,7 @@ void application_impl::reset_p2p_node(const fc::path& data_dir)
          "seed05.bts-nodes.net:1776",          // Thom         (USA)
          "seed06.bts-nodes.net:1776",          // Thom         (USA)
          "seed07.bts-nodes.net:1776",          // Thom         (Singapore)
+         "seed.bts.bangzi.info:55501",          // Bangzi         (Germany)
          "seeds.bitshares.eu:1776"            // pc           (http://seeds.quisquis.de/bitshares.html)
       };
       for( const string& endpoint_string : seeds )
