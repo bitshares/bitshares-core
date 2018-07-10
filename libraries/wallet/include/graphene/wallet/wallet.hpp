@@ -664,10 +664,6 @@ class wallet_api
       bool    load_wallet_file(string wallet_filename = "");
 
       /** Exits from BitShares wallet.
-       *
-       * @param wallet_filename the filename of the wallet JSON file to load.
-       *                        If \c wallet_filename is empty, it reloads the
-       *                        existing wallet file
        * 
        * The current wallet will be closed.
        */

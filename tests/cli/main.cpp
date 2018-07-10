@@ -483,31 +483,3 @@ BOOST_AUTO_TEST_CASE( cli_confidential_tx_test )
    }
    app1->shutdown();
 }
-
-////////////////
-// Start a server and connect using the same calls as the CLI
-// Quit wallet and be sure that file was saved correctly
-////////////////
-BOOST_AUTO_TEST_CASE( cli_quit )
-{
-   using namespace graphene::chain;
-   using namespace graphene::app;
-   std::shared_ptr<graphene::app::application> app1;
-   try {
-      BOOST_TEST_MESSAGE("Testing wallet connection and quit command.");
-
-      fc::temp_directory app_dir ( graphene::utilities::temp_directory_path() );
-
-	int server_port_number = 0;
-	app1 = start_application(app_dir, server_port_number);
-
-      // connect to the server
-	client_connection con(app1, app_dir, server_port_number);
-
-      BOOST_CHECK_NO_THROW( con.wallet_api_ptr->quit() );
-   } catch( fc::exception& e ) {
-      edump((e.to_detail_string()));
-      throw;
-   }
-   app1->shutdown();
-}

@@ -74,6 +74,9 @@
 #include <graphene/debug_witness/debug_api.hpp>
 #include <fc/smart_ref_impl.hpp>
 
+#include <cstdlib>
+using namespace std;
+
 #ifndef WIN32
 # include <sys/types.h>
 # include <sys/stat.h>
@@ -779,13 +782,7 @@ public:
     {
         ilog( "Exiting Wallet ..." );
 
-        try {
-            save_wallet_file();
-        } catch (...) {
-            FC_THROW("Got error while saving wallet file in quit command.");
-        }
-
-        exit(0);
+        _Exit(0);
     }
 
    void save_wallet_file(string wallet_filename = "")
