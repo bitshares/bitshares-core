@@ -126,6 +126,7 @@ template<> struct js_name<fc::signed_int>      { static std::string name(){ retu
 template<> struct js_name< vote_id_type >      { static std::string name(){ return "vote_id";    } };
 template<> struct js_name< time_point_sec >    { static std::string name(){ return "time_point_sec"; } };
 
+
 template<uint8_t S, uint8_t T, typename O>
 struct js_name<graphene::db::object_id<S,T,O> >
 {
@@ -267,6 +268,8 @@ struct serializer<uint64_t,false>
    static void generate() {}
 };
 template<> struct serializer<vote_id_type,false> { static void init() {} static void generate() {} };
+
+
 #ifdef __APPLE__
 // on mac, size_t is a distinct type from uint64_t or uint32_t and needs a separate specialization
 template<> struct serializer<size_t,false> { static void init() {} static void generate() {} };
@@ -276,6 +279,13 @@ template<> struct serializer<int64_t,true> { static void init() {} static void g
 
 template<typename T>
 struct serializer<fc::optional<T>,false>
+{
+   static void init() { serializer<T>::init(); }
+   static void generate(){}
+};
+
+template<typename T>
+struct serializer<graphene::chain::extension<T>,false>
 {
    static void init() { serializer<T>::init(); }
    static void generate(){}
