@@ -774,6 +774,20 @@ public:
 
       return true;
    }
+
+    void quit()
+    {
+        ilog( "Exiting Wallet ..." );
+
+        try {
+            save_wallet_file();
+        } catch (...) {
+            FC_THROW("Got error while saving wallet file in quit command.");
+        }
+
+        exit(0);
+    }
+
    void save_wallet_file(string wallet_filename = "")
    {
       //
@@ -3779,6 +3793,11 @@ string wallet_api::gethelp(const string& method)const
 bool wallet_api::load_wallet_file( string wallet_filename )
 {
    return my->load_wallet_file( wallet_filename );
+}
+
+void wallet_api::quit()
+{
+    my->quit();
 }
 
 void wallet_api::save_wallet_file( string wallet_filename )
