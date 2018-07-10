@@ -85,7 +85,7 @@ BOOST_AUTO_TEST_CASE(failed_modify_test)
    BOOST_CHECK_THROW(db.modify(obj, [](account_balance_object& obj) {
       throw 5;
    }), int);
-   BOOST_CHECK_NE(db.find_object(obj_id), nullptr);
+   BOOST_CHECK_NE((long)db.find_object(obj_id), (long)nullptr);
 } FC_LOG_AND_RETHROW() }
 
 BOOST_AUTO_TEST_CASE( flat_index_test )
