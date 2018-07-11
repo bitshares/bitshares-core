@@ -293,7 +293,6 @@ FC_REFLECT( graphene::chain::account_update_operation,
 
 FC_REFLECT_TYPENAME( graphene::chain::account_update_operation::extensions_type )
 
-
 FC_REFLECT( graphene::chain::account_upgrade_operation,
             (fee)(account_to_upgrade)(upgrade_to_lifetime_member)(extensions) )
 
