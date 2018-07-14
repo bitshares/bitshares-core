@@ -186,30 +186,6 @@ bool elasticsearch_plugin_impl::add_elasticsearch( const account_id_type account
    os.virtual_op = oho->virtual_op;
    os.op = fc::json::to_string(oho->op);
 
-   // visitor data
-   visitor_struct vs;
-   if(_elasticsearch_visitor) {
-      operation_visitor o_v;
-      oho->op.visit(o_v);
-
-      vs.fee_data.asset = o_v.fee_asset;
-      vs.fee_data.amount = o_v.fee_amount;
-
-      vs.transfer_data.asset = o_v.transfer_asset_id;
-      vs.transfer_data.amount = o_v.transfer_amount;
-      vs.transfer_data.from = o_v.transfer_from;
-      vs.transfer_data.to = o_v.transfer_to;
-
-      vs.fill_data.order_id = o_v.fill_order_id;
-      vs.fill_data.account_id = o_v.fill_account_id;
-      vs.fill_data.pays_asset_id = o_v.fill_pays_asset_id;
-      vs.fill_data.pays_amount = o_v.fill_pays_amount;
-      vs.fill_data.receives_asset_id = o_v.fill_receives_asset_id;
-      vs.fill_data.receives_amount = o_v.fill_receives_amount;
-      vs.fill_data.fill_price = o_v.fill_fill_price;
-      vs.fill_data.is_maker = o_v.fill_is_maker;
-   }
-
    // block data
    std::string trx_id = "";
    if(!b.transactions.empty() && oho->trx_in_block < b.transactions.size()) {
@@ -234,7 +210,32 @@ bool elasticsearch_plugin_impl::add_elasticsearch( const account_id_type account
    bulk_line_struct.operation_type = op_type;
    bulk_line_struct.operation_id_num = ath.operation_id.instance.value;
    bulk_line_struct.block_data = bs;
-   bulk_line_struct.additional_data = vs;
+
+   // visitor data
+   visitor_struct vs;
+   if(_elasticsearch_visitor) {
+      operation_visitor o_v;
+      oho->op.visit(o_v);
+
+      vs.fee_data.asset = o_v.fee_asset;
+      vs.fee_data.amount = o_v.fee_amount;
+
+      vs.transfer_data.asset = o_v.transfer_asset_id;
+      vs.transfer_data.amount = o_v.transfer_amount;
+      vs.transfer_data.from = o_v.transfer_from;
+      vs.transfer_data.to = o_v.transfer_to;
+
+      vs.fill_data.order_id = o_v.fill_order_id;
+      vs.fill_data.account_id = o_v.fill_account_id;
+      vs.fill_data.pays_asset_id = o_v.fill_pays_asset_id;
+      vs.fill_data.pays_amount = o_v.fill_pays_amount;
+      vs.fill_data.receives_asset_id = o_v.fill_receives_asset_id;
+      vs.fill_data.receives_amount = o_v.fill_receives_amount;
+      vs.fill_data.fill_price = o_v.fill_fill_price;
+      vs.fill_data.is_maker = o_v.fill_is_maker;
+
+      bulk_line_struct.additional_data = vs;
+   }
 
    std::string bulk_line = fc::json::to_string(bulk_line_struct);
 

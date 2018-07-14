@@ -171,7 +171,7 @@ struct bulk_struct {
    int operation_type;
    int operation_id_num;
    block_struct block_data;
-   visitor_struct additional_data;
+   optional<visitor_struct> additional_data;
 };
 
 } } //graphene::elasticsearch
