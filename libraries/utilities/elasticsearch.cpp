@@ -24,6 +24,7 @@
 #include <graphene/utilities/elasticsearch.hpp>
 
 #include <boost/algorithm/string/join.hpp>
+#include <boost/algorithm/string.hpp>
 #include <fc/log/logger.hpp>
 #include <fc/io/json.hpp>
 
@@ -204,6 +205,15 @@ std::string getEndPoint(ES& es)
       return "";
    else
       return CurlReadBuffer;
+}
+
+std::string generateIndexName(fc::time_point_sec block_date, std::string _elasticsearch_index_prefix)
+{
+   auto block_date_string = block_date.to_iso_string();
+   std::vector<std::string> parts;
+   boost::split(parts, block_date_string, boost::is_any_of("-"));
+   std::string index_name = _elasticsearch_index_prefix + parts[0] + "-" + parts[1];
+   return index_name;
 }
 
 } } // end namespace graphene::utilities

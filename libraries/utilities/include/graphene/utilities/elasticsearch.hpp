@@ -27,6 +27,7 @@
 #include <vector>
 
 #include <curl/curl.h>
+#include <fc/time.hpp>
 
 size_t WriteCallback(void *contents, size_t size, size_t nmemb, void *userp);
 
@@ -50,5 +51,6 @@ namespace graphene { namespace utilities {
    bool deleteAll(ES& es);
    bool handleBulkResponse(long http_code, std::string CurlReadBuffer);
    std::string getEndPoint(ES& es);
+   std::string generateIndexName(fc::time_point_sec block_date, std::string _elasticsearch_index_prefix);
 
 } } // end namespace graphene::utilities

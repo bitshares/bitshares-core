@@ -38,12 +38,6 @@
 #include <fc/thread/thread.hpp>
 
 #include <curl/curl.h>
-#include <boost/algorithm/string/join.hpp>
-#include <boost/algorithm/string/replace.hpp>
-#include <boost/algorithm/string/find.hpp>
-#include <boost/algorithm/string.hpp>
-#include <regex>
-
 #include <graphene/utilities/elasticsearch.hpp>
 
 namespace graphene { namespace elasticsearch {
@@ -238,13 +232,9 @@ bool elasticsearch_plugin_impl::add_elasticsearch( const account_id_type account
    }
 
    std::string bulk_line = fc::json::to_string(bulk_line_struct);
-
-   auto block_date = bulk_line_struct.block_data.block_time.to_iso_string();
-   std::vector<std::string> parts;
-   boost::split(parts, block_date, boost::is_any_of("-"));
-   std::string index_name = _elasticsearch_index_prefix + parts[0] + "-" + parts[1]; // index name
+   auto block_date = bulk_line_struct.block_data.block_time;
+   std::string index_name = graphene::utilities::generateIndexName(block_date, _elasticsearch_index_prefix);
    std::string _id = fc::json::to_string(ath.id);
-
    prepare = graphene::utilities::createBulk(index_name, bulk_line, _id, 0);
    bulk_lines.insert(bulk_lines.end(), prepare.begin(), prepare.end());
 
