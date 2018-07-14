@@ -147,6 +147,13 @@ void elasticsearch_plugin_impl::update_account_histories( const signed_block& b 
          add_elasticsearch( account_id, oho, b );
       }
    }
+   
+   if((fc::time_point::now() - b.timestamp) < fc::seconds(30)) {
+      if (curl && bulk.size() != 0) { // flush the pending bulk if we are not in replay
+         prepare.clear();
+         graphene::utilities::SendBulk(curl, bulk, _elasticsearch_node_url, _elasticsearch_logs, "logs-account-history");
+      }
+   }
 }
 
 void elasticsearch_plugin_impl::add_elasticsearch( const account_id_type account_id, const optional <operation_history_object>& oho, const signed_block& b)
