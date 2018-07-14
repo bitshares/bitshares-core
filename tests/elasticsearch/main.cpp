@@ -105,8 +105,8 @@ BOOST_AUTO_TEST_CASE(es1) {
 
          // do some transfers in 1 block
          transfer(account_id_type()(db), bob, asset(100));
-         transfer(account_id_type()(db), bob, asset(100));
-         transfer(account_id_type()(db), bob, asset(100));
+         transfer(account_id_type()(db), bob, asset(200));
+         transfer(account_id_type()(db), bob, asset(300));
 
          generate_block();
          fc::usleep(fc::milliseconds(1000)); // index.refresh_interval
@@ -118,6 +118,16 @@ BOOST_AUTO_TEST_CASE(es1) {
          total = j["count"].as_string();
          BOOST_CHECK_EQUAL(total, "13");
 
+         // check the visitor data
+         auto block_date = db.head_block_time();
+         std::string index_name = graphene::utilities::generateIndexName(block_date, "bitshares-");
+
+         es.endpoint = index_name + "/data/2.9.12"; // we know last op is a transfer of amount 300
+         curl = curl_easy_init();
+         res = graphene::utilities::getEndPoint(es);
+         j = fc::json::from_string(res);
+         auto last_transfer_amount = j["_source"]["additional_data"]["transfer_data"]["amount"].as_string();
+         BOOST_CHECK_EQUAL(last_transfer_amount, "300");
       }
    }
    catch (fc::exception &e) {
