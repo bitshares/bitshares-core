@@ -183,5 +183,27 @@ bool deleteAll(ES& es)
    else
       return true;
 }
+std::string getEndPoint(ES& es)
+{
+   CURL *curl = es.curl;
+   std::string elasticsearch_url = es.elasticsearch_url;
+   std::string endpoint = es.endpoint;
+   std::string auth = es.auth;
+
+   std::string CurlReadBuffer;
+   std::string url = elasticsearch_url + endpoint;
+   curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "GET");
+   curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+   curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
+   curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)&CurlReadBuffer);
+   curl_easy_setopt(curl, CURLOPT_USERAGENT, "libcrp/0.1");
+   if(!auth.empty())
+      curl_easy_setopt(curl, CURLOPT_USERPWD, auth.c_str());
+   curl_easy_perform(curl);
+   if(CurlReadBuffer.empty())
+      return "";
+   else
+      return CurlReadBuffer;
+}
 
 } } // end namespace graphene::utilities

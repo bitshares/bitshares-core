@@ -49,5 +49,6 @@ namespace graphene { namespace utilities {
    std::string simpleQuery(ES& es);
    bool deleteAll(ES& es);
    bool handleBulkResponse(long http_code, std::string CurlReadBuffer);
+   std::string getEndPoint(ES& es);
 
 } } // end namespace graphene::utilities
