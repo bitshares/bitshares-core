@@ -43,6 +43,15 @@ namespace graphene { namespace utilities {
          std::string endpoint;
          std::string query;
    };
+   class CurlRequest {
+      public:
+         CURL *handler;
+         std::string url;
+         std::string type;
+         std::string auth;
+         std::string query;
+         //bool response;
+   };
 
    bool SendBulk(ES& es);
    std::vector<std::string> createBulk(std::string type, std::string data, std::string id, bool onlycreate);
@@ -52,5 +61,10 @@ namespace graphene { namespace utilities {
    bool handleBulkResponse(long http_code, std::string CurlReadBuffer);
    std::string getEndPoint(ES& es);
    std::string generateIndexName(fc::time_point_sec block_date, std::string _elasticsearch_index_prefix);
+   std::string doCurl(CurlRequest& curl);
+   std::string joinBulkLines(std::vector<std::string>& bulk);
+   long getResponseCode(CURL *handler);
 
-} } // end namespace graphene::utilities
+
+
+   } } // end namespace graphene::utilities

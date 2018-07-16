@@ -38,90 +38,59 @@ namespace graphene { namespace utilities {
 
 bool checkES(ES& es)
 {
-   CURL *curl = es.curl;
-   std::string elasticsearch_url = es.elasticsearch_url;
-   std::string auth = es.auth;
+   graphene::utilities::CurlRequest curl_request;
+   curl_request.handler = es.curl;
+   curl_request.url = es.elasticsearch_url + "_nodes";
+   curl_request.auth = es.auth;
+   curl_request.type = "GET";
 
-   std::string CurlReadBuffer;
-   std::string url = elasticsearch_url + "_nodes";
-   curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "GET");
-   curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
-   curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
-   curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)&CurlReadBuffer);
-   curl_easy_setopt(curl, CURLOPT_USERAGENT, "libcrp/0.1");
-   if(!auth.empty())
-      curl_easy_setopt(curl, CURLOPT_USERPWD, auth.c_str());
-   curl_easy_perform(curl);
-   if(CurlReadBuffer.empty())
+   if(doCurl(curl_request).empty())
       return false;
-   else
-      return true;
+   return true;
+
 }
 std::string simpleQuery(ES& es)
 {
-   CURL *curl = es.curl;
-   std::string elasticsearch_url = es.elasticsearch_url;
-   std::string endpoint = es.endpoint;
-   std::string query = es.query;
-   std::string auth = es.auth;
+   graphene::utilities::CurlRequest curl_request;
+   curl_request.handler = es.curl;
+   curl_request.url = es.elasticsearch_url + es.endpoint;
+   curl_request.auth = es.auth;
+   curl_request.type = "POST";
+   curl_request.query = es.query;
 
-   std::string CurlReadBuffer;
-   struct curl_slist *headers = NULL;
-   headers = curl_slist_append(headers, "Content-Type: application/json");
-   std::string url = elasticsearch_url + endpoint;
-   curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
-   curl_easy_setopt(curl, CURLOPT_POST, true);
-   curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "POST");
-   curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
-   curl_easy_setopt(curl, CURLOPT_POSTFIELDS, query.c_str());
-   curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
-   curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)&CurlReadBuffer);
-   curl_easy_setopt(curl, CURLOPT_USERAGENT, "libcrp/0.1");
-   if(!auth.empty())
-      curl_easy_setopt(curl, CURLOPT_USERPWD, auth.c_str());
-   curl_easy_perform(curl);
-
-   if(!CurlReadBuffer.empty())
-      return CurlReadBuffer;
-   return "";
+   return doCurl(curl_request);
 }
 
 bool SendBulk(ES& es)
 {
-   CURL *curl = es.curl;
-   std::vector<std::string>& bulk = es.bulk_lines;
-   std::string elasticsearch_url = es.elasticsearch_url;
-   std::string auth = es.auth;
+   std::string bulking = joinBulkLines(es.bulk_lines);
 
-   std::string CurlReadBuffer;
+   graphene::utilities::CurlRequest curl_request;
+   curl_request.handler = es.curl;
+   curl_request.url = es.elasticsearch_url + "_bulk";
+   curl_request.auth = es.auth;
+   curl_request.type = "POST";
+   curl_request.query = bulking;
 
-   std::string bulking = "";
-   bulking = boost::algorithm::join(bulk, "\n");
-   bulking = bulking + "\n";
-   bulk.clear();
+   auto curlResponse = doCurl(curl_request);
 
-   struct curl_slist *headers = NULL;
-   headers = curl_slist_append(headers, "Content-Type: application/json");
-   std::string url = elasticsearch_url + "_bulk";
-   curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
-   curl_easy_setopt(curl, CURLOPT_POST, true);
-   curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "POST");
-   curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
-   curl_easy_setopt(curl, CURLOPT_POSTFIELDS, bulking.c_str());
-   curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
-   curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)&CurlReadBuffer);
-   curl_easy_setopt(curl, CURLOPT_USERAGENT, "libcrp/0.1");
-   if(!auth.empty()) {
-      curl_easy_setopt(curl, CURLOPT_USERPWD, auth.c_str());
-   }
-   curl_easy_perform(curl);
-
-   long http_code = 0;
-   curl_easy_getinfo (curl, CURLINFO_RESPONSE_CODE, &http_code);
-
-   if(handleBulkResponse(http_code, CurlReadBuffer))
+   if(handleBulkResponse(getResponseCode(curl_request.handler), curlResponse))
       return true;
    return false;
+}
+
+std::string joinBulkLines(std::vector<std::string>& bulk)
+{
+   std::string bulking = boost::algorithm::join(bulk, "\n");
+   bulking = bulking + "\n";
+
+   return bulking;
+}
+long getResponseCode(CURL *handler)
+{
+   long http_code = 0;
+   curl_easy_getinfo (handler, CURLINFO_RESPONSE_CODE, &http_code);
+   return http_code;
 }
 
 bool handleBulkResponse(long http_code, std::string CurlReadBuffer)
@@ -163,48 +132,28 @@ std::vector<std::string> createBulk(std::string index_name, std::string data, st
 
 bool deleteAll(ES& es)
 {
-   CURL *curl = es.curl;
-   std::string elasticsearch_url = es.elasticsearch_url;
-   std::string auth = es.auth;
-   std::string index_prefix = es.index_prefix;
+   graphene::utilities::CurlRequest curl_request;
+   curl_request.handler = es.curl;
+   curl_request.url = es.elasticsearch_url + es.index_prefix + "*";
+   curl_request.auth = es.auth;
+   curl_request.type = "DELETE";
 
-   std::string CurlReadBuffer;
-
-   std::string url = elasticsearch_url + index_prefix + "*";
-   curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
-   curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "DELETE");
-   curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
-   curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)&CurlReadBuffer);
-   curl_easy_setopt(curl, CURLOPT_USERAGENT, "libcrp/0.1");
-   if(!auth.empty())
-      curl_easy_setopt(curl, CURLOPT_USERPWD, auth.c_str());
-   curl_easy_perform(curl);
-   if(CurlReadBuffer.empty())
+   auto curl_response =  doCurl(curl_request);
+   if(curl_response.empty())
       return false;
    else
       return true;
 }
 std::string getEndPoint(ES& es)
 {
-   CURL *curl = es.curl;
-   std::string elasticsearch_url = es.elasticsearch_url;
-   std::string endpoint = es.endpoint;
-   std::string auth = es.auth;
 
-   std::string CurlReadBuffer;
-   std::string url = elasticsearch_url + endpoint;
-   curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "GET");
-   curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
-   curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
-   curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)&CurlReadBuffer);
-   curl_easy_setopt(curl, CURLOPT_USERAGENT, "libcrp/0.1");
-   if(!auth.empty())
-      curl_easy_setopt(curl, CURLOPT_USERPWD, auth.c_str());
-   curl_easy_perform(curl);
-   if(CurlReadBuffer.empty())
-      return "";
-   else
-      return CurlReadBuffer;
+   graphene::utilities::CurlRequest curl_request;
+   curl_request.handler = es.curl;
+   curl_request.url = es.elasticsearch_url + es.endpoint;
+   curl_request.auth = es.auth;
+   curl_request.type = "GET";
+
+   return doCurl(curl_request);
 }
 
 std::string generateIndexName(fc::time_point_sec block_date, std::string _elasticsearch_index_prefix)
@@ -214,6 +163,30 @@ std::string generateIndexName(fc::time_point_sec block_date, std::string _elasti
    boost::split(parts, block_date_string, boost::is_any_of("-"));
    std::string index_name = _elasticsearch_index_prefix + parts[0] + "-" + parts[1];
    return index_name;
+}
+
+std::string doCurl(CurlRequest& curl)
+{
+   std::string CurlReadBuffer;
+   struct curl_slist *headers = NULL;
+   headers = curl_slist_append(headers, "Content-Type: application/json");
+
+   curl_easy_setopt(curl.handler, CURLOPT_HTTPHEADER, headers);
+   curl_easy_setopt(curl.handler, CURLOPT_URL, curl.url.c_str());
+   curl_easy_setopt(curl.handler, CURLOPT_CUSTOMREQUEST, curl.type.c_str());
+   if(curl.type == "POST")
+   {
+      curl_easy_setopt(curl.handler, CURLOPT_POST, true);
+      curl_easy_setopt(curl.handler, CURLOPT_POSTFIELDS, curl.query.c_str());
+   }
+   curl_easy_setopt(curl.handler, CURLOPT_WRITEFUNCTION, WriteCallback);
+   curl_easy_setopt(curl.handler, CURLOPT_WRITEDATA, (void *)&CurlReadBuffer);
+   curl_easy_setopt(curl.handler, CURLOPT_USERAGENT, "libcrp/0.1");
+   if(!curl.auth.empty())
+      curl_easy_setopt(curl.handler, CURLOPT_USERPWD, curl.auth.c_str());
+   curl_easy_perform(curl.handler);
+
+   return CurlReadBuffer;
 }
 
 } } // end namespace graphene::utilities
