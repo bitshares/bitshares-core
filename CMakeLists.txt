@@ -54,13 +54,6 @@ LIST(APPEND BOOST_COMPONENTS thread
                              locale)
 SET( Boost_USE_STATIC_LIBS ON CACHE STRING "ON or OFF" )
 
-OPTION( ASSET_BALANCE_SORTING "Keep account_balance objects sorted by asset and amount to be used in asset_api (ON OR OFF)" OFF )
-if( ASSET_BALANCE_SORTING )
-  MESSAGE( STATUS "Configurating ASSET_BALANCE_SORTING" )
-  SET( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DASSET_BALANCE_SORTED" )
-  SET( CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DASSET_BALANCE_SORTED" )
-endif()
-
 IF( WIN32 )
   SET(BOOST_ROOT $ENV{BOOST_ROOT})
   set(Boost_USE_MULTITHREADED ON)
@@ -75,6 +68,13 @@ IF(NOT "${Boost_VERSION}" MATCHES "1.53(.*)")
    LIST(APPEND BOOST_COMPONENTS coroutine)
    SET(Boost_LIBRARIES ${BOOST_LIBRARIES_TEMP} ${Boost_LIBRARIES})
 ENDIF()
+
+OPTION( ASSET_BALANCE_SORTING "Keep account_balance objects sorted by asset and amount, to be used in asset_api (ON OR OFF)" ON )
+if( ASSET_BALANCE_SORTING )
+  MESSAGE( STATUS "Configurating ASSET_BALANCE_SORTING" )
+  SET( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DASSET_BALANCE_SORTED" )
+  SET( CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DASSET_BALANCE_SORTED" )
+endif()
 
 if( WIN32 )
 

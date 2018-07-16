@@ -121,7 +121,15 @@
 #define GRAPHENE_RECENTLY_MISSED_COUNT_INCREMENT             4
 #define GRAPHENE_RECENTLY_MISSED_COUNT_DECREMENT             3
 
-#define GRAPHENE_CURRENT_DB_VERSION                          "BTS2.17"
+#define GPH_DB_VER                                           (std::string("BTS2.17"))
+
+#ifdef ASSET_BALANCE_SORTED
+   #define GPH_DB_OPT_ABS                                    (std::string())
+#else
+   #define GPH_DB_OPT_ABS                                    (std::string("-asset_balance_unsorted"))
+#endif
+
+#define GRAPHENE_CURRENT_DB_VERSION                          (GPH_DB_VER + GPH_DB_OPT_ABS)
 
 #define GRAPHENE_IRREVERSIBLE_THRESHOLD                      (70 * GRAPHENE_1_PERCENT)
 
