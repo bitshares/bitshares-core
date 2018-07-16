@@ -4545,6 +4545,80 @@ vesting_balance_object_with_info::vesting_balance_object_with_info( const vestin
    allowed_withdraw_time = now;
 }
 
+signed_transaction wallet_api::update_authorities( string account_name,
+                                                   pair<uint16_t, flat_map<std::string, uint16_t>> owner,
+                                                   pair<uint16_t, flat_map<std::string, uint16_t>> active,
+                                                   std::string memo_key,
+                                                   bool broadcast )
+{
+   FC_ASSERT( !is_locked() );
+
+   auto account = get_account(account_name);
+   FC_ASSERT( account_name == account.name, "Account name doesn't match?" );
+
+   authority new_auth_owner;
+   authority new_auth_active;
+   new_auth_owner = account.owner;
+   new_auth_active = account.active;
+
+   account_update_operation op;
+   op.account = account.id;
+
+   // process owner auths
+   new_auth_owner.weight_threshold = weight_type(owner.first);
+   if (owner.second.size() > 0) {
+      for (const auto &auths : owner.second) {
+         if (auths.second == 0) // delete
+            new_auth_owner = delete_authority(new_auth_owner, auths.first);
+         else  // add
+            new_auth_owner = insert_authority(new_auth_owner, auths.first, auths.second);
+      }
+   }
+   op.owner = new_auth_owner;
+
+   // process active auths
+   new_auth_active.weight_threshold = active.first;
+   if (active.second.size() > 0) {
+      for (const auto &auths : active.second) {
+         if (auths.second == 0) // delete
+            new_auth_active = delete_authority(new_auth_active, auths.first);
+         else  // add
+            new_auth_active = insert_authority(new_auth_active, auths.first, auths.second);
+      }
+   }
+   op.active = new_auth_active;
+
+   // process the memo
+   if(memo_key != "") {
+      account_options ao;
+      ao.memo_key = public_key_type(memo_key);
+      op.new_options = ao;
+   }
+
+   signed_transaction tx;
+   tx.operations.push_back(op);
+   auto current_fees = my->_remote_db->get_global_properties().parameters.current_fees;
+   my->set_operation_fees( tx, current_fees );
+   tx.validate();
+
+   return my->sign_transaction( tx, broadcast );
+}
+
+authority wallet_api::delete_authority(authority auth, std::string key)
+{
+   if(is_public_key_registered(key)) auth.key_auths.erase(public_key_type(key));
+   else auth.account_auths.erase(get_account(key).id);
+
+   return auth;
+}
+authority wallet_api::insert_authority(authority auth, std::string key, uint16_t w)
+{
+   if(is_public_key_registered(key)) auth.add_authority(public_key_type(key), weight_type(w));
+   else auth.add_authority(get_account(key).id, weight_type(w));
+
+   return auth;
+}
+
 } } // graphene::wallet
 
 namespace fc {
