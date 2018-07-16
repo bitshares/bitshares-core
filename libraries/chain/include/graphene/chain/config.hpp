@@ -121,13 +121,13 @@
 #define GRAPHENE_RECENTLY_MISSED_COUNT_INCREMENT             4
 #define GRAPHENE_RECENTLY_MISSED_COUNT_DECREMENT             3
 
+#define GPH_DB_VER                                           (std::string("BTS2.17"))
+
 #ifdef ASSET_BALANCE_SORTED
    #define GPH_DB_OPT_ABS                                    (std::string())
 #else
    #define GPH_DB_OPT_ABS                                    (std::string("-asset_balance_unsorted"))
 #endif
-
-#define GPH_DB_VER                                           (std::string("BTS2.17"))
 
 #define GRAPHENE_CURRENT_DB_VERSION                          (GPH_DB_VER + GPH_DB_OPT_ABS)
 
