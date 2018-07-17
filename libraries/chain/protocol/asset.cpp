@@ -53,26 +53,6 @@ namespace graphene { namespace chain {
          return amult < bmult;
       }
 
-      bool operator <= ( const price& a, const price& b )
-      {
-         return !(b < a);
-      }
-
-      bool operator != ( const price& a, const price& b )
-      {
-         return !(a == b);
-      }
-
-      bool operator > ( const price& a, const price& b )
-      {
-         return (b < a);
-      }
-
-      bool operator >= ( const price& a, const price& b )
-      {
-         return !(a < b);
-      }
-
       asset operator * ( const asset& a, const price& b )
       {
          if( a.asset_id == b.base.asset_id )
