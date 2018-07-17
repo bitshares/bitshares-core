@@ -471,7 +471,7 @@ BOOST_AUTO_TEST_CASE( cli_confidential_tx_test )
       generate_block(app1); head_block++;
 
       // ** Check head block:
-      BOOST_MESSAGE("Check that all expected blocks have processed");
+      BOOST_TEST_MESSAGE("Check that all expected blocks have processed");
       dynamic_global_property_object dgp = W.get_dynamic_global_properties();
       BOOST_CHECK(dgp.head_block_number == head_block);
 
