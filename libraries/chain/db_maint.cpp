@@ -72,12 +72,45 @@ vector<std::reference_wrapper<const typename Index::object_type>> database::sort
    return refs;
 }
 
-template<class... Types>
-void database::perform_account_maintenance(std::tuple<Types...> helpers)
+template<class Type>
+void database::perform_account_maintenance(Type tally_helper)
 {
-   const auto& idx = get_index_type<account_index>().indices().get<by_name>();
-   for( const account_object& a : idx )
-      detail::for_each(helpers, a, detail::gen_seq<sizeof...(Types)>());
+   const auto& bal_idx = get_index_type< account_balance_index >().indices().get< by_maintenance_flag >();
+   if( bal_idx.begin() != bal_idx.end() )
+   {
+      auto bal_itr = bal_idx.rbegin();
+      while( bal_itr->maintenance_flag )
+      {
+         const account_balance_object& bal_obj = *bal_itr;
+
+         modify( get_account_stats_by_owner( bal_obj.owner ), [&bal_obj](account_statistics_object& aso) {
+            aso.core_in_balance = bal_obj.balance;
+         });
+
+         modify( bal_obj, []( account_balance_object& abo ) {
+            abo.maintenance_flag = false;
+         });
+
+         bal_itr = bal_idx.rbegin();
+      }
+   }
+
+   const auto& stats_idx = get_index_type< account_stats_index >().indices().get< by_maintenance_seq >();
+   auto stats_itr = stats_idx.lower_bound( true );
+
+   while( stats_itr != stats_idx.end() )
+   {
+      const account_statistics_object& acc_stat = *stats_itr;
+      const account_object& acc_obj = acc_stat.owner( *this );
+      ++stats_itr;
+
+      if( acc_stat.has_some_core_voting() )
+         tally_helper( acc_obj, acc_stat );
+
+      if( acc_stat.has_pending_fees() )
+         acc_stat.process_fees( acc_obj, *this );
+   }
+
 }
 
 /// @brief A visitor for @ref worker_type which calls pay_worker on the worker within
@@ -1014,7 +1047,8 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
          d._total_voting_stake = 0;
       }
 
-      void operator()(const account_object& stake_account) {
+      void operator()( const account_object& stake_account, const account_statistics_object& stats )
+      {
          if( props.parameters.count_non_member_votes || stake_account.is_member(d.head_block_time()) )
          {
             // There may be a difference between the account whose stake is voting and the one specifying opinions.
@@ -1025,10 +1059,9 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
                    GRAPHENE_PROXY_TO_SELF_ACCOUNT)? stake_account
                                      : d.get(stake_account.options.voting_account);
 
-            const auto& stats = stake_account.statistics(d);
             uint64_t voting_stake = stats.total_core_in_orders.value
                   + (stake_account.cashback_vb.valid() ? (*stake_account.cashback_vb)(d).balance.amount.value: 0)
-                  + d.get_balance(stake_account.get_id(), asset_id_type()).amount.value;
+                  + stats.core_in_balance.value;
 
             for( vote_id_type id : opinion_account.options.votes )
             {
@@ -1065,22 +1098,8 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
          }
       }
    } tally_helper(*this, gpo);
-   struct process_fees_helper {
-      database& d;
-      const global_property_object& props;
 
-      process_fees_helper(database& d, const global_property_object& gpo)
-         : d(d), props(gpo) {}
-
-      void operator()(const account_object& a) {
-         a.statistics(d).process_fees(a, d);
-      }
-   } fee_helper(*this, gpo);
-
-   perform_account_maintenance(std::tie(
-      tally_helper,
-      fee_helper
-      ));
+   perform_account_maintenance( tally_helper );
 
    struct clear_canary {
       clear_canary(vector<uint64_t>& target): target(target){}

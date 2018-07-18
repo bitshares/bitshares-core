@@ -179,9 +179,10 @@ void application_impl::reset_p2p_node(const fc::path& data_dir)
          "seed.cubeconnex.com:1777",          // cube         (USA)
          "seed.roelandp.nl:1776",             // roelandp     (Canada)
          "seed04.bts-nodes.net:1776",         // Thom         (Australia)
-         "seed05.bts-nodes.net:1776",          // Thom         (USA)
-         "seed06.bts-nodes.net:1776",          // Thom         (USA)
-         "seed07.bts-nodes.net:1776",          // Thom         (Singapore)
+         "seed05.bts-nodes.net:1776",         // Thom         (USA)
+         "seed06.bts-nodes.net:1776",         // Thom         (USA)
+         "seed07.bts-nodes.net:1776",         // Thom         (Singapore)
+         "seed.bts.bangzi.info:55501",        // Bangzi       (Germany)
          "seeds.bitshares.eu:1776"            // pc           (http://seeds.quisquis.de/bitshares.html)
       };
       for( const string& endpoint_string : seeds )
@@ -436,7 +437,6 @@ void application_impl::startup()
       wild_access.allowed_apis.push_back( "database_api" );
       wild_access.allowed_apis.push_back( "network_broadcast_api" );
       wild_access.allowed_apis.push_back( "history_api" );
-      wild_access.allowed_apis.push_back( "crypto_api" );
       wild_access.allowed_apis.push_back( "orders_api" );
       _apiaccess.permission_map["*"] = wild_access;
    }

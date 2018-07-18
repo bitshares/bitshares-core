@@ -28,7 +28,7 @@
 #include <graphene/chain/protocol/transaction.hpp>
 #include <graphene/chain/protocol/types.hpp>
 
-namespace graphene { namespace app {
+namespace graphene { namespace chain {
 
 void operation_get_impacted_accounts(
    const graphene::chain::operation& op,

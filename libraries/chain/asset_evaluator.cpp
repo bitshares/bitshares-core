@@ -378,54 +378,55 @@ void check_children_of_bitasset(database& d, const asset_update_bitasset_operati
       return;
 
    // loop through all assets that have this asset as a backing asset
-   const auto& idx = d.get_index_type<asset_index>().indices().get<by_type>();
-
-   for( auto itr = idx.lower_bound(true); itr != idx.end(); ++itr )
-   {
-      const auto& child = *itr;
-      if ( child.bitasset_data(d).options.short_backing_asset == op.asset_to_update )
-      {
-         if ( after_hf_922_931 )
+   const auto& idx = d.get_index_type<graphene::chain::asset_bitasset_data_index>()
+         .indices()
+         .get<by_short_backing_asset>();
+   auto backed_range = idx.equal_range(op.asset_to_update);
+   std::for_each( backed_range.first, backed_range.second,
+         [after_hf_922_931, &new_backing_asset, &d, &op](const asset_bitasset_data_object& bitasset_data)
          {
-            FC_ASSERT( child.get_id() != op.new_options.short_backing_asset,
-                  "A BitAsset would be invalidated by changing this backing asset ('A' backed by 'B' backed by 'A')." );
-
-            FC_ASSERT( child.issuer != GRAPHENE_COMMITTEE_ACCOUNT,
-                  "A blockchain-controlled market asset would be invalidated by changing this backing asset." );
-
-            FC_ASSERT( !new_backing_asset.is_market_issued(),
-                  "A non-blockchain controlled BitAsset would be invalidated by changing this backing asset.");
-
-         }
-         else
-         {
-            if( child.get_id() == op.new_options.short_backing_asset )
+            const auto& child = bitasset_data.asset_id(d);
+            if ( after_hf_922_931 )
             {
-               wlog( "Before hf-922-931, modified an asset to be backed by another, but would cause a continuous "
-                     "loop. A cannot be backed by B which is backed by A." );
-               return;
-            }
+               FC_ASSERT( child.get_id() != op.new_options.short_backing_asset,
+                     "A BitAsset would be invalidated by changing this backing asset ('A' backed by 'B' backed by 'A')." );
 
-            if( child.issuer == GRAPHENE_COMMITTEE_ACCOUNT )
-            {
-               wlog( "before hf-922-931, modified an asset to be backed by a non-CORE, but this asset "
-                        "is a backing asset for a committee-issued asset. This occurred at block ${b}",
-                        ("b", d.head_block_num()));
-               return;
+               FC_ASSERT( child.issuer != GRAPHENE_COMMITTEE_ACCOUNT,
+                     "A blockchain-controlled market asset would be invalidated by changing this backing asset." );
+
+               FC_ASSERT( !new_backing_asset.is_market_issued(),
+                     "A non-blockchain controlled BitAsset would be invalidated by changing this backing asset.");
+
             }
             else
             {
-               if ( new_backing_asset.is_market_issued() ) { // a.k.a. !UIA
-                  wlog( "before hf-922-931, modified an asset to be backed by an MPA, but this asset "
-                        "is a backing asset for another MPA, which would cause MPA backed by MPA backed by MPA. "
-                        "This occurred at block ${b}",
+               if( child.get_id() == op.new_options.short_backing_asset )
+               {
+                  wlog( "Before hf-922-931, modified an asset to be backed by another, but would cause a continuous "
+                        "loop. A cannot be backed by B which is backed by A." );
+                  return;
+               }
+
+               if( child.issuer == GRAPHENE_COMMITTEE_ACCOUNT )
+               {
+                  wlog( "before hf-922-931, modified an asset to be backed by a non-CORE, but this asset "
+                        "is a backing asset for a committee-issued asset. This occurred at block ${b}",
                         ("b", d.head_block_num()));
                   return;
                }
-            } // if child.issuer
-         } // if hf 922/931
-      } // if this child is backed by the asset being adjusted
-   } // for each asset
+               else
+               {
+                  if ( new_backing_asset.is_market_issued() ) // a.k.a. !UIA
+                  {
+                     wlog( "before hf-922-931, modified an asset to be backed by an MPA, but this asset "
+                           "is a backing asset for another MPA, which would cause MPA backed by MPA backed by MPA. "
+                           "This occurred at block ${b}",
+                           ("b", d.head_block_num()));
+                     return;
+                  }
+               } // if child.issuer
+            } // if hf 922/931
+         } ); // end of lambda and std::for_each()
 } // check_children_of_bitasset
 
 void_result asset_update_bitasset_evaluator::do_evaluate(const asset_update_bitasset_operation& op)

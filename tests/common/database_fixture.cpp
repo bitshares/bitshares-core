@@ -27,6 +27,7 @@
 #include <graphene/account_history/account_history_plugin.hpp>
 #include <graphene/market_history/market_history_plugin.hpp>
 #include <graphene/grouped_orders/grouped_orders_plugin.hpp>
+#include <graphene/elasticsearch/elasticsearch_plugin.hpp>
 
 #include <graphene/db/simple_index.hpp>
 
@@ -73,7 +74,6 @@ database_fixture::database_fixture()
       if( arg == "--show-test-names" )
          std::cout << "running test " << boost::unit_test::framework::current_test_case().p_name << std::endl;
    }
-   auto ahplugin = app.register_plugin<graphene::account_history::account_history_plugin>();
    auto mhplugin = app.register_plugin<graphene::market_history::market_history_plugin>();
    auto goplugin = app.register_plugin<graphene::grouped_orders::grouped_orders_plugin>();
    init_account_pub_key = init_account_priv_key.get_public_key();
@@ -126,8 +126,23 @@ database_fixture::database_fixture()
       options.insert(std::make_pair("track-account", boost::program_options::variable_value(track_account, false)));
    }
 
-   ahplugin->plugin_set_app(&app);
-   ahplugin->plugin_initialize(options);
+   if(boost::unit_test::framework::current_test_case().p_name.value == "es1") {
+      auto esplugin = app.register_plugin<graphene::elasticsearch::elasticsearch_plugin>();
+      esplugin->plugin_set_app(&app);
+
+      options.insert(std::make_pair("elasticsearch-node-url", boost::program_options::variable_value(string("http://localhost:9200/"), false)));
+      options.insert(std::make_pair("elasticsearch-bulk-replay", boost::program_options::variable_value(uint32_t(2), false)));
+      options.insert(std::make_pair("elasticsearch-bulk-sync", boost::program_options::variable_value(uint32_t(2), false)));
+
+      esplugin->plugin_initialize(options);
+      esplugin->plugin_startup();
+   }
+   else {
+      auto ahplugin = app.register_plugin<graphene::account_history::account_history_plugin>();
+      ahplugin->plugin_set_app(&app);
+      ahplugin->plugin_initialize(options);
+      ahplugin->plugin_startup();
+   }
 
    options.insert(std::make_pair("bucket-size", boost::program_options::variable_value(string("[15]"),false)));
    mhplugin->plugin_set_app(&app);
@@ -136,7 +151,6 @@ database_fixture::database_fixture()
    goplugin->plugin_set_app(&app);
    goplugin->plugin_initialize(options);
 
-   ahplugin->plugin_startup();
    mhplugin->plugin_startup();
    goplugin->plugin_startup();
 
@@ -190,7 +204,7 @@ void database_fixture::verify_asset_supplies( const database& db )
    const asset_dynamic_data_object& core_asset_data = db.get_core_asset().dynamic_asset_data_id(db);
    BOOST_CHECK(core_asset_data.fee_pool == 0);
 
-   const simple_index<account_statistics_object>& statistics_index = db.get_index_type<simple_index<account_statistics_object>>();
+   const auto& statistics_index = db.get_index_type<account_stats_index>().indices();
    const auto& balance_index = db.get_index_type<account_balance_index>().indices();
    const auto& settle_index = db.get_index_type<force_settlement_index>().indices();
    const auto& bids = db.get_index_type<collateral_bid_index>().indices();
