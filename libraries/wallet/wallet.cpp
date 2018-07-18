@@ -780,9 +780,7 @@ public:
 
     void quit()
     {
-        ilog( "Exiting Wallet ..." );
-
-        _Exit(0);
+        ilog( "Quiting Wallet ..." );
     }
 
    void save_wallet_file(string wallet_filename = "")
