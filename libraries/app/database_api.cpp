@@ -879,16 +879,6 @@ vector<asset> database_api::get_named_account_balances(const std::string& name, 
    return my->get_account_balances( name, assets );
 }
 
-/*
-vector<asset> database_api_impl::get_named_account_balances(const std::string& name, const flat_set<asset_id_type>& assets) const
-{
-   const auto& accounts_by_name = _db.get_index_type<account_index>().indices().get<by_name>();
-   auto itr = accounts_by_name.find(name);
-   FC_ASSERT( itr != accounts_by_name.end() );
-   return get_account_balances(itr->get_id(), assets);
-}
-*/
-
 vector<balance_object> database_api::get_balance_objects( const vector<address>& addrs )const
 {
    return my->get_balance_objects( addrs );
