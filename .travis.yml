@@ -21,7 +21,7 @@ addons:
 script:
  - sed -i '/tests/d' libraries/fc/CMakeLists.txt
  - cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_C_FLAGS=--coverage -DCMAKE_CXX_FLAGS=--coverage -DBoost_USE_STATIC_LIBS=OFF  -DCMAKE_CXX_OUTPUT_EXTENSION_REPLACE=ON .
- - 'which build-wrapper-linux-x86-64 && build-wrapper-linux-x86-64 --out-dir bw-output make -j 2 cli_wallet witness_node chain_test || make -j 2 cli_wallet witness_node chain_test'
+ - 'which build-wrapper-linux-x86-64 && build-wrapper-linux-x86-64 --out-dir bw-output make -j 2 cli_wallet witness_node chain_test cli_test || make -j 2 cli_wallet witness_node chain_test cli_test'
  - set -o pipefail
  - tests/chain_test 2>&1 | cat
  - tests/cli_test 2>&1 | cat
