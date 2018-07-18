@@ -1786,7 +1786,7 @@ public:
    { try {
       account_object voting_account_object = get_account(voting_account);
 
-      fc::optional<witness_object> witness_obj = _remote_db->get_witness_by_account(voting_account);
+      fc::optional<witness_object> witness_obj = _remote_db->get_witness_by_account(witness);
       if (!witness_obj)
          FC_THROW("Account ${witness} is not registered as a witness", ("witness", witness));
       if (approve)
