@@ -24,5 +24,6 @@ script:
  - 'which build-wrapper-linux-x86-64 && build-wrapper-linux-x86-64 --out-dir bw-output make -j 2 cli_wallet witness_node chain_test || make -j 2 cli_wallet witness_node chain_test'
  - set -o pipefail
  - tests/chain_test 2>&1 | cat
+ - tests/cli_test 2>&1 | cat
  - 'find libraries/[acdenptuw]*/CMakeFiles/*.dir programs/[cdgjsw]*/CMakeFiles/*.dir -type d | while read d; do gcov -o "$d" "${d/CMakeFiles*.dir//}"/*.cpp; done >/dev/null'
  - 'which sonar-scanner && sonar-scanner || true'
