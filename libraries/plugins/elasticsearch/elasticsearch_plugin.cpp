@@ -23,20 +23,9 @@
  */
 
 #include <graphene/elasticsearch/elasticsearch_plugin.hpp>
-
 #include <graphene/chain/impacted.hpp>
-
 #include <graphene/chain/account_evaluator.hpp>
-#include <graphene/chain/account_object.hpp>
-#include <graphene/chain/config.hpp>
-#include <graphene/chain/database.hpp>
-#include <graphene/chain/evaluator.hpp>
-#include <graphene/chain/operation_history_object.hpp>
-#include <graphene/chain/transaction_evaluation_state.hpp>
-
 #include <fc/smart_ref_impl.hpp>
-#include <fc/thread/thread.hpp>
-
 #include <curl/curl.h>
 #include <graphene/utilities/elasticsearch.hpp>
 
@@ -72,7 +61,7 @@ class elasticsearch_plugin_impl
       CURL *curl; // curl handler
       vector <string> bulk_lines; //  vector of op lines
       vector<std::string> prepare;
-private:
+   private:
       bool add_elasticsearch( const account_id_type account_id, const optional<operation_history_object>& oho, const signed_block& b );
 
 };
