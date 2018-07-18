@@ -1737,8 +1737,8 @@ BOOST_AUTO_TEST_CASE( balance_object_test )
    database db;
    const uint32_t skip_flags = database::skip_undo_history_check;
    fc::temp_directory td( graphene::utilities::temp_directory_path() );
-   genesis_state.initial_balances.push_back({generate_private_key("n").get_public_key(), GRAPHENE_SYMBOL, 1});
-   genesis_state.initial_balances.push_back({generate_private_key("x").get_public_key(), GRAPHENE_SYMBOL, 1});
+   genesis_state.initial_balances.push_back({address(generate_private_key("n").get_public_key()), GRAPHENE_SYMBOL, 1});
+   genesis_state.initial_balances.push_back({address(generate_private_key("x").get_public_key()), GRAPHENE_SYMBOL, 1});
    fc::time_point_sec starting_time = genesis_state.initial_timestamp + 3000;
 
    auto n_key = generate_private_key("n");
@@ -1747,14 +1747,14 @@ BOOST_AUTO_TEST_CASE( balance_object_test )
    auto v2_key = generate_private_key("v2");
 
    genesis_state_type::initial_vesting_balance_type vest;
-   vest.owner = v1_key.get_public_key();
+   vest.owner = address(v1_key.get_public_key());
    vest.asset_symbol = GRAPHENE_SYMBOL;
    vest.amount = 500;
    vest.begin_balance = vest.amount;
    vest.begin_timestamp = starting_time;
    vest.vesting_duration_seconds = 60;
    genesis_state.initial_vesting_balances.push_back(vest);
-   vest.owner = v2_key.get_public_key();
+   vest.owner = address(v2_key.get_public_key());
    vest.begin_timestamp -= fc::seconds(30);
    vest.amount = 400;
    genesis_state.initial_vesting_balances.push_back(vest);

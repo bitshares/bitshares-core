@@ -266,6 +266,7 @@ namespace graphene { namespace chain {
        friend bool operator == ( const public_key_type& p1, const fc::ecc::public_key& p2);
        friend bool operator == ( const public_key_type& p1, const public_key_type& p2);
        friend bool operator != ( const public_key_type& p1, const public_key_type& p2);
+       friend bool operator < ( const public_key_type& p1, const public_key_type& p2);
    };
 
    struct extended_public_key_type

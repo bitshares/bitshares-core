@@ -87,6 +87,11 @@ namespace graphene { namespace chain {
        return p1.key_data != p2.key_data;
     }
     
+    bool operator < ( const public_key_type& p1, const public_key_type& p2)
+    {
+       return address(p1) < address(p2);
+    }
+
     // extended_public_key_type
     
     extended_public_key_type::extended_public_key_type():key_data(){};

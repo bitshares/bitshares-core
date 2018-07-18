@@ -3187,7 +3187,7 @@ bool wallet_api::import_key(string account_name_or_id, string wif_key)
    fc::optional<fc::ecc::private_key> optional_private_key = wif_to_key(wif_key);
    if (!optional_private_key)
       FC_THROW("Invalid private key");
-   string shorthash = detail::address_to_shorthash(optional_private_key->get_public_key());
+   string shorthash = detail::address_to_shorthash(address(optional_private_key->get_public_key()));
    copy_wallet_file( "before-import-key-" + shorthash );
 
    if( my->import_key(account_name_or_id, wif_key) )
@@ -3844,7 +3844,7 @@ vector< signed_transaction > wallet_api_impl::import_balance( string name_or_id,
             continue;
          for( const public_key_type& pub : _wallet.extra_keys[ claimer.id ] )
          {
-            addrs.push_back( pub );
+            address pub_addr( address(pub) );
             auto it = _keys.find( pub );
             if( it != _keys.end() )
             {
@@ -3864,16 +3864,16 @@ vector< signed_transaction > wallet_api_impl::import_balance( string name_or_id,
          optional< private_key_type > key = wif_to_key( wif_key );
          FC_ASSERT( key.valid(), "Invalid private key" );
          fc::ecc::public_key pk = key->get_public_key();
-         addrs.push_back( pk );
+         addrs.push_back( address(pk) );
          keys[addrs.back()] = *key;
          // see chain/balance_evaluator.cpp
-         addrs.push_back( pts_address( pk, false, 56 ) );
+         addrs.push_back( address( pts_address( pk, false, 56 ) ) );
          keys[addrs.back()] = *key;
-         addrs.push_back( pts_address( pk, true, 56 ) );
+         addrs.push_back( address( pts_address( pk, true, 56 ) ) );
          keys[addrs.back()] = *key;
-         addrs.push_back( pts_address( pk, false, 0 ) );
+         addrs.push_back( address( pts_address( pk, false, 0 ) ) );
          keys[addrs.back()] = *key;
-         addrs.push_back( pts_address( pk, true, 0 ) );
+         addrs.push_back( address( pts_address( pk, true, 0 ) ) );
          keys[addrs.back()] = *key;
       }
    }
