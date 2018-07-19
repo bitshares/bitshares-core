@@ -666,8 +666,10 @@ class wallet_api
       /** Exits from BitShares wallet.
        * 
        * The current wallet will be closed.
+       * 
+       * @returns SIGNAL
        */
-      void    quit();
+      int    quit();
 
       /** Saves the current wallet to the given filename.
        * 

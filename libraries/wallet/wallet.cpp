@@ -82,6 +82,12 @@ using namespace std;
 # include <sys/stat.h>
 #endif
 
+#ifdef WIN32
+# include <signal.h>
+#else
+# include <csignal>
+#endif
+
 // explicit instantiation for later use
 namespace fc {
 	template class api<graphene::wallet::wallet_api, identity_member>;
@@ -778,9 +784,11 @@ public:
       return true;
    }
 
-    void quit()
+    int quit()
     {
         ilog( "Quiting Wallet ..." );
+
+        return SIGQUIT;
     }
 
    void save_wallet_file(string wallet_filename = "")
@@ -3790,9 +3798,9 @@ bool wallet_api::load_wallet_file( string wallet_filename )
    return my->load_wallet_file( wallet_filename );
 }
 
-void wallet_api::quit()
+int wallet_api::quit()
 {
-    my->quit();
+    return my->quit();
 }
 
 void wallet_api::save_wallet_file( string wallet_filename )
