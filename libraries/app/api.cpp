@@ -163,6 +163,10 @@ namespace graphene { namespace app {
     void network_broadcast_api::broadcast_transaction(const signed_transaction& trx)
     {
        trx.validate();
+       if(_app.get_options().max_pending_tx_size>0)
+       {
+           FC_ASSERT(_app.chain_database()->pending_tx_size()<=_app.get_options().max_pending_tx_size,"chain is busy.");
+       }
        _app.chain_database()->push_transaction(trx);
        if( _app.p2p_node() != nullptr )
           _app.p2p_node()->broadcast_transaction(trx);
