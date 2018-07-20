@@ -669,7 +669,7 @@ class wallet_api
        * 
        * @returns SIGNAL
        */
-      int    quit();
+      void    quit();
 
       /** Saves the current wallet to the given filename.
        * 
