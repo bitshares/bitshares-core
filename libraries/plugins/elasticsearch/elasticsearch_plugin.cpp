@@ -63,6 +63,23 @@ class elasticsearch_plugin_impl
       vector<std::string> prepare;
    private:
       bool add_elasticsearch( const account_id_type account_id, const optional<operation_history_object>& oho, const signed_block& b );
+      const account_transaction_history_object& addNewEntry(const account_statistics_object& stats_obj,
+                                                            const account_id_type account_id,
+                                                            const optional <operation_history_object>& oho);
+      const account_statistics_object& getStatsObject(const account_id_type account_id);
+      void growStats(const account_statistics_object stats_obj, const account_transaction_history_object& ath);
+      const int16_t getOperationType(const optional <operation_history_object>& oho);
+      const operation_history_struct doOperationHistory(const optional <operation_history_object>& oho);
+      const block_struct doBlock(const optional <operation_history_object>& oho, const signed_block& b);
+      const visitor_struct doVisitor(const optional <operation_history_object>& oho);
+      const uint32_t checkState(const fc::time_point_sec& block_time);
+      void cleanObjects(const account_transaction_history_object& ath, account_id_type account_id);
+      const std::string createBulkLine(const account_transaction_history_object& ath,
+                                       const optional <operation_history_object>& oho,
+                                       const signed_block& b);
+      void prepareBulk(const fc::time_point_sec& block_date,
+                       const account_transaction_history_id_type& ath_id,
+                       const std::string& bulk_line);
 
 };
 
@@ -139,93 +156,12 @@ bool elasticsearch_plugin_impl::add_elasticsearch( const account_id_type account
                                                    const optional <operation_history_object>& oho,
                                                    const signed_block& b)
 {
-   graphene::chain::database& db = database();
-   const auto &stats_obj = account_id(db).statistics(db);
-
-   // add new entry
-   const auto &ath = db.create<account_transaction_history_object>([&](account_transaction_history_object &obj) {
-      obj.operation_id = oho->id;
-      obj.account = account_id;
-      obj.sequence = stats_obj.total_ops + 1;
-      obj.next = stats_obj.most_recent_op;
-   });
-
-   // keep stats growing as no op will be removed
-   db.modify(stats_obj, [&](account_statistics_object &obj) {
-      obj.most_recent_op = ath.id;
-      obj.total_ops = ath.sequence;
-   });
-
-   // operation_type
-   int op_type = -1;
-   if (!oho->id.is_null())
-      op_type = oho->op.which();
-
-   // operation history data
-   operation_history_struct os;
-   os.trx_in_block = oho->trx_in_block;
-   os.op_in_trx = oho->op_in_trx;
-   os.operation_result = fc::json::to_string(oho->result);
-   os.virtual_op = oho->virtual_op;
-   os.op = fc::json::to_string(oho->op);
-
-   // block data
-   std::string trx_id = "";
-   if(!b.transactions.empty() && oho->trx_in_block < b.transactions.size()) {
-      trx_id = b.transactions[oho->trx_in_block].id().str();
-   }
-   block_struct bs;
-   bs.block_num = b.block_num();
-   bs.block_time = b.timestamp;
-   bs.trx_id = trx_id;
-
-   // check if we are in replay or in sync and change number of bulk documents accordingly
-   uint32_t limit_documents = 0;
-   if((fc::time_point::now() - b.timestamp) < fc::seconds(30))
-      limit_documents = _elasticsearch_bulk_sync;
-   else
-      limit_documents = _elasticsearch_bulk_replay;
-
-   // we have everything, creating bulk line
-   bulk_struct bulk_line_struct;
-   bulk_line_struct.account_history = ath;
-   bulk_line_struct.operation_history = os;
-   bulk_line_struct.operation_type = op_type;
-   bulk_line_struct.operation_id_num = ath.operation_id.instance.value;
-   bulk_line_struct.block_data = bs;
-
-   // visitor data
-   visitor_struct vs;
-   if(_elasticsearch_visitor) {
-      operation_visitor o_v;
-      oho->op.visit(o_v);
-
-      vs.fee_data.asset = o_v.fee_asset;
-      vs.fee_data.amount = o_v.fee_amount;
-
-      vs.transfer_data.asset = o_v.transfer_asset_id;
-      vs.transfer_data.amount = o_v.transfer_amount;
-      vs.transfer_data.from = o_v.transfer_from;
-      vs.transfer_data.to = o_v.transfer_to;
-
-      vs.fill_data.order_id = o_v.fill_order_id;
-      vs.fill_data.account_id = o_v.fill_account_id;
-      vs.fill_data.pays_asset_id = o_v.fill_pays_asset_id;
-      vs.fill_data.pays_amount = o_v.fill_pays_amount;
-      vs.fill_data.receives_asset_id = o_v.fill_receives_asset_id;
-      vs.fill_data.receives_amount = o_v.fill_receives_amount;
-      vs.fill_data.fill_price = o_v.fill_fill_price;
-      vs.fill_data.is_maker = o_v.fill_is_maker;
-
-      bulk_line_struct.additional_data = vs;
-   }
-
-   std::string bulk_line = fc::json::to_string(bulk_line_struct);
-   auto block_date = bulk_line_struct.block_data.block_time;
-   std::string index_name = graphene::utilities::generateIndexName(block_date, _elasticsearch_index_prefix);
-   std::string _id = fc::json::to_string(ath.id);
-   prepare = graphene::utilities::createBulk(index_name, bulk_line, _id, 0);
-   bulk_lines.insert(bulk_lines.end(), prepare.begin(), prepare.end());
+   const auto &stats_obj = getStatsObject(account_id);
+   const auto &ath = addNewEntry(stats_obj, account_id, oho);
+   growStats(stats_obj, ath);
+   uint32_t limit_documents = checkState(b.timestamp);
+   std::string bulk_line = createBulkLine(ath, oho, b);
+   prepareBulk(b.timestamp, ath.id, bulk_line);
 
    if (curl && bulk_lines.size() >= limit_documents) { // we are in bulk time, ready to add data to elasticsearech
       prepare.clear();
@@ -242,6 +178,151 @@ bool elasticsearch_plugin_impl::add_elasticsearch( const account_id_type account
          bulk_lines.clear();
    }
 
+   cleanObjects(ath, account_id);
+
+   return true;
+}
+
+const account_statistics_object& elasticsearch_plugin_impl::getStatsObject(const account_id_type account_id)
+{
+   graphene::chain::database& db = database();
+   const auto &stats_obj = account_id(db).statistics(db);
+
+   return stats_obj;
+}
+
+const account_transaction_history_object& elasticsearch_plugin_impl::addNewEntry(const account_statistics_object& stats_obj,
+                                                                                 const account_id_type account_id,
+                                                                                 const optional <operation_history_object>& oho)
+{
+   graphene::chain::database& db = database();
+   const auto &ath = db.create<account_transaction_history_object>([&](account_transaction_history_object &obj) {
+      obj.operation_id = oho->id;
+      obj.account = account_id;
+      obj.sequence = stats_obj.total_ops + 1;
+      obj.next = stats_obj.most_recent_op;
+   });
+
+   return ath;
+}
+
+void elasticsearch_plugin_impl::growStats(const account_statistics_object stats_obj,
+                                          const account_transaction_history_object& ath)
+{
+   graphene::chain::database& db = database();
+   db.modify(stats_obj, [&](account_statistics_object &obj) {
+      obj.most_recent_op = ath.id;
+      obj.total_ops = ath.sequence;
+   });
+}
+
+const std::string elasticsearch_plugin_impl::createBulkLine(const account_transaction_history_object& ath,
+                                                            const optional <operation_history_object>& oho,
+                                                            const signed_block& b)
+{
+   const int16_t op_type = getOperationType(oho);
+   operation_history_struct os = doOperationHistory(oho);
+   block_struct bs = doBlock(oho, b);
+
+   bulk_struct bulk_line_struct;
+   bulk_line_struct.account_history = ath;
+   bulk_line_struct.operation_history = os;
+   bulk_line_struct.operation_type = op_type;
+   bulk_line_struct.operation_id_num = ath.operation_id.instance.value;
+   bulk_line_struct.block_data = bs;
+
+   if(_elasticsearch_visitor) {
+      visitor_struct vs = doVisitor(oho);
+      bulk_line_struct.additional_data = vs;
+   }
+   std::string bulk_line = fc::json::to_string(bulk_line_struct);
+
+   return bulk_line;
+}
+
+const int16_t elasticsearch_plugin_impl::getOperationType(const optional <operation_history_object>& oho)
+{
+   if (!oho->id.is_null())
+      return oho->op.which();
+   return -1;
+}
+
+const operation_history_struct elasticsearch_plugin_impl::doOperationHistory(const optional <operation_history_object>& oho)
+{
+   operation_history_struct os;
+   os.trx_in_block = oho->trx_in_block;
+   os.op_in_trx = oho->op_in_trx;
+   os.operation_result = fc::json::to_string(oho->result);
+   os.virtual_op = oho->virtual_op;
+   os.op = fc::json::to_string(oho->op);
+
+   return os;
+}
+
+const block_struct elasticsearch_plugin_impl::doBlock(const optional <operation_history_object>& oho, const signed_block& b)
+{
+   std::string trx_id = "";
+   if(!b.transactions.empty() && oho->trx_in_block < b.transactions.size())
+      trx_id = b.transactions[oho->trx_in_block].id().str();
+   block_struct bs;
+   bs.block_num = b.block_num();
+   bs.block_time = b.timestamp;
+   bs.trx_id = trx_id;
+
+   return bs;
+}
+
+const visitor_struct elasticsearch_plugin_impl::doVisitor(const optional <operation_history_object>& oho)
+{
+   visitor_struct vs;
+   operation_visitor o_v;
+   oho->op.visit(o_v);
+
+   vs.fee_data.asset = o_v.fee_asset;
+   vs.fee_data.amount = o_v.fee_amount;
+
+   vs.transfer_data.asset = o_v.transfer_asset_id;
+   vs.transfer_data.amount = o_v.transfer_amount;
+   vs.transfer_data.from = o_v.transfer_from;
+   vs.transfer_data.to = o_v.transfer_to;
+
+   vs.fill_data.order_id = o_v.fill_order_id;
+   vs.fill_data.account_id = o_v.fill_account_id;
+   vs.fill_data.pays_asset_id = o_v.fill_pays_asset_id;
+   vs.fill_data.pays_amount = o_v.fill_pays_amount;
+   vs.fill_data.receives_asset_id = o_v.fill_receives_asset_id;
+   vs.fill_data.receives_amount = o_v.fill_receives_amount;
+   vs.fill_data.fill_price = o_v.fill_fill_price;
+   vs.fill_data.is_maker = o_v.fill_is_maker;
+
+   return vs;
+}
+
+const uint32_t elasticsearch_plugin_impl::checkState(const fc::time_point_sec& block_time)
+{
+   uint32_t limit_documents;
+   if((fc::time_point::now() - block_time) < fc::seconds(30))
+      limit_documents = _elasticsearch_bulk_sync;
+   else
+      limit_documents = _elasticsearch_bulk_replay;
+
+   return limit_documents;
+}
+
+void elasticsearch_plugin_impl::prepareBulk(const fc::time_point_sec& block_date,
+                                            const account_transaction_history_id_type& ath_id,
+                                            const std::string& bulk_line )
+{
+   //auto block_date =  b.timestamp;
+   std::string index_name = graphene::utilities::generateIndexName(block_date, _elasticsearch_index_prefix);
+   std::string _id = fc::json::to_string(ath_id);
+   prepare = graphene::utilities::createBulk(index_name, bulk_line, _id, 0);
+   bulk_lines.insert(bulk_lines.end(), prepare.begin(), prepare.end());
+}
+
+void elasticsearch_plugin_impl::cleanObjects(const account_transaction_history_object& ath, account_id_type account_id)
+{
+   graphene::chain::database& db = database();
    // remove everything except current object from ath
    const auto &his_idx = db.get_index_type<account_transaction_history_index>();
    const auto &by_seq_idx = his_idx.indices().get<by_seq>();
@@ -266,7 +347,6 @@ bool elasticsearch_plugin_impl::add_elasticsearch( const account_id_type account
          db.remove(remove_op_id(db));
       }
    }
-   return true;
 }
 
 } // end namespace detail
