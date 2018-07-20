@@ -50,21 +50,18 @@ namespace graphene { namespace utilities {
          std::string type;
          std::string auth;
          std::string query;
-         //bool response;
    };
 
    bool SendBulk(ES& es);
-   std::vector<std::string> createBulk(std::string type, std::string data, std::string id, bool onlycreate);
+   const std::vector<std::string> createBulk(const std::string& index_name, const std::string& data, const std::string& id, bool onlycreate);
    bool checkES(ES& es);
-   std::string simpleQuery(ES& es);
+   const std::string simpleQuery(ES& es);
    bool deleteAll(ES& es);
-   bool handleBulkResponse(long http_code, std::string CurlReadBuffer);
-   std::string getEndPoint(ES& es);
-   std::string generateIndexName(fc::time_point_sec block_date, std::string _elasticsearch_index_prefix);
-   std::string doCurl(CurlRequest& curl);
-   std::string joinBulkLines(std::vector<std::string>& bulk);
+   bool handleBulkResponse(long http_code, const std::string& CurlReadBuffer);
+   const std::string getEndPoint(ES& es);
+   const std::string generateIndexName(const fc::time_point_sec& block_date, const std::string& _elasticsearch_index_prefix);
+   const std::string doCurl(CurlRequest& curl);
+   const std::string joinBulkLines(const std::vector<std::string>& bulk);
    long getResponseCode(CURL *handler);
 
-
-
-   } } // end namespace graphene::utilities
+} } // end namespace graphene::utilities

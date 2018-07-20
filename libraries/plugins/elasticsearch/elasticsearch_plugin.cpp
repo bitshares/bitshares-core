@@ -313,8 +313,7 @@ void elasticsearch_plugin_impl::prepareBulk(const fc::time_point_sec& block_date
                                             const account_transaction_history_id_type& ath_id,
                                             const std::string& bulk_line )
 {
-   //auto block_date =  b.timestamp;
-   std::string index_name = graphene::utilities::generateIndexName(block_date, _elasticsearch_index_prefix);
+   auto index_name = graphene::utilities::generateIndexName(block_date, _elasticsearch_index_prefix);
    std::string _id = fc::json::to_string(ath_id);
    prepare = graphene::utilities::createBulk(index_name, bulk_line, _id, 0);
    bulk_lines.insert(bulk_lines.end(), prepare.begin(), prepare.end());

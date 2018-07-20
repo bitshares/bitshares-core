@@ -49,7 +49,7 @@ bool checkES(ES& es)
    return true;
 
 }
-std::string simpleQuery(ES& es)
+const std::string simpleQuery(ES& es)
 {
    graphene::utilities::CurlRequest curl_request;
    curl_request.handler = es.curl;
@@ -79,9 +79,9 @@ bool SendBulk(ES& es)
    return false;
 }
 
-std::string joinBulkLines(std::vector<std::string>& bulk)
+const std::string joinBulkLines(const std::vector<std::string>& bulk)
 {
-   std::string bulking = boost::algorithm::join(bulk, "\n");
+   auto bulking = boost::algorithm::join(bulk, "\n");
    bulking = bulking + "\n";
 
    return bulking;
@@ -93,7 +93,7 @@ long getResponseCode(CURL *handler)
    return http_code;
 }
 
-bool handleBulkResponse(long http_code, std::string CurlReadBuffer)
+bool handleBulkResponse(long http_code, const std::string& CurlReadBuffer)
 {
    if(http_code == 200) {
       // all good, but check errors in response
@@ -118,7 +118,7 @@ bool handleBulkResponse(long http_code, std::string CurlReadBuffer)
    return true;
 }
 
-std::vector<std::string> createBulk(std::string index_name, std::string data, std::string id, bool onlycreate)
+const std::vector<std::string> createBulk(const std::string& index_name, const std::string& data, const std::string& id, bool onlycreate)
 {
    std::vector<std::string> bulk;
    std::string create_string = "";
@@ -144,9 +144,8 @@ bool deleteAll(ES& es)
    else
       return true;
 }
-std::string getEndPoint(ES& es)
+const std::string getEndPoint(ES& es)
 {
-
    graphene::utilities::CurlRequest curl_request;
    curl_request.handler = es.curl;
    curl_request.url = es.elasticsearch_url + es.endpoint;
@@ -156,7 +155,7 @@ std::string getEndPoint(ES& es)
    return doCurl(curl_request);
 }
 
-std::string generateIndexName(fc::time_point_sec block_date, std::string _elasticsearch_index_prefix)
+const std::string generateIndexName(const fc::time_point_sec& block_date, const std::string& _elasticsearch_index_prefix)
 {
    auto block_date_string = block_date.to_iso_string();
    std::vector<std::string> parts;
@@ -165,7 +164,7 @@ std::string generateIndexName(fc::time_point_sec block_date, std::string _elasti
    return index_name;
 }
 
-std::string doCurl(CurlRequest& curl)
+const std::string doCurl(CurlRequest& curl)
 {
    std::string CurlReadBuffer;
    struct curl_slist *headers = NULL;
