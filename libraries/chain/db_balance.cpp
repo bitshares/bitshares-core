@@ -67,6 +67,8 @@ void database::adjust_balance(account_id_type account, asset delta )
          b.owner = account;
          b.asset_type = delta.asset_id;
          b.balance = delta.amount.value;
+         if( b.asset_type == asset_id_type() ) // CORE asset
+            b.maintenance_flag = true;
       });
    } else {
       if( delta.amount < 0 )
@@ -154,9 +156,13 @@ void database::deposit_cashback(const account_object& acct, share_type amount, b
 
    if( new_vbid.valid() )
    {
-      modify( acct, [&]( account_object& _acct )
+      modify( acct, [&new_vbid]( account_object& _acct )
       {
          _acct.cashback_vb = *new_vbid;
+      } );
+      modify( acct.statistics( *this ), []( account_statistics_object& aso )
+      {
+         aso.has_cashback_vb = true;
       } );
    }
 

@@ -1,0 +1,5 @@
+// bitshares-core issue #604
+// Implement BSIP 26: refund order creation fee in original paid asset when order is cancelled
+#ifndef HARDFORK_CORE_604_TIME
+#define HARDFORK_CORE_604_TIME (fc::time_point_sec( 1532008920 )) // Thu, 19 Jul 2018 14:02:00 UTC
+#endif

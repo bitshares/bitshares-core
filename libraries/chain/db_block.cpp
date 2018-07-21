@@ -147,12 +147,15 @@ bool database::_push_block(const signed_block& new_block)
 
             // pop blocks until we hit the forked block
             while( head_block_id() != branches.second.back()->data.previous )
+            {
+               ilog( "popping block #${n} ${id}", ("n",head_block_num())("id",head_block_id()) );
                pop_block();
+            }
 
             // push all blocks on the new fork
             for( auto ritr = branches.first.rbegin(); ritr != branches.first.rend(); ++ritr )
             {
-                ilog( "pushing blocks from fork ${n} ${id}", ("n",(*ritr)->data.block_num())("id",(*ritr)->data.id()) );
+                ilog( "pushing block from fork #${n} ${id}", ("n",(*ritr)->data.block_num())("id",(*ritr)->id) );
                 optional<fc::exception> except;
                 try {
                    undo_database::session session = _undo_db.start_undo_session();
@@ -167,21 +170,27 @@ bool database::_push_block(const signed_block& new_block)
                    // remove the rest of branches.first from the fork_db, those blocks are invalid
                    while( ritr != branches.first.rend() )
                    {
-                      _fork_db.remove( (*ritr)->data.id() );
+                      ilog( "removing block from fork_db #${n} ${id}", ("n",(*ritr)->data.block_num())("id",(*ritr)->id) );
+                      _fork_db.remove( (*ritr)->id );
                       ++ritr;
                    }
                    _fork_db.set_head( branches.second.front() );
 
                    // pop all blocks from the bad fork
                    while( head_block_id() != branches.second.back()->data.previous )
-                      pop_block();
-
-                   // restore all blocks from the good fork
-                   for( auto ritr = branches.second.rbegin(); ritr != branches.second.rend(); ++ritr )
                    {
+                      ilog( "popping block #${n} ${id}", ("n",head_block_num())("id",head_block_id()) );
+                      pop_block();
+                   }
+
+                   ilog( "Switching back to fork: ${id}", ("id",branches.second.front()->data.id()) );
+                   // restore all blocks from the good fork
+                   for( auto ritr2 = branches.second.rbegin(); ritr2 != branches.second.rend(); ++ritr2 )
+                   {
+                      ilog( "pushing block #${n} ${id}", ("n",(*ritr2)->data.block_num())("id",(*ritr2)->id) );
                       auto session = _undo_db.start_undo_session();
-                      apply_block( (*ritr)->data, skip );
-                      _block_id_to_block.store( new_block.id(), (*ritr)->data );
+                      apply_block( (*ritr2)->data, skip );
+                      _block_id_to_block.store( (*ritr2)->id, (*ritr2)->data );
                       session.commit();
                    }
                    throw *except;
@@ -286,7 +295,7 @@ processed_transaction database::push_proposal(const proposal_object& proposal)
       {
          _applied_ops.resize( old_applied_ops_size );
       }
-      elog( "${e}", ("e",e.to_detail_string() ) );
+      wlog( "${e}", ("e",e.to_detail_string() ) );
       throw;
    }
 
@@ -512,7 +521,8 @@ void database::_apply_block( const signed_block& next_block )
       ++_current_trx_in_block;
    }
 
-   update_global_dynamic_data(next_block);
+   const uint32_t missed = update_witness_missed_blocks( next_block );
+   update_global_dynamic_data( next_block, missed );
    update_signing_witness(signing_witness, next_block);
    update_last_irreversible_block();
 
@@ -619,10 +629,13 @@ processed_transaction database::_apply_transaction(const signed_transaction& trx
    }
    ptrx.operation_results = std::move(eval_state.operation_results);
 
-   //Make sure the temp account has no non-zero balances
-   const auto& index = get_index_type<account_balance_index>().indices().get<by_account_asset>();
-   auto range = index.equal_range( boost::make_tuple( GRAPHENE_TEMP_ACCOUNT ) );
-   std::for_each(range.first, range.second, [](const account_balance_object& b) { FC_ASSERT(b.balance == 0); });
+   if( head_block_time() < HARDFORK_CORE_1040_TIME ) // TODO totally remove this code block after hard fork
+   {
+      //Make sure the temp account has no non-zero balances
+      const auto& index = get_index_type<account_balance_index>().indices().get<by_account_asset>();
+      auto range = index.equal_range( boost::make_tuple( GRAPHENE_TEMP_ACCOUNT ) );
+      std::for_each(range.first, range.second, [](const account_balance_object& b) { FC_ASSERT(b.balance == 0); });
+   }
 
    return ptrx;
 } FC_CAPTURE_AND_RETHROW( (trx) ) }

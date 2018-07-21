@@ -274,6 +274,15 @@ class utility {
        * @return A list of keys that are deterministically derived from the brainkey
        */
       static vector<brain_key_info> derive_owner_keys_from_brain_key(string brain_key, int number_of_desired_keys = 1);
+
+      /** Suggests a safe brain key to use for creating your account.
+       * \c create_account_with_brain_key() requires you to specify a 'brain key',
+       * a long passphrase that provides enough entropy to generate cyrptographic
+       * keys.  This function will suggest a suitably random string that should
+       * be easy to write down (and, with effort, memorize).
+       * @returns a suggested brain_key
+       */
+      static brain_key_info suggest_brain_key();
 };
 
 struct operation_detail {
@@ -383,7 +392,7 @@ class wallet_api
        * @return All info about the specified account
        *
        * This function fetches all relevant objects for the given account. If the string
-       * of @ref name_or_id cannot be tied to an account, that input will be ignored.
+       * of \c name_or_id cannot be tied to an account, that input will be ignored.
        *
        */
       full_account                      get_full_account( const string& name_or_id);
@@ -688,7 +697,7 @@ class wallet_api
       * @see suggest_brain_key()
       *
       * @param brain_key    Brain key
-      * @param numberOfDesiredKeys  Number of desired keys
+      * @param number_of_desired_keys  Number of desired keys
       * @return A list of keys that are deterministically derived from the brainkey
       */
      vector<brain_key_info> derive_owner_keys_from_brain_key(string brain_key, int number_of_desired_keys = 1) const;
@@ -913,7 +922,7 @@ class wallet_api
       blind_receipt receive_blind_transfer( string confirmation_receipt, string opt_from, string opt_memo );
 
       /**
-       *  Transfers a public balance from @from to one or more blinded balances using a
+       *  Transfers a public balance from \c from_account_id_or_name to one or more blinded balances using a
        *  stealth transfer.
        */
       blind_confirmation transfer_to_blind( string from_account_id_or_name, 
@@ -1007,6 +1016,26 @@ class wallet_api
       signed_transaction borrow_asset(string borrower_name, string amount_to_borrow, string asset_symbol,
                                       string amount_of_collateral, bool broadcast = false);
 
+      /** Borrow an asset or update the debt/collateral ratio for the loan, with additional options.
+       *
+       * This is the first step in shorting an asset.  Call \c sell_asset() to complete the short.
+       *
+       * @param borrower_name the name or id of the account associated with the transaction.
+       * @param amount_to_borrow the amount of the asset being borrowed.  Make this value
+       *                         negative to pay back debt.
+       * @param asset_symbol the symbol or id of the asset being borrowed.
+       * @param amount_of_collateral the amount of the backing asset to add to your collateral
+       *        position.  Make this negative to claim back some of your collateral.
+       *        The backing asset is defined in the \c bitasset_options for the asset being borrowed.
+       * @param extensions additional options
+       * @param broadcast true to broadcast the transaction on the network
+       * @returns the signed transaction borrowing the asset
+       */
+      signed_transaction borrow_asset_ext( string borrower_name, string amount_to_borrow, string asset_symbol,
+                                           string amount_of_collateral,
+                                           call_order_update_operation::extensions_type extensions,
+                                           bool broadcast = false );
+
       /** Cancel an existing order
        *
        * @param order_id the id of order to be cancelled
@@ -1078,6 +1107,21 @@ class wallet_api
                                       optional<string> new_issuer,
                                       asset_options new_options,
                                       bool broadcast = false);
+
+      /** Update the issuer of an asset
+       * Since this call requires the owner authority of the current issuer to sign the transaction,
+       * a separated operation is used to change the issuer. This call simplifies the use of this action.
+       *
+       * @note This operation requires the owner key to be available in the wallet.
+       *
+       * @param symbol the name or id of the asset to update
+       * @param new_issuer if changing the asset's issuer, the name or id of the new issuer.
+       * @param broadcast true to broadcast the transaction on the network
+       * @returns the signed transaction updating the asset
+       */
+      signed_transaction update_asset_issuer(string symbol,
+                                             string new_issuer,
+                                             bool broadcast = false);
 
       /** Update the options specific to a BitAsset.
        *
@@ -1153,6 +1197,23 @@ class wallet_api
                                              string symbol,
                                              string amount,
                                              bool broadcast = false);
+
+      /** Claim funds from the fee pool for the given asset.
+       *
+       * User-issued assets can optionally have a pool of the core asset which is 
+       * automatically used to pay transaction fees for any transaction using that
+       * asset (using the asset's core exchange rate).
+       *
+       * This command allows the issuer to withdraw those funds from the fee pool.
+       *
+       * @param symbol the name or id of the asset whose fee pool you wish to claim
+       * @param amount the amount of the core asset to withdraw
+       * @param broadcast true to broadcast the transaction on the network
+       * @returns the signed transaction claiming from the fee pool
+       */
+      signed_transaction claim_asset_fee_pool(string symbol,
+                                              string amount,
+                                              bool broadcast = false);
 
       /** Burns the given user-issued asset.
        *
@@ -1327,7 +1388,7 @@ class wallet_api
       /**
        * Update a witness object owned by the given account.
        *
-       * @param witness The name of the witness's owner account.  Also accepts the ID of the owner account or the ID of the witness.
+       * @param witness_name The name of the witness's owner account.  Also accepts the ID of the owner account or the ID of the witness.
        * @param url Same as for create_witness.  The empty string makes it remain the same.
        * @param block_signing_key The new block signing public key.  The empty string makes it remain the same.
        * @param broadcast true if you wish to broadcast the transaction.
@@ -1365,7 +1426,7 @@ class wallet_api
        * Update your votes for a worker
        *
        * @param account The account which will pay the fee and update votes.
-       * @param worker_vote_delta {"vote_for" : [...], "vote_against" : [...], "vote_abstain" : [...]}
+       * @param delta {"vote_for" : [...], "vote_against" : [...], "vote_abstain" : [...]}
        * @param broadcast true if you wish to broadcast the transaction.
        */
       signed_transaction update_worker_votes(
@@ -1693,12 +1754,14 @@ FC_API( graphene::wallet::wallet_api,
         (create_account_with_brain_key)
         (sell_asset)
         (borrow_asset)
+        (borrow_asset_ext)
         (cancel_order)
         (transfer)
         (transfer2)
         (get_transaction_id)
         (create_asset)
         (update_asset)
+        (update_asset_issuer)
         (update_bitasset)
         (update_asset_feed_producers)
         (publish_asset_feed)
@@ -1706,6 +1769,7 @@ FC_API( graphene::wallet::wallet_api,
         (get_asset)
         (get_bitasset_data)
         (fund_asset_fee_pool)
+        (claim_asset_fee_pool)
         (reserve_asset)
         (global_settle_asset)
         (settle_asset)

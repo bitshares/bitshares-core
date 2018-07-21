@@ -388,3 +388,98 @@ BOOST_AUTO_TEST_CASE( cli_set_voting_proxy )
    }
    app1->shutdown();
 }
+
+///////////////////
+// Test blind transactions and mantissa length of range proofs.
+///////////////////
+BOOST_AUTO_TEST_CASE( cli_confidential_tx_test )
+{
+   using namespace graphene::chain;
+   using namespace graphene::app;
+   using namespace graphene::wallet;
+   std::shared_ptr<graphene::app::application> app1;
+   try {
+
+      // ** Start a Graphene chain and API server:
+      fc::temp_directory app_dir( graphene::utilities::temp_directory_path() );
+      int server_port_number;
+      app1 = start_application(app_dir, server_port_number);
+      unsigned int head_block = 0;
+
+      // ** Connect a Wallet to the API server, and generate three BLIND accounts:
+      client_connection con(app1, app_dir, server_port_number);
+      auto & W = *con.wallet_api_ptr; // Wallet alias
+      BOOST_TEST_MESSAGE("Setting wallet password");
+      W.set_password("supersecret");
+      W.unlock("supersecret");
+      BOOST_TEST_MESSAGE("Creating blind accounts");
+      graphene::wallet::brain_key_info bki_nathan = W.suggest_brain_key();
+      graphene::wallet::brain_key_info bki_alice = W.suggest_brain_key();
+      graphene::wallet::brain_key_info bki_bob = W.suggest_brain_key();
+      W.create_blind_account("nathan", bki_nathan.brain_priv_key);
+      W.create_blind_account("alice", bki_alice.brain_priv_key);
+      W.create_blind_account("bob", bki_bob.brain_priv_key);
+      BOOST_CHECK(W.get_blind_accounts().size() == 3);
+
+      // ** Block 1: Import Nathan account:
+      BOOST_TEST_MESSAGE("Importing nathan key and balance");
+      std::vector<std::string> nathan_keys{"5KQwrPbwdL6PhXujxW37FSSQZ1JiwsST4cqQzDeyXtP79zkvFD3"};
+      W.import_key("nathan", nathan_keys[0]);
+      W.import_balance("nathan", nathan_keys, true);
+      generate_block(app1); head_block++;
+
+      // ** Block 2: Nathan will blind 100M BTS:
+      BOOST_TEST_MESSAGE("Blinding a large balance");
+      W.transfer_to_blind("nathan", "BTS", {{"nathan","100000000"}}, true);
+      BOOST_CHECK( W.get_blind_balances("nathan")[0].amount == 10000000000000 );
+      generate_block(app1); head_block++;
+
+      // ** Block 3: Nathan will send 1M BTS to alice and 10K BTS to bob. We
+      // then confirm that balances are received, and then analyze the range
+      // prooofs to make sure the mantissa length does not reveal approximate
+      // balance (issue #480).
+      std::map<std::string, share_type> to_list = {{"alice",100000000000},
+                                                   {"bob",    1000000000}};
+      vector<blind_confirmation> bconfs;
+      asset_object core_asset = W.get_asset("1.3.0");
+      BOOST_TEST_MESSAGE("Sending blind transactions to alice and bob");
+      for (auto to : to_list) {
+        string amount = core_asset.amount_to_string(to.second);
+        bconfs.push_back(W.blind_transfer("nathan",to.first,amount,core_asset.symbol,true));
+        BOOST_CHECK( W.get_blind_balances(to.first)[0].amount == to.second );
+      }
+      BOOST_TEST_MESSAGE("Inspecting range proof mantissa lengths");
+      vector<int> rp_mantissabits;
+      for (auto conf : bconfs) {
+        for (auto out : conf.trx.operations[0].get<blind_transfer_operation>().outputs) {
+          rp_mantissabits.push_back(1+out.range_proof[1]); // 2nd byte encodes mantissa length
+        }
+      }
+      // We are checking the mantissa length of the range proofs for several Pedersen
+      // commitments of varying magnitude.  We don't want the mantissa lengths to give
+      // away magnitude.  Deprecated wallet behavior was to use "just enough" mantissa
+      // bits to prove range, but this gives away value to within a factor of two. As a
+      // naive test, we assume that if all mantissa lengths are equal, then they are not
+      // revealing magnitude.  However, future more-sophisticated wallet behavior
+      // *might* randomize mantissa length to achieve some space savings in the range
+      // proof.  The following test will fail in that case and a more sophisticated test
+      // will be needed.
+      auto adjacent_unequal = std::adjacent_find(rp_mantissabits.begin(),
+           /* find unequal adjacent values */    rp_mantissabits.end(),
+                                                 std::not_equal_to<int>());
+      BOOST_CHECK(adjacent_unequal == rp_mantissabits.end());
+      generate_block(app1); head_block++;
+
+      // ** Check head block:
+      BOOST_TEST_MESSAGE("Check that all expected blocks have processed");
+      dynamic_global_property_object dgp = W.get_dynamic_global_properties();
+      BOOST_CHECK(dgp.head_block_number == head_block);
+
+      // wait for everything to finish up
+      fc::usleep(fc::seconds(1));
+   } catch( fc::exception& e ) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+   app1->shutdown();
+}

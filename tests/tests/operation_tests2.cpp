@@ -551,6 +551,117 @@ BOOST_AUTO_TEST_CASE( withdraw_permission_nominal_case )
    BOOST_CHECK_EQUAL(get_balance(dan_id, asset_id_type()), 25);
 } FC_LOG_AND_RETHROW() }
 
+/**
+ * Test asset whitelisting feature for withdrawals.
+ * Reproduces https://github.com/bitshares/bitshares-core/issues/942 and tests the fix for it.
+ */
+BOOST_AUTO_TEST_CASE( withdraw_permission_whitelist_asset_test )
+{ try {
+
+   uint32_t skip = database::skip_witness_signature
+                 | database::skip_transaction_signatures
+                 | database::skip_transaction_dupe_check
+                 | database::skip_block_size_check
+                 | database::skip_tapos_check
+                 | database::skip_authority_check
+                 | database::skip_merkle_check
+                 ;
+
+   generate_blocks( HARDFORK_415_TIME, true, skip ); // get over Graphene 415 asset whitelisting bug
+   generate_block( skip );
+
+   for( int i=0; i<2; i++ )
+   {
+      if( i == 1 )
+      {
+         generate_blocks( HARDFORK_CORE_942_TIME, true, skip );
+         generate_block( skip );
+      }
+
+      int blocks = 0;
+      set_expiration( db, trx );
+
+      ACTORS( (nathan)(dan)(izzy) );
+
+      const asset_id_type uia_id = create_user_issued_asset( "ADVANCED", izzy_id(db), white_list ).id;
+
+      issue_uia( nathan_id, asset(1000, uia_id) );
+
+      // Make a whitelist authority
+      {
+         BOOST_TEST_MESSAGE( "Changing the whitelist authority" );
+         asset_update_operation uop;
+         uop.issuer = izzy_id;
+         uop.asset_to_update = uia_id;
+         uop.new_options = uia_id(db).options;
+         uop.new_options.whitelist_authorities.insert(izzy_id);
+         trx.operations.push_back(uop);
+         PUSH_TX( db, trx, ~0 );
+         trx.operations.clear();
+      }
+
+      // Add dan to whitelist
+      {
+         upgrade_to_lifetime_member( izzy_id );
+
+         account_whitelist_operation wop;
+         wop.authorizing_account = izzy_id;
+         wop.account_to_list = dan_id;
+         wop.new_listing = account_whitelist_operation::white_listed;
+         trx.operations.push_back( wop );
+         PUSH_TX( db, trx, ~0 );
+         trx.operations.clear();
+      }
+
+      // create withdraw permission
+      {
+         withdraw_permission_create_operation op;
+         op.authorized_account = dan_id;
+         op.withdraw_from_account = nathan_id;
+         op.withdrawal_limit = asset(5, uia_id);
+         op.withdrawal_period_sec = fc::hours(1).to_seconds();
+         op.periods_until_expiration = 5;
+         op.period_start_time = db.head_block_time() + 1;
+         trx.operations.push_back(op);
+         PUSH_TX( db, trx, ~0 );
+         trx.operations.clear();
+      }
+
+      withdraw_permission_id_type first_permit_id; // first object must have id 0
+
+      generate_block( skip ); // get to the time point that able to withdraw
+      ++blocks;
+      set_expiration( db, trx );
+
+      // try claim a withdrawal
+      {
+         withdraw_permission_claim_operation op;
+         op.withdraw_permission = first_permit_id;
+         op.withdraw_from_account = nathan_id;
+         op.withdraw_to_account = dan_id;
+         op.amount_to_withdraw = asset(5, uia_id);
+         trx.operations.push_back(op);
+         if( i == 0 ) // before hard fork, should pass
+            PUSH_TX( db, trx, ~0 );
+         else // after hard fork, should throw
+            GRAPHENE_CHECK_THROW( PUSH_TX( db, trx, ~0 ), fc::assert_exception );
+         trx.operations.clear();
+      }
+
+      // TODO add test cases for other white-listing features
+
+      // undo above tx's and reset
+      generate_block( skip );
+      ++blocks;
+      while( blocks > 0 )
+      {
+         db.pop_block();
+         --blocks;
+      }
+   }
+
+} FC_LOG_AND_RETHROW() }
+
 
 /**
  * This case checks to see whether the amount claimed within any particular withdrawal period
@@ -987,8 +1098,28 @@ BOOST_AUTO_TEST_CASE( witness_create )
  *  issuer and only if the global settle bit is set.
  */
 BOOST_AUTO_TEST_CASE( global_settle_test )
-{
-   try {
+{ try {
+   uint32_t skip = database::skip_witness_signature
+                 | database::skip_transaction_signatures
+                 | database::skip_transaction_dupe_check
+                 | database::skip_block_size_check
+                 | database::skip_tapos_check
+                 | database::skip_authority_check
+                 | database::skip_merkle_check
+                 ;
+
+   generate_block( skip );
+
+  for( int i=0; i<2; i++ )
+  {
+   if( i == 1 )
+   {
+      auto mi = db.get_global_properties().parameters.maintenance_interval;
+      generate_blocks(HARDFORK_CORE_342_TIME - mi, true, skip);
+      generate_blocks(db.get_dynamic_global_properties().next_maintenance_time, true, skip);
+   }
+   set_expiration( db, trx );
+
    ACTORS((nathan)(ben)(valentine)(dan));
    asset_id_type bit_usd_id = create_bitasset("USDBIT", nathan_id, 100, global_settle | charge_market_fee).get_id();
 
@@ -1059,11 +1190,23 @@ BOOST_AUTO_TEST_CASE( global_settle_test )
    BOOST_CHECK_EQUAL(get_balance(valentine_id, bit_usd_id), 0);
    BOOST_CHECK_EQUAL(get_balance(valentine_id, asset_id_type()), 10045);
    BOOST_CHECK_EQUAL(get_balance(ben_id, bit_usd_id), 0);
-   BOOST_CHECK_EQUAL(get_balance(ben_id, asset_id_type()), 10091);
+   if( i == 1 ) // BSIP35: better rounding
+   {
+      BOOST_CHECK_EQUAL(get_balance(ben_id, asset_id_type()), 10090);
+      BOOST_CHECK_EQUAL(get_balance(dan_id, asset_id_type()), 9850);
+   }
+   else
+   {
+      BOOST_CHECK_EQUAL(get_balance(ben_id, asset_id_type()), 10091);
+      BOOST_CHECK_EQUAL(get_balance(dan_id, asset_id_type()), 9849);
+   }
    BOOST_CHECK_EQUAL(get_balance(dan_id, bit_usd_id), 0);
-   BOOST_CHECK_EQUAL(get_balance(dan_id, asset_id_type()), 9849);
-} FC_LOG_AND_RETHROW()
-}
+
+   // undo above tx's and reset
+   generate_block( skip );
+   db.pop_block();
+  }
+} FC_LOG_AND_RETHROW() }
 
 BOOST_AUTO_TEST_CASE( worker_create_test )
 { try {
@@ -1334,6 +1477,28 @@ BOOST_AUTO_TEST_CASE( burn_worker_test )
 
 BOOST_AUTO_TEST_CASE( force_settle_test )
 {
+   uint32_t skip = database::skip_witness_signature
+                 | database::skip_transaction_signatures
+                 | database::skip_transaction_dupe_check
+                 | database::skip_block_size_check
+                 | database::skip_tapos_check
+                 | database::skip_authority_check
+                 | database::skip_merkle_check
+                 ;
+
+   generate_block( skip );
+
+  for( int i=0; i<2; i++ )
+  {
+   if( i == 1 )
+   {
+      auto mi = db.get_global_properties().parameters.maintenance_interval;
+      generate_blocks(HARDFORK_CORE_342_TIME - mi, true, skip);
+      generate_blocks(db.get_dynamic_global_properties().next_maintenance_time, true, skip);
+   }
+   set_expiration( db, trx );
+
+   int blocks = 0;
    try
    {
       ACTORS( (nathan)(shorter1)(shorter2)(shorter3)(shorter4)(shorter5) );
@@ -1453,7 +1618,9 @@ BOOST_AUTO_TEST_CASE( force_settle_test )
       BOOST_CHECK( settle_id(db).owner == nathan_id );
 
       // Wait for settlement to take effect
-      generate_blocks(settle_id(db).settlement_date);
+      generate_blocks( settle_id(db).settlement_date, true, skip );
+      blocks += 2;
+
       BOOST_CHECK(db.find(settle_id) == nullptr);
       BOOST_CHECK_EQUAL( bitusd_id(db).bitasset_data(db).force_settled_volume.value, 50 );
       BOOST_CHECK_EQUAL( get_balance(nathan_id, bitusd_id), 14950);
@@ -1483,13 +1650,21 @@ BOOST_AUTO_TEST_CASE( force_settle_test )
       // c2 2000 : 3998   1.9990   550 settled
       // c1 1000 : 2000   2.0000
 
-      generate_blocks( settle_id(db).settlement_date );
+      generate_blocks( settle_id(db).settlement_date, true, skip );
+      blocks += 2;
 
       int64_t call1_payout =                0;
       int64_t call2_payout =       550*99/100;
       int64_t call3_payout = 49 + 2950*99/100;
       int64_t call4_payout =      4000*99/100;
       int64_t call5_payout =      5000*99/100;
+
+      if( i == 1 ) // BSIP35: better rounding
+      {
+         call3_payout = 49 + (2950*99+100-1)/100; // round up
+         call4_payout =      (4000*99+100-1)/100; // round up
+         call5_payout =      (5000*99+100-1)/100; // round up
+      }
 
       BOOST_CHECK_EQUAL( get_balance(shorter1_id, core_id), initial_balance-2*1000 );  // full collat still tied up
       BOOST_CHECK_EQUAL( get_balance(shorter2_id, core_id), initial_balance-2*1999 );  // full collat still tied up
@@ -1518,6 +1693,16 @@ BOOST_AUTO_TEST_CASE( force_settle_test )
       edump((e.to_detail_string()));
       throw;
    }
+
+   // undo above tx's and reset
+   generate_block( skip );
+   ++blocks;
+   while( blocks > 0 )
+   {
+      db.pop_block();
+      --blocks;
+   }
+  }
 }
 
 BOOST_AUTO_TEST_CASE( assert_op_test )

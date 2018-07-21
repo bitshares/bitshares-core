@@ -392,7 +392,9 @@ void es_objects_plugin::plugin_initialize(const boost::program_options::variable
 
 void es_objects_plugin::plugin_startup()
 {
-   ilog("elasticsearch objects: plugin_startup() begin");
+   if(!graphene::utilities::checkES(my->curl, my->_es_objects_elasticsearch_url))
+      FC_THROW_EXCEPTION(fc::exception, "ES database is not up in url ${url}", ("url", my->_es_objects_elasticsearch_url));
+   ilog("elasticsearch OBJECTS: plugin_startup() begin");
 }
 
 } }

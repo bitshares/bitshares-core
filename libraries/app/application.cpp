@@ -179,9 +179,10 @@ void application_impl::reset_p2p_node(const fc::path& data_dir)
          "seed.cubeconnex.com:1777",          // cube         (USA)
          "seed.roelandp.nl:1776",             // roelandp     (Canada)
          "seed04.bts-nodes.net:1776",         // Thom         (Australia)
-         "seed05.bts-nodes.net:1776",          // Thom         (USA)
-         "seed06.bts-nodes.net:1776",          // Thom         (USA)
-         "seed07.bts-nodes.net:1776",          // Thom         (Singapore)
+         "seed05.bts-nodes.net:1776",         // Thom         (USA)
+         "seed06.bts-nodes.net:1776",         // Thom         (USA)
+         "seed07.bts-nodes.net:1776",         // Thom         (Singapore)
+         "seed.bts.bangzi.info:55501",        // Bangzi       (Germany)
          "seeds.bitshares.eu:1776"            // pc           (http://seeds.quisquis.de/bitshares.html)
       };
       for( const string& endpoint_string : seeds )
@@ -436,7 +437,6 @@ void application_impl::startup()
       wild_access.allowed_apis.push_back( "database_api" );
       wild_access.allowed_apis.push_back( "network_broadcast_api" );
       wild_access.allowed_apis.push_back( "history_api" );
-      wild_access.allowed_apis.push_back( "crypto_api" );
       wild_access.allowed_apis.push_back( "orders_api" );
       _apiaccess.permission_map["*"] = wild_access;
    }
@@ -497,9 +497,10 @@ bool application_impl::handle_block(const graphene::net::block_message& blk_msg,
       const auto& witness = blk_msg.block.witness(*_chain_db);
       const auto& witness_account = witness.witness_account(*_chain_db);
       auto last_irr = _chain_db->get_dynamic_global_properties().last_irreversible_block_num;
-      ilog("Got block: #${n} time: ${t} latency: ${l} ms from: ${w}  irreversible: ${i} (-${d})",
+      ilog("Got block: #${n} ${bid} time: ${t} latency: ${l} ms from: ${w}  irreversible: ${i} (-${d})",
            ("t",blk_msg.block.timestamp)
            ("n", blk_msg.block.block_num())
+           ("bid", blk_msg.block.id())
            ("l", (latency.count()/1000))
            ("w",witness_account.name)
            ("i",last_irr)("d",blk_msg.block.block_num()-last_irr) );
