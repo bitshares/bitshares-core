@@ -215,25 +215,25 @@ void es_objects_plugin_impl::PrepareAccount(const account_object* account_object
 
 void es_objects_plugin_impl::PrepareAsset(const asset_object* asset_object, const fc::time_point_sec block_time, uint32_t block_number)
 {
-   asset_struct _asset;
-   _asset.object_id = asset_object->id;
-   _asset.block_time = block_time;
-   _asset.block_number = block_number;
-   _asset.symbol = asset_object->symbol;
-   _asset.issuer = asset_object->issuer;
-   _asset.is_market_issued = asset_object->is_market_issued();
-   _asset.dynamic_asset_data_id = asset_object->dynamic_asset_data_id;
-   _asset.bitasset_data_id = asset_object->bitasset_data_id;
+   asset_struct asset;
+   asset.object_id = asset_object->id;
+   asset.block_time = block_time;
+   asset.block_number = block_number;
+   asset.symbol = asset_object->symbol;
+   asset.issuer = asset_object->issuer;
+   asset.is_market_issued = asset_object->is_market_issued();
+   asset.dynamic_asset_data_id = asset_object->dynamic_asset_data_id;
+   asset.bitasset_data_id = asset_object->bitasset_data_id;
 
    auto it = assets.find(asset_object->id);
    if(it == assets.end())
-      assets[asset_object->id] = _asset;
+      assets[asset_object->id] = asset;
    else {
-      if(it->second == _asset) return;
-      else assets[asset_object->id] = _asset;
+      if(it->second == asset) return;
+      else assets[asset_object->id] = asset;
    }
 
-   std::string data = fc::json::to_string(_asset);
+   std::string data = fc::json::to_string(asset);
    prepare = graphene::utilities::createBulk(_es_objects_index_prefix + "asset", data, "", 1);
    bulk.insert(bulk.end(), prepare.begin(), prepare.end());
    prepare.clear();
