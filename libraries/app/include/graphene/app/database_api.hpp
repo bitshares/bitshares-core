@@ -298,7 +298,7 @@ class database_api
        *    was just canceled accidentally, in such case, the result orders' price may lower or equal to start_price,
        *    but orders' id greater than start_id
        */
-      vector<limit_order_object> get_account_limit_orders( const string& name_or_id,
+      vector<limit_order_object> get_account_limit_orders( const string& account_name_or_id,
                                                   const string &base,
                                                   const string &quote,
                                                   uint32_t limit = 101,
