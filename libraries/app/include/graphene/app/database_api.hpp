@@ -756,7 +756,6 @@ FC_API(graphene::app::database_api,
    // Accounts
    (get_account_id_from_string)
    (get_accounts)
-   (get_account_limit_orders)
    (get_full_accounts)
    (get_account_by_name)
    (get_account_references)
@@ -779,6 +778,7 @@ FC_API(graphene::app::database_api,
    // Markets / feeds
    (get_order_book)
    (get_limit_orders)
+   (get_account_limit_orders)
    (get_call_orders)
    (get_settle_orders)
    (get_margin_positions)
