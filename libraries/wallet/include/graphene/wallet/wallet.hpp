@@ -365,7 +365,12 @@ class wallet_api
        * @returns the list of asset objects, ordered by symbol
        */
       vector<asset_object>              list_assets(const string& lowerbound, uint32_t limit)const;
-      
+      /** Returns assets count registered on the blockchain.
+       * 
+       * @returns assets count
+       */
+      uint64_t get_assets_count()const;
+
       /** Returns the most recent operations on the named account.
        *
        * This returns a list of operation history objects, which describe activity on the account.
@@ -1717,6 +1722,7 @@ FC_API( graphene::wallet::wallet_api,
         (list_accounts)
         (list_account_balances)
         (list_assets)
+        (get_assets_count)
         (import_key)
         (import_accounts)
         (import_account_keys)

@@ -101,6 +101,7 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       vector<optional<asset_object>> get_assets(const vector<asset_id_type>& asset_ids)const;
       vector<asset_object>           list_assets(const string& lower_bound_symbol, uint32_t limit)const;
       vector<optional<asset_object>> lookup_asset_symbols(const vector<string>& symbols_or_ids)const;
+      uint64_t                       get_assets_count()const;
 
       // Markets / feeds
       vector<limit_order_object>         get_limit_orders(asset_id_type a, asset_id_type b, uint32_t limit)const;
@@ -994,6 +995,16 @@ vector<asset_object> database_api_impl::list_assets(const string& lower_bound_sy
       result.emplace_back(*itr++);
 
    return result;
+}
+
+uint64_t database_api::get_assets_count()const
+{
+   return my->get_assets_count();
+}
+
+uint64_t database_api_impl::get_assets_count()const
+{
+   return _db.get_index_type<asset_index>().indices().size();
 }
 
 vector<optional<asset_object>> database_api::lookup_asset_symbols(const vector<string>& symbols_or_ids)const
