@@ -399,6 +399,12 @@ class database_api
        */
       vector<optional<asset_object>> lookup_asset_symbols(const vector<string>& symbols_or_ids)const;
 
+      /**
+       * @brief Get assets count
+       * @return The assets count
+       */
+      uint64_t get_asset_count()const;
+
       /////////////////////
       // Markets / feeds //
       /////////////////////
@@ -774,6 +780,7 @@ FC_API(graphene::app::database_api,
    (get_assets)
    (list_assets)
    (lookup_asset_symbols)
+   (get_asset_count)
 
    // Markets / feeds
    (get_order_book)
