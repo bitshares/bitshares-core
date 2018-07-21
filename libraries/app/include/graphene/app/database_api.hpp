@@ -374,7 +374,7 @@ class database_api
        * @brief Get assets count
        * @return The assets count
        */
-      uint64_t get_assets_count()const;
+      uint64_t get_asset_count()const;
 
       /////////////////////
       // Markets / feeds //
@@ -751,7 +751,7 @@ FC_API(graphene::app::database_api,
    (get_assets)
    (list_assets)
    (lookup_asset_symbols)
-   (get_assets_count)
+   (get_asset_count)
 
    // Markets / feeds
    (get_order_book)

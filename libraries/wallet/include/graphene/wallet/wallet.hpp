@@ -369,7 +369,7 @@ class wallet_api
        * 
        * @returns assets count
        */
-      uint64_t get_assets_count()const;
+      uint64_t get_asset_count()const;
 
       /** Returns the most recent operations on the named account.
        *
@@ -1722,7 +1722,7 @@ FC_API( graphene::wallet::wallet_api,
         (list_accounts)
         (list_account_balances)
         (list_assets)
-        (get_assets_count)
+        (get_asset_count)
         (import_key)
         (import_accounts)
         (import_account_keys)
