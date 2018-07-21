@@ -34,6 +34,8 @@ namespace graphene { namespace chain {
       fc::time_point_sec            timestamp;
       witness_id_type               witness;
       checksum_type                 transaction_merkle_root;
+      // Note: when we need to add data to `extensions`, remember to review `database::_generate_block()`.
+      //       More info in https://github.com/bitshares/bitshares-core/issues/1136
       extensions_type               extensions;
 
       static uint32_t num_from_id(const block_id_type& id);
