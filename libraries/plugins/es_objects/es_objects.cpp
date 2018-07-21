@@ -60,6 +60,7 @@ class es_objects_plugin_impl
       bool _es_objects_balances = true;
       bool _es_objects_limit_orders = true;
       bool _es_objects_asset_bitasset = true;
+      std::string _es_objects_index_prefix = "objects-";
       CURL *curl; // curl handler
       vector <std::string> bulk;
       vector<std::string> prepare;
@@ -171,7 +172,7 @@ void es_objects_plugin_impl::PrepareProposal(const proposal_object* proposal_obj
    }
 
    std::string data = fc::json::to_string(prop);
-   prepare = graphene::utilities::createBulk("bitshares-proposal", data, "", 1);
+   prepare = graphene::utilities::createBulk(_es_objects_index_prefix + "proposal", data, "", 1);
    bulk.insert(bulk.end(), prepare.begin(), prepare.end());
    prepare.clear();
 }
@@ -207,7 +208,7 @@ void es_objects_plugin_impl::PrepareAccount(const account_object* account_object
    }
 
    std::string data = fc::json::to_string(acct);
-   prepare = graphene::utilities::createBulk("bitshares-account", data, "", 1);
+   prepare = graphene::utilities::createBulk(_es_objects_index_prefix + "account", data, "", 1);
    bulk.insert(bulk.end(), prepare.begin(), prepare.end());
    prepare.clear();
 }
@@ -233,7 +234,7 @@ void es_objects_plugin_impl::PrepareAsset(const asset_object* asset_object, cons
    }
 
    std::string data = fc::json::to_string(_asset);
-   prepare = graphene::utilities::createBulk("bitshares-asset", data, "", 1);
+   prepare = graphene::utilities::createBulk(_es_objects_index_prefix + "asset", data, "", 1);
    bulk.insert(bulk.end(), prepare.begin(), prepare.end());
    prepare.clear();
 }
@@ -256,7 +257,7 @@ void es_objects_plugin_impl::PrepareBalance(const balance_object* balance_object
    }
 
    std::string data = fc::json::to_string(balance);
-   prepare = graphene::utilities::createBulk("bitshares-balance", data, "", 1);
+   prepare = graphene::utilities::createBulk(_es_objects_index_prefix + "balance", data, "", 1);
    bulk.insert(bulk.end(), prepare.begin(), prepare.end());
    prepare.clear();
 }
@@ -282,7 +283,7 @@ void es_objects_plugin_impl::PrepareLimit(const limit_order_object* limit_object
    }
 
    std::string data = fc::json::to_string(limit);
-   prepare = graphene::utilities::createBulk("bitshares-limitorder", data, "", 1);
+   prepare = graphene::utilities::createBulk(_es_objects_index_prefix + "limitorder", data, "", 1);
    bulk.insert(bulk.end(), prepare.begin(), prepare.end());
    prepare.clear();
 }
@@ -307,7 +308,7 @@ void es_objects_plugin_impl::PrepareBitAsset(const asset_bitasset_data_object* b
       }
 
       std::string data = fc::json::to_string(bitasset);
-      prepare = graphene::utilities::createBulk("bitshares-bitasset", data, "", 1);
+      prepare = graphene::utilities::createBulk(_es_objects_index_prefix + "bitasset", data, "", 1);
       bulk.insert(bulk.end(), prepare.begin(), prepare.end());
       prepare.clear();
    }
@@ -354,7 +355,7 @@ void es_objects_plugin::plugin_set_program_options(
          ("es-objects-balances", boost::program_options::value<bool>(), "Store balances objects")
          ("es-objects-limit-orders", boost::program_options::value<bool>(), "Store limit order objects")
          ("es-objects-asset-bitasset", boost::program_options::value<bool>(), "Store feed data")
-
+         ("es-objects-index-prefix", boost::program_options::value<std::string>(), "Add a prefix to the index(objects-)")
          ;
    cfg.add(cli);
 }
@@ -394,6 +395,9 @@ void es_objects_plugin::plugin_initialize(const boost::program_options::variable
    if (options.count("es-objects-asset-bitasset")) {
       my->_es_objects_asset_bitasset = options["es-objects-asset-bitasset"].as<bool>();
    }
+   if (options.count("es-objects-index-prefix")) {
+      my->_es_objects_index_prefix = options["es-objects-index-prefix"].as<std::string>();
+   }
 }
 
 void es_objects_plugin::plugin_startup()
@@ -402,6 +406,7 @@ void es_objects_plugin::plugin_startup()
    es.curl = my->curl;
    es.elasticsearch_url = my->_es_objects_elasticsearch_url;
    es.auth = my->_es_objects_auth;
+   es.auth = my->_es_objects_index_prefix;
 
    if(!graphene::utilities::checkES(es))
       FC_THROW_EXCEPTION(fc::exception, "ES database is not up in url ${url}", ("url", my->_es_objects_elasticsearch_url));

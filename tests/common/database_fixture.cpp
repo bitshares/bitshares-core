@@ -28,11 +28,8 @@
 #include <graphene/market_history/market_history_plugin.hpp>
 #include <graphene/grouped_orders/grouped_orders_plugin.hpp>
 #include <graphene/elasticsearch/elasticsearch_plugin.hpp>
+#include <graphene/es_objects/es_objects.hpp>
 
-#include <graphene/db/simple_index.hpp>
-
-#include <graphene/chain/account_object.hpp>
-#include <graphene/chain/asset_object.hpp>
 #include <graphene/chain/committee_member_object.hpp>
 #include <graphene/chain/fba_object.hpp>
 #include <graphene/chain/market_object.hpp>
@@ -45,9 +42,7 @@
 #include <fc/crypto/digest.hpp>
 #include <fc/smart_ref_impl.hpp>
 
-#include <iostream>
 #include <iomanip>
-#include <sstream>
 
 #include "database_fixture.hpp"
 
@@ -144,6 +139,24 @@ database_fixture::database_fixture()
       ahplugin->plugin_set_app(&app);
       ahplugin->plugin_initialize(options);
       ahplugin->plugin_startup();
+   }
+
+   if(boost::unit_test::framework::current_test_case().p_name.value == "es2") {
+      auto esobjects_plugin = app.register_plugin<graphene::es_objects::es_objects_plugin>();
+      esobjects_plugin->plugin_set_app(&app);
+
+      options.insert(std::make_pair("es-objects-elasticsearch-url", boost::program_options::variable_value(string("http://localhost:9200/"), false)));
+      options.insert(std::make_pair("es-objects-bulk-replay", boost::program_options::variable_value(uint32_t(2), false)));
+      options.insert(std::make_pair("es-objects-bulk-sync", boost::program_options::variable_value(uint32_t(2), false)));
+      options.insert(std::make_pair("es-objects-proposals", boost::program_options::variable_value(true, false)));
+      options.insert(std::make_pair("es-objects-accounts", boost::program_options::variable_value(true, false)));
+      options.insert(std::make_pair("es-objects-assets", boost::program_options::variable_value(true, false)));
+      options.insert(std::make_pair("es-objects-balances", boost::program_options::variable_value(true, false)));
+      options.insert(std::make_pair("es-objects-limit-orders", boost::program_options::variable_value(true, false)));
+      options.insert(std::make_pair("es-objects-asset-bitasset", boost::program_options::variable_value(true, false)));
+
+      esobjects_plugin->plugin_initialize(options);
+      esobjects_plugin->plugin_startup();
    }
 
    options.insert(std::make_pair("bucket-size", boost::program_options::variable_value(string("[15]"),false)));

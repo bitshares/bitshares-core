@@ -136,4 +136,49 @@ BOOST_AUTO_TEST_CASE(es1) {
    }
 }
 
+BOOST_AUTO_TEST_CASE(es2) {
+   try {
+
+      CURL *curl; // curl handler
+      curl = curl_easy_init();
+
+      graphene::utilities::ES es;
+      es.curl = curl;
+      es.elasticsearch_url = "http://localhost:9200/";
+      es.index_prefix = "objects-";
+      //es.auth = "elastic:changeme";
+
+      // delete all first
+      auto dele = graphene::utilities::deleteAll(es);
+
+      generate_block();
+      fc::usleep(fc::milliseconds(1000)); // this is because index.refresh_interval, nothing to worry
+
+      if(dele) { // all records deleted
+
+         //account_id_type() do 3 ops
+         create_bitasset("USD", account_id_type());
+         auto dan = create_account("dan");
+         auto bob = create_account("bob");
+
+         generate_block();
+         fc::usleep(fc::milliseconds(1000)); // this is because index.refresh_interval, nothing to worry
+
+         curl = curl_easy_init();
+         string query = "{ \"query\" : { \"bool\" : { \"must\" : [{\"match_all\": {}}] } } }";
+         es.endpoint = es.index_prefix + "*/data/_count";
+         es.query = query;
+
+         auto res = graphene::utilities::simpleQuery(es);
+         variant j = fc::json::from_string(res);
+         auto total = j["count"].as_string();
+         BOOST_CHECK_EQUAL(total, "8");
+      }
+   }
+   catch (fc::exception &e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
 BOOST_AUTO_TEST_SUITE_END()
