@@ -235,13 +235,13 @@ BOOST_AUTO_TEST_CASE( cli_quit )
 
       fc::temp_directory app_dir ( graphene::utilities::temp_directory_path() );
 
-	int server_port_number = 0;
-	app1 = start_application(app_dir, server_port_number);
+	    int server_port_number = 0;
+	    app1 = start_application(app_dir, server_port_number);
 
       // connect to the server
-	client_connection con(app1, app_dir, server_port_number);
+	    client_connection con(app1, app_dir, server_port_number);
 
-      BOOST_CHECK_NO_THROW( con.wallet_api_ptr->quit() );
+      BOOST_CHECK_THROW( con.wallet_api_ptr->quit(), fc::canceled_exception );
    } catch( fc::exception& e ) {
       edump((e.to_detail_string()));
       throw;
