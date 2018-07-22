@@ -280,7 +280,7 @@ class database_api
        * @brief Fetch all orders relevant to the specified account and specified market, result orders
        *        are sorted descendingly by price
        *
-       * @param name_or_id  The name or ID of an account to retrieve
+       * @param account_name_or_id  The name or ID of an account to retrieve
        * @param base  Base asset
        * @param quote  Quote asset
        * @param limit  The limitation of items each query can fetch, not greater than 101
@@ -291,7 +291,7 @@ class database_api
        * @return List of orders from @ref name_or_id to the corresponding account
        *
        * @note
-       * 1. if @ref name_or_id cannot be tied to an account, empty result will be returned
+       * 1. if @ref account_name_or_id cannot be tied to an account, empty result will be returned
        * 2. @ref start_id and @ref start_price can be empty, if so the api will return the "first page" of orders;
        *    if start_id is specified, its price will be used to do page query preferentially, otherwise the start_price
        *    will be used; start_id and start_price may be used cooperatively in case of the order specified by start_id
