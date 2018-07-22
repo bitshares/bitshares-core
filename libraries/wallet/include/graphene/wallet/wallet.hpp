@@ -667,7 +667,7 @@ class wallet_api
        * 
        * The current wallet will be closed.
        * 
-       * @returns SIGNAL
+       * @throws fc::canceled_exception
        */
       void    quit();
 

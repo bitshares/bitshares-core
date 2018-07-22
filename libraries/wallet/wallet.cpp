@@ -74,9 +74,6 @@
 #include <graphene/debug_witness/debug_api.hpp>
 #include <fc/smart_ref_impl.hpp>
 
-#include <cstdlib>
-using namespace std;
-
 #ifndef WIN32
 # include <sys/types.h>
 # include <sys/stat.h>
