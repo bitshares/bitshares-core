@@ -105,7 +105,7 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
 
       // Markets / feeds
       vector<limit_order_object>         get_limit_orders(asset_id_type a, asset_id_type b, uint32_t limit)const;
-      vector<limit_order_object>         get_account_limit_orders( const string& name_or_id,
+      vector<limit_order_object>         get_account_limit_orders( const string& account_name_or_id,
                                                                    const string &base,
                                                                    const string &quote, uint32_t limit,
                                                                    optional<limit_order_id_type> ostart_id,
@@ -663,30 +663,21 @@ vector<optional<account_object>> database_api_impl::get_accounts(const vector<st
    return result;
 }
 
-vector<limit_order_object> database_api::get_account_limit_orders( const string& name_or_id, const string &base,
+vector<limit_order_object> database_api::get_account_limit_orders( const string& account_name_or_id, const string &base,
         const string &quote, uint32_t limit, optional<limit_order_id_type> ostart_id, optional<price> ostart_price)
 {
-   return my->get_account_limit_orders( name_or_id, base, quote, limit, ostart_id, ostart_price );
+   return my->get_account_limit_orders( account_name_or_id, base, quote, limit, ostart_id, ostart_price );
 }
 
-vector<limit_order_object> database_api_impl::get_account_limit_orders( const string& name_or_id, const string &base,
+vector<limit_order_object> database_api_impl::get_account_limit_orders( const string& account_name_or_id, const string &base,
         const string &quote, uint32_t limit, optional<limit_order_id_type> ostart_id, optional<price> ostart_price)
 {
    FC_ASSERT( limit <= 101 );
 
    vector<limit_order_object>   results;
-   const account_object*        account = nullptr;
    uint32_t                     count = 0;
 
-   if (std::isdigit(name_or_id[0]))
-      account = _db.find(fc::variant(name_or_id, 1).as<account_id_type>(1));
-   else
-   {
-      const auto& idx = _db.get_index_type<account_index>().indices().get<by_name>();
-      auto itr = idx.find(name_or_id);
-      if (itr != idx.end())
-         account = &*itr;
-   }
+   const account_object* account = get_account_from_string(account_name_or_id);
    if (account == nullptr)
       return results;
 
