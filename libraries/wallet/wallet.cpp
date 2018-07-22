@@ -780,8 +780,10 @@ public:
            tx.signatures.empty() )
       {
          auto dyn_props = get_dynamic_global_properties();
+         auto props = get_global_properties();
          tx.set_reference_block( dyn_props.head_block_id );
-         tx.set_expiration( fc::time_point_sec::maximum() );
+         tx.set_expiration( fc::time_point_sec(
+            props.parameters.maximum_time_until_expiration ) );
       }
       for ( const public_key_type &key : approving_key_set )
          tx.sign( get_private_key( key ), _chain_id );
