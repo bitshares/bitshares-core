@@ -288,7 +288,7 @@ class database_api
        *                  but order ID greater than this order
        * @param start_price  Fetch orders with price lower than or equal to this price
        *
-       * @return List of orders from @ref name_or_id to the corresponding account
+       * @return List of orders from @ref account_name_or_id to the corresponding account
        *
        * @note
        * 1. if @ref account_name_or_id cannot be tied to an account, empty result will be returned
