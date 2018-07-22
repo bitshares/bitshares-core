@@ -25,9 +25,17 @@
 #include <boost/test/unit_test.hpp>
 #include <string>
 #include <cmath>
-#include <graphene/chain/asset_object.hpp>
 
-BOOST_AUTO_TEST_SUITE(asset_tests)
+#include <graphene/chain/asset_object.hpp>
+#include <graphene/app/api.hpp>
+
+#include "../common/database_fixture.hpp"
+
+using namespace graphene::chain;
+using namespace graphene::chain::test;
+using namespace graphene::app;
+
+BOOST_FIXTURE_TEST_SUITE(asset_tests, database_fixture)
 
 BOOST_AUTO_TEST_CASE( asset_to_from_string )
 {
@@ -70,6 +78,33 @@ BOOST_AUTO_TEST_CASE( asset_to_from_string )
       test_obj.precision = i;
       BOOST_CHECK_EQUAL(negative_results[i], test_obj.amount_to_string(amt12345 * -1));
    }
+}
+
+BOOST_AUTO_TEST_CASE( asset_holders )
+{
+
+   graphene::app::asset_api asset_api(db);
+
+   // create an asset and some accounts
+   create_bitasset("USD", account_id_type());
+   auto dan = create_account("dan");
+   auto bob = create_account("bob");
+   auto alice = create_account("alice");
+
+   transfer(account_id_type()(db), dan, asset(100));
+   transfer(account_id_type()(db), alice, asset(200));
+   transfer(account_id_type()(db), bob, asset(300));
+
+   vector<account_asset_balance> holders = asset_api.get_asset_holders(asset_id_type(), 0, 100);
+   BOOST_CHECK_EQUAL(holders.size(), 4);
+   // we can only guarantee the order if compiler flag is on
+   #ifdef ASSET_BALANCE_SORTED 
+      BOOST_CHECK(holders[0].name == "committee-account");
+      BOOST_CHECK(holders[1].name == "bob");
+      BOOST_CHECK(holders[2].name == "alice");
+      BOOST_CHECK(holders[3].name == "dan");
+   #endif
+
 }
 
 BOOST_AUTO_TEST_SUITE_END()
