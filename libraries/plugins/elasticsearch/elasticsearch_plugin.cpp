@@ -67,7 +67,7 @@ class elasticsearch_plugin_impl
                                                             const account_id_type account_id,
                                                             const optional <operation_history_object>& oho);
       const account_statistics_object& getStatsObject(const account_id_type account_id);
-      void growStats(const account_statistics_object stats_obj, const account_transaction_history_object& ath);
+      void growStats(const account_statistics_object& stats_obj, const account_transaction_history_object& ath);
       const int16_t getOperationType(const optional <operation_history_object>& oho);
       const operation_history_struct doOperationHistory(const optional <operation_history_object>& oho);
       const block_struct doBlock(const optional <operation_history_object>& oho, const signed_block& b);
@@ -206,7 +206,7 @@ const account_transaction_history_object& elasticsearch_plugin_impl::addNewEntry
    return ath;
 }
 
-void elasticsearch_plugin_impl::growStats(const account_statistics_object stats_obj,
+void elasticsearch_plugin_impl::growStats(const account_statistics_object& stats_obj,
                                           const account_transaction_history_object& ath)
 {
    graphene::chain::database& db = database();
