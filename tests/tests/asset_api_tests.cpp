@@ -23,8 +23,6 @@
  */
 
 #include <boost/test/unit_test.hpp>
-//#include <string>
-//#include <cmath>
 
 #include <graphene/chain/asset_object.hpp>
 #include <graphene/app/api.hpp>
