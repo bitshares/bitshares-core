@@ -121,7 +121,8 @@ database_fixture::database_fixture()
       options.insert(std::make_pair("track-account", boost::program_options::variable_value(track_account, false)));
    }
 
-   if(boost::unit_test::framework::current_test_case().p_name.value == "es1") {
+   auto test_name = boost::unit_test::framework::current_test_case().p_name.value;
+   if(test_name == "elasticsearch_account_history" || test_name == "elasticsearch_suite") {
       auto esplugin = app.register_plugin<graphene::elasticsearch::elasticsearch_plugin>();
       esplugin->plugin_set_app(&app);
 
@@ -141,7 +142,7 @@ database_fixture::database_fixture()
       ahplugin->plugin_startup();
    }
 
-   if(boost::unit_test::framework::current_test_case().p_name.value == "es2") {
+   if(test_name == "elasticsearch_objects" || test_name == "elasticsearch_suite") {
       auto esobjects_plugin = app.register_plugin<graphene::es_objects::es_objects_plugin>();
       esobjects_plugin->plugin_set_app(&app);
 
