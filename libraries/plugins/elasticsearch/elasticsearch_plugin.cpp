@@ -63,24 +63,23 @@ class elasticsearch_plugin_impl
       vector<std::string> prepare;
    private:
       bool add_elasticsearch( const account_id_type account_id, const optional<operation_history_object>& oho, const signed_block& b );
-      const account_transaction_history_object& addNewEntry(const account_statistics_object& stats_obj,
-                                                            const account_id_type account_id,
-                                                            const optional <operation_history_object>& oho);
-      const account_statistics_object& getStatsObject(const account_id_type account_id);
-      void growStats(const account_statistics_object& stats_obj, const account_transaction_history_object& ath);
-      const int16_t getOperationType(const optional <operation_history_object>& oho);
-      const operation_history_struct doOperationHistory(const optional <operation_history_object>& oho);
-      const block_struct doBlock(const optional <operation_history_object>& oho, const signed_block& b);
-      const visitor_struct doVisitor(const optional <operation_history_object>& oho);
-      const uint32_t checkState(const fc::time_point_sec& block_time);
+      inline const account_transaction_history_object& addNewEntry(const account_statistics_object& stats_obj,
+                                                                   const account_id_type account_id,
+                                                                   const optional <operation_history_object>& oho);
+      inline const account_statistics_object& getStatsObject(const account_id_type account_id);
+      inline void growStats(const account_statistics_object& stats_obj, const account_transaction_history_object& ath);
+      inline const int16_t getOperationType(const optional <operation_history_object>& oho);
+      inline const operation_history_struct doOperationHistory(const optional <operation_history_object>& oho);
+      inline const block_struct doBlock(const optional <operation_history_object>& oho, const signed_block& b);
+      inline const visitor_struct doVisitor(const optional <operation_history_object>& oho);
+      inline const uint32_t checkState(const fc::time_point_sec& block_time);
       void cleanObjects(const account_transaction_history_object& ath, account_id_type account_id);
-      const std::string createBulkLine(const account_transaction_history_object& ath,
-                                       const optional <operation_history_object>& oho,
-                                       const signed_block& b);
-      void prepareBulk(const fc::time_point_sec& block_date,
-                       const account_transaction_history_id_type& ath_id,
-                       const std::string& bulk_line);
-
+      inline const std::string createBulkLine(const account_transaction_history_object& ath,
+                                              const optional <operation_history_object>& oho,
+                                              const signed_block& b);
+      inline void prepareBulk(const fc::time_point_sec& block_date,
+                              const account_transaction_history_id_type& ath_id,
+                              const std::string& bulk_line);
 };
 
 elasticsearch_plugin_impl::~elasticsearch_plugin_impl()
@@ -183,7 +182,7 @@ bool elasticsearch_plugin_impl::add_elasticsearch( const account_id_type account
    return true;
 }
 
-const account_statistics_object& elasticsearch_plugin_impl::getStatsObject(const account_id_type account_id)
+inline const account_statistics_object& elasticsearch_plugin_impl::getStatsObject(const account_id_type account_id)
 {
    graphene::chain::database& db = database();
    const auto &stats_obj = account_id(db).statistics(db);
@@ -191,9 +190,9 @@ const account_statistics_object& elasticsearch_plugin_impl::getStatsObject(const
    return stats_obj;
 }
 
-const account_transaction_history_object& elasticsearch_plugin_impl::addNewEntry(const account_statistics_object& stats_obj,
-                                                                                 const account_id_type account_id,
-                                                                                 const optional <operation_history_object>& oho)
+inline const account_transaction_history_object& elasticsearch_plugin_impl::addNewEntry(const account_statistics_object& stats_obj,
+                                                                                        const account_id_type account_id,
+                                                                                        const optional <operation_history_object>& oho)
 {
    graphene::chain::database& db = database();
    const auto &ath = db.create<account_transaction_history_object>([&](account_transaction_history_object &obj) {
@@ -206,8 +205,8 @@ const account_transaction_history_object& elasticsearch_plugin_impl::addNewEntry
    return ath;
 }
 
-void elasticsearch_plugin_impl::growStats(const account_statistics_object& stats_obj,
-                                          const account_transaction_history_object& ath)
+inline void elasticsearch_plugin_impl::growStats(const account_statistics_object& stats_obj,
+                                                 const account_transaction_history_object& ath)
 {
    graphene::chain::database& db = database();
    db.modify(stats_obj, [&](account_statistics_object &obj) {
@@ -216,9 +215,9 @@ void elasticsearch_plugin_impl::growStats(const account_statistics_object& stats
    });
 }
 
-const std::string elasticsearch_plugin_impl::createBulkLine(const account_transaction_history_object& ath,
-                                                            const optional <operation_history_object>& oho,
-                                                            const signed_block& b)
+inline const std::string elasticsearch_plugin_impl::createBulkLine(const account_transaction_history_object& ath,
+                                                                   const optional <operation_history_object>& oho,
+                                                                   const signed_block& b)
 {
    const int16_t op_type = getOperationType(oho);
    operation_history_struct os = doOperationHistory(oho);
@@ -240,14 +239,14 @@ const std::string elasticsearch_plugin_impl::createBulkLine(const account_transa
    return bulk_line;
 }
 
-const int16_t elasticsearch_plugin_impl::getOperationType(const optional <operation_history_object>& oho)
+inline const int16_t elasticsearch_plugin_impl::getOperationType(const optional <operation_history_object>& oho)
 {
    if (!oho->id.is_null())
       return oho->op.which();
    return -1;
 }
 
-const operation_history_struct elasticsearch_plugin_impl::doOperationHistory(const optional <operation_history_object>& oho)
+inline const operation_history_struct elasticsearch_plugin_impl::doOperationHistory(const optional <operation_history_object>& oho)
 {
    operation_history_struct os;
    os.trx_in_block = oho->trx_in_block;
@@ -259,7 +258,7 @@ const operation_history_struct elasticsearch_plugin_impl::doOperationHistory(con
    return os;
 }
 
-const block_struct elasticsearch_plugin_impl::doBlock(const optional <operation_history_object>& oho, const signed_block& b)
+inline const block_struct elasticsearch_plugin_impl::doBlock(const optional <operation_history_object>& oho, const signed_block& b)
 {
    std::string trx_id = "";
    if(!b.transactions.empty() && oho->trx_in_block < b.transactions.size())
@@ -272,7 +271,7 @@ const block_struct elasticsearch_plugin_impl::doBlock(const optional <operation_
    return bs;
 }
 
-const visitor_struct elasticsearch_plugin_impl::doVisitor(const optional <operation_history_object>& oho)
+inline const visitor_struct elasticsearch_plugin_impl::doVisitor(const optional <operation_history_object>& oho)
 {
    visitor_struct vs;
    operation_visitor o_v;
@@ -298,7 +297,7 @@ const visitor_struct elasticsearch_plugin_impl::doVisitor(const optional <operat
    return vs;
 }
 
-const uint32_t elasticsearch_plugin_impl::checkState(const fc::time_point_sec& block_time)
+inline const uint32_t elasticsearch_plugin_impl::checkState(const fc::time_point_sec& block_time)
 {
    uint32_t limit_documents;
    if((fc::time_point::now() - block_time) < fc::seconds(30))
@@ -309,9 +308,9 @@ const uint32_t elasticsearch_plugin_impl::checkState(const fc::time_point_sec& b
    return limit_documents;
 }
 
-void elasticsearch_plugin_impl::prepareBulk(const fc::time_point_sec& block_date,
-                                            const account_transaction_history_id_type& ath_id,
-                                            const std::string& bulk_line )
+inline void elasticsearch_plugin_impl::prepareBulk(const fc::time_point_sec& block_date,
+                                                   const account_transaction_history_id_type& ath_id,
+                                                   const std::string& bulk_line )
 {
    auto index_name = graphene::utilities::generateIndexName(block_date, _elasticsearch_index_prefix);
    std::string _id = fc::json::to_string(ath_id);
