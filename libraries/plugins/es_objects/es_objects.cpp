@@ -70,14 +70,13 @@ class es_objects_plugin_impl
       map<object_id_type, asset_struct> assets;
       map<object_id_type, balance_struct> balances;
       map<object_id_type, limit_order_struct> limit_orders;
-      //uint32_t bitasset_seq;
    private:
-      void PrepareProposal(const proposal_object* proposal_object, const fc::time_point_sec block_time, uint32_t block_number);
-      void PrepareAccount(const account_object* account_object, const fc::time_point_sec block_time, uint32_t block_number);
-      void PrepareAsset(const asset_object* asset_object, const fc::time_point_sec block_time, uint32_t block_number);
-      void PrepareBalance(const balance_object* balance_object, const fc::time_point_sec block_time, uint32_t block_number);
-      void PrepareLimit(const limit_order_object* limit_object, const fc::time_point_sec block_time, uint32_t block_number);
-      void PrepareBitAsset(const asset_bitasset_data_object* bitasset_object, const fc::time_point_sec block_time, uint32_t block_number);
+      void PrepareProposal(const proposal_object& proposal_object, const fc::time_point_sec& block_time, const uint32_t& block_number);
+      void PrepareAccount(const account_object& account_object, const fc::time_point_sec& block_time, const uint32_t& block_number);
+      void PrepareAsset(const asset_object& asset_object, const fc::time_point_sec& block_time, const uint32_t& block_number);
+      void PrepareBalance(const balance_object& balance_object, const fc::time_point_sec& block_time, const uint32_t& block_number);
+      void PrepareLimit(const limit_order_object& limit_object, const fc::time_point_sec& block_time, const uint32_t& block_number);
+      void PrepareBitAsset(const asset_bitasset_data_object& bitasset_object, const fc::time_point_sec& block_time, const uint32_t& block_number);
 };
 
 void es_objects_plugin_impl::updateDatabase( const vector<object_id_type>& ids , bool isNew)
@@ -113,62 +112,63 @@ void es_objects_plugin_impl::updateDatabase( const vector<object_id_type>& ids ,
          auto obj = db.find_object(value);
          auto p = static_cast<const proposal_object*>(obj);
          if(p != nullptr)
-            PrepareProposal(p, block_time, block_number);
+            PrepareProposal(*p, block_time, block_number);
       }
       else if(value.is<account_object>() && _es_objects_accounts) {
          auto obj = db.find_object(value);
          auto a = static_cast<const account_object*>(obj);
          if(a != nullptr)
-            PrepareAccount(a, block_time, block_number);
+            PrepareAccount(*a, block_time, block_number);
       }
       else if(value.is<asset_object>() && _es_objects_assets) {
          auto obj = db.find_object(value);
          auto a = static_cast<const asset_object*>(obj);
          if(a != nullptr)
-            PrepareAsset(a, block_time, block_number);
+            PrepareAsset(*a, block_time, block_number);
       }
       else if(value.is<balance_object>() && _es_objects_balances) {
          auto obj = db.find_object(value);
          auto b = static_cast<const balance_object*>(obj);
          if(b != nullptr)
-            PrepareBalance(b, block_time, block_number);
+            PrepareBalance(*b, block_time, block_number);
       }
       else if(value.is<limit_order_object>() && _es_objects_limit_orders) {
          auto obj = db.find_object(value);
          auto l = static_cast<const limit_order_object*>(obj);
          if(l != nullptr)
-            PrepareLimit(l, block_time, block_number);
+            PrepareLimit(*l, block_time, block_number);
       }
       else if(value.is<asset_bitasset_data_object>() && _es_objects_asset_bitasset) {
          auto obj = db.find_object(value);
          auto ba = static_cast<const asset_bitasset_data_object*>(obj);
          if(ba != nullptr)
-            PrepareBitAsset(ba, block_time, block_number);
+            PrepareBitAsset(*ba, block_time, block_number);
       }
    }
 }
 
-void es_objects_plugin_impl::PrepareProposal(const proposal_object* proposal_object, const fc::time_point_sec block_time, uint32_t block_number)
+void es_objects_plugin_impl::PrepareProposal(const proposal_object& proposal_object,
+                                             const fc::time_point_sec& block_time, const uint32_t& block_number)
 {
    proposal_struct prop;
-   prop.object_id = proposal_object->id;
+   prop.object_id = proposal_object.id;
    prop.block_time = block_time;
    prop.block_number = block_number;
-   prop.expiration_time = proposal_object->expiration_time;
-   prop.review_period_time = proposal_object->review_period_time;
-   prop.proposed_transaction = fc::json::to_string(proposal_object->proposed_transaction);
-   prop.required_owner_approvals = fc::json::to_string(proposal_object->required_owner_approvals);
-   prop.available_owner_approvals = fc::json::to_string(proposal_object->available_owner_approvals);
-   prop.required_active_approvals = fc::json::to_string(proposal_object->required_active_approvals);
-   prop.available_key_approvals = fc::json::to_string(proposal_object->available_key_approvals);
-   prop.proposer = proposal_object->proposer;
+   prop.expiration_time = proposal_object.expiration_time;
+   prop.review_period_time = proposal_object.review_period_time;
+   prop.proposed_transaction = fc::json::to_string(proposal_object.proposed_transaction);
+   prop.required_owner_approvals = fc::json::to_string(proposal_object.required_owner_approvals);
+   prop.available_owner_approvals = fc::json::to_string(proposal_object.available_owner_approvals);
+   prop.required_active_approvals = fc::json::to_string(proposal_object.required_active_approvals);
+   prop.available_key_approvals = fc::json::to_string(proposal_object.available_key_approvals);
+   prop.proposer = proposal_object.proposer;
 
-   auto it = proposals.find(proposal_object->id);
+   auto it = proposals.find(proposal_object.id);
    if(it == proposals.end())
-      proposals[proposal_object->id] = prop;
+      proposals[proposal_object.id] = prop;
    else {
       if(it->second == prop) return;
-      else proposals[proposal_object->id] = prop;
+      else proposals[proposal_object.id] = prop;
    }
 
    std::string data = fc::json::to_string(prop);
@@ -177,34 +177,35 @@ void es_objects_plugin_impl::PrepareProposal(const proposal_object* proposal_obj
    prepare.clear();
 }
 
-void es_objects_plugin_impl::PrepareAccount(const account_object* account_object, const fc::time_point_sec block_time, uint32_t block_number)
+void es_objects_plugin_impl::PrepareAccount(const account_object& account_object,
+                                            const fc::time_point_sec& block_time, const uint32_t& block_number)
 {
    account_struct acct;
-   acct.object_id = account_object->id;
+   acct.object_id = account_object.id;
    acct.block_time = block_time;
    acct.block_number = block_number;
-   acct.membership_expiration_date = account_object->membership_expiration_date;
-   acct.registrar = account_object->registrar;
-   acct.referrer = account_object->referrer;
-   acct.lifetime_referrer = account_object->lifetime_referrer;
-   acct.network_fee_percentage = account_object->network_fee_percentage;
-   acct.lifetime_referrer_fee_percentage = account_object->lifetime_referrer_fee_percentage;
-   acct.referrer_rewards_percentage = account_object->referrer_rewards_percentage;
-   acct.name = account_object->name;
-   acct.owner_account_auths = fc::json::to_string(account_object->owner.account_auths);
-   acct.owner_key_auths = fc::json::to_string(account_object->owner.key_auths);
-   acct.owner_address_auths = fc::json::to_string(account_object->owner.address_auths);
-   acct.active_account_auths = fc::json::to_string(account_object->active.account_auths);
-   acct.active_key_auths = fc::json::to_string(account_object->active.key_auths);
-   acct.active_address_auths = fc::json::to_string(account_object->active.address_auths);
-   acct.voting_account = account_object->options.voting_account;
+   acct.membership_expiration_date = account_object.membership_expiration_date;
+   acct.registrar = account_object.registrar;
+   acct.referrer = account_object.referrer;
+   acct.lifetime_referrer = account_object.lifetime_referrer;
+   acct.network_fee_percentage = account_object.network_fee_percentage;
+   acct.lifetime_referrer_fee_percentage = account_object.lifetime_referrer_fee_percentage;
+   acct.referrer_rewards_percentage = account_object.referrer_rewards_percentage;
+   acct.name = account_object.name;
+   acct.owner_account_auths = fc::json::to_string(account_object.owner.account_auths);
+   acct.owner_key_auths = fc::json::to_string(account_object.owner.key_auths);
+   acct.owner_address_auths = fc::json::to_string(account_object.owner.address_auths);
+   acct.active_account_auths = fc::json::to_string(account_object.active.account_auths);
+   acct.active_key_auths = fc::json::to_string(account_object.active.key_auths);
+   acct.active_address_auths = fc::json::to_string(account_object.active.address_auths);
+   acct.voting_account = account_object.options.voting_account;
 
-   auto it = accounts.find(account_object->id);
+   auto it = accounts.find(account_object.id);
    if(it == accounts.end())
-      accounts[account_object->id] = acct;
+      accounts[account_object.id] = acct;
    else {
       if(it->second == acct) return;
-      else accounts[account_object->id] = acct;
+      else accounts[account_object.id] = acct;
    }
 
    std::string data = fc::json::to_string(acct);
@@ -213,24 +214,25 @@ void es_objects_plugin_impl::PrepareAccount(const account_object* account_object
    prepare.clear();
 }
 
-void es_objects_plugin_impl::PrepareAsset(const asset_object* asset_object, const fc::time_point_sec block_time, uint32_t block_number)
+void es_objects_plugin_impl::PrepareAsset(const asset_object& asset_object,
+                                          const fc::time_point_sec& block_time, const uint32_t& block_number)
 {
    asset_struct asset;
-   asset.object_id = asset_object->id;
+   asset.object_id = asset_object.id;
    asset.block_time = block_time;
    asset.block_number = block_number;
-   asset.symbol = asset_object->symbol;
-   asset.issuer = asset_object->issuer;
-   asset.is_market_issued = asset_object->is_market_issued();
-   asset.dynamic_asset_data_id = asset_object->dynamic_asset_data_id;
-   asset.bitasset_data_id = asset_object->bitasset_data_id;
+   asset.symbol = asset_object.symbol;
+   asset.issuer = asset_object.issuer;
+   asset.is_market_issued = asset_object.is_market_issued();
+   asset.dynamic_asset_data_id = asset_object.dynamic_asset_data_id;
+   asset.bitasset_data_id = asset_object.bitasset_data_id;
 
-   auto it = assets.find(asset_object->id);
+   auto it = assets.find(asset_object.id);
    if(it == assets.end())
-      assets[asset_object->id] = asset;
+      assets[asset_object.id] = asset;
    else {
       if(it->second == asset) return;
-      else assets[asset_object->id] = asset;
+      else assets[asset_object.id] = asset;
    }
 
    std::string data = fc::json::to_string(asset);
@@ -239,21 +241,22 @@ void es_objects_plugin_impl::PrepareAsset(const asset_object* asset_object, cons
    prepare.clear();
 }
 
-void es_objects_plugin_impl::PrepareBalance(const balance_object* balance_object, const fc::time_point_sec block_time, uint32_t block_number)
+void es_objects_plugin_impl::PrepareBalance(const balance_object& balance_object,
+                                            const fc::time_point_sec& block_time, const uint32_t& block_number)
 {
    balance_struct balance;
-   balance.object_id = balance_object->id;
+   balance.object_id = balance_object.id;
    balance.block_time = block_time;
-   balance.block_number = block_number;balance.owner = balance_object->owner;
-   balance.asset_id = balance_object->balance.asset_id;
-   balance.amount = balance_object->balance.amount;
+   balance.block_number = block_number;balance.owner = balance_object.owner;
+   balance.asset_id = balance_object.balance.asset_id;
+   balance.amount = balance_object.balance.amount;
 
-   auto it = balances.find(balance_object->id);
+   auto it = balances.find(balance_object.id);
    if(it == balances.end())
-      balances[balance_object->id] = balance;
+      balances[balance_object.id] = balance;
    else {
       if(it->second == balance) return;
-      else balances[balance_object->id] = balance;
+      else balances[balance_object.id] = balance;
    }
 
    std::string data = fc::json::to_string(balance);
@@ -262,24 +265,25 @@ void es_objects_plugin_impl::PrepareBalance(const balance_object* balance_object
    prepare.clear();
 }
 
-void es_objects_plugin_impl::PrepareLimit(const limit_order_object* limit_object, const fc::time_point_sec block_time, uint32_t block_number)
+void es_objects_plugin_impl::PrepareLimit(const limit_order_object& limit_object,
+                                          const fc::time_point_sec& block_time, const uint32_t& block_number)
 {
    limit_order_struct limit;
-   limit.object_id = limit_object->id;
+   limit.object_id = limit_object.id;
    limit.block_time = block_time;
    limit.block_number = block_number;
-   limit.expiration = limit_object->expiration;
-   limit.seller = limit_object->seller;
-   limit.for_sale = limit_object->for_sale;
-   limit.sell_price = limit_object->sell_price;
-   limit.deferred_fee = limit_object->deferred_fee;
+   limit.expiration = limit_object.expiration;
+   limit.seller = limit_object.seller;
+   limit.for_sale = limit_object.for_sale;
+   limit.sell_price = limit_object.sell_price;
+   limit.deferred_fee = limit_object.deferred_fee;
 
-   auto it = limit_orders.find(limit_object->id);
+   auto it = limit_orders.find(limit_object.id);
    if(it == limit_orders.end())
-      limit_orders[limit_object->id] = limit;
+      limit_orders[limit_object.id] = limit;
    else {
       if(it->second == limit) return;
-      else limit_orders[limit_object->id] = limit;
+      else limit_orders[limit_object.id] = limit;
    }
 
    std::string data = fc::json::to_string(limit);
@@ -288,23 +292,24 @@ void es_objects_plugin_impl::PrepareLimit(const limit_order_object* limit_object
    prepare.clear();
 }
 
-void es_objects_plugin_impl::PrepareBitAsset(const asset_bitasset_data_object* bitasset_object, const fc::time_point_sec block_time, uint32_t block_number)
+void es_objects_plugin_impl::PrepareBitAsset(const asset_bitasset_data_object& bitasset_object,
+                                             const fc::time_point_sec& block_time, const uint32_t& block_number)
 {
-   if(!bitasset_object->is_prediction_market) {
+   if(!bitasset_object.is_prediction_market) {
 
       bitasset_struct bitasset;
-      bitasset.object_id = bitasset_object->id;
+      bitasset.object_id = bitasset_object.id;
       bitasset.block_time = block_time;
       bitasset.block_number = block_number;
-      bitasset.current_feed = fc::json::to_string(bitasset_object->current_feed);
-      bitasset.current_feed_publication_time = bitasset_object->current_feed_publication_time;
+      bitasset.current_feed = fc::json::to_string(bitasset_object.current_feed);
+      bitasset.current_feed_publication_time = bitasset_object.current_feed_publication_time;
 
-      auto it = bitassets.find(bitasset_object->id);
+      auto it = bitassets.find(bitasset_object.id);
       if(it == bitassets.end())
-         bitassets[bitasset_object->id] = bitasset;
+         bitassets[bitasset_object.id] = bitasset;
       else {
          if(it->second == bitasset) return;
-         else bitassets[bitasset_object->id] = bitasset;
+         else bitassets[bitasset_object.id] = bitasset;
       }
 
       std::string data = fc::json::to_string(bitasset);
