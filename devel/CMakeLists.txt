@@ -24,6 +24,13 @@ target_include_directories( cybex_wallet
                                      "${CMAKE_SOURCE_DIR}/libraries/plugins/debug_witness/include"
                           )
 
+if( APPLE )
+	find_package( Boost REQUIRED COMPONENTS program_options )
+	include_directories( ${Boost_INCLUDE_DIRS} )
+	find_package( openssl REQUIRED )
+	include_directories( ${OPENSSL_INCLUDE_DIR} )
+endif()
+
 
 INSTALL( 
    TARGETS cybex_wallet
