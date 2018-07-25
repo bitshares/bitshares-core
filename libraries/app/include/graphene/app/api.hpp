@@ -176,10 +176,31 @@ namespace graphene { namespace app {
                                                                         uint32_t stop = 0,
                                                                         unsigned limit = 100,
                                                                         uint32_t start = 0) const;
-
+         /**
+          * @brief Get orders with b:a pair
+          * @param a Base in pair
+          * @param b Quote in pair
+          * @param limit Maximum number of orders to retrieve
+          * @return A list of orders with b:a pair
+          */
          vector<order_history_object> get_fill_order_history( asset_id_type a, asset_id_type b, uint32_t limit )const;
+
+         /**
+          * @brief Get markets with b:a pair
+          * @param a Base in pair
+          * @param b Quote in pair
+          * @param bucket_seconds Represents the length in seconds of bucket
+          * @param start Time in seconds from where buckets begin
+          * @param end Time in seconds where buckets stop
+          * @return A list of markets with b:a pair (maximum markets to retrieve is less than 200)
+          */
          vector<bucket_object> get_market_history( asset_id_type a, asset_id_type b, uint32_t bucket_seconds,
                                                    fc::time_point_sec start, fc::time_point_sec end )const;
+
+         /**
+          * @brief Get tracked buckets
+          * @return A list of tracked buckets
+          */                                          
          flat_set<uint32_t> get_market_history_buckets()const;
       private:
            application& _app;
@@ -195,6 +216,12 @@ namespace graphene { namespace app {
       block_api(graphene::chain::database& db);
       ~block_api();
 
+      /**
+          * @brief Get signed blocks
+          * @param block_num_from The lowest block number
+          * @param block_num_to The highest block number
+          * @return A list of signed blocks from block_num_from till block_num_to
+          */
       vector<optional<signed_block>> get_blocks(uint32_t block_num_from, uint32_t block_num_to)const;
 
    private:
@@ -241,6 +268,10 @@ namespace graphene { namespace app {
           */
          fc::variant broadcast_transaction_synchronous(const signed_transaction& trx);
 
+         /**
+          * @brief Broadcast a signed block to the network
+          * @param block The signed block to broadcast
+          */
          void broadcast_block( const signed_block& block );
 
          /**
@@ -309,14 +340,50 @@ namespace graphene { namespace app {
       public:
          crypto_api();
          
+         /**
+          * @brief Get 33-byte commitment
+          * @param blind Sha-256 blind factor type
+          * @param value Positive 64-bit integer value
+          * @return A 33-byte commit
+          */
          fc::ecc::commitment_type blind( const fc::ecc::blind_factor_type& blind, uint64_t value );
          
+         /**
+          * @brief Get sha-256 blind factor type
+          * @param blinds_in List of sha-256 blind factor types
+          * @param non_neg 32-bit integer value
+          * @return A blind factor type
+          */
          fc::ecc::blind_factor_type blind_sum( const std::vector<blind_factor_type>& blinds_in, uint32_t non_neg );
          
+         /**
+          * @brief Verifies that commits + neg_commits + excess == 0
+          * @param commits_in List of 33-byte commitments
+          * @param neg_commits_in List of 33-byte commitments
+          * @param excess Sum of two list of 33-byte commitments where sums the first set and subtracts the second
+          * @return Boolean - true in event of commits + neg_commits + excess == 0, otherwise false 
+          */
          bool verify_sum( const std::vector<commitment_type>& commits_in, const std::vector<commitment_type>& neg_commits_in, int64_t excess );
          
+         /**
+          * @brief Verifies range proof for 33-byte commitment
+          * @param commit 33-byte commitment
+          * @param proof List of characters
+          * @return A structure with success, min and max values
+          */
          verify_range_result verify_range( const fc::ecc::commitment_type& commit, const std::vector<char>& proof );
          
+         /**
+          * @brief Proves with respect to min_value the range for commit which has the provided blinding factor and value
+          * @param min_value Positive 64-bit integer value
+          * @param commit 33-byte commitment
+          * @param commit_blind Sha-256 blind factor type for the correct digits
+          * @param nonce Sha-256 blind factor type for our non-forged signatures
+          * @param exp Exponents base 10 in range [-1 ; 18] inclusively
+          * @param min_bits 8-bit positive integer, must be in range [0 ; 64] inclusively
+          * @param actual_value 64-bit positive integer, must be greater or equal min_value
+          * @return A list of characters as proof in proof
+          */
          std::vector<char> range_proof_sign( uint64_t min_value, 
                                              const commitment_type& commit, 
                                              const blind_factor_type& commit_blind, 
@@ -325,12 +392,22 @@ namespace graphene { namespace app {
                                              uint8_t min_bits,
                                              uint64_t actual_value );
                                        
-         
+         /**
+          * @brief Verifies range proof rewind for 33-byte commit
+          * @param nonce Sha-256 blind refactor type
+          * @param commit 33-byte commitment
+          * @param proof List of characters
+          * @return A structure with success, min, max, value_out, blind_out and message_out values
+          */
          verify_range_proof_rewind_result verify_range_proof_rewind( const blind_factor_type& nonce,
                                                                      const fc::ecc::commitment_type& commit, 
                                                                      const std::vector<char>& proof );
          
-                                         
+         /**
+          * @brief Get range proof info
+          * @param proof List of characters
+          * @return A range proof info structure with exponent, mantissa, min and max values
+          */                                       
          range_proof_info range_get_info( const std::vector<char>& proof );
    };
 
@@ -344,7 +421,18 @@ namespace graphene { namespace app {
          ~asset_api();
 
          vector<account_asset_balance> get_asset_holders( asset_id_type asset_id, uint32_t start, uint32_t limit  )const;
+
+         /**
+          * @brief Get holders count for a specific asset
+          * @param asset_id The specific asset
+          * @return A holders count for the specified asset
+          */
          int get_asset_holders_count( asset_id_type asset_id )const;
+
+         /**
+          * @brief Get all asset holders
+          * @return A list of all asset holders
+          */
          vector<asset_holders> get_all_asset_holders() const;
 
       private:
