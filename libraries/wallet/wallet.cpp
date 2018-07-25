@@ -777,7 +777,7 @@ public:
 
     void quit()
     {
-        ilog( "Quiting Cli Wallet ..." );
+        ilog( "Quitting Cli Wallet ..." );
         
         throw fc::canceled_exception();
     }
