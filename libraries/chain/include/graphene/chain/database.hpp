@@ -425,7 +425,9 @@ namespace graphene { namespace chain {
           *  @return true if the transaction would validate
           */
          processed_transaction validate_transaction( const signed_transaction& trx );
-
+  
+         // pending_tx queue  length check
+         size_t pending_tx_size() const {return _pending_tx.size();}
 
          /** when popping a block, the transactions that were removed get cached here so they
           * can be reapplied at the proper time */

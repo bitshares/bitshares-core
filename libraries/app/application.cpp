@@ -454,7 +454,7 @@ namespace detail {
          reset_websocket_tls_server();
 
          //
-         // rexcovery
+         // recovery
          //
          if (_options->count("recovery-path"))
          {
@@ -484,6 +484,8 @@ namespace detail {
                 db.close();
 
          }
+         if( _options->count("max-pending-tx-size") )
+             _app_options.max_pending_tx_size = _options->at("max-pending-tx-size").as<uint32_t>();
       } FC_LOG_AND_RETHROW() }
 
       optional< api_access_info > get_api_access_info(const string& username)const
@@ -989,6 +991,7 @@ void application::set_program_options(boost::program_options::options_descriptio
          ("dbg-init-key", bpo::value<string>(), "Block signing key to use for init witnesses, overrides genesis file")
          ("api-access", bpo::value<boost::filesystem::path>(), "JSON file specifying API permissions")
          ("plugins", bpo::value<string>(), "Space-separated list of plugins to activate")
+         ("max-pending-tx-size", bpo::value<uint32_t>(), "Max pending_tx size")
          // TODO uncomment this when GUI is ready
          //("enable-subscribe-to-all", bpo::value<bool>()->implicit_value(false),
          // "Whether allow API clients to subscribe to universal object creation and removal events")

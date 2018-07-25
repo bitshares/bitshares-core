@@ -38,14 +38,36 @@ using namespace graphene::chain;
 using namespace std;
 namespace bpo = boost::program_options;
 
+int last_block_num(block_database &block_db)
+{
+   int n=0,m=0;
+   try{
+      optional<block_id_type> id=block_db.last_id();
+      if(id.valid())
+      {
+           n = block_header::num_from_id(*id);
+      }
+      optional<signed_block>  blk= block_db.last();
+      if(blk.valid()){  
+           m=blk->block_num();
+      }
+   }
+   catch(const fc::exception& e)
+   {
+   }
+
+   return n<=m?n:m;
+}
+
 int main( int argc, char** argv )
 {
    
 
    block_database src,dst;
 
-   string input,output;   
-   int i,j,start,last;
+   string input,output;
+   
+   int i,j=0,start=0,last;
 
    std::cout << "backup bitshares block database." <<std::endl;
    try {
@@ -73,16 +95,19 @@ int main( int argc, char** argv )
          std::cout << opts << "\n";
          return 0;
       }
+
+      src.open(input);
+      dst.open(output);
+
       if( options.count("start") )
       {
          start=options.at("start").as<int>();
          if( start <1) start=1;
       }
-      else start=1;
-
+      else  {
+         start=last_block_num(dst)+1;
+      }
       
-      src.open(input);
-      dst.open(output);
     
       j=0;
       for(i=start;i<=last;i++)
@@ -109,7 +134,7 @@ int main( int argc, char** argv )
    dst.close();
    if(j)
    {
-        std::cout << std::endl << "last block:" << j << std::endl;
+        std::cout << std::endl << "start:" << start << std::endl << "last block:" << j << std::endl;
    }
 
    return 0;
