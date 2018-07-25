@@ -70,12 +70,15 @@ void graphene::chain::asset_bitasset_data_object::update_median_feeds(time_point
    if( current_feeds.size() < options.minimum_feeds )
    {
       //... don't calculate a median, and set a null feed
+      feed_cer_updated = false; // new median cer is null, won't update asset_object anyway, set to false for better performance
       current_feed_publication_time = current_time;
       current_feed = price_feed();
       return;
    }
    if( current_feeds.size() == 1 )
    {
+      if( current_feed.core_exchange_rate != current_feeds.front().get().core_exchange_rate )
+         feed_cer_updated = true;
       current_feed = std::move(current_feeds.front());
       return;
    }
@@ -94,6 +97,8 @@ void graphene::chain::asset_bitasset_data_object::update_median_feeds(time_point
 #undef CALCULATE_MEDIAN_VALUE
    // *** End Median Calculations ***
 
+   if( current_feed.core_exchange_rate != median_feed.core_exchange_rate )
+      feed_cer_updated = true;
    current_feed = median_feed;
 }
 

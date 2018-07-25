@@ -232,12 +232,13 @@ void database::update_worker_votes()
 
 void database::pay_workers( share_type& budget )
 {
+   const auto head_time = head_block_time();
 //   ilog("Processing payroll! Available budget is ${b}", ("b", budget));
    vector<std::reference_wrapper<const worker_object>> active_workers;
-   get_index_type<worker_index>().inspect_all_objects([this, &active_workers](const object& o) {
+   // TODO optimization: add by_expiration index to avoid iterating through all objects
+   get_index_type<worker_index>().inspect_all_objects([head_time, &active_workers](const object& o) {
       const worker_object& w = static_cast<const worker_object&>(o);
-      auto now = head_block_time();
-      if( w.is_active(now) && w.approving_stake() > 0 )
+      if( w.is_active(head_time) && w.approving_stake() > 0 )
          active_workers.emplace_back(w);
    });
 
@@ -251,15 +252,21 @@ void database::pay_workers( share_type& budget )
       return wa.id < wb.id;
    });
 
+   const auto last_budget_time = get_dynamic_global_properties().last_budget_time;
+   const auto passed_time_ms = head_time - last_budget_time;
+   const bool passed_time_is_a_day = ( passed_time_ms == fc::days(1) );
+   // the variable above is more likely false on BitShares mainnet, so do calculations below anyway
+   const auto passed_time_count = passed_time_ms.count();
+   const auto day_count = fc::days(1).count();
    for( uint32_t i = 0; i < active_workers.size() && budget > 0; ++i )
    {
       const worker_object& active_worker = active_workers[i];
       share_type requested_pay = active_worker.daily_pay;
-      if( head_block_time() - get_dynamic_global_properties().last_budget_time != fc::days(1) )
+      if( !passed_time_is_a_day )
       {
          fc::uint128 pay(requested_pay.value);
-         pay *= (head_block_time() - get_dynamic_global_properties().last_budget_time).count();
-         pay /= fc::days(1).count();
+         pay *= passed_time_count;
+         pay /= day_count;
          requested_pay = pay.to_uint64();
       }
 
@@ -437,8 +444,8 @@ void database::update_active_committee_members()
 void database::initialize_budget_record( fc::time_point_sec now, budget_record& rec )const
 {
    const dynamic_global_property_object& dpo = get_dynamic_global_properties();
-   const asset_object& core = asset_id_type(0)(*this);
-   const asset_dynamic_data_object& core_dd = core.dynamic_asset_data_id(*this);
+   const asset_object& core = get_core_asset();
+   const asset_dynamic_data_object& core_dd = get_core_dynamic_data();
 
    rec.from_initial_reserve = core.reserved(*this);
    rec.from_accumulated_fees = core_dd.accumulated_fees;
@@ -491,8 +498,7 @@ void database::process_budget()
    {
       const global_property_object& gpo = get_global_properties();
       const dynamic_global_property_object& dpo = get_dynamic_global_properties();
-      const asset_dynamic_data_object& core =
-         asset_id_type(0)(*this).dynamic_asset_data_id(*this);
+      const asset_dynamic_data_object& core = get_core_dynamic_data();
       fc::time_point_sec now = head_block_time();
 
       int64_t time_to_maint = (dpo.next_maintenance_time - now).to_seconds();
@@ -655,8 +661,7 @@ void split_fba_balance(
    if( fba.accumulated_fba_fees == 0 )
       return;
 
-   const asset_object& core = asset_id_type(0)(db);
-   const asset_dynamic_data_object& core_dd = core.dynamic_asset_data_id(db);
+   const asset_dynamic_data_object& core_dd = db.get_core_dynamic_data();
 
    if( !fba.is_configured(db) )
    {
@@ -1208,9 +1213,10 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
    update_active_committee_members();
    update_worker_votes();
 
-   modify(gpo, [this](global_property_object& p) {
+   const dynamic_global_property_object& dgpo = get_dynamic_global_properties();
+
+   modify(gpo, [&dgpo](global_property_object& p) {
       // Remove scaling of account registration fee
-      const auto& dgpo = get_dynamic_global_properties();
       p.parameters.current_fees->get<account_create_operation>().basic_fee >>= p.parameters.account_fee_scale_bitshifts *
             (dgpo.accounts_registered_this_interval / p.parameters.accounts_per_fee_scale);
 
@@ -1221,7 +1227,7 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
       }
    });
 
-   auto next_maintenance_time = get<dynamic_global_property_object>(dynamic_global_property_id_type()).next_maintenance_time;
+   auto next_maintenance_time = dgpo.next_maintenance_time;
    auto maintenance_interval = gpo.parameters.maintenance_interval;
 
    if( next_maintenance_time <= next_block.timestamp )
@@ -1250,8 +1256,6 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
          next_maintenance_time += (y+1) * maintenance_interval;
       }
    }
-
-   const dynamic_global_property_object& dgpo = get_dynamic_global_properties();
 
    if( (dgpo.next_maintenance_time < HARDFORK_613_TIME) && (next_maintenance_time >= HARDFORK_613_TIME) )
       deprecate_annual_members(*this);

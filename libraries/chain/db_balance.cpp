@@ -168,7 +168,7 @@ void database::deposit_cashback(const account_object& acct, share_type amount, b
        acct.get_id() == GRAPHENE_TEMP_ACCOUNT )
    {
       // The blockchain's accounts do not get cashback; it simply goes to the reserve pool.
-      modify(get(asset_id_type()).dynamic_asset_data_id(*this), [amount](asset_dynamic_data_object& d) {
+      modify( get_core_dynamic_data(), [amount](asset_dynamic_data_object& d) {
          d.current_supply -= amount;
       });
       return;

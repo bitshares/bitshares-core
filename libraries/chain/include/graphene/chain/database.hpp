@@ -252,6 +252,7 @@ namespace graphene { namespace chain {
 
          const chain_id_type&                   get_chain_id()const;
          const asset_object&                    get_core_asset()const;
+         const asset_dynamic_data_object&       get_core_dynamic_data()const;
          const chain_property_object&           get_chain_properties()const;
          const global_property_object&          get_global_properties()const;
          const dynamic_global_property_object&  get_dynamic_global_properties()const;
@@ -259,6 +260,7 @@ namespace graphene { namespace chain {
          const fee_schedule&                    current_fee_schedule()const;
          const account_statistics_object&       get_account_stats_by_owner( account_id_type owner )const;
          const special_assets_meta_object&      get_special_assets_meta_object()const;
+         const witness_schedule_object&         get_witness_schedule_object()const;
 
          time_point_sec   head_block_time()const;
          uint32_t         head_block_num()const;
@@ -388,7 +390,8 @@ namespace graphene { namespace chain {
          bool fill_settle_order( const force_settlement_object& settle, const asset& pays, const asset& receives,
                                  const price& fill_price, const bool is_maker );
 
-         bool check_call_orders( const asset_object& mia, bool enable_black_swan = true, bool for_new_limit_order = false );
+         bool check_call_orders( const asset_object& mia, bool enable_black_swan = true, bool for_new_limit_order = false,
+                                 const asset_bitasset_data_object* bitasset_ptr = nullptr );
 
          // helpers to fill_order
          void pay_order( const account_object& receiver, const asset& receives, const asset& pays );
@@ -397,7 +400,7 @@ namespace graphene { namespace chain {
          asset pay_market_fees( const asset_object& recv_asset, const asset& receives );
 
 
-         ///@}
+         ///@{
          /**
           *  This method validates transactions without adding it to the pending state.
           *  @return true if the transaction would validate
@@ -453,9 +456,11 @@ namespace graphene { namespace chain {
          void clear_expired_proposals();
          void clear_expired_orders();
          void update_expired_feeds();
+         void update_core_exchange_rates();
          void update_maintenance_flag( bool new_maintenance_flag );
          void update_withdraw_permissions();
-         bool check_for_blackswan( const asset_object& mia, bool enable_black_swan = true );
+         bool check_for_blackswan( const asset_object& mia, bool enable_black_swan = true,
+                                   const asset_bitasset_data_object* bitasset_ptr = nullptr );
 
          ///Steps performed only at maintenance intervals
          ///@{
@@ -526,6 +531,20 @@ namespace graphene { namespace chain {
           * database::close() has not been called, or failed during execution.
           */
          bool                              _opened = false;
+
+         /// Tracks assets affected by bitshares-core issue #453 before hard fork #615 in one block
+         flat_set<asset_id_type>           _issue_453_affected_assets;
+
+         /// Pointers to core asset object and global objects who will have immutable addresses after created
+         ///@{
+         const asset_object*                    _p_core_asset_obj          = nullptr;
+         const asset_dynamic_data_object*       _p_core_dynamic_data_obj   = nullptr;
+         const global_property_object*          _p_global_prop_obj         = nullptr;
+         const dynamic_global_property_object*  _p_dyn_global_prop_obj     = nullptr;
+         const chain_property_object*           _p_chain_property_obj      = nullptr;
+         const special_assets_meta_object*      _p_special_assets_meta_obj = nullptr;
+         const witness_schedule_object*         _p_witness_schedule_obj    = nullptr;
+         ///@}
    };
 
    namespace detail
