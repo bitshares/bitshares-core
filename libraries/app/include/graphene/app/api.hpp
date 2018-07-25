@@ -177,11 +177,11 @@ namespace graphene { namespace app {
                                                                         unsigned limit = 100,
                                                                         uint32_t start = 0) const;
          /**
-          * @brief Get orders with b:a pair
+          * @brief Get history of orders with b:a pair
           * @param a Base in pair
           * @param b Quote in pair
           * @param limit Maximum number of orders to retrieve
-          * @return A list of orders with b:a pair
+          * @return A history of orders with b:a pair
           */
          vector<order_history_object> get_fill_order_history( asset_id_type a, asset_id_type b, uint32_t limit )const;
 
@@ -192,13 +192,14 @@ namespace graphene { namespace app {
           * @param bucket_seconds Represents the length in seconds of bucket
           * @param start Time in seconds from where buckets begin
           * @param end Time in seconds where buckets stop
-          * @return A list of markets with b:a pair (maximum markets to retrieve is less than 200)
+          * @return A history in market with b:a pair (maximum markets to retrieve is less than 200)
           */
          vector<bucket_object> get_market_history( asset_id_type a, asset_id_type b, uint32_t bucket_seconds,
                                                    fc::time_point_sec start, fc::time_point_sec end )const;
 
          /**
-          * @brief Get tracked buckets
+          * @brief Get tracked buckets.
+          * Track market history by grouping orders into buckets of equal size measured in seconds specified as a JSON array of numbers.
           * @return A list of tracked buckets
           */                                          
          flat_set<uint32_t> get_market_history_buckets()const;
@@ -421,18 +422,18 @@ namespace graphene { namespace app {
          ~asset_api();
 
          /**
-          * @brief Get holders for a specific asset
+          * @brief Get account holders for a specific asset
           * @param asset_id The specific asset
-          * @param start The start index of first asset
+          * @param start The start index
           * @param limit Maximum limit must not exceed 100
-          * @return A holders for the specified asset
+          * @return A list of account holders for the specified asset
           */
          vector<account_asset_balance> get_asset_holders( asset_id_type asset_id, uint32_t start, uint32_t limit  )const;
 
          /**
-          * @brief Get holders count for a specific asset
+          * @brief Get account holders count for a specific asset
           * @param asset_id The specific asset
-          * @return A holders count for the specified asset
+          * @return Holders count for the specified asset
           */
          int get_asset_holders_count( asset_id_type asset_id )const;
 
