@@ -420,6 +420,13 @@ namespace graphene { namespace app {
          asset_api(graphene::chain::database& db);
          ~asset_api();
 
+         /**
+          * @brief Get holders for a specific asset
+          * @param asset_id The specific asset
+          * @param start The start index of first asset
+          * @param limit Maximum limit must not exceed 100
+          * @return A holders for the specified asset
+          */
          vector<account_asset_balance> get_asset_holders( asset_id_type asset_id, uint32_t start, uint32_t limit  )const;
 
          /**
