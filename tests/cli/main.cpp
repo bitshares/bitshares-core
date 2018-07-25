@@ -95,6 +95,9 @@ std::shared_ptr<graphene::app::application> start_application(fc::temp_directory
    cfg.emplace("seed-nodes", boost::program_options::variable_value(string("[]"), false));
    app1->initialize(app_dir.path(), cfg);
 
+   app1->initialize_plugins(cfg);
+   app1->startup_plugins();
+
    app1->startup();
    fc::usleep(fc::milliseconds(500));
 	return app1;
@@ -544,7 +547,16 @@ BOOST_AUTO_TEST_CASE( account_history_pagination )
 
       // now get account history and make sure everything is there (and no duplicates)
       std::vector<graphene::wallet::operation_detail> history = con.wallet_api_ptr->get_account_history("jmjatlanta", 300);
-      BOOST_CHECK_EQUAL(300, history.size() );
+      BOOST_CHECK_EQUAL(201, history.size() );
+
+      std::set<object_id_type> operation_ids;
+
+      for(auto op : history)
+      {
+    	  if (operation_ids.find(op.op.id) != operation_ids.end())
+    		  BOOST_FAIL("Duplicate found");
+    	  operation_ids.insert(op.op.id);
+      }
 
    } catch( fc::exception& e ) {
       edump((e.to_detail_string()));
