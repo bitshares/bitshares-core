@@ -488,7 +488,7 @@ BOOST_AUTO_TEST_CASE( cli_confidential_tx_test )
 }
 
 /******
- * Check account history pagination (see bitshares-core/issue/1176
+ * Check account history pagination (see bitshares-core/issue/1176)
  */
 BOOST_AUTO_TEST_CASE( account_history_pagination )
 {
@@ -525,13 +525,16 @@ BOOST_AUTO_TEST_CASE( account_history_pagination )
       account_object nathan_acct_after_upgrade = con.wallet_api_ptr->get_account("nathan");
 
       // verify that the upgrade was successful
-      BOOST_CHECK_PREDICATE( std::not_equal_to<uint32_t>(), (nathan_acct_before_upgrade.membership_expiration_date.sec_since_epoch())(nathan_acct_after_upgrade.membership_expiration_date.sec_since_epoch()) );
+      BOOST_CHECK_PREDICATE( std::not_equal_to<uint32_t>(),
+    		  (nathan_acct_before_upgrade.membership_expiration_date.sec_since_epoch())
+			  (nathan_acct_after_upgrade.membership_expiration_date.sec_since_epoch()) );
       BOOST_CHECK(nathan_acct_after_upgrade.is_lifetime_member());
 
       // create a new account
       graphene::wallet::brain_key_info bki = con.wallet_api_ptr->suggest_brain_key();
       BOOST_CHECK(!bki.brain_priv_key.empty());
-      signed_transaction create_acct_tx = con.wallet_api_ptr->create_account_with_brain_key(bki.brain_priv_key, "jmjatlanta", "nathan", "nathan", true);
+      signed_transaction create_acct_tx = con.wallet_api_ptr->create_account_with_brain_key(
+    		  bki.brain_priv_key, "jmjatlanta", "nathan", "nathan", true);
       // save the private key for this new account in the wallet file
    	  BOOST_CHECK(con.wallet_api_ptr->import_key("jmjatlanta", bki.wif_priv_key));
       con.wallet_api_ptr->save_wallet_file(con.wallet_filename);
@@ -540,7 +543,8 @@ BOOST_AUTO_TEST_CASE( account_history_pagination )
       BOOST_TEST_MESSAGE("Transferring bitshares from Nathan to jmjatlanta");
       for(int i = 1; i <= 200; i++)
       {
-          signed_transaction transfer_tx = con.wallet_api_ptr->transfer("nathan", "jmjatlanta", std::to_string(i), "1.3.0", "Here are some BTS for your new account", true);
+          signed_transaction transfer_tx = con.wallet_api_ptr->transfer("nathan", "jmjatlanta", std::to_string(i),
+        		  "1.3.0", "Here are some BTS for your new account", true);
       }
 
       BOOST_CHECK(generate_block(app1));
