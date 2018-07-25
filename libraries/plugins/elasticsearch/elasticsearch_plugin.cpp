@@ -70,6 +70,7 @@ class elasticsearch_plugin_impl
       visitor_struct vs;
       bulk_struct bulk_line_struct;
       std::string bulk_line;
+      std::string index_name;
    private:
       bool add_elasticsearch( const account_id_type account_id, const optional<operation_history_object>& oho, const signed_block& b );
       const account_transaction_history_object& addNewEntry(const account_statistics_object& stats_obj,
@@ -83,11 +84,8 @@ class elasticsearch_plugin_impl
       void doVisitor(const optional <operation_history_object>& oho);
       void checkState(const fc::time_point_sec& block_time);
       void cleanObjects(const account_transaction_history_object& ath, account_id_type account_id);
-      void createBulkLine(const account_transaction_history_object& ath,
-                          const optional <operation_history_object>& oho,
-                          const signed_block& b);
-      void prepareBulk(const fc::time_point_sec& block_date,
-                       const account_transaction_history_id_type& ath_id,
+      void createBulkLine(const account_transaction_history_object& ath);
+      void prepareBulk(const account_transaction_history_id_type& ath_id,
                        const std::string& bulk_line);
 };
 
@@ -99,6 +97,7 @@ elasticsearch_plugin_impl::~elasticsearch_plugin_impl()
 bool elasticsearch_plugin_impl::update_account_histories( const signed_block& b )
 {
    checkState(b.timestamp);
+   index_name = graphene::utilities::generateIndexName(b.timestamp, _elasticsearch_index_prefix);
 
    graphene::chain::database& db = database();
    const vector<optional< operation_history_object > >& hist = db.get_applied_operations();
@@ -232,8 +231,8 @@ bool elasticsearch_plugin_impl::add_elasticsearch( const account_id_type account
    const auto &stats_obj = getStatsObject(account_id);
    const auto &ath = addNewEntry(stats_obj, account_id, oho);
    growStats(stats_obj, ath);
-   createBulkLine(ath, oho, b);
-   prepareBulk(b.timestamp, ath.id, bulk_line);
+   createBulkLine(ath);
+   prepareBulk(ath.id, bulk_line);
 
    if (curl && bulk_lines.size() >= limit_documents) { // we are in bulk time, ready to add data to elasticsearech
       prepare.clear();
@@ -287,9 +286,7 @@ void elasticsearch_plugin_impl::growStats(const account_statistics_object& stats
    });
 }
 
-void elasticsearch_plugin_impl::createBulkLine(const account_transaction_history_object& ath,
-                                               const optional <operation_history_object>& oho,
-                                               const signed_block& b)
+void elasticsearch_plugin_impl::createBulkLine(const account_transaction_history_object& ath)
 {
    bulk_line_struct.account_history = ath;
    bulk_line_struct.operation_history = os;
@@ -301,11 +298,9 @@ void elasticsearch_plugin_impl::createBulkLine(const account_transaction_history
    bulk_line = fc::json::to_string(bulk_line_struct);
 }
 
-void elasticsearch_plugin_impl::prepareBulk(const fc::time_point_sec& block_date,
-                                            const account_transaction_history_id_type& ath_id,
+void elasticsearch_plugin_impl::prepareBulk(const account_transaction_history_id_type& ath_id,
                                             const std::string& bulk_line )
 {
-   auto index_name = graphene::utilities::generateIndexName(block_date, _elasticsearch_index_prefix);
    std::string _id = fc::json::to_string(ath_id);
    prepare = graphene::utilities::createBulk(index_name, bulk_line, _id, 0);
    bulk_lines.insert(bulk_lines.end(), prepare.begin(), prepare.end());
