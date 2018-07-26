@@ -24,6 +24,9 @@
 
 #include <graphene/chain/database.hpp>
 
+#include <graphene/chain/chain_property_object.hpp>
+#include <graphene/chain/witness_schedule_object.hpp>
+#include <graphene/chain/special_authority_object.hpp>
 #include <graphene/chain/operation_history_object.hpp>
 #include <graphene/chain/protocol/fee_schedule.hpp>
 
