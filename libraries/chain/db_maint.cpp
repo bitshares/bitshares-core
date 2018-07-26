@@ -170,21 +170,20 @@ void database::pay_workers( share_type& budget )
 
    const auto last_budget_time = get_dynamic_global_properties().last_budget_time;
    const auto passed_time_ms = head_time - last_budget_time;
-   const bool passed_time_is_a_day = ( passed_time_ms == fc::days(1) );
-   // the variable above is more likely false on BitShares mainnet, so do calculations below anyway
    const auto passed_time_count = passed_time_ms.count();
    const auto day_count = fc::days(1).count();
    for( uint32_t i = 0; i < active_workers.size() && budget > 0; ++i )
    {
       const worker_object& active_worker = active_workers[i];
       share_type requested_pay = active_worker.daily_pay;
-      if( !passed_time_is_a_day )
-      {
-         fc::uint128 pay(requested_pay.value);
-         pay *= passed_time_count;
-         pay /= day_count;
-         requested_pay = pay.to_uint64();
-      }
+
+      // Note: if there is a good chance that passed_time_count == day_count,
+      //       for better performance, can avoid the 128 bit calculation by adding a check.
+      //       Since it's not the case on BitShares mainnet, we're not using a check here.
+      fc::uint128 pay(requested_pay.value);
+      pay *= passed_time_count;
+      pay /= day_count;
+      requested_pay = pay.to_uint64();
 
       share_type actual_pay = std::min(budget, requested_pay);
       //ilog(" ==> Paying ${a} to worker ${w}", ("w", active_worker.id)("a", actual_pay));
