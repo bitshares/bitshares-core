@@ -666,8 +666,6 @@ class wallet_api
       /** Quitting from BitShares wallet.
        * 
        * The current wallet will be closed.
-       * 
-       * @return fc::canceled_exception
        */
       void    quit();
 
