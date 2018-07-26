@@ -495,16 +495,17 @@ BOOST_AUTO_TEST_CASE( account_history_pagination )
    using namespace graphene::chain;
    using namespace graphene::app;
    std::shared_ptr<graphene::app::application> app1;
-   try {
+   try
+   {
       fc::temp_directory app_dir ( graphene::utilities::temp_directory_path() );
 
-	  int server_port_number = 0;
-	  app1 = start_application(app_dir, server_port_number);
+      int server_port_number = 0;
+      app1 = start_application(app_dir, server_port_number);
 
       // connect to the server
-	  client_connection con(app1, app_dir, server_port_number);
+      client_connection con(app1, app_dir, server_port_number);
 
-	  // set wallet password
+      // set wallet password
       BOOST_TEST_MESSAGE("Setting wallet password");
       con.wallet_api_ptr->set_password("supersecret");
       con.wallet_api_ptr->unlock("supersecret");
@@ -526,17 +527,17 @@ BOOST_AUTO_TEST_CASE( account_history_pagination )
 
       // verify that the upgrade was successful
       BOOST_CHECK_PREDICATE( std::not_equal_to<uint32_t>(),
-    		  (nathan_acct_before_upgrade.membership_expiration_date.sec_since_epoch())
-			  (nathan_acct_after_upgrade.membership_expiration_date.sec_since_epoch()) );
+                             (nathan_acct_before_upgrade.membership_expiration_date.sec_since_epoch())
+                             (nathan_acct_after_upgrade.membership_expiration_date.sec_since_epoch()) );
       BOOST_CHECK(nathan_acct_after_upgrade.is_lifetime_member());
 
       // create a new account
       graphene::wallet::brain_key_info bki = con.wallet_api_ptr->suggest_brain_key();
       BOOST_CHECK(!bki.brain_priv_key.empty());
       signed_transaction create_acct_tx = con.wallet_api_ptr->create_account_with_brain_key(
-    		  bki.brain_priv_key, "jmjatlanta", "nathan", "nathan", true);
+                                                bki.brain_priv_key, "jmjatlanta", "nathan", "nathan", true);
       // save the private key for this new account in the wallet file
-   	  BOOST_CHECK(con.wallet_api_ptr->import_key("jmjatlanta", bki.wif_priv_key));
+      BOOST_CHECK(con.wallet_api_ptr->import_key("jmjatlanta", bki.wif_priv_key));
       con.wallet_api_ptr->save_wallet_file(con.wallet_filename);
 
       // attempt to give jmjatlanta some bitsahres
@@ -544,7 +545,7 @@ BOOST_AUTO_TEST_CASE( account_history_pagination )
       for(int i = 1; i <= 200; i++)
       {
           signed_transaction transfer_tx = con.wallet_api_ptr->transfer("nathan", "jmjatlanta", std::to_string(i),
-        		  "1.3.0", "Here are some BTS for your new account", true);
+                                                 "1.3.0", "Here are some BTS for your new account", true);
       }
 
       BOOST_CHECK(generate_block(app1));
@@ -555,16 +556,18 @@ BOOST_AUTO_TEST_CASE( account_history_pagination )
 
       std::set<object_id_type> operation_ids;
 
-      for(auto op : history)
+      for(auto& op : history)
       {
-    	  if (operation_ids.find(op.op.id) != operation_ids.end())
-    		  BOOST_FAIL("Duplicate found");
-    	  operation_ids.insert(op.op.id);
+         if( operation_ids.find(op.op.id) != operation_ids.end() )
+         {
+            BOOST_FAIL("Duplicate found");
+         }
+         operation_ids.insert(op.op.id);
       }
 
    } catch( fc::exception& e ) {
       edump((e.to_detail_string()));
-	  throw;
+      throw;
    }
    app1->shutdown();
 
