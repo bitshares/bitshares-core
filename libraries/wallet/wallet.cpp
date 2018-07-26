@@ -3844,7 +3844,7 @@ vector< signed_transaction > wallet_api_impl::import_balance( string name_or_id,
             continue;
          for( const public_key_type& pub : _wallet.extra_keys[ claimer.id ] )
          {
-            address pub_addr( address(pub) );
+            addrs.push_back( address(pub) );
             auto it = _keys.find( pub );
             if( it != _keys.end() )
             {
