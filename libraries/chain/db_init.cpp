@@ -373,6 +373,7 @@ void database::init_genesis(const genesis_state_type& genesis_state)
          a.options.core_exchange_rate.quote.asset_id = asset_id_type(0);
          a.dynamic_asset_data_id = dyn_asset.id;
       });
+   FC_ASSERT( dyn_asset.id == asset_dynamic_data_id_type() );
    FC_ASSERT( asset_id_type(core_asset.id) == asset().asset_id );
    FC_ASSERT( get_balance(account_id_type(), asset_id_type()) == asset(dyn_asset.current_supply) );
    _p_core_asset_obj = &core_asset;
