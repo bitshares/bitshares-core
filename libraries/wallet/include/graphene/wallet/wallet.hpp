@@ -663,11 +663,11 @@ class wallet_api
        */
       bool    load_wallet_file(string wallet_filename = "");
 
-      /** Exits from BitShares wallet.
+      /** Quitting from BitShares wallet.
        * 
        * The current wallet will be closed.
        * 
-       * @throws fc::canceled_exception
+       * @return fc::canceled_exception
        */
       void    quit();
 
