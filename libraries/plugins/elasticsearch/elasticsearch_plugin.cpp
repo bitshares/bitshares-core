@@ -193,7 +193,7 @@ void elasticsearch_plugin_impl::doOperationHistory(const optional <operation_his
 void elasticsearch_plugin_impl::doBlock(const optional <operation_history_object>& oho, const signed_block& b)
 {
    std::string trx_id = "";
-   if(!b.transactions.empty() && oho->trx_in_block < b.transactions.size())
+   if(oho->trx_in_block < b.transactions.size())
       trx_id = b.transactions[oho->trx_in_block].id().str();
    bs.block_num = b.block_num();
    bs.block_time = b.timestamp;
