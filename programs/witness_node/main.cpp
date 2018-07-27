@@ -70,7 +70,7 @@ namespace bpo = boost::program_options;
 void write_default_logging_config_to_stream(std::ostream& out);
 fc::optional<fc::logging_config> load_logging_config_from_ini_file(const fc::path& config_ini_filename);
 
-class deduplicator 
+class deduplicator
 {
    public:
       deduplicator() : modifier(nullptr) {}
@@ -189,6 +189,24 @@ static void create_logging_config_file(const fc::path& config_ini_path, const fc
    out_cfg.close();
 }
 
+void load_configuration_options(const fc::path& data_dir, const bpo::options_description& cfg_options, bpo::variables_map& options)
+{
+   // load witness node initial configuration
+   fc::path config_ini_path = data_dir / "config.ini";
+   if( !exists(config_ini_path) )
+      create_new_config_file( config_ini_path, data_dir, cfg_options );
+   load_config_file( config_ini_path, cfg_options, options );
+
+   // load witness node logging configuration
+   const auto logging_ini_path = data_dir / "logging.ini";
+   if (!fc::exists(logging_ini_path))
+   {
+      create_logging_config_file (logging_ini_path, data_dir);
+   }
+
+   load_logging_config_file( logging_ini_path );
+}
+
 int main(int argc, char** argv) {
    app::application* node = new app::application();
    fc::oexception unhandled_exception;
@@ -250,21 +268,7 @@ int main(int argc, char** argv) {
          if( data_dir.is_relative() )
             data_dir = fc::current_path() / data_dir;
       }
-
-      // load witness node initial configuration
-      fc::path config_ini_path = data_dir / "config.ini";
-      if( !fc::exists(config_ini_path) )
-         create_new_config_file( config_ini_path, data_dir, cfg_options );
-      load_config_file( config_ini_path, cfg_options, options );
-
-      // load witness node logging configuration
-      const auto logging_ini_path = data_dir / "logging.ini";
-      if (!exists(logging_ini_path))
-      {
-         create_logging_config_file (logging_ini_path, data_dir);
-      }
-
-      load_logging_config_file( logging_ini_path );
+      load_configuration_options(data_dir, cfg_options, options);
 
       bpo::notify(options);
       node->initialize(data_dir, options);
@@ -308,7 +312,7 @@ int main(int argc, char** argv) {
    }
 }
 
-// logging config is too complicated to be parsed by boost::program_options, 
+// logging config is too complicated to be parsed by boost::program_options,
 // so we do it by hand
 //
 // Currently, you can only specify the filenames and logging levels, which
