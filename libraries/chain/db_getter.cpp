@@ -105,4 +105,9 @@ const account_statistics_object& database::get_account_stats_by_owner( account_i
    return *itr;
 }
 
+const special_assets_meta_object& database::get_special_assets_meta_object()const
+{
+   return get( special_assets_meta_id_type() );
+}
+
 } }

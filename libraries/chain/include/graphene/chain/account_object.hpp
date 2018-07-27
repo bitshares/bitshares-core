@@ -130,7 +130,6 @@ namespace graphene { namespace chain {
          bool              maintenance_flag = false; ///< Whether need to process this balance object in maintenance interval
 
          asset get_balance()const { return asset(balance, asset_type); }
-         void  adjust_balance(const asset& delta);
    };
 
 
@@ -241,6 +240,9 @@ namespace graphene { namespace chain {
          static const uint8_t top_n_control_owner  = 1;
          static const uint8_t top_n_control_active = 2;
 
+         /// Return the related assets if the account has top_holders_special_authority set.
+         flat_set<asset_id_type> get_top_n_control_assets() const;
+
          /**
           * This is a set of assets which the account is allowed to have.
           * This is utilized to restrict buyback accounts to the assets that trade in their markets.
@@ -334,7 +336,7 @@ namespace graphene { namespace chain {
    };
 
    struct by_account_asset;
-   struct by_asset_balance;
+   struct by_asset;
    struct by_maintenance_flag;
    /**
     * @ingroup object_index
@@ -352,7 +354,8 @@ namespace graphene { namespace chain {
                member<account_balance_object, asset_id_type, &account_balance_object::asset_type>
             >
          >,
-         ordered_unique< tag<by_asset_balance>,
+#ifdef ASSET_BALANCE_SORTED
+         ordered_unique< tag<by_asset>,
             composite_key<
                account_balance_object,
                member<account_balance_object, asset_id_type, &account_balance_object::asset_type>,
@@ -365,6 +368,11 @@ namespace graphene { namespace chain {
                std::less< account_id_type >
             >
          >
+#else
+         ordered_non_unique< tag<by_asset>,
+               member<account_balance_object, asset_id_type, &account_balance_object::asset_type>
+         >
+#endif
       >
    > account_balance_object_multi_index_type;
 

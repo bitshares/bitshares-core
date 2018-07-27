@@ -29,6 +29,22 @@
 
 namespace graphene { namespace chain {
 
+flat_set<asset_id_type> account_object::get_top_n_control_assets() const
+{
+   flat_set<asset_id_type> result;
+   if( owner_special_authority.which() == special_authority::tag< top_holders_special_authority >::value )
+   {
+      const top_holders_special_authority& tha = owner_special_authority.get< top_holders_special_authority >();
+      result.insert( tha.asset );
+   }
+   if( active_special_authority.which() == special_authority::tag< top_holders_special_authority >::value )
+   {
+      const top_holders_special_authority& tha = active_special_authority.get< top_holders_special_authority >();
+      result.insert( tha.asset );
+   }
+   return result;
+}
+
 share_type cut_fee(share_type a, uint16_t p)
 {
    if( a == 0 || p == 0 )
@@ -40,14 +56,6 @@ share_type cut_fee(share_type a, uint16_t p)
    r *= p;
    r /= GRAPHENE_100_PERCENT;
    return r.to_uint64();
-}
-
-void account_balance_object::adjust_balance(const asset& delta)
-{
-   assert(delta.asset_id == asset_type);
-   balance += delta.amount;
-   if( asset_type == asset_id_type() ) // CORE asset
-      maintenance_flag = true;
 }
 
 void account_statistics_object::process_fees(const account_object& a, database& d) const

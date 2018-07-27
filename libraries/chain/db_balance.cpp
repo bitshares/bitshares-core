@@ -26,6 +26,7 @@
 
 #include <graphene/chain/account_object.hpp>
 #include <graphene/chain/asset_object.hpp>
+#include <graphene/chain/special_authority_object.hpp>
 #include <graphene/chain/vesting_balance_object.hpp>
 #include <graphene/chain/witness_object.hpp>
 
@@ -52,29 +53,55 @@ string database::to_pretty_string( const asset& a )const
 
 void database::adjust_balance(account_id_type account, asset delta )
 { try {
+
    if( delta.amount == 0 )
       return;
 
-   auto& index = get_index_type<account_balance_index>().indices().get<by_account_asset>();
+#ifndef ASSET_BALANCE_SORTED
+   const auto& special_assets = get_special_assets_meta_object().special_assets;
+   bool maint_flag = ( delta.asset_id == asset_id_type() // CORE asset
+                       || special_assets.find( delta.asset_id ) != special_assets.end() ); // special asset
+#else
+   bool maint_flag = ( delta.asset_id == asset_id_type() ); // CORE asset
+#endif
+
+   const auto& index = get_index_type<account_balance_index>().indices().get<by_account_asset>();
    auto itr = index.find(boost::make_tuple(account, delta.asset_id));
+
    if(itr == index.end())
    {
-      FC_ASSERT( delta.amount > 0, "Insufficient Balance: ${a}'s balance of ${b} is less than required ${r}", 
+      FC_ASSERT( delta.amount > 0,
+                 "Insufficient Balance: ${a}'s balance of ${b} is less than required ${r}",
                  ("a",account(*this).name)
                  ("b",to_pretty_string(asset(0,delta.asset_id)))
                  ("r",to_pretty_string(-delta)));
-      create<account_balance_object>([account,&delta](account_balance_object& b) {
+
+      create<account_balance_object>([account,&delta,maint_flag](account_balance_object& b)
+      {
          b.owner = account;
          b.asset_type = delta.asset_id;
-         b.balance = delta.amount.value;
-         if( b.asset_type == asset_id_type() ) // CORE asset
+         b.balance = delta.amount;
+         if( maint_flag )
             b.maintenance_flag = true;
       });
-   } else {
+   }
+   else
+   {
       if( delta.amount < 0 )
-         FC_ASSERT( itr->get_balance() >= -delta, "Insufficient Balance: ${a}'s balance of ${b} is less than required ${r}", ("a",account(*this).name)("b",to_pretty_string(itr->get_balance()))("r",to_pretty_string(-delta)));
-      modify(*itr, [delta](account_balance_object& b) {
-         b.adjust_balance(delta);
+      {
+         FC_ASSERT( itr->balance >= -delta.amount,
+                    "Insufficient Balance: ${a}'s balance of ${b} is less than required ${r}",
+                    ("a",account(*this).name)
+                    ("b",to_pretty_string(itr->get_balance()))
+                    ("r",to_pretty_string(-delta))
+                  );
+      }
+
+      modify(*itr, [delta,maint_flag](account_balance_object& b)
+      {
+         b.balance += delta.amount;
+         if( maint_flag )
+            b.maintenance_flag = true;
       });
    }
 

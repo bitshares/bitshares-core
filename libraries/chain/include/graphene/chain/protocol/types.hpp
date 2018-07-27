@@ -148,7 +148,7 @@ namespace graphene { namespace chain {
    {
       impl_global_property_object_type,
       impl_dynamic_global_property_object_type,
-      impl_reserved0_object_type,      // formerly index_meta_object_type, TODO: delete me
+      impl_special_assets_meta_object_type,
       impl_asset_dynamic_data_type,
       impl_asset_bitasset_data_type,
       impl_account_balance_object_type,
@@ -163,7 +163,8 @@ namespace graphene { namespace chain {
       impl_special_authority_object_type,
       impl_buyback_object_type,
       impl_fba_accumulator_object_type,
-      impl_collateral_bid_object_type
+      impl_collateral_bid_object_type,
+      impl_account_special_balance_object_type
    };
 
    //typedef fc::unsigned_int            object_id_type;
@@ -202,6 +203,7 @@ namespace graphene { namespace chain {
    // implementation types
    class global_property_object;
    class dynamic_global_property_object;
+   class special_assets_meta_object;
    class asset_dynamic_data_object;
    class asset_bitasset_data_object;
    class account_balance_object;
@@ -216,9 +218,11 @@ namespace graphene { namespace chain {
    class buyback_object;
    class fba_accumulator_object;
    class collateral_bid_object;
+   class account_special_balance_object;
 
    typedef object_id< implementation_ids, impl_global_property_object_type,  global_property_object>                    global_property_id_type;
    typedef object_id< implementation_ids, impl_dynamic_global_property_object_type,  dynamic_global_property_object>    dynamic_global_property_id_type;
+   typedef object_id< implementation_ids, impl_special_assets_meta_object_type,  special_assets_meta_object>            special_assets_meta_id_type;
    typedef object_id< implementation_ids, impl_asset_dynamic_data_type,      asset_dynamic_data_object>                 asset_dynamic_data_id_type;
    typedef object_id< implementation_ids, impl_asset_bitasset_data_type,     asset_bitasset_data_object>                asset_bitasset_data_id_type;
    typedef object_id< implementation_ids, impl_account_balance_object_type,  account_balance_object>                    account_balance_id_type;
@@ -237,6 +241,7 @@ namespace graphene { namespace chain {
    typedef object_id< implementation_ids, impl_buyback_object_type, buyback_object >                                    buyback_id_type;
    typedef object_id< implementation_ids, impl_fba_accumulator_object_type, fba_accumulator_object >                    fba_accumulator_id_type;
    typedef object_id< implementation_ids, impl_collateral_bid_object_type, collateral_bid_object >                      collateral_bid_id_type;
+   typedef object_id< implementation_ids, impl_account_special_balance_object_type,  account_special_balance_object>    account_special_balance_id_type;
 
    typedef fc::array<char, GRAPHENE_MAX_ASSET_SYMBOL_LENGTH>    symbol_type;
    typedef fc::ripemd160                                        block_id_type;
@@ -352,7 +357,7 @@ FC_REFLECT_ENUM( graphene::chain::object_type,
 FC_REFLECT_ENUM( graphene::chain::impl_object_type,
                  (impl_global_property_object_type)
                  (impl_dynamic_global_property_object_type)
-                 (impl_reserved0_object_type)
+                 (impl_special_assets_meta_object_type)
                  (impl_asset_dynamic_data_type)
                  (impl_asset_bitasset_data_type)
                  (impl_account_balance_object_type)
@@ -368,6 +373,7 @@ FC_REFLECT_ENUM( graphene::chain::impl_object_type,
                  (impl_buyback_object_type)
                  (impl_fba_accumulator_object_type)
                  (impl_collateral_bid_object_type)
+                 (impl_account_special_balance_object_type)
                )
 
 FC_REFLECT_TYPENAME( graphene::chain::share_type )
@@ -388,6 +394,7 @@ FC_REFLECT_TYPENAME( graphene::chain::worker_id_type )
 FC_REFLECT_TYPENAME( graphene::chain::balance_id_type )
 FC_REFLECT_TYPENAME( graphene::chain::global_property_id_type )
 FC_REFLECT_TYPENAME( graphene::chain::dynamic_global_property_id_type )
+FC_REFLECT_TYPENAME( graphene::chain::special_assets_meta_id_type )
 FC_REFLECT_TYPENAME( graphene::chain::asset_dynamic_data_id_type )
 FC_REFLECT_TYPENAME( graphene::chain::asset_bitasset_data_id_type )
 FC_REFLECT_TYPENAME( graphene::chain::account_balance_id_type )
@@ -400,6 +407,7 @@ FC_REFLECT_TYPENAME( graphene::chain::special_authority_id_type )
 FC_REFLECT_TYPENAME( graphene::chain::buyback_id_type )
 FC_REFLECT_TYPENAME( graphene::chain::fba_accumulator_id_type )
 FC_REFLECT_TYPENAME( graphene::chain::collateral_bid_id_type )
+FC_REFLECT_TYPENAME( graphene::chain::account_special_balance_id_type )
 
 FC_REFLECT( graphene::chain::void_t, )
 

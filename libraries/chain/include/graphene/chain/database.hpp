@@ -258,6 +258,7 @@ namespace graphene { namespace chain {
          const node_property_object&            get_node_properties()const;
          const fee_schedule&                    current_fee_schedule()const;
          const account_statistics_object&       get_account_stats_by_owner( account_id_type owner )const;
+         const special_assets_meta_object&      get_special_assets_meta_object()const;
 
          time_point_sec   head_block_time()const;
          uint32_t         head_block_num()const;
@@ -477,6 +478,11 @@ namespace graphene { namespace chain {
 
          template<class Type>
          void perform_account_maintenance( Type tally_helper );
+
+         void perform_balance_maintenance();
+#ifndef ASSET_BALANCE_SORTED
+         void perform_special_assets_maintenance();
+#endif
          ///@}
          ///@}
 

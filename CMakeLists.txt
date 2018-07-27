@@ -69,6 +69,13 @@ IF(NOT "${Boost_VERSION}" MATCHES "1.53(.*)")
    SET(Boost_LIBRARIES ${BOOST_LIBRARIES_TEMP} ${Boost_LIBRARIES})
 ENDIF()
 
+OPTION( ASSET_BALANCE_SORTING "Keep account_balance objects sorted by asset and amount, to be used in asset_api (ON OR OFF)" ON )
+if( ASSET_BALANCE_SORTING )
+  MESSAGE( STATUS "Configurating ASSET_BALANCE_SORTING" )
+  SET( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DASSET_BALANCE_SORTED" )
+  SET( CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DASSET_BALANCE_SORTED" )
+endif()
+
 if( WIN32 )
 
     message( STATUS "Configuring BitShares on WIN32")
@@ -203,3 +210,7 @@ endif(LINUX)
 
  include(CPack)
 endif(ENABLE_INSTALLER)
+
+MESSAGE( STATUS "" )
+MESSAGE( STATUS "ASSET_BALANCE_SORTING: ${ASSET_BALANCE_SORTING}" )
+MESSAGE( STATUS "" )
