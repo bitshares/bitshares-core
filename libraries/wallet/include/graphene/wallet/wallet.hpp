@@ -663,6 +663,12 @@ class wallet_api
        */
       bool    load_wallet_file(string wallet_filename = "");
 
+      /** Quitting from BitShares wallet.
+       * 
+       * The current wallet will be closed.
+       */
+      void    quit();
+
       /** Saves the current wallet to the given filename.
        * 
        * @warning This does not change the wallet filename that will be used for future
@@ -1848,4 +1854,5 @@ FC_API( graphene::wallet::wallet_api,
         (blind_history)
         (receive_blind_transfer)
         (get_order_book)
+        (quit)
       )
