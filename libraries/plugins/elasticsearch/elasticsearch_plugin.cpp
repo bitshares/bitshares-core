@@ -232,6 +232,7 @@ bool elasticsearch_plugin_impl::add_elasticsearch( const account_id_type account
    growStats(stats_obj, ath);
    createBulkLine(ath);
    prepareBulk(ath.id);
+   cleanObjects(ath, account_id);
 
    if (curl && bulk_lines.size() >= limit_documents) { // we are in bulk time, ready to add data to elasticsearech
       prepare.clear();
@@ -246,8 +247,6 @@ bool elasticsearch_plugin_impl::add_elasticsearch( const account_id_type account
       else
          bulk_lines.clear();
    }
-
-   cleanObjects(ath, account_id);
 
    return true;
 }
@@ -374,8 +373,7 @@ void elasticsearch_plugin::plugin_initialize(const boost::program_options::varia
    database().applied_block.connect( [&]( const signed_block& b) {
       if(!my->update_account_histories(b))
       {
-         edump(("Error populating ES database, exiting to avoid history gaps."));
-         throw;
+         FC_THROW_EXCEPTION(graphene::chain::plugin_exception, "Error populating ES database, we are going to keep trying.");
       }
    } );
    my->_oho_index = database().add_index< primary_index< operation_history_index > >();
