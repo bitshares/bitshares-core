@@ -409,17 +409,17 @@ class wallet_api
        * @param name_or_id  The name or ID of an account to retrieve
        * @param base  Base asset
        * @param quote  Quote asset
-       * @param limit  The limitation of items each query can fetch, currently 101
-       * @param start_id  Start order id, fetch orders which price are lower than or equal to this order
-       * @param start_price  Fetch orders with price lower than or equal to this price
+       * @param limit  The limitation of items each query can fetch (max: 101)
+       * @param ostart_id  Start order id, fetch orders which price are lower than or equal to this order
+       * @param ostart_price  Fetch orders with price lower than or equal to this price
        *
        * @return List of orders from @ref name_or_id to the corresponding account
        *
        * @note
-       * 1. if @ref name_or_id cannot be tied to an account, empty result will be returned
-       * 2. @ref start_id and @ref start_price can be empty, if so the api will return the "first page" of orders;
-       *    if start_id is specified and valid, its price will be used to do page query preferentially,
-       *    otherwise the start_price will be used 
+       * 1. if \c name_or_id cannot be tied to an account, empty result will be returned
+       * 2. \c ostart_id and \c ostart_price can be \c null, if so the api will return the "first page" of orders;
+       *    if \c ostart_id is specified and valid, its price will be used to do page query preferentially,
+       *    otherwise the \c ostart_price will be used 
        */
       vector<limit_order_object>        get_account_limit_orders( const string& name_or_id,
                                             const string &base,
@@ -927,8 +927,10 @@ class wallet_api
        *  that it exists in the blockchain.  If it exists then it will report the amount received and
        *  who sent it.
        *
-       *  @param opt_from - if not empty and the sender is a unknown public key, then the unknown public key will be given the label opt_from
-       *  @param confirmation_receipt - a base58 encoded stealth confirmation 
+       *  @param opt_from if not empty and the sender is a unknown public key,
+       *                  then the unknown public key will be given the label \c opt_from
+       *  @param confirmation_receipt a base58 encoded stealth confirmation
+       *  @param opt_memo a self-defined label for this transfer to be saved in local wallet file
        */
       blind_receipt receive_blind_transfer( string confirmation_receipt, string opt_from, string opt_memo );
 
