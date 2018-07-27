@@ -115,34 +115,36 @@ void asset_create_evaluator::pay_fee()
 
 object_id_type asset_create_evaluator::do_apply( const asset_create_operation& op )
 { try {
-   bool hf_429 = fee_is_odd && db().head_block_time() > HARDFORK_CORE_429_TIME;
+   database& d = db();
+
+   bool hf_429 = fee_is_odd && d.head_block_time() > HARDFORK_CORE_429_TIME;
 
    const asset_dynamic_data_object& dyn_asset =
-      db().create<asset_dynamic_data_object>( [&]( asset_dynamic_data_object& a ) {
+      d.create<asset_dynamic_data_object>( [hf_429,this]( asset_dynamic_data_object& a ) {
          a.current_supply = 0;
          a.fee_pool = core_fee_paid - (hf_429 ? 1 : 0);
       });
+
    if( fee_is_odd && !hf_429 )
    {
-      const auto& core_dd = db().get<asset_object>( asset_id_type() ).dynamic_data( db() );
-      db().modify( core_dd, [=]( asset_dynamic_data_object& dd ) {
+      d.modify( d.get_core_dynamic_data(), []( asset_dynamic_data_object& dd ) {
          dd.current_supply++;
       });
    }
 
    asset_bitasset_data_id_type bit_asset_id;
 
-   auto next_asset_id = db().get_index_type<asset_index>().get_next_id();
+   auto next_asset_id = d.get_index_type<asset_index>().get_next_id();
 
    if( op.bitasset_opts.valid() )
-      bit_asset_id = db().create<asset_bitasset_data_object>( [&]( asset_bitasset_data_object& a ) {
+      bit_asset_id = d.create<asset_bitasset_data_object>( [&op,next_asset_id]( asset_bitasset_data_object& a ) {
             a.options = *op.bitasset_opts;
             a.is_prediction_market = op.is_prediction_market;
             a.asset_id = next_asset_id;
          }).id;
 
    const asset_object& new_asset =
-     db().create<asset_object>( [&]( asset_object& a ) {
+     d.create<asset_object>( [&op,next_asset_id,&dyn_asset,bit_asset_id]( asset_object& a ) {
          a.issuer = op.issuer;
          a.symbol = op.symbol;
          a.precision = op.precision;
@@ -155,7 +157,7 @@ object_id_type asset_create_evaluator::do_apply( const asset_create_operation& o
          if( op.bitasset_opts.valid() )
             a.bitasset_data_id = bit_asset_id;
       });
-   assert( new_asset.id == next_asset_id );
+   FC_ASSERT( new_asset.id == next_asset_id, "Unexpected object database error, object id mismatch" );
 
    return new_asset.id;
 } FC_CAPTURE_AND_RETHROW( (op) ) }
@@ -181,7 +183,7 @@ void_result asset_issue_evaluator::do_apply( const asset_issue_operation& o )
 { try {
    db().adjust_balance( o.issue_to_account, o.asset_to_issue );
 
-   db().modify( *asset_dyn_data, [&]( asset_dynamic_data_object& data ){
+   db().modify( *asset_dyn_data, [&o]( asset_dynamic_data_object& data ){
         data.current_supply += o.asset_to_issue.amount;
    });
 
@@ -213,7 +215,7 @@ void_result asset_reserve_evaluator::do_apply( const asset_reserve_operation& o 
 { try {
    db().adjust_balance( o.payer, -o.amount_to_reserve );
 
-   db().modify( *asset_dyn_data, [&]( asset_dynamic_data_object& data ){
+   db().modify( *asset_dyn_data, [&o]( asset_dynamic_data_object& data ){
         data.current_supply -= o.amount_to_reserve.amount;
    });
 
@@ -235,7 +237,7 @@ void_result asset_fund_fee_pool_evaluator::do_apply(const asset_fund_fee_pool_op
 { try {
    db().adjust_balance(o.from_account, -o.amount);
 
-   db().modify( *asset_dyn_data, [&]( asset_dynamic_data_object& data ) {
+   db().modify( *asset_dyn_data, [&o]( asset_dynamic_data_object& data ) {
       data.fee_pool += o.amount;
    });
 
@@ -319,7 +321,21 @@ void_result asset_update_evaluator::do_apply(const asset_update_operation& o)
          d.cancel_settle_order(*itr);
    }
 
-   d.modify(*asset_to_update, [&](asset_object& a) {
+   // For market-issued assets, if core change rate changed, update flag in bitasset data
+   if( asset_to_update->is_market_issued()
+          && asset_to_update->options.core_exchange_rate != o.new_options.core_exchange_rate )
+   {
+      const auto& bitasset = asset_to_update->bitasset_data(d);
+      if( !bitasset.asset_cer_updated )
+      {
+         d.modify( bitasset, [](asset_bitasset_data_object& b)
+         {
+            b.asset_cer_updated = true;
+         });
+      }
+   }
+
+   d.modify(*asset_to_update, [&o](asset_object& a) {
       if( o.new_issuer )
          a.issuer = *o.new_issuer;
       a.options = o.new_options;
