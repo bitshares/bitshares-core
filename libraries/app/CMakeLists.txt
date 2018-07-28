@@ -8,6 +8,7 @@ add_library( graphene_app
              database_api.cpp
              impacted.cpp
              plugin.cpp
+             config_util.cpp
              ${HEADERS}
              ${EGENESIS_HEADERS}
            )
