@@ -71,7 +71,8 @@ int get_available_port()
    socklen_t len = sizeof(sin);
    if (getsockname(socket_fd, (struct sockaddr *)&sin, &len) == -1)
       return -1;
-   return sin.sin_port;
+   close(socket_fd);
+   return ntohs(sin.sin_port);
 }
 
 ///////////
@@ -100,7 +101,7 @@ std::shared_ptr<graphene::app::application> start_application(fc::temp_directory
 
    app1->startup();
    fc::usleep(fc::milliseconds(500));
-	return app1;
+   return app1;
 }
 
 ///////////
@@ -111,13 +112,12 @@ std::shared_ptr<graphene::app::application> start_application(fc::temp_directory
 bool generate_block(std::shared_ptr<graphene::app::application> app) {
    try {
       fc::ecc::private_key committee_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("nathan")));
-	   auto db = app->chain_database();
-	   auto block_1 = db->generate_block(
-	         db->get_slot_time(1),
-	         db->get_scheduled_witness(1),
-	         committee_key,
-	         database::skip_nothing);
-	   return true;
+      auto db = app->chain_database();
+      auto block_1 = db->generate_block( db->get_slot_time(1),
+                                         db->get_scheduled_witness(1),
+                                         committee_key,
+                                         database::skip_nothing );
+      return true;
    } catch (exception &e) {
       return false;
    }
@@ -211,11 +211,11 @@ BOOST_AUTO_TEST_CASE( cli_connect )
    try {
       fc::temp_directory app_dir ( graphene::utilities::temp_directory_path() );
 
-	   int server_port_number = 0;
-	   app1 = start_application(app_dir, server_port_number);
+      int server_port_number = 0;
+      app1 = start_application(app_dir, server_port_number);
 
       // connect to the server
-	   client_connection con(app1, app_dir, server_port_number);
+      client_connection con(app1, app_dir, server_port_number);
 
    } catch( fc::exception& e ) {
       edump((e.to_detail_string()));
@@ -299,7 +299,7 @@ BOOST_AUTO_TEST_CASE( cli_vote_for_2_witnesses )
       BOOST_CHECK(!bki.brain_priv_key.empty());
       signed_transaction create_acct_tx = con.wallet_api_ptr->create_account_with_brain_key(bki.brain_priv_key, "jmjatlanta", "nathan", "nathan", true);
       // save the private key for this new account in the wallet file
-   	BOOST_CHECK(con.wallet_api_ptr->import_key("jmjatlanta", bki.wif_priv_key));
+      BOOST_CHECK(con.wallet_api_ptr->import_key("jmjatlanta", bki.wif_priv_key));
       con.wallet_api_ptr->save_wallet_file(con.wallet_filename);
 
       // attempt to give jmjatlanta some bitsahres
@@ -361,7 +361,7 @@ BOOST_AUTO_TEST_CASE( cli_set_voting_proxy )
 
       fc::temp_directory app_dir( graphene::utilities::temp_directory_path() );
 
-      int server_port_number;
+      int server_port_number = 0;
       app1 = start_application(app_dir, server_port_number);
 
       // connect to the server
@@ -395,7 +395,7 @@ BOOST_AUTO_TEST_CASE( cli_set_voting_proxy )
       BOOST_CHECK(!bki.brain_priv_key.empty());
       signed_transaction create_acct_tx = con.wallet_api_ptr->create_account_with_brain_key(bki.brain_priv_key, "jmjatlanta", "nathan", "nathan", true);
       // save the private key for this new account in the wallet file
-   	  BOOST_CHECK(con.wallet_api_ptr->import_key("jmjatlanta", bki.wif_priv_key));
+      BOOST_CHECK(con.wallet_api_ptr->import_key("jmjatlanta", bki.wif_priv_key));
       con.wallet_api_ptr->save_wallet_file(con.wallet_filename);
 
       // attempt to give jmjatlanta some bitsahres
@@ -433,7 +433,7 @@ BOOST_AUTO_TEST_CASE( cli_confidential_tx_test )
 
       // ** Start a Graphene chain and API server:
       fc::temp_directory app_dir( graphene::utilities::temp_directory_path() );
-      int server_port_number;
+      int server_port_number = 0;
       app1 = start_application(app_dir, server_port_number);
       unsigned int head_block = 0;
 
