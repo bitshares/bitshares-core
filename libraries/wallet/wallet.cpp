@@ -808,12 +808,12 @@ public:
          //
          // http://en.wikipedia.org/wiki/Most_vexing_parse
          //
-         fc::ofstream outfile{ fc::path( wallet_filename + ".backup" ) };
+         fc::ofstream outfile{ fc::path( wallet_filename + ".tmp" ) };
          outfile.write( data.c_str(), data.length() );
          outfile.flush();
          outfile.close();
 
-         fc::rename( wallet_filename + ".backup", wallet_filename );
+         fc::rename( wallet_filename + ".tmp", wallet_filename );
 
          wlog( "successfully saved wallet to file ${fn}", ("fn", wallet_filename) );
 
