@@ -813,7 +813,16 @@ public:
          outfile.flush();
          outfile.close();
 
-         fc::rename( wallet_filename + ".tmp", wallet_filename );
+         std::string wallet_file_content;
+         fc::read_file_contents(wallet_filename, wallet_file_content);
+
+         if (wallet_file_content == data) {
+            fc::rename( wallet_filename + ".tmp", wallet_filename );
+         } 
+         else 
+         {
+            throw;
+         }
 
          wlog( "successfully saved wallet to file ${fn}", ("fn", wallet_filename) );
 
