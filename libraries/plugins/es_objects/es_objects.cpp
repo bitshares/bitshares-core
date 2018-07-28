@@ -47,7 +47,7 @@ class es_objects_plugin_impl
       {  curl = curl_easy_init(); }
       virtual ~es_objects_plugin_impl();
 
-      void updateDatabase( const vector<object_id_type>& ids , bool isNew);
+      bool updateDatabase( const vector<object_id_type>& ids , bool isNew);
 
       es_objects_plugin& _self;
       std::string _es_objects_elasticsearch_url = "http://localhost:9200/";
@@ -79,7 +79,7 @@ class es_objects_plugin_impl
       void PrepareBitAsset(const asset_bitasset_data_object& bitasset_object, const fc::time_point_sec& block_time, const uint32_t& block_number);
 };
 
-void es_objects_plugin_impl::updateDatabase( const vector<object_id_type>& ids , bool isNew)
+bool es_objects_plugin_impl::updateDatabase( const vector<object_id_type>& ids , bool isNew)
 {
    graphene::chain::database &db = _self.database();
 
@@ -92,20 +92,6 @@ void es_objects_plugin_impl::updateDatabase( const vector<object_id_type>& ids ,
       limit_documents = _es_objects_bulk_sync;
    else
       limit_documents = _es_objects_bulk_replay;
-
-   if (curl && bulk.size() >= limit_documents) { // we are in bulk time, ready to add data to elasticsearech
-
-      graphene::utilities::ES es;
-      es.curl = curl;
-      es.bulk_lines = bulk;
-      es.elasticsearch_url = _es_objects_elasticsearch_url;
-      es.auth = _es_objects_auth;
-
-      if(!graphene::utilities::SendBulk(es))
-         elog("Error sending data to database");
-         //return false;
-      bulk.clear();
-   }
 
    for(auto const& value: ids) {
       if(value.is<proposal_object>() && _es_objects_proposals) {
@@ -145,6 +131,22 @@ void es_objects_plugin_impl::updateDatabase( const vector<object_id_type>& ids ,
             PrepareBitAsset(*ba, block_time, block_number);
       }
    }
+
+   if (curl && bulk.size() >= limit_documents) { // we are in bulk time, ready to add data to elasticsearech
+
+      graphene::utilities::ES es;
+      es.curl = curl;
+      es.bulk_lines = bulk;
+      es.elasticsearch_url = _es_objects_elasticsearch_url;
+      es.auth = _es_objects_auth;
+
+      if(!graphene::utilities::SendBulk(es))
+         return false;
+      else
+         bulk.clear();
+   }
+
+   return true;
 }
 
 void es_objects_plugin_impl::PrepareProposal(const proposal_object& proposal_object,
@@ -397,9 +399,18 @@ void es_objects_plugin::plugin_set_program_options(
 
 void es_objects_plugin::plugin_initialize(const boost::program_options::variables_map& options)
 {
-   database().new_objects.connect([&]( const vector<object_id_type>& ids, const flat_set<account_id_type>& impacted_accounts ){ my->updateDatabase(ids, 1); });
-   database().changed_objects.connect([&]( const vector<object_id_type>& ids, const flat_set<account_id_type>& impacted_accounts ){ my->updateDatabase(ids, 0); });
-
+   database().new_objects.connect([&]( const vector<object_id_type>& ids, const flat_set<account_id_type>& impacted_accounts ) {
+      if(!my->updateDatabase(ids, 1))
+      {
+         FC_THROW_EXCEPTION(graphene::chain::plugin_exception, "Error populating ES database, we are going to keep trying.");
+      }
+   });
+   database().changed_objects.connect([&]( const vector<object_id_type>& ids, const flat_set<account_id_type>& impacted_accounts ) {
+      if(!my->updateDatabase(ids, 0))
+      {
+         FC_THROW_EXCEPTION(graphene::chain::plugin_exception, "Error populating ES database, we are going to keep trying.");
+      }
+   });
    if (options.count("es-objects-elasticsearch-url")) {
       my->_es_objects_elasticsearch_url = options["es-objects-elasticsearch-url"].as<std::string>();
    }
