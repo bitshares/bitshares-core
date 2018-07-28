@@ -118,15 +118,14 @@ bool handleBulkResponse(long http_code, const std::string& CurlReadBuffer)
    return true;
 }
 
-const std::vector<std::string> createBulk(const std::string& index_name, const std::string& data, const std::string& id, bool onlycreate)
+const std::vector<std::string> createBulk(const fc::mutable_variant_object& bulk_header, const std::string& data)
 {
    std::vector<std::string> bulk;
-   std::string create_string = "";
-   if(!onlycreate)
-      create_string = ",\"_id\" : "+id;
-
-   bulk.push_back("{ \"index\" : { \"_index\" : \""+index_name+"\", \"_type\" : \"data\" "+create_string+" } }");
+   fc::mutable_variant_object final_bulk_header;
+   final_bulk_header["index"] = bulk_header;
+   bulk.push_back(fc::json::to_string(final_bulk_header));
    bulk.push_back(data);
+
    return bulk;
 }
 

@@ -28,6 +28,7 @@
 
 #include <curl/curl.h>
 #include <fc/time.hpp>
+#include <fc/variant_object.hpp>
 
 size_t WriteCallback(void *contents, size_t size, size_t nmemb, void *userp);
 
@@ -53,7 +54,7 @@ namespace graphene { namespace utilities {
    };
 
    bool SendBulk(ES& es);
-   const std::vector<std::string> createBulk(const std::string& index_name, const std::string& data, const std::string& id, bool onlycreate);
+   const std::vector<std::string> createBulk(const fc::mutable_variant_object& bulk_header, const std::string& data);
    bool checkES(ES& es);
    const std::string simpleQuery(ES& es);
    bool deleteAll(ES& es);

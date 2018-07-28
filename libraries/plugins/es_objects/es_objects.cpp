@@ -172,7 +172,12 @@ void es_objects_plugin_impl::PrepareProposal(const proposal_object& proposal_obj
    }
 
    std::string data = fc::json::to_string(prop);
-   prepare = graphene::utilities::createBulk(_es_objects_index_prefix + "proposal", data, "", 1);
+
+   fc::mutable_variant_object bulk_header;
+   bulk_header["_index"] = _es_objects_index_prefix + "proposal";
+   bulk_header["_type"] = "data";
+
+   prepare = graphene::utilities::createBulk(bulk_header, data);
    bulk.insert(bulk.end(), prepare.begin(), prepare.end());
    prepare.clear();
 }
@@ -209,7 +214,12 @@ void es_objects_plugin_impl::PrepareAccount(const account_object& account_object
    }
 
    std::string data = fc::json::to_string(acct);
-   prepare = graphene::utilities::createBulk(_es_objects_index_prefix + "account", data, "", 1);
+
+   fc::mutable_variant_object bulk_header;
+   bulk_header["_index"] = _es_objects_index_prefix + "acount";
+   bulk_header["_type"] = "data";
+
+   prepare = graphene::utilities::createBulk(bulk_header, data);
    bulk.insert(bulk.end(), prepare.begin(), prepare.end());
    prepare.clear();
 }
@@ -236,7 +246,12 @@ void es_objects_plugin_impl::PrepareAsset(const asset_object& asset_object,
    }
 
    std::string data = fc::json::to_string(asset);
-   prepare = graphene::utilities::createBulk(_es_objects_index_prefix + "asset", data, "", 1);
+
+   fc::mutable_variant_object bulk_header;
+   bulk_header["_index"] = _es_objects_index_prefix + "asset";
+   bulk_header["_type"] = "data";
+
+   prepare = graphene::utilities::createBulk(bulk_header, data);
    bulk.insert(bulk.end(), prepare.begin(), prepare.end());
    prepare.clear();
 }
@@ -260,7 +275,12 @@ void es_objects_plugin_impl::PrepareBalance(const balance_object& balance_object
    }
 
    std::string data = fc::json::to_string(balance);
-   prepare = graphene::utilities::createBulk(_es_objects_index_prefix + "balance", data, "", 1);
+
+   fc::mutable_variant_object bulk_header;
+   bulk_header["_index"] = _es_objects_index_prefix + "balance";
+   bulk_header["_type"] = "data";
+
+   prepare = graphene::utilities::createBulk(bulk_header, data);
    bulk.insert(bulk.end(), prepare.begin(), prepare.end());
    prepare.clear();
 }
@@ -287,7 +307,12 @@ void es_objects_plugin_impl::PrepareLimit(const limit_order_object& limit_object
    }
 
    std::string data = fc::json::to_string(limit);
-   prepare = graphene::utilities::createBulk(_es_objects_index_prefix + "limitorder", data, "", 1);
+
+   fc::mutable_variant_object bulk_header;
+   bulk_header["_index"] = _es_objects_index_prefix + "limitorder";
+   bulk_header["_type"] = "data";
+
+   prepare = graphene::utilities::createBulk(bulk_header, data);
    bulk.insert(bulk.end(), prepare.begin(), prepare.end());
    prepare.clear();
 }
@@ -313,7 +338,12 @@ void es_objects_plugin_impl::PrepareBitAsset(const asset_bitasset_data_object& b
       }
 
       std::string data = fc::json::to_string(bitasset);
-      prepare = graphene::utilities::createBulk(_es_objects_index_prefix + "bitasset", data, "", 1);
+
+      fc::mutable_variant_object bulk_header;
+      bulk_header["_index"] = _es_objects_index_prefix + "bitasset";
+      bulk_header["_type"] = "data";
+
+      prepare = graphene::utilities::createBulk(bulk_header, data);
       bulk.insert(bulk.end(), prepare.begin(), prepare.end());
       prepare.clear();
    }

@@ -298,8 +298,12 @@ void elasticsearch_plugin_impl::createBulkLine(const account_transaction_history
 
 void elasticsearch_plugin_impl::prepareBulk(const account_transaction_history_id_type& ath_id)
 {
-   std::string _id = fc::json::to_string(ath_id);
-   prepare = graphene::utilities::createBulk(index_name, bulk_line, _id, 0);
+   const std::string _id = fc::json::to_string(ath_id);
+   fc::mutable_variant_object bulk_header;
+   bulk_header["_index"] = index_name;
+   bulk_header["_type"] = "data";
+   bulk_header["_id"] = fc::to_string(ath_id.space_id) + "." + fc::to_string(ath_id.type_id) + "." + ath_id.instance;
+   prepare = graphene::utilities::createBulk(bulk_header, bulk_line);
    bulk_lines.insert(bulk_lines.end(), prepare.begin(), prepare.end());
 }
 
