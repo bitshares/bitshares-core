@@ -413,7 +413,7 @@ class wallet_api
        * @param ostart_id  Start order id, fetch orders which price are lower than or equal to this order
        * @param ostart_price  Fetch orders with price lower than or equal to this price
        *
-       * @return List of orders from @ref name_or_id to the corresponding account
+       * @return List of orders from \c name_or_id to the corresponding account
        *
        * @note
        * 1. if \c name_or_id cannot be tied to an account, empty result will be returned
