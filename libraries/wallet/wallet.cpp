@@ -821,6 +821,7 @@ public:
          } 
          else 
          {
+            disable_umask_protection();
             throw;
          }
 
