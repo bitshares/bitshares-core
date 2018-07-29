@@ -36,8 +36,6 @@
 #include <graphene/db/simple_index.hpp>
 #include <fc/signals.hpp>
 
-#include <graphene/chain/protocol/protocol.hpp>
-
 #include <fc/log/logger.hpp>
 
 #include <map>
