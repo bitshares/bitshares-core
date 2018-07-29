@@ -254,7 +254,7 @@ bool elasticsearch_plugin_impl::add_elasticsearch( const account_id_type account
 const account_statistics_object& elasticsearch_plugin_impl::getStatsObject(const account_id_type account_id)
 {
    graphene::chain::database& db = database();
-   const auto &stats_obj = account_id(db).statistics(db);
+   const auto &stats_obj = db.get_account_stats_by_owner(account_id);
 
    return stats_obj;
 }

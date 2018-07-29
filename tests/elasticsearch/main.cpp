@@ -160,7 +160,7 @@ BOOST_AUTO_TEST_CASE(elasticsearch_objects) {
          auto res = graphene::utilities::simpleQuery(es);
          variant j = fc::json::from_string(res);
          auto total = j["count"].as_string();
-         BOOST_CHECK_EQUAL(total, "6");
+         BOOST_CHECK_EQUAL(total, "2");
 
          es.endpoint = es.index_prefix + "asset/data/_search";
          res = graphene::utilities::simpleQuery(es);
