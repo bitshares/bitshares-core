@@ -75,8 +75,10 @@ namespace graphene { namespace chain {
             skip_merkle_check           = 1 << 7,  ///< used while reindexing
             skip_assert_evaluation      = 1 << 8,  ///< used while reindexing
             skip_undo_history_check     = 1 << 9,  ///< used while reindexing
-            skip_witness_schedule_check = 1 << 10,  ///< used while reindexing
-            skip_validate               = 1 << 11 ///< used prior to checkpoint, skips validate() call on transaction
+            skip_witness_schedule_check = 1 << 10, ///< used while reindexing
+            skip_validate               = 1 << 11, ///< used prior to checkpoint, skips validate() call on transaction
+            skip_witness_key_cache_update  = 1 << 12, ///< used while reindexing -- do not update cache
+            force_witness_key_cache_update = 1 << 13  ///< used while applying a block but not applying pending transactions
          };
 
          /**
@@ -435,10 +437,18 @@ namespace graphene { namespace chain {
          void                  apply_block( const signed_block& next_block, uint32_t skip = skip_nothing );
          processed_transaction apply_transaction( const signed_transaction& trx, uint32_t skip = skip_nothing );
          operation_result      apply_operation( transaction_evaluation_state& eval_state, const operation& op );
+
+         void                  init_witness_key_cache( std::set<witness_id_type>& witnesses );
+         void                  update_witness_key_cache( witness_id_type wit, const public_key_type& pub_key );
+         void                  refresh_witness_key_cache();
+         optional<public_key_type> find_witness_key_from_cache( witness_id_type wit ) const;
+
       private:
          void                  _apply_block( const signed_block& next_block );
          processed_transaction _apply_transaction( const signed_transaction& trx );
          void                  _cancel_bids_and_revive_mpa( const asset_object& bitasset, const asset_bitasset_data_object& bad );
+
+         flat_map< witness_id_type, optional<public_key_type> > _witness_key_cache;
 
          ///Steps involved in applying a new block
          ///@{

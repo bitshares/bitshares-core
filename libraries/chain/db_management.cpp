@@ -108,6 +108,7 @@ void database::reindex( fc::path data_dir )
                              skip_transaction_dupe_check |
                              skip_tapos_check |
                              skip_witness_schedule_check |
+                             skip_witness_key_cache_update |
                              skip_authority_check);
       else
       {
@@ -185,6 +186,7 @@ void database::open(
                     ("last_block->id", last_block)("head_block_id",head_block_num()) );
          reindex( data_dir );
       }
+      refresh_witness_key_cache();
       _opened = true;
    }
    FC_CAPTURE_LOG_AND_RETHROW( (data_dir) )

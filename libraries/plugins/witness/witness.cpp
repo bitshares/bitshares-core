@@ -130,6 +130,9 @@ void witness_plugin::plugin_startup()
             new_chain_banner(d);
          _production_skip_flags |= graphene::chain::database::skip_undo_history_check;
       }
+
+      d.init_witness_key_cache( _witnesses );
+
       schedule_production_loop();
    } else
       elog("No witnesses configured! Please add witness IDs and private keys to configuration.");
@@ -250,7 +253,7 @@ block_production_condition::block_production_condition_enum witness_plugin::mayb
    }
 
    fc::time_point_sec scheduled_time = db.get_slot_time( slot );
-   graphene::chain::public_key_type scheduled_key = scheduled_witness( db ).signing_key;
+   graphene::chain::public_key_type scheduled_key = *db.find_witness_key_from_cache( scheduled_witness ); // should be valid
    auto private_key_itr = _private_keys.find( scheduled_key );
 
    if( private_key_itr == _private_keys.end() )

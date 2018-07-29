@@ -38,17 +38,21 @@ void_result witness_create_evaluator::do_evaluate( const witness_create_operatio
 
 object_id_type witness_create_evaluator::do_apply( const witness_create_operation& op )
 { try {
+   database& _db = db();
    vote_id_type vote_id;
-   db().modify(db().get_global_properties(), [&vote_id](global_property_object& p) {
+   _db.modify( _db.get_global_properties(), [&vote_id](global_property_object& p) {
       vote_id = get_next_vote_id(p, vote_id_type::witness);
    });
 
-   const auto& new_witness_object = db().create<witness_object>( [&]( witness_object& obj ){
+   const auto& new_witness_object = _db.create<witness_object>( [&op,&vote_id]( witness_object& obj ){
          obj.witness_account  = op.witness_account;
          obj.signing_key      = op.block_signing_key;
          obj.vote_id          = vote_id;
          obj.url              = op.url;
    });
+
+   _db.update_witness_key_cache( new_witness_object.id, op.block_signing_key );
+
    return new_witness_object.id;
 } FC_CAPTURE_AND_RETHROW( (op) ) }
 
@@ -63,13 +67,17 @@ void_result witness_update_evaluator::do_apply( const witness_update_operation& 
    database& _db = db();
    _db.modify(
       _db.get(op.witness),
-      [&]( witness_object& wit )
+      [&op]( witness_object& wit )
       {
          if( op.new_url.valid() )
             wit.url = *op.new_url;
          if( op.new_signing_key.valid() )
             wit.signing_key = *op.new_signing_key;
       });
+
+   if( op.new_signing_key.valid() )
+      _db.update_witness_key_cache( op.witness, *op.new_signing_key );
+
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (op) ) }
 

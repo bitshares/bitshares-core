@@ -264,6 +264,12 @@ BOOST_AUTO_TEST_CASE( change_signing_key )
             PUSH_TX( db, wu_trx, 0 );
          };
 
+         // Initialize witness key cache
+         std::set< witness_id_type > witnesses;
+         for( uint32_t i = 0; i <= 11; ++i ) // 11 init witnesses and 0 is reserved
+            witnesses.insert( witness_id_type(i) );
+         db.init_witness_key_cache( witnesses );
+
          // open database
          db.open(data_dir.path(), make_genesis, "TEST");
 
