@@ -438,9 +438,13 @@ namespace graphene { namespace chain {
          processed_transaction apply_transaction( const signed_transaction& trx, uint32_t skip = skip_nothing );
          operation_result      apply_operation( transaction_evaluation_state& eval_state, const operation& op );
 
+         /// Initialize _witness_key_cache with a list of witnesses, to be refreshed later
          void                  init_witness_key_cache( std::set<witness_id_type>& witnesses );
+         /// Update signing key of a witness in the cache, only do if force_update flag is set and the witness is in the cache
          void                  update_witness_key_cache( witness_id_type wit, const public_key_type& pub_key );
+         /// Fetch signing keys of all witnesses in the cache from object database and update the cache accordingly
          void                  refresh_witness_key_cache();
+         /// Search for signing key of given witness from the cache
          optional<public_key_type> find_witness_key_from_cache( witness_id_type wit ) const;
 
       private:
@@ -448,6 +452,7 @@ namespace graphene { namespace chain {
          processed_transaction _apply_transaction( const signed_transaction& trx );
          void                  _cancel_bids_and_revive_mpa( const asset_object& bitasset, const asset_bitasset_data_object& bad );
 
+         /// For tracking signing keys of specified witnesses, only update when applied a block or popped a block
          flat_map< witness_id_type, optional<public_key_type> > _witness_key_cache;
 
          ///Steps involved in applying a new block
