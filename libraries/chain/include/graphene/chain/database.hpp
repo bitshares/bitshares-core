@@ -412,6 +412,10 @@ namespace graphene { namespace chain {
          /**
           * @}
           */
+
+         /// Enable or disable tracking of votes of standby witnesses and committee members
+         inline void enable_standby_votes_tracking(bool enable)  { _track_standby_votes = enable; }
+
    protected:
          //Mark pop_undo() as protected -- we do not want outside calling pop_undo(); it should call pop_block() instead
          void pop_undo() { object_database::pop_undo(); }
@@ -518,6 +522,10 @@ namespace graphene { namespace chain {
          flat_map<uint32_t,block_id_type>  _checkpoints;
 
          node_property_object              _node_property_object;
+
+         /// Whether to update votes of standby witnesses and committee members when performing chain maintenance.
+         /// Set it to true to provide accurate data to API clients, set to false to have better performance.
+         bool                              _track_standby_votes = true;
 
          /**
           * Whether database is successfully opened or not.
