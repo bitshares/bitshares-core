@@ -279,18 +279,18 @@ int main( int argc, char** argv )
       {
          wallet_cli->register_api( wapi );
          wallet_cli->start();
-         wallet_cli->wait();
       }
       else
       {
-        fc::promise<int>::ptr exit_promise = new fc::promise<int>("UNIX Signal Handler");
-        fc::set_signal_handler([&exit_promise](int signal) {
-           exit_promise->set_value(signal);
-        }, SIGINT);
-
-        ilog( "Entering Daemon Mode, ^C to exit" );
-        exit_promise->wait();
+         ilog( "Entering Daemon Mode, ^C to exit" );
       }
+
+      fc::promise<int>::ptr exit_promise = new fc::promise<int>("UNIX Signal Handler");
+      fc::set_signal_handler([&exit_promise](int signal) {
+          exit_promise->set_value(signal);
+      }, SIGINT);
+
+      exit_promise->wait();
 
       wapi->save_wallet_file(wallet_file.generic_string());
       locked_connection.disconnect();
