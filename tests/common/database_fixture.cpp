@@ -125,6 +125,11 @@ database_fixture::database_fixture()
       track_account.push_back(track);
       options.insert(std::make_pair("track-account", boost::program_options::variable_value(track_account, false)));
    }
+   // standby votes tracking
+   if( boost::unit_test::framework::current_test_case().p_name.value == "track_votes_witnesses_disabled" ||
+       boost::unit_test::framework::current_test_case().p_name.value == "track_votes_committee_disabled") {
+      app.chain_database()->enable_standby_votes_tracking( false );
+   }
 
    if(boost::unit_test::framework::current_test_case().p_name.value == "es1") {
       auto esplugin = app.register_plugin<graphene::elasticsearch::elasticsearch_plugin>();
