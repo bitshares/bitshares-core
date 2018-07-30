@@ -279,7 +279,6 @@ int main( int argc, char** argv )
       {
          wallet_cli->register_api( wapi );
          wallet_cli->start();
-         //wallet_cli->wait();
       }
       else
       {
