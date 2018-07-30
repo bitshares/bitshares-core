@@ -54,7 +54,7 @@ namespace fc {
    extern std::unordered_map<std::string, appender::ptr> &get_appender_map();
 }
 
-BOOST_AUTO_TEST_CASE(load_configuration_options_test_config_files_created)
+BOOST_AUTO_TEST_CASE(load_configuration_options_test_config_logging_files_created)
 {
    fc::temp_directory app_dir(graphene::utilities::temp_directory_path());
    auto dir = app_dir.path();
@@ -100,6 +100,10 @@ BOOST_AUTO_TEST_CASE(load_configuration_options_test_config_ini_options)
           "option2=1\n\n";
    out.close();
 
+   /// check preconditions
+   BOOST_CHECK(fc::exists(config_ini_file));
+   BOOST_CHECK(!fc::exists(logging_ini_file));
+
    bpo::variables_map options;
    app::load_configuration_options(dir, cfg_options, options);
 
@@ -109,6 +113,10 @@ BOOST_AUTO_TEST_CASE(load_configuration_options_test_config_ini_options)
    BOOST_CHECK_EQUAL(options.count("option2"), 1);
    BOOST_CHECK_EQUAL(options["option1"].as<std::string>(), "is present");
    BOOST_CHECK_EQUAL(options["option2"].as<int>(), 1);
+
+   /// when the config.ini exists and doesn't contain logging configuration while the logging.ini doesn't exist
+   /// the default logging.ini is created
+   BOOST_CHECK(fc::exists(logging_ini_file));
 }
 
 BOOST_AUTO_TEST_CASE(load_configuration_options_test_logging_ini_options)
@@ -141,6 +149,57 @@ BOOST_AUTO_TEST_CASE(load_configuration_options_test_logging_ini_options)
 
    /// check the options values are parsed into the output map
    /// this is a little bit tricky since load_configuration_options() doesn't provide output variable for logging_config
+   auto logger_map = fc::get_logger_map();
+   auto appender_map = fc::get_appender_map();
+   BOOST_CHECK_EQUAL(logger_map.size(), 1);
+   BOOST_CHECK(logger_map.count("default"));
+   BOOST_CHECK_EQUAL(appender_map.size(), 1);
+   BOOST_CHECK(appender_map.count("default"));
+}
+
+BOOST_AUTO_TEST_CASE(load_configuration_options_test_legacy_config_ini_options)
+{
+   fc::temp_directory app_dir(graphene::utilities::temp_directory_path());
+   auto dir = app_dir.path();
+   auto config_ini_file = dir / "config.ini";
+   auto logging_ini_file = dir / "logging.ini";
+
+   /// create config.ini
+   bpo::options_description cfg_options("config.ini options");
+   cfg_options.add_options()
+   ("option1", bpo::value<std::string>(), "")
+   ("option2", bpo::value<int>(), "")
+   ;
+   std::ofstream out(config_ini_file.preferred_string());
+   out << "option1=is present\n"
+          "option2=1\n\n"
+          "[log.file_appender.default]\n"
+          "filename=test.log\n\n"
+          "[logger.default]\n"
+          "level=info\n"
+          "appenders=default\n\n"
+          ;
+   out.close();
+
+   /// clear logger and appender state
+   fc::get_logger_map().clear();
+   fc::get_appender_map().clear();
+   BOOST_CHECK(fc::get_logger_map().empty());
+   BOOST_CHECK(fc::get_appender_map().empty());
+
+   bpo::variables_map options;
+   app::load_configuration_options(dir, cfg_options, options);
+
+   /// check logging.ini not created
+   BOOST_CHECK(!fc::exists(logging_ini_file));
+
+   /// check the options values are parsed into the output map
+   BOOST_CHECK(!options.empty());
+   BOOST_CHECK_EQUAL(options.count("option1"), 1);
+   BOOST_CHECK_EQUAL(options.count("option2"), 1);
+   BOOST_CHECK_EQUAL(options["option1"].as<std::string>(), "is present");
+   BOOST_CHECK_EQUAL(options["option2"].as<int>(), 1);
+
    auto logger_map = fc::get_logger_map();
    auto appender_map = fc::get_appender_map();
    BOOST_CHECK_EQUAL(logger_map.size(), 1);

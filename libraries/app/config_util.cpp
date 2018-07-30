@@ -223,19 +223,23 @@ static void load_config_file(const fc::path& config_ini_path, const bpo::options
                                            unique_options, true), options);
 }
 
-static void load_logging_config_file(const fc::path& config_ini_path)
+static bool load_logging_config_file(const fc::path& config_ini_path)
 {
    // try to get logging options from the config file.
    try
    {
       fc::optional<fc::logging_config> logging_config = load_logging_config_from_ini_file(config_ini_path);
       if (logging_config)
+      {
          fc::configure_logging(*logging_config);
+         return true;
+      }
    }
    catch (const fc::exception& ex)
    {
       wlog("Error parsing logging config from logging config file ${config}, using default config", ("config", config_ini_path.preferred_string()));
    }
+   return false;
 }
 
 static void create_new_config_file(const fc::path& config_ini_path, const fc::path& data_dir,
@@ -300,20 +304,39 @@ namespace graphene { namespace app {
 
    void load_configuration_options(const fc::path& data_dir, const bpo::options_description& cfg_options, bpo::variables_map& options)
    {
-      // load witness node initial configuration
-      fc::path config_ini_path = data_dir / "config.ini";
-      if( !exists(config_ini_path) )
-         create_new_config_file( config_ini_path, data_dir, cfg_options );
-      load_config_file( config_ini_path, cfg_options, options );
-
-      // load witness node logging configuration
+      const auto config_ini_path = data_dir / "config.ini";
       const auto logging_ini_path = data_dir / "logging.ini";
-      if (!fc::exists(logging_ini_path))
+
+      if(!exists(config_ini_path) && fc::exists(logging_ini_path))
       {
-         create_logging_config_file (logging_ini_path, data_dir);
+         // this is an uncommon case
+         create_new_config_file(config_ini_path, data_dir, cfg_options);
+      }
+      else if(!exists(config_ini_path))
+      {
+         // create default config.ini and logging.ini
+         create_new_config_file(config_ini_path, data_dir, cfg_options);
+         create_logging_config_file(logging_ini_path, data_dir);
       }
 
-      load_logging_config_file( logging_ini_path );
+      // load witness node configuration
+      load_config_file(config_ini_path, cfg_options, options);
+
+      // load logging configuration
+      if (fc::exists(logging_ini_path))
+      {
+         load_logging_config_file(logging_ini_path);
+      }
+      else
+      {
+         // this is the legacy config.ini case
+         if(!load_logging_config_file(config_ini_path))
+         {
+            // config_ini_path doesn't contain valid logging options - fall back to the defaults
+            create_logging_config_file(logging_ini_path, data_dir);
+            load_logging_config_file(logging_ini_path);
+         }
+      }
    }
 
 } } // graphene::app
