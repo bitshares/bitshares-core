@@ -85,7 +85,7 @@ namespace graphene { namespace chain {
                       );
             if (exc)
                 std::rethrow_exception(exc);
-            FC_ASSERT(ok, "Could not modify object, most likely a index constraint was violated");
+            FC_ASSERT(ok, "Could not modify object, most likely an index constraint was violated");
          }
 
          virtual void remove( const object& obj )override
