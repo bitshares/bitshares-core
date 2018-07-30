@@ -141,8 +141,10 @@ BOOST_AUTO_TEST_CASE( call_order_update_test )
       BOOST_REQUIRE_EQUAL( get_balance( dan, bitusd ), 5000 );
       BOOST_REQUIRE_EQUAL( get_balance( dan, core ), 10000000 - 20000  );
 
-      BOOST_TEST_MESSAGE( "increasing debt without increasing collateral again" );
+      BOOST_TEST_MESSAGE( "increasing debt a lot without increasing collateral, fails due to black swan" );
       GRAPHENE_REQUIRE_THROW( borrow( dan, bitusd.amount(80000), asset(0)), fc::exception );
+      BOOST_TEST_MESSAGE( "attempting to claim most of collateral without paying off debt, fails due to black swan" );
+      GRAPHENE_REQUIRE_THROW( cover( dan, bitusd.amount(0), asset(20000-1)), fc::exception );
       BOOST_TEST_MESSAGE( "attempting to claim all collateral without paying off debt" );
       GRAPHENE_REQUIRE_THROW( cover( dan, bitusd.amount(0), asset(20000)), fc::exception );
 
@@ -243,8 +245,10 @@ BOOST_AUTO_TEST_CASE( old_call_order_update_test_after_hardfork_583 )
       BOOST_REQUIRE_EQUAL( get_balance( dan, bitusd ), 5000 );
       BOOST_REQUIRE_EQUAL( get_balance( dan, core ), 10000000 - 20000  );
 
-      BOOST_TEST_MESSAGE( "increasing debt without increasing collateral again" );
+      BOOST_TEST_MESSAGE( "increasing debt a lot without increasing collateral, fails due to black swan" );
       GRAPHENE_REQUIRE_THROW( borrow( dan, bitusd.amount(80000), asset(0)), fc::exception );
+      BOOST_TEST_MESSAGE( "attempting to claim most of collateral without paying off debt, fails due to black swan" );
+      GRAPHENE_REQUIRE_THROW( cover( dan, bitusd.amount(0), asset(20000-1)), fc::exception );
       BOOST_TEST_MESSAGE( "attempting to claim all collateral without paying off debt" );
       GRAPHENE_REQUIRE_THROW( cover( dan, bitusd.amount(0), asset(20000)), fc::exception );
 

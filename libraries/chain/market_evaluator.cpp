@@ -248,6 +248,11 @@ void_result call_order_update_evaluator::do_apply(const call_order_update_operat
       call_obj = &*itr;
       old_collateralization = call_obj->collateralization();
       old_debt = call_obj->debt;
+      auto new_collateral = call_obj->collateral + o.delta_collateral.amount;
+      auto new_debt = *old_debt + o.delta_debt.amount;
+
+      // Forbid zero collateral with nonzero debt (avoids divide by zero when calculating call price below)
+      FC_ASSERT(!(new_collateral == 0 && new_debt != 0), "Cannot have zero collateral and nonzero debt");
 
       d.modify( *call_obj, [&]( call_order_object& call ){
          call.collateral += o.delta_collateral.amount;
