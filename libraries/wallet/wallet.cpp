@@ -821,8 +821,7 @@ public:
          } 
          else 
          {
-            disable_umask_protection();
-            throw;
+            FC_THROW("wallet file cannot be saved");
          }
 
          wlog( "successfully saved wallet to file ${fn}", ("fn", wallet_filename) );
