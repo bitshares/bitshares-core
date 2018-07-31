@@ -181,7 +181,7 @@ namespace graphene { namespace app {
           * @param a Base in pair
           * @param b Quote in pair
           * @param limit Maximum number of orders to retrieve
-          * @return A history of orders with b:a pair
+          * @return A history of orders with b:a pair, where a <= b, otherwise a and b will be swaped
           */
          vector<order_history_object> get_fill_order_history( asset_id_type a, asset_id_type b, uint32_t limit )const;
 
@@ -192,7 +192,7 @@ namespace graphene { namespace app {
           * @param bucket_seconds Represents the length in seconds of bucket
           * @param start Time in seconds from where buckets begin
           * @param end Time in seconds where buckets stop
-          * @return A history in market with b:a pair (maximum markets to retrieve is less than 200)
+          * @return A history in market with b:a pair (maximum markets to retrieve is less than 200), where a <= b, otherwise a and b will be swaped
           */
          vector<bucket_object> get_market_history( asset_id_type a, asset_id_type b, uint32_t bucket_seconds,
                                                    fc::time_point_sec start, fc::time_point_sec end )const;
