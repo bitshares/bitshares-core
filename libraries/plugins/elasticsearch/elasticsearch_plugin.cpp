@@ -71,6 +71,7 @@ class elasticsearch_plugin_impl
       bulk_struct bulk_line_struct;
       std::string bulk_line;
       std::string index_name;
+      bool is_sync = false;
    private:
       bool add_elasticsearch( const account_id_type account_id, const optional<operation_history_object>& oho, const signed_block& b );
       const account_transaction_history_object& addNewEntry(const account_statistics_object& stats_obj,
@@ -86,6 +87,7 @@ class elasticsearch_plugin_impl
       void cleanObjects(const account_transaction_history_object& ath, account_id_type account_id);
       void createBulkLine(const account_transaction_history_object& ath);
       void prepareBulk(const account_transaction_history_id_type& ath_id);
+      void populateESstruct();
 };
 
 elasticsearch_plugin_impl::~elasticsearch_plugin_impl()
@@ -164,15 +166,35 @@ bool elasticsearch_plugin_impl::update_account_histories( const signed_block& b 
             return false;
       }
    }
+   // we send bulk at end of block when we are in sync for better real time client experience
+   if(is_sync)
+   {
+      populateESstruct();
+      if(es.bulk_lines.size() > 0)
+      {
+         prepare.clear();
+         if(!graphene::utilities::SendBulk(es))
+            return false;
+         else
+            bulk_lines.clear();
+      }
+   }
+
    return true;
 }
 
 void elasticsearch_plugin_impl::checkState(const fc::time_point_sec& block_time)
 {
    if((fc::time_point::now() - block_time) < fc::seconds(30))
+   {
       limit_documents = _elasticsearch_bulk_sync;
+      is_sync = false;
+   }
    else
+   {
       limit_documents = _elasticsearch_bulk_replay;
+      is_sync = true;
+   }
 }
 
 void elasticsearch_plugin_impl::getOperationType(const optional <operation_history_object>& oho)
@@ -236,12 +258,7 @@ bool elasticsearch_plugin_impl::add_elasticsearch( const account_id_type account
 
    if (curl && bulk_lines.size() >= limit_documents) { // we are in bulk time, ready to add data to elasticsearech
       prepare.clear();
-
-      es.curl = curl;
-      es.bulk_lines = bulk_lines;
-      es.elasticsearch_url = _elasticsearch_node_url;
-      es.auth = _elasticsearch_basic_auth;
-
+      populateESstruct();
       if(!graphene::utilities::SendBulk(es))
          return false;
       else
@@ -334,6 +351,14 @@ void elasticsearch_plugin_impl::cleanObjects(const account_transaction_history_o
          db.remove(remove_op_id(db));
       }
    }
+}
+
+void elasticsearch_plugin_impl::populateESstruct()
+{
+   es.curl = curl;
+   es.bulk_lines = bulk_lines;
+   es.elasticsearch_url = _elasticsearch_node_url;
+   es.auth = _elasticsearch_basic_auth;
 }
 
 } // end namespace detail
