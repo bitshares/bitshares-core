@@ -188,12 +188,12 @@ void elasticsearch_plugin_impl::checkState(const fc::time_point_sec& block_time)
    if((fc::time_point::now() - block_time) < fc::seconds(30))
    {
       limit_documents = _elasticsearch_bulk_sync;
-      is_sync = false;
+      is_sync = true;
    }
    else
    {
       limit_documents = _elasticsearch_bulk_replay;
-      is_sync = true;
+      is_sync = false;
    }
 }
 
