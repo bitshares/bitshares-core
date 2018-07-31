@@ -235,39 +235,42 @@ BOOST_AUTO_TEST_CASE( undo_block )
    }
 }
 
-BOOST_AUTO_TEST_CASE( change_signing_key )
+BOOST_AUTO_TEST_CASE( change_signing_key_test )
 {
    try {
       fc::temp_directory data_dir( graphene::utilities::temp_directory_path() );
+
+      auto init_account_priv_key  = fc::ecc::private_key::regenerate(fc::sha256::hash(string("null_key")) );
+      auto init_pub_key = init_account_priv_key.get_public_key();
+      auto new_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("new_key")) );
+      auto new_pub_key = new_key.get_public_key();
+
+      std::map< public_key_type, fc::ecc::private_key > key_map;
+      key_map[init_pub_key] = init_account_priv_key;
+      key_map[new_pub_key] = new_key;
+
+      std::set< witness_id_type > witnesses;
+      for( uint32_t i = 0; i <= 11; ++i ) // 11 init witnesses and 0 is reserved
+         witnesses.insert( witness_id_type(i) );
+
+      auto change_signing_key = [&init_account_priv_key]( database& db, witness_id_type wit, public_key_type new_signing_key ) {
+         witness_update_operation wuop;
+         wuop.witness_account = wit(db).witness_account;
+         wuop.witness = wit;
+         wuop.new_signing_key = new_signing_key;
+         signed_transaction wu_trx;
+         wu_trx.operations.push_back( wuop );
+         wu_trx.set_reference_block( db.head_block_id() );
+         wu_trx.set_expiration( db.head_block_time()
+                               + fc::seconds( 0x1000 * db.get_global_properties().parameters.block_interval ) );
+         wu_trx.sign( init_account_priv_key, db.get_chain_id() );
+         PUSH_TX( db, wu_trx, 0 );
+      };
+
       {
          database db;
-         auto init_account_priv_key  = fc::ecc::private_key::regenerate(fc::sha256::hash(string("null_key")) );
-         auto init_pub_key = init_account_priv_key.get_public_key();
-         auto new_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("new_key")) );
-         auto new_pub_key = new_key.get_public_key();
-
-         std::map< public_key_type, fc::ecc::private_key > key_map;
-         key_map[init_pub_key] = init_account_priv_key;
-         key_map[new_pub_key] = new_key;
-
-         auto change_signing_key = [&db,&init_account_priv_key]( witness_id_type wit, public_key_type new_signing_key ) {
-            witness_update_operation wuop;
-            wuop.witness_account = wit(db).witness_account;
-            wuop.witness = wit;
-            wuop.new_signing_key = new_signing_key;
-            signed_transaction wu_trx;
-            wu_trx.operations.push_back( wuop );
-            wu_trx.set_reference_block( db.head_block_id() );
-            wu_trx.set_expiration( db.head_block_time()
-                                  + fc::seconds( 0x1000 * db.get_global_properties().parameters.block_interval ) );
-            wu_trx.sign( init_account_priv_key, db.get_chain_id() );
-            PUSH_TX( db, wu_trx, 0 );
-         };
 
          // Initialize witness key cache
-         std::set< witness_id_type > witnesses;
-         for( uint32_t i = 0; i <= 11; ++i ) // 11 init witnesses and 0 is reserved
-            witnesses.insert( witness_id_type(i) );
          db.init_witness_key_cache( witnesses );
 
          // open database
@@ -287,7 +290,7 @@ BOOST_AUTO_TEST_CASE( change_signing_key )
             auto now = db.get_slot_time(1);
             auto next_witness = db.get_scheduled_witness( 1 );
             public_key_type current_key = next_witness(db).signing_key;
-            change_signing_key( next_witness, new_key.get_public_key() );
+            change_signing_key( db, next_witness, new_key.get_public_key() );
             idump( (i)(now)(next_witness) );
             auto b = db.generate_block( now, next_witness, key_map[current_key], database::skip_nothing );
             idump( (b) );
@@ -307,7 +310,7 @@ BOOST_AUTO_TEST_CASE( change_signing_key )
             auto now = db.get_slot_time(1);
             auto next_witness = db.get_scheduled_witness( 1 );
             public_key_type current_key = next_witness(db).signing_key;
-            change_signing_key( next_witness, new_key.get_public_key() );
+            change_signing_key( db, next_witness, new_key.get_public_key() );
             idump( (i)(now)(next_witness) );
             auto b = db.generate_block( now, next_witness, key_map[current_key], database::skip_nothing );
             idump( (b) );
@@ -326,6 +329,12 @@ BOOST_AUTO_TEST_CASE( change_signing_key )
 
          // close the database, flush all data to disk
          db.close();
+      }
+      {
+         database db;
+
+         // Initialize witness key cache
+         db.init_witness_key_cache( witnesses );
 
          // reopen database, all data should be unchanged
          db.open(data_dir.path(), make_genesis, "TEST");
@@ -336,7 +345,7 @@ BOOST_AUTO_TEST_CASE( change_signing_key )
             auto now = db.get_slot_time(1);
             auto next_witness = db.get_scheduled_witness( 1 );
             public_key_type current_key = next_witness(db).signing_key;
-            change_signing_key( next_witness, new_key.get_public_key() );
+            change_signing_key( db, next_witness, new_key.get_public_key() );
             idump( (i)(now)(next_witness) );
             auto b = db.generate_block( now, next_witness, key_map[current_key], database::skip_nothing );
             idump( (b) );
