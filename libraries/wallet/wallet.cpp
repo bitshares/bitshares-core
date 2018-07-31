@@ -808,16 +808,17 @@ public:
          //
          // http://en.wikipedia.org/wiki/Most_vexing_parse
          //
-         fc::ofstream outfile{ fc::path( wallet_filename + ".tmp" ) };
+         std::string tmp_wallet_filename = wallet_filename + ".tmp";
+         fc::ofstream outfile{ fc::path( tmp_wallet_filename ) };
          outfile.write( data.c_str(), data.length() );
          outfile.flush();
          outfile.close();
 
          std::string wallet_file_content;
-         fc::read_file_contents(wallet_filename, wallet_file_content);
+         fc::read_file_contents(tmp_wallet_filename, wallet_file_content);
 
          if (wallet_file_content == data) {
-            fc::rename( wallet_filename + ".tmp", wallet_filename );
+            fc::rename( tmp_wallet_filename, wallet_filename );
          } 
          else 
          {
