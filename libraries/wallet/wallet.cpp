@@ -814,15 +814,21 @@ public:
          outfile.flush();
          outfile.close();
 
+         wlog( "saved successfully wallet to tmp file ${fn}", ("fn", tmp_wallet_filename) );
+
          std::string wallet_file_content;
          fc::read_file_contents(tmp_wallet_filename, wallet_file_content);
 
          if (wallet_file_content == data) {
+            wlog( "validated successfully tmp wallet file ${fn}", ("fn", tmp_wallet_filename) );
+
             fc::rename( tmp_wallet_filename, wallet_filename );
+
+            wlog( "renamed successfully tmp wallet file to ${fn}", ("fn", tmp_wallet_filename) );
          } 
          else 
          {
-            FC_THROW("wallet file cannot be saved");
+            FC_THROW("tmp wallet file cannot be validated ${fn}", ("fn", tmp_wallet_filename) );
          }
 
          wlog( "successfully saved wallet to file ${fn}", ("fn", wallet_filename) );
