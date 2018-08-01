@@ -227,9 +227,9 @@ int main( int argc, char** argv )
          wallet_cli->set_prompt(  locked ? "locked >>> " : "unlocked >>> " );
       }));
 
-      auto _websocket_server = std::make_shared<fc::http::websocket_server>();
       if( options.count("rpc-endpoint") )
       {
+         auto _websocket_server = std::make_shared<fc::http::websocket_server>();
          _websocket_server->on_connection([&wapi]( const fc::http::websocket_connection_ptr& c ){
             auto wsc = std::make_shared<fc::rpc::websocket_api_connection>(*c, GRAPHENE_MAX_NESTED_OBJECTS);
             wsc->register_api(wapi);
@@ -244,9 +244,9 @@ int main( int argc, char** argv )
       if( options.count( "rpc-tls-certificate" ) )
          cert_pem = options.at("rpc-tls-certificate").as<string>();
 
-      auto _websocket_tls_server = std::make_shared<fc::http::websocket_tls_server>(cert_pem);
       if( options.count("rpc-tls-endpoint") )
       {
+         auto _websocket_tls_server = std::make_shared<fc::http::websocket_tls_server>(cert_pem);
          _websocket_tls_server->on_connection([&wapi]( const fc::http::websocket_connection_ptr& c ){
             auto wsc = std::make_shared<fc::rpc::websocket_api_connection>(*c, GRAPHENE_MAX_NESTED_OBJECTS);
             wsc->register_api(wapi);
@@ -257,10 +257,10 @@ int main( int argc, char** argv )
          _websocket_tls_server->start_accept();
       }
 
-      auto _http_server = std::make_shared<fc::http::server>();
       if( options.count("rpc-http-endpoint" ) )
       {
          ilog( "Listening for incoming HTTP RPC requests on ${p}", ("p", options.at("rpc-http-endpoint").as<string>() ) );
+         auto _http_server = std::make_shared<fc::http::server>();
          _http_server->listen( fc::ip::endpoint::from_string( options.at( "rpc-http-endpoint" ).as<string>() ) );
          //
          // due to implementation, on_request() must come AFTER listen()
