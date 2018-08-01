@@ -824,7 +824,7 @@ public:
 
             fc::rename( tmp_wallet_filename, wallet_filename );
 
-            wlog( "renamed successfully tmp wallet file to ${fn}", ("fn", tmp_wallet_filename) );
+            wlog( "renamed successfully tmp wallet file ${fn}", ("fn", tmp_wallet_filename) );
          } 
          else 
          {
