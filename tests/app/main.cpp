@@ -115,8 +115,8 @@ BOOST_AUTO_TEST_CASE(load_configuration_options_test_config_ini_options)
    BOOST_CHECK_EQUAL(options["option2"].as<int>(), 1);
 
    /// when the config.ini exists and doesn't contain logging configuration while the logging.ini doesn't exist
-   /// the default logging.ini is created
-   BOOST_CHECK(fc::exists(logging_ini_file));
+   /// the logging.ini is not created
+   BOOST_CHECK(!fc::exists(logging_ini_file));
 }
 
 BOOST_AUTO_TEST_CASE(load_configuration_options_test_logging_ini_options)

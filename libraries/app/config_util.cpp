@@ -330,12 +330,7 @@ namespace graphene { namespace app {
       else
       {
          // this is the legacy config.ini case
-         if(!load_logging_config_file(config_ini_path))
-         {
-            // config_ini_path doesn't contain valid logging options - fall back to the defaults
-            create_logging_config_file(logging_ini_path, data_dir);
-            load_logging_config_file(logging_ini_path);
-         }
+         load_logging_config_file(config_ini_path);
       }
    }
 
