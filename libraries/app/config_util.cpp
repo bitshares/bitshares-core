@@ -65,9 +65,6 @@ private:
    const boost::shared_ptr<bpo::option_description> (*modifier)(const boost::shared_ptr<bpo::option_description>&);
 };
 
-// logging config is too complicated to be parsed by boost::program_options,
-// so we do it by hand
-//
 // Currently, you can only specify the filenames and logging levels, which
 // are all most users would want to change.  At a later time, options can
 // be added to control rotation intervals, compression, and other seldom-
@@ -116,6 +113,8 @@ static void write_default_logging_config_to_stream(std::ostream& out)
           "appenders=rpc\n\n";
 }
 
+// logging config is too complicated to be parsed by boost::program_options,
+// so we do it by hand
 static fc::optional<fc::logging_config> load_logging_config_from_ini_file(const fc::path& config_ini_filename)
 {
    try
