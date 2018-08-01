@@ -249,7 +249,7 @@ static void create_new_config_file(const fc::path& config_ini_path, const fc::pa
       fc::create_directories(data_dir);
 
    auto modify_option_defaults = [](const boost::shared_ptr<bpo::option_description>& o) -> const boost::shared_ptr<bpo::option_description> {
-       const std::basic_string<char, std::char_traits<char>, std::allocator<char>> & name = o->long_name();
+       const std::string& name = o->long_name();
        if( name == "partial-operations" )
           return new_option_description(name, bpo::value<bool>()->default_value(true), o->description() );
        if( name == "max-ops-per-account" )
