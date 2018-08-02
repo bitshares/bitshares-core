@@ -253,7 +253,7 @@ static void create_new_config_file(const fc::path& config_ini_path, const fc::pa
        if( name == "partial-operations" )
           return new_option_description(name, bpo::value<bool>()->default_value(true), o->description() );
        if( name == "max-ops-per-account" )
-          return new_option_description(name, bpo::value<int>()->default_value(1000), o->description() );
+          return new_option_description(name, bpo::value<int>()->default_value(100), o->description() );
        return o;
    };
    deduplicator dedup(modify_option_defaults);
