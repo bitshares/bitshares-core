@@ -34,10 +34,9 @@ We recommend building on Ubuntu 16.04 LTS (64-bit)
 
 **Build Script:**
 
-    LATEST_RELEASE_TAG=$(curl https://raw.githubusercontent.com/bitshares/bitshares-core/master/current_version)
     git clone https://github.com/bitshares/bitshares-core.git
     cd bitshares-core
-    git checkout $LATEST_RELEASE_TAG
+    git checkout master # may substitute "master" with current release tag
     git submodule update --init --recursive
     cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo .
     make
