@@ -40,7 +40,7 @@ RUN \
         -DCMAKE_BUILD_TYPE=Release \
         . && \
     make witness_node cli_wallet && \
-    make install && \
+    install -s programs/witness_node/witness_node programs/cli_wallet/cli_wallet /usr/local/bin && \
     #
     # Obtain version
     mkdir /etc/bitshares && \
