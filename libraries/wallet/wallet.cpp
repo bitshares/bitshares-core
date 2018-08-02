@@ -79,6 +79,12 @@
 # include <sys/stat.h>
 #endif
 
+#ifdef WIN32
+# include <signal.h>
+#else
+# include <csignal>
+#endif
+
 // explicit instantiation for later use
 namespace fc {
 	template class api<graphene::wallet::wallet_api, identity_member>;
@@ -779,7 +785,7 @@ public:
     {
         ilog( "Quitting Cli Wallet ..." );
         
-        throw fc::canceled_exception();
+        raise(SIGINT);
     }
 
    void save_wallet_file(string wallet_filename = "")
