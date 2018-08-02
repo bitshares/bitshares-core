@@ -53,14 +53,6 @@
 
 #include "../common/genesis_file_util.hpp"
 
-#include <fc/interprocess/signals.hpp>
-
-#ifdef WIN32
-# include <signal.h>
-#else
-# include <csignal>
-#endif
-
 //////
 /// @brief attempt to find an available port on localhost
 /// @returns an available port number, or -1 on error
@@ -252,16 +244,7 @@ BOOST_AUTO_TEST_CASE( cli_quit )
       // connect to the server
       client_connection con(app1, app_dir, server_port_number);
 
-      fc::promise<int>::ptr exit_promise = new fc::promise<int>("UNIX Signal Handler");
-      fc::set_signal_handler([&exit_promise](int signal) {
-          exit_promise->set_value(signal);
-      }, SIGINT);
-
-      con.wallet_api_ptr->quit();
-
-      int i = exit_promise->wait();
-
-      BOOST_CHECK_EQUAL(SIGINT, i);
+      BOOST_CHECK_THROW( con.wallet_api_ptr->quit(), fc::canceled_exception );
    } catch( fc::exception& e ) {
       edump((e.to_detail_string()));
       throw;
