@@ -799,6 +799,7 @@ public:
       wlog( "saving wallet to file ${fn}", ("fn", wallet_filename) );
 
       string data = fc::json::to_pretty_string( _wallet );
+
       try
       {
          enable_umask_protection();
@@ -837,6 +838,11 @@ public:
       }
       catch(...)
       {
+         string ws_password = _wallet.ws_password;
+         _wallet.ws_password = "";
+         wlog("wallet file ${data}", ("data", fc::json::to_pretty_string( _wallet ) ) );
+         _wallet.ws_password = ws_password;
+
          disable_umask_protection();
          throw;
       }
