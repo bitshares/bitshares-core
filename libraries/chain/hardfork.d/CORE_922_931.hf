@@ -1,0 +1,5 @@
+// bitshares-core issue #922 Missing checks when updating an asset's bitasset_data
+// bitshares-core issue #931 Changing backing asset ID runs some checks against the old value instead of the new
+#ifndef HARDFORK_CORE_922_931_TIME
+#define HARDFORK_CORE_922_931_TIME (fc::time_point_sec( 1532008920 )) // Thu, 19 Jul 2018 14:02:00 UTC
+#endif

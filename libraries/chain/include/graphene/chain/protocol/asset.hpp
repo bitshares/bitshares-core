@@ -29,6 +29,8 @@ namespace graphene { namespace chain {
 
    extern const int64_t scaled_precision_lut[];
 
+   struct price;
+
    struct asset
    {
       asset( share_type a = 0, asset_id_type id = asset_id_type() )
@@ -60,20 +62,20 @@ namespace graphene { namespace chain {
          FC_ASSERT( a.asset_id == b.asset_id );
          return a.amount < b.amount;
       }
-      friend bool operator <= ( const asset& a, const asset& b )
+      friend inline bool operator <= ( const asset& a, const asset& b )
       {
-         return (a == b) || (a < b);
+         return !(b < a);
       }
 
-      friend bool operator != ( const asset& a, const asset& b )
+      friend inline bool operator != ( const asset& a, const asset& b )
       {
          return !(a == b);
       }
-      friend bool operator > ( const asset& a, const asset& b )
+      friend inline bool operator > ( const asset& a, const asset& b )
       {
-         return !(a <= b);
+         return (b < a);
       }
-      friend bool operator >= ( const asset& a, const asset& b )
+      friend inline bool operator >= ( const asset& a, const asset& b )
       {
          return !(a < b);
       }
@@ -94,6 +96,8 @@ namespace graphene { namespace chain {
          FC_ASSERT( precision < 19 );
          return scaled_precision_lut[ precision ];
       }
+
+      asset multiply_and_round_up( const price& p )const; ///< Multiply and round up
    };
 
    /**
@@ -110,8 +114,8 @@ namespace graphene { namespace chain {
     */
    struct price
    {
-      price(const asset& base = asset(), const asset quote = asset())
-         : base(base),quote(quote){}
+      explicit price(const asset& _base = asset(), const asset _quote = asset())
+         : base(_base),quote(_quote){}
 
       asset base;
       asset quote;
@@ -136,15 +140,15 @@ namespace graphene { namespace chain {
    price operator / ( const asset& base, const asset& quote );
    inline price operator~( const price& p ) { return price{p.quote,p.base}; }
 
-   bool  operator <  ( const asset& a, const asset& b );
-   bool  operator <= ( const asset& a, const asset& b );
    bool  operator <  ( const price& a, const price& b );
-   bool  operator <= ( const price& a, const price& b );
-   bool  operator >  ( const price& a, const price& b );
-   bool  operator >= ( const price& a, const price& b );
    bool  operator == ( const price& a, const price& b );
-   bool  operator != ( const price& a, const price& b );
-   asset operator *  ( const asset& a, const price& b );
+
+   inline bool  operator >  ( const price& a, const price& b ) { return (b < a); }
+   inline bool  operator <= ( const price& a, const price& b ) { return !(b < a); }
+   inline bool  operator >= ( const price& a, const price& b ) { return !(a < b); }
+   inline bool  operator != ( const price& a, const price& b ) { return !(a == b); }
+
+   asset operator *  ( const asset& a, const price& b ); ///< Multiply and round down
 
    price operator *  ( const price& p, const ratio_type& r );
    price operator /  ( const price& p, const ratio_type& r );

@@ -43,10 +43,19 @@ share_type asset_bitasset_data_object::max_force_settlement_volume(share_type cu
    return volume.to_uint64();
 }
 
+/******
+ * @brief calculate the median feed
+ *
+ * This calculates the median feed. It sets the current_feed_publication_time
+ * and current_feed member variables
+ *
+ * @param current_time the time to use in the calculations
+ */
 void graphene::chain::asset_bitasset_data_object::update_median_feeds(time_point_sec current_time)
 {
    current_feed_publication_time = current_time;
    vector<std::reference_wrapper<const price_feed>> current_feeds;
+   // find feeds that were alive at current_time
    for( const pair<account_id_type, pair<time_point_sec,price_feed>>& f : feeds )
    {
       if( (current_time - f.second.first).to_seconds() < options.feed_lifetime_sec &&
@@ -61,12 +70,15 @@ void graphene::chain::asset_bitasset_data_object::update_median_feeds(time_point
    if( current_feeds.size() < options.minimum_feeds )
    {
       //... don't calculate a median, and set a null feed
+      feed_cer_updated = false; // new median cer is null, won't update asset_object anyway, set to false for better performance
       current_feed_publication_time = current_time;
       current_feed = price_feed();
       return;
    }
    if( current_feeds.size() == 1 )
    {
+      if( current_feed.core_exchange_rate != current_feeds.front().get().core_exchange_rate )
+         feed_cer_updated = true;
       current_feed = std::move(current_feeds.front());
       return;
    }
@@ -85,6 +97,8 @@ void graphene::chain::asset_bitasset_data_object::update_median_feeds(time_point
 #undef CALCULATE_MEDIAN_VALUE
    // *** End Median Calculations ***
 
+   if( current_feed.core_exchange_rate != median_feed.core_exchange_rate )
+      feed_cer_updated = true;
    current_feed = median_feed;
 }
 
@@ -147,14 +161,15 @@ asset asset_object::amount_from_string(string amount_string) const
 
 string asset_object::amount_to_string(share_type amount) const
 {
-   share_type scaled_precision = 1;
-   for( uint8_t i = 0; i < precision; ++i )
-      scaled_precision *= 10;
-   assert(scaled_precision > 0);
+   share_type scaled_precision = asset::scaled_precision( precision );
 
    string result = fc::to_string(amount.value / scaled_precision.value);
-   auto decimals = amount.value % scaled_precision.value;
+   auto decimals = abs( amount.value % scaled_precision.value );
    if( decimals )
+   {
+      if( amount < 0 && result == "0" )
+         result = "-0";
       result += "." + fc::to_string(scaled_precision.value + decimals).erase(0,1);
+   }
    return result;
 }

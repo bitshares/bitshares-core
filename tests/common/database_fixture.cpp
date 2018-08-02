@@ -27,6 +27,7 @@
 #include <graphene/account_history/account_history_plugin.hpp>
 #include <graphene/market_history/market_history_plugin.hpp>
 #include <graphene/grouped_orders/grouped_orders_plugin.hpp>
+#include <graphene/elasticsearch/elasticsearch_plugin.hpp>
 
 #include <graphene/db/simple_index.hpp>
 
@@ -73,7 +74,6 @@ database_fixture::database_fixture()
       if( arg == "--show-test-names" )
          std::cout << "running test " << boost::unit_test::framework::current_test_case().p_name << std::endl;
    }
-   auto ahplugin = app.register_plugin<graphene::account_history::account_history_plugin>();
    auto mhplugin = app.register_plugin<graphene::market_history::market_history_plugin>();
    auto goplugin = app.register_plugin<graphene::grouped_orders::grouped_orders_plugin>();
    init_account_pub_key = init_account_priv_key.get_public_key();
@@ -94,6 +94,18 @@ database_fixture::database_fixture()
       genesis_state.initial_witness_candidates.push_back({name, init_account_priv_key.get_public_key()});
    }
    genesis_state.initial_parameters.current_fees->zero_all_fees();
+
+   genesis_state_type::initial_asset_type init_mpa1;
+   init_mpa1.symbol = "INITMPA";
+   init_mpa1.issuer_name = "committee-account";
+   init_mpa1.description = "Initial MPA";
+   init_mpa1.precision = 4;
+   init_mpa1.max_supply = GRAPHENE_MAX_SHARE_SUPPLY;
+   init_mpa1.accumulated_fees = 0;
+   init_mpa1.is_bitasset = true;
+   // TODO add initial UIA's; add initial short positions; test non-zero accumulated_fees
+   genesis_state.initial_assets.push_back( init_mpa1 );
+
    open_database();
 
    // add account tracking for ahplugin for special test case with track-account enabled
@@ -113,9 +125,29 @@ database_fixture::database_fixture()
       track_account.push_back(track);
       options.insert(std::make_pair("track-account", boost::program_options::variable_value(track_account, false)));
    }
+   // standby votes tracking
+   if( boost::unit_test::framework::current_test_case().p_name.value == "track_votes_witnesses_disabled" ||
+       boost::unit_test::framework::current_test_case().p_name.value == "track_votes_committee_disabled") {
+      app.chain_database()->enable_standby_votes_tracking( false );
+   }
 
-   ahplugin->plugin_set_app(&app);
-   ahplugin->plugin_initialize(options);
+   if(boost::unit_test::framework::current_test_case().p_name.value == "es1") {
+      auto esplugin = app.register_plugin<graphene::elasticsearch::elasticsearch_plugin>();
+      esplugin->plugin_set_app(&app);
+
+      options.insert(std::make_pair("elasticsearch-node-url", boost::program_options::variable_value(string("http://localhost:9200/"), false)));
+      options.insert(std::make_pair("elasticsearch-bulk-replay", boost::program_options::variable_value(uint32_t(2), false)));
+      options.insert(std::make_pair("elasticsearch-bulk-sync", boost::program_options::variable_value(uint32_t(2), false)));
+
+      esplugin->plugin_initialize(options);
+      esplugin->plugin_startup();
+   }
+   else {
+      auto ahplugin = app.register_plugin<graphene::account_history::account_history_plugin>();
+      ahplugin->plugin_set_app(&app);
+      ahplugin->plugin_initialize(options);
+      ahplugin->plugin_startup();
+   }
 
    options.insert(std::make_pair("bucket-size", boost::program_options::variable_value(string("[15]"),false)));
    mhplugin->plugin_set_app(&app);
@@ -124,11 +156,14 @@ database_fixture::database_fixture()
    goplugin->plugin_set_app(&app);
    goplugin->plugin_initialize(options);
 
-   ahplugin->plugin_startup();
    mhplugin->plugin_startup();
    goplugin->plugin_startup();
 
    generate_block();
+
+   asset_id_type mpa1_id(1);
+   BOOST_REQUIRE( mpa1_id(db).is_market_issued() );
+   BOOST_CHECK( mpa1_id(db).bitasset_data(db).asset_id == mpa1_id );
 
    set_expiration( db, trx );
    } catch ( const fc::exception& e )
@@ -174,7 +209,7 @@ void database_fixture::verify_asset_supplies( const database& db )
    const asset_dynamic_data_object& core_asset_data = db.get_core_asset().dynamic_asset_data_id(db);
    BOOST_CHECK(core_asset_data.fee_pool == 0);
 
-   const simple_index<account_statistics_object>& statistics_index = db.get_index_type<simple_index<account_statistics_object>>();
+   const auto& statistics_index = db.get_index_type<account_stats_index>().indices();
    const auto& balance_index = db.get_index_type<account_balance_index>().indices();
    const auto& settle_index = db.get_index_type<force_settlement_index>().indices();
    const auto& bids = db.get_index_type<collateral_bid_index>().indices();
@@ -200,6 +235,7 @@ void database_fixture::verify_asset_supplies( const database& db )
       if( for_sale.asset_id == asset_id_type() ) core_in_orders += for_sale.amount;
       total_balances[for_sale.asset_id] += for_sale.amount;
       total_balances[asset_id_type()] += o.deferred_fee;
+      total_balances[o.deferred_paid_fee.asset_id] += o.deferred_paid_fee.amount;
    }
    for( const call_order_object& o : db.get_index_type<call_order_index>().indices() )
    {
@@ -350,20 +386,25 @@ void database_fixture::generate_blocks( uint32_t block_count )
       generate_block();
 }
 
-void database_fixture::generate_blocks(fc::time_point_sec timestamp, bool miss_intermediate_blocks, uint32_t skip)
+uint32_t database_fixture::generate_blocks(fc::time_point_sec timestamp, bool miss_intermediate_blocks, uint32_t skip)
 {
    if( miss_intermediate_blocks )
    {
       generate_block(skip);
       auto slots_to_miss = db.get_slot_at_time(timestamp);
       if( slots_to_miss <= 1 )
-         return;
+         return 1;
       --slots_to_miss;
       generate_block(skip, init_account_priv_key, slots_to_miss);
-      return;
+      return 2;
    }
+   uint32_t blocks = 0;
    while( db.head_block_time() < timestamp )
+   {
       generate_block(skip);
+      ++blocks;
+   }
+   return blocks;
 }
 
 account_create_operation database_fixture::make_account(
@@ -458,7 +499,9 @@ const asset_object& database_fixture::create_bitasset(
    const string& name,
    account_id_type issuer /* = GRAPHENE_WITNESS_ACCOUNT */,
    uint16_t market_fee_percent /* = 100 */ /* 1% */,
-   uint16_t flags /* = charge_market_fee */
+   uint16_t flags /* = charge_market_fee */,
+   uint16_t precision /* = GRAPHENE_BLOCKCHAIN_PRECISION_DIGITS */,
+   asset_id_type backing_asset /* = CORE */
    )
 { try {
    asset_create_operation creator;
@@ -466,14 +509,15 @@ const asset_object& database_fixture::create_bitasset(
    creator.fee = asset();
    creator.symbol = name;
    creator.common_options.max_supply = GRAPHENE_MAX_SHARE_SUPPLY;
-   creator.precision = 2;
+   creator.precision = precision;
    creator.common_options.market_fee_percent = market_fee_percent;
    if( issuer == GRAPHENE_WITNESS_ACCOUNT )
       flags |= witness_fed_asset;
    creator.common_options.issuer_permissions = flags;
    creator.common_options.flags = flags & ~global_settle;
-   creator.common_options.core_exchange_rate = price({asset(1,asset_id_type(1)),asset(1)});
+   creator.common_options.core_exchange_rate = price(asset(1,asset_id_type(1)),asset(1));
    creator.bitasset_opts = bitasset_options();
+   creator.bitasset_opts->short_backing_asset = backing_asset;
    trx.operations.push_back(std::move(creator));
    trx.validate();
    processed_transaction ptx = db.push_transaction(trx, ~0);
@@ -485,7 +529,9 @@ const asset_object& database_fixture::create_prediction_market(
    const string& name,
    account_id_type issuer /* = GRAPHENE_WITNESS_ACCOUNT */,
    uint16_t market_fee_percent /* = 100 */ /* 1% */,
-   uint16_t flags /* = charge_market_fee */
+   uint16_t flags /* = charge_market_fee */,
+   uint16_t precision /* = 2, which seems arbitrary, but historically chosen */,
+   asset_id_type backing_asset /* = CORE */
    )
 { try {
    asset_create_operation creator;
@@ -493,14 +539,15 @@ const asset_object& database_fixture::create_prediction_market(
    creator.fee = asset();
    creator.symbol = name;
    creator.common_options.max_supply = GRAPHENE_MAX_SHARE_SUPPLY;
-   creator.precision = GRAPHENE_BLOCKCHAIN_PRECISION_DIGITS;
+   creator.precision = precision;
    creator.common_options.market_fee_percent = market_fee_percent;
    creator.common_options.issuer_permissions = flags | global_settle;
    creator.common_options.flags = flags & ~global_settle;
    if( issuer == GRAPHENE_WITNESS_ACCOUNT )
       creator.common_options.flags |= witness_fed_asset;
-   creator.common_options.core_exchange_rate = price({asset(1,asset_id_type(1)),asset(1)});
+   creator.common_options.core_exchange_rate = price(asset(1,asset_id_type(1)),asset(1));
    creator.bitasset_opts = bitasset_options();
+   creator.bitasset_opts->short_backing_asset = backing_asset;
    creator.is_prediction_market = true;
    trx.operations.push_back(std::move(creator));
    trx.validate();
@@ -508,6 +555,7 @@ const asset_object& database_fixture::create_prediction_market(
    trx.operations.clear();
    return db.get<asset_object>(ptx.operation_results[0].get<object_id_type>());
 } FC_CAPTURE_AND_RETHROW( (name)(flags) ) }
+
 
 const asset_object& database_fixture::create_user_issued_asset( const string& name )
 {
@@ -517,7 +565,7 @@ const asset_object& database_fixture::create_user_issued_asset( const string& na
    creator.symbol = name;
    creator.common_options.max_supply = 0;
    creator.precision = 2;
-   creator.common_options.core_exchange_rate = price({asset(1,asset_id_type(1)),asset(1)});
+   creator.common_options.core_exchange_rate = price(asset(1,asset_id_type(1)),asset(1));
    creator.common_options.max_supply = GRAPHENE_MAX_SHARE_SUPPLY;
    creator.common_options.flags = charge_market_fee;
    creator.common_options.issuer_permissions = charge_market_fee;
@@ -528,15 +576,16 @@ const asset_object& database_fixture::create_user_issued_asset( const string& na
    return db.get<asset_object>(ptx.operation_results[0].get<object_id_type>());
 }
 
-const asset_object& database_fixture::create_user_issued_asset( const string& name, const account_object& issuer, uint16_t flags )
+const asset_object& database_fixture::create_user_issued_asset( const string& name, const account_object& issuer, uint16_t flags,
+                                                                const price& core_exchange_rate, uint16_t precision)
 {
    asset_create_operation creator;
    creator.issuer = issuer.id;
    creator.fee = asset();
    creator.symbol = name;
    creator.common_options.max_supply = 0;
-   creator.precision = 2;
-   creator.common_options.core_exchange_rate = price({asset(1,asset_id_type(1)),asset(1)});
+   creator.precision = precision;
+   creator.common_options.core_exchange_rate = core_exchange_rate;
    creator.common_options.max_supply = GRAPHENE_MAX_SHARE_SUPPLY;
    creator.common_options.flags = flags;
    creator.common_options.issuer_permissions = flags;
@@ -726,22 +775,27 @@ digest_type database_fixture::digest( const transaction& tx )
    return tx.digest();
 }
 
-const limit_order_object*database_fixture::create_sell_order(account_id_type user, const asset& amount, const asset& recv)
+const limit_order_object*database_fixture::create_sell_order(account_id_type user, const asset& amount, const asset& recv,
+                                                const time_point_sec order_expiration,
+                                                const price& fee_core_exchange_rate )
 {
-   auto r =  create_sell_order(user(db), amount, recv);
+   auto r =  create_sell_order( user(db), amount, recv, order_expiration, fee_core_exchange_rate );
    verify_asset_supplies(db);
    return r;
 }
 
-const limit_order_object* database_fixture::create_sell_order( const account_object& user, const asset& amount, const asset& recv )
+const limit_order_object* database_fixture::create_sell_order( const account_object& user, const asset& amount, const asset& recv,
+                                                const time_point_sec order_expiration,
+                                                const price& fee_core_exchange_rate )
 {
    //wdump((amount)(recv));
    limit_order_create_operation buy_order;
    buy_order.seller = user.id;
    buy_order.amount_to_sell = amount;
    buy_order.min_to_receive = recv;
+   buy_order.expiration = order_expiration;
    trx.operations.push_back(buy_order);
-   for( auto& op : trx.operations ) db.current_fee_schedule().set_fee(op);
+   for( auto& op : trx.operations ) db.current_fee_schedule().set_fee(op, fee_core_exchange_rate);
    trx.validate();
    auto processed = db.push_transaction(trx, ~0);
    trx.operations.clear();
@@ -837,6 +891,38 @@ void database_fixture::publish_feed( const asset_object& mia, const account_obje
    verify_asset_supplies(db);
 }
 
+/***
+ * @brief helper method to add a price feed
+ *
+ * Adds a price feed for asset2, pushes the transaction, and generates the block
+ *
+ * @param fixture the database_fixture
+ * @param publisher who is publishing the feed
+ * @param asset1 the base asset
+ * @param amount1 the amount of the base asset
+ * @param asset2 the quote asset
+ * @param amount2 the amount of the quote asset
+ * @param core_id id of core (helps with core_exchange_rate)
+ */
+void database_fixture::publish_feed(const account_id_type& publisher,
+      const asset_id_type& asset1, int64_t amount1,
+      const asset_id_type& asset2, int64_t amount2,
+      const asset_id_type& core_id)
+{
+   const asset_object& a1 = asset1(db);
+   const asset_object& a2 = asset2(db);
+   const asset_object& core = core_id(db);
+   asset_publish_feed_operation op;
+   op.publisher = publisher;
+   op.asset_id = asset2;
+   op.feed.settlement_price = ~price(a1.amount(amount1),a2.amount(amount2));
+   op.feed.core_exchange_rate = ~price(core.amount(amount1), a2.amount(amount2));
+   trx.operations.push_back(std::move(op));
+   PUSH_TX( db, trx, ~0);
+   generate_block();
+   trx.clear();
+}
+
 void database_fixture::force_global_settle( const asset_object& what, const price& p )
 { try {
    set_expiration( db, trx );
@@ -870,7 +956,8 @@ operation_result database_fixture::force_settle( const account_object& who, asse
    return op_result;
 } FC_CAPTURE_AND_RETHROW( (who)(what) ) }
 
-const call_order_object* database_fixture::borrow(const account_object& who, asset what, asset collateral)
+const call_order_object* database_fixture::borrow( const account_object& who, asset what, asset collateral,
+                                                   optional<uint16_t> target_cr )
 { try {
    set_expiration( db, trx );
    trx.operations.clear();
@@ -878,6 +965,7 @@ const call_order_object* database_fixture::borrow(const account_object& who, ass
    update.funding_account = who.id;
    update.delta_collateral = collateral;
    update.delta_debt = what;
+   update.extensions.value.target_collateral_ratio = target_cr;
    trx.operations.push_back(update);
    for( auto& op : trx.operations ) db.current_fee_schedule().set_fee(op);
    trx.validate();
@@ -892,9 +980,9 @@ const call_order_object* database_fixture::borrow(const account_object& who, ass
    if( itr != call_idx.end() )
       call_obj = &*itr;
    return call_obj;
-} FC_CAPTURE_AND_RETHROW( (who.name)(what)(collateral) ) }
+} FC_CAPTURE_AND_RETHROW( (who.name)(what)(collateral)(target_cr) ) }
 
-void database_fixture::cover(const account_object& who, asset what, asset collateral)
+void database_fixture::cover(const account_object& who, asset what, asset collateral, optional<uint16_t> target_cr)
 { try {
    set_expiration( db, trx );
    trx.operations.clear();
@@ -902,13 +990,14 @@ void database_fixture::cover(const account_object& who, asset what, asset collat
    update.funding_account = who.id;
    update.delta_collateral = -collateral;
    update.delta_debt = -what;
+   update.extensions.value.target_collateral_ratio = target_cr;
    trx.operations.push_back(update);
    for( auto& op : trx.operations ) db.current_fee_schedule().set_fee(op);
    trx.validate();
    db.push_transaction(trx, ~0);
    trx.operations.clear();
    verify_asset_supplies(db);
-} FC_CAPTURE_AND_RETHROW( (who.name)(what)(collateral) ) }
+} FC_CAPTURE_AND_RETHROW( (who.name)(what)(collateral)(target_cr) ) }
 
 void database_fixture::bid_collateral(const account_object& who, const asset& to_bid, const asset& to_cover)
 { try {
@@ -936,6 +1025,7 @@ void database_fixture::fund_fee_pool( const account_object& from, const asset_ob
 
    for( auto& op : trx.operations ) db.current_fee_schedule().set_fee(op);
    trx.validate();
+   set_expiration( db, trx );
    db.push_transaction(trx, ~0);
    trx.operations.clear();
    verify_asset_supplies(db);

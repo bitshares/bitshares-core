@@ -295,7 +295,7 @@ processed_transaction database::push_proposal(const proposal_object& proposal)
       {
          _applied_ops.resize( old_applied_ops_size );
       }
-      elog( "${e}", ("e",e.to_detail_string() ) );
+      wlog( "${e}", ("e",e.to_detail_string() ) );
       throw;
    }
 
@@ -503,11 +503,13 @@ void database::_apply_block( const signed_block& next_block )
 
    const witness_object& signing_witness = validate_block_header(skip, next_block);
    const auto& global_props = get_global_properties();
-   const auto& dynamic_global_props = get<dynamic_global_property_object>(dynamic_global_property_id_type());
+   const auto& dynamic_global_props = get_dynamic_global_properties();
    bool maint_needed = (dynamic_global_props.next_maintenance_time <= next_block.timestamp);
 
    _current_block_num    = next_block_num;
    _current_trx_in_block = 0;
+
+   _issue_453_affected_assets.clear();
 
    for( const auto& trx : next_block.transactions )
    {
@@ -521,7 +523,8 @@ void database::_apply_block( const signed_block& next_block )
       ++_current_trx_in_block;
    }
 
-   update_global_dynamic_data(next_block);
+   const uint32_t missed = update_witness_missed_blocks( next_block );
+   update_global_dynamic_data( next_block, missed );
    update_signing_witness(signing_witness, next_block);
    update_last_irreversible_block();
 
@@ -533,7 +536,8 @@ void database::_apply_block( const signed_block& next_block )
    clear_expired_transactions();
    clear_expired_proposals();
    clear_expired_orders();
-   update_expired_feeds();
+   update_expired_feeds();       // this will update expired feeds and some core exchange rates
+   update_core_exchange_rates(); // this will update remaining core exchange rates
    update_withdraw_permissions();
 
    // n.b., update_maintenance_flag() happens this late
@@ -628,10 +632,13 @@ processed_transaction database::_apply_transaction(const signed_transaction& trx
    }
    ptrx.operation_results = std::move(eval_state.operation_results);
 
-   //Make sure the temp account has no non-zero balances
-   const auto& index = get_index_type<account_balance_index>().indices().get<by_account_asset>();
-   auto range = index.equal_range( boost::make_tuple( GRAPHENE_TEMP_ACCOUNT ) );
-   std::for_each(range.first, range.second, [](const account_balance_object& b) { FC_ASSERT(b.balance == 0); });
+   if( head_block_time() < HARDFORK_CORE_1040_TIME ) // TODO totally remove this code block after hard fork
+   {
+      //Make sure the temp account has no non-zero balances
+      const auto& index = get_index_type<account_balance_index>().indices().get<by_account_asset>();
+      auto range = index.equal_range( boost::make_tuple( GRAPHENE_TEMP_ACCOUNT ) );
+      std::for_each(range.first, range.second, [](const account_balance_object& b) { FC_ASSERT(b.balance == 0); });
+   }
 
    return ptrx;
 } FC_CAPTURE_AND_RETHROW( (trx) ) }

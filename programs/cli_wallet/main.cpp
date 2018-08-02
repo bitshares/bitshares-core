@@ -38,7 +38,6 @@
 
 #include <graphene/app/api.hpp>
 #include <graphene/chain/config.hpp>
-#include <graphene/chain/protocol/protocol.hpp>
 #include <graphene/egenesis/egenesis.hpp>
 #include <graphene/utilities/key_conversion.hpp>
 #include <graphene/wallet/wallet.hpp>
@@ -86,6 +85,7 @@ int main( int argc, char** argv )
          ("daemon,d", "Run the wallet in daemon mode" )
          ("wallet-file,w", bpo::value<string>()->implicit_value("wallet.json"), "wallet to load")
          ("chain-id", bpo::value<string>(), "chain ID to connect to")
+         ("suggest-brain-key", "Suggest a safe brain key to use for creating your account")
          ("version,v", "Display version information");
 
 
@@ -106,6 +106,13 @@ int main( int argc, char** argv )
          std::cout << "SSL: " << OPENSSL_VERSION_TEXT << "\n";
          std::cout << "Boost: " << boost::replace_all_copy(std::string(BOOST_LIB_VERSION), "_", ".") << "\n";
          std::cout << "Websocket++: " << websocketpp::major_version << "." << websocketpp::minor_version << "." << websocketpp::patch_version << "\n";
+         return 0;
+      }
+      if( options.count("suggest-brain-key") )
+      {
+         auto keyinfo = graphene::wallet::utility::suggest_brain_key();
+         string data = fc::json::to_pretty_string( keyinfo );
+         std::cout << data.c_str() << std::endl;
          return 0;
       }
 
@@ -272,18 +279,18 @@ int main( int argc, char** argv )
       {
          wallet_cli->register_api( wapi );
          wallet_cli->start();
-         wallet_cli->wait();
       }
       else
       {
-        fc::promise<int>::ptr exit_promise = new fc::promise<int>("UNIX Signal Handler");
-        fc::set_signal_handler([&exit_promise](int signal) {
-           exit_promise->set_value(signal);
-        }, SIGINT);
-
-        ilog( "Entering Daemon Mode, ^C to exit" );
-        exit_promise->wait();
+         ilog( "Entering Daemon Mode, ^C to exit" );
       }
+
+      fc::promise<int>::ptr exit_promise = new fc::promise<int>("UNIX Signal Handler");
+      fc::set_signal_handler([&exit_promise](int signal) {
+          exit_promise->set_value(signal);
+      }, SIGINT);
+
+      exit_promise->wait();
 
       wapi->save_wallet_file(wallet_file.generic_string());
       locked_connection.disconnect();

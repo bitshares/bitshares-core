@@ -71,7 +71,8 @@ int get_available_port()
    socklen_t len = sizeof(sin);
    if (getsockname(socket_fd, (struct sockaddr *)&sin, &len) == -1)
       return -1;
-   return sin.sin_port;
+   close(socket_fd);
+   return ntohs(sin.sin_port);
 }
 
 ///////////
@@ -95,9 +96,12 @@ std::shared_ptr<graphene::app::application> start_application(fc::temp_directory
    cfg.emplace("seed-nodes", boost::program_options::variable_value(string("[]"), false));
    app1->initialize(app_dir.path(), cfg);
 
+   app1->initialize_plugins(cfg);
+   app1->startup_plugins();
+
    app1->startup();
    fc::usleep(fc::milliseconds(500));
-	return app1;
+   return app1;
 }
 
 ///////////
@@ -108,13 +112,12 @@ std::shared_ptr<graphene::app::application> start_application(fc::temp_directory
 bool generate_block(std::shared_ptr<graphene::app::application> app) {
    try {
       fc::ecc::private_key committee_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("nathan")));
-	   auto db = app->chain_database();
-	   auto block_1 = db->generate_block(
-	         db->get_slot_time(1),
-	         db->get_scheduled_witness(1),
-	         committee_key,
-	         database::skip_nothing);
-	   return true;
+      auto db = app->chain_database();
+      auto block_1 = db->generate_block( db->get_slot_time(1),
+                                         db->get_scheduled_witness(1),
+                                         committee_key,
+                                         database::skip_nothing );
+      return true;
    } catch (exception &e) {
       return false;
    }
@@ -208,11 +211,11 @@ BOOST_AUTO_TEST_CASE( cli_connect )
    try {
       fc::temp_directory app_dir ( graphene::utilities::temp_directory_path() );
 
-	   int server_port_number = 0;
-	   app1 = start_application(app_dir, server_port_number);
+      int server_port_number = 0;
+      app1 = start_application(app_dir, server_port_number);
 
       // connect to the server
-	   client_connection con(app1, app_dir, server_port_number);
+      client_connection con(app1, app_dir, server_port_number);
 
    } catch( fc::exception& e ) {
       edump((e.to_detail_string()));
@@ -220,6 +223,34 @@ BOOST_AUTO_TEST_CASE( cli_connect )
    }
    app1->shutdown();
 }
+
+////////////////
+// Start a server and connect using the same calls as the CLI
+// Quit wallet and be sure that file was saved correctly
+////////////////
+BOOST_AUTO_TEST_CASE( cli_quit )
+{
+   using namespace graphene::chain;
+   using namespace graphene::app;
+   std::shared_ptr<graphene::app::application> app1;
+   try {
+      BOOST_TEST_MESSAGE("Testing wallet connection and quit command.");
+
+      fc::temp_directory app_dir ( graphene::utilities::temp_directory_path() );
+
+      int server_port_number = 0;
+      app1 = start_application(app_dir, server_port_number);
+
+      // connect to the server
+      client_connection con(app1, app_dir, server_port_number);
+
+      BOOST_CHECK_THROW( con.wallet_api_ptr->quit(), fc::canceled_exception );
+   } catch( fc::exception& e ) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+   app1->shutdown();
+ } 
 
 ///////////////////////
 // Start a server and connect using the same calls as the CLI
@@ -268,7 +299,7 @@ BOOST_AUTO_TEST_CASE( cli_vote_for_2_witnesses )
       BOOST_CHECK(!bki.brain_priv_key.empty());
       signed_transaction create_acct_tx = con.wallet_api_ptr->create_account_with_brain_key(bki.brain_priv_key, "jmjatlanta", "nathan", "nathan", true);
       // save the private key for this new account in the wallet file
-   	BOOST_CHECK(con.wallet_api_ptr->import_key("jmjatlanta", bki.wif_priv_key));
+      BOOST_CHECK(con.wallet_api_ptr->import_key("jmjatlanta", bki.wif_priv_key));
       con.wallet_api_ptr->save_wallet_file(con.wallet_filename);
 
       // attempt to give jmjatlanta some bitsahres
@@ -330,7 +361,7 @@ BOOST_AUTO_TEST_CASE( cli_set_voting_proxy )
 
       fc::temp_directory app_dir( graphene::utilities::temp_directory_path() );
 
-      int server_port_number;
+      int server_port_number = 0;
       app1 = start_application(app_dir, server_port_number);
 
       // connect to the server
@@ -364,7 +395,7 @@ BOOST_AUTO_TEST_CASE( cli_set_voting_proxy )
       BOOST_CHECK(!bki.brain_priv_key.empty());
       signed_transaction create_acct_tx = con.wallet_api_ptr->create_account_with_brain_key(bki.brain_priv_key, "jmjatlanta", "nathan", "nathan", true);
       // save the private key for this new account in the wallet file
-   	  BOOST_CHECK(con.wallet_api_ptr->import_key("jmjatlanta", bki.wif_priv_key));
+      BOOST_CHECK(con.wallet_api_ptr->import_key("jmjatlanta", bki.wif_priv_key));
       con.wallet_api_ptr->save_wallet_file(con.wallet_filename);
 
       // attempt to give jmjatlanta some bitsahres
@@ -387,4 +418,185 @@ BOOST_AUTO_TEST_CASE( cli_set_voting_proxy )
       throw;
    }
    app1->shutdown();
+}
+
+///////////////////
+// Test blind transactions and mantissa length of range proofs.
+///////////////////
+BOOST_AUTO_TEST_CASE( cli_confidential_tx_test )
+{
+   using namespace graphene::chain;
+   using namespace graphene::app;
+   using namespace graphene::wallet;
+   std::shared_ptr<graphene::app::application> app1;
+   try {
+
+      // ** Start a Graphene chain and API server:
+      fc::temp_directory app_dir( graphene::utilities::temp_directory_path() );
+      int server_port_number = 0;
+      app1 = start_application(app_dir, server_port_number);
+      unsigned int head_block = 0;
+
+      // ** Connect a Wallet to the API server, and generate three BLIND accounts:
+      client_connection con(app1, app_dir, server_port_number);
+      auto & W = *con.wallet_api_ptr; // Wallet alias
+      BOOST_TEST_MESSAGE("Setting wallet password");
+      W.set_password("supersecret");
+      W.unlock("supersecret");
+      BOOST_TEST_MESSAGE("Creating blind accounts");
+      graphene::wallet::brain_key_info bki_nathan = W.suggest_brain_key();
+      graphene::wallet::brain_key_info bki_alice = W.suggest_brain_key();
+      graphene::wallet::brain_key_info bki_bob = W.suggest_brain_key();
+      W.create_blind_account("nathan", bki_nathan.brain_priv_key);
+      W.create_blind_account("alice", bki_alice.brain_priv_key);
+      W.create_blind_account("bob", bki_bob.brain_priv_key);
+      BOOST_CHECK(W.get_blind_accounts().size() == 3);
+
+      // ** Block 1: Import Nathan account:
+      BOOST_TEST_MESSAGE("Importing nathan key and balance");
+      std::vector<std::string> nathan_keys{"5KQwrPbwdL6PhXujxW37FSSQZ1JiwsST4cqQzDeyXtP79zkvFD3"};
+      W.import_key("nathan", nathan_keys[0]);
+      W.import_balance("nathan", nathan_keys, true);
+      generate_block(app1); head_block++;
+
+      // ** Block 2: Nathan will blind 100M BTS:
+      BOOST_TEST_MESSAGE("Blinding a large balance");
+      W.transfer_to_blind("nathan", "BTS", {{"nathan","100000000"}}, true);
+      BOOST_CHECK( W.get_blind_balances("nathan")[0].amount == 10000000000000 );
+      generate_block(app1); head_block++;
+
+      // ** Block 3: Nathan will send 1M BTS to alice and 10K BTS to bob. We
+      // then confirm that balances are received, and then analyze the range
+      // prooofs to make sure the mantissa length does not reveal approximate
+      // balance (issue #480).
+      std::map<std::string, share_type> to_list = {{"alice",100000000000},
+                                                   {"bob",    1000000000}};
+      vector<blind_confirmation> bconfs;
+      asset_object core_asset = W.get_asset("1.3.0");
+      BOOST_TEST_MESSAGE("Sending blind transactions to alice and bob");
+      for (auto to : to_list) {
+        string amount = core_asset.amount_to_string(to.second);
+        bconfs.push_back(W.blind_transfer("nathan",to.first,amount,core_asset.symbol,true));
+        BOOST_CHECK( W.get_blind_balances(to.first)[0].amount == to.second );
+      }
+      BOOST_TEST_MESSAGE("Inspecting range proof mantissa lengths");
+      vector<int> rp_mantissabits;
+      for (auto conf : bconfs) {
+        for (auto out : conf.trx.operations[0].get<blind_transfer_operation>().outputs) {
+          rp_mantissabits.push_back(1+out.range_proof[1]); // 2nd byte encodes mantissa length
+        }
+      }
+      // We are checking the mantissa length of the range proofs for several Pedersen
+      // commitments of varying magnitude.  We don't want the mantissa lengths to give
+      // away magnitude.  Deprecated wallet behavior was to use "just enough" mantissa
+      // bits to prove range, but this gives away value to within a factor of two. As a
+      // naive test, we assume that if all mantissa lengths are equal, then they are not
+      // revealing magnitude.  However, future more-sophisticated wallet behavior
+      // *might* randomize mantissa length to achieve some space savings in the range
+      // proof.  The following test will fail in that case and a more sophisticated test
+      // will be needed.
+      auto adjacent_unequal = std::adjacent_find(rp_mantissabits.begin(),
+           /* find unequal adjacent values */    rp_mantissabits.end(),
+                                                 std::not_equal_to<int>());
+      BOOST_CHECK(adjacent_unequal == rp_mantissabits.end());
+      generate_block(app1); head_block++;
+
+      // ** Check head block:
+      BOOST_TEST_MESSAGE("Check that all expected blocks have processed");
+      dynamic_global_property_object dgp = W.get_dynamic_global_properties();
+      BOOST_CHECK(dgp.head_block_number == head_block);
+
+      // wait for everything to finish up
+      fc::usleep(fc::seconds(1));
+   } catch( fc::exception& e ) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+   app1->shutdown();
+}
+
+/******
+ * Check account history pagination (see bitshares-core/issue/1176)
+ */
+BOOST_AUTO_TEST_CASE( account_history_pagination )
+{
+   using namespace graphene::chain;
+   using namespace graphene::app;
+   std::shared_ptr<graphene::app::application> app1;
+   try
+   {
+      fc::temp_directory app_dir ( graphene::utilities::temp_directory_path() );
+
+      int server_port_number = 0;
+      app1 = start_application(app_dir, server_port_number);
+
+      // connect to the server
+      client_connection con(app1, app_dir, server_port_number);
+
+      // set wallet password
+      BOOST_TEST_MESSAGE("Setting wallet password");
+      con.wallet_api_ptr->set_password("supersecret");
+      con.wallet_api_ptr->unlock("supersecret");
+
+      // import Nathan account
+      BOOST_TEST_MESSAGE("Importing nathan key");
+      std::vector<std::string> nathan_keys{"5KQwrPbwdL6PhXujxW37FSSQZ1JiwsST4cqQzDeyXtP79zkvFD3"};
+      BOOST_CHECK_EQUAL(nathan_keys[0], "5KQwrPbwdL6PhXujxW37FSSQZ1JiwsST4cqQzDeyXtP79zkvFD3");
+      BOOST_CHECK(con.wallet_api_ptr->import_key("nathan", nathan_keys[0]));
+
+      BOOST_TEST_MESSAGE("Importing nathan's balance");
+      std::vector<signed_transaction> import_txs = con.wallet_api_ptr->import_balance("nathan", nathan_keys, true);
+      account_object nathan_acct_before_upgrade = con.wallet_api_ptr->get_account("nathan");
+
+      // upgrade nathan
+      BOOST_TEST_MESSAGE("Upgrading Nathan to LTM");
+      signed_transaction upgrade_tx = con.wallet_api_ptr->upgrade_account("nathan", true);
+      account_object nathan_acct_after_upgrade = con.wallet_api_ptr->get_account("nathan");
+
+      // verify that the upgrade was successful
+      BOOST_CHECK_PREDICATE( std::not_equal_to<uint32_t>(),
+                             (nathan_acct_before_upgrade.membership_expiration_date.sec_since_epoch())
+                             (nathan_acct_after_upgrade.membership_expiration_date.sec_since_epoch()) );
+      BOOST_CHECK(nathan_acct_after_upgrade.is_lifetime_member());
+
+      // create a new account
+      graphene::wallet::brain_key_info bki = con.wallet_api_ptr->suggest_brain_key();
+      BOOST_CHECK(!bki.brain_priv_key.empty());
+      signed_transaction create_acct_tx = con.wallet_api_ptr->create_account_with_brain_key(
+                                                bki.brain_priv_key, "jmjatlanta", "nathan", "nathan", true);
+      // save the private key for this new account in the wallet file
+      BOOST_CHECK(con.wallet_api_ptr->import_key("jmjatlanta", bki.wif_priv_key));
+      con.wallet_api_ptr->save_wallet_file(con.wallet_filename);
+
+      // attempt to give jmjatlanta some bitsahres
+      BOOST_TEST_MESSAGE("Transferring bitshares from Nathan to jmjatlanta");
+      for(int i = 1; i <= 200; i++)
+      {
+          signed_transaction transfer_tx = con.wallet_api_ptr->transfer("nathan", "jmjatlanta", std::to_string(i),
+                                                 "1.3.0", "Here are some BTS for your new account", true);
+      }
+
+      BOOST_CHECK(generate_block(app1));
+
+      // now get account history and make sure everything is there (and no duplicates)
+      std::vector<graphene::wallet::operation_detail> history = con.wallet_api_ptr->get_account_history("jmjatlanta", 300);
+      BOOST_CHECK_EQUAL(201, history.size() );
+
+      std::set<object_id_type> operation_ids;
+
+      for(auto& op : history)
+      {
+         if( operation_ids.find(op.op.id) != operation_ids.end() )
+         {
+            BOOST_FAIL("Duplicate found");
+         }
+         operation_ids.insert(op.op.id);
+      }
+
+   } catch( fc::exception& e ) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+   app1->shutdown();
+
 }

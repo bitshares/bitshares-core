@@ -35,10 +35,10 @@ Getting Started
 Build instructions and additional documentation are available in the
 [wiki](https://github.com/bitshares/bitshares-core/wiki).
 
-We recommend building on Ubuntu 16.04 LTS, and the build dependencies may be installed with:
+We recommend building on Ubuntu 16.04 LTS (64-bit), and the build dependencies may be installed with:
 
     sudo apt-get update
-    sudo apt-get install autoconf cmake git libboost-all-dev libssl-dev g++ libcurl4-openssl-dev
+    sudo apt-get install autoconf cmake make automake libtool git libboost-all-dev libssl-dev g++ libcurl4-openssl-dev
 
 To build after all dependencies are installed:
 
@@ -51,9 +51,11 @@ To build after all dependencies are installed:
 
 **NOTE:** BitShares requires an [OpenSSL](https://www.openssl.org/) version in the 1.0.x series. OpenSSL 1.1.0 and newer are NOT supported. If your system OpenSSL version is newer, then you will need to manually provide an older version of OpenSSL and specify it to CMake using `-DOPENSSL_INCLUDE_DIR`, `-DOPENSSL_SSL_LIBRARY`, and `-DOPENSSL_CRYPTO_LIBRARY`.
 
-**NOTE:** BitShares requires a [Boost](http://www.boost.org/) version in the range [1.57, 1.63]. Versions earlier than
-1.57 or newer than 1.63 are NOT supported. If your system Boost version is newer, then you will need to manually build
+**NOTE:** BitShares requires a [Boost](http://www.boost.org/) version in the range [1.57, 1.65]. Versions earlier than
+1.57 or newer than 1.65 are NOT supported. If your system Boost version is newer, then you will need to manually build
 an older version of Boost and specify it to CMake using `DBOOST_ROOT`.
+
+**NOTE:** BitShares requires a 64-bit operating system to build, and will not build on a 32-bit OS.
 
 After building, the witness node can be launched with:
 
@@ -65,8 +67,12 @@ the blockchain. After syncing, you can exit the node using Ctrl+C and setup the 
 
     rpc-endpoint = 127.0.0.1:8090
 
-**NOTE:** By default the witness node will start in reduced memory ram mode by using some of the commands detailed in [Memory reduction for nodes](https://github.com/bitshares/bitshares-core/wiki/Memory-reduction-for-nodes).
-In order to run a full node with all the account history you need to remove `partial-operations` and `max-ops-per-account` from your config file. Please note that currently(2017-12-23) a full node need 54GB of RAM to operate and required memory is growing fast.
+**IMPORTANT:** By default the witness node will start in reduced memory ram mode by using some of the commands detailed in [Memory reduction for nodes](https://github.com/bitshares/bitshares-core/wiki/Memory-reduction-for-nodes).
+In order to run a full node with all the account history you need to remove `partial-operations` and `max-ops-per-account` from your config file. Please note that currently(2018-07-02) a full node will need more than 100GB of RAM to operate and required memory is growing fast. Consider the following table before running a node:
+
+| Default | Full | Minimal  | ElasticSearch 
+| --- | --- | --- | ---
+| 20G RAM | 120G RAM | 4G RAM | 200G SSD HD, 16G RAM
 
 After starting the witness node again, in a separate terminal you can run:
 

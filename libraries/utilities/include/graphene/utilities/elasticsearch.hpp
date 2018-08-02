@@ -38,5 +38,7 @@ namespace graphene { namespace utilities {
 
    bool SendBulk(CURL *curl, std::vector <std::string>& bulk, std::string elasticsearch_url, bool do_logs, std::string logs_index);
    std::vector<std::string> createBulk(std::string type, std::string data, std::string id, bool onlycreate);
+   bool checkES(CURL *curl, std::string elasticsearch_url);
+   std::string simpleQuery(CURL *curl, std::string elasticsearch_url, std::string endpoint, std::string query);
 
 } } // end namespace graphene::utilities

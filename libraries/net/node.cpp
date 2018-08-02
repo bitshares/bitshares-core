@@ -750,13 +750,11 @@ namespace graphene { namespace net { namespace detail {
             idump((inventory_to_advertise));
             for (const item_id& item_to_advertise : inventory_to_advertise)
             {
-              if (peer->inventory_advertised_to_peer.find(item_to_advertise) != peer->inventory_advertised_to_peer.end() )
-                 idump((*peer->inventory_advertised_to_peer.find(item_to_advertise)));
-              if (peer->inventory_peer_advertised_to_us.find(item_to_advertise) != peer->inventory_peer_advertised_to_us.end() )
-                 idump((*peer->inventory_peer_advertised_to_us.find(item_to_advertise)));
+               auto adv_to_peer = peer->inventory_advertised_to_peer.find(item_to_advertise);
+               auto adv_to_us   = peer->inventory_peer_advertised_to_us.find(item_to_advertise);
 
-              if (peer->inventory_advertised_to_peer.find(item_to_advertise) == peer->inventory_advertised_to_peer.end() &&
-                  peer->inventory_peer_advertised_to_us.find(item_to_advertise) == peer->inventory_peer_advertised_to_us.end())
+              if (adv_to_peer == peer->inventory_advertised_to_peer.end() &&
+                  adv_to_us == peer->inventory_peer_advertised_to_us.end())
               {
                 items_to_advertise_by_type[item_to_advertise.item_type].push_back(item_to_advertise.item_hash);
                 peer->inventory_advertised_to_peer.insert(peer_connection::timestamped_item_id(item_to_advertise, fc::time_point::now()));
@@ -764,6 +762,13 @@ namespace graphene { namespace net { namespace detail {
                 if (item_to_advertise.item_type == trx_message_type)
                   testnetlog("advertising transaction ${id} to peer ${endpoint}", ("id", item_to_advertise.item_hash)("endpoint", peer->get_remote_endpoint()));
                 dlog("advertising item ${id} to peer ${endpoint}", ("id", item_to_advertise.item_hash)("endpoint", peer->get_remote_endpoint()));
+              }
+              else
+              {
+                 if (adv_to_peer != peer->inventory_advertised_to_peer.end() )
+                    idump( (*adv_to_peer) );
+                 if (adv_to_us != peer->inventory_peer_advertised_to_us.end() )
+                    idump( (*adv_to_us) );
               }
             }
               dlog("advertising ${count} new item(s) of ${types} type(s) to peer ${endpoint}",

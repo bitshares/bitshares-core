@@ -55,7 +55,7 @@
 
 using namespace graphene;
 namespace bpo = boost::program_options;
-         
+
 int main(int argc, char** argv) {
    app::application* node = new app::application();
    fc::oexception unhandled_exception;

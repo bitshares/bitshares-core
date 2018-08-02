@@ -41,8 +41,6 @@ void_result balance_claim_evaluator::do_evaluate(const balance_claim_operation& 
              ("op", op.balance_owner_key)
              ("bal", balance->owner)
              );
-   if( !(d.get_node_properties().skip_flags & (database::skip_authority_check |
-                                               database::skip_transaction_signatures)) )
 
    FC_ASSERT(op.total_claimed.asset_id == balance->asset_type());
 

@@ -259,14 +259,51 @@ class database_api
       // Accounts //
       //////////////
 
+     /**
+      * @brief Get account object from a name or ID
+      * @param account_name_or_id ID or name of the accounts
+      * @return Account ID
+      *
+      */
+      account_id_type get_account_id_from_string(const std::string& name_or_id) const;
+
       /**
        * @brief Get a list of accounts by ID
-       * @param account_ids IDs of the accounts to retrieve
+       * @param account_names_or_ids IDs or names of the accounts to retrieve
        * @return The accounts corresponding to the provided IDs
        *
        * This function has semantics identical to @ref get_objects
        */
-      vector<optional<account_object>> get_accounts(const vector<account_id_type>& account_ids)const;
+      vector<optional<account_object>> get_accounts(const vector<std::string>& account_names_or_ids)const;
+
+      /**
+       * @brief Fetch all orders relevant to the specified account and specified market, result orders
+       *        are sorted descendingly by price
+       *
+       * @param account_name_or_id  The name or ID of an account to retrieve
+       * @param base  Base asset
+       * @param quote  Quote asset
+       * @param limit  The limitation of items each query can fetch, not greater than 101
+       * @param start_id  Start order id, fetch orders which price lower than this order, or price equal to this order
+       *                  but order ID greater than this order
+       * @param start_price  Fetch orders with price lower than or equal to this price
+       *
+       * @return List of orders from @ref account_name_or_id to the corresponding account
+       *
+       * @note
+       * 1. if @ref account_name_or_id cannot be tied to an account, empty result will be returned
+       * 2. @ref start_id and @ref start_price can be empty, if so the api will return the "first page" of orders;
+       *    if start_id is specified, its price will be used to do page query preferentially, otherwise the start_price
+       *    will be used; start_id and start_price may be used cooperatively in case of the order specified by start_id
+       *    was just canceled accidentally, in such case, the result orders' price may lower or equal to start_price,
+       *    but orders' id greater than start_id
+       */
+      vector<limit_order_object> get_account_limit_orders( const string& account_name_or_id,
+                                                  const string &base,
+                                                  const string &quote,
+                                                  uint32_t limit = 101,
+                                                  optional<limit_order_id_type> ostart_id = optional<limit_order_id_type>(),
+                                                  optional<price> ostart_price = optional<price>());
 
       /**
        * @brief Fetch all objects relevant to the specified accounts and subscribe to updates
@@ -286,7 +323,7 @@ class database_api
       /**
        *  @return all accounts that referr to the key or account id in their owner or active authorities.
        */
-      vector<account_id_type> get_account_references( account_id_type account_id )const;
+      vector<account_id_type> get_account_references( const std::string account_id_or_name )const;
 
       /**
        * @brief Get a list of accounts by name
@@ -311,11 +348,11 @@ class database_api
 
       /**
        * @brief Get an account's balances in various assets
-       * @param id ID of the account to get balances for
+       * @param account_name_or_id ID or name of the account to get balances for
        * @param assets IDs of the assets to get balances of; if empty, get all assets account has a balance in
        * @return Balances of the account
        */
-      vector<asset> get_account_balances(account_id_type id, const flat_set<asset_id_type>& assets)const;
+      vector<asset> get_account_balances(const std::string& account_name_or_id, const flat_set<asset_id_type>& assets)const;
 
       /// Semantically equivalent to @ref get_account_balances, but takes a name instead of an ID.
       vector<asset> get_named_account_balances(const std::string& name, const flat_set<asset_id_type>& assets)const;
@@ -325,7 +362,7 @@ class database_api
 
       vector<asset> get_vested_balances( const vector<balance_id_type>& objs )const;
 
-      vector<vesting_balance_object> get_vesting_balances( account_id_type account_id )const;
+      vector<vesting_balance_object> get_vesting_balances( const std::string account_id_or_name )const;
 
       /**
        * @brief Get the total number of accounts registered with the blockchain
@@ -361,6 +398,12 @@ class database_api
        * This function has semantics identical to @ref get_objects
        */
       vector<optional<asset_object>> lookup_asset_symbols(const vector<string>& symbols_or_ids)const;
+
+      /**
+       * @brief Get assets count
+       * @return The assets count
+       */
+      uint64_t get_asset_count()const;
 
       /////////////////////
       // Markets / feeds //
@@ -401,9 +444,9 @@ class database_api
       vector<collateral_bid_object> get_collateral_bids(const asset_id_type asset, uint32_t limit, uint32_t start)const;
 
       /**
-       *  @return all open margin positions for a given account id.
+       *  @return all open margin positions for a given account id or name.
        */
-      vector<call_order_object> get_margin_positions( const account_id_type& id )const;
+      vector<call_order_object> get_margin_positions( const std::string account_id_or_name )const;
 
       /**
        * @brief Request notification when the active orders in the market between two assets changes
@@ -498,10 +541,10 @@ class database_api
 
       /**
        * @brief Get the witness owned by a given account
-       * @param account The ID of the account whose witness should be retrieved
+       * @param account_id_or_name The ID of the account whose witness should be retrieved
        * @return The witness object, or null if the account does not have a witness
        */
-      fc::optional<witness_object> get_witness_by_account(account_id_type account)const;
+      fc::optional<witness_object> get_witness_by_account(const std::string account_id_or_name)const;
 
       /**
        * @brief Get names and IDs for registered witnesses
@@ -531,10 +574,10 @@ class database_api
 
       /**
        * @brief Get the committee_member owned by a given account
-       * @param account The ID of the account whose committee_member should be retrieved
+       * @param account The ID or name of the account whose committee_member should be retrieved
        * @return The committee_member object, or null if the account does not have a committee_member
        */
-      fc::optional<committee_member_object> get_committee_member_by_account(account_id_type account)const;
+      fc::optional<committee_member_object> get_committee_member_by_account(const std::string account_id_or_name)const;
 
       /**
        * @brief Get names and IDs for registered committee_members
@@ -563,10 +606,10 @@ class database_api
 
       /**
        * @brief Get the workers owned by a given account
-       * @param account The ID of the account whose worker should be retrieved
+       * @param account_id_or_name The ID or name of the account whose worker should be retrieved
        * @return The worker object, or null if the account does not have a worker
        */
-      vector<optional<worker_object>> get_workers_by_account(account_id_type account)const;
+      vector<optional<worker_object>> get_workers_by_account(const std::string account_id_or_name)const;
 
       /**
        * @brief Get the total number of workers registered with the blockchain
@@ -596,6 +639,10 @@ class database_api
       /// @brief Get a hexdump of the serialized binary form of a transaction
       std::string get_transaction_hex(const signed_transaction& trx)const;
 
+      /// @brief Get a hexdump of the serialized binary form of a
+      /// signatures-stripped transaction
+      std::string get_transaction_hex_without_sig( const signed_transaction &trx ) const;
+
       /**
        *  This API will take a partially signed transaction and a set of public keys that the owner has the ability to sign for
        *  and return the minimal subset of public keys that should add signatures to the transaction.
@@ -618,7 +665,7 @@ class database_api
       /**
        * @return true if the signers have enough authority to authorize an account
        */
-      bool           verify_account_authority( const string& name_or_id, const flat_set<public_key_type>& signers )const;
+      bool           verify_account_authority( const string& account_name_or_id, const flat_set<public_key_type>& signers )const;
 
       /**
        *  Validates a transaction against the current state without broadcasting it on the network.
@@ -638,7 +685,7 @@ class database_api
       /**
        *  @return the set of proposed transactions relevant to the specified account id.
        */
-      vector<proposal_object> get_proposed_transactions( account_id_type id )const;
+      vector<proposal_object> get_proposed_transactions( const std::string account_id_or_name )const;
 
       //////////////////////
       // Blinded balances //
@@ -655,21 +702,21 @@ class database_api
 
       /**
        *  @brief Get non expired withdraw permission objects for a giver(ex:recurring customer)
-       *  @param account Account to get objects from
+       *  @param account Account ID or name to get objects from
        *  @param start Withdraw permission objects(1.12.X) before this ID will be skipped in results. Pagination purposes.
        *  @param limit Maximum number of objects to retrieve
        *  @return Withdraw permission objects for the account
        */
-      vector<withdraw_permission_object> get_withdraw_permissions_by_giver(account_id_type account, withdraw_permission_id_type start, uint32_t limit)const;
+      vector<withdraw_permission_object> get_withdraw_permissions_by_giver(const std::string account_id_or_name, withdraw_permission_id_type start, uint32_t limit)const;
 
       /**
        *  @brief Get non expired withdraw permission objects for a recipient(ex:service provider)
-       *  @param account Account to get objects from
+       *  @param account Account ID or name to get objects from
        *  @param start Withdraw permission objects(1.12.X) before this ID will be skipped in results. Pagination purposes.
        *  @param limit Maximum number of objects to retrieve
        *  @return Withdraw permission objects for the account
        */
-      vector<withdraw_permission_object> get_withdraw_permissions_by_recipient(account_id_type account, withdraw_permission_id_type start, uint32_t limit)const;
+      vector<withdraw_permission_object> get_withdraw_permissions_by_recipient(const std::string account_id_or_name, withdraw_permission_id_type start, uint32_t limit)const;
 
    private:
       std::shared_ptr< database_api_impl > my;
@@ -713,6 +760,7 @@ FC_API(graphene::app::database_api,
    (is_public_key_registered)
 
    // Accounts
+   (get_account_id_from_string)
    (get_accounts)
    (get_full_accounts)
    (get_account_by_name)
@@ -732,10 +780,12 @@ FC_API(graphene::app::database_api,
    (get_assets)
    (list_assets)
    (lookup_asset_symbols)
+   (get_asset_count)
 
    // Markets / feeds
    (get_order_book)
    (get_limit_orders)
+   (get_account_limit_orders)
    (get_call_orders)
    (get_settle_orders)
    (get_margin_positions)
@@ -770,6 +820,7 @@ FC_API(graphene::app::database_api,
 
    // Authority / validation
    (get_transaction_hex)
+   (get_transaction_hex_without_sig)
    (get_required_signatures)
    (get_potential_signatures)
    (get_potential_address_signatures)
