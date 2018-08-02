@@ -32,7 +32,7 @@ namespace graphene { namespace chain {
       bool operator == ( const price& a, const price& b )
       {
          if( std::tie( a.base.asset_id, a.quote.asset_id ) != std::tie( b.base.asset_id, b.quote.asset_id ) )
-             return false;
+            return false;
 
          const auto amult = uint128_t( b.quote.amount.value ) * a.base.amount.value;
          const auto bmult = uint128_t( a.quote.amount.value ) * b.base.amount.value;
@@ -51,26 +51,6 @@ namespace graphene { namespace chain {
          const auto bmult = uint128_t( a.quote.amount.value ) * b.base.amount.value;
 
          return amult < bmult;
-      }
-
-      bool operator <= ( const price& a, const price& b )
-      {
-         return (a == b) || (a < b);
-      }
-
-      bool operator != ( const price& a, const price& b )
-      {
-         return !(a == b);
-      }
-
-      bool operator > ( const price& a, const price& b )
-      {
-         return !(a <= b);
-      }
-
-      bool operator >= ( const price& a, const price& b )
-      {
-         return !(a < b);
       }
 
       asset operator * ( const asset& a, const price& b )
@@ -232,7 +212,11 @@ namespace graphene { namespace chain {
          return ~(asset( cp.numerator().convert_to<int64_t>(), debt.asset_id ) / asset( cp.denominator().convert_to<int64_t>(), collateral.asset_id ));
       } FC_CAPTURE_AND_RETHROW( (debt)(collateral)(collateral_ratio) ) }
 
-      bool price::is_null() const { return *this == price(); }
+      bool price::is_null() const
+      {
+         // Effectively same as "return *this == price();" but perhaps faster
+         return ( base.asset_id == asset_id_type() && quote.asset_id == asset_id_type() );
+      }
 
       void price::validate() const
       { try {

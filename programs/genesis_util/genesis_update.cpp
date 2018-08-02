@@ -34,7 +34,6 @@
 
 #include <graphene/app/api.hpp>
 #include <graphene/chain/protocol/address.hpp>
-#include <graphene/chain/protocol/protocol.hpp>
 #include <graphene/egenesis/egenesis.hpp>
 #include <graphene/utilities/key_conversion.hpp>
 
