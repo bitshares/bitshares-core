@@ -58,9 +58,9 @@ RUN chown bitshares:bitshares -R /var/lib/bitshares
 VOLUME ["/var/lib/bitshares", "/etc/bitshares"]
 
 # rpc service:
-EXPOSE 8090
+EXPOSE 8091
 # p2p service:
-EXPOSE 2001
+EXPOSE 9091
 
 # default exec/config files
 ADD docker/default_config.ini /etc/bitshares/config.ini

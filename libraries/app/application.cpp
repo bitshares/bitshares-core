@@ -164,26 +164,12 @@ void application_impl::reset_p2p_node(const fc::path& data_dir)
    }
    else
    {
-      // https://bitsharestalk.org/index.php/topic,23715.0.html
       vector<string> seeds = {
-         "104.236.144.84:1777",               // puppies      (USA)
-         "128.199.143.47:2015",               // Harvey       (Singapore)
-         "23.92.53.182:1776",                 // sahkan       (USA)
-         "192.121.166.162:1776",              // sahkan       (UK)
-         "51.15.61.160:1776",                 // lafona       (France)
-         "bts-seed1.abit-more.com:62015",     // abit         (China)
-         "node.blckchnd.com:4243",            // blckchnd     (Germany)
-         "seed.bitsharesdex.com:50696",       // iHashFury    (Europe)
-         "seed.bitsharesnodes.com:1776",      // wackou       (Netherlands)
-         "seed.blocktrades.us:1776",          // BlockTrades  (USA)
-         "seed.cubeconnex.com:1777",          // cube         (USA)
-         "seed.roelandp.nl:1776",             // roelandp     (Canada)
-         "seed04.bts-nodes.net:1776",         // Thom         (Australia)
-         "seed05.bts-nodes.net:1776",         // Thom         (USA)
-         "seed06.bts-nodes.net:1776",         // Thom         (USA)
-         "seed07.bts-nodes.net:1776",         // Thom         (Singapore)
-         "seed.bts.bangzi.info:55501",        // Bangzi       (Germany)
-         "seeds.bitshares.eu:1776"            // pc           (http://seeds.quisquis.de/bitshares.html)
+               "seed.testnet.bitshares.eu:1776",   // BitShares Europe
+               "176.9.148.19:16543",               // Uptick.rocks
+               "31.171.251.20:1776",               // @Taconator
+               "23.92.53.25:11010",                // sahkan
+               "139.162.242.253:1700",             // rnglab
       };
       for( const string& endpoint_string : seeds )
       {
@@ -930,8 +916,9 @@ void application::set_program_options(boost::program_options::options_descriptio
           "P2P nodes to connect to on startup (may specify multiple times)")
          ("seed-nodes", bpo::value<string>()->composing(),
           "JSON array of P2P nodes to connect to on startup")
-         ("checkpoint,c", bpo::value<vector<string>>()->composing(),
-          "Pairs of [BLOCK_NUM,BLOCK_ID] that should be enforced as checkpoints.")
+         ("checkpoint,c", bpo::value<vector<string>>()->default_value(
+             vector<string>(1, "[\"12204000\", \"00ba37e095ab9f3fa752f812591213a75ffc2087\"]"), "[\"12204000\", \"00ba37e095ab9f3fa752f812591213a75ffc2087\"]")->composing(),
+             "Pairs of [BLOCK_NUM,BLOCK_ID] that should be enforced as checkpoints.")
          ("rpc-endpoint", bpo::value<string>()->implicit_value("127.0.0.1:8090"),
           "Endpoint for websocket RPC to listen on")
          ("rpc-tls-endpoint", bpo::value<string>()->implicit_value("127.0.0.1:8089"),
