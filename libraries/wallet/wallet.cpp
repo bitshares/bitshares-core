@@ -838,13 +838,10 @@ public:
       }
       catch(...)
       {
-         if (&_wallet != nullptr) 
-         {
-             string ws_password = _wallet.ws_password;
-             _wallet.ws_password = "";
-             wlog("wallet file content is next: ${data}", ("data", fc::json::to_pretty_string( _wallet ) ) );
-             _wallet.ws_password = ws_password;
-         }
+         string ws_password = _wallet.ws_password;
+         _wallet.ws_password = "";
+         wlog("wallet file content is next: ${data}", ("data", fc::json::to_pretty_string( _wallet ) ) );
+         _wallet.ws_password = ws_password;
 
          disable_umask_protection();
          throw;
