@@ -16,7 +16,7 @@ The `Dockerfile` performs the following steps:
 7. Purge source code off the container
 8. Add a local bitshares user and set `$HOME` to `/var/lib/bitshares`
 9. Make `/var/lib/bitshares` and `/etc/bitshares` a docker *volume*
-10. Expose ports `8090` and `2001`
+10. Expose ports `8091` and `9091`
 11. Add default config from `docker/default_config.ini` and entry point script
 12. Run entry point script by default
 
