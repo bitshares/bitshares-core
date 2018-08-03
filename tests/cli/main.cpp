@@ -304,7 +304,7 @@ BOOST_AUTO_TEST_CASE( cli_vote_for_2_witnesses )
 
       // attempt to give jmjatlanta some bitsahres
       BOOST_TEST_MESSAGE("Transferring bitshares from Nathan to jmjatlanta");
-      signed_transaction transfer_tx = con.wallet_api_ptr->transfer("nathan", "jmjatlanta", "10000", "1.3.0", "Here are some BTS for your new account", true);
+      signed_transaction transfer_tx = con.wallet_api_ptr->transfer("nathan", "jmjatlanta", "10000", "1.3.0", "Here are some CORE token for your new account", true);
 
       // get the details for init1
       witness_object init1_obj = con.wallet_api_ptr->get_witness("init1");
@@ -400,7 +400,7 @@ BOOST_AUTO_TEST_CASE( cli_set_voting_proxy )
 
       // attempt to give jmjatlanta some bitsahres
       BOOST_TEST_MESSAGE("Transferring bitshares from Nathan to jmjatlanta");
-      signed_transaction transfer_tx = con.wallet_api_ptr->transfer("nathan", "jmjatlanta", "10000", "1.3.0", "Here are some BTS for your new account", true);
+      signed_transaction transfer_tx = con.wallet_api_ptr->transfer("nathan", "jmjatlanta", "10000", "1.3.0", "Here are some CORE token for your new account", true);
 
       // grab account for comparison
       account_object prior_voting_account = con.wallet_api_ptr->get_account("jmjatlanta");
@@ -459,13 +459,13 @@ BOOST_AUTO_TEST_CASE( cli_confidential_tx_test )
       W.import_balance("nathan", nathan_keys, true);
       generate_block(app1); head_block++;
 
-      // ** Block 2: Nathan will blind 100M BTS:
+      // ** Block 2: Nathan will blind 100M CORE token:
       BOOST_TEST_MESSAGE("Blinding a large balance");
-      W.transfer_to_blind("nathan", "BTS", {{"nathan","100000000"}}, true);
+      W.transfer_to_blind("nathan", GRAPHENE_SYMBOL, {{"nathan","100000000"}}, true);
       BOOST_CHECK( W.get_blind_balances("nathan")[0].amount == 10000000000000 );
       generate_block(app1); head_block++;
 
-      // ** Block 3: Nathan will send 1M BTS to alice and 10K BTS to bob. We
+      // ** Block 3: Nathan will send 1M CORE token to alice and 10K CORE token to bob. We
       // then confirm that balances are received, and then analyze the range
       // prooofs to make sure the mantissa length does not reveal approximate
       // balance (issue #480).
@@ -573,7 +573,7 @@ BOOST_AUTO_TEST_CASE( account_history_pagination )
       for(int i = 1; i <= 200; i++)
       {
           signed_transaction transfer_tx = con.wallet_api_ptr->transfer("nathan", "jmjatlanta", std::to_string(i),
-                                                 "1.3.0", "Here are some BTS for your new account", true);
+                                                 "1.3.0", "Here are some CORE token for your new account", true);
       }
 
       BOOST_CHECK(generate_block(app1));
