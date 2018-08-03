@@ -26,7 +26,6 @@
 #include <graphene/app/api.hpp>
 #include <graphene/app/api_access.hpp>
 #include <graphene/app/application.hpp>
-#include <graphene/app/impacted.hpp>
 #include <graphene/chain/database.hpp>
 #include <graphene/chain/get_config.hpp>
 #include <graphene/utilities/key_conversion.hpp>
@@ -309,7 +308,7 @@ namespace graphene { namespace app {
        return result;
     }
 
-    vector<operation_history_object> history_api::get_account_history( account_id_type account,
+    vector<operation_history_object> history_api::get_account_history( const std::string account_id_or_name,
                                                                        operation_history_id_type stop,
                                                                        unsigned limit,
                                                                        operation_history_id_type start ) const
@@ -318,7 +317,9 @@ namespace graphene { namespace app {
        const auto& db = *_app.chain_database();
        FC_ASSERT( limit <= 100 );
        vector<operation_history_object> result;
+       account_id_type account;
        try {
+          account = database_api.get_account_id_from_string(account_id_or_name);
           const account_transaction_history_object& node = account(db).statistics(db).most_recent_op(db);
           if(start == operation_history_id_type() || start.instance.value > node.operation_id.instance.value)
              start = node.operation_id;
@@ -342,7 +343,7 @@ namespace graphene { namespace app {
        return result;
     }
 
-    vector<operation_history_object> history_api::get_account_history_operations( account_id_type account,
+    vector<operation_history_object> history_api::get_account_history_operations( const std::string account_id_or_name,
                                                                        int operation_id,
                                                                        operation_history_id_type start,
                                                                        operation_history_id_type stop,
@@ -352,6 +353,10 @@ namespace graphene { namespace app {
        const auto& db = *_app.chain_database();
        FC_ASSERT( limit <= 100 );
        vector<operation_history_object> result;
+       account_id_type account;
+       try {
+          account = database_api.get_account_id_from_string(account_id_or_name);
+       } catch(...) { return result; }
        const auto& stats = account(db).statistics(db);
        if( stats.most_recent_op == account_transaction_history_id_type() ) return result;
        const account_transaction_history_object* node = &stats.most_recent_op(db);
@@ -378,7 +383,7 @@ namespace graphene { namespace app {
     }
 
 
-    vector<operation_history_object> history_api::get_relative_account_history( account_id_type account,
+    vector<operation_history_object> history_api::get_relative_account_history( const std::string account_id_or_name,
                                                                                 uint32_t stop,
                                                                                 unsigned limit,
                                                                                 uint32_t start) const
@@ -387,12 +392,15 @@ namespace graphene { namespace app {
        const auto& db = *_app.chain_database();
        FC_ASSERT(limit <= 100);
        vector<operation_history_object> result;
+       account_id_type account;
+       try {
+          account = database_api.get_account_id_from_string(account_id_or_name);
+       } catch(...) { return result; }
        const auto& stats = account(db).statistics(db);
        if( start == 0 )
           start = stats.total_ops;
        else
           start = min( stats.total_ops, start );
-
 
        if( start >= stop && start > stats.removed_ops && limit > 0 )
        {
@@ -419,12 +427,12 @@ namespace graphene { namespace app {
        return hist->tracked_buckets();
     }
 
-    history_operation_detail history_api::get_account_history_by_operations(account_id_type account, vector<uint16_t> operation_types, uint32_t start, unsigned limit)
+    history_operation_detail history_api::get_account_history_by_operations(const std::string account_id_or_name, vector<uint16_t> operation_types, uint32_t start, unsigned limit)
     {
-        FC_ASSERT(limit <= 100);
-        history_operation_detail result;
-        vector<operation_history_object> objs = get_relative_account_history(account, start, limit, limit + start - 1);
-        std::for_each(objs.begin(), objs.end(), [&](const operation_history_object &o) {
+       FC_ASSERT(limit <= 100);
+       history_operation_detail result;
+       vector<operation_history_object> objs = get_relative_account_history(account_id_or_name, start, limit, limit + start - 1);
+       std::for_each(objs.begin(), objs.end(), [&](const operation_history_object &o) {
                     if (operation_types.empty() || find(operation_types.begin(), operation_types.end(), o.op.which()) != operation_types.end()) {
                         result.operation_history_objs.push_back(o);
                      }
@@ -461,20 +469,6 @@ namespace graphene { namespace app {
     } FC_CAPTURE_AND_RETHROW( (a)(b)(bucket_seconds)(start)(end) ) }
 
     crypto_api::crypto_api(){};
-
-    blind_signature crypto_api::blind_sign( const extended_private_key_type& key, const blinded_hash& hash, int i )
-    {
-       return fc::ecc::extended_private_key( key ).blind_sign( hash, i );
-    }
-
-    signature_type crypto_api::unblind_signature( const extended_private_key_type& key,
-                                                     const extended_public_key_type& bob,
-                                                     const blind_signature& sig,
-                                                     const fc::sha256& hash,
-                                                     int i )
-    {
-       return fc::ecc::extended_private_key( key ).unblind_signature( extended_public_key( bob ), sig, hash, i );
-    }
 
     commitment_type crypto_api::blind( const blind_factor_type& blind, uint64_t value )
     {

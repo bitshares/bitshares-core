@@ -1,4 +1,4 @@
 // #188 Add operation to allow claiming of funds in an asset's fee pool
 #ifndef HARDFORK_CORE_188_TIME
-#define HARDFORK_CORE_188_TIME (fc::time_point_sec( 1526738280 )) // Sat, 19 May 2018 13:58:00 UTC
+#define HARDFORK_CORE_188_TIME (fc::time_point_sec( 1526738280 )) // Sat, 19 May 2018 13:58:00 UTC // testnet
 #endif

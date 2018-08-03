@@ -27,16 +27,42 @@
 #include <vector>
 
 #include <curl/curl.h>
+#include <fc/time.hpp>
+#include <fc/variant_object.hpp>
 
-static size_t WriteCallback(void *contents, size_t size, size_t nmemb, void *userp)
-{
-   ((std::string*)userp)->append((char*)contents, size * nmemb);
-   return size * nmemb;
-}
+size_t WriteCallback(void *contents, size_t size, size_t nmemb, void *userp);
 
 namespace graphene { namespace utilities {
 
-   bool SendBulk(CURL *curl, std::vector <std::string>& bulk, std::string elasticsearch_url, bool do_logs, std::string logs_index);
-   std::vector<std::string> createBulk(std::string type, std::string data, std::string id, bool onlycreate);
+   class ES {
+      public:
+         CURL *curl;
+         std::vector <std::string> bulk_lines;
+         std::string elasticsearch_url;
+         std::string index_prefix;
+         std::string auth;
+         std::string endpoint;
+         std::string query;
+   };
+   class CurlRequest {
+      public:
+         CURL *handler;
+         std::string url;
+         std::string type;
+         std::string auth;
+         std::string query;
+   };
+
+   bool SendBulk(ES& es);
+   const std::vector<std::string> createBulk(const fc::mutable_variant_object& bulk_header, const std::string& data);
+   bool checkES(ES& es);
+   const std::string simpleQuery(ES& es);
+   bool deleteAll(ES& es);
+   bool handleBulkResponse(long http_code, const std::string& CurlReadBuffer);
+   const std::string getEndPoint(ES& es);
+   const std::string generateIndexName(const fc::time_point_sec& block_date, const std::string& _elasticsearch_index_prefix);
+   const std::string doCurl(CurlRequest& curl);
+   const std::string joinBulkLines(const std::vector<std::string>& bulk);
+   long getResponseCode(CURL *handler);
 
 } } // end namespace graphene::utilities

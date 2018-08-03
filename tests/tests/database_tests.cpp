@@ -62,8 +62,34 @@ BOOST_AUTO_TEST_CASE( undo_test )
    }
 }
 
+/**
+ * Check that database modify() functors that throw do not get caught by boost, which will remove the object
+ */
+BOOST_AUTO_TEST_CASE(failed_modify_test)
+{ try {
+   database db;
+   // Create dummy object
+   const auto& obj = db.create<account_balance_object>([](account_balance_object& obj) {
+                     obj.owner = account_id_type(123);
+                  });
+   account_balance_id_type obj_id = obj.id;
+   BOOST_CHECK_EQUAL(obj.owner.instance.value, 123);
+
+   // Modify dummy object, check that changes stick
+   db.modify(obj, [](account_balance_object& obj) {
+      obj.owner = account_id_type(234);
+   });
+   BOOST_CHECK_EQUAL(obj_id(db).owner.instance.value, 234);
+
+   // Throw exception when modifying object, check that object still exists after
+   BOOST_CHECK_THROW(db.modify(obj, [](account_balance_object& obj) {
+      throw 5;
+   }), int);
+   BOOST_CHECK_NE((long)db.find_object(obj_id), (long)nullptr);
+} FC_LOG_AND_RETHROW() }
+
 BOOST_AUTO_TEST_CASE( flat_index_test )
-{
+{ try {
    ACTORS((sam));
    const auto& bitusd = create_bitasset("USDBIT", sam.id);
    const asset_id_type bitusd_id = bitusd.id;
@@ -71,14 +97,14 @@ BOOST_AUTO_TEST_CASE( flat_index_test )
    price_feed current_feed;
    current_feed.settlement_price = bitusd.amount(100) / asset(100);
    publish_feed(bitusd, sam, current_feed);
-   FC_ASSERT( (int)bitusd.bitasset_data_id->instance == 0 );
-   FC_ASSERT( !(*bitusd.bitasset_data_id)(db).current_feed.settlement_price.is_null() );
+   BOOST_CHECK_EQUAL( (int)bitusd.bitasset_data_id->instance, 1 );
+   BOOST_CHECK( !(*bitusd.bitasset_data_id)(db).current_feed.settlement_price.is_null() );
    try {
       auto ses = db._undo_db.start_undo_session();
       const auto& obj1 = db.create<asset_bitasset_data_object>( [&]( asset_bitasset_data_object& obj ){
           obj.settlement_fund = 17;
       });
-      FC_ASSERT( obj1.settlement_fund == 17 );
+      BOOST_REQUIRE_EQUAL( obj1.settlement_fund.value, 17 );
       throw std::string("Expected");
       // With flat_index, obj1 will not really be removed from the index
    } catch ( const std::string& e )
@@ -89,8 +115,8 @@ BOOST_AUTO_TEST_CASE( flat_index_test )
    const auto& dynamic_global_props = db.get<dynamic_global_property_object>(dynamic_global_property_id_type());
    generate_blocks(dynamic_global_props.next_maintenance_time, true);
 
-   FC_ASSERT( !(*bitusd_id(db).bitasset_data_id)(db).current_feed.settlement_price.is_null() );
-}
+   BOOST_CHECK( !(*bitusd_id(db).bitasset_data_id)(db).current_feed.settlement_price.is_null() );
+} FC_CAPTURE_AND_RETHROW() }
 
 BOOST_AUTO_TEST_CASE( merge_test )
 {

@@ -918,19 +918,21 @@ bool database::fill_settle_order( const force_settlement_object& settle, const a
  *
  *  @return true if a margin call was executed.
  */
-bool database::check_call_orders(const asset_object& mia, bool enable_black_swan, bool for_new_limit_order )
+bool database::check_call_orders( const asset_object& mia, bool enable_black_swan, bool for_new_limit_order,
+                                  const asset_bitasset_data_object* bitasset_ptr )
 { try {
-    auto head_time = head_block_time();
-    auto maint_time = get_dynamic_global_properties().next_maintenance_time;
+    const auto& dyn_prop = get_dynamic_global_properties();
+    auto maint_time = dyn_prop.next_maintenance_time;
     if( for_new_limit_order )
        FC_ASSERT( maint_time <= HARDFORK_CORE_625_TIME ); // `for_new_limit_order` is only true before HF 338 / 625
 
     if( !mia.is_market_issued() ) return false;
 
-    if( check_for_blackswan( mia, enable_black_swan ) ) 
+    const asset_bitasset_data_object& bitasset = ( bitasset_ptr ? *bitasset_ptr : mia.bitasset_data(*this) );
+
+    if( check_for_blackswan( mia, enable_black_swan, &bitasset ) )
        return false;
 
-    const asset_bitasset_data_object& bitasset = mia.bitasset_data(*this);
     if( bitasset.is_prediction_market ) return false;
     if( bitasset.current_feed.settlement_price.is_null() ) return false;
 
@@ -961,6 +963,10 @@ bool database::check_call_orders(const asset_object& mia, bool enable_black_swan
     bool filled_limit = false;
     bool margin_called = false;
 
+    auto head_time = head_block_time();
+    auto head_num = head_block_num();
+
+    bool before_hardfork_615 = ( head_time < HARDFORK_615_TIME );
     bool after_hardfork_436 = ( head_time > HARDFORK_436_TIME );
 
     bool before_core_hardfork_184 = ( maint_time <= HARDFORK_CORE_184_TIME ); // something-for-nothing
@@ -970,7 +976,7 @@ bool database::check_call_orders(const asset_object& mia, bool enable_black_swan
     bool before_core_hardfork_606 = ( maint_time <= HARDFORK_CORE_606_TIME ); // feed always trigger call
     bool before_core_hardfork_834 = ( maint_time <= HARDFORK_CORE_834_TIME ); // target collateral ratio option
 
-    while( !check_for_blackswan( mia, enable_black_swan ) && call_itr != call_end )
+    while( !check_for_blackswan( mia, enable_black_swan, &bitasset ) && call_itr != call_end )
     {
        bool  filled_call      = false;
        price match_price;
@@ -1000,7 +1006,7 @@ bool database::check_call_orders(const asset_object& mia, bool enable_black_swan
        if( usd_to_buy * match_price > call_itr->get_collateral() )
        {
           elog( "black swan detected on asset ${symbol} (${id}) at block ${b}",
-                ("id",mia.id)("symbol",mia.symbol)("b",head_block_num()) );
+                ("id",mia.id)("symbol",mia.symbol)("b",head_num) );
           edump((enable_black_swan));
           FC_ASSERT( enable_black_swan );
           globally_settle_asset(mia, bitasset.current_feed.settlement_price );
@@ -1027,9 +1033,9 @@ bool database::check_call_orders(const asset_object& mia, bool enable_black_swan
           if( order_receives.amount == 0 ) // TODO this should not happen. remove the warning after confirmed
           {
              if( before_core_hardfork_184 )
-                wlog( "Something for nothing issue (#184, variant D-1) occurred at block #${block}", ("block",head_block_num()) );
+                wlog( "Something for nothing issue (#184, variant D-1) occurred at block #${block}", ("block",head_num) );
              else
-                wlog( "Something for nothing issue (#184, variant D-2) occurred at block #${block}", ("block",head_block_num()) );
+                wlog( "Something for nothing issue (#184, variant D-2) occurred at block #${block}", ("block",head_num) );
           }
 
           if( before_core_hardfork_342 )
@@ -1052,7 +1058,7 @@ bool database::check_call_orders(const asset_object& mia, bool enable_black_swan
 
              // Be here, the limit order would be paying something for nothing
              if( order_receives.amount == 0 ) // TODO remove warning after hard fork core-342
-                wlog( "Something for nothing issue (#184, variant D) occurred at block #${block}", ("block",head_block_num()) );
+                wlog( "Something for nothing issue (#184, variant D) occurred at block #${block}", ("block",head_num) );
           }
           else
              order_receives = usd_to_buy.multiply_and_round_up( match_price ); // round up, in favor of limit order
@@ -1062,7 +1068,11 @@ bool database::check_call_orders(const asset_object& mia, bool enable_black_swan
           if( usd_to_buy == usd_for_sale )
              filled_limit = true;
           else if( filled_limit && maint_time <= HARDFORK_CORE_453_TIME ) // TODO remove warning after hard fork core-453
-             wlog( "Multiple limit match problem (issue 453) occurred at block #${block}", ("block",head_block_num()) );
+          {
+             wlog( "Multiple limit match problem (issue 453) occurred at block #${block}", ("block",head_num) );
+             if( before_hardfork_615 )
+                _issue_453_affected_assets.insert( bitasset.asset_id );
+          }
        }
 
        call_pays  = order_receives;

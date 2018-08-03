@@ -116,44 +116,45 @@ namespace graphene { namespace app {
    class history_api
    {
       public:
-         history_api(application& app):_app(app){}
+         history_api(application& app)
+               :_app(app), database_api( std::ref(*app.chain_database()), &(app.get_options())) {}
 
-         /**
+      /**
           * @brief Get operations relevant to the specificed account
-          * @param account The account whose history should be queried
+          * @param account_id_or_name The account ID or name whose history should be queried
           * @param stop ID of the earliest operation to retrieve
           * @param limit Maximum number of operations to retrieve (must not exceed 100)
           * @param start ID of the most recent operation to retrieve
           * @return A list of operations performed by account, ordered from most recent to oldest.
           */
-         vector<operation_history_object> get_account_history(account_id_type account,
+         vector<operation_history_object> get_account_history(const std::string account_id_or_name,
                                                               operation_history_id_type stop = operation_history_id_type(),
                                                               unsigned limit = 100,
                                                               operation_history_id_type start = operation_history_id_type())const;
 
          /**
           * @brief Get operations relevant to the specified account filtering by operation type
-          * @param account The account whose history should be queried
+          * @param account_id_or_name The account ID or name whose history should be queried
           * @param operation_types The IDs of the operation we want to get operations in the account( 0 = transfer , 1 = limit order create, ...)
           * @param start the sequence number where to start looping back throw the history
           * @param limit the max number of entries to return (from start number)
           * @return history_operation_detail
           */
-          history_operation_detail get_account_history_by_operations(account_id_type account,
+          history_operation_detail get_account_history_by_operations(const std::string account_id_or_name,
                                                                      vector<uint16_t> operation_types,
                                                                      uint32_t start,
                                                                      unsigned limit);
 
          /**
           * @brief Get only asked operations relevant to the specified account
-          * @param account The account whose history should be queried
+          * @param account_id_or_name The account ID or name whose history should be queried
           * @param operation_id The ID of the operation we want to get operations in the account( 0 = transfer , 1 = limit order create, ...)
           * @param stop ID of the earliest operation to retrieve
           * @param limit Maximum number of operations to retrieve (must not exceed 100)
           * @param start ID of the most recent operation to retrieve
           * @return A list of operations performed by account, ordered from most recent to oldest.
           */
-         vector<operation_history_object> get_account_history_operations(account_id_type account,
+         vector<operation_history_object> get_account_history_operations(const std::string account_id_or_name,
                                                                          int operation_id,
                                                                          operation_history_id_type start = operation_history_id_type(),
                                                                          operation_history_id_type stop = operation_history_id_type(),
@@ -163,7 +164,7 @@ namespace graphene { namespace app {
           * @breif Get operations relevant to the specified account referenced
           * by an event numbering specific to the account. The current number of operations
           * for the account can be found in the account statistics (or use 0 for start).
-          * @param account The account whose history should be queried
+          * @param account_id_or_name The account ID or name whose history should be queried
           * @param stop Sequence number of earliest operation. 0 is default and will
           * query 'limit' number of operations.
           * @param limit Maximum number of operations to retrieve (must not exceed 100)
@@ -171,7 +172,7 @@ namespace graphene { namespace app {
           * 0 is default, which will start querying from the most recent operation.
           * @return A list of operations performed by account, ordered from most recent to oldest.
           */
-         vector<operation_history_object> get_relative_account_history( account_id_type account,
+         vector<operation_history_object> get_relative_account_history( const std::string account_id_or_name,
                                                                         uint32_t stop = 0,
                                                                         unsigned limit = 100,
                                                                         uint32_t start = 0) const;
@@ -182,6 +183,7 @@ namespace graphene { namespace app {
          flat_set<uint32_t> get_market_history_buckets()const;
       private:
            application& _app;
+           graphene::app::database_api database_api;
    };
 
    /**
@@ -307,14 +309,6 @@ namespace graphene { namespace app {
       public:
          crypto_api();
          
-         fc::ecc::blind_signature blind_sign( const extended_private_key_type& key, const fc::ecc::blinded_hash& hash, int i );
-         
-         signature_type unblind_signature( const extended_private_key_type& key,
-                                              const extended_public_key_type& bob,
-                                              const fc::ecc::blind_signature& sig,
-                                              const fc::sha256& hash,
-                                              int i );
-                                                                  
          fc::ecc::commitment_type blind( const fc::ecc::blind_factor_type& blind, uint64_t value );
          
          fc::ecc::blind_factor_type blind_sum( const std::vector<blind_factor_type>& blinds_in, uint32_t non_neg );
@@ -493,8 +487,6 @@ FC_API(graphene::app::network_node_api,
        (set_advanced_node_parameters)
      )
 FC_API(graphene::app::crypto_api,
-       (blind_sign)
-       (unblind_signature)
        (blind)
        (blind_sum)
        (verify_sum)

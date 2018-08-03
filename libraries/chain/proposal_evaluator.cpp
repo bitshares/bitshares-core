@@ -225,20 +225,6 @@ void_result proposal_update_evaluator::do_evaluate(const proposal_update_operati
                  "", ("id", id)("available", _proposal->available_owner_approvals) );
    }
 
-   /*  All authority checks happen outside of evaluators
-   if( (d.get_node_properties().skip_flags & database::skip_authority_check) == 0 )
-   {
-      for( const auto& id : o.key_approvals_to_add )
-      {
-         FC_ASSERT( trx_state->signed_by(id) );
-      }
-      for( const auto& id : o.key_approvals_to_remove )
-      {
-         FC_ASSERT( trx_state->signed_by(id) );
-      }
-   }
-   */
-
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }
 
@@ -277,6 +263,9 @@ void_result proposal_update_evaluator::do_apply(const proposal_update_operation&
       try {
          _processed_transaction = d.push_proposal(*_proposal);
       } catch(fc::exception& e) {
+         d.modify(*_proposal, [&e](proposal_object& p) {
+            p.fail_reason = e.to_string(fc::log_level(fc::log_level::all));
+         });
          wlog("Proposed transaction ${id} failed to apply once approved with exception:\n----\n${reason}\n----\nWill try again when it expires.",
               ("id", o.proposal)("reason", e.to_detail_string()));
          _proposal_failed = true;

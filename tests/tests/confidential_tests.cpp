@@ -25,7 +25,6 @@
 #include <boost/test/unit_test.hpp>
 
 #include <graphene/chain/database.hpp>
-#include <graphene/chain/protocol/protocol.hpp>
 #include <graphene/chain/exceptions.hpp>
 
 #include <graphene/chain/account_object.hpp>

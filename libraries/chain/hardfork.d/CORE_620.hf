@@ -1,4 +1,4 @@
 // bitshares-core issue #620 Allow numbers at the end of asset symbol
 #ifndef HARDFORK_CORE_620_TIME
-#define HARDFORK_CORE_620_TIME (fc::time_point_sec( 1526738280 )) // Sat, 19 May 2018 13:58:00 UTC
+#define HARDFORK_CORE_620_TIME (fc::time_point_sec( 1526738280 )) // Sat, 19 May 2018 13:58:00 UTC // testnet
 #endif
