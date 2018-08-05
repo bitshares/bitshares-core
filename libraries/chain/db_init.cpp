@@ -33,6 +33,7 @@
 #include <graphene/chain/chain_property_object.hpp>
 #include <graphene/chain/committee_member_object.hpp>
 #include <graphene/chain/confidential_object.hpp>
+#include <graphene/chain/custom_authority_object.hpp>
 #include <graphene/chain/fba_object.hpp>
 #include <graphene/chain/global_property_object.hpp>
 #include <graphene/chain/market_object.hpp>
@@ -53,6 +54,7 @@
 #include <graphene/chain/committee_member_evaluator.hpp>
 #include <graphene/chain/confidential_evaluator.hpp>
 #include <graphene/chain/custom_evaluator.hpp>
+#include <graphene/chain/custom_authority_evaluator.hpp>
 #include <graphene/chain/market_evaluator.hpp>
 #include <graphene/chain/proposal_evaluator.hpp>
 #include <graphene/chain/transfer_evaluator.hpp>
@@ -173,6 +175,9 @@ void database::initialize_evaluators()
    register_evaluator<asset_claim_fees_evaluator>();
    register_evaluator<asset_update_issuer_evaluator>();
    register_evaluator<asset_claim_pool_evaluator>();
+   register_evaluator<custom_authority_create_evaluator>();
+   register_evaluator<custom_authority_update_evaluator>();
+   register_evaluator<custom_authority_delete_evaluator>();
 }
 
 void database::initialize_indexes()
@@ -216,6 +221,7 @@ void database::initialize_indexes()
    add_index< primary_index< special_authority_index                      > >();
    add_index< primary_index< buyback_index                                > >();
    add_index< primary_index<collateral_bid_index                          > >();
+   add_index< primary_index<custom_authority_index                        > >();
 
    add_index< primary_index< simple_index< fba_accumulator_object       > > >();
 }

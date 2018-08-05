@@ -162,7 +162,8 @@ namespace graphene { namespace chain {
       impl_special_authority_object_type,
       impl_buyback_object_type,
       impl_fba_accumulator_object_type,
-      impl_collateral_bid_object_type
+      impl_collateral_bid_object_type,
+      impl_custom_authority_object_type
    };
 
    //typedef fc::unsigned_int            object_id_type;
@@ -214,6 +215,7 @@ namespace graphene { namespace chain {
    class buyback_object;
    class fba_accumulator_object;
    class collateral_bid_object;
+   class custom_authority_object;
 
    typedef object_id< implementation_ids, impl_global_property_object_type,  global_property_object>                    global_property_id_type;
    typedef object_id< implementation_ids, impl_dynamic_global_property_object_type,  dynamic_global_property_object>    dynamic_global_property_id_type;
@@ -234,6 +236,7 @@ namespace graphene { namespace chain {
    typedef object_id< implementation_ids, impl_buyback_object_type, buyback_object >                                    buyback_id_type;
    typedef object_id< implementation_ids, impl_fba_accumulator_object_type, fba_accumulator_object >                    fba_accumulator_id_type;
    typedef object_id< implementation_ids, impl_collateral_bid_object_type, collateral_bid_object >                      collateral_bid_id_type;
+   typedef object_id< implementation_ids, impl_custom_authority_object_type, custom_authority_object >                  custom_authority_id_type;
 
    typedef fc::ripemd160                                        block_id_type;
    typedef fc::ripemd160                                        checksum_type;
@@ -364,6 +367,7 @@ FC_REFLECT_ENUM( graphene::chain::impl_object_type,
                  (impl_buyback_object_type)
                  (impl_fba_accumulator_object_type)
                  (impl_collateral_bid_object_type)
+                 (impl_custom_authority_object_type)
                )
 
 FC_REFLECT_TYPENAME( graphene::chain::share_type )
@@ -395,6 +399,7 @@ FC_REFLECT_TYPENAME( graphene::chain::special_authority_id_type )
 FC_REFLECT_TYPENAME( graphene::chain::buyback_id_type )
 FC_REFLECT_TYPENAME( graphene::chain::fba_accumulator_id_type )
 FC_REFLECT_TYPENAME( graphene::chain::collateral_bid_id_type )
+FC_REFLECT_TYPENAME( graphene::chain::custom_authority_id_type )
 
 FC_REFLECT( graphene::chain::void_t, )
 
