@@ -128,7 +128,13 @@ struct graphene_extension_unpack_visitor
    const uint32_t max_depth;
 };
 
+struct empty_struct {};
+
+typedef extension< empty_struct > empty_extensions_type;
+
 } } // graphene::chain
+
+FC_REFLECT( graphene::chain::empty_struct, )
 
 namespace fc {
 

@@ -27,9 +27,10 @@
 #include <graphene/chain/protocol/assert.hpp>
 #include <graphene/chain/protocol/asset_ops.hpp>
 #include <graphene/chain/protocol/balance.hpp>
-#include <graphene/chain/protocol/custom.hpp>
 #include <graphene/chain/protocol/committee_member.hpp>
 #include <graphene/chain/protocol/confidential.hpp>
+#include <graphene/chain/protocol/custom.hpp>
+#include <graphene/chain/protocol/custom_authority.hpp>
 #include <graphene/chain/protocol/fba.hpp>
 #include <graphene/chain/protocol/market.hpp>
 #include <graphene/chain/protocol/proposal.hpp>
@@ -95,7 +96,10 @@ namespace graphene { namespace chain {
             bid_collateral_operation,
             execute_bid_operation,          // VIRTUAL
             asset_claim_pool_operation,
-            asset_update_issuer_operation
+            asset_update_issuer_operation,
+            custom_authority_create_operation,
+            custom_authority_update_operation,
+            custom_authority_delete_operation
          > operation;
 
    /// @} // operations group
