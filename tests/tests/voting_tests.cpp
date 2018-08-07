@@ -393,4 +393,28 @@ BOOST_AUTO_TEST_CASE(track_votes_committee_disabled)
    } FC_LOG_AND_RETHROW()
 }
 
+BOOST_AUTO_TEST_CASE(invalid_voting_account)
+{
+	ACTORS((alice));
+
+	account_id_type invalid_account_id;
+	invalid_account_id.instance = 99999;
+
+	graphene::chain::account_update_operation op;
+	op.account = alice_id;
+	op.new_options = alice.options;
+	op.new_options->voting_account = invalid_account_id;
+	trx.operations.push_back(op);
+	sign(trx, alice_private_key);
+	try
+	{
+		PUSH_TX(db, trx, ~0);
+		BOOST_FAIL("Updating an account with an invalid voting account should fail.");
+	}
+	catch (fc::exception& ex)
+	{
+		// We should end up here
+	}
+}
+
 BOOST_AUTO_TEST_SUITE_END()
