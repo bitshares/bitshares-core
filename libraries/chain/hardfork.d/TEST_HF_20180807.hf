@@ -1,0 +1,4 @@
+// Changes required for upgrading test net to latest core release
+#ifndef HARDFORK_TEST_20180807_TIME
+#define HARDFORK_TEST_20180807_TIME (fc::time_point_sec( 1533663600 )) // Tue Aug  7 17:40:00 UTC 2018
+#endif

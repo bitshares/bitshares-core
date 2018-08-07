@@ -71,7 +71,8 @@ void verify_account_votes( const database& db, const account_options& options )
    FC_ASSERT( options.num_committee <= chain_params.maximum_committee_count,
               "Voted for more committee members than currently allowed (${c})", ("c", chain_params.maximum_committee_count) );
 
-   FC_ASSERT( db.find_object(options.voting_account), "Invalid proxy account specified." );
+   if( db.head_block_time() >= HARDFORK_TEST_20180807_TIME ) // testnet only
+      FC_ASSERT( db.find_object(options.voting_account), "Invalid proxy account specified." );
 
    uint32_t max_vote_id = gpo.next_available_vote_id;
    bool has_worker_votes = false;
