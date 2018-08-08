@@ -1102,10 +1102,15 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
             // There may be a difference between the account whose stake is voting and the one specifying opinions.
             // Usually they're the same, but if the stake account has specified a voting_account, that account is the one
             // specifying the opinions.
-            const account_object& opinion_account =
+            const account_object* opinion_account_ptr =
                   (stake_account.options.voting_account ==
-                   GRAPHENE_PROXY_TO_SELF_ACCOUNT)? stake_account
-                                     : d.get(stake_account.options.voting_account);
+                   GRAPHENE_PROXY_TO_SELF_ACCOUNT)? &stake_account
+                                     : d.find(stake_account.options.voting_account);
+
+            if( !opinion_account_ptr ) // skip non-exist account
+               return;
+
+            const account_object& opinion_account = *opinion_account_ptr;
 
             uint64_t voting_stake = stats.total_core_in_orders.value
                   + (stake_account.cashback_vb.valid() ? (*stake_account.cashback_vb)(d).balance.amount.value: 0)
