@@ -259,6 +259,7 @@ struct get_impacted_account_visitor
    void operator()( const custom_authority_create_operation& op )
    {
       _impacted.insert( op.fee_payer() ); // account
+      add_authority_accounts( _impacted, op.auth );
    }
    void operator()( const custom_authority_update_operation& op )
    {
@@ -422,7 +423,7 @@ void get_relevant_accounts( const object* obj, flat_set<account_id_type>& accoun
               const auto& aobj = dynamic_cast<const custom_authority_object*>(obj);
               FC_ASSERT( aobj != nullptr );
               accounts.insert( aobj->account );
-              add_authority_accounts( accounts, aobj->custom_auth );
+              add_authority_accounts( accounts, aobj->auth );
               break;
            }
       }

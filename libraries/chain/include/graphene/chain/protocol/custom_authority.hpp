@@ -53,11 +53,24 @@ namespace graphene { namespace chain {
 
 //         vector<operation_restriction>   restrictions;
 
+   /**
+    * op_wrapper is used to get around the circular definition of operation and proposals that contain them.
+    */
+   struct op_wrapper;
+
    struct operation_restriction;
    typedef vector<operation_restriction> attr_restriction_type;
 
    struct operation_restriction
    {
+
+      enum member_modifier_type
+      {
+         mmod_none,
+         mmod_size,
+         mmod_pack_size,
+         MEMBER_MODIFIER_TYPE_COUNT ///< Sentry value which contains the number of different types
+      };
 
       enum function_type
       {
@@ -67,34 +80,67 @@ namespace graphene { namespace chain {
          func_le,
          func_gt,
          func_ge,
-         func_any,
-         func_none,
-         func_attr,
-         FUNCTION_TYPE_COUNT ///< Sentry value which contains the number of different function types
+         func_in,
+         func_not_in,
+         func_has_all,
+         func_has_none,
+         func_is_valid,
+         func_not_valid,
+         FUNCTION_TYPE_COUNT ///< Sentry value which contains the number of different types
       };
 
       typedef static_variant <
+         void_t,
+
          bool,
          int64_t,
          string,
-         asset_id_type,
-         account_id_type,
 
-         flat_set< bool             >,
-         flat_set< int64_t          >,
-         flat_set< string           >,
-         flat_set< asset_id_type    >,
-         flat_set< account_id_type  >,
+         account_id_type,
+         asset_id_type,
+         force_settlement_id_type,
+         committee_member_id_type,
+         witness_id_type,
+         limit_order_id_type,
+         call_order_id_type,
+         custom_id_type,
+         proposal_id_type,
+         withdraw_permission_id_type,
+         vesting_balance_id_type,
+         worker_id_type,
+         balance_id_type,
+
+         flat_set< bool                        >,
+         flat_set< int64_t                     >,
+         flat_set< string                      >,
+
+         flat_set< account_id_type             >,
+         flat_set< asset_id_type               >,
+         flat_set< force_settlement_id_type    >,
+         flat_set< committee_member_id_type    >,
+         flat_set< witness_id_type             >,
+         flat_set< limit_order_id_type         >,
+         flat_set< call_order_id_type          >,
+         flat_set< custom_id_type              >,
+         flat_set< proposal_id_type            >,
+         flat_set< withdraw_permission_id_type >,
+         flat_set< vesting_balance_id_type     >,
+         flat_set< worker_id_type              >,
+         flat_set< balance_id_type             >,
 
          attr_restriction_type
 
       > argument_type;
 
-      unsigned_int               member;
-      function_type              function;
+      unsigned_int               member;          // index, use unsigned_int to save space TODO jsonify to actual name
+      unsigned_int               member_modifier; // index, use unsigned_int to save space TODO jsonify to actual name
+      unsigned_int               function;        // index, use unsigned_int to save space TODO jsonify to actual name
       argument_type              argument;
 
       empty_extensions_type      extensions;
+
+      uint64_t get_units()const;
+      void validate( const op_wrapper& opw )const;
    };
 
    /**
@@ -103,33 +149,54 @@ namespace graphene { namespace chain {
     */
    struct custom_authority_create_operation : public base_operation
    {
-      struct fee_parameters_type { uint64_t fee =  GRAPHENE_BLOCKCHAIN_PRECISION; };
+      struct fee_parameters_type
+      {
+         uint64_t basic_fee        = GRAPHENE_BLOCKCHAIN_PRECISION;
+         uint32_t price_per_k_unit = 100; ///< units = valid seconds * items in auth * items in restrictions
+      };
 
-      asset             fee;
-      account_id_type   account;
+      asset                           fee; // TODO: defer fee to expiration / update / removal ?
+      account_id_type                 account;
+      uint32_t                        auth_id;
+      bool                            enabled;
+      time_point_sec                  valid_from;
+      time_point_sec                  valid_to;
+      unsigned_int                    operation_type;
+      authority                       auth;
+      vector<operation_restriction>   restrictions;
+
+      empty_extensions_type           extensions;
 
       account_id_type fee_payer()const { return account; }
       void            validate()const;
+      share_type      calculate_fee(const fee_parameters_type& k)const;
    };
 
    /**
-    * @brief Create a new custom authority
+    * @brief Update a custom authority
     * @ingroup operations
     */
    struct custom_authority_update_operation : public base_operation
    {
-      struct fee_parameters_type { uint64_t fee =  GRAPHENE_BLOCKCHAIN_PRECISION; };
+      struct fee_parameters_type
+      {
+         uint64_t basic_fee        = GRAPHENE_BLOCKCHAIN_PRECISION;
+         uint32_t price_per_k_unit = 100; ///< units = valid seconds * items in auth * items in restrictions
+      };
 
       asset             fee;
       account_id_type   account;
+      uint64_t          delta_units; // to calculate fee, it will be validated in evaluator
+                                     // Note: if start was in the past, when updating, used fee should be deducted
 
       account_id_type fee_payer()const { return account; }
       void            validate()const;
+      share_type      calculate_fee(const fee_parameters_type& k)const;
    };
 
 
    /**
-    * @brief Create a new custom authority
+    * @brief Delete a custom authority
     * @ingroup operations
     */
    struct custom_authority_delete_operation : public base_operation
@@ -145,6 +212,13 @@ namespace graphene { namespace chain {
 
 } } // graphene::chain
 
+FC_REFLECT_ENUM( graphene::chain::operation_restriction::member_modifier_type,
+                 (mmod_none)
+                 (mmod_size)
+                 (mmod_pack_size)
+                 (MEMBER_MODIFIER_TYPE_COUNT)
+               )
+
 FC_REFLECT_ENUM( graphene::chain::operation_restriction::function_type,
                  (func_eq)
                  (func_ne)
@@ -152,21 +226,25 @@ FC_REFLECT_ENUM( graphene::chain::operation_restriction::function_type,
                  (func_le)
                  (func_gt)
                  (func_ge)
-                 (func_any)
-                 (func_none)
-                 (func_attr)
+                 (func_in)
+                 (func_not_in)
+                 (func_has_all)
+                 (func_has_none)
+                 (func_is_valid)
+                 (func_not_valid)
                  (FUNCTION_TYPE_COUNT)
                )
 
 FC_REFLECT( graphene::chain::operation_restriction,
             (member)
+            (member_modifier)
             (function)
             (argument)
             (extensions)
           )
 
-FC_REFLECT( graphene::chain::custom_authority_create_operation::fee_parameters_type, (fee) )
-FC_REFLECT( graphene::chain::custom_authority_update_operation::fee_parameters_type, (fee) )
+FC_REFLECT( graphene::chain::custom_authority_create_operation::fee_parameters_type, (basic_fee)(price_per_k_unit) )
+FC_REFLECT( graphene::chain::custom_authority_update_operation::fee_parameters_type, (basic_fee)(price_per_k_unit) )
 FC_REFLECT( graphene::chain::custom_authority_delete_operation::fee_parameters_type, (fee) )
 
 FC_REFLECT( graphene::chain::custom_authority_create_operation, (fee)(account) )
