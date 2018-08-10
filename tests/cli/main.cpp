@@ -373,8 +373,6 @@ BOOST_FIXTURE_TEST_CASE( cli_set_voting_proxy, cli_fixture )
 ///////////////////
 BOOST_FIXTURE_TEST_CASE( cli_confidential_tx_test, cli_fixture )
 {
-   //using namespace graphene::chain;
-   //using namespace graphene::app;
    using namespace graphene::wallet;
    try {
       unsigned int head_block = 0;
