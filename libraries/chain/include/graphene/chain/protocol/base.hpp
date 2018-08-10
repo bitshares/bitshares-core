@@ -99,6 +99,15 @@ namespace graphene { namespace chain {
    };
 
    /**
+    * An operation may or may not support custom authorities.
+    */
+   struct base_custom_auth_type
+   {
+      asset_id_type fee_asset;
+      share_type    fee_amount;
+   };
+
+   /**
     *  For future expansion many structus include a single member of type
     *  extensions_type that can be changed when updating a protocol.  You can
     *  always add new types to a static_variant without breaking backward
@@ -122,3 +131,64 @@ namespace graphene { namespace chain {
 FC_REFLECT_TYPENAME( graphene::chain::operation_result )
 FC_REFLECT_TYPENAME( graphene::chain::future_extensions )
 FC_REFLECT( graphene::chain::void_result, )
+
+/*
+#define GRAPHENE_OPERATION_REFLECT_IMPL_INLINE( TYPE, MEMBERS ) \
+template<typename Visitor>\
+static inline void visit( const Visitor& v ) { \
+    BOOST_PP_SEQ_FOR_EACH( FC_REFLECT_VISIT_MEMBER, v, MEMBERS ) \
+}
+*/
+
+#define GRAPHENE_OPERATION_NS_ITEM_TO_NS( r, x, NS_ITEM ) \
+   namespace NS_ITEM {
+
+#define GRAPHENE_OPERATION_NS_ITEM_TO_NS_END( r, x, NS_ITEM ) \
+   }
+
+#define GRAPHENE_OPERATION_NS_SEQ_TO_NS( NS_SEQ ) \
+   BOOST_PP_SEQ_FOR_EACH( GRAPHENE_OPERATION_NS_ITEM_TO_NS, , NS_SEQ )
+
+#define GRAPHENE_OPERATION_NS_SEQ_TO_NS_END( NS_SEQ ) \
+   BOOST_PP_SEQ_FOR_EACH( GRAPHENE_OPERATION_NS_ITEM_TO_NS_END, , NS_SEQ )
+
+#define GRAPHENE_OPERATION_NS_ITEM_TO_TYPE_PREFIX( r, x, NS_ITEM ) \
+   NS_ITEM::
+
+#define GRAPHENE_OPERATION_NS_SEQ_TO_TYPE_PREFIX( NS_SEQ ) \
+   BOOST_PP_SEQ_FOR_EACH( GRAPHENE_OPERATION_NS_ITEM_TO_TYPE_PREFIX, , NS_SEQ )
+
+#define GRAPHENE_OPERATION_MEMBER_TO_RESTRICTION_MEMBER( r, TYPE, MEMBER ) \
+   ( decltype(((TYPE*)nullptr)->MEMBER) MEMBER )
+
+#define GRAPHENE_OPERATION_MEMBERS_TO_RESTRICTION_MEMBERS( TYPE, MEMBERS ) \
+   BOOST_PP_SEQ_FOR_EACH( GRAPHENE_OPERATION_MEMBER_TO_RESTRICTION_MEMBER, TYPE, MEMBERS )
+
+#define GRAPHENE_OPERATION_CAT_NS_TYPE( NS_SEQ, OP_TYPE ) \
+   GRAPHENE_OPERATION_NS_SEQ_TO_TYPE_PREFIX( NS_SEQ )OP_TYPE
+
+#define GRAPHENE_OPERATION_REFLECT( NS_SEQ, OP_TYPE, MEMBERS ) \
+   GRAPHENE_OPERATION_NS_SEQ_TO_NS( NS_SEQ ) \
+      struct OP_TYPE ## restrictions { \
+         BOOST_PP_SEQ_ENUM( GRAPHENE_OPERATION_MEMBERS_TO_RESTRICTION_MEMBERS( \
+                               GRAPHENE_OPERATION_CAT_NS_TYPE( NS_SEQ, OP_TYPE ), MEMBERS ) ) \
+      }; \
+   GRAPHENE_OPERATION_NS_SEQ_TO_NS_END( NS_SEQ ) \
+   FC_REFLECT( GRAPHENE_OPERATION_CAT_NS_TYPE( NS_SEQ, OP_TYPE ), MEMBERS ) \
+
+
+/*
+#define FC_REFLECT_DERIVED( TYPE, INHERITS, MEMBERS ) \
+namespace fc {  \
+  template<> struct get_typename<TYPE>  { static const char* name()  { return BOOST_PP_STRINGIZE(TYPE);  } }; \
+template<> struct reflector<TYPE> {\
+    typedef TYPE type; \
+    typedef fc::true_type  is_defined; \
+    typedef fc::false_type is_enum; \
+    enum  member_count_enum {  \
+      local_member_count = 0  BOOST_PP_SEQ_FOR_EACH( FC_REFLECT_MEMBER_COUNT, +, MEMBERS ),\
+      total_member_count = local_member_count BOOST_PP_SEQ_FOR_EACH( FC_REFLECT_BASE_MEMBER_COUNT, +, INHERITS )\
+    }; \
+    FC_REFLECT_DERIVED_IMPL_INLINE( TYPE, INHERITS, MEMBERS ) \
+}; }
+*/

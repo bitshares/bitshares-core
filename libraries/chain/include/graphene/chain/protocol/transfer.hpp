@@ -48,6 +48,9 @@ namespace graphene { namespace chain {
          uint32_t price_per_kbyte = 10 * GRAPHENE_BLOCKCHAIN_PRECISION; /// only required for large memos.
       };
 
+      struct custom_auth_type : public base_custom_auth_type {
+      };
+
       asset            fee;
       /// Account to transfer asset from
       account_id_type  from;
@@ -59,6 +62,7 @@ namespace graphene { namespace chain {
       /// User provided data encrypted to the memo key of the "to" account
       optional<memo_data> memo;
       extensions_type   extensions;
+      empty_extensions_type   tmp_extensions;
 
       account_id_type fee_payer()const { return from; }
       void            validate()const;
@@ -104,4 +108,6 @@ FC_REFLECT( graphene::chain::transfer_operation::fee_parameters_type, (fee)(pric
 FC_REFLECT( graphene::chain::override_transfer_operation::fee_parameters_type, (fee)(price_per_kbyte) )
 
 FC_REFLECT( graphene::chain::override_transfer_operation, (fee)(issuer)(from)(to)(amount)(memo)(extensions) )
-FC_REFLECT( graphene::chain::transfer_operation, (fee)(from)(to)(amount)(memo)(extensions) )
+FC_REFLECT( graphene::chain::transfer_operation, (fee)(from)(to)(amount)(memo)(extensions)(tmp_extensions) )
+
+//GRAPHENE_OPERATION_REFLECT( (graphene)(chain), transfer_operation, (fee)(from)(to)(amount)(memo)(extensions) )
