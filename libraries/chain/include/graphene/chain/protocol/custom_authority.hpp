@@ -81,6 +81,7 @@ namespace graphene { namespace chain {
          func_has_none,
          //func_is_valid,  // -> size() == 1
          //func_not_valid, // -> size() == 0
+         func_attr,
          FUNCTION_TYPE_COUNT ///< Sentry value which contains the number of different types
       };
 
@@ -91,6 +92,7 @@ namespace graphene { namespace chain {
          string, \
          time_point_sec, \
          public_key_type, \
+         fc::sha256, \
          account_id_type, \
          asset_id_type, \
          force_settlement_id_type, \
@@ -109,6 +111,7 @@ namespace graphene { namespace chain {
          flat_set< string                      >, \
          flat_set< time_point_sec              >, \
          flat_set< public_key_type             >, \
+         flat_set< fc::sha256                  >, \
          flat_set< account_id_type             >, \
          flat_set< asset_id_type               >, \
          flat_set< force_settlement_id_type    >, \
@@ -226,6 +229,7 @@ FC_REFLECT_ENUM( graphene::chain::operation_restriction::function_type,
                  (func_has_none)
                  //(func_is_valid)
                  //(func_not_valid)
+                 (func_attr)
                  (FUNCTION_TYPE_COUNT)
                )
 
