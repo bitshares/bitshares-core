@@ -89,6 +89,8 @@ namespace graphene { namespace chain {
          bool, \
          int64_t, \
          string, \
+         time_point_sec, \
+         public_key_type, \
          account_id_type, \
          asset_id_type, \
          force_settlement_id_type, \
@@ -105,6 +107,8 @@ namespace graphene { namespace chain {
          flat_set< bool                        >, \
          flat_set< int64_t                     >, \
          flat_set< string                      >, \
+         flat_set< time_point_sec              >, \
+         flat_set< public_key_type             >, \
          flat_set< account_id_type             >, \
          flat_set< asset_id_type               >, \
          flat_set< force_settlement_id_type    >, \
