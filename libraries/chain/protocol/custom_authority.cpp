@@ -34,13 +34,13 @@ struct argument_get_units_visitor
    typedef uint64_t result_type;
 
    template<typename T>
-   result_type operator()( const T& t )
+   inline result_type operator()( const T& t )
    {
       return 1;
    }
 
    template<typename T>
-   result_type operator()( const flat_set<T>& t )
+   inline result_type operator()( const flat_set<T>& t )
    {
       return t.size();
    }
@@ -63,36 +63,88 @@ uint64_t operation_restriction::get_units()const
 }
 
 namespace detail {
-   template<typename T> bool is_simple_data_type() { return false; }
+   // comparable data types can use < <= > >= == !=
+   template<typename T> inline bool is_comparable_data_type() { return false; }
 
-   template<> bool is_simple_data_type<bool>() { return true; }
-   template<> bool is_simple_data_type<char>() { return true; }
-   template<> bool is_simple_data_type<int8_t>() { return true; }
-   template<> bool is_simple_data_type<uint8_t>() { return true; }
-   template<> bool is_simple_data_type<int16_t>() { return true; }
-   template<> bool is_simple_data_type<uint16_t>() { return true; }
-   template<> bool is_simple_data_type<int32_t>() { return true; }
-   template<> bool is_simple_data_type<uint32_t>() { return true; }
-   template<> bool is_simple_data_type<int64_t>() { return true; }
-   template<> bool is_simple_data_type<uint64_t>() { return true; }
-   template<> bool is_simple_data_type<unsigned_int>() { return true; }
+   template<> inline bool is_comparable_data_type<int8_t>() { return true; }
+   template<> inline bool is_comparable_data_type<uint8_t>() { return true; }
+   template<> inline bool is_comparable_data_type<int16_t>() { return true; }
+   template<> inline bool is_comparable_data_type<uint16_t>() { return true; }
+   template<> inline bool is_comparable_data_type<int32_t>() { return true; }
+   template<> inline bool is_comparable_data_type<uint32_t>() { return true; }
+   template<> inline bool is_comparable_data_type<int64_t>() { return true; }
+   template<> inline bool is_comparable_data_type<uint64_t>() { return true; }
+   template<> inline bool is_comparable_data_type<unsigned_int>() { return true; }
+   template<> inline bool is_comparable_data_type<time_point_sec>() { return true; }
 
-   template<> bool is_simple_data_type<string>() { return true; }
+   // simple data types can use == !=
+   template<typename T> inline bool is_simple_data_type() { return false; }
 
-   template<> bool is_simple_data_type<account_id_type>() { return true; }
-   template<> bool is_simple_data_type<asset_id_type>() { return true; }
-   template<> bool is_simple_data_type<force_settlement_id_type>() { return true; }
-   template<> bool is_simple_data_type<committee_member_id_type>() { return true; }
-   template<> bool is_simple_data_type<witness_id_type>() { return true; }
-   template<> bool is_simple_data_type<limit_order_id_type>() { return true; }
-   template<> bool is_simple_data_type<call_order_id_type>() { return true; }
-   template<> bool is_simple_data_type<custom_id_type>() { return true; }
-   template<> bool is_simple_data_type<proposal_id_type>() { return true; }
-   template<> bool is_simple_data_type<withdraw_permission_id_type>() { return true; }
-   template<> bool is_simple_data_type<vesting_balance_id_type>() { return true; }
-   template<> bool is_simple_data_type<worker_id_type>() { return true; }
-   template<> bool is_simple_data_type<balance_id_type>() { return true; }
+   template<> inline bool is_simple_data_type<bool>() { return true; }
+   template<> inline bool is_simple_data_type<char>() { return true; }
+   template<> inline bool is_simple_data_type<int8_t>() { return true; }
+   template<> inline bool is_simple_data_type<uint8_t>() { return true; }
+   template<> inline bool is_simple_data_type<int16_t>() { return true; }
+   template<> inline bool is_simple_data_type<uint16_t>() { return true; }
+   template<> inline bool is_simple_data_type<int32_t>() { return true; }
+   template<> inline bool is_simple_data_type<uint32_t>() { return true; }
+   template<> inline bool is_simple_data_type<int64_t>() { return true; }
+   template<> inline bool is_simple_data_type<uint64_t>() { return true; }
+   template<> inline bool is_simple_data_type<unsigned_int>() { return true; }
+
+   template<> inline bool is_simple_data_type<string>() { return true; }
+   template<> inline bool is_simple_data_type<time_point_sec>() { return true; }
+   template<> inline bool is_simple_data_type<public_key_type>() { return true; }
+
+   template<> inline bool is_simple_data_type<account_id_type>() { return true; }
+   template<> inline bool is_simple_data_type<asset_id_type>() { return true; }
+   template<> inline bool is_simple_data_type<force_settlement_id_type>() { return true; }
+   template<> inline bool is_simple_data_type<committee_member_id_type>() { return true; }
+   template<> inline bool is_simple_data_type<witness_id_type>() { return true; }
+   template<> inline bool is_simple_data_type<limit_order_id_type>() { return true; }
+   template<> inline bool is_simple_data_type<call_order_id_type>() { return true; }
+   template<> inline bool is_simple_data_type<custom_id_type>() { return true; }
+   template<> inline bool is_simple_data_type<proposal_id_type>() { return true; }
+   template<> inline bool is_simple_data_type<withdraw_permission_id_type>() { return true; }
+   template<> inline bool is_simple_data_type<vesting_balance_id_type>() { return true; }
+   template<> inline bool is_simple_data_type<worker_id_type>() { return true; }
+   template<> inline bool is_simple_data_type<balance_id_type>() { return true; }
 }
+
+template<typename T>
+struct compatible_argument_validate_visitor
+{
+   typedef void result_type;
+   const char* name;
+
+   compatible_argument_validate_visitor( const char* _name ) : name(_name) {}
+
+   template<typename ArgType>
+   inline result_type operator()( const ArgType& arg );
+
+   // argument type T is compatible with member type T
+   inline result_type operator()( const T& arg ) {}
+};
+
+// by default incompatible
+template<typename T> template<typename ArgType>
+inline void compatible_argument_validate_visitor<T>::operator()( const ArgType& arg )
+{
+   FC_THROW( "Argument '${arg}' is incompatible for ${name}",
+             ("arg", arg)("name", name) );
+}
+
+// compatible member types X and argument type Y and X != Y
+template<> template<> inline void compatible_argument_validate_visitor<char>::operator()( const string& arg ) {}
+template<> template<> inline void compatible_argument_validate_visitor<int8_t>::operator()( const int64_t& arg ) {}
+template<> template<> inline void compatible_argument_validate_visitor<uint8_t>::operator()( const int64_t& arg ) {}
+template<> template<> inline void compatible_argument_validate_visitor<int16_t>::operator()( const int64_t& arg ) {}
+template<> template<> inline void compatible_argument_validate_visitor<uint16_t>::operator()( const int64_t& arg ) {}
+template<> template<> inline void compatible_argument_validate_visitor<int32_t>::operator()( const int64_t& arg ) {}
+template<> template<> inline void compatible_argument_validate_visitor<uint32_t>::operator()( const int64_t& arg ) {}
+// no int64_t here because it's already covered by generic template
+template<> template<> inline void compatible_argument_validate_visitor<uint64_t>::operator()( const int64_t& arg ) {}
+template<> template<> inline void compatible_argument_validate_visitor<unsigned_int>::operator()( const int64_t& arg ) {}
 
 template<typename T>
 struct list_argument_validate_visitor
@@ -103,33 +155,31 @@ struct list_argument_validate_visitor
    list_argument_validate_visitor( const char* _name ) : name(_name) {}
 
    template<typename ArgType>
-   result_type operator()( const ArgType& arg );
+   inline result_type operator()( const ArgType& arg );
 
    // argument type flat_set<T> is compatible with member list_like<T>
-   result_type operator()( const flat_set<T>& arg ) {}
+   inline result_type operator()( const flat_set<T>& arg ) {}
 };
 
 // by default incompatible
 template<typename T> template<typename ArgType>
-void list_argument_validate_visitor<T>::operator()( const ArgType& arg )
+inline void list_argument_validate_visitor<T>::operator()( const ArgType& arg )
 {
-   FC_THROW( "Argument type '${a}' is incompatible with list-like member '${m}' which contains data with type ${t}",
-             ("a", fc::get_typename<ArgType>::name())
-             ("m", name)
-             ("t", fc::get_typename<T>::name()) );
+   FC_THROW( "Argument '${arg}' is incompatible, requires a compatible flat_set for ${name}",
+             ("arg", arg)("name", name) );
 }
 
-// compatible types X : flat_set<Y> and X != Y
-template<> template<> void list_argument_validate_visitor<char>::operator()( const flat_set<string>& arg ) {}
-template<> template<> void list_argument_validate_visitor<int8_t>::operator()( const flat_set<int64_t>& arg ) {}
-template<> template<> void list_argument_validate_visitor<uint8_t>::operator()( const flat_set<int64_t>& arg ) {}
-template<> template<> void list_argument_validate_visitor<int16_t>::operator()( const flat_set<int64_t>& arg ) {}
-template<> template<> void list_argument_validate_visitor<uint16_t>::operator()( const flat_set<int64_t>& arg ) {}
-template<> template<> void list_argument_validate_visitor<int32_t>::operator()( const flat_set<int64_t>& arg ) {}
-template<> template<> void list_argument_validate_visitor<uint32_t>::operator()( const flat_set<int64_t>& arg ) {}
+// compatible member types X and argument type flat_set<Y> and X != Y
+template<> template<> inline void list_argument_validate_visitor<char>::operator()( const flat_set<string>& arg ) {}
+template<> template<> inline void list_argument_validate_visitor<int8_t>::operator()( const flat_set<int64_t>& arg ) {}
+template<> template<> inline void list_argument_validate_visitor<uint8_t>::operator()( const flat_set<int64_t>& arg ) {}
+template<> template<> inline void list_argument_validate_visitor<int16_t>::operator()( const flat_set<int64_t>& arg ) {}
+template<> template<> inline void list_argument_validate_visitor<uint16_t>::operator()( const flat_set<int64_t>& arg ) {}
+template<> template<> inline void list_argument_validate_visitor<int32_t>::operator()( const flat_set<int64_t>& arg ) {}
+template<> template<> inline void list_argument_validate_visitor<uint32_t>::operator()( const flat_set<int64_t>& arg ) {}
 // no int64_t here because it's already covered by generic template
-template<> template<> void list_argument_validate_visitor<uint64_t>::operator()( const flat_set<int64_t>& arg ) {}
-template<> template<> void list_argument_validate_visitor<unsigned_int>::operator()( const flat_set<int64_t>& arg ) {}
+template<> template<> inline void list_argument_validate_visitor<uint64_t>::operator()( const flat_set<int64_t>& arg ) {}
+template<> template<> inline void list_argument_validate_visitor<unsigned_int>::operator()( const flat_set<int64_t>& arg ) {}
 
 struct number_argument_validate_visitor
 {
@@ -139,26 +189,57 @@ struct number_argument_validate_visitor
    number_argument_validate_visitor( const char* _name ) : name(_name) {}
 
    template<typename ArgType>
-   result_type operator()( const ArgType& arg )
+   inline result_type operator()( const ArgType& arg )
    {
-      FC_THROW( "Can only use a number type as argument for ${name}",
-                ("name", name) );
+      FC_THROW( "Argument '${arg}' is incompatible, requires a number type for ${name}",
+                ("arg", arg)("name", name) );
    }
 
-   result_type operator()( const int64_t& arg ) {}
+   inline result_type operator()( const int64_t& arg ) {}
 };
 
-void require_comparative_function( const operation_restriction& op_restriction, const char* name )
+inline bool is_subset_function( const operation_restriction::function_type function )
 {
-   // function should be a comparative function
-   FC_ASSERT( op_restriction.function == operation_restriction::func_eq
-              || op_restriction.function == operation_restriction::func_ne
-              || op_restriction.function == operation_restriction::func_lt
-              || op_restriction.function == operation_restriction::func_le
-              || op_restriction.function == operation_restriction::func_gt
-              || op_restriction.function == operation_restriction::func_ge,
-              "Can only use comparative function for ${name}",
-              ("name", name) );
+   return ( function == operation_restriction::func_in
+            || function == operation_restriction::func_not_in );
+}
+
+inline bool is_superset_function( const operation_restriction::function_type function )
+{
+   return ( function == operation_restriction::func_has_all
+            || function == operation_restriction::func_has_none );
+}
+
+inline bool is_equal_function( const operation_restriction::function_type function )
+{
+   return ( function == operation_restriction::func_eq
+            || function == operation_restriction::func_ne );
+}
+
+inline bool is_compare_function( const operation_restriction::function_type function )
+{
+   return ( function == operation_restriction::func_eq
+            || function == operation_restriction::func_ne
+            || function == operation_restriction::func_lt
+            || function == operation_restriction::func_le
+            || function == operation_restriction::func_gt
+            || function == operation_restriction::func_ge );
+}
+
+void require_compare_function( const operation_restriction& op_restriction, const char* name )
+{
+   // function should be a compare function
+   FC_ASSERT( is_compare_function( op_restriction.function ),
+              "Function '${func}' is incompatible, requires a compare function for ${name}",
+              ("func", op_restriction.function)("name", name) );
+}
+
+template<typename T>
+void require_compatible_argument( const operation_restriction& op_restriction, const char* name )
+{
+   // argument should be T-compatible
+   compatible_argument_validate_visitor<T> vtor( name );
+   op_restriction.argument.visit( vtor );
 }
 
 template<typename T>
@@ -186,13 +267,78 @@ struct op_restriction_validation_helper
                  "Internal error: should only use this helper for mmod_none" );
    }
 
-   // by default don't support undefined types
-   // FIXME need it for recursion
+   template<typename T>
+   void validate_comparable_member( const char* name )
+   {
+      if( is_subset_function( op_restriction.function ) )
+      {
+         // argument need to be a list, and type should be compatible to T
+         require_list_argument<T>( op_restriction, name );
+      }
+      else if( is_compare_function( op_restriction.function ) )
+      {
+         // argument need to be compatible
+         require_compatible_argument<T>( op_restriction, name );
+      }
+      else
+      {
+         FC_THROW( "Function '${func}' is incompatible, requires a compare function or subset function for ${name}",
+                   ("func", op_restriction.function)("name", name) );
+      }
+   }
+
+   template<typename T>
+   void validate_non_comparable_simple_member( const char* name )
+   {
+      if( is_subset_function( op_restriction.function ) )
+      {
+         // argument need to be a list, and type should be compatible to T
+         require_list_argument<T>( op_restriction, name );
+      }
+      else if( is_equal_function( op_restriction.function ) )
+      {
+         // argument need to be compatible
+         require_compatible_argument<T>( op_restriction, name );
+      }
+      else
+      {
+         FC_THROW( "Function '${func}' is incompatible, requires an equal function or subset function for ${name}",
+                   ("func", op_restriction.function)("name", name) );
+      }
+   }
+
+   template<typename T>
+   void validate_list_like_member( const char* name )
+   {
+      FC_ASSERT( is_superset_function( op_restriction.function ),
+                 "List-like member '${name}' can only use func_has_all or func_has_none",
+                 ("name", name) );
+      FC_ASSERT( detail::is_simple_data_type<T>(),
+                 "Simple data type in list-like member '${name}' is required",
+                 ("name", name) );
+      // argument need to be a list, and type should be compatible to T
+      require_list_argument<T>( op_restriction, name );
+   }
+
    template<typename T>
    void validate_by_member_type( const char* name, const T* t )
    {
-      FC_THROW( "Restriction on '${name}' is not supported due to its type '${type}'",
-                ("name", name)("type", fc::get_typename<T>::name()) );
+      // TODO change to compile-time check for better performance
+      if( detail::is_comparable_data_type<T>() ) // member is a number type or time point
+      {
+         validate_comparable_member<T>( name );
+      }
+      else if( detail::is_simple_data_type<T>() ) // member is another simple type
+      {
+         validate_non_comparable_simple_member<T>( name );
+      }
+      else
+      {
+         // by default don't support undefined types
+         // FIXME need it for recursion
+         FC_THROW( "Restriction on '${name}' is not supported due to its type '${type}'",
+                   ("name", name)("type", fc::get_typename<T>::name()) );
+      }
    }
 
    template<typename T>
@@ -217,17 +363,10 @@ struct op_restriction_validation_helper
    }
 
    template<typename T>
-   void validate_list_like_member( const char* name )
+   void validate_by_member_type( const char* name, const extension<T>* t )
    {
-      FC_ASSERT( op_restriction.function == operation_restriction::func_has_all
-                 || op_restriction.function == operation_restriction::func_has_none,
-                 "List-like member '${name}' can only use func_has_all or func_has_none",
-                 ("name", name) );
-      FC_ASSERT( detail::is_simple_data_type<T>(),
-                 "Simple data type in list-like member '${name}' is required",
-                 ("name", name) );
-      // validate argument, need to be a list, and type should be compatible to T
-      require_list_argument<T>( op_restriction, name );
+      // extract the underlying type
+      validate_by_member_type( name, (const T*)nullptr );
    }
 
    template<typename T>
@@ -380,12 +519,12 @@ void operation_restriction::validate( unsigned_int op_type )const
 
    if( member_modifier.value == mmod_size )
    {
-      require_comparative_function( *this, "size modifier" );
+      require_compare_function( *this, "size modifier" );
       require_number_argument( *this, "size modifier" );
    }
    else if( member_modifier.value == mmod_pack_size )
    {
-      require_comparative_function( *this, "pack_size modifier" );
+      require_compare_function( *this, "pack_size modifier" );
       require_number_argument( *this, "pack_size modifier" );
    }
 
