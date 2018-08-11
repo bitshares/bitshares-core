@@ -471,18 +471,9 @@ struct op_restriction_validate_visitor
                  "member number ${m} is too large",
                  ("m",op_restriction.member) );
 
-      // other member modifiers have been checked outside, so only check mmod_none here
+      // other member modifiers should have been checked outside, so only check mmod_none here
       if( op_restriction.member_modifier.value == operation_restriction::mmod_none )
       {
-         // member_validate_visitor<OpType> vtor( op_restriction );
-         // fc::reflector<OpType>::visit( vtor );
-
-         // NOTE: above implementation iterates through all reflected members to find specified member,
-         //       possible to improve performance by visiting specified member by index/number directly
-         // ------------------------
-         // So we have the code below
-         // TODO cleanup above comments
-
          by_index_member_validate_visitor<OpType> vtor( op_restriction );
          fc::reflector<OpType>::visit_local_member( vtor, op_restriction.member.value );
       }
