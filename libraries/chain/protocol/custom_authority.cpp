@@ -264,7 +264,12 @@ struct op_restriction_validation_helper
 template< typename OpType >
 struct member_validate_visitor
 {
-   member_validate_visitor( const OpType& o, const operation_restriction& opr ) : op(o), op_restriction(opr) {}
+   typedef void result_type;
+
+   mutable uint32_t which = 0;
+   const operation_restriction& op_restriction;
+
+   member_validate_visitor( const operation_restriction& opr ) : op_restriction(opr) {}
 
    template<typename Member, class Class, Member (Class::*member)>
    void operator()( const char* name )const
@@ -291,9 +296,6 @@ struct member_validate_visitor
       ++which;
    }
 
-   mutable uint32_t which = 0;
-   const OpType& op;                            ///< the operation
-   const operation_restriction& op_restriction; ///< the restriction
 };
 
 struct op_restriction_validate_visitor
@@ -304,8 +306,10 @@ struct op_restriction_validate_visitor
    op_restriction_validate_visitor( const operation_restriction& opr ) : op_restriction(opr) {}
 
    template<typename OpType>
-   result_type operator()( const OpType& op )
+   result_type operator()( const OpType& )
    {
+      // Note: the parameter is a reference of *nullptr, we should not use it
+
       FC_ASSERT( op_restriction.member < fc::reflector<OpType>::total_member_count,
                  "member number ${m} is too large",
                  ("m",op_restriction.member) );
@@ -315,7 +319,7 @@ struct op_restriction_validate_visitor
       {
          // TODO: this implementation iterates through all reflected members to find specified member,
          //       possible to improve performance by visiting specified member by index/number directly
-         member_validate_visitor<OpType> vtor( op, op_restriction );
+         member_validate_visitor<OpType> vtor( op_restriction );
          fc::reflector<OpType>::visit( vtor );
       }
    }
