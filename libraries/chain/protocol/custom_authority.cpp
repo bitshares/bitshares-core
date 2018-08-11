@@ -189,31 +189,31 @@ struct op_restriction_validation_helper
    // by default don't support undefined types
    // FIXME need it for recursion
    template<typename T>
-   void validate_by_member_type( const char* name, const T& t )
+   void validate_by_member_type( const char* name, const T* t )
    {
       FC_THROW( "Restriction on '${name}' is not supported due to its type '${type}'",
                 ("name", name)("type", fc::get_typename<T>::name()) );
    }
 
    template<typename T>
-   void validate_by_member_type( const char* name, const optional<T>& t )
+   void validate_by_member_type( const char* name, const optional<T>* t )
    {
       // extract the underlying type
-      validate_by_member_type<T>( name, T() );
+      validate_by_member_type( name, (const T*)nullptr );
    }
 
    template<typename T>
-   void validate_by_member_type( const char* name, const safe<T>& t )
+   void validate_by_member_type( const char* name, const safe<T>* t )
    {
       // extract the underlying type
-      validate_by_member_type<T>( name, t.value );
+      validate_by_member_type( name, (const T*)nullptr );
    }
 
    template<typename T>
-   void validate_by_member_type( const char* name, const smart_ref<T>& t )
+   void validate_by_member_type( const char* name, const smart_ref<T>* t )
    {
       // extract the underlying type
-      validate_by_member_type<T>( name, t.value );
+      validate_by_member_type( name, (const T*)nullptr );
    }
 
    template<typename T>
@@ -231,19 +231,19 @@ struct op_restriction_validation_helper
    }
 
    template<typename T>
-   void validate_by_member_type( const char* name, const vector<T>& t )
+   void validate_by_member_type( const char* name, const vector<T>* t )
    {
       validate_list_like_member<T>( name );
    }
 
    template<typename T>
-   void validate_by_member_type( const char* name, const set<T>& t )
+   void validate_by_member_type( const char* name, const set<T>* t )
    {
       validate_list_like_member<T>( name );
    }
 
    template<typename T>
-   void validate_by_member_type( const char* name, const flat_set<T>& t )
+   void validate_by_member_type( const char* name, const flat_set<T>* t )
    {
       validate_list_like_member<T>( name );
    }
@@ -277,7 +277,7 @@ struct member_validate_visitor
          //validate_member( op_restriction );
 
          op_restriction_validation_helper helper( op_restriction );
-         helper.validate_by_member_type( name, op.*member );
+         helper.validate_by_member_type( name, (const Member*)nullptr );
 
          // Giving the member type, we know what function is available
          // Giving function, we know what argument it should be
