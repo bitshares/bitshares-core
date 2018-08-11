@@ -84,8 +84,8 @@ namespace graphene { namespace chain {
          func_not_in,
          func_has_all,
          func_has_none,
-         func_is_valid,
-         func_not_valid,
+         //func_is_valid,  // -> size() == 1
+         //func_not_valid, // -> size() == 0
          FUNCTION_TYPE_COUNT ///< Sentry value which contains the number of different types
       };
 
@@ -230,8 +230,8 @@ FC_REFLECT_ENUM( graphene::chain::operation_restriction::function_type,
                  (func_not_in)
                  (func_has_all)
                  (func_has_none)
-                 (func_is_valid)
-                 (func_not_valid)
+                 //(func_is_valid)
+                 //(func_not_valid)
                  (FUNCTION_TYPE_COUNT)
                )
 
