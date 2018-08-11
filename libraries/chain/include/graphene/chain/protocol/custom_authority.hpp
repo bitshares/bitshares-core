@@ -86,46 +86,46 @@ namespace graphene { namespace chain {
       };
 
       #define GRAPHENE_OP_RESTRICTION_ARGUMENTS_VARIADIC \
-         void_t, \
-         bool, \
-         int64_t, \
-         string, \
-         time_point_sec, \
-         public_key_type, \
-         fc::sha256, \
-         account_id_type, \
-         asset_id_type, \
-         force_settlement_id_type, \
-         committee_member_id_type, \
-         witness_id_type, \
-         limit_order_id_type, \
-         call_order_id_type, \
-         custom_id_type, \
-         proposal_id_type, \
-         withdraw_permission_id_type, \
-         vesting_balance_id_type, \
-         worker_id_type, \
-         balance_id_type, \
-         flat_set< bool                        >, \
-         flat_set< int64_t                     >, \
-         flat_set< string                      >, \
-         flat_set< time_point_sec              >, \
-         flat_set< public_key_type             >, \
-         flat_set< fc::sha256                  >, \
-         flat_set< account_id_type             >, \
-         flat_set< asset_id_type               >, \
-         flat_set< force_settlement_id_type    >, \
-         flat_set< committee_member_id_type    >, \
-         flat_set< witness_id_type             >, \
-         flat_set< limit_order_id_type         >, \
-         flat_set< call_order_id_type          >, \
-         flat_set< custom_id_type              >, \
-         flat_set< proposal_id_type            >, \
-         flat_set< withdraw_permission_id_type >, \
-         flat_set< vesting_balance_id_type     >, \
-         flat_set< worker_id_type              >, \
-         flat_set< balance_id_type             >, \
-         attr_restriction_type
+         /*  0 */ void_t, \
+         /*  1 */ bool, \
+         /*  2 */ int64_t, \
+         /*  3 */ string, \
+         /*  4 */ time_point_sec, \
+         /*  5 */ public_key_type, \
+         /*  6 */ fc::sha256, \
+         /*  7 */ account_id_type, \
+         /*  8 */ asset_id_type, \
+         /*  9 */ force_settlement_id_type, \
+         /* 10 */ committee_member_id_type, \
+         /* 11 */ witness_id_type, \
+         /* 12 */ limit_order_id_type, \
+         /* 13 */ call_order_id_type, \
+         /* 14 */ custom_id_type, \
+         /* 15 */ proposal_id_type, \
+         /* 16 */ withdraw_permission_id_type, \
+         /* 17 */ vesting_balance_id_type, \
+         /* 18 */ worker_id_type, \
+         /* 19 */ balance_id_type, \
+         /* 20 */ flat_set< bool                        >, \
+         /* 21 */ flat_set< int64_t                     >, \
+         /* 22 */ flat_set< string                      >, \
+         /* 23 */ flat_set< time_point_sec              >, \
+         /* 24 */ flat_set< public_key_type             >, \
+         /* 25 */ flat_set< fc::sha256                  >, \
+         /* 26 */ flat_set< account_id_type             >, \
+         /* 27 */ flat_set< asset_id_type               >, \
+         /* 28 */ flat_set< force_settlement_id_type    >, \
+         /* 29 */ flat_set< committee_member_id_type    >, \
+         /* 30 */ flat_set< witness_id_type             >, \
+         /* 31 */ flat_set< limit_order_id_type         >, \
+         /* 32 */ flat_set< call_order_id_type          >, \
+         /* 33 */ flat_set< custom_id_type              >, \
+         /* 34 */ flat_set< proposal_id_type            >, \
+         /* 35 */ flat_set< withdraw_permission_id_type >, \
+         /* 36 */ flat_set< vesting_balance_id_type     >, \
+         /* 37 */ flat_set< worker_id_type              >, \
+         /* 38 */ flat_set< balance_id_type             >, \
+         /* 39 */ attr_restriction_type
 
       typedef static_variant < GRAPHENE_OP_RESTRICTION_ARGUMENTS_VARIADIC > argument_type;
 
