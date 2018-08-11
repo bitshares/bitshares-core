@@ -107,57 +107,6 @@ template<> struct is_simple_data_type<vesting_balance_id_type> { static const bo
 template<> struct is_simple_data_type<worker_id_type> { static const bool value = true; };
 template<> struct is_simple_data_type<balance_id_type> { static const bool value = true; };
 
-/*
-namespace detail {
-   // comparable data types can use < <= > >= == !=
-   template<typename T> inline bool is_comparable_data_type() { return false; }
-
-   template<> inline bool is_comparable_data_type<int8_t>() { return true; }
-   template<> inline bool is_comparable_data_type<uint8_t>() { return true; }
-   template<> inline bool is_comparable_data_type<int16_t>() { return true; }
-   template<> inline bool is_comparable_data_type<uint16_t>() { return true; }
-   template<> inline bool is_comparable_data_type<int32_t>() { return true; }
-   template<> inline bool is_comparable_data_type<uint32_t>() { return true; }
-   template<> inline bool is_comparable_data_type<int64_t>() { return true; }
-   template<> inline bool is_comparable_data_type<uint64_t>() { return true; }
-   template<> inline bool is_comparable_data_type<unsigned_int>() { return true; }
-   template<> inline bool is_comparable_data_type<time_point_sec>() { return true; }
-
-   // simple data types can use == !=
-   template<typename T> inline bool is_simple_data_type() { return false; }
-
-   template<> inline bool is_simple_data_type<bool>() { return true; }
-   template<> inline bool is_simple_data_type<char>() { return true; }
-   template<> inline bool is_simple_data_type<int8_t>() { return true; }
-   template<> inline bool is_simple_data_type<uint8_t>() { return true; }
-   template<> inline bool is_simple_data_type<int16_t>() { return true; }
-   template<> inline bool is_simple_data_type<uint16_t>() { return true; }
-   template<> inline bool is_simple_data_type<int32_t>() { return true; }
-   template<> inline bool is_simple_data_type<uint32_t>() { return true; }
-   template<> inline bool is_simple_data_type<int64_t>() { return true; }
-   template<> inline bool is_simple_data_type<uint64_t>() { return true; }
-   template<> inline bool is_simple_data_type<unsigned_int>() { return true; }
-
-   template<> inline bool is_simple_data_type<string>() { return true; }
-   template<> inline bool is_simple_data_type<time_point_sec>() { return true; }
-   template<> inline bool is_simple_data_type<public_key_type>() { return true; }
-
-   template<> inline bool is_simple_data_type<account_id_type>() { return true; }
-   template<> inline bool is_simple_data_type<asset_id_type>() { return true; }
-   template<> inline bool is_simple_data_type<force_settlement_id_type>() { return true; }
-   template<> inline bool is_simple_data_type<committee_member_id_type>() { return true; }
-   template<> inline bool is_simple_data_type<witness_id_type>() { return true; }
-   template<> inline bool is_simple_data_type<limit_order_id_type>() { return true; }
-   template<> inline bool is_simple_data_type<call_order_id_type>() { return true; }
-   template<> inline bool is_simple_data_type<custom_id_type>() { return true; }
-   template<> inline bool is_simple_data_type<proposal_id_type>() { return true; }
-   template<> inline bool is_simple_data_type<withdraw_permission_id_type>() { return true; }
-   template<> inline bool is_simple_data_type<vesting_balance_id_type>() { return true; }
-   template<> inline bool is_simple_data_type<worker_id_type>() { return true; }
-   template<> inline bool is_simple_data_type<balance_id_type>() { return true; }
-}
-*/
-
 template<typename T>
 struct compatible_argument_validate_visitor
 {
@@ -490,56 +439,6 @@ struct op_restriction_validation_helper
    }
 
 };
-
-/*
-   result_type operator()( const attr_restriction_type& t )
-   {
-      for( const auto& restriction : t )
-      {
-         restriction.argument.visit(*this);
-      }
-   }
-};
-*/
-
-/*
-template< typename OpType >
-struct member_validate_visitor
-{
-   typedef void result_type;
-
-   mutable uint32_t which = 0;
-   const operation_restriction& op_restriction;
-
-   member_validate_visitor( const operation_restriction& opr ) : op_restriction(opr) {}
-
-   template<typename Member, class Class, Member (Class::*member)>
-   void operator()( const char* name )const
-   {
-      if( which == op_restriction.member ) // `op.*member` is the specified member
-      {
-
-         // Firstly we check if the member type is supported
-
-         //validate_member( op_restriction );
-
-         op_restriction_validation_helper helper( op_restriction );
-         helper.validate_by_member_type( name, (const Member*)nullptr );
-
-         // Giving the member type, we know what function is available
-         // Giving function, we know what argument it should be
-
-         //function_validate_visitor vtor( op_restriction );
-
-         // validate argument
-         //argument_validate_visitor vtor;
-         //argument.visit( vtor );
-      }
-      ++which;
-   }
-
-};
-*/
 
 template< typename OpType >
 struct by_index_member_validate_visitor
