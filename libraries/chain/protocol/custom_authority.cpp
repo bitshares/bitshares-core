@@ -91,6 +91,7 @@ namespace detail {
    template<> bool is_simple_data_type<balance_id_type>() { return true; }
 }
 
+
 template<typename T>
 struct list_argument_validate_visitor
 {
@@ -99,7 +100,6 @@ struct list_argument_validate_visitor
 
    list_argument_validate_visitor( const char* _name ) : name(_name) {}
 
-
    template<typename ArgType>
    result_type operator()( const ArgType& arg );
 
@@ -107,6 +107,7 @@ struct list_argument_validate_visitor
    result_type operator()( const flat_set<T>& arg ) {}
 };
 
+// by default incompatible
 template<typename T> template<typename ArgType>
 void list_argument_validate_visitor<T>::operator()( const ArgType& arg )
 {
@@ -116,7 +117,7 @@ void list_argument_validate_visitor<T>::operator()( const ArgType& arg )
              ("t", fc::get_typename<T>::name()) );
 }
 
-// special compatible types
+// compatible types X : flat_set<Y> and X != Y
 template<> template<> void list_argument_validate_visitor<char>::operator()( const flat_set<string>& arg ) {}
 template<> template<> void list_argument_validate_visitor<int8_t>::operator()( const flat_set<int64_t>& arg ) {}
 template<> template<> void list_argument_validate_visitor<uint8_t>::operator()( const flat_set<int64_t>& arg ) {}
@@ -124,148 +125,9 @@ template<> template<> void list_argument_validate_visitor<int16_t>::operator()( 
 template<> template<> void list_argument_validate_visitor<uint16_t>::operator()( const flat_set<int64_t>& arg ) {}
 template<> template<> void list_argument_validate_visitor<int32_t>::operator()( const flat_set<int64_t>& arg ) {}
 template<> template<> void list_argument_validate_visitor<uint32_t>::operator()( const flat_set<int64_t>& arg ) {}
-template<> template<> void list_argument_validate_visitor<int64_t>::operator()( const flat_set<int64_t>& arg ) {}
+// no int64_t here because it's already covered by generic template
 template<> template<> void list_argument_validate_visitor<uint64_t>::operator()( const flat_set<int64_t>& arg ) {}
 template<> template<> void list_argument_validate_visitor<unsigned_int>::operator()( const flat_set<int64_t>& arg ) {}
-
-/*
-template<>
-struct list_argument_validate_visitor<char>
-{
-   typedef void result_type;
-
-   // TODO kill duplicate code
-   template<typename ArgType>
-   result_type operator()( const ArgType& arg )
-   {
-      FC_THROW( "Incompatible list type for ${t} : ${a}",
-                ("t", fc::get_typename<char>::name())("a", fc::get_typename<ArgType>::name()) );
-   }
-
-
-   result_type operator()( const flat_set<string>& arg ) {}
-};
-
-template<>
-struct list_argument_validate_visitor<int8_t>
-{
-   typedef void result_type;
-
-   template<typename ArgType>
-   result_type operator()( const ArgType& arg )
-   {
-      FC_THROW( "Incompatible list type for ${t} : ${a}",
-                ("t", fc::get_typename<int8_t>::name())("a", fc::get_typename<ArgType>::name()) );
-   }
-
-   result_type operator()( const flat_set<int64_t>& arg ) {}
-};
-
-template<>
-struct list_argument_validate_visitor<uint8_t>
-{
-   typedef void result_type;
-
-   template<typename ArgType>
-   result_type operator()( const ArgType& arg )
-   {
-      FC_THROW( "Incompatible list type for ${t} : ${a}",
-                ("t", fc::get_typename<uint8_t>::name())("a", fc::get_typename<ArgType>::name()) );
-   }
-
-   result_type operator()( const flat_set<int64_t>& arg ) {}
-};
-
-template<>
-struct list_argument_validate_visitor<int16_t>
-{
-   typedef void result_type;
-
-   template<typename ArgType>
-   result_type operator()( const ArgType& arg )
-   {
-      FC_THROW( "Incompatible list type for ${t} : ${a}",
-                ("t", fc::get_typename<int16_t>::name())("a", fc::get_typename<ArgType>::name()) );
-   }
-
-   result_type operator()( const flat_set<int64_t>& arg ) {}
-};
-
-template<>
-struct list_argument_validate_visitor<uint16_t>
-{
-   typedef void result_type;
-
-   template<typename ArgType>
-   result_type operator()( const ArgType& arg )
-   {
-      FC_THROW( "Incompatible list type for ${t} : ${a}",
-                ("t", fc::get_typename<uint16_t>::name())("a", fc::get_typename<ArgType>::name()) );
-   }
-
-   result_type operator()( const flat_set<int64_t>& arg ) {}
-};
-
-template<>
-struct list_argument_validate_visitor<int32_t>
-{
-   typedef void result_type;
-
-   template<typename ArgType>
-   result_type operator()( const ArgType& arg )
-   {
-      FC_THROW( "Incompatible list type for ${t} : ${a}",
-                ("t", fc::get_typename<int32_t>::name())("a", fc::get_typename<ArgType>::name()) );
-   }
-
-   result_type operator()( const flat_set<int64_t>& arg ) {}
-};
-
-template<>
-struct list_argument_validate_visitor<uint32_t>
-{
-   typedef void result_type;
-
-   template<typename ArgType>
-   result_type operator()( const ArgType& arg )
-   {
-      FC_THROW( "Incompatible list type for ${t} : ${a}",
-                ("t", fc::get_typename<uint32_t>::name())("a", fc::get_typename<ArgType>::name()) );
-   }
-
-   result_type operator()( const flat_set<int64_t>& arg ) {}
-};
-
-template<>
-struct list_argument_validate_visitor<uint64_t>
-{
-   typedef void result_type;
-
-   template<typename ArgType>
-   result_type operator()( const ArgType& arg )
-   {
-      FC_THROW( "Incompatible list type for ${t} : ${a}",
-                ("t", fc::get_typename<uint64_t>::name())("a", fc::get_typename<ArgType>::name()) );
-   }
-
-   result_type operator()( const flat_set<int64_t>& arg ) {}
-};
-
-template<>
-struct list_argument_validate_visitor<unsigned_int>
-{
-   typedef void result_type;
-
-   template<typename ArgType>
-   result_type operator()( const ArgType& arg )
-   {
-      FC_THROW( "Incompatible list type for ${t} : ${a}",
-                ("t", fc::get_typename<unsigned_int>::name())("a", fc::get_typename<ArgType>::name()) );
-   }
-
-   result_type operator()( const flat_set<int64_t>& arg ) {}
-};
-*/
 
 struct number_argument_validate_visitor
 {
