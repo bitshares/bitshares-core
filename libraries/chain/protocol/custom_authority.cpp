@@ -261,6 +261,7 @@ struct op_restriction_validation_helper
 };
 */
 
+/*
 template< typename OpType >
 struct member_validate_visitor
 {
@@ -297,6 +298,24 @@ struct member_validate_visitor
    }
 
 };
+*/
+
+template< typename OpType >
+struct by_index_member_validate_visitor
+{
+   typedef void result_type;
+
+   const operation_restriction& op_restriction;
+
+   by_index_member_validate_visitor( const operation_restriction& opr ) : op_restriction(opr) {}
+
+   template<typename Member, class Class, Member (Class::*member)>
+   void operator()( const char* name )const
+   {
+      op_restriction_validation_helper helper( op_restriction );
+      helper.validate_by_member_type( name, (const Member*)nullptr );
+   }
+};
 
 struct op_restriction_validate_visitor
 {
@@ -306,10 +325,8 @@ struct op_restriction_validate_visitor
    op_restriction_validate_visitor( const operation_restriction& opr ) : op_restriction(opr) {}
 
    template<typename OpType>
-   result_type operator()( const OpType& )
+   result_type operator()( const OpType& ) // Note: the parameter is a reference of *nullptr, we should not use it
    {
-      // Note: the parameter is a reference of *nullptr, we should not use it
-
       FC_ASSERT( op_restriction.member < fc::reflector<OpType>::total_member_count,
                  "member number ${m} is too large",
                  ("m",op_restriction.member) );
@@ -317,10 +334,17 @@ struct op_restriction_validate_visitor
       // other member modifiers have been checked outside, so only check mmod_none here
       if( op_restriction.member_modifier.value == operation_restriction::mmod_none )
       {
-         // TODO: this implementation iterates through all reflected members to find specified member,
+         // member_validate_visitor<OpType> vtor( op_restriction );
+         // fc::reflector<OpType>::visit( vtor );
+
+         // NOTE: above implementation iterates through all reflected members to find specified member,
          //       possible to improve performance by visiting specified member by index/number directly
-         member_validate_visitor<OpType> vtor( op_restriction );
-         fc::reflector<OpType>::visit( vtor );
+         // ------------------------
+         // So we have the code below
+         // TODO cleanup above comments
+
+         by_index_member_validate_visitor<OpType> vtor( op_restriction );
+         fc::reflector<OpType>::visit_local_member( vtor, op_restriction.member.value );
       }
    }
 
@@ -336,7 +360,7 @@ void validate_op_restriction_by_op_type( const operation_restriction& op_restric
    op_restriction_validate_visitor vtor( op_restriction );
    switch( op_type.value )
    {
-      // expands to something like following for all operations:
+      // will have code like below for all operations:
       //    case op_type : operation::visit<op_type>( visitor )
       BOOST_PP_SEQ_FOR_EACH_I( GRAPHENE_OP_IDX_CASE_VISIT, , BOOST_PP_VARIADIC_TO_SEQ( GRAPHENE_OPERATIONS_VARIADIC ) )
 
