@@ -53,11 +53,6 @@ namespace graphene { namespace chain {
 
 //         vector<operation_restriction>   restrictions;
 
-   /**
-    * op_wrapper is used to get around the circular definition of operation and proposals that contain them.
-    */
-   struct op_wrapper;
-
    struct operation_restriction;
    typedef vector<operation_restriction> attr_restriction_type;
 
@@ -89,48 +84,43 @@ namespace graphene { namespace chain {
          FUNCTION_TYPE_COUNT ///< Sentry value which contains the number of different types
       };
 
-      typedef static_variant <
-         void_t,
-
-         bool,
-         int64_t,
-         string,
-
-         account_id_type,
-         asset_id_type,
-         force_settlement_id_type,
-         committee_member_id_type,
-         witness_id_type,
-         limit_order_id_type,
-         call_order_id_type,
-         custom_id_type,
-         proposal_id_type,
-         withdraw_permission_id_type,
-         vesting_balance_id_type,
-         worker_id_type,
-         balance_id_type,
-
-         flat_set< bool                        >,
-         flat_set< int64_t                     >,
-         flat_set< string                      >,
-
-         flat_set< account_id_type             >,
-         flat_set< asset_id_type               >,
-         flat_set< force_settlement_id_type    >,
-         flat_set< committee_member_id_type    >,
-         flat_set< witness_id_type             >,
-         flat_set< limit_order_id_type         >,
-         flat_set< call_order_id_type          >,
-         flat_set< custom_id_type              >,
-         flat_set< proposal_id_type            >,
-         flat_set< withdraw_permission_id_type >,
-         flat_set< vesting_balance_id_type     >,
-         flat_set< worker_id_type              >,
-         flat_set< balance_id_type             >,
-
+      #define GRAPHENE_OP_RESTRICTION_ARGUMENTS_VARIADIC \
+         void_t, \
+         bool, \
+         int64_t, \
+         string, \
+         account_id_type, \
+         asset_id_type, \
+         force_settlement_id_type, \
+         committee_member_id_type, \
+         witness_id_type, \
+         limit_order_id_type, \
+         call_order_id_type, \
+         custom_id_type, \
+         proposal_id_type, \
+         withdraw_permission_id_type, \
+         vesting_balance_id_type, \
+         worker_id_type, \
+         balance_id_type, \
+         flat_set< bool                        >, \
+         flat_set< int64_t                     >, \
+         flat_set< string                      >, \
+         flat_set< account_id_type             >, \
+         flat_set< asset_id_type               >, \
+         flat_set< force_settlement_id_type    >, \
+         flat_set< committee_member_id_type    >, \
+         flat_set< witness_id_type             >, \
+         flat_set< limit_order_id_type         >, \
+         flat_set< call_order_id_type          >, \
+         flat_set< custom_id_type              >, \
+         flat_set< proposal_id_type            >, \
+         flat_set< withdraw_permission_id_type >, \
+         flat_set< vesting_balance_id_type     >, \
+         flat_set< worker_id_type              >, \
+         flat_set< balance_id_type             >, \
          attr_restriction_type
 
-      > argument_type;
+      typedef static_variant < GRAPHENE_OP_RESTRICTION_ARGUMENTS_VARIADIC > argument_type;
 
       unsigned_int               member;          // index, use unsigned_int to save space TODO jsonify to actual name
       unsigned_int               member_modifier; // index, use unsigned_int to save space TODO jsonify to actual name
@@ -140,7 +130,7 @@ namespace graphene { namespace chain {
       empty_extensions_type      extensions;
 
       uint64_t get_units()const;
-      void validate( const op_wrapper& opw )const;
+      void validate( unsigned_int op_type )const;
    };
 
    /**

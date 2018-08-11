@@ -24,6 +24,9 @@
 #include <graphene/chain/protocol/custom_authority.hpp>
 #include <graphene/chain/protocol/operations.hpp>
 
+#include <boost/preprocessor/variadic/to_seq.hpp>
+#include <boost/preprocessor/seq/for_each_i.hpp>
+
 namespace graphene { namespace chain {
 
 struct argument_get_units_visitor
@@ -91,7 +94,6 @@ namespace detail {
    template<> bool is_simple_data_type<balance_id_type>() { return true; }
 }
 
-
 template<typename T>
 struct list_argument_validate_visitor
 {
@@ -111,7 +113,7 @@ struct list_argument_validate_visitor
 template<typename T> template<typename ArgType>
 void list_argument_validate_visitor<T>::operator()( const ArgType& arg )
 {
-   FC_THROW( "Argument type '${a}' is incompatible with list-like member '${m}' whose contained type is ${t}",
+   FC_THROW( "Argument type '${a}' is incompatible with list-like member '${m}' which contains data with type ${t}",
              ("a", fc::get_typename<ArgType>::name())
              ("m", name)
              ("t", fc::get_typename<T>::name()) );
@@ -178,62 +180,54 @@ struct op_restriction_validation_helper
 {
    const operation_restriction& op_restriction; ///< the restriction
 
-   op_restriction_validation_helper( const operation_restriction& opr ) : op_restriction(opr) {}
+   op_restriction_validation_helper( const operation_restriction& opr ) : op_restriction(opr)
+   {
+      FC_ASSERT( op_restriction.member_modifier.value == operation_restriction::mmod_none,
+                 "Internal error: should only use this helper for mmod_none" );
+   }
 
    // by default don't support undefined types
    // FIXME need it for recursion
    template<typename T>
    void validate_by_member_type( const char* name, const T& t )
    {
-      FC_THROW( "Restriction on ${name} is not supported due to its type ${type}",
+      FC_THROW( "Restriction on '${name}' is not supported due to its type '${type}'",
                 ("name", name)("type", fc::get_typename<T>::name()) );
    }
 
    template<typename T>
    void validate_by_member_type( const char* name, const optional<T>& t )
    {
-      if( op_restriction.member_modifier.value == operation_restriction::mmod_none )
-      {
-         // extract the underlying type
-         validate_by_member_type<T>( name, T() );
-      }
+      // extract the underlying type
+      validate_by_member_type<T>( name, T() );
    }
 
    template<typename T>
    void validate_by_member_type( const char* name, const safe<T>& t )
    {
-      if( op_restriction.member_modifier.value == operation_restriction::mmod_none )
-      {
-         // extract the underlying type
-         validate_by_member_type<T>( name, t.value );
-      }
+      // extract the underlying type
+      validate_by_member_type<T>( name, t.value );
    }
 
    template<typename T>
    void validate_by_member_type( const char* name, const smart_ref<T>& t )
    {
-      if( op_restriction.member_modifier.value == operation_restriction::mmod_none )
-      {
-         // extract the underlying type
-         validate_by_member_type<T>( name, t.value );
-      }
+      // extract the underlying type
+      validate_by_member_type<T>( name, t.value );
    }
 
    template<typename T>
    void validate_list_like_member( const char* name )
    {
-      if( op_restriction.member_modifier.value == operation_restriction::mmod_none )
-      {
-         FC_ASSERT( op_restriction.function == operation_restriction::func_has_all
-                    || op_restriction.function == operation_restriction::func_has_none,
-                    "List-like member '${name}' can only use func_has_all or func_has_none",
-                    ("name", name) );
-         FC_ASSERT( detail::is_simple_data_type<T>(),
-                    "Simple data type in list-like member '${name}' is required",
-                    ("name", name) );
-         // validate argument, need to be a list, and type should be compatible to T
-         require_list_argument<T>( op_restriction, name );
-      }
+      FC_ASSERT( op_restriction.function == operation_restriction::func_has_all
+                 || op_restriction.function == operation_restriction::func_has_none,
+                 "List-like member '${name}' can only use func_has_all or func_has_none",
+                 ("name", name) );
+      FC_ASSERT( detail::is_simple_data_type<T>(),
+                 "Simple data type in list-like member '${name}' is required",
+                 ("name", name) );
+      // validate argument, need to be a list, and type should be compatible to T
+      require_list_argument<T>( op_restriction, name );
    }
 
    template<typename T>
@@ -253,6 +247,7 @@ struct op_restriction_validation_helper
    {
       validate_list_like_member<T>( name );
    }
+
 };
 
 /*
@@ -315,15 +310,40 @@ struct op_restriction_validate_visitor
                  "member number ${m} is too large",
                  ("m",op_restriction.member) );
 
-      // TODO: this implementation iterates through all reflected members to find specified member,
-      //       possible to improve performance by visiting specified member by index/number directly
-      member_validate_visitor<OpType> vtor( op, op_restriction );
-      fc::reflector<OpType>::visit( vtor );
+      // other member modifiers have been checked outside, so only check mmod_none here
+      if( op_restriction.member_modifier.value == operation_restriction::mmod_none )
+      {
+         // TODO: this implementation iterates through all reflected members to find specified member,
+         //       possible to improve performance by visiting specified member by index/number directly
+         member_validate_visitor<OpType> vtor( op, op_restriction );
+         fc::reflector<OpType>::visit( vtor );
+      }
    }
 
 };
 
-void operation_restriction::validate( const op_wrapper& opw )const
+#define GRAPHENE_OP_IDX_CASE_VISIT(r, data, I, elem) \
+   case I : \
+      operation::visit< I >( vtor ); \
+      break;
+
+void validate_op_restriction_by_op_type( const operation_restriction& op_restriction, unsigned_int op_type )
+{
+   op_restriction_validate_visitor vtor( op_restriction );
+   switch( op_type.value )
+   {
+      // expands to something like following for all operations:
+      //    case op_type : operation::visit<op_type>( visitor )
+      BOOST_PP_SEQ_FOR_EACH_I( GRAPHENE_OP_IDX_CASE_VISIT, , BOOST_PP_VARIADIC_TO_SEQ( GRAPHENE_OPERATIONS_VARIADIC ) )
+
+      default:
+         break;
+   }
+
+}
+
+//void operation_restriction::validate( const op_wrapper& opw )const
+void operation_restriction::validate( unsigned_int op_type )const
 {
    // validate member modifier
    FC_ASSERT( member_modifier < MEMBER_MODIFIER_TYPE_COUNT,
@@ -346,9 +366,8 @@ void operation_restriction::validate( const op_wrapper& opw )const
               "function number ${f} is too large",
               ("f",function) );
 
-   // validate details
-   op_restriction_validate_visitor vtor( *this );
-   opw.op.visit( vtor );
+   // validate details by operation_type
+   validate_op_restriction_by_op_type( *this, op_type );
 }
 
 share_type custom_authority_create_operation::calculate_fee( const fee_parameters_type& k )const
@@ -387,10 +406,7 @@ void custom_authority_create_operation::validate()const
 
    // Note: when adding new operation with hard fork, need to check more strictly in evaluator
    // TODO add code in evaluator
-   FC_ASSERT( operation_type < operation::count(), "operation type too large" );
-   operation op;
-   op.set_which( operation_type );
-   op_wrapper opw( op );
+   FC_ASSERT( operation_type < operation::count(), "operation_type is too large" );
 
    // Note: allow auths to be empty
    //FC_ASSERT( auth.num_auths() > 0, "Can not set empty auth" );
@@ -402,7 +418,7 @@ void custom_authority_create_operation::validate()const
    for( const auto& restriction : restrictions )
    {
       // recursively validate member index and argument type
-      restriction.validate( opw );
+      restriction.validate( operation_type );
    }
 }
 
