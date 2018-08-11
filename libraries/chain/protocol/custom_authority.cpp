@@ -23,11 +23,20 @@
  */
 #include <graphene/chain/protocol/custom_authority.hpp>
 #include <graphene/chain/protocol/operations.hpp>
+#include <graphene/chain/protocol/fee_schedule.hpp>
 
 #include <boost/preprocessor/variadic/to_seq.hpp>
 #include <boost/preprocessor/seq/for_each_i.hpp>
 
+#include <type_traits>
+
 namespace graphene { namespace chain {
+
+template <bool B>
+using bool_const = std::integral_constant<bool, B>;
+
+struct op_restriction_validate_visitor;
+void validate_op_restriction_commons( const operation_restriction& op_restriction );
 
 struct argument_get_units_visitor
 {
@@ -62,6 +71,43 @@ uint64_t operation_restriction::get_units()const
    return argument.visit( vtor );
 }
 
+// comparable data types can use < <= > >= == !=
+template<typename T> struct is_comparable_data_type { static const bool value = false; };
+
+template<> struct is_comparable_data_type<int8_t> { static const bool value = true; };
+template<> struct is_comparable_data_type<uint8_t> { static const bool value = true; };
+template<> struct is_comparable_data_type<int16_t> { static const bool value = true; };
+template<> struct is_comparable_data_type<uint16_t> { static const bool value = true; };
+template<> struct is_comparable_data_type<int32_t> { static const bool value = true; };
+template<> struct is_comparable_data_type<uint32_t> { static const bool value = true; };
+template<> struct is_comparable_data_type<int64_t> { static const bool value = true; };
+template<> struct is_comparable_data_type<uint64_t> { static const bool value = true; };
+template<> struct is_comparable_data_type<unsigned_int> { static const bool value = true; };
+template<> struct is_comparable_data_type<time_point_sec> { static const bool value = true; };
+
+// simple data types can use == !=
+template<typename T> struct is_simple_data_type { static const bool value = is_comparable_data_type<T>::value; };
+
+template<> struct is_simple_data_type<bool> { static const bool value = true; };
+template<> struct is_simple_data_type<string> { static const bool value = true; };
+template<> struct is_simple_data_type<public_key_type> { static const bool value = true; };
+template<> struct is_simple_data_type<fc::sha256> { static const bool value = true; };
+
+template<> struct is_simple_data_type<account_id_type> { static const bool value = true; };
+template<> struct is_simple_data_type<asset_id_type> { static const bool value = true; };
+template<> struct is_simple_data_type<force_settlement_id_type> { static const bool value = true; };
+template<> struct is_simple_data_type<committee_member_id_type> { static const bool value = true; };
+template<> struct is_simple_data_type<witness_id_type> { static const bool value = true; };
+template<> struct is_simple_data_type<limit_order_id_type> { static const bool value = true; };
+template<> struct is_simple_data_type<call_order_id_type> { static const bool value = true; };
+template<> struct is_simple_data_type<custom_id_type> { static const bool value = true; };
+template<> struct is_simple_data_type<proposal_id_type> { static const bool value = true; };
+template<> struct is_simple_data_type<withdraw_permission_id_type> { static const bool value = true; };
+template<> struct is_simple_data_type<vesting_balance_id_type> { static const bool value = true; };
+template<> struct is_simple_data_type<worker_id_type> { static const bool value = true; };
+template<> struct is_simple_data_type<balance_id_type> { static const bool value = true; };
+
+/*
 namespace detail {
    // comparable data types can use < <= > >= == !=
    template<typename T> inline bool is_comparable_data_type() { return false; }
@@ -110,6 +156,7 @@ namespace detail {
    template<> inline bool is_simple_data_type<worker_id_type>() { return true; }
    template<> inline bool is_simple_data_type<balance_id_type>() { return true; }
 }
+*/
 
 template<typename T>
 struct compatible_argument_validate_visitor
@@ -181,6 +228,36 @@ template<> template<> inline void list_argument_validate_visitor<uint32_t>::oper
 template<> template<> inline void list_argument_validate_visitor<uint64_t>::operator()( const flat_set<int64_t>& arg ) {}
 template<> template<> inline void list_argument_validate_visitor<unsigned_int>::operator()( const flat_set<int64_t>& arg ) {}
 
+template<typename T>
+struct attr_argument_validate_visitor
+{
+   typedef void result_type;
+   const char* name;
+
+   attr_argument_validate_visitor( const char* _name ) : name(_name) {}
+
+   template<typename ArgType>
+   inline result_type operator()( const ArgType& arg )
+   {
+      FC_THROW( "Argument '${arg}' is incompatible, requires an attr_restriction_type for ${name}",
+                ("arg", arg)("name", name) );
+   }
+
+   result_type operator()( const attr_restriction_type& arg ) // vector<operation_restriction>
+   {
+      // Recursively check T.members
+      for( const operation_restriction& restriction : arg )
+      {
+         // validate common data
+         validate_op_restriction_commons( restriction );
+         // validate member-related
+         op_restriction_validate_visitor vtor( restriction );
+         vtor( *((const T*)nullptr) );
+      }
+   }
+};
+
+
 struct number_argument_validate_visitor
 {
    typedef void result_type;
@@ -250,6 +327,14 @@ void require_list_argument( const operation_restriction& op_restriction, const c
    op_restriction.argument.visit( vtor );
 }
 
+template<typename T>
+void require_attr_argument( const operation_restriction& op_restriction, const char* name )
+{
+   // argument should be flat_set< T-compatible >
+   attr_argument_validate_visitor<T> vtor( name );
+   op_restriction.argument.visit( vtor );
+}
+
 void require_number_argument( const operation_restriction& op_restriction, const char* name )
 {
    // argument should be a number
@@ -267,8 +352,8 @@ struct op_restriction_validation_helper
                  "Internal error: should only use this helper for mmod_none" );
    }
 
-   template<typename T>
-   void validate_comparable_member( const char* name )
+   template<typename T> // comparable, simple data type
+   void validate_member( const char* name, std::true_type, std::true_type )
    {
       if( is_subset_function( op_restriction.function ) )
       {
@@ -287,8 +372,8 @@ struct op_restriction_validation_helper
       }
    }
 
-   template<typename T>
-   void validate_non_comparable_simple_member( const char* name )
+   template<typename T> // non-comparable, simple data type
+   void validate_member( const char* name, std::false_type, std::true_type )
    {
       if( is_subset_function( op_restriction.function ) )
       {
@@ -307,13 +392,23 @@ struct op_restriction_validation_helper
       }
    }
 
+   template<typename T> // non-compatible, not-simple, aka object-like type
+   void validate_member( const char* name, std::false_type, std::false_type )
+   {
+      FC_ASSERT( op_restriction.function == operation_restriction::func_attr,
+                 "Object-like member '${name}' can only use func_attr",
+                 ("name", name) );
+      // argument need to be a attribute_restriction
+      require_attr_argument<T>( op_restriction, name );
+   }
+
    template<typename T>
    void validate_list_like_member( const char* name )
    {
       FC_ASSERT( is_superset_function( op_restriction.function ),
                  "List-like member '${name}' can only use func_has_all or func_has_none",
                  ("name", name) );
-      FC_ASSERT( detail::is_simple_data_type<T>(),
+      FC_ASSERT( is_simple_data_type<T>::value,
                  "Simple data type in list-like member '${name}' is required",
                  ("name", name) );
       // argument need to be a list, and type should be compatible to T
@@ -323,22 +418,9 @@ struct op_restriction_validation_helper
    template<typename T>
    void validate_by_member_type( const char* name, const T* t )
    {
-      // TODO change to compile-time check for better performance
-      if( detail::is_comparable_data_type<T>() ) // member is a number type or time point
-      {
-         validate_comparable_member<T>( name );
-      }
-      else if( detail::is_simple_data_type<T>() ) // member is another simple type
-      {
-         validate_non_comparable_simple_member<T>( name );
-      }
-      else
-      {
-         // by default don't support undefined types
-         // FIXME need it for recursion
-         FC_THROW( "Restriction on '${name}' is not supported due to its type '${type}'",
-                   ("name", name)("type", fc::get_typename<T>::name()) );
-      }
+      const bool is_comparable = is_comparable_data_type<T>::value;
+      const bool is_simple     = is_simple_data_type<T>::value;
+      validate_member<T>( name, bool_const<is_comparable>(), bool_const<is_simple>() );
    }
 
    template<typename T>
@@ -385,6 +467,26 @@ struct op_restriction_validation_helper
    void validate_by_member_type( const char* name, const flat_set<T>* t )
    {
       validate_list_like_member<T>( name );
+   }
+
+   template<typename... T>
+   void validate_by_member_type( const char* name, const flat_map<T...>* t )
+   {
+      FC_THROW( "Restriction on '${name}' is not supported due to its type",
+                ("name", name) );
+   }
+
+   template<typename... T>
+   void validate_by_member_type( const char* name, const static_variant<T...>* t )
+   {
+      FC_THROW( "Restriction on '${name}' is not supported due to its type",
+                ("name", name) );
+   }
+
+   void validate_by_member_type( const char* name, const fba_accumulator_id_type* t )
+   {
+      FC_THROW( "Restriction on '${name}' is not supported due to its type",
+                ("name", name) );
    }
 
 };
@@ -509,30 +611,34 @@ void validate_op_restriction_by_op_type( const operation_restriction& op_restric
 
 }
 
-//void operation_restriction::validate( const op_wrapper& opw )const
-void operation_restriction::validate( unsigned_int op_type )const
+void validate_op_restriction_commons( const operation_restriction& op_restriction )
 {
    // validate member modifier
-   FC_ASSERT( member_modifier < MEMBER_MODIFIER_TYPE_COUNT,
+   FC_ASSERT( op_restriction.member_modifier < operation_restriction::MEMBER_MODIFIER_TYPE_COUNT,
               "member modifier number ${mm} is too large",
-              ("mm",member_modifier) );
+              ("mm", op_restriction.member_modifier) );
 
-   if( member_modifier.value == mmod_size )
+   if( op_restriction.member_modifier.value == operation_restriction::mmod_size )
    {
-      require_compare_function( *this, "size modifier" );
-      require_number_argument( *this, "size modifier" );
+      require_compare_function( op_restriction, "size modifier" );
+      require_number_argument( op_restriction, "size modifier" );
    }
-   else if( member_modifier.value == mmod_pack_size )
+   else if( op_restriction.member_modifier.value == operation_restriction::mmod_pack_size )
    {
-      require_compare_function( *this, "pack_size modifier" );
-      require_number_argument( *this, "pack_size modifier" );
+      require_compare_function( op_restriction, "pack_size modifier" );
+      require_number_argument( op_restriction, "pack_size modifier" );
    }
 
    // validate function
-   FC_ASSERT( function < FUNCTION_TYPE_COUNT,
+   FC_ASSERT( op_restriction.function < operation_restriction::FUNCTION_TYPE_COUNT,
               "function number ${f} is too large",
-              ("f",function) );
+              ("f", op_restriction.function) );
+}
 
+void operation_restriction::validate( unsigned_int op_type )const
+{
+   // validate common data
+   validate_op_restriction_commons( *this );
    // validate details by operation_type
    validate_op_restriction_by_op_type( *this, op_type );
 }
