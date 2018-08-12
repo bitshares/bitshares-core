@@ -41,7 +41,7 @@ namespace graphene { namespace chain {
 
       asset                           fee; // TODO: defer fee to expiration / update / removal ?
       account_id_type                 account;
-      uint32_t                        auth_id;
+      uint32_t                        custom_id;
       bool                            enabled;
       time_point_sec                  valid_from;
       time_point_sec                  valid_to;
@@ -100,6 +100,18 @@ FC_REFLECT( graphene::chain::custom_authority_create_operation::fee_parameters_t
 FC_REFLECT( graphene::chain::custom_authority_update_operation::fee_parameters_type, (basic_fee)(price_per_k_unit) )
 FC_REFLECT( graphene::chain::custom_authority_delete_operation::fee_parameters_type, (fee) )
 
-FC_REFLECT( graphene::chain::custom_authority_create_operation, (fee)(account) )
+FC_REFLECT( graphene::chain::custom_authority_create_operation,
+            (fee)
+            (account)
+            (custom_id)
+            (enabled)
+            (valid_from)
+            (valid_to)
+            (operation_type)
+            (auth)
+            (restrictions)
+            (extensions)
+          )
+
 FC_REFLECT( graphene::chain::custom_authority_update_operation, (fee)(account) )
 FC_REFLECT( graphene::chain::custom_authority_delete_operation, (fee)(account) )
