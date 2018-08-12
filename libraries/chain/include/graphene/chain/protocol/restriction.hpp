@@ -27,13 +27,12 @@
 namespace graphene { namespace chain {
 
 
-   struct restriction_type;
-   typedef vector<restriction_type> attr_restriction_type;
+   struct restriction;
 
    /**
     * Defines the set of valid operation restritions as a discriminated union type.
     */
-   struct restriction_type
+   struct restriction
    {
 
       enum member_modifier_type
@@ -102,7 +101,7 @@ namespace graphene { namespace chain {
          /* 36 */ flat_set< vesting_balance_id_type     >, \
          /* 37 */ flat_set< worker_id_type              >, \
          /* 38 */ flat_set< balance_id_type             >, \
-         /* 39 */ attr_restriction_type
+         /* 39 */ vector< restriction >
 
       typedef static_variant < GRAPHENE_OP_RESTRICTION_ARGUMENTS_VARIADIC > argument_type;
 
@@ -125,14 +124,14 @@ namespace graphene { namespace chain {
 
 } } // graphene::chain
 
-FC_REFLECT_ENUM( graphene::chain::restriction_type::member_modifier_type,
+FC_REFLECT_ENUM( graphene::chain::restriction::member_modifier_type,
                  (mmod_none)
                  (mmod_size)
                  (mmod_pack_size)
                  (MEMBER_MODIFIER_TYPE_COUNT)
                )
 
-FC_REFLECT_ENUM( graphene::chain::restriction_type::function_type,
+FC_REFLECT_ENUM( graphene::chain::restriction::function_type,
                  (func_eq)
                  (func_ne)
                  (func_lt)
@@ -149,7 +148,7 @@ FC_REFLECT_ENUM( graphene::chain::restriction_type::function_type,
                  (FUNCTION_TYPE_COUNT)
                )
 
-FC_REFLECT( graphene::chain::restriction_type,
+FC_REFLECT( graphene::chain::restriction,
             (member)
             (member_modifier)
             (function)
