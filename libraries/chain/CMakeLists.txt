@@ -32,6 +32,7 @@ endif( GRAPHENE_DISABLE_UNITY_BUILD )
 ## SORT .cpp by most likely to change / break compile
 add_library( graphene_chain
 
+             protocol/restriction.cpp
              protocol/custom_authority.cpp
              # As database takes the longest to compile, start it first
              ${GRAPHENE_DB_FILES}
