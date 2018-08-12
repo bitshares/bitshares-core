@@ -26,9 +26,6 @@
 
 namespace graphene { namespace chain {
 
-
-   struct restriction;
-
    /**
     * Defines the set of valid operation restritions as a discriminated union type.
     */
