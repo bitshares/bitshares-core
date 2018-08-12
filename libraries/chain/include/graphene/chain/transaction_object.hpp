@@ -50,8 +50,8 @@ namespace graphene { namespace chain {
          static const uint8_t space_id = implementation_ids;
          static const uint8_t type_id  = impl_transaction_object_type;
 
-         signed_transaction  trx;
-         transaction_id_type trx_id;
+         signed_transaction_with_signees  trx;
+         transaction_id_type              trx_id;
 
          time_point_sec get_expiration()const { return trx.expiration; }
    };

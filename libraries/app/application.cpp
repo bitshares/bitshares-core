@@ -562,7 +562,7 @@ void application_impl::handle_transaction(const graphene::net::trx_message& tran
       trx_count = 0;
    }
 
-   _chain_db->push_transaction( transaction_message.trx );
+   _chain_db->push_transaction( signed_transaction_with_signees( transaction_message.trx, get_chain_id() ) );
 } FC_CAPTURE_AND_RETHROW( (transaction_message) ) }
 
 void application_impl::handle_message(const message& message_to_process)

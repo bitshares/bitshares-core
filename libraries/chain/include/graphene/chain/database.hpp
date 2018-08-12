@@ -119,13 +119,13 @@ namespace graphene { namespace chain {
           *  @return true if the block is in our fork DB or saved to disk as
           *  part of the official chain, otherwise return false
           */
-         bool                       is_known_block( const block_id_type& id )const;
-         bool                       is_known_transaction( const transaction_id_type& id )const;
-         block_id_type              get_block_id_for_num( uint32_t block_num )const;
-         optional<signed_block>     fetch_block_by_id( const block_id_type& id )const;
-         optional<signed_block>     fetch_block_by_number( uint32_t num )const;
-         const signed_transaction&  get_recent_transaction( const transaction_id_type& trx_id )const;
-         std::vector<block_id_type> get_block_ids_on_fork(block_id_type head_of_fork) const;
+         bool                                    is_known_block( const block_id_type& id )const;
+         bool                                    is_known_transaction( const transaction_id_type& id )const;
+         block_id_type                           get_block_id_for_num( uint32_t block_num )const;
+         optional<signed_block>                  fetch_block_by_id( const block_id_type& id )const;
+         optional<signed_block>                  fetch_block_by_number( uint32_t num )const;
+         const signed_transaction_with_signees&  get_recent_transaction( const transaction_id_type& trx_id )const;
+         std::vector<block_id_type>              get_block_ids_on_fork(block_id_type head_of_fork) const;
 
          /**
           *  Calculate the percent of block production slots that were missed in the
@@ -138,12 +138,13 @@ namespace graphene { namespace chain {
          bool before_last_checkpoint()const;
 
          bool push_block( const signed_block& b, uint32_t skip = skip_nothing );
-         processed_transaction push_transaction( const signed_transaction& trx, uint32_t skip = skip_nothing );
+         processed_transaction_with_signees push_transaction( const signed_transaction_with_signees& trx,
+                                                              uint32_t skip = skip_nothing );
          bool _push_block( const signed_block& b );
-         processed_transaction _push_transaction( const signed_transaction& trx );
+         processed_transaction_with_signees _push_transaction( const signed_transaction_with_signees& trx );
 
          ///@throws fc::exception if the proposed transaction fails to apply.
-         processed_transaction push_proposal( const proposal_object& proposal );
+         processed_transaction_with_signees push_proposal( const proposal_object& proposal );
 
          signed_block generate_block(
             const fc::time_point_sec when,
@@ -404,12 +405,12 @@ namespace graphene { namespace chain {
           *  This method validates transactions without adding it to the pending state.
           *  @return true if the transaction would validate
           */
-         processed_transaction validate_transaction( const signed_transaction& trx );
+         processed_transaction_with_signees validate_transaction( const signed_transaction_with_signees& trx );
 
 
          /** when popping a block, the transactions that were removed get cached here so they
           * can be reapplied at the proper time */
-         std::deque< signed_transaction >       _popped_tx;
+         std::deque< signed_transaction_with_signees >       _popped_tx;
 
          /**
           * @}
@@ -432,13 +433,16 @@ namespace graphene { namespace chain {
 
        public:
          // these were formerly private, but they have a fairly well-defined API, so let's make them public
-         void                  apply_block( const signed_block& next_block, uint32_t skip = skip_nothing );
-         processed_transaction apply_transaction( const signed_transaction& trx, uint32_t skip = skip_nothing );
-         operation_result      apply_operation( transaction_evaluation_state& eval_state, const operation& op );
+         void                               apply_block( const signed_block& next_block, uint32_t skip = skip_nothing );
+         processed_transaction_with_signees apply_transaction( const signed_transaction_with_signees& trx,
+                                                               uint32_t skip = skip_nothing );
+         operation_result                   apply_operation( transaction_evaluation_state& eval_state, const operation& op );
       private:
-         void                  _apply_block( const signed_block& next_block );
-         processed_transaction _apply_transaction( const signed_transaction& trx );
-         void                  _cancel_bids_and_revive_mpa( const asset_object& bitasset, const asset_bitasset_data_object& bad );
+         void                               _apply_block( const signed_block& next_block );
+         processed_transaction_with_signees _apply_transaction( const signed_transaction_with_signees& trx );
+
+         void                               _cancel_bids_and_revive_mpa( const asset_object& bitasset,
+                                                                         const asset_bitasset_data_object& bad );
 
          ///Steps involved in applying a new block
          ///@{
@@ -485,8 +489,8 @@ namespace graphene { namespace chain {
          ///@}
          ///@}
 
-         vector< processed_transaction >        _pending_tx;
-         fork_database                          _fork_db;
+         vector< processed_transaction_with_signees >        _pending_tx;
+         fork_database                                       _fork_db;
 
          /**
           *  Note: we can probably store blocks by block num rather than

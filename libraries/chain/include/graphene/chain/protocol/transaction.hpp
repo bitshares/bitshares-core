@@ -123,6 +123,8 @@ namespace graphene { namespace chain {
       signed_transaction( const transaction& trx = transaction() )
          : transaction(trx){}
 
+      virtual ~signed_transaction() {}
+
       /** signs and appends to signatures */
       const signature_type& sign( const private_key_type& key, const chain_id_type& chain_id );
 
@@ -165,12 +167,37 @@ namespace graphene { namespace chain {
          uint32_t max_recursion = GRAPHENE_MAX_SIG_CHECK_DEPTH
          ) const;
 
-      flat_set<public_key_type> get_signature_keys( const chain_id_type& chain_id )const;
+      virtual flat_set<public_key_type> get_signature_keys( const chain_id_type& chain_id )const;
 
       vector<signature_type> signatures;
 
       /// Removes all operations and signatures
       void clear() { operations.clear(); signatures.clear(); }
+   };
+
+   /**
+    *  @brief extract public keys from signatures of a transaction
+    */
+   struct signed_transaction_with_signees : public signed_transaction
+   {
+      signed_transaction_with_signees() : signed_transaction() {}
+
+      signed_transaction_with_signees( const signed_transaction& tx ) : signed_transaction(tx) {}
+
+      signed_transaction_with_signees( const signed_transaction& tx, const chain_id_type& chain_id )
+      : signed_transaction(tx), signees( get_signature_keys( chain_id ) )
+      {}
+
+      virtual ~signed_transaction_with_signees() {}
+
+      flat_set<public_key_type> get_signature_keys( const chain_id_type& chain_id )const override
+      {
+         if( !signees.empty() || signatures.empty() )
+            return signees;
+         return signed_transaction::get_signature_keys( chain_id );
+      }
+
+      flat_set<public_key_type> signees;
    };
 
    void verify_authority( const vector<operation>& ops, const flat_set<public_key_type>& sigs,
@@ -199,9 +226,42 @@ namespace graphene { namespace chain {
       processed_transaction( const signed_transaction& trx = signed_transaction() )
          : signed_transaction(trx){}
 
+      virtual ~processed_transaction() {}
+
       vector<operation_result> operation_results;
 
       digest_type merkle_digest()const;
+   };
+
+   /**
+    *  @brief extract public keys from signatures of a processed transaction
+    */
+   struct processed_transaction_with_signees : public processed_transaction
+   {
+      processed_transaction_with_signees() : processed_transaction() {}
+
+      processed_transaction_with_signees( const transaction& tx ) : processed_transaction(tx) {}
+
+      processed_transaction_with_signees( const processed_transaction& tx ) : processed_transaction(tx) {}
+
+      processed_transaction_with_signees( const signed_transaction_with_signees& tx )
+      : processed_transaction(tx), signees( tx.signees )
+      {}
+
+      processed_transaction_with_signees( const processed_transaction& tx, const chain_id_type& chain_id )
+      : processed_transaction(tx), signees( get_signature_keys( chain_id ) )
+      {}
+
+      virtual ~processed_transaction_with_signees() {}
+
+      flat_set<public_key_type> get_signature_keys( const chain_id_type& chain_id )const override
+      {
+         if( !signees.empty() || signatures.empty() )
+            return signees;
+         return signed_transaction::get_signature_keys( chain_id );
+      }
+
+      flat_set<public_key_type> signees;
    };
 
    /// @} transactions group
@@ -210,4 +270,6 @@ namespace graphene { namespace chain {
 
 FC_REFLECT( graphene::chain::transaction, (ref_block_num)(ref_block_prefix)(expiration)(operations)(extensions) )
 FC_REFLECT_DERIVED( graphene::chain::signed_transaction, (graphene::chain::transaction), (signatures) )
+FC_REFLECT_DERIVED( graphene::chain::signed_transaction_with_signees, (graphene::chain::signed_transaction), (signees) )
 FC_REFLECT_DERIVED( graphene::chain::processed_transaction, (graphene::chain::signed_transaction), (operation_results) )
+FC_REFLECT_DERIVED( graphene::chain::processed_transaction_with_signees, (graphene::chain::processed_transaction), (signees) )

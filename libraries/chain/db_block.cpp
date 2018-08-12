@@ -79,7 +79,7 @@ optional<signed_block> database::fetch_block_by_number( uint32_t num )const
    return optional<signed_block>();
 }
 
-const signed_transaction& database::get_recent_transaction(const transaction_id_type& trx_id) const
+const signed_transaction_with_signees& database::get_recent_transaction(const transaction_id_type& trx_id) const
 {
    auto& index = get_index_type<transaction_index>().indices().get<by_trx_id>();
    auto itr = index.find(trx_id);
@@ -225,9 +225,9 @@ bool database::_push_block(const signed_block& new_block)
  * queues full as well, it will be kept in the queue to be propagated later when a new block flushes out the pending
  * queues.
  */
-processed_transaction database::push_transaction( const signed_transaction& trx, uint32_t skip )
+processed_transaction_with_signees database::push_transaction( const signed_transaction_with_signees& trx, uint32_t skip )
 { try {
-   processed_transaction result;
+   processed_transaction_with_signees result;
    detail::with_skip_flags( *this, skip, [&]()
    {
       result = _push_transaction( trx );
@@ -235,7 +235,7 @@ processed_transaction database::push_transaction( const signed_transaction& trx,
    return result;
 } FC_CAPTURE_AND_RETHROW( (trx) ) }
 
-processed_transaction database::_push_transaction( const signed_transaction& trx )
+processed_transaction_with_signees database::_push_transaction( const signed_transaction_with_signees& trx )
 {
    // If this is the first transaction pushed after applying a block, start a new undo session.
    // This allows us to quickly rewind to the clean state of the head block, in case a new block arrives.
@@ -260,19 +260,19 @@ processed_transaction database::_push_transaction( const signed_transaction& trx
    return processed_trx;
 }
 
-processed_transaction database::validate_transaction( const signed_transaction& trx )
+processed_transaction_with_signees database::validate_transaction( const signed_transaction_with_signees& trx )
 {
    auto session = _undo_db.start_undo_session();
    return _apply_transaction( trx );
 }
 
-processed_transaction database::push_proposal(const proposal_object& proposal)
+processed_transaction_with_signees database::push_proposal(const proposal_object& proposal)
 { try {
    transaction_evaluation_state eval_state(this);
    eval_state._is_proposed_trx = true;
 
    eval_state.operation_results.reserve(proposal.proposed_transaction.operations.size());
-   processed_transaction ptrx(proposal.proposed_transaction);
+   processed_transaction_with_signees ptrx(proposal.proposed_transaction);
    eval_state._trx = &ptrx;
    size_t old_applied_ops_size = _applied_ops.size();
 
@@ -358,7 +358,7 @@ signed_block database::_generate_block(
 
    uint64_t postponed_tx_count = 0;
    // pop pending state (reset to head block state)
-   for( const processed_transaction& tx : _pending_tx )
+   for( const processed_transaction_with_signees& tx : _pending_tx )
    {
       size_t new_total_size = total_block_size + fc::raw::pack_size( tx );
 
@@ -372,7 +372,7 @@ signed_block database::_generate_block(
       try
       {
          auto temp_session = _undo_db.start_undo_session();
-         processed_transaction ptx = _apply_transaction( tx );
+         processed_transaction_with_signees ptx = _apply_transaction( tx );
          temp_session.merge();
 
          // We have to recompute pack_size(ptx) because it may be different
@@ -559,9 +559,9 @@ void database::_apply_block( const signed_block& next_block )
 
 
 
-processed_transaction database::apply_transaction(const signed_transaction& trx, uint32_t skip)
+processed_transaction_with_signees database::apply_transaction(const signed_transaction_with_signees& trx, uint32_t skip)
 {
-   processed_transaction result;
+   processed_transaction_with_signees result;
    detail::with_skip_flags( *this, skip, [&]()
    {
       result = _apply_transaction(trx);
@@ -569,7 +569,7 @@ processed_transaction database::apply_transaction(const signed_transaction& trx,
    return result;
 }
 
-processed_transaction database::_apply_transaction(const signed_transaction& trx)
+processed_transaction_with_signees database::_apply_transaction(const signed_transaction_with_signees& trx)
 { try {
    uint32_t skip = get_node_properties().skip_flags;
 
@@ -623,7 +623,7 @@ processed_transaction database::_apply_transaction(const signed_transaction& trx
    eval_state.operation_results.reserve(trx.operations.size());
 
    //Finally process the operations
-   processed_transaction ptrx(trx);
+   processed_transaction_with_signees ptrx(trx);
    _current_op_in_trx = 0;
    for( const auto& op : ptrx.operations )
    {
