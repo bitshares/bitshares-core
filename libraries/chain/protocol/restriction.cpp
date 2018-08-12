@@ -142,19 +142,15 @@ struct compatible_argument_validate_visitor
    compatible_argument_validate_visitor( const char* _name ) : name(_name) {}
 
    template<typename ArgType>
-   inline result_type operator()( const ArgType& arg );
+   inline result_type operator()( const ArgType& arg ) // by default incompatible
+   {
+      FC_THROW( "Argument '${arg}' is incompatible for ${name}",
+                ("arg", arg)("name", name) );
+   }
 
    // argument type T is compatible with member type T
    inline result_type operator()( const T& arg ) {}
 };
-
-// by default incompatible
-template<typename T> template<typename ArgType>
-inline void compatible_argument_validate_visitor<T>::operator()( const ArgType& arg )
-{
-   FC_THROW( "Argument '${arg}' is incompatible for ${name}",
-             ("arg", arg)("name", name) );
-}
 
 // compatible member types X and argument type Y and X != Y
 template<> template<> inline void compatible_argument_validate_visitor<char>::operator()( const string& arg ) {}
@@ -177,19 +173,15 @@ struct list_argument_validate_visitor
    list_argument_validate_visitor( const char* _name ) : name(_name) {}
 
    template<typename ArgType>
-   inline result_type operator()( const ArgType& arg );
+   inline result_type operator()( const ArgType& arg ) // by default incompatible
+   {
+      FC_THROW( "Argument '${arg}' is incompatible, requires a compatible flat_set for ${name}",
+                ("arg", arg)("name", name) );
+   }
 
    // argument type flat_set<T> is compatible with member list_like<T>
    inline result_type operator()( const flat_set<T>& arg ) {}
 };
-
-// by default incompatible
-template<typename T> template<typename ArgType>
-inline void list_argument_validate_visitor<T>::operator()( const ArgType& arg )
-{
-   FC_THROW( "Argument '${arg}' is incompatible, requires a compatible flat_set for ${name}",
-             ("arg", arg)("name", name) );
-}
 
 // compatible member types X and argument type flat_set<Y> and X != Y
 template<> template<> inline void list_argument_validate_visitor<char>::operator()( const flat_set<string>& arg ) {}
@@ -225,13 +217,12 @@ struct attr_argument_validate_visitor
       {
          // validate common data
          validate_restriction_commons( restriction );
-         // validate member-related
+         // validate member-related data
          restriction_validate_visitor vtor( restriction );
          vtor( *((const T*)nullptr) );
       }
    }
 };
-
 
 struct number_argument_validate_visitor
 {
@@ -295,7 +286,7 @@ void require_compatible_argument( const restriction_type& op_restriction, const 
 }
 
 template<typename T>
-void require_list_argument( const restriction_type& op_restriction, const char* name )
+void require_compatible_list_argument( const restriction_type& op_restriction, const char* name )
 {
    // argument should be flat_set< T-compatible >
    list_argument_validate_visitor<T> vtor( name );
@@ -305,7 +296,7 @@ void require_list_argument( const restriction_type& op_restriction, const char* 
 template<typename T>
 void require_attr_argument( const restriction_type& op_restriction, const char* name )
 {
-   // argument should be flat_set< T-compatible >
+   // argument should be attr and compatible to T
    attr_argument_validate_visitor<T> vtor( name );
    op_restriction.argument.visit( vtor );
 }
@@ -333,7 +324,7 @@ struct restriction_validation_helper
       if( is_subset_function( op_restriction.function ) )
       {
          // argument need to be a list, and type should be compatible to T
-         require_list_argument<T>( op_restriction, name );
+         require_compatible_list_argument<T>( op_restriction, name );
       }
       else if( is_compare_function( op_restriction.function ) )
       {
@@ -353,7 +344,7 @@ struct restriction_validation_helper
       if( is_subset_function( op_restriction.function ) )
       {
          // argument need to be a list, and type should be compatible to T
-         require_list_argument<T>( op_restriction, name );
+         require_compatible_list_argument<T>( op_restriction, name );
       }
       else if( is_equal_function( op_restriction.function ) )
       {
@@ -367,7 +358,7 @@ struct restriction_validation_helper
       }
    }
 
-   template<typename T> // non-compatible, not-simple, aka object-like type
+   template<typename T> // non-comparable, not-simple, aka object-like type
    void validate_member( const char* name, std::false_type, std::false_type )
    {
       FC_ASSERT( op_restriction.function == restriction_type::func_attr,
@@ -387,11 +378,11 @@ struct restriction_validation_helper
                  "Simple data type in list-like member '${name}' is required",
                  ("name", name) );
       // argument need to be a list, and type should be compatible to T
-      require_list_argument<T>( op_restriction, name );
+      require_compatible_list_argument<T>( op_restriction, name );
    }
 
    template<typename T>
-   void validate_by_member_type( const char* name, const T* t )
+   void validate_by_member_type( const char* name, const T* t ) // generic template
    {
       const bool is_comparable = is_comparable_data_type<T>::value;
       const bool is_simple     = is_simple_data_type<T>::value;
@@ -466,7 +457,6 @@ struct restriction_validation_helper
 
 };
 
-template< typename OpType >
 struct by_index_member_validate_visitor
 {
    typedef void result_type;
@@ -500,7 +490,7 @@ struct restriction_validate_visitor
       // other member modifiers should have been checked outside, so only check mmod_none here
       if( op_restriction.member_modifier.value == restriction_type::mmod_none )
       {
-         by_index_member_validate_visitor<OpType> vtor( op_restriction );
+         by_index_member_validate_visitor vtor( op_restriction );
          fc::reflector<OpType>::visit_local_member( vtor, op_restriction.member.value );
       }
    }
