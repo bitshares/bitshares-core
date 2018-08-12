@@ -47,7 +47,7 @@ namespace graphene { namespace chain {
          time_point_sec                  valid_to;
          unsigned_int                    operation_type;
          authority                       auth;
-         vector<operation_restriction>   restrictions;
+         vector<restriction_type>        restrictions;
    };
 
    /**
