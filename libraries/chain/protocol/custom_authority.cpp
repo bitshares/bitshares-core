@@ -36,9 +36,9 @@ share_type custom_authority_create_operation::calculate_fee( const fee_parameter
       unit_fee *= (valid_to - valid_from).to_seconds();
       unit_fee *= auth.num_auths();
       uint64_t restriction_units = 0;
-      for( const auto& restriction : restrictions )
+      for( const auto& r : restrictions )
       {
-         restriction_units += restriction.get_units();
+         restriction_units += r.get_units();
       }
       unit_fee *= restriction_units;
       unit_fee /= 1000;
@@ -71,10 +71,10 @@ void custom_authority_create_operation::validate()const
    //FC_ASSERT( !auth.is_impossible(), "cannot use an imposible authority threshold" );
 
    // Note: allow restrictions to be empty
-   for( const auto& restriction : restrictions )
+   for( const auto& r: restrictions )
    {
       // recursively validate member index and argument type
-      restriction.validate( operation_type );
+      r.validate( operation_type );
    }
 }
 
@@ -110,10 +110,10 @@ void custom_authority_update_operation::validate()const
    //FC_ASSERT( !auth.is_impossible(), "cannot use an imposible authority threshold" );
 
    // Note: allow restrictions to be empty
-   for( const auto& restriction : restrictions )
+   for( const auto& r : restrictions )
    {
       // TODO recursively validate member index and argument type
-      restriction.validate( operation_type );
+      r.validate( operation_type );
    }
 */
 }
