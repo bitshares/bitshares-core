@@ -35,8 +35,8 @@ namespace graphene { namespace chain {
 template <bool B>
 using bool_const = std::integral_constant<bool, B>;
 
-struct op_restriction_validate_visitor;
-void validate_op_restriction_commons( const restriction_type& op_restriction );
+struct restriction_validate_visitor;
+void validate_restriction_commons( const restriction_type& op_restriction );
 
 struct argument_get_units_visitor
 {
@@ -224,9 +224,9 @@ struct attr_argument_validate_visitor
       for( const restriction_type& restriction : arg )
       {
          // validate common data
-         validate_op_restriction_commons( restriction );
+         validate_restriction_commons( restriction );
          // validate member-related
-         op_restriction_validate_visitor vtor( restriction );
+         restriction_validate_visitor vtor( restriction );
          vtor( *((const T*)nullptr) );
       }
    }
@@ -317,11 +317,11 @@ void require_number_argument( const restriction_type& op_restriction, const char
    op_restriction.argument.visit( vtor );
 }
 
-struct op_restriction_validation_helper
+struct restriction_validation_helper
 {
    const restriction_type& op_restriction; ///< the restriction
 
-   op_restriction_validation_helper( const restriction_type& opr ) : op_restriction(opr)
+   restriction_validation_helper( const restriction_type& opr ) : op_restriction(opr)
    {
       FC_ASSERT( op_restriction.member_modifier.value == restriction_type::mmod_none,
                  "Internal error: should only use this helper for mmod_none" );
@@ -478,17 +478,17 @@ struct by_index_member_validate_visitor
    template<typename Member, class Class, Member (Class::*member)>
    void operator()( const char* name )const
    {
-      op_restriction_validation_helper helper( op_restriction );
+      restriction_validation_helper helper( op_restriction );
       helper.validate_by_member_type( name, (const Member*)nullptr );
    }
 };
 
-struct op_restriction_validate_visitor
+struct restriction_validate_visitor
 {
    typedef void result_type;
    const restriction_type& op_restriction;
 
-   op_restriction_validate_visitor( const restriction_type& opr ) : op_restriction(opr) {}
+   restriction_validate_visitor( const restriction_type& opr ) : op_restriction(opr) {}
 
    template<typename OpType>
    result_type operator()( const OpType& ) // Note: the parameter is a reference of *nullptr, we should not use it
@@ -512,9 +512,9 @@ struct op_restriction_validate_visitor
       operation::visit< I >( vtor ); \
       break;
 
-void validate_op_restriction_by_op_type( const restriction_type& op_restriction, unsigned_int op_type )
+void validate_restriction_details( const restriction_type& op_restriction, unsigned_int op_type )
 {
-   op_restriction_validate_visitor vtor( op_restriction );
+   restriction_validate_visitor vtor( op_restriction );
    switch( op_type.value )
    {
       // will have code like below for all operations:
@@ -527,7 +527,7 @@ void validate_op_restriction_by_op_type( const restriction_type& op_restriction,
 
 }
 
-void validate_op_restriction_commons( const restriction_type& op_restriction )
+void validate_restriction_commons( const restriction_type& op_restriction )
 {
    // validate member modifier
    FC_ASSERT( op_restriction.member_modifier < restriction_type::MEMBER_MODIFIER_TYPE_COUNT,
@@ -554,9 +554,9 @@ void validate_op_restriction_commons( const restriction_type& op_restriction )
 void restriction_type::validate( unsigned_int op_type )const
 {
    // validate common data
-   validate_op_restriction_commons( *this );
+   validate_restriction_commons( *this );
    // validate details by operation_type
-   validate_op_restriction_by_op_type( *this, op_type );
+   validate_restriction_details( *this, op_type );
 }
 
 } } // graphene::chain
