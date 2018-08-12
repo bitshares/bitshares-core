@@ -35,7 +35,7 @@ namespace graphene { namespace chain {
 template <bool B>
 using bool_const = std::integral_constant<bool, B>;
 
-struct restriction_validate_visitor;
+struct restriction_validation_visitor;
 void validate_restriction_commons( const restriction_type& op_restriction );
 
 struct argument_get_units_visitor
@@ -134,12 +134,12 @@ template<> struct is_simple_data_type<worker_id_type> { static const bool value 
 template<> struct is_simple_data_type<balance_id_type> { static const bool value = true; };
 
 template<typename T>
-struct compatible_argument_validate_visitor
+struct compatible_argument_validation_visitor
 {
    typedef void result_type;
    const char* name;
 
-   compatible_argument_validate_visitor( const char* _name ) : name(_name) {}
+   compatible_argument_validation_visitor( const char* _name ) : name(_name) {}
 
    template<typename ArgType>
    inline result_type operator()( const ArgType& arg ) // by default incompatible
@@ -153,24 +153,24 @@ struct compatible_argument_validate_visitor
 };
 
 // compatible member types X and argument type Y and X != Y
-template<> template<> inline void compatible_argument_validate_visitor<char>::operator()( const string& arg ) {}
-template<> template<> inline void compatible_argument_validate_visitor<int8_t>::operator()( const int64_t& arg ) {}
-template<> template<> inline void compatible_argument_validate_visitor<uint8_t>::operator()( const int64_t& arg ) {}
-template<> template<> inline void compatible_argument_validate_visitor<int16_t>::operator()( const int64_t& arg ) {}
-template<> template<> inline void compatible_argument_validate_visitor<uint16_t>::operator()( const int64_t& arg ) {}
-template<> template<> inline void compatible_argument_validate_visitor<int32_t>::operator()( const int64_t& arg ) {}
-template<> template<> inline void compatible_argument_validate_visitor<uint32_t>::operator()( const int64_t& arg ) {}
+template<> template<> inline void compatible_argument_validation_visitor<char>::operator()( const string& arg ) {}
+template<> template<> inline void compatible_argument_validation_visitor<int8_t>::operator()( const int64_t& arg ) {}
+template<> template<> inline void compatible_argument_validation_visitor<uint8_t>::operator()( const int64_t& arg ) {}
+template<> template<> inline void compatible_argument_validation_visitor<int16_t>::operator()( const int64_t& arg ) {}
+template<> template<> inline void compatible_argument_validation_visitor<uint16_t>::operator()( const int64_t& arg ) {}
+template<> template<> inline void compatible_argument_validation_visitor<int32_t>::operator()( const int64_t& arg ) {}
+template<> template<> inline void compatible_argument_validation_visitor<uint32_t>::operator()( const int64_t& arg ) {}
 // no int64_t here because it's already covered by generic template
-template<> template<> inline void compatible_argument_validate_visitor<uint64_t>::operator()( const int64_t& arg ) {}
-template<> template<> inline void compatible_argument_validate_visitor<unsigned_int>::operator()( const int64_t& arg ) {}
+template<> template<> inline void compatible_argument_validation_visitor<uint64_t>::operator()( const int64_t& arg ) {}
+template<> template<> inline void compatible_argument_validation_visitor<unsigned_int>::operator()( const int64_t& arg ) {}
 
 template<typename T>
-struct list_argument_validate_visitor
+struct list_argument_validation_visitor
 {
    typedef void result_type;
    const char* name;
 
-   list_argument_validate_visitor( const char* _name ) : name(_name) {}
+   list_argument_validation_visitor( const char* _name ) : name(_name) {}
 
    template<typename ArgType>
    inline result_type operator()( const ArgType& arg ) // by default incompatible
@@ -184,24 +184,24 @@ struct list_argument_validate_visitor
 };
 
 // compatible member types X and argument type flat_set<Y> and X != Y
-template<> template<> inline void list_argument_validate_visitor<char>::operator()( const flat_set<string>& arg ) {}
-template<> template<> inline void list_argument_validate_visitor<int8_t>::operator()( const flat_set<int64_t>& arg ) {}
-template<> template<> inline void list_argument_validate_visitor<uint8_t>::operator()( const flat_set<int64_t>& arg ) {}
-template<> template<> inline void list_argument_validate_visitor<int16_t>::operator()( const flat_set<int64_t>& arg ) {}
-template<> template<> inline void list_argument_validate_visitor<uint16_t>::operator()( const flat_set<int64_t>& arg ) {}
-template<> template<> inline void list_argument_validate_visitor<int32_t>::operator()( const flat_set<int64_t>& arg ) {}
-template<> template<> inline void list_argument_validate_visitor<uint32_t>::operator()( const flat_set<int64_t>& arg ) {}
+template<> template<> inline void list_argument_validation_visitor<char>::operator()( const flat_set<string>& arg ) {}
+template<> template<> inline void list_argument_validation_visitor<int8_t>::operator()( const flat_set<int64_t>& arg ) {}
+template<> template<> inline void list_argument_validation_visitor<uint8_t>::operator()( const flat_set<int64_t>& arg ) {}
+template<> template<> inline void list_argument_validation_visitor<int16_t>::operator()( const flat_set<int64_t>& arg ) {}
+template<> template<> inline void list_argument_validation_visitor<uint16_t>::operator()( const flat_set<int64_t>& arg ) {}
+template<> template<> inline void list_argument_validation_visitor<int32_t>::operator()( const flat_set<int64_t>& arg ) {}
+template<> template<> inline void list_argument_validation_visitor<uint32_t>::operator()( const flat_set<int64_t>& arg ) {}
 // no int64_t here because it's already covered by generic template
-template<> template<> inline void list_argument_validate_visitor<uint64_t>::operator()( const flat_set<int64_t>& arg ) {}
-template<> template<> inline void list_argument_validate_visitor<unsigned_int>::operator()( const flat_set<int64_t>& arg ) {}
+template<> template<> inline void list_argument_validation_visitor<uint64_t>::operator()( const flat_set<int64_t>& arg ) {}
+template<> template<> inline void list_argument_validation_visitor<unsigned_int>::operator()( const flat_set<int64_t>& arg ) {}
 
 template<typename T>
-struct attr_argument_validate_visitor
+struct attr_argument_validation_visitor
 {
    typedef void result_type;
    const char* name;
 
-   attr_argument_validate_visitor( const char* _name ) : name(_name) {}
+   attr_argument_validation_visitor( const char* _name ) : name(_name) {}
 
    template<typename ArgType>
    inline result_type operator()( const ArgType& arg )
@@ -218,18 +218,18 @@ struct attr_argument_validate_visitor
          // validate common data
          validate_restriction_commons( restriction );
          // validate member-related data
-         restriction_validate_visitor vtor( restriction );
+         restriction_validation_visitor vtor( restriction );
          vtor( *((const T*)nullptr) );
       }
    }
 };
 
-struct number_argument_validate_visitor
+struct number_argument_validation_visitor
 {
    typedef void result_type;
    const char* name;
 
-   number_argument_validate_visitor( const char* _name ) : name(_name) {}
+   number_argument_validation_visitor( const char* _name ) : name(_name) {}
 
    template<typename ArgType>
    inline result_type operator()( const ArgType& arg )
@@ -281,7 +281,7 @@ template<typename T>
 void require_compatible_argument( const restriction_type& op_restriction, const char* name )
 {
    // argument should be T-compatible
-   compatible_argument_validate_visitor<T> vtor( name );
+   compatible_argument_validation_visitor<T> vtor( name );
    op_restriction.argument.visit( vtor );
 }
 
@@ -289,7 +289,7 @@ template<typename T>
 void require_compatible_list_argument( const restriction_type& op_restriction, const char* name )
 {
    // argument should be flat_set< T-compatible >
-   list_argument_validate_visitor<T> vtor( name );
+   list_argument_validation_visitor<T> vtor( name );
    op_restriction.argument.visit( vtor );
 }
 
@@ -297,14 +297,14 @@ template<typename T>
 void require_attr_argument( const restriction_type& op_restriction, const char* name )
 {
    // argument should be attr and compatible to T
-   attr_argument_validate_visitor<T> vtor( name );
+   attr_argument_validation_visitor<T> vtor( name );
    op_restriction.argument.visit( vtor );
 }
 
 void require_number_argument( const restriction_type& op_restriction, const char* name )
 {
    // argument should be a number
-   number_argument_validate_visitor vtor( name );
+   number_argument_validation_visitor vtor( name );
    op_restriction.argument.visit( vtor );
 }
 
@@ -457,13 +457,13 @@ struct restriction_validation_helper
 
 };
 
-struct by_index_member_validate_visitor
+struct member_validation_visitor
 {
    typedef void result_type;
 
    const restriction_type& op_restriction;
 
-   by_index_member_validate_visitor( const restriction_type& opr ) : op_restriction(opr) {}
+   member_validation_visitor( const restriction_type& opr ) : op_restriction(opr) {}
 
    template<typename Member, class Class, Member (Class::*member)>
    void operator()( const char* name )const
@@ -473,12 +473,12 @@ struct by_index_member_validate_visitor
    }
 };
 
-struct restriction_validate_visitor
+struct restriction_validation_visitor
 {
    typedef void result_type;
    const restriction_type& op_restriction;
 
-   restriction_validate_visitor( const restriction_type& opr ) : op_restriction(opr) {}
+   restriction_validation_visitor( const restriction_type& opr ) : op_restriction(opr) {}
 
    template<typename OpType>
    result_type operator()( const OpType& ) // Note: the parameter is a reference of *nullptr, we should not use it
@@ -490,7 +490,7 @@ struct restriction_validate_visitor
       // other member modifiers should have been checked outside, so only check mmod_none here
       if( op_restriction.member_modifier.value == restriction_type::mmod_none )
       {
-         by_index_member_validate_visitor vtor( op_restriction );
+         member_validation_visitor vtor( op_restriction );
          fc::reflector<OpType>::visit_local_member( vtor, op_restriction.member.value );
       }
    }
@@ -504,7 +504,7 @@ struct restriction_validate_visitor
 
 void validate_restriction_details( const restriction_type& op_restriction, unsigned_int op_type )
 {
-   restriction_validate_visitor vtor( op_restriction );
+   restriction_validation_visitor vtor( op_restriction );
    switch( op_type.value )
    {
       // will have code like below for all operations:
