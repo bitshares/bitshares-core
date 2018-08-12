@@ -114,7 +114,13 @@ namespace graphene { namespace chain {
       empty_extensions_type      extensions;
 
       uint64_t get_units()const;
+
+      /// Validates the restriction with given operation type, to be called by an operation validator
       void validate( unsigned_int op_type )const;
+
+      /// Validates common data in the restriction, to be used internally
+      void validate_common_data() const;
+
    };
 
 } } // graphene::chain
