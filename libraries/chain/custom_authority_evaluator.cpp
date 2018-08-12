@@ -32,7 +32,7 @@ namespace graphene { namespace chain {
 
 void_result custom_authority_create_evaluator::do_evaluate(const custom_authority_create_evaluator::operation_type& op)
 { try {
-   database& d = db();
+   const database& d = db();
 
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (op) ) }
@@ -46,7 +46,7 @@ object_id_type custom_authority_create_evaluator::do_apply(const custom_authorit
 
 void_result custom_authority_update_evaluator::do_evaluate(const custom_authority_update_evaluator::operation_type& op)
 { try {
-   database& d = db();
+   const database& d = db();
 
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (op) ) }
@@ -60,7 +60,7 @@ void_result custom_authority_update_evaluator::do_apply(const custom_authority_u
 
 void_result custom_authority_delete_evaluator::do_evaluate(const custom_authority_delete_evaluator::operation_type& op)
 { try {
-   database& d = db();
+   const database& d = db();
 
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (op) ) }
