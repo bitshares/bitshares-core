@@ -180,6 +180,9 @@ bool elasticsearch_plugin_impl::update_account_histories( const signed_block& b 
       }
    }
 
+   if(bulk_lines.size() != limit_documents)
+      bulk_lines.reserve(limit_documents);
+
    return true;
 }
 
@@ -321,7 +324,8 @@ void elasticsearch_plugin_impl::prepareBulk(const account_transaction_history_id
    bulk_header["_type"] = "data";
    bulk_header["_id"] = fc::to_string(ath_id.space_id) + "." + fc::to_string(ath_id.type_id) + "." + ath_id.instance;
    prepare = graphene::utilities::createBulk(bulk_header, bulk_line);
-   bulk_lines.insert(bulk_lines.end(), prepare.begin(), prepare.end());
+   std::move(prepare.begin(), prepare.end(), std::back_inserter(bulk_lines));
+   prepare.clear();
 }
 
 void elasticsearch_plugin_impl::cleanObjects(const account_transaction_history_object& ath, account_id_type account_id)
