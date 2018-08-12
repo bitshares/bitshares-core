@@ -36,7 +36,6 @@ template <bool B>
 using bool_const = std::integral_constant<bool, B>;
 
 struct restriction_validation_visitor;
-void validate_restriction_commons( const restriction_type& op_restriction );
 
 struct argument_get_units_visitor
 {
@@ -83,9 +82,9 @@ struct argument_get_units_visitor
    result_type operator()( const attr_restriction_type& t )
    {
       result_type result = 0;
-      for( const auto& restriction : t )
+      for( const auto& r : t )
       {
-         result += restriction.argument.visit(*this);
+         result += r.argument.visit(*this);
       }
       return result;
    }
@@ -213,12 +212,12 @@ struct attr_argument_validation_visitor
    result_type operator()( const attr_restriction_type& arg ) // vector<restriction_type>
    {
       // Recursively check T.members
-      for( const restriction_type& restriction : arg )
+      for( const restriction_type& r : arg )
       {
          // validate common data
-         validate_restriction_commons( restriction );
+         r.validate_common_data();
          // validate member-related data
-         restriction_validation_visitor vtor( restriction );
+         restriction_validation_visitor vtor( r );
          vtor( *((const T*)nullptr) );
       }
    }
@@ -269,116 +268,116 @@ inline bool is_compare_function( const restriction_type::function_type function 
             || function == restriction_type::func_ge );
 }
 
-void require_compare_function( const restriction_type& op_restriction, const char* name )
+void require_compare_function( const restriction_type& r, const char* name )
 {
    // function should be a compare function
-   FC_ASSERT( is_compare_function( op_restriction.function ),
+   FC_ASSERT( is_compare_function( r.function ),
               "Function '${func}' is incompatible, requires a compare function for ${name}",
-              ("func", op_restriction.function)("name", name) );
+              ("func", r.function)("name", name) );
 }
 
 template<typename T>
-void require_compatible_argument( const restriction_type& op_restriction, const char* name )
+void require_compatible_argument( const restriction_type& r, const char* name )
 {
    // argument should be T-compatible
    compatible_argument_validation_visitor<T> vtor( name );
-   op_restriction.argument.visit( vtor );
+   r.argument.visit( vtor );
 }
 
 template<typename T>
-void require_compatible_list_argument( const restriction_type& op_restriction, const char* name )
+void require_compatible_list_argument( const restriction_type& r, const char* name )
 {
    // argument should be flat_set< T-compatible >
    list_argument_validation_visitor<T> vtor( name );
-   op_restriction.argument.visit( vtor );
+   r.argument.visit( vtor );
 }
 
 template<typename T>
-void require_attr_argument( const restriction_type& op_restriction, const char* name )
+void require_attr_argument( const restriction_type& r, const char* name )
 {
    // argument should be attr and compatible to T
    attr_argument_validation_visitor<T> vtor( name );
-   op_restriction.argument.visit( vtor );
+   r.argument.visit( vtor );
 }
 
-void require_number_argument( const restriction_type& op_restriction, const char* name )
+void require_number_argument( const restriction_type& r, const char* name )
 {
    // argument should be a number
    number_argument_validation_visitor vtor( name );
-   op_restriction.argument.visit( vtor );
+   r.argument.visit( vtor );
 }
 
 struct restriction_validation_helper
 {
-   const restriction_type& op_restriction; ///< the restriction
+   const restriction_type& _restriction; ///< the restriction
 
-   restriction_validation_helper( const restriction_type& opr ) : op_restriction(opr)
+   restriction_validation_helper( const restriction_type& r ) : _restriction(r)
    {
-      FC_ASSERT( op_restriction.member_modifier.value == restriction_type::mmod_none,
+      FC_ASSERT( _restriction.member_modifier.value == restriction_type::mmod_none,
                  "Internal error: should only use this helper for mmod_none" );
    }
 
    template<typename T> // comparable, simple data type
    void validate_member( const char* name, std::true_type, std::true_type )
    {
-      if( is_subset_function( op_restriction.function ) )
+      if( is_subset_function( _restriction.function ) )
       {
          // argument need to be a list, and type should be compatible to T
-         require_compatible_list_argument<T>( op_restriction, name );
+         require_compatible_list_argument<T>( _restriction, name );
       }
-      else if( is_compare_function( op_restriction.function ) )
+      else if( is_compare_function( _restriction.function ) )
       {
          // argument need to be compatible
-         require_compatible_argument<T>( op_restriction, name );
+         require_compatible_argument<T>( _restriction, name );
       }
       else
       {
          FC_THROW( "Function '${func}' is incompatible, requires a compare function or subset function for ${name}",
-                   ("func", op_restriction.function)("name", name) );
+                   ("func", _restriction.function)("name", name) );
       }
    }
 
    template<typename T> // non-comparable, simple data type
    void validate_member( const char* name, std::false_type, std::true_type )
    {
-      if( is_subset_function( op_restriction.function ) )
+      if( is_subset_function( _restriction.function ) )
       {
          // argument need to be a list, and type should be compatible to T
-         require_compatible_list_argument<T>( op_restriction, name );
+         require_compatible_list_argument<T>( _restriction, name );
       }
-      else if( is_equal_function( op_restriction.function ) )
+      else if( is_equal_function( _restriction.function ) )
       {
          // argument need to be compatible
-         require_compatible_argument<T>( op_restriction, name );
+         require_compatible_argument<T>( _restriction, name );
       }
       else
       {
          FC_THROW( "Function '${func}' is incompatible, requires an equal function or subset function for ${name}",
-                   ("func", op_restriction.function)("name", name) );
+                   ("func", _restriction.function)("name", name) );
       }
    }
 
    template<typename T> // non-comparable, not-simple, aka object-like type
    void validate_member( const char* name, std::false_type, std::false_type )
    {
-      FC_ASSERT( op_restriction.function == restriction_type::func_attr,
+      FC_ASSERT( _restriction.function == restriction_type::func_attr,
                  "Object-like member '${name}' can only use func_attr",
                  ("name", name) );
       // argument need to be a attribute_restriction
-      require_attr_argument<T>( op_restriction, name );
+      require_attr_argument<T>( _restriction, name );
    }
 
    template<typename T>
    void validate_list_like_member( const char* name )
    {
-      FC_ASSERT( is_superset_function( op_restriction.function ),
+      FC_ASSERT( is_superset_function( _restriction.function ),
                  "List-like member '${name}' can only use func_has_all or func_has_none",
                  ("name", name) );
       FC_ASSERT( is_simple_data_type<T>::value,
                  "Simple data type in list-like member '${name}' is required",
                  ("name", name) );
       // argument need to be a list, and type should be compatible to T
-      require_compatible_list_argument<T>( op_restriction, name );
+      require_compatible_list_argument<T>( _restriction, name );
    }
 
    template<typename T>
@@ -461,14 +460,14 @@ struct member_validation_visitor
 {
    typedef void result_type;
 
-   const restriction_type& op_restriction;
+   const restriction_type& _restriction;
 
-   member_validation_visitor( const restriction_type& opr ) : op_restriction(opr) {}
+   member_validation_visitor( const restriction_type& r ) : _restriction(r) {}
 
    template<typename Member, class Class, Member (Class::*member)>
    void operator()( const char* name )const
    {
-      restriction_validation_helper helper( op_restriction );
+      restriction_validation_helper helper( _restriction );
       helper.validate_by_member_type( name, (const Member*)nullptr );
    }
 };
@@ -476,22 +475,22 @@ struct member_validation_visitor
 struct restriction_validation_visitor
 {
    typedef void result_type;
-   const restriction_type& op_restriction;
+   const restriction_type& _restriction;
 
-   restriction_validation_visitor( const restriction_type& opr ) : op_restriction(opr) {}
+   restriction_validation_visitor( const restriction_type& r ) : _restriction(r) {}
 
    template<typename OpType>
    result_type operator()( const OpType& ) // Note: the parameter is a reference of *nullptr, we should not use it
    {
-      FC_ASSERT( op_restriction.member < fc::reflector<OpType>::total_member_count,
+      FC_ASSERT( _restriction.member < fc::reflector<OpType>::total_member_count,
                  "member number ${m} is too large",
-                 ("m",op_restriction.member) );
+                 ("m",_restriction.member) );
 
       // other member modifiers should have been checked outside, so only check mmod_none here
-      if( op_restriction.member_modifier.value == restriction_type::mmod_none )
+      if( _restriction.member_modifier.value == restriction_type::mmod_none )
       {
-         member_validation_visitor vtor( op_restriction );
-         fc::reflector<OpType>::visit_local_member( vtor, op_restriction.member.value );
+         member_validation_visitor vtor( _restriction );
+         fc::reflector<OpType>::visit_local_member( vtor, _restriction.member.value );
       }
    }
 
@@ -502,9 +501,9 @@ struct restriction_validation_visitor
       operation::visit< I >( vtor ); \
       break;
 
-void validate_restriction_details( const restriction_type& op_restriction, unsigned_int op_type )
+void validate_restriction_details( const restriction_type& r, unsigned_int op_type )
 {
-   restriction_validation_visitor vtor( op_restriction );
+   restriction_validation_visitor vtor( r );
    switch( op_type.value )
    {
       // will have code like below for all operations:
@@ -517,34 +516,34 @@ void validate_restriction_details( const restriction_type& op_restriction, unsig
 
 }
 
-void validate_restriction_commons( const restriction_type& op_restriction )
+void restriction_type::validate_common_data() const
 {
    // validate member modifier
-   FC_ASSERT( op_restriction.member_modifier < restriction_type::MEMBER_MODIFIER_TYPE_COUNT,
+   FC_ASSERT( member_modifier < MEMBER_MODIFIER_TYPE_COUNT,
               "member modifier number ${mm} is too large",
-              ("mm", op_restriction.member_modifier) );
+              ("mm", member_modifier) );
 
-   if( op_restriction.member_modifier.value == restriction_type::mmod_size )
+   if( member_modifier.value == mmod_size )
    {
-      require_compare_function( op_restriction, "size modifier" );
-      require_number_argument( op_restriction, "size modifier" );
+      require_compare_function( *this, "size modifier" );
+      require_number_argument( *this, "size modifier" );
    }
-   else if( op_restriction.member_modifier.value == restriction_type::mmod_pack_size )
+   else if( member_modifier.value == mmod_pack_size )
    {
-      require_compare_function( op_restriction, "pack_size modifier" );
-      require_number_argument( op_restriction, "pack_size modifier" );
+      require_compare_function( *this, "pack_size modifier" );
+      require_number_argument( *this, "pack_size modifier" );
    }
 
    // validate function
-   FC_ASSERT( op_restriction.function < restriction_type::FUNCTION_TYPE_COUNT,
+   FC_ASSERT( function < FUNCTION_TYPE_COUNT,
               "function number ${f} is too large",
-              ("f", op_restriction.function) );
+              ("f", function) );
 }
 
 void restriction_type::validate( unsigned_int op_type )const
 {
    // validate common data
-   validate_restriction_commons( *this );
+   validate_common_data();
    // validate details by operation_type
    validate_restriction_details( *this, op_type );
 }
