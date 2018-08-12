@@ -48,10 +48,36 @@ struct argument_get_units_visitor
       return 1;
    }
 
+   inline result_type operator()( const fc::sha256& t )
+   {
+      return 4;
+   }
+
+   inline result_type operator()( const public_key_type& t )
+   {
+      return 4;
+   }
+
+   inline result_type operator()( const string& t )
+   {
+      return ( t.size() + 7 ) / 8;
+   }
+
    template<typename T>
    inline result_type operator()( const flat_set<T>& t )
    {
-      return t.size();
+      return t.size() * (*this)( *((const T*)nullptr) );
+   }
+
+   template<typename T>
+   inline result_type operator()( const flat_set<string>& t )
+   {
+      result_type result = 0;
+      for( const auto& s : t )
+      {
+         result += ( s.size() + 7 ) / 8;
+      }
+      return result;
    }
 
    result_type operator()( const attr_restriction_type& t )
