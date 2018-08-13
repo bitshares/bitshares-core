@@ -66,7 +66,7 @@ namespace graphene { namespace db {
                   catch ( const fc::exception& e )
                   {
                      elog( "${e}", ("e",e.to_detail_string() ) );
-                     throw; // maybe crash..
+                     //throw; // maybe crash..
                   }
                   if( _disable_on_exit ) _db.disable();
                }

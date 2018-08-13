@@ -88,7 +88,7 @@ namespace graphene { namespace chain {
       {
          try {
             return op.calculate_fee( param.get<OpType>() ).value;
-         } catch (fc::assert_exception e) {
+         } catch (fc::assert_exception& e) {
              fee_parameters params; params.set_which(current_op);
              auto itr = param.parameters.find(params);
              if( itr != param.parameters.end() ) params = *itr;
