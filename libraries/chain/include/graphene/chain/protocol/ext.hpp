@@ -233,8 +233,9 @@ template<typename T> struct get_typename< graphene::chain::extension<T> >
 { 
    static const char* name()
    { 
-      return (std::string("graphene::chain::extension<") 
-         + fc::get_typename<T>::name() + std::string(">")).c_str();   
+      static std::string n = std::string("graphene::chain::extension<") 
+         + fc::get_typename<T>::name() + std::string(">");
+      return n.c_str();
    } 
 };
 
