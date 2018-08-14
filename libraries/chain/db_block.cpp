@@ -266,6 +266,24 @@ processed_transaction database::validate_transaction( const signed_transaction& 
    return _apply_transaction( trx );
 }
 
+class push_proposal_nesting_guard {
+public:
+   push_proposal_nesting_guard( uint32_t& nesting_counter, const database& db )
+      : orig_value(nesting_counter), counter(nesting_counter)
+   {
+      FC_ASSERT( counter < db.get_global_properties().active_witnesses.size() * 2, "Max proposal nesting depth exceeded!" );
+      counter++;
+   }
+   ~push_proposal_nesting_guard()
+   {
+      if( --counter != orig_value )
+         elog( "Unexpected proposal nesting count value: ${n} != ${o}", ("n",counter)("o",orig_value) );
+   }
+private:
+    const uint32_t  orig_value;
+    uint32_t& counter;
+};
+
 processed_transaction database::push_proposal(const proposal_object& proposal)
 { try {
    transaction_evaluation_state eval_state(this);
@@ -277,6 +295,7 @@ processed_transaction database::push_proposal(const proposal_object& proposal)
    size_t old_applied_ops_size = _applied_ops.size();
 
    try {
+      push_proposal_nesting_guard guard( _push_proposal_nesting_depth, *this );
       if( _undo_db.size() >= _undo_db.max_size() )
          _undo_db.set_max_size( _undo_db.size() + 1 );
       auto session = _undo_db.start_undo_session(true);
