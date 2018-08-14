@@ -1448,6 +1448,69 @@ BOOST_FIXTURE_TEST_CASE( parent_owner_test, database_fixture )
    }
 }
 
+/// This test case reproduces https://github.com/bitshares/bitshares-core/issues/944
+BOOST_FIXTURE_TEST_CASE( missing_owner_auth_test, database_fixture )
+{
+   try
+   {
+      ACTORS(
+         (alice)
+         );
+
+      auto set_auth = [&](
+         account_id_type aid,
+         const authority& active,
+         const authority& owner
+         )
+      {
+         signed_transaction tx;
+         account_update_operation op;
+         op.account = aid;
+         op.active = active;
+         op.owner = owner;
+         tx.operations.push_back( op );
+         set_expiration( db, tx );
+         PUSH_TX( db, tx, database::skip_transaction_signatures | database::skip_authority_check );
+      } ;
+
+      auto get_active = [&](
+         account_id_type aid
+         ) -> const authority*
+      {
+         return &(aid(db).active);
+      } ;
+
+      auto get_owner = [&](
+         account_id_type aid
+         ) -> const authority*
+      {
+         return &(aid(db).owner);
+      } ;
+
+      fc::ecc::private_key alice_active_key = fc::ecc::private_key::regenerate(fc::digest("alice_active"));
+      fc::ecc::private_key alice_owner_key = fc::ecc::private_key::regenerate(fc::digest("alice_owner"));
+      public_key_type alice_active_pub( alice_active_key.get_public_key() );
+      public_key_type alice_owner_pub( alice_owner_key.get_public_key() );
+      set_auth( alice_id, authority( 1, alice_active_pub, 1 ), authority( 1, alice_owner_pub, 1 ) );
+
+      signed_transaction tx;
+      account_update_operation op;
+      op.account = alice_id;
+      op.owner = authority( 1, alice_active_pub, 1 );
+      tx.operations.push_back( op );
+
+      // https://github.com/bitshares/bitshares-core/issues/944
+      GRAPHENE_REQUIRE_THROW( tx.verify_authority( db.get_chain_id(), get_active, get_owner ),
+                              graphene::chain::tx_missing_owner_auth );
+
+   }
+   catch(fc::exception& e)
+   {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
 BOOST_AUTO_TEST_CASE( issue_214 )
 { try {
    ACTORS( (alice)(bob) );
