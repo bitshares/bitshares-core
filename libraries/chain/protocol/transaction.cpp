@@ -93,14 +93,15 @@ void transaction::set_reference_block( const block_id_type& reference_block )
    ref_block_prefix = reference_block._hash[1];
 }
 
-void transaction::get_required_authorities( flat_set<account_id_type>& active, flat_set<account_id_type>& owner, vector<authority>& other )const
+void transaction::get_required_authorities( flat_set<account_id_type>& active,
+                                            flat_set<account_id_type>& owner,
+                                            vector<authority>& other )const
 {
    for( const auto& op : operations )
       operation_get_required_authorities( op, active, owner, other );
    for( const auto& account : owner )
       active.erase( account );
 }
-
 
 
 const flat_set<public_key_type> empty_keyset;
@@ -162,7 +163,7 @@ struct sign_state
       bool check_authority( account_id_type id )
       {
          if( approved_by.find(id) != approved_by.end() ) return true;
-         return check_authority( get_active(id) );
+         return check_authority( get_active(id) ) || ( allow_non_immediate_owner && check_authority( get_owner(id) ) );
       }
 
       /**
@@ -197,7 +198,8 @@ struct sign_state
             {
                if( depth == max_recursion )
                   continue;
-               if( check_authority( get_active( a.first ), depth+1 ) )
+               if( check_authority( get_active( a.first ), depth+1 )
+                     || ( allow_non_immediate_owner && check_authority( get_owner( a.first ), depth+1 ) ) )
                {
                   approved_by.insert( a.first );
                   total_weight += a.second;
@@ -228,9 +230,16 @@ struct sign_state
       }
 
       sign_state( const flat_set<public_key_type>& sigs,
-                  const std::function<const authority*(account_id_type)>& a,
+                  const std::function<const authority*(account_id_type)>& active,
+                  const std::function<const authority*(account_id_type)>& owner,
+                  bool allow_owner,
+                  uint32_t max_recursion_depth = GRAPHENE_MAX_SIG_CHECK_DEPTH,
                   const flat_set<public_key_type>& keys = empty_keyset )
-      :get_active(a),available_keys(keys)
+      :  get_active(active),
+         get_owner(owner),
+         allow_non_immediate_owner(allow_owner),
+         max_recursion(max_recursion_depth),
+         available_keys(keys)
       {
          for( const auto& key : sigs )
             provided_signatures[ key ] = false;
@@ -238,11 +247,14 @@ struct sign_state
       }
 
       const std::function<const authority*(account_id_type)>& get_active;
-      const flat_set<public_key_type>&                        available_keys;
+      const std::function<const authority*(account_id_type)>& get_owner;
+
+      const bool                       allow_non_immediate_owner;
+      const uint32_t                   max_recursion;
+      const flat_set<public_key_type>& available_keys;
 
       flat_map<public_key_type,bool>   provided_signatures;
       flat_set<account_id_type>        approved_by;
-      uint32_t                         max_recursion = GRAPHENE_MAX_SIG_CHECK_DEPTH;
 };
 
 
@@ -266,9 +278,7 @@ void verify_authority( const vector<operation>& ops, const flat_set<public_key_t
       GRAPHENE_ASSERT( required_active.find(GRAPHENE_COMMITTEE_ACCOUNT) == required_active.end(),
                        invalid_committee_approval, "Committee account may only propose transactions" );
 
-   // TODO allow_non_immediate_owner
-   sign_state s(sigs,get_active);
-   s.max_recursion = max_recursion_depth;
+   sign_state s( sigs, get_active, get_owner, allow_non_immediate_owner, max_recursion_depth );
    for( auto& id : active_aprovals )
       s.approved_by.insert( id );
    for( auto& id : owner_approvals )
@@ -333,8 +343,7 @@ set<public_key_type> signed_transaction::get_required_signatures(
    get_required_authorities( required_active, required_owner, other );
 
    const flat_set<public_key_type>& signature_keys = get_signature_keys( chain_id );
-   sign_state s( signature_keys, get_active, available_keys );
-   s.max_recursion = max_recursion_depth;
+   sign_state s( signature_keys, get_active, get_owner, allow_non_immediate_owner, max_recursion_depth, available_keys );
 
    for( const auto& auth : other )
       s.check_authority(&auth);
