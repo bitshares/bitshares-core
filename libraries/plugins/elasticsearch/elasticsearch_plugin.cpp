@@ -75,16 +75,16 @@ class elasticsearch_plugin_impl
    private:
       bool add_elasticsearch( const account_id_type account_id, const optional<operation_history_object>& oho );
       const account_transaction_history_object& addNewEntry(const account_statistics_object& stats_obj,
-                                                            const account_id_type account_id,
+                                                            const account_id_type& account_id,
                                                             const optional <operation_history_object>& oho);
-      const account_statistics_object& getStatsObject(const account_id_type account_id);
+      const account_statistics_object& getStatsObject(const account_id_type& account_id);
       void growStats(const account_statistics_object& stats_obj, const account_transaction_history_object& ath);
       void getOperationType(const optional <operation_history_object>& oho);
       void doOperationHistory(const optional <operation_history_object>& oho);
       void doBlock(uint32_t trx_in_block, const signed_block& b);
       void doVisitor(const optional <operation_history_object>& oho);
       void checkState(const fc::time_point_sec& block_time);
-      void cleanObjects(const account_transaction_history_object& ath, account_id_type account_id);
+      void cleanObjects(const account_transaction_history_id_type& ath, const account_id_type& account_id);
       void createBulkLine(const account_transaction_history_object& ath);
       void prepareBulk(const account_transaction_history_id_type& ath_id);
       void populateESstruct();
@@ -256,7 +256,7 @@ bool elasticsearch_plugin_impl::add_elasticsearch( const account_id_type account
    growStats(stats_obj, ath);
    createBulkLine(ath);
    prepareBulk(ath.id);
-   cleanObjects(ath, account_id);
+   cleanObjects(ath.id, account_id);
 
    if (curl && bulk_lines.size() >= limit_documents) { // we are in bulk time, ready to add data to elasticsearech
       prepare.clear();
@@ -270,7 +270,7 @@ bool elasticsearch_plugin_impl::add_elasticsearch( const account_id_type account
    return true;
 }
 
-const account_statistics_object& elasticsearch_plugin_impl::getStatsObject(const account_id_type account_id)
+const account_statistics_object& elasticsearch_plugin_impl::getStatsObject(const account_id_type& account_id)
 {
    graphene::chain::database& db = database();
    const auto &stats_obj = db.get_account_stats_by_owner(account_id);
@@ -279,7 +279,7 @@ const account_statistics_object& elasticsearch_plugin_impl::getStatsObject(const
 }
 
 const account_transaction_history_object& elasticsearch_plugin_impl::addNewEntry(const account_statistics_object& stats_obj,
-                                                                                 const account_id_type account_id,
+                                                                                 const account_id_type& account_id,
                                                                                  const optional <operation_history_object>& oho)
 {
    graphene::chain::database& db = database();
@@ -327,14 +327,14 @@ void elasticsearch_plugin_impl::prepareBulk(const account_transaction_history_id
    prepare.clear();
 }
 
-void elasticsearch_plugin_impl::cleanObjects(const account_transaction_history_object& ath, account_id_type account_id)
+void elasticsearch_plugin_impl::cleanObjects(const account_transaction_history_id_type& ath_id, const account_id_type& account_id)
 {
    graphene::chain::database& db = database();
    // remove everything except current object from ath
    const auto &his_idx = db.get_index_type<account_transaction_history_index>();
    const auto &by_seq_idx = his_idx.indices().get<by_seq>();
    auto itr = by_seq_idx.lower_bound(boost::make_tuple(account_id, 0));
-   if (itr != by_seq_idx.end() && itr->account == account_id && itr->id != ath.id) {
+   if (itr != by_seq_idx.end() && itr->account == account_id && itr->id != ath_id) {
       // if found, remove the entry
       const auto remove_op_id = itr->operation_id;
       const auto itr_remove = itr;
