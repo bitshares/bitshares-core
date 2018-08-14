@@ -173,7 +173,7 @@ bool elasticsearch_plugin_impl::update_account_histories( const signed_block& b 
       if(es.bulk_lines.size() > 0)
       {
          prepare.clear();
-         if(!graphene::utilities::SendBulk(es))
+         if(!graphene::utilities::SendBulk(std::move(es)))
             return false;
          else
             bulk_lines.clear();
@@ -261,7 +261,7 @@ bool elasticsearch_plugin_impl::add_elasticsearch( const account_id_type account
    if (curl && bulk_lines.size() >= limit_documents) { // we are in bulk time, ready to add data to elasticsearech
       prepare.clear();
       populateESstruct();
-      if(!graphene::utilities::SendBulk(es))
+      if(!graphene::utilities::SendBulk(std::move(es)))
          return false;
       else
          bulk_lines.clear();
@@ -359,7 +359,7 @@ void elasticsearch_plugin_impl::cleanObjects(const account_transaction_history_o
 void elasticsearch_plugin_impl::populateESstruct()
 {
    es.curl = curl;
-   es.bulk_lines = bulk_lines;
+   es.bulk_lines = std::move(bulk_lines);
    es.elasticsearch_url = _elasticsearch_node_url;
    es.auth = _elasticsearch_basic_auth;
 }

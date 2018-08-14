@@ -140,7 +140,7 @@ bool es_objects_plugin_impl::updateDatabase( const vector<object_id_type>& ids ,
       es.elasticsearch_url = _es_objects_elasticsearch_url;
       es.auth = _es_objects_auth;
 
-      if(!graphene::utilities::SendBulk(es))
+      if(!graphene::utilities::SendBulk(std::move(es)))
          return false;
       else
          bulk.clear();
