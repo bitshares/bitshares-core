@@ -73,7 +73,7 @@ class elasticsearch_plugin_impl
       std::string index_name;
       bool is_sync = false;
    private:
-      bool add_elasticsearch( const account_id_type account_id, const optional<operation_history_object>& oho, const signed_block& b );
+      bool add_elasticsearch( const account_id_type account_id, const optional<operation_history_object>& oho );
       const account_transaction_history_object& addNewEntry(const account_statistics_object& stats_obj,
                                                             const account_id_type account_id,
                                                             const optional <operation_history_object>& oho);
@@ -162,7 +162,7 @@ bool elasticsearch_plugin_impl::update_account_histories( const signed_block& b 
 
       for( auto& account_id : impacted )
       {
-         if(!add_elasticsearch( account_id, oho, b ))
+         if(!add_elasticsearch( account_id, oho ))
             return false;
       }
    }
@@ -249,8 +249,7 @@ void elasticsearch_plugin_impl::doVisitor(const optional <operation_history_obje
 }
 
 bool elasticsearch_plugin_impl::add_elasticsearch( const account_id_type account_id,
-                                                   const optional <operation_history_object>& oho,
-                                                   const signed_block& b)
+                                                   const optional <operation_history_object>& oho)
 {
    const auto &stats_obj = getStatsObject(account_id);
    const auto &ath = addNewEntry(stats_obj, account_id, oho);
