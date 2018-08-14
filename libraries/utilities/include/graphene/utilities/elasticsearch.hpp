@@ -58,7 +58,7 @@ namespace graphene { namespace utilities {
    bool checkES(ES& es);
    const std::string simpleQuery(ES& es);
    bool deleteAll(ES& es);
-   bool handleBulkResponse(long http_code, const std::string& CurlReadBuffer);
+   bool handleBulkResponse(long http_code);
    const std::string getEndPoint(ES& es);
    const std::string generateIndexName(const fc::time_point_sec& block_date, const std::string& _elasticsearch_index_prefix);
    const std::string doCurl(CurlRequest&& curl);
