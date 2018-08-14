@@ -32,11 +32,14 @@
 #include <graphene/db/simple_index.hpp>
 
 #include <fc/crypto/digest.hpp>
+
 #include "../common/database_fixture.hpp"
+#include <cstdlib>
+#include <iostream>
 
 using namespace graphene::chain;
 
-//BOOST_FIXTURE_TEST_SUITE( performance_tests, database_fixture )
+BOOST_FIXTURE_TEST_SUITE( performance_tests, database_fixture )
 
 BOOST_AUTO_TEST_CASE( sigcheck_benchmark )
 {
@@ -44,35 +47,42 @@ BOOST_AUTO_TEST_CASE( sigcheck_benchmark )
    auto digest = fc::sha256::hash("hello");
    auto sig = nathan_key.sign_compact( digest );
    auto start = fc::time_point::now();
-   for( uint32_t i = 0; i < 100000; ++i )
-      auto pub = fc::ecc::public_key( sig, digest );
+   const uint32_t cycles = 100000;
+   for( uint32_t i = 0; i < cycles; ++i )
+      fc::ecc::public_key( sig, digest );
    auto end = fc::time_point::now();
    auto elapsed = end-start;
-   wdump( ((100000.0*1000000.0) / elapsed.count()) );
+   wlog( "Benchmark: verify ${sps} signatures/s", ("sps",(cycles*1000000.0)/elapsed.count()) );
 }
-/*
+
 BOOST_AUTO_TEST_CASE( transfer_benchmark )
 {
-   fc::ecc::private_key nathan_key = fc::ecc::private_key::generate();
-   const key_object& key = register_key(nathan_key.get_public_key());
+   const fc::ecc::private_key nathan_key = fc::ecc::private_key::generate();
+   const fc::ecc::public_key  nathan_pub = nathan_key.get_public_key();;
    const auto& committee_account = account_id_type()(db);
+   const uint32_t cycles = 100000;
+   std::vector<const account_object*> accounts;
+   accounts.reserve( cycles );
    auto start = fc::time_point::now();
-   for( uint32_t i = 0; i < 1000*1000; ++i )
+   for( uint32_t i = 0; i < cycles; ++i )
    {
-      const auto& a = create_account("a"+fc::to_string(i), key.id);
-      transfer( committee_account, a, asset(1000) );
+      const auto& a = create_account("a"+fc::to_string(i), nathan_pub);
+      accounts[i] = &a;
    }
    auto end = fc::time_point::now();
    auto elapsed = end - start;
-   wdump( (elapsed) );
+   wlog( "Create ${aps} accounts/s", ("aps",(cycles*1000000.0)/elapsed.count()) );
+
+   start = fc::time_point::now();
+   for( uint32_t i = 0; i < cycles; ++i )
+      transfer( committee_account, *(accounts[i]), asset(1000) );
+   end = fc::time_point::now();
+   elapsed = end - start;
+   wlog( "${aps} transfers/s", ("aps",(cycles*1000000.0)/elapsed.count()) );
 }
-*/
 
-//BOOST_AUTO_TEST_SUITE_END()
+BOOST_AUTO_TEST_SUITE_END()
 
-//#define BOOST_TEST_MODULE "C++ Unit Tests for Graphene Blockchain Database"
-#include <cstdlib>
-#include <iostream>
 #include <boost/test/included/unit_test.hpp>
 
 boost::unit_test::test_suite* init_unit_test_suite(int argc, char* argv[]) {
