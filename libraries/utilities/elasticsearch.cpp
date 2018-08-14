@@ -61,7 +61,7 @@ const std::string simpleQuery(ES& es)
    return doCurl(std::move(curl_request));
 }
 
-bool SendBulk(ES& es)
+bool SendBulk(ES&& es)
 {
    std::string bulking = joinBulkLines(std::move(es.bulk_lines));
 
