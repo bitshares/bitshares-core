@@ -279,18 +279,19 @@ void verify_authority( const vector<operation>& ops, const flat_set<public_key_t
    }
 
    // fetch all of the top level authorities
-   for( auto id : required_active )
-   {
-      GRAPHENE_ASSERT( s.check_authority(id) || 
-                       s.check_authority(get_owner(id)), 
-                       tx_missing_active_auth, "Missing Active Authority ${id}", ("id",id)("auth",*get_active(id))("owner",*get_owner(id)) );
-   }
-
    for( auto id : required_owner )
    {
       GRAPHENE_ASSERT( owner_approvals.find(id) != owner_approvals.end() ||
-                       s.check_authority(get_owner(id)), 
+                       s.check_authority(get_owner(id)),
                        tx_missing_owner_auth, "Missing Owner Authority ${id}", ("id",id)("auth",*get_owner(id)) );
+   }
+
+   for( auto id : required_active )
+   {
+      GRAPHENE_ASSERT( s.check_authority(id) ||
+                       s.check_authority(get_owner(id)),
+                       tx_missing_active_auth, "Missing Active Authority ${id}",
+                       ("id",id)("auth",*get_active(id))("owner",*get_owner(id)) );
    }
 
    GRAPHENE_ASSERT(
