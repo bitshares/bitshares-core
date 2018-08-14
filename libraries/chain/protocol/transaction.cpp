@@ -249,6 +249,7 @@ struct sign_state
 void verify_authority( const vector<operation>& ops, const flat_set<public_key_type>& sigs,
                        const std::function<const authority*(account_id_type)>& get_active,
                        const std::function<const authority*(account_id_type)>& get_owner,
+                       bool allow_non_immediate_owner,
                        uint32_t max_recursion_depth,
                        bool  allow_committe,
                        const flat_set<account_id_type>& active_aprovals,
@@ -265,6 +266,7 @@ void verify_authority( const vector<operation>& ops, const flat_set<public_key_t
       GRAPHENE_ASSERT( required_active.find(GRAPHENE_COMMITTEE_ACCOUNT) == required_active.end(),
                        invalid_committee_approval, "Committee account may only propose transactions" );
 
+   // TODO allow_non_immediate_owner
    sign_state s(sigs,get_active);
    s.max_recursion = max_recursion_depth;
    for( auto& id : active_aprovals )
@@ -322,6 +324,7 @@ set<public_key_type> signed_transaction::get_required_signatures(
    const flat_set<public_key_type>& available_keys,
    const std::function<const authority*(account_id_type)>& get_active,
    const std::function<const authority*(account_id_type)>& get_owner,
+   bool allow_non_immediate_owner,
    uint32_t max_recursion_depth )const
 {
    flat_set<account_id_type> required_active;
@@ -357,6 +360,7 @@ set<public_key_type> signed_transaction::minimize_required_signatures(
    const flat_set<public_key_type>& available_keys,
    const std::function<const authority*(account_id_type)>& get_active,
    const std::function<const authority*(account_id_type)>& get_owner,
+   bool allow_non_immediate_owner,
    uint32_t max_recursion
    ) const
 {
@@ -368,7 +372,7 @@ set<public_key_type> signed_transaction::minimize_required_signatures(
       result.erase( k );
       try
       {
-         graphene::chain::verify_authority( operations, result, get_active, get_owner, max_recursion );
+         graphene::chain::verify_authority( operations, result, get_active, get_owner, allow_non_immediate_owner, max_recursion );
          continue;  // element stays erased if verify_authority is ok
       }
       catch( const tx_missing_owner_auth& e ) {}
@@ -406,9 +410,15 @@ void signed_transaction::verify_authority(
    const chain_id_type& chain_id,
    const std::function<const authority*(account_id_type)>& get_active,
    const std::function<const authority*(account_id_type)>& get_owner,
+   bool allow_non_immediate_owner,
    uint32_t max_recursion )const
 { try {
-   graphene::chain::verify_authority( operations, get_signature_keys( chain_id ), get_active, get_owner, max_recursion );
+   graphene::chain::verify_authority( operations,
+                                      get_signature_keys( chain_id ),
+                                      get_active,
+                                      get_owner,
+                                      allow_non_immediate_owner,
+                                      max_recursion );
 } FC_CAPTURE_AND_RETHROW( (*this) ) }
 
 } } // graphene::chain

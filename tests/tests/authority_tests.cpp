@@ -1192,7 +1192,9 @@ BOOST_FIXTURE_TEST_CASE( get_required_signatures_test, database_fixture )
          ) -> bool
       {
          //wdump( (tx)(available_keys) );
-         set<public_key_type> result_set = tx.get_required_signatures( db.get_chain_id(), available_keys, get_active, get_owner );
+         // TODO add test case for post hard fork
+         set<public_key_type> result_set = tx.get_required_signatures( db.get_chain_id(), available_keys,
+                                                                       get_active, get_owner, false );
          //wdump( (result_set)(ref_set) );
          return result_set == ref_set;
       } ;
@@ -1306,7 +1308,9 @@ BOOST_FIXTURE_TEST_CASE( nonminimal_sig_test, database_fixture )
          ) -> bool
       {
          //wdump( (tx)(available_keys) );
-         set<public_key_type> result_set = tx.get_required_signatures( db.get_chain_id(), available_keys, get_active, get_owner );
+         // TODO add test case for post hard fork
+         set<public_key_type> result_set = tx.get_required_signatures( db.get_chain_id(), available_keys,
+                                                                       get_active, get_owner, false );
          //wdump( (result_set)(ref_set) );
          return result_set == ref_set;
       } ;
@@ -1318,7 +1322,9 @@ BOOST_FIXTURE_TEST_CASE( nonminimal_sig_test, database_fixture )
          ) -> bool
       {
          //wdump( (tx)(available_keys) );
-         set<public_key_type> result_set = tx.minimize_required_signatures( db.get_chain_id(), available_keys, get_active, get_owner );
+         // TODO add test case for post hard fork
+         set<public_key_type> result_set = tx.minimize_required_signatures( db.get_chain_id(), available_keys,
+                                                                            get_active, get_owner, false );
          //wdump( (result_set)(ref_set) );
          return result_set == ref_set;
       } ;
@@ -1337,9 +1343,10 @@ BOOST_FIXTURE_TEST_CASE( nonminimal_sig_test, database_fixture )
       BOOST_CHECK( chk( tx, { alice_public_key, bob_public_key }, { alice_public_key, bob_public_key } ) );
       BOOST_CHECK( chk_min( tx, { alice_public_key, bob_public_key }, { alice_public_key } ) );
 
-      GRAPHENE_REQUIRE_THROW( tx.verify_authority( db.get_chain_id(), get_active, get_owner ), fc::exception );
+      // TODO add test case for post hard fork
+      GRAPHENE_REQUIRE_THROW( tx.verify_authority( db.get_chain_id(), get_active, get_owner, false ), fc::exception );
       sign( tx, alice_private_key );
-      tx.verify_authority( db.get_chain_id(), get_active, get_owner );
+      tx.verify_authority( db.get_chain_id(), get_active, get_owner, false );
    }
    catch(fc::exception& e)
    {
@@ -1401,7 +1408,9 @@ BOOST_FIXTURE_TEST_CASE( parent_owner_test, database_fixture )
          ) -> bool
       {
          //wdump( (tx)(available_keys) );
-         set<public_key_type> result_set = tx.get_required_signatures( db.get_chain_id(), available_keys, get_active, get_owner );
+         // TODO add test case for post hard fork
+         set<public_key_type> result_set = tx.get_required_signatures( db.get_chain_id(), available_keys,
+                                                                       get_active, get_owner, false );
          //wdump( (result_set)(ref_set) );
          return result_set == ref_set;
       } ;
@@ -1424,11 +1433,12 @@ BOOST_FIXTURE_TEST_CASE( parent_owner_test, database_fixture )
       BOOST_CHECK( chk( tx, { alice_owner_pub }, { } ) );
       BOOST_CHECK( chk( tx, { alice_active_pub, alice_owner_pub }, { alice_active_pub } ) );
       sign( tx, alice_owner_key );
-      GRAPHENE_REQUIRE_THROW( tx.verify_authority( db.get_chain_id(), get_active, get_owner ), fc::exception );
+      // TODO add test case for post hard fork
+      GRAPHENE_REQUIRE_THROW( tx.verify_authority( db.get_chain_id(), get_active, get_owner, false ), fc::exception );
 
       tx.clear_signatures();
       sign( tx, alice_active_key );
-      tx.verify_authority( db.get_chain_id(), get_active, get_owner );
+      tx.verify_authority( db.get_chain_id(), get_active, get_owner, false );
 
    }
    catch(fc::exception& e)
