@@ -138,7 +138,7 @@ bool deleteAll(ES& es)
    curl_request.auth = es.auth;
    curl_request.type = "DELETE";
 
-   auto curl_response =  doCurl(std::move(curl_request));
+   auto curl_response = doCurl(std::move(curl_request));
    if(curl_response.empty())
       return false;
    else
