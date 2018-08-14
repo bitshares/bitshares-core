@@ -81,7 +81,7 @@ class elasticsearch_plugin_impl
       void growStats(const account_statistics_object& stats_obj, const account_transaction_history_object& ath);
       void getOperationType(const optional <operation_history_object>& oho);
       void doOperationHistory(const optional <operation_history_object>& oho);
-      void doBlock(const optional <operation_history_object>& oho, const signed_block& b);
+      void doBlock(uint32_t trx_in_block, const signed_block& b);
       void doVisitor(const optional <operation_history_object>& oho);
       void checkState(const fc::time_point_sec& block_time);
       void cleanObjects(const account_transaction_history_object& ath, account_id_type account_id);
@@ -140,7 +140,7 @@ bool elasticsearch_plugin_impl::update_account_histories( const signed_block& b 
       // populate what we can before impacted loop
       getOperationType(oho);
       doOperationHistory(oho);
-      doBlock(oho, b);
+      doBlock(oho->trx_in_block, b);
       if(_elasticsearch_visitor)
          doVisitor(oho);
 
@@ -215,11 +215,11 @@ void elasticsearch_plugin_impl::doOperationHistory(const optional <operation_his
    os.op = fc::json::to_string(oho->op);
 }
 
-void elasticsearch_plugin_impl::doBlock(const optional <operation_history_object>& oho, const signed_block& b)
+void elasticsearch_plugin_impl::doBlock(uint32_t trx_in_block, const signed_block& b)
 {
    std::string trx_id = "";
-   if(oho->trx_in_block < b.transactions.size())
-      trx_id = b.transactions[oho->trx_in_block].id().str();
+   if(trx_in_block < b.transactions.size())
+      trx_id = b.transactions[trx_in_block].id().str();
    bs.block_num = b.block_num();
    bs.block_time = b.timestamp;
    bs.trx_id = trx_id;
