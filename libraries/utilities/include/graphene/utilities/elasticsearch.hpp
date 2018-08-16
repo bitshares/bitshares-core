@@ -54,7 +54,7 @@ namespace graphene { namespace utilities {
    };
 
    bool SendBulk(ES&& es);
-   const std::vector<std::string> createBulk(const fc::mutable_variant_object& bulk_header, const std::string&& data);
+   const std::vector<std::string> createBulk(const fc::mutable_variant_object& bulk_header, std::string&& data);
    bool checkES(ES& es);
    const std::string simpleQuery(ES& es);
    bool deleteAll(ES& es);
