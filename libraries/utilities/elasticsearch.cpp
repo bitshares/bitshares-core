@@ -74,7 +74,7 @@ bool SendBulk(ES&& es)
 
    auto curlResponse = doCurl(curl_request);
 
-   if(handleBulkResponse(getResponseCode(curl_request.handler)))
+   if(handleBulkResponse(getResponseCode(curl_request.handler), curlResponse))
       return true;
    return false;
 }
@@ -93,16 +93,15 @@ long getResponseCode(CURL *handler)
    return http_code;
 }
 
-bool handleBulkResponse(long http_code)
+bool handleBulkResponse(long http_code, const std::string& CurlReadBuffer)
 {
    if(http_code == 200) {
       // all good, but check errors in response
-      // removed this for performance
-      //fc::variant j = fc::json::from_string(CurlReadBuffer);
-      //bool errors = j["errors"].as_bool();
-      //if(errors == true) {
-      //   return false;
-      //}
+      fc::variant j = fc::json::from_string(CurlReadBuffer);
+      bool errors = j["errors"].as_bool();
+      if(errors == true) {
+         return false;
+      }
    }
    else {
       if(http_code == 413) {
