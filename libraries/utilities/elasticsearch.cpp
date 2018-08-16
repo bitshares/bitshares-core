@@ -119,7 +119,7 @@ bool handleBulkResponse(long http_code)
    return true;
 }
 
-const std::vector<std::string> createBulk(const fc::mutable_variant_object& bulk_header, const std::string&& data)
+const std::vector<std::string> createBulk(const fc::mutable_variant_object& bulk_header, std::string&& data)
 {
    std::vector<std::string> bulk;
    fc::mutable_variant_object final_bulk_header;
