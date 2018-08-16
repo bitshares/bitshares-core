@@ -266,10 +266,26 @@ processed_transaction database::validate_transaction( const signed_transaction& 
    return _apply_transaction( trx );
 }
 
+class push_proposal_nesting_guard {
+public:
+   push_proposal_nesting_guard( uint32_t& nesting_counter, const database& db )
+      : orig_value(nesting_counter), counter(nesting_counter)
+   {
+      FC_ASSERT( counter < db.get_global_properties().active_witnesses.size() * 2, "Max proposal nesting depth exceeded!" );
+      counter++;
+   }
+   ~push_proposal_nesting_guard()
+   {
+      if( --counter != orig_value )
+         elog( "Unexpected proposal nesting count value: ${n} != ${o}", ("n",counter)("o",orig_value) );
+   }
+private:
+    const uint32_t  orig_value;
+    uint32_t& counter;
+};
+
 processed_transaction database::push_proposal(const proposal_object& proposal)
 { try {
-   FC_ASSERT( _undo_db.size() < _undo_db.max_size(), "Undo database is full!" );
-
    transaction_evaluation_state eval_state(this);
    eval_state._is_proposed_trx = true;
 
@@ -279,6 +295,9 @@ processed_transaction database::push_proposal(const proposal_object& proposal)
    size_t old_applied_ops_size = _applied_ops.size();
 
    try {
+      push_proposal_nesting_guard guard( _push_proposal_nesting_depth, *this );
+      if( _undo_db.size() >= _undo_db.max_size() )
+         _undo_db.set_max_size( _undo_db.size() + 1 );
       auto session = _undo_db.start_undo_session(true);
       for( auto& op : proposal.proposed_transaction.operations )
          eval_state.operation_results.emplace_back(apply_operation(eval_state, op));
@@ -571,19 +590,6 @@ processed_transaction database::apply_transaction(const signed_transaction& trx,
    return result;
 }
 
-class undo_size_restorer {
-   public:
-      undo_size_restorer( undo_database& db ) : _db( db ), old_max( db.max_size() ) {
-         _db.set_max_size( old_max * 2 );
-      }
-      ~undo_size_restorer() {
-         _db.set_max_size( old_max );
-      }
-   private:
-      undo_database& _db;
-      size_t         old_max;
-};
-
 processed_transaction database::_apply_transaction(const signed_transaction& trx)
 { try {
    uint32_t skip = get_node_properties().skip_flags;
@@ -637,7 +643,6 @@ processed_transaction database::_apply_transaction(const signed_transaction& trx
 
    eval_state.operation_results.reserve(trx.operations.size());
 
-   const undo_size_restorer undo_guard( _undo_db );
    //Finally process the operations
    processed_transaction ptrx(trx);
    _current_op_in_trx = 0;
