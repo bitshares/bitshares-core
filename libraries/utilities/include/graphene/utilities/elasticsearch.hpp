@@ -61,8 +61,8 @@ namespace graphene { namespace utilities {
    bool handleBulkResponse(long http_code);
    const std::string getEndPoint(ES& es);
    const std::string generateIndexName(const fc::time_point_sec& block_date, const std::string& _elasticsearch_index_prefix);
-   const std::string doCurl(CurlRequest&& curl);
-   const std::string joinBulkLines(const std::vector<std::string>&& bulk);
+   const std::string doCurl(CurlRequest& curl);
+   const std::string joinBulkLines(const std::vector<std::string>& bulk);
    long getResponseCode(CURL *handler);
 
 } } // end namespace graphene::utilities

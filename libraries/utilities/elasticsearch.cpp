@@ -44,7 +44,7 @@ bool checkES(ES& es)
    curl_request.auth = es.auth;
    curl_request.type = "GET";
 
-   if(doCurl(std::move(curl_request)).empty())
+   if(doCurl(curl_request).empty())
       return false;
    return true;
 
@@ -58,12 +58,12 @@ const std::string simpleQuery(ES& es)
    curl_request.type = "POST";
    curl_request.query = es.query;
 
-   return doCurl(std::move(curl_request));
+   return doCurl(curl_request);
 }
 
 bool SendBulk(ES&& es)
 {
-   std::string bulking = joinBulkLines(std::move(es.bulk_lines));
+   std::string bulking = joinBulkLines(es.bulk_lines);
 
    graphene::utilities::CurlRequest curl_request;
    curl_request.handler = es.curl;
@@ -72,14 +72,14 @@ bool SendBulk(ES&& es)
    curl_request.type = "POST";
    curl_request.query = std::move(bulking);
 
-   auto curlResponse = doCurl(std::move(curl_request));
+   auto curlResponse = doCurl(curl_request);
 
    if(handleBulkResponse(getResponseCode(curl_request.handler)))
       return true;
    return false;
 }
 
-const std::string joinBulkLines(const std::vector<std::string>&& bulk)
+const std::string joinBulkLines(const std::vector<std::string>& bulk)
 {
    auto bulking = boost::algorithm::join(bulk, "\n");
    bulking = bulking + "\n";
@@ -138,7 +138,7 @@ bool deleteAll(ES& es)
    curl_request.auth = es.auth;
    curl_request.type = "DELETE";
 
-   auto curl_response = doCurl(std::move(curl_request));
+   auto curl_response = doCurl(curl_request);
    if(curl_response.empty())
       return false;
    else
@@ -152,7 +152,7 @@ const std::string getEndPoint(ES& es)
    curl_request.auth = es.auth;
    curl_request.type = "GET";
 
-   return doCurl(std::move(curl_request));
+   return doCurl(curl_request);
 }
 
 const std::string generateIndexName(const fc::time_point_sec& block_date, const std::string& _elasticsearch_index_prefix)
@@ -164,7 +164,7 @@ const std::string generateIndexName(const fc::time_point_sec& block_date, const 
    return index_name;
 }
 
-const std::string doCurl(CurlRequest&& curl)
+const std::string doCurl(CurlRequest& curl)
 {
    std::string CurlReadBuffer;
    struct curl_slist *headers = NULL;
