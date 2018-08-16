@@ -362,6 +362,9 @@ void elasticsearch_plugin_impl::populateESstruct()
    es.bulk_lines = std::move(bulk_lines);
    es.elasticsearch_url = _elasticsearch_node_url;
    es.auth = _elasticsearch_basic_auth;
+   es.index_prefix = _elasticsearch_index_prefix;
+   es.endpoint = "";
+   es.query = "";
 }
 
 } // end namespace detail
