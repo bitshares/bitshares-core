@@ -2091,7 +2091,7 @@ public:
       account_object from_account = get_account(from);
       account_object to_account = get_account(to);
       account_id_type from_id = from_account.id;
-      account_id_type to_id = get_account_id(to);
+      account_id_type to_id = to_account.id;
 
       transfer_operation xfer_op;
 

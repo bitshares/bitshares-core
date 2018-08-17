@@ -57,7 +57,7 @@ void transaction::validate() const
 {
    FC_ASSERT( operations.size() > 0, "A transaction must have at least one operation", ("trx",*this) );
    for( const auto& op : operations )
-      operation_validate(op); 
+      operation_validate(op);
 }
 
 graphene::chain::transaction_id_type graphene::chain::transaction::id() const
@@ -108,8 +108,8 @@ const flat_set<public_key_type> empty_keyset;
 
 struct sign_state
 {
-      /** returns true if we have a signature for this key or can 
-       * produce a signature for this key, else returns false. 
+      /** returns true if we have a signature for this key or can
+       * produce a signature for this key, else returns false.
        */
       bool signed_by( const public_key_type& k )
       {
@@ -168,7 +168,7 @@ struct sign_state
 
       /**
        *  Checks to see if we have signatures of the active authorites of
-       *  the accounts specified in authority or the keys specified. 
+       *  the accounts specified in authority or the keys specified.
        */
       bool check_authority( const authority* au, uint32_t depth = 0 )
       {
@@ -247,7 +247,7 @@ struct sign_state
 };
 
 
-void verify_authority( const vector<operation>& ops, const flat_set<public_key_type>& sigs, 
+void verify_authority( const vector<operation>& ops, const flat_set<public_key_type>& sigs,
                        const std::function<const authority*(account_id_type)>& get_active,
                        const std::function<const authority*(account_id_type)>& get_owner,
                        uint32_t max_recursion_depth,
@@ -279,18 +279,19 @@ void verify_authority( const vector<operation>& ops, const flat_set<public_key_t
    }
 
    // fetch all of the top level authorities
-   for( auto id : required_active )
-   {
-      GRAPHENE_ASSERT( s.check_authority(id) || 
-                       s.check_authority(get_owner(id)), 
-                       tx_missing_active_auth, "Missing Active Authority ${id}", ("id",id)("auth",*get_active(id))("owner",*get_owner(id)) );
-   }
-
    for( auto id : required_owner )
    {
       GRAPHENE_ASSERT( owner_approvals.find(id) != owner_approvals.end() ||
-                       s.check_authority(get_owner(id)), 
+                       s.check_authority(get_owner(id)),
                        tx_missing_owner_auth, "Missing Owner Authority ${id}", ("id",id)("auth",*get_owner(id)) );
+   }
+
+   for( auto id : required_active )
+   {
+      GRAPHENE_ASSERT( s.check_authority(id) ||
+                       s.check_authority(get_owner(id)),
+                       tx_missing_active_auth, "Missing Active Authority ${id}",
+                       ("id",id)("auth",*get_active(id))("owner",*get_owner(id)) );
    }
 
    GRAPHENE_ASSERT(

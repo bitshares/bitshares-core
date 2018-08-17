@@ -357,7 +357,10 @@ signed_block database::_generate_block(
    if( !(skip & skip_witness_signature) )
       FC_ASSERT( witness_obj.signing_key == block_signing_private_key.get_public_key() );
 
-   static const size_t max_block_header_size = fc::raw::pack_size( signed_block_header() ) + 4;
+   static const size_t max_partial_block_header_size = fc::raw::pack_size( signed_block_header() )
+                                                       - fc::raw::pack_size( witness_id_type() ) // witness_id
+                                                       + 4; // space to store size of transactions
+   const size_t max_block_header_size = max_partial_block_header_size + fc::raw::pack_size( witness_id );
    auto maximum_block_size = get_global_properties().parameters.maximum_block_size;
    size_t total_block_size = max_block_header_size;
 
@@ -394,12 +397,21 @@ signed_block database::_generate_block(
       {
          auto temp_session = _undo_db.start_undo_session();
          processed_transaction ptx = _apply_transaction( tx );
-         temp_session.merge();
 
          // We have to recompute pack_size(ptx) because it may be different
          // than pack_size(tx) (i.e. if one or more results increased
          // their size)
-         total_block_size += fc::raw::pack_size( ptx );
+         new_total_size = total_block_size + fc::raw::pack_size( ptx );
+         // postpone transaction if it would make block too big
+         if( new_total_size >= maximum_block_size )
+         {
+            postponed_tx_count++;
+            continue;
+         }
+
+         temp_session.merge();
+
+         total_block_size = new_total_size;
          pending_block.transactions.push_back( ptx );
       }
       catch ( const fc::exception& e )
