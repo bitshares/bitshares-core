@@ -939,7 +939,6 @@ BOOST_FIXTURE_TEST_CASE( max_authority_membership, database_fixture )
       });
 
       transaction tx;
-      processed_transaction ptx;
 
       private_key_type committee_key = init_account_priv_key;
       // Sam is the creator of accounts
@@ -1447,6 +1446,59 @@ BOOST_FIXTURE_TEST_CASE( parent_owner_test, database_fixture )
       throw;
    }
 }
+
+BOOST_AUTO_TEST_CASE( nested_execution )
+{ try {
+   ACTORS( (alice)(bob) );
+   fund( alice );
+
+   generate_blocks( HARDFORK_CORE_214_TIME + fc::hours(1) );
+   set_expiration( db, trx );
+
+   const auto& gpo = db.get_global_properties();
+
+   proposal_create_operation pco;
+   pco.expiration_time = db.head_block_time() + fc::minutes(1);
+   pco.fee_paying_account = alice_id;
+   proposal_id_type inner;
+   {
+      transfer_operation top;
+      top.from = alice_id;
+      top.to = bob_id;
+      top.amount = asset( 10 );
+      pco.proposed_ops.emplace_back( top );
+      trx.operations.push_back( pco );
+      inner = PUSH_TX( db, trx, ~0 ).operation_results.front().get<object_id_type>();
+      trx.clear();
+      pco.proposed_ops.clear();
+   }
+
+   std::vector<proposal_id_type> nested;
+   nested.push_back( inner );
+   for( size_t i = 0; i < gpo.active_witnesses.size() * 2; i++ )
+   {
+      proposal_update_operation pup;
+      pup.fee_paying_account = alice_id;
+      pup.proposal = nested.back();
+      pup.active_approvals_to_add.insert( alice_id );
+      pco.proposed_ops.emplace_back( pup );
+      trx.operations.push_back( pco );
+      nested.push_back( PUSH_TX( db, trx, ~0 ).operation_results.front().get<object_id_type>() );
+      trx.clear();
+      pco.proposed_ops.clear();
+   }
+
+   proposal_update_operation pup;
+   pup.fee_paying_account = alice_id;
+   pup.proposal = nested.back();
+   pup.active_approvals_to_add.insert( alice_id );
+   trx.operations.push_back( pup );
+   PUSH_TX( db, trx, ~0 );
+
+   for( size_t i = 1; i < nested.size(); i++ )
+      BOOST_CHECK_THROW( db.get<proposal_object>( nested[i] ), fc::assert_exception ); // executed successfully -> object removed
+   db.get<proposal_object>( inner ); // wasn't executed -> object exists, doesn't throw
+} FC_LOG_AND_RETHROW() }
 
 BOOST_AUTO_TEST_CASE( issue_214 )
 { try {

@@ -61,7 +61,7 @@ const std::string simpleQuery(ES& es)
    return doCurl(curl_request);
 }
 
-bool SendBulk(ES& es)
+bool SendBulk(ES&& es)
 {
    std::string bulking = joinBulkLines(es.bulk_lines);
 
@@ -70,7 +70,7 @@ bool SendBulk(ES& es)
    curl_request.url = es.elasticsearch_url + "_bulk";
    curl_request.auth = es.auth;
    curl_request.type = "POST";
-   curl_request.query = bulking;
+   curl_request.query = std::move(bulking);
 
    auto curlResponse = doCurl(curl_request);
 
@@ -118,7 +118,7 @@ bool handleBulkResponse(long http_code, const std::string& CurlReadBuffer)
    return true;
 }
 
-const std::vector<std::string> createBulk(const fc::mutable_variant_object& bulk_header, const std::string& data)
+const std::vector<std::string> createBulk(const fc::mutable_variant_object& bulk_header, std::string&& data)
 {
    std::vector<std::string> bulk;
    fc::mutable_variant_object final_bulk_header;
@@ -137,7 +137,7 @@ bool deleteAll(ES& es)
    curl_request.auth = es.auth;
    curl_request.type = "DELETE";
 
-   auto curl_response =  doCurl(curl_request);
+   auto curl_response = doCurl(curl_request);
    if(curl_response.empty())
       return false;
    else
