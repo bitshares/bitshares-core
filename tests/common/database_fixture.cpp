@@ -198,7 +198,6 @@ database_fixture::~database_fixture()
    if( !std::uncaught_exception() )
    {
       verify_asset_supplies(db);
-      verify_account_history_plugin_index();
       BOOST_CHECK( db.get_node_properties().skip_flags == database::skip_nothing );
    }
    return;
@@ -291,90 +290,6 @@ void database_fixture::verify_asset_supplies( const database& db )
 
    BOOST_CHECK_EQUAL( core_in_orders.value , reported_core_in_orders.value );
 //   wlog("***  End  asset supply verification ***");
-}
-
-void database_fixture::verify_account_history_plugin_index( )const
-{
-   return;
-   if( skip_key_index_test )
-      return;
-
-   const std::shared_ptr<graphene::account_history::account_history_plugin> pin =
-      app.get_plugin<graphene::account_history::account_history_plugin>("account_history");
-   if( pin->tracked_accounts().size() == 0 )
-   {
-      /*
-      vector< pair< account_id_type, address > > tuples_from_db;
-      const auto& primary_account_idx = db.get_index_type<account_index>().indices().get<by_id>();
-      flat_set< public_key_type > acct_addresses;
-      acct_addresses.reserve( 2 * GRAPHENE_DEFAULT_MAX_AUTHORITY_MEMBERSHIP + 2 );
-
-      for( const account_object& acct : primary_account_idx )
-      {
-         account_id_type account_id = acct.id;
-         acct_addresses.clear();
-         for( const pair< account_id_type, weight_type >& auth : acct.owner.account_auths )
-         {
-            if( auth.first.type() == key_object_type )
-               acct_addresses.insert(  auth.first );
-         }
-         for( const pair< object_id_type, weight_type >& auth : acct.active.auths )
-         {
-            if( auth.first.type() == key_object_type )
-               acct_addresses.insert( auth.first );
-         }
-         acct_addresses.insert( acct.options.get_memo_key()(db).key_address() );
-         for( const address& addr : acct_addresses )
-            tuples_from_db.emplace_back( account_id, addr );
-      }
-
-      vector< pair< account_id_type, address > > tuples_from_index;
-      tuples_from_index.reserve( tuples_from_db.size() );
-      const auto& key_account_idx =
-         db.get_index_type<graphene::account_history::key_account_index>()
-         .indices().get<graphene::account_history::by_key>();
-
-      for( const graphene::account_history::key_account_object& key_account : key_account_idx )
-      {
-         address addr = key_account.key;
-         for( const account_id_type& account_id : key_account.account_ids )
-            tuples_from_index.emplace_back( account_id, addr );
-      }
-
-      // TODO:  use function for common functionality
-      {
-         // due to hashed index, account_id's may not be in sorted order...
-         std::sort( tuples_from_db.begin(), tuples_from_db.end() );
-         size_t size_before_uniq = tuples_from_db.size();
-         auto last = std::unique( tuples_from_db.begin(), tuples_from_db.end() );
-         tuples_from_db.erase( last, tuples_from_db.end() );
-         // but they should be unique (multiple instances of the same
-         //  address within an account should have been de-duplicated
-         //  by the flat_set above)
-         BOOST_CHECK( tuples_from_db.size() == size_before_uniq );
-      }
-
-      {
-         // (address, account) should be de-duplicated by flat_set<>
-         // in key_account_object
-         std::sort( tuples_from_index.begin(), tuples_from_index.end() );
-         auto last = std::unique( tuples_from_index.begin(), tuples_from_index.end() );
-         size_t size_before_uniq = tuples_from_db.size();
-         tuples_from_index.erase( last, tuples_from_index.end() );
-         BOOST_CHECK( tuples_from_index.size() == size_before_uniq );
-      }
-
-      //BOOST_CHECK_EQUAL( tuples_from_db, tuples_from_index );
-      bool is_equal = true;
-      is_equal &= (tuples_from_db.size() == tuples_from_index.size());
-      for( size_t i=0,n=tuples_from_db.size(); i<n; i++ )
-         is_equal &= (tuples_from_db[i] == tuples_from_index[i] );
-
-      bool account_history_plugin_index_ok = is_equal;
-      BOOST_CHECK( account_history_plugin_index_ok );
-         */
-   }
-   return;
 }
 
 void database_fixture::open_database()

@@ -1534,15 +1534,11 @@ BOOST_FIXTURE_TEST_CASE( update_account_keys, database_fixture )
                            database::skip_transaction_signatures );
                      }
                   }
-                  verify_account_history_plugin_index();
                   generate_block( skip_flags );
 
-                  verify_account_history_plugin_index();
                   db.pop_block();
-                  verify_account_history_plugin_index();
                }
                db.pop_block();
-               verify_account_history_plugin_index();
             }
          }
       }
