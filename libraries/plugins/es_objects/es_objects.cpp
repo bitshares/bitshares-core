@@ -140,7 +140,7 @@ bool es_objects_plugin_impl::updateDatabase( const vector<object_id_type>& ids ,
       es.elasticsearch_url = _es_objects_elasticsearch_url;
       es.auth = _es_objects_auth;
 
-      if(!graphene::utilities::SendBulk(es))
+      if(!graphene::utilities::SendBulk(std::move(es)))
          return false;
       else
          bulk.clear();
@@ -179,7 +179,7 @@ void es_objects_plugin_impl::PrepareProposal(const proposal_object& proposal_obj
    bulk_header["_index"] = _es_objects_index_prefix + "proposal";
    bulk_header["_type"] = "data";
 
-   prepare = graphene::utilities::createBulk(bulk_header, data);
+   prepare = graphene::utilities::createBulk(bulk_header, std::move(data));
    bulk.insert(bulk.end(), prepare.begin(), prepare.end());
    prepare.clear();
 }
@@ -221,7 +221,7 @@ void es_objects_plugin_impl::PrepareAccount(const account_object& account_object
    bulk_header["_index"] = _es_objects_index_prefix + "acount";
    bulk_header["_type"] = "data";
 
-   prepare = graphene::utilities::createBulk(bulk_header, data);
+   prepare = graphene::utilities::createBulk(bulk_header, std::move(data));
    bulk.insert(bulk.end(), prepare.begin(), prepare.end());
    prepare.clear();
 }
@@ -253,7 +253,7 @@ void es_objects_plugin_impl::PrepareAsset(const asset_object& asset_object,
    bulk_header["_index"] = _es_objects_index_prefix + "asset";
    bulk_header["_type"] = "data";
 
-   prepare = graphene::utilities::createBulk(bulk_header, data);
+   prepare = graphene::utilities::createBulk(bulk_header, std::move(data));
    bulk.insert(bulk.end(), prepare.begin(), prepare.end());
    prepare.clear();
 }
@@ -282,7 +282,7 @@ void es_objects_plugin_impl::PrepareBalance(const balance_object& balance_object
    bulk_header["_index"] = _es_objects_index_prefix + "balance";
    bulk_header["_type"] = "data";
 
-   prepare = graphene::utilities::createBulk(bulk_header, data);
+   prepare = graphene::utilities::createBulk(bulk_header, std::move(data));
    bulk.insert(bulk.end(), prepare.begin(), prepare.end());
    prepare.clear();
 }
@@ -314,7 +314,7 @@ void es_objects_plugin_impl::PrepareLimit(const limit_order_object& limit_object
    bulk_header["_index"] = _es_objects_index_prefix + "limitorder";
    bulk_header["_type"] = "data";
 
-   prepare = graphene::utilities::createBulk(bulk_header, data);
+   prepare = graphene::utilities::createBulk(bulk_header, std::move(data));
    bulk.insert(bulk.end(), prepare.begin(), prepare.end());
    prepare.clear();
 }
@@ -345,7 +345,7 @@ void es_objects_plugin_impl::PrepareBitAsset(const asset_bitasset_data_object& b
       bulk_header["_index"] = _es_objects_index_prefix + "bitasset";
       bulk_header["_type"] = "data";
 
-      prepare = graphene::utilities::createBulk(bulk_header, data);
+      prepare = graphene::utilities::createBulk(bulk_header, std::move(data));
       bulk.insert(bulk.end(), prepare.begin(), prepare.end());
       prepare.clear();
    }

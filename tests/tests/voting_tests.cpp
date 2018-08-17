@@ -393,4 +393,26 @@ BOOST_AUTO_TEST_CASE(track_votes_committee_disabled)
    } FC_LOG_AND_RETHROW()
 }
 
+BOOST_AUTO_TEST_CASE(invalid_voting_account)
+{
+   try
+   {
+      ACTORS((alice));
+
+      account_id_type invalid_account_id( (uint64_t)999999 );
+
+      BOOST_CHECK( !db.find( invalid_account_id ) );
+
+      graphene::chain::account_update_operation op;
+      op.account = alice_id;
+      op.new_options = alice.options;
+      op.new_options->voting_account = invalid_account_id;
+      trx.operations.push_back(op);
+      sign(trx, alice_private_key);
+
+      GRAPHENE_REQUIRE_THROW( PUSH_TX( db, trx, ~0 ), fc::exception );
+
+   } FC_LOG_AND_RETHROW()
+}
+
 BOOST_AUTO_TEST_SUITE_END()
