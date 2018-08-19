@@ -36,7 +36,8 @@ using namespace graphene::chain::test;
 
 BOOST_FIXTURE_TEST_SUITE(database_api_tests, database_fixture)
 
-BOOST_AUTO_TEST_CASE(is_registered) {
+BOOST_AUTO_TEST_CASE(is_registered)
+{
    try {
       /***
        * Arrange
@@ -71,7 +72,8 @@ BOOST_AUTO_TEST_CASE(is_registered) {
    } FC_LOG_AND_RETHROW()
 }
 
-BOOST_AUTO_TEST_CASE( get_potential_signatures_owner_and_active ) {
+BOOST_AUTO_TEST_CASE( get_potential_signatures_owner_and_active )
+{
    try {
       fc::ecc::private_key nathan_key1 = fc::ecc::private_key::regenerate(fc::digest("key1"));
       fc::ecc::private_key nathan_key2 = fc::ecc::private_key::regenerate(fc::digest("key2"));
@@ -118,7 +120,8 @@ BOOST_AUTO_TEST_CASE( get_potential_signatures_owner_and_active ) {
    } FC_LOG_AND_RETHROW()
 }
 
-BOOST_AUTO_TEST_CASE( get_potential_signatures_other ) {
+BOOST_AUTO_TEST_CASE( get_potential_signatures_other )
+{
    try {
       fc::ecc::private_key priv_key1 = fc::ecc::private_key::regenerate(fc::digest("key1"));
       public_key_type pub_key1( priv_key1.get_public_key() );
@@ -138,7 +141,8 @@ BOOST_AUTO_TEST_CASE( get_potential_signatures_other ) {
    } FC_LOG_AND_RETHROW()
 }
 
-BOOST_AUTO_TEST_CASE( get_required_signatures_owner_or_active ) {
+BOOST_AUTO_TEST_CASE( get_required_signatures_owner_or_active )
+{
    try {
       fc::ecc::private_key nathan_key1 = fc::ecc::private_key::regenerate(fc::digest("key1"));
       fc::ecc::private_key nathan_key2 = fc::ecc::private_key::regenerate(fc::digest("key2"));
@@ -211,7 +215,8 @@ BOOST_AUTO_TEST_CASE( get_required_signatures_owner_or_active ) {
    } FC_LOG_AND_RETHROW()
 }
 
-BOOST_AUTO_TEST_CASE( get_required_signatures_partially_signed_or_not ) {
+BOOST_AUTO_TEST_CASE( get_required_signatures_partially_signed_or_not )
+{
    try {
       fc::ecc::private_key morgan_key = fc::ecc::private_key::regenerate(fc::digest("morgan_key"));
       fc::ecc::private_key nathan_key = fc::ecc::private_key::regenerate(fc::digest("nathan_key"));
@@ -602,7 +607,8 @@ BOOST_AUTO_TEST_CASE( get_required_signatures_partially_signed_or_not ) {
    } FC_LOG_AND_RETHROW()
 }
 
-BOOST_AUTO_TEST_CASE( set_subscribe_callback_disable_notify_all_test ) {
+BOOST_AUTO_TEST_CASE( set_subscribe_callback_disable_notify_all_test )
+{
    try {
       ACTORS( (alice) );
 
@@ -792,7 +798,7 @@ BOOST_AUTO_TEST_CASE(get_account_limit_orders)
        limit_order_id_type(o.id), o.sell_price);
    BOOST_CHECK(results.size() == 71);
    BOOST_CHECK(results.front().id > o.id);
-   // NOTE 3: because of NOTE 1, here should be little than 
+   // NOTE 3: because of NOTE 1, here should be little than
    BOOST_CHECK(results.front().sell_price < o.sell_price);
    for (size_t i = 0 ; i < results.size() - 1 ; ++i)
    {
