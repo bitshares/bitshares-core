@@ -122,7 +122,6 @@ template<> struct js_name<fc::uint160>         { static std::string name(){ retu
 template<> struct js_name<fc::sha224>          { static std::string name(){ return "bytes 28";   } };
 template<> struct js_name<fc::sha256>          { static std::string name(){ return "bytes 32";   } };
 template<> struct js_name<fc::unsigned_int>    { static std::string name(){ return "varuint32";  } };
-template<> struct js_name<fc::signed_int>      { static std::string name(){ return "varint32";   } };
 template<> struct js_name< vote_id_type >      { static std::string name(){ return "vote_id";    } };
 template<> struct js_name< time_point_sec >    { static std::string name(){ return "time_point_sec"; } };
 

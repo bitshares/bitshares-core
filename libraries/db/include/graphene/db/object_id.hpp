@@ -34,7 +34,6 @@ namespace graphene { namespace db {
    using  fc::flat_map;
    using  fc::variant;
    using  fc::unsigned_int;
-   using  fc::signed_int;
 
    struct object_id_type
    {
