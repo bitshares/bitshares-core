@@ -3,11 +3,21 @@
 #include <fc/thread/thread.hpp>
 #include <fc/log/logger.hpp>
 #include <fc/network/tcp_socket.hpp>
+#include <fc/network/rate_limiting.hpp>
+
 #include <graphene/chain/config.hpp>
 #include <graphene/chain/protocol/types.hpp>
 #include <graphene/net/node.hpp>
 #include <graphene/net/core_messages.hpp>
 #include <graphene/net/peer_connection.hpp>
+
+#include <boost/accumulators/accumulators.hpp>
+#include <boost/accumulators/statistics/stats.hpp>
+#include <boost/accumulators/statistics/rolling_mean.hpp>
+#include <boost/accumulators/statistics/min.hpp>
+#include <boost/accumulators/statistics/max.hpp>
+#include <boost/accumulators/statistics/sum.hpp>
+#include <boost/accumulators/statistics/count.hpp>
 
 namespace graphene { namespace net { namespace detail {
 
@@ -162,6 +172,84 @@ private:
       void error_encountered(const std::string& message, const fc::oexception& error) override;
       uint8_t get_current_block_interval_in_seconds() const override;
     };
+
+    namespace bmi = boost::multi_index;
+    class blockchain_tied_message_cache
+    {
+    private:
+      static const uint32_t cache_duration_in_blocks = GRAPHENE_NET_MESSAGE_CACHE_DURATION_IN_BLOCKS;
+
+      struct message_hash_index{};
+      struct message_contents_hash_index{};
+      struct block_clock_index{};
+      struct message_info
+      {
+        message_hash_type message_hash;
+        message           message_body;
+        uint32_t          block_clock_when_received;
+
+        // for network performance stats
+        message_propagation_data propagation_data;
+        fc::uint160_t     message_contents_hash; // hash of whatever the message contains (if it's a transaction, this is the transaction id, if it's a block, it's the block_id)
+
+        message_info( const message_hash_type& message_hash,
+                      const message&           message_body,
+                      uint32_t                 block_clock_when_received,
+                      const message_propagation_data& propagation_data,
+                      fc::uint160_t            message_contents_hash ) :
+          message_hash( message_hash ),
+          message_body( message_body ),
+          block_clock_when_received( block_clock_when_received ),
+          propagation_data( propagation_data ),
+          message_contents_hash( message_contents_hash )
+        {}
+      };
+      typedef boost::multi_index_container
+        < message_info,
+            bmi::indexed_by< bmi::ordered_unique< bmi::tag<message_hash_index>,
+                                                  bmi::member<message_info, message_hash_type, &message_info::message_hash> >,
+                             bmi::ordered_non_unique< bmi::tag<message_contents_hash_index>,
+                                                      bmi::member<message_info, fc::uint160_t, &message_info::message_contents_hash> >,
+                             bmi::ordered_non_unique< bmi::tag<block_clock_index>,
+                                                      bmi::member<message_info, uint32_t, &message_info::block_clock_when_received> > >
+        > message_cache_container;
+
+      message_cache_container _message_cache;
+
+      uint32_t block_clock;
+
+    public:
+      blockchain_tied_message_cache() :
+        block_clock( 0 )
+      {}
+      void block_accepted();
+      void cache_message( const message& message_to_cache, const message_hash_type& hash_of_message_to_cache,
+                        const message_propagation_data& propagation_data, const fc::uint160_t& message_content_hash );
+      message get_message( const message_hash_type& hash_of_message_to_lookup );
+      message_propagation_data get_message_propagation_data( const fc::uint160_t& hash_of_message_contents_to_lookup ) const;
+      size_t size() const { return _message_cache.size(); }
+    };
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// This specifies configuration info for the local node.  It's stored as JSON
+// in the configuration directory (application data directory)
+struct node_configuration
+{
+   node_configuration() : accept_incoming_connections(true), wait_if_endpoint_is_busy(true) {}
+
+   fc::ip::endpoint listen_endpoint;
+   bool accept_incoming_connections;
+   bool wait_if_endpoint_is_busy;
+   /**
+    * Originally, our p2p code just had a 'node-id' that was a random number identifying this node
+    * on the network.  This is now a private key/public key pair, where the public key is used
+    * in place of the old random node-id.  The private part is unused, but might be used in
+    * the future to support some notion of trusted peers.
+    */
+   fc::ecc::private_key private_key;
+};
+
 
 class node_impl : public peer_connection_delegate
 {

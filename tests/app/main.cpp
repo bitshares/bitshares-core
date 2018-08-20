@@ -325,6 +325,8 @@ BOOST_AUTO_TEST_CASE( two_node_network )
       BOOST_CHECK_EQUAL(app1.chain_database()->head_block_num(), 1);
 
       BOOST_TEST_MESSAGE( "Checking GRAPHENE_NULL_ACCOUNT has balance" );
+      BOOST_CHECK_EQUAL( db1->get_balance( GRAPHENE_NULL_ACCOUNT, asset_id_type() ).amount.value, 1000000 );
+      BOOST_CHECK_EQUAL( db2->get_balance( GRAPHENE_NULL_ACCOUNT, asset_id_type() ).amount.value, 1000000 );
    } catch( fc::exception& e ) {
       edump((e.to_detail_string()));
       throw;
@@ -348,4 +350,23 @@ BOOST_AUTO_TEST_CASE(application_impl_breakout) {
    test_impl impl;
    graphene::net::item_id id;
    BOOST_CHECK(impl.has_item(id));
+}
+
+#include "../../libraries/net/node_impl.hxx"
+
+/******
+ * @brief create a malformed message and make sure the application can handle it
+ */
+BOOST_AUTO_TEST_CASE( bad_message )
+{
+   class test_impl : public graphene::net::detail::node_impl {
+   public:
+      test_impl() : node_impl(nullptr) {}
+   };
+
+   test_impl impl;
+   graphene::net::peer_connection* peer;
+   graphene::net::message msg;
+   msg.msg_type = graphene::net::core_message_type_enum::block_message_type;
+   impl.on_message(peer, msg);
 }
