@@ -98,7 +98,7 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       vector<vesting_balance_object> get_vesting_balances( const std::string account_id_or_name )const;
 
       // Assets
-      vector<optional<asset_object>> get_assets(const vector<asset_id_type>& asset_ids)const;
+      vector<optional<asset_object>> get_assets(const vector<std::string>& asset_names_or_ids)const;
       vector<asset_object>           list_assets(const string& lower_bound_symbol, uint32_t limit)const;
       vector<optional<asset_object>> lookup_asset_symbols(const vector<string>& symbols_or_ids)const;
       uint64_t                       get_asset_count()const;
@@ -225,6 +225,31 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
          }
          FC_ASSERT( account, "no such account" );
          return account;
+      }
+
+      const asset_object* get_asset_from_string( const std::string& name_or_id ) const
+      {
+         // TODO cache the result to avoid repeatly fetching from db
+         FC_ASSERT( name_or_id.size() > 0);
+         const asset_object* asset = nullptr;
+         if (std::isdigit(name_or_id[0]))
+            asset = _db.find(fc::variant(name_or_id, 1).as<asset_id_type>(1));
+         else
+         {
+            const auto& idx = _db.get_index_type<asset_index>().indices().get<by_symbol>();
+            auto itr = idx.find(name_or_id);
+            if (itr != idx.end())
+               asset = &*itr;
+         }
+         FC_ASSERT( asset, "no such asset" );
+         return asset;
+      }
+      std::string asset_id_to_string(asset_id_type id) const
+      {
+          std::string asset_id = fc::to_string(id.space_id) +
+                                 "." + fc::to_string(id.type_id) +
+                                 "." + fc::to_string(id.instance.value);
+          return asset_id;
       }
 
       template<typename T>
@@ -1049,16 +1074,18 @@ vector<vesting_balance_object> database_api_impl::get_vesting_balances( const st
 //                                                                  //
 //////////////////////////////////////////////////////////////////////
 
-vector<optional<asset_object>> database_api::get_assets(const vector<asset_id_type>& asset_ids)const
+vector<optional<asset_object>> database_api::get_assets(const vector<std::string>& asset_names_or_ids)const
 {
-   return my->get_assets( asset_ids );
+   return my->get_assets( asset_names_or_ids );
 }
 
-vector<optional<asset_object>> database_api_impl::get_assets(const vector<asset_id_type>& asset_ids)const
+vector<optional<asset_object>> database_api_impl::get_assets(const vector<std::string>& asset_names_or_ids)const
 {
-   vector<optional<asset_object>> result; result.reserve(asset_ids.size());
-   std::transform(asset_ids.begin(), asset_ids.end(), std::back_inserter(result),
-                  [this](asset_id_type id) -> optional<asset_object> {
+   vector<optional<asset_object>> result; result.reserve(asset_names_or_ids.size());
+   std::transform(asset_names_or_ids.begin(), asset_names_or_ids.end(), std::back_inserter(result),
+                  [this](std::string id_or_name) -> optional<asset_object> {
+      const asset_object* asset = get_asset_from_string(id_or_name);
+      asset_id_type id = asset->id;
       if(auto o = _db.find(id))
       {
          subscribe_to_item( id );
@@ -1453,7 +1480,7 @@ vector<market_volume> database_api_impl::get_top_markets(uint32_t limit)const
    {
       market_volume mv;
       mv.time = now;
-      const auto assets = get_assets( { itr->base, itr->quote } );
+      const auto assets = get_assets( { asset_id_to_string(itr->base), asset_id_to_string(itr->quote) } );
       mv.base = assets[0]->symbol;
       mv.quote = assets[1]->symbol;
       mv.base_volume = uint128_amount_to_string( itr->base_volume, assets[0]->precision );

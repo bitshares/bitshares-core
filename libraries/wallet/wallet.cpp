@@ -608,9 +608,16 @@ public:
    {
       return get_account(account_name_or_id).get_id();
    }
+   std::string asset_id_to_string(asset_id_type id) const
+   {
+      std::string asset_id = fc::to_string(id.space_id) +
+                             "." + fc::to_string(id.type_id) +
+                             "." + fc::to_string(id.instance.value);
+      return asset_id;
+   }
    optional<asset_object> find_asset(asset_id_type id)const
    {
-      auto rec = _remote_db->get_assets({id}).front();
+      auto rec = _remote_db->get_assets({asset_id_to_string(id)}).front();
       return rec;
    }
    optional<asset_object> find_asset(string asset_symbol_or_id)const
