@@ -98,7 +98,7 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       vector<vesting_balance_object> get_vesting_balances( const std::string account_id_or_name )const;
 
       // Assets
-      vector<optional<asset_object>> get_assets(const vector<std::string>& asset_names_or_ids)const;
+      vector<optional<asset_object>> get_assets(const vector<std::string>& asset_symbols_or_ids)const;
       vector<asset_object>           list_assets(const string& lower_bound_symbol, uint32_t limit)const;
       vector<optional<asset_object>> lookup_asset_symbols(const vector<string>& symbols_or_ids)const;
       uint64_t                       get_asset_count()const;
@@ -1074,15 +1074,15 @@ vector<vesting_balance_object> database_api_impl::get_vesting_balances( const st
 //                                                                  //
 //////////////////////////////////////////////////////////////////////
 
-vector<optional<asset_object>> database_api::get_assets(const vector<std::string>& asset_names_or_ids)const
+vector<optional<asset_object>> database_api::get_assets(const vector<std::string>& asset_symbols_or_ids)const
 {
-   return my->get_assets( asset_names_or_ids );
+   return my->get_assets( asset_symbols_or_ids );
 }
 
-vector<optional<asset_object>> database_api_impl::get_assets(const vector<std::string>& asset_names_or_ids)const
+vector<optional<asset_object>> database_api_impl::get_assets(const vector<std::string>& asset_symbols_or_ids)const
 {
-   vector<optional<asset_object>> result; result.reserve(asset_names_or_ids.size());
-   std::transform(asset_names_or_ids.begin(), asset_names_or_ids.end(), std::back_inserter(result),
+   vector<optional<asset_object>> result; result.reserve(asset_symbols_or_ids.size());
+   std::transform(asset_symbols_or_ids.begin(), asset_symbols_or_ids.end(), std::back_inserter(result),
                   [this](std::string id_or_name) -> optional<asset_object> {
       const asset_object* asset = get_asset_from_string(id_or_name);
       asset_id_type id = asset->id;

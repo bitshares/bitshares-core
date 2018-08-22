@@ -375,12 +375,12 @@ class database_api
 
       /**
        * @brief Get a list of assets by ID
-       * @param asset_names_or_ids Names or IDs of the assets to retrieve
+       * @param asset_symbols_or_ids Symbol names or IDs of the assets to retrieve
        * @return The assets corresponding to the provided IDs
        *
        * This function has semantics identical to @ref get_objects
        */
-      vector<optional<asset_object>> get_assets(const vector<std::string>& asset_names_or_ids)const;
+      vector<optional<asset_object>> get_assets(const vector<std::string>& asset_symbols_or_ids)const;
 
       /**
        * @brief Get assets alphabetically by symbol name
