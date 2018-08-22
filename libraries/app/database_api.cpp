@@ -244,12 +244,19 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
          FC_ASSERT( asset, "no such asset" );
          return asset;
       }
-      std::string asset_id_to_string(asset_id_type id) const
+      vector<optional<asset_object>> get_assets(const vector<asset_id_type>& asset_ids)const
       {
-          std::string asset_id = fc::to_string(id.space_id) +
-                                 "." + fc::to_string(id.type_id) +
-                                 "." + fc::to_string(id.instance.value);
-          return asset_id;
+         vector<optional<asset_object>> result; result.reserve(asset_ids.size());
+         std::transform(asset_ids.begin(), asset_ids.end(), std::back_inserter(result),
+                 [this](asset_id_type id) -> optional<asset_object> {
+            if(auto o = _db.find(id))
+            {
+               subscribe_to_item( id );
+               return *o;
+            }
+            return {};
+         });
+         return result;
       }
 
       template<typename T>
@@ -1480,7 +1487,7 @@ vector<market_volume> database_api_impl::get_top_markets(uint32_t limit)const
    {
       market_volume mv;
       mv.time = now;
-      const auto assets = get_assets( { asset_id_to_string(itr->base), asset_id_to_string(itr->quote) } );
+      const auto assets = get_assets( { itr->base, itr->quote } );
       mv.base = assets[0]->symbol;
       mv.quote = assets[1]->symbol;
       mv.base_volume = uint128_amount_to_string( itr->base_volume, assets[0]->precision );
