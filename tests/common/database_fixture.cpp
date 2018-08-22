@@ -1171,7 +1171,7 @@ bool _push_block( database& db, const signed_block& b, uint32_t skip_flags /* = 
 
 processed_transaction _push_transaction( database& db, const signed_transaction& tx, uint32_t skip_flags /* = 0 */ )
 { try {
-   auto pt = db.push_transaction( tx, skip_flags );
+   auto pt = db.push_transaction( signed_transaction( tx, db.get_chain_id() ), skip_flags );
    database_fixture::verify_asset_supplies(db);
    return pt;
 } FC_CAPTURE_AND_RETHROW((tx)) }

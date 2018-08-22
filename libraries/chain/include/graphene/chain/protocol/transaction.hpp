@@ -123,6 +123,13 @@ namespace graphene { namespace chain {
       signed_transaction( const transaction& trx = transaction() )
          : transaction(trx){}
 
+      /** Extract public keys from signatures when initializing with another signed transaction and a chain ID */
+      signed_transaction( const signed_transaction& trx, const chain_id_type& chain_id )
+         : signed_transaction(trx)
+      {
+         signees = _get_signature_keys( chain_id );
+      }
+
       /** signs and appends to signatures */
       const signature_type& sign( const private_key_type& key, const chain_id_type& chain_id );
 
@@ -169,8 +176,15 @@ namespace graphene { namespace chain {
 
       vector<signature_type> signatures;
 
-      /// Removes all operations and signatures
-      void clear() { operations.clear(); signatures.clear(); }
+      /** Extracted public keys from signatures if this object was initialized with a chain ID. */
+      flat_set<public_key_type> signees;
+
+      /// Removes all operations, signatures and signees
+      void clear() { operations.clear(); signatures.clear(); signees.clear(); }
+
+   private:
+      /// To be used by constructor and get_signature_keys() function
+      flat_set<public_key_type> _get_signature_keys( const chain_id_type& chain_id )const;
    };
 
    void verify_authority( const vector<operation>& ops, const flat_set<public_key_type>& sigs,
@@ -209,5 +223,6 @@ namespace graphene { namespace chain {
 } } // graphene::chain
 
 FC_REFLECT( graphene::chain::transaction, (ref_block_num)(ref_block_prefix)(expiration)(operations)(extensions) )
+// Note: not reflecting signees field for backward compatibility; in addition, it should not be in p2p messages
 FC_REFLECT_DERIVED( graphene::chain::signed_transaction, (graphene::chain::transaction), (signatures) )
 FC_REFLECT_DERIVED( graphene::chain::processed_transaction, (graphene::chain::signed_transaction), (operation_results) )

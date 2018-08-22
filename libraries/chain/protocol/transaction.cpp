@@ -303,6 +303,15 @@ void verify_authority( const vector<operation>& ops, const flat_set<public_key_t
 
 
 flat_set<public_key_type> signed_transaction::get_signature_keys( const chain_id_type& chain_id )const
+{
+   // Strictly we should check whether the given chain ID is same as the one used to initialize the object.
+   // However, we don't pass in another chain ID so far, for better performance, we skip the check.
+   if( !signees.empty() || signatures.empty() )
+      return signees;
+   return _get_signature_keys( chain_id );
+}
+
+flat_set<public_key_type> signed_transaction::_get_signature_keys( const chain_id_type& chain_id )const
 { try {
    auto d = sig_digest( chain_id );
    flat_set<public_key_type> result;
