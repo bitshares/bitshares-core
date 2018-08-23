@@ -99,7 +99,7 @@ node_property_object& database::node_properties()
 
 uint32_t database::last_non_undoable_block_num() const
 {
-   return head_block_num() - _undo_db.size();
+   return head_block_num() - ( _undo_db.size() - _undo_db.active_sessions());
 }
 
 const account_statistics_object& database::get_account_stats_by_owner( account_id_type owner )const
