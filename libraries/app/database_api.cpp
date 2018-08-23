@@ -104,7 +104,7 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       uint64_t                       get_asset_count()const;
 
       // Markets / feeds
-      vector<limit_order_object>         get_limit_orders(std::string& a, std::string& b, uint32_t limit)const;
+      vector<limit_order_object>         get_limit_orders(const std::string& a, const std::string& b, uint32_t limit)const;
       vector<limit_order_object>         get_account_limit_orders( const string& account_name_or_id,
                                                                    const string &base,
                                                                    const string &quote, uint32_t limit,
@@ -1204,7 +1204,7 @@ vector<limit_order_object> database_api::get_limit_orders(std::string a, std::st
 /**
  *  @return the limit orders for both sides of the book for the two assets specified up to limit number on each side.
  */
-vector<limit_order_object> database_api_impl::get_limit_orders(std::string& a, std::string& b, uint32_t limit)const
+vector<limit_order_object> database_api_impl::get_limit_orders(const std::string& a, const std::string& b, uint32_t limit)const
 {
    FC_ASSERT( limit <= 300 );
 
