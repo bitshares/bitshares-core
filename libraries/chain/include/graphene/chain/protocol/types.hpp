@@ -74,7 +74,6 @@ namespace graphene { namespace chain {
    using                               fc::enum_type;
    using                               fc::optional;
    using                               fc::unsigned_int;
-   using                               fc::signed_int;
    using                               fc::time_point_sec;
    using                               fc::time_point;
    using                               fc::safe;
