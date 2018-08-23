@@ -40,7 +40,7 @@ RUN \
         -DCMAKE_BUILD_TYPE=Release \
         . && \
     make witness_node cli_wallet && \
-    make install && \
+    install -s programs/witness_node/witness_node programs/cli_wallet/cli_wallet /usr/local/bin && \
     #
     # Obtain version
     mkdir /etc/bitshares && \
@@ -60,12 +60,15 @@ VOLUME ["/var/lib/bitshares", "/etc/bitshares"]
 # rpc service:
 EXPOSE 8090
 # p2p service:
-EXPOSE 2001
+EXPOSE 1776
 
 # default exec/config files
 ADD docker/default_config.ini /etc/bitshares/config.ini
 ADD docker/bitsharesentry.sh /usr/local/bin/bitsharesentry.sh
 RUN chmod a+x /usr/local/bin/bitsharesentry.sh
 
+# Make Docker send SIGINT instead of SIGTERM to the daemon
+STOPSIGNAL SIGINT
+
 # default execute entry
-CMD /usr/local/bin/bitsharesentry.sh
+CMD ["/usr/local/bin/bitsharesentry.sh"]

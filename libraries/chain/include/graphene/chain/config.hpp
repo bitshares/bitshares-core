@@ -33,7 +33,6 @@
 #define GRAPHENE_MAX_ASSET_SYMBOL_LENGTH 16
 
 #define GRAPHENE_MAX_SHARE_SUPPLY int64_t(1000000000000000ll)
-#define GRAPHENE_MAX_PAY_RATE 10000 /* 100% */
 #define GRAPHENE_MAX_SIG_CHECK_DEPTH 2
 /**
  * Don't allow the committee_members to publish a limit that would
@@ -54,12 +53,9 @@
 #define GRAPHENE_MAX_UNDO_HISTORY 10000
 
 #define GRAPHENE_MIN_BLOCK_SIZE_LIMIT (GRAPHENE_MIN_TRANSACTION_SIZE_LIMIT*5) // 5 transactions per block
-#define GRAPHENE_MIN_TRANSACTION_EXPIRATION_LIMIT (GRAPHENE_MAX_BLOCK_INTERVAL * 5) // 5 transactions per block
 #define GRAPHENE_BLOCKCHAIN_PRECISION                           uint64_t( 100000 )
 
 #define GRAPHENE_BLOCKCHAIN_PRECISION_DIGITS                    5
-#define GRAPHENE_DEFAULT_TRANSFER_FEE                           (1*GRAPHENE_BLOCKCHAIN_PRECISION)
-#define GRAPHENE_MAX_INSTANCE_ID                                (uint64_t(-1)>>16)
 /** percentage fields are fixed point with a denominator of 10,000 */
 #define GRAPHENE_100_PERCENT                                    10000
 #define GRAPHENE_1_PERCENT                                      (GRAPHENE_100_PERCENT/100)
@@ -69,7 +65,6 @@
 #define GRAPHENE_DEFAULT_FORCE_SETTLEMENT_OFFSET                0 ///< 1%
 #define GRAPHENE_DEFAULT_FORCE_SETTLEMENT_MAX_VOLUME            (20* GRAPHENE_1_PERCENT) ///< 20%
 #define GRAPHENE_DEFAULT_PRICE_FEED_LIFETIME                    (60*60*24) ///< 1 day
-#define GRAPHENE_MAX_FEED_PRODUCERS                             200
 #define GRAPHENE_DEFAULT_MAX_AUTHORITY_MEMBERSHIP               10
 #define GRAPHENE_DEFAULT_MAX_ASSET_WHITELIST_AUTHORITIES        10
 #define GRAPHENE_DEFAULT_MAX_ASSET_FEED_PUBLISHERS              10
@@ -96,13 +91,9 @@
 #define GRAPHENE_DEFAULT_COMMITTEE_PROPOSAL_REVIEW_PERIOD_SEC (60*60*24*7*2) // Two weeks
 #define GRAPHENE_DEFAULT_NETWORK_PERCENT_OF_FEE               (20*GRAPHENE_1_PERCENT)
 #define GRAPHENE_DEFAULT_LIFETIME_REFERRER_PERCENT_OF_FEE     (30*GRAPHENE_1_PERCENT)
-#define GRAPHENE_DEFAULT_MAX_BULK_DISCOUNT_PERCENT            (50*GRAPHENE_1_PERCENT)
-#define GRAPHENE_DEFAULT_BULK_DISCOUNT_THRESHOLD_MIN          ( GRAPHENE_BLOCKCHAIN_PRECISION*int64_t(1000) )
-#define GRAPHENE_DEFAULT_BULK_DISCOUNT_THRESHOLD_MAX          ( GRAPHENE_DEFAULT_BULK_DISCOUNT_THRESHOLD_MIN*int64_t(100) )
 #define GRAPHENE_DEFAULT_CASHBACK_VESTING_PERIOD_SEC          (60*60*24*365) ///< 1 year
 #define GRAPHENE_DEFAULT_CASHBACK_VESTING_THRESHOLD           (GRAPHENE_BLOCKCHAIN_PRECISION*int64_t(100))
 #define GRAPHENE_DEFAULT_BURN_PERCENT_OF_FEE                  (20*GRAPHENE_1_PERCENT)
-#define GRAPHENE_WITNESS_PAY_PERCENT_PRECISION                (1000000000)
 #define GRAPHENE_DEFAULT_MAX_ASSERT_OPCODE                    1
 #define GRAPHENE_DEFAULT_FEE_LIQUIDATION_THRESHOLD            GRAPHENE_BLOCKCHAIN_PRECISION * 100;
 #define GRAPHENE_DEFAULT_ACCOUNTS_PER_FEE_SCALE               1000
@@ -113,18 +104,6 @@
 
 #define GRAPHENE_MAX_URL_LENGTH                               127
 
-// counter initialization values used to derive near and far future seeds for shuffling witnesses
-// we use the fractional bits of sqrt(2) in hex
-#define GRAPHENE_NEAR_SCHEDULE_CTR_IV                    ( (uint64_t( 0x6a09 ) << 0x30)    \
-                                                         | (uint64_t( 0xe667 ) << 0x20)    \
-                                                         | (uint64_t( 0xf3bc ) << 0x10)    \
-                                                         | (uint64_t( 0xc908 )        ) )
-
-// and the fractional bits of sqrt(3) in hex
-#define GRAPHENE_FAR_SCHEDULE_CTR_IV                     ( (uint64_t( 0xbb67 ) << 0x30)    \
-                                                         | (uint64_t( 0xae85 ) << 0x20)    \
-                                                         | (uint64_t( 0x84ca ) << 0x10)    \
-                                                         | (uint64_t( 0xa73b )        ) )
 
 /**
  * every second, the fraction of burned core asset which cycles is
@@ -139,12 +118,10 @@
 
 #define GRAPHENE_DEFAULT_MINIMUM_FEEDS                       7
 
-#define GRAPHENE_MAX_INTEREST_APR                            uint16_t( 10000 )
-
 #define GRAPHENE_RECENTLY_MISSED_COUNT_INCREMENT             4
 #define GRAPHENE_RECENTLY_MISSED_COUNT_DECREMENT             3
 
-#define GRAPHENE_CURRENT_DB_VERSION                          "BTS2.15"
+#define GRAPHENE_CURRENT_DB_VERSION                          "BTS2.17"
 
 #define GRAPHENE_IRREVERSIBLE_THRESHOLD                      (70 * GRAPHENE_1_PERCENT)
 

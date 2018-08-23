@@ -25,7 +25,6 @@
 #include <boost/test/unit_test.hpp>
 
 #include <graphene/chain/database.hpp>
-#include <graphene/chain/protocol/protocol.hpp>
 #include <graphene/chain/exceptions.hpp>
 
 #include <graphene/chain/account_object.hpp>
@@ -60,7 +59,7 @@ BOOST_AUTO_TEST_CASE( simple_single_signature )
       sign(trx, nathan_key);
       PUSH_TX( db, trx, database::skip_transaction_dupe_check );
 
-      BOOST_CHECK_EQUAL(get_balance(nathan, core), old_balance - 500);
+      BOOST_CHECK_EQUAL(get_balance(nathan, core), static_cast<int64_t>(old_balance - 500));
    } catch (fc::exception& e) {
       edump((e.to_detail_string()));
       throw;
@@ -98,25 +97,25 @@ BOOST_AUTO_TEST_CASE( any_two_of_three )
       GRAPHENE_CHECK_THROW(PUSH_TX( db, trx, database::skip_transaction_dupe_check ), fc::exception);
       sign(trx, nathan_key2);
       PUSH_TX( db, trx, database::skip_transaction_dupe_check );
-      BOOST_CHECK_EQUAL(get_balance(nathan, core), old_balance - 500);
+      BOOST_CHECK_EQUAL(get_balance(nathan, core), static_cast<int64_t>(old_balance - 500));
 
       trx.signatures.clear();
       sign(trx, nathan_key2);
       sign(trx, nathan_key3);
       PUSH_TX( db, trx, database::skip_transaction_dupe_check );
-      BOOST_CHECK_EQUAL(get_balance(nathan, core), old_balance - 1000);
+      BOOST_CHECK_EQUAL(get_balance(nathan, core), static_cast<int64_t>(old_balance - 1000));
 
       trx.signatures.clear();
       sign(trx, nathan_key1);
       sign(trx, nathan_key3);
       PUSH_TX( db, trx, database::skip_transaction_dupe_check );
-      BOOST_CHECK_EQUAL(get_balance(nathan, core), old_balance - 1500);
+      BOOST_CHECK_EQUAL(get_balance(nathan, core), static_cast<int64_t>(old_balance - 1500));
 
       trx.signatures.clear();
       //sign(trx, fc::ecc::private_key::generate());
       sign(trx,nathan_key3);
       GRAPHENE_CHECK_THROW(PUSH_TX( db, trx, database::skip_transaction_dupe_check ), fc::exception);
-      BOOST_CHECK_EQUAL(get_balance(nathan, core), old_balance - 1500);
+      BOOST_CHECK_EQUAL(get_balance(nathan, core), static_cast<int64_t>(old_balance - 1500));
    } catch (fc::exception& e) {
       edump((e.to_detail_string()));
       throw;
@@ -166,7 +165,7 @@ BOOST_AUTO_TEST_CASE( recursive_accounts )
       BOOST_TEST_MESSAGE( "Attempting to transfer with parent1 and parent2 signature, should succeed" );
       sign(trx,parent1_key);
       PUSH_TX( db, trx, database::skip_transaction_dupe_check );
-      BOOST_CHECK_EQUAL(get_balance(child, core), old_balance - 500);
+      BOOST_CHECK_EQUAL(get_balance(child, core), static_cast<int64_t>(old_balance - 500));
       trx.operations.clear();
       trx.signatures.clear();
 
@@ -181,7 +180,7 @@ BOOST_AUTO_TEST_CASE( recursive_accounts )
          sign(trx,parent1_key);
          sign(trx,parent2_key);
          PUSH_TX( db, trx, database::skip_transaction_dupe_check );
-         BOOST_REQUIRE_EQUAL(child.active.num_auths(), 3);
+         BOOST_REQUIRE_EQUAL(child.active.num_auths(), 3u);
          trx.operations.clear();
          trx.signatures.clear();
       }
@@ -204,13 +203,13 @@ BOOST_AUTO_TEST_CASE( recursive_accounts )
       BOOST_TEST_MESSAGE( "Attempting transfer both parents, should succeed" );
       sign(trx,  parent1_key);
       PUSH_TX( db, trx, database::skip_transaction_dupe_check );
-      BOOST_CHECK_EQUAL(get_balance(child, core), old_balance - 1000);
+      BOOST_CHECK_EQUAL(get_balance(child, core), static_cast<int64_t>(old_balance - 1000));
       trx.signatures.clear();
 
       BOOST_TEST_MESSAGE( "Attempting transfer with just child key, should succeed" );
       sign(trx, child_key);
       PUSH_TX( db, trx, database::skip_transaction_dupe_check );
-      BOOST_CHECK_EQUAL(get_balance(child, core), old_balance - 1500);
+      BOOST_CHECK_EQUAL(get_balance(child, core), static_cast<int64_t>(old_balance - 1500));
       trx.operations.clear();
       trx.signatures.clear();
 
@@ -243,7 +242,7 @@ BOOST_AUTO_TEST_CASE( recursive_accounts )
 
       BOOST_TEST_MESSAGE( "Attempt to transfer using parent2_key and grandparent_key" );
       PUSH_TX( db, trx, database::skip_transaction_dupe_check );
-      BOOST_CHECK_EQUAL(get_balance(child, core), old_balance - 2000);
+      BOOST_CHECK_EQUAL(get_balance(child, core), static_cast<int64_t>(old_balance - 2000));
       trx.clear();
 
       BOOST_TEST_MESSAGE( "Update grandparent account authority to be committee account" );
@@ -269,7 +268,7 @@ BOOST_AUTO_TEST_CASE( recursive_accounts )
       trx.signatures.clear();
       sign(trx,  child_key);
       PUSH_TX( db, trx, database::skip_transaction_dupe_check );
-      BOOST_CHECK_EQUAL(get_balance(child, core), old_balance - 2500);
+      BOOST_CHECK_EQUAL(get_balance(child, core), static_cast<int64_t>(old_balance - 2500));
       trx.operations.clear();
       trx.signatures.clear();
 
@@ -330,17 +329,17 @@ BOOST_AUTO_TEST_CASE( proposed_single_account )
          vector<authority> other;
          flat_set<account_id_type> active_set, owner_set;
          operation_get_required_authorities(op,active_set,owner_set,other);
-         BOOST_CHECK_EQUAL(active_set.size(), 1);
-         BOOST_CHECK_EQUAL(owner_set.size(), 0);
-         BOOST_CHECK_EQUAL(other.size(), 0);
+         BOOST_CHECK_EQUAL(active_set.size(), 1lu);
+         BOOST_CHECK_EQUAL(owner_set.size(), 0lu);
+         BOOST_CHECK_EQUAL(other.size(), 0lu);
          BOOST_CHECK(*active_set.begin() == moneyman.get_id());
 
          active_set.clear();
          other.clear();
          operation_get_required_authorities(op.proposed_ops.front().op,active_set,owner_set,other);
-         BOOST_CHECK_EQUAL(active_set.size(), 1);
-         BOOST_CHECK_EQUAL(owner_set.size(), 0);
-         BOOST_CHECK_EQUAL(other.size(), 0);
+         BOOST_CHECK_EQUAL(active_set.size(), 1lu);
+         BOOST_CHECK_EQUAL(owner_set.size(), 0lu);
+         BOOST_CHECK_EQUAL(other.size(), 0lu);
          BOOST_CHECK(*active_set.begin() == nathan.id);
       }
 
@@ -350,10 +349,10 @@ BOOST_AUTO_TEST_CASE( proposed_single_account )
       sign( trx,  init_account_priv_key  );
       const proposal_object& proposal = db.get<proposal_object>(PUSH_TX( db, trx ).operation_results.front().get<object_id_type>());
 
-      BOOST_CHECK_EQUAL(proposal.required_active_approvals.size(), 1);
-      BOOST_CHECK_EQUAL(proposal.available_active_approvals.size(), 0);
-      BOOST_CHECK_EQUAL(proposal.required_owner_approvals.size(), 0);
-      BOOST_CHECK_EQUAL(proposal.available_owner_approvals.size(), 0);
+      BOOST_CHECK_EQUAL(proposal.required_active_approvals.size(), 1lu);
+      BOOST_CHECK_EQUAL(proposal.available_active_approvals.size(), 0lu);
+      BOOST_CHECK_EQUAL(proposal.required_owner_approvals.size(), 0lu);
+      BOOST_CHECK_EQUAL(proposal.available_owner_approvals.size(), 0lu);
       BOOST_CHECK(*proposal.required_active_approvals.begin() == nathan.id);
 
       proposal_update_operation pup;
@@ -388,6 +387,49 @@ BOOST_AUTO_TEST_CASE( proposed_single_account )
       edump((e.to_detail_string()));
       throw;
    }
+}
+
+BOOST_AUTO_TEST_CASE( proposal_failure )
+{
+   try
+   {
+      ACTORS( (bob) (alice) );
+
+      fund( bob,   asset(1000000) );
+      fund( alice, asset(1000000) );
+
+      // create proposal that will eventually fail due to lack of funds
+      transfer_operation top;
+      top.to = alice_id;
+      top.from = bob_id;
+      top.amount = asset(2000000);
+      proposal_create_operation pop;
+      pop.proposed_ops.push_back( { top } );
+      pop.expiration_time = db.head_block_time() + fc::days(1);
+      pop.fee_paying_account = bob_id;
+      trx.operations.push_back( pop );
+      trx.signatures.clear();
+      sign( trx, bob_private_key );
+      processed_transaction processed = PUSH_TX( db, trx );
+      proposal_object prop = db.get<proposal_object>(processed.operation_results.front().get<object_id_type>());
+      trx.clear();
+      generate_block();
+      // add signature
+      proposal_update_operation up_op;
+      up_op.proposal = prop.id;
+      up_op.fee_paying_account = bob_id;
+      up_op.active_approvals_to_add.emplace( bob_id );
+      trx.operations.push_back( up_op );
+      sign( trx, bob_private_key );
+      PUSH_TX( db, trx );
+      trx.clear();
+
+      // check fail reason
+      const proposal_object& result = db.get<proposal_object>(prop.id);
+      BOOST_CHECK(!result.fail_reason.empty());
+      BOOST_CHECK_EQUAL( result.fail_reason.substr(0, 16), "Assert Exception");
+   }
+   FC_LOG_AND_RETHROW()
 }
 
 /// Verify that committee authority cannot be invoked in a normal transaction
@@ -480,6 +522,8 @@ BOOST_AUTO_TEST_CASE( committee_authority )
 
    generate_blocks(prop.expiration_time);
    BOOST_CHECK_EQUAL(get_balance(nathan, asset_id_type()(db)), 100000);
+   // proposal deleted
+   BOOST_CHECK_THROW( db.get<proposal_object>(prop.id), fc::exception );
 } FC_LOG_AND_RETHROW() }
 
 BOOST_FIXTURE_TEST_CASE( fired_committee_members, database_fixture )
@@ -694,7 +738,7 @@ BOOST_FIXTURE_TEST_CASE( proposal_delete, database_fixture )
       PUSH_TX( db, trx );
       trx.clear();
       BOOST_CHECK(!prop.is_authorized_to_execute(db));
-      BOOST_CHECK_EQUAL(prop.available_active_approvals.size(), 1);
+      BOOST_CHECK_EQUAL(prop.available_active_approvals.size(), 1lu);
 
       std::swap(uop.active_approvals_to_add, uop.active_approvals_to_remove);
       trx.operations.push_back(uop);
@@ -702,7 +746,7 @@ BOOST_FIXTURE_TEST_CASE( proposal_delete, database_fixture )
       PUSH_TX( db, trx );
       trx.clear();
       BOOST_CHECK(!prop.is_authorized_to_execute(db));
-      BOOST_CHECK_EQUAL(prop.available_active_approvals.size(), 0);
+      BOOST_CHECK_EQUAL(prop.available_active_approvals.size(), 0lu);
    }
 
    {
@@ -756,8 +800,8 @@ BOOST_FIXTURE_TEST_CASE( proposal_owner_authority_delete, database_fixture )
    }
 
    const proposal_object& prop = *db.get_index_type<proposal_index>().indices().begin();
-   BOOST_CHECK_EQUAL(prop.required_active_approvals.size(), 1);
-   BOOST_CHECK_EQUAL(prop.required_owner_approvals.size(), 1);
+   BOOST_CHECK_EQUAL(prop.required_active_approvals.size(), 1lu);
+   BOOST_CHECK_EQUAL(prop.required_owner_approvals.size(), 1lu);
    BOOST_CHECK(!prop.is_authorized_to_execute(db));
 
    {
@@ -770,7 +814,7 @@ BOOST_FIXTURE_TEST_CASE( proposal_owner_authority_delete, database_fixture )
       PUSH_TX( db, trx );
       trx.clear();
       BOOST_CHECK(!prop.is_authorized_to_execute(db));
-      BOOST_CHECK_EQUAL(prop.available_owner_approvals.size(), 1);
+      BOOST_CHECK_EQUAL(prop.available_owner_approvals.size(), 1lu);
 
       std::swap(uop.owner_approvals_to_add, uop.owner_approvals_to_remove);
       trx.operations.push_back(uop);
@@ -778,7 +822,7 @@ BOOST_FIXTURE_TEST_CASE( proposal_owner_authority_delete, database_fixture )
       PUSH_TX( db, trx );
       trx.clear();
       BOOST_CHECK(!prop.is_authorized_to_execute(db));
-      BOOST_CHECK_EQUAL(prop.available_owner_approvals.size(), 0);
+      BOOST_CHECK_EQUAL(prop.available_owner_approvals.size(), 0lu);
    }
 
    {
@@ -833,8 +877,8 @@ BOOST_FIXTURE_TEST_CASE( proposal_owner_authority_complete, database_fixture )
    }
 
    const proposal_object& prop = *db.get_index_type<proposal_index>().indices().begin();
-   BOOST_CHECK_EQUAL(prop.required_active_approvals.size(), 1);
-   BOOST_CHECK_EQUAL(prop.required_owner_approvals.size(), 1);
+   BOOST_CHECK_EQUAL(prop.required_active_approvals.size(), 1lu);
+   BOOST_CHECK_EQUAL(prop.required_owner_approvals.size(), 1lu);
    BOOST_CHECK(!prop.is_authorized_to_execute(db));
 
    {
@@ -850,7 +894,7 @@ BOOST_FIXTURE_TEST_CASE( proposal_owner_authority_complete, database_fixture )
       PUSH_TX( db, trx );
       trx.clear();
       BOOST_CHECK(!prop.is_authorized_to_execute(db));
-      BOOST_CHECK_EQUAL(prop.available_key_approvals.size(), 1);
+      BOOST_CHECK_EQUAL(prop.available_key_approvals.size(), 1lu);
 
       std::swap(uop.key_approvals_to_add, uop.key_approvals_to_remove);
       trx.operations.push_back(uop);
@@ -860,7 +904,7 @@ BOOST_FIXTURE_TEST_CASE( proposal_owner_authority_complete, database_fixture )
       PUSH_TX( db, trx );
       trx.clear();
       BOOST_CHECK(!prop.is_authorized_to_execute(db));
-      BOOST_CHECK_EQUAL(prop.available_key_approvals.size(), 0);
+      BOOST_CHECK_EQUAL(prop.available_key_approvals.size(), 0lu);
 
       std::swap(uop.key_approvals_to_add, uop.key_approvals_to_remove);
       trx.operations.push_back(uop);
@@ -870,7 +914,7 @@ BOOST_FIXTURE_TEST_CASE( proposal_owner_authority_complete, database_fixture )
       PUSH_TX( db, trx );
       trx.clear();
       BOOST_CHECK(!prop.is_authorized_to_execute(db));
-      BOOST_CHECK_EQUAL(prop.available_key_approvals.size(), 1);
+      BOOST_CHECK_EQUAL(prop.available_key_approvals.size(), 1lu);
 
       uop.key_approvals_to_add.clear();
       uop.owner_approvals_to_add.insert(nathan.get_id());
@@ -895,7 +939,6 @@ BOOST_FIXTURE_TEST_CASE( max_authority_membership, database_fixture )
       });
 
       transaction tx;
-      processed_transaction ptx;
 
       private_key_type committee_key = init_account_priv_key;
       // Sam is the creator of accounts
@@ -1403,6 +1446,59 @@ BOOST_FIXTURE_TEST_CASE( parent_owner_test, database_fixture )
       throw;
    }
 }
+
+BOOST_AUTO_TEST_CASE( nested_execution )
+{ try {
+   ACTORS( (alice)(bob) );
+   fund( alice );
+
+   generate_blocks( HARDFORK_CORE_214_TIME + fc::hours(1) );
+   set_expiration( db, trx );
+
+   const auto& gpo = db.get_global_properties();
+
+   proposal_create_operation pco;
+   pco.expiration_time = db.head_block_time() + fc::minutes(1);
+   pco.fee_paying_account = alice_id;
+   proposal_id_type inner;
+   {
+      transfer_operation top;
+      top.from = alice_id;
+      top.to = bob_id;
+      top.amount = asset( 10 );
+      pco.proposed_ops.emplace_back( top );
+      trx.operations.push_back( pco );
+      inner = PUSH_TX( db, trx, ~0 ).operation_results.front().get<object_id_type>();
+      trx.clear();
+      pco.proposed_ops.clear();
+   }
+
+   std::vector<proposal_id_type> nested;
+   nested.push_back( inner );
+   for( size_t i = 0; i < gpo.active_witnesses.size() * 2; i++ )
+   {
+      proposal_update_operation pup;
+      pup.fee_paying_account = alice_id;
+      pup.proposal = nested.back();
+      pup.active_approvals_to_add.insert( alice_id );
+      pco.proposed_ops.emplace_back( pup );
+      trx.operations.push_back( pco );
+      nested.push_back( PUSH_TX( db, trx, ~0 ).operation_results.front().get<object_id_type>() );
+      trx.clear();
+      pco.proposed_ops.clear();
+   }
+
+   proposal_update_operation pup;
+   pup.fee_paying_account = alice_id;
+   pup.proposal = nested.back();
+   pup.active_approvals_to_add.insert( alice_id );
+   trx.operations.push_back( pup );
+   PUSH_TX( db, trx, ~0 );
+
+   for( size_t i = 1; i < nested.size(); i++ )
+      BOOST_CHECK_THROW( db.get<proposal_object>( nested[i] ), fc::assert_exception ); // executed successfully -> object removed
+   db.get<proposal_object>( inner ); // wasn't executed -> object exists, doesn't throw
+} FC_LOG_AND_RETHROW() }
 
 BOOST_AUTO_TEST_CASE( issue_214 )
 { try {

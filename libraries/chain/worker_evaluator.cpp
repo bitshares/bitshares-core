@@ -106,7 +106,7 @@ object_id_type worker_create_evaluator::do_apply(const worker_create_evaluator::
 void refund_worker_type::pay_worker(share_type pay, database& db)
 {
    total_burned += pay;
-   db.modify(db.get(asset_id_type()).dynamic_data(db), [pay](asset_dynamic_data_object& d) {
+   db.modify( db.get_core_dynamic_data(), [pay](asset_dynamic_data_object& d) {
       d.current_supply -= pay;
    });
 }
