@@ -25,6 +25,8 @@
 #include <graphene/app/plugin.hpp>
 #include <graphene/app/config_util.hpp>
 
+#include <graphene/net/peer_connection.hpp>
+
 #include <graphene/chain/balance_object.hpp>
 
 #include <graphene/utilities/tempdir.hpp>
@@ -359,14 +361,113 @@ BOOST_AUTO_TEST_CASE(application_impl_breakout) {
  */
 BOOST_AUTO_TEST_CASE( bad_message )
 {
-   class test_impl : public graphene::net::detail::node_impl {
-   public:
-      test_impl() : node_impl(nullptr) {}
+   // TODO: Implement a message_oriented_connection to override read_loop()
+   class my_peer_connection : public graphene::net::peer_connection
+   {
+      my_peer_connection(graphene::net::peer_connection_delegate* delegate) : 
+         graphene::net::peer_connection(delegate)
+      {
+      }
    };
 
-   test_impl impl;
-   graphene::net::peer_connection* peer;
-   graphene::net::message msg;
-   msg.msg_type = graphene::net::core_message_type_enum::block_message_type;
-   impl.on_message(peer, msg);
+   // override application_impl to override get_item
+   class my_app_impl : public graphene::app::detail::application_impl {
+      private:
+         graphene::chain::chain_id_type _chain_id;
+      public:
+         my_app_impl() : application_impl(nullptr) {}
+         bool has_item(const net::item_id& id) override {
+            return true;
+         }
+         graphene::chain::chain_id_type get_chain_id() const { return _chain_id; }
+         graphene::net::message get_item(const graphene::net::item_id& id) { 
+            graphene::net::message result;
+            try {
+               FC_ASSERT( false );
+            } FC_CAPTURE_AND_RETHROW( (id))
+            return result;
+         }
+   };
+
+   // override node_impl (actually no longer necessary)
+   class my_node_impl : public graphene::net::detail::node_impl {
+   public:
+      my_node_impl() : node_impl("user agent") { }
+   };
+
+   my_node_impl _node_impl;
+   my_app_impl _app_impl;
+   _node_impl.set_node_delegate(&_app_impl, &fc::thread::current());
+   graphene::net::peer_connection* peer = nullptr;
+
+   graphene::net::fetch_items_message msg;
+   graphene::chain::block_id_type block_id;
+   msg.items_to_fetch.push_back(block_id);
+
+   try
+   {
+      _node_impl.on_message(peer, msg);
+      std::cout << "on_message was successful.\n";
+   }
+   catch( fc::out_of_range_exception& e )
+   {
+      std::cerr << "Out of range exception thrown.\n";
+   }
+   catch( std::exception& e)
+   {
+      std::cerr << "Uh oh... Exception thrown. " << e.what() << '\n';
+   }
+   catch (...)
+   {
+      std::cerr << "Unknown exception thrown.\n";
+   }
+}
+
+bool testit(size_t size)
+{
+   const int BUFFER_SIZE = 16;
+   const int LEFTOVER = BUFFER_SIZE - sizeof(graphene::net::message_header);
+
+   char buffer[BUFFER_SIZE];
+   {
+      // a cheat to get bytes into buffer
+      graphene::net::message_header h;
+      h.size = size;
+      h.msg_type = graphene::net::block_message_type;
+      memcpy((char*)&buffer[0], (char*)&h, sizeof(graphene::net::message_header));
+   }
+   graphene::net::message m;
+   memcpy((char*)&m, buffer, sizeof(graphene::net::message_header));
+   size_t _bytes_received = BUFFER_SIZE;
+
+   // max size is 2,097,152
+   FC_ASSERT( m.size <= MAX_MESSAGE_SIZE, "", ("m.size",m.size)("MAX_MESSAGE_SIZE",MAX_MESSAGE_SIZE) );
+
+   size_t remaining_bytes_with_padding = 16 * ((m.size - LEFTOVER + 15) / 16);
+   m.data.resize(LEFTOVER + remaining_bytes_with_padding);
+   std::copy(buffer + sizeof(graphene::net::message_header), buffer + sizeof(buffer), m.data.begin());
+   if (remaining_bytes_with_padding)
+   {
+      char bytes[remaining_bytes_with_padding];
+      memset(&bytes[0], 0, remaining_bytes_with_padding);
+      // make some bytes
+      for(size_t i = 0; i < remaining_bytes_with_padding; ++i)
+      {
+         bytes[i] = (char)(i % 10);
+      }
+      memcpy(&m.data[LEFTOVER], &bytes[0], remaining_bytes_with_padding);
+      _bytes_received += remaining_bytes_with_padding;
+   }
+   m.data.resize(m.size); // truncate off the padding bytes
+   // now see what we've got
+   return true;
+}
+
+BOOST_AUTO_TEST_CASE( malformed_message )
+{
+   for(size_t i = MAX_MESSAGE_SIZE - 10; i <= MAX_MESSAGE_SIZE; ++i)
+   {
+      std::cout << "Tesing " << std::to_string(i) << '\n';
+      testit(i);
+   }
 }
