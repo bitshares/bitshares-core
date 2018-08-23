@@ -104,7 +104,7 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       uint64_t                       get_asset_count()const;
 
       // Markets / feeds
-      vector<limit_order_object>         get_limit_orders(std::string a, std::string b, uint32_t limit)const;
+      vector<limit_order_object>         get_limit_orders(std::string& a, std::string& b, uint32_t limit)const;
       vector<limit_order_object>         get_account_limit_orders( const string& account_name_or_id,
                                                                    const string &base,
                                                                    const string &quote, uint32_t limit,
@@ -258,8 +258,10 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
          });
          return result;
       }
-      vector<limit_order_object> get_limit_orders(const asset_id_type& a, const asset_id_type& b, const uint32_t& limit)const
+      vector<limit_order_object> get_limit_orders(const asset_id_type a, const asset_id_type b, const uint32_t limit)const
       {
+         FC_ASSERT( limit <= 300 );
+
          const auto& limit_order_idx = _db.get_index_type<limit_order_index>();
          const auto& limit_price_idx = limit_order_idx.indices().get<by_price>();
 
@@ -1202,17 +1204,14 @@ vector<limit_order_object> database_api::get_limit_orders(std::string a, std::st
 /**
  *  @return the limit orders for both sides of the book for the two assets specified up to limit number on each side.
  */
-vector<limit_order_object> database_api_impl::get_limit_orders(std::string a, std::string b, uint32_t limit)const
+vector<limit_order_object> database_api_impl::get_limit_orders(std::string& a, std::string& b, uint32_t limit)const
 {
-   FC_ASSERT( limit <= 100 );
-   vector<limit_order_object> results;
-   results.reserve(limit*2);
+   FC_ASSERT( limit <= 300 );
 
    const asset_id_type asset_a_id = get_asset_from_string(a)->id;
    const asset_id_type asset_b_id = get_asset_from_string(b)->id;
 
-   results = get_limit_orders(asset_a_id, asset_b_id, limit);
-   return results;
+   return get_limit_orders(asset_a_id, asset_b_id, limit);
 }
 
 vector<call_order_object> database_api::get_call_orders(asset_id_type a, uint32_t limit)const
