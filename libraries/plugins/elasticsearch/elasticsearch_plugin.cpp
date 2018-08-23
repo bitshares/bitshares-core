@@ -321,7 +321,8 @@ void elasticsearch_plugin_impl::prepareBulk(const account_transaction_history_id
    fc::mutable_variant_object bulk_header;
    bulk_header["_index"] = index_name;
    bulk_header["_type"] = "data";
-   bulk_header["_id"] = fc::to_string(ath_id.space_id) + "." + fc::to_string(ath_id.type_id) + "." + ath_id.instance;
+   bulk_header["_id"] = fc::to_string(ath_id.space_id) + "." + fc::to_string(ath_id.type_id) + "."
+                      + fc::to_string(ath_id.instance.value);
    prepare = graphene::utilities::createBulk(bulk_header, std::move(bulk_line));
    std::move(prepare.begin(), prepare.end(), std::back_inserter(bulk_lines));
    prepare.clear();
