@@ -34,13 +34,11 @@ namespace graphene { namespace db {
    using  fc::flat_map;
    using  fc::variant;
    using  fc::unsigned_int;
-   using  fc::signed_int;
 
    struct object_id_type
    {
       object_id_type( uint8_t s, uint8_t t, uint64_t i )
       {
-         assert( i>>48 == 0 );
          FC_ASSERT( i >> 48 == 0, "instance overflow", ("instance",i) );
          number = (uint64_t(s)<<56) | (uint64_t(t)<<48) | i;
       }

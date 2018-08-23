@@ -274,6 +274,15 @@ class utility {
        * @return A list of keys that are deterministically derived from the brainkey
        */
       static vector<brain_key_info> derive_owner_keys_from_brain_key(string brain_key, int number_of_desired_keys = 1);
+
+      /** Suggests a safe brain key to use for creating your account.
+       * \c create_account_with_brain_key() requires you to specify a 'brain key',
+       * a long passphrase that provides enough entropy to generate cyrptographic
+       * keys.  This function will suggest a suitably random string that should
+       * be easy to write down (and, with effort, memorize).
+       * @returns a suggested brain_key
+       */
+      static brain_key_info suggest_brain_key();
 };
 
 struct operation_detail {
@@ -356,7 +365,12 @@ class wallet_api
        * @returns the list of asset objects, ordered by symbol
        */
       vector<asset_object>              list_assets(const string& lowerbound, uint32_t limit)const;
-      
+      /** Returns assets count registered on the blockchain.
+       * 
+       * @returns assets count
+       */
+      uint64_t get_asset_count()const;
+
       /** Returns the most recent operations on the named account.
        *
        * This returns a list of operation history objects, which describe activity on the account.
@@ -388,6 +402,32 @@ class wallet_api
        */
       full_account                      get_full_account( const string& name_or_id);
       vector<bucket_object>             get_market_history(string symbol, string symbol2, uint32_t bucket, fc::time_point_sec start, fc::time_point_sec end)const;
+
+      /**
+       * @brief Fetch all orders relevant to the specified account sorted descendingly by price
+       *
+       * @param name_or_id  The name or ID of an account to retrieve
+       * @param base  Base asset
+       * @param quote  Quote asset
+       * @param limit  The limitation of items each query can fetch (max: 101)
+       * @param ostart_id  Start order id, fetch orders which price are lower than or equal to this order
+       * @param ostart_price  Fetch orders with price lower than or equal to this price
+       *
+       * @return List of orders from \c name_or_id to the corresponding account
+       *
+       * @note
+       * 1. if \c name_or_id cannot be tied to an account, empty result will be returned
+       * 2. \c ostart_id and \c ostart_price can be \c null, if so the api will return the "first page" of orders;
+       *    if \c ostart_id is specified and valid, its price will be used to do page query preferentially,
+       *    otherwise the \c ostart_price will be used 
+       */
+      vector<limit_order_object>        get_account_limit_orders( const string& name_or_id,
+                                            const string &base,
+                                            const string &quote,
+                                            uint32_t limit = 101,
+                                            optional<limit_order_id_type> ostart_id = optional<limit_order_id_type>(),
+                                            optional<price> ostart_price = optional<price>());
+
       vector<limit_order_object>        get_limit_orders(string a, string b, uint32_t limit)const;
       vector<call_order_object>         get_call_orders(string a, uint32_t limit)const;
       vector<force_settlement_object>   get_settle_orders(string a, uint32_t limit)const;
@@ -622,6 +662,12 @@ class wallet_api
        * @returns true if the specified wallet is loaded
        */
       bool    load_wallet_file(string wallet_filename = "");
+
+      /** Quitting from BitShares wallet.
+       * 
+       * The current wallet will be closed.
+       */
+      void    quit();
 
       /** Saves the current wallet to the given filename.
        * 
@@ -881,8 +927,10 @@ class wallet_api
        *  that it exists in the blockchain.  If it exists then it will report the amount received and
        *  who sent it.
        *
-       *  @param opt_from - if not empty and the sender is a unknown public key, then the unknown public key will be given the label opt_from
-       *  @param confirmation_receipt - a base58 encoded stealth confirmation 
+       *  @param opt_from if not empty and the sender is a unknown public key,
+       *                  then the unknown public key will be given the label \c opt_from
+       *  @param confirmation_receipt a base58 encoded stealth confirmation
+       *  @param opt_memo a self-defined label for this transfer to be saved in local wallet file
        */
       blind_receipt receive_blind_transfer( string confirmation_receipt, string opt_from, string opt_memo );
 
@@ -981,6 +1029,26 @@ class wallet_api
       signed_transaction borrow_asset(string borrower_name, string amount_to_borrow, string asset_symbol,
                                       string amount_of_collateral, bool broadcast = false);
 
+      /** Borrow an asset or update the debt/collateral ratio for the loan, with additional options.
+       *
+       * This is the first step in shorting an asset.  Call \c sell_asset() to complete the short.
+       *
+       * @param borrower_name the name or id of the account associated with the transaction.
+       * @param amount_to_borrow the amount of the asset being borrowed.  Make this value
+       *                         negative to pay back debt.
+       * @param asset_symbol the symbol or id of the asset being borrowed.
+       * @param amount_of_collateral the amount of the backing asset to add to your collateral
+       *        position.  Make this negative to claim back some of your collateral.
+       *        The backing asset is defined in the \c bitasset_options for the asset being borrowed.
+       * @param extensions additional options
+       * @param broadcast true to broadcast the transaction on the network
+       * @returns the signed transaction borrowing the asset
+       */
+      signed_transaction borrow_asset_ext( string borrower_name, string amount_to_borrow, string asset_symbol,
+                                           string amount_of_collateral,
+                                           call_order_update_operation::extensions_type extensions,
+                                           bool broadcast = false );
+
       /** Cancel an existing order
        *
        * @param order_id the id of order to be cancelled
@@ -1052,6 +1120,21 @@ class wallet_api
                                       optional<string> new_issuer,
                                       asset_options new_options,
                                       bool broadcast = false);
+
+      /** Update the issuer of an asset
+       * Since this call requires the owner authority of the current issuer to sign the transaction,
+       * a separated operation is used to change the issuer. This call simplifies the use of this action.
+       *
+       * @note This operation requires the owner key to be available in the wallet.
+       *
+       * @param symbol the name or id of the asset to update
+       * @param new_issuer if changing the asset's issuer, the name or id of the new issuer.
+       * @param broadcast true to broadcast the transaction on the network
+       * @returns the signed transaction updating the asset
+       */
+      signed_transaction update_asset_issuer(string symbol,
+                                             string new_issuer,
+                                             bool broadcast = false);
 
       /** Update the options specific to a BitAsset.
        *
@@ -1127,6 +1210,23 @@ class wallet_api
                                              string symbol,
                                              string amount,
                                              bool broadcast = false);
+
+      /** Claim funds from the fee pool for the given asset.
+       *
+       * User-issued assets can optionally have a pool of the core asset which is 
+       * automatically used to pay transaction fees for any transaction using that
+       * asset (using the asset's core exchange rate).
+       *
+       * This command allows the issuer to withdraw those funds from the fee pool.
+       *
+       * @param symbol the name or id of the asset whose fee pool you wish to claim
+       * @param amount the amount of the core asset to withdraw
+       * @param broadcast true to broadcast the transaction on the network
+       * @returns the signed transaction claiming from the fee pool
+       */
+      signed_transaction claim_asset_fee_pool(string symbol,
+                                              string amount,
+                                              bool broadcast = false);
 
       /** Burns the given user-issued asset.
        *
@@ -1656,6 +1756,7 @@ FC_API( graphene::wallet::wallet_api,
         (list_accounts)
         (list_account_balances)
         (list_assets)
+        (get_asset_count)
         (import_key)
         (import_accounts)
         (import_account_keys)
@@ -1667,12 +1768,14 @@ FC_API( graphene::wallet::wallet_api,
         (create_account_with_brain_key)
         (sell_asset)
         (borrow_asset)
+        (borrow_asset_ext)
         (cancel_order)
         (transfer)
         (transfer2)
         (get_transaction_id)
         (create_asset)
         (update_asset)
+        (update_asset_issuer)
         (update_bitasset)
         (update_asset_feed_producers)
         (publish_asset_feed)
@@ -1680,6 +1783,7 @@ FC_API( graphene::wallet::wallet_api,
         (get_asset)
         (get_bitasset_data)
         (fund_asset_fee_pool)
+        (claim_asset_fee_pool)
         (reserve_asset)
         (global_settle_asset)
         (settle_asset)
@@ -1717,6 +1821,7 @@ FC_API( graphene::wallet::wallet_api,
         (get_private_key)
         (load_wallet_file)
         (normalize_brain_key)
+        (get_account_limit_orders)
         (get_limit_orders)
         (get_call_orders)
         (get_settle_orders)
@@ -1751,4 +1856,5 @@ FC_API( graphene::wallet::wallet_api,
         (blind_history)
         (receive_blind_transfer)
         (get_order_book)
+        (quit)
       )

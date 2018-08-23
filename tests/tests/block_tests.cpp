@@ -32,6 +32,9 @@
 #include <graphene/chain/committee_member_object.hpp>
 #include <graphene/chain/proposal_object.hpp>
 #include <graphene/chain/market_object.hpp>
+#include <graphene/chain/hardfork.hpp>
+#include <graphene/chain/witness_schedule_object.hpp>
+#include <graphene/chain/witness_object.hpp>
 
 #include <graphene/utilities/tempdir.hpp>
 
@@ -1297,18 +1300,50 @@ BOOST_AUTO_TEST_CASE( genesis_reserve_ids )
    }
 }
 
+BOOST_FIXTURE_TEST_CASE( miss_some_blocks, database_fixture )
+{ try {
+   std::vector<witness_id_type> witnesses = witness_schedule_id_type()(db).current_shuffled_witnesses;
+   BOOST_CHECK_EQUAL( 10, witnesses.size() );
+   // database_fixture constructor calls generate_block once, signed by witnesses[0]
+   generate_block(); // witnesses[1]
+   generate_block(); // witnesses[2]
+   for( const auto& id : witnesses )
+      BOOST_CHECK_EQUAL( 0, id(db).total_missed );
+   // generate_blocks generates another block *now* (witnesses[3])
+   // and one at now+10 blocks (witnesses[12%10])
+   generate_blocks( db.head_block_time() + db.get_global_properties().parameters.block_interval * 10, true );
+   // i. e. 8 blocks are missed in between by witness[4..11%10]
+   for( uint32_t i = 0; i < witnesses.size(); i++ )
+      BOOST_CHECK_EQUAL( (i+7) % 10 < 2 ? 0 : 1, witnesses[i](db).total_missed );
+} FC_LOG_AND_RETHROW() }
+
 BOOST_FIXTURE_TEST_CASE( miss_many_blocks, database_fixture )
 {
    try
    {
+      auto get_misses = []( database& db ) {
+         std::map< witness_id_type, uint32_t > misses;
+         for( const auto& witness_id : witness_schedule_id_type()(db).current_shuffled_witnesses )
+            misses[witness_id] = witness_id(db).total_missed;
+         return misses;
+      };
       generate_block();
       generate_block();
       generate_block();
+      auto missed_before = get_misses( db );
       // miss 10 maintenance intervals
       generate_blocks( db.get_dynamic_global_properties().next_maintenance_time + db.get_global_properties().parameters.maintenance_interval * 10, true );
       generate_block();
       generate_block();
       generate_block();
+      auto missed_after = get_misses( db );
+      BOOST_CHECK_EQUAL( missed_before.size(), missed_after.size() );
+      for( const auto& miss : missed_before )
+      {
+          const auto& after = missed_after.find( miss.first );
+          BOOST_REQUIRE( after != missed_after.end() );
+          BOOST_CHECK_EQUAL( miss.second, after->second );
+      }
    }
    catch (fc::exception& e)
    {
@@ -1499,15 +1534,11 @@ BOOST_FIXTURE_TEST_CASE( update_account_keys, database_fixture )
                            database::skip_transaction_signatures );
                      }
                   }
-                  verify_account_history_plugin_index();
                   generate_block( skip_flags );
 
-                  verify_account_history_plugin_index();
                   db.pop_block();
-                  verify_account_history_plugin_index();
                }
                db.pop_block();
-               verify_account_history_plugin_index();
             }
          }
       }
@@ -1650,5 +1681,49 @@ BOOST_FIXTURE_TEST_CASE( tapos_rollover, database_fixture )
       throw;
    }
 }
+
+BOOST_FIXTURE_TEST_CASE( temp_account_balance, database_fixture )
+{ try {
+   ACTORS( (alice) );
+   fund( alice );
+   create_user_issued_asset( "UIA" );
+
+   generate_block();
+   set_expiration( db, trx );
+
+   transfer_operation top;
+   top.amount = asset( 1000 );
+   top.from = alice_id;
+   top.to   = GRAPHENE_TEMP_ACCOUNT;
+   trx.operations.push_back( top );
+
+   limit_order_create_operation loc;
+   loc.amount_to_sell = top.amount;
+   loc.expiration = db.head_block_time() + 1;
+   loc.seller = GRAPHENE_TEMP_ACCOUNT;
+   loc.min_to_receive = asset( 1000, asset_id_type(1) );
+   trx.operations.push_back( loc );
+   sign( trx, alice_private_key );
+   PUSH_TX( db, trx );
+   trx.clear();
+
+   generate_block();
+   generate_block();
+   generate_block();
+
+   top.to = GRAPHENE_COMMITTEE_ACCOUNT;
+   trx.operations.push_back( top );
+   sign( trx, alice_private_key );
+   BOOST_CHECK_THROW( PUSH_TX( db, trx ), fc::assert_exception );
+
+   generate_blocks( HARDFORK_CORE_1040_TIME );
+
+   set_expiration( db, trx );
+   trx.signatures.clear();
+   sign( trx, alice_private_key );
+   PUSH_TX( db, trx );
+
+   BOOST_CHECK( get_balance( GRAPHENE_TEMP_ACCOUNT, asset_id_type() ) > 0 );
+} FC_LOG_AND_RETHROW() }
 
 BOOST_AUTO_TEST_SUITE_END()

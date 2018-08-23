@@ -1,0 +1,5 @@
+// bitshares-core issue #342
+// Mitigate rounding issue when matching orders
+#ifndef HARDFORK_CORE_342_TIME
+#define HARDFORK_CORE_342_TIME (fc::time_point_sec( 1532008920 )) // Thu, 19 Jul 2018 14:02:00 UTC
+#endif

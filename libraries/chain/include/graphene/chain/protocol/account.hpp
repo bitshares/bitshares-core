@@ -57,6 +57,12 @@ namespace graphene { namespace chain {
       flat_set<vote_id_type> votes;
       extensions_type        extensions;
 
+      /// Whether this account is voting
+      inline bool is_voting() const
+      {
+         return ( voting_account != GRAPHENE_PROXY_TO_SELF_ACCOUNT || !votes.empty() );
+      }
+
       void validate()const;
    };
 

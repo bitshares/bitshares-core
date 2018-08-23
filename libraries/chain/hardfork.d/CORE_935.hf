@@ -1,0 +1,4 @@
+// bitshares-core issue #935 Call check_call_orders not only when settlement_price changed
+#ifndef HARDFORK_CORE_935_TIME
+#define HARDFORK_CORE_935_TIME (fc::time_point_sec( 1532008920 )) // Thu, 19 Jul 2018 14:02:00 UTC
+#endif

@@ -7,7 +7,7 @@ containers. This README serves as documentation.
 
 The `Dockerfile` performs the following steps:
 
-1. Obtain base image (phusion/baseimage:0.9.19)
+1. Obtain base image (phusion/baseimage:0.10.1)
 2. Install required dependencies using `apt-get`
 3. Add bitshares-core source code into container
 4. Update git submodules
@@ -16,7 +16,7 @@ The `Dockerfile` performs the following steps:
 7. Purge source code off the container
 8. Add a local bitshares user and set `$HOME` to `/var/lib/bitshares`
 9. Make `/var/lib/bitshares` and `/etc/bitshares` a docker *volume*
-10. Expose ports `8090` and `2001`
+10. Expose ports `8090` and `1776`
 11. Add default config from `docker/default_config.ini` and entry point script
 12. Run entry point script by default
 

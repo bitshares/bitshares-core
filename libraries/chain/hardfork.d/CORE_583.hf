@@ -1,0 +1,4 @@
+// bitshares-core issue #583 Always allow updating a call order to higher collateral ratio
+#ifndef HARDFORK_CORE_583_TIME
+#define HARDFORK_CORE_583_TIME (fc::time_point_sec( 1532008920 )) // Thu, 19 Jul 2018 14:02:00 UTC
+#endif
