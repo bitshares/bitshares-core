@@ -411,12 +411,12 @@ class database_api
 
       /**
        * @brief Get limit orders in a given market
-       * @param a ID of asset being sold
-       * @param b ID of asset being purchased
+       * @param a Symbol or ID of asset being sold
+       * @param b Symbol or ID of asset being purchased
        * @param limit Maximum number of orders to retrieve
        * @return The limit orders, ordered from least price to greatest
        */
-      vector<limit_order_object> get_limit_orders(asset_id_type a, asset_id_type b, uint32_t limit)const;
+      vector<limit_order_object> get_limit_orders(std::string a, std::string b, uint32_t limit)const;
 
       /**
        * @brief Get call orders in a given asset

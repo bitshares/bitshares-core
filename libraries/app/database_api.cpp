@@ -104,7 +104,7 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       uint64_t                       get_asset_count()const;
 
       // Markets / feeds
-      vector<limit_order_object>         get_limit_orders(asset_id_type a, asset_id_type b, uint32_t limit)const;
+      vector<limit_order_object>         get_limit_orders(std::string a, std::string b, uint32_t limit)const;
       vector<limit_order_object>         get_account_limit_orders( const string& account_name_or_id,
                                                                    const string &base,
                                                                    const string &quote, uint32_t limit,
@@ -256,6 +256,35 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
             }
             return {};
          });
+         return result;
+      }
+      vector<limit_order_object> get_limit_orders(const asset_id_type& a, const asset_id_type& b, const uint32_t& limit)const
+      {
+         const auto& limit_order_idx = _db.get_index_type<limit_order_index>();
+         const auto& limit_price_idx = limit_order_idx.indices().get<by_price>();
+
+         vector<limit_order_object> result;
+         result.reserve(limit*2);
+
+         uint32_t count = 0;
+         auto limit_itr = limit_price_idx.lower_bound(price::max(a,b));
+         auto limit_end = limit_price_idx.upper_bound(price::min(a,b));
+         while(limit_itr != limit_end && count < limit)
+         {
+            result.push_back(*limit_itr);
+            ++limit_itr;
+            ++count;
+         }
+         count = 0;
+         limit_itr = limit_price_idx.lower_bound(price::max(b,a));
+         limit_end = limit_price_idx.upper_bound(price::min(b,a));
+         while(limit_itr != limit_end && count < limit)
+         {
+            result.push_back(*limit_itr);
+            ++limit_itr;
+            ++count;
+         }
+
          return result;
       }
 
@@ -1165,7 +1194,7 @@ vector<optional<asset_object>> database_api_impl::lookup_asset_symbols(const vec
 //                                                                  //
 //////////////////////////////////////////////////////////////////////
 
-vector<limit_order_object> database_api::get_limit_orders(asset_id_type a, asset_id_type b, uint32_t limit)const
+vector<limit_order_object> database_api::get_limit_orders(std::string a, std::string b, uint32_t limit)const
 {
    return my->get_limit_orders( a, b, limit );
 }
@@ -1173,33 +1202,17 @@ vector<limit_order_object> database_api::get_limit_orders(asset_id_type a, asset
 /**
  *  @return the limit orders for both sides of the book for the two assets specified up to limit number on each side.
  */
-vector<limit_order_object> database_api_impl::get_limit_orders(asset_id_type a, asset_id_type b, uint32_t limit)const
+vector<limit_order_object> database_api_impl::get_limit_orders(std::string a, std::string b, uint32_t limit)const
 {
-   const auto& limit_order_idx = _db.get_index_type<limit_order_index>();
-   const auto& limit_price_idx = limit_order_idx.indices().get<by_price>();
+   FC_ASSERT( limit <= 100 );
+   vector<limit_order_object> results;
+   results.reserve(limit*2);
 
-   vector<limit_order_object> result;
+   const asset_id_type asset_a_id = get_asset_from_string(a)->id;
+   const asset_id_type asset_b_id = get_asset_from_string(b)->id;
 
-   uint32_t count = 0;
-   auto limit_itr = limit_price_idx.lower_bound(price::max(a,b));
-   auto limit_end = limit_price_idx.upper_bound(price::min(a,b));
-   while(limit_itr != limit_end && count < limit)
-   {
-      result.push_back(*limit_itr);
-      ++limit_itr;
-      ++count;
-   }
-   count = 0;
-   limit_itr = limit_price_idx.lower_bound(price::max(b,a));
-   limit_end = limit_price_idx.upper_bound(price::min(b,a));
-   while(limit_itr != limit_end && count < limit)
-   {
-      result.push_back(*limit_itr);
-      ++limit_itr;
-      ++count;
-   }
-
-   return result;
+   results = get_limit_orders(asset_a_id, asset_b_id, limit);
+   return results;
 }
 
 vector<call_order_object> database_api::get_call_orders(asset_id_type a, uint32_t limit)const
