@@ -253,7 +253,7 @@ struct cli_fixture
 ////////////////
 BOOST_FIXTURE_TEST_CASE( cli_connect, cli_fixture )
 {
-    BOOST_TEST_MESSAGE("Testing wallet connection.");
+   BOOST_TEST_MESSAGE("Testing wallet connection.");
 }
 
 ////////////////
@@ -262,8 +262,8 @@ BOOST_FIXTURE_TEST_CASE( cli_connect, cli_fixture )
 ////////////////
 BOOST_FIXTURE_TEST_CASE( cli_quit, cli_fixture )
 {
-    BOOST_TEST_MESSAGE("Testing wallet connection and quit command.");
-    BOOST_CHECK_THROW( con->wallet_api_ptr->quit(), fc::canceled_exception );
+   BOOST_TEST_MESSAGE("Testing wallet connection and quit command.");
+   BOOST_CHECK_THROW( con->wallet_api_ptr->quit(), fc::canceled_exception );
 }
 
 ///////////////////////
@@ -273,75 +273,75 @@ BOOST_FIXTURE_TEST_CASE( cli_quit, cli_fixture )
 ///////////////////////
 BOOST_FIXTURE_TEST_CASE( cli_vote_for_2_witnesses, cli_fixture )
 {
-    try
-    {
-        BOOST_TEST_MESSAGE("Cli Vote Test for 2 Witnesses");
+   try
+   {
+      BOOST_TEST_MESSAGE("Cli Vote Test for 2 Witnesses");
 
-        account_object nathan_acct_before_upgrade, nathan_acct_after_upgrade;
-        std::vector<signed_transaction> import_txs;
-        signed_transaction upgrade_tx, transfer_tx;
+      account_object nathan_acct_before_upgrade, nathan_acct_after_upgrade;
+      std::vector<signed_transaction> import_txs;
+      signed_transaction upgrade_tx, transfer_tx;
 
-        BOOST_TEST_MESSAGE("Importing nathan's balance");
-        import_txs = con->wallet_api_ptr->import_balance("nathan", nathan_keys, true);
-        nathan_acct_before_upgrade = con->wallet_api_ptr->get_account("nathan");
+      BOOST_TEST_MESSAGE("Importing nathan's balance");
+      import_txs = con->wallet_api_ptr->import_balance("nathan", nathan_keys, true);
+      nathan_acct_before_upgrade = con->wallet_api_ptr->get_account("nathan");
 
-        // upgrade nathan
-        BOOST_TEST_MESSAGE("Upgrading Nathan to LTM");
-        upgrade_tx = con->wallet_api_ptr->upgrade_account("nathan", true);
-        nathan_acct_after_upgrade = con->wallet_api_ptr->get_account("nathan");
+      // upgrade nathan
+      BOOST_TEST_MESSAGE("Upgrading Nathan to LTM");
+      upgrade_tx = con->wallet_api_ptr->upgrade_account("nathan", true);
+      nathan_acct_after_upgrade = con->wallet_api_ptr->get_account("nathan");
 
-        // verify that the upgrade was successful
-        BOOST_CHECK_PREDICATE( std::not_equal_to<uint32_t>(), (nathan_acct_before_upgrade.membership_expiration_date.sec_since_epoch())(nathan_acct_after_upgrade.membership_expiration_date.sec_since_epoch()) );
-        BOOST_CHECK(nathan_acct_after_upgrade.is_lifetime_member());
+      // verify that the upgrade was successful
+      BOOST_CHECK_PREDICATE( std::not_equal_to<uint32_t>(), (nathan_acct_before_upgrade.membership_expiration_date.sec_since_epoch())(nathan_acct_after_upgrade.membership_expiration_date.sec_since_epoch()) );
+      BOOST_CHECK(nathan_acct_after_upgrade.is_lifetime_member());
 
-        // create a new account
-        graphene::wallet::brain_key_info bki = con->wallet_api_ptr->suggest_brain_key();
-        BOOST_CHECK(!bki.brain_priv_key.empty());
-        signed_transaction create_acct_tx = con->wallet_api_ptr->create_account_with_brain_key(bki.brain_priv_key, "jmjatlanta", "nathan", "nathan", true);
-        // save the private key for this new account in the wallet file
-        BOOST_CHECK(con->wallet_api_ptr->import_key("jmjatlanta", bki.wif_priv_key));
-        con->wallet_api_ptr->save_wallet_file(con->wallet_filename);
+      // create a new account
+      graphene::wallet::brain_key_info bki = con->wallet_api_ptr->suggest_brain_key();
+      BOOST_CHECK(!bki.brain_priv_key.empty());
+      signed_transaction create_acct_tx = con->wallet_api_ptr->create_account_with_brain_key(bki.brain_priv_key, "jmjatlanta", "nathan", "nathan", true);
+      // save the private key for this new account in the wallet file
+      BOOST_CHECK(con->wallet_api_ptr->import_key("jmjatlanta", bki.wif_priv_key));
+      con->wallet_api_ptr->save_wallet_file(con->wallet_filename);
 
-        // attempt to give jmjatlanta some bitsahres
-        BOOST_TEST_MESSAGE("Transferring bitshares from Nathan to jmjatlanta");
-        transfer_tx = con->wallet_api_ptr->transfer("nathan", "jmjatlanta", "10000", "1.3.0", "Here are some CORE token for your new account", true);
+      // attempt to give jmjatlanta some bitsahres
+      BOOST_TEST_MESSAGE("Transferring bitshares from Nathan to jmjatlanta");
+      transfer_tx = con->wallet_api_ptr->transfer("nathan", "jmjatlanta", "10000", "1.3.0", "Here are some CORE token for your new account", true);
 
-        // get the details for init1
-        witness_object init1_obj = con->wallet_api_ptr->get_witness("init1");
-        int init1_start_votes = init1_obj.total_votes;
-        // Vote for a witness
-        signed_transaction vote_witness1_tx = con->wallet_api_ptr->vote_for_witness("jmjatlanta", "init1", true, true);
+      // get the details for init1
+      witness_object init1_obj = con->wallet_api_ptr->get_witness("init1");
+      int init1_start_votes = init1_obj.total_votes;
+      // Vote for a witness
+      signed_transaction vote_witness1_tx = con->wallet_api_ptr->vote_for_witness("jmjatlanta", "init1", true, true);
 
-        // generate a block to get things started
-        BOOST_CHECK(generate_block(app1));
-        // wait for a maintenance interval
-        BOOST_CHECK(generate_maintenance_block(app1));
+      // generate a block to get things started
+      BOOST_CHECK(generate_block(app1));
+      // wait for a maintenance interval
+      BOOST_CHECK(generate_maintenance_block(app1));
 
-        // Verify that the vote is there
-        init1_obj = con->wallet_api_ptr->get_witness("init1");
-        witness_object init2_obj = con->wallet_api_ptr->get_witness("init2");
-        int init1_middle_votes = init1_obj.total_votes;
-        BOOST_CHECK(init1_middle_votes > init1_start_votes);
+      // Verify that the vote is there
+      init1_obj = con->wallet_api_ptr->get_witness("init1");
+      witness_object init2_obj = con->wallet_api_ptr->get_witness("init2");
+      int init1_middle_votes = init1_obj.total_votes;
+      BOOST_CHECK(init1_middle_votes > init1_start_votes);
 
-        // Vote for a 2nd witness
-        int init2_start_votes = init2_obj.total_votes;
-        signed_transaction vote_witness2_tx = con->wallet_api_ptr->vote_for_witness("jmjatlanta", "init2", true, true);
+      // Vote for a 2nd witness
+      int init2_start_votes = init2_obj.total_votes;
+      signed_transaction vote_witness2_tx = con->wallet_api_ptr->vote_for_witness("jmjatlanta", "init2", true, true);
 
-        // send another block to trigger maintenance interval
-        BOOST_CHECK(generate_maintenance_block(app1));
+      // send another block to trigger maintenance interval
+      BOOST_CHECK(generate_maintenance_block(app1));
 
-        // Verify that both the first vote and the 2nd are there
-        init2_obj = con->wallet_api_ptr->get_witness("init2");
-        init1_obj = con->wallet_api_ptr->get_witness("init1");
+      // Verify that both the first vote and the 2nd are there
+      init2_obj = con->wallet_api_ptr->get_witness("init2");
+      init1_obj = con->wallet_api_ptr->get_witness("init1");
 
-        int init2_middle_votes = init2_obj.total_votes;
-        BOOST_CHECK(init2_middle_votes > init2_start_votes);
-        int init1_last_votes = init1_obj.total_votes;
-        BOOST_CHECK(init1_last_votes > init1_start_votes);
-    } catch( fc::exception& e ) {
-        edump((e.to_detail_string()));
-        throw;
-    }
+      int init2_middle_votes = init2_obj.total_votes;
+      BOOST_CHECK(init2_middle_votes > init2_start_votes);
+      int init1_last_votes = init1_obj.total_votes;
+      BOOST_CHECK(init1_last_votes > init1_start_votes);
+   } catch( fc::exception& e ) {
+      edump((e.to_detail_string()));
+      throw;
+   }
 }
 
 ///////////////////
@@ -441,16 +441,16 @@ BOOST_FIXTURE_TEST_CASE( cli_confidential_tx_test, cli_fixture )
       asset_object core_asset = W.get_asset("1.3.0");
       BOOST_TEST_MESSAGE("Sending blind transactions to alice and bob");
       for (auto to : to_list) {
-        string amount = core_asset.amount_to_string(to.second);
-        bconfs.push_back(W.blind_transfer("nathan",to.first,amount,core_asset.symbol,true));
-        BOOST_CHECK( W.get_blind_balances(to.first)[0].amount == to.second );
+         string amount = core_asset.amount_to_string(to.second);
+         bconfs.push_back(W.blind_transfer("nathan",to.first,amount,core_asset.symbol,true));
+         BOOST_CHECK( W.get_blind_balances(to.first)[0].amount == to.second );
       }
       BOOST_TEST_MESSAGE("Inspecting range proof mantissa lengths");
       vector<int> rp_mantissabits;
       for (auto conf : bconfs) {
-        for (auto out : conf.trx.operations[0].get<blind_transfer_operation>().outputs) {
-          rp_mantissabits.push_back(1+out.range_proof[1]); // 2nd byte encodes mantissa length
-        }
+         for (auto out : conf.trx.operations[0].get<blind_transfer_operation>().outputs) {
+            rp_mantissabits.push_back(1+out.range_proof[1]); // 2nd byte encodes mantissa length
+         }
       }
       // We are checking the mantissa length of the range proofs for several Pedersen
       // commitments of varying magnitude.  We don't want the mantissa lengths to give
@@ -513,8 +513,8 @@ BOOST_FIXTURE_TEST_CASE( account_history_pagination, cli_fixture )
       BOOST_TEST_MESSAGE("Transferring bitshares from Nathan to jmjatlanta");
       for(int i = 1; i <= 200; i++)
       {
-          signed_transaction transfer_tx = con->wallet_api_ptr->transfer("nathan", "jmjatlanta", std::to_string(i),
-                                                 "1.3.0", "Here are some CORE token for your new account", true);
+         signed_transaction transfer_tx = con->wallet_api_ptr->transfer("nathan", "jmjatlanta", std::to_string(i),
+                                                "1.3.0", "Here are some CORE token for your new account", true);
       }
 
       BOOST_CHECK(generate_block(app1));
