@@ -942,7 +942,7 @@ void application::set_program_options(boost::program_options::options_descriptio
          ("api-access", bpo::value<boost::filesystem::path>(), "JSON file specifying API permissions")
          ("plugins", bpo::value<string>(), "Space-separated list of plugins to activate")
          ("io-threads", bpo::value<uint16_t>()->implicit_value(0), "Number of IO threads, default to 0 for auto-configuration")
-         ("enable-subscribe-to-all", bpo::value<bool>()->implicit_value(false),
+         ("enable-subscribe-to-all", bpo::value<bool>()->implicit_value(true),
           "Whether allow API clients to subscribe to universal object creation and removal events")
          ("enable-standby-votes-tracking", bpo::value<bool>()->implicit_value(true),
           "Whether to enable tracking of votes of standby witnesses and committee members. "
