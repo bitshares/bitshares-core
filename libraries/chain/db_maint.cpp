@@ -534,12 +534,6 @@ void database::process_budget()
          _dpo.last_budget_time = now;
       });
 
-      create< budget_record_object >( [&]( budget_record_object& _rec )
-      {
-         _rec.time = head_block_time();
-         _rec.record = rec;
-      });
-
       // available_funds is money we could spend, but don't want to.
       // we simply let it evaporate back into the reserve.
    }
