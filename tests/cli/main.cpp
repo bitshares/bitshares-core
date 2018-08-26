@@ -202,11 +202,11 @@ public:
 
 struct cli_fixture
 {
-   int server_port_number {0};
+   int server_port_number;
    fc::temp_directory app_dir = graphene::utilities::temp_directory_path();
-   std::shared_ptr<graphene::app::application> app1 = start_application(app_dir, server_port_number);
-   client_connection* con = new client_connection(app1, app_dir, server_port_number);
-   std::vector<std::string> nathan_keys { "5KQwrPbwdL6PhXujxW37FSSQZ1JiwsST4cqQzDeyXtP79zkvFD3" };
+   std::shared_ptr<graphene::app::application> app1;
+   client_connection* con;
+   std::vector<std::string> nathan_keys;
 
    cli_fixture()
    {
@@ -214,6 +214,11 @@ struct cli_fixture
 
       using namespace graphene::chain;
       using namespace graphene::app;
+
+      server_port_number = 0;
+      app1 = start_application(app_dir, server_port_number);
+      con = new client_connection(app1, app_dir, server_port_number);
+      nathan_keys.insert(nathan_keys.begin(), 1, "5KQwrPbwdL6PhXujxW37FSSQZ1JiwsST4cqQzDeyXtP79zkvFD3");
 
       try 
       {
