@@ -362,6 +362,7 @@ BOOST_AUTO_TEST_CASE(application_impl_breakout) {
 BOOST_AUTO_TEST_CASE( bad_message )
 {
    // TODO: Implement a message_oriented_connection to override read_loop()
+   /*
    class my_peer_connection : public graphene::net::peer_connection
    {
       my_peer_connection(graphene::net::peer_connection_delegate* delegate) : 
@@ -369,6 +370,7 @@ BOOST_AUTO_TEST_CASE( bad_message )
       {
       }
    };
+   */
 
    // override application_impl to override get_item
    class my_app_impl : public graphene::app::detail::application_impl {

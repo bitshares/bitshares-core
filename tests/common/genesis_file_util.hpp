@@ -1,5 +1,7 @@
 #pragma once
 
+#include <boost/filesystem/path.hpp>
+
 /////////
 /// @brief forward declaration, using as a hack to generate a genesis.json file
 /// for testing
@@ -13,7 +15,7 @@ namespace graphene { namespace app { namespace detail {
 /// @param directory the directory to place the file "genesis.json"
 /// @returns the full path to the file
 ////////
-boost::filesystem::path create_genesis_file(fc::temp_directory& directory) {
+boost::filesystem::path create_genesis_file(const fc::temp_directory& directory) {
    boost::filesystem::path genesis_path = boost::filesystem::path{directory.path().generic_string()} / "genesis.json";
    fc::path genesis_out = genesis_path;
    graphene::chain::genesis_state_type genesis_state = graphene::app::detail::create_example_genesis();
