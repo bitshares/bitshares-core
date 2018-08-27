@@ -635,7 +635,6 @@ const account_object& database_fixture::create_account(
       trx.validate();
 
       processed_transaction ptx = db.push_transaction(trx, ~0);
-      //wdump( (ptx) );
       const account_object& result = db.get<account_object>(ptx.operation_results[0].get<object_id_type>());
       trx.operations.clear();
       return result;
@@ -719,7 +718,6 @@ const limit_order_object* database_fixture::create_sell_order( const account_obj
                                                 const time_point_sec order_expiration,
                                                 const price& fee_core_exchange_rate )
 {
-   //wdump((amount)(recv));
    limit_order_create_operation buy_order;
    buy_order.seller = user.id;
    buy_order.amount_to_sell = amount;
@@ -731,7 +729,6 @@ const limit_order_object* database_fixture::create_sell_order( const account_obj
    auto processed = db.push_transaction(trx, ~0);
    trx.operations.clear();
    verify_asset_supplies(db);
-   //wdump((processed));
    return db.find<limit_order_object>( processed.operation_results[0].get<object_id_type>() );
 }
 
@@ -1171,7 +1168,8 @@ bool _push_block( database& db, const signed_block& b, uint32_t skip_flags /* = 
 
 processed_transaction _push_transaction( database& db, const signed_transaction& tx, uint32_t skip_flags /* = 0 */ )
 { try {
-   auto pt = db.push_transaction( signed_transaction( tx, db.get_chain_id() ), skip_flags );
+   tx.get_signature_keys( db.get_chain_id() ); // Extract public keys from signatures
+   auto pt = db.push_transaction( tx, skip_flags );
    database_fixture::verify_asset_supplies(db);
    return pt;
 } FC_CAPTURE_AND_RETHROW((tx)) }

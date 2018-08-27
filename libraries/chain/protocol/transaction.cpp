@@ -72,6 +72,7 @@ const signature_type& graphene::chain::signed_transaction::sign(const private_ke
 {
    digest_type h = sig_digest( chain_id );
    signatures.push_back(key.sign_compact(h));
+   signees.clear(); // Clear signees since it may be inconsistent after added a new signature
    return signatures.back();
 }
 
@@ -302,13 +303,15 @@ void verify_authority( const vector<operation>& ops, const flat_set<public_key_t
 } FC_CAPTURE_AND_RETHROW( (ops)(sigs) ) }
 
 
-flat_set<public_key_type> signed_transaction::get_signature_keys( const chain_id_type& chain_id )const
+const flat_set<public_key_type>& signed_transaction::get_signature_keys( const chain_id_type& chain_id )const
 {
-   // Strictly we should check whether the given chain ID is same as the one used to initialize the object.
+   // Strictly we should check whether the given chain ID is same as the one used to initialize the `signees` field.
    // However, we don't pass in another chain ID so far, for better performance, we skip the check.
-   if( !signees.empty() || signatures.empty() )
-      return signees;
-   return _get_signature_keys( chain_id );
+   if( signees.empty() && !signatures.empty() )
+   {
+      signees = _get_signature_keys( chain_id );
+   }
+   return signees;
 }
 
 flat_set<public_key_type> signed_transaction::_get_signature_keys( const chain_id_type& chain_id )const
@@ -339,7 +342,7 @@ set<public_key_type> signed_transaction::get_required_signatures(
    vector<authority> other;
    get_required_authorities( required_active, required_owner, other );
 
-   flat_set<public_key_type> signature_keys = get_signature_keys( chain_id );
+   const flat_set<public_key_type>& signature_keys = get_signature_keys( chain_id );
    sign_state s( signature_keys, get_active, available_keys );
    s.max_recursion = max_recursion_depth;
 

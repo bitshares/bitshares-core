@@ -172,15 +172,30 @@ namespace graphene { namespace chain {
          uint32_t max_recursion = GRAPHENE_MAX_SIG_CHECK_DEPTH
          ) const;
 
-      flat_set<public_key_type> get_signature_keys( const chain_id_type& chain_id )const;
+      /**
+       * @brief Extract public keys from signatures with given chain ID.
+       * @param chain_id A chain ID
+       * @return Public keys
+       * @note If @ref signees is empty, E.G. when it's the first time calling
+       *       this function for the signed transaction, public keys will be
+       *       extracted with given chain ID, and be stored into the mutable
+       *       @ref signees field, then @ref signees will be returned;
+       *       otherwise, the @ref chain_id parameter will be ignored, and
+       *       @ref signees will be returned directly.
+       */
+      const flat_set<public_key_type>& get_signature_keys( const chain_id_type& chain_id )const;
 
+      /** Signatures */
       vector<signature_type> signatures;
 
-      /** Extracted public keys from signatures if this object was initialized with a chain ID. */
-      flat_set<public_key_type> signees;
+      /** Public keys extracted from signatures */
+      mutable flat_set<public_key_type> signees;
 
       /// Removes all operations, signatures and signees
       void clear() { operations.clear(); signatures.clear(); signees.clear(); }
+
+      /// Removes all signatures and signees
+      void clear_signatures() { signatures.clear(); signees.clear(); }
 
    private:
       /// To be used by constructor and get_signature_keys() function

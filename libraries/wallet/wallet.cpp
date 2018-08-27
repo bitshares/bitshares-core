@@ -1912,7 +1912,7 @@ public:
       owned_keys.reserve( pks.size() );
       std::copy_if( pks.begin(), pks.end(), std::inserter(owned_keys, owned_keys.end()),
                     [this](const public_key_type& pk){ return _keys.find(pk) != _keys.end(); } );
-      tx.signatures.clear();
+      tx.clear_signatures();
       set<public_key_type> approving_key_set = _remote_db->get_required_signatures( tx, owned_keys );
 
       auto dyn_props = get_dynamic_global_properties();
@@ -1931,7 +1931,7 @@ public:
       for (;;)
       {
          tx.set_expiration( dyn_props.time + fc::seconds(30 + expiration_time_offset) );
-         tx.signatures.clear();
+         tx.clear_signatures();
 
          for( const public_key_type& key : approving_key_set )
             tx.sign( get_private_key(key), _chain_id );
@@ -2062,7 +2062,6 @@ public:
       trx.operations = {op};
       set_operation_fees( trx, _remote_db->get_global_properties().parameters.current_fees);
       trx.validate();
-      idump((broadcast));
 
       return sign_transaction(trx, broadcast);
    }
@@ -2087,7 +2086,6 @@ public:
       trx.operations = {op};
       set_operation_fees( trx, _remote_db->get_global_properties().parameters.current_fees);
       trx.validate();
-      idump((broadcast));
 
       return sign_transaction(trx, broadcast);
    }
