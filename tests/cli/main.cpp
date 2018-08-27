@@ -93,7 +93,10 @@ std::shared_ptr<graphene::app::application> start_application(fc::temp_directory
    app1->startup_plugins();
    boost::program_options::variables_map cfg;
    server_port_number = get_available_port();
-   cfg.emplace("rpc-endpoint", boost::program_options::variable_value(string("127.0.0.1:" + std::to_string(server_port_number)), false));
+   cfg.emplace(
+      "rpc-endpoint", 
+      boost::program_options::variable_value(string("127.0.0.1:" + std::to_string(server_port_number)), false)
+   );
    cfg.emplace("genesis-json", boost::program_options::variable_value(create_genesis_file(app_dir), false));
    cfg.emplace("seed-nodes", boost::program_options::variable_value(string("[]"), false));
    app1->initialize(app_dir.path(), cfg);
@@ -157,7 +160,11 @@ public:
    /////////
    // constructor
    /////////
-   client_connection(std::shared_ptr<graphene::app::application> app, const fc::temp_directory& data_dir, const int server_port_number)
+   client_connection(
+      std::shared_ptr<graphene::app::application> app, 
+      const fc::temp_directory& data_dir, 
+      const int server_port_number
+   )
    {
       wallet_data.chain_id = app->chain_database()->get_chain_id();
       wallet_data.ws_server = "ws://127.0.0.1:" + std::to_string(server_port_number);
@@ -211,11 +218,11 @@ struct cli_fixture
    std::vector<std::string> nathan_keys;
 
    cli_fixture() : 
-   server_port_number(0),
-   app_dir( graphene::utilities::temp_directory_path() ),
-   app1( start_application(app_dir, server_port_number) ), 
-   con( app1, app_dir, server_port_number ),
-   nathan_keys( {"5KQwrPbwdL6PhXujxW37FSSQZ1JiwsST4cqQzDeyXtP79zkvFD3"} )
+      server_port_number(0),
+      app_dir( graphene::utilities::temp_directory_path() ),
+      app1( start_application(app_dir, server_port_number) ), 
+      con( app1, app_dir, server_port_number ),
+      nathan_keys( {"5KQwrPbwdL6PhXujxW37FSSQZ1JiwsST4cqQzDeyXtP79zkvFD3"} )
    {
       BOOST_TEST_MESSAGE("Setup cli_wallet::boost_fixture_test_case");
 
@@ -291,7 +298,11 @@ BOOST_FIXTURE_TEST_CASE( upgrade_nathan_account, cli_fixture )
       nathan_acct_after_upgrade = con.wallet_api_ptr->get_account("nathan");
 
       // verify that the upgrade was successful
-      BOOST_CHECK_PREDICATE( std::not_equal_to<uint32_t>(), (nathan_acct_before_upgrade.membership_expiration_date.sec_since_epoch())(nathan_acct_after_upgrade.membership_expiration_date.sec_since_epoch()) );
+      BOOST_CHECK_PREDICATE( 
+         std::not_equal_to<uint32_t>(), 
+         (nathan_acct_before_upgrade.membership_expiration_date.sec_since_epoch())
+         (nathan_acct_after_upgrade.membership_expiration_date.sec_since_epoch()) 
+      );
       BOOST_CHECK(nathan_acct_after_upgrade.is_lifetime_member());
    } catch( fc::exception& e ) {
       edump((e.to_detail_string()));
@@ -315,14 +326,18 @@ BOOST_FIXTURE_TEST_CASE( cli_vote_for_2_witnesses, cli_fixture )
       // create a new account
       graphene::wallet::brain_key_info bki = con.wallet_api_ptr->suggest_brain_key();
       BOOST_CHECK(!bki.brain_priv_key.empty());
-      signed_transaction create_acct_tx = con.wallet_api_ptr->create_account_with_brain_key(bki.brain_priv_key, "jmjatlanta", "nathan", "nathan", true);
+      signed_transaction create_acct_tx = con.wallet_api_ptr->create_account_with_brain_key(
+         bki.brain_priv_key, "jmjatlanta", "nathan", "nathan", true
+      );
       // save the private key for this new account in the wallet file
       BOOST_CHECK(con.wallet_api_ptr->import_key("jmjatlanta", bki.wif_priv_key));
       con.wallet_api_ptr->save_wallet_file(con.wallet_filename);
 
       // attempt to give jmjatlanta some bitsahres
       BOOST_TEST_MESSAGE("Transferring bitshares from Nathan to jmjatlanta");
-      signed_transaction transfer_tx = con.wallet_api_ptr->transfer("nathan", "jmjatlanta", "10000", "1.3.0", "Here are some CORE token for your new account", true);
+      signed_transaction transfer_tx = con.wallet_api_ptr->transfer(
+         "nathan", "jmjatlanta", "10000", "1.3.0", "Here are some CORE token for your new account", true
+      );
 
       // get the details for init1
       witness_object init1_obj = con.wallet_api_ptr->get_witness("init1");
@@ -374,14 +389,18 @@ BOOST_FIXTURE_TEST_CASE( cli_set_voting_proxy, cli_fixture )
       // create a new account
       graphene::wallet::brain_key_info bki = con.wallet_api_ptr->suggest_brain_key();
       BOOST_CHECK(!bki.brain_priv_key.empty());
-      signed_transaction create_acct_tx = con.wallet_api_ptr->create_account_with_brain_key(bki.brain_priv_key, "jmjatlanta", "nathan", "nathan", true);
+      signed_transaction create_acct_tx = con.wallet_api_ptr->create_account_with_brain_key(
+         bki.brain_priv_key, "jmjatlanta", "nathan", "nathan", true
+      );
       // save the private key for this new account in the wallet file
       BOOST_CHECK(con.wallet_api_ptr->import_key("jmjatlanta", bki.wif_priv_key));
       con.wallet_api_ptr->save_wallet_file(con.wallet_filename);
 
       // attempt to give jmjatlanta some bitsahres
       BOOST_TEST_MESSAGE("Transferring bitshares from Nathan to jmjatlanta");
-      signed_transaction transfer_tx = con.wallet_api_ptr->transfer("nathan", "jmjatlanta", "10000", "1.3.0", "Here are some CORE token for your new account", true);
+      signed_transaction transfer_tx = con.wallet_api_ptr->transfer(
+         "nathan", "jmjatlanta", "10000", "1.3.0", "Here are some CORE token for your new account", true
+      );
 
       // grab account for comparison
       account_object prior_voting_account = con.wallet_api_ptr->get_account("jmjatlanta");
@@ -492,7 +511,9 @@ BOOST_FIXTURE_TEST_CASE( account_history_pagination, cli_fixture )
       // create a new account
       graphene::wallet::brain_key_info bki = con.wallet_api_ptr->suggest_brain_key();
       BOOST_CHECK(!bki.brain_priv_key.empty());
-      signed_transaction create_acct_tx = con.wallet_api_ptr->create_account_with_brain_key(bki.brain_priv_key, "jmjatlanta", "nathan", "nathan", true);
+      signed_transaction create_acct_tx = con.wallet_api_ptr->create_account_with_brain_key(
+         bki.brain_priv_key, "jmjatlanta", "nathan", "nathan", true
+      );
       // save the private key for this new account in the wallet file
       BOOST_CHECK(con.wallet_api_ptr->import_key("jmjatlanta", bki.wif_priv_key));
       con.wallet_api_ptr->save_wallet_file(con.wallet_filename);
