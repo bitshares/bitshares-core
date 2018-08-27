@@ -162,11 +162,7 @@ namespace graphene { namespace app {
     void network_broadcast_api::broadcast_transaction(const signed_transaction& trx)
     {
        trx.validate();
-
-       auto& chain_db = *_app.chain_database();
-       trx.get_signature_keys( chain_db.get_chain_id() ); // Extract public keys from signatures
-       chain_db.push_transaction( trx );
-
+       _app.chain_database()->push_transaction(trx);
        if( _app.p2p_node() != nullptr )
           _app.p2p_node()->broadcast_transaction(trx);
     }
@@ -192,11 +188,7 @@ namespace graphene { namespace app {
     {
        trx.validate();
        _callbacks[trx.id()] = cb;
-
-       auto& chain_db = *_app.chain_database();
-       trx.get_signature_keys( chain_db.get_chain_id() ); // Extract public keys from signatures
-       chain_db.push_transaction( trx );
-
+       _app.chain_database()->push_transaction(trx);
        if( _app.p2p_node() != nullptr )
           _app.p2p_node()->broadcast_transaction(trx);
     }

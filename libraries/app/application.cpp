@@ -567,8 +567,6 @@ void application_impl::handle_transaction(const graphene::net::trx_message& tran
       trx_count = 0;
    }
 
-   transaction_message.trx.get_signature_keys( get_chain_id() ); // Extract public keys from signatures
-
    _chain_db->push_transaction( transaction_message.trx );
 } FC_CAPTURE_AND_RETHROW( (transaction_message) ) }
 

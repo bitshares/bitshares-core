@@ -304,30 +304,24 @@ void verify_authority( const vector<operation>& ops, const flat_set<public_key_t
 
 
 const flat_set<public_key_type>& signed_transaction::get_signature_keys( const chain_id_type& chain_id )const
-{
+{ try {
    // Strictly we should check whether the given chain ID is same as the one used to initialize the `signees` field.
    // However, we don't pass in another chain ID so far, for better performance, we skip the check.
    if( signees.empty() && !signatures.empty() )
    {
-      signees = _get_signature_keys( chain_id );
+      auto d = sig_digest( chain_id );
+      flat_set<public_key_type> result;
+      for( const auto&  sig : signatures )
+      {
+         GRAPHENE_ASSERT(
+            result.insert( fc::ecc::public_key(sig,d) ).second,
+            tx_duplicate_sig,
+            "Duplicate Signature detected" );
+      }
+      signees = std::move( result );
    }
    return signees;
-}
-
-flat_set<public_key_type> signed_transaction::_get_signature_keys( const chain_id_type& chain_id )const
-{ try {
-   auto d = sig_digest( chain_id );
-   flat_set<public_key_type> result;
-   for( const auto&  sig : signatures )
-   {
-      GRAPHENE_ASSERT(
-         result.insert( fc::ecc::public_key(sig,d) ).second,
-         tx_duplicate_sig,
-         "Duplicate Signature detected" );
-   }
-   return result;
 } FC_CAPTURE_AND_RETHROW() }
-
 
 
 set<public_key_type> signed_transaction::get_required_signatures(

@@ -123,13 +123,6 @@ namespace graphene { namespace chain {
       signed_transaction( const transaction& trx = transaction() )
          : transaction(trx){}
 
-      /** Extract public keys from signatures when initializing with another signed transaction and a chain ID */
-      signed_transaction( const signed_transaction& trx, const chain_id_type& chain_id )
-         : signed_transaction(trx)
-      {
-         signees = _get_signature_keys( chain_id );
-      }
-
       /** signs and appends to signatures */
       const signature_type& sign( const private_key_type& key, const chain_id_type& chain_id );
 
@@ -196,10 +189,6 @@ namespace graphene { namespace chain {
 
       /// Removes all signatures and signees
       void clear_signatures() { signatures.clear(); signees.clear(); }
-
-   private:
-      /// To be used by constructor and get_signature_keys() function
-      flat_set<public_key_type> _get_signature_keys( const chain_id_type& chain_id )const;
    };
 
    void verify_authority( const vector<operation>& ops, const flat_set<public_key_type>& sigs,
