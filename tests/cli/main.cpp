@@ -203,22 +203,27 @@ public:
 struct cli_fixture
 {
    int server_port_number;
-   fc::temp_directory app_dir = graphene::utilities::temp_directory_path();
+   fc::temp_directory app_dir;
    std::shared_ptr<graphene::app::application> app1;
    client_connection* con;
    std::vector<std::string> nathan_keys;
 
-   cli_fixture()
+   cli_fixture() : 
+   server_port_number(0),
+   app_dir( graphene::utilities::temp_directory_path() ),
+   app1( start_application(app_dir, server_port_number) ), 
+   con( new client_connection(app1, app_dir, server_port_number) ),
+   nathan_keys( {"5KQwrPbwdL6PhXujxW37FSSQZ1JiwsST4cqQzDeyXtP79zkvFD3"} )
    {
       BOOST_TEST_MESSAGE("Setup cli_wallet::boost_fixture_test_case");
 
       using namespace graphene::chain;
       using namespace graphene::app;
 
-      server_port_number = 0;
+      /*server_port_number = 0;
       app1 = start_application(app_dir, server_port_number);
       con = new client_connection(app1, app_dir, server_port_number);
-      nathan_keys.insert(nathan_keys.begin(), 1, "5KQwrPbwdL6PhXujxW37FSSQZ1JiwsST4cqQzDeyXtP79zkvFD3");
+      nathan_keys.insert(nathan_keys.begin(), 1, "5KQwrPbwdL6PhXujxW37FSSQZ1JiwsST4cqQzDeyXtP79zkvFD3");*/
 
       try 
       {
