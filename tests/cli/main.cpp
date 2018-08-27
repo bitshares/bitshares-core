@@ -220,11 +220,6 @@ struct cli_fixture
       using namespace graphene::chain;
       using namespace graphene::app;
 
-      /*server_port_number = 0;
-      app1 = start_application(app_dir, server_port_number);
-      con = new client_connection(app1, app_dir, server_port_number);
-      nathan_keys.insert(nathan_keys.begin(), 1, "5KQwrPbwdL6PhXujxW37FSSQZ1JiwsST4cqQzDeyXtP79zkvFD3");*/
-
       try 
       {
          BOOST_TEST_MESSAGE("Setting wallet password");
