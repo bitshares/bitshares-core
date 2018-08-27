@@ -53,6 +53,8 @@
 
 #include "../common/genesis_file_util.hpp"
 
+#define INVOKE(test) ((struct test*)this)->test_method();
+
 //////
 /// @brief attempt to find an available port on localhost
 /// @returns an available port number, or -1 on error
@@ -269,20 +271,15 @@ BOOST_FIXTURE_TEST_CASE( cli_quit, cli_fixture )
    BOOST_CHECK_THROW( con.wallet_api_ptr->quit(), fc::canceled_exception );
 }
 
-///////////////////////
-// Start a server and connect using the same calls as the CLI
-// Vote for two witnesses, and make sure they both stay there
-// after a maintenance block
-///////////////////////
-BOOST_FIXTURE_TEST_CASE( cli_vote_for_2_witnesses, cli_fixture )
+BOOST_FIXTURE_TEST_CASE( upgrade_nathan_account, cli_fixture )
 {
    try
    {
-      BOOST_TEST_MESSAGE("Cli Vote Test for 2 Witnesses");
+      BOOST_TEST_MESSAGE("Upgrade Nathan's account");
 
       account_object nathan_acct_before_upgrade, nathan_acct_after_upgrade;
       std::vector<signed_transaction> import_txs;
-      signed_transaction upgrade_tx, transfer_tx;
+      signed_transaction upgrade_tx;
 
       BOOST_TEST_MESSAGE("Importing nathan's balance");
       import_txs = con.wallet_api_ptr->import_balance("nathan", nathan_keys, true);
@@ -296,6 +293,24 @@ BOOST_FIXTURE_TEST_CASE( cli_vote_for_2_witnesses, cli_fixture )
       // verify that the upgrade was successful
       BOOST_CHECK_PREDICATE( std::not_equal_to<uint32_t>(), (nathan_acct_before_upgrade.membership_expiration_date.sec_since_epoch())(nathan_acct_after_upgrade.membership_expiration_date.sec_since_epoch()) );
       BOOST_CHECK(nathan_acct_after_upgrade.is_lifetime_member());
+   } catch( fc::exception& e ) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
+///////////////////////
+// Start a server and connect using the same calls as the CLI
+// Vote for two witnesses, and make sure they both stay there
+// after a maintenance block
+///////////////////////
+BOOST_FIXTURE_TEST_CASE( cli_vote_for_2_witnesses, cli_fixture )
+{
+   try
+   {
+      BOOST_TEST_MESSAGE("Cli Vote Test for 2 Witnesses");
+
+      INVOKE(upgrade_nathan_account);
 
       // create a new account
       graphene::wallet::brain_key_info bki = con.wallet_api_ptr->suggest_brain_key();
@@ -307,7 +322,7 @@ BOOST_FIXTURE_TEST_CASE( cli_vote_for_2_witnesses, cli_fixture )
 
       // attempt to give jmjatlanta some bitsahres
       BOOST_TEST_MESSAGE("Transferring bitshares from Nathan to jmjatlanta");
-      transfer_tx = con.wallet_api_ptr->transfer("nathan", "jmjatlanta", "10000", "1.3.0", "Here are some CORE token for your new account", true);
+      signed_transaction transfer_tx = con.wallet_api_ptr->transfer("nathan", "jmjatlanta", "10000", "1.3.0", "Here are some CORE token for your new account", true);
 
       // get the details for init1
       witness_object init1_obj = con.wallet_api_ptr->get_witness("init1");
@@ -354,22 +369,7 @@ BOOST_FIXTURE_TEST_CASE( cli_vote_for_2_witnesses, cli_fixture )
 BOOST_FIXTURE_TEST_CASE( cli_set_voting_proxy, cli_fixture )
 {
    try {
-      account_object nathan_acct_before_upgrade, nathan_acct_after_upgrade;
-      std::vector<signed_transaction> import_txs;
-      signed_transaction upgrade_tx, transfer_tx;
-
-      BOOST_TEST_MESSAGE("Importing nathan's balance");
-      import_txs = con.wallet_api_ptr->import_balance("nathan", nathan_keys, true);
-      nathan_acct_before_upgrade = con.wallet_api_ptr->get_account("nathan");
-
-      // upgrade nathan
-      BOOST_TEST_MESSAGE("Upgrading Nathan to LTM");
-      upgrade_tx = con.wallet_api_ptr->upgrade_account("nathan", true);
-      nathan_acct_after_upgrade = con.wallet_api_ptr->get_account("nathan");
-
-      // verify that the upgrade was successful
-      BOOST_CHECK_PREDICATE( std::not_equal_to<uint32_t>(), (nathan_acct_before_upgrade.membership_expiration_date.sec_since_epoch())(nathan_acct_after_upgrade.membership_expiration_date.sec_since_epoch()) );
-      BOOST_CHECK(nathan_acct_after_upgrade.is_lifetime_member());
+      INVOKE(upgrade_nathan_account);
 
       // create a new account
       graphene::wallet::brain_key_info bki = con.wallet_api_ptr->suggest_brain_key();
@@ -381,7 +381,7 @@ BOOST_FIXTURE_TEST_CASE( cli_set_voting_proxy, cli_fixture )
 
       // attempt to give jmjatlanta some bitsahres
       BOOST_TEST_MESSAGE("Transferring bitshares from Nathan to jmjatlanta");
-      transfer_tx = con.wallet_api_ptr->transfer("nathan", "jmjatlanta", "10000", "1.3.0", "Here are some CORE token for your new account", true);
+      signed_transaction transfer_tx = con.wallet_api_ptr->transfer("nathan", "jmjatlanta", "10000", "1.3.0", "Here are some CORE token for your new account", true);
 
       // grab account for comparison
       account_object prior_voting_account = con.wallet_api_ptr->get_account("jmjatlanta");
@@ -487,22 +487,7 @@ BOOST_FIXTURE_TEST_CASE( account_history_pagination, cli_fixture )
 {
    try
    {
-      account_object nathan_acct_before_upgrade, nathan_acct_after_upgrade;
-      std::vector<signed_transaction> import_txs;
-      signed_transaction upgrade_tx;
-
-      BOOST_TEST_MESSAGE("Importing nathan's balance");
-      import_txs = con.wallet_api_ptr->import_balance("nathan", nathan_keys, true);
-      nathan_acct_before_upgrade = con.wallet_api_ptr->get_account("nathan");
-
-      // upgrade nathan
-      BOOST_TEST_MESSAGE("Upgrading Nathan to LTM");
-      upgrade_tx = con.wallet_api_ptr->upgrade_account("nathan", true);
-      nathan_acct_after_upgrade = con.wallet_api_ptr->get_account("nathan");
-
-      // verify that the upgrade was successful
-      BOOST_CHECK_PREDICATE( std::not_equal_to<uint32_t>(), (nathan_acct_before_upgrade.membership_expiration_date.sec_since_epoch())(nathan_acct_after_upgrade.membership_expiration_date.sec_since_epoch()) );
-      BOOST_CHECK(nathan_acct_after_upgrade.is_lifetime_member());
+      INVOKE(upgrade_nathan_account);
 
       // create a new account
       graphene::wallet::brain_key_info bki = con.wallet_api_ptr->suggest_brain_key();
