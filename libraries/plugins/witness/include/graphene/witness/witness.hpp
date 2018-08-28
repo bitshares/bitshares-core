@@ -72,6 +72,9 @@ public:
    virtual void plugin_startup() override;
    virtual void plugin_shutdown() override;
 
+   inline const fc::flat_map< chain::witness_id_type, fc::optional<chain::public_key_type> >& get_witness_key_cache()
+   { return _witness_key_cache; }
+
 private:
    void schedule_production_loop();
    block_production_condition::block_production_condition_enum block_production_loop();

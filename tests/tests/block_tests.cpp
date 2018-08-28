@@ -270,9 +270,6 @@ BOOST_AUTO_TEST_CASE( change_signing_key_test )
       {
          database db;
 
-         // Initialize witness key cache
-         db.init_witness_key_cache( witnesses );
-
          // open database
          db.open(data_dir.path(), make_genesis, "TEST");
 
@@ -332,9 +329,6 @@ BOOST_AUTO_TEST_CASE( change_signing_key_test )
       }
       {
          database db;
-
-         // Initialize witness key cache
-         db.init_witness_key_cache( witnesses );
 
          // reopen database, all data should be unchanged
          db.open(data_dir.path(), make_genesis, "TEST");
