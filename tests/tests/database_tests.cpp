@@ -62,6 +62,32 @@ BOOST_AUTO_TEST_CASE( undo_test )
    }
 }
 
+/**
+ * Check that database modify() functors that throw do not get caught by boost, which will remove the object
+ */
+BOOST_AUTO_TEST_CASE(failed_modify_test)
+{ try {
+   database db;
+   // Create dummy object
+   const auto& obj = db.create<account_balance_object>([](account_balance_object& obj) {
+                     obj.owner = account_id_type(123);
+                  });
+   account_balance_id_type obj_id = obj.id;
+   BOOST_CHECK_EQUAL(obj.owner.instance.value, 123);
+
+   // Modify dummy object, check that changes stick
+   db.modify(obj, [](account_balance_object& obj) {
+      obj.owner = account_id_type(234);
+   });
+   BOOST_CHECK_EQUAL(obj_id(db).owner.instance.value, 234);
+
+   // Throw exception when modifying object, check that object still exists after
+   BOOST_CHECK_THROW(db.modify(obj, [](account_balance_object& obj) {
+      throw 5;
+   }), int);
+   BOOST_CHECK_NE((long)db.find_object(obj_id), (long)nullptr);
+} FC_LOG_AND_RETHROW() }
+
 BOOST_AUTO_TEST_CASE( flat_index_test )
 { try {
    ACTORS((sam));

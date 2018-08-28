@@ -71,6 +71,8 @@ void verify_account_votes( const database& db, const account_options& options )
    FC_ASSERT( options.num_committee <= chain_params.maximum_committee_count,
               "Voted for more committee members than currently allowed (${c})", ("c", chain_params.maximum_committee_count) );
 
+   FC_ASSERT( db.find_object(options.voting_account), "Invalid proxy account specified." );
+
    uint32_t max_vote_id = gpo.next_available_vote_id;
    bool has_worker_votes = false;
    for( auto id : options.votes )
@@ -134,7 +136,6 @@ void_result account_create_evaluator::do_evaluate( const account_create_operatio
       FC_ASSERT( !op.extensions.value.buyback_options.valid() );
    }
 
-   FC_ASSERT( d.find_object(op.options.voting_account), "Invalid proxy account specified." );
    FC_ASSERT( fee_paying_account->is_lifetime_member(), "Only Lifetime members may register an account." );
    FC_ASSERT( op.referrer(d).is_member(d.head_block_time()), "The referrer must be either a lifetime or annual subscriber." );
 

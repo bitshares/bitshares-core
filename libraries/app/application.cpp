@@ -385,6 +385,11 @@ void application_impl::startup()
    }
    _chain_db->add_checkpoints( loaded_checkpoints );
 
+   if( _options->count("enable-standby-votes-tracking") )
+   {
+      _chain_db->enable_standby_votes_tracking( _options->at("enable-standby-votes-tracking").as<bool>() );
+   }
+
    if( _options->count("replay-blockchain") )
       _chain_db->wipe( _data_dir / "blockchain", false );
 
@@ -938,6 +943,9 @@ void application::set_program_options(boost::program_options::options_descriptio
          ("api-access", bpo::value<boost::filesystem::path>(), "JSON file specifying API permissions")
          ("plugins", bpo::value<string>(), "Space-separated list of plugins to activate")
          ("io-threads", bpo::value<uint16_t>()->implicit_value(0), "Number of IO threads, default to 0 for auto-configuration")
+         ("enable-standby-votes-tracking", bpo::value<bool>()->implicit_value(true),
+          "Whether to enable tracking of votes of standby witnesses and committee members. "
+          "Set it to true to provide accurate data to API clients, set to false for slightly better performance.")
          // TODO uncomment this when GUI is ready
          //("enable-subscribe-to-all", bpo::value<bool>()->implicit_value(false),
          // "Whether allow API clients to subscribe to universal object creation and removal events")

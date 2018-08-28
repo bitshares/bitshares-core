@@ -131,14 +131,17 @@ struct worker_pay_visitor
          worker.pay_worker(pay, db);
       }
 };
+
 void database::update_worker_votes()
 {
-   auto& idx = get_index_type<worker_index>();
-   auto itr = idx.indices().get<by_account>().begin();
+   const auto& idx = get_index_type<worker_index>().indices().get<by_account>();
+   auto itr = idx.begin();
+   auto itr_end = idx.end();
    bool allow_negative_votes = (head_block_time() < HARDFORK_607_TIME);
-   while( itr != idx.indices().get<by_account>().end() )
+   while( itr != itr_end )
    {
-      modify( *itr, [&]( worker_object& obj ){
+      modify( *itr, [this,allow_negative_votes]( worker_object& obj )
+      {
          obj.total_votes_for = _vote_tally_buffer[obj.vote_for];
          obj.total_votes_against = allow_negative_votes ? _vote_tally_buffer[obj.vote_against] : 0;
       });
@@ -216,21 +219,37 @@ void database::update_active_witnesses()
    }
 
    const chain_property_object& cpo = get_chain_properties();
-   auto wits = sort_votable_objects<witness_index>(std::max(witness_count*2+1, (size_t)cpo.immutable_parameters.min_witness_count));
+
+   witness_count = std::max( witness_count*2+1, (size_t)cpo.immutable_parameters.min_witness_count );
+   auto wits = sort_votable_objects<witness_index>( witness_count );
 
    const global_property_object& gpo = get_global_properties();
 
-   const auto& all_witnesses = get_index_type<witness_index>().indices();
+   auto update_witness_total_votes = [this]( const witness_object& wit ) {
+      modify( wit, [this]( witness_object& obj )
+      {
+         obj.total_votes = _vote_tally_buffer[obj.vote_id];
+      });
+   };
 
-   for( const witness_object& wit : all_witnesses )
+   if( _track_standby_votes )
    {
-      modify( wit, [&]( witness_object& obj ){
-              obj.total_votes = _vote_tally_buffer[wit.vote_id];
-              });
+      const auto& all_witnesses = get_index_type<witness_index>().indices();
+      for( const witness_object& wit : all_witnesses )
+      {
+         update_witness_total_votes( wit );
+      }
+   }
+   else
+   {
+      for( const witness_object& wit : wits )
+      {
+         update_witness_total_votes( wit );
+      }
    }
 
    // Update witness authority
-   modify( get(GRAPHENE_WITNESS_ACCOUNT), [&]( account_object& a )
+   modify( get(GRAPHENE_WITNESS_ACCOUNT), [this,&wits]( account_object& a )
    {
       if( head_block_time() < HARDFORK_533_TIME )
       {
@@ -268,7 +287,8 @@ void database::update_active_witnesses()
       }
    } );
 
-   modify(gpo, [&]( global_property_object& gp ){
+   modify( gpo, [&wits]( global_property_object& gp )
+   {
       gp.active_witnesses.clear();
       gp.active_witnesses.reserve(wits.size());
       std::transform(wits.begin(), wits.end(),
@@ -290,24 +310,47 @@ void database::update_active_committee_members()
    uint64_t stake_tally = 0; // _committee_count_histogram_buffer[0];
    size_t committee_member_count = 0;
    if( stake_target > 0 )
+   {
       while( (committee_member_count < _committee_count_histogram_buffer.size() - 1)
              && (stake_tally <= stake_target) )
+      {
          stake_tally += _committee_count_histogram_buffer[++committee_member_count];
+      }
+   }
 
    const chain_property_object& cpo = get_chain_properties();
-   auto committee_members = sort_votable_objects<committee_member_index>(std::max(committee_member_count*2+1, (size_t)cpo.immutable_parameters.min_committee_member_count));
 
-   for( const committee_member_object& del : committee_members )
+   committee_member_count = std::max( committee_member_count*2+1, (size_t)cpo.immutable_parameters.min_committee_member_count );
+   auto committee_members = sort_votable_objects<committee_member_index>( committee_member_count );
+
+   auto update_committee_member_total_votes = [this]( const committee_member_object& cm ) {
+      modify( cm, [this]( committee_member_object& obj )
+      {
+         obj.total_votes = _vote_tally_buffer[obj.vote_id];
+      });
+   };
+
+   if( _track_standby_votes )
    {
-      modify( del, [&]( committee_member_object& obj ){
-              obj.total_votes = _vote_tally_buffer[del.vote_id];
-              });
+      const auto& all_committee_members = get_index_type<committee_member_index>().indices();
+      for( const committee_member_object& cm : all_committee_members )
+      {
+         update_committee_member_total_votes( cm );
+      }
+   }
+   else
+   {
+      for( const committee_member_object& cm : committee_members )
+      {
+         update_committee_member_total_votes( cm );
+      }
    }
 
    // Update committee authorities
    if( !committee_members.empty() )
    {
-      modify(get(GRAPHENE_COMMITTEE_ACCOUNT), [&](account_object& a)
+      const account_object& committee_account = get(GRAPHENE_COMMITTEE_ACCOUNT);
+      modify( committee_account, [this,&committee_members](account_object& a)
       {
          if( head_block_time() < HARDFORK_533_TIME )
          {
@@ -316,10 +359,10 @@ void database::update_active_committee_members()
             a.active.weight_threshold = 0;
             a.active.clear();
 
-            for( const committee_member_object& del : committee_members )
+            for( const committee_member_object& cm : committee_members )
             {
-               weights.emplace(del.committee_member_account, _vote_tally_buffer[del.vote_id]);
-               total_votes += _vote_tally_buffer[del.vote_id];
+               weights.emplace( cm.committee_member_account, _vote_tally_buffer[cm.vote_id] );
+               total_votes += _vote_tally_buffer[cm.vote_id];
             }
 
             // total_votes is 64 bits. Subtract the number of leading low bits from 64 to get the number of useful bits,
@@ -343,12 +386,14 @@ void database::update_active_committee_members()
                vc.add( cm.committee_member_account, _vote_tally_buffer[cm.vote_id] );
             vc.finish( a.active );
          }
-      } );
-      modify(get(GRAPHENE_RELAXED_COMMITTEE_ACCOUNT), [&](account_object& a) {
-         a.active = get(GRAPHENE_COMMITTEE_ACCOUNT).active;
+      });
+      modify( get(GRAPHENE_RELAXED_COMMITTEE_ACCOUNT), [&committee_account](account_object& a)
+      {
+         a.active = committee_account.active;
       });
    }
-   modify(get_global_properties(), [&](global_property_object& gp) {
+   modify( get_global_properties(), [&committee_members](global_property_object& gp)
+   {
       gp.active_committee_members.clear();
       std::transform(committee_members.begin(), committee_members.end(),
                      std::inserter(gp.active_committee_members, gp.active_committee_members.begin()),
@@ -395,7 +440,6 @@ void database::initialize_budget_record( fc::time_point_sec now, budget_record& 
    //   be able to use the entire reserve
    budget_u128 += ((uint64_t(1) << GRAPHENE_CORE_ASSET_CYCLE_RATE_BITS) - 1);
    budget_u128 >>= GRAPHENE_CORE_ASSET_CYCLE_RATE_BITS;
-   share_type budget;
    if( budget_u128 < reserve.value )
       rec.total_budget = share_type(budget_u128.to_uint64());
    else

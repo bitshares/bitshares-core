@@ -36,8 +36,6 @@
 #include <graphene/db/simple_index.hpp>
 #include <fc/signals.hpp>
 
-#include <graphene/chain/protocol/protocol.hpp>
-
 #include <fc/log/logger.hpp>
 
 #include <map>
@@ -416,6 +414,10 @@ namespace graphene { namespace chain {
          /**
           * @}
           */
+
+         /// Enable or disable tracking of votes of standby witnesses and committee members
+         inline void enable_standby_votes_tracking(bool enable)  { _track_standby_votes = enable; }
+
    protected:
          //Mark pop_undo() as protected -- we do not want outside calling pop_undo(); it should call pop_block() instead
          void pop_undo() { object_database::pop_undo(); }
@@ -536,6 +538,10 @@ namespace graphene { namespace chain {
 
          node_property_object              _node_property_object;
 
+         /// Whether to update votes of standby witnesses and committee members when performing chain maintenance.
+         /// Set it to true to provide accurate data to API clients, set to false to have better performance.
+         bool                              _track_standby_votes = true;
+
          /**
           * Whether database is successfully opened or not.
           *
@@ -544,6 +550,9 @@ namespace graphene { namespace chain {
           * database::close() has not been called, or failed during execution.
           */
          bool                              _opened = false;
+
+         // Counts nested proposal updates
+         uint32_t                           _push_proposal_nesting_depth = 0;
 
          /// Tracks assets affected by bitshares-core issue #453 before hard fork #615 in one block
          flat_set<asset_id_type>           _issue_453_affected_assets;
