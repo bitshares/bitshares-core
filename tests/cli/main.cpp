@@ -310,17 +310,10 @@ BOOST_FIXTURE_TEST_CASE( upgrade_nathan_account, cli_fixture )
    }
 }
 
-///////////////////////
-// Start a server and connect using the same calls as the CLI
-// Vote for two witnesses, and make sure they both stay there
-// after a maintenance block
-///////////////////////
-BOOST_FIXTURE_TEST_CASE( cli_vote_for_2_witnesses, cli_fixture )
+BOOST_FIXTURE_TEST_CASE( create_new_account, cli_fixture )
 {
    try
    {
-      BOOST_TEST_MESSAGE("Cli Vote Test for 2 Witnesses");
-
       INVOKE(upgrade_nathan_account);
 
       // create a new account
@@ -338,6 +331,24 @@ BOOST_FIXTURE_TEST_CASE( cli_vote_for_2_witnesses, cli_fixture )
       signed_transaction transfer_tx = con.wallet_api_ptr->transfer(
          "nathan", "jmjatlanta", "10000", "1.3.0", "Here are some CORE token for your new account", true
       );
+   } catch( fc::exception& e ) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
+///////////////////////
+// Start a server and connect using the same calls as the CLI
+// Vote for two witnesses, and make sure they both stay there
+// after a maintenance block
+///////////////////////
+BOOST_FIXTURE_TEST_CASE( cli_vote_for_2_witnesses, cli_fixture )
+{
+   try
+   {
+      BOOST_TEST_MESSAGE("Cli Vote Test for 2 Witnesses");
+
+      INVOKE(create_new_account);
 
       // get the details for init1
       witness_object init1_obj = con.wallet_api_ptr->get_witness("init1");
@@ -384,23 +395,7 @@ BOOST_FIXTURE_TEST_CASE( cli_vote_for_2_witnesses, cli_fixture )
 BOOST_FIXTURE_TEST_CASE( cli_set_voting_proxy, cli_fixture )
 {
    try {
-      INVOKE(upgrade_nathan_account);
-
-      // create a new account
-      graphene::wallet::brain_key_info bki = con.wallet_api_ptr->suggest_brain_key();
-      BOOST_CHECK(!bki.brain_priv_key.empty());
-      signed_transaction create_acct_tx = con.wallet_api_ptr->create_account_with_brain_key(
-         bki.brain_priv_key, "jmjatlanta", "nathan", "nathan", true
-      );
-      // save the private key for this new account in the wallet file
-      BOOST_CHECK(con.wallet_api_ptr->import_key("jmjatlanta", bki.wif_priv_key));
-      con.wallet_api_ptr->save_wallet_file(con.wallet_filename);
-
-      // attempt to give jmjatlanta some bitsahres
-      BOOST_TEST_MESSAGE("Transferring bitshares from Nathan to jmjatlanta");
-      signed_transaction transfer_tx = con.wallet_api_ptr->transfer(
-         "nathan", "jmjatlanta", "10000", "1.3.0", "Here are some CORE token for your new account", true
-      );
+      INVOKE(create_new_account);
 
       // grab account for comparison
       account_object prior_voting_account = con.wallet_api_ptr->get_account("jmjatlanta");
@@ -506,21 +501,11 @@ BOOST_FIXTURE_TEST_CASE( account_history_pagination, cli_fixture )
 {
    try
    {
-      INVOKE(upgrade_nathan_account);
-
-      // create a new account
-      graphene::wallet::brain_key_info bki = con.wallet_api_ptr->suggest_brain_key();
-      BOOST_CHECK(!bki.brain_priv_key.empty());
-      signed_transaction create_acct_tx = con.wallet_api_ptr->create_account_with_brain_key(
-         bki.brain_priv_key, "jmjatlanta", "nathan", "nathan", true
-      );
-      // save the private key for this new account in the wallet file
-      BOOST_CHECK(con.wallet_api_ptr->import_key("jmjatlanta", bki.wif_priv_key));
-      con.wallet_api_ptr->save_wallet_file(con.wallet_filename);
+      INVOKE(create_new_account);
 
       // attempt to give jmjatlanta some bitsahres
       BOOST_TEST_MESSAGE("Transferring bitshares from Nathan to jmjatlanta");
-      for(int i = 1; i <= 200; i++)
+      for(int i = 1; i <= 199; i++)
       {
          signed_transaction transfer_tx = con.wallet_api_ptr->transfer("nathan", "jmjatlanta", std::to_string(i),
                                                 "1.3.0", "Here are some CORE token for your new account", true);
