@@ -352,29 +352,6 @@ signed_block database::_generate_block(
    witness_id_type scheduled_witness = get_scheduled_witness( slot_num );
    FC_ASSERT( scheduled_witness == witness_id );
 
-   if( !(skip & skip_witness_signature) )
-   {
-      auto signing_key = find_witness_key_from_cache( witness_id );
-      if( signing_key.valid() ) // witness in cache
-      {
-         FC_ASSERT( *signing_key == block_signing_private_key.get_public_key() );
-      }
-      else // witness not in cache
-      {
-         const auto& witness_obj = witness_id(*this);
-         FC_ASSERT( witness_obj.signing_key == block_signing_private_key.get_public_key() );
-      }
-   }
-
-   static const size_t max_partial_block_header_size = fc::raw::pack_size( signed_block_header() )
-                                                       - fc::raw::pack_size( witness_id_type() ) // witness_id
-                                                       + 4; // space to store size of transactions
-   const size_t max_block_header_size = max_partial_block_header_size + fc::raw::pack_size( witness_id );
-   auto maximum_block_size = get_global_properties().parameters.maximum_block_size;
-   size_t total_block_size = max_block_header_size;
-
-   signed_block pending_block;
-
    //
    // The following code throws away existing pending_tx_session and
    // rebuilds it by re-applying pending transactions.
@@ -389,6 +366,27 @@ signed_block database::_generate_block(
 
    // pop pending state (reset to head block state)
    _pending_tx_session.reset();
+
+   // Check witness signing key
+   if( !(skip & skip_witness_signature) )
+   {
+      // Note: if this check failed (which won't happen in normal situations),
+      // we would have temporarily broken the invariant that
+      // _pending_tx_session is the result of applying _pending_tx.
+      // In this case, when the node received a new block,
+      // the push_block() call will re-create the _pending_tx_session.
+      FC_ASSERT( witness_id(*this).signing_key == block_signing_private_key.get_public_key() );
+   }
+
+   static const size_t max_partial_block_header_size = fc::raw::pack_size( signed_block_header() )
+                                                       - fc::raw::pack_size( witness_id_type() ) // witness_id
+                                                       + 4; // space to store size of transactions
+   const size_t max_block_header_size = max_partial_block_header_size + fc::raw::pack_size( witness_id );
+   auto maximum_block_size = get_global_properties().parameters.maximum_block_size;
+   size_t total_block_size = max_block_header_size;
+
+   signed_block pending_block;
+
    _pending_tx_session = _undo_db.start_undo_session();
 
    uint64_t postponed_tx_count = 0;
@@ -452,12 +450,6 @@ signed_block database::_generate_block(
    if( !(skip & skip_witness_signature) )
       pending_block.sign( block_signing_private_key );
 
-   // TODO:  Move this to _push_block() so session is restored.
-   if( !(skip & skip_block_size_check) )
-   {
-      FC_ASSERT( fc::raw::pack_size(pending_block) <= get_global_properties().parameters.maximum_block_size );
-   }
-
    push_block( pending_block, skip );
 
    return pending_block;
@@ -478,9 +470,6 @@ void database::pop_block()
    pop_undo();
 
    _popped_tx.insert( _popped_tx.begin(), head_block->transactions.begin(), head_block->transactions.end() );
-
-   // Note: for better performance, can move this to where calls pop_block();
-   refresh_witness_key_cache();
 
 } FC_CAPTURE_AND_RETHROW() }
 
@@ -545,7 +534,17 @@ void database::_apply_block( const signed_block& next_block )
    uint32_t skip = get_node_properties().skip_flags;
    _applied_ops.clear();
 
-   FC_ASSERT( (skip & skip_merkle_check) || next_block.transaction_merkle_root == next_block.calculate_merkle_root(), "", ("next_block.transaction_merkle_root",next_block.transaction_merkle_root)("calc",next_block.calculate_merkle_root())("next_block",next_block)("id",next_block.id()) );
+   if( !(skip & skip_block_size_check) )
+   {
+      FC_ASSERT( fc::raw::pack_size(next_block) <= get_global_properties().parameters.maximum_block_size );
+   }
+
+   FC_ASSERT( (skip & skip_merkle_check) || next_block.transaction_merkle_root == next_block.calculate_merkle_root(),
+              "",
+              ("next_block.transaction_merkle_root",next_block.transaction_merkle_root)
+              ("calc",next_block.calculate_merkle_root())
+              ("next_block",next_block)
+              ("id",next_block.id()) );
 
    const witness_object& signing_witness = validate_block_header(skip, next_block);
    const auto& global_props = get_global_properties();
@@ -556,9 +555,6 @@ void database::_apply_block( const signed_block& next_block )
    _current_trx_in_block = 0;
 
    _issue_453_affected_assets.clear();
-
-   if( !(skip&skip_witness_key_cache_update) )
-      skip |= force_witness_key_cache_update;
 
    for( const auto& trx : next_block.transactions )
    {
@@ -746,45 +742,6 @@ void database::add_checkpoints( const flat_map<uint32_t,block_id_type>& checkpts
 bool database::before_last_checkpoint()const
 {
    return (_checkpoints.size() > 0) && (_checkpoints.rbegin()->first >= head_block_num());
-}
-
-void database::init_witness_key_cache( std::set<witness_id_type>& witnesses )
-{
-   for( const witness_id_type& wit : witnesses )
-      _witness_key_cache[wit]; // add it
-}
-
-void database::update_witness_key_cache( witness_id_type wit, const public_key_type& pub_key )
-{
-   if( _witness_key_cache.empty() )
-      return;
-   uint32_t skip = get_node_properties().skip_flags;
-   if( (skip&force_witness_key_cache_update) )
-   {
-      auto itr = _witness_key_cache.find( wit );
-      if( itr != _witness_key_cache.end() )
-         itr->second = pub_key;
-   }
-}
-
-void database::refresh_witness_key_cache()
-{
-   for( auto& wit_key : _witness_key_cache )
-   {
-      const witness_object* wit_obj = find( wit_key.first );
-      if( wit_obj )
-         wit_key.second = wit_obj->signing_key;
-      else
-         wit_key.second.reset();
-   }
-}
-
-optional<public_key_type> database::find_witness_key_from_cache( witness_id_type wit ) const
-{
-   auto itr = _witness_key_cache.find( wit );
-   if( itr != _witness_key_cache.end() )
-      return itr->second;
-   return optional<public_key_type>();
 }
 
 } }
