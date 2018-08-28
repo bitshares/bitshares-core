@@ -201,6 +201,22 @@ object_id_type proposal_create_evaluator::do_apply(const proposal_create_operati
                           std::inserter(proposal.required_active_approvals, proposal.required_active_approvals.begin()));
    });
 
+   // creating a virtual proposal_update_operation to make the proposal execute on creation if auto_approve=true
+   if( *o.extensions.value.auto_approve )
+   {
+      transaction_evaluation_state prop_update_context( &d );
+      prop_update_context.skip_fee_schedule_check = true;
+
+      proposal_update_operation update_vop;
+      update_vop.fee = asset( 0, asset_id_type() );
+      update_vop.fee_paying_account = proposal.proposer;
+      update_vop.proposal = proposal.id;
+      // adding the proposer as active approver
+      flat_set<account_id_type> active_approvals; active_approvals.insert(proposal.proposer);
+      update_vop.active_approvals_to_add = active_approvals;
+      d.apply_operation(prop_update_context, update_vop);
+   }
+
    return proposal.id;
 } FC_CAPTURE_AND_RETHROW( (o) ) }
 

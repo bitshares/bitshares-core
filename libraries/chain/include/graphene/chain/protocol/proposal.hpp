@@ -23,6 +23,8 @@
  */
 #pragma once
 #include <graphene/chain/protocol/base.hpp>
+#include <graphene/chain/protocol/ext.hpp>
+#include <fc/reflect/reflect.hpp>
 
 namespace graphene { namespace chain { 
    /**
@@ -73,12 +75,16 @@ namespace graphene { namespace chain {
           uint32_t price_per_kbyte = 10;
        };
 
+       struct ext {
+         optional<bool> auto_approve;
+       };
+
        asset              fee;
        account_id_type    fee_paying_account;
        vector<op_wrapper> proposed_ops;
        time_point_sec     expiration_time;
        optional<uint32_t> review_period_seconds;
-       extensions_type    extensions;
+       extension<ext>     extensions;
 
        /**
         * Constructs a proposal_create_operation suitable for committee
@@ -172,7 +178,7 @@ namespace graphene { namespace chain {
 FC_REFLECT( graphene::chain::proposal_create_operation::fee_parameters_type, (fee)(price_per_kbyte) )
 FC_REFLECT( graphene::chain::proposal_update_operation::fee_parameters_type, (fee)(price_per_kbyte) )
 FC_REFLECT( graphene::chain::proposal_delete_operation::fee_parameters_type, (fee) )
-
+FC_REFLECT( graphene::chain::proposal_create_operation::ext, (auto_approve) );
 FC_REFLECT( graphene::chain::proposal_create_operation, (fee)(fee_paying_account)(expiration_time)
             (proposed_ops)(review_period_seconds)(extensions) )
 FC_REFLECT( graphene::chain::proposal_update_operation, (fee)(fee_paying_account)(proposal)

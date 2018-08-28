@@ -36,6 +36,7 @@
 #include <graphene/chain/vesting_balance_object.hpp>
 #include <graphene/chain/withdraw_permission_object.hpp>
 #include <graphene/chain/witness_object.hpp>
+#include <graphene/chain/proposal_object.hpp>
 
 #include <graphene/market_history/market_history_plugin.hpp>
 #include <fc/crypto/digest.hpp>
@@ -2356,6 +2357,128 @@ BOOST_AUTO_TEST_CASE( vesting_balance_withdraw_test )
    }
    // TODO:  Test with non-core asset and Bob account
 } FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE( proposal_auto_approval_test )
+{
+   // fast jump to hardfork time
+   generate_blocks( HARDFORK_CORE_588_TIME );
+   // one more block to pass hardfork time
+   generate_block();
+   set_expiration( db, trx );
+
+   ACTORS( (alice) (bob) );
+   account_id_type committee_account;
+
+   int64_t init_amount(10000);
+   transfer( committee_account, alice_id, asset(init_amount) );
+   transfer( committee_account, bob_id, asset(init_amount) );
+   proposal_id_type p_id_1;
+
+   transfer_operation top;
+   top.to = alice_id;
+   top.from = bob_id;
+   top.amount = asset(1000);
+
+   BOOST_TEST_MESSAGE( "Transfer proposal by alice; transfer from bob to alice: auto_approve = true" );
+   {
+
+      proposal_create_operation pcop = proposal_create_operation::committee_proposal(
+            db.get_global_properties().parameters, db.head_block_time());
+      pcop.fee_paying_account = alice_id;
+      pcop.review_period_seconds.reset();
+      pcop.expiration_time = db.head_block_time() + 10;
+      pcop.proposed_ops.emplace_back(top);
+      pcop.extensions.value.auto_approve = true;
+
+      trx.operations.push_back(pcop);
+      trx.validate();
+      PUSH_TX( db, trx, ~0 );
+
+      try
+      {
+         const auto& idx = db.get_index_type<proposal_index>();
+         idx.inspect_all_objects( [&](const object& obj){
+            const proposal_object& p = static_cast<const proposal_object&>(obj);
+            p_id_1 = p.id;
+            if ( p.available_active_approvals.find( alice_id ) != p.available_active_approvals.end() )
+               BOOST_TEST_MESSAGE( "SUCCESS: Proposer was found as active approver" );
+            else
+               BOOST_FAIL( "FAIL: Proposer not found as active approver" );
+
+            if( get_balance( alice, asset_id_type()(db) ) == get_balance( bob, asset_id_type()(db) ) )
+               BOOST_TEST_MESSAGE( "\nSUCCESS: Proposal was not executed\n" );
+            else
+               BOOST_FAIL( "\nFAIL: Proposal was executed\n" );
+         });
+      } catch (fc::exception &e)
+      {
+         wlog( e.to_string() );
+      }
+   }
+
+   BOOST_TEST_MESSAGE( "Transfer proposal by alice: auto_approve = false" );
+   {
+      proposal_create_operation pcop = proposal_create_operation::committee_proposal(
+            db.get_global_properties().parameters, db.head_block_time());
+      pcop.fee_paying_account = alice_id;
+      pcop.review_period_seconds.reset();
+      pcop.expiration_time = db.head_block_time() + 10;
+      pcop.proposed_ops.emplace_back(top);
+      // pcop.extensions.value.auto_approve_proposal = false; // default
+
+      trx = signed_transaction();
+      set_expiration(db, trx);
+      trx.operations.push_back(pcop);
+      trx.validate();
+      PUSH_TX( db, trx, ~0 );
+
+      try
+      {
+         const auto& idx = db.get_index_type<proposal_index>();
+         idx.inspect_all_objects( [&](const object& obj){
+            const proposal_object& p = static_cast<const proposal_object&>(obj);
+            if(p_id_1 != p.id ){
+               if ( p.available_active_approvals.find( alice_id ) == p.available_active_approvals.end() )
+                  BOOST_TEST_MESSAGE( "SUCCESS: Proposer was not found as active approver" );
+               else
+                  BOOST_FAIL( "FAIL: Proposer was found as active approver" );
+            }
+         });
+      } catch (fc::exception &e)
+      {
+         wlog( e.to_string() );
+      }
+   }
+
+   BOOST_TEST_MESSAGE( "Transfer proposal by alice; transfer from alice to bob: auto_approve = true" );
+   {
+      transfer_operation top;
+      top.from = alice_id;
+      top.to = bob_id;
+      top.amount = asset(1000);
+
+      proposal_create_operation pcop = proposal_create_operation::committee_proposal(
+            db.get_global_properties().parameters, db.head_block_time());
+      pcop.fee_paying_account = alice_id;
+      pcop.review_period_seconds.reset();
+      pcop.expiration_time = db.head_block_time() + 10;
+      pcop.proposed_ops.emplace_back(top);
+      pcop.extensions.value.auto_approve = true;
+
+      trx = signed_transaction();
+      set_expiration(db, trx);
+      trx.operations.push_back(pcop);
+      trx.validate();
+      PUSH_TX( db, trx, ~0 );
+
+      if( get_balance( alice, asset_id_type()(db) ) == int64_t(9000)
+       && get_balance( bob, asset_id_type()(db) )  == int64_t(11000) )
+         BOOST_TEST_MESSAGE( "\nSUCCSESS: Proposal was auto approved and executed\n" );
+      else
+         BOOST_FAIL( "\nFAIL: Proposal was not auto approved, hence not executed\n" );
+   }
+}
+
 
 // TODO:  Write linear VBO tests
 
