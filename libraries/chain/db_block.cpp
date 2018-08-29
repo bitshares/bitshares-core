@@ -209,7 +209,10 @@ bool database::_push_block(const signed_block& new_block)
       session.commit();
    } catch ( const fc::exception& e ) {
       elog("Failed to push new block:\n${e}", ("e", e.to_detail_string()));
-      _fork_db.remove(new_block.id());
+      if( !(skip&skip_fork_db) )
+      {
+         _fork_db.remove( new_block.id() );
+      }
       throw;
    }
 
