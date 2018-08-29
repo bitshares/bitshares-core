@@ -450,7 +450,7 @@ signed_block database::_generate_block(
    if( !(skip & skip_witness_signature) )
       pending_block.sign( block_signing_private_key );
 
-   push_block( pending_block, skip );
+   push_block( pending_block, skip | skip_transaction_signatures ); // skip authority check when pushing self-generated blocks
 
    return pending_block;
 } FC_CAPTURE_AND_RETHROW( (witness_id) ) }
