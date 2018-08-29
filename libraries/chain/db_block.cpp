@@ -380,7 +380,8 @@ signed_block database::_generate_block(
 
    static const size_t max_partial_block_header_size = fc::raw::pack_size( signed_block_header() )
                                                        - fc::raw::pack_size( witness_id_type() ) // witness_id
-                                                       + 4; // space to store size of transactions
+                                                       + 3; // max space to store size of transactions (out of block header),
+                                                            // +3 means 3*7=21 bits so it's practically safe
    const size_t max_block_header_size = max_partial_block_header_size + fc::raw::pack_size( witness_id );
    auto maximum_block_size = get_global_properties().parameters.maximum_block_size;
    size_t total_block_size = max_block_header_size;
@@ -395,7 +396,7 @@ signed_block database::_generate_block(
       size_t new_total_size = total_block_size + fc::raw::pack_size( tx );
 
       // postpone transaction if it would make block too big
-      if( new_total_size >= maximum_block_size )
+      if( new_total_size > maximum_block_size )
       {
          postponed_tx_count++;
          continue;
@@ -411,7 +412,7 @@ signed_block database::_generate_block(
          // their size)
          new_total_size = total_block_size + fc::raw::pack_size( ptx );
          // postpone transaction if it would make block too big
-         if( new_total_size >= maximum_block_size )
+         if( new_total_size > maximum_block_size )
          {
             postponed_tx_count++;
             continue;
