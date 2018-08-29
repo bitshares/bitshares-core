@@ -448,7 +448,7 @@ signed_block database::_generate_block(
       FC_ASSERT( fc::raw::pack_size(pending_block) <= get_global_properties().parameters.maximum_block_size );
    }
 
-   push_block( pending_block, skip );
+   push_block( pending_block, skip | skip_transaction_signatures ); // skip authority check when pushing self-generated blocks
 
    return pending_block;
 } FC_CAPTURE_AND_RETHROW( (witness_id) ) }
