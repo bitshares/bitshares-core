@@ -1843,4 +1843,57 @@ BOOST_FIXTURE_TEST_CASE( temp_account_balance, database_fixture )
    BOOST_CHECK( get_balance( GRAPHENE_TEMP_ACCOUNT, asset_id_type() ) > 0 );
 } FC_LOG_AND_RETHROW() }
 
+/// This test case tries to generate blocks when there are too many pending transactions.
+/// If we add some logging in signed_transaction::get_signature_keys(), we can see if the code will extract public key(s)
+/// from signature(s) of same transactions multiple times.
+/// See https://github.com/bitshares/bitshares-core/pull/1251
+BOOST_FIXTURE_TEST_CASE( block_size_test, database_fixture )
+{
+   try
+   {
+      ACTORS((alice)(bob));
+
+      const fc::ecc::private_key& key = generate_private_key("null_key");
+      BOOST_TEST_MESSAGE( "Give Alice some money" );
+      transfer(committee_account, alice_id, asset(10000000));
+      generate_block();
+
+      const size_t default_block_header_size = fc::raw::pack_size( signed_block_header() );
+      const auto& gpo = db.get_global_properties();
+      const auto block_interval = gpo.parameters.block_interval;
+      idump( (default_block_header_size)(gpo.parameters.maximum_block_size) );
+
+      BOOST_TEST_MESSAGE( "Start" );
+      // Note: a signed transaction with a transfer operation inside is at least 112 bytes
+      for( uint64_t i = 100; i <= 230; ++i )
+      {
+         db._undo_db.disable(); // Temporarily disable undo db to change max block size
+         db.modify( gpo, [i,&default_block_header_size](global_property_object& p) {
+            p.parameters.maximum_block_size = default_block_header_size + i;
+         });
+         db._undo_db.enable();
+         idump( (i)(gpo.parameters.maximum_block_size) );
+
+         signed_transaction xfer_tx;
+         transfer_operation xfer_op;
+         xfer_op.from = alice_id;
+         xfer_op.to = bob_id;
+         xfer_op.amount = asset(i);
+         xfer_tx.operations.push_back( xfer_op );
+         xfer_tx.set_expiration( db.head_block_time() + fc::seconds( 0x1000 * block_interval ) );
+         xfer_tx.set_reference_block( db.head_block_id() );
+         sign( xfer_tx, alice_private_key );
+         PUSH_TX( db, xfer_tx, 0 );
+
+         db.generate_block( db.get_slot_time(1), db.get_scheduled_witness(1), key, 0 );
+      }
+
+   }
+   catch( fc::exception& e )
+   {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
 BOOST_AUTO_TEST_SUITE_END()
