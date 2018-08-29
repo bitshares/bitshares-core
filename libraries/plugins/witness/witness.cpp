@@ -198,7 +198,7 @@ block_production_condition::block_production_condition_enum witness_plugin::bloc
    switch( result )
    {
       case block_production_condition::produced:
-         ilog("Generated block #${n} with timestamp ${t} at time ${c}", (capture));
+         ilog("Generated block #${n} with ${x} transaction(s) and timestamp ${t} at time ${c}", (capture));
          break;
       case block_production_condition::not_synced:
          ilog("Not producing block because production is disabled until we receive a recent block (see: --enable-stale-production)");
@@ -298,7 +298,7 @@ block_production_condition::block_production_condition_enum witness_plugin::mayb
       private_key_itr->second,
       _production_skip_flags
       );
-   capture("n", block.block_num())("t", block.timestamp)("c", now);
+   capture("n", block.block_num())("t", block.timestamp)("c", now)("x", block.transactions.size());
    fc::async( [this,block](){ p2p_node().broadcast(net::block_message(block)); } );
 
    return block_production_condition::produced;
