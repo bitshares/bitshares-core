@@ -47,6 +47,18 @@ public:
    const account_object* acnt;
 };
 
+class account_update_votes_evaluator : public evaluator<account_update_votes_evaluator>
+{
+public:
+   typedef account_update_votes_operation operation_type;
+
+   void_result do_evaluate ( const account_update_votes_operation& o );
+   void_result do_apply( const account_update_votes_operation& o );
+
+   const account_object* acnt;
+   account_options _new_options;
+};
+
 class account_upgrade_evaluator : public evaluator<account_upgrade_evaluator>
 {
 public:

@@ -2357,6 +2357,167 @@ BOOST_AUTO_TEST_CASE( vesting_balance_withdraw_test )
    // TODO:  Test with non-core asset and Bob account
 } FC_LOG_AND_RETHROW() }
 
+BOOST_AUTO_TEST_CASE( account_update_votes_operation_test )
+{
+   try
+   {
+      const fc::ecc::private_key alice_private = fc::ecc::private_key::generate();
+      const public_key_type alice_public       = alice_private.get_public_key();
+      const account_object& alice              = create_account("alice", alice_public);
+
+      const auto& active_committee_members = db.get_global_properties().active_committee_members;
+      const auto& active_witness_members   = db.get_global_properties().active_witnesses;
+
+      transfer( account_id_type()(db), alice, asset(1000000000) );
+      trx.operations.clear();
+
+      // creating committee and witness test votes
+      vote_id_type vote_id_c0 = active_committee_members[0](db).vote_id;
+      vote_id_type vote_id_c1 = active_committee_members[1](db).vote_id;
+      vote_id_type vote_id_c2 = active_committee_members[2](db).vote_id;
+      vote_id_type vote_id_w0;
+      vote_id_type vote_id_w1;
+      vote_id_type vote_id_w2;
+
+      int i = 0;
+      for(auto& vote_id : active_witness_members)
+      {
+         if(i == 0)      vote_id_w0 = vote_id(db).vote_id;
+         else if(i == 1) vote_id_w1 = vote_id(db).vote_id;
+         else if(i == 2) vote_id_w2 = vote_id(db).vote_id;
+         else if(i == 3) break;
+         ++i;
+      }
+
+      #define VOTES_FIND(X) alice.options.votes.find(X)
+      #define VOTES_END     alice.options.votes.end()
+
+      BOOST_TEST_MESSAGE( "\n1. Checking for correct witness and committee num and if votes were added.\n" );
+      {
+         account_update_votes_operation op;
+         op.account       = alice.id;
+         op.votes_to_add  = flat_set<vote_id_type>( {vote_id_c0, vote_id_c1, vote_id_w0, vote_id_w1} );
+         op.num_committee = 2;
+         op.num_witness   = 2;
+
+         trx = signed_transaction();
+         set_expiration(db, trx);
+         trx.operations.push_back(op);
+         PUSH_TX( db, trx, ~0 );
+
+         BOOST_CHECK( VOTES_FIND(vote_id_c0) != VOTES_END && VOTES_FIND(vote_id_c1) != VOTES_END
+                   && VOTES_FIND(vote_id_w0) != VOTES_END && VOTES_FIND(vote_id_w1) != VOTES_END );
+         BOOST_CHECK( alice.options.num_committee == 2 );
+         BOOST_CHECK( alice.options.num_witness   == 2 );
+      }
+
+      BOOST_TEST_MESSAGE( "\n2. Checking for correct witness and committee num and if votes were removed.\n" );
+      {
+         account_update_votes_operation op;
+         op.account         = alice.id;
+         op.votes_to_remove = flat_set<vote_id_type>( {vote_id_c0, vote_id_c1, vote_id_w0, vote_id_w1} );
+         op.num_committee   = 0;
+         op.num_witness     = 0;
+
+         trx = signed_transaction();
+         set_expiration(db, trx);
+         trx.operations.push_back(op);
+         PUSH_TX( db, trx, ~0 );
+
+         BOOST_CHECK( VOTES_FIND(vote_id_c0) == VOTES_END && VOTES_FIND(vote_id_c1) == VOTES_END
+                   && VOTES_FIND(vote_id_w0) == VOTES_END && VOTES_FIND(vote_id_w1) == VOTES_END );
+         BOOST_CHECK( alice.options.num_committee == 0 );
+         BOOST_CHECK( alice.options.num_witness   == 0 );
+      }
+
+      BOOST_TEST_MESSAGE( "\n3. Trying to add and remove the same votes.\n" );
+      {
+         account_update_votes_operation op;
+         op.account         = alice.id;
+         op.votes_to_add    = flat_set<vote_id_type>( {vote_id_c0, vote_id_c1, vote_id_w0, vote_id_w1} );
+         op.votes_to_remove = flat_set<vote_id_type>( {vote_id_c0, vote_id_w0} );
+         op.num_committee   = 0;
+         op.num_witness     = 0;
+
+         trx = signed_transaction();
+         set_expiration(db, trx);
+         trx.operations.push_back(op);
+
+         GRAPHENE_REQUIRE_THROW( PUSH_TX( db, trx, ~0 ), fc::assert_exception);
+      }
+
+      BOOST_TEST_MESSAGE( "\n4. Add and remove at the same time. num_committee && num_witness should stay the same\n" );
+      {
+         account_update_votes_operation op;
+         op.account       = alice.id;
+         op.votes_to_add  = flat_set<vote_id_type>( {vote_id_c0, vote_id_c1, vote_id_w0, vote_id_w1} );
+         op.num_committee = 2;
+         op.num_witness   = 2;
+
+         trx = signed_transaction();
+         set_expiration(db, trx);
+         trx.operations.push_back(op);
+         trx.validate();
+         PUSH_TX( db, trx, ~0 );
+
+         op = account_update_votes_operation();
+         op.account         = alice.id;
+         op.votes_to_add    = flat_set<vote_id_type>( {vote_id_c2, vote_id_w2} );
+         op.votes_to_remove = flat_set<vote_id_type>( {vote_id_c1, vote_id_w1} );
+
+         trx = signed_transaction();
+         set_expiration(db, trx);
+         trx.operations.push_back(op);
+         PUSH_TX( db, trx, ~0 );
+
+         BOOST_CHECK( VOTES_FIND(vote_id_c0) != VOTES_END
+                   && VOTES_FIND(vote_id_c1) == VOTES_END
+                   && VOTES_FIND(vote_id_c2) != VOTES_END
+                   && VOTES_FIND(vote_id_w0) != VOTES_END
+                   && VOTES_FIND(vote_id_w1) == VOTES_END
+                   && VOTES_FIND(vote_id_w2) != VOTES_END
+         );
+         BOOST_CHECK( alice.options.num_committee == 2 );
+         BOOST_CHECK( alice.options.num_witness   == 2 );
+
+      }
+
+      BOOST_TEST_MESSAGE( "\n5. Change the voting_account.\n" );
+      {
+         BOOST_CHECK( alice.options.voting_account == GRAPHENE_PROXY_TO_SELF_ACCOUNT );
+
+         account_update_votes_operation op;
+         op.account         = alice.id;
+         op.voting_account  = GRAPHENE_NULL_ACCOUNT;
+         op.votes_to_remove = flat_set<vote_id_type>( {vote_id_c0, vote_id_c2, vote_id_w0, vote_id_w2} );
+         op.num_committee   = 0;
+         op.num_witness     = 0;
+
+         trx = signed_transaction();
+         set_expiration(db, trx);
+         trx.operations.push_back(op);
+         PUSH_TX( db, trx, ~0 );
+
+         BOOST_CHECK( alice.options.voting_account == GRAPHENE_NULL_ACCOUNT );
+         BOOST_CHECK( alice.options.is_voting() );
+      }
+
+      BOOST_TEST_MESSAGE( "\n6. Set no parameters.\n" );
+      {
+         account_update_votes_operation op;
+         op.account = alice.id;
+
+         trx = signed_transaction();
+         set_expiration(db, trx);
+         trx.operations.push_back(op);
+
+         GRAPHENE_REQUIRE_THROW( PUSH_TX( db, trx, ~0 ), fc::assert_exception );
+      }
+   } catch (fc::exception& e) {
+      edump( (e.to_detail_string() ) );
+   }
+}
+
 // TODO:  Write linear VBO tests
 
 BOOST_AUTO_TEST_SUITE_END()
