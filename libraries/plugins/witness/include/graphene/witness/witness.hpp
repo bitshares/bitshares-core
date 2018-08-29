@@ -41,8 +41,7 @@ namespace block_production_condition
       no_private_key = 4,
       low_participation = 5,
       lag = 6,
-      consecutive = 7,
-      exception_producing_block = 8
+      exception_producing_block = 7
    };
 }
 
@@ -79,7 +78,6 @@ private:
 
    boost::program_options::variables_map _options;
    bool _production_enabled = false;
-   bool _consecutive_production_enabled = false;
    uint32_t _required_witness_participation = 33 * GRAPHENE_1_PERCENT;
    uint32_t _production_skip_flags = graphene::chain::database::skip_nothing;
 
