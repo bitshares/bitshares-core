@@ -420,11 +420,11 @@ class database_api
 
       /**
        * @brief Get call orders in a given asset
-       * @param a ID of asset being called
+       * @param a Symbol or ID of asset being called
        * @param limit Maximum number of orders to retrieve
        * @return The call orders, ordered from earliest to be called to latest
        */
-      vector<call_order_object> get_call_orders(asset_id_type a, uint32_t limit)const;
+      vector<call_order_object> get_call_orders(const std::string& a, uint32_t limit)const;
 
       /**
        * @brief Get forced settlement orders in a given asset

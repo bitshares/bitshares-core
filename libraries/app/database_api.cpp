@@ -110,7 +110,7 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
                                                                    const string &quote, uint32_t limit,
                                                                    optional<limit_order_id_type> ostart_id,
                                                                    optional<price> ostart_price );
-      vector<call_order_object>          get_call_orders(asset_id_type a, uint32_t limit)const;
+      vector<call_order_object>          get_call_orders(const std::string& a, uint32_t limit)const;
       vector<force_settlement_object>    get_settle_orders(asset_id_type a, uint32_t limit)const;
       vector<call_order_object>          get_margin_positions( const std::string account_id_or_name )const;
       vector<collateral_bid_object>      get_collateral_bids(const asset_id_type asset, uint32_t limit, uint32_t start)const;
@@ -1214,15 +1214,18 @@ vector<limit_order_object> database_api_impl::get_limit_orders(const std::string
    return get_limit_orders(asset_a_id, asset_b_id, limit);
 }
 
-vector<call_order_object> database_api::get_call_orders(asset_id_type a, uint32_t limit)const
+vector<call_order_object> database_api::get_call_orders(const std::string& a, uint32_t limit)const
 {
    return my->get_call_orders( a, limit );
 }
 
-vector<call_order_object> database_api_impl::get_call_orders(asset_id_type a, uint32_t limit)const
+vector<call_order_object> database_api_impl::get_call_orders(const std::string& a, uint32_t limit)const
 {
+   FC_ASSERT( limit <= 300 );
+
+   const asset_id_type asset_a_id = get_asset_from_string(a)->id;
    const auto& call_index = _db.get_index_type<call_order_index>().indices().get<by_price>();
-   const asset_object& mia = _db.get(a);
+   const asset_object& mia = _db.get(asset_a_id);
    price index_price = price::min(mia.bitasset_data(_db).options.short_backing_asset, mia.get_id());
    
    vector< call_order_object> result;
