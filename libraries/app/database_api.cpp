@@ -111,7 +111,7 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
                                                                    optional<limit_order_id_type> ostart_id,
                                                                    optional<price> ostart_price );
       vector<call_order_object>          get_call_orders(const std::string& a, uint32_t limit)const;
-      vector<force_settlement_object>    get_settle_orders(asset_id_type a, uint32_t limit)const;
+      vector<force_settlement_object>    get_settle_orders(const std::string& a, uint32_t limit)const;
       vector<call_order_object>          get_margin_positions( const std::string account_id_or_name )const;
       vector<collateral_bid_object>      get_collateral_bids(const asset_id_type asset, uint32_t limit, uint32_t start)const;
 
@@ -1239,15 +1239,18 @@ vector<call_order_object> database_api_impl::get_call_orders(const std::string& 
    return result;
 }
 
-vector<force_settlement_object> database_api::get_settle_orders(asset_id_type a, uint32_t limit)const
+vector<force_settlement_object> database_api::get_settle_orders(const std::string& a, uint32_t limit)const
 {
    return my->get_settle_orders( a, limit );
 }
 
-vector<force_settlement_object> database_api_impl::get_settle_orders(asset_id_type a, uint32_t limit)const
+vector<force_settlement_object> database_api_impl::get_settle_orders(const std::string& a, uint32_t limit)const
 {
+   FC_ASSERT( limit <= 300 );
+
+   const asset_id_type asset_a_id = get_asset_from_string(a)->id;
    const auto& settle_index = _db.get_index_type<force_settlement_index>().indices().get<by_expiration>();
-   const asset_object& mia = _db.get(a);
+   const asset_object& mia = _db.get(asset_a_id);
 
    vector<force_settlement_object> result;
    auto itr_min = settle_index.lower_bound(mia.get_id());

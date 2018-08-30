@@ -3108,9 +3108,9 @@ vector<call_order_object> wallet_api::get_call_orders(std::string a, uint32_t li
    return my->_remote_db->get_call_orders(a, limit);
 }
 
-vector<force_settlement_object> wallet_api::get_settle_orders(string a, uint32_t limit)const
+vector<force_settlement_object> wallet_api::get_settle_orders(std::string a, uint32_t limit)const
 {
-   return my->_remote_db->get_settle_orders(get_asset(a).id, limit);
+   return my->_remote_db->get_settle_orders(a, limit);
 }
 
 vector<collateral_bid_object> wallet_api::get_collateral_bids(string asset, uint32_t limit, uint32_t start)const
