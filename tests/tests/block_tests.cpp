@@ -1875,6 +1875,7 @@ BOOST_FIXTURE_TEST_CASE( block_size_test, database_fixture )
       //       an empty block is 112 bytes;
       //       a block with a transfer is 215 bytes;
       //       a block with 2 transfers is 318 bytes.
+      uint32_t large_block_count = 0;
       for( uint64_t i = 90; i <= 230; ++i )
       {
          if( i > 120 && i < 200 ) // skip some
@@ -1908,11 +1909,13 @@ BOOST_FIXTURE_TEST_CASE( block_size_test, database_fixture )
          maybe_large_block.transaction_merkle_root = maybe_large_block.calculate_merkle_root();
          maybe_large_block.witness = db.get_scheduled_witness(1);
          maybe_large_block.sign(key);
-         idump( (fc::raw::pack_size(maybe_large_block)) );
+         auto maybe_large_block_size = fc::raw::pack_size(maybe_large_block);
+         idump( (maybe_large_block_size) );
 
          // should fail to push if it's too large
-         if( fc::raw::pack_size(maybe_large_block) > gpo.parameters.maximum_block_size )
+         if( maybe_large_block_size > gpo.parameters.maximum_block_size )
          {
+            ++large_block_count;
             BOOST_CHECK_THROW( db.push_block(maybe_large_block), fc::exception );
          }
 
@@ -1920,7 +1923,8 @@ BOOST_FIXTURE_TEST_CASE( block_size_test, database_fixture )
          auto good_block = db.generate_block( db.get_slot_time(1), db.get_scheduled_witness(1), key, database::skip_nothing );
          idump( (fc::raw::pack_size(good_block)) );
       }
-
+      // make sure we have tested at least once pushing a large block
+      BOOST_CHECK_GT( large_block_count, 0 );
    }
    catch( fc::exception& e )
    {
