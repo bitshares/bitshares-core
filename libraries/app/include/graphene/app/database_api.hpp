@@ -676,7 +676,7 @@ class database_api
        *  For each operation calculate the required fee in the specified asset type.  If the asset type does
        *  not have a valid core_exchange_rate
        */
-      vector< fc::variant > get_required_fees( const vector<operation>& ops, asset_id_type id )const;
+      vector< fc::variant > get_required_fees( const vector<operation>& ops, const std::string& asset_id_or_symbol )const;
 
       ///////////////////////////
       // Proposed transactions //
