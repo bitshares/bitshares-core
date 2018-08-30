@@ -1861,8 +1861,6 @@ BOOST_FIXTURE_TEST_CASE( block_size_test, database_fixture )
       BOOST_TEST_MESSAGE( "Give Alice some money" );
       transfer(committee_account, alice_id, asset(10000000));
       generate_block();
-      // generate one more block to initialize fork db
-      db.generate_block( db.get_slot_time(1), db.get_scheduled_witness(1), key, database::skip_nothing );
 
       const size_t default_block_header_size = fc::raw::pack_size( signed_block_header() );
       const auto& gpo = db.get_global_properties();
