@@ -3113,9 +3113,9 @@ vector<force_settlement_object> wallet_api::get_settle_orders(std::string a, uin
    return my->_remote_db->get_settle_orders(a, limit);
 }
 
-vector<collateral_bid_object> wallet_api::get_collateral_bids(string asset, uint32_t limit, uint32_t start)const
+vector<collateral_bid_object> wallet_api::get_collateral_bids(std::string asset, uint32_t limit, uint32_t start)const
 {
-   return my->_remote_db->get_collateral_bids(get_asset(asset).id, limit, start);
+   return my->_remote_db->get_collateral_bids(asset, limit, start);
 }
 
 brain_key_info wallet_api::suggest_brain_key()const

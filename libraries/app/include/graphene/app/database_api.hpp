@@ -436,12 +436,12 @@ class database_api
 
       /**
        * @brief Get collateral_bid_objects for a given asset
-       * @param a ID of asset
+       * @param a Symbol or ID of asset
        * @param limit Maximum number of objects to retrieve
        * @param start skip that many results
        * @return The settle orders, ordered from earliest settlement date to latest
        */
-      vector<collateral_bid_object> get_collateral_bids(const asset_id_type asset, uint32_t limit, uint32_t start)const;
+      vector<collateral_bid_object> get_collateral_bids(const std::string& a, uint32_t limit, uint32_t start)const;
 
       /**
        *  @return all open margin positions for a given account id or name.
