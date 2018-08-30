@@ -115,8 +115,8 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       vector<call_order_object>          get_margin_positions( const std::string account_id_or_name )const;
       vector<collateral_bid_object>      get_collateral_bids(const std::string& asset, uint32_t limit, uint32_t start)const;
 
-      void subscribe_to_market(std::function<void(const variant&)> callback, asset_id_type a, asset_id_type b);
-      void unsubscribe_from_market(asset_id_type a, asset_id_type b);
+      void subscribe_to_market(std::function<void(const variant&)> callback, const std::string& a, const std::string& b);
+      void unsubscribe_from_market(const std::string& a, const std::string& b);
 
       market_ticker                      get_ticker( const string& base, const string& quote, bool skip_order_book = false )const;
       market_volume                      get_24_volume( const string& base, const string& quote )const;
@@ -1314,28 +1314,34 @@ vector<collateral_bid_object> database_api_impl::get_collateral_bids(const std::
    return result;
 } FC_CAPTURE_AND_RETHROW( (asset)(limit)(skip) ) }
 
-void database_api::subscribe_to_market(std::function<void(const variant&)> callback, asset_id_type a, asset_id_type b)
+void database_api::subscribe_to_market(std::function<void(const variant&)> callback, const std::string& a, const std::string& b)
 {
    my->subscribe_to_market( callback, a, b );
 }
 
-void database_api_impl::subscribe_to_market(std::function<void(const variant&)> callback, asset_id_type a, asset_id_type b)
+void database_api_impl::subscribe_to_market(std::function<void(const variant&)> callback, const std::string& a, const std::string& b)
 {
-   if(a > b) std::swap(a,b);
-   FC_ASSERT(a != b);
-   _market_subscriptions[ std::make_pair(a,b) ] = callback;
+   auto asset_a_id = get_asset_from_string(a)->id;
+   auto asset_b_id = get_asset_from_string(b)->id;
+
+   if(asset_a_id > asset_b_id) std::swap(asset_a_id,asset_b_id);
+   FC_ASSERT(asset_a_id != asset_b_id);
+   _market_subscriptions[ std::make_pair(asset_a_id,asset_b_id) ] = callback;
 }
 
-void database_api::unsubscribe_from_market(asset_id_type a, asset_id_type b)
+void database_api::unsubscribe_from_market(const std::string& a, const std::string& b)
 {
    my->unsubscribe_from_market( a, b );
 }
 
-void database_api_impl::unsubscribe_from_market(asset_id_type a, asset_id_type b)
+void database_api_impl::unsubscribe_from_market(const std::string& a, const std::string& b)
 {
-   if(a > b) std::swap(a,b);
-   FC_ASSERT(a != b);
-   _market_subscriptions.erase(std::make_pair(a,b));
+   auto asset_a_id = get_asset_from_string(a)->id;
+   auto asset_b_id = get_asset_from_string(b)->id;
+
+   if(a > b) std::swap(asset_a_id,asset_b_id);
+   FC_ASSERT(asset_a_id != asset_b_id);
+   _market_subscriptions.erase(std::make_pair(asset_a_id,asset_b_id));
 }
 
 string database_api_impl::price_to_string( const price& _price, const asset_object& _base, const asset_object& _quote )

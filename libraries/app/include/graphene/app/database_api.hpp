@@ -451,21 +451,21 @@ class database_api
       /**
        * @brief Request notification when the active orders in the market between two assets changes
        * @param callback Callback method which is called when the market changes
-       * @param a First asset ID
-       * @param b Second asset ID
+       * @param a First asset Symbol or ID
+       * @param b Second asset Symbol or ID
        *
        * Callback will be passed a variant containing a vector<pair<operation, operation_result>>. The vector will
        * contain, in order, the operations which changed the market, and their results.
        */
       void subscribe_to_market(std::function<void(const variant&)> callback,
-                   asset_id_type a, asset_id_type b);
+                               const std::string& a, const std::string& b);
 
       /**
        * @brief Unsubscribe from updates to a given market
-       * @param a First asset ID
-       * @param b Second asset ID
+       * @param a First asset Symbol ID
+       * @param b Second asset Symbol ID
        */
-      void unsubscribe_from_market( asset_id_type a, asset_id_type b );
+      void unsubscribe_from_market( const std::string& a, const std::string& b );
 
       /**
        * @brief Returns the ticker for the market assetA:assetB
