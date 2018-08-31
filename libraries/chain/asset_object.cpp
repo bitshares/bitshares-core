@@ -73,13 +73,17 @@ void graphene::chain::asset_bitasset_data_object::update_median_feeds(time_point
       feed_cer_updated = false; // new median cer is null, won't update asset_object anyway, set to false for better performance
       current_feed_publication_time = current_time;
       current_feed = price_feed();
+      current_maintenance_collateralization = price();
       return;
    }
    if( current_feeds.size() == 1 )
    {
       if( current_feed.core_exchange_rate != current_feeds.front().get().core_exchange_rate )
          feed_cer_updated = true;
-      current_feed = std::move(current_feeds.front());
+      current_feed = current_feeds.front();
+      // Note: 1. perhaps can defer updating current_maintenance_collateralization for better performance;
+      //       2. can check time before updating for better performance.
+      current_maintenance_collateralization = current_feed.maintenance_collateralization();
       return;
    }
 
@@ -100,6 +104,9 @@ void graphene::chain::asset_bitasset_data_object::update_median_feeds(time_point
    if( current_feed.core_exchange_rate != median_feed.core_exchange_rate )
       feed_cer_updated = true;
    current_feed = median_feed;
+   // Note: 1. perhaps can defer updating current_maintenance_collateralization for better performance;
+   //       2. can check time before updating for better performance.
+   current_maintenance_collateralization = current_feed.maintenance_collateralization();
 }
 
 
@@ -157,7 +164,7 @@ asset asset_object::amount_from_string(string amount_string) const
       satoshis *= -1;
 
    return amount(satoshis);
-   } FC_CAPTURE_AND_RETHROW( (amount_string) ) }
+} FC_CAPTURE_AND_RETHROW( (amount_string) ) }
 
 string asset_object::amount_to_string(share_type amount) const
 {

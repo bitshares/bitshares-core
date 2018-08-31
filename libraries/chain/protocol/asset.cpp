@@ -271,6 +271,12 @@ namespace graphene { namespace chain {
          return (asset( cp.numerator().convert_to<int64_t>(), settlement_price.base.asset_id ) / asset( cp.denominator().convert_to<int64_t>(), settlement_price.quote.asset_id ));
       }
 
+      price price_feed::maintenance_collateralization()const
+      {
+         if( settlement_price.is_null() )
+            return price();
+         return ~settlement_price * ratio_type( maintenance_collateral_ratio, GRAPHENE_COLLATERAL_RATIO_DENOM );
+      }
 // compile-time table of powers of 10 using template metaprogramming
 
 template< int N >

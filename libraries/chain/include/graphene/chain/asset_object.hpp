@@ -191,6 +191,9 @@ namespace graphene { namespace chain {
          price_feed current_feed;
          /// This is the publication time of the oldest feed which was factored into current_feed.
          time_point_sec current_feed_publication_time;
+         /// Call orders with collateralization (aka collateral/debt) not greater than this value are in margin call territory.
+         /// This value is derived from @ref current_feed for better performance and should be kept consistent.
+         price current_maintenance_collateralization;
 
          /// True if this asset implements a @ref prediction_market
          bool is_prediction_market = false;
@@ -305,6 +308,7 @@ FC_REFLECT_DERIVED( graphene::chain::asset_bitasset_data_object, (graphene::db::
                     (feeds)
                     (current_feed)
                     (current_feed_publication_time)
+                    (current_maintenance_collateralization)
                     (options)
                     (force_settled_volume)
                     (is_prediction_market)
