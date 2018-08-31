@@ -42,12 +42,6 @@ namespace graphene { namespace chain {
 */
 void database::globally_settle_asset( const asset_object& mia, const price& settlement_price )
 { try {
-   /*
-   elog( "BLACK SWAN!" );
-   debug_dump();
-   edump( (mia.symbol)(settlement_price) );
-   */
-
    const asset_bitasset_data_object& bitasset = mia.bitasset_data(*this);
    FC_ASSERT( !bitasset.has_settlement(), "black swan already occurred, it should not happen again" );
 
