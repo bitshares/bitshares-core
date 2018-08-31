@@ -158,6 +158,7 @@ namespace graphene { namespace chain {
       impl_blinded_balance_object_type,
       impl_chain_property_object_type,
       impl_witness_schedule_object_type,
+      impl_reserved1_object_type,      // formerly impl_budget_record_object_type, TODO: delete me
       impl_special_authority_object_type,
       impl_buyback_object_type,
       impl_fba_accumulator_object_type,
@@ -358,6 +359,7 @@ FC_REFLECT_ENUM( graphene::chain::impl_object_type,
                  (impl_blinded_balance_object_type)
                  (impl_chain_property_object_type)
                  (impl_witness_schedule_object_type)
+                 (impl_reserved1_object_type)
                  (impl_special_authority_object_type)
                  (impl_buyback_object_type)
                  (impl_fba_accumulator_object_type)
