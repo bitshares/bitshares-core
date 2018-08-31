@@ -119,7 +119,6 @@ void witness_plugin::plugin_startup()
 { try {
    ilog("witness plugin:  plugin_startup() begin");
    chain::database& d = database();
-
    if( !_witnesses.empty() )
    {
       ilog("Launching block production for ${n} witnesses.", ("n", _witnesses.size()));
@@ -130,15 +129,36 @@ void witness_plugin::plugin_startup()
             new_chain_banner(d);
          _production_skip_flags |= graphene::chain::database::skip_undo_history_check;
       }
+      refresh_witness_key_cache();
+      d.applied_block.connect( [this]( const chain::signed_block& b )
+      {
+         refresh_witness_key_cache();
+      });
       schedule_production_loop();
-   } else
-      elog("No witnesses configured! Please add witness IDs and private keys to configuration.");
+   }
+   else
+   {
+      ilog("No witness configured.");
+   }
    ilog("witness plugin:  plugin_startup() end");
 } FC_CAPTURE_AND_RETHROW() }
 
 void witness_plugin::plugin_shutdown()
 {
    // nothing to do
+}
+
+void witness_plugin::refresh_witness_key_cache()
+{
+   const auto& db = database();
+   for( const chain::witness_id_type wit_id : _witnesses )
+   {
+      const chain::witness_object* wit_obj = db.find( wit_id );
+      if( wit_obj )
+         _witness_key_cache[wit_id] = wit_obj->signing_key;
+      else
+         _witness_key_cache[wit_id] = fc::optional<chain::public_key_type>();
+   }
 }
 
 void witness_plugin::schedule_production_loop()
@@ -178,7 +198,7 @@ block_production_condition::block_production_condition_enum witness_plugin::bloc
    switch( result )
    {
       case block_production_condition::produced:
-         ilog("Generated block #${n} with timestamp ${t} at time ${c}", (capture));
+         ilog("Generated block #${n} with ${x} transaction(s) and timestamp ${t} at time ${c}", (capture));
          break;
       case block_production_condition::not_synced:
          ilog("Not producing block because production is disabled until we receive a recent block (see: --enable-stale-production)");
@@ -247,7 +267,7 @@ block_production_condition::block_production_condition_enum witness_plugin::mayb
    }
 
    fc::time_point_sec scheduled_time = db.get_slot_time( slot );
-   graphene::chain::public_key_type scheduled_key = scheduled_witness( db ).signing_key;
+   graphene::chain::public_key_type scheduled_key = *_witness_key_cache[scheduled_witness]; // should be valid
    auto private_key_itr = _private_keys.find( scheduled_key );
 
    if( private_key_itr == _private_keys.end() )
@@ -275,7 +295,7 @@ block_production_condition::block_production_condition_enum witness_plugin::mayb
       private_key_itr->second,
       _production_skip_flags
       );
-   capture("n", block.block_num())("t", block.timestamp)("c", now);
+   capture("n", block.block_num())("t", block.timestamp)("c", now)("x", block.transactions.size());
    fc::async( [this,block](){ p2p_node().broadcast(net::block_message(block)); } );
 
    return block_production_condition::produced;

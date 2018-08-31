@@ -235,6 +235,123 @@ BOOST_AUTO_TEST_CASE( undo_block )
    }
 }
 
+BOOST_AUTO_TEST_CASE( change_signing_key_test )
+{
+   try {
+      fc::temp_directory data_dir( graphene::utilities::temp_directory_path() );
+
+      auto init_account_priv_key  = fc::ecc::private_key::regenerate(fc::sha256::hash(string("null_key")) );
+      auto init_pub_key = init_account_priv_key.get_public_key();
+      auto new_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("new_key")) );
+      auto new_pub_key = new_key.get_public_key();
+
+      std::map< public_key_type, fc::ecc::private_key > key_map;
+      key_map[init_pub_key] = init_account_priv_key;
+      key_map[new_pub_key] = new_key;
+
+      std::set< witness_id_type > witnesses;
+      for( uint32_t i = 0; i <= 11; ++i ) // 11 init witnesses and 0 is reserved
+         witnesses.insert( witness_id_type(i) );
+
+      auto change_signing_key = [&init_account_priv_key]( database& db, witness_id_type wit, public_key_type new_signing_key ) {
+         witness_update_operation wuop;
+         wuop.witness_account = wit(db).witness_account;
+         wuop.witness = wit;
+         wuop.new_signing_key = new_signing_key;
+         signed_transaction wu_trx;
+         wu_trx.operations.push_back( wuop );
+         wu_trx.set_reference_block( db.head_block_id() );
+         wu_trx.set_expiration( db.head_block_time()
+                               + fc::seconds( 0x1000 * db.get_global_properties().parameters.block_interval ) );
+         wu_trx.sign( init_account_priv_key, db.get_chain_id() );
+         PUSH_TX( db, wu_trx, 0 );
+      };
+
+      {
+         database db;
+
+         // open database
+         db.open(data_dir.path(), make_genesis, "TEST");
+
+         // generate some empty blocks with init keys
+         for( uint32_t i = 0; i < 30; ++i )
+         {
+            auto now = db.get_slot_time(1);
+            auto next_witness = db.get_scheduled_witness( 1 );
+            db.generate_block( now, next_witness, init_account_priv_key, database::skip_nothing );
+         }
+
+         // generate some blocks and change keys in same block
+         for( uint32_t i = 0; i < 9; ++i )
+         {
+            auto now = db.get_slot_time(1);
+            auto next_witness = db.get_scheduled_witness( 1 );
+            public_key_type current_key = next_witness(db).signing_key;
+            change_signing_key( db, next_witness, new_key.get_public_key() );
+            idump( (i)(now)(next_witness) );
+            auto b = db.generate_block( now, next_witness, key_map[current_key], database::skip_nothing );
+            idump( (b) );
+         }
+
+         // pop a few blocks and clear pending, some signing keys should be changed back
+         for( uint32_t i = 0; i < 4; ++i )
+         {
+            db.pop_block();
+         }
+         db._popped_tx.clear();
+         db.clear_pending();
+
+         // generate a few blocks and change keys in same block
+         for( uint32_t i = 0; i < 2; ++i )
+         {
+            auto now = db.get_slot_time(1);
+            auto next_witness = db.get_scheduled_witness( 1 );
+            public_key_type current_key = next_witness(db).signing_key;
+            change_signing_key( db, next_witness, new_key.get_public_key() );
+            idump( (i)(now)(next_witness) );
+            auto b = db.generate_block( now, next_witness, key_map[current_key], database::skip_nothing );
+            idump( (b) );
+         }
+
+         // generate some blocks but don't change a key
+         for( uint32_t i = 0; i < 25; ++i )
+         {
+            auto now = db.get_slot_time(1);
+            auto next_witness = db.get_scheduled_witness( 1 );
+            public_key_type current_key = next_witness(db).signing_key;
+            idump( (i)(now)(next_witness) );
+            auto b = db.generate_block( now, next_witness, key_map[current_key], database::skip_nothing );
+            idump( (b) );
+         }
+
+         // close the database, flush all data to disk
+         db.close();
+      }
+      {
+         database db;
+
+         // reopen database, all data should be unchanged
+         db.open(data_dir.path(), make_genesis, "TEST");
+
+         // generate more blocks and change keys in same block
+         for( uint32_t i = 0; i < 25; ++i )
+         {
+            auto now = db.get_slot_time(1);
+            auto next_witness = db.get_scheduled_witness( 1 );
+            public_key_type current_key = next_witness(db).signing_key;
+            change_signing_key( db, next_witness, new_key.get_public_key() );
+            idump( (i)(now)(next_witness) );
+            auto b = db.generate_block( now, next_witness, key_map[current_key], database::skip_nothing );
+            idump( (b) );
+         }
+
+      }
+   } catch (fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
 BOOST_AUTO_TEST_CASE( fork_blocks )
 {
    try {
@@ -1725,5 +1842,93 @@ BOOST_FIXTURE_TEST_CASE( temp_account_balance, database_fixture )
 
    BOOST_CHECK( get_balance( GRAPHENE_TEMP_ACCOUNT, asset_id_type() ) > 0 );
 } FC_LOG_AND_RETHROW() }
+
+///
+/// This test case tries to
+/// * generate blocks when there are too many pending transactions,
+/// * push blocks that are too large.
+/// If we add some logging in signed_transaction::get_signature_keys(), we can see if the code will extract public key(s)
+/// from signature(s) of same transactions multiple times.
+/// See https://github.com/bitshares/bitshares-core/pull/1251
+///
+BOOST_FIXTURE_TEST_CASE( block_size_test, database_fixture )
+{
+   try
+   {
+      ACTORS((alice)(bob));
+
+      const fc::ecc::private_key& key = generate_private_key("null_key");
+      BOOST_TEST_MESSAGE( "Give Alice some money" );
+      transfer(committee_account, alice_id, asset(10000000));
+      generate_block();
+
+      const size_t default_block_header_size = fc::raw::pack_size( signed_block_header() );
+      const auto& gpo = db.get_global_properties();
+      const auto block_interval = gpo.parameters.block_interval;
+      idump( (db.head_block_num())(default_block_header_size)(gpo.parameters.maximum_block_size) );
+
+      BOOST_TEST_MESSAGE( "Start" );
+      // Note: a signed transaction with a transfer operation inside is at least 102 bytes;
+      //       after processed, it become 103 bytes;
+      //       an empty block is 112 bytes;
+      //       a block with a transfer is 215 bytes;
+      //       a block with 2 transfers is 318 bytes.
+      uint32_t large_block_count = 0;
+      for( uint64_t i = 90; i <= 230; ++i )
+      {
+         if( i > 120 && i < 200 ) // skip some
+            i = 200;
+
+         // Temporarily disable undo db and change max block size
+         db._undo_db.disable();
+         db.modify( gpo, [i,&default_block_header_size](global_property_object& p) {
+            p.parameters.maximum_block_size = default_block_header_size + i;
+         });
+         db._undo_db.enable();
+         idump( (i)(gpo.parameters.maximum_block_size) );
+
+         // push a transaction
+         signed_transaction xfer_tx;
+         transfer_operation xfer_op;
+         xfer_op.from = alice_id;
+         xfer_op.to = bob_id;
+         xfer_op.amount = asset(i);
+         xfer_tx.operations.push_back( xfer_op );
+         xfer_tx.set_expiration( db.head_block_time() + fc::seconds( 0x1000 * block_interval ) );
+         xfer_tx.set_reference_block( db.head_block_id() );
+         sign( xfer_tx, alice_private_key );
+         auto processed_tx = PUSH_TX( db, xfer_tx, database::skip_nothing );
+
+         // sign a temporary block
+         signed_block maybe_large_block;
+         maybe_large_block.transactions.push_back(processed_tx);
+         maybe_large_block.previous = db.head_block_id();
+         maybe_large_block.timestamp = db.get_slot_time(1);
+         maybe_large_block.transaction_merkle_root = maybe_large_block.calculate_merkle_root();
+         maybe_large_block.witness = db.get_scheduled_witness(1);
+         maybe_large_block.sign(key);
+         auto maybe_large_block_size = fc::raw::pack_size(maybe_large_block);
+         idump( (maybe_large_block_size) );
+
+         // should fail to push if it's too large
+         if( maybe_large_block_size > gpo.parameters.maximum_block_size )
+         {
+            ++large_block_count;
+            BOOST_CHECK_THROW( db.push_block(maybe_large_block), fc::exception );
+         }
+
+         // generate a block normally
+         auto good_block = db.generate_block( db.get_slot_time(1), db.get_scheduled_witness(1), key, database::skip_nothing );
+         idump( (fc::raw::pack_size(good_block)) );
+      }
+      // make sure we have tested at least once pushing a large block
+      BOOST_CHECK_GT( large_block_count, 0 );
+   }
+   catch( fc::exception& e )
+   {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
 
 BOOST_AUTO_TEST_SUITE_END()

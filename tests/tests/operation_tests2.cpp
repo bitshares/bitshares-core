@@ -35,6 +35,8 @@
 #include <graphene/chain/witness_object.hpp>
 #include <graphene/chain/worker_object.hpp>
 
+#include <graphene/witness/witness.hpp>
+
 #include <graphene/utilities/tempdir.hpp>
 
 #include <fc/crypto/digest.hpp>
@@ -1044,15 +1046,147 @@ BOOST_AUTO_TEST_CASE( feed_limit_test )
 
 BOOST_AUTO_TEST_CASE( witness_create )
 { try {
+
+   uint32_t skip = database::skip_witness_signature
+                 | database::skip_transaction_signatures
+                 | database::skip_transaction_dupe_check
+                 | database::skip_block_size_check
+                 | database::skip_tapos_check
+                 | database::skip_authority_check
+                 | database::skip_merkle_check
+                 ;
+   generate_block(skip);
+
+   auto wtplugin = app.register_plugin<graphene::witness_plugin::witness_plugin>();
+   wtplugin->plugin_set_app(&app);
+   boost::program_options::variables_map options;
+
+   // init witness key cahce
+   std::set< witness_id_type > caching_witnesses;
+   std::vector< std::string > witness_ids;
+   for( uint64_t i = 1; ; ++i )
+   {
+      witness_id_type wid(i);
+      caching_witnesses.insert( wid );
+      string wid_str = "\"" + std::string(object_id_type(wid)) + "\"";
+      witness_ids.push_back( wid_str );
+      if( !db.find(wid) )
+         break;
+   }
+   options.insert( std::make_pair( "witness-id", boost::program_options::variable_value( witness_ids, false ) ) );
+   wtplugin->plugin_initialize(options);
+   wtplugin->plugin_startup();
+
+   const auto& wit_key_cache = wtplugin->get_witness_key_cache();
+
+   // setup test account
    ACTOR(nathan);
    upgrade_to_lifetime_member(nathan_id);
    trx.clear();
-   witness_id_type nathan_witness_id = create_witness(nathan_id, nathan_private_key).id;
+
+   // create witness
+   witness_id_type nathan_witness_id = create_witness(nathan_id, nathan_private_key, skip).id;
+
+   // nathan should be in the cache
+   BOOST_CHECK_EQUAL( caching_witnesses.count(nathan_witness_id), 1 );
+
+   // nathan's key in the cache should still be null before a new block is generated
+   auto nathan_itr = wit_key_cache.find( nathan_witness_id );
+   BOOST_CHECK( nathan_itr != wit_key_cache.end() && !nathan_itr->second.valid() );
+
    // Give nathan some voting stake
    transfer(committee_account, nathan_id, asset(10000000));
-   generate_block();
+   generate_block(skip);
+
+   // nathan should be a witness now
+   BOOST_REQUIRE( db.find( nathan_witness_id ) );
+   // nathan's key in the cache should have been stored now
+   nathan_itr = wit_key_cache.find( nathan_witness_id );
+   BOOST_CHECK( nathan_itr != wit_key_cache.end() && nathan_itr->second.valid()
+                && *nathan_itr->second == nathan_private_key.get_public_key() );
+
+   // undo the block
+   db.pop_block();
+
+   // nathan should not be a witness now
+   BOOST_REQUIRE( !db.find( nathan_witness_id ) );
+   // nathan's key in the cache should still be valid, since witness plugin doesn't get notified on popped block
+   nathan_itr = wit_key_cache.find( nathan_witness_id );
+   BOOST_CHECK( nathan_itr != wit_key_cache.end() && nathan_itr->second.valid()
+                && *nathan_itr->second == nathan_private_key.get_public_key() );
+
+   // copy popped transactions
+   auto popped_tx = db._popped_tx;
+
+   // generate another block
+   generate_block(skip);
+
+   // nathan should not be a witness now
+   BOOST_REQUIRE( !db.find( nathan_witness_id ) );
+   // nathan's key in the cache should be null now
+   BOOST_CHECK( nathan_itr != wit_key_cache.end() && !nathan_itr->second.valid() );
+
+   // push the popped tx
+   for( const auto& tx : popped_tx )
+   {
+      PUSH_TX( db, tx, skip );
+   }
+   // generate another block
+   generate_block(skip);
    set_expiration( db, trx );
 
+   // nathan should be a witness now
+   BOOST_REQUIRE( db.find( nathan_witness_id ) );
+   // nathan's key in the cache should have been stored now
+   nathan_itr = wit_key_cache.find( nathan_witness_id );
+   BOOST_CHECK( nathan_itr != wit_key_cache.end() && nathan_itr->second.valid()
+                && *nathan_itr->second == nathan_private_key.get_public_key() );
+
+   // generate a new key
+   fc::ecc::private_key new_signing_key = fc::ecc::private_key::regenerate(fc::digest("nathan_new"));
+
+   // update nathan's block signing key
+   {
+      witness_update_operation wuop;
+      wuop.witness_account = nathan_id;
+      wuop.witness = nathan_witness_id;
+      wuop.new_signing_key = new_signing_key.get_public_key();
+      signed_transaction wu_trx;
+      wu_trx.operations.push_back( wuop );
+      set_expiration( db, wu_trx );
+      PUSH_TX( db, wu_trx, skip );
+   }
+
+   // nathan's key in the cache should still be old key
+   nathan_itr = wit_key_cache.find( nathan_witness_id );
+   BOOST_CHECK( nathan_itr != wit_key_cache.end() && nathan_itr->second.valid()
+                && *nathan_itr->second == nathan_private_key.get_public_key() );
+
+   // generate another block
+   generate_block(skip);
+
+   // nathan's key in the cache should have changed to new key
+   nathan_itr = wit_key_cache.find( nathan_witness_id );
+   BOOST_CHECK( nathan_itr != wit_key_cache.end() && nathan_itr->second.valid()
+                && *nathan_itr->second == new_signing_key.get_public_key() );
+
+   // undo the block
+   db.pop_block();
+
+   // nathan's key in the cache should still be new key, since witness plugin doesn't get notified on popped block
+   nathan_itr = wit_key_cache.find( nathan_witness_id );
+   BOOST_CHECK( nathan_itr != wit_key_cache.end() && nathan_itr->second.valid()
+                && *nathan_itr->second == new_signing_key.get_public_key() );
+
+   // generate another block
+   generate_block(skip);
+
+   // nathan's key in the cache should be old key now
+   nathan_itr = wit_key_cache.find( nathan_witness_id );
+   BOOST_CHECK( nathan_itr != wit_key_cache.end() && nathan_itr->second.valid()
+                && *nathan_itr->second == nathan_private_key.get_public_key() );
+
+   // voting
    {
       account_update_operation op;
       op.account = nathan_id;

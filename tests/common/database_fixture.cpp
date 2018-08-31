@@ -653,20 +653,23 @@ const committee_member_object& database_fixture::create_committee_member( const 
    return db.get<committee_member_object>(ptx.operation_results[0].get<object_id_type>());
 }
 
-const witness_object&database_fixture::create_witness(account_id_type owner, const fc::ecc::private_key& signing_private_key)
+const witness_object&database_fixture::create_witness(account_id_type owner,
+                                                        const fc::ecc::private_key& signing_private_key,
+                                                        uint32_t skip_flags )
 {
-   return create_witness(owner(db), signing_private_key);
+   return create_witness(owner(db), signing_private_key, skip_flags );
 }
 
 const witness_object& database_fixture::create_witness( const account_object& owner,
-                                                        const fc::ecc::private_key& signing_private_key )
+                                                        const fc::ecc::private_key& signing_private_key,
+                                                        uint32_t skip_flags )
 { try {
    witness_create_operation op;
    op.witness_account = owner.id;
    op.block_signing_key = signing_private_key.get_public_key();
    trx.operations.push_back(op);
    trx.validate();
-   processed_transaction ptx = db.push_transaction(trx, ~0);
+   processed_transaction ptx = db.push_transaction(trx, skip_flags );
    trx.clear();
    return db.get<witness_object>(ptx.operation_results[0].get<object_id_type>());
 } FC_CAPTURE_AND_RETHROW() }

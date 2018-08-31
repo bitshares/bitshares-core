@@ -73,6 +73,14 @@ void database::reindex( fc::path data_dir )
    }
    else
       _undo_db.disable();
+
+   uint32_t skip = skip_witness_signature |
+                   skip_block_size_check |
+                   skip_transaction_signatures |
+                   skip_transaction_dupe_check |
+                   skip_tapos_check |
+                   skip_witness_schedule_check |
+                   skip_authority_check;
    for( uint32_t i = head_block_num() + 1; i <= last_block_num; ++i )
    {
       if( i % 10000 == 0 ) std::cerr << "   " << double(i*100)/last_block_num << "%   "<<i << " of " <<last_block_num<<"   \n";
@@ -103,21 +111,11 @@ void database::reindex( fc::path data_dir )
          break;
       }
       if( i < undo_point )
-         apply_block(*block, skip_witness_signature |
-                             skip_transaction_signatures |
-                             skip_transaction_dupe_check |
-                             skip_tapos_check |
-                             skip_witness_schedule_check |
-                             skip_authority_check);
+         apply_block( *block, skip );
       else
       {
          _undo_db.enable();
-         push_block(*block, skip_witness_signature |
-                            skip_transaction_signatures |
-                            skip_transaction_dupe_check |
-                            skip_tapos_check |
-                            skip_witness_schedule_check |
-                            skip_authority_check);
+         push_block( *block, skip );
       }
    }
    _undo_db.enable();

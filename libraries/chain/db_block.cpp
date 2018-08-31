@@ -209,7 +209,10 @@ bool database::_push_block(const signed_block& new_block)
       session.commit();
    } catch ( const fc::exception& e ) {
       elog("Failed to push new block:\n${e}", ("e", e.to_detail_string()));
-      _fork_db.remove(new_block.id());
+      if( !(skip&skip_fork_db) )
+      {
+         _fork_db.remove( new_block.id() );
+      }
       throw;
    }
 
@@ -352,20 +355,6 @@ signed_block database::_generate_block(
    witness_id_type scheduled_witness = get_scheduled_witness( slot_num );
    FC_ASSERT( scheduled_witness == witness_id );
 
-   const auto& witness_obj = witness_id(*this);
-
-   if( !(skip & skip_witness_signature) )
-      FC_ASSERT( witness_obj.signing_key == block_signing_private_key.get_public_key() );
-
-   static const size_t max_partial_block_header_size = fc::raw::pack_size( signed_block_header() )
-                                                       - fc::raw::pack_size( witness_id_type() ) // witness_id
-                                                       + 4; // space to store size of transactions
-   const size_t max_block_header_size = max_partial_block_header_size + fc::raw::pack_size( witness_id );
-   auto maximum_block_size = get_global_properties().parameters.maximum_block_size;
-   size_t total_block_size = max_block_header_size;
-
-   signed_block pending_block;
-
    //
    // The following code throws away existing pending_tx_session and
    // rebuilds it by re-applying pending transactions.
@@ -377,17 +366,40 @@ signed_block database::_generate_block(
    // the value of the "when" variable is known, which means we need to
    // re-apply pending transactions in this method.
    //
+
+   // pop pending state (reset to head block state)
    _pending_tx_session.reset();
+
+   // Check witness signing key
+   if( !(skip & skip_witness_signature) )
+   {
+      // Note: if this check failed (which won't happen in normal situations),
+      // we would have temporarily broken the invariant that
+      // _pending_tx_session is the result of applying _pending_tx.
+      // In this case, when the node received a new block,
+      // the push_block() call will re-create the _pending_tx_session.
+      FC_ASSERT( witness_id(*this).signing_key == block_signing_private_key.get_public_key() );
+   }
+
+   static const size_t max_partial_block_header_size = fc::raw::pack_size( signed_block_header() )
+                                                       - fc::raw::pack_size( witness_id_type() ) // witness_id
+                                                       + 3; // max space to store size of transactions (out of block header),
+                                                            // +3 means 3*7=21 bits so it's practically safe
+   const size_t max_block_header_size = max_partial_block_header_size + fc::raw::pack_size( witness_id );
+   auto maximum_block_size = get_global_properties().parameters.maximum_block_size;
+   size_t total_block_size = max_block_header_size;
+
+   signed_block pending_block;
+
    _pending_tx_session = _undo_db.start_undo_session();
 
    uint64_t postponed_tx_count = 0;
-   // pop pending state (reset to head block state)
    for( const processed_transaction& tx : _pending_tx )
    {
       size_t new_total_size = total_block_size + fc::raw::pack_size( tx );
 
       // postpone transaction if it would make block too big
-      if( new_total_size >= maximum_block_size )
+      if( new_total_size > maximum_block_size )
       {
          postponed_tx_count++;
          continue;
@@ -403,7 +415,7 @@ signed_block database::_generate_block(
          // their size)
          new_total_size = total_block_size + fc::raw::pack_size( ptx );
          // postpone transaction if it would make block too big
-         if( new_total_size >= maximum_block_size )
+         if( new_total_size > maximum_block_size )
          {
             postponed_tx_count++;
             continue;
@@ -441,12 +453,6 @@ signed_block database::_generate_block(
 
    if( !(skip & skip_witness_signature) )
       pending_block.sign( block_signing_private_key );
-
-   // TODO:  Move this to _push_block() so session is restored.
-   if( !(skip & skip_block_size_check) )
-   {
-      FC_ASSERT( fc::raw::pack_size(pending_block) <= get_global_properties().parameters.maximum_block_size );
-   }
 
    push_block( pending_block, skip | skip_transaction_signatures ); // skip authority check when pushing self-generated blocks
 
@@ -532,7 +538,17 @@ void database::_apply_block( const signed_block& next_block )
    uint32_t skip = get_node_properties().skip_flags;
    _applied_ops.clear();
 
-   FC_ASSERT( (skip & skip_merkle_check) || next_block.transaction_merkle_root == next_block.calculate_merkle_root(), "", ("next_block.transaction_merkle_root",next_block.transaction_merkle_root)("calc",next_block.calculate_merkle_root())("next_block",next_block)("id",next_block.id()) );
+   if( !(skip & skip_block_size_check) )
+   {
+      FC_ASSERT( fc::raw::pack_size(next_block) <= get_global_properties().parameters.maximum_block_size );
+   }
+
+   FC_ASSERT( (skip & skip_merkle_check) || next_block.transaction_merkle_root == next_block.calculate_merkle_root(),
+              "",
+              ("next_block.transaction_merkle_root",next_block.transaction_merkle_root)
+              ("calc",next_block.calculate_merkle_root())
+              ("next_block",next_block)
+              ("id",next_block.id()) );
 
    const witness_object& signing_witness = validate_block_header(skip, next_block);
    const auto& global_props = get_global_properties();
