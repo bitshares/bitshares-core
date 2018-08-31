@@ -427,6 +427,9 @@ bool database::apply_order(const limit_order_object& new_order_object, bool allo
    // 5. the call order's collateral ratio is below or equals to MCR
    // 6. the limit order provided a good price
 
+   auto maint_time = get_dynamic_global_properties().next_maintenance_time;
+   bool before_core_hardfork_1270 = ( maint_time <= HARDFORK_CORE_1270_TIME ); // call price caching issue
+
    bool to_check_call_orders = false;
    const asset_object& sell_asset = sell_asset_id( *this );
    const asset_bitasset_data_object* sell_abd = nullptr;
@@ -439,7 +442,10 @@ bool database::apply_order(const limit_order_object& new_order_object, bool allo
           && !sell_abd->has_settlement()
           && !sell_abd->current_feed.settlement_price.is_null() )
       {
-         call_match_price = ~sell_abd->current_feed.max_short_squeeze_price();
+         if( before_core_hardfork_1270 )
+            call_match_price = ~sell_abd->current_feed.max_short_squeeze_price_before_hf_1270();
+         else
+            call_match_price = ~sell_abd->current_feed.max_short_squeeze_price();
          if( ~new_order_object.sell_price <= call_match_price ) // new limit order price is good enough to match a call
             to_check_call_orders = true;
       }
@@ -934,12 +940,14 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
     const limit_order_index& limit_index = get_index_type<limit_order_index>();
     const auto& limit_price_index = limit_index.indices().get<by_price>();
 
+    bool before_core_hardfork_1270 = ( maint_time <= HARDFORK_CORE_1270_TIME ); // call price caching issue
+
     // looking for limit orders selling the most USD for the least CORE
     auto max_price = price::max( mia.id, bitasset.options.short_backing_asset );
     // stop when limit orders are selling too little USD for too much CORE
-    auto min_price = bitasset.current_feed.max_short_squeeze_price();
+    auto min_price = ( before_core_hardfork_1270 ? bitasset.current_feed.max_short_squeeze_price_before_hf_1270()
+                                                 : bitasset.current_feed.max_short_squeeze_price() );
 
-    assert( max_price.base.asset_id == min_price.base.asset_id );
     // NOTE limit_price_index is sorted from greatest to least
     auto limit_itr = limit_price_index.lower_bound( max_price );
     auto limit_end = limit_price_index.upper_bound( min_price );

@@ -200,6 +200,8 @@ namespace graphene { namespace chain {
        *  must be confirmed by having the max_short_squeeze_price() move below the black swan price.
        */
       price max_short_squeeze_price()const;
+      /// Another implementation of max_short_squeeze_price() before the core-1270 hard fork
+      price max_short_squeeze_price_before_hf_1270()const;
 
       /// Call orders with collateralization (aka collateral/debt) not greater than this value are in margin call territory.
       /// Calculation: ~settlement_price * maintenance_collateral_ratio / GRAPHENE_COLLATERAL_RATIO_DENOM
