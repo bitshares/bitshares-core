@@ -461,7 +461,32 @@ bool database::apply_order(const limit_order_object& new_order_object, bool allo
          finished = ( match( new_order_object, *old_limit_itr, old_limit_itr->sell_price ) != 2 );
       }
 
-      if( !finished )
+      if( !finished && !before_core_hardfork_1270 ) // TODO refactor or cleanup duplicate code after core-1270 hard fork
+      {
+         // check if there are margin calls
+         const auto& call_collateral_idx = get_index_type<call_order_index>().indices().get<by_collateral>();
+         auto call_min = price::min( recv_asset_id, sell_asset_id );
+         while( !finished )
+         {
+            // hard fork core-343 and core-625 took place at same time,
+            // always check call order with least collateral ratio
+            auto call_itr = call_collateral_idx.lower_bound( call_min );
+            if( call_itr == call_collateral_idx.end()
+                  || call_itr->debt_type() != sell_asset_id
+                  // feed protected https://github.com/cryptonomex/graphene/issues/436
+                  || call_itr->collateralization() > sell_abd->current_maintenance_collateralization )
+               break;
+            // hard fork core-338 and core-625 took place at same time, not checking HARDFORK_CORE_338_TIME here.
+            int match_result = match( new_order_object, *call_itr, call_match_price,
+                                      sell_abd->current_feed.settlement_price,
+                                      sell_abd->current_feed.maintenance_collateral_ratio );
+            // match returns 1 or 3 when the new order was fully filled. In this case, we stop matching; otherwise keep matching.
+            // since match can return 0 due to BSIP38 (hard fork core-834), we no longer only check if the result is 2.
+            if( match_result == 1 || match_result == 3 )
+               finished = true;
+         }
+      }
+      else if( !finished ) // and before core-1270 hard fork
       {
          // check if there are margin calls
          const auto& call_price_idx = get_index_type<call_order_index>().indices().get<by_price>();
