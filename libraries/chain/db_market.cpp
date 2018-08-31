@@ -51,15 +51,14 @@ void database::globally_settle_asset( const asset_object& mia, const price& sett
    const asset_dynamic_data_object& mia_dyn = mia.dynamic_asset_data_id(*this);
    auto original_mia_supply = mia_dyn.current_supply;
 
-   const call_order_index& call_index = get_index_type<call_order_index>();
-   const auto& call_price_index = call_index.indices().get<by_price>();
+   const auto& call_index = get_index_type<call_order_index>().indices().get<by_collateral>();
 
    auto maint_time = get_dynamic_global_properties().next_maintenance_time;
    bool before_core_hardfork_342 = ( maint_time <= HARDFORK_CORE_342_TIME ); // better rounding
 
    // cancel all call orders and accumulate it into collateral_gathered
-   auto call_itr = call_price_index.lower_bound( price::min( bitasset.options.short_backing_asset, mia.id ) );
-   auto call_end = call_price_index.upper_bound( price::max( bitasset.options.short_backing_asset, mia.id ) );
+   auto call_itr = call_index.lower_bound( price::min( bitasset.options.short_backing_asset, mia.id ) );
+   auto call_end = call_index.upper_bound( price::max( bitasset.options.short_backing_asset, mia.id ) );
    asset pays;
    while( call_itr != call_end )
    {
@@ -83,8 +82,7 @@ void database::globally_settle_asset( const asset_object& mia, const price& sett
       FC_ASSERT( fill_call_order( order, pays, order.get_debt(), settlement_price, true ) ); // call order is maker
    }
 
-   modify( bitasset, [&]( asset_bitasset_data_object& obj ){
-           assert( collateral_gathered.asset_id == settlement_price.quote.asset_id );
+   modify( bitasset, [&mia,original_mia_supply,&collateral_gathered]( asset_bitasset_data_object& obj ){
            obj.settlement_price = mia.amount(original_mia_supply) / collateral_gathered; //settlement_price;
            obj.settlement_fund  = collateral_gathered.amount;
            });
@@ -93,7 +91,7 @@ void database::globally_settle_asset( const asset_object& mia, const price& sett
    /// that is a lie, the supply didn't change.   We need to capture the current supply before
    /// filling all call orders and then restore it afterward.   Then in the force settlement
    /// evaluator reduce the supply
-   modify( mia_dyn, [&]( asset_dynamic_data_object& obj ){
+   modify( mia_dyn, [original_mia_supply]( asset_dynamic_data_object& obj ){
            obj.current_supply = original_mia_supply;
          });
 
