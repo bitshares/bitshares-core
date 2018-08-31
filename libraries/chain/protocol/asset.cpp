@@ -203,10 +203,11 @@ namespace graphene { namespace chain {
        *  never go to 0 and the debt can never go more than GRAPHENE_MAX_SHARE_SUPPLY
        *
        *  CR * DEBT/COLLAT or DEBT/(COLLAT/CR)
+       *
+       *  Note: this function is only used before core-1270 hard fork.
        */
       price price::call_price( const asset& debt, const asset& collateral, uint16_t collateral_ratio)
       { try {
-         // TODO replace the calculation with new operator*() and/or operator/(), could be a hardfork change due to edge cases
          boost::rational<int128_t> swan(debt.amount.value,collateral.amount.value);
          boost::rational<int128_t> ratio( collateral_ratio, GRAPHENE_COLLATERAL_RATIO_DENOM );
          auto cp = swan * ratio;
