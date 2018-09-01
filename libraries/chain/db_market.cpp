@@ -131,7 +131,9 @@ void database::_cancel_bids_and_revive_mpa( const asset_object& bitasset, const 
 
    // cancel remaining bids
    const auto& bid_idx = get_index_type< collateral_bid_index >().indices().get<by_price>();
-   auto itr = bid_idx.lower_bound( boost::make_tuple( bitasset.id, price::max( bad.options.short_backing_asset, bitasset.id ), collateral_bid_id_type() ) );
+   auto itr = bid_idx.lower_bound( boost::make_tuple( bitasset.id,
+                                                      price::max( bad.options.short_backing_asset, bitasset.id ),
+                                                      collateral_bid_id_type() ) );
    while( itr != bid_idx.end() && itr->inv_swan_price.quote.asset_id == bitasset.id )
    {
       const collateral_bid_object& bid = *itr;
@@ -161,7 +163,8 @@ void database::cancel_bid(const collateral_bid_object& bid, bool create_virtual_
    remove(bid);
 }
 
-void database::execute_bid( const collateral_bid_object& bid, share_type debt_covered, share_type collateral_from_fund, const price_feed& current_feed )
+void database::execute_bid( const collateral_bid_object& bid, share_type debt_covered, share_type collateral_from_fund,
+                            const price_feed& current_feed )
 {
    const call_order_object& call_obj = create<call_order_object>( [&](call_order_object& call ){
          call.borrower = bid.bidder;
@@ -172,8 +175,9 @@ void database::execute_bid( const collateral_bid_object& bid, share_type debt_co
                                              current_feed.maintenance_collateral_ratio);
       });
 
+   // Note: CORE asset in collateral_bid_object is not counted in account_stats.total_core_in_orders
    if( bid.inv_swan_price.base.asset_id == asset_id_type() )
-      modify(bid.bidder(*this).statistics(*this), [&](account_statistics_object& stats) {
+      modify( get_account_stats_by_owner(bid.bidder), [&](account_statistics_object& stats) {
          stats.total_core_in_orders += call_obj.collateral;
       });
 
@@ -816,11 +820,11 @@ bool database::fill_limit_order( const limit_order_object& order, const asset& p
 bool database::fill_call_order( const call_order_object& order, const asset& pays, const asset& receives,
                                 const price& fill_price, const bool is_maker )
 { try {
-   //idump((pays)(receives)(order));
-   FC_ASSERT( order.get_debt().asset_id == receives.asset_id );
-   FC_ASSERT( order.get_collateral().asset_id == pays.asset_id );
-   FC_ASSERT( order.get_collateral() >= pays );
+   FC_ASSERT( order.debt_type() == receives.asset_id );
+   FC_ASSERT( order.collateral_type() == pays.asset_id );
+   FC_ASSERT( order.collateral >= pays.amount );
 
+   // TODO pass in mia and bitasset_data for better performance
    const asset_object& mia = receives.asset_id(*this);
    FC_ASSERT( mia.is_market_issued() );
 
@@ -836,33 +840,30 @@ bool database::fill_call_order( const call_order_object& order, const asset& pay
             else if( get_dynamic_global_properties().next_maintenance_time > HARDFORK_CORE_343_TIME )
               o.call_price = price::call_price( o.get_debt(), o.get_collateral(),
                                 mia.bitasset_data(*this).current_feed.maintenance_collateral_ratio );
-       });
-
-   const asset_dynamic_data_object& mia_ddo = mia.dynamic_asset_data_id(*this);
-
-   modify( mia_ddo, [&]( asset_dynamic_data_object& ao ){
-       //idump((receives));
-        ao.current_supply -= receives.amount;
       });
 
-   const account_object& borrower = order.borrower(*this);
+   // update current supply
+   const asset_dynamic_data_object& mia_ddo = mia.dynamic_asset_data_id(*this);
+
+   modify( mia_ddo, [&receives]( asset_dynamic_data_object& ao ){
+         ao.current_supply -= receives.amount;
+      });
+
+   // adjust balance and/or account statistics
    if( collateral_freed.valid() || pays.asset_id == asset_id_type() )
    {
-      const account_statistics_object& borrower_statistics = borrower.statistics(*this);
       if( collateral_freed.valid() )
-         adjust_balance(borrower.get_id(), *collateral_freed);
+         adjust_balance( order.borrower, *collateral_freed );
 
-      modify( borrower_statistics, [&]( account_statistics_object& b ){
-              if( collateral_freed.valid() && collateral_freed->amount > 0 && collateral_freed->asset_id == asset_id_type() )
-                b.total_core_in_orders -= collateral_freed->amount;
+      modify( get_account_stats_by_owner(order.borrower), [&collateral_freed,&pays]( account_statistics_object& b ){
+              if( collateral_freed.valid() && collateral_freed->asset_id == asset_id_type() )
+                 b.total_core_in_orders -= collateral_freed->amount;
               if( pays.asset_id == asset_id_type() )
-                b.total_core_in_orders -= pays.amount;
+                 b.total_core_in_orders -= pays.amount;
 
-              assert( b.total_core_in_orders >= 0 );
            });
    }
 
-   assert( pays.asset_id != receives.asset_id );
    push_applied_operation( fill_order_operation( order.id, order.borrower, pays, receives,
                                                  asset(0, pays.asset_id), fill_price, is_maker ) );
 

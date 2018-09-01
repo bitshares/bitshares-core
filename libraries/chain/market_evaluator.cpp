@@ -396,6 +396,8 @@ void_result bid_collateral_evaluator::do_apply(const bid_collateral_operation& o
       bid.inv_swan_price = o.additional_collateral / o.debt_covered;
    });
 
+   // Note: CORE asset in collateral_bid_object is not counted in account_stats.total_core_in_orders
+
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }
 
