@@ -38,18 +38,48 @@
 #include <fc/rpc/websocket_api.hpp>
 #include <fc/rpc/cli.hpp>
 
-#include <sys/socket.h>
-#include <netinet/ip.h>
-#include <sys/types.h>
+#ifdef _WIN32
+   #ifndef _WIN32_WINNT
+      #define _WIN32_WINNT 0x0501
+   #endif
+   #include <winsock2.h>
+   #include <WS2tcpip.h>
+#else
+   #include <sys/socket.h>
+   #include <netinet/ip.h>
+   #include <sys/types.h>
+#endif
 
 #include <boost/filesystem/path.hpp>
 
 #define BOOST_TEST_MODULE Test Application
 #include <boost/test/included/unit_test.hpp>
 
+/*****
+ * Boost Global Initialization for Windows
+ * ( sets up Winsock stuf )
+ */
+#ifdef _WIN32
+int sockInit(void)
+{
+   WSADATA wsa_data;
+   return WSAStartup(MAKEWORD(1,1), &wsa_data);
+}
+int sockQuit(void)
+{
+   return WSACleanup();
+}
+class MyInitialization {
+   MyInitialization() { sockInit();}
+   ~MyInitialization() { sockQuit();}
+};
+BOOST_GLOBAL_FIXTURE( MyInitialization )
+#endif
+
 /*********************
  * Helper Methods
  *********************/
+
 
 #include "../common/genesis_file_util.hpp"
 
