@@ -410,7 +410,12 @@ void application_impl::startup()
    }
 
    if( _options->count("enable-subscribe-to-all") )
-      _app_options.enable_subscribe_to_all = _options->at("enable-subscribe-to-all").as<bool>();
+      _app_options.enable_subscribe_to_all = true;
+
+   if (_app_options.enable_subscribe_to_all)
+      std::cout << "subscribe_to_all is true\n";
+   else
+      std::cout << "subscribe_to_all is false\n";
 
    if( _active_plugins.find( "market_history" ) != _active_plugins.end() )
       _app_options.has_market_history_plugin = true;
