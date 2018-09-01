@@ -168,9 +168,15 @@ void database::execute_bid( const collateral_bid_object& bid, share_type debt_co
          call.borrower = bid.bidder;
          call.collateral = bid.inv_swan_price.base.amount + collateral_from_fund;
          call.debt = debt_covered;
-         call.call_price = price::call_price(asset(debt_covered, bid.inv_swan_price.quote.asset_id),
-                                             asset(call.collateral, bid.inv_swan_price.base.asset_id),
-                                             current_feed.maintenance_collateral_ratio);
+         // don't calculate call_price after core-1270 hard fork
+         if( get_dynamic_global_properties().next_maintenance_time > HARDFORK_CORE_1270_TIME )
+            // bid.inv_swan_price is in collateral / debt
+            call.call_price = price( asset( 1, bid.inv_swan_price.base.asset_id ),
+                                     asset( 1, bid.inv_swan_price.quote.asset_id ) );
+         else
+            call.call_price = price::call_price( asset(debt_covered, bid.inv_swan_price.quote.asset_id),
+                                                 asset(call.collateral, bid.inv_swan_price.base.asset_id),
+                                                 current_feed.maintenance_collateral_ratio );
       });
 
    // Note: CORE asset in collateral_bid_object is not counted in account_stats.total_core_in_orders
@@ -866,9 +872,17 @@ bool database::fill_call_order( const call_order_object& order, const asset& pay
               collateral_freed = o.get_collateral();
               o.collateral = 0;
             }
-            else if( get_dynamic_global_properties().next_maintenance_time > HARDFORK_CORE_343_TIME )
-              o.call_price = price::call_price( o.get_debt(), o.get_collateral(),
-                                mia.bitasset_data(*this).current_feed.maintenance_collateral_ratio );
+            else
+            {
+               auto maint_time = get_dynamic_global_properties().next_maintenance_time;
+               // update call_price after core-343 hard fork,
+               // but don't update call_price after core-1270 hard fork
+               if( maint_time <= HARDFORK_CORE_1270_TIME && maint_time > HARDFORK_CORE_343_TIME )
+               {
+                  o.call_price = price::call_price( o.get_debt(), o.get_collateral(),
+                                                    mia.bitasset_data(*this).current_feed.maintenance_collateral_ratio );
+               }
+            }
       });
 
    // update current supply
