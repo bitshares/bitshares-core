@@ -980,11 +980,26 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
 
     const call_order_index& call_index = get_index_type<call_order_index>();
     const auto& call_price_index = call_index.indices().get<by_price>();
+    const auto& call_collateral_index = call_index.indices().get<by_collateral>();
 
     auto call_min = price::min( bitasset.options.short_backing_asset, mia.id );
     auto call_max = price::max( bitasset.options.short_backing_asset, mia.id );
-    auto call_itr = call_price_index.lower_bound( call_min );
-    auto call_end = call_price_index.upper_bound( call_max );
+
+    auto call_price_itr = call_price_index.begin();
+    auto call_price_end = call_price_itr;
+    auto call_collateral_itr = call_collateral_index.begin();
+    auto call_collateral_end = call_collateral_itr;
+
+    if( before_core_hardfork_1270 )
+    {
+       call_price_itr = call_price_index.lower_bound( call_min );
+       call_price_end = call_price_index.upper_bound( call_max );
+    }
+    else
+    {
+       call_collateral_itr = call_collateral_index.lower_bound( call_min );
+       call_collateral_end = call_collateral_index.upper_bound( call_max );
+    }
 
     bool filled_limit = false;
     bool margin_called = false;
@@ -1003,15 +1018,18 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
     bool before_core_hardfork_834 = ( maint_time <= HARDFORK_CORE_834_TIME ); // target collateral ratio option
 
     while( !check_for_blackswan( mia, enable_black_swan, &bitasset ) // TODO perhaps improve performance by passing in iterators
-           && call_itr != call_end
-           && limit_itr != limit_end )
+           && limit_itr != limit_end
+           && ( ( !before_core_hardfork_1270 && call_collateral_itr != call_collateral_end )
+              || ( before_core_hardfork_1270 && call_price_itr != call_price_end ) ) )
     {
        bool  filled_call      = false;
 
-       const call_order_object& call_order = *call_itr;
+       const call_order_object& call_order = ( before_core_hardfork_1270 ? *call_price_itr : *call_collateral_itr );
 
        // Feed protected (don't call if CR>MCR) https://github.com/cryptonomex/graphene/issues/436
-       if( after_hardfork_436 && bitasset.current_feed.settlement_price > ~call_order.call_price )
+       if( ( !before_core_hardfork_1270 && bitasset.current_maintenance_collateralization < call_order.collateralization() )
+             || ( before_core_hardfork_1270
+                   && after_hardfork_436 && bitasset.current_feed.settlement_price > ~call_order.call_price ) )
           return margin_called;
 
        const limit_order_object& limit_order = *limit_itr;
@@ -1102,11 +1120,13 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
        order_pays = call_receives;
 
        if( filled_call && before_core_hardfork_343 )
-          ++call_itr;
+          ++call_price_itr;
        // when for_new_limit_order is true, the call order is maker, otherwise the call order is taker
        fill_call_order( call_order, call_pays, call_receives, match_price, for_new_limit_order );
-       if( !before_core_hardfork_343 )
-          call_itr = call_price_index.lower_bound( call_min );
+       if( !before_core_hardfork_1270 )
+          call_collateral_itr = call_collateral_index.lower_bound( call_min );
+       else if( !before_core_hardfork_343 )
+          call_price_itr = call_price_index.lower_bound( call_min );
 
        auto next_limit_itr = std::next( limit_itr );
        // when for_new_limit_order is true, the limit order is taker, otherwise the limit order is maker
