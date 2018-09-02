@@ -23,4 +23,4 @@ echo "2- Add 'graphene_$pluginName' to ../../programs/witness_node/CMakeLists.tx
 echo "3- Include plugin header file '#include <graphene/$pluginName/$pluginName.hpp>' to ../../programs/witness_node/main.cpp."
 echo "4- Initialize plugin with the others with 'auto ${pluginName}_plug = node->register_plugin<$pluginName::$pluginName>();' in ../../programs/witness_node/main.cpp"
 echo "5- cmake and make"
-echo "5- Start plugin with './../programs/witness_node/witness_node --plugins \"$pluginName\"'. After the seed nodes are added you start to see see a msgs from the plugin 'onBlock' "
+echo "6- Start plugin with './../programs/witness_node/witness_node --plugins \"$pluginName\"'. After the seed nodes are added you start to see see a msgs from the plugin 'onBlock' "
