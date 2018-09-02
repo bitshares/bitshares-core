@@ -342,10 +342,11 @@ namespace graphene { namespace app {
          crypto_api();
          
          /**
-          * @brief Get 33-byte commitment
+          * @brief Generates a pedersen commitment: *commit = blind * G + value * G2. The commitment is 33 bytes, the blinding factor is 32 bytes.
+          * (For more information about pederson commitment check please next url https://en.wikipedia.org/wiki/Commitment_scheme)
           * @param blind Sha-256 blind factor type
           * @param value Positive 64-bit integer value
-          * @return A 33-byte commit
+          * @return A 33-byte pedersen commitment: *commit = blind * G + value * G2
           */
          fc::ecc::commitment_type blind( const fc::ecc::blind_factor_type& blind, uint64_t value );
          
@@ -359,25 +360,25 @@ namespace graphene { namespace app {
          
          /**
           * @brief Verifies that commits + neg_commits + excess == 0
-          * @param commits_in List of 33-byte commitments
-          * @param neg_commits_in List of 33-byte commitments
-          * @param excess Sum of two list of 33-byte commitments where sums the first set and subtracts the second
+          * @param commits_in List of 33-byte pedersen commitments
+          * @param neg_commits_in List of 33-byte pedersen commitments
+          * @param excess Sum of two list of 33-byte pedersen commitments where sums the first set and subtracts the second
           * @return Boolean - true in event of commits + neg_commits + excess == 0, otherwise false 
           */
          bool verify_sum( const std::vector<commitment_type>& commits_in, const std::vector<commitment_type>& neg_commits_in, int64_t excess );
          
          /**
-          * @brief Verifies range proof for 33-byte commitment
-          * @param commit 33-byte commitment
+          * @brief Verifies range proof for 33-byte pedersen commitment
+          * @param commit 33-byte pedersen commitment
           * @param proof List of characters
           * @return A structure with success, min and max values
           */
          verify_range_result verify_range( const fc::ecc::commitment_type& commit, const std::vector<char>& proof );
          
          /**
-          * @brief Proves with respect to min_value the range for commit which has the provided blinding factor and value
+          * @brief Proves with respect to min_value the range for pedersen commitment which has the provided blinding factor and value
           * @param min_value Positive 64-bit integer value
-          * @param commit 33-byte commitment
+          * @param commit 33-byte pedersen commitment
           * @param commit_blind Sha-256 blind factor type for the correct digits
           * @param nonce Sha-256 blind factor type for our non-forged signatures
           * @param exp Exponents base 10 in range [-1 ; 18] inclusively
@@ -394,9 +395,9 @@ namespace graphene { namespace app {
                                              uint64_t actual_value );
                                        
          /**
-          * @brief Verifies range proof rewind for 33-byte commit
+          * @brief Verifies range proof rewind for 33-byte pedersen commitment
           * @param nonce Sha-256 blind refactor type
-          * @param commit 33-byte commitment
+          * @param commit 33-byte pedersen commitment
           * @param proof List of characters
           * @return A structure with success, min, max, value_out, blind_out and message_out values
           */
@@ -405,8 +406,12 @@ namespace graphene { namespace app {
                                                                      const std::vector<char>& proof );
          
          /**
-          * @brief Get range proof info
-          * @param proof List of characters
+          * @brief Gets "range proof" info. The cli_wallet includes functionality for sending blind transfers in which the values of the input and outputs amounts are “blinded.”
+          * In the case where a transaction produces two or more outputs, (e.g. an amount to the intended recipient plus “change” back to the sender), 
+          * a "range proof" must be supplied to prove that none of the outputs commit to a negative value.
+          * The range proofs are computed by library functions in secp256k1-zkp, which provides a very flexible and capable range proof library, 
+          * in which a balance can be struck between amount of privacy and compactness of proof.
+          * @param proof List of proof's characters
           * @return A range proof info structure with exponent, mantissa, min and max values
           */                                       
          range_proof_info range_get_info( const std::vector<char>& proof );
