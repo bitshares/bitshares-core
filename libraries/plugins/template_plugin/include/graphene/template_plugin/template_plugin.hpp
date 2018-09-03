@@ -27,21 +27,7 @@
 #include <graphene/chain/database.hpp>
 
 namespace graphene { namespace template_plugin {
-   using namespace chain;
-
-//
-// Plugins should #define their SPACE_ID's so plugins with
-// conflicting SPACE_ID assignments can be compiled into the
-// same binary (by simply re-assigning some of the conflicting #defined
-// SPACE_ID's in a build script).
-//
-// Assignment of SPACE_ID's cannot be done at run-time because
-// various template automagic depends on them being known at compile
-// time.
-//
-#ifndef template_SPACE_ID
-#define template_SPACE_ID 6
-#endif
+using namespace chain;
 
 namespace detail
 {
@@ -65,6 +51,5 @@ class template_plugin : public graphene::app::plugin
       friend class detail::template_plugin_impl;
       std::unique_ptr<detail::template_plugin_impl> my;
 };
-
 
 } } //graphene::template
