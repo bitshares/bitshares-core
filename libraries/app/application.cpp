@@ -409,9 +409,8 @@ void application_impl::startup()
       _force_validate = true;
    }
 
-   // TODO uncomment this when GUI is ready
-   //if( _options->count("enable-subscribe-to-all") )
-   //   _app_options.enable_subscribe_to_all = _options->at("enable-subscribe-to-all").as<bool>();
+   if ( _options->count("enable-subscribe-to-all") )
+      _app_options.enable_subscribe_to_all = _options->at( "enable-subscribe-to-all" ).as<bool>();
 
    if( _active_plugins.find( "market_history" ) != _active_plugins.end() )
       _app_options.has_market_history_plugin = true;
@@ -944,12 +943,11 @@ void application::set_program_options(boost::program_options::options_descriptio
          ("api-access", bpo::value<boost::filesystem::path>(), "JSON file specifying API permissions")
          ("plugins", bpo::value<string>(), "Space-separated list of plugins to activate")
          ("io-threads", bpo::value<uint16_t>()->implicit_value(0), "Number of IO threads, default to 0 for auto-configuration")
+         ("enable-subscribe-to-all", bpo::value<bool>()->implicit_value(true),
+          "Whether allow API clients to subscribe to universal object creation and removal events")
          ("enable-standby-votes-tracking", bpo::value<bool>()->implicit_value(true),
           "Whether to enable tracking of votes of standby witnesses and committee members. "
           "Set it to true to provide accurate data to API clients, set to false for slightly better performance.")
-         // TODO uncomment this when GUI is ready
-         //("enable-subscribe-to-all", bpo::value<bool>()->implicit_value(false),
-         // "Whether allow API clients to subscribe to universal object creation and removal events")
          ;
    command_line_options.add(configuration_file_options);
    command_line_options.add_options()
