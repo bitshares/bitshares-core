@@ -80,7 +80,6 @@ BOOST_GLOBAL_FIXTURE( MyInitialization )
  * Helper Methods
  *********************/
 
-
 #include "../common/genesis_file_util.hpp"
 
 #define INVOKE(test) ((struct test*)this)->test_method();
