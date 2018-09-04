@@ -960,6 +960,7 @@ void database::process_bitassets()
 //       * NOTE: the removal can't be applied to testnet
 void process_hf_868_890( database& db, bool skip_check_call_orders )
 {
+   const auto next_maint_time = db.get_dynamic_global_properties().next_maintenance_time;
    const auto head_time = db.head_block_time();
    const auto head_num = db.head_block_num();
    wlog( "Processing hard fork core-868-890 at block ${n}", ("n",head_num) );
@@ -1019,8 +1020,8 @@ void process_hf_868_890( database& db, bool skip_check_call_orders )
       }
 
       // always update the median feed due to https://github.com/bitshares/bitshares-core/issues/890
-      db.modify( bitasset_data, [&head_time]( asset_bitasset_data_object &obj ) {
-         obj.update_median_feeds( head_time );
+      db.modify( bitasset_data, [head_time,next_maint_time]( asset_bitasset_data_object &obj ) {
+         obj.update_median_feeds( head_time, next_maint_time );
       });
 
       bool median_changed = ( old_feed.settlement_price != bitasset_data.current_feed.settlement_price );

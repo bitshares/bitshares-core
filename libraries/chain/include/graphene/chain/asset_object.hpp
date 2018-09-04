@@ -244,7 +244,19 @@ namespace graphene { namespace chain {
          { return feed_expiration_time() >= current_time; }
          bool feed_is_expired(time_point_sec current_time)const
          { return feed_expiration_time() <= current_time; }
-         void update_median_feeds(time_point_sec current_time);
+
+         /******
+          * @brief calculate the median feed
+          *
+          * This calculates the median feed from @ref feeds, feed_lifetime_sec
+          * in @ref options, and the given parameters.
+          * It may update the current_feed_publication_time, current_feed and
+          * current_maintenance_collateralization member variables.
+          *
+          * @param current_time the current time to use in the calculations
+          * @param next_maintenance_time the next chain maintenance time
+          */
+         void update_median_feeds(time_point_sec current_time, time_point_sec next_maintenance_time);
    };
 
    // key extractor for short backing asset
