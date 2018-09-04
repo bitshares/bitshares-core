@@ -730,7 +730,8 @@ void_result asset_update_bitasset_evaluator::do_apply(const asset_update_bitasse
       });
 
       if( to_check_call_orders )
-         db_conn.check_call_orders( asset_being_updated );
+         // Process margin calls, allow black swan, not for a new limit order
+         db_conn.check_call_orders( asset_being_updated, true, false, bitasset_to_update );
 
       return void_result();
 
@@ -741,9 +742,8 @@ void_result asset_update_feed_producers_evaluator::do_evaluate(const asset_updat
 { try {
    database& d = db();
 
-   FC_ASSERT( o.new_feed_producers.size() <= d.get_global_properties().parameters.maximum_asset_feed_publishers );
-   for( auto id : o.new_feed_producers )
-      d.get_object(id);
+   FC_ASSERT( o.new_feed_producers.size() <= d.get_global_properties().parameters.maximum_asset_feed_publishers,
+              "Cannot specify more feed producers than maximum allowed" );
 
    const asset_object& a = o.asset_to_update(d);
 
@@ -751,18 +751,33 @@ void_result asset_update_feed_producers_evaluator::do_evaluate(const asset_updat
    FC_ASSERT(!(a.options.flags & committee_fed_asset), "Cannot set feed producers on a committee-fed asset.");
    FC_ASSERT(!(a.options.flags & witness_fed_asset), "Cannot set feed producers on a witness-fed asset.");
 
-   const asset_bitasset_data_object& b = a.bitasset_data(d);
-   bitasset_to_update = &b;
-   FC_ASSERT( a.issuer == o.issuer );
+   FC_ASSERT( a.issuer == o.issuer, "Only asset issuer can update feed producers of an asset" );
+
+   asset_to_update = &a;
+
+   // Make sure all producers exist. Check these after asset because account lookup is more expensive
+   for( auto id : o.new_feed_producers )
+      d.get_object(id);
+
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }
 
 void_result asset_update_feed_producers_evaluator::do_apply(const asset_update_feed_producers_evaluator::operation_type& o)
 { try {
-   db().modify(*bitasset_to_update, [&](asset_bitasset_data_object& a) {
+   database& d = db();
+   const auto head_time = d.head_block_time();
+   const asset_bitasset_data_object& bitasset_to_update = asset_to_update->bitasset_data(d);
+   d.modify( bitasset_to_update, [&o,head_time](asset_bitasset_data_object& a) {
       //This is tricky because I have a set of publishers coming in, but a map of publisher to feed is stored.
       //I need to update the map such that the keys match the new publishers, but not munge the old price feeds from
       //publishers who are being kept.
+
+      // TODO possible performance optimization:
+      //      Since both the map and the set are ordered by account already, we can iterate through them only once
+      //      and avoid lookups while iterating by maintaining two iterators at same time.
+      //      However, this operation is not used much, and both the set and the map are small,
+      //      so likely we won't gain much with the optimization.
+
       //First, remove any old publishers who are no longer publishers
       for( auto itr = a.feeds.begin(); itr != a.feeds.end(); )
       {
@@ -772,12 +787,14 @@ void_result asset_update_feed_producers_evaluator::do_apply(const asset_update_f
             ++itr;
       }
       //Now, add any new publishers
-      for( auto itr = o.new_feed_producers.begin(); itr != o.new_feed_producers.end(); ++itr )
-         if( !a.feeds.count(*itr) )
-            a.feeds[*itr];
-      a.update_median_feeds(db().head_block_time());
+      for( const account_id_type acc : o.new_feed_producers )
+      {
+         a.feeds[acc];
+      }
+      a.update_median_feeds( head_time );
    });
-   db().check_call_orders( o.asset_to_update(db()) );
+   // Process margin calls, allow black swan, not for a new limit order
+   d.check_call_orders( *asset_to_update, true, false, &bitasset_to_update );
 
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }
