@@ -70,6 +70,21 @@ namespace graphene { namespace chain {
       bool validate()const{ return true; }
    };
 
+   struct hash_operation_predicate
+   {
+	   account_id_type pay_to;
+	   std::vector<unsigned char> key_hash;
+	   int64_t key_size;
+	   bool validate() const { return true; }
+   };
+
+   struct timeout_operation_predicate
+   {
+	   account_id_type pay_to;
+	   uint64_t epoch;
+	   bool validate() const { return true; }
+   };
+
    /**
     *  When defining predicates do not make the protocol dependent upon
     *  implementation details.
@@ -77,7 +92,9 @@ namespace graphene { namespace chain {
    typedef static_variant<
       account_name_eq_lit_predicate,
       asset_symbol_eq_lit_predicate,
-      block_id_predicate
+      block_id_predicate,
+      hash_operation_predicate,
+      timeout_operation_predicate
      > predicate;
 
 
@@ -109,6 +126,8 @@ FC_REFLECT( graphene::chain::assert_operation::fee_parameters_type, (fee) )
 FC_REFLECT( graphene::chain::account_name_eq_lit_predicate, (account_id)(name) )
 FC_REFLECT( graphene::chain::asset_symbol_eq_lit_predicate, (asset_id)(symbol) )
 FC_REFLECT( graphene::chain::block_id_predicate, (id) )
+FC_REFLECT( graphene::chain::hash_operation_predicate, (pay_to)(key_hash)(key_size) )
+FC_REFLECT( graphene::chain::timeout_operation_predicate, (pay_to)(epoch) )
 FC_REFLECT_TYPENAME( graphene::chain::predicate )
 FC_REFLECT( graphene::chain::assert_operation, (fee)(fee_paying_account)(predicates)(required_auths)(extensions) )
  

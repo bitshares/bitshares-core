@@ -38,6 +38,7 @@
 #include <graphene/chain/protocol/withdraw_permission.hpp>
 #include <graphene/chain/protocol/witness.hpp>
 #include <graphene/chain/protocol/worker.hpp>
+#include <graphene/chain/protocol/htlc.hpp>
 
 namespace graphene { namespace chain {
 
@@ -95,7 +96,9 @@ namespace graphene { namespace chain {
             bid_collateral_operation,
             execute_bid_operation,          // VIRTUAL
             asset_claim_pool_operation,
-            asset_update_issuer_operation
+            asset_update_issuer_operation,
+            htlc_create_operation,
+            htlc_update_operation
          > operation;
 
    /// @} // operations group
