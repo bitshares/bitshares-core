@@ -285,6 +285,18 @@ void database_fixture::verify_asset_supplies( const database& db )
       BOOST_CHECK_EQUAL(item.first(db).dynamic_asset_data_id(db).current_supply.value, item.second.value);
    }
 
+   // htlc
+   const auto& htlc_idx = db.get_index_type< htlc_index >().indices().get< by_id >();
+   for( auto itr = htlc_idx.begin(); itr != htlc_idx.end(); ++itr )
+   {
+      // do not add in htlc escrow objects that are completed
+      if (itr->preimage.size() == 0)
+      {
+         total_balances[itr->amount.asset_id] += itr->amount.amount;
+         total_balances[itr->pending_fee.asset_id] += itr->pending_fee.amount;
+      }
+   }
+
    for( const asset_object& asset_obj : db.get_index_type<asset_index>().indices() )
    {
       BOOST_CHECK_EQUAL(total_balances[asset_obj.id].value, asset_obj.dynamic_asset_data_id(db).current_supply.value);
