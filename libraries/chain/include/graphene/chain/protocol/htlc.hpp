@@ -24,7 +24,7 @@
 #pragma once
 #include <fc/time.hpp>
 #include <boost/container/flat_set.hpp>
-#include <graphene/chain/escrow_object.hpp>
+#include <graphene/chain/htlc_object.hpp>
 #include <graphene/chain/protocol/base.hpp>
 #include <graphene/chain/protocol/types.hpp>
 

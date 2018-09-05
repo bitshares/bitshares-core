@@ -561,8 +561,8 @@ void database::update_withdraw_permissions()
 void database::remove_expired_htlcs()
 {
    const auto& htlc_idx = get_index_type<htlc_index>().indices().get<by_expiration>();
-   while ( !htlc_idx.empty() && escrow_idx.begin() != htlc_idx.end()
-         && htlc_idx.begin()->htlc_expiration <= head_block_time() && !htlc_idx.begin()->disputed )
+   while ( !htlc_idx.empty() && htlc_idx.begin() != htlc_idx.end()
+         && htlc_idx.begin()->expiration <= head_block_time() )
    {
       adjust_balance( htlc_idx.begin()->from, htlc_idx.begin()->amount );
       remove( *htlc_idx.begin());

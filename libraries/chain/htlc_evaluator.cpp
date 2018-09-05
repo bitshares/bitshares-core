@@ -22,8 +22,8 @@
  * THE SOFTWARE.
  */
 #include <graphene/chain/database.hpp>
-#include <graphene/chain/escrow_evaluator.hpp>
-#include <graphene/chain/escrow_object.hpp>
+#include <graphene/chain/htlc_evaluator.hpp>
+#include <graphene/chain/htlc_object.hpp>
 #include <graphene/chain/htlc_object.hpp>
 #include <graphene/chain/hardfork.hpp>
 
