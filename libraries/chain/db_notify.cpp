@@ -393,7 +393,7 @@ void get_relevant_accounts( const object* obj, flat_set<account_id_type>& accoun
               break;
              case impl_witness_schedule_object_type:
               break;
-             case impl_budget_record_object_type:
+             case impl_reserved1_object_type:
               break;
              case impl_special_authority_object_type:
               break;

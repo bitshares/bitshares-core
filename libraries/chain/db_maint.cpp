@@ -33,7 +33,6 @@
 
 #include <graphene/chain/account_object.hpp>
 #include <graphene/chain/asset_object.hpp>
-#include <graphene/chain/budget_record_object.hpp>
 #include <graphene/chain/buyback_object.hpp>
 #include <graphene/chain/chain_property_object.hpp>
 #include <graphene/chain/committee_member_object.hpp>
@@ -130,6 +129,33 @@ struct worker_pay_visitor
       {
          worker.pay_worker(pay, db);
       }
+};
+
+/// @brief A budget record struct to be used in initialize_budget_record and process_budget
+struct budget_record
+{
+    uint64_t time_since_last_budget = 0;
+
+    // sources of budget
+    share_type from_initial_reserve = 0;
+    share_type from_accumulated_fees = 0;
+    share_type from_unused_witness_budget = 0;
+
+    // witness budget requested by the committee
+    share_type requested_witness_budget = 0;
+
+    // funds that can be released from reserve at maximum rate
+    share_type total_budget = 0;
+
+    // sinks of budget, should sum up to total_budget
+    share_type witness_budget = 0;
+    share_type worker_budget = 0;
+
+    // unused budget
+    share_type leftover_worker_funds = 0;
+
+    // change in supply due to budget operations
+    share_type supply_delta = 0;
 };
 
 void database::update_worker_votes()
@@ -532,12 +558,6 @@ void database::process_budget()
          // instead of adding it.
          _dpo.witness_budget = witness_budget;
          _dpo.last_budget_time = now;
-      });
-
-      create< budget_record_object >( [&]( budget_record_object& _rec )
-      {
-         _rec.time = head_block_time();
-         _rec.record = rec;
       });
 
       // available_funds is money we could spend, but don't want to.
