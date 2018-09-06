@@ -119,7 +119,7 @@ namespace graphene { namespace app {
          history_api(application& app)
                :_app(app), database_api( std::ref(*app.chain_database()), &(app.get_options())) {}
 
-      /**
+         /**
           * @brief Get operations relevant to the specificed account
           * @param account_id_or_name The account ID or name whose history should be queried
           * @param stop ID of the earliest operation to retrieve
@@ -127,38 +127,46 @@ namespace graphene { namespace app {
           * @param start ID of the most recent operation to retrieve
           * @return A list of operations performed by account, ordered from most recent to oldest.
           */
-         vector<operation_history_object> get_account_history(const std::string account_id_or_name,
-                                                              operation_history_id_type stop = operation_history_id_type(),
-                                                              unsigned limit = 100,
-                                                              operation_history_id_type start = operation_history_id_type())const;
+         vector<operation_history_object> get_account_history(
+            const std::string account_id_or_name,
+            operation_history_id_type stop = operation_history_id_type(),
+            unsigned limit = 100,
+            operation_history_id_type start = operation_history_id_type()
+         )const;
 
          /**
           * @brief Get operations relevant to the specified account filtering by operation type
           * @param account_id_or_name The account ID or name whose history should be queried
-          * @param operation_types The IDs of the operation we want to get operations in the account( 0 = transfer , 1 = limit order create, ...)
+          * @param operation_types The IDs of the operation we want to get operations in the account
+          * ( 0 = transfer , 1 = limit order create, ...)
           * @param start the sequence number where to start looping back throw the history
           * @param limit the max number of entries to return (from start number)
           * @return history_operation_detail
           */
-          history_operation_detail get_account_history_by_operations(const std::string account_id_or_name,
-                                                                     vector<uint16_t> operation_types,
-                                                                     uint32_t start,
-                                                                     unsigned limit);
+         history_operation_detail get_account_history_by_operations(
+            const std::string account_id_or_name,
+            vector<uint16_t> operation_types,
+            uint32_t start,
+            unsigned limit
+         );
 
          /**
           * @brief Get only asked operations relevant to the specified account
           * @param account_id_or_name The account ID or name whose history should be queried
-          * @param operation_id The ID of the operation we want to get operations in the account( 0 = transfer , 1 = limit order create, ...)
+          * @param operation_id The ID of the operation we want to get operations in the account
+          * ( 0 = transfer , 1 = limit order create, ...)
           * @param stop ID of the earliest operation to retrieve
           * @param limit Maximum number of operations to retrieve (must not exceed 100)
           * @param start ID of the most recent operation to retrieve
           * @return A list of operations performed by account, ordered from most recent to oldest.
           */
-         vector<operation_history_object> get_account_history_operations(const std::string account_id_or_name,
-                                                                         int operation_id,
-                                                                         operation_history_id_type start = operation_history_id_type(),
-                                                                         operation_history_id_type stop = operation_history_id_type(),
-                                                                         unsigned limit = 100)const;
+         vector<operation_history_object> get_account_history_operations(
+            const std::string account_id_or_name,
+            int operation_id,
+            operation_history_id_type start = operation_history_id_type(),
+            operation_history_id_type stop = operation_history_id_type(),
+            unsigned limit = 100
+         )const;
 
          /**
           * @breif Get operations relevant to the specified account referenced
@@ -178,28 +186,30 @@ namespace graphene { namespace app {
                                                                         uint32_t start = 0) const;
          /**
           * @brief Get history of orders with b:a pair
-          * @param a Base in pair
-          * @param b Quote in pair
+          * @param a asset in pair
+          * @param b asset in pair
           * @param limit Maximum number of orders to retrieve
           * @return A history of orders with b:a pair, where a <= b, otherwise a and b will be swaped
           */
          vector<order_history_object> get_fill_order_history( asset_id_type a, asset_id_type b, uint32_t limit )const;
 
          /**
-          * @brief Get markets with b:a pair
-          * @param a Base in pair
-          * @param b Quote in pair
+          * @brief Gets accumulated market history with b:a pair
+          * @param a asset in pair
+          * @param b asset in pair
           * @param bucket_seconds Represents the length in seconds of bucket
           * @param start Time in seconds from where buckets begin
           * @param end Time in seconds where buckets stop
-          * @return A history in market with b:a pair (maximum markets to retrieve is less than 200), where a <= b, otherwise a and b will be swaped
+          * @return A history in market with b:a pair (maximum markets to retrieve is less than 200), 
+          * where a <= b, otherwise a and b will be swaped
           */
          vector<bucket_object> get_market_history( asset_id_type a, asset_id_type b, uint32_t bucket_seconds,
                                                    fc::time_point_sec start, fc::time_point_sec end )const;
 
          /**
           * @brief Get tracked buckets.
-          * Track market history by grouping orders into buckets of equal size measured in seconds specified as a JSON array of numbers.
+          * Track market history by grouping orders into buckets of equal size measured in seconds 
+          * specified as a JSON array of numbers.
           * @return A list of tracked buckets
           */                                          
          flat_set<uint32_t> get_market_history_buckets()const;
@@ -342,8 +352,10 @@ namespace graphene { namespace app {
          crypto_api();
          
          /**
-          * @brief Generates a pedersen commitment: *commit = blind * G + value * G2. The commitment is 33 bytes, the blinding factor is 32 bytes.
-          * (For more information about pederson commitment check please next url https://en.wikipedia.org/wiki/Commitment_scheme)
+          * @brief Generates a pedersen commitment: *commit = blind * G + value * G2. 
+          * The commitment is 33 bytes, the blinding factor is 32 bytes.
+          * (For more information about pederson commitment check please next url 
+          * https://en.wikipedia.org/wiki/Commitment_scheme)
           * @param blind Sha-256 blind factor type
           * @param value Positive 64-bit integer value
           * @return A 33-byte pedersen commitment: *commit = blind * G + value * G2
@@ -365,7 +377,9 @@ namespace graphene { namespace app {
           * @param excess Sum of two list of 33-byte pedersen commitments where sums the first set and subtracts the second
           * @return Boolean - true in event of commits + neg_commits + excess == 0, otherwise false 
           */
-         bool verify_sum( const std::vector<commitment_type>& commits_in, const std::vector<commitment_type>& neg_commits_in, int64_t excess );
+         bool verify_sum( 
+            const std::vector<commitment_type>& commits_in, const std::vector<commitment_type>& neg_commits_in, int64_t excess 
+         );
          
          /**
           * @brief Verifies range proof for 33-byte pedersen commitment
@@ -376,7 +390,8 @@ namespace graphene { namespace app {
          verify_range_result verify_range( const fc::ecc::commitment_type& commit, const std::vector<char>& proof );
          
          /**
-          * @brief Proves with respect to min_value the range for pedersen commitment which has the provided blinding factor and value
+          * @brief Proves with respect to min_value the range for pedersen 
+          * commitment which has the provided blinding factor and value
           * @param min_value Positive 64-bit integer value
           * @param commit 33-byte pedersen commitment
           * @param commit_blind Sha-256 blind factor type for the correct digits
@@ -406,10 +421,13 @@ namespace graphene { namespace app {
                                                                      const std::vector<char>& proof );
          
          /**
-          * @brief Gets "range proof" info. The cli_wallet includes functionality for sending blind transfers in which the values of the input and outputs amounts are “blinded.”
-          * In the case where a transaction produces two or more outputs, (e.g. an amount to the intended recipient plus “change” back to the sender), 
+          * @brief Gets "range proof" info. The cli_wallet includes functionality for sending blind transfers 
+          * in which the values of the input and outputs amounts are “blinded.”
+          * In the case where a transaction produces two or more outputs, (e.g. an amount to the intended 
+          * recipient plus “change” back to the sender), 
           * a "range proof" must be supplied to prove that none of the outputs commit to a negative value.
-          * The range proofs are computed by library functions in secp256k1-zkp, which provides a very flexible and capable range proof library, 
+          * The range proofs are computed by library functions in secp256k1-zkp, 
+          * which provides a very flexible and capable range proof library, 
           * in which a balance can be struck between amount of privacy and compactness of proof.
           * @param proof List of proof's characters
           * @return A range proof info structure with exponent, mantissa, min and max values
@@ -427,16 +445,16 @@ namespace graphene { namespace app {
          ~asset_api();
 
          /**
-          * @brief Get account holders for a specific asset
+          * @brief Get asset holders for a specific asset
           * @param asset_id The specific asset
           * @param start The start index
           * @param limit Maximum limit must not exceed 100
-          * @return A list of account holders for the specified asset
+          * @return A list of asset holders for the specified asset
           */
          vector<account_asset_balance> get_asset_holders( asset_id_type asset_id, uint32_t start, uint32_t limit  )const;
 
          /**
-          * @brief Get account holders count for a specific asset
+          * @brief Get asset holders count for a specific asset
           * @param asset_id The specific asset
           * @return Holders count for the specified asset
           */
