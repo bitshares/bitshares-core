@@ -914,7 +914,7 @@ void_result asset_publish_feeds_evaluator::do_evaluate(const asset_publish_feed_
 
    const asset_object& base = o.asset_id(d);
    //Verify that this feed is for a market-issued asset and that asset is backed by the base
-   FC_ASSERT(base.is_market_issued());
+   FC_ASSERT( base.is_market_issued(), "Can only publish price feeds for market-issued assets" );
 
    const asset_bitasset_data_object& bitasset = base.bitasset_data(d);
    if( bitasset.is_prediction_market || d.head_block_time() <= HARDFORK_CORE_216_TIME )
@@ -923,36 +923,45 @@ void_result asset_publish_feeds_evaluator::do_evaluate(const asset_publish_feed_
    }
 
    // the settlement price must be quoted in terms of the backing asset
-   FC_ASSERT( o.feed.settlement_price.quote.asset_id == bitasset.options.short_backing_asset );
+   FC_ASSERT( o.feed.settlement_price.quote.asset_id == bitasset.options.short_backing_asset,
+              "Quote asset type in settlement price should be same as backing asset of this asset" );
 
    if( d.head_block_time() > HARDFORK_480_TIME )
    {
       if( !o.feed.core_exchange_rate.is_null() )
       {
-         FC_ASSERT( o.feed.core_exchange_rate.quote.asset_id == asset_id_type() );
+         FC_ASSERT( o.feed.core_exchange_rate.quote.asset_id == asset_id_type(),
+                    "Quote asset in core exchange rate should be CORE asset" );
       }
    }
    else
    {
       if( (!o.feed.settlement_price.is_null()) && (!o.feed.core_exchange_rate.is_null()) )
       {
-         FC_ASSERT( o.feed.settlement_price.quote.asset_id == o.feed.core_exchange_rate.quote.asset_id );
+         // Old buggy code, but we have to live with it
+         FC_ASSERT( o.feed.settlement_price.quote.asset_id == o.feed.core_exchange_rate.quote.asset_id, "Bad feed" );
       }
    }
 
    //Verify that the publisher is authoritative to publish a feed
    if( base.options.flags & witness_fed_asset )
    {
-      FC_ASSERT( d.get(GRAPHENE_WITNESS_ACCOUNT).active.account_auths.count(o.publisher) );
+      FC_ASSERT( d.get(GRAPHENE_WITNESS_ACCOUNT).active.account_auths.count(o.publisher),
+                 "Only active witnesses are allowed to publish price feeds for this asset" );
    }
    else if( base.options.flags & committee_fed_asset )
    {
-      FC_ASSERT( d.get(GRAPHENE_COMMITTEE_ACCOUNT).active.account_auths.count(o.publisher) );
+      FC_ASSERT( d.get(GRAPHENE_COMMITTEE_ACCOUNT).active.account_auths.count(o.publisher),
+                 "Only active committee members are allowed to publish price feeds for this asset" );
    }
    else
    {
-      FC_ASSERT(bitasset.feeds.count(o.publisher));
+      FC_ASSERT( bitasset.feeds.count(o.publisher),
+                 "The account is not in the set of allowed price feed producers of this asset" );
    }
+
+   asset_ptr = &base;
+   bitasset_ptr = &bitasset;
 
    return void_result();
 } FC_CAPTURE_AND_RETHROW((o)) }
@@ -962,8 +971,8 @@ void_result asset_publish_feeds_evaluator::do_apply(const asset_publish_feed_ope
 
    database& d = db();
 
-   const asset_object& base = o.asset_id(d);
-   const asset_bitasset_data_object& bad = base.bitasset_data(d);
+   const asset_object& base = *asset_ptr;
+   const asset_bitasset_data_object& bad = *bitasset_ptr;
 
    auto old_feed =  bad.current_feed;
    // Store medians for this asset
@@ -984,7 +993,8 @@ void_result asset_publish_feeds_evaluator::do_apply(const asset_publish_feed_ope
                                         bad.current_feed.maintenance_collateral_ratio ) < bad.current_feed.settlement_price ) )
             d.revive_bitasset(base);
       }
-      db().check_call_orders(base);
+      // Process margin calls, allow black swan, not for a new limit order
+      d.check_call_orders( base, true, false, bitasset_ptr );
    }
 
    return void_result();
