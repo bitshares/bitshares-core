@@ -214,8 +214,8 @@ namespace graphene { namespace chain {
          while( cp.numerator() > GRAPHENE_MAX_SHARE_SUPPLY || cp.denominator() > GRAPHENE_MAX_SHARE_SUPPLY )
             cp = boost::rational<int128_t>( (cp.numerator() >> 1)+1, (cp.denominator() >> 1)+1 );
 
-         return ~(  asset( cp.numerator().convert_to<int64_t>(), debt.asset_id )
-                  / asset( cp.denominator().convert_to<int64_t>(), collateral.asset_id ) );
+         return  (  asset( cp.denominator().convert_to<int64_t>(), collateral.asset_id )
+                  / asset( cp.numerator().convert_to<int64_t>(), debt.asset_id ) );
       } FC_CAPTURE_AND_RETHROW( (debt)(collateral)(collateral_ratio) ) }
 
       bool price::is_null() const
