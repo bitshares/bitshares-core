@@ -3627,9 +3627,10 @@ namespace graphene { namespace net { namespace detail {
       // the read loop before it gets an EOF).
       // operate off copies of the lists in case they change during iteration
       std::list<peer_connection_ptr> all_peers;
-      boost::push_back(all_peers, _active_connections);
-      boost::push_back(all_peers, _handshaking_connections);
-      boost::push_back(all_peers, _closing_connections);
+      auto p_back = [&all_peers](const peer_connection_ptr& conn) { all_peers.push_back(conn); };
+      std::for_each(_active_connections.begin(), _active_connections.end(), p_back);
+      std::for_each(_handshaking_connections.begin(), _handshaking_connections.end(), p_back);
+      std::for_each(_closing_connections.begin(), _closing_connections.end(), p_back);
 
       for (const peer_connection_ptr& peer : all_peers)
       {

@@ -1,5 +1,6 @@
 #pragma once
 #include <memory>
+#include <mutex>
 #include <fc/thread/thread.hpp>
 #include <fc/log/logger.hpp>
 #include <fc/network/tcp_socket.hpp>
@@ -10,6 +11,104 @@
 #include <graphene/net/peer_connection.hpp>
 
 namespace graphene { namespace net { namespace detail {
+
+/*******
+ * A class to wrap std::unordered_set for multithreading
+ */
+template <class Key, class Hash = std::hash<Key>, class Pred = std::equal_to<Key> >
+class concurrent_unordered_set : private std::unordered_set<Key, Hash, Pred>
+{
+private:
+   mutable std::recursive_mutex mux;
+
+public:
+   // insertion
+   std::pair< typename std::unordered_set<Key, Hash, Pred>::iterator, bool> emplace( Key key)
+   {
+      std::lock_guard<std::recursive_mutex> lock(mux);
+      return std::unordered_set<Key, Hash, Pred>::emplace( key );
+   }
+   std::pair< typename std::unordered_set<Key, Hash, Pred>::iterator, bool> insert (const Key& val)
+   {
+      std::lock_guard<std::recursive_mutex> lock(mux);
+      return std::unordered_set<Key, Hash, Pred>::insert( val ); 
+   }
+   // size
+   size_t size() const 
+   { 
+      std::lock_guard<std::recursive_mutex> lock(mux);
+      return std::unordered_set<Key, Hash, Pred>::size(); 
+   }
+   bool empty() const noexcept
+   {
+      std::lock_guard<std::recursive_mutex> lock(mux);
+      return std::unordered_set<Key, Hash, Pred>::empty();
+   }
+   // removal
+   void clear() noexcept
+   {
+      std::lock_guard<std::recursive_mutex> lock(mux);
+      std::unordered_set<Key, Hash, Pred>::clear();
+   }
+   typename std::unordered_set<Key, Hash, Pred>::iterator erase( 
+         typename std::unordered_set<Key, Hash, Pred>::const_iterator itr)
+   { 
+      std::lock_guard<std::recursive_mutex> lock(mux);
+      return std::unordered_set<Key, Hash, Pred>::erase( itr); 
+   }
+   size_t erase( const Key& key)
+   {
+      std::lock_guard<std::recursive_mutex> lock(mux);
+      return std::unordered_set<Key, Hash, Pred>::erase( key ); 
+   }
+   // iteration
+   typename std::unordered_set<Key, Hash, Pred>::iterator begin() noexcept 
+   { 
+      std::lock_guard<std::recursive_mutex> lock(mux);
+      return std::unordered_set<Key, Hash, Pred>::begin(); 
+   }
+   typename std::unordered_set<Key, Hash, Pred>::const_iterator begin() const noexcept 
+   { 
+      std::lock_guard<std::recursive_mutex> lock(mux);
+      return std::unordered_set<Key, Hash, Pred>::begin(); 
+   }
+   typename std::unordered_set<Key, Hash, Pred>::local_iterator begin(size_t n) 
+   { 
+      std::lock_guard<std::recursive_mutex> lock(mux);
+      return std::unordered_set<Key, Hash, Pred>::begin(n); 
+   }
+   typename std::unordered_set<Key, Hash, Pred>::const_local_iterator begin(size_t n) const 
+   { 
+      std::lock_guard<std::recursive_mutex> lock(mux);
+      return std::unordered_set<Key, Hash, Pred>::begin(n); 
+   }
+   typename std::unordered_set<Key, Hash, Pred>::iterator end() noexcept 
+   { 
+      std::lock_guard<std::recursive_mutex> lock(mux);
+      return std::unordered_set<Key, Hash, Pred>::end(); 
+   }
+   typename std::unordered_set<Key, Hash, Pred>::const_iterator end() const noexcept 
+   { 
+      std::lock_guard<std::recursive_mutex> lock(mux);
+      return std::unordered_set<Key, Hash, Pred>::end(); 
+   }
+   typename std::unordered_set<Key, Hash, Pred>::local_iterator end(size_t n) 
+   { 
+      std::lock_guard<std::recursive_mutex> lock(mux);
+      return std::unordered_set<Key, Hash, Pred>::end(n); 
+   }
+   typename std::unordered_set<Key, Hash, Pred>::const_local_iterator end(size_t n) const 
+   { 
+      std::lock_guard<std::recursive_mutex> lock(mux);
+      return std::unordered_set<Key, Hash, Pred>::end(n); 
+   }
+   // search
+   typename std::unordered_set<Key, Hash, Pred>::const_iterator find(Key key)
+   {
+      std::lock_guard<std::recursive_mutex> lock(mux);
+      return std::unordered_set<Key, Hash, Pred>::find(key); 
+   }
+};   
 
 // when requesting items from peers, we want to prioritize any blocks before
 // transactions, but otherwise request items in the order we heard about them
@@ -274,7 +373,7 @@ class node_impl : public peer_connection_delegate
        * back and forth (not yet ready to initiate syncing) */
       std::unordered_set<graphene::net::peer_connection_ptr>                     _handshaking_connections;
       /** stores fully established connections we're either syncing with or in normal operation with */
-      std::unordered_set<graphene::net::peer_connection_ptr>                     _active_connections;
+      concurrent_unordered_set<graphene::net::peer_connection_ptr>               _active_connections;
       /** stores connections we've closed (sent closing message, not actually closed), but are still waiting for the remote end to close before we delete them */
       std::unordered_set<graphene::net::peer_connection_ptr>                     _closing_connections;
       /** stores connections we've closed, but are still waiting for the OS to notify us that the socket is really closed */
