@@ -276,4 +276,69 @@ BOOST_AUTO_TEST_CASE( htlc_fulfilled )
 	   BOOST_TEST_CHECK( get_balance(alice_id, graphene::chain::asset_id_type()) == 90000 );
 }
 
+BOOST_AUTO_TEST_CASE( other_peoples_money )
+{
+   ACTORS((alice)(bob));
+
+   fc::time_point_sec starting_time = genesis_state.initial_timestamp + 3000;
+	
+
+   int64_t init_balance(100000);
+
+   transfer( committee_account, alice_id, graphene::chain::asset(init_balance) );
+
+   uint16_t key_size = 256;
+   std::vector<unsigned char> pre_image(256);
+   generate_random_preimage(key_size, pre_image);
+   std::vector<unsigned char> key_hash = hash_it(pre_image);
+
+   graphene::chain::htlc_id_type alice_htlc_id;
+   // cler everything out
+   generate_block();
+   trx.clear();
+   // Bob attempts to put a contract on the blockchain using Alice's funds
+   {
+      graphene::chain::htlc_create_operation create_operation;
+      create_operation.amount = graphene::chain::asset( 10000 );
+      create_operation.destination = bob_id;
+      create_operation.epoch = fc::time_point::now() + fc::seconds(3);
+      create_operation.key_hash = key_hash;
+      create_operation.key_size = key_size;
+      create_operation.source = alice_id;
+      trx.operations.push_back(create_operation);
+      sign(trx, bob_private_key);
+      try
+      {
+    	  PUSH_TX(db, trx, database::skip_nothing);
+    	  BOOST_FAIL( "Bob stole money from Alice!" );
+      } catch (fc::exception& ex)
+      {
+         // this is supposed to happen
+         //BOOST_TEST_MESSAGE("This is the error thrown (expected):");
+         //BOOST_TEST_MESSAGE(ex.to_detail_string(fc::log_level(fc::log_level::all)));
+      }
+      trx.clear();
+   }
+   // now try the same but with Alice's signature (should work)
+   {
+      graphene::chain::htlc_create_operation create_operation;
+      create_operation.amount = graphene::chain::asset( 10000 );
+      create_operation.destination = bob_id;
+      create_operation.epoch = fc::time_point::now() + fc::seconds(3);
+      create_operation.key_hash = key_hash;
+      create_operation.key_size = key_size;
+      create_operation.source = alice_id;
+      trx.operations.push_back(create_operation);
+      sign(trx, alice_private_key);
+      try
+      {
+         PUSH_TX(db, trx, database::skip_nothing);
+      } catch (fc::exception& ex)
+      {
+    	   BOOST_FAIL( "Alice cannot create a contract!" );
+      }
+      trx.clear();
+   }
+}
+
 BOOST_AUTO_TEST_SUITE_END()
