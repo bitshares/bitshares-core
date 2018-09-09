@@ -182,6 +182,9 @@ void_result call_order_update_evaluator::do_evaluate(const call_order_update_ope
    else if( _bitasset_data->current_feed.settlement_price.is_null() )
       FC_THROW_EXCEPTION(insufficient_feeds, "Cannot borrow asset with no price feed.");
 
+   // Note: there was code here checking whether the account has enough balance to increase delta collateral,
+   //       which is now removed since the check is implicitly done later by `adjust_balance()` in `do_apply()`.
+
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }
 

@@ -849,19 +849,18 @@ bool database::fill_call_order( const call_order_object& order, const asset& pay
          ao.current_supply -= receives.amount;
       });
 
-   // adjust balance and/or account statistics
-   if( collateral_freed.valid() || pays.asset_id == asset_id_type() )
+   // Adjust balance
+   if( collateral_freed.valid() )
+      adjust_balance( order.borrower, *collateral_freed );
+
+   // Update account statistics. We know that order.collateral_type() == pays.asset_id
+   if( pays.asset_id == asset_id_type() )
    {
-      if( collateral_freed.valid() )
-         adjust_balance( order.borrower, *collateral_freed );
-
       modify( get_account_stats_by_owner(order.borrower), [&collateral_freed,&pays]( account_statistics_object& b ){
-              if( collateral_freed.valid() && collateral_freed->asset_id == asset_id_type() )
-                 b.total_core_in_orders -= collateral_freed->amount;
-              if( pays.asset_id == asset_id_type() )
-                 b.total_core_in_orders -= pays.amount;
-
-           });
+         b.total_core_in_orders -= pays.amount;
+         if( collateral_freed.valid() )
+            b.total_core_in_orders -= collateral_freed->amount;
+      });
    }
 
    push_applied_operation( fill_order_operation( order.id, order.borrower, pays, receives,
