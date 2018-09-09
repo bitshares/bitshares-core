@@ -76,7 +76,6 @@ optional<signed_block> database::fetch_block_by_number( uint32_t num )const
       return results[0]->data;
    else
       return _block_id_to_block.fetch_by_number(num);
-   return optional<signed_block>();
 }
 
 const signed_transaction& database::get_recent_transaction(const transaction_id_type& trx_id) const
