@@ -803,20 +803,19 @@ void_result asset_global_settle_evaluator::do_evaluate(const asset_global_settle
 { try {
    const database& d = db();
    asset_to_settle = &op.asset_to_settle(d);
-   FC_ASSERT(asset_to_settle->is_market_issued());
-   FC_ASSERT(asset_to_settle->can_global_settle());
-   FC_ASSERT(asset_to_settle->issuer == op.issuer );
-   FC_ASSERT(asset_to_settle->dynamic_data(d).current_supply > 0);
+   FC_ASSERT( asset_to_settle->is_market_issued(), "Can only globally settle market-issued assets" );
+   FC_ASSERT( asset_to_settle->can_global_settle(), "The global_settle permission of this asset is disabled" );
+   FC_ASSERT( asset_to_settle->issuer == op.issuer, "Only asset issuer can globally settle an asset" );
+   FC_ASSERT( asset_to_settle->dynamic_data(d).current_supply > 0, "Can not globally settle an asset with zero supply" );
 
    const asset_bitasset_data_object& _bitasset_data  = asset_to_settle->bitasset_data(d);
    // if there is a settlement for this asset, then no further global settle may be taken
    FC_ASSERT( !_bitasset_data.has_settlement(), "This asset has settlement, cannot global settle again" );
 
    const auto& idx = d.get_index_type<call_order_index>().indices().get<by_collateral>();
-   assert( !idx.empty() );
-   auto itr = idx.lower_bound(boost::make_tuple(price::min(asset_to_settle->bitasset_data(d).options.short_backing_asset,
-                                                           op.asset_to_settle)));
-   assert( itr != idx.end() && itr->debt_type() == op.asset_to_settle );
+   FC_ASSERT( !idx.empty(), "Internal error: no debt position found" );
+   auto itr = idx.lower_bound( price::min( _bitasset_data.options.short_backing_asset, op.asset_to_settle ) );
+   FC_ASSERT( itr != idx.end() && itr->debt_type() == op.asset_to_settle, "Internal error: no debt position found" );
    const call_order_object& least_collateralized_short = *itr;
    FC_ASSERT(least_collateralized_short.get_debt() * op.settle_price <= least_collateralized_short.get_collateral(),
              "Cannot force settle at supplied price: least collateralized short lacks sufficient collateral to settle.");
@@ -827,7 +826,7 @@ void_result asset_global_settle_evaluator::do_evaluate(const asset_global_settle
 void_result asset_global_settle_evaluator::do_apply(const asset_global_settle_evaluator::operation_type& op)
 { try {
    database& d = db();
-   d.globally_settle_asset( op.asset_to_settle(db()), op.settle_price );
+   d.globally_settle_asset( *asset_to_settle, op.settle_price );
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (op) ) }
 
