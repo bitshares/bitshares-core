@@ -92,7 +92,7 @@ static void create_snapshot( const graphene::chain::database& db, const fc::path
    {
       out.open( dest );
    }
-   catch ( fc::exception e )
+   catch ( fc::exception& e )
    {
       wlog( "Failed to open snapshot destination: ${ex}", ("ex",e) );
       return;
@@ -104,7 +104,7 @@ static void create_snapshot( const graphene::chain::database& db, const fc::path
          {
             db.get_index( (uint8_t)space_id, (uint8_t)type_id );
          }
-         catch (fc::assert_exception e)
+         catch (fc::assert_exception& e)
          {
             continue;
          }

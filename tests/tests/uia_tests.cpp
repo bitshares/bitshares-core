@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015 Cryptonomex, Inc., and contributors.
+ * Copyright (c) 2015-2018 Cryptonomex, Inc., and contributors.
  *
  * The MIT License
  *
@@ -34,6 +34,8 @@
 
 #include <fc/crypto/digest.hpp>
 
+#include <locale>
+
 #include "../common/database_fixture.hpp"
 
 using namespace graphene::chain;
@@ -54,7 +56,7 @@ BOOST_AUTO_TEST_CASE( create_advanced_uia )
       creator.common_options.market_fee_percent = GRAPHENE_MAX_MARKET_FEE_PERCENT/100; /*1%*/
       creator.common_options.issuer_permissions = charge_market_fee|white_list|override_authority|transfer_restricted|disable_confidential;
       creator.common_options.flags = charge_market_fee|white_list|override_authority|disable_confidential;
-      creator.common_options.core_exchange_rate = price({asset(2),asset(1,asset_id_type(1))});
+      creator.common_options.core_exchange_rate = price(asset(2),asset(1,asset_id_type(1)));
       creator.common_options.whitelist_authorities = creator.common_options.blacklist_authorities = {account_id_type()};
       trx.operations.push_back(std::move(creator));
       PUSH_TX( db, trx, ~0 );
@@ -99,7 +101,7 @@ BOOST_AUTO_TEST_CASE( override_transfer_test )
    sign( trx,  dan_private_key  );
    GRAPHENE_REQUIRE_THROW( PUSH_TX( db, trx, 0 ), tx_missing_active_auth );
    BOOST_TEST_MESSAGE( "Pass with issuer's signature" );
-   trx.signatures.clear();
+   trx.clear_signatures();
    sign( trx,  sam_private_key  );
    PUSH_TX( db, trx, 0 );
 
@@ -128,7 +130,7 @@ BOOST_AUTO_TEST_CASE( override_transfer_test2 )
    sign( trx,  dan_private_key  );
    GRAPHENE_REQUIRE_THROW( PUSH_TX( db, trx, 0 ), fc::exception);
    BOOST_TEST_MESSAGE( "Fail because overide_authority flag is not set" );
-   trx.signatures.clear();
+   trx.clear_signatures();
    sign( trx,  sam_private_key  );
    GRAPHENE_REQUIRE_THROW( PUSH_TX( db, trx, 0 ), fc::exception );
 
@@ -430,7 +432,7 @@ BOOST_AUTO_TEST_CASE( asset_name_test )
 {
    try
    {
-      ACTORS( (alice)(bob) );
+      ACTORS( (alice)(bob)(sam) );
 
       auto has_asset = [&]( std::string symbol ) -> bool
       {
@@ -455,20 +457,68 @@ BOOST_AUTO_TEST_CASE( asset_name_test )
       // Bob can't create ALPHA.ONE
       GRAPHENE_REQUIRE_THROW( create_user_issued_asset( "ALPHA.ONE", bob_id(db), 0 ), fc::exception );
       BOOST_CHECK(  has_asset("ALPHA") );    BOOST_CHECK( !has_asset("ALPHA.ONE") );
-      if( db.head_block_time() <= HARDFORK_409_TIME )
-      {
-         // Alice can't create ALPHA.ONE before hardfork
-         GRAPHENE_REQUIRE_THROW( create_user_issued_asset( "ALPHA.ONE", alice_id(db), 0 ), fc::exception );
-         BOOST_CHECK(  has_asset("ALPHA") );    BOOST_CHECK( !has_asset("ALPHA.ONE") );
-         generate_blocks( HARDFORK_409_TIME );
-         generate_block();
-         // Bob can't create ALPHA.ONE after hardfork
-         GRAPHENE_REQUIRE_THROW( create_user_issued_asset( "ALPHA.ONE", bob_id(db), 0 ), fc::exception );
-         BOOST_CHECK(  has_asset("ALPHA") );    BOOST_CHECK( !has_asset("ALPHA.ONE") );
-      }
-      // Alice can create it
+
+      // Alice can create ALPHA.ONE
       create_user_issued_asset( "ALPHA.ONE", alice_id(db), 0 );
       BOOST_CHECK(  has_asset("ALPHA") );    BOOST_CHECK( has_asset("ALPHA.ONE") );
+
+      // Sam tries to create asset ending in a number but fails before hf_620
+      GRAPHENE_REQUIRE_THROW( create_user_issued_asset( "SP500", sam_id(db), 0 ), fc::assert_exception );
+      BOOST_CHECK(  !has_asset("SP500") );
+
+      // create a proposal to create asset ending in a number, this will fail before hf_620
+      auto& core = asset_id_type()(db);
+      asset_create_operation op_p;
+      op_p.issuer = alice_id;
+      op_p.symbol = "SP500";
+      op_p.common_options.core_exchange_rate = asset( 1 ) / asset( 1, asset_id_type( 1 ) );
+      op_p.fee = core.amount(0);
+
+      const auto& curfees = *db.get_global_properties().parameters.current_fees;
+      const auto& proposal_create_fees = curfees.get<proposal_create_operation>();
+      proposal_create_operation prop;
+      prop.fee_paying_account = alice_id;
+      prop.proposed_ops.emplace_back( op_p );
+      prop.expiration_time =  db.head_block_time() + fc::days(1);
+      prop.fee = asset( proposal_create_fees.fee + proposal_create_fees.price_per_kbyte );
+
+      signed_transaction tx;
+      tx.operations.push_back( prop );
+      db.current_fee_schedule().set_fee( tx.operations.back() );
+      set_expiration( db, tx );
+      sign( tx, alice_private_key );
+      GRAPHENE_REQUIRE_THROW(PUSH_TX( db, tx ), fc::assert_exception);
+
+      generate_blocks( HARDFORK_CORE_620_TIME + 1);
+      generate_block();
+
+      // Sam can create asset ending in number after hf_620
+      create_user_issued_asset( "NIKKEI225", sam_id(db), 0 );
+      BOOST_CHECK(  has_asset("NIKKEI225") );
+
+      // make sure other assets can still be created after hf_620
+      create_user_issued_asset( "ALPHA2", alice_id(db), 0 );
+      create_user_issued_asset( "ALPHA2.ONE", alice_id(db), 0 );
+      BOOST_CHECK(  has_asset("ALPHA2") );
+      BOOST_CHECK( has_asset("ALPHA2.ONE") );
+
+      // locales issue
+      std::locale loc1("en_US.UTF8");
+      static const std::locale& loc2 = std::locale::classic();
+      const wchar_t c = L'\u042f';
+      // isalpha will allow non ascii chars if locale is not C
+      BOOST_CHECK_EQUAL( isalpha(c, loc1), true);
+      BOOST_CHECK_EQUAL( isalpha(c, loc2), false);
+
+      // proposal to create asset ending in number will now be created successfully as we are in > hf_620 time
+      prop.expiration_time =  db.head_block_time() + fc::days(3);
+      signed_transaction tx_hf620;
+      tx_hf620.operations.push_back( prop );
+      db.current_fee_schedule().set_fee( tx_hf620.operations.back() );
+      set_expiration( db, tx_hf620 );
+      sign( tx_hf620, alice_private_key );
+      PUSH_TX( db, tx_hf620 );
+
    }
    catch(fc::exception& e)
    {

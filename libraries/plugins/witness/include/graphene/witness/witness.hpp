@@ -41,8 +41,7 @@ namespace block_production_condition
       no_private_key = 4,
       low_participation = 5,
       lag = 6,
-      consecutive = 7,
-      exception_producing_block = 8
+      exception_producing_block = 7
    };
 }
 
@@ -72,20 +71,29 @@ public:
    virtual void plugin_startup() override;
    virtual void plugin_shutdown() override;
 
+   inline const fc::flat_map< chain::witness_id_type, fc::optional<chain::public_key_type> >& get_witness_key_cache()
+   { return _witness_key_cache; }
+
 private:
    void schedule_production_loop();
    block_production_condition::block_production_condition_enum block_production_loop();
    block_production_condition::block_production_condition_enum maybe_produce_block( fc::limited_mutable_variant_object& capture );
 
+   /// Fetch signing keys of all witnesses in the cache from object database and update the cache accordingly
+   void refresh_witness_key_cache();
+
    boost::program_options::variables_map _options;
    bool _production_enabled = false;
-   bool _consecutive_production_enabled = false;
    uint32_t _required_witness_participation = 33 * GRAPHENE_1_PERCENT;
    uint32_t _production_skip_flags = graphene::chain::database::skip_nothing;
 
    std::map<chain::public_key_type, fc::ecc::private_key> _private_keys;
    std::set<chain::witness_id_type> _witnesses;
    fc::future<void> _block_production_task;
+
+   /// For tracking signing keys of specified witnesses, only update when applied a block
+   fc::flat_map< chain::witness_id_type, fc::optional<chain::public_key_type> > _witness_key_cache;
+
 };
 
 } } //graphene::witness_plugin

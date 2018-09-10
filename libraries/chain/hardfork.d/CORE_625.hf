@@ -1,0 +1,4 @@
+// bitshares-core issue #625 Fix "Potential erratic order matching issue involving margin call orders"
+#ifndef HARDFORK_CORE_625_TIME
+#define HARDFORK_CORE_625_TIME (fc::time_point_sec( 1532008920 )) // Thu, 19 Jul 2018 14:02:00 UTC
+#endif

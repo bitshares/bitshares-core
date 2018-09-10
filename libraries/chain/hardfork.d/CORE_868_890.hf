@@ -1,0 +1,5 @@
+// bitshares-core issue #868 Clear price feed data after updated a bitAsset's backing asset ID
+// bitshares-core issue #890 Update median feeds after feed_lifetime_sec changed
+#ifndef HARDFORK_CORE_868_890_TIME
+#define HARDFORK_CORE_868_890_TIME (fc::time_point_sec( 1532008920 )) // Thu, 19 Jul 2018 14:02:00 UTC
+#endif

@@ -25,7 +25,6 @@
 #include <boost/test/unit_test.hpp>
 
 #include <graphene/chain/database.hpp>
-#include <graphene/chain/protocol/protocol.hpp>
 #include <graphene/chain/exceptions.hpp>
 
 #include <graphene/chain/account_object.hpp>
@@ -79,7 +78,7 @@ BOOST_AUTO_TEST_CASE( confidential_test )
    trx.operations = {to_blind};
    sign( trx,  dan_private_key  );
    db.push_transaction(trx);
-   trx.signatures.clear();
+   trx.clear_signatures();
 
    BOOST_TEST_MESSAGE( "Transfering from blind to blind with change address" );
    auto Out3B  = fc::sha256::hash("Out3B");
@@ -122,7 +121,7 @@ BOOST_AUTO_TEST_CASE( confidential_test )
    from_blind.blinding_factor = Out4B;
    from_blind.inputs.push_back( {out4.commitment, out4.owner} );
    trx.operations = {from_blind};
-   trx.signatures.clear();
+   trx.clear_signatures();
    db.push_transaction(trx);
 
    BOOST_REQUIRE_EQUAL( get_balance( nathan, core ), 750-300-10-10 );

@@ -34,22 +34,27 @@ namespace graphene { namespace chain {
 
 const asset_object& database::get_core_asset() const
 {
-   return get(asset_id_type());
+   return *_p_core_asset_obj;
+}
+
+const asset_dynamic_data_object& database::get_core_dynamic_data() const
+{
+   return *_p_core_dynamic_data_obj;
 }
 
 const global_property_object& database::get_global_properties()const
 {
-   return get( global_property_id_type() );
+   return *_p_global_prop_obj;
 }
 
 const chain_property_object& database::get_chain_properties()const
 {
-   return get( chain_property_id_type() );
+   return *_p_chain_property_obj;
 }
 
-const dynamic_global_property_object&database::get_dynamic_global_properties() const
+const dynamic_global_property_object& database::get_dynamic_global_properties() const
 {
-   return get( dynamic_global_property_id_type() );
+   return *_p_dyn_global_prop_obj;
 }
 
 const fee_schedule&  database::current_fee_schedule()const
@@ -59,17 +64,17 @@ const fee_schedule&  database::current_fee_schedule()const
 
 time_point_sec database::head_block_time()const
 {
-   return get( dynamic_global_property_id_type() ).time;
+   return get_dynamic_global_properties().time;
 }
 
 uint32_t database::head_block_num()const
 {
-   return get( dynamic_global_property_id_type() ).head_block_number;
+   return get_dynamic_global_properties().head_block_number;
 }
 
 block_id_type database::head_block_id()const
 {
-   return get( dynamic_global_property_id_type() ).head_block_id;
+   return get_dynamic_global_properties().head_block_id;
 }
 
 decltype( chain_parameters::block_interval ) database::block_interval( )const
@@ -94,8 +99,27 @@ node_property_object& database::node_properties()
 
 uint32_t database::last_non_undoable_block_num() const
 {
-   return head_block_num() - _undo_db.size();
+   //see https://github.com/bitshares/bitshares-core/issues/377
+   /*
+   There is a case when a value of undo_db.size() is greater then head_block_num(),
+   and as result we get a wrong value for last_non_undoable_block_num.
+   To resolve it we should take into account a number of active_sessions in calculations of
+   last_non_undoable_block_num (active sessions are related to a new block which is under generation).
+   */
+   return head_block_num() - ( _undo_db.size() - _undo_db.active_sessions() );
 }
 
+const account_statistics_object& database::get_account_stats_by_owner( account_id_type owner )const
+{
+   auto& idx = get_index_type<account_stats_index>().indices().get<by_owner>();
+   auto itr = idx.find( owner );
+   FC_ASSERT( itr != idx.end(), "Can not find account statistics object for owner ${a}", ("a",owner) );
+   return *itr;
+}
+
+const witness_schedule_object& database::get_witness_schedule_object()const
+{
+   return *_p_witness_schedule_obj;
+}
 
 } }

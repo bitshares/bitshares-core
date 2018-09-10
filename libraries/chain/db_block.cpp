@@ -76,7 +76,6 @@ optional<signed_block> database::fetch_block_by_number( uint32_t num )const
       return results[0]->data;
    else
       return _block_id_to_block.fetch_by_number(num);
-   return optional<signed_block>();
 }
 
 const signed_transaction& database::get_recent_transaction(const transaction_id_type& trx_id) const
@@ -209,7 +208,10 @@ bool database::_push_block(const signed_block& new_block)
       session.commit();
    } catch ( const fc::exception& e ) {
       elog("Failed to push new block:\n${e}", ("e", e.to_detail_string()));
-      _fork_db.remove(new_block.id());
+      if( !(skip&skip_fork_db) )
+      {
+         _fork_db.remove( new_block.id() );
+      }
       throw;
    }
 
@@ -266,6 +268,24 @@ processed_transaction database::validate_transaction( const signed_transaction& 
    return _apply_transaction( trx );
 }
 
+class push_proposal_nesting_guard {
+public:
+   push_proposal_nesting_guard( uint32_t& nesting_counter, const database& db )
+      : orig_value(nesting_counter), counter(nesting_counter)
+   {
+      FC_ASSERT( counter < db.get_global_properties().active_witnesses.size() * 2, "Max proposal nesting depth exceeded!" );
+      counter++;
+   }
+   ~push_proposal_nesting_guard()
+   {
+      if( --counter != orig_value )
+         elog( "Unexpected proposal nesting count value: ${n} != ${o}", ("n",counter)("o",orig_value) );
+   }
+private:
+    const uint32_t  orig_value;
+    uint32_t& counter;
+};
+
 processed_transaction database::push_proposal(const proposal_object& proposal)
 { try {
    transaction_evaluation_state eval_state(this);
@@ -277,6 +297,9 @@ processed_transaction database::push_proposal(const proposal_object& proposal)
    size_t old_applied_ops_size = _applied_ops.size();
 
    try {
+      push_proposal_nesting_guard guard( _push_proposal_nesting_depth, *this );
+      if( _undo_db.size() >= _undo_db.max_size() )
+         _undo_db.set_max_size( _undo_db.size() + 1 );
       auto session = _undo_db.start_undo_session(true);
       for( auto& op : proposal.proposed_transaction.operations )
          eval_state.operation_results.emplace_back(apply_operation(eval_state, op));
@@ -295,7 +318,7 @@ processed_transaction database::push_proposal(const proposal_object& proposal)
       {
          _applied_ops.resize( old_applied_ops_size );
       }
-      elog( "${e}", ("e",e.to_detail_string() ) );
+      wlog( "${e}", ("e",e.to_detail_string() ) );
       throw;
    }
 
@@ -331,17 +354,6 @@ signed_block database::_generate_block(
    witness_id_type scheduled_witness = get_scheduled_witness( slot_num );
    FC_ASSERT( scheduled_witness == witness_id );
 
-   const auto& witness_obj = witness_id(*this);
-
-   if( !(skip & skip_witness_signature) )
-      FC_ASSERT( witness_obj.signing_key == block_signing_private_key.get_public_key() );
-
-   static const size_t max_block_header_size = fc::raw::pack_size( signed_block_header() ) + 4;
-   auto maximum_block_size = get_global_properties().parameters.maximum_block_size;
-   size_t total_block_size = max_block_header_size;
-
-   signed_block pending_block;
-
    //
    // The following code throws away existing pending_tx_session and
    // rebuilds it by re-applying pending transactions.
@@ -353,17 +365,40 @@ signed_block database::_generate_block(
    // the value of the "when" variable is known, which means we need to
    // re-apply pending transactions in this method.
    //
+
+   // pop pending state (reset to head block state)
    _pending_tx_session.reset();
+
+   // Check witness signing key
+   if( !(skip & skip_witness_signature) )
+   {
+      // Note: if this check failed (which won't happen in normal situations),
+      // we would have temporarily broken the invariant that
+      // _pending_tx_session is the result of applying _pending_tx.
+      // In this case, when the node received a new block,
+      // the push_block() call will re-create the _pending_tx_session.
+      FC_ASSERT( witness_id(*this).signing_key == block_signing_private_key.get_public_key() );
+   }
+
+   static const size_t max_partial_block_header_size = fc::raw::pack_size( signed_block_header() )
+                                                       - fc::raw::pack_size( witness_id_type() ) // witness_id
+                                                       + 3; // max space to store size of transactions (out of block header),
+                                                            // +3 means 3*7=21 bits so it's practically safe
+   const size_t max_block_header_size = max_partial_block_header_size + fc::raw::pack_size( witness_id );
+   auto maximum_block_size = get_global_properties().parameters.maximum_block_size;
+   size_t total_block_size = max_block_header_size;
+
+   signed_block pending_block;
+
    _pending_tx_session = _undo_db.start_undo_session();
 
    uint64_t postponed_tx_count = 0;
-   // pop pending state (reset to head block state)
    for( const processed_transaction& tx : _pending_tx )
    {
       size_t new_total_size = total_block_size + fc::raw::pack_size( tx );
 
       // postpone transaction if it would make block too big
-      if( new_total_size >= maximum_block_size )
+      if( new_total_size > maximum_block_size )
       {
          postponed_tx_count++;
          continue;
@@ -373,12 +408,21 @@ signed_block database::_generate_block(
       {
          auto temp_session = _undo_db.start_undo_session();
          processed_transaction ptx = _apply_transaction( tx );
-         temp_session.merge();
 
          // We have to recompute pack_size(ptx) because it may be different
          // than pack_size(tx) (i.e. if one or more results increased
          // their size)
-         total_block_size += fc::raw::pack_size( ptx );
+         new_total_size = total_block_size + fc::raw::pack_size( ptx );
+         // postpone transaction if it would make block too big
+         if( new_total_size > maximum_block_size )
+         {
+            postponed_tx_count++;
+            continue;
+         }
+
+         temp_session.merge();
+
+         total_block_size = new_total_size;
          pending_block.transactions.push_back( ptx );
       }
       catch ( const fc::exception& e )
@@ -409,13 +453,7 @@ signed_block database::_generate_block(
    if( !(skip & skip_witness_signature) )
       pending_block.sign( block_signing_private_key );
 
-   // TODO:  Move this to _push_block() so session is restored.
-   if( !(skip & skip_block_size_check) )
-   {
-      FC_ASSERT( fc::raw::pack_size(pending_block) <= get_global_properties().parameters.maximum_block_size );
-   }
-
-   push_block( pending_block, skip );
+   push_block( pending_block, skip | skip_transaction_signatures ); // skip authority check when pushing self-generated blocks
 
    return pending_block;
 } FC_CAPTURE_AND_RETHROW( (witness_id) ) }
@@ -499,15 +537,27 @@ void database::_apply_block( const signed_block& next_block )
    uint32_t skip = get_node_properties().skip_flags;
    _applied_ops.clear();
 
-   FC_ASSERT( (skip & skip_merkle_check) || next_block.transaction_merkle_root == next_block.calculate_merkle_root(), "", ("next_block.transaction_merkle_root",next_block.transaction_merkle_root)("calc",next_block.calculate_merkle_root())("next_block",next_block)("id",next_block.id()) );
+   if( !(skip & skip_block_size_check) )
+   {
+      FC_ASSERT( fc::raw::pack_size(next_block) <= get_global_properties().parameters.maximum_block_size );
+   }
+
+   FC_ASSERT( (skip & skip_merkle_check) || next_block.transaction_merkle_root == next_block.calculate_merkle_root(),
+              "",
+              ("next_block.transaction_merkle_root",next_block.transaction_merkle_root)
+              ("calc",next_block.calculate_merkle_root())
+              ("next_block",next_block)
+              ("id",next_block.id()) );
 
    const witness_object& signing_witness = validate_block_header(skip, next_block);
    const auto& global_props = get_global_properties();
-   const auto& dynamic_global_props = get<dynamic_global_property_object>(dynamic_global_property_id_type());
+   const auto& dynamic_global_props = get_dynamic_global_properties();
    bool maint_needed = (dynamic_global_props.next_maintenance_time <= next_block.timestamp);
 
    _current_block_num    = next_block_num;
    _current_trx_in_block = 0;
+
+   _issue_453_affected_assets.clear();
 
    for( const auto& trx : next_block.transactions )
    {
@@ -521,7 +571,8 @@ void database::_apply_block( const signed_block& next_block )
       ++_current_trx_in_block;
    }
 
-   update_global_dynamic_data(next_block);
+   const uint32_t missed = update_witness_missed_blocks( next_block );
+   update_global_dynamic_data( next_block, missed );
    update_signing_witness(signing_witness, next_block);
    update_last_irreversible_block();
 
@@ -533,7 +584,8 @@ void database::_apply_block( const signed_block& next_block )
    clear_expired_transactions();
    clear_expired_proposals();
    clear_expired_orders();
-   update_expired_feeds();
+   update_expired_feeds();       // this will update expired feeds and some core exchange rates
+   update_core_exchange_rates(); // this will update remaining core exchange rates
    update_withdraw_permissions();
 
    // n.b., update_maintenance_flag() happens this late
@@ -628,10 +680,13 @@ processed_transaction database::_apply_transaction(const signed_transaction& trx
    }
    ptrx.operation_results = std::move(eval_state.operation_results);
 
-   //Make sure the temp account has no non-zero balances
-   const auto& index = get_index_type<account_balance_index>().indices().get<by_account_asset>();
-   auto range = index.equal_range( boost::make_tuple( GRAPHENE_TEMP_ACCOUNT ) );
-   std::for_each(range.first, range.second, [](const account_balance_object& b) { FC_ASSERT(b.balance == 0); });
+   if( head_block_time() < HARDFORK_CORE_1040_TIME ) // TODO totally remove this code block after hard fork
+   {
+      //Make sure the temp account has no non-zero balances
+      const auto& index = get_index_type<account_balance_index>().indices().get<by_account_asset>();
+      auto range = index.equal_range( boost::make_tuple( GRAPHENE_TEMP_ACCOUNT ) );
+      std::for_each(range.first, range.second, [](const account_balance_object& b) { FC_ASSERT(b.balance == 0); });
+   }
 
    return ptrx;
 } FC_CAPTURE_AND_RETHROW( (trx) ) }
