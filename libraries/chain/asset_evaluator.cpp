@@ -730,7 +730,8 @@ void_result asset_update_bitasset_evaluator::do_apply(const asset_update_bitasse
       });
 
       if( to_check_call_orders )
-         db_conn.check_call_orders( asset_being_updated );
+         // Process margin calls, allow black swan, not for a new limit order
+         db_conn.check_call_orders( asset_being_updated, true, false, bitasset_to_update );
 
       return void_result();
 
@@ -741,9 +742,8 @@ void_result asset_update_feed_producers_evaluator::do_evaluate(const asset_updat
 { try {
    database& d = db();
 
-   FC_ASSERT( o.new_feed_producers.size() <= d.get_global_properties().parameters.maximum_asset_feed_publishers );
-   for( auto id : o.new_feed_producers )
-      d.get_object(id);
+   FC_ASSERT( o.new_feed_producers.size() <= d.get_global_properties().parameters.maximum_asset_feed_publishers,
+              "Cannot specify more feed producers than maximum allowed" );
 
    const asset_object& a = o.asset_to_update(d);
 
@@ -751,18 +751,33 @@ void_result asset_update_feed_producers_evaluator::do_evaluate(const asset_updat
    FC_ASSERT(!(a.options.flags & committee_fed_asset), "Cannot set feed producers on a committee-fed asset.");
    FC_ASSERT(!(a.options.flags & witness_fed_asset), "Cannot set feed producers on a witness-fed asset.");
 
-   const asset_bitasset_data_object& b = a.bitasset_data(d);
-   bitasset_to_update = &b;
-   FC_ASSERT( a.issuer == o.issuer );
+   FC_ASSERT( a.issuer == o.issuer, "Only asset issuer can update feed producers of an asset" );
+
+   asset_to_update = &a;
+
+   // Make sure all producers exist. Check these after asset because account lookup is more expensive
+   for( auto id : o.new_feed_producers )
+      d.get_object(id);
+
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }
 
 void_result asset_update_feed_producers_evaluator::do_apply(const asset_update_feed_producers_evaluator::operation_type& o)
 { try {
-   db().modify(*bitasset_to_update, [&](asset_bitasset_data_object& a) {
+   database& d = db();
+   const auto head_time = d.head_block_time();
+   const asset_bitasset_data_object& bitasset_to_update = asset_to_update->bitasset_data(d);
+   d.modify( bitasset_to_update, [&o,head_time](asset_bitasset_data_object& a) {
       //This is tricky because I have a set of publishers coming in, but a map of publisher to feed is stored.
       //I need to update the map such that the keys match the new publishers, but not munge the old price feeds from
       //publishers who are being kept.
+
+      // TODO possible performance optimization:
+      //      Since both the map and the set are ordered by account already, we can iterate through them only once
+      //      and avoid lookups while iterating by maintaining two iterators at same time.
+      //      However, this operation is not used much, and both the set and the map are small,
+      //      so likely we won't gain much with the optimization.
+
       //First, remove any old publishers who are no longer publishers
       for( auto itr = a.feeds.begin(); itr != a.feeds.end(); )
       {
@@ -772,12 +787,14 @@ void_result asset_update_feed_producers_evaluator::do_apply(const asset_update_f
             ++itr;
       }
       //Now, add any new publishers
-      for( auto itr = o.new_feed_producers.begin(); itr != o.new_feed_producers.end(); ++itr )
-         if( !a.feeds.count(*itr) )
-            a.feeds[*itr];
-      a.update_median_feeds(db().head_block_time());
+      for( const account_id_type acc : o.new_feed_producers )
+      {
+         a.feeds[acc];
+      }
+      a.update_median_feeds( head_time );
    });
-   db().check_call_orders( o.asset_to_update(db()) );
+   // Process margin calls, allow black swan, not for a new limit order
+   d.check_call_orders( *asset_to_update, true, false, &bitasset_to_update );
 
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }
@@ -786,20 +803,19 @@ void_result asset_global_settle_evaluator::do_evaluate(const asset_global_settle
 { try {
    const database& d = db();
    asset_to_settle = &op.asset_to_settle(d);
-   FC_ASSERT(asset_to_settle->is_market_issued());
-   FC_ASSERT(asset_to_settle->can_global_settle());
-   FC_ASSERT(asset_to_settle->issuer == op.issuer );
-   FC_ASSERT(asset_to_settle->dynamic_data(d).current_supply > 0);
+   FC_ASSERT( asset_to_settle->is_market_issued(), "Can only globally settle market-issued assets" );
+   FC_ASSERT( asset_to_settle->can_global_settle(), "The global_settle permission of this asset is disabled" );
+   FC_ASSERT( asset_to_settle->issuer == op.issuer, "Only asset issuer can globally settle an asset" );
+   FC_ASSERT( asset_to_settle->dynamic_data(d).current_supply > 0, "Can not globally settle an asset with zero supply" );
 
    const asset_bitasset_data_object& _bitasset_data  = asset_to_settle->bitasset_data(d);
    // if there is a settlement for this asset, then no further global settle may be taken
    FC_ASSERT( !_bitasset_data.has_settlement(), "This asset has settlement, cannot global settle again" );
 
    const auto& idx = d.get_index_type<call_order_index>().indices().get<by_collateral>();
-   assert( !idx.empty() );
-   auto itr = idx.lower_bound(boost::make_tuple(price::min(asset_to_settle->bitasset_data(d).options.short_backing_asset,
-                                                           op.asset_to_settle)));
-   assert( itr != idx.end() && itr->debt_type() == op.asset_to_settle );
+   FC_ASSERT( !idx.empty(), "Internal error: no debt position found" );
+   auto itr = idx.lower_bound( price::min( _bitasset_data.options.short_backing_asset, op.asset_to_settle ) );
+   FC_ASSERT( itr != idx.end() && itr->debt_type() == op.asset_to_settle, "Internal error: no debt position found" );
    const call_order_object& least_collateralized_short = *itr;
    FC_ASSERT(least_collateralized_short.get_debt() * op.settle_price <= least_collateralized_short.get_collateral(),
              "Cannot force settle at supplied price: least collateralized short lacks sufficient collateral to settle.");
@@ -810,7 +826,7 @@ void_result asset_global_settle_evaluator::do_evaluate(const asset_global_settle
 void_result asset_global_settle_evaluator::do_apply(const asset_global_settle_evaluator::operation_type& op)
 { try {
    database& d = db();
-   d.globally_settle_asset( op.asset_to_settle(db()), op.settle_price );
+   d.globally_settle_asset( *asset_to_settle, op.settle_price );
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (op) ) }
 
@@ -897,7 +913,7 @@ void_result asset_publish_feeds_evaluator::do_evaluate(const asset_publish_feed_
 
    const asset_object& base = o.asset_id(d);
    //Verify that this feed is for a market-issued asset and that asset is backed by the base
-   FC_ASSERT(base.is_market_issued());
+   FC_ASSERT( base.is_market_issued(), "Can only publish price feeds for market-issued assets" );
 
    const asset_bitasset_data_object& bitasset = base.bitasset_data(d);
    if( bitasset.is_prediction_market || d.head_block_time() <= HARDFORK_CORE_216_TIME )
@@ -906,36 +922,45 @@ void_result asset_publish_feeds_evaluator::do_evaluate(const asset_publish_feed_
    }
 
    // the settlement price must be quoted in terms of the backing asset
-   FC_ASSERT( o.feed.settlement_price.quote.asset_id == bitasset.options.short_backing_asset );
+   FC_ASSERT( o.feed.settlement_price.quote.asset_id == bitasset.options.short_backing_asset,
+              "Quote asset type in settlement price should be same as backing asset of this asset" );
 
    if( d.head_block_time() > HARDFORK_480_TIME )
    {
       if( !o.feed.core_exchange_rate.is_null() )
       {
-         FC_ASSERT( o.feed.core_exchange_rate.quote.asset_id == asset_id_type() );
+         FC_ASSERT( o.feed.core_exchange_rate.quote.asset_id == asset_id_type(),
+                    "Quote asset in core exchange rate should be CORE asset" );
       }
    }
    else
    {
       if( (!o.feed.settlement_price.is_null()) && (!o.feed.core_exchange_rate.is_null()) )
       {
-         FC_ASSERT( o.feed.settlement_price.quote.asset_id == o.feed.core_exchange_rate.quote.asset_id );
+         // Old buggy code, but we have to live with it
+         FC_ASSERT( o.feed.settlement_price.quote.asset_id == o.feed.core_exchange_rate.quote.asset_id, "Bad feed" );
       }
    }
 
    //Verify that the publisher is authoritative to publish a feed
    if( base.options.flags & witness_fed_asset )
    {
-      FC_ASSERT( d.get(GRAPHENE_WITNESS_ACCOUNT).active.account_auths.count(o.publisher) );
+      FC_ASSERT( d.get(GRAPHENE_WITNESS_ACCOUNT).active.account_auths.count(o.publisher),
+                 "Only active witnesses are allowed to publish price feeds for this asset" );
    }
    else if( base.options.flags & committee_fed_asset )
    {
-      FC_ASSERT( d.get(GRAPHENE_COMMITTEE_ACCOUNT).active.account_auths.count(o.publisher) );
+      FC_ASSERT( d.get(GRAPHENE_COMMITTEE_ACCOUNT).active.account_auths.count(o.publisher),
+                 "Only active committee members are allowed to publish price feeds for this asset" );
    }
    else
    {
-      FC_ASSERT(bitasset.feeds.count(o.publisher));
+      FC_ASSERT( bitasset.feeds.count(o.publisher),
+                 "The account is not in the set of allowed price feed producers of this asset" );
    }
+
+   asset_ptr = &base;
+   bitasset_ptr = &bitasset;
 
    return void_result();
 } FC_CAPTURE_AND_RETHROW((o)) }
@@ -945,8 +970,8 @@ void_result asset_publish_feeds_evaluator::do_apply(const asset_publish_feed_ope
 
    database& d = db();
 
-   const asset_object& base = o.asset_id(d);
-   const asset_bitasset_data_object& bad = base.bitasset_data(d);
+   const asset_object& base = *asset_ptr;
+   const asset_bitasset_data_object& bad = *bitasset_ptr;
 
    auto old_feed =  bad.current_feed;
    // Store medians for this asset
@@ -967,7 +992,8 @@ void_result asset_publish_feeds_evaluator::do_apply(const asset_publish_feed_ope
                                         bad.current_feed.maintenance_collateral_ratio ) < bad.current_feed.settlement_price ) )
             d.revive_bitasset(base);
       }
-      db().check_call_orders(base);
+      // Process margin calls, allow black swan, not for a new limit order
+      d.check_call_orders( base, true, false, bitasset_ptr );
    }
 
    return void_result();

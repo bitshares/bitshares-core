@@ -42,12 +42,6 @@ namespace graphene { namespace chain {
 */
 void database::globally_settle_asset( const asset_object& mia, const price& settlement_price )
 { try {
-   /*
-   elog( "BLACK SWAN!" );
-   debug_dump();
-   edump( (mia.symbol)(settlement_price) );
-   */
-
    const asset_bitasset_data_object& bitasset = mia.bitasset_data(*this);
    FC_ASSERT( !bitasset.has_settlement(), "black swan already occurred, it should not happen again" );
 
@@ -137,7 +131,9 @@ void database::_cancel_bids_and_revive_mpa( const asset_object& bitasset, const 
 
    // cancel remaining bids
    const auto& bid_idx = get_index_type< collateral_bid_index >().indices().get<by_price>();
-   auto itr = bid_idx.lower_bound( boost::make_tuple( bitasset.id, price::max( bad.options.short_backing_asset, bitasset.id ), collateral_bid_id_type() ) );
+   auto itr = bid_idx.lower_bound( boost::make_tuple( bitasset.id,
+                                                      price::max( bad.options.short_backing_asset, bitasset.id ),
+                                                      collateral_bid_id_type() ) );
    while( itr != bid_idx.end() && itr->inv_swan_price.quote.asset_id == bitasset.id )
    {
       const collateral_bid_object& bid = *itr;
@@ -167,7 +163,8 @@ void database::cancel_bid(const collateral_bid_object& bid, bool create_virtual_
    remove(bid);
 }
 
-void database::execute_bid( const collateral_bid_object& bid, share_type debt_covered, share_type collateral_from_fund, const price_feed& current_feed )
+void database::execute_bid( const collateral_bid_object& bid, share_type debt_covered, share_type collateral_from_fund,
+                            const price_feed& current_feed )
 {
    const call_order_object& call_obj = create<call_order_object>( [&](call_order_object& call ){
          call.borrower = bid.bidder;
@@ -178,8 +175,9 @@ void database::execute_bid( const collateral_bid_object& bid, share_type debt_co
                                              current_feed.maintenance_collateral_ratio);
       });
 
+   // Note: CORE asset in collateral_bid_object is not counted in account_stats.total_core_in_orders
    if( bid.inv_swan_price.base.asset_id == asset_id_type() )
-      modify(bid.bidder(*this).statistics(*this), [&](account_statistics_object& stats) {
+      modify( get_account_stats_by_owner(bid.bidder), [&](account_statistics_object& stats) {
          stats.total_core_in_orders += call_obj.collateral;
       });
 
@@ -822,11 +820,11 @@ bool database::fill_limit_order( const limit_order_object& order, const asset& p
 bool database::fill_call_order( const call_order_object& order, const asset& pays, const asset& receives,
                                 const price& fill_price, const bool is_maker )
 { try {
-   //idump((pays)(receives)(order));
-   FC_ASSERT( order.get_debt().asset_id == receives.asset_id );
-   FC_ASSERT( order.get_collateral().asset_id == pays.asset_id );
-   FC_ASSERT( order.get_collateral() >= pays );
+   FC_ASSERT( order.debt_type() == receives.asset_id );
+   FC_ASSERT( order.collateral_type() == pays.asset_id );
+   FC_ASSERT( order.collateral >= pays.amount );
 
+   // TODO pass in mia and bitasset_data for better performance
    const asset_object& mia = receives.asset_id(*this);
    FC_ASSERT( mia.is_market_issued() );
 
@@ -842,33 +840,29 @@ bool database::fill_call_order( const call_order_object& order, const asset& pay
             else if( get_dynamic_global_properties().next_maintenance_time > HARDFORK_CORE_343_TIME )
               o.call_price = price::call_price( o.get_debt(), o.get_collateral(),
                                 mia.bitasset_data(*this).current_feed.maintenance_collateral_ratio );
-       });
-
-   const asset_dynamic_data_object& mia_ddo = mia.dynamic_asset_data_id(*this);
-
-   modify( mia_ddo, [&]( asset_dynamic_data_object& ao ){
-       //idump((receives));
-        ao.current_supply -= receives.amount;
       });
 
-   const account_object& borrower = order.borrower(*this);
-   if( collateral_freed.valid() || pays.asset_id == asset_id_type() )
+   // update current supply
+   const asset_dynamic_data_object& mia_ddo = mia.dynamic_asset_data_id(*this);
+
+   modify( mia_ddo, [&receives]( asset_dynamic_data_object& ao ){
+         ao.current_supply -= receives.amount;
+      });
+
+   // Adjust balance
+   if( collateral_freed.valid() )
+      adjust_balance( order.borrower, *collateral_freed );
+
+   // Update account statistics. We know that order.collateral_type() == pays.asset_id
+   if( pays.asset_id == asset_id_type() )
    {
-      const account_statistics_object& borrower_statistics = borrower.statistics(*this);
-      if( collateral_freed.valid() )
-         adjust_balance(borrower.get_id(), *collateral_freed);
-
-      modify( borrower_statistics, [&]( account_statistics_object& b ){
-              if( collateral_freed.valid() && collateral_freed->amount > 0 && collateral_freed->asset_id == asset_id_type() )
-                b.total_core_in_orders -= collateral_freed->amount;
-              if( pays.asset_id == asset_id_type() )
-                b.total_core_in_orders -= pays.amount;
-
-              assert( b.total_core_in_orders >= 0 );
-           });
+      modify( get_account_stats_by_owner(order.borrower), [&collateral_freed,&pays]( account_statistics_object& b ){
+         b.total_core_in_orders -= pays.amount;
+         if( collateral_freed.valid() )
+            b.total_core_in_orders -= collateral_freed->amount;
+      });
    }
 
-   assert( pays.asset_id != receives.asset_id );
    push_applied_operation( fill_order_operation( order.id, order.borrower, pays, receives,
                                                  asset(0, pays.asset_id), fill_price, is_maker ) );
 
@@ -915,6 +909,7 @@ bool database::fill_settle_order( const force_settlement_object& settle, const a
  *  @param enable_black_swan - when adjusting collateral, triggering a black swan is invalid and will throw
  *                             if enable_black_swan is not set to true.
  *  @param for_new_limit_order - true if this function is called when matching call orders with a new limit order
+ *  @param bitasset_ptr - an optional pointer to the bitasset_data object of the asset
  *
  *  @return true if a margin call was executed.
  */
@@ -936,9 +931,6 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
     if( bitasset.is_prediction_market ) return false;
     if( bitasset.current_feed.settlement_price.is_null() ) return false;
 
-    const call_order_index& call_index = get_index_type<call_order_index>();
-    const auto& call_price_index = call_index.indices().get<by_price>();
-
     const limit_order_index& limit_index = get_index_type<limit_order_index>();
     const auto& limit_price_index = limit_index.indices().get<by_price>();
 
@@ -954,6 +946,9 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
 
     if( limit_itr == limit_end )
        return false;
+
+    const call_order_index& call_index = get_index_type<call_order_index>();
+    const auto& call_price_index = call_index.indices().get<by_price>();
 
     auto call_min = price::min( bitasset.options.short_backing_asset, mia.id );
     auto call_max = price::max( bitasset.options.short_backing_asset, mia.id );
@@ -976,34 +971,30 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
     bool before_core_hardfork_606 = ( maint_time <= HARDFORK_CORE_606_TIME ); // feed always trigger call
     bool before_core_hardfork_834 = ( maint_time <= HARDFORK_CORE_834_TIME ); // target collateral ratio option
 
-    while( !check_for_blackswan( mia, enable_black_swan, &bitasset ) && call_itr != call_end )
+    while( !check_for_blackswan( mia, enable_black_swan, &bitasset ) // TODO perhaps improve performance by passing in iterators
+           && call_itr != call_end
+           && limit_itr != limit_end )
     {
        bool  filled_call      = false;
-       price match_price;
-       asset usd_for_sale;
-       if( limit_itr != limit_end )
-       {
-          assert( limit_itr != limit_price_index.end() );
-          match_price      = limit_itr->sell_price;
-          usd_for_sale     = limit_itr->amount_for_sale();
-       }
-       else return margin_called;
 
-       match_price.validate();
+       const call_order_object& call_order = *call_itr;
 
        // Feed protected (don't call if CR>MCR) https://github.com/cryptonomex/graphene/issues/436
-       if( after_hardfork_436 && ( bitasset.current_feed.settlement_price > ~call_itr->call_price ) )
+       if( after_hardfork_436 && bitasset.current_feed.settlement_price > ~call_order.call_price )
           return margin_called;
 
+       const limit_order_object& limit_order = *limit_itr;
+       price match_price  = limit_order.sell_price;
+       // There was a check `match_price.validate();` here, which is removed now because it always passes
+
        // Old rule: margin calls can only buy high https://github.com/bitshares/bitshares-core/issues/606
-       if( before_core_hardfork_606 && match_price > ~call_itr->call_price )
+       if( before_core_hardfork_606 && match_price > ~call_order.call_price )
           return margin_called;
 
        margin_called = true;
 
-       auto usd_to_buy   = call_itr->get_debt();
-
-       if( usd_to_buy * match_price > call_itr->get_collateral() )
+       auto usd_to_buy = call_order.get_debt();
+       if( usd_to_buy * match_price > call_order.get_collateral() )
        {
           elog( "black swan detected on asset ${symbol} (${id}) at block ${b}",
                 ("id",mia.id)("symbol",mia.symbol)("b",head_num) );
@@ -1014,10 +1005,11 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
        }
 
        if( !before_core_hardfork_834 )
-          usd_to_buy.amount = call_itr->get_max_debt_to_cover( match_price,
+          usd_to_buy.amount = call_order.get_max_debt_to_cover( match_price,
                                                                bitasset.current_feed.settlement_price,
                                                                bitasset.current_feed.maintenance_collateral_ratio );
 
+       asset usd_for_sale = limit_order.amount_for_sale();
        asset call_pays, call_receives, order_pays, order_receives;
        if( usd_to_buy > usd_for_sale )
        {  // fill order
@@ -1078,17 +1070,16 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
        call_pays  = order_receives;
        order_pays = call_receives;
 
-       auto old_call_itr = call_itr;
        if( filled_call && before_core_hardfork_343 )
           ++call_itr;
        // when for_new_limit_order is true, the call order is maker, otherwise the call order is taker
-       fill_call_order(*old_call_itr, call_pays, call_receives, match_price, for_new_limit_order );
+       fill_call_order( call_order, call_pays, call_receives, match_price, for_new_limit_order );
        if( !before_core_hardfork_343 )
           call_itr = call_price_index.lower_bound( call_min );
 
        auto next_limit_itr = std::next( limit_itr );
        // when for_new_limit_order is true, the limit order is taker, otherwise the limit order is maker
-       bool really_filled = fill_limit_order( *limit_itr, order_pays, order_receives, true, match_price, !for_new_limit_order );
+       bool really_filled = fill_limit_order( limit_order, order_pays, order_receives, true, match_price, !for_new_limit_order );
        if( really_filled || ( filled_limit && before_core_hardfork_453 ) )
           limit_itr = next_limit_itr;
 
