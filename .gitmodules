@@ -6,3 +6,6 @@
     path = libraries/fc
     url = https://github.com/bitshares/bitshares-fc.git
     ignore = dirty
+[submodule "libraries/tbb"]
+	path = libraries/tbb
+	url = https://github.com/wjakob/tbb

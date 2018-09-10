@@ -5,7 +5,7 @@ if( UNIX AND NOT APPLE )
 endif()
 
 target_link_libraries( genesis_update
-                       PRIVATE graphene_app graphene_chain graphene_egenesis_none fc ${CMAKE_DL_LIBS} ${PLATFORM_SPECIFIC_LIBS} )
+                       PRIVATE graphene_app graphene_chain graphene_egenesis_none graphene_net fc tbb_static ${CMAKE_DL_LIBS} ${PLATFORM_SPECIFIC_LIBS} )
 
 install( TARGETS
    genesis_update

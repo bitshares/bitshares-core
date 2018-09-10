@@ -1,5 +1,6 @@
 #pragma once
 #include <memory>
+#include <tbb/concurrent_unordered_set.h>
 #include <fc/thread/thread.hpp>
 #include <fc/log/logger.hpp>
 #include <fc/network/tcp_socket.hpp>
@@ -274,7 +275,7 @@ class node_impl : public peer_connection_delegate
        * back and forth (not yet ready to initiate syncing) */
       std::unordered_set<graphene::net::peer_connection_ptr>                     _handshaking_connections;
       /** stores fully established connections we're either syncing with or in normal operation with */
-      std::unordered_set<graphene::net::peer_connection_ptr>                     _active_connections;
+      tbb::concurrent_unordered_set<graphene::net::peer_connection_ptr, std::hash<graphene::net::peer_connection_ptr> > _active_connections;
       /** stores connections we've closed (sent closing message, not actually closed), but are still waiting for the remote end to close before we delete them */
       std::unordered_set<graphene::net::peer_connection_ptr>                     _closing_connections;
       /** stores connections we've closed, but are still waiting for the OS to notify us that the socket is really closed */
