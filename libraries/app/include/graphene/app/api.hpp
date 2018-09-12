@@ -208,7 +208,7 @@ namespace graphene { namespace app {
 
          /**
           * @brief Get list of seconds for grouping asset pairs in OHLC https://en.wikipedia.org/wiki/Open-high-low-close_chart
-          * @return A list of seconds
+          * @return A list of seconds which are represented as unsigned integers
           */                                          
          flat_set<uint32_t> get_market_history_buckets()const;
       private:
