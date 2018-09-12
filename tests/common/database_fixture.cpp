@@ -140,7 +140,8 @@ database_fixture::database_fixture()
       esplugin->plugin_initialize(options);
       esplugin->plugin_startup();
    }
-   else {
+   else if( boost::unit_test::framework::get<boost::unit_test::test_suite>(boost::unit_test::framework::current_test_case().p_parent_id).p_name.value != "performance_tests" )
+   {
       auto ahplugin = app.register_plugin<graphene::account_history::account_history_plugin>();
       ahplugin->plugin_set_app(&app);
       ahplugin->plugin_initialize(options);
