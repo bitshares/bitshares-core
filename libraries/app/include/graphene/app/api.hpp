@@ -185,31 +185,29 @@ namespace graphene { namespace app {
                                                                         unsigned limit = 100,
                                                                         uint32_t start = 0) const;
          /**
-          * @brief Get history of orders with b:a pair
+          * @brief Get list of orders with b:a pair
           * @param a asset in pair
           * @param b asset in pair
-          * @param limit Maximum number of orders to retrieve
+          * @param limit Maximum limit of orders to retrieve
           * @return A history of orders with b:a pair, where a <= b, otherwise a and b will be swaped
           */
          vector<order_history_object> get_fill_order_history( asset_id_type a, asset_id_type b, uint32_t limit )const;
 
          /**
-          * @brief Gets accumulated market history with b:a pair
+          * @brief Get accumulated market history with b:a pair
+          * Thus supporting OHLC https://www.investopedia.com/terms/o/ohlcchart.asp
           * @param a asset in pair
           * @param b asset in pair
           * @param bucket_seconds Represents the length in seconds of bucket
-          * @param start Time in seconds from where buckets begin
-          * @param end Time in seconds where buckets stop
-          * @return A history in market with b:a pair (maximum markets to retrieve is less than 200), 
-          * where a <= b, otherwise a and b will be swaped
+          * @param start Time point in seconds since 1970 from where buckets begin
+          * @param end Time point in seconds since 1970 where buckets stop
+          * @return A history in market with b:a pair (limit to retrieve is less than 200 buckets), where a less or equal than b
           */
          vector<bucket_object> get_market_history( asset_id_type a, asset_id_type b, uint32_t bucket_seconds,
                                                    fc::time_point_sec start, fc::time_point_sec end )const;
 
          /**
-          * @brief Get tracked buckets.
-          * Track market history by grouping orders into buckets of equal size measured in seconds 
-          * specified as a JSON array of numbers.
+          * @brief Get tracked groups of orders with equal size measured in seconds known as buckets
           * @return A list of tracked buckets
           */                                          
          flat_set<uint32_t> get_market_history_buckets()const;
@@ -354,8 +352,7 @@ namespace graphene { namespace app {
          /**
           * @brief Generates a pedersen commitment: *commit = blind * G + value * G2. 
           * The commitment is 33 bytes, the blinding factor is 32 bytes.
-          * (For more information about pederson commitment check please next url 
-          * https://en.wikipedia.org/wiki/Commitment_scheme)
+          * For more information about pederson commitment check next url https://en.wikipedia.org/wiki/Commitment_scheme
           * @param blind Sha-256 blind factor type
           * @param value Positive 64-bit integer value
           * @return A 33-byte pedersen commitment: *commit = blind * G + value * G2
@@ -426,9 +423,6 @@ namespace graphene { namespace app {
           * In the case where a transaction produces two or more outputs, (e.g. an amount to the intended 
           * recipient plus “change” back to the sender), 
           * a "range proof" must be supplied to prove that none of the outputs commit to a negative value.
-          * The range proofs are computed by library functions in secp256k1-zkp, 
-          * which provides a very flexible and capable range proof library, 
-          * in which a balance can be struck between amount of privacy and compactness of proof.
           * @param proof List of proof's characters
           * @return A range proof info structure with exponent, mantissa, min and max values
           */                                       
