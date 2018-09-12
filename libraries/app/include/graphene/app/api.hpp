@@ -185,11 +185,11 @@ namespace graphene { namespace app {
                                                                         unsigned limit = 100,
                                                                         uint32_t start = 0) const;
          /**
-          * @brief Get list of orders with b:a pair
+          * @brief Get asset pairs with b:a pair
           * @param a asset in pair
           * @param b asset in pair
-          * @param limit Maximum limit of orders to retrieve
-          * @return A history of orders with b:a pair, where a <= b, otherwise a and b will be swaped
+          * @param limit Maximum count of asset pairs to retrieve
+          * @return Asset pairs with b:a pair
           */
          vector<order_history_object> get_fill_order_history( asset_id_type a, asset_id_type b, uint32_t limit )const;
 
@@ -199,16 +199,16 @@ namespace graphene { namespace app {
           * @param a asset in pair
           * @param b asset in pair
           * @param bucket_seconds Represents the length in seconds of bucket
-          * @param start Time point in seconds since 1970 from where buckets begin
-          * @param end Time point in seconds since 1970 where buckets stop
-          * @return A history in market with b:a pair (limit to retrieve is less than 200 buckets), where a less or equal than b
+          * @param start Time point in seconds from where buckets begin, E.G. "2018-09-12T18:00:00"
+          * @param end Time point in seconds where buckets stop, E.G. "2018-09-12T18:00:55"
+          * @return A history in market with b:a pair (limit to retrieve is less than 200 buckets)
           */
          vector<bucket_object> get_market_history( asset_id_type a, asset_id_type b, uint32_t bucket_seconds,
                                                    fc::time_point_sec start, fc::time_point_sec end )const;
 
          /**
-          * @brief Get tracked groups of orders with equal size measured in seconds known as buckets
-          * @return A list of tracked buckets
+          * @brief Get list of seconds for grouping asset pairs in OHLC https://en.wikipedia.org/wiki/Open-high-low-close_chart
+          * @return A list of seconds
           */                                          
          flat_set<uint32_t> get_market_history_buckets()const;
       private:
