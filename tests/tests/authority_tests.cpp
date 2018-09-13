@@ -1738,59 +1738,59 @@ BOOST_FIXTURE_TEST_CASE( parent_owner_test, database_fixture )
       // signing tests
       sign( tx, alice_owner_key );
       PUSH_TX( db, tx, database::skip_transaction_dupe_check );
-      tx.signatures.clear();
+      tx.clear_signatures();
 
       sign( tx, alice_active_key );
       PUSH_TX( db, tx, database::skip_transaction_dupe_check );
-      tx.signatures.clear();
+      tx.clear_signatures();
 
       sign( tx, bob_owner_key );
       PUSH_TX( db, tx, database::skip_transaction_dupe_check );
-      tx.signatures.clear();
+      tx.clear_signatures();
 
       sign( tx, bob_active_key );
       PUSH_TX( db, tx, database::skip_transaction_dupe_check );
-      tx.signatures.clear();
+      tx.clear_signatures();
 
       sign( tx, cindy_owner_key );
       PUSH_TX( db, tx, database::skip_transaction_dupe_check );
-      tx.signatures.clear();
+      tx.clear_signatures();
 
       sign( tx, cindy_active_key );
       PUSH_TX( db, tx, database::skip_transaction_dupe_check );
-      tx.signatures.clear();
+      tx.clear_signatures();
 
       sign( tx, daisy_owner_key );
       PUSH_TX( db, tx, database::skip_transaction_dupe_check );
-      tx.signatures.clear();
+      tx.clear_signatures();
 
       sign( tx, daisy_active_key );
       PUSH_TX( db, tx, database::skip_transaction_dupe_check );
-      tx.signatures.clear();
+      tx.clear_signatures();
 
       sign( tx, edwin_owner_key );
       PUSH_TX( db, tx, database::skip_transaction_dupe_check );
-      tx.signatures.clear();
+      tx.clear_signatures();
 
       sign( tx, edwin_active_key );
       PUSH_TX( db, tx, database::skip_transaction_dupe_check );
-      tx.signatures.clear();
+      tx.clear_signatures();
 
       sign( tx, frank_owner_key );
       PUSH_TX( db, tx, database::skip_transaction_dupe_check );
-      tx.signatures.clear();
+      tx.clear_signatures();
 
       sign( tx, frank_active_key );
       PUSH_TX( db, tx, database::skip_transaction_dupe_check );
-      tx.signatures.clear();
+      tx.clear_signatures();
 
       sign( tx, gavin_owner_key );
       PUSH_TX( db, tx, database::skip_transaction_dupe_check );
-      tx.signatures.clear();
+      tx.clear_signatures();
 
       sign( tx, gavin_active_key );
       PUSH_TX( db, tx, database::skip_transaction_dupe_check );
-      tx.signatures.clear();
+      tx.clear_signatures();
 
       // proposal tests
       pid = new_proposal();

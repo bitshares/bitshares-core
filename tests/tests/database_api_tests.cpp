@@ -153,8 +153,7 @@ BOOST_AUTO_TEST_CASE( get_signatures_non_immediate_owner )
          trx.operations.push_back(op);
          sign(trx, nathan_key1);
          PUSH_TX( db, trx, database::skip_transaction_dupe_check );
-         trx.operations.clear();
-         trx.signatures.clear();
+         trx.clear();
 
          op.account = ashley_id;
          op.active = authority(1, a_pub_key_active, 1);
@@ -162,8 +161,7 @@ BOOST_AUTO_TEST_CASE( get_signatures_non_immediate_owner )
          trx.operations.push_back(op);
          sign(trx, ashley_key1);
          PUSH_TX( db, trx, database::skip_transaction_dupe_check );
-         trx.operations.clear();
-         trx.signatures.clear();
+         trx.clear();
 
          op.account = oliver_id;
          op.active = authority(1, o_pub_key_active, 1);
@@ -171,8 +169,7 @@ BOOST_AUTO_TEST_CASE( get_signatures_non_immediate_owner )
          trx.operations.push_back(op);
          sign(trx, oliver_key1);
          PUSH_TX( db, trx, database::skip_transaction_dupe_check );
-         trx.operations.clear();
-         trx.signatures.clear();
+         trx.clear();
       } FC_CAPTURE_AND_RETHROW ((nathan.active))
 
       // this transaction requires active
