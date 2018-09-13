@@ -2961,7 +2961,15 @@ map<string,account_id_type> wallet_api::list_accounts(const string& lowerbound, 
 
 vector<asset> wallet_api::list_account_balances(const string& id)
 {
-   return my->_remote_db->get_account_balances(id, flat_set<asset_id_type>());
+   /*
+    * Compatibility issue
+    * Current Date: 2018-09-13 More info: https://github.com/bitshares/bitshares-core/issues/1307
+    * Todo: remove the next 2 lines and change always_id to id in remote call after next hardfork
+    */
+   auto account = get_account(id);
+   auto always_id = account_id_to_string(account.id);
+
+   return my->_remote_db->get_account_balances(always_id, flat_set<asset_id_type>());
 }
 
 vector<asset_object> wallet_api::list_assets(const string& lowerbound, uint32_t limit)const
@@ -3230,6 +3238,10 @@ void wallet_api::remove_builder_transaction(transaction_handle_type handle)
 account_object wallet_api::get_account(string account_name_or_id) const
 {
    return my->get_account(account_name_or_id);
+}
+string wallet_api::account_id_to_string(account_id_type id) const
+{
+   return my->account_id_to_string(id);
 }
 
 asset_object wallet_api::get_asset(string asset_name_or_id) const

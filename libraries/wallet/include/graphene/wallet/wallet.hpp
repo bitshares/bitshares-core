@@ -476,6 +476,13 @@ class wallet_api
        */
       account_object                    get_account(string account_name_or_id) const;
 
+      /** Returns string representation of an account ID.
+       *
+       * @param id the ID of the account to be converted to string
+       * @returns string representation of account ID
+       */
+      string                    account_id_to_string(account_id_type id) const;
+
       /** Returns information about the given asset.
        * @param asset_name_or_id the symbol or id of the asset in question
        * @returns the information about the asset stored in the block chain
