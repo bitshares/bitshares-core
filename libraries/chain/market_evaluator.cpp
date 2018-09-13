@@ -268,8 +268,8 @@ void_result call_order_update_evaluator::do_apply(const call_order_update_operat
          call.debt       = new_debt;
          if( before_core_hardfork_1270 ) // don't update call_price after core-1270 hard fork
          {
-            call.call_price  =  price::call_price(call.get_debt(), call.get_collateral(),
-                                                  _bitasset_data->current_feed.maintenance_collateral_ratio);
+            call.call_price  =  price::call_price( call.get_debt(), call.get_collateral(),
+                                                   _bitasset_data->current_feed.maintenance_collateral_ratio );
          }
          call.target_collateral_ratio = o.extensions.value.target_collateral_ratio;
       });
