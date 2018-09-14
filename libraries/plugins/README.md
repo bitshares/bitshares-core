@@ -8,14 +8,14 @@ Plugins are optional to run by node operator according to their needs however al
 
 # Available Plugins
 
-Number              | Name                     | Description                                                                 | Category       | Status
---------------------|--------------------------|-----------------------------------------------------------------------------|----------------|--------
-[1](witness)        | Witness                  | Generate and sign blocks                                                    | Block producer | Stable
-[2](account_history)| Account History          | Save account history data                                                   | History        | Stable
-[3](delayed_node)   | Delayed Node             | Avoid forks by running a several times confirmed and delayed blockchain     | Business       | Stable
-[4](debug_witness)  | Debug Witness            | Run "what-if" tests                                                         | Debug          | Stable
-[5](market_history) | Market History           | Save market history data                                                    | Market data    | Stable
-[6](snapshot)       | Snapshot                 | Get a json of all objects in blockchain at a specificed time or block       | Debug          | Stable
-[7](elasticsearch)  | ElasticSearch            | Save account history data into elasticsearch database                       | History        | Experimental
-[8](es_objects)     | ES Objects               | Save selected objects into elasticsearch database                           | History        | Experimental
-[9](grouped_orders) | Grouped Orders           | Expose api to create a grouped order book of bitshares markets              | Market data    | Experimental
+Number              | Name                     | Description                                                                 | Category       | Status        | Space ID     
+--------------------|--------------------------|-----------------------------------------------------------------------------|----------------|---------------|--------------|
+[1](witness)        | Witness                  | Generate and sign blocks                                                    | Block producer | Stable        | 4
+[2](account_history)| Account History          | Save account history data                                                   | History        | Stable        |
+[3](delayed_node)   | Delayed Node             | Avoid forks by running a several times confirmed and delayed blockchain     | Business       | Stable        |
+[4](debug_witness)  | Debug Witness            | Run "what-if" tests                                                         | Debug          | Stable        |
+[5](market_history) | Market History           | Save market history data                                                    | Market data    | Stable        | 5
+[6](snapshot)       | Snapshot                 | Get a json of all objects in blockchain at a specificed time or block       | Debug          | Stable        | 
+[7](elasticsearch)  | ElasticSearch            | Save account history data into elasticsearch database                       | History        | Experimental  | 6
+[8](es_objects)     | ES Objects               | Save selected objects into elasticsearch database                           | History        | Experimental  |
+[9](grouped_orders) | Grouped Orders           | Expose api to create a grouped order book of bitshares markets              | Market data    | Experimental  |
