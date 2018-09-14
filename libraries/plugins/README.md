@@ -8,7 +8,7 @@ Plugins are optional to run by node operator according to their needs however al
 
 # Available Plugins
 
-Number              | Name                     | Description                                                                 | Category       | Status        | Space ID     
+Number              | Name                     | Description                                                                 | Category       | Status        | SpaceID     
 --------------------|--------------------------|-----------------------------------------------------------------------------|----------------|---------------|--------------|
 [1](witness)        | Witness                  | Generate and sign blocks                                                    | Block producer | Stable        | 4
 [2](account_history)| Account History          | Save account history data                                                   | History        | Stable        |
