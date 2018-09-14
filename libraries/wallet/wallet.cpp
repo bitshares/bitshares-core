@@ -2967,7 +2967,7 @@ vector<asset> wallet_api::list_account_balances(const string& id)
     * Todo: remove the next 2 lines and change always_id to id in remote call after next hardfork
     */
    auto account = get_account(id);
-   auto always_id = account_id_to_string(account.id);
+   auto always_id = my->account_id_to_string(account.id);
 
    return my->_remote_db->get_account_balances(always_id, flat_set<asset_id_type>());
 }
@@ -3238,10 +3238,6 @@ void wallet_api::remove_builder_transaction(transaction_handle_type handle)
 account_object wallet_api::get_account(string account_name_or_id) const
 {
    return my->get_account(account_name_or_id);
-}
-string wallet_api::account_id_to_string(account_id_type id) const
-{
-   return my->account_id_to_string(id);
 }
 
 asset_object wallet_api::get_asset(string asset_name_or_id) const
