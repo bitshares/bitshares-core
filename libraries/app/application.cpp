@@ -529,10 +529,12 @@ bool application_impl::handle_block(const graphene::net::block_message& blk_msg,
          // happens, there's no reason to fetch the transactions, so  construct a list of the
          // transaction message ids we no longer need.
          // during sync, it is unlikely that we'll see any old
+         contained_transaction_message_ids.reserve( contained_transaction_message_ids.size()
+                                                    + blk_msg.block.transactions.size() );
          for (const processed_transaction& transaction : blk_msg.block.transactions)
          {
             graphene::net::trx_message transaction_message(transaction);
-            contained_transaction_message_ids.push_back(graphene::net::message(transaction_message).id());
+            contained_transaction_message_ids.emplace_back(graphene::net::message(transaction_message).id());
          }
       }
 
