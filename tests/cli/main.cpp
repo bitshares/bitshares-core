@@ -566,3 +566,91 @@ BOOST_FIXTURE_TEST_CASE( account_history_pagination, cli_fixture )
       throw;
    }
 }
+
+///////////////////////
+// Start a server and connect using the same calls as the CLI
+// Create an HTLC
+///////////////////////
+BOOST_AUTO_TEST_CASE( cli_create_htlc )
+{
+   using namespace graphene::chain;
+   using namespace graphene::app;
+   std::shared_ptr<graphene::app::application> app1;
+   try {
+      fc::temp_directory app_dir( graphene::utilities::temp_directory_path() );
+
+      int server_port_number = 0;
+      app1 = start_application(app_dir, server_port_number);
+
+      // connect to the server
+      client_connection con(app1, app_dir, server_port_number);
+
+      BOOST_TEST_MESSAGE("Setting wallet password");
+      con.wallet_api_ptr->set_password("supersecret");
+      con.wallet_api_ptr->unlock("supersecret");
+
+      // import Nathan account
+      BOOST_TEST_MESSAGE("Importing nathan key");
+      std::vector<std::string> nathan_keys{"5KQwrPbwdL6PhXujxW37FSSQZ1JiwsST4cqQzDeyXtP79zkvFD3"};
+      BOOST_CHECK_EQUAL(nathan_keys[0], "5KQwrPbwdL6PhXujxW37FSSQZ1JiwsST4cqQzDeyXtP79zkvFD3");
+      BOOST_CHECK(con.wallet_api_ptr->import_key("nathan", nathan_keys[0]));
+
+      BOOST_TEST_MESSAGE("Importing nathan's balance");
+      std::vector<signed_transaction> import_txs = con.wallet_api_ptr->import_balance("nathan", nathan_keys, true);
+      account_object nathan_acct_before_upgrade = con.wallet_api_ptr->get_account("nathan");
+
+      // upgrade nathan
+      BOOST_TEST_MESSAGE("Upgrading Nathan to LTM");
+      signed_transaction upgrade_tx = con.wallet_api_ptr->upgrade_account("nathan", true);
+      account_object nathan_acct_after_upgrade = con.wallet_api_ptr->get_account("nathan");
+
+      // verify that the upgrade was successful
+      BOOST_CHECK_PREDICATE( std::not_equal_to<uint32_t>(), (nathan_acct_before_upgrade.membership_expiration_date.sec_since_epoch())
+            (nathan_acct_after_upgrade.membership_expiration_date.sec_since_epoch()) );
+      BOOST_CHECK(nathan_acct_after_upgrade.is_lifetime_member());
+
+      // create a new account for alice
+      graphene::wallet::brain_key_info bki = con.wallet_api_ptr->suggest_brain_key();
+      BOOST_CHECK(!bki.brain_priv_key.empty());
+      signed_transaction create_acct_tx = con.wallet_api_ptr->create_account_with_brain_key(bki.brain_priv_key, "alice", 
+            "nathan", "nathan", true);
+      // save the private key for this new account in the wallet file
+      BOOST_CHECK(con.wallet_api_ptr->import_key("alice", bki.wif_priv_key));
+      con.wallet_api_ptr->save_wallet_file(con.wallet_filename);
+
+      // attempt to give alice some bitsahres
+      BOOST_TEST_MESSAGE("Transferring bitshares from Nathan to alice");
+      signed_transaction transfer_tx = con.wallet_api_ptr->transfer("nathan", "alice", "10000", "1.3.0", 
+            "Here are some CORE token for your new account", true);
+
+      // create an HTLC
+      std::string preimage_string = "My Secret";
+      fc::ripemd160 preimage = fc::ripemd160::hash(preimage_string);
+      std::vector<unsigned char> hash(preimage.data_size());
+      for(size_t i = 0; i < preimage.data_size(); ++i)
+         hash[i] = preimage.data()[i];
+      fc::time_point_sec timelock = fc::time_point::now() + fc::days(1);
+      graphene::chain::signed_transaction result_tx 
+            = con.wallet_api_ptr->create_htlc("alice", "nathan", 
+            "1.3.0", "1000", "RIPEMD160", hash, preimage.data_size(), timelock, true);
+
+      // share the id with bob
+      graphene::chain::transaction_id_type htlc_trans_id = con.wallet_api_ptr->get_transaction_id(result_tx);
+      BOOST_TEST_MESSAGE("The hash is " + std::string(htlc_trans_id));
+      
+      // generate a block to get things started
+      BOOST_CHECK(generate_block(app1));
+      // wait for a maintenance interval
+      BOOST_CHECK(generate_maintenance_block(app1));
+
+      // send another block to trigger maintenance interval
+      BOOST_CHECK(generate_maintenance_block(app1));
+
+      // wait for everything to finish up
+      fc::usleep(fc::seconds(1));
+   } catch( fc::exception& e ) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+   app1->shutdown();
+}

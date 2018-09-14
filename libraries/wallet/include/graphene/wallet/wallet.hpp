@@ -490,6 +490,13 @@ class wallet_api
        */
       asset_bitasset_data_object        get_bitasset_data(string asset_name_or_id)const;
 
+      /**
+       * Returns information about the given HTLC object.
+       * @param htlc_id the id of the HTLC object.
+       * @returns the information about the HTLC object
+       */
+      htlc_object                      get_htlc(string htlc_id) const;
+
       /** Lookup the id of a named account.
        * @param account_name_or_id the name of the account to look up
        * @returns the id of the named account
@@ -1447,6 +1454,33 @@ class wallet_api
          worker_vote_delta delta,
          bool broadcast = false
          );
+
+      /**
+       * Create a hashed time lock contract
+       * 
+       * @param source The account that will reserve the funds (and pay the fee)
+       * @param destination The account that will receive the funds if the preimage is presented
+       * @param asset_symbol The asset that is to be traded
+       * @param amount the amount of the asset that is to be traded
+       * @param hash_algorithm the algorithm used to generate the hash from the preimage. Can be RIPEMD160 or SHA256.
+       * @param preimage_hash the hash of the preimage
+       * @param preimage_size the size of the preimage in bytes
+       * @param timelock when the time lock expires
+       * @param broadcast true if you wish to broadcast the transaction
+       */
+      signed_transaction create_htlc( string source, string destination, string asset_symbol, string amount,
+         string hash_algorithm, std::vector<unsigned char> preimage_hash, size_t preimage_size, 
+         fc::time_point_sec timelock, bool broadcast = false );
+
+      /****
+       * Update a hashed time lock contract
+       * 
+       * @param htlc_id The object identifier of the HTLC on the blockchain
+       * @param issuer Who is performing this operation (and paying the fee)
+       * @param preimage the preimage that should evaluate to the preimage_hash
+       */
+      signed_transaction update_htlc( string htlc_id, string issuer, std::vector<unsigned char> preimage, 
+         bool broadcast = false );
 
       /**
        * Get information about a vesting balance object.

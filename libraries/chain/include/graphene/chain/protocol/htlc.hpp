@@ -31,22 +31,29 @@
 namespace graphene { 
    namespace chain {
 
-      struct htlc_create_operation : public base_operation {
-          struct fee_parameters_type {
-             uint64_t fee            = 1 * GRAPHENE_BLOCKCHAIN_PRECISION;
-          };
-    	  asset fee; // paid to network
-    	  account_id_type source; // where the held monies are to come from
-    	  account_id_type destination; // where the held monies will go if the preimage is provided
-    	  asset amount; // the amount to hold
-    	  std::vector<unsigned char> key_hash; // the hash of the preimage
-    	  uint16_t key_size; // the size of the preimage
-    	  fc::time_point_sec epoch; // The time the funds will be returned to the source if not claimed
-    	  extensions_type extensions; // for future expansion
+      struct htlc_create_operation : public base_operation 
+      {
+         struct fee_parameters_type {
+            uint64_t fee            = 1 * GRAPHENE_BLOCKCHAIN_PRECISION;
+         };
+         enum hash_algorithm {
+            UNKNOWN,
+            RIPEMD160,
+            SHA256
+         };
+    	   asset fee; // paid to network
+    	   account_id_type source; // where the held monies are to come from
+    	   account_id_type destination; // where the held monies will go if the preimage is provided
+    	   asset amount; // the amount to hold
+         enum hash_algorithm hash_type = hash_algorithm::UNKNOWN; // hash algorithm used to create key_hash
+    	   std::vector<unsigned char> key_hash; // the hash of the preimage
+    	   uint16_t key_size; // the size of the preimage
+    	   fc::time_point_sec epoch; // The time the funds will be returned to the source if not claimed
+    	   extensions_type extensions; // for future expansion
 
-    	  void validate()const;
-          void get_required_active_authorities( boost::container::flat_set<account_id_type>& a )const{ a.insert(source); }
-          account_id_type fee_payer()const { return source; }
+    	   void validate()const;
+         void get_required_active_authorities( boost::container::flat_set<account_id_type>& a )const{ a.insert(source); }
+         account_id_type fee_payer()const { return source; }
 
       };
 

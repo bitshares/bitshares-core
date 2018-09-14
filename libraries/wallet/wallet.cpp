@@ -645,6 +645,13 @@ public:
       return *opt;
    }
 
+   htlc_object get_htlc(string htlc_id) const
+   {
+      auto obj = _remote_db->get_htlc(htlc_id);
+      FC_ASSERT(obj, "HTLC not found");
+      return *obj;
+   }
+
    asset_id_type get_asset_id(string asset_symbol_or_id) const
    {
       FC_ASSERT( asset_symbol_or_id.size() > 0 );
@@ -1733,6 +1740,63 @@ public:
       tx.validate();
 
       return sign_transaction( tx, broadcast );
+   }
+
+   signed_transaction create_htlc( string source, string destination, string asset_symbol, string amount,
+         string hash_algorithm, std::vector<unsigned char> preimage_hash, size_t preimage_size, fc::time_point_sec timelock, bool broadcast = false )
+   {
+      try 
+      {
+         FC_ASSERT( !self.is_locked() );
+         fc::optional<asset_object> asset_obj = get_asset(asset_symbol);
+         FC_ASSERT(asset_obj, "Could not find asset matching ${asset}", ("asset", asset_symbol));
+
+         htlc_create_operation create_op;
+         create_op.source = get_account(source).id;
+         create_op.destination = get_account(destination).id;
+         create_op.amount = asset_obj->amount_from_string(amount);
+         create_op.epoch = timelock;
+         create_op.key_hash = preimage_hash;
+         create_op.key_size = preimage_size;
+         if ( "SHA256" == hash_algorithm )
+            create_op.hash_type = htlc_create_operation::hash_algorithm::SHA256;
+         if ( "RIPEMD160" == hash_algorithm )
+            create_op.hash_type = htlc_create_operation::hash_algorithm::RIPEMD160;
+         FC_ASSERT(create_op.hash_type != htlc_create_operation::hash_algorithm::UNKNOWN, 
+               "Unknown hash algorithm: ${algo}", ("algo", hash_algorithm));
+
+         signed_transaction tx;
+         tx.operations.push_back(create_op);
+         set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees);
+         tx.validate();
+
+         return sign_transaction(tx, broadcast);
+      } FC_CAPTURE_AND_RETHROW( (source)(destination)(amount)(asset_symbol)(hash_algorithm)
+            (preimage_hash)(preimage_size)(timelock)(broadcast) ) 
+   }
+
+   signed_transaction update_htlc( string htlc_id, string issuer, std::vector<unsigned char> preimage, bool broadcast )
+   {
+      try 
+      {
+         FC_ASSERT( !self.is_locked() );
+         fc::optional<htlc_object> htlc_obj = get_htlc(htlc_id);
+         FC_ASSERT(htlc_obj, "Could not find HTLC matching ${htlc}", ("htlc", htlc_id));
+
+         account_object issuer_obj = get_account(issuer);
+
+         htlc_update_operation update_op;
+         update_op.htlc_id = htlc_obj->id;
+         update_op.update_issuer = issuer_obj.id;
+         update_op.preimage = preimage;
+
+         signed_transaction tx;
+         tx.operations.push_back(update_op);
+         set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees);
+         tx.validate();
+
+         return sign_transaction(tx, broadcast);
+      } FC_CAPTURE_AND_RETHROW( (htlc_id)(issuer)(preimage)(broadcast) ) 
    }
 
    vector< vesting_balance_object_with_info > get_vesting_balances( string account_name )
@@ -3010,6 +3074,14 @@ vector<asset_object> wallet_api::list_assets(const string& lowerbound, uint32_t 
 uint64_t wallet_api::get_asset_count()const
 {
    return my->_remote_db->get_asset_count();
+}
+
+signed_transaction wallet_api::create_htlc( string source, string destination, string asset_symbol, string amount,
+         string hash_algorithm, std::vector<unsigned char> preimage_hash, size_t preimage_size, 
+         fc::time_point_sec timelock, bool broadcast)
+{
+   return my->create_htlc(source, destination, asset_symbol, amount, hash_algorithm, preimage_hash, preimage_size,
+         timelock, broadcast);
 }
 
 vector<operation_detail> wallet_api::get_account_history(string name, int limit)const
