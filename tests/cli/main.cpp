@@ -38,14 +38,38 @@
 #include <fc/rpc/websocket_api.hpp>
 #include <fc/rpc/cli.hpp>
 
-#include <sys/socket.h>
-#include <netinet/ip.h>
-#include <sys/types.h>
+#ifdef _WIN32
+   #ifndef _WIN32_WINNT
+      #define _WIN32_WINNT 0x0501
+   #endif
+   #include <winsock2.h>
+   #include <WS2tcpip.h>
+#else
+   #include <sys/socket.h>
+   #include <netinet/ip.h>
+   #include <sys/types.h>
+#endif
 
 #include <boost/filesystem/path.hpp>
 
 #define BOOST_TEST_MODULE Test Application
 #include <boost/test/included/unit_test.hpp>
+
+/*****
+ * Global Initialization for Windows
+ * ( sets up Winsock stuf )
+ */
+#ifdef _WIN32
+int sockInit(void)
+{
+   WSADATA wsa_data;
+   return WSAStartup(MAKEWORD(1,1), &wsa_data);
+}
+int sockQuit(void)
+{
+   return WSACleanup();
+}
+#endif
 
 /*********************
  * Helper Methods
@@ -73,7 +97,11 @@ int get_available_port()
    socklen_t len = sizeof(sin);
    if (getsockname(socket_fd, (struct sockaddr *)&sin, &len) == -1)
       return -1;
+#ifdef _WIN32
+   closesocket(socket_fd);
+#else
    close(socket_fd);
+#endif
    return ntohs(sin.sin_port);
 }
 
@@ -92,6 +120,9 @@ std::shared_ptr<graphene::app::application> start_application(fc::temp_directory
    app1->register_plugin< graphene::grouped_orders::grouped_orders_plugin>();
    app1->startup_plugins();
    boost::program_options::variables_map cfg;
+#ifdef _WIN32
+   sockInit();
+#endif
    server_port_number = get_available_port();
    cfg.emplace(
       "rpc-endpoint", 
@@ -253,6 +284,9 @@ struct cli_fixture
       fc::usleep(fc::seconds(1));
         
       app1->shutdown();
+#ifdef _WIN32
+      sockQuit();
+#endif
    }
 };
 
