@@ -4,7 +4,7 @@ The bitshares plugins are a collection of tools that brings new functionality wi
 
 The main source of I/O of the bitshares blockchain is the API. Plugins are a more powerful alternative to build more complex developments for when the current API is not enough.
 
-Plugins are optional to run by node operator according to their needs however all plugins here will be compiled. There are plans for optional build of plugins at: #533 
+Plugins are optional to run by node operator according to their needs however all plugins here will be compiled. There are plans for optional build of plugins at: [Issue 533](https://github.com/bitshares/bitshares-core/issues/533)
 
 # Available Plugins
 
