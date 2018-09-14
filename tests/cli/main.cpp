@@ -102,7 +102,11 @@ int get_available_port()
    socklen_t len = sizeof(sin);
    if (getsockname(socket_fd, (struct sockaddr *)&sin, &len) == -1)
       return -1;
+#ifdef _WIN32
+   closesocket(socket_fd);
+#else
    close(socket_fd);
+#endif
    return ntohs(sin.sin_port);
 }
 
