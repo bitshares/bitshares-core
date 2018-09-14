@@ -3050,6 +3050,13 @@ vector<operation_detail> wallet_api::get_relative_account_history(string name, u
    const account_object& account = my->get_account(account_id);
    const account_statistics_object& stats = my->get_object(account.statistics);
 
+   /*
+    * Compatibility issue
+    * Current Date: 2018-09-14 More info: https://github.com/bitshares/bitshares-core/issues/1307
+    * Todo: remove the next line and change always_id to name in remote call after next hardfork
+    */
+   auto always_id = my->account_id_to_string(account_id);
+
    if(start == 0)
        start = stats.total_ops;
    else
@@ -3057,7 +3064,7 @@ vector<operation_detail> wallet_api::get_relative_account_history(string name, u
 
    while( limit > 0 )
    {
-      vector <operation_history_object> current = my->_remote_hist->get_relative_account_history(name, stop, std::min<uint32_t>(100, limit), start);
+      vector <operation_history_object> current = my->_remote_hist->get_relative_account_history(always_id, stop, std::min<uint32_t>(100, limit), start);
       for (auto &o : current) {
          std::stringstream ss;
          auto memo = o.op.visit(detail::operation_printer(ss, *my, o.result));
