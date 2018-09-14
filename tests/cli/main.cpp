@@ -56,7 +56,7 @@
 #include <boost/test/included/unit_test.hpp>
 
 /*****
- * Boost Global Initialization for Windows
+ * Global Initialization for Windows
  * ( sets up Winsock stuf )
  */
 #ifdef _WIN32
@@ -69,11 +69,6 @@ int sockQuit(void)
 {
    return WSACleanup();
 }
-class MyInitialization {
-   MyInitialization() { sockInit();}
-   ~MyInitialization() { sockQuit();}
-};
-BOOST_GLOBAL_FIXTURE( MyInitialization )
 #endif
 
 /*********************
@@ -125,6 +120,9 @@ std::shared_ptr<graphene::app::application> start_application(fc::temp_directory
    app1->register_plugin< graphene::grouped_orders::grouped_orders_plugin>();
    app1->startup_plugins();
    boost::program_options::variables_map cfg;
+#ifdef _WIN32
+   sockInit();
+#endif
    server_port_number = get_available_port();
    cfg.emplace(
       "rpc-endpoint", 
@@ -286,6 +284,9 @@ struct cli_fixture
       fc::usleep(fc::seconds(1));
         
       app1->shutdown();
+#ifdef _WIN32
+      sockQuit();
+#endif
    }
 };
 
