@@ -2986,6 +2986,14 @@ vector<operation_detail> wallet_api::get_account_history(string name, int limit)
 {
    vector<operation_detail> result;
 
+   /*
+    * Compatibility issue
+    * Current Date: 2018-09-14 More info: https://github.com/bitshares/bitshares-core/issues/1307
+    * Todo: remove the next 2 lines and change always_id to name in remote call after next hardfork
+    */
+   auto account = get_account(name);
+   auto always_id = my->account_id_to_string(account.id);
+
    while( limit > 0 )
    {
       bool skip_first_row = false;
@@ -3004,14 +3012,6 @@ vector<operation_detail> wallet_api::get_account_history(string name, int limit)
       }
 
       int page_limit = skip_first_row ? std::min( 100, limit + 1 ) : std::min( 100, limit );
-
-      /*
-       * Compatibility issue
-       * Current Date: 2018-09-14 More info: https://github.com/bitshares/bitshares-core/issues/1307
-       * Todo: remove the next 2 lines and change always_id to name in remote call after next hardfork
-       */
-      auto account = get_account(name);
-      auto always_id = my->account_id_to_string(account.id);
 
       vector<operation_history_object> current = my->_remote_hist->get_account_history( always_id, operation_history_id_type(),
                                                                                         page_limit, start );
