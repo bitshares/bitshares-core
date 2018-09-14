@@ -283,6 +283,9 @@ static void create_new_config_file(const fc::path& config_ini_path, const fc::pa
       out_cfg << "\n";
    }
 
+   out_cfg << "\n"
+           << "# Logging configuration is loaded from logging.ini by default.\n"
+           << "# If logging.ini exists, logging configuration added in this file will be ignored.\n";
    out_cfg.close();
 }
 
