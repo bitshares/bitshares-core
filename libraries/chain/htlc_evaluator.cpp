@@ -56,10 +56,25 @@ namespace graphene {
                 esc.preimage_hash		   = o.key_hash;
                 esc.preimage_size		   = o.key_size;
                 esc.expiration		      = o.epoch;
+                esc.preimage_hash_algorithm = o.hash_type;
              });
              return  esc.id;
 
           } FC_CAPTURE_AND_RETHROW( (o) )
+      }
+
+      template<typename T>
+      bool test_hash(const std::vector<unsigned char>& incoming_preimage, const std::vector<unsigned char>& valid_hash)
+      {
+         T attempted_hash = T::hash(incoming_preimage);
+         if (attempted_hash.data_size() != valid_hash.size())
+            return false;
+         for(size_t i = 0; i < attempted_hash.data_size(); ++i)
+         {
+            if (attempted_hash.data()[i] != valid_hash[i])
+               return false;
+         }
+         return true;
       }
 
       void_result htlc_update_evaluator::do_evaluate(const htlc_update_operation& o)
@@ -69,25 +84,21 @@ namespace graphene {
     	  // TODO: Use signatures to determine what to do, not whether preimage was provided
     	  if (o.preimage.size() > 0)
     	  {
-    		  FC_ASSERT(o.preimage.size() == htlc_obj->preimage_size, "Preimage size mismatch.");
-    		  FC_ASSERT(fc::time_point::now().sec_since_epoch() < htlc_obj->expiration.sec_since_epoch(), "Preimage provided after escrow expiration.");
+    		   FC_ASSERT(o.preimage.size() == htlc_obj->preimage_size, "Preimage size mismatch.");
+    		   FC_ASSERT(fc::time_point::now().sec_since_epoch() < htlc_obj->expiration.sec_since_epoch(), "Preimage provided after escrow expiration.");
 
-    		  // hash the preimage given by the user
-    		  fc::sha256 attempted_hash = fc::sha256::hash(o.preimage);
-    		  // put the preimage hash in a format we can compare
-    		  std::vector<unsigned char> passed_hash(attempted_hash.data_size());
-    		  char* data = attempted_hash.data();
-    		  for(size_t i = 0; i < attempted_hash.data_size(); ++i)
-    		  {
-    			  passed_hash[i] = data[i];
-    		  }
+    		   // see if the preimages match
+            bool match = false;
+            if (htlc_obj->preimage_hash_algorithm == graphene::chain::htlc_object::hash_algorithm::SHA256)
+               match = test_hash<fc::sha256>(o.preimage, htlc_obj->preimage_hash);
+            if (htlc_obj->preimage_hash_algorithm == graphene::chain::htlc_object::hash_algorithm::RIPEMD160)
+               match = test_hash<fc::ripemd160>(o.preimage, htlc_obj->preimage_hash);
 
-    		  FC_ASSERT(passed_hash == htlc_obj->preimage_hash, "Provided preimage does not generate correct hash.");
+    		  FC_ASSERT(match, "Provided preimage does not generate correct hash.");
     	  }
     	  else
     	  {
     		  FC_ASSERT(fc::time_point::now().sec_since_epoch() > htlc_obj->expiration.sec_since_epoch(), "Unable to reclaim until escrow expiration.");
-    		  FC_ASSERT(htlc_obj->preimage.size() == 0, "Preimage already provided.");
     	  }
     	  return void_result();
       }
@@ -97,9 +108,7 @@ namespace graphene {
     	  if (o.preimage.size() > 0)
     	  {
     		  db().adjust_balance(htlc_obj->to, htlc_obj->amount);
-    		  db().modify(*htlc_obj, [&o](htlc_object& obj){
-    			  obj.preimage = o.preimage;
-    		  });
+    		  db().remove(*htlc_obj);
     	  }
     	  else
     	  {

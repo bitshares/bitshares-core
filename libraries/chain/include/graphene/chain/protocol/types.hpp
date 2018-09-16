@@ -163,7 +163,7 @@ namespace graphene { namespace chain {
       impl_buyback_object_type,
       impl_fba_accumulator_object_type,
       impl_collateral_bid_object_type,
-      impl_htlc_object_type
+      impl_htlc_object_type,
    };
 
    //typedef fc::unsigned_int            object_id_type;
@@ -236,7 +236,7 @@ namespace graphene { namespace chain {
    typedef object_id< implementation_ids, impl_buyback_object_type, buyback_object >                                    buyback_id_type;
    typedef object_id< implementation_ids, impl_fba_accumulator_object_type, fba_accumulator_object >                    fba_accumulator_id_type;
    typedef object_id< implementation_ids, impl_collateral_bid_object_type, collateral_bid_object >                      collateral_bid_id_type;
-   typedef object_id< implementation_ids, impl_htlc_object_type, htlc_object >                                          htlc_id_type;
+   typedef object_id< implementation_ids, impl_htlc_object_type,               htlc_object>                             htlc_id_type;
 
    typedef fc::ripemd160                                        block_id_type;
    typedef fc::ripemd160                                        checksum_type;

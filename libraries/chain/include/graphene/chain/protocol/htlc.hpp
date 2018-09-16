@@ -36,16 +36,12 @@ namespace graphene {
          struct fee_parameters_type {
             uint64_t fee            = 1 * GRAPHENE_BLOCKCHAIN_PRECISION;
          };
-         enum hash_algorithm {
-            UNKNOWN,
-            RIPEMD160,
-            SHA256
-         };
     	   asset fee; // paid to network
     	   account_id_type source; // where the held monies are to come from
     	   account_id_type destination; // where the held monies will go if the preimage is provided
     	   asset amount; // the amount to hold
-         enum hash_algorithm hash_type = hash_algorithm::UNKNOWN; // hash algorithm used to create key_hash
+         enum graphene::chain::htlc_object::hash_algorithm hash_type 
+               = graphene::chain::htlc_object::hash_algorithm::UNKNOWN; // hash algorithm used to create key_hash
     	   std::vector<unsigned char> key_hash; // the hash of the preimage
     	   uint16_t key_size; // the size of the preimage
     	   fc::time_point_sec epoch; // The time the funds will be returned to the source if not claimed

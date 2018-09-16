@@ -49,6 +49,7 @@
    #include <netinet/ip.h>
    #include <sys/types.h>
 #endif
+#include <thread>
 
 #include <boost/filesystem/path.hpp>
 
@@ -143,13 +144,15 @@ std::shared_ptr<graphene::app::application> start_application(fc::temp_directory
 ///////////
 /// Send a block to the db
 /// @param app the application
+/// @param returned_block the signed block
 /// @returns true on success
 ///////////
-bool generate_block(std::shared_ptr<graphene::app::application> app) {
+bool generate_block(std::shared_ptr<graphene::app::application> app, graphene::chain::signed_block& returned_block) 
+{
    try {
       fc::ecc::private_key committee_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("nathan")));
       auto db = app->chain_database();
-      auto block_1 = db->generate_block( db->get_slot_time(1),
+      returned_block = db->generate_block( db->get_slot_time(1),
                                          db->get_scheduled_witness(1),
                                          committee_key,
                                          database::skip_nothing );
@@ -157,6 +160,12 @@ bool generate_block(std::shared_ptr<graphene::app::application> app) {
    } catch (exception &e) {
       return false;
    }
+}
+
+bool generate_block(std::shared_ptr<graphene::app::application> app) 
+{
+   graphene::chain::signed_block returned_block;
+   return generate_block(app, returned_block);
 }
 
 ///////////
@@ -609,43 +618,75 @@ BOOST_AUTO_TEST_CASE( cli_create_htlc )
             (nathan_acct_after_upgrade.membership_expiration_date.sec_since_epoch()) );
       BOOST_CHECK(nathan_acct_after_upgrade.is_lifetime_member());
 
-      // create a new account for alice
-      graphene::wallet::brain_key_info bki = con.wallet_api_ptr->suggest_brain_key();
-      BOOST_CHECK(!bki.brain_priv_key.empty());
-      signed_transaction create_acct_tx = con.wallet_api_ptr->create_account_with_brain_key(bki.brain_priv_key, "alice", 
-            "nathan", "nathan", true);
-      // save the private key for this new account in the wallet file
-      BOOST_CHECK(con.wallet_api_ptr->import_key("alice", bki.wif_priv_key));
-      con.wallet_api_ptr->save_wallet_file(con.wallet_filename);
+      // create a new account for Alice
+      {
+         graphene::wallet::brain_key_info bki = con.wallet_api_ptr->suggest_brain_key();
+         BOOST_CHECK(!bki.brain_priv_key.empty());
+         signed_transaction create_acct_tx = con.wallet_api_ptr->create_account_with_brain_key(bki.brain_priv_key, "alice", 
+               "nathan", "nathan", true);
+         // save the private key for this new account in the wallet file
+         BOOST_CHECK(con.wallet_api_ptr->import_key("alice", bki.wif_priv_key));
+         con.wallet_api_ptr->save_wallet_file(con.wallet_filename);
+      }
+
+      // create a new account for Bob
+      {
+         graphene::wallet::brain_key_info bki = con.wallet_api_ptr->suggest_brain_key();
+         BOOST_CHECK(!bki.brain_priv_key.empty());
+         signed_transaction create_acct_tx = con.wallet_api_ptr->create_account_with_brain_key(bki.brain_priv_key, "bob", 
+               "nathan", "nathan", true);
+         // save the private key for this new account in the wallet file
+         BOOST_CHECK(con.wallet_api_ptr->import_key("bob", bki.wif_priv_key));
+         con.wallet_api_ptr->save_wallet_file(con.wallet_filename);
+      }
 
       // attempt to give alice some bitsahres
       BOOST_TEST_MESSAGE("Transferring bitshares from Nathan to alice");
       signed_transaction transfer_tx = con.wallet_api_ptr->transfer("nathan", "alice", "10000", "1.3.0", 
             "Here are some CORE token for your new account", true);
 
+      BOOST_TEST_MESSAGE("Creating HTLC");
       // create an HTLC
       std::string preimage_string = "My Secret";
-      fc::ripemd160 preimage = fc::ripemd160::hash(preimage_string);
-      std::vector<unsigned char> hash(preimage.data_size());
-      for(size_t i = 0; i < preimage.data_size(); ++i)
-         hash[i] = preimage.data()[i];
+      fc::ripemd160 preimage_md = fc::ripemd160::hash(preimage_string);
+      std::vector<unsigned char> hash(preimage_md.data_size());
+      for(size_t i = 0; i < preimage_md.data_size(); ++i)
+         hash[i] = preimage_md.data()[i];
       fc::time_point_sec timelock = fc::time_point::now() + fc::days(1);
       graphene::chain::signed_transaction result_tx 
-            = con.wallet_api_ptr->create_htlc("alice", "nathan", 
-            "1.3.0", "1000", "RIPEMD160", hash, preimage.data_size(), timelock, true);
+            = con.wallet_api_ptr->create_htlc("alice", "bob", 
+            "1.3.0", "1000", "RIPEMD160", hash, preimage_string.size(), timelock, true);
 
-      // share the id with bob
-      graphene::chain::transaction_id_type htlc_trans_id = con.wallet_api_ptr->get_transaction_id(result_tx);
-      BOOST_TEST_MESSAGE("The hash is " + std::string(htlc_trans_id));
+      // normally, a wallet would watch block production, and find the transaction. Here, we can cheat:
+      BOOST_TEST_MESSAGE("Generating Block");
+      graphene::chain::signed_block result_block;
+      BOOST_CHECK(generate_block(app1, result_block));
+
+      // get the ID:
+      htlc_id_type htlc_id = result_block.transactions[5].operation_results[0].get<object_id_type>();
+      std::string htlc_id_as_string = fc::json::to_pretty_string(htlc_id);
+      BOOST_TEST_MESSAGE("The HTLC ID is: " + htlc_id_as_string);
+
+      // Bob can now look over Alice's HTLC
+      BOOST_TEST_MESSAGE("Retrieving HTLC Object by ID");
+      try
+      {
+         //con.wallet_api_ptr->get_object(htlc_id);
+         graphene::chain::htlc_object alice_htlc = con.wallet_api_ptr->get_htlc(htlc_id_as_string);
+         BOOST_TEST_MESSAGE("The HTLC Object is: " + fc::json::to_pretty_string(alice_htlc));
+      }
+      catch(std::exception& e)
+      {
+         BOOST_FAIL(e.what());
+      }
+      catch(...)
+      {
+         BOOST_FAIL("Unknown exception attempting to retrieve HTLC");
+      }
+
+      // TODO: API for Bob to claim the funds by giving the preimage
+      // TODO: Clean the HTLC object (no need to have preimage stored there, nor reference to claim tx)
       
-      // generate a block to get things started
-      BOOST_CHECK(generate_block(app1));
-      // wait for a maintenance interval
-      BOOST_CHECK(generate_maintenance_block(app1));
-
-      // send another block to trigger maintenance interval
-      BOOST_CHECK(generate_maintenance_block(app1));
-
       // wait for everything to finish up
       fc::usleep(fc::seconds(1));
    } catch( fc::exception& e ) {

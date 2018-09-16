@@ -35,6 +35,7 @@
 #include <boost/range/iterator_range.hpp>
 #include <boost/rational.hpp>
 #include <boost/multiprecision/cpp_int.hpp>
+#include <boost/algorithm/string.hpp>
 
 #include <cctype>
 
@@ -2300,13 +2301,37 @@ vector<withdraw_permission_object> database_api_impl::get_withdraw_permissions_b
 // Escrow / HTLC                                                    //
 //                                                                  //
 //////////////////////////////////////////////////////////////////////
+htlc_id_type htlc_string_to_id(std::string incoming)
+{
+   boost::replace_all(incoming, "\"", "");
+   boost::replace_all(incoming, ".", ",");
+   std::stringstream ss(incoming);
+   htlc_id_type id;
+   int i;
+   int pos = 0;
+   while(ss >> i)
+   {
+      if (pos == 0 && i != id.space_id)
+         FC_ASSERT("Invalid HTLC ID");
+      if (pos == 1 && i != id.type_id)
+         FC_ASSERT("Invalid HTLC ID");
+      if (pos == 2)
+         id.instance = i;
+      pos++;
+      if (ss.peek() == ',')
+         ss.ignore();
+   }
+   return id;
+}
+
 fc::optional<htlc_object> database_api_impl::get_htlc(const std::string htlc_id) const
 {
-   FC_ASSERT( htlc_id.size() > 0 );
-   const htlc_object* htlc = _db.find(fc::variant(htlc_id, 1).as<htlc_id_type>(1));
-   if (htlc)
-      return *htlc;
-   return {};
+   htlc_id_type id = htlc_string_to_id(htlc_id);
+   const auto& htlc_idx = _db.get_index_type<htlc_index>().indices().get<by_id>();
+   auto itr = htlc_idx.find(id);
+   if (itr == htlc_idx.end())
+      return {};
+   return (*itr);      
 }
 
 //////////////////////////////////////////////////////////////////////

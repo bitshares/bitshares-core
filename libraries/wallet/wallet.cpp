@@ -1759,10 +1759,10 @@ public:
          create_op.key_hash = preimage_hash;
          create_op.key_size = preimage_size;
          if ( "SHA256" == hash_algorithm )
-            create_op.hash_type = htlc_create_operation::hash_algorithm::SHA256;
+            create_op.hash_type = htlc_object::hash_algorithm::SHA256;
          if ( "RIPEMD160" == hash_algorithm )
-            create_op.hash_type = htlc_create_operation::hash_algorithm::RIPEMD160;
-         FC_ASSERT(create_op.hash_type != htlc_create_operation::hash_algorithm::UNKNOWN, 
+            create_op.hash_type = htlc_object::hash_algorithm::RIPEMD160;
+         FC_ASSERT(create_op.hash_type != htlc_object::hash_algorithm::UNKNOWN, 
                "Unknown hash algorithm: ${algo}", ("algo", hash_algorithm));
 
          signed_transaction tx;
@@ -3082,6 +3082,11 @@ signed_transaction wallet_api::create_htlc( string source, string destination, s
 {
    return my->create_htlc(source, destination, asset_symbol, amount, hash_algorithm, preimage_hash, preimage_size,
          timelock, broadcast);
+}
+
+graphene::chain::htlc_object wallet_api::get_htlc(std::string htlc_id) const
+{
+   return my->get_htlc(htlc_id);
 }
 
 vector<operation_detail> wallet_api::get_account_history(string name, int limit)const

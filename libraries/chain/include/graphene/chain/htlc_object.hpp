@@ -40,14 +40,20 @@ namespace graphene { namespace chain {
             static const uint8_t space_id = implementation_ids;
             static const uint8_t type_id  = impl_htlc_object_type;
 
+            enum hash_algorithm {
+               UNKNOWN,
+               RIPEMD160,
+               SHA256
+            };
+
             account_id_type         from;
             account_id_type         to;
             asset                   amount;
             fc::time_point_sec      expiration;
             asset                   pending_fee;
             vector<unsigned char>	preimage_hash;
+            enum hash_algorithm     preimage_hash_algorithm;
             uint16_t				      preimage_size;
-            vector<unsigned char>	preimage;
       };
 
       struct by_from_id;
@@ -72,6 +78,8 @@ namespace graphene { namespace chain {
 
    } }
 
+FC_REFLECT_ENUM( graphene::chain::htlc_object::hash_algorithm, (UNKNOWN)(RIPEMD160)(SHA256));
+
 FC_REFLECT_DERIVED( graphene::chain::htlc_object, (graphene::db::object),
                     (from)(to)(amount)(expiration)(pending_fee)
-					(preimage_hash)(preimage_size)(preimage) );
+					(preimage_hash)(preimage_hash_algorithm)(preimage_size) );
