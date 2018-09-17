@@ -85,6 +85,8 @@ void database::reindex( fc::path data_dir )
 
    size_t total_processed_block_size;
    size_t total_block_size = _block_id_to_block.total_block_size();
+   const auto& gpo = get_global_properties();
+   const fc::time_point_sec now( fc::time_point::now() );
    for( uint32_t i = head_block_num() + 1; i <= last_block_num; ++i )
    {
       if( i % 10000 == 0 ) 
@@ -107,6 +109,8 @@ void database::reindex( fc::path data_dir )
          flush();
          ilog( "Done" );
       }
+      if( head_block_time() >= now - gpo.parameters.maximum_time_until_expiration )
+         skip &= ~skip_transaction_dupe_check;
       fc::optional< signed_block > block = _block_id_to_block.fetch_by_number(i);
       if( !block.valid() )
       {
