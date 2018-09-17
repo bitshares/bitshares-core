@@ -199,7 +199,7 @@ namespace graphene { namespace app {
           * @param a asset in pair
           * @param b asset in pair
           * @param bucket_seconds Represents the length in seconds of bucket.
-          * Note that bucket_seconds need to be within result, otherwise no data will be returned
+          * Note that bucket_seconds need to be within result of get_market_history_buckets(), otherwise no data will be returned
           * @param start Time point in seconds from where buckets begin, E.G. "YYYY-MM-DDThh:mm:ss"
           * @param end Time point in seconds where buckets stop, E.G. "YYYY-MM-DDThh:mm:ss"
           * @return A history in market with b:a pair (limit to retrieve is less than 200 buckets)
