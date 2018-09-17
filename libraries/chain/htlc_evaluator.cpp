@@ -69,8 +69,7 @@ namespace graphene {
       bool test_hash(const std::vector<unsigned char>& incoming_preimage, const std::vector<unsigned char>& valid_hash)
       {
          std::string incoming_string(incoming_preimage.begin(), incoming_preimage.end());
-         //T attempted_hash = T::hash(incoming_string);
-         fc::ripemd160 attempted_hash = fc::ripemd160::hash(incoming_string);
+         T attempted_hash = T::hash(incoming_string);
          if (attempted_hash.data_size() != valid_hash.size())
             return false;
          char* data = attempted_hash.data();
