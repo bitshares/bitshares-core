@@ -1469,8 +1469,8 @@ class wallet_api
        * @param broadcast true if you wish to broadcast the transaction
        */
       signed_transaction create_htlc( string source, string destination, string asset_symbol, string amount,
-         string hash_algorithm, std::vector<unsigned char> preimage_hash, size_t preimage_size, 
-         fc::time_point_sec timelock, bool broadcast = false );
+         string hash_algorithm, const std::vector<unsigned char>& preimage_hash, size_t preimage_size, 
+         const fc::time_point_sec& timelock, bool broadcast = false );
 
       /****
        * Update a hashed time lock contract
@@ -1479,7 +1479,7 @@ class wallet_api
        * @param issuer Who is performing this operation (and paying the fee)
        * @param preimage the preimage that should evaluate to the preimage_hash
        */
-      signed_transaction update_htlc( string htlc_id, string issuer, std::vector<unsigned char> preimage, 
+      signed_transaction update_htlc( string htlc_id, string issuer, const std::vector<unsigned char>& preimage, 
          bool broadcast = false );
 
       /**

@@ -1743,7 +1743,8 @@ public:
    }
 
    signed_transaction create_htlc( string source, string destination, string asset_symbol, string amount,
-         string hash_algorithm, std::vector<unsigned char> preimage_hash, size_t preimage_size, fc::time_point_sec timelock, bool broadcast = false )
+         string hash_algorithm, const std::vector<unsigned char>& preimage_hash, size_t preimage_size, 
+         const fc::time_point_sec& timelock, bool broadcast = false )
    {
       try 
       {
@@ -1759,10 +1760,10 @@ public:
          create_op.key_hash = preimage_hash;
          create_op.key_size = preimage_size;
          if ( "SHA256" == hash_algorithm )
-            create_op.hash_type = htlc_object::hash_algorithm::SHA256;
+            create_op.hash_type = hash_algorithm::sha256;
          if ( "RIPEMD160" == hash_algorithm )
-            create_op.hash_type = htlc_object::hash_algorithm::RIPEMD160;
-         FC_ASSERT(create_op.hash_type != htlc_object::hash_algorithm::UNKNOWN, 
+            create_op.hash_type = hash_algorithm::ripemd160;
+         FC_ASSERT(create_op.hash_type != hash_algorithm::unknown, 
                "Unknown hash algorithm: ${algo}", ("algo", hash_algorithm));
 
          signed_transaction tx;
@@ -1775,7 +1776,7 @@ public:
             (preimage_hash)(preimage_size)(timelock)(broadcast) ) 
    }
 
-   signed_transaction update_htlc( string htlc_id, string issuer, std::vector<unsigned char> preimage, bool broadcast )
+   signed_transaction update_htlc( string htlc_id, string issuer, const std::vector<unsigned char>& preimage, bool broadcast )
    {
       try 
       {
@@ -3077,8 +3078,8 @@ uint64_t wallet_api::get_asset_count()const
 }
 
 signed_transaction wallet_api::create_htlc( string source, string destination, string asset_symbol, string amount,
-         string hash_algorithm, std::vector<unsigned char> preimage_hash, size_t preimage_size, 
-         fc::time_point_sec timelock, bool broadcast)
+         string hash_algorithm, const std::vector<unsigned char>& preimage_hash, size_t preimage_size, 
+         const fc::time_point_sec& timelock, bool broadcast)
 {
    return my->create_htlc(source, destination, asset_symbol, amount, hash_algorithm, preimage_hash, preimage_size,
          timelock, broadcast);
@@ -3087,6 +3088,12 @@ signed_transaction wallet_api::create_htlc( string source, string destination, s
 graphene::chain::htlc_object wallet_api::get_htlc(std::string htlc_id) const
 {
    return my->get_htlc(htlc_id);
+}
+
+signed_transaction wallet_api::update_htlc( std::string htlc_id, std::string issuer, const std::vector<unsigned char>& preimage,
+      bool broadcast)
+{
+   return my->update_htlc(htlc_id, issuer, preimage, broadcast);
 }
 
 vector<operation_detail> wallet_api::get_account_history(string name, int limit)const

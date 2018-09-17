@@ -32,33 +32,33 @@
 
 namespace graphene { namespace chain {
 
-      /**
-       * Temporally save escrow transactions until funds are released or operation expired.
-       */
-      class htlc_object : public graphene::db::abstract_object<htlc_object> {
-         public:
-            static const uint8_t space_id = implementation_ids;
-            static const uint8_t type_id  = impl_htlc_object_type;
+   enum hash_algorithm {
+      unknown = 0x00,
+      ripemd160 = 0x01,
+      sha256 = 0x02
+   };
+   
+   /**
+    * Temporally save escrow transactions until funds are released or operation expired.
+    */
+   class htlc_object : public graphene::db::abstract_object<htlc_object> {
+      public:
+         static const uint8_t space_id = implementation_ids;
+         static const uint8_t type_id  = impl_htlc_object_type;
 
-            enum hash_algorithm {
-               UNKNOWN,
-               RIPEMD160,
-               SHA256
-            };
+         account_id_type         from;
+         account_id_type         to;
+         asset                   amount;
+         fc::time_point_sec      expiration;
+         asset                   pending_fee;
+         vector<unsigned char>	preimage_hash;
+         fc::enum_type<uint8_t, hash_algorithm> preimage_hash_algorithm;
+         uint16_t				      preimage_size;
+   };
 
-            account_id_type         from;
-            account_id_type         to;
-            asset                   amount;
-            fc::time_point_sec      expiration;
-            asset                   pending_fee;
-            vector<unsigned char>	preimage_hash;
-            enum hash_algorithm     preimage_hash_algorithm;
-            uint16_t				      preimage_size;
-      };
-
-      struct by_from_id;
-      struct by_expiration;
-      typedef multi_index_container<
+   struct by_from_id;
+   struct by_expiration;
+   typedef multi_index_container<
          htlc_object,
          indexed_by<
             ordered_unique< tag< by_id >, member< object, object_id_type, &object::id > >,
@@ -72,14 +72,14 @@ namespace graphene { namespace chain {
             >
          >
 
-      > htlc_object_index_type;
+   > htlc_object_index_type;
 
-      typedef generic_index< htlc_object, htlc_object_index_type > htlc_index;
+   typedef generic_index< htlc_object, htlc_object_index_type > htlc_index;
 
-   } }
+} }
 
-FC_REFLECT_ENUM( graphene::chain::htlc_object::hash_algorithm, (UNKNOWN)(RIPEMD160)(SHA256));
+FC_REFLECT_ENUM( graphene::chain::hash_algorithm, (unknown)(ripemd160)(sha256));
 
 FC_REFLECT_DERIVED( graphene::chain::htlc_object, (graphene::db::object),
-                    (from)(to)(amount)(expiration)(pending_fee)
+               (from)(to)(amount)(expiration)(pending_fee)
 					(preimage_hash)(preimage_hash_algorithm)(preimage_size) );

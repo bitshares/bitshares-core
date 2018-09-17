@@ -36,8 +36,10 @@ namespace graphene {
           //           "Operation not allowed before HARDFORK_ESCROW_TIME."); // remove after HARDFORK_ESCROW_TIME
 
           FC_ASSERT( fc::time_point_sec(o.epoch) > db().head_block_time() );
-          // TODO: what is the fee denominated in?
-          FC_ASSERT( db().get_balance( o.source, o.amount.asset_id ) >= (o.amount + o.fee) );
+          // make sure we have the funds for the HTLC
+          FC_ASSERT( db().get_balance( o.source, o.amount.asset_id ) >= (o.amount ) );
+          // make sure we have the funds for the fee
+          FC_ASSERT( db().get_balance( o.source, asset().asset_id) > o.fee );
           return void_result();
       }
 
@@ -66,12 +68,15 @@ namespace graphene {
       template<typename T>
       bool test_hash(const std::vector<unsigned char>& incoming_preimage, const std::vector<unsigned char>& valid_hash)
       {
-         T attempted_hash = T::hash(incoming_preimage);
+         std::string incoming_string(incoming_preimage.begin(), incoming_preimage.end());
+         //T attempted_hash = T::hash(incoming_string);
+         fc::ripemd160 attempted_hash = fc::ripemd160::hash(incoming_string);
          if (attempted_hash.data_size() != valid_hash.size())
             return false;
+         char* data = attempted_hash.data();
          for(size_t i = 0; i < attempted_hash.data_size(); ++i)
          {
-            if (attempted_hash.data()[i] != valid_hash[i])
+            if ( ((unsigned char)data[i]) != valid_hash[i])
                return false;
          }
          return true;
@@ -89,9 +94,9 @@ namespace graphene {
 
     		   // see if the preimages match
             bool match = false;
-            if (htlc_obj->preimage_hash_algorithm == graphene::chain::htlc_object::hash_algorithm::SHA256)
+            if (htlc_obj->preimage_hash_algorithm == graphene::chain::hash_algorithm::sha256)
                match = test_hash<fc::sha256>(o.preimage, htlc_obj->preimage_hash);
-            if (htlc_obj->preimage_hash_algorithm == graphene::chain::htlc_object::hash_algorithm::RIPEMD160)
+            if (htlc_obj->preimage_hash_algorithm == graphene::chain::hash_algorithm::ripemd160)
                match = test_hash<fc::ripemd160>(o.preimage, htlc_obj->preimage_hash);
 
     		  FC_ASSERT(match, "Provided preimage does not generate correct hash.");
@@ -105,16 +110,8 @@ namespace graphene {
 
       void_result htlc_update_evaluator::do_apply(const htlc_update_operation& o)
       {
-    	  if (o.preimage.size() > 0)
-    	  {
-    		  db().adjust_balance(htlc_obj->to, htlc_obj->amount);
-    		  db().remove(*htlc_obj);
-    	  }
-    	  else
-    	  {
-    		  db().adjust_balance(htlc_obj->from, htlc_obj->amount);
-    		  db().remove(*htlc_obj);
-    	  }
+ 		  db().adjust_balance(htlc_obj->to, htlc_obj->amount);
+  		  db().remove(*htlc_obj);
     	  return void_result();
       }
    } // namespace chain

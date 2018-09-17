@@ -40,8 +40,8 @@ namespace graphene {
     	   account_id_type source; // where the held monies are to come from
     	   account_id_type destination; // where the held monies will go if the preimage is provided
     	   asset amount; // the amount to hold
-         enum graphene::chain::htlc_object::hash_algorithm hash_type 
-               = graphene::chain::htlc_object::hash_algorithm::UNKNOWN; // hash algorithm used to create key_hash
+         fc::enum_type<uint8_t, graphene::chain::hash_algorithm> hash_type 
+               = graphene::chain::hash_algorithm::unknown; // hash algorithm used to create key_hash
     	   std::vector<unsigned char> key_hash; // the hash of the preimage
     	   uint16_t key_size; // the size of the preimage
     	   fc::time_point_sec epoch; // The time the funds will be returned to the source if not claimed
@@ -74,5 +74,5 @@ namespace graphene {
 FC_REFLECT( graphene::chain::htlc_create_operation::fee_parameters_type, (fee) )
 FC_REFLECT( graphene::chain::htlc_update_operation::fee_parameters_type, (fee) )
 
-FC_REFLECT( graphene::chain::htlc_create_operation, (fee)(source)(destination)(amount)(key_hash)(key_size)(epoch)(extensions))
-FC_REFLECT( graphene::chain::htlc_update_operation, (fee)(update_issuer)(preimage)(extensions))
+FC_REFLECT( graphene::chain::htlc_create_operation, (fee)(source)(destination)(amount)(key_hash)(key_size)(epoch)(extensions)(hash_type))
+FC_REFLECT( graphene::chain::htlc_update_operation, (fee)(htlc_id)(update_issuer)(preimage)(extensions))
