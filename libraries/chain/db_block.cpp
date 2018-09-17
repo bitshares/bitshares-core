@@ -626,9 +626,12 @@ processed_transaction database::_apply_transaction(const signed_transaction& trx
 
    auto& trx_idx = get_mutable_index_type<transaction_index>();
    const chain_id_type& chain_id = get_chain_id();
-   auto trx_id = trx.id();
-   FC_ASSERT( (skip & skip_transaction_dupe_check) ||
-              trx_idx.indices().get<by_trx_id>().find(trx_id) == trx_idx.indices().get<by_trx_id>().end() );
+   transaction_id_type trx_id;
+   if( !(skip & skip_transaction_dupe_check) )
+   {
+      trx_id = trx.id();
+      FC_ASSERT( trx_idx.indices().get<by_trx_id>().find(trx_id) == trx_idx.indices().get<by_trx_id>().end() );
+   }
    transaction_evaluation_state eval_state(this);
    const chain_parameters& chain_parameters = get_global_properties().parameters;
    eval_state._trx = &trx;
@@ -662,7 +665,7 @@ processed_transaction database::_apply_transaction(const signed_transaction& trx
    //Insert transaction into unique transactions database.
    if( !(skip & skip_transaction_dupe_check) )
    {
-      create<transaction_object>([&](transaction_object& transaction) {
+      create<transaction_object>([&trx_id,&trx](transaction_object& transaction) {
          transaction.trx_id = trx_id;
          transaction.trx = trx;
       });
