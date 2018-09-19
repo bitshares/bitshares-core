@@ -82,14 +82,13 @@ void database::reindex( fc::path data_dir )
                    skip_witness_schedule_check |
                    skip_authority_check;
 
-   uint64_t total_processed_block_size;
-   uint64_t total_block_size;
+   size_t total_processed_block_size;
+   size_t total_block_size = _block_id_to_block.total_block_size();
    for( uint32_t i = head_block_num() + 1; i <= last_block_num; ++i )
    {
       if( i % 10000 == 0 ) 
       {
-         total_processed_block_size = _block_id_to_block.total_processed_block_size();
-         total_block_size = _block_id_to_block.total_block_size();
+         total_processed_block_size = _block_id_to_block.blocks_current_position();
 
          std::cerr << "   "
                    << double(total_processed_block_size*100) / total_block_size << "%   " 
