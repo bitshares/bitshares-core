@@ -91,9 +91,9 @@ void database::reindex( fc::path data_dir )
          total_processed_block_size = _block_id_to_block.total_processed_block_size();
          total_block_size = _block_id_to_block.total_block_size();
 
-         std::cerr << "   " << 
-            double(total_processed_block_size*100) / total_block_size << "%   " << 
-            total_processed_block_size << " of " <<  total_block_size << "   \n";
+         std::cerr << "   "
+                   << double(total_processed_block_size*100) / total_block_size << "%   " 
+                   << total_processed_block_size << " of " <<  total_block_size << "   \n";
       }
       if( i == flush_point )
       {
