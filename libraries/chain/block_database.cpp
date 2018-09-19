@@ -271,4 +271,16 @@ optional<block_id_type> block_database::last_id()const
    return optional<block_id_type>();
 }
 
+uint64_t block_database::total_processed_block_size()const
+{
+   _blocks.seekg( 0, _blocks.cur );
+   return (uint64_t)_blocks.tellg();
+}
+
+uint64_t block_database::total_block_size()const
+{
+   _blocks.seekg( 0, _blocks.end );
+   return (uint64_t)_blocks.tellg();
+}
+
 } }
