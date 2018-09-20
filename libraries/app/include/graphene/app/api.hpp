@@ -185,11 +185,11 @@ namespace graphene { namespace app {
                                                                         unsigned limit = 100,
                                                                         uint32_t start = 0) const;
          /**
-          * @brief Get trading orders with b:a pair
+          * @brief Get matching orders with b:a pair
           * @param a asset in pair
           * @param b asset in pair
-          * @param limit Maximum count of trading orders to retrieve
-          * @return Trading orders with b:a pair
+          * @param limit Maximum count of matching orders to retrieve with b:a pair
+          * @return Matching orders with b:a pair
           */
          vector<order_history_object> get_fill_order_history( asset_id_type a, asset_id_type b, uint32_t limit )const;
 
@@ -208,7 +208,7 @@ namespace graphene { namespace app {
                                                    fc::time_point_sec start, fc::time_point_sec end )const;
 
          /**
-          * @brief Get list of seconds for grouping a trading orders in OHLC
+          * @brief Get list of seconds for grouping matching orders in OHLC
           * @return A list of seconds as unsigned integers. The list comes from program options or from config file.
           */                                          
          flat_set<uint32_t> get_market_history_buckets()const;
