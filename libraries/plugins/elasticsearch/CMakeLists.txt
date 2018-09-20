@@ -6,7 +6,7 @@ add_library( graphene_elasticsearch
 find_package(CURL REQUIRED)
 include_directories(${CURL_INCLUDE_DIRS})
 if(MSVC)
-   set_source_files_properties(elasticsearch_plugin.cpp PROPERTIES COMPILE_FLAGS "/bigobj" )
+  set_source_files_properties(elasticsearch_plugin.cpp PROPERTIES COMPILE_FLAGS "/bigobj" )
 endif(MSVC)
 if(CURL_STATICLIB)
   SET_TARGET_PROPERTIES(graphene_elasticsearch PROPERTIES
