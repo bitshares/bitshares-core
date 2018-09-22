@@ -485,7 +485,8 @@ bool database::apply_order(const limit_order_object& new_order_object, bool allo
             // hard fork core-338 and core-625 took place at same time, not checking HARDFORK_CORE_338_TIME here.
             int match_result = match( new_order_object, *call_itr, call_match_price,
                                       sell_abd->current_feed.settlement_price,
-                                      sell_abd->current_feed.maintenance_collateral_ratio );
+                                      sell_abd->current_feed.maintenance_collateral_ratio,
+                                      sell_abd->current_maintenance_collateralization );
             // match returns 1 or 3 when the new order was fully filled. In this case, we stop matching; otherwise keep matching.
             // since match can return 0 due to BSIP38 (hard fork core-834), we no longer only check if the result is 2.
             if( match_result == 1 || match_result == 3 )
@@ -509,7 +510,8 @@ bool database::apply_order(const limit_order_object& new_order_object, bool allo
             // assume hard fork core-338 and core-625 will take place at same time, not checking HARDFORK_CORE_338_TIME here.
             int match_result = match( new_order_object, *call_itr, call_match_price,
                                       sell_abd->current_feed.settlement_price,
-                                      sell_abd->current_feed.maintenance_collateral_ratio );
+                                      sell_abd->current_feed.maintenance_collateral_ratio,
+                                      optional<price>() );
             // match returns 1 or 3 when the new order was fully filled. In this case, we stop matching; otherwise keep matching.
             // since match can return 0 due to BSIP38 (hard fork core-834), we no longer only check if the result is 2.
             if( match_result == 1 || match_result == 3 )
@@ -615,7 +617,8 @@ int database::match( const limit_order_object& usd, const limit_order_object& co
 }
 
 int database::match( const limit_order_object& bid, const call_order_object& ask, const price& match_price,
-                     const price& feed_price, const uint16_t maintenance_collateral_ratio )
+                     const price& feed_price, const uint16_t maintenance_collateral_ratio,
+                     const optional<price>& maintenance_collateralization )
 {
    FC_ASSERT( bid.sell_asset_id() == ask.debt_type() );
    FC_ASSERT( bid.receive_asset_id() == ask.collateral_type() );
@@ -641,7 +644,10 @@ int database::match( const limit_order_object& bid, const call_order_object& ask
    // TODO if we're sure `before_core_hardfork_834` is always false, remove the check
    asset usd_to_buy   = ( before_core_hardfork_834 ?
                           ask.get_debt() :
-                          asset( ask.get_max_debt_to_cover( match_price, feed_price, maintenance_collateral_ratio ),
+                          asset( ask.get_max_debt_to_cover( match_price,
+                                                            feed_price,
+                                                            maintenance_collateral_ratio,
+                                                            maintenance_collateralization ),
                                  ask.debt_type() ) );
 
    asset call_pays, call_receives, order_pays, order_receives;
@@ -1067,10 +1073,19 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
           return true;
        }
 
-       if( !before_core_hardfork_834 )
+       if( !before_core_hardfork_1270 )
+       {
           usd_to_buy.amount = call_order.get_max_debt_to_cover( match_price,
-                                                               bitasset.current_feed.settlement_price,
-                                                               bitasset.current_feed.maintenance_collateral_ratio );
+                                                                bitasset.current_feed.settlement_price,
+                                                                bitasset.current_feed.maintenance_collateral_ratio,
+                                                                bitasset.current_maintenance_collateralization );
+       }
+       else if( !before_core_hardfork_834 )
+       {
+          usd_to_buy.amount = call_order.get_max_debt_to_cover( match_price,
+                                                                bitasset.current_feed.settlement_price,
+                                                                bitasset.current_feed.maintenance_collateral_ratio );
+       }
 
        asset usd_for_sale = limit_order.amount_for_sale();
        asset call_pays, call_receives, order_pays, order_receives;

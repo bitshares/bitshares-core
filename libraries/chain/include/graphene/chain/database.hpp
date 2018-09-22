@@ -352,8 +352,10 @@ namespace graphene { namespace chain {
           * This function takes a new limit order, and runs the markets attempting to match it with existing orders
           * already on the books.
           */
+         ///@{
          bool apply_order_before_hardfork_625(const limit_order_object& new_order_object, bool allow_black_swan = true);
          bool apply_order(const limit_order_object& new_order_object, bool allow_black_swan = true);
+         ///@}
 
          /**
           * Matches the two orders, the first parameter is taker, the second is maker.
@@ -368,14 +370,17 @@ namespace graphene { namespace chain {
          ///@{
          int match( const limit_order_object& taker, const limit_order_object& maker, const price& trade_price );
          int match( const limit_order_object& taker, const call_order_object& maker, const price& trade_price,
-                    const price& feed_price, const uint16_t maintenance_collateral_ratio );
+                    const price& feed_price, const uint16_t maintenance_collateral_ratio,
+                    const optional<price>& maintenance_collateralization );
+         ///@}
+
+         /// Matches the two orders, the first parameter is taker, the second is maker.
          /// @return the amount of asset settled
          asset match(const call_order_object& call,
                    const force_settlement_object& settle,
                    const price& match_price,
                    asset max_settlement,
                    const price& fill_price);
-         ///@}
 
          /**
           * @return true if the order was completely filled and thus freed.
@@ -395,6 +400,7 @@ namespace graphene { namespace chain {
 
          asset calculate_market_fee(const asset_object& recv_asset, const asset& trade_amount);
          asset pay_market_fees( const asset_object& recv_asset, const asset& receives );
+         ///@}
 
 
          ///@{
