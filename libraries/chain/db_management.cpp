@@ -252,7 +252,7 @@ void database::close(bool rewind)
    // are disadvantages like: performance overhead, exceptions aren't supported by all platforms,                    //
    // the biggest drawback is that handling exceptions is not enforced by the type-system.                           //
    // Unlike, Java, for example, where exceptions must be caught by the caller,                                      //
-   // catching a C++ exception is optional. his means spotting all the unhandled exceptions during a code review     //
+   // catching a C++ exception is optional. This means spotting all the unhandled exceptions during a code review    //
    // will be challenging, and requires deep knowledge of all of the functions called.                               //
    // Consider using an Either type to handle errors. They lift the error into the type-system,                      //
    // making them safer than exceptions whilst yielding the same performance characteristics as error-codes.         //
