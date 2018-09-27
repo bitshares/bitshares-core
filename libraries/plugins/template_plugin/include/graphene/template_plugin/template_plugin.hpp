@@ -40,7 +40,7 @@ using namespace chain;
 // time.
 //
 #ifndef template_plugin_SPACE_ID
-#define template_plugin_SPACE_ID 0000
+#define template_plugin_SPACE_ID @SPACE_ID@
 #endif
 
 
