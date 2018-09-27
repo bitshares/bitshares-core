@@ -415,6 +415,30 @@ namespace graphene { namespace chain {
          /// Enable or disable tracking of votes of standby witnesses and committee members
          inline void enable_standby_votes_tracking(bool enable)  { _track_standby_votes = enable; }
 
+         /** Precomputes digests, signatures and operation validations depending
+          *  on skip flags. "Expensive" computations may be done in a parallel
+          *  thread.
+          *
+          * @param block the block to preprocess
+          * @param skip indicates which computations can be skipped
+          * @return a future that will resolve to the input block with
+          *         precomputations applied
+          */
+         fc::future<void> precompute_parallel( const signed_block& block, const uint32_t skip = skip_nothing )const;
+
+         /** Precomputes digests, signatures and operation validations.
+          *  "Expensive" computations may be done in a parallel thread.
+          *
+          * @param trx the transaction to preprocess
+          * @return a future that will resolve to the input transaction with
+          *         precomputations applied
+          */
+         fc::future<void> precompute_parallel( const precomputable_transaction& trx )const;
+   private:
+         template<typename Trx>
+         void _precompute_parallel( const Trx* trx, const size_t count, const uint32_t skip )const;
+         void _precompute_parallel( const signed_block& block, const uint32_t skip )const;
+
    protected:
          //Mark pop_undo() as protected -- we do not want outside calling pop_undo(); it should call pop_block() instead
          void pop_undo() { object_database::pop_undo(); }

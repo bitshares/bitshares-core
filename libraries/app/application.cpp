@@ -540,13 +540,17 @@ bool application_impl::handle_block(const graphene::net::block_message& blk_msg,
    FC_ASSERT( (latency.count()/1000) > -5000, "Rejecting block with timestamp in the future" );
 
    try {
-      // TODO: in the case where this block is valid but on a fork that's too old for us to switch to,
-      // you can help the network code out by throwing a block_older_than_undo_history exception.
-      // when the net code sees that, it will stop trying to push blocks from that chain, but
-      // leave that peer connected so that they can get sync blocks from us
-      bool result = _chain_db->push_block( blk_msg.block,
-                                           (_is_block_producer | _force_validate) ?
-                                              database::skip_nothing : database::skip_transaction_signatures );
+      const uint32_t skip = (_is_block_producer | _force_validate) ?
+                               database::skip_nothing : database::skip_transaction_signatures;
+      bool result = valve.do_serial( [this,&blk_msg,skip] () {
+         _chain_db->precompute_parallel( blk_msg.block, skip ).wait();
+      }, [this,&blk_msg,skip] () {
+         // TODO: in the case where this block is valid but on a fork that's too old for us to switch to,
+         // you can help the network code out by throwing a block_older_than_undo_history exception.
+         // when the net code sees that, it will stop trying to push blocks from that chain, but
+         // leave that peer connected so that they can get sync blocks from us
+         return _chain_db->push_block( blk_msg.block, skip );
+      });
 
       // the block was accepted, so we now know all of the transactions contained in the block
       if (!sync_mode)
@@ -596,6 +600,7 @@ void application_impl::handle_transaction(const graphene::net::trx_message& tran
       trx_count = 0;
    }
 
+   _chain_db->precompute_parallel( transaction_message.trx ).wait();
    _chain_db->push_transaction( transaction_message.trx );
 } FC_CAPTURE_AND_RETHROW( (transaction_message) ) }
 

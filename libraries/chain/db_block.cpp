@@ -37,6 +37,7 @@
 #include <graphene/chain/exceptions.hpp>
 #include <graphene/chain/evaluator.hpp>
 
+#include <fc/thread/parallel.hpp>
 #include <fc/smart_ref_impl.hpp>
 
 namespace graphene { namespace chain {
@@ -749,6 +750,76 @@ void database::add_checkpoints( const flat_map<uint32_t,block_id_type>& checkpts
 bool database::before_last_checkpoint()const
 {
    return (_checkpoints.size() > 0) && (_checkpoints.rbegin()->first >= head_block_num());
+}
+
+
+static const uint32_t skip_expensive = database::skip_transaction_signatures | database::skip_witness_signature
+                                       | database::skip_merkle_check | database::skip_transaction_dupe_check;
+
+template<typename Trx>
+void database::_precompute_parallel( const Trx* trx, const size_t count, const uint32_t skip )const
+{
+   for( size_t i = 0; i < count; ++i, ++trx )
+   {
+      trx->validate(); // TODO - parallelize wrt confidential operations
+      if( !(skip&skip_transaction_dupe_check) )
+         trx->id();
+      if( !(skip&skip_transaction_signatures) )
+         trx->get_signature_keys( get_chain_id() );
+   }
+}
+
+void database::_precompute_parallel( const signed_block& block, const uint32_t skip )const
+{ try {
+   const bool cheap = (skip & skip_expensive) == skip_expensive;
+   std::vector<fc::future<void>> workers;
+   if( !block.transactions.empty() )
+   {
+      if( cheap )
+         _precompute_parallel( &block.transactions[0], block.transactions.size(), skip );
+      else
+      {
+         uint32_t chunks = fc::asio::default_io_service_scope::get_num_threads();
+         if( !chunks ) return;
+         uint32_t chunk_size = block.transactions.size() / chunks;
+         if( chunks * chunk_size < block.transactions.size() )
+            chunk_size++;
+         workers.reserve( chunks + 1 );
+         for( size_t base = 0; base < block.transactions.size(); base += chunk_size )
+            workers.push_back( fc::do_parallel( [this,&block,base,chunk_size,skip] () {
+               _precompute_parallel( &block.transactions[base],
+                                     base + chunk_size < block.transactions.size() ? chunk_size : block.transactions.size() - base,
+                                     skip );
+            }) );
+      }
+   }
+
+   if( !(skip&skip_witness_signature) )
+      workers.push_back( fc::do_parallel( [&block] () { block.signee(); } ) );
+   if( !(skip&skip_merkle_check) )
+      block.calculate_merkle_root();
+   block.id();
+   for( auto& worker : workers )
+      worker.wait();
+} FC_LOG_AND_RETHROW() }
+
+fc::future<void> database::precompute_parallel( const signed_block& block, const uint32_t skip )const
+{
+   if( block.transactions.empty() || (skip & skip_expensive) == skip_expensive )
+   {
+      _precompute_parallel( block, skip );
+      return fc::future< void >( fc::promise< void >::ptr( new fc::promise< void >( true ) ) );
+   }
+   return fc::do_parallel([this,&block,skip] () {
+      _precompute_parallel( block, skip );
+   });
+}
+
+fc::future<void> database::precompute_parallel( const precomputable_transaction& trx )const
+{
+   return fc::do_parallel([this,&trx] () {
+      _precompute_parallel( &trx, 1, skip_nothing );
+   });
 }
 
 } }

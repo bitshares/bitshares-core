@@ -26,8 +26,9 @@
 
 namespace graphene { namespace chain {
 
-   struct block_header
+   class block_header
    {
+   public:
       digest_type                   digest()const;
       block_id_type                 previous;
       uint32_t                      block_num()const { return num_from_id(previous) + 1; }
@@ -41,20 +42,27 @@ namespace graphene { namespace chain {
       static uint32_t num_from_id(const block_id_type& id);
    };
 
-   struct signed_block_header : public block_header
+   class signed_block_header : public block_header
    {
-      block_id_type              id()const;
-      fc::ecc::public_key        signee()const;
+   public:
+      const block_id_type&       id()const;
+      const fc::ecc::public_key& signee()const;
       void                       sign( const fc::ecc::private_key& signer );
       bool                       validate_signee( const fc::ecc::public_key& expected_signee )const;
 
       signature_type             witness_signature;
+   protected:
+      mutable fc::ecc::public_key _signee;
+      mutable block_id_type       _block_id;
    };
 
-   struct signed_block : public signed_block_header
+   class signed_block : public signed_block_header
    {
-      checksum_type calculate_merkle_root()const;
+   public:
+      const checksum_type& calculate_merkle_root()const;
       vector<processed_transaction> transactions;
+   protected:
+      mutable checksum_type   _calculated_merkle_root;
    };
 
 } } // graphene::chain

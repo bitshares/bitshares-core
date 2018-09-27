@@ -60,7 +60,7 @@ void transaction::validate() const
       operation_validate(op);
 }
 
-const graphene::chain::transaction_id_type& graphene::chain::transaction::id() const
+const transaction_id_type& transaction::id() const
 {
    auto h = digest();
    memcpy(_tx_id_buffer._hash, h._hash, std::min(sizeof(_tx_id_buffer), sizeof(h)));

@@ -62,8 +62,9 @@ namespace graphene { namespace chain {
    /**
     *  @brief groups operations that should be applied atomically
     */
-   struct transaction
+   class transaction
    {
+   public:
       /**
        * Least significant 16 bits from the reference block number. If @ref relative_expiration is zero, this field
        * must be zero as well.
@@ -89,7 +90,6 @@ namespace graphene { namespace chain {
       virtual const transaction_id_type& id()const;
       virtual void                       validate() const;
       /// Calculate the digest used for signature validation
-      digest_type         sig_digest( const chain_id_type& chain_id )const;
 
       void set_expiration( fc::time_point_sec expiration_time );
       void set_reference_block( const block_id_type& reference_block );
@@ -122,8 +122,9 @@ namespace graphene { namespace chain {
    /**
     *  @brief adds a signature to a transaction
     */
-   struct signed_transaction : public transaction
+   class signed_transaction : public transaction
    {
+   public:
       signed_transaction( const transaction& trx = transaction() )
          : transaction(trx){}
 
@@ -185,13 +186,10 @@ namespace graphene { namespace chain {
       /** Signatures */
       vector<signature_type> signatures;
 
-      /** Public keys extracted from signatures */
-      mutable flat_set<public_key_type> signees;
-
-      /// Removes all operations and signatures
+      /** Removes all operations and signatures */
       void clear() { operations.clear(); signatures.clear(); }
 
-      /// Removes all signatures
+      /** Removes all signatures */
       void clear_signatures() { signatures.clear(); }
    protected:
       /** Public keys extracted from signatures */
