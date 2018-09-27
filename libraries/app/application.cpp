@@ -166,6 +166,7 @@ void application_impl::reset_p2p_node(const fc::path& data_dir)
    {
       // https://bitsharestalk.org/index.php/topic,23715.0.html
       vector<string> seeds = {
+         "seed01.liondani.com:1776",          // liondani     (GERMANY) 
          "104.236.144.84:1777",               // puppies      (USA)
          "128.199.143.47:2015",               // Harvey       (Singapore)
          "23.92.53.182:1776",                 // sahkan       (USA)
