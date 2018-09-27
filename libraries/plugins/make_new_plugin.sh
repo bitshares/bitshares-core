@@ -29,11 +29,11 @@ fi
 pluginName="$1"
 
 echo "Copying template..."
-cp -r template_plugin $pluginName
+cp -r template_plugin "$pluginName"
 
 echo "Renaming files/directories..."
-mv $pluginName/include/graphene/template_plugin $pluginName/include/graphene/$pluginName
-for file in `find $pluginName -type f -name '*template_plugin*'`; do mv $file `sed s/template_plugin/$pluginName/g <<< $file`; done;
+mv "$pluginName/include/graphene/template_plugin" "$pluginName/include/graphene/$pluginName"
+for file in `find "$pluginName" -type f -name '*template_plugin*'`; do mv $file `sed s/template_plugin/"$pluginName"/g <<< $file`; done;
 echo "Renaming in files..."
 find $pluginName -type f -exec sed -i "s/template_plugin/$pluginName/g" {} \;
 echo "Assigning next available SPACE_ID..."
