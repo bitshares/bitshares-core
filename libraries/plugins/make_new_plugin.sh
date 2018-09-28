@@ -33,12 +33,12 @@ cp -r template_plugin "$pluginName"
 
 echo "Renaming files/directories..."
 mv "$pluginName/include/graphene/template_plugin" "$pluginName/include/graphene/$pluginName"
-for file in `find "$pluginName" -type f -name '*template_plugin*'`; do mv $file `sed s/template_plugin/"$pluginName"/g <<< $file`; done;
+for file in `find "$pluginName" -type f -name '*template_plugin*'`; do mv "$file" `sed s/template_plugin/"$pluginName"/g <<< $file`; done;
 echo "Renaming in files..."
-find $pluginName -type f -exec sed -i "s/template_plugin/$pluginName/g" {} \;
+find "$pluginName" -type f -exec sed -i "s/template_plugin/$pluginName/g" {} \;
 echo "Assigning next available SPACE_ID..."
 next_space_id
-find $pluginName -type f -exec sed -i "s/@SPACE_ID@/$?/g" {} \;
+find "$pluginName" -type f -exec sed -i "s/@SPACE_ID@/$?/g" {} \;
 
 echo "Done! $pluginName is ready."
 echo "Next steps:"
