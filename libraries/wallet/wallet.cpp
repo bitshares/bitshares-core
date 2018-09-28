@@ -1794,7 +1794,15 @@ public:
                                         bool broadcast /* = false */)
    { try {
       account_object voting_account_object = get_account(voting_account);
-      fc::optional<committee_member_object> committee_member_obj = _remote_db->get_committee_member_by_account(committee_member);
+
+      /*
+       * Compatibility issue
+       * Current Date: 2018-09-28 More info: https://github.com/bitshares/bitshares-core/issues/1307
+       * Todo: remove the next 2 lines and change always_id to name in remote call after next hardfork
+       */
+      auto account = get_account(committee_member);
+      auto always_id = account_id_to_string(account.id);
+      fc::optional<committee_member_object> committee_member_obj = _remote_db->get_committee_member_by_account(always_id);
       if (!committee_member_obj)
          FC_THROW("Account ${committee_member} is not registered as a committee_member", ("committee_member", committee_member));
       if (approve)
