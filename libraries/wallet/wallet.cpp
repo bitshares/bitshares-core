@@ -1828,7 +1828,14 @@ public:
    { try {
       account_object voting_account_object = get_account(voting_account);
 
-      fc::optional<witness_object> witness_obj = _remote_db->get_witness_by_account(witness);
+      /*
+       * Compatibility issue
+       * Current Date: 2018-09-28 More info: https://github.com/bitshares/bitshares-core/issues/1307
+       * Todo: remove the next 2 lines and change always_id to name in remote call after next hardfork
+       */
+      auto account = get_account(witness);
+      auto always_id = account_id_to_string(account.id);
+      fc::optional<witness_object> witness_obj = _remote_db->get_witness_by_account(always_id);
       if (!witness_obj)
          FC_THROW("Account ${witness} is not registered as a witness", ("witness", witness));
       if (approve)
