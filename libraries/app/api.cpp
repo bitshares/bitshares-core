@@ -384,9 +384,9 @@ namespace graphene { namespace app {
 
 
     vector<operation_history_object> history_api::get_relative_account_history( const std::string account_id_or_name,
-                                                                                uint32_t stop,
+                                                                                uint64_t stop,
                                                                                 unsigned limit,
-                                                                                uint32_t start) const
+                                                                                uint64_t start) const
     {
        FC_ASSERT( _app.chain_database() );
        const auto& db = *_app.chain_database();

@@ -66,7 +66,7 @@ class account_history_plugin_impl
       flat_set<account_id_type> _tracked_accounts;
       bool _partial_operations = false;
       primary_index< operation_history_index >* _oho_index;
-      uint32_t _max_ops_per_account = -1;
+      uint64_t _max_ops_per_account = -1;
    private:
       /** add one history record, then check and remove the earliest history record */
       void add_account_history( const account_id_type account_id, const operation_history_id_type op_id );
@@ -298,7 +298,7 @@ void account_history_plugin::plugin_initialize(const boost::program_options::var
        my->_partial_operations = options["partial-operations"].as<bool>();
    }
    if (options.count("max-ops-per-account")) {
-       my->_max_ops_per_account = options["max-ops-per-account"].as<uint32_t>();
+       my->_max_ops_per_account = options["max-ops-per-account"].as<uint64_t>();
    }
 }
 
