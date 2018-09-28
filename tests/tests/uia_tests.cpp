@@ -502,14 +502,6 @@ BOOST_AUTO_TEST_CASE( asset_name_test )
       BOOST_CHECK(  has_asset("ALPHA2") );
       BOOST_CHECK( has_asset("ALPHA2.ONE") );
 
-      // locales issue
-      std::locale loc1("en_US.UTF8");
-      static const std::locale& loc2 = std::locale::classic();
-      const wchar_t c = L'\u042f';
-      // isalpha will allow non ascii chars if locale is not C
-      BOOST_CHECK_EQUAL( isalpha(c, loc1), true);
-      BOOST_CHECK_EQUAL( isalpha(c, loc2), false);
-
       // proposal to create asset ending in number will now be created successfully as we are in > hf_620 time
       prop.expiration_time =  db.head_block_time() + fc::days(3);
       signed_transaction tx_hf620;
