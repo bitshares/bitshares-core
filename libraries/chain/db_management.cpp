@@ -76,6 +76,7 @@ void database::reindex( fc::path data_dir )
 
    uint32_t skip = skip_witness_signature |
                    skip_block_size_check |
+                   skip_merkle_check |
                    skip_transaction_signatures |
                    skip_transaction_dupe_check |
                    skip_tapos_check |
