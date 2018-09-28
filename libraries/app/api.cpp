@@ -141,7 +141,7 @@ namespace graphene { namespace app {
        {
           /// we need to ensure the database_api is not deleted for the life of the async operation
           auto capture_this = shared_from_this();
-          for( std::size_t trx_num = 0; trx_num < b.transactions.size(); ++trx_num )
+          for( uint32_t trx_num = 0; trx_num < b.transactions.size(); ++trx_num )
           {
              const auto& trx = b.transactions[trx_num];
              auto id = trx.id();
