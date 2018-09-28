@@ -1738,8 +1738,15 @@ public:
          result.emplace_back( get_object<vesting_balance_object>(*vbid), now );
          return result;
       }
+      /*
+       * Compatibility issue
+       * Current Date: 2018-09-28 More info: https://github.com/bitshares/bitshares-core/issues/1307
+       * Todo: remove the next 2 lines and change always_id to name in remote call after next hardfork
+      */
+      auto account = get_account(account_name);
+      auto always_id = account_id_to_string(account.id);
 
-      vector< vesting_balance_object > vbos = _remote_db->get_vesting_balances( account_name );
+      vector< vesting_balance_object > vbos = _remote_db->get_vesting_balances( always_id );
       if( vbos.size() == 0 )
          return result;
 
