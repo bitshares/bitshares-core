@@ -110,7 +110,8 @@ BOOST_AUTO_TEST_CASE( one_hundred_k_benchmark )
       auto end = fc::time_point::now();
       auto elapsed = end - start;
       total_time += elapsed.count();
-      wlog( "Create ${aps} accounts/s over ${total}ms", ("aps",(cycles*1000000)/elapsed.count())("total",elapsed.count()/1000) );
+      wlog( "Create ${aps} accounts/s over ${total}ms",
+            ("aps",(cycles*1000000)/elapsed.count())("total",elapsed.count()/1000) );
    }
 
    {
@@ -141,7 +142,8 @@ BOOST_AUTO_TEST_CASE( one_hundred_k_benchmark )
       auto end = fc::time_point::now();
       auto elapsed = end - start;
       total_time += elapsed.count();
-      wlog( "${aps} transfers/s over ${total}ms", ("aps",(2*cycles*1000000)/elapsed.count())("total",elapsed.count()/1000) );
+      wlog( "${aps} transfers/s over ${total}ms",
+            ("aps",(2*cycles*1000000)/elapsed.count())("total",elapsed.count()/1000) );
       trx.clear();
    }
 
@@ -168,7 +170,8 @@ BOOST_AUTO_TEST_CASE( one_hundred_k_benchmark )
       auto end = fc::time_point::now();
       auto elapsed = end - start;
       total_time += elapsed.count();
-      wlog( "${aps} asset create/s over ${total}ms", ("aps",(cycles*1000000)/elapsed.count())("total",elapsed.count()/1000) );
+      wlog( "${aps} asset create/s over ${total}ms",
+            ("aps",(cycles*1000000)/elapsed.count())("total",elapsed.count()/1000) );
       trx.clear();
    }
 
@@ -192,12 +195,14 @@ BOOST_AUTO_TEST_CASE( one_hundred_k_benchmark )
       auto end = fc::time_point::now();
       auto elapsed = end - start;
       total_time += elapsed.count();
-      wlog( "${aps} issuances/s over ${total}ms", ("aps",(cycles*1000000)/elapsed.count())("total",elapsed.count()/1000) );
+      wlog( "${aps} issuances/s over ${total}ms",
+            ("aps",(cycles*1000000)/elapsed.count())("total",elapsed.count()/1000) );
       trx.clear();
    }
 
    wlog( "${total} operations in ${total_time}ms => ${avg} ops/s on average",
-         ("total",total_count)("total_time",total_time/1000)("avg",(total_count*1000000)/total_time) );
+         ("total",total_count)("total_time",total_time/1000)
+         ("avg",(total_count*1000000)/total_time) );
 
    db._undo_db.enable();
 } FC_LOG_AND_RETHROW() }
