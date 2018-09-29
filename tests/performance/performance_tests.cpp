@@ -47,12 +47,12 @@ BOOST_AUTO_TEST_CASE( sigcheck_benchmark )
    auto digest = fc::sha256::hash("hello");
    auto sig = nathan_key.sign_compact( digest );
    auto start = fc::time_point::now();
-   const uint32_t cycles = 100000;
+   const uint64_t cycles = 100000;
    for( uint32_t i = 0; i < cycles; ++i )
       fc::ecc::public_key( sig, digest );
    auto end = fc::time_point::now();
    auto elapsed = end-start;
-   wlog( "Benchmark: verify ${sps} signatures/s", ("sps",(cycles*1000000.0)/elapsed.count()) );
+   wlog( "Benchmark: verify ${sps} signatures/s", ("sps",(cycles*1000000)/elapsed.count()) );
 }
 
 // See https://bitshares.org/blog/2015/06/08/measuring-performance/
@@ -68,9 +68,9 @@ BOOST_AUTO_TEST_CASE( one_hundred_k_benchmark )
    const fc::ecc::public_key  nathan_pub = nathan_key.get_public_key();;
    const auto& committee_account = account_id_type()(db);
 
-   const uint32_t cycles = 200000;
+   const uint64_t cycles = 200000;
    uint64_t total_time = 0;
-   uint32_t total_count = 0;
+   uint64_t total_count = 0;
    std::vector<account_id_type> accounts;
    accounts.reserve( cycles+1 );
    std::vector<asset_id_type> assets;
@@ -110,7 +110,7 @@ BOOST_AUTO_TEST_CASE( one_hundred_k_benchmark )
       auto end = fc::time_point::now();
       auto elapsed = end - start;
       total_time += elapsed.count();
-      wlog( "Create ${aps} accounts/s over ${total}µs", ("aps",(cycles*1000000.0)/elapsed.count())("total",elapsed.count()) );
+      wlog( "Create ${aps} accounts/s over ${total}ms", ("aps",(cycles*1000000)/elapsed.count())("total",elapsed.count()/1000) );
    }
 
    {
@@ -141,7 +141,7 @@ BOOST_AUTO_TEST_CASE( one_hundred_k_benchmark )
       auto end = fc::time_point::now();
       auto elapsed = end - start;
       total_time += elapsed.count();
-      wlog( "${aps} transfers/s over ${total}µs", ("aps",(2*cycles*1000000.0)/elapsed.count())("total",elapsed.count()) );
+      wlog( "${aps} transfers/s over ${total}ms", ("aps",(2*cycles*1000000)/elapsed.count())("total",elapsed.count()/1000) );
       trx.clear();
    }
 
@@ -168,7 +168,7 @@ BOOST_AUTO_TEST_CASE( one_hundred_k_benchmark )
       auto end = fc::time_point::now();
       auto elapsed = end - start;
       total_time += elapsed.count();
-      wlog( "${aps} asset create/s over ${total}µs", ("aps",(cycles*1000000.0)/elapsed.count())("total",elapsed.count()) );
+      wlog( "${aps} asset create/s over ${total}ms", ("aps",(cycles*1000000)/elapsed.count())("total",elapsed.count()/1000) );
       trx.clear();
    }
 
@@ -192,12 +192,12 @@ BOOST_AUTO_TEST_CASE( one_hundred_k_benchmark )
       auto end = fc::time_point::now();
       auto elapsed = end - start;
       total_time += elapsed.count();
-      wlog( "${aps} issuances/s over ${total}µs", ("aps",(cycles*1000000.0)/elapsed.count())("total",elapsed.count()) );
+      wlog( "${aps} issuances/s over ${total}ms", ("aps",(cycles*1000000)/elapsed.count())("total",elapsed.count()/1000) );
       trx.clear();
    }
 
-   wlog( "${total} operations in ${total_time}µs => ${avg} ops/s on average",
-         ("total",total_count)("total_time",total_time)("avg",(total_count*1000000.0)/total_time) );
+   wlog( "${total} operations in ${total_time}ms => ${avg} ops/s on average",
+         ("total",total_count)("total_time",total_time/1000)("avg",(total_count*1000000)/total_time) );
 
    db._undo_db.enable();
 } FC_LOG_AND_RETHROW() }
