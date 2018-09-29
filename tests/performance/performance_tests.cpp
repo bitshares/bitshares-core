@@ -98,7 +98,7 @@ BOOST_AUTO_TEST_CASE( one_hundred_k_benchmark )
          trx.operations.push_back( aco );
          transactions.push_back( trx );
          trx.operations.clear();
-         total_count++;
+         ++total_count;
       }
 
       auto start = fc::time_point::now();
@@ -128,9 +128,9 @@ BOOST_AUTO_TEST_CASE( one_hundred_k_benchmark )
          to2.from = accounts[i];
          to2.to = accounts[i+1];
          trx.operations.push_back( to1 );
-         total_count++;
+         ++total_count;
          trx.operations.push_back( to2 );
-         total_count++;
+         ++total_count;
          transactions[i] = trx;
          trx.operations.clear();
       }
@@ -154,7 +154,7 @@ BOOST_AUTO_TEST_CASE( one_hundred_k_benchmark )
          aco.issuer = accounts[i];
          aco.symbol = "ASSET" + fc::to_string( i );
          trx.operations.push_back( aco );
-         total_count++;
+         ++total_count;
          transactions[i] = trx;
          trx.operations.clear();
       }
@@ -181,7 +181,7 @@ BOOST_AUTO_TEST_CASE( one_hundred_k_benchmark )
          aio.issue_to_account = accounts[i+1];
          aio.asset_to_issue = asset( 10, assets[i] );
          trx.operations.push_back( aio );
-         total_count++;
+         ++total_count;
          transactions[i] = trx;
          trx.operations.clear();
       }
