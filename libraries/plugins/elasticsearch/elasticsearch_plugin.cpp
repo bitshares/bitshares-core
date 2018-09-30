@@ -227,23 +227,37 @@ void elasticsearch_plugin_impl::doBlock(uint32_t trx_in_block, const signed_bloc
 
 void elasticsearch_plugin_impl::doVisitor(const optional <operation_history_object>& oho)
 {
+   graphene::chain::database& db = database();
+
    operation_visitor o_v;
    oho->op.visit(o_v);
 
    vs.fee_data.asset = o_v.fee_asset;
+   vs.fee_data.asset_name = o_v.fee_asset(db).symbol;
    vs.fee_data.amount = o_v.fee_amount;
+   vs.fee_data.amount_calculated = (float)(o_v.fee_amount.value)/pow(10, o_v.fee_asset(db).precision);
 
    vs.transfer_data.asset = o_v.transfer_asset_id;
+   vs.transfer_data.asset_name = o_v.transfer_asset_id(db).symbol;
    vs.transfer_data.amount = o_v.transfer_amount;
+   vs.transfer_data.amount_calculated = (float)(o_v.transfer_amount.value)/(pow(10, o_v.transfer_asset_id(db).precision));
    vs.transfer_data.from = o_v.transfer_from;
    vs.transfer_data.to = o_v.transfer_to;
 
    vs.fill_data.order_id = o_v.fill_order_id;
    vs.fill_data.account_id = o_v.fill_account_id;
    vs.fill_data.pays_asset_id = o_v.fill_pays_asset_id;
+   vs.fill_data.pays_asset_name = o_v.fill_pays_asset_id(db).symbol;
    vs.fill_data.pays_amount = o_v.fill_pays_amount;
+   vs.fill_data.pays_amount_calculated = (float)(o_v.fill_pays_amount.value)/pow(10, o_v.fill_pays_asset_id(db).precision);
    vs.fill_data.receives_asset_id = o_v.fill_receives_asset_id;
+   vs.fill_data.receives_asset_name = o_v.fill_receives_asset_id(db).symbol;
    vs.fill_data.receives_amount = o_v.fill_receives_amount;
+   vs.fill_data.receives_amount_calculated = (float)(o_v.fill_receives_amount.value)/pow(10, o_v.fill_receives_asset_id(db).precision);
+
+   float fill_price = (float)(o_v.fill_receives_amount.value/o_v.fill_receives_asset_id(db).precision) /
+           (float)(o_v.fill_pays_amount.value / o_v.fill_pays_asset_id(db).precision);
+   vs.fill_data.fill_price_calculated = fill_price;
    vs.fill_data.fill_price = o_v.fill_fill_price;
    vs.fill_data.is_maker = o_v.fill_is_maker;
 }
