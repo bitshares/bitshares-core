@@ -189,7 +189,7 @@ void_result call_order_update_evaluator::do_evaluate(const call_order_update_ope
 } FC_CAPTURE_AND_RETHROW( (o) ) }
 
 
-void_result call_order_update_evaluator::do_apply(const call_order_update_operation& o)
+object_id_type call_order_update_evaluator::do_apply(const call_order_update_operation& o)
 { try {
    database& d = db();
 
@@ -220,6 +220,7 @@ void_result call_order_update_evaluator::do_apply(const call_order_update_operat
    auto& call_idx = d.get_index_type<call_order_index>().indices().get<by_account>();
    auto itr = call_idx.find( boost::make_tuple(o.funding_account, o.delta_debt.asset_id) );
    const call_order_object* call_obj = nullptr;
+   call_order_id_type call_order_id;
 
    optional<price> old_collateralization;
    optional<share_type> old_debt;
@@ -237,18 +238,20 @@ void_result call_order_update_evaluator::do_apply(const call_order_update_operat
                                              _bitasset_data->current_feed.maintenance_collateral_ratio);
          call.target_collateral_ratio = o.extensions.value.target_collateral_ratio;
       });
+      call_order_id = call_obj->id;
    }
    else // updating existing debt position
    {
       call_obj = &*itr;
       auto new_collateral = call_obj->collateral + o.delta_collateral.amount;
       auto new_debt = call_obj->debt + o.delta_debt.amount;
+      call_order_id = call_obj->id;
 
       if( new_debt == 0 )
       {
          FC_ASSERT( new_collateral == 0, "Should claim all collateral when closing debt position" );
          d.remove( *call_obj );
-         return void_result();
+         return call_order_id;
       }
 
       FC_ASSERT( new_collateral > 0 && new_debt > 0,
@@ -264,13 +267,12 @@ void_result call_order_update_evaluator::do_apply(const call_order_update_operat
                                               _bitasset_data->current_feed.maintenance_collateral_ratio );
          call.target_collateral_ratio = o.extensions.value.target_collateral_ratio;
       });
+      call_order_id = call_obj->id;
    }
 
    // then we must check for margin calls and other issues
    if( !_bitasset_data->is_prediction_market )
    {
-      call_order_id_type call_order_id = call_obj->id;
-
       // check to see if the order needs to be margin called now, but don't allow black swans and require there to be
       // limit orders available that could be used to fill the order.
       // Note: due to https://github.com/bitshares/bitshares-core/issues/649, before core-343 hard fork,
@@ -331,7 +333,7 @@ void_result call_order_update_evaluator::do_apply(const call_order_update_operat
       }
    }
 
-   return void_result();
+   return call_order_id;
 } FC_CAPTURE_AND_RETHROW( (o) ) }
 
 void_result bid_collateral_evaluator::do_evaluate(const bid_collateral_operation& o)
