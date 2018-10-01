@@ -428,6 +428,68 @@ BOOST_AUTO_TEST_CASE( transfer_restricted_test )
    }
 }
 
+/***
+ * Test to see if a asset name is valid
+ * @param db the database
+ * @param acct the account that will attempt to create the asset
+ * @param asset_name the asset_name
+ * @param allowed whether the creation should be successful
+ * @returns true if meets expectations
+ */
+bool test_asset_name(graphene::chain::database_fixture* db, const graphene::chain::account_object& acct, std::string asset_name, bool allowed)
+{
+   if (allowed)
+   {
+      try
+      {
+         db->create_user_issued_asset(asset_name, acct, 0);
+      } catch (...)
+      {
+         return false;
+      }
+   }
+   else
+   {
+      try
+      {
+         db->create_user_issued_asset(asset_name, acct, 0);
+         return false;
+      } catch (fc::exception& ex) 
+      {
+         return true;
+      } catch (...)
+      {
+         return false;
+      }
+   }
+   return true;
+}
+
+/***
+ * Test to see if an ascii character can be used in an asset name
+ * @param c the ascii character (NOTE: includes extended ascii up to 255)
+ * @param allowed_beginning true if it should be allowed as the first character of an asset name
+ * @param allowed_middle true if it should be allowed in the middle of an asset name
+ * @param allowed_end true if it should be allowed at the end of an asset name
+ * @returns true if tests met expectations
+ */
+bool test_asset_char(graphene::chain::database_fixture* db, const graphene::chain::account_object& acct, const char c, bool allowed_beginning, bool allowed_middle, bool allowed_end)
+{
+   // beginning
+   std::string asset_name = std::string("") + c + "CHARLIE";
+   if (!test_asset_name(db, acct, asset_name, allowed_beginning))
+      return false;
+
+   // middle
+   asset_name = std::string("CHAR") + c + "LIE";
+   if (!test_asset_name(db, acct, asset_name, allowed_middle))
+      return false;
+
+   // end
+   asset_name = std::string("CHARLIE") + c;
+   return test_asset_name(db, acct, asset_name, allowed_end);
+}
+
 BOOST_AUTO_TEST_CASE( asset_name_test )
 {
    try
@@ -511,6 +573,16 @@ BOOST_AUTO_TEST_CASE( asset_name_test )
       sign( tx_hf620, alice_private_key );
       PUSH_TX( db, tx_hf620 );
 
+      // assets with invalid characters should not be allowed
+      for (int c = 0; c < 128; ++c)
+      {
+         if ( (c >= 48 && c <= 57) ) // numbers
+            BOOST_CHECK_MESSAGE( test_asset_char(this, alice_id(db), c, false, true, true), "Failed on good char " + std::to_string(c) );
+         else if ( c >= 65 && c <= 90) // letters
+            BOOST_CHECK_MESSAGE( test_asset_char(this, alice_id(db), c, true, true, true), "Failed on good char " + std::to_string(c) );
+         else                       // everything else
+            BOOST_CHECK_MESSAGE( test_asset_char(this, alice_id(db), c, false, false, false), "Failed on bad char " + std::to_string(c) );
+      }
    }
    catch(fc::exception& e)
    {
