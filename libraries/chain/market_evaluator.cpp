@@ -267,7 +267,6 @@ object_id_type call_order_update_evaluator::do_apply(const call_order_update_ope
                                               _bitasset_data->current_feed.maintenance_collateral_ratio );
          call.target_collateral_ratio = o.extensions.value.target_collateral_ratio;
       });
-      call_order_id = call_obj->id;
    }
 
    // then we must check for margin calls and other issues
