@@ -353,7 +353,7 @@ void application_impl::startup()
          }
          if( modified_genesis )
          {
-            ilog("WARNING:  GENESIS WAS MODIFIED, YOUR CHAIN ID MAY BE DIFFERENT\n");
+            wlog("WARNING:  GENESIS WAS MODIFIED, YOUR CHAIN ID MAY BE DIFFERENT\n");
             genesis_str += "BOGUS";
             genesis.initial_chain_id = fc::sha256::hash( genesis_str );
          }
@@ -985,10 +985,8 @@ void application::initialize(const fc::path& data_dir, const boost::program_opti
          try {
             genesis_state = fc::json::from_file(genesis_out).as<genesis_state_type>( 20 );
          } catch(const fc::exception& e) {
-            ilog(
-               "Unable to parse existing genesis file:\n${e_string}\nWould you like to replace it? [y/N] ",
-               ("e_string", e.to_string())
-            );
+            std::cerr << "Unable to parse existing genesis file:\n" << e.to_string()
+                      << "\nWould you like to replace it? [y/N] ";
             char response = std::cin.get();
             if( toupper(response) != 'Y' )
                return;

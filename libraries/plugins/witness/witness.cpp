@@ -52,7 +52,7 @@ void new_chain_banner( const graphene::chain::database& db )
       "\n");
    if( db.get_slot_at_time( fc::time_point::now() ) > 200 )
    {
-      ilog("Your genesis seems to have an old timestamp\n"
+      wlog("Your genesis seems to have an old timestamp\n"
          "Please consider using the --genesis-timestamp option to give your genesis a recent timestamp\n"
          "\n"
       );
