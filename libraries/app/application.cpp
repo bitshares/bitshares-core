@@ -339,7 +339,7 @@ void application_impl::startup()
             modified_genesis = true;
 
             ilog(
-               "Used genesis timestamp:  ${timestamp} (PLEASE RECORD THIS)\n", 
+               "Used genesis timestamp:  ${timestamp} (PLEASE RECORD THIS)", 
                ("timestamp", genesis.initial_timestamp.to_iso_string())
             );
          }
@@ -349,11 +349,11 @@ void application_impl::startup()
             FC_ASSERT( genesis.initial_witness_candidates.size() >= genesis.initial_active_witnesses );
             set_dbg_init_key( genesis, init_key );
             modified_genesis = true;
-            ilog("Set init witness key to ${init_key}\n", ("init_key", init_key));
+            ilog("Set init witness key to ${init_key}", ("init_key", init_key));
          }
          if( modified_genesis )
          {
-            wlog("WARNING:  GENESIS WAS MODIFIED, YOUR CHAIN ID MAY BE DIFFERENT\n");
+            wlog("WARNING:  GENESIS WAS MODIFIED, YOUR CHAIN ID MAY BE DIFFERENT");
             genesis_str += "BOGUS";
             genesis.initial_chain_id = fc::sha256::hash( genesis_str );
          }
@@ -992,9 +992,9 @@ void application::initialize(const fc::path& data_dir, const boost::program_opti
                return;
          }
 
-         ilog("Updating genesis state in file ${genesis_out} \n", ("genesis_out", genesis_out.generic_string()));
+         std::cerr << "Updating genesis state in file " << genesis_out.generic_string() << "\n";
       } else {
-         ilog("Creating example genesis state in file ${genesis_out} \n", ("genesis_out", genesis_out.generic_string()));
+         std::cerr << "Creating example genesis state in file " << genesis_out.generic_string() << "\n";
       }
       fc::json::save_to_file(genesis_state, genesis_out);
 
