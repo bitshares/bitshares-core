@@ -140,14 +140,14 @@ struct fee_struct {
    asset_id_type asset;
    std::string asset_name;
    share_type amount;
-   float amount_units;
+   double amount_units;
 };
 
 struct transfer_struct {
    asset_id_type asset;
    std::string asset_name;
    share_type amount;
-   float amount_units;
+   double amount_units;
    account_id_type from;
    account_id_type to;
 };
@@ -158,13 +158,13 @@ struct fill_struct {
    asset_id_type pays_asset_id;
    std::string pays_asset_name;
    share_type pays_amount;
-   float pays_amount_units;
+   double pays_amount_units;
    asset_id_type receives_asset_id;
    std::string receives_asset_name;
    share_type receives_amount;
-   float receives_amount_units;
+   double receives_amount_units;
    double fill_price;
-   float fill_price_units;
+   double fill_price_units;
    bool is_maker;
 };
 
