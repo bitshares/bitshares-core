@@ -337,8 +337,11 @@ void application_impl::startup()
             genesis.initial_timestamp -= ( genesis.initial_timestamp.sec_since_epoch()
                                            % genesis.initial_parameters.block_interval );
             modified_genesis = true;
-            std::cerr << "Used genesis timestamp:  " << genesis.initial_timestamp.to_iso_string()
-                      << " (PLEASE RECORD THIS)\n";
+
+            ilog(
+               "Used genesis timestamp:  ${timestamp} (PLEASE RECORD THIS)\n", 
+               ("timestamp", genesis.initial_timestamp.to_iso_string())
+            );
          }
          if( _options->count("dbg-init-key") )
          {
@@ -346,11 +349,11 @@ void application_impl::startup()
             FC_ASSERT( genesis.initial_witness_candidates.size() >= genesis.initial_active_witnesses );
             set_dbg_init_key( genesis, init_key );
             modified_genesis = true;
-            std::cerr << "Set init witness key to " << init_key << "\n";
+            ilog("Set init witness key to ${init_key}\n", ("init_key", init_key));
          }
          if( modified_genesis )
          {
-            std::cerr << "WARNING:  GENESIS WAS MODIFIED, YOUR CHAIN ID MAY BE DIFFERENT\n";
+            ilog("WARNING:  GENESIS WAS MODIFIED, YOUR CHAIN ID MAY BE DIFFERENT\n");
             genesis_str += "BOGUS";
             genesis.initial_chain_id = fc::sha256::hash( genesis_str );
          }
@@ -982,16 +985,18 @@ void application::initialize(const fc::path& data_dir, const boost::program_opti
          try {
             genesis_state = fc::json::from_file(genesis_out).as<genesis_state_type>( 20 );
          } catch(const fc::exception& e) {
-            std::cerr << "Unable to parse existing genesis file:\n" << e.to_string()
-                      << "\nWould you like to replace it? [y/N] ";
+            ilog(
+               "Unable to parse existing genesis file:\n${e_string}\nWould you like to replace it? [y/N] ",
+               ("e_string", e.to_string())
+            );
             char response = std::cin.get();
             if( toupper(response) != 'Y' )
                return;
          }
 
-         std::cerr << "Updating genesis state in file " << genesis_out.generic_string() << "\n";
+         ilog("Updating genesis state in file ${genesis_out} \n", ("genesis_out", genesis_out.generic_string()));
       } else {
-         std::cerr << "Creating example genesis state in file " << genesis_out.generic_string() << "\n";
+         ilog("Creating example genesis state in file ${genesis_out} \n", ("genesis_out", genesis_out.generic_string()));
       }
       fc::json::save_to_file(genesis_state, genesis_out);
 
