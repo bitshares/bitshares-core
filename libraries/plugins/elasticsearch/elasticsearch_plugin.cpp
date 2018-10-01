@@ -43,6 +43,7 @@ class elasticsearch_plugin_impl
       virtual ~elasticsearch_plugin_impl();
 
       bool update_account_histories( const signed_block& b );
+      void populatePowTable();
 
       graphene::chain::database& database()
       {
@@ -72,6 +73,7 @@ class elasticsearch_plugin_impl
       std::string bulk_line;
       std::string index_name;
       bool is_sync = false;
+      map <uint8_t , uint64_t > lookup_pow_table;
    private:
       bool add_elasticsearch( const account_id_type account_id, const optional<operation_history_object>& oho );
       const account_transaction_history_object& addNewEntry(const account_statistics_object& stats_obj,
@@ -235,12 +237,12 @@ void elasticsearch_plugin_impl::doVisitor(const optional <operation_history_obje
    vs.fee_data.asset = o_v.fee_asset;
    vs.fee_data.asset_name = o_v.fee_asset(db).symbol;
    vs.fee_data.amount = o_v.fee_amount;
-   vs.fee_data.amount_units = (double)(o_v.fee_amount.value)/pow(10, o_v.fee_asset(db).precision);
+   vs.fee_data.amount_units = (double)(o_v.fee_amount.value)/lookup_pow_table[o_v.fee_asset(db).precision];
 
    vs.transfer_data.asset = o_v.transfer_asset_id;
    vs.transfer_data.asset_name = o_v.transfer_asset_id(db).symbol;
    vs.transfer_data.amount = o_v.transfer_amount;
-   vs.transfer_data.amount_units = (double)(o_v.transfer_amount.value)/(pow(10, o_v.transfer_asset_id(db).precision));
+   vs.transfer_data.amount_units = (double)(o_v.transfer_amount.value)/lookup_pow_table[o_v.transfer_asset_id(db).precision];
    vs.transfer_data.from = o_v.transfer_from;
    vs.transfer_data.to = o_v.transfer_to;
 
@@ -249,14 +251,14 @@ void elasticsearch_plugin_impl::doVisitor(const optional <operation_history_obje
    vs.fill_data.pays_asset_id = o_v.fill_pays_asset_id;
    vs.fill_data.pays_asset_name = o_v.fill_pays_asset_id(db).symbol;
    vs.fill_data.pays_amount = o_v.fill_pays_amount;
-   vs.fill_data.pays_amount_units = (double)(o_v.fill_pays_amount.value)/pow(10, o_v.fill_pays_asset_id(db).precision);
+   vs.fill_data.pays_amount_units = (double)(o_v.fill_pays_amount.value)/lookup_pow_table[o_v.fill_pays_asset_id(db).precision];
    vs.fill_data.receives_asset_id = o_v.fill_receives_asset_id;
    vs.fill_data.receives_asset_name = o_v.fill_receives_asset_id(db).symbol;
    vs.fill_data.receives_amount = o_v.fill_receives_amount;
-   vs.fill_data.receives_amount_units = (double)(o_v.fill_receives_amount.value)/pow(10, o_v.fill_receives_asset_id(db).precision);
+   vs.fill_data.receives_amount_units = (double)(o_v.fill_receives_amount.value)/lookup_pow_table[o_v.fill_receives_asset_id(db).precision];
 
-   auto fill_price = (o_v.fill_receives_amount.value/pow(10, o_v.fill_receives_asset_id(db).precision)) /
-           (o_v.fill_pays_amount.value / pow(10, o_v.fill_pays_asset_id(db).precision));
+   auto fill_price = (double)(o_v.fill_receives_amount.value/lookup_pow_table[o_v.fill_receives_asset_id(db).precision]) /
+           (double)(o_v.fill_pays_amount.value / lookup_pow_table[o_v.fill_pays_asset_id(db).precision]);
    vs.fill_data.fill_price_units = fill_price;
    vs.fill_data.fill_price = o_v.fill_fill_price;
    vs.fill_data.is_maker = o_v.fill_is_maker;
@@ -382,6 +384,23 @@ void elasticsearch_plugin_impl::populateESstruct()
    es.query = "";
 }
 
+void elasticsearch_plugin_impl::populatePowTable()
+{
+   lookup_pow_table[0] = 1;
+   lookup_pow_table[1] = 10;
+   lookup_pow_table[2] = 100;
+   lookup_pow_table[3] = 1000;
+   lookup_pow_table[4] = 10000;
+   lookup_pow_table[5] = 100000;
+   lookup_pow_table[6] = 1000000;
+   lookup_pow_table[7] = 10000000;
+   lookup_pow_table[8] = 100000000;
+   lookup_pow_table[9] = 1000000000;
+   lookup_pow_table[10] = 10000000000;
+   lookup_pow_table[11] = 100000000000;
+   lookup_pow_table[12] = 1000000000000;
+}
+
 } // end namespace detail
 
 elasticsearch_plugin::elasticsearch_plugin() :
@@ -459,6 +478,8 @@ void elasticsearch_plugin::plugin_startup()
    if(!graphene::utilities::checkES(es))
       FC_THROW_EXCEPTION(fc::exception, "ES database is not up in url ${url}", ("url", my->_elasticsearch_node_url));
    ilog("elasticsearch ACCOUNT HISTORY: plugin_startup() begin");
+
+   my->populatePowTable();
 }
 
 } }
