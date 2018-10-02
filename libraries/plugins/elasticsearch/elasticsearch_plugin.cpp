@@ -43,7 +43,6 @@ class elasticsearch_plugin_impl
       virtual ~elasticsearch_plugin_impl();
 
       bool update_account_histories( const signed_block& b );
-      void populatePowTable();
 
       graphene::chain::database& database()
       {
@@ -73,7 +72,21 @@ class elasticsearch_plugin_impl
       std::string bulk_line;
       std::string index_name;
       bool is_sync = false;
-      map <uint8_t , uint64_t > lookup_pow_table;
+      const double lookup_pow_table[13] = {
+              1,
+              10,
+              100,
+              1000,
+              10000,
+              100000,
+              1000000,
+              10000000,
+              100000000,
+              1000000000,
+              10000000000,
+              100000000000,
+              1000000000000
+      };
    private:
       bool add_elasticsearch( const account_id_type account_id, const optional<operation_history_object>& oho );
       const account_transaction_history_object& addNewEntry(const account_statistics_object& stats_obj,
@@ -384,23 +397,6 @@ void elasticsearch_plugin_impl::populateESstruct()
    es.query = "";
 }
 
-void elasticsearch_plugin_impl::populatePowTable()
-{
-   lookup_pow_table[0] = 1;
-   lookup_pow_table[1] = 10;
-   lookup_pow_table[2] = 100;
-   lookup_pow_table[3] = 1000;
-   lookup_pow_table[4] = 10000;
-   lookup_pow_table[5] = 100000;
-   lookup_pow_table[6] = 1000000;
-   lookup_pow_table[7] = 10000000;
-   lookup_pow_table[8] = 100000000;
-   lookup_pow_table[9] = 1000000000;
-   lookup_pow_table[10] = 10000000000;
-   lookup_pow_table[11] = 100000000000;
-   lookup_pow_table[12] = 1000000000000;
-}
-
 } // end namespace detail
 
 elasticsearch_plugin::elasticsearch_plugin() :
@@ -478,8 +474,6 @@ void elasticsearch_plugin::plugin_startup()
    if(!graphene::utilities::checkES(es))
       FC_THROW_EXCEPTION(fc::exception, "ES database is not up in url ${url}", ("url", my->_elasticsearch_node_url));
    ilog("elasticsearch ACCOUNT HISTORY: plugin_startup() begin");
-
-   my->populatePowTable();
 }
 
 } }
