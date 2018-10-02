@@ -72,21 +72,6 @@ class elasticsearch_plugin_impl
       std::string bulk_line;
       std::string index_name;
       bool is_sync = false;
-      const double lookup_pow_table[13] = {
-              1,
-              10,
-              100,
-              1000,
-              10000,
-              100000,
-              1000000,
-              10000000,
-              100000000,
-              1000000000,
-              10000000000,
-              100000000000,
-              1000000000000
-      };
    private:
       bool add_elasticsearch( const account_id_type account_id, const optional<operation_history_object>& oho );
       const account_transaction_history_object& addNewEntry(const account_statistics_object& stats_obj,
@@ -250,12 +235,12 @@ void elasticsearch_plugin_impl::doVisitor(const optional <operation_history_obje
    vs.fee_data.asset = o_v.fee_asset;
    vs.fee_data.asset_name = o_v.fee_asset(db).symbol;
    vs.fee_data.amount = o_v.fee_amount;
-   vs.fee_data.amount_units = (double)(o_v.fee_amount.value)/lookup_pow_table[o_v.fee_asset(db).precision];
+   vs.fee_data.amount_units = (o_v.fee_amount.value)/asset::scaled_precision(o_v.fee_asset(db).precision).value;
 
    vs.transfer_data.asset = o_v.transfer_asset_id;
    vs.transfer_data.asset_name = o_v.transfer_asset_id(db).symbol;
    vs.transfer_data.amount = o_v.transfer_amount;
-   vs.transfer_data.amount_units = (double)(o_v.transfer_amount.value)/lookup_pow_table[o_v.transfer_asset_id(db).precision];
+   vs.transfer_data.amount_units = (o_v.transfer_amount.value)/asset::scaled_precision(o_v.transfer_asset_id(db).precision).value;
    vs.transfer_data.from = o_v.transfer_from;
    vs.transfer_data.to = o_v.transfer_to;
 
@@ -264,14 +249,14 @@ void elasticsearch_plugin_impl::doVisitor(const optional <operation_history_obje
    vs.fill_data.pays_asset_id = o_v.fill_pays_asset_id;
    vs.fill_data.pays_asset_name = o_v.fill_pays_asset_id(db).symbol;
    vs.fill_data.pays_amount = o_v.fill_pays_amount;
-   vs.fill_data.pays_amount_units = (double)(o_v.fill_pays_amount.value)/lookup_pow_table[o_v.fill_pays_asset_id(db).precision];
+   vs.fill_data.pays_amount_units = (o_v.fill_pays_amount.value)/asset::scaled_precision(o_v.fill_pays_asset_id(db).precision).value;
    vs.fill_data.receives_asset_id = o_v.fill_receives_asset_id;
    vs.fill_data.receives_asset_name = o_v.fill_receives_asset_id(db).symbol;
    vs.fill_data.receives_amount = o_v.fill_receives_amount;
-   vs.fill_data.receives_amount_units = (double)(o_v.fill_receives_amount.value)/lookup_pow_table[o_v.fill_receives_asset_id(db).precision];
+   vs.fill_data.receives_amount_units = (o_v.fill_receives_amount.value)/asset::scaled_precision(o_v.fill_receives_asset_id(db).precision).value;
 
-   auto fill_price = (double)(o_v.fill_receives_amount.value/lookup_pow_table[o_v.fill_receives_asset_id(db).precision]) /
-           (double)(o_v.fill_pays_amount.value / lookup_pow_table[o_v.fill_pays_asset_id(db).precision]);
+   auto fill_price = (double)(o_v.fill_receives_amount.value/asset::scaled_precision(o_v.fill_receives_asset_id(db).precision).value) /
+           (o_v.fill_pays_amount.value / asset::scaled_precision(o_v.fill_pays_asset_id(db).precision).value);
    vs.fill_data.fill_price_units = fill_price;
    vs.fill_data.fill_price = o_v.fill_fill_price;
    vs.fill_data.is_maker = o_v.fill_is_maker;
