@@ -41,7 +41,7 @@ namespace bpo = boost::program_options;
 
 void new_chain_banner( const graphene::chain::database& db )
 {
-   std::cerr << "\n"
+   ilog("\n"
       "********************************\n"
       "*                              *\n"
       "*   ------- NEW CHAIN ------   *\n"
@@ -49,13 +49,11 @@ void new_chain_banner( const graphene::chain::database& db )
       "*   ------------------------   *\n"
       "*                              *\n"
       "********************************\n"
-      "\n";
+      "\n");
    if( db.get_slot_at_time( fc::time_point::now() ) > 200 )
    {
-      std::cerr << "Your genesis seems to have an old timestamp\n"
-         "Please consider using the --genesis-timestamp option to give your genesis a recent timestamp\n"
-         "\n"
-         ;
+      wlog("Your genesis seems to have an old timestamp");
+      wlog("Please consider using the --genesis-timestamp option to give your genesis a recent timestamp");
    }
 }
 
