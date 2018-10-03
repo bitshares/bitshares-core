@@ -143,7 +143,6 @@ void witness_plugin::plugin_startup()
 
 void witness_plugin::plugin_shutdown()
 {
-   // nothing to do
    _shutting_down = true;
 }
 
