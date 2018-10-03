@@ -144,6 +144,20 @@ void witness_plugin::plugin_startup()
 void witness_plugin::plugin_shutdown()
 {
    _shutting_down = true;
+
+   stop_block_production();
+}
+
+void witness_plugin::stop_block_production()
+{
+   try {
+      if( _block_production_task.valid() )
+         _block_production_task.cancel_and_wait(__FUNCTION__);
+   } catch(fc::canceled_exception&) {
+      //Expected exception. Move along.
+   } catch(fc::exception& e) {
+      edump((e.to_detail_string()));
+   }
 }
 
 void witness_plugin::refresh_witness_key_cache()
@@ -178,6 +192,8 @@ void witness_plugin::schedule_production_loop()
 
 block_production_condition::block_production_condition_enum witness_plugin::block_production_loop()
 {
+   if (_shutting_down) return block_production_condition::block_production_condition_enum::shutdown;
+
    block_production_condition::block_production_condition_enum result;
    fc::limited_mutable_variant_object capture( GRAPHENE_MAX_NESTED_OBJECTS );
    try
