@@ -235,12 +235,12 @@ void elasticsearch_plugin_impl::doVisitor(const optional <operation_history_obje
    vs.fee_data.asset = o_v.fee_asset;
    vs.fee_data.asset_name = o_v.fee_asset(db).symbol;
    vs.fee_data.amount = o_v.fee_amount;
-   vs.fee_data.amount_units = (o_v.fee_amount.value)/asset::scaled_precision(o_v.fee_asset(db).precision).value;
+   vs.fee_data.amount_units = (o_v.fee_amount.value)/(double)asset::scaled_precision(o_v.fee_asset(db).precision).value;
 
    vs.transfer_data.asset = o_v.transfer_asset_id;
    vs.transfer_data.asset_name = o_v.transfer_asset_id(db).symbol;
    vs.transfer_data.amount = o_v.transfer_amount;
-   vs.transfer_data.amount_units = (o_v.transfer_amount.value)/asset::scaled_precision(o_v.transfer_asset_id(db).precision).value;
+   vs.transfer_data.amount_units = (o_v.transfer_amount.value)/(double)asset::scaled_precision(o_v.transfer_asset_id(db).precision).value;
    vs.transfer_data.from = o_v.transfer_from;
    vs.transfer_data.to = o_v.transfer_to;
 
@@ -249,14 +249,14 @@ void elasticsearch_plugin_impl::doVisitor(const optional <operation_history_obje
    vs.fill_data.pays_asset_id = o_v.fill_pays_asset_id;
    vs.fill_data.pays_asset_name = o_v.fill_pays_asset_id(db).symbol;
    vs.fill_data.pays_amount = o_v.fill_pays_amount;
-   vs.fill_data.pays_amount_units = (o_v.fill_pays_amount.value)/asset::scaled_precision(o_v.fill_pays_asset_id(db).precision).value;
+   vs.fill_data.pays_amount_units = (o_v.fill_pays_amount.value)/(double)asset::scaled_precision(o_v.fill_pays_asset_id(db).precision).value;
    vs.fill_data.receives_asset_id = o_v.fill_receives_asset_id;
    vs.fill_data.receives_asset_name = o_v.fill_receives_asset_id(db).symbol;
    vs.fill_data.receives_amount = o_v.fill_receives_amount;
-   vs.fill_data.receives_amount_units = (o_v.fill_receives_amount.value)/asset::scaled_precision(o_v.fill_receives_asset_id(db).precision).value;
+   vs.fill_data.receives_amount_units = (o_v.fill_receives_amount.value)/(double)asset::scaled_precision(o_v.fill_receives_asset_id(db).precision).value;
 
-   auto fill_price = (double)(o_v.fill_receives_amount.value/asset::scaled_precision(o_v.fill_receives_asset_id(db).precision).value) /
-           (o_v.fill_pays_amount.value / asset::scaled_precision(o_v.fill_pays_asset_id(db).precision).value);
+   auto fill_price = (o_v.fill_receives_amount.value/(double)asset::scaled_precision(o_v.fill_receives_asset_id(db).precision).value) /
+           (o_v.fill_pays_amount.value/(double)asset::scaled_precision(o_v.fill_pays_asset_id(db).precision).value);
    vs.fill_data.fill_price_units = fill_price;
    vs.fill_data.fill_price = o_v.fill_fill_price;
    vs.fill_data.is_maker = o_v.fill_is_maker;
