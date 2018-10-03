@@ -84,6 +84,7 @@ private:
 
    boost::program_options::variables_map _options;
    bool _production_enabled = false;
+   bool _shutting_down = false;
    uint32_t _required_witness_participation = 33 * GRAPHENE_1_PERCENT;
    uint32_t _production_skip_flags = graphene::chain::database::skip_nothing;
 

@@ -144,6 +144,7 @@ void witness_plugin::plugin_startup()
 void witness_plugin::plugin_shutdown()
 {
    // nothing to do
+   _shutting_down = true;
 }
 
 void witness_plugin::refresh_witness_key_cache()
@@ -161,6 +162,8 @@ void witness_plugin::refresh_witness_key_cache()
 
 void witness_plugin::schedule_production_loop()
 {
+   if (_shutting_down) return;
+
    //Schedule for the next second's tick regardless of chain state
    // If we would wait less than 50ms, wait for the whole second.
    fc::time_point now = fc::time_point::now();
