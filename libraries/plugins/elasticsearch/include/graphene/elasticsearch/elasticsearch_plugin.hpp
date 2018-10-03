@@ -138,12 +138,16 @@ struct block_struct {
 
 struct fee_struct {
    asset_id_type asset;
+   std::string asset_name;
    share_type amount;
+   double amount_units;
 };
 
 struct transfer_struct {
    asset_id_type asset;
+   std::string asset_name;
    share_type amount;
+   double amount_units;
    account_id_type from;
    account_id_type to;
 };
@@ -152,10 +156,15 @@ struct fill_struct {
    object_id_type order_id;
    account_id_type account_id;
    asset_id_type pays_asset_id;
+   std::string pays_asset_name;
    share_type pays_amount;
+   double pays_amount_units;
    asset_id_type receives_asset_id;
+   std::string receives_asset_name;
    share_type receives_amount;
+   double receives_amount_units;
    double fill_price;
+   double fill_price_units;
    bool is_maker;
 };
 
@@ -178,8 +187,10 @@ struct bulk_struct {
 
 FC_REFLECT( graphene::elasticsearch::operation_history_struct, (trx_in_block)(op_in_trx)(operation_result)(virtual_op)(op) )
 FC_REFLECT( graphene::elasticsearch::block_struct, (block_num)(block_time)(trx_id) )
-FC_REFLECT( graphene::elasticsearch::fee_struct, (asset)(amount) )
-FC_REFLECT( graphene::elasticsearch::transfer_struct, (asset)(amount)(from)(to) )
-FC_REFLECT( graphene::elasticsearch::fill_struct, (order_id)(account_id)(pays_asset_id)(pays_amount)(receives_asset_id)(receives_amount)(fill_price)(is_maker))
+FC_REFLECT( graphene::elasticsearch::fee_struct, (asset)(asset_name)(amount)(amount_units) )
+FC_REFLECT( graphene::elasticsearch::transfer_struct, (asset)(asset_name)(amount)(amount_units)(from)(to) )
+FC_REFLECT( graphene::elasticsearch::fill_struct, (order_id)(account_id)(pays_asset_id)(pays_asset_name)(pays_amount)(pays_amount_units)
+                                                  (receives_asset_id)(receives_asset_name)(receives_amount)(receives_amount_units)(fill_price)
+                                                  (fill_price_units)(is_maker))
 FC_REFLECT( graphene::elasticsearch::visitor_struct, (fee_data)(transfer_data)(fill_data) )
 FC_REFLECT( graphene::elasticsearch::bulk_struct, (account_history)(operation_history)(operation_type)(operation_id_num)(block_data)(additional_data) )
