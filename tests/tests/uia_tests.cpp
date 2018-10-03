@@ -473,21 +473,26 @@ bool test_asset_name(graphene::chain::database_fixture* db, const graphene::chai
  * @param allowed_end true if it should be allowed at the end of an asset name
  * @returns true if tests met expectations
  */
-bool test_asset_char(graphene::chain::database_fixture* db, const graphene::chain::account_object& acct, const char c, bool allowed_beginning, bool allowed_middle, bool allowed_end)
+bool test_asset_char(graphene::chain::database_fixture* db, const graphene::chain::account_object& acct, const unsigned char& c, bool allowed_beginning, bool allowed_middle, bool allowed_end)
 {
+   std::ostringstream asset_name;
    // beginning
-   std::string asset_name = std::string("") + c + "CHARLIE";
-   if (!test_asset_name(db, acct, asset_name, allowed_beginning))
+   asset_name << c << "CHARLIE";
+   if (!test_asset_name(db, acct, asset_name.str(), allowed_beginning))
       return false;
 
    // middle
-   asset_name = std::string("CHAR") + c + "LIE";
-   if (!test_asset_name(db, acct, asset_name, allowed_middle))
+   asset_name.str("");
+   asset_name.clear();
+   asset_name << "CHAR" << c << "LIE";
+   if (!test_asset_name(db, acct, asset_name.str(), allowed_middle))
       return false;
 
    // end
-   asset_name = std::string("CHARLIE") + c;
-   return test_asset_name(db, acct, asset_name, allowed_end);
+   asset_name.str("");
+   asset_name.clear();
+   asset_name << "CHARLIE" << c;
+   return test_asset_name(db, acct, asset_name.str(), allowed_end);
 }
 
 BOOST_AUTO_TEST_CASE( asset_name_test )
@@ -574,15 +579,17 @@ BOOST_AUTO_TEST_CASE( asset_name_test )
       PUSH_TX( db, tx_hf620 );
 
       // assets with invalid characters should not be allowed
-      for (int c = 0; c < 128; ++c)
+      unsigned char c = 0;
+      do
       {
          if ( (c >= 48 && c <= 57) ) // numbers
-            BOOST_CHECK_MESSAGE( test_asset_char(this, alice_id(db), c, false, true, true), "Failed on good char " + std::to_string(c) );
+            BOOST_CHECK_MESSAGE( test_asset_char(this, alice_id(db), c, false, true, true), "Failed on good ASCII value " + std::to_string(c) );
          else if ( c >= 65 && c <= 90) // letters
-            BOOST_CHECK_MESSAGE( test_asset_char(this, alice_id(db), c, true, true, true), "Failed on good char " + std::to_string(c) );
+            BOOST_CHECK_MESSAGE( test_asset_char(this, alice_id(db), c, true, true, true), "Failed on good ASCII value " + std::to_string(c) );
          else                       // everything else
-            BOOST_CHECK_MESSAGE( test_asset_char(this, alice_id(db), c, false, false, false), "Failed on bad char " + std::to_string(c) );
-      }
+            BOOST_CHECK_MESSAGE( test_asset_char(this, alice_id(db), c, false, false, false), "Failed on bad ASCII value " + std::to_string(c) );
+         c++;
+      } while (c != 0);
    }
    catch(fc::exception& e)
    {
