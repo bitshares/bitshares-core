@@ -55,6 +55,13 @@ namespace graphene { namespace chain {
 using std::cout;
 using std::cerr;
 
+void clearable_block::clear()
+{
+   _calculated_merkle_root = checksum_type();
+   _signee = fc::ecc::public_key();
+   _block_id = block_id_type();
+}
+
 database_fixture::database_fixture()
    : app(), db( *app.chain_database() )
 {

@@ -1057,7 +1057,6 @@ BOOST_FIXTURE_TEST_CASE( bogus_signature, database_fixture )
       PUSH_TX( db,  trx, skip  );
 
       trx.operations.push_back( xfer_op );
-      trx.signees.clear(); // signees should be invalidated
       BOOST_TEST_MESSAGE( "Invalidating Alices Signature" );
       // Alice's signature is now invalid
       GRAPHENE_REQUIRE_THROW( PUSH_TX( db,  trx, skip  ), fc::exception );

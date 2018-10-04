@@ -80,11 +80,12 @@ BOOST_AUTO_TEST_CASE( block_database_test )
       FC_ASSERT( !bdb.is_open() );
       bdb.open( data_dir.path() );
 
-      signed_block b;
+      clearable_block b;
       for( uint32_t i = 0; i < 5; ++i )
       {
          if( i > 0 ) b.previous = b.id();
          b.witness = witness_id_type(i+1);
+         b.clear();
          bdb.store( b.id(), b );
 
          auto fetch = bdb.fetch_by_number( b.block_num() );
@@ -976,7 +977,6 @@ BOOST_FIXTURE_TEST_CASE( double_sign_check, database_fixture )
 
    BOOST_TEST_MESSAGE( "Verify that signing once with the proper key passes" );
    trx.signatures.pop_back();
-   trx.signees.clear(); // signees should be invalidated
    db.push_transaction(trx, 0);
 
 } FC_LOG_AND_RETHROW() }
