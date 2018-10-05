@@ -143,13 +143,13 @@ void witness_plugin::plugin_startup()
 
 void witness_plugin::plugin_shutdown()
 {
-   _shutting_down = true;
-
    stop_block_production();
 }
 
 void witness_plugin::stop_block_production()
 {
+   _shutting_down = true;
+   
    try {
       if( _block_production_task.valid() )
          _block_production_task.cancel_and_wait(__FUNCTION__);
