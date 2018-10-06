@@ -121,9 +121,9 @@ set<account_id_type> account_member_index::get_account_members(const account_obj
       result.insert(auth.first);
    return result;
 }
-set<public_key_type> account_member_index::get_key_members(const account_object& a)const
+set<public_key_type, account_member_index::key_compare> account_member_index::get_key_members(const account_object& a)const
 {
-   set<public_key_type> result;
+   set<public_key_type, key_compare> result;
    for( auto auth : a.owner.key_auths )
       result.insert(auth.first);
    for( auto auth : a.active.key_auths )
@@ -215,7 +215,7 @@ void account_member_index::object_modified(const object& after)
 
 
     {
-       set<public_key_type> after_key_members = get_key_members(a);
+       set<public_key_type, key_compare> after_key_members = get_key_members(a);
 
        vector<public_key_type> removed; removed.reserve(before_key_members.size());
        std::set_difference(before_key_members.begin(), before_key_members.end(),
