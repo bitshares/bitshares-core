@@ -90,6 +90,12 @@ struct market_ticker
    string                     percent_change;
    string                     base_volume;
    string                     quote_volume;
+
+   market_ticker() {}
+   market_ticker(const market_ticker_object& mto,
+                 const fc::time_point_sec& now,
+                 const asset_object& asset_base,
+                 const asset_object& asset_quote);
 };
 
 struct market_volume
