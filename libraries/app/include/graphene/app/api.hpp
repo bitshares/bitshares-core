@@ -185,33 +185,33 @@ namespace graphene { namespace app {
                                                                         unsigned limit = 100,
                                                                         uint32_t start = 0) const;
          /**
-          * @brief Get applied and filled order operations (limit/call/settlement orders) with b:a pair
-          * @param a asset in pair
-          * @param b asset in pair
-          * @param limit Maximum count of applied and filled order operations (limit/call/settlement orders) 
-          * to retrieve with b:a pair
-          * @return applied and filled order operations (limit/call/settlement orders) with b:a pair
+          * @brief Get details of order executions occurred most recently in a trading pair
+          * @param a One asset in a trading pair
+          * @param b The other asset in the trading pair
+          * @param limit Maximum records to return
+          * @return a list of order_history objects, in "most recent first" order
           */
          vector<order_history_object> get_fill_order_history( asset_id_type a, asset_id_type b, uint32_t limit )const;
 
          /**
-          * @brief Get accumulated market history with b:a pair
-          * Thus supporting OHLC
-          * @param a asset in pair
-          * @param b asset in pair
-          * @param bucket_seconds Represents the length in seconds of bucket.
-          * Note that bucket_seconds need to be within result of get_market_history_buckets(), otherwise no data will be returned
-          * @param start Time point in seconds from where buckets begin, E.G. "YYYY-MM-DDThh:mm:ss"
-          * @param end Time point in seconds where buckets stop, E.G. "YYYY-MM-DDThh:mm:ss"
-          * @return A history in market with b:a pair (limit to retrieve is less than 200 buckets)
+          * @brief Get OHLCV data of a trading pair in a time range
+          * @param a One asset in a trading pair
+          * @param b The other asset in the trading pair
+          * @param bucket_seconds Length of each time bucket in seconds. 
+          * Note: it need to be within result of get_market_history_buckets() API, otherwise no data will be returned
+          * @param start The start of a time range, E.G. "2018-01-01T00:00:00"
+          * @param end The end of the time range
+          * @return A list of OHLCV data, in "least recent first" order. 
+          * If there are more than 200 records in the specified time range, the first 200 records will be returned.
           */
          vector<bucket_object> get_market_history( asset_id_type a, asset_id_type b, uint32_t bucket_seconds,
                                                    fc::time_point_sec start, fc::time_point_sec end )const;
 
          /**
-          * @brief Get list of seconds for grouping applied and filled order operations (limit/call/settlement orders)
-          * @return A list of seconds as unsigned integers. The list comes from program options or from config file.
-          */                                          
+          * @brief Get OHLCV time bucket lengths supported (configured) by this API server
+          * @return A list of time bucket lengths in seconds. E.G. if the result contains a number "300", 
+          * it means this API server supports OHLCV data aggregated in 5-minute buckets.
+          */                                 
          flat_set<uint32_t> get_market_history_buckets()const;
       private:
            application& _app;
