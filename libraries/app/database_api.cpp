@@ -122,6 +122,8 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       market_volume                      get_24_volume( const string& base, const string& quote )const;
       order_book                         get_order_book( const string& base, const string& quote, unsigned limit = 50 )const;
       vector<market_ticker>              get_top_markets(uint32_t limit)const;
+      market_ticker                      buildTicker(const market_ticker_object& mto) const;
+      market_ticker                      appendOrderBookToTicker(market_ticker& ticker) const;
       vector<market_trade>               get_trade_history( const string& base, const string& quote, fc::time_point_sec start, fc::time_point_sec stop, unsigned limit = 100 )const;
       vector<market_trade>               get_trade_history_by_sequence( const string& base, const string& quote, int64_t start, fc::time_point_sec stop, unsigned limit = 100 )const;
 
@@ -225,23 +227,6 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
          }
          FC_ASSERT( account, "no such account" );
          return account;
-      }
-      market_ticker buildTicker(const market_ticker_object& mto) const
-      {
-         const auto assets = get_assets( { mto.base, mto.quote } );
-         const fc::time_point_sec now = _db.head_block_time();
-
-         market_ticker ticker(mto, now, *assets[0], *assets[1]);
-         return ticker;
-      }
-
-      market_ticker appendOrderBookToTicker(market_ticker& ticker) const
-      {
-         const auto orders = get_order_book(ticker.base, ticker.quote, 1);
-         if (!orders.asks.empty()) ticker.lowest_ask = orders.asks[0].price;
-         if (!orders.bids.empty()) ticker.highest_bid = orders.bids[0].price;
-
-         return ticker;
       }
 
       template<typename T>
@@ -1471,6 +1456,21 @@ vector<market_ticker> database_api_impl::get_top_markets(uint32_t limit)const
       ++itr;
    }
    return result;
+}
+market_ticker database_api_impl::buildTicker(const market_ticker_object& mto) const
+{
+   const auto assets = get_assets( { mto.base, mto.quote } );
+   const fc::time_point_sec now = _db.head_block_time();
+   market_ticker ticker(mto, now, *assets[0], *assets[1]);
+   return ticker;
+}
+
+market_ticker database_api_impl::appendOrderBookToTicker(market_ticker& ticker) const
+{
+   const auto orders = get_order_book(ticker.base, ticker.quote, 1);
+   if (!orders.asks.empty()) ticker.lowest_ask = orders.asks[0].price;
+   if (!orders.bids.empty()) ticker.highest_bid = orders.bids[0].price;
+   return ticker;
 }
 
 vector<market_trade> database_api::get_trade_history( const string& base,
