@@ -244,6 +244,7 @@ void es_objects_plugin_impl::PrepareAccount(const account_object& account_object
    acct.active_key_auths = fc::json::to_string(account_object.active.key_auths);
    acct.active_address_auths = fc::json::to_string(account_object.active.address_auths);
    acct.voting_account = account_object.options.voting_account;
+   acct.votes = fc::json::to_string(account_object.options.votes);
 
    std::string data = fc::json::to_string(acct);
 
