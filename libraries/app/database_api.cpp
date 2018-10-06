@@ -1467,8 +1467,7 @@ vector<market_ticker> database_api_impl::get_top_markets(uint32_t limit)const
    while( itr != volume_idx.rend() && result.size() < limit)
    {
       auto ticker = buildTicker(*itr);
-      ticker = appendOrderBookToTicker(ticker);
-      result.emplace_back( std::move(ticker) );
+      result.emplace_back( appendOrderBookToTicker(ticker) );
       ++itr;
    }
    return result;
