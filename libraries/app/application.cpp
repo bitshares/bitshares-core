@@ -394,8 +394,11 @@ void application_impl::startup()
       _chain_db->enable_standby_votes_tracking( _options->at("enable-standby-votes-tracking").as<bool>() );
    }
 
-   if( _options->count("replay-blockchain") )
+   if( _options->count("replay-blockchain") || _options->count("revalidate-blockchain") )
       _chain_db->wipe( _data_dir / "blockchain", false );
+
+   if( _options->count("revalidate-blockchain") )
+      _chain_db->_replay_with_validation = true;
 
    try
    {
@@ -961,9 +964,10 @@ void application::set_program_options(boost::program_options::options_descriptio
           "Path to create a Genesis State at. If a well-formed JSON file exists at the path, it will be parsed and any "
           "missing fields in a Genesis State will be added, and any unknown fields will be removed. If no file or an "
           "invalid file is found, it will be replaced with an example Genesis State.")
-         ("replay-blockchain", "Rebuild object graph by replaying all blocks")
+         ("replay-blockchain", "Rebuild object graph by replaying all blocks without validatino")
+         ("revalidate-blockchain", "Rebuild object graph by replaying all blocks with full validation")
          ("resync-blockchain", "Delete all blocks and re-sync with network from scratch")
-         ("force-validate", "Force validation of all transactions")
+         ("force-validate", "Force validation of all transactions during normal operation")
          ("genesis-timestamp", bpo::value<uint32_t>(),
           "Replace timestamp from genesis.json with current time plus this many seconds (experts only!)")
          ;
