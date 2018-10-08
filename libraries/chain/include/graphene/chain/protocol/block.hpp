@@ -23,8 +23,13 @@
  */
 #pragma once
 #include <graphene/chain/protocol/transaction.hpp>
+#include <graphene/chain/protocol/version.hpp>
 
 namespace graphene { namespace chain {
+
+   typedef static_variant< version >         block_header_extensions;
+   // for future extensions 
+   typedef flat_set<block_header_extensions> block_header_extensions_type;
 
    struct block_header
    {
@@ -36,7 +41,7 @@ namespace graphene { namespace chain {
       checksum_type                 transaction_merkle_root;
       // Note: when we need to add data to `extensions`, remember to review `database::_generate_block()`.
       //       More info in https://github.com/bitshares/bitshares-core/issues/1136
-      extensions_type               extensions;
+      block_header_extensions_type  extensions;
 
       static uint32_t num_from_id(const block_id_type& id);
    };
@@ -58,6 +63,9 @@ namespace graphene { namespace chain {
    };
 
 } } // graphene::chain
+
+FC_REFLECT_TYPENAME( graphene::chain::block_header_extensions )
+FC_REFLECT_TYPENAME( graphene::chain::block_header_extensions_type )
 
 FC_REFLECT( graphene::chain::block_header, (previous)(timestamp)(witness)(transaction_merkle_root)(extensions) )
 FC_REFLECT_DERIVED( graphene::chain::signed_block_header, (graphene::chain::block_header), (witness_signature) )
