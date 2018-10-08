@@ -55,7 +55,7 @@ void_result asset_create_evaluator::do_evaluate( const asset_create_operation& o
    auto asset_symbol_itr = asset_indx.find( op.symbol );
    FC_ASSERT( asset_symbol_itr == asset_indx.end() );
 
-   if( d.head_block_time() > HARDFORK_385_TIME )
+   if( d.head_block_time() > HARDFORK_385_VERSION )
    {
       auto dotpos = op.symbol.rfind( '.' );
       if( dotpos != std::string::npos )
@@ -68,7 +68,7 @@ void_result asset_create_evaluator::do_evaluate( const asset_create_operation& o
                     ("s",op.symbol)("p",prefix)("i", op.issuer(d).name) );
       }
 
-      if(d.head_block_time() <= HARDFORK_CORE_620_TIME ) { // TODO: remove this check after hf_620
+      if(d.head_block_time() <= HARDFORK_CORE_620_VERSION ) { // TODO: remove this check after hf_620
          static const std::locale& loc = std::locale::classic();
          FC_ASSERT(isalpha(op.symbol.back(), loc), "Asset ${s} must end with alpha character before hardfork 620", ("s",op.symbol));
       }
@@ -117,7 +117,7 @@ object_id_type asset_create_evaluator::do_apply( const asset_create_operation& o
 { try {
    database& d = db();
 
-   bool hf_429 = fee_is_odd && d.head_block_time() > HARDFORK_CORE_429_TIME;
+   bool hf_429 = fee_is_odd && d.head_block_time() > HARDFORK_CORE_429_VERSION;
 
    const asset_dynamic_data_object& dyn_asset =
       d.create<asset_dynamic_data_object>( [hf_429,this]( asset_dynamic_data_object& a ) {
@@ -272,12 +272,12 @@ void_result asset_update_evaluator::do_evaluate(const asset_update_operation& o)
 
    if( o.new_issuer )
    {
-      FC_ASSERT( d.head_block_time() < HARDFORK_CORE_199_TIME,
+      FC_ASSERT( d.head_block_time() < HARDFORK_CORE_199_VERSION,
                  "Since Hardfork #199, updating issuer requires the use of asset_update_issuer_operation.");
       validate_new_issuer( d, a, *o.new_issuer );
    }
 
-   if( (d.head_block_time() < HARDFORK_572_TIME) || (a.dynamic_asset_data_id(d).current_supply != 0) )
+   if( (d.head_block_time() < HARDFORK_572_VERSION) || (a.dynamic_asset_data_id(d).current_supply != 0) )
    {
       // new issuer_permissions must be subset of old issuer permissions
       FC_ASSERT(!(o.new_options.issuer_permissions & ~a.options.issuer_permissions),
@@ -357,9 +357,9 @@ void_result asset_update_issuer_evaluator::do_evaluate(const asset_update_issuer
               "Incorrect issuer for asset! (${o.issuer} != ${a.issuer})",
               ("o.issuer", o.issuer)("a.issuer", a.issuer) );
 
-   if( d.head_block_time() < HARDFORK_CORE_199_TIME )
+   if( d.head_block_time() < HARDFORK_CORE_199_VERSION )
    {
-      // TODO: remove after HARDFORK_CORE_199_TIME has passed
+      // TODO: remove after HARDFORK_CORE_199_VERSION has passed
       FC_ASSERT(false, "Not allowed until hardfork 199");
    }
 
@@ -459,7 +459,7 @@ void_result asset_update_bitasset_evaluator::do_evaluate(const asset_update_bita
 
    FC_ASSERT( !current_bitasset_data.has_settlement(), "Cannot update a bitasset after a global settlement has executed" );
 
-   bool after_hf_core_922_931 = ( d.get_dynamic_global_properties().next_maintenance_time > HARDFORK_CORE_922_931_TIME );
+   bool after_hf_core_922_931 = ( d.get_dynamic_global_properties().next_maintenance_time > HARDFORK_CORE_922_931_VERSION );
 
    // Are we changing the backing asset?
    if( op.new_options.short_backing_asset != current_bitasset_data.options.short_backing_asset )
@@ -639,7 +639,7 @@ static bool update_bitasset_object_options(
       asset_bitasset_data_object& bdo, const asset_object& asset_to_update )
 {
    const fc::time_point_sec& next_maint_time = db.get_dynamic_global_properties().next_maintenance_time;
-   bool after_hf_core_868_890 = ( next_maint_time > HARDFORK_CORE_868_890_TIME );
+   bool after_hf_core_868_890 = ( next_maint_time > HARDFORK_CORE_868_890_VERSION );
 
    // If the minimum number of feeds to calculate a median has changed, we need to recalculate the median
    bool should_update_feeds = false;
@@ -696,7 +696,7 @@ static bool update_bitasset_object_options(
       //      2. if wlog did not actually get called
 
       // We need to call check_call_orders if the price feed changes after hardfork core-935
-      if( next_maint_time > HARDFORK_CORE_935_TIME )
+      if( next_maint_time > HARDFORK_CORE_935_VERSION )
          return ( !( old_feed == bdo.current_feed ) );
 
       // We need to call check_call_orders if the settlement price changes after hardfork core-868-890
@@ -840,7 +840,7 @@ void_result asset_settle_evaluator::do_evaluate(const asset_settle_evaluator::op
    if( bitasset.is_prediction_market )
       FC_ASSERT( bitasset.has_settlement(), "global settlement must occur before force settling a prediction market"  );
    else if( bitasset.current_feed.settlement_price.is_null()
-            && ( d.head_block_time() <= HARDFORK_CORE_216_TIME
+            && ( d.head_block_time() <= HARDFORK_CORE_216_VERSION
                  || !bitasset.has_settlement() ) )
       FC_THROW_EXCEPTION(insufficient_feeds, "Cannot force settle with no price feed.");
    FC_ASSERT(d.get_balance(d.get(op.account), *asset_to_settle) >= op.amount);
@@ -865,7 +865,7 @@ operation_result asset_settle_evaluator::do_apply(const asset_settle_evaluator::
 
       if( settled_amount.amount == 0 && !bitasset.is_prediction_market )
       {
-         if( d.get_dynamic_global_properties().next_maintenance_time > HARDFORK_CORE_184_TIME )
+         if( d.get_dynamic_global_properties().next_maintenance_time > HARDFORK_CORE_184_VERSION )
             FC_THROW( "Settle amount is too small to receive anything due to rounding" );
          else // TODO remove this warning after hard fork core-184
             wlog( "Something for nothing issue (#184, variant F) occurred at block #${block}", ("block",d.head_block_num()) );
@@ -874,7 +874,7 @@ operation_result asset_settle_evaluator::do_apply(const asset_settle_evaluator::
       asset pays = op.amount;
       if( op.amount.amount != mia_dyn.current_supply
             && settled_amount.amount != 0
-            && d.get_dynamic_global_properties().next_maintenance_time > HARDFORK_CORE_342_TIME )
+            && d.get_dynamic_global_properties().next_maintenance_time > HARDFORK_CORE_342_VERSION )
       {
          pays = settled_amount.multiply_and_round_up( bitasset.settlement_price );
       }
@@ -916,7 +916,7 @@ void_result asset_publish_feeds_evaluator::do_evaluate(const asset_publish_feed_
    FC_ASSERT( base.is_market_issued(), "Can only publish price feeds for market-issued assets" );
 
    const asset_bitasset_data_object& bitasset = base.bitasset_data(d);
-   if( bitasset.is_prediction_market || d.head_block_time() <= HARDFORK_CORE_216_TIME )
+   if( bitasset.is_prediction_market || d.head_block_time() <= HARDFORK_CORE_216_VERSION )
    {
       FC_ASSERT( !bitasset.has_settlement(), "No further feeds may be published after a settlement event" );
    }
@@ -925,7 +925,7 @@ void_result asset_publish_feeds_evaluator::do_evaluate(const asset_publish_feed_
    FC_ASSERT( o.feed.settlement_price.quote.asset_id == bitasset.options.short_backing_asset,
               "Quote asset type in settlement price should be same as backing asset of this asset" );
 
-   if( d.head_block_time() > HARDFORK_480_TIME )
+   if( d.head_block_time() > HARDFORK_480_VERSION )
    {
       if( !o.feed.core_exchange_rate.is_null() )
       {
@@ -982,7 +982,7 @@ void_result asset_publish_feeds_evaluator::do_apply(const asset_publish_feed_ope
 
    if( !(old_feed == bad.current_feed) )
    {
-      if( bad.has_settlement() ) // implies head_block_time > HARDFORK_CORE_216_TIME
+      if( bad.has_settlement() ) // implies head_block_time > HARDFORK_CORE_216_VERSION
       {
          const auto& mia_dyn = base.dynamic_asset_data_id(d);
          if( !bad.current_feed.settlement_price.is_null()
@@ -1003,7 +1003,7 @@ void_result asset_publish_feeds_evaluator::do_apply(const asset_publish_feed_ope
 
 void_result asset_claim_fees_evaluator::do_evaluate( const asset_claim_fees_operation& o )
 { try {
-   FC_ASSERT( db().head_block_time() > HARDFORK_413_TIME );
+   FC_ASSERT( db().head_block_time() > HARDFORK_413_VERSION );
    FC_ASSERT( o.amount_to_claim.asset_id(db()).issuer == o.issuer, "Asset fees may only be claimed by the issuer" );
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }
@@ -1029,7 +1029,7 @@ void_result asset_claim_fees_evaluator::do_apply( const asset_claim_fees_operati
 
 void_result asset_claim_pool_evaluator::do_evaluate( const asset_claim_pool_operation& o )
 { try {
-    FC_ASSERT( db().head_block_time() >= HARDFORK_CORE_188_TIME,
+    FC_ASSERT( db().head_block_time() >= HARDFORK_CORE_188_VERSION,
          "This operation is only available after Hardfork #188!" );
     FC_ASSERT( o.asset_id(db()).issuer == o.issuer, "Asset fee pool may only be claimed by the issuer" );
 

@@ -184,7 +184,7 @@ BOOST_AUTO_TEST_CASE( old_call_order_update_test_after_hardfork_583 )
 {
    try {
 
-      generate_blocks( HARDFORK_CORE_583_TIME );
+      generate_blocks( HARDFORK_CORE_583_VERSION );
       generate_block();
       set_expiration( db, trx );
 
@@ -287,7 +287,7 @@ BOOST_AUTO_TEST_CASE( old_call_order_update_test_after_hardfork_583 )
 BOOST_AUTO_TEST_CASE( asset_settle_cancel_operation_test_after_hf588 )
 {
    // fast jump to hardfork time
-   generate_blocks( HARDFORK_CORE_588_TIME );
+   generate_blocks( HARDFORK_CORE_588_VERSION );
    // one more block to pass hardfork time
    generate_block();
    set_expiration( db, trx );
@@ -451,7 +451,7 @@ BOOST_AUTO_TEST_CASE( more_call_order_update_test_after_hardfork_583 )
 {
    try {
 
-      generate_blocks( HARDFORK_CORE_583_TIME );
+      generate_blocks( HARDFORK_CORE_583_VERSION );
       generate_block();
       set_expiration( db, trx );
 
@@ -601,7 +601,7 @@ BOOST_AUTO_TEST_CASE( call_order_update_target_cr_hardfork_time_test )
 {
    try {
       auto mi = db.get_global_properties().parameters.maintenance_interval;
-      generate_blocks(HARDFORK_CORE_834_TIME - mi);
+      generate_blocks(HARDFORK_CORE_834_VERSION - mi);
 
       set_expiration( db, trx );
 
@@ -730,7 +730,7 @@ BOOST_AUTO_TEST_CASE( margin_call_limit_test )
       // protection threshold.
       BOOST_TEST_MESSAGE( "Creating a margin call that is NOT protected by the max short squeeze price" );
       auto order = create_sell_order( borrower2, bitusd.amount(1000), core.amount(1400) );
-      if( db.head_block_time() <= HARDFORK_436_TIME )
+      if( db.head_block_time() <= HARDFORK_436_VERSION )
       {
          BOOST_CHECK( order == nullptr );
 
@@ -862,7 +862,7 @@ BOOST_AUTO_TEST_CASE( prediction_market_resolves_to_0 )
 BOOST_AUTO_TEST_CASE( create_account_test )
 {
    try {
-      generate_blocks( HARDFORK_CORE_143_TIME );
+      generate_blocks( HARDFORK_CORE_143_VERSION );
       set_expiration( db, trx );
       trx.operations.push_back(make_account());
       account_create_operation op = trx.operations.back().get<account_create_operation>();
@@ -1357,7 +1357,7 @@ BOOST_AUTO_TEST_CASE( update_uia_issuer )
       GRAPHENE_REQUIRE_THROW( update_issuer_proposal( test_id, alice_id(db), bob_id(db), alice_owner), fc::exception );
 
       // Fast Forward to Hardfork time
-      generate_blocks( HARDFORK_CORE_199_TIME );
+      generate_blocks( HARDFORK_CORE_199_VERSION );
 
       BOOST_TEST_MESSAGE( "After hardfork time, proposal goes through (but doesn't execute yet)" );
       update_issuer_proposal( test_id, alice_id(db), bob_id(db), alice_owner);

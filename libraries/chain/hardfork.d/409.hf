@@ -1,4 +1,4 @@
 // #409 Allow creation of sub-assets
-#ifndef HARDFORK_409_TIME
-#define HARDFORK_409_TIME (graphene::chain::version(2,2,0, fc::time_point_sec( 1446652800 ) ) )
+#ifndef HARDFORK_409_VERSION
+#define HARDFORK_409_VERSION (graphene::chain::version(2,2,0, fc::time_point_sec( 1446652800 ) ) )
 #endif

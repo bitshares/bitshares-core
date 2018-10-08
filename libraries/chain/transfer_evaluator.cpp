@@ -102,7 +102,7 @@ void_result override_transfer_evaluator::do_evaluate( const override_transfer_op
    FC_ASSERT( is_authorized_asset( d, to_account, asset_type ) );
    FC_ASSERT( is_authorized_asset( d, from_account, asset_type ) );
 
-   if( d.head_block_time() <= HARDFORK_419_TIME )
+   if( d.head_block_time() <= HARDFORK_419_VERSION )
    {
       FC_ASSERT( is_authorized_asset( d, from_account, asset_type ) );
    }

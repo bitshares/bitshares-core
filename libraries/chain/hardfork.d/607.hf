@@ -1,4 +1,4 @@
 // #607 Disable negative voting on workers
-#ifndef HARDFORK_607_TIME
-#define HARDFORK_607_TIME (graphene::chain::version(2,7,0, fc::time_point_sec( 1458752400 ) ) ) 
+#ifndef HARDFORK_607_VERSION
+#define HARDFORK_607_VERSION (graphene::chain::version(2,7,0, fc::time_point_sec( 1458752400 ) ) ) 
 #endif

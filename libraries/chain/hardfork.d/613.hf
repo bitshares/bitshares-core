@@ -1,4 +1,4 @@
 // #613 Deprecate annual membership
-#ifndef HARDFORK_613_TIME
-#define HARDFORK_613_TIME (graphene::chain::version(2,7,0, fc::time_point_sec( 1458752400 ) ) ) 
+#ifndef HARDFORK_613_VERSION
+#define HARDFORK_613_VERSION (graphene::chain::version(2,7,0, fc::time_point_sec( 1458752400 ) ) ) 
 #endif

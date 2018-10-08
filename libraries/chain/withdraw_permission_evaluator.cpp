@@ -65,7 +65,7 @@ void_result withdraw_permission_claim_evaluator::do_evaluate(const withdraw_perm
    FC_ASSERT(permit.expiration > head_block_time);
    FC_ASSERT(permit.authorized_account == op.withdraw_to_account);
    FC_ASSERT(permit.withdraw_from_account == op.withdraw_from_account);
-   if (head_block_time >= HARDFORK_23_TIME) {
+   if (head_block_time >= HARDFORK_23_VERSION) {
       FC_ASSERT(permit.period_start_time <= head_block_time);
    }
    FC_ASSERT(op.amount_to_withdraw <= permit.available_this_period( head_block_time ) );
@@ -86,7 +86,7 @@ void_result withdraw_permission_claim_evaluator::do_evaluate(const withdraw_perm
 
    const account_object& from  = op.withdraw_from_account(d);
    bool from_is_authorized = ( is_authorized_asset( d, from, _asset ) );
-   if( head_block_time > HARDFORK_CORE_942_TIME ) // TODO remove this check after hard fork if things in `else` did not occur
+   if( head_block_time > HARDFORK_CORE_942_VERSION ) // TODO remove this check after hard fork if things in `else` did not occur
    {
       FC_ASSERT( from_is_authorized,
                  "Account ${acct} '${name}' is unauthorized to withdraw asset ${a} '${sym}' due to whitelist / blacklist",

@@ -163,7 +163,7 @@ void database::update_worker_votes()
    const auto& idx = get_index_type<worker_index>().indices().get<by_account>();
    auto itr = idx.begin();
    auto itr_end = idx.end();
-   bool allow_negative_votes = (head_block_time() < HARDFORK_607_TIME);
+   bool allow_negative_votes = (head_block_time() < HARDFORK_607_VERSION);
    while( itr != itr_end )
    {
       modify( *itr, [this,allow_negative_votes]( worker_object& obj )
@@ -277,7 +277,7 @@ void database::update_active_witnesses()
    // Update witness authority
    modify( get(GRAPHENE_WITNESS_ACCOUNT), [this,&wits]( account_object& a )
    {
-      if( head_block_time() < HARDFORK_533_TIME )
+      if( head_block_time() < HARDFORK_533_VERSION )
       {
          uint64_t total_votes = 0;
          map<account_id_type, uint64_t> weights;
@@ -378,7 +378,7 @@ void database::update_active_committee_members()
       const account_object& committee_account = get(GRAPHENE_COMMITTEE_ACCOUNT);
       modify( committee_account, [this,&committee_members](account_object& a)
       {
-         if( head_block_time() < HARDFORK_533_TIME )
+         if( head_block_time() < HARDFORK_533_VERSION )
          {
             uint64_t total_votes = 0;
             map<account_id_type, uint64_t> weights;
@@ -905,7 +905,7 @@ void database::process_bitassets()
 {
    time_point_sec head_time = head_block_time();
    uint32_t head_epoch_seconds = head_time.sec_since_epoch();
-   bool after_hf_core_518 = ( head_time >= HARDFORK_CORE_518_TIME ); // clear expired feeds
+   bool after_hf_core_518 = ( head_time >= HARDFORK_CORE_518_VERSION ); // clear expired feeds
 
    const auto update_bitasset = [this,head_time,head_epoch_seconds,after_hf_core_518]( asset_bitasset_data_object &o )
    {
@@ -1228,20 +1228,20 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
       }
    }
 
-   if( (dgpo.next_maintenance_time < HARDFORK_613_TIME) && (next_maintenance_time >= HARDFORK_613_TIME) )
+   if( (dgpo.next_maintenance_time < HARDFORK_613_VERSION) && (next_maintenance_time >= HARDFORK_613_VERSION) )
       deprecate_annual_members(*this);
 
    // To reset call_price of all call orders, then match by new rule
    bool to_update_and_match_call_orders = false;
-   if( (dgpo.next_maintenance_time <= HARDFORK_CORE_343_TIME) && (next_maintenance_time > HARDFORK_CORE_343_TIME) )
+   if( (dgpo.next_maintenance_time <= HARDFORK_CORE_343_VERSION) && (next_maintenance_time > HARDFORK_CORE_343_VERSION) )
       to_update_and_match_call_orders = true;
 
    // Process inconsistent price feeds
-   if( (dgpo.next_maintenance_time <= HARDFORK_CORE_868_890_TIME) && (next_maintenance_time > HARDFORK_CORE_868_890_TIME) )
+   if( (dgpo.next_maintenance_time <= HARDFORK_CORE_868_890_VERSION) && (next_maintenance_time > HARDFORK_CORE_868_890_VERSION) )
       process_hf_868_890( *this, to_update_and_match_call_orders );
 
    // Explicitly call check_call_orders of all markets
-   if( (dgpo.next_maintenance_time <= HARDFORK_CORE_935_TIME) && (next_maintenance_time > HARDFORK_CORE_935_TIME)
+   if( (dgpo.next_maintenance_time <= HARDFORK_CORE_935_VERSION) && (next_maintenance_time > HARDFORK_CORE_935_VERSION)
          && !to_update_and_match_call_orders )
       process_hf_935( *this );
 

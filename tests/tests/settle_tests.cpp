@@ -39,7 +39,7 @@ BOOST_AUTO_TEST_CASE( settle_rounding_test )
 {
    try {
       // get around Graphene issue #615 feed expiration bug
-      generate_blocks(HARDFORK_615_TIME);
+      generate_blocks(HARDFORK_615_VERSION);
       generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
       set_expiration( db, trx );
 
@@ -643,7 +643,7 @@ BOOST_AUTO_TEST_CASE( settle_rounding_test_after_hf_184 )
 {
    try {
       auto mi = db.get_global_properties().parameters.maintenance_interval;
-      generate_blocks(HARDFORK_CORE_184_TIME - mi);
+      generate_blocks(HARDFORK_CORE_184_VERSION - mi);
       generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
       set_expiration( db, trx );
 
@@ -1255,7 +1255,7 @@ BOOST_AUTO_TEST_CASE( global_settle_rounding_test )
 {
    try {
       // get around Graphene issue #615 feed expiration bug
-      generate_blocks(HARDFORK_615_TIME);
+      generate_blocks(HARDFORK_615_VERSION);
       generate_block();
       set_expiration( db, trx );
 
@@ -1378,7 +1378,7 @@ BOOST_AUTO_TEST_CASE( global_settle_rounding_test_after_hf_184 )
 {
    try {
       auto mi = db.get_global_properties().parameters.maintenance_interval;
-      generate_blocks(HARDFORK_CORE_184_TIME - mi); // assume that hard fork core-184 and core-342 happen at same time
+      generate_blocks(HARDFORK_CORE_184_VERSION - mi); // assume that hard fork core-184 and core-342 happen at same time
       generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
       set_expiration( db, trx );
 

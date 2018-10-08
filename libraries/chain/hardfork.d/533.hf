@@ -1,4 +1,4 @@
 // #533 Improve vote counting implementation
-#ifndef HARDFORK_533_TIME
-#define HARDFORK_533_TIME (graphene::chain::version(2,5,0, fc::time_point_sec( 1456250400 ) ) ) 
+#ifndef HARDFORK_533_VERSION
+#define HARDFORK_533_VERSION (graphene::chain::version(2,5,0, fc::time_point_sec( 1456250400 ) ) ) 
 #endif

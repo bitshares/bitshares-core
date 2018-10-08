@@ -1548,7 +1548,7 @@ BOOST_AUTO_TEST_CASE( nested_execution )
    ACTORS( (alice)(bob) );
    fund( alice );
 
-   generate_blocks( HARDFORK_CORE_214_TIME + fc::hours(1) );
+   generate_blocks( HARDFORK_CORE_214_VERSION + fc::hours(1) );
    set_expiration( db, trx );
 
    const auto& gpo = db.get_global_properties();
@@ -1601,7 +1601,7 @@ BOOST_AUTO_TEST_CASE( issue_214 )
    ACTORS( (alice)(bob) );
    fund( alice );
 
-   generate_blocks( HARDFORK_CORE_214_TIME - fc::hours(1) );
+   generate_blocks( HARDFORK_CORE_214_VERSION - fc::hours(1) );
    set_expiration( db, trx );
 
    // Bob proposes that Alice transfer 500 CORE to himself
@@ -1656,7 +1656,7 @@ BOOST_AUTO_TEST_CASE( issue_214 )
       db.get<proposal_object>( pid1a ); // still exists
    }
 
-   generate_blocks( HARDFORK_CORE_214_TIME + fc::hours(1) );
+   generate_blocks( HARDFORK_CORE_214_VERSION + fc::hours(1) );
    set_expiration( db, trx );
    sign( trx, bob_private_key );
    // after the HF the previously failed tx works too

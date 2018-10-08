@@ -274,7 +274,7 @@ BOOST_AUTO_TEST_CASE(bsip36)
       BOOST_CHECK_EQUAL(itr[1].first.instance.value, 17);
 
       // Advancing into HF time
-      generate_blocks(HARDFORK_CORE_518_TIME);
+      generate_blocks(HARDFORK_CORE_518_VERSION);
 
       // Advancing to next maint
       generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
@@ -454,7 +454,7 @@ BOOST_AUTO_TEST_CASE(bsip36_update_feed_producers)
       BOOST_CHECK_EQUAL(itr[1].first.instance.value, 18);
 
       // Advancing into HF time
-      generate_blocks(HARDFORK_CORE_518_TIME);
+      generate_blocks(HARDFORK_CORE_518_VERSION);
 
       // Advancing to next maint
       generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);

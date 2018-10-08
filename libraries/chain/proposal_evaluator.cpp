@@ -46,27 +46,27 @@ struct proposal_operation_hardfork_visitor
    // TODO review and cleanup code below after hard fork
    // hf_834
    void operator()(const graphene::chain::call_order_update_operation &v) const {
-      if (next_maintenance_time <= HARDFORK_CORE_834_TIME) {
+      if (next_maintenance_time <= HARDFORK_CORE_834_VERSION) {
          FC_ASSERT( !v.extensions.value.target_collateral_ratio.valid(),
                     "Can not set target_collateral_ratio in call_order_update_operation before hardfork 834." );
       }
    }
    // hf_620
    void operator()(const graphene::chain::asset_create_operation &v) const {
-      if (block_time < HARDFORK_CORE_620_TIME) {
+      if (block_time < HARDFORK_CORE_620_VERSION) {
          static const std::locale &loc = std::locale::classic();
          FC_ASSERT(isalpha(v.symbol.back(), loc), "Asset ${s} must end with alpha character before hardfork 620", ("s", v.symbol));
       }
    }
    // hf_199
    void operator()(const graphene::chain::asset_update_issuer_operation &v) const {
-      if (block_time < HARDFORK_CORE_199_TIME) {
+      if (block_time < HARDFORK_CORE_199_VERSION) {
          FC_ASSERT(false, "Not allowed until hardfork 199");
       }
    }
    // hf_188
    void operator()(const graphene::chain::asset_claim_pool_operation &v) const {
-      if (block_time < HARDFORK_CORE_188_TIME) {
+      if (block_time < HARDFORK_CORE_188_VERSION) {
          FC_ASSERT(false, "Not allowed until hardfork 188");
       }
    }
@@ -90,7 +90,7 @@ struct proposal_operation_hardfork_visitor
    // it in a earlier stage.
    //
    void operator()(const graphene::chain::asset_settle_cancel_operation &v) const {
-      if (block_time > HARDFORK_CORE_588_TIME) {
+      if (block_time > HARDFORK_CORE_588_VERSION) {
          FC_ASSERT(!"Virtual operation");
       }
    }
@@ -122,7 +122,7 @@ void_result proposal_create_evaluator::do_evaluate(const proposal_create_operati
    const fc::time_point_sec next_maint_time = d.get_dynamic_global_properties().next_maintenance_time;
    proposal_operation_hardfork_visitor vtor( block_time, next_maint_time );
    vtor( o );
-   if( block_time < HARDFORK_CORE_214_TIME )
+   if( block_time < HARDFORK_CORE_214_VERSION )
    { // cannot be removed after hf, unfortunately
       hardfork_visitor_214 hf214;
       for (const op_wrapper &op : o.proposed_ops)

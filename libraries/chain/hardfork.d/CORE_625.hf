@@ -1,4 +1,4 @@
 // bitshares-core issue #625 Fix "Potential erratic order matching issue involving margin call orders"
-#ifndef HARDFORK_CORE_625_TIME
-#define HARDFORK_CORE_625_TIME (graphene::chain::version(2,9,0, fc::time_point_sec( 1532008920 ) ) ) // Thu, 19 Jul 2018 14:02:00 UTC
+#ifndef HARDFORK_CORE_625_VERSION
+#define HARDFORK_CORE_625_VERSION (graphene::chain::version(2,9,0, fc::time_point_sec( 1532008920 ) ) ) // Thu, 19 Jul 2018 14:02:00 UTC
 #endif

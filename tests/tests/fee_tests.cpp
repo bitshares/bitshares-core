@@ -174,12 +174,12 @@ BOOST_AUTO_TEST_CASE(asset_claim_fees_test)
 
       }
 
-      if( db.head_block_time() <= HARDFORK_413_TIME )
+      if( db.head_block_time() <= HARDFORK_413_VERSION )
       {
          // can't claim before hardfork
          GRAPHENE_REQUIRE_THROW( claim_fees( izzy_id, _izzy(1) ), fc::exception );
-         generate_blocks( HARDFORK_413_TIME );
-         while( db.head_block_time() <= HARDFORK_413_TIME )
+         generate_blocks( HARDFORK_413_VERSION );
+         while( db.head_block_time() <= HARDFORK_413_VERSION )
          {
             generate_block();
          }
@@ -296,7 +296,7 @@ BOOST_AUTO_TEST_CASE(asset_claim_pool_test)
         GRAPHENE_REQUIRE_THROW( claim_pool_proposal( alice_id, aliceusd_id, _core(1), core_asset), fc::exception );
 
         // Fast forward to hard fork date
-        generate_blocks( HARDFORK_CORE_188_TIME );
+        generate_blocks( HARDFORK_CORE_188_VERSION );
 
         // New reference for core_asset after having produced blocks
         const asset_object& core_asset_hf = asset_id_type()(db);
@@ -769,7 +769,7 @@ BOOST_AUTO_TEST_CASE( fee_refund_test )
       {
          if( i == 1 )
          {
-            generate_blocks( HARDFORK_445_TIME, true, skip );
+            generate_blocks( HARDFORK_445_VERSION, true, skip );
             generate_block( skip );
          }
 
@@ -819,7 +819,7 @@ BOOST_AUTO_TEST_CASE( fee_refund_test )
          cancel_limit_order( bo1_id(db) );
 
          int64_t cancel_net_fee;
-         if( db.head_block_time() > HARDFORK_445_TIME )
+         if( db.head_block_time() > HARDFORK_445_VERSION )
             cancel_net_fee = order_cancel_fee;
          else
             cancel_net_fee = order_create_fee + order_cancel_fee;
@@ -927,7 +927,7 @@ BOOST_AUTO_TEST_CASE( non_core_fee_refund_test )
          bool before_hardfork_445 = ( i < 2 );
          if( i == 2 )
          {
-            generate_blocks( HARDFORK_445_TIME, true, skip );
+            generate_blocks( HARDFORK_445_VERSION, true, skip );
             generate_block( skip );
          }
 
@@ -956,7 +956,7 @@ BOOST_AUTO_TEST_CASE( non_core_fee_refund_test )
          int64_t core_fee_refund_usd;
          int64_t usd_fee_refund_core;
          int64_t usd_fee_refund_usd;
-         if( db.head_block_time() > HARDFORK_445_TIME )
+         if( db.head_block_time() > HARDFORK_445_VERSION )
          {
             core_fee_refund_core = order_create_fee;
             core_fee_refund_usd = 0;
@@ -1319,8 +1319,8 @@ BOOST_AUTO_TEST_CASE( hf445_fee_refund_cross_test )
       // prepare params
       const chain_parameters& params = db.get_global_properties().parameters;
       time_point_sec max_exp = time_point_sec::maximum();
-      time_point_sec exp = HARDFORK_445_TIME.hardfork_time + fc::seconds( params.block_interval * (params.maintenance_skip_slots + 1) * 3 );
-      time_point_sec exp2 = HARDFORK_445_TIME.hardfork_time + fc::seconds( params.block_interval * (params.maintenance_skip_slots + 1) * 13 );
+      time_point_sec exp = HARDFORK_445_VERSION.hardfork_time + fc::seconds( params.block_interval * (params.maintenance_skip_slots + 1) * 3 );
+      time_point_sec exp2 = HARDFORK_445_VERSION.hardfork_time + fc::seconds( params.block_interval * (params.maintenance_skip_slots + 1) * 13 );
       price cer( asset(1), asset(1, usd_id) );
       const auto* usd_stat = &usd_id( db ).dynamic_asset_data_id( db );
 
@@ -1525,7 +1525,7 @@ BOOST_AUTO_TEST_CASE( hf445_fee_refund_cross_test )
       generate_block( skip );
 
       // generate blocks util hard fork 445
-      generate_blocks( HARDFORK_445_TIME, true, skip );
+      generate_blocks( HARDFORK_445_VERSION, true, skip );
       generate_block( skip );
 
       // nothing will change
@@ -1834,13 +1834,13 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_test )
          if( i == 4 )
          {
             BOOST_TEST_MESSAGE( "Hard fork 445" );
-            generate_blocks( HARDFORK_445_TIME, true, skip );
+            generate_blocks( HARDFORK_445_VERSION, true, skip );
             generate_block( skip );
          }
          else if( i == 8 )
          {
             BOOST_TEST_MESSAGE( "Hard fork core-604 (bsip26)" );
-            generate_blocks( HARDFORK_CORE_604_TIME, true, skip );
+            generate_blocks( HARDFORK_CORE_604_VERSION, true, skip );
             generate_block( skip );
          }
 
@@ -1893,7 +1893,7 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_test )
          int64_t accum_on_new;
          int64_t accum_on_fill;
          int64_t pool_refund;
-         if( db.head_block_time() > HARDFORK_CORE_604_TIME )
+         if( db.head_block_time() > HARDFORK_CORE_604_VERSION )
          {
             core_fee_refund_core = order_create_fee;
             core_fee_refund_usd = 0;
@@ -1903,7 +1903,7 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_test )
             accum_on_fill = usd_create_fee;
             pool_refund = core_create_fee;
          }
-         else if( db.head_block_time() > HARDFORK_445_TIME )
+         else if( db.head_block_time() > HARDFORK_445_VERSION )
          {
             core_fee_refund_core = order_create_fee;
             core_fee_refund_usd = 0;
@@ -2384,9 +2384,9 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_cross_test )
       // prepare params
       const chain_parameters& params = db.get_global_properties().parameters;
       time_point_sec max_exp = time_point_sec::maximum();
-      time_point_sec exp = HARDFORK_CORE_604_TIME.hardfork_time + fc::seconds( params.block_interval * (params.maintenance_skip_slots + 1) * 3 );
-      time_point_sec exp1 = HARDFORK_CORE_604_TIME.hardfork_time + fc::seconds( params.block_interval * (params.maintenance_skip_slots + 1) * 13 );
-      time_point_sec exp2 = HARDFORK_CORE_604_TIME.hardfork_time + fc::seconds( params.block_interval * (params.maintenance_skip_slots + 1) * 23 );
+      time_point_sec exp = HARDFORK_CORE_604_VERSION.hardfork_time + fc::seconds( params.block_interval * (params.maintenance_skip_slots + 1) * 3 );
+      time_point_sec exp1 = HARDFORK_CORE_604_VERSION.hardfork_time + fc::seconds( params.block_interval * (params.maintenance_skip_slots + 1) * 13 );
+      time_point_sec exp2 = HARDFORK_CORE_604_VERSION.hardfork_time + fc::seconds( params.block_interval * (params.maintenance_skip_slots + 1) * 23 );
       price cer = usd_id( db ).options.core_exchange_rate;
       const auto* usd_stat = &usd_id( db ).dynamic_asset_data_id( db );
 
@@ -2665,7 +2665,7 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_cross_test )
       generate_block( skip );
 
       // generate blocks util hard fork 445
-      generate_blocks( HARDFORK_445_TIME, true, skip );
+      generate_blocks( HARDFORK_445_VERSION, true, skip );
       generate_block( skip );
 
       // nothing will change
@@ -2950,7 +2950,7 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_cross_test )
       generate_block( skip );
 
       // generate blocks util hard fork core-604
-      generate_blocks( HARDFORK_CORE_604_TIME, true, skip );
+      generate_blocks( HARDFORK_CORE_604_VERSION, true, skip );
       generate_block( skip );
 
       // nothing will change
@@ -3449,11 +3449,11 @@ BOOST_AUTO_TEST_CASE( stealth_fba_test )
       ACTORS( (alice)(bob)(chloe)(dan)(izzy)(philbin)(tom) );
       upgrade_to_lifetime_member(philbin_id);
 
-      generate_blocks( HARDFORK_538_TIME );
-      generate_blocks( HARDFORK_555_TIME );
-      generate_blocks( HARDFORK_563_TIME );
-      generate_blocks( HARDFORK_572_TIME );
-      generate_blocks( HARDFORK_599_TIME );
+      generate_blocks( HARDFORK_538_VERSION );
+      generate_blocks( HARDFORK_555_VERSION );
+      generate_blocks( HARDFORK_563_VERSION );
+      generate_blocks( HARDFORK_572_VERSION );
+      generate_blocks( HARDFORK_599_VERSION );
 
       // Philbin (registrar who registers Rex)
 
@@ -3732,7 +3732,7 @@ BOOST_AUTO_TEST_CASE( issue_429_test )
 
       verify_asset_supplies( db );
 
-      generate_blocks( HARDFORK_CORE_429_TIME + 10 );
+      generate_blocks( HARDFORK_CORE_429_VERSION + 10 );
 
       {
          signed_transaction tx;

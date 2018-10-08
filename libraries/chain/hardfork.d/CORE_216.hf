@@ -1,4 +1,4 @@
 // bitshares-core #216 Process to reset a Smartcoin after a Black Swan
-#ifndef HARDFORK_CORE_216_TIME
-#define HARDFORK_CORE_216_TIME (graphene::chain::version(2,8,0, fc::time_point_sec( 1512747600 ) ) )
+#ifndef HARDFORK_CORE_216_VERSION
+#define HARDFORK_CORE_216_VERSION (graphene::chain::version(2,8,0, fc::time_point_sec( 1512747600 ) ) )
 #endif

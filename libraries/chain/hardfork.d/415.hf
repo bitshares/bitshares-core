@@ -1,4 +1,4 @@
 // #415 Default accept policy for asset with no whitelist authorities
-#ifndef HARDFORK_415_TIME
-#define HARDFORK_415_TIME (graphene::chain::version(2,2,0, fc::time_point_sec( 1446652800 ) ) )
+#ifndef HARDFORK_415_VERSION
+#define HARDFORK_415_VERSION (graphene::chain::version(2,2,0, fc::time_point_sec( 1446652800 ) ) )
 #endif

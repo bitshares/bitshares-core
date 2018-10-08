@@ -40,7 +40,7 @@ BOOST_FIXTURE_TEST_SUITE(market_tests, database_fixture)
  */
 BOOST_AUTO_TEST_CASE(issue_338_etc)
 { try {
-   generate_blocks(HARDFORK_615_TIME); // get around Graphene issue #615 feed expiration bug
+   generate_blocks(HARDFORK_615_VERSION); // get around Graphene issue #615 feed expiration bug
    generate_block();
 
    set_expiration( db, trx );
@@ -163,7 +163,7 @@ BOOST_AUTO_TEST_CASE(issue_338_etc)
    BOOST_CHECK_EQUAL( 6923, call.collateral.value );
 
    // generate blocks to let the settle order execute (price feed will expire after it)
-   generate_blocks( HARDFORK_615_TIME + fc::hours(25) );
+   generate_blocks( HARDFORK_615_VERSION + fc::hours(25) );
    // call2 get settled #343
    BOOST_CHECK_EQUAL( 252, get_balance(seller_id, usd_id) );
    BOOST_CHECK_EQUAL( 8177, get_balance(seller_id, core_id) );
@@ -212,7 +212,7 @@ BOOST_AUTO_TEST_CASE(issue_338_etc)
 
    // generate a block, sell_low will expire
    BOOST_TEST_MESSAGE( "Expire sell_low" );
-   generate_blocks( HARDFORK_615_TIME + fc::hours(26) );
+   generate_blocks( HARDFORK_615_VERSION + fc::hours(26) );
    BOOST_CHECK( db.find<limit_order_object>( sell_low ) == nullptr );
 
    // #453 multiple order matching issue occurs
@@ -232,7 +232,7 @@ BOOST_AUTO_TEST_CASE(issue_338_etc)
 BOOST_AUTO_TEST_CASE(hardfork_core_338_test)
 { try {
    auto mi = db.get_global_properties().parameters.maintenance_interval;
-   generate_blocks(HARDFORK_CORE_343_TIME - mi); // assume all hard forks occur at same time
+   generate_blocks(HARDFORK_CORE_343_VERSION - mi); // assume all hard forks occur at same time
    generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
 
    set_expiration( db, trx );
@@ -407,7 +407,7 @@ BOOST_AUTO_TEST_CASE(hardfork_core_338_test)
 BOOST_AUTO_TEST_CASE(hardfork_core_453_test)
 { try {
    auto mi = db.get_global_properties().parameters.maintenance_interval;
-   generate_blocks(HARDFORK_CORE_453_TIME - mi); // assume all hard forks occur at same time
+   generate_blocks(HARDFORK_CORE_453_VERSION - mi); // assume all hard forks occur at same time
    generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
 
    set_expiration( db, trx );
@@ -487,7 +487,7 @@ BOOST_AUTO_TEST_CASE(hardfork_core_453_test)
 BOOST_AUTO_TEST_CASE(hardfork_core_625_big_limit_order_test)
 { try {
    auto mi = db.get_global_properties().parameters.maintenance_interval;
-   generate_blocks(HARDFORK_CORE_625_TIME - mi); // assume all hard forks occur at same time
+   generate_blocks(HARDFORK_CORE_625_VERSION - mi); // assume all hard forks occur at same time
    generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
 
    set_expiration( db, trx );
@@ -636,7 +636,7 @@ BOOST_AUTO_TEST_CASE(hardfork_core_625_big_limit_order_test)
 BOOST_AUTO_TEST_CASE(hard_fork_453_cross_test)
 { try { // create orders before hard fork, which will be matched on hard fork
    auto mi = db.get_global_properties().parameters.maintenance_interval;
-   generate_blocks(HARDFORK_CORE_453_TIME - mi); // assume all hard forks occur at same time
+   generate_blocks(HARDFORK_CORE_453_VERSION - mi); // assume all hard forks occur at same time
    generate_block();
 
    set_expiration( db, trx );
@@ -845,7 +845,7 @@ BOOST_AUTO_TEST_CASE(hard_fork_453_cross_test)
 BOOST_AUTO_TEST_CASE(hard_fork_338_cross_test)
 { try { // create orders before hard fork, which will be matched on hard fork
    auto mi = db.get_global_properties().parameters.maintenance_interval;
-   generate_blocks(HARDFORK_CORE_338_TIME - mi); // assume all hard forks occur at same time
+   generate_blocks(HARDFORK_CORE_338_VERSION - mi); // assume all hard forks occur at same time
    generate_block();
 
    set_expiration( db, trx );
@@ -965,7 +965,7 @@ BOOST_AUTO_TEST_CASE(hard_fork_338_cross_test)
 BOOST_AUTO_TEST_CASE(hard_fork_649_cross_test)
 { try { // create orders before hard fork, which will be matched on hard fork
    auto mi = db.get_global_properties().parameters.maintenance_interval;
-   generate_blocks(HARDFORK_CORE_343_TIME - mi); // assume all hard forks occur at same time
+   generate_blocks(HARDFORK_CORE_343_VERSION - mi); // assume all hard forks occur at same time
    generate_block();
 
    set_expiration( db, trx );
@@ -1079,7 +1079,7 @@ BOOST_AUTO_TEST_CASE(hard_fork_649_cross_test)
 BOOST_AUTO_TEST_CASE(hard_fork_343_cross_test)
 { try { // create orders before hard fork, which will be matched on hard fork
    auto mi = db.get_global_properties().parameters.maintenance_interval;
-   generate_blocks(HARDFORK_CORE_343_TIME - mi); // assume all hard forks occur at same time
+   generate_blocks(HARDFORK_CORE_343_VERSION - mi); // assume all hard forks occur at same time
    generate_block();
 
    set_expiration( db, trx );
@@ -1196,7 +1196,7 @@ BOOST_AUTO_TEST_CASE(hard_fork_343_cross_test)
 BOOST_AUTO_TEST_CASE(target_cr_test_limit_call)
 { try {
    auto mi = db.get_global_properties().parameters.maintenance_interval;
-   generate_blocks(HARDFORK_CORE_834_TIME - mi);
+   generate_blocks(HARDFORK_CORE_834_VERSION - mi);
    generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
 
    set_expiration( db, trx );
@@ -1374,7 +1374,7 @@ BOOST_AUTO_TEST_CASE(target_cr_test_limit_call)
 BOOST_AUTO_TEST_CASE(target_cr_test_call_limit)
 { try {
    auto mi = db.get_global_properties().parameters.maintenance_interval;
-   generate_blocks(HARDFORK_CORE_834_TIME - mi);
+   generate_blocks(HARDFORK_CORE_834_VERSION - mi);
    generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
 
    set_expiration( db, trx );

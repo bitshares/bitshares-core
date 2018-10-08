@@ -55,7 +55,7 @@ void database::globally_settle_asset( const asset_object& mia, const price& sett
    const auto& call_price_index = call_index.indices().get<by_price>();
 
    auto maint_time = get_dynamic_global_properties().next_maintenance_time;
-   bool before_core_hardfork_342 = ( maint_time <= HARDFORK_CORE_342_TIME ); // better rounding
+   bool before_core_hardfork_342 = ( maint_time <= HARDFORK_CORE_342_VERSION ); // better rounding
 
    // cancel all call orders and accumulate it into collateral_gathered
    auto call_itr = call_price_index.lower_bound( price::min( bitasset.options.short_backing_asset, mia.id ) );
@@ -276,7 +276,7 @@ void database::cancel_limit_order( const limit_order_object& order, bool create_
    // could be virtual op or real op here
    if( order.deferred_paid_fee.amount == 0 )
    {
-      // be here, order.create_time <= HARDFORK_CORE_604_TIME, or fee paid in CORE, or no fee to refund.
+      // be here, order.create_time <= HARDFORK_CORE_604_VERSION, or fee paid in CORE, or no fee to refund.
       // if order was created before hard fork 604 then cancelled no matter before or after hard fork 604,
       //    see it as fee paid in CORE, deferred_fee should be refunded to order owner but not fee pool
       adjust_balance( order.seller, deferred_fee );
@@ -312,7 +312,7 @@ bool maybe_cull_small_order( database& db, const limit_order_object& order )
     */
    if( order.amount_to_receive().amount == 0 )
    {
-      if( order.deferred_fee > 0 && db.head_block_time() <= HARDFORK_CORE_604_TIME )
+      if( order.deferred_fee > 0 && db.head_block_time() <= HARDFORK_CORE_604_VERSION )
       { // TODO remove this warning after hard fork core-604
          wlog( "At block ${n}, cancelling order without charging a fee: ${o}", ("n",db.head_block_num())("o",order) );
          db.cancel_limit_order( order, true, true );
@@ -367,7 +367,7 @@ bool database::apply_order_before_hardfork_625(const limit_order_object& new_ord
    const limit_order_object* updated_order_object = find< limit_order_object >( order_id );
    if( updated_order_object == nullptr )
       return true;
-   if( head_block_time() <= HARDFORK_555_TIME )
+   if( head_block_time() <= HARDFORK_555_VERSION )
       return false;
    // before #555 we would have done maybe_cull_small_order() logic as a result of fill_order() being called by match() above
    // however after #555 we need to get rid of small orders -- #555 hardfork defers logic that was done too eagerly before, and
@@ -524,7 +524,7 @@ int database::match( const limit_order_object& usd, const limit_order_object& co
    asset usd_pays, usd_receives, core_pays, core_receives;
 
    auto maint_time = get_dynamic_global_properties().next_maintenance_time;
-   bool before_core_hardfork_342 = ( maint_time <= HARDFORK_CORE_342_TIME ); // better rounding
+   bool before_core_hardfork_342 = ( maint_time <= HARDFORK_CORE_342_VERSION ); // better rounding
 
    bool cull_taker = false;
    if( usd_for_sale <= core_for_sale * match_price ) // rounding down here should be fine
@@ -533,7 +533,7 @@ int database::match( const limit_order_object& usd, const limit_order_object& co
 
       // Be here, it's possible that taker is paying something for nothing due to partially filled in last loop.
       // In this case, we see it as filled and cancel it later
-      if( usd_receives.amount == 0 && maint_time > HARDFORK_CORE_184_TIME )
+      if( usd_receives.amount == 0 && maint_time > HARDFORK_CORE_184_VERSION )
          return 1;
 
       if( before_core_hardfork_342 )
@@ -588,11 +588,11 @@ int database::match( const limit_order_object& bid, const call_order_object& ask
 
    auto maint_time = get_dynamic_global_properties().next_maintenance_time;
    // TODO remove when we're sure it's always false
-   bool before_core_hardfork_184 = ( maint_time <= HARDFORK_CORE_184_TIME ); // something-for-nothing
+   bool before_core_hardfork_184 = ( maint_time <= HARDFORK_CORE_184_VERSION ); // something-for-nothing
    // TODO remove when we're sure it's always false
-   bool before_core_hardfork_342 = ( maint_time <= HARDFORK_CORE_342_TIME ); // better rounding
+   bool before_core_hardfork_342 = ( maint_time <= HARDFORK_CORE_342_VERSION ); // better rounding
    // TODO remove when we're sure it's always false
-   bool before_core_hardfork_834 = ( maint_time <= HARDFORK_CORE_834_TIME ); // target collateral ratio option
+   bool before_core_hardfork_834 = ( maint_time <= HARDFORK_CORE_834_VERSION ); // target collateral ratio option
    if( before_core_hardfork_184 )
       ilog( "match(limit,call) is called before hardfork core-184 at block #${block}", ("block",head_block_num()) );
    if( before_core_hardfork_342 )
@@ -668,7 +668,7 @@ asset database::match( const call_order_object& call,
    FC_ASSERT(call.debt > 0 && call.collateral > 0 && settle.balance.amount > 0);
 
    auto maint_time = get_dynamic_global_properties().next_maintenance_time;
-   bool before_core_hardfork_342 = ( maint_time <= HARDFORK_CORE_342_TIME ); // better rounding
+   bool before_core_hardfork_342 = ( maint_time <= HARDFORK_CORE_342_VERSION ); // better rounding
 
    auto settle_for_sale = std::min(settle.balance, max_settlement);
    auto call_debt = call.get_debt();
@@ -681,7 +681,7 @@ asset database::match( const call_order_object& call,
    bool cull_settle_order = false; // whether need to cancel dust settle order
    if( call_pays.amount == 0 )
    {
-      if( maint_time > HARDFORK_CORE_184_TIME )
+      if( maint_time > HARDFORK_CORE_184_VERSION )
       {
          if( call_receives == call_debt ) // the call order is smaller than or equal to the settle order
          {
@@ -767,7 +767,7 @@ asset database::match( const call_order_object& call,
 bool database::fill_limit_order( const limit_order_object& order, const asset& pays, const asset& receives, bool cull_if_small,
                            const price& fill_price, const bool is_maker )
 { try {
-   cull_if_small |= (head_block_time() < HARDFORK_555_TIME);
+   cull_if_small |= (head_block_time() < HARDFORK_555_VERSION);
 
    FC_ASSERT( order.amount_for_sale().asset_id == pays.asset_id );
    FC_ASSERT( pays.asset_id != receives.asset_id );
@@ -790,7 +790,7 @@ bool database::fill_limit_order( const limit_order_object& order, const asset& p
       } );
    }
 
-   if( order.deferred_paid_fee.amount > 0 ) // implies head_block_time() > HARDFORK_CORE_604_TIME
+   if( order.deferred_paid_fee.amount > 0 ) // implies head_block_time() > HARDFORK_CORE_604_VERSION
    {
       const auto& fee_asset_dyn_data = order.deferred_paid_fee.asset_id(*this).dynamic_asset_data_id(*this);
       modify( fee_asset_dyn_data, [&](asset_dynamic_data_object& addo) {
@@ -837,7 +837,7 @@ bool database::fill_call_order( const call_order_object& order, const asset& pay
               collateral_freed = o.get_collateral();
               o.collateral = 0;
             }
-            else if( get_dynamic_global_properties().next_maintenance_time > HARDFORK_CORE_343_TIME )
+            else if( get_dynamic_global_properties().next_maintenance_time > HARDFORK_CORE_343_VERSION )
               o.call_price = price::call_price( o.get_debt(), o.get_collateral(),
                                 mia.bitasset_data(*this).current_feed.maintenance_collateral_ratio );
       });
@@ -919,7 +919,7 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
     const auto& dyn_prop = get_dynamic_global_properties();
     auto maint_time = dyn_prop.next_maintenance_time;
     if( for_new_limit_order )
-       FC_ASSERT( maint_time <= HARDFORK_CORE_625_TIME ); // `for_new_limit_order` is only true before HF 338 / 625
+       FC_ASSERT( maint_time <= HARDFORK_CORE_625_VERSION ); // `for_new_limit_order` is only true before HF 338 / 625
 
     if( !mia.is_market_issued() ) return false;
 
@@ -961,15 +961,15 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
     auto head_time = head_block_time();
     auto head_num = head_block_num();
 
-    bool before_hardfork_615 = ( head_time < HARDFORK_615_TIME );
-    bool after_hardfork_436 = ( head_time > HARDFORK_436_TIME );
+    bool before_hardfork_615 = ( head_time < HARDFORK_615_VERSION );
+    bool after_hardfork_436 = ( head_time > HARDFORK_436_VERSION );
 
-    bool before_core_hardfork_184 = ( maint_time <= HARDFORK_CORE_184_TIME ); // something-for-nothing
-    bool before_core_hardfork_342 = ( maint_time <= HARDFORK_CORE_342_TIME ); // better rounding
-    bool before_core_hardfork_343 = ( maint_time <= HARDFORK_CORE_343_TIME ); // update call_price after partially filled
-    bool before_core_hardfork_453 = ( maint_time <= HARDFORK_CORE_453_TIME ); // multiple matching issue
-    bool before_core_hardfork_606 = ( maint_time <= HARDFORK_CORE_606_TIME ); // feed always trigger call
-    bool before_core_hardfork_834 = ( maint_time <= HARDFORK_CORE_834_TIME ); // target collateral ratio option
+    bool before_core_hardfork_184 = ( maint_time <= HARDFORK_CORE_184_VERSION ); // something-for-nothing
+    bool before_core_hardfork_342 = ( maint_time <= HARDFORK_CORE_342_VERSION ); // better rounding
+    bool before_core_hardfork_343 = ( maint_time <= HARDFORK_CORE_343_VERSION ); // update call_price after partially filled
+    bool before_core_hardfork_453 = ( maint_time <= HARDFORK_CORE_453_VERSION ); // multiple matching issue
+    bool before_core_hardfork_606 = ( maint_time <= HARDFORK_CORE_606_VERSION ); // feed always trigger call
+    bool before_core_hardfork_834 = ( maint_time <= HARDFORK_CORE_834_VERSION ); // target collateral ratio option
 
     while( !check_for_blackswan( mia, enable_black_swan, &bitasset ) // TODO perhaps improve performance by passing in iterators
            && call_itr != call_end
@@ -1059,7 +1059,7 @@ bool database::check_call_orders( const asset_object& mia, bool enable_black_swa
 
           if( usd_to_buy == usd_for_sale )
              filled_limit = true;
-          else if( filled_limit && maint_time <= HARDFORK_CORE_453_TIME ) // TODO remove warning after hard fork core-453
+          else if( filled_limit && maint_time <= HARDFORK_CORE_453_VERSION ) // TODO remove warning after hard fork core-453
           {
              wlog( "Multiple limit match problem (issue 453) occurred at block #${block}", ("block",head_num) );
              if( before_hardfork_615 )

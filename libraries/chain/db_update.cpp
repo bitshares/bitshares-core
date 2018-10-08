@@ -205,7 +205,7 @@ bool database::check_for_blackswan( const asset_object& mia, bool enable_black_s
 
     const auto& dyn_prop = get_dynamic_global_properties();
     auto maint_time = dyn_prop.next_maintenance_time;
-    if( maint_time > HARDFORK_CORE_338_TIME )
+    if( maint_time > HARDFORK_CORE_338_VERSION )
        // due to #338, we won't check for black swan on incoming limit order, so need to check with MSSP here
        highest = bitasset.current_feed.max_short_squeeze_price();
 
@@ -243,7 +243,7 @@ bool database::check_for_blackswan( const asset_object& mia, bool enable_black_s
             ("h",highest.to_real())("~h",(~highest).to_real()) );
        edump((enable_black_swan));
        FC_ASSERT( enable_black_swan, "Black swan was detected during a margin update which is not allowed to trigger a blackswan" );
-       if( maint_time > HARDFORK_CORE_338_TIME && ~least_collateral <= settle_price )
+       if( maint_time > HARDFORK_CORE_338_VERSION && ~least_collateral <= settle_price )
           // global settle at feed price if possible
           globally_settle_asset(mia, settle_price );
        else
@@ -259,9 +259,9 @@ void database::clear_expired_orders()
          auto head_time = head_block_time();
          auto maint_time = get_dynamic_global_properties().next_maintenance_time;
 
-         bool before_core_hardfork_184 = ( maint_time <= HARDFORK_CORE_184_TIME ); // something-for-nothing
-         bool before_core_hardfork_342 = ( maint_time <= HARDFORK_CORE_342_TIME ); // better rounding
-         bool before_core_hardfork_606 = ( maint_time <= HARDFORK_CORE_606_TIME ); // feed always trigger call
+         bool before_core_hardfork_184 = ( maint_time <= HARDFORK_CORE_184_VERSION ); // something-for-nothing
+         bool before_core_hardfork_342 = ( maint_time <= HARDFORK_CORE_342_VERSION ); // better rounding
+         bool before_core_hardfork_606 = ( maint_time <= HARDFORK_CORE_606_VERSION ); // feed always trigger call
 
          auto& limit_index = get_index_type<limit_order_index>().indices().get<by_expiration>();
          while( !limit_index.empty() && limit_index.begin()->expiration <= head_time )
@@ -459,7 +459,7 @@ void database::clear_expired_orders()
 void database::update_expired_feeds()
 {
    const auto head_time = head_block_time();
-   bool after_hardfork_615 = ( head_time >= HARDFORK_615_TIME );
+   bool after_hardfork_615 = ( head_time >= HARDFORK_615_VERSION );
 
    const auto& idx = get_index_type<asset_bitasset_data_index>().indices().get<by_feed_expiration>();
    auto itr = idx.begin();

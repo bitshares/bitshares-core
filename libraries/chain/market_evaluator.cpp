@@ -64,7 +64,7 @@ void_result limit_order_create_evaluator::do_evaluate(const limit_order_create_o
 
 void limit_order_create_evaluator::convert_fee()
 {
-   if( db().head_block_time() <= HARDFORK_CORE_604_TIME )
+   if( db().head_block_time() <= HARDFORK_CORE_604_VERSION )
       generic_evaluator::convert_fee();
    else
       if( !trx_state->skip_fee )
@@ -80,12 +80,12 @@ void limit_order_create_evaluator::convert_fee()
 
 void limit_order_create_evaluator::pay_fee()
 {
-   if( db().head_block_time() <= HARDFORK_445_TIME )
+   if( db().head_block_time() <= HARDFORK_445_VERSION )
       generic_evaluator::pay_fee();
    else
    {
       _deferred_fee = core_fee_paid;
-      if( db().head_block_time() > HARDFORK_CORE_604_TIME && fee_asset->get_id() != asset_id_type() )
+      if( db().head_block_time() > HARDFORK_CORE_604_VERSION && fee_asset->get_id() != asset_id_type() )
          _deferred_paid_fee = fee_from_account;
    }
 }
@@ -112,7 +112,7 @@ object_id_type limit_order_create_evaluator::do_apply(const limit_order_create_o
    });
    limit_order_id_type order_id = new_order_object.id; // save this because we may remove the object by filling it
    bool filled;
-   if( db().get_dynamic_global_properties().next_maintenance_time <= HARDFORK_CORE_625_TIME )
+   if( db().get_dynamic_global_properties().next_maintenance_time <= HARDFORK_CORE_625_VERSION )
       filled = db().apply_order_before_hardfork_625( new_order_object );
    else
       filled = db().apply_order( new_order_object );
@@ -142,7 +142,7 @@ asset limit_order_cancel_evaluator::do_apply(const limit_order_cancel_operation&
 
    d.cancel_limit_order(*_order, false /* don't create a virtual op*/);
 
-   if( d.get_dynamic_global_properties().next_maintenance_time <= HARDFORK_CORE_606_TIME )
+   if( d.get_dynamic_global_properties().next_maintenance_time <= HARDFORK_CORE_606_VERSION )
    {
       // Possible optimization: order can be called by canceling a limit order iff the canceled order was at the top of the book.
       // Do I need to check calls in both assets?
@@ -158,7 +158,7 @@ void_result call_order_update_evaluator::do_evaluate(const call_order_update_ope
    database& d = db();
 
    // TODO: remove this check and the assertion after hf_834
-   if( d.get_dynamic_global_properties().next_maintenance_time <= HARDFORK_CORE_834_TIME )
+   if( d.get_dynamic_global_properties().next_maintenance_time <= HARDFORK_CORE_834_VERSION )
       FC_ASSERT( !o.extensions.value.target_collateral_ratio.valid(),
                  "Can not set target_collateral_ratio in call_order_update_operation before hardfork 834." );
 
@@ -296,7 +296,7 @@ object_id_type call_order_update_evaluator::do_apply(const call_order_update_ope
          call_obj = d.find(call_order_id);
          // we know no black swan event has occurred
          FC_ASSERT( call_obj, "no margin call was executed and yet the call object was deleted" );
-         if( d.head_block_time() <= HARDFORK_CORE_583_TIME ) // TODO remove after hard fork core-583
+         if( d.head_block_time() <= HARDFORK_CORE_583_VERSION ) // TODO remove after hard fork core-583
          {
             // We didn't fill any call orders.  This may be because we
             // aren't in margin call territory, or it may be because there
@@ -339,7 +339,7 @@ void_result bid_collateral_evaluator::do_evaluate(const bid_collateral_operation
 { try {
    database& d = db();
 
-   FC_ASSERT( d.head_block_time() > HARDFORK_CORE_216_TIME, "Not yet!" );
+   FC_ASSERT( d.head_block_time() > HARDFORK_CORE_216_VERSION, "Not yet!" );
 
    _paying_account = &o.bidder(d);
    _debt_asset     = &o.debt_covered.asset_id(d);

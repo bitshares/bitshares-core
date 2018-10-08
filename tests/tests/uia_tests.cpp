@@ -155,10 +155,10 @@ BOOST_AUTO_TEST_CASE( issue_whitelist_uia )
       trx.operations.emplace_back(op);
       set_expiration( db, trx );
       //Fail because nathan is not whitelisted, but only before hardfork time
-      if( db.head_block_time() <= HARDFORK_415_TIME )
+      if( db.head_block_time() <= HARDFORK_415_VERSION )
       {
          GRAPHENE_REQUIRE_THROW(PUSH_TX( db, trx, ~0 ), fc::exception);
-         generate_blocks( HARDFORK_415_TIME );
+         generate_blocks( HARDFORK_415_VERSION );
          generate_block();
          set_expiration( db, trx );
       }
@@ -274,7 +274,7 @@ BOOST_AUTO_TEST_CASE( transfer_whitelist_uia )
       op.amount = advanced.amount(50);
       trx.operations.back() = op;
       //Fail because nathan is blacklisted
-      if( db.head_block_time() <= HARDFORK_419_TIME )
+      if( db.head_block_time() <= HARDFORK_419_VERSION )
       {
          // before the hardfork time, it fails because the whitelist check fails
          GRAPHENE_REQUIRE_THROW(PUSH_TX( db, trx, ~0 ), transfer_from_account_not_whitelisted );
@@ -518,7 +518,7 @@ BOOST_AUTO_TEST_CASE( asset_name_test )
       GRAPHENE_REQUIRE_THROW( create_user_issued_asset( "ALPHA", alice_id(db), 0 ), fc::exception );
       BOOST_CHECK(  has_asset("ALPHA") );    BOOST_CHECK( !has_asset("ALPHA.ONE") );
 
-      generate_blocks( HARDFORK_385_TIME );
+      generate_blocks( HARDFORK_385_VERSION );
       generate_block();
 
       // Bob can't create ALPHA.ONE
@@ -556,7 +556,7 @@ BOOST_AUTO_TEST_CASE( asset_name_test )
       sign( tx, alice_private_key );
       GRAPHENE_REQUIRE_THROW(PUSH_TX( db, tx ), fc::assert_exception);
 
-      generate_blocks( HARDFORK_CORE_620_TIME + 1);
+      generate_blocks( HARDFORK_CORE_620_VERSION + 1);
       generate_block();
 
       // Sam can create asset ending in number after hf_620

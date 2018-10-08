@@ -1833,7 +1833,7 @@ BOOST_FIXTURE_TEST_CASE( temp_account_balance, database_fixture )
    sign( trx, alice_private_key );
    BOOST_CHECK_THROW( PUSH_TX( db, trx ), fc::assert_exception );
 
-   generate_blocks( HARDFORK_CORE_1040_TIME );
+   generate_blocks( HARDFORK_CORE_1040_VERSION );
 
    set_expiration( db, trx );
    trx.clear_signatures();

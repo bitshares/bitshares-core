@@ -1,4 +1,4 @@
 // #436 Prevent margin call from being triggered unless feed < call price
-#ifndef HARDFORK_436_TIME
-#define HARDFORK_436_TIME (graphene::chain::version(2,3,0, fc::time_point_sec( 1450288800 ) ) )
+#ifndef HARDFORK_436_VERSION
+#define HARDFORK_436_VERSION (graphene::chain::version(2,3,0, fc::time_point_sec( 1450288800 ) ) )
 #endif

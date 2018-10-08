@@ -1,4 +1,4 @@
 // bitshares-core issue #834 "BSIP38: add target CR option to short positions"
-#ifndef HARDFORK_CORE_834_TIME
-#define HARDFORK_CORE_834_TIME (graphene::chain::version(2,9,0, fc::time_point_sec( 1532008920 ) ) ) // Thu, 19 Jul 2018 14:02:00 UTC
+#ifndef HARDFORK_CORE_834_VERSION
+#define HARDFORK_CORE_834_VERSION (graphene::chain::version(2,9,0, fc::time_point_sec( 1532008920 ) ) ) // Thu, 19 Jul 2018 14:02:00 UTC
 #endif

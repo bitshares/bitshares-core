@@ -306,7 +306,7 @@ processed_transaction database::push_proposal(const proposal_object& proposal)
       remove(proposal);
       session.merge();
    } catch ( const fc::exception& e ) {
-      if( head_block_time() <= HARDFORK_483_TIME )
+      if( head_block_time() <= HARDFORK_483_VERSION )
       {
          for( size_t i=old_applied_ops_size,n=_applied_ops.size(); i<n; i++ )
          {
@@ -683,7 +683,7 @@ processed_transaction database::_apply_transaction(const signed_transaction& trx
    }
    ptrx.operation_results = std::move(eval_state.operation_results);
 
-   if( head_block_time() < HARDFORK_CORE_1040_TIME ) // TODO totally remove this code block after hard fork
+   if( head_block_time() < HARDFORK_CORE_1040_VERSION ) // TODO totally remove this code block after hard fork
    {
       //Make sure the temp account has no non-zero balances
       const auto& index = get_index_type<account_balance_index>().indices().get<by_account_asset>();
