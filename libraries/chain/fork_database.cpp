@@ -50,7 +50,7 @@ void     fork_database::start_block(signed_block b)
 }
 
 /**
- * Pushes the block into the fork database and caches it if it doesn't link
+ * Pushes the block into the fork database
  *
  */
 shared_ptr<fork_item>  fork_database::push_block(const signed_block& b)
@@ -64,7 +64,6 @@ shared_ptr<fork_item>  fork_database::push_block(const signed_block& b)
       wlog( "Pushing block to fork database that failed to link: ${id}, ${num}", ("id",b.id())("num",b.block_num()) );
       wlog( "Head: ${num}, ${id}", ("num",_head->data.block_num())("id",_head->data.id()) );
       throw;
-      _unlinked_index.insert( item );
    }
    return _head;
 }
@@ -92,35 +91,10 @@ void  fork_database::_push_block(const item_ptr& item)
    {
       _head = item;
       uint32_t min_num = _head->num - std::min( _max_size, _head->num );
-//      ilog( "min block in fork DB ${n}, max_size: ${m}", ("n",min_num)("m",_max_size) );
       auto& num_idx = _index.get<block_num>();
       while( num_idx.size() && (*num_idx.begin())->num < min_num )
          num_idx.erase( num_idx.begin() );
-      
-      _unlinked_index.get<block_num>().erase(_head->num - _max_size);
    }
-   //_push_next( item );
-}
-
-/**
- *  Iterate through the unlinked cache and insert anything that
- *  links to the newly inserted item.  This will start a recursive
- *  set of calls performing a depth-first insertion of pending blocks as
- *  _push_next(..) calls _push_block(...) which will in turn call _push_next
- */
-void fork_database::_push_next( const item_ptr& new_item )
-{
-    auto& prev_idx = _unlinked_index.get<by_previous>();
-
-    auto itr = prev_idx.find( new_item->id );
-    while( itr != prev_idx.end() )
-    {
-       auto tmp = *itr;
-       prev_idx.erase( itr );
-       _push_block( tmp );
-
-       itr = prev_idx.find( new_item->id );
-    }
 }
 
 void fork_database::set_max_size( uint32_t s )
@@ -128,29 +102,15 @@ void fork_database::set_max_size( uint32_t s )
    _max_size = s;
    if( !_head ) return;
 
-   { /// index
-      auto& by_num_idx = _index.get<block_num>();
-      auto itr = by_num_idx.begin();
-      while( itr != by_num_idx.end() )
-      {
-         if( (*itr)->num < std::max(int64_t(0),int64_t(_head->num) - _max_size) )
-            by_num_idx.erase(itr);
-         else
-            break;
-         itr = by_num_idx.begin();
-      }
-   }
-   { /// unlinked_index
-      auto& by_num_idx = _unlinked_index.get<block_num>();
-      auto itr = by_num_idx.begin();
-      while( itr != by_num_idx.end() )
-      {
-         if( (*itr)->num < std::max(int64_t(0),int64_t(_head->num) - _max_size) )
-            by_num_idx.erase(itr);
-         else
-            break;
-         itr = by_num_idx.begin();
-      }
+   auto& by_num_idx = _index.get<block_num>();
+   auto itr = by_num_idx.begin();
+   while( itr != by_num_idx.end() )
+   {
+      if( (*itr)->num < std::max(int64_t(0),int64_t(_head->num) - _max_size) )
+         by_num_idx.erase(itr);
+      else
+         break;
+      itr = by_num_idx.begin();
    }
 }
 
@@ -158,11 +118,7 @@ bool fork_database::is_known_block(const block_id_type& id)const
 {
    auto& index = _index.get<block_id>();
    auto itr = index.find(id);
-   if( itr != index.end() )
-      return true;
-   auto& unlinked_index = _unlinked_index.get<block_id>();
-   auto unlinked_itr = unlinked_index.find(id);
-   return unlinked_itr != unlinked_index.end();
+   return itr != index.end();
 }
 
 item_ptr fork_database::fetch_block(const block_id_type& id)const
@@ -171,10 +127,6 @@ item_ptr fork_database::fetch_block(const block_id_type& id)const
    auto itr = index.find(id);
    if( itr != index.end() )
       return *itr;
-   auto& unlinked_index = _unlinked_index.get<block_id>();
-   auto unlinked_itr = unlinked_index.find(id);
-   if( unlinked_itr != unlinked_index.end() )
-      return *unlinked_itr;
    return item_ptr();
 }
 
