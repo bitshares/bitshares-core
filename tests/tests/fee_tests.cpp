@@ -1319,8 +1319,8 @@ BOOST_AUTO_TEST_CASE( hf445_fee_refund_cross_test )
       // prepare params
       const chain_parameters& params = db.get_global_properties().parameters;
       time_point_sec max_exp = time_point_sec::maximum();
-      time_point_sec exp = HARDFORK_445_TIME + fc::seconds( params.block_interval * (params.maintenance_skip_slots + 1) * 3 );
-      time_point_sec exp2 = HARDFORK_445_TIME + fc::seconds( params.block_interval * (params.maintenance_skip_slots + 1) * 13 );
+      time_point_sec exp = HARDFORK_445_TIME.hardfork_time + fc::seconds( params.block_interval * (params.maintenance_skip_slots + 1) * 3 );
+      time_point_sec exp2 = HARDFORK_445_TIME.hardfork_time + fc::seconds( params.block_interval * (params.maintenance_skip_slots + 1) * 13 );
       price cer( asset(1), asset(1, usd_id) );
       const auto* usd_stat = &usd_id( db ).dynamic_asset_data_id( db );
 
@@ -2384,9 +2384,9 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_cross_test )
       // prepare params
       const chain_parameters& params = db.get_global_properties().parameters;
       time_point_sec max_exp = time_point_sec::maximum();
-      time_point_sec exp = HARDFORK_CORE_604_TIME + fc::seconds( params.block_interval * (params.maintenance_skip_slots + 1) * 3 );
-      time_point_sec exp1 = HARDFORK_CORE_604_TIME + fc::seconds( params.block_interval * (params.maintenance_skip_slots + 1) * 13 );
-      time_point_sec exp2 = HARDFORK_CORE_604_TIME + fc::seconds( params.block_interval * (params.maintenance_skip_slots + 1) * 23 );
+      time_point_sec exp = HARDFORK_CORE_604_TIME.hardfork_time + fc::seconds( params.block_interval * (params.maintenance_skip_slots + 1) * 3 );
+      time_point_sec exp1 = HARDFORK_CORE_604_TIME.hardfork_time + fc::seconds( params.block_interval * (params.maintenance_skip_slots + 1) * 13 );
+      time_point_sec exp2 = HARDFORK_CORE_604_TIME.hardfork_time + fc::seconds( params.block_interval * (params.maintenance_skip_slots + 1) * 23 );
       price cer = usd_id( db ).options.core_exchange_rate;
       const auto* usd_stat = &usd_id( db ).dynamic_asset_data_id( db );
 

@@ -22,6 +22,7 @@
  * THE SOFTWARE.
  */
 #pragma once
+#include <graphene/chain/protocol/version.hpp>
 #include <graphene/chain/protocol/asset.hpp>
 #include <graphene/db/object.hpp>
 #include <graphene/db/generic_index.hpp>
@@ -46,6 +47,7 @@ namespace graphene { namespace chain {
          string           url;
          int64_t          total_missed = 0;
          uint32_t         last_confirmed_block_num = 0;
+         version          running_version;
 
          witness_object() : vote_id(vote_id_type::witness) {}
    };
@@ -80,4 +82,5 @@ FC_REFLECT_DERIVED( graphene::chain::witness_object, (graphene::db::object),
                     (url) 
                     (total_missed)
                     (last_confirmed_block_num)
+                    (running_version)
                   )
