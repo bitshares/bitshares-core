@@ -143,7 +143,21 @@ void witness_plugin::plugin_startup()
 
 void witness_plugin::plugin_shutdown()
 {
-   // nothing to do
+   stop_block_production();
+}
+
+void witness_plugin::stop_block_production()
+{
+   _shutting_down = true;
+   
+   try {
+      if( _block_production_task.valid() )
+         _block_production_task.cancel_and_wait(__FUNCTION__);
+   } catch(fc::canceled_exception&) {
+      //Expected exception. Move along.
+   } catch(fc::exception& e) {
+      edump((e.to_detail_string()));
+   }
 }
 
 void witness_plugin::refresh_witness_key_cache()
@@ -161,6 +175,8 @@ void witness_plugin::refresh_witness_key_cache()
 
 void witness_plugin::schedule_production_loop()
 {
+   if (_shutting_down) return;
+
    //Schedule for the next second's tick regardless of chain state
    // If we would wait less than 50ms, wait for the whole second.
    fc::time_point now = fc::time_point::now();
@@ -176,6 +192,8 @@ void witness_plugin::schedule_production_loop()
 
 block_production_condition::block_production_condition_enum witness_plugin::block_production_loop()
 {
+   if (_shutting_down) return block_production_condition::block_production_condition_enum::shutdown;
+
    block_production_condition::block_production_condition_enum result;
    fc::limited_mutable_variant_object capture( GRAPHENE_MAX_NESTED_OBJECTS );
    try
