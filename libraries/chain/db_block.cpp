@@ -465,15 +465,17 @@ signed_block database::_generate_block(
 void database::pop_block()
 { try {
    _pending_tx_session.reset();
-   auto head_id = head_block_id();
-   optional<signed_block> head_block = fetch_block_by_id( head_id );
-   GRAPHENE_ASSERT( head_block.valid(), pop_empty_chain, "there are no blocks to pop" );
-
-   _fork_db.pop_block();
+   auto fork_db_head = _fork_db.head();
+   FC_ASSERT( fork_db_head, "Trying to pop() from empty fork database!?" );
+   if( fork_db_head->id == head_block_id() )
+      _fork_db.pop_block();
+   else
+   {
+      fork_db_head = _fork_db.fetch_block( head_block_id() );
+      FC_ASSERT( fork_db_head, "Trying to pop() block that's not in fork database!?" );
+   }
    pop_undo();
-
-   _popped_tx.insert( _popped_tx.begin(), head_block->transactions.begin(), head_block->transactions.end() );
-
+   _popped_tx.insert( _popped_tx.begin(), fork_db_head->data.transactions.begin(), fork_db_head->data.transactions.end() );
 } FC_CAPTURE_AND_RETHROW() }
 
 void database::clear_pending()
