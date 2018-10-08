@@ -58,6 +58,7 @@ add_library( graphene_chain
              protocol/fee_schedule.cpp
              protocol/confidential.cpp
              protocol/vote.cpp
+	     protocol/version.cpp
 
              genesis_state.cpp
              get_config.cpp
