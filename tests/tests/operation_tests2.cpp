@@ -170,7 +170,7 @@ BOOST_AUTO_TEST_CASE( withdraw_permission_create_after_hardfork_23 )
       op.withdrawal_limit = asset(5);
       op.withdrawal_period_sec = fc::hours(1).to_seconds();
       op.periods_until_expiration = 5;
-      op.period_start_time = HARDFORK_23_VERSION + db.get_global_properties().parameters.block_interval*5; // 5 blocks after fork time
+      op.period_start_time = HARDFORK_23_VERSION.hardfork_time + db.get_global_properties().parameters.block_interval*5; // 5 blocks after fork time
       trx.operations.push_back(op);
       REQUIRE_OP_VALIDATION_FAILURE(op, withdrawal_limit, asset());
       REQUIRE_OP_VALIDATION_FAILURE(op, periods_until_expiration, 0);
@@ -681,7 +681,7 @@ BOOST_AUTO_TEST_CASE( withdraw_permission_whitelist_asset_test )
 BOOST_AUTO_TEST_CASE( withdraw_permission_incremental_case )
 { try {
     INVOKE(withdraw_permission_create_after_hardfork_23);
-    time_point_sec expected_first_period_start_time = HARDFORK_23_VERSION + db.get_global_properties().parameters.block_interval*5; // Hard-coded to synchronize with withdraw_permission_create_after_hardfork_23()
+    time_point_sec expected_first_period_start_time = HARDFORK_23_VERSION.hardfork_time + db.get_global_properties().parameters.block_interval*5; // Hard-coded to synchronize with withdraw_permission_create_after_hardfork_23()
     uint64_t expected_period_duration_seconds = fc::hours(1).to_seconds(); // Hard-coded to synchronize with withdraw_permission_create_after_hardfork_23()
 
     auto nathan_private_key = generate_private_key("nathan");
