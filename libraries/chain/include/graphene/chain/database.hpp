@@ -135,9 +135,9 @@ namespace graphene { namespace chain {
          bool before_last_checkpoint()const;
 
          bool push_block( const signed_block& b, uint32_t skip = skip_nothing );
-         processed_transaction push_transaction( const signed_transaction& trx, uint32_t skip = skip_nothing );
+         processed_transaction push_transaction( const precomputable_transaction& trx, uint32_t skip = skip_nothing );
          bool _push_block( const signed_block& b );
-         processed_transaction _push_transaction( const signed_transaction& trx );
+         processed_transaction _push_transaction( const precomputable_transaction& trx );
 
          ///@throws fc::exception if the proposed transaction fails to apply.
          processed_transaction push_proposal( const proposal_object& proposal );
@@ -406,7 +406,7 @@ namespace graphene { namespace chain {
 
          /** when popping a block, the transactions that were removed get cached here so they
           * can be reapplied at the proper time */
-         std::deque< signed_transaction >       _popped_tx;
+         std::deque< precomputable_transaction > _popped_tx;
 
          /**
           * @}

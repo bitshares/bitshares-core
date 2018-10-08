@@ -303,7 +303,7 @@ BOOST_AUTO_TEST_CASE( asset_settle_cancel_operation_test_after_hf588 )
       pcop.proposed_ops.emplace_back(ascop);
       trx.operations.push_back(pcop);
 
-      BOOST_CHECK_EXCEPTION(db.push_transaction(trx), fc::assert_exception,
+      BOOST_CHECK_EXCEPTION(PUSH_TX(db, trx), fc::assert_exception,
             [](fc::assert_exception const &e) -> bool {
                std::cout << e.to_string() << std::endl;
                if (e.to_string().find("Virtual operation") != std::string::npos)
@@ -333,7 +333,7 @@ BOOST_AUTO_TEST_CASE( asset_settle_cancel_operation_test_after_hf588 )
 
       trx.operations.push_back(pcop);
 
-      BOOST_CHECK_EXCEPTION(db.push_transaction(trx), fc::assert_exception,
+      BOOST_CHECK_EXCEPTION(PUSH_TX(db, trx), fc::assert_exception,
             [](fc::assert_exception const &e) -> bool {
                std::cout << e.to_string() << std::endl;
                if (e.to_string().find("Virtual operation") != std::string::npos)
@@ -656,7 +656,7 @@ BOOST_AUTO_TEST_CASE( call_order_update_target_cr_hardfork_time_test )
          tx.operations.push_back( prop );
          db.current_fee_schedule().set_fee( tx.operations.back() );
          set_expiration( db, tx );
-         db.push_transaction( tx, ~0 );
+         PUSH_TX( db, tx, ~0 );
       };
 
       BOOST_TEST_MESSAGE( "bob tries to propose a proposal with target_cr set, "

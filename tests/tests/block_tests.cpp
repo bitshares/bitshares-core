@@ -602,11 +602,11 @@ BOOST_AUTO_TEST_CASE( undo_pending )
          t.to = nathan_id;
          t.amount = asset(5000);
          trx.operations.push_back(t);
-         db.push_transaction(trx, ~0);
+         PUSH_TX(db, trx, ~0);
          trx.clear();
          set_expiration( db, trx );
          trx.operations.push_back(t);
-         db.push_transaction(trx, ~0);
+         PUSH_TX(db, trx, ~0);
 
          BOOST_CHECK(db.get_balance(nathan_id, asset_id_type()).amount == 10000);
          db.clear_pending();
@@ -757,7 +757,7 @@ BOOST_AUTO_TEST_CASE( tapos )
       cop.active = cop.owner;
       trx.operations.push_back(cop);
       trx.sign( init_account_priv_key, db1.get_chain_id() );
-      db1.push_transaction(trx);
+      PUSH_TX(db1, trx);
       b = db1.generate_block(db1.get_slot_time(1), db1.get_scheduled_witness(1), init_account_priv_key, database::skip_nothing);
       trx.clear();
 
@@ -952,7 +952,7 @@ BOOST_FIXTURE_TEST_CASE( double_sign_check, database_fixture )
    for( auto& op : trx.operations ) db.current_fee_schedule().set_fee(op);
    trx.validate();
 
-   db.push_transaction(trx, ~0);
+   PUSH_TX(db, trx, ~0);
 
    trx.operations.clear();
    t.from = bob.id;
@@ -963,21 +963,21 @@ BOOST_FIXTURE_TEST_CASE( double_sign_check, database_fixture )
    trx.validate();
 
    BOOST_TEST_MESSAGE( "Verify that not-signing causes an exception" );
-   GRAPHENE_REQUIRE_THROW( db.push_transaction(trx, 0), fc::exception );
+   GRAPHENE_REQUIRE_THROW( PUSH_TX(db, trx, 0), fc::exception );
 
    BOOST_TEST_MESSAGE( "Verify that double-signing causes an exception" );
    sign( trx, bob_private_key );
    sign( trx, bob_private_key );
-   GRAPHENE_REQUIRE_THROW( db.push_transaction(trx, 0), tx_duplicate_sig );
+   GRAPHENE_REQUIRE_THROW( PUSH_TX(db, trx, 0), tx_duplicate_sig );
 
    BOOST_TEST_MESSAGE( "Verify that signing with an extra, unused key fails" );
    trx.signatures.pop_back();
    sign( trx, generate_private_key("bogus" ));
-   GRAPHENE_REQUIRE_THROW( db.push_transaction(trx, 0), tx_irrelevant_sig );
+   GRAPHENE_REQUIRE_THROW( PUSH_TX(db, trx, 0), tx_irrelevant_sig );
 
    BOOST_TEST_MESSAGE( "Verify that signing once with the proper key passes" );
    trx.signatures.pop_back();
-   db.push_transaction(trx, 0);
+   PUSH_TX(db, trx, 0);
 
 } FC_LOG_AND_RETHROW() }
 
@@ -998,7 +998,7 @@ BOOST_FIXTURE_TEST_CASE( change_block_interval, database_fixture )
       uop.new_parameters.block_interval = 1;
       cop.proposed_ops.emplace_back(uop);
       trx.operations.push_back(cop);
-      db.push_transaction(trx);
+      PUSH_TX(db, trx);
    }
    BOOST_TEST_MESSAGE( "Updating proposal by signing with the committee_member private key" );
    {
@@ -1019,7 +1019,7 @@ BOOST_FIXTURE_TEST_CASE( change_block_interval, database_fixture )
       sign( trx, get_account("init6" ).active.get_keys().front(),init_account_priv_key);
       sign( trx, get_account("init7" ).active.get_keys().front(),init_account_priv_key);
       */
-      db.push_transaction(trx);
+      PUSH_TX(db, trx);
       BOOST_CHECK(proposal_id_type()(db).is_authorized_to_execute(db));
    }
    BOOST_TEST_MESSAGE( "Verifying that the interval didn't change immediately" );
@@ -1602,7 +1602,7 @@ BOOST_FIXTURE_TEST_CASE( update_account_keys, database_fixture )
                trx.operations.push_back( create_op );
                // trx.sign( sam_key );
 
-               processed_transaction ptx_create = db.push_transaction( trx,
+               processed_transaction ptx_create = PUSH_TX( db, trx,
                   database::skip_transaction_dupe_check |
                   database::skip_transaction_signatures
                );
@@ -1639,11 +1639,11 @@ BOOST_FIXTURE_TEST_CASE( update_account_keys, database_fixture )
                      sign( trx, *owner_privkey[i] );
                      if( i < int(create_op.owner.weight_threshold-1) )
                      {
-                        GRAPHENE_REQUIRE_THROW(db.push_transaction(trx), fc::exception);
+                        GRAPHENE_REQUIRE_THROW(PUSH_TX(db, trx), fc::exception);
                      }
                      else
                      {
-                        db.push_transaction( trx,
+                        PUSH_TX( db, trx,
                            database::skip_transaction_dupe_check |
                            database::skip_transaction_signatures );
                      }

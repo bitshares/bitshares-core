@@ -228,7 +228,7 @@ bool database::_push_block(const signed_block& new_block)
  * queues full as well, it will be kept in the queue to be propagated later when a new block flushes out the pending
  * queues.
  */
-processed_transaction database::push_transaction( const signed_transaction& trx, uint32_t skip )
+processed_transaction database::push_transaction( const precomputable_transaction& trx, uint32_t skip )
 { try {
    processed_transaction result;
    detail::with_skip_flags( *this, skip, [&]()
@@ -238,7 +238,7 @@ processed_transaction database::push_transaction( const signed_transaction& trx,
    return result;
 } FC_CAPTURE_AND_RETHROW( (trx) ) }
 
-processed_transaction database::_push_transaction( const signed_transaction& trx )
+processed_transaction database::_push_transaction( const precomputable_transaction& trx )
 {
    // If this is the first transaction pushed after applying a block, start a new undo session.
    // This allows us to quickly rewind to the clean state of the head block, in case a new block arrives.

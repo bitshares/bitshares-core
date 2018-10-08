@@ -498,7 +498,7 @@ BOOST_AUTO_TEST_CASE( committee_authority )
    */
    trx.operations.push_back(uop);
    sign( trx, committee_key );
-   db.push_transaction(trx);
+   PUSH_TX(db, trx);
    BOOST_CHECK_EQUAL(get_balance(nathan, asset_id_type()(db)), 0);
    BOOST_CHECK(db.get<proposal_object>(prop.id).is_authorized_to_execute(db));
 
