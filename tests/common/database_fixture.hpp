@@ -211,6 +211,14 @@ struct database_fixture {
     */
    uint32_t generate_blocks(fc::time_point_sec timestamp, bool miss_intermediate_blocks = true, uint32_t skip = ~0);
 
+   /**
+    * @brief Wraps the generate_blocks method to take version as an input parameter
+    * @param version target version/time to generate blocks until
+    * @return number of blocks generated  
+   */
+   uint32_t generate_blocks(graphene::chain::version version, bool miss_intermediate_blocks = true, uint32_t skip = ~0);
+
+
    account_create_operation make_account(
       const std::string& name = "nathan",
       public_key_type = public_key_type()

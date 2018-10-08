@@ -340,6 +340,11 @@ uint32_t database_fixture::generate_blocks(fc::time_point_sec timestamp, bool mi
    return blocks;
 }
 
+uint32_t database_fixture::generate_blocks(graphene::chain::version version, bool miss_intermediate_blocks, uint32_t skip)
+{
+   generate_blocks(version.hardfork_time, miss_intermediate_blocks, skip);
+}
+
 account_create_operation database_fixture::make_account(
    const std::string& name /* = "nathan" */,
    public_key_type key /* = key_id_type() */
