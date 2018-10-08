@@ -1,4 +1,4 @@
 // #599 Unpacking of extension is incorrect
 #ifndef HARDFORK_599_TIME
-#define HARDFORK_599_TIME (fc::time_point_sec( 1459789200 ))
+#define HARDFORK_599_TIME (graphene::chain::version(2,6,0, fc::time_point_sec( 1459789200 ) ) )
 #endif
