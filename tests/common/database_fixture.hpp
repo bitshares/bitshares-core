@@ -25,6 +25,7 @@
 
 #include <graphene/app/application.hpp>
 #include <graphene/chain/database.hpp>
+#include <graphene/chain/protocol/version.hpp>
 #include <graphene/chain/protocol/types.hpp>
 #include <fc/io/json.hpp>
 #include <fc/smart_ref_impl.hpp>
