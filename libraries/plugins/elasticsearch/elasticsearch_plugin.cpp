@@ -341,7 +341,7 @@ void elasticsearch_plugin_impl::createBulkLine(const account_transaction_history
    bulk_line_struct.block_data = bs;
    if(_elasticsearch_visitor)
       bulk_line_struct.additional_data = vs;
-   bulk_line = fc::json::to_string(bulk_line_struct);
+   bulk_line = fc::json::to_string(bulk_line_struct, fc::json::legacy_generator);
 }
 
 void elasticsearch_plugin_impl::prepareBulk(const account_transaction_history_id_type& ath_id)

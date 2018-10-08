@@ -250,6 +250,15 @@ struct adaptor_struct {
            o["owner_"] = o["owner"].as_string();
            o.erase("owner");
        }
+       if (o.find("proposed_ops") != o.end())
+       {
+          o["proposed_ops"] = fc::json::to_string(o["proposed_ops"]);
+       }
+      if (o.find("initializer") != o.end())
+      {
+         o["initializer"] = fc::json::to_string(o["initializer"]);
+      }
+
        variant v;
        fc::to_variant(o, v, FC_PACK_MAX_DEPTH);
        return v;
