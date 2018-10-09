@@ -1610,7 +1610,7 @@ class wallet_api
        *
        * @return the signed transaction
        */
-      signed_transaction multisig_sign_transaction( signed_transaction tx,
+      signed_transaction sign_transaction2( signed_transaction tx,
                                                     bool broadcast = false );
 
       void dbg_make_uia(string creator, string symbol);
@@ -1801,6 +1801,7 @@ FC_API( graphene::wallet::wallet_api,
         (save_wallet_file)
         (serialize_transaction)
         (sign_transaction)
+        (sign_transaction2)
         (get_prototype_operation)
         (propose_parameter_change)
         (propose_fee_change)
@@ -1829,5 +1830,4 @@ FC_API( graphene::wallet::wallet_api,
         (blind_history)
         (receive_blind_transfer)
         (get_order_book)
-        (multisig_sign_transaction)
       )

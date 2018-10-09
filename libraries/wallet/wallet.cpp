@@ -760,8 +760,23 @@ public:
       return true;
    }
 
-   signed_transaction multisig_sign_transaction( signed_transaction tx,
-                                                 bool broadcast )
+   /**
+    * Get the required public keys to sign the transaction which had been
+    * owned by us
+    *
+    * NOTE, if `erase_existing_sigs` set to true, the original trasaction's
+    * signatures will be erased
+    *
+    * @param tx           The transaction to be signed
+    * @param erase_existing_sigs
+    *        The transaction could have been partially signed already,
+    *        if set to false, the corresponding public key of existing
+    *        signatures won't be returned.
+    *        If set to true, the existing signatures will be erase and
+    *        all required keys returned.
+   */
+   set<public_key_type> get_owned_required_keys( signed_transaction &tx,
+                                                    bool erase_existing_sigs = true)
    {
       set<public_key_type> pks = _remote_db->get_potential_signatures( tx );
       flat_set<public_key_type> owned_keys;
@@ -772,8 +787,17 @@ public:
                        return _keys.find( pk ) != _keys.end();
                     } );
 
+      if ( erase_existing_sigs )
+         tx.signatures.clear();
+
+      return _remote_db->get_required_signatures( tx, owned_keys );
+   }
+
+   signed_transaction sign_transaction2( signed_transaction tx,
+                                                 bool broadcast )
+   {
       set<public_key_type> approving_key_set =
-         _remote_db->get_required_signatures( tx, owned_keys );
+         std::move( get_owned_required_keys( tx, false ) );
 
       if ( ( ( tx.ref_block_num == 0 && tx.ref_block_prefix == 0 ) ||
              tx.expiration == fc::time_point_sec() ) &&
@@ -1907,13 +1931,8 @@ public:
 
    signed_transaction sign_transaction(signed_transaction tx, bool broadcast = false)
    {
-      set<public_key_type> pks = _remote_db->get_potential_signatures( tx );
-      flat_set<public_key_type> owned_keys;
-      owned_keys.reserve( pks.size() );
-      std::copy_if( pks.begin(), pks.end(), std::inserter(owned_keys, owned_keys.end()),
-                    [this](const public_key_type& pk){ return _keys.find(pk) != _keys.end(); } );
-      tx.signatures.clear();
-      set<public_key_type> approving_key_set = _remote_db->get_required_signatures( tx, owned_keys );
+      set<public_key_type> approving_key_set =
+         std::move( get_owned_required_keys( tx ) );
 
       auto dyn_props = get_dynamic_global_properties();
       tx.set_reference_block( dyn_props.head_block_id );
@@ -3723,10 +3742,10 @@ dynamic_global_property_object wallet_api::get_dynamic_global_properties() const
    return my->get_dynamic_global_properties();
 }
 
-signed_transaction wallet_api::multisig_sign_transaction( signed_transaction tx,
+signed_transaction wallet_api::sign_transaction2( signed_transaction tx,
                                                           bool broadcast )
 {
-   return my->multisig_sign_transaction( tx, broadcast );
+   return my->sign_transaction2( tx, broadcast );
 }
 
 string wallet_api::help()const
