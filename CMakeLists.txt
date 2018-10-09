@@ -82,12 +82,14 @@ if( WIN32 )
 
     set(CRYPTO_LIB)
 
-    #looks like this flag can have different default on some machines.
-    SET(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} /SAFESEH:NO")
-    SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /SAFESEH:NO")
+    if( MSVC )
+        #looks like this flag can have different default on some machines.
+        SET(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} /SAFESEH:NO")
+        SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /SAFESEH:NO")
 
-    # Probably cmake has a bug and vcxproj generated for executable in Debug conf. has disabled debug info
-    set(CMAKE_EXE_LINKER_FLAGS_DEBUG "${CMAKE_EXE_LINKER_FLAGS_DEBUG} /DEBUG")
+        # Probably cmake has a bug and vcxproj generated for executable in Debug conf. has disabled debug info
+        set(CMAKE_EXE_LINKER_FLAGS_DEBUG "${CMAKE_EXE_LINKER_FLAGS_DEBUG} /DEBUG")
+    endif ( MSVC )
 
     # On windows tcl should be installed to the directory pointed by setenv.bat script
     SET(TCL_INCLUDE_PATH $ENV{TCL_ROOT}/include)
