@@ -127,6 +127,7 @@ database_fixture::database_fixture()
    }
 
    auto test_name = boost::unit_test::framework::current_test_case().p_name.value;
+   auto test_suite_id = boost::unit_test::framework::current_test_case().p_parent_id;
    if(test_name == "elasticsearch_account_history" || test_name == "elasticsearch_suite") {
       auto esplugin = app.register_plugin<graphene::elasticsearch::elasticsearch_plugin>();
       esplugin->plugin_set_app(&app);
@@ -140,7 +141,8 @@ database_fixture::database_fixture()
       esplugin->plugin_initialize(options);
       esplugin->plugin_startup();
    }
-   else {
+   else if( boost::unit_test::framework::get<boost::unit_test::test_suite>(test_suite_id).p_name.value != "performance_tests" )
+   {
       auto ahplugin = app.register_plugin<graphene::account_history::account_history_plugin>();
       ahplugin->plugin_set_app(&app);
       ahplugin->plugin_initialize(options);
