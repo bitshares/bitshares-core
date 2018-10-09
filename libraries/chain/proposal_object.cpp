@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015 Cryptonomex, Inc., and contributors.
+ * Copyright (c) 2015-2018 Cryptonomex, Inc., and contributors.
  *
  * The MIT License
  *
@@ -22,7 +22,6 @@
  * THE SOFTWARE.
  */
 #include <graphene/chain/database.hpp>
-#include <graphene/chain/account_object.hpp>
 #include <graphene/chain/proposal_object.hpp>
 
 namespace graphene { namespace chain {
@@ -43,13 +42,10 @@ bool proposal_object::is_authorized_to_execute(database& db) const
    } 
    catch ( const fc::exception& e )
    {
-      //idump((available_active_approvals));
-      //wlog((e.to_detail_string()));
       return false;
    }
    return true;
 }
-
 
 void required_approval_index::object_inserted( const object& obj )
 {

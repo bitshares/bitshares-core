@@ -92,6 +92,26 @@ namespace graphene { namespace chain {
          FC_THROW_EXCEPTION( fc::assert_exception, "invalid asset * price", ("asset",a)("price",b) );
       }
 
+      asset asset::multiply_and_round_up( const price& b )const
+      {
+         const asset& a = *this;
+         if( a.asset_id == b.base.asset_id )
+         {
+            FC_ASSERT( b.base.amount.value > 0 );
+            uint128_t result = (uint128_t(a.amount.value) * b.quote.amount.value + b.base.amount.value - 1)/b.base.amount.value;
+            FC_ASSERT( result <= GRAPHENE_MAX_SHARE_SUPPLY );
+            return asset( result.convert_to<int64_t>(), b.quote.asset_id );
+         }
+         else if( a.asset_id == b.quote.asset_id )
+         {
+            FC_ASSERT( b.quote.amount.value > 0 );
+            uint128_t result = (uint128_t(a.amount.value) * b.base.amount.value + b.quote.amount.value - 1)/b.quote.amount.value;
+            FC_ASSERT( result <= GRAPHENE_MAX_SHARE_SUPPLY );
+            return asset( result.convert_to<int64_t>(), b.base.asset_id );
+         }
+         FC_THROW_EXCEPTION( fc::assert_exception, "invalid asset::multiply_and_round_up(price)", ("asset",a)("price",b) );
+      }
+
       price operator / ( const asset& base, const asset& quote )
       { try {
          FC_ASSERT( base.asset_id != quote.asset_id );
