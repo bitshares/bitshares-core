@@ -14,6 +14,10 @@ if(MSVC)
   set_source_files_properties( tests/common/database_fixture.cpp PROPERTIES COMPILE_FLAGS "/bigobj" )
 endif(MSVC)
 
+file(GLOB SLOW_UNIT_TESTS "slow_tests/*.cpp")
+add_executable( slow_chain_test ${SLOW_UNIT_TESTS} ${COMMON_SOURCES} )
+target_link_libraries( slow_chain_test graphene_chain graphene_app graphene_account_history graphene_elasticsearch graphene_egenesis_none fc graphene_wallet ${PLATFORM_SPECIFIC_LIBS} )
+
 file(GLOB PERFORMANCE_TESTS "performance/*.cpp")
 add_executable( performance_test ${COMMON_SOURCES} ${PERFORMANCE_TESTS} )
 target_link_libraries( performance_test graphene_chain graphene_app graphene_account_history graphene_elasticsearch graphene_es_objects graphene_egenesis_none fc ${PLATFORM_SPECIFIC_LIBS} )
