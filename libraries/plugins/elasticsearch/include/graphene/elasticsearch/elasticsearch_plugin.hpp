@@ -228,10 +228,6 @@ struct adaptor_struct {
             }
          }
       }
-      if (o.find("kind") != o.end())
-      {
-         o["kind"] = o["kind"].as_string();
-      }
       if (o.find("new_parameters") != o.end())
       {
          auto& tmp = o["new_parameters"];
