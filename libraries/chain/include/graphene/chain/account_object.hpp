@@ -53,9 +53,9 @@ namespace graphene { namespace chain {
           */
          account_transaction_history_id_type most_recent_op;
          /** Total operations related to this account. */
-         uint32_t                            total_ops = 0;
+         uint64_t                            total_ops = 0;
          /** Total operations related to this account that has been removed from the database. */
-         uint32_t                            removed_ops = 0;
+         uint64_t                            removed_ops = 0;
 
          /**
           * When calculating votes it is necessary to know how much is stored in orders (and thus unavailable for
