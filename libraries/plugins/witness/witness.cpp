@@ -192,23 +192,29 @@ void witness_plugin::schedule_production_loop()
 
 block_production_condition::block_production_condition_enum witness_plugin::block_production_loop()
 {
-   if (_shutting_down) return block_production_condition::block_production_condition_enum::shutdown;
-
    block_production_condition::block_production_condition_enum result;
    fc::limited_mutable_variant_object capture( GRAPHENE_MAX_NESTED_OBJECTS );
-   try
+
+   if (_shutting_down) 
    {
-      result = maybe_produce_block(capture);
+      result = block_production_condition::shutdown;
    }
-   catch( const fc::canceled_exception& )
+   else
    {
-      //We're trying to exit. Go ahead and let this one out.
-      throw;
-   }
-   catch( const fc::exception& e )
-   {
-      elog("Got exception while generating block:\n${e}", ("e", e.to_detail_string()));
-      result = block_production_condition::exception_producing_block;
+      try
+      {
+         result = maybe_produce_block(capture);
+      }
+      catch( const fc::canceled_exception& )
+      {
+         //We're trying to exit. Go ahead and let this one out.
+         throw;
+      }
+      catch( const fc::exception& e )
+      {
+         elog("Got exception while generating block:\n${e}", ("e", e.to_detail_string()));
+         result = block_production_condition::exception_producing_block;
+      }
    }
 
    switch( result )
@@ -235,6 +241,9 @@ block_production_condition::block_production_condition_enum witness_plugin::bloc
       case block_production_condition::exception_producing_block:
          elog( "exception producing block" );
          break;
+      case block_production_condition::shutdown:
+         ilog( "shutdown producing block" );
+         return result;
    }
 
    schedule_production_loop();
