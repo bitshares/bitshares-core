@@ -245,7 +245,7 @@ block_production_condition::block_production_condition_enum witness_plugin::bloc
          ilog( "shutdown producing block" );
          return result;
       default:
-         elog( "unknown condition while producing block" );
+         elog( "unknown condition ${result} while producing block", ("result", (unsigned char)result) );
          break;
    }
 
