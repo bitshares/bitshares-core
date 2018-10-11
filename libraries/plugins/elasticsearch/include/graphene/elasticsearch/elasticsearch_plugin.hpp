@@ -215,7 +215,7 @@ struct adaptor_struct {
          auto& memo = o["memo"];
          if (memo.is_string())
          {
-            o["memo_"] = variant(o["memo"]);
+            o["memo_"] = o["memo"];
             o.erase("memo");
          }
          else if (memo.is_object())
