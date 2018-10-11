@@ -407,8 +407,7 @@ void application_impl::startup()
                       graphene::chain::database::skip_transaction_signatures |
                       graphene::chain::database::skip_transaction_dupe_check |
                       graphene::chain::database::skip_tapos_check |
-                      graphene::chain::database::skip_witness_schedule_check |
-                      graphene::chain::database::skip_authority_check;
+                      graphene::chain::database::skip_witness_schedule_check;
       if( _options->count("revalidate-blockchain") ) // see also handle_block()
          skip = _options->count("force-validate") ? 0 : graphene::chain::database::skip_transaction_signatures;
       graphene::chain::detail::with_skip_flags( *_chain_db, skip, [this,&initial_state] () {
