@@ -74,16 +74,7 @@ void database::reindex( fc::path data_dir )
    else
       _undo_db.disable();
 
-   uint32_t skip = skip_witness_signature |
-                   skip_block_size_check |
-                   skip_merkle_check |
-                   skip_transaction_signatures |
-                   skip_transaction_dupe_check |
-                   skip_tapos_check |
-                   skip_witness_schedule_check |
-                   skip_authority_check;
-   if( _replay_with_validation )
-      skip = 0;
+   uint32_t skip = node_properties().skip_flags;
 
    size_t total_processed_block_size;
    size_t total_block_size = _block_id_to_block.total_block_size();

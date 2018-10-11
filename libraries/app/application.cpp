@@ -26,6 +26,7 @@
 #include <graphene/app/application.hpp>
 #include <graphene/app/plugin.hpp>
 
+#include <graphene/chain/db_with.hpp>
 #include <graphene/chain/genesis_state.hpp>
 #include <graphene/chain/protocol/fee_schedule.hpp>
 #include <graphene/chain/protocol/types.hpp>
@@ -397,12 +398,22 @@ void application_impl::startup()
    if( _options->count("replay-blockchain") || _options->count("revalidate-blockchain") )
       _chain_db->wipe( _data_dir / "blockchain", false );
 
-   if( _options->count("revalidate-blockchain") )
-      _chain_db->_replay_with_validation = true;
-
    try
    {
-      _chain_db->open( _data_dir / "blockchain", initial_state, GRAPHENE_CURRENT_DB_VERSION );
+      // these flags are used in open() only, i. e. during replay
+      uint32_t skip = graphene::chain::database::skip_witness_signature |
+                      graphene::chain::database::skip_block_size_check |
+                      graphene::chain::database::skip_merkle_check |
+                      graphene::chain::database::skip_transaction_signatures |
+                      graphene::chain::database::skip_transaction_dupe_check |
+                      graphene::chain::database::skip_tapos_check |
+                      graphene::chain::database::skip_witness_schedule_check |
+                      graphene::chain::database::skip_authority_check;
+      if( _options->count("revalidate-blockchain") ) // see also handle_block()
+         skip = _options->count("force-validate") ? 0 : graphene::chain::database::skip_transaction_signatures;
+      graphene::chain::detail::with_skip_flags( *_chain_db, skip, [this,&initial_state] () {
+         _chain_db->open( _data_dir / "blockchain", initial_state, GRAPHENE_CURRENT_DB_VERSION );
+      });
    }
    catch( const fc::exception& e )
    {
