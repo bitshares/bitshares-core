@@ -235,7 +235,7 @@ void database::init_genesis(const genesis_state_type& genesis_state)
    _undo_db.disable();
    struct auth_inhibitor {
       auth_inhibitor(database& db) : db(db), old_flags(db.node_properties().skip_flags)
-      { db.node_properties().skip_flags |= skip_authority_check; }
+      { db.node_properties().skip_flags |= skip_transaction_signatures; }
       ~auth_inhibitor()
       { db.node_properties().skip_flags = old_flags; }
    private:

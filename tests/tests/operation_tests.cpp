@@ -1940,7 +1940,7 @@ BOOST_AUTO_TEST_CASE( reserve_asset_test )
          transaction tx;
          tx.operations.push_back( op );
          set_expiration( db, tx );
-         db.push_transaction( tx, database::skip_authority_check | database::skip_tapos_check | database::skip_transaction_signatures );
+         PUSH_TX( db, tx, database::skip_tapos_check | database::skip_transaction_signatures );
       } ;
 
       auto _issue_uia = [&]( const account_object& recipient, asset amount )
@@ -1952,7 +1952,7 @@ BOOST_AUTO_TEST_CASE( reserve_asset_test )
          transaction tx;
          tx.operations.push_back( op );
          set_expiration( db, tx );
-         db.push_transaction( tx, database::skip_authority_check | database::skip_tapos_check | database::skip_transaction_signatures );
+         PUSH_TX( db, tx, database::skip_tapos_check | database::skip_transaction_signatures );
       } ;
 
       int64_t init_balance = 10000;
@@ -2043,7 +2043,7 @@ BOOST_AUTO_TEST_CASE( cover_with_collateral_test )
          transaction tx;
          tx.operations.push_back( op );
          set_expiration( db, tx );
-         db.push_transaction( tx, database::skip_authority_check | database::skip_tapos_check | database::skip_transaction_signatures );
+         PUSH_TX( db, tx, database::skip_tapos_check | database::skip_transaction_signatures );
       } ;
 
       // margin call requirement:  1.75x

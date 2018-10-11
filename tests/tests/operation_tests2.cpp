@@ -565,7 +565,6 @@ BOOST_AUTO_TEST_CASE( withdraw_permission_whitelist_asset_test )
                  | database::skip_transaction_dupe_check
                  | database::skip_block_size_check
                  | database::skip_tapos_check
-                 | database::skip_authority_check
                  | database::skip_merkle_check
                  ;
 
@@ -1052,7 +1051,6 @@ BOOST_AUTO_TEST_CASE( witness_create )
                  | database::skip_transaction_dupe_check
                  | database::skip_block_size_check
                  | database::skip_tapos_check
-                 | database::skip_authority_check
                  | database::skip_merkle_check
                  ;
    generate_block(skip);
@@ -1238,7 +1236,6 @@ BOOST_AUTO_TEST_CASE( global_settle_test )
                  | database::skip_transaction_dupe_check
                  | database::skip_block_size_check
                  | database::skip_tapos_check
-                 | database::skip_authority_check
                  | database::skip_merkle_check
                  ;
 
@@ -1616,7 +1613,6 @@ BOOST_AUTO_TEST_CASE( force_settle_test )
                  | database::skip_transaction_dupe_check
                  | database::skip_block_size_check
                  | database::skip_tapos_check
-                 | database::skip_authority_check
                  | database::skip_merkle_check
                  ;
 
@@ -2058,7 +2054,7 @@ BOOST_AUTO_TEST_CASE(zero_second_vbo)
          transaction tx;
          tx.operations.push_back( op );
          set_expiration( db, tx );
-         db.push_transaction( tx, database::skip_authority_check | database::skip_tapos_check | database::skip_transaction_signatures );
+         PUSH_TX( db, tx, database::skip_tapos_check | database::skip_transaction_signatures );
       }
       enable_fees();
       upgrade_to_lifetime_member(alice_id);
