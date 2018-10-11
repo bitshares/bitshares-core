@@ -266,6 +266,14 @@ namespace graphene { namespace chain {
        friend bool operator != ( const public_key_type& p1, const public_key_type& p2);
    };
 
+   class pubkey_comparator {
+   public:
+      inline bool operator()( const public_key_type& a, const public_key_type& b )const
+      {
+         return a.key_data < b.key_data;
+      }
+   };
+
    struct extended_public_key_type
    {
       struct binary_key
