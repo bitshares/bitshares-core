@@ -58,6 +58,7 @@ class elasticsearch_plugin_impl
       bool _elasticsearch_visitor = false;
       std::string _elasticsearch_basic_auth = "";
       std::string _elasticsearch_index_prefix = "bitshares-";
+      bool _elasticsearch_operation_object = false;
       CURL *curl; // curl handler
       vector <string> bulk_lines; //  vector of op lines
       vector<std::string> prepare;
@@ -212,7 +213,15 @@ void elasticsearch_plugin_impl::doOperationHistory(const optional <operation_his
    os.op_in_trx = oho->op_in_trx;
    os.operation_result = fc::json::to_string(oho->result);
    os.virtual_op = oho->virtual_op;
-   os.op = fc::json::to_string(oho->op);
+
+   if(_elasticsearch_operation_object) {
+      oho->op.visit(fc::from_static_variant(os.op_object, FC_PACK_MAX_DEPTH));
+      adaptor_struct adaptor;
+      os.op_object = adaptor.adapt(os.op_object.get_object());
+   }
+   else
+      os.op = fc::json::to_string(oho->op);
+
 }
 
 void elasticsearch_plugin_impl::doBlock(uint32_t trx_in_block, const signed_block& b)
@@ -330,7 +339,7 @@ void elasticsearch_plugin_impl::createBulkLine(const account_transaction_history
    bulk_line_struct.block_data = bs;
    if(_elasticsearch_visitor)
       bulk_line_struct.additional_data = vs;
-   bulk_line = fc::json::to_string(bulk_line_struct);
+   bulk_line = fc::json::to_string(bulk_line_struct, fc::json::legacy_generator);
 }
 
 void elasticsearch_plugin_impl::prepareBulk(const account_transaction_history_id_type& ath_id)
@@ -418,6 +427,7 @@ void elasticsearch_plugin::plugin_set_program_options(
          ("elasticsearch-visitor", boost::program_options::value<bool>(), "Use visitor to index additional data(slows down the replay(false))")
          ("elasticsearch-basic-auth", boost::program_options::value<std::string>(), "Pass basic auth to elasticsearch database('')")
          ("elasticsearch-index-prefix", boost::program_options::value<std::string>(), "Add a prefix to the index(bitshares-)")
+         ("elasticsearch-operation-object", boost::program_options::value<bool>(), "Save operation as object(false)")
          ;
    cfg.add(cli);
 }
@@ -450,6 +460,9 @@ void elasticsearch_plugin::plugin_initialize(const boost::program_options::varia
    }
    if (options.count("elasticsearch-index-prefix")) {
       my->_elasticsearch_index_prefix = options["elasticsearch-index-prefix"].as<std::string>();
+   }
+   if (options.count("elasticsearch-operation-object")) {
+      my->_elasticsearch_operation_object = options["elasticsearch-operation-object"].as<bool>();
    }
 }
 
