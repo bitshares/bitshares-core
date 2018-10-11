@@ -1,0 +1,4 @@
+// Test hardfork file for version testing
+#ifndef HARDFORK_TEST_VERSION
+#define HARDFORK_TEST_VERSION (graphene::chain::version(2,10,0, fc::time_point_sec( 1543665600 ) ) ) // Sat, 01 Dec 2018 12:00:00 UTC
+#endif

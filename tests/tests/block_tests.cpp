@@ -23,6 +23,7 @@
  */
 
 #include <boost/test/unit_test.hpp>
+#include <graphene/chain/hardfork.hpp>
 
 #include <graphene/chain/database.hpp>
 #include <graphene/chain/exceptions.hpp>
@@ -1930,5 +1931,50 @@ BOOST_FIXTURE_TEST_CASE( block_size_test, database_fixture )
       throw;
    }
 }
+
+BOOST_FIXTURE_TEST_CASE( version_test, database_fixture )
+{
+   BOOST_TEST_MESSAGE("VERSIONING TEST");
+
+   const version DEFAULT;
+   block_header_extensions block_header_ext( DEFAULT );
+      
+   BOOST_TEST_MESSAGE("\tBEFORE HF");
+   {
+      signed_block head_block = generate_block();
+
+      version v;
+      for( const block_header_extensions& ext : head_block.extensions )
+      {
+         if( ext.which() == block_header_ext.which() )
+         {
+            v = ext.get<version>();
+            break;
+         }
+      }
+      BOOST_CHECK( v.v_num == 0 );
+   }
+
+   BOOST_TEST_MESSAGE("\tAFTER HF");
+   {
+      generate_blocks( HARDFORK_TEST_VERSION );
+      generate_block();
+
+      signed_block head_block = generate_block();
+      
+      version v;
+      for( const block_header_extensions& ext : head_block.extensions )
+      {
+         if( ext.which() == block_header_ext.which() )
+         {
+            v = ext.get<version>();
+            break;
+         }
+      }
+      // only true if GRAPHENE_BLOCKCHAIN_VERSION == HARDFORK_TEST_VERSION
+      BOOST_CHECK( v.v_num == HARDFORK_TEST_VERSION.v_num );
+   }
+}
+
 
 BOOST_AUTO_TEST_SUITE_END()

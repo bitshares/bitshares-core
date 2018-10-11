@@ -23,7 +23,7 @@
  */
 #pragma once
 
-#define GRAPHENE_BLOCKCHAIN_VERSION ( graphene::chain::version(2,9,0, fc::time_point_sec( 1532008920 ) ) )
+#define GRAPHENE_BLOCKCHAIN_VERSION HARDFORK_TEST_VERSION //( graphene::chain::version(2,9,0, fc::time_point_sec( 1532008920 ) ) )
 
 #define GRAPHENE_SYMBOL "BTS"
 #define GRAPHENE_ADDRESS_PREFIX "BTS"
