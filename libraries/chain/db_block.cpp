@@ -765,18 +765,16 @@ void database::_precompute_parallel( const Trx* trx, const size_t count, const u
    }
 }
 
-void database::_precompute_parallel( const signed_block& block, const uint32_t skip )const
+fc::future<void> database::precompute_parallel( const signed_block& block, const uint32_t skip )const
 { try {
-   const bool cheap = (skip & skip_expensive) == skip_expensive;
    std::vector<fc::future<void>> workers;
    if( !block.transactions.empty() )
    {
-      if( cheap )
+      if( (skip & skip_expensive) == skip_expensive )
          _precompute_parallel( &block.transactions[0], block.transactions.size(), skip );
       else
       {
          uint32_t chunks = fc::asio::default_io_service_scope::get_num_threads();
-         if( !chunks ) return;
          uint32_t chunk_size = block.transactions.size() / chunks;
          if( chunks * chunk_size < block.transactions.size() )
             chunk_size++;
@@ -795,21 +793,16 @@ void database::_precompute_parallel( const signed_block& block, const uint32_t s
    if( !(skip&skip_merkle_check) )
       block.calculate_merkle_root();
    block.id();
-   for( auto& worker : workers )
-      worker.wait();
-} FC_LOG_AND_RETHROW() }
 
-fc::future<void> database::precompute_parallel( const signed_block& block, const uint32_t skip )const
-{
-   if( block.transactions.empty() || (skip & skip_expensive) == skip_expensive )
-   {
-      _precompute_parallel( block, skip );
+   if( workers.empty() )
       return fc::future< void >( fc::promise< void >::ptr( new fc::promise< void >( true ) ) );
-   }
-   return fc::do_parallel([this,&block,skip] () {
-      _precompute_parallel( block, skip );
-   });
-}
+
+   auto first = workers.begin();
+   auto worker = first;
+   while( ++worker != workers.end() )
+      worker->wait();
+   return *first;
+} FC_LOG_AND_RETHROW() }
 
 fc::future<void> database::precompute_parallel( const precomputable_transaction& trx )const
 {
