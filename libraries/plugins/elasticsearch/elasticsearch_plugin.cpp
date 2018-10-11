@@ -216,10 +216,8 @@ void elasticsearch_plugin_impl::doOperationHistory(const optional <operation_his
 
    if(_elasticsearch_operation_object) {
       oho->op.visit(fc::from_static_variant(os.op_object, FC_PACK_MAX_DEPTH));
-      if (os.op_object.is_object()) {
-         adaptor_struct adaptor;
-         os.op_object = adaptor.adapt(os.op_object.get_object());
-      }
+      adaptor_struct adaptor;
+      os.op_object = adaptor.adapt(os.op_object.get_object());
    }
    else
       os.op = fc::json::to_string(oho->op);
