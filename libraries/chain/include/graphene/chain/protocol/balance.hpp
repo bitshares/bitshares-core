@@ -33,8 +33,9 @@ namespace graphene { namespace chain {
     * vesting balance, @ref total_claimed must not exceed @ref balance_object::available at the time of evaluation. If
     * the object contains a non-vesting balance, @ref total_claimed must be the full balance of the object.
     */
-   struct balance_claim_operation : public base_operation
+   class balance_claim_operation : public base_operation
    {
+   public:
       struct fee_parameters_type {};
 
       asset             fee;
@@ -46,10 +47,10 @@ namespace graphene { namespace chain {
       account_id_type fee_payer()const { return deposit_to_account; }
       share_type      calculate_fee(const fee_parameters_type& )const { return 0; }
       void            validate()const;
-      void            get_required_authorities( vector<authority>& a )const
-      {
-         a.push_back( authority( 1, balance_owner_key, 1 ) );
-      }
+      void            get_required_authorities( vector<const authority*>& a )const;
+
+   private:
+      mutable authority _auth;
    };
 
 } } // graphene::chain

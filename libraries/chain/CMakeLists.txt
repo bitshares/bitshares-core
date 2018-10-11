@@ -42,6 +42,7 @@ add_library( graphene_chain
              protocol/asset.cpp
              protocol/assert.cpp
              protocol/account.cpp
+             protocol/balance.cpp
              protocol/transfer.cpp
              protocol/committee_member.cpp
              protocol/witness.cpp

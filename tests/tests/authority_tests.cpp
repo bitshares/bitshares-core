@@ -178,7 +178,9 @@ BOOST_AUTO_TEST_CASE( recursive_accounts )
          sign(trx,parent1_key);
          sign(trx,parent2_key);
          PUSH_TX( db, trx, database::skip_transaction_dupe_check );
-         BOOST_REQUIRE_EQUAL(child.active.num_auths(), 3u);
+         BOOST_REQUIRE_EQUAL( 2, child.active.account_auths.size() );
+         BOOST_REQUIRE_EQUAL( 1, child.active.key_auths.size() );
+         BOOST_REQUIRE_EQUAL( 0, child.active.address_auths.size() );
          trx.clear();
       }
 
@@ -318,7 +320,7 @@ BOOST_AUTO_TEST_CASE( proposed_single_account )
                                      
       asset nathan_start_balance = db.get_balance(nathan.get_id(), core.get_id());
       {
-         vector<authority> other;
+         vector<const authority*> other;
          flat_set<account_id_type> active_set, owner_set;
          operation_get_required_authorities(op,active_set,owner_set,other);
          BOOST_CHECK_EQUAL(active_set.size(), 1lu);
@@ -487,7 +489,7 @@ BOOST_AUTO_TEST_CASE( committee_authority )
    uop.fee_paying_account = GRAPHENE_TEMP_ACCOUNT;
    uop.proposal = prop.id;
 
-   uop.key_approvals_to_add.emplace(committee_key.get_public_key());
+   uop.key_approvals_to_add.emplace_back(committee_key.get_public_key());
    /*
    uop.key_approvals_to_add.emplace(1);
    uop.key_approvals_to_add.emplace(2);
@@ -505,7 +507,7 @@ BOOST_AUTO_TEST_CASE( committee_authority )
    trx.clear_signatures();
    generate_blocks(*prop.review_period_time);
    uop.key_approvals_to_add.clear();
-   uop.key_approvals_to_add.insert(committee_key.get_public_key()); // was 7
+   uop.key_approvals_to_add.emplace_back( committee_key.get_public_key() ); // was 7
    trx.operations.back() = uop;
    sign( trx,  committee_key );
    // Should throw because the transaction is now in review.
@@ -566,7 +568,7 @@ BOOST_FIXTURE_TEST_CASE( fired_committee_members, database_fixture )
    proposal_update_operation uop;
    uop.fee_paying_account = GRAPHENE_TEMP_ACCOUNT;
    uop.proposal = pid;
-   uop.key_approvals_to_add.emplace(init_account_pub_key);
+   uop.key_approvals_to_add.emplace_back(init_account_pub_key);
    trx.operations.back() = uop;
    sign( trx, committee_key );
    PUSH_TX( db, trx );
@@ -877,7 +879,7 @@ BOOST_FIXTURE_TEST_CASE( proposal_owner_authority_complete, database_fixture )
       proposal_update_operation uop;
       uop.fee_paying_account = nathan.get_id();
       uop.proposal = prop.id;
-      uop.key_approvals_to_add.insert(dan.active.key_auths.begin()->first);
+      uop.key_approvals_to_add.emplace_back(dan.active.key_auths.begin()->first);
       trx.operations.push_back(uop);
       set_expiration( db, trx );
       sign( trx, nathan_key );
@@ -976,7 +978,9 @@ BOOST_FIXTURE_TEST_CASE( max_authority_membership, database_fixture )
          test_authority.weight_threshold = num_keys;
 
          for( int i=0; i<num_keys; i++ )
-            test_authority.key_auths[ key_ids[i] ] = 1;
+            test_authority.key_auths.emplace_back( key_ids[i], 1 );
+         std::sort( test_authority.key_auths.begin(), test_authority.key_auths.end(),
+                    compare_entries_by_address ); // TODO: eliminate sorting after hardfork
 
          auto check_tx = [&]( const authority& owner_auth,
                               const authority& active_auth )
@@ -1051,7 +1055,7 @@ BOOST_FIXTURE_TEST_CASE( bogus_signature, database_fixture )
       sign( trx, alice_key  );
 
       flat_set<account_id_type> active_set, owner_set;
-      vector<authority> others;
+      vector<const authority*> others;
       trx.get_required_authorities( active_set, owner_set, others );
 
       PUSH_TX( db,  trx, skip  );

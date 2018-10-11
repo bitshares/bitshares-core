@@ -1061,7 +1061,6 @@ BOOST_FIXTURE_TEST_CASE( pop_block_twice, database_fixture )
       const asset_object& core = asset_id_type()(db);
 
       // Sam is the creator of accounts
-      private_key_type committee_key = init_account_priv_key;
       private_key_type sam_key = generate_private_key("sam");
       account_object sam_account_object = create_account("sam", sam_key);
 
@@ -1468,20 +1467,28 @@ BOOST_FIXTURE_TEST_CASE( miss_many_blocks, database_fixture )
    }
 }
 
+static void sort_and_remove_dupes( std::vector<std::pair<public_key_type,weight_type>>& keys )
+{
+   std::sort( keys.begin(), keys.end(), compare_entries_by_address );
+   auto new_active_end = std::unique( keys.begin(), keys.end() );
+   if( new_active_end != keys.end() )
+      keys.erase( new_active_end, keys.end() );
+}
+
 BOOST_FIXTURE_TEST_CASE( update_account_keys, database_fixture )
 {
    try
    {
-      const asset_object& core = asset_id_type()(db);
+      // Sam is the creator of accounts
+      ACTORS( (sam) );
+      fund( sam );
+      upgrade_to_lifetime_member(sam_id);
+
       uint32_t skip_flags =
           database::skip_transaction_dupe_check
         | database::skip_witness_signature
         | database::skip_transaction_signatures
         ;
-
-      // Sam is the creator of accounts
-      private_key_type committee_key = init_account_priv_key;
-      private_key_type sam_key = generate_private_key("sam");
 
       //
       // A = old key set
@@ -1497,10 +1504,6 @@ BOOST_FIXTURE_TEST_CASE( update_account_keys, database_fixture )
       //
       // and assert that all four cases were tested at least once
       //
-      account_object sam_account_object = create_account( "sam", sam_key );
-
-      // upgrade sam to LTM
-      upgrade_to_lifetime_member(sam_account_object.id);
 
       //Get a sane head block time
       generate_block( skip_flags );
@@ -1509,29 +1512,18 @@ BOOST_FIXTURE_TEST_CASE( update_account_keys, database_fixture )
          p.parameters.committee_proposal_review_period = fc::hours(1).to_seconds();
       });
 
-      transaction tx;
-      processed_transaction ptx;
-
-      account_object committee_account_object = committee_account(db);
-      // transfer from committee account to Sam account
-      transfer(committee_account_object, sam_account_object, core.amount(100000));
-
       const int num_keys = 5;
       vector< private_key_type > numbered_private_keys;
-      vector< vector< public_key_type > > numbered_key_id;
+      vector< public_key_type > numbered_key_id;
       numbered_private_keys.reserve( num_keys );
-      numbered_key_id.push_back( vector<public_key_type>() );
-      numbered_key_id.push_back( vector<public_key_type>() );
 
       for( int i=0; i<num_keys; i++ )
       {
          private_key_type privkey = generate_private_key(std::string("key_") + std::to_string(i));
          public_key_type pubkey = privkey.get_public_key();
-         address addr( pubkey );
 
          numbered_private_keys.push_back( privkey );
-         numbered_key_id[0].push_back( pubkey );
-         //numbered_key_id[1].push_back( addr );
+         numbered_key_id.push_back( pubkey );
       }
 
       // each element of possible_key_sched is a list of exactly num_keys
@@ -1561,11 +1553,9 @@ BOOST_FIXTURE_TEST_CASE( update_account_keys, database_fixture )
       // we can only undo in blocks
       generate_block( skip_flags );
 
-      std::cout << "update_account_keys:  this test will take a few minutes...\n";
-
       // Originally we had a loop here to go from use_address=0 to 1
       // Live chain do not allow this so it had to be removed: https://github.com/bitshares/bitshares-core/issues/565
-      vector< public_key_type > key_ids = numbered_key_id[ 0 ];
+      const vector< public_key_type >& key_ids = numbered_key_id;
       for( int num_owner_keys=1; num_owner_keys<=2; num_owner_keys++ )
       {
          for( int num_active_keys=1; num_active_keys<=2; num_active_keys++ )
@@ -1585,22 +1575,24 @@ BOOST_FIXTURE_TEST_CASE( update_account_keys, database_fixture )
                for( int owner_index=0; owner_index<num_owner_keys; owner_index++ )
                {
                   int i = *(it++);
-                  create_op.owner.key_auths[ key_ids[ i ] ] = 1;
+                  create_op.owner.key_auths.emplace_back( key_ids[ i ], 1 );
                   owner_privkey.push_back( &numbered_private_keys[i] );
                   owner_keyid.push_back( &key_ids[ i ] );
                }
+               sort_and_remove_dupes( create_op.owner.key_auths );
                // size() < num_owner_keys is possible when some keys are duplicates
                create_op.owner.weight_threshold = create_op.owner.key_auths.size();
 
                for( int active_index=0; active_index<num_active_keys; active_index++ )
-                  create_op.active.key_auths[ key_ids[ *(it++) ] ] = 1;
+                  create_op.active.key_auths.emplace_back( key_ids[ *(it++) ], 1 );
+               sort_and_remove_dupes( create_op.active.key_auths );
                // size() < num_active_keys is possible when some keys are duplicates
                create_op.active.weight_threshold = create_op.active.key_auths.size();
 
                create_op.options.memo_key = key_ids[ *(it++) ] ;
-               create_op.registrar = sam_account_object.id;
+               create_op.registrar = sam_id;
+               create_op.validate();
                trx.operations.push_back( create_op );
-               // trx.sign( sam_key );
 
                processed_transaction ptx_create = db.push_transaction( trx,
                   database::skip_transaction_dupe_check |
@@ -1623,15 +1615,18 @@ BOOST_FIXTURE_TEST_CASE( update_account_keys, database_fixture )
                   update_op.new_options = create_op.options;
 
                   for( int owner_index=0; owner_index<num_owner_keys; owner_index++ )
-                     update_op.owner->key_auths[ key_ids[ *(it++) ] ] = 1;
+                     update_op.owner->key_auths.emplace_back( key_ids[ *(it++) ], 1 );
+                  sort_and_remove_dupes( update_op.owner->key_auths );
                   // size() < num_owner_keys is possible when some keys are duplicates
                   update_op.owner->weight_threshold = update_op.owner->key_auths.size();
                   for( int active_index=0; active_index<num_active_keys; active_index++ )
-                     update_op.active->key_auths[ key_ids[ *(it++) ] ] = 1;
+                     update_op.active->key_auths.emplace_back( key_ids[ *(it++) ], 1 );
+                  sort_and_remove_dupes( update_op.active->key_auths );
                   // size() < num_active_keys is possible when some keys are duplicates
                   update_op.active->weight_threshold = update_op.active->key_auths.size();
                   FC_ASSERT( update_op.new_options.valid() );
                   update_op.new_options->memo_key = key_ids[ *(it++) ] ;
+                  update_op.validate();
 
                   trx.operations.push_back( update_op );
                   for( int i=0; i<int(create_op.owner.weight_threshold); i++)

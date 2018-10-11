@@ -115,8 +115,9 @@ namespace graphene { namespace chain {
     * If an account's owner and active authority are both required, only the owner authority may approve. An attempt to
     * add or remove active authority approval to such a proposal will fail.
     */
-   struct proposal_update_operation : public base_operation
+   class proposal_update_operation : public base_operation
    {
+   public:
       struct fee_parameters_type { 
          uint64_t fee            = 20 * GRAPHENE_BLOCKCHAIN_PRECISION; 
          uint32_t price_per_kbyte = 10;
@@ -129,16 +130,19 @@ namespace graphene { namespace chain {
       flat_set<account_id_type>  active_approvals_to_remove;
       flat_set<account_id_type>  owner_approvals_to_add;
       flat_set<account_id_type>  owner_approvals_to_remove;
-      flat_set<public_key_type>  key_approvals_to_add;
-      flat_set<public_key_type>  key_approvals_to_remove;
+      std::vector<public_key_type> key_approvals_to_add;    // must be unique and sorted by address
+      std::vector<public_key_type> key_approvals_to_remove; // must be unique and sorted by address
+      // TODO: relax the above constraints to only "unique" (hardfork)
       extensions_type            extensions;
 
       account_id_type fee_payer()const { return fee_paying_account; }
       void            validate()const;
       share_type      calculate_fee(const fee_parameters_type& k)const;
-      void get_required_authorities( vector<authority>& )const;
+      void get_required_authorities( vector<const authority*>& )const;
       void get_required_active_authorities( flat_set<account_id_type>& )const;
       void get_required_owner_authorities( flat_set<account_id_type>& )const;
+   private:
+      mutable authority _auth;
    };
 
    /**

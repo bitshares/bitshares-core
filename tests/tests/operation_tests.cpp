@@ -915,10 +915,12 @@ BOOST_AUTO_TEST_CASE( create_account_test )
       BOOST_CHECK(nathan_account.id.type() == account_object_type);
       BOOST_CHECK(nathan_account.name == "nathan");
 
-      BOOST_REQUIRE(nathan_account.owner.num_auths() == 1);
-      BOOST_CHECK(nathan_account.owner.key_auths.at(committee_key) == 123);
-      BOOST_REQUIRE(nathan_account.active.num_auths() == 1);
-      BOOST_CHECK(nathan_account.active.key_auths.at(committee_key) == 321);
+      BOOST_REQUIRE_EQUAL( 1, nathan_account.owner.num_auths() );
+      BOOST_CHECK( nathan_account.owner.key_auths[0].first == committee_key );
+      BOOST_CHECK_EQUAL( 123, nathan_account.owner.key_auths[0].second );
+      BOOST_REQUIRE_EQUAL( 1, nathan_account.active.num_auths() );
+      BOOST_CHECK( nathan_account.active.key_auths[0].first == committee_key );
+      BOOST_CHECK_EQUAL( 321, nathan_account.active.key_auths[0].second );
       BOOST_CHECK(nathan_account.options.voting_account == GRAPHENE_PROXY_TO_SELF_ACCOUNT);
       BOOST_CHECK(nathan_account.options.memo_key == committee_key);
 
@@ -955,13 +957,13 @@ BOOST_AUTO_TEST_CASE( update_account )
 
       BOOST_CHECK(nathan.options.memo_key == init_account_pub_key);
       BOOST_CHECK(nathan.active.weight_threshold == 2);
-      BOOST_CHECK(nathan.active.num_auths() == 2);
-      BOOST_CHECK(nathan.active.key_auths.at(key_id) == 1);
-      BOOST_CHECK(nathan.active.key_auths.at(init_account_pub_key) == 1);
+      BOOST_CHECK_EQUAL( 2, nathan.active.num_auths() );
+      BOOST_CHECK_EQUAL( 1, nathan.active.key_auths[0].second );
+      BOOST_CHECK_EQUAL( 1, nathan.active.key_auths[1].second );
       BOOST_CHECK(nathan.owner.weight_threshold == 2);
-      BOOST_CHECK(nathan.owner.num_auths() == 2);
-      BOOST_CHECK(nathan.owner.key_auths.at(key_id) == 1);
-      BOOST_CHECK(nathan.owner.key_auths.at(init_account_pub_key) == 1);
+      BOOST_CHECK_EQUAL( 2, nathan.owner.num_auths() );
+      BOOST_CHECK_EQUAL( 1, nathan.owner.key_auths[0].second );
+      BOOST_CHECK_EQUAL( 1, nathan.owner.key_auths[1].second );
       BOOST_CHECK(nathan.options.votes.size() == 2);
 
       enable_fees();

@@ -140,7 +140,7 @@ void_result proposal_create_evaluator::do_evaluate(const proposal_create_operati
    {
       // If we're dealing with the committee authority, make sure this transaction has a sufficient review period.
       flat_set<account_id_type> auths;
-      vector<authority> other;
+      vector<const authority*> other;
       for( auto& op : o.proposed_ops )
       {
          operation_get_required_authorities(op.op, auths, auths, other);
@@ -188,7 +188,7 @@ object_id_type proposal_create_evaluator::do_apply(const proposal_create_operati
 
       //Populate the required approval sets
       flat_set<account_id_type> required_active;
-      vector<authority> other;
+      vector<const authority*> other;
       
       // TODO: consider caching values from evaluate?
       for( auto& op : _proposed_trx.operations )

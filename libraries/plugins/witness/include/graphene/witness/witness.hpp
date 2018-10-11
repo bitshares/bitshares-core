@@ -81,7 +81,7 @@ private:
    uint32_t _required_witness_participation = 33 * GRAPHENE_1_PERCENT;
    uint32_t _production_skip_flags = graphene::chain::database::skip_nothing;
 
-   std::map<chain::public_key_type, fc::ecc::private_key, chain::pubkey_comparator> _private_keys;
+   std::map<chain::public_key_type, fc::ecc::private_key> _private_keys;
    std::set<chain::witness_id_type> _witnesses;
    fc::future<void> _block_production_task;
 

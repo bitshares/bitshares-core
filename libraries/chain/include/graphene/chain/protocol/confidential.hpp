@@ -80,14 +80,22 @@ struct blind_memo
 /**
  *  @ingroup stealth
  */
-struct blind_input
+class blind_input
 {
+public:
+   blind_input() {}
+   blind_input( const fc::ecc::commitment_type& commit, const authority& o )
+      : commitment( commit ), owner( o ) {}
+
    fc::ecc::commitment_type      commitment;
    /** provided to maintain the invariant that all authority
     * required by an operation is explicit in the operation.  Must
     * match blinded_balance_id->owner
     */
    authority                      owner;
+
+private:
+   mutable flat_map<public_key_type,weight_type> key_auths;
 };
 
 /**
@@ -183,11 +191,7 @@ struct transfer_from_blind_operation : public base_operation
    account_id_type fee_payer()const { return GRAPHENE_TEMP_ACCOUNT; }
    void            validate()const;
 
-   void            get_required_authorities( vector<authority>& a )const
-   {
-      for( const auto& in : inputs )
-         a.push_back( in.owner ); 
-   }
+   void            get_required_authorities( vector<const authority*>& a )const;
 };
 
 /**
@@ -249,11 +253,7 @@ struct blind_transfer_operation : public base_operation
    void            validate()const;
    share_type      calculate_fee( const fee_parameters_type& k )const;
 
-   void            get_required_authorities( vector<authority>& a )const
-   {
-      for( const auto& in : inputs )
-         a.push_back( in.owner ); 
-   }
+   void            get_required_authorities( vector<const authority*>& a )const;
 };
 
 ///@} endgroup stealth

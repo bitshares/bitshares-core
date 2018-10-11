@@ -182,12 +182,12 @@ void account_create_operation::validate()const
    FC_ASSERT( fee.amount >= 0 );
    FC_ASSERT( is_valid_name( name ) );
    FC_ASSERT( referrer_percent <= GRAPHENE_100_PERCENT );
+   owner.validate();
    FC_ASSERT( owner.num_auths() != 0 );
    FC_ASSERT( owner.address_auths.size() == 0 );
+   active.validate();
    FC_ASSERT( active.num_auths() != 0 );
    FC_ASSERT( active.address_auths.size() == 0 );
-   FC_ASSERT( !owner.is_impossible(), "cannot create an account with an imposible owner authority threshold" );
-   FC_ASSERT( !active.is_impossible(), "cannot create an account with an imposible active authority threshold" );
    options.validate();
    if( extensions.value.owner_special_authority.valid() )
       validate_special_authority( *extensions.value.owner_special_authority );
@@ -237,15 +237,15 @@ void account_update_operation::validate()const
 
    if( owner )
    {
+      owner->validate();
       FC_ASSERT( owner->num_auths() != 0 );
       FC_ASSERT( owner->address_auths.size() == 0 );
-      FC_ASSERT( !owner->is_impossible(), "cannot update an account with an imposible owner authority threshold" );
    }
    if( active )
    {
+      active->validate();
       FC_ASSERT( active->num_auths() != 0 );
       FC_ASSERT( active->address_auths.size() == 0 );
-      FC_ASSERT( !active->is_impossible(), "cannot update an account with an imposible active authority threshold" );
    }
 
    if( new_options )

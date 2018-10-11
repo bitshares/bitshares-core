@@ -673,10 +673,9 @@ public:
 
    fc::ecc::private_key get_private_key_for_account(const account_object& account)const
    {
-      vector<public_key_type> active_keys = account.active.get_keys();
-      if (active_keys.size() != 1)
+      if (account.active.key_auths.size() != 1)
          FC_THROW("Expecting a simple authority with one active key");
-      return get_private_key(active_keys.front());
+      return get_private_key(account.active.key_auths[0].first);
    }
 
    // imports the private key into the wallet, and associate it in some way (?) with the
@@ -694,10 +693,10 @@ public:
 
       // make a list of all current public keys for the named account
       flat_set<public_key_type> all_keys_for_account;
-      std::vector<public_key_type> active_keys = account.active.get_keys();
-      std::vector<public_key_type> owner_keys = account.owner.get_keys();
-      std::copy(active_keys.begin(), active_keys.end(), std::inserter(all_keys_for_account, all_keys_for_account.end()));
-      std::copy(owner_keys.begin(), owner_keys.end(), std::inserter(all_keys_for_account, all_keys_for_account.end()));
+      for( const auto& pair : account.active.key_auths )
+         all_keys_for_account.insert( pair.first );
+      for( const auto& pair : account.owner.key_auths )
+         all_keys_for_account.insert( pair.first );
       all_keys_for_account.insert(account.options.memo_key);
 
       _keys[wif_pub_key] = wif_key;
@@ -848,6 +847,49 @@ public:
       }
    }
 
+   class key_sorting_visitor // TODO: remove after hardfork
+   {
+   public:
+      typedef void result_type;
+
+      template<typename T>
+      void operator()( const T& op )const {}
+
+      void operator()( proposal_create_operation& op )const
+      {
+         for( const auto& nested : op.proposed_ops )
+            nested.op.visit( *this );
+      }
+
+      void operator()( account_create_operation& op )const
+      {
+         std::sort( op.owner.key_auths.begin(), op.owner.key_auths.end(), compare_entries_by_address );
+         std::sort( op.active.key_auths.begin(), op.active.key_auths.end(), compare_entries_by_address );
+      }
+
+      void operator()( account_update_operation& op )const
+      {
+         if( op.owner )
+            std::sort( op.owner->key_auths.begin(), op.owner->key_auths.end(), compare_entries_by_address );
+         if( op.active )
+            std::sort( op.active->key_auths.begin(), op.active->key_auths.end(), compare_entries_by_address );
+      }
+
+      void operator()( proposal_update_operation& op )const
+      {
+         if( op.key_approvals_to_add.size() > 1 )
+            std::sort( op.key_approvals_to_add.begin(), op.key_approvals_to_add.end(), compare_keys_by_address );
+         if( op.key_approvals_to_remove.size() > 1 )
+            std::sort( op.key_approvals_to_remove.begin(), op.key_approvals_to_remove.end(), compare_keys_by_address );
+      }
+
+      static const key_sorting_visitor& get_instance()
+      {
+         static key_sorting_visitor instance;
+         return instance;
+      }
+   };
+
    transaction_handle_type begin_builder_transaction()
    {
       int trx_handle = _builder_transactions.empty()? 0
@@ -858,6 +900,7 @@ public:
    void add_operation_to_builder_transaction(transaction_handle_type transaction_handle, const operation& op)
    {
       FC_ASSERT(_builder_transactions.count(transaction_handle));
+      op.visit( key_sorting_visitor::get_instance() );
       _builder_transactions[transaction_handle].operations.emplace_back(op);
    }
    void replace_operation_in_builder_transaction(transaction_handle_type handle,
@@ -867,6 +910,7 @@ public:
       FC_ASSERT(_builder_transactions.count(handle));
       signed_transaction& trx = _builder_transactions[handle];
       FC_ASSERT( operation_index < trx.operations.size());
+      new_op.visit( key_sorting_visitor::get_instance() );
       trx.operations[operation_index] = new_op;
    }
    asset set_fees_on_builder_transaction(transaction_handle_type handle, string fee_asset = GRAPHENE_SYMBOL)
@@ -1005,15 +1049,14 @@ public:
       auto current_fees = _remote_db->get_global_properties().parameters.current_fees;
       set_operation_fees( tx, current_fees );
 
-      vector<public_key_type> paying_keys = registrar_account_object.active.get_keys();
-
       auto dyn_props = get_dynamic_global_properties();
       tx.set_reference_block( dyn_props.head_block_id );
       tx.set_expiration( dyn_props.time + fc::seconds(30) );
       tx.validate();
 
-      for( public_key_type& key : paying_keys )
+      for( const auto& pair : registrar_account_object.active.key_auths )
       {
+         const auto& key = pair.first;
          auto it = _keys.find(key);
          if( it != _keys.end() )
          {
@@ -1131,15 +1174,14 @@ public:
 
          set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees);
 
-         vector<public_key_type> paying_keys = registrar_account_object.active.get_keys();
-
          auto dyn_props = get_dynamic_global_properties();
          tx.set_reference_block( dyn_props.head_block_id );
          tx.set_expiration( dyn_props.time + fc::seconds(30) );
          tx.validate();
 
-         for( public_key_type& key : paying_keys )
+         for( const auto& pair : registrar_account_object.active.key_auths )
          {
+            const auto& key = pair.first;
             auto it = _keys.find(key);
             if( it != _keys.end() )
             {
@@ -2579,9 +2621,13 @@ public:
       for( const std::string& name : delta.owner_approvals_to_remove )
          update_op.owner_approvals_to_remove.insert( get_account( name ).id );
       for( const std::string& k : delta.key_approvals_to_add )
-         update_op.key_approvals_to_add.insert( public_key_type( k ) );
+         update_op.key_approvals_to_add.emplace_back( k );
+      std::sort( update_op.key_approvals_to_add.begin(), update_op.key_approvals_to_add.end(),
+                 compare_keys_by_address ); // TODO: eliminate sorting after hardfork
       for( const std::string& k : delta.key_approvals_to_remove )
-         update_op.key_approvals_to_remove.insert( public_key_type( k ) );
+         update_op.key_approvals_to_remove.emplace_back( k );
+      std::sort( update_op.key_approvals_to_remove.begin(), update_op.key_approvals_to_remove.end(),
+                 compare_keys_by_address ); // TODO: eliminate sorting after hardfork
 
       signed_transaction tx;
       tx.operations.push_back(update_op);
@@ -3366,34 +3412,39 @@ map<string, bool> wallet_api::import_accounts( string filename, string password 
    const auto password_hash = fc::sha512::hash( password );
    FC_ASSERT( fc::sha512::hash( password_hash ) == imported_keys.password_checksum );
 
+   const auto import_this_account = [this] ( const exported_account_keys& item ) -> bool
+   {
+      try
+      {
+         const account_object account = get_account( item.account_name );
+         for( const auto& public_key : item.public_keys )
+         {
+            if( account.owner.key_auths.end() != std::find_if( account.owner.key_auths.begin(),
+                                                               account.owner.key_auths.end(),
+                                                               [&public_key] ( std::pair<public_key_type,weight_type> entry ) {
+                                                                  return entry.first == public_key;
+                                                               } ) )
+               return true;
+
+            if( account.active.key_auths.end() != std::find_if( account.owner.key_auths.begin(),
+                                                                account.owner.key_auths.end(),
+                                                                [&public_key] ( std::pair<public_key_type,weight_type> entry ) {
+                                                                   return entry.first == public_key;
+                                                                } ) )
+               return true;
+         }
+      }
+      catch( ... )
+      {
+      }
+
+      return false;
+   };
+
    map<string, bool> result;
    for( const auto& item : imported_keys.account_keys )
    {
-       const auto import_this_account = [ & ]() -> bool
-       {
-           try
-           {
-               const account_object account = get_account( item.account_name );
-               const auto& owner_keys = account.owner.get_keys();
-               const auto& active_keys = account.active.get_keys();
-
-               for( const auto& public_key : item.public_keys )
-               {
-                   if( std::find( owner_keys.begin(), owner_keys.end(), public_key ) != owner_keys.end() )
-                       return true;
-
-                   if( std::find( active_keys.begin(), active_keys.end(), public_key ) != active_keys.end() )
-                       return true;
-               }
-           }
-           catch( ... )
-           {
-           }
-
-           return false;
-       };
-
-       const auto should_proceed = import_this_account();
+       const auto should_proceed = import_this_account( item );
        result[ item.account_name ] = should_proceed;
 
        if( should_proceed )
@@ -4295,7 +4346,7 @@ blind_confirmation wallet_api::transfer_from_blind( string from_blind_account_ke
    from_blind.to = to_account.id;
    from_blind.amount = amount;
    from_blind.blinding_factor = conf.outputs.back().decrypted_memo.blinding_factor;
-   from_blind.inputs.push_back( {conf.outputs.back().decrypted_memo.commitment, authority() } );
+   from_blind.inputs.emplace_back( conf.outputs.back().decrypted_memo.commitment, authority() );
    from_blind.fee  = fees->calculate_fee( from_blind, asset_obj->options.core_exchange_rate );
 
    idump( (from_blind) );
@@ -4380,7 +4431,7 @@ blind_confirmation wallet_api::blind_transfer_help( string from_key_or_label,
       }
       else
       {
-         blind_tr.inputs.push_back({start->commitment(), start->control_authority});
+         blind_tr.inputs.emplace_back( start->commitment(), start->control_authority );
          blinding_factors.push_back( start->data.blinding_factor );
          total_amount += start->amount;
 
@@ -4654,13 +4705,6 @@ blind_receipt wallet_api::receive_blind_transfer( string confirmation_receipt, s
    auto owner = authority(1, public_key_type(child_pubkey), 1);
    result.control_authority = owner;
    result.data = memo;
-
-   auto child_key_itr = owner.key_auths.find( child_pubkey );
-   if( child_key_itr != owner.key_auths.end() )
-      my->_keys[child_key_itr->first] = key_to_wif( child_priv_key );
-
-   // my->_wallet.blinded_balances[memo.amount.asset_id][bal.to].push_back( bal );
-
    result.date = fc::time_point::now();
    my->_wallet.blind_receipts.insert( result );
    my->_keys[child_pubkey] = key_to_wif( child_priv_key );

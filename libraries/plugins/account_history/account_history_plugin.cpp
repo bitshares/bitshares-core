@@ -128,7 +128,7 @@ void account_history_plugin_impl::update_account_histories( const signed_block& 
 
       // get the set of accounts this operation applies to
       flat_set<account_id_type> impacted;
-      vector<authority> other;
+      vector<const authority*> other;
       operation_get_required_authorities( op.op, impacted, impacted, other ); // fee_payer is added here
 
       if( op.op.which() == operation::tag< account_create_operation >::value )
@@ -136,8 +136,8 @@ void account_history_plugin_impl::update_account_histories( const signed_block& 
       else
          graphene::chain::operation_get_impacted_accounts( op.op, impacted );
 
-      for( auto& a : other )
-         for( auto& item : a.account_auths )
+      for( auto a : other )
+         for( auto& item : a->account_auths )
             impacted.insert( item.first );
 
       // be here, either _max_ops_per_account > 0, or _partial_operations == false, or both

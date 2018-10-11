@@ -149,7 +149,7 @@ bool elasticsearch_plugin_impl::update_account_histories( const signed_block& b 
 
       // get the set of accounts this operation applies to
       flat_set<account_id_type> impacted;
-      vector<authority> other;
+      vector<const authority*> other;
       operation_get_required_authorities( op.op, impacted, impacted, other ); // fee_payer is added here
 
       if( op.op.which() == operation::tag< account_create_operation >::value )
@@ -157,8 +157,8 @@ bool elasticsearch_plugin_impl::update_account_histories( const signed_block& b 
       else
          graphene::chain::operation_get_impacted_accounts( op.op, impacted );
 
-      for( auto& a : other )
-         for( auto& item : a.account_auths )
+      for( auto a : other )
+         for( auto& item : a->account_auths )
             impacted.insert( item.first );
 
       for( auto& account_id : impacted )

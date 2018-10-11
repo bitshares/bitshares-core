@@ -53,6 +53,29 @@ namespace graphene { namespace chain {
        FC_ASSERT( fc::ripemd160::hash( key_data.data, key_data.size() )._hash[0] == bin_key.check );
     };
 
+   int compare_keys_by_address( const public_key_type& a, const public_key_type& b )
+   {
+      return address(a) < address(b);
+   }
+
+   int compare_entries_by_address( const std::pair<public_key_type, weight_type>& a,
+                                   const std::pair<public_key_type, weight_type>& b )
+   {
+      return address( a.first ) < address( b.first );
+   }
+
+   void check_key_set( const std::vector<public_key_type>& s )
+   {
+      if( s.size() < 2 ) return;
+      address prev_addr( s[0] );
+      for( size_t i = 1; i < s.size(); i++ )
+      {
+          address current_addr( s[i] );
+          FC_ASSERT( prev_addr < current_addr, "Invalid order in public_key set!" );
+          prev_addr = current_addr;
+      }
+   }
+
     public_key_type::operator fc::ecc::public_key_data() const
     {
        return key_data;

@@ -112,7 +112,7 @@ namespace graphene { namespace chain {
          return results;
       }
 
-      void get_required_authorities( flat_set<account_id_type>& active, flat_set<account_id_type>& owner, vector<authority>& other )const;
+      void get_required_authorities( flat_set<account_id_type>& active, flat_set<account_id_type>& owner, vector<const authority*>& other )const;
    };
 
    /**

@@ -36,7 +36,6 @@ void transfer_to_blind_operation::validate()const
    FC_ASSERT( fee.amount >= 0 );
    FC_ASSERT( amount.amount > 0 );
 
-   vector<commitment_type> in;
    vector<commitment_type> out(outputs.size());
    int64_t                 net_public = amount.amount.value;
    for( uint32_t i = 0; i < out.size(); ++i )
@@ -45,7 +44,7 @@ void transfer_to_blind_operation::validate()const
       /// require all outputs to be sorted prevents duplicates AND prevents implementations
       /// from accidentally leaking information by how they arrange commitments.
       if( i > 0 ) FC_ASSERT( out[i-1] < out[i], "all outputs must be sorted by commitment id" );
-      FC_ASSERT( !outputs[i].owner.is_impossible() );
+      outputs[i].owner.validate();
    }
    FC_ASSERT( out.size(), "there must be at least one output" );
 
@@ -91,6 +90,11 @@ void transfer_from_blind_operation::validate()const
    FC_ASSERT( fc::ecc::verify_sum( in, out, 0 ) );
 }
 
+void transfer_from_blind_operation::get_required_authorities( vector<const authority*>& a )const
+{
+   for( const auto& in : inputs )
+      a.push_back( &in.owner );
+}
 
 /**
  *  If fee_payer = temp_account_id, then the fee is paid by the surplus balance of inputs-outputs and
@@ -120,7 +124,7 @@ void blind_transfer_operation::validate()const
    {
       out[i] = outputs[i].commitment;
       if( i > 0 ) FC_ASSERT( out[i-1] < out[i] );
-      FC_ASSERT( !outputs[i].owner.is_impossible() );
+      outputs[i].owner.validate();
    }
    FC_ASSERT( in.size(), "there must be at least one input" );
    FC_ASSERT( fc::ecc::verify_sum( in, out, net_public ), "", ("net_public", net_public) );
@@ -141,6 +145,11 @@ share_type blind_transfer_operation::calculate_fee( const fee_parameters_type& k
     return k.fee + outputs.size() * k.price_per_output;
 }
 
+void blind_transfer_operation::get_required_authorities( vector<const authority*>& a )const
+{
+   for( const auto& in : inputs )
+      a.push_back( &in.owner );
+}
 
 
 

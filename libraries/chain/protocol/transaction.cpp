@@ -95,7 +95,7 @@ void transaction::set_reference_block( const block_id_type& reference_block )
    ref_block_prefix = reference_block._hash[1];
 }
 
-void transaction::get_required_authorities( flat_set<account_id_type>& active, flat_set<account_id_type>& owner, vector<authority>& other )const
+void transaction::get_required_authorities( flat_set<account_id_type>& active, flat_set<account_id_type>& owner, vector<const authority*>& other )const
 {
    for( const auto& op : operations )
       operation_get_required_authorities( op, active, owner, other );
@@ -105,7 +105,7 @@ void transaction::get_required_authorities( flat_set<account_id_type>& active, f
 
 
 
-const flat_set<public_key_type> empty_keyset;
+static const flat_set<public_key_type> empty_keyset;
 
 struct sign_state
 {
@@ -258,7 +258,7 @@ void verify_authority( const vector<operation>& ops, const flat_set<public_key_t
 { try {
    flat_set<account_id_type> required_active;
    flat_set<account_id_type> required_owner;
-   vector<authority> other;
+   vector<const authority*> other;
 
    for( const auto& op : ops )
       operation_get_required_authorities( op, required_active, required_owner, other );
@@ -274,9 +274,9 @@ void verify_authority( const vector<operation>& ops, const flat_set<public_key_t
    for( auto& id : owner_approvals )
       s.approved_by.insert( id );
 
-   for( const auto& auth : other )
+   for( const auto auth : other )
    {
-      GRAPHENE_ASSERT( s.check_authority(&auth), tx_missing_other_auth, "Missing Authority", ("auth",auth)("sigs",sigs) );
+      GRAPHENE_ASSERT( s.check_authority(auth), tx_missing_other_auth, "Missing Authority", ("sigs",sigs) );
    }
 
    // fetch all of the top level authorities
@@ -284,15 +284,15 @@ void verify_authority( const vector<operation>& ops, const flat_set<public_key_t
    {
       GRAPHENE_ASSERT( owner_approvals.find(id) != owner_approvals.end() ||
                        s.check_authority(get_owner(id)),
-                       tx_missing_owner_auth, "Missing Owner Authority ${id}", ("id",id)("auth",*get_owner(id)) );
+                       tx_missing_owner_auth, "Missing Owner Authority for ${id}", ("id",id) );
    }
 
    for( auto id : required_active )
    {
       GRAPHENE_ASSERT( s.check_authority(id) ||
                        s.check_authority(get_owner(id)),
-                       tx_missing_active_auth, "Missing Active Authority ${id}",
-                       ("id",id)("auth",*get_active(id))("owner",*get_owner(id)) );
+                       tx_missing_active_auth, "Missing Active Authority for ${id}",
+                       ("id",id) );
    }
 
    GRAPHENE_ASSERT(
@@ -333,7 +333,7 @@ set<public_key_type> signed_transaction::get_required_signatures(
 {
    flat_set<account_id_type> required_active;
    flat_set<account_id_type> required_owner;
-   vector<authority> other;
+   vector<const authority*> other;
    get_required_authorities( required_active, required_owner, other );
 
    const flat_set<public_key_type>& signature_keys = get_signature_keys( chain_id );
@@ -341,7 +341,7 @@ set<public_key_type> signed_transaction::get_required_signatures(
    s.max_recursion = max_recursion_depth;
 
    for( const auto& auth : other )
-      s.check_authority(&auth);
+      s.check_authority(auth);
    for( auto& owner : required_owner )
       s.check_authority( get_owner( owner ) );
    for( auto& active : required_active )

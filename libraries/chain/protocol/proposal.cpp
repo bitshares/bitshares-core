@@ -63,11 +63,14 @@ void proposal_update_operation::validate() const
       FC_ASSERT(owner_approvals_to_remove.find(a) == owner_approvals_to_remove.end(),
                 "Cannot add and remove approval at the same time.");
    }
+   flat_set<public_key_type> remove_keys( key_approvals_to_remove.begin(), key_approvals_to_remove.end() );
    for( auto a : key_approvals_to_add )
    {
-      FC_ASSERT(key_approvals_to_remove.find(a) == key_approvals_to_remove.end(),
+      FC_ASSERT(remove_keys.find(a) == remove_keys.end(),
                 "Cannot add and remove approval at the same time.");
    }
+   check_key_set( key_approvals_to_add );
+   check_key_set( key_approvals_to_remove );
 }
 
 void proposal_delete_operation::validate() const
@@ -80,17 +83,21 @@ share_type proposal_update_operation::calculate_fee(const fee_parameters_type& k
    return k.fee + calculate_data_fee( fc::raw::pack_size(*this), k.price_per_kbyte );
 }
 
-void proposal_update_operation::get_required_authorities( vector<authority>& o )const
+void proposal_update_operation::get_required_authorities( vector<const authority*>& o )const
 {
-   authority auth;
-   for( const auto& k : key_approvals_to_add )
-      auth.key_auths[k] = 1;
-   for( const auto& k : key_approvals_to_remove )
-      auth.key_auths[k] = 1;
-   auth.weight_threshold = auth.key_auths.size();
+   if( key_approvals_to_add.empty() && key_approvals_to_remove.empty() ) return;
 
-   if( auth.weight_threshold > 0 )
-      o.emplace_back( std::move(auth) );
+   _auth.weight_threshold = key_approvals_to_add.size() + key_approvals_to_remove.size(); // we know they're disjoint
+   vector<std::pair<public_key_type,weight_type>> temp;
+   temp.reserve( _auth.weight_threshold );
+   for( const auto& k : key_approvals_to_add )
+      temp.emplace_back( k, 1 );
+   for( const auto& k : key_approvals_to_remove )
+      temp.emplace_back( k, 1 );
+   std::sort( temp.begin(), temp.end(), compare_entries_by_address );
+   _auth.key_auths = std::move( temp );
+
+   o.push_back( &_auth );
 }
 
 void proposal_update_operation::get_required_active_authorities( flat_set<account_id_type>& a )const

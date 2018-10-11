@@ -263,6 +263,12 @@ namespace graphene { namespace chain {
        friend bool operator == ( const public_key_type& p1, const public_key_type& p2);
        friend bool operator != ( const public_key_type& p1, const public_key_type& p2);
    };
+   inline bool operator <  ( const public_key_type& a, const public_key_type& b ) { return a.key_data <  b.key_data; }
+
+   void check_key_set( const std::vector<public_key_type>& s );
+   int compare_keys_by_address( const public_key_type& a, const public_key_type& b );
+   int compare_entries_by_address( const std::pair<public_key_type, weight_type>& a,
+                                   const std::pair<public_key_type, weight_type>& b );
 
    struct extended_public_key_type
    {

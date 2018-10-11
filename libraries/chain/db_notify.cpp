@@ -26,6 +26,13 @@ struct get_impacted_account_visitor
    get_impacted_account_visitor( flat_set<account_id_type>& impact ):_impacted(impact) {}
    typedef void result_type;
 
+   static void add_authority_accounts( flat_set<account_id_type>& result,
+                                       const authority& a )
+   {
+      for( auto& item : a.account_auths )
+         result.insert( item.first );
+   }
+
    void operator()( const transfer_operation& op )
    {
       _impacted.insert( op.to );
@@ -150,11 +157,11 @@ struct get_impacted_account_visitor
    void operator()( const proposal_create_operation& op )
    {
       _impacted.insert( op.fee_payer() ); // fee_paying_account
-      vector<authority> other;
+      vector<const authority*> other;
       for( const auto& proposed_op : op.proposed_ops )
          operation_get_required_authorities( proposed_op.op, _impacted, _impacted, other );
       for( auto& o : other )
-         add_authority_accounts( _impacted, o );
+         add_authority_accounts( _impacted, *o );
    }
    void operator()( const proposal_update_operation& op )
    {

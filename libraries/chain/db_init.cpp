@@ -500,7 +500,7 @@ void database::init_genesis(const genesis_state_type& genesis_state)
             cop.name = asset.symbol + "-collateral-holder-" + std::to_string(collateral_holder_number);
             boost::algorithm::to_lower(cop.name);
             cop.registrar = GRAPHENE_TEMP_ACCOUNT;
-            cop.owner = authority(1, collateral_rec.owner, 1);
+            cop.owner = authority( collateral_rec.owner );
             cop.active = cop.owner;
             account_id_type owner_account_id = apply_operation(genesis_eval_state, cop).get<object_id_type>();
 
