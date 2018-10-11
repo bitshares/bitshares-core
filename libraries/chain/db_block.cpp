@@ -449,7 +449,13 @@ signed_block database::_generate_block(
    pending_block.timestamp = when;
    pending_block.transaction_merkle_root = pending_block.calculate_merkle_root();
    pending_block.witness = witness_id;
-
+   
+   // TODO CHANGE THIS TO PREFFERED HF_VERSION
+   if( when >= HARDFORK_TEST_VERSION )
+      // write the current binary version to the header
+      pending_block.extensions.insert( block_header_extensions( GRAPHENE_BLOCKCHAIN_VERSION ) );
+   
+   
    if( !(skip & skip_witness_signature) )
       pending_block.sign( block_signing_private_key );
 
