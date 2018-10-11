@@ -409,7 +409,11 @@ void application_impl::startup()
                       graphene::chain::database::skip_tapos_check |
                       graphene::chain::database::skip_witness_schedule_check;
       if( _options->count("revalidate-blockchain") ) // see also handle_block()
+      {
+         if( !loaded_checkpoints.empty() )
+            wlog( "Warning - revalidate will not validate before last checkpoint" );
          skip = _options->count("force-validate") ? 0 : graphene::chain::database::skip_transaction_signatures;
+      }
       graphene::chain::detail::with_skip_flags( *_chain_db, skip, [this,&initial_state] () {
          _chain_db->open( _data_dir / "blockchain", initial_state, GRAPHENE_CURRENT_DB_VERSION );
       });
