@@ -1,4 +1,4 @@
 // bitshares-core issue #338 Fix "margin call order fills at price of matching limit_order"
 #ifndef HARDFORK_CORE_338_VERSION
-#define HARDFORK_CORE_338_VERSION (graphene::chain::version(2,9,0, fc::time_point_sec( 1532008920 ) ) ) // Thu, 19 Jul 2018 14:02:00 UTC
+#define HARDFORK_CORE_338_VERSION (graphene::chain::version(10,0,0, fc::time_point_sec( 1532008920 ) ) ) // Thu, 19 Jul 2018 14:02:00 UTC
 #endif
