@@ -24,15 +24,17 @@
 #pragma once
 #include <graphene/chain/protocol/transaction.hpp>
 #include <graphene/chain/protocol/version.hpp>
+#include <graphene/chain/protocol/ext.hpp>
 
 namespace graphene { namespace chain {
 
-   typedef static_variant< version >         block_header_extensions;
-   // for future extensions 
-   typedef flat_set<block_header_extensions> block_header_extensions_type;
-
    struct block_header
    {
+      struct ext {
+         optional< version > witness_running_version;
+      };
+      typedef extension< ext > block_header_extensions_type;
+
       digest_type                   digest()const;
       block_id_type                 previous;
       uint32_t                      block_num()const { return num_from_id(previous) + 1; }
@@ -64,9 +66,9 @@ namespace graphene { namespace chain {
 
 } } // graphene::chain
 
-FC_REFLECT_TYPENAME( graphene::chain::block_header_extensions )
-FC_REFLECT_TYPENAME( graphene::chain::block_header_extensions_type )
-
 FC_REFLECT( graphene::chain::block_header, (previous)(timestamp)(witness)(transaction_merkle_root)(extensions) )
+FC_REFLECT( graphene::chain::block_header::ext, (witness_running_version) )
+FC_REFLECT_TYPENAME( graphene::chain::block_header::block_header_extensions_type )
+
 FC_REFLECT_DERIVED( graphene::chain::signed_block_header, (graphene::chain::block_header), (witness_signature) )
 FC_REFLECT_DERIVED( graphene::chain::signed_block, (graphene::chain::signed_block_header), (transactions) )

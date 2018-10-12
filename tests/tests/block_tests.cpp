@@ -1934,45 +1934,31 @@ BOOST_FIXTURE_TEST_CASE( block_size_test, database_fixture )
 
 BOOST_FIXTURE_TEST_CASE( version_test, database_fixture )
 {
-   BOOST_TEST_MESSAGE("VERSIONING TEST");
+   BOOST_TEST_MESSAGE("\nVERSIONING TEST\n");
 
-   const version DEFAULT;
-   block_header_extensions block_header_ext( DEFAULT );
-      
-   BOOST_TEST_MESSAGE("\tBEFORE HF");
+   BOOST_TEST_MESSAGE("\n\tBEFORE HF\n");
    {
       signed_block head_block = generate_block();
 
-      version v;
-      for( const block_header_extensions& ext : head_block.extensions )
-      {
-         if( ext.which() == block_header_ext.which() )
-         {
-            v = ext.get<version>();
-            break;
-         }
-      }
-      BOOST_CHECK( v.v_num == 0 );
+      BOOST_CHECK( !head_block.extensions.value.witness_running_version.valid() );
    }
 
-   BOOST_TEST_MESSAGE("\tAFTER HF");
+   BOOST_TEST_MESSAGE("\n\tAFTER HF\n");
    {
       generate_blocks( HARDFORK_TEST_VERSION );
-      generate_block();
-
       signed_block head_block = generate_block();
       
-      version v;
-      for( const block_header_extensions& ext : head_block.extensions )
+      bool version_was_set = head_block.extensions.value.witness_running_version.valid();
+      if( version_was_set )
       {
-         if( ext.which() == block_header_ext.which() )
-         {
-            v = ext.get<version>();
-            break;
-         }
+         version v = *(head_block.extensions.value.witness_running_version);
+         // can only be true if GRAPHENE_BLOCKCHAIN_VERSION == HARDFORK_TEST_VERSION
+         BOOST_CHECK( v.v_num == HARDFORK_TEST_VERSION.v_num );
       }
-      // only true if GRAPHENE_BLOCKCHAIN_VERSION == HARDFORK_TEST_VERSION
-      BOOST_CHECK( v.v_num == HARDFORK_TEST_VERSION.v_num );
+      else
+      {
+         BOOST_FAIL( "The version was not set, or is not the current hardfork version.");
+      }
    }
 }
 

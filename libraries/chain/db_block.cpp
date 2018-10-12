@@ -450,10 +450,15 @@ signed_block database::_generate_block(
    pending_block.transaction_merkle_root = pending_block.calculate_merkle_root();
    pending_block.witness = witness_id;
    
-   // TODO CHANGE THIS TO PREFFERED HF_VERSION
-   if( when >= HARDFORK_TEST_VERSION )
-      // write the current binary version to the header
-      pending_block.extensions.insert( block_header_extensions( GRAPHENE_BLOCKCHAIN_VERSION ) );
+   // TODO change to next hardfork version
+   if( when >= HARDFORK_TEST_VERSION ) 
+   {
+      // inserts the version in to the block if the witness running_version changed
+      if( witness_obj.running_version != GRAPHENE_BLOCKCHAIN_VERSION )
+      {
+         pending_block.extensions.value.witness_running_version = optional<version>(GRAPHENE_BLOCKCHAIN_VERSION);
+      }
+   }
    
    
    if( !(skip & skip_witness_signature) )
@@ -564,6 +569,20 @@ void database::_apply_block( const signed_block& next_block )
    _current_trx_in_block = 0;
 
    _issue_453_affected_assets.clear();
+
+   // TODO change HARDFORK_TEST_VERSION to next HF version
+   if( next_block.timestamp >= HARDFORK_TEST_VERSION )
+   {
+      // modifies the witness running version and sets it to the new one
+      if( signing_witness.running_version != GRAPHENE_BLOCKCHAIN_VERSION )
+      {
+         modify( signing_witness, [&] ( witness_object& wit_obj ) 
+         {
+            // witness_running_version was set in _generate_block()
+            wit_obj.running_version = *(next_block.extensions.value.witness_running_version);
+         } );
+      }
+   }
 
    for( const auto& trx : next_block.transactions )
    {
