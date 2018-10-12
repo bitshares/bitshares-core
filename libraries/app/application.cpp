@@ -401,19 +401,25 @@ void application_impl::startup()
    try
    {
       // these flags are used in open() only, i. e. during replay
-      uint32_t skip = graphene::chain::database::skip_witness_signature |
-                      graphene::chain::database::skip_block_size_check |
-                      graphene::chain::database::skip_merkle_check |
-                      graphene::chain::database::skip_transaction_signatures |
-                      graphene::chain::database::skip_transaction_dupe_check |
-                      graphene::chain::database::skip_tapos_check |
-                      graphene::chain::database::skip_witness_schedule_check;
+      uint32_t skip;
       if( _options->count("revalidate-blockchain") ) // see also handle_block()
       {
          if( !loaded_checkpoints.empty() )
             wlog( "Warning - revalidate will not validate before last checkpoint" );
-         skip = _options->count("force-validate") ? 0 : graphene::chain::database::skip_transaction_signatures;
+         if( _options->count("force-validate") )
+            skip = graphene::chain::database::skip_nothing;
+         else
+            skip = graphene::chain::database::skip_transaction_signatures;
       }
+      else // no revalidate, skip most checks
+         skip = graphene::chain::database::skip_witness_signature |
+                graphene::chain::database::skip_block_size_check |
+                graphene::chain::database::skip_merkle_check |
+                graphene::chain::database::skip_transaction_signatures |
+                graphene::chain::database::skip_transaction_dupe_check |
+                graphene::chain::database::skip_tapos_check |
+                graphene::chain::database::skip_witness_schedule_check;
+
       graphene::chain::detail::with_skip_flags( *_chain_db, skip, [this,&initial_state] () {
          _chain_db->open( _data_dir / "blockchain", initial_state, GRAPHENE_CURRENT_DB_VERSION );
       });
