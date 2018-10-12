@@ -342,7 +342,7 @@ uint32_t database_fixture::generate_blocks(fc::time_point_sec timestamp, bool mi
 
 uint32_t database_fixture::generate_blocks(graphene::chain::version version, bool miss_intermediate_blocks, uint32_t skip)
 {
-   generate_blocks(version.hardfork_time, miss_intermediate_blocks, skip);
+   return generate_blocks(version.hardfork_time, miss_intermediate_blocks, skip);
 }
 
 account_create_operation database_fixture::make_account(

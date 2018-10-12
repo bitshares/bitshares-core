@@ -1939,26 +1939,36 @@ BOOST_FIXTURE_TEST_CASE( version_test, database_fixture )
    BOOST_TEST_MESSAGE("\n\tBEFORE HF\n");
    {
       signed_block head_block = generate_block();
-
       BOOST_CHECK( !head_block.extensions.value.witness_running_version.valid() );
    }
 
    BOOST_TEST_MESSAGE("\n\tAFTER HF\n");
    {
-      generate_blocks( HARDFORK_TEST_VERSION );
+      generate_blocks( HARDFORK_TEST_VERSION - fc::hours(10) );
+
+      auto num_active_witnesses = db.get_global_properties().active_witnesses.size();
+      // for each active witness
+      edump( (num_active_witnesses) );
+      for(size_t i = 0; i < num_active_witnesses; ++i)
+      {
+         signed_block head_block = generate_block();
+         bool version_was_set = head_block.extensions.value.witness_running_version.valid();
+         if( version_was_set )
+         {
+            version v = *(head_block.extensions.value.witness_running_version);
+            // can only be true if GRAPHENE_BLOCKCHAIN_VERSION == HARDFORK_TEST_VERSION
+            BOOST_CHECK( v.v_num == HARDFORK_TEST_VERSION.v_num );
+         }
+         else
+         {
+            BOOST_FAIL( "The version was not set, or is not the current hardfork version.");
+         }
+      }
+
       signed_block head_block = generate_block();
-      
-      bool version_was_set = head_block.extensions.value.witness_running_version.valid();
-      if( version_was_set )
-      {
-         version v = *(head_block.extensions.value.witness_running_version);
-         // can only be true if GRAPHENE_BLOCKCHAIN_VERSION == HARDFORK_TEST_VERSION
-         BOOST_CHECK( v.v_num == HARDFORK_TEST_VERSION.v_num );
-      }
-      else
-      {
-         BOOST_FAIL( "The version was not set, or is not the current hardfork version.");
-      }
+      // After all witnesses published their version there shouldn't be 
+      // a version in the next block
+      BOOST_CHECK( !head_block.extensions.value.witness_running_version.valid() );
    }
 }
 

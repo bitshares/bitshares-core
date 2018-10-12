@@ -88,7 +88,7 @@ namespace graphene { namespace chain {
          return version( major(), minor(), patch(), hardfork_time + offset );
       }
       version operator - ( const fc::microseconds offset ) {
-         return version( major(), minor(), patch(), hardfork_time + offset );
+         return version( major(), minor(), patch(), hardfork_time - offset );
       }
       version& operator += ( const fc::microseconds offset ) {
          hardfork_time += offset;
