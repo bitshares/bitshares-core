@@ -1742,7 +1742,7 @@ public:
       return sign_transaction( tx, broadcast );
    }
 
-   signed_transaction create_htlc( string source, string destination, string asset_symbol, string amount,
+   signed_transaction htlc_prepare( string source, string destination, string asset_symbol, string amount,
          string hash_algorithm, const std::vector<unsigned char>& preimage_hash, size_t preimage_size, 
          const fc::time_point_sec& timelock, bool broadcast = false )
    {
@@ -1776,7 +1776,7 @@ public:
             (preimage_hash)(preimage_size)(timelock)(broadcast) ) 
    }
 
-   signed_transaction update_htlc( string htlc_id, string issuer, const std::vector<unsigned char>& preimage, bool broadcast )
+   signed_transaction htlc_redeem( string htlc_id, string issuer, const std::vector<unsigned char>& preimage, bool broadcast )
    {
       try 
       {
@@ -1798,6 +1798,11 @@ public:
 
          return sign_transaction(tx, broadcast);
       } FC_CAPTURE_AND_RETHROW( (htlc_id)(issuer)(preimage)(broadcast) ) 
+   }
+
+   signed_transaction htlc_extend_expiry ( string htlc_id, string issuer, const fc::time_point_sec& timeout, bool broadcast)
+   {
+      throw std::logic_error("Not Implemented");
    }
 
    vector< vesting_balance_object_with_info > get_vesting_balances( string account_name )
@@ -3077,11 +3082,11 @@ uint64_t wallet_api::get_asset_count()const
    return my->_remote_db->get_asset_count();
 }
 
-signed_transaction wallet_api::create_htlc( string source, string destination, string asset_symbol, string amount,
+signed_transaction wallet_api::htlc_prepare( string source, string destination, string asset_symbol, string amount,
          string hash_algorithm, const std::vector<unsigned char>& preimage_hash, size_t preimage_size, 
          const fc::time_point_sec& timelock, bool broadcast)
 {
-   return my->create_htlc(source, destination, asset_symbol, amount, hash_algorithm, preimage_hash, preimage_size,
+   return my->htlc_prepare(source, destination, asset_symbol, amount, hash_algorithm, preimage_hash, preimage_size,
          timelock, broadcast);
 }
 
@@ -3090,10 +3095,16 @@ graphene::chain::htlc_object wallet_api::get_htlc(std::string htlc_id) const
    return my->get_htlc(htlc_id);
 }
 
-signed_transaction wallet_api::update_htlc( std::string htlc_id, std::string issuer, const std::vector<unsigned char>& preimage,
+signed_transaction wallet_api::htlc_redeem( std::string htlc_id, std::string issuer, const std::vector<unsigned char>& preimage,
       bool broadcast)
 {
-   return my->update_htlc(htlc_id, issuer, preimage, broadcast);
+   return my->htlc_redeem(htlc_id, issuer, preimage, broadcast);
+}
+
+signed_transaction wallet_api::htlc_extend_expiry ( std::string htlc_id, std::string issuer, const fc::time_point_sec& timelock,
+      bool broadcast)
+{
+   return my->htlc_extend_expiry(htlc_id, issuer, timelock, broadcast);
 }
 
 vector<operation_detail> wallet_api::get_account_history(string name, int limit)const

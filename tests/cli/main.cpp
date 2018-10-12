@@ -677,7 +677,7 @@ BOOST_AUTO_TEST_CASE( cli_create_htlc )
          hash[i] = preimage_md.data()[i];
       fc::time_point_sec timelock = fc::time_point::now() + fc::days(1);
       graphene::chain::signed_transaction result_tx 
-            = con.wallet_api_ptr->create_htlc("alice", "bob", 
+            = con.wallet_api_ptr->htlc_prepare("alice", "bob", 
             "BTS", "3", "RIPEMD160", hash, preimage_string.size(), timelock, true);
 
       // normally, a wallet would watch block production, and find the transaction. Here, we can cheat:
@@ -699,7 +699,7 @@ BOOST_AUTO_TEST_CASE( cli_create_htlc )
       BOOST_TEST_MESSAGE("The HTLC Object is: " + fc::json::to_pretty_string(alice_htlc));
 
       // Bob likes what he sees, so he creates an HTLC, using the info he retrieved from Alice's HTLC
-      con.wallet_api_ptr->create_htlc("bob", "alice",
+      con.wallet_api_ptr->htlc_prepare("bob", "alice",
             "BOBCOIN", "3", "RIPEMD160", hash, preimage_string.size(), timelock, true);
 
       // normally, a wallet would watch block production, and find the transaction. Here, we can cheat:
@@ -725,7 +725,7 @@ BOOST_AUTO_TEST_CASE( cli_create_htlc )
          BOOST_TEST_MESSAGE("Alice uses her preimage to retrieve the BOBCOIN");
          std::string secret = "My Secret";
          vector<unsigned char> secret_vector(secret.begin(), secret.end());
-         con.wallet_api_ptr->update_htlc(bob_htlc_id_as_string, "alice", secret_vector, true);
+         con.wallet_api_ptr->htlc_redeem(bob_htlc_id_as_string, "alice", secret_vector, true);
          BOOST_TEST_MESSAGE("The system is generating a block");
          BOOST_CHECK(generate_block(app1));
       }
@@ -736,7 +736,7 @@ BOOST_AUTO_TEST_CASE( cli_create_htlc )
          BOOST_TEST_MESSAGE("Bob uses Alice's preimage to retrieve the BOBCOIN");
          std::string secret = "My Secret";
          vector<unsigned char> secret_vector(secret.begin(), secret.end());
-         con.wallet_api_ptr->update_htlc(alice_htlc_id_as_string, "bob", secret_vector, true);
+         con.wallet_api_ptr->htlc_redeem(alice_htlc_id_as_string, "bob", secret_vector, true);
          BOOST_TEST_MESSAGE("The system is generating a block");
          BOOST_CHECK(generate_block(app1));
       }

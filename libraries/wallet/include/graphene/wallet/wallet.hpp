@@ -1468,9 +1468,9 @@ class wallet_api
        * @param timelock when the time lock expires
        * @param broadcast true if you wish to broadcast the transaction
        */
-      signed_transaction create_htlc( string source, string destination, string asset_symbol, string amount,
-         string hash_algorithm, const std::vector<unsigned char>& preimage_hash, size_t preimage_size, 
-         const fc::time_point_sec& timelock, bool broadcast = false );
+      signed_transaction htlc_prepare( string source, string destination, string asset_symbol, string amount,
+            string hash_algorithm, const std::vector<unsigned char>& preimage_hash, size_t preimage_size, 
+            const fc::time_point_sec& timelock, bool broadcast = false );
 
       /****
        * Update a hashed time lock contract
@@ -1479,8 +1479,19 @@ class wallet_api
        * @param issuer Who is performing this operation (and paying the fee)
        * @param preimage the preimage that should evaluate to the preimage_hash
        */
-      signed_transaction update_htlc( string htlc_id, string issuer, const std::vector<unsigned char>& preimage, 
-         bool broadcast = false );
+      signed_transaction htlc_redeem( string htlc_id, string issuer, const std::vector<unsigned char>& preimage, 
+            bool broadcast = false );
+
+      /*****
+       * Set a new timelock on an existing HTLC
+       * 
+       * @param htlc_id The object identifier of the HTLC on the blockchain
+       * @param issuer Who is performing this operation (and paying the fee)
+       * @param timelock the new time of expiry
+       * @param broadcast true to broadcast to the network
+       */
+      signed_transaction htlc_extend_expiry(string htlc_id, string issuer, const fc::time_point_sec& timelock,
+            bool broadcast = false);
 
       /**
        * Get information about a vesting balance object.
@@ -1811,6 +1822,7 @@ FC_API( graphene::wallet::wallet_api,
         (update_asset)
         (update_asset_issuer)
         (update_bitasset)
+        (get_htlc)
         (update_asset_feed_producers)
         (publish_asset_feed)
         (issue_asset)
@@ -1832,6 +1844,9 @@ FC_API( graphene::wallet::wallet_api,
         (update_witness)
         (create_worker)
         (update_worker_votes)
+        (htlc_prepare)
+        (htlc_redeem)
+        (htlc_extend_expiry)
         (get_vesting_balances)
         (withdraw_vesting)
         (vote_for_committee_member)
