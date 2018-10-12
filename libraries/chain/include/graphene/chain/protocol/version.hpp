@@ -32,6 +32,9 @@ namespace graphene { namespace chain {
    * This class represents an example versioning scheme for the Bitshares Blockchain.
    * Implemented in a way which was discussed in https://github.com/bitshares/bitshares-core/issues/1173
    * The versioning here is Major.Minor.Patch
+   * Major == Changes to the protocol
+   * Minor == Feature with non protocol related changes
+   * Patch == Patch/Hotfix
    */
    struct version 
    {
