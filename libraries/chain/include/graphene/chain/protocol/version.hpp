@@ -62,7 +62,7 @@ namespace graphene { namespace chain {
 
       /** 
        * in parts of the code the old HARDFORK_*_TIME var is used in a way
-       * that time is added on it to have the same behaviour as before
+       * that time is added on it. To have the same behaviour as before
        * this operator overloads were added
        */
       version operator + ( const uint32_t offset ) {
