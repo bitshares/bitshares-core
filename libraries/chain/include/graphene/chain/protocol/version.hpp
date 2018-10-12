@@ -60,9 +60,11 @@ namespace graphene { namespace chain {
       friend bool operator >  ( const fc::time_point_sec &o, const version &_this) { return _this <  o; }
       friend bool operator >= ( const fc::time_point_sec &o, const version &_this) { return _this <= o; }
 
-      // in parts of the code the old HARDFORK_*_TIME var is used in a way
-      // that time is added on it to have the same behaviour as before
-      // this operators were added
+      /** 
+       * in parts of the code the old HARDFORK_*_TIME var is used in a way
+       * that time is added on it to have the same behaviour as before
+       * this operator overloads were added
+       */
       version operator + ( const uint32_t offset ) {
          return version( major(), minor(), patch(), hardfork_time + offset );
       }
@@ -78,7 +80,7 @@ namespace graphene { namespace chain {
          return *this;
       }
 
-      // same as operators above
+      // same as the above operators
       version operator + ( const fc::microseconds offset ) {
          return version( major(), minor(), patch(), hardfork_time + offset );
       }
