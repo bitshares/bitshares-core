@@ -96,6 +96,8 @@ namespace graphene { namespace chain {
          bool is_transfer_restricted()const { return options.flags & transfer_restricted; }
          bool can_override()const { return options.flags & override_authority; }
          bool allow_confidential()const { return !(options.flags & asset_issuer_permission_flags::disable_confidential); }
+         /// @return true if this asset can modify the max supply
+         bool can_modify_max_supply() const { return !(options.flags & asset_issuer_permission_flags::disable_modify_max_supply); }
 
          /// Helper function to get an asset object with the given amount in this asset's type
          asset amount(share_type a)const { return asset(a, id); }
