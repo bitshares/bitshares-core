@@ -47,8 +47,8 @@ class es_objects_plugin_impl
       {  curl = curl_easy_init(); }
       virtual ~es_objects_plugin_impl();
 
-      bool indexDatabase( const vector<object_id_type>& ids, std::string action);
-      void RemoveFromDatabase( object_id_type id, std::string index);
+      bool index_database( const vector<object_id_type>& ids, std::string action);
+      void remove_from_database( object_id_type id, std::string index);
 
       es_objects_plugin& _self;
       std::string _es_objects_elasticsearch_url = "http://localhost:9200/";
@@ -82,7 +82,7 @@ class es_objects_plugin_impl
 
 };
 
-bool es_objects_plugin_impl::indexDatabase( const vector<object_id_type>& ids, std::string action)
+bool es_objects_plugin_impl::index_database( const vector<object_id_type>& ids, std::string action)
 {
    graphene::chain::database &db = _self.database();
 
@@ -102,7 +102,7 @@ bool es_objects_plugin_impl::indexDatabase( const vector<object_id_type>& ids, s
          auto p = static_cast<const proposal_object*>(obj);
          if(p != nullptr) {
             if(action == "delete")
-               RemoveFromDatabase(p->id, "proposal");
+               remove_from_database(p->id, "proposal");
             else
                prepare_proposal(*p);
          }
@@ -112,7 +112,7 @@ bool es_objects_plugin_impl::indexDatabase( const vector<object_id_type>& ids, s
          auto a = static_cast<const account_object*>(obj);
          if(a != nullptr) {
             if(action == "delete")
-               RemoveFromDatabase(a->id, "account");
+               remove_from_database(a->id, "account");
             else
                prepare_account(*a);
          }
@@ -122,7 +122,7 @@ bool es_objects_plugin_impl::indexDatabase( const vector<object_id_type>& ids, s
          auto a = static_cast<const asset_object*>(obj);
          if(a != nullptr) {
             if(action == "delete")
-               RemoveFromDatabase(a->id, "asset");
+               remove_from_database(a->id, "asset");
             else
                prepare_asset(*a);
          }
@@ -132,7 +132,7 @@ bool es_objects_plugin_impl::indexDatabase( const vector<object_id_type>& ids, s
          auto b = static_cast<const account_balance_object*>(obj);
          if(b != nullptr) {
             if(action == "delete")
-               RemoveFromDatabase(b->id, "balance");
+               remove_from_database(b->id, "balance");
             else
                prepare_balance(*b);
          }
@@ -142,7 +142,7 @@ bool es_objects_plugin_impl::indexDatabase( const vector<object_id_type>& ids, s
          auto l = static_cast<const limit_order_object*>(obj);
          if(l != nullptr) {
             if(action == "delete")
-               RemoveFromDatabase(l->id, "limitorder");
+               remove_from_database(l->id, "limitorder");
             else
                prepare_limit(*l);
          }
@@ -152,7 +152,7 @@ bool es_objects_plugin_impl::indexDatabase( const vector<object_id_type>& ids, s
          auto ba = static_cast<const asset_bitasset_data_object*>(obj);
          if(ba != nullptr) {
             if(action == "delete")
-               RemoveFromDatabase(ba->id, "bitasset");
+               remove_from_database(ba->id, "bitasset");
             else
                prepare_bitasset(*ba);
          }
@@ -176,7 +176,7 @@ bool es_objects_plugin_impl::indexDatabase( const vector<object_id_type>& ids, s
    return true;
 }
 
-void es_objects_plugin_impl::RemoveFromDatabase( object_id_type id, std::string index)
+void es_objects_plugin_impl::remove_from_database( object_id_type id, std::string index)
 {
    wdump((id));
    if(_es_objects_keep_only_current)
@@ -422,19 +422,19 @@ void es_objects_plugin::plugin_set_program_options(
 void es_objects_plugin::plugin_initialize(const boost::program_options::variables_map& options)
 {
    database().new_objects.connect([&]( const vector<object_id_type>& ids, const flat_set<account_id_type>& impacted_accounts ) {
-      if(!my->indexDatabase(ids, "create"))
+      if(!my->index_database(ids, "create"))
       {
          FC_THROW_EXCEPTION(graphene::chain::plugin_exception, "Error creating object from ES database, we are going to keep trying.");
       }
    });
    database().changed_objects.connect([&]( const vector<object_id_type>& ids, const flat_set<account_id_type>& impacted_accounts ) {
-      if(!my->indexDatabase(ids, "update"))
+      if(!my->index_database(ids, "update"))
       {
          FC_THROW_EXCEPTION(graphene::chain::plugin_exception, "Error updating object from ES database, we are going to keep trying.");
       }
    });
    database().removed_objects.connect([this](const vector<object_id_type>& ids, const vector<const object*>& objs, const flat_set<account_id_type>& impacted_accounts) {
-       if(!my->indexDatabase(ids, "delete"))
+       if(!my->index_database(ids, "delete"))
        {
           FC_THROW_EXCEPTION(graphene::chain::plugin_exception, "Error deleting object from ES database, we are going to keep trying.");
        }
