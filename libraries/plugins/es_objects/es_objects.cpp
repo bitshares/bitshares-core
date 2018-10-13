@@ -72,13 +72,13 @@ class es_objects_plugin_impl
       fc::time_point_sec block_time;
 
    private:
-      void PrepareProposal(const proposal_object& proposal_object);
-      void PrepareAccount(const account_object& account_object);
-      void PrepareAsset(const asset_object& asset_object);
-      void PrepareBalance(const account_balance_object& account_balance_object);
-      void PrepareLimit(const limit_order_object& limit_object);
-      void PrepareBitAsset(const asset_bitasset_data_object& bitasset_object);
-      std::string createIdstring(object_id_type& object_id);
+      void prepare_proposal(const proposal_object& proposal_object);
+      void prepare_account(const account_object& account_object);
+      void prepare_asset(const asset_object& asset_object);
+      void prepare_balance(const account_balance_object& account_balance_object);
+      void prepare_limit(const limit_order_object& limit_object);
+      void prepare_bitasset(const asset_bitasset_data_object& bitasset_object);
+      std::string create_id_string(object_id_type& object_id);
 
 };
 
@@ -104,7 +104,7 @@ bool es_objects_plugin_impl::indexDatabase( const vector<object_id_type>& ids, s
             if(action == "delete")
                RemoveFromDatabase(p->id, "proposal");
             else
-               PrepareProposal(*p);
+               prepare_proposal(*p);
          }
       }
       else if(value.is<account_object>() && _es_objects_accounts) {
@@ -114,7 +114,7 @@ bool es_objects_plugin_impl::indexDatabase( const vector<object_id_type>& ids, s
             if(action == "delete")
                RemoveFromDatabase(a->id, "account");
             else
-               PrepareAccount(*a);
+               prepare_account(*a);
          }
       }
       else if(value.is<asset_object>() && _es_objects_assets) {
@@ -124,7 +124,7 @@ bool es_objects_plugin_impl::indexDatabase( const vector<object_id_type>& ids, s
             if(action == "delete")
                RemoveFromDatabase(a->id, "asset");
             else
-               PrepareAsset(*a);
+               prepare_asset(*a);
          }
       }
       else if(value.is<account_balance_object>() && _es_objects_balances) {
@@ -134,7 +134,7 @@ bool es_objects_plugin_impl::indexDatabase( const vector<object_id_type>& ids, s
             if(action == "delete")
                RemoveFromDatabase(b->id, "balance");
             else
-               PrepareBalance(*b);
+               prepare_balance(*b);
          }
       }
       else if(value.is<limit_order_object>() && _es_objects_limit_orders) {
@@ -144,7 +144,7 @@ bool es_objects_plugin_impl::indexDatabase( const vector<object_id_type>& ids, s
             if(action == "delete")
                RemoveFromDatabase(l->id, "limitorder");
             else
-               PrepareLimit(*l);
+               prepare_limit(*l);
          }
       }
       else if(value.is<asset_bitasset_data_object>() && _es_objects_asset_bitasset) {
@@ -154,7 +154,7 @@ bool es_objects_plugin_impl::indexDatabase( const vector<object_id_type>& ids, s
             if(action == "delete")
                RemoveFromDatabase(ba->id, "bitasset");
             else
-               PrepareBitAsset(*ba);
+               prepare_bitasset(*ba);
          }
       }
    }
@@ -182,7 +182,7 @@ void es_objects_plugin_impl::RemoveFromDatabase( object_id_type id, std::string 
    if(_es_objects_keep_only_current)
    {
       fc::mutable_variant_object delete_line;
-      delete_line["_id"] = createIdstring(id);
+      delete_line["_id"] = create_id_string(id);
       delete_line["_index"] = _es_objects_index_prefix + index;
       delete_line["_type"] = "data";
       fc::mutable_variant_object final_delete_line;
@@ -193,7 +193,7 @@ void es_objects_plugin_impl::RemoveFromDatabase( object_id_type id, std::string 
    }
 }
 
-void es_objects_plugin_impl::PrepareProposal(const proposal_object& proposal_object)
+void es_objects_plugin_impl::prepare_proposal(const proposal_object& proposal_object)
 {
    proposal_struct prop;
    prop.object_id = proposal_object.id;
@@ -215,7 +215,7 @@ void es_objects_plugin_impl::PrepareProposal(const proposal_object& proposal_obj
    bulk_header["_type"] = "data";
    if(_es_objects_keep_only_current)
    {
-      bulk_header["_id"] = createIdstring(prop.object_id);
+      bulk_header["_id"] = create_id_string(prop.object_id);
    }
 
    prepare = graphene::utilities::createBulk(bulk_header, std::move(data));
@@ -223,7 +223,7 @@ void es_objects_plugin_impl::PrepareProposal(const proposal_object& proposal_obj
    prepare.clear();
 }
 
-void es_objects_plugin_impl::PrepareAccount(const account_object& account_object)
+void es_objects_plugin_impl::prepare_account(const account_object& account_object)
 {
    account_struct acct;
    acct.object_id = account_object.id;
@@ -253,7 +253,7 @@ void es_objects_plugin_impl::PrepareAccount(const account_object& account_object
    bulk_header["_type"] = "data";
    if(_es_objects_keep_only_current)
    {
-      bulk_header["_id"] = createIdstring(acct.object_id);
+      bulk_header["_id"] = create_id_string(acct.object_id);
    }
 
    prepare = graphene::utilities::createBulk(bulk_header, std::move(data));
@@ -261,7 +261,7 @@ void es_objects_plugin_impl::PrepareAccount(const account_object& account_object
    prepare.clear();
 }
 
-void es_objects_plugin_impl::PrepareAsset(const asset_object& asset_object)
+void es_objects_plugin_impl::prepare_asset(const asset_object& asset_object)
 {
    asset_struct asset;
    asset.object_id = asset_object.id;
@@ -280,7 +280,7 @@ void es_objects_plugin_impl::PrepareAsset(const asset_object& asset_object)
    bulk_header["_type"] = "data";
    if(_es_objects_keep_only_current)
    {
-      bulk_header["_id"] = createIdstring(asset.object_id);
+      bulk_header["_id"] = create_id_string(asset.object_id);
    }
 
    prepare = graphene::utilities::createBulk(bulk_header, std::move(data));
@@ -288,7 +288,7 @@ void es_objects_plugin_impl::PrepareAsset(const asset_object& asset_object)
    prepare.clear();
 }
 
-void es_objects_plugin_impl::PrepareBalance(const account_balance_object& account_balance_object)
+void es_objects_plugin_impl::prepare_balance(const account_balance_object& account_balance_object)
 {
    balance_struct balance;
    balance.object_id = account_balance_object.id;
@@ -306,7 +306,7 @@ void es_objects_plugin_impl::PrepareBalance(const account_balance_object& accoun
    bulk_header["_type"] = "data";
    if(_es_objects_keep_only_current)
    {
-      bulk_header["_id"] = createIdstring(balance.object_id);
+      bulk_header["_id"] = create_id_string(balance.object_id);
    }
 
    prepare = graphene::utilities::createBulk(bulk_header, std::move(data));
@@ -314,7 +314,7 @@ void es_objects_plugin_impl::PrepareBalance(const account_balance_object& accoun
    prepare.clear();
 }
 
-void es_objects_plugin_impl::PrepareLimit(const limit_order_object& limit_object)
+void es_objects_plugin_impl::prepare_limit(const limit_order_object& limit_object)
 {
    limit_order_struct limit;
    limit.object_id = limit_object.id;
@@ -333,7 +333,7 @@ void es_objects_plugin_impl::PrepareLimit(const limit_order_object& limit_object
    bulk_header["_type"] = "data";
    if(_es_objects_keep_only_current)
    {
-      bulk_header["_id"] = createIdstring(limit.object_id);
+      bulk_header["_id"] = create_id_string(limit.object_id);
    }
 
    prepare = graphene::utilities::createBulk(bulk_header, std::move(data));
@@ -341,7 +341,7 @@ void es_objects_plugin_impl::PrepareLimit(const limit_order_object& limit_object
    prepare.clear();
 }
 
-void es_objects_plugin_impl::PrepareBitAsset(const asset_bitasset_data_object& bitasset_object)
+void es_objects_plugin_impl::prepare_bitasset(const asset_bitasset_data_object& bitasset_object)
 {
    if(!bitasset_object.is_prediction_market) {
 
@@ -359,7 +359,7 @@ void es_objects_plugin_impl::PrepareBitAsset(const asset_bitasset_data_object& b
       bulk_header["_type"] = "data";
       if(_es_objects_keep_only_current)
       {
-         bulk_header["_id"] = createIdstring(bitasset.object_id);
+         bulk_header["_id"] = create_id_string(bitasset.object_id);
       }
 
       prepare = graphene::utilities::createBulk(bulk_header, std::move(data));
@@ -367,7 +367,7 @@ void es_objects_plugin_impl::PrepareBitAsset(const asset_bitasset_data_object& b
       prepare.clear();
    }
 }
-std::string es_objects_plugin_impl::createIdstring(object_id_type& object_id)
+std::string es_objects_plugin_impl::create_id_string(object_id_type& object_id)
 {
    return fc::to_string(object_id.space()) + "." + fc::to_string(object_id.type()) + "." + fc::to_string(object_id.instance());
 }
