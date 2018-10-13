@@ -119,8 +119,7 @@ BOOST_AUTO_TEST_CASE( htlc_expires )
    }
 
    // verify funds on hold (make sure this can cover fees)
-   BOOST_TEST_CHECK( get_balance(alice_id, graphene::chain::asset_id_type()) == 90000 );
-   //BOOST_TEST_CHECK( get_balance(alice_id, graphene::chain::asset_id_type()) > 98000 );
+   BOOST_CHECK_EQUAL( get_balance(alice_id, graphene::chain::asset_id_type()), 90000 );
 
    // make sure Alice can't get it back before the timeout
    {
@@ -163,7 +162,7 @@ BOOST_AUTO_TEST_CASE( htlc_expires )
       trx.clear();
    }
    // verify funds return (what about fees?)
-   BOOST_TEST_CHECK( get_balance(alice_id, graphene::chain::asset_id_type()) == 100000 );
+   BOOST_CHECK_EQUAL( get_balance(alice_id, graphene::chain::asset_id_type()), 100000 );
    // verify Bob cannot execute the contract after the fact
 }
 
@@ -211,7 +210,7 @@ BOOST_AUTO_TEST_CASE( htlc_fulfilled )
 	   }
 
 	   // verify funds on hold (make sure this can cover fees)
-	   BOOST_TEST_CHECK( get_balance(alice_id, graphene::chain::asset_id_type()) == 90000 );
+	   BOOST_CHECK_EQUAL( get_balance(alice_id, graphene::chain::asset_id_type()), 90000 );
 
 	   // make sure Alice can't get it back before the timeout
 	   {
@@ -233,7 +232,7 @@ BOOST_AUTO_TEST_CASE( htlc_fulfilled )
 	   }
 
 	   // balance should not have changed
-	   BOOST_TEST_CHECK( get_balance(alice_id, graphene::chain::asset_id_type()) == 90000 );
+	   BOOST_CHECK_EQUAL( get_balance(alice_id, graphene::chain::asset_id_type()), 90000 );
 	   // make sure Bob (or anyone) can see the details of the transaction
 	   // send an update operation to claim the funds
 	   {
@@ -272,16 +271,13 @@ BOOST_AUTO_TEST_CASE( htlc_fulfilled )
 	      trx.clear();
 	   }
 	   // verify funds end up in Bob's account
-	   BOOST_TEST_CHECK( get_balance(bob_id,   graphene::chain::asset_id_type()) == 10000 );
-	   BOOST_TEST_CHECK( get_balance(alice_id, graphene::chain::asset_id_type()) == 90000 );
+	   BOOST_CHECK_EQUAL( get_balance(bob_id,   graphene::chain::asset_id_type()), 10000 );
+	   BOOST_CHECK_EQUAL( get_balance(alice_id, graphene::chain::asset_id_type()), 90000 );
 }
 
 BOOST_AUTO_TEST_CASE( other_peoples_money )
 {
    ACTORS((alice)(bob));
-
-   fc::time_point_sec starting_time = genesis_state.initial_timestamp + 3000;
-	
 
    int64_t init_balance(100000);
 

@@ -1760,10 +1760,10 @@ public:
          create_op.key_hash = preimage_hash;
          create_op.key_size = preimage_size;
          if ( "SHA256" == hash_algorithm )
-            create_op.hash_type = hash_algorithm::sha256;
+            create_op.hash_type = graphene::chain::hash_algorithm::sha256;
          if ( "RIPEMD160" == hash_algorithm )
-            create_op.hash_type = hash_algorithm::ripemd160;
-         FC_ASSERT(create_op.hash_type != hash_algorithm::unknown, 
+            create_op.hash_type = graphene::chain::hash_algorithm::ripemd160;
+         FC_ASSERT(create_op.hash_type != graphene::chain::hash_algorithm::unknown, 
                "Unknown hash algorithm: ${algo}", ("algo", hash_algorithm));
 
          signed_transaction tx;
