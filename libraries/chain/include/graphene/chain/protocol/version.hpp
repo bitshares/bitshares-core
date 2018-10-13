@@ -48,7 +48,11 @@ namespace graphene { namespace chain {
       bool operator <= ( const version &o )const { return v_num <= o.v_num; }
       bool operator >  ( const version &o )const { return v_num >  o.v_num; }
       bool operator >= ( const version &o )const { return v_num >= o.v_num; }
-
+      
+      /** 
+       * In parts of the code the old HARDFORK_*_TIME var is compared to other 
+       * time variables. These operators ensure the old behaviour.
+       */
       bool operator == ( const fc::time_point_sec &o)const { return hardfork_time == o; }
       bool operator != ( const fc::time_point_sec &o)const { return hardfork_time != o; }
       bool operator <  ( const fc::time_point_sec &o)const { return hardfork_time <  o; }
@@ -64,9 +68,9 @@ namespace graphene { namespace chain {
       friend bool operator >= ( const fc::time_point_sec &o, const version &_this) { return _this <= o; }
 
       /** 
-       * in parts of the code the old HARDFORK_*_TIME var is used in a way
-       * that time is added on it. To have the same behaviour as before
-       * this operator overloads were added
+       * In parts of the code the old HARDFORK_*_TIME var is used in a way
+       * that time_point_sec or uint_32t is added on it. 
+       * These operators ensure the old behaviour
        */
       version operator + ( const uint32_t offset ) {
          return version( major(), minor(), patch(), hardfork_time + offset );
@@ -82,8 +86,6 @@ namespace graphene { namespace chain {
          hardfork_time -= offset;
          return *this;
       }
-
-      // same as the above operators
       version operator + ( const fc::microseconds offset ) {
          return version( major(), minor(), patch(), hardfork_time + offset );
       }

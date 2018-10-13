@@ -1934,41 +1934,93 @@ BOOST_FIXTURE_TEST_CASE( block_size_test, database_fixture )
 
 BOOST_FIXTURE_TEST_CASE( version_test, database_fixture )
 {
-   BOOST_TEST_MESSAGE("\nVERSIONING TEST\n");
+   BOOST_TEST_MESSAGE( ("VERSIONING TEST") );
 
-   BOOST_TEST_MESSAGE("\n\tBEFORE HF\n");
+   BOOST_TEST_MESSAGE( ("\tBEFORE HF") );
    {
       signed_block head_block = generate_block();
       BOOST_CHECK( !head_block.extensions.value.witness_running_version.valid() );
    }
 
-   BOOST_TEST_MESSAGE("\n\tAFTER HF\n");
+   BOOST_TEST_MESSAGE( ("\tAFTER HF") );
    {
-      generate_blocks( HARDFORK_TEST_VERSION - fc::hours(10) );
+      // right before hardfork
+      generate_blocks( HARDFORK_TEST_VERSION - fc::seconds(1) );
 
       auto num_active_witnesses = db.get_global_properties().active_witnesses.size();
-      // for each active witness
-      edump( (num_active_witnesses) );
-      for(size_t i = 0; i < num_active_witnesses; ++i)
+      flat_set< witness_id_type > allready_published;  
+
+      signed_block head_block;
+      // all witnesses must include their version into a block
+      while( allready_published.size() != num_active_witnesses )
       {
-         signed_block head_block = generate_block();
+         head_block = generate_block();
+
          bool version_was_set = head_block.extensions.value.witness_running_version.valid();
+         witness_id_type signed_witness = head_block.witness;
          if( version_was_set )
          {
-            version v = *(head_block.extensions.value.witness_running_version);
-            // can only be true if GRAPHENE_BLOCKCHAIN_VERSION == HARDFORK_TEST_VERSION
-            BOOST_CHECK( v.v_num == HARDFORK_TEST_VERSION.v_num );
-         }
-         else
-         {
-            BOOST_FAIL( "The version was not set, or is not the current hardfork version.");
+            if( allready_published.find(signed_witness) == allready_published.end() )
+            {
+               version v = *(head_block.extensions.value.witness_running_version);
+               // can only be true if GRAPHENE_BLOCKCHAIN_VERSION == HARDFORK_TEST_VERSION
+               BOOST_CHECK( v == HARDFORK_TEST_VERSION );
+               allready_published.insert( signed_witness );
+            }
+            else
+            {
+               BOOST_FAIL( "This witness has allready included its version in to a block.");
+            }
          }
       }
+      // try some more blocks; version should not be set here
+      for(int i = 0; i < 3; i++)
+      {
+         head_block = generate_block();
+         BOOST_CHECK( !head_block.extensions.value.witness_running_version.valid() );
+      }
+   }
 
-      signed_block head_block = generate_block();
-      // After all witnesses published their version there shouldn't be 
-      // a version in the next block
-      BOOST_CHECK( !head_block.extensions.value.witness_running_version.valid() );
+   BOOST_TEST_MESSAGE( ("OPERATOR TESTS") );
+   {
+      version v1 = HARDFORK_TEST_VERSION;
+      version v2 = HARDFORK_TEST_VERSION;
+
+      BOOST_TEST_MESSAGE( ("\tversion +- uint32_t") );
+      v1 = v1 + uint32_t(3);
+      v2 = version( v2.major(), v2.minor(), v2.patch(), v2.hardfork_time + uint32_t(3) ); 
+      BOOST_CHECK( v1.hardfork_time == v2.hardfork_time );
+
+      v1 = v1 - uint32_t(3);
+      v2 = version( v2.major(), v2.minor(), v2.patch(), v2.hardfork_time - uint32_t(3) ); 
+      BOOST_CHECK( v1.hardfork_time == v2.hardfork_time );
+
+      BOOST_TEST_MESSAGE( ("\tversion +-= uint32_t") );
+      v1 += uint32_t(3); 
+      v2.hardfork_time += uint32_t(3);
+      BOOST_CHECK( v1.hardfork_time == v2.hardfork_time );
+
+      v1 -= uint32_t(3);
+      v2.hardfork_time -= uint32_t(3);
+      BOOST_CHECK( v1.hardfork_time == v2.hardfork_time );
+
+      BOOST_TEST_MESSAGE( ("\tversion +- fc::microseconds") );
+      v1 = v1 + fc::seconds(3);
+      v2 = version(v2.major(), v2.minor(), v2.patch(), v2.hardfork_time + fc::seconds(3) );
+      BOOST_CHECK( v1.hardfork_time == v2.hardfork_time );
+
+      v1 = v1 - fc::seconds(3);
+      v2 = version(v2.major(), v2.minor(), v2.patch(), v2.hardfork_time - fc::seconds(3) );
+      BOOST_CHECK( v1.hardfork_time == v2.hardfork_time );
+
+      BOOST_TEST_MESSAGE( ("\tversion +-= fc::microseconds") );
+      v1 += fc::seconds(3);
+      v2.hardfork_time += fc::seconds(3);
+      BOOST_CHECK( v1.hardfork_time == v2.hardfork_time );
+
+      v1 -= fc::seconds(3);
+      v2.hardfork_time -= fc::seconds(3);
+      BOOST_CHECK( v1.hardfork_time == v2.hardfork_time );
    }
 }
 
