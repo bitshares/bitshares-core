@@ -3043,7 +3043,8 @@ vector<operation_detail> wallet_api::get_account_history(string name, int limit)
 
       int page_limit = skip_first_row ? std::min( 100, limit + 1 ) : std::min( 100, limit );
 
-      vector<operation_history_object> current = my->_remote_hist->get_account_history( always_id, operation_history_id_type(),
+      vector<operation_history_object> current = my->_remote_hist->get_account_history( always_id,
+                                                                                        operation_history_id_type(),
                                                                                         page_limit, start );
       bool first_row = true;
       for( auto& o : current )
@@ -3094,7 +3095,10 @@ vector<operation_detail> wallet_api::get_relative_account_history(string name, u
 
    while( limit > 0 )
    {
-      vector <operation_history_object> current = my->_remote_hist->get_relative_account_history(always_id, stop, std::min<uint32_t>(100, limit), start);
+      vector <operation_history_object> current = my->_remote_hist->get_relative_account_history(always_id,
+                                                                                                 stop,
+                                                                                                 std::min<uint32_t>(100, limit),
+                                                                                                 start);
       for (auto &o : current) {
          std::stringstream ss;
          auto memo = o.op.visit(detail::operation_printer(ss, *my, o.result));
