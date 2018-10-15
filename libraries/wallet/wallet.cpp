@@ -3043,9 +3043,11 @@ vector<operation_detail> wallet_api::get_account_history(string name, int limit)
 
       int page_limit = skip_first_row ? std::min( 100, limit + 1 ) : std::min( 100, limit );
 
-      vector<operation_history_object> current = my->_remote_hist->get_account_history( always_id,
-                                                                                        operation_history_id_type(),
-                                                                                        page_limit, start );
+      vector<operation_history_object> current = my->_remote_hist->get_account_history(
+            always_id,
+            operation_history_id_type(),
+            page_limit,
+            start );
       bool first_row = true;
       for( auto& o : current )
       {
@@ -3073,7 +3075,11 @@ vector<operation_detail> wallet_api::get_account_history(string name, int limit)
    return result;
 }
 
-vector<operation_detail> wallet_api::get_relative_account_history(string name, uint32_t stop, int limit, uint32_t start)const
+vector<operation_detail> wallet_api::get_relative_account_history(
+      string name,
+      uint32_t stop,
+      int limit,
+      uint32_t start)const
 {
    vector<operation_detail> result;
    auto account_id = get_account(name).get_id();
@@ -3095,10 +3101,11 @@ vector<operation_detail> wallet_api::get_relative_account_history(string name, u
 
    while( limit > 0 )
    {
-      vector <operation_history_object> current = my->_remote_hist->get_relative_account_history(always_id,
-                                                                                                 stop,
-                                                                                                 std::min<uint32_t>(100, limit),
-                                                                                                 start);
+      vector <operation_history_object> current = my->_remote_hist->get_relative_account_history(
+            always_id,
+            stop,
+            std::min<uint32_t>(100, limit),
+            start);
       for (auto &o : current) {
          std::stringstream ss;
          auto memo = o.op.visit(detail::operation_printer(ss, *my, o.result));
@@ -3113,7 +3120,11 @@ vector<operation_detail> wallet_api::get_relative_account_history(string name, u
    return result;
 }
 
-account_history_operation_detail wallet_api::get_account_history_by_operations(string name, vector<uint16_t> operation_types, uint32_t start, int limit)
+account_history_operation_detail wallet_api::get_account_history_by_operations(
+      string name,
+      vector<uint16_t> operation_types,
+      uint32_t start,
+      int limit)
 {
     account_history_operation_detail result;
     auto account_id = get_account(name).get_id();
@@ -3165,17 +3176,23 @@ full_account wallet_api::get_full_account( const string& name_or_id)
     return my->_remote_db->get_full_accounts({name_or_id}, false)[name_or_id];
 }
 
-vector<bucket_object> wallet_api::get_market_history( string symbol1, string symbol2, uint32_t bucket , fc::time_point_sec start, fc::time_point_sec end )const
+vector<bucket_object> wallet_api::get_market_history(
+      string symbol1,
+      string symbol2,
+      uint32_t bucket,
+      fc::time_point_sec start,
+      fc::time_point_sec end )const
 {
    return my->_remote_hist->get_market_history( get_asset_id(symbol1), get_asset_id(symbol2), bucket, start, end );
 }
 
-vector<limit_order_object> wallet_api::get_account_limit_orders( const string& name_or_id,
-                                                                const string &base,
-                                                                const string &quote,
-                                                                uint32_t limit,
-                                                                optional<limit_order_id_type> ostart_id,
-                                                                optional<price> ostart_price)
+vector<limit_order_object> wallet_api::get_account_limit_orders(
+      const string& name_or_id,
+      const string &base,
+      const string &quote,
+      uint32_t limit,
+      optional<limit_order_id_type> ostart_id,
+      optional<price> ostart_price)
 {
    return my->_remote_db->get_account_limit_orders(name_or_id, base, quote, limit, ostart_id, ostart_price);
 }
@@ -3277,11 +3294,11 @@ signed_transaction wallet_api::propose_builder_transaction(
 }
 
 signed_transaction wallet_api::propose_builder_transaction2(
-   transaction_handle_type handle,
-   string account_name_or_id,
-   time_point_sec expiration,
-   uint32_t review_period_seconds,
-   bool broadcast)
+      transaction_handle_type handle,
+      string account_name_or_id,
+      time_point_sec expiration,
+      uint32_t review_period_seconds,
+      bool broadcast)
 {
    return my->propose_builder_transaction2(handle, account_name_or_id, expiration, review_period_seconds, broadcast);
 }
