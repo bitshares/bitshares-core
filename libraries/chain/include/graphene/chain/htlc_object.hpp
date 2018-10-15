@@ -35,7 +35,8 @@ namespace graphene { namespace chain {
    enum hash_algorithm {
       unknown = 0x00,
       ripemd160 = 0x01,
-      sha256 = 0x02
+      sha256 = 0x02,
+      sha1 = 0x03
    };
    
    /**
@@ -53,7 +54,7 @@ namespace graphene { namespace chain {
          asset                   pending_fee;
          vector<unsigned char>	preimage_hash;
          fc::enum_type<uint8_t, hash_algorithm> preimage_hash_algorithm;
-         uint16_t				      preimage_size;
+         uint16_t                preimage_size;
    };
 
    struct by_from_id;
@@ -83,7 +84,7 @@ namespace fc
   template<> struct get_typename<fc::enum_type<unsigned char, graphene::chain::hash_algorithm>> { static const char* name() { return "fc::enum_type<unsigned char, graphene::chain::hash_algorithm>"; } };
 }
 
-FC_REFLECT_ENUM( graphene::chain::hash_algorithm, (unknown)(ripemd160)(sha256));
+FC_REFLECT_ENUM( graphene::chain::hash_algorithm, (unknown)(ripemd160)(sha256)(sha1));
 
 FC_REFLECT_DERIVED( graphene::chain::htlc_object, (graphene::db::object),
                (from)(to)(amount)(expiration)(pending_fee)

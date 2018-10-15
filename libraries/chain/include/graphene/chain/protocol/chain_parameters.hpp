@@ -30,7 +30,6 @@ namespace graphene { namespace chain { struct fee_schedule; } }
 
 namespace graphene { namespace chain {
 
-   typedef static_variant<>  parameter_extension; 
    struct chain_parameters
    {
       /** using a smart ref breaks the circular dependency created between operations and the fee schedule */
@@ -63,13 +62,46 @@ namespace graphene { namespace chain {
       uint16_t                accounts_per_fee_scale              = GRAPHENE_DEFAULT_ACCOUNTS_PER_FEE_SCALE; ///< number of accounts between fee scalings
       uint8_t                 account_fee_scale_bitshifts         = GRAPHENE_DEFAULT_ACCOUNT_FEE_SCALE_BITSHIFTS; ///< number of times to left bitshift account registration fee at each scaling
       uint8_t                 max_authority_depth                 = GRAPHENE_MAX_SIG_CHECK_DEPTH;
+
+      struct ext
+      {
+         struct committee_updatable_parameters
+         {
+            uint32_t htlc_max_timeout_secs;
+            uint32_t htlc_max_preimage_size;
+         };
+      };
+      typedef static_variant<ext::committee_updatable_parameters> parameter_extension;
+      typedef flat_set<parameter_extension> extensions_type;
+
       extensions_type         extensions;
 
       /** defined in fee_schedule.cpp */
       void validate()const;
+
+      const ext::committee_updatable_parameters get_committee_updatable_parameters() const
+      {
+         if (extensions.size() > 0)
+         {
+            for ( const parameter_extension& e : extensions )
+            {
+               if ( e.which() == parameter_extension::tag<ext::committee_updatable_parameters>::value )
+                  return e.get<ext::committee_updatable_parameters>();
+            }
+         }
+         return ext::committee_updatable_parameters();
+      }
    };
 
 } }  // graphene::chain
+
+FC_REFLECT( graphene::chain::chain_parameters::ext::committee_updatable_parameters, 
+            (htlc_max_timeout_secs)
+            (htlc_max_preimage_size)
+         )
+
+FC_REFLECT_TYPENAME( graphene::chain::chain_parameters::parameter_extension )
+FC_REFLECT_TYPENAME( graphene::chain::chain_parameters::extensions_type )
 
 FC_REFLECT( graphene::chain::chain_parameters,
             (current_fees)

@@ -1763,6 +1763,8 @@ public:
             create_op.hash_type = graphene::chain::hash_algorithm::sha256;
          if ( "RIPEMD160" == hash_algorithm )
             create_op.hash_type = graphene::chain::hash_algorithm::ripemd160;
+         if ( "SHA1" == hash_algorithm )
+            create_op.hash_type = graphene::chain::hash_algorithm::sha1;
          FC_ASSERT(create_op.hash_type != graphene::chain::hash_algorithm::unknown, 
                "Unknown hash algorithm: ${algo}", ("algo", hash_algorithm));
 

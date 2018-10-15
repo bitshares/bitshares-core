@@ -21,6 +21,7 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
+#include <fc/crypto/sha1.hpp>
 #include <graphene/chain/database.hpp>
 #include <graphene/chain/htlc_evaluator.hpp>
 #include <graphene/chain/htlc_object.hpp>
@@ -31,15 +32,22 @@ namespace graphene {
 
       void_result htlc_create_evaluator::do_evaluate(const htlc_create_operation& o)
       {
-          //FC_ASSERT( db().head_block_time() > HARDFORK_ESCROW_TIME,
-          //           "Operation not allowed before HARDFORK_ESCROW_TIME."); // remove after HARDFORK_ESCROW_TIME
+         //FC_ASSERT( db().head_block_time() > HARDFORK_HTLC_TIME,
+         //           "Operation not allowed before HARDFORK_HTLC_TIME."); // remove after HARDFORK_ESCROW_TIME
 
-          FC_ASSERT( fc::time_point_sec(o.epoch) > db().head_block_time() );
-          // make sure we have the funds for the HTLC
-          FC_ASSERT( db().get_balance( o.source, o.amount.asset_id ) >= (o.amount ) );
-          // make sure we have the funds for the fee
-          FC_ASSERT( db().get_balance( o.source, asset().asset_id) > o.fee );
-          return void_result();
+         const graphene::chain::global_property_object& global_properties = db().get_global_properties();
+         // make sure the expiration is reasonable
+         FC_ASSERT( o.epoch.sec_since_epoch() < fc::time_point::now().sec_since_epoch() 
+               + global_properties.parameters.get_committee_updatable_parameters().htlc_max_timeout_secs, 
+               "HTLC Timeout exceeds allowed length" );
+         // make sure the preimage length is reasonable
+         FC_ASSERT( o.key_size < global_properties.parameters.get_committee_updatable_parameters().htlc_max_preimage_size,
+               "HTLC preimage length exceeds allowed length" ); 
+         // make sure sender has the funds for the HTLC
+         FC_ASSERT( db().get_balance( o.source, o.amount.asset_id ) >= (o.amount ), "Insufficient funds" );
+         // make sure sender has the funds for the fee
+         FC_ASSERT( db().get_balance( o.source, asset().asset_id) > o.fee, "Insufficient funds" );
+         return void_result();
       }
 
       object_id_type htlc_create_evaluator::do_apply(const htlc_create_operation& o)
@@ -96,6 +104,8 @@ namespace graphene {
                match = test_hash<fc::sha256>(o.preimage, htlc_obj->preimage_hash);
             if (htlc_obj->preimage_hash_algorithm == graphene::chain::hash_algorithm::ripemd160)
                match = test_hash<fc::ripemd160>(o.preimage, htlc_obj->preimage_hash);
+            if (htlc_obj->preimage_hash_algorithm == graphene::chain::hash_algorithm::sha1)
+               match = test_hash<fc::sha1>(o.preimage, htlc_obj->preimage_hash);
 
     		  FC_ASSERT(match, "Provided preimage does not generate correct hash.");
     	  }
