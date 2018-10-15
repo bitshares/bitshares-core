@@ -76,7 +76,12 @@ namespace graphene { namespace chain {
 
    typedef generic_index< htlc_object, htlc_object_index_type > htlc_index;
 
-} }
+} } // namespace graphene::chain
+
+namespace fc
+{
+  template<> struct get_typename<fc::enum_type<unsigned char, graphene::chain::hash_algorithm>> { static const char* name() { return "fc::enum_type<unsigned char, graphene::chain::hash_algorithm>"; } };
+}
 
 FC_REFLECT_ENUM( graphene::chain::hash_algorithm, (unknown)(ripemd160)(sha256));
 
