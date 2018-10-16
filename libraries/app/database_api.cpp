@@ -167,7 +167,7 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       vector<withdraw_permission_object> get_withdraw_permissions_by_giver(const std::string account_id_or_name, withdraw_permission_id_type start, uint32_t limit)const;
       vector<withdraw_permission_object> get_withdraw_permissions_by_recipient(const std::string account_id_or_name, withdraw_permission_id_type start, uint32_t limit)const;
 
-   //private:
+   // private:
       static string price_to_string( const price& _price, const asset_object& _base, const asset_object& _quote );
 
       template<typename T>
@@ -272,7 +272,9 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       map< pair<asset_id_type,asset_id_type>, std::function<void(const variant&)> >      _market_subscriptions;
       graphene::chain::database&                                                                                                            _db;
       const application_options* _app_options = nullptr;
-
+   private:
+      bool public_key_found(const flat_set<public_key_type>& to_be_found, 
+            const vector<public_key_type>& collection_to_search)const;
 };
 
 //////////////////////////////////////////////////////////////////////
@@ -2068,17 +2070,29 @@ bool database_api::verify_account_authority( const string& account_name_or_id, c
    return my->verify_account_authority( account_name_or_id, signers );
 }
 
-bool database_api_impl::verify_account_authority( const string& account_name_or_id, const flat_set<public_key_type>& keys )const
+bool database_api_impl::public_key_found(const flat_set<public_key_type>& to_be_found,
+      const vector<public_key_type>& collection_to_search) const
+{
+   for (public_key_type from_collection : collection_to_search)
+   {
+      for(public_key_type passed_in : to_be_found ) 
+      {
+         if (passed_in == from_collection)
+         {
+            return true;
+         }
+      }
+   }
+   return false;
+}
+
+bool database_api_impl::verify_account_authority( const string& account_name_or_id, 
+      const flat_set<public_key_type>& keys )const
 {
    const account_object* account = get_account_from_string(account_name_or_id);
 
-   /// reuse trx.verify_authority by creating a dummy transfer
-   signed_transaction trx;
-   transfer_operation op;
-   op.from = account->id;
-   trx.operations.emplace_back(op);
-
-   return verify_authority( trx );
+   return public_key_found(keys, account->active.get_keys())
+         && public_key_found(keys, account->owner.get_keys());
 }
 
 processed_transaction database_api::validate_transaction( const signed_transaction& trx )const
