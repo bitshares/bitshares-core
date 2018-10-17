@@ -166,6 +166,7 @@ void application_impl::reset_p2p_node(const fc::path& data_dir)
    {
       // https://bitsharestalk.org/index.php/topic,23715.0.html
       vector<string> seeds = {
+         "seed01.liondani.com:1776",          // liondani     (GERMANY)
          "104.236.144.84:1777",               // puppies      (USA)
          "128.199.143.47:2015",               // Harvey       (Singapore)
          "23.92.53.182:1776",                 // sahkan       (USA)
@@ -336,8 +337,11 @@ void application_impl::startup()
             genesis.initial_timestamp -= ( genesis.initial_timestamp.sec_since_epoch()
                                            % genesis.initial_parameters.block_interval );
             modified_genesis = true;
-            std::cerr << "Used genesis timestamp:  " << genesis.initial_timestamp.to_iso_string()
-                      << " (PLEASE RECORD THIS)\n";
+
+            ilog(
+               "Used genesis timestamp:  ${timestamp} (PLEASE RECORD THIS)", 
+               ("timestamp", genesis.initial_timestamp.to_iso_string())
+            );
          }
          if( _options->count("dbg-init-key") )
          {
@@ -345,11 +349,11 @@ void application_impl::startup()
             FC_ASSERT( genesis.initial_witness_candidates.size() >= genesis.initial_active_witnesses );
             set_dbg_init_key( genesis, init_key );
             modified_genesis = true;
-            std::cerr << "Set init witness key to " << init_key << "\n";
+            ilog("Set init witness key to ${init_key}", ("init_key", init_key));
          }
          if( modified_genesis )
          {
-            std::cerr << "WARNING:  GENESIS WAS MODIFIED, YOUR CHAIN ID MAY BE DIFFERENT\n";
+            wlog("WARNING:  GENESIS WAS MODIFIED, YOUR CHAIN ID MAY BE DIFFERENT");
             genesis_str += "BOGUS";
             genesis.initial_chain_id = fc::sha256::hash( genesis_str );
          }
@@ -409,9 +413,8 @@ void application_impl::startup()
       _force_validate = true;
    }
 
-   // TODO uncomment this when GUI is ready
-   //if( _options->count("enable-subscribe-to-all") )
-   //   _app_options.enable_subscribe_to_all = _options->at("enable-subscribe-to-all").as<bool>();
+   if ( _options->count("enable-subscribe-to-all") )
+      _app_options.enable_subscribe_to_all = _options->at( "enable-subscribe-to-all" ).as<bool>();
 
    if( _active_plugins.find( "market_history" ) != _active_plugins.end() )
       _app_options.has_market_history_plugin = true;
@@ -502,10 +505,11 @@ bool application_impl::handle_block(const graphene::net::block_message& blk_msg,
       const auto& witness = blk_msg.block.witness(*_chain_db);
       const auto& witness_account = witness.witness_account(*_chain_db);
       auto last_irr = _chain_db->get_dynamic_global_properties().last_irreversible_block_num;
-      ilog("Got block: #${n} ${bid} time: ${t} latency: ${l} ms from: ${w}  irreversible: ${i} (-${d})",
+      ilog("Got block: #${n} ${bid} time: ${t} transaction(s): ${x} latency: ${l} ms from: ${w}  irreversible: ${i} (-${d})",
            ("t",blk_msg.block.timestamp)
            ("n", blk_msg.block.block_num())
            ("bid", blk_msg.block.id())
+           ("x", blk_msg.block.transactions.size())
            ("l", (latency.count()/1000))
            ("w",witness_account.name)
            ("i",last_irr)("d",blk_msg.block.block_num()-last_irr) );
@@ -529,10 +533,12 @@ bool application_impl::handle_block(const graphene::net::block_message& blk_msg,
          // happens, there's no reason to fetch the transactions, so  construct a list of the
          // transaction message ids we no longer need.
          // during sync, it is unlikely that we'll see any old
+         contained_transaction_message_ids.reserve( contained_transaction_message_ids.size()
+                                                    + blk_msg.block.transactions.size() );
          for (const processed_transaction& transaction : blk_msg.block.transactions)
          {
             graphene::net::trx_message transaction_message(transaction);
-            contained_transaction_message_ids.push_back(graphene::net::message(transaction_message).id());
+            contained_transaction_message_ids.emplace_back(graphene::net::message(transaction_message).id());
          }
       }
 
@@ -943,12 +949,11 @@ void application::set_program_options(boost::program_options::options_descriptio
          ("api-access", bpo::value<boost::filesystem::path>(), "JSON file specifying API permissions")
          ("plugins", bpo::value<string>(), "Space-separated list of plugins to activate")
          ("io-threads", bpo::value<uint16_t>()->implicit_value(0), "Number of IO threads, default to 0 for auto-configuration")
+         ("enable-subscribe-to-all", bpo::value<bool>()->implicit_value(true),
+          "Whether allow API clients to subscribe to universal object creation and removal events")
          ("enable-standby-votes-tracking", bpo::value<bool>()->implicit_value(true),
           "Whether to enable tracking of votes of standby witnesses and committee members. "
           "Set it to true to provide accurate data to API clients, set to false for slightly better performance.")
-         // TODO uncomment this when GUI is ready
-         //("enable-subscribe-to-all", bpo::value<bool>()->implicit_value(false),
-         // "Whether allow API clients to subscribe to universal object creation and removal events")
          ;
    command_line_options.add(configuration_file_options);
    command_line_options.add_options()
