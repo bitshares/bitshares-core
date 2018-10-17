@@ -20,6 +20,8 @@ The web wallet is [BitShares UI](https://github.com/bitshares/bitshares-ui).
 
 Visit [BitShares.org](https://bitshares.org/) to learn about BitShares and join the community at [BitSharesTalk.org](https://bitsharestalk.org/).
 
+Information for developers can be found in the [Bitshares Developer Portal](https://dev.bitshares.works/). Users interested in how bitshares works can go to the [BitShares Documentation](https://how.bitshares.works/) site.
+
 Getting Started
 ---------------
 Build instructions and additional documentation are available in the
@@ -71,12 +73,12 @@ the blockchain. After syncing, you can exit the node using Ctrl+C and setup the 
 
     rpc-endpoint = 127.0.0.1:8090
 
-**IMPORTANT:** By default the witness node will start in reduced memory ram mode by using some of the commands detailed in [Memory reduction for nodes](https://github.com/bitshares/bitshares-core/wiki/Memory-reduction-for-nodes).
-In order to run a full node with all the account history you need to remove `partial-operations` and `max-ops-per-account` from your config file. Please note that currently(2018-07-02) a full node will need more than 100GB of RAM to operate and required memory is growing fast. Consider the following table before running a node:
+**IMPORTANT:** By default the witness node will start in reduced memory mode by using some of the commands detailed in [Memory reduction for nodes](https://github.com/bitshares/bitshares-core/wiki/Memory-reduction-for-nodes).
+In order to run a full node with all the account history you need to remove `partial-operations` and `max-ops-per-account` from your config file. Please note that currently(2018-10-17) a full node will need more than 160GB of RAM to operate and required memory is growing fast. Consider the following table as minimal requirements before running a node:
 
 | Default | Full | Minimal  | ElasticSearch 
 | --- | --- | --- | ---
-| 16G RAM | 120G RAM | 4G RAM | 500G SSD HD, 32G RAM
+| 100G HDD, 16G RAM | 200G HDD, 160G RAM | 80G HDD, 4G RAM | 500G SSD, 32G RAM
 
 After starting the witness node again, in a separate terminal you can run:
 
