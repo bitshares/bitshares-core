@@ -2161,9 +2161,7 @@ namespace graphene { namespace net { namespace detail {
 
           // append the remaining items to the peer's list
           boost::push_back(originating_peer->ids_of_items_to_get, item_hashes_received);
-
-          originating_peer->number_of_unfetched_item_ids = blockchain_item_ids_inventory_message_received.total_remaining_item_count;
-
+          
           uint32_t new_number_of_unfetched_items = calculate_unsynced_block_count_from_all_peers();
           if (new_number_of_unfetched_items != _total_number_of_unfetched_items)
             _delegate->sync_status(blockchain_item_ids_inventory_message_received.item_type,

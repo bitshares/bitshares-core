@@ -116,9 +116,10 @@ void database::update_last_irreversible_block()
 
    static_assert( GRAPHENE_IRREVERSIBLE_THRESHOLD > 0, "irreversible threshold must be nonzero" );
 
-   // 1 1 1 2 2 2 2 2 2 2 -> 2     .7*10 = 7
+   // 1 1 1 2 2 2 2 2 2 2 -> 2     .3*10 = 3
    // 1 1 1 1 1 1 1 2 2 2 -> 1
    // 3 3 3 3 3 3 3 3 3 3 -> 3
+   // 3 3 3 4 4 4 4 4 4 4 -> 4
 
    size_t offset = ((GRAPHENE_100_PERCENT - GRAPHENE_IRREVERSIBLE_THRESHOLD) * wit_objs.size() / GRAPHENE_100_PERCENT);
 

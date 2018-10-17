@@ -1,5 +1,7 @@
 language: c++
 
+cache: ccache
+
 git:
   depth: 1
 
@@ -10,7 +12,7 @@ sudo: true
 install:
  - echo "deb http://de.archive.ubuntu.com/ubuntu xenial main restricted universe multiverse" | sudo tee -a /etc/apt/sources.list
  - sudo apt-get update
- - sudo apt-get install --allow-unauthenticated g++ libboost-all-dev cmake libreadline-dev libssl-dev autoconf parallel
+ - sudo apt-get install --allow-unauthenticated g++ libboost-all-dev cmake libreadline-dev libssl-dev autoconf parallel ccache
 
 addons:
   sonarcloud:
@@ -18,12 +20,22 @@ addons:
     token:
       secure: "Ik4xQhs9imtsFIC1SMAPmdLId9lVadY/4PEgo5tM4M5cQRvyt4xeuMMV+CRIT6tGEEqF71ea74qVJTxT7qinWZ3kmHliFjbqDxk1FbjCpK6NGQDyTdfWMVJFIlk7WefvtGAwFBkf6pSTs553bKNNM0HbBYQGKe08waLwv7R+lOmVjTTKIRF/cCVw+C5QQZdXFnUMTg+mRuUqGk4WvNNPmcBfkX0ekHPrXwAD5ATVS1q0iloA0nzHq8CPNmPE+IyXdPw0EBp+fl3cL9MgrlwRbELxrnCKFy+ObdjhDj7z3FDIxDe+03gVlgd+6Fame+9EJCeeeNLF4G4qNR1sLEvHRqVz12/NYnRU9hQL0c/jJtiUquOJA5+HqrhhB9XUZjS1xbHV3aIU5PR0bdDP6MKatvIVwRhwxwhaDXh7VSimis8eL+LvXT7EO+rGjco0c17RuzZpFCsKmXCej4Q8iDBMdOIWwe2WuWi8zb6MFvnLyK2EcM53hAn2yMwU+nprbpHwzU5oJTFZLD+J78zCSGk7uu7vsF+EEnheMwfqafP9MpMEXGXaXZiq7QKy3KvxQTg+1ozPIu+fgxvY0xdyrjJHOSJlrvXN7osjD4IDTs6D5cLAZ04WGIKsulZDr7ZN5n3gmA9h4cfhJsIEia0uQzLmWnfF6RksxWElK1i1+xmse7E="
 
+env:
+  global:
+    - CCACHE_COMPRESS=exists_means_true
+    - CCACHE_MAXSIZE=1Gi
+    - CCACHE_SLOPPINESS=include_file_ctime,include_file_mtime,time_macros
+
 script:
+ - 'echo $((`date +%s` - 120)) >_start_time'
+ - ccache -s
+ - '( [ `ccache -s | grep "files in cache" | cut -c 20-` = 0 ] && touch _empty_cache ) || true'
  - sed -i '/tests/d' libraries/fc/CMakeLists.txt
- - cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_C_FLAGS=--coverage -DCMAKE_CXX_FLAGS=--coverage -DBoost_USE_STATIC_LIBS=OFF  -DCMAKE_CXX_OUTPUT_EXTENSION_REPLACE=ON .
+ - cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_C_FLAGS=--coverage -DCMAKE_CXX_FLAGS=--coverage -DBoost_USE_STATIC_LIBS=OFF -DCMAKE_CXX_OUTPUT_EXTENSION_REPLACE=ON .
  - 'which build-wrapper-linux-x86-64 && build-wrapper-linux-x86-64 --out-dir bw-output make -j 2 cli_wallet witness_node chain_test cli_test || make -j 2 cli_wallet witness_node chain_test cli_test'
  - set -o pipefail
- - tests/chain_test 2>&1 | cat
- - tests/cli_test 2>&1 | cat
+ - '[ -r _empty_cache ] || tests/chain_test 2>&1 | cat'
+ - '[ -r _empty_cache ] || tests/cli_test 2>&1 | cat'
  - 'find libraries/[acdenptuw]*/CMakeFiles/*.dir programs/[cdgjsw]*/CMakeFiles/*.dir -type d | while read d; do gcov -o "$d" "${d/CMakeFiles*.dir//}"/*.cpp; done >/dev/null'
- - 'which sonar-scanner && sonar-scanner || true'
+ - '( [ -r _empty_cache -o $((`date +%s` - `cat _start_time`)) -gt $((42 * 60)) ] && echo "WARNING! Skipping sonar scanner due to time constraints!" ) || ( which sonar-scanner && sonar-scanner || true )'
+ - '[ ! -r _empty_cache ] || ( echo "Please restart with populated cache" && false )'
