@@ -43,8 +43,8 @@ The entry point simplifies the use of parameters for the `witness_node`
 
 The default configuration is:
 
-    p2p-endpoint = 0.0.0.0:9090
-    rpc-endpoint = 0.0.0.0:8090
+    p2p-endpoint = 0.0.0.0:9091
+    rpc-endpoint = 0.0.0.0:8091
     bucket-size = [60,300,900,1800,3600,14400,86400]
     history-per-size = 1000
     max-ops-per-account = 1000
