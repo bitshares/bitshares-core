@@ -30,7 +30,6 @@
 #include <graphene/chain/hardfork.hpp>
 
 #include <graphene/chain/balance_object.hpp>
-#include <graphene/chain/budget_record_object.hpp>
 #include <graphene/chain/committee_member_object.hpp>
 #include <graphene/chain/market_object.hpp>
 #include <graphene/chain/withdraw_permission_object.hpp>

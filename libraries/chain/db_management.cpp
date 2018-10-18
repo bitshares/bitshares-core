@@ -73,15 +73,43 @@ void database::reindex( fc::path data_dir )
    }
    else
       _undo_db.disable();
+
+   uint32_t skip = skip_witness_signature |
+                   skip_block_size_check |
+                   skip_merkle_check |
+                   skip_transaction_signatures |
+                   skip_transaction_dupe_check |
+                   skip_tapos_check |
+                   skip_witness_schedule_check |
+                   skip_authority_check;
+
+   size_t total_processed_block_size;
+   size_t total_block_size = _block_id_to_block.total_block_size();
+   const auto& gpo = get_global_properties();
    for( uint32_t i = head_block_num() + 1; i <= last_block_num; ++i )
    {
-      if( i % 10000 == 0 ) std::cerr << "   " << double(i*100)/last_block_num << "%   "<<i << " of " <<last_block_num<<"   \n";
+      if( i % 10000 == 0 ) 
+      {
+         total_processed_block_size = _block_id_to_block.blocks_current_position();
+
+         ilog(
+            "   [by size: ${size}%   ${processed} of ${total}]   [by num: ${num}%   ${i} of ${last}]",
+            ("size", double(total_processed_block_size) / total_block_size * 100)
+            ("processed", total_processed_block_size)
+            ("total", total_block_size)
+            ("num", double(i*100)/last_block_num)
+            ("i", i)
+            ("last", last_block_num)
+         );
+      }
       if( i == flush_point )
       {
          ilog( "Writing database to disk at block ${i}", ("i",i) );
          flush();
          ilog( "Done" );
       }
+      if( head_block_time() >= last_block->timestamp - gpo.parameters.maximum_time_until_expiration )
+         skip &= ~skip_transaction_dupe_check;
       fc::optional< signed_block > block = _block_id_to_block.fetch_by_number(i);
       if( !block.valid() )
       {
@@ -103,21 +131,11 @@ void database::reindex( fc::path data_dir )
          break;
       }
       if( i < undo_point )
-         apply_block(*block, skip_witness_signature |
-                             skip_transaction_signatures |
-                             skip_transaction_dupe_check |
-                             skip_tapos_check |
-                             skip_witness_schedule_check |
-                             skip_authority_check);
+         apply_block( *block, skip );
       else
       {
          _undo_db.enable();
-         push_block(*block, skip_witness_signature |
-                            skip_transaction_signatures |
-                            skip_transaction_dupe_check |
-                            skip_tapos_check |
-                            skip_witness_schedule_check |
-                            skip_authority_check);
+         push_block( *block, skip );
       }
    }
    _undo_db.enable();

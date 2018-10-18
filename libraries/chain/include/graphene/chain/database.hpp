@@ -73,8 +73,8 @@ namespace graphene { namespace chain {
             skip_merkle_check           = 1 << 7,  ///< used while reindexing
             skip_assert_evaluation      = 1 << 8,  ///< used while reindexing
             skip_undo_history_check     = 1 << 9,  ///< used while reindexing
-            skip_witness_schedule_check = 1 << 10,  ///< used while reindexing
-            skip_validate               = 1 << 11 ///< used prior to checkpoint, skips validate() call on transaction
+            skip_witness_schedule_check = 1 << 10, ///< used while reindexing
+            skip_validate               = 1 << 11  ///< used prior to checkpoint, skips validate() call on transaction
          };
 
          /**

@@ -73,7 +73,7 @@ namespace graphene { namespace chain {
                                        [&m, &exc](ObjectType& o) mutable {
                                           try {
                                              m(o);
-                                          } catch (fc::exception e) {
+                                          } catch (fc::exception& e) {
                                              exc = std::current_exception();
                                              elog("Exception while modifying object: ${e} -- object may be corrupted",
                                                   ("e", e));
