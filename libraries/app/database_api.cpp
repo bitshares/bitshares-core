@@ -2070,29 +2070,27 @@ bool database_api::verify_account_authority( const string& account_name_or_id, c
    return my->verify_account_authority( account_name_or_id, signers );
 }
 
-bool database_api_impl::public_key_found(const flat_set<public_key_type>& to_be_found,
-      const vector<public_key_type>& collection_to_search) const
-{
-   for (public_key_type from_collection : collection_to_search)
-   {
-      for(public_key_type passed_in : to_be_found ) 
-      {
-         if (passed_in == from_collection)
-         {
-            return true;
-         }
-      }
-   }
-   return false;
-}
-
 bool database_api_impl::verify_account_authority( const string& account_name_or_id, 
       const flat_set<public_key_type>& keys )const
 {
-   const account_object* account = get_account_from_string(account_name_or_id);
+   // create a dummy transfer
+   transfer_operation op;
+   op.from = get_account_from_string(account_name_or_id)->id;
+   std::vector<operation> ops;
+   ops.emplace_back(op);
 
-   return public_key_found(keys, account->active.get_keys())
-         && public_key_found(keys, account->owner.get_keys());
+   try
+   {
+      graphene::chain::verify_authority(ops, keys,
+            [this]( account_id_type id ){ return &id(_db).active; },
+            [this]( account_id_type id ){ return &id(_db).owner; } );
+   } 
+   catch (fc::exception& ex)
+   {
+      return false;
+   }
+
+   return true;
 }
 
 processed_transaction database_api::validate_transaction( const signed_transaction& trx )const
