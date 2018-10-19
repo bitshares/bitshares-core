@@ -220,49 +220,10 @@ void database::close(bool rewind)
    // DB state (issue #336).
    clear_pending();
 
-   // ************************************************************************************************************** //
-   // Issue Number:           #946                                                                                   //
-   // Issue Title:            Possible to save unclean object database to file during replay                         //
-   // Issue URL:              https://github.com/bitshares/bitshares-core/issues/946                                 //
-   // ************************************************************************************************************** //
-   // Issue Description:      During replay, undo_db is disabled, that said, when there is an exception thrown,      //
-   // changes made to object database won't rewound, which means the in-memory object database would be unclean.     //
-   // When caught the exception, the node will dump object database from memory to disk.                             //
-   // That means the on-disk object database would be unclean.                                                       //
-   // On next (and future) startup, if does not specify --replay-blockchain,                                         //
-   // the on-disk object database would be considered clean and be loaded into memory directly.                      //
-   // ************************************************************************************************************** //
-   // Issue Solution:         Check if was caught exception during replay with disabled undo_db,                     //
-   // then we shouldn't flush object database, otherwise if undo_db is enabled we have to flush                      //
-   // object database even if there was caught exception, also if there wasn't caught exception we have to flush     //
-   // object database even if undo_db is disabled.                                                                   //
-   // ************************************************************************************************************** //
-   // Issue Conclusion:       We should NOT flush object database when:                                              //
-   //                                  1. undo_db is disabled                                                        //
-   //                                           AND                                                                  //
-   //                                  2. was caught exception                                                       //
-   //                                                                                                                //
-   //                         We should flush object database when:                                                  //
-   //                                  1. undo_db is enabled                                                         //
-   //                                           OR                                                                   //
-   //                                  2. wasn't caught exception                                                    //
-   // ************************************************************************************************************** //
-   // Issue summary:          There is a method std::current_exception() for checking caught exception, at the same  //
-   // time it depends on error handling implementation. Currently is implemented throw/catch approach in which       //
-   // are disadvantages like: performance overhead, exceptions aren't supported by all platforms,                    //
-   // the biggest drawback is that handling exceptions is not enforced by the type-system.                           //
-   // Unlike, Java, for example, where exceptions must be caught by the caller,                                      //
-   // catching a C++ exception is optional. This means spotting all the unhandled exceptions during a code review    //
-   // will be challenging, and requires deep knowledge of all of the functions called.                               //
-   // Consider using an Either type to handle errors. They lift the error into the type-system,                      //
-   // making them safer than exceptions whilst yielding the same performance characteristics as error-codes.         //
-   //                                                                                                                //
-   // https://hackernoon.com/error-handling-in-c-or-why-you-should-use-eithers-in-favor-of-exceptions-and-error-codes-f0640912eb45
-   // https://github.com/LoopPerfect/neither (C++ Either implementation)                                             //
-   //                                                                                                                //
-   // See #1338 issue for Error Handling implementation by Eithers.                                                  //
-   // https://github.com/bitshares/bitshares-core/issues/1338                                                        //
-   // ************************************************************************************************************** //
+   // Possible to save unclean object database to file during replay #946
+   // https://github.com/bitshares/bitshares-core/issues/946
+   // Solution: not to flush object database when undo_db is disabled AND was caught exception.
+   // Flush object database when undo_db is enabled OR wasn't caught exception.
    if (_undo_db.enabled() || !std::current_exception())
       object_database::flush();
    object_database::close();
