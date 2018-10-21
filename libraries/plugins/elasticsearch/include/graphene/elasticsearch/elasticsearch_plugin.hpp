@@ -258,6 +258,10 @@ struct adaptor_struct {
       {
          o["policy"] = fc::json::to_string(o["policy"]);
       }
+      if (o.find("predicates") != o.end())
+      {
+         o["predicates"] = fc::json::to_string(o["predicates"]);
+      }
 
 
       variant v;
