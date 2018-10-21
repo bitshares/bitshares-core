@@ -254,6 +254,11 @@ struct adaptor_struct {
       {
          o["initializer"] = fc::json::to_string(o["initializer"]);
       }
+      if (o.find("policy") != o.end())
+      {
+         o["policy"] = fc::json::to_string(o["policy"]);
+      }
+
 
       variant v;
       fc::to_variant(o, v, FC_PACK_MAX_DEPTH);
