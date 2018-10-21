@@ -266,6 +266,11 @@ struct adaptor_struct {
       {
          o["active_special_authority"] = fc::json::to_string(o["active_special_authority"]);
       }
+      if (o.find("owner_special_authority") != o.end())
+      {
+         o["owner_special_authority"] = fc::json::to_string(o["owner_special_authority"]);
+      }
+
 
       variant v;
       fc::to_variant(o, v, FC_PACK_MAX_DEPTH);
