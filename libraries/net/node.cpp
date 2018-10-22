@@ -996,19 +996,19 @@ namespace graphene { namespace net { namespace detail {
 
       // Now process the peers that we need to do yielding functions with (disconnect sends a message with the
       // disconnect reason, so it may yield)
+      for( const peer_connection_ptr& peer : peers_to_disconnect_gently )
       {
-         std::lock_guard<std::recursive_mutex> lock(_active_connections.get_mutex());
-         for( const peer_connection_ptr& peer : peers_to_disconnect_gently )
          {
+            std::lock_guard<std::recursive_mutex> lock(_active_connections.get_mutex());
             fc::exception detailed_error( FC_LOG_MESSAGE(warn, "Disconnecting due to inactivity",
                   ( "last_message_received_seconds_ago", (peer->get_last_message_received_time() 
-                        - fc::time_point::now() ).count() / fc::seconds(1 ).count() )
+                  - fc::time_point::now() ).count() / fc::seconds(1 ).count() )
                   ( "last_message_sent_seconds_ago", (peer->get_last_message_sent_time() 
-                        - fc::time_point::now() ).count() / fc::seconds(1 ).count() )
+                  - fc::time_point::now() ).count() / fc::seconds(1 ).count() )
                   ( "inactivity_timeout", _active_connections.find(peer ) != _active_connections.end() 
-                        ? _peer_inactivity_timeout * 10 : _peer_inactivity_timeout ) ) );
-            disconnect_from_peer( peer.get(), "Disconnecting due to inactivity", false, detailed_error );
+                  ? _peer_inactivity_timeout * 10 : _peer_inactivity_timeout ) ) );
          }
+         disconnect_from_peer( peer.get(), "Disconnecting due to inactivity", false, detailed_error );
       }
       peers_to_disconnect_gently.clear();
 
@@ -1029,6 +1029,7 @@ namespace graphene { namespace net { namespace detail {
       
       {
          std::lock_guard<std::recursive_mutex> lock(_active_connections.get_mutex());
+         // JMJ 2018-10-22 Unsure why we're making a copy here, but this is probably unnecessary
          std::list<peer_connection_ptr> original_active_peers(_active_connections.begin(), _active_connections.end());
          for( const peer_connection_ptr& active_peer : original_active_peers )
          {
@@ -1222,10 +1223,12 @@ namespace graphene { namespace net { namespace detail {
       {
          std::lock_guard<std::recursive_mutex> lock(_active_connections.get_mutex());
          for (const peer_connection_ptr active_peer : _active_connections)
-         if (node_id == active_peer->node_id)
          {
-            dlog("is_already_connected_to_id returning true because the peer is already in our active list");
-            return true;
+            if (node_id == active_peer->node_id)
+            {
+               dlog("is_already_connected_to_id returning true because the peer is already in our active list");
+               return true;
+            }
          }
       }
       for (const peer_connection_ptr handshaking_peer : _handshaking_connections)
@@ -2102,6 +2105,7 @@ namespace graphene { namespace net { namespace detail {
             {
                std::lock_guard<std::recursive_mutex> lock(_active_connections.get_mutex());
                for (const peer_connection_ptr& peer : _active_connections)
+               {
                   if (peer != originating_peer->shared_from_this() &&
                         !peer->ids_of_items_to_get.empty() &&
                         peer->ids_of_items_to_get.front() == blockchain_item_ids_inventory_message_received.item_hashes_available.front())
@@ -2112,6 +2116,7 @@ namespace graphene { namespace net { namespace detail {
                      is_first_item_for_other_peer = true;
                      break;
                   }
+               }
             }
             dlog("is_first_item_for_other_peer: ${is_first}.  item_hashes_received.size() = ${size}",
                  ("is_first", is_first_item_for_other_peer)("size", item_hashes_received.size()));
