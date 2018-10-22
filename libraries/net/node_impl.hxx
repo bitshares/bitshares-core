@@ -22,6 +22,9 @@ private:
    mutable std::recursive_mutex mux;
 
 public:
+   // iterations require a lock. This exposes the mutex. Use with care (i.e. lock_guard)
+   std::recursive_mutex& get_mutex()const { return mux; }
+
    // insertion
    std::pair< typename std::unordered_set<Key, Hash, Pred>::iterator, bool> emplace( Key key)
    {

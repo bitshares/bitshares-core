@@ -326,18 +326,22 @@ namespace graphene { namespace net { namespace detail {
       ilog( "cleaning up node" );
       _node_is_shutting_down = true;
 
-      for (const peer_connection_ptr& active_peer : _active_connections)
       {
-        fc::optional<fc::ip::endpoint> inbound_endpoint = active_peer->get_endpoint_for_connecting();
-        if (inbound_endpoint)
-        {
-          fc::optional<potential_peer_record> updated_peer_record = _potential_peer_db.lookup_entry_for_endpoint(*inbound_endpoint);
-          if (updated_peer_record)
-          {
-            updated_peer_record->last_seen_time = fc::time_point::now();
-            _potential_peer_db.update_entry(*updated_peer_record);
-          }
-        }
+         std::lock_guard<std::recursive_mutex> lock(_active_connections.get_mutex());
+         for (const peer_connection_ptr& active_peer : _active_connections)
+         {
+            fc::optional<fc::ip::endpoint> inbound_endpoint = active_peer->get_endpoint_for_connecting();
+            if (inbound_endpoint)
+            {
+               fc::optional<potential_peer_record> updated_peer_record = _potential_peer_db
+                     .lookup_entry_for_endpoint(*inbound_endpoint);
+               if (updated_peer_record)
+               {
+                  updated_peer_record->last_seen_time = fc::time_point::now();
+                  _potential_peer_db.update_entry(*updated_peer_record);
+               }
+            }
+         }
       }
 
       try
@@ -528,6 +532,7 @@ namespace graphene { namespace net { namespace detail {
             std::set<item_hash_t> sync_items_to_request;
 
             // for each idle peer that we're syncing with
+            std::lock_guard<std::recursive_mutex> lock(_active_connections.get_mutex());
             for( const peer_connection_ptr& peer : _active_connections )
             {
               if( peer->we_need_sync_items_from_peer &&
@@ -586,6 +591,7 @@ namespace graphene { namespace net { namespace detail {
 
     bool node_impl::is_item_in_any_peers_inventory(const item_id& item) const
     {
+      std::lock_guard<std::recursive_mutex> lock(_active_connections.get_mutex());
       for( const peer_connection_ptr& peer : _active_connections )
       {
         if (peer->inventory_peer_advertised_to_us.find(item) != peer->inventory_peer_advertised_to_us.end() )
@@ -625,9 +631,12 @@ namespace graphene { namespace net { namespace detail {
         fetch_messages_to_send_set items_by_peer;
 
         // initialize the fetch_messages_to_send with an empty set of items for all idle peers
-        for (const peer_connection_ptr& peer : _active_connections)
-          if (peer->idle())
-            items_by_peer.insert(peer_and_items_to_fetch(peer));
+        {
+         std::lock_guard<std::recursive_mutex> lock(_active_connections.get_mutex());
+         for (const peer_connection_ptr& peer : _active_connections)
+            if (peer->idle())
+               items_by_peer.insert(peer_and_items_to_fetch(peer));
+        }
 
         // now loop over all items we want to fetch
         for (auto item_iter = _items_to_fetch.begin(); item_iter != _items_to_fetch.end();)
@@ -735,9 +744,10 @@ namespace graphene { namespace net { namespace detail {
         // first, then send them all in a batch (to avoid any fiber interruption points while
         // we're computing the messages)
         std::list<std::pair<peer_connection_ptr, item_ids_inventory_message> > inventory_messages_to_send;
-
-        for (const peer_connection_ptr& peer : _active_connections)
         {
+         std::lock_guard<std::recursive_mutex> lock(_active_connections.get_mutex());
+         for (const peer_connection_ptr& peer : _active_connections)
+         {
           // only advertise to peers who are in sync with us
           idump((peer->peer_needs_sync_items_from_us));
           if( !peer->peer_needs_sync_items_from_us )
@@ -779,7 +789,8 @@ namespace graphene { namespace net { namespace detail {
               inventory_messages_to_send.push_back(std::make_pair(peer, item_ids_inventory_message(items_group.first, items_group.second)));
           }
           peer->clear_old_inventory();
-        }
+         }
+        } // lock_guard
 
         for (auto iter = inventory_messages_to_send.begin(); iter != inventory_messages_to_send.end(); ++iter)
           iter->first->send_message(iter->second);
@@ -865,72 +876,77 @@ namespace graphene { namespace net { namespace detail {
         fc::time_point active_disconnect_threshold = fc::time_point::now() - fc::seconds(active_disconnect_timeout);
         fc::time_point active_send_keepalive_threshold = fc::time_point::now() - fc::seconds(active_send_keepalive_timeout);
         fc::time_point active_ignored_request_threshold = fc::time_point::now() - active_ignored_request_timeout;
-        for( const peer_connection_ptr& active_peer : _active_connections )
         {
-          if( active_peer->connection_initiation_time < active_disconnect_threshold &&
-              active_peer->get_last_message_received_time() < active_disconnect_threshold )
-          {
-            wlog( "Closing connection with peer ${peer} due to inactivity of at least ${timeout} seconds",
-                  ( "peer", active_peer->get_remote_endpoint() )("timeout", active_disconnect_timeout ) );
-            peers_to_disconnect_gently.push_back( active_peer );
-          }
-          else
-          {
-            bool disconnect_due_to_request_timeout = false;
-            if (!active_peer->sync_items_requested_from_peer.empty() &&
-                active_peer->last_sync_item_received_time < active_ignored_request_threshold)
+         std::lock_guard<std::recursive_mutex> lock(_active_connections.get_mutex());
+
+         for( const peer_connection_ptr& active_peer : _active_connections )
+         {
+            if( active_peer->connection_initiation_time < active_disconnect_threshold &&
+                  active_peer->get_last_message_received_time() < active_disconnect_threshold )
             {
-              wlog("Disconnecting peer ${peer} because they haven't made any progress on my remaining ${count} sync item requests",
-                   ("peer", active_peer->get_remote_endpoint())("count", active_peer->sync_items_requested_from_peer.size()));
-              disconnect_due_to_request_timeout = true;
+               wlog( "Closing connection with peer ${peer} due to inactivity of at least ${timeout} seconds",
+                     ( "peer", active_peer->get_remote_endpoint() )("timeout", active_disconnect_timeout ) );
+               peers_to_disconnect_gently.push_back( active_peer );
             }
-            if (!disconnect_due_to_request_timeout &&
-                active_peer->item_ids_requested_from_peer &&
-                active_peer->item_ids_requested_from_peer->get<1>() < active_ignored_request_threshold)
-              {
-                wlog("Disconnecting peer ${peer} because they didn't respond to my request for sync item ids after ${synopsis}",
-                      ("peer", active_peer->get_remote_endpoint())
-                      ("synopsis", active_peer->item_ids_requested_from_peer->get<0>()));
-                disconnect_due_to_request_timeout = true;
-              }
-            if (!disconnect_due_to_request_timeout)
-              for (const peer_connection::item_to_time_map_type::value_type& item_and_time : active_peer->items_requested_from_peer)
-                if (item_and_time.second < active_ignored_request_threshold)
-                {
-                  wlog("Disconnecting peer ${peer} because they didn't respond to my request for item ${id}",
-                        ("peer", active_peer->get_remote_endpoint())("id", item_and_time.first.item_hash));
+            else
+            {
+               bool disconnect_due_to_request_timeout = false;
+               if (!active_peer->sync_items_requested_from_peer.empty() &&
+                  active_peer->last_sync_item_received_time < active_ignored_request_threshold)
+               {
+                  wlog("Disconnecting peer ${peer} because they haven't made any progress on my remaining ${count} sync item requests",
+                        ("peer", active_peer->get_remote_endpoint())("count", 
+                        active_peer->sync_items_requested_from_peer.size()));
                   disconnect_due_to_request_timeout = true;
-                  break;
-                }
-            if (disconnect_due_to_request_timeout)
-            {
-              // we should probably disconnect nicely and give them a reason, but right now the logic
-              // for rescheduling the requests only executes when the connection is fully closed,
-              // and we want to get those requests rescheduled as soon as possible
-              peers_to_disconnect_forcibly.push_back(active_peer);
-            }
-            else if (active_peer->connection_initiation_time < active_send_keepalive_threshold &&
+               }
+               if (!disconnect_due_to_request_timeout &&
+                  active_peer->item_ids_requested_from_peer &&
+                  active_peer->item_ids_requested_from_peer->get<1>() < active_ignored_request_threshold)
+               {
+                  wlog("Disconnecting peer ${peer} because they didn't respond to my request for sync item ids after ${synopsis}",
+                        ("peer", active_peer->get_remote_endpoint())
+                        ("synopsis", active_peer->item_ids_requested_from_peer->get<0>()));
+                  disconnect_due_to_request_timeout = true;
+               }
+               if (!disconnect_due_to_request_timeout)
+                  for (const peer_connection::item_to_time_map_type::value_type& item_and_time : active_peer->items_requested_from_peer)
+                     if (item_and_time.second < active_ignored_request_threshold)
+                  {
+                     wlog("Disconnecting peer ${peer} because they didn't respond to my request for item ${id}",
+                           ("peer", active_peer->get_remote_endpoint())("id", item_and_time.first.item_hash));
+                     disconnect_due_to_request_timeout = true;
+                     break;
+                  }
+               if (disconnect_due_to_request_timeout)
+               {
+                  // we should probably disconnect nicely and give them a reason, but right now the logic
+                  // for rescheduling the requests only executes when the connection is fully closed,
+                  // and we want to get those requests rescheduled as soon as possible
+                  peers_to_disconnect_forcibly.push_back(active_peer);
+               }
+               else if (active_peer->connection_initiation_time < active_send_keepalive_threshold &&
                      active_peer->get_last_message_received_time() < active_send_keepalive_threshold)
-            {
-              wlog( "Sending a keepalive message to peer ${peer} who hasn't sent us any messages in the last ${timeout} seconds",
-                    ( "peer", active_peer->get_remote_endpoint() )("timeout", active_send_keepalive_timeout ) );
-              peers_to_send_keep_alive.push_back(active_peer);
-            }            
-            else if (active_peer->we_need_sync_items_from_peer && 
+               {
+                  wlog( "Sending a keepalive message to peer ${peer} who hasn't sent us any messages in the last ${timeout} seconds",
+                        ( "peer", active_peer->get_remote_endpoint() )("timeout", active_send_keepalive_timeout ) );
+                  peers_to_send_keep_alive.push_back(active_peer);
+               }              
+               else if (active_peer->we_need_sync_items_from_peer && 
                      !active_peer->is_currently_handling_message() &&
                      !active_peer->item_ids_requested_from_peer &&
                      active_peer->ids_of_items_to_get.empty())
-            {
-              // This is a state we should never get into in the first place, but if we do, we should disconnect the peer
-              // to re-establish the connection.
-              fc_wlog(fc::logger::get("sync"), "Disconnecting peer ${peer} because we think we need blocks from them but sync has stalled.",
-                      ("peer", active_peer->get_remote_endpoint()));
-              wlog("Disconnecting peer ${peer} because we think we need blocks from them but sync has stalled.",
-                      ("peer", active_peer->get_remote_endpoint()));
-              peers_to_disconnect_forcibly.push_back(active_peer);
-            }
-          }
-        }
+               {
+                  // This is a state we should never get into in the first place, but if we do, we should disconnect the peer
+                  // to re-establish the connection.
+                  fc_wlog(fc::logger::get("sync"), "Disconnecting peer ${peer} because we think we need blocks from them but sync has stalled.",
+                        ("peer", active_peer->get_remote_endpoint()));
+                  wlog("Disconnecting peer ${peer} because we think we need blocks from them but sync has stalled.",
+                        ("peer", active_peer->get_remote_endpoint()));
+                  peers_to_disconnect_forcibly.push_back(active_peer);
+               }
+            } // else
+         } // for
+        } // scoped_lock
 
         fc::time_point closing_disconnect_threshold = fc::time_point::now() - fc::seconds(GRAPHENE_NET_PEER_DISCONNECT_TIMEOUT);
         for( const peer_connection_ptr& closing_peer : _closing_connections )
@@ -980,13 +996,19 @@ namespace graphene { namespace net { namespace detail {
 
       // Now process the peers that we need to do yielding functions with (disconnect sends a message with the
       // disconnect reason, so it may yield)
-      for( const peer_connection_ptr& peer : peers_to_disconnect_gently )
       {
-        fc::exception detailed_error( FC_LOG_MESSAGE(warn, "Disconnecting due to inactivity",
-                                                      ( "last_message_received_seconds_ago", (peer->get_last_message_received_time() - fc::time_point::now() ).count() / fc::seconds(1 ).count() )
-                                                      ( "last_message_sent_seconds_ago", (peer->get_last_message_sent_time() - fc::time_point::now() ).count() / fc::seconds(1 ).count() )
-                                                      ( "inactivity_timeout", _active_connections.find(peer ) != _active_connections.end() ? _peer_inactivity_timeout * 10 : _peer_inactivity_timeout ) ) );
-        disconnect_from_peer( peer.get(), "Disconnecting due to inactivity", false, detailed_error );
+         std::lock_guard<std::recursive_mutex> lock(_active_connections.get_mutex());
+         for( const peer_connection_ptr& peer : peers_to_disconnect_gently )
+         {
+            fc::exception detailed_error( FC_LOG_MESSAGE(warn, "Disconnecting due to inactivity",
+                  ( "last_message_received_seconds_ago", (peer->get_last_message_received_time() 
+                        - fc::time_point::now() ).count() / fc::seconds(1 ).count() )
+                  ( "last_message_sent_seconds_ago", (peer->get_last_message_sent_time() 
+                        - fc::time_point::now() ).count() / fc::seconds(1 ).count() )
+                  ( "inactivity_timeout", _active_connections.find(peer ) != _active_connections.end() 
+                        ? _peer_inactivity_timeout * 10 : _peer_inactivity_timeout ) ) );
+            disconnect_from_peer( peer.get(), "Disconnecting due to inactivity", false, detailed_error );
+         }
       }
       peers_to_disconnect_gently.clear();
 
@@ -1004,23 +1026,26 @@ namespace graphene { namespace net { namespace detail {
     void node_impl::fetch_updated_peer_lists_loop()
     {
       VERIFY_CORRECT_THREAD();
-
-      std::list<peer_connection_ptr> original_active_peers(_active_connections.begin(), _active_connections.end());
-      for( const peer_connection_ptr& active_peer : original_active_peers )
+      
       {
-        try
-        {
-          active_peer->send_message(address_request_message());
-        }
-        catch ( const fc::canceled_exception& )
-        {
-          throw;
-        }
-        catch (const fc::exception& e)
-        {
-          dlog("Caught exception while sending address request message to peer ${peer} : ${e}",
-               ("peer", active_peer->get_remote_endpoint())("e", e));
-        }
+         std::lock_guard<std::recursive_mutex> lock(_active_connections.get_mutex());
+         std::list<peer_connection_ptr> original_active_peers(_active_connections.begin(), _active_connections.end());
+         for( const peer_connection_ptr& active_peer : original_active_peers )
+         {
+            try
+            {
+               active_peer->send_message(address_request_message());
+            }
+            catch ( const fc::canceled_exception& )
+            {
+               throw;
+            }
+            catch (const fc::exception& e)
+            {
+               dlog("Caught exception while sending address request message to peer ${peer} : ${e}",
+                     ("peer", active_peer->get_remote_endpoint())("e", e));
+            }
+         }
       }
 
       // this has nothing to do with updating the peer list, but we need to prune this list 
@@ -1174,9 +1199,12 @@ namespace graphene { namespace net { namespace detail {
 
     peer_connection_ptr node_impl::get_peer_by_node_id(const node_id_t& node_id)
     {
-      for (const peer_connection_ptr& active_peer : _active_connections)
-        if (node_id == active_peer->node_id)
-          return active_peer;
+      {
+         std::lock_guard<std::recursive_mutex> lock(_active_connections.get_mutex());
+         for (const peer_connection_ptr& active_peer : _active_connections)
+            if (node_id == active_peer->node_id)
+               return active_peer;
+      }
       for (const peer_connection_ptr& handshaking_peer : _handshaking_connections)
         if (node_id == handshaking_peer->node_id)
           return handshaking_peer;
@@ -1191,12 +1219,15 @@ namespace graphene { namespace net { namespace detail {
         dlog("is_already_connected_to_id returning true because the peer is us");
         return true;
       }
-      for (const peer_connection_ptr active_peer : _active_connections)
-        if (node_id == active_peer->node_id)
-        {
-          dlog("is_already_connected_to_id returning true because the peer is already in our active list");
-          return true;
-        }
+      {
+         std::lock_guard<std::recursive_mutex> lock(_active_connections.get_mutex());
+         for (const peer_connection_ptr active_peer : _active_connections)
+         if (node_id == active_peer->node_id)
+         {
+            dlog("is_already_connected_to_id returning true because the peer is already in our active list");
+            return true;
+         }
+      }
       for (const peer_connection_ptr handshaking_peer : _handshaking_connections)
         if (node_id == handshaking_peer->node_id)
         {
@@ -1234,12 +1265,15 @@ namespace graphene { namespace net { namespace detail {
            ("max", _maximum_number_of_connections));
       dlog("   my id is ${id}", ("id", _node_id));
 
-      for (const peer_connection_ptr& active_connection : _active_connections)
       {
-        dlog("        active: ${endpoint} with ${id}   [${direction}]",
-             ("endpoint", active_connection->get_remote_endpoint())
-             ("id", active_connection->node_id)
-             ("direction", active_connection->direction));
+         std::lock_guard<std::recursive_mutex> lock(_active_connections.get_mutex());
+         for (const peer_connection_ptr& active_connection : _active_connections)
+         {
+            dlog("        active: ${endpoint} with ${id}   [${direction}]",
+                  ("endpoint", active_connection->get_remote_endpoint())
+                  ("id", active_connection->node_id)
+                  ("direction", active_connection->direction));
+         }
       }
       for (const peer_connection_ptr& handshaking_connection : _handshaking_connections)
       {
@@ -1661,6 +1695,7 @@ namespace graphene { namespace net { namespace detail {
       if (!_peer_advertising_disabled)
       {
         reply.addresses.reserve(_active_connections.size());
+        std::lock_guard<std::recursive_mutex> lock(_active_connections.get_mutex());
         for (const peer_connection_ptr& active_peer : _active_connections)
         {
           fc::optional<potential_peer_record> updated_peer_record = _potential_peer_db.lookup_entry_for_endpoint(*active_peer->get_remote_endpoint());
@@ -1846,6 +1881,7 @@ namespace graphene { namespace net { namespace detail {
     {
       VERIFY_CORRECT_THREAD();
       uint32_t max_number_of_unfetched_items = 0;
+      std::lock_guard<std::recursive_mutex> lock(_active_connections.get_mutex());
       for( const peer_connection_ptr& peer : _active_connections )
       {
         uint32_t this_peer_number_of_unfetched_items = (uint32_t)peer->ids_of_items_to_get.size() + peer->number_of_unfetched_item_ids;
@@ -2063,17 +2099,20 @@ namespace graphene { namespace net { namespace detail {
               originating_peer->ids_of_items_to_get.empty())
           {
             bool is_first_item_for_other_peer = false;
-            for (const peer_connection_ptr& peer : _active_connections)
-              if (peer != originating_peer->shared_from_this() &&
-                  !peer->ids_of_items_to_get.empty() &&
-                  peer->ids_of_items_to_get.front() == blockchain_item_ids_inventory_message_received.item_hashes_available.front())
-              {
-                dlog("The item ${newitem} is the first item for peer ${peer}",
-                     ("newitem", blockchain_item_ids_inventory_message_received.item_hashes_available.front())
-                     ("peer", peer->get_remote_endpoint()));
-                is_first_item_for_other_peer = true;
-                break;
-              }
+            {
+               std::lock_guard<std::recursive_mutex> lock(_active_connections.get_mutex());
+               for (const peer_connection_ptr& peer : _active_connections)
+                  if (peer != originating_peer->shared_from_this() &&
+                        !peer->ids_of_items_to_get.empty() &&
+                        peer->ids_of_items_to_get.front() == blockchain_item_ids_inventory_message_received.item_hashes_available.front())
+                  {
+                     dlog("The item ${newitem} is the first item for peer ${peer}",
+                           ("newitem", blockchain_item_ids_inventory_message_received.item_hashes_available.front())
+                           ("peer", peer->get_remote_endpoint()));
+                     is_first_item_for_other_peer = true;
+                     break;
+                  }
+            }
             dlog("is_first_item_for_other_peer: ${is_first}.  item_hashes_received.size() = ${size}",
                  ("is_first", is_first_item_for_other_peer)("size", item_hashes_received.size()));
             if (!is_first_item_for_other_peer)
@@ -2360,15 +2399,18 @@ namespace graphene { namespace net { namespace detail {
         item_id advertised_item_id(item_ids_inventory_message_received.item_type, item_hash);
         bool we_advertised_this_item_to_a_peer = false;
         bool we_requested_this_item_from_a_peer = false;
-        for (const peer_connection_ptr peer : _active_connections)
         {
-          if (peer->inventory_advertised_to_peer.find(advertised_item_id) != peer->inventory_advertised_to_peer.end())
-          {
-            we_advertised_this_item_to_a_peer = true;
-            break;
-          }
-          if (peer->items_requested_from_peer.find(advertised_item_id) != peer->items_requested_from_peer.end())
-            we_requested_this_item_from_a_peer = true;
+           std::lock_guard<std::recursive_mutex> lock(_active_connections.get_mutex());
+            for (const peer_connection_ptr peer : _active_connections)
+            {
+               if (peer->inventory_advertised_to_peer.find(advertised_item_id) != peer->inventory_advertised_to_peer.end())
+               {
+                  we_advertised_this_item_to_a_peer = true;
+                  break;
+               }
+               if (peer->items_requested_from_peer.find(advertised_item_id) != peer->items_requested_from_peer.end())
+                  we_requested_this_item_from_a_peer = true;
+            }
         }
 
         // if we have already advertised it to a peer, we must have it, no need to do anything else
@@ -2583,83 +2625,88 @@ namespace graphene { namespace net { namespace detail {
 
       if( client_accepted_block )
       {
-        --_total_number_of_unfetched_items;
-        dlog("sync: client accpted the block, we now have only ${count} items left to fetch before we're in sync",
-              ("count", _total_number_of_unfetched_items));
-        bool is_fork_block = is_hard_fork_block(block_message_to_send.block.block_num());
-        for (const peer_connection_ptr& peer : _active_connections)
-        {
-          ASSERT_TASK_NOT_PREEMPTED(); // don't yield while iterating over _active_connections
-          bool disconnecting_this_peer = false;
-          if (is_fork_block)
-          {
-            // we just pushed a hard fork block.  Find out if this peer is running a client
-            // that will be unable to process future blocks
-            if (peer->last_known_fork_block_number != 0)
+         --_total_number_of_unfetched_items;
+         dlog("sync: client accpted the block, we now have only ${count} items left to fetch before we're in sync",
+               ("count", _total_number_of_unfetched_items));
+         bool is_fork_block = is_hard_fork_block(block_message_to_send.block.block_num());
+         {
+            std::lock_guard<std::recursive_mutex> lock(_active_connections.get_mutex());
+
+            for (const peer_connection_ptr& peer : _active_connections)
             {
-              uint32_t next_fork_block_number = get_next_known_hard_fork_block_number(peer->last_known_fork_block_number);
-              if (next_fork_block_number != 0 &&
-                  next_fork_block_number <= block_message_to_send.block.block_num())
-              {
-                std::ostringstream disconnect_reason_stream;
-                disconnect_reason_stream << "You need to upgrade your client due to hard fork at block " << block_message_to_send.block.block_num();
-                peers_to_disconnect[peer] = std::make_pair(disconnect_reason_stream.str(),
-                                                           fc::oexception(fc::exception(FC_LOG_MESSAGE(error, "You need to upgrade your client due to hard fork at block ${block_number}",
-                                                                                                       ("block_number", block_message_to_send.block.block_num())))));
+               ASSERT_TASK_NOT_PREEMPTED(); // don't yield while iterating over _active_connections
+               bool disconnecting_this_peer = false;
+               if (is_fork_block)
+               {
+                  // we just pushed a hard fork block.  Find out if this peer is running a client
+                  // that will be unable to process future blocks
+                  if (peer->last_known_fork_block_number != 0)
+                  {
+                     uint32_t next_fork_block_number = get_next_known_hard_fork_block_number(peer->last_known_fork_block_number);
+                     if (next_fork_block_number != 0 &&
+                           next_fork_block_number <= block_message_to_send.block.block_num())
+                     {
+                        std::ostringstream disconnect_reason_stream;
+                        disconnect_reason_stream << "You need to upgrade your client due to hard fork at block " << block_message_to_send.block.block_num();
+                        peers_to_disconnect[peer] = std::make_pair(disconnect_reason_stream.str(),
+                              fc::oexception(fc::exception(FC_LOG_MESSAGE(error, "You need to upgrade your client due to hard fork at block ${block_number}",
+                              ("block_number", block_message_to_send.block.block_num())))));
 #ifdef ENABLE_DEBUG_ULOGS
-                ulog("Disconnecting from peer during sync because their version is too old.  Their version date: ${date}", ("date", peer->graphene_git_revision_unix_timestamp));
+                        ulog("Disconnecting from peer during sync because their version is too old.  Their version date: ${date}", ("date", peer->graphene_git_revision_unix_timestamp));
 #endif
-                disconnecting_this_peer = true;
-              }
-            }
-          }
-          if (!disconnecting_this_peer &&
-              peer->ids_of_items_to_get.empty() && peer->ids_of_items_being_processed.empty())
-          {
-            dlog( "Cannot pop first element off peer ${peer}'s list, its list is empty", ("peer", peer->get_remote_endpoint() ) );
-            // we don't know for sure that this peer has the item we just received.
-            // If peer is still syncing to us, we know they will ask us for
-            // sync item ids at least one more time and we'll notify them about
-            // the item then, so there's no need to do anything.  If we still need items
-            // from them, we'll be asking them for more items at some point, and
-            // that will clue them in that they are out of sync.  If we're fully in sync
-            // we need to kick off another round of synchronization with them so they can
-            // find out about the new item.
-            if (!peer->peer_needs_sync_items_from_us && !peer->we_need_sync_items_from_peer)
-            {
-              dlog("We will be restarting synchronization with peer ${peer}", ("peer", peer->get_remote_endpoint()));
-              peers_we_need_to_sync_to.insert(peer);
-            }
-          }
-          else if (!disconnecting_this_peer)
-          {
-            auto items_being_processed_iter = peer->ids_of_items_being_processed.find(block_message_to_send.block_id);
-            if (items_being_processed_iter != peer->ids_of_items_being_processed.end())
-            {
-              peer->last_block_delegate_has_seen = block_message_to_send.block_id;
-              peer->last_block_time_delegate_has_seen = block_message_to_send.block.timestamp;
+                        disconnecting_this_peer = true;
+                     }
+                  }
+               }
+               if (!disconnecting_this_peer &&
+                     peer->ids_of_items_to_get.empty() && peer->ids_of_items_being_processed.empty())
+               {
+                  dlog( "Cannot pop first element off peer ${peer}'s list, its list is empty", ("peer", peer->get_remote_endpoint() ) );
+                  // we don't know for sure that this peer has the item we just received.
+                  // If peer is still syncing to us, we know they will ask us for
+                  // sync item ids at least one more time and we'll notify them about
+                  // the item then, so there's no need to do anything.  If we still need items
+                  // from them, we'll be asking them for more items at some point, and
+                  // that will clue them in that they are out of sync.  If we're fully in sync
+                  // we need to kick off another round of synchronization with them so they can
+                  // find out about the new item.
+                  if (!peer->peer_needs_sync_items_from_us && !peer->we_need_sync_items_from_peer)
+                  {
+                     dlog("We will be restarting synchronization with peer ${peer}", ("peer", peer->get_remote_endpoint()));
+                     peers_we_need_to_sync_to.insert(peer);
+                  }
+               }
+               else if (!disconnecting_this_peer)
+               {
+                  auto items_being_processed_iter = peer->ids_of_items_being_processed.find(block_message_to_send.block_id);
+                  if (items_being_processed_iter != peer->ids_of_items_being_processed.end())
+                  {
+                     peer->last_block_delegate_has_seen = block_message_to_send.block_id;
+                     peer->last_block_time_delegate_has_seen = block_message_to_send.block.timestamp;
 
-              peer->ids_of_items_being_processed.erase(items_being_processed_iter);
-              dlog("Removed item from ${endpoint}'s list of items being processed, still processing ${len} blocks",
-                   ("endpoint", peer->get_remote_endpoint())("len", peer->ids_of_items_being_processed.size()));
+                     peer->ids_of_items_being_processed.erase(items_being_processed_iter);
+                     dlog("Removed item from ${endpoint}'s list of items being processed, still processing ${len} blocks",
+                           ("endpoint", peer->get_remote_endpoint())("len", peer->ids_of_items_being_processed.size()));
 
-              // if we just received the last item in our list from this peer, we will want to
-              // send another request to find out if we are in sync, but we can't do this yet
-              // (we don't want to allow a fiber swap in the middle of popping items off the list)
-              if (peer->ids_of_items_to_get.empty() &&
-                  peer->number_of_unfetched_item_ids == 0 &&
-                  peer->ids_of_items_being_processed.empty())
-                peers_with_newly_empty_item_lists.insert(peer);
+                     // if we just received the last item in our list from this peer, we will want to
+                     // send another request to find out if we are in sync, but we can't do this yet
+                     // (we don't want to allow a fiber swap in the middle of popping items off the list)
+                     if (peer->ids_of_items_to_get.empty() &&
+                           peer->number_of_unfetched_item_ids == 0 &&
+                           peer->ids_of_items_being_processed.empty())
+                     peers_with_newly_empty_item_lists.insert(peer);
 
-              // in this case, we know the peer was offering us this exact item, no need to
-              // try to inform them of its existence
-            }
-          }
-        }
+                     // in this case, we know the peer was offering us this exact item, no need to
+                     // try to inform them of its existence
+                  }
+               }
+            } // for
+         } // lock_guard
       }
       else
       {
         // invalid message received
+        std::lock_guard<std::recursive_mutex> lock(_active_connections.get_mutex());
         for (const peer_connection_ptr& peer : _active_connections)
         {
           ASSERT_TASK_NOT_PREEMPTED(); // don't yield while iterating over _active_connections
@@ -2762,15 +2809,18 @@ namespace graphene { namespace net { namespace detail {
 
           // find out if this block is the next block on the active chain or one of the forks
           bool potential_first_block = false;
-          for (const peer_connection_ptr& peer : _active_connections)
           {
-            ASSERT_TASK_NOT_PREEMPTED(); // don't yield while iterating over _active_connections
-            if (!peer->ids_of_items_to_get.empty() &&
-                peer->ids_of_items_to_get.front() == received_block_iter->block_id)
+            std::lock_guard<std::recursive_mutex> lock(_active_connections.get_mutex());
+            for (const peer_connection_ptr& peer : _active_connections)
             {
-              potential_first_block = true;
-              peer->ids_of_items_to_get.pop_front();
-              peer->ids_of_items_being_processed.insert(received_block_iter->block_id);
+               ASSERT_TASK_NOT_PREEMPTED(); // don't yield while iterating over _active_connections
+               if (!peer->ids_of_items_to_get.empty() &&
+                     peer->ids_of_items_to_get.front() == received_block_iter->block_id)
+               {
+                  potential_first_block = true;
+                  peer->ids_of_items_to_get.pop_front();
+                  peer->ids_of_items_being_processed.insert(received_block_iter->block_id);
+               }
             }
           }
 
@@ -2798,6 +2848,7 @@ namespace graphene { namespace net { namespace detail {
             {
               dlog("Already received and accepted this block (presumably through normal inventory mechanism), treating it as accepted");
               std::vector< peer_connection_ptr > peers_needing_next_batch;
+              std::lock_guard<std::recursive_mutex> lock(_active_connections.get_mutex());
               for (const peer_connection_ptr& peer : _active_connections)
               {
                 auto items_being_processed_iter = peer->ids_of_items_being_processed.find(received_block_iter->block_id);
@@ -2921,22 +2972,24 @@ namespace graphene { namespace net { namespace detail {
         item_id block_message_item_id(core_message_type_enum::block_message_type, message_hash);
         uint32_t block_number = block_message_to_process.block.block_num();
         fc::time_point_sec block_time = block_message_to_process.block.timestamp;
-
-        for (const peer_connection_ptr& peer : _active_connections)
         {
-          ASSERT_TASK_NOT_PREEMPTED(); // don't yield while iterating over _active_connections
+         std::lock_guard<std::recursive_mutex> lock(_active_connections.get_mutex());
+         for (const peer_connection_ptr& peer : _active_connections)
+         {
+            ASSERT_TASK_NOT_PREEMPTED(); // don't yield while iterating over _active_connections
 
-          auto iter = peer->inventory_peer_advertised_to_us.find(block_message_item_id);
-          if (iter != peer->inventory_peer_advertised_to_us.end())
-          {
-            // this peer offered us the item.  It will eventually expire from the peer's
-            // inventory_peer_advertised_to_us list after some time has passed (currently 2 minutes).
-            // For now, it will remain there, which will prevent us from offering the peer this
-            // block back when we rebroadcast the block below
-            peer->last_block_delegate_has_seen = block_message_to_process.block_id;
-            peer->last_block_time_delegate_has_seen = block_time;
-          }
-          peer->clear_old_inventory();
+            auto iter = peer->inventory_peer_advertised_to_us.find(block_message_item_id);
+            if (iter != peer->inventory_peer_advertised_to_us.end())
+            {
+               // this peer offered us the item.  It will eventually expire from the peer's
+               // inventory_peer_advertised_to_us list after some time has passed (currently 2 minutes).
+               // For now, it will remain there, which will prevent us from offering the peer this
+               // block back when we rebroadcast the block below
+               peer->last_block_delegate_has_seen = block_message_to_process.block_id;
+               peer->last_block_time_delegate_has_seen = block_time;
+            }
+            peer->clear_old_inventory();
+         }
         }
         message_propagation_data propagation_data{message_receive_time, message_validated_time, originating_peer->node_id};
         broadcast( block_message_to_process, propagation_data );
@@ -2946,6 +2999,7 @@ namespace graphene { namespace net { namespace detail {
         {
           // we just pushed a hard fork block.  Find out if any of our peers are running clients
           // that will be unable to process future blocks
+          std::lock_guard<std::recursive_mutex> lock(_active_connections.get_mutex());
           for (const peer_connection_ptr& peer : _active_connections)
           {
             if (peer->last_known_fork_block_number != 0)
@@ -2990,6 +3044,7 @@ namespace graphene { namespace net { namespace detail {
         disconnect_reason = "You offered me a block that I have deemed to be invalid";
 
         peers_to_disconnect.insert( originating_peer->shared_from_this() );
+        std::lock_guard<std::recursive_mutex> lock(_active_connections.get_mutex());
         for (const peer_connection_ptr& peer : _active_connections)
           if (!peer->ids_of_items_to_get.empty() && peer->ids_of_items_to_get.front() == block_message_to_process.block_id)
             peers_to_disconnect.insert(peer);
@@ -3113,25 +3168,28 @@ namespace graphene { namespace net { namespace detail {
 
     void node_impl::forward_firewall_check_to_next_available_peer(firewall_check_state_data* firewall_check_state)
     {
-      for (const peer_connection_ptr& peer : _active_connections)
       {
-        if (firewall_check_state->expected_node_id != peer->node_id && // it's not the node who is asking us to test
-            !peer->firewall_check_state && // the peer isn't already performing a check for another node
-            firewall_check_state->nodes_already_tested.find(peer->node_id) == firewall_check_state->nodes_already_tested.end() &&
-            peer->core_protocol_version >= 106)
-        {
-          wlog("forwarding firewall check for node ${to_check} to peer ${checker}",
-               ("to_check", firewall_check_state->endpoint_to_test)
-               ("checker", peer->get_remote_endpoint()));
-          firewall_check_state->nodes_already_tested.insert(peer->node_id);
-          peer->firewall_check_state = firewall_check_state;
-          check_firewall_message check_request;
-          check_request.endpoint_to_check = firewall_check_state->endpoint_to_test;
-          check_request.node_id = firewall_check_state->expected_node_id;
-          peer->send_message(check_request);
-          return;
-        }
-      }
+         std::lock_guard<std::recursive_mutex> lock(_active_connections.get_mutex());
+         for (const peer_connection_ptr& peer : _active_connections)
+         {
+            if (firewall_check_state->expected_node_id != peer->node_id && // it's not the node who is asking us to test
+                  !peer->firewall_check_state && // the peer isn't already performing a check for another node
+                  firewall_check_state->nodes_already_tested.find(peer->node_id) == firewall_check_state->nodes_already_tested.end() &&
+                  peer->core_protocol_version >= 106)
+            {
+               wlog("forwarding firewall check for node ${to_check} to peer ${checker}",
+                     ("to_check", firewall_check_state->endpoint_to_test)
+                     ("checker", peer->get_remote_endpoint()));
+               firewall_check_state->nodes_already_tested.insert(peer->node_id);
+               peer->firewall_check_state = firewall_check_state;
+               check_firewall_message check_request;
+               check_request.endpoint_to_check = firewall_check_state->endpoint_to_test;
+               check_request.node_id = firewall_check_state->expected_node_id;
+               peer->send_message(check_request);
+               return;
+            }
+         }
+      } // lock_guard
       wlog("Unable to forward firewall check for node ${to_check} to any other peers, returning 'unable'",
            ("to_check", firewall_check_state->endpoint_to_test));
 
@@ -3304,6 +3362,7 @@ namespace graphene { namespace net { namespace detail {
       }
 
       fc::time_point now = fc::time_point::now();
+      std::lock_guard<std::recursive_mutex> lock(_active_connections.get_mutex());
       for (const peer_connection_ptr& peer : _active_connections)
       {
         ASSERT_TASK_NOT_PREEMPTED(); // don't yield while iterating over _active_connections
@@ -3423,6 +3482,7 @@ namespace graphene { namespace net { namespace detail {
 
     void node_impl::start_synchronizing()
     {
+      std::lock_guard<std::recursive_mutex> lock(_active_connections.get_mutex());
       for( const peer_connection_ptr& peer : _active_connections )
         start_synchronizing_with_peer( peer );
     }
@@ -3628,7 +3688,10 @@ namespace graphene { namespace net { namespace detail {
       // operate off copies of the lists in case they change during iteration
       std::list<peer_connection_ptr> all_peers;
       auto p_back = [&all_peers](const peer_connection_ptr& conn) { all_peers.push_back(conn); };
-      std::for_each(_active_connections.begin(), _active_connections.end(), p_back);
+      {
+         std::lock_guard<std::recursive_mutex> lock(_active_connections.get_mutex());
+         std::for_each(_active_connections.begin(), _active_connections.end(), p_back);
+      }
       std::for_each(_handshaking_connections.begin(), _handshaking_connections.end(), p_back);
       std::for_each(_closing_connections.begin(), _closing_connections.end(), p_back);
 
@@ -4180,11 +4243,14 @@ namespace graphene { namespace net { namespace detail {
     peer_connection_ptr node_impl::get_connection_to_endpoint( const fc::ip::endpoint& remote_endpoint )
     {
       VERIFY_CORRECT_THREAD();
-      for( const peer_connection_ptr& active_peer : _active_connections )
       {
-        fc::optional<fc::ip::endpoint> endpoint_for_this_peer( active_peer->get_remote_endpoint() );
-        if( endpoint_for_this_peer && *endpoint_for_this_peer == remote_endpoint )
-          return active_peer;
+         std::lock_guard<std::recursive_mutex> lock(_active_connections.get_mutex());
+         for( const peer_connection_ptr& active_peer : _active_connections )
+         {
+            fc::optional<fc::ip::endpoint> endpoint_for_this_peer( active_peer->get_remote_endpoint() );
+            if( endpoint_for_this_peer && *endpoint_for_this_peer == remote_endpoint )
+               return active_peer;
+         }
       }
       for( const peer_connection_ptr& handshaking_peer : _handshaking_connections )
       {
@@ -4235,16 +4301,19 @@ namespace graphene { namespace net { namespace detail {
       ilog( " number of peers: ${active} active, ${handshaking}, ${closing} closing.  attempting to maintain ${desired} - ${maximum} peers",
            ( "active", _active_connections.size() )("handshaking", _handshaking_connections.size() )("closing",_closing_connections.size() )
            ( "desired", _desired_number_of_connections )("maximum", _maximum_number_of_connections ) );
-      for( const peer_connection_ptr& peer : _active_connections )
       {
-        ilog( "       active peer ${endpoint} peer_is_in_sync_with_us:${in_sync_with_us} we_are_in_sync_with_peer:${in_sync_with_them}",
-             ( "endpoint", peer->get_remote_endpoint() )
-             ( "in_sync_with_us", !peer->peer_needs_sync_items_from_us )("in_sync_with_them", !peer->we_need_sync_items_from_peer ) );
-        if( peer->we_need_sync_items_from_peer )
-          ilog( "              above peer has ${count} sync items we might need", ("count", peer->ids_of_items_to_get.size() ) );
-        if (peer->inhibit_fetching_sync_blocks)
-          ilog( "              we are not fetching sync blocks from the above peer (inhibit_fetching_sync_blocks == true)" );
+         std::lock_guard<std::recursive_mutex> lock(_active_connections.get_mutex());
+         for( const peer_connection_ptr& peer : _active_connections )
+         {
+            ilog( "       active peer ${endpoint} peer_is_in_sync_with_us:${in_sync_with_us} we_are_in_sync_with_peer:${in_sync_with_them}",
+                  ( "endpoint", peer->get_remote_endpoint() )
+                  ( "in_sync_with_us", !peer->peer_needs_sync_items_from_us )("in_sync_with_them", !peer->we_need_sync_items_from_peer ) );
+            if( peer->we_need_sync_items_from_peer )
+               ilog( "              above peer has ${count} sync items we might need", ("count", peer->ids_of_items_to_get.size() ) );
+            if (peer->inhibit_fetching_sync_blocks)
+               ilog( "              we are not fetching sync blocks from the above peer (inhibit_fetching_sync_blocks == true)" );
 
+         }
       }
       for( const peer_connection_ptr& peer : _handshaking_connections )
       {
@@ -4259,6 +4328,7 @@ namespace graphene { namespace net { namespace detail {
       ilog( "node._items_to_fetch size: ${size}", ("size", _items_to_fetch.size() ) );
       ilog( "node._new_inventory size: ${size}", ("size", _new_inventory.size() ) );
       ilog( "node._message_cache size: ${size}", ("size", _message_cache.size() ) );
+      std::lock_guard<std::recursive_mutex> lock(_active_connections.get_mutex());
       for( const peer_connection_ptr& peer : _active_connections )
       {
         ilog( "  peer ${endpoint}", ("endpoint", peer->get_remote_endpoint() ) );
@@ -4356,6 +4426,7 @@ namespace graphene { namespace net { namespace detail {
     {
       VERIFY_CORRECT_THREAD();
       std::vector<peer_status> statuses;
+      std::lock_guard<std::recursive_mutex> lock(_active_connections.get_mutex());
       for (const peer_connection_ptr& peer : _active_connections)
       {
         ASSERT_TASK_NOT_PREEMPTED(); // don't yield while iterating over _active_connections
@@ -4547,9 +4618,12 @@ namespace graphene { namespace net { namespace detail {
       _allowed_peers.insert(allowed_peers.begin(), allowed_peers.end());
       std::list<peer_connection_ptr> peers_to_disconnect;
       if (!_allowed_peers.empty())
-        for (const peer_connection_ptr& peer : _active_connections)
-          if (_allowed_peers.find(peer->node_id) == _allowed_peers.end())
-            peers_to_disconnect.push_back(peer);
+      {
+         std::lock_guard<std::recursive_mutex> lock(_active_connections.get_mutex());
+         for (const peer_connection_ptr& peer : _active_connections)
+            if (_allowed_peers.find(peer->node_id) == _allowed_peers.end())
+               peers_to_disconnect.push_back(peer);
+      }
       for (const peer_connection_ptr& peer : peers_to_disconnect)
         disconnect_from_peer(peer.get(), "My allowed_peers list has changed, and you're no longer allowed.  Bye.");
 #endif // ENABLE_P2P_DEBUGGING_API
