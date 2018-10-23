@@ -146,5 +146,47 @@ BOOST_AUTO_TEST_CASE( any_two_of_three )
    }
 }
 
+BOOST_AUTO_TEST_CASE( verify_authority_multiple_accounts )
+{
+   try {
+      fc::ecc::private_key nathan_key = fc::ecc::private_key::regenerate(fc::digest("key1"));
+      fc::ecc::private_key alice_key = fc::ecc::private_key::regenerate(fc::digest("key2"));
+      fc::ecc::private_key bob_key = fc::ecc::private_key::regenerate(fc::digest("key3"));
+      
+      const account_object& nathan = create_account("nathan", nathan_key.get_public_key() );
+      fund(nathan);
+
+      create_account("alice", alice_key.get_public_key() );
+      create_account("bob", bob_key.get_public_key() );
+
+      graphene::app::database_api db_api(db);
+
+      try {
+         account_update_operation op;
+         op.account = nathan.id;
+         op.active = authority(3, public_key_type(nathan_key.get_public_key()), 1, 
+               public_key_type(alice_key.get_public_key()), 1, public_key_type(bob_key.get_public_key()), 1);
+         op.owner = *op.active;
+         trx.operations.push_back(op);
+         sign(trx, nathan_key);
+         PUSH_TX( db, trx, database::skip_transaction_dupe_check );
+         trx.clear();
+      } FC_CAPTURE_AND_RETHROW ((nathan.active))
+
+      // requires 3 signatures
+      {
+      	flat_set<public_key_type> public_keys;
+      	public_keys.emplace(nathan_key.get_public_key());
+      	public_keys.emplace(alice_key.get_public_key());
+      	public_keys.emplace(bob_key.get_public_key());
+      	BOOST_CHECK(db_api.verify_account_authority("nathan", public_keys));
+      }
+
+   } catch (fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
 BOOST_AUTO_TEST_SUITE_END()
 
