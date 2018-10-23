@@ -109,7 +109,8 @@ BOOST_AUTO_TEST_CASE( any_two_of_three )
       try {
          account_update_operation op;
          op.account = nathan.id;
-         op.active = authority(2, public_key_type(nathan_key1.get_public_key()), 1, public_key_type(nathan_key2.get_public_key()), 1, public_key_type(nathan_key3.get_public_key()), 1);
+         op.active = authority(2, public_key_type(nathan_key1.get_public_key()), 1, 
+               public_key_type(nathan_key2.get_public_key()), 1, public_key_type(nathan_key3.get_public_key()), 1);
          op.owner = *op.active;
          trx.operations.push_back(op);
          sign(trx, nathan_key1);
