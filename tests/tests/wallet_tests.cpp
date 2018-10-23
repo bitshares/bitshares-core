@@ -26,6 +26,7 @@
 
 #include <graphene/app/database_api.hpp>
 #include <graphene/wallet/wallet.hpp>
+#include <fc/crypto/digest.hpp>
 
 #include <iostream>
 
@@ -45,7 +46,7 @@ BOOST_FIXTURE_TEST_SUITE(wallet_tests, database_fixture)
           /***
            * Act
            */
-          int nbr_keys_desired = 3;
+          unsigned int nbr_keys_desired = 3;
           vector<brain_key_info> derived_keys = graphene::wallet::utility::derive_owner_keys_from_brain_key("SOME WORDS GO HERE", nbr_keys_desired);
 
 
@@ -70,7 +71,7 @@ BOOST_FIXTURE_TEST_SUITE(wallet_tests, database_fixture)
           string expected_prefix = GRAPHENE_ADDRESS_PREFIX;
           for (auto info : derived_keys) {
               string description = (string) info.pub_key;
-              BOOST_CHECK_EQUAL(0, description.find(expected_prefix));
+              BOOST_CHECK_EQUAL(0u, description.find(expected_prefix));
           }
 
       } FC_LOG_AND_RETHROW()
@@ -95,4 +96,54 @@ BOOST_FIXTURE_TEST_SUITE(wallet_tests, database_fixture)
       } FC_LOG_AND_RETHROW()
   }
 
+BOOST_AUTO_TEST_CASE( any_two_of_three )
+{
+   try {
+      fc::ecc::private_key nathan_key1 = fc::ecc::private_key::regenerate(fc::digest("key1"));
+      fc::ecc::private_key nathan_key2 = fc::ecc::private_key::regenerate(fc::digest("key2"));
+      fc::ecc::private_key nathan_key3 = fc::ecc::private_key::regenerate(fc::digest("key3"));
+      const account_object& nathan = create_account("nathan", nathan_key1.get_public_key() );
+      fund(nathan);
+      graphene::app::database_api db_api(db);
+
+      try {
+         account_update_operation op;
+         op.account = nathan.id;
+         op.active = authority(2, public_key_type(nathan_key1.get_public_key()), 1, public_key_type(nathan_key2.get_public_key()), 1, public_key_type(nathan_key3.get_public_key()), 1);
+         op.owner = *op.active;
+         trx.operations.push_back(op);
+         sign(trx, nathan_key1);
+         PUSH_TX( db, trx, database::skip_transaction_dupe_check );
+         trx.clear();
+      } FC_CAPTURE_AND_RETHROW ((nathan.active))
+
+      // two keys should work
+      {
+      	flat_set<public_key_type> public_keys;
+      	public_keys.emplace(nathan_key1.get_public_key());
+      	public_keys.emplace(nathan_key2.get_public_key());
+      	BOOST_CHECK(db_api.verify_account_authority("nathan", public_keys));
+      }
+
+      // the other two keys should work
+      {
+     	   flat_set<public_key_type> public_keys;
+      	public_keys.emplace(nathan_key2.get_public_key());
+      	public_keys.emplace(nathan_key3.get_public_key());
+     	   BOOST_CHECK(db_api.verify_account_authority("nathan", public_keys));
+      }
+
+      // just one key should not work
+      {
+     	   flat_set<public_key_type> public_keys;
+         public_keys.emplace(nathan_key1.get_public_key());
+     	   BOOST_CHECK(!db_api.verify_account_authority("nathan", public_keys));
+      }
+   } catch (fc::exception& e) {
+      edump((e.to_detail_string()));
+      throw;
+   }
+}
+
 BOOST_AUTO_TEST_SUITE_END()
+
