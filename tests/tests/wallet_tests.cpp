@@ -156,8 +156,7 @@ BOOST_AUTO_TEST_CASE( verify_authority_multiple_accounts )
       try {
          account_update_operation op;
          op.account = nathan.id;
-         op.active = authority(3, nathan_public_key, 1, 
-               alice.id, 1, bob.id, 1);
+         op.active = authority(3, nathan_public_key, 1, alice.id, 1, bob.id, 1);
          op.owner = *op.active;
          trx.operations.push_back(op);
          sign(trx, nathan_private_key);
