@@ -254,6 +254,23 @@ struct adaptor_struct {
       {
          o["initializer"] = fc::json::to_string(o["initializer"]);
       }
+      if (o.find("policy") != o.end())
+      {
+         o["policy"] = fc::json::to_string(o["policy"]);
+      }
+      if (o.find("predicates") != o.end())
+      {
+         o["predicates"] = fc::json::to_string(o["predicates"]);
+      }
+      if (o.find("active_special_authority") != o.end())
+      {
+         o["active_special_authority"] = fc::json::to_string(o["active_special_authority"]);
+      }
+      if (o.find("owner_special_authority") != o.end())
+      {
+         o["owner_special_authority"] = fc::json::to_string(o["owner_special_authority"]);
+      }
+
 
       variant v;
       fc::to_variant(o, v, FC_PACK_MAX_DEPTH);
