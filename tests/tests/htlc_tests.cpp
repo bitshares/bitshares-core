@@ -65,7 +65,11 @@ void generate_random_preimage(uint16_t key_size, std::vector<unsigned char>& vec
 
 std::vector<unsigned char> hash_it(std::vector<unsigned char> preimage)
 {
-	fc::sha256 hash = fc::sha256::hash(preimage);
+   // convert the preimage to a char array
+   unsigned char char_array[preimage.size()];
+   for(unsigned int i = 0; i < preimage.size(); ++i)
+      char_array[i] = preimage[i];
+	fc::sha256 hash = fc::sha256::hash((char*)char_array, preimage.size());
 	std::vector<unsigned char> ret_val(hash.data_size());
 	char* data = hash.data();
 	for(size_t i = 0; i < hash.data_size(); i++)
@@ -75,8 +79,21 @@ std::vector<unsigned char> hash_it(std::vector<unsigned char> preimage)
 	return ret_val;
 }
 
+void set_committee_parameters(database_fixture* db_fixture)
+{
+   // set the committee parameters
+   db_fixture->db.modify(db_fixture->db.get_global_properties(), [](global_property_object& p) {
+      graphene::chain::committee_updatable_parameters params;
+      params.htlc_max_preimage_size = 1024;
+      params.htlc_max_timeout_secs = 60 * 60 * 24 * 28;
+      p.parameters.extensions.value.committee_updatable_options = params;
+   });
+}
+
 BOOST_AUTO_TEST_CASE( htlc_expires )
 {
+   set_committee_parameters(this);
+
    ACTORS((alice)(bob));
 
    int64_t init_balance(100000);
@@ -92,14 +109,16 @@ BOOST_AUTO_TEST_CASE( htlc_expires )
    // cler everything out
    generate_block();
    trx.clear();
+   fc::time_point_sec expiration = db.head_block_time() + fc::seconds(60);
    // Alice puts a contract on the blockchain
    {
       graphene::chain::htlc_create_operation create_operation;
 
       create_operation.amount = graphene::chain::asset( 10000 );
       create_operation.destination = bob_id;
-      create_operation.epoch = fc::time_point::now() + fc::seconds(3);
+      create_operation.epoch = expiration;
       create_operation.key_hash = key_hash;
+      create_operation.hash_type = graphene::chain::hash_algorithm::sha256;
       create_operation.key_size = key_size;
       create_operation.source = alice_id;
       trx.operations.push_back(create_operation);
@@ -116,51 +135,19 @@ BOOST_AUTO_TEST_CASE( htlc_expires )
       // can we assume that alice's transaction will be the only one in this block?
       processed_transaction alice_trx = blk.transactions[0];
       alice_htlc_id = alice_trx.operation_results[0].get<object_id_type>();
+      generate_block();
    }
 
-   // verify funds on hold (make sure this can cover fees)
+   // verify funds on hold (TODO: make sure this can cover fees)
    BOOST_CHECK_EQUAL( get_balance(alice_id, graphene::chain::asset_id_type()), 90000 );
 
-   // make sure Alice can't get it back before the timeout
-   {
-      graphene::chain::htlc_update_operation update_operation;
-      update_operation.update_issuer = alice_id;
-      update_operation.htlc_id = alice_htlc_id;
-      trx.operations.push_back(update_operation);
-      sign(trx, alice_private_key);
-      try
-      {
-          PUSH_TX(db, trx, ~0);
-          BOOST_FAIL("Should not allow Alice to reclaim funds before timeout");
-      } catch (fc::exception& ex)
-      {
-    	  // this should happen
-      }
-      generate_block();
-      trx.clear();
-   }
-
-   // make sure Alice can't spend it.
    // make sure Bob (or anyone) can see the details of the transaction
+   graphene::app::database_api db_api(db);
+   optional<graphene::chain::htlc_object> htlc = db_api.get_htlc(fc::json::to_pretty_string(alice_htlc_id));
+   BOOST_CHECK(htlc);
+
    // let it expire (wait for timeout)
-   std::this_thread::sleep_for(std::chrono::seconds(4));
-   // send an update operation to reclaim the funds
-   {
-      graphene::chain::htlc_update_operation update_operation;
-      update_operation.update_issuer = alice_id;
-      update_operation.htlc_id = alice_htlc_id;
-      trx.operations.push_back(update_operation);
-      sign(trx, alice_private_key);
-      try
-      {
-          PUSH_TX(db, trx, ~0);
-      } catch (fc::exception& ex)
-      {
-          BOOST_FAIL(ex.to_detail_string(fc::log_level(fc::log_level::all)));
-      }
-      generate_block();
-      trx.clear();
-   }
+   generate_blocks(expiration + fc::seconds(120) );
    // verify funds return (what about fees?)
    BOOST_CHECK_EQUAL( get_balance(alice_id, graphene::chain::asset_id_type()), 100000 );
    // verify Bob cannot execute the contract after the fact
@@ -168,115 +155,100 @@ BOOST_AUTO_TEST_CASE( htlc_expires )
 
 BOOST_AUTO_TEST_CASE( htlc_fulfilled )
 {
-	   ACTORS((alice)(bob));
+   set_committee_parameters(this);
+	
+   ACTORS((alice)(bob));
 
-	   int64_t init_balance(100000);
+   int64_t init_balance(100000);
 
-	   transfer( committee_account, alice_id, graphene::chain::asset(init_balance) );
+   transfer( committee_account, alice_id, graphene::chain::asset(init_balance) );
 
-	   uint16_t key_size = 256;
-	   std::vector<unsigned char> pre_image(256);
-	   generate_random_preimage(key_size, pre_image);
-	   std::vector<unsigned char> key_hash = hash_it(pre_image);
+   uint16_t key_size = 256;
+   std::vector<unsigned char> pre_image(key_size);
+   generate_random_preimage(key_size, pre_image);
+   std::vector<unsigned char> key_hash = hash_it(pre_image);
 
-	   graphene::chain::htlc_id_type alice_htlc_id;
-	   // cler everything out
-	   generate_block();
-	   trx.clear();
-	   // Alice puts a contract on the blockchain
-	   {
-	      graphene::chain::htlc_create_operation create_operation;
+   graphene::chain::htlc_id_type alice_htlc_id;
+   // cler everything out
+   generate_block();
+   trx.clear();
+   // Alice puts a contract on the blockchain
+   {
+      graphene::chain::htlc_create_operation create_operation;
 
-	      create_operation.amount = graphene::chain::asset( 10000 );
-	      create_operation.destination = bob_id;
-	      create_operation.epoch = fc::time_point::now() + fc::seconds(3);
-	      create_operation.key_hash = key_hash;
-	      create_operation.key_size = key_size;
-	      create_operation.source = alice_id;
-	      trx.operations.push_back(create_operation);
-	      sign(trx, alice_private_key);
-	      try
-	      {
-	    	  PUSH_TX(db, trx, ~0);
-	      } catch (fc::exception& ex)
-	      {
-	    	  BOOST_FAIL( ex.to_detail_string(fc::log_level(fc::log_level::all)) );
-	      }
-	      trx.clear();
-	      graphene::chain::signed_block blk = generate_block();
-	      // can we assume that alice's transaction will be the only one in this block?
-	      processed_transaction alice_trx = blk.transactions[0];
-	      alice_htlc_id = alice_trx.operation_results[0].get<object_id_type>();
-	   }
+      create_operation.amount = graphene::chain::asset( 10000 );
+      create_operation.destination = bob_id;
+      create_operation.epoch = db.head_block_time() + fc::seconds(10);
+      create_operation.key_hash = key_hash;
+      create_operation.hash_type = graphene::chain::hash_algorithm::sha256;
+      create_operation.key_size = key_size;
+      create_operation.source = alice_id;
+      trx.operations.push_back(create_operation);
+      sign(trx, alice_private_key);
+      try
+      {
+         PUSH_TX(db, trx, ~0);
+      } catch (fc::exception& ex)
+      {
+         BOOST_FAIL( ex.to_detail_string(fc::log_level(fc::log_level::all)) );
+      }
+      trx.clear();
+      graphene::chain::signed_block blk = generate_block();
+      // can we assume that alice's transaction will be the only one in this block?
+      processed_transaction alice_trx = blk.transactions[0];
+      alice_htlc_id = alice_trx.operation_results[0].get<object_id_type>();
+   }
 
-	   // verify funds on hold (make sure this can cover fees)
-	   BOOST_CHECK_EQUAL( get_balance(alice_id, graphene::chain::asset_id_type()), 90000 );
+   // verify funds on hold (make sure this can cover fees)
+   BOOST_CHECK_EQUAL( get_balance(alice_id, graphene::chain::asset_id_type()), 90000 );
 
-	   // make sure Alice can't get it back before the timeout
-	   {
-	      graphene::chain::htlc_update_operation update_operation;
-	      update_operation.update_issuer = alice_id;
-	      update_operation.htlc_id = alice_htlc_id;
-	      trx.operations.push_back(update_operation);
-	      sign(trx, alice_private_key);
-	      try
-	      {
-	          PUSH_TX(db, trx, ~0);
-	          BOOST_FAIL("Should not allow Alice to reclaim funds before timeout");
-	      } catch (fc::exception& ex)
-	      {
-	    	  // this should happen
-	      }
-	      generate_block();
-	      trx.clear();
-	   }
+   // TODO: make sure Bob (or anyone) can see the details of the transaction
 
-	   // balance should not have changed
-	   BOOST_CHECK_EQUAL( get_balance(alice_id, graphene::chain::asset_id_type()), 90000 );
-	   // make sure Bob (or anyone) can see the details of the transaction
-	   // send an update operation to claim the funds
-	   {
-	      graphene::chain::htlc_update_operation update_operation;
-	      update_operation.update_issuer = bob_id;
-	      update_operation.htlc_id = alice_htlc_id;
-	      update_operation.preimage = pre_image;
-	      trx.operations.push_back(update_operation);
-	      sign(trx, bob_private_key);
-	      try
-	      {
-	          PUSH_TX(db, trx, ~0);
-	      } catch (fc::exception& ex)
-	      {
-	          BOOST_FAIL(ex.to_detail_string(fc::log_level(fc::log_level::all)));
-	      }
-	      generate_block();
-	      trx.clear();
-	   }
-	   // verify Alice cannot execute the contract after the fact
-	   {
-	      graphene::chain::htlc_update_operation update_operation;
-	      update_operation.update_issuer = alice_id;
-	      update_operation.htlc_id = alice_htlc_id;
-	      trx.operations.push_back(update_operation);
-	      sign(trx, alice_private_key);
-	      try
-	      {
-	          PUSH_TX(db, trx, ~0);
-	          BOOST_FAIL("Should not allow Alice to reclaim funds after Bob already claimed them.");
-	      } catch (fc::exception& ex)
-	      {
-	    	  // this should happen
-	      }
-	      generate_block();
-	      trx.clear();
-	   }
-	   // verify funds end up in Bob's account
-	   BOOST_CHECK_EQUAL( get_balance(bob_id,   graphene::chain::asset_id_type()), 10000 );
-	   BOOST_CHECK_EQUAL( get_balance(alice_id, graphene::chain::asset_id_type()), 90000 );
+   // send an update operation to claim the funds
+   {
+      graphene::chain::htlc_update_operation update_operation;
+      update_operation.update_issuer = bob_id;
+      update_operation.htlc_id = alice_htlc_id;
+      update_operation.preimage = pre_image;
+      trx.operations.push_back(update_operation);
+      sign(trx, bob_private_key);
+      try
+      {
+            PUSH_TX(db, trx, ~0);
+      } catch (fc::exception& ex)
+      {
+            BOOST_FAIL(ex.to_detail_string(fc::log_level(fc::log_level::all)));
+      }
+      generate_block();
+      trx.clear();
+   }
+   // verify Alice cannot execute the contract after the fact
+   {
+      graphene::chain::htlc_update_operation update_operation;
+      update_operation.update_issuer = alice_id;
+      update_operation.htlc_id = alice_htlc_id;
+      trx.operations.push_back(update_operation);
+      sign(trx, alice_private_key);
+      try
+      {
+            PUSH_TX(db, trx, ~0);
+            BOOST_FAIL("Should not allow Alice to reclaim funds after Bob already claimed them.");
+      } catch (fc::exception& ex)
+      {
+         // this should happen
+      }
+      generate_block();
+      trx.clear();
+   }
+   // verify funds end up in Bob's account
+   BOOST_CHECK_EQUAL( get_balance(bob_id,   graphene::chain::asset_id_type()), 10000 );
+   BOOST_CHECK_EQUAL( get_balance(alice_id, graphene::chain::asset_id_type()), 90000 );
 }
 
 BOOST_AUTO_TEST_CASE( other_peoples_money )
 {
+   set_committee_parameters(this);
+	
    ACTORS((alice)(bob));
 
    int64_t init_balance(100000);
@@ -297,7 +269,7 @@ BOOST_AUTO_TEST_CASE( other_peoples_money )
       graphene::chain::htlc_create_operation create_operation;
       create_operation.amount = graphene::chain::asset( 10000 );
       create_operation.destination = bob_id;
-      create_operation.epoch = fc::time_point::now() + fc::seconds(3);
+      create_operation.epoch = db.head_block_time() + fc::seconds(3);
       create_operation.key_hash = key_hash;
       create_operation.key_size = key_size;
       create_operation.source = alice_id;
@@ -320,8 +292,9 @@ BOOST_AUTO_TEST_CASE( other_peoples_money )
       graphene::chain::htlc_create_operation create_operation;
       create_operation.amount = graphene::chain::asset( 10000 );
       create_operation.destination = bob_id;
-      create_operation.epoch = fc::time_point::now() + fc::seconds(3);
+      create_operation.epoch = db.head_block_time() + fc::seconds(3);
       create_operation.key_hash = key_hash;
+      create_operation.hash_type = graphene::chain::hash_algorithm::sha256;
       create_operation.key_size = key_size;
       create_operation.source = alice_id;
       trx.operations.push_back(create_operation);
@@ -336,5 +309,53 @@ BOOST_AUTO_TEST_CASE( other_peoples_money )
       trx.clear();
    }
 }
+
+BOOST_AUTO_TEST_CASE( set_htlc_params )
+{ try {
+   set_committee_parameters(this);
+
+   BOOST_TEST_MESSAGE( "Creating a proposal to change the max_preimage_size to 2048" );
+   {
+      proposal_create_operation cop = proposal_create_operation::committee_proposal(db.get_global_properties().parameters, db.head_block_time());
+      cop.fee_paying_account = GRAPHENE_TEMP_ACCOUNT;
+      cop.expiration_time = db.head_block_time() + *cop.review_period_seconds + 10;
+      committee_member_update_global_parameters_operation uop;
+      graphene::chain::committee_updatable_parameters new_params;
+      new_params.htlc_max_preimage_size = 2048;
+      new_params.htlc_max_timeout_secs = 60 * 60 * 24 * 28;
+      uop.new_parameters.extensions.value.committee_updatable_options = new_params;
+      cop.proposed_ops.emplace_back(uop);
+      trx.operations.push_back(cop);
+      db.push_transaction(trx);
+   }
+   BOOST_TEST_MESSAGE( "Updating proposal by signing with the committee_member private key" );
+   {
+      proposal_update_operation uop;
+      uop.fee_paying_account = GRAPHENE_TEMP_ACCOUNT;
+      uop.active_approvals_to_add = {get_account("init0").get_id(), get_account("init1").get_id(),
+                                     get_account("init2").get_id(), get_account("init3").get_id(),
+                                     get_account("init4").get_id(), get_account("init5").get_id(),
+                                     get_account("init6").get_id(), get_account("init7").get_id()};
+      trx.operations.push_back(uop);
+      sign( trx, init_account_priv_key );
+      db.push_transaction(trx);
+      BOOST_CHECK(proposal_id_type()(db).is_authorized_to_execute(db));
+   }
+   BOOST_TEST_MESSAGE( "Verifying that the parameters didn't change immediately" );
+
+   BOOST_CHECK_EQUAL(db.get_global_properties().parameters.extensions.value.committee_updatable_options->htlc_max_preimage_size, 1024u);
+
+   BOOST_TEST_MESSAGE( "Generating blocks until proposal expires" );
+   generate_blocks(proposal_id_type()(db).expiration_time + 5);
+   BOOST_TEST_MESSAGE( "Verify that the parameters still have not changed" );
+   BOOST_CHECK_EQUAL(db.get_global_properties().parameters.extensions.value.committee_updatable_options->htlc_max_preimage_size, 1024u);
+
+   BOOST_TEST_MESSAGE( "Generating blocks until next maintenance interval" );
+   generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+   generate_block();   // get the maintenance skip slots out of the way
+
+   BOOST_TEST_MESSAGE( "Verify that the change has been implemented" );
+   BOOST_CHECK_EQUAL(db.get_global_properties().parameters.extensions.value.committee_updatable_options->htlc_max_preimage_size, 2048u);
+} FC_LOG_AND_RETHROW() }
 
 BOOST_AUTO_TEST_SUITE_END()
