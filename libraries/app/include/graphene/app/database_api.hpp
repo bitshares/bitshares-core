@@ -663,10 +663,10 @@ class database_api
       bool           verify_authority( const signed_transaction& trx )const;
 
       /**
-       * @brief Verify that the public keys have enough authority to approve an operation
+       * @brief Verify that the public keys have enough authority to approve an operation for this account
        * @param account_name_or_id the account to check
        * @param signers the public keys
-       * @return true if the passed in keys have enough authority to approve an operation
+       * @return true if the passed in keys have enough authority to approve an operation for this account
        */
       bool verify_account_authority( const string& account_name_or_id, const flat_set<public_key_type>& signers )const;
 
