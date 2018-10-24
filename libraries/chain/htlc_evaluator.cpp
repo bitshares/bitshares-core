@@ -30,19 +30,29 @@
 namespace graphene { 
    namespace chain {
 
+      optional<committee_updatable_parameters> get_committee_htlc_parameters(graphene::chain::database& db)
+      {
+         return db.get_global_properties().parameters.extensions.value.committee_updatable_options;
+      }
+
       void_result htlc_create_evaluator::do_evaluate(const htlc_create_operation& o)
       {
          //FC_ASSERT( db().head_block_time() > HARDFORK_HTLC_TIME,
          //           "Operation not allowed before HARDFORK_HTLC_TIME."); // remove after HARDFORK_ESCROW_TIME
 
-         const graphene::chain::global_property_object& global_properties = db().get_global_properties();
+         optional<committee_updatable_parameters> committee_parameters = get_committee_htlc_parameters(db());
+
+         FC_ASSERT(committee_parameters, "HTLC Committee parameters are not set.");
+
          // make sure the expiration is reasonable
-         FC_ASSERT( o.epoch.sec_since_epoch() < fc::time_point::now().sec_since_epoch() 
-               + global_properties.parameters.get_committee_updatable_parameters().htlc_max_timeout_secs, 
+         FC_ASSERT( o.epoch.sec_since_epoch() < db().head_block_time().sec_since_epoch()
+               + committee_parameters->htlc_max_timeout_secs, 
                "HTLC Timeout exceeds allowed length" );
          // make sure the preimage length is reasonable
-         FC_ASSERT( o.key_size < global_properties.parameters.get_committee_updatable_parameters().htlc_max_preimage_size,
+         FC_ASSERT( o.key_size < committee_parameters->htlc_max_preimage_size,
                "HTLC preimage length exceeds allowed length" ); 
+         // make sure we have a hash algorithm set
+         FC_ASSERT( o.hash_type != graphene::chain::hash_algorithm::unknown, "HTLC Hash Algorithm must be set" );
          // make sure sender has the funds for the HTLC
          FC_ASSERT( db().get_balance( o.source, o.amount.asset_id ) >= (o.amount ), "Insufficient funds" );
          // make sure sender has the funds for the fee
@@ -75,8 +85,11 @@ namespace graphene {
       template<typename T>
       bool test_hash(const std::vector<unsigned char>& incoming_preimage, const std::vector<unsigned char>& valid_hash)
       {
-         std::string incoming_string(incoming_preimage.begin(), incoming_preimage.end());
-         T attempted_hash = T::hash(incoming_string);
+         // convert incoming_preimage to an array
+         unsigned char incoming_array[incoming_preimage.size()];
+         for(int i = 0; i < incoming_preimage.size(); ++i)
+            incoming_array[i] = incoming_preimage[i];
+         T attempted_hash = T::hash( (char*)incoming_array, incoming_preimage.size());
          if (attempted_hash.data_size() != valid_hash.size())
             return false;
          char* data = attempted_hash.data();
@@ -96,7 +109,7 @@ namespace graphene {
     	  if (o.preimage.size() > 0)
     	  {
     		   FC_ASSERT(o.preimage.size() == htlc_obj->preimage_size, "Preimage size mismatch.");
-    		   FC_ASSERT(fc::time_point::now().sec_since_epoch() < htlc_obj->expiration.sec_since_epoch(), "Preimage provided after escrow expiration.");
+    		   FC_ASSERT(db().head_block_time().sec_since_epoch() < htlc_obj->expiration.sec_since_epoch(), "Preimage provided after escrow expiration.");
 
     		   // see if the preimages match
             bool match = false;
@@ -107,11 +120,11 @@ namespace graphene {
             if (htlc_obj->preimage_hash_algorithm == graphene::chain::hash_algorithm::sha1)
                match = test_hash<fc::sha1>(o.preimage, htlc_obj->preimage_hash);
 
-    		  FC_ASSERT(match, "Provided preimage does not generate correct hash.");
+    		   FC_ASSERT(match, "Provided preimage does not generate correct hash.");
     	  }
     	  else
     	  {
-    		  FC_ASSERT(fc::time_point::now().sec_since_epoch() > htlc_obj->expiration.sec_since_epoch(), "Unable to reclaim until escrow expiration.");
+    		   FC_ASSERT(db().head_block_time().sec_since_epoch() > htlc_obj->expiration.sec_since_epoch(), "Unable to reclaim until escrow expiration.");
     	  }
     	  return void_result();
       }
