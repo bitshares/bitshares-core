@@ -272,7 +272,6 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       map< pair<asset_id_type,asset_id_type>, std::function<void(const variant&)> >      _market_subscriptions;
       graphene::chain::database&                                                                                                            _db;
       const application_options* _app_options = nullptr;
-
 };
 
 //////////////////////////////////////////////////////////////////////
@@ -2068,17 +2067,27 @@ bool database_api::verify_account_authority( const string& account_name_or_id, c
    return my->verify_account_authority( account_name_or_id, signers );
 }
 
-bool database_api_impl::verify_account_authority( const string& account_name_or_id, const flat_set<public_key_type>& keys )const
+bool database_api_impl::verify_account_authority( const string& account_name_or_id, 
+      const flat_set<public_key_type>& keys )const
 {
-   const account_object* account = get_account_from_string(account_name_or_id);
-
-   /// reuse trx.verify_authority by creating a dummy transfer
-   signed_transaction trx;
+   // create a dummy transfer
    transfer_operation op;
-   op.from = account->id;
-   trx.operations.emplace_back(op);
+   op.from = get_account_from_string(account_name_or_id)->id;
+   std::vector<operation> ops;
+   ops.emplace_back(op);
 
-   return verify_authority( trx );
+   try
+   {
+      graphene::chain::verify_authority(ops, keys,
+            [this]( account_id_type id ){ return &id(_db).active; },
+            [this]( account_id_type id ){ return &id(_db).owner; } );
+   } 
+   catch (fc::exception& ex)
+   {
+      return false;
+   }
+
+   return true;
 }
 
 processed_transaction database_api::validate_transaction( const signed_transaction& trx )const

@@ -669,9 +669,12 @@ class database_api
       bool           verify_authority( const signed_transaction& trx )const;
 
       /**
-       * @return true if the signers have enough authority to authorize an account
+       * @brief Verify that the public keys have enough authority to approve an operation for this account
+       * @param account_name_or_id the account to check
+       * @param signers the public keys
+       * @return true if the passed in keys have enough authority to approve an operation for this account
        */
-      bool           verify_account_authority( const string& account_name_or_id, const flat_set<public_key_type>& signers )const;
+      bool verify_account_authority( const string& account_name_or_id, const flat_set<public_key_type>& signers )const;
 
       /**
        *  Validates a transaction against the current state without broadcasting it on the network.
