@@ -984,7 +984,7 @@ void application::set_program_options(boost::program_options::options_descriptio
           "Path to create a Genesis State at. If a well-formed JSON file exists at the path, it will be parsed and any "
           "missing fields in a Genesis State will be added, and any unknown fields will be removed. If no file or an "
           "invalid file is found, it will be replaced with an example Genesis State.")
-         ("replay-blockchain", "Rebuild object graph by replaying all blocks without validatino")
+         ("replay-blockchain", "Rebuild object graph by replaying all blocks without validation")
          ("revalidate-blockchain", "Rebuild object graph by replaying all blocks with full validation")
          ("resync-blockchain", "Delete all blocks and re-sync with network from scratch")
          ("force-validate", "Force validation of all transactions during normal operation")
