@@ -90,9 +90,51 @@ void set_committee_parameters(database_fixture* db_fixture)
    });
 }
 
+void advance_past_hardfork(database_fixture* db_fixture)
+{
+   db_fixture->generate_blocks(HARDFORK_HTLC_TIME);
+   set_committee_parameters(db_fixture);
+   set_expiration(db_fixture->db, db_fixture->trx);
+}
+
+BOOST_AUTO_TEST_CASE( htlc_before_hardfork )
+{
+   ACTORS((alice)(bob));
+
+   int64_t init_balance(100000);
+
+   transfer( committee_account, alice_id, graphene::chain::asset(init_balance) );
+
+   uint16_t key_size = 256;
+   std::vector<unsigned char> pre_image(256);
+   generate_random_preimage(key_size, pre_image);
+   std::vector<unsigned char> key_hash = hash_it(pre_image);
+
+   graphene::chain::htlc_id_type alice_htlc_id;
+   // cler everything out
+   generate_block();
+   trx.clear();
+   fc::time_point_sec expiration = db.head_block_time() + fc::seconds(60);
+   // Alice puts a contract on the blockchain
+   {
+      graphene::chain::htlc_create_operation create_operation;
+
+      create_operation.amount = graphene::chain::asset( 10000 );
+      create_operation.destination = bob_id;
+      create_operation.epoch = expiration;
+      create_operation.key_hash = key_hash;
+      create_operation.hash_type = graphene::chain::hash_algorithm::sha256;
+      create_operation.key_size = key_size;
+      create_operation.source = alice_id;
+      trx.operations.push_back(create_operation);
+      sign(trx, alice_private_key);
+      GRAPHENE_CHECK_THROW(PUSH_TX(db, trx, ~0), fc::exception);
+   }
+}
+
 BOOST_AUTO_TEST_CASE( htlc_expires )
 {
-   set_committee_parameters(this);
+   advance_past_hardfork(this);
 
    ACTORS((alice)(bob));
 
@@ -123,13 +165,7 @@ BOOST_AUTO_TEST_CASE( htlc_expires )
       create_operation.source = alice_id;
       trx.operations.push_back(create_operation);
       sign(trx, alice_private_key);
-      try
-      {
-    	  PUSH_TX(db, trx, ~0);
-      } catch (fc::exception& ex)
-      {
-    	  BOOST_FAIL( ex.to_detail_string(fc::log_level(fc::log_level::all)) );
-      }
+      PUSH_TX(db, trx, ~0);
       trx.clear();
       graphene::chain::signed_block blk = generate_block();
       // can we assume that alice's transaction will be the only one in this block?
@@ -155,7 +191,7 @@ BOOST_AUTO_TEST_CASE( htlc_expires )
 
 BOOST_AUTO_TEST_CASE( htlc_fulfilled )
 {
-   set_committee_parameters(this);
+   advance_past_hardfork(this);
 	
    ACTORS((alice)(bob));
 
@@ -185,13 +221,7 @@ BOOST_AUTO_TEST_CASE( htlc_fulfilled )
       create_operation.source = alice_id;
       trx.operations.push_back(create_operation);
       sign(trx, alice_private_key);
-      try
-      {
-         PUSH_TX(db, trx, ~0);
-      } catch (fc::exception& ex)
-      {
-         BOOST_FAIL( ex.to_detail_string(fc::log_level(fc::log_level::all)) );
-      }
+      PUSH_TX(db, trx, ~0);
       trx.clear();
       graphene::chain::signed_block blk = generate_block();
       // can we assume that alice's transaction will be the only one in this block?
@@ -212,13 +242,7 @@ BOOST_AUTO_TEST_CASE( htlc_fulfilled )
       update_operation.preimage = pre_image;
       trx.operations.push_back(update_operation);
       sign(trx, bob_private_key);
-      try
-      {
-            PUSH_TX(db, trx, ~0);
-      } catch (fc::exception& ex)
-      {
-            BOOST_FAIL(ex.to_detail_string(fc::log_level(fc::log_level::all)));
-      }
+      PUSH_TX(db, trx, ~0);
       generate_block();
       trx.clear();
    }
@@ -229,14 +253,7 @@ BOOST_AUTO_TEST_CASE( htlc_fulfilled )
       update_operation.htlc_id = alice_htlc_id;
       trx.operations.push_back(update_operation);
       sign(trx, alice_private_key);
-      try
-      {
-            PUSH_TX(db, trx, ~0);
-            BOOST_FAIL("Should not allow Alice to reclaim funds after Bob already claimed them.");
-      } catch (fc::exception& ex)
-      {
-         // this should happen
-      }
+      GRAPHENE_CHECK_THROW(PUSH_TX(db, trx, ~0), fc::exception);
       generate_block();
       trx.clear();
    }
@@ -247,7 +264,7 @@ BOOST_AUTO_TEST_CASE( htlc_fulfilled )
 
 BOOST_AUTO_TEST_CASE( other_peoples_money )
 {
-   set_committee_parameters(this);
+   advance_past_hardfork(this);
 	
    ACTORS((alice)(bob));
 
@@ -275,16 +292,7 @@ BOOST_AUTO_TEST_CASE( other_peoples_money )
       create_operation.source = alice_id;
       trx.operations.push_back(create_operation);
       sign(trx, bob_private_key);
-      try
-      {
-    	  PUSH_TX(db, trx, database::skip_nothing);
-    	  BOOST_FAIL( "Bob stole money from Alice!" );
-      } catch (fc::exception& ex)
-      {
-         // this is supposed to happen
-         //BOOST_TEST_MESSAGE("This is the error thrown (expected):");
-         //BOOST_TEST_MESSAGE(ex.to_detail_string(fc::log_level(fc::log_level::all)));
-      }
+      GRAPHENE_CHECK_THROW(PUSH_TX(db, trx, database::skip_nothing), fc::exception);
       trx.clear();
    }
    // now try the same but with Alice's signature (should work)
@@ -299,21 +307,48 @@ BOOST_AUTO_TEST_CASE( other_peoples_money )
       create_operation.source = alice_id;
       trx.operations.push_back(create_operation);
       sign(trx, alice_private_key);
-      try
-      {
-         PUSH_TX(db, trx, database::skip_nothing);
-      } catch (fc::exception& ex)
-      {
-    	   BOOST_FAIL( "Alice cannot create a contract!" );
-      }
+      PUSH_TX(db, trx, database::skip_nothing);
       trx.clear();
    }
 }
 
 BOOST_AUTO_TEST_CASE( set_htlc_params )
-{ try {
-   set_committee_parameters(this);
+{ 
+   {
+      // try to set committee parameters before hardfork
+      proposal_create_operation cop = proposal_create_operation::committee_proposal(
+            db.get_global_properties().parameters, db.head_block_time());
+      cop.fee_paying_account = GRAPHENE_TEMP_ACCOUNT;
+      cop.expiration_time = db.head_block_time() + *cop.review_period_seconds + 10;
+      committee_member_update_global_parameters_operation cmuop;
+      graphene::chain::htlc_options new_params;
+      new_params.max_preimage_size = 2048;
+      new_params.max_timeout_secs = 60 * 60 * 24 * 28;
+      cmuop.new_parameters.extensions.value.updatable_htlc_options = new_params;
+      cop.proposed_ops.emplace_back(cmuop);
+      trx.operations.push_back(cop);
+      // update with signatures
+      proposal_update_operation uop;
+      uop.fee_paying_account = GRAPHENE_TEMP_ACCOUNT;
+      uop.active_approvals_to_add = {get_account("init0").get_id(), get_account("init1").get_id(),
+                                     get_account("init2").get_id(), get_account("init3").get_id(),
+                                     get_account("init4").get_id(), get_account("init5").get_id(),
+                                     get_account("init6").get_id(), get_account("init7").get_id()};
+      trx.operations.push_back(uop);
+      sign( trx, init_account_priv_key );
+      db.push_transaction(trx);
+      BOOST_CHECK(proposal_id_type()(db).is_authorized_to_execute(db));
+      generate_blocks(proposal_id_type()(db).expiration_time + 5);
+      generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+      // the proposal should have failed
+      BOOST_CHECK(!db.get_global_properties().parameters.extensions.value.updatable_htlc_options.valid());
+      trx.clear();
+   }
 
+   // now things should start working...
+   advance_past_hardfork(this);
+
+   proposal_id_type good_proposal_id;
    BOOST_TEST_MESSAGE( "Creating a proposal to change the max_preimage_size to 2048" );
    {
       proposal_create_operation cop = proposal_create_operation::committee_proposal(db.get_global_properties().parameters, db.head_block_time());
@@ -326,11 +361,13 @@ BOOST_AUTO_TEST_CASE( set_htlc_params )
       uop.new_parameters.extensions.value.updatable_htlc_options = new_params;
       cop.proposed_ops.emplace_back(uop);
       trx.operations.push_back(cop);
-      db.push_transaction(trx);
+      graphene::chain::processed_transaction proc_trx =db.push_transaction(trx);
+      good_proposal_id = proc_trx.operation_results[0].get<object_id_type>();
    }
    BOOST_TEST_MESSAGE( "Updating proposal by signing with the committee_member private key" );
    {
       proposal_update_operation uop;
+      uop.proposal = good_proposal_id;
       uop.fee_paying_account = GRAPHENE_TEMP_ACCOUNT;
       uop.active_approvals_to_add = {get_account("init0").get_id(), get_account("init1").get_id(),
                                      get_account("init2").get_id(), get_account("init3").get_id(),
@@ -339,14 +376,14 @@ BOOST_AUTO_TEST_CASE( set_htlc_params )
       trx.operations.push_back(uop);
       sign( trx, init_account_priv_key );
       db.push_transaction(trx);
-      BOOST_CHECK(proposal_id_type()(db).is_authorized_to_execute(db));
+      BOOST_CHECK(good_proposal_id(db).is_authorized_to_execute(db));
    }
    BOOST_TEST_MESSAGE( "Verifying that the parameters didn't change immediately" );
 
    BOOST_CHECK_EQUAL(db.get_global_properties().parameters.extensions.value.updatable_htlc_options->max_preimage_size, 1024u);
 
    BOOST_TEST_MESSAGE( "Generating blocks until proposal expires" );
-   generate_blocks(proposal_id_type()(db).expiration_time + 5);
+   generate_blocks(good_proposal_id(db).expiration_time + 5);
    BOOST_TEST_MESSAGE( "Verify that the parameters still have not changed" );
    BOOST_CHECK_EQUAL(db.get_global_properties().parameters.extensions.value.updatable_htlc_options->max_preimage_size, 1024u);
 
@@ -356,6 +393,6 @@ BOOST_AUTO_TEST_CASE( set_htlc_params )
 
    BOOST_TEST_MESSAGE( "Verify that the change has been implemented" );
    BOOST_CHECK_EQUAL(db.get_global_properties().parameters.extensions.value.updatable_htlc_options->max_preimage_size, 2048u);
-} FC_LOG_AND_RETHROW() }
+}
 
 BOOST_AUTO_TEST_SUITE_END()

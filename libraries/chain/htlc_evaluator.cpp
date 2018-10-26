@@ -87,7 +87,7 @@ namespace graphene {
       {
          // convert incoming_preimage to an array
          unsigned char incoming_array[incoming_preimage.size()];
-         for(int i = 0; i < incoming_preimage.size(); ++i)
+         for(unsigned i = 0; i < incoming_preimage.size(); ++i)
             incoming_array[i] = incoming_preimage[i];
          T attempted_hash = T::hash( (char*)incoming_array, incoming_preimage.size());
          if (attempted_hash.data_size() != valid_hash.size())

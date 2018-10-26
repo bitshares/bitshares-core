@@ -1,4 +1,4 @@
-// htlc support for bitshares-core
-#ifndef HTLC_ESCROW_TIME
-#define HTLC_ESCROW_TIME (fc::time_point_sec( 1600000000 ))
+// HTLC implementation
+#ifndef HARDFORK_HTLC_TIME
+#define HARDFORK_HTLC_TIME (fc::time_point_sec( 1600000000 ) )
 #endif
