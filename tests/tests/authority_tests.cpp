@@ -1677,4 +1677,42 @@ BOOST_AUTO_TEST_CASE( issue_214 )
    BOOST_CHECK_EQUAL( top.amount.amount.value, get_balance( bob_id, top.amount.asset_id ) );
 } FC_LOG_AND_RETHROW() }
 
+BOOST_AUTO_TEST_CASE( irrelevant_signatures )
+{ try {
+   ACTORS( (alice)(bob) );
+   fund( alice );
+
+   // PK: BTS4vsFgTXJcGQMKCFayF2hrNRfYcKjNZ6Mzk8aw9M4zuWfscPhzE, A: BTSGfxPKKLj6tdTUB7i3mHsd2m7QvPLPy2YA
+   const fc::ecc::private_key test2 = fc::ecc::private_key::regenerate( fc::sha256::hash( std::string( "test-2" ) ) );
+   const public_key_type test2_pub( test2.get_public_key() );
+
+   // PK: BTS7FXC7S9UH7HEH8QiuJ8Xv1NRJJZd1GomALLm9ffjtH95Tb2ZQB, A: BTSBajRqmdrXqmDpZhJ8sgkGagdeXneHFVeM
+   const fc::ecc::private_key test3 = fc::ecc::private_key::regenerate( fc::sha256::hash( std::string( "test-3" ) ) );
+   const public_key_type test3_pub( test3.get_public_key() );
+
+   BOOST_REQUIRE( test2_pub.key_data < test3_pub.key_data );
+   BOOST_REQUIRE( address( test3_pub ) < address( test2_pub ) );
+
+   account_update_operation auo;
+   auo.account = alice_id;
+   auo.active = authority( 2, test2_pub, 2, test3_pub, 1 );
+
+   trx.clear();
+   set_expiration( db, trx );
+   trx.operations.push_back( auo );
+   sign( trx, alice_private_key );
+   PUSH_TX( db, trx );
+   trx.clear();
+
+   transfer_operation to;
+   to.amount = asset( 1 );
+   to.from = alice_id;
+   to.to = bob_id;
+   trx.operations.push_back( to );
+   sign( trx, test2 );
+   sign( trx, test3 );
+   PUSH_TX( db, trx );
+
+} FC_LOG_AND_RETHROW() }
+
 BOOST_AUTO_TEST_SUITE_END()
