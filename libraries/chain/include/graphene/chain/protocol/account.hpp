@@ -166,6 +166,44 @@ namespace graphene { namespace chain {
    };
 
    /**
+    * @ingroup operations
+    * @brief Update the votes, num_witness, num_committee and proxy of an existing account
+    * This operation is used to update the votes, num_witness, num_committee and proxy of an existing account.
+    *
+    */
+   struct account_update_votes_operation : public base_operation
+   {
+      struct fee_parameters_type
+      {
+         share_type fee             = 20 * GRAPHENE_BLOCKCHAIN_PRECISION;
+         uint32_t   price_per_kbyte = GRAPHENE_BLOCKCHAIN_PRECISION;
+      };
+
+      asset fee;
+      /// The account to update
+      account_id_type account;
+
+      /// New account options
+      flat_set<vote_id_type>    votes_to_add;
+      flat_set<vote_id_type>    votes_to_remove;
+
+      // a new voting account to set
+      optional<account_id_type> voting_account;
+      // a new number of witness_votes to set
+      optional<uint16_t> num_witness;
+      // a new number of commitee_votes to set
+      optional<uint16_t> num_committee;
+
+      // for future extensions (see account_update_operation)
+      extensions_type extensions;
+
+      account_id_type fee_payer()const { return account; }
+      void            validate()const;
+      share_type      calculate_fee( const fee_parameters_type& k )const;
+
+   };
+
+   /**
     * @brief This operation is used to whitelist and blacklist accounts, primarily for transacting in whitelisted assets
     * @ingroup operations
     *
@@ -284,6 +322,10 @@ FC_REFLECT(graphene::chain::account_update_operation::ext, (null_ext)(owner_spec
 FC_REFLECT( graphene::chain::account_update_operation,
             (fee)(account)(owner)(active)(new_options)(extensions)
           )
+
+FC_REFLECT( graphene::chain::account_update_votes_operation,
+            (fee) (account) (votes_to_add) (votes_to_remove) (voting_account) (num_witness) (num_committee) (extensions) )
+FC_REFLECT( graphene::chain::account_update_votes_operation::fee_parameters_type, (fee) (price_per_kbyte) )
 
 FC_REFLECT( graphene::chain::account_upgrade_operation,
             (fee)(account_to_upgrade)(upgrade_to_lifetime_member)(extensions) )

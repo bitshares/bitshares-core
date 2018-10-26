@@ -208,9 +208,6 @@ void account_create_operation::validate()const
    }
 }
 
-
-
-
 share_type account_update_operation::calculate_fee( const fee_parameters_type& k )const
 {
    auto core_fee_required = k.fee;  
@@ -254,6 +251,33 @@ void account_update_operation::validate()const
       validate_special_authority( *extensions.value.owner_special_authority );
    if( extensions.value.active_special_authority.valid() )
       validate_special_authority( *extensions.value.active_special_authority );
+}
+
+share_type account_update_votes_operation::calculate_fee( const fee_parameters_type& k ) const 
+{
+   auto core_fee_required = k.fee + calculate_data_fee( fc::raw::pack_size(*this), k.price_per_kbyte );
+   return core_fee_required;
+}
+
+void account_update_votes_operation::validate() const
+{
+   FC_ASSERT( account != GRAPHENE_TEMP_ACCOUNT );
+   FC_ASSERT( fee.amount >= 0 );
+   FC_ASSERT( account != account_id_type() );
+   FC_ASSERT( !votes_to_add.empty()
+           || !votes_to_remove.empty()
+           || voting_account.valid()
+           || num_witness.valid()
+           || num_committee.valid(),
+           "At least one parameter has to be set." );
+
+   for(const auto& id : votes_to_add)
+   {
+      FC_ASSERT(votes_to_remove.find(id) == votes_to_remove.end(),
+       "Can not add and remove at the same time.", ("id", id) );
+   }
+
+   // further checking requires chain_state @ref account_update_votes_evaluator::do_evaluate()
 }
 
 share_type account_upgrade_operation::calculate_fee(const fee_parameters_type& k) const

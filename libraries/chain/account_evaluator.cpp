@@ -36,6 +36,7 @@
 #include <graphene/chain/special_authority_object.hpp>
 #include <graphene/chain/witness_object.hpp>
 #include <graphene/chain/worker_object.hpp>
+#include <graphene/chain/protocol/account.hpp>
 
 #include <algorithm>
 
@@ -367,6 +368,52 @@ void_result account_update_evaluator::do_apply( const account_update_operation& 
          sa.account = o.account;
       } );
    }
+
+   return void_result();
+} FC_CAPTURE_AND_RETHROW( (o) ) }
+
+void_result account_update_votes_evaluator::do_evaluate(const account_update_votes_operation& o)
+{ try {
+   database& d = db();
+   acnt = &o.account(d);
+
+   // getting chain_state and validating
+   _new_options.votes = acnt->options.votes;
+   for(const auto& id : o.votes_to_remove) _new_options.votes.erase(id);
+   for(const auto& id : o.votes_to_add)    _new_options.votes.insert(id);
+
+   _new_options.num_witness   = o.num_witness.valid()  ? *o.num_witness   : acnt->options.num_witness;
+   _new_options.num_committee = o.num_committee.valid()? *o.num_committee : acnt->options.num_committee;
+   _new_options.validate();
+   verify_account_votes(d, _new_options);
+
+   return void_result();
+} FC_CAPTURE_AND_RETHROW( (o) ) }
+
+void_result account_update_votes_evaluator::do_apply(const account_update_votes_operation& o)
+{ try {
+   database& d = db();
+
+   // fill not updateable variables
+   _new_options.memo_key = acnt->options.memo_key;
+
+   // set voting account to old/new
+   _new_options.voting_account = o.voting_account.valid() ? *o.voting_account : acnt->options.voting_account;
+
+   // update account statistics
+   if( _new_options.is_voting() != acnt->options.is_voting() )
+   {
+      d.modify( acnt->statistics( d ), []( account_statistics_object& aso )
+      {
+         aso.is_voting = !aso.is_voting;
+      });
+   }
+
+   // update account_object
+   d.modify(*acnt, [&](account_object& a)
+   {
+      a.options = _new_options;
+   });
 
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }
