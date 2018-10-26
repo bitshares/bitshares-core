@@ -83,10 +83,10 @@ void set_committee_parameters(database_fixture* db_fixture)
 {
    // set the committee parameters
    db_fixture->db.modify(db_fixture->db.get_global_properties(), [](global_property_object& p) {
-      graphene::chain::committee_updatable_parameters params;
-      params.htlc_max_preimage_size = 1024;
-      params.htlc_max_timeout_secs = 60 * 60 * 24 * 28;
-      p.parameters.extensions.value.committee_updatable_options = params;
+      graphene::chain::htlc_options params;
+      params.max_preimage_size = 1024;
+      params.max_timeout_secs = 60 * 60 * 24 * 28;
+      p.parameters.extensions.value.updatable_htlc_options = params;
    });
 }
 
@@ -320,10 +320,10 @@ BOOST_AUTO_TEST_CASE( set_htlc_params )
       cop.fee_paying_account = GRAPHENE_TEMP_ACCOUNT;
       cop.expiration_time = db.head_block_time() + *cop.review_period_seconds + 10;
       committee_member_update_global_parameters_operation uop;
-      graphene::chain::committee_updatable_parameters new_params;
-      new_params.htlc_max_preimage_size = 2048;
-      new_params.htlc_max_timeout_secs = 60 * 60 * 24 * 28;
-      uop.new_parameters.extensions.value.committee_updatable_options = new_params;
+      graphene::chain::htlc_options new_params;
+      new_params.max_preimage_size = 2048;
+      new_params.max_timeout_secs = 60 * 60 * 24 * 28;
+      uop.new_parameters.extensions.value.updatable_htlc_options = new_params;
       cop.proposed_ops.emplace_back(uop);
       trx.operations.push_back(cop);
       db.push_transaction(trx);
@@ -343,19 +343,19 @@ BOOST_AUTO_TEST_CASE( set_htlc_params )
    }
    BOOST_TEST_MESSAGE( "Verifying that the parameters didn't change immediately" );
 
-   BOOST_CHECK_EQUAL(db.get_global_properties().parameters.extensions.value.committee_updatable_options->htlc_max_preimage_size, 1024u);
+   BOOST_CHECK_EQUAL(db.get_global_properties().parameters.extensions.value.updatable_htlc_options->max_preimage_size, 1024u);
 
    BOOST_TEST_MESSAGE( "Generating blocks until proposal expires" );
    generate_blocks(proposal_id_type()(db).expiration_time + 5);
    BOOST_TEST_MESSAGE( "Verify that the parameters still have not changed" );
-   BOOST_CHECK_EQUAL(db.get_global_properties().parameters.extensions.value.committee_updatable_options->htlc_max_preimage_size, 1024u);
+   BOOST_CHECK_EQUAL(db.get_global_properties().parameters.extensions.value.updatable_htlc_options->max_preimage_size, 1024u);
 
    BOOST_TEST_MESSAGE( "Generating blocks until next maintenance interval" );
    generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
    generate_block();   // get the maintenance skip slots out of the way
 
    BOOST_TEST_MESSAGE( "Verify that the change has been implemented" );
-   BOOST_CHECK_EQUAL(db.get_global_properties().parameters.extensions.value.committee_updatable_options->htlc_max_preimage_size, 2048u);
+   BOOST_CHECK_EQUAL(db.get_global_properties().parameters.extensions.value.updatable_htlc_options->max_preimage_size, 2048u);
 } FC_LOG_AND_RETHROW() }
 
 BOOST_AUTO_TEST_SUITE_END()

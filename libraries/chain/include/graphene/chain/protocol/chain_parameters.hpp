@@ -30,10 +30,10 @@ namespace graphene { namespace chain { struct fee_schedule; } }
 
 namespace graphene { namespace chain {
 
-   struct committee_updatable_parameters
+   struct htlc_options
    {
-      uint32_t htlc_max_timeout_secs;
-      uint32_t htlc_max_preimage_size;
+      uint32_t max_timeout_secs;
+      uint32_t max_preimage_size;
    };
 
    struct chain_parameters
@@ -71,7 +71,7 @@ namespace graphene { namespace chain {
 
       struct ext
       {
-         optional< committee_updatable_parameters > committee_updatable_options;
+         optional< htlc_options > updatable_htlc_options;
       };
 
       extension<ext> extensions;
@@ -83,8 +83,8 @@ namespace graphene { namespace chain {
 
 } }  // graphene::chain
 
-FC_REFLECT( graphene::chain::committee_updatable_parameters, (htlc_max_timeout_secs) (htlc_max_preimage_size) )
-FC_REFLECT( graphene::chain::chain_parameters::ext, (committee_updatable_options))
+FC_REFLECT( graphene::chain::htlc_options, (max_timeout_secs) (max_preimage_size) )
+FC_REFLECT( graphene::chain::chain_parameters::ext, (updatable_htlc_options))
 
 FC_REFLECT( graphene::chain::chain_parameters,
             (current_fees)

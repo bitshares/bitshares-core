@@ -30,9 +30,9 @@
 namespace graphene { 
    namespace chain {
 
-      optional<committee_updatable_parameters> get_committee_htlc_parameters(graphene::chain::database& db)
+      optional<htlc_options> get_committee_htlc_options(graphene::chain::database& db)
       {
-         return db.get_global_properties().parameters.extensions.value.committee_updatable_options;
+         return db.get_global_properties().parameters.extensions.value.updatable_htlc_options;
       }
 
       void_result htlc_create_evaluator::do_evaluate(const htlc_create_operation& o)
@@ -40,16 +40,16 @@ namespace graphene {
          //FC_ASSERT( db().head_block_time() > HARDFORK_HTLC_TIME,
          //           "Operation not allowed before HARDFORK_HTLC_TIME."); // remove after HARDFORK_ESCROW_TIME
 
-         optional<committee_updatable_parameters> committee_parameters = get_committee_htlc_parameters(db());
+         optional<htlc_options> htlc_options = get_committee_htlc_options(db());
 
-         FC_ASSERT(committee_parameters, "HTLC Committee parameters are not set.");
+         FC_ASSERT(htlc_options, "HTLC Committee options are not set.");
 
          // make sure the expiration is reasonable
          FC_ASSERT( o.epoch.sec_since_epoch() < db().head_block_time().sec_since_epoch()
-               + committee_parameters->htlc_max_timeout_secs, 
+               + htlc_options->max_timeout_secs, 
                "HTLC Timeout exceeds allowed length" );
          // make sure the preimage length is reasonable
-         FC_ASSERT( o.key_size < committee_parameters->htlc_max_preimage_size,
+         FC_ASSERT( o.key_size < htlc_options->max_preimage_size,
                "HTLC preimage length exceeds allowed length" ); 
          // make sure we have a hash algorithm set
          FC_ASSERT( o.hash_type != graphene::chain::hash_algorithm::unknown, "HTLC Hash Algorithm must be set" );
