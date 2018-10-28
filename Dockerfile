@@ -38,7 +38,6 @@ RUN \
     git submodule update --init --recursive && \
     cmake \
         -DCMAKE_BUILD_TYPE=Release \
-	-DGRAPHENE_DISABLE_UNITY_BUILD=ON \
         . && \
     make witness_node cli_wallet && \
     install -s programs/witness_node/witness_node programs/cli_wallet/cli_wallet /usr/local/bin && \
