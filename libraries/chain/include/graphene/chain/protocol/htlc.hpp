@@ -36,37 +36,80 @@ namespace graphene {
          struct fee_parameters_type {
             uint64_t fee            = 1 * GRAPHENE_BLOCKCHAIN_PRECISION;
          };
-    	   asset fee; // paid to network
-    	   account_id_type source; // where the held monies are to come from
-    	   account_id_type destination; // where the held monies will go if the preimage is provided
-    	   asset amount; // the amount to hold
+         // paid to network
+    	   asset fee; 
+         // where the held monies are to come from
+         account_id_type source;
+         // where the held monies will go if the preimage is provided
+    	   account_id_type destination; 
+         // the amount to hold
+    	   asset amount;
+         // hash algorithm used to create key_hash
          fc::enum_type<uint8_t, graphene::chain::hash_algorithm> hash_type 
-               = graphene::chain::hash_algorithm::unknown; // hash algorithm used to create key_hash
-    	   std::vector<unsigned char> key_hash; // the hash of the preimage
-    	   uint16_t key_size; // the size of the preimage
-    	   fc::time_point_sec epoch; // The time the funds will be returned to the source if not claimed
-    	   extensions_type extensions; // for future expansion
+               = graphene::chain::hash_algorithm::unknown;
+         // the hash of the preimage
+    	   std::vector<unsigned char> key_hash;
+         // the size of the preimage
+    	   uint16_t key_size;
+         // The time the funds will be returned to the source if not claimed
+    	   fc::time_point_sec epoch;
+         // for future expansion
+    	   extensions_type extensions; 
 
+         /***
+          * @brief Does simple validation of this object
+          */
     	   void validate()const;
-         void get_required_active_authorities( boost::container::flat_set<account_id_type>& a )const{ a.insert(source); }
+         
+         /**
+          * @brief Determines who is required to sign
+          */
+         void get_required_active_authorities( boost::container::flat_set<account_id_type>& a )const
+         { 
+            a.insert(source); 
+         }
+
+         /**
+          * @brief who will pay the fee
+          */
          account_id_type fee_payer()const { return source; }
 
       };
 
       struct htlc_update_operation : public base_operation
       {
-          struct fee_parameters_type {
-             uint64_t fee            = 1 * GRAPHENE_BLOCKCHAIN_PRECISION;
-          };
-    	  asset                       fee; // paid to network
-    	  htlc_id_type                htlc_id; // the object we are attempting to update
-    	  account_id_type             update_issuer; // who is attempting to update the transaction
-    	  std::vector<unsigned char>  preimage; // the preimage (not used if after epoch timeout)
-    	  extensions_type             extensions; // for future expansion
+         struct fee_parameters_type {
+            uint64_t fee = 1 * GRAPHENE_BLOCKCHAIN_PRECISION;
+         };
+         
+         // paid to network
+         asset fee;
+         // the object we are attempting to update
+         htlc_id_type htlc_id;
+         // who is attempting to update the transaction
+    	   account_id_type update_issuer;
+         // the preimage (not used if after epoch timeout)
+    	   std::vector<unsigned char> preimage;
+         // for future expansion
+         extensions_type extensions; 
 
-    	  void validate()const;
-          void get_required_active_authorities( boost::container::flat_set<account_id_type>& a )const{ a.insert(update_issuer); }
-          account_id_type fee_payer()const { return update_issuer; }
+         /***
+          * @brief Perform obvious checks to validate this object
+          */
+    	   void validate()const;
+         
+         /***
+          * @determines who should have signed this object
+          */
+         void get_required_active_authorities( boost::container::flat_set<account_id_type>& a )const
+         { 
+            a.insert(update_issuer); 
+         }
+
+         /**
+          * @brief Who is to pay the fee
+          */
+         account_id_type fee_payer()const { return update_issuer; }
       };
    } 
 }

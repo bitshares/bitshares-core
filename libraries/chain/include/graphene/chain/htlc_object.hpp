@@ -40,21 +40,25 @@ namespace graphene { namespace chain {
    };
    
    /**
-    * Temporally save escrow transactions until funds are released or operation expired.
+    * @brief database object to store HTLCs
+    * 
+    * This object is stored in the database while an HTLC is active. The HTLC will
+    * become inactive at expiration or when unlocked via the preimage.
     */
    class htlc_object : public graphene::db::abstract_object<htlc_object> {
       public:
+         // uniquely identify this object in the database
          static const uint8_t space_id = implementation_ids;
          static const uint8_t type_id  = impl_htlc_object_type;
 
-         account_id_type         from;
-         account_id_type         to;
-         asset                   amount;
-         fc::time_point_sec      expiration;
-         asset                   pending_fee;
-         vector<unsigned char>	preimage_hash;
+         account_id_type from;
+         account_id_type to;
+         asset amount;
+         fc::time_point_sec expiration;
+         asset pending_fee;
+         vector<unsigned char> preimage_hash;
          fc::enum_type<uint8_t, hash_algorithm> preimage_hash_algorithm;
-         uint16_t                preimage_size;
+         uint16_t preimage_size;
    };
 
    struct by_from_id;
@@ -64,11 +68,11 @@ namespace graphene { namespace chain {
          indexed_by<
             ordered_unique< tag< by_id >, member< object, object_id_type, &object::id > >,
 
-            ordered_non_unique< tag< by_expiration >, member< htlc_object, fc::time_point_sec, &htlc_object::expiration > >,
+            ordered_non_unique< tag< by_expiration >, member< htlc_object, 
+                  fc::time_point_sec, &htlc_object::expiration > >,
 
             ordered_non_unique< tag< by_from_id >,
-               composite_key< htlc_object,
-                  member< htlc_object, account_id_type,  &htlc_object::from >
+                  composite_key< htlc_object, member< htlc_object, account_id_type,  &htlc_object::from >
                >
             >
          >
@@ -81,7 +85,14 @@ namespace graphene { namespace chain {
 
 namespace fc
 {
-  template<> struct get_typename<fc::enum_type<unsigned char, graphene::chain::hash_algorithm>> { static const char* name() { return "fc::enum_type<unsigned char, graphene::chain::hash_algorithm>"; } };
+  template<> 
+  struct get_typename<fc::enum_type<unsigned char, graphene::chain::hash_algorithm>> 
+  { 
+     static const char* name()
+     { 
+        return "fc::enum_type<unsigned char, graphene::chain::hash_algorithm>"; 
+     } 
+   };
 }
 
 FC_REFLECT_ENUM( graphene::chain::hash_algorithm, (unknown)(ripemd160)(sha256)(sha1));

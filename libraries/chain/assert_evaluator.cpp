@@ -49,14 +49,6 @@ struct predicate_evaluator
    {
       FC_ASSERT( block_summary_id_type( block_header::num_from_id( p.id ) & 0xffff )(db).block_id == p.id );
    }
-   void operator()(const hash_operation_predicate& p)const
-   {
-	  // TODO: Implement this method
-   }
-   void operator()(const timeout_operation_predicate& p)const
-   {
-	  // TODO: Implement this method
-   }
 };
 
 void_result assert_evaluator::do_evaluate( const assert_operation& o )

@@ -30,7 +30,7 @@
 namespace graphene { 
    namespace chain {
 
-      optional<htlc_options> get_committee_htlc_options(graphene::chain::database& db)
+      optional<htlc_options> htlc_create_evaluator::get_committee_htlc_options(graphene::chain::database& db)
       {
          return db.get_global_properties().parameters.extensions.value.updatable_htlc_options;
       }
@@ -83,7 +83,7 @@ namespace graphene {
       }
 
       template<typename T>
-      bool test_hash(const std::vector<unsigned char>& incoming_preimage, const std::vector<unsigned char>& valid_hash)
+      bool htlc_update_evaluator::test_hash(const std::vector<unsigned char>& incoming_preimage, const std::vector<unsigned char>& valid_hash)
       {
          // convert incoming_preimage to an array
          unsigned char incoming_array[incoming_preimage.size()];

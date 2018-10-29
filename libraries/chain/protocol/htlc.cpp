@@ -26,11 +26,13 @@
 namespace graphene { namespace chain {
 
       void htlc_create_operation::validate()const {
-    	  //TODO: Implement
-    	  // signer must equal from
+    	   FC_ASSERT( source != destination );
+         FC_ASSERT( fee.amount >= 0 );
+         FC_ASSERT( amount.amount > 0 );
       }
+
       void htlc_update_operation::validate()const {
-    	  //TODO: Implement
-    	  // if preimage is provided, size must equal the size stored in the contract
+         FC_ASSERT( fee.amount >= 0 );
+         FC_ASSERT( preimage.size() > 0 );
       }
 } }

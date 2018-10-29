@@ -29,21 +29,26 @@ namespace graphene {
 
       class htlc_create_evaluator : public evaluator<htlc_create_evaluator>
       {
-      public:
-    	  typedef htlc_create_operation operation_type;
+         public:
+    	      typedef htlc_create_operation operation_type;
 
-    	  void_result do_evaluate( const htlc_create_operation& o);
-    	  object_id_type do_apply( const htlc_create_operation& o);
+    	      void_result do_evaluate( const htlc_create_operation& o);
+    	      object_id_type do_apply( const htlc_create_operation& o);
+         private:
+            optional<htlc_options> get_committee_htlc_options(graphene::chain::database& db);
       };
 
       class htlc_update_evaluator : public evaluator<htlc_update_evaluator>
       {
-      public:
-    	  typedef htlc_update_operation operation_type;
+         public:
+    	      typedef htlc_update_operation operation_type;
 
-    	  void_result do_evaluate( const htlc_update_operation& o);
-    	  void_result do_apply( const htlc_update_operation& o);
-    	  const htlc_object* htlc_obj = nullptr;
+    	      void_result do_evaluate( const htlc_update_operation& o);
+    	      void_result do_apply( const htlc_update_operation& o);
+    	      const htlc_object* htlc_obj = nullptr;
+         private:
+            template<typename T>
+            bool test_hash(const std::vector<unsigned char>& incoming_preimage, const std::vector<unsigned char>& valid_hash);
       };
    } // namespace graphene
 } // namespace graphene
