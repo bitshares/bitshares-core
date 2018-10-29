@@ -330,6 +330,10 @@ struct database_fixture {
    void transfer( account_id_type from, account_id_type to, const asset& amount, const asset& fee = asset() );
    void transfer( const account_object& from, const account_object& to, const asset& amount, const asset& fee = asset() );
    void fund_fee_pool( const account_object& from, const asset_object& asset_to_fund, const share_type amount );
+   /**
+    * NOTE: This modifies the database directly. You will probably have to call this each time you
+    * finish creating a block
+    */
    void enable_fees();
    void change_fees( const flat_set< fee_parameters >& new_params, uint32_t new_scale = 0 );
    void upgrade_to_lifetime_member( account_id_type account );

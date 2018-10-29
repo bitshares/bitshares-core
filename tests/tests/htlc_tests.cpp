@@ -195,9 +195,10 @@ BOOST_AUTO_TEST_CASE( htlc_fulfilled )
 	
    ACTORS((alice)(bob));
 
-   int64_t init_balance(100000);
+   int64_t init_balance(1000000);
 
    transfer( committee_account, alice_id, graphene::chain::asset(init_balance) );
+   transfer( committee_account, bob_id, graphene::chain::asset(init_balance) );
 
    uint16_t key_size = 256;
    std::vector<unsigned char> pre_image(key_size);
@@ -208,17 +209,19 @@ BOOST_AUTO_TEST_CASE( htlc_fulfilled )
    // cler everything out
    generate_block();
    trx.clear();
+   enable_fees();
    // Alice puts a contract on the blockchain
    {
       graphene::chain::htlc_create_operation create_operation;
 
-      create_operation.amount = graphene::chain::asset( 10000 );
+      create_operation.amount = graphene::chain::asset( 100000 );
       create_operation.destination = bob_id;
       create_operation.epoch = db.head_block_time() + fc::seconds(10);
       create_operation.key_hash = key_hash;
       create_operation.hash_type = graphene::chain::hash_algorithm::sha256;
       create_operation.key_size = key_size;
       create_operation.source = alice_id;
+      create_operation.fee = db.current_fee_schedule().calculate_fee( create_operation );
       trx.operations.push_back(create_operation);
       sign(trx, alice_private_key);
       PUSH_TX(db, trx, ~0);
@@ -230,7 +233,7 @@ BOOST_AUTO_TEST_CASE( htlc_fulfilled )
    }
 
    // verify funds on hold (make sure this can cover fees)
-   BOOST_CHECK_EQUAL( get_balance(alice_id, graphene::chain::asset_id_type()), 90000 );
+   BOOST_CHECK_EQUAL( get_balance(alice_id, graphene::chain::asset_id_type()), 700000 );
 
    // TODO: make sure Bob (or anyone) can see the details of the transaction
 
@@ -240,9 +243,17 @@ BOOST_AUTO_TEST_CASE( htlc_fulfilled )
       update_operation.update_issuer = bob_id;
       update_operation.htlc_id = alice_htlc_id;
       update_operation.preimage = pre_image;
+      update_operation.fee = db.current_fee_schedule().calculate_fee( update_operation );
       trx.operations.push_back(update_operation);
       sign(trx, bob_private_key);
-      PUSH_TX(db, trx, ~0);
+      try
+      {
+         PUSH_TX(db, trx, ~0);
+      } 
+      catch (fc::exception& ex)
+      {
+         BOOST_FAIL(ex.what());
+      }
       generate_block();
       trx.clear();
    }
@@ -258,8 +269,8 @@ BOOST_AUTO_TEST_CASE( htlc_fulfilled )
       trx.clear();
    }
    // verify funds end up in Bob's account
-   BOOST_CHECK_EQUAL( get_balance(bob_id,   graphene::chain::asset_id_type()), 10000 );
-   BOOST_CHECK_EQUAL( get_balance(alice_id, graphene::chain::asset_id_type()), 90000 );
+   BOOST_CHECK_EQUAL( get_balance(bob_id,   graphene::chain::asset_id_type()), 1000000 );
+   BOOST_CHECK_EQUAL( get_balance(alice_id, graphene::chain::asset_id_type()), 700000 );
 }
 
 BOOST_AUTO_TEST_CASE( other_peoples_money )

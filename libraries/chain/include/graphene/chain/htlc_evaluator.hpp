@@ -34,6 +34,7 @@ namespace graphene {
 
     	      void_result do_evaluate( const htlc_create_operation& o);
     	      object_id_type do_apply( const htlc_create_operation& o);
+
          private:
             optional<htlc_options> get_committee_htlc_options(graphene::chain::database& db);
       };

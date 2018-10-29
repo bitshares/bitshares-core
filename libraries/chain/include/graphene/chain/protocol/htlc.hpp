@@ -35,6 +35,7 @@ namespace graphene {
       {
          struct fee_parameters_type {
             uint64_t fee            = 1 * GRAPHENE_BLOCKCHAIN_PRECISION;
+            uint64_t price_per_day  = 1 * GRAPHENE_BLOCKCHAIN_PRECISION;
          };
          // paid to network
     	   asset fee; 
@@ -74,6 +75,17 @@ namespace graphene {
           */
          account_id_type fee_payer()const { return source; }
 
+         /****
+          * @brief calculates the fee to be paid for this operation
+          */
+         share_type calculate_fee(const fee_parameters_type& fee_params)const
+         {
+            // TODO: somehow base this on head block time instead of fc::time_point::now
+            uint32_t secs = 86400; // epoch.sec_since_epoch() - fc::time_point::now().sec_since_epoch();
+            uint32_t days = secs / (60 * 60 * 24);
+            return fee_params.fee + (fee_params.price_per_day * days);
+         }
+
       };
 
       struct htlc_update_operation : public base_operation
@@ -110,6 +122,14 @@ namespace graphene {
           * @brief Who is to pay the fee
           */
          account_id_type fee_payer()const { return update_issuer; }
+
+         /****
+          * @brief calculates the fee to be paid for this operation
+          */
+         share_type calculate_fee(const fee_parameters_type& fee_params)const
+         {
+            return fee_params.fee;
+         }
       };
    } 
 }

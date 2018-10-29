@@ -590,6 +590,13 @@ BOOST_AUTO_TEST_CASE( cli_create_htlc )
 
       int server_port_number = 0;
       app1 = start_application(app_dir, server_port_number);
+      // set committee parameters
+      app1->chain_database()->modify(app1->chain_database()->get_global_properties(), [](global_property_object& p) {
+         graphene::chain::htlc_options params;
+         params.max_preimage_size = 1024;
+         params.max_timeout_secs = 60 * 60 * 24 * 28;
+         p.parameters.extensions.value.updatable_htlc_options = params;
+      });
 
       // connect to the server
       client_connection con(app1, app_dir, server_port_number);
