@@ -1788,7 +1788,7 @@ public:
 
          account_object issuer_obj = get_account(issuer);
 
-         htlc_update_operation update_op;
+         htlc_redeem_operation update_op;
          update_op.htlc_id = htlc_obj->id;
          update_op.update_issuer = issuer_obj.id;
          update_op.preimage = preimage;
@@ -1804,7 +1804,26 @@ public:
 
    signed_transaction htlc_extend_expiry ( string htlc_id, string issuer, const fc::time_point_sec& timeout, bool broadcast)
    {
-      throw std::logic_error("Not Implemented");
+      try 
+      {
+         FC_ASSERT( !self.is_locked() );
+         fc::optional<htlc_object> htlc_obj = get_htlc(htlc_id);
+         FC_ASSERT(htlc_obj, "Could not find HTLC matching ${htlc}", ("htlc", htlc_id));
+
+         account_object issuer_obj = get_account(issuer);
+
+         htlc_extend_operation update_op;
+         update_op.htlc_id = htlc_obj->id;
+         update_op.update_issuer = issuer_obj.id;
+         update_op.epoch = timeout;
+
+         signed_transaction tx;
+         tx.operations.push_back(update_op);
+         set_operation_fees( tx, _remote_db->get_global_properties().parameters.current_fees);
+         tx.validate();
+
+         return sign_transaction(tx, broadcast);
+      } FC_CAPTURE_AND_RETHROW( (htlc_id)(issuer)(timeout)(broadcast) ) 
    }
 
    vector< vesting_balance_object_with_info > get_vesting_balances( string account_name )

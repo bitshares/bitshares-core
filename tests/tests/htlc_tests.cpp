@@ -44,7 +44,6 @@
 #include <graphene/chain/hardfork.hpp>
 
 #include <graphene/chain/balance_object.hpp>
-#include <graphene/chain/htlc_object.hpp>
 #include <graphene/chain/market_object.hpp>
 
 #include <graphene/app/api.hpp>
@@ -83,10 +82,14 @@ void set_committee_parameters(database_fixture* db_fixture)
 {
    // set the committee parameters
    db_fixture->db.modify(db_fixture->db.get_global_properties(), [](global_property_object& p) {
+      // htlc options
       graphene::chain::htlc_options params;
       params.max_preimage_size = 1024;
       params.max_timeout_secs = 60 * 60 * 24 * 28;
       p.parameters.extensions.value.updatable_htlc_options = params;
+      // htlc operation fees
+      p.parameters.current_fees->get<htlc_create_operation>().fee = 2 * GRAPHENE_BLOCKCHAIN_PRECISION;
+      p.parameters.current_fees->get<htlc_create_operation>().fee_per_day = 2 * GRAPHENE_BLOCKCHAIN_PRECISION;
    });
 }
 
@@ -239,7 +242,7 @@ BOOST_AUTO_TEST_CASE( htlc_fulfilled )
 
    // send an update operation to claim the funds
    {
-      graphene::chain::htlc_update_operation update_operation;
+      graphene::chain::htlc_redeem_operation update_operation;
       update_operation.update_issuer = bob_id;
       update_operation.htlc_id = alice_htlc_id;
       update_operation.preimage = pre_image;
@@ -254,17 +257,6 @@ BOOST_AUTO_TEST_CASE( htlc_fulfilled )
       {
          BOOST_FAIL(ex.what());
       }
-      generate_block();
-      trx.clear();
-   }
-   // verify Alice cannot execute the contract after the fact
-   {
-      graphene::chain::htlc_update_operation update_operation;
-      update_operation.update_issuer = alice_id;
-      update_operation.htlc_id = alice_htlc_id;
-      trx.operations.push_back(update_operation);
-      sign(trx, alice_private_key);
-      GRAPHENE_CHECK_THROW(PUSH_TX(db, trx, ~0), fc::exception);
       generate_block();
       trx.clear();
    }

@@ -31,8 +31,11 @@ namespace graphene { namespace chain {
          FC_ASSERT( amount.amount > 0 );
       }
 
-      void htlc_update_operation::validate()const {
+      void htlc_redeem_operation::validate()const {
          FC_ASSERT( fee.amount >= 0 );
          FC_ASSERT( preimage.size() > 0 );
+      }
+      void htlc_extend_operation::validate()const {
+         FC_ASSERT( fee.amount >= 0 );
       }
 } }

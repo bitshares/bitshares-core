@@ -260,7 +260,11 @@ struct get_impacted_account_visitor
    {
       _impacted.insert( op.fee_payer() ); 
    }
-   void operator()( const htlc_update_operation& op )
+   void operator()( const htlc_redeem_operation& op )
+   {
+      _impacted.insert( op.fee_payer() ); 
+   }
+   void operator()( const htlc_extend_operation& op )
    {
       _impacted.insert( op.fee_payer() ); 
    }

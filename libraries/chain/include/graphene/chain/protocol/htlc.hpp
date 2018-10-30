@@ -34,8 +34,8 @@ namespace graphene {
       struct htlc_create_operation : public base_operation 
       {
          struct fee_parameters_type {
-            uint64_t fee            = 1 * GRAPHENE_BLOCKCHAIN_PRECISION;
-            uint64_t price_per_day  = 1 * GRAPHENE_BLOCKCHAIN_PRECISION;
+            uint64_t fee = 1 * GRAPHENE_BLOCKCHAIN_PRECISION;
+            uint64_t fee_per_day = 1 * GRAPHENE_BLOCKCHAIN_PRECISION;
          };
          // paid to network
     	   asset fee; 
@@ -83,12 +83,12 @@ namespace graphene {
             // TODO: somehow base this on head block time instead of fc::time_point::now
             uint32_t secs = 86400; // epoch.sec_since_epoch() - fc::time_point::now().sec_since_epoch();
             uint32_t days = secs / (60 * 60 * 24);
-            return fee_params.fee + (fee_params.price_per_day * days);
+            return fee_params.fee + (fee_params.fee_per_day * days);
          }
 
       };
 
-      struct htlc_update_operation : public base_operation
+      struct htlc_redeem_operation : public base_operation
       {
          struct fee_parameters_type {
             uint64_t fee = 1 * GRAPHENE_BLOCKCHAIN_PRECISION;
@@ -131,11 +131,62 @@ namespace graphene {
             return fee_params.fee;
          }
       };
+
+      struct htlc_extend_operation : public base_operation
+      {
+         struct fee_parameters_type {
+            uint64_t fee = 1 * GRAPHENE_BLOCKCHAIN_PRECISION;
+            uint64_t fee_per_day = 1 * GRAPHENE_BLOCKCHAIN_PRECISION;
+         };
+         
+         // paid to network
+         asset fee;
+         // the object we are attempting to update
+         htlc_id_type htlc_id;
+         // who is attempting to update the transaction
+    	   account_id_type update_issuer;
+         // the new expiry
+    	   fc::time_point_sec epoch;
+         // for future expansion
+         extensions_type extensions; 
+
+         /***
+          * @brief Perform obvious checks to validate this object
+          */
+    	   void validate()const;
+         
+         /***
+          * @determines who should have signed this object
+          */
+         void get_required_active_authorities( boost::container::flat_set<account_id_type>& a )const
+         { 
+            a.insert(update_issuer); 
+         }
+
+         /**
+          * @brief Who is to pay the fee
+          */
+         account_id_type fee_payer()const { return update_issuer; }
+
+         /****
+          * @brief calculates the fee to be paid for this operation
+          */
+         share_type calculate_fee(const fee_parameters_type& fee_params)const
+         {
+            // TODO: somehow base this on head block time instead of fc::time_point::now
+            uint32_t secs = 86400; // epoch.sec_since_epoch() - fc::time_point::now().sec_since_epoch();
+            uint32_t days = secs / (60 * 60 * 24);
+            return fee_params.fee + (fee_params.fee_per_day * days);
+         }
+      };
    } 
 }
 
-FC_REFLECT( graphene::chain::htlc_create_operation::fee_parameters_type, (fee) )
-FC_REFLECT( graphene::chain::htlc_update_operation::fee_parameters_type, (fee) )
+FC_REFLECT( graphene::chain::htlc_create_operation::fee_parameters_type, (fee) (fee_per_day) )
+FC_REFLECT( graphene::chain::htlc_redeem_operation::fee_parameters_type, (fee) )
+FC_REFLECT( graphene::chain::htlc_extend_operation::fee_parameters_type, (fee) (fee_per_day))
 
-FC_REFLECT( graphene::chain::htlc_create_operation, (fee)(source)(destination)(amount)(key_hash)(key_size)(epoch)(extensions)(hash_type))
-FC_REFLECT( graphene::chain::htlc_update_operation, (fee)(htlc_id)(update_issuer)(preimage)(extensions))
+FC_REFLECT( graphene::chain::htlc_create_operation, 
+      (fee)(source)(destination)(amount)(key_hash)(key_size)(epoch)(extensions)(hash_type))
+FC_REFLECT( graphene::chain::htlc_redeem_operation, (fee)(htlc_id)(update_issuer)(preimage)(extensions))
+FC_REFLECT( graphene::chain::htlc_extend_operation, (fee)(htlc_id)(update_issuer)(epoch)(extensions))

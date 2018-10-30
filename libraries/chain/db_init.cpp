@@ -179,7 +179,8 @@ void database::initialize_evaluators()
    register_evaluator<asset_update_issuer_evaluator>();
    register_evaluator<asset_claim_pool_evaluator>();
    register_evaluator<htlc_create_evaluator>();
-   register_evaluator<htlc_update_evaluator>();
+   register_evaluator<htlc_redeem_evaluator>();
+   register_evaluator<htlc_extend_evaluator>();
 }
 
 void database::initialize_indexes()

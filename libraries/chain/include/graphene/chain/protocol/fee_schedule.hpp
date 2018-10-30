@@ -43,6 +43,12 @@ namespace graphene { namespace chain {
          FC_ASSERT( itr != parameters.end() );
          return itr->template get<typename Operation::fee_parameters_type>();
       }
+      typename Operation::fee_parameters_type& get(flat_set<fee_parameters>& parameters)
+      {
+         auto itr = parameters.find( typename Operation::fee_parameters_type() );
+         FC_ASSERT( itr != parameters.end() );
+         return itr->template get<typename Operation::fee_parameters_type>();
+      }
    };
 
    template<>

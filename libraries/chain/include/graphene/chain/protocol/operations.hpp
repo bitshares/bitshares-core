@@ -98,7 +98,8 @@ namespace graphene { namespace chain {
             asset_claim_pool_operation,
             asset_update_issuer_operation,
             htlc_create_operation,
-            htlc_update_operation
+            htlc_redeem_operation,
+            htlc_extend_operation
          > operation;
 
    /// @} // operations group

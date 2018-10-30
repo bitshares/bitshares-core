@@ -83,7 +83,11 @@ namespace graphene { namespace chain {
 
 } }  // graphene::chain
 
-FC_REFLECT( graphene::chain::htlc_options, (max_timeout_secs) (max_preimage_size) )
+FC_REFLECT( graphene::chain::htlc_options, 
+      (max_timeout_secs) 
+      (max_preimage_size) 
+)
+
 FC_REFLECT( graphene::chain::chain_parameters::ext, (updatable_htlc_options))
 
 FC_REFLECT( graphene::chain::chain_parameters,
