@@ -682,7 +682,7 @@ BOOST_AUTO_TEST_CASE( cli_create_htlc )
       std::vector<unsigned char> hash(preimage_md.data_size());
       for(size_t i = 0; i < preimage_md.data_size(); ++i)
          hash[i] = preimage_md.data()[i];
-      fc::time_point_sec timelock = fc::time_point::now() + fc::days(1);
+      uint32_t timelock = fc::days(1).to_seconds();
       graphene::chain::signed_transaction result_tx 
             = con.wallet_api_ptr->htlc_prepare("alice", "bob", 
             "BTS", "3", "RIPEMD160", hash, preimage_string.size(), timelock, true);

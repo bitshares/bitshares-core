@@ -53,7 +53,7 @@ namespace graphene {
          // the size of the preimage
     	   uint16_t key_size;
          // The time the funds will be returned to the source if not claimed
-    	   fc::time_point_sec epoch;
+    	   uint32_t seconds_in_force;
          // for future expansion
     	   extensions_type extensions; 
 
@@ -80,9 +80,7 @@ namespace graphene {
           */
          share_type calculate_fee(const fee_parameters_type& fee_params)const
          {
-            // TODO: somehow base this on head block time instead of fc::time_point::now
-            uint32_t secs = 86400; // epoch.sec_since_epoch() - fc::time_point::now().sec_since_epoch();
-            uint32_t days = secs / (60 * 60 * 24);
+            uint32_t days = seconds_in_force / (60 * 60 * 24);
             return fee_params.fee + (fee_params.fee_per_day * days);
          }
 
@@ -145,8 +143,8 @@ namespace graphene {
          htlc_id_type htlc_id;
          // who is attempting to update the transaction
     	   account_id_type update_issuer;
-         // the new expiry
-    	   fc::time_point_sec epoch;
+         // how much to add
+         uint32_t seconds_to_add;
          // for future expansion
          extensions_type extensions; 
 
@@ -173,9 +171,7 @@ namespace graphene {
           */
          share_type calculate_fee(const fee_parameters_type& fee_params)const
          {
-            // TODO: somehow base this on head block time instead of fc::time_point::now
-            uint32_t secs = 86400; // epoch.sec_since_epoch() - fc::time_point::now().sec_since_epoch();
-            uint32_t days = secs / (60 * 60 * 24);
+            uint32_t days = seconds_to_add / (60 * 60 * 24);
             return fee_params.fee + (fee_params.fee_per_day * days);
          }
       };
@@ -187,6 +183,6 @@ FC_REFLECT( graphene::chain::htlc_redeem_operation::fee_parameters_type, (fee) )
 FC_REFLECT( graphene::chain::htlc_extend_operation::fee_parameters_type, (fee) (fee_per_day))
 
 FC_REFLECT( graphene::chain::htlc_create_operation, 
-      (fee)(source)(destination)(amount)(key_hash)(key_size)(epoch)(extensions)(hash_type))
+      (fee)(source)(destination)(amount)(key_hash)(key_size)(seconds_in_force)(extensions)(hash_type))
 FC_REFLECT( graphene::chain::htlc_redeem_operation, (fee)(htlc_id)(update_issuer)(preimage)(extensions))
-FC_REFLECT( graphene::chain::htlc_extend_operation, (fee)(htlc_id)(update_issuer)(epoch)(extensions))
+FC_REFLECT( graphene::chain::htlc_extend_operation, (fee)(htlc_id)(update_issuer)(seconds_to_add)(extensions))

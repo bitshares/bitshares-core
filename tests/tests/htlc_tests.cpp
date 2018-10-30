@@ -117,14 +117,13 @@ BOOST_AUTO_TEST_CASE( htlc_before_hardfork )
    // cler everything out
    generate_block();
    trx.clear();
-   fc::time_point_sec expiration = db.head_block_time() + fc::seconds(60);
    // Alice puts a contract on the blockchain
    {
       graphene::chain::htlc_create_operation create_operation;
 
       create_operation.amount = graphene::chain::asset( 10000 );
       create_operation.destination = bob_id;
-      create_operation.epoch = expiration;
+      create_operation.seconds_in_force = 60;
       create_operation.key_hash = key_hash;
       create_operation.hash_type = graphene::chain::hash_algorithm::sha256;
       create_operation.key_size = key_size;
@@ -154,14 +153,13 @@ BOOST_AUTO_TEST_CASE( htlc_expires )
    // cler everything out
    generate_block();
    trx.clear();
-   fc::time_point_sec expiration = db.head_block_time() + fc::seconds(60);
    // Alice puts a contract on the blockchain
    {
       graphene::chain::htlc_create_operation create_operation;
 
       create_operation.amount = graphene::chain::asset( 10000 );
       create_operation.destination = bob_id;
-      create_operation.epoch = expiration;
+      create_operation.seconds_in_force = 60;
       create_operation.key_hash = key_hash;
       create_operation.hash_type = graphene::chain::hash_algorithm::sha256;
       create_operation.key_size = key_size;
@@ -186,9 +184,9 @@ BOOST_AUTO_TEST_CASE( htlc_expires )
    BOOST_CHECK(htlc);
 
    // let it expire (wait for timeout)
-   generate_blocks(expiration + fc::seconds(120) );
-   // verify funds return (what about fees?)
-   BOOST_CHECK_EQUAL( get_balance(alice_id, graphene::chain::asset_id_type()), 100000 );
+   generate_blocks(fc::time_point_sec(120) );
+   // verify funds return (minus the fees)
+   BOOST_CHECK_EQUAL( get_balance(alice_id, graphene::chain::asset_id_type()), 90000 );
    // verify Bob cannot execute the contract after the fact
 }
 
@@ -219,7 +217,7 @@ BOOST_AUTO_TEST_CASE( htlc_fulfilled )
 
       create_operation.amount = graphene::chain::asset( 100000 );
       create_operation.destination = bob_id;
-      create_operation.epoch = db.head_block_time() + fc::seconds(10);
+      create_operation.seconds_in_force = 86400;
       create_operation.key_hash = key_hash;
       create_operation.hash_type = graphene::chain::hash_algorithm::sha256;
       create_operation.key_size = key_size;
@@ -289,7 +287,7 @@ BOOST_AUTO_TEST_CASE( other_peoples_money )
       graphene::chain::htlc_create_operation create_operation;
       create_operation.amount = graphene::chain::asset( 10000 );
       create_operation.destination = bob_id;
-      create_operation.epoch = db.head_block_time() + fc::seconds(3);
+      create_operation.seconds_in_force = 3;
       create_operation.key_hash = key_hash;
       create_operation.key_size = key_size;
       create_operation.source = alice_id;
@@ -303,7 +301,7 @@ BOOST_AUTO_TEST_CASE( other_peoples_money )
       graphene::chain::htlc_create_operation create_operation;
       create_operation.amount = graphene::chain::asset( 10000 );
       create_operation.destination = bob_id;
-      create_operation.epoch = db.head_block_time() + fc::seconds(3);
+      create_operation.seconds_in_force = 3;
       create_operation.key_hash = key_hash;
       create_operation.hash_type = graphene::chain::hash_algorithm::sha256;
       create_operation.key_size = key_size;

@@ -45,12 +45,9 @@ namespace graphene {
          FC_ASSERT(htlc_options, "HTLC Committee options are not set.");
 
          // make sure the expiration is reasonable
-         FC_ASSERT( o.epoch.sec_since_epoch() < db().head_block_time().sec_since_epoch()
-               + htlc_options->max_timeout_secs, 
-               "HTLC Timeout exceeds allowed length" );
+         FC_ASSERT( o.seconds_in_force < htlc_options->max_timeout_secs, "HTLC Timeout exceeds allowed length" );
          // make sure the preimage length is reasonable
-         FC_ASSERT( o.key_size < htlc_options->max_preimage_size,
-               "HTLC preimage length exceeds allowed length" ); 
+         FC_ASSERT( o.key_size < htlc_options->max_preimage_size, "HTLC preimage length exceeds allowed length" ); 
          // make sure we have a hash algorithm set
          FC_ASSERT( o.hash_type != graphene::chain::hash_algorithm::unknown, "HTLC Hash Algorithm must be set" );
          // make sure sender has the funds for the HTLC
@@ -74,7 +71,7 @@ namespace graphene {
                 esc.amount                = o.amount;
                 esc.preimage_hash		   = o.key_hash;
                 esc.preimage_size		   = o.key_size;
-                esc.expiration		      = o.epoch;
+                esc.expiration		      = db().head_block_time() + o.seconds_in_force;
                 esc.preimage_hash_algorithm = o.hash_type;
              });
              return  esc.id;
@@ -140,7 +137,7 @@ namespace graphene {
       void_result htlc_extend_evaluator::do_apply(const htlc_extend_operation& o)
       {
          db().modify(*htlc_obj, [&o](htlc_object& db_obj) {
-            db_obj.expiration = o.epoch;
+            db_obj.expiration = fc::time_point_sec(db_obj.expiration.sec_since_epoch() + o.seconds_to_add);
          });
 
     	   return void_result();
