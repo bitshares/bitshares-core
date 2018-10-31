@@ -274,7 +274,9 @@ static void create_new_config_file(const fc::path& config_ini_path, const fc::pa
       if( !od ) continue;
 
       auto it = std::find_if( plugin_first_option.begin(), plugin_first_option.end(),
-                              [&od](const std::pair<std::string, std::string>& element){ return element.second == od->long_name();} );
+            [&od](const std::pair<std::string, std::string>& element) {
+         return element.second == od->long_name();
+      });
 
       if(*it != std::pair<std::string, std::string>("", ""))
          out_cfg << "# ==== " << it->first << " ==== \n";
