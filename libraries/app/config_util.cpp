@@ -260,6 +260,8 @@ static void create_new_config_file(const fc::path& config_ini_path, const fc::pa
    std::ofstream out_cfg(config_ini_path.preferred_string());
 
    std::vector<std::pair<std::string, std::string>> plugin_first_option;
+   plugin_first_option.push_back(std::make_pair("witness", "enable-stale-production"));
+   plugin_first_option.push_back(std::make_pair("debug_witness", "debug-private-key"));
    plugin_first_option.push_back(std::make_pair("account_history", "track-account"));
    plugin_first_option.push_back(std::make_pair("elasticsearch", "elasticsearch-node-url"));
    plugin_first_option.push_back(std::make_pair("market_history", "bucket-size"));
@@ -278,7 +280,7 @@ static void create_new_config_file(const fc::path& config_ini_path, const fc::pa
          return element.second == od->long_name();
       });
 
-      if(*it != std::pair<std::string, std::string>("", ""))
+      if(it != plugin_first_option.end())
          out_cfg << "# ==== " << it->first << " ==== \n";
 
       if( !od->description().empty() )
