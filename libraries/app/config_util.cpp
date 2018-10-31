@@ -258,10 +258,26 @@ static void create_new_config_file(const fc::path& config_ini_path, const fc::pa
    };
    deduplicator dedup(modify_option_defaults);
    std::ofstream out_cfg(config_ini_path.preferred_string());
+
+   std::vector<std::pair<std::string, std::string>> plugin_first_option;
+   plugin_first_option.push_back(std::make_pair("account_history", "track-account"));
+   plugin_first_option.push_back(std::make_pair("elasticsearch", "elasticsearch-node-url"));
+   plugin_first_option.push_back(std::make_pair("market_history", "bucket-size"));
+   plugin_first_option.push_back(std::make_pair("delayed_node", "trusted-node"));
+   plugin_first_option.push_back(std::make_pair("snapshot", "snapshot-at-block"));
+   plugin_first_option.push_back(std::make_pair("es_objects", "es-objects-elasticsearch-url"));
+   plugin_first_option.push_back(std::make_pair("grouped_orders", "tracked-groups"));
+
    for( const boost::shared_ptr<bpo::option_description> opt : cfg_options.options() )
    {
       const boost::shared_ptr<bpo::option_description> od = dedup.next(opt);
       if( !od ) continue;
+
+      auto it = std::find_if( plugin_first_option.begin(), plugin_first_option.end(),
+                              [&od](const std::pair<std::string, std::string>& element){ return element.second == od->long_name();} );
+
+      if(*it != std::pair<std::string, std::string>("", ""))
+         out_cfg << "# ==== " << it->first << " ==== \n";
 
       if( !od->description().empty() )
          out_cfg << "# " << od->description() << "\n";
