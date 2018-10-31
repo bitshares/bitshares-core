@@ -212,7 +212,7 @@ int main(int argc, char** argv)
        {
           std::shared_ptr<peer_probe> probe(new peer_probe());
           probe->start(remote, my_node_id, chain_id);
-          probes.push_back( probe );
+          probes.emplace_back( std::move( probe ) );
        }
        catch (const fc::exception&)
        {
@@ -222,10 +222,7 @@ int main(int argc, char** argv)
 
     if (!probes.empty())
     {
-       try {
-          probes[0]->wait( fc::microseconds(10000) );
-       } catch ( fc::timeout_exception& e ) { /* ignore */ }
-
+       fc::yield();
        std::vector<std::shared_ptr<peer_probe>> running;
        for ( auto& probe : probes ) {
           if (probe->_probe_complete_promise->error())
