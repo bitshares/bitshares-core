@@ -156,7 +156,7 @@ BOOST_AUTO_TEST_CASE(asset_claim_fees_test)
          fc::ecc::private_key your_pk = (issuer == izzy_id) ? jill_private_key : izzy_private_key;
          sign( tx, your_pk );
          GRAPHENE_REQUIRE_THROW( PUSH_TX( db, tx ), fc::exception );
-         tx.signatures.clear();
+         tx.clear_signatures();
          sign( tx, my_pk );
          PUSH_TX( db, tx );
       };

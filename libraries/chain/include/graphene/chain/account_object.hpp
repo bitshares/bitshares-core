@@ -53,9 +53,9 @@ namespace graphene { namespace chain {
           */
          account_transaction_history_id_type most_recent_op;
          /** Total operations related to this account. */
-         uint32_t                            total_ops = 0;
+         uint64_t                            total_ops = 0;
          /** Total operations related to this account that has been removed from the database. */
-         uint32_t                            removed_ops = 0;
+         uint64_t                            removed_ops = 0;
 
          /**
           * When calculating votes it is necessary to know how much is stored in orders (and thus unavailable for
@@ -292,6 +292,14 @@ namespace graphene { namespace chain {
     */
    class account_member_index : public secondary_index
    {
+      class key_compare {
+      public:
+         inline bool operator()( const public_key_type& a, const public_key_type& b )const
+         {
+            return a.key_data < b.key_data;
+         }
+      };
+
       public:
          virtual void object_inserted( const object& obj ) override;
          virtual void object_removed( const object& obj ) override;
@@ -301,18 +309,18 @@ namespace graphene { namespace chain {
 
          /** given an account or key, map it to the set of accounts that reference it in an active or owner authority */
          map< account_id_type, set<account_id_type> > account_to_account_memberships;
-         map< public_key_type, set<account_id_type> > account_to_key_memberships;
+         map< public_key_type, set<account_id_type>, key_compare > account_to_key_memberships;
          /** some accounts use address authorities in the genesis block */
          map< address, set<account_id_type> >         account_to_address_memberships;
 
 
       protected:
          set<account_id_type>  get_account_members( const account_object& a )const;
-         set<public_key_type>  get_key_members( const account_object& a )const;
+         set<public_key_type, key_compare>  get_key_members( const account_object& a )const;
          set<address>          get_address_members( const account_object& a )const;
 
          set<account_id_type>  before_account_members;
-         set<public_key_type>  before_key_members;
+         set<public_key_type, key_compare>  before_key_members;
          set<address>          before_address_members;
    };
 

@@ -247,12 +247,12 @@ struct operation_process_fill_order
              db.modify( *bucket_itr, [&]( bucket_object& b ){
                   try {
                      b.base_volume += trade_price.base.amount;
-                  } catch( fc::overflow_exception ) {
+                  } catch( fc::overflow_exception& ) {
                      b.base_volume = std::numeric_limits<int64_t>::max();
                   }
                   try {
                      b.quote_volume += trade_price.quote.amount;
-                  } catch( fc::overflow_exception ) {
+                  } catch( fc::overflow_exception& ) {
                      b.quote_volume = std::numeric_limits<int64_t>::max();
                   }
                   b.close_base = fill_price.base.amount;

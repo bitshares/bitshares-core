@@ -92,7 +92,7 @@ namespace graphene { namespace chain {
          static const uint8_t type_id  = impl_account_transaction_history_object_type;
          account_id_type                      account; /// the account this operation applies to
          operation_history_id_type            operation_id;
-         uint32_t                             sequence = 0; /// the operation position within the given account
+         uint64_t                             sequence = 0; /// the operation position within the given account
          account_transaction_history_id_type  next;
 
          //std::pair<account_id_type,operation_history_id_type>  account_op()const  { return std::tie( account, operation_id ); }
@@ -121,7 +121,7 @@ namespace graphene { namespace chain {
          ordered_unique< tag<by_seq>,
             composite_key< account_transaction_history_object,
                member< account_transaction_history_object, account_id_type, &account_transaction_history_object::account>,
-               member< account_transaction_history_object, uint32_t, &account_transaction_history_object::sequence>
+               member< account_transaction_history_object, uint64_t, &account_transaction_history_object::sequence>
             >
          >,
          ordered_unique< tag<by_op>,

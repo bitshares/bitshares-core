@@ -87,8 +87,7 @@ BOOST_AUTO_TEST_CASE( get_potential_signatures_owner_and_active ) {
          trx.operations.push_back(op);
          sign(trx, nathan_key1);
          PUSH_TX( db, trx, database::skip_transaction_dupe_check );
-         trx.operations.clear();
-         trx.signatures.clear();
+         trx.clear();
       } FC_CAPTURE_AND_RETHROW ((nathan.active))
 
       // this op requires active
@@ -155,8 +154,7 @@ BOOST_AUTO_TEST_CASE( get_required_signatures_owner_or_active ) {
          trx.operations.push_back(op);
          sign(trx, nathan_key1);
          PUSH_TX( db, trx, database::skip_transaction_dupe_check );
-         trx.operations.clear();
-         trx.signatures.clear();
+         trx.clear();
       } FC_CAPTURE_AND_RETHROW ((nathan.active))
 
       graphene::app::database_api db_api(db);
@@ -310,7 +308,7 @@ BOOST_AUTO_TEST_CASE( get_required_signatures_partially_signed_or_not ) {
       BOOST_CHECK( pub_keys.find( pub_key_morgan ) != pub_keys.end() );
 
       // sign with m, should be enough
-      trx.signatures.clear();
+      trx.clear_signatures();
       sign(trx, morgan_key);
 
       // provides [], should return []
@@ -365,7 +363,7 @@ BOOST_AUTO_TEST_CASE( get_required_signatures_partially_signed_or_not ) {
       BOOST_CHECK( pub_keys.size() == 0 );
 
       // make a transaction that require 2 signatures (m+n)
-      trx.signatures.clear();
+      trx.clear_signatures();
       op.from = nathan.id;
       trx.operations.push_back(op);
 
@@ -492,7 +490,7 @@ BOOST_AUTO_TEST_CASE( get_required_signatures_partially_signed_or_not ) {
       BOOST_CHECK( pub_keys.find( pub_key_nathan ) != pub_keys.end() );
 
       // sign with m, but actually need m+n
-      trx.signatures.clear();
+      trx.clear_signatures();
       sign(trx, morgan_key);
 
       // provides [], should return []

@@ -501,28 +501,34 @@ class database_api
       vector<market_volume> get_top_markets(uint32_t limit)const;
 
       /**
-       * @brief Returns recent trades for the market assetA:assetB, ordered by time, most recent first. The range is [stop, start)
-       * Note: Currently, timezone offsets are not supported. The time must be UTC.
-       * @param a String name of the first asset
-       * @param b String name of the second asset
-       * @param stop Stop time as a UNIX timestamp, the earliest trade to retrieve
-       * @param limit Number of trasactions to retrieve, capped at 100
+       * @brief Returns recent trades for the market base:quote, ordered by time, most recent first.
+       * Note: Currently, timezone offsets are not supported. The time must be UTC. The range is [stop, start).
+       *       In case when there are more than 100 trades occurred in the same second, this API only returns
+       *       the first 100 records, can use another API `get_trade_history_by_sequence` to query for the rest.
+       * @param base symbol or ID of the base asset
+       * @param quote symbol or ID of the quote asset
        * @param start Start time as a UNIX timestamp, the latest trade to retrieve
+       * @param stop Stop time as a UNIX timestamp, the earliest trade to retrieve
+       * @param limit Number of trasactions to retrieve, capped at 100.
        * @return Recent transactions in the market
        */
-      vector<market_trade> get_trade_history( const string& base, const string& quote, fc::time_point_sec start, fc::time_point_sec stop, unsigned limit = 100 )const;
+      vector<market_trade> get_trade_history( const string& base, const string& quote,
+                                              fc::time_point_sec start, fc::time_point_sec stop,
+                                              unsigned limit = 100 )const;
 
       /**
-       * @brief Returns trades for the market assetA:assetB, ordered by time, most recent first. The range is [stop, start)
-       * Note: Currently, timezone offsets are not supported. The time must be UTC.
-       * @param a String name of the first asset
-       * @param b String name of the second asset
+       * @brief Returns trades for the market base:quote, ordered by time, most recent first.
+       * Note: Currently, timezone offsets are not supported. The time must be UTC. The range is [stop, start).
+       * @param base symbol or ID of the base asset
+       * @param quote symbol or ID of the quote asset
+       * @param start Start sequence as an Integer, the latest trade to retrieve
        * @param stop Stop time as a UNIX timestamp, the earliest trade to retrieve
        * @param limit Number of trasactions to retrieve, capped at 100
-       * @param start Start sequence as an Integer, the latest trade to retrieve
        * @return Transactions in the market
        */
-      vector<market_trade> get_trade_history_by_sequence( const string& base, const string& quote, int64_t start, fc::time_point_sec stop, unsigned limit = 100 )const;
+      vector<market_trade> get_trade_history_by_sequence( const string& base, const string& quote,
+                                                          int64_t start, fc::time_point_sec stop,
+                                                          unsigned limit = 100 )const;
 
 
 
