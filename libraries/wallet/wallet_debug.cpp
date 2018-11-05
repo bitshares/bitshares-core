@@ -58,4 +58,10 @@ void wallet_api::dbg_update_object( fc::variant_object update )
    my->dbg_update_object( update );
 }
 
+void wallet_api::flood_network(string prefix, uint32_t number_of_transactions)
+{
+   FC_ASSERT(!is_locked());
+   my->flood_network(prefix, number_of_transactions);
+}
+
 }} // graphene::wallet
