@@ -1765,6 +1765,24 @@ public:
    } FC_CAPTURE_AND_RETHROW( (account_name) )
    }
 
+   vector<vesting_balance_object_with_info> get_mfs_vesting_balances(string account_name_or_id) const
+   { try {
+       fc::time_point_sec now = _remote_db->get_dynamic_global_properties().time;
+
+       auto account = get_account(account_name_or_id);
+       auto always_id = account_id_to_string(account.id);
+
+       vector<vesting_balance_object> vbos = _remote_db->get_mfs_vesting_balances(always_id);
+
+       std::vector<vesting_balance_object_with_info> result;
+       for (const vesting_balance_object& vbo : vbos)
+       {
+          result.emplace_back(vbo, now);
+       }
+       return result;
+   } FC_CAPTURE_AND_RETHROW( (account_name_or_id) )
+   }
+
    signed_transaction withdraw_vesting(
       string witness_name,
       string amount,
@@ -3692,6 +3710,11 @@ signed_transaction wallet_api::update_witness(
 vector< vesting_balance_object_with_info > wallet_api::get_vesting_balances( string account_name )
 {
    return my->get_vesting_balances( account_name );
+}
+
+vector<vesting_balance_object_with_info> wallet_api::get_mfs_vesting_balances(string account_name_or_id)
+{
+   return my->get_mfs_vesting_balances(account_name_or_id);
 }
 
 signed_transaction wallet_api::withdraw_vesting(

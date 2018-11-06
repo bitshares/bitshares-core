@@ -23,6 +23,7 @@
  */
 #include <boost/test/unit_test.hpp>
 #include <boost/program_options.hpp>
+#include <boost/range/algorithm.hpp>
 
 #include <graphene/account_history/account_history_plugin.hpp>
 #include <graphene/market_history/market_history_plugin.hpp>
@@ -55,7 +56,7 @@ namespace graphene { namespace chain {
 using std::cout;
 using std::cerr;
 
-database_fixture::database_fixture()
+database_fixture::database_fixture(const fc::time_point_sec &initial_timestamp)
    : app(), db( *app.chain_database() )
 {
    try {
@@ -75,7 +76,7 @@ database_fixture::database_fixture()
 
    boost::program_options::variables_map options;
 
-   genesis_state.initial_timestamp = time_point_sec( GRAPHENE_TESTING_GENESIS_TIMESTAMP );
+   genesis_state.initial_timestamp = initial_timestamp;
 
    genesis_state.initial_active_witnesses = 10;
    for( unsigned int i = 0; i < genesis_state.initial_active_witnesses; ++i )
@@ -509,8 +510,9 @@ const asset_object& database_fixture::create_user_issued_asset( const string& na
    return db.get<asset_object>(ptx.operation_results[0].get<object_id_type>());
 }
 
-const asset_object& database_fixture::create_user_issued_asset( const string& name, const account_object& issuer, uint16_t flags,
-                                                                const price& core_exchange_rate, uint16_t precision)
+const asset_object& database_fixture::create_user_issued_asset( const string& name, const account_object& issuer,
+                                                               uint16_t flags, const price& core_exchange_rate,
+                                                               uint16_t precision, uint16_t market_fee_percent)
 {
    asset_create_operation creator;
    creator.issuer = issuer.id;
@@ -522,6 +524,7 @@ const asset_object& database_fixture::create_user_issued_asset( const string& na
    creator.common_options.max_supply = GRAPHENE_MAX_SHARE_SUPPLY;
    creator.common_options.flags = flags;
    creator.common_options.issuer_permissions = flags;
+   creator.common_options.market_fee_percent = market_fee_percent;
    trx.operations.clear();
    trx.operations.push_back(std::move(creator));
    set_expiration( db, trx );
@@ -723,6 +726,9 @@ const limit_order_object* database_fixture::create_sell_order( const account_obj
                                                 const time_point_sec order_expiration,
                                                 const price& fee_core_exchange_rate )
 {
+   set_expiration( db, trx );
+   trx.operations.clear();
+
    limit_order_create_operation buy_order;
    buy_order.seller = user.id;
    buy_order.amount_to_sell = amount;
@@ -1118,6 +1124,25 @@ int64_t database_fixture::get_balance( account_id_type account, asset_id_type a 
 int64_t database_fixture::get_balance( const account_object& account, const asset_object& a )const
 {
   return db.get_balance(account.get_id(), a.get_id()).amount.value;
+}
+
+int64_t database_fixture::get_market_fee_reward( account_id_type account, asset_id_type asset_type)const
+{
+   auto& vesting_balances = db.get_index_type<vesting_balance_index>().indices().get<by_vesting_type>();
+   auto market_vesting_balances = vesting_balances.equal_range(boost::make_tuple(account, vesting_balance_type::market_fee_sharing));
+   auto market_balance = boost::range::find_if(market_vesting_balances,
+      [&asset_type](const vesting_balance_object& vbo) { return vbo.balance.asset_id == asset_type;}
+   );
+
+  FC_ASSERT( market_balance != boost::end(market_vesting_balances) );
+
+  auto allowed_to_withdraw = market_balance->get_allowed_withdraw(db.head_block_time());
+  return allowed_to_withdraw.amount.value;
+}
+
+int64_t database_fixture::get_market_fee_reward( const account_object& account, const asset_object& a )const
+{
+  return get_market_fee_reward(account.get_id(), a.get_id());
 }
 
 vector< operation_history_object > database_fixture::get_operation_history( account_id_type account_id )const

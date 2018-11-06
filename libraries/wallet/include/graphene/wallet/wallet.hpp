@@ -1455,6 +1455,13 @@ class wallet_api
        */
       vector< vesting_balance_object_with_info > get_vesting_balances( string account_name );
 
+      /** List account's market fee sharing vesting balances.
+       * Each account can have multiple market fee sharing vesting balances.
+       * @param account_name_or_id the name or id of the account whose balances you want
+       * @returns a list of the given account's market fee sharing vesting balances
+       */
+      vector< vesting_balance_object_with_info > get_mfs_vesting_balances(string account_name_or_id);
+
       /**
        * Withdraw a vesting balance.
        *
@@ -1799,6 +1806,7 @@ FC_API( graphene::wallet::wallet_api,
         (create_worker)
         (update_worker_votes)
         (get_vesting_balances)
+        (get_mfs_vesting_balances)
         (withdraw_vesting)
         (vote_for_committee_member)
         (vote_for_witness)

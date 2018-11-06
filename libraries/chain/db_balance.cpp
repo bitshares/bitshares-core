@@ -28,6 +28,7 @@
 #include <graphene/chain/asset_object.hpp>
 #include <graphene/chain/vesting_balance_object.hpp>
 #include <graphene/chain/witness_object.hpp>
+#include <boost/range/algorithm.hpp>
 
 namespace graphene { namespace chain {
 
@@ -79,6 +80,40 @@ void database::adjust_balance(account_id_type account, asset delta )
    }
 
 } FC_CAPTURE_AND_RETHROW( (account)(delta) ) }
+
+void database::deposit_market_fee_vesting_balance(const account_id_type &account_id, const asset &delta)
+{ try {
+   FC_ASSERT( delta.amount > 0, "Invalid negative value for balance");
+
+   if( delta.amount == 0 )
+      return;
+
+   auto& vesting_balances = get_index_type<vesting_balance_index>().indices().get<by_vesting_type>();
+   auto market_vesting_balances = vesting_balances.equal_range(boost::make_tuple(account_id, vesting_balance_type::market_fee_sharing));
+   auto market_balance = boost::range::find_if(market_vesting_balances,
+      [&delta](const vesting_balance_object& vbo) { return vbo.balance.asset_id == delta.asset_id;}
+   );
+
+   if(market_balance == boost::end(market_vesting_balances) )
+   {
+      create<vesting_balance_object>([&](vesting_balance_object &vbo) {
+         vbo.owner = account_id;
+         vbo.balance = delta;
+         vbo.balance_type = vesting_balance_type::market_fee_sharing;
+         cdd_vesting_policy policy;
+         policy.vesting_seconds = { 0 };
+         policy.coin_seconds_earned = vbo.balance.amount.value;
+         policy.coin_seconds_earned_last_update = head_block_time();
+         vbo.policy = policy;
+      });
+   } else {
+      modify( *market_balance, [&]( vesting_balance_object& vbo )
+      {
+         vbo.deposit_vested(head_block_time(), delta);
+      });
+   }
+
+} FC_CAPTURE_AND_RETHROW( (account_id)(delta) ) }
 
 optional< vesting_balance_id_type > database::deposit_lazy_vesting(
    const optional< vesting_balance_id_type >& ovbid,

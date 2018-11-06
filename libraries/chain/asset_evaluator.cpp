@@ -45,6 +45,12 @@ void_result asset_create_evaluator::do_evaluate( const asset_create_operation& o
    FC_ASSERT( op.common_options.whitelist_authorities.size() <= chain_parameters.maximum_asset_whitelist_authorities );
    FC_ASSERT( op.common_options.blacklist_authorities.size() <= chain_parameters.maximum_asset_whitelist_authorities );
 
+   if( d.head_block_time() < HARDFORK_1268_TIME )
+   {
+      FC_ASSERT(!op.common_options.additional_options.value.null_ext.valid());
+      FC_ASSERT(!op.common_options.additional_options.value.reward_percent.valid());
+   }
+
    // Check that all authorities do exist
    for( auto id : op.common_options.whitelist_authorities )
       d.get_object(id);
@@ -275,6 +281,12 @@ void_result asset_update_evaluator::do_evaluate(const asset_update_operation& o)
       FC_ASSERT( d.head_block_time() < HARDFORK_CORE_199_TIME,
                  "Since Hardfork #199, updating issuer requires the use of asset_update_issuer_operation.");
       validate_new_issuer( d, a, *o.new_issuer );
+   }
+
+   if ( o.new_options.additional_options.value.reward_percent.valid() )
+   {
+      FC_ASSERT( d.head_block_time() >= HARDFORK_1268_TIME,
+         "Referrer percent is only available after HARDFORK_1268_TIME!");
    }
 
    if( (d.head_block_time() < HARDFORK_572_TIME) || (a.dynamic_asset_data_id(d).current_supply != 0) )

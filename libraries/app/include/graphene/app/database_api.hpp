@@ -364,6 +364,8 @@ class database_api
 
       vector<vesting_balance_object> get_vesting_balances( const std::string account_id_or_name )const;
 
+      vector<vesting_balance_object> get_mfs_vesting_balances( const std::string account_id_or_name )const;
+
       /**
        * @brief Get the total number of accounts registered with the blockchain
        */
@@ -784,6 +786,7 @@ FC_API(graphene::app::database_api,
    (get_balance_objects)
    (get_vested_balances)
    (get_vesting_balances)
+   (get_mfs_vesting_balances)
 
    // Assets
    (get_assets)

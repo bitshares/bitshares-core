@@ -26,6 +26,7 @@
 #include <graphene/chain/protocol/asset.hpp>
 #include <graphene/db/object.hpp>
 #include <graphene/db/generic_index.hpp>
+#include <boost/multi_index/composite_key.hpp>
 
 #include <fc/static_variant.hpp>
 #include <fc/uint128.hpp>
@@ -124,6 +125,9 @@ namespace graphene { namespace chain {
       cdd_vesting_policy
       > vesting_policy;
 
+   enum class vesting_balance_type { unspecified,
+                                          worker,
+                                          market_fee_sharing };
    /**
     * Vesting balance object is a balance that is locked by the blockchain for a period of time.
     */
@@ -140,6 +144,8 @@ namespace graphene { namespace chain {
          asset balance;
          /// The vesting policy stores details on when funds vest, and controls when they may be withdrawn
          vesting_policy policy;
+         /// type of the vesting balance
+         vesting_balance_type balance_type = vesting_balance_type::unspecified;
 
          vesting_balance_object() {}
 
@@ -171,12 +177,22 @@ namespace graphene { namespace chain {
     * @ingroup object_index
     */
    struct by_account;
+   struct by_vesting_type;
+
    typedef multi_index_container<
       vesting_balance_object,
       indexed_by<
-         ordered_unique< tag<by_id>, member< object, object_id_type, &object::id > >,
+         ordered_unique< tag<by_id>, member< object, object_id_type, &object::id >
+         >,
          ordered_non_unique< tag<by_account>,
             member<vesting_balance_object, account_id_type, &vesting_balance_object::owner>
+         >,
+         ordered_non_unique< tag<by_vesting_type>,
+            composite_key<
+               vesting_balance_object,
+               member<vesting_balance_object, account_id_type, &vesting_balance_object::owner>,
+               member<vesting_balance_object, vesting_balance_type, &vesting_balance_object::balance_type>
+            >
          >
       >
    > vesting_balance_multi_index_type;

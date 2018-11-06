@@ -303,6 +303,8 @@ namespace graphene { namespace chain {
           */
          void adjust_balance(account_id_type account, asset delta);
 
+         void deposit_market_fee_vesting_balance(const account_id_type &account, const asset &delta);
+
          /**
           * @brief Helper to make lazy deposit to CDD VBO.
           *
@@ -395,6 +397,7 @@ namespace graphene { namespace chain {
 
          asset calculate_market_fee(const asset_object& recv_asset, const asset& trade_amount);
          asset pay_market_fees( const asset_object& recv_asset, const asset& receives );
+         asset pay_market_fees( const account_object& seller, const asset_object& recv_asset, const asset& receives );
 
 
          ///@{
