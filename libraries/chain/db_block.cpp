@@ -775,9 +775,7 @@ fc::future<void> database::precompute_parallel( const signed_block& block, const
       else
       {
          uint32_t chunks = fc::asio::default_io_service_scope::get_num_threads();
-         uint32_t chunk_size = block.transactions.size() / chunks;
-         if( chunks * chunk_size < block.transactions.size() )
-            chunk_size++;
+         uint32_t chunk_size = ( block.transactions.size() + chunks - 1 ) / chunks;
          workers.reserve( chunks + 1 );
          for( size_t base = 0; base < block.transactions.size(); base += chunk_size )
             workers.push_back( fc::do_parallel( [this,&block,base,chunk_size,skip] () {

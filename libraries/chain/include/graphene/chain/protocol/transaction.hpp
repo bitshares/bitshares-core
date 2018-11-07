@@ -89,7 +89,6 @@ namespace graphene { namespace chain {
       digest_type                        digest()const;
       virtual const transaction_id_type& id()const;
       virtual void                       validate() const;
-      /// Calculate the digest used for signature validation
 
       void set_expiration( fc::time_point_sec expiration_time );
       void set_reference_block( const block_id_type& reference_block );
@@ -115,6 +114,7 @@ namespace graphene { namespace chain {
       void get_required_authorities( flat_set<account_id_type>& active, flat_set<account_id_type>& owner, vector<authority>& other )const;
 
    protected:
+      // Calculate the digest used for signature validation
       digest_type sig_digest( const chain_id_type& chain_id )const;
       mutable transaction_id_type _tx_id_buffer;
    };
@@ -206,9 +206,9 @@ namespace graphene { namespace chain {
       precomputable_transaction( const signed_transaction& tx ) : signed_transaction(tx) {};
       precomputable_transaction( signed_transaction&& tx ) : signed_transaction( std::move(tx) ) {};
 
-      virtual const transaction_id_type&       id()const;
-      virtual void                             validate() const;
-      virtual const flat_set<public_key_type>& get_signature_keys( const chain_id_type& chain_id )const;
+      virtual const transaction_id_type&       id()const override;
+      virtual void                             validate()const override;
+      virtual const flat_set<public_key_type>& get_signature_keys( const chain_id_type& chain_id )const override;
    protected:
       mutable bool _validated = false;
    };

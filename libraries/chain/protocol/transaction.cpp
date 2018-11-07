@@ -303,8 +303,6 @@ void verify_authority( const vector<operation>& ops, const flat_set<public_key_t
 
 const flat_set<public_key_type>& signed_transaction::get_signature_keys( const chain_id_type& chain_id )const
 { try {
-   // Strictly we should check whether the given chain ID is same as the one used to initialize the `signees` field.
-   // However, we don't pass in another chain ID so far, for better performance, we skip the check.
    auto d = sig_digest( chain_id );
    flat_set<public_key_type> result;
    for( const auto&  sig : signatures )
@@ -397,6 +395,8 @@ void precomputable_transaction::validate() const
 
 const flat_set<public_key_type>& precomputable_transaction::get_signature_keys( const chain_id_type& chain_id )const
 {
+   // Strictly we should check whether the given chain ID is same as the one used to initialize the `signees` field.
+   // However, we don't pass in another chain ID so far, for better performance, we skip the check.
    if( _signees.empty() )
       signed_transaction::get_signature_keys( chain_id );
    return _signees;

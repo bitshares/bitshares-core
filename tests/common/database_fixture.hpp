@@ -172,6 +172,7 @@ namespace graphene { namespace chain {
 
 class clearable_block : public signed_block {
 public:
+   /** @brief Clears internal cached values like ID, signing key, Merkle root etc. */
    void clear();
 };
 

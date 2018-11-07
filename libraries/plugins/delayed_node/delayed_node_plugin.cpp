@@ -103,6 +103,7 @@ void delayed_node_plugin::sync_with_trusted_node()
       while( remote_dpo.last_irreversible_block_num > db.head_block_num() )
       {
          fc::optional<graphene::chain::signed_block> block = my->database_api->get_block( db.head_block_num()+1 );
+         // TODO: during sync, decouple requesting blocks from preprocessing + applying them
          FC_ASSERT(block, "Trusted node claims it has blocks it doesn't actually have.");
          ilog("Pushing block #${n}", ("n", block->block_num()));
          db.precompute_parallel( *block, graphene::chain::database::skip_nothing ).wait();
