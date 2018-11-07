@@ -144,6 +144,12 @@ void_result proposal_create_evaluator::do_evaluate(const proposal_create_operati
       for( auto& op : o.proposed_ops )
       {
          operation_get_required_authorities(op.op, auths, auths, other);
+         // If we are attempting to set HTLC parameters, make sure the HTLC hardfork date has passed.
+         if (op.op.which() == operation::tag<committee_member_update_global_parameters_operation>::value)
+            if (d.head_block_time() < HARDFORK_HTLC_TIME)
+               if (op.op.get<committee_member_update_global_parameters_operation>().new_parameters.extensions
+               .value.updatable_htlc_options.valid())
+                  FC_ASSERT(false, "Unable to set HTLC parameters before hardfork.");
       }
 
       FC_ASSERT( other.size() == 0 ); // TODO: what about other??? 

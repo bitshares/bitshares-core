@@ -117,7 +117,7 @@ BOOST_AUTO_TEST_CASE( htlc_before_hardfork )
    // cler everything out
    generate_block();
    trx.clear();
-   // Alice puts a contract on the blockchain
+   // Alice tries to put a contract on the blockchain
    {
       graphene::chain::htlc_create_operation create_operation;
 
@@ -131,6 +131,17 @@ BOOST_AUTO_TEST_CASE( htlc_before_hardfork )
       trx.operations.push_back(create_operation);
       sign(trx, alice_private_key);
       GRAPHENE_CHECK_THROW(PUSH_TX(db, trx, ~0), fc::exception);
+   }
+   // attempt to create a proposal that contains htlc stuff
+   {
+
+      graphene::chain::committee_member_update_global_parameters_operation param_op;
+
+      graphene::chain::proposal_create_operation create_operation;
+
+      create_operation.fee_paying_account = committee_account;
+      create_operation.review_period_seconds = 60 * 60 * 48;
+      create_operation.proposed_ops.emplace_back(param_op);
    }
 }
 
@@ -337,11 +348,9 @@ BOOST_AUTO_TEST_CASE( set_htlc_params )
                                      get_account("init6").get_id(), get_account("init7").get_id()};
       trx.operations.push_back(uop);
       sign( trx, init_account_priv_key );
-      db.push_transaction(trx);
-      BOOST_CHECK(proposal_id_type()(db).is_authorized_to_execute(db));
-      generate_blocks(proposal_id_type()(db).expiration_time + 5);
-      generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
-      // the proposal should have failed
+      BOOST_TEST_MESSAGE("Sending proposal.");
+      GRAPHENE_CHECK_THROW(db.push_transaction(trx), fc::exception);
+      BOOST_TEST_MESSAGE("Verifying that proposal did not succeeed.");
       BOOST_CHECK(!db.get_global_properties().parameters.extensions.value.updatable_htlc_options.valid());
       trx.clear();
    }
