@@ -70,7 +70,7 @@ int main(int argc, char** argv) {
 
       bpo::variables_map options;
 
-      auto witness_plug = node->register_plugin<witness_plugin::witness_plugin>();
+      auto witness_plug = node->register_plugin<witness_plugin::witness_plugin>(true);
       auto debug_witness_plug = node->register_plugin<debug_witness_plugin::debug_witness_plugin>();
       auto history_plug = node->register_plugin<account_history::account_history_plugin>();
       auto elasticsearch_plug = node->register_plugin<elasticsearch::elasticsearch_plugin>();
