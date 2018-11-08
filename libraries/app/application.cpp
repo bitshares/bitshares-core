@@ -1007,31 +1007,17 @@ void application::initialize(const fc::path& data_dir, const boost::program_opti
       fc::asio::default_io_service_scope::set_num_threads(num_threads);
    }
 
-   std::vector<string> wanted;
-   if( options.count("plugins") )
-   {
-      boost::split(wanted, options.at("plugins").as<std::string>(), [](char c){return c == ' ';});
-   }
-   else
-   {
-      wanted.push_back("witness");
-      wanted.push_back("account_history");
-      wanted.push_back("market_history");
-      wanted.push_back("grouped_orders");
-   }
-   int es_ah_conflict_counter = 0;
-   for (auto& it : wanted)
-   {
-      if(it == "account_history")
-         ++es_ah_conflict_counter;
-      if(it == "elasticsearch")
-         ++es_ah_conflict_counter;
+   if (options.count("plugins")) {
+       std::set<string> plugins;
+       boost::split(plugins, options.at("plugins").as<std::string>(), [](char c){return c == ' ';});
 
-      if(es_ah_conflict_counter > 1) {
-         elog("Can't start program with elasticsearch and account_history plugin at the same time");
-         std::exit(EXIT_FAILURE);
-      }
-      if (!it.empty()) enable_plugin(it);
+       FC_ASSERT(!(plugins.count("account_history") && plugins.count("elasticsearch")),
+                 "Plugin conflict: Cannot load both account_history plugin and elasticsearch plugin");
+
+       std::for_each(plugins.begin(), plugins.end(), [this](const string& plug) mutable {
+           if (!plug.empty())
+               enable_plugin(plug);
+       });
    }
 }
 
