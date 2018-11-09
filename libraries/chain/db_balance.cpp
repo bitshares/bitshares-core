@@ -83,7 +83,7 @@ void database::adjust_balance(account_id_type account, asset delta )
 
 void database::deposit_market_fee_vesting_balance(const account_id_type &account_id, const asset &delta)
 { try {
-   FC_ASSERT( delta.amount > 0, "Invalid negative value for balance");
+   FC_ASSERT( delta.amount >= 0, "Invalid negative value for balance");
 
    if( delta.amount == 0 )
       return;
@@ -94,22 +94,26 @@ void database::deposit_market_fee_vesting_balance(const account_id_type &account
       [&delta](const vesting_balance_object& vbo) { return vbo.balance.asset_id == delta.asset_id;}
    );
 
+   auto block_time = head_block_time();
+
    if(market_balance == boost::end(market_vesting_balances) )
    {
-      create<vesting_balance_object>([&](vesting_balance_object &vbo) {
+      create<vesting_balance_object>([&account_id, &delta, &block_time](vesting_balance_object &vbo) {
          vbo.owner = account_id;
          vbo.balance = delta;
          vbo.balance_type = vesting_balance_type::market_fee_sharing;
+
          cdd_vesting_policy policy;
          policy.vesting_seconds = { 0 };
          policy.coin_seconds_earned = vbo.balance.amount.value;
-         policy.coin_seconds_earned_last_update = head_block_time();
+         policy.coin_seconds_earned_last_update = block_time;
+
          vbo.policy = policy;
       });
    } else {
-      modify( *market_balance, [&]( vesting_balance_object& vbo )
+      modify( *market_balance, [&block_time, &delta]( vesting_balance_object& vbo )
       {
-         vbo.deposit_vested(head_block_time(), delta);
+         vbo.deposit_vested(block_time, delta);
       });
    }
 
@@ -118,6 +122,7 @@ void database::deposit_market_fee_vesting_balance(const account_id_type &account
 optional< vesting_balance_id_type > database::deposit_lazy_vesting(
    const optional< vesting_balance_id_type >& ovbid,
    share_type amount, uint32_t req_vesting_seconds,
+   vesting_balance_type balance_type,
    account_id_type req_owner,
    bool require_vesting )
 {
@@ -151,6 +156,7 @@ optional< vesting_balance_id_type > database::deposit_lazy_vesting(
    {
       _vbo.owner = req_owner;
       _vbo.balance = amount;
+      _vbo.balance_type = balance_type;
 
       cdd_vesting_policy policy;
       policy.vesting_seconds = req_vesting_seconds;
@@ -186,6 +192,7 @@ void database::deposit_cashback(const account_object& acct, share_type amount, b
       acct.cashback_vb,
       amount,
       get_global_properties().parameters.cashback_vesting_period_seconds,
+      vesting_balance_type::cashback,
       acct.id,
       require_vesting );
 
@@ -213,6 +220,7 @@ void database::deposit_witness_pay(const witness_object& wit, share_type amount)
       wit.pay_vb,
       amount,
       get_global_properties().parameters.witness_pay_vesting_seconds,
+      vesting_balance_type::witness,
       wit.witness_account,
       true );
 

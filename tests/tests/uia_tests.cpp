@@ -59,11 +59,6 @@ BOOST_AUTO_TEST_CASE( create_advanced_uia )
       creator.common_options.core_exchange_rate = price(asset(2),asset(1,asset_id_type(1)));
       creator.common_options.whitelist_authorities = creator.common_options.blacklist_authorities = {account_id_type()};
 
-      if( db.head_block_time() >= HARDFORK_1268_TIME )
-      {
-         creator.common_options.additional_options.value.reward_percent = 12;
-      }
-
       trx.operations.push_back(std::move(creator));
       PUSH_TX( db, trx, ~0 );
 
@@ -80,10 +75,6 @@ BOOST_AUTO_TEST_CASE( create_advanced_uia )
       BOOST_CHECK(test_asset_dynamic_data.accumulated_fees == 0);
       BOOST_CHECK(test_asset_dynamic_data.fee_pool == 0);
 
-      if( db.head_block_time() >= HARDFORK_1268_TIME )
-      {
-         BOOST_CHECK(test_asset.options.additional_options.value.reward_percent == 12);
-      }
    } catch(fc::exception& e) {
       edump((e.to_detail_string()));
       throw;

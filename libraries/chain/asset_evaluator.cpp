@@ -47,8 +47,8 @@ void_result asset_create_evaluator::do_evaluate( const asset_create_operation& o
 
    if( d.head_block_time() < HARDFORK_1268_TIME )
    {
-      FC_ASSERT(!op.common_options.additional_options.value.null_ext.valid());
-      FC_ASSERT(!op.common_options.additional_options.value.reward_percent.valid());
+      FC_ASSERT( !op.common_options.extensions.value.reward_percent.valid(),
+         "Asset additional options reward percent is only available after HARDFORK_1268_TIME!");
    }
 
    // Check that all authorities do exist
@@ -283,7 +283,7 @@ void_result asset_update_evaluator::do_evaluate(const asset_update_operation& o)
       validate_new_issuer( d, a, *o.new_issuer );
    }
 
-   if ( o.new_options.additional_options.value.reward_percent.valid() )
+   if ( o.new_options.extensions.value.reward_percent.valid() )
    {
       FC_ASSERT( d.head_block_time() >= HARDFORK_1268_TIME,
          "Referrer percent is only available after HARDFORK_1268_TIME!");

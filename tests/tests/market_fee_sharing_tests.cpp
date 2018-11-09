@@ -1,6 +1,4 @@
 #include <boost/test/unit_test.hpp>
-//#include <boost/core/ignore_unused.hpp>
-//#include <chrono>
 
 #include <graphene/chain/database.hpp>
 #include <graphene/app/database_api.hpp>
@@ -39,7 +37,7 @@ struct reward_database_fixture : database_fixture
       op.issuer = issuer_id;
       op.asset_to_update = asset_id;
       op.new_options = asset_id(db).options;
-      op.new_options.additional_options.value.reward_percent = reward_percent;
+      op.new_options.extensions.value.reward_percent = reward_percent;
 
       signed_transaction tx;
       tx.operations.push_back( op );
@@ -146,7 +144,6 @@ BOOST_AUTO_TEST_CASE(asset_rewards_test)
       // 1000 Izzys and 1500 Jills are matched, so the fees should be
       //   100 Izzy (10%) and 300 Jill (20%).
       // Bob's and Alice's referrers should get rewards
-
       share_type bob_refereer_reward = get_market_fee_reward( bob.referrer, izzycoin_id );
       share_type alice_refereer_reward = get_market_fee_reward( alice.referrer, jillcoin_id );
 
@@ -209,6 +206,19 @@ BOOST_AUTO_TEST_CASE(asset_claim_reward_test)
       transfer( committee_account, bob.get_id(),   _core(1000) );
       transfer( committee_account, izzy.get_id(),  _core(1000) );
 
+      generate_blocks_past_reward_hardfork();
+      // update_asset: set referrer percent
+      update_asset(jill_id, jill_private_key, jillcoin.get_id(), jillcoin_reward_percent);
+
+      // Alice and Bob place orders which match
+      create_sell_order( alice, jillcoin.amount(200000), _core(1) );
+      create_sell_order( bob, _core(1), jillcoin.amount(100000) );
+
+      const int64_t izzy_reward = get_market_fee_reward( izzy, jillcoin );
+      const int64_t izzy_balance = get_balance( izzy, jillcoin );
+
+      BOOST_CHECK_GT(izzy_reward, 0);
+
       auto claim_reward = [&]( account_object referrer, asset amount_to_claim, fc::ecc::private_key private_key )
       {
         vesting_balance_withdraw_operation op;
@@ -225,22 +235,6 @@ BOOST_AUTO_TEST_CASE(asset_claim_reward_test)
       };
 
       const int64_t amount_to_claim = 3;
-      //GRAPHENE_REQUIRE_THROW( claim_reward( izzy, jillcoin.amount(amount_to_claim), izzy_private_key ), fc::exception );
-      //GRAPHENE_REQUIRE_THROW( update_asset(jill_id, jill_private_key, jillcoin.get_id(), jillcoin_reward_percent), fc::exception );
-      generate_blocks_past_reward_hardfork();
-      // update_asset: set referrer percent
-      update_asset(jill_id, jill_private_key, jillcoin.get_id(), jillcoin_reward_percent);
-
-      // Alice and Bob place orders which match
-      create_sell_order( alice, jillcoin.amount(200000), _core(1) );
-      create_sell_order( bob, _core(1), jillcoin.amount(100000) );
-
-      const int64_t izzy_reward = get_market_fee_reward( izzy, jillcoin );
-      const int64_t izzy_balance = get_balance( izzy, jillcoin );
-
-      BOOST_CHECK_GT(izzy_reward, 0);
-
-
       claim_reward( izzy, jillcoin.amount(amount_to_claim), izzy_private_key );
 
       BOOST_CHECK_EQUAL(get_balance( izzy, jillcoin ), izzy_balance + amount_to_claim);
