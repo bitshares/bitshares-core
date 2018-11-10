@@ -199,16 +199,13 @@ void es_objects_plugin_impl::prepareTemplate(T blockchain_object, string index_n
    }
 
    auto blockchain_object_string = fc::json::to_string(blockchain_object, fc::json::legacy_generator);
-
-   variant j = fc::json::from_string(blockchain_object_string);
-
+   variant blockchain_object_variant = fc::json::from_string(blockchain_object_string);
    fc::mutable_variant_object o;
 
    adaptor_struct adaptor;
-   auto adapted = adaptor.adapt(j.get_object());
+   auto adapted = adaptor.adapt(blockchain_object_variant.get_object());
 
    fc::from_variant(adapted, o, FC_PACK_MAX_DEPTH);
-
    o["object_id"] = string(blockchain_object.id);
    o["block_time"] = block_time;
    o["block_number"] = block_number;
