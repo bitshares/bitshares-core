@@ -32,7 +32,6 @@
 #include <graphene/chain/market_object.hpp>
 #include <graphene/chain/asset_object.hpp>
 #include <graphene/chain/account_object.hpp>
-#include <boost/algorithm/string.hpp>
 
 #include <graphene/utilities/elasticsearch.hpp>
 
@@ -74,8 +73,8 @@ class es_objects_plugin_impl
       fc::time_point_sec block_time;
 
    private:
-       template<typename T>
-       void prepareTemplate(T blockchain_object, string index_name);
+      template<typename T>
+      void prepareTemplate(T blockchain_object, string index_name);
 };
 
 bool es_objects_plugin_impl::index_database( const vector<object_id_type>& ids, std::string action)
