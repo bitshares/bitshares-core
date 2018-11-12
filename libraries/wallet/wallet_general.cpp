@@ -348,4 +348,10 @@ signed_transaction wallet_api::sign_transaction(signed_transaction tx, bool broa
    return my->sign_transaction( tx, broadcast);
 } FC_CAPTURE_AND_RETHROW( (tx) ) }
 
+std::map<string,std::function<string(fc::variant,const fc::variants&)> >
+wallet_api::get_result_formatters() const
+{
+   return my->get_result_formatters();
+}
+
 }} // graphene::wallet

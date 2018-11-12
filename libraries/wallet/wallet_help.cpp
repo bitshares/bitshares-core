@@ -112,10 +112,4 @@ string wallet_api::gethelp(const string& method)const
    return ss.str();
 }
 
-std::map<string,std::function<string(fc::variant,const fc::variants&)> >
-wallet_api::get_result_formatters() const
-{
-   return my->get_result_formatters();
-}
-
 }} // graphene::wallet
