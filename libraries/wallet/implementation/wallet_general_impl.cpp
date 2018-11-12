@@ -26,6 +26,81 @@ namespace graphene { namespace wallet {
 
 namespace detail {
 
+pair<transaction_id_type,signed_transaction> wallet_api_impl::broadcast_transaction(signed_transaction tx)
+{
+      try {
+         _remote_net_broadcast->broadcast_transaction(tx);
+      }
+      catch (const fc::exception& e) {
+         elog("Caught exception while broadcasting tx ${id}:  ${e}", ("id", tx.id().str())("e", e.to_detail_string()));
+         throw;
+      }
+      return std::make_pair(tx.id(),tx);
+}
+
+signed_transaction wallet_api_impl::sign_transaction(signed_transaction tx, bool broadcast)
+{
+   set<public_key_type> pks = _remote_db->get_potential_signatures( tx );
+   flat_set<public_key_type> owned_keys;
+   owned_keys.reserve( pks.size() );
+   std::copy_if( pks.begin(), pks.end(), std::inserter(owned_keys, owned_keys.end()),
+                  [this](const public_key_type& pk){ return _keys.find(pk) != _keys.end(); } );
+   tx.clear_signatures();
+   set<public_key_type> approving_key_set = _remote_db->get_required_signatures( tx, owned_keys );
+
+   auto dyn_props = get_dynamic_global_properties();
+   tx.set_reference_block( dyn_props.head_block_id );
+
+   // first, some bookkeeping, expire old items from _recently_generated_transactions
+   // since transactions include the head block id, we just need the index for keeping transactions unique
+   // when there are multiple transactions in the same block.  choose a time period that should be at
+   // least one block long, even in the worst case.  2 minutes ought to be plenty.
+   fc::time_point_sec oldest_transaction_ids_to_track(dyn_props.time - fc::minutes(2));
+   auto oldest_transaction_record_iter = _recently_generated_transactions.get<timestamp_index>().lower_bound(oldest_transaction_ids_to_track);
+   auto begin_iter = _recently_generated_transactions.get<timestamp_index>().begin();
+   _recently_generated_transactions.get<timestamp_index>().erase(begin_iter, oldest_transaction_record_iter);
+
+   uint32_t expiration_time_offset = 0;
+   for (;;)
+   {
+      tx.set_expiration( dyn_props.time + fc::seconds(30 + expiration_time_offset) );
+      tx.clear_signatures();
+
+      for( const public_key_type& key : approving_key_set )
+         tx.sign( get_private_key(key), _chain_id );
+
+      graphene::chain::transaction_id_type this_transaction_id = tx.id();
+      auto iter = _recently_generated_transactions.find(this_transaction_id);
+      if (iter == _recently_generated_transactions.end())
+      {
+         // we haven't generated this transaction before, the usual case
+         recently_generated_transaction_record this_transaction_record;
+         this_transaction_record.generation_time = dyn_props.time;
+         this_transaction_record.transaction_id = this_transaction_id;
+         _recently_generated_transactions.insert(this_transaction_record);
+         break;
+      }
+
+      // else we've generated a dupe, increment expiration time and re-sign it
+      ++expiration_time_offset;
+   }
+
+   if( broadcast )
+   {
+      try
+      {
+         _remote_net_broadcast->broadcast_transaction( tx );
+      }
+      catch (const fc::exception& e)
+      {
+         elog("Caught exception while broadcasting tx ${id}:  ${e}", ("id", tx.id().str())("e", e.to_detail_string()) );
+         throw;
+      }
+   }
+
+   return tx;
+}
+
 void wallet_api_impl::enable_umask_protection()
 {
 #ifdef __unix__

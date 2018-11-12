@@ -333,4 +333,19 @@ void wallet_api::quit()
     my->quit();
 }
 
+string wallet_api::serialize_transaction( signed_transaction tx )const
+{
+   return fc::to_hex(fc::raw::pack(tx));
+}
+
+pair<transaction_id_type,signed_transaction> wallet_api::broadcast_transaction(signed_transaction tx)
+{
+   return my->broadcast_transaction(tx);
+}
+
+signed_transaction wallet_api::sign_transaction(signed_transaction tx, bool broadcast /* = false */)
+{ try {
+   return my->sign_transaction( tx, broadcast);
+} FC_CAPTURE_AND_RETHROW( (tx) ) }
+
 }} // graphene::wallet
