@@ -354,4 +354,9 @@ wallet_api::get_result_formatters() const
    return my->get_result_formatters();
 }
 
+fc::ecc::private_key wallet_api::derive_private_key(const std::string& prefix_string, int sequence_number) const
+{
+   return detail::derive_private_key( prefix_string, sequence_number );
+}
+
 }} // graphene::wallet

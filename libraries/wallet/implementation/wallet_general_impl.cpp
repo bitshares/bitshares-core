@@ -26,6 +26,15 @@ namespace graphene { namespace wallet {
 
 namespace detail {
 
+fc::ecc::private_key derive_private_key( const std::string& prefix_string,
+                                         int sequence_number )
+{
+   std::string sequence_string = std::to_string(sequence_number);
+   fc::sha512 h = fc::sha512::hash(prefix_string + " " + sequence_string);
+   fc::ecc::private_key derived_key = fc::ecc::private_key::regenerate(fc::sha256::hash(h));
+   return derived_key;
+}
+
 std::map<string,std::function<string(fc::variant,const fc::variants&)>> wallet_api_impl::get_result_formatters() const
 {
    std::map<string,std::function<string(fc::variant,const fc::variants&)> > m;

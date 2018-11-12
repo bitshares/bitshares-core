@@ -301,11 +301,6 @@ signed_transaction wallet_api::upgrade_account( string name, bool broadcast )
    return my->upgrade_account(name,broadcast);
 }
 
-fc::ecc::private_key wallet_api::derive_private_key(const std::string& prefix_string, int sequence_number) const
-{
-   return detail::derive_private_key( prefix_string, sequence_number );
-}
-
 signed_transaction wallet_api::whitelist_account(string authorizing_account,
                                                  string account_to_list,
                                                  account_whitelist_operation::account_listing new_listing_status,
