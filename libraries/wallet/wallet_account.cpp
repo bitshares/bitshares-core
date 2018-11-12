@@ -218,17 +218,6 @@ full_account wallet_api::get_full_account( const string& name_or_id)
     return my->_remote_db->get_full_accounts({name_or_id}, false)[name_or_id];
 }
 
-vector<limit_order_object> wallet_api::get_account_limit_orders(
-      const string& name_or_id,
-      const string &base,
-      const string &quote,
-      uint32_t limit,
-      optional<limit_order_id_type> ostart_id,
-      optional<price> ostart_price)
-{
-   return my->_remote_db->get_account_limit_orders(name_or_id, base, quote, limit, ostart_id, ostart_price);
-}
-
 account_object wallet_api::get_account(string account_name_or_id) const
 {
    return my->get_account(account_name_or_id);
