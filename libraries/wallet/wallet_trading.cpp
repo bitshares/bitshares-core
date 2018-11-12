@@ -61,21 +61,6 @@ signed_transaction wallet_api::cancel_order(object_id_type order_id, bool broadc
    return my->cancel_order(order_id, broadcast);
 }
 
-signed_transaction wallet_api::global_settle_asset(string symbol,
-                                                   price settle_price,
-                                                   bool broadcast /* = false */)
-{
-   return my->global_settle_asset(symbol, settle_price, broadcast);
-}
-
-signed_transaction wallet_api::settle_asset(string account_to_settle,
-                                            string amount_to_settle,
-                                            string symbol,
-                                            bool broadcast /* = false */)
-{
-   return my->settle_asset(account_to_settle, amount_to_settle, symbol, broadcast);
-}
-
 vector<bucket_object> wallet_api::get_market_history(
       string symbol1,
       string symbol2,

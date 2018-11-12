@@ -132,4 +132,19 @@ signed_transaction wallet_api::issue_asset(string to_account, string amount, str
    return my->issue_asset(to_account, amount, symbol, memo, broadcast);
 }
 
+signed_transaction wallet_api::global_settle_asset(string symbol,
+                                                   price settle_price,
+                                                   bool broadcast /* = false */)
+{
+   return my->global_settle_asset(symbol, settle_price, broadcast);
+}
+
+signed_transaction wallet_api::settle_asset(string account_to_settle,
+                                            string amount_to_settle,
+                                            string symbol,
+                                            bool broadcast /* = false */)
+{
+   return my->settle_asset(account_to_settle, amount_to_settle, symbol, broadcast);
+}
+
 }} // graphene::wallet
