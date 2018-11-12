@@ -512,7 +512,8 @@ const asset_object& database_fixture::create_user_issued_asset( const string& na
 
 const asset_object& database_fixture::create_user_issued_asset( const string& name, const account_object& issuer,
                                                                uint16_t flags, const price& core_exchange_rate,
-                                                               uint16_t precision, uint16_t market_fee_percent)
+                                                               uint8_t precision, uint16_t market_fee_percent,
+                                                               additional_asset_options_t additional_options)
 {
    asset_create_operation creator;
    creator.issuer = issuer.id;
@@ -525,6 +526,7 @@ const asset_object& database_fixture::create_user_issued_asset( const string& na
    creator.common_options.flags = flags;
    creator.common_options.issuer_permissions = flags;
    creator.common_options.market_fee_percent = market_fee_percent;
+   creator.common_options.extensions = std::move(additional_options);
    trx.operations.clear();
    trx.operations.push_back(std::move(creator));
    set_expiration( db, trx );

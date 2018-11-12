@@ -31,13 +31,15 @@ struct reward_database_fixture : database_fixture
    void update_asset( const account_id_type& issuer_id,
                      const fc::ecc::private_key& private_key,
                      const asset_id_type& asset_id,
-                     uint16_t reward_percent )
+                     uint16_t reward_percent,
+                     flat_set<account_id_type> whitelist_market_fee_sharing = flat_set<account_id_type>())
    {
       asset_update_operation op;
       op.issuer = issuer_id;
       op.asset_to_update = asset_id;
       op.new_options = asset_id(db).options;
       op.new_options.extensions.value.reward_percent = reward_percent;
+      op.new_options.extensions.value.whitelist_market_fee_sharing = whitelist_market_fee_sharing;
 
       signed_transaction tx;
       tx.operations.push_back( op );
@@ -55,6 +57,100 @@ struct reward_database_fixture : database_fixture
 };
 
 BOOST_FIXTURE_TEST_SUITE( reward_tests, reward_database_fixture )
+
+BOOST_AUTO_TEST_CASE(cannot_create_asset_with_additional_options_before_hf)
+{
+   try
+   {
+      ACTOR(issuer);
+
+      price price(asset(1, asset_id_type(1)), asset(1));
+      uint16_t market_fee_percent = 100;
+
+      additional_asset_options_t options;
+      options.value.reward_percent = 100;
+      options.value.whitelist_market_fee_sharing = flat_set<account_id_type>{issuer_id};
+
+      GRAPHENE_CHECK_THROW(create_user_issued_asset("USD",
+                                                    issuer,
+                                                    charge_market_fee,
+                                                    price,
+                                                    2,
+                                                    market_fee_percent,
+                                                    options),
+                           fc::assert_exception);
+   }
+   FC_LOG_AND_RETHROW()
+}
+
+BOOST_AUTO_TEST_CASE(create_asset_with_additional_options_after_hf)
+{
+   try
+   {
+      ACTOR(issuer);
+
+      generate_blocks_past_reward_hardfork();
+
+      uint16_t reward_percent = 100;
+      flat_set<account_id_type> whitelist = {issuer_id};
+      price price(asset(1, asset_id_type(1)), asset(1));
+      uint16_t market_fee_percent = 100;
+
+      additional_asset_options_t options;
+      options.value.reward_percent = reward_percent;
+      options.value.whitelist_market_fee_sharing = whitelist;
+
+      asset_object usd_asset = create_user_issued_asset("USD",
+                                                        issuer,
+                                                        charge_market_fee,
+                                                        price,
+                                                        2,
+                                                        market_fee_percent,
+                                                        options);
+
+      additional_asset_options usd_options = usd_asset.options.extensions.value;
+      BOOST_CHECK_EQUAL(reward_percent, *usd_options.reward_percent);
+      BOOST_CHECK(whitelist == *usd_options.whitelist_market_fee_sharing);
+   }
+   FC_LOG_AND_RETHROW()
+}
+
+BOOST_AUTO_TEST_CASE(cannot_update_additional_options_before_hf)
+{
+   try
+   {
+      ACTOR(issuer);
+
+      asset_object usd_asset = create_user_issued_asset("USD", issuer, charge_market_fee);
+
+      GRAPHENE_CHECK_THROW(
+                  update_asset(issuer_id, issuer_private_key, usd_asset.get_id(), 40, {issuer_id}),
+                  fc::assert_exception );
+   }
+   FC_LOG_AND_RETHROW()
+}
+
+BOOST_AUTO_TEST_CASE(update_additional_options_after_hf)
+{
+   try
+   {
+      ACTOR(issuer);
+
+      asset_object usd_asset = create_user_issued_asset("USD", issuer, charge_market_fee);
+
+      generate_blocks_past_reward_hardfork();
+
+      uint16_t reward_percent = 40;
+      flat_set<account_id_type> whitelist = {issuer_id};
+      update_asset(issuer_id, issuer_private_key, usd_asset.get_id(), reward_percent, whitelist);
+
+      asset_object updated_asset = usd_asset.get_id()(db);
+      additional_asset_options options = updated_asset.options.extensions.value;
+      BOOST_CHECK_EQUAL(reward_percent, *options.reward_percent);
+      BOOST_CHECK(whitelist == *options.whitelist_market_fee_sharing);
+   }
+   FC_LOG_AND_RETHROW()
+}
 
 BOOST_AUTO_TEST_CASE(asset_rewards_test)
 {
@@ -101,10 +197,9 @@ BOOST_AUTO_TEST_CASE(asset_rewards_test)
       asset_id_type izzycoin_id = create_bitasset( "IZZYCOIN", izzy_id, izzycoin_market_percent ).id;
       asset_id_type jillcoin_id = create_bitasset( "JILLCOIN", jill_id, jillcoin_market_percent ).id;
 
-      GRAPHENE_REQUIRE_THROW( update_asset(izzy_id, izzy_private_key, izzycoin_id, izzycoin_reward_percent), fc::exception );
       generate_blocks_past_reward_hardfork();
-      update_asset(izzy_id, izzy_private_key, izzycoin_id, izzycoin_reward_percent);
 
+      update_asset(izzy_id, izzy_private_key, izzycoin_id, izzycoin_reward_percent);
       update_asset(jill_id, jill_private_key, jillcoin_id, jillcoin_reward_percent);
 
       const share_type izzy_prec = asset::scaled_precision( asset_id_type(izzycoin_id)(db).precision );
