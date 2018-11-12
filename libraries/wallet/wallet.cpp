@@ -85,7 +85,7 @@
 #include "wallet_blockchain_inspection.cpp"
 #include "wallet_general.cpp"
 #include "wallet_governance.cpp"
-#include "wallet_privacy_mode.cpp"
+#include "wallet_stealth.cpp"
 #include "wallet_trading.cpp"
 #include "wallet_transaction_builder.cpp"
 #include "wallet_debug.cpp"
