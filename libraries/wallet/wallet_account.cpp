@@ -22,8 +22,6 @@
  * THE SOFTWARE.
  */
 
-#include "implementation/wallet_account_impl.cpp"
-
 namespace graphene { namespace wallet {
 
 uint64_t wallet_api::get_account_count() const

@@ -22,8 +22,6 @@
  * THE SOFTWARE.
  */
 
-#include "implementation/wallet_debug_impl.cpp"
-
 namespace graphene { namespace wallet {
 
 void wallet_api::dbg_make_uia(string creator, string symbol)

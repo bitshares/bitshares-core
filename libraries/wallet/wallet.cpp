@@ -80,6 +80,17 @@
 # include <sys/stat.h>
 #endif
 
+#include "implementation/wallet_account_impl.cpp"
+#include "implementation/wallet_asset_impl.cpp"
+#include "implementation/wallet_blockchain_inspection_impl.cpp"
+#include "implementation/wallet_general_impl.cpp"
+#include "implementation/wallet_governance_impl.cpp"
+#include "implementation/wallet_trading_impl.cpp"
+#include "implementation/wallet_transaction_builder_impl.cpp"
+#include "implementation/wallet_debug_impl.cpp"
+#include "implementation/wallet_network_impl.cpp"
+#include "implementation/wallet_help_impl.cpp"
+
 #include "wallet_account.cpp"
 #include "wallet_asset.cpp"
 #include "wallet_blockchain_inspection.cpp"

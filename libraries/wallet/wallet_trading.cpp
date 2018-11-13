@@ -22,8 +22,6 @@
  * THE SOFTWARE.
  */
 
-#include "implementation/wallet_trading_impl.cpp"
-
 namespace graphene { namespace wallet {
 
 signed_transaction wallet_api::sell_asset(string seller_account,

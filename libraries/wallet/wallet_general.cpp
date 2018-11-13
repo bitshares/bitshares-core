@@ -22,8 +22,6 @@
  * THE SOFTWARE.
  */
 
-#include "implementation/wallet_general_impl.cpp"
-
 namespace graphene { namespace wallet {
 
 bool wallet_api::is_locked()const

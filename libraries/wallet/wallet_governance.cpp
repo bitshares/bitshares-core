@@ -22,8 +22,6 @@
  * THE SOFTWARE.
  */
 
-#include "implementation/wallet_governance_impl.cpp"
-
 namespace graphene { namespace wallet {
 
 signed_transaction wallet_api::propose_parameter_change(

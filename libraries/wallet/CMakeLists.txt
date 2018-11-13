@@ -1,36 +1,6 @@
 file(GLOB HEADERS "include/graphene/wallet/*.hpp")
 
-if( GRAPHENE_DISABLE_UNITY_BUILD )
-   set( GRAPHENE_WALLET_FILES
-		wallet_account.cpp
-		wallet_asset.cpp
-		wallet_blockchain_inspection.cpp
-		wallet_general.cpp
-		wallet_governance.cpp
-		wallet_privacy_mode.cpp
-		wallet_trading.cpp
-		wallet_transaction_builder.cpp
-		wallet_debug.cpp
-		wallet_network.cpp
-		wallet_help.cpp
-
-		implementation/wallet_account_impl.cpp
-		implementation/wallet_asset_impl.cpp
-		implementation/wallet_blockchain_inspection_impl.cpp
-		implementation/wallet_general_impl.cpp
-		implementation/wallet_governance_impl.cpp
-		implementation/wallet_trading_impl.cpp
-		implementation/wallet_transaction_builder_impl.cpp
-		implementation/wallet_debug_impl.cpp
-		implementation/wallet_network_impl.cpp
-		implementation/wallet_help_impl.cpp
-   )
-   message( STATUS "Graphene wallet unity build disabled" )
-else( GRAPHENE_DISABLE_UNITY_BUILD )
-   set( GRAPHENE_WALLET_FILES
-        wallet.cpp )
-   message( STATUS "Graphene wallet unity build enabled" )
-endif( GRAPHENE_DISABLE_UNITY_BUILD )
+set( GRAPHENE_WALLET_FILES wallet.cpp )
 
 find_package( Perl )
 find_package( Doxygen )

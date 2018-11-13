@@ -22,8 +22,6 @@
  * THE SOFTWARE.
  */
 
-#include "implementation/wallet_asset_impl.cpp"
-
 namespace graphene { namespace wallet {
 
 vector<asset_object> wallet_api::list_assets(const string& lowerbound, uint32_t limit)const

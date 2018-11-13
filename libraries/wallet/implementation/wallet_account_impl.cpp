@@ -266,6 +266,15 @@ signed_transaction wallet_api_impl::whitelist_account(string authorizing_account
    return sign_transaction( tx, broadcast );
 } FC_CAPTURE_AND_RETHROW( (authorizing_account)(account_to_list)(new_listing_status)(broadcast) ) }
 
+fc::ecc::private_key derive_private_key( const std::string& prefix_string,
+                                         int sequence_number )
+{
+   std::string sequence_string = std::to_string(sequence_number);
+   fc::sha512 h = fc::sha512::hash(prefix_string + " " + sequence_string);
+   fc::ecc::private_key derived_key = fc::ecc::private_key::regenerate(fc::sha256::hash(h));
+   return derived_key;
+}
+
 // This function generates derived keys starting with index 0 and keeps incrementing
 // the index until it finds a key that isn't registered in the block chain.  To be
 // safer, it continues checking for a few more keys to make sure there wasn't a short gap

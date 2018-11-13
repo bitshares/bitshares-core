@@ -22,8 +22,6 @@
  * THE SOFTWARE.
  */
 
-#include "implementation/wallet_blockchain_inspection_impl.cpp"
-
 namespace graphene { namespace wallet {
 
 global_property_object wallet_api::get_global_properties() const

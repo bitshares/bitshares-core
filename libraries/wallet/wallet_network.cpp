@@ -22,8 +22,6 @@
  * THE SOFTWARE.
  */
 
-#include "implementation/wallet_network_impl.cpp"
-
 namespace graphene { namespace wallet {
 
 void wallet_api::network_add_nodes( const vector<string>& nodes )

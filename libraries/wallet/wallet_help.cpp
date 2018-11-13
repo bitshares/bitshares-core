@@ -22,8 +22,6 @@
  * THE SOFTWARE.
  */
 
-#include "implementation/wallet_help_impl.cpp"
-
 namespace graphene { namespace wallet {
 
 variant wallet_api::info()

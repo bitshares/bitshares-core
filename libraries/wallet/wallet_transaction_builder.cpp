@@ -22,8 +22,6 @@
  * THE SOFTWARE.
  */
 
-#include "implementation/wallet_transaction_builder_impl.cpp"
-
 namespace graphene { namespace wallet {
 
 transaction_handle_type wallet_api::begin_builder_transaction()
