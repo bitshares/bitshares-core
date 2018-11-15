@@ -117,8 +117,7 @@ int main(int argc, char** argv) {
          node->enable_plugin("market_history");
          node->enable_plugin("grouped_orders");
       }
-
-
+      
       if( options.count("help") )
       {
          std::cout << app_options << "\n";
