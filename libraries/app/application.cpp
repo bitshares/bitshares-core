@@ -947,7 +947,6 @@ void application::set_program_options(boost::program_options::options_descriptio
          ("genesis-json", bpo::value<boost::filesystem::path>(), "File to read Genesis State from")
          ("dbg-init-key", bpo::value<string>(), "Block signing key to use for init witnesses, overrides genesis file")
          ("api-access", bpo::value<boost::filesystem::path>(), "JSON file specifying API permissions")
-         ("plugins", bpo::value<string>(), "Space-separated list of plugins to activate")
          ("io-threads", bpo::value<uint16_t>()->implicit_value(0), "Number of IO threads, default to 0 for auto-configuration")
          ("enable-subscribe-to-all", bpo::value<bool>()->implicit_value(true),
           "Whether allow API clients to subscribe to universal object creation and removal events")
@@ -1005,19 +1004,6 @@ void application::initialize(const fc::path& data_dir, const boost::program_opti
    {
       const uint16_t num_threads = options["io-threads"].as<uint16_t>();
       fc::asio::default_io_service_scope::set_num_threads(num_threads);
-   }
-
-   if (options.count("plugins")) {
-       std::set<string> plugins;
-       boost::split(plugins, options.at("plugins").as<std::string>(), [](char c){return c == ' ';});
-
-       FC_ASSERT(!(plugins.count("account_history") && plugins.count("elasticsearch")),
-                 "Plugin conflict: Cannot load both account_history plugin and elasticsearch plugin");
-
-       std::for_each(plugins.begin(), plugins.end(), [this](const string& plug) mutable {
-           if (!plug.empty())
-               enable_plugin(plug);
-       });
    }
 }
 

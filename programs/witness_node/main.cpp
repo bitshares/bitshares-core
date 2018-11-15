@@ -40,6 +40,7 @@
 #include <boost/filesystem.hpp>
 #include <boost/property_tree/ptree.hpp>
 #include <boost/container/flat_set.hpp>
+#include <boost/algorithm/string.hpp>
 
 #include <graphene/utilities/git_revision.hpp>
 #include <boost/algorithm/string/replace.hpp>
@@ -66,7 +67,7 @@ int main(int argc, char** argv) {
             ("help,h", "Print this help message and exit.")
             ("data-dir,d", bpo::value<boost::filesystem::path>()->default_value("witness_node_data_dir"), "Directory containing databases, configuration file, etc.")
             ("version,v", "Display version information")
-            ;
+            ("plugins", bpo::value<std::string>(), "Space-separated list of plugins to activate");
 
       bpo::variables_map options;
 
@@ -90,9 +91,33 @@ int main(int argc, char** argv) {
       }
       catch (const boost::program_options::error& e)
       {
-        std::cerr << "Error parsing command line: " << e.what() << "\n";
-        return 1;
+         std::cerr << "Error parsing command line: " << e.what() << "\n";
+         return 1;
       }
+
+      if (options.count("plugins")) {
+
+         std::set<std::string> plugins;
+         boost::split(plugins, options.at("plugins").as<std::string>(), [](char c){return c == ' ';});
+
+         if(plugins.count("account_history") && plugins.count("elasticsearch")) {
+            std::cerr << "Plugin conflict: Cannot load both account_history plugin and elasticsearch plugin\n";
+            return 1;
+         }
+
+         std::for_each(plugins.begin(), plugins.end(), [node](const std::string& plug) mutable {
+             if (!plug.empty()) {
+                node->enable_plugin(plug);
+             }
+         });
+      }
+      else {
+         node->enable_plugin("witness");
+         node->enable_plugin("account_history");
+         node->enable_plugin("market_history");
+         node->enable_plugin("grouped_orders");
+      }
+
 
       if( options.count("help") )
       {

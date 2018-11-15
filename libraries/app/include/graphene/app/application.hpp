@@ -101,8 +101,9 @@ namespace graphene { namespace app {
 
          const application_options& get_options();
 
-      private:
          void enable_plugin( const string& name );
+
+      private:
          void add_available_plugin( std::shared_ptr<abstract_plugin> p );
          std::shared_ptr<detail::application_impl> my;
 
