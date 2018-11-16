@@ -454,4 +454,108 @@ BOOST_AUTO_TEST_CASE(white_list_doesnt_contain_registrar_test)
    FC_LOG_AND_RETHROW()
 }
 
+BOOST_AUTO_TEST_CASE(create_asset_via_proposal_test)
+{
+   try
+   {
+      ACTOR(issuer);
+      price core_exchange_rate(asset(1, asset_id_type(1)), asset(1));
+      
+      asset_create_operation create_op;
+      create_op.issuer = issuer.id;
+      create_op.fee = asset();
+      create_op.symbol = "ASSET";
+      create_op.common_options.max_supply = 0;
+      create_op.precision = 2;
+      create_op.common_options.core_exchange_rate = core_exchange_rate;
+      create_op.common_options.max_supply = GRAPHENE_MAX_SHARE_SUPPLY;
+      create_op.common_options.flags = charge_market_fee;
+
+      additional_asset_options_t options;
+      options.value.reward_percent = 100;
+      options.value.whitelist_market_fee_sharing = flat_set<account_id_type>{issuer_id};
+      create_op.common_options.extensions = std::move(options);;
+
+      const auto& curfees = *db.get_global_properties().parameters.current_fees;
+      const auto& proposal_create_fees = curfees.get<proposal_create_operation>();
+      proposal_create_operation prop;
+      prop.fee_paying_account = issuer_id;
+      prop.proposed_ops.emplace_back( create_op );
+      prop.expiration_time =  db.head_block_time() + fc::days(1);
+      prop.fee = asset( proposal_create_fees.fee + proposal_create_fees.price_per_kbyte );
+
+      {
+         signed_transaction tx;
+         tx.operations.push_back( prop );
+         db.current_fee_schedule().set_fee( tx.operations.back() );
+         set_expiration( db, tx );
+         sign( tx, issuer_private_key );
+         GRAPHENE_CHECK_THROW(PUSH_TX( db, tx ), fc::exception);
+      }
+
+      generate_blocks_past_reward_hardfork();
+
+      {
+         prop.expiration_time =  db.head_block_time() + fc::days(1);
+         signed_transaction tx;
+         tx.operations.push_back( prop );
+         db.current_fee_schedule().set_fee( tx.operations.back() );
+         set_expiration( db, tx );
+         sign( tx, issuer_private_key );
+         PUSH_TX( db, tx );
+      }
+   }
+   FC_LOG_AND_RETHROW()
+}
+
+BOOST_AUTO_TEST_CASE(update_asset_via_proposal_test)
+{
+   try
+   {
+      ACTOR(issuer);
+      asset_object usd_asset = create_user_issued_asset("USD", issuer, charge_market_fee);
+
+      additional_asset_options_t options;
+      options.value.reward_percent = 100;
+      options.value.whitelist_market_fee_sharing = flat_set<account_id_type>{issuer_id};
+
+      asset_update_operation update_op;
+      update_op.issuer = issuer_id;
+      update_op.asset_to_update = usd_asset.get_id();
+      asset_options new_options;
+      update_op.new_options = usd_asset.options;
+      update_op.new_options.extensions = std::move(options);
+
+      const auto& curfees = *db.get_global_properties().parameters.current_fees;
+      const auto& proposal_create_fees = curfees.get<proposal_create_operation>();
+      proposal_create_operation prop;
+      prop.fee_paying_account = issuer_id;
+      prop.proposed_ops.emplace_back( update_op );
+      prop.expiration_time =  db.head_block_time() + fc::days(1);
+      prop.fee = asset( proposal_create_fees.fee + proposal_create_fees.price_per_kbyte );
+
+      {
+         signed_transaction tx;
+         tx.operations.push_back( prop );
+         db.current_fee_schedule().set_fee( tx.operations.back() );
+         set_expiration( db, tx );
+         sign( tx, issuer_private_key );
+         GRAPHENE_CHECK_THROW(PUSH_TX( db, tx ), fc::exception);
+      }
+
+      generate_blocks_past_reward_hardfork();
+
+      {
+         prop.expiration_time =  db.head_block_time() + fc::days(1);
+         signed_transaction tx;
+         tx.operations.push_back( prop );
+         db.current_fee_schedule().set_fee( tx.operations.back() );
+         set_expiration( db, tx );
+         sign( tx, issuer_private_key );
+         PUSH_TX( db, tx );
+      }
+   }
+   FC_LOG_AND_RETHROW()
+}
+
 BOOST_AUTO_TEST_SUITE_END()
