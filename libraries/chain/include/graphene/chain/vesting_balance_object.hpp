@@ -120,9 +120,27 @@ namespace graphene { namespace chain {
       void on_withdraw(const vesting_policy_context& ctx);
    };
 
+     /**
+    * @brief instant vesting policy
+    *
+    * This policy allows to withdraw everything that is on a balance immediately
+    *
+    */
+   struct instant_vesting_policy
+   {
+      asset get_allowed_withdraw(const vesting_policy_context& ctx)const;
+      bool is_deposit_allowed(const vesting_policy_context& ctx)const;
+      bool is_deposit_vested_allowed(const vesting_policy_context&)const { return false; }
+      bool is_withdraw_allowed(const vesting_policy_context& ctx)const;
+      void on_deposit(const vesting_policy_context& ctx);
+      void on_deposit_vested(const vesting_policy_context&);
+      void on_withdraw(const vesting_policy_context& ctx);
+   };
+
    typedef fc::static_variant<
       linear_vesting_policy,
-      cdd_vesting_policy
+      cdd_vesting_policy,
+      instant_vesting_policy
       > vesting_policy;
 
    enum class vesting_balance_type {   unspecified,
@@ -218,6 +236,8 @@ FC_REFLECT(graphene::chain::cdd_vesting_policy,
            (coin_seconds_earned)
            (coin_seconds_earned_last_update)
           )
+
+FC_REFLECT_EMPTY( graphene::chain::instant_vesting_policy )
 
 FC_REFLECT_TYPENAME( graphene::chain::vesting_policy )
 

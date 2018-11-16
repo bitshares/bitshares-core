@@ -2359,4 +2359,68 @@ BOOST_AUTO_TEST_CASE( vesting_balance_withdraw_test )
 
 // TODO:  Write linear VBO tests
 
+BOOST_AUTO_TEST_CASE( create_vesting_balance_with_instant_vesting_policy_test )
+{ try {
+   ACTOR(alice);
+
+   INVOKE( create_uia );
+
+   const asset_object& core = asset_id_type()(db);
+   const asset_object& test_asset = get_asset(UIA_TEST_SYMBOL);
+
+   vesting_balance_create_operation op;
+   op.fee = core.amount( 0 );
+   op.creator = account_id_type();
+   op.owner = account_id_type();
+   op.amount = test_asset.amount( 100 );
+   op.policy = instant_vesting_policy_initializer{};
+
+   // Fee must be non-negative
+   REQUIRE_OP_VALIDATION_SUCCESS( op, fee, core.amount(1) );
+   REQUIRE_OP_VALIDATION_SUCCESS( op, fee, core.amount(0) );
+   REQUIRE_OP_VALIDATION_FAILURE( op, fee, core.amount(-1) );
+
+   // Amount must be positive
+   REQUIRE_OP_VALIDATION_SUCCESS( op, amount, core.amount(1) );
+   REQUIRE_OP_VALIDATION_FAILURE( op, amount, core.amount(0) );
+   REQUIRE_OP_VALIDATION_FAILURE( op, amount, core.amount(-1) );
+
+   transfer(committee_account(db), alice, core.amount(100000));
+
+   op.creator = alice_id;
+   op.owner = alice_id;
+
+   account_id_type nobody = account_id_type(1234);
+
+   trx.operations.push_back(op);
+   // Invalid account_id's
+   REQUIRE_THROW_WITH_VALUE( op, creator, nobody );
+   REQUIRE_THROW_WITH_VALUE( op,   owner, nobody );
+
+   // Insufficient funds
+   REQUIRE_THROW_WITH_VALUE( op, amount, core.amount(999999999) );
+   // Alice can fund a bond to herself or to Bob
+   op.amount = core.amount( 1000 );
+
+   trx.operations.back() = op;
+   set_expiration( db, trx );
+   sign(trx, alice_private_key);
+
+   processed_transaction ptx = PUSH_TX( db, trx, ~0 );
+   const vesting_balance_id_type& vbid = ptx.operation_results.back().get<object_id_type>();
+
+   {
+      vesting_balance_withdraw_operation withdraw_op;
+      withdraw_op.vesting_balance = vbid;
+      withdraw_op.owner = alice_id;
+      withdraw_op.amount = op.amount;
+
+      signed_transaction withdraw_tx;
+      withdraw_tx.operations.push_back( withdraw_op );
+      set_expiration( db, withdraw_tx );
+      sign(withdraw_tx, alice_private_key);
+      PUSH_TX( db, withdraw_tx );
+   }
+} FC_LOG_AND_RETHROW() }
+
 BOOST_AUTO_TEST_SUITE_END()

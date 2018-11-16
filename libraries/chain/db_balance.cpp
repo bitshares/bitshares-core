@@ -102,13 +102,7 @@ void database::deposit_market_fee_vesting_balance(const account_id_type &account
          vbo.owner = account_id;
          vbo.balance = delta;
          vbo.balance_type = vesting_balance_type::market_fee_sharing;
-
-         cdd_vesting_policy policy;
-         policy.vesting_seconds = { 0 };
-         policy.coin_seconds_earned = vbo.balance.amount.value;
-         policy.coin_seconds_earned_last_update = block_time;
-
-         vbo.policy = policy;
+         vbo.policy = instant_vesting_policy{};
       });
    } else {
       modify( *market_balance, [&block_time, &delta]( vesting_balance_object& vbo )
