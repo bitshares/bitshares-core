@@ -1152,40 +1152,42 @@ asset database::pay_market_fees( const asset_object& recv_asset, const asset& re
 asset database::pay_market_fees(const account_object& seller, const asset_object& recv_asset, const asset& receives )
 {
    const auto issuer_fees = calculate_market_fee( recv_asset, receives );
-
    FC_ASSERT( issuer_fees <= receives, "Market fee shouldn't be greater than receives");
-
    //Don't dirty undo state if not actually collecting any fees
-   if( issuer_fees.amount > 0 )
+   if ( issuer_fees.amount > 0 )
    {
       // calculate and pay rewards
       asset reward = recv_asset.amount(0);
 
-      const auto reward_percent = recv_asset.options.extensions.value.reward_percent;
+      auto is_rewards_allowed = [&recv_asset, &seller]() {
+         const auto &white_list = recv_asset.options.extensions.value.whitelist_market_fee_sharing;
+         return ( !white_list || (*white_list).empty() || ( (*white_list).find(seller.referrer) != (*white_list).end() ) );
+      };
 
-      if ( reward_percent && *reward_percent )
+      if ( is_rewards_allowed() )
       {
-         const auto reward_value = detail::calculate_percent(issuer_fees.amount, *reward_percent);
-
-         if ( reward_value > 0 )
+         const auto reward_percent = recv_asset.options.extensions.value.reward_percent;
+         if ( reward_percent && *reward_percent )
          {
-            reward = recv_asset.amount(reward_value);
-
-            FC_ASSERT( reward < issuer_fees, "Market reward should be less than issuer fees");
-            // cut referrer percent from reward
-            const auto referrer_rewards_percentage = seller.referrer_rewards_percentage;
-            const auto referrer_rewards_value = detail::calculate_percent(reward.amount, referrer_rewards_percentage);
-
-            auto registrar_reward = reward;
-            if ( referrer_rewards_value > 0 )
+            const auto reward_value = detail::calculate_percent(issuer_fees.amount, *reward_percent);
+            if ( reward_value > 0 )
             {
-               FC_ASSERT ( referrer_rewards_value <= reward.amount, "Referrer reward shouldn't be greater than total reward" );
+               reward = recv_asset.amount(reward_value);
+               FC_ASSERT( reward < issuer_fees, "Market reward should be less than issuer fees");
+               // cut referrer percent from reward
+               const auto referrer_rewards_percentage = seller.referrer_rewards_percentage;
+               const auto referrer_rewards_value = detail::calculate_percent(reward.amount, referrer_rewards_percentage);
+               auto registrar_reward = reward;
 
-               const asset referrer_reward = recv_asset.amount(referrer_rewards_value);
-               registrar_reward -= referrer_reward;
-               deposit_market_fee_vesting_balance(seller.referrer, referrer_reward);
+               if ( referrer_rewards_value > 0 )
+               {
+                  FC_ASSERT ( referrer_rewards_value <= reward.amount, "Referrer reward shouldn't be greater than total reward" );
+                  const asset referrer_reward = recv_asset.amount(referrer_rewards_value);
+                  registrar_reward -= referrer_reward;
+                  deposit_market_fee_vesting_balance(seller.referrer, referrer_reward);
+               }
+               deposit_market_fee_vesting_balance(seller.registrar, registrar_reward);
             }
-            deposit_market_fee_vesting_balance(seller.registrar, registrar_reward);
          }
       }
 

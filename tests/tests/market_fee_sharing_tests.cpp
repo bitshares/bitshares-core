@@ -23,6 +23,8 @@ namespace fc
 
 struct reward_database_fixture : database_fixture
 {
+   using whitelist_market_fee_sharing_t = fc::optional<flat_set<account_id_type>>;
+
    reward_database_fixture()
       : database_fixture(HARDFORK_1268_TIME - 100)
    {
@@ -32,7 +34,7 @@ struct reward_database_fixture : database_fixture
                      const fc::ecc::private_key& private_key,
                      const asset_id_type& asset_id,
                      uint16_t reward_percent,
-                     flat_set<account_id_type> whitelist_market_fee_sharing = flat_set<account_id_type>())
+                     const whitelist_market_fee_sharing_t &whitelist_market_fee_sharing = whitelist_market_fee_sharing_t{})
    {
       asset_update_operation op;
       op.issuer = issuer_id;
@@ -54,6 +56,13 @@ struct reward_database_fixture : database_fixture
       database_fixture::generate_blocks( HARDFORK_1268_TIME );
       database_fixture::generate_block();
    }
+
+   asset core_asset(int64_t x )
+   {
+       return asset( x*core_precision );
+   };
+
+   const share_type core_precision = asset::scaled_precision( asset_id_type()(db).precision );
 };
 
 BOOST_FIXTURE_TEST_SUITE( reward_tests, reward_database_fixture )
@@ -123,8 +132,9 @@ BOOST_AUTO_TEST_CASE(cannot_update_additional_options_before_hf)
 
       asset_object usd_asset = create_user_issued_asset("USD", issuer, charge_market_fee);
 
+      flat_set<account_id_type> whitelist = {issuer_id};
       GRAPHENE_CHECK_THROW(
-                  update_asset(issuer_id, issuer_private_key, usd_asset.get_id(), 40, {issuer_id}),
+                  update_asset(issuer_id, issuer_private_key, usd_asset.get_id(), 40, whitelist),
                   fc::assert_exception );
    }
    FC_LOG_AND_RETHROW()
@@ -177,16 +187,10 @@ BOOST_AUTO_TEST_CASE(asset_rewards_test)
       auto alice = register_account("alice", alicereferrer);
       auto bob = register_account("bob", bobreferrer);
 
-      const share_type core_prec = asset::scaled_precision( asset_id_type()(db).precision );
-
-      // Return number of core shares (times precision)
-      auto _core = [&]( int64_t x ) -> asset
-      {  return asset( x*core_prec );    };
-
-      transfer( committee_account, alice.id, _core(1000000) );
-      transfer( committee_account, bob.id, _core(1000000) );
-      transfer( committee_account, izzy_id, _core(1000000) );
-      transfer( committee_account, jill_id, _core(1000000) );
+      transfer( committee_account, alice.id, core_asset(1000000) );
+      transfer( committee_account, bob.id, core_asset(1000000) );
+      transfer( committee_account, izzy_id, core_asset(1000000) );
+      transfer( committee_account, jill_id, core_asset(1000000) );
 
       constexpr auto izzycoin_reward_percent = 10*GRAPHENE_1_PERCENT;
       constexpr auto jillcoin_reward_percent = 20*GRAPHENE_1_PERCENT;
@@ -215,13 +219,13 @@ BOOST_AUTO_TEST_CASE(asset_rewards_test)
 
       // Izzycoin is worth 100 BTS
       price_feed feed;
-      feed.settlement_price = price( _izzy(1), _core(100) );
+      feed.settlement_price = price( _izzy(1), core_asset(100) );
       feed.maintenance_collateral_ratio = 175 * GRAPHENE_COLLATERAL_RATIO_DENOM / 100;
       feed.maximum_short_squeeze_ratio = 150 * GRAPHENE_COLLATERAL_RATIO_DENOM / 100;
       publish_feed( izzycoin_id(db), izzy, feed );
 
       // Jillcoin is worth 30 BTS
-      feed.settlement_price = price( _jill(1), _core(30) );
+      feed.settlement_price = price( _jill(1), core_asset(30) );
       feed.maintenance_collateral_ratio = 175 * GRAPHENE_COLLATERAL_RATIO_DENOM / 100;
       feed.maximum_short_squeeze_ratio = 150 * GRAPHENE_COLLATERAL_RATIO_DENOM / 100;
       publish_feed( jillcoin_id(db), jill, feed );
@@ -229,8 +233,8 @@ BOOST_AUTO_TEST_CASE(asset_rewards_test)
       enable_fees();
 
       // Alice and Bob create some coins
-      borrow( alice.id, _izzy( 1500), _core( 600000) );
-      borrow( bob.id, _jill(2000), _core(180000) );
+      borrow( alice.id, _izzy( 1500), core_asset( 600000) );
+      borrow( bob.id, _jill(2000), core_asset(180000) );
 
       // Alice and Bob place orders which match
       create_sell_order( alice.id, _izzy(1000), _jill(1500) ); // Alice is willing to sell her 1000 Izzy's for 1.5 Jill
@@ -286,28 +290,23 @@ BOOST_AUTO_TEST_CASE(asset_claim_reward_test)
       auto obj = jill_id(db);
       const asset_object jillcoin = create_user_issued_asset( "JCOIN", jill,  charge_market_fee, price, 2, market_fee_percent );
 
-      const share_type core_prec = asset::scaled_precision( asset_id_type()(db).precision );
-
-      // return number of core shares (times precision)
-      auto _core = [&core_prec]( int64_t x ) -> asset { return asset( x*core_prec ); };
-
       const account_object alice = create_account("alice", izzy, izzy, 50);
       const account_object bob   = create_account("bob",   izzy, izzy, 50);
 
       // prepare users' balance
       issue_uia( alice, jillcoin.amount( 20000000 ) );
 
-      transfer( committee_account, alice.get_id(), _core(1000) );
-      transfer( committee_account, bob.get_id(),   _core(1000) );
-      transfer( committee_account, izzy.get_id(),  _core(1000) );
+      transfer( committee_account, alice.get_id(), core_asset(1000) );
+      transfer( committee_account, bob.get_id(),   core_asset(1000) );
+      transfer( committee_account, izzy.get_id(),  core_asset(1000) );
 
       generate_blocks_past_reward_hardfork();
       // update_asset: set referrer percent
       update_asset(jill_id, jill_private_key, jillcoin.get_id(), jillcoin_reward_percent);
 
       // Alice and Bob place orders which match
-      create_sell_order( alice, jillcoin.amount(200000), _core(1) );
-      create_sell_order( bob, _core(1), jillcoin.amount(100000) );
+      create_sell_order( alice, jillcoin.amount(200000), core_asset(1) );
+      create_sell_order( bob, core_asset(1), jillcoin.amount(100000) );
 
       const int64_t izzy_reward = get_market_fee_reward( izzy, jillcoin );
       const int64_t izzy_balance = get_balance( izzy, jillcoin );
@@ -337,4 +336,122 @@ BOOST_AUTO_TEST_CASE(asset_claim_reward_test)
    }
    FC_LOG_AND_RETHROW()
 }
+
+BOOST_AUTO_TEST_CASE(create_actors)
+{
+   try
+   {
+      ACTORS((jill)(izzy));
+
+      upgrade_to_lifetime_member(izzy);
+
+      price price(asset(1, asset_id_type(1)), asset(1));
+      uint16_t market_fee_percent = 20 * GRAPHENE_1_PERCENT;
+      auto obj = jill_id(db);
+      const asset_object jillcoin = create_user_issued_asset( "JCOIN", jill,  charge_market_fee, price, 2, market_fee_percent );
+
+      const account_object alice = create_account("alice", izzy, izzy, 50);
+      const account_object bob   = create_account("bob",   izzy, izzy, 50);
+
+      // prepare users' balance
+      issue_uia( alice, jillcoin.amount( 20000000 ) );
+
+      transfer( committee_account, alice.get_id(), core_asset(1000) );
+      transfer( committee_account, bob.get_id(),   core_asset(1000) );
+      transfer( committee_account, izzy.get_id(),  core_asset(1000) );
+   }
+   FC_LOG_AND_RETHROW()
+}
+
+BOOST_AUTO_TEST_CASE(white_list_is_empty_test)
+{
+   try
+   {
+      INVOKE(create_actors);
+
+      generate_blocks_past_reward_hardfork();
+      GET_ACTOR(jill);
+
+      constexpr auto jillcoin_reward_percent = 2*GRAPHENE_1_PERCENT;
+      const asset_object &jillcoin = get_asset("JCOIN");
+
+      flat_set<account_id_type> whitelist;
+      update_asset(jill_id, jill_private_key, jillcoin.get_id(), jillcoin_reward_percent, whitelist);
+
+      GET_ACTOR(izzy);
+      BOOST_CHECK_THROW( get_market_fee_reward( izzy, jillcoin ), fc::exception );
+
+      GET_ACTOR(alice);
+      GET_ACTOR(bob);
+      // Alice and Bob place orders which match
+      create_sell_order( alice, jillcoin.amount(200000), core_asset(1) );
+      create_sell_order( bob, core_asset(1), jillcoin.amount(100000) );
+
+      const auto izzy_reward = get_market_fee_reward( izzy, jillcoin );
+      BOOST_CHECK_GT(izzy_reward , 0);
+   }
+   FC_LOG_AND_RETHROW()
+}
+
+BOOST_AUTO_TEST_CASE(white_list_contains_registrar_test)
+{
+   try
+   {
+      INVOKE(create_actors);
+
+      generate_blocks_past_reward_hardfork();
+      GET_ACTOR(jill);
+
+      constexpr auto jillcoin_reward_percent = 2*GRAPHENE_1_PERCENT;
+      const asset_object &jillcoin = get_asset("JCOIN");
+
+      GET_ACTOR(izzy);
+      flat_set<account_id_type> whitelist = {jill_id, izzy_id};
+
+      update_asset(jill_id, jill_private_key, jillcoin.get_id(), jillcoin_reward_percent, whitelist);
+
+      BOOST_CHECK_THROW( get_market_fee_reward( izzy, jillcoin ), fc::exception );
+
+      GET_ACTOR(alice);
+      GET_ACTOR(bob);
+      // Alice and Bob place orders which match
+      create_sell_order( alice, jillcoin.amount(200000), core_asset(1) );
+      create_sell_order( bob, core_asset(1), jillcoin.amount(100000) );
+
+      const auto izzy_reward = get_market_fee_reward( izzy, jillcoin );
+      BOOST_CHECK_GT(izzy_reward , 0);
+   }
+   FC_LOG_AND_RETHROW()
+}
+
+BOOST_AUTO_TEST_CASE(white_list_doesnt_contain_registrar_test)
+{
+   try
+   {
+      INVOKE(create_actors);
+
+      generate_blocks_past_reward_hardfork();
+      GET_ACTOR(jill);
+
+      constexpr auto jillcoin_reward_percent = 2*GRAPHENE_1_PERCENT;
+      const asset_object &jillcoin = get_asset("JCOIN");
+
+      GET_ACTOR(alice);
+      flat_set<account_id_type> whitelist = {jill_id, alice_id};
+
+      update_asset(jill_id, jill_private_key, jillcoin.get_id(), jillcoin_reward_percent, whitelist);
+
+      GET_ACTOR(izzy);
+      BOOST_CHECK_THROW( get_market_fee_reward( izzy, jillcoin ), fc::exception );
+
+      GET_ACTOR(bob);
+      // Alice and Bob place orders which match
+      create_sell_order( alice, jillcoin.amount(200000), core_asset(1) );
+      create_sell_order( bob, core_asset(1), jillcoin.amount(100000) );
+
+      BOOST_CHECK_THROW( get_market_fee_reward( izzy, jillcoin ), fc::exception );
+   }
+   FC_LOG_AND_RETHROW()
+}
+
 BOOST_AUTO_TEST_SUITE_END()
