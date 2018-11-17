@@ -28,6 +28,7 @@
 #include <graphene/chain/hardfork.hpp>
 
 #include <graphene/chain/balance_object.hpp>
+#include <graphene/chain/budget_record_object.hpp>
 #include <graphene/chain/committee_member_object.hpp>
 #include <graphene/chain/market_object.hpp>
 #include <graphene/chain/withdraw_permission_object.hpp>
@@ -2148,6 +2149,14 @@ BOOST_AUTO_TEST_CASE(zero_second_vbo)
          BOOST_CHECK( vbid(db).get_allowed_withdraw(db.head_block_time()) == asset(0) );
          generate_block();
          BOOST_CHECK( vbid(db).get_allowed_withdraw(db.head_block_time()) == asset(10000) );
+
+         /*
+         db.get_index_type< simple_index<budget_record_object> >().inspect_all_objects(
+            [&](const object& o)
+            {
+               ilog( "budget: ${brec}", ("brec", static_cast<const budget_record_object&>(o)) );
+            });
+         */
       }
    } FC_LOG_AND_RETHROW()
 }
