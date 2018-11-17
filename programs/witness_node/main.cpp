@@ -65,9 +65,11 @@ int main(int argc, char** argv) {
       bpo::options_description cfg_options("Graphene Witness Node");
       app_options.add_options()
             ("help,h", "Print this help message and exit.")
-            ("data-dir,d", bpo::value<boost::filesystem::path>()->default_value("witness_node_data_dir"), "Directory containing databases, configuration file, etc.")
+            ("data-dir,d", bpo::value<boost::filesystem::path>()->default_value("witness_node_data_dir"),
+                    "Directory containing databases, configuration file, etc.")
             ("version,v", "Display version information")
-            ("plugins", bpo::value<std::string>(), "Space-separated list of plugins to activate");
+            ("plugins", bpo::value<std::string>()->default_value("witness account_history market_history grouped_orders"),
+                    "Space-separated list of plugins to activate");
 
       bpo::variables_map options;
 
@@ -110,12 +112,6 @@ int main(int argc, char** argv) {
                 node->enable_plugin(plug);
              }
          });
-      }
-      else {
-         node->enable_plugin("witness");
-         node->enable_plugin("account_history");
-         node->enable_plugin("market_history");
-         node->enable_plugin("grouped_orders");
       }
       
       if( options.count("help") )
