@@ -558,4 +558,113 @@ BOOST_AUTO_TEST_CASE(update_asset_via_proposal_test)
    FC_LOG_AND_RETHROW()
 }
 
+BOOST_AUTO_TEST_CASE(issue_asset){
+   try
+   {
+       ACTORS((alice)(bob)(izzy)(jill));
+      // Izzy issues asset to Alice  (Izzycoin market percent - 10%)
+      // Jill issues asset to Bob    (Jillcoin market percent - 20%)
+
+      fund( alice, core_asset(1000000) );
+      fund( bob, core_asset(1000000) );
+      fund( izzy, core_asset(1000000) );
+      fund( jill, core_asset(1000000) );
+
+      price price(asset(1, asset_id_type(1)), asset(1));
+      constexpr auto izzycoin_market_percent = 10*GRAPHENE_1_PERCENT;
+      asset_object izzycoin = create_user_issued_asset( "IZZYCOIN", izzy,  charge_market_fee, price, 2, izzycoin_market_percent );
+
+      constexpr auto jillcoin_market_percent = 20*GRAPHENE_1_PERCENT;
+      asset_object jillcoin = create_user_issued_asset( "JILLCOIN", jill,  charge_market_fee, price, 2, jillcoin_market_percent );
+
+      // Alice and Bob create some coins
+      issue_uia( alice, izzycoin.amount( 100000 ) );
+      issue_uia( bob, jillcoin.amount( 100000 ) );
+   }
+   FC_LOG_AND_RETHROW()
+}
+
+BOOST_AUTO_TEST_CASE(accumulated_fees_before_hf_test)
+{
+   try
+   {
+      INVOKE(issue_asset);
+
+      const asset_object &jillcoin = get_asset("JILLCOIN");
+      const asset_object &izzycoin = get_asset("IZZYCOIN");
+
+      GET_ACTOR(alice);
+      GET_ACTOR(bob);
+
+      // Alice and Bob place orders which match
+      create_sell_order( alice_id, izzycoin.amount(100), jillcoin.amount(300) );   // Alice is willing to sell her Izzy's for 3 Jill
+      create_sell_order(   bob_id, jillcoin.amount(700), izzycoin.amount(200) );   // Bob is buying up to 200 Izzy's for up to 3.5 Jill
+
+      // 100 Izzys and 300 Jills are matched, so the fees should be
+      // 10 Izzy (10%) and 60 Jill (20%).
+      BOOST_CHECK( izzycoin.dynamic_asset_data_id(db).accumulated_fees == izzycoin.amount(10).amount );
+      BOOST_CHECK( jillcoin.dynamic_asset_data_id(db).accumulated_fees == jillcoin.amount(60).amount );
+   }
+   FC_LOG_AND_RETHROW()
+}
+
+BOOST_AUTO_TEST_CASE(accumulated_fees_after_hf_test)
+{
+   try
+   {
+      INVOKE(issue_asset);
+
+      generate_blocks_past_reward_hardfork();
+
+      const asset_object &jillcoin = get_asset("JILLCOIN");
+      const asset_object &izzycoin = get_asset("IZZYCOIN");
+
+      GET_ACTOR(alice);
+      GET_ACTOR(bob);
+
+      // Alice and Bob place orders which match
+      create_sell_order( alice_id, izzycoin.amount(100), jillcoin.amount(300) );   // Alice is willing to sell her Izzy's for 3 Jill
+      create_sell_order(   bob_id, jillcoin.amount(700), izzycoin.amount(200) );   // Bob is buying up to 200 Izzy's for up to 3.5 Jill
+
+      // 100 Izzys and 300 Jills are matched, so the fees should be
+      // 10 Izzy (10%) and 60 Jill (20%).
+      BOOST_CHECK( izzycoin.dynamic_asset_data_id(db).accumulated_fees == izzycoin.amount(10).amount );
+      BOOST_CHECK( jillcoin.dynamic_asset_data_id(db).accumulated_fees == jillcoin.amount(60).amount );
+   }
+   FC_LOG_AND_RETHROW()
+}
+
+BOOST_AUTO_TEST_CASE(accumulated_fees_with_additional_options_after_hf_test)
+{
+   try
+   {
+      INVOKE(issue_asset);
+
+      generate_blocks_past_reward_hardfork();
+
+      GET_ACTOR(jill);
+      GET_ACTOR(izzy);
+
+      const asset_object &jillcoin = get_asset("JILLCOIN");
+      const asset_object &izzycoin = get_asset("IZZYCOIN");
+
+      uint16_t reward_percent = 0;
+      update_asset(jill_id, jill_private_key, jillcoin.get_id(), reward_percent);
+      update_asset(izzy_id, izzy_private_key, izzycoin.get_id(), reward_percent);
+
+      GET_ACTOR(alice);
+      GET_ACTOR(bob);
+
+      // Alice and Bob place orders which match
+      create_sell_order( alice_id, izzycoin.amount(100), jillcoin.amount(300) );   // Alice is willing to sell her Izzy's for 3 Jill
+      create_sell_order(   bob_id, jillcoin.amount(700), izzycoin.amount(200) );   // Bob is buying up to 200 Izzy's for up to 3.5 Jill
+
+      // 100 Izzys and 300 Jills are matched, so the fees should be
+      // 10 Izzy (10%) and 60 Jill (20%).
+      BOOST_CHECK( izzycoin.dynamic_asset_data_id(db).accumulated_fees == izzycoin.amount(10).amount );
+      BOOST_CHECK( jillcoin.dynamic_asset_data_id(db).accumulated_fees == jillcoin.amount(60).amount );
+   }
+   FC_LOG_AND_RETHROW()
+}
+
 BOOST_AUTO_TEST_SUITE_END()
