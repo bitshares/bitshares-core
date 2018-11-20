@@ -51,7 +51,7 @@ struct reward_database_fixture : database_fixture
       PUSH_TX( db, tx );
    }
 
-   void generate_blocks_past_reward_hardfork()
+   void generate_blocks_past_hf1268()
    {
       database_fixture::generate_blocks( HARDFORK_1268_TIME );
       database_fixture::generate_block();
@@ -65,7 +65,7 @@ struct reward_database_fixture : database_fixture
    const share_type core_precision = asset::scaled_precision( asset_id_type()(db).precision );
 };
 
-BOOST_FIXTURE_TEST_SUITE( reward_tests, reward_database_fixture )
+BOOST_FIXTURE_TEST_SUITE( fee_sharing_tests, reward_database_fixture )
 
 BOOST_AUTO_TEST_CASE(cannot_create_asset_with_additional_options_before_hf)
 {
@@ -98,7 +98,7 @@ BOOST_AUTO_TEST_CASE(create_asset_with_additional_options_after_hf)
    {
       ACTOR(issuer);
 
-      generate_blocks_past_reward_hardfork();
+      generate_blocks_past_hf1268();
 
       uint16_t reward_percent = 100;
       flat_set<account_id_type> whitelist = {issuer_id};
@@ -148,7 +148,7 @@ BOOST_AUTO_TEST_CASE(update_additional_options_after_hf)
 
       asset_object usd_asset = create_user_issued_asset("USD", issuer, charge_market_fee);
 
-      generate_blocks_past_reward_hardfork();
+      generate_blocks_past_hf1268();
 
       uint16_t reward_percent = 40;
       flat_set<account_id_type> whitelist = {issuer_id};
@@ -201,7 +201,7 @@ BOOST_AUTO_TEST_CASE(asset_rewards_test)
       asset_id_type izzycoin_id = create_bitasset( "IZZYCOIN", izzy_id, izzycoin_market_percent ).id;
       asset_id_type jillcoin_id = create_bitasset( "JILLCOIN", jill_id, jillcoin_market_percent ).id;
 
-      generate_blocks_past_reward_hardfork();
+      generate_blocks_past_hf1268();
 
       update_asset(izzy_id, izzy_private_key, izzycoin_id, izzycoin_reward_percent);
       update_asset(jill_id, jill_private_key, jillcoin_id, jillcoin_reward_percent);
@@ -300,7 +300,7 @@ BOOST_AUTO_TEST_CASE(asset_claim_reward_test)
       transfer( committee_account, bob.get_id(),   core_asset(1000) );
       transfer( committee_account, izzy.get_id(),  core_asset(1000) );
 
-      generate_blocks_past_reward_hardfork();
+      generate_blocks_past_hf1268();
       // update_asset: set referrer percent
       update_asset(jill_id, jill_private_key, jillcoin.get_id(), jillcoin_reward_percent);
 
@@ -369,7 +369,7 @@ BOOST_AUTO_TEST_CASE(white_list_is_empty_test)
    {
       INVOKE(create_actors);
 
-      generate_blocks_past_reward_hardfork();
+      generate_blocks_past_hf1268();
       GET_ACTOR(jill);
 
       constexpr auto jillcoin_reward_percent = 2*GRAPHENE_1_PERCENT;
@@ -399,7 +399,7 @@ BOOST_AUTO_TEST_CASE(white_list_contains_registrar_test)
    {
       INVOKE(create_actors);
 
-      generate_blocks_past_reward_hardfork();
+      generate_blocks_past_hf1268();
       GET_ACTOR(jill);
 
       constexpr auto jillcoin_reward_percent = 2*GRAPHENE_1_PERCENT;
@@ -430,7 +430,7 @@ BOOST_AUTO_TEST_CASE(white_list_doesnt_contain_registrar_test)
    {
       INVOKE(create_actors);
 
-      generate_blocks_past_reward_hardfork();
+      generate_blocks_past_hf1268();
       GET_ACTOR(jill);
 
       constexpr auto jillcoin_reward_percent = 2*GRAPHENE_1_PERCENT;
@@ -493,7 +493,7 @@ BOOST_AUTO_TEST_CASE(create_asset_via_proposal_test)
          GRAPHENE_CHECK_THROW(PUSH_TX( db, tx ), fc::exception);
       }
 
-      generate_blocks_past_reward_hardfork();
+      generate_blocks_past_hf1268();
 
       {
          prop.expiration_time =  db.head_block_time() + fc::days(1);
@@ -543,7 +543,7 @@ BOOST_AUTO_TEST_CASE(update_asset_via_proposal_test)
          GRAPHENE_CHECK_THROW(PUSH_TX( db, tx ), fc::exception);
       }
 
-      generate_blocks_past_reward_hardfork();
+      generate_blocks_past_hf1268();
 
       {
          prop.expiration_time =  db.head_block_time() + fc::days(1);
@@ -614,7 +614,7 @@ BOOST_AUTO_TEST_CASE(accumulated_fees_after_hf_test)
    {
       INVOKE(issue_asset);
 
-      generate_blocks_past_reward_hardfork();
+      generate_blocks_past_hf1268();
 
       const asset_object &jillcoin = get_asset("JILLCOIN");
       const asset_object &izzycoin = get_asset("IZZYCOIN");
@@ -640,7 +640,7 @@ BOOST_AUTO_TEST_CASE(accumulated_fees_with_additional_options_after_hf_test)
    {
       INVOKE(issue_asset);
 
-      generate_blocks_past_reward_hardfork();
+      generate_blocks_past_hf1268();
 
       GET_ACTOR(jill);
       GET_ACTOR(izzy);
@@ -666,5 +666,117 @@ BOOST_AUTO_TEST_CASE(accumulated_fees_with_additional_options_after_hf_test)
    }
    FC_LOG_AND_RETHROW()
 }
+
+BOOST_AUTO_TEST_CASE( create_vesting_balance_with_instant_vesting_policy_before_hf1268_test )
+{ try {
+
+   ACTOR(alice);
+   fund(alice);
+
+   const asset_object& core = asset_id_type()(db);
+
+   vesting_balance_create_operation op;
+   op.fee = core.amount( 0 );
+   op.creator = alice_id;
+   op.owner = alice_id;
+   op.amount = core.amount( 100 );
+   op.policy = instant_vesting_policy_initializer{};
+
+   trx.operations.push_back(op);
+   set_expiration( db, trx );
+   sign(trx, alice_private_key);
+
+   GRAPHENE_REQUIRE_THROW(PUSH_TX( db, trx, ~0 ), fc::exception);
+
+} FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE( create_vesting_balance_with_instant_vesting_policy_after_hf1268_test )
+{ try {
+
+   ACTOR(alice);
+   fund(alice);
+
+   generate_blocks_past_hf1268();
+
+   const asset_object& core = asset_id_type()(db);
+
+   vesting_balance_create_operation op;
+   op.fee = core.amount( 0 );
+   op.creator = alice_id;
+   op.owner = alice_id;
+   op.amount = core.amount( 100 );
+   op.policy = instant_vesting_policy_initializer{};
+
+   trx.operations.push_back(op);
+   set_expiration( db, trx );
+
+   processed_transaction ptx = PUSH_TX( db, trx, ~0 );
+   const vesting_balance_id_type& vbid = ptx.operation_results.back().get<object_id_type>();
+
+   auto withdraw = [&](const asset& amount) {
+      vesting_balance_withdraw_operation withdraw_op;
+      withdraw_op.vesting_balance = vbid;
+      withdraw_op.owner = alice_id;
+      withdraw_op.amount = amount;
+
+      signed_transaction withdraw_tx;
+      withdraw_tx.operations.push_back( withdraw_op );
+      set_expiration( db, withdraw_tx );
+      sign(withdraw_tx, alice_private_key);
+      PUSH_TX( db, withdraw_tx );
+   };
+   // try to withdraw more then it is on the balance
+   GRAPHENE_REQUIRE_THROW(withdraw(op.amount.amount + 1), fc::exception);
+   //to withdraw all that is on the balance
+   withdraw(op.amount);
+   // try to withdraw more then it is on the balance
+   GRAPHENE_REQUIRE_THROW(withdraw( core.amount(1) ), fc::exception);
+} FC_LOG_AND_RETHROW() }
+
+
+BOOST_AUTO_TEST_CASE( create_vesting_balance_with_instant_vesting_policy_via_proposal_test )
+{ try {
+
+   ACTOR(actor);
+   fund(actor);
+
+   const asset_object& core = asset_id_type()(db);
+
+   vesting_balance_create_operation create_op;
+   create_op.fee = core.amount( 0 );
+   create_op.creator = actor_id;
+   create_op.owner = actor_id;
+   create_op.amount = core.amount( 100 );
+   create_op.policy = instant_vesting_policy_initializer{};
+
+   const auto& curfees = *db.get_global_properties().parameters.current_fees;
+   const auto& proposal_create_fees = curfees.get<proposal_create_operation>();
+   proposal_create_operation prop;
+   prop.fee_paying_account = actor_id;
+   prop.proposed_ops.emplace_back( create_op );
+   prop.expiration_time =  db.head_block_time() + fc::days(1);
+   prop.fee = asset( proposal_create_fees.fee + proposal_create_fees.price_per_kbyte );
+
+   {
+      signed_transaction tx;
+      tx.operations.push_back( prop );
+      db.current_fee_schedule().set_fee( tx.operations.back() );
+      set_expiration( db, tx );
+      sign( tx, actor_private_key );
+      GRAPHENE_CHECK_THROW(PUSH_TX( db, tx ), fc::exception);
+   }
+
+   generate_blocks_past_hf1268();
+
+   {
+      prop.expiration_time =  db.head_block_time() + fc::days(1);
+      signed_transaction tx;
+      tx.operations.push_back( prop );
+      db.current_fee_schedule().set_fee( tx.operations.back() );
+      set_expiration( db, tx );
+      sign( tx, actor_private_key );
+      PUSH_TX( db, tx );
+   }
+} FC_LOG_AND_RETHROW() }
 
 BOOST_AUTO_TEST_SUITE_END()
