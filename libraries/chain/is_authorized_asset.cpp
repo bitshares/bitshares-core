@@ -49,6 +49,9 @@ bool _is_authorized_asset(
       if( asset_obj.options.blacklist_authorities.find(id) != asset_obj.options.blacklist_authorities.end() )
          return false;
    }
+   
+   if( asset_obj.options.flags & only_issuer_limit_orders_allowed )
+      return false;
 
    if( d.head_block_time() > HARDFORK_415_TIME )
    {
