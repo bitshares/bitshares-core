@@ -57,7 +57,7 @@ void verify_authority_accounts( const database& db, const authority& a )
    }
 }
 
-void verify_account_votes( const database& db, const account_options& options )
+void verify_account_votes( database& db, const account_options& options, const account_id_type account = account_id_type(0))
 {
    // ensure account's votes satisfy requirements
    // NB only the part of vote checking that requires chain state is here,
@@ -117,8 +117,14 @@ void verify_account_votes( const database& db, const account_options& options )
          }
       }
    }
+   if(account != account_id_type(0) &&
+         (options.votes != account(db).options.votes || options.voting_account != account(db).options.voting_account)) {
+      auto &stats_obj = db.get_account_stats_by_owner(account);
+      db.modify(stats_obj, [&](account_statistics_object &obj) {
+         obj.last_vote_time = db.head_block_time();
+      });
+   }
 }
-
 
 void_result account_create_evaluator::do_evaluate( const account_create_operation& op )
 { try {
@@ -306,7 +312,7 @@ void_result account_update_evaluator::do_evaluate( const account_update_operatio
    acnt = &o.account(d);
 
    if( o.new_options.valid() )
-      verify_account_votes( d, *o.new_options );
+      verify_account_votes(d, *o.new_options, o.account);
 
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }

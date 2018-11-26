@@ -414,5 +414,130 @@ BOOST_AUTO_TEST_CASE(invalid_voting_account)
 
    } FC_LOG_AND_RETHROW()
 }
+BOOST_AUTO_TEST_CASE(last_voting_date)
+{
+   try
+   {
+      ACTORS((alice));
+
+      transfer(committee_account, alice_id, asset(100));
+
+      // we are going to vote for this witness
+      auto witness1 = witness_id_type(1)(db);
+
+      auto stats_obj = db.get_account_stats_by_owner(alice_id);
+      BOOST_CHECK_EQUAL(stats_obj.last_vote_time.sec_since_epoch(), 0);
+
+      // alice votes
+      graphene::chain::account_update_operation op;
+      op.account = alice_id;
+      op.new_options = alice.options;
+      op.new_options->votes.insert(witness1.vote_id);
+      trx.operations.push_back(op);
+      sign(trx, alice_private_key);
+      PUSH_TX( db, trx, ~0 );
+
+      auto now = db.head_block_time().sec_since_epoch();
+
+      // last_vote_time is updated for alice
+      stats_obj = db.get_account_stats_by_owner(alice_id);
+      BOOST_CHECK_EQUAL(stats_obj.last_vote_time.sec_since_epoch(), now);
+
+   } FC_LOG_AND_RETHROW()
+}
+BOOST_AUTO_TEST_CASE(last_voting_date_proxy)
+{
+   try
+   {
+      ACTORS((alice)(proxy)(bob));
+
+      transfer(committee_account, alice_id, asset(100));
+      transfer(committee_account, bob_id, asset(200));
+      transfer(committee_account, proxy_id, asset(300));
+
+      generate_block();
+
+      // witness to vote for
+      auto witness1 = witness_id_type(1)(db);
+
+      // alice changes proxy, this is voting activity
+      {
+         graphene::chain::account_update_operation op;
+         op.account = alice_id;
+         op.new_options = alice_id(db).options;
+         op.new_options->voting_account = proxy_id;
+         trx.operations.push_back(op);
+         sign(trx, alice_private_key);
+         PUSH_TX( db, trx, ~0 );
+      }
+      // alice last_vote_time is updated
+      auto alice_stats_obj = db.get_account_stats_by_owner(alice_id);
+      auto now = db.head_block_time().sec_since_epoch();
+      BOOST_CHECK_EQUAL(alice_stats_obj.last_vote_time.sec_since_epoch(), now);
+
+      generate_block();
+
+      // alice update account but no proxy or voting changes are done
+      {
+         graphene::chain::account_update_operation op;
+         op.account = alice_id;
+         op.new_options = alice_id(db).options;
+         trx.operations.push_back(op);
+         sign(trx, alice_private_key);
+         set_expiration( db, trx );
+         PUSH_TX( db, trx, ~0 );
+      }
+      // last_vote_time is not updated
+      now = db.head_block_time().sec_since_epoch();
+      alice_stats_obj = db.get_account_stats_by_owner(alice_id);
+      BOOST_CHECK(alice_stats_obj.last_vote_time.sec_since_epoch() != now);
+
+      generate_block();
+
+      // bob votes
+      {
+         graphene::chain::account_update_operation op;
+         op.account = bob_id;
+         op.new_options = bob_id(db).options;
+         op.new_options->votes.insert(witness1.vote_id);
+         trx.operations.push_back(op);
+         sign(trx, bob_private_key);
+         set_expiration( db, trx );
+         PUSH_TX(db, trx, ~0);
+      }
+
+      // last_vote_time for bob is updated as he voted
+      now = db.head_block_time().sec_since_epoch();
+      auto bob_stats_obj = db.get_account_stats_by_owner(bob_id);
+      BOOST_CHECK_EQUAL(bob_stats_obj.last_vote_time.sec_since_epoch(), now);
+
+      generate_block();
+
+      // proxy votes
+      {
+         graphene::chain::account_update_operation op;
+         op.account = proxy_id;
+         op.new_options = proxy_id(db).options;
+         op.new_options->votes.insert(witness1.vote_id);
+         trx.operations.push_back(op);
+         sign(trx, proxy_private_key);
+         PUSH_TX(db, trx, ~0);
+      }
+
+      // proxy just voted so the last_vote_time is updated
+      now = db.head_block_time().sec_since_epoch();
+      auto proxy_stats_obj = db.get_account_stats_by_owner(proxy_id);
+      BOOST_CHECK_EQUAL(proxy_stats_obj.last_vote_time.sec_since_epoch(), now);
+
+      // alice haves proxy, proxy votes but last_vote_time is not updated for alice
+      alice_stats_obj = db.get_account_stats_by_owner(alice_id);
+      BOOST_CHECK(alice_stats_obj.last_vote_time.sec_since_epoch() != now);
+
+      // bob haves nothing to do with proxy so last_vote_time is not updated
+      bob_stats_obj = db.get_account_stats_by_owner(bob_id);
+      BOOST_CHECK(bob_stats_obj.last_vote_time.sec_since_epoch() != now);
+
+   } FC_LOG_AND_RETHROW()
+}
 
 BOOST_AUTO_TEST_SUITE_END()

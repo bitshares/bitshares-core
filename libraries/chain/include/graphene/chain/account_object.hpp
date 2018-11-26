@@ -70,6 +70,8 @@ namespace graphene { namespace chain {
 
          bool is_voting = false; ///< redundately store whether this account is voting for better maintenance performance
 
+         time_point_sec last_vote_time; // add last time voted
+
          /// Whether this account owns some CORE asset and is voting
          inline bool has_some_core_voting() const
          {
@@ -453,6 +455,7 @@ FC_REFLECT_DERIVED( graphene::chain::account_statistics_object,
                     (core_in_balance)
                     (has_cashback_vb)
                     (is_voting)
+                    (last_vote_time)
                     (lifetime_fees_paid)
                     (pending_fees)(pending_vested_fees)
                   )
