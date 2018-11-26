@@ -491,4 +491,17 @@ BOOST_AUTO_TEST_CASE( revive_empty_with_bid )
    }
 }
 
+/** Creates a black swan, bids on more than outstanding debt
+ */
+BOOST_AUTO_TEST_CASE( overflow )
+{ try {
+   init_standard_swan( 100000 );
+
+   wait_for_hf_core_216();
+
+   bid_collateral( borrower2(), back().amount(1000), swan().amount(GRAPHENE_MAX_SHARE_SUPPLY - 1) );
+   set_feed(1, 2);
+   wait_for_maintenance();
+} FC_LOG_AND_RETHROW() }
+
 BOOST_AUTO_TEST_SUITE_END()
