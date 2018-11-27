@@ -40,7 +40,7 @@ namespace graphene { namespace chain {
          MEMBER_MODIFIER_TYPE_COUNT ///< Sentry value which contains the number of different types
       };
 
-      enum function_type
+       enum function_type
       {
          func_eq,
          func_ne,

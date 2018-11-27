@@ -217,8 +217,12 @@ struct attr_argument_validation_visitor
          // validate common data
          r.validate_common_data();
          // validate member-related data
-         restriction_validation_visitor vtor( r );
-         vtor( *((const T*)nullptr) );
+
+//TODO: uncomment when tests for functionality will be ready
+//      commmented to fix build on macos
+//
+//         restriction_validation_visitor vtor( r );
+//         vtor( *((const T*)nullptr) );
       }
    }
 };
@@ -360,7 +364,7 @@ struct restriction_validation_helper
    template<typename T> // non-comparable, not-simple, aka object-like type
    void validate_member( const char* name, std::false_type, std::false_type )
    {
-      FC_ASSERT( _restriction.function == restriction::func_attr,
+      FC_ASSERT( _restriction.function == unsigned_int(restriction::func_attr),
                  "Object-like member '${name}' can only use func_attr",
                  ("name", name) );
       // argument need to be a attribute_restriction
@@ -482,7 +486,7 @@ struct restriction_validation_visitor
    template<typename OpType>
    result_type operator()( const OpType& ) // Note: the parameter is a reference of *nullptr, we should not use it
    {
-      FC_ASSERT( _restriction.member < fc::reflector<OpType>::total_member_count,
+       FC_ASSERT( _restriction.member < unsigned_int(fc::reflector<OpType>::total_member_count),
                  "member number ${m} is too large",
                  ("m",_restriction.member) );
 
@@ -519,7 +523,7 @@ void validate_restriction_details( const restriction& r, unsigned_int op_type )
 void restriction::validate_common_data() const
 {
    // validate member modifier
-   FC_ASSERT( member_modifier < MEMBER_MODIFIER_TYPE_COUNT,
+   FC_ASSERT( member_modifier < unsigned_int(MEMBER_MODIFIER_TYPE_COUNT),
               "member modifier number ${mm} is too large",
               ("mm", member_modifier) );
 
@@ -535,7 +539,7 @@ void restriction::validate_common_data() const
    }
 
    // validate function
-   FC_ASSERT( function < FUNCTION_TYPE_COUNT,
+   FC_ASSERT( function < unsigned_int(FUNCTION_TYPE_COUNT),
               "function number ${f} is too large",
               ("f", function) );
 }

@@ -62,7 +62,7 @@ void custom_authority_create_operation::validate()const
 
    // Note: when adding new operation with hard fork, need to check more strictly in evaluator
    // TODO add code in evaluator
-   FC_ASSERT( operation_type < operation::count(), "operation_type is too large" );
+   FC_ASSERT( static_cast<int64_t>(operation_type) < operation::count(), "operation_type is too large" );
 
    // Note: allow auths to be empty
    //FC_ASSERT( auth.num_auths() > 0, "Can not set empty auth" );
