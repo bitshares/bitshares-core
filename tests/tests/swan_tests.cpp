@@ -495,13 +495,24 @@ BOOST_AUTO_TEST_CASE( revive_empty_with_bid )
  */
 BOOST_AUTO_TEST_CASE( overflow )
 { try {
-   init_standard_swan( 100000 );
+   init_standard_swan( 700 );
 
    wait_for_hf_core_216();
 
-   bid_collateral( borrower2(), back().amount(1000), swan().amount(GRAPHENE_MAX_SHARE_SUPPLY - 1) );
+   bid_collateral( borrower(),  back().amount(2200), swan().amount(GRAPHENE_MAX_SHARE_SUPPLY - 1) );
+   bid_collateral( borrower2(), back().amount(2100), swan().amount(1399) );
    set_feed(1, 2);
    wait_for_maintenance();
+
+   auto& call_idx = db.get_index_type<call_order_index>().indices().get<by_account>();
+   auto itr = call_idx.find( boost::make_tuple(_borrower, _swan) );
+   BOOST_REQUIRE( itr != call_idx.end() );
+   BOOST_CHECK_EQUAL( 1, itr->debt.value );
+   itr = call_idx.find( boost::make_tuple(_borrower2, _swan) );
+   BOOST_REQUIRE( itr != call_idx.end() );
+   BOOST_CHECK_EQUAL( 1399, itr->debt.value );
+
+   BOOST_CHECK( !swan().bitasset_data(db).has_settlement() );
 } FC_LOG_AND_RETHROW() }
 
 BOOST_AUTO_TEST_SUITE_END()
