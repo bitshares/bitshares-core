@@ -497,7 +497,7 @@ BOOST_AUTO_TEST_CASE( overflow )
 { try {
    init_standard_swan( 700 );
 
-   wait_for_hf_core_216();
+   generate_blocks( HARDFORK_TEST_20171128_TIME );
 
    bid_collateral( borrower(),  back().amount(2200), swan().amount(GRAPHENE_MAX_SHARE_SUPPLY - 1) );
    bid_collateral( borrower2(), back().amount(2100), swan().amount(1399) );
