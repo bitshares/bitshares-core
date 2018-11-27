@@ -24,6 +24,7 @@
 #pragma once
 #include <graphene/chain/protocol/authority.hpp>
 #include <graphene/chain/protocol/custom_authority.hpp>
+#include <graphene/chain/protocol/operations.hpp>
 #include <graphene/db/generic_index.hpp>
 #include <boost/multi_index/composite_key.hpp>
 
@@ -48,6 +49,8 @@ namespace graphene { namespace chain {
          unsigned_int                    operation_type;
          authority                       auth;
          vector<restriction>             restrictions;
+       
+         bool validate(const operation& an_operation) const;
    };
 
    struct by_account_custom;
