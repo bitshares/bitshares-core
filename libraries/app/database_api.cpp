@@ -96,7 +96,6 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       vector<balance_object> get_balance_objects( const vector<address>& addrs )const;
       vector<asset> get_vested_balances( const vector<balance_id_type>& objs )const;
       vector<vesting_balance_object> get_vesting_balances( const std::string account_id_or_name )const;
-      vector<vesting_balance_object> get_mfs_vesting_balances( const std::string account_id_or_name )const;
 
       // Assets
       vector<optional<asset_object>> get_assets(const vector<asset_id_type>& asset_ids)const;
@@ -1027,11 +1026,6 @@ vector<vesting_balance_object> database_api::get_vesting_balances( const std::st
    return my->get_vesting_balances( account_id_or_name );
 }
 
-vector<vesting_balance_object> database_api::get_mfs_vesting_balances( const std::string account_id_or_name )const
-{
-   return my->get_mfs_vesting_balances( account_id_or_name );
-}
-
 vector<vesting_balance_object> database_api_impl::get_vesting_balances( const std::string account_id_or_name )const
 {
    try
@@ -1043,27 +1037,6 @@ vector<vesting_balance_object> database_api_impl::get_vesting_balances( const st
                     [&result](const vesting_balance_object& balance) {
                        result.emplace_back(balance);
                     });
-      return result;
-   }
-   FC_CAPTURE_AND_RETHROW( (account_id_or_name) );
-}
-
-vector<vesting_balance_object> database_api_impl::get_mfs_vesting_balances( const std::string account_id_or_name )const
-{
-   try
-   {
-      const account_id_type account_id = get_account_from_string(account_id_or_name)->id;
-      vector<vesting_balance_object> result;
-
-      auto& vesting_balances = _db.get_index_type<vesting_balance_index>().indices().get<by_vesting_type>();
-      auto key = boost::make_tuple(account_id, vesting_balance_type::market_fee_sharing);
-      auto mfs_vesting_range = vesting_balances.equal_range(key);
-
-      std::for_each(mfs_vesting_range.first, mfs_vesting_range.second,
-                    [&result](const vesting_balance_object& balance) {
-                       result.emplace_back(balance);
-                    });
-
       return result;
    }
    FC_CAPTURE_AND_RETHROW( (account_id_or_name) );
