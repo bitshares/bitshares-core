@@ -51,4 +51,34 @@ BOOST_AUTO_TEST_CASE( validation_for_wrong_operation_name_is_failed )
     BOOST_CHECK(!authority.validate(graphene::chain::asset_create_operation()));
 }
 
+BOOST_AUTO_TEST_CASE( validation_fails_when_now_is_after_valid_period )
+{
+    graphene::chain::custom_authority_object authority;
+    
+    authority.operation_name = "graphene::chain::transfer_operation";
+    authority.valid_from = graphene::chain::time_point_sec(0);
+    authority.valid_to = graphene::chain::time_point_sec(5);
+    BOOST_CHECK(!authority.validate(graphene::chain::transfer_operation(), graphene::chain::time_point_sec(6)));
+}
+
+BOOST_AUTO_TEST_CASE( validation_fails_when_now_is_before_valid_period )
+{
+    graphene::chain::custom_authority_object authority;
+    
+    authority.operation_name = "graphene::chain::transfer_operation";
+    authority.valid_from = graphene::chain::time_point_sec(3);
+    authority.valid_to = graphene::chain::time_point_sec(5);
+    BOOST_CHECK(!authority.validate(graphene::chain::transfer_operation(), graphene::chain::time_point_sec(1)));
+}
+
+BOOST_AUTO_TEST_CASE( validation_passes_when_now_is_in_valid_period )
+{
+    graphene::chain::custom_authority_object authority;
+    
+    authority.operation_name = "graphene::chain::transfer_operation";
+    authority.valid_from = graphene::chain::time_point_sec(3);
+    authority.valid_to = graphene::chain::time_point_sec(5);
+    BOOST_CHECK(authority.validate(graphene::chain::transfer_operation(), graphene::chain::time_point_sec(4)));
+}
+
 BOOST_AUTO_TEST_SUITE_END()

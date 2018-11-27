@@ -54,3 +54,13 @@ bool custom_authority_object::validate(const operation& an_operation) const
 {
     return get_operation_name(an_operation) == operation_name;
 }
+
+bool custom_authority_object::validate(const operation& an_operation, const time_point_sec now) const
+{
+    if (now < valid_from || valid_to < now)
+    {
+        return false;
+    }
+    
+    return get_operation_name(an_operation) == operation_name;
+}
