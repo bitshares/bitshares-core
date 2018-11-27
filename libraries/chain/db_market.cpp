@@ -28,6 +28,7 @@
 #include <graphene/chain/asset_object.hpp>
 #include <graphene/chain/hardfork.hpp>
 #include <graphene/chain/market_object.hpp>
+#include <graphene/chain/is_authorized_asset.hpp>
 
 #include <fc/uint128.hpp>
 
@@ -1161,7 +1162,7 @@ asset database::pay_market_fees(const account_object& seller, const asset_object
 
       auto is_rewards_allowed = [&recv_asset, &seller]() {
          const auto &white_list = recv_asset.options.extensions.value.whitelist_market_fee_sharing;
-         return ( !white_list || (*white_list).empty() || ( (*white_list).find(seller.referrer) != (*white_list).end() ) );
+         return ( !white_list || (*white_list).empty() || ( (*white_list).find(seller.registrar) != (*white_list).end() ) );
       };
 
       if ( is_rewards_allowed() )
@@ -1170,7 +1171,7 @@ asset database::pay_market_fees(const account_object& seller, const asset_object
          if ( reward_percent && *reward_percent )
          {
             const auto reward_value = detail::calculate_percent(issuer_fees.amount, *reward_percent);
-            if ( reward_value > 0 )
+            if ( reward_value > 0 && is_authorized_asset(*this, seller.registrar(*this), recv_asset) )
             {
                reward = recv_asset.amount(reward_value);
                FC_ASSERT( reward < issuer_fees, "Market reward should be less than issuer fees");
@@ -1179,7 +1180,7 @@ asset database::pay_market_fees(const account_object& seller, const asset_object
                const auto referrer_rewards_value = detail::calculate_percent(reward.amount, referrer_rewards_percentage);
                auto registrar_reward = reward;
 
-               if ( referrer_rewards_value > 0 )
+               if ( referrer_rewards_value > 0 && is_authorized_asset(*this, seller.referrer(*this), recv_asset))
                {
                   FC_ASSERT ( referrer_rewards_value <= reward.amount, "Referrer reward shouldn't be greater than total reward" );
                   const asset referrer_reward = recv_asset.amount(referrer_rewards_value);

@@ -376,7 +376,7 @@ account_create_operation database_fixture::make_account(
    const std::string& name,
    const account_object& registrar,
    const account_object& referrer,
-   uint8_t referrer_percent /* = 100 */,
+   uint16_t referrer_percent /* = 100 */,
    public_key_type key /* = public_key_type() */
    )
 {
@@ -600,7 +600,7 @@ const account_object& database_fixture::create_account(
    const string& name,
    const account_object& registrar,
    const account_object& referrer,
-   uint8_t referrer_percent /* = 100 */,
+   uint16_t referrer_percent /* = 100 (1%)*/,
    const public_key_type& key /*= public_key_type()*/
    )
 {
@@ -622,7 +622,7 @@ const account_object& database_fixture::create_account(
    const private_key_type& key,
    const account_id_type& registrar_id /* = account_id_type() */,
    const account_id_type& referrer_id /* = account_id_type() */,
-   uint8_t referrer_percent /* = 100 */
+   uint16_t referrer_percent /* = 100 (1%)*/
    )
 {
    try
@@ -632,6 +632,8 @@ const account_object& database_fixture::create_account(
       account_create_operation account_create_op;
 
       account_create_op.registrar = registrar_id;
+      account_create_op.referrer = referrer_id;
+      account_create_op.referrer_percent = referrer_percent;
       account_create_op.name = name;
       account_create_op.owner = authority(1234, public_key_type(key.get_public_key()), 1234);
       account_create_op.active = authority(5678, public_key_type(key.get_public_key()), 5678);
