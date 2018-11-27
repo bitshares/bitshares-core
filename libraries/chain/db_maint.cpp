@@ -805,6 +805,7 @@ void database::process_bids( const asset_bitasset_data_object& bad )
    asset_id_type to_revive_id = (asset( 0, bad.options.short_backing_asset ) * bad.settlement_price).asset_id;
    const asset_object& to_revive = to_revive_id( *this );
    const asset_dynamic_data_object& bdd = to_revive.dynamic_data( *this );
+   const bool has_hf_20181128 = head_block_time() >= HARDFORK_TEST_20171128_TIME;
 
    const auto& bid_idx = get_index_type< collateral_bid_index >().indices().get<by_price>();
    const auto start = bid_idx.lower_bound( boost::make_tuple( to_revive_id, price::max( bad.options.short_backing_asset, to_revive_id ), collateral_bid_id_type() ) );
@@ -815,7 +816,7 @@ void database::process_bids( const asset_bitasset_data_object& bad )
    {
       const collateral_bid_object& bid = *itr;
       asset debt_in_bid = bid.inv_swan_price.quote;
-      if( debt_in_bid.amount > bdd.current_supply )
+      if( has_hf_20181128 && debt_in_bid.amount > bdd.current_supply )
          debt_in_bid.amount = bdd.current_supply;
       asset total_collateral = debt_in_bid * bad.settlement_price;
       total_collateral += bid.inv_swan_price.base;
