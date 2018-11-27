@@ -23,10 +23,34 @@
  */
 
 #include <graphene/chain/custom_authority_object.hpp>
+#include <fc/reflect/reflect.hpp>
 
 using namespace graphene::chain;
 
+namespace  {
+    struct type_name_visitor
+    {
+        typedef void result_type;
+        
+        template <class T>
+        void operator () (const T&)
+        {
+            type_name = fc::get_typename<T>::name();
+        }
+        
+        std::string type_name;
+    };
+    
+    std::string get_operation_name(const operation& an_operation)
+    {
+        type_name_visitor type_name_retriver;
+        an_operation.visit(type_name_retriver);
+        
+        return type_name_retriver.type_name;
+    }
+}
+
 bool custom_authority_object::validate(const operation& an_operation) const
 {
-    return false;
+    return get_operation_name(an_operation) == operation_name;
 }

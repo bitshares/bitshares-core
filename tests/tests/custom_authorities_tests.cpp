@@ -33,7 +33,22 @@ BOOST_AUTO_TEST_CASE( validation_for_correct_operation_name_is_passed )
 {
     graphene::chain::custom_authority_object authority;
     
+    authority.operation_name = "graphene::chain::transfer_operation";
     BOOST_CHECK(authority.validate(graphene::chain::transfer_operation()));
+    
+    authority.operation_name = "graphene::chain::asset_create_operation";
+    BOOST_CHECK(authority.validate(graphene::chain::asset_create_operation()));
+}
+
+BOOST_AUTO_TEST_CASE( validation_for_wrong_operation_name_is_failed )
+{
+    graphene::chain::custom_authority_object authority;
+    
+    authority.operation_name = "graphene::chain::asset_create_operation";
+    BOOST_CHECK(!authority.validate(graphene::chain::transfer_operation()));
+    
+    authority.operation_name = "graphene::chain::transfer_operation";
+    BOOST_CHECK(!authority.validate(graphene::chain::asset_create_operation()));
 }
 
 BOOST_AUTO_TEST_SUITE_END()

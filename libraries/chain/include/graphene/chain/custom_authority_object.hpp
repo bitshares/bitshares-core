@@ -47,6 +47,7 @@ namespace graphene { namespace chain {
          time_point_sec                  valid_from;
          time_point_sec                  valid_to;
          unsigned_int                    operation_type;
+         std::string                     operation_name;
          authority                       auth;
          vector<restriction>             restrictions;
        
