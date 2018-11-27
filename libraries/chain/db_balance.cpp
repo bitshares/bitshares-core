@@ -81,6 +81,48 @@ void database::adjust_balance(account_id_type account, asset delta )
 
 } FC_CAPTURE_AND_RETHROW( (account)(delta) ) }
 
+namespace detail {
+
+   /**
+    * Used as a key to search vesting_balance_object in the index
+   */
+   struct vbo_mfs_key
+   {
+      account_id_type   account_id;
+      asset_id_type     asset_id;
+
+      vbo_mfs_key(const account_id_type& account, const asset_id_type& asset):
+         account_id(account),
+         asset_id(asset)
+      {}
+
+      bool operator()(const vbo_mfs_key& k, const vesting_balance_object& vbo)const
+      {
+         return ( vbo.balance_type == vesting_balance_type::market_fee_sharing ) &&
+                  ( k.asset_id == vbo.balance.asset_id ) &&
+                  ( k.account_id == vbo.owner );
+      }
+
+      uint64_t operator()(const vbo_mfs_key& k)const
+      {
+         return vbo_mfs_hash(k.account_id, k.asset_id);
+      }
+   };
+} //detail
+
+asset database::get_market_fee_vesting_balance(const account_id_type &account_id, const asset_id_type &asset_id)
+{
+   auto& vesting_balances = get_index_type<vesting_balance_index>().indices().get<by_vesting_type>();
+   const auto& key = detail::vbo_mfs_key{account_id, asset_id};
+   auto vbo_it = vesting_balances.find(key, key, key);
+
+   if( vbo_it == vesting_balances.end() )
+   {
+      return asset(0, asset_id);
+   }
+   return vbo_it->balance;
+}
+
 void database::deposit_market_fee_vesting_balance(const account_id_type &account_id, const asset &delta)
 { try {
    FC_ASSERT( delta.amount >= 0, "Invalid negative value for balance");
@@ -89,14 +131,12 @@ void database::deposit_market_fee_vesting_balance(const account_id_type &account
       return;
 
    auto& vesting_balances = get_index_type<vesting_balance_index>().indices().get<by_vesting_type>();
-   auto market_vesting_balances = vesting_balances.equal_range(boost::make_tuple(account_id, vesting_balance_type::market_fee_sharing));
-   auto market_balance = boost::range::find_if(market_vesting_balances,
-      [&delta](const vesting_balance_object& vbo) { return vbo.balance.asset_id == delta.asset_id;}
-   );
+   const auto& key = detail::vbo_mfs_key{account_id, delta.asset_id};
+   auto vbo_it = vesting_balances.find(key, key, key);
 
    auto block_time = head_block_time();
 
-   if(market_balance == boost::end(market_vesting_balances) )
+   if( vbo_it == vesting_balances.end() )
    {
       create<vesting_balance_object>([&account_id, &delta, &block_time](vesting_balance_object &vbo) {
          vbo.owner = account_id;
@@ -105,12 +145,11 @@ void database::deposit_market_fee_vesting_balance(const account_id_type &account
          vbo.policy = instant_vesting_policy{};
       });
    } else {
-      modify( *market_balance, [&block_time, &delta]( vesting_balance_object& vbo )
+      modify( *vbo_it, [&block_time, &delta]( vesting_balance_object& vbo )
       {
          vbo.deposit_vested(block_time, delta);
       });
    }
-
 } FC_CAPTURE_AND_RETHROW( (account_id)(delta) ) }
 
 optional< vesting_balance_id_type > database::deposit_lazy_vesting(

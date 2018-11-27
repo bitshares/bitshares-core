@@ -27,6 +27,8 @@
 #include <graphene/db/object.hpp>
 #include <graphene/db/generic_index.hpp>
 #include <boost/multi_index/composite_key.hpp>
+#include <boost/multi_index/hashed_index.hpp>
+#include <boost/multi_index/identity.hpp>
 
 #include <fc/static_variant.hpp>
 #include <fc/uint128.hpp>
@@ -199,6 +201,63 @@ namespace graphene { namespace chain {
    struct by_account;
    struct by_vesting_type;
 
+namespace detail {
+
+   /**
+      Calculate a hash for account_id_type and asset_id.
+      Use object_id.hash_value function to calculate sum of hashes from account_id_type and asset_id.
+      then subducts a result from std::numeric_limits<uint64_t>::max().
+      object_id.hash_value returns uint64_t but only 48 bits are significant
+      so std::numeric_limits<uint64_t>::max() - (48 bits + 48 bits) always correct from point of natural numbers
+   */
+   inline uint64_t vbo_mfs_hash(const account_id_type& account_id, const asset_id_type& asset_id)
+   {
+      return std::numeric_limits<uint64_t>::max() - ( hash_value(account_id) + hash_value(asset_id) );
+   }
+
+   /**
+    * Used as CompatibleHash
+      Calculate a hash vesting_balance_object
+      if vesting_balance_object.balance_type is market_fee_sharing
+         calculate has as vbo_mfs_hash(vesting_balance_object.owner, hash(vbo.balance.asset_id) (see vbo_mfs_hash)
+      otherwise: hash_value(vesting_balance_object.id);
+   */
+   struct vesting_balance_object_hash
+   {
+      uint64_t operator()(const vesting_balance_object& vbo) const
+      {
+         if ( vbo.balance_type == vesting_balance_type::market_fee_sharing )
+         {
+            return vbo_mfs_hash(vbo.owner, vbo.balance.asset_id);
+         }
+         return hash_value(vbo.id);
+      }
+   };
+
+   /**
+    * Used as CompatiblePred
+    * Compares two vesting_balance_objects
+    * if vesting_balance_object.balance_type is a market_fee_sharing
+    *    compare owners' ids and assets' ids
+    * otherwise: vesting_balance_object.id
+   */
+   struct vesting_balance_object_equal
+   {
+      bool operator() (const vesting_balance_object& lhs, const vesting_balance_object& rhs) const
+      {
+         if ( ( lhs.balance_type == vesting_balance_type::market_fee_sharing ) &&
+              ( lhs.balance_type == rhs.balance_type ) &&
+              ( lhs.owner == rhs.owner ) &&
+              ( lhs.balance.asset_id == rhs.balance.asset_id)
+            )
+         {
+               return true;
+         }
+         return ( lhs.id == rhs.id );
+      }
+   };
+} // detail
+
    typedef multi_index_container<
       vesting_balance_object,
       indexed_by<
@@ -207,12 +266,10 @@ namespace graphene { namespace chain {
          ordered_non_unique< tag<by_account>,
             member<vesting_balance_object, account_id_type, &vesting_balance_object::owner>
          >,
-         ordered_non_unique< tag<by_vesting_type>,
-            composite_key<
-               vesting_balance_object,
-               member<vesting_balance_object, account_id_type, &vesting_balance_object::owner>,
-               member<vesting_balance_object, vesting_balance_type, &vesting_balance_object::balance_type>
-            >
+         hashed_unique< tag<by_vesting_type>,
+            identity<vesting_balance_object>,
+            detail::vesting_balance_object_hash,
+            detail::vesting_balance_object_equal
          >
       >
    > vesting_balance_multi_index_type;

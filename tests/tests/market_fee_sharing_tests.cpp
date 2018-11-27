@@ -102,6 +102,16 @@ struct reward_database_fixture : database_fixture
    };
 
    const share_type core_precision = asset::scaled_precision( asset_id_type()(db).precision );
+
+   void create_vesting_balance_object(const account_id_type& account_id, vesting_balance_type balance_type )
+   {
+      auto block_time = db.head_block_time();
+
+      db.create<vesting_balance_object>([&account_id, &block_time, balance_type] (vesting_balance_object &vbo) {
+         vbo.owner = account_id;
+         vbo.balance_type = balance_type;
+      });
+   };
 };
 
 BOOST_FIXTURE_TEST_SUITE( fee_sharing_tests, reward_database_fixture )
@@ -420,8 +430,8 @@ BOOST_AUTO_TEST_CASE(white_list_is_empty_test)
 
       GET_ACTOR(izzyregistrar);
       GET_ACTOR(izzyreferrer);
-      BOOST_CHECK_THROW( get_market_fee_reward( izzyregistrar, jillcoin ), fc::exception );
-      BOOST_CHECK_THROW( get_market_fee_reward( izzyreferrer, jillcoin ), fc::exception );
+      BOOST_CHECK_EQUAL( get_market_fee_reward( izzyregistrar, jillcoin ), 0 );
+      BOOST_CHECK_EQUAL( get_market_fee_reward( izzyreferrer, jillcoin ), 0 );
 
       GET_ACTOR(alice);
       GET_ACTOR(bob);
@@ -455,8 +465,8 @@ BOOST_AUTO_TEST_CASE(white_list_contains_registrar_test)
 
       update_asset(jill_id, jill_private_key, jillcoin.get_id(), jillcoin_reward_percent, whitelist);
 
-      BOOST_CHECK_THROW( get_market_fee_reward( izzyregistrar, jillcoin ), fc::exception );
-      BOOST_CHECK_THROW( get_market_fee_reward( izzyreferrer, jillcoin ), fc::exception );
+      BOOST_CHECK_EQUAL( get_market_fee_reward( izzyregistrar, jillcoin ), 0 );
+      BOOST_CHECK_EQUAL( get_market_fee_reward( izzyreferrer, jillcoin ), 0 );
 
       GET_ACTOR(alice);
       GET_ACTOR(bob);
@@ -490,8 +500,8 @@ BOOST_AUTO_TEST_CASE(white_list_contains_referrer_test)
 
       update_asset(jill_id, jill_private_key, jillcoin.get_id(), jillcoin_reward_percent, whitelist);
 
-      BOOST_CHECK_THROW( get_market_fee_reward( izzyregistrar, jillcoin ), fc::exception );
-      BOOST_CHECK_THROW( get_market_fee_reward( izzyreferrer, jillcoin ), fc::exception );
+      BOOST_CHECK_EQUAL( get_market_fee_reward( izzyregistrar, jillcoin ), 0 );
+      BOOST_CHECK_EQUAL( get_market_fee_reward( izzyreferrer, jillcoin ), 0 );
 
       GET_ACTOR(alice);
       GET_ACTOR(bob);
@@ -499,8 +509,8 @@ BOOST_AUTO_TEST_CASE(white_list_contains_referrer_test)
       create_sell_order( alice, jillcoin.amount(200000), core_asset(1) );
       create_sell_order( bob, core_asset(1), jillcoin.amount(100000) );
 
-      BOOST_CHECK_THROW( get_market_fee_reward( izzyregistrar, jillcoin ), fc::exception );
-      BOOST_CHECK_THROW( get_market_fee_reward( izzyreferrer, jillcoin ), fc::exception );
+      BOOST_CHECK_EQUAL( get_market_fee_reward( izzyregistrar, jillcoin ), 0 );
+      BOOST_CHECK_EQUAL( get_market_fee_reward( izzyreferrer, jillcoin ), 0 );
    }
    FC_LOG_AND_RETHROW()
 }
@@ -524,16 +534,16 @@ BOOST_AUTO_TEST_CASE(white_list_doesnt_contain_registrar_test)
 
       GET_ACTOR(izzyregistrar);
       GET_ACTOR(izzyreferrer);
-      BOOST_CHECK_THROW( get_market_fee_reward( izzyregistrar, jillcoin ), fc::exception );
-      BOOST_CHECK_THROW( get_market_fee_reward( izzyreferrer, jillcoin ), fc::exception );
+      BOOST_CHECK_EQUAL( get_market_fee_reward( izzyregistrar, jillcoin ), 0 );
+      BOOST_CHECK_EQUAL( get_market_fee_reward( izzyreferrer, jillcoin ), 0 );
 
       GET_ACTOR(bob);
       // Alice and Bob place orders which match
       create_sell_order( alice, jillcoin.amount(200000), core_asset(1) );
       create_sell_order( bob, core_asset(1), jillcoin.amount(100000) );
 
-      BOOST_CHECK_THROW( get_market_fee_reward( izzyregistrar, jillcoin ), fc::exception );
-      BOOST_CHECK_THROW( get_market_fee_reward( izzyreferrer, jillcoin ), fc::exception );
+      BOOST_CHECK_EQUAL( get_market_fee_reward( izzyregistrar, jillcoin ), 0 );
+      BOOST_CHECK_EQUAL( get_market_fee_reward( izzyreferrer, jillcoin ), 0);
    }
    FC_LOG_AND_RETHROW()
 }
@@ -927,11 +937,39 @@ BOOST_AUTO_TEST_CASE(white_list_asset_rewards_test)
       // Only Bob's registrar should get rewards
       share_type bob_registrar_reward = get_market_fee_reward( bob.registrar, izzycoin_id );
       BOOST_CHECK_GT( bob_registrar_reward, 0 );
-      BOOST_CHECK_THROW( get_market_fee_reward( bob.referrer, izzycoin_id ), fc::exception );
-      BOOST_CHECK_THROW( get_market_fee_reward( alice.registrar, jillcoin_id ), fc::exception );
-      BOOST_CHECK_THROW( get_market_fee_reward( alice.referrer, jillcoin_id ), fc::exception );
+      BOOST_CHECK_EQUAL( get_market_fee_reward( bob.referrer, izzycoin_id ), 0 );
+      BOOST_CHECK_EQUAL( get_market_fee_reward( alice.registrar, jillcoin_id ), 0 );
+      BOOST_CHECK_EQUAL( get_market_fee_reward( alice.referrer, jillcoin_id ), 0 );
    }
    FC_LOG_AND_RETHROW()
 }
+
+BOOST_AUTO_TEST_CASE( create_vesting_balance_object_test )
+{ 
+   /**
+    * Test checks that an account could have duplicates VBO (with the same asset_type)
+    * for any type of vesting_balance_type
+    * except vesting_balance_type::market_fee_sharing
+   */
+   try {
+
+      ACTOR(actor);
+
+      create_vesting_balance_object(actor_id, vesting_balance_type::unspecified);
+      create_vesting_balance_object(actor_id, vesting_balance_type::unspecified);
+
+      create_vesting_balance_object(actor_id, vesting_balance_type::cashback);
+      create_vesting_balance_object(actor_id, vesting_balance_type::cashback);
+
+      create_vesting_balance_object(actor_id, vesting_balance_type::witness);
+      create_vesting_balance_object(actor_id, vesting_balance_type::witness);
+
+      create_vesting_balance_object(actor_id, vesting_balance_type::worker);
+      create_vesting_balance_object(actor_id, vesting_balance_type::worker);
+
+      create_vesting_balance_object(actor_id, vesting_balance_type::market_fee_sharing);
+      GRAPHENE_CHECK_THROW(create_vesting_balance_object(actor_id, vesting_balance_type::market_fee_sharing), fc::exception);
+
+} FC_LOG_AND_RETHROW() }
 
 BOOST_AUTO_TEST_SUITE_END()

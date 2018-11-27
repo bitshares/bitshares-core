@@ -1130,23 +1130,14 @@ int64_t database_fixture::get_balance( const account_object& account, const asse
   return db.get_balance(account.get_id(), a.get_id()).amount.value;
 }
 
-int64_t database_fixture::get_market_fee_reward( account_id_type account, asset_id_type asset_type)const
+int64_t database_fixture::get_market_fee_reward( account_id_type account_id, asset_id_type asset_id)const
 {
-   auto& vesting_balances = db.get_index_type<vesting_balance_index>().indices().get<by_vesting_type>();
-   auto market_vesting_balances = vesting_balances.equal_range(boost::make_tuple(account, vesting_balance_type::market_fee_sharing));
-   auto market_balance = boost::range::find_if(market_vesting_balances,
-      [&asset_type](const vesting_balance_object& vbo) { return vbo.balance.asset_id == asset_type;}
-   );
-
-  FC_ASSERT( market_balance != boost::end(market_vesting_balances) );
-
-  auto allowed_to_withdraw = market_balance->get_allowed_withdraw(db.head_block_time());
-  return allowed_to_withdraw.amount.value;
+   return db.get_market_fee_vesting_balance(account_id, asset_id).amount.value;
 }
 
-int64_t database_fixture::get_market_fee_reward( const account_object& account, const asset_object& a )const
+int64_t database_fixture::get_market_fee_reward( const account_object& account, const asset_object& asset )const
 {
-  return get_market_fee_reward(account.get_id(), a.get_id());
+  return get_market_fee_reward(account.get_id(), asset.get_id());
 }
 
 vector< operation_history_object > database_fixture::get_operation_history( account_id_type account_id )const
