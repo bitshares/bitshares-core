@@ -44,7 +44,6 @@ inline bool is_authorized_asset(const database& d, const account_object& acct, c
 {
    bool fast_check = !(asset_obj.options.flags & white_list);
    fast_check &= !(acct.allowed_assets.valid());
-   fast_check &= !(asset_obj.options.flags & only_issuer_limit_orders_allowed);
 
    if( fast_check )
       return true;
