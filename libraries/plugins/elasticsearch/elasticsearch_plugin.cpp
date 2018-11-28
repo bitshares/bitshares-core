@@ -59,6 +59,7 @@ class elasticsearch_plugin_impl
       std::string _elasticsearch_basic_auth = "";
       std::string _elasticsearch_index_prefix = "bitshares-";
       bool _elasticsearch_operation_object = false;
+      uint32_t _elasticsearch_start_es_after_block = 0; // disabled
       CURL *curl; // curl handler
       vector <string> bulk_lines; //  vector of op lines
       vector<std::string> prepare;
@@ -428,6 +429,7 @@ void elasticsearch_plugin::plugin_set_program_options(
          ("elasticsearch-basic-auth", boost::program_options::value<std::string>(), "Pass basic auth to elasticsearch database('')")
          ("elasticsearch-index-prefix", boost::program_options::value<std::string>(), "Add a prefix to the index(bitshares-)")
          ("elasticsearch-operation-object", boost::program_options::value<bool>(), "Save operation as object(false)")
+         ("elasticsearch-start-es-after-block", boost::program_options::value<uint32_t>(), "Start doing ES job after block(0)")
          ;
    cfg.add(cli);
 }
@@ -435,11 +437,14 @@ void elasticsearch_plugin::plugin_set_program_options(
 void elasticsearch_plugin::plugin_initialize(const boost::program_options::variables_map& options)
 {
    database().applied_block.connect( [&]( const signed_block& b) {
-      if(!my->update_account_histories(b))
-      {
-         FC_THROW_EXCEPTION(graphene::chain::plugin_exception, "Error populating ES database, we are going to keep trying.");
+      if(my->_elasticsearch_start_es_after_block == 0 || b.block_num() > my->_elasticsearch_start_es_after_block)  {
+         if (!my->update_account_histories(b)) {
+            FC_THROW_EXCEPTION(graphene::chain::plugin_exception, 
+	          "Error populating ES database, we are going to keep trying.");
+         }
       }
    } );
+
    my->_oho_index = database().add_index< primary_index< operation_history_index > >();
    database().add_index< primary_index< account_transaction_history_index > >();
 
@@ -464,6 +469,9 @@ void elasticsearch_plugin::plugin_initialize(const boost::program_options::varia
    if (options.count("elasticsearch-operation-object")) {
       my->_elasticsearch_operation_object = options["elasticsearch-operation-object"].as<bool>();
    }
+   if (options.count("elasticsearch-start-es-after-block")) {
+      my->_elasticsearch_start_es_after_block = options["elasticsearch-start-es-after-block"].as<uint32_t>();
+   }   
 }
 
 void elasticsearch_plugin::plugin_startup()
