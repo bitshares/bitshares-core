@@ -60,22 +60,11 @@ void custom_authority_create_operation::validate()const
 
    FC_ASSERT( valid_from < valid_to, "valid_from must be earlier than valid_to" );
 
-   // Note: when adding new operation with hard fork, need to check more strictly in evaluator
-   // TODO add code in evaluator
-   FC_ASSERT( static_cast<int64_t>(operation_type) < operation::count(), "operation_type is too large" );
-
    // Note: allow auths to be empty
    //FC_ASSERT( auth.num_auths() > 0, "Can not set empty auth" );
    FC_ASSERT( auth.address_auths.size() == 0, "Address auth is not supported" );
    // Note: allow auths to be impossible
    //FC_ASSERT( !auth.is_impossible(), "cannot use an imposible authority threshold" );
-
-   // Note: allow restrictions to be empty
-   for( const auto& r: restrictions )
-   {
-      // recursively validate member index and argument type
-      r.validate( operation_type );
-   }
 }
 
 share_type custom_authority_update_operation::calculate_fee( const fee_parameters_type& k )const

@@ -52,10 +52,10 @@ namespace  {
 
 bool custom_authority_object::validate(const operation& an_operation) const
 {
-    return get_operation_name(an_operation) == operation_name;
+    return validate(an_operation, time_point::now());
 }
 
-bool custom_authority_object::validate(const operation& an_operation, const time_point_sec now) const
+bool custom_authority_object::validate(const operation& an_operation, const time_point now) const
 {
     if (now < valid_from || valid_to < now)
     {

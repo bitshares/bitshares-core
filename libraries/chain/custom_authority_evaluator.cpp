@@ -76,7 +76,7 @@ object_id_type custom_authority_create_evaluator::do_apply(const custom_authorit
       obj.enabled        = op.enabled;
       obj.valid_from     = op.valid_from;
       obj.valid_to       = op.valid_to;
-      obj.operation_type = op.operation_type;
+      obj.operation_name = op.operation_name;
       obj.auth           = op.auth;
       obj.restrictions   = op.restrictions;
    });

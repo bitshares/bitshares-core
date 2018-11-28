@@ -43,9 +43,9 @@ namespace graphene { namespace chain {
       account_id_type                 account;
       uint32_t                        custom_id;
       bool                            enabled;
-      time_point_sec                  valid_from;
-      time_point_sec                  valid_to;
-      unsigned_int                    operation_type;
+      time_point                      valid_from;
+      time_point                      valid_to;
+      std::string                     operation_name;
       authority                       auth;
       vector<restriction>             restrictions;
 
@@ -107,7 +107,7 @@ FC_REFLECT( graphene::chain::custom_authority_create_operation,
             (enabled)
             (valid_from)
             (valid_to)
-            (operation_type)
+            (operation_name)
             (auth)
             (restrictions)
             (extensions)
