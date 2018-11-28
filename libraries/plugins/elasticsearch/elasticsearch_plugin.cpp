@@ -75,7 +75,7 @@ class elasticsearch_plugin_impl
       std::string index_name;
       bool is_sync = false;
    private:
-      bool add_elasticsearch( const account_id_type account_id, const optional<operation_history_object>& oho );
+      bool add_elasticsearch( const account_id_type account_id, const optional<operation_history_object>& oho, const uint32_t block_number );
       const account_transaction_history_object& addNewEntry(const account_statistics_object& stats_obj,
                                                             const account_id_type& account_id,
                                                             const optional <operation_history_object>& oho);
@@ -164,7 +164,7 @@ bool elasticsearch_plugin_impl::update_account_histories( const signed_block& b 
 
       for( auto& account_id : impacted )
       {
-         if(!add_elasticsearch( account_id, oho ))
+         if(!add_elasticsearch( account_id, oho, b.block_num() ))
             return false;
       }
    }
@@ -277,13 +277,16 @@ void elasticsearch_plugin_impl::doVisitor(const optional <operation_history_obje
 }
 
 bool elasticsearch_plugin_impl::add_elasticsearch( const account_id_type account_id,
-                                                   const optional <operation_history_object>& oho)
+                                                   const optional <operation_history_object>& oho,
+                                                   const uint32_t block_number)
 {
    const auto &stats_obj = getStatsObject(account_id);
    const auto &ath = addNewEntry(stats_obj, account_id, oho);
    growStats(stats_obj, ath);
-   createBulkLine(ath);
-   prepareBulk(ath.id);
+   if(_elasticsearch_start_es_after_block == 0 || block_number > _elasticsearch_start_es_after_block)  {
+      createBulkLine(ath);
+      prepareBulk(ath.id);
+   }
    cleanObjects(ath.id, account_id);
 
    if (curl && bulk_lines.size() >= limit_documents) { // we are in bulk time, ready to add data to elasticsearech
@@ -437,12 +440,8 @@ void elasticsearch_plugin::plugin_set_program_options(
 void elasticsearch_plugin::plugin_initialize(const boost::program_options::variables_map& options)
 {
    database().applied_block.connect( [&]( const signed_block& b) {
-      if(my->_elasticsearch_start_es_after_block == 0 || b.block_num() > my->_elasticsearch_start_es_after_block)  {
-         if (!my->update_account_histories(b)) {
-            FC_THROW_EXCEPTION(graphene::chain::plugin_exception, 
-	          "Error populating ES database, we are going to keep trying.");
-         }
-      }
+      if (!my->update_account_histories(b))
+         FC_THROW_EXCEPTION(graphene::chain::plugin_exception, "Error populating ES database, we are going to keep trying.");
    } );
 
    my->_oho_index = database().add_index< primary_index< operation_history_index > >();
