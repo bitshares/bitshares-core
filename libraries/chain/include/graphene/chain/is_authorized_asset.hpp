@@ -42,10 +42,6 @@ bool _is_authorized_asset(const database& d, const account_object& acct, const a
 
 inline bool is_authorized_asset(const database& d, const account_object& acct, const asset_object& asset_obj)
 {
-   // the issuer is allowed to create limit orders with his own asset
-   if( acct.get_id() == asset_obj.issuer )
-      return true;
-
    bool fast_check = !(asset_obj.options.flags & white_list);
    fast_check &= !(acct.allowed_assets.valid());
    fast_check &= !(asset_obj.options.flags & only_issuer_limit_orders_allowed);

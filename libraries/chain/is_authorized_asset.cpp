@@ -50,9 +50,6 @@ bool _is_authorized_asset(
          return false;
    }
    
-   if( asset_obj.options.flags & only_issuer_limit_orders_allowed )
-      return false;
-
    if( d.head_block_time() > HARDFORK_415_TIME )
    {
       if( asset_obj.options.whitelist_authorities.size() == 0 )

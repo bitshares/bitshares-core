@@ -2418,13 +2418,7 @@ BOOST_AUTO_TEST_CASE( asset_only_issuer_limit_orders_allowed_test )
         set_expiration( db, trx );
         trx.operations.push_back( locop );
         
-        try {
-            PUSH_TX( db, trx, ~0 );
-        }
-        catch( fc::assert_exception &e ) {
-            EDUMP( e.to_detail_string() );
-        }
-
+        PUSH_TX( db, trx, ~0 );
     }
 
     EDUMP( "creating a limit order with bob acc" );
@@ -2439,32 +2433,21 @@ BOOST_AUTO_TEST_CASE( asset_only_issuer_limit_orders_allowed_test )
         trx = signed_transaction();
         set_expiration( db, trx );
         trx.operations.push_back( top );
-        try{
-            PUSH_TX( db, trx, ~0 );
-        }
-        catch(fc::assert_exception &e) {
-            EDUMP( e.to_detail_string() );
-        }
+        
+        PUSH_TX( db, trx, ~0 );
+ 
         // create limit order
         limit_order_create_operation locop;
         locop.fee            = asset(0);
         locop.seller         = bob_id;
         locop.amount_to_sell = asset( 100, test_asset_id ); 
-        locop.min_to_receive = asset(100);
+        locop.min_to_receive = asset( 100 );
 
         trx = signed_transaction();
         set_expiration( db, trx );
         trx.operations.push_back( locop );
-        GRAPHENE_REQUIRE_THROW( PUSH_TX( db, trx, ~0 ), fc::assert_exception );
 
-        /*
-        try{
-            PUSH_TX( db, trx, ~0 );
-        }
-        catch(fc::assert_exception &e) {
-            EDUMP( e.to_detail_string() );
-        }
-        */
+        GRAPHENE_REQUIRE_THROW( PUSH_TX( db, trx, ~0 ), fc::assert_exception );
     }
 }
 // TODO:  Write linear VBO tests

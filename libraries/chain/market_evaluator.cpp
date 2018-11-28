@@ -55,6 +55,9 @@ void_result limit_order_create_evaluator::do_evaluate(const limit_order_create_o
       FC_ASSERT( _sell_asset->options.blacklist_markets.find(_receive_asset->id) 
             == _sell_asset->options.blacklist_markets.end(),
             "This market has been blacklisted." );
+   
+   if( _sell_asset->options.flags & only_issuer_limit_orders_allowed && _seller->get_id() != _sell_asset->issuer )
+      FC_ASSERT( false, "limit order forbidden by asset permission flag" );
 
    FC_ASSERT( is_authorized_asset( d, *_seller, *_sell_asset ) );
    FC_ASSERT( is_authorized_asset( d, *_seller, *_receive_asset ) );
