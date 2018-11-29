@@ -25,6 +25,7 @@
 #include <boost/test/unit_test.hpp>
 
 #include <graphene/chain/custom_authority_object.hpp>
+#include <graphene/chain/protocol/restriction.hpp>
 #include <graphene/chain/protocol/operations.hpp>
 
 using namespace graphene::chain;
@@ -81,6 +82,124 @@ BOOST_AUTO_TEST_CASE( validation_passes_when_now_is_in_valid_period )
     authority.valid_from = time_point_sec(3);
     authority.valid_to = time_point_sec(5);
     BOOST_CHECK(authority.validate(transfer_operation(), time_point_sec(4)));
+}
+
+BOOST_AUTO_TEST_SUITE_END()
+
+BOOST_AUTO_TEST_SUITE( restrictions )
+
+template <class From, class To>
+struct cast
+{
+    static To cast_from(const From& from)
+    {
+        FC_THROW("Not supported types came");
+    }
+};
+
+template <>
+struct cast<int, asset>
+{
+    static asset cast_from(const int from)
+    {
+        return asset(from);
+    }
+};
+
+transfer_operation g_operation;
+
+template <class T>
+struct comparor
+{
+    static bool compare(const T& left, const T& right)
+    {
+        FC_THROW("Not supported types came.");
+    }
+};
+
+template <>
+struct comparor<asset>
+{
+    static bool compare(const asset& left, const asset& right)
+    {
+        return left < right;
+    }
+};
+
+template <class Operation>
+struct agrument_comparer
+{
+    Operation operation;
+    
+    int value = 0;
+    std::string argument;
+    
+    template<typename Member, class Class, Member (Class::*member)>
+    void operator()( const char* name )const
+    {
+        if (name == argument)
+        {
+            auto typed_value = cast<int, Member>::cast_from(value);
+            
+            FC_ASSERT( comparor<Member>::compare(operation.*member, typed_value) );
+        }
+    }
+};
+
+struct operation_argument_comparer
+{
+    int value = 0;
+    std::string argument;
+    
+    typedef void result_type;
+    
+    template <class OperationT>
+    void operator () (const OperationT& op)
+    {
+        agrument_comparer<OperationT> an_argument_comparer;
+        an_argument_comparer.operation = op;
+        an_argument_comparer.value = value;
+        an_argument_comparer.argument = argument;
+        
+        fc::reflector<OperationT>::visit( an_argument_comparer );
+    }
+};
+
+struct lt_restriction
+{
+    int value = 0;
+    std::string argument;
+    
+    bool validate( const operation& op ) const
+    {
+        try
+        {
+            operation_argument_comparer comparer;
+            comparer.value = value;
+            comparer.argument = argument;
+            op.visit(comparer);
+            
+            return true;
+        }
+        catch (...)
+        {
+            return false;
+        }
+    }
+};
+
+BOOST_AUTO_TEST_CASE( validation_passes_for_lt_restriction_when_argument_less_then_value )
+{
+    transfer_operation operation;
+    operation.amount = asset(2);
+    
+    g_operation = operation;
+    
+    lt_restriction restriction;
+    restriction.value = 5;
+    restriction.argument = "amount";
+    
+    BOOST_CHECK(restriction.validate(operation));
 }
 
 BOOST_AUTO_TEST_SUITE_END()
