@@ -57,7 +57,7 @@ void verify_authority_accounts( const database& db, const authority& a )
    }
 }
 
-void verify_account_votes( database& db, const account_options& options, const account_id_type account = account_id_type(0))
+void verify_account_votes( const database& db, const account_options& options)
 {
    // ensure account's votes satisfy requirements
    // NB only the part of vote checking that requires chain state is here,
@@ -116,13 +116,6 @@ void verify_account_votes( database& db, const account_options& options, const a
                break;
          }
       }
-   }
-   if(account != account_id_type(0) &&
-         (options.votes != account(db).options.votes || options.voting_account != account(db).options.voting_account)) {
-      auto &stats_obj = db.get_account_stats_by_owner(account);
-      db.modify(stats_obj, [&](account_statistics_object &obj) {
-         obj.last_vote_time = db.head_block_time();
-      });
    }
 }
 
@@ -312,7 +305,7 @@ void_result account_update_evaluator::do_evaluate( const account_update_operatio
    acnt = &o.account(d);
 
    if( o.new_options.valid() )
-      verify_account_votes(d, *o.new_options, o.account);
+      verify_account_votes(d, *o.new_options);
 
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }
@@ -324,11 +317,16 @@ void_result account_update_evaluator::do_apply( const account_update_operation& 
    bool sa_before = acnt->has_special_authority();
 
    // update account statistics
-   if( o.new_options.valid() && o.new_options->is_voting() != acnt->options.is_voting() )
+   if( o.new_options.valid() )
    {
-      d.modify( acnt->statistics( d ), []( account_statistics_object& aso )
+      d.modify( acnt->statistics( d ), [&]( account_statistics_object& aso )
       {
-         aso.is_voting = !aso.is_voting;
+         if(o.new_options->is_voting() != acnt->options.is_voting())
+            aso.is_voting = !aso.is_voting;
+
+         if((o.new_options->votes != acnt->options.votes ||
+               o.new_options->voting_account != acnt->options.voting_account))
+            aso.last_vote_time = d.head_block_time();
       } );
    }
 
