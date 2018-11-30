@@ -451,11 +451,29 @@ namespace graphene { namespace chain {
 
          //////////////////// db_witness_schedule.cpp ////////////////////
 
+         /***
+          * Determine if any blocks were missed. If so, keep track of which
+          * witnesses we've missed from.
+          * @param b the incoming block
+          * @returns the number of blocks that have been missed.
+          */
          uint32_t update_witness_missed_blocks( const signed_block& b );
 
          //////////////////// db_update.cpp ////////////////////
          void update_global_dynamic_data( const signed_block& b, const uint32_t missed_blocks );
+
+         /***
+          * Calculates witness information based on the incoming block. Things like witness pay, last
+          * confirmed block number, absolute slot number (aslot).
+          * @param signing_witness the witness that produced the block
+          * @param new_block the incoming block
+          */
          void update_signing_witness(const witness_object& signing_witness, const signed_block& new_block);
+
+         /***
+          * Calculate the last irreversible block based on the information
+          * we have from the witnesses. Places the result in the dynamic_global_property_object
+          */
          void update_last_irreversible_block();
          void clear_expired_transactions();
          void clear_expired_proposals();

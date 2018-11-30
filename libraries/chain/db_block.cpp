@@ -531,6 +531,10 @@ void database::apply_block( const signed_block& next_block, uint32_t skip )
    return;
 }
 
+/***
+ * @brief A completed block has been received, and we need to process it.
+ * @param next_block the incoming block
+ */
 void database::_apply_block( const signed_block& next_block )
 { try {
    uint32_t next_block_num = next_block.block_num();
