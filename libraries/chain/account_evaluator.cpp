@@ -57,7 +57,7 @@ void verify_authority_accounts( const database& db, const authority& a )
    }
 }
 
-void verify_account_votes( const database& db, const account_options& options)
+void verify_account_votes( const database& db, const account_options& options )
 {
    // ensure account's votes satisfy requirements
    // NB only the part of vote checking that requires chain state is here,
@@ -305,7 +305,7 @@ void_result account_update_evaluator::do_evaluate( const account_update_operatio
    acnt = &o.account(d);
 
    if( o.new_options.valid() )
-      verify_account_votes(d, *o.new_options);
+      verify_account_votes( d, *o.new_options );
 
    return void_result();
 } FC_CAPTURE_AND_RETHROW( (o) ) }
