@@ -90,6 +90,25 @@ BOOST_AUTO_TEST_SUITE_END()
 
 BOOST_AUTO_TEST_SUITE( restrictions )
 
+struct equal
+{
+    template <class T>
+    bool operator () (const T& left, const T& right) const
+    {
+        return left == right;
+    }
+};
+
+struct not_equal
+{
+    template <class T>
+    bool operator () (const T& left, const T& right) const
+    {
+        return left != right;
+    }
+};
+
+template <typename Comparer>
 class static_variable_comparer
 {
 public:
@@ -102,14 +121,16 @@ public:
     template <class T>
     result_type operator () (const T& right)
     {
-        FC_ASSERT(m_left.get<T>() == right);
+        Comparer comparer;
+        FC_ASSERT(comparer(m_left.get<T>(), right));
     }
     
 private:
     generic_member m_left;
 };
 
-struct eq_restriction
+template <typename Comparer>
+struct base_restriction
 {
     generic_member value;
     std::string argument;
@@ -120,7 +141,7 @@ struct eq_restriction
         {
             auto member = get_operation_member(op, argument);
             
-            static_variable_comparer comparer(value);
+            static_variable_comparer<Comparer> comparer(value);
             member.visit(comparer);
             
             return true;
@@ -131,6 +152,9 @@ struct eq_restriction
         }
     }
 };
+
+typedef base_restriction<equal> eq_restriction;
+typedef base_restriction<not_equal> neq_restriction;
 
 BOOST_AUTO_TEST_CASE( validation_passes_for_eq_restriction_when_assets_are_equal )
 {
@@ -162,6 +186,42 @@ BOOST_AUTO_TEST_CASE( validation_fails_for_eq_restriction_when_comparing_asset_a
     operation.amount = asset(5);
     
     eq_restriction restriction;
+    restriction.value = account_id_type(1);
+    restriction.argument = "amount";
+    
+    BOOST_CHECK(!restriction.validate(operation));
+}
+
+BOOST_AUTO_TEST_CASE( validation_passes_for_neq_restriction_when_assets_are_not_equal )
+{
+    transfer_operation operation;
+    operation.amount = asset(5);
+    
+    neq_restriction restriction;
+    restriction.value = asset(6);
+    restriction.argument = "amount";
+    
+    BOOST_CHECK(restriction.validate(operation));
+}
+
+BOOST_AUTO_TEST_CASE( validation_fails_for_neq_restriction_when_assets_are_equal )
+{
+    transfer_operation operation;
+    operation.amount = asset(5);
+    
+    neq_restriction restriction;
+    restriction.value = asset(5);
+    restriction.argument = "amount";
+    
+    BOOST_CHECK(!restriction.validate(operation));
+}
+
+BOOST_AUTO_TEST_CASE( validation_fails_for_neq_restriction_when_comparing_different_types )
+{
+    transfer_operation operation;
+    operation.amount = asset(5);
+    
+    neq_restriction restriction;
     restriction.value = account_id_type(1);
     restriction.argument = "amount";
     
