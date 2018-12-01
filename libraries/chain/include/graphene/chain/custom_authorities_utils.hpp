@@ -108,5 +108,44 @@ generic_member get_operation_member(operation a_operation, const std::string& me
     
     return member_fetcher.get_member_value();
 }
+    
+struct equal
+{
+    template <class T>
+    bool operator () (const T& left, const T& right) const
+    {
+        return left == right;
+    }
+};
+
+struct not_equal
+{
+    template <class T>
+    bool operator () (const T& left, const T& right) const
+    {
+        return left != right;
+    }
+};
+
+template <typename Comparer>
+class static_variable_comparer
+{
+public:
+    static_variable_comparer(const generic_member& left)
+    : m_left(left)
+    {}
+    
+    typedef void result_type;
+    
+    template <class T>
+    result_type operator () (const T& right)
+    {
+        Comparer comparer;
+        FC_ASSERT(comparer(m_left.get<T>(), right));
+    }
+    
+private:
+    generic_member m_left;
+};
 
 } } 
