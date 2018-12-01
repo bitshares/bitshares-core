@@ -25,7 +25,7 @@
 
 namespace graphene { namespace chain {
 
-typedef fc::static_variant<asset, account_id_type, fc::optional<memo_data>, extensions_type> generic_member;
+typedef fc::static_variant<asset, account_id_type, extensions_type> generic_member;
 
 template <class T>
 class member_fetcher

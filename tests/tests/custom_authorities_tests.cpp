@@ -90,37 +90,45 @@ BOOST_AUTO_TEST_SUITE_END()
 
 BOOST_AUTO_TEST_SUITE( restrictions )
 
-template <class Operation>
-struct agrument_comparer
+class static_variable_comparer
 {
-    std::string argument;
+public:
+    static_variable_comparer(const generic_member& left)
+    : m_left(left)
+    {}
     
-    template<typename Member, class Class, Member (Class::*member)>
-    void operator()( const char* name )const
-    {
-       
-    }
-};
-
-struct operation_argument_comparer
-{
     typedef void result_type;
     
-    template <class OperationT>
-    void operator () (const OperationT& op)
+    template <class T>
+    result_type operator () (const T& right)
     {
-        
+        FC_ASSERT(m_left.get<T>() == right);
     }
+    
+private:
+    generic_member m_left;
 };
 
 struct eq_restriction
 {
-    fc::static_variant<asset> value;
+    generic_member value;
     std::string argument;
     
     bool validate( const operation& op ) const
     {
-        return false;
+        try
+        {
+            auto member = get_operation_member(op, argument);
+            
+            static_variable_comparer comparer(value);
+            member.visit(comparer);
+            
+            return true;
+        }
+        catch (...)
+        {
+            return false;
+        }
     }
 };
 
