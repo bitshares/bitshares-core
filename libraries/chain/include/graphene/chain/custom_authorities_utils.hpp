@@ -156,6 +156,11 @@ public:
     : m_data_list(data_list)
     {}
     
+    bool was_found() const
+    {
+        return m_was_found;
+    }
+    
     typedef void result_type;
     
     template <class T>
@@ -163,17 +168,18 @@ public:
     {
         Comparer comparer;
         
-        bool ok = false;
+        bool was_found = false;
         for (generic_member& value : m_data_list)
         {
-            ok |= comparer(value.get<T>(), right);
+            was_found |= comparer(value.get<T>(), right);
         }
         
-        FC_ASSERT(ok);
+        m_was_found = was_found;
     }
     
 private:
     std::vector<generic_member> m_data_list;
+    bool m_was_found = false;
 };
     
 } } 
