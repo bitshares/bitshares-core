@@ -156,6 +156,18 @@ BOOST_AUTO_TEST_CASE( validation_fails_for_eq_restriction_when_assets_are_not_eq
     BOOST_CHECK(!restriction.validate(operation));
 }
 
+BOOST_AUTO_TEST_CASE( validation_fails_for_eq_restriction_when_comparing_asset_and_account )
+{
+    transfer_operation operation;
+    operation.amount = asset(5);
+    
+    eq_restriction restriction;
+    restriction.value = account_id_type(1);
+    restriction.argument = "amount";
+    
+    BOOST_CHECK(!restriction.validate(operation));
+}
+
 BOOST_AUTO_TEST_SUITE_END()
 
 BOOST_AUTO_TEST_SUITE( custom_authorities_utils )
