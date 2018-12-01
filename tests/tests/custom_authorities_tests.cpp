@@ -28,6 +28,7 @@
 #include <graphene/chain/protocol/restriction.hpp>
 #include <graphene/chain/protocol/operations.hpp>
 #include <graphene/chain/account_object.hpp>
+#include <graphene/chain/custom_authorities_utils.hpp>
 
 using namespace graphene::chain;
 
@@ -138,90 +139,6 @@ BOOST_AUTO_TEST_CASE( validation_passes_for_eq_restriction_when_assets_are_equal
 BOOST_AUTO_TEST_SUITE_END()
 
 BOOST_AUTO_TEST_SUITE( custom_authorities_utils )
-
-typedef fc::static_variant<asset, account_id_type, fc::optional<memo_data>, extensions_type> generic_member;
-
-template <class T>
-class member_fetcher
-{
-public:
-    member_fetcher(const T& object, const std::string& member_name)
-    : m_object(object)
-    , m_member_name(member_name)
-    {}
-    
-    template<typename Member, class Class, Member (Class::*member)>
-    void operator () ( const char* name ) const
-    {
-        if (name == m_member_name)
-        {
-            set_value(m_object.*member);
-        }
-    }
-    
-    const generic_member& get_member_value()
-    {
-        return m_value;
-    }
-    
-private:
-    template <class Value>
-    void set_value(const Value&) const
-    {}
-    
-    //TODO: need to add new definition for every new supported type
-    void set_value(const asset& value) const
-    {
-        m_value = value;
-    }
-    
-private:
-    const T& m_object;
-    std::string m_member_name;
-    mutable generic_member m_value;
-};
-
-template <class T>
-generic_member get_member(const T& object, const std::string& member_name)
-{
-    member_fetcher<T> fetcher(object, member_name);
-    fc::reflector<T>::visit(fetcher);
-    
-    return fetcher.get_member_value();
-}
-
-class operation_member_fetcher
-{
-public:
-    operation_member_fetcher(const std::string& member_name)
-    : m_member_name(member_name)
-    {}
-    
-    const generic_member& get_member_value()
-    {
-        return m_value;
-    }
-    
-    typedef void result_type;
-    
-    template <class Operation>
-    void operator () ( const Operation& a_operation) const
-    {
-        m_value = get_member(a_operation, m_member_name);
-    }
-    
-private:
-    std::string m_member_name;
-    mutable generic_member m_value;
-};
-
-generic_member get_operation_member(operation a_operation, const std::string& member_name)
-{
-    operation_member_fetcher member_fetcher(member_name);
-    a_operation.visit(member_fetcher);
-    
-    return member_fetcher.get_member_value();
-}
 
 BOOST_AUTO_TEST_CASE( get_amount_member_of_transfer_operation )
 {
