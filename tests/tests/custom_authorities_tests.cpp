@@ -117,6 +117,29 @@ struct base_restriction
 typedef base_restriction<equal> eq_restriction;
 typedef base_restriction<not_equal> neq_restriction;
 
+struct any_restriction
+{
+    std::vector<generic_member> values;
+    std::string argument;
+    
+    bool validate( const operation& op ) const
+    {
+        try
+        {
+            auto member = get_operation_member(op, argument);
+            
+            static_variable_in_list_checker<equal> comparer(values);
+            member.visit(comparer);
+            
+            return true;
+        }
+        catch (...)
+        {
+            return false;
+        }
+    }
+};
+
 BOOST_AUTO_TEST_CASE( validation_passes_for_eq_restriction_when_assets_are_equal )
 {
     transfer_operation operation;
@@ -184,6 +207,42 @@ BOOST_AUTO_TEST_CASE( validation_fails_for_neq_restriction_when_comparing_differ
     
     neq_restriction restriction;
     restriction.value = account_id_type(1);
+    restriction.argument = "amount";
+    
+    BOOST_CHECK(!restriction.validate(operation));
+}
+
+BOOST_AUTO_TEST_CASE( validation_passes_for_any_restriction_when_argument_value_is_present_in_the_list_with_single_value)
+{
+    transfer_operation operation;
+    operation.amount = asset(5);
+    
+    any_restriction restriction;
+    restriction.values = {asset(5)};
+    restriction.argument = "amount";
+    
+    BOOST_CHECK(restriction.validate(operation));
+}
+
+BOOST_AUTO_TEST_CASE( validation_passes_for_any_restriction_when_argument_value_is_present_in_the_list_with_several_values )
+{
+    transfer_operation operation;
+    operation.amount = asset(5);
+    
+    any_restriction restriction;
+    restriction.values = {asset(1), asset(2), asset(5)};
+    restriction.argument = "amount";
+    
+    BOOST_CHECK(restriction.validate(operation));
+}
+
+BOOST_AUTO_TEST_CASE( validation_fails_for_any_restriction_when_argument_value_is_not_present_in_the_list_with_several_values )
+{
+    transfer_operation operation;
+    operation.amount = asset(5);
+    
+    any_restriction restriction;
+    restriction.values = {asset(1), asset(2), asset(3)};
     restriction.argument = "amount";
     
     BOOST_CHECK(!restriction.validate(operation));

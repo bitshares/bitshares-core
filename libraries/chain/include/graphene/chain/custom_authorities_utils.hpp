@@ -148,4 +148,32 @@ private:
     generic_member m_left;
 };
 
+template <typename Comparer>
+class static_variable_in_list_checker
+{
+public:
+    static_variable_in_list_checker(const std::vector<generic_member>& data_list)
+    : m_data_list(data_list)
+    {}
+    
+    typedef void result_type;
+    
+    template <class T>
+    result_type operator () (const T& right)
+    {
+        Comparer comparer;
+        
+        bool ok = false;
+        for (generic_member& value : m_data_list)
+        {
+            ok |= comparer(value.get<T>(), right);
+        }
+        
+        FC_ASSERT(ok);
+    }
+    
+private:
+    std::vector<generic_member> m_data_list;
+};
+    
 } } 
