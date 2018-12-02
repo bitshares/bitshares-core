@@ -182,15 +182,15 @@ void database::initialize_indexes()
    _undo_db.set_max_size( GRAPHENE_MIN_UNDO_HISTORY );
 
    //Protocol object indexes
-   add_index< primary_index<asset_index> >();
+   add_index< primary_index<asset_index, 13> >(); // 8192 assets per chunk
    add_index< primary_index<force_settlement_index> >();
 
-   auto acnt_index = add_index< primary_index<account_index> >();
+   auto acnt_index = add_index< primary_index<account_index, 20> >(); // ~1 million accounts per chunk
    acnt_index->add_secondary_index<account_member_index>();
    acnt_index->add_secondary_index<account_referrer_index>();
 
-   add_index< primary_index<committee_member_index> >();
-   add_index< primary_index<witness_index> >();
+   add_index< primary_index<committee_member_index, 8> >(); // 256 members per chunk
+   add_index< primary_index<witness_index, 10> >(); // 1024 witnesses per chunk
    add_index< primary_index<limit_order_index > >();
    add_index< primary_index<call_order_index > >();
 
@@ -206,10 +206,10 @@ void database::initialize_indexes()
    //Implementation object indexes
    add_index< primary_index<transaction_index                             > >();
    add_index< primary_index<account_balance_index                         > >();
-   add_index< primary_index<asset_bitasset_data_index                     > >();
+   add_index< primary_index<asset_bitasset_data_index,                 13 > >(); // 8192
    add_index< primary_index<simple_index<global_property_object          >> >();
    add_index< primary_index<simple_index<dynamic_global_property_object  >> >();
-   add_index< primary_index<account_stats_index                           > >();
+   add_index< primary_index<account_stats_index,                       20 > >(); // 1 Mi
    add_index< primary_index<simple_index<asset_dynamic_data_object       >> >();
    add_index< primary_index<simple_index<block_summary_object            >> >();
    add_index< primary_index<simple_index<chain_property_object          > > >();
