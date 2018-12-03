@@ -822,16 +822,37 @@ BOOST_AUTO_TEST_CASE( switch_forks_bad_block )
       BOOST_TEST_MESSAGE("This should still have 2 1s in it");
       print_last_confirmed(global_properties.active_witnesses, db3);
 
-      // now we still have
-      // 1 1 2 2 2 2 2 2 3 4 which means slot 2 is officially LIB, and because this block pushed it over the edge, chain M has the LIB
-      // and chain B is no more. Pushing a block to the B chain should fail
+      // once we grow beyond the length of db1's chain, we will be unable to switch back to it if we need to, as the LIB has moved forward
 
-      trx = create_simple_transaction(db1, 7, account_idx, init_account_pub_key);
+      // add block O to chain 2, now the chains are of equal length
+      trx = create_simple_transaction(db2, 7, account_idx, init_account_pub_key);
+      PUSH_TX(db2, trx);
+      auto block_o = db2.generate_block(db2.get_slot_time(4), db2.get_scheduled_witness(4), init_account_priv_key, database::skip_nothing);
+      BOOST_TEST_MESSAGE("Pushing block O on fork M");
+      db3.push_block(block_o, database::skip_nothing);
+
+      // add block P to chain M, now the chain M is longer than B, db3 should switch forks,
+      // and we should be unable to roll back to chain B
+      trx = create_simple_transaction(db2, 8, account_idx, init_account_pub_key);
+      PUSH_TX(db2, trx);
+      auto block_p = db2.generate_block(db2.get_slot_time(5), db2.get_scheduled_witness(5), init_account_priv_key, database::skip_nothing);
+      BOOST_TEST_MESSAGE("Pushing block P on fork M");
+      db3.push_block(block_p, database::skip_nothing);
+
+      // attempt to roll back to chain B
+      trx = create_simple_transaction(db1, 9, account_idx, init_account_pub_key);
       PUSH_TX(db1, trx);
-      BOOST_TEST_MESSAGE("Now adding block E to the first chain (this should not fail)");
+      BOOST_TEST_MESSAGE("Now adding block E to the first chain");
       auto block_e = db1.generate_block(db1.get_slot_time(5), db1.get_scheduled_witness(5), init_account_priv_key, database::skip_nothing);
-      BOOST_TEST_MESSAGE("Attempting to push block E to DB3, but the fork should not be there");
-      GRAPHENE_REQUIRE_THROW(db3.push_block(block_e, database::skip_nothing), fc::exception);
+      BOOST_TEST_MESSAGE("Attempting to push block E to DB3");
+      db3.push_block(block_e, database::skip_nothing);
+
+      trx = create_simple_transaction(db1, 10, account_idx, init_account_pub_key);
+      PUSH_TX(db1, trx);
+      BOOST_TEST_MESSAGE("Now adding block F to the first chain (this should not fail)");
+      auto block_f = db1.generate_block(db1.get_slot_time(6), db1.get_scheduled_witness(6), init_account_priv_key, database::skip_nothing);
+      BOOST_TEST_MESSAGE("Attempting to push block F to DB3, should attempt to switch forks, but the fork should not be there");
+      GRAPHENE_REQUIRE_THROW(db3.push_block(block_f, database::skip_nothing), fc::exception);
 
    } catch (fc::exception& e) {
       edump((e.to_detail_string()));
