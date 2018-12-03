@@ -756,7 +756,7 @@ BOOST_AUTO_TEST_CASE( switch_forks_bad_block )
       // now build block B
       trx = create_simple_transaction(db1, 2, account_idx, init_account_pub_key);
       PUSH_TX(db1, trx);
-      auto block_b = db1.generate_block(db1.get_slot_time(2), db1.get_scheduled_witness(2), init_account_priv_key, database::skip_nothing);
+      auto block_b = db1.generate_block(db1.get_slot_time(1), db1.get_scheduled_witness(1), init_account_priv_key, database::skip_nothing);
       BOOST_TEST_MESSAGE("Pushing block B");
       db3.push_block(block_b, database::skip_nothing);
 
@@ -765,21 +765,21 @@ BOOST_AUTO_TEST_CASE( switch_forks_bad_block )
       // now build block M, and a fork should be created on db3
       trx = create_simple_transaction(db2, 3, account_idx, init_account_pub_key);
       PUSH_TX(db2, trx);
-      auto block_m = db2.generate_block(db2.get_slot_time(2), db2.get_scheduled_witness(2), init_account_priv_key, database::skip_nothing);
+      auto block_m = db2.generate_block(db2.get_slot_time(1), db2.get_scheduled_witness(1), init_account_priv_key, database::skip_nothing);
       BOOST_TEST_MESSAGE("Pushing block M");
       db3.push_block(block_m, database::skip_nothing);
 
       // block c should be on the b fork
       trx = create_simple_transaction(db1, 4, account_idx, init_account_pub_key);
       PUSH_TX(db1, trx);
-      auto block_c = db1.generate_block(db1.get_slot_time(3), db1.get_scheduled_witness(3), init_account_priv_key, database::skip_nothing);
+      auto block_c = db1.generate_block(db1.get_slot_time(1), db1.get_scheduled_witness(1), init_account_priv_key, database::skip_nothing);
       BOOST_TEST_MESSAGE("Pushing block C on fork B");
       db3.push_block(block_c, database::skip_nothing);
 
       // block d should be on the b fork
       trx = create_simple_transaction(db1, 5, account_idx, init_account_pub_key);
       PUSH_TX(db1, trx);
-      auto block_d = db1.generate_block(db1.get_slot_time(4), db1.get_scheduled_witness(4), init_account_priv_key, database::skip_nothing);
+      auto block_d = db1.generate_block(db1.get_slot_time(1), db1.get_scheduled_witness(1), init_account_priv_key, database::skip_nothing);
       BOOST_TEST_MESSAGE("Pushing block D on fork B");
       db3.push_block(block_d, database::skip_nothing);
 
@@ -815,7 +815,7 @@ BOOST_AUTO_TEST_CASE( switch_forks_bad_block )
       // attempt to make block M the LIB by adding a block N, this should eliminate the B fork
       trx = create_simple_transaction(db2, 6, account_idx, init_account_pub_key);
       PUSH_TX(db2, trx);
-      auto block_n = db2.generate_block(db2.get_slot_time(3), db2.get_scheduled_witness(3), init_account_priv_key, database::skip_nothing);
+      auto block_n = db2.generate_block(db2.get_slot_time(1), db2.get_scheduled_witness(1), init_account_priv_key, database::skip_nothing);
       BOOST_TEST_MESSAGE("Pushing block N on fork M");
       db3.push_block(block_n, database::skip_nothing);
 
@@ -827,7 +827,7 @@ BOOST_AUTO_TEST_CASE( switch_forks_bad_block )
       // add block O to chain 2, now the chains are of equal length
       trx = create_simple_transaction(db2, 7, account_idx, init_account_pub_key);
       PUSH_TX(db2, trx);
-      auto block_o = db2.generate_block(db2.get_slot_time(4), db2.get_scheduled_witness(4), init_account_priv_key, database::skip_nothing);
+      auto block_o = db2.generate_block(db2.get_slot_time(1), db2.get_scheduled_witness(1), init_account_priv_key, database::skip_nothing);
       BOOST_TEST_MESSAGE("Pushing block O on fork M");
       db3.push_block(block_o, database::skip_nothing);
 
@@ -835,7 +835,7 @@ BOOST_AUTO_TEST_CASE( switch_forks_bad_block )
       // and we should be unable to roll back to chain B
       trx = create_simple_transaction(db2, 8, account_idx, init_account_pub_key);
       PUSH_TX(db2, trx);
-      auto block_p = db2.generate_block(db2.get_slot_time(5), db2.get_scheduled_witness(5), init_account_priv_key, database::skip_nothing);
+      auto block_p = db2.generate_block(db2.get_slot_time(1), db2.get_scheduled_witness(1), init_account_priv_key, database::skip_nothing);
       BOOST_TEST_MESSAGE("Pushing block P on fork M");
       db3.push_block(block_p, database::skip_nothing);
 
@@ -843,14 +843,14 @@ BOOST_AUTO_TEST_CASE( switch_forks_bad_block )
       trx = create_simple_transaction(db1, 9, account_idx, init_account_pub_key);
       PUSH_TX(db1, trx);
       BOOST_TEST_MESSAGE("Now adding block E to the first chain");
-      auto block_e = db1.generate_block(db1.get_slot_time(5), db1.get_scheduled_witness(5), init_account_priv_key, database::skip_nothing);
+      auto block_e = db1.generate_block(db1.get_slot_time(1), db1.get_scheduled_witness(1), init_account_priv_key, database::skip_nothing);
       BOOST_TEST_MESSAGE("Attempting to push block E to DB3");
       db3.push_block(block_e, database::skip_nothing);
 
       trx = create_simple_transaction(db1, 10, account_idx, init_account_pub_key);
       PUSH_TX(db1, trx);
       BOOST_TEST_MESSAGE("Now adding block F to the first chain (this should not fail)");
-      auto block_f = db1.generate_block(db1.get_slot_time(6), db1.get_scheduled_witness(6), init_account_priv_key, database::skip_nothing);
+      auto block_f = db1.generate_block(db1.get_slot_time(1), db1.get_scheduled_witness(1), init_account_priv_key, database::skip_nothing);
       BOOST_TEST_MESSAGE("Attempting to push block F to DB3, should attempt to switch forks, but the fork should not be there");
       GRAPHENE_REQUIRE_THROW(db3.push_block(block_f, database::skip_nothing), fc::exception);
 
