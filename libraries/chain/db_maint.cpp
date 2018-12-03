@@ -814,11 +814,14 @@ void database::process_bids( const asset_bitasset_data_object& bad )
    while( covered < bdd.current_supply && itr != bid_idx.end() && itr->inv_swan_price.quote.asset_id == to_revive_id )
    {
       const collateral_bid_object& bid = *itr;
-      asset total_collateral = bid.inv_swan_price.quote * bad.settlement_price;
+      asset debt_in_bid = bid.inv_swan_price.quote;
+      if( debt_in_bid.amount > bdd.current_supply )
+         debt_in_bid.amount = bdd.current_supply;
+      asset total_collateral = debt_in_bid * bad.settlement_price;
       total_collateral += bid.inv_swan_price.base;
-      price call_price = price::call_price( bid.inv_swan_price.quote, total_collateral, bad.current_feed.maintenance_collateral_ratio );
+      price call_price = price::call_price( debt_in_bid, total_collateral, bad.current_feed.maintenance_collateral_ratio );
       if( ~call_price >= bad.current_feed.settlement_price ) break;
-      covered += bid.inv_swan_price.quote.amount;
+      covered += debt_in_bid.amount;
       ++itr;
    }
    if( covered < bdd.current_supply ) return;
@@ -830,9 +833,12 @@ void database::process_bids( const asset_bitasset_data_object& bad )
    {
       const collateral_bid_object& bid = *itr;
       ++itr;
-      share_type debt = bid.inv_swan_price.quote.amount;
-      share_type collateral = (bid.inv_swan_price.quote * bad.settlement_price).amount;
-      if( bid.inv_swan_price.quote.amount >= to_cover )
+      asset debt_in_bid = bid.inv_swan_price.quote;
+      if( debt_in_bid.amount > bdd.current_supply )
+         debt_in_bid.amount = bdd.current_supply;
+      share_type debt = debt_in_bid.amount;
+      share_type collateral = (debt_in_bid * bad.settlement_price).amount;
+      if( debt >= to_cover )
       {
          debt = to_cover;
          collateral = remaining_fund;
