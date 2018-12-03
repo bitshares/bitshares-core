@@ -506,7 +506,9 @@ namespace graphene { namespace chain {
          ///@}
 
          vector< processed_transaction >        _pending_tx;
+      protected:
          fork_database                          _fork_db;
+      private:
 
          /**
           *  Note: we can probably store blocks by block num rather than

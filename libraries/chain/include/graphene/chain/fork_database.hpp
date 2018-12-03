@@ -104,6 +104,7 @@ namespace graphene { namespace chain {
          > fork_multi_index_type;
 
          void set_max_size( uint32_t s );
+         uint32_t get_max_size () { return _max_size; }
 
       private:
          /** @return a pointer to the newly pushed item */
