@@ -25,7 +25,7 @@
 
 namespace graphene { namespace chain {
 
-typedef fc::static_variant<asset, account_id_type, extensions_type> generic_member;
+typedef fc::static_variant<asset, account_id_type, extensions_type, future_extensions, public_key_type > generic_member;
 
 template <class T>
 class member_fetcher
@@ -123,7 +123,7 @@ struct not_equal
     template <class T>
     bool operator () (const T& left, const T& right) const
     {
-        return left != right;
+        return !(left == right);
     }
 };
 

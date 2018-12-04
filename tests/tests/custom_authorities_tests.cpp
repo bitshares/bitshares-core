@@ -220,7 +220,12 @@ public:
     {}
     
     template <class T>
-    void operator () (const T& list) const
+    void operator () (const T&) const
+    {
+        FC_ASSERT("Not list type come.");
+    }
+    
+    void operator () (const fc::static_variant<void_t>&) const
     {
         FC_ASSERT("Not list type come.");
     }
@@ -408,10 +413,34 @@ BOOST_AUTO_TEST_CASE( validation_fails_for_none_restriction_when_argument_value_
     BOOST_CHECK(!restriction.validate(operation));
 }
 
-BOOST_AUTO_TEST_CASE( validation_passes_for_conatins_all_restriction_when_argument_contains_list_value)
+BOOST_AUTO_TEST_CASE( validation_passes_for_conatins_all_restriction_when_argument_contains_list_values)
 {
     assert_operation operation;
     operation.required_auths = {account_id_type(1), account_id_type(2), account_id_type(3)};
+    
+    contains_all_restriction restriction;
+    restriction.values = {account_id_type(1), account_id_type(2), account_id_type(3)};
+    restriction.argument = "required_auths";
+    
+    BOOST_CHECK(restriction.validate(operation));
+}
+
+BOOST_AUTO_TEST_CASE( validation_failes_for_conatins_all_restriction_when_argument_contains_subset_of_list_values)
+{
+    assert_operation operation;
+    operation.required_auths = {account_id_type(1), account_id_type(2), account_id_type(3)};
+    
+    contains_all_restriction restriction;
+    restriction.values = {account_id_type(0), account_id_type(1), account_id_type(2), account_id_type(3), account_id_type(4)};
+    restriction.argument = "required_auths";
+    
+    BOOST_CHECK(!restriction.validate(operation));
+}
+
+BOOST_AUTO_TEST_CASE( validation_passes_for_conatins_all_restriction_when_argument_contains_superset_of_list_values)
+{
+    assert_operation operation;
+    operation.required_auths = {account_id_type(0), account_id_type(1), account_id_type(2), account_id_type(3), account_id_type(4)};
     
     contains_all_restriction restriction;
     restriction.values = {account_id_type(1), account_id_type(2), account_id_type(3)};
