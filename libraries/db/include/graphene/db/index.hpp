@@ -234,14 +234,12 @@ namespace graphene { namespace db {
             fc::raw::unpack(ds, _next_id);
             fc::raw::unpack(ds, open_ver);
             FC_ASSERT( open_ver == get_object_version(), "Incompatible Version, the serialization of objects in this index has changed" );
-            try {
-               vector<char> tmp;
-               while( true ) 
-               {
-                  fc::raw::unpack( ds, tmp );
-                  load( tmp );
-               }
-            } catch ( const fc::exception&  ){}
+            vector<char> tmp;
+            while( ds.remaining() > 0 )
+            {
+               fc::raw::unpack( ds, tmp );
+               load( tmp );
+            }
          }
 
          virtual void save( const path& db ) override 
