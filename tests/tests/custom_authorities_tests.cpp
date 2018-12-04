@@ -117,6 +117,31 @@ struct base_restriction
 typedef base_restriction<equal> eq_restriction;
 typedef base_restriction<not_equal> neq_restriction;
 
+class any_of
+{
+public:
+    any_of(const std::vector<generic_member>& values)
+    : m_values(values)
+    {}
+    
+    template <class T>
+    void operator () (const T& member) const
+    {
+        for (const generic_member& value: m_values)
+        {
+            if (is_equal(get<T>(value), member))
+            {
+                return;
+            }
+        }
+        
+        FC_THROW("Argument was not present in the list.");
+    }
+    
+private:
+    std::vector<generic_member> m_values;
+};
+
 struct any_restriction
 {
     std::vector<generic_member> values;
@@ -126,12 +151,9 @@ struct any_restriction
     {
         try
         {
-            auto member = get_operation_member(op, argument);
-            
-            static_variable_in_list_checker<equal> comparer(values);
-            member.visit(comparer);
-            
-            return comparer.was_found();
+            operation_member_visitor<any_of> visitor(argument, any_of(values));
+            op.visit(visitor);
+            return true;
         }
         catch (...)
         {
