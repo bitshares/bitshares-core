@@ -447,6 +447,30 @@ BOOST_AUTO_TEST_CASE( validation_passes_for_contains_none_restriction_when_argum
     BOOST_CHECK(restriction.validate(operation));
 }
 
+BOOST_AUTO_TEST_CASE( validation_fails_for_contains_none_restriction_when_argument_contained_any_of_list_values)
+{
+    assert_operation operation;
+    operation.required_auths = {account_id_type(0), account_id_type(1), account_id_type(2)};
+    
+    contains_none_restriction restriction;
+    restriction.values = {account_id_type(1)};
+    restriction.argument = "required_auths";
+    
+    BOOST_CHECK(!restriction.validate(operation));
+}
+
+BOOST_AUTO_TEST_CASE( validation_fails_for_contains_none_restriction_when_argument_contained_several_of_list_values)
+{
+    assert_operation operation;
+    operation.required_auths = {account_id_type(0), account_id_type(1), account_id_type(2)};
+    
+    contains_none_restriction restriction;
+    restriction.values = {account_id_type(1), account_id_type(2)};
+    restriction.argument = "required_auths";
+    
+    BOOST_CHECK(!restriction.validate(operation));
+}
+
 BOOST_AUTO_TEST_SUITE_END()
 
 BOOST_AUTO_TEST_SUITE( custom_authorities_utils )
