@@ -140,6 +140,29 @@ struct any_restriction
     }
 };
 
+class none_of
+{
+public:
+    none_of(const std::vector<generic_member>& values)
+    : m_values(values)
+    {}
+    
+    template <class T>
+    void operator () (const T& member) const
+    {
+        for (const generic_member& value: m_values)
+        {
+            if (is_equal(get<T>(value), member))
+            {
+                FC_THROW("Operation member is present in the list.");
+            }
+        }
+    }
+    
+private:
+    std::vector<generic_member> m_values;
+};
+
 struct none_restriction
 {
     std::vector<generic_member> values;
@@ -149,67 +172,15 @@ struct none_restriction
     {
         try
         {
-            auto member = get_operation_member(op, argument);
-            
-            static_variable_in_list_checker<equal> comparer(values);
-            member.visit(comparer);
-            
-            return !comparer.was_found();
+            operation_member_visitor<none_of> visitor(argument, none_of(values));
+            op.visit(visitor);
+            return true;
         }
         catch (...)
         {
             return false;
         }
     }
-};
-
-template <typename T, typename Action>
-struct member_visitor
-{
-    member_visitor(const std::string& member_name,  const Action& action, const T& object)
-    : m_member_name(member_name)
-    , m_action(action)
-    , m_object(object)
-    {}
-    
-    typedef void result_type;
-    
-    template<typename Member, class Class, Member (Class::*member)>
-    void operator () ( const char* name ) const
-    {
-        if (name == m_member_name)
-        {
-            m_action(m_object.*member);
-        }
-    }
-    
-private:
-    const std::string m_member_name;
-    Action m_action;
-    T m_object;
-};
-
-template <typename Action>
-class operation_member_visitor
-{
-public:
-    operation_member_visitor(const std::string& member_name,  const Action& action)
-    : m_member_name(member_name)
-    , m_action(action)
-    {}
-    
-    typedef void result_type;
-    
-    template <typename Operation>
-    void operator () (const Operation& op) const
-    {
-        member_visitor<Operation, Action> vistor(m_member_name, m_action, op);
-        fc::reflector<Operation>::visit(vistor);
-    }
-    
-private:
-    const std::string m_member_name;
-    Action m_action;
 };
 
 class contains_all

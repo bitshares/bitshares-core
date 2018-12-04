@@ -25,7 +25,7 @@
 
 namespace graphene { namespace chain {
 
-typedef fc::static_variant<asset, account_id_type, extensions_type, future_extensions, public_key_type > generic_member;
+typedef fc::static_variant<asset, account_id_type, extensions_type, future_extensions, public_key_type, time_point_sec, bool > generic_member;
 
 template <class T>
 class member_fetcher
@@ -181,5 +181,77 @@ private:
     std::vector<generic_member> m_data_list;
     bool m_was_found = false;
 };
+    
+template <typename T, typename Action>
+struct member_visitor
+{
+    member_visitor(const std::string& member_name,  const Action& action, const T& object)
+    : m_member_name(member_name)
+    , m_action(action)
+    , m_object(object)
+    {}
+    
+    typedef void result_type;
+    
+    template<typename Member, class Class, Member (Class::*member)>
+    void operator () ( const char* name ) const
+    {
+        if (name == m_member_name)
+        {
+            m_action(m_object.*member);
+        }
+    }
+    
+private:
+    const std::string m_member_name;
+    Action m_action;
+    T m_object;
+};
+
+template <typename Action>
+class operation_member_visitor
+{
+public:
+    operation_member_visitor(const std::string& member_name,  const Action& action)
+    : m_member_name(member_name)
+    , m_action(action)
+    {}
+    
+    typedef void result_type;
+    
+    template <typename Operation>
+    void operator () (const Operation& op) const
+    {
+        member_visitor<Operation, Action> vistor(m_member_name, m_action, op);
+        fc::reflector<Operation>::visit(vistor);
+    }
+    
+private:
+    const std::string m_member_name;
+    Action m_action;
+};
+
+template <class T>
+bool is_equal(const T& left, const T& right)
+{
+    FC_ASSERT(false);
+}
+    
+bool is_equal(const asset& left, const asset& right)
+{
+    return left == right;
+}
+
+template <typename T>
+const T& get(const generic_member& variant)
+{
+    FC_ASSERT(false);
+}
+
+template <>
+const asset& get<asset>(const generic_member& variant)
+{
+    return variant.get<asset>();
+}
     
 } } 
