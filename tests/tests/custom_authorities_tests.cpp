@@ -142,26 +142,6 @@ private:
     std::vector<generic_member> m_values;
 };
 
-struct any_restriction
-{
-    std::vector<generic_member> values;
-    std::string argument;
-    
-    bool validate( const operation& op ) const
-    {
-        try
-        {
-            operation_member_visitor<any_of> visitor(argument, any_of(values));
-            op.visit(visitor);
-            return true;
-        }
-        catch (...)
-        {
-            return false;
-        }
-    }
-};
-
 class none_of
 {
 public:
@@ -185,26 +165,6 @@ private:
     std::vector<generic_member> m_values;
 };
 
-struct none_restriction
-{
-    std::vector<generic_member> values;
-    std::string argument;
-    
-    bool validate( const operation& op ) const
-    {
-        try
-        {
-            operation_member_visitor<none_of> visitor(argument, none_of(values));
-            op.visit(visitor);
-            return true;
-        }
-        catch (...)
-        {
-            return false;
-        }
-    }
-};
-
 class contains_all
 {
 public:
@@ -214,11 +174,6 @@ public:
     
     template <class T>
     void operator () (const T&) const
-    {
-        FC_ASSERT("Not list type come.");
-    }
-    
-    void operator () (const fc::static_variant<void_t>&) const
     {
         FC_ASSERT("Not list type come.");
     }
@@ -242,25 +197,63 @@ private:
     std::vector<generic_member> m_values;
 };
 
-struct contains_all_restriction
+class contains_none
+{
+public:
+    contains_none(const std::vector<generic_member>& values)
+    : m_values(values)
+    {}
+    
+    template <class T>
+    void operator () (const T&) const
+    {
+        FC_ASSERT("Not list type come.");
+    }
+    
+    template <class T>
+    void operator () (const flat_set<T>& list) const
+    {
+        for (const generic_member& value: m_values)
+        {
+            for (const auto& item: list)
+            {
+                if (is_equal(item, get<T>(value)))
+                {
+                    FC_THROW("Should not contain any of same items.");
+                }
+            }
+        }
+    }
+    
+private:
+    std::vector<generic_member> m_values;
+};
+
+template <typename Action>
+struct list_restriction
 {
     std::vector<generic_member> values;
     std::string argument;
-
+    
     bool validate( const operation& op ) const
     {
         try
         {
-            operation_member_visitor<contains_all> visitor(argument, contains_all(values));
+            operation_member_visitor<Action> visitor(argument, Action(values));
             op.visit(visitor);
             return true;
         }
-        catch (...)
+        catch (const fc::exception& e)
         {
             return false;
         }
     }
 };
+
+typedef list_restriction<any_of> any_restriction;
+typedef list_restriction<none_of> none_restriction;
+typedef list_restriction<contains_all> contains_all_restriction;
+typedef list_restriction<contains_none> contains_none_restriction;
 
 BOOST_AUTO_TEST_CASE( validation_passes_for_eq_restriction_when_assets_are_equal )
 {
@@ -437,6 +430,18 @@ BOOST_AUTO_TEST_CASE( validation_passes_for_conatins_all_restriction_when_argume
     
     contains_all_restriction restriction;
     restriction.values = {account_id_type(1), account_id_type(2), account_id_type(3)};
+    restriction.argument = "required_auths";
+    
+    BOOST_CHECK(restriction.validate(operation));
+}
+
+BOOST_AUTO_TEST_CASE( validation_passes_for_contains_none_restriction_when_argument_not_contains_any_of_list_values)
+{
+    assert_operation operation;
+    operation.required_auths = {account_id_type(0), account_id_type(1), account_id_type(2)};
+    
+    contains_none_restriction restriction;
+    restriction.values = {account_id_type(3), account_id_type(4)};
     restriction.argument = "required_auths";
     
     BOOST_CHECK(restriction.validate(operation));
