@@ -163,6 +163,107 @@ struct none_restriction
     }
 };
 
+template <typename T, typename Action>
+struct member_visitor
+{
+    member_visitor(const std::string& member_name,  const Action& action, const T& object)
+    : m_member_name(member_name)
+    , m_action(action)
+    , m_object(object)
+    {}
+    
+    typedef void result_type;
+    
+    template<typename Member, class Class, Member (Class::*member)>
+    void operator () ( const char* name ) const
+    {
+        if (name == m_member_name)
+        {
+            m_action(m_object.*member);
+        }
+    }
+    
+private:
+    const std::string m_member_name;
+    Action m_action;
+    T m_object;
+};
+
+template <typename Action>
+class operation_member_visitor
+{
+public:
+    operation_member_visitor(const std::string& member_name,  const Action& action)
+    : m_member_name(member_name)
+    , m_action(action)
+    {}
+    
+    typedef void result_type;
+    
+    template <typename Operation>
+    void operator () (const Operation& op) const
+    {
+        member_visitor<Operation, Action> vistor(m_member_name, m_action, op);
+        fc::reflector<Operation>::visit(vistor);
+    }
+    
+private:
+    const std::string m_member_name;
+    Action m_action;
+};
+
+class contains_all
+{
+public:
+    contains_all(const std::vector<generic_member>& values)
+    : m_values(values)
+    {}
+    
+    template <class T>
+    void operator () (const T& list) const
+    {
+        FC_ASSERT("Not list type come.");
+    }
+    
+    template <class T>
+    void operator () (const flat_set<T>& list) const
+    {
+        for (const generic_member& value: m_values)
+        {
+            bool contains = false;
+            for (const auto& item: list)
+            {
+                contains |= (item == value.get<T>());
+            }
+            
+            FC_ASSERT(contains);
+        }
+    }
+    
+private:
+    std::vector<generic_member> m_values;
+};
+
+struct contains_all_restriction
+{
+    std::vector<generic_member> values;
+    std::string argument;
+
+    bool validate( const operation& op ) const
+    {
+        try
+        {
+            operation_member_visitor<contains_all> visitor(argument, contains_all(values));
+            op.visit(visitor);
+            return true;
+        }
+        catch (...)
+        {
+            return false;
+        }
+    }
+};
+
 BOOST_AUTO_TEST_CASE( validation_passes_for_eq_restriction_when_assets_are_equal )
 {
     transfer_operation operation;
@@ -305,6 +406,18 @@ BOOST_AUTO_TEST_CASE( validation_fails_for_none_restriction_when_argument_value_
     restriction.argument = "amount";
     
     BOOST_CHECK(!restriction.validate(operation));
+}
+
+BOOST_AUTO_TEST_CASE( validation_passes_for_conatins_all_restriction_when_argument_contains_list_value)
+{
+    assert_operation operation;
+    operation.required_auths = {account_id_type(1), account_id_type(2), account_id_type(3)};
+    
+    contains_all_restriction restriction;
+    restriction.values = {account_id_type(1), account_id_type(2), account_id_type(3)};
+    restriction.argument = "required_auths";
+    
+    BOOST_CHECK(restriction.validate(operation));
 }
 
 BOOST_AUTO_TEST_SUITE_END()
