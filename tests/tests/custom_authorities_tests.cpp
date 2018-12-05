@@ -88,7 +88,7 @@ BOOST_AUTO_TEST_CASE( validation_passes_when_now_is_in_valid_period )
 
 BOOST_AUTO_TEST_SUITE_END()
 
-BOOST_AUTO_TEST_SUITE( restrictions )
+BOOST_AUTO_TEST_SUITE( custom_authority_restrictions )
 
 template <typename Action>
 struct base_restriction
@@ -287,14 +287,7 @@ typedef base_list_restriction<none_of>       none_restriction;
 typedef base_list_restriction<contains_all>  contains_all_restriction;
 typedef base_list_restriction<contains_none> contains_none_restriction;
 
-struct attribute_assert_restriction;
-
-typedef fc::static_variant<eq_restriction, neq_restriction, any_restriction, none_restriction, contains_all_restriction, contains_none_restriction, attribute_assert_restriction> restriction;
-
-struct attribute_assert_restriction
-{
-    std::vector<restriction> restrictions;
-};
+typedef fc::static_variant<eq_restriction, neq_restriction, any_restriction, none_restriction, contains_all_restriction, contains_none_restriction> restriction;
 
 BOOST_AUTO_TEST_CASE( validation_passes_for_eq_restriction_when_assets_are_equal )
 {
