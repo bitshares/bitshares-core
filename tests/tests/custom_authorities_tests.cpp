@@ -90,6 +90,50 @@ BOOST_AUTO_TEST_SUITE_END()
 
 BOOST_AUTO_TEST_SUITE( restrictions )
 
+template <typename Action>
+struct base_restriction
+{
+    generic_member value;
+    std::string argument;
+    
+    template <typename Operation>
+    bool validate( const Operation& op ) const
+    {
+        try
+        {
+            member_visitor<Operation, Action> visitor(argument, Action(value), op);
+            fc::reflector<Operation>::visit(visitor);
+            return true;
+        }
+        catch (...)
+        {
+            return false;
+        }
+    }
+};
+
+template <typename Action>
+struct base_list_restriction
+{
+    std::vector<generic_member> values;
+    std::string argument;
+    
+    template <typename Operation>
+    bool validate( const Operation& op ) const
+    {
+        try
+        {
+            member_visitor<Operation, Action> visitor(argument, Action(values), op);
+            fc::reflector<Operation>::visit(visitor);
+            return true;
+        }
+        catch (const fc::exception& e)
+        {
+            return false;
+        }
+    }
+};
+
 class equal
 {
 public:
@@ -122,27 +166,6 @@ public:
     
 private:
     generic_member m_value;
-};
-
-template <typename Action>
-struct base_restriction
-{
-    generic_member value;
-    std::string argument;
-    
-    bool validate( const operation& op ) const
-    {
-        try
-        {
-            operation_member_visitor<Action> visitor(argument, Action(value));
-            op.visit(visitor);
-            return true;
-        }
-        catch (...)
-        {
-            return false;
-        }
-    }
 };
 
 class any_of
@@ -257,27 +280,6 @@ private:
     std::vector<generic_member> m_values;
 };
 
-template <typename Action>
-struct base_list_restriction
-{
-    std::vector<generic_member> values;
-    std::string argument;
-    
-    bool validate( const operation& op ) const
-    {
-        try
-        {
-            operation_member_visitor<Action> visitor(argument, Action(values));
-            op.visit(visitor);
-            return true;
-        }
-        catch (const fc::exception& e)
-        {
-            return false;
-        }
-    }
-};
-
 typedef base_restriction<equal>              eq_restriction;
 typedef base_restriction<not_equal>          neq_restriction;
 typedef base_list_restriction<any_of>        any_restriction;
@@ -285,7 +287,14 @@ typedef base_list_restriction<none_of>       none_restriction;
 typedef base_list_restriction<contains_all>  contains_all_restriction;
 typedef base_list_restriction<contains_none> contains_none_restriction;
 
-typedef fc::static_variant<eq_restriction, neq_restriction, any_restriction, none_restriction, contains_all_restriction, contains_none_restriction> restriction;
+struct attribute_assert_restriction;
+
+typedef fc::static_variant<eq_restriction, neq_restriction, any_restriction, none_restriction, contains_all_restriction, contains_none_restriction, attribute_assert_restriction> restriction;
+
+struct attribute_assert_restriction
+{
+    std::vector<restriction> restrictions;
+};
 
 BOOST_AUTO_TEST_CASE( validation_passes_for_eq_restriction_when_assets_are_equal )
 {
