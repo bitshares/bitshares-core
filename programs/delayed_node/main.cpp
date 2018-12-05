@@ -70,9 +70,9 @@ int main(int argc, char** argv) {
 
       bpo::variables_map options;
 
-      auto delayed_plug = node->register_plugin<delayed_node::delayed_node_plugin>();
-      auto history_plug = node->register_plugin<account_history::account_history_plugin>();
-      auto market_history_plug = node->register_plugin<market_history::market_history_plugin>();
+      auto delayed_plug = node->register_plugin<delayed_node::delayed_node_plugin>(true);
+      auto history_plug = node->register_plugin<account_history::account_history_plugin>(true);
+      auto market_history_plug = node->register_plugin<market_history::market_history_plugin>(true);
 
       try
       {
@@ -87,13 +87,6 @@ int main(int argc, char** argv) {
         std::cerr << "Error parsing command line: " << e.what() << "\n";
         return 1;
       }
-
-      std::set<std::string> plugins = {"delayed_node", "account_history", "market_history"};
-      std::for_each(plugins.begin(), plugins.end(), [node](const std::string& plug) mutable {
-          if (!plug.empty()) {
-             node->enable_plugin(plug);
-          }
-      });
 
       if( options.count("help") )
       {
