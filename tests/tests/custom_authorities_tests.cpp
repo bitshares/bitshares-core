@@ -90,7 +90,41 @@ BOOST_AUTO_TEST_SUITE_END()
 
 BOOST_AUTO_TEST_SUITE( restrictions )
 
-template <typename Comparer>
+class equal
+{
+public:
+    equal(const generic_member& value)
+    : m_value(value)
+    {}
+    
+    template <class T>
+    void operator () (const T& member) const
+    {
+        FC_ASSERT(is_equal(get<T>(m_value), member));
+    }
+    
+private:
+    generic_member m_value;
+};
+
+class not_equal
+{
+public:
+    not_equal(const generic_member& value)
+    : m_value(value)
+    {}
+    
+    template <class T>
+    void operator () (const T& member) const
+    {
+        FC_ASSERT(!is_equal(get<T>(m_value), member));
+    }
+    
+private:
+    generic_member m_value;
+};
+
+template <typename Action>
 struct base_restriction
 {
     generic_member value;
@@ -100,11 +134,8 @@ struct base_restriction
     {
         try
         {
-            auto member = get_operation_member(op, argument);
-            
-            static_variable_comparer<Comparer> comparer(value);
-            member.visit(comparer);
-            
+            operation_member_visitor<Action> visitor(argument, Action(value));
+            op.visit(visitor);
             return true;
         }
         catch (...)
@@ -113,9 +144,6 @@ struct base_restriction
         }
     }
 };
-
-typedef base_restriction<equal> eq_restriction;
-typedef base_restriction<not_equal> neq_restriction;
 
 class any_of
 {
@@ -230,7 +258,7 @@ private:
 };
 
 template <typename Action>
-struct list_restriction
+struct base_list_restriction
 {
     std::vector<generic_member> values;
     std::string argument;
@@ -250,10 +278,14 @@ struct list_restriction
     }
 };
 
-typedef list_restriction<any_of> any_restriction;
-typedef list_restriction<none_of> none_restriction;
-typedef list_restriction<contains_all> contains_all_restriction;
-typedef list_restriction<contains_none> contains_none_restriction;
+typedef base_restriction<equal>              eq_restriction;
+typedef base_restriction<not_equal>          neq_restriction;
+typedef base_list_restriction<any_of>        any_restriction;
+typedef base_list_restriction<none_of>       none_restriction;
+typedef base_list_restriction<contains_all>  contains_all_restriction;
+typedef base_list_restriction<contains_none> contains_none_restriction;
+
+typedef fc::static_variant<eq_restriction, neq_restriction, any_restriction, none_restriction, contains_all_restriction, contains_none_restriction> restriction;
 
 BOOST_AUTO_TEST_CASE( validation_passes_for_eq_restriction_when_assets_are_equal )
 {
@@ -472,26 +504,3 @@ BOOST_AUTO_TEST_CASE( validation_fails_for_contains_none_restriction_when_argume
 }
 
 BOOST_AUTO_TEST_SUITE_END()
-
-BOOST_AUTO_TEST_SUITE( custom_authorities_utils )
-
-BOOST_AUTO_TEST_CASE( get_amount_member_of_transfer_operation )
-{
-    transfer_operation operation;
-    operation.amount = asset(5);
-    
-    BOOST_CHECK(asset(5) == get_member(operation, "amount").get<asset>());
-}
-
-BOOST_AUTO_TEST_CASE( get_amount_member_of_generic_operation )
-{
-    transfer_operation a_transfer_operation;
-    a_transfer_operation.amount = asset(5);
-    
-    operation a_operation = a_transfer_operation;
-    
-    BOOST_CHECK(asset(5) == get_operation_member(a_operation, "amount").get<asset>());
-}
-
-BOOST_AUTO_TEST_SUITE_END()
-
