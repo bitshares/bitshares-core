@@ -2461,7 +2461,7 @@ BOOST_AUTO_TEST_CASE( buyback )
          issue_uia( alice_id, asset( 1000, buyme_id ) );
          issue_uia( alice_id, asset( 1000, nono_id ) );
 
-         // Alice wants to sell 100 BUYME for 1000 BTS, a middle price.
+         // Alice wants to sell 100 BUYME for 1000 TUSC, a middle price.
          limit_order_id_type order_id_mid = create_sell_order( alice_id, asset( 100, buyme_id ), asset( 1000, asset_id_type() ) )->id;
 
          generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
@@ -2477,7 +2477,7 @@ BOOST_AUTO_TEST_CASE( buyback )
          generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
          generate_block();
 
-         // partial fill, Alice now sells 90 BUYME for 900 BTS.
+         // partial fill, Alice now sells 90 BUYME for 900 TUSC.
          BOOST_CHECK( order_id_mid(db).for_sale == 90 );
 
          // TODO check burn amount
@@ -2485,9 +2485,9 @@ BOOST_AUTO_TEST_CASE( buyback )
          // aagh more state in trx
          set_expiration( db, trx );  // #11
 
-         // Selling 10 BUYME for 50 BTS, a low price.
+         // Selling 10 BUYME for 50 TUSC, a low price.
          limit_order_id_type order_id_low  = create_sell_order( alice_id, asset( 10, buyme_id ), asset(  50, asset_id_type() ) )->id;
-         // Selling 10 BUYME for 150 BTS, a high price.
+         // Selling 10 BUYME for 150 TUSC, a high price.
          limit_order_id_type order_id_high = create_sell_order( alice_id, asset( 10, buyme_id ), asset( 150, asset_id_type() ) )->id;
 
          fund( rex_id(db), asset( 250, asset_id_type() ) );
@@ -2509,7 +2509,7 @@ BOOST_AUTO_TEST_CASE( buyback )
 
          BOOST_CHECK( get_balance( rex_id, asset_id_type() ) == 0 );
 
-         // clear out the books -- 700 left on mid order, 150 left on high order, so 2000 BTS should result in 1150 left over
+         // clear out the books -- 700 left on mid order, 150 left on high order, so 2000 TUSC should result in 1150 left over
 
          fund( rex_id(db), asset( 2000, asset_id_type() ) );
          generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
@@ -2519,7 +2519,7 @@ BOOST_AUTO_TEST_CASE( buyback )
          BOOST_CHECK( get_balance( rex_id, asset_id_type() ) == 1150 );
 
          GRAPHENE_CHECK_THROW( transfer( alice_id, rex_id, asset( 1, nono_id ) ), fc::exception );
-         // TODO: Check cancellation works for account which is BTS-restricted
+         // TODO: Check cancellation works for account which is TUSC-restricted
       }
 
    } FC_LOG_AND_RETHROW()

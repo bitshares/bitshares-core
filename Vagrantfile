@@ -1,4 +1,4 @@
-# Configures Ubuntu 14.04 VM to be used with BitShares 2.0 (Graphene)
+# Configures Ubuntu 14.04 VM to be used with TUSC 2.0 (Graphene)
 # Downloads and builds all necessary software to run witness node and web GUI
 # Use with Vagrant (http://docs.vagrantup.com/v2/getting-started/index.html)
 # or just execute the shell script below.
@@ -24,7 +24,7 @@ sudo apt-get install -yfV libssl-dev openssl build-essential python-dev autotool
 sudo apt-get install -yfV libbz2-dev automake doxygen cmake ncurses-dev libtool nodejs nodejs-legacy npm mc
 sudo apt-get -y autoremove
 
-[ ! -d "bts" ] && mkdir bts && cd bts
+[ ! -d "tusc" ] && mkdir tusc && cd tusc
 [ ! -d "tmp" ] && mkdir tmp
 [ ! -d "build" ] && mkdir build
 
@@ -36,17 +36,17 @@ if [ ! -d "tmp/boost_1_57_0" ]; then
     cd boost_1_57_0/
     ./bootstrap.sh --prefix=/usr/local/ > /dev/null
     sudo ./b2 install > /dev/null
-    cd ~/bts
+    cd ~/tusc
 fi 
   
 if [ ! -d "graphene" ]; then
-  echo_msg "building bitshares graphene toolkit.."  
+  echo_msg "building tusc graphene toolkit.."  
   git clone https://github.com/cryptonomex/graphene.git
   cd graphene
   git submodule update --init --recursive
   cmake .
   make
-  cd ~/bts
+  cd ~/tusc
 fi
 
 if [ ! -d "graphene-ui" ]; then
@@ -57,7 +57,7 @@ if [ ! -d "graphene-ui" ]; then
   cd ../web
   npm install --silent
   npm run-script build
-  cd ~/bts
+  cd ~/tusc
 fi
 
 # ------ shell script end ------
