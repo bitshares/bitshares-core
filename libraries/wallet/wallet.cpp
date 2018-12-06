@@ -538,7 +538,7 @@ public:
 
       fc::mutable_variant_object result;
       //result["blockchain_name"]        = BLOCKCHAIN_NAME;
-      //result["blockchain_description"] = BTS_BLOCKCHAIN_DESCRIPTION;
+      //result["blockchain_description"] = TUSC_BLOCKCHAIN_DESCRIPTION;
       result["client_version"]           = client_version;
       result["graphene_revision"]        = graphene::utilities::git_revision_sha;
       result["graphene_revision_age"]    = fc::get_approximate_relative_time_string( fc::time_point_sec( graphene::utilities::git_revision_unix_timestamp ) );

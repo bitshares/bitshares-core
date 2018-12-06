@@ -769,7 +769,7 @@ BOOST_AUTO_TEST_CASE(get_account_limit_orders)
    // 2. returned orders sorted by price desendingly
    // 3. the first order's sell price equal to specified
    cancel_limit_order(o); // NOTE 1: this canceled order was in scope of the
-                          // first created 50 orders, so with price 2.5 BTS/CNY
+                          // first created 50 orders, so with price 2.5 TUSC/CNY
    results = db_api.get_account_limit_orders(seller.name, GRAPHENE_SYMBOL, "CNY", 50,
        limit_order_id_type(o.id), o.sell_price);
    BOOST_CHECK(results.size() == 50);
