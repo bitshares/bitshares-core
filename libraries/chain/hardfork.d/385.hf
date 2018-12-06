@@ -1,4 +1,4 @@
 // #385 October 23 enforce PARENT.CHILD and allow short names
-#ifndef HARDFORK_385_TIME
-#define HARDFORK_385_TIME (fc::time_point_sec( 1445558400 ))
+#ifndef HARDFORK_385_VERSION
+#define HARDFORK_385_VERSION (graphene::chain::version(2,0,0, fc::time_point_sec( 1445558400 ) ) )
 #endif

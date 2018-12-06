@@ -1,4 +1,4 @@
 // bitshares-core issue #606 Fix "Undercollateralized short positions should be called regardless of asks"
-#ifndef HARDFORK_CORE_606_TIME
-#define HARDFORK_CORE_606_TIME (fc::time_point_sec( 1532008920 )) // Thu, 19 Jul 2018 14:02:00 UTC
+#ifndef HARDFORK_CORE_606_VERSION
+#define HARDFORK_CORE_606_VERSION (graphene::chain::version(10,0,0, fc::time_point_sec( 1532008920 ) ) ) // Thu, 19 Jul 2018 14:02:00 UTC
 #endif

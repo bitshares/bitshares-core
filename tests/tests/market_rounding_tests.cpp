@@ -43,7 +43,7 @@ BOOST_FIXTURE_TEST_SUITE(market_rounding_tests, database_fixture)
 BOOST_AUTO_TEST_CASE( trade_amount_equals_zero )
 {
    try {
-      generate_blocks( HARDFORK_555_TIME );
+      generate_blocks( HARDFORK_555_VERSION );
       generate_block();
       set_expiration( db, trx );
 
@@ -98,7 +98,7 @@ BOOST_AUTO_TEST_CASE( trade_amount_equals_zero_after_hf_184 )
 {
    try {
       auto mi = db.get_global_properties().parameters.maintenance_interval;
-      generate_blocks(HARDFORK_CORE_184_TIME - mi);
+      generate_blocks(HARDFORK_CORE_184_VERSION - mi);
       generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
 
       set_expiration( db, trx );
@@ -150,7 +150,7 @@ BOOST_AUTO_TEST_CASE( trade_amount_equals_zero_after_hf_184 )
 BOOST_AUTO_TEST_CASE( limit_limit_rounding_test1 )
 {
    try {
-      generate_blocks( HARDFORK_555_TIME );
+      generate_blocks( HARDFORK_555_VERSION );
       generate_block();
       set_expiration( db, trx );
 
@@ -215,7 +215,7 @@ BOOST_AUTO_TEST_CASE( limit_limit_rounding_test1_after_hf_342 )
 {
    try {
       auto mi = db.get_global_properties().parameters.maintenance_interval;
-      generate_blocks(HARDFORK_CORE_342_TIME - mi);
+      generate_blocks(HARDFORK_CORE_342_VERSION - mi);
       generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
 
       set_expiration( db, trx );
@@ -279,7 +279,7 @@ BOOST_AUTO_TEST_CASE( limit_limit_rounding_test1_after_hf_342 )
 BOOST_AUTO_TEST_CASE( limit_limit_rounding_test2 )
 {
    try {
-      generate_blocks( HARDFORK_555_TIME );
+      generate_blocks( HARDFORK_555_VERSION );
       generate_block();
       set_expiration( db, trx );
 
@@ -345,7 +345,7 @@ BOOST_AUTO_TEST_CASE( limit_limit_rounding_test2_after_hf_342 )
 {
    try {
       auto mi = db.get_global_properties().parameters.maintenance_interval;
-      generate_blocks(HARDFORK_CORE_342_TIME - mi);
+      generate_blocks(HARDFORK_CORE_342_VERSION - mi);
       generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
 
       set_expiration( db, trx );
@@ -408,7 +408,7 @@ BOOST_AUTO_TEST_CASE( limit_limit_rounding_test2_after_hf_342 )
  */
 BOOST_AUTO_TEST_CASE( issue_132_limit_and_call_test1 )
 { try { // matching a limit order with call order
-   generate_blocks( HARDFORK_555_TIME );
+   generate_blocks( HARDFORK_555_VERSION );
    generate_block();
 
    set_expiration( db, trx );
@@ -483,7 +483,7 @@ BOOST_AUTO_TEST_CASE( issue_132_limit_and_call_test1 )
  */
 BOOST_AUTO_TEST_CASE( issue_132_limit_and_call_test2 )
 { try {
-   generate_blocks( HARDFORK_555_TIME );
+   generate_blocks( HARDFORK_555_VERSION );
    generate_block();
 
    set_expiration( db, trx );
@@ -554,7 +554,7 @@ BOOST_AUTO_TEST_CASE( issue_132_limit_and_call_test2 )
  */
 BOOST_AUTO_TEST_CASE( issue_132_limit_and_call_test3 )
 { try {
-   generate_blocks( HARDFORK_555_TIME );
+   generate_blocks( HARDFORK_555_VERSION );
    generate_block();
 
    set_expiration( db, trx );
@@ -631,7 +631,7 @@ BOOST_AUTO_TEST_CASE( issue_132_limit_and_call_test3 )
 BOOST_AUTO_TEST_CASE( issue_132_limit_and_call_test1_after_hardfork )
 { try {
    auto mi = db.get_global_properties().parameters.maintenance_interval;
-   generate_blocks(HARDFORK_CORE_184_TIME - mi);
+   generate_blocks(HARDFORK_CORE_184_VERSION - mi);
    generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
 
    set_expiration( db, trx );
@@ -707,7 +707,7 @@ BOOST_AUTO_TEST_CASE( issue_132_limit_and_call_test1_after_hardfork )
 BOOST_AUTO_TEST_CASE( issue_132_limit_and_call_test2_after_hardfork )
 { try {
    auto mi = db.get_global_properties().parameters.maintenance_interval;
-   generate_blocks(HARDFORK_CORE_184_TIME - mi);
+   generate_blocks(HARDFORK_CORE_184_VERSION - mi);
    generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
 
    set_expiration( db, trx );
@@ -780,7 +780,7 @@ BOOST_AUTO_TEST_CASE( issue_132_limit_and_call_test2_after_hardfork )
 BOOST_AUTO_TEST_CASE( issue_132_limit_and_call_test3_after_hardfork )
 { try {
    auto mi = db.get_global_properties().parameters.maintenance_interval;
-   generate_blocks(HARDFORK_CORE_184_TIME - mi);
+   generate_blocks(HARDFORK_CORE_184_VERSION - mi);
    generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
 
    set_expiration( db, trx );
@@ -858,7 +858,7 @@ BOOST_AUTO_TEST_CASE( issue_132_limit_and_call_test3_after_hardfork )
  */
 BOOST_AUTO_TEST_CASE( limit_call_rounding_test1 )
 { try {
-   generate_blocks( HARDFORK_555_TIME );
+   generate_blocks( HARDFORK_555_VERSION );
    generate_block();
 
    set_expiration( db, trx );
@@ -929,7 +929,7 @@ BOOST_AUTO_TEST_CASE( limit_call_rounding_test1 )
 BOOST_AUTO_TEST_CASE( limit_call_rounding_test1_after_hf_342 )
 { try {
    auto mi = db.get_global_properties().parameters.maintenance_interval;
-   generate_blocks(HARDFORK_CORE_342_TIME - mi);
+   generate_blocks(HARDFORK_CORE_342_VERSION - mi);
    generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
 
    set_expiration( db, trx );
@@ -1003,7 +1003,7 @@ BOOST_AUTO_TEST_CASE( limit_call_rounding_test1_after_hf_342 )
  */
 BOOST_AUTO_TEST_CASE( limit_call_rounding_test2 )
 { try {
-   generate_blocks( HARDFORK_555_TIME );
+   generate_blocks( HARDFORK_555_VERSION );
    generate_block();
 
    set_expiration( db, trx );
@@ -1075,7 +1075,7 @@ BOOST_AUTO_TEST_CASE( limit_call_rounding_test2 )
 BOOST_AUTO_TEST_CASE( limit_call_rounding_test2_after_hf_342 )
 { try {
    auto mi = db.get_global_properties().parameters.maintenance_interval;
-   generate_blocks(HARDFORK_CORE_342_TIME - mi);
+   generate_blocks(HARDFORK_CORE_342_VERSION - mi);
    generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
 
    set_expiration( db, trx );
@@ -1146,7 +1146,7 @@ BOOST_AUTO_TEST_CASE( limit_call_rounding_test2_after_hf_342 )
  */
 BOOST_AUTO_TEST_CASE( call_limit_rounding_test1 )
 { try {
-   generate_blocks( HARDFORK_555_TIME );
+   generate_blocks( HARDFORK_555_VERSION );
    generate_block();
 
    set_expiration( db, trx );
@@ -1226,7 +1226,7 @@ BOOST_AUTO_TEST_CASE( call_limit_rounding_test1 )
 BOOST_AUTO_TEST_CASE( call_limit_rounding_test1_after_hf_342 )
 { try {
    auto mi = db.get_global_properties().parameters.maintenance_interval;
-   generate_blocks(HARDFORK_CORE_342_TIME - mi);
+   generate_blocks(HARDFORK_CORE_342_VERSION - mi);
    generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
 
    set_expiration( db, trx );
@@ -1305,7 +1305,7 @@ BOOST_AUTO_TEST_CASE( call_limit_rounding_test1_after_hf_342 )
  */
 BOOST_AUTO_TEST_CASE( call_limit_rounding_test2 )
 { try {
-   generate_blocks( HARDFORK_555_TIME );
+   generate_blocks( HARDFORK_555_VERSION );
    generate_block();
 
    set_expiration( db, trx );
@@ -1408,7 +1408,7 @@ BOOST_AUTO_TEST_CASE( call_limit_rounding_test2 )
 BOOST_AUTO_TEST_CASE( call_limit_rounding_test2_after_hf_342 )
 { try {
    auto mi = db.get_global_properties().parameters.maintenance_interval;
-   generate_blocks(HARDFORK_CORE_342_TIME - mi);
+   generate_blocks(HARDFORK_CORE_342_VERSION - mi);
    generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
 
    set_expiration( db, trx );

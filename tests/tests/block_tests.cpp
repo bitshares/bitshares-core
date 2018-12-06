@@ -23,6 +23,7 @@
  */
 
 #include <boost/test/unit_test.hpp>
+#include <graphene/chain/hardfork.hpp>
 
 #include <graphene/chain/database.hpp>
 #include <graphene/chain/exceptions.hpp>
@@ -1833,7 +1834,7 @@ BOOST_FIXTURE_TEST_CASE( temp_account_balance, database_fixture )
    sign( trx, alice_private_key );
    BOOST_CHECK_THROW( PUSH_TX( db, trx ), fc::assert_exception );
 
-   generate_blocks( HARDFORK_CORE_1040_TIME );
+   generate_blocks( HARDFORK_CORE_1040_VERSION );
 
    set_expiration( db, trx );
    trx.clear_signatures();
@@ -1930,5 +1931,98 @@ BOOST_FIXTURE_TEST_CASE( block_size_test, database_fixture )
       throw;
    }
 }
+
+BOOST_FIXTURE_TEST_CASE( version_test, database_fixture )
+{
+   BOOST_TEST_MESSAGE( ("VERSIONING TEST") );
+
+   BOOST_TEST_MESSAGE( ("\tBEFORE HF") );
+   {
+      signed_block head_block = generate_block();
+      BOOST_CHECK( !head_block.extensions.value.witness_running_version.valid() );
+   }
+
+   BOOST_TEST_MESSAGE( ("\tAFTER HF") );
+   {
+      // right before hardfork
+      generate_blocks( HARDFORK_TEST_VERSION - fc::seconds(1) );
+
+      auto num_active_witnesses = db.get_global_properties().active_witnesses.size();
+      flat_set< witness_id_type > allready_published;  
+
+      signed_block head_block;
+      // all witnesses must include their version into a block
+      while( allready_published.size() != num_active_witnesses )
+      {
+         head_block = generate_block();
+
+         bool version_was_set = head_block.extensions.value.witness_running_version.valid();
+         witness_id_type signed_witness = head_block.witness;
+         if( version_was_set )
+         {
+            if( allready_published.find(signed_witness) == allready_published.end() )
+            {
+               version v = *(head_block.extensions.value.witness_running_version);
+               // can only be true if GRAPHENE_BLOCKCHAIN_VERSION == HARDFORK_TEST_VERSION
+               BOOST_CHECK( v == HARDFORK_TEST_VERSION );
+               allready_published.insert( signed_witness );
+            }
+            else
+            {
+               BOOST_FAIL( "This witness has allready included its version in to a block.");
+            }
+         }
+      }
+      // try some more blocks; version should not be set here
+      for(int i = 0; i < 3; i++)
+      {
+         head_block = generate_block();
+         BOOST_CHECK( !head_block.extensions.value.witness_running_version.valid() );
+      }
+   }
+
+   BOOST_TEST_MESSAGE( ("OPERATOR TESTS") );
+   {
+      version v1 = HARDFORK_TEST_VERSION;
+      version v2 = HARDFORK_TEST_VERSION;
+
+      BOOST_TEST_MESSAGE( ("\tversion +- uint32_t") );
+      v1 = v1 + uint32_t(3);
+      v2 = version( v2.major(), v2.minor(), v2.patch(), v2.hardfork_time + uint32_t(3) ); 
+      BOOST_CHECK( v1.hardfork_time == v2.hardfork_time );
+
+      v1 = v1 - uint32_t(3);
+      v2 = version( v2.major(), v2.minor(), v2.patch(), v2.hardfork_time - uint32_t(3) ); 
+      BOOST_CHECK( v1.hardfork_time == v2.hardfork_time );
+
+      BOOST_TEST_MESSAGE( ("\tversion +-= uint32_t") );
+      v1 += uint32_t(3); 
+      v2.hardfork_time += uint32_t(3);
+      BOOST_CHECK( v1.hardfork_time == v2.hardfork_time );
+
+      v1 -= uint32_t(3);
+      v2.hardfork_time -= uint32_t(3);
+      BOOST_CHECK( v1.hardfork_time == v2.hardfork_time );
+
+      BOOST_TEST_MESSAGE( ("\tversion +- fc::microseconds") );
+      v1 = v1 + fc::seconds(3);
+      v2 = version(v2.major(), v2.minor(), v2.patch(), v2.hardfork_time + fc::seconds(3) );
+      BOOST_CHECK( v1.hardfork_time == v2.hardfork_time );
+
+      v1 = v1 - fc::seconds(3);
+      v2 = version(v2.major(), v2.minor(), v2.patch(), v2.hardfork_time - fc::seconds(3) );
+      BOOST_CHECK( v1.hardfork_time == v2.hardfork_time );
+
+      BOOST_TEST_MESSAGE( ("\tversion +-= fc::microseconds") );
+      v1 += fc::seconds(3);
+      v2.hardfork_time += fc::seconds(3);
+      BOOST_CHECK( v1.hardfork_time == v2.hardfork_time );
+
+      v1 -= fc::seconds(3);
+      v2.hardfork_time -= fc::seconds(3);
+      BOOST_CHECK( v1.hardfork_time == v2.hardfork_time );
+   }
+}
+
 
 BOOST_AUTO_TEST_SUITE_END()

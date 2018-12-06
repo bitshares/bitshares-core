@@ -111,7 +111,7 @@ struct swan_fixture : database_fixture {
     }
 
     void wait_for_hf_core_216() {
-      generate_blocks( HARDFORK_CORE_216_TIME );
+      generate_blocks( HARDFORK_CORE_216_VERSION );
       generate_block();
     }
 

@@ -1,5 +1,5 @@
 // bitshares-core issue #342
 // Mitigate rounding issue when matching orders
-#ifndef HARDFORK_CORE_342_TIME
-#define HARDFORK_CORE_342_TIME (fc::time_point_sec( 1532008920 )) // Thu, 19 Jul 2018 14:02:00 UTC
+#ifndef HARDFORK_CORE_342_VERSION
+#define HARDFORK_CORE_342_VERSION (graphene::chain::version(10,0,0, fc::time_point_sec( 1532008920 ) ) ) // Thu, 19 Jul 2018 14:02:00 UTC
 #endif

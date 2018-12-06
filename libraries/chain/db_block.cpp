@@ -306,7 +306,7 @@ processed_transaction database::push_proposal(const proposal_object& proposal)
       remove(proposal);
       session.merge();
    } catch ( const fc::exception& e ) {
-      if( head_block_time() <= HARDFORK_483_TIME )
+      if( head_block_time() <= HARDFORK_483_VERSION )
       {
          for( size_t i=old_applied_ops_size,n=_applied_ops.size(); i<n; i++ )
          {
@@ -449,7 +449,18 @@ signed_block database::_generate_block(
    pending_block.timestamp = when;
    pending_block.transaction_merkle_root = pending_block.calculate_merkle_root();
    pending_block.witness = witness_id;
-
+   
+   // TODO change to next hardfork version
+   if( when >= HARDFORK_TEST_VERSION ) 
+   {
+      // inserts the version in to the block if the witness running_version changed
+      if( witness_obj.running_version != GRAPHENE_BLOCKCHAIN_VERSION )
+      {
+         pending_block.extensions.value.witness_running_version = optional<version>(GRAPHENE_BLOCKCHAIN_VERSION);
+      }
+   }
+   
+   
    if( !(skip & skip_witness_signature) )
       pending_block.sign( block_signing_private_key );
 
@@ -558,6 +569,20 @@ void database::_apply_block( const signed_block& next_block )
    _current_trx_in_block = 0;
 
    _issue_453_affected_assets.clear();
+
+   // TODO change HARDFORK_TEST_VERSION to next HF version
+   if( next_block.timestamp >= HARDFORK_TEST_VERSION )
+   {
+      // modifies the witness running version and sets it to the new one
+      if( signing_witness.running_version != GRAPHENE_BLOCKCHAIN_VERSION )
+      {
+         modify( signing_witness, [&] ( witness_object& wit_obj ) 
+         {
+            // witness_running_version was set in _generate_block()
+            wit_obj.running_version = *(next_block.extensions.value.witness_running_version);
+         } );
+      }
+   }
 
    for( const auto& trx : next_block.transactions )
    {
@@ -683,7 +708,7 @@ processed_transaction database::_apply_transaction(const signed_transaction& trx
    }
    ptrx.operation_results = std::move(eval_state.operation_results);
 
-   if( head_block_time() < HARDFORK_CORE_1040_TIME ) // TODO totally remove this code block after hard fork
+   if( head_block_time() < HARDFORK_CORE_1040_VERSION ) // TODO totally remove this code block after hard fork
    {
       //Make sure the temp account has no non-zero balances
       const auto& index = get_index_type<account_balance_index>().indices().get<by_account_asset>();

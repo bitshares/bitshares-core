@@ -1,4 +1,4 @@
 // #516 Special authorities
-#ifndef HARDFORK_516_TIME
-#define HARDFORK_516_TIME (fc::time_point_sec( 1456250400 ))
+#ifndef HARDFORK_516_VERSION
+#define HARDFORK_516_VERSION (graphene::chain::version(6,0,0, fc::time_point_sec( 1456250400 ) ) ) 
 #endif

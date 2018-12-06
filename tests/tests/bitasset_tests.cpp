@@ -148,13 +148,13 @@ BOOST_AUTO_TEST_CASE( reset_backing_asset_on_witness_asset )
        // do a maintenance block
       generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
       // generate blocks until close to hard fork
-      generate_blocks( HARDFORK_CORE_868_890_TIME - fc::hours(1) );
+      generate_blocks( HARDFORK_CORE_868_890_VERSION - fc::hours(1) );
     */
 
    BOOST_TEST_MESSAGE("Advance to near hard fork");
    auto maint_interval = db.get_global_properties().parameters.maintenance_interval;
-   generate_blocks( HARDFORK_CORE_868_890_TIME - maint_interval);
-   trx.set_expiration(HARDFORK_CORE_868_890_TIME - fc::seconds(1));
+   generate_blocks( HARDFORK_CORE_868_890_VERSION - maint_interval);
+   trx.set_expiration(HARDFORK_CORE_868_890_VERSION.hardfork_time - fc::seconds(1));
 
    BOOST_TEST_MESSAGE("Create USDBIT");
    asset_id_type bit_usd_id = create_bitasset("USDBIT").id;
@@ -247,8 +247,8 @@ BOOST_AUTO_TEST_CASE( reset_backing_asset_on_witness_asset )
    }
    {
       BOOST_TEST_MESSAGE("Advance to after hard fork");
-      generate_blocks( HARDFORK_CORE_868_890_TIME + fc::seconds(1));
-      trx.set_expiration(HARDFORK_CORE_868_890_TIME + fc::hours(2));
+      generate_blocks( HARDFORK_CORE_868_890_VERSION + fc::seconds(1));
+      trx.set_expiration(HARDFORK_CORE_868_890_VERSION.hardfork_time + fc::hours(2));
 
       BOOST_TEST_MESSAGE("After hardfork, 1 feed should have been erased");
       const asset_bitasset_data_object& jmj_obj = bit_jmj_id(db).bitasset_data(db);
@@ -284,8 +284,8 @@ BOOST_AUTO_TEST_CASE( reset_backing_asset_on_non_witness_asset )
 
    BOOST_TEST_MESSAGE("Advance to near hard fork");
    auto maint_interval = db.get_global_properties().parameters.maintenance_interval;
-   generate_blocks( HARDFORK_CORE_868_890_TIME - maint_interval);
-   trx.set_expiration(HARDFORK_CORE_868_890_TIME - fc::seconds(1));
+   generate_blocks( HARDFORK_CORE_868_890_VERSION - maint_interval);
+   trx.set_expiration(HARDFORK_CORE_868_890_VERSION.hardfork_time - fc::seconds(1));
 
 
    BOOST_TEST_MESSAGE("Create USDBIT");
@@ -383,8 +383,8 @@ BOOST_AUTO_TEST_CASE( reset_backing_asset_on_non_witness_asset )
    }
    {
       BOOST_TEST_MESSAGE("Advance to past hard fork");
-      generate_blocks( HARDFORK_CORE_868_890_TIME + maint_interval);
-      trx.set_expiration(HARDFORK_CORE_868_890_TIME + fc::hours(48));
+      generate_blocks( HARDFORK_CORE_868_890_VERSION + maint_interval);
+      trx.set_expiration(HARDFORK_CORE_868_890_VERSION.hardfork_time + fc::hours(48));
 
       BOOST_TEST_MESSAGE("Verify that the incorrect feeds have been corrected");
       const asset_bitasset_data_object& jmj_obj = bit_jmj_id(db).bitasset_data(db);
@@ -451,7 +451,7 @@ BOOST_AUTO_TEST_CASE( hf_890_test )
                  | database::skip_authority_check
                  | database::skip_merkle_check
                  ;
-   generate_blocks(HARDFORK_615_TIME, true, skip); // get around Graphene issue #615 feed expiration bug
+   generate_blocks(HARDFORK_615_VERSION, true, skip); // get around Graphene issue #615 feed expiration bug
    generate_blocks(db.get_dynamic_global_properties().next_maintenance_time, true, skip);
 
    for( int i=0; i<2; ++i )
@@ -461,7 +461,7 @@ BOOST_AUTO_TEST_CASE( hf_890_test )
 
       if( i == 1 ) // go beyond hard fork
       {
-         blocks += generate_blocks(HARDFORK_CORE_868_890_TIME - mi, true, skip);
+         blocks += generate_blocks(HARDFORK_CORE_868_890_VERSION - mi, true, skip);
          blocks += generate_blocks(db.get_dynamic_global_properties().next_maintenance_time, true, skip);
       }
       set_expiration( db, trx );
@@ -527,7 +527,7 @@ BOOST_AUTO_TEST_CASE( hf_890_test )
          ba_op.asset_to_update = usd_id;
          ba_op.issuer = asset_to_update.issuer;
          ba_op.new_options = asset_to_update.bitasset_data(db).options;
-         ba_op.new_options.feed_lifetime_sec = HARDFORK_CORE_868_890_TIME.sec_since_epoch()
+         ba_op.new_options.feed_lifetime_sec = HARDFORK_CORE_868_890_VERSION.hardfork_time.sec_since_epoch()
                                              - db.head_block_time().sec_since_epoch()
                                              + mi
                                              + 1800;
@@ -543,7 +543,7 @@ BOOST_AUTO_TEST_CASE( hf_890_test )
          BOOST_CHECK( db.find<limit_order_object>( sell_id ) );
 
          // go beyond hard fork
-         blocks += generate_blocks(HARDFORK_CORE_868_890_TIME - mi, true, skip);
+         blocks += generate_blocks(HARDFORK_CORE_868_890_VERSION - mi, true, skip);
          blocks += generate_blocks(db.get_dynamic_global_properties().next_maintenance_time, true, skip);
       }
 
@@ -627,8 +627,8 @@ BOOST_AUTO_TEST_CASE( bitasset_evaluator_test_before_922_931 )
 {
    BOOST_TEST_MESSAGE("Advance to near hard fork 922 / 931");
    auto global_params = db.get_global_properties().parameters;
-   generate_blocks( HARDFORK_CORE_922_931_TIME - global_params.maintenance_interval );
-   trx.set_expiration( HARDFORK_CORE_922_931_TIME - global_params.maintenance_interval + global_params.maximum_time_until_expiration );
+   generate_blocks( HARDFORK_CORE_922_931_VERSION - global_params.maintenance_interval );
+   trx.set_expiration( HARDFORK_CORE_922_931_VERSION.hardfork_time - global_params.maintenance_interval + global_params.maximum_time_until_expiration );
 
    ACTORS( (nathan) (john) );
 
@@ -773,8 +773,8 @@ BOOST_AUTO_TEST_CASE( bitasset_evaluator_test_after_922_931 )
 {
    BOOST_TEST_MESSAGE("Advance to after hard fork 922 / 931");
    auto global_params = db.get_global_properties().parameters;
-   generate_blocks( HARDFORK_CORE_922_931_TIME + global_params.maintenance_interval );
-   trx.set_expiration( HARDFORK_CORE_922_931_TIME + global_params.maintenance_interval + global_params.maximum_time_until_expiration );
+   generate_blocks( HARDFORK_CORE_922_931_VERSION + global_params.maintenance_interval );
+   trx.set_expiration( HARDFORK_CORE_922_931_VERSION.hardfork_time + global_params.maintenance_interval + global_params.maximum_time_until_expiration );
 
    ACTORS( (nathan) (john) );
 
@@ -921,7 +921,7 @@ BOOST_AUTO_TEST_CASE( hf_935_test )
                  | database::skip_authority_check
                  | database::skip_merkle_check
                  ;
-   generate_blocks( HARDFORK_615_TIME, true, skip ); // get around Graphene issue #615 feed expiration bug
+   generate_blocks( HARDFORK_615_VERSION, true, skip ); // get around Graphene issue #615 feed expiration bug
    generate_blocks( db.get_dynamic_global_properties().next_maintenance_time, true, skip );
    generate_block( skip );
 
@@ -933,12 +933,12 @@ BOOST_AUTO_TEST_CASE( hf_935_test )
 
       if( i == 2 ) // go beyond hard fork 890
       {
-         generate_blocks( HARDFORK_CORE_868_890_TIME - mi, true, skip );
+         generate_blocks( HARDFORK_CORE_868_890_VERSION - mi, true, skip );
          generate_blocks( db.get_dynamic_global_properties().next_maintenance_time, true, skip );
       }
       else if( i == 4 ) // go beyond hard fork 935
       {
-         generate_blocks( HARDFORK_CORE_935_TIME - mi, true, skip );
+         generate_blocks( HARDFORK_CORE_935_VERSION - mi, true, skip );
          generate_blocks( db.get_dynamic_global_properties().next_maintenance_time, true, skip );
       }
       set_expiration( db, trx );
@@ -1051,7 +1051,7 @@ BOOST_AUTO_TEST_CASE( hf_935_test )
          ba_op.asset_to_update = usd_id;
          ba_op.issuer = asset_to_update.issuer;
          ba_op.new_options = asset_to_update.bitasset_data(db).options;
-         ba_op.new_options.feed_lifetime_sec = HARDFORK_CORE_935_TIME.sec_since_epoch()
+         ba_op.new_options.feed_lifetime_sec = HARDFORK_CORE_935_VERSION.hardfork_time.sec_since_epoch()
                                              + mi * 3 + 86400 * 2
                                              - db.head_block_time().sec_since_epoch();
          trx.operations.push_back(ba_op);
@@ -1072,18 +1072,18 @@ BOOST_AUTO_TEST_CASE( hf_935_test )
          BOOST_CHECK( db.find<limit_order_object>( sell_id ) );
 
          // go beyond hard fork 890
-         blocks += generate_blocks( HARDFORK_CORE_868_890_TIME - mi, true, skip );
-         bool was_before_hf_343 = ( db.get_dynamic_global_properties().next_maintenance_time <= HARDFORK_CORE_343_TIME );
+         blocks += generate_blocks( HARDFORK_CORE_868_890_VERSION - mi, true, skip );
+         bool was_before_hf_343 = ( db.get_dynamic_global_properties().next_maintenance_time <= HARDFORK_CORE_343_VERSION );
 
          blocks += generate_blocks( db.get_dynamic_global_properties().next_maintenance_time, true, skip );
-         bool now_after_hf_343 = ( db.get_dynamic_global_properties().next_maintenance_time > HARDFORK_CORE_343_TIME );
+         bool now_after_hf_343 = ( db.get_dynamic_global_properties().next_maintenance_time > HARDFORK_CORE_343_VERSION );
 
          if( was_before_hf_343 && now_after_hf_343 ) // if hf 343 executed at same maintenance interval, actually after hf 890
             affected_by_hf_343 = true;
       }
 
       // after hard fork 890, if it's before hard fork 935
-      if( db.get_dynamic_global_properties().next_maintenance_time <= HARDFORK_CORE_935_TIME )
+      if( db.get_dynamic_global_properties().next_maintenance_time <= HARDFORK_CORE_935_VERSION )
       {
          // median should have changed
          BOOST_CHECK( usd_id(db).bitasset_data(db).current_feed.settlement_price == current_feed.settlement_price );
@@ -1100,7 +1100,7 @@ BOOST_AUTO_TEST_CASE( hf_935_test )
             BOOST_CHECK( db.find<limit_order_object>( sell_id ) );
 
          // go beyond hard fork 935
-         blocks += generate_blocks(HARDFORK_CORE_935_TIME - mi, true, skip);
+         blocks += generate_blocks(HARDFORK_CORE_935_VERSION - mi, true, skip);
          blocks += generate_blocks(db.get_dynamic_global_properties().next_maintenance_time, true, skip);
       }
 
@@ -1219,8 +1219,8 @@ BOOST_AUTO_TEST_CASE( reset_backing_asset_switching_to_witness_fed )
 
    BOOST_TEST_MESSAGE("Advance to near hard fork");
    auto maint_interval = db.get_global_properties().parameters.maintenance_interval;
-   generate_blocks( HARDFORK_CORE_868_890_TIME - maint_interval);
-   trx.set_expiration(HARDFORK_CORE_868_890_TIME - fc::seconds(1));
+   generate_blocks( HARDFORK_CORE_868_890_VERSION - maint_interval);
+   trx.set_expiration(HARDFORK_CORE_868_890_VERSION - fc::seconds(1));
 
 
    BOOST_TEST_MESSAGE("Create USDBIT");
@@ -1326,8 +1326,8 @@ BOOST_AUTO_TEST_CASE( reset_backing_asset_switching_to_witness_fed )
    }
    {
       BOOST_TEST_MESSAGE("Advance to past hard fork");
-      generate_blocks( HARDFORK_CORE_868_890_TIME + maint_interval);
-      trx.set_expiration(HARDFORK_CORE_868_890_TIME + fc::hours(48));
+      generate_blocks( HARDFORK_CORE_868_890_VERSION + maint_interval);
+      trx.set_expiration(HARDFORK_CORE_868_890_VERSION + fc::hours(48));
 
       BOOST_TEST_MESSAGE("Verify that the incorrect feeds have been removed");
       const asset_bitasset_data_object& jmj_obj = bit_jmj_id(db).bitasset_data(db);

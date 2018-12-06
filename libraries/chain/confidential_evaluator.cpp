@@ -73,7 +73,7 @@ void_result transfer_to_blind_evaluator::do_apply( const transfer_to_blind_opera
 
 void transfer_to_blind_evaluator::pay_fee()
 {
-   if( db().head_block_time() >= HARDFORK_563_TIME )
+   if( db().head_block_time() >= HARDFORK_563_VERSION )
       pay_fba_fee( fba_accumulator_id_transfer_to_blind );
    else
       generic_evaluator::pay_fee();
@@ -117,7 +117,7 @@ void_result transfer_from_blind_evaluator::do_apply( const transfer_from_blind_o
 
 void transfer_from_blind_evaluator::pay_fee()
 {
-   if( db().head_block_time() >= HARDFORK_563_TIME )
+   if( db().head_block_time() >= HARDFORK_563_VERSION )
       pay_fba_fee( fba_accumulator_id_transfer_from_blind );
    else
       generic_evaluator::pay_fee();
@@ -174,7 +174,7 @@ void_result blind_transfer_evaluator::do_apply( const blind_transfer_operation& 
 
 void blind_transfer_evaluator::pay_fee()
 {
-   if( db().head_block_time() >= HARDFORK_563_TIME )
+   if( db().head_block_time() >= HARDFORK_563_VERSION )
       pay_fba_fee( fba_accumulator_id_blind_transfer );
    else
       generic_evaluator::pay_fee();
