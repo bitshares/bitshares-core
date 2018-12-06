@@ -36,54 +36,54 @@ BOOST_AUTO_TEST_SUITE( custom_authority )
 
 BOOST_AUTO_TEST_CASE( validation_for_correct_operation_name_is_passed )
 {
-	custom_authority_object authority;
-	
-	authority.operation_name = "graphene::chain::transfer_operation";
-	BOOST_CHECK(authority.validate(transfer_operation(), time_point_sec(0)));
-	
-	authority.operation_name = "graphene::chain::asset_create_operation";
-	BOOST_CHECK(authority.validate(asset_create_operation(), time_point_sec(0)));
+   custom_authority_object authority;
+   
+   authority.operation_name = "graphene::chain::transfer_operation";
+   BOOST_CHECK(authority.validate(transfer_operation(), time_point_sec(0)));
+   
+   authority.operation_name = "graphene::chain::asset_create_operation";
+   BOOST_CHECK(authority.validate(asset_create_operation(), time_point_sec(0)));
 }
 
 BOOST_AUTO_TEST_CASE( validation_for_wrong_operation_name_is_failed )
 {
-	custom_authority_object authority;
-	
-	authority.operation_name = "graphene::chain::asset_create_operation";
-	BOOST_CHECK(!authority.validate(transfer_operation(), time_point_sec(0)));
-	
-	authority.operation_name = "graphene::chain::transfer_operation";
-	BOOST_CHECK(!authority.validate(asset_create_operation(), time_point_sec(0)));
+   custom_authority_object authority;
+   
+   authority.operation_name = "graphene::chain::asset_create_operation";
+   BOOST_CHECK(!authority.validate(transfer_operation(), time_point_sec(0)));
+   
+   authority.operation_name = "graphene::chain::transfer_operation";
+   BOOST_CHECK(!authority.validate(asset_create_operation(), time_point_sec(0)));
 }
 
 BOOST_AUTO_TEST_CASE( validation_fails_when_now_is_after_valid_period )
 {
-	custom_authority_object authority;
-	
-	authority.operation_name = "graphene::chain::transfer_operation";
-	authority.valid_from = time_point_sec(0);
-	authority.valid_to = time_point_sec(5);
-	BOOST_CHECK(!authority.validate(transfer_operation(), time_point_sec(6)));
+   custom_authority_object authority;
+   
+   authority.operation_name = "graphene::chain::transfer_operation";
+   authority.valid_from = time_point_sec(0);
+   authority.valid_to = time_point_sec(5);
+   BOOST_CHECK(!authority.validate(transfer_operation(), time_point_sec(6)));
 }
 
 BOOST_AUTO_TEST_CASE( validation_fails_when_now_is_before_valid_period )
 {
-	graphene::chain::custom_authority_object authority;
-	
-	authority.operation_name = "graphene::chain::transfer_operation";
-	authority.valid_from = time_point_sec(3);
-	authority.valid_to = time_point_sec(5);
-	BOOST_CHECK(!authority.validate(transfer_operation(), time_point_sec(1)));
+   graphene::chain::custom_authority_object authority;
+   
+   authority.operation_name = "graphene::chain::transfer_operation";
+   authority.valid_from = time_point_sec(3);
+   authority.valid_to = time_point_sec(5);
+   BOOST_CHECK(!authority.validate(transfer_operation(), time_point_sec(1)));
 }
 
 BOOST_AUTO_TEST_CASE( validation_passes_when_now_is_in_valid_period )
 {
-	custom_authority_object authority;
-	
-	authority.operation_name = "graphene::chain::transfer_operation";
-	authority.valid_from = time_point_sec(3);
-	authority.valid_to = time_point_sec(5);
-	BOOST_CHECK(authority.validate(transfer_operation(), time_point_sec(4)));
+   custom_authority_object authority;
+   
+   authority.operation_name = "graphene::chain::transfer_operation";
+   authority.valid_from = time_point_sec(3);
+   authority.valid_to = time_point_sec(5);
+   BOOST_CHECK(authority.validate(transfer_operation(), time_point_sec(4)));
 }
 
 BOOST_AUTO_TEST_SUITE_END()
@@ -92,218 +92,218 @@ BOOST_AUTO_TEST_SUITE( custom_authority_restrictions )
 
 BOOST_AUTO_TEST_CASE( validation_passes_for_eq_restriction_when_assets_are_equal )
 {
-	transfer_operation operation;
-	operation.amount = asset(5);
-	
-	eq_restriction restriction;
-	restriction.value = asset(5);
-	restriction.argument = "amount";
-	
-	BOOST_CHECK(restriction.validate(operation));
+   transfer_operation operation;
+   operation.amount = asset(5);
+   
+   eq_restriction restriction;
+   restriction.value = asset(5);
+   restriction.argument = "amount";
+   
+   BOOST_CHECK(restriction.validate(operation));
 }
 
 BOOST_AUTO_TEST_CASE( validation_fails_for_eq_restriction_when_assets_are_not_equal )
 {
-	transfer_operation operation;
-	operation.amount = asset(5);
-	
-	eq_restriction restriction;
-	restriction.value = asset(6);
-	restriction.argument = "amount";
-	
-	BOOST_CHECK(!restriction.validate(operation));
+   transfer_operation operation;
+   operation.amount = asset(5);
+   
+   eq_restriction restriction;
+   restriction.value = asset(6);
+   restriction.argument = "amount";
+   
+   BOOST_CHECK(!restriction.validate(operation));
 }
 
 BOOST_AUTO_TEST_CASE( validation_fails_for_eq_restriction_when_comparing_asset_and_account )
 {
-	transfer_operation operation;
-	operation.amount = asset(5);
-	
-	eq_restriction restriction;
-	restriction.value = account_id_type(1);
-	restriction.argument = "amount";
-	
-	BOOST_CHECK(!restriction.validate(operation));
+   transfer_operation operation;
+   operation.amount = asset(5);
+   
+   eq_restriction restriction;
+   restriction.value = account_id_type(1);
+   restriction.argument = "amount";
+   
+   BOOST_CHECK(!restriction.validate(operation));
 }
 
 BOOST_AUTO_TEST_CASE( validation_passes_for_neq_restriction_when_assets_are_not_equal )
 {
-	transfer_operation operation;
-	operation.amount = asset(5);
-	
-	neq_restriction restriction;
-	restriction.value = asset(6);
-	restriction.argument = "amount";
-	
-	BOOST_CHECK(restriction.validate(operation));
+   transfer_operation operation;
+   operation.amount = asset(5);
+   
+   neq_restriction restriction;
+   restriction.value = asset(6);
+   restriction.argument = "amount";
+   
+   BOOST_CHECK(restriction.validate(operation));
 }
 
 BOOST_AUTO_TEST_CASE( validation_fails_for_neq_restriction_when_assets_are_equal )
 {
-	transfer_operation operation;
-	operation.amount = asset(5);
-	
-	neq_restriction restriction;
-	restriction.value = asset(5);
-	restriction.argument = "amount";
-	
-	BOOST_CHECK(!restriction.validate(operation));
+   transfer_operation operation;
+   operation.amount = asset(5);
+   
+   neq_restriction restriction;
+   restriction.value = asset(5);
+   restriction.argument = "amount";
+   
+   BOOST_CHECK(!restriction.validate(operation));
 }
 
 BOOST_AUTO_TEST_CASE( validation_fails_for_neq_restriction_when_comparing_different_types )
 {
-	transfer_operation operation;
-	operation.amount = asset(5);
-	
-	neq_restriction restriction;
-	restriction.value = account_id_type(1);
-	restriction.argument = "amount";
-	
-	BOOST_CHECK(!restriction.validate(operation));
+   transfer_operation operation;
+   operation.amount = asset(5);
+   
+   neq_restriction restriction;
+   restriction.value = account_id_type(1);
+   restriction.argument = "amount";
+   
+   BOOST_CHECK(!restriction.validate(operation));
 }
 
 BOOST_AUTO_TEST_CASE( validation_passes_for_any_restriction_when_argument_value_is_present_in_the_list_with_single_value)
 {
-	transfer_operation operation;
-	operation.amount = asset(5);
-	
-	any_restriction restriction;
-	restriction.values = {asset(5)};
-	restriction.argument = "amount";
-	
-	BOOST_CHECK(restriction.validate(operation));
+   transfer_operation operation;
+   operation.amount = asset(5);
+   
+   any_restriction restriction;
+   restriction.values = {asset(5)};
+   restriction.argument = "amount";
+   
+   BOOST_CHECK(restriction.validate(operation));
 }
 
 BOOST_AUTO_TEST_CASE( validation_passes_for_any_restriction_when_argument_value_is_present_in_the_list_with_several_values )
 {
-	transfer_operation operation;
-	operation.amount = asset(5);
-	
-	any_restriction restriction;
-	restriction.values = {asset(1), asset(2), asset(5)};
-	restriction.argument = "amount";
-	
-	BOOST_CHECK(restriction.validate(operation));
+   transfer_operation operation;
+   operation.amount = asset(5);
+   
+   any_restriction restriction;
+   restriction.values = {asset(1), asset(2), asset(5)};
+   restriction.argument = "amount";
+   
+   BOOST_CHECK(restriction.validate(operation));
 }
 
 BOOST_AUTO_TEST_CASE( validation_fails_for_any_restriction_when_argument_value_is_not_present_in_the_list_with_several_values )
 {
-	transfer_operation operation;
-	operation.amount = asset(5);
-	
-	any_restriction restriction;
-	restriction.values = {asset(1), asset(2), asset(3)};
-	restriction.argument = "amount";
-	
-	BOOST_CHECK(!restriction.validate(operation));
+   transfer_operation operation;
+   operation.amount = asset(5);
+   
+   any_restriction restriction;
+   restriction.values = {asset(1), asset(2), asset(3)};
+   restriction.argument = "amount";
+   
+   BOOST_CHECK(!restriction.validate(operation));
 }
 
 BOOST_AUTO_TEST_CASE( validation_passes_for_none_restriction_when_argument_value_is_not_present_in_the_empty_list)
 {
-	transfer_operation operation;
-	operation.amount = asset(4);
-	
-	none_restriction restriction;
-	restriction.values = {};
-	restriction.argument = "amount";
-	
-	BOOST_CHECK(restriction.validate(operation));
+   transfer_operation operation;
+   operation.amount = asset(4);
+   
+   none_restriction restriction;
+   restriction.values = {};
+   restriction.argument = "amount";
+   
+   BOOST_CHECK(restriction.validate(operation));
 }
 
 BOOST_AUTO_TEST_CASE( validation_passes_for_none_restriction_when_argument_value_is_not_present_in_list)
 {
-	transfer_operation operation;
-	operation.amount = asset(4);
-	
-	none_restriction restriction;
-	restriction.values = {asset(1), asset(2)};
-	restriction.argument = "amount";
-	
-	BOOST_CHECK(restriction.validate(operation));
+   transfer_operation operation;
+   operation.amount = asset(4);
+   
+   none_restriction restriction;
+   restriction.values = {asset(1), asset(2)};
+   restriction.argument = "amount";
+   
+   BOOST_CHECK(restriction.validate(operation));
 }
 
 BOOST_AUTO_TEST_CASE( validation_fails_for_none_restriction_when_argument_value_is_present_in_list)
 {
-	transfer_operation operation;
-	operation.amount = asset(2);
-	
-	none_restriction restriction;
-	restriction.values = {asset(1), asset(2), asset(3)};
-	restriction.argument = "amount";
-	
-	BOOST_CHECK(!restriction.validate(operation));
+   transfer_operation operation;
+   operation.amount = asset(2);
+   
+   none_restriction restriction;
+   restriction.values = {asset(1), asset(2), asset(3)};
+   restriction.argument = "amount";
+   
+   BOOST_CHECK(!restriction.validate(operation));
 }
 
 BOOST_AUTO_TEST_CASE( validation_passes_for_conatins_all_restriction_when_argument_contains_list_values)
 {
-	assert_operation operation;
-	operation.required_auths = {account_id_type(1), account_id_type(2), account_id_type(3)};
-	
-	contains_all_restriction restriction;
-	restriction.values = {account_id_type(1), account_id_type(2), account_id_type(3)};
-	restriction.argument = "required_auths";
-	
-	BOOST_CHECK(restriction.validate(operation));
+   assert_operation operation;
+   operation.required_auths = {account_id_type(1), account_id_type(2), account_id_type(3)};
+   
+   contains_all_restriction restriction;
+   restriction.values = {account_id_type(1), account_id_type(2), account_id_type(3)};
+   restriction.argument = "required_auths";
+   
+   BOOST_CHECK(restriction.validate(operation));
 }
 
 BOOST_AUTO_TEST_CASE( validation_failes_for_conatins_all_restriction_when_argument_contains_subset_of_list_values)
 {
-	assert_operation operation;
-	operation.required_auths = {account_id_type(1), account_id_type(2), account_id_type(3)};
-	
-	contains_all_restriction restriction;
-	restriction.values = {account_id_type(0), account_id_type(1), account_id_type(2), account_id_type(3), account_id_type(4)};
-	restriction.argument = "required_auths";
-	
-	BOOST_CHECK(!restriction.validate(operation));
+   assert_operation operation;
+   operation.required_auths = {account_id_type(1), account_id_type(2), account_id_type(3)};
+   
+   contains_all_restriction restriction;
+   restriction.values = {account_id_type(0), account_id_type(1), account_id_type(2), account_id_type(3), account_id_type(4)};
+   restriction.argument = "required_auths";
+   
+   BOOST_CHECK(!restriction.validate(operation));
 }
 
 BOOST_AUTO_TEST_CASE( validation_passes_for_conatins_all_restriction_when_argument_contains_superset_of_list_values)
 {
-	assert_operation operation;
-	operation.required_auths = {account_id_type(0), account_id_type(1), account_id_type(2), account_id_type(3), account_id_type(4)};
-	
-	contains_all_restriction restriction;
-	restriction.values = {account_id_type(1), account_id_type(2), account_id_type(3)};
-	restriction.argument = "required_auths";
-	
-	BOOST_CHECK(restriction.validate(operation));
+   assert_operation operation;
+   operation.required_auths = {account_id_type(0), account_id_type(1), account_id_type(2), account_id_type(3), account_id_type(4)};
+   
+   contains_all_restriction restriction;
+   restriction.values = {account_id_type(1), account_id_type(2), account_id_type(3)};
+   restriction.argument = "required_auths";
+   
+   BOOST_CHECK(restriction.validate(operation));
 }
 
 BOOST_AUTO_TEST_CASE( validation_passes_for_contains_none_restriction_when_argument_not_contains_any_of_list_values)
 {
-	assert_operation operation;
-	operation.required_auths = {account_id_type(0), account_id_type(1), account_id_type(2)};
-	
-	contains_none_restriction restriction;
-	restriction.values = {account_id_type(3), account_id_type(4)};
-	restriction.argument = "required_auths";
-	
-	BOOST_CHECK(restriction.validate(operation));
+   assert_operation operation;
+   operation.required_auths = {account_id_type(0), account_id_type(1), account_id_type(2)};
+   
+   contains_none_restriction restriction;
+   restriction.values = {account_id_type(3), account_id_type(4)};
+   restriction.argument = "required_auths";
+   
+   BOOST_CHECK(restriction.validate(operation));
 }
 
 BOOST_AUTO_TEST_CASE( validation_fails_for_contains_none_restriction_when_argument_contained_any_of_list_values)
 {
-	assert_operation operation;
-	operation.required_auths = {account_id_type(0), account_id_type(1), account_id_type(2)};
-	
-	contains_none_restriction restriction;
-	restriction.values = {account_id_type(1)};
-	restriction.argument = "required_auths";
-	
-	BOOST_CHECK(!restriction.validate(operation));
+   assert_operation operation;
+   operation.required_auths = {account_id_type(0), account_id_type(1), account_id_type(2)};
+   
+   contains_none_restriction restriction;
+   restriction.values = {account_id_type(1)};
+   restriction.argument = "required_auths";
+   
+   BOOST_CHECK(!restriction.validate(operation));
 }
 
 BOOST_AUTO_TEST_CASE( validation_fails_for_contains_none_restriction_when_argument_contained_several_of_list_values)
 {
-	assert_operation operation;
-	operation.required_auths = {account_id_type(0), account_id_type(1), account_id_type(2)};
-	
-	contains_none_restriction restriction;
-	restriction.values = {account_id_type(1), account_id_type(2)};
-	restriction.argument = "required_auths";
-	
-	BOOST_CHECK(!restriction.validate(operation));
+   assert_operation operation;
+   operation.required_auths = {account_id_type(0), account_id_type(1), account_id_type(2)};
+   
+   contains_none_restriction restriction;
+   restriction.values = {account_id_type(1), account_id_type(2)};
+   restriction.argument = "required_auths";
+   
+   BOOST_CHECK(!restriction.validate(operation));
 }
 
 BOOST_AUTO_TEST_SUITE_END()
