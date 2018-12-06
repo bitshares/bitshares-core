@@ -42,7 +42,7 @@ struct base_restriction
 			fc::reflector<Operation>::visit(visitor);
 			return true;
 		}
-		catch (...)
+		catch (const fc::exception&)
 		{
 			return false;
 		}
@@ -64,7 +64,7 @@ struct base_list_restriction
 			fc::reflector<Operation>::visit(visitor);
 			return true;
 		}
-		catch (const fc::exception& e)
+		catch (const fc::exception&)
 		{
 			return false;
 		}
