@@ -194,6 +194,10 @@ namespace graphene { namespace db {
     *  @brief A secondary index that tracks objects in vectors indexed by object
     *  id. It is meant for fully (or almost fully) populated indexes only (will
     *  fail when loading an object_database with large gaps).
+    *
+    *  WARNING! If any of the methods called on insertion, removal or
+    *  modification throws, subsequent behaviour is undefined! Such exceptions
+    *  indicate that this index type is not appropriate for the use-case.
     */
    template<typename Object, uint8_t chunkbits>
    class direct_index : public secondary_index
@@ -205,6 +209,7 @@ namespace graphene { namespace db {
          static const size_t _mask = ((1 << chunkbits) - 1);
          size_t next = 0;
          vector< vector< const Object* > > content;
+         object_id_type id_being_modified;
 
       public:
          direct_index() {
@@ -254,13 +259,23 @@ namespace graphene { namespace db {
             content[instance >> chunkbits][instance & _mask] = nullptr;
          }
 
+         virtual void about_to_modify( const object& before )
+         {
+            id_being_modified = before.id;
+         }
+
+         virtual void object_modified( const object& after  )
+         {
+            FC_ASSERT( id_being_modified == after.id, "Modification of ID is not supported!");
+         }
+
          template< typename object_id >
          const Object* find( const object_id& id )const
          {
             static_assert( object_id::space_id == Object::space_id, "Space ID mismatch!" );
             static_assert( object_id::type_id == Object::type_id, "Type_ID mismatch!" );
             if( id.instance >= next ) return nullptr;
-            return content[id.instance >> chunkbits][id.instance & _mask];
+            return content[id.instance.value >> chunkbits][id.instance.value & _mask];
          };
 
          template< typename object_id >
