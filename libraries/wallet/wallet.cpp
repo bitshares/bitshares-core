@@ -3104,21 +3104,25 @@ uint64_t wallet_api::get_asset_count()const
    return my->_remote_db->get_asset_count();
 }
 
+std::vector<unsigned char> string_to_vec(std::string incoming)
+{
+   char s[3];
+   s[2] = 0;
+   std::vector<unsigned char> vec;
+   for(int i = 0; i < incoming.length(); i+= 2)
+   {
+      s[0] = incoming[i];
+      s[1] = incoming[i+1];
+      vec.push_back( (int)strtol(&s[0], nullptr, 16));
+   }
+   return vec;
+}
+
 signed_transaction wallet_api::htlc_prepare( string source, string destination, string asset_symbol, string amount,
          string hash_algorithm, const std::string& preimage_hash, size_t preimage_size, 
          const uint32_t seconds_in_force, bool broadcast)
 {
-   // convert string back into binary
-   char s[3];
-   s[2] = 0;
-   std::vector<unsigned char> uns;
-   for(int i = 0; i < preimage_hash.length(); i+= 2)
-   {
-      s[0] = preimage_hash[i];
-      s[1] = preimage_hash[i+1];
-      uns.push_back( (int)strtol(&s[0], nullptr, 16));
-   }
-   return my->htlc_prepare(source, destination, asset_symbol, amount, hash_algorithm, uns, preimage_size,
+   return my->htlc_prepare(source, destination, asset_symbol, amount, hash_algorithm, string_to_vec(preimage_hash), preimage_size,
          seconds_in_force, broadcast);
 }
 
@@ -3127,10 +3131,11 @@ graphene::chain::htlc_object wallet_api::get_htlc(std::string htlc_id) const
    return my->get_htlc(htlc_id);
 }
 
-signed_transaction wallet_api::htlc_redeem( std::string htlc_id, std::string issuer, const std::vector<unsigned char>& preimage,
+signed_transaction wallet_api::htlc_redeem( std::string htlc_id, std::string issuer, const std::string& preimage,
       bool broadcast)
 {
-   return my->htlc_redeem(htlc_id, issuer, preimage, broadcast);
+
+   return my->htlc_redeem(htlc_id, issuer, std::vector<unsigned char>(preimage.begin(), preimage.end()), broadcast);
 }
 
 signed_transaction wallet_api::htlc_extend_expiry ( std::string htlc_id, std::string issuer, const uint32_t seconds_to_add,

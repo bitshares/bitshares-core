@@ -1479,7 +1479,7 @@ class wallet_api
        * @param issuer Who is performing this operation (and paying the fee)
        * @param preimage the preimage that should evaluate to the preimage_hash
        */
-      signed_transaction htlc_redeem( string htlc_id, string issuer, const std::vector<unsigned char>& preimage, 
+      signed_transaction htlc_redeem( string htlc_id, string issuer, const std::string& preimage, 
             bool broadcast = false );
 
       /*****

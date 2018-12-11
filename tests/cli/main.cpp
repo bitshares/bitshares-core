@@ -739,8 +739,7 @@ BOOST_AUTO_TEST_CASE( cli_create_htlc )
       {
          BOOST_TEST_MESSAGE("Alice uses her preimage to retrieve the BOBCOIN");
          std::string secret = "My Secret";
-         vector<unsigned char> secret_vector(secret.begin(), secret.end());
-         con.wallet_api_ptr->htlc_redeem(bob_htlc_id_as_string, "alice", secret_vector, true);
+         con.wallet_api_ptr->htlc_redeem(bob_htlc_id_as_string, "alice", secret, true);
          BOOST_TEST_MESSAGE("The system is generating a block");
          BOOST_CHECK(generate_block(app1));
       }
@@ -750,8 +749,7 @@ BOOST_AUTO_TEST_CASE( cli_create_htlc )
       {
          BOOST_TEST_MESSAGE("Bob uses Alice's preimage to retrieve the BOBCOIN");
          std::string secret = "My Secret";
-         vector<unsigned char> secret_vector(secret.begin(), secret.end());
-         con.wallet_api_ptr->htlc_redeem(alice_htlc_id_as_string, "bob", secret_vector, true);
+         con.wallet_api_ptr->htlc_redeem(alice_htlc_id_as_string, "bob", secret, true);
          BOOST_TEST_MESSAGE("The system is generating a block");
          BOOST_CHECK(generate_block(app1));
       }
