@@ -37,6 +37,7 @@
 #include <fc/network/http/websocket.hpp>
 #include <fc/rpc/websocket_api.hpp>
 #include <fc/rpc/cli.hpp>
+#include <fc/crypto/base58.hpp>
 
 #ifdef _WIN32
    #ifndef _WIN32_WINNT
@@ -678,14 +679,21 @@ BOOST_AUTO_TEST_CASE( cli_create_htlc )
       BOOST_TEST_MESSAGE("Alice has agreed to buy 3 BOBCOIN from Bob for 3 BTS. Alice creates an HTLC");
       // create an HTLC
       std::string preimage_string = "My Secret";
-      fc::ripemd160 preimage_md = fc::ripemd160::hash(preimage_string);
-      std::vector<unsigned char> hash(preimage_md.data_size());
-      for(size_t i = 0; i < preimage_md.data_size(); ++i)
-         hash[i] = preimage_md.data()[i];
+      fc::sha256 preimage_md = fc::sha256::hash(preimage_string);
+      std::stringstream ss;
+      int data_size = preimage_md.data_size();
+      for(int i = 0; i < preimage_md.data_size(); i++)
+      {
+         char d = preimage_md.data()[i];
+         unsigned char uc = static_cast<unsigned char>(d);
+         ss << std::setfill('0') << std::setw(2) << std::hex << (int)uc;
+      }
+      std::string hash_str = ss.str();
+      BOOST_TEST_MESSAGE("Secret is " + preimage_string + " and hash is " + hash_str);
       uint32_t timelock = fc::days(1).to_seconds();
       graphene::chain::signed_transaction result_tx 
             = con.wallet_api_ptr->htlc_prepare("alice", "bob", 
-            "BTS", "3", "RIPEMD160", hash, preimage_string.size(), timelock, true);
+            "1.3.0", "3", "SHA256", hash_str, preimage_string.size(), timelock, true);
 
       // normally, a wallet would watch block production, and find the transaction. Here, we can cheat:
       std::string alice_htlc_id_as_string;
@@ -707,7 +715,7 @@ BOOST_AUTO_TEST_CASE( cli_create_htlc )
 
       // Bob likes what he sees, so he creates an HTLC, using the info he retrieved from Alice's HTLC
       con.wallet_api_ptr->htlc_prepare("bob", "alice",
-            "BOBCOIN", "3", "RIPEMD160", hash, preimage_string.size(), timelock, true);
+            "BOBCOIN", "3", "SHA256", hash_str, preimage_string.size(), timelock, true);
 
       // normally, a wallet would watch block production, and find the transaction. Here, we can cheat:
       std::string bob_htlc_id_as_string;

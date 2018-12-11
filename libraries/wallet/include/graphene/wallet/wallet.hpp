@@ -1469,7 +1469,7 @@ class wallet_api
        * @param broadcast true if you wish to broadcast the transaction
        */
       signed_transaction htlc_prepare( string source, string destination, string asset_symbol, string amount,
-            string hash_algorithm, const std::vector<unsigned char>& preimage_hash, size_t preimage_size, 
+            string hash_algorithm, const std::string& preimage_hash, size_t preimage_size, 
             const uint32_t seconds_in_force, bool broadcast = false );
 
       /****
