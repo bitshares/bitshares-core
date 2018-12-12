@@ -135,6 +135,8 @@ public:
    std::string operator()(const account_create_operation& op)const;
    std::string operator()(const account_update_operation& op)const;
    std::string operator()(const asset_create_operation& op)const;
+   std::string operator()(const htlc_create_operation& op)const;
+   std::string operator()(const htlc_redeem_operation& op)const;
 };
 
 template<class T>
@@ -2972,6 +2974,36 @@ std::string operation_printer::operator()(const asset_create_operation& op) cons
       out << "User-Issue Asset ";
    out << "'" << op.symbol << "' with issuer " << wallet.get_account(op.issuer).name;
    return fee(op.fee);
+}
+
+std::string operation_printer::operator()(const htlc_redeem_operation& op) const
+{
+   auto from = wallet.get_account( op.source );
+
+   out << "Redeem HTLC from " << from.name
+         << " with database id " << std::to_string(op.htlc_id.space_id) 
+         << "." << std::to_string(op.htlc_id.type_id) 
+         << "." << std::to_string((uint64_t)op.htlc_id.instance)
+         << " with preimage \"";
+   for (unsigned char c : op.preimage)
+      out << c;
+   out << "\"";
+   return fee(op.fee);
+}
+
+std::string operation_printer::operator()(const htlc_create_operation& op) const
+{
+   auto a = wallet.get_asset( op.fee.asset_id );
+   auto payer = wallet.get_account( op.fee_payer() );
+   auto to = wallet.get_account( op.destination );
+   operation_result_printer rprinter(wallet);
+   std::string database_id = result.visit(rprinter);
+
+   out << "Create HTLC to " << to.name
+         << " with database id " << database_id
+         << " Fee paid by " << payer.name 
+         << " (Fee: " << a.amount_to_pretty_string( op.fee ) << ")";
+   return "";
 }
 
 std::string operation_result_printer::operator()(const void_result& x) const
