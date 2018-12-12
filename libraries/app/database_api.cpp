@@ -2009,18 +2009,10 @@ set<public_key_type> database_api_impl::get_potential_signatures( const signed_t
             result.insert(k);
          return &auth;
       },
-      _db.get_global_properties().parameters.max_authority_depth
+	  result,
+      _db.get_global_properties().parameters.max_authority_depth,
+      1
    );
-
-   // Insert keys in required "other" authories
-   flat_set<account_id_type> required_active;
-   flat_set<account_id_type> required_owner;
-   vector<authority> other;
-   trx.get_required_authorities( required_active, required_owner, other );
-   for( const auto& auth : other )
-      for( const auto& key : auth.get_keys() )
-         result.insert( key );
-
    return result;
 }
 

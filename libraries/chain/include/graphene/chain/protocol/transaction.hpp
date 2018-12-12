@@ -143,6 +143,18 @@ namespace graphene { namespace chain {
          const std::function<const authority*(account_id_type)>& get_owner,
          uint32_t max_recursion = GRAPHENE_MAX_SIG_CHECK_DEPTH
          )const;
+	  /**
+		* database_api.cpp supply,increse efficiensy
+		*/
+	  void get_required_signatures(
+         const chain_id_type& chain_id,
+         const flat_set<public_key_type>& available_keys,
+         const std::function<const authority*(account_id_type)>& get_active,
+         const std::function<const authority*(account_id_type)>& get_owner,
+         set<public_key_type> &conti_use_reult,
+         uint32_t max_recursion = GRAPHENE_MAX_SIG_CHECK_DEPTH,
+         uint32_t need_authority_type = 0 /*0 no need ,1 need other*/
+         )const;
 
       void verify_authority(
          const chain_id_type& chain_id,
