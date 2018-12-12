@@ -2978,10 +2978,8 @@ std::string operation_printer::operator()(const asset_create_operation& op) cons
 
 std::string operation_printer::operator()(const htlc_redeem_operation& op) const
 {
-   auto from = wallet.get_account( op.source );
-
-   out << "Redeem HTLC from " << from.name
-         << " with database id " << std::to_string(op.htlc_id.space_id) 
+   out << "Redeem HTLC with database id " 
+         << std::to_string(op.htlc_id.space_id) 
          << "." << std::to_string(op.htlc_id.type_id) 
          << "." << std::to_string((uint64_t)op.htlc_id.instance)
          << " with preimage \"";
