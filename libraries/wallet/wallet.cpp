@@ -1762,12 +1762,7 @@ public:
          create_op.seconds_in_force = seconds_in_force;
          create_op.key_hash = preimage_hash;
          create_op.key_size = preimage_size;
-         if ( "SHA256" == hash_algorithm )
-            create_op.hash_type = graphene::chain::hash_algorithm::sha256;
-         if ( "RIPEMD160" == hash_algorithm )
-            create_op.hash_type = graphene::chain::hash_algorithm::ripemd160;
-         if ( "SHA1" == hash_algorithm )
-            create_op.hash_type = graphene::chain::hash_algorithm::sha1;
+         create_op.hash_type = graphene::chain::string_to_hash_algorithm(hash_algorithm);
          FC_ASSERT(create_op.hash_type != graphene::chain::hash_algorithm::unknown, 
                "Unknown hash algorithm: ${algo}", ("algo", hash_algorithm));
 
@@ -3160,9 +3155,30 @@ signed_transaction wallet_api::htlc_prepare( string source, string destination, 
          seconds_in_force, broadcast);
 }
 
-graphene::chain::htlc_object wallet_api::get_htlc(std::string htlc_id) const
+std::string object_id_to_string(const graphene::db::object_id_type& obj_id) 
 {
-   return my->get_htlc(htlc_id);
+   return std::to_string(obj_id.space()) + "." + std::to_string(obj_id.type()) + "." + std::to_string(obj_id.instance());
+}
+
+variant wallet_api::get_htlc(std::string htlc_id) const
+{
+   graphene::chain::htlc_object obj = my->get_htlc(htlc_id);
+   fc::mutable_variant_object ret_val;
+   ret_val["database_id"] = (std::string)obj.id;
+   ret_val["from"] = object_id_to_string(obj.from);
+   ret_val["to"] = object_id_to_string(obj.to);
+   ret_val["amount"] = obj.amount.amount.value;
+   ret_val["asset"] = object_id_to_string(obj.amount.asset_id);
+   ret_val["expiration"] = fc::get_approximate_relative_time_string(obj.expiration);
+   ret_val["pending_fee_amount"] = obj.pending_fee.amount.value;
+   ret_val["pending_fee_asset"] = object_id_to_string(obj.pending_fee.asset_id);
+   std::stringstream hash_string;
+   for(unsigned char c : obj.preimage_hash)
+      hash_string << std::setfill('0') << std::setw(2) << std::hex << c;
+   ret_val["preimage_hash"] = hash_string.str();
+   ret_val["preimage_algorithm"] = graphene::chain::hash_algorithm_to_string(obj.preimage_hash_algorithm);
+   ret_val["preimage_size"] = obj.preimage_size;
+   return ret_val;
 }
 
 signed_transaction wallet_api::htlc_redeem( std::string htlc_id, std::string issuer, const std::string& preimage,

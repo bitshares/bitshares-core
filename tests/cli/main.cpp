@@ -681,7 +681,6 @@ BOOST_AUTO_TEST_CASE( cli_create_htlc )
       std::string preimage_string = "My Secret";
       fc::sha256 preimage_md = fc::sha256::hash(preimage_string);
       std::stringstream ss;
-      int data_size = preimage_md.data_size();
       for(int i = 0; i < preimage_md.data_size(); i++)
       {
          char d = preimage_md.data()[i];
@@ -710,7 +709,7 @@ BOOST_AUTO_TEST_CASE( cli_create_htlc )
 
       // Bob can now look over Alice's HTLC, to see if it is what was agreed to.
       BOOST_TEST_MESSAGE("Bob retrieves the HTLC Object by ID to examine it.");
-      graphene::chain::htlc_object alice_htlc = con.wallet_api_ptr->get_htlc(alice_htlc_id_as_string);
+      auto alice_htlc = con.wallet_api_ptr->get_htlc(alice_htlc_id_as_string);
       BOOST_TEST_MESSAGE("The HTLC Object is: " + fc::json::to_pretty_string(alice_htlc));
 
       // Bob likes what he sees, so he creates an HTLC, using the info he retrieved from Alice's HTLC
@@ -732,7 +731,7 @@ BOOST_AUTO_TEST_CASE( cli_create_htlc )
 
       // Alice can now look over Bob's HTLC, to see if it is what was agreed to:
       BOOST_TEST_MESSAGE("Alice retrieves the HTLC Object by ID to examine it.");
-      graphene::chain::htlc_object bob_htlc = con.wallet_api_ptr->get_htlc(bob_htlc_id_as_string);
+      auto bob_htlc = con.wallet_api_ptr->get_htlc(bob_htlc_id_as_string);
       BOOST_TEST_MESSAGE("The HTLC Object is: " + fc::json::to_pretty_string(bob_htlc));
 
       // Alice likes what she sees, so uses her preimage to get her BOBCOIN

@@ -38,7 +38,7 @@ namespace graphene { namespace chain {
       sha256 = 0x02,
       sha1 = 0x03
    };
-   
+
    /**
     * @brief database object to store HTLCs
     * 

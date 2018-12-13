@@ -31,6 +31,21 @@
 namespace graphene { 
    namespace chain {
 
+      /**
+       * Convert the hash algorithm to a string
+       * @param algo the enum to convert
+       * @returns a string (lower case)
+       */
+      std::string hash_algorithm_to_string(fc::enum_type<uint8_t, hash_algorithm> algo);
+
+      /**
+       * Convert a string to the enum that matches the hash algorithm
+       * @param incoing the string (case insensitive)
+       * @returns the matching enum
+       */
+      fc::enum_type<uint8_t, hash_algorithm> string_to_hash_algorithm(std::string incoming);
+   
+
       struct htlc_create_operation : public base_operation 
       {
          struct fee_parameters_type {
