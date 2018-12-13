@@ -360,37 +360,37 @@ set<public_key_type> signed_transaction::get_required_signatures(
 }
 
 void signed_transaction::get_required_signatures(
-	   const chain_id_type& chain_id,
-	   const flat_set<public_key_type>& available_keys,
-	   const std::function<const authority*(account_id_type)>& get_active,
-	   const std::function<const authority*(account_id_type)>& get_owner,
-	   set<public_key_type> &conti_use_reult,
-	   uint32_t max_recursion /*= GRAPHENE_MAX_SIG_CHECK_DEPTH*/,
-	   uint32_t need_authority_type /*= 0*/ /*0 no need ,1 need other*/
-	   )const
+	const chain_id_type& chain_id,
+	const flat_set<public_key_type>& available_keys,
+	const std::function<const authority*(account_id_type)>& get_active,
+	const std::function<const authority*(account_id_type)>& get_owner,
+	set<public_key_type> &conti_use_reult,
+	uint32_t max_recursion /*= GRAPHENE_MAX_SIG_CHECK_DEPTH*/,
+	uint32_t need_authority_type /*= 0*/ /*0 no need ,1 need other*/
+	)const
 {
-	   flat_set<account_id_type> required_active;
-	   flat_set<account_id_type> required_owner;
-	   vector<authority> other;
-	   get_required_authorities( required_active, required_owner, other );
-	   sign_state s(get_signature_keys( chain_id ),get_active,available_keys);
-	   for( const auto& auth : other )
-		 s.check_authority(&auth);
-	   for( auto& owner : required_owner )
-		 s.check_authority( get_owner( owner ) );
-	   for( auto& active : required_active )
-		 s.check_authority( active	);
-	   switch(need_authority_type)
+	flat_set<account_id_type> required_active;
+	flat_set<account_id_type> required_owner;
+	vector<authority> other;
+	get_required_authorities( required_active, required_owner, other );
+	sign_state s(get_signature_keys( chain_id ),get_active,available_keys);
+	for( const auto& auth : other )
+	 s.check_authority(&auth);
+	for( auto& owner : required_owner )
+	 s.check_authority( get_owner( owner ) );
+	for( auto& active : required_active )
+	 s.check_authority( active	);
+	switch(need_authority_type)
+	{
+	   case 1:
 	   {
-		   case 1:
-		   {
-			   for (const auto &auth : other)
-				   for (const auto &key : auth.get_keys())
-					   conti_use_reult.insert(key);
-			   break;
-		   }
-		   default:break;
+		   for (const auto &auth : other)
+			   for (const auto &key : auth.get_keys())
+				   conti_use_reult.insert(key);
+		   break;
 	   }
+	   default:break;
+	}
 }
 
 
