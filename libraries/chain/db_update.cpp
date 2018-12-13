@@ -564,9 +564,10 @@ void database::clear_expired_htlcs()
    while ( !htlc_idx.empty() && htlc_idx.begin() != htlc_idx.end()
          && htlc_idx.begin()->expiration <= head_block_time() )
    {
-      adjust_balance( htlc_idx.begin()->from, htlc_idx.begin()->amount );
+      const htlc_object& obj = *htlc_idx.begin();
+      adjust_balance( obj.from, obj.amount );
       // virtual op
-      htlc_refund_operation vop;
+      htlc_refund_operation vop(obj.id, obj.from);
       vop.htlc_id = htlc_idx.begin()->id;
       push_applied_operation(vop);
 
