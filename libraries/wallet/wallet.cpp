@@ -115,14 +115,16 @@ private:
    ostream& out;
    const wallet_api_impl& wallet;
    operation_result result;
+   operation_history_object hist;
 
    std::string fee(const asset& a) const;
 
 public:
-   operation_printer( ostream& out, const wallet_api_impl& wallet, const operation_result& r = operation_result() )
+   operation_printer( ostream& out, const wallet_api_impl& wallet, const operation_history_object& obj )
       : out(out),
         wallet(wallet),
-        result(r)
+        result(obj.result),
+        hist(obj)
    {}
    typedef std::string result_type;
 
@@ -2314,7 +2316,7 @@ public:
             auto b = _remote_db->get_block_header(i.block_num);
             FC_ASSERT(b);
             ss << b->timestamp.to_iso_string() << " ";
-            i.op.visit(operation_printer(ss, *this, i.result));
+            i.op.visit(operation_printer(ss, *this, i));
             ss << " \n";
          }
 
@@ -2331,7 +2333,7 @@ public:
             auto b = _remote_db->get_block_header(i.block_num);
             FC_ASSERT(b);
             ss << b->timestamp.to_iso_string() << " ";
-            i.op.visit(operation_printer(ss, *this, i.result));
+            i.op.visit(operation_printer(ss, *this, i));
             ss << " \n";
          }
 
@@ -2352,7 +2354,7 @@ public:
               auto b = _remote_db->get_block_header(i.block_num);
               FC_ASSERT(b);
               ss << b->timestamp.to_iso_string() << " ";
-              i.op.visit(operation_printer(ss, *this, i.result));
+              i.op.visit(operation_printer(ss, *this, i));
               ss << " transaction_id : ";
               ss << d.transaction_id.str();
               ss << " \n";
@@ -2394,7 +2396,7 @@ public:
       {
          auto r = result.as<blind_confirmation>( GRAPHENE_MAX_NESTED_OBJECTS );
          std::stringstream ss;
-         r.trx.operations[0].visit( operation_printer( ss, *this, operation_result() ) );
+         r.trx.operations[0].visit( operation_printer( ss, *this, operation_history_object() ) );
          ss << "\n";
          for( const auto& out : r.outputs )
          {
@@ -2407,7 +2409,7 @@ public:
       {
          auto r = result.as<blind_confirmation>( GRAPHENE_MAX_NESTED_OBJECTS );
          std::stringstream ss;
-         r.trx.operations[0].visit( operation_printer( ss, *this, operation_result() ) );
+         r.trx.operations[0].visit( operation_printer( ss, *this, operation_history_object() ) );
          ss << "\n";
          for( const auto& out : r.outputs )
          {
@@ -2986,20 +2988,24 @@ std::string operation_printer::operator()(const htlc_redeem_operation& op) const
 
 std::string operation_printer::operator()(const htlc_create_operation& op) const
 {
-   auto a = wallet.get_asset( op.fee.asset_id );
-   auto payer = wallet.get_account( op.fee_payer() );
+   auto fee_asset = wallet.get_asset( op.fee.asset_id );
    auto to = wallet.get_account( op.destination );
    operation_result_printer rprinter(wallet);
    std::string database_id = result.visit(rprinter);
 
    out << "Create HTLC to " << to.name
-         << " with database id " << database_id
+         << " with id " << database_id
          << " preimage hash: [";
    for(unsigned char c : op.key_hash)
    {
       out << setfill('0') << std::setw(2) << std::hex << (int)c;
    }
-   out << "] (Fee: " << a.amount_to_pretty_string( op.fee ) << ")";
+   out << "] (Fee: " << fee_asset.amount_to_pretty_string( op.fee ) << ")";
+   // determine if the block that the HTLC is in is before or after LIB
+   int32_t pending_blocks = hist.block_num - wallet.get_dynamic_global_properties().last_irreversible_block_num;
+   if (pending_blocks > 0)
+      out << " (pending " << std::to_string(pending_blocks) << " blocks)";
+
    return "";
 }
 
@@ -3155,23 +3161,18 @@ signed_transaction wallet_api::htlc_prepare( string source, string destination, 
          seconds_in_force, broadcast);
 }
 
-std::string object_id_to_string(const graphene::db::object_id_type& obj_id) 
-{
-   return std::to_string(obj_id.space()) + "." + std::to_string(obj_id.type()) + "." + std::to_string(obj_id.instance());
-}
-
 variant wallet_api::get_htlc(std::string htlc_id) const
 {
    graphene::chain::htlc_object obj = my->get_htlc(htlc_id);
    fc::mutable_variant_object ret_val;
    ret_val["database_id"] = (std::string)obj.id;
-   ret_val["from"] = object_id_to_string(obj.from);
-   ret_val["to"] = object_id_to_string(obj.to);
+   ret_val["from"] = (std::string)((graphene::db::object_id_type)obj.from);
+   ret_val["to"] = (std::string)((graphene::db::object_id_type)obj.to);
    ret_val["amount"] = obj.amount.amount.value;
-   ret_val["asset"] = object_id_to_string(obj.amount.asset_id);
+   ret_val["asset"] = (std::string)((graphene::db::object_id_type)obj.amount.asset_id);
    ret_val["expiration"] = fc::get_approximate_relative_time_string(obj.expiration);
    ret_val["pending_fee_amount"] = obj.pending_fee.amount.value;
-   ret_val["pending_fee_asset"] = object_id_to_string(obj.pending_fee.asset_id);
+   ret_val["pending_fee_asset"] = (std::string)((graphene::db::object_id_type)obj.pending_fee.asset_id);
    std::stringstream hash_string;
    for(unsigned char c : obj.preimage_hash)
       hash_string << std::setfill('0') << std::setw(2) << std::hex << (int)c;
@@ -3242,7 +3243,7 @@ vector<operation_detail> wallet_api::get_account_history(string name, int limit)
             }
          }
          std::stringstream ss;
-         auto memo = o.op.visit(detail::operation_printer(ss, *my, o.result));
+         auto memo = o.op.visit(detail::operation_printer(ss, *my, o));
          result.push_back( operation_detail{ memo, ss.str(), o } );
       }
 
@@ -3290,7 +3291,7 @@ vector<operation_detail> wallet_api::get_relative_account_history(
             start);
       for (auto &o : current) {
          std::stringstream ss;
-         auto memo = o.op.visit(detail::operation_printer(ss, *my, o.result));
+         auto memo = o.op.visit(detail::operation_printer(ss, *my, o));
          result.push_back(operation_detail{memo, ss.str(), o});
       }
       if (current.size() < std::min<uint32_t>(100, limit))
@@ -3334,7 +3335,7 @@ account_history_operation_detail wallet_api::get_account_history_by_operations(
         auto current = my->_remote_hist->get_account_history_by_operations(always_id, operation_types, start, min_limit);
         for (auto& obj : current.operation_history_objs) {
             std::stringstream ss;
-            auto memo = obj.op.visit(detail::operation_printer(ss, *my, obj.result));
+            auto memo = obj.op.visit(detail::operation_printer(ss, *my, obj));
 
             transaction_id_type transaction_id;
             auto block = get_block(obj.block_num);
