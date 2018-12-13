@@ -2999,8 +2999,12 @@ std::string operation_printer::operator()(const htlc_create_operation& op) const
 
    out << "Create HTLC to " << to.name
          << " with database id " << database_id
-         << " Fee paid by " << payer.name 
-         << " (Fee: " << a.amount_to_pretty_string( op.fee ) << ")";
+         << " preimage hash: [";
+   for(unsigned char c : op.key_hash)
+   {
+      out << setfill('0') << std::setw(2) << std::hex << (int)c;
+   }
+   out << "] (Fee: " << a.amount_to_pretty_string( op.fee ) << ")";
    return "";
 }
 
