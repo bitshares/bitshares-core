@@ -3174,7 +3174,7 @@ variant wallet_api::get_htlc(std::string htlc_id) const
    ret_val["pending_fee_asset"] = object_id_to_string(obj.pending_fee.asset_id);
    std::stringstream hash_string;
    for(unsigned char c : obj.preimage_hash)
-      hash_string << std::setfill('0') << std::setw(2) << std::hex << c;
+      hash_string << std::setfill('0') << std::setw(2) << std::hex << (int)c;
    ret_val["preimage_hash"] = hash_string.str();
    ret_val["preimage_algorithm"] = graphene::chain::hash_algorithm_to_string(obj.preimage_hash_algorithm);
    ret_val["preimage_size"] = obj.preimage_size;
