@@ -190,14 +190,33 @@ namespace graphene {
             return fee_params.fee + (fee_params.fee_per_day * days);
          }
       };
+
+      struct htlc_refund_operation : public base_operation
+      {
+         struct fee_parameters_type {};
+
+         htlc_refund_operation(){}
+         htlc_refund_operation( const htlc_id_type& htlc_id ) : htlc_id(htlc_id) {}
+
+         account_id_type fee_payer()const { return GRAPHENE_TEMP_ACCOUNT; }
+         void            validate()const { FC_ASSERT( !"virtual operation" ); }
+
+         /// This is a virtual operation; there is no fee
+         share_type      calculate_fee(const fee_parameters_type& k)const { return 0; }
+
+         htlc_id_type htlc_id;
+         asset fee;
+      };
    } 
 }
 
 FC_REFLECT( graphene::chain::htlc_create_operation::fee_parameters_type, (fee) (fee_per_day) )
 FC_REFLECT( graphene::chain::htlc_redeem_operation::fee_parameters_type, (fee) )
 FC_REFLECT( graphene::chain::htlc_extend_operation::fee_parameters_type, (fee) (fee_per_day))
+FC_REFLECT( graphene::chain::htlc_refund_operation::fee_parameters_type, ) // VIRTUAL
 
 FC_REFLECT( graphene::chain::htlc_create_operation, 
       (fee)(source)(destination)(amount)(key_hash)(key_size)(seconds_in_force)(extensions)(hash_type))
 FC_REFLECT( graphene::chain::htlc_redeem_operation, (fee)(htlc_id)(update_issuer)(preimage)(extensions))
 FC_REFLECT( graphene::chain::htlc_extend_operation, (fee)(htlc_id)(update_issuer)(seconds_to_add)(extensions))
+FC_REFLECT( graphene::chain::htlc_refund_operation, (fee)(htlc_id))
