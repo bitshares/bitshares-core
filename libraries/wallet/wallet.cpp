@@ -1747,7 +1747,7 @@ public:
       return sign_transaction( tx, broadcast );
    }
 
-   signed_transaction htlc_prepare( string source, string destination, string asset_symbol, string amount,
+   signed_transaction htlc_prepare( string source, string destination, string amount, string asset_symbol,
          string hash_algorithm, const std::vector<unsigned char>& preimage_hash, size_t preimage_size, 
          const uint32_t seconds_in_force, bool broadcast = false )
    {
@@ -3153,11 +3153,11 @@ std::vector<unsigned char> string_to_vec(std::string incoming)
    return vec;
 }
 
-signed_transaction wallet_api::htlc_prepare( string source, string destination, string asset_symbol, string amount,
+signed_transaction wallet_api::htlc_prepare( string source, string destination, string amount, string asset_symbol,
          string hash_algorithm, const std::string& preimage_hash, size_t preimage_size, 
          const uint32_t seconds_in_force, bool broadcast)
 {
-   return my->htlc_prepare(source, destination, asset_symbol, amount, hash_algorithm, string_to_vec(preimage_hash), preimage_size,
+   return my->htlc_prepare(source, destination, amount, asset_symbol, hash_algorithm, string_to_vec(preimage_hash), preimage_size,
          seconds_in_force, broadcast);
 }
 

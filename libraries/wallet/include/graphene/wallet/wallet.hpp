@@ -1460,15 +1460,15 @@ class wallet_api
        * 
        * @param source The account that will reserve the funds (and pay the fee)
        * @param destination The account that will receive the funds if the preimage is presented
-       * @param asset_symbol The asset that is to be traded
        * @param amount the amount of the asset that is to be traded
+       * @param asset_symbol The asset that is to be traded
        * @param hash_algorithm the algorithm used to generate the hash from the preimage. Can be RIPEMD160 or SHA256.
        * @param preimage_hash the hash of the preimage
        * @param preimage_size the size of the preimage in bytes
        * @param seconds_in_force when the time lock expires
        * @param broadcast true if you wish to broadcast the transaction
        */
-      signed_transaction htlc_prepare( string source, string destination, string asset_symbol, string amount,
+      signed_transaction htlc_prepare( string source, string destination, string amount, string asset_symbol,
             string hash_algorithm, const std::string& preimage_hash, size_t preimage_size, 
             const uint32_t seconds_in_force, bool broadcast = false );
 

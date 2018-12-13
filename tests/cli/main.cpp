@@ -692,7 +692,7 @@ BOOST_AUTO_TEST_CASE( cli_create_htlc )
       uint32_t timelock = fc::days(1).to_seconds();
       graphene::chain::signed_transaction result_tx 
             = con.wallet_api_ptr->htlc_prepare("alice", "bob", 
-            "1.3.0", "3", "SHA256", hash_str, preimage_string.size(), timelock, true);
+            "3", "1.3.0", "SHA256", hash_str, preimage_string.size(), timelock, true);
 
       // normally, a wallet would watch block production, and find the transaction. Here, we can cheat:
       std::string alice_htlc_id_as_string;
@@ -714,7 +714,7 @@ BOOST_AUTO_TEST_CASE( cli_create_htlc )
 
       // Bob likes what he sees, so he creates an HTLC, using the info he retrieved from Alice's HTLC
       con.wallet_api_ptr->htlc_prepare("bob", "alice",
-            "BOBCOIN", "3", "SHA256", hash_str, preimage_string.size(), timelock, true);
+            "3", "BOBCOIN", "SHA256", hash_str, preimage_string.size(), timelock, true);
 
       // normally, a wallet would watch block production, and find the transaction. Here, we can cheat:
       std::string bob_htlc_id_as_string;
