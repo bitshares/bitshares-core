@@ -204,7 +204,7 @@ namespace graphene { namespace db {
    {
       static_assert( chunkbits < 64, "Do you really want arrays with more than 2^63 elements???" );
 
-      private:
+      // private
          static const size_t MAX_HOLE = 100;
          static const size_t _mask = ((1 << chunkbits) - 1);
          size_t next = 0;
