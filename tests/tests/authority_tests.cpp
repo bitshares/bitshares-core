@@ -498,7 +498,7 @@ BOOST_AUTO_TEST_CASE( committee_authority )
    */
    trx.operations.push_back(uop);
    sign( trx, committee_key );
-   db.push_transaction(trx);
+   PUSH_TX(db, trx);
    BOOST_CHECK_EQUAL(get_balance(nathan, asset_id_type()(db)), 0);
    BOOST_CHECK(db.get<proposal_object>(prop.id).is_authorized_to_execute(db));
 
@@ -1057,7 +1057,6 @@ BOOST_FIXTURE_TEST_CASE( bogus_signature, database_fixture )
       PUSH_TX( db,  trx, skip  );
 
       trx.operations.push_back( xfer_op );
-      trx.signees.clear(); // signees should be invalidated
       BOOST_TEST_MESSAGE( "Invalidating Alices Signature" );
       // Alice's signature is now invalid
       GRAPHENE_REQUIRE_THROW( PUSH_TX( db,  trx, skip  ), fc::exception );
@@ -1169,7 +1168,7 @@ BOOST_FIXTURE_TEST_CASE( get_required_signatures_test, database_fixture )
          op.owner = auth;
          tx.operations.push_back( op );
          set_expiration( db, tx );
-         PUSH_TX( db, tx, database::skip_transaction_signatures | database::skip_authority_check );
+         PUSH_TX( db, tx, database::skip_transaction_signatures );
       } ;
 
       auto get_active = [&](
@@ -1283,7 +1282,7 @@ BOOST_FIXTURE_TEST_CASE( nonminimal_sig_test, database_fixture )
          op.owner = auth;
          tx.operations.push_back( op );
          set_expiration( db, tx );
-         PUSH_TX( db, tx, database::skip_transaction_signatures | database::skip_authority_check );
+         PUSH_TX( db, tx, database::skip_transaction_signatures );
       } ;
 
       auto get_active = [&](
@@ -1370,7 +1369,7 @@ BOOST_FIXTURE_TEST_CASE( parent_owner_test, database_fixture )
          op.owner = owner;
          tx.operations.push_back( op );
          set_expiration( db, tx );
-         PUSH_TX( db, tx, database::skip_transaction_signatures | database::skip_authority_check );
+         PUSH_TX( db, tx, database::skip_transaction_signatures );
       } ;
 
       auto set_auth = [&](
@@ -1462,7 +1461,7 @@ BOOST_FIXTURE_TEST_CASE( missing_owner_auth_test, database_fixture )
          op.owner = owner;
          tx.operations.push_back( op );
          set_expiration( db, tx );
-         PUSH_TX( db, tx, database::skip_transaction_signatures | database::skip_authority_check );
+         PUSH_TX( db, tx, database::skip_transaction_signatures );
       } ;
 
       auto get_active = [&](
@@ -1675,6 +1674,44 @@ BOOST_AUTO_TEST_CASE( issue_214 )
    BOOST_CHECK_THROW( db.get<proposal_object>(pid1), fc::assert_exception );
    BOOST_CHECK_THROW( db.get<proposal_object>(pid2), fc::assert_exception );
    BOOST_CHECK_EQUAL( top.amount.amount.value, get_balance( bob_id, top.amount.asset_id ) );
+} FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE( irrelevant_signatures )
+{ try {
+   ACTORS( (alice)(bob) );
+   fund( alice );
+
+   // PK: BTS4vsFgTXJcGQMKCFayF2hrNRfYcKjNZ6Mzk8aw9M4zuWfscPhzE, A: BTSGfxPKKLj6tdTUB7i3mHsd2m7QvPLPy2YA
+   const fc::ecc::private_key test2 = fc::ecc::private_key::regenerate( fc::sha256::hash( std::string( "test-2" ) ) );
+   const public_key_type test2_pub( test2.get_public_key() );
+
+   // PK: BTS7FXC7S9UH7HEH8QiuJ8Xv1NRJJZd1GomALLm9ffjtH95Tb2ZQB, A: BTSBajRqmdrXqmDpZhJ8sgkGagdeXneHFVeM
+   const fc::ecc::private_key test3 = fc::ecc::private_key::regenerate( fc::sha256::hash( std::string( "test-3" ) ) );
+   const public_key_type test3_pub( test3.get_public_key() );
+
+   BOOST_REQUIRE( test2_pub.key_data < test3_pub.key_data );
+   BOOST_REQUIRE( address( test3_pub ) < address( test2_pub ) );
+
+   account_update_operation auo;
+   auo.account = alice_id;
+   auo.active = authority( 2, test2_pub, 2, test3_pub, 1 );
+
+   trx.clear();
+   set_expiration( db, trx );
+   trx.operations.push_back( auo );
+   sign( trx, alice_private_key );
+   PUSH_TX( db, trx );
+   trx.clear();
+
+   transfer_operation to;
+   to.amount = asset( 1 );
+   to.from = alice_id;
+   to.to = bob_id;
+   trx.operations.push_back( to );
+   sign( trx, test2 );
+   sign( trx, test3 );
+   PUSH_TX( db, trx );
+
 } FC_LOG_AND_RETHROW() }
 
 BOOST_AUTO_TEST_SUITE_END()

@@ -377,7 +377,7 @@ BOOST_AUTO_TEST_CASE( transfer_restricted_test )
          transaction tx;
          tx.operations.push_back( op );
          set_expiration( db, tx );
-         PUSH_TX( db, tx, database::skip_authority_check | database::skip_tapos_check | database::skip_transaction_signatures );
+         PUSH_TX( db, tx, database::skip_tapos_check | database::skip_transaction_signatures );
       } ;
 
       const asset_object& uia = create_user_issued_asset( "TXRX", sam, transfer_restricted );
@@ -396,7 +396,7 @@ BOOST_AUTO_TEST_CASE( transfer_restricted_test )
          transaction tx;
          tx.operations.push_back( op );
          set_expiration( db, tx );
-         PUSH_TX( db, tx, database::skip_authority_check | database::skip_tapos_check | database::skip_transaction_signatures );
+         PUSH_TX( db, tx, database::skip_tapos_check | database::skip_transaction_signatures );
       } ;
 
       BOOST_TEST_MESSAGE( "Enable transfer_restricted, send fails" );

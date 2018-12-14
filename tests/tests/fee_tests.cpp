@@ -759,7 +759,6 @@ BOOST_AUTO_TEST_CASE( fee_refund_test )
                     | database::skip_transaction_dupe_check
                     | database::skip_block_size_check
                     | database::skip_tapos_check
-                    | database::skip_authority_check
                     | database::skip_merkle_check
                     ;
 
@@ -897,7 +896,6 @@ BOOST_AUTO_TEST_CASE( non_core_fee_refund_test )
                     | database::skip_transaction_dupe_check
                     | database::skip_block_size_check
                     | database::skip_tapos_check
-                    | database::skip_authority_check
                     | database::skip_merkle_check
                     ;
 
@@ -1284,7 +1282,6 @@ BOOST_AUTO_TEST_CASE( hf445_fee_refund_cross_test )
                     | database::skip_transaction_dupe_check
                     | database::skip_block_size_check
                     | database::skip_tapos_check
-                    | database::skip_authority_check
                     | database::skip_merkle_check
                     ;
 
@@ -1791,7 +1788,6 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_test )
                     | database::skip_transaction_dupe_check
                     | database::skip_block_size_check
                     | database::skip_tapos_check
-                    | database::skip_authority_check
                     | database::skip_merkle_check
                     ;
 
@@ -2349,7 +2345,6 @@ BOOST_AUTO_TEST_CASE( bsip26_fee_refund_cross_test )
                     | database::skip_transaction_dupe_check
                     | database::skip_block_size_check
                     | database::skip_tapos_check
-                    | database::skip_authority_check
                     | database::skip_merkle_check
                     ;
 
