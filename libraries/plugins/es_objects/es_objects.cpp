@@ -380,11 +380,12 @@ es_objects_plugin::es_objects_plugin() :
 es_objects_plugin::~es_objects_plugin()
 {
 }
-
+/*
 std::string es_objects_plugin::plugin_name()const
 {
    return "es_objects";
 }
+*/
 std::string es_objects_plugin::plugin_description()const
 {
    return "Stores blockchain objects in ES database. Experimental.";
@@ -472,7 +473,7 @@ void es_objects_plugin::plugin_initialize(const boost::program_options::variable
    }
 }
 
-void es_objects_plugin::plugin_startup()
+void es_objects_plugin::startup()
 {
    graphene::utilities::ES es;
    es.curl = my->curl;
@@ -482,7 +483,7 @@ void es_objects_plugin::plugin_startup()
 
    if(!graphene::utilities::checkES(es))
       FC_THROW_EXCEPTION(fc::exception, "ES database is not up in url ${url}", ("url", my->_es_objects_elasticsearch_url));
-   ilog("elasticsearch OBJECTS: plugin_startup() begin");
+   //ilog("elasticsearch OBJECTS: plugin_startup() begin");
 }
 
 } }

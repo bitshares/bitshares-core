@@ -249,11 +249,12 @@ grouped_orders_plugin::grouped_orders_plugin() :
 grouped_orders_plugin::~grouped_orders_plugin()
 {
 }
-
+/*
 std::string grouped_orders_plugin::plugin_name()const
 {
    return "grouped_orders";
 }
+*/
 
 void grouped_orders_plugin::plugin_set_program_options(
    boost::program_options::options_description& cli,
@@ -283,7 +284,7 @@ void grouped_orders_plugin::plugin_initialize(const boost::program_options::vari
 
 } FC_CAPTURE_AND_RETHROW() }
 
-void grouped_orders_plugin::plugin_startup()
+void grouped_orders_plugin::startup()
 {
 }
 

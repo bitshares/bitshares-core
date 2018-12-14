@@ -1014,17 +1014,17 @@ void application::initialize(const fc::path& data_dir, const boost::program_opti
    }
    else
    {
-      wanted.push_back("witness");
-      wanted.push_back("account_history");
-      wanted.push_back("market_history");
-      wanted.push_back("grouped_orders");
+      wanted.push_back("witness_plugin");
+      wanted.push_back("account_history_plugin");
+      wanted.push_back("market_history_plugin");
+      wanted.push_back("grouped_orders_plugin");
    }
    int es_ah_conflict_counter = 0;
    for (auto& it : wanted)
    {
-      if(it == "account_history")
+      if(it == "account_history_plugin")
          ++es_ah_conflict_counter;
-      if(it == "elasticsearch")
+      if(it == "elasticsearch_plugin")
          ++es_ah_conflict_counter;
 
       if(es_ah_conflict_counter > 1) {

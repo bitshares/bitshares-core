@@ -99,12 +99,18 @@ class plugin : public abstract_plugin
    public:
       plugin();
       virtual ~plugin() override;
-
-      virtual std::string plugin_name()const override;
+      /**
+       *des No need to override
+       *@{ begin
+       */
+      void plugin_startup();
+      void plugin_shutdown();
+      virtual std::string plugin_name() const override;
+      /**
+       *@} end
+       */
       virtual std::string plugin_description()const override;
       virtual void plugin_initialize( const boost::program_options::variables_map& options ) override;
-      virtual void plugin_startup() override;
-      virtual void plugin_shutdown() override;
       virtual void plugin_set_app( application* app ) override;
       virtual void plugin_set_program_options(
          boost::program_options::options_description& command_line_options,
@@ -114,6 +120,12 @@ class plugin : public abstract_plugin
       chain::database& database() { return *app().chain_database(); }
       application& app()const { assert(_app); return *_app; }
    protected:
+      /**
+       * @des subclass overrides the startup and shutdown function
+       */
+      virtual void startup();
+      virtual void shutdown();
+      
       net::node& p2p_node() { return *app().p2p_node(); }
 
    private:

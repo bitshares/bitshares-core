@@ -405,11 +405,12 @@ elasticsearch_plugin::elasticsearch_plugin() :
 elasticsearch_plugin::~elasticsearch_plugin()
 {
 }
-
+/*
 std::string elasticsearch_plugin::plugin_name()const
 {
    return "elasticsearch";
 }
+*/
 std::string elasticsearch_plugin::plugin_description()const
 {
    return "Stores account history data in elasticsearch database(EXPERIMENTAL).";
@@ -466,7 +467,7 @@ void elasticsearch_plugin::plugin_initialize(const boost::program_options::varia
    }
 }
 
-void elasticsearch_plugin::plugin_startup()
+void elasticsearch_plugin::startup()
 {
    graphene::utilities::ES es;
    es.curl = my->curl;
@@ -475,7 +476,7 @@ void elasticsearch_plugin::plugin_startup()
 
    if(!graphene::utilities::checkES(es))
       FC_THROW_EXCEPTION(fc::exception, "ES database is not up in url ${url}", ("url", my->_elasticsearch_node_url));
-   ilog("elasticsearch ACCOUNT HISTORY: plugin_startup() begin");
+   //ilog("elasticsearch ACCOUNT HISTORY: plugin_startup() begin");
 }
 
 } }

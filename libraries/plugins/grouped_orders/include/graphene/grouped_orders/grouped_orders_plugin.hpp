@@ -72,18 +72,18 @@ class grouped_orders_plugin : public graphene::app::plugin
       grouped_orders_plugin();
       virtual ~grouped_orders_plugin();
 
-      std::string plugin_name()const override;
+      //std::string plugin_name()const override;
       virtual void plugin_set_program_options(
          boost::program_options::options_description& cli,
          boost::program_options::options_description& cfg) override;
       virtual void plugin_initialize(
          const boost::program_options::variables_map& options) override;
-      virtual void plugin_startup() override;
-
+      
       const flat_set<uint16_t>&   tracked_groups()const;
 
       const map< limit_order_group_key, limit_order_group_data >& limit_order_groups();
-
+   protected:
+      virtual void startup() override;
    private:
       friend class detail::grouped_orders_plugin_impl;
       std::unique_ptr<detail::grouped_orders_plugin_impl> my;

@@ -74,12 +74,12 @@ void witness_plugin::plugin_set_program_options(
          ;
    config_file_options.add(command_line_options);
 }
-
+/*
 std::string witness_plugin::plugin_name()const
 {
    return "witness";
 }
-
+*/
 void witness_plugin::plugin_initialize(const boost::program_options::variables_map& options)
 { try {
    ilog("witness plugin:  plugin_initialize() begin");
@@ -113,9 +113,9 @@ void witness_plugin::plugin_initialize(const boost::program_options::variables_m
    ilog("witness plugin:  plugin_initialize() end");
 } FC_LOG_AND_RETHROW() }
 
-void witness_plugin::plugin_startup()
+void witness_plugin::startup()
 { try {
-   ilog("witness plugin:  plugin_startup() begin");
+   //ilog("witness plugin:  plugin_startup() begin");
    chain::database& d = database();
    if( !_witnesses.empty() )
    {
@@ -138,10 +138,10 @@ void witness_plugin::plugin_startup()
    {
       ilog("No witness configured.");
    }
-   ilog("witness plugin:  plugin_startup() end");
+   //ilog("witness plugin:  plugin_startup() end");
 } FC_CAPTURE_AND_RETHROW() }
 
-void witness_plugin::plugin_shutdown()
+void witness_plugin::shutdown()
 {
    stop_block_production();
 }

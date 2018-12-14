@@ -132,7 +132,7 @@ void delayed_node_plugin::mainloop()
    }
 }
 
-void delayed_node_plugin::plugin_startup()
+void delayed_node_plugin::startup()
 {
    fc::async([this]()
    {

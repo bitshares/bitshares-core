@@ -53,11 +53,12 @@ void debug_witness_plugin::plugin_set_program_options(
    config_file_options.add(command_line_options);
 }
 
+/*
 std::string debug_witness_plugin::plugin_name()const
 {
    return "debug_witness";
 }
-
+*/
 void debug_witness_plugin::plugin_initialize(const boost::program_options::variables_map& options)
 { try {
    ilog("debug_witness plugin:  plugin_initialize() begin");
@@ -90,9 +91,9 @@ void debug_witness_plugin::plugin_initialize(const boost::program_options::varia
    ilog("debug_witness plugin:  plugin_initialize() end");
 } FC_LOG_AND_RETHROW() }
 
-void debug_witness_plugin::plugin_startup()
+void debug_witness_plugin::startup()
 {
-   ilog("debug_witness_plugin::plugin_startup() begin");
+   //ilog("debug_witness_plugin::plugin_startup() begin");
    chain::database& db = database();
 
    // connect needed signals
@@ -155,7 +156,7 @@ void debug_witness_plugin::flush_json_object_stream()
       _json_object_stream->flush();
 }
 
-void debug_witness_plugin::plugin_shutdown()
+void debug_witness_plugin::shutdown()
 {
    if( _json_object_stream )
    {

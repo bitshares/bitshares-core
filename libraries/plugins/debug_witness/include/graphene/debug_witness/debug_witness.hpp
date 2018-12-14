@@ -36,7 +36,7 @@ class debug_witness_plugin : public graphene::app::plugin {
 public:
    ~debug_witness_plugin();
 
-   std::string plugin_name()const override;
+   //std::string plugin_name()const override;
 
    virtual void plugin_set_program_options(
       boost::program_options::options_description &command_line_options,
@@ -44,11 +44,11 @@ public:
       ) override;
 
    virtual void plugin_initialize( const boost::program_options::variables_map& options ) override;
-   virtual void plugin_startup() override;
-   virtual void plugin_shutdown() override;
-
    void set_json_object_stream( const std::string& filename );
    void flush_json_object_stream();
+protected:
+   virtual void startup() override;
+   virtual void shutdown() override;
 
 private:
 

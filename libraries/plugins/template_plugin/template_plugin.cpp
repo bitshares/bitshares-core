@@ -72,11 +72,12 @@ template_plugin::template_plugin() :
 template_plugin::~template_plugin()
 {
 }
-
+/*
 std::string template_plugin::plugin_name()const
 {
    return "template_plugin";
 }
+*/
 std::string template_plugin::plugin_description()const
 {
    return "template_plugin description";
@@ -104,9 +105,9 @@ void template_plugin::plugin_initialize(const boost::program_options::variables_
    }
 }
 
-void template_plugin::plugin_startup()
+void template_plugin::startup()
 {
-   ilog("template_plugin: plugin_startup() begin");
+   //ilog("template_plugin: plugin_startup() begin");
 }
 
 } }

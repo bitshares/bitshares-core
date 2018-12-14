@@ -232,19 +232,19 @@ class market_history_plugin : public graphene::app::plugin
       market_history_plugin();
       virtual ~market_history_plugin();
 
-      std::string plugin_name()const override;
+      //std::string plugin_name()const override;
       virtual void plugin_set_program_options(
          boost::program_options::options_description& cli,
          boost::program_options::options_description& cfg) override;
       virtual void plugin_initialize(
          const boost::program_options::variables_map& options) override;
-      virtual void plugin_startup() override;
-
+      
       uint32_t                    max_history()const;
       const flat_set<uint32_t>&   tracked_buckets()const;
       uint32_t                    max_order_his_records_per_market()const;
       uint32_t                    max_order_his_seconds_per_market()const;
-
+   protected:
+      virtual void startup() override;
    private:
       friend class detail::market_history_plugin_impl;
       std::unique_ptr<detail::market_history_plugin_impl> my;

@@ -50,7 +50,7 @@ class witness_plugin : public graphene::app::plugin {
 public:
    ~witness_plugin() { stop_block_production(); }
 
-   std::string plugin_name()const override;
+   //std::string plugin_name()const override;
 
    virtual void plugin_set_program_options(
       boost::program_options::options_description &command_line_options,
@@ -61,11 +61,13 @@ public:
    void stop_block_production();
 
    virtual void plugin_initialize( const boost::program_options::variables_map& options ) override;
-   virtual void plugin_startup() override;
-   virtual void plugin_shutdown() override;
-
    inline const fc::flat_map< chain::witness_id_type, fc::optional<chain::public_key_type> >& get_witness_key_cache()
    { return _witness_key_cache; }
+   
+protected:
+   virtual void startup() override;
+   virtual void shutdown() override;
+
 
 private:
    void schedule_production_loop();

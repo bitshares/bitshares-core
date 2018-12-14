@@ -2009,9 +2009,9 @@ set<public_key_type> database_api_impl::get_potential_signatures( const signed_t
             result.insert(k);
          return &auth;
       },
-		result,
+      result,
       _db.get_global_properties().parameters.max_authority_depth,
-		1
+      1
    );
    return result;
 }

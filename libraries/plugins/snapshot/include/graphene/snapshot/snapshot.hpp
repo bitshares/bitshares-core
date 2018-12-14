@@ -34,7 +34,7 @@ class snapshot_plugin : public graphene::app::plugin {
    public:
       ~snapshot_plugin() {}
 
-      std::string plugin_name()const override;
+      //std::string plugin_name()const override;
       std::string plugin_description()const override;
 
       virtual void plugin_set_program_options(
@@ -43,8 +43,9 @@ class snapshot_plugin : public graphene::app::plugin {
       ) override;
 
       virtual void plugin_initialize( const boost::program_options::variables_map& options ) override;
-      virtual void plugin_startup() override;
-      virtual void plugin_shutdown() override;
+   protected:
+      virtual void startup() override;
+      virtual void shutdown() override;
 
    private:
        void check_snapshot( const graphene::chain::signed_block& b);

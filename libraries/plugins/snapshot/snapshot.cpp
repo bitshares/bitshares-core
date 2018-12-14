@@ -48,12 +48,12 @@ void snapshot_plugin::plugin_set_program_options(
          ;
    config_file_options.add(command_line_options);
 }
-
+/*
 std::string snapshot_plugin::plugin_name()const
 {
    return "snapshot";
 }
-
+*/
 std::string snapshot_plugin::plugin_description()const
 {
    return "Create snapshots at a specified time or block number.";
@@ -80,9 +80,9 @@ void snapshot_plugin::plugin_initialize(const boost::program_options::variables_
    ilog("snapshot plugin: plugin_initialize() end");
 } FC_LOG_AND_RETHROW() }
 
-void snapshot_plugin::plugin_startup() {}
+void snapshot_plugin::startup() {}
 
-void snapshot_plugin::plugin_shutdown() {}
+void snapshot_plugin::shutdown() {}
 
 static void create_snapshot( const graphene::chain::database& db, const fc::path& dest )
 {

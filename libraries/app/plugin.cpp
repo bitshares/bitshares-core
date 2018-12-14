@@ -24,6 +24,7 @@
 
 #include <graphene/app/plugin.hpp>
 #include <graphene/chain/protocol/fee_schedule.hpp>
+#include <graphene/app/plugin_type.hpp>
 
 namespace graphene { namespace app {
 
@@ -40,8 +41,9 @@ plugin::~plugin()
 
 std::string plugin::plugin_name()const
 {
-   return "<unknown plugin>";
+   return get_plugin_name(*this);
 }
+
 
 std::string plugin::plugin_description()const
 {
@@ -55,10 +57,44 @@ void plugin::plugin_initialize( const boost::program_options::variables_map& opt
 
 void plugin::plugin_startup()
 {
-   return;
+   try
+   {
+      try
+      {
+         startup();
+         ilog("Start ${plugin} succeed",("plugin",plugin_name()));
+      }
+      catch(...)
+      {
+         wlog("Start ${plugin} faied",("plugin",plugin_name()));
+         throw;
+      }
+   }FC_CAPTURE_AND_RETHROW()
 }
 
 void plugin::plugin_shutdown()
+{
+   try
+   {
+      try
+      {
+         shutdown();
+         ilog("Shutdown ${plugin} succeed",("plugin",plugin_name()));
+      }
+      catch(...)
+      {
+         wlog("Shutdown ${plugin} faied",("plugin",plugin_name()));
+         throw;
+      }
+   }FC_CAPTURE_AND_RETHROW()
+}
+
+void plugin::startup()
+{
+   return;
+}
+
+void plugin::shutdown()
 {
    return;
 }

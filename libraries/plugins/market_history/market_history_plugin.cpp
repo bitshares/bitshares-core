@@ -398,12 +398,12 @@ market_history_plugin::market_history_plugin() :
 market_history_plugin::~market_history_plugin()
 {
 }
-
+/*
 std::string market_history_plugin::plugin_name()const
 {
    return "market_history";
 }
-
+*/
 void market_history_plugin::plugin_set_program_options(
    boost::program_options::options_description& cli,
    boost::program_options::options_description& cfg
@@ -444,7 +444,7 @@ void market_history_plugin::plugin_initialize(const boost::program_options::vari
       my->_max_order_his_seconds_per_market = options["max-order-his-seconds-per-market"].as<uint32_t>();
 } FC_CAPTURE_AND_RETHROW() }
 
-void market_history_plugin::plugin_startup()
+void market_history_plugin::startup()
 {
 }
 

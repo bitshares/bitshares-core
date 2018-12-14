@@ -7,3 +7,5 @@ add_subdirectory( delayed_node )
 add_subdirectory( debug_witness )
 add_subdirectory( snapshot )
 add_subdirectory( es_objects )
+add_subdirectory( template_plugin )
+
