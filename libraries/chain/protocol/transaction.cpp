@@ -364,7 +364,7 @@ void signed_transaction::get_required_signatures(
    const flat_set<public_key_type>& available_keys,
    const std::function<const authority*(account_id_type)>& get_active,
    const std::function<const authority*(account_id_type)>& get_owner,
-   set<public_key_type> &conti_use_reult,
+   set<public_key_type> *conti_use_reult,
    uint32_t max_recursion /*= GRAPHENE_MAX_SIG_CHECK_DEPTH*/,
    uint32_t need_authority_type /*= 0*/ /*0 no need ,1 need other*/
    )const
@@ -393,11 +393,13 @@ void signed_transaction::get_required_signatures(
       default:break;
    }
    */
+   if (conti_use_reult == nullptr)
+      return;
    if(need_authority_type == 1)
    {
       for (const auto &auth : other)
          for (const auto &key : auth.get_keys())
-            conti_use_reult.insert(key);
+            conti_use_reult->insert(key);
    }
 }
 

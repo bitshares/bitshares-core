@@ -16,7 +16,8 @@ add_library( graphene_app
 # need to link graphene_debug_witness because plugins aren't sufficiently isolated #246
 target_link_libraries( graphene_app fc graphene_db graphene_chain graphene_net graphene_utilities
 
-#get_sub_class_name you need link graphene_witness
+#get_sub_class_name you need link 
+                       graphene_witness
                        graphene_debug_witness
                        graphene_account_history
                        graphene_elasticsearch        
