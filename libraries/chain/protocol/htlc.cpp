@@ -26,7 +26,6 @@
 namespace graphene { namespace chain {
 
    void htlc_create_operation::validate()const {
-     FC_ASSERT( source != destination );
       FC_ASSERT( fee.amount >= 0 );
       FC_ASSERT( amount.amount > 0 );
    }

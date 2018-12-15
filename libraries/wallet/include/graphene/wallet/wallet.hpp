@@ -1462,10 +1462,10 @@ class wallet_api
        * @param destination The account that will receive the funds if the preimage is presented
        * @param amount the amount of the asset that is to be traded
        * @param asset_symbol The asset that is to be traded
-       * @param hash_algorithm the algorithm used to generate the hash from the preimage. Can be RIPEMD160 or SHA256.
+       * @param hash_algorithm the algorithm used to generate the hash from the preimage. Can be RIPEMD160, SHA1 or SHA256.
        * @param preimage_hash the hash of the preimage
        * @param preimage_size the size of the preimage in bytes
-       * @param claim_period_seconds when the time lock expires
+       * @param claim_period_seconds how long after creation until the lock expires
        * @param broadcast true if you wish to broadcast the transaction
        */
       signed_transaction htlc_prepare( string source, string destination, string amount, string asset_symbol,
@@ -1483,14 +1483,14 @@ class wallet_api
             bool broadcast = false );
 
       /*****
-       * Set a new timelock on an existing HTLC
+       * Increase the timelock on an existing HTLC
        * 
        * @param htlc_id The object identifier of the HTLC on the blockchain
        * @param issuer Who is performing this operation (and paying the fee)
-       * @param timelock the new time of expiry
+       * @param seconds_to_add how many seconds to add to the existing timelock
        * @param broadcast true to broadcast to the network
        */
-      signed_transaction htlc_extend_expiry(string htlc_id, string issuer, const uint32_t seconds_to_add,
+      signed_transaction htlc_extend(string htlc_id, string issuer, const uint32_t seconds_to_add,
             bool broadcast = false);
 
       /**
@@ -1846,7 +1846,7 @@ FC_API( graphene::wallet::wallet_api,
         (update_worker_votes)
         (htlc_prepare)
         (htlc_redeem)
-        (htlc_extend_expiry)
+        (htlc_extend)
         (get_vesting_balances)
         (withdraw_vesting)
         (vote_for_committee_member)

@@ -117,12 +117,12 @@ BOOST_AUTO_TEST_CASE( htlc_before_hardfork )
       graphene::chain::htlc_create_operation create_operation;
 
       create_operation.amount = graphene::chain::asset( 10000 );
-      create_operation.destination = bob_id;
+      create_operation.to = bob_id;
       create_operation.claim_period_seconds = 60;
       create_operation.preimage_hash = preimage_hash;
       create_operation.hash_type = graphene::chain::hash_algorithm::sha256;
       create_operation.preimage_size = preimage_size;
-      create_operation.source = alice_id;
+      create_operation.from = alice_id;
       trx.operations.push_back(create_operation);
       sign(trx, alice_private_key);
       GRAPHENE_CHECK_THROW(PUSH_TX(db, trx, ~0), fc::exception);
@@ -164,18 +164,17 @@ BOOST_AUTO_TEST_CASE( htlc_expires )
       graphene::chain::htlc_create_operation create_operation;
 
       create_operation.amount = graphene::chain::asset( 10000 );
-      create_operation.destination = bob_id;
+      create_operation.to = bob_id;
       create_operation.claim_period_seconds = 60;
       create_operation.preimage_hash = preimage_hash;
       create_operation.hash_type = graphene::chain::hash_algorithm::sha256;
       create_operation.preimage_size = preimage_size;
-      create_operation.source = alice_id;
+      create_operation.from = alice_id;
       trx.operations.push_back(create_operation);
       sign(trx, alice_private_key);
       PUSH_TX(db, trx, ~0);
       trx.clear();
       graphene::chain::signed_block blk = generate_block();
-      // can we assume that alice's transaction will be the only one in this block?
       processed_transaction alice_trx = blk.transactions[0];
       alice_htlc_id = alice_trx.operation_results[0].get<object_id_type>();
       generate_block();
@@ -222,19 +221,18 @@ BOOST_AUTO_TEST_CASE( htlc_fulfilled )
       graphene::chain::htlc_create_operation create_operation;
 
       create_operation.amount = graphene::chain::asset( 100000 );
-      create_operation.destination = bob_id;
+      create_operation.to = bob_id;
       create_operation.claim_period_seconds = 86400;
       create_operation.preimage_hash = preimage_hash;
       create_operation.hash_type = graphene::chain::hash_algorithm::sha256;
       create_operation.preimage_size = preimage_size;
-      create_operation.source = alice_id;
+      create_operation.from = alice_id;
       create_operation.fee = db.current_fee_schedule().calculate_fee( create_operation );
       trx.operations.push_back(create_operation);
       sign(trx, alice_private_key);
       PUSH_TX(db, trx, ~0);
       trx.clear();
       graphene::chain::signed_block blk = generate_block();
-      // can we assume that alice's transaction will be the only one in this block?
       processed_transaction alice_trx = blk.transactions[0];
       alice_htlc_id = alice_trx.operation_results[0].get<object_id_type>();
    }
@@ -265,7 +263,7 @@ BOOST_AUTO_TEST_CASE( htlc_fulfilled )
       trx.clear();
    }
    // verify funds end up in Bob's account
-   BOOST_CHECK_EQUAL( get_balance(bob_id,   graphene::chain::asset_id_type()), 1000000 );
+   BOOST_CHECK_EQUAL( get_balance(bob_id,   graphene::chain::asset_id_type()), 1100000 );
    BOOST_CHECK_EQUAL( get_balance(alice_id, graphene::chain::asset_id_type()), 700000 );
 }
 
@@ -292,11 +290,11 @@ BOOST_AUTO_TEST_CASE( other_peoples_money )
    {
       graphene::chain::htlc_create_operation create_operation;
       create_operation.amount = graphene::chain::asset( 10000 );
-      create_operation.destination = bob_id;
+      create_operation.to = bob_id;
       create_operation.claim_period_seconds = 3;
       create_operation.preimage_hash = preimage_hash;
       create_operation.preimage_size = preimage_size;
-      create_operation.source = alice_id;
+      create_operation.from = alice_id;
       trx.operations.push_back(create_operation);
       sign(trx, bob_private_key);
       GRAPHENE_CHECK_THROW(PUSH_TX(db, trx, database::skip_nothing), fc::exception);
@@ -306,12 +304,12 @@ BOOST_AUTO_TEST_CASE( other_peoples_money )
    {
       graphene::chain::htlc_create_operation create_operation;
       create_operation.amount = graphene::chain::asset( 10000 );
-      create_operation.destination = bob_id;
+      create_operation.to = bob_id;
       create_operation.claim_period_seconds = 3;
       create_operation.preimage_hash = preimage_hash;
       create_operation.hash_type = graphene::chain::hash_algorithm::sha256;
       create_operation.preimage_size = preimage_size;
-      create_operation.source = alice_id;
+      create_operation.from = alice_id;
       trx.operations.push_back(create_operation);
       sign(trx, alice_private_key);
       PUSH_TX(db, trx, database::skip_nothing);

@@ -1760,8 +1760,8 @@ public:
          FC_ASSERT(asset_obj, "Could not find asset matching ${asset}", ("asset", asset_symbol));
 
          htlc_create_operation create_op;
-         create_op.source = get_account(source).id;
-         create_op.destination = get_account(destination).id;
+         create_op.from = get_account(source).id;
+         create_op.to = get_account(destination).id;
          create_op.amount = asset_obj->amount_from_string(amount);
          create_op.claim_period_seconds = claim_period_seconds;
          create_op.preimage_hash = preimage_hash;
@@ -1804,7 +1804,7 @@ public:
       } FC_CAPTURE_AND_RETHROW( (htlc_id)(issuer)(preimage)(broadcast) ) 
    }
 
-   signed_transaction htlc_extend_expiry ( string htlc_id, string issuer, const uint32_t seconds_to_add, bool broadcast)
+   signed_transaction htlc_extend ( string htlc_id, string issuer, const uint32_t seconds_to_add, bool broadcast)
    {
       try 
       {
@@ -2991,7 +2991,7 @@ std::string operation_printer::operator()(const htlc_redeem_operation& op) const
 std::string operation_printer::operator()(const htlc_create_operation& op) const
 {
    auto fee_asset = wallet.get_asset( op.fee.asset_id );
-   auto to = wallet.get_account( op.destination );
+   auto to = wallet.get_account( op.to );
    operation_result_printer rprinter(wallet);
    std::string database_id = result.visit(rprinter);
 
@@ -3143,16 +3143,11 @@ uint64_t wallet_api::get_asset_count()const
 
 std::vector<uint8_t> string_to_vec(std::string incoming)
 {
-   char s[3];
-   s[2] = 0;
-   std::vector<uint8_t> vec;
-   for(int i = 0; i < incoming.length(); i+= 2)
-   {
-      s[0] = incoming[i];
-      s[1] = incoming[i+1];
-      vec.push_back( (int)strtol(&s[0], nullptr, 16));
-   }
-   return vec;
+   FC_ASSERT(incoming.size() % 2 == 0, "Invalid incoming hash.");
+   std::size_t outgoing_size = incoming.size() / 2;
+   std::vector<uint8_t> outgoing(outgoing_size);
+   fc::from_hex(incoming, (char*)outgoing.data(), outgoing_size);
+   return outgoing;
 }
 
 signed_transaction wallet_api::htlc_prepare( string source, string destination, string amount, string asset_symbol,
@@ -3189,10 +3184,10 @@ signed_transaction wallet_api::htlc_redeem( std::string htlc_id, std::string iss
    return my->htlc_redeem(htlc_id, issuer, std::vector<uint8_t>(preimage.begin(), preimage.end()), broadcast);
 }
 
-signed_transaction wallet_api::htlc_extend_expiry ( std::string htlc_id, std::string issuer, const uint32_t seconds_to_add,
+signed_transaction wallet_api::htlc_extend ( std::string htlc_id, std::string issuer, const uint32_t seconds_to_add,
       bool broadcast)
 {
-   return my->htlc_extend_expiry(htlc_id, issuer, seconds_to_add, broadcast);
+   return my->htlc_extend(htlc_id, issuer, seconds_to_add, broadcast);
 }
 
 vector<operation_detail> wallet_api::get_account_history(string name, int limit)const

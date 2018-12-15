@@ -40,9 +40,9 @@ namespace graphene {
          // paid to network
     	   asset fee; 
          // where the held monies are to come from
-         account_id_type source;
+         account_id_type from;
          // where the held monies will go if the preimage is provided
-    	   account_id_type destination; 
+    	   account_id_type to; 
          // the amount to hold
     	   asset amount;
          // hash algorithm used to create preimage_hash
@@ -65,7 +65,7 @@ namespace graphene {
          /**
           * @brief who will pay the fee
           */
-         account_id_type fee_payer()const { return source; }
+         account_id_type fee_payer()const { return from; }
 
          /****
           * @brief calculates the fee to be paid for this operation
@@ -179,7 +179,7 @@ FC_REFLECT( graphene::chain::htlc_extend_operation::fee_parameters_type, (fee) (
 FC_REFLECT( graphene::chain::htlc_refund_operation::fee_parameters_type, ) // VIRTUAL
 
 FC_REFLECT( graphene::chain::htlc_create_operation, 
-      (fee)(source)(destination)(amount)(preimage_hash)(preimage_size)(claim_period_seconds)(extensions)(hash_type))
+      (fee)(from)(to)(amount)(preimage_hash)(preimage_size)(claim_period_seconds)(extensions)(hash_type))
 FC_REFLECT( graphene::chain::htlc_redeem_operation, (fee)(htlc_id)(redeemer)(preimage)(extensions))
 FC_REFLECT( graphene::chain::htlc_extend_operation, (fee)(htlc_id)(update_issuer)(seconds_to_add)(extensions))
 FC_REFLECT( graphene::chain::htlc_refund_operation, (fee)(htlc_id)(to))
