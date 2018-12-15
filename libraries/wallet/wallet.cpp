@@ -652,9 +652,11 @@ public:
 
    htlc_object get_htlc(string htlc_id) const
    {
-      auto obj = _remote_db->get_htlc(htlc_id);
-      FC_ASSERT(obj, "HTLC not found");
-      return *obj;
+      htlc_id_type id;
+      fc::from_variant(htlc_id, id);
+      auto obj = _remote_db->get_objects( { id }).front();
+      htlc_object htlc = obj.template as<htlc_object>(GRAPHENE_MAX_NESTED_OBJECTS);
+      return htlc;
    }
 
    asset_id_type get_asset_id(string asset_symbol_or_id) const
@@ -3171,8 +3173,6 @@ variant wallet_api::get_htlc(std::string htlc_id) const
    ret_val["amount"] = obj.amount.amount.value;
    ret_val["asset"] = (std::string)((graphene::db::object_id_type)obj.amount.asset_id);
    ret_val["expiration"] = fc::get_approximate_relative_time_string(obj.expiration);
-   ret_val["pending_fee_amount"] = obj.pending_fee.amount.value;
-   ret_val["pending_fee_asset"] = (std::string)((graphene::db::object_id_type)obj.pending_fee.asset_id);
    std::stringstream hash_string;
    for(unsigned char c : obj.preimage_hash)
       hash_string << std::setfill('0') << std::setw(2) << std::hex << (int)c;

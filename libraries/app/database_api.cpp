@@ -168,9 +168,6 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
       vector<withdraw_permission_object> get_withdraw_permissions_by_giver(const std::string account_id_or_name, withdraw_permission_id_type start, uint32_t limit)const;
       vector<withdraw_permission_object> get_withdraw_permissions_by_recipient(const std::string account_id_or_name, withdraw_permission_id_type start, uint32_t limit)const;
 
-      // Escrow / HTLC
-      fc::optional<htlc_object> get_htlc(const std::string htlc_id) const;
-
    //private:
       static string price_to_string( const price& _price, const asset_object& _base, const asset_object& _quote );
 
@@ -420,10 +417,6 @@ void database_api_impl::cancel_all_subscriptions( bool reset_callback, bool rese
 //                                                                  //
 //////////////////////////////////////////////////////////////////////
 
-optional<htlc_object> database_api::get_htlc(const std::string& htlc_id) const
-{
-   return my->get_htlc( htlc_id );
-}
 optional<block_header> database_api::get_block_header(uint32_t block_num)const
 {
    return my->get_block_header( block_num );
@@ -2294,44 +2287,6 @@ vector<withdraw_permission_object> database_api_impl::get_withdraw_permissions_b
       ++withdraw_itr;
    }
    return result;
-}
-
-//////////////////////////////////////////////////////////////////////
-//                                                                  //
-// Escrow / HTLC                                                    //
-//                                                                  //
-//////////////////////////////////////////////////////////////////////
-htlc_id_type htlc_string_to_id(std::string incoming)
-{
-   boost::replace_all(incoming, "\"", "");
-   boost::replace_all(incoming, ".", ",");
-   std::stringstream ss(incoming);
-   htlc_id_type id;
-   int i;
-   int pos = 0;
-   while(ss >> i)
-   {
-      if (pos == 0 && i != id.space_id)
-         FC_ASSERT("Invalid HTLC ID");
-      if (pos == 1 && i != id.type_id)
-         FC_ASSERT("Invalid HTLC ID");
-      if (pos == 2)
-         id.instance = i;
-      pos++;
-      if (ss.peek() == ',')
-         ss.ignore();
-   }
-   return id;
-}
-
-fc::optional<htlc_object> database_api_impl::get_htlc(const std::string htlc_id) const
-{
-   htlc_id_type id = htlc_string_to_id(htlc_id);
-   const auto& htlc_idx = _db.get_index_type<htlc_index>().indices().get<by_id>();
-   auto itr = htlc_idx.find(id);
-   if (itr == htlc_idx.end())
-      return {};
-   return (*itr);      
 }
 
 //////////////////////////////////////////////////////////////////////

@@ -55,7 +55,6 @@ namespace graphene { namespace chain {
          account_id_type to;
          asset amount;
          fc::time_point_sec expiration;
-         asset pending_fee;
          vector<unsigned char> preimage_hash;
          fc::enum_type<uint8_t, hash_algorithm> preimage_hash_algorithm;
          uint16_t preimage_size;
@@ -68,13 +67,15 @@ namespace graphene { namespace chain {
          indexed_by<
             ordered_unique< tag< by_id >, member< object, object_id_type, &object::id > >,
 
-            ordered_non_unique< tag< by_expiration >, member< htlc_object, 
-                  fc::time_point_sec, &htlc_object::expiration > >,
+            ordered_unique< tag< by_expiration >, 
+                  composite_key< htlc_object, 
+                  member< htlc_object, fc::time_point_sec, &htlc_object::expiration >,
+                  member< object, object_id_type, &object::id > > >,
 
-            ordered_non_unique< tag< by_from_id >,
-                  composite_key< htlc_object, member< htlc_object, account_id_type,  &htlc_object::from >
-               >
-            >
+            ordered_unique< tag< by_from_id >,
+                  composite_key< htlc_object, 
+                  member< htlc_object, account_id_type,  &htlc_object::from >,
+                  member< object, object_id_type, &object::id > > >
          >
 
    > htlc_object_index_type;
@@ -98,5 +99,5 @@ namespace fc
 FC_REFLECT_ENUM( graphene::chain::hash_algorithm, (unknown)(ripemd160)(sha256)(sha1));
 
 FC_REFLECT_DERIVED( graphene::chain::htlc_object, (graphene::db::object),
-               (from)(to)(amount)(expiration)(pending_fee)
+               (from)(to)(amount)(expiration)
 					(preimage_hash)(preimage_hash_algorithm)(preimage_size) );

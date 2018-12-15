@@ -268,13 +268,6 @@ class database_api
       account_id_type get_account_id_from_string(const std::string& name_or_id) const;
 
       /**
-       * @brief Get HTLC object from an ID
-       * @param htlc_id the id of the HTLC
-       * @return the HTLC object
-       */
-      fc::optional<htlc_object> get_htlc( const std::string& htlc_id ) const;
-
-      /**
        * @brief Get a list of accounts by ID
        * @param account_names_or_ids IDs or names of the accounts to retrieve
        * @return The accounts corresponding to the provided IDs
@@ -797,9 +790,6 @@ FC_API(graphene::app::database_api,
    (list_assets)
    (lookup_asset_symbols)
    (get_asset_count)
-
-   // HTLC / Escrow
-   (get_htlc)
 
    // Markets / feeds
    (get_order_book)

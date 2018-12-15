@@ -422,9 +422,13 @@ void get_relevant_accounts( const object* obj, flat_set<account_id_type>& accoun
               FC_ASSERT( aobj != nullptr );
               accounts.insert( aobj->bidder );
               break;
-           } case impl_htlc_object_type:
-            break;
-
+           } case impl_htlc_object_type: {
+              const auto& htlc_obj = dynamic_cast<const htlc_object*>(obj);
+              FC_ASSERT( htlc_obj != nullptr);
+              accounts.insert( htlc_obj->from );
+              accounts.insert( htlc_obj->to );
+              break;
+           }
       }
    }
 } // end get_relevant_accounts( const object* obj, flat_set<account_id_type>& accounts )

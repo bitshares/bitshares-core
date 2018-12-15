@@ -703,7 +703,7 @@ BOOST_AUTO_TEST_CASE( cli_create_htlc )
 
          // get the ID:
          htlc_id_type htlc_id = result_block.transactions[result_block.transactions.size()-1].operation_results[0].get<object_id_type>();
-         alice_htlc_id_as_string = fc::json::to_pretty_string(htlc_id);
+         alice_htlc_id_as_string = (std::string)(object_id_type)htlc_id;
          BOOST_TEST_MESSAGE("Alice shares the HTLC ID with Bob. The HTLC ID is: " + alice_htlc_id_as_string);
       }
 
@@ -725,7 +725,7 @@ BOOST_AUTO_TEST_CASE( cli_create_htlc )
 
          // get the ID:
          htlc_id_type htlc_id = result_block.transactions[result_block.transactions.size()-1].operation_results[0].get<object_id_type>();
-         bob_htlc_id_as_string = fc::json::to_pretty_string(htlc_id);
+         bob_htlc_id_as_string = (std::string)(object_id_type)htlc_id;
          BOOST_TEST_MESSAGE("Bob shares the HTLC ID with Alice. The HTLC ID is: " + bob_htlc_id_as_string);
       }
 

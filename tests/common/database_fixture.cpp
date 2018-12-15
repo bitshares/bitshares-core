@@ -290,7 +290,6 @@ void database_fixture::verify_asset_supplies( const database& db )
    for( auto itr = htlc_idx.begin(); itr != htlc_idx.end(); ++itr )
    {
       total_balances[itr->amount.asset_id] += itr->amount.amount;
-      total_balances[itr->pending_fee.asset_id] += itr->pending_fee.amount;
    }
 
    for( const asset_object& asset_obj : db.get_index_type<asset_index>().indices() )

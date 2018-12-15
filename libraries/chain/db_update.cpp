@@ -561,20 +561,19 @@ void database::update_withdraw_permissions()
 void database::clear_expired_htlcs()
 {
    const auto& htlc_idx = get_index_type<htlc_index>().indices().get<by_expiration>();
-   while ( !htlc_idx.empty() && htlc_idx.begin() != htlc_idx.end()
+   while ( htlc_idx.begin() != htlc_idx.end()
          && htlc_idx.begin()->expiration <= head_block_time() )
    {
       const htlc_object& obj = *htlc_idx.begin();
       adjust_balance( obj.from, obj.amount );
       // virtual op
-      htlc_refund_operation vop(obj.id, obj.from);
+      htlc_refund_operation vop( obj.id, obj.from );
       vop.htlc_id = htlc_idx.begin()->id;
-      push_applied_operation(vop);
+      push_applied_operation( vop );
 
       // remove the db object
-      remove( *htlc_idx.begin());
+      remove( *htlc_idx.begin() );
    }
-
 }
 
 } }

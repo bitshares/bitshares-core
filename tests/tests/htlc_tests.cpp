@@ -95,7 +95,7 @@ void set_committee_parameters(database_fixture* db_fixture)
 
 void advance_past_hardfork(database_fixture* db_fixture)
 {
-   db_fixture->generate_blocks(HARDFORK_HTLC_TIME);
+   db_fixture->generate_blocks(HARDFORK_CORE_1468_TIME);
    set_committee_parameters(db_fixture);
    set_expiration(db_fixture->db, db_fixture->trx);
 }
@@ -191,8 +191,8 @@ BOOST_AUTO_TEST_CASE( htlc_expires )
 
    // make sure Bob (or anyone) can see the details of the transaction
    graphene::app::database_api db_api(db);
-   optional<graphene::chain::htlc_object> htlc = db_api.get_htlc(fc::json::to_pretty_string(alice_htlc_id));
-   BOOST_CHECK(htlc);
+   auto obj = db_api.get_objects( {alice_htlc_id }).front();
+   graphene::chain::htlc_object htlc = obj.template as<graphene::chain::htlc_object>(GRAPHENE_MAX_NESTED_OBJECTS);
 
    // let it expire (wait for timeout)
    generate_blocks(fc::time_point_sec(120) );

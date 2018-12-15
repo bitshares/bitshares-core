@@ -1,4 +1,0 @@
-// HTLC implementation
-#ifndef HARDFORK_HTLC_TIME
-#define HARDFORK_HTLC_TIME (fc::time_point_sec( 1600000000 ) )
-#endif

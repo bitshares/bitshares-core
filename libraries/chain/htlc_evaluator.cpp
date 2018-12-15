@@ -37,41 +37,35 @@ namespace graphene {
 
       void_result htlc_create_evaluator::do_evaluate(const htlc_create_operation& o)
       {
-         //FC_ASSERT( db().head_block_time() > HARDFORK_HTLC_TIME,
-         //           "Operation not allowed before HARDFORK_HTLC_TIME."); // remove after HARDFORK_ESCROW_TIME
+         //FC_ASSERT( db().head_block_time() > HARDFORK_CORE_1468_TIME,
+         //           "Operation not allowed before HARDFORK_CORE_1468_TIME."); // remove after HARDFORK_ESCROW_TIME
 
          optional<htlc_options> htlc_options = get_committee_htlc_options(db());
 
          FC_ASSERT(htlc_options, "HTLC Committee options are not set.");
 
          // make sure the expiration is reasonable
-         FC_ASSERT( o.seconds_in_force < htlc_options->max_timeout_secs, "HTLC Timeout exceeds allowed length" );
+         FC_ASSERT( o.seconds_in_force <= htlc_options->max_timeout_secs, "HTLC Timeout exceeds allowed length" );
          // make sure the preimage length is reasonable
-         FC_ASSERT( o.key_size < htlc_options->max_preimage_size, "HTLC preimage length exceeds allowed length" ); 
+         FC_ASSERT( o.key_size <= htlc_options->max_preimage_size, "HTLC preimage length exceeds allowed length" ); 
          // make sure we have a hash algorithm set
          FC_ASSERT( o.hash_type != graphene::chain::hash_algorithm::unknown, "HTLC Hash Algorithm must be set" );
-         // make sure sender has the funds for the HTLC
-         FC_ASSERT( db().get_balance( o.source, o.amount.asset_id ) >= (o.amount ), "Insufficient funds" );
-         // make sure sender has the funds for the fee
-         FC_ASSERT( db().get_balance( o.source, asset().asset_id) > o.fee, "Insufficient funds" );
          return void_result();
       }
 
       object_id_type htlc_create_evaluator::do_apply(const htlc_create_operation& o)
       {
           try {
-             //FC_ASSERT( db().head_block_time() > HARDFORK_ESCROW_TIME,
-             //           "Operation not allowed before HARDFORK_ESCROW_TIME."); // remove after HARDFORK_ESCROW_TIME
+             graphene::chain::database& dbase = db();
+             dbase.adjust_balance( o.source, -o.amount );
 
-             db().adjust_balance( o.source, -o.amount );
-
-             const htlc_object& esc = db().create<htlc_object>([&]( htlc_object& esc ) {
+             const htlc_object& esc = db().create<htlc_object>([&dbase,o]( htlc_object& esc ) {
                 esc.from                  = o.source;
                 esc.to                    = o.destination;
                 esc.amount                = o.amount;
                 esc.preimage_hash		   = o.key_hash;
                 esc.preimage_size		   = o.key_size;
-                esc.expiration		      = db().head_block_time() + o.seconds_in_force;
+                esc.expiration		      = dbase.head_block_time() + o.seconds_in_force;
                 esc.preimage_hash_algorithm = o.hash_type;
              });
              return  esc.id;
@@ -82,86 +76,62 @@ namespace graphene {
       template<typename T>
       bool htlc_redeem_evaluator::test_hash(const std::vector<unsigned char>& incoming_preimage, const std::vector<unsigned char>& valid_hash)
       {
-         // convert incoming_preimage to an array
-         unsigned char incoming_array[incoming_preimage.size()];
-         for(unsigned i = 0; i < incoming_preimage.size(); ++i)
-            incoming_array[i] = incoming_preimage[i];
-         T attempted_hash = T::hash( (char*)incoming_array, incoming_preimage.size());
+         T attempted_hash = T::hash( (const char*)incoming_preimage.data(), incoming_preimage.size());
          if (attempted_hash.data_size() != valid_hash.size())
             return false;
-         char* data = attempted_hash.data();
-         for(size_t i = 0; i < attempted_hash.data_size(); ++i)
-         {
-            if ( ((unsigned char)data[i]) != valid_hash[i])
-               return false;
-         }
-         return true;
+         return memcmp(attempted_hash.data(), valid_hash.data(), attempted_hash.data_size()) == 0;
       }
 
       void_result htlc_redeem_evaluator::do_evaluate(const htlc_redeem_operation& o)
       {
     	   htlc_obj = &db().get<htlc_object>(o.htlc_id);
 
-  		   FC_ASSERT(o.preimage.size() == htlc_obj->preimage_size, "Preimage size mismatch.");
-    		FC_ASSERT(db().head_block_time().sec_since_epoch() < htlc_obj->expiration.sec_since_epoch(), "Preimage provided after escrow expiration.");
+         FC_ASSERT(o.preimage.size() == htlc_obj->preimage_size, "Preimage size mismatch.");
+    		FC_ASSERT(db().head_block_time() < htlc_obj->expiration, "Preimage provided after escrow expiration.");
 
     		// see if the preimages match
          bool match = false;
-         if (htlc_obj->preimage_hash_algorithm == graphene::chain::hash_algorithm::sha256)
-            match = test_hash<fc::sha256>(o.preimage, htlc_obj->preimage_hash);
-         if (htlc_obj->preimage_hash_algorithm == graphene::chain::hash_algorithm::ripemd160)
-            match = test_hash<fc::ripemd160>(o.preimage, htlc_obj->preimage_hash);
-         if (htlc_obj->preimage_hash_algorithm == graphene::chain::hash_algorithm::sha1)
-            match = test_hash<fc::sha1>(o.preimage, htlc_obj->preimage_hash);
+         switch(htlc_obj->preimage_hash_algorithm)
+         {
+            case (graphene::chain::hash_algorithm::sha256):
+               match = test_hash<fc::sha256>(o.preimage, htlc_obj->preimage_hash);
+               break;
+            case (graphene::chain::hash_algorithm::ripemd160):
+               match = test_hash<fc::ripemd160>(o.preimage, htlc_obj->preimage_hash);
+               break;
+            case (graphene::chain::hash_algorithm::sha1):
+               match = test_hash<fc::sha1>(o.preimage, htlc_obj->preimage_hash);
+               break;
+            default:
+               break;
+         }
 
-    		FC_ASSERT(match, "Provided preimage does not generate correct hash.");
-    	   return void_result();
+         FC_ASSERT(match, "Provided preimage does not generate correct hash.");
+         return void_result();
       }
 
       void_result htlc_redeem_evaluator::do_apply(const htlc_redeem_operation& o)
       {
- 		   db().adjust_balance(htlc_obj->to, htlc_obj->amount);
-  		   db().remove(*htlc_obj);
-    	   return void_result();
+         db().adjust_balance(htlc_obj->to, htlc_obj->amount);
+         db().remove(*htlc_obj);
+         return void_result();
       }
 
       void_result htlc_extend_evaluator::do_evaluate(const htlc_extend_operation& o)
       {
-    	   htlc_obj = &db().get<htlc_object>(o.htlc_id);
-
-  		   FC_ASSERT(db().head_block_time().sec_since_epoch() < htlc_obj->expiration.sec_since_epoch(), "HTLC has already expired.");
-
-    	   return void_result();
+         htlc_obj = &db().get<htlc_object>(o.htlc_id);
+         FC_ASSERT(db().head_block_time().sec_since_epoch() < htlc_obj->expiration.sec_since_epoch(), "HTLC has already expired.");
+         return void_result();
       }
 
       void_result htlc_extend_evaluator::do_apply(const htlc_extend_operation& o)
       {
          db().modify(*htlc_obj, [&o](htlc_object& db_obj) {
-            db_obj.expiration = fc::time_point_sec(db_obj.expiration.sec_since_epoch() + o.seconds_to_add);
+            db_obj.expiration += o.seconds_to_add;
          });
 
     	   return void_result();
       }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
    } // namespace chain
 } // namespace graphene
