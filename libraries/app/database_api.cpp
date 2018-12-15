@@ -799,11 +799,9 @@ std::map<std::string, full_account> database_api_impl::get_full_accounts( const 
 
 
       // Add the account's balances
-      auto balance_range = _db.get_index_type<account_balance_index>().indices().get<by_account_asset>().equal_range(boost::make_tuple(account->id));
-      std::for_each(balance_range.first, balance_range.second,
-                    [&acnt](const account_balance_object& balance) {
-                       acnt.balances.emplace_back(balance);
-                    });
+      const auto& balances = _db.get_index_type< primary_index< account_balance_index > >().get_secondary_index< balances_by_account_index >().get_account_balances( account->id );
+      for( const auto balance : balances )
+         acnt.balances.emplace_back( *balance.second );
 
       // Add the account's vesting balances
       auto vesting_range = _db.get_index_type<vesting_balance_index>().indices().get<by_account>().equal_range(account->id);
@@ -955,10 +953,10 @@ vector<asset> database_api_impl::get_account_balances(const std::string& account
    if (assets.empty())
    {
       // if the caller passes in an empty list of assets, return balances for all assets the account owns
-      const account_balance_index& balance_index = _db.get_index_type<account_balance_index>();
-      auto range = balance_index.indices().get<by_account_asset>().equal_range(boost::make_tuple(acnt));
-      for (const account_balance_object& balance : boost::make_iterator_range(range.first, range.second))
-         result.push_back(asset(balance.get_balance()));
+      const auto& balance_index = _db.get_index_type< primary_index< account_balance_index > >();
+      const auto& balances = balance_index.get_secondary_index< balances_by_account_index >().get_account_balances( acnt );
+      for( const auto balance : balances )
+         result.push_back( balance.second->get_balance() );
    }
    else
    {

@@ -205,7 +205,10 @@ void database::initialize_indexes()
 
    //Implementation object indexes
    add_index< primary_index<transaction_index                             > >();
-   add_index< primary_index<account_balance_index                         > >();
+
+   auto bal_idx = add_index< primary_index<account_balance_index          > >();
+   bal_idx->add_secondary_index<balances_by_account_index>();
+
    add_index< primary_index<asset_bitasset_data_index,                 13 > >(); // 8192
    add_index< primary_index<simple_index<global_property_object          >> >();
    add_index< primary_index<simple_index<dynamic_global_property_object  >> >();
