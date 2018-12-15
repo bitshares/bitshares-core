@@ -170,6 +170,12 @@ extern uint32_t GRAPHENE_TESTING_GENESIS_TIMESTAMP;
 
 namespace graphene { namespace chain {
 
+class clearable_block : public signed_block {
+public:
+   /** @brief Clears internal cached values like ID, signing key, Merkle root etc. */
+   void clear();
+};
+
 struct database_fixture {
    // the reason we use an app is to exercise the indexes of built-in
    //   plugins

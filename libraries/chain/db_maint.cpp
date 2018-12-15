@@ -33,6 +33,7 @@
 
 #include <graphene/chain/account_object.hpp>
 #include <graphene/chain/asset_object.hpp>
+#include <graphene/chain/budget_record_object.hpp>
 #include <graphene/chain/buyback_object.hpp>
 #include <graphene/chain/chain_property_object.hpp>
 #include <graphene/chain/committee_member_object.hpp>
@@ -129,33 +130,6 @@ struct worker_pay_visitor
       {
          worker.pay_worker(pay, db);
       }
-};
-
-/// @brief A budget record struct to be used in initialize_budget_record and process_budget
-struct budget_record
-{
-    uint64_t time_since_last_budget = 0;
-
-    // sources of budget
-    share_type from_initial_reserve = 0;
-    share_type from_accumulated_fees = 0;
-    share_type from_unused_witness_budget = 0;
-
-    // witness budget requested by the committee
-    share_type requested_witness_budget = 0;
-
-    // funds that can be released from reserve at maximum rate
-    share_type total_budget = 0;
-
-    // sinks of budget, should sum up to total_budget
-    share_type witness_budget = 0;
-    share_type worker_budget = 0;
-
-    // unused budget
-    share_type leftover_worker_funds = 0;
-
-    // change in supply due to budget operations
-    share_type supply_delta = 0;
 };
 
 void database::update_worker_votes()
@@ -560,6 +534,12 @@ void database::process_budget()
          _dpo.last_budget_time = now;
       });
 
+      create< budget_record_object >( [&]( budget_record_object& _rec )
+      {
+         _rec.time = head_block_time();
+         _rec.record = rec;
+      });
+
       // available_funds is money we could spend, but don't want to.
       // we simply let it evaporate back into the reserve.
    }
@@ -834,11 +814,14 @@ void database::process_bids( const asset_bitasset_data_object& bad )
    while( covered < bdd.current_supply && itr != bid_idx.end() && itr->inv_swan_price.quote.asset_id == to_revive_id )
    {
       const collateral_bid_object& bid = *itr;
-      asset total_collateral = bid.inv_swan_price.quote * bad.settlement_price;
+      asset debt_in_bid = bid.inv_swan_price.quote;
+      if( debt_in_bid.amount > bdd.current_supply )
+         debt_in_bid.amount = bdd.current_supply;
+      asset total_collateral = debt_in_bid * bad.settlement_price;
       total_collateral += bid.inv_swan_price.base;
-      price call_price = price::call_price( bid.inv_swan_price.quote, total_collateral, bad.current_feed.maintenance_collateral_ratio );
+      price call_price = price::call_price( debt_in_bid, total_collateral, bad.current_feed.maintenance_collateral_ratio );
       if( ~call_price >= bad.current_feed.settlement_price ) break;
-      covered += bid.inv_swan_price.quote.amount;
+      covered += debt_in_bid.amount;
       ++itr;
    }
    if( covered < bdd.current_supply ) return;
@@ -850,9 +833,12 @@ void database::process_bids( const asset_bitasset_data_object& bad )
    {
       const collateral_bid_object& bid = *itr;
       ++itr;
-      share_type debt = bid.inv_swan_price.quote.amount;
-      share_type collateral = (bid.inv_swan_price.quote * bad.settlement_price).amount;
-      if( bid.inv_swan_price.quote.amount >= to_cover )
+      asset debt_in_bid = bid.inv_swan_price.quote;
+      if( debt_in_bid.amount > bdd.current_supply )
+         debt_in_bid.amount = bdd.current_supply;
+      share_type debt = debt_in_bid.amount;
+      share_type collateral = (debt_in_bid * bad.settlement_price).amount;
+      if( debt >= to_cover )
       {
          debt = to_cover;
          collateral = remaining_fund;

@@ -577,7 +577,7 @@ vector<vector<account_id_type>> database_api_impl::get_key_references( vector<pu
           auto itr = refs.account_to_address_memberships.find(a);
           if( itr != refs.account_to_address_memberships.end() )
           {
-             result.reserve( itr->second.size() );
+             result.reserve( result.size() + itr->second.size() );
              for( auto item : itr->second )
              {
                 result.push_back(item);
@@ -587,7 +587,7 @@ vector<vector<account_id_type>> database_api_impl::get_key_references( vector<pu
 
       if( itr != refs.account_to_key_memberships.end() )
       {
-         result.reserve( itr->second.size() );
+         result.reserve( result.size() + itr->second.size() );
          for( auto item : itr->second ) result.push_back(item);
       }
       final_result.emplace_back( std::move(result) );
@@ -2448,7 +2448,7 @@ void database_api_impl::on_applied_block()
       }
       if( market.valid() && _market_subscriptions.count(*market) )
          // FIXME this may cause fill_order_operation be pushed before order creation
-         subscribed_markets_ops[*market].emplace_back( std::move( std::make_pair( op.op, op.result ) ) );
+         subscribed_markets_ops[*market].emplace_back(std::make_pair(op.op, op.result));
    }
    /// we need to ensure the database_api is not deleted for the life of the async operation
    auto capture_this = shared_from_this();

@@ -28,6 +28,7 @@
 #include <graphene/chain/hardfork.hpp>
 
 #include <graphene/chain/balance_object.hpp>
+#include <graphene/chain/budget_record_object.hpp>
 #include <graphene/chain/committee_member_object.hpp>
 #include <graphene/chain/market_object.hpp>
 #include <graphene/chain/withdraw_permission_object.hpp>
@@ -138,7 +139,7 @@ BOOST_AUTO_TEST_CASE( withdraw_permission_create_before_hardfork_23 )
       trx.operations.back() = op;
    }
    sign( trx, nathan_private_key );
-   db.push_transaction( trx );
+   PUSH_TX( db, trx );
    trx.clear();
 } FC_LOG_AND_RETHROW() }
 
@@ -183,7 +184,7 @@ BOOST_AUTO_TEST_CASE( withdraw_permission_create_after_hardfork_23 )
       trx.operations.back() = op;
    }
    sign( trx, nathan_private_key );
-   db.push_transaction( trx );
+   PUSH_TX( db, trx );
    trx.clear();
 } FC_LOG_AND_RETHROW() }
 
@@ -564,7 +565,6 @@ BOOST_AUTO_TEST_CASE( withdraw_permission_whitelist_asset_test )
                  | database::skip_transaction_dupe_check
                  | database::skip_block_size_check
                  | database::skip_tapos_check
-                 | database::skip_authority_check
                  | database::skip_merkle_check
                  ;
 
@@ -1027,7 +1027,7 @@ BOOST_AUTO_TEST_CASE( feed_limit_test )
    op.issuer = bit_usd.issuer;
    trx.operations = {op};
    sign( trx, nathan_private_key );
-   db.push_transaction(trx);
+   PUSH_TX(db, trx);
 
    BOOST_TEST_MESSAGE("Checking current_feed is null");
    BOOST_CHECK(bitasset.current_feed.settlement_price.is_null());
@@ -1037,7 +1037,7 @@ BOOST_AUTO_TEST_CASE( feed_limit_test )
    trx.clear();
    trx.operations = {op};
    sign( trx, nathan_private_key );
-   db.push_transaction(trx);
+   PUSH_TX(db, trx);
 
    BOOST_TEST_MESSAGE("Checking current_feed is not null");
    BOOST_CHECK(!bitasset.current_feed.settlement_price.is_null());
@@ -1051,7 +1051,6 @@ BOOST_AUTO_TEST_CASE( witness_create )
                  | database::skip_transaction_dupe_check
                  | database::skip_block_size_check
                  | database::skip_tapos_check
-                 | database::skip_authority_check
                  | database::skip_merkle_check
                  ;
    generate_block(skip);
@@ -1237,7 +1236,6 @@ BOOST_AUTO_TEST_CASE( global_settle_test )
                  | database::skip_transaction_dupe_check
                  | database::skip_block_size_check
                  | database::skip_tapos_check
-                 | database::skip_authority_check
                  | database::skip_merkle_check
                  ;
 
@@ -1615,7 +1613,6 @@ BOOST_AUTO_TEST_CASE( force_settle_test )
                  | database::skip_transaction_dupe_check
                  | database::skip_block_size_check
                  | database::skip_tapos_check
-                 | database::skip_authority_check
                  | database::skip_merkle_check
                  ;
 
@@ -1910,13 +1907,13 @@ BOOST_AUTO_TEST_CASE( balance_object_test )
    trx.operations = {op};
    _sign( trx, n_key );
    // Fail because I'm claiming from an address which hasn't signed
-   GRAPHENE_CHECK_THROW(db.push_transaction(trx), tx_missing_other_auth);
+   GRAPHENE_CHECK_THROW(PUSH_TX(db, trx), tx_missing_other_auth);
    trx.clear();
    op.balance_to_claim = balance_id_type();
    op.balance_owner_key = n_key.get_public_key();
    trx.operations = {op};
    _sign( trx, n_key );
-   db.push_transaction(trx);
+   PUSH_TX(db, trx);
 
    // Not using fixture's get_balance() here because it uses fixture's db, not my override
    BOOST_CHECK_EQUAL(db.get_balance(op.deposit_to_account, asset_id_type()).amount.value, 1);
@@ -1944,7 +1941,7 @@ BOOST_AUTO_TEST_CASE( balance_object_test )
    _sign( trx, n_key );
    _sign( trx, v1_key );
    // Attempting to claim 1 from a balance with 0 available
-   GRAPHENE_CHECK_THROW(db.push_transaction(trx), balance_claim_invalid_claim_amount);
+   GRAPHENE_CHECK_THROW(PUSH_TX(db, trx), balance_claim_invalid_claim_amount);
 
    op.balance_to_claim = vesting_balance_2.id;
    op.total_claimed.amount = 151;
@@ -1954,7 +1951,7 @@ BOOST_AUTO_TEST_CASE( balance_object_test )
    _sign( trx, n_key );
    _sign( trx, v2_key );
    // Attempting to claim 151 from a balance with 150 available
-   GRAPHENE_CHECK_THROW(db.push_transaction(trx), balance_claim_invalid_claim_amount);
+   GRAPHENE_CHECK_THROW(PUSH_TX(db, trx), balance_claim_invalid_claim_amount);
 
    op.balance_to_claim = vesting_balance_2.id;
    op.total_claimed.amount = 100;
@@ -1963,7 +1960,7 @@ BOOST_AUTO_TEST_CASE( balance_object_test )
    trx.clear_signatures();
    _sign( trx, n_key );
    _sign( trx, v2_key );
-   db.push_transaction(trx);
+   PUSH_TX(db, trx);
    BOOST_CHECK_EQUAL(db.get_balance(op.deposit_to_account, asset_id_type()).amount.value, 101);
    BOOST_CHECK_EQUAL(vesting_balance_2.balance.amount.value, 300);
 
@@ -1973,7 +1970,7 @@ BOOST_AUTO_TEST_CASE( balance_object_test )
    _sign( trx, n_key );
    _sign( trx, v2_key );
    // Attempting to claim twice within a day
-   GRAPHENE_CHECK_THROW(db.push_transaction(trx), balance_claim_claimed_too_often);
+   GRAPHENE_CHECK_THROW(PUSH_TX(db, trx), balance_claim_claimed_too_often);
 
    db.generate_block(db.get_slot_time(1), db.get_scheduled_witness(1), init_account_priv_key, skip_flags);
    slot = db.get_slot_at_time(vesting_balance_1.vesting_policy->begin_timestamp + 60);
@@ -1987,7 +1984,7 @@ BOOST_AUTO_TEST_CASE( balance_object_test )
    trx.clear_signatures();
    _sign( trx, n_key );
    _sign( trx, v1_key );
-   db.push_transaction(trx);
+   PUSH_TX(db, trx);
    BOOST_CHECK(db.find_object(op.balance_to_claim) == nullptr);
    BOOST_CHECK_EQUAL(db.get_balance(op.deposit_to_account, asset_id_type()).amount.value, 601);
 
@@ -1999,7 +1996,7 @@ BOOST_AUTO_TEST_CASE( balance_object_test )
    _sign( trx, n_key );
    _sign( trx, v2_key );
    // Attempting to claim twice within a day
-   GRAPHENE_CHECK_THROW(db.push_transaction(trx), balance_claim_claimed_too_often);
+   GRAPHENE_CHECK_THROW(PUSH_TX(db, trx), balance_claim_claimed_too_often);
 
    db.generate_block(db.get_slot_time(1), db.get_scheduled_witness(1), init_account_priv_key, skip_flags);
    slot = db.get_slot_at_time(db.head_block_time() + fc::days(1));
@@ -2011,7 +2008,7 @@ BOOST_AUTO_TEST_CASE( balance_object_test )
    trx.clear_signatures();
    _sign( trx, n_key );
    _sign( trx, v2_key );
-   db.push_transaction(trx);
+   PUSH_TX(db, trx);
    BOOST_CHECK(db.find_object(op.balance_to_claim) == nullptr);
    BOOST_CHECK_EQUAL(db.get_balance(op.deposit_to_account, asset_id_type()).amount.value, 901);
 } FC_LOG_AND_RETHROW() }
@@ -2031,7 +2028,7 @@ BOOST_AUTO_TEST_CASE(transfer_with_memo) {
       op.memo->set_message(alice_private_key, bob_public_key, "Dear Bob,\n\nMoney!\n\nLove, Alice");
       trx.operations = {op};
       trx.sign(alice_private_key, db.get_chain_id());
-      db.push_transaction(trx);
+      PUSH_TX(db, trx);
 
       BOOST_CHECK_EQUAL(get_balance(alice_id, asset_id_type()), 500);
       BOOST_CHECK_EQUAL(get_balance(bob_id, asset_id_type()), 500);
@@ -2057,7 +2054,7 @@ BOOST_AUTO_TEST_CASE(zero_second_vbo)
          transaction tx;
          tx.operations.push_back( op );
          set_expiration( db, tx );
-         db.push_transaction( tx, database::skip_authority_check | database::skip_tapos_check | database::skip_transaction_signatures );
+         PUSH_TX( db, tx, database::skip_tapos_check | database::skip_transaction_signatures );
       }
       enable_fees();
       upgrade_to_lifetime_member(alice_id);
@@ -2148,6 +2145,14 @@ BOOST_AUTO_TEST_CASE(zero_second_vbo)
          BOOST_CHECK( vbid(db).get_allowed_withdraw(db.head_block_time()) == asset(0) );
          generate_block();
          BOOST_CHECK( vbid(db).get_allowed_withdraw(db.head_block_time()) == asset(10000) );
+
+         /*
+         db.get_index_type< simple_index<budget_record_object> >().inspect_all_objects(
+            [&](const object& o)
+            {
+               ilog( "budget: ${brec}", ("brec", static_cast<const budget_record_object&>(o)) );
+            });
+         */
       }
    } FC_LOG_AND_RETHROW()
 }
@@ -2424,18 +2429,18 @@ BOOST_AUTO_TEST_CASE( buyback )
             sign( tx, philbin_private_key );
 
             // Alice and Philbin signed, but asset issuer is invalid
-            GRAPHENE_CHECK_THROW( db.push_transaction(tx), account_create_buyback_incorrect_issuer );
+            GRAPHENE_CHECK_THROW( PUSH_TX(db, tx), account_create_buyback_incorrect_issuer );
 
             tx.clear_signatures();
             tx.operations.back().get< account_create_operation >().extensions.value.buyback_options->asset_to_buy_issuer = izzy_id;
             sign( tx, philbin_private_key );
 
             // Izzy didn't sign
-            GRAPHENE_CHECK_THROW( db.push_transaction(tx), tx_missing_active_auth );
+            GRAPHENE_CHECK_THROW( PUSH_TX(db, tx), tx_missing_active_auth );
             sign( tx, izzy_private_key );
 
             // OK
-            processed_transaction ptx = db.push_transaction( tx );
+            processed_transaction ptx = PUSH_TX( db, tx );
             rex_id = ptx.operation_results.back().get< object_id_type >();
 
             // Try to create another account rex2 which is bbo on same asset
@@ -2443,7 +2448,7 @@ BOOST_AUTO_TEST_CASE( buyback )
             tx.operations.back().get< account_create_operation >().name = "rex2";
             sign( tx, izzy_private_key );
             sign( tx, philbin_private_key );
-            GRAPHENE_CHECK_THROW( db.push_transaction(tx), account_create_buyback_already_exists );
+            GRAPHENE_CHECK_THROW( PUSH_TX(db, tx), account_create_buyback_already_exists );
          }
 
          // issue some BUYME to Alice
