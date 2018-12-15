@@ -964,6 +964,22 @@ void database::process_bitassets()
    }
 }
 
+void update_median_feeds(database& db)
+{
+   time_point_sec head_time = db.head_block_time();
+   time_point_sec next_maint_time = db.get_dynamic_global_properties().next_maintenance_time;
+
+   const auto update_bitasset = [head_time, next_maint_time]( asset_bitasset_data_object &o )
+   {
+      o.update_median_feeds( head_time, next_maint_time );
+   };
+
+   for( const auto& d : db.get_index_type<asset_bitasset_data_index>().indices() )
+   {
+      db.modify( d, update_bitasset );
+   }
+}
+
 /******
  * @brief one-time data process for hard fork core-868-890
  *
@@ -1292,6 +1308,7 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
    if( to_update_and_match_call_orders_for_hf_1270 )
    {
       update_call_orders_hf_1270(*this);
+      update_median_feeds(*this);
       match_call_orders(*this);
    }
 
