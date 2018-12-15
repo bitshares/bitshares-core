@@ -94,6 +94,9 @@ struct proposal_operation_hardfork_visitor
          FC_ASSERT(!"Virtual operation");
       }
    }
+   void operator()(const graphene::chain::committee_member_update_global_parameters_operation &op) const {
+      FC_ASSERT(block_time > HARDFORK_CORE_1468_TIME, "Not allowed until hardfork 1468");
+   }
    // loop and self visit in proposals
    void operator()(const graphene::chain::proposal_create_operation &v) const {
       for (const op_wrapper &op : v.proposed_ops)
@@ -144,11 +147,6 @@ void_result proposal_create_evaluator::do_evaluate(const proposal_create_operati
       for( auto& op : o.proposed_ops )
       {
          operation_get_required_authorities(op.op, auths, auths, other);
-         // If we are attempting to set HTLC parameters, make sure the HTLC hardfork date has passed.
-         FC_ASSERT( op.op.which() != operation::tag<committee_member_update_global_parameters_operation>::value
-               || d.head_block_time() >= HARDFORK_CORE_1468_TIME
-               || !op.op.get<committee_member_update_global_parameters_operation>().new_parameters.extensions
-               .value.updatable_htlc_options.valid(), "Unable to set HTLC parameters before hardfork.");
       }
 
       FC_ASSERT( other.size() == 0 ); // TODO: what about other??? 
