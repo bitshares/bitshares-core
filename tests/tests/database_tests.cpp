@@ -182,6 +182,16 @@ BOOST_AUTO_TEST_CASE( direct_index_test )
    test_account.name = "account50";
    my_accounts.load( fc::raw::pack( test_account ) );
 
+   // can handle nested modification
+   my_accounts.modify( direct.get( account_id_type(0) ), [&direct,&my_accounts] ( object& outer ) {
+      account_object& _outer = dynamic_cast< account_object& >( outer );
+      my_accounts.modify( direct.get( account_id_type(50) ), [] ( object& inner ) {
+         account_object& _inner = dynamic_cast< account_object& >( inner );
+         _inner.referrer = account_id_type(102);
+      });
+      _outer.options.voting_account = GRAPHENE_PROXY_TO_SELF_ACCOUNT;
+   });
+
    // direct.next is still 103, so 204 is not allowed
    test_account.id = account_id_type(204);
    test_account.name = "account204";

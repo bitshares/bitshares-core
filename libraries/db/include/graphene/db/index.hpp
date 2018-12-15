@@ -23,11 +23,14 @@
  */
 #pragma once
 #include <graphene/db/object.hpp>
+
 #include <fc/interprocess/file_mapping.hpp>
 #include <fc/io/raw.hpp>
 #include <fc/io/json.hpp>
 #include <fc/crypto/sha256.hpp>
+
 #include <fstream>
+#include <stack>
 
 namespace graphene { namespace db {
    class object_database;
@@ -209,7 +212,7 @@ namespace graphene { namespace db {
          static const size_t _mask = ((1 << chunkbits) - 1);
          size_t next = 0;
          vector< vector< const Object* > > content;
-         object_id_type id_being_modified;
+         std::stack< object_id_type > ids_being_modified;
 
       public:
          direct_index() {
@@ -226,7 +229,7 @@ namespace graphene { namespace db {
                if( !(next & _mask) )
                {
                   content.resize((next >> chunkbits) + 1);
-                  content[next >> chunkbits].reserve( 1 << chunkbits );
+                  content[next >> chunkbits].resize( 1 << chunkbits, nullptr );
                }
                next++;
             }
@@ -238,7 +241,7 @@ namespace graphene { namespace db {
                if( !(next & _mask) || (next & (~_mask)) != (instance & (~_mask)) )
                {
                   content.resize((instance >> chunkbits) + 1);
-                  content[instance >> chunkbits].reserve( 1 << chunkbits );
+                  content[instance >> chunkbits].resize( 1 << chunkbits, nullptr );
                }
                while( next <= instance )
                {
@@ -261,12 +264,13 @@ namespace graphene { namespace db {
 
          virtual void about_to_modify( const object& before )
          {
-            id_being_modified = before.id;
+            ids_being_modified.emplace( before.id );
          }
 
          virtual void object_modified( const object& after  )
          {
-            FC_ASSERT( id_being_modified == after.id, "Modification of ID is not supported!");
+            FC_ASSERT( ids_being_modified.top() == after.id, "Modification of ID is not supported!");
+            ids_being_modified.pop();
          }
 
          template< typename object_id >
