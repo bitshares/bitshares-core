@@ -31,21 +31,6 @@
 namespace graphene { 
    namespace chain {
 
-      /**
-       * Convert the hash algorithm to a string
-       * @param algo the enum to convert
-       * @returns a string (lower case)
-       */
-      std::string hash_algorithm_to_string(fc::enum_type<uint8_t, hash_algorithm> algo);
-
-      /**
-       * Convert a string to the enum that matches the hash algorithm
-       * @param incoing the string (case insensitive)
-       * @returns the matching enum
-       */
-      fc::enum_type<uint8_t, hash_algorithm> string_to_hash_algorithm(std::string incoming);
-   
-
       struct htlc_create_operation : public base_operation 
       {
          struct fee_parameters_type {
@@ -60,15 +45,15 @@ namespace graphene {
     	   account_id_type destination; 
          // the amount to hold
     	   asset amount;
-         // hash algorithm used to create key_hash
+         // hash algorithm used to create preimage_hash
          fc::enum_type<uint8_t, graphene::chain::hash_algorithm> hash_type 
                = graphene::chain::hash_algorithm::unknown;
          // the hash of the preimage
-    	   std::vector<unsigned char> key_hash;
+    	   std::vector<uint8_t> preimage_hash;
          // the size of the preimage
-    	   uint16_t key_size;
+    	   uint16_t preimage_size;
          // The time the funds will be returned to the source if not claimed
-    	   uint32_t seconds_in_force;
+    	   uint32_t claim_period_seconds;
          // for future expansion
     	   extensions_type extensions; 
 
@@ -77,14 +62,6 @@ namespace graphene {
           */
     	   void validate()const;
          
-         /**
-          * @brief Determines who is required to sign
-          */
-         void get_required_active_authorities( boost::container::flat_set<account_id_type>& a )const
-         { 
-            a.insert(source); 
-         }
-
          /**
           * @brief who will pay the fee
           */
@@ -95,7 +72,7 @@ namespace graphene {
           */
          share_type calculate_fee(const fee_parameters_type& fee_params)const
          {
-            uint32_t days = seconds_in_force / (60 * 60 * 24);
+            uint32_t days = claim_period_seconds / (60 * 60 * 24);
             return fee_params.fee + (fee_params.fee_per_day * days);
          }
 
@@ -104,7 +81,7 @@ namespace graphene {
       struct htlc_redeem_operation : public base_operation
       {
          struct fee_parameters_type {
-            uint64_t fee = 1 * GRAPHENE_BLOCKCHAIN_PRECISION;
+            uint64_t fee_per_kb = 1 * GRAPHENE_BLOCKCHAIN_PRECISION;
          };
          
          // paid to network
@@ -112,9 +89,9 @@ namespace graphene {
          // the object we are attempting to update
          htlc_id_type htlc_id;
          // who is attempting to update the transaction
-    	   account_id_type update_issuer;
+    	   account_id_type redeemer;
          // the preimage (not used if after epoch timeout)
-    	   std::vector<unsigned char> preimage;
+    	   std::vector<uint8_t> preimage;
          // for future expansion
          extensions_type extensions; 
 
@@ -123,25 +100,17 @@ namespace graphene {
           */
     	   void validate()const;
          
-         /***
-          * @determines who should have signed this object
-          */
-         void get_required_active_authorities( boost::container::flat_set<account_id_type>& a )const
-         { 
-            a.insert(update_issuer); 
-         }
-
          /**
           * @brief Who is to pay the fee
           */
-         account_id_type fee_payer()const { return update_issuer; }
+         account_id_type fee_payer()const { return redeemer; }
 
          /****
           * @brief calculates the fee to be paid for this operation
           */
          share_type calculate_fee(const fee_parameters_type& fee_params)const
          {
-            return fee_params.fee;
+            return preimage.size() / 1024 * fee_params.fee_per_kb;
          }
       };
 
@@ -168,14 +137,6 @@ namespace graphene {
           */
     	   void validate()const;
          
-         /***
-          * @determines who should have signed this object
-          */
-         void get_required_active_authorities( boost::container::flat_set<account_id_type>& a )const
-         { 
-            a.insert(update_issuer); 
-         }
-
          /**
           * @brief Who is to pay the fee
           */
@@ -213,12 +174,12 @@ namespace graphene {
 }
 
 FC_REFLECT( graphene::chain::htlc_create_operation::fee_parameters_type, (fee) (fee_per_day) )
-FC_REFLECT( graphene::chain::htlc_redeem_operation::fee_parameters_type, (fee) )
+FC_REFLECT( graphene::chain::htlc_redeem_operation::fee_parameters_type, (fee_per_kb) )
 FC_REFLECT( graphene::chain::htlc_extend_operation::fee_parameters_type, (fee) (fee_per_day))
 FC_REFLECT( graphene::chain::htlc_refund_operation::fee_parameters_type, ) // VIRTUAL
 
 FC_REFLECT( graphene::chain::htlc_create_operation, 
-      (fee)(source)(destination)(amount)(key_hash)(key_size)(seconds_in_force)(extensions)(hash_type))
-FC_REFLECT( graphene::chain::htlc_redeem_operation, (fee)(htlc_id)(update_issuer)(preimage)(extensions))
+      (fee)(source)(destination)(amount)(preimage_hash)(preimage_size)(claim_period_seconds)(extensions)(hash_type))
+FC_REFLECT( graphene::chain::htlc_redeem_operation, (fee)(htlc_id)(redeemer)(preimage)(extensions))
 FC_REFLECT( graphene::chain::htlc_extend_operation, (fee)(htlc_id)(update_issuer)(seconds_to_add)(extensions))
 FC_REFLECT( graphene::chain::htlc_refund_operation, (fee)(htlc_id)(to))

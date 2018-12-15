@@ -1750,8 +1750,8 @@ public:
    }
 
    signed_transaction htlc_prepare( string source, string destination, string amount, string asset_symbol,
-         string hash_algorithm, const std::vector<unsigned char>& preimage_hash, size_t preimage_size, 
-         const uint32_t seconds_in_force, bool broadcast = false )
+         string hash_algorithm, const std::vector<uint8_t>& preimage_hash, size_t preimage_size, 
+         const uint32_t claim_period_seconds, bool broadcast = false )
    {
       try 
       {
@@ -1763,9 +1763,9 @@ public:
          create_op.source = get_account(source).id;
          create_op.destination = get_account(destination).id;
          create_op.amount = asset_obj->amount_from_string(amount);
-         create_op.seconds_in_force = seconds_in_force;
-         create_op.key_hash = preimage_hash;
-         create_op.key_size = preimage_size;
+         create_op.claim_period_seconds = claim_period_seconds;
+         create_op.preimage_hash = preimage_hash;
+         create_op.preimage_size = preimage_size;
          create_op.hash_type = graphene::chain::string_to_hash_algorithm(hash_algorithm);
          FC_ASSERT(create_op.hash_type != graphene::chain::hash_algorithm::unknown, 
                "Unknown hash algorithm: ${algo}", ("algo", hash_algorithm));
@@ -1777,10 +1777,10 @@ public:
 
          return sign_transaction(tx, broadcast);
       } FC_CAPTURE_AND_RETHROW( (source)(destination)(amount)(asset_symbol)(hash_algorithm)
-            (preimage_hash)(preimage_size)(seconds_in_force)(broadcast) ) 
+            (preimage_hash)(preimage_size)(claim_period_seconds)(broadcast) ) 
    }
 
-   signed_transaction htlc_redeem( string htlc_id, string issuer, const std::vector<unsigned char>& preimage, bool broadcast )
+   signed_transaction htlc_redeem( string htlc_id, string issuer, const std::vector<uint8_t>& preimage, bool broadcast )
    {
       try 
       {
@@ -1792,7 +1792,7 @@ public:
 
          htlc_redeem_operation update_op;
          update_op.htlc_id = htlc_obj->id;
-         update_op.update_issuer = issuer_obj.id;
+         update_op.redeemer = issuer_obj.id;
          update_op.preimage = preimage;
 
          signed_transaction tx;
@@ -2998,7 +2998,7 @@ std::string operation_printer::operator()(const htlc_create_operation& op) const
    out << "Create HTLC to " << to.name
          << " with id " << database_id
          << " preimage hash: [";
-   for(unsigned char c : op.key_hash)
+   for(uint8_t c : op.preimage_hash)
    {
       out << setfill('0') << std::setw(2) << std::hex << (int)c;
    }
@@ -3141,11 +3141,11 @@ uint64_t wallet_api::get_asset_count()const
    return my->_remote_db->get_asset_count();
 }
 
-std::vector<unsigned char> string_to_vec(std::string incoming)
+std::vector<uint8_t> string_to_vec(std::string incoming)
 {
    char s[3];
    s[2] = 0;
-   std::vector<unsigned char> vec;
+   std::vector<uint8_t> vec;
    for(int i = 0; i < incoming.length(); i+= 2)
    {
       s[0] = incoming[i];
@@ -3157,10 +3157,10 @@ std::vector<unsigned char> string_to_vec(std::string incoming)
 
 signed_transaction wallet_api::htlc_prepare( string source, string destination, string amount, string asset_symbol,
          string hash_algorithm, const std::string& preimage_hash, size_t preimage_size, 
-         const uint32_t seconds_in_force, bool broadcast)
+         const uint32_t claim_period_seconds, bool broadcast)
 {
    return my->htlc_prepare(source, destination, amount, asset_symbol, hash_algorithm, string_to_vec(preimage_hash), preimage_size,
-         seconds_in_force, broadcast);
+         claim_period_seconds, broadcast);
 }
 
 variant wallet_api::get_htlc(std::string htlc_id) const
@@ -3174,10 +3174,10 @@ variant wallet_api::get_htlc(std::string htlc_id) const
    ret_val["asset"] = (std::string)((graphene::db::object_id_type)obj.amount.asset_id);
    ret_val["expiration"] = fc::get_approximate_relative_time_string(obj.expiration);
    std::stringstream hash_string;
-   for(unsigned char c : obj.preimage_hash)
+   for(uint8_t c : obj.preimage_hash)
       hash_string << std::setfill('0') << std::setw(2) << std::hex << (int)c;
    ret_val["preimage_hash"] = hash_string.str();
-   ret_val["preimage_algorithm"] = graphene::chain::hash_algorithm_to_string(obj.preimage_hash_algorithm);
+   ret_val["preimage_algorithm"] = (std::string)obj.preimage_hash_algorithm;
    ret_val["preimage_size"] = obj.preimage_size;
    return ret_val;
 }
@@ -3186,7 +3186,7 @@ signed_transaction wallet_api::htlc_redeem( std::string htlc_id, std::string iss
       bool broadcast)
 {
 
-   return my->htlc_redeem(htlc_id, issuer, std::vector<unsigned char>(preimage.begin(), preimage.end()), broadcast);
+   return my->htlc_redeem(htlc_id, issuer, std::vector<uint8_t>(preimage.begin(), preimage.end()), broadcast);
 }
 
 signed_transaction wallet_api::htlc_extend_expiry ( std::string htlc_id, std::string issuer, const uint32_t seconds_to_add,

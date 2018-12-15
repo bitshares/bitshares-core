@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 jmjatlanta and contributors.
+ * Copyright (c) 2018 Bitshares Foundation, and contributors.
  *
  * The MIT License
  *
@@ -21,22 +21,25 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-#include <graphene/chain/protocol/htlc.hpp>
+#include <graphene/chain/htlc_object.hpp>
 
 namespace graphene { namespace chain {
 
-   void htlc_create_operation::validate()const {
-     FC_ASSERT( source != destination );
-      FC_ASSERT( fee.amount >= 0 );
-      FC_ASSERT( amount.amount > 0 );
+   /****
+    * Convert string to hash algorithm enum
+    * @param incoming the string to convert
+    * @returns one of the valid algorithms or the enum value "unknown"
+    */
+   fc::enum_type<uint8_t, hash_algorithm> string_to_hash_algorithm(std::string incoming)
+   {
+      std::transform(incoming.begin(), incoming.end(), incoming.begin(), ::toupper);
+      if (incoming == "RIPEMD160")
+         return hash_algorithm::ripemd160;
+      if (incoming == "SHA256")
+         return hash_algorithm::sha256;
+      if (incoming == "SHA1")
+         return hash_algorithm::sha1;
+      return hash_algorithm::unknown;
    }
-
-   void htlc_redeem_operation::validate()const {
-      FC_ASSERT( fee.amount >= 0 );
-      FC_ASSERT( preimage.size() > 0 );
-   }
-   void htlc_extend_operation::validate()const {
-      FC_ASSERT( fee.amount >= 0 );
-   }
-
+   
 } }

@@ -55,27 +55,22 @@ using namespace graphene::chain::test;
 
 BOOST_FIXTURE_TEST_SUITE( htlc_tests, database_fixture )
 
-void generate_random_preimage(uint16_t key_size, std::vector<unsigned char>& vec)
+void generate_random_preimage(uint16_t key_size, std::vector<uint8_t>& vec)
 {
-	std::independent_bits_engine<std::default_random_engine, CHAR_BIT, unsigned char> rbe;
+	std::independent_bits_engine<std::default_random_engine, CHAR_BIT, uint8_t> rbe;
 	std::generate(begin(vec), end(vec), std::ref(rbe));
 	return;
 }
 
-std::vector<unsigned char> hash_it(std::vector<unsigned char> preimage)
+/****
+ * Hash the preimage and put it in a vector
+ * @param preimage the preimage
+ * @returns a vector that cointains the sha256 hash of the preimage
+ */
+std::vector<uint8_t> hash_it(std::vector<uint8_t> preimage)
 {
-   // convert the preimage to a char array
-   unsigned char char_array[preimage.size()];
-   for(unsigned int i = 0; i < preimage.size(); ++i)
-      char_array[i] = preimage[i];
-	fc::sha256 hash = fc::sha256::hash((char*)char_array, preimage.size());
-	std::vector<unsigned char> ret_val(hash.data_size());
-	char* data = hash.data();
-	for(size_t i = 0; i < hash.data_size(); i++)
-	{
-		ret_val[i] = data[i];
-	}
-	return ret_val;
+	fc::sha256 hash = fc::sha256::hash((char*)preimage.data(), preimage.size());
+   return std::vector<uint8_t>(hash.data(), hash.data() + hash.data_size());
 }
 
 void set_committee_parameters(database_fixture* db_fixture)
@@ -108,10 +103,10 @@ BOOST_AUTO_TEST_CASE( htlc_before_hardfork )
 
    transfer( committee_account, alice_id, graphene::chain::asset(init_balance) );
 
-   uint16_t key_size = 256;
+   uint16_t preimage_size = 256;
    std::vector<unsigned char> pre_image(256);
-   generate_random_preimage(key_size, pre_image);
-   std::vector<unsigned char> key_hash = hash_it(pre_image);
+   generate_random_preimage(preimage_size, pre_image);
+   std::vector<unsigned char> preimage_hash = hash_it(pre_image);
 
    graphene::chain::htlc_id_type alice_htlc_id;
    // cler everything out
@@ -123,10 +118,10 @@ BOOST_AUTO_TEST_CASE( htlc_before_hardfork )
 
       create_operation.amount = graphene::chain::asset( 10000 );
       create_operation.destination = bob_id;
-      create_operation.seconds_in_force = 60;
-      create_operation.key_hash = key_hash;
+      create_operation.claim_period_seconds = 60;
+      create_operation.preimage_hash = preimage_hash;
       create_operation.hash_type = graphene::chain::hash_algorithm::sha256;
-      create_operation.key_size = key_size;
+      create_operation.preimage_size = preimage_size;
       create_operation.source = alice_id;
       trx.operations.push_back(create_operation);
       sign(trx, alice_private_key);
@@ -155,10 +150,10 @@ BOOST_AUTO_TEST_CASE( htlc_expires )
 
    transfer( committee_account, alice_id, graphene::chain::asset(init_balance) );
 
-   uint16_t key_size = 256;
+   uint16_t preimage_size = 256;
    std::vector<unsigned char> pre_image(256);
-   generate_random_preimage(key_size, pre_image);
-   std::vector<unsigned char> key_hash = hash_it(pre_image);
+   generate_random_preimage(preimage_size, pre_image);
+   std::vector<unsigned char> preimage_hash = hash_it(pre_image);
 
    graphene::chain::htlc_id_type alice_htlc_id;
    // cler everything out
@@ -170,10 +165,10 @@ BOOST_AUTO_TEST_CASE( htlc_expires )
 
       create_operation.amount = graphene::chain::asset( 10000 );
       create_operation.destination = bob_id;
-      create_operation.seconds_in_force = 60;
-      create_operation.key_hash = key_hash;
+      create_operation.claim_period_seconds = 60;
+      create_operation.preimage_hash = preimage_hash;
       create_operation.hash_type = graphene::chain::hash_algorithm::sha256;
-      create_operation.key_size = key_size;
+      create_operation.preimage_size = preimage_size;
       create_operation.source = alice_id;
       trx.operations.push_back(create_operation);
       sign(trx, alice_private_key);
@@ -212,10 +207,10 @@ BOOST_AUTO_TEST_CASE( htlc_fulfilled )
    transfer( committee_account, alice_id, graphene::chain::asset(init_balance) );
    transfer( committee_account, bob_id, graphene::chain::asset(init_balance) );
 
-   uint16_t key_size = 256;
-   std::vector<unsigned char> pre_image(key_size);
-   generate_random_preimage(key_size, pre_image);
-   std::vector<unsigned char> key_hash = hash_it(pre_image);
+   uint16_t preimage_size = 256;
+   std::vector<unsigned char> pre_image(preimage_size);
+   generate_random_preimage(preimage_size, pre_image);
+   std::vector<unsigned char> preimage_hash = hash_it(pre_image);
 
    graphene::chain::htlc_id_type alice_htlc_id;
    // cler everything out
@@ -228,10 +223,10 @@ BOOST_AUTO_TEST_CASE( htlc_fulfilled )
 
       create_operation.amount = graphene::chain::asset( 100000 );
       create_operation.destination = bob_id;
-      create_operation.seconds_in_force = 86400;
-      create_operation.key_hash = key_hash;
+      create_operation.claim_period_seconds = 86400;
+      create_operation.preimage_hash = preimage_hash;
       create_operation.hash_type = graphene::chain::hash_algorithm::sha256;
-      create_operation.key_size = key_size;
+      create_operation.preimage_size = preimage_size;
       create_operation.source = alice_id;
       create_operation.fee = db.current_fee_schedule().calculate_fee( create_operation );
       trx.operations.push_back(create_operation);
@@ -252,7 +247,7 @@ BOOST_AUTO_TEST_CASE( htlc_fulfilled )
    // send an update operation to claim the funds
    {
       graphene::chain::htlc_redeem_operation update_operation;
-      update_operation.update_issuer = bob_id;
+      update_operation.redeemer = bob_id;
       update_operation.htlc_id = alice_htlc_id;
       update_operation.preimage = pre_image;
       update_operation.fee = db.current_fee_schedule().calculate_fee( update_operation );
@@ -284,10 +279,10 @@ BOOST_AUTO_TEST_CASE( other_peoples_money )
 
    transfer( committee_account, alice_id, graphene::chain::asset(init_balance) );
 
-   uint16_t key_size = 256;
+   uint16_t preimage_size = 256;
    std::vector<unsigned char> pre_image(256);
-   generate_random_preimage(key_size, pre_image);
-   std::vector<unsigned char> key_hash = hash_it(pre_image);
+   generate_random_preimage(preimage_size, pre_image);
+   std::vector<unsigned char> preimage_hash = hash_it(pre_image);
 
    graphene::chain::htlc_id_type alice_htlc_id;
    // cler everything out
@@ -298,9 +293,9 @@ BOOST_AUTO_TEST_CASE( other_peoples_money )
       graphene::chain::htlc_create_operation create_operation;
       create_operation.amount = graphene::chain::asset( 10000 );
       create_operation.destination = bob_id;
-      create_operation.seconds_in_force = 3;
-      create_operation.key_hash = key_hash;
-      create_operation.key_size = key_size;
+      create_operation.claim_period_seconds = 3;
+      create_operation.preimage_hash = preimage_hash;
+      create_operation.preimage_size = preimage_size;
       create_operation.source = alice_id;
       trx.operations.push_back(create_operation);
       sign(trx, bob_private_key);
@@ -312,10 +307,10 @@ BOOST_AUTO_TEST_CASE( other_peoples_money )
       graphene::chain::htlc_create_operation create_operation;
       create_operation.amount = graphene::chain::asset( 10000 );
       create_operation.destination = bob_id;
-      create_operation.seconds_in_force = 3;
-      create_operation.key_hash = key_hash;
+      create_operation.claim_period_seconds = 3;
+      create_operation.preimage_hash = preimage_hash;
       create_operation.hash_type = graphene::chain::hash_algorithm::sha256;
-      create_operation.key_size = key_size;
+      create_operation.preimage_size = preimage_size;
       create_operation.source = alice_id;
       trx.operations.push_back(create_operation);
       sign(trx, alice_private_key);

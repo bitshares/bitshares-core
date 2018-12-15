@@ -45,11 +45,13 @@ namespace graphene {
          FC_ASSERT(htlc_options, "HTLC Committee options are not set.");
 
          // make sure the expiration is reasonable
-         FC_ASSERT( o.seconds_in_force <= htlc_options->max_timeout_secs, "HTLC Timeout exceeds allowed length" );
+         FC_ASSERT( o.claim_period_seconds <= htlc_options->max_timeout_secs, "HTLC Timeout exceeds allowed length" );
          // make sure the preimage length is reasonable
-         FC_ASSERT( o.key_size <= htlc_options->max_preimage_size, "HTLC preimage length exceeds allowed length" ); 
+         FC_ASSERT( o.preimage_size <= htlc_options->max_preimage_size, "HTLC preimage length exceeds allowed length" ); 
          // make sure we have a hash algorithm set
          FC_ASSERT( o.hash_type != graphene::chain::hash_algorithm::unknown, "HTLC Hash Algorithm must be set" );
+         // make sure the sender has the funds for the HTLC
+         FC_ASSERT( db().get_balance( o.source, o.amount.asset_id) >= (o.amount), "Insufficient funds") ;
          return void_result();
       }
 
@@ -63,9 +65,9 @@ namespace graphene {
                 esc.from                  = o.source;
                 esc.to                    = o.destination;
                 esc.amount                = o.amount;
-                esc.preimage_hash		   = o.key_hash;
-                esc.preimage_size		   = o.key_size;
-                esc.expiration		      = dbase.head_block_time() + o.seconds_in_force;
+                esc.preimage_hash		   = o.preimage_hash;
+                esc.preimage_size		   = o.preimage_size;
+                esc.expiration		      = dbase.head_block_time() + o.claim_period_seconds;
                 esc.preimage_hash_algorithm = o.hash_type;
              });
              return  esc.id;
@@ -74,7 +76,7 @@ namespace graphene {
       }
 
       template<typename T>
-      bool htlc_redeem_evaluator::test_hash(const std::vector<unsigned char>& incoming_preimage, const std::vector<unsigned char>& valid_hash)
+      bool htlc_redeem_evaluator::test_hash(const std::vector<uint8_t>& incoming_preimage, const std::vector<uint8_t>& valid_hash)
       {
          T attempted_hash = T::hash( (const char*)incoming_preimage.data(), incoming_preimage.size());
          if (attempted_hash.data_size() != valid_hash.size())

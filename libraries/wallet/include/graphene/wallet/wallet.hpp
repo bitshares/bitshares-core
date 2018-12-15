@@ -1465,12 +1465,12 @@ class wallet_api
        * @param hash_algorithm the algorithm used to generate the hash from the preimage. Can be RIPEMD160 or SHA256.
        * @param preimage_hash the hash of the preimage
        * @param preimage_size the size of the preimage in bytes
-       * @param seconds_in_force when the time lock expires
+       * @param claim_period_seconds when the time lock expires
        * @param broadcast true if you wish to broadcast the transaction
        */
       signed_transaction htlc_prepare( string source, string destination, string amount, string asset_symbol,
             string hash_algorithm, const std::string& preimage_hash, size_t preimage_size, 
-            const uint32_t seconds_in_force, bool broadcast = false );
+            const uint32_t claim_period_seconds, bool broadcast = false );
 
       /****
        * Update a hashed time lock contract
