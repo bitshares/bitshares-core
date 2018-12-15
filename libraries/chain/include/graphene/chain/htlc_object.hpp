@@ -55,8 +55,8 @@ namespace graphene { namespace chain {
    class htlc_object : public graphene::db::abstract_object<htlc_object> {
       public:
          // uniquely identify this object in the database
-         static const uint8_t space_id = implementation_ids;
-         static const uint8_t type_id  = impl_htlc_object_type;
+         static const uint8_t space_id = protocol_ids;
+         static const uint8_t type_id  = htlc_object_type;
 
          account_id_type from;
          account_id_type to;
