@@ -1507,4 +1507,314 @@ BOOST_AUTO_TEST_CASE(target_cr_test_call_limit)
 
 } FC_LOG_AND_RETHROW() }
 
+BOOST_AUTO_TEST_CASE(mcr_bug_increase_before1270)
+{ try {
+
+   generate_blocks(HARDFORK_CORE_453_TIME);
+
+   generate_block();
+
+   set_expiration( db, trx );
+
+   ACTORS((seller)(borrower)(borrower2)(feedproducer));
+
+   const auto& bitusd = create_bitasset("USDBIT", feedproducer_id);
+   const auto& core   = asset_id_type()(db);
+
+   int64_t init_balance(1000000);
+
+   transfer(committee_account, borrower_id, asset(init_balance));
+   transfer(committee_account, borrower2_id, asset(init_balance));
+   update_feed_producers( bitusd, {feedproducer.id} );
+
+   price_feed current_feed;
+   current_feed.settlement_price = bitusd.amount( 100 ) / core.amount(100);
+   current_feed.maintenance_collateral_ratio = 1750;
+   current_feed.maximum_short_squeeze_ratio  = 1100;
+   publish_feed( bitusd, feedproducer, current_feed );
+
+   const call_order_object& b1 = *borrow( borrower, bitusd.amount(1000), asset(1800));
+   auto b1_id = b1.id;
+   const call_order_object& b2 = *borrow( borrower2, bitusd.amount(1000), asset(2000) );
+   auto b2_id = b2.id;
+
+   BOOST_CHECK_EQUAL( get_balance( borrower, bitusd ), 1000 );
+   BOOST_CHECK_EQUAL( get_balance( borrower2, bitusd ), 1000 );
+   BOOST_CHECK_EQUAL( get_balance( borrower , core ), init_balance - 1800 );
+   BOOST_CHECK_EQUAL( get_balance( borrower2, core ), init_balance - 2000 );
+
+   // move order to margin call territory with mcr only
+   current_feed.maintenance_collateral_ratio = 2000;
+   publish_feed( bitusd, feedproducer, current_feed );
+
+   BOOST_CHECK_EQUAL( get_balance( borrower, bitusd ), 1000 );
+   BOOST_CHECK_EQUAL( get_balance( borrower2, bitusd ), 1000 );
+   BOOST_CHECK_EQUAL( get_balance( borrower , core ), 998200 );
+   BOOST_CHECK_EQUAL( get_balance( borrower2, core ), 998000 );
+
+   BOOST_CHECK( db.find<call_order_object>( b1_id ) );
+   BOOST_CHECK( db.find<call_order_object>( b2_id ) );
+
+   // attempt to trade the margin call
+   create_sell_order( borrower2, bitusd.amount(1000), core.amount(1100) );
+
+   BOOST_CHECK_EQUAL( get_balance( borrower, bitusd ), 1000 );
+   BOOST_CHECK_EQUAL( get_balance( borrower2, bitusd ), 0 );
+   BOOST_CHECK_EQUAL( get_balance( borrower , core ), 998200 );
+   BOOST_CHECK_EQUAL( get_balance( borrower2, core ), 998000  );
+
+   print_market(bitusd.symbol, core.symbol);
+
+   // both calls are still there, no margin call, mcr bug
+   BOOST_CHECK( db.find<call_order_object>( b1_id ) );
+   BOOST_CHECK( db.find<call_order_object>( b2_id ) );
+
+} FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE(mcr_bug_increase_after1270)
+{ try {
+
+   generate_blocks(HARDFORK_CORE_1270_TIME);
+
+   generate_block();
+
+   set_expiration( db, trx );
+
+   ACTORS((seller)(borrower)(borrower2)(feedproducer));
+
+   const auto& bitusd = create_bitasset("USDBIT", feedproducer_id);
+   const auto& core   = asset_id_type()(db);
+
+   int64_t init_balance(1000000);
+
+   transfer(committee_account, borrower_id, asset(init_balance));
+   transfer(committee_account, borrower2_id, asset(init_balance));
+   update_feed_producers( bitusd, {feedproducer.id} );
+
+   price_feed current_feed;
+   current_feed.settlement_price = bitusd.amount( 100 ) / core.amount(100);
+   current_feed.maintenance_collateral_ratio = 1750;
+   current_feed.maximum_short_squeeze_ratio  = 1100;
+   publish_feed( bitusd, feedproducer, current_feed );
+
+   const call_order_object& b1 = *borrow( borrower, bitusd.amount(1000), asset(1800));
+   auto b1_id = b1.id;
+   const call_order_object& b2 = *borrow( borrower2, bitusd.amount(1000), asset(2000) );
+   auto b2_id = b2.id;
+
+   BOOST_CHECK_EQUAL( get_balance( borrower, bitusd ), 1000 );
+   BOOST_CHECK_EQUAL( get_balance( borrower2, bitusd ), 1000 );
+   BOOST_CHECK_EQUAL( get_balance( borrower , core ), init_balance - 1800 );
+   BOOST_CHECK_EQUAL( get_balance( borrower2, core ), init_balance - 2000 );
+
+   // move order to margin call territory with mcr only
+   current_feed.maintenance_collateral_ratio = 2000;
+   publish_feed( bitusd, feedproducer, current_feed );
+
+   BOOST_CHECK_EQUAL( get_balance( borrower, bitusd ), 1000 );
+   BOOST_CHECK_EQUAL( get_balance( borrower2, bitusd ), 1000 );
+   BOOST_CHECK_EQUAL( get_balance( borrower , core ), 998200 );
+   BOOST_CHECK_EQUAL( get_balance( borrower2, core ), 998000 );
+
+   BOOST_CHECK( db.find<call_order_object>( b1_id ) );
+   BOOST_CHECK( db.find<call_order_object>( b2_id ) );
+
+   // attempt to trade the margin call
+   create_sell_order( borrower2, bitusd.amount(1000), core.amount(1100) );
+
+   BOOST_CHECK_EQUAL( get_balance( borrower, bitusd ), 1000 );
+   BOOST_CHECK_EQUAL( get_balance( borrower2, bitusd ), 0 );
+   BOOST_CHECK_EQUAL( get_balance( borrower , core ), 998900 );
+   BOOST_CHECK_EQUAL( get_balance( borrower2, core ), 999100  );
+
+   print_market(bitusd.symbol, core.symbol);
+
+   // b1 is margin called
+   BOOST_CHECK( ! db.find<call_order_object>( b1_id ) );
+   BOOST_CHECK( db.find<call_order_object>( b2_id ) );
+
+
+} FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE(mcr_bug_decrease_before1270)
+{ try {
+
+   generate_blocks(HARDFORK_CORE_453_TIME);
+
+   generate_block();
+
+   set_expiration( db, trx );
+
+   ACTORS((seller)(borrower)(borrower2)(feedproducer));
+
+   const auto& bitusd = create_bitasset("USDBIT", feedproducer_id);
+   const auto& core   = asset_id_type()(db);
+
+   int64_t init_balance(1000000);
+
+   transfer(committee_account, borrower_id, asset(init_balance));
+   transfer(committee_account, borrower2_id, asset(init_balance));
+   update_feed_producers( bitusd, {feedproducer.id} );
+
+   price_feed current_feed;
+   current_feed.settlement_price = bitusd.amount( 100 ) / core.amount(100);
+   current_feed.maintenance_collateral_ratio = 1750;
+   current_feed.maximum_short_squeeze_ratio  = 1100;
+   publish_feed( bitusd, feedproducer, current_feed );
+
+   const call_order_object& b1 = *borrow( borrower, bitusd.amount(1000), asset(1800));
+   auto b1_id = b1.id;
+   const call_order_object& b2 = *borrow( borrower2, bitusd.amount(1000), asset(2000) );
+   auto b2_id = b2.id;
+
+   BOOST_CHECK_EQUAL( get_balance( borrower, bitusd ), 1000 );
+   BOOST_CHECK_EQUAL( get_balance( borrower2, bitusd ), 1000 );
+   BOOST_CHECK_EQUAL( get_balance( borrower , core ), init_balance - 1800 );
+   BOOST_CHECK_EQUAL( get_balance( borrower2, core ), init_balance - 2000 );
+
+   // move order to margin call territory with the feed
+   current_feed.settlement_price = bitusd.amount( 100 ) / core.amount(150);
+   publish_feed( bitusd, feedproducer, current_feed );
+
+   // getting out of margin call territory with mcr change
+   current_feed.maintenance_collateral_ratio = 1100;
+   publish_feed( bitusd, feedproducer, current_feed );
+
+   BOOST_CHECK_EQUAL( get_balance( borrower, bitusd ), 1000 );
+   BOOST_CHECK_EQUAL( get_balance( borrower2, bitusd ), 1000 );
+   BOOST_CHECK_EQUAL( get_balance( borrower , core ), 998200 );
+   BOOST_CHECK_EQUAL( get_balance( borrower2, core ), 998000 );
+
+   BOOST_CHECK( db.find<call_order_object>( b1_id ) );
+   BOOST_CHECK( db.find<call_order_object>( b2_id ) );
+
+   // attempt to trade the margin call
+   create_sell_order( borrower2, bitusd.amount(1000), core.amount(1100) );
+
+   BOOST_CHECK_EQUAL( get_balance( borrower, bitusd ), 1000 );
+   BOOST_CHECK_EQUAL( get_balance( borrower2, bitusd ), 0 );
+   BOOST_CHECK_EQUAL( get_balance( borrower , core ), 998350 );
+   BOOST_CHECK_EQUAL( get_balance( borrower2, core ), 999650  );
+
+   print_market(bitusd.symbol, core.symbol);
+
+   // margin call at b1, mcr bug
+   BOOST_CHECK( !db.find<call_order_object>( b1_id ) );
+   BOOST_CHECK( db.find<call_order_object>( b2_id ) );
+
+
+} FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE(mcr_bug_decrease_after1270)
+{ try {
+
+   generate_blocks(HARDFORK_CORE_1270_TIME);
+
+   generate_block();
+
+   set_expiration( db, trx );
+
+   ACTORS((seller)(borrower)(borrower2)(feedproducer));
+
+   const auto& bitusd = create_bitasset("USDBIT", feedproducer_id);
+   const auto& core   = asset_id_type()(db);
+
+   int64_t init_balance(1000000);
+
+   transfer(committee_account, borrower_id, asset(init_balance));
+   transfer(committee_account, borrower2_id, asset(init_balance));
+   update_feed_producers( bitusd, {feedproducer.id} );
+
+   price_feed current_feed;
+   current_feed.settlement_price = bitusd.amount( 100 ) / core.amount(100);
+   current_feed.maintenance_collateral_ratio = 1750;
+   current_feed.maximum_short_squeeze_ratio  = 1100;
+   publish_feed( bitusd, feedproducer, current_feed );
+
+   const call_order_object& b1 = *borrow( borrower, bitusd.amount(1000), asset(1800));
+   auto b1_id = b1.id;
+   const call_order_object& b2 = *borrow( borrower2, bitusd.amount(1000), asset(2000) );
+   auto b2_id = b2.id;
+
+   BOOST_CHECK_EQUAL( get_balance( borrower, bitusd ), 1000 );
+   BOOST_CHECK_EQUAL( get_balance( borrower2, bitusd ), 1000 );
+   BOOST_CHECK_EQUAL( get_balance( borrower , core ), init_balance - 1800 );
+   BOOST_CHECK_EQUAL( get_balance( borrower2, core ), init_balance - 2000 );
+
+   // move order to margin call territory with the feed
+   current_feed.settlement_price = bitusd.amount( 100 ) / core.amount(150);
+   publish_feed( bitusd, feedproducer, current_feed );
+
+   // getting out of margin call territory with mcr decrease
+   current_feed.maintenance_collateral_ratio = 1100;
+   publish_feed( bitusd, feedproducer, current_feed );
+
+   BOOST_CHECK_EQUAL( get_balance( borrower, bitusd ), 1000 );
+   BOOST_CHECK_EQUAL( get_balance( borrower2, bitusd ), 1000 );
+   BOOST_CHECK_EQUAL( get_balance( borrower , core ), 998200 );
+   BOOST_CHECK_EQUAL( get_balance( borrower2, core ), 998000 );
+
+   BOOST_CHECK( db.find<call_order_object>( b1_id ) );
+   BOOST_CHECK( db.find<call_order_object>( b2_id ) );
+
+   // attempt to trade the margin call
+   create_sell_order( borrower2, bitusd.amount(1000), core.amount(1100) );
+
+   BOOST_CHECK_EQUAL( get_balance( borrower, bitusd ), 1000 );
+   BOOST_CHECK_EQUAL( get_balance( borrower2, bitusd ), 0 );
+   BOOST_CHECK_EQUAL( get_balance( borrower , core ), 998200 );
+   BOOST_CHECK_EQUAL( get_balance( borrower2, core ), 998000  );
+
+   print_market(bitusd.symbol, core.symbol);
+
+   // both calls are there, no margin call, good
+   BOOST_CHECK( db.find<call_order_object>( b1_id ) );
+   BOOST_CHECK( db.find<call_order_object>( b2_id ) );
+
+
+} FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE(mcr_bug_cross1270)
+{ try {
+
+   INVOKE(mcr_bug_increase_before1270);
+
+   auto mi = db.get_global_properties().parameters.maintenance_interval;
+   generate_blocks(HARDFORK_CORE_1270_TIME - mi);
+
+   const asset_object& core = get_asset("BTS");
+   const asset_object& bitusd = get_asset("USDBIT");
+   const asset_id_type bitusd_id = bitusd.id;
+   const account_object& feedproducer = get_account("feedproducer");
+
+   // feed is expired
+   BOOST_CHECK_EQUAL((*bitusd_id(db).bitasset_data_id)(db).current_feed.maintenance_collateral_ratio, 1750);
+   BOOST_CHECK_EQUAL((*bitusd_id(db).bitasset_data_id)(db).feed_is_expired(db.head_block_time()), false); // should be true?
+
+   // make new feed
+   price_feed current_feed;
+   current_feed.settlement_price = bitusd.amount( 100 ) / core.amount(100);
+   current_feed.maintenance_collateral_ratio = 2000;
+   current_feed.maximum_short_squeeze_ratio  = 1100;
+   publish_feed( bitusd, feedproducer, current_feed );
+
+   BOOST_CHECK_EQUAL((*bitusd_id(db).bitasset_data_id)(db).current_feed.maintenance_collateral_ratio, 2000);
+   BOOST_CHECK_EQUAL((*bitusd_id(db).bitasset_data_id)(db).feed_is_expired(db.head_block_time()), false);
+
+   // pass hardfork
+   generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+   generate_block();
+
+   // feed is still valid
+   BOOST_CHECK_EQUAL((*bitusd_id(db).bitasset_data_id)(db).current_feed.maintenance_collateral_ratio, 2000);
+
+   // margin call is traded
+   print_market(asset_id_type(1)(db).symbol, asset_id_type()(db).symbol);
+
+   // call b1 not there anymore
+   BOOST_CHECK( !db.find<call_order_object>( call_order_id_type() ) );
+   BOOST_CHECK( db.find<call_order_object>( call_order_id_type(1) ) );
+
+} FC_LOG_AND_RETHROW() }
+
 BOOST_AUTO_TEST_SUITE_END()
