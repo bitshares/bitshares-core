@@ -60,32 +60,32 @@ fc::optional<fc::logging_config> load_logging_config_from_ini_file(const fc::pat
 
 int main(int argc, char** argv) {
    try {
-      app::application* node = new app::application();
+      app::application node;
       bpo::options_description app_options("Graphene Delayed Node");
       bpo::options_description cfg_options("Graphene Delayed Node");
       app_options.add_options()
-            ("help,h", "Print this help message and exit.")
-            ("data-dir,d", bpo::value<boost::filesystem::path>()->default_value("delayed_node_data_dir"), "Directory containing databases, configuration file, etc.")
-            ;
+              ("help,h", "Print this help message and exit.")
+              ("data-dir,d", bpo::value<boost::filesystem::path>()->default_value("delayed_node_data_dir"), "Directory containing databases, configuration file, etc.")
+              ;
 
       bpo::variables_map options;
 
-      auto delayed_plug = node->register_plugin<delayed_node::delayed_node_plugin>(true);
-      auto history_plug = node->register_plugin<account_history::account_history_plugin>(true);
-      auto market_history_plug = node->register_plugin<market_history::market_history_plugin>(true);
+      auto delayed_plug = node.register_plugin<delayed_node::delayed_node_plugin>(true);
+      auto history_plug = node.register_plugin<account_history::account_history_plugin>(true);
+      auto market_history_plug = node.register_plugin<market_history::market_history_plugin>(true);
 
       try
       {
          bpo::options_description cli, cfg;
-         node->set_program_options(cli, cfg);
+         node.set_program_options(cli, cfg);
          app_options.add(cli);
          cfg_options.add(cfg);
          bpo::store(bpo::parse_command_line(argc, argv, app_options), options);
       }
       catch (const boost::program_options::error& e)
       {
-        std::cerr << "Error parsing command line: " << e.what() << "\n";
-        return 1;
+         std::cerr << "Error parsing command line: " << e.what() << "\n";
+         return 1;
       }
 
       if( options.count("help") )
@@ -160,24 +160,26 @@ int main(int argc, char** argv) {
          elog("Error parsing configuration file: ${e}", ("e", e.what()));
          return 1;
       }
+      if( !options.count("plugins") )
+         options.insert( std::make_pair( "plugins", bpo::variable_value(std::string("delayed_node account_history market_history"), true) ) );
 
-      node->initialize(data_dir, options);
-      node->initialize_plugins( options );
+      node.initialize(data_dir, options);
+      node.initialize_plugins( options );
 
-      node->startup();
-      node->startup_plugins();
+      node.startup();
+      node.startup_plugins();
 
       fc::promise<int>::ptr exit_promise = new fc::promise<int>("UNIX Signal Handler");
       fc::set_signal_handler([&exit_promise](int signal) {
-         exit_promise->set_value(signal);
+          exit_promise->set_value(signal);
       }, SIGINT);
 
-      ilog("Started delayed node on a chain with ${h} blocks.", ("h", node->chain_database()->head_block_num()));
-      ilog("Chain ID is ${id}", ("id", node->chain_database()->get_chain_id()) );
+      ilog("Started delayed node on a chain with ${h} blocks.", ("h", node.chain_database()->head_block_num()));
+      ilog("Chain ID is ${id}", ("id", node.chain_database()->get_chain_id()) );
 
       int signal = exit_promise->wait();
       ilog("Exiting from signal ${n}", ("n", signal));
-      node->shutdown_plugins();
+      node.shutdown_plugins();
       return 0;
    } catch( const fc::exception& e ) {
       elog("Exiting with error:\n${e}", ("e", e.to_detail_string()));
@@ -239,14 +241,14 @@ fc::optional<fc::logging_config> load_logging_config_from_ini_file(const fc::pat
             // stdout/stderr will be taken from ini file, everything else hard-coded here
             fc::console_appender::config console_appender_config;
             console_appender_config.level_colors.emplace_back(
-               fc::console_appender::level_color(fc::log_level::debug,
-                                                 fc::console_appender::color::green));
+                    fc::console_appender::level_color(fc::log_level::debug,
+                                                      fc::console_appender::color::green));
             console_appender_config.level_colors.emplace_back(
-               fc::console_appender::level_color(fc::log_level::warn,
-                                                 fc::console_appender::color::brown));
+                    fc::console_appender::level_color(fc::log_level::warn,
+                                                      fc::console_appender::color::brown));
             console_appender_config.level_colors.emplace_back(
-               fc::console_appender::level_color(fc::log_level::error,
-                                                 fc::console_appender::color::cyan));
+                    fc::console_appender::level_color(fc::log_level::error,
+                                                      fc::console_appender::color::cyan));
             console_appender_config.stream = fc::variant(stream_name, 1).as<fc::console_appender::stream::type>(1);
             logging_config.appenders.push_back(fc::appender_config(console_appender_name, "console", fc::variant(console_appender_config, GRAPHENE_MAX_NESTED_OBJECTS)));
             found_logging_config = true;
