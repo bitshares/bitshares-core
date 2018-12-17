@@ -73,7 +73,7 @@ namespace graphene {
           */
          share_type calculate_fee(const fee_parameters_type& fee_params)const
          {
-            uint32_t days = std::min<long>(1, claim_period_seconds / (60 * 60 * 24));
+            uint32_t days = std::min<uint64_t>(1, claim_period_seconds / (60 * 60 * 24));
             return fee_params.fee + (fee_params.fee_per_day * days);
          }
 
@@ -111,7 +111,9 @@ namespace graphene {
           */
          share_type calculate_fee(const fee_parameters_type& fee_params)const
          {
-            return preimage.size() / 1024 * fee_params.fee_per_kb;
+            if (fee_params.fee_per_kb > 0)
+               return std::min<share_type>(1, preimage.size() / (1024 * fee_params.fee_per_kb));
+            return 0;
          }
       };
 
@@ -148,7 +150,7 @@ namespace graphene {
           */
          share_type calculate_fee(const fee_parameters_type& fee_params)const
          {
-            uint32_t days = seconds_to_add / (60 * 60 * 24);
+            uint32_t days = std::min<uint64_t>(1, seconds_to_add / (60 * 60 * 24));
             return fee_params.fee + (fee_params.fee_per_day * days);
          }
       };
