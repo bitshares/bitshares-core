@@ -27,6 +27,7 @@
 #include <graphene/chain/htlc_object.hpp>
 #include <graphene/chain/protocol/base.hpp>
 #include <graphene/chain/protocol/types.hpp>
+#include <algorithm> // std::min
 
 namespace graphene { 
    namespace chain {
@@ -72,7 +73,7 @@ namespace graphene {
           */
          share_type calculate_fee(const fee_parameters_type& fee_params)const
          {
-            uint32_t days = claim_period_seconds / (60 * 60 * 24);
+            uint32_t days = std::min<long>(1, claim_period_seconds / (60 * 60 * 24));
             return fee_params.fee + (fee_params.fee_per_day * days);
          }
 

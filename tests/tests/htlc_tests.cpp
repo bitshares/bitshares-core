@@ -90,7 +90,7 @@ void set_committee_parameters(database_fixture* db_fixture)
 
 void advance_past_hardfork(database_fixture* db_fixture)
 {
-   db_fixture->generate_blocks(HARDFORK_CORE_1468_TIME);
+   db_fixture->generate_blocks(HARDFORK_CORE_1468_TIME+1);
    set_committee_parameters(db_fixture);
    set_expiration(db_fixture->db, db_fixture->trx);
 }
@@ -319,6 +319,7 @@ BOOST_AUTO_TEST_CASE( other_peoples_money )
 
 BOOST_AUTO_TEST_CASE( set_htlc_params )
 { 
+try {
    {
       // try to set committee parameters before hardfork
       proposal_create_operation cop = proposal_create_operation::committee_proposal(
@@ -348,7 +349,54 @@ BOOST_AUTO_TEST_CASE( set_htlc_params )
       trx.clear();
    }
 
+   /*
+   {
+      BOOST_TEST_MESSAGE("Attempting to set HTLC fees before hard fork.");
+      // get existing fees
+      const chain_parameters& existing_params = db.get_global_properties().parameters;
+      const fee_schedule_type& existing_fee_schedule = *(existing_params.current_fees);
+      // build a map of existing fees
+      flat_map< int, fee_parameters > fee_map;
+      fee_map.reserve( existing_fee_schedule.parameters.size() );
+      for( const fee_parameters& op_fee : existing_fee_schedule.parameters )
+         fee_map[ op_fee.which() ] = op_fee;
+      // add the ability to look up the fee shedule
+      fee_schedule_type new_fee_schedule;
+      new_fee_schedule.scale = existing_fee_schedule.scale;
+      // replace the htlc_create_operation fee structure with the new one
+      for(auto param : existing_fee_schedule.parameters)
+      {
+         if (param.which() != ((operation)htlc_create_operation()).which()) // we want to keep it as is...
+            new_fee_schedule.parameters.insert(param);
+         else
+         {
+            // we want to change this one
+            htlc_create_operation::fee_parameters_type htlc_param;
+            htlc_param.fee_per_day = 2;
+            htlc_param.fee = 2;
+            new_fee_schedule.parameters.insert(htlc_param);
+         }
+      }
+      // send a fee change proposal
+      chain_parameters new_parameters = existing_params;
+      new_parameters.current_fees = new_fee_schedule;
+      committee_member_update_global_parameters_operation cmuop;
+      cmuop.new_parameters = new_parameters;
+      proposal_create_operation cop = proposal_create_operation::committee_proposal(
+            existing_params, db.head_block_time());
+      cop.fee_paying_account = GRAPHENE_TEMP_ACCOUNT;
+      cop.expiration_time = db.head_block_time() + *cop.review_period_seconds + 10;
+      cop.proposed_ops.emplace_back( cmuop );
+      cop.expiration_time =  db.head_block_time() + fc::days(1);
+      cop.fee = asset( 100000 );
+      trx.operations.push_back( cop );
+      BOOST_TEST_MESSAGE("About to push fees before their time.");
+      db.push_transaction( trx );
+      BOOST_TEST_MESSAGE("Attempted to push fees before their time.");
+   }
+   */
    // now things should start working...
+   BOOST_TEST_MESSAGE("Advancing to HTLC hardfork time.");
    advance_past_hardfork(this);
 
    proposal_id_type good_proposal_id;
@@ -367,6 +415,7 @@ BOOST_AUTO_TEST_CASE( set_htlc_params )
       graphene::chain::processed_transaction proc_trx =db.push_transaction(trx);
       good_proposal_id = proc_trx.operation_results[0].get<object_id_type>();
    }
+
    BOOST_TEST_MESSAGE( "Updating proposal by signing with the committee_member private key" );
    {
       proposal_update_operation uop;
@@ -396,6 +445,13 @@ BOOST_AUTO_TEST_CASE( set_htlc_params )
 
    BOOST_TEST_MESSAGE( "Verify that the change has been implemented" );
    BOOST_CHECK_EQUAL(db.get_global_properties().parameters.extensions.value.updatable_htlc_options->max_preimage_size, 2048u);
+} catch (fc::exception &fcx) {
+   BOOST_FAIL("FC Exception: " << fcx.to_detail_string());
+} catch (std::exception &ex) {
+   BOOST_FAIL("Exception: " << ex.what());
+} catch (...) {
+   BOOST_FAIL("Uncaught exception.");
+}
 }
 
 BOOST_AUTO_TEST_SUITE_END()

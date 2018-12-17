@@ -691,7 +691,7 @@ BOOST_AUTO_TEST_CASE( cli_create_htlc )
       BOOST_TEST_MESSAGE("Secret is " + preimage_string + " and hash is " + hash_str);
       uint32_t timelock = fc::days(1).to_seconds();
       graphene::chain::signed_transaction result_tx 
-            = con.wallet_api_ptr->htlc_prepare("alice", "bob", 
+            = con.wallet_api_ptr->htlc_create("alice", "bob", 
             "3", "1.3.0", "SHA256", hash_str, preimage_string.size(), timelock, true);
 
       // normally, a wallet would watch block production, and find the transaction. Here, we can cheat:
@@ -713,7 +713,7 @@ BOOST_AUTO_TEST_CASE( cli_create_htlc )
       BOOST_TEST_MESSAGE("The HTLC Object is: " + fc::json::to_pretty_string(alice_htlc));
 
       // Bob likes what he sees, so he creates an HTLC, using the info he retrieved from Alice's HTLC
-      con.wallet_api_ptr->htlc_prepare("bob", "alice",
+      con.wallet_api_ptr->htlc_create("bob", "alice",
             "3", "BOBCOIN", "SHA256", hash_str, preimage_string.size(), timelock, true);
 
       // normally, a wallet would watch block production, and find the transaction. Here, we can cheat:

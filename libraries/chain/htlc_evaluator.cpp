@@ -37,9 +37,6 @@ namespace graphene {
 
       void_result htlc_create_evaluator::do_evaluate(const htlc_create_operation& o)
       {
-         //FC_ASSERT( db().head_block_time() > HARDFORK_CORE_1468_TIME,
-         //           "Operation not allowed before HARDFORK_CORE_1468_TIME."); // remove after HARDFORK_ESCROW_TIME
-
          optional<htlc_options> htlc_options = get_committee_htlc_options(db());
 
          FC_ASSERT(htlc_options, "HTLC Committee options are not set.");

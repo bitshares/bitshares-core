@@ -1468,7 +1468,7 @@ class wallet_api
        * @param claim_period_seconds how long after creation until the lock expires
        * @param broadcast true if you wish to broadcast the transaction
        */
-      signed_transaction htlc_prepare( string source, string destination, string amount, string asset_symbol,
+      signed_transaction htlc_create( string source, string destination, string amount, string asset_symbol,
             string hash_algorithm, const std::string& preimage_hash, size_t preimage_size, 
             const uint32_t claim_period_seconds, bool broadcast = false );
 
@@ -1844,7 +1844,7 @@ FC_API( graphene::wallet::wallet_api,
         (update_witness)
         (create_worker)
         (update_worker_votes)
-        (htlc_prepare)
+        (htlc_create)
         (htlc_redeem)
         (htlc_extend)
         (get_vesting_balances)

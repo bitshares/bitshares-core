@@ -95,7 +95,10 @@ struct proposal_operation_hardfork_visitor
       }
    }
    void operator()(const graphene::chain::committee_member_update_global_parameters_operation &op) const {
-      FC_ASSERT(block_time > HARDFORK_CORE_1468_TIME, "Not allowed until hardfork 1468");
+      if (block_time < HARDFORK_CORE_1468_TIME) {
+         FC_ASSERT(!op.new_parameters.extensions.value.updatable_htlc_options.valid(), "Unable to set HTLC options before hardfork 1468");
+         // TODO: Do not allow changing of fees before hardfork
+      }
    }
    // loop and self visit in proposals
    void operator()(const graphene::chain::proposal_create_operation &v) const {
