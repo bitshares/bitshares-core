@@ -66,13 +66,15 @@ int main(int argc, char** argv) {
       app_options.add_options()
               ("help,h", "Print this help message and exit.")
               ("data-dir,d", bpo::value<boost::filesystem::path>()->default_value("delayed_node_data_dir"), "Directory containing databases, configuration file, etc.")
+              ("plugins", bpo::value<std::string>()->default_value("delayed_node account_history market_history"),
+               "Space-separated list of plugins to activate");
               ;
 
       bpo::variables_map options;
 
-      auto delayed_plug = node.register_plugin<delayed_node::delayed_node_plugin>(true);
-      auto history_plug = node.register_plugin<account_history::account_history_plugin>(true);
-      auto market_history_plug = node.register_plugin<market_history::market_history_plugin>(true);
+      auto delayed_plug = node.register_plugin<delayed_node::delayed_node_plugin>();
+      auto history_plug = node.register_plugin<account_history::account_history_plugin>();
+      auto market_history_plug = node.register_plugin<market_history::market_history_plugin>();
 
       try
       {
@@ -160,9 +162,20 @@ int main(int argc, char** argv) {
          elog("Error parsing configuration file: ${e}", ("e", e.what()));
          return 1;
       }
-      if( !options.count("plugins") )
-         options.insert( std::make_pair( "plugins", bpo::variable_value(std::string("delayed_node account_history market_history"), true) ) );
 
+      std::set<std::string> plugins;
+      boost::split(plugins, options.at("plugins").as<std::string>(), [](char c){return c == ' ';});
+
+      if(plugins.count("account_history") && plugins.count("elasticsearch")) {
+         std::cerr << "Plugin conflict: Cannot load both account_history plugin and elasticsearch plugin\n";
+         return 1;
+      }
+
+      std::for_each(plugins.begin(), plugins.end(), [&](const std::string& plug) mutable {
+          if (!plug.empty()) {
+             node.enable_plugin(plug);
+          }
+      });
       node.initialize(data_dir, options);
       node.initialize_plugins( options );
 
