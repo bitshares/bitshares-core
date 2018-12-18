@@ -198,14 +198,11 @@ void es_objects_plugin_impl::prepareTemplate(T blockchain_object, string index_n
       bulk_header["_id"] = string(blockchain_object.id);
    }
 
-   auto blockchain_object_string = fc::json::to_string(blockchain_object, fc::json::legacy_generator);
-   variant blockchain_object_variant = fc::json::from_string(blockchain_object_string);
-   fc::mutable_variant_object o;
-
    adaptor_struct adaptor;
-   auto adapted = adaptor.adapt(blockchain_object_variant.get_object());
+   fc::variant blockchain_object_variant;
+   fc::to_variant( blockchain_object, blockchain_object_variant, GRAPHENE_NET_MAX_NESTED_OBJECTS );
+   fc::mutable_variant_object o = adaptor.adapt(blockchain_object_variant.get_object());
 
-   fc::from_variant(adapted, o, FC_PACK_MAX_DEPTH);
    o["object_id"] = string(blockchain_object.id);
    o["block_time"] = block_time;
    o["block_number"] = block_number;

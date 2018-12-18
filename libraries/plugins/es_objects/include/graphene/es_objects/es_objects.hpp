@@ -54,7 +54,7 @@ class es_objects_plugin : public graphene::app::plugin
 };
 
 struct adaptor_struct {
-   variant adapt(const variant_object &obj) {
+    fc::mutable_variant_object adapt(const variant_object &obj) {
       fc::mutable_variant_object o(obj);
       vector<string> keys_to_rename;
       for (auto i = o.begin(); i != o.end(); ++i) {
@@ -94,10 +94,8 @@ struct adaptor_struct {
       {
          o["operations"] = fc::json::to_string(o["operations"]);
       }
-
-      variant v;
-      fc::to_variant(o, v, FC_PACK_MAX_DEPTH);
-      return v;
+      
+      return o;
    }
 
    void adapt(fc::variants &v) {
