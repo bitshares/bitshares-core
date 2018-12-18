@@ -146,7 +146,7 @@ BOOST_AUTO_TEST_CASE( htlc_expires )
 
    ACTORS((alice)(bob));
 
-   int64_t init_balance(100000);
+   int64_t init_balance(100 * GRAPHENE_BLOCKCHAIN_PRECISION);
 
    transfer( committee_account, alice_id, graphene::chain::asset(init_balance) );
 
@@ -162,8 +162,8 @@ BOOST_AUTO_TEST_CASE( htlc_expires )
    // Alice puts a contract on the blockchain
    {
       graphene::chain::htlc_create_operation create_operation;
-
-      create_operation.amount = graphene::chain::asset( 10000 );
+      BOOST_TEST_MESSAGE("Alice (who has 100 coins, is transferring 2 coins to Bob");
+      create_operation.amount = graphene::chain::asset( 2 * GRAPHENE_BLOCKCHAIN_PRECISION );
       create_operation.to = bob_id;
       create_operation.claim_period_seconds = 60;
       create_operation.preimage_hash = preimage_hash;
@@ -180,8 +180,8 @@ BOOST_AUTO_TEST_CASE( htlc_expires )
       generate_block();
    }
 
-   // verify funds on hold (TODO: make sure this can cover fees)
-   BOOST_CHECK_EQUAL( get_balance(alice_id, graphene::chain::asset_id_type()), 90000 );
+   // verify funds on hold... 100 - 2 = 98, minus the 1 coin fee = 9
+   BOOST_CHECK_EQUAL( get_balance(alice_id, graphene::chain::asset_id_type()), 97 * GRAPHENE_BLOCKCHAIN_PRECISION );
 
    // make sure Bob (or anyone) can see the details of the transaction
    graphene::app::database_api db_api(db);
@@ -189,9 +189,9 @@ BOOST_AUTO_TEST_CASE( htlc_expires )
    graphene::chain::htlc_object htlc = obj.template as<graphene::chain::htlc_object>(GRAPHENE_MAX_NESTED_OBJECTS);
 
    // let it expire (wait for timeout)
-   generate_blocks(fc::time_point_sec(120) );
+   generate_blocks( fc::time_point::now() + fc::seconds(120) );
    // verify funds return (minus the fees)
-   BOOST_CHECK_EQUAL( get_balance(alice_id, graphene::chain::asset_id_type()), 90000 );
+   BOOST_CHECK_EQUAL( get_balance(alice_id, graphene::chain::asset_id_type()), 99 * GRAPHENE_BLOCKCHAIN_PRECISION );
    // verify Bob cannot execute the contract after the fact
 }
 

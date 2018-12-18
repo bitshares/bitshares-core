@@ -27,7 +27,7 @@
 #include <graphene/chain/htlc_object.hpp>
 #include <graphene/chain/protocol/base.hpp>
 #include <graphene/chain/protocol/types.hpp>
-#include <algorithm> // std::min
+#include <algorithm> // std::max
 
 namespace graphene { 
    namespace chain {
@@ -73,7 +73,7 @@ namespace graphene {
           */
          share_type calculate_fee(const fee_parameters_type& fee_params)const
          {
-            uint32_t days = std::min<uint64_t>(1, claim_period_seconds / (60 * 60 * 24));
+            uint64_t days = std::max<uint64_t>(1, claim_period_seconds / (60 * 60 * 24));
             return fee_params.fee + (fee_params.fee_per_day * days);
          }
 
@@ -112,7 +112,7 @@ namespace graphene {
          share_type calculate_fee(const fee_parameters_type& fee_params)const
          {
             if (fee_params.fee_per_kb > 0)
-               return std::min<share_type>(1, preimage.size() / (1024 * fee_params.fee_per_kb));
+               return std::max<share_type>(1, preimage.size() / (1024 * fee_params.fee_per_kb));
             return 0;
          }
       };
@@ -150,7 +150,7 @@ namespace graphene {
           */
          share_type calculate_fee(const fee_parameters_type& fee_params)const
          {
-            uint32_t days = std::min<uint64_t>(1, seconds_to_add / (60 * 60 * 24));
+            uint32_t days = std::max<uint64_t>(1, seconds_to_add / (60 * 60 * 24));
             return fee_params.fee + (fee_params.fee_per_day * days);
          }
       };
