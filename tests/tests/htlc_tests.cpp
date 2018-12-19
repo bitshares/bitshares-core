@@ -486,17 +486,10 @@ BOOST_AUTO_TEST_CASE( htlc_hardfork_test )
       BOOST_CHECK_EQUAL(db.get_global_properties().parameters.extensions.value.updatable_htlc_options->max_preimage_size, 2048u);
       BOOST_CHECK_EQUAL(db.get_global_properties().parameters.current_fees->get<htlc_create_operation>().fee, 2 * GRAPHENE_BLOCKCHAIN_PRECISION);
       
-   } catch (fc::exception &fcx) {
-      BOOST_FAIL("FC Exception: " << fcx.to_detail_string());
-   } catch (std::exception &ex) {
-      BOOST_FAIL("Exception: " << ex.what());
-   } catch (...) {
-      BOOST_FAIL("Uncaught exception.");
-   }
-}
+} FC_LOG_AND_RETHROW() }
 
 BOOST_AUTO_TEST_CASE( htlc_before_hardfork )
-{
+{ try {
    ACTORS((alice)(bob));
 
    int64_t init_balance(100000);
@@ -509,9 +502,10 @@ BOOST_AUTO_TEST_CASE( htlc_before_hardfork )
    std::vector<unsigned char> preimage_hash = hash_it(pre_image);
 
    graphene::chain::htlc_id_type alice_htlc_id;
-   // cler everything out
+   // clear everything out
    generate_block();
    trx.clear();
+
    // Alice tries to put a contract on the blockchain
    {
       graphene::chain::htlc_create_operation create_operation;
@@ -526,8 +520,65 @@ BOOST_AUTO_TEST_CASE( htlc_before_hardfork )
       trx.operations.push_back(create_operation);
       sign(trx, alice_private_key);
       GRAPHENE_CHECK_THROW(PUSH_TX(db, trx, ~0), fc::exception);
+      trx.clear();
    }
-}
+
+   // Propose htlc_create
+   {
+      proposal_create_operation pco;
+      pco.expiration_time = db.head_block_time() + fc::minutes(1);
+      pco.fee_paying_account = alice_id;
+
+      graphene::chain::htlc_create_operation create_operation;
+      create_operation.amount = graphene::chain::asset( 10000 );
+      create_operation.to = bob_id;
+      create_operation.claim_period_seconds = 60;
+      create_operation.preimage_hash = preimage_hash;
+      create_operation.hash_type = htlc_hash_algorithm::sha256;
+      create_operation.preimage_size = preimage_size;
+      create_operation.from = alice_id;
+
+      pco.proposed_ops.emplace_back( create_operation );
+      trx.operations.push_back( pco );
+      GRAPHENE_CHECK_THROW( PUSH_TX( db, trx, ~0 ), fc::assert_exception );
+      trx.clear();
+   }
+
+   // Propose htlc_redeem
+   {
+      proposal_create_operation pco;
+      pco.expiration_time = db.head_block_time() + fc::minutes(1);
+      pco.fee_paying_account = alice_id;
+
+      graphene::chain::htlc_redeem_operation rop;
+      rop.redeemer = bob_id;
+      rop.htlc_id = alice_htlc_id;
+      string preimage_str = "Arglebargle";
+      rop.preimage.insert( rop.preimage.begin(), preimage_str.begin(), preimage_str.end() );
+
+      pco.proposed_ops.emplace_back( rop );
+      trx.operations.push_back( pco );
+      GRAPHENE_CHECK_THROW( PUSH_TX( db, trx, ~0 ), fc::assert_exception );
+      trx.clear();
+   }
+
+   // Propose htlc_extend
+   {
+      proposal_create_operation pco;
+      pco.expiration_time = db.head_block_time() + fc::minutes(1);
+      pco.fee_paying_account = alice_id;
+
+      graphene::chain::htlc_extend_operation xop;
+      xop.htlc_id = alice_htlc_id;
+      xop.seconds_to_add = 100;
+      xop.update_issuer = alice_id;
+
+      pco.proposed_ops.emplace_back( xop );
+      trx.operations.push_back( pco );
+      GRAPHENE_CHECK_THROW( PUSH_TX( db, trx, ~0 ), fc::assert_exception );
+      trx.clear();
+   }
+} FC_LOG_AND_RETHROW() }
 
 BOOST_AUTO_TEST_CASE( fee_calculations )
 {

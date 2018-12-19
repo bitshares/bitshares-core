@@ -102,6 +102,15 @@ struct proposal_operation_hardfork_visitor
          FC_ASSERT(!op.new_parameters.current_fees->exists<htlc_extend_operation>());
       }
    }
+   void operator()(const graphene::chain::htlc_create_operation &op) const {
+      FC_ASSERT( block_time >= HARDFORK_CORE_1468_TIME, "Not allowed until hardfork 1468" );
+   }
+   void operator()(const graphene::chain::htlc_redeem_operation &op) const {
+      FC_ASSERT( block_time >= HARDFORK_CORE_1468_TIME, "Not allowed until hardfork 1468" );
+   }
+   void operator()(const graphene::chain::htlc_extend_operation &op) const {
+      FC_ASSERT( block_time >= HARDFORK_CORE_1468_TIME, "Not allowed until hardfork 1468" );
+   }
    // loop and self visit in proposals
    void operator()(const graphene::chain::proposal_create_operation &v) const {
       for (const op_wrapper &op : v.proposed_ops)
