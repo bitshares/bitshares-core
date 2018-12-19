@@ -23,6 +23,8 @@
  */
 #include <graphene/chain/protocol/htlc.hpp>
 
+#define SECONDS_PER_DAY (60 * 60 * 24)
+
 namespace graphene { namespace chain {
 
    void htlc_create_operation::validate()const {
@@ -33,11 +35,29 @@ namespace graphene { namespace chain {
             || hash_type == htlc_hash_algorithm::sha256, "Unknown Hash Algorithm");
    }
 
+   share_type htlc_create_operation::calculate_fee(const fee_parameters_type& fee_params)const
+   {
+      uint64_t days = (claim_period_seconds + SECONDS_PER_DAY - 1) / SECONDS_PER_DAY;
+      return fee_params.fee + (fee_params.fee_per_day * days);
+   }
+
    void htlc_redeem_operation::validate()const {
       FC_ASSERT( fee.amount >= 0 );
    }
+
+   share_type htlc_redeem_operation::calculate_fee(const fee_parameters_type& fee_params)const
+   {
+      return fee_params.fee
+             + ( preimage.size() + 1023 ) / 1024 * fee_params.fee_per_kb;
+   }
+
    void htlc_extend_operation::validate()const {
       FC_ASSERT( fee.amount >= 0 );
    }
 
+   share_type htlc_extend_operation::calculate_fee(const fee_parameters_type& fee_params)const
+   {
+      uint32_t days = (seconds_to_add + SECONDS_PER_DAY - 1) / SECONDS_PER_DAY;
+      return fee_params.fee + (fee_params.fee_per_day * days);
+   }
 } }

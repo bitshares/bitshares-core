@@ -77,13 +77,7 @@ namespace graphene {
          /****
           * @brief calculates the fee to be paid for this operation
           */
-         share_type calculate_fee(const fee_parameters_type& fee_params)const
-         {
-            
-            uint64_t days = std::max<uint64_t>( 1, std::ceil( claim_period_seconds / (double)(60 * 60 * 24) ) );
-            return fee_params.fee + (fee_params.fee_per_day * days);
-         }
-
+         share_type calculate_fee(const fee_parameters_type& fee_params)const;
       };
 
       struct htlc_redeem_operation : public base_operation
@@ -117,13 +111,7 @@ namespace graphene {
          /****
           * @brief calculates the fee to be paid for this operation
           */
-         share_type calculate_fee(const fee_parameters_type& fee_params)const
-         {
-            if (fee_params.fee_per_kb > 0)
-               return fee_params.fee + std::max<share_type>(fee_params.fee_per_kb, 
-                     std::ceil( preimage.size() / (double)1024 ) * fee_params.fee_per_kb );
-            return fee_params.fee;
-         }
+         share_type calculate_fee(const fee_parameters_type& fee_params)const;
       };
 
       struct htlc_extend_operation : public base_operation
@@ -138,7 +126,7 @@ namespace graphene {
          // the object we are attempting to update
          htlc_id_type htlc_id;
          // who is attempting to update the transaction
-    	   account_id_type update_issuer;
+         account_id_type update_issuer;
          // how much to add
          uint32_t seconds_to_add;
          // for future expansion
@@ -147,7 +135,7 @@ namespace graphene {
          /***
           * @brief Perform obvious checks to validate this object
           */
-    	   void validate()const;
+         void validate()const;
          
          /**
           * @brief Who is to pay the fee
@@ -157,11 +145,7 @@ namespace graphene {
          /****
           * @brief calculates the fee to be paid for this operation
           */
-         share_type calculate_fee(const fee_parameters_type& fee_params)const
-         {
-            uint32_t days = std::max<uint64_t>(1, std::ceil( seconds_to_add / (double)(60 * 60 * 24) ) );
-            return fee_params.fee + (fee_params.fee_per_day * days);
-         }
+         share_type calculate_fee(const fee_parameters_type& fee_params)const;
       };
 
       struct htlc_refund_operation : public base_operation

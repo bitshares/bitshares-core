@@ -539,7 +539,7 @@ BOOST_AUTO_TEST_CASE( fee_calculations )
       htlc_create_operation create;
       // no days
       create.claim_period_seconds = 0;
-      BOOST_CHECK_EQUAL( create.calculate_fee(create_fee).value, 4 );
+      BOOST_CHECK_EQUAL( create.calculate_fee(create_fee).value, 2 );
       // exactly 1 day
       create.claim_period_seconds = 60 * 60 * 24;
       BOOST_CHECK_EQUAL( create.calculate_fee(create_fee).value, 4 );
@@ -555,7 +555,7 @@ BOOST_AUTO_TEST_CASE( fee_calculations )
       htlc_redeem_operation redeem;
       // no preimage
       redeem.preimage = std::vector<uint8_t>();
-      BOOST_CHECK_EQUAL( redeem.calculate_fee( redeem_fee ).value, 4 ) ;
+      BOOST_CHECK_EQUAL( redeem.calculate_fee( redeem_fee ).value, 2 ) ;
       // exactly 1KB
       std::string test(1024, 'a');
       redeem.preimage = std::vector<uint8_t>( test.begin(), test.end() );
@@ -573,7 +573,7 @@ BOOST_AUTO_TEST_CASE( fee_calculations )
       htlc_extend_operation extend;
       // no days
       extend.seconds_to_add = 0;
-      BOOST_CHECK_EQUAL( extend.calculate_fee( extend_fee ).value, 4 );
+      BOOST_CHECK_EQUAL( extend.calculate_fee( extend_fee ).value, 2 );
       // exactly 1 day
       extend.seconds_to_add = 60 * 60 * 24;
       BOOST_CHECK_EQUAL( extend.calculate_fee( extend_fee ).value, 4 );
