@@ -112,7 +112,7 @@ namespace graphene {
          share_type calculate_fee(const fee_parameters_type& fee_params)const
          {
             if (fee_params.fee_per_kb > 0)
-               return std::max<share_type>(1, preimage.size() / (1024 * fee_params.fee_per_kb));
+               return std::max<share_type>(fee_params.fee_per_kb, preimage.size() / 1024 * fee_params.fee_per_kb);
             return 0;
          }
       };
