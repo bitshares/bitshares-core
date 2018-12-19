@@ -1827,11 +1827,6 @@ BOOST_FIXTURE_TEST_CASE( temp_account_balance, database_fixture )
 
    top.to = GRAPHENE_COMMITTEE_ACCOUNT;
    trx.operations.push_back( top );
-   sign( trx, alice_private_key );
-   BOOST_CHECK_THROW( PUSH_TX( db, trx ), fc::assert_exception );
-
-   generate_blocks( HARDFORK_CORE_1040_TIME );
-
    set_expiration( db, trx );
    trx.clear_signatures();
    sign( trx, alice_private_key );

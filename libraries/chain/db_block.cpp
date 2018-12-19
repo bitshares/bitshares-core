@@ -681,14 +681,6 @@ processed_transaction database::_apply_transaction(const signed_transaction& trx
    }
    ptrx.operation_results = std::move(eval_state.operation_results);
 
-   if( head_block_time() < HARDFORK_CORE_1040_TIME ) // TODO totally remove this code block after hard fork
-   {
-      //Make sure the temp account has no non-zero balances
-      const auto& index = get_index_type<account_balance_index>().indices().get<by_account_asset>();
-      auto range = index.equal_range( boost::make_tuple( GRAPHENE_TEMP_ACCOUNT ) );
-      std::for_each(range.first, range.second, [](const account_balance_object& b) { FC_ASSERT(b.balance == 0); });
-   }
-
    return ptrx;
 } FC_CAPTURE_AND_RETHROW( (trx) ) }
 
