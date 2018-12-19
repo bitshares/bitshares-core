@@ -36,6 +36,23 @@
 
 #include <graphene/chain/protocol/ext.hpp>
 
+// TODO: move this to fc
+#include <fc/crypto/sha1.hpp>
+FC_REFLECT_TYPENAME( fc::sha1 )
+namespace fc { namespace raw {
+   template<typename T>
+   inline void pack( T& ds, const fc::sha1& ep, uint32_t _max_depth = 1 ) {
+      ds << ep;
+   }
+
+   template<typename T>
+   inline void unpack( T& ds, sha1& ep, uint32_t _max_depth = 1 ) {
+      ds >> ep;
+   }
+
+} }
+// /TODO: move to fc
+
 #include <fc/io/raw.hpp>
 #include <fc/uint128.hpp>
 #include <fc/static_variant.hpp>

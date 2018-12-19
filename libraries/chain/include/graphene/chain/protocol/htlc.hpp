@@ -22,6 +22,10 @@
  * THE SOFTWARE.
  */
 #pragma once
+
+#include <fc/crypto/ripemd160.hpp>
+#include <fc/crypto/sha1.hpp>
+#include <fc/crypto/sha256.hpp>
 #include <fc/time.hpp>
 #include <boost/container/flat_set.hpp>
 #include <graphene/chain/protocol/base.hpp>
@@ -31,12 +35,15 @@
 namespace graphene { 
    namespace chain {
 
-      enum htlc_hash_algorithm {
-         unknown = 0x00,
-         ripemd160 = 0x01,
-         sha256 = 0x02,
-         sha1 = 0x03
-      };
+      typedef fc::ripemd160    htlc_algo_ripemd160;
+      typedef fc::sha1         htlc_algo_sha1;
+      typedef fc::sha256       htlc_algo_sha256;
+
+      typedef fc::static_variant<
+         htlc_algo_ripemd160,
+         htlc_algo_sha1,
+         htlc_algo_sha256
+      > htlc_hash;
 
       struct htlc_create_operation : public base_operation 
       {
@@ -45,29 +52,26 @@ namespace graphene {
             uint64_t fee_per_day = 1 * GRAPHENE_BLOCKCHAIN_PRECISION;
          };
          // paid to network
-    	   asset fee; 
+         asset fee;
          // where the held monies are to come from
          account_id_type from;
          // where the held monies will go if the preimage is provided
-    	   account_id_type to; 
+         account_id_type to;
          // the amount to hold
-    	   asset amount;
-         // hash algorithm used to create preimage_hash
-         fc::enum_type<uint8_t, htlc_hash_algorithm> hash_type 
-               = htlc_hash_algorithm::unknown;
-         // the hash of the preimage
-    	   std::vector<uint8_t> preimage_hash;
+         asset amount;
+         // the (typed) hash of the preimage
+         htlc_hash preimage_hash;
          // the size of the preimage
-    	   uint16_t preimage_size;
+         uint16_t preimage_size;
          // The time the funds will be returned to the source if not claimed
-    	   uint32_t claim_period_seconds;
+         uint32_t claim_period_seconds;
          // for future expansion
-    	   extensions_type extensions; 
+         extensions_type extensions;
 
          /***
           * @brief Does simple validation of this object
           */
-    	   void validate()const;
+         void validate()const;
          
          /**
           * @brief who will pay the fee
@@ -92,9 +96,9 @@ namespace graphene {
          // the object we are attempting to update
          htlc_id_type htlc_id;
          // who is attempting to update the transaction
-    	   account_id_type redeemer;
+         account_id_type redeemer;
          // the preimage (not used if after epoch timeout)
-    	   std::vector<uint8_t> preimage;
+         std::vector<uint8_t> preimage;
          // for future expansion
          extensions_type extensions; 
 
@@ -169,7 +173,7 @@ namespace graphene {
    } 
 }
 
-FC_REFLECT_ENUM( graphene::chain::htlc_hash_algorithm, (unknown)(ripemd160)(sha256)(sha1));
+FC_REFLECT_TYPENAME( graphene::chain::htlc_hash )
 
 FC_REFLECT( graphene::chain::htlc_create_operation::fee_parameters_type, (fee) (fee_per_day) )
 FC_REFLECT( graphene::chain::htlc_redeem_operation::fee_parameters_type, (fee) (fee_per_kb) )
@@ -177,7 +181,7 @@ FC_REFLECT( graphene::chain::htlc_extend_operation::fee_parameters_type, (fee) (
 FC_REFLECT( graphene::chain::htlc_refund_operation::fee_parameters_type, ) // VIRTUAL
 
 FC_REFLECT( graphene::chain::htlc_create_operation, 
-      (fee)(from)(to)(amount)(preimage_hash)(preimage_size)(claim_period_seconds)(extensions)(hash_type))
+      (fee)(from)(to)(amount)(preimage_hash)(preimage_size)(claim_period_seconds)(extensions))
 FC_REFLECT( graphene::chain::htlc_redeem_operation, (fee)(htlc_id)(redeemer)(preimage)(extensions))
 FC_REFLECT( graphene::chain::htlc_extend_operation, (fee)(htlc_id)(update_issuer)(seconds_to_add)(extensions))
 FC_REFLECT( graphene::chain::htlc_refund_operation, (fee)(htlc_id)(to))

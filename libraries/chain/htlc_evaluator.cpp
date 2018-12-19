@@ -21,7 +21,6 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-#include <fc/crypto/sha1.hpp>
 #include <graphene/chain/database.hpp>
 #include <graphene/chain/htlc_evaluator.hpp>
 #include <graphene/chain/htlc_object.hpp>
@@ -45,8 +44,6 @@ namespace graphene {
          FC_ASSERT( o.claim_period_seconds <= htlc_options->max_timeout_secs, "HTLC Timeout exceeds allowed length" );
          // make sure the preimage length is reasonable
          FC_ASSERT( o.preimage_size <= htlc_options->max_preimage_size, "HTLC preimage length exceeds allowed length" ); 
-         // make sure we have a hash algorithm set
-         FC_ASSERT( o.hash_type != htlc_hash_algorithm::unknown, "HTLC Hash Algorithm must be set" );
          // make sure the sender has the funds for the HTLC
          FC_ASSERT( db().get_balance( o.from, o.amount.asset_id) >= (o.amount), "Insufficient funds") ;
          return void_result();
@@ -65,21 +62,28 @@ namespace graphene {
                esc.preimage_hash         = o.preimage_hash;
                esc.preimage_size         = o.preimage_size;
                esc.expiration            = dbase.head_block_time() + o.claim_period_seconds;
-               esc.preimage_hash_algorithm = o.hash_type;
             });
             return  esc.id;
 
          } FC_CAPTURE_AND_RETHROW( (o) )
       }
 
-      template<typename T>
-      bool htlc_redeem_evaluator::test_hash(const std::vector<uint8_t>& incoming_preimage, const std::vector<uint8_t>& valid_hash)
+      class htlc_redeem_visitor
       {
-         T attempted_hash = T::hash( (const char*)incoming_preimage.data(), incoming_preimage.size());
-         if (attempted_hash.data_size() != valid_hash.size())
-            return false;
-         return memcmp(attempted_hash.data(), valid_hash.data(), attempted_hash.data_size()) == 0;
-      }
+      //private:
+         const std::vector<uint8_t>& data;
+      public:
+         typedef bool result_type;
+
+         htlc_redeem_visitor( const std::vector<uint8_t>& preimage )
+            : data( preimage ) {}
+
+         template<typename T>
+         bool operator()( const T& preimage_hash )const
+         {
+            return T::hash( (const char*)data.data(), (uint32_t) data.size() ) == preimage_hash;
+         }
+      };
 
       void_result htlc_redeem_evaluator::do_evaluate(const htlc_redeem_operation& o)
       {
@@ -88,24 +92,9 @@ namespace graphene {
          FC_ASSERT(o.preimage.size() == htlc_obj->preimage_size, "Preimage size mismatch.");
          FC_ASSERT(db().head_block_time() < htlc_obj->expiration, "Preimage provided after escrow expiration.");
 
-         // see if the preimages match
-         bool match = false;
-         switch(htlc_obj->preimage_hash_algorithm)
-         {
-            case (htlc_hash_algorithm::sha256):
-               match = test_hash<fc::sha256>(o.preimage, htlc_obj->preimage_hash);
-               break;
-            case (htlc_hash_algorithm::ripemd160):
-               match = test_hash<fc::ripemd160>(o.preimage, htlc_obj->preimage_hash);
-               break;
-            case (htlc_hash_algorithm::sha1):
-               match = test_hash<fc::sha1>(o.preimage, htlc_obj->preimage_hash);
-               break;
-            default:
-               break;
-         }
+         const htlc_redeem_visitor vtor( o.preimage );
+         FC_ASSERT( htlc_obj->preimage_hash.visit( vtor ), "Provided preimage does not generate correct hash.");
 
-         FC_ASSERT(match, "Provided preimage does not generate correct hash.");
          return void_result();
       }
 

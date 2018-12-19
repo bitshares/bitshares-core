@@ -265,6 +265,27 @@ struct op_prototype_visitor
    }
 };
 
+class htlc_hash_to_string_visitor
+{
+public:
+   typedef string result_type;
+
+   result_type operator()( const fc::ripemd160& hash )const
+   {
+       return "RIPEMD160 " + hash.str();
+   }
+
+   result_type operator()( const fc::sha1& hash )const
+   {
+       return "SHA1 " + hash.str();
+   }
+
+   result_type operator()( const fc::sha256& hash )const
+   {
+       return "SHA256 " + hash.str();
+   }
+};
+
 class wallet_api_impl
 {
 public:
@@ -1750,8 +1771,21 @@ public:
       return sign_transaction( tx, broadcast );
    }
 
+   static htlc_hash do_hash( const string& algorithm, const std::string& hash )
+   {
+      string name_upper;
+      std::transform( algorithm.begin(), algorithm.end(), std::back_inserter(name_upper), ::toupper);
+      if( name_upper == "RIPEMD160" )
+         return fc::ripemd160( hash );
+      if( name_upper == "SHA256" )
+         return fc::sha256( hash );
+      if( name_upper == "SHA1" )
+         return fc::sha1( hash );
+      FC_THROW_EXCEPTION( fc::invalid_arg_exception, "Unknown algorithm '${a}'", ("a",algorithm) );
+   }
+
    signed_transaction htlc_create( string source, string destination, string amount, string asset_symbol,
-         string hash_algorithm, const std::vector<uint8_t>& preimage_hash, size_t preimage_size, 
+         string hash_algorithm, const std::string& preimage_hash, size_t preimage_size,
          const uint32_t claim_period_seconds, bool broadcast = false )
    {
       try 
@@ -1765,11 +1799,8 @@ public:
          create_op.to = get_account(destination).id;
          create_op.amount = asset_obj->amount_from_string(amount);
          create_op.claim_period_seconds = claim_period_seconds;
-         create_op.preimage_hash = preimage_hash;
+         create_op.preimage_hash = do_hash( hash_algorithm, preimage_hash );
          create_op.preimage_size = preimage_size;
-         create_op.hash_type = graphene::chain::string_to_hash_algorithm(hash_algorithm);
-         FC_ASSERT(create_op.hash_type != htlc_hash_algorithm::unknown, 
-               "Unknown hash algorithm: ${algo}", ("algo", hash_algorithm));
 
          signed_transaction tx;
          tx.operations.push_back(create_op);
@@ -2991,6 +3022,8 @@ std::string operation_printer::operator()(const htlc_redeem_operation& op) const
 
 std::string operation_printer::operator()(const htlc_create_operation& op) const
 {
+   static htlc_hash_to_string_visitor vtor;
+
    auto fee_asset = wallet.get_asset( op.fee.asset_id );
    auto to = wallet.get_account( op.to );
    operation_result_printer rprinter(wallet);
@@ -2998,12 +3031,9 @@ std::string operation_printer::operator()(const htlc_create_operation& op) const
 
    out << "Create HTLC to " << to.name
          << " with id " << database_id
-         << " preimage hash: [";
-   for(uint8_t c : op.preimage_hash)
-   {
-      out << setfill('0') << std::setw(2) << std::hex << (int)c;
-   }
-   out << "] (Fee: " << fee_asset.amount_to_pretty_string( op.fee ) << ")";
+         << " preimage hash: ["
+         << op.preimage_hash.visit( vtor )
+         << "] (Fee: " << fee_asset.amount_to_pretty_string( op.fee ) << ")";
    // determine if the block that the HTLC is in is before or after LIB
    int32_t pending_blocks = hist.block_num - wallet.get_dynamic_global_properties().last_irreversible_block_num;
    if (pending_blocks > 0)
@@ -3142,25 +3172,18 @@ uint64_t wallet_api::get_asset_count()const
    return my->_remote_db->get_asset_count();
 }
 
-std::vector<uint8_t> string_to_vec(std::string incoming)
-{
-   FC_ASSERT(incoming.size() % 2 == 0, "Invalid incoming hash.");
-   std::size_t outgoing_size = incoming.size() / 2;
-   std::vector<uint8_t> outgoing(outgoing_size);
-   fc::from_hex(incoming, (char*)outgoing.data(), outgoing_size);
-   return outgoing;
-}
-
 signed_transaction wallet_api::htlc_create( string source, string destination, string amount, string asset_symbol,
          string hash_algorithm, const std::string& preimage_hash, size_t preimage_size, 
          const uint32_t claim_period_seconds, bool broadcast)
 {
-   return my->htlc_create(source, destination, amount, asset_symbol, hash_algorithm, string_to_vec(preimage_hash), preimage_size,
+   return my->htlc_create(source, destination, amount, asset_symbol, hash_algorithm, preimage_hash, preimage_size,
          claim_period_seconds, broadcast);
 }
 
 variant wallet_api::get_htlc(std::string htlc_id) const
 {
+   static detail::htlc_hash_to_string_visitor vtor;
+
    graphene::chain::htlc_object obj = my->get_htlc(htlc_id);
    fc::mutable_variant_object ret_val;
    ret_val["database_id"] = (std::string)obj.id;
@@ -3169,11 +3192,7 @@ variant wallet_api::get_htlc(std::string htlc_id) const
    ret_val["amount"] = obj.amount.amount.value;
    ret_val["asset"] = (std::string)((graphene::db::object_id_type)obj.amount.asset_id);
    ret_val["expiration"] = fc::get_approximate_relative_time_string(obj.expiration);
-   std::stringstream hash_string;
-   for(uint8_t c : obj.preimage_hash)
-      hash_string << std::setfill('0') << std::setw(2) << std::hex << (int)c;
-   ret_val["preimage_hash"] = hash_string.str();
-   ret_val["preimage_algorithm"] = (std::string)obj.preimage_hash_algorithm;
+   ret_val["preimage_hash"] = obj.preimage_hash.visit( vtor );
    ret_val["preimage_size"] = obj.preimage_size;
    return ret_val;
 }

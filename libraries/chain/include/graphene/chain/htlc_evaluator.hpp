@@ -44,9 +44,6 @@ namespace graphene {
     	      void_result do_evaluate( const htlc_redeem_operation& o);
     	      void_result do_apply( const htlc_redeem_operation& o);
     	      const htlc_object* htlc_obj = nullptr;
-         private:
-            template<typename T>
-            bool test_hash(const std::vector<uint8_t>& incoming_preimage, const std::vector<uint8_t>& valid_hash);
       };
 
       class htlc_extend_evaluator : public evaluator<htlc_extend_evaluator>

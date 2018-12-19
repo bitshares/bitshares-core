@@ -23,30 +23,13 @@
  */
 #include <graphene/chain/protocol/htlc.hpp>
 
-#include <fc/crypto/ripemd160.hpp>
-#include <fc/crypto/sha1.hpp>
-#include <fc/crypto/sha256.hpp>
-
 #define SECONDS_PER_DAY (60 * 60 * 24)
 
 namespace graphene { namespace chain {
 
    void htlc_create_operation::validate()const {
-      static const fc::ripemd160 ripemd160_instance;
-      static const fc::sha1      sha1_instance;
-      static const fc::sha256    sha256_instance;
-
       FC_ASSERT( fee.amount >= 0 );
       FC_ASSERT( amount.amount > 0 );
-      FC_ASSERT( hash_type == htlc_hash_algorithm::ripemd160
-            || hash_type == htlc_hash_algorithm::sha1
-            || hash_type == htlc_hash_algorithm::sha256, "Unknown Hash Algorithm");
-      FC_ASSERT( ( hash_type == htlc_hash_algorithm::ripemd160
-                   && preimage_hash.size() == ripemd160_instance.data_size() )
-            || ( hash_type == htlc_hash_algorithm::sha1
-                 && preimage_hash.size() == sha1_instance.data_size() )
-            || ( hash_type == htlc_hash_algorithm::sha256
-                 && preimage_hash.size() == sha256_instance.data_size() ), "Hash length mismatch");
    }
 
    share_type htlc_create_operation::calculate_fee(const fee_parameters_type& fee_params)const

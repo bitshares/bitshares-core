@@ -33,13 +33,6 @@
 
 namespace graphene { namespace chain {
 
-   /****
-    * Convert string to hash algorithm enum
-    * @param incoming the string to convert
-    * @returns one of the valid algorithms or the enum value "unknown"
-    */
-   fc::enum_type<uint8_t, htlc_hash_algorithm> string_to_hash_algorithm(std::string incoming);
-
    /**
     * @brief database object to store HTLCs
     * 
@@ -56,8 +49,7 @@ namespace graphene { namespace chain {
          account_id_type to;
          asset amount;
          fc::time_point_sec expiration;
-         vector<uint8_t> preimage_hash;
-         fc::enum_type<uint8_t, htlc_hash_algorithm> preimage_hash_algorithm;
+         htlc_hash preimage_hash;
          uint16_t preimage_size;
    };
 
@@ -85,18 +77,6 @@ namespace graphene { namespace chain {
 
 } } // namespace graphene::chain
 
-namespace fc
-{
-  template<> 
-  struct get_typename<fc::enum_type<uint8_t, graphene::chain::htlc_hash_algorithm>> 
-  { 
-     static const char* name()
-     { 
-        return "fc::enum_type<uint8_t, graphene::chain::hash_algorithm>"; 
-     } 
-   };
-}
-
 FC_REFLECT_DERIVED( graphene::chain::htlc_object, (graphene::db::object),
                (from)(to)(amount)(expiration)
-					(preimage_hash)(preimage_hash_algorithm)(preimage_size) );
+					(preimage_hash)(preimage_size) );

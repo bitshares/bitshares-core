@@ -68,10 +68,10 @@ void generate_random_preimage(uint16_t key_size, std::vector<uint8_t>& vec)
  * @param preimage the preimage
  * @returns a vector that cointains the sha256 hash of the preimage
  */
-std::vector<uint8_t> hash_it(std::vector<uint8_t> preimage)
+template<typename H>
+H hash_it(std::vector<uint8_t> preimage)
 {
-	fc::sha256 hash = fc::sha256::hash((char*)preimage.data(), preimage.size());
-   return std::vector<uint8_t>(hash.data(), hash.data() + hash.data_size());
+   return H::hash( (char*)preimage.data(), preimage.size() );
 }
 
 flat_map< uint64_t, graphene::chain::fee_parameters > get_htlc_fee_parameters()
@@ -179,7 +179,6 @@ try {
    uint16_t preimage_size = 256;
    std::vector<unsigned char> pre_image(256);
    generate_random_preimage(preimage_size, pre_image);
-   std::vector<unsigned char> preimage_hash = hash_it(pre_image);
 
    graphene::chain::htlc_id_type alice_htlc_id;
    // cler everything out
@@ -192,8 +191,7 @@ try {
       create_operation.amount = graphene::chain::asset( 3 * GRAPHENE_BLOCKCHAIN_PRECISION );
       create_operation.to = bob_id;
       create_operation.claim_period_seconds = 60;
-      create_operation.preimage_hash = preimage_hash;
-      create_operation.hash_type = htlc_hash_algorithm::sha256;
+      create_operation.preimage_hash = hash_it<fc::sha256>( pre_image );
       create_operation.preimage_size = preimage_size;
       create_operation.from = alice_id;
       create_operation.fee = db.get_global_properties().parameters.current_fees->calculate_fee(create_operation);
@@ -237,7 +235,6 @@ BOOST_AUTO_TEST_CASE( htlc_fulfilled )
    uint16_t preimage_size = 256;
    std::vector<unsigned char> pre_image(preimage_size);
    generate_random_preimage(preimage_size, pre_image);
-   std::vector<unsigned char> preimage_hash = hash_it(pre_image);
 
    graphene::chain::htlc_id_type alice_htlc_id;
    // clear everything out
@@ -250,8 +247,7 @@ BOOST_AUTO_TEST_CASE( htlc_fulfilled )
       create_operation.amount = graphene::chain::asset( 20 * GRAPHENE_BLOCKCHAIN_PRECISION );
       create_operation.to = bob_id;
       create_operation.claim_period_seconds = 86400;
-      create_operation.preimage_hash = preimage_hash;
-      create_operation.hash_type = htlc_hash_algorithm::sha256;
+      create_operation.preimage_hash = hash_it<fc::sha1>( pre_image );
       create_operation.preimage_size = preimage_size;
       create_operation.from = alice_id;
       create_operation.fee = db.current_fee_schedule().calculate_fee( create_operation );
@@ -309,7 +305,6 @@ try {
    uint16_t preimage_size = 256;
    std::vector<unsigned char> pre_image(256);
    generate_random_preimage(preimage_size, pre_image);
-   std::vector<unsigned char> preimage_hash = hash_it(pre_image);
 
    graphene::chain::htlc_id_type alice_htlc_id;
    // cler everything out
@@ -321,7 +316,7 @@ try {
       create_operation.amount = graphene::chain::asset( 1 * GRAPHENE_BLOCKCHAIN_PRECISION );
       create_operation.to = bob_id;
       create_operation.claim_period_seconds = 3;
-      create_operation.preimage_hash = preimage_hash;
+      create_operation.preimage_hash = hash_it<fc::ripemd160>( pre_image );
       create_operation.preimage_size = preimage_size;
       create_operation.from = alice_id;
       create_operation.fee = db.current_fee_schedule().calculate_fee( create_operation );
@@ -336,8 +331,7 @@ try {
       create_operation.amount = graphene::chain::asset( 1 * GRAPHENE_BLOCKCHAIN_PRECISION );
       create_operation.to = bob_id;
       create_operation.claim_period_seconds = 3;
-      create_operation.preimage_hash = preimage_hash;
-      create_operation.hash_type = htlc_hash_algorithm::sha256;
+      create_operation.preimage_hash = hash_it<fc::ripemd160>( pre_image );
       create_operation.preimage_size = preimage_size;
       create_operation.from = alice_id;
       create_operation.fee = db.current_fee_schedule().calculate_fee( create_operation );
@@ -499,7 +493,6 @@ BOOST_AUTO_TEST_CASE( htlc_before_hardfork )
    uint16_t preimage_size = 256;
    std::vector<unsigned char> pre_image(256);
    generate_random_preimage(preimage_size, pre_image);
-   std::vector<unsigned char> preimage_hash = hash_it(pre_image);
 
    graphene::chain::htlc_id_type alice_htlc_id;
    // clear everything out
@@ -513,8 +506,7 @@ BOOST_AUTO_TEST_CASE( htlc_before_hardfork )
       create_operation.amount = graphene::chain::asset( 10000 );
       create_operation.to = bob_id;
       create_operation.claim_period_seconds = 60;
-      create_operation.preimage_hash = preimage_hash;
-      create_operation.hash_type = htlc_hash_algorithm::sha256;
+      create_operation.preimage_hash = hash_it<fc::sha256>( pre_image );
       create_operation.preimage_size = preimage_size;
       create_operation.from = alice_id;
       trx.operations.push_back(create_operation);
@@ -533,8 +525,7 @@ BOOST_AUTO_TEST_CASE( htlc_before_hardfork )
       create_operation.amount = graphene::chain::asset( 10000 );
       create_operation.to = bob_id;
       create_operation.claim_period_seconds = 60;
-      create_operation.preimage_hash = preimage_hash;
-      create_operation.hash_type = htlc_hash_algorithm::sha256;
+      create_operation.preimage_hash = hash_it<fc::sha256>( pre_image );
       create_operation.preimage_size = preimage_size;
       create_operation.from = alice_id;
 
