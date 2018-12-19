@@ -46,7 +46,7 @@ namespace graphene {
          // make sure the preimage length is reasonable
          FC_ASSERT( o.preimage_size <= htlc_options->max_preimage_size, "HTLC preimage length exceeds allowed length" ); 
          // make sure we have a hash algorithm set
-         FC_ASSERT( o.hash_type != graphene::chain::hash_algorithm::unknown, "HTLC Hash Algorithm must be set" );
+         FC_ASSERT( o.hash_type != htlc_hash_algorithm::unknown, "HTLC Hash Algorithm must be set" );
          // make sure the sender has the funds for the HTLC
          FC_ASSERT( db().get_balance( o.from, o.amount.asset_id) >= (o.amount), "Insufficient funds") ;
          return void_result();
@@ -58,7 +58,7 @@ namespace graphene {
             graphene::chain::database& dbase = db();
             dbase.adjust_balance( o.from, -o.amount );
 
-            const htlc_object& esc = db().create<htlc_object>([&dbase,o]( htlc_object& esc ) {
+            const htlc_object& esc = db().create<htlc_object>([&dbase,&o]( htlc_object& esc ) {
                esc.from                  = o.from;
                esc.to                    = o.to;
                esc.amount                = o.amount;
@@ -92,13 +92,13 @@ namespace graphene {
          bool match = false;
          switch(htlc_obj->preimage_hash_algorithm)
          {
-            case (graphene::chain::hash_algorithm::sha256):
+            case (htlc_hash_algorithm::sha256):
                match = test_hash<fc::sha256>(o.preimage, htlc_obj->preimage_hash);
                break;
-            case (graphene::chain::hash_algorithm::ripemd160):
+            case (htlc_hash_algorithm::ripemd160):
                match = test_hash<fc::ripemd160>(o.preimage, htlc_obj->preimage_hash);
                break;
-            case (graphene::chain::hash_algorithm::sha1):
+            case (htlc_hash_algorithm::sha1):
                match = test_hash<fc::sha1>(o.preimage, htlc_obj->preimage_hash);
                break;
             default:

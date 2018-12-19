@@ -45,6 +45,7 @@
 
 #include <graphene/chain/balance_object.hpp>
 #include <graphene/chain/market_object.hpp>
+#include <graphene/chain/htlc_object.hpp>
 
 #include <graphene/app/api.hpp>
 
@@ -83,6 +84,7 @@ flat_map< uint64_t, graphene::chain::fee_parameters > get_htlc_fee_parameters()
    ret_val[((operation)htlc_create_operation()).which()] = create_param;
 
    htlc_redeem_operation::fee_parameters_type redeem_param;
+   redeem_param.fee = 2 * GRAPHENE_BLOCKCHAIN_PRECISION;
    redeem_param.fee_per_kb = 2 * GRAPHENE_BLOCKCHAIN_PRECISION;
    ret_val[((operation)htlc_redeem_operation()).which()] = redeem_param;
 
@@ -191,7 +193,7 @@ try {
       create_operation.to = bob_id;
       create_operation.claim_period_seconds = 60;
       create_operation.preimage_hash = preimage_hash;
-      create_operation.hash_type = graphene::chain::hash_algorithm::sha256;
+      create_operation.hash_type = htlc_hash_algorithm::sha256;
       create_operation.preimage_size = preimage_size;
       create_operation.from = alice_id;
       create_operation.fee = db.get_global_properties().parameters.current_fees->calculate_fee(create_operation);
@@ -249,7 +251,7 @@ BOOST_AUTO_TEST_CASE( htlc_fulfilled )
       create_operation.to = bob_id;
       create_operation.claim_period_seconds = 86400;
       create_operation.preimage_hash = preimage_hash;
-      create_operation.hash_type = graphene::chain::hash_algorithm::sha256;
+      create_operation.hash_type = htlc_hash_algorithm::sha256;
       create_operation.preimage_size = preimage_size;
       create_operation.from = alice_id;
       create_operation.fee = db.current_fee_schedule().calculate_fee( create_operation );
@@ -287,8 +289,8 @@ BOOST_AUTO_TEST_CASE( htlc_fulfilled )
       generate_block();
       trx.clear();
    }
-   // verify funds end up in Bob's account (100 + 20 - 2(fee) )
-   BOOST_CHECK_EQUAL( get_balance(bob_id,   graphene::chain::asset_id_type()), 118 * GRAPHENE_BLOCKCHAIN_PRECISION );
+   // verify funds end up in Bob's account (100 + 20 - 4(fee) )
+   BOOST_CHECK_EQUAL( get_balance(bob_id,   graphene::chain::asset_id_type()), 116 * GRAPHENE_BLOCKCHAIN_PRECISION );
    // verify funds remain out of Alice's acount ( 100 - 20 - 4 )
    BOOST_CHECK_EQUAL( get_balance(alice_id, graphene::chain::asset_id_type()), 76 * GRAPHENE_BLOCKCHAIN_PRECISION );
 }
@@ -335,7 +337,7 @@ try {
       create_operation.to = bob_id;
       create_operation.claim_period_seconds = 3;
       create_operation.preimage_hash = preimage_hash;
-      create_operation.hash_type = graphene::chain::hash_algorithm::sha256;
+      create_operation.hash_type = htlc_hash_algorithm::sha256;
       create_operation.preimage_size = preimage_size;
       create_operation.from = alice_id;
       create_operation.fee = db.current_fee_schedule().calculate_fee( create_operation );
@@ -518,7 +520,7 @@ BOOST_AUTO_TEST_CASE( htlc_before_hardfork )
       create_operation.to = bob_id;
       create_operation.claim_period_seconds = 60;
       create_operation.preimage_hash = preimage_hash;
-      create_operation.hash_type = graphene::chain::hash_algorithm::sha256;
+      create_operation.hash_type = htlc_hash_algorithm::sha256;
       create_operation.preimage_size = preimage_size;
       create_operation.from = alice_id;
       trx.operations.push_back(create_operation);
@@ -535,12 +537,13 @@ BOOST_AUTO_TEST_CASE( fee_calculations )
       create_fee.fee = 2;
       create_fee.fee_per_day = 2;
       htlc_create_operation create;
+      // no days
       create.claim_period_seconds = 0;
       BOOST_CHECK_EQUAL( create.calculate_fee(create_fee).value, 4 );
-      // almost 2 days
-      create.claim_period_seconds = 2 * 60 * 60 * 24 - 1;
+      // exactly 1 day
+      create.claim_period_seconds = 60 * 60 * 24;
       BOOST_CHECK_EQUAL( create.calculate_fee(create_fee).value, 4 );
-      // 2 days
+      // tad over a day
       create.claim_period_seconds++;
       BOOST_CHECK_EQUAL( create.calculate_fee(create_fee).value, 6 );
    }
@@ -548,12 +551,19 @@ BOOST_AUTO_TEST_CASE( fee_calculations )
    {
       htlc_redeem_operation::fee_parameters_type redeem_fee;
       redeem_fee.fee_per_kb = 2;
+      redeem_fee.fee = 2;
       htlc_redeem_operation redeem;
+      // no preimage
       redeem.preimage = std::vector<uint8_t>();
-      BOOST_CHECK_EQUAL( redeem.calculate_fee( redeem_fee ).value, 2 ) ;
-      std::string test(2048, 'a');
+      BOOST_CHECK_EQUAL( redeem.calculate_fee( redeem_fee ).value, 4 ) ;
+      // exactly 1KB
+      std::string test(1024, 'a');
       redeem.preimage = std::vector<uint8_t>( test.begin(), test.end() );
       BOOST_CHECK_EQUAL( redeem.calculate_fee( redeem_fee ).value, 4 ) ;
+      // just 1 byte over 1KB
+      std::string larger(1025, 'a');
+      redeem.preimage = std::vector<uint8_t>( larger.begin(), larger.end() );
+      BOOST_CHECK_EQUAL( redeem.calculate_fee( redeem_fee ).value, 6 ) ;
    }
    // extend
    {
@@ -561,12 +571,13 @@ BOOST_AUTO_TEST_CASE( fee_calculations )
       extend_fee.fee = 2;
       extend_fee.fee_per_day = 2;
       htlc_extend_operation extend;
+      // no days
       extend.seconds_to_add = 0;
       BOOST_CHECK_EQUAL( extend.calculate_fee( extend_fee ).value, 4 );
-      // almost 2 days
-      extend.seconds_to_add = 2 * 60 * 60 * 24 - 1;
+      // exactly 1 day
+      extend.seconds_to_add = 60 * 60 * 24;
       BOOST_CHECK_EQUAL( extend.calculate_fee( extend_fee ).value, 4 );
-      // 2 days
+      // 1 day and 1 second
       extend.seconds_to_add++;
       BOOST_CHECK_EQUAL( extend.calculate_fee( extend_fee ).value, 6 );
    }

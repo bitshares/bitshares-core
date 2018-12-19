@@ -30,16 +30,16 @@ namespace graphene { namespace chain {
     * @param incoming the string to convert
     * @returns one of the valid algorithms or the enum value "unknown"
     */
-   fc::enum_type<uint8_t, hash_algorithm> string_to_hash_algorithm(std::string incoming)
+   fc::enum_type<uint8_t, htlc_hash_algorithm> string_to_hash_algorithm(std::string incoming)
    {
       std::transform(incoming.begin(), incoming.end(), incoming.begin(), ::toupper);
       if (incoming == "RIPEMD160")
-         return hash_algorithm::ripemd160;
+         return htlc_hash_algorithm::ripemd160;
       if (incoming == "SHA256")
-         return hash_algorithm::sha256;
+         return htlc_hash_algorithm::sha256;
       if (incoming == "SHA1")
-         return hash_algorithm::sha1;
-      return hash_algorithm::unknown;
+         return htlc_hash_algorithm::sha1;
+      return htlc_hash_algorithm::unknown;
    }
    
 } }

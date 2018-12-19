@@ -24,13 +24,19 @@
 #pragma once
 #include <fc/time.hpp>
 #include <boost/container/flat_set.hpp>
-#include <graphene/chain/htlc_object.hpp>
 #include <graphene/chain/protocol/base.hpp>
 #include <graphene/chain/protocol/types.hpp>
 #include <algorithm> // std::max
 
 namespace graphene { 
    namespace chain {
+
+      enum htlc_hash_algorithm {
+         unknown = 0x00,
+         ripemd160 = 0x01,
+         sha256 = 0x02,
+         sha1 = 0x03
+      };
 
       struct htlc_create_operation : public base_operation 
       {
@@ -47,8 +53,8 @@ namespace graphene {
          // the amount to hold
     	   asset amount;
          // hash algorithm used to create preimage_hash
-         fc::enum_type<uint8_t, graphene::chain::hash_algorithm> hash_type 
-               = graphene::chain::hash_algorithm::unknown;
+         fc::enum_type<uint8_t, htlc_hash_algorithm> hash_type 
+               = htlc_hash_algorithm::unknown;
          // the hash of the preimage
     	   std::vector<uint8_t> preimage_hash;
          // the size of the preimage
@@ -73,7 +79,8 @@ namespace graphene {
           */
          share_type calculate_fee(const fee_parameters_type& fee_params)const
          {
-            uint64_t days = std::max<uint64_t>(1, claim_period_seconds / (60 * 60 * 24));
+            
+            uint64_t days = std::max<uint64_t>( 1, std::ceil( claim_period_seconds / (double)(60 * 60 * 24) ) );
             return fee_params.fee + (fee_params.fee_per_day * days);
          }
 
@@ -82,6 +89,7 @@ namespace graphene {
       struct htlc_redeem_operation : public base_operation
       {
          struct fee_parameters_type {
+            uint64_t fee = 1 * GRAPHENE_BLOCKCHAIN_PRECISION;
             uint64_t fee_per_kb = 1 * GRAPHENE_BLOCKCHAIN_PRECISION;
          };
          
@@ -112,8 +120,9 @@ namespace graphene {
          share_type calculate_fee(const fee_parameters_type& fee_params)const
          {
             if (fee_params.fee_per_kb > 0)
-               return std::max<share_type>(fee_params.fee_per_kb, preimage.size() / 1024 * fee_params.fee_per_kb);
-            return 0;
+               return fee_params.fee + std::max<share_type>(fee_params.fee_per_kb, 
+                     std::ceil( preimage.size() / (double)1024 ) * fee_params.fee_per_kb );
+            return fee_params.fee;
          }
       };
 
@@ -150,7 +159,7 @@ namespace graphene {
           */
          share_type calculate_fee(const fee_parameters_type& fee_params)const
          {
-            uint32_t days = std::max<uint64_t>(1, seconds_to_add / (60 * 60 * 24));
+            uint32_t days = std::max<uint64_t>(1, std::ceil( seconds_to_add / (double)(60 * 60 * 24) ) );
             return fee_params.fee + (fee_params.fee_per_day * days);
          }
       };
@@ -176,8 +185,10 @@ namespace graphene {
    } 
 }
 
+FC_REFLECT_ENUM( graphene::chain::htlc_hash_algorithm, (unknown)(ripemd160)(sha256)(sha1));
+
 FC_REFLECT( graphene::chain::htlc_create_operation::fee_parameters_type, (fee) (fee_per_day) )
-FC_REFLECT( graphene::chain::htlc_redeem_operation::fee_parameters_type, (fee_per_kb) )
+FC_REFLECT( graphene::chain::htlc_redeem_operation::fee_parameters_type, (fee) (fee_per_kb) )
 FC_REFLECT( graphene::chain::htlc_extend_operation::fee_parameters_type, (fee) (fee_per_day))
 FC_REFLECT( graphene::chain::htlc_refund_operation::fee_parameters_type, ) // VIRTUAL
 

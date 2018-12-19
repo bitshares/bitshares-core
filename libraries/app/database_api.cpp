@@ -35,7 +35,6 @@
 #include <boost/range/iterator_range.hpp>
 #include <boost/rational.hpp>
 #include <boost/multiprecision/cpp_int.hpp>
-#include <boost/algorithm/string.hpp>
 
 #include <cctype>
 

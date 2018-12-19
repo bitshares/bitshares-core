@@ -26,25 +26,19 @@
 #include <boost/multi_index/composite_key.hpp>
 #include <fc/time.hpp>
 #include <graphene/chain/protocol/types.hpp>
+#include <graphene/chain/protocol/htlc.hpp>
 #include <graphene/chain/protocol/asset.hpp>
 #include <graphene/db/object.hpp>
 #include <graphene/db/generic_index.hpp>
 
 namespace graphene { namespace chain {
 
-   enum hash_algorithm {
-      unknown = 0x00,
-      ripemd160 = 0x01,
-      sha256 = 0x02,
-      sha1 = 0x03
-   };
-
    /****
     * Convert string to hash algorithm enum
     * @param incoming the string to convert
     * @returns one of the valid algorithms or the enum value "unknown"
     */
-   fc::enum_type<uint8_t, hash_algorithm> string_to_hash_algorithm(std::string incoming);
+   fc::enum_type<uint8_t, htlc_hash_algorithm> string_to_hash_algorithm(std::string incoming);
 
    /**
     * @brief database object to store HTLCs
@@ -63,7 +57,7 @@ namespace graphene { namespace chain {
          asset amount;
          fc::time_point_sec expiration;
          vector<uint8_t> preimage_hash;
-         fc::enum_type<uint8_t, hash_algorithm> preimage_hash_algorithm;
+         fc::enum_type<uint8_t, htlc_hash_algorithm> preimage_hash_algorithm;
          uint16_t preimage_size;
    };
 
@@ -94,7 +88,7 @@ namespace graphene { namespace chain {
 namespace fc
 {
   template<> 
-  struct get_typename<fc::enum_type<uint8_t, graphene::chain::hash_algorithm>> 
+  struct get_typename<fc::enum_type<uint8_t, graphene::chain::htlc_hash_algorithm>> 
   { 
      static const char* name()
      { 
@@ -102,8 +96,6 @@ namespace fc
      } 
    };
 }
-
-FC_REFLECT_ENUM( graphene::chain::hash_algorithm, (unknown)(ripemd160)(sha256)(sha1));
 
 FC_REFLECT_DERIVED( graphene::chain::htlc_object, (graphene::db::object),
                (from)(to)(amount)(expiration)

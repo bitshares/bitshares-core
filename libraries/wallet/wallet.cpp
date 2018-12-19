@@ -65,6 +65,7 @@
 #include <graphene/app/api.hpp>
 #include <graphene/chain/asset_object.hpp>
 #include <graphene/chain/protocol/fee_schedule.hpp>
+#include <graphene/chain/htlc_object.hpp>
 #include <graphene/chain/hardfork.hpp>
 #include <graphene/utilities/git_revision.hpp>
 #include <graphene/utilities/key_conversion.hpp>
@@ -1767,7 +1768,7 @@ public:
          create_op.preimage_hash = preimage_hash;
          create_op.preimage_size = preimage_size;
          create_op.hash_type = graphene::chain::string_to_hash_algorithm(hash_algorithm);
-         FC_ASSERT(create_op.hash_type != graphene::chain::hash_algorithm::unknown, 
+         FC_ASSERT(create_op.hash_type != htlc_hash_algorithm::unknown, 
                "Unknown hash algorithm: ${algo}", ("algo", hash_algorithm));
 
          signed_transaction tx;

@@ -270,7 +270,7 @@ struct get_impacted_account_visitor
    }
    void operator()( const htlc_refund_operation& op ) 
    { 
-      _impacted.insert( op.fee_payer() ); // bidder
+      _impacted.insert( op.fee_payer() );
    }
 };
 
@@ -360,7 +360,7 @@ void get_relevant_accounts( const object* obj, flat_set<account_id_type>& accoun
         } case balance_object_type:{
            /** these are free from any accounts */
            break;
-        } case htlc_object_type: {
+        } case htlc_object_type:{
               const auto& htlc_obj = dynamic_cast<const htlc_object*>(obj);
               FC_ASSERT( htlc_obj != nullptr);
               accounts.insert( htlc_obj->from );
@@ -428,7 +428,7 @@ void get_relevant_accounts( const object* obj, flat_set<account_id_type>& accoun
               FC_ASSERT( aobj != nullptr );
               accounts.insert( aobj->bidder );
               break;
-           } 
+           }
       }
    }
 } // end get_relevant_accounts( const object* obj, flat_set<account_id_type>& accounts )
