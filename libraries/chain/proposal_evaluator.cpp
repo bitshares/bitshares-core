@@ -97,7 +97,9 @@ struct proposal_operation_hardfork_visitor
    void operator()(const graphene::chain::committee_member_update_global_parameters_operation &op) const {
       if (block_time < HARDFORK_CORE_1468_TIME) {
          FC_ASSERT(!op.new_parameters.extensions.value.updatable_htlc_options.valid(), "Unable to set HTLC options before hardfork 1468");
-         // TODO: Do not allow changing of fees before hardfork
+         FC_ASSERT(!op.new_parameters.current_fees->exists<htlc_create_operation>());
+         FC_ASSERT(!op.new_parameters.current_fees->exists<htlc_redeem_operation>());
+         FC_ASSERT(!op.new_parameters.current_fees->exists<htlc_extend_operation>());
       }
    }
    // loop and self visit in proposals

@@ -73,24 +73,92 @@ std::vector<uint8_t> hash_it(std::vector<uint8_t> preimage)
    return std::vector<uint8_t>(hash.data(), hash.data() + hash.data_size());
 }
 
+flat_map< uint64_t, graphene::chain::fee_parameters > get_htlc_fee_parameters()
+{
+   flat_map<uint64_t, graphene::chain::fee_parameters> ret_val;
+
+   htlc_create_operation::fee_parameters_type create_param;
+   create_param.fee_per_day = 2 * GRAPHENE_BLOCKCHAIN_PRECISION;
+   create_param.fee = 2 * GRAPHENE_BLOCKCHAIN_PRECISION;
+   ret_val[((operation)htlc_create_operation()).which()] = create_param;
+
+   htlc_redeem_operation::fee_parameters_type redeem_param;
+   redeem_param.fee_per_kb = 2 * GRAPHENE_BLOCKCHAIN_PRECISION;
+   ret_val[((operation)htlc_redeem_operation()).which()] = redeem_param;
+
+   htlc_extend_operation::fee_parameters_type extend_param;
+   extend_param.fee = 2 * GRAPHENE_BLOCKCHAIN_PRECISION;
+   extend_param.fee_per_day = 2 * GRAPHENE_BLOCKCHAIN_PRECISION;
+   ret_val[((operation)htlc_extend_operation()).which()] = extend_param;
+
+   return ret_val;
+}
+
+/****
+ * @brief push through a proposal that sets htlc parameters and fees
+ * @param db_fixture the database connection
+ */
 void set_committee_parameters(database_fixture* db_fixture)
 {
-   // set the committee parameters
-   db_fixture->db.modify(db_fixture->db.get_global_properties(), [](global_property_object& p) {
-      // htlc options
-      graphene::chain::htlc_options params;
-      params.max_preimage_size = 1024;
-      params.max_timeout_secs = 60 * 60 * 24 * 28;
-      p.parameters.extensions.value.updatable_htlc_options = params;
-      // htlc operation fees
-      p.parameters.current_fees->get<htlc_create_operation>().fee = 2 * GRAPHENE_BLOCKCHAIN_PRECISION;
-      p.parameters.current_fees->get<htlc_create_operation>().fee_per_day = 2 * GRAPHENE_BLOCKCHAIN_PRECISION;
-   });
+   // htlc fees
+   // get existing fee_schedule
+   const chain_parameters& existing_params = db_fixture->db.get_global_properties().parameters;
+   const fee_schedule_type& existing_fee_schedule = *(existing_params.current_fees);
+   // create a new fee_shedule
+   fee_schedule_type new_fee_schedule;
+   new_fee_schedule.scale = existing_fee_schedule.scale;
+   // replace the old with the new
+   flat_map<uint64_t, graphene::chain::fee_parameters> params_map = get_htlc_fee_parameters();
+   for(auto param : existing_fee_schedule.parameters)
+   {
+      auto itr = params_map.find(param.which());
+      if (itr == params_map.end())
+         new_fee_schedule.parameters.insert(param);
+      else
+      {
+         new_fee_schedule.parameters.insert( (*itr).second);
+      }
+   }
+   // htlc parameters
+   proposal_create_operation cop = proposal_create_operation::committee_proposal(
+         db_fixture->db.get_global_properties().parameters, db_fixture->db.head_block_time());
+   cop.fee_paying_account = GRAPHENE_TEMP_ACCOUNT;
+   cop.expiration_time = db_fixture->db.head_block_time() + *cop.review_period_seconds + 10;
+   committee_member_update_global_parameters_operation uop;
+   graphene::chain::htlc_options new_params;
+   new_params.max_preimage_size = 19200;
+   new_params.max_timeout_secs = 60 * 60 * 24 * 28;
+   uop.new_parameters.extensions.value.updatable_htlc_options = new_params;
+   uop.new_parameters.current_fees = new_fee_schedule;
+   cop.proposed_ops.emplace_back(uop);
+   
+   db_fixture->trx.operations.push_back(cop);
+   graphene::chain::processed_transaction proc_trx =db_fixture->db.push_transaction(db_fixture->trx);
+   proposal_id_type good_proposal_id = proc_trx.operation_results[0].get<object_id_type>();
+
+   proposal_update_operation puo;
+   puo.proposal = good_proposal_id;
+   puo.fee_paying_account = GRAPHENE_TEMP_ACCOUNT;
+   puo.active_approvals_to_add = {
+         db_fixture->get_account("init0").get_id(), db_fixture->get_account("init1").get_id(),
+         db_fixture->get_account("init2").get_id(), db_fixture->get_account("init3").get_id(),
+         db_fixture->get_account("init4").get_id(), db_fixture->get_account("init5").get_id(),
+         db_fixture->get_account("init6").get_id(), db_fixture->get_account("init7").get_id()};
+   db_fixture->trx.operations.push_back(puo);
+   db_fixture->sign( db_fixture->trx, db_fixture->init_account_priv_key );
+   db_fixture->db.push_transaction(db_fixture->trx);
+   db_fixture->trx.clear();
+
+   db_fixture->generate_blocks( good_proposal_id( db_fixture->db ).expiration_time + 5 );
+   db_fixture->generate_blocks( db_fixture->db.get_dynamic_global_properties().next_maintenance_time );
+   db_fixture->generate_block();   // get the maintenance skip slots out of the way
+
 }
 
 void advance_past_hardfork(database_fixture* db_fixture)
 {
    db_fixture->generate_blocks(HARDFORK_CORE_1468_TIME+1);
+   set_expiration(db_fixture->db, db_fixture->trx);
    set_committee_parameters(db_fixture);
    set_expiration(db_fixture->db, db_fixture->trx);
 }
@@ -201,7 +269,7 @@ BOOST_AUTO_TEST_CASE( htlc_fulfilled )
 	
    ACTORS((alice)(bob));
 
-   int64_t init_balance(1000000);
+   int64_t init_balance(100 * GRAPHENE_BLOCKCHAIN_PRECISION);
 
    transfer( committee_account, alice_id, graphene::chain::asset(init_balance) );
    transfer( committee_account, bob_id, graphene::chain::asset(init_balance) );
@@ -220,7 +288,7 @@ BOOST_AUTO_TEST_CASE( htlc_fulfilled )
    {
       graphene::chain::htlc_create_operation create_operation;
 
-      create_operation.amount = graphene::chain::asset( 100000 );
+      create_operation.amount = graphene::chain::asset( 20 * GRAPHENE_BLOCKCHAIN_PRECISION );
       create_operation.to = bob_id;
       create_operation.claim_period_seconds = 86400;
       create_operation.preimage_hash = preimage_hash;
@@ -237,8 +305,8 @@ BOOST_AUTO_TEST_CASE( htlc_fulfilled )
       alice_htlc_id = alice_trx.operation_results[0].get<object_id_type>();
    }
 
-   // verify funds on hold (make sure this can cover fees)
-   BOOST_CHECK_EQUAL( get_balance(alice_id, graphene::chain::asset_id_type()), 700000 );
+   // verify funds on hold (make sure this can cover fees) (100 - 20 - fee)
+   BOOST_CHECK_EQUAL( get_balance(alice_id, graphene::chain::asset_id_type()), 7800000 );
 
    // TODO: make sure Bob (or anyone) can see the details of the transaction
 
@@ -262,9 +330,10 @@ BOOST_AUTO_TEST_CASE( htlc_fulfilled )
       generate_block();
       trx.clear();
    }
-   // verify funds end up in Bob's account
-   BOOST_CHECK_EQUAL( get_balance(bob_id,   graphene::chain::asset_id_type()), 1100000 );
-   BOOST_CHECK_EQUAL( get_balance(alice_id, graphene::chain::asset_id_type()), 700000 );
+   // verify funds end up in Bob's account (100 + 20 - 0.00002(fee))
+   BOOST_CHECK_EQUAL( get_balance(bob_id,   graphene::chain::asset_id_type()), 11999998 );
+   // 100 - 20 - 0.00002
+   BOOST_CHECK_EQUAL( get_balance(alice_id, graphene::chain::asset_id_type()), 7999998 );
 }
 
 BOOST_AUTO_TEST_CASE( other_peoples_money )
@@ -317,141 +386,150 @@ BOOST_AUTO_TEST_CASE( other_peoples_money )
    }
 }
 
-BOOST_AUTO_TEST_CASE( set_htlc_params )
+BOOST_AUTO_TEST_CASE( htlc_hardfork_tests )
 { 
-try {
-   {
-      // try to set committee parameters before hardfork
-      proposal_create_operation cop = proposal_create_operation::committee_proposal(
-            db.get_global_properties().parameters, db.head_block_time());
-      cop.fee_paying_account = GRAPHENE_TEMP_ACCOUNT;
-      cop.expiration_time = db.head_block_time() + *cop.review_period_seconds + 10;
-      committee_member_update_global_parameters_operation cmuop;
-      graphene::chain::htlc_options new_params;
-      new_params.max_preimage_size = 2048;
-      new_params.max_timeout_secs = 60 * 60 * 24 * 28;
-      cmuop.new_parameters.extensions.value.updatable_htlc_options = new_params;
-      cop.proposed_ops.emplace_back(cmuop);
-      trx.operations.push_back(cop);
-      // update with signatures
-      proposal_update_operation uop;
-      uop.fee_paying_account = GRAPHENE_TEMP_ACCOUNT;
-      uop.active_approvals_to_add = {get_account("init0").get_id(), get_account("init1").get_id(),
-                                     get_account("init2").get_id(), get_account("init3").get_id(),
-                                     get_account("init4").get_id(), get_account("init5").get_id(),
-                                     get_account("init6").get_id(), get_account("init7").get_id()};
-      trx.operations.push_back(uop);
-      sign( trx, init_account_priv_key );
-      BOOST_TEST_MESSAGE("Sending proposal.");
-      GRAPHENE_CHECK_THROW(db.push_transaction(trx), fc::exception);
-      BOOST_TEST_MESSAGE("Verifying that proposal did not succeeed.");
-      BOOST_CHECK(!db.get_global_properties().parameters.extensions.value.updatable_htlc_options.valid());
-      trx.clear();
-   }
-
-   /*
-   {
-      BOOST_TEST_MESSAGE("Attempting to set HTLC fees before hard fork.");
-      // get existing fees
-      const chain_parameters& existing_params = db.get_global_properties().parameters;
-      const fee_schedule_type& existing_fee_schedule = *(existing_params.current_fees);
-      // build a map of existing fees
-      flat_map< int, fee_parameters > fee_map;
-      fee_map.reserve( existing_fee_schedule.parameters.size() );
-      for( const fee_parameters& op_fee : existing_fee_schedule.parameters )
-         fee_map[ op_fee.which() ] = op_fee;
-      // add the ability to look up the fee shedule
-      fee_schedule_type new_fee_schedule;
-      new_fee_schedule.scale = existing_fee_schedule.scale;
-      // replace the htlc_create_operation fee structure with the new one
-      for(auto param : existing_fee_schedule.parameters)
+   try {
       {
-         if (param.which() != ((operation)htlc_create_operation()).which()) // we want to keep it as is...
-            new_fee_schedule.parameters.insert(param);
-         else
-         {
-            // we want to change this one
-            htlc_create_operation::fee_parameters_type htlc_param;
-            htlc_param.fee_per_day = 2;
-            htlc_param.fee = 2;
-            new_fee_schedule.parameters.insert(htlc_param);
-         }
+         // try to set committee parameters before hardfork
+         proposal_create_operation cop = proposal_create_operation::committee_proposal(
+               db.get_global_properties().parameters, db.head_block_time());
+         cop.fee_paying_account = GRAPHENE_TEMP_ACCOUNT;
+         cop.expiration_time = db.head_block_time() + *cop.review_period_seconds + 10;
+         committee_member_update_global_parameters_operation cmuop;
+         graphene::chain::htlc_options new_params;
+         new_params.max_preimage_size = 2048;
+         new_params.max_timeout_secs = 60 * 60 * 24 * 28;
+         cmuop.new_parameters.extensions.value.updatable_htlc_options = new_params;
+         cop.proposed_ops.emplace_back(cmuop);
+         trx.operations.push_back(cop);
+         // update with signatures
+         proposal_update_operation uop;
+         uop.fee_paying_account = GRAPHENE_TEMP_ACCOUNT;
+         uop.active_approvals_to_add = {get_account("init0").get_id(), get_account("init1").get_id(),
+                                       get_account("init2").get_id(), get_account("init3").get_id(),
+                                       get_account("init4").get_id(), get_account("init5").get_id(),
+                                       get_account("init6").get_id(), get_account("init7").get_id()};
+         trx.operations.push_back(uop);
+         sign( trx, init_account_priv_key );
+         BOOST_TEST_MESSAGE("Sending proposal.");
+         GRAPHENE_CHECK_THROW(db.push_transaction(trx), fc::exception);
+         BOOST_TEST_MESSAGE("Verifying that proposal did not succeeed.");
+         BOOST_CHECK(!db.get_global_properties().parameters.extensions.value.updatable_htlc_options.valid());
+         trx.clear();
       }
-      // send a fee change proposal
-      chain_parameters new_parameters = existing_params;
-      new_parameters.current_fees = new_fee_schedule;
-      committee_member_update_global_parameters_operation cmuop;
-      cmuop.new_parameters = new_parameters;
-      proposal_create_operation cop = proposal_create_operation::committee_proposal(
-            existing_params, db.head_block_time());
-      cop.fee_paying_account = GRAPHENE_TEMP_ACCOUNT;
-      cop.expiration_time = db.head_block_time() + *cop.review_period_seconds + 10;
-      cop.proposed_ops.emplace_back( cmuop );
-      cop.expiration_time =  db.head_block_time() + fc::days(1);
-      cop.fee = asset( 100000 );
-      trx.operations.push_back( cop );
-      BOOST_TEST_MESSAGE("About to push fees before their time.");
-      db.push_transaction( trx );
-      BOOST_TEST_MESSAGE("Attempted to push fees before their time.");
+
+      {
+         BOOST_TEST_MESSAGE("Attempting to set HTLC fees before hard fork.");
+
+         // get existing fee_schedule
+         const chain_parameters& existing_params = db.get_global_properties().parameters;
+         const fee_schedule_type& existing_fee_schedule = *(existing_params.current_fees);
+         // create a new fee_shedule
+         fee_schedule_type new_fee_schedule;
+         new_fee_schedule.scale = existing_fee_schedule.scale;
+         // replace the old with the new
+         flat_map<uint64_t, graphene::chain::fee_parameters> params_map = get_htlc_fee_parameters();
+         for(auto param : existing_fee_schedule.parameters)
+         {
+            auto itr = params_map.find(param.which());
+            if (itr == params_map.end())
+               new_fee_schedule.parameters.insert(param);
+            else
+            {
+               new_fee_schedule.parameters.insert( (*itr).second);
+            }
+         }
+         proposal_create_operation cop = proposal_create_operation::committee_proposal(
+               db.get_global_properties().parameters, db.head_block_time());
+         cop.fee_paying_account = GRAPHENE_TEMP_ACCOUNT;
+         cop.expiration_time = db.head_block_time() + *cop.review_period_seconds + 10;
+         committee_member_update_global_parameters_operation uop;
+         uop.new_parameters.current_fees = new_fee_schedule;
+         cop.proposed_ops.emplace_back(uop);
+         cop.fee = asset( 100000 );
+         trx.operations.push_back( cop );
+         GRAPHENE_CHECK_THROW(db.push_transaction( trx ), fc::exception);
+         trx.clear();
+      }
+
+      // now things should start working...
+      BOOST_TEST_MESSAGE("Advancing to HTLC hardfork time.");
+      advance_past_hardfork(this);
+
+      proposal_id_type good_proposal_id;
+      BOOST_TEST_MESSAGE( "Creating a proposal to change the max_preimage_size to 2048 and set higher fees" );
+      {
+         // get existing fee_schedule
+         const chain_parameters& existing_params = db.get_global_properties().parameters;
+         const fee_schedule_type& existing_fee_schedule = *(existing_params.current_fees);
+         // create a new fee_shedule
+         fee_schedule_type new_fee_schedule;
+         new_fee_schedule.scale = existing_fee_schedule.scale;
+         // replace the old with the new
+         flat_map<uint64_t, graphene::chain::fee_parameters> params_map = get_htlc_fee_parameters();
+         for(auto param : existing_fee_schedule.parameters)
+         {
+            auto itr = params_map.find(param.which());
+            if (itr == params_map.end())
+               new_fee_schedule.parameters.insert(param);
+            else
+            {
+               new_fee_schedule.parameters.insert( (*itr).second);
+            }
+         }
+         proposal_create_operation cop = proposal_create_operation::committee_proposal(db.get_global_properties().parameters, db.head_block_time());
+         cop.fee_paying_account = GRAPHENE_TEMP_ACCOUNT;
+         cop.expiration_time = db.head_block_time() + *cop.review_period_seconds + 10;
+         committee_member_update_global_parameters_operation uop;
+         graphene::chain::htlc_options new_params;
+         new_params.max_preimage_size = 2048;
+         new_params.max_timeout_secs = 60 * 60 * 24 * 28;
+         uop.new_parameters.extensions.value.updatable_htlc_options = new_params;
+         uop.new_parameters.current_fees = new_fee_schedule;
+         cop.proposed_ops.emplace_back(uop);
+         trx.operations.push_back(cop);
+         graphene::chain::processed_transaction proc_trx =db.push_transaction(trx);
+         good_proposal_id = proc_trx.operation_results[0].get<object_id_type>();
+      }
+
+      BOOST_TEST_MESSAGE( "Updating proposal by signing with the committee_member private key" );
+      {
+         proposal_update_operation uop;
+         uop.proposal = good_proposal_id;
+         uop.fee_paying_account = GRAPHENE_TEMP_ACCOUNT;
+         uop.active_approvals_to_add = {get_account("init0").get_id(), get_account("init1").get_id(),
+                                       get_account("init2").get_id(), get_account("init3").get_id(),
+                                       get_account("init4").get_id(), get_account("init5").get_id(),
+                                       get_account("init6").get_id(), get_account("init7").get_id()};
+         trx.operations.push_back(uop);
+         sign( trx, init_account_priv_key );
+         db.push_transaction(trx);
+         BOOST_CHECK(good_proposal_id(db).is_authorized_to_execute(db));
+      }
+      BOOST_TEST_MESSAGE( "Verifying that the parameters didn't change immediately" );
+
+      BOOST_CHECK_EQUAL(db.get_global_properties().parameters.extensions.value.updatable_htlc_options->max_preimage_size, 19200u);
+
+      BOOST_TEST_MESSAGE( "Generating blocks until proposal expires" );
+      generate_blocks(good_proposal_id(db).expiration_time + 5);
+      BOOST_TEST_MESSAGE( "Verify that the parameters still have not changed" );
+      BOOST_CHECK_EQUAL(db.get_global_properties().parameters.extensions.value.updatable_htlc_options->max_preimage_size, 19200u);
+
+      BOOST_TEST_MESSAGE( "Generating blocks until next maintenance interval" );
+      generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+      generate_block();   // get the maintenance skip slots out of the way
+
+      BOOST_TEST_MESSAGE( "Verify that the change has been implemented" );
+      BOOST_CHECK_EQUAL(db.get_global_properties().parameters.extensions.value.updatable_htlc_options->max_preimage_size, 2048u);
+      BOOST_CHECK_EQUAL(db.get_global_properties().parameters.current_fees->get<htlc_create_operation>().fee, 2 * GRAPHENE_BLOCKCHAIN_PRECISION);
+      
+   } catch (fc::exception &fcx) {
+      BOOST_FAIL("FC Exception: " << fcx.to_detail_string());
+   } catch (std::exception &ex) {
+      BOOST_FAIL("Exception: " << ex.what());
+   } catch (...) {
+      BOOST_FAIL("Uncaught exception.");
    }
-   */
-   // now things should start working...
-   BOOST_TEST_MESSAGE("Advancing to HTLC hardfork time.");
-   advance_past_hardfork(this);
-
-   proposal_id_type good_proposal_id;
-   BOOST_TEST_MESSAGE( "Creating a proposal to change the max_preimage_size to 2048" );
-   {
-      proposal_create_operation cop = proposal_create_operation::committee_proposal(db.get_global_properties().parameters, db.head_block_time());
-      cop.fee_paying_account = GRAPHENE_TEMP_ACCOUNT;
-      cop.expiration_time = db.head_block_time() + *cop.review_period_seconds + 10;
-      committee_member_update_global_parameters_operation uop;
-      graphene::chain::htlc_options new_params;
-      new_params.max_preimage_size = 2048;
-      new_params.max_timeout_secs = 60 * 60 * 24 * 28;
-      uop.new_parameters.extensions.value.updatable_htlc_options = new_params;
-      cop.proposed_ops.emplace_back(uop);
-      trx.operations.push_back(cop);
-      graphene::chain::processed_transaction proc_trx =db.push_transaction(trx);
-      good_proposal_id = proc_trx.operation_results[0].get<object_id_type>();
-   }
-
-   BOOST_TEST_MESSAGE( "Updating proposal by signing with the committee_member private key" );
-   {
-      proposal_update_operation uop;
-      uop.proposal = good_proposal_id;
-      uop.fee_paying_account = GRAPHENE_TEMP_ACCOUNT;
-      uop.active_approvals_to_add = {get_account("init0").get_id(), get_account("init1").get_id(),
-                                     get_account("init2").get_id(), get_account("init3").get_id(),
-                                     get_account("init4").get_id(), get_account("init5").get_id(),
-                                     get_account("init6").get_id(), get_account("init7").get_id()};
-      trx.operations.push_back(uop);
-      sign( trx, init_account_priv_key );
-      db.push_transaction(trx);
-      BOOST_CHECK(good_proposal_id(db).is_authorized_to_execute(db));
-   }
-   BOOST_TEST_MESSAGE( "Verifying that the parameters didn't change immediately" );
-
-   BOOST_CHECK_EQUAL(db.get_global_properties().parameters.extensions.value.updatable_htlc_options->max_preimage_size, 1024u);
-
-   BOOST_TEST_MESSAGE( "Generating blocks until proposal expires" );
-   generate_blocks(good_proposal_id(db).expiration_time + 5);
-   BOOST_TEST_MESSAGE( "Verify that the parameters still have not changed" );
-   BOOST_CHECK_EQUAL(db.get_global_properties().parameters.extensions.value.updatable_htlc_options->max_preimage_size, 1024u);
-
-   BOOST_TEST_MESSAGE( "Generating blocks until next maintenance interval" );
-   generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
-   generate_block();   // get the maintenance skip slots out of the way
-
-   BOOST_TEST_MESSAGE( "Verify that the change has been implemented" );
-   BOOST_CHECK_EQUAL(db.get_global_properties().parameters.extensions.value.updatable_htlc_options->max_preimage_size, 2048u);
-} catch (fc::exception &fcx) {
-   BOOST_FAIL("FC Exception: " << fcx.to_detail_string());
-} catch (std::exception &ex) {
-   BOOST_FAIL("Exception: " << ex.what());
-} catch (...) {
-   BOOST_FAIL("Uncaught exception.");
-}
 }
 
 BOOST_AUTO_TEST_SUITE_END()
