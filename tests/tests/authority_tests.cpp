@@ -1704,10 +1704,8 @@ BOOST_AUTO_TEST_CASE( self_approving_proposal )
    trx.operations.push_back(pup);
    PUSH_TX( db, trx, ~0 );
 
-   // The inner push_proposal fails, but that doesn't make the inner
-   // proposal_update fail. Therefore, the outer push_proposal succeeds and the
-   // proposal is removed.
-   BOOST_CHECK_THROW( db.get<proposal_object>(pid1), fc::assert_exception );
+   // Proposal failed and still exists
+   db.get<proposal_object>(pid1);
 } FC_LOG_AND_RETHROW() }
 
 BOOST_AUTO_TEST_SUITE_END()
