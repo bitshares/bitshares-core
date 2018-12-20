@@ -153,6 +153,8 @@ void witness_plugin::stop_block_production()
    try {
       if( _block_production_task.valid() )
          _block_production_task.cancel_and_wait(__FUNCTION__);
+      if(_network_quality_testing.valid())
+            _network_quality_testing.cancel_and_wait(__FUNCTION__);
    } catch(fc::canceled_exception&) {
       //Expected exception. Move along.
    } catch(fc::exception& e) {
@@ -244,6 +246,9 @@ block_production_condition::block_production_condition_enum witness_plugin::bloc
       case block_production_condition::shutdown:
          ilog( "shutdown producing block" );
          return result;
+      case block_production_condition::not_first_node:
+         ilog( "Not producing block because node isn't first node. but enable-stale-production is true." );
+         break;
       default:
          elog( "unknown condition ${result} while producing block", ("result", (unsigned char)result) );
          break;
@@ -267,7 +272,12 @@ block_production_condition::block_production_condition_enum witness_plugin::mayb
       else
          return block_production_condition::not_synced;
    }
-
+   // if this enable-stale-production is true,and p2p_node isn't zero,prevent BLOCKCHAIN fork.
+   if (db.head_block_num() == 0 && p2p_node().get_connection_count() != 0 /* not first node ? */)
+   {
+      return block_production_condition::not_first_node;
+   }
+   
    // is anyone scheduled to produce now or one second in the future?
    uint32_t slot = db.get_slot_at_time( now );
    if( slot == 0 )
