@@ -270,20 +270,27 @@ processed_transaction database::validate_transaction( const signed_transaction& 
 
 class push_proposal_nesting_guard {
 public:
-   push_proposal_nesting_guard( uint32_t& nesting_counter, const database& db )
-      : orig_value(nesting_counter), counter(nesting_counter)
+   push_proposal_nesting_guard( uint32_t& nesting_counter, uint64_t& prop_id,
+                                const database& db, const proposal_object& proposal )
+      : orig_value(nesting_counter), counter(nesting_counter), orig_id(prop_id), current_id(prop_id)
    {
       FC_ASSERT( counter < db.get_global_properties().active_witnesses.size() * 2, "Max proposal nesting depth exceeded!" );
+      if( db.head_block_time() >= HARDFORK_CORE_1479_TIME )
+         FC_ASSERT( proposal.id.instance() < current_id, "Cannot approve proposals that didn't exist at time of creation!" );
       counter++;
+      current_id = proposal.id.instance();
    }
    ~push_proposal_nesting_guard()
    {
       if( --counter != orig_value )
          elog( "Unexpected proposal nesting count value: ${n} != ${o}", ("n",counter)("o",orig_value) );
+      current_id = orig_id;
    }
 private:
     const uint32_t  orig_value;
     uint32_t& counter;
+    const uint64_t orig_id;
+    uint64_t& current_id;
 };
 
 processed_transaction database::push_proposal(const proposal_object& proposal)
@@ -297,7 +304,8 @@ processed_transaction database::push_proposal(const proposal_object& proposal)
    size_t old_applied_ops_size = _applied_ops.size();
 
    try {
-      push_proposal_nesting_guard guard( _push_proposal_nesting_depth, *this );
+      push_proposal_nesting_guard guard( _push_proposal_nesting_depth, _push_proposal_current_id,
+                                         *this, proposal );
       if( _undo_db.size() >= _undo_db.max_size() )
          _undo_db.set_max_size( _undo_db.size() + 1 );
       auto session = _undo_db.start_undo_session(true);
