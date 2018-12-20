@@ -1,4 +1,4 @@
 // bitshares-core issue #1479 nodes crashing on self-approving proposal
 #ifndef HARDFORK_CORE_1479_TIME
-#define HARDFORK_CORE_1479_TIME (fc::time_point_sec( 1545302820 )) // 2018-12-20T10:47:00Z
+#define HARDFORK_CORE_1479_TIME (fc::time_point_sec( 1545299220 )) // 2018-12-20T09:47:00Z
 #endif
