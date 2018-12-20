@@ -287,7 +287,10 @@ private:
 };
 
 processed_transaction database::push_proposal(const proposal_object& proposal)
-{ try {
+{
+  proposal_object proposal_copy = proposal;   // make a copy for logging and to be used safely
+  proposal_id_type proposal_id = proposal.id;
+  try {
    transaction_evaluation_state eval_state(this);
    eval_state._is_proposed_trx = true;
 
@@ -301,9 +304,14 @@ processed_transaction database::push_proposal(const proposal_object& proposal)
       if( _undo_db.size() >= _undo_db.max_size() )
          _undo_db.set_max_size( _undo_db.size() + 1 );
       auto session = _undo_db.start_undo_session(true);
-      for( auto& op : proposal.proposed_transaction.operations )
+      for( auto& op : proposal_copy.proposed_transaction.operations )
          eval_state.operation_results.emplace_back(apply_operation(eval_state, op));
-      remove(proposal);
+      // The proposal object can be removed from database when processing,
+      // then be re-inserted to database when undo session destructs,
+      // in this case the address would be different, which means the reference would be invalidated already.
+      const proposal_object* po = find(proposal_id);
+      FC_ASSERT( po, "Proposal ${p} was removed unexpectedly", ("p",proposal_id) ); // make sure the proposal still exists
+      remove(*po);
       session.merge();
    } catch ( const fc::exception& e ) {
       if( head_block_time() <= HARDFORK_483_TIME )
@@ -324,7 +332,7 @@ processed_transaction database::push_proposal(const proposal_object& proposal)
 
    ptrx.operation_results = std::move(eval_state.operation_results);
    return ptrx;
-} FC_CAPTURE_AND_RETHROW( (proposal) ) }
+} FC_CAPTURE_AND_RETHROW( (proposal_copy) ) }
 
 signed_block database::generate_block(
    fc::time_point_sec when,

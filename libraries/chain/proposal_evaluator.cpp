@@ -229,7 +229,9 @@ void_result proposal_update_evaluator::do_evaluate(const proposal_update_operati
 } FC_CAPTURE_AND_RETHROW( (o) ) }
 
 void_result proposal_update_evaluator::do_apply(const proposal_update_operation& o)
-{ try {
+{
+  auto o_copy = o; // make a copy for logging
+  try {
    database& d = db();
 
    // Potential optimization: if _executed_proposal is true, we can skip the modify step and make push_proposal skip
@@ -257,20 +259,25 @@ void_result proposal_update_evaluator::do_apply(const proposal_update_operation&
    {
       // All required approvals are satisfied. Execute!
       _executed_proposal = true;
+      proposal_id_type proposal_id = o.proposal;
       try {
          _processed_transaction = d.push_proposal(*_proposal);
       } catch(fc::exception& e) {
-         d.modify(*_proposal, [&e](proposal_object& p) {
-            p.fail_reason = e.to_string(fc::log_level(fc::log_level::all));
-         });
+         const proposal_object* po = d.find(proposal_id);
+         if( po )
+         {
+            d.modify(*po, [&e](proposal_object& p) {
+               p.fail_reason = e.to_string(fc::log_level(fc::log_level::all));
+            });
+         }
          wlog("Proposed transaction ${id} failed to apply once approved with exception:\n----\n${reason}\n----\nWill try again when it expires.",
-              ("id", o.proposal)("reason", e.to_detail_string()));
+              ("id", proposal_id)("reason", e.to_detail_string()));
          _proposal_failed = true;
       }
    }
 
    return void_result();
-} FC_CAPTURE_AND_RETHROW( (o) ) }
+} FC_CAPTURE_AND_RETHROW( (o_copy) ) }
 
 void_result proposal_delete_evaluator::do_evaluate(const proposal_delete_operation& o)
 { try {

@@ -156,6 +156,8 @@ void database::clear_expired_proposals()
    while( !proposal_expiration_index.empty() && proposal_expiration_index.begin()->expiration_time <= head_block_time() )
    {
       const proposal_object& proposal = *proposal_expiration_index.begin();
+      proposal_object proposal_copy = proposal; // make a copy for logging
+      proposal_id_type proposal_id = proposal.id;
       processed_transaction result;
       try {
          if( proposal.is_authorized_to_execute(*this) )
@@ -166,9 +168,15 @@ void database::clear_expired_proposals()
          }
       } catch( const fc::exception& e ) {
          elog("Failed to apply proposed transaction on its expiration. Deleting it.\n${proposal}\n${error}",
-              ("proposal", proposal)("error", e.to_detail_string()));
+              ("proposal", proposal_copy)("error", e.to_detail_string()));
       }
-      remove(proposal);
+      // Remove the proposal object if fail to execute.
+      // The proposal object can be removed from database when processing,
+      // then be re-inserted to database when undo session destructs,
+      // in this case the address would be different, which means the reference would be invalidated already.
+      const proposal_object* po = find(proposal_id);
+      if( po ) // only remove if found
+         remove(*po);
    }
 }
 
