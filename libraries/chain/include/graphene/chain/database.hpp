@@ -538,7 +538,6 @@ namespace graphene { namespace chain {
 
          // Counts nested proposal updates
          uint32_t                           _push_proposal_nesting_depth = 0;
-         uint64_t                           _push_proposal_current_id = UINT64_MAX;
 
          /// Tracks assets affected by bitshares-core issue #453 before hard fork #615 in one block
          flat_set<asset_id_type>           _issue_453_affected_assets;
