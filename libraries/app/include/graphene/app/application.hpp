@@ -40,6 +40,7 @@ namespace graphene { namespace app {
       public:
          bool enable_subscribe_to_all = false;
          bool has_market_history_plugin = false;
+         uint32_t max_account_history_operations_limit=100;
    };
 
    class application
