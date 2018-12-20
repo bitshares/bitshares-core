@@ -80,11 +80,12 @@ BOOST_AUTO_TEST_CASE( block_database_test )
       FC_ASSERT( !bdb.is_open() );
       bdb.open( data_dir.path() );
 
-      signed_block b;
+      clearable_block b;
       for( uint32_t i = 0; i < 5; ++i )
       {
          if( i > 0 ) b.previous = b.id();
          b.witness = witness_id_type(i+1);
+         b.clear();
          bdb.store( b.id(), b );
 
          auto fetch = bdb.fetch_by_number( b.block_num() );
@@ -601,11 +602,11 @@ BOOST_AUTO_TEST_CASE( undo_pending )
          t.to = nathan_id;
          t.amount = asset(5000);
          trx.operations.push_back(t);
-         db.push_transaction(trx, ~0);
+         PUSH_TX(db, trx, ~0);
          trx.clear();
          set_expiration( db, trx );
          trx.operations.push_back(t);
-         db.push_transaction(trx, ~0);
+         PUSH_TX(db, trx, ~0);
 
          BOOST_CHECK(db.get_balance(nathan_id, asset_id_type()).amount == 10000);
          db.clear_pending();
@@ -687,7 +688,7 @@ BOOST_AUTO_TEST_CASE( duplicate_transactions )
       db2.open(dir2.path(), make_genesis, "TEST");
       BOOST_CHECK( db1.get_chain_id() == db2.get_chain_id() );
 
-      auto skip_sigs = database::skip_transaction_signatures | database::skip_authority_check;
+      auto skip_sigs = database::skip_transaction_signatures;
 
       auto init_account_priv_key  = fc::ecc::private_key::regenerate(fc::sha256::hash(string("null_key")) );
       public_key_type init_account_pub_key  = init_account_priv_key.get_public_key();
@@ -756,7 +757,7 @@ BOOST_AUTO_TEST_CASE( tapos )
       cop.active = cop.owner;
       trx.operations.push_back(cop);
       trx.sign( init_account_priv_key, db1.get_chain_id() );
-      db1.push_transaction(trx);
+      PUSH_TX(db1, trx);
       b = db1.generate_block(db1.get_slot_time(1), db1.get_scheduled_witness(1), init_account_priv_key, database::skip_nothing);
       trx.clear();
 
@@ -766,11 +767,11 @@ BOOST_AUTO_TEST_CASE( tapos )
       trx.operations.push_back(t);
       trx.sign( init_account_priv_key, db1.get_chain_id() );
       //relative_expiration is 1, but ref block is 2 blocks old, so this should fail.
-      GRAPHENE_REQUIRE_THROW(PUSH_TX( db1, trx, database::skip_transaction_signatures | database::skip_authority_check ), fc::exception);
+      GRAPHENE_REQUIRE_THROW(PUSH_TX( db1, trx, database::skip_transaction_signatures ), fc::exception);
       set_expiration( db1, trx );
       trx.clear_signatures();
       trx.sign( init_account_priv_key, db1.get_chain_id() );
-      db1.push_transaction(trx, database::skip_transaction_signatures | database::skip_authority_check);
+      PUSH_TX( db1, trx, database::skip_transaction_signatures );
    } catch (fc::exception& e) {
       edump((e.to_detail_string()));
       throw;
@@ -951,7 +952,7 @@ BOOST_FIXTURE_TEST_CASE( double_sign_check, database_fixture )
    for( auto& op : trx.operations ) db.current_fee_schedule().set_fee(op);
    trx.validate();
 
-   db.push_transaction(trx, ~0);
+   PUSH_TX(db, trx, ~0);
 
    trx.operations.clear();
    t.from = bob.id;
@@ -962,22 +963,21 @@ BOOST_FIXTURE_TEST_CASE( double_sign_check, database_fixture )
    trx.validate();
 
    BOOST_TEST_MESSAGE( "Verify that not-signing causes an exception" );
-   GRAPHENE_REQUIRE_THROW( db.push_transaction(trx, 0), fc::exception );
+   GRAPHENE_REQUIRE_THROW( PUSH_TX(db, trx, 0), fc::exception );
 
    BOOST_TEST_MESSAGE( "Verify that double-signing causes an exception" );
    sign( trx, bob_private_key );
    sign( trx, bob_private_key );
-   GRAPHENE_REQUIRE_THROW( db.push_transaction(trx, 0), tx_duplicate_sig );
+   GRAPHENE_REQUIRE_THROW( PUSH_TX(db, trx, 0), tx_duplicate_sig );
 
    BOOST_TEST_MESSAGE( "Verify that signing with an extra, unused key fails" );
    trx.signatures.pop_back();
    sign( trx, generate_private_key("bogus" ));
-   GRAPHENE_REQUIRE_THROW( db.push_transaction(trx, 0), tx_irrelevant_sig );
+   GRAPHENE_REQUIRE_THROW( PUSH_TX(db, trx, 0), tx_irrelevant_sig );
 
    BOOST_TEST_MESSAGE( "Verify that signing once with the proper key passes" );
    trx.signatures.pop_back();
-   trx.signees.clear(); // signees should be invalidated
-   db.push_transaction(trx, 0);
+   PUSH_TX(db, trx, 0);
 
 } FC_LOG_AND_RETHROW() }
 
@@ -998,7 +998,7 @@ BOOST_FIXTURE_TEST_CASE( change_block_interval, database_fixture )
       uop.new_parameters.block_interval = 1;
       cop.proposed_ops.emplace_back(uop);
       trx.operations.push_back(cop);
-      db.push_transaction(trx);
+      PUSH_TX(db, trx);
    }
    BOOST_TEST_MESSAGE( "Updating proposal by signing with the committee_member private key" );
    {
@@ -1019,7 +1019,7 @@ BOOST_FIXTURE_TEST_CASE( change_block_interval, database_fixture )
       sign( trx, get_account("init6" ).active.get_keys().front(),init_account_priv_key);
       sign( trx, get_account("init7" ).active.get_keys().front(),init_account_priv_key);
       */
-      db.push_transaction(trx);
+      PUSH_TX(db, trx);
       BOOST_CHECK(proposal_id_type()(db).is_authorized_to_execute(db));
    }
    BOOST_TEST_MESSAGE( "Verifying that the interval didn't change immediately" );
@@ -1056,7 +1056,6 @@ BOOST_FIXTURE_TEST_CASE( pop_block_twice, database_fixture )
       uint32_t skip_flags = (
            database::skip_witness_signature
          | database::skip_transaction_signatures
-         | database::skip_authority_check
          );
 
       const asset_object& core = asset_id_type()(db);
@@ -1231,8 +1230,8 @@ BOOST_FIXTURE_TEST_CASE( transaction_invalidated_in_cache, database_fixture )
       };
 
       // tx's created by ACTORS() have bogus authority, so we need to
-      // skip_authority_check in the block where they're included
-      signed_block b1 = generate_block(db, database::skip_authority_check);
+      // skip_transaction_signatures in the block where they're included
+      signed_block b1 = generate_block(db, database::skip_transaction_signatures);
 
       fc::temp_directory data_dir2( graphene::utilities::temp_directory_path() );
 
@@ -1244,7 +1243,7 @@ BOOST_FIXTURE_TEST_CASE( transaction_invalidated_in_cache, database_fixture )
       {
          optional< signed_block > b = db.fetch_block_by_number( db2.head_block_num()+1 );
          db2.push_block(*b, database::skip_witness_signature
-                           |database::skip_authority_check );
+                           |database::skip_transaction_signatures );
       }
       BOOST_CHECK( db2.get( alice_id ).name == "alice" );
       BOOST_CHECK( db2.get( bob_id ).name == "bob" );
@@ -1253,7 +1252,7 @@ BOOST_FIXTURE_TEST_CASE( transaction_invalidated_in_cache, database_fixture )
       transfer( account_id_type(), alice_id, asset( 1000 ) );
       transfer( account_id_type(),   bob_id, asset( 1000 ) );
       // need to skip authority check here as well for same reason as above
-      db2.push_block(generate_block(db, database::skip_authority_check), database::skip_authority_check);
+      db2.push_block(generate_block(db, database::skip_transaction_signatures), database::skip_transaction_signatures);
 
       BOOST_CHECK_EQUAL(db.get_balance(alice_id, asset_id_type()).amount.value, 1000);
       BOOST_CHECK_EQUAL(db.get_balance(  bob_id, asset_id_type()).amount.value, 1000);
@@ -1478,7 +1477,6 @@ BOOST_FIXTURE_TEST_CASE( update_account_keys, database_fixture )
           database::skip_transaction_dupe_check
         | database::skip_witness_signature
         | database::skip_transaction_signatures
-        | database::skip_authority_check
         ;
 
       // Sam is the creator of accounts
@@ -1604,10 +1602,9 @@ BOOST_FIXTURE_TEST_CASE( update_account_keys, database_fixture )
                trx.operations.push_back( create_op );
                // trx.sign( sam_key );
 
-               processed_transaction ptx_create = db.push_transaction( trx,
+               processed_transaction ptx_create = PUSH_TX( db, trx,
                   database::skip_transaction_dupe_check |
-                  database::skip_transaction_signatures |
-                  database::skip_authority_check
+                  database::skip_transaction_signatures
                );
                account_id_type alice_account_id =
                   ptx_create.operation_results[0]
@@ -1642,11 +1639,11 @@ BOOST_FIXTURE_TEST_CASE( update_account_keys, database_fixture )
                      sign( trx, *owner_privkey[i] );
                      if( i < int(create_op.owner.weight_threshold-1) )
                      {
-                        GRAPHENE_REQUIRE_THROW(db.push_transaction(trx), fc::exception);
+                        GRAPHENE_REQUIRE_THROW(PUSH_TX(db, trx), fc::exception);
                      }
                      else
                      {
-                        db.push_transaction( trx,
+                        PUSH_TX( db, trx,
                            database::skip_transaction_dupe_check |
                            database::skip_transaction_signatures );
                      }
@@ -1830,11 +1827,6 @@ BOOST_FIXTURE_TEST_CASE( temp_account_balance, database_fixture )
 
    top.to = GRAPHENE_COMMITTEE_ACCOUNT;
    trx.operations.push_back( top );
-   sign( trx, alice_private_key );
-   BOOST_CHECK_THROW( PUSH_TX( db, trx ), fc::assert_exception );
-
-   generate_blocks( HARDFORK_CORE_1040_TIME );
-
    set_expiration( db, trx );
    trx.clear_signatures();
    sign( trx, alice_private_key );

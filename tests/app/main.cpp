@@ -267,7 +267,7 @@ BOOST_AUTO_TEST_CASE( two_node_network )
       BOOST_CHECK_EQUAL( db2->get_balance( GRAPHENE_NULL_ACCOUNT, asset_id_type() ).amount.value, 0 );
 
       BOOST_TEST_MESSAGE( "Creating transfer tx" );
-      graphene::chain::signed_transaction trx;
+      graphene::chain::precomputable_transaction trx;
       {
          account_id_type nathan_id = db2->get_index_type<account_index>().indices().get<by_name>().find( "nathan" )->id;
          fc::ecc::private_key nathan_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("nathan")));

@@ -25,6 +25,7 @@
 
 #include <fc/io/raw.hpp>
 #include <fc/container/flat.hpp>
+#include <fc/thread/parallel.hpp>
 #include <fc/uint128.hpp>
 
 namespace graphene { namespace db {
@@ -72,14 +73,20 @@ void object_database::flush()
 {
 //   ilog("Save object_database in ${d}", ("d", _data_dir));
    fc::create_directories( _data_dir / "object_database.tmp" / "lock" );
+   std::vector<fc::future<void>> tasks;
+   tasks.reserve(200);
    for( uint32_t space = 0; space < _index.size(); ++space )
    {
       fc::create_directories( _data_dir / "object_database.tmp" / fc::to_string(space) );
       const auto types = _index[space].size();
       for( uint32_t type = 0; type  <  types; ++type )
          if( _index[space][type] )
-            _index[space][type]->save( _data_dir / "object_database.tmp" / fc::to_string(space)/fc::to_string(type) );
+            tasks.push_back( fc::do_parallel( [this,space,type] () {
+               _index[space][type]->save( _data_dir / "object_database.tmp" / fc::to_string(space)/fc::to_string(type) );
+            } ) );
    }
+   for( auto& task : tasks )
+      task.wait();
    fc::remove_all( _data_dir / "object_database.tmp" / "lock" );
    if( fc::exists( _data_dir / "object_database" ) )
       fc::rename( _data_dir / "object_database", _data_dir / "object_database.old" );
@@ -103,11 +110,17 @@ void object_database::open(const fc::path& data_dir)
        wlog("Ignoring locked object_database");
        return;
    }
+   std::vector<fc::future<void>> tasks;
+   tasks.reserve(200);
    ilog("Opening object database from ${d} ...", ("d", data_dir));
    for( uint32_t space = 0; space < _index.size(); ++space )
       for( uint32_t type = 0; type  < _index[space].size(); ++type )
          if( _index[space][type] )
-            _index[space][type]->open( _data_dir / "object_database" / fc::to_string(space)/fc::to_string(type) );
+            tasks.push_back( fc::do_parallel( [this,space,type] () {
+               _index[space][type]->open( _data_dir / "object_database" / fc::to_string(space)/fc::to_string(type) );
+            } ) );
+   for( auto& task : tasks )
+      task.wait();
    ilog( "Done opening object database." );
 
 } FC_CAPTURE_AND_RETHROW( (data_dir) ) }

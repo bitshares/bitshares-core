@@ -22,6 +22,8 @@ Visit [BitShares.org](https://bitshares.org/) to learn about BitShares and join 
 
 Information for developers can be found in the [Bitshares Developer Portal](https://dev.bitshares.works/). Users interested in how bitshares works can go to the [BitShares Documentation](https://how.bitshares.works/) site.
 
+For security issues and bug bounty program please visit [Hack the DEX](https://hackthedex.io).
+
 Getting Started
 ---------------
 Build instructions and additional documentation are available in the
