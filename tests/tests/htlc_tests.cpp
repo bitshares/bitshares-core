@@ -223,6 +223,7 @@ try {
 
 BOOST_AUTO_TEST_CASE( htlc_fulfilled )
 {
+try {
    ACTORS((alice)(bob));
 
    int64_t init_balance(100 * GRAPHENE_BLOCKCHAIN_PRECISION);
@@ -263,24 +264,40 @@ BOOST_AUTO_TEST_CASE( htlc_fulfilled )
    // make sure Alice's money gets put on hold (100 - 20 - 4(fee) )
    BOOST_CHECK_EQUAL( get_balance( alice_id, graphene::chain::asset_id_type()), 76 * GRAPHENE_BLOCKCHAIN_PRECISION );
 
-   // TODO: make sure Bob (or anyone) can see the details of the transaction
+   // extend the timeout so that Bob has more time
+   {
+      graphene::chain::htlc_extend_operation extend_operation;
+      extend_operation.htlc_id = alice_htlc_id;
+      extend_operation.seconds_to_add = 86400;
+      extend_operation.update_issuer = alice_id;
+      extend_operation.fee = db.current_fee_schedule().calculate_fee( extend_operation );
+      trx.operations.push_back( extend_operation );
+      sign( trx, alice_private_key );
+      PUSH_TX( db, trx, ~0 );
+      trx.clear();
+      generate_blocks( db.head_block_time() + fc::seconds(87000) );
+      set_expiration( db, trx );
+   }
 
-   // send an update operation to claim the funds
+   // make sure Alice's money is still on hold, and account for extra fee
+   BOOST_CHECK_EQUAL( get_balance( alice_id, graphene::chain::asset_id_type()), 72 * GRAPHENE_BLOCKCHAIN_PRECISION );
+
+   // send a redeem operation to claim the funds
    {
       graphene::chain::htlc_redeem_operation update_operation;
       update_operation.redeemer = bob_id;
       update_operation.htlc_id = alice_htlc_id;
       update_operation.preimage = pre_image;
       update_operation.fee = db.current_fee_schedule().calculate_fee( update_operation );
-      trx.operations.push_back(update_operation);
+      trx.operations.push_back( update_operation );
       sign(trx, bob_private_key);
       try
       {
-         PUSH_TX(db, trx, ~0);
+         PUSH_TX( db, trx, ~0 );
       } 
-      catch (fc::exception& ex)
+      catch ( fc::exception& ex )
       {
-         BOOST_FAIL(ex.what());
+         BOOST_FAIL( ex.to_detail_string() );
       }
       generate_block();
       trx.clear();
@@ -288,7 +305,8 @@ BOOST_AUTO_TEST_CASE( htlc_fulfilled )
    // verify funds end up in Bob's account (100 + 20 - 4(fee) )
    BOOST_CHECK_EQUAL( get_balance(bob_id,   graphene::chain::asset_id_type()), 116 * GRAPHENE_BLOCKCHAIN_PRECISION );
    // verify funds remain out of Alice's acount ( 100 - 20 - 4 )
-   BOOST_CHECK_EQUAL( get_balance(alice_id, graphene::chain::asset_id_type()), 76 * GRAPHENE_BLOCKCHAIN_PRECISION );
+   BOOST_CHECK_EQUAL( get_balance(alice_id, graphene::chain::asset_id_type()), 72 * GRAPHENE_BLOCKCHAIN_PRECISION );
+} FC_LOG_AND_RETHROW()
 }
 
 BOOST_AUTO_TEST_CASE( other_peoples_money )
