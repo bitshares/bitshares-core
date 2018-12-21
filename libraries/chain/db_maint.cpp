@@ -693,7 +693,7 @@ void distribute_fba_balances( database& db )
 void create_buyback_orders( database& db )
 {
    const auto& bbo_idx = db.get_index_type< buyback_index >().indices().get<by_id>();
-   const auto& bal_idx = db.get_index_type< account_balance_index >().indices().get< by_account_asset >();
+   const auto& bal_idx = db.get_index_type< primary_index< account_balance_index > >().get_secondary_index< balances_by_account_index >();
 
    for( const buyback_object& bbo : bbo_idx )
    {
@@ -701,7 +701,6 @@ void create_buyback_orders( database& db )
       assert( asset_to_buy.buyback_account.valid() );
 
       const account_object& buyback_account = (*(asset_to_buy.buyback_account))(db);
-      asset_id_type next_asset = asset_id_type();
 
       if( !buyback_account.allowed_assets.valid() )
       {
@@ -709,16 +708,11 @@ void create_buyback_orders( database& db )
          continue;
       }
 
-      while( true )
+      for( const auto& entry : bal_idx.get_account_balances( buyback_account.id ) )
       {
-         auto it = bal_idx.lower_bound( boost::make_tuple( buyback_account.id, next_asset ) );
-         if( it == bal_idx.end() )
-            break;
-         if( it->owner != buyback_account.id )
-            break;
+         const auto* it = entry.second;
          asset_id_type asset_to_sell = it->asset_type;
          share_type amount_to_sell = it->balance;
-         next_asset = asset_to_sell + 1;
          if( asset_to_sell == asset_to_buy.id )
             continue;
          if( amount_to_sell == 0 )

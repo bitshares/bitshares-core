@@ -120,7 +120,6 @@ void verify_account_votes( const database& db, const account_options& options )
    }
 }
 
-
 void_result account_create_evaluator::do_evaluate( const account_create_operation& op )
 { try {
    database& d = db();
@@ -319,11 +318,16 @@ void_result account_update_evaluator::do_apply( const account_update_operation& 
    bool sa_before = acnt->has_special_authority();
 
    // update account statistics
-   if( o.new_options.valid() && o.new_options->is_voting() != acnt->options.is_voting() )
+   if( o.new_options.valid() )
    {
-      d.modify( acnt->statistics( d ), []( account_statistics_object& aso )
+      d.modify( acnt->statistics( d ), [&]( account_statistics_object& aso )
       {
-         aso.is_voting = !aso.is_voting;
+         if(o.new_options->is_voting() != acnt->options.is_voting())
+            aso.is_voting = !aso.is_voting;
+
+         if((o.new_options->votes != acnt->options.votes ||
+               o.new_options->voting_account != acnt->options.voting_account))
+            aso.last_vote_time = d.head_block_time();
       } );
    }
 
