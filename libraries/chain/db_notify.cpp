@@ -259,11 +259,16 @@ struct get_impacted_account_visitor
    }
    void operator()( const htlc_create_operation& op )
    {
-      _impacted.insert( op.fee_payer() ); 
+      _impacted.insert( op.fee_payer() );
+      _impacted.insert( op.to );
    }
    void operator()( const htlc_redeem_operation& op )
    {
       _impacted.insert( op.fee_payer() ); 
+   }
+   void operator()( const htlc_redeemed_operation& op )
+   {
+      _impacted.insert( op.from );
    }
    void operator()( const htlc_extend_operation& op )
    {

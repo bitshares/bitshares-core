@@ -99,6 +99,7 @@ namespace graphene { namespace chain {
             asset_update_issuer_operation,
             htlc_create_operation,
             htlc_redeem_operation,
+            htlc_redeemed_operation,         // VIRTUAL
             htlc_extend_operation,
             htlc_refund_operation            // VIRTUAL
          > operation;

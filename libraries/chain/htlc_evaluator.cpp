@@ -100,6 +100,9 @@ namespace graphene {
       void_result htlc_redeem_evaluator::do_apply(const htlc_redeem_operation& o)
       {
          db().adjust_balance(htlc_obj->to, htlc_obj->amount);
+         // notify related parties
+         htlc_redeemed_operation virt_op( htlc_obj->id, htlc_obj->from, htlc_obj->to, htlc_obj->amount );
+         db().push_applied_operation( virt_op );
          db().remove(*htlc_obj);
          return void_result();
       }
