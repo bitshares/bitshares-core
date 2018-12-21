@@ -36,6 +36,7 @@
 #include <graphene/chain/vesting_balance_object.hpp>
 #include <graphene/chain/witness_object.hpp>
 #include <graphene/chain/worker_object.hpp>
+#include <graphene/chain/htlc_object.hpp>
 
 #include <graphene/utilities/tempdir.hpp>
 
@@ -283,6 +284,13 @@ void database_fixture::verify_asset_supplies( const database& db )
    for( const auto& item : total_debts )
    {
       BOOST_CHECK_EQUAL(item.first(db).dynamic_asset_data_id(db).current_supply.value, item.second.value);
+   }
+
+   // htlc
+   const auto& htlc_idx = db.get_index_type< htlc_index >().indices().get< by_id >();
+   for( auto itr = htlc_idx.begin(); itr != htlc_idx.end(); ++itr )
+   {
+      total_balances[itr->amount.asset_id] += itr->amount.amount;
    }
 
    for( const asset_object& asset_obj : db.get_index_type<asset_index>().indices() )

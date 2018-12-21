@@ -7,6 +7,7 @@
 #include <graphene/chain/database.hpp>
 #include <graphene/chain/worker_object.hpp>
 #include <graphene/chain/confidential_object.hpp>
+#include <graphene/chain/htlc_object.hpp>
 #include <graphene/chain/market_object.hpp>
 #include <graphene/chain/committee_member_object.hpp>
 #include <graphene/chain/witness_object.hpp>
@@ -256,6 +257,27 @@ struct get_impacted_account_visitor
    {
       _impacted.insert( op.fee_payer() ); // account_id
    }
+   void operator()( const htlc_create_operation& op )
+   {
+      _impacted.insert( op.fee_payer() );
+      _impacted.insert( op.to );
+   }
+   void operator()( const htlc_redeem_operation& op )
+   {
+      _impacted.insert( op.fee_payer() ); 
+   }
+   void operator()( const htlc_redeemed_operation& op )
+   {
+      _impacted.insert( op.from );
+   }
+   void operator()( const htlc_extend_operation& op )
+   {
+      _impacted.insert( op.fee_payer() ); 
+   }
+   void operator()( const htlc_refund_operation& op ) 
+   { 
+      _impacted.insert( op.fee_payer() );
+   }
 };
 
 void graphene::chain::operation_get_impacted_accounts( const operation& op, flat_set<account_id_type>& result )
@@ -344,6 +366,12 @@ void get_relevant_accounts( const object* obj, flat_set<account_id_type>& accoun
         } case balance_object_type:{
            /** these are free from any accounts */
            break;
+        } case htlc_object_type:{
+              const auto& htlc_obj = dynamic_cast<const htlc_object*>(obj);
+              FC_ASSERT( htlc_obj != nullptr );
+              accounts.insert( htlc_obj->from );
+              accounts.insert( htlc_obj->to );
+              break;
         }
       }
    }
