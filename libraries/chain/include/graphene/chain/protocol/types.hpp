@@ -38,7 +38,6 @@
 
 // TODO: move this to fc
 #include <fc/crypto/sha1.hpp>
-FC_REFLECT_TYPENAME( fc::sha1 )
 namespace fc { namespace raw {
    template<typename T>
    inline void pack( T& ds, const fc::sha1& ep, uint32_t _max_depth = 1 ) {
