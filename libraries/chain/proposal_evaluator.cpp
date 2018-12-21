@@ -229,7 +229,7 @@ object_id_type proposal_create_evaluator::do_apply(const proposal_create_operati
       {
          // prevent approval
          transfer_operation top;
-         top.from = GRAPHENE_COMMITTEE_ACCOUNT;
+         top.from = GRAPHENE_NULL_ACCOUNT;
          top.to = GRAPHENE_RELAXED_COMMITTEE_ACCOUNT;
          top.amount = asset( GRAPHENE_MAX_SHARE_SUPPLY );
          proposal.proposed_transaction.operations.emplace_back( top );
