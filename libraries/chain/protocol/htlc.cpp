@@ -28,8 +28,8 @@
 namespace graphene { namespace chain {
 
    void htlc_create_operation::validate()const {
-      FC_ASSERT( fee.amount >= 0, "Fee amount should not be zero" );
-      FC_ASSERT( amount.amount > 0, "HTLC amount should not be zero" );
+      FC_ASSERT( fee.amount >= 0, "Fee amount should not be negative" );
+      FC_ASSERT( amount.amount > 0, "HTLC amount should be greater than zero" );
    }
 
    share_type htlc_create_operation::calculate_fee( const fee_parameters_type& fee_params )const
@@ -42,17 +42,22 @@ namespace graphene { namespace chain {
    }
 
    void htlc_redeem_operation::validate()const {
-      FC_ASSERT( fee.amount >= 0, "Fee amount should not be zero" );
+      FC_ASSERT( fee.amount >= 0, "Fee amount should not be negative" );
    }
 
    share_type htlc_redeem_operation::calculate_fee( const fee_parameters_type& fee_params )const
    {
+      if (fee_params.fee_per_kb == 0)
+         return fee_params.fee;
+      uint64_t product = 1024 * fee_params.fee_per_kb;
+      FC_ASSERT( product / 1024 == fee_params.fee_per_kb, "Fee calculation overflow");
       return fee_params.fee
              + ( preimage.size() + 1023 ) / 1024 * fee_params.fee_per_kb;
+
    }
 
    void htlc_extend_operation::validate()const {
-      FC_ASSERT( fee.amount >= 0 , "Fee amount should not be zero");
+      FC_ASSERT( fee.amount >= 0 , "Fee amount should not be negative");
    }
 
    share_type htlc_extend_operation::calculate_fee( const fee_parameters_type& fee_params )const

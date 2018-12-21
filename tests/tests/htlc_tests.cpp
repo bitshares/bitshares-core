@@ -291,14 +291,7 @@ try {
       update_operation.fee = db.current_fee_schedule().calculate_fee( update_operation );
       trx.operations.push_back( update_operation );
       sign(trx, bob_private_key);
-      try
-      {
-         PUSH_TX( db, trx, ~0 );
-      } 
-      catch ( fc::exception& ex )
-      {
-         BOOST_FAIL( ex.to_detail_string() );
-      }
+      PUSH_TX( db, trx, ~0 );
       generate_block();
       trx.clear();
    }
