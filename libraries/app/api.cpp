@@ -352,8 +352,8 @@ namespace graphene { namespace app {
     {
        FC_ASSERT( _app.chain_database() );
        const auto& db = *_app.chain_database();
-        uint32_t max_account_history_operations_limit=_app.get_options().max_account_history_operations_limit;
-        FC_ASSERT(limit <= max_account_history_operations_limit);
+       const uint32_t max_account_history_operations_limit=_app.get_options().max_account_history_operations_limit;
+       FC_ASSERT(limit <= max_account_history_operations_limit);
        vector<operation_history_object> result;
        account_id_type account;
        try {
