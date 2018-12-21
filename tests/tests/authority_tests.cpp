@@ -1708,4 +1708,39 @@ BOOST_AUTO_TEST_CASE( self_approving_proposal )
    db.get<proposal_object>(pid1);
 } FC_LOG_AND_RETHROW() }
 
+BOOST_AUTO_TEST_CASE( self_deleting_proposal )
+{ try {
+   ACTORS( (alice) );
+   fund( alice );
+
+   generate_blocks( HARDFORK_CORE_1479_TIME );
+   trx.clear();
+   set_expiration( db, trx );
+
+   proposal_delete_operation pdo;
+   pdo.fee_paying_account = alice_id;
+   pdo.proposal = proposal_id_type(0);
+   pdo.using_owner_authority = false;
+
+   proposal_create_operation pop;
+   pop.proposed_ops.emplace_back( pdo );
+   pop.fee_paying_account = alice_id;
+   pop.expiration_time = db.head_block_time() + fc::days(1);
+   trx.operations.push_back( pop );
+   const proposal_id_type pid1 = PUSH_TX( db, trx, ~0 ).operation_results[0].get<object_id_type>();
+   trx.clear();
+   BOOST_REQUIRE_EQUAL( 0, pid1.instance.value );
+   db.get<proposal_object>(pid1);
+
+   proposal_update_operation pup;
+   pup.fee_paying_account = alice_id;
+   pup.proposal = proposal_id_type(0);
+   pup.active_approvals_to_add.insert( alice_id );
+   trx.operations.push_back(pup);
+   PUSH_TX( db, trx, ~0 );
+
+   // Proposal failed and still exists
+   db.get<proposal_object>(pid1);
+} FC_LOG_AND_RETHROW() }
+
 BOOST_AUTO_TEST_SUITE_END()
