@@ -1,0 +1,4 @@
+// HTLC implementation
+#ifndef HARDFORK_CORE_1468_TIME
+#define HARDFORK_CORE_1468_TIME (fc::time_point_sec( 1545422400 ) ) // 2018-12-21T20:00:00Z // testnet
+#endif
