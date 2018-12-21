@@ -441,7 +441,6 @@ void application_impl::startup()
 
    if ( _options->count("max-account-history-operations-limit") )
    {
-      uint32_t max_acct_hist_limit = _options->at("max-account-history-operations-limit").as<uint32_t>();
       _app_options.max_account_history_operations_limit = _options->at("max-account-history-operations-limit").as<uint32_t>();
    }
 
