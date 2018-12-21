@@ -47,13 +47,10 @@ namespace graphene { namespace chain {
 
    share_type htlc_redeem_operation::calculate_fee( const fee_parameters_type& fee_params )const
    {
-      if (fee_params.fee_per_kb == 0)
-         return fee_params.fee;
-      uint64_t product = 1024 * fee_params.fee_per_kb;
-      FC_ASSERT( product / 1024 == fee_params.fee_per_kb, "Fee calculation overflow");
-      return fee_params.fee
-             + ( preimage.size() + 1023 ) / 1024 * fee_params.fee_per_kb;
-
+      uint64_t kb = ( preimage.size() + 1023 ) / 1024;
+      uint64_t product = kb * fee_params.fee_per_kb;
+      FC_ASSERT( kb == 0 || product / kb == fee_params.fee_per_kb, "Fee calculation overflow");
+      return fee_params.fee + product;
    }
 
    void htlc_extend_operation::validate()const {
