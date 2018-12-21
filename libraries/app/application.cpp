@@ -988,8 +988,8 @@ void application::set_program_options(boost::program_options::options_descriptio
          ("enable-standby-votes-tracking", bpo::value<bool>()->implicit_value(true),
           "Whether to enable tracking of votes of standby witnesses and committee members. "
           "Set it to true to provide accurate data to API clients, set to false for slightly better performance.")
-           ("max-account-history-operations-limit",boost::program_options::value<uint32_t>()->default_value(100),
-                   "for history_api::get_account_history_operations to increase its limited value default is 100")
+         ("max-account-history-operations-limit",boost::program_options::value<uint32_t>()->default_value(100),
+          "For history_api::get_account_history_operations to increase its limited value default is 100")
          ;
    command_line_options.add(configuration_file_options);
    command_line_options.add_options()
