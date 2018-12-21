@@ -120,6 +120,13 @@ void hardfork_visitor_1479::operator()(const proposal_update_operation &v)
    nested_update_count++;
 }
 
+void hardfork_visitor_1479::operator()(const proposal_delete_operation &v)
+{
+   if( nested_update_count == 0 || v.proposal.instance.value > max_update_instance )
+      max_update_instance = v.proposal.instance.value;
+   nested_update_count++;
+}
+
 // loop and self visit in proposals
 void hardfork_visitor_1479::operator()(const graphene::chain::proposal_create_operation &v)
 {
@@ -216,7 +223,8 @@ object_id_type proposal_create_evaluator::do_apply(const proposal_create_operati
                           std::inserter(proposal.required_active_approvals, proposal.required_active_approvals.begin()));
 
       if( d.head_block_time() > HARDFORK_CORE_1479_TIME )
-         FC_ASSERT( vtor_1479.nested_update_count == 0 || proposal.id.instance() > vtor_1479.max_update_instance, "Cannot update a proposal with a future id!" );
+         FC_ASSERT( vtor_1479.nested_update_count == 0 || proposal.id.instance() > vtor_1479.max_update_instance,
+                    "Cannot update/delete a proposal with a future id!" );
       else if( vtor_1479.nested_update_count > 0 && proposal.id.instance() <= vtor_1479.max_update_instance )
       {
          // prevent approval

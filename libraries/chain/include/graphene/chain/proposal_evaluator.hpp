@@ -41,6 +41,8 @@ namespace graphene { namespace chain {
 
       void operator()(const proposal_update_operation &v);
 
+      void operator()(const proposal_delete_operation &v);
+
       // loop and self visit in proposals
       void operator()(const graphene::chain::proposal_create_operation &v);
    };
