@@ -37,6 +37,7 @@
 #include <graphene/chain/exceptions.hpp>
 #include <graphene/chain/evaluator.hpp>
 
+#include <fc/thread/parallel.hpp>
 #include <fc/smart_ref_impl.hpp>
 
 namespace graphene { namespace chain {
@@ -227,7 +228,7 @@ bool database::_push_block(const signed_block& new_block)
  * queues full as well, it will be kept in the queue to be propagated later when a new block flushes out the pending
  * queues.
  */
-processed_transaction database::push_transaction( const signed_transaction& trx, uint32_t skip )
+processed_transaction database::push_transaction( const precomputable_transaction& trx, uint32_t skip )
 { try {
    processed_transaction result;
    detail::with_skip_flags( *this, skip, [&]()
@@ -237,7 +238,7 @@ processed_transaction database::push_transaction( const signed_transaction& trx,
    return result;
 } FC_CAPTURE_AND_RETHROW( (trx) ) }
 
-processed_transaction database::_push_transaction( const signed_transaction& trx )
+processed_transaction database::_push_transaction( const precomputable_transaction& trx )
 {
    // If this is the first transaction pushed after applying a block, start a new undo session.
    // This allows us to quickly rewind to the clean state of the head block, in case a new block arrives.
@@ -465,15 +466,17 @@ signed_block database::_generate_block(
 void database::pop_block()
 { try {
    _pending_tx_session.reset();
-   auto head_id = head_block_id();
-   optional<signed_block> head_block = fetch_block_by_id( head_id );
-   GRAPHENE_ASSERT( head_block.valid(), pop_empty_chain, "there are no blocks to pop" );
-
-   _fork_db.pop_block();
+   auto fork_db_head = _fork_db.head();
+   FC_ASSERT( fork_db_head, "Trying to pop() from empty fork database!?" );
+   if( fork_db_head->id == head_block_id() )
+      _fork_db.pop_block();
+   else
+   {
+      fork_db_head = _fork_db.fetch_block( head_block_id() );
+      FC_ASSERT( fork_db_head, "Trying to pop() block that's not in fork database!?" );
+   }
    pop_undo();
-
-   _popped_tx.insert( _popped_tx.begin(), head_block->transactions.begin(), head_block->transactions.end() );
-
+   _popped_tx.insert( _popped_tx.begin(), fork_db_head->data.transactions.begin(), fork_db_head->data.transactions.end() );
 } FC_CAPTURE_AND_RETHROW() }
 
 void database::clear_pending()
@@ -622,22 +625,17 @@ processed_transaction database::_apply_transaction(const signed_transaction& trx
 { try {
    uint32_t skip = get_node_properties().skip_flags;
 
-   if( true || !(skip&skip_validate) )   /* issue #505 explains why this skip_flag is disabled */
-      trx.validate();
+   trx.validate();
 
    auto& trx_idx = get_mutable_index_type<transaction_index>();
    const chain_id_type& chain_id = get_chain_id();
-   transaction_id_type trx_id;
    if( !(skip & skip_transaction_dupe_check) )
-   {
-      trx_id = trx.id();
-      FC_ASSERT( trx_idx.indices().get<by_trx_id>().find(trx_id) == trx_idx.indices().get<by_trx_id>().end() );
-   }
+      FC_ASSERT( trx_idx.indices().get<by_trx_id>().find(trx.id()) == trx_idx.indices().get<by_trx_id>().end() );
    transaction_evaluation_state eval_state(this);
    const chain_parameters& chain_parameters = get_global_properties().parameters;
    eval_state._trx = &trx;
 
-   if( !(skip & (skip_transaction_signatures | skip_authority_check) ) )
+   if( !(skip & skip_transaction_signatures) )
    {
       auto get_active = [&]( account_id_type id ) { return &id(*this).active; };
       auto get_owner  = [&]( account_id_type id ) { return &id(*this).owner;  };
@@ -666,8 +664,8 @@ processed_transaction database::_apply_transaction(const signed_transaction& trx
    //Insert transaction into unique transactions database.
    if( !(skip & skip_transaction_dupe_check) )
    {
-      create<transaction_object>([&trx_id,&trx](transaction_object& transaction) {
-         transaction.trx_id = trx_id;
+      create<transaction_object>([&trx](transaction_object& transaction) {
+         transaction.trx_id = trx.id();
          transaction.trx = trx;
       });
    }
@@ -683,14 +681,6 @@ processed_transaction database::_apply_transaction(const signed_transaction& trx
       ++_current_op_in_trx;
    }
    ptrx.operation_results = std::move(eval_state.operation_results);
-
-   if( head_block_time() < HARDFORK_CORE_1040_TIME ) // TODO totally remove this code block after hard fork
-   {
-      //Make sure the temp account has no non-zero balances
-      const auto& index = get_index_type<account_balance_index>().indices().get<by_account_asset>();
-      auto range = index.equal_range( boost::make_tuple( GRAPHENE_TEMP_ACCOUNT ) );
-      std::for_each(range.first, range.second, [](const account_balance_object& b) { FC_ASSERT(b.balance == 0); });
-   }
 
    return ptrx;
 } FC_CAPTURE_AND_RETHROW( (trx) ) }
@@ -749,6 +739,67 @@ void database::add_checkpoints( const flat_map<uint32_t,block_id_type>& checkpts
 bool database::before_last_checkpoint()const
 {
    return (_checkpoints.size() > 0) && (_checkpoints.rbegin()->first >= head_block_num());
+}
+
+
+static const uint32_t skip_expensive = database::skip_transaction_signatures | database::skip_witness_signature
+                                       | database::skip_merkle_check | database::skip_transaction_dupe_check;
+
+template<typename Trx>
+void database::_precompute_parallel( const Trx* trx, const size_t count, const uint32_t skip )const
+{
+   for( size_t i = 0; i < count; ++i, ++trx )
+   {
+      trx->validate(); // TODO - parallelize wrt confidential operations
+      if( !(skip&skip_transaction_dupe_check) )
+         trx->id();
+      if( !(skip&skip_transaction_signatures) )
+         trx->get_signature_keys( get_chain_id() );
+   }
+}
+
+fc::future<void> database::precompute_parallel( const signed_block& block, const uint32_t skip )const
+{ try {
+   std::vector<fc::future<void>> workers;
+   if( !block.transactions.empty() )
+   {
+      if( (skip & skip_expensive) == skip_expensive )
+         _precompute_parallel( &block.transactions[0], block.transactions.size(), skip );
+      else
+      {
+         uint32_t chunks = fc::asio::default_io_service_scope::get_num_threads();
+         uint32_t chunk_size = ( block.transactions.size() + chunks - 1 ) / chunks;
+         workers.reserve( chunks + 1 );
+         for( size_t base = 0; base < block.transactions.size(); base += chunk_size )
+            workers.push_back( fc::do_parallel( [this,&block,base,chunk_size,skip] () {
+               _precompute_parallel( &block.transactions[base],
+                                     base + chunk_size < block.transactions.size() ? chunk_size : block.transactions.size() - base,
+                                     skip );
+            }) );
+      }
+   }
+
+   if( !(skip&skip_witness_signature) )
+      workers.push_back( fc::do_parallel( [&block] () { block.signee(); } ) );
+   if( !(skip&skip_merkle_check) )
+      block.calculate_merkle_root();
+   block.id();
+
+   if( workers.empty() )
+      return fc::future< void >( fc::promise< void >::ptr( new fc::promise< void >( true ) ) );
+
+   auto first = workers.begin();
+   auto worker = first;
+   while( ++worker != workers.end() )
+      worker->wait();
+   return *first;
+} FC_LOG_AND_RETHROW() }
+
+fc::future<void> database::precompute_parallel( const precomputable_transaction& trx )const
+{
+   return fc::do_parallel([this,&trx] () {
+      _precompute_parallel( &trx, 1, skip_nothing );
+   });
 }
 
 } }
