@@ -1992,7 +1992,7 @@ set<address> database_api::get_potential_address_signatures( const signed_transa
 set<public_key_type> database_api_impl::get_potential_signatures( const signed_transaction& trx )const
 {
    set<public_key_type> result;
-   trx.get_required_signatures(
+   trx.add_required_signatures(
       _db.get_chain_id(),
       flat_set<public_key_type>(),
       [&]( account_id_type id )
@@ -2009,9 +2009,10 @@ set<public_key_type> database_api_impl::get_potential_signatures( const signed_t
             result.insert(k);
          return &auth;
       },
+      &result,
       _db.get_global_properties().parameters.max_authority_depth
    );
-
+   /*
    // Insert keys in required "other" authories
    flat_set<account_id_type> required_active;
    flat_set<account_id_type> required_owner;
@@ -2020,7 +2021,7 @@ set<public_key_type> database_api_impl::get_potential_signatures( const signed_t
    for( const auto& auth : other )
       for( const auto& key : auth.get_keys() )
          result.insert( key );
-
+   */
    return result;
 }
 
