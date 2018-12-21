@@ -244,6 +244,9 @@ block_production_condition::block_production_condition_enum witness_plugin::bloc
       case block_production_condition::shutdown:
          ilog( "shutdown producing block" );
          return result;
+      case block_production_condition::not_first_node:
+         ilog( "Not producing block because node isn't first node. but enable-stale-production is true." );
+         break;
       default:
          elog( "unknown condition ${result} while producing block", ("result", (unsigned char)result) );
          break;
@@ -275,7 +278,12 @@ block_production_condition::block_production_condition_enum witness_plugin::mayb
       capture("next_time", db.get_slot_time(1));
       return block_production_condition::not_time_yet;
    }
-
+   /* if you decrease producing block time,child node enable-stale-production  is true,and before change update_global_dynamic_data,child node could  not sync BC*/
+   if (db.head_block_num() == 0 && p2p_node().get_connection_count() != 0 /* not first node ? */)
+   {
+	  return block_production_condition::not_first_node;
+   }
+   
    //
    // this assert should not fail, because now <= db.head_block_time()
    // should have resulted in slot == 0.
