@@ -838,26 +838,29 @@ namespace graphene { namespace net { namespace detail {
 
         uint32_t handshaking_timeout = _peer_inactivity_timeout;
         fc::time_point handshaking_disconnect_threshold = fc::time_point::now() - fc::seconds(handshaking_timeout);
-        for( const peer_connection_ptr handshaking_peer : _handshaking_connections )
-          if( handshaking_peer->connection_initiation_time < handshaking_disconnect_threshold &&
-              handshaking_peer->get_last_message_received_time() < handshaking_disconnect_threshold &&
-              handshaking_peer->get_last_message_sent_time() < handshaking_disconnect_threshold )
-          {
-            wlog( "Forcibly disconnecting from handshaking peer ${peer} due to inactivity of at least ${timeout} seconds",
-                  ( "peer", handshaking_peer->get_remote_endpoint() )("timeout", handshaking_timeout ) );
-            wlog("Peer's negotiating status: ${status}, bytes sent: ${sent}, bytes received: ${received}",
-                  ("status", handshaking_peer->negotiation_status)
-                  ("sent", handshaking_peer->get_total_bytes_sent())
-                  ("received", handshaking_peer->get_total_bytes_received()));
-            handshaking_peer->connection_closed_error = fc::exception(FC_LOG_MESSAGE(warn, "Terminating handshaking connection due to inactivity of ${timeout} seconds.  Negotiating status: ${status}, bytes sent: ${sent}, bytes received: ${received}",
-                                                                                      ("peer", handshaking_peer->get_remote_endpoint())
-                                                                                      ("timeout", handshaking_timeout)
-                                                                                      ("status", handshaking_peer->negotiation_status)
-                                                                                      ("sent", handshaking_peer->get_total_bytes_sent())
-                                                                                      ("received", handshaking_peer->get_total_bytes_received())));
+        {
+         std::lock_guard<std::recursive_mutex> lock(_handshaking_connections.get_mutex());
+         for( const peer_connection_ptr handshaking_peer : _handshaking_connections )
+            if( handshaking_peer->connection_initiation_time < handshaking_disconnect_threshold &&
+                 handshaking_peer->get_last_message_received_time() < handshaking_disconnect_threshold &&
+               handshaking_peer->get_last_message_sent_time() < handshaking_disconnect_threshold )
+            {
+               wlog( "Forcibly disconnecting from handshaking peer ${peer} due to inactivity of at least ${timeout} seconds",
+                     ( "peer", handshaking_peer->get_remote_endpoint() )("timeout", handshaking_timeout ) );
+               wlog("Peer's negotiating status: ${status}, bytes sent: ${sent}, bytes received: ${received}",
+                     ("status", handshaking_peer->negotiation_status)
+                     ("sent", handshaking_peer->get_total_bytes_sent())
+                     ("received", handshaking_peer->get_total_bytes_received()));
+               handshaking_peer->connection_closed_error = fc::exception(FC_LOG_MESSAGE(warn, 
+                     "Terminating handshaking connection due to inactivity of ${timeout} seconds.  Negotiating status: ${status}, bytes sent: ${sent}, bytes received: ${received}",
+                     ("peer", handshaking_peer->get_remote_endpoint())
+                     ("timeout", handshaking_timeout)
+                     ("status", handshaking_peer->negotiation_status)
+                     ("sent", handshaking_peer->get_total_bytes_sent())
+                     ("received", handshaking_peer->get_total_bytes_received())));
             peers_to_disconnect_forcibly.push_back( handshaking_peer );
           }
-
+        }
         // timeout for any active peers is two block intervals
         uint32_t active_disconnect_timeout = 10 * _recent_block_interval_in_seconds;
         uint32_t active_send_keepalive_timeout = active_disconnect_timeout / 2;
@@ -949,37 +952,44 @@ namespace graphene { namespace net { namespace detail {
         } // scoped_lock
 
         fc::time_point closing_disconnect_threshold = fc::time_point::now() - fc::seconds(GRAPHENE_NET_PEER_DISCONNECT_TIMEOUT);
-        for( const peer_connection_ptr& closing_peer : _closing_connections )
-          if( closing_peer->connection_closed_time < closing_disconnect_threshold )
-          {
-            // we asked this peer to close their connectoin to us at least GRAPHENE_NET_PEER_DISCONNECT_TIMEOUT
-            // seconds ago, but they haven't done it yet.  Terminate the connection now
-            wlog( "Forcibly disconnecting peer ${peer} who failed to close their connection in a timely manner",
-                  ( "peer", closing_peer->get_remote_endpoint() ) );
-            peers_to_disconnect_forcibly.push_back( closing_peer );
-          }
-
+        {
+         std::lock_guard<std::recursive_mutex> lock(_closing_connections.get_mutex());
+         for( const peer_connection_ptr& closing_peer : _closing_connections )
+            if( closing_peer->connection_closed_time < closing_disconnect_threshold )
+            {
+               // we asked this peer to close their connectoin to us at least GRAPHENE_NET_PEER_DISCONNECT_TIMEOUT
+               // seconds ago, but they haven't done it yet.  Terminate the connection now
+               wlog( "Forcibly disconnecting peer ${peer} who failed to close their connection in a timely manner",
+                     ( "peer", closing_peer->get_remote_endpoint() ) );
+               peers_to_disconnect_forcibly.push_back( closing_peer );
+            }
+        }
         uint32_t failed_terminate_timeout_seconds = 120;
         fc::time_point failed_terminate_threshold = fc::time_point::now() - fc::seconds(failed_terminate_timeout_seconds);
-        for (const peer_connection_ptr& peer : _terminating_connections )
-          if (peer->get_connection_terminated_time() != fc::time_point::min() &&
-              peer->get_connection_terminated_time() < failed_terminate_threshold)
-          {
-            wlog("Terminating connection with peer ${peer}, closing the connection didn't work", ("peer", peer->get_remote_endpoint()));
-            peers_to_terminate.push_back(peer);
-          }
-
+        {
+         std::lock_guard<std::recursive_mutex> lock(_terminating_connections.get_mutex());
+         for (const peer_connection_ptr& peer : _terminating_connections )
+            if (peer->get_connection_terminated_time() != fc::time_point::min() &&
+               peer->get_connection_terminated_time() < failed_terminate_threshold)
+            {
+               wlog("Terminating connection with peer ${peer}, closing the connection didn't work", ("peer", peer->get_remote_endpoint()));
+               peers_to_terminate.push_back(peer);
+            }
+        }
         // That's the end of the sorting step; now all peers that require further processing are now in one of the
         // lists peers_to_disconnect_gently,  peers_to_disconnect_forcibly, peers_to_send_keep_alive, or peers_to_terminate
 
         // if we've decided to delete any peers, do it now; in its current implementation this doesn't yield,
         // and once we start yielding, we may find that we've moved that peer to another list (closed or active)
         // and that triggers assertions, maybe even errors
-        for (const peer_connection_ptr& peer : peers_to_terminate )
         {
-          assert(_terminating_connections.find(peer) != _terminating_connections.end());
-          _terminating_connections.erase(peer);
-          schedule_peer_for_deletion(peer);
+         std::lock_guard<std::recursive_mutex> lock(_terminating_connections.get_mutex());
+         for (const peer_connection_ptr& peer : peers_to_terminate )
+         {
+            assert(_terminating_connections.find(peer) != _terminating_connections.end());
+            _terminating_connections.erase(peer);
+            schedule_peer_for_deletion(peer);
+         }
         }
         peers_to_terminate.clear();
 
@@ -1007,8 +1017,8 @@ namespace graphene { namespace net { namespace detail {
                   - fc::time_point::now() ).count() / fc::seconds(1 ).count() )
                   ( "inactivity_timeout", _active_connections.find(peer ) != _active_connections.end() 
                   ? _peer_inactivity_timeout * 10 : _peer_inactivity_timeout ) ) );
+            disconnect_from_peer( peer.get(), "Disconnecting due to inactivity", false, detailed_error );
          }
-         disconnect_from_peer( peer.get(), "Disconnecting due to inactivity", false, detailed_error );
       }
       peers_to_disconnect_gently.clear();
 
@@ -1206,9 +1216,12 @@ namespace graphene { namespace net { namespace detail {
             if (node_id == active_peer->node_id)
                return active_peer;
       }
-      for (const peer_connection_ptr& handshaking_peer : _handshaking_connections)
-        if (node_id == handshaking_peer->node_id)
-          return handshaking_peer;
+      {
+         std::lock_guard<std::recursive_mutex> lock(_handshaking_connections.get_mutex());
+         for (const peer_connection_ptr& handshaking_peer : _handshaking_connections)
+            if (node_id == handshaking_peer->node_id)
+               return handshaking_peer;
+      }
       return peer_connection_ptr();
     }
 
@@ -1231,12 +1244,15 @@ namespace graphene { namespace net { namespace detail {
             }
          }
       }
-      for (const peer_connection_ptr handshaking_peer : _handshaking_connections)
-        if (node_id == handshaking_peer->node_id)
-        {
-          dlog("is_already_connected_to_id returning true because the peer is already in our handshaking list");
-          return true;
-        }
+      {
+         std::lock_guard<std::recursive_mutex> lock(_handshaking_connections.get_mutex());
+         for (const peer_connection_ptr handshaking_peer : _handshaking_connections)
+            if (node_id == handshaking_peer->node_id)
+            {
+               dlog("is_already_connected_to_id returning true because the peer is already in our handshaking list");
+               return true;
+            }
+      }
       return false;
     }
 
@@ -1278,12 +1294,15 @@ namespace graphene { namespace net { namespace detail {
                   ("direction", active_connection->direction));
          }
       }
-      for (const peer_connection_ptr& handshaking_connection : _handshaking_connections)
       {
-        dlog("   handshaking: ${endpoint} with ${id}  [${direction}]",
-             ("endpoint", handshaking_connection->get_remote_endpoint())
-             ("id", handshaking_connection->node_id)
-             ("direction", handshaking_connection->direction));
+         std::lock_guard<std::recursive_mutex> lock(_handshaking_connections.get_mutex());
+         for (const peer_connection_ptr& handshaking_connection : _handshaking_connections)
+         {
+            dlog("   handshaking: ${endpoint} with ${id}  [${direction}]",
+                  ("endpoint", handshaking_connection->get_remote_endpoint())
+                  ("id", handshaking_connection->node_id)
+                  ("direction", handshaking_connection->direction));
+         }
       }
     }
 
@@ -3697,8 +3716,14 @@ namespace graphene { namespace net { namespace detail {
          std::lock_guard<std::recursive_mutex> lock(_active_connections.get_mutex());
          std::for_each(_active_connections.begin(), _active_connections.end(), p_back);
       }
-      std::for_each(_handshaking_connections.begin(), _handshaking_connections.end(), p_back);
-      std::for_each(_closing_connections.begin(), _closing_connections.end(), p_back);
+      {
+         std::lock_guard<std::recursive_mutex> lock(_handshaking_connections.get_mutex());
+         std::for_each(_handshaking_connections.begin(), _handshaking_connections.end(), p_back);
+      }
+      {
+         std::lock_guard<std::recursive_mutex> lock(_closing_connections.get_mutex());
+         std::for_each(_closing_connections.begin(), _closing_connections.end(), p_back);
+      }
 
       for (const peer_connection_ptr& peer : all_peers)
       {
@@ -4257,11 +4282,14 @@ namespace graphene { namespace net { namespace detail {
                return active_peer;
          }
       }
-      for( const peer_connection_ptr& handshaking_peer : _handshaking_connections )
       {
-        fc::optional<fc::ip::endpoint> endpoint_for_this_peer( handshaking_peer->get_remote_endpoint() );
-        if( endpoint_for_this_peer && *endpoint_for_this_peer == remote_endpoint )
-          return handshaking_peer;
+         std::lock_guard<std::recursive_mutex> lock(_handshaking_connections.get_mutex());
+         for( const peer_connection_ptr& handshaking_peer : _handshaking_connections )
+         {
+            fc::optional<fc::ip::endpoint> endpoint_for_this_peer( handshaking_peer->get_remote_endpoint() );
+            if( endpoint_for_this_peer && *endpoint_for_this_peer == remote_endpoint )
+               return handshaking_peer;
+         }
       }
       return peer_connection_ptr();
     }
@@ -4320,12 +4348,14 @@ namespace graphene { namespace net { namespace detail {
 
          }
       }
-      for( const peer_connection_ptr& peer : _handshaking_connections )
       {
-        ilog( "  handshaking peer ${endpoint} in state ours(${our_state}) theirs(${their_state})",
-             ( "endpoint", peer->get_remote_endpoint() )("our_state", peer->our_state )("their_state", peer->their_state ) );
+         std::lock_guard<std::recursive_mutex> lock(_handshaking_connections.get_mutex());
+         for( const peer_connection_ptr& peer : _handshaking_connections )
+         {
+            ilog( "  handshaking peer ${endpoint} in state ours(${our_state}) theirs(${their_state})",
+                  ( "endpoint", peer->get_remote_endpoint() )("our_state", peer->our_state )("their_state", peer->their_state ) );
+         }
       }
-
       ilog( "--------- MEMORY USAGE ------------" );
       ilog( "node._active_sync_requests size: ${size}", ("size", _active_sync_requests.size() ) );
       ilog( "node._received_sync_items size: ${size}", ("size", _received_sync_items.size() ) );
