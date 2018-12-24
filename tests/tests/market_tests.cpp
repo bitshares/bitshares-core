@@ -231,9 +231,11 @@ BOOST_AUTO_TEST_CASE(issue_338_etc)
  */
 BOOST_AUTO_TEST_CASE(hardfork_core_338_test)
 { try {
-   auto mi = db.get_global_properties().parameters.maintenance_interval;
-   generate_blocks(HARDFORK_CORE_343_TIME - mi); // assume all hard forks occur at same time
-   generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+
+   if(hf1270)
+      generate_blocks(HARDFORK_CORE_1270_TIME);
+   else
+      generate_blocks(HARDFORK_CORE_343_TIME);
 
    set_expiration( db, trx );
 
@@ -325,7 +327,8 @@ BOOST_AUTO_TEST_CASE(hardfork_core_338_test)
 
    // call's call_price will be updated after the match, to 741/31/1.75 CORE/USD = 2964/217
    // it's above settlement price (10/1) so won't be margin called again
-   BOOST_CHECK( price(asset(2964),asset(217,usd_id)) == call.call_price );
+   if(!hf1270) // can use call price only if we are before hf1270
+      BOOST_CHECK( price(asset(2964),asset(217,usd_id)) == call.call_price );
 
    // This would match with call before, but would match with call2 after #343 fixed
    BOOST_CHECK( !create_sell_order(seller, bitusd.amount(700), core.amount(6000) ) );
@@ -342,7 +345,8 @@ BOOST_AUTO_TEST_CASE(hardfork_core_338_test)
    BOOST_CHECK_EQUAL( 1000, call3.debt.value );
    BOOST_CHECK_EQUAL( 16000, call3.collateral.value );
    // call2's call_price will be updated after the match, to 78/3/1.75 CORE/USD = 312/21
-   BOOST_CHECK( price(asset(312),asset(21,usd_id)) == call2.call_price );
+   if(!hf1270) // can use call price only if we are before hf1270
+      BOOST_CHECK( price(asset(312),asset(21,usd_id)) == call2.call_price );
    // it's above settlement price (10/1) so won't be margin called
 
    // at this moment, collateralization of call is 7410 / 310 = 23.9
@@ -406,9 +410,11 @@ BOOST_AUTO_TEST_CASE(hardfork_core_338_test)
  */
 BOOST_AUTO_TEST_CASE(hardfork_core_453_test)
 { try {
-   auto mi = db.get_global_properties().parameters.maintenance_interval;
-   generate_blocks(HARDFORK_CORE_453_TIME - mi); // assume all hard forks occur at same time
-   generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+
+   if(hf1270)
+      generate_blocks(HARDFORK_CORE_1270_TIME);
+   else
+      generate_blocks(HARDFORK_CORE_343_TIME);
 
    set_expiration( db, trx );
 
@@ -478,7 +484,6 @@ BOOST_AUTO_TEST_CASE(hardfork_core_453_test)
    // generate a block
    generate_block();
 
-
 } FC_LOG_AND_RETHROW() }
 
 /***
@@ -486,9 +491,11 @@ BOOST_AUTO_TEST_CASE(hardfork_core_453_test)
  */
 BOOST_AUTO_TEST_CASE(hardfork_core_625_big_limit_order_test)
 { try {
-   auto mi = db.get_global_properties().parameters.maintenance_interval;
-   generate_blocks(HARDFORK_CORE_625_TIME - mi); // assume all hard forks occur at same time
-   generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+
+   if(hf1270)
+      generate_blocks(HARDFORK_CORE_1270_TIME);
+   else
+      generate_blocks(HARDFORK_CORE_625_TIME);
 
    set_expiration( db, trx );
 
@@ -1195,9 +1202,11 @@ BOOST_AUTO_TEST_CASE(hard_fork_343_cross_test)
  */
 BOOST_AUTO_TEST_CASE(target_cr_test_limit_call)
 { try {
-   auto mi = db.get_global_properties().parameters.maintenance_interval;
-   generate_blocks(HARDFORK_CORE_834_TIME - mi);
-   generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+
+   if(hf1270)
+      generate_blocks(HARDFORK_CORE_1270_TIME);
+   else
+      generate_blocks(HARDFORK_CORE_834_TIME);
 
    set_expiration( db, trx );
 
@@ -1284,6 +1293,8 @@ BOOST_AUTO_TEST_CASE(target_cr_test_limit_call)
    // even though call2 has a higher CR, since call's TCR is less than call2's TCR, so we expect call will cover less when called
    BOOST_CHECK_LT( call_to_cover.value, call2_to_cover.value );
 
+   print_market(asset_id_type(1)(db).symbol, asset_id_type()(db).symbol);
+
    // Create a big sell order slightly below the call price, will be matched with several orders
    BOOST_CHECK( !create_sell_order(seller, bitusd.amount(700*4), core.amount(5900*4) ) );
 
@@ -1292,6 +1303,9 @@ BOOST_AUTO_TEST_CASE(target_cr_test_limit_call)
    // buy_high pays 111 CORE, receives 10 USD goes to buyer3's balance
    BOOST_CHECK_EQUAL( 10, get_balance(buyer3, bitusd) );
    BOOST_CHECK_EQUAL( init_balance - 111, get_balance(buyer3, core) );
+
+   print_market(asset_id_type(1)(db).symbol, asset_id_type()(db).symbol);
+   return;
 
    // then it will match with call, at mssp: 1/11 = 1000/11000
    const call_order_object* tmp_call = db.find<call_order_object>( call_id );
@@ -1373,9 +1387,11 @@ BOOST_AUTO_TEST_CASE(target_cr_test_limit_call)
  */
 BOOST_AUTO_TEST_CASE(target_cr_test_call_limit)
 { try {
-   auto mi = db.get_global_properties().parameters.maintenance_interval;
-   generate_blocks(HARDFORK_CORE_834_TIME - mi);
-   generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
+
+   if(hf1270)
+      generate_blocks(HARDFORK_CORE_1270_TIME);
+   else
+      generate_blocks(HARDFORK_CORE_834_TIME);
 
    set_expiration( db, trx );
 
@@ -1816,5 +1832,41 @@ BOOST_AUTO_TEST_CASE(mcr_bug_cross1270)
    BOOST_CHECK( db.find<call_order_object>( call_order_id_type(1) ) );
 
 } FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE(hardfork_core_338_test_after_hf1270)
+{ try {
+   hf1270 = true;
+   INVOKE(hardfork_core_338_test);
+
+} FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE(hardfork_core_453_test_after_hf1270)
+{ try {
+   hf1270 = true;
+   INVOKE(hardfork_core_453_test);
+
+} FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE(hardfork_core_625_big_limit_order_test_after_hf1270)
+{ try {
+   hf1270 = true;
+   INVOKE(hardfork_core_625_big_limit_order_test);
+
+} FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE(target_cr_test_limit_call_after_hf1270)
+{ try {
+   hf1270 = true;
+   INVOKE(target_cr_test_limit_call);
+
+} FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE(target_cr_test_call_limit_after_hf1270)
+{ try {
+   hf1270 = true;
+   INVOKE(target_cr_test_call_limit);
+
+} FC_LOG_AND_RETHROW() }
+
 
 BOOST_AUTO_TEST_SUITE_END()
