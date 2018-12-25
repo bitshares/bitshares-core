@@ -91,7 +91,7 @@ share_type call_order_object::get_max_debt_to_cover( price match_price,
    uint16_t tcr = std::max( *target_collateral_ratio, maintenance_collateral_ratio ); // use mcr if target cr is too small
 
    price target_collateralization = ( after_core_hardfork_1270 ?
-                                      ~feed_price * ratio_type( tcr, GRAPHENE_COLLATERAL_RATIO_DENOM ) :
+                                      feed_price * ratio_type( tcr, GRAPHENE_COLLATERAL_RATIO_DENOM ) :
                                       price() );
 
    // be defensive here, make sure match_price is in collateral / debt format
