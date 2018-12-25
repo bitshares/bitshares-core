@@ -376,9 +376,12 @@ namespace graphene { namespace app {
           else node = &node->next(db);
        }
        if( stop.instance.value == 0 && result.size() < limit ) {
-          const account_transaction_history_object head = account_transaction_history_id_type()(db);
-          if( head.account == account && head.operation_id(db).op.which() == operation_id )
-             result.push_back(head.operation_id(db));
+          try
+          {
+            const account_transaction_history_object head = account_transaction_history_id_type()(db);
+            if( head.account == account && head.operation_id(db).op.which() == operation_id )
+               result.push_back(head.operation_id(db));
+          } catch (fc::exception& ignore) { /* limit of history reached, head not found */ }
        }
        return result;
     }
