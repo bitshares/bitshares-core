@@ -549,31 +549,52 @@ BOOST_AUTO_TEST_CASE(get_account_history_operations) {
 
       int asset_create_op_id = operation::tag<asset_create_operation>::value;
       int account_create_op_id = operation::tag<account_create_operation>::value;
+      int transfer_op_id = operation::tag<graphene::chain::transfer_operation>::value;
 
       //account_id_type() did 1 asset_create op
-      vector<operation_history_object> histories = hist_api.get_account_history_operations("committee-account", asset_create_op_id, operation_history_id_type(), operation_history_id_type(), 100);
+      vector<operation_history_object> histories = hist_api.get_account_history_operations(
+            "committee-account", asset_create_op_id, operation_history_id_type(), operation_history_id_type(), 100);
       BOOST_CHECK_EQUAL(histories.size(), 1);
       BOOST_CHECK_EQUAL(histories[0].id.instance(), 0);
       BOOST_CHECK_EQUAL(histories[0].op.which(), asset_create_op_id);
 
       //account_id_type() did 2 account_create ops
-      histories = hist_api.get_account_history_operations("committee-account", account_create_op_id, operation_history_id_type(), operation_history_id_type(), 100);
+      histories = hist_api.get_account_history_operations(
+            "committee-account", account_create_op_id, operation_history_id_type(), operation_history_id_type(), 100);
       BOOST_CHECK_EQUAL(histories.size(), 2);
       BOOST_CHECK_EQUAL(histories[0].op.which(), account_create_op_id);
 
       // No asset_create op larger than id1
-      histories = hist_api.get_account_history_operations("committee-account", asset_create_op_id, operation_history_id_type(), operation_history_id_type(1), 100);
+      histories = hist_api.get_account_history_operations(
+            "committee-account", asset_create_op_id, operation_history_id_type(), operation_history_id_type(1), 100);
       BOOST_CHECK_EQUAL(histories.size(), 0);
 
       // Limit 1 returns 1 result
-      histories = hist_api.get_account_history_operations("committee-account", account_create_op_id, operation_history_id_type(),operation_history_id_type(), 1);
+      histories = hist_api.get_account_history_operations(
+            "committee-account", account_create_op_id, operation_history_id_type(),operation_history_id_type(), 1);
       BOOST_CHECK_EQUAL(histories.size(), 1);
       BOOST_CHECK_EQUAL(histories[0].op.which(), account_create_op_id);
 
       // alice has 1 op
-      histories = hist_api.get_account_history_operations("alice", account_create_op_id, operation_history_id_type(),operation_history_id_type(), 100);
+      histories = hist_api.get_account_history_operations(
+            "alice", account_create_op_id, operation_history_id_type(),operation_history_id_type(), 100);
       BOOST_CHECK_EQUAL(histories.size(), 1);
       BOOST_CHECK_EQUAL(histories[0].op.which(), account_create_op_id);
+
+      // create a bunch of accounts
+      for(int i = 0; i < 110; ++i)
+      {
+         std::string acct_name = "mytempacct" + std::to_string(i);
+         create_account(acct_name);
+      }
+      generate_block();
+
+      histories = hist_api.get_account_history_operations(
+            "committee-account", account_create_op_id, operation_history_id_type(), operation_history_id_type(), 100);
+      BOOST_CHECK_EQUAL(histories.size(), 100);
+      if (histories.size() > 0)
+         BOOST_CHECK_EQUAL(histories[0].op.which(), account_create_op_id);
+      
 
    } catch (fc::exception &e) {
       edump((e.to_detail_string()));
