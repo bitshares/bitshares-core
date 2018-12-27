@@ -592,7 +592,6 @@ BOOST_AUTO_TEST_CASE( call_order_update_validation_test )
 
    op.extensions.value.target_collateral_ratio = 65535;
    op.validate(); // still valid
-
 }
 
 // Tests that target_cr option can't be set before hard fork core-834
@@ -2002,6 +2001,73 @@ BOOST_AUTO_TEST_CASE( reserve_asset_test )
       edump((e.to_detail_string()));
       throw;
    }
+}
+
+BOOST_AUTO_TEST_CASE( call_order_update_evaluator_test )
+{
+   try
+   {
+      ACTORS( (alice) (bob) );
+      transfer(committee_account, alice_id, asset(1000000 * GRAPHENE_BLOCKCHAIN_PRECISION));
+
+      const auto& bitusd = create_bitasset( "USDBIT", alice_id );
+      const auto& core   = asset_id_type()(db);
+
+      BOOST_TEST_MESSAGE( "Setting price feed to $100000 / 1" );
+      update_feed_producers( bitusd, {alice_id} );
+      price_feed current_feed;
+      current_feed.settlement_price = bitusd.amount( 100000 ) / core.amount(1);
+      publish_feed( bitusd, alice, current_feed );
+
+      {
+         BOOST_TEST_MESSAGE( "Attempting a call_order_update that exceeds max_supply" );
+         call_order_update_operation op;
+         op.funding_account = alice_id;
+         op.delta_collateral = asset( 1000000 * GRAPHENE_BLOCKCHAIN_PRECISION );
+         op.delta_debt = asset( bitusd.options.max_supply + 1, bitusd.id );
+         transaction tx;
+         tx.operations.push_back( op );
+         set_expiration( db, tx );
+         GRAPHENE_REQUIRE_THROW(PUSH_TX( db, tx, database::skip_tapos_check | database::skip_transaction_signatures ), fc::exception );
+      }
+
+      {
+         BOOST_TEST_MESSAGE( "Creating 2 bitusd and transferring to bob (increases current supply)" );
+         call_order_update_operation op;
+         op.funding_account = alice_id;
+         op.delta_collateral = asset( 100 * GRAPHENE_BLOCKCHAIN_PRECISION );
+         op.delta_debt = asset( 2, bitusd.id );
+         transaction tx;
+         tx.operations.push_back( op );
+         set_expiration( db, tx );
+         PUSH_TX( db, tx, database::skip_tapos_check | database::skip_transaction_signatures );
+         transfer( alice, bob, asset( 2, bitusd.id ) );
+      }
+
+      {
+         BOOST_TEST_MESSAGE( "Again attempting a call_order_update_operation that is max_supply - 1 (should throw)" );
+         call_order_update_operation op;
+         op.funding_account = alice_id;
+         op.delta_collateral = asset( 100000 * GRAPHENE_BLOCKCHAIN_PRECISION );
+         op.delta_debt = asset( bitusd.options.max_supply - 1, bitusd.id );
+         transaction tx;
+         tx.operations.push_back( op );
+         set_expiration( db, tx );
+         GRAPHENE_REQUIRE_THROW(PUSH_TX( db, tx, database::skip_tapos_check | database::skip_transaction_signatures ), fc::exception);
+      }
+
+      {
+         BOOST_TEST_MESSAGE( "Again attempting a call_order_update_operation that equals max_supply (should work)" );
+         call_order_update_operation op;
+         op.funding_account = alice_id;
+         op.delta_collateral = asset( 100000 * GRAPHENE_BLOCKCHAIN_PRECISION );
+         op.delta_debt = asset( bitusd.options.max_supply - 2, bitusd.id );
+         transaction tx;
+         tx.operations.push_back( op );
+         set_expiration( db, tx );
+         PUSH_TX( db, tx, database::skip_tapos_check | database::skip_transaction_signatures );
+      }
+   } FC_LOG_AND_RETHROW()
 }
 
 /**

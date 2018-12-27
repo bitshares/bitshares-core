@@ -167,6 +167,10 @@ void_result call_order_update_evaluator::do_evaluate(const call_order_update_ope
    FC_ASSERT( _debt_asset->is_market_issued(), "Unable to cover ${sym} as it is not a collateralized asset.",
               ("sym", _debt_asset->symbol) );
 
+   const auto& dyn_data = _debt_asset->dynamic_data(d);
+   FC_ASSERT( dyn_data.current_supply + o.delta_debt.amount <= _debt_asset->options.max_supply,
+         "Borrowing this quantity would exceed MAX_SUPPLY" );
+
    _bitasset_data  = &_debt_asset->bitasset_data(d);
 
    /// if there is a settlement for this asset, then no further margin positions may be taken and
