@@ -114,6 +114,10 @@ struct swan_fixture : database_fixture {
       generate_blocks( HARDFORK_CORE_216_TIME );
       generate_block();
     }
+    void wait_for_hf_core_1270() {
+       generate_blocks( HARDFORK_CORE_1270_TIME );
+       generate_block();
+    }
 
     void wait_for_maintenance() {
       generate_blocks( db.get_dynamic_global_properties().next_maintenance_time );
@@ -141,6 +145,9 @@ BOOST_FIXTURE_TEST_SUITE( swan_tests, swan_fixture )
  */
 BOOST_AUTO_TEST_CASE( black_swan )
 { try {
+      if(hf1270)
+         wait_for_hf_core_1270();
+
       init_standard_swan();
 
       force_settle( borrower(), swan().amount(100) );
@@ -167,6 +174,11 @@ BOOST_AUTO_TEST_CASE( black_swan )
  */
 BOOST_AUTO_TEST_CASE( black_swan_issue_346 )
 { try {
+      if(hf1270) {
+         wait_for_hf_core_1270();
+         set_expiration(db, trx);
+      }
+
       ACTORS((buyer)(seller)(borrower)(borrower2)(settler)(feeder));
 
       const asset_object& core = asset_id_type()(db);
@@ -246,11 +258,11 @@ BOOST_AUTO_TEST_CASE( black_swan_issue_346 )
          force_settle( settler, bitusd.amount(100) );
 
          // wait for forced settlement to execute
-         // this would throw on Sep.18 testnet, see #346
+         // this would throw on Sep.18 testnet, see #346 (https://github.com/cryptonomex/graphene/issues/346)
          wait_for_settlement();
       }
 
-      // issue 350
+      // issue 350 (https://github.com/cryptonomex/graphene/issues/350)
       {
          // ok, new asset
          const asset_object& bitusd = setup_asset();
@@ -265,6 +277,8 @@ BOOST_AUTO_TEST_CASE( black_swan_issue_346 )
          // We attempt to match against $0.019 order and black swan,
          // and this is intended behavior.  See discussion in ticket.
          //
+         print_market(bitusd.symbol, core.symbol);
+
          BOOST_CHECK( bitusd.bitasset_data(db).has_settlement() );
          BOOST_CHECK( db.find_object( oid_019 ) != nullptr );
          BOOST_CHECK( db.find_object( oid_020 ) == nullptr );
@@ -282,7 +296,10 @@ BOOST_AUTO_TEST_CASE( revive_recovered )
 { try {
       init_standard_swan( 700 );
 
-      wait_for_hf_core_216();
+      if(hf1270)
+         wait_for_hf_core_1270();
+      else
+         wait_for_hf_core_216();
 
       // revive after price recovers
       set_feed( 700, 800 );
@@ -304,7 +321,10 @@ BOOST_AUTO_TEST_CASE( recollateralize )
       // no hardfork yet
       GRAPHENE_REQUIRE_THROW( bid_collateral( borrower2(), back().amount(1000), swan().amount(100) ), fc::exception );
 
-      wait_for_hf_core_216();
+      if(hf1270)
+         wait_for_hf_core_1270();
+      else
+         wait_for_hf_core_216();
 
       int64_t b2_balance = get_balance( borrower2(), back() );
       bid_collateral( borrower2(), back().amount(1000), swan().amount(100) );
@@ -396,7 +416,10 @@ BOOST_AUTO_TEST_CASE( revive_empty_recovered )
 { try {
       limit_order_id_type oid = init_standard_swan( 1000 );
 
-      wait_for_hf_core_216();
+      if(hf1270)
+         wait_for_hf_core_1270();
+      else
+         wait_for_hf_core_216();
 
       set_expiration( db, trx );
       cancel_limit_order( oid(db) );
@@ -423,7 +446,10 @@ BOOST_AUTO_TEST_CASE( revive_empty_recovered )
  */
 BOOST_AUTO_TEST_CASE( revive_empty )
 { try {
-      wait_for_hf_core_216();
+      if(hf1270)
+         wait_for_hf_core_1270();
+      else
+         wait_for_hf_core_216();
 
       limit_order_id_type oid = init_standard_swan( 1000 );
 
@@ -447,7 +473,10 @@ BOOST_AUTO_TEST_CASE( revive_empty )
  */
 BOOST_AUTO_TEST_CASE( revive_empty_with_bid )
 { try {
-      wait_for_hf_core_216();
+      if(hf1270)
+         wait_for_hf_core_1270();
+      else
+         wait_for_hf_core_216();
 
       standard_users();
       standard_asset();
@@ -490,5 +519,56 @@ BOOST_AUTO_TEST_CASE( revive_empty_with_bid )
       throw;
    }
 }
+
+BOOST_AUTO_TEST_CASE(black_swan_after_hf1270)
+{ try {
+   hf1270 = true;
+   INVOKE(black_swan);
+
+} FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE(black_swan_issue_346_hf1270)
+{ try {
+   hf1270 = true;
+   INVOKE(black_swan_issue_346);
+
+} FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE(revive_recovered_hf1270)
+{ try {
+   hf1270 = true;
+   INVOKE(revive_recovered);
+
+} FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE(recollateralize_hf1270)
+{ try {
+   hf1270 = true;
+   INVOKE(recollateralize);
+
+} FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE(revive_empty_recovered_hf1270)
+{ try {
+   hf1270 = true;
+   INVOKE(revive_empty_recovered);
+
+} FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE(revive_empty_hf1270)
+{ try {
+   hf1270 = true;
+   INVOKE(revive_empty);
+
+} FC_LOG_AND_RETHROW() }
+
+BOOST_AUTO_TEST_CASE(revive_empty_with_bid_hf1270)
+{ try {
+   hf1270 = true;
+   INVOKE(revive_empty_with_bid);
+
+} FC_LOG_AND_RETHROW() }
+
+
 
 BOOST_AUTO_TEST_SUITE_END()
