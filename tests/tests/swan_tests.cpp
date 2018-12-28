@@ -368,13 +368,13 @@ BOOST_AUTO_TEST_CASE( recollateralize )
       graphene::app::database_api db_api(db);
       GRAPHENE_REQUIRE_THROW( db_api.get_collateral_bids(back().id, 100, 0), fc::assert_exception );
       vector<collateral_bid_object> bids = db_api.get_collateral_bids(_swan, 100, 1);
-      BOOST_CHECK_EQUAL( 1, bids.size() );
+      BOOST_CHECK_EQUAL( 1u, bids.size() );
       FC_ASSERT( _borrower2 == bids[0].bidder );
       bids = db_api.get_collateral_bids(_swan, 1, 0);
-      BOOST_CHECK_EQUAL( 1, bids.size() );
+      BOOST_CHECK_EQUAL( 1u, bids.size() );
       FC_ASSERT( _borrower == bids[0].bidder );
       bids = db_api.get_collateral_bids(_swan, 100, 0);
-      BOOST_CHECK_EQUAL( 2, bids.size() );
+      BOOST_CHECK_EQUAL( 2u, bids.size() );
       FC_ASSERT( _borrower == bids[0].bidder );
       FC_ASSERT( _borrower2 == bids[1].bidder );
 
