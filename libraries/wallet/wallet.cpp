@@ -1440,8 +1440,11 @@ public:
       optional<asset_object> debt_asset = find_asset(debt_symbol);
       if (!debt_asset)
         FC_THROW("No asset with that symbol exists!");
-      const asset_object& collateral = get_asset(get_object(*debt_asset->bitasset_data_id).options.short_backing_asset);
 
+      //avoid segment error.
+      FC_ASSERT(debt_asset->bitasset_data_id.valid(), "debt_symbol is invalid...");
+      const asset_object& collateral = get_asset(get_object(*debt_asset->bitasset_data_id).options.short_backing_asset);
+      
       bid_collateral_operation op;
       op.bidder = get_account_id(bidder_name);
       op.debt_covered = debt_asset->amount_from_string(debt_amount);
