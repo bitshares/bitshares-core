@@ -847,7 +847,7 @@ BOOST_FIXTURE_TEST_CASE( maintenance_interval, database_fixture )
 {
    try {
       generate_block();
-      BOOST_CHECK_EQUAL(db.head_block_num(), 2);
+      BOOST_CHECK_EQUAL(db.head_block_num(), 2u);
 
       fc::time_point_sec maintenence_time = db.get_dynamic_global_properties().next_maintenance_time;
       BOOST_CHECK_GT(maintenence_time.sec_since_epoch(), db.head_block_time().sec_since_epoch());
@@ -1024,17 +1024,17 @@ BOOST_FIXTURE_TEST_CASE( change_block_interval, database_fixture )
    }
    BOOST_TEST_MESSAGE( "Verifying that the interval didn't change immediately" );
 
-   BOOST_CHECK_EQUAL(db.get_global_properties().parameters.block_interval, 5);
+   BOOST_CHECK_EQUAL(db.get_global_properties().parameters.block_interval, 5u);
    auto past_time = db.head_block_time().sec_since_epoch();
    generate_block();
-   BOOST_CHECK_EQUAL(db.head_block_time().sec_since_epoch() - past_time, 5);
+   BOOST_CHECK_EQUAL(db.head_block_time().sec_since_epoch() - past_time, 5u);
    generate_block();
-   BOOST_CHECK_EQUAL(db.head_block_time().sec_since_epoch() - past_time, 10);
+   BOOST_CHECK_EQUAL(db.head_block_time().sec_since_epoch() - past_time, 10u);
 
    BOOST_TEST_MESSAGE( "Generating blocks until proposal expires" );
    generate_blocks(proposal_id_type()(db).expiration_time + 5);
    BOOST_TEST_MESSAGE( "Verify that the block interval is still 5 seconds" );
-   BOOST_CHECK_EQUAL(db.get_global_properties().parameters.block_interval, 5);
+   BOOST_CHECK_EQUAL(db.get_global_properties().parameters.block_interval, 5u);
 
    BOOST_TEST_MESSAGE( "Generating blocks until next maintenance interval" );
    generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
@@ -1044,9 +1044,9 @@ BOOST_FIXTURE_TEST_CASE( change_block_interval, database_fixture )
    BOOST_CHECK_EQUAL(db.get_global_properties().parameters.block_interval, 1);
    past_time = db.head_block_time().sec_since_epoch();
    generate_block();
-   BOOST_CHECK_EQUAL(db.head_block_time().sec_since_epoch() - past_time, 1);
+   BOOST_CHECK_EQUAL(db.head_block_time().sec_since_epoch() - past_time, 1u);
    generate_block();
-   BOOST_CHECK_EQUAL(db.head_block_time().sec_since_epoch() - past_time, 2);
+   BOOST_CHECK_EQUAL(db.head_block_time().sec_since_epoch() - past_time, 2u);
 } FC_LOG_AND_RETHROW() }
 
 BOOST_FIXTURE_TEST_CASE( pop_block_twice, database_fixture )
@@ -1122,7 +1122,7 @@ BOOST_FIXTURE_TEST_CASE( rsf_missed_blocks, database_fixture )
          "1111111111111111111111111111111111111111111111111111111111111111"
          "1111111111111111111111111111111111111111111111111111111111111111"
       );
-      BOOST_CHECK_EQUAL( db.witness_participation_rate(), GRAPHENE_100_PERCENT );
+      BOOST_CHECK_EQUAL( db.witness_participation_rate(), (uint32_t)GRAPHENE_100_PERCENT );
 
       generate_block( ~0, init_account_priv_key, 1 );
       BOOST_CHECK_EQUAL( rsf(),
@@ -1419,7 +1419,7 @@ BOOST_AUTO_TEST_CASE( genesis_reserve_ids )
 BOOST_FIXTURE_TEST_CASE( miss_some_blocks, database_fixture )
 { try {
    std::vector<witness_id_type> witnesses = witness_schedule_id_type()(db).current_shuffled_witnesses;
-   BOOST_CHECK_EQUAL( 10, witnesses.size() );
+   BOOST_CHECK_EQUAL( 10u, witnesses.size() );
    // database_fixture constructor calls generate_block once, signed by witnesses[0]
    generate_block(); // witnesses[1]
    generate_block(); // witnesses[2]
@@ -1914,7 +1914,7 @@ BOOST_FIXTURE_TEST_CASE( block_size_test, database_fixture )
          idump( (fc::raw::pack_size(good_block)) );
       }
       // make sure we have tested at least once pushing a large block
-      BOOST_CHECK_GT( large_block_count, 0 );
+      BOOST_CHECK_GT( large_block_count, 0u );
    }
    catch( fc::exception& e )
    {

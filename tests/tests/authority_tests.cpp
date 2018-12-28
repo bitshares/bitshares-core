@@ -1734,7 +1734,7 @@ BOOST_AUTO_TEST_CASE( self_approving_proposal )
    trx.operations.push_back(pop);
    const proposal_id_type pid1 = PUSH_TX( db, trx, ~0 ).operation_results[0].get<object_id_type>();
    trx.clear();
-   BOOST_REQUIRE_EQUAL( 0, pid1.instance.value );
+   BOOST_REQUIRE_EQUAL( 0u, pid1.instance.value );
    db.get<proposal_object>(pid1);
 
    trx.operations.push_back(pup);
@@ -1765,7 +1765,7 @@ BOOST_AUTO_TEST_CASE( self_deleting_proposal )
    trx.operations.push_back( pop );
    const proposal_id_type pid1 = PUSH_TX( db, trx, ~0 ).operation_results[0].get<object_id_type>();
    trx.clear();
-   BOOST_REQUIRE_EQUAL( 0, pid1.instance.value );
+   BOOST_REQUIRE_EQUAL( 0u, pid1.instance.value );
    db.get<proposal_object>(pid1);
 
    proposal_update_operation pup;
