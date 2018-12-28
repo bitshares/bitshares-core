@@ -57,7 +57,7 @@ BOOST_AUTO_TEST_CASE(get_account_history) {
       vector<operation_history_object> histories = hist_api.get_account_history("1.2.0", operation_history_id_type(), 100, operation_history_id_type());
 
       BOOST_CHECK_EQUAL(histories.size(), 3u);
-      BOOST_CHECK_EQUAL(histories[2].id.instance(), 7u);
+      BOOST_CHECK_EQUAL(histories[2].id.instance(), 0u);
       BOOST_CHECK_EQUAL(histories[2].op.which(), asset_create_op_id);
 
       // 1 account_create op larger than id1
