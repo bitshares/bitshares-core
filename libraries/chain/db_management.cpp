@@ -31,6 +31,7 @@
 #include <graphene/chain/protocol/fee_schedule.hpp>
 
 #include <fc/io/fstream.hpp>
+#include <fc/smart_ref_impl.hpp>
 
 #include <fstream>
 #include <functional>
