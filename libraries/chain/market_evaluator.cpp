@@ -157,8 +157,10 @@ void_result call_order_update_evaluator::do_evaluate(const call_order_update_ope
 { try {
    database& d = db();
 
+   auto next_maintenance_time = d.get_dynamic_global_properties().next_maintenance_time;
+
    // TODO: remove this check and the assertion after hf_834
-   if( d.get_dynamic_global_properties().next_maintenance_time <= HARDFORK_CORE_834_TIME )
+   if( next_maintenance_time <= HARDFORK_CORE_834_TIME )
       FC_ASSERT( !o.extensions.value.target_collateral_ratio.valid(),
                  "Can not set target_collateral_ratio in call_order_update_operation before hardfork 834." );
 
@@ -167,8 +169,9 @@ void_result call_order_update_evaluator::do_evaluate(const call_order_update_ope
    FC_ASSERT( _debt_asset->is_market_issued(), "Unable to cover ${sym} as it is not a collateralized asset.",
               ("sym", _debt_asset->symbol) );
 
-   FC_ASSERT( _debt_asset->dynamic_data(d).current_supply + o.delta_debt.amount <= _debt_asset->options.max_supply,
-         "Borrowing this quantity would exceed MAX_SUPPLY" );
+   FC_ASSERT( next_maintenance_time <= HARDFORK_CORE_1465_TIME 
+         || _debt_asset->dynamic_data(d).current_supply + o.delta_debt.amount <= _debt_asset->options.max_supply,
+      "Borrowing this quantity would exceed MAX_SUPPLY" );
 
    _bitasset_data  = &_debt_asset->bitasset_data(d);
 

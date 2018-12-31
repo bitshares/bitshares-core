@@ -2010,6 +2010,10 @@ BOOST_AUTO_TEST_CASE( call_order_update_evaluator_test )
       ACTORS( (alice) (bob) );
       transfer(committee_account, alice_id, asset(1000000 * GRAPHENE_BLOCKCHAIN_PRECISION));
 
+      // advance past hardfork
+      generate_blocks( HARDFORK_CORE_1465_TIME );
+      set_expiration( db, trx );
+
       const auto& bitusd = create_bitasset( "USDBIT", alice_id );
       const auto& core   = asset_id_type()(db);
 
