@@ -950,15 +950,9 @@ void application::set_program_options(boost::program_options::options_descriptio
          ("seed-nodes", bpo::value<string>()->composing(),
           "JSON array of P2P nodes to connect to on startup")
          ("checkpoint,c", bpo::value<vector<string>>()->default_value(
-             vector<string>({
-               "[\"12204000\", \"00ba37e095ab9f3fa752f812591213a75ffc2087\"]",
-               "[\"22668517\", \"0159e4e579f49d76d221e5a756a88b38dc7ee9a2\"]",
-               "[\"22668518\", \"0159e4e600cb149e22ef960442ca331159914617\"]" }),
-               "[\"12204000\", \"00ba37e095ab9f3fa752f812591213a75ffc2087\"]\n"
-               "checkpoint = [\"22668517\", \"0159e4e579f49d76d221e5a756a88b38dc7ee9a2\"]\n"
-               "checkpoint = [\"22668518\", \"0159e4e600cb149e22ef960442ca331159914617\"]\n"
-             )->composing(),
-             "Pairs of [BLOCK_NUM,BLOCK_ID] that should be enforced as checkpoints.")
+               vector<string>(1, "[\"22668518\", \"0159e4e600cb149e22ef960442ca331159914617\"]"),
+               "[\"22668518\", \"0159e4e600cb149e22ef960442ca331159914617\"]")->composing(),
+               "Pairs of [BLOCK_NUM,BLOCK_ID] that should be enforced as checkpoints.")
          ("rpc-endpoint", bpo::value<string>()->implicit_value("127.0.0.1:8090"),
           "Endpoint for websocket RPC to listen on")
          ("rpc-tls-endpoint", bpo::value<string>()->implicit_value("127.0.0.1:8089"),
