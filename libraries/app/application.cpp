@@ -1151,7 +1151,10 @@ void application::initialize_plugins( const boost::program_options::variables_ma
 void application::startup_plugins()
 {
    for( auto& entry : my->_active_plugins )
+   {
       entry.second->plugin_startup();
+      ilog( "Plugin ${name} started", ( "name", entry.second->plugin_name() ) );
+   }
    return;
 }
 
