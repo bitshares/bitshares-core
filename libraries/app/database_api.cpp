@@ -259,7 +259,7 @@ class database_api_impl : public std::enable_shared_from_this<database_api_impl>
 
       bool _notify_remove_create = false;
       mutable fc::bloom_filter _subscribe_filter;
-      mutable std::set<account_id_type> _subscribed_accounts;
+      std::set<account_id_type> _subscribed_accounts;
       std::function<void(const fc::variant&)> _subscribe_callback;
       std::function<void(const fc::variant&)> _pending_trx_callback;
       std::function<void(const fc::variant&)> _block_applied_callback;
@@ -592,17 +592,6 @@ vector<vector<account_id_type>> database_api_impl::get_key_references( vector<pu
          for( auto item : itr->second ) result.push_back(item);
       }
       final_result.emplace_back( std::move(result) );
-   }
-
-   for( auto vec_pos = 0; vec_pos < final_result.size() && _subscribed_accounts.size() <= 100; ++vec_pos)
-   {
-      const auto vec = final_result[vec_pos];
-      for( auto acct_pos = 0; acct_pos < vec.size() && _subscribed_accounts.size() <= 100; ++acct_pos)
-      {
-         const auto acct = vec[acct_pos];
-         subscribe_to_item( acct );
-         _subscribed_accounts.insert( acct );
-      }
    }
 
    return final_result;
