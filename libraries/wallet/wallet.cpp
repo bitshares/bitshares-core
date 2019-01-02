@@ -1441,8 +1441,7 @@ public:
       if (!debt_asset)
         FC_THROW("No asset with that symbol exists!");
 
-      //avoid segment error.
-      FC_ASSERT(debt_asset->bitasset_data_id.valid(), "debt_symbol is invalid...");
+      FC_ASSERT(debt_asset->bitasset_data_id.valid(), "Not a bitasset, bidding not possible.");
       const asset_object& collateral = get_asset(get_object(*debt_asset->bitasset_data_id).options.short_backing_asset);
       
       bid_collateral_operation op;
