@@ -208,16 +208,20 @@ database_fixture::database_fixture()
 }
 
 database_fixture::~database_fixture()
-{ try {
-   // If we're unwinding due to an exception, don't do any more checks.
-   // This way, boost test's last checkpoint tells us approximately where the error was.
-   if( !std::uncaught_exception() )
-   {
-      verify_asset_supplies(db);
-      BOOST_CHECK( db.get_node_properties().skip_flags == database::skip_nothing );
+{ 
+   try {
+      // If we're unwinding due to an exception, don't do any more checks.
+      // This way, boost test's last checkpoint tells us approximately where the error was.
+      if( !std::uncaught_exception() )
+      {
+         verify_asset_supplies(db);
+         BOOST_CHECK( db.get_node_properties().skip_flags == database::skip_nothing );
+      }
+      return;
+   } catch (fc::exception& ex) {
+      BOOST_FAIL( ex.to_detail_string() );
    }
-   return;
-} FC_CAPTURE_AND_RETHROW() }
+} 
 
 fc::ecc::private_key database_fixture::generate_private_key(string seed)
 {

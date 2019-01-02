@@ -38,7 +38,7 @@ undo_database::session::~session()
    catch ( const fc::exception& e )
    {
       elog( "${e}", ("e",e.to_detail_string() ) );
-      throw; // maybe crash..
+      std::terminate();
    }
    if( _disable_on_exit ) _db.disable();
 }
