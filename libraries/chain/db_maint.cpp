@@ -919,6 +919,30 @@ void database::process_bitassets()
    }
 }
 
+/****
+ * @brief a one-time data process to correct max_supply
+ */
+void process_hf_1465( database& db )
+{
+   const auto head_time = db.head_block_time();
+   const auto head_num = db.head_block_num();
+   wlog( "Processing hard fork core-1465 at block ${n}", ("n",head_num) );
+   // for each market issued asset
+   const auto& asset_idx = db.get_index_type<asset_index>().indices().get<by_type>();
+   for( auto asset_itr = asset_idx.lower_bound(true); asset_itr != asset_idx.end(); ++asset_itr )
+   {
+      const auto& current_asset = *asset_itr;
+      graphene::chain::share_type current_supply = current_asset.dynamic_data(db).current_supply;
+      graphene::chain::share_type max_supply = current_asset.options.max_supply;
+      if (current_supply > max_supply && max_supply != GRAPHENE_MAX_SHARE_SUPPLY)
+      {
+         db.modify<asset_object>( current_asset, [current_supply](asset_object& obj) {
+            obj.options.max_supply = graphene::chain::share_type(std::min(current_supply.value, GRAPHENE_MAX_SHARE_SUPPLY));
+         });
+      }
+   }
+}
+
 /******
  * @brief one-time data process for hard fork core-868-890
  *
@@ -1224,6 +1248,10 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
    if( (dgpo.next_maintenance_time <= HARDFORK_CORE_935_TIME) && (next_maintenance_time > HARDFORK_CORE_935_TIME)
          && !to_update_and_match_call_orders )
       process_hf_935( *this );
+
+   // make sure current_supply is less than or equal to max_supply
+   if ( dgpo.next_maintenance_time <= HARDFORK_CORE_1465_TIME && next_maintenance_time > HARDFORK_CORE_1465_TIME )
+      process_hf_1465(*this);
 
    modify(dgpo, [next_maintenance_time](dynamic_global_property_object& d) {
       d.next_maintenance_time = next_maintenance_time;
