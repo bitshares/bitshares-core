@@ -2008,20 +2008,53 @@ BOOST_AUTO_TEST_CASE( call_order_update_evaluator_test )
    try
    {
       ACTORS( (alice) (bob) );
-      transfer(committee_account, alice_id, asset(1000000 * GRAPHENE_BLOCKCHAIN_PRECISION));
+      transfer(committee_account, alice_id, asset(10000000 * GRAPHENE_BLOCKCHAIN_PRECISION));
+
+      const auto& core   = asset_id_type()(db);
+
+      // attempt to increase current supply beyond max_supply
+      const auto& bitjmj = create_bitasset( "JMJBIT", alice_id );
+      share_type original_max_supply = bitjmj.options.max_supply;
+
+      {
+         BOOST_TEST_MESSAGE( "Setting price feed to $100000 / 1" );
+         update_feed_producers( bitjmj, {alice_id} );
+         price_feed current_feed;
+         current_feed.settlement_price = bitjmj.amount( 100000 ) / core.amount(1);
+         publish_feed( bitjmj, alice, current_feed );
+      }
+
+      {
+         BOOST_TEST_MESSAGE( "Attempting a call_order_update that exceeds max_supply" );
+         call_order_update_operation op;
+         op.funding_account = alice_id;
+         op.delta_collateral = asset( 1000000 * GRAPHENE_BLOCKCHAIN_PRECISION );
+         op.delta_debt = asset( bitjmj.options.max_supply + 1, bitjmj.id );
+         transaction tx;
+         tx.operations.push_back( op );
+         set_expiration( db, tx );
+         PUSH_TX( db, tx, database::skip_tapos_check | database::skip_transaction_signatures );
+         generate_block();
+      }
 
       // advance past hardfork
       generate_blocks( HARDFORK_CORE_1465_TIME );
       set_expiration( db, trx );
 
-      const auto& bitusd = create_bitasset( "USDBIT", alice_id );
-      const auto& core   = asset_id_type()(db);
+      // bitjmj should have its problem corrected
+      auto newbitjmj = bitjmj.get_id()(db);
+      BOOST_REQUIRE_GT(newbitjmj.options.max_supply.value, original_max_supply.value);
 
-      BOOST_TEST_MESSAGE( "Setting price feed to $100000 / 1" );
-      update_feed_producers( bitusd, {alice_id} );
-      price_feed current_feed;
-      current_feed.settlement_price = bitusd.amount( 100000 ) / core.amount(1);
-      publish_feed( bitusd, alice, current_feed );
+      // now try with an asset after the hardfork
+      const auto& bitusd = create_bitasset( "USDBIT", alice_id );
+
+      {
+         BOOST_TEST_MESSAGE( "Setting price feed to $100000 / 1" );
+         update_feed_producers( bitusd, {alice_id} );
+         price_feed current_feed;
+         current_feed.settlement_price = bitusd.amount( 100000 ) / core.amount(1);
+         publish_feed( bitusd, alice, current_feed );
+      }
 
       {
          BOOST_TEST_MESSAGE( "Attempting a call_order_update that exceeds max_supply" );
