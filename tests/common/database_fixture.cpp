@@ -120,6 +120,11 @@ database_fixture::database_fixture()
    {
       options.insert(std::make_pair("max-ops-per-account", boost::program_options::variable_value((uint64_t)75, false)));
    }
+   if (current_test_name == "setting_max_operation_limit_get_account_history_operations")
+   {
+      options.insert(std::make_pair("max-ops-per-account", boost::program_options::variable_value((uint64_t)125, false)));
+      app.set_options_max_account_history_operations_limit(300);
+   }
    // add account tracking for ahplugin for special test case with track-account enabled
    if( !options.count("track-account") && current_test_name == "track_account") {
       std::vector<std::string> track_account;

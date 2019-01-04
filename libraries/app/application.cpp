@@ -439,6 +439,11 @@ void application_impl::startup()
    if ( _options->count("enable-subscribe-to-all") )
       _app_options.enable_subscribe_to_all = _options->at( "enable-subscribe-to-all" ).as<bool>();
 
+   if ( _options->count("max-account-history-operations-limit") )
+   {
+      _app_options.max_account_history_operations_limit = _options->at("max-account-history-operations-limit").as<uint32_t>();
+   }
+
    if( _active_plugins.find( "market_history" ) != _active_plugins.end() )
       _app_options.has_market_history_plugin = true;
 
@@ -982,6 +987,8 @@ void application::set_program_options(boost::program_options::options_descriptio
          ("enable-standby-votes-tracking", bpo::value<bool>()->implicit_value(true),
           "Whether to enable tracking of votes of standby witnesses and committee members. "
           "Set it to true to provide accurate data to API clients, set to false for slightly better performance.")
+         ("max-account-history-operations-limit",boost::program_options::value<uint32_t>()->default_value(100),
+          "for history_api::get_account_history_operations to set its limit value default ass 100")
          ;
    command_line_options.add(configuration_file_options);
    command_line_options.add_options()
@@ -1095,6 +1102,10 @@ std::shared_ptr<chain::database> application::chain_database() const
 void application::set_block_production(bool producing_blocks)
 {
    my->_is_block_producer = producing_blocks;
+}
+void application::set_options_max_account_history_operations_limit(const uint64_t& max_limit)
+{
+    my->_app_options.max_account_history_operations_limit=max_limit;
 }
 
 optional< api_access_info > application::get_api_access_info( const string& username )const
