@@ -1,8 +1,11 @@
 TUSC Core
 ==============
 
-[Build Status]
-TBD
+[Build Status](https://travis-ci.org/TUSCNetwork/tusc-core/branches):
+
+`master` |
+ --- |
+ [![](https://travis-ci.org/TUSCNetwork/tusc-core.svg?branch=master)](https://travis-ci.org/TUSCNetwork/tusc-core) 
 
 
 * [Getting Started](#getting-started)
