@@ -65,6 +65,7 @@ namespace graphene { namespace chain {
    class transaction
    {
    public:
+      virtual ~transaction() = default;
       /**
        * Least significant 16 bits from the reference block number. If @ref relative_expiration is zero, this field
        * must be zero as well.
