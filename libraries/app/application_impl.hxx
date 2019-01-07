@@ -66,7 +66,7 @@ class application_impl : public net::node_delegate
 
       virtual void handle_transaction(const graphene::net::trx_message& transaction_message) override;
 
-      void handle_message(const graphene::net::message& message_to_process);
+      void handle_message(const graphene::net::message& message_to_process) override;
 
       bool is_included_block(const graphene::chain::block_id_type& block_id);
 
