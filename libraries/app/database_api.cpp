@@ -539,6 +539,7 @@ dynamic_global_property_object database_api_impl::get_dynamic_global_properties(
 
 vector<vector<account_id_type>> database_api::get_key_references( vector<public_key_type> key )const
 {
+   FC_ASSERT(key.size() <= 100, "Number of keys must be 100 or less");
    return my->get_key_references( key );
 }
 
@@ -593,9 +594,6 @@ vector<vector<account_id_type>> database_api_impl::get_key_references( vector<pu
       }
       final_result.emplace_back( std::move(result) );
    }
-
-   for( auto i : final_result )
-      subscribe_to_item(i);
 
    return final_result;
 }
