@@ -936,6 +936,10 @@ void process_hf_1465( database& db )
       graphene::chain::share_type max_supply = current_asset.options.max_supply;
       if (current_supply > max_supply && max_supply != GRAPHENE_MAX_SHARE_SUPPLY)
       {
+         wlog( "Adjusting max_supply of ${asset} because current_supply (${current_supply}) is greater than ${old}.", 
+               ("asset", current_asset.symbol) 
+               ("current_supply", current_supply.value)
+               ("old", max_supply));
          db.modify<asset_object>( current_asset, [current_supply](asset_object& obj) {
             obj.options.max_supply = graphene::chain::share_type(std::min(current_supply.value, GRAPHENE_MAX_SHARE_SUPPLY));
          });

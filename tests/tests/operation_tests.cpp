@@ -2014,6 +2014,7 @@ BOOST_AUTO_TEST_CASE( call_order_update_evaluator_test )
 
       // attempt to increase current supply beyond max_supply
       const auto& bitjmj = create_bitasset( "JMJBIT", alice_id );
+      auto bitjmj_id = bitjmj.get_id();
       share_type original_max_supply = bitjmj.options.max_supply;
 
       {
@@ -2042,7 +2043,7 @@ BOOST_AUTO_TEST_CASE( call_order_update_evaluator_test )
       set_expiration( db, trx );
 
       // bitjmj should have its problem corrected
-      auto newbitjmj = bitjmj.get_id()(db);
+      auto newbitjmj = bitjmj_id(db);
       BOOST_REQUIRE_GT(newbitjmj.options.max_supply.value, original_max_supply.value);
 
       // now try with an asset after the hardfork
