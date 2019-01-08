@@ -2054,7 +2054,7 @@ BOOST_AUTO_TEST_CASE( call_order_update_evaluator_test )
          update_feed_producers( bitusd, {alice_id} );
          price_feed current_feed;
          current_feed.settlement_price = bitusd.amount( 100000 ) / core.amount(1);
-         publish_feed( bitusd, alice, current_feed );
+         publish_feed( bitusd, alice_id(db), current_feed );
       }
 
       {
@@ -2079,7 +2079,7 @@ BOOST_AUTO_TEST_CASE( call_order_update_evaluator_test )
          tx.operations.push_back( op );
          set_expiration( db, tx );
          PUSH_TX( db, tx, database::skip_tapos_check | database::skip_transaction_signatures );
-         transfer( alice, bob, asset( 2, bitusd.id ) );
+         transfer( alice_id(db), bob_id(db), asset( 2, bitusd.id ) );
       }
 
       {
