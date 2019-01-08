@@ -214,30 +214,36 @@ BOOST_AUTO_TEST_CASE(price_to_string_test) {
             GRAPHENE_REQUIRE_THROW( price_to_string( p[i][j], 0, 20 ), fc::exception );
          }
          try {
-            idump( (i) (j) (p[i][j]) );
-            idump(
-                (price_to_string(p[i][j],0,0))
-                (price_to_string(p[i][j],0,1))
-                (price_to_string(p[i][j],0,2))
-                (price_to_string(p[i][j],0,8))
-                (price_to_string(p[i][j],0,19))
-                (price_to_string(p[i][j],1,0))
-                (price_to_string(p[i][j],1,15))
-                (price_to_string(p[i][j],2,6))
-                (price_to_string(p[i][j],2,10))
-                (price_to_string(p[i][j],5,0))
-                (price_to_string(p[i][j],9,1))
-                (price_to_string(p[i][j],9,9))
-                (price_to_string(p[i][j],9,19))
-                (price_to_string(p[i][j],18,10))
-                (price_to_string(p[i][j],18,13))
-                (price_to_string(p[i][j],18,19))
-                (price_to_string(p[i][j],19,0))
-                (price_to_string(p[i][j],19,7))
-                (price_to_string(p[i][j],19,19))
-                (price_diff_percent_string(p[i][j],p[j][i]))
-              );
-         } catch(...) {}
+            price pr = p[i][j];
+            idump( (i) (j) (pr) );
+            if ( pr.base.amount == 0 || (pr.base.amount > 0 && pr.quote.amount >= 0 ) )
+            {
+               idump( (price_to_string( pr ,0,0)) );
+               idump( (price_to_string( pr ,0,1)) );
+               idump( (price_to_string( pr ,0,2)) );
+               idump( (price_to_string( pr ,0,8)) );
+               idump( (price_to_string( pr ,0,19)) );
+               idump( (price_to_string( pr ,1,0)) );
+               idump( (price_to_string( pr ,1,15)) );
+               idump( (price_to_string( pr ,2,6)) );
+               idump( (price_to_string( pr ,2,10)) );
+               idump( (price_to_string( pr ,5,0)) );
+               idump( (price_to_string( pr ,9,1)) );
+               idump( (price_to_string( pr ,9,9)) );
+               idump( (price_to_string( pr ,9,19)) );
+               idump( (price_to_string( pr ,18,10)) );
+               idump( (price_to_string( pr ,18,13)) );
+               idump( (price_to_string( pr ,18,19)) );
+               idump( (price_to_string( pr ,19,0)) );
+               idump( (price_to_string( pr ,19,7)) );
+               idump( (price_to_string( pr ,19,19)) );
+               idump( (price_diff_percent_string( pr ,p[j][i])) );
+            } else {
+               GRAPHENE_REQUIRE_THROW( price_to_string( pr, 0, 0 ), fc::exception );
+            }
+         } catch(...) {
+            BOOST_FAIL( "Failure to log price_to_string" );
+         }
       }
 
 }
