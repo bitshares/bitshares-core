@@ -27,13 +27,21 @@
 
 namespace fc
 {
-   template<> bool smart_ref<graphene::chain::fee_schedule>::operator !()const { throw std::logic_error("Not Implemented"); }
-   template class smart_ref<graphene::chain::fee_schedule>;
+   // explicitly instantiate the smart_ref, gcc fails to instantiate it in some release builds
+   //template graphene::chain::fee_schedule& smart_ref<graphene::chain::fee_schedule>::operator=(smart_ref<graphene::chain::fee_schedule>&&);
+   //template graphene::chain::fee_schedule& smart_ref<graphene::chain::fee_schedule>::operator=(U&&);
+   //template graphene::chain::fee_schedule& smart_ref<graphene::chain::fee_schedule>::operator=(const smart_ref&);
+   //template smart_ref<graphene::chain::fee_schedule>::smart_ref();
+   //template const graphene::chain::fee_schedule& smart_ref<graphene::chain::fee_schedule>::operator*() const;
 }
 
 #define MAX_FEE_STABILIZATION_ITERATION 4
 
 namespace graphene { namespace chain {
+
+   typedef fc::smart_ref<fee_schedule> smart_fee_schedule;
+
+   static smart_fee_schedule tmp;
 
    fee_schedule::fee_schedule()
    {
