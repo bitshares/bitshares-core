@@ -88,7 +88,7 @@ namespace graphene { namespace app {
 
          net::node_ptr                    p2p_node();
          std::shared_ptr<chain::database> chain_database()const;
-         void set_options_max_account_history_operations_limit(const uint64_t& max_limit);
+         void set_dgb_max_acct_history_opt_limit();
          void set_block_production(bool producing_blocks);
          fc::optional< api_access_info > get_api_access_info( const string& username )const;
          void set_api_access_info(const string& username, api_access_info&& permissions);

@@ -318,6 +318,13 @@ void application_impl::set_dbg_init_key( graphene::chain::genesis_state_type& ge
       genesis.initial_witness_candidates[i].block_signing_key = init_pubkey;
 }
 
+
+void application_impl::set_dgb_max_acct_history_opt_limit() {
+   if (_options->count("max-account-history-operations-limit")) {
+      _app_options.max_account_history_operations_limit = _options->at("max-account-history-operations-limit").as<uint64_t>();
+   }
+}
+
 void application_impl::startup()
 { try {
    fc::create_directories(_data_dir / "blockchain");
@@ -439,10 +446,7 @@ void application_impl::startup()
    if ( _options->count("enable-subscribe-to-all") )
       _app_options.enable_subscribe_to_all = _options->at( "enable-subscribe-to-all" ).as<bool>();
 
-   if ( _options->count("max-account-history-operations-limit") )
-   {
-      _app_options.max_account_history_operations_limit = _options->at("max-account-history-operations-limit").as<uint32_t>();
-   }
+   set_dgb_max_acct_history_opt_limit();
 
    if( _active_plugins.find( "market_history" ) != _active_plugins.end() )
       _app_options.has_market_history_plugin = true;
@@ -1083,6 +1087,18 @@ void application::startup()
       throw;
    }
 }
+void application::set_dgb_max_acct_history_opt_limit()
+{
+   try {
+      my->set_dgb_max_acct_history_opt_limit();
+   } catch ( const fc::exception& e ) {
+      elog( "${e}", ("e",e.to_detail_string()) );
+      throw;
+   } catch ( ... ) {
+      elog( "unexpected exception" );
+      throw;
+   }
+}
 
 std::shared_ptr<abstract_plugin> application::get_plugin(const string& name) const
 {
@@ -1102,10 +1118,6 @@ std::shared_ptr<chain::database> application::chain_database() const
 void application::set_block_production(bool producing_blocks)
 {
    my->_is_block_producer = producing_blocks;
-}
-void application::set_options_max_account_history_operations_limit(const uint64_t& max_limit)
-{
-    my->_app_options.max_account_history_operations_limit=max_limit;
 }
 
 optional< api_access_info > application::get_api_access_info( const string& username )const

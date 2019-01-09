@@ -122,8 +122,9 @@ database_fixture::database_fixture()
    }
    if (current_test_name == "setting_max_operation_limit_get_account_history_operations")
    {
-      options.insert(std::make_pair("max-ops-per-account", boost::program_options::variable_value((uint64_t)125, false)));
-      app.set_options_max_account_history_operations_limit(300);
+       options.insert(std::make_pair("max-ops-per-account", boost::program_options::variable_value((uint64_t)125, false)));
+       options.insert(std::make_pair("max-account-history-operations-limit", boost::program_options::variable_value((uint64_t)300, false)));
+       options.insert(std::make_pair("plugins", boost::program_options::variable_value(string("account_history"), false)));
    }
    // add account tracking for ahplugin for special test case with track-account enabled
    if( !options.count("track-account") && current_test_name == "track_account") {
@@ -166,6 +167,11 @@ database_fixture::database_fixture()
       ahplugin->plugin_set_app(&app);
       ahplugin->plugin_initialize(options);
       ahplugin->plugin_startup();
+       if (current_test_name == "setting_max_operation_limit_get_account_history_operations")
+       {
+           app.initialize(graphene::utilities::temp_directory_path(), options);
+           app.set_dgb_max_acct_history_opt_limit();
+       }
    }
 
    if(current_test_name == "elasticsearch_objects" || current_test_name == "elasticsearch_suite") {
