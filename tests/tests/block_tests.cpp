@@ -805,7 +805,6 @@ BOOST_AUTO_TEST_CASE( switch_forks_bad_block )
       // 1 1 1 1 1 1 1 2 3 4, so LIB = 1
 
       // now move 5 of the "1" witnesses up to slot 2
-      /*
       int count = 0;
       for(int i = 0; i < global_properties.active_witnesses.size() && count < 5; i++)
       {
@@ -820,7 +819,6 @@ BOOST_AUTO_TEST_CASE( switch_forks_bad_block )
             count++;
          }
       }
-      */
      
       // now we have
       // 1 1 2 2 2 2 2 2 3 4, so LIB = 2, although we won't shrink the database right now
@@ -869,6 +867,38 @@ BOOST_AUTO_TEST_CASE( switch_forks_bad_block )
       edump((e.to_detail_string()));
       throw;
    }
+}
+
+BOOST_AUTO_TEST_CASE( unable_to_switch )
+{
+   fc::temp_directory dir( graphene::utilities::temp_directory_path() );
+   database db;
+   db.open( dir.path(), make_genesis, "TEST" );
+
+   // make the first block
+   signed_block block1;
+   block1.timestamp = db.get_slot_time( 1 );
+   block1.witness = db.get_scheduled_witness( 1 );
+   uint32_t skipper = database::skip_witness_schedule_check | database::skip_witness_signature;
+   db.push_block( block1, skipper );
+   // add a second block
+   signed_block forka_block2;
+   forka_block2.timestamp = db.get_slot_time( 2 );
+   forka_block2.witness = db.get_scheduled_witness( 1 );
+   forka_block2.previous = block1.id();
+   db.push_block( forka_block2, skipper );
+   // make a fork off the first block
+   signed_block forkb_block2;
+   forkb_block2.timestamp = db.get_slot_time( 2 );
+   forkb_block2.witness = db.get_scheduled_witness(1);
+   forkb_block2.previous = block1.id();
+   db.push_block( forkb_block2, skipper );
+   // make a 3rd block (second on fork b). This should cause a switch as b is longer
+   signed_block forkb_block3;
+   forkb_block3.timestamp = db.get_slot_time( 3 );
+   forkb_block3.witness = db.get_scheduled_witness( 1 );
+   forkb_block3.previous = forkb_block2.id();
+   db.push_block( forkb_block3, skipper );
 }
 
 BOOST_AUTO_TEST_CASE( duplicate_transactions )
