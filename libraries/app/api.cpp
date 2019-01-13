@@ -101,7 +101,7 @@ namespace graphene { namespace app {
        }
        else if( api_name == "asset_api" )
        {
-          _asset_api = std::make_shared< asset_api >( std::ref( *_app.chain_database() ) );
+          _asset_api = std::make_shared< asset_api >( std::ref( _app ) );
        }
        else if( api_name == "orders_api" )
        {
@@ -316,7 +316,8 @@ namespace graphene { namespace app {
     {
        FC_ASSERT( _app.chain_database() );
        const auto& db = *_app.chain_database();
-       FC_ASSERT( limit <= 100 );
+       uint64_t api_limit_get_account_history=_app.get_options().api_limit_get_account_history;
+       FC_ASSERT( limit <= api_limit_get_account_history );
        vector<operation_history_object> result;
        account_id_type account;
        try {
@@ -352,8 +353,8 @@ namespace graphene { namespace app {
     {
        FC_ASSERT( _app.chain_database() );
        const auto& db = *_app.chain_database();
-       uint64_t max_account_history_operations_limit=_app.get_options().max_account_history_operations_limit;
-       FC_ASSERT(limit <= max_account_history_operations_limit);
+       uint64_t api_limit_get_account_history_operations=_app.get_options().api_limit_get_account_history_operations;
+       FC_ASSERT(limit <= api_limit_get_account_history_operations);
        vector<operation_history_object> result;
        account_id_type account;
        try {
@@ -392,7 +393,8 @@ namespace graphene { namespace app {
     {
        FC_ASSERT( _app.chain_database() );
        const auto& db = *_app.chain_database();
-       FC_ASSERT(limit <= 100);
+       uint64_t api_limit_get_relative_account_history=_app.get_options().api_limit_get_relative_account_history;
+       FC_ASSERT(limit <= api_limit_get_relative_account_history);
        vector<operation_history_object> result;
        account_id_type account;
        try {
@@ -431,7 +433,8 @@ namespace graphene { namespace app {
 
     history_operation_detail history_api::get_account_history_by_operations(const std::string account_id_or_name, vector<uint16_t> operation_types, uint32_t start, unsigned limit)
     {
-       FC_ASSERT(limit <= 100);
+       uint64_t api_limit_get_account_history_by_operations=_app.get_options().api_limit_get_account_history_by_operations;
+       FC_ASSERT(limit <= api_limit_get_account_history_by_operations);
        history_operation_detail result;
        vector<operation_history_object> objs = get_relative_account_history(account_id_or_name, start, limit, limit + start - 1);
        std::for_each(objs.begin(), objs.end(), [&](const operation_history_object &o) {
@@ -527,13 +530,14 @@ namespace graphene { namespace app {
     }
 
     // asset_api
-    asset_api::asset_api(graphene::chain::database& db) : _db(db) { }
-    asset_api::~asset_api() { }
-
     vector<account_asset_balance> asset_api::get_asset_holders( asset_id_type asset_id, uint32_t start, uint32_t limit ) const {
-      FC_ASSERT(limit <= 100);
 
-      const auto& bal_idx = _db.get_index_type< account_balance_index >().indices().get< by_asset_balance >();
+      FC_ASSERT( _app.chain_database() );
+      const auto& db = *_app.chain_database();
+      uint64_t api_limit_get_asset_holders=_app.get_options().api_limit_get_asset_holders;
+
+      FC_ASSERT(limit <= api_limit_get_asset_holders);
+      const auto& bal_idx = db.get_index_type< account_balance_index >().indices().get< by_asset_balance >();
       auto range = bal_idx.equal_range( boost::make_tuple( asset_id ) );
 
       vector<account_asset_balance> result;
@@ -550,7 +554,7 @@ namespace graphene { namespace app {
         if( index++ < start )
             continue;
 
-        const auto account = _db.find(bal.owner);
+        const auto account = db.find(bal.owner);
 
         account_asset_balance aab;
         aab.name       = account->name;
@@ -564,8 +568,9 @@ namespace graphene { namespace app {
     }
     // get number of asset holders.
     int asset_api::get_asset_holders_count( asset_id_type asset_id ) const {
-
-      const auto& bal_idx = _db.get_index_type< account_balance_index >().indices().get< by_asset_balance >();
+      FC_ASSERT( _app.chain_database() );
+      const auto& db = *_app.chain_database();
+      const auto& bal_idx = db.get_index_type< account_balance_index >().indices().get< by_asset_balance >();
       auto range = bal_idx.equal_range( boost::make_tuple( asset_id ) );
 
       int count = boost::distance(range) - 1;
@@ -574,18 +579,19 @@ namespace graphene { namespace app {
     }
     // function to get vector of system assets with holders count.
     vector<asset_holders> asset_api::get_all_asset_holders() const {
-
+      FC_ASSERT( _app.chain_database() );
+      const auto& db = *_app.chain_database();
       vector<asset_holders> result;
 
       vector<asset_id_type> total_assets;
-      for( const asset_object& asset_obj : _db.get_index_type<asset_index>().indices() )
+      for( const asset_object& asset_obj : db.get_index_type<asset_index>().indices() )
       {
-        const auto& dasset_obj = asset_obj.dynamic_asset_data_id(_db);
+        const auto& dasset_obj = asset_obj.dynamic_asset_data_id(db);
 
         asset_id_type asset_id;
         asset_id = dasset_obj.id;
 
-        const auto& bal_idx = _db.get_index_type< account_balance_index >().indices().get< by_asset_balance >();
+        const auto& bal_idx = db.get_index_type< account_balance_index >().indices().get< by_asset_balance >();
         auto range = bal_idx.equal_range( boost::make_tuple( asset_id ) );
 
         int count = boost::distance(range) - 1;
@@ -614,7 +620,8 @@ namespace graphene { namespace app {
                                                                optional<price> start,
                                                                uint32_t limit )const
    {
-      FC_ASSERT( limit <= 101 );
+      uint64_t api_limit_get_grouped_limit_orders=_app.get_options().api_limit_get_grouped_limit_orders;
+      FC_ASSERT( limit <= api_limit_get_grouped_limit_orders );
       auto plugin = _app.get_plugin<grouped_orders_plugin>( "grouped_orders" );
       FC_ASSERT( plugin );
       const auto& limit_groups = plugin->limit_order_groups();

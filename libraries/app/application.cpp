@@ -319,10 +319,26 @@ void application_impl::set_dbg_init_key( graphene::chain::genesis_state_type& ge
 }
 
 
-void application_impl::set_dgb_max_acct_history_opt_limit() {
-   if (_options->count("max-account-history-operations-limit")) {
-      _app_options.max_account_history_operations_limit = _options->at("max-account-history-operations-limit").as<uint64_t>();
+void application_impl::set_dgb_api_limit_api() {
+   if (_options->count("api-limit-get-account-history-operations")) {
+      _app_options.api_limit_get_account_history_operations = _options->at("api-limit-get-account-history-operations").as<uint64_t>();
    }
+   if(_options->count("api-limit-get-account-history")){
+      _app_options.api_limit_get_account_history = _options->at("api-limit-get-account-history").as<uint64_t>();
+   }
+   if(_options->count("api-limit-get-grouped-limit-orders")){
+      _app_options.api_limit_get_grouped_limit_orders = _options->at("api-limit-get-grouped-limit-orders").as<uint64_t>();
+   }
+   if(_options->count("api-limit-get-relative-account-history")){
+       _app_options.api_limit_get_relative_account_history = _options->at("api-limit-get-relative-account-history").as<uint64_t>();
+   }
+   if(_options->count("api-limit-get-account-history-by-operations")){
+       _app_options.api_limit_get_account_history_by_operations = _options->at("api-limit-get-account-history-by-operations").as<uint64_t>();
+   }
+   if(_options->count("api-limit-get-asset-holders")){
+       _app_options.api_limit_get_asset_holders = _options->at("api-limit-get-asset-holders").as<uint64_t>();
+   }
+
 }
 
 void application_impl::startup()
@@ -446,7 +462,7 @@ void application_impl::startup()
    if ( _options->count("enable-subscribe-to-all") )
       _app_options.enable_subscribe_to_all = _options->at( "enable-subscribe-to-all" ).as<bool>();
 
-   set_dgb_max_acct_history_opt_limit();
+   set_dgb_api_limit_api();
 
    if( _active_plugins.find( "market_history" ) != _active_plugins.end() )
       _app_options.has_market_history_plugin = true;
@@ -991,8 +1007,18 @@ void application::set_program_options(boost::program_options::options_descriptio
          ("enable-standby-votes-tracking", bpo::value<bool>()->implicit_value(true),
           "Whether to enable tracking of votes of standby witnesses and committee members. "
           "Set it to true to provide accurate data to API clients, set to false for slightly better performance.")
-         ("max-account-history-operations-limit",boost::program_options::value<uint64_t>()->default_value(100),
-          "for history_api::get_account_history_operations to set its limit value default ass 100")
+         ("api-limit-get-account-history-operations",boost::program_options::value<uint64_t>()->default_value(100),
+          "For history_api::get_account_history_operations to set its default limit value as 100")
+         ("api-limit-get-account-history",boost::program_options::value<uint64_t>()->default_value(100),
+          "For history_api::get_account_history to set its default limit value as 100")
+         ("api-limit-get-grouped-limit-orders",boost::program_options::value<uint64_t>()->default_value(101),
+          "For orders_api::get_grouped_limit_orders to set its default limit value as 101")
+         ("api-limit-get-relative-account-history",boost::program_options::value<uint64_t>()->default_value(100),
+          "For history_api::get_relative_account_history to set its default limit value as 100")
+         ("api-limit-get-account-history-by-operations",boost::program_options::value<uint64_t>()->default_value(100),
+          "For history_api::get_account_history_by_operations to set its default limit value as 100")
+         ("api-limit-get-asset-holders",boost::program_options::value<uint64_t>()->default_value(100),
+          "For asset_api::get_asset_holders to set its default limit value as 100")
          ;
    command_line_options.add(configuration_file_options);
    command_line_options.add_options()
@@ -1087,10 +1113,10 @@ void application::startup()
       throw;
    }
 }
-void application::set_dgb_max_acct_history_opt_limit()
+void application::set_dgb_api_limit_api()
 {
    try {
-      my->set_dgb_max_acct_history_opt_limit();
+      my->set_dgb_api_limit_api();
    } catch ( const fc::exception& e ) {
       elog( "${e}", ("e",e.to_detail_string()) );
       throw;
