@@ -581,9 +581,9 @@ FC_API(graphene::app::history_api,
        (get_account_history_by_operations)
        (get_account_history_operations)
        (get_relative_account_history)
-       (get_fill_order_history)
-       (get_market_history)
-       (get_market_history_buckets)
+      //  (get_fill_order_history)
+      //  (get_market_history)
+      //  (get_market_history_buckets)
      )
 FC_API(graphene::app::block_api,
        (get_blocks)
@@ -617,8 +617,8 @@ FC_API(graphene::app::asset_api,
        (get_all_asset_holders)
      )
 FC_API(graphene::app::orders_api,
-       (get_tracked_groups)
-       (get_grouped_limit_orders)
+      //  (get_tracked_groups)
+      //  (get_grouped_limit_orders)
      )
 FC_API(graphene::app::login_api,
        (login)

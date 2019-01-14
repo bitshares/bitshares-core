@@ -2350,93 +2350,93 @@ public:
          }
          return ss.str();
       };
-      m["get_order_book"] = [](variant result, const fc::variants& a)
-      {
-         auto orders = result.as<order_book>( GRAPHENE_MAX_NESTED_OBJECTS );
-         auto bids = orders.bids;
-         auto asks = orders.asks;
-         std::stringstream ss;
-         std::stringstream sum_stream;
-         sum_stream << "Sum(" << orders.base << ')';
-         double bid_sum = 0;
-         double ask_sum = 0;
-         const int spacing = 20;
+      // m["get_order_book"] = [](variant result, const fc::variants& a)
+      // {
+      //    auto orders = result.as<order_book>( GRAPHENE_MAX_NESTED_OBJECTS );
+      //    auto bids = orders.bids;
+      //    auto asks = orders.asks;
+      //    std::stringstream ss;
+      //    std::stringstream sum_stream;
+      //    sum_stream << "Sum(" << orders.base << ')';
+      //    double bid_sum = 0;
+      //    double ask_sum = 0;
+      //    const int spacing = 20;
 
-         auto prettify_num = [&ss]( double n )
-         {
-            if (abs( round( n ) - n ) < 0.00000000001 )
-            {
-               ss << (int) n;
-            }
-            else if (n - floor(n) < 0.000001)
-            {
-               ss << setiosflags( ios::fixed ) << setprecision(10) << n;
-            }
-            else
-            {
-               ss << setiosflags( ios::fixed ) << setprecision(6) << n;
-            }
-         };
-         auto prettify_num_string = [&]( string& num_string )
-         {
-            double n = fc::to_double( num_string );
-            prettify_num( n );
-         };
+      //    auto prettify_num = [&ss]( double n )
+      //    {
+      //       if (abs( round( n ) - n ) < 0.00000000001 )
+      //       {
+      //          ss << (int) n;
+      //       }
+      //       else if (n - floor(n) < 0.000001)
+      //       {
+      //          ss << setiosflags( ios::fixed ) << setprecision(10) << n;
+      //       }
+      //       else
+      //       {
+      //          ss << setiosflags( ios::fixed ) << setprecision(6) << n;
+      //       }
+      //    };
+      //    auto prettify_num_string = [&]( string& num_string )
+      //    {
+      //       double n = fc::to_double( num_string );
+      //       prettify_num( n );
+      //    };
 
-         ss << setprecision( 8 ) << setiosflags( ios::fixed ) << setiosflags( ios::left );
+      //    ss << setprecision( 8 ) << setiosflags( ios::fixed ) << setiosflags( ios::left );
 
-         ss << ' ' << setw( (spacing * 4) + 6 ) << "BUY ORDERS" << "SELL ORDERS\n"
-            << ' ' << setw( spacing + 1 ) << "Price" << setw( spacing ) << orders.quote << ' ' << setw( spacing )
-            << orders.base << ' ' << setw( spacing ) << sum_stream.str()
-            << "   " << setw( spacing + 1 ) << "Price" << setw( spacing ) << orders.quote << ' ' << setw( spacing )
-            << orders.base << ' ' << setw( spacing ) << sum_stream.str()
-            << "\n====================================================================================="
-            << "|=====================================================================================\n";
+      //    ss << ' ' << setw( (spacing * 4) + 6 ) << "BUY ORDERS" << "SELL ORDERS\n"
+      //       << ' ' << setw( spacing + 1 ) << "Price" << setw( spacing ) << orders.quote << ' ' << setw( spacing )
+      //       << orders.base << ' ' << setw( spacing ) << sum_stream.str()
+      //       << "   " << setw( spacing + 1 ) << "Price" << setw( spacing ) << orders.quote << ' ' << setw( spacing )
+      //       << orders.base << ' ' << setw( spacing ) << sum_stream.str()
+      //       << "\n====================================================================================="
+      //       << "|=====================================================================================\n";
 
-         for (unsigned int i = 0; i < bids.size() || i < asks.size() ; i++)
-         {
-            if ( i < bids.size() )
-            {
-                bid_sum += fc::to_double( bids[i].base );
-                ss << ' ' << setw( spacing );
-                prettify_num_string( bids[i].price );
-                ss << ' ' << setw( spacing );
-                prettify_num_string( bids[i].quote );
-                ss << ' ' << setw( spacing );
-                prettify_num_string( bids[i].base );
-                ss << ' ' << setw( spacing );
-                prettify_num( bid_sum );
-                ss << ' ';
-            }
-            else
-            {
-                ss << setw( (spacing * 4) + 5 ) << ' ';
-            }
+      //    for (unsigned int i = 0; i < bids.size() || i < asks.size() ; i++)
+      //    {
+      //       if ( i < bids.size() )
+      //       {
+      //           bid_sum += fc::to_double( bids[i].base );
+      //           ss << ' ' << setw( spacing );
+      //           prettify_num_string( bids[i].price );
+      //           ss << ' ' << setw( spacing );
+      //           prettify_num_string( bids[i].quote );
+      //           ss << ' ' << setw( spacing );
+      //           prettify_num_string( bids[i].base );
+      //           ss << ' ' << setw( spacing );
+      //           prettify_num( bid_sum );
+      //           ss << ' ';
+      //       }
+      //       else
+      //       {
+      //           ss << setw( (spacing * 4) + 5 ) << ' ';
+      //       }
 
-            ss << '|';
+      //       ss << '|';
 
-            if ( i < asks.size() )
-            {
-               ask_sum += fc::to_double( asks[i].base );
-               ss << ' ' << setw( spacing );
-               prettify_num_string( asks[i].price );
-               ss << ' ' << setw( spacing );
-               prettify_num_string( asks[i].quote );
-               ss << ' ' << setw( spacing );
-               prettify_num_string( asks[i].base );
-               ss << ' ' << setw( spacing );
-               prettify_num( ask_sum );
-            }
+      //       if ( i < asks.size() )
+      //       {
+      //          ask_sum += fc::to_double( asks[i].base );
+      //          ss << ' ' << setw( spacing );
+      //          prettify_num_string( asks[i].price );
+      //          ss << ' ' << setw( spacing );
+      //          prettify_num_string( asks[i].quote );
+      //          ss << ' ' << setw( spacing );
+      //          prettify_num_string( asks[i].base );
+      //          ss << ' ' << setw( spacing );
+      //          prettify_num( ask_sum );
+      //       }
 
-            ss << '\n';
-         }
+      //       ss << '\n';
+      //    }
 
-         ss << endl
-            << "Buy Total:  " << bid_sum << ' ' << orders.base << endl
-            << "Sell Total: " << ask_sum << ' ' << orders.base << endl;
+      //    ss << endl
+      //       << "Buy Total:  " << bid_sum << ' ' << orders.base << endl
+      //       << "Sell Total: " << ask_sum << ' ' << orders.base << endl;
 
-         return ss.str();
-      };
+      //    return ss.str();
+      // };
 
       return m;
    }
@@ -3176,46 +3176,46 @@ full_account wallet_api::get_full_account( const string& name_or_id)
     return my->_remote_db->get_full_accounts({name_or_id}, false)[name_or_id];
 }
 
-vector<bucket_object> wallet_api::get_market_history(
-      string symbol1,
-      string symbol2,
-      uint32_t bucket,
-      fc::time_point_sec start,
-      fc::time_point_sec end )const
-{
-   return my->_remote_hist->get_market_history( get_asset_id(symbol1), get_asset_id(symbol2), bucket, start, end );
-}
+// vector<bucket_object> wallet_api::get_market_history(
+//       string symbol1,
+//       string symbol2,
+//       uint32_t bucket,
+//       fc::time_point_sec start,
+//       fc::time_point_sec end )const
+// {
+//    return my->_remote_hist->get_market_history( get_asset_id(symbol1), get_asset_id(symbol2), bucket, start, end );
+// }
 
-vector<limit_order_object> wallet_api::get_account_limit_orders(
-      const string& name_or_id,
-      const string &base,
-      const string &quote,
-      uint32_t limit,
-      optional<limit_order_id_type> ostart_id,
-      optional<price> ostart_price)
-{
-   return my->_remote_db->get_account_limit_orders(name_or_id, base, quote, limit, ostart_id, ostart_price);
-}
+// vector<limit_order_object> wallet_api::get_account_limit_orders(
+//       const string& name_or_id,
+//       const string &base,
+//       const string &quote,
+//       uint32_t limit,
+//       optional<limit_order_id_type> ostart_id,
+//       optional<price> ostart_price)
+// {
+//    return my->_remote_db->get_account_limit_orders(name_or_id, base, quote, limit, ostart_id, ostart_price);
+// }
 
-vector<limit_order_object> wallet_api::get_limit_orders(string a, string b, uint32_t limit)const
-{
-   return my->_remote_db->get_limit_orders(get_asset(a).id, get_asset(b).id, limit);
-}
+// vector<limit_order_object> wallet_api::get_limit_orders(string a, string b, uint32_t limit)const
+// {
+//    return my->_remote_db->get_limit_orders(get_asset(a).id, get_asset(b).id, limit);
+// }
 
-vector<call_order_object> wallet_api::get_call_orders(string a, uint32_t limit)const
-{
-   return my->_remote_db->get_call_orders(get_asset(a).id, limit);
-}
+// vector<call_order_object> wallet_api::get_call_orders(string a, uint32_t limit)const
+// {
+//    return my->_remote_db->get_call_orders(get_asset(a).id, limit);
+// }
 
-vector<force_settlement_object> wallet_api::get_settle_orders(string a, uint32_t limit)const
-{
-   return my->_remote_db->get_settle_orders(get_asset(a).id, limit);
-}
+// vector<force_settlement_object> wallet_api::get_settle_orders(string a, uint32_t limit)const
+// {
+//    return my->_remote_db->get_settle_orders(get_asset(a).id, limit);
+// }
 
-vector<collateral_bid_object> wallet_api::get_collateral_bids(string asset, uint32_t limit, uint32_t start)const
-{
-   return my->_remote_db->get_collateral_bids(get_asset(asset).id, limit, start);
-}
+// vector<collateral_bid_object> wallet_api::get_collateral_bids(string asset, uint32_t limit, uint32_t start)const
+// {
+//    return my->_remote_db->get_collateral_bids(get_asset(asset).id, limit, start);
+// }
 
 brain_key_info wallet_api::suggest_brain_key()const
 {
@@ -4687,10 +4687,10 @@ vector<blind_receipt> wallet_api::blind_history( string key_or_account )
    return result;
 }
 
-order_book wallet_api::get_order_book( const string& base, const string& quote, unsigned limit )
-{
-   return( my->_remote_db->get_order_book( base, quote, limit ) );
-}
+// order_book wallet_api::get_order_book( const string& base, const string& quote, unsigned limit )
+// {
+//    return( my->_remote_db->get_order_book( base, quote, limit ) );
+// }
 
 signed_block_with_info::signed_block_with_info( const signed_block& block )
    : signed_block( block )
