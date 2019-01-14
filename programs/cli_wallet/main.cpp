@@ -116,28 +116,27 @@ int main( int argc, char** argv )
          return 0;
       }
 
+      // set up logging
       fc::path data_dir;
       fc::logging_config cfg;
       fc::path log_dir = data_dir / "logs";
-
       fc::file_appender::config ac;
-      ac.filename             = log_dir / "rpc" / "rpc.log";
+      ac.filename             = log_dir / "cli_rpc" / "rpc.log";
       ac.flush                = true;
       ac.rotate               = true;
       ac.rotation_interval    = fc::hours( 1 );
       ac.rotation_limit       = fc::days( 1 );
-
-      std::cout << "Logging RPC to file: " << (data_dir / ac.filename).preferred_string() << "\n";
-
       cfg.appenders.push_back(fc::appender_config( "default", "console", fc::variant(fc::console_appender::config(), 20)));
       cfg.appenders.push_back(fc::appender_config( "rpc", "file", fc::variant(ac, 5)));
-
       cfg.loggers = { fc::logger_config("default"), fc::logger_config( "rpc") };
       cfg.loggers.front().level = fc::log_level::info;
       cfg.loggers.front().appenders = {"default"};
       cfg.loggers.back().level = fc::log_level::debug;
       cfg.loggers.back().appenders = {"rpc"};
+      std::cout << "Logging RPC to file: " << (data_dir / ac.filename).preferred_string() << "\n";
+      fc::configure_logging( cfg );
 
+      // key generation
       fc::ecc::private_key committee_private_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("null_key")));
 
       idump( (key_to_wif( committee_private_key ) ) );
