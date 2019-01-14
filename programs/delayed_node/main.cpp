@@ -163,10 +163,15 @@ int main(int argc, char** argv) {
       if( !options.count("plugins") )
          options.insert( std::make_pair( "plugins", bpo::variable_value(std::string("delayed_node account_history market_history"), true) ) );
 
-      node.initialize(data_dir, options);
+      if (!node.initialize(data_dir, options))
+         return 0;
+
       node.initialize_plugins( options );
 
-      node.startup();
+      if (!node.startup())
+      {
+         return 0;
+      }
       node.startup_plugins();
 
       fc::promise<int>::ptr exit_promise = new fc::promise<int>("UNIX Signal Handler");
@@ -180,6 +185,7 @@ int main(int argc, char** argv) {
       int signal = exit_promise->wait();
       ilog("Exiting from signal ${n}", ("n", signal));
       node.shutdown_plugins();
+      node.shutdown();
       return 0;
    } catch( const fc::exception& e ) {
       elog("Exiting with error:\n${e}", ("e", e.to_detail_string()));

@@ -120,10 +120,18 @@ int main(int argc, char** argv) {
       app::load_configuration_options(data_dir, cfg_options, options);
 
       bpo::notify(options);
-      node->initialize(data_dir, options);
+      if (!node->initialize(data_dir, options))
+      {
+         delete node;
+         return 0;
+      }
       node->initialize_plugins( options );
 
-      node->startup();
+      if (!node->startup())
+      {
+         delete node;
+         return 0;
+      }
       node->startup_plugins();
 
       fc::promise<int>::ptr exit_promise = new fc::promise<int>("UNIX Signal Handler");

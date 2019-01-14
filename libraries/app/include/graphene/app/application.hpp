@@ -50,9 +50,17 @@ namespace graphene { namespace app {
 
          void set_program_options( boost::program_options::options_description& command_line_options,
                                    boost::program_options::options_description& configuration_file_options )const;
-         void initialize(const fc::path& data_dir, const boost::program_options::variables_map&options);
+         /**
+          * Initializes the application
+          * @returns true if the calling method should continue, false otherwise
+          */
+         bool initialize(const fc::path& data_dir, const boost::program_options::variables_map&options);
          void initialize_plugins( const boost::program_options::variables_map& options );
-         void startup();
+         /***
+          * Performs startup
+          * @returns true if the calling method should continue, false otherwise
+          */
+         bool startup();
          void shutdown();
          void startup_plugins();
          void shutdown_plugins();
