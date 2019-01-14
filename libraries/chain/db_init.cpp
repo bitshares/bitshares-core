@@ -683,8 +683,6 @@ void database::init_genesis(const genesis_state_type& genesis_state)
       }
    });
 
-   update_active_witnesses( false );
-
    // Enable fees
    modify(get_global_properties(), [&genesis_state](global_property_object& p) {
       p.parameters.current_fees = genesis_state.initial_parameters.current_fees;
