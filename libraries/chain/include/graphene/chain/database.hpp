@@ -499,7 +499,7 @@ namespace graphene { namespace chain {
          void process_budget();
          void pay_workers( share_type& budget );
          void perform_chain_maintenance(const signed_block& next_block, const global_property_object& global_props);
-         void update_active_witnesses();
+         void update_active_witnesses( bool reshuffle = true);
          void update_active_committee_members();
          void update_worker_votes();
          void process_bids( const asset_bitasset_data_object& bad );
@@ -574,6 +574,8 @@ namespace graphene { namespace chain {
          const chain_property_object*           _p_chain_property_obj      = nullptr;
          const witness_schedule_object*         _p_witness_schedule_obj    = nullptr;
          ///@}
+         // a list of active witnesses, updated every maintenance interval
+         vector<const witness_object*> _active_witnesses;
    };
 
    namespace detail

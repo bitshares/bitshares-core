@@ -198,105 +198,112 @@ void database::pay_workers( share_type& budget )
    }
 }
 
-void database::update_active_witnesses()
+void database::update_active_witnesses( bool reshuffle )
 { try {
-   assert( _witness_count_histogram_buffer.size() > 0 );
-   share_type stake_target = (_total_voting_stake-_witness_count_histogram_buffer[0]) / 2;
-
-   /// accounts that vote for 0 or 1 witness do not get to express an opinion on
-   /// the number of witnesses to have (they abstain and are non-voting accounts)
-
-   share_type stake_tally = 0; 
-
-   size_t witness_count = 0;
-   if( stake_target > 0 )
-   {
-      while( (witness_count < _witness_count_histogram_buffer.size() - 1)
-             && (stake_tally <= stake_target) )
-      {
-         stake_tally += _witness_count_histogram_buffer[++witness_count];
-      }
-   }
-
-   const chain_property_object& cpo = get_chain_properties();
-
-   witness_count = std::max( witness_count*2+1, (size_t)cpo.immutable_parameters.min_witness_count );
-   auto wits = sort_votable_objects<witness_index>( witness_count );
-
    const global_property_object& gpo = get_global_properties();
-
-   auto update_witness_total_votes = [this]( const witness_object& wit ) {
-      modify( wit, [this]( witness_object& obj )
-      {
-         obj.total_votes = _vote_tally_buffer[obj.vote_id];
-      });
-   };
-
-   if( _track_standby_votes )
+   if ( reshuffle )
    {
-      const auto& all_witnesses = get_index_type<witness_index>().indices();
-      for( const witness_object& wit : all_witnesses )
-      {
-         update_witness_total_votes( wit );
-      }
-   }
-   else
-   {
-      for( const witness_object& wit : wits )
-      {
-         update_witness_total_votes( wit );
-      }
-   }
+      assert( _witness_count_histogram_buffer.size() > 0 );
+      share_type stake_target = (_total_voting_stake-_witness_count_histogram_buffer[0]) / 2;
 
-   // Update witness authority
-   modify( get(GRAPHENE_WITNESS_ACCOUNT), [this,&wits]( account_object& a )
-   {
-      if( head_block_time() < HARDFORK_533_TIME )
-      {
-         uint64_t total_votes = 0;
-         map<account_id_type, uint64_t> weights;
-         a.active.weight_threshold = 0;
-         a.active.clear();
+      /// accounts that vote for 0 or 1 witness do not get to express an opinion on
+      /// the number of witnesses to have (they abstain and are non-voting accounts)
 
-         for( const witness_object& wit : wits )
+      share_type stake_tally = 0; 
+
+      size_t witness_count = 0;
+      if( stake_target > 0 )
+      {
+         while( (witness_count < _witness_count_histogram_buffer.size() - 1)
+               && (stake_tally <= stake_target) )
          {
-            weights.emplace(wit.witness_account, _vote_tally_buffer[wit.vote_id]);
-            total_votes += _vote_tally_buffer[wit.vote_id];
+            stake_tally += _witness_count_histogram_buffer[++witness_count];
          }
+      }
 
-         // total_votes is 64 bits. Subtract the number of leading low bits from 64 to get the number of useful bits,
-         // then I want to keep the most significant 16 bits of what's left.
-         int8_t bits_to_drop = std::max(int(boost::multiprecision::detail::find_msb(total_votes)) - 15, 0);
-         for( const auto& weight : weights )
+      const chain_property_object& cpo = get_chain_properties();
+
+      witness_count = std::max( witness_count*2+1, (size_t)cpo.immutable_parameters.min_witness_count );
+      auto wits = sort_votable_objects<witness_index>( witness_count );
+
+      auto update_witness_total_votes = [this]( const witness_object& wit ) {
+         modify( wit, [this]( witness_object& obj )
          {
-            // Ensure that everyone has at least one vote. Zero weights aren't allowed.
-            uint16_t votes = std::max((weight.second >> bits_to_drop), uint64_t(1) );
-            a.active.account_auths[weight.first] += votes;
-            a.active.weight_threshold += votes;
-         }
+            obj.total_votes = _vote_tally_buffer[obj.vote_id];
+         });
+      };
 
-         a.active.weight_threshold /= 2;
-         a.active.weight_threshold += 1;
+      if( _track_standby_votes )
+      {
+         const auto& all_witnesses = get_index_type<witness_index>().indices();
+         for( const witness_object& wit : all_witnesses )
+         {
+            update_witness_total_votes( wit );
+         }
       }
       else
       {
-         vote_counter vc;
          for( const witness_object& wit : wits )
-            vc.add( wit.witness_account, _vote_tally_buffer[wit.vote_id] );
-         vc.finish( a.active );
+         {
+            update_witness_total_votes( wit );
+         }
       }
-   } );
 
-   modify( gpo, [&wits]( global_property_object& gp )
-   {
-      gp.active_witnesses.clear();
-      gp.active_witnesses.reserve(wits.size());
-      std::transform(wits.begin(), wits.end(),
-                     std::inserter(gp.active_witnesses, gp.active_witnesses.end()),
-                     [](const witness_object& w) {
-         return w.id;
+      // Update witness authority
+      modify( get(GRAPHENE_WITNESS_ACCOUNT), [this,&wits]( account_object& a )
+      {
+         if( head_block_time() < HARDFORK_533_TIME )
+         {
+            uint64_t total_votes = 0;
+            map<account_id_type, uint64_t> weights;
+            a.active.weight_threshold = 0;
+            a.active.clear();
+
+            for( const witness_object& wit : wits )
+            {
+               weights.emplace(wit.witness_account, _vote_tally_buffer[wit.vote_id]);
+               total_votes += _vote_tally_buffer[wit.vote_id];
+            }
+
+            // total_votes is 64 bits. Subtract the number of leading low bits from 64 to get the number of useful bits,
+            // then I want to keep the most significant 16 bits of what's left.
+            int8_t bits_to_drop = std::max(int(boost::multiprecision::detail::find_msb(total_votes)) - 15, 0);
+            for( const auto& weight : weights )
+            {
+               // Ensure that everyone has at least one vote. Zero weights aren't allowed.
+               uint16_t votes = std::max((weight.second >> bits_to_drop), uint64_t(1) );
+               a.active.account_auths[weight.first] += votes;
+               a.active.weight_threshold += votes;
+            }
+
+            a.active.weight_threshold /= 2;
+            a.active.weight_threshold += 1;
+         }
+         else
+         {
+            vote_counter vc;
+            for( const witness_object& wit : wits )
+               vc.add( wit.witness_account, _vote_tally_buffer[wit.vote_id] );
+            vc.finish( a.active );
+         }
+      } );
+
+      modify( gpo, [&wits]( global_property_object& gp )
+      {
+         gp.active_witnesses.clear();
+         gp.active_witnesses.reserve(wits.size());
+         std::transform(wits.begin(), wits.end(),
+                        std::inserter(gp.active_witnesses, gp.active_witnesses.end()),
+                        [](const witness_object& w) {
+            return w.id;
+         });
       });
-   });
+   }
+
+   _active_witnesses.clear();
+   _active_witnesses.reserve( gpo.active_witnesses.size() );
+   for( const witness_id_type& wid : gpo.active_witnesses )
+      _active_witnesses.push_back( &(wid(*this)) );
 
 } FC_CAPTURE_AND_RETHROW() }
 
