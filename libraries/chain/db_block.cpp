@@ -129,7 +129,7 @@ bool database::push_block(const signed_block& new_block, uint32_t skip)
 bool database::_push_block(const signed_block& new_block)
 { try {
    uint32_t skip = get_node_properties().skip_flags;
-   /// TODO: if the block is greater than the head block and before the next maitenance interval
+   // TODO: If the block is greater than the head block and before the next maitenance interval
    // verify that the block signer is in the current set of active witnesses.
 
    shared_ptr<fork_item> new_head = _fork_db.push_block(new_block);
