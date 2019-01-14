@@ -7,7 +7,7 @@ TUSC Core
  --- |
  [![](https://travis-ci.org/TUSCNetwork/tusc-core.svg?branch=master)](https://travis-ci.org/TUSCNetwork/tusc-core) 
 
-test
+
 * [Getting Started](#getting-started)
 * [Support](#support)
 * [Using the API](#using-the-api)
