@@ -42,7 +42,7 @@ class application_impl : public net::node_delegate
 
       void set_dbg_init_key( graphene::chain::genesis_state_type& genesis, const std::string& init_key );
 
-      bool startup();
+      uint8_t startup();
 
       fc::optional< api_access_info > get_api_access_info(const string& username)const;
 

@@ -318,7 +318,7 @@ void application_impl::set_dbg_init_key( graphene::chain::genesis_state_type& ge
       genesis.initial_witness_candidates[i].block_signing_key = init_pubkey;
 }
 
-bool application_impl::startup()
+uint8_t application_impl::startup()
 { try {
    fc::create_directories(_data_dir / "blockchain");
 
@@ -454,7 +454,7 @@ bool application_impl::startup()
       {
          elog("Failed to load file from ${path}",
             ("path", _options->at("api-access").as<boost::filesystem::path>().string()));
-         return false;
+         return EXIT_FAILURE;
       }
    }
    else
@@ -475,7 +475,7 @@ bool application_impl::startup()
    reset_p2p_node(_data_dir);
    reset_websocket_server();
    reset_websocket_tls_server();
-   return true;
+   return DO_NOT_EXIT;
 } FC_LOG_AND_RETHROW() }
 
 optional< api_access_info > application_impl::get_api_access_info(const string& username)const
@@ -1001,7 +1001,7 @@ void application::set_program_options(boost::program_options::options_descriptio
    configuration_file_options.add(_cfg_options);
 }
 
-bool application::initialize(const fc::path& data_dir, const boost::program_options::variables_map& options)
+uint8_t application::initialize(const fc::path& data_dir, const boost::program_options::variables_map& options)
 {
    my->_data_dir = data_dir;
    my->_options = &options;
@@ -1019,7 +1019,7 @@ bool application::initialize(const fc::path& data_dir, const boost::program_opti
                       << "\nWould you like to replace it? [y/N] ";
             char response = std::cin.get();
             if( toupper(response) != 'Y' )
-               return false;
+               return EXIT_FAILURE;
          }
 
          std::cerr << "Updating genesis state in file " << genesis_out.generic_string() << "\n";
@@ -1028,7 +1028,7 @@ bool application::initialize(const fc::path& data_dir, const boost::program_opti
       }
       fc::json::save_to_file(genesis_state, genesis_out);
 
-      return false;
+      return EXIT_SUCCESS;
    }
 
    if ( options.count("io-threads") )
@@ -1059,14 +1059,14 @@ bool application::initialize(const fc::path& data_dir, const boost::program_opti
 
       if(es_ah_conflict_counter > 1) {
          elog("Can't start program with elasticsearch and account_history plugin at the same time");
-         return false;
+         return EXIT_FAILURE;
       }
       if (!it.empty()) enable_plugin(it);
    }
    return true;
 }
 
-bool application::startup()
+uint8_t application::startup()
 {
    try {
       return my->startup();

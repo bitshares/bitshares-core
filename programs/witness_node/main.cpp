@@ -120,18 +120,21 @@ int main(int argc, char** argv) {
       app::load_configuration_options(data_dir, cfg_options, options);
 
       bpo::notify(options);
-      if (!node->initialize(data_dir, options))
+
+      uint8_t ret_val;
+      if ( ( ret_val = node->initialize(data_dir, options)) != DO_NOT_EXIT )
       {
          delete node;
-         return 0;
+         return ret_val;
       }
       node->initialize_plugins( options );
 
-      if (!node->startup())
+      if ( (ret_val = node->startup()) != DO_NOT_EXIT )
       {
          delete node;
-         return 0;
+         return ret_val;
       }
+
       node->startup_plugins();
 
       fc::promise<int>::ptr exit_promise = new fc::promise<int>("UNIX Signal Handler");
@@ -154,7 +157,7 @@ int main(int argc, char** argv) {
       node->shutdown_plugins();
       node->shutdown();
       delete node;
-      return 0;
+      return EXIT_SUCCESS;
    } catch( const fc::exception& e ) {
       // deleting the node can yield, so do this outside the exception handler
       unhandled_exception = e;
@@ -165,7 +168,7 @@ int main(int argc, char** argv) {
       elog("Exiting with error:\n${e}", ("e", unhandled_exception->to_detail_string()));
       node->shutdown();
       delete node;
-      return 1;
+      return EXIT_FAILURE;
    }
 }
 
