@@ -154,6 +154,11 @@ database_fixture::database_fixture()
        options.insert(std::make_pair("api-limit-get-asset-holders", boost::program_options::variable_value((uint64_t)250, false)));
        options.insert(std::make_pair("plugins", boost::program_options::variable_value(string("account_history"), false)));
    }
+   if(current_test_name =="api_limit_get_key_references")
+   {
+	   options.insert(std::make_pair("api-limit-get-key-references", boost::program_options::variable_value((uint64_t)200, false)));
+	   options.insert(std::make_pair("plugins", boost::program_options::variable_value(string("account_history"), false)));
+   }
 
    // add account tracking for ahplugin for special test case with track-account enabled
    if( !options.count("track-account") && current_test_name == "track_account") {
@@ -198,7 +203,8 @@ database_fixture::database_fixture()
       ahplugin->plugin_startup();
       if (current_test_name == "api_limit_get_account_history_operations" || current_test_name == "api_limit_get_account_history"
       || current_test_name == "api_limit_get_grouped_limit_orders" || current_test_name == "api_limit_get_relative_account_history"
-      || current_test_name == "api_limit_get_account_history_by_operations" || current_test_name =="api_limit_get_asset_holders")
+      || current_test_name == "api_limit_get_account_history_by_operations" || current_test_name =="api_limit_get_asset_holders"
+      || current_test_name =="api_limit_get_key_references")
       {
           app.initialize(graphene::utilities::temp_directory_path(), options);
           app.set_dgb_api_limit_api();

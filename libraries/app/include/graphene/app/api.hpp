@@ -438,8 +438,8 @@ namespace graphene { namespace app {
    class asset_api
    {
       public:
-         asset_api(application& app);
-	 ~asset_api();
+   	asset_api(application& app);
+   	~asset_api();
 
          /**
           * @brief Get asset holders for a specific asset

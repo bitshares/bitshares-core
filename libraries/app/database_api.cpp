@@ -539,7 +539,6 @@ dynamic_global_property_object database_api_impl::get_dynamic_global_properties(
 
 vector<vector<account_id_type>> database_api::get_key_references( vector<public_key_type> key )const
 {
-   FC_ASSERT(key.size() <= 100, "Number of keys must be 100 or less");
    return my->get_key_references( key );
 }
 
@@ -548,7 +547,10 @@ vector<vector<account_id_type>> database_api::get_key_references( vector<public_
  */
 vector<vector<account_id_type>> database_api_impl::get_key_references( vector<public_key_type> keys )const
 {
-   const auto& idx = _db.get_index_type<account_index>();
+	FC_ASSERT( _app_options && _app_options->api_limit_get_key_references, "App needs to be passed");
+	uint64_t api_limit_get_key_references=_app_options->api_limit_get_key_references;
+	FC_ASSERT(keys.size() <= api_limit_get_key_references);
+	const auto& idx = _db.get_index_type<account_index>();
    const auto& aidx = dynamic_cast<const base_primary_index&>(idx);
    const auto& refs = aidx.get_secondary_index<graphene::chain::account_member_index>();
 
