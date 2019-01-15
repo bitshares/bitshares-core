@@ -571,9 +571,7 @@ namespace graphene { namespace app {
     }
     // get number of asset holders.
     int asset_api::get_asset_holders_count( asset_id_type asset_id ) const {
-      FC_ASSERT( _app.chain_database() );
-      const auto& db = *_app.chain_database();
-      const auto& bal_idx = db.get_index_type< account_balance_index >().indices().get< by_asset_balance >();
+      const auto& bal_idx = _db.get_index_type< account_balance_index >().indices().get< by_asset_balance >();
       auto range = bal_idx.equal_range( boost::make_tuple( asset_id ) );
 
       int count = boost::distance(range) - 1;
