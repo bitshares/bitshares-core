@@ -46,7 +46,7 @@ namespace graphene { namespace app {
          uint64_t api_limit_get_relative_account_history=100;
          uint64_t api_limit_get_account_history_by_operations=100;
          uint64_t api_limit_get_asset_holders=100;
-	      uint64_t api_limit_get_key_references=100;
+	 uint64_t api_limit_get_key_references=100;
    };
 
    class application
