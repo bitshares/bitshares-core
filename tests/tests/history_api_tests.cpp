@@ -606,146 +606,141 @@ BOOST_AUTO_TEST_CASE(get_account_history_operations) {
 //new test case for increasing the limit based on the config file
 BOOST_AUTO_TEST_CASE(api_limit_get_account_history_operations) {
    try {
-      graphene::app::history_api hist_api(app);
+   graphene::app::history_api hist_api(app);
+   //account_id_type() do 3 ops
+   create_bitasset("CNY", account_id_type());
+   create_account("sam");
+   create_account("alice");
 
-      //account_id_type() do 3 ops
-      create_bitasset("CNY", account_id_type());
-      create_account("sam");
-      create_account("alice");
+   generate_block();
+   fc::usleep(fc::milliseconds(2000));
 
-      generate_block();
-      fc::usleep(fc::milliseconds(2000));
+   int asset_create_op_id = operation::tag<asset_create_operation>::value;
+   int account_create_op_id = operation::tag<account_create_operation>::value;
 
-      int asset_create_op_id = operation::tag<asset_create_operation>::value;
-      int account_create_op_id = operation::tag<account_create_operation>::value;
+   //account_id_type() did 1 asset_create op
+   vector<operation_history_object> histories = hist_api.get_account_history_operations(
+	"committee-account", asset_create_op_id, operation_history_id_type(), operation_history_id_type(), 200);
+   BOOST_CHECK_EQUAL(histories.size(), 1);
+   BOOST_CHECK_EQUAL(histories[0].id.instance(), 0);
+   BOOST_CHECK_EQUAL(histories[0].op.which(), asset_create_op_id);
 
-      //account_id_type() did 1 asset_create op
-      vector<operation_history_object> histories = hist_api.get_account_history_operations(
-	    "committee-account", asset_create_op_id, operation_history_id_type(), operation_history_id_type(), 200);
-      BOOST_CHECK_EQUAL(histories.size(), 1);
-      BOOST_CHECK_EQUAL(histories[0].id.instance(), 0);
-      BOOST_CHECK_EQUAL(histories[0].op.which(), asset_create_op_id);
+   //account_id_type() did 2 account_create ops
+   histories = hist_api.get_account_history_operations(
+	"committee-account", account_create_op_id, operation_history_id_type(), operation_history_id_type(), 200);
+   BOOST_CHECK_EQUAL(histories.size(), 2);
+   BOOST_CHECK_EQUAL(histories[0].op.which(), account_create_op_id);
 
-      //account_id_type() did 2 account_create ops
-      histories = hist_api.get_account_history_operations(
-	    "committee-account", account_create_op_id, operation_history_id_type(), operation_history_id_type(), 200);
-      BOOST_CHECK_EQUAL(histories.size(), 2);
-      BOOST_CHECK_EQUAL(histories[0].op.which(), account_create_op_id);
+   // No asset_create op larger than id1
+   histories = hist_api.get_account_history_operations(
+	"committee-account", asset_create_op_id, operation_history_id_type(), operation_history_id_type(1), 200);
+   BOOST_CHECK_EQUAL(histories.size(), 0);
 
-      // No asset_create op larger than id1
-      histories = hist_api.get_account_history_operations(
-	    "committee-account", asset_create_op_id, operation_history_id_type(), operation_history_id_type(1), 200);
-      BOOST_CHECK_EQUAL(histories.size(), 0);
+   // Limit 1 returns 1 result
+   histories = hist_api.get_account_history_operations(
+	"committee-account", account_create_op_id, operation_history_id_type(),operation_history_id_type(), 1);
+   BOOST_CHECK_EQUAL(histories.size(), 1);
+   BOOST_CHECK_EQUAL(histories[0].op.which(), account_create_op_id);
 
-      // Limit 1 returns 1 result
-      histories = hist_api.get_account_history_operations(
-	    "committee-account", account_create_op_id, operation_history_id_type(),operation_history_id_type(), 1);
-      BOOST_CHECK_EQUAL(histories.size(), 1);
-      BOOST_CHECK_EQUAL(histories[0].op.which(), account_create_op_id);
+   // alice has 1 op
+   histories = hist_api.get_account_history_operations(
+	"alice", account_create_op_id, operation_history_id_type(),operation_history_id_type(), 200);
+   BOOST_CHECK_EQUAL(histories.size(), 1);
+   BOOST_CHECK_EQUAL(histories[0].op.which(), account_create_op_id);
 
-      // alice has 1 op
-      histories = hist_api.get_account_history_operations(
-	    "alice", account_create_op_id, operation_history_id_type(),operation_history_id_type(), 200);
-      BOOST_CHECK_EQUAL(histories.size(), 1);
-      BOOST_CHECK_EQUAL(histories[0].op.which(), account_create_op_id);
+   // create a bunch of accounts
+   for(int i = 0; i < 126; ++i)
+   {
+   	std::string acct_name = "mytempacct" + std::to_string(i);
+      create_account(acct_name);
+   }
+   generate_block();
 
-      // create a bunch of accounts
-      for(int i = 0; i < 126; ++i)
-      {
-      	std::string acct_name = "mytempacct" + std::to_string(i);
-      	create_account(acct_name);
-      }
-      generate_block();
-
-      // history is set to limit transactions to 125 (see database_fixture.hpp)
-      // so asking for more should only return 125 (and not throw exception,
-      // see https://github.com/bitshares/bitshares-core/issues/1490
-      GRAPHENE_CHECK_THROW(hist_api.get_account_history_operations("commitee-account", account_create_op_id, operation_history_id_type(),operation_history_id_type(), 301), fc::exception);
-      histories = hist_api.get_account_history_operations("committee-account", account_create_op_id, operation_history_id_type(), operation_history_id_type(), 200);
-      BOOST_REQUIRE_EQUAL( histories.size(), 125 );
+   // history is set to limit transactions to 125 (see database_fixture.hpp)
+   // so asking for more should only return 125 (and not throw exception,
+   // see https://github.com/bitshares/bitshares-core/issues/1490
+   GRAPHENE_CHECK_THROW(hist_api.get_account_history_operations("commitee-account", account_create_op_id, operation_history_id_type(),operation_history_id_type(), 301), fc::exception);
+   histories = hist_api.get_account_history_operations("committee-account", account_create_op_id, operation_history_id_type(), operation_history_id_type(), 200);
+   BOOST_REQUIRE_EQUAL( histories.size(), 125 );
    }
    catch (fc::exception &e)
    {
-   	edump((e.to_detail_string()));
-      throw;
+ 	edump((e.to_detail_string()));
+   throw;
    }
 }
 
 BOOST_AUTO_TEST_CASE(api_limit_get_account_history) {
-   try
+   try{
+   graphene::app::history_api hist_api(app);
+   //account_id_type() do 3 ops
+   create_bitasset("USD", account_id_type());
+   create_account("dan");
+   create_account("bob");
+
+   generate_block();
+   fc::usleep(fc::milliseconds(2000));
+
+   int asset_create_op_id = operation::tag<asset_create_operation>::value;
+   int account_create_op_id = operation::tag<account_create_operation>::value;
+   //account_id_type() did 3 ops and includes id0
+   vector<operation_history_object> histories = hist_api.get_account_history("1.2.0", operation_history_id_type(), 210, operation_history_id_type());
+
+   BOOST_CHECK_EQUAL(histories.size(), 3);
+   BOOST_CHECK_EQUAL(histories[2].id.instance(), 0);
+   BOOST_CHECK_EQUAL(histories[2].op.which(), asset_create_op_id);
+
+   // 1 account_create op larger than id1
+   histories = hist_api.get_account_history("1.2.0", operation_history_id_type(1), 210, operation_history_id_type());
+   BOOST_CHECK_EQUAL(histories.size(), 1);
+   BOOST_CHECK(histories[0].id.instance() != 0);
+   BOOST_CHECK_EQUAL(histories[0].op.which(), account_create_op_id);
+
+
+   // Limit 2 returns 2 result
+   histories = hist_api.get_account_history("1.2.0", operation_history_id_type(), 2, operation_history_id_type());
+   BOOST_CHECK_EQUAL(histories.size(), 2);
+   BOOST_CHECK(histories[1].id.instance() != 0);
+   BOOST_CHECK_EQUAL(histories[1].op.which(), account_create_op_id);
+   // bob has 1 op
+   histories = hist_api.get_account_history("bob", operation_history_id_type(), 210, operation_history_id_type());
+   BOOST_CHECK_EQUAL(histories.size(), 1);
+   BOOST_CHECK_EQUAL(histories[0].op.which(), account_create_op_id);
+
+   // create a bunch of accounts
+   for(int i = 0; i < 126; ++i)
    {
-      graphene::app::history_api hist_api(app);
+     	std::string acct_name = "mytempacct" + std::to_string(i);
+     	create_account(acct_name);
+   }
+   generate_block();
 
-      //account_id_type() do 3 ops
-      create_bitasset("USD", account_id_type());
-      create_account("dan");
-      create_account("bob");
-
-      generate_block();
-      fc::usleep(fc::milliseconds(2000));
-
-      int asset_create_op_id = operation::tag<asset_create_operation>::value;
-      int account_create_op_id = operation::tag<account_create_operation>::value;
-      //account_id_type() did 3 ops and includes id0
-      vector<operation_history_object> histories = hist_api.get_account_history("1.2.0", operation_history_id_type(), 210, operation_history_id_type());
-
-      BOOST_CHECK_EQUAL(histories.size(), 3);
-      BOOST_CHECK_EQUAL(histories[2].id.instance(), 0);
-      BOOST_CHECK_EQUAL(histories[2].op.which(), asset_create_op_id);
-
-      // 1 account_create op larger than id1
-      histories = hist_api.get_account_history("1.2.0", operation_history_id_type(1), 210, operation_history_id_type());
-      BOOST_CHECK_EQUAL(histories.size(), 1);
-      BOOST_CHECK(histories[0].id.instance() != 0);
-      BOOST_CHECK_EQUAL(histories[0].op.which(), account_create_op_id);
-
-
-      // Limit 2 returns 2 result
-      histories = hist_api.get_account_history("1.2.0", operation_history_id_type(), 2, operation_history_id_type());
-      BOOST_CHECK_EQUAL(histories.size(), 2);
-      BOOST_CHECK(histories[1].id.instance() != 0);
-      BOOST_CHECK_EQUAL(histories[1].op.which(), account_create_op_id);
-      // bob has 1 op
-      histories = hist_api.get_account_history("bob", operation_history_id_type(), 210, operation_history_id_type());
-      BOOST_CHECK_EQUAL(histories.size(), 1);
-      BOOST_CHECK_EQUAL(histories[0].op.which(), account_create_op_id);
-
-      // create a bunch of accounts
-      for(int i = 0; i < 126; ++i)
-      {
-      	std::string acct_name = "mytempacct" + std::to_string(i);
-      	create_account(acct_name);
-      }
-      generate_block();
-
-      GRAPHENE_CHECK_THROW(hist_api.get_account_history("1.2.0", operation_history_id_type(), 260, operation_history_id_type()), fc::exception);
-      histories = hist_api.get_account_history("1.2.0", operation_history_id_type(), 210, operation_history_id_type());
-      BOOST_REQUIRE_EQUAL( histories.size(), 125 );
-
+   GRAPHENE_CHECK_THROW(hist_api.get_account_history("1.2.0", operation_history_id_type(), 260, operation_history_id_type()), fc::exception);
+   histories = hist_api.get_account_history("1.2.0", operation_history_id_type(), 210, operation_history_id_type());
+   BOOST_REQUIRE_EQUAL( histories.size(), 125 );
    } catch (fc::exception &e) {
-      edump((e.to_detail_string()));
-      throw;
+   edump((e.to_detail_string()));
+   throw;
    }
 }
 BOOST_AUTO_TEST_CASE(api_limit_get_relative_account_history) {
-   try
-   {
-      graphene::app::history_api hist_api(app);
-      //account_id_type() do 3 ops
-      create_bitasset("USD", account_id_type());
-      create_account("dan");
-      create_account("bob");
+   try{
+   graphene::app::history_api hist_api(app);
+   //account_id_type() do 3 ops
+   create_bitasset("USD", account_id_type());
+   create_account("dan");
+   create_account("bob");
 
-      generate_block();
-      fc::usleep(fc::milliseconds(2000));
+   generate_block();
+   fc::usleep(fc::milliseconds(2000));
 
-      GRAPHENE_CHECK_THROW(hist_api.get_relative_account_history("1.2.0", 126, 260, 0), fc::exception);
-      vector<operation_history_object> histories = hist_api.get_relative_account_history("1.2.0", 126, 210, 0);
-      BOOST_REQUIRE_EQUAL( histories.size(), 0 );
+   GRAPHENE_CHECK_THROW(hist_api.get_relative_account_history("1.2.0", 126, 260, 0), fc::exception);
+   vector<operation_history_object> histories = hist_api.get_relative_account_history("1.2.0", 126, 210, 0);
+   BOOST_REQUIRE_EQUAL( histories.size(), 0 );
 
    } catch (fc::exception &e) {
-      edump((e.to_detail_string()));
-      throw;
+   edump((e.to_detail_string()));
+   throw;
    }
 }
 
