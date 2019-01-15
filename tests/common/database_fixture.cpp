@@ -146,6 +146,7 @@ database_fixture::database_fixture()
    if(current_test_name =="api_limit_get_account_history_by_operations")
    {
        options.insert(std::make_pair("api-limit-get-account-history-by-operations", boost::program_options::variable_value((uint64_t)250, false)));
+	    options.insert(std::make_pair("api-limit-get-relative-account-history", boost::program_options::variable_value((uint64_t)250, false)));
        options.insert(std::make_pair("plugins", boost::program_options::variable_value(string("account_history"), false)));
    }
    if(current_test_name =="api_limit_get_asset_holders")
