@@ -421,7 +421,7 @@ BOOST_AUTO_TEST_CASE(track_account) {
       // dan makes 1 op
       create_bitasset("EUR", dan_id);
 
-      generate_block( ~database::skip_fork_db );
+      generate_block();
 
       // anything against account_id_type() should be {}
       vector<operation_history_object> histories = hist_api.get_account_history("1.2.0", operation_history_id_type(0), 10, operation_history_id_type(0));
@@ -449,7 +449,7 @@ BOOST_AUTO_TEST_CASE(track_account) {
       create_bitasset( "BTC", account_id_type() );
       create_bitasset( "GBP", dan_id );
 
-      generate_block( ~database::skip_fork_db );
+      generate_block();
 
       histories = hist_api.get_account_history("dan", operation_history_id_type(0), 10, operation_history_id_type(0));
       BOOST_CHECK_EQUAL(histories.size(), 3);
