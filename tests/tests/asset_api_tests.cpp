@@ -76,9 +76,9 @@ BOOST_AUTO_TEST_CASE( api_limit_get_asset_holders )
    transfer(account_id_type()(db), bob, asset(300));
 
    // make call
-   GRAPHENE_CHECK_THROW(asset_api.get_asset_holders(asset_id_type(), 0, 260), fc::exception)
-   vector<account_asset_balance> holders = asset_api.get_asset_holders(asset_id_type(), 0, 210);;
-   BOOST_REQUIRE_EQUAL( holders.size(), 4 );
+   GRAPHENE_CHECK_THROW(asset_api.get_asset_holders(asset_id_type(), 0, 260), fc::exception);
+   vector<account_asset_balance> holders = asset_api.get_asset_holders(asset_id_type(), 0, 210);
+   BOOST_REQUIRE_EQUAL( holders.size(), 4u );
 }
 
 BOOST_AUTO_TEST_SUITE_END()

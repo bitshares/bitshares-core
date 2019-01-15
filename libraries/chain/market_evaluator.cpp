@@ -49,11 +49,11 @@ void_result limit_order_create_evaluator::do_evaluate(const limit_order_create_o
    _receive_asset = &op.min_to_receive.asset_id(d);
 
    if( _sell_asset->options.whitelist_markets.size() )
-      FC_ASSERT( _sell_asset->options.whitelist_markets.find(_receive_asset->id)
+      FC_ASSERT( _sell_asset->options.whitelist_markets.find(_receive_asset->id) 
             != _sell_asset->options.whitelist_markets.end(),
             "This market has not been whitelisted." );
    if( _sell_asset->options.blacklist_markets.size() )
-      FC_ASSERT( _sell_asset->options.blacklist_markets.find(_receive_asset->id)
+      FC_ASSERT( _sell_asset->options.blacklist_markets.find(_receive_asset->id) 
             == _sell_asset->options.blacklist_markets.end(),
             "This market has been blacklisted." );
 

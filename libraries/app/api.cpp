@@ -530,15 +530,15 @@ namespace graphene { namespace app {
     }
 
     // asset_api
-    asset_api::asset_api(application& app) :_app(app),_db(std::ref(*app.chain_database())) {
-	    FC_ASSERT(_app.chain_database() );
-    }
+    asset_api::asset_api(graphene::app::application& app) :
+         _app(app),
+         _db( *app.chain_database()),
+         database_api( std::ref(*app.chain_database()), &(app.get_options())
+         ) { }
     asset_api::~asset_api() { }
 
     vector<account_asset_balance> asset_api::get_asset_holders( asset_id_type asset_id, uint32_t start, uint32_t limit ) const {
-
       uint64_t api_limit_get_asset_holders=_app.get_options().api_limit_get_asset_holders;
-
       FC_ASSERT(limit <= api_limit_get_asset_holders);
       const auto& bal_idx = _db.get_index_type< account_balance_index >().indices().get< by_asset_balance >();
       auto range = bal_idx.equal_range( boost::make_tuple( asset_id ) );
@@ -620,7 +620,7 @@ namespace graphene { namespace app {
    {
       uint64_t api_limit_get_grouped_limit_orders=_app.get_options().api_limit_get_grouped_limit_orders;
       FC_ASSERT( limit <= api_limit_get_grouped_limit_orders );
-      auto plugin = _app.get_plugin<grouped_orders_plugin>( "grouped_orders" );
+      auto plugin = _app.get_plugin<graphene::grouped_orders::grouped_orders_plugin>( "grouped_orders" );
       FC_ASSERT( plugin );
       const auto& limit_groups = plugin->limit_order_groups();
       vector< limit_order_group > result;

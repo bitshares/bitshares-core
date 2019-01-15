@@ -438,8 +438,8 @@ namespace graphene { namespace app {
    class asset_api
    {
       public:
-   	asset_api(application& app);
-   	~asset_api();
+         asset_api(application& app);
+         ~asset_api();
 
          /**
           * @brief Get asset holders for a specific asset
@@ -464,8 +464,9 @@ namespace graphene { namespace app {
          vector<asset_holders> get_all_asset_holders() const;
 
       private:
-           application& _app;
-           graphene::chain::database& _db;
+         graphene::app::application& _app;
+         graphene::chain::database& _db;
+         graphene::app::database_api database_api;
    };
 
    /**

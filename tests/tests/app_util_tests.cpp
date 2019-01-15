@@ -270,7 +270,7 @@ BOOST_AUTO_TEST_CASE(price_to_string_verify)
       BOOST_CHECK_EQUAL( price_to_string( price{ asset(mx), asset(mx) }, 0, 0), "1" );
       BOOST_CHECK_EQUAL( price_to_string( price{ asset(1), asset(mx) }, 0, 0), "0.0000000000000000001" );
       BOOST_CHECK_EQUAL( price_to_string( price{ asset(mx), asset(1) }, 0, 0), "9223372036854775807" );
-   }
+   } 
    catch (fc::exception& fx)
    {
       BOOST_FAIL( "FC Exception: " + fx.to_detail_string() );

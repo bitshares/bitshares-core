@@ -547,10 +547,9 @@ vector<vector<account_id_type>> database_api::get_key_references( vector<public_
  */
 vector<vector<account_id_type>> database_api_impl::get_key_references( vector<public_key_type> keys )const
 {
-	FC_ASSERT( _app_options && _app_options->api_limit_get_key_references, "App needs to be passed");
-	uint64_t api_limit_get_key_references=_app_options->api_limit_get_key_references;
-	FC_ASSERT(keys.size() <= api_limit_get_key_references);
-	const auto& idx = _db.get_index_type<account_index>();
+   uint64_t api_limit_get_key_references=_app_options->api_limit_get_key_references;
+   FC_ASSERT(keys.size() <= api_limit_get_key_references);
+   const auto& idx = _db.get_index_type<account_index>();
    const auto& aidx = dynamic_cast<const base_primary_index&>(idx);
    const auto& refs = aidx.get_secondary_index<graphene::chain::account_member_index>();
 

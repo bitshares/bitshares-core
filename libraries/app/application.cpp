@@ -319,7 +319,8 @@ void application_impl::set_dbg_init_key( graphene::chain::genesis_state_type& ge
 }
 
 
-void application_impl::set_dgb_api_limit_api() {
+
+void application_impl::set_api_limit() {
    if (_options->count("api-limit-get-account-history-operations")) {
       _app_options.api_limit_get_account_history_operations = _options->at("api-limit-get-account-history-operations").as<uint64_t>();
    }
@@ -341,7 +342,6 @@ void application_impl::set_dgb_api_limit_api() {
 	if(_options->count("api-limit-get-key-references")){
 		_app_options.api_limit_get_key_references = _options->at("api-limit-get-key-references").as<uint64_t>();
 	}
-
 }
 
 void application_impl::startup()
@@ -465,7 +465,7 @@ void application_impl::startup()
    if ( _options->count("enable-subscribe-to-all") )
       _app_options.enable_subscribe_to_all = _options->at( "enable-subscribe-to-all" ).as<bool>();
 
-   set_dgb_api_limit_api();
+   set_api_limit();
 
    if( _active_plugins.find( "market_history" ) != _active_plugins.end() )
       _app_options.has_market_history_plugin = true;
@@ -1118,10 +1118,11 @@ void application::startup()
       throw;
    }
 }
-void application::set_dgb_api_limit_api()
+
+void application::set_api_limit()
 {
    try {
-      my->set_dgb_api_limit_api();
+      my->set_api_limit();
    } catch ( const fc::exception& e ) {
       elog( "${e}", ("e",e.to_detail_string()) );
       throw;
@@ -1130,7 +1131,6 @@ void application::set_dgb_api_limit_api()
       throw;
    }
 }
-
 std::shared_ptr<abstract_plugin> application::get_plugin(const string& name) const
 {
    return my->_active_plugins[name];

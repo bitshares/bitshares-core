@@ -122,44 +122,43 @@ database_fixture::database_fixture()
    }
    if (current_test_name == "api_limit_get_account_history_operations")
    {
-       options.insert(std::make_pair("max-ops-per-account", boost::program_options::variable_value((uint64_t)125, false)));
-       options.insert(std::make_pair("api-limit-get-account-history-operations", boost::program_options::variable_value((uint64_t)300, false)));
-       options.insert(std::make_pair("plugins", boost::program_options::variable_value(string("account_history"), false)));
+    options.insert(std::make_pair("max-ops-per-account", boost::program_options::variable_value((uint64_t)125, false)));
+    options.insert(std::make_pair("api-limit-get-account-history-operations", boost::program_options::variable_value((uint64_t)300, false)));
+    options.insert(std::make_pair("plugins", boost::program_options::variable_value(string("account_history"), false)));
    }
    if(current_test_name =="api_limit_get_account_history")
    {
-       options.insert(std::make_pair("max-ops-per-account", boost::program_options::variable_value((uint64_t)125, false)));
-       options.insert(std::make_pair("api-limit-get-account-history", boost::program_options::variable_value((uint64_t)250, false)));
-       options.insert(std::make_pair("plugins", boost::program_options::variable_value(string("account_history"), false)));
+    options.insert(std::make_pair("max-ops-per-account", boost::program_options::variable_value((uint64_t)125, false)));
+    options.insert(std::make_pair("api-limit-get-account-history", boost::program_options::variable_value((uint64_t)250, false)));
+    options.insert(std::make_pair("plugins", boost::program_options::variable_value(string("account_history"), false)));
    }
    if(current_test_name =="api_limit_get_grouped_limit_orders")
    {
-       options.insert(std::make_pair("api-limit-get-grouped-limit-orders", boost::program_options::variable_value((uint64_t)250, false)));
-       options.insert(std::make_pair("plugins", boost::program_options::variable_value(string("grouped_orders"), false)));
+    options.insert(std::make_pair("api-limit-get-grouped-limit-orders", boost::program_options::variable_value((uint64_t)250, false)));
+    options.insert(std::make_pair("plugins", boost::program_options::variable_value(string("grouped_orders"), false)));
    }
    if(current_test_name =="api_limit_get_relative_account_history")
    {
-       options.insert(std::make_pair("max-ops-per-account", boost::program_options::variable_value((uint64_t)125, false)));
-       options.insert(std::make_pair("api-limit-get-relative-account-history", boost::program_options::variable_value((uint64_t)250, false)));
-       options.insert(std::make_pair("plugins", boost::program_options::variable_value(string("account_history"), false)));
+    options.insert(std::make_pair("max-ops-per-account", boost::program_options::variable_value((uint64_t)125, false)));
+    options.insert(std::make_pair("api-limit-get-relative-account-history", boost::program_options::variable_value((uint64_t)250, false)));
+    options.insert(std::make_pair("plugins", boost::program_options::variable_value(string("account_history"), false)));
    }
    if(current_test_name =="api_limit_get_account_history_by_operations")
    {
-       options.insert(std::make_pair("api-limit-get-account-history-by-operations", boost::program_options::variable_value((uint64_t)250, false)));
-	    options.insert(std::make_pair("api-limit-get-relative-account-history", boost::program_options::variable_value((uint64_t)250, false)));
-       options.insert(std::make_pair("plugins", boost::program_options::variable_value(string("account_history"), false)));
+    options.insert(std::make_pair("api-limit-get-account-history-by-operations", boost::program_options::variable_value((uint64_t)250, false)));
+    options.insert(std::make_pair("api-limit-get-relative-account-history", boost::program_options::variable_value((uint64_t)250, false)));
+    options.insert(std::make_pair("plugins", boost::program_options::variable_value(string("account_history"), false)));
    }
    if(current_test_name =="api_limit_get_asset_holders")
    {
-       options.insert(std::make_pair("api-limit-get-asset-holders", boost::program_options::variable_value((uint64_t)250, false)));
-       options.insert(std::make_pair("plugins", boost::program_options::variable_value(string("account_history"), false)));
+    options.insert(std::make_pair("api-limit-get-asset-holders", boost::program_options::variable_value((uint64_t)250, false)));
+    options.insert(std::make_pair("plugins", boost::program_options::variable_value(string("account_history"), false)));
    }
    if(current_test_name =="api_limit_get_key_references")
    {
-	   options.insert(std::make_pair("api-limit-get-key-references", boost::program_options::variable_value((uint64_t)200, false)));
-	   options.insert(std::make_pair("plugins", boost::program_options::variable_value(string("account_history"), false)));
+    options.insert(std::make_pair("api-limit-get-key-references", boost::program_options::variable_value((uint64_t)200, false)));
+    options.insert(std::make_pair("plugins", boost::program_options::variable_value(string("account_history"), false)));
    }
-
    // add account tracking for ahplugin for special test case with track-account enabled
    if( !options.count("track-account") && current_test_name == "track_account") {
       std::vector<std::string> track_account;
@@ -207,7 +206,7 @@ database_fixture::database_fixture()
       || current_test_name =="api_limit_get_key_references")
       {
           app.initialize(graphene::utilities::temp_directory_path(), options);
-          app.set_dgb_api_limit_api();
+          app.set_api_limit();
       }
    }
 
