@@ -37,7 +37,7 @@ BOOST_FIXTURE_TEST_SUITE(grouped_orders_api_tests, database_fixture)
 BOOST_AUTO_TEST_CASE(api_limit_get_grouped_limit_orders) {
 	try
 	{
-		graphene::app::orders_api orders_api(app);
+	   graphene::app::orders_api orders_api(app);
 	   optional< api_access_info > acc;
 	   optional<price> start;
 
@@ -56,7 +56,7 @@ BOOST_AUTO_TEST_CASE(api_limit_get_grouped_limit_orders) {
 	}
 	catch (fc::exception &e)
 	{
-		edump((e.to_detail_string()));
+	   edump((e.to_detail_string()));
 	   throw;
 	}
 }
