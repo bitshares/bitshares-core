@@ -34,33 +34,31 @@ using namespace graphene::chain::test;
 using namespace graphene::app;
 
 BOOST_FIXTURE_TEST_SUITE(grouped_orders_api_tests, database_fixture)
-
 BOOST_AUTO_TEST_CASE(api_limit_get_grouped_limit_orders) {
- try {
-    graphene::app::orders_api orders_api(app);
-    optional< api_access_info > acc;
-    optional<price> start;
+	try
+	{
+		graphene::app::orders_api orders_api(app);
+	   optional< api_access_info > acc;
+	   optional<price> start;
 
-    //account_id_type() do 3 ops
-    create_bitasset("USD", account_id_type());
-    create_account("dan");
-    create_account("bob");
+	   //account_id_type() do 3 ops
+	   create_bitasset("USD", account_id_type());
+	   create_account("dan");
+	   create_account("bob");
 
-    asset_id_type bit_jmj_id = create_bitasset("JMJBIT").id;
-    generate_block();
-    fc::usleep(fc::milliseconds(2000));
+	   asset_id_type bit_jmj_id = create_bitasset("JMJBIT").id;
+	   generate_block();
+	   fc::usleep(fc::milliseconds(2000));
 
-    int asset_create_op_id = operation::tag<asset_create_operation>::value;
-    int account_create_op_id = operation::tag<account_create_operation>::value;
-
-    GRAPHENE_CHECK_THROW(orders_api.get_grouped_limit_orders(asset_id_type(), asset_id_type(),10, start,260), fc::exception)
-    vector< limit_order_group > orders =orders_api.get_grouped_limit_orders(asset_id_type(), bit_jmj_id, 10,start,240);
-    BOOST_REQUIRE_EQUAL( orders.size(), 0);
-
- } catch (fc::exception &e) {
-    edump((e.to_detail_string()));
-    throw;
- }
+	   GRAPHENE_CHECK_THROW(orders_api.get_grouped_limit_orders(asset_id_type(), asset_id_type(),10, start,260), fc::exception);
+	   vector< limit_order_group > orders =orders_api.get_grouped_limit_orders(asset_id_type(), bit_jmj_id, 10,start,240);
+	   BOOST_REQUIRE_EQUAL( orders.size(), 0);
+	}
+	catch (fc::exception &e)
+	{
+		edump((e.to_detail_string()));
+	   throw;
+	}
 }
 
 

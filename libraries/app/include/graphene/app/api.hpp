@@ -438,8 +438,8 @@ namespace graphene { namespace app {
    class asset_api
    {
       public:
-         asset_api(application& app)
-                 :_app(app), database_api( std::ref(*app.chain_database()), &(app.get_options())) {}
+		   asset_api(application& app);
+		   ~asset_api();
 
          /**
           * @brief Get asset holders for a specific asset
@@ -465,7 +465,7 @@ namespace graphene { namespace app {
 
       private:
            application& _app;
-           graphene::app::database_api database_api;
+           graphene::chain::database& _db;
    };
 
    /**
