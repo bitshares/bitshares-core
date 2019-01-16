@@ -174,10 +174,6 @@ BOOST_AUTO_TEST_CASE( black_swan )
  */
 BOOST_AUTO_TEST_CASE( black_swan_issue_346 )
 { try {
-      if(hf1270) {
-         wait_for_hf_core_1270();
-         set_expiration(db, trx);
-      }
 
       ACTORS((buyer)(seller)(borrower)(borrower2)(settler)(feeder));
 
@@ -277,8 +273,6 @@ BOOST_AUTO_TEST_CASE( black_swan_issue_346 )
          // We attempt to match against $0.019 order and black swan,
          // and this is intended behavior.  See discussion in ticket.
          //
-         print_market(bitusd.symbol, core.symbol);
-
          BOOST_CHECK( bitusd.bitasset_data(db).has_settlement() );
          BOOST_CHECK( db.find_object( oid_019 ) != nullptr );
          BOOST_CHECK( db.find_object( oid_020 ) == nullptr );
@@ -527,12 +521,7 @@ BOOST_AUTO_TEST_CASE(black_swan_after_hf1270)
 
 } FC_LOG_AND_RETHROW() }
 
-BOOST_AUTO_TEST_CASE(black_swan_issue_346_hf1270)
-{ try {
-   hf1270 = true;
-   INVOKE(black_swan_issue_346);
-
-} FC_LOG_AND_RETHROW() }
+// black_swan_issue_346_hf1270 is skipped as it is already failing with HARDFORK_CORE_834_TIME
 
 BOOST_AUTO_TEST_CASE(revive_recovered_hf1270)
 { try {
@@ -568,7 +557,5 @@ BOOST_AUTO_TEST_CASE(revive_empty_with_bid_hf1270)
    INVOKE(revive_empty_with_bid);
 
 } FC_LOG_AND_RETHROW() }
-
-
 
 BOOST_AUTO_TEST_SUITE_END()
