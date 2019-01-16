@@ -222,4 +222,75 @@ BOOST_AUTO_TEST_CASE( direct_index_test )
    // but the secondary has not updated its representation
 } FC_LOG_AND_RETHROW() }
 
+BOOST_AUTO_TEST_CASE( voting_weight_maintenance_test )
+{
+   ACTORS( (alice) (bob) )
+   account_statistics_id_type alice_stat_id = alice.statistics;
+   account_statistics_id_type bob_stat_id = bob.statistics;
+
+   account_id_type committee_acc_id;
+   transfer( committee_acc_id, alice_id, asset(10000) );
+   transfer( committee_acc_id, bob_id, asset(5000) );
+
+   time_point_sec next_maintenance = db.get_dynamic_global_properties().next_maintenance_time;
+   generate_blocks( next_maintenance );
+   generate_block();
+   
+   edump((alice_stat_id(db).voting_statistics.self_voting_power)(alice_stat_id(db).voting_statistics.get_total_voting_power())
+      (alice_stat_id(db).voting_statistics.has_proxy));
+
+   BOOST_CHECK( alice_stat_id(db).voting_statistics.self_voting_power == 10000 
+      && alice_stat_id(db).voting_statistics.get_total_voting_power() == 10000
+      && alice_stat_id(db).voting_statistics.has_proxy == false
+   );
+   BOOST_CHECK( bob_stat_id(db).voting_statistics.self_voting_power == 5000
+      && bob_stat_id(db).voting_statistics.get_total_voting_power() == 5000
+      && bob_stat_id(db).voting_statistics.has_proxy == false 
+   );
+
+
+   // one more maintenance with stake increase
+   transfer( committee_acc_id, alice_id, asset(10000) );
+
+   next_maintenance = db.get_dynamic_global_properties().next_maintenance_time;
+   generate_blocks( next_maintenance );
+   generate_block();
+
+   BOOST_CHECK( alice_stat_id(db).voting_statistics.self_voting_power == 20000
+      && alice_stat_id(db).voting_statistics.get_total_voting_power() == 20000
+      && alice_stat_id(db).voting_statistics.has_proxy == false
+   );
+   BOOST_CHECK( bob_stat_id(db).voting_statistics.self_voting_power == 5000
+      && bob_stat_id(db).voting_statistics.get_total_voting_power() == 5000
+      && bob_stat_id(db).voting_statistics.has_proxy == false
+   );
+
+
+   // set bob as proxy in alice_acc
+   account_options opt;
+   opt.voting_account = bob_id;
+
+   account_update_operation op;
+   op.account     = alice_id;
+   op.new_options = opt;
+
+   signed_transaction trx;
+   test::set_expiration( db, trx );
+   trx.operations.push_back( op );
+   PUSH_TX( db, trx, ~0 );
+
+   next_maintenance = db.get_dynamic_global_properties().next_maintenance_time;
+   generate_blocks( next_maintenance );
+   generate_block();
+
+   BOOST_CHECK( alice_stat_id(db).voting_statistics.self_voting_power == 20000
+      && alice_stat_id(db).voting_statistics.get_total_voting_power() == 0
+      && alice_stat_id(db).voting_statistics.has_proxy == true
+   );
+   BOOST_CHECK( bob_stat_id(db).voting_statistics.self_voting_power == 5000
+      && bob_stat_id(db).voting_statistics.get_total_voting_power() == 25000
+      && bob_stat_id(db).voting_statistics.has_proxy == false
+   );
+}
+
 BOOST_AUTO_TEST_SUITE_END()
