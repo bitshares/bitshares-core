@@ -98,6 +98,29 @@ namespace graphene { namespace chain {
           */
          share_type pending_vested_fees;
 
+         /**
+          * Specifies the total voting weight of this account (set in maintenance interval)
+          */
+         struct voting_stat
+         {
+            bool has_proxy;
+            uint64_t self_voting_power;
+            flat_map<account_id_type, uint64_t> proxy_for;
+
+            const uint64_t get_total_voting_power() const
+            {
+               if( !has_proxy ) {
+                  uint64_t total = self_voting_power;
+                  for( const auto& pair : proxy_for )
+                     total += pair.second;
+                  return total;
+               }
+               return 0;
+            }
+         };
+         
+         voting_stat voting_statistics;
+
          /// Whether this account has pending fees, no matter vested or not
          inline bool has_pending_fees() const { return pending_fees > 0 || pending_vested_fees > 0; }
 
@@ -466,5 +489,11 @@ FC_REFLECT_DERIVED( graphene::chain::account_statistics_object,
                     (last_vote_time)
                     (lifetime_fees_paid)
                     (pending_fees)(pending_vested_fees)
+                    (voting_statistics)
                   )
 
+FC_REFLECT( graphene::chain::account_statistics_object::voting_stat,
+            (has_proxy)
+            (self_voting_power)
+            (proxy_for)
+          )

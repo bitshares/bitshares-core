@@ -1101,15 +1101,29 @@ void database::perform_chain_maintenance(const signed_block& next_block, const g
             // There may be a difference between the account whose stake is voting and the one specifying opinions.
             // Usually they're the same, but if the stake account has specified a voting_account, that account is the one
             // specifying the opinions.
-            const account_object& opinion_account =
-                  (stake_account.options.voting_account ==
-                   GRAPHENE_PROXY_TO_SELF_ACCOUNT)? stake_account
-                                     : d.get(stake_account.options.voting_account);
+            bool has_proxy = stake_account.options.voting_account != GRAPHENE_PROXY_TO_SELF_ACCOUNT;
+                                     
+            const account_object& opinion_account = has_proxy ? d.get(stake_account.options.voting_account)
+                                     : stake_account;
 
             uint64_t voting_stake = stats.total_core_in_orders.value
-                  + (stake_account.cashback_vb.valid() ? (*stake_account.cashback_vb)(d).balance.amount.value: 0)
+                  + (stake_account.cashback_vb.valid() ? ( *stake_account.cashback_vb)(d).balance.amount.value: 0 )
                   + stats.core_in_balance.value;
 
+            // set the voting weight of the given account
+            d.modify( stats, [voting_stake, has_proxy](account_statistics_object& aso) {
+               aso.voting_statistics.has_proxy = has_proxy;
+               aso.voting_statistics.self_voting_power = voting_stake;
+            });
+            
+            if( has_proxy )
+            {
+               const auto& opinion_acc_stat = opinion_account.statistics(d);
+               d.modify( opinion_acc_stat, [voting_stake, &stake_account](account_statistics_object& aso) {
+                  aso.voting_statistics.proxy_for.insert( std::pair<account_id_type, uint64_t>( stake_account.id, voting_stake ) );
+               });
+            }
+            
             for( vote_id_type id : opinion_account.options.votes )
             {
                uint32_t offset = id.instance();
