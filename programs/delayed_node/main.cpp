@@ -166,11 +166,6 @@ int main(int argc, char** argv) {
       std::set<std::string> plugins;
       boost::split(plugins, options.at("plugins").as<std::string>(), [](char c){return c == ' ';});
 
-      if(plugins.count("account_history") && plugins.count("elasticsearch")) {
-         std::cerr << "Plugin conflict: Cannot load both account_history plugin and elasticsearch plugin\n";
-         return 1;
-      }
-
       std::for_each(plugins.begin(), plugins.end(), [&](const std::string& plug) mutable {
           if (!plug.empty()) {
              node.enable_plugin(plug);
