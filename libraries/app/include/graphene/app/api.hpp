@@ -266,19 +266,19 @@ namespace graphene { namespace app {
           * The transaction will be checked for validity in the local database prior to broadcasting. If it fails to
           * apply locally, an error will be thrown and the transaction will not be broadcast.
           */
-         void broadcast_transaction(const signed_transaction& trx);
+         void broadcast_transaction(const precomputable_transaction& trx);
 
          /** this version of broadcast transaction registers a callback method that will be called when the transaction is
           * included into a block.  The callback method includes the transaction id, block number, and transaction number in the
           * block.
           */
-         void broadcast_transaction_with_callback( confirmation_callback cb, const signed_transaction& trx);
+         void broadcast_transaction_with_callback( confirmation_callback cb, const precomputable_transaction& trx);
 
          /** this version of broadcast transaction registers a callback method that will be called when the transaction is
           * included into a block.  The callback method includes the transaction id, block number, and transaction number in the
           * block.
           */
-         fc::variant broadcast_transaction_synchronous(const signed_transaction& trx);
+         fc::variant broadcast_transaction_synchronous(const precomputable_transaction& trx);
 
          /**
           * @brief Broadcast a signed block to the network

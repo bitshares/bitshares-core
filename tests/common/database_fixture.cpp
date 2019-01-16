@@ -30,6 +30,7 @@
 #include <graphene/elasticsearch/elasticsearch_plugin.hpp>
 #include <graphene/es_objects/es_objects.hpp>
 
+#include <graphene/chain/balance_object.hpp>
 #include <graphene/chain/committee_member_object.hpp>
 #include <graphene/chain/fba_object.hpp>
 #include <graphene/chain/market_object.hpp>
@@ -54,6 +55,13 @@ namespace graphene { namespace chain {
 
 using std::cout;
 using std::cerr;
+
+void clearable_block::clear()
+{
+   _calculated_merkle_root = checksum_type();
+   _signee = fc::ecc::public_key();
+   _block_id = block_id_type();
+}
 
 database_fixture::database_fixture()
    : app(), db( *app.chain_database() )
@@ -103,8 +111,17 @@ database_fixture::database_fixture()
 
    open_database();
 
+   /**
+    * Test specific settings
+    */
+   auto current_test_name = boost::unit_test::framework::current_test_case().p_name.value;
+   auto current_test_suite_id = boost::unit_test::framework::current_test_case().p_parent_id;
+   if (current_test_name == "get_account_history_operations")
+   {
+      options.insert(std::make_pair("max-ops-per-account", boost::program_options::variable_value((uint64_t)75, false)));
+   }
    // add account tracking for ahplugin for special test case with track-account enabled
-   if( !options.count("track-account") && boost::unit_test::framework::current_test_case().p_name.value == "track_account") {
+   if( !options.count("track-account") && current_test_name == "track_account") {
       std::vector<std::string> track_account;
       std::string track = "\"1.2.17\"";
       track_account.push_back(track);
@@ -112,7 +129,7 @@ database_fixture::database_fixture()
       options.insert(std::make_pair("partial-operations", boost::program_options::variable_value(true, false)));
    }
    // account tracking 2 accounts
-   if( !options.count("track-account") && boost::unit_test::framework::current_test_case().p_name.value == "track_account2") {
+   if( !options.count("track-account") && current_test_name == "track_account2") {
       std::vector<std::string> track_account;
       std::string track = "\"1.2.0\"";
       track_account.push_back(track);
@@ -125,10 +142,7 @@ database_fixture::database_fixture()
        boost::unit_test::framework::current_test_case().p_name.value == "track_votes_committee_disabled") {
       app.chain_database()->enable_standby_votes_tracking( false );
    }
-
-   auto test_name = boost::unit_test::framework::current_test_case().p_name.value;
-   auto test_suite_id = boost::unit_test::framework::current_test_case().p_parent_id;
-   if(test_name == "elasticsearch_account_history" || test_name == "elasticsearch_suite") {
+   if(current_test_name == "elasticsearch_account_history" || current_test_name == "elasticsearch_suite") {
       auto esplugin = app.register_plugin<graphene::elasticsearch::elasticsearch_plugin>();
       esplugin->plugin_set_app(&app);
 
@@ -141,7 +155,7 @@ database_fixture::database_fixture()
       esplugin->plugin_initialize(options);
       esplugin->plugin_startup();
    }
-   else if( boost::unit_test::framework::get<boost::unit_test::test_suite>(test_suite_id).p_name.value != "performance_tests" )
+   else if( boost::unit_test::framework::get<boost::unit_test::test_suite>(current_test_suite_id).p_name.value != "performance_tests" )
    {
       auto ahplugin = app.register_plugin<graphene::account_history::account_history_plugin>();
       ahplugin->plugin_set_app(&app);
@@ -149,7 +163,7 @@ database_fixture::database_fixture()
       ahplugin->plugin_startup();
    }
 
-   if(test_name == "elasticsearch_objects" || test_name == "elasticsearch_suite") {
+   if(current_test_name == "elasticsearch_objects" || current_test_name == "elasticsearch_suite") {
       auto esobjects_plugin = app.register_plugin<graphene::es_objects::es_objects_plugin>();
       esobjects_plugin->plugin_set_app(&app);
 
@@ -227,7 +241,7 @@ void database_fixture::verify_asset_supplies( const database& db )
    BOOST_CHECK(core_asset_data.fee_pool == 0);
 
    const auto& statistics_index = db.get_index_type<account_stats_index>().indices();
-   const auto& balance_index = db.get_index_type<account_balance_index>().indices();
+   const auto& acct_balance_index = db.get_index_type<account_balance_index>().indices();
    const auto& settle_index = db.get_index_type<force_settlement_index>().indices();
    const auto& bids = db.get_index_type<collateral_bid_index>().indices();
    map<asset_id_type,share_type> total_balances;
@@ -235,7 +249,7 @@ void database_fixture::verify_asset_supplies( const database& db )
    share_type core_in_orders;
    share_type reported_core_in_orders;
 
-   for( const account_balance_object& b : balance_index )
+   for( const account_balance_object& b : acct_balance_index )
       total_balances[b.asset_type] += b.balance;
    for( const force_settlement_object& s : settle_index )
       total_balances[s.balance.asset_id] += s.balance.amount;
@@ -277,6 +291,8 @@ void database_fixture::verify_asset_supplies( const database& db )
       total_balances[ vbo.balance.asset_id ] += vbo.balance.amount;
    for( const fba_accumulator_object& fba : db.get_index_type< simple_index< fba_accumulator_object > >() )
       total_balances[ asset_id_type() ] += fba.accumulated_fba_fees;
+   for( const balance_object& bo : db.get_index_type< balance_index >().indices() )
+      total_balances[ bo.balance.asset_id ] += bo.balance.amount;
 
    total_balances[asset_id_type()] += db.get_dynamic_global_properties().witness_budget;
 
@@ -453,7 +469,7 @@ const asset_object& database_fixture::create_bitasset(
    creator.bitasset_opts->short_backing_asset = backing_asset;
    trx.operations.push_back(std::move(creator));
    trx.validate();
-   processed_transaction ptx = db.push_transaction(trx, ~0);
+   processed_transaction ptx = PUSH_TX(db, trx, ~0);
    trx.operations.clear();
    return db.get<asset_object>(ptx.operation_results[0].get<object_id_type>());
 } FC_CAPTURE_AND_RETHROW( (name)(flags) ) }
@@ -484,7 +500,7 @@ const asset_object& database_fixture::create_prediction_market(
    creator.is_prediction_market = true;
    trx.operations.push_back(std::move(creator));
    trx.validate();
-   processed_transaction ptx = db.push_transaction(trx, ~0);
+   processed_transaction ptx = PUSH_TX(db, trx, ~0);
    trx.operations.clear();
    return db.get<asset_object>(ptx.operation_results[0].get<object_id_type>());
 } FC_CAPTURE_AND_RETHROW( (name)(flags) ) }
@@ -504,7 +520,7 @@ const asset_object& database_fixture::create_user_issued_asset( const string& na
    creator.common_options.issuer_permissions = charge_market_fee;
    trx.operations.push_back(std::move(creator));
    trx.validate();
-   processed_transaction ptx = db.push_transaction(trx, ~0);
+   processed_transaction ptx = PUSH_TX(db, trx, ~0);
    trx.operations.clear();
    return db.get<asset_object>(ptx.operation_results[0].get<object_id_type>());
 }
@@ -526,7 +542,7 @@ const asset_object& database_fixture::create_user_issued_asset( const string& na
    trx.operations.push_back(std::move(creator));
    set_expiration( db, trx );
    trx.validate();
-   processed_transaction ptx = db.push_transaction(trx, ~0);
+   processed_transaction ptx = PUSH_TX(db, trx, ~0);
    trx.operations.clear();
    return db.get<asset_object>(ptx.operation_results[0].get<object_id_type>());
 }
@@ -539,7 +555,7 @@ void database_fixture::issue_uia( const account_object& recipient, asset amount 
    op.asset_to_issue = amount;
    op.issue_to_account = recipient.id;
    trx.operations.push_back(op);
-   db.push_transaction( trx, ~0 );
+   PUSH_TX( db, trx, ~0 );
    trx.operations.clear();
 }
 
@@ -585,7 +601,7 @@ const account_object& database_fixture::create_account(
 {
    trx.operations.push_back(make_account(name, key));
    trx.validate();
-   processed_transaction ptx = db.push_transaction(trx, ~0);
+   processed_transaction ptx = PUSH_TX(db, trx, ~0);
    auto& result = db.get<account_object>(ptx.operation_results[0].get<object_id_type>());
    trx.operations.clear();
    return result;
@@ -604,7 +620,7 @@ const account_object& database_fixture::create_account(
       trx.operations.resize(1);
       trx.operations.back() = (make_account(name, registrar, referrer, referrer_percent, key));
       trx.validate();
-      auto r = db.push_transaction(trx, ~0);
+      auto r = PUSH_TX(db, trx, ~0);
       const auto& result = db.get<account_object>(r.operation_results[0].get<object_id_type>());
       trx.operations.clear();
       return result;
@@ -636,7 +652,7 @@ const account_object& database_fixture::create_account(
 
       trx.validate();
 
-      processed_transaction ptx = db.push_transaction(trx, ~0);
+      processed_transaction ptx = PUSH_TX(db, trx, ~0);
       const account_object& result = db.get<account_object>(ptx.operation_results[0].get<object_id_type>());
       trx.operations.clear();
       return result;
@@ -650,7 +666,7 @@ const committee_member_object& database_fixture::create_committee_member( const 
    op.committee_member_account = owner.id;
    trx.operations.push_back(op);
    trx.validate();
-   processed_transaction ptx = db.push_transaction(trx, ~0);
+   processed_transaction ptx = PUSH_TX(db, trx, ~0);
    trx.operations.clear();
    return db.get<committee_member_object>(ptx.operation_results[0].get<object_id_type>());
 }
@@ -671,7 +687,7 @@ const witness_object& database_fixture::create_witness( const account_object& ow
    op.block_signing_key = signing_private_key.get_public_key();
    trx.operations.push_back(op);
    trx.validate();
-   processed_transaction ptx = db.push_transaction(trx, skip_flags );
+   processed_transaction ptx = PUSH_TX(db, trx, skip_flags );
    trx.clear();
    return db.get<witness_object>(ptx.operation_results[0].get<object_id_type>());
 } FC_CAPTURE_AND_RETHROW() }
@@ -686,7 +702,7 @@ const worker_object& database_fixture::create_worker( const account_id_type owne
    op.work_end_date = op.work_begin_date + duration;
    trx.operations.push_back(op);
    trx.validate();
-   processed_transaction ptx = db.push_transaction(trx, ~0);
+   processed_transaction ptx = PUSH_TX(db, trx, ~0);
    trx.clear();
    return db.get<worker_object>(ptx.operation_results[0].get<object_id_type>());
 } FC_CAPTURE_AND_RETHROW() }
@@ -731,7 +747,7 @@ const limit_order_object* database_fixture::create_sell_order( const account_obj
    trx.operations.push_back(buy_order);
    for( auto& op : trx.operations ) db.current_fee_schedule().set_fee(op, fee_core_exchange_rate);
    trx.validate();
-   auto processed = db.push_transaction(trx, ~0);
+   auto processed = PUSH_TX(db, trx, ~0);
    trx.operations.clear();
    verify_asset_supplies(db);
    return db.find<limit_order_object>( processed.operation_results[0].get<object_id_type>() );
@@ -745,7 +761,7 @@ asset database_fixture::cancel_limit_order( const limit_order_object& order )
   trx.operations.push_back(cancel_order);
   for( auto& op : trx.operations ) db.current_fee_schedule().set_fee(op);
   trx.validate();
-  auto processed = db.push_transaction(trx, ~0);
+  auto processed = PUSH_TX(db, trx, ~0);
   trx.operations.clear();
    verify_asset_supplies(db);
   return processed.operation_results[0].get<asset>();
@@ -781,7 +797,7 @@ void database_fixture::transfer(
          for( auto& op : trx.operations ) db.current_fee_schedule().set_fee(op);
       }
       trx.validate();
-      db.push_transaction(trx, ~0);
+      PUSH_TX(db, trx, ~0);
       verify_asset_supplies(db);
       trx.operations.clear();
    } FC_CAPTURE_AND_RETHROW( (from.id)(to.id)(amount)(fee) )
@@ -799,7 +815,7 @@ void database_fixture::update_feed_producers( const asset_object& mia, flat_set<
 
    for( auto& op : trx.operations ) db.current_fee_schedule().set_fee(op);
    trx.validate();
-   db.push_transaction(trx, ~0);
+   PUSH_TX(db, trx, ~0);
    trx.operations.clear();
    verify_asset_supplies(db);
 } FC_CAPTURE_AND_RETHROW( (mia)(producers) ) }
@@ -819,7 +835,7 @@ void database_fixture::publish_feed( const asset_object& mia, const account_obje
 
    for( auto& op : trx.operations ) db.current_fee_schedule().set_fee(op);
    trx.validate();
-   db.push_transaction(trx, ~0);
+   PUSH_TX(db, trx, ~0);
    trx.operations.clear();
    verify_asset_supplies(db);
 }
@@ -867,7 +883,7 @@ void database_fixture::force_global_settle( const asset_object& what, const pric
    trx.operations.push_back(sop);
    for( auto& op : trx.operations ) db.current_fee_schedule().set_fee(op);
    trx.validate();
-   db.push_transaction(trx, ~0);
+   PUSH_TX(db, trx, ~0);
    trx.operations.clear();
    verify_asset_supplies(db);
 } FC_CAPTURE_AND_RETHROW( (what)(p) ) }
@@ -882,7 +898,7 @@ operation_result database_fixture::force_settle( const account_object& who, asse
    trx.operations.push_back(sop);
    for( auto& op : trx.operations ) db.current_fee_schedule().set_fee(op);
    trx.validate();
-   processed_transaction ptx = db.push_transaction(trx, ~0);
+   processed_transaction ptx = PUSH_TX(db, trx, ~0);
    const operation_result& op_result = ptx.operation_results.front();
    trx.operations.clear();
    verify_asset_supplies(db);
@@ -902,7 +918,7 @@ const call_order_object* database_fixture::borrow( const account_object& who, as
    trx.operations.push_back(update);
    for( auto& op : trx.operations ) db.current_fee_schedule().set_fee(op);
    trx.validate();
-   db.push_transaction(trx, ~0);
+   PUSH_TX(db, trx, ~0);
    trx.operations.clear();
    verify_asset_supplies(db);
 
@@ -927,7 +943,7 @@ void database_fixture::cover(const account_object& who, asset what, asset collat
    trx.operations.push_back(update);
    for( auto& op : trx.operations ) db.current_fee_schedule().set_fee(op);
    trx.validate();
-   db.push_transaction(trx, ~0);
+   PUSH_TX(db, trx, ~0);
    trx.operations.clear();
    verify_asset_supplies(db);
 } FC_CAPTURE_AND_RETHROW( (who.name)(what)(collateral)(target_cr) ) }
@@ -943,7 +959,7 @@ void database_fixture::bid_collateral(const account_object& who, const asset& to
    trx.operations.push_back(bid);
    for( auto& op : trx.operations ) db.current_fee_schedule().set_fee(op);
    trx.validate();
-   db.push_transaction(trx, ~0);
+   PUSH_TX(db, trx, ~0);
    trx.operations.clear();
    verify_asset_supplies(db);
 } FC_CAPTURE_AND_RETHROW( (who.name)(to_bid)(to_cover) ) }
@@ -959,7 +975,7 @@ void database_fixture::fund_fee_pool( const account_object& from, const asset_ob
    for( auto& op : trx.operations ) db.current_fee_schedule().set_fee(op);
    trx.validate();
    set_expiration( db, trx );
-   db.push_transaction(trx, ~0);
+   PUSH_TX(db, trx, ~0);
    trx.operations.clear();
    verify_asset_supplies(db);
 }
@@ -986,7 +1002,7 @@ void database_fixture::upgrade_to_lifetime_member( const account_object& account
       op.upgrade_to_lifetime_member = true;
       op.fee = db.get_global_properties().parameters.current_fees->calculate_fee(op);
       trx.operations = {op};
-      db.push_transaction(trx, ~0);
+      PUSH_TX(db, trx, ~0);
       FC_ASSERT( op.account_to_upgrade(db).is_lifetime_member() );
       trx.clear();
       verify_asset_supplies(db);
@@ -1006,7 +1022,7 @@ void database_fixture::upgrade_to_annual_member(const account_object& account)
       op.account_to_upgrade = account.get_id();
       op.fee = db.get_global_properties().parameters.current_fees->calculate_fee(op);
       trx.operations = {op};
-      db.push_transaction(trx, ~0);
+      PUSH_TX(db, trx, ~0);
       FC_ASSERT( op.account_to_upgrade(db).is_member(db.head_block_time()) );
       trx.clear();
       verify_asset_supplies(db);
@@ -1173,7 +1189,7 @@ bool _push_block( database& db, const signed_block& b, uint32_t skip_flags /* = 
 
 processed_transaction _push_transaction( database& db, const signed_transaction& tx, uint32_t skip_flags /* = 0 */ )
 { try {
-   auto pt = db.push_transaction( tx, skip_flags );
+   auto pt = db.push_transaction( precomputable_transaction(tx), skip_flags );
    database_fixture::verify_asset_supplies(db);
    return pt;
 } FC_CAPTURE_AND_RETHROW((tx)) }
