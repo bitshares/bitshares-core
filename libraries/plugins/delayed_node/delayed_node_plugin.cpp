@@ -58,7 +58,7 @@ delayed_node_plugin::~delayed_node_plugin()
 void delayed_node_plugin::plugin_set_program_options(bpo::options_description& cli, bpo::options_description& cfg)
 {
    cli.add_options()
-         ("trusted-node", boost::program_options::value<std::string>()->default_value("127.0.0.1:8090"), "RPC endpoint of a trusted validating node (required for delayed_node)")
+         ("trusted-node", boost::program_options::value<std::string>(), "RPC endpoint of a trusted validating node (required for delayed_node)")
          ;
    cfg.add(cli);
 }
