@@ -59,7 +59,7 @@ namespace graphene { namespace db {
                {
                   mv._apply_undo = false;
                }
-               ~session(); // defined in implementation file to prevent repeated compiler warnings
+               ~session();
                void commit() { _apply_undo = false; _db.commit();  }
                void undo()   { if( _apply_undo ) _db.undo(); _apply_undo = false; }
                void merge()  { if( _apply_undo ) _db.merge(); _apply_undo = false; }
