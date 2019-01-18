@@ -163,14 +163,10 @@ int main(int argc, char** argv) {
       if( !options.count("plugins") )
          options.insert( std::make_pair( "plugins", bpo::variable_value(std::string("delayed_node account_history market_history"), true) ) );
 
-      uint8_t ret_val;
-      if ( (ret_val = node.initialize(data_dir, options)) != DO_NOT_EXIT )
-         return ret_val;
-
+      node.initialize(data_dir, options);
       node.initialize_plugins( options );
 
-      if ( (ret_val = node.startup()) != DO_NOT_EXIT )
-         return ret_val;
+      node.startup();
 
       node.startup_plugins();
 

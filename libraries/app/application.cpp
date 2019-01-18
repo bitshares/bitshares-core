@@ -318,7 +318,7 @@ void application_impl::set_dbg_init_key( graphene::chain::genesis_state_type& ge
       genesis.initial_witness_candidates[i].block_signing_key = init_pubkey;
 }
 
-uint8_t application_impl::startup()
+void application_impl::startup()
 { try {
    fc::create_directories(_data_dir / "blockchain");
 
@@ -444,18 +444,14 @@ uint8_t application_impl::startup()
 
    if( _options->count("api-access") ) {
 
-      if(fc::exists(_options->at("api-access").as<boost::filesystem::path>()))
-      {
-         _apiaccess = fc::json::from_file( _options->at("api-access").as<boost::filesystem::path>() ).as<api_access>( 20 );
-         ilog( "Using api access file from ${path}",
-               ("path", _options->at("api-access").as<boost::filesystem::path>().string()) );
-      }
-      else
-      {
-         elog("Failed to load file from ${path}",
-            ("path", _options->at("api-access").as<boost::filesystem::path>().string()));
-         return EXIT_FAILURE;
-      }
+      fc::path api_access_file = _options->at("api-access").as<boost::filesystem::path>();
+
+      FC_ASSERT( fc::exists(api_access_file), 
+            "Failed to load file from ${path}", ("path", api_access_file) );
+
+      _apiaccess = fc::json::from_file( api_access_file ).as<api_access>( 20 );
+      ilog( "Using api access file from ${path}",
+            ("path", api_access_file) );
    }
    else
    {
@@ -475,7 +471,6 @@ uint8_t application_impl::startup()
    reset_p2p_node(_data_dir);
    reset_websocket_server();
    reset_websocket_tls_server();
-   return DO_NOT_EXIT;
 } FC_LOG_AND_RETHROW() }
 
 optional< api_access_info > application_impl::get_api_access_info(const string& username)const
@@ -986,10 +981,6 @@ void application::set_program_options(boost::program_options::options_descriptio
          ;
    command_line_options.add(configuration_file_options);
    command_line_options.add_options()
-         ("create-genesis-json", bpo::value<boost::filesystem::path>(),
-          "Path to create a Genesis State at. If a well-formed JSON file exists at the path, it will be parsed and any "
-          "missing fields in a Genesis State will be added, and any unknown fields will be removed. If no file or an "
-          "invalid file is found, it will be replaced with an example Genesis State.")
          ("replay-blockchain", "Rebuild object graph by replaying all blocks without validation")
          ("revalidate-blockchain", "Rebuild object graph by replaying all blocks with full validation")
          ("resync-blockchain", "Delete all blocks and re-sync with network from scratch")
@@ -1001,35 +992,10 @@ void application::set_program_options(boost::program_options::options_descriptio
    configuration_file_options.add(_cfg_options);
 }
 
-uint8_t application::initialize(const fc::path& data_dir, const boost::program_options::variables_map& options)
+void application::initialize(const fc::path& data_dir, const boost::program_options::variables_map& options)
 {
    my->_data_dir = data_dir;
    my->_options = &options;
-
-   if( options.count("create-genesis-json") )
-   {
-      fc::path genesis_out = options.at("create-genesis-json").as<boost::filesystem::path>();
-      genesis_state_type genesis_state = detail::create_example_genesis();
-      if( fc::exists(genesis_out) )
-      {
-         try {
-            genesis_state = fc::json::from_file(genesis_out).as<genesis_state_type>( 20 );
-         } catch(const fc::exception& e) {
-            std::cerr << "Unable to parse existing genesis file:\n" << e.to_string()
-                      << "\nWould you like to replace it? [y/N] ";
-            char response = std::cin.get();
-            if( toupper(response) != 'Y' )
-               return EXIT_FAILURE;
-         }
-
-         std::cerr << "Updating genesis state in file " << genesis_out.generic_string() << "\n";
-      } else {
-         std::cerr << "Creating example genesis state in file " << genesis_out.generic_string() << "\n";
-      }
-      fc::json::save_to_file(genesis_state, genesis_out);
-
-      return EXIT_SUCCESS;
-   }
 
    if ( options.count("io-threads") )
    {
@@ -1057,19 +1023,16 @@ uint8_t application::initialize(const fc::path& data_dir, const boost::program_o
       if(it == "elasticsearch")
          ++es_ah_conflict_counter;
 
-      if(es_ah_conflict_counter > 1) {
-         elog("Can't start program with elasticsearch and account_history plugin at the same time");
-         return EXIT_FAILURE;
-      }
+      FC_ASSERT(es_ah_conflict_counter <= 1, "Can't start program with elasticsearch and account_history plugin at the same time");
+
       if (!it.empty()) enable_plugin(it);
    }
-   return true;
 }
 
-uint8_t application::startup()
+void application::startup()
 {
    try {
-      return my->startup();
+      my->startup();
    } catch ( const fc::exception& e ) {
       elog( "${e}", ("e",e.to_detail_string()) );
       throw;

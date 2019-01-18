@@ -36,13 +36,13 @@ class application_impl : public net::node_delegate
       {
       }
 
-      ~application_impl()
+      virtual ~application_impl()
       {
       }
 
       void set_dbg_init_key( graphene::chain::genesis_state_type& genesis, const std::string& init_key );
 
-      uint8_t startup();
+      void startup();
 
       fc::optional< api_access_info > get_api_access_info(const string& username)const;
 

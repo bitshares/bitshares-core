@@ -29,10 +29,6 @@
 
 #include <boost/program_options.hpp>
 
-#ifndef DO_NOT_EXIT
-   #define DO_NOT_EXIT 254
-#endif
-
 namespace graphene { namespace app {
    namespace detail { class application_impl; }
    using std::string;
@@ -54,17 +50,9 @@ namespace graphene { namespace app {
 
          void set_program_options( boost::program_options::options_description& command_line_options,
                                    boost::program_options::options_description& configuration_file_options )const;
-         /**
-          * Initializes the application
-          * @returns DO_NOT_EXIT if the calling method should continue, otherwise EXIT_SUCCESS or EXIT_FAILURE
-          */
-         uint8_t initialize(const fc::path& data_dir, const boost::program_options::variables_map&options);
+         void initialize(const fc::path& data_dir, const boost::program_options::variables_map&options);
          void initialize_plugins( const boost::program_options::variables_map& options );
-         /***
-          * Performs startup
-          * @returns DO_NOT_EXIT if the calling method should continue, otherwise EXIT_SUCCESS or EXIT_FAILURE
-          */
-         uint8_t startup();
+         void startup();
          void shutdown();
          void startup_plugins();
          void shutdown_plugins();

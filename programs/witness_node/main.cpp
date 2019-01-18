@@ -121,20 +121,10 @@ int main(int argc, char** argv) {
 
       bpo::notify(options);
 
-      uint8_t ret_val;
-      if ( ( ret_val = node->initialize(data_dir, options)) != DO_NOT_EXIT )
-      {
-         delete node;
-         return ret_val;
-      }
+      node->initialize(data_dir, options);
       node->initialize_plugins( options );
 
-      if ( (ret_val = node->startup()) != DO_NOT_EXIT )
-      {
-         delete node;
-         return ret_val;
-      }
-
+      node->startup();
       node->startup_plugins();
 
       fc::promise<int>::ptr exit_promise = new fc::promise<int>("UNIX Signal Handler");
