@@ -56,9 +56,9 @@ using namespace graphene::chain::test;
 
 BOOST_FIXTURE_TEST_SUITE( htlc_tests, database_fixture )
 
-void generate_random_preimage(uint16_t key_size, std::vector<uint8_t>& vec)
+void generate_random_preimage(uint16_t key_size, std::vector<char>& vec)
 {
-	std::independent_bits_engine<std::default_random_engine, CHAR_BIT, uint8_t> rbe;
+	std::independent_bits_engine<std::default_random_engine, CHAR_BIT, unsigned char> rbe;
 	std::generate(begin(vec), end(vec), std::ref(rbe));
 	return;
 }
@@ -69,7 +69,7 @@ void generate_random_preimage(uint16_t key_size, std::vector<uint8_t>& vec)
  * @returns a vector that cointains the sha256 hash of the preimage
  */
 template<typename H>
-H hash_it(std::vector<uint8_t> preimage)
+H hash_it(std::vector<char> preimage)
 {
    return H::hash( (char*)preimage.data(), preimage.size() );
 }
@@ -177,7 +177,7 @@ try {
    advance_past_hardfork(this);
 
    uint16_t preimage_size = 256;
-   std::vector<unsigned char> pre_image(256);
+   std::vector<char> pre_image(256);
    generate_random_preimage(preimage_size, pre_image);
 
    graphene::chain::htlc_id_type alice_htlc_id;
@@ -234,7 +234,7 @@ try {
    advance_past_hardfork(this);
    
    uint16_t preimage_size = 256;
-   std::vector<unsigned char> pre_image(preimage_size);
+   std::vector<char> pre_image(preimage_size);
    generate_random_preimage(preimage_size, pre_image);
 
    graphene::chain::htlc_id_type alice_htlc_id;
@@ -314,7 +314,7 @@ try {
    transfer( committee_account, alice_id, graphene::chain::asset(init_balance) );
 
    uint16_t preimage_size = 256;
-   std::vector<unsigned char> pre_image(256);
+   std::vector<char> pre_image(256);
    generate_random_preimage(preimage_size, pre_image);
 
    graphene::chain::htlc_id_type alice_htlc_id;
@@ -502,7 +502,7 @@ BOOST_AUTO_TEST_CASE( htlc_before_hardfork )
    transfer( committee_account, alice_id, graphene::chain::asset(init_balance) );
 
    uint16_t preimage_size = 256;
-   std::vector<unsigned char> pre_image(256);
+   std::vector<char> pre_image(256);
    generate_random_preimage(preimage_size, pre_image);
 
    graphene::chain::htlc_id_type alice_htlc_id;
@@ -607,15 +607,15 @@ BOOST_AUTO_TEST_CASE( fee_calculations )
       redeem_fee.fee = 2;
       htlc_redeem_operation redeem;
       // no preimage
-      redeem.preimage = std::vector<uint8_t>();
+      redeem.preimage = std::vector<char>();
       BOOST_CHECK_EQUAL( redeem.calculate_fee( redeem_fee ).value, 2 ) ;
       // exactly 1KB
       std::string test(1024, 'a');
-      redeem.preimage = std::vector<uint8_t>( test.begin(), test.end() );
+      redeem.preimage = std::vector<char>( test.begin(), test.end() );
       BOOST_CHECK_EQUAL( redeem.calculate_fee( redeem_fee ).value, 4 ) ;
       // just 1 byte over 1KB
       std::string larger(1025, 'a');
-      redeem.preimage = std::vector<uint8_t>( larger.begin(), larger.end() );
+      redeem.preimage = std::vector<char>( larger.begin(), larger.end() );
       BOOST_CHECK_EQUAL( redeem.calculate_fee( redeem_fee ).value, 6 ) ;
    }
    // extend

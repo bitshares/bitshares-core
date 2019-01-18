@@ -71,11 +71,11 @@ namespace graphene {
       class htlc_redeem_visitor
       {
       //private:
-         const std::vector<uint8_t>& data;
+         const std::vector<char>& data;
       public:
          typedef bool result_type;
 
-         htlc_redeem_visitor( const std::vector<uint8_t>& preimage )
+         htlc_redeem_visitor( const std::vector<char>& preimage )
             : data( preimage ) {}
 
          template<typename T>
