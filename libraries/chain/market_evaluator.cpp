@@ -188,6 +188,10 @@ void_result call_order_update_evaluator::do_evaluate(const call_order_update_ope
    else if( _bitasset_data->current_feed.settlement_price.is_null() )
       FC_THROW_EXCEPTION(insufficient_feeds, "Cannot borrow asset with no price feed.");
 
+   _dynamic_data_obj = &_debt_asset->dynamic_asset_data_id(d);
+   FC_ASSERT( _dynamic_data_obj->current_supply + o.delta_debt.amount >= 0,
+         "This transaction would bring current supply below zero.");
+
    // Note: there was code here checking whether the account has enough balance to increase delta collateral,
    //       which is now removed since the check is implicitly done later by `adjust_balance()` in `do_apply()`.
 
@@ -204,9 +208,8 @@ object_id_type call_order_update_evaluator::do_apply(const call_order_update_ope
       d.adjust_balance( o.funding_account, o.delta_debt );
 
       // Deduct the debt paid from the total supply of the debt asset.
-      d.modify(_debt_asset->dynamic_asset_data_id(d), [&](asset_dynamic_data_object& dynamic_asset) {
+      d.modify(*_dynamic_data_obj, [&](asset_dynamic_data_object& dynamic_asset) {
          dynamic_asset.current_supply += o.delta_debt.amount;
-         FC_ASSERT(dynamic_asset.current_supply >= 0);
       });
    }
 

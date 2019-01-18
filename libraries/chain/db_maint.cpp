@@ -924,7 +924,6 @@ void database::process_bitassets()
  */
 void process_hf_1465( database& db )
 {
-   const auto head_time = db.head_block_time();
    const auto head_num = db.head_block_num();
    wlog( "Processing hard fork core-1465 at block ${n}", ("n",head_num) );
    // for each market issued asset
