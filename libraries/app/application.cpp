@@ -975,7 +975,6 @@ void application::set_program_options(boost::program_options::options_descriptio
          ("genesis-json", bpo::value<boost::filesystem::path>(), "File to read Genesis State from")
          ("dbg-init-key", bpo::value<string>(), "Block signing key to use for init witnesses, overrides genesis file")
          ("api-access", bpo::value<boost::filesystem::path>(), "JSON file specifying API permissions")
-         ("plugins", bpo::value<string>(), "Space-separated list of plugins to activate")
          ("io-threads", bpo::value<uint16_t>()->implicit_value(0), "Number of IO threads, default to 0 for auto-configuration")
          ("enable-subscribe-to-all", bpo::value<bool>()->implicit_value(true),
           "Whether allow API clients to subscribe to universal object creation and removal events")
@@ -1034,33 +1033,6 @@ void application::initialize(const fc::path& data_dir, const boost::program_opti
    {
       const uint16_t num_threads = options["io-threads"].as<uint16_t>();
       fc::asio::default_io_service_scope::set_num_threads(num_threads);
-   }
-
-   std::vector<string> wanted;
-   if( options.count("plugins") )
-   {
-      boost::split(wanted, options.at("plugins").as<std::string>(), [](char c){return c == ' ';});
-   }
-   else
-   {
-      wanted.push_back("witness");
-      wanted.push_back("account_history");
-      wanted.push_back("market_history");
-      wanted.push_back("grouped_orders");
-   }
-   int es_ah_conflict_counter = 0;
-   for (auto& it : wanted)
-   {
-      if(it == "account_history")
-         ++es_ah_conflict_counter;
-      if(it == "elasticsearch")
-         ++es_ah_conflict_counter;
-
-      if(es_ah_conflict_counter > 1) {
-         elog("Can't start program with elasticsearch and account_history plugin at the same time");
-         std::exit(EXIT_FAILURE);
-      }
-      if (!it.empty()) enable_plugin(it);
    }
 }
 
