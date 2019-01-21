@@ -7,12 +7,14 @@ A **graphene** blockchain software will use the `app` library to define what the
 Code in libraries is the most important part of **bitshares-core** project and it is maintained by the Bitshares Core Team and contributors.
 # Available Libraries
 
-Folder                             | Name                     | Description                                                                 | Category       | Status
------------------------------------|--------------------------|-----------------------------------------------------------------------------|----------------|---------------
-[app](app) | Application          | Control the behaviour of the `witness_node` application, connect to the seeds, open he API, load plugins, etc.                                                    | Library        | Active        
-[chain](chain)     | Blockchain            | Define all objects, operations and types. This include the consensus protocol, defines the whole blockchain behaviour.                                                          | Library          | Active        
-[db](db)       | Database             | Define the internal database graphene uses.    | Library       | Active        
-[egenesis](egenesis)     | Genesis |  | Library        | Active  
-[fc](fc)           | Fast-compiling C++ library |  https://github.com/bitshares/bitshares-fc | Library        | Active  
-[plugins](plugins)   | Plugins           | All plugin modules are stored here. | Library    | Active  
-[wallet](wallet)   | Wallet           | Wallet definition for the `cli_wallet` software. | Library    | Active  |
+Folder | Name | Description | Category | Status
+---|---|---|---|---
+[app](app) | Application | Bundles component libraries (chain, network, plugins) into a useful application. Also provides API access. | Library | Active 
+[chain](chain) | Blockchain | Define all objects, operations and types. This include the consensus protocol, defines the whole blockchain behaviour. | Library | Active 
+[db](db) | Database | Define the internal database graphene uses. | Library | Active 
+[egenesis](egenesis) | Genesis |  | Library | Active
+[fc](fc) | Fast-compiling C++ library | https://github.com/bitshares/bitshares-fc | Library | Active 
+[net](net) | Network | The graphene p2p layer. | Library | Active 
+[plugins](plugins) | Plugins | All plugin modules are stored here. | Library | Active 
+[utilities](utilities) | Network | Provide common utility calls used in applications or other libraries. | Library | Active 
+[wallet](wallet) | Wallet | Wallet definition for the `cli_wallet` software. | Library | Active

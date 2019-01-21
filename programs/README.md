@@ -9,12 +9,12 @@ Programs in here are part of the **bitshares-core** project and are maintained b
 
 # Available Programs
 
-Folder                             | Name                     | Description                                                                 | Category       | Status        | Help     
------------------------------------|--------------------------|-----------------------------------------------------------------------------|----------------|---------------|--------------|
-[witness_node](witness_node) | Witness Node          | Main blockchain software                                                   | Node        | Active        | `./witness_node --help`
-[cli_wallet](cli_wallet)     | CLI Wallet            | Command line wallet                                                         | Wallet          | Active        | `./cli_wallet --help`
-[delayed_node](delayed_node)       | Delayed Node             | Runs a node with `delayed_node` plugin loaded. This is deprecatd in favour of `./witness_node --plugins "delayed_node"`    | Node       | Deprecated        | `./delayed_node --help`
-[js_operation_serializer](js_operation_serializer)     | Operation Serializer | Dump all blockchain operations and types. Used by the UI. | Tool        | Old  | `./js_operation_serializer`
-[size_checker](size_checker)           | Size Checker    | Provides wire size average in bytes of all the operations  | Tool        | Old  | `./size_checker`
-[build_helpers](build_helpers)   | Build Helpers           | | Tool    | Old  | `./member_enumerator` and `./cat-parts`
-[genesis_util](genesis_util)   | Gensis Utils           | | Tool    | Old  |
+Folder | Name  | Description | Category | Status | Help 
+---|---|---|---|---|---
+[witness_node](witness_node) | Witness Node | Main blockchain software | Node | Active | `./witness_node --help`
+[cli_wallet](cli_wallet) | CLI Wallet | Command line wallet  | Wallet | Active | `./cli_wallet --help` 
+[delayed_node](delayed_node) | Delayed Node | Runs a node with `delayed_node` plugin loaded. This is deprecatd in favour of `./witness_node --plugins "delayed_node"` | Node | Deprecated | `./delayed_node --help`
+[js_operation_serializer](js_operation_serializer) | Operation Serializer | Dump all blockchain operations and types. Used by the UI. | Tool | Old | `./js_operation_serializer`
+[size_checker](size_checker) | Size Checker | Provides wire size average in bytes of all the operations  | Tool | Old | `./size_checker`
+[build_helpers](build_helpers) | Build Helpers | | Tool | Old | `./member_enumerator` and `./cat-parts`
+[genesis_util](genesis_util) | Genesis Utils | | Tool | Old |
