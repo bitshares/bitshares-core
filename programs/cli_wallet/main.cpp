@@ -68,6 +68,47 @@ using namespace graphene::wallet;
 using namespace std;
 namespace bpo = boost::program_options;
 
+/***
+ * @brief sets up basic logging
+ * 
+ * Sends most logging messages (up to level "info") to the console and RPC messages 
+ * (including level "debug")to a file
+ */
+void setup_logging()
+{
+      // set up logging
+      fc::logging_config cfg;
+      // console logger
+      fc::console_appender::config console_appender_config;
+      console_appender_config.level_colors.emplace_back(
+            fc::console_appender::level_color(fc::log_level::debug,
+            fc::console_appender::color::green));
+      console_appender_config.level_colors.emplace_back(
+            fc::console_appender::level_color(fc::log_level::warn,
+            fc::console_appender::color::brown));
+      console_appender_config.level_colors.emplace_back(
+            fc::console_appender::level_color(fc::log_level::error,
+            fc::console_appender::color::red));
+      cfg.appenders.push_back(fc::appender_config( "default", "console", fc::variant(console_appender_config, 20)));
+      cfg.loggers = { fc::logger_config("default"), fc::logger_config( "rpc") };
+      cfg.loggers.front().level = fc::log_level::info;
+      cfg.loggers.front().appenders = {"default"};
+      // file logger
+      fc::path data_dir;
+      fc::path log_dir = data_dir / "cli_wallet_logs";
+      fc::file_appender::config ac;
+      ac.filename             = log_dir / "rpc.log";
+      ac.flush                = true;
+      ac.rotate               = true;
+      ac.rotation_interval    = fc::hours( 1 );
+      ac.rotation_limit       = fc::days( 1 );
+      cfg.appenders.push_back(fc::appender_config( "rpc", "file", fc::variant(ac, 5)));
+      cfg.loggers.back().level = fc::log_level::debug;
+      cfg.loggers.back().appenders = {"rpc"};
+      fc::configure_logging( cfg );
+      ilog ( "Logging RPC to file: " + (ac.filename).preferred_string() );
+}
+
 int main( int argc, char** argv )
 {
    try {
@@ -116,37 +157,7 @@ int main( int argc, char** argv )
          return 0;
       }
 
-      // set up logging
-      fc::logging_config cfg;
-      // console logger
-      fc::console_appender::config console_appender_config;
-      console_appender_config.level_colors.emplace_back(
-            fc::console_appender::level_color(fc::log_level::debug,
-            fc::console_appender::color::green));
-      console_appender_config.level_colors.emplace_back(
-            fc::console_appender::level_color(fc::log_level::warn,
-            fc::console_appender::color::brown));
-      console_appender_config.level_colors.emplace_back(
-            fc::console_appender::level_color(fc::log_level::error,
-            fc::console_appender::color::red));
-      cfg.appenders.push_back(fc::appender_config( "default", "console", fc::variant(console_appender_config, 20)));
-      cfg.loggers = { fc::logger_config("default"), fc::logger_config( "rpc") };
-      cfg.loggers.front().level = fc::log_level::info;
-      cfg.loggers.front().appenders = {"default"};
-      // file logger
-      fc::path data_dir;
-      fc::path log_dir = data_dir / "cli_wallet_logs";
-      fc::file_appender::config ac;
-      ac.filename             = log_dir / "rpc.log";
-      ac.flush                = true;
-      ac.rotate               = true;
-      ac.rotation_interval    = fc::hours( 1 );
-      ac.rotation_limit       = fc::days( 1 );
-      cfg.appenders.push_back(fc::appender_config( "rpc", "file", fc::variant(ac, 5)));
-      cfg.loggers.back().level = fc::log_level::debug;
-      cfg.loggers.back().appenders = {"rpc"};
-      fc::configure_logging( cfg );
-      ilog ( "Logging RPC to file: " + (data_dir / ac.filename).preferred_string() );
+      setup_logging();
 
       // key generation
       fc::ecc::private_key committee_private_key = fc::ecc::private_key::regenerate(fc::sha256::hash(string("null_key")));
