@@ -444,18 +444,14 @@ void application_impl::startup()
 
    if( _options->count("api-access") ) {
 
-      if(fc::exists(_options->at("api-access").as<boost::filesystem::path>()))
-      {
-         _apiaccess = fc::json::from_file( _options->at("api-access").as<boost::filesystem::path>() ).as<api_access>( 20 );
-         ilog( "Using api access file from ${path}",
-               ("path", _options->at("api-access").as<boost::filesystem::path>().string()) );
-      }
-      else
-      {
-         elog("Failed to load file from ${path}",
-            ("path", _options->at("api-access").as<boost::filesystem::path>().string()));
-         std::exit(EXIT_FAILURE);
-      }
+      fc::path api_access_file = _options->at("api-access").as<boost::filesystem::path>();
+
+      FC_ASSERT( fc::exists(api_access_file), 
+            "Failed to load file from ${path}", ("path", api_access_file) );
+
+      _apiaccess = fc::json::from_file( api_access_file ).as<api_access>( 20 );
+      ilog( "Using api access file from ${path}",
+            ("path", api_access_file) );
    }
    else
    {
@@ -984,10 +980,6 @@ void application::set_program_options(boost::program_options::options_descriptio
          ;
    command_line_options.add(configuration_file_options);
    command_line_options.add_options()
-         ("create-genesis-json", bpo::value<boost::filesystem::path>(),
-          "Path to create a Genesis State at. If a well-formed JSON file exists at the path, it will be parsed and any "
-          "missing fields in a Genesis State will be added, and any unknown fields will be removed. If no file or an "
-          "invalid file is found, it will be replaced with an example Genesis State.")
          ("replay-blockchain", "Rebuild object graph by replaying all blocks without validation")
          ("revalidate-blockchain", "Rebuild object graph by replaying all blocks with full validation")
          ("resync-blockchain", "Delete all blocks and re-sync with network from scratch")
@@ -1004,31 +996,6 @@ void application::initialize(const fc::path& data_dir, const boost::program_opti
    my->_data_dir = data_dir;
    my->_options = &options;
 
-   if( options.count("create-genesis-json") )
-   {
-      fc::path genesis_out = options.at("create-genesis-json").as<boost::filesystem::path>();
-      genesis_state_type genesis_state = detail::create_example_genesis();
-      if( fc::exists(genesis_out) )
-      {
-         try {
-            genesis_state = fc::json::from_file(genesis_out).as<genesis_state_type>( 20 );
-         } catch(const fc::exception& e) {
-            std::cerr << "Unable to parse existing genesis file:\n" << e.to_string()
-                      << "\nWould you like to replace it? [y/N] ";
-            char response = std::cin.get();
-            if( toupper(response) != 'Y' )
-               return;
-         }
-
-         std::cerr << "Updating genesis state in file " << genesis_out.generic_string() << "\n";
-      } else {
-         std::cerr << "Creating example genesis state in file " << genesis_out.generic_string() << "\n";
-      }
-      fc::json::save_to_file(genesis_state, genesis_out);
-
-      std::exit(EXIT_SUCCESS);
-   }
-
    if ( options.count("io-threads") )
    {
       const uint16_t num_threads = options["io-threads"].as<uint16_t>();
@@ -1039,7 +1006,7 @@ void application::initialize(const fc::path& data_dir, const boost::program_opti
 void application::startup()
 {
    try {
-   my->startup();
+      my->startup();
    } catch ( const fc::exception& e ) {
       elog( "${e}", ("e",e.to_detail_string()) );
       throw;

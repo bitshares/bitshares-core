@@ -137,6 +137,7 @@ int main(int argc, char** argv) {
       app::load_configuration_options(data_dir, cfg_options, options);
 
       bpo::notify(options);
+
       node->initialize(data_dir, options);
       node->initialize_plugins( options );
 
@@ -163,7 +164,7 @@ int main(int argc, char** argv) {
       node->shutdown_plugins();
       node->shutdown();
       delete node;
-      return 0;
+      return EXIT_SUCCESS;
    } catch( const fc::exception& e ) {
       // deleting the node can yield, so do this outside the exception handler
       unhandled_exception = e;
@@ -174,7 +175,7 @@ int main(int argc, char** argv) {
       elog("Exiting with error:\n${e}", ("e", unhandled_exception->to_detail_string()));
       node->shutdown();
       delete node;
-      return 1;
+      return EXIT_FAILURE;
    }
 }
 

@@ -175,6 +175,7 @@ int main(int argc, char** argv) {
       node.initialize_plugins( options );
 
       node.startup();
+
       node.startup_plugins();
 
       fc::promise<int>::ptr exit_promise = new fc::promise<int>("UNIX Signal Handler");
@@ -188,10 +189,11 @@ int main(int argc, char** argv) {
       int signal = exit_promise->wait();
       ilog("Exiting from signal ${n}", ("n", signal));
       node.shutdown_plugins();
-      return 0;
+      node.shutdown();
+      return EXIT_SUCCESS;
    } catch( const fc::exception& e ) {
       elog("Exiting with error:\n${e}", ("e", e.to_detail_string()));
-      return 1;
+      return EXIT_FAILURE;
    }
 }
 
