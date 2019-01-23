@@ -327,7 +327,7 @@ namespace graphene { namespace net { namespace detail {
       _node_is_shutting_down = true;
 
       {
-         std::lock_guard<std::recursive_mutex> lock(_active_connections.get_mutex());
+         fc::scoped_lock<fc::mutex> lock(_active_connections.get_mutex());
          for (const peer_connection_ptr& active_peer : _active_connections)
          {
             fc::optional<fc::ip::endpoint> inbound_endpoint = active_peer->get_endpoint_for_connecting();
@@ -532,7 +532,7 @@ namespace graphene { namespace net { namespace detail {
             std::set<item_hash_t> sync_items_to_request;
 
             // for each idle peer that we're syncing with
-            std::lock_guard<std::recursive_mutex> lock(_active_connections.get_mutex());
+            fc::scoped_lock<fc::mutex> lock(_active_connections.get_mutex());
             for( const peer_connection_ptr& peer : _active_connections )
             {
               if( peer->we_need_sync_items_from_peer &&
@@ -591,7 +591,7 @@ namespace graphene { namespace net { namespace detail {
 
     bool node_impl::is_item_in_any_peers_inventory(const item_id& item) const
     {
-      std::lock_guard<std::recursive_mutex> lock(_active_connections.get_mutex());
+      fc::scoped_lock<fc::mutex> lock(_active_connections.get_mutex());
       for( const peer_connection_ptr& peer : _active_connections )
       {
         if (peer->inventory_peer_advertised_to_us.find(item) != peer->inventory_peer_advertised_to_us.end() )
@@ -632,7 +632,7 @@ namespace graphene { namespace net { namespace detail {
 
         // initialize the fetch_messages_to_send with an empty set of items for all idle peers
         {
-         std::lock_guard<std::recursive_mutex> lock(_active_connections.get_mutex());
+         fc::scoped_lock<fc::mutex> lock(_active_connections.get_mutex());
          for (const peer_connection_ptr& peer : _active_connections)
             if (peer->idle())
                items_by_peer.insert(peer_and_items_to_fetch(peer));
@@ -745,7 +745,7 @@ namespace graphene { namespace net { namespace detail {
         // we're computing the messages)
         std::list<std::pair<peer_connection_ptr, item_ids_inventory_message> > inventory_messages_to_send;
         {
-         std::lock_guard<std::recursive_mutex> lock(_active_connections.get_mutex());
+         fc::scoped_lock<fc::mutex> lock(_active_connections.get_mutex());
          for (const peer_connection_ptr& peer : _active_connections)
          {
           // only advertise to peers who are in sync with us
@@ -839,7 +839,7 @@ namespace graphene { namespace net { namespace detail {
         uint32_t handshaking_timeout = _peer_inactivity_timeout;
         fc::time_point handshaking_disconnect_threshold = fc::time_point::now() - fc::seconds(handshaking_timeout);
         {
-         std::lock_guard<std::recursive_mutex> lock(_handshaking_connections.get_mutex());
+         fc::scoped_lock<fc::mutex> lock(_handshaking_connections.get_mutex());
          for( const peer_connection_ptr handshaking_peer : _handshaking_connections )
             if( handshaking_peer->connection_initiation_time < handshaking_disconnect_threshold &&
                  handshaking_peer->get_last_message_received_time() < handshaking_disconnect_threshold &&
@@ -880,7 +880,7 @@ namespace graphene { namespace net { namespace detail {
         fc::time_point active_send_keepalive_threshold = fc::time_point::now() - fc::seconds(active_send_keepalive_timeout);
         fc::time_point active_ignored_request_threshold = fc::time_point::now() - active_ignored_request_timeout;
         {
-         std::lock_guard<std::recursive_mutex> lock(_active_connections.get_mutex());
+         fc::scoped_lock<fc::mutex> lock(_active_connections.get_mutex());
 
          for( const peer_connection_ptr& active_peer : _active_connections )
          {
@@ -953,7 +953,7 @@ namespace graphene { namespace net { namespace detail {
 
         fc::time_point closing_disconnect_threshold = fc::time_point::now() - fc::seconds(GRAPHENE_NET_PEER_DISCONNECT_TIMEOUT);
         {
-         std::lock_guard<std::recursive_mutex> lock(_closing_connections.get_mutex());
+         fc::scoped_lock<fc::mutex> lock(_closing_connections.get_mutex());
          for( const peer_connection_ptr& closing_peer : _closing_connections )
             if( closing_peer->connection_closed_time < closing_disconnect_threshold )
             {
@@ -967,7 +967,7 @@ namespace graphene { namespace net { namespace detail {
         uint32_t failed_terminate_timeout_seconds = 120;
         fc::time_point failed_terminate_threshold = fc::time_point::now() - fc::seconds(failed_terminate_timeout_seconds);
         {
-         std::lock_guard<std::recursive_mutex> lock(_terminating_connections.get_mutex());
+         fc::scoped_lock<fc::mutex> lock(_terminating_connections.get_mutex());
          for (const peer_connection_ptr& peer : _terminating_connections )
             if (peer->get_connection_terminated_time() != fc::time_point::min() &&
                peer->get_connection_terminated_time() < failed_terminate_threshold)
@@ -983,7 +983,7 @@ namespace graphene { namespace net { namespace detail {
         // and once we start yielding, we may find that we've moved that peer to another list (closed or active)
         // and that triggers assertions, maybe even errors
         {
-         std::lock_guard<std::recursive_mutex> lock(_terminating_connections.get_mutex());
+         fc::scoped_lock<fc::mutex> lock(_terminating_connections.get_mutex());
          for (const peer_connection_ptr& peer : peers_to_terminate )
          {
             assert(_terminating_connections.find(peer) != _terminating_connections.end());
@@ -1009,7 +1009,7 @@ namespace graphene { namespace net { namespace detail {
       for( const peer_connection_ptr& peer : peers_to_disconnect_gently )
       {
          {
-            std::lock_guard<std::recursive_mutex> lock(_active_connections.get_mutex());
+            fc::scoped_lock<fc::mutex> lock(_active_connections.get_mutex());
             fc::exception detailed_error( FC_LOG_MESSAGE(warn, "Disconnecting due to inactivity",
                   ( "last_message_received_seconds_ago", (peer->get_last_message_received_time() 
                   - fc::time_point::now() ).count() / fc::seconds(1 ).count() )
@@ -1038,7 +1038,7 @@ namespace graphene { namespace net { namespace detail {
       VERIFY_CORRECT_THREAD();
       
       {
-         std::lock_guard<std::recursive_mutex> lock(_active_connections.get_mutex());
+         fc::scoped_lock<fc::mutex> lock(_active_connections.get_mutex());
          // JMJ 2018-10-22 Unsure why we're making a copy here, but this is probably unnecessary
          std::list<peer_connection_ptr> original_active_peers(_active_connections.begin(), _active_connections.end());
          for( const peer_connection_ptr& active_peer : original_active_peers )
@@ -1211,13 +1211,13 @@ namespace graphene { namespace net { namespace detail {
     peer_connection_ptr node_impl::get_peer_by_node_id(const node_id_t& node_id)
     {
       {
-         std::lock_guard<std::recursive_mutex> lock(_active_connections.get_mutex());
+         fc::scoped_lock<fc::mutex> lock(_active_connections.get_mutex());
          for (const peer_connection_ptr& active_peer : _active_connections)
             if (node_id == active_peer->node_id)
                return active_peer;
       }
       {
-         std::lock_guard<std::recursive_mutex> lock(_handshaking_connections.get_mutex());
+         fc::scoped_lock<fc::mutex> lock(_handshaking_connections.get_mutex());
          for (const peer_connection_ptr& handshaking_peer : _handshaking_connections)
             if (node_id == handshaking_peer->node_id)
                return handshaking_peer;
@@ -1234,7 +1234,7 @@ namespace graphene { namespace net { namespace detail {
         return true;
       }
       {
-         std::lock_guard<std::recursive_mutex> lock(_active_connections.get_mutex());
+         fc::scoped_lock<fc::mutex> lock(_active_connections.get_mutex());
          for (const peer_connection_ptr active_peer : _active_connections)
          {
             if (node_id == active_peer->node_id)
@@ -1245,7 +1245,7 @@ namespace graphene { namespace net { namespace detail {
          }
       }
       {
-         std::lock_guard<std::recursive_mutex> lock(_handshaking_connections.get_mutex());
+         fc::scoped_lock<fc::mutex> lock(_handshaking_connections.get_mutex());
          for (const peer_connection_ptr handshaking_peer : _handshaking_connections)
             if (node_id == handshaking_peer->node_id)
             {
@@ -1285,7 +1285,7 @@ namespace graphene { namespace net { namespace detail {
       dlog("   my id is ${id}", ("id", _node_id));
 
       {
-         std::lock_guard<std::recursive_mutex> lock(_active_connections.get_mutex());
+         fc::scoped_lock<fc::mutex> lock(_active_connections.get_mutex());
          for (const peer_connection_ptr& active_connection : _active_connections)
          {
             dlog("        active: ${endpoint} with ${id}   [${direction}]",
@@ -1295,7 +1295,7 @@ namespace graphene { namespace net { namespace detail {
          }
       }
       {
-         std::lock_guard<std::recursive_mutex> lock(_handshaking_connections.get_mutex());
+         fc::scoped_lock<fc::mutex> lock(_handshaking_connections.get_mutex());
          for (const peer_connection_ptr& handshaking_connection : _handshaking_connections)
          {
             dlog("   handshaking: ${endpoint} with ${id}  [${direction}]",
@@ -1717,7 +1717,7 @@ namespace graphene { namespace net { namespace detail {
       if (!_peer_advertising_disabled)
       {
         reply.addresses.reserve(_active_connections.size());
-        std::lock_guard<std::recursive_mutex> lock(_active_connections.get_mutex());
+        fc::scoped_lock<fc::mutex> lock(_active_connections.get_mutex());
         for (const peer_connection_ptr& active_peer : _active_connections)
         {
           fc::optional<potential_peer_record> updated_peer_record = _potential_peer_db.lookup_entry_for_endpoint(*active_peer->get_remote_endpoint());
@@ -1903,7 +1903,7 @@ namespace graphene { namespace net { namespace detail {
     {
       VERIFY_CORRECT_THREAD();
       uint32_t max_number_of_unfetched_items = 0;
-      std::lock_guard<std::recursive_mutex> lock(_active_connections.get_mutex());
+      fc::scoped_lock<fc::mutex> lock(_active_connections.get_mutex());
       for( const peer_connection_ptr& peer : _active_connections )
       {
         uint32_t this_peer_number_of_unfetched_items = (uint32_t)peer->ids_of_items_to_get.size() + peer->number_of_unfetched_item_ids;
@@ -2122,7 +2122,7 @@ namespace graphene { namespace net { namespace detail {
           {
             bool is_first_item_for_other_peer = false;
             {
-               std::lock_guard<std::recursive_mutex> lock(_active_connections.get_mutex());
+               fc::scoped_lock<fc::mutex> lock(_active_connections.get_mutex());
                for (const peer_connection_ptr& peer : _active_connections)
                {
                   if (peer != originating_peer->shared_from_this() &&
@@ -2424,7 +2424,7 @@ namespace graphene { namespace net { namespace detail {
         bool we_advertised_this_item_to_a_peer = false;
         bool we_requested_this_item_from_a_peer = false;
         {
-           std::lock_guard<std::recursive_mutex> lock(_active_connections.get_mutex());
+           fc::scoped_lock<fc::mutex> lock(_active_connections.get_mutex());
             for (const peer_connection_ptr peer : _active_connections)
             {
                if (peer->inventory_advertised_to_peer.find(advertised_item_id) != peer->inventory_advertised_to_peer.end())
@@ -2654,7 +2654,7 @@ namespace graphene { namespace net { namespace detail {
                ("count", _total_number_of_unfetched_items));
          bool is_fork_block = is_hard_fork_block(block_message_to_send.block.block_num());
          {
-            std::lock_guard<std::recursive_mutex> lock(_active_connections.get_mutex());
+            fc::scoped_lock<fc::mutex> lock(_active_connections.get_mutex());
 
             for (const peer_connection_ptr& peer : _active_connections)
             {
@@ -2730,7 +2730,7 @@ namespace graphene { namespace net { namespace detail {
       else
       {
         // invalid message received
-        std::lock_guard<std::recursive_mutex> lock(_active_connections.get_mutex());
+        fc::scoped_lock<fc::mutex> lock(_active_connections.get_mutex());
         for (const peer_connection_ptr& peer : _active_connections)
         {
           ASSERT_TASK_NOT_PREEMPTED(); // don't yield while iterating over _active_connections
@@ -2834,7 +2834,7 @@ namespace graphene { namespace net { namespace detail {
           // find out if this block is the next block on the active chain or one of the forks
           bool potential_first_block = false;
           {
-            std::lock_guard<std::recursive_mutex> lock(_active_connections.get_mutex());
+            fc::scoped_lock<fc::mutex> lock(_active_connections.get_mutex());
             for (const peer_connection_ptr& peer : _active_connections)
             {
                ASSERT_TASK_NOT_PREEMPTED(); // don't yield while iterating over _active_connections
@@ -2872,7 +2872,7 @@ namespace graphene { namespace net { namespace detail {
             {
               dlog("Already received and accepted this block (presumably through normal inventory mechanism), treating it as accepted");
               std::vector< peer_connection_ptr > peers_needing_next_batch;
-              std::lock_guard<std::recursive_mutex> lock(_active_connections.get_mutex());
+              fc::scoped_lock<fc::mutex> lock(_active_connections.get_mutex());
               for (const peer_connection_ptr& peer : _active_connections)
               {
                 auto items_being_processed_iter = peer->ids_of_items_being_processed.find(received_block_iter->block_id);
@@ -2997,7 +2997,7 @@ namespace graphene { namespace net { namespace detail {
         uint32_t block_number = block_message_to_process.block.block_num();
         fc::time_point_sec block_time = block_message_to_process.block.timestamp;
         {
-         std::lock_guard<std::recursive_mutex> lock(_active_connections.get_mutex());
+         fc::scoped_lock<fc::mutex> lock(_active_connections.get_mutex());
          for (const peer_connection_ptr& peer : _active_connections)
          {
             ASSERT_TASK_NOT_PREEMPTED(); // don't yield while iterating over _active_connections
@@ -3023,7 +3023,7 @@ namespace graphene { namespace net { namespace detail {
         {
           // we just pushed a hard fork block.  Find out if any of our peers are running clients
           // that will be unable to process future blocks
-          std::lock_guard<std::recursive_mutex> lock(_active_connections.get_mutex());
+          fc::scoped_lock<fc::mutex> lock(_active_connections.get_mutex());
           for (const peer_connection_ptr& peer : _active_connections)
           {
             if (peer->last_known_fork_block_number != 0)
@@ -3068,7 +3068,7 @@ namespace graphene { namespace net { namespace detail {
         disconnect_reason = "You offered me a block that I have deemed to be invalid";
 
         peers_to_disconnect.insert( originating_peer->shared_from_this() );
-        std::lock_guard<std::recursive_mutex> lock(_active_connections.get_mutex());
+        fc::scoped_lock<fc::mutex> lock(_active_connections.get_mutex());
         for (const peer_connection_ptr& peer : _active_connections)
           if (!peer->ids_of_items_to_get.empty() && peer->ids_of_items_to_get.front() == block_message_to_process.block_id)
             peers_to_disconnect.insert(peer);
@@ -3193,7 +3193,7 @@ namespace graphene { namespace net { namespace detail {
     void node_impl::forward_firewall_check_to_next_available_peer(firewall_check_state_data* firewall_check_state)
     {
       {
-         std::lock_guard<std::recursive_mutex> lock(_active_connections.get_mutex());
+         fc::scoped_lock<fc::mutex> lock(_active_connections.get_mutex());
          for (const peer_connection_ptr& peer : _active_connections)
          {
             if (firewall_check_state->expected_node_id != peer->node_id && // it's not the node who is asking us to test
@@ -3386,7 +3386,7 @@ namespace graphene { namespace net { namespace detail {
       }
 
       fc::time_point now = fc::time_point::now();
-      std::lock_guard<std::recursive_mutex> lock(_active_connections.get_mutex());
+      fc::scoped_lock<fc::mutex> lock(_active_connections.get_mutex());
       for (const peer_connection_ptr& peer : _active_connections)
       {
         ASSERT_TASK_NOT_PREEMPTED(); // don't yield while iterating over _active_connections
@@ -3506,7 +3506,7 @@ namespace graphene { namespace net { namespace detail {
 
     void node_impl::start_synchronizing()
     {
-      std::lock_guard<std::recursive_mutex> lock(_active_connections.get_mutex());
+      fc::scoped_lock<fc::mutex> lock(_active_connections.get_mutex());
       for( const peer_connection_ptr& peer : _active_connections )
         start_synchronizing_with_peer( peer );
     }
@@ -3713,15 +3713,15 @@ namespace graphene { namespace net { namespace detail {
       std::list<peer_connection_ptr> all_peers;
       auto p_back = [&all_peers](const peer_connection_ptr& conn) { all_peers.push_back(conn); };
       {
-         std::lock_guard<std::recursive_mutex> lock(_active_connections.get_mutex());
+         fc::scoped_lock<fc::mutex> lock(_active_connections.get_mutex());
          std::for_each(_active_connections.begin(), _active_connections.end(), p_back);
       }
       {
-         std::lock_guard<std::recursive_mutex> lock(_handshaking_connections.get_mutex());
+         fc::scoped_lock<fc::mutex> lock(_handshaking_connections.get_mutex());
          std::for_each(_handshaking_connections.begin(), _handshaking_connections.end(), p_back);
       }
       {
-         std::lock_guard<std::recursive_mutex> lock(_closing_connections.get_mutex());
+         fc::scoped_lock<fc::mutex> lock(_closing_connections.get_mutex());
          std::for_each(_closing_connections.begin(), _closing_connections.end(), p_back);
       }
 
@@ -4274,7 +4274,7 @@ namespace graphene { namespace net { namespace detail {
     {
       VERIFY_CORRECT_THREAD();
       {
-         std::lock_guard<std::recursive_mutex> lock(_active_connections.get_mutex());
+         fc::scoped_lock<fc::mutex> lock(_active_connections.get_mutex());
          for( const peer_connection_ptr& active_peer : _active_connections )
          {
             fc::optional<fc::ip::endpoint> endpoint_for_this_peer( active_peer->get_remote_endpoint() );
@@ -4283,7 +4283,7 @@ namespace graphene { namespace net { namespace detail {
          }
       }
       {
-         std::lock_guard<std::recursive_mutex> lock(_handshaking_connections.get_mutex());
+         fc::scoped_lock<fc::mutex> lock(_handshaking_connections.get_mutex());
          for( const peer_connection_ptr& handshaking_peer : _handshaking_connections )
          {
             fc::optional<fc::ip::endpoint> endpoint_for_this_peer( handshaking_peer->get_remote_endpoint() );
@@ -4335,7 +4335,7 @@ namespace graphene { namespace net { namespace detail {
            ( "active", _active_connections.size() )("handshaking", _handshaking_connections.size() )("closing",_closing_connections.size() )
            ( "desired", _desired_number_of_connections )("maximum", _maximum_number_of_connections ) );
       {
-         std::lock_guard<std::recursive_mutex> lock(_active_connections.get_mutex());
+         fc::scoped_lock<fc::mutex> lock(_active_connections.get_mutex());
          for( const peer_connection_ptr& peer : _active_connections )
          {
             ilog( "       active peer ${endpoint} peer_is_in_sync_with_us:${in_sync_with_us} we_are_in_sync_with_peer:${in_sync_with_them}",
@@ -4349,7 +4349,7 @@ namespace graphene { namespace net { namespace detail {
          }
       }
       {
-         std::lock_guard<std::recursive_mutex> lock(_handshaking_connections.get_mutex());
+         fc::scoped_lock<fc::mutex> lock(_handshaking_connections.get_mutex());
          for( const peer_connection_ptr& peer : _handshaking_connections )
          {
             ilog( "  handshaking peer ${endpoint} in state ours(${our_state}) theirs(${their_state})",
@@ -4363,7 +4363,7 @@ namespace graphene { namespace net { namespace detail {
       ilog( "node._items_to_fetch size: ${size}", ("size", _items_to_fetch.size() ) );
       ilog( "node._new_inventory size: ${size}", ("size", _new_inventory.size() ) );
       ilog( "node._message_cache size: ${size}", ("size", _message_cache.size() ) );
-      std::lock_guard<std::recursive_mutex> lock(_active_connections.get_mutex());
+      fc::scoped_lock<fc::mutex> lock(_active_connections.get_mutex());
       for( const peer_connection_ptr& peer : _active_connections )
       {
         ilog( "  peer ${endpoint}", ("endpoint", peer->get_remote_endpoint() ) );
@@ -4461,7 +4461,7 @@ namespace graphene { namespace net { namespace detail {
     {
       VERIFY_CORRECT_THREAD();
       std::vector<peer_status> statuses;
-      std::lock_guard<std::recursive_mutex> lock(_active_connections.get_mutex());
+      fc::scoped_lock<fc::mutex> lock(_active_connections.get_mutex());
       for (const peer_connection_ptr& peer : _active_connections)
       {
         ASSERT_TASK_NOT_PREEMPTED(); // don't yield while iterating over _active_connections
@@ -4654,7 +4654,7 @@ namespace graphene { namespace net { namespace detail {
       std::list<peer_connection_ptr> peers_to_disconnect;
       if (!_allowed_peers.empty())
       {
-         std::lock_guard<std::recursive_mutex> lock(_active_connections.get_mutex());
+         fc::scoped_lock<fc::mutex> lock(_active_connections.get_mutex());
          for (const peer_connection_ptr& peer : _active_connections)
             if (_allowed_peers.find(peer->node_id) == _allowed_peers.end())
                peers_to_disconnect.push_back(peer);
