@@ -199,20 +199,18 @@ namespace graphene { namespace chain {
     * @ingroup object_index
     */
    struct by_account;
+   // by_vesting_type index MUST NOT be used for iterating because order is not well-defined.
    struct by_vesting_type;
 
 namespace detail {
 
    /**
       Calculate a hash for account_id_type and asset_id.
-      Use object_id.hash_value function to calculate sum of hashes from account_id_type and asset_id.
-      then subducts a result from std::numeric_limits<uint64_t>::max().
-      object_id.hash_value returns uint64_t but only 48 bits are significant
-      so std::numeric_limits<uint64_t>::max() - (48 bits + 48 bits) always correct from point of natural numbers
+      Use 48 bit value (see object_id.hpp) for account_id and XOR it with 24 bit for asset_id
    */
    inline uint64_t vbo_mfs_hash(const account_id_type& account_id, const asset_id_type& asset_id)
    {
-      return std::numeric_limits<uint64_t>::max() - ( hash_value(account_id) + hash_value(asset_id) );
+      return (asset_id.instance.value << 40) ^ account_id.instance.value;
    }
 
    /**
