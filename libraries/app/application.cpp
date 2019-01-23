@@ -26,6 +26,7 @@
 #include <graphene/app/application.hpp>
 #include <graphene/app/plugin.hpp>
 
+#include <graphene/chain/db_with.hpp>
 #include <graphene/chain/genesis_state.hpp>
 #include <graphene/chain/protocol/fee_schedule.hpp>
 #include <graphene/chain/protocol/types.hpp>
@@ -169,8 +170,8 @@ void application_impl::reset_p2p_node(const fc::path& data_dir)
          "seed01.liondani.com:1776",          // liondani     (GERMANY)
          "104.236.144.84:1777",               // puppies      (USA)
          "128.199.143.47:2015",               // Harvey       (Singapore)
-         "23.92.53.182:1776",                 // sahkan       (USA)
-         "192.121.166.162:1776",              // sahkan       (UK)
+         "209.105.239.13:1776",               // sahkan       (USA)
+         "45.35.12.22:1776",                  // sahkan       (USA)
          "51.15.61.160:1776",                 // lafona       (France)
          "bts-seed1.abit-more.com:62015",     // abit         (China)
          "node.blckchnd.com:4243",            // blckchnd     (Germany)
@@ -394,12 +395,34 @@ void application_impl::startup()
       _chain_db->enable_standby_votes_tracking( _options->at("enable-standby-votes-tracking").as<bool>() );
    }
 
-   if( _options->count("replay-blockchain") )
+   if( _options->count("replay-blockchain") || _options->count("revalidate-blockchain") )
       _chain_db->wipe( _data_dir / "blockchain", false );
 
    try
    {
-      _chain_db->open( _data_dir / "blockchain", initial_state, GRAPHENE_CURRENT_DB_VERSION );
+      // these flags are used in open() only, i. e. during replay
+      uint32_t skip;
+      if( _options->count("revalidate-blockchain") ) // see also handle_block()
+      {
+         if( !loaded_checkpoints.empty() )
+            wlog( "Warning - revalidate will not validate before last checkpoint" );
+         if( _options->count("force-validate") )
+            skip = graphene::chain::database::skip_nothing;
+         else
+            skip = graphene::chain::database::skip_transaction_signatures;
+      }
+      else // no revalidate, skip most checks
+         skip = graphene::chain::database::skip_witness_signature |
+                graphene::chain::database::skip_block_size_check |
+                graphene::chain::database::skip_merkle_check |
+                graphene::chain::database::skip_transaction_signatures |
+                graphene::chain::database::skip_transaction_dupe_check |
+                graphene::chain::database::skip_tapos_check |
+                graphene::chain::database::skip_witness_schedule_check;
+
+      graphene::chain::detail::with_skip_flags( *_chain_db, skip, [this,&initial_state] () {
+         _chain_db->open( _data_dir / "blockchain", initial_state, GRAPHENE_CURRENT_DB_VERSION );
+      });
    }
    catch( const fc::exception& e )
    {
@@ -517,13 +540,17 @@ bool application_impl::handle_block(const graphene::net::block_message& blk_msg,
    FC_ASSERT( (latency.count()/1000) > -5000, "Rejecting block with timestamp in the future" );
 
    try {
-      // TODO: in the case where this block is valid but on a fork that's too old for us to switch to,
-      // you can help the network code out by throwing a block_older_than_undo_history exception.
-      // when the net code sees that, it will stop trying to push blocks from that chain, but
-      // leave that peer connected so that they can get sync blocks from us
-      bool result = _chain_db->push_block( blk_msg.block,
-                                           (_is_block_producer | _force_validate) ?
-                                              database::skip_nothing : database::skip_transaction_signatures );
+      const uint32_t skip = (_is_block_producer | _force_validate) ?
+                               database::skip_nothing : database::skip_transaction_signatures;
+      bool result = valve.do_serial( [this,&blk_msg,skip] () {
+         _chain_db->precompute_parallel( blk_msg.block, skip ).wait();
+      }, [this,&blk_msg,skip] () {
+         // TODO: in the case where this block is valid but on a fork that's too old for us to switch to,
+         // you can help the network code out by throwing a block_older_than_undo_history exception.
+         // when the net code sees that, it will stop trying to push blocks from that chain, but
+         // leave that peer connected so that they can get sync blocks from us
+         return _chain_db->push_block( blk_msg.block, skip );
+      });
 
       // the block was accepted, so we now know all of the transactions contained in the block
       if (!sync_mode)
@@ -573,6 +600,7 @@ void application_impl::handle_transaction(const graphene::net::trx_message& tran
       trx_count = 0;
    }
 
+   _chain_db->precompute_parallel( transaction_message.trx ).wait();
    _chain_db->push_transaction( transaction_message.trx );
 } FC_CAPTURE_AND_RETHROW( (transaction_message) ) }
 
@@ -961,9 +989,10 @@ void application::set_program_options(boost::program_options::options_descriptio
           "Path to create a Genesis State at. If a well-formed JSON file exists at the path, it will be parsed and any "
           "missing fields in a Genesis State will be added, and any unknown fields will be removed. If no file or an "
           "invalid file is found, it will be replaced with an example Genesis State.")
-         ("replay-blockchain", "Rebuild object graph by replaying all blocks")
+         ("replay-blockchain", "Rebuild object graph by replaying all blocks without validation")
+         ("revalidate-blockchain", "Rebuild object graph by replaying all blocks with full validation")
          ("resync-blockchain", "Delete all blocks and re-sync with network from scratch")
-         ("force-validate", "Force validation of all transactions")
+         ("force-validate", "Force validation of all transactions during normal operation")
          ("genesis-timestamp", bpo::value<uint32_t>(),
           "Replace timestamp from genesis.json with current time plus this many seconds (experts only!)")
          ;

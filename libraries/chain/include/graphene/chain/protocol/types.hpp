@@ -36,6 +36,22 @@
 
 #include <graphene/chain/protocol/ext.hpp>
 
+// TODO: move this to fc
+#include <fc/crypto/sha1.hpp>
+namespace fc { namespace raw {
+   template<typename T>
+   inline void pack( T& ds, const fc::sha1& ep, uint32_t _max_depth = 1 ) {
+      ds << ep;
+   }
+
+   template<typename T>
+   inline void unpack( T& ds, sha1& ep, uint32_t _max_depth = 1 ) {
+      ds >> ep;
+   }
+
+} }
+// /TODO: move to fc
+
 #include <fc/io/raw.hpp>
 #include <fc/uint128.hpp>
 #include <fc/static_variant.hpp>
@@ -140,6 +156,7 @@ namespace graphene { namespace chain {
       vesting_balance_object_type,
       worker_object_type,
       balance_object_type,
+      htlc_object_type,
       OBJECT_TYPE_COUNT ///< Sentry value which contains the number of different object types
    };
 
@@ -158,7 +175,7 @@ namespace graphene { namespace chain {
       impl_blinded_balance_object_type,
       impl_chain_property_object_type,
       impl_witness_schedule_object_type,
-      impl_reserved1_object_type,      // formerly impl_budget_record_object_type, TODO: delete me
+      impl_budget_record_object_type,
       impl_special_authority_object_type,
       impl_buyback_object_type,
       impl_fba_accumulator_object_type,
@@ -182,6 +199,7 @@ namespace graphene { namespace chain {
    class worker_object;
    class balance_object;
    class blinded_balance_object;
+   class htlc_object;
 
    typedef object_id< protocol_ids, account_object_type,            account_object>               account_id_type;
    typedef object_id< protocol_ids, asset_object_type,              asset_object>                 asset_id_type;
@@ -197,6 +215,7 @@ namespace graphene { namespace chain {
    typedef object_id< protocol_ids, vesting_balance_object_type,    vesting_balance_object>       vesting_balance_id_type;
    typedef object_id< protocol_ids, worker_object_type,             worker_object>                worker_id_type;
    typedef object_id< protocol_ids, balance_object_type,            balance_object>               balance_id_type;
+   typedef object_id< protocol_ids, htlc_object_type,               htlc_object>                  htlc_id_type;
 
    // implementation types
    class global_property_object;
@@ -210,6 +229,7 @@ namespace graphene { namespace chain {
    class account_transaction_history_object;
    class chain_property_object;
    class witness_schedule_object;
+   class budget_record_object;
    class special_authority_object;
    class buyback_object;
    class fba_accumulator_object;
@@ -229,6 +249,7 @@ namespace graphene { namespace chain {
                       account_transaction_history_object>       account_transaction_history_id_type;
    typedef object_id< implementation_ids, impl_chain_property_object_type,   chain_property_object>                     chain_property_id_type;
    typedef object_id< implementation_ids, impl_witness_schedule_object_type, witness_schedule_object>                   witness_schedule_id_type;
+   typedef object_id< implementation_ids, impl_budget_record_object_type, budget_record_object >                        budget_record_id_type;
    typedef object_id< implementation_ids, impl_blinded_balance_object_type, blinded_balance_object >                    blinded_balance_id_type;
    typedef object_id< implementation_ids, impl_special_authority_object_type, special_authority_object >                special_authority_id_type;
    typedef object_id< implementation_ids, impl_buyback_object_type, buyback_object >                                    buyback_id_type;
@@ -262,6 +283,14 @@ namespace graphene { namespace chain {
        friend bool operator == ( const public_key_type& p1, const fc::ecc::public_key& p2);
        friend bool operator == ( const public_key_type& p1, const public_key_type& p2);
        friend bool operator != ( const public_key_type& p1, const public_key_type& p2);
+   };
+
+   class pubkey_comparator {
+   public:
+      inline bool operator()( const public_key_type& a, const public_key_type& b )const
+      {
+         return a.key_data < b.key_data;
+      }
    };
 
    struct extended_public_key_type
@@ -343,6 +372,7 @@ FC_REFLECT_ENUM( graphene::chain::object_type,
                  (vesting_balance_object_type)
                  (worker_object_type)
                  (balance_object_type)
+                 (htlc_object_type)
                  (OBJECT_TYPE_COUNT)
                )
 FC_REFLECT_ENUM( graphene::chain::impl_object_type,
@@ -359,7 +389,7 @@ FC_REFLECT_ENUM( graphene::chain::impl_object_type,
                  (impl_blinded_balance_object_type)
                  (impl_chain_property_object_type)
                  (impl_witness_schedule_object_type)
-                 (impl_reserved1_object_type)
+                 (impl_budget_record_object_type)
                  (impl_special_authority_object_type)
                  (impl_buyback_object_type)
                  (impl_fba_accumulator_object_type)
@@ -391,10 +421,12 @@ FC_REFLECT_TYPENAME( graphene::chain::account_statistics_id_type )
 FC_REFLECT_TYPENAME( graphene::chain::transaction_obj_id_type )
 FC_REFLECT_TYPENAME( graphene::chain::block_summary_id_type )
 FC_REFLECT_TYPENAME( graphene::chain::account_transaction_history_id_type )
+FC_REFLECT_TYPENAME( graphene::chain::budget_record_id_type )
 FC_REFLECT_TYPENAME( graphene::chain::special_authority_id_type )
 FC_REFLECT_TYPENAME( graphene::chain::buyback_id_type )
 FC_REFLECT_TYPENAME( graphene::chain::fba_accumulator_id_type )
 FC_REFLECT_TYPENAME( graphene::chain::collateral_bid_id_type )
+FC_REFLECT_TYPENAME( graphene::chain::htlc_id_type )
 
 FC_REFLECT( graphene::chain::void_t, )
 

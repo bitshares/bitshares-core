@@ -108,6 +108,23 @@ struct proposal_operation_hardfork_visitor
          FC_ASSERT(!"Virtual operation");
       }
    }
+   void operator()(const graphene::chain::committee_member_update_global_parameters_operation &op) const {
+      if (block_time < HARDFORK_CORE_1468_TIME) {
+         FC_ASSERT(!op.new_parameters.extensions.value.updatable_htlc_options.valid(), "Unable to set HTLC options before hardfork 1468");
+         FC_ASSERT(!op.new_parameters.current_fees->exists<htlc_create_operation>());
+         FC_ASSERT(!op.new_parameters.current_fees->exists<htlc_redeem_operation>());
+         FC_ASSERT(!op.new_parameters.current_fees->exists<htlc_extend_operation>());
+      }
+   }
+   void operator()(const graphene::chain::htlc_create_operation &op) const {
+      FC_ASSERT( block_time >= HARDFORK_CORE_1468_TIME, "Not allowed until hardfork 1468" );
+   }
+   void operator()(const graphene::chain::htlc_redeem_operation &op) const {
+      FC_ASSERT( block_time >= HARDFORK_CORE_1468_TIME, "Not allowed until hardfork 1468" );
+   }
+   void operator()(const graphene::chain::htlc_extend_operation &op) const {
+      FC_ASSERT( block_time >= HARDFORK_CORE_1468_TIME, "Not allowed until hardfork 1468" );
+   }
    // loop and self visit in proposals
    void operator()(const graphene::chain::proposal_create_operation &v) const {
       for (const op_wrapper &op : v.proposed_ops)
@@ -127,6 +144,27 @@ struct hardfork_visitor_214 // non-recursive proposal visitor
    }
 };
 
+void hardfork_visitor_1479::operator()(const proposal_update_operation &v)
+{
+   if( nested_update_count == 0 || v.proposal.instance.value > max_update_instance )
+      max_update_instance = v.proposal.instance.value;
+   nested_update_count++;
+}
+
+void hardfork_visitor_1479::operator()(const proposal_delete_operation &v)
+{
+   if( nested_update_count == 0 || v.proposal.instance.value > max_update_instance )
+      max_update_instance = v.proposal.instance.value;
+   nested_update_count++;
+}
+
+// loop and self visit in proposals
+void hardfork_visitor_1479::operator()(const graphene::chain::proposal_create_operation &v)
+{
+   for (const op_wrapper &op : v.proposed_ops)
+      op.op.visit(*this);
+}
+
 void_result proposal_create_evaluator::do_evaluate(const proposal_create_operation& o)
 { try {
    const database& d = db();
@@ -142,6 +180,7 @@ void_result proposal_create_evaluator::do_evaluate(const proposal_create_operati
       for (const op_wrapper &op : o.proposed_ops)
          op.op.visit( hf214 );
    }
+   vtor_1479( o );
 
    const auto& global_parameters = d.get_global_properties().parameters;
 
@@ -213,6 +252,20 @@ object_id_type proposal_create_evaluator::do_apply(const proposal_create_operati
       std::set_difference(required_active.begin(), required_active.end(),
                           proposal.required_owner_approvals.begin(), proposal.required_owner_approvals.end(),
                           std::inserter(proposal.required_active_approvals, proposal.required_active_approvals.begin()));
+
+      if( d.head_block_time() > HARDFORK_CORE_1479_TIME )
+         FC_ASSERT( vtor_1479.nested_update_count == 0 || proposal.id.instance() > vtor_1479.max_update_instance,
+                    "Cannot update/delete a proposal with a future id!" );
+      else if( vtor_1479.nested_update_count > 0 && proposal.id.instance() <= vtor_1479.max_update_instance )
+      {
+         // prevent approval
+         transfer_operation top;
+         top.from = GRAPHENE_NULL_ACCOUNT;
+         top.to = GRAPHENE_RELAXED_COMMITTEE_ACCOUNT;
+         top.amount = asset( GRAPHENE_MAX_SHARE_SUPPLY );
+         proposal.proposed_transaction.operations.emplace_back( top );
+         wlog( "Issue 1479: ${p}", ("p",proposal) );
+      }
    });
 
    return proposal.id;

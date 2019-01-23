@@ -34,8 +34,9 @@ script:
  - cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_C_FLAGS=--coverage -DCMAKE_CXX_FLAGS=--coverage -DBoost_USE_STATIC_LIBS=OFF -DCMAKE_CXX_OUTPUT_EXTENSION_REPLACE=ON .
  - 'which build-wrapper-linux-x86-64 && build-wrapper-linux-x86-64 --out-dir bw-output make -j 2 cli_wallet witness_node chain_test cli_test || make -j 2 cli_wallet witness_node chain_test cli_test'
  - set -o pipefail
+ - '[ $((`date +%s` - `cat _start_time`)) -gt $((42 * 60)) ] && touch _empty_cache || true'
  - '[ -r _empty_cache ] || tests/chain_test 2>&1 | cat'
  - '[ -r _empty_cache ] || tests/cli_test 2>&1 | cat'
  - 'find libraries/[acdenptuw]*/CMakeFiles/*.dir programs/[cdgjsw]*/CMakeFiles/*.dir -type d | while read d; do gcov -o "$d" "${d/CMakeFiles*.dir//}"/*.cpp; done >/dev/null'
- - '( [ -r _empty_cache -o $((`date +%s` - `cat _start_time`)) -gt $((42 * 60)) ] && echo "WARNING! Skipping sonar scanner due to time constraints!" ) || ( which sonar-scanner && sonar-scanner || true )'
- - '[ ! -r _empty_cache ] || ( echo "Please restart with populated cache" && false )'
+ - '[ -r _empty_cache ] || ( which sonar-scanner && sonar-scanner || true )'
+ - '[ ! -r _empty_cache ] || ( echo "WARNING! Skipped some tests due to compile time! Please restart with populated cache." && false )'

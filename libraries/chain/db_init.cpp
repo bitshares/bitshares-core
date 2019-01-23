@@ -29,6 +29,7 @@
 #include <graphene/chain/asset_object.hpp>
 #include <graphene/chain/balance_object.hpp>
 #include <graphene/chain/block_summary_object.hpp>
+#include <graphene/chain/budget_record_object.hpp>
 #include <graphene/chain/buyback_object.hpp>
 #include <graphene/chain/chain_property_object.hpp>
 #include <graphene/chain/committee_member_object.hpp>
@@ -45,6 +46,7 @@
 #include <graphene/chain/witness_object.hpp>
 #include <graphene/chain/witness_schedule_object.hpp>
 #include <graphene/chain/worker_object.hpp>
+#include <graphene/chain/htlc_object.hpp>
 
 #include <graphene/chain/account_evaluator.hpp>
 #include <graphene/chain/asset_evaluator.hpp>
@@ -60,6 +62,7 @@
 #include <graphene/chain/withdraw_permission_evaluator.hpp>
 #include <graphene/chain/witness_evaluator.hpp>
 #include <graphene/chain/worker_evaluator.hpp>
+#include <graphene/chain/htlc_evaluator.hpp>
 
 #include <graphene/chain/protocol/fee_schedule.hpp>
 
@@ -125,6 +128,9 @@ const uint8_t witness_object::type_id;
 const uint8_t worker_object::space_id;
 const uint8_t worker_object::type_id;
 
+const uint8_t htlc_object::space_id;
+const uint8_t htlc_object::type_id;
+
 
 void database::initialize_evaluators()
 {
@@ -173,6 +179,9 @@ void database::initialize_evaluators()
    register_evaluator<asset_claim_fees_evaluator>();
    register_evaluator<asset_update_issuer_evaluator>();
    register_evaluator<asset_claim_pool_evaluator>();
+   register_evaluator<htlc_create_evaluator>();
+   register_evaluator<htlc_redeem_evaluator>();
+   register_evaluator<htlc_extend_evaluator>();
 }
 
 void database::initialize_indexes()
@@ -181,15 +190,15 @@ void database::initialize_indexes()
    _undo_db.set_max_size( GRAPHENE_MIN_UNDO_HISTORY );
 
    //Protocol object indexes
-   add_index< primary_index<asset_index> >();
+   add_index< primary_index<asset_index, 13> >(); // 8192 assets per chunk
    add_index< primary_index<force_settlement_index> >();
 
-   auto acnt_index = add_index< primary_index<account_index> >();
+   auto acnt_index = add_index< primary_index<account_index, 20> >(); // ~1 million accounts per chunk
    acnt_index->add_secondary_index<account_member_index>();
    acnt_index->add_secondary_index<account_referrer_index>();
 
-   add_index< primary_index<committee_member_index> >();
-   add_index< primary_index<witness_index> >();
+   add_index< primary_index<committee_member_index, 8> >(); // 256 members per chunk
+   add_index< primary_index<witness_index, 10> >(); // 1024 witnesses per chunk
    add_index< primary_index<limit_order_index > >();
    add_index< primary_index<call_order_index > >();
 
@@ -201,22 +210,26 @@ void database::initialize_indexes()
    add_index< primary_index<worker_index> >();
    add_index< primary_index<balance_index> >();
    add_index< primary_index<blinded_balance_index> >();
+   add_index< primary_index< htlc_index> >();
 
    //Implementation object indexes
    add_index< primary_index<transaction_index                             > >();
-   add_index< primary_index<account_balance_index                         > >();
-   add_index< primary_index<asset_bitasset_data_index                     > >();
+
+   auto bal_idx = add_index< primary_index<account_balance_index          > >();
+   bal_idx->add_secondary_index<balances_by_account_index>();
+
+   add_index< primary_index<asset_bitasset_data_index,                 13 > >(); // 8192
    add_index< primary_index<simple_index<global_property_object          >> >();
    add_index< primary_index<simple_index<dynamic_global_property_object  >> >();
-   add_index< primary_index<account_stats_index                           > >();
+   add_index< primary_index<account_stats_index,                       20 > >(); // 1 Mi
    add_index< primary_index<simple_index<asset_dynamic_data_object       >> >();
    add_index< primary_index<simple_index<block_summary_object            >> >();
    add_index< primary_index<simple_index<chain_property_object          > > >();
    add_index< primary_index<simple_index<witness_schedule_object        > > >();
+   add_index< primary_index<simple_index<budget_record_object           > > >();
    add_index< primary_index< special_authority_index                      > >();
    add_index< primary_index< buyback_index                                > >();
    add_index< primary_index<collateral_bid_index                          > >();
-
    add_index< primary_index< simple_index< fba_accumulator_object       > > >();
 }
 
@@ -233,7 +246,7 @@ void database::init_genesis(const genesis_state_type& genesis_state)
    _undo_db.disable();
    struct auth_inhibitor {
       auth_inhibitor(database& db) : db(db), old_flags(db.node_properties().skip_flags)
-      { db.node_properties().skip_flags |= skip_authority_check; }
+      { db.node_properties().skip_flags |= skip_transaction_signatures; }
       ~auth_inhibitor()
       { db.node_properties().skip_flags = old_flags; }
    private:
