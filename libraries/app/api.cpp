@@ -35,10 +35,14 @@
 #include <graphene/chain/transaction_history_object.hpp>
 #include <graphene/chain/withdraw_permission_object.hpp>
 #include <graphene/chain/worker_object.hpp>
+#include <graphene/chain/protocol/transaction.hpp>
 
 #include <fc/crypto/hex.hpp>
 #include <fc/rpc/api_connection.hpp>
 #include <fc/thread/future.hpp>
+#include <fc/crypto/pke.hpp>
+#include <fc/time.hpp>
+#include <fc/variant.hpp>
 
 template class fc::api<graphene::app::block_api>;
 template class fc::api<graphene::app::network_broadcast_api>;
@@ -82,6 +86,87 @@ namespace graphene { namespace app {
        for( const std::string& api_name : acc->allowed_apis )
           enable_api( api_name );
        return true;
+    }
+
+    bool login_api::login_signed( const string& b64_encoded_trx )
+    {
+      const string trx_json = fc::base64_decode( b64_encoded_trx );
+      auto var = fc::json::from_string( trx_json );
+      auto trx = var.as<signed_transaction>( 200 );
+
+      auto db = _app.chain_database();
+      int64_t offset( (trx.expiration - db->head_block_time()).to_seconds() );
+      if( offset > 5*60 || offset < 0 )
+         return false; 
+
+      auto op = trx.operations[0];
+      if( op.which() != operation::tag<transfer_operation>::value ) // only transfer op for validation
+         return false;
+      const auto acc_id = op.get<transfer_operation>().from;
+
+      const auto& signature_keys = trx.get_signature_keys( db->get_chain_id() );
+      if( signature_keys.empty() )
+         return false;
+      
+      const auto& public_key = *signature_keys.begin();
+      
+      auto key_refs = (*_database_api)->get_key_references( {public_key} )[0];
+      if( std::find( key_refs.begin(), key_refs.end(), acc_id ) == key_refs.end() )
+         return false;
+      
+      const auto& acc = acc_id(*db);
+      optional< api_access_info_signed_variant > api_access_info_var = _app.get_api_access_info_signed( acc.name );
+      if( !api_access_info_var )
+         return false;
+
+      if( api_access_info_var->which() == api_access_info_signed_variant::tag<api_access_info_signed>::value )
+      {
+         const auto& api_access_info = api_access_info_var->get<api_access_info_signed>();
+         if( !verify_api_access_info_signed( acc, api_access_info ) )
+            return false; // TODO or try default login then???
+
+         for( const auto& api : api_access_info.allowed_apis )
+            enable_api( api );
+
+         return true;
+      }
+      else // api_access_info_var.which() == api_access_info_signed_variant::tag<std::vector<api_access_info_signed>>::value
+      {
+         const auto& api_access_info_vec = api_access_info_var->get<std::vector<api_access_info_signed>>();
+         for( const auto& api_access_info : api_access_info_vec )
+         {
+            if( !verify_api_access_info_signed( acc, api_access_info ) )
+               continue;
+            
+            for( const auto& api : api_access_info.allowed_apis )
+               enable_api( api );
+            
+            return true;
+         }
+         return false;
+      }
+    }
+
+    bool login_api::verify_api_access_info_signed( const account_object& acc,
+       const api_access_info_signed& api_access_info )
+    {
+      if( api_access_info.required_lifetime_member && !acc.is_lifetime_member() ) 
+         return false;
+
+      const auto& required_registrar_name = api_access_info.required_registrar;
+      if( required_registrar_name == "" )
+         return true;
+
+      auto db = _app.chain_database();
+      const string account_registrar_name = acc.registrar(*db).name;
+      string account_original_registrar_name;
+      if( acc.original_registrar )
+         account_original_registrar_name = (*acc.original_registrar)(*db).name;
+
+      bool has_required_registrar = required_registrar_name == account_registrar_name
+         || required_registrar_name == account_original_registrar_name;
+
+      return has_required_registrar;
     }
 
     void login_api::enable_api( const std::string& api_name )
