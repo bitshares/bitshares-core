@@ -24,6 +24,7 @@
 #pragma once
 
 #include <fc/reflect/reflect.hpp>
+#include <fc/static_variant.hpp>
 
 #include <map>
 #include <string>
@@ -38,10 +39,25 @@ struct api_access_info
    std::vector< std::string > allowed_apis;
 };
 
+struct api_access_info_signed
+{
+   bool required_lifetime_member;
+   std::string required_registrar;
+   std::vector< std::string > allowed_apis;
+};
+
 struct api_access
 {
    std::map< std::string, api_access_info > permission_map;
+   std::vector< api_access_info_signed > permission_map_signed_default;
+   std::map< std::string, api_access_info_signed > permission_map_signed_user;
 };
+
+typedef fc::static_variant<
+   api_access_info_signed,
+   std::vector< api_access_info_signed >
+> api_access_info_signed_variant;
+
 
 } } // graphene::app
 
@@ -51,6 +67,16 @@ FC_REFLECT( graphene::app::api_access_info,
     (allowed_apis)
    )
 
+FC_REFLECT( graphene::app::api_access_info_signed,
+    (required_lifetime_member)
+    (required_registrar)
+    (allowed_apis)
+   )
+
 FC_REFLECT( graphene::app::api_access,
     (permission_map)
+    (permission_map_signed_default)
+    (permission_map_signed_user)
    )
+
+FC_REFLECT_TYPENAME( graphene::app::api_access_info_signed_variant )
