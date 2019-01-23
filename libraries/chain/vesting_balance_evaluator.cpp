@@ -30,6 +30,7 @@
 
 namespace graphene { namespace chain {
 namespace detail {
+   // TODO review and remove code below and links to it after hf_1268
    void check_vesting_balance_policy_hf_1268(const fc::time_point_sec& block_time, const vesting_policy_initializer& policy)
    {
       if( block_time < HARDFORK_1268_TIME )
