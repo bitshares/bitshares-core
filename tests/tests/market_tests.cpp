@@ -232,10 +232,14 @@ BOOST_AUTO_TEST_CASE(issue_338_etc)
 BOOST_AUTO_TEST_CASE(hardfork_core_338_test)
 { try {
 
+   auto mi = db.get_global_properties().parameters.maintenance_interval;
+
    if(hf1270)
-      generate_blocks(HARDFORK_CORE_1270_TIME);
+      generate_blocks(HARDFORK_CORE_1270_TIME - mi);
    else
-      generate_blocks(HARDFORK_CORE_343_TIME);
+      generate_blocks(HARDFORK_CORE_343_TIME - mi);
+
+   generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
 
    set_expiration( db, trx );
 
@@ -411,10 +415,14 @@ BOOST_AUTO_TEST_CASE(hardfork_core_338_test)
 BOOST_AUTO_TEST_CASE(hardfork_core_453_test)
 { try {
 
+   auto mi = db.get_global_properties().parameters.maintenance_interval;
+
    if(hf1270)
-      generate_blocks(HARDFORK_CORE_1270_TIME);
+      generate_blocks(HARDFORK_CORE_1270_TIME - mi);
    else
-      generate_blocks(HARDFORK_CORE_343_TIME);
+      generate_blocks(HARDFORK_CORE_343_TIME - mi);
+
+   generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
 
    set_expiration( db, trx );
 
@@ -492,10 +500,14 @@ BOOST_AUTO_TEST_CASE(hardfork_core_453_test)
 BOOST_AUTO_TEST_CASE(hardfork_core_625_big_limit_order_test)
 { try {
 
+   auto mi = db.get_global_properties().parameters.maintenance_interval;
+
    if(hf1270)
-      generate_blocks(HARDFORK_CORE_1270_TIME);
+      generate_blocks(HARDFORK_CORE_1270_TIME - mi);
    else
-      generate_blocks(HARDFORK_CORE_625_TIME);
+      generate_blocks(HARDFORK_CORE_625_TIME - mi);
+
+   generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
 
    set_expiration( db, trx );
 
@@ -1203,10 +1215,14 @@ BOOST_AUTO_TEST_CASE(hard_fork_343_cross_test)
 BOOST_AUTO_TEST_CASE(target_cr_test_limit_call)
 { try {
 
+   auto mi = db.get_global_properties().parameters.maintenance_interval;
+
    if(hf1270)
-      generate_blocks(HARDFORK_CORE_1270_TIME);
+      generate_blocks(HARDFORK_CORE_1270_TIME - mi);
    else
-      generate_blocks(HARDFORK_CORE_834_TIME);
+      generate_blocks(HARDFORK_CORE_834_TIME - mi);
+
+   generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
 
    set_expiration( db, trx );
 
@@ -1383,10 +1399,14 @@ BOOST_AUTO_TEST_CASE(target_cr_test_limit_call)
 BOOST_AUTO_TEST_CASE(target_cr_test_call_limit)
 { try {
 
+   auto mi = db.get_global_properties().parameters.maintenance_interval;
+
    if(hf1270)
-      generate_blocks(HARDFORK_CORE_1270_TIME);
+      generate_blocks(HARDFORK_CORE_1270_TIME - mi);
    else
-      generate_blocks(HARDFORK_CORE_834_TIME);
+      generate_blocks(HARDFORK_CORE_834_TIME - mi);
+
+   generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
 
    set_expiration( db, trx );
 
@@ -1521,8 +1541,9 @@ BOOST_AUTO_TEST_CASE(target_cr_test_call_limit)
 BOOST_AUTO_TEST_CASE(mcr_bug_increase_before1270)
 { try {
 
-   generate_blocks(HARDFORK_CORE_453_TIME);
-
+   auto mi = db.get_global_properties().parameters.maintenance_interval;
+   generate_blocks(HARDFORK_CORE_453_TIME - mi);
+   generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
    generate_block();
 
    set_expiration( db, trx );
@@ -1585,8 +1606,9 @@ BOOST_AUTO_TEST_CASE(mcr_bug_increase_before1270)
 BOOST_AUTO_TEST_CASE(mcr_bug_increase_after1270)
 { try {
 
-   generate_blocks(HARDFORK_CORE_1270_TIME);
-
+   auto mi = db.get_global_properties().parameters.maintenance_interval;
+   generate_blocks(HARDFORK_CORE_1270_TIME - mi);
+   generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
    generate_block();
 
    set_expiration( db, trx );
@@ -1650,8 +1672,9 @@ BOOST_AUTO_TEST_CASE(mcr_bug_increase_after1270)
 BOOST_AUTO_TEST_CASE(mcr_bug_decrease_before1270)
 { try {
 
-   generate_blocks(HARDFORK_CORE_453_TIME);
-
+   auto mi = db.get_global_properties().parameters.maintenance_interval;
+   generate_blocks(HARDFORK_CORE_453_TIME - mi);
+   generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
    generate_block();
 
    set_expiration( db, trx );
@@ -1719,8 +1742,9 @@ BOOST_AUTO_TEST_CASE(mcr_bug_decrease_before1270)
 BOOST_AUTO_TEST_CASE(mcr_bug_decrease_after1270)
 { try {
 
-   generate_blocks(HARDFORK_CORE_1270_TIME);
-
+   auto mi = db.get_global_properties().parameters.maintenance_interval;
+   generate_blocks(HARDFORK_CORE_1270_TIME - mi);
+   generate_blocks(db.get_dynamic_global_properties().next_maintenance_time);
    generate_block();
 
    set_expiration( db, trx );

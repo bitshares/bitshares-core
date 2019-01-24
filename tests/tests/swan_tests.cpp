@@ -115,8 +115,9 @@ struct swan_fixture : database_fixture {
       generate_block();
     }
     void wait_for_hf_core_1270() {
-       generate_blocks( HARDFORK_CORE_1270_TIME );
-       generate_block();
+       auto mi = db.get_global_properties().parameters.maintenance_interval;
+       generate_blocks(HARDFORK_CORE_1270_TIME - mi);
+       wait_for_maintenance();
     }
 
     void wait_for_maintenance() {
