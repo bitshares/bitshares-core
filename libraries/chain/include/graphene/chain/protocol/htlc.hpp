@@ -98,7 +98,7 @@ namespace graphene {
          // who is attempting to update the transaction
          account_id_type redeemer;
          // the preimage (not used if after epoch timeout)
-         std::vector<uint8_t> preimage;
+         std::vector<char> preimage;
          // for future expansion
          extensions_type extensions; 
 
