@@ -12,9 +12,9 @@ Folder | Name | Description | Status
 [app](app) | Application | Bundles component libraries (chain, network, plugins) into a useful application. Also provides API access. | Active 
 [chain](chain) | Blockchain | Defines all objects, operations and types. This include the consensus protocol, defines the whole blockchain behaviour. | Active 
 [db](db) | Database | Defines the internal database graphene uses. | Active 
-[egenesis](egenesis) | Genesis |  | Active
+[egenesis](egenesis) | Genesis | Hardcodes the `genesis.json` file into the `witness_node` executable.| Active
 [fc](fc) | Fast-compiling C++ library | https://github.com/bitshares/bitshares-fc | Active 
 [net](net) | Network | The graphene p2p layer. | Active 
 [plugins](plugins) | Plugins | Collection of singleton designed modules used for extending the bitshares-core.  | Active 
-[utilities](utilities) | Network | Common utility calls used in applications or other libraries. | Active 
+[utilities](utilities) | Utilities | Common utility calls used in applications or other libraries. | Active 
 [wallet](wallet) | Wallet | Wallet definition for the `cli_wallet` software. | Active
