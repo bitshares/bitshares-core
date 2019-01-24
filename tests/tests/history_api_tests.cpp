@@ -549,7 +549,6 @@ BOOST_AUTO_TEST_CASE(get_account_history_operations) {
 
       int asset_create_op_id = operation::tag<asset_create_operation>::value;
       int account_create_op_id = operation::tag<account_create_operation>::value;
-      int transfer_op_id = operation::tag<graphene::chain::transfer_operation>::value;
 
       //account_id_type() did 1 asset_create op
       vector<operation_history_object> histories = hist_api.get_account_history_operations(
@@ -594,7 +593,7 @@ BOOST_AUTO_TEST_CASE(get_account_history_operations) {
       // see https://github.com/bitshares/bitshares-core/issues/1490
       histories = hist_api.get_account_history_operations(
             "committee-account", account_create_op_id, operation_history_id_type(), operation_history_id_type(), 100);
-      BOOST_CHECK_EQUAL(histories.size(), 75);
+      BOOST_CHECK_EQUAL(histories.size(), 75u);
       if (histories.size() > 0)
          BOOST_CHECK_EQUAL(histories[0].op.which(), account_create_op_id);
       
