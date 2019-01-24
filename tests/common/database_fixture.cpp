@@ -219,7 +219,11 @@ database_fixture::~database_fixture()
       }
       return;
    } catch (fc::exception& ex) {
-      BOOST_FAIL( ex.to_detail_string() );
+      BOOST_FAIL( std::string("fc::exception in ~database_fixture: ") + ex.to_detail_string() );
+   } catch (std::exception& e) {
+      BOOST_FAIL( std::string("std::exception in ~database_fixture:") + e.what() );
+   } catch (...) {
+      BOOST_FAIL( "Uncaught exception in ~database_fixture" );
    }
 } 
 
