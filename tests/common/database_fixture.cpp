@@ -459,7 +459,7 @@ const asset_object& database_fixture::create_bitasset(
    creator.issuer = issuer;
    creator.fee = asset();
    creator.symbol = name;
-   creator.common_options.max_supply = GRAPHENE_MAX_SHARE_SUPPLY;
+   creator.common_options.max_supply = GRAPHENE_MAX_SHARE_SUPPLY / 2;
    creator.precision = precision;
    creator.common_options.market_fee_percent = market_fee_percent;
    if( issuer == GRAPHENE_WITNESS_ACCOUNT )

@@ -157,8 +157,10 @@ void_result call_order_update_evaluator::do_evaluate(const call_order_update_ope
 { try {
    database& d = db();
 
+   auto next_maintenance_time = d.get_dynamic_global_properties().next_maintenance_time;
+
    // TODO: remove this check and the assertion after hf_834
-   if( d.get_dynamic_global_properties().next_maintenance_time <= HARDFORK_CORE_834_TIME )
+   if( next_maintenance_time <= HARDFORK_CORE_834_TIME )
       FC_ASSERT( !o.extensions.value.target_collateral_ratio.valid(),
                  "Can not set target_collateral_ratio in call_order_update_operation before hardfork 834." );
 
@@ -166,6 +168,14 @@ void_result call_order_update_evaluator::do_evaluate(const call_order_update_ope
    _debt_asset     = &o.delta_debt.asset_id(d);
    FC_ASSERT( _debt_asset->is_market_issued(), "Unable to cover ${sym} as it is not a collateralized asset.",
               ("sym", _debt_asset->symbol) );
+
+   _dynamic_data_obj = &_debt_asset->dynamic_asset_data_id(d);
+   FC_ASSERT( next_maintenance_time <= HARDFORK_CORE_1465_TIME 
+         || _dynamic_data_obj->current_supply + o.delta_debt.amount <= _debt_asset->options.max_supply,
+      "Borrowing this quantity would exceed MAX_SUPPLY" );
+
+   FC_ASSERT( _dynamic_data_obj->current_supply + o.delta_debt.amount >= 0,
+         "This transaction would bring current supply below zero.");
 
    _bitasset_data  = &_debt_asset->bitasset_data(d);
 
@@ -198,9 +208,8 @@ object_id_type call_order_update_evaluator::do_apply(const call_order_update_ope
       d.adjust_balance( o.funding_account, o.delta_debt );
 
       // Deduct the debt paid from the total supply of the debt asset.
-      d.modify(_debt_asset->dynamic_asset_data_id(d), [&](asset_dynamic_data_object& dynamic_asset) {
+      d.modify(*_dynamic_data_obj, [&](asset_dynamic_data_object& dynamic_asset) {
          dynamic_asset.current_supply += o.delta_debt.amount;
-         FC_ASSERT(dynamic_asset.current_supply >= 0);
       });
    }
 
