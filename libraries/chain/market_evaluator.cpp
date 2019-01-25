@@ -169,9 +169,13 @@ void_result call_order_update_evaluator::do_evaluate(const call_order_update_ope
    FC_ASSERT( _debt_asset->is_market_issued(), "Unable to cover ${sym} as it is not a collateralized asset.",
               ("sym", _debt_asset->symbol) );
 
+   _dynamic_data_obj = &_debt_asset->dynamic_asset_data_id(d);
    FC_ASSERT( next_maintenance_time <= HARDFORK_CORE_1465_TIME 
-         || _debt_asset->dynamic_data(d).current_supply + o.delta_debt.amount <= _debt_asset->options.max_supply,
+         || _dynamic_data_obj->current_supply + o.delta_debt.amount <= _debt_asset->options.max_supply,
       "Borrowing this quantity would exceed MAX_SUPPLY" );
+
+   FC_ASSERT( _dynamic_data_obj->current_supply + o.delta_debt.amount >= 0,
+         "This transaction would bring current supply below zero.");
 
    _bitasset_data  = &_debt_asset->bitasset_data(d);
 
@@ -187,10 +191,6 @@ void_result call_order_update_evaluator::do_evaluate(const call_order_update_ope
                  "Debt amount and collateral amount should be same when updating debt position in a prediction market" );
    else if( _bitasset_data->current_feed.settlement_price.is_null() )
       FC_THROW_EXCEPTION(insufficient_feeds, "Cannot borrow asset with no price feed.");
-
-   _dynamic_data_obj = &_debt_asset->dynamic_asset_data_id(d);
-   FC_ASSERT( _dynamic_data_obj->current_supply + o.delta_debt.amount >= 0,
-         "This transaction would bring current supply below zero.");
 
    // Note: there was code here checking whether the account has enough balance to increase delta collateral,
    //       which is now removed since the check is implicitly done later by `adjust_balance()` in `do_apply()`.
