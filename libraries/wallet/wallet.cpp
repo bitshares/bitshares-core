@@ -1812,7 +1812,7 @@ public:
             (preimage_hash)(preimage_size)(claim_period_seconds)(broadcast) ) 
    }
 
-   signed_transaction htlc_redeem( string htlc_id, string issuer, const std::vector<uint8_t>& preimage, bool broadcast )
+   signed_transaction htlc_redeem( string htlc_id, string issuer, const std::vector<char>& preimage, bool broadcast )
    {
       try 
       {
@@ -3201,7 +3201,7 @@ signed_transaction wallet_api::htlc_redeem( std::string htlc_id, std::string iss
       bool broadcast)
 {
 
-   return my->htlc_redeem(htlc_id, issuer, std::vector<uint8_t>(preimage.begin(), preimage.end()), broadcast);
+   return my->htlc_redeem(htlc_id, issuer, std::vector<char>(preimage.begin(), preimage.end()), broadcast);
 }
 
 signed_transaction wallet_api::htlc_extend ( std::string htlc_id, std::string issuer, const uint32_t seconds_to_add,
