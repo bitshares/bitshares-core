@@ -549,7 +549,7 @@ BOOST_FIXTURE_TEST_CASE( account_history_pagination, cli_fixture )
 
       // now get account history and make sure everything is there (and no duplicates)
       std::vector<graphene::wallet::operation_detail> history = con.wallet_api_ptr->get_account_history("jmjatlanta", 300);
-      BOOST_CHECK_EQUAL(201, history.size() );
+      BOOST_CHECK_EQUAL(201u, history.size() );
 
       std::set<object_id_type> operation_ids;
 
