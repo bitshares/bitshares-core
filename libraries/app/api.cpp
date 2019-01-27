@@ -345,7 +345,7 @@ namespace graphene { namespace app {
     }
 
     vector<operation_history_object> history_api::get_account_history_operations( const std::string account_id_or_name,
-                                                                       int operation_id,
+                                                                       int operation_type,
                                                                        operation_history_id_type start,
                                                                        operation_history_id_type stop,
                                                                        unsigned limit) const
@@ -368,7 +368,7 @@ namespace graphene { namespace app {
        {
           if( node->operation_id.instance.value <= start.instance.value ) {
 
-             if(node->operation_id(db).op.which() == operation_id)
+             if(node->operation_id(db).op.which() == operation_type)
                result.push_back( node->operation_id(db) );
           }
           if( node->next == account_transaction_history_id_type() )
@@ -377,7 +377,7 @@ namespace graphene { namespace app {
        }
        if( stop.instance.value == 0 && result.size() < limit ) {
           auto head = db.find(account_transaction_history_id_type());
-          if (head != nullptr && head->account == account && head->operation_id(db).op.which() == operation_id)
+          if (head != nullptr && head->account == account && head->operation_id(db).op.which() == operation_type)
             result.push_back(head->operation_id(db));
        }
        return result;
