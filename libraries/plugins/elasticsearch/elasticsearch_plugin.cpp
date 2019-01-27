@@ -59,7 +59,7 @@ class elasticsearch_plugin_impl
       std::string _elasticsearch_basic_auth = "";
       std::string _elasticsearch_index_prefix = "bitshares-";
       bool _elasticsearch_operation_object = false;
-      uint32_t _elasticsearch_start_es_after_block = 0; // disabled
+      uint32_t _elasticsearch_start_es_after_block = 0;
       CURL *curl; // curl handler
       vector <string> bulk_lines; //  vector of op lines
       vector<std::string> prepare;
@@ -283,7 +283,7 @@ bool elasticsearch_plugin_impl::add_elasticsearch( const account_id_type account
    const auto &stats_obj = getStatsObject(account_id);
    const auto &ath = addNewEntry(stats_obj, account_id, oho);
    growStats(stats_obj, ath);
-   if(_elasticsearch_start_es_after_block == 0 || block_number > _elasticsearch_start_es_after_block)  {
+   if(block_number > _elasticsearch_start_es_after_block)  {
       createBulkLine(ath);
       prepareBulk(ath.id);
    }

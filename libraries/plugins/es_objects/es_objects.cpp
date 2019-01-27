@@ -63,7 +63,7 @@ class es_objects_plugin_impl
       bool _es_objects_limit_orders = true;
       bool _es_objects_asset_bitasset = true;
       std::string _es_objects_index_prefix = "objects-";
-      uint32_t _es_objects_start_es_after_block = 0; // disabled
+      uint32_t _es_objects_start_es_after_block = 0;
       CURL *curl; // curl handler
       vector <std::string> bulk;
       vector<std::string> prepare;
@@ -85,7 +85,7 @@ bool es_objects_plugin_impl::index_database( const vector<object_id_type>& ids, 
    block_time = db.head_block_time();
    block_number = db.head_block_num();
 
-   if(_es_objects_start_es_after_block == 0 || block_number > _es_objects_start_es_after_block) {
+   if(block_number > _es_objects_start_es_after_block) {
 
       // check if we are in replay or in sync and change number of bulk documents accordingly
       uint32_t limit_documents = 0;
