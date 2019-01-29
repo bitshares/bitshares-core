@@ -30,6 +30,10 @@
 
 namespace graphene { namespace chain {
 
+namespace detail {
+   void check_asset_options_hf_1268(const fc::time_point_sec& block_time, const asset_options& options);
+   void check_vesting_balance_policy_hf_1268(const fc::time_point_sec& block_time, const vesting_policy_initializer& policy);
+}
 
 struct proposal_operation_hardfork_visitor
 {
@@ -57,6 +61,16 @@ struct proposal_operation_hardfork_visitor
          static const std::locale &loc = std::locale::classic();
          FC_ASSERT(isalpha(v.symbol.back(), loc), "Asset ${s} must end with alpha character before hardfork 620", ("s", v.symbol));
       }
+
+      detail::check_asset_options_hf_1268(block_time, v.common_options);
+   }
+   // hf_1268
+   void operator()(const graphene::chain::asset_update_operation &v) const {
+      detail::check_asset_options_hf_1268(block_time, v.new_options);
+   }
+   // hf_1268
+   void operator()(const graphene::chain::vesting_balance_create_operation &v) const {
+      detail::check_vesting_balance_policy_hf_1268(block_time, v.policy);
    }
    // hf_199
    void operator()(const graphene::chain::asset_update_issuer_operation &v) const {

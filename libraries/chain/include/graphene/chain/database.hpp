@@ -47,6 +47,7 @@ namespace graphene { namespace chain {
    class transaction_evaluation_state;
 
    struct budget_record;
+   enum class vesting_balance_type;
 
    /**
     *   @class database
@@ -302,6 +303,15 @@ namespace graphene { namespace chain {
           */
          void adjust_balance(account_id_type account, asset delta);
 
+         void deposit_market_fee_vesting_balance(const account_id_type &account_id, const asset &delta);
+        /**
+          * @brief Retrieve a particular account's market fee vesting balance in a given asset
+          * @param owner Account whose balance should be retrieved
+          * @param asset_id ID of the asset to get balance in
+          * @return owner's balance in asset
+          */
+         asset get_market_fee_vesting_balance(const account_id_type &account_id, const asset_id_type &asset_id);
+
          /**
           * @brief Helper to make lazy deposit to CDD VBO.
           *
@@ -319,6 +329,7 @@ namespace graphene { namespace chain {
             const optional< vesting_balance_id_type >& ovbid,
             share_type amount,
             uint32_t req_vesting_seconds,
+            vesting_balance_type balance_type,
             account_id_type req_owner,
             bool require_vesting );
 
@@ -394,6 +405,7 @@ namespace graphene { namespace chain {
 
          asset calculate_market_fee(const asset_object& recv_asset, const asset& trade_amount);
          asset pay_market_fees( const asset_object& recv_asset, const asset& receives );
+         asset pay_market_fees( const account_object& seller, const asset_object& recv_asset, const asset& receives );
 
 
          ///@{
