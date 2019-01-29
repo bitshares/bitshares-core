@@ -48,7 +48,6 @@ LIST(APPEND BOOST_COMPONENTS thread
                              system
                              filesystem
                              program_options
-                             serialization
                              chrono
                              unit_test_framework
                              context
